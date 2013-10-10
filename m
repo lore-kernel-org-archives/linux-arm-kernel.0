@@ -1,46 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 10 Oct 2013 16:22:06 -0600
-Subject: [PATCH v7 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <CAAVeFuLvHdUuDurqA_=tvxJonNP+RekotM_MuysQrJD0PUgcSQ@mail.gmail.com>
-References: <1380904635-18113-1-git-send-email-acourbot@nvidia.com>
- <1380904635-18113-2-git-send-email-acourbot@nvidia.com>
- <CAOesGMj74Pui1V5O7zxEipM5Hg6nboVTUCFuMY0c0aUh=wuu3Q@mail.gmail.com>
- <CAAVeFuLvHdUuDurqA_=tvxJonNP+RekotM_MuysQrJD0PUgcSQ@mail.gmail.com>
-Message-ID: <5257288E.6000704@wwwdotorg.org>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Fri, 11 Oct 2013 00:22:10 +0200
+Subject: [RFCv3 0/7] OMAP SSI driver
+In-Reply-To: <20131010201914.GC29989@blackmetal.musicnaut.iki.fi>
+References: <1381091235-18293-1-git-send-email-sre@debian.org>
+ <20131008172815.GA8313@atomide.com>
+ <20131010172128.GF28657@earth.universe>
+ <20131010182801.GB29989@blackmetal.musicnaut.iki.fi>
+ <20131010200236.GA6603@earth.universe>
+ <20131010201914.GC29989@blackmetal.musicnaut.iki.fi>
+Message-ID: <20131010222210.GA7938@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2013 02:58 PM, Alexandre Courbot wrote:
-> On Wed, Oct 9, 2013 at 4:47 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Fri, Oct 4, 2013 at 9:37 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
-...
->> But do we really need to panic here? It's a PITA to debug since it'll
->> be a very early panic. I'd rather have the system log errors in dmesg
->> but continue booting with one cpu.
+On Thu, Oct 10, 2013 at 11:19:14PM +0300, Aaro Koskinen wrote:
+> On Thu, Oct 10, 2013 at 10:02:36PM +0200, Sebastian Reichel wrote:
+> > P.S.: You can get a mainline kernel status matrix for the Nokia
+> >       N900 on this page: http://elinux.org/N900
 > 
-> Actually the first version of this series continued on one CPU if TF
-> support was missing (as secondary CPUs would simply fail to boot), but
-> IIRC Stephen advocated for the current behavior (panic) instead. I
-> agree such an early panic is hard to debug, especially considering
-> that most devices using TF (Tegra retail devices) do not even feature
-> a serial port.
-> 
-> On the other hand, if we continue booting in these conditions the
-> system freezes as soon as cpuidle kicks in, so we won't be going very
-> far anyway. However the console is up when it happens.
-> 
-> Maybe if there is a way to disable the kernel features TF is supposed
-> to manage (SMP & cpuidle at the moment) when registration fails, the
-> system could continue more gracefully (even if on one leg) and warn
-> the user about this condition. Stephen, can I have your thoughts on
-> this?
+> Thanks for summary,
 
-If we can disable the features that rely on TF/secure-mode when support
-is missing, then doing that rather than panic is fine. We do something
-similar for PCIe on Tegra20, where LP2 cpuidle state must be disabled or
-PCIe interrupts won't work.
+You're welcome.
 
-I would be inclined to merge the patch as-is right now, since it's only
-enabling a new feature that won't see any regressions due to this panic,
-and then add the disable-other-features with a separate patch/series
-later. Does that seem reasonable?
+> and the above page looks very useful. I wonder would it make sense
+> to add also N9/N950 there (some functionality is shared)?
+
+mh maybe. I haven't looked @ N9/N950 so far, since I don't own them.
+I would be interested in a N950, but I don't own one and it's almost
+impossible to get one :(
+
+Apart from that I'm not sure if it's a good idea to make the table
+even more complex. Maybe just add a new page?
+
+> Also TWL4030 DT status could be updated, e.g. watchdog support
+> was done already last year with 8899b8d93ec64b7a8e54807a68a958e1206535e2.
+
+Yes. I only recently added the DT column and have not yet checked
+all the drivers. Probably it's also a good idea to split this
+column into "driver supports DT" and "DT file supports it".
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131011/6e3fd846/attachment.sig>
