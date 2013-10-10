@@ -1,37 +1,57 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 10 Oct 2013 11:51:36 +0300
-Subject: [PATCH 4/5] clk: tegra124: Add new peripheral clocks
-In-Reply-To: <52557D92.9050200@wwwdotorg.org>
-References: <1380878014-22088-1-git-send-email-pdeschrijver@nvidia.com>
- <1380878014-22088-5-git-send-email-pdeschrijver@nvidia.com>
- <525487C7.6080103@wwwdotorg.org>
- <20131009081123.GB3973@tbergstrom-lnx.Nvidia.com>
- <52557D92.9050200@wwwdotorg.org>
-Message-ID: <20131010085136.GP4233@tbergstrom-lnx.Nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Oct 2013 10:02:05 +0100
+Subject: [RFC PATCH] ARM: kexec: Assemble relocate code in ARM mode
+In-Reply-To: <1381352223-17721-1-git-send-email-taras.kondratiuk@linaro.org>
+References: <1381352223-17721-1-git-send-email-taras.kondratiuk@linaro.org>
+Message-ID: <20131010090205.GA3817@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 06:00:18PM +0200, Stephen Warren wrote:
-> On 10/09/2013 02:11 AM, Peter De Schrijver wrote:
-> > On Wed, Oct 09, 2013 at 12:31:35AM +0200, Stephen Warren wrote:
-> >> On 10/04/2013 03:12 AM, Peter De Schrijver wrote:
-> >>> Tegra124 introduces a number of new peripheral clocks. This patch adds those
-> >>> to the common peripheral clock code.
-> >>
-> >> Don't you need to add AFC[0..5] in this patch and/or patch 5?
-> > 
-> > AFC[0..5] are reset only nodes afaik. Up to now, we haven't done that.
-> > The goal is to include them once we move to the reset framework.
-> 
-> No, we've always added clock entries for all reset-only clocks into the
-> clock driver. Since the port to the reset framework is not available
-> yet, we need to continue to do this. Otherwise, we won't be able to
-> upstream audio support.
-> 
+On Wed, Oct 09, 2013 at 09:57:03PM +0100, Taras Kondratiuk wrote:
+> In Thumb2 kernel (CONFIG_THUMB2_KERNEL) kexec's relocate code is assembled
+> in Thumb2 mode, but cpu_v7_reset() jumps to this code in ARM state,
+> because its address is page aligned and has 0 in LSB.
 
-The only clock which required this up to now was 'cop' (avp). Which is not
-in upstream.
+This used to work, but Dave broken it when he fixed the reset code in
+153cd8e839b5 ("ARM: 7553/1: proc-v7: Ensure correct instruction set after
+cpu_reset").
+
+> Assemble this code in ARM mode to fix the issue.
+
+In the interest of keeping kexec a possibility for v7m, it might be better
+to do something similar to head.S (i.e. switch back to thumb if we're a
+thumb-2 kernel).
 
 Cheers,
 
-Peter.
+Will
+
+> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+> ---
+> Based on v3.12-rc4
+> 
+> Cc: Dave Martin <dave.martin@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linaro-kernel at lists.linaro.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/kernel/relocate_kernel.S |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
+> index d0cdedf..a3af323 100644
+> --- a/arch/arm/kernel/relocate_kernel.S
+> +++ b/arch/arm/kernel/relocate_kernel.S
+> @@ -5,6 +5,7 @@
+>  #include <asm/kexec.h>
+>  
+>  	.globl relocate_new_kernel
+> +	.arm
+>  relocate_new_kernel:
+>  
+>  	ldr	r0,kexec_indirection_page
+> -- 
+> 1.7.9.5
+> 
+> 
