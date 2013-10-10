@@ -1,55 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Oct 2013 16:22:38 +0200
-Subject: [PATCH 3/6] ARM: integrator: delete non-devicetree boot path
-In-Reply-To: <20131008095148.GD28972@e106331-lin.cambridge.arm.com>
-References: <1380816202-3128-1-git-send-email-linus.walleij@linaro.org>
- <20131008095148.GD28972@e106331-lin.cambridge.arm.com>
-Message-ID: <CACRpkdZvV9Ck-wG9w+=wh1DvvyddYj0k7WUB9aQMT9V4yH+Ykw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Oct 2013 15:23:05 +0100
+Subject: [PATCH 3/3] arm64: include: asm: atomic.h: use 'unsigned int'
+ and 'atomic_t' instead of 'unsigned long' for atomic_clear_mask()
+In-Reply-To: <52568998.2080108@asianux.com>
+References: <52561137.3070608@asianux.com> <5256117A.4000009@asianux.com>
+ <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
+ <20131010100733.GH3817@mudshark.cambridge.arm.com>
+ <52568998.2080108@asianux.com>
+Message-ID: <20131010142305.GG6199@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 8, 2013 at 11:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+On Thu, Oct 10, 2013 at 12:03:52PM +0100, Chen Gang wrote:
+> On 10/10/2013 06:07 PM, Will Deacon wrote:
+> > On Thu, Oct 10, 2013 at 03:35:21AM +0100, Chen Gang wrote:
+> >> In current kernel wide source, for arm64, only s390 scsi drivers use
+> >> atomic_clear_mask(), now, s390 itself need use 'unsigned int' and
+> >> 'atomic_t', so need match s390's atomic_clear_mask().
+> >>
+> >>
+> >> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> >> ---
+> >>  arch/arm64/include/asm/atomic.h |   13 +++++++------
+> >>  1 files changed, 7 insertions(+), 6 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
+> >> index 8363644..58808fc 100644
+> >> --- a/arch/arm64/include/asm/atomic.h
+> >> +++ b/arch/arm64/include/asm/atomic.h
+> >> @@ -126,16 +126,17 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
+> >>  	return oldval;
+> >>  }
+> >>  
+> >> -static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
+> >> +static inline void atomic_clear_mask(unsigned int mask, atomic_t *ptr)
+> >>  {
+> >> -	unsigned long tmp, tmp2;
+> >> +	unsigned int tmp;
+> > 
+> > Same comment here as for ARM; I think you want a signed int.
+> > 
+> 
+> OK, replied in patch 2/3 for ARM.
+> 
+> BTW: do arm64 need atomic_clear_mask()?
 
->> +       /* Remap the Integrator system controller */
->> +       ap_syscon_base = ioremap(INTEGRATOR_SC_BASE, 0x100);
->
-> It seems a shame that this didn't get described in the DT. This hasn't
-> been fully moved over...
+No. Neither ARM nor arm64 need this function.
 
-No. There is still stuff to move over, and not only the system controller,
-also the EBI (external bus interface) on the AP.
-
-But we can still work from this point, or do you mean that we cannot
-proceed to delete the ATAG boot path before we fix this?
-
-My idea is that deleting this makes the code easier to handle after
-the shrink.
-
->> +       if (!ap_syscon_base) {
->> +               dev_err(&pdev->dev, "unable to remap the AP syscon for PCIv3\n");
->> +               return -ENODEV;
->> +       }
->> +
->> +       /* Device tree probe path */
->> +       if (!np) {
->> +               dev_err(&pdev->dev, "no device tree node for PCIv3\n");
->> +               return -ENODEV;
->> +       }
->
-> We didn't unmap the syscon registers, yet we mapped them here. Either
-> we've got a useless mapping, or we're mapping it from the wrong block of
-> code...
-
-Sorry I'm not following this. The only thing the patch does is remove the
-ATAG boot path, moving the relevant part of the DT boot path over
-to the DT probe function and renaming it pci_v3_probe() in the process
-which might make the patch messy but that is all it does.
-
-If you mean that we should unmap the syscon base you're right
-but that would be a separate patch, right?
-
-I'll write a separate patch for that instead using devm_* so we
-don't have to unmap it by calling any special function.
-
-Yours,
-Linus Walleij
+Will
