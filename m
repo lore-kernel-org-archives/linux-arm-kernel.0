@@ -1,45 +1,40 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 10 Oct 2013 12:12:08 +0200
-Subject: [PATCH] ARM: mm: Fix ECC mem policy printk
-Message-ID: <ef807d1f329e54c42fdaca8d97cf58ac7c4dc1ed.1381399914.git.michal.simek@xilinx.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Oct 2013 11:08:40 +0100
+Subject: [PATCH] pinctrl: phandle entries will be applied sequentially
+In-Reply-To: <20131010072624.GA29191@S2101-09.ap.freescale.net>
+References: <1381297324-19006-1-git-send-email-shawn.guo@linaro.org>
+ <CACRpkdazPK6SNg9PdWCrjB8nwho1rCueumJWAN=STXdN1zNnMA@mail.gmail.com>
+ <20131010072624.GA29191@S2101-09.ap.freescale.net>
+Message-ID: <20131010100840.GP25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ECC policy is just connected to L1 cache
-(IMP - bit 9 - in L1 page table entry format)
-and has no connection to other ECC capable devices
-in the system. That's why declaring connection with
-L1 cache make sense.
+On Thu, Oct 10, 2013 at 03:26:26PM +0800, Shawn Guo wrote:
+> However, my patch is talking about a different thing.  For example, we
+> have a device whose pinctrl-0 consists of two phandle entries that point
+> to pin configuration nodes foo and bar.
+> 
+> 	pinctrl-0 = <&foo &bar>;
+> 
+> 	foo {
+> 		...
+> 	};
+> 
+> 	bar {
+> 		...
+> 	};
+> 
+> My patch only wants to make it clear that the configuration specified by
+> node foo will be applied to pin controller first, and the configuration
+> defined in node bar will be applied after that.  When both nodes have
+> configuration for a pin, these two configs for the same pin go to two
+> different pinctrl_setting structures.  And these two pinctrl_settings
+> can not be applied accumulatedly but only sequentially.  That's what my
+> patch talks about.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
-IRC printk without KERN_ facility level is just INFO.
-Please correct me if I am wrong.
+I still say this is a potentially dangerous thing, and in my case of
+overriding the DAT3 pull-sense, it will cause the pin to glitch if
+nothing is connected to it.
 
----
- arch/arm/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index b1d17ee..e9899dc 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -556,7 +556,7 @@ static void __init build_mem_type_table(void)
- 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WB;
- 		break;
- 	}
--	printk("Memory policy: ECC %sabled, Data cache %s\n",
-+	pr_info("Memory policy: L1 ECC %sabled, Data cache %s\n",
- 		ecc_mask ? "en" : "dis", cp->policy);
-
- 	for (i = 0; i < ARRAY_SIZE(mem_types); i++) {
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/ea034d98/attachment.sig>
+So even if you do get this clarified, I am *not* happy to change my
+patch.
