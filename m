@@ -1,55 +1,56 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 10 Oct 2013 07:27:03 -0600
-Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
-In-Reply-To: <201310101225.10455.marex@denx.de>
-References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
- <201310082256.28474.marex@denx.de>
- <0E83723C55F66F43A6041464FE31119D401869@039-SN2MPN1-011.039d.mgd.msft.net>
- <201310101225.10455.marex@denx.de>
-Message-ID: <CAErSpo7oHK1tyndKdgk_6f3F7O0pMCSUV+RLUy0V75OKKFniow@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 10 Oct 2013 08:32:10 -0500
+Subject: [PATCH V6 02/15] ARM: OMAP2+: AM33XX: add lateinit hook for
+ calling pm late init
+In-Reply-To: <52563BD8.1060703@ti.com>
+References: <1381354144-7134-1-git-send-email-nm@ti.com>
+ <1381361098-8283-1-git-send-email-nm@ti.com>
+ <52563BD8.1060703@ti.com>
+Message-ID: <20131010133209.GA13105@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 4:25 AM, Marek Vasut <marex@denx.de> wrote:
+On 00:32-20131010, Joel Fernandes wrote:
+> On 10/09/2013 06:24 PM, Nishanth Menon wrote:
+> > Call OMAP2+ generic lateinit hook from AM specific late init hook.
+> > This allows the generic late initializations such as cpufreq hooks
+> > to be active.
+> > 
+> > Cc: Benoit Cousson <bcousson@baylibre.com>
+> > Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/board-generic.c |    1 +
+> >  arch/arm/mach-omap2/common.h        |    1 +
+> >  arch/arm/mach-omap2/io.c            |    6 ++++++
+> >  3 files changed, 8 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> > index 87162e1..b474498 100644
+> > --- a/arch/arm/mach-omap2/board-generic.c
+> > +++ b/arch/arm/mach-omap2/board-generic.c
+> > @@ -180,6 +180,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+> >  	.init_irq	= omap_intc_of_init,
+> >  	.handle_irq	= omap3_intc_handle_irq,
+> >  	.init_machine	= omap_generic_init,
+> > +	.init_late	= am33xx_init_late,
+> 
+> Instead of adding a new a *_init_late function for every platform, perhaps
+> better to just do:
+> .init_late	= omap2_common_pm_late_init;
+> 
+> since that's the only function you're calling.
+> 
+> Later if more functions are added, then it can be wrapped around.
 
-> In the meantime, this is what I see upon probe with V6 of the patches:
->
-> Linux version 3.12.0-rc2-next-20130927+
-> [...]
-> imx6q-pcie 1ffc000.pcie: phy link never came up
-> PCI host bridge to bus 0000:00
-> pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
-> pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
-> pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
+And what benefit would that give us? we break consistency of functions
+available in io.c, considering the work we have already done in
+out-of-tree patches on ti-forks, we *do know* that there is more
+incoming and has to be done anyways, I prefer having symmetric
+functions and a placeholder that folks can add on to.
 
-This indicates a bug in your host bridge driver.  You must supply the
-bus number range claimed by the host bridge.  There's no way the PCI
-core can figure that out itself.  We do assume [bus 00-ff], but that's
-only a fallback and will prevent multi-host bridge configurations from
-working.
-
-> PCI: bus0: Fast back to back transfers disabled
-> PCI: bus1: Fast back to back transfers enabled
-> PCI: Device 0000:00:00.0 not available because of resource collisions
-> pcieport: probe of 0000:00:00.0 failed with error -22
-
-If you boot with "ignore_loglevel", you should see more details about
-this device, including the BAR values we read from it.  Based on
-pcibios_enable_device() in arch/arm/kernel/bios32.c, my guess is that
-00:00.0 has an uninitialized BAR (maybe it is in power-on state), and
-you didn't do anything to assign the BAR before trying to bind the
-pcieport driver to it.  You might be missing a call to
-pci_bus_assign_resources() or pci_assign_unassigned_resources().
-
-> pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
-> pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref]
-> pci 0000:00:00.0: PCI bridge to [bus 01]
-> pci 0000:00:00.0: PCI bridge to [bus 01]
->
-> Is this line normal/expected? Is this related to the PCIe switch I have there?
-> pcieport: probe of 0000:00:00.0 failed with error -22
->
-> Thank you for your help!
->
-> Best regards,
-> Marek Vasut
+-- 
+Regards,
+Nishanth Menon
