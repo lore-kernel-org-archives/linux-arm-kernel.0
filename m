@@ -1,64 +1,92 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Thu, 10 Oct 2013 17:57:06 +0200
-Subject: [PATCH 4/7] iommu/arm-smmu: Support buggy implementations where
- all config accesses are secure
-In-Reply-To: <20131010154726.GB8528@mudshark.cambridge.arm.com>
-References: <1381358286-27065-1-git-send-email-andreas.herrmann@calxeda.com>
- <1381358286-27065-5-git-send-email-andreas.herrmann@calxeda.com>
- <20131010154726.GB8528@mudshark.cambridge.arm.com>
-Message-ID: <20131010155706.GR2935@alberich>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 10 Oct 2013 17:58:34 +0200
+Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
+In-Reply-To: <CAErSpo7oHK1tyndKdgk_6f3F7O0pMCSUV+RLUy0V75OKKFniow@mail.gmail.com>
+References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
+ <201310101225.10455.marex@denx.de>
+ <CAErSpo7oHK1tyndKdgk_6f3F7O0pMCSUV+RLUy0V75OKKFniow@mail.gmail.com>
+Message-ID: <201310101758.35085.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 11:47:27AM -0400, Will Deacon wrote:
-> On Wed, Oct 09, 2013 at 11:38:03PM +0100, Andreas Herrmann wrote:
-> > In such a case we have to use secure aliases of some non-secure
-> > registers.
+Hi Bjorn,
+
+> On Thu, Oct 10, 2013 at 4:25 AM, Marek Vasut <marex@denx.de> wrote:
+> > In the meantime, this is what I see upon probe with V6 of the patches:
 > > 
-> > This handling is switched on by DT property
-> > "arm,smmu-secure-config-access" for an SMMU node.
-> > 
-> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > ---
-> >  drivers/iommu/arm-smmu.c |   30 +++++++++++++++++++++---------
-> >  1 file changed, 21 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index f877d02..91316a8 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -51,6 +51,7 @@
-> >  /* Driver options */
-> >  #define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
-> >  #define ARM_SMMU_OPT_MASK_STREAM_IDS		(1 << 1)
-> > +#define ARM_SMMU_OPT_SECURE_CONFIG_ACCESS	(1 << 2)
-> >  
-> >  /* Maximum number of stream IDs assigned to a single device */
-> >  #define MAX_MASTER_STREAMIDS		8
-> > @@ -65,6 +66,15 @@
-> >  #define ARM_SMMU_GR0(smmu)		((smmu)->base)
-> >  #define ARM_SMMU_GR1(smmu)		((smmu)->base + (smmu)->pagesize)
-> >  
-> > +/*
-> > + * SMMU global address space with conditional offset to access secure aliases of
-> > + * non-secure registers (e.g. nsCR0: 0x400, nsGFSR: 0x448, nsGFSYNR0: 0x450)
-> > + */
-> > +#define ARM_SMMU_GR0_NS(smmu)						\
-> > +	((smmu)->base +							\
-> > +		((smmu->options & ARM_SMMU_OPT_SECURE_CONFIG_ACCESS)	\
-> > +			? 0x400 : 0))
+> > Linux version 3.12.0-rc2-next-20130927+
+> > [...]
+> > imx6q-pcie 1ffc000.pcie: phy link never came up
+> > PCI host bridge to bus 0000:00
+> > pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
+> > pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+> > pci_bus 0000:00: No busn resource found for root bus, will use [bus
+> > 00-ff]
 > 
-> You have a slight issue with the ordering of your patches, as this macro is
-> used by the stream masking patch, but this patch is based on top of the
-> latter.
+> This indicates a bug in your host bridge driver.  You must supply the
+> bus number range claimed by the host bridge.  There's no way the PCI
+> core can figure that out itself.  We do assume [bus 00-ff], but that's
+> only a fallback and will prevent multi-host bridge configurations from
+> working.
 > 
-> Can you introduce this patch first please? I think it's ok for merging, but
-> I still have reservations with the other one.
+> > PCI: bus0: Fast back to back transfers disabled
+> > PCI: bus1: Fast back to back transfers enabled
+> > PCI: Device 0000:00:00.0 not available because of resource collisions
+> > pcieport: probe of 0000:00:00.0 failed with error -22
+> 
+> If you boot with "ignore_loglevel", you should see more details about
+> this device, including the BAR values we read from it.  Based on
+> pcibios_enable_device() in arch/arm/kernel/bios32.c, my guess is that
+> 00:00.0 has an uninitialized BAR (maybe it is in power-on state), and
+> you didn't do anything to assign the BAR before trying to bind the
+> pcieport driver to it.  You might be missing a call to
+> pci_bus_assign_resources() or pci_assign_unassigned_resources().
 
-Oops, I've done some shuffling to update the first patch in the
-series. Obviously I mixed something up during this.
+I tried you suggestion, this is what I got now (and with V7 of the patches):
 
-I'll fix this asap.
+Note that my topology is: rootport->2_port_switch->ethernet_chip , the other 
+port of the switch is not used .
 
+imx6q-pcie 1ffc000.pcie: phy link never came up
+PCI host bridge to bus 0000:00
+pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
+pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
+pci_bus 0000:00: scanning bus
+pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
+pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x5c
+pci 0000:00:00.0: supports D1
+pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
+pci 0000:00:00.0: PME# disabled
+pci_bus 0000:00: fixups for bus
+PCI: bus0: Fast back to back transfers disabled
+pci 0000:00:00.0: scanning [bus 01-01] behind bridge, pass 0
+pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+pci_bus 0000:01: scanning bus
+pci_bus 0000:01: fixups for bus
+PCI: bus1: Fast back to back transfers enabled
+pci_bus 0000:01: bus scan returning with max=01
+pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+pci_bus 0000:00: bus scan returning with max=01
+pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 01
+PCI: Device 0000:00:00.0 not available because of resource collisions
+pcieport: probe of 0000:00:00.0 failed with error -22
+pci 0000:00:00.0: fixup irq: got 155
+pci 0000:00:00.0: assigning IRQ 155                                                                                                                                         
+pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]                                                                                                               
+pci 0000:00:00.0: BAR 0: set to [mem 0x01000000-0x010fffff] (PCI address 
+[0x1000000-0x10                                                                                    
+fffff])                                                                                                                                                                     
+pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref]                                                                                                          
+pci 0000:00:00.0: PCI bridge to [bus 01]                                                                                                                                    
+pci 0000:00:00.0: PCI bridge to [bus 01]                                                                                                                                    
+pci_bus 0000:00: resource 4 [io  0x1000-0x10000]                                                                                                                            
+pci_bus 0000:00: resource 5 [mem 0x01000000-0x01efffff]
 
-Andreas
+What is this conflicting device 0000:00:01 I observe here? Does it have to do 
+with the switch ?
+
+Best regards,
+Marek Vasut
