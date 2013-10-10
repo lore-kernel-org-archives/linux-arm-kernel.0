@@ -1,179 +1,157 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Thu, 10 Oct 2013 09:58:34 -0700
-Subject: [PATCH RESEND v5 1/2] PWM: PXA: add device tree support to PWM
- driver
-In-Reply-To: <20131008131214.GA12839@ulmo.nvidia.com>
-References: <1379791174-2369-1-git-send-email-mikedunn@newsguy.com>
- <1379791174-2369-2-git-send-email-mikedunn@newsguy.com>
- <20131008131214.GA12839@ulmo.nvidia.com>
-Message-ID: <5256DCBA.6020408@newsguy.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Thu, 10 Oct 2013 19:01:07 +0200
+Subject: [PATCH 7/7] iommu/arm-smmu: Introduce automatic stream-id-masking
+In-Reply-To: <20131010160539.GC8528@mudshark.cambridge.arm.com>
+References: <1381358286-27065-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1381358286-27065-8-git-send-email-andreas.herrmann@calxeda.com>
+ <20131010160539.GC8528@mudshark.cambridge.arm.com>
+Message-ID: <20131010170107.GU2935@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2013 06:12 AM, Thierry Reding wrote:
-> On Sat, Sep 21, 2013 at 12:19:33PM -0700, Mike Dunn wrote:
->> This patch adds device tree support to the PXA's PWM driver.  Nothing
->> needs to be extracted from the device tree node by the PWM device.
->> Client devices need only specify the period; the per-chip index is
->> implicitly zero because one device node must be present for each PWM
->> output in use.  This approach is more convenient due to the wide
->> variability in the number of PWM channels present across the various PXA
->> variants, and is made possible by the fact that the register sets for
->> each PWM channel are segregated from each other.  An of_xlate() method
->> is added to parse this single-cell node.  The existing ID table is
->> reused for the match table data.
->>
->> Tested on a Palm Treo 680 (both platform data and DT cases).
->>
->> Signed-off-by: Mike Dunn <mikedunn@newsguy.com>
->> ---
->>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 30 +++++++++++++
->>  drivers/pwm/pwm-pxa.c                             | 52 ++++++++++++++++++++++-
->>  2 files changed, 81 insertions(+), 1 deletion(-)
->>  create mode 100644 Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+On Thu, Oct 10, 2013 at 12:05:39PM -0400, Will Deacon wrote:
+> On Wed, Oct 09, 2013 at 11:38:06PM +0100, Andreas Herrmann wrote:
+> > Try to determine a mask that can be used for all StreamIDs of a master
+> > device. This allows to use just one SMR group instead of
+> > number-of-streamids SMR groups for a master device.
+> > 
+> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c |   79 ++++++++++++++++++++++++++++++++++++----------
+> >  1 file changed, 63 insertions(+), 16 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 91316a8..4e8ceab 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -28,6 +28,7 @@
+> >   *	- Context fault reporting
+> >   */
+> >  
+> > +#define DEBUG
+> >  #define pr_fmt(fmt) "arm-smmu: " fmt
+> >  
+> >  #include <linux/delay.h>
+> > @@ -341,6 +342,9 @@ struct arm_smmu_master {
+> >  	struct rb_node			node;
+> >  	int				num_streamids;
+> >  	u16				streamids[MAX_MASTER_STREAMIDS];
+> > +	int				num_smrs;
 > 
-> This looks good to me, but I'd like to get an Acked-by: from one of the
-> device tree bindings maintainers.
+> This is easy to confuse with smmu->num_mapping_groups, but is actually the
+> number of SMRs in use by this master, right? Maybe tweaking the name
+> (num_used_smrs?) would make this clearer.
 > 
-> Thierry
-
-
-Thanks much Thierry and Stephen for the reviews and advice.  Stephen, are there
-any remaining issues with the bindings below?
-
-Thanks again,
-Mike
-
-
+> > +	u16				smr_mask;
+> > +	u16				smr_id;
+> >  
+> >  	/*
+> >  	 * We only need to allocate these on the root SMMU, as we
+> > @@ -530,14 +534,11 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
+> >  					ARM_SMMU_OPT_MASK_STREAM_IDS));
+> >  			return -EINVAL;
+> >  		}
+> > -		/* set fixed streamid (0) that will be used for masking */
+> > -		master->num_streamids = 1;
+> > -		master->streamids[0] = 0;
+> > -	} else {
+> > -		for (i = 0; i < master->num_streamids; ++i)
+> > -			master->streamids[i] = masterspec->args[i];
+> >  	}
+> >  
+> > +	for (i = 0; i < master->num_streamids; ++i)
+> > +		master->streamids[i] = masterspec->args[i];
+> > +
+> >  	return insert_smmu_master(smmu, master);
+> >  }
+> >  
+> > @@ -1049,6 +1050,41 @@ static void arm_smmu_domain_destroy(struct iommu_domain *domain)
+> >  	kfree(smmu_domain);
+> >  }
+> >  
+> > +/*
+> > + * no duplicates streamids please
+> > + */
 > 
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->> new file mode 100644
->> index 0000000..5ae9f1e
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
->> @@ -0,0 +1,30 @@
->> +Marvell PWM controller
->> +
->> +Required properties:
->> +- compatible: should be one or more of:
->> +  - "marvell,pxa250-pwm"
->> +  - "marvell,pxa270-pwm"
->> +  - "marvell,pxa168-pwm"
->> +  - "marvell,pxa910-pwm"
->> +- reg: Physical base address and length of the registers used by the PWM channel
->> +  Note that one device instance must be created for each PWM that is used, so the
->> +  length covers only the register window for one PWM output, not that of the
->> +  entire PWM controller.  Currently length is 0x10 for all supported devices.
->> +- #pwm-cells: Should be 1.  This cell is used to specify the period in
->> +  nanoseconds.
->> +
->> +Example PWM device node:
->> +
->> +pwm0: pwm at 40b00000 {
->> +	compatible = "marvell,pxa250-pwm";
->> +	reg = <0x40b00000 0x10>;
->> +	#pwm-cells = <1>;
->> +};
->> +
->> +Example PWM client node:
->> +
->> +backlight {
->> +	compatible = "pwm-backlight";
->> +	pwms = <&pwm0 5000000>;
->> +	...
->> +}
->> diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
->> index a4d2164..e928cc8 100644
->> --- a/drivers/pwm/pwm-pxa.c
->> +++ b/drivers/pwm/pwm-pxa.c
->> @@ -19,6 +19,7 @@
->>  #include <linux/clk.h>
->>  #include <linux/io.h>
->>  #include <linux/pwm.h>
->> +#include <linux/of_device.h>
->>  
->>  #include <asm/div64.h>
->>  
->> @@ -124,6 +125,45 @@ static struct pwm_ops pxa_pwm_ops = {
->>  	.owner = THIS_MODULE,
->>  };
->>  
->> +#ifdef CONFIG_OF
->> +/*
->> + * Device tree users must create one device instance for each pwm channel.
->> + * Hence we dispense with the HAS_SECONDARY_PWM and "tell" the original driver
->> + * code that this is a single channel pxa25x-pwm.  Currently all devices are
->> + * supported identically.
->> + */
->> +static struct of_device_id pwm_of_match[] = {
->> +	{ .compatible = "marvell,pxa250-pwm", .data = &pwm_id_table[0]},
->> +	{ .compatible = "marvell,pxa270-pwm", .data = &pwm_id_table[0]},
->> +	{ .compatible = "marvell,pxa168-pwm", .data = &pwm_id_table[0]},
->> +	{ .compatible = "marvell,pxa910-pwm", .data = &pwm_id_table[0]},
->> +	{ }
->> +};
->> +MODULE_DEVICE_TABLE(of, pwm_of_match);
->> +#else
->> +static struct of_device_id *pwm_of_match;
->> +#endif
->> +
->> +static const struct platform_device_id *pxa_pwm_get_id_dt(struct device *dev)
->> +{
->> +	const struct of_device_id *id = of_match_device(pwm_of_match, dev);
->> +	return id ? id->data : NULL;
->> +}
->> +
->> +static struct pwm_device *
->> +pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
->> +{
->> +	struct pwm_device *pwm;
->> +
->> +	pwm = pwm_request_from_chip(pc, 0, NULL);
->> +	if (IS_ERR(pwm))
->> +		return pwm;
->> +
->> +	pwm_set_period(pwm, args->args[0]);
->> +
->> +	return pwm;
->> +}
->> +
->>  static int pwm_probe(struct platform_device *pdev)
->>  {
->>  	const struct platform_device_id *id = platform_get_device_id(pdev);
->> @@ -131,6 +171,12 @@ static int pwm_probe(struct platform_device *pdev)
->>  	struct resource *r;
->>  	int ret = 0;
->>  
->> +	if (IS_ENABLED(CONFIG_OF) && id == NULL)
->> +		id = pxa_pwm_get_id_dt(&pdev->dev);
->> +
->> +	if (id == NULL)
->> +		return -EINVAL;
->> +
->>  	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
->>  	if (pwm == NULL) {
->>  		dev_err(&pdev->dev, "failed to allocate memory\n");
->> @@ -145,7 +191,10 @@ static int pwm_probe(struct platform_device *pdev)
->>  	pwm->chip.ops = &pxa_pwm_ops;
->>  	pwm->chip.base = -1;
->>  	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
->> -
->> +	if (IS_ENABLED(CONFIG_OF)) {
->> +		pwm->chip.of_xlate = pxa_pwm_of_xlate;
->> +		pwm->chip.of_pwm_n_cells = 1;
->> +	}
->>  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>  	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
->>  	if (IS_ERR(pwm->mmio_base))
->> @@ -176,6 +225,7 @@ static struct platform_driver pwm_driver = {
->>  	.driver		= {
->>  		.name	= "pxa25x-pwm",
->>  		.owner	= THIS_MODULE,
->> +		.of_match_table	= of_match_ptr(pwm_of_match),
->>  	},
->>  	.probe		= pwm_probe,
->>  	.remove		= pwm_remove,
->> -- 
->> 1.8.1.5
->>
+> We could probably check for that actually in register_smmu_master.
+> 
+> > +static void determine_smr_mapping(struct arm_smmu_device *smmu,
+> > +				struct arm_smmu_master *master)
+> > +{
+> > +	int nr_sid;
+> > +	u16 i, v1, v2, const_mask;
+> 
+> The bitwise stuff later on could use some more meaningful identifiers
+> (although the comments do help).
+> 
+> > +
+> > +	if (smmu->options & ARM_SMMU_OPT_MASK_STREAM_IDS) {
+> > +		master->smr_mask = smmu->smr_mask_bits;
+> > +		master->smr_id = 0;
+> > +		return;
+> > +	}
+> > +
+> > +	nr_sid = master->num_streamids;
+> > +	if (!is_power_of_2(nr_sid))
+> > +		return;
+> 
+> As I mentioned before, we could do better than this if we forced the DT to
+> contain complete topological information. Then we could round up to the next
+> power of two and check that we didn't accidentally include another device.
+> What is your opinion on this?
+> 
+> > +	v1 = 0;
+> > +	v2 = -1;
+> 
+> I'd rather this was written as 0xffff;
+> 
+> > +	for (i = 0; i < nr_sid; i++) {
+> > +		v1 |= master->streamids[i];	/* for const 0 bits */
+> > +		v2 &= ~(master->streamids[i]);	/* const 1 bits */
+> > +	}
+> > +	const_mask = (~v1) | v2;	/* const bits (either 0 or 1) */
+> > +
+> > +	v1 = hweight16(~const_mask);
+> > +	if ((1 << v1) == nr_sid) {
+> > +		/* if smr_mask is set, only 1 SMR group is used smr[0] = 0 */
+> > +		master->smr_mask = ~const_mask;
+> > +		master->smr_id = v1 & const_mask;
+> > +	}
+> 
+> Hehe, this is cool, nice one! I originally thought you could just xor stuff,
+> but that ends up being slightly nasty because it all has to be done pairwise.
+> 
+> > +}
+> > +
+> >  static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
+> >  					  struct arm_smmu_master *master)
+> >  {
+> > @@ -1062,15 +1098,22 @@ static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
+> >  	if (master->smrs)
+> >  		return -EEXIST;
+> >  
+> > -	smrs = kmalloc(sizeof(*smrs) * master->num_streamids, GFP_KERNEL);
+> > +	determine_smr_mapping(smmu, master);
+> > +
+> > +	if (master->smr_mask)
+> > +		master->num_smrs = 1;
+> 
+> So the next challenge would be to allocate one SMR using your power-of-2
+> trick, then mop up what's left with individual SMR entries.
+
+BTW, the coding style of this patch might be nasty. I had cut it out
+of some later version of my prototype driver and adapted it to your
+driver.
+
+So you don't generally object and it seems you'd accept this patch (if
+minor things fixed) and I should scrub the other mask-stream-id patch.
+
+Sigh ... so I need to figure out how to do the mop-up.
+
+
+Andreas
+
+PS: Even w/o the "mop-up" I could get my sata-smmu combination get working
+    with this patch as it is.
+    (I'd just need to add some fake streamids to get to a power-of-2. And
+    yes, while I am writing this I am pretty sure you'd hate this ;-)
