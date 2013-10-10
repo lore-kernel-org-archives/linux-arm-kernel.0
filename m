@@ -1,58 +1,94 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Oct 2013 09:47:02 -0700
-Subject: [PATCH] ARM: dts: omap4-panda-es: Do not reset gpio1
-In-Reply-To: <1381423481-5920-1-git-send-email-nm@ti.com>
-References: <1381313521-10422-1-git-send-email-rnayak@ti.com>
- <1381423481-5920-1-git-send-email-nm@ti.com>
-Message-ID: <20131010164702.GF29913@atomide.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Thu, 10 Oct 2013 18:47:59 +0200
+Subject: [PATCH 2/7] iommu/arm-smmu: Introduce bus notifier block
+In-Reply-To: <20131010161217.GD8528@mudshark.cambridge.arm.com>
+References: <1381358286-27065-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1381358286-27065-3-git-send-email-andreas.herrmann@calxeda.com>
+ <20131010161217.GD8528@mudshark.cambridge.arm.com>
+Message-ID: <20131010164759.GT2935@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [131010 09:53]:
-> Do not reset GPIO1 at boot-up because GPIO 7 in GPIO1 block is used on
-> OMAP4460 PandaBoard-ES to select voltage register in TPS62361 which
-> supplies VDD_MPU.
+On Thu, Oct 10, 2013 at 12:12:17PM -0400, Will Deacon wrote:
+> On Wed, Oct 09, 2013 at 11:38:01PM +0100, Andreas Herrmann wrote:
+> >  drivers/iommu/arm-smmu.c |   53 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 53 insertions(+)
+> > 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 478c8ad..87239e8 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -46,6 +46,7 @@
+> >  #include <linux/amba/bus.h>
+> >  
+> >  #include <asm/pgalloc.h>
+> > +#include <asm/dma-iommu.h>
+> >  
+> >  /* Driver options */
+> >  #define ARM_SMMU_OPT_ISOLATE_DEVICES		(1 << 0)
+> > @@ -1983,6 +1984,56 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+> >  	return 0;
+> >  }
+> >  
+> > +static int arm_smmu_device_notifier(struct notifier_block *nb,
+> > +				unsigned long action, void *data)
+> > +{
+> > +	struct device *dev = data;
+> > +	struct dma_iommu_mapping *mapping;
+> > +	struct arm_smmu_device *smmu;
+> > +	void __iomem *gr0_base;
+> > +	u32 cr0;
+> > +	int ret;
+> > +
+> > +	switch (action) {
+> > +	case BUS_NOTIFY_BIND_DRIVER:
+> > +
+> > +		arm_smmu_add_device(dev);
+> > +		smmu = dev->archdata.iommu;
+> > +		if (!smmu || !(smmu->options & ARM_SMMU_OPT_ISOLATE_DEVICES))
+> > +			break;
+> > +
+> > +		mapping = arm_iommu_create_mapping(&platform_bus_type,
+> > +						0, SZ_128M, 0);
 > 
-> Without this, OMAP4460 PandaBoard-ES boards fail to boot-up because
-> MPU voltage switches over to VSET0 voltage value (boot voltage) which
-> is not sufficient to operate the device at OPP100.
+> We need to find a better way of doing this; I'm really not happy hardcoding
+> that size limit and hoping for the best.
 
-Is this needs as a fix for the -rc series?
+Hmm, seems that mid-term we should try to enlarge this area by another
+128M if a mapping fails due to this limit. I think Joerg's amd_iommu
+driver does this.
 
-Tony
- 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> As explained here: http://marc.info/?l=u-boot&m=133066647800872&w=2
+(But at the same time I'd prefer to start with even a hardcoded value,
+or to simply introduce some option to set this fixed limit per master
+or per smmu.)
+
+> > +		if (IS_ERR(mapping)) {
+> > +			ret = PTR_ERR(mapping);
+> > +			dev_info(dev, "arm_iommu_create_mapping failed\n");
+> > +			break;
+> > +		}
+> > +
+> > +		ret = arm_iommu_attach_device(dev, mapping);
+> > +		if (ret < 0) {
+> > +			dev_info(dev, "arm_iommu_attach_device failed\n");
+> > +			arm_iommu_release_mapping(mapping);
+> > +		}
+> > +
+> > +		gr0_base = ARM_SMMU_GR0_NS(smmu);
+> > +		cr0 = readl_relaxed(gr0_base + ARM_SMMU_GR0_sCR0);
+> > +		cr0 |= sCR0_USFCFG;
+> > +		writel(cr0, gr0_base + ARM_SMMU_GR0_sCR0);
 > 
-> GPIO1 reset causes PandaBoard-ES to stop functioning.
-> This depends on Patch series from Rajendra:
-> http://marc.info/?l=linux-doc&m=138131355520116&w=2
-> Applies on Benoit's for_13/dts branch:
-> https://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
-> 
-> Tested on PandaBoard-ES without the u-boot uenv hack
-> 
->  arch/arm/boot/dts/omap4-panda-es.dts |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-> index 56c4354..816d1c9 100644
-> --- a/arch/arm/boot/dts/omap4-panda-es.dts
-> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
-> @@ -62,3 +62,7 @@
->  		gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
->  	};
->  };
-> +
-> +&gpio1 {
-> +	 ti,no-reset-on-init;
-> +};
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Why do you need to enable this flag? If no mapping is found, that means *we*
+> screwed something up, so we should report that and not rely on the hardware
+> potentially raising a fault. I also prefer to allow passthrough for devices
+> that don't hit in the stream table, because it allows people to ignore the SMMU
+> in their DT if they want to.
+
+You are right that's not strictly required for device isolation.
+
+(but it helped to learn about relevant stream-ids that were not
+covered by by my DTS ;-)
+
+
+Andreas
