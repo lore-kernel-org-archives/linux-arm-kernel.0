@@ -1,32 +1,48 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 10 Oct 2013 18:26:13 -0400
-Subject: [PATCH v3 0/5] Add some missing bits for exynos5250-snow
-In-Reply-To: <1380839303-4834-1-git-send-email-seanpaul@chromium.org>
+Date: Thu, 10 Oct 2013 18:26:15 -0400
+Subject: [PATCH v3 2/5] ARM: dts: Add dp-controller node to exynos5250-snow
+In-Reply-To: <1381443978-5654-1-git-send-email-seanpaul@chromium.org>
 References: <1380839303-4834-1-git-send-email-seanpaul@chromium.org>
-Message-ID: <1381443978-5654-1-git-send-email-seanpaul@chromium.org>
+ <1381443978-5654-1-git-send-email-seanpaul@chromium.org>
+Message-ID: <1381443978-5654-3-git-send-email-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set adds some missing devicetree nodes to the exynos5250-snow file as well
-as adds a drm_bridge driver for the ptn3460 DP-LVDS chip. This chip is used in
-the exynos5250-snow board.
+This patch adds the dp-controller node to the exynos5250-snow board dts
+file.
 
-Sean
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+---
 
+v2: Added dp-controller address to node (rebased on linux-next)
+v3: Added status = "okay"
 
-Sean Paul (5):
- ARM: dts: Add fimd display-timings for exynos5250-snow
- ARM: dts: Add dp-controller node to exynos5250-snow
- drm/bridge: Add PTN3460 bridge driver
- drm/exynos: Initialize ptn3460 if present
- ARM: dts: Add ptn3460 to exynos5250-snow
+ arch/arm/boot/dts/exynos5250-snow.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
- Documentation/devicetree/bindings/drm/bridge/ptn3460.txt |  27 ++++++++++++++++
- arch/arm/boot/dts/exynos5250-snow.dts                    |  50 ++++++++++++++++
- drivers/gpu/drm/Kconfig                                  |   2 ++
- drivers/gpu/drm/Makefile                                 |   1 +
- drivers/gpu/drm/bridge/Kconfig                           |   4 +++
- drivers/gpu/drm/bridge/Makefile                          |   3 ++
- drivers/gpu/drm/bridge/ptn3460.c                         | 349 ++++++++++++++++
- drivers/gpu/drm/exynos/exynos_drm_core.c                 |  44 ++++++++++++++++
- include/drm/bridge/ptn3460.h                             |  37 ++++++++++++++++
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 28eea9b..f813644 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -186,6 +186,19 @@
+ 		samsung,vbus-gpio = <&gpx1 1 0>;
+ 	};
+ 
++	dp-controller at 145B0000 {
++		samsung,color-space = <0>;
++		samsung,dynamic-range = <0>;
++		samsung,ycbcr-coeff = <0>;
++		samsung,color-depth = <1>;
++		samsung,link-rate = <0x0a>;
++		samsung,lane-count = <2>;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&dp_hpd>;
++		status = "okay";
++	};
++
+ 	fimd: fimd at 14400000 {
+ 		status = "okay";
+ 		display-timings {
+-- 
+1.8.4
