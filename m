@@ -1,86 +1,68 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Thu, 10 Oct 2013 15:47:45 -0700
-Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
-In-Reply-To: <20131010175010.17870.58060@capellas-linux> (Sebastian Capella's
- message of "Thu, 10 Oct 2013 10:50:10 -0700")
-References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
- <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
- <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
- <20131003214246.24540.99218@capellas-linux>
- <20131003234735.19051.84583@capellas-linux>
- <20131010175010.17870.58060@capellas-linux>
-Message-ID: <878uy0u4j2.fsf@tw-ebiederman.twitter.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Oct 2013 23:53:31 +0100
+Subject: [PATCH 2/5] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <CAF6AEGvNyD8-_t2y69a5Gjey7Jg_LXVYNgpYW1rsFFyTkABg=Q@mail.gmail.com>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <E1VSwVU-0000hu-09@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGsvBaX5+c1P=ups+k=d1F3r+JphgYOt5wb7pEM3mihOQw@mail.gmail.com>
+ <20131010215951.GS25034@n2100.arm.linux.org.uk>
+ <CAF6AEGvNyD8-_t2y69a5Gjey7Jg_LXVYNgpYW1rsFFyTkABg=Q@mail.gmail.com>
+Message-ID: <20131010225331.GT25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian Capella <sebastian.capella@linaro.org> writes:
+On Thu, Oct 10, 2013 at 06:23:26PM -0400, Rob Clark wrote:
+> On Thu, Oct 10, 2013 at 5:59 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Oct 10, 2013 at 05:25:15PM -0400, Rob Clark wrote:
+> >> probably this thread is applicable here too?
+> >>
+> >> https://lkml.org/lkml/2013/9/12/417
+> >>
+> >> (although.. we have at least a few  slightly differet variants on the
+> >> same errno -> VM_FAULT_x switch in different drivers.. maybe we should
+> >> do something better)
+> >
+> > Hmm.  It seems today's vm_insert_pfn() has the following error return
+> > values:
+> >
+> > -EFAULT - virtual address outside vma
+> > -EINVAL - track_pfn_insert() failure
+> > -ENOMEM - failed to get locked pte
+> > -EBUSY - entry already exists in pte
+> >
+> > So it seems my handling -EIO, -EAGAIN, -ERESTARTSYS and -EINTR are all
+> > redundant and can be removed.  I'm not sure if it makes sense for this
+> > to be generic - it looks like it's only Intel, gma500 and me who use
+> > this, and Intel handles more error codes (due to it calling other
+> > functions.)
+> 
+> I just noticed msm and omapdrm are missing the -EBUSY case (have some
+> patches I need to send), which was why I mentioned this.  They do have
+> other error cases from other fxns, so maybe something generic/common
+> doesn't make sense..  but I realized i915 fixed the same issue a while
+> back, so somewhere common has the advantage of somehow not forgetting
+> to fix other drivers ;-)
 
-> Quoting Sebastian Capella (2013-10-03 16:47:35)
->> Quoting Sebastian Capella (2013-10-03 14:42:46)
->> > Quoting Andrew Morton (2013-10-03 14:15:23)
->> > > On Thu,  3 Oct 2013 14:10:37 -0700 Sebastian Capella <sebastian.capella@linaro.org> wrote:
->> > > 
->> > > > Enhance name_to_dev_t to handle trailing newline characters
->> > > > on device paths.  Some inputs to name_to_dev_t may come from
->> > > > userspace where oftentimes a '\n' is appended to the path.
->> > > > Added const to the name buffer in both the function
->> > > > declaration and the prototype to reflect input buffer
->> > > > handling.
->> > > > 
->> > > > By handling trailing newlines in name_to_dev_t, userspace
->> > > > buffers may be directly passed to name_to_dev_t without
->> > > > modification.
->> > > 
->> > > We have lib/string.c:strim() - perhaps this patch would be
->> > > neater if it were to use it?
->> > 
->> > Hi Morton,
->> > 
->> > I was intending to respect the const handling of the input buffer.
->> > 
->> > The actual buffer in this case is not really const as it comes from
->> > the file buffering, but removing the const requires changing the
->> > store function defined in the kobj_attribute, and would propagate
->> > to many areas in the kernel.
->> > 
->> > Modifying the buffer and removing the const was also suggested by Pavel.
->> > After some discussion I posted this version which did not change the
->> > buffer or the prototype.
->> > 
->> > Please let me know if the preference is to modify the store function
->> > definition.
->> > 
->> > I'll prepare a patchset that removes the consts to see how much is
->> > changed.
->> > 
->> > Thanks,
->> > 
->> > Sebastian
->> 
->> Hi Andrew,
->> 
->> Sorry for calling you Morton earlier.
->> 
->> I looked into removing the const from the store function, but I'm not sure
->> this is the right idea, so I'm going to shelf that for now.
->> 
->> Please let me know your thoughts.
->> 
->> Thanks,
->> 
->> Sebastian
->  
-> Ping...
->
-> Hi Andrew,
->
-> Do you have any feedback on this?
->
-> Below are the three options considered thus far.  Do
-> you have any additional suggestions or preferences?
+Here's the promised delta:
 
-What is wrong with requiring userspace to use echo -n ?
+ drivers/gpu/drm/armada/armada_gem.c |    5 -----
+ 1 files changed, 0 insertions(+), 5 deletions(-)
 
-That by far seems the simplest and least error prone solution.
-
-Eric
+diff --git a/drivers/gpu/drm/armada/armada_gem.c b/drivers/gpu/drm/armada/armada_gem.c
+index 02de7a4..1e74f70 100644
+--- a/drivers/gpu/drm/armada/armada_gem.c
++++ b/drivers/gpu/drm/armada/armada_gem.c
+@@ -25,12 +25,7 @@ static int armada_gem_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 	ret = vm_insert_pfn(vma, addr, pfn);
+ 
+ 	switch (ret) {
+-	case -EIO:
+-	case -EAGAIN:
+-		set_need_resched();
+ 	case 0:
+-	case -ERESTARTSYS:
+-	case -EINTR:
+ 	case -EBUSY:
+ 		return VM_FAULT_NOPAGE;
+ 	case -ENOMEM:
