@@ -1,203 +1,136 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 10 Oct 2013 11:17:42 +0300
-Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
-In-Reply-To: <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
- <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
- <52525642.8010307@ti.com> <20131007154103.GW8949@atomide.com>
- <20131007190322.GY8949@atomide.com>
- <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
-Message-ID: <525662A6.4080504@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 Oct 2013 09:39:55 +0100
+Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
+ fault
+In-Reply-To: <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
+References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy2E6aRndw88_S_3wfyTOYd5rQQTc4+Cw5Hd1DFXuM6EBA@mail.gmail.com>
+ <523063AC.8040803@arm.com>	<20130911193855.GN9860@cbox>
+ <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
+Message-ID: <525667DB.7090705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Paul,
+On 10/10/13 05:51, Anup Patel wrote:
+> On Thu, Sep 12, 2013 at 1:08 AM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+>> On Wed, Sep 11, 2013 at 01:35:56PM +0100, Marc Zyngier wrote:
+>>> On 11/09/13 13:21, Anup Patel wrote:
+>>>> On Tue, Sep 10, 2013 at 3:21 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>> Anup Patel recently brought up the fact that when we run a guest
+>>>>> with cache disabled, we don't flush the cache to the Point of
+>>>>> Coherency, hence possibly missing bits of data that have been
+>>>>> written in the cache, but have not reached memory.
+>>>>>
+>>>>> There are several approaches to this issue:
+>>>>> - Using the DC bit when caches are off: this breaks guests assuming
+>>>>>   caches off while doing DMA operations. Bootloaders, for example.
+>>>>> - Fetch the memory attributes on translation fault, and flush the
+>>>>>   cache while handling the fault. This relies on using the PAR_EL1
+>>>>>   register to obtain the Stage-1 memory attributes.
+>>>>>
+>>>>> While this second solution is clearly not ideal (it duplicates what
+>>>>> the HW already does to generate HPFAR_EL2), it is more correct than
+>>>>> not doing anything.
+>>>>>
+>>>>> Cc: Anup Patel <anup@brainfault.org>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> ---
+>>>>>
+>>>>>  arch/arm/include/asm/kvm_mmu.h    |  4 ++--
+>>>>>  arch/arm/kvm/mmu.c                |  2 +-
+>>>>>  arch/arm64/include/asm/kvm_host.h |  1 +
+>>>>>  arch/arm64/include/asm/kvm_mmu.h  |  9 +++++++--
+>>>>>  arch/arm64/kernel/asm-offsets.c   |  1 +
+>>>>>  arch/arm64/kvm/hyp.S              | 28 ++++++++++++----------------
+>>>>>  6 files changed, 24 insertions(+), 21 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>>>>> index 472ac70..faffdf0 100644
+>>>>> --- a/arch/arm/include/asm/kvm_mmu.h
+>>>>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>>>>> @@ -105,7 +105,7 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
+>>>>>
+>>>>>  struct kvm;
+>>>>>
+>>>>> -static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+>>>>> +static inline void coherent_icache_guest_page(struct kvm_vcpu *vcpu, gfn_t gfn)
+>>>>>  {
+>>>>>         /*
+>>>>>          * If we are going to insert an instruction page and the icache is
+>>>>> @@ -120,7 +120,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+>>>>>          * need any kind of flushing (DDI 0406C.b - Page B3-1392).
+>>>>>          */
+>>>>>         if (icache_is_pipt()) {
+>>>>> -               unsigned long hva = gfn_to_hva(kvm, gfn);
+>>>>> +               unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
+>>>>>                 __cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
+>>>>>         } else if (!icache_is_vivt_asid_tagged()) {
+>>>>>                 /* any kind of VIPT cache */
+>>>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>>>> index 0988d9e..ffb3cc4 100644
+>>>>> --- a/arch/arm/kvm/mmu.c
+>>>>> +++ b/arch/arm/kvm/mmu.c
+>>>>> @@ -547,7 +547,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>>                 return -EFAULT;
+>>>>>
+>>>>>         new_pte = pfn_pte(pfn, PAGE_S2);
+>>>>> -       coherent_icache_guest_page(vcpu->kvm, gfn);
+>>>>> +       coherent_icache_guest_page(vcpu, gfn);
+>>>>>
+>>>>>         spin_lock(&vcpu->kvm->mmu_lock);
+>>>>>         if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
+>>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>>>> index 331a852..2530f92 100644
+>>>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>>>> @@ -79,6 +79,7 @@ struct kvm_mmu_memory_cache {
+>>>>>  struct kvm_vcpu_fault_info {
+>>>>>         u32 esr_el2;            /* Hyp Syndrom Register */
+>>>>>         u64 far_el2;            /* Hyp Fault Address Register */
+>>>>> +       u64 par_el2;            /* Result of FAR_EL2 translation */
+>>>>
+>>>> Please rename this to par_el1 because we are saving result of Stage1
+>>>> translation only.
+>>>
+>>> That'd be very confusing, as we deal with PAR_EL1 separately, as part of
+>>> the guest context.
+>>>
+>>> If anything, I may rename it to "what_I_d_love_HPFAR_to_return" instead.
+>>>
+>>
+>> while extremely clear, it may be a bit verbose ;)
+>>
+>> I honestly think that 'making up' a register name is a bit confusing as
+>> well.  I can live with it, but perhaps fault_ipa, or s1_fault_attr or
+>> something like that would work.  Eh.
+>>
+>> -Christoffer
+> 
+> Hi Marc,
+> 
+> Are you planning to go ahead with this approach ?
 
-My dibs on this below.
+[adding Catalin, as we heavily discussed this recently]
 
-On 10/09/2013 09:55 PM, Paul Walmsley wrote:
-> On Mon, 7 Oct 2013, Tony Lindgren wrote:
->
->> And assuming Paul is OK with these patches in general.
->
-> Actually, I have several concerns with this series, as you and I
-> discussed.  Some of us have been talking them over with other folks for
-> the past few months to try to figure out what to do.  Most of the concerns
-> have fairly easy technical solutions, but we shouldn't merge these patches
-> until they're resolved.
->
-> The issues are:
->
-> 1. whether the clock data should go into DT
-> 2. what the right place for DT clock data is in the DT
-> 3. whether it makes sense to merge "experimental" DT bindings in this case
-> 4. where clockdomain data belongs
->
-> The first issue - and the one I'm least concerned about - is that, in my
-> view, it still does not make technical sense to move this data into DT.
-> This is chip-level hardware data that never needs to be changed by board
-> designers or end users.  Adding it to DT is going to result in a boot-time
-> cost (due to DT parse overhead) and additional memory consumption for very
-> little benefit, compared to an implementation that places this data into a
-> dynamically loadable module.  For some users, the boot-time bloat is a big
-> deal: the example that's been mentioned to me recently is an automotive
-> back-up camera that needs to cold-boot to complete functionality in a few
-> hundred microseconds.
+Not as such, as it doesn't solve the full issue. It merely papers over
+the whole "my cache is off" problem. More specifically, any kind of
+speculative access from another CPU while caches are off in the guest
+completely nukes the benefit of this patch.
 
-Personally I share the concern, I don't see much point in using the DT 
-for any kind of purpose... it is just another binary compatibility 
-breaker in the picture in addition to boot-loader, and it basically does 
-not solve any _real_ problems either.
+Also, turning the the caches off is another source of problems, as
+speculation also screws up set/way invalidation.
 
-Boot time issues can be solved by adding alternative clock data sources 
-like Tony pointed out, granted, we don't have support for those yet, but 
-we need to start somewhere.
+> We really need this patch for X-Gene L3 cache.
 
-> However, according to some other upstream maintainers, Linus's goal is to
-> move most of the device-specific static data out of the kernel tree, into
-> DT files (in the ARM case).  If that non-technical constraint is indeed
-> the dominant consideration, then I agree that moving this data to DT is
-> the only viable course of action.
+So far, I can see two possibilities:
+- either we mandate caches to be always on (DC bit, and you're not
+allowed to turn the caches off).
+- Or we mandate that caches are invalidated (by VA) for each write that
+is performed with caches off.
 
-Yeah... Personally I can't see any other way forward right now either as 
-I was basically given the option to use DT for this work or not do it at 
-all...
+In both cases, it sucks, as it requires changes in the guest.
 
->
-> ...
->
-> The second issue concerns where the SoC clock nodes should go in the DT.
-> In these patches, the clock data has been encoded in a large "clocks" node
-> off the top level.  This is almost certainly not the right thing to do
-> from a device hardware point of view.  These clocks don't exist as
-> standalone devices with their own address spaces decoded on the
-> interconnect.  In all of the SoC cases that I'm aware of, clock control
-> registers are part of larger IP blocks.
->
-> For example, in the OMAP case, most of the system integration clock
-> control registers are part of the OMAP-specific PRCM block, PRM block, or
-> CM block.  Then there are other device-specific clocks, like DSS PLLs or
-> UART dividers.  The control registers for these are generally located in
-> the subsystem or device IP block itself, and are inaccessible when the
-> subsystem or IP block is disabled.  These device-specific clocks belong to
-> the IP block, not the SoC integration.  So, for example, if two SoCs use
-> the same IP block, then the clock registers, and their offsets from the IP
-> block address space base, are likely to be identical.
-
-None of the clock registers defined in this set reside outside PRCM / 
-control module, so they are always accessible. IP block internal 
-dividers for UART and like, are defined and used only internally by the 
-device drivers.
-
->
-> So in my view, the right things to do here are to:
->
-> 1. associate SoC DT clock data with the device node that contains the
->     clock control registers
-
-So, either "cm", "prcm", and maybe "control_module" instead of current 
-"clocks". How much do we benefit from this? This would get rid of need 
-to call of_iomap() for each register basically.
-
->
-> 2. specify relative offsets for clock registers from the start of
->     the IP block address range, rather than absolute addresses for clock
->     registers
->
-> 3. place the responsibility for registering clocks into the IP block
->     drivers themselves
->
-> This naturally separates clocks into per-IP block DT files.  It also
-> provides the CCF with an easy way to ensure that the device that
-> encloses the clock is enabled and accessible by the CPU core, before
-> trying to access registers inside.
->
-> Similarly, non-SoC off-chip clock data (such as for dedicated I2C PLLs)
-> should also be associated with their I2C device node.
->
-> Making these changes to Tero's existing patches should be relatively
-> straightforward, based on what I've seen.
-
-
-For the set, it doesn't matter where the clock nodes reside, if someone 
-can point me out where to put them, they can be easily moved around. 
-Separating the individual clocks based on their IP mapping can probably 
-just be done by checking their register address.
-
-Anyway, I would like to have a concensus if something like this should 
-be done or not before starting to do the changes, as this is going to 
-change the layout of the clock data completely, and will require a 
-complete new testing + debugging round to be done, in addition to script 
-changes.
-
-
-> ...
->
-> Regarding the third issue: let's postulate for the moment that the clock
-> binding issues that I mention in #2 above are ignored (ha!), and that the
-> existing DT clock data is merged.  These bindings are currently marked as
-> "Unstable - ABI compatibility may be broken in the future".  What happens
-> if, when we meet to discuss clock bindings at the kernel summit, we decide
-> that significant changes are needed?  We could easily wind up with kernels
-> that won't boot at all when used with newer DT data.
->
-> Not to mention, merging such a large amount of code and data before the
-> bindings are stable will increase the risk of massive churn as the
-> bindings evolve towards stability.
->
-> So IMHO, the way to fix this is to consider the clock data to be IP-block
-> specific, as mentioned in #2.  Then there's no need for global clock
-> bindings for the SoC clock cases.
->
-> Otherwise, it seems prudent to at least wait until the global clock
-> bindings are no longer marked as unstable.  The whole DT migration was
-> predicated on the ideas of reducing churn in the Linux codebase, and
-> preserving forward compatibility for DT data.  We shouldn't discard these
-> goals just to merge something a little sooner.
-
-Well, we can keep support for the vendor specific clock bindings in the 
-kernel and if generic bindings will eventually go forward, we can evolve 
-towards that. A pressing problem for this work to proceed is that we 
-need to get boot support for some new SoCs in rather sooner than again 
-wait two years and work with TI internal trees. And getting the boot 
-support quickly in, it seems the only way to get it done is via vendor 
-specific bindings, which are unstable in a sense that _if_ the generic 
-bindings go forward, we should start using those instead.
-
-> ...
->
-> The fourth issue is where the clockdomain data should go.  The basic issue
-> here is that the notion of "clockdomains" here is completely
-> OMAP-specific.  OMAP clockdomains demarcate a group of clocks or IP blocks
-> that share the same automatic idle behavior, controlled by their enclosing
-> IP block (e.g., PRCM, PRM, CM, etc.).  Clockdomains are also used in the
-> OMAP kernel code to link the clocks to their enclosing power domains,
-> voltage rail control, etc.
->
-> So since these are OMAP PRCM/CM/PRM-specific constructs, the right place
-> for OMAP clockdomain data is underneath the OMAP-specific CM/PRCM DT
-> nodes.  Again this should be an easy change to Tero's existing patches.
-
-Yea, does not matter where in the dts files these reside. Clockdomain 
-bindings / code implementation can be moved to wherever the CM code is 
-going to move, and this should not cause any changes to the clockdomain 
-binding definitions. Anyway, again I would like to have a clear 
-concensus if the bindings should move someplace else before doing the 
-changes.
-
--Tero
-
->
-> ...
->
-> So hey, if you've made it this far, thanks for reading.  My sense is that
-> implementing #2 and #4 are relatively straightforward.
->
-> Also, since this seems to have been a problem for some folks in the past,
-> I want to make clear that I think both Mike and Tero have been doing good
-> jobs on the CCF and OMAP clock patches so far.
->
-> regards
->
-> - Paul
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
