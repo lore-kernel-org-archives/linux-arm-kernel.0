@@ -1,32 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 10 Oct 2013 16:16:31 +0900
-Subject: [PATCH 06/11] ARM: shmobile: marzen: Enable CONFIG_VFP in defconfig
+Date: Thu, 10 Oct 2013 16:16:32 +0900
+Subject: [PATCH 07/11] ARM: shmobile: bockw: Do not enable CONFIG_DEVTMPFS
+ defconfig
 In-Reply-To: <1381389396-22000-1-git-send-email-horms+renesas@verge.net.au>
 References: <1381389396-22000-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1381389396-22000-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1381389396-22000-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_VFP is required to boot into a Debian armhf user-space.
-This change brings the marzen defconfig into line with
+This change brings the bockw defconfig into line with
 other shmobile defconfigs.
 
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/marzen_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/bockw_defconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 5d0fa5f..cafab6a 100644
---- a/arch/arm/configs/marzen_defconfig
-+++ b/arch/arm/configs/marzen_defconfig
-@@ -30,6 +30,7 @@ CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_VFP=y
- CONFIG_KEXEC=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_PM_RUNTIME=y
+diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+index db7d792..03fef6d 100644
+--- a/arch/arm/configs/bockw_defconfig
++++ b/arch/arm/configs/bockw_defconfig
+@@ -43,8 +43,6 @@ CONFIG_IP_PNP_DHCP=y
+ # CONFIG_INET_DIAG is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_DEVTMPFS=y
+-CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_STANDALONE is not set
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+ # CONFIG_FW_LOADER is not set
 -- 
 1.8.4
