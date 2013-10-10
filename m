@@ -1,157 +1,63 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Thu, 10 Oct 2013 19:01:07 +0200
-Subject: [PATCH 7/7] iommu/arm-smmu: Introduce automatic stream-id-masking
-In-Reply-To: <20131010160539.GC8528@mudshark.cambridge.arm.com>
-References: <1381358286-27065-1-git-send-email-andreas.herrmann@calxeda.com>
- <1381358286-27065-8-git-send-email-andreas.herrmann@calxeda.com>
- <20131010160539.GC8528@mudshark.cambridge.arm.com>
-Message-ID: <20131010170107.GU2935@alberich>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 10 Oct 2013 21:45:09 +0530
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
+References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
+ <20131005190200.GZ12758@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
+ <20131005233137.GA12758@n2100.arm.linux.org.uk>
+ <20131006052029.GE2954@intel.com>
+ <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
+ <20131007111728.GM12758@n2100.arm.linux.org.uk>
+ <20131007103936.GH2954@intel.com>
+ <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
+Message-ID: <20131010161509.GC2954@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 12:05:39PM -0400, Will Deacon wrote:
-> On Wed, Oct 09, 2013 at 11:38:06PM +0100, Andreas Herrmann wrote:
-> > Try to determine a mask that can be used for all StreamIDs of a master
-> > device. This allows to use just one SMR group instead of
-> > number-of-streamids SMR groups for a master device.
-> > 
-> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > ---
-> >  drivers/iommu/arm-smmu.c |   79 ++++++++++++++++++++++++++++++++++++----------
-> >  1 file changed, 63 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index 91316a8..4e8ceab 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -28,6 +28,7 @@
-> >   *	- Context fault reporting
-> >   */
-> >  
-> > +#define DEBUG
-> >  #define pr_fmt(fmt) "arm-smmu: " fmt
-> >  
-> >  #include <linux/delay.h>
-> > @@ -341,6 +342,9 @@ struct arm_smmu_master {
-> >  	struct rb_node			node;
-> >  	int				num_streamids;
-> >  	u16				streamids[MAX_MASTER_STREAMIDS];
-> > +	int				num_smrs;
+On Tue, Oct 08, 2013 at 06:34:42PM -0700, Dan Williams wrote:
+> On Mon, Oct 7, 2013 at 3:39 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Mon, Oct 07, 2013 at 12:17:28PM +0100, Russell King - ARM Linux wrote:
+> >> On Mon, Oct 07, 2013 at 12:45:33PM +0200, Guennadi Liakhovetski wrote:
+> >> > No, not something in the middle. I was thinking about
+> >> >
+> >> > (1) cookie 1-3 are submitted
+> >> > (2) cookie 1 succeeds
+> >> > (3) a DMA error occurs, cookies 2-3 are discarded
+> > discarded using terminate_all right?
+> >
+> >> > (4) cookie 4 is submitted and succeeds
+> >> > (5) the user requests status of cookie 2 and gets success back, AFAICS
+> > No you cant!, you can only request for 4..
+> >>
+> >> This is a side effect of using a sequential cookie based system to indicate
+> >> whether a descriptor has succeeded or not.
+> > In the above case, since user calls terminate_all we can put a rule that
+> > terminate should reset the cookie counter.
+> > So after the terminate_all the cookies are sequentially valid!
 > 
-> This is easy to confuse with smmu->num_mapping_groups, but is actually the
-> number of SMRs in use by this master, right? Maybe tweaking the name
-> (num_used_smrs?) would make this clearer.
-> 
-> > +	u16				smr_mask;
-> > +	u16				smr_id;
-> >  
-> >  	/*
-> >  	 * We only need to allocate these on the root SMMU, as we
-> > @@ -530,14 +534,11 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
-> >  					ARM_SMMU_OPT_MASK_STREAM_IDS));
-> >  			return -EINVAL;
-> >  		}
-> > -		/* set fixed streamid (0) that will be used for masking */
-> > -		master->num_streamids = 1;
-> > -		master->streamids[0] = 0;
-> > -	} else {
-> > -		for (i = 0; i < master->num_streamids; ++i)
-> > -			master->streamids[i] = masterspec->args[i];
-> >  	}
-> >  
-> > +	for (i = 0; i < master->num_streamids; ++i)
-> > +		master->streamids[i] = masterspec->args[i];
-> > +
-> >  	return insert_smmu_master(smmu, master);
-> >  }
-> >  
-> > @@ -1049,6 +1050,41 @@ static void arm_smmu_domain_destroy(struct iommu_domain *domain)
-> >  	kfree(smmu_domain);
-> >  }
-> >  
-> > +/*
-> > + * no duplicates streamids please
-> > + */
-> 
-> We could probably check for that actually in register_smmu_master.
-> 
-> > +static void determine_smr_mapping(struct arm_smmu_device *smmu,
-> > +				struct arm_smmu_master *master)
-> > +{
-> > +	int nr_sid;
-> > +	u16 i, v1, v2, const_mask;
-> 
-> The bitwise stuff later on could use some more meaningful identifiers
-> (although the comments do help).
-> 
-> > +
-> > +	if (smmu->options & ARM_SMMU_OPT_MASK_STREAM_IDS) {
-> > +		master->smr_mask = smmu->smr_mask_bits;
-> > +		master->smr_id = 0;
-> > +		return;
-> > +	}
-> > +
-> > +	nr_sid = master->num_streamids;
-> > +	if (!is_power_of_2(nr_sid))
-> > +		return;
-> 
-> As I mentioned before, we could do better than this if we forced the DT to
-> contain complete topological information. Then we could round up to the next
-> power of two and check that we didn't accidentally include another device.
-> What is your opinion on this?
-> 
-> > +	v1 = 0;
-> > +	v2 = -1;
-> 
-> I'd rather this was written as 0xffff;
-> 
-> > +	for (i = 0; i < nr_sid; i++) {
-> > +		v1 |= master->streamids[i];	/* for const 0 bits */
-> > +		v2 &= ~(master->streamids[i]);	/* const 1 bits */
-> > +	}
-> > +	const_mask = (~v1) | v2;	/* const bits (either 0 or 1) */
-> > +
-> > +	v1 = hweight16(~const_mask);
-> > +	if ((1 << v1) == nr_sid) {
-> > +		/* if smr_mask is set, only 1 SMR group is used smr[0] = 0 */
-> > +		master->smr_mask = ~const_mask;
-> > +		master->smr_id = v1 & const_mask;
-> > +	}
-> 
-> Hehe, this is cool, nice one! I originally thought you could just xor stuff,
-> but that ends up being slightly nasty because it all has to be done pairwise.
-> 
-> > +}
-> > +
-> >  static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
-> >  					  struct arm_smmu_master *master)
-> >  {
-> > @@ -1062,15 +1098,22 @@ static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
-> >  	if (master->smrs)
-> >  		return -EEXIST;
-> >  
-> > -	smrs = kmalloc(sizeof(*smrs) * master->num_streamids, GFP_KERNEL);
-> > +	determine_smr_mapping(smmu, master);
-> > +
-> > +	if (master->smr_mask)
-> > +		master->num_smrs = 1;
-> 
-> So the next challenge would be to allocate one SMR using your power-of-2
-> trick, then mop up what's left with individual SMR entries.
+> I think you and Guennadi address this later in the thread, but I think
+> cookie values should always increase.  I see nothing but trouble if
+> cookie values are allowed to go backwards.
+Ok, my idea was to do this in terminate_all ONLY which is complete reset for a
+channel. Anything done before that should not be valid and should not e
+referenced!
+But am okay to drop the idea...
 
-BTW, the coding style of this patch might be nasty. I had cut it out
-of some later version of my prototype driver and adapted it to your
-driver.
+> > Anyways as pointed above user shouldnt check for 2, he should have removed all
+> > refs till 3 before calling terminate.
+> >
+> >> What may be better is to change the wording here: not DMA_SUCCESS but
+> >> DMA_COMPLETED.  That doesn't imply that it has been successful, merely
+> >> that the DMA engine has finished with the transaction.
+> > Agreed that its not indication of success but of DMA completetion. I have seen
+> > cases where slave perhiphral got stuck while sending last FIFO but since DMA
+> > finished transferiing to FIFO it says complete.
+> >
+> > Dan do you agree?
+> 
+> Yes, it's an indication of completion, not necessarily success.
+Sure, will update this..
 
-So you don't generally object and it seems you'd accept this patch (if
-minor things fixed) and I should scrub the other mask-stream-id patch.
-
-Sigh ... so I need to figure out how to do the mop-up.
-
-
-Andreas
-
-PS: Even w/o the "mop-up" I could get my sata-smmu combination get working
-    with this patch as it is.
-    (I'd just need to add some fake streamids to get to a power-of-2. And
-    yes, while I am writing this I am pretty sure you'd hate this ;-)
+-- 
+~Vinod
