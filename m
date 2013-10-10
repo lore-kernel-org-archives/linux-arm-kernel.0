@@ -1,105 +1,178 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Thu, 10 Oct 2013 10:50:10 -0700
-Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
-In-Reply-To: <20131003234735.19051.84583@capellas-linux>
-References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
- <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
- <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
- <20131003214246.24540.99218@capellas-linux>
- <20131003234735.19051.84583@capellas-linux>
-Message-ID: <20131010175010.17870.58060@capellas-linux>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 10 Oct 2013 11:56:52 -0600
+Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
+In-Reply-To: <201310101939.44295.marex@denx.de>
+References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
+ <201310101758.35085.marex@denx.de>
+ <CAErSpo64NbDhA0LX95s1T=DvuBhWi7qeqS2maNJn15zbG8GCUA@mail.gmail.com>
+ <201310101939.44295.marex@denx.de>
+Message-ID: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Capella (2013-10-03 16:47:35)
-> Quoting Sebastian Capella (2013-10-03 14:42:46)
-> > Quoting Andrew Morton (2013-10-03 14:15:23)
-> > > On Thu,  3 Oct 2013 14:10:37 -0700 Sebastian Capella <sebastian.capella@linaro.org> wrote:
-> > > 
-> > > > Enhance name_to_dev_t to handle trailing newline characters
-> > > > on device paths.  Some inputs to name_to_dev_t may come from
-> > > > userspace where oftentimes a '\n' is appended to the path.
-> > > > Added const to the name buffer in both the function
-> > > > declaration and the prototype to reflect input buffer
-> > > > handling.
-> > > > 
-> > > > By handling trailing newlines in name_to_dev_t, userspace
-> > > > buffers may be directly passed to name_to_dev_t without
-> > > > modification.
-> > > 
-> > > We have lib/string.c:strim() - perhaps this patch would be
-> > > neater if it were to use it?
-> > 
-> > Hi Morton,
-> > 
-> > I was intending to respect the const handling of the input buffer.
-> > 
-> > The actual buffer in this case is not really const as it comes from
-> > the file buffering, but removing the const requires changing the
-> > store function defined in the kobj_attribute, and would propagate
-> > to many areas in the kernel.
-> > 
-> > Modifying the buffer and removing the const was also suggested by Pavel.
-> > After some discussion I posted this version which did not change the
-> > buffer or the prototype.
-> > 
-> > Please let me know if the preference is to modify the store function
-> > definition.
-> > 
-> > I'll prepare a patchset that removes the consts to see how much is
-> > changed.
-> > 
-> > Thanks,
-> > 
-> > Sebastian
-> 
-> Hi Andrew,
-> 
-> Sorry for calling you Morton earlier.
-> 
-> I looked into removing the const from the store function, but I'm not sure
-> this is the right idea, so I'm going to shelf that for now.
-> 
-> Please let me know your thoughts.
-> 
-> Thanks,
-> 
-> Sebastian
- 
-Ping...
+On Thu, Oct 10, 2013 at 11:39 AM, Marek Vasut <marex@denx.de> wrote:
+> Hi Bjorn,
+>
+>> [+cc Yinghai]
+>>
+>> On Thu, Oct 10, 2013 at 9:58 AM, Marek Vasut <marex@denx.de> wrote:
+>> >> On Thu, Oct 10, 2013 at 4:25 AM, Marek Vasut <marex@denx.de> wrote:
+>> > I tried you suggestion, this is what I got now (and with V7 of the
+>> > patches):
+>> >
+>> > Note that my topology is: rootport->2_port_switch->ethernet_chip , the
+>> > other port of the switch is not used .
+>> >
+>> > imx6q-pcie 1ffc000.pcie: phy link never came up
+>> > PCI host bridge to bus 0000:00
+>> > pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
+>> > pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+>> > pci_bus 0000:00: No busn resource found for root bus, will use [bus
+>> > 00-ff] pci_bus 0000:00: scanning bus
+>> > pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+>> > pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+>> > pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
+>>
+>> This is probably your Root Port, and it looks like its BARs haven't
+>> been programmed.
+>
+> The BAR programming should be happening in:
+>
+> drivers/pci/host/pcie-designware.c
+>
+> 494 void dw_pcie_setup_rc(struct pcie_port *pp)
+> 495 {
+> [...]
+> 532
+> 533         /* setup RC BARs */
+> 534         dw_pcie_writel_rc(pp, 0x00000004, PCI_BASE_ADDRESS_0);
+> 535         dw_pcie_writel_rc(pp, 0x00000004, PCI_BASE_ADDRESS_1);
 
-Hi Andrew,
+0x00000004 in a BAR would indicate a 64-bit non-prefetchable memory
+BAR.  Bits 0-3 are normally read-only, but maybe there's a way for
+setup code to write them.  In any case, this doesn't assign an address
+to the BAR.
 
-Do you have any feedback on this?
+>> > pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x5c
+>> > pci 0000:00:00.0: supports D1
+>> > pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
+>> > pci 0000:00:00.0: PME# disabled
+>> > pci_bus 0000:00: fixups for bus
+>> > PCI: bus0: Fast back to back transfers disabled
+>> > pci 0000:00:00.0: scanning [bus 01-01] behind bridge, pass 0
+>> > pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+>> > pci_bus 0000:01: scanning bus
+>> > pci_bus 0000:01: fixups for bus
+>> > PCI: bus1: Fast back to back transfers enabled
+>> > pci_bus 0000:01: bus scan returning with max=01
+>> > pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+>> > pci_bus 0000:00: bus scan returning with max=01
+>> > pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 01
+>>
+>> We should have found the switch (an Upstream Port and two Downstream
+>> Ports) and the ethernet device here.  Have you ever seen this work,
+>> i.e., have we ever found those devices, with any kernel?
+>
+> I got it working in U-Boot, but the PCI stack there is ported from older kernel
+> version and the MX6 PCIe driver is entirely custom (even though it's copying the
+> behavior of the MX6 PCIe driver in kernel).
+>
+> I managed to detect the whole topology in U-Boot:
+>
+>   00:01.0     - 16c3:abcd - Bridge device
+>    01:00.0    - 12d8:2303 - Bridge device
+>     02:01.0   - 12d8:2303 - Bridge device
+>      03:00.0  - 8086:1531 - Network controller
+>     02:02.0   - 12d8:2303 - Bridge device
+>
+> The 00:01.0 is the MX6 root bridge , the 01:00.0 is the switch's upstream port,
+> 02:01.0 and 02:02.0 are the downstream ports and the 03:00.0 is the ethernet
+> controller.
+>
+> I suspect the PCIe works without issues here.
 
-Below are the three options considered thus far.  Do
-you have any additional suggestions or preferences?
+Interesting that we found 00:00.0 above, and U-Boot didn't.
 
-Thanks,
+>> It's possible that your host bridge is configured to only generate
+>> config cycles for bus 00, i.e., the host bridge resource is actually
+>> "[bus 00]".  If that were the case, we'd never see anything on bus 01.
+>>  This would be i.MX6q-specific configuration, so I can't help here.
+>
+> I checked the pcie-designware.c code and maybe this is where this is set up?
+>
+> 543         /* setup bus numbers */
+> 544         dw_pcie_readl_rc(pp, PCI_PRIMARY_BUS, &val);
+> 545         val &= 0xff000000;
+> 546         val |= 0x00010100;
+> 547         dw_pcie_writel_rc(pp, val, PCI_PRIMARY_BUS);
+>
+>> I suppose it's conceivable this is related to 928bea96 "PCI: Delay
+>> enabling bridges until they're needed".  Per spec (PCI-to-PCI Bridge
+>> Spec, r1.2, sec 3.2.4.3), I don't think the bridge enable bits affect
+>> config transaction forwarding, but if your Root Port were defective
+>> and only forwarded config transactions when enabled, you'd also see
+>> this.  You could try forcibly setting the enable bits in
+>> pci_scan_bridge() just as an experiment.
+>
+> Will try. I can also try reverting this or the whole set:
+>
+>     * pci/yinghai-assign-unassigned-v6:
+>       PCI: Assign resources for hot-added host bridge more aggressively
+>       PCI: Move resource reallocation code to non-__init
+>       PCI: Delay enabling bridges until they're needed
+>       PCI: Assign resources on a per-bus basis
+>       PCI: Enable unassigned resource reallocation on per-bus basis
+>       PCI: Turn on reallocation for unassigned resources with host bridge offset
+>       PCI: Look for unassigned resources on per-bus basis
+>       PCI: Drop temporary variable in pci_assign_unassigned_resources()
+>
+> Would that help maybe?
 
-Sebastian
+I doubt it.  Maybe you could compare config space under U-Boot with
+config space under Linux and look for differences?
 
+>> > PCI: Device 0000:00:00.0 not available because of resource collisions
+>> > pcieport: probe of 0000:00:00.0 failed with error -22
+>> > pci 0000:00:00.0: fixup irq: got 155
+>> > pci 0000:00:00.0: assigning IRQ 155
+>> > pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
+>> > pci 0000:00:00.0: BAR 0: set to [mem 0x01000000-0x010fffff] (PCI address
+>> > [0x1000000-0x10
+>> > fffff])
+>> > pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref]
+>>
+>> You *are* assigning resources here; I'm not sure why we're trying to
+>> bind the pcieport driver before resource assignment.  That seems out
+>> of order.
+>
+> Could it be a bug in the PCIe subsystem then ?
 
-1) copy buffer, remove \n.
-  - v1 patch did this
-  - alternatively could use an array on the stack or a preallocated global
-    Pros:
-     . cleanest change
-    Cons:
-     . adds memcpy
-2) make name_to_dev_t work with readonly buffer to ignore \n
-  - v2 and v3 patches do this
-    Pros:
-     . no memcpy, no big modifications to unrelated code
-    Cons:
-     . seems more appropriate to harden store functions to user input
-       than name_to_dev_t.
-     . a little complicated
-3) remove const from buffer and modify contents in place to remove \n
-  - remove const from sysfs_ops.store, modify dependent definitions
-  - remove const from kobj_attribute.store, modify dependent definitions
-    Pros:
-     . no memcpy
-    Cons:
-     . a lot of modifications
-     . const contract to not modify the input buffer seems the right way.
+More likely an arm issue, since other platforms aren't seeing this problem.
+
+>> > pci 0000:00:00.0: PCI bridge to [bus 01]
+>> > pci 0000:00:00.0: PCI bridge to [bus 01]
+>> > pci_bus 0000:00: resource 4 [io  0x1000-0x10000]
+>> > pci_bus 0000:00: resource 5 [mem 0x01000000-0x01efffff]
+>> >
+>> > What is this conflicting device 0000:00:01 I observe here? Does it have
+>> > to do with the switch ?
+>>
+>> I don't see a 0000:00:01.  That's not a complete PCI ID anyway; it
+>> means domain 0000, bus 00, device 01, but there's no function number.
+>
+> It is there somewhere around the middle of the log I pasted, see:
+>
+> -->8--
+> pci_bus 0000:01: scanning bus
+> pci_bus 0000:01: fixups for bus
+> PCI: bus1: Fast back to back transfers enabled
+> pci_bus 0000:01: bus scan returning with max=01
+> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+> pci_bus 0000:00: bus scan returning with max=01
+> pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 01
+
+Oh, you mean just "0000:01" (not "0000:00:01").  That refers to bus
+01, not to any specific device.  And we aren't seeing a conflict
+related to it.
+
+Bjorn
