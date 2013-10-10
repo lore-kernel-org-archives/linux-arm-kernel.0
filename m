@@ -1,106 +1,32 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 10 Oct 2013 18:26:17 -0400
-Subject: [PATCH v3 4/5] drm/exynos: Initialize ptn3460 if present
-In-Reply-To: <1381443978-5654-1-git-send-email-seanpaul@chromium.org>
+Date: Thu, 10 Oct 2013 18:26:13 -0400
+Subject: [PATCH v3 0/5] Add some missing bits for exynos5250-snow
+In-Reply-To: <1380839303-4834-1-git-send-email-seanpaul@chromium.org>
 References: <1380839303-4834-1-git-send-email-seanpaul@chromium.org>
- <1381443978-5654-1-git-send-email-seanpaul@chromium.org>
-Message-ID: <1381443978-5654-5-git-send-email-seanpaul@chromium.org>
+Message-ID: <1381443978-5654-1-git-send-email-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds code to look for the ptn3460 in the device tree file on
-exynos initialization. If ptn node is found, the driver will initialize
-the ptn3460 driver and skip creating a DP connector (since the bridge
-driver will register its own connector).
+This set adds some missing devicetree nodes to the exynos5250-snow file as well
+as adds a drm_bridge driver for the ptn3460 DP-LVDS chip. This chip is used in
+the exynos5250-snow board.
 
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
----
-
-v2:
-	- Changed include from of_i2c.h to i2c.h
-	- Changed of_find_by_name to of_find_compatible
-v3: No changes
+Sean
 
 
- drivers/gpu/drm/exynos/exynos_drm_core.c | 44 +++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
+Sean Paul (5):
+ ARM: dts: Add fimd display-timings for exynos5250-snow
+ ARM: dts: Add dp-controller node to exynos5250-snow
+ drm/bridge: Add PTN3460 bridge driver
+ drm/exynos: Initialize ptn3460 if present
+ ARM: dts: Add ptn3460 to exynos5250-snow
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_core.c b/drivers/gpu/drm/exynos/exynos_drm_core.c
-index 1bef6dc..08ca4f9 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_core.c
-@@ -12,7 +12,9 @@
-  * option) any later version.
-  */
- 
-+#include <linux/i2c.h>
- #include <drm/drmP.h>
-+#include <drm/bridge/ptn3460.h>
- #include "exynos_drm_drv.h"
- #include "exynos_drm_encoder.h"
- #include "exynos_drm_connector.h"
-@@ -20,6 +22,40 @@
- 
- static LIST_HEAD(exynos_drm_subdrv_list);
- 
-+struct bridge_init {
-+	struct i2c_client *client;
-+	struct device_node *node;
-+};
-+
-+static bool find_bridge(const char *compat, struct bridge_init *bridge)
-+{
-+	bridge->client = NULL;
-+	bridge->node = of_find_compatible_node(NULL, NULL, compat);
-+	if (!bridge->node)
-+		return false;
-+
-+	bridge->client = of_find_i2c_device_by_node(bridge->node);
-+	if (!bridge->client)
-+		return false;
-+
-+	return true;
-+}
-+
-+/* returns the number of bridges attached */
-+static int exynos_drm_attach_lcd_bridge(struct drm_device *dev,
-+		struct drm_encoder *encoder)
-+{
-+	struct bridge_init bridge;
-+	int ret;
-+
-+	if (find_bridge("nxp,ptn3460", &bridge)) {
-+		ret = ptn3460_init(dev, encoder, bridge.client, bridge.node);
-+		if (!ret)
-+			return 1;
-+	}
-+	return 0;
-+}
-+
- static int exynos_drm_create_enc_conn(struct drm_device *dev,
- 					struct exynos_drm_subdrv *subdrv)
- {
-@@ -36,6 +72,13 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
- 		DRM_ERROR("failed to create encoder\n");
- 		return -EFAULT;
- 	}
-+	subdrv->encoder = encoder;
-+
-+	if (subdrv->manager->display_ops->type == EXYNOS_DISPLAY_TYPE_LCD) {
-+		ret = exynos_drm_attach_lcd_bridge(dev, encoder);
-+		if (ret)
-+			return 0;
-+	}
- 
- 	/*
- 	 * create and initialize a connector for this sub driver and
-@@ -48,7 +91,6 @@ static int exynos_drm_create_enc_conn(struct drm_device *dev,
- 		goto err_destroy_encoder;
- 	}
- 
--	subdrv->encoder = encoder;
- 	subdrv->connector = connector;
- 
- 	return 0;
--- 
-1.8.4
+ Documentation/devicetree/bindings/drm/bridge/ptn3460.txt |  27 ++++++++++++++++
+ arch/arm/boot/dts/exynos5250-snow.dts                    |  50 ++++++++++++++++
+ drivers/gpu/drm/Kconfig                                  |   2 ++
+ drivers/gpu/drm/Makefile                                 |   1 +
+ drivers/gpu/drm/bridge/Kconfig                           |   4 +++
+ drivers/gpu/drm/bridge/Makefile                          |   3 ++
+ drivers/gpu/drm/bridge/ptn3460.c                         | 349 ++++++++++++++++
+ drivers/gpu/drm/exynos/exynos_drm_core.c                 |  44 ++++++++++++++++
+ include/drm/bridge/ptn3460.h                             |  37 ++++++++++++++++
