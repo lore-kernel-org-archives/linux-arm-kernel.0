@@ -1,87 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Oct 2013 16:13:52 +0200
-Subject: [PATCH 1/6 v2] ARM: integrator: get the LM interrupts from DT
-Message-ID: <1381414432-17816-1-git-send-email-linus.walleij@linaro.org>
+From: sre@debian.org (Sebastian Reichel)
+Date: Thu, 10 Oct 2013 16:19:22 +0200
+Subject: [RFCv3 1/7] ARM: OMAP2+: hwmod-data: Add SSI information
+In-Reply-To: <alpine.DEB.2.02.1310090542270.30199@utopia.booyaka.com>
+References: <1381091235-18293-1-git-send-email-sre@debian.org>
+ <1381091235-18293-2-git-send-email-sre@debian.org>
+ <alpine.DEB.2.02.1310090542270.30199@utopia.booyaka.com>
+Message-ID: <20131010141921.GE28657@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OF/DT boot path needs to get the LM (Logical Module)
-IRQs from the device tree for coherency. This augments the
-DT syscon node to contain these IRQs and alter the DT LM
-code to get them from there.
+On Wed, Oct 09, 2013 at 05:43:13AM +0000, Paul Walmsley wrote:
+> On Sun, 6 Oct 2013, Sebastian Reichel wrote:
+> 
+> > This patch adds Synchronous Serial Interface (SSI) hwmod support for
+> > OMAP34xx SoCs.
+> > 
+> > Signed-off-by: Sebastian Reichel <sre@debian.org>
+> 
+> Thanks, queued this one for v3.13.  You can drop it from any future 
+> reposts of this series.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Updated documentation in accordance with Mark Ruthlands
-  review comments.
----
- Documentation/devicetree/bindings/arm/arm-boards | 21 +++++++++++++++++++++
- arch/arm/boot/dts/integratorap.dts               |  3 +++
- arch/arm/mach-integrator/integrator_ap.c         |  2 +-
- 3 files changed, 25 insertions(+), 1 deletion(-)
+Thanks.
 
-diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
-index db5858e..8e32213 100644
---- a/Documentation/devicetree/bindings/arm/arm-boards
-+++ b/Documentation/devicetree/bindings/arm/arm-boards
-@@ -9,9 +9,30 @@ Required properties (in root node):
- 
- FPGA type interrupt controllers, see the versatile-fpga-irq binding doc.
- 
-+Required nodes:
-+
- In the root node the Integrator/CP must have a /cpcon node pointing
- to the CP control registers, and the Integrator/AP must have a
- /syscon node pointing to the Integrator/AP system controller.
-+The AP syscon node must include the logic module interrupts, stated
-+in order of module instance <module 0, module 1, module 2 ...>
-+example:
-+
-+/dts-v1/;
-+/include/ "integrator.dtsi"
-+
-+/ {
-+	model = "ARM Integrator/AP";
-+	compatible = "arm,integrator-ap";
-+
-+	syscon {
-+		/* AP system controller registers */
-+		reg = <0x11000000 0x100>;
-+		interrupt-parent = <&pic>;
-+		/* These are the logic module IRQs */
-+		interrupts = <9> <10> <11> <12>;
-+	};
-+};
- 
- 
- ARM Versatile Application and Platform Baseboards
-diff --git a/arch/arm/boot/dts/integratorap.dts b/arch/arm/boot/dts/integratorap.dts
-index b6b82ec..d566792 100644
---- a/arch/arm/boot/dts/integratorap.dts
-+++ b/arch/arm/boot/dts/integratorap.dts
-@@ -21,6 +21,9 @@
- 	syscon {
- 		/* AP system controller registers */
- 		reg = <0x11000000 0x100>;
-+		interrupt-parent = <&pic>;
-+		/* These are the logical module IRQs */
-+		interrupts = <9> <10> <11> <12>;
- 	};
- 
- 	timer0: timer at 13000000 {
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index d9e95e6..f5fbd8a 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -541,7 +541,7 @@ static void __init ap_init_of(void)
- 		lmdev->resource.start = 0xc0000000 + 0x10000000 * i;
- 		lmdev->resource.end = lmdev->resource.start + 0x0fffffff;
- 		lmdev->resource.flags = IORESOURCE_MEM;
--		lmdev->irq = IRQ_AP_EXPINT0 + i;
-+		lmdev->irq = irq_of_parse_and_map(syscon, i);
- 		lmdev->id = i;
- 
- 		lm_device_register(lmdev);
--- 
-1.8.3.1
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131010/647ee67a/attachment-0001.sig>
