@@ -1,50 +1,93 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Oct 2013 10:15:40 -0700
-Subject: [PATCH V5] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
- register
-In-Reply-To: <5256A7AE.6000605@ti.com>
-References: <1381391028-4189-1-git-send-email-r.sricharan@ti.com>
- <5256A7AE.6000605@ti.com>
-Message-ID: <20131010171540.GG29913@atomide.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 10 Oct 2013 11:17:31 -0600
+Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
+In-Reply-To: <201310101758.35085.marex@denx.de>
+References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
+ <201310101225.10455.marex@denx.de>
+ <CAErSpo7oHK1tyndKdgk_6f3F7O0pMCSUV+RLUy0V75OKKFniow@mail.gmail.com>
+ <201310101758.35085.marex@denx.de>
+Message-ID: <CAErSpo64NbDhA0LX95s1T=DvuBhWi7qeqS2maNJn15zbG8GCUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [131010 06:20]:
-> On Thursday 10 October 2013 03:43 AM, Sricharan R wrote:
-> > From: R Sricharan <r.sricharan@ti.com>
-> > 
-> > The realtime counter called master counter, produces the count
-> > used by the private timer peripherals in the MPU_CLUSTER. The
-> > CNTFRQ per cpu register is used to denote the frequency of the counter.
-> > Currently the frequency value is passed from the
-> > DT file, but this is not scalable when we have other non-DT guest
-> > OS. This register must be set to the right value by the
-> > secure rom code. Setting this register helps in propagating the right
-> > frequency value across OSes.
-> > 
-> > More discussions and the reason for adding this in a non-DT
-> > way can be seen from below.
-> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
-> > 
-> > So configuring this secure register for all the cpus here.
-> > 
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Cc: Nishanth Menon <nm@ti.com>
-> > Cc: Rajendra Nayak <rnayak@ti.com>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Tested-by: Nishanth Menon <nm@ti.com>
-> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> > ---
-> >  [V5] Removed the use of extern variable in omap-smp.c
-> >       as per suggestion from Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > 
-> Thanks for the updates Sricharan. Looks fine now.
-> 
-> Tony, Can you apply this version if you are fine with it.
+[+cc Yinghai]
 
-Yes thanks looks good to me now. Applying into omap-for-v3.13/soc.
+On Thu, Oct 10, 2013 at 9:58 AM, Marek Vasut <marex@denx.de> wrote:
+>> On Thu, Oct 10, 2013 at 4:25 AM, Marek Vasut <marex@denx.de> wrote:
+> I tried you suggestion, this is what I got now (and with V7 of the patches):
+>
+> Note that my topology is: rootport->2_port_switch->ethernet_chip , the other
+> port of the switch is not used .
+>
+> imx6q-pcie 1ffc000.pcie: phy link never came up
+> PCI host bridge to bus 0000:00
+> pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
+> pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+> pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
+> pci_bus 0000:00: scanning bus
+> pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+> pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+> pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
 
-Tony
+This is probably your Root Port, and it looks like its BARs haven't
+been programmed.
+
+> pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x5c
+> pci 0000:00:00.0: supports D1
+> pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
+> pci 0000:00:00.0: PME# disabled
+> pci_bus 0000:00: fixups for bus
+> PCI: bus0: Fast back to back transfers disabled
+> pci 0000:00:00.0: scanning [bus 01-01] behind bridge, pass 0
+> pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+> pci_bus 0000:01: scanning bus
+> pci_bus 0000:01: fixups for bus
+> PCI: bus1: Fast back to back transfers enabled
+> pci_bus 0000:01: bus scan returning with max=01
+> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+> pci_bus 0000:00: bus scan returning with max=01
+> pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 01
+
+We should have found the switch (an Upstream Port and two Downstream
+Ports) and the ethernet device here.  Have you ever seen this work,
+i.e., have we ever found those devices, with any kernel?
+
+It's possible that your host bridge is configured to only generate
+config cycles for bus 00, i.e., the host bridge resource is actually
+"[bus 00]".  If that were the case, we'd never see anything on bus 01.
+ This would be i.MX6q-specific configuration, so I can't help here.
+
+I suppose it's conceivable this is related to 928bea96 "PCI: Delay
+enabling bridges until they're needed".  Per spec (PCI-to-PCI Bridge
+Spec, r1.2, sec 3.2.4.3), I don't think the bridge enable bits affect
+config transaction forwarding, but if your Root Port were defective
+and only forwarded config transactions when enabled, you'd also see
+this.  You could try forcibly setting the enable bits in
+pci_scan_bridge() just as an experiment.
+
+> PCI: Device 0000:00:00.0 not available because of resource collisions
+> pcieport: probe of 0000:00:00.0 failed with error -22
+> pci 0000:00:00.0: fixup irq: got 155
+> pci 0000:00:00.0: assigning IRQ 155
+> pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
+> pci 0000:00:00.0: BAR 0: set to [mem 0x01000000-0x010fffff] (PCI address
+> [0x1000000-0x10
+> fffff])
+> pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref]
+
+You *are* assigning resources here; I'm not sure why we're trying to
+bind the pcieport driver before resource assignment.  That seems out
+of order.
+
+> pci 0000:00:00.0: PCI bridge to [bus 01]
+> pci 0000:00:00.0: PCI bridge to [bus 01]
+> pci_bus 0000:00: resource 4 [io  0x1000-0x10000]
+> pci_bus 0000:00: resource 5 [mem 0x01000000-0x01efffff]
+>
+> What is this conflicting device 0000:00:01 I observe here? Does it have to do
+> with the switch ?
+
+I don't see a 0000:00:01.  That's not a complete PCI ID anyway; it
+means domain 0000, bus 00, device 01, but there's no function number.
+
+Bjorn
