@@ -1,70 +1,140 @@
-From: zyy@motorola.com (Yuanyuan ZHONG)
-Date: Thu, 10 Oct 2013 11:00:18 -0500
-Subject: [PATCH] arm: vfp: always clear vfp_current_hw_state when forcing
- reload
-In-Reply-To: <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
-References: <1380751187-11257-1-git-send-email-zyy@motorola.com>
- <20131002221123.GC12758@n2100.arm.linux.org.uk>
- <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
-Message-ID: <CAFUV4K1CkzGZVEwkXGX38jG0HxerqQq--d-qFiqF9J6wi88xYQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Oct 2013 17:05:39 +0100
+Subject: [PATCH 7/7] iommu/arm-smmu: Introduce automatic stream-id-masking
+In-Reply-To: <1381358286-27065-8-git-send-email-andreas.herrmann@calxeda.com>
+References: <1381358286-27065-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1381358286-27065-8-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20131010160539.GC8528@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, et al
+On Wed, Oct 09, 2013 at 11:38:06PM +0100, Andreas Herrmann wrote:
+> Try to determine a mask that can be used for all StreamIDs of a master
+> device. This allows to use just one SMR group instead of
+> number-of-streamids SMR groups for a master device.
+> 
+> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> ---
+>  drivers/iommu/arm-smmu.c |   79 ++++++++++++++++++++++++++++++++++++----------
+>  1 file changed, 63 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 91316a8..4e8ceab 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -28,6 +28,7 @@
+>   *	- Context fault reporting
+>   */
+>  
+> +#define DEBUG
+>  #define pr_fmt(fmt) "arm-smmu: " fmt
+>  
+>  #include <linux/delay.h>
+> @@ -341,6 +342,9 @@ struct arm_smmu_master {
+>  	struct rb_node			node;
+>  	int				num_streamids;
+>  	u16				streamids[MAX_MASTER_STREAMIDS];
+> +	int				num_smrs;
 
-If there is no further comments, I'll submit it to patch system.
-Thanks.
+This is easy to confuse with smmu->num_mapping_groups, but is actually the
+number of SMRs in use by this master, right? Maybe tweaking the name
+(num_used_smrs?) would make this clearer.
 
-On Wed, Oct 2, 2013 at 5:21 PM, Yuanyuan ZHONG <zyy@motorola.com> wrote:
-> On Wed, Oct 2, 2013 at 5:11 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Wed, Oct 02, 2013 at 04:59:47PM -0500, Yuanyuan Zhong wrote:
->>> The current thread trying to clear the held vfp state may not be
->>> the owner of hw state. For example,
->>>       Core0                   Core1
->>>                               Thread1 uses VFP.
->>>                                 Thread1 vfpstate.hard.cpu = 1.
->>>                                 vfp_current_hw_state[1] points to Thread1
->>>                                   vfpstate.
->>>       Going to suspend.
->>>       Freeze Thread1.
->>>                               Thread1 is switched out.
->>>                               VFP HW registers saved to Thread1 vfpstate.
->>
->> Correct so far.  At this point:
->>
->>                                 vfp_current_hw_state[1] = &thread1->vfpstate;
->>                                 thread1->vfpstate.hard.cpu = 1;
->>
->>>       Core0 disables Core1.
->>>                               Stopper thread calls vfp_force_reload().
->>>                               Stopper thread vfpstate.hard.cpu = NR_CPUS.
->>
->> Correct, except there's another part to this.  vfp_state_in_hw() returns
->> true here, since thread1->vfpstate.hard.cpu is the dying CPU (CPU 1), and
->> vfp_current_hw_state[1] is &thread1->vfpstate.  So we also do this:
->>
->>                                 clear FPEXC_EN
->>                                 vfp_current_hw_state[1] = NULL;
->>
-> vfp_state_in_hw() returns false. It's checking current_thread_info()
-> which is the stopper thread migration/1, not thread1.
->>>                               ...
->>>                               (No PM notifier for non-idle path. So
->>>                                 vfp_pm_suspend() is NOT called on Core1.)
->>>                               ...
->>>                               Core1 is off and VFP HW registers are lost.
->>>       ...
->>>       Core0 enables Core1.
->>>       Core0 thaw Thread1.
->>>       Thread1 migrate to Core1
->>>         before using VFP.
->>>                               Thread1 starts using VFP.
->>>                               Now we have vfp_current_hw_state[1] points
->>>                                 to Thread1 vfpstate. And Thread1 has
->>>                                 vfpstate.hard.cpu = 1.
->>
->> No.  With my above correction:
->>                                 vfp_current_hw_state[1] = NULL
->>
->> and that forces a reload of the saved context.
+> +	u16				smr_mask;
+> +	u16				smr_id;
+>  
+>  	/*
+>  	 * We only need to allocate these on the root SMMU, as we
+> @@ -530,14 +534,11 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
+>  					ARM_SMMU_OPT_MASK_STREAM_IDS));
+>  			return -EINVAL;
+>  		}
+> -		/* set fixed streamid (0) that will be used for masking */
+> -		master->num_streamids = 1;
+> -		master->streamids[0] = 0;
+> -	} else {
+> -		for (i = 0; i < master->num_streamids; ++i)
+> -			master->streamids[i] = masterspec->args[i];
+>  	}
+>  
+> +	for (i = 0; i < master->num_streamids; ++i)
+> +		master->streamids[i] = masterspec->args[i];
+> +
+>  	return insert_smmu_master(smmu, master);
+>  }
+>  
+> @@ -1049,6 +1050,41 @@ static void arm_smmu_domain_destroy(struct iommu_domain *domain)
+>  	kfree(smmu_domain);
+>  }
+>  
+> +/*
+> + * no duplicates streamids please
+> + */
+
+We could probably check for that actually in register_smmu_master.
+
+> +static void determine_smr_mapping(struct arm_smmu_device *smmu,
+> +				struct arm_smmu_master *master)
+> +{
+> +	int nr_sid;
+> +	u16 i, v1, v2, const_mask;
+
+The bitwise stuff later on could use some more meaningful identifiers
+(although the comments do help).
+
+> +
+> +	if (smmu->options & ARM_SMMU_OPT_MASK_STREAM_IDS) {
+> +		master->smr_mask = smmu->smr_mask_bits;
+> +		master->smr_id = 0;
+> +		return;
+> +	}
+> +
+> +	nr_sid = master->num_streamids;
+> +	if (!is_power_of_2(nr_sid))
+> +		return;
+
+As I mentioned before, we could do better than this if we forced the DT to
+contain complete topological information. Then we could round up to the next
+power of two and check that we didn't accidentally include another device.
+What is your opinion on this?
+
+> +	v1 = 0;
+> +	v2 = -1;
+
+I'd rather this was written as 0xffff;
+
+> +	for (i = 0; i < nr_sid; i++) {
+> +		v1 |= master->streamids[i];	/* for const 0 bits */
+> +		v2 &= ~(master->streamids[i]);	/* const 1 bits */
+> +	}
+> +	const_mask = (~v1) | v2;	/* const bits (either 0 or 1) */
+> +
+> +	v1 = hweight16(~const_mask);
+> +	if ((1 << v1) == nr_sid) {
+> +		/* if smr_mask is set, only 1 SMR group is used smr[0] = 0 */
+> +		master->smr_mask = ~const_mask;
+> +		master->smr_id = v1 & const_mask;
+> +	}
+
+Hehe, this is cool, nice one! I originally thought you could just xor stuff,
+but that ends up being slightly nasty because it all has to be done pairwise.
+
+> +}
+> +
+>  static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
+>  					  struct arm_smmu_master *master)
+>  {
+> @@ -1062,15 +1098,22 @@ static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
+>  	if (master->smrs)
+>  		return -EEXIST;
+>  
+> -	smrs = kmalloc(sizeof(*smrs) * master->num_streamids, GFP_KERNEL);
+> +	determine_smr_mapping(smmu, master);
+> +
+> +	if (master->smr_mask)
+> +		master->num_smrs = 1;
+
+So the next challenge would be to allocate one SMR using your power-of-2
+trick, then mop up what's left with individual SMR entries.
+
+Will
