@@ -1,178 +1,515 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 11 Oct 2013 17:58:38 +0800
-Subject: [PATCH V2 3/4] ARM: tegra: add LP1 support code for Tegra124
-In-Reply-To: <1381485519-4027-1-git-send-email-josephl@nvidia.com>
-References: <1381485519-4027-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1381485519-4027-4-git-send-email-josephl@nvidia.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri, 11 Oct 2013 11:57:04 +0200
+Subject: [PATCH v4 11/17] clk: at91: add PMC programmable clocks
+In-Reply-To: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
+References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1381485424-13895-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LP1 suspend procedure is the same with Tegra30 and Tegra114. Just
-need to update the difference of the register address, then we can
-continue to share the code.
+This patch adds new at91 programmable clocks implementation using common clk
+framework.
+A programmable clock is a clock which can be exported on a given pin to clock
+external devices.
+Each programmable clock is given an id (from 0 to 8).
+The number of available programmable clocks depends on the SoC you're using.
+Programmable clock driver only implements the clock setting (clock rate and
+parent setting). It must be chained to a system clock in order to
+enable/disable the generated clock.
+The PCKX pins used to output the clock signals must be assigned to the
+appropriate peripheral (see atmel's datasheets).
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
-V2:
-* squash from 2/7 to 5/7 in V1
----
- arch/arm/mach-tegra/Makefile        |  1 +
- arch/arm/mach-tegra/flowctrl.c      |  2 ++
- arch/arm/mach-tegra/iomap.h         |  3 +++
- arch/arm/mach-tegra/pm.c            | 12 +++++++++---
- arch/arm/mach-tegra/sleep-tegra30.S | 33 ++++++++++++++++++++++++++++-----
- 5 files changed, 43 insertions(+), 8 deletions(-)
+ drivers/clk/at91/Makefile           |    2 +
+ drivers/clk/at91/clk-programmable.c |  423 +++++++++++++++++++++++++++++++++++
+ drivers/clk/at91/pmc.c              |   15 ++
+ drivers/clk/at91/pmc.h              |    9 +
+ 4 files changed, 449 insertions(+)
+ create mode 100644 drivers/clk/at91/clk-programmable.c
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index de3748e..019bb17 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -36,6 +36,7 @@ ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= cpuidle-tegra114.o
- endif
- obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= sleep-tegra30.o
-+obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= pm-tegra30.o
- ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= cpuidle-tegra114.o
- endif
-diff --git a/arch/arm/mach-tegra/flowctrl.c b/arch/arm/mach-tegra/flowctrl.c
-index 5348543..ce8ab8a 100644
---- a/arch/arm/mach-tegra/flowctrl.c
-+++ b/arch/arm/mach-tegra/flowctrl.c
-@@ -87,6 +87,7 @@ void flowctrl_cpu_suspend_enter(unsigned int cpuid)
- 		break;
- 	case TEGRA30:
- 	case TEGRA114:
-+	case TEGRA124:
- 		/* clear wfe bitmap */
- 		reg &= ~TEGRA30_FLOW_CTRL_CSR_WFE_BITMAP;
- 		/* clear wfi bitmap */
-@@ -125,6 +126,7 @@ void flowctrl_cpu_suspend_exit(unsigned int cpuid)
- 		break;
- 	case TEGRA30:
- 	case TEGRA114:
-+	case TEGRA124:
- 		/* clear wfe bitmap */
- 		reg &= ~TEGRA30_FLOW_CTRL_CSR_WFE_BITMAP;
- 		/* clear wfi bitmap */
-diff --git a/arch/arm/mach-tegra/iomap.h b/arch/arm/mach-tegra/iomap.h
-index cbee57f..26b1c2a 100644
---- a/arch/arm/mach-tegra/iomap.h
-+++ b/arch/arm/mach-tegra/iomap.h
-@@ -105,6 +105,9 @@
- #define TEGRA_EMC1_BASE			0x7001A800
- #define TEGRA_EMC1_SIZE			SZ_2K
- 
-+#define TEGRA124_EMC_BASE		0x7001B000
-+#define TEGRA124_EMC_SIZE		SZ_2K
+diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+index 04deba3..3873b62 100644
+--- a/drivers/clk/at91/Makefile
++++ b/drivers/clk/at91/Makefile
+@@ -5,3 +5,5 @@
+ obj-y += pmc.o
+ obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
+ obj-y += clk-system.o clk-peripheral.o
 +
- #define TEGRA_CSITE_BASE		0x70040000
- #define TEGRA_CSITE_SIZE		SZ_256K
- 
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index 36ed88a..4ae0286 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -59,8 +59,10 @@ static void tegra_tear_down_cpu_init(void)
- 		break;
- 	case TEGRA30:
- 	case TEGRA114:
-+	case TEGRA124:
- 		if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) ||
--		    IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC))
-+		    IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC) ||
-+		    IS_ENABLED(CONFIG_ARCH_TEGRA_124_SOC))
- 			tegra_tear_down_cpu = tegra30_tear_down_cpu;
- 		break;
- 	}
-@@ -216,8 +218,10 @@ static bool tegra_lp1_iram_hook(void)
- 		break;
- 	case TEGRA30:
- 	case TEGRA114:
-+	case TEGRA124:
- 		if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) ||
--		    IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC))
-+		    IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC) ||
-+		    IS_ENABLED(CONFIG_ARCH_TEGRA_124_SOC))
- 			tegra30_lp1_iram_hook();
- 		break;
- 	default:
-@@ -244,8 +248,10 @@ static bool tegra_sleep_core_init(void)
- 		break;
- 	case TEGRA30:
- 	case TEGRA114:
-+	case TEGRA124:
- 		if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) ||
--		    IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC))
-+		    IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC) ||
-+		    IS_ENABLED(CONFIG_ARCH_TEGRA_124_SOC))
- 			tegra30_sleep_core_init();
- 		break;
- 	default:
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index 7c529a1..b16d4a57 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -408,8 +408,12 @@ _pll_m_c_x_done:
- 	cmp	r10, #TEGRA30
- 	movweq	r0, #:lower16:TEGRA_EMC_BASE	@ r0 reserved for emc base
- 	movteq	r0, #:upper16:TEGRA_EMC_BASE
--	movwne	r0, #:lower16:TEGRA_EMC0_BASE
--	movtne	r0, #:upper16:TEGRA_EMC0_BASE
-+	cmp	r10, #TEGRA114
-+	movweq	r0, #:lower16:TEGRA_EMC0_BASE
-+	movteq	r0, #:upper16:TEGRA_EMC0_BASE
-+	cmp	r10, #TEGRA124
-+	movweq	r0, #:lower16:TEGRA124_EMC_BASE
-+	movteq	r0, #:upper16:TEGRA124_EMC_BASE
- 
- exit_self_refresh:
- 	ldr	r1, [r5, #0xC]		@ restore EMC_XM2VTTGENPADCTRL
-@@ -556,6 +560,17 @@ tegra114_sdram_pad_address:
- 	.word	TEGRA_EMC1_BASE + EMC_XM2VTTGENPADCTRL2			@0x30
- tegra114_sdram_pad_adress_end:
- 
-+tegra124_sdram_pad_address:
-+	.word	TEGRA124_EMC_BASE + EMC_CFG				@0x0
-+	.word	TEGRA124_EMC_BASE + EMC_ZCAL_INTERVAL			@0x4
-+	.word	TEGRA124_EMC_BASE + EMC_AUTO_CAL_INTERVAL		@0x8
-+	.word	TEGRA124_EMC_BASE + EMC_XM2VTTGENPADCTRL		@0xc
-+	.word	TEGRA124_EMC_BASE + EMC_XM2VTTGENPADCTRL2		@0x10
-+	.word	TEGRA_PMC_BASE + PMC_IO_DPD_STATUS			@0x14
-+	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_CLK_SOURCE_MSELECT	@0x18
-+	.word	TEGRA_CLK_RESET_BASE + CLK_RESET_SCLK_BURST		@0x1c
-+tegra124_sdram_pad_address_end:
++obj-$(CONFIG_AT91_PROGRAMMABLE_CLOCKS)	+= clk-programmable.o
+diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+new file mode 100644
+index 0000000..b34f80b
+--- /dev/null
++++ b/drivers/clk/at91/clk-programmable.c
+@@ -0,0 +1,423 @@
++/*
++ * drivers/clk/at91/clk-programmable.c
++ *
++ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ */
 +
- tegra30_sdram_pad_size:
- 	.word	tegra30_sdram_pad_address_end - tegra30_sdram_pad_address
- 
-@@ -700,8 +715,13 @@ tegra30_sdram_self_refresh:
- 	cmp	r10, #TEGRA30
- 	adreq	r2, tegra30_sdram_pad_address
- 	ldreq	r3, tegra30_sdram_pad_size
--	adrne	r2, tegra114_sdram_pad_address
--	ldrne	r3, tegra114_sdram_pad_size
-+	cmp	r10, #TEGRA114
-+	adreq	r2, tegra114_sdram_pad_address
-+	ldreq	r3, tegra114_sdram_pad_size
-+	cmp	r10, #TEGRA124
-+	adreq	r2, tegra124_sdram_pad_address
-+	ldreq	r3, tegra30_sdram_pad_size
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/clk/at91_pmc.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/io.h>
++#include <linux/wait.h>
++#include <linux/sched.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
 +
- 	mov	r9, #0
++#include "pmc.h"
++
++#define PROG_SOURCE_MAX		5
++#define PROG_ID_MAX		7
++
++#define PROG_STATUS_MASK(id)	(1 << ((id) + 8))
++#define PROG_PRES_MASK		0x7
++#define PROG_MAX_RM9200_CSS	3
++
++struct clk_programmable_layout {
++	u8 pres_shift;
++	u8 css_mask;
++	u8 have_slck_mck;
++};
++
++struct clk_programmable {
++	struct clk_hw hw;
++	struct at91_pmc *pmc;
++	unsigned int irq;
++	wait_queue_head_t wait;
++	u8 id;
++	u8 css;
++	u8 pres;
++	u8 slckmck;
++	const struct clk_programmable_layout *layout;
++};
++
++#define to_clk_programmable(hw) container_of(hw, struct clk_programmable, hw)
++
++
++static irqreturn_t clk_programmable_irq_handler(int irq, void *dev_id)
++{
++	struct clk_programmable *prog = (struct clk_programmable *)dev_id;
++
++	wake_up(&prog->wait);
++
++	return IRQ_HANDLED;
++}
++
++static int clk_programmable_prepare(struct clk_hw *hw)
++{
++	u32 tmp;
++	struct clk_programmable *prog = to_clk_programmable(hw);
++	struct at91_pmc *pmc = prog->pmc;
++	const struct clk_programmable_layout *layout = prog->layout;
++	u8 id = prog->id;
++	u32 mask = PROG_STATUS_MASK(id);
++
++	tmp = prog->css | (prog->pres << layout->pres_shift);
++	if (layout->have_slck_mck && prog->slckmck)
++		tmp |= AT91_PMC_CSSMCK_MCK;
++
++	pmc_write(pmc, AT91_PMC_PCKR(id), tmp);
++
++	while (!(pmc_read(pmc, AT91_PMC_SR) & mask))
++		wait_event(prog->wait, pmc_read(pmc, AT91_PMC_SR) & mask);
++
++	return 0;
++}
++
++static int clk_programmable_is_ready(struct clk_hw *hw)
++{
++	struct clk_programmable *prog = to_clk_programmable(hw);
++	struct at91_pmc *pmc = prog->pmc;
++
++	return !!(pmc_read(pmc, AT91_PMC_SR) & AT91_PMC_PCKR(prog->id));
++}
++
++static unsigned long clk_programmable_recalc_rate(struct clk_hw *hw,
++						  unsigned long parent_rate)
++{
++	u32 tmp;
++	struct clk_programmable *prog = to_clk_programmable(hw);
++	struct at91_pmc *pmc = prog->pmc;
++	const struct clk_programmable_layout *layout = prog->layout;
++
++	tmp = pmc_read(pmc, AT91_PMC_PCKR(prog->id));
++	prog->pres = (tmp >> layout->pres_shift) & PROG_PRES_MASK;
++
++	return parent_rate >> prog->pres;
++}
++
++static long clk_programmable_round_rate(struct clk_hw *hw, unsigned long rate,
++					unsigned long *parent_rate)
++{
++	unsigned long best_rate = *parent_rate;
++	unsigned long best_diff;
++	unsigned long new_diff;
++	unsigned long cur_rate;
++	int shift = shift;
++
++	if (rate > *parent_rate)
++		return *parent_rate;
++	else
++		best_diff = *parent_rate - rate;
++
++	if (!best_diff)
++		return best_rate;
++
++	for (shift = 1; shift < PROG_PRES_MASK; shift++) {
++		cur_rate = *parent_rate >> shift;
++
++		if (cur_rate > rate)
++			new_diff = cur_rate - rate;
++		else
++			new_diff = rate - cur_rate;
++
++		if (!new_diff)
++			return cur_rate;
++
++		if (new_diff < best_diff) {
++			best_diff = new_diff;
++			best_rate = cur_rate;
++		}
++
++		if (rate > cur_rate)
++			break;
++	}
++
++	return best_rate;
++}
++
++static int clk_programmable_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_programmable *prog = to_clk_programmable(hw);
++	const struct clk_programmable_layout *layout = prog->layout;
++	if (index > layout->css_mask) {
++		if (index > PROG_MAX_RM9200_CSS && layout->have_slck_mck) {
++			prog->css = 0;
++			prog->slckmck = 1;
++			return 0;
++		} else {
++			return -EINVAL;
++		}
++	}
++
++	prog->css = index;
++	return 0;
++}
++
++static u8 clk_programmable_get_parent(struct clk_hw *hw)
++{
++	u32 tmp;
++	u8 ret;
++	struct clk_programmable *prog = to_clk_programmable(hw);
++	struct at91_pmc *pmc = prog->pmc;
++	const struct clk_programmable_layout *layout = prog->layout;
++
++	tmp = pmc_read(pmc, AT91_PMC_PCKR(prog->id));
++	prog->css = tmp & layout->css_mask;
++	ret = prog->css;
++	if (layout->have_slck_mck) {
++		prog->slckmck = !!(tmp & AT91_PMC_CSSMCK_MCK);
++		if (prog->slckmck && !ret)
++			ret = PROG_MAX_RM9200_CSS + 1;
++	}
++
++	return ret;
++}
++
++static int clk_programmable_set_rate(struct clk_hw *hw, unsigned long rate,
++				     unsigned long parent_rate)
++{
++	struct clk_programmable *prog = to_clk_programmable(hw);
++	unsigned long best_rate = parent_rate;
++	unsigned long best_diff;
++	unsigned long new_diff;
++	unsigned long cur_rate;
++	int shift = 0;
++
++	if (rate > parent_rate)
++		return parent_rate;
++	else
++		best_diff = parent_rate - rate;
++
++	if (!best_diff) {
++		prog->pres = shift;
++		return 0;
++	}
++
++	for (shift = 1; shift < PROG_PRES_MASK; shift++) {
++		cur_rate = parent_rate >> shift;
++
++		if (cur_rate > rate)
++			new_diff = cur_rate - rate;
++		else
++			new_diff = rate - cur_rate;
++
++		if (!new_diff)
++			break;
++
++		if (new_diff < best_diff) {
++			best_diff = new_diff;
++			best_rate = cur_rate;
++		}
++
++		if (rate > cur_rate)
++			break;
++	}
++
++	prog->pres = shift;
++	return 0;
++}
++
++static const struct clk_ops programmable_ops = {
++	.prepare = clk_programmable_prepare,
++	.is_prepared = clk_programmable_is_ready,
++	.recalc_rate = clk_programmable_recalc_rate,
++	.round_rate = clk_programmable_round_rate,
++	.get_parent = clk_programmable_get_parent,
++	.set_parent = clk_programmable_set_parent,
++	.set_rate = clk_programmable_set_rate,
++};
++
++static struct clk * __init
++at91_clk_register_programmable(struct at91_pmc *pmc, unsigned int irq,
++			       const char *name, const char **parent_names,
++			       u8 num_parents, u8 id,
++			       const struct clk_programmable_layout *layout)
++{
++	int ret;
++	struct clk_programmable *prog;
++	struct clk *clk = NULL;
++	struct clk_init_data init;
++	char irq_name[11];
++
++	if (id > PROG_ID_MAX)
++		return ERR_PTR(-EINVAL);
++
++	prog = kzalloc(sizeof(*prog), GFP_KERNEL);
++	if (!prog)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &programmable_ops;
++	init.parent_names = parent_names;
++	init.num_parents = num_parents;
++	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
++
++	prog->id = id;
++	prog->layout = layout;
++	prog->hw.init = &init;
++	prog->pmc = pmc;
++	prog->irq = irq;
++	init_waitqueue_head(&prog->wait);
++	irq_set_status_flags(prog->irq, IRQ_NOAUTOEN);
++	snprintf(irq_name, sizeof(irq_name), "clk-prog%d", id);
++	ret = request_irq(prog->irq, clk_programmable_irq_handler,
++			  IRQF_TRIGGER_HIGH, irq_name, prog);
++	if (ret)
++		return ERR_PTR(ret);
++
++	clk = clk_register(NULL, &prog->hw);
++	if (IS_ERR(clk))
++		kfree(prog);
++
++	return clk;
++}
++
++static const struct clk_programmable_layout at91rm9200_programmable_layout = {
++	.pres_shift = 2,
++	.css_mask = 0x3,
++	.have_slck_mck = 0,
++};
++
++static const struct clk_programmable_layout at91sam9g45_programmable_layout = {
++	.pres_shift = 2,
++	.css_mask = 0x3,
++	.have_slck_mck = 1,
++};
++
++static const struct clk_programmable_layout at91sam9x5_programmable_layout = {
++	.pres_shift = 4,
++	.css_mask = 0x7,
++	.have_slck_mck = 0,
++};
++
++struct clk_prog_data {
++	struct clk **clks;
++	u8 *ids;
++	unsigned int clk_num;
++};
++
++static struct clk * __init
++of_clk_src_periph_get(struct of_phandle_args *clkspec, void *data)
++{
++	struct clk_prog_data *clk_data = data;
++	unsigned int id = clkspec->args[0];
++	int i;
++
++	if (id > PROG_ID_MAX)
++		goto err;
++
++	for (i = 0; i < clk_data->clk_num; i++) {
++		if (clk_data->ids[i] == id)
++			return clk_data->clks[i];
++	}
++
++err:
++	pr_err("%s: invalid clock id %d\n", __func__, id);
++	return ERR_PTR(-EINVAL);
++}
++
++static void __init
++of_at91_clk_prog_setup(struct device_node *np, struct at91_pmc *pmc,
++		       const struct clk_programmable_layout *layout)
++{
++	int num;
++	u32 id;
++	int i;
++	unsigned int irq;
++	struct clk *clk;
++	int num_parents;
++	u8 *ids;
++	struct clk **clks;
++	struct clk_prog_data *clktab;
++	const char *parent_names[PROG_SOURCE_MAX];
++	const char *name;
++	struct device_node *progclknp;
++
++	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
++	if (num_parents <= 0 || num_parents > PROG_SOURCE_MAX)
++		return;
++
++	for (i = 0; i < num_parents; ++i) {
++		parent_names[i] = of_clk_get_parent_name(np, i);
++		if (!parent_names[i])
++			return;
++	}
++
++	num = of_get_child_count(np);
++	if (!num || num > (PROG_ID_MAX + 1))
++		return;
++
++	clktab = kzalloc(sizeof(*clktab), GFP_KERNEL);
++	if (!clktab)
++		return;
++
++	ids = kzalloc(num * sizeof(*ids), GFP_KERNEL);
++	if (!ids)
++		goto out_free_clktab;
++
++	clks = kzalloc(num * sizeof(*clks), GFP_KERNEL);
++	if (!clks)
++		goto out_free_ids;
++
++	i = 0;
++	for_each_child_of_node(np, progclknp) {
++		name = progclknp->name;
++
++		if (of_property_read_u32(progclknp, "atmel,clk-id", &id))
++			goto out_free_clks;
++
++		irq = irq_of_parse_and_map(np, 0);
++		if (!irq)
++			goto out_free_clks;
++
++		clk = at91_clk_register_programmable(pmc, irq, name,
++						     parent_names, num_parents,
++						     id, layout);
++		if (IS_ERR(clk))
++			goto out_free_clks;
++
++		clks[i] = clk;
++		ids[i++] = id;
++	}
++
++	clktab->clk_num = num;
++	clktab->clks = clks;
++	clktab->ids = ids;
++	of_clk_add_provider(np, of_clk_src_periph_get, clktab);
++	return;
++
++out_free_clks:
++	kfree(clks);
++out_free_ids:
++	kfree(ids);
++out_free_clktab:
++	kfree(clktab);
++}
++
++
++void __init of_at91rm9200_clk_prog_setup(struct device_node *np,
++					 struct at91_pmc *pmc)
++{
++	of_at91_clk_prog_setup(np, pmc, &at91rm9200_programmable_layout);
++}
++
++void __init of_at91sam9g45_clk_prog_setup(struct device_node *np,
++					  struct at91_pmc *pmc)
++{
++	of_at91_clk_prog_setup(np, pmc, &at91sam9g45_programmable_layout);
++}
++
++void __init of_at91sam9x5_clk_prog_setup(struct device_node *np,
++					 struct at91_pmc *pmc)
++{
++	of_at91_clk_prog_setup(np, pmc, &at91sam9x5_programmable_layout);
++}
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index 8e27e92..5b8a959e 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -257,6 +257,21 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
+ 		.compatible = "atmel,at91sam9x5-clk-peripheral",
+ 		.data = of_at91sam9x5_clk_periph_setup,
+ 	},
++	/* Programmable clocks */
++#if defined(CONFIG_AT91_PROGRAMMABLE_CLOCKS)
++	{
++		.compatible = "atmel,at91rm9200-clk-programmable",
++		.data = of_at91rm9200_clk_prog_setup,
++	},
++	{
++		.compatible = "atmel,at91sam9g45-clk-programmable",
++		.data = of_at91sam9g45_clk_prog_setup,
++	},
++	{
++		.compatible = "atmel,at91sam9x5-clk-programmable",
++		.data = of_at91sam9x5_clk_prog_setup,
++	},
++#endif
+ 	{ /*sentinel*/ }
+ };
  
- padsave:
-@@ -719,7 +739,10 @@ padsave_done:
+diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+index 08c30fb..5f20dc1 100644
+--- a/drivers/clk/at91/pmc.h
++++ b/drivers/clk/at91/pmc.h
+@@ -82,4 +82,13 @@ extern void __init of_at91rm9200_clk_periph_setup(struct device_node *np,
+ extern void __init of_at91sam9x5_clk_periph_setup(struct device_node *np,
+ 						  struct at91_pmc *pmc);
  
- 	cmp	r10, #TEGRA30
- 	ldreq	r0, =TEGRA_EMC_BASE	@ r0 reserved for emc base addr
--	ldrne	r0, =TEGRA_EMC0_BASE
-+	cmp	r10, #TEGRA114
-+	ldreq	r0, =TEGRA_EMC0_BASE
-+	cmp	r10, #TEGRA124
-+	ldreq	r0, =TEGRA124_EMC_BASE
- 
- enter_self_refresh:
- 	cmp	r10, #TEGRA30
++#if defined(CONFIG_AT91_PROGRAMMABLE_CLOCKS)
++extern void __init of_at91rm9200_clk_prog_setup(struct device_node *np,
++						struct at91_pmc *pmc);
++extern void __init of_at91sam9g45_clk_prog_setup(struct device_node *np,
++						 struct at91_pmc *pmc);
++extern void __init of_at91sam9x5_clk_prog_setup(struct device_node *np,
++						struct at91_pmc *pmc);
++#endif
++
+ #endif /* __PMC_H_ */
 -- 
-1.8.4
+1.7.9.5
