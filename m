@@ -1,88 +1,66 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 11 Oct 2013 19:15:36 +0300
-Subject: [PATCH 06/11] ARM: OMAP3: CM/PM: add API for forcing IVA2 clk
- enable/disable
+Date: Fri, 11 Oct 2013 19:15:37 +0300
+Subject: [PATCH 07/11] ARM: OMAP3: CM/PM: add new API for checking IVA2 idle
+ status
 In-Reply-To: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
 References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381508141-15244-7-git-send-email-t-kristo@ti.com>
+Message-ID: <1381508141-15244-8-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP3 PM code directly writes to CM register space to enable/disable IVA2
-clock during boot during the IVA2 reset. Direct access shall be avoided,
-thus implement an API call for this, and change the PM core to use this.
+OMAP3 PM code needs this functionality during the IVA2 reset, but is currently
+using direct CM register accesses for this purpose. Implement a new API so
+the PM code can use this instead.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm3xxx.c |   10 ++++++++++
+ arch/arm/mach-omap2/cm3xxx.c |    6 ++++++
  arch/arm/mach-omap2/cm3xxx.h |    1 +
- arch/arm/mach-omap2/pm34xx.c |    7 +++----
- 3 files changed, 14 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c |    3 +--
+ 3 files changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index f13742b..55bf939 100644
+index 55bf939..b0509b9 100644
 --- a/arch/arm/mach-omap2/cm3xxx.c
 +++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -686,6 +686,16 @@ u32 omap3_cm_write_module_clken(s16 module, u8 regs, bool fck, u32 val)
- 	return omap3_cm_access_module_clken(module, regs, fck, val, true);
+@@ -696,6 +696,12 @@ void omap3_cm_force_iva_clk(bool enable)
+ 	omap2_cm_write_mod_reg(val, OMAP3430_IVA2_MOD, CM_FCLKEN);
  }
  
-+void omap3_cm_force_iva_clk(bool enable)
++bool omap3_cm_is_iva_active(void)
 +{
-+	u32 val = 0;
-+
-+	if (enable)
-+		val = OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK;
-+
-+	omap2_cm_write_mod_reg(val, OMAP3430_IVA2_MOD, CM_FCLKEN);
++	return omap2_cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSTST) &
++		OMAP3430_CLKACTIVITY_IVA2_MASK;
 +}
 +
  /*
   *
   */
 diff --git a/arch/arm/mach-omap2/cm3xxx.h b/arch/arm/mach-omap2/cm3xxx.h
-index 2481781..61fdfc7 100644
+index 61fdfc7..a944b5f 100644
 --- a/arch/arm/mach-omap2/cm3xxx.h
 +++ b/arch/arm/mach-omap2/cm3xxx.h
-@@ -86,6 +86,7 @@ extern void omap3_cm_restore_context(void);
- extern void omap3_cm_save_scratchpad_contents(u32 *ptr);
+@@ -87,6 +87,7 @@ extern void omap3_cm_save_scratchpad_contents(u32 *ptr);
  extern u32 omap3_cm_write_module_clken(s16 module, u8 regs, bool fck, u32 val);
  extern u32 omap3_cm_read_module_clken(s16 module, u8 regs, bool fck);
-+extern void omap3_cm_force_iva_clk(bool enable);
+ extern void omap3_cm_force_iva_clk(bool enable);
++extern bool omap3_cm_is_iva_active(void);
  
  extern int __init omap3xxx_cm_init(void);
  
 diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index f3ba439..ede058a 100644
+index ede058a..a73a012 100644
 --- a/arch/arm/mach-omap2/pm34xx.c
 +++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -412,7 +412,7 @@ restore:
- static void __init omap3_iva_idle(void)
- {
- 	/* ensure IVA2 clock is disabled */
--	omap2_cm_write_mod_reg(0, OMAP3430_IVA2_MOD, CM_FCLKEN);
-+	omap3_cm_force_iva_clk(false);
+@@ -415,8 +415,7 @@ static void __init omap3_iva_idle(void)
+ 	omap3_cm_force_iva_clk(false);
  
  	/* if no clock activity, nothing else to do */
- 	if (!(omap2_cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSTST) &
-@@ -426,8 +426,7 @@ static void __init omap3_iva_idle(void)
- 			  OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
- 
- 	/* Enable IVA2 clock */
--	omap2_cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK,
--			 OMAP3430_IVA2_MOD, CM_FCLKEN);
-+	omap3_cm_force_iva_clk(true);
- 
- 	/* Set IVA2 boot mode to 'idle' */
- 	omap_ctrl_writel(OMAP3_IVA2_BOOTMOD_IDLE,
-@@ -437,7 +436,7 @@ static void __init omap3_iva_idle(void)
- 	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
- 
- 	/* Disable IVA2 clock */
--	omap2_cm_write_mod_reg(0, OMAP3430_IVA2_MOD, CM_FCLKEN);
-+	omap3_cm_force_iva_clk(false);
+-	if (!(omap2_cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSTST) &
+-	      OMAP3430_CLKACTIVITY_IVA2_MASK))
++	if (!omap3_cm_is_iva_active())
+ 		return;
  
  	/* Reset IVA2 */
- 	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
 -- 
 1.7.9.5
