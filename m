@@ -1,115 +1,76 @@
-From: richard.weinberger@gmail.com (Richard Weinberger)
-Date: Fri, 11 Oct 2013 14:08:17 +0200
-Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
- "include/asm/atomic.h"
-In-Reply-To: <5257E539.9080902@asianux.com>
-References: <52561137.3070608@asianux.com> <5256117A.4000009@asianux.com>
- <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
- <20131010100733.GH3817@mudshark.cambridge.arm.com>
- <52568998.2080108@asianux.com>
- <20131010142305.GG6199@mudshark.cambridge.arm.com>
- <525751E2.3020207@asianux.com>
- <20131011104419.GE14732@mudshark.cambridge.arm.com>
- <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
-Message-ID: <CAFLxGvwsx2YfNHiGtjWsANfVW74PT3KneLA-T6SpY4NEp_OSUA@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 11 Oct 2013 14:12:17 +0200
+Subject: [PATCH v4 3/5] dma: mxs-dma: Fix channel reset hardware bug
+In-Reply-To: <1381493539-31756-1-git-send-email-mpa@pengutronix.de>
+References: <1381493539-31756-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1381493539-31756-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 1:47 PM, Chen Gang <gang.chen@asianux.com> wrote:
-> In current kernel wide source code, except other architectures, only
-> s390 scsi drivers use atomic_clear_mask(), and arm/arm64 need not
-> support s390 drivers.
->
-> So remove atomic_clear_mask() from "arm[64]/include/asm/atomic.h".
+This is no official errata, but I noticed that the channel reset may
+stop working if the DMA state engine is in the READ_FLUSH state.
 
-Is it really worth removing such a primitive?
-If someone needs it later he has to implement it from scratch and
-introduces bugs...
+This patch uses the channel debug1 register to wait for the DMA
+statemachine to leave the READ_FLUSH state. After that we can continue
+to reset the channel.
 
->
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm/include/asm/atomic.h   |   24 ------------------------
->  arch/arm64/include/asm/atomic.h |   14 --------------
->  2 files changed, 0 insertions(+), 38 deletions(-)
->
-> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
-> index da1c77d..3b3ae49fa 100644
-> --- a/arch/arm/include/asm/atomic.h
-> +++ b/arch/arm/include/asm/atomic.h
-> @@ -134,21 +134,6 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
->         return oldval;
->  }
->
-> -static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
-> -{
-> -       unsigned long tmp, tmp2;
-> -
-> -       __asm__ __volatile__("@ atomic_clear_mask\n"
-> -"1:    ldrex   %0, [%3]\n"
-> -"      bic     %0, %0, %4\n"
-> -"      strex   %1, %0, [%3]\n"
-> -"      teq     %1, #0\n"
-> -"      bne     1b"
-> -       : "=&r" (tmp), "=&r" (tmp2), "+Qo" (*addr)
-> -       : "r" (addr), "Ir" (mask)
-> -       : "cc");
-> -}
-> -
->  #else /* ARM_ARCH_6 */
->
->  #ifdef CONFIG_SMP
-> @@ -197,15 +182,6 @@ static inline int atomic_cmpxchg(atomic_t *v, int old, int new)
->         return ret;
->  }
->
-> -static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
-> -{
-> -       unsigned long flags;
-> -
-> -       raw_local_irq_save(flags);
-> -       *addr &= ~mask;
-> -       raw_local_irq_restore(flags);
-> -}
-> -
->  #endif /* __LINUX_ARM_ARCH__ */
->
->  #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
-> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-> index 8363644..01de5aa 100644
-> --- a/arch/arm64/include/asm/atomic.h
-> +++ b/arch/arm64/include/asm/atomic.h
-> @@ -126,20 +126,6 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
->         return oldval;
->  }
->
-> -static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
-> -{
-> -       unsigned long tmp, tmp2;
-> -
-> -       asm volatile("// atomic_clear_mask\n"
-> -"1:    ldxr    %0, %2\n"
-> -"      bic     %0, %0, %3\n"
-> -"      stxr    %w1, %0, %2\n"
-> -"      cbnz    %w1, 1b"
-> -       : "=&r" (tmp), "=&r" (tmp2), "+Q" (*addr)
-> -       : "Ir" (mask)
-> -       : "cc");
-> -}
-> -
->  #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
->
->  static inline int __atomic_add_unless(atomic_t *v, int a, int u)
-> --
-> 1.7.7.6
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Tested on i.MX28.
 
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/dma/mxs-dma.c | 29 +++++++++++++++++++++++++++--
+ 1 file changed, 27 insertions(+), 2 deletions(-)
 
-
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 52282b0..42b634a 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -60,6 +60,7 @@
+ 	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x080 : 0x140) + (n) * 0x70)
+ #define HW_APBHX_CHn_BAR(d, n) \
+ 	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x070 : 0x130) + (n) * 0x70)
++#define HW_APBX_CHn_DEBUG1(d, n) (0x150 + (n) * 0x70)
+ 
+ /*
+  * ccw bits definitions
+@@ -204,12 +205,36 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
+-	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
++	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma)) {
+ 		writel(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
+ 			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
+-	else
++	} else {
++		unsigned long elapsed = 0;
++		const unsigned long max_wait = 50000; /* 50ms */
++		void __iomem *reg_dbg1 = mxs_dma->base +
++				HW_APBX_CHn_DEBUG1(mxs_dma, chan_id);
++
++		/*
++		 * On i.MX28 APBX, the DMA channel can stop working if we reset
++		 * the channel while it is in READ_FLUSH (0x08) state.
++		 * We wait here until we leave the state. Then we trigger the
++		 * reset. Waiting a maximum of 50ms, the kernel shouldn't crash
++		 * because of this.
++		 */
++		while ((readl(reg_dbg1) & 0xf) == 0x8 && elapsed < max_wait) {
++			udelay(100);
++			elapsed += 100;
++		}
++
++		if (elapsed >= max_wait)
++			dev_err(&mxs_chan->mxs_dma->pdev->dev,
++					"Failed waiting for the DMA channel %d to leave state READ_FLUSH, trying to reset channel in READ_FLUSH state now\n",
++					chan_id);
++
++
+ 		writel(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
+ 			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_SET);
++	}
+ }
+ 
+ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
 -- 
-Thanks,
-//richard
+1.8.4.rc3
