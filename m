@@ -1,143 +1,89 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Fri, 11 Oct 2013 02:29:05 +0000
-Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
-In-Reply-To: <201310110418.56460.marex@denx.de>
-References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
- <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
- <201310110413.02354.marex@denx.de> <201310110418.56460.marex@denx.de>
-Message-ID: <0E83723C55F66F43A6041464FE31119D40A1F3@039-SN2MPN1-011.039d.mgd.msft.net>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Thu, 10 Oct 2013 23:21:30 -0400
+Subject: [PATCH 2/5] usb: gadget: s3c-hsotg: support configurable UTMI
+ PHY width
+In-Reply-To: <5256FAFA.1020509@linaro.org>
+References: <1381140752-312-1-git-send-email-matt.porter@linaro.org>
+ <1381140752-312-3-git-send-email-matt.porter@linaro.org>
+ <20131010152922.GF28375@radagast> <5256DBD0.8030008@linaro.org>
+ <20131010174620.GC19802@radagast>
+ <A2CA0424C0A6F04399FB9E1CD98E030458E16893@US01WEMBX2.internal.synopsys.com>
+ <5256FAFA.1020509@linaro.org>
+Message-ID: <52576EBA.9000502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek:
-In order to setup the irq properly when the PCIe switch is used.
-Did you update the map_irq function in pcie_designware.c driver?
-Here is the patch used by me when I trying to bring up the PCIe switch at my side.
-Patch is attached.
+On 10/10/2013 03:07 PM, Matt Porter wrote:
+> On 10/10/2013 01:57 PM, Paul Zimmerman wrote:
+>>> From: Felipe Balbi [mailto:balbi at ti.com]
+>>> Sent: Thursday, October 10, 2013 10:46 AM
+>>>
+>>> On Thu, Oct 10, 2013 at 12:54:40PM -0400, Matt Porter wrote:
+>>>> On 10/10/2013 11:29 AM, Felipe Balbi wrote:
+>>>>> On Mon, Oct 07, 2013 at 06:12:29AM -0400, Matt Porter wrote:
+>>>>>> Extend dwc2 binding with an optional utmi phy width property.
+>>>>>> Enable the s3c-hsotg.c driver to use standard dwc2 binding
+>>>>>> and enable configuration of the UTMI phy width based on the
+>>>>>> property.
+>>>>>>
+>>>>>> Signed-off-by: Matt Porter <matt.porter@linaro.org>
+>>>>>> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+>>>>>> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+>>>>>> ---
+>>>>>>   Documentation/devicetree/bindings/staging/dwc2.txt |  4 ++++
+>>>>>>   drivers/usb/gadget/s3c-hsotg.c                     | 18
+>>>>>> +++++++++++++++++-
+>>>>>>   drivers/usb/gadget/s3c-hsotg.h                     |  1 +
+>>>>>>   3 files changed, 22 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/staging/dwc2.txt
+>>> b/Documentation/devicetree/bindings/staging/dwc2.txt
+>>>>>> index 1a1b7cf..fb6b8ee 100644
+>>>>>> --- a/Documentation/devicetree/bindings/staging/dwc2.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/staging/dwc2.txt
+>>>>>> @@ -6,10 +6,14 @@ Required properties:
+>>>>>>   - reg : Should contain 1 register range (address and length)
+>>>>>>   - interrupts : Should contain 1 interrupt
+>>>>>>
+>>>>>> +Optional properties:
+>>>>>> +- snps,phy-utmi-width: Must contain the UTMI data width (either 8
+>>>>>> or 16)
+>>>>>
+>>>>> isn't this available in any of the configuration registers ?
+>>>>
+>>>> Yes and no. HWCFG4 has a UTMI data width field. However, it has 3
+>>>> valid states, "8", "16", or "8 or 16". The BCM281xx implementation is
+>>>> set to the latter and the attached phy is 8-bit.
+>>>>
+>>>> Looking at dwc2 prior to Matthijs Kooijman's patch [1] which starts
+>>>> validating the value of phy_utmi_width in that driver, the pci.c
+>>>> dwc2_module_params .phy_utmi_width field there even had the comment,
+>>>> "/* 16 bits - NOT DETECTABLE */". The autodetect code in
+>>>> dwc2_set_param_phy_utmi_width() will fail if HWCFG4 has the "8 or 16"
+>>>> option as it just decides to default to a phy width of 16 if nothing
+>>>> is configured by the platform glue. This property would also allow
+>>>> this issue to be addressed in that driver.
+>>>
+>>> fair enough, but I'd really like to hear from DT folks if your suggested
+>>> binding is acceptable. It seems like we can equally argue that it's a SW
+>>> configuration or HW description.
+>>
+>> It's definitely a HW description - the width of the UTMI data connection.
+>>
+>> But, which PHY is this? Does it have a register that could tell what
+>> the data width is? The dwc2 core has an (optional) PHY Vendor Control
+>> Register that allows reading the PHY registers.
+>
+> This is the integrated PHY on the bcm28155 part (the entire
+> bcm281xx/11351 family shares it). My register doc doesn't show the
+> optional PHY vendor control register as being present in this dwc2
+> implementation. I'll track down with the design team if this is
+> accurate...but it appears we can't go that route.
 
+The design team confirmed that we do not have any registers that can be 
+accessed via the PHY Vendor Control Register. All PHY control registers 
+are implemented in the MMIO control block which is supported in the PHY 
+control driver later in this series.They also confirmed there's no other 
+way to detect that it's an 8-bit data path.
 
-Best Regards
-Richard Zhu
-
-
------Original Message-----
-From: linux-pci-owner@vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org] On Behalf Of Marek Vasut
-Sent: Friday, October 11, 2013 10:19 AM
-To: Bjorn Helgaas
-Cc: Zhu Richard-R65037; linux-arm-kernel at lists.infradead.org; Shawn Guo; linux-pci at vger.kernel.org; tharvey at gateworks.com; Frank Li; Sean Cross; Sascha Hauer; Yinghai Lu
-Subject: Re: [PATCH v7 0/2] Add PCIe support for i.MX6q
-
-Hi,
-
-> Hi Bjorn,
-> 
-> > On Thu, Oct 10, 2013 at 11:39 AM, Marek Vasut <marex@denx.de> wrote:
-> > > Hi Bjorn,
-> > > 
-> > >> [+cc Yinghai]
-> > >> 
-> > >> On Thu, Oct 10, 2013 at 9:58 AM, Marek Vasut <marex@denx.de> wrote:
-> > >> >> On Thu, Oct 10, 2013 at 4:25 AM, Marek Vasut <marex@denx.de> wrote:
-> > >> > I tried you suggestion, this is what I got now (and with V7 of 
-> > >> > the
-> > >> > patches):
-> > >> > 
-> > >> > Note that my topology is: 
-> > >> > rootport->2_port_switch->ethernet_chip , the other port of the switch is not used .
-> > >> > 
-> > >> > imx6q-pcie 1ffc000.pcie: phy link never came up
-> 
-> After discussing with Tim a little, looks like a clock bit was 
-> missing. The above line was the cause of all the issues. Now I can 
-> probe the bus, but I still need more patches:
-> 
-> This dirty patch here limits the PCIe operation to GEN1 only. It's 
-> based on this Freescale patch [1]. Without this change, the PCIe 
-> switch is not detected. Any idea why? (I also had to increase the PHY 
-> startup delay to get GEN1 going).
-> 
-> [1]
-> https://www.osadl.org/monitoring/patches/r8s7/1342-ENGR00180230-MX6-PC
-> IE-
-> enlarge-the-eye-diagram-and-fo.patch
-> 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c 
-> index 32b30ca..df2838b 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -330,13 +330,16 @@ static void imx6_pcie_host_init(struct pcie_port 
-> *pp)
-> 
->         dw_pcie_setup_rc(pp);
-> 
-> +// Enable GEN1
-> +writel(((readl(pp->dbi_base + 0x7c) & 0xfffffff0) | 0x1), 
-> +pp->dbi_base +
-> 0x7c); +
->         regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->                         IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
-> 
->         while (!dw_pcie_link_up(pp)) {
->                 usleep_range(100, 1000);
->                 count++;
-> -               if (count >= 10) {
-> +               if (count >= 200) {
->                         dev_err(pp->dev, "phy link never came up\n");
->                         dev_dbg(pp->dev,
->                                 "DEBUG_R0: 0x%08x, DEBUG_R1: 
-> 0x%08x\n",
-> 
-
-The lspci now also looks much better.
-
-~ # lspci
-00:00.0 Class 0604: 16c3:abcd
-01:00.0 Class 0604: 12d8:2303
-02:01.0 Class 0604: 12d8:2303
-02:02.0 Class 0604: 12d8:2303
-03:00.0 Class 0200: 8086:1531
-
-And so does the probe log (but the pcieport failure still persists):
-
-PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [io  0x1000-0x10000] pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff] pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff] pci_bus 0000:00: scanning bus pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400 pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff] pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref] pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x5c pci 0000:00:00.0: supports D1 pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold pci 0000:00:00.0: PME# disabled pci_bus 0000:00: fixups for bus
-PCI: bus0: Fast back to back transfers disabled pci 0000:00:00.0: scanning [bus 01-01] behind bridge, pass 0 pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1 pci_bus 0000:01: scanning bus pci 0000:01:00.0: [12d8:2303] type 01 class 0x060400 pci 0000:01:00.0: calling pci_fixup_ide_bases+0x0/0x5c pci 0000:01:00.0: supports D1 D2 pci 0000:01:00.0: PME# supported from D0 D1 D2 D3hot D3cold pci 0000:01:00.0: PME# disabled pci_bus 0000:01: fixups for bus
-PCI: bus1: Fast back to back transfers disabled pci 0000:01:00.0: scanning [bus 00-00] behind bridge, pass 0 pci 0000:01:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring pci 0000:01:00.0: scanning [bus 00-00] behind bridge, pass 1 pci_bus 0000:02: scanning bus pci 0000:02:01.0: [12d8:2303] type 01 class 0x060400 pci 0000:02:01.0: calling pci_fixup_ide_bases+0x0/0x5c pci 0000:02:01.0: supports D1 D2 pci 0000:02:01.0: PME# supported from D0 D1 D2 D3hot D3cold pci 0000:02:01.0: PME# disabled pci 0000:02:02.0: [12d8:2303] type 01 class 0x060400 pci 0000:02:02.0: calling pci_fixup_ide_bases+0x0/0x5c pci 0000:02:02.0: supports D1 D2 pci 0000:02:02.0: PME# supported from D0 D1 D2 D3hot D3cold pci 0000:02:02.0: PME# disabled pci_bus 0000:02: fixups for bus
-PCI: bus2: Fast back to back transfers disabled pci 0000:02:01.0: scanning [bus 03-03] behind bridge, pass 0 pci 0000:02:02.0: scanning [bus 04-04] behind bridge, pass 0 pci 0000:02:01.0: scanning [bus 00-00] behind bridge, pass 1 pci_bus 0000:03: scanning bus pci 0000:03:00.0: [8086:1531] type 00 class 0x020000 pci 0000:03:00.0: reg 0x10: [mem 0x01000000-0x017fffff] pci 0000:03:00.0: reg 0x18: [io  0x1000-0x101f] pci 0000:03:00.0: reg 0x1c: [mem 0x01800000-0x01803fff] pci 0000:03:00.0: calling pci_fixup_ide_bases+0x0/0x5c pci 0000:03:00.0: PME# supported from D0 D3hot D3cold pci 0000:03:00.0: PME# disabled pci_bus 0000:03: fixups for bus
-PCI: bus3: Fast back to back transfers disabled pci_bus 0000:03: bus scan returning with max=03 pci_bus 0000:03: busn_res: [bus 03-ff] end is updated to 03 pci 0000:02:02.0: scanning [bus 00-00] behind bridge, pass 1 pci_bus 0000:04: scanning bus pci_bus 0000:04: fixups for bus
-PCI: bus4: Fast back to back transfers enabled pci_bus 0000:04: bus scan returning with max=04 pci_bus 0000:04: busn_res: [bus 04-ff] end is updated to 04 pci_bus 0000:02: bus scan returning with max=04 pci_bus 0000:02: busn_res: [bus 02-ff] end is updated to 04 pci_bus 0000:01: bus scan returning with max=04 pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 04 pci_bus 0000:00: bus scan returning with max=04 pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 04
-PCI: Device 0000:00:00.0 not available because of resource collisions
-pcieport: probe of 0000:00:00.0 failed with error -22
-PCI: Device 0000:00:00.0 not available because of resource collisions pci 0000:00:00.0: Error enabling bridge (-22), continuing
-PCI: enabling device 0000:01:00.0 (0140 -> 0143) pcieport 0000:01:00.0: enabling bus mastering
-PCI: Device 0000:00:00.0 not available because of resource collisions pci 0000:00:00.0: Error enabling bridge (-22), continuing
-PCI: Device 0000:00:00.0 not available because of resource collisions pci 0000:00:00.0: Error enabling bridge (-22), continuing pci 0000:03:00.0: calling quirk_e100_interrupt+0x0/0x20c pci 0000:00:00.0: fixup irq: got 155 pci 0000:00:00.0: assigning IRQ 155 pcieport 0000:01:00.0: fixup irq: got 0 pcieport 0000:01:00.0: assigning IRQ 00 pcieport 0000:02:01.0: fixup irq: got 0 pcieport 0000:02:01.0: assigning IRQ 00 pcieport 0000:02:02.0: fixup irq: got 0 pcieport 0000:02:02.0: assigning IRQ 00 pci 0000:03:00.0: fixup irq: got 155 pci 0000:03:00.0: assigning IRQ 155 pci 0000:00:00.0: BAR 8: assigned [mem 0x01000000-0x01bfffff] pci 0000:00:00.0: BAR 0: assigned [mem 0x01c00000-0x01cfffff] pci 0000:00:00.0: BAR 0: set to [mem 0x01c00000-0x01cfffff] (PCI address [0x1c00000-0x1c
-fffff])
-pci 0000:00:00.0: BAR 6: assigned [mem 0x01d00000-0x01d0ffff pref] pci 0000:00:00.0: BAR 7: assigned [io  0x1000-0x1fff] pcieport 0000:01:00.0: BAR 8: assigned [mem 0x01000000-0x01bfffff] pcieport 0000:01:00.0: BAR 7: assigned [io  0x1000-0x1fff] pcieport 0000:02:01.0: BAR 8: assigned [mem 0x01000000-0x01bfffff] pcieport 0000:02:01.0: BAR 7: assigned [io  0x1000-0x1fff] pci 0000:03:00.0: BAR 0: assigned [mem 0x01000000-0x017fffff] pci 0000:03:00.0: BAR 0: set to [mem 0x01000000-0x017fffff] (PCI address
-[0x1000000-0x17
-fffff])
-pci 0000:03:00.0: BAR 3: assigned [mem 0x01800000-0x01803fff] pci 0000:03:00.0: BAR 3: set to [mem 0x01800000-0x01803fff] (PCI address
-[0x1800000-0x18
-03fff])
-pci 0000:03:00.0: BAR 2: assigned [io  0x1000-0x101f] pci 0000:03:00.0: BAR 2: set to [io  0x1000-0x101f] (PCI address
-[0x1000-0x101f])
-pci 0000:00:00.0: PCI bridge to [bus 01-04]
-pci 0000:00:00.0:   bridge window [io  0x1000-0x1fff]
-pci 0000:00:00.0:   bridge window [mem 0x01000000-0x01bfffff]
-pci 0000:00:00.0: PCI bridge to [bus 01-04]
-pci 0000:00:00.0:   bridge window [io  0x1000-0x1fff]
-pci 0000:00:00.0:   bridge window [mem 0x01000000-0x01bfffff]
-pci_bus 0000:00: resource 4 [io  0x1000-0x10000] pci_bus 0000:00: resource 5 [mem 0x01000000-0x01efffff] pci_bus 0000:01: resource 0 [io  0x1000-0x1fff] pci_bus 0000:01: resource 1 [mem 0x01000000-0x01bfffff] pci_bus 0000:02: resource 0 [io  0x1000-0x1fff] pci_bus 0000:02: resource 1 [mem 0x01000000-0x01bfffff] pci_bus 0000:03: resource 0 [io  0x1000-0x1fff] pci_bus 0000:03: resource 1 [mem 0x01000000-0x01bfffff]
-
-Best regards,
-Marek Vasut
---
-To unsubscribe from this list: send the line "unsubscribe linux-pci" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-pcie-correct-the-irq-map-when-pcie-switch-is-used.patch
-Type: application/octet-stream
-Size: 1068 bytes
-Desc: 0001-pcie-correct-the-irq-map-when-pcie-switch-is-used.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131011/e30598e8/attachment-0001.obj>
+-Matt
