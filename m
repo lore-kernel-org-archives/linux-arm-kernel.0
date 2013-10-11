@@ -1,78 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 11 Oct 2013 15:24:28 -0700
-Subject: [PATCHv4 4/6] arm64: add CPU_HOTPLUG infrastructure
-In-Reply-To: <1381515846-1684-5-git-send-email-mark.rutland@arm.com>
-References: <1381515846-1684-1-git-send-email-mark.rutland@arm.com>
- <1381515846-1684-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <52587A9C.9070503@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 11 Oct 2013 22:26:08 +0000 (UTC)
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+In-Reply-To: <5258421D.8030006@ti.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+ <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
+ <52525642.8010307@ti.com> <20131007154103.GW8949@atomide.com>
+ <20131007190322.GY8949@atomide.com>
+ <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
+ <alpine.DEB.2.02.1310091858411.30199@utopia.booyaka.com>
+ <525654AE.7060009@ti.com>
+ <alpine.DEB.2.02.1310111749180.27397@utopia.booyaka.com>
+ <5258421D.8030006@ti.com>
+Message-ID: <alpine.DEB.2.02.1310112223570.27397@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/13 11:24, Mark Rutland wrote:
-> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-> index 1720be6..f4a11a3 100644
-> --- a/arch/arm64/include/asm/cpu_ops.h
-> +++ b/arch/arm64/include/asm/cpu_ops.h
-> @@ -34,6 +34,11 @@ struct device_node;
->   * @cpu_boot:	Boots a cpu into the kernel.
->   * @cpu_postboot: Optionally, perform any post-boot cleanup or necesary
->   *		synchronisation. Called from the cpu being booted.
-> + * @cpu_disable: Prepares a cpu to die. May fail for some mechanism-specific
-> + * 		reason, which will cause the hot unplug to be aborted. Called
-> + * 		from the cpu to be killed.
-> + * @cpu_die:	Makes the a leave the kernel. Must not fail. Called from the
+On Fri, 11 Oct 2013, Tero Kristo wrote:
 
-Makes the cpu? Makes a cpu?
+> Well, even if you sign something, you can still update it. Writing any
+> software to true OTP memory is one way to commit suicide IMO. How many nasty
+> bugs have you seen with ROM code? Also, if people want to make their custom
+> security solutions which are not supported by the kernel, why should the
+> kernel care about it? We don't know the details, and can't influence the
+> design, so we can't prepare for it anyway.
 
-> + *		cpu being killed.
->   */
->  struct cpu_operations {
->  	const char	*name;
-> @@ -41,6 +46,10 @@ struct cpu_operations {
->  	int		(*cpu_prepare)(unsigned int);
->  	int		(*cpu_boot)(unsigned int);
->  	void		(*cpu_postboot)(void);
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	int		(*cpu_disable)(unsigned int cpu);
-> +	void		(*cpu_die)(unsigned int cpu);
-> +#endif
->  };
->  
->  extern const struct cpu_operations *cpu_ops[NR_CPUS];
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 6806bc4..888776e 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-[snip]
-> +
-> +/*
-> + * Called from the idle thread for the CPU which has been shutdown.
-> + *
-> + * Note that we disable IRQs here, but do not re-enable them
-> + * before returning to the caller. This is also the behaviour
-> + * of the other hotplug-cpu capable cores, so presumably coming
-> + * out of idle fixes this.
-> + */
-> +void __ref cpu_die(void)
+The point is that newer kernels need to be compatible with older DT data: 
+that's the "stable ABI" criterion that's been discussed quite a bit.  The 
+worst-case scenario if the bindings are at a top-level node and not fully 
+cooked is that it can make it very difficult, if not impossible, to have 
+this forward compatibility for the DT data without having extremely nasty 
+hacks.
 
-__ref is unnecessary now that __cpuinit is gone. I see arm32 needs the
-same treatment.
 
-> +{
-> +	unsigned int cpu = smp_processor_id();
-> +
-> +	idle_task_exit();
-> +
-> +	local_irq_disable();
-> +	mb();
-
-Can you please comment this mb().
-
-> +
-> +	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> +	complete(&cpu_died);
-> +
->
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+- Paul
