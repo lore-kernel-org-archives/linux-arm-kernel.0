@@ -1,64 +1,48 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 11 Oct 2013 12:46:10 +0200
-Subject: [PATCH 2/3] ASoC: mxs-saif: Store saif state
-In-Reply-To: <20131011123146.73ff30ce@ipc1.ka-ro>
-References: <1381486264-1672-1-git-send-email-mpa@pengutronix.de>
- <1381486264-1672-3-git-send-email-mpa@pengutronix.de>
- <20131011123146.73ff30ce@ipc1.ka-ro>
-Message-ID: <20131011104610.GI19005@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 11 Oct 2013 11:49:20 +0100
+Subject: New big-endian patch series against 3.12-rc4
+In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <5257D7B0.3010108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ben,
 
-On Fri, Oct 11, 2013 at 12:31:46PM +0200, Lothar Wa?mann wrote:
-> Hi,
+On 08/10/13 23:34, Ben Dooks wrote:
+> This is a new series for big-endian on ARM re-based onto 3.12-rc4
+> and updated with new patches from Victor to fix regressions since 3.11.
 > 
-> > Trigger commands may be passed multiple times. To avoid errors with
-> > clk_enable/disable, store the saif state and return if saif is already
-> > running/stopped.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  sound/soc/mxs/mxs-saif.c | 8 ++++++++
-> >  sound/soc/mxs/mxs-saif.h | 5 +++++
-> >  2 files changed, 13 insertions(+)
-> > 
-> > diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-> > index b56b8a0..c8ead01 100644
-> > --- a/sound/soc/mxs/mxs-saif.c
-> > +++ b/sound/soc/mxs/mxs-saif.c
-> > @@ -503,6 +503,9 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
-> >  	case SNDRV_PCM_TRIGGER_START:
-> >  	case SNDRV_PCM_TRIGGER_RESUME:
-> >  	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-> > +		if (saif->state == MXS_SAIF_STATE_RUNNING)
-> > +			return 0;
-> > +
-> >  		dev_dbg(cpu_dai->dev, "start\n");
-> >  
-> >  		clk_enable(master_saif->clk);
-> > @@ -543,6 +546,7 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
-> >  		}
-> >  
-> >  		master_saif->ongoing = 1;
-> > +		saif->state = MXS_SAIF_STATE_RUNNING;
-> >
-> It seems to me that you could use the already existing variable
-> 'ongoing' that already reflects the state like you need it.
+> I have not been able to test this further than building it as I do not
+> currently have access to any hardware, however there where no big issues
+> when re-basing. Thanks to Marc Zyngier for pointing out the need for a
+> rebase.
+> 
+> The branch is at:
+> 
+>   git://git.baserock.org/delta/linux baserock/bjdooks/3.12-rc4/core
+> 
+> Russell, if possible could this go into -next and then if everything
+> I can issue a pull request for it.
+> 
+> Changes since last:
+> 
+> - Updated to 3.12-rc4 to be closer to mainline
+> - Added Victor's patches for CCI and TC2 boot
+> - Added Victor's patch for ASID extraction
+> - Updated Victor's patch with fix for building on older kernels
 
-'ongoing' can only be used if master_saif == saif. Otherwise this
-variable does not reflect the state of the saif. For example there could
-be parallel audio playback and recording, setting the variable only on
-the master_saif->ongoing but not for the second saif.
+For what it is worth, I've just gave this series a run as a KVM/arm64
+guest, running some Linaro OE userspace.
 
-Regards,
+While this doesn't exercise any of the driver code (the guest is
+entirely virtio based, and I have a separate patch series for this), the
+core code looks solid enough.
 
-Markus Pargmann
+I'm looking forward to seeing this series in next.
 
+Thanks,
 
+	M.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Jazz is not dead. It just smells funny...
