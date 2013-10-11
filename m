@@ -1,56 +1,30 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 11 Oct 2013 13:55:04 +0200
-Subject: [PATCH 2/2] PCI: imx6: Fix the clock for PCIe
-In-Reply-To: <000c01cec652$55adbb30$01093190$%han@samsung.com>
-References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
- <1381457552-6575-2-git-send-email-marex@denx.de>
- <000c01cec652$55adbb30$01093190$%han@samsung.com>
-Message-ID: <201310111355.04746.marex@denx.de>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Fri, 11 Oct 2013 13:59:00 +0200
+Subject: [PATCH] serial: prepare for 9bit data
+In-Reply-To: <20130926224755.GA15399@kroah.com>
+References: <1379938052-6026-1-git-send-email-jiri.prchal@aksignal.cz>
+ <20130926224755.GA15399@kroah.com>
+Message-ID: <5257E804.6020800@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jingoo Han,
 
-> On Friday, October 11, 2013 11:13 AM, Marek Vasut wrote:
-> > The clk #205 are lvds_sel, not lvds_gate , so fix this. Moreover,
-> > the PCIe needs lvds_gate for successful operation, so make the PCIe
-> > driver enable (set as output) the lvds_gate .
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Frank Li <lznuaa@gmail.com>
-> > Cc: Richard Zhu <r65037@freescale.com>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Sean Cross <xobs@kosagi.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Tim Harvey <tharvey@gateworks.com>
-> > Cc: Yinghai Lu <yinghai@kernel.org>
-> > ---
-> > 
-> >  arch/arm/boot/dts/imx6qdl.dtsi |  6 +++---
-> >  drivers/pci/host/pci-imx6.c    | 19 ++++++++++++++++++-
-> >  2 files changed, 21 insertions(+), 4 deletions(-)
-> 
-> Hi Marek Vasut,
-> 
-> How about splitting this patch into two patches such as
-> arch part and driver part?
-> 
-> It is because driver part was merged into PCI tree by Bjorn Helgaas,[1]
-> and arch part was merged into i.MX tree by Shawn Guo.[2]
-> Thus, your patch can make the conflict issue.
-> 
-> For example,
->   [PATCH 1/2] ARM: dts: imx6qdl: Fix the clock for PCIe
->   [PATCH 2/2] PCI: imx6: Fix the clock for PCIe
-> 
-> Then, 1st patch can be merged to i.MX tree, and 2nd patch can be merged
-> to PCI tree.
-> 
-> If I am wrong, please let me know kindly. :-)
 
-By all means, you're right. Is the patch addressing the issue correctly (if we 
-ignore that it's not split)? Shawn?
+Dne 27.9.2013 00:47, Greg KH napsal(a):
+> On Mon, Sep 23, 2013 at 02:07:32PM +0200, Jiri Prchal wrote:
+>> This patch adds 9bit data possibility for serial_core. Please confirm that I did it right way at right place. I'll make atmel_serial driver for 9bit data later.
+>
+> Please wrap your lines properly.
+>
+> I'd rather wait to add this type of patch _after_ you have tested it and
+> verified that your driver works, and take that patch at the same time.
+>
+> Otherwise, this is just added cruft that no one is using, and I'd have
+> to remove it :)
+No one is using it because it is NOT implemented.
+Try to search internet for "9bit serial" to see how many people like to use it.
+But I probably not bother to do it and I'll try some tricks with parity.
+As many others.
 
-Best regards,
-Marek Vasut
+Best regard
+Jiri
