@@ -1,201 +1,75 @@
-From: b35083@freescale.com (Jingchang Lu)
-Date: Fri, 11 Oct 2013 09:53:41 +0800
-Subject: [PATCH RESEND 2/3] ARM: dts: vf610: Add eDMA node
-In-Reply-To: <1381456421-7620-1-git-send-email-b35083@freescale.com>
-References: <1381456421-7620-1-git-send-email-b35083@freescale.com>
-Message-ID: <1381456421-7620-2-git-send-email-b35083@freescale.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 11 Oct 2013 04:12:31 +0200
+Subject: [PATCH 1/2] PCI: imx6: Make reset-gpio optional
+In-Reply-To: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
+References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
+Message-ID: <1381457552-6575-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
----
- arch/arm/boot/dts/vf610.dtsi         |  49 +++++++++++++++++
- include/dt-bindings/dma/vf610-edma.h | 103 +++++++++++++++++++++++++++++++++++
- 2 files changed, 152 insertions(+)
- create mode 100644 include/dt-bindings/dma/vf610-edma.h
+Some boards do not have a PCIe reset GPIO. To avoid probe
+failure on these boards, make the reset GPIO optional as
+well.
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index d31ce1b..365e0fa 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -10,6 +10,7 @@
- #include "skeleton.dtsi"
- #include "vf610-pinfunc.h"
- #include <dt-bindings/clock/vf610-clock.h>
-+#include <dt-bindings/dma/vf610-edma.h>
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Frank Li <lznuaa@gmail.com>
+Cc: Richard Zhu <r65037@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Sean Cross <xobs@kosagi.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Tim Harvey <tharvey@gateworks.com>
+Cc: Yinghai Lu <yinghai@kernel.org>
+---
+ drivers/pci/host/pci-imx6.c | 29 +++++++++++++++--------------
+ 1 file changed, 15 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index d3639aa..8e7adce 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -220,9 +220,12 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+ 			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
  
- / {
- 	aliases {
-@@ -87,6 +88,30 @@
- 				arm,tag-latency = <2 2 2>;
- 			};
+-	gpio_set_value(imx6_pcie->reset_gpio, 0);
+-	msleep(100);
+-	gpio_set_value(imx6_pcie->reset_gpio, 1);
++	/* Some boards don't have PCIe reset GPIO. */
++	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		gpio_set_value(imx6_pcie->reset_gpio, 0);
++		msleep(100);
++		gpio_set_value(imx6_pcie->reset_gpio, 1);
++	}
  
-+			edma0: dma-controller at 40018000 {
-+				#dma-cells = <2>;
-+				compatible = "fsl,vf610-edma";
-+				reg = <0x40018000 0x2000>;
-+				interrupts = <0 8 0x04>, <0 9 0x04>;
-+				interrupt-names = "edma-tx", "edma-err";
-+				dma-channels = <32>;
-+				fsl,dma-mux = <&dmamux0>, <&dmamux1>;
-+			};
-+
-+			dmamux0: dmamux at 40024000 {
-+				reg = <0x40024000 0x1000>;
-+				fsl,dmamux-id = <0>;
-+				clocks = <&clks VF610_CLK_DMAMUX0>;
-+				clock-names = "dmamux";
-+			};
-+
-+			dmamux1: dmamux at 40025000 {
-+				reg = <0x40025000 0x1000>;
-+				fsl,dmamux-id = <1>;
-+				clocks = <&clks VF610_CLK_DMAMUX1>;
-+				clock-names = "dmamux";
-+			};
-+
- 			uart0: serial at 40027000 {
- 				compatible = "fsl,vf610-lpuart";
- 				reg = <0x40027000 0x1000>;
-@@ -432,6 +457,30 @@
- 			reg = <0x40080000 0x80000>;
- 			ranges;
+ 	return 0;
+ }
+@@ -447,17 +450,15 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
  
-+			edma1: dma-controller at 40098000 {
-+				#dma-cells = <2>;
-+				compatible = "fsl,vf610-edma";
-+				reg = <0x40098000 0x2000>;
-+				interrupts = <0 10 0x04>, <0 11 0x04>;
-+				interrupt-names = "edma-tx", "edma-err";
-+				dma-channels = <32>;
-+				fsl,dma-mux = <&dmamux2>, <&dmamux3>;
-+			};
-+
-+			dmamux2: dmamux at 400a1000 {
-+				reg = <0x400a1000 0x1000>;
-+				fsl,dmamux-id = <1>;
-+				clocks = <&clks VF610_CLK_DMAMUX2>;
-+				clock-names = "dmamux";
-+			};
-+
-+			dmamux3: dmamux at 400a2000 {
-+				reg = <0x400a2000 0x1000>;
-+				fsl,dmamux-id = <0>;
-+				clocks = <&clks VF610_CLK_DMAMUX3>;
-+				clock-names = "dmamux";
-+			};
-+
- 			uart4: serial at 400a9000 {
- 				compatible = "fsl,vf610-lpuart";
- 				reg = <0x400a9000 0x1000>;
-diff --git a/include/dt-bindings/dma/vf610-edma.h b/include/dt-bindings/dma/vf610-edma.h
-new file mode 100644
-index 0000000..dbe1db2
---- /dev/null
-+++ b/include/dt-bindings/dma/vf610-edma.h
-@@ -0,0 +1,103 @@
-+/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ */
-+
-+#ifndef __DT_BINDINGS_VF610_EDMA_H__
-+#define __DT_BINDINGS_VF610_EDMA_H__
-+
-+/* DMAMUX0,3 reqeust source(slot) number */
-+#define VF610_EDMA_MUXID0_UART0_RX	2
-+#define VF610_EDMA_MUXID0_UART0_TX	3
-+#define VF610_EDMA_MUXID0_UART1_RX	4
-+#define VF610_EDMA_MUXID0_UART1_TX	5
-+#define VF610_EDMA_MUXID0_UART2_RX	6
-+#define VF610_EDMA_MUXID0_UART2_TX	7
-+#define VF610_EDMA_MUXID0_UART3_RX	8
-+#define VF610_EDMA_MUXID0_UART3_TX	9
-+#define VF610_EDMA_MUXID0_DSPI0_RX	12
-+#define VF610_EDMA_MUXID0_DSPI0_TX	13
-+#define VF610_EDMA_MUXID0_DSPI1_RX	14
-+#define VF610_EDMA_MUXID0_DSPI1_TX	15
-+#define VF610_EDMA_MUXID0_SAI0_RX	16
-+#define VF610_EDMA_MUXID0_SAI0_TX	17
-+#define VF610_EDMA_MUXID0_SAI1_RX	18
-+#define VF610_EDMA_MUXID0_SAI1_TX	19
-+#define VF610_EDMA_MUXID0_SAI2_RX	20
-+#define VF610_EDMA_MUXID0_SAI2_TX	21
-+#define VF610_EDMA_MUXID0_PDB		22
-+#define VF610_EDMA_MUXID0_FTM0_CH0	24
-+#define VF610_EDMA_MUXID0_FTM0_CH1	25
-+#define VF610_EDMA_MUXID0_FTM0_CH2	26
-+#define VF610_EDMA_MUXID0_FTM0_CH3	27
-+#define VF610_EDMA_MUXID0_FTM0_CH4	28
-+#define VF610_EDMA_MUXID0_FTM0_CH5	29
-+#define VF610_EDMA_MUXID0_FTM0_CH6	30
-+#define VF610_EDMA_MUXID0_FTM0_CH7	31
-+#define VF610_EDMA_MUXID0_FTM1_CH0	32
-+#define VF610_EDMA_MUXID0_FTM1_CH1	33
-+#define VF610_EDMA_MUXID0_ADC0		34
-+#define VF610_EDMA_MUXID0_QUADSPI0	36
-+#define VF610_EDMA_MUXID0_GPIOA		38
-+#define VF610_EDMA_MUXID0_GPIOB		39
-+#define VF610_EDMA_MUXID0_GPIOC		40
-+#define VF610_EDMA_MUXID0_GPIOD		41
-+#define VF610_EDMA_MUXID0_GPIOE		42
-+#define VF610_EDMA_MUXID0_RLE_RX	45
-+#define VF610_EDMA_MUXID0_RLE_TX	46
-+#define VF610_EDMA_MUXID0_SPDIF_RX	47
-+#define VF610_EDMA_MUXID0_SPDIF_TX	48
-+#define VF610_EDMA_MUXID0_I2C0_RX	50
-+#define VF610_EDMA_MUXID0_I2C0_TX	51
-+#define VF610_EDMA_MUXID0_I2C1_RX	52
-+#define VF610_EDMA_MUXID0_I2C1_TX	53
-+
-+/* DMA MUX1,2 request source(slot) number */
-+#define VF610_EDMA_MUXID1_UART4_RX	2
-+#define VF610_EDMA_MUXID1_UART4_TX	3
-+#define VF610_EDMA_MUXID1_UART5_RX	4
-+#define VF610_EDMA_MUXID1_UART5_TX	5
-+#define VF610_EDMA_MUXID1_SAI3_RX	8
-+#define VF610_EDMA_MUXID1_SAI3_TX	9
-+#define VF610_EDMA_MUXID1_DSPI2_RX	10
-+#define VF610_EDMA_MUXID1_DSPI2_TX	11
-+#define VF610_EDMA_MUXID1_DSPI3_RX	12
-+#define VF610_EDMA_MUXID1_DSPI3_TX	13
-+#define VF610_EDMA_MUXID1_FTM2_CH0	16
-+#define VF610_EDMA_MUXID1_FTM2_CH1	17
-+#define VF610_EDMA_MUXID1_FTM3_CH0	18
-+#define VF610_EDMA_MUXID1_FTM3_CH1	19
-+#define VF610_EDMA_MUXID1_FTM3_CH2	20
-+#define VF610_EDMA_MUXID1_FTM3_CH3	21
-+#define VF610_EDMA_MUXID1_FTM3_CH4	22
-+#define VF610_EDMA_MUXID1_FTM3_CH5	24
-+#define VF610_EDMA_MUXID1_FTM3_CH6	25
-+#define VF610_EDMA_MUXID1_FTM3_CH7	26
-+#define VF610_EDMA_MUXID1_QUADSPI1	27
-+#define VF610_EDMA_MUXID1_DAC0		32
-+#define VF610_EDMA_MUXID1_DAC1		33
-+#define VF610_EDMA_MUXID1_ESAI_BIFIFO_TX	34
-+#define VF610_EDMA_MUXID1_ESAI_BIFIFO_RX	35
-+#define VF610_EDMA_MUXID1_I2C2_RX	36
-+#define VF610_EDMA_MUXID1_I2C2_TX	37
-+#define VF610_EDMA_MUXID1_I2C3_RX	38
-+#define VF610_EDMA_MUXID1_I2C3_TX	39
-+#define VF610_EDMA_MUXID1_ASRC0_TX	40
-+#define VF610_EDMA_MUXID1_ASRC0_RX	41
-+#define VF610_EDMA_MUXID1_ASRC1_TX	42
-+#define VF610_EDMA_MUXID1_ASRC1_RX	43
-+#define VF610_EDMA_MUXID1_TIMER0	44
-+#define VF610_EDMA_MUXID1_TIMER1	45
-+#define VF610_EDMA_MUXID1_TIMER2	46
-+#define VF610_EDMA_MUXID1_TIMER3	47
-+#define VF610_EDMA_MUXID1_TIMER4	48
-+#define VF610_EDMA_MUXID1_TIMER5	49
-+#define VF610_EDMA_MUXID1_TIMER6	50
-+#define VF610_EDMA_MUXID1_TIMER7	51
-+
-+#endif
+ 	/* Fetch GPIOs */
+ 	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+-	if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
+-		dev_err(&pdev->dev, "no reset-gpio defined\n");
+-		ret = -ENODEV;
+-	}
+-	ret = devm_gpio_request_one(&pdev->dev,
+-				imx6_pcie->reset_gpio,
+-				GPIOF_OUT_INIT_LOW,
+-				"PCIe reset");
+-	if (ret) {
+-		dev_err(&pdev->dev, "unable to get reset gpio\n");
+-		goto err;
++	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		ret = devm_gpio_request_one(&pdev->dev,
++					imx6_pcie->reset_gpio,
++					GPIOF_OUT_INIT_LOW,
++					"PCIe reset");
++		if (ret) {
++			dev_err(&pdev->dev, "unable to get reset gpio\n");
++			goto err;
++		}
+ 	}
+ 
+ 	imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
 -- 
-1.8.0
+1.8.4.rc3
