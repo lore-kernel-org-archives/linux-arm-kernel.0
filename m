@@ -1,66 +1,68 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 11 Oct 2013 19:15:37 +0300
-Subject: [PATCH 07/11] ARM: OMAP3: CM/PM: add new API for checking IVA2 idle
- status
+Date: Fri, 11 Oct 2013 19:15:38 +0300
+Subject: [PATCH 08/11] ARM: OMAP3: control: add API for setting IVA bootmode
 In-Reply-To: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
 References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381508141-15244-8-git-send-email-t-kristo@ti.com>
+Message-ID: <1381508141-15244-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP3 PM code needs this functionality during the IVA2 reset, but is currently
-using direct CM register accesses for this purpose. Implement a new API so
-the PM code can use this instead.
+OMAP3 PM core requires IVA2 bootmode to be set to idle during init. Currently,
+a direct register write is used for this. Add a new ctrl API for this purpose
+instead.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm3xxx.c |    6 ++++++
- arch/arm/mach-omap2/cm3xxx.h |    1 +
- arch/arm/mach-omap2/pm34xx.c |    3 +--
- 3 files changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/control.c |   11 +++++++++++
+ arch/arm/mach-omap2/control.h |    1 +
+ arch/arm/mach-omap2/pm34xx.c  |    3 +--
+ 3 files changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index 55bf939..b0509b9 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -696,6 +696,12 @@ void omap3_cm_force_iva_clk(bool enable)
- 	omap2_cm_write_mod_reg(val, OMAP3430_IVA2_MOD, CM_FCLKEN);
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index a597114..44bb4d5 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -569,4 +569,15 @@ int omap3_ctrl_save_padconf(void)
+ 	return 0;
  }
  
-+bool omap3_cm_is_iva_active(void)
++/**
++ * omap3_ctrl_set_iva_bootmode_idle - sets the IVA2 bootmode to idle
++ *
++ * Sets the bootmode for IVA2 to idle. This is needed by the PM code to
++ * force disable IVA2 so that it does not prevent any low-power states.
++ */
++void omap3_ctrl_set_iva_bootmode_idle(void)
 +{
-+	return omap2_cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSTST) &
-+		OMAP3430_CLKACTIVITY_IVA2_MASK;
++	omap_ctrl_writel(OMAP3_IVA2_BOOTMOD_IDLE,
++			 OMAP343X_CONTROL_IVA2_BOOTMOD);
 +}
-+
- /*
-  *
-  */
-diff --git a/arch/arm/mach-omap2/cm3xxx.h b/arch/arm/mach-omap2/cm3xxx.h
-index 61fdfc7..a944b5f 100644
---- a/arch/arm/mach-omap2/cm3xxx.h
-+++ b/arch/arm/mach-omap2/cm3xxx.h
-@@ -87,6 +87,7 @@ extern void omap3_cm_save_scratchpad_contents(u32 *ptr);
- extern u32 omap3_cm_write_module_clken(s16 module, u8 regs, bool fck, u32 val);
- extern u32 omap3_cm_read_module_clken(s16 module, u8 regs, bool fck);
- extern void omap3_cm_force_iva_clk(bool enable);
-+extern bool omap3_cm_is_iva_active(void);
- 
- extern int __init omap3xxx_cm_init(void);
- 
+ #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index f7d7c2e..da05480 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -427,6 +427,7 @@ extern void omap_ctrl_write_dsp_boot_addr(u32 bootaddr);
+ extern void omap_ctrl_write_dsp_boot_mode(u8 bootmode);
+ extern void omap3630_ctrl_disable_rta(void);
+ extern int omap3_ctrl_save_padconf(void);
++extern void omap3_ctrl_set_iva_bootmode_idle(void);
+ extern void omap2_set_globals_control(void __iomem *ctrl,
+ 				      void __iomem *ctrl_pad);
+ #else
 diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index ede058a..a73a012 100644
+index a73a012..a0c7e83 100644
 --- a/arch/arm/mach-omap2/pm34xx.c
 +++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -415,8 +415,7 @@ static void __init omap3_iva_idle(void)
- 	omap3_cm_force_iva_clk(false);
+@@ -428,8 +428,7 @@ static void __init omap3_iva_idle(void)
+ 	omap3_cm_force_iva_clk(true);
  
- 	/* if no clock activity, nothing else to do */
--	if (!(omap2_cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSTST) &
--	      OMAP3430_CLKACTIVITY_IVA2_MASK))
-+	if (!omap3_cm_is_iva_active())
- 		return;
+ 	/* Set IVA2 boot mode to 'idle' */
+-	omap_ctrl_writel(OMAP3_IVA2_BOOTMOD_IDLE,
+-			 OMAP343X_CONTROL_IVA2_BOOTMOD);
++	omap3_ctrl_set_iva_bootmode_idle();
  
- 	/* Reset IVA2 */
+ 	/* Un-reset IVA2 */
+ 	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
 -- 
 1.7.9.5
