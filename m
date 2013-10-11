@@ -1,55 +1,118 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 11 Oct 2013 10:17:50 -0700
-Subject: KVM virtual timer issue with trinity
-In-Reply-To: <20131009110039.GD6564@mudshark.cambridge.arm.com>
-References: <20130906163052.GG30450@mudshark.cambridge.arm.com>
- <20130912093750.GE15357@mudshark.cambridge.arm.com>
- <20130912152716.GP9860@cbox>
- <20131009110039.GD6564@mudshark.cambridge.arm.com>
-Message-ID: <20131011171750.GF5108@cbox>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Oct 2013 10:21:28 -0700
+Subject: [PATCH] pinctrl: single: call pcs_soc->rearm() whenever IRQ
+ mask is changed
+In-Reply-To: <1381507996-15021-1-git-send-email-rogerq@ti.com>
+References: <1381507996-15021-1-git-send-email-rogerq@ti.com>
+Message-ID: <20131011172128.GT29913@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 12:00:39PM +0100, Will Deacon wrote:
-> On Thu, Sep 12, 2013 at 04:27:16PM +0100, Christoffer Dall wrote:
-> > On Thu, Sep 12, 2013 at 10:37:50AM +0100, Will Deacon wrote:
-> > > On Fri, Sep 06, 2013 at 05:30:52PM +0100, Will Deacon wrote:
-> > > > Running trinity as a normal user in a KVM guest on my TC2 (A15s only)
-> > > > eventually leads to a situation where responsiveness is extremely sluggish.
-> > > > Further investigation shows that issuing a `sleep 1' command never returns.
-> > > > This seems to be because the virtual timer has stopped generating interrupts
-> > > > on CPU0 (CPU1 seems ok).
-> > > > 
-> > > > Dumping the timer state (see below), it looks like CPU0's timer expired in
-> > > > the past, but we're perhaps not receiving the interrupt. The trinity logs
-> > > > don't reveal anything obvious (and they're huge, so I can't include them
-> > > > here).
-> > > > 
-> > > > I can reproduce this in an hour or so, so if you want me to try anything out
-> > > > in the host, I can give it a go. I'm using 3.11 as both the guest and host.
-> > > 
-> > > Any ideas on things I can do to get to the bottom of this? It's preventing
-> > > me from running trinity to find any other issues and there's no reason you
-> > > couldn't hit this lockup under other workloads.
-> > > 
-> > I've been thinking on this, sorry about the late response.
-> > 
-> > I see something similar when resuming a suspended guest, but I don't
-> > have very clever ideas or debug strategies yet.  I plan on looking at
-> > this once I get a new revision of the save/restore QEMU patches out.
+* Roger Quadros <rogerq@ti.com> [131011 09:21]:
+> On OMAPs the IO ring must be rearmed each time the pad wakeup
+> configuration is changed. So call pcs_soc->rearm() from
+> pcs_irq_set().
 > 
-> Marc was saying that you'd managed to resolve the issue with suspend, but I
-> can still reproduce the issue with trinity on a 3.12-rc4 kernel (host and
-> guest).
-
-Yeah, that issue turned out to be simply overwriting the restored
-counter values.  I need to look at this some more, still present in my
-todo list...
-
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  drivers/pinctrl/pinctrl-single.c |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
 > 
-> I tried to reproduce in a model, but I ran into a bunch of other unrelated
-> problems that look like bugs in the model itself.
-> 
-Great...
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index c2aada7..1800e47 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -1604,6 +1604,9 @@ static inline void pcs_irq_set(struct pcs_soc_data *pcs_soc,
+>  		pcs->write(mask, pcswi->reg);
+>  		raw_spin_unlock(&pcs->lock);
+>  	}
+> +
+> +	if (pcs_soc->rearm)
+> +		pcs_soc->rearm();
+>  }
+>  
+>  /**
+> @@ -1626,8 +1629,6 @@ static void pcs_irq_unmask(struct irq_data *d)
+>  	struct pcs_soc_data *pcs_soc = irq_data_get_irq_chip_data(d);
+>  
+>  	pcs_irq_set(pcs_soc, d->irq, true);
+> -	if (pcs_soc->rearm)
+> -		pcs_soc->rearm();
+>  }
 
--Christoffer
+This seems to cause the wake-up interrupts to happen also during
+runtime for me, which makes the omap3 behave the same way as omap4
+already does.
+
+However, the concern I have is that we only want the io chain
+wake-up happen during idle and not during runtime.. So counting
+on the io chain in your EHCI driver during runtime would require
+also additional tracking of idle wake up events vs runtime wake-up
+events somewhere once we have the automatic solution for runtime PM.
+That is to avoid spurious interrupts during runtime.
+
+In any case, since this is an interrupt controller now, we should
+just follow the Linux standard for interrupt controllers, so if
+you do a request_irq() on it, you really should get interrupts.
+
+I've updated the patch a litte below to also remove the now bogus
+comment, and to update the description.
+
+So considering all that, I suggest that Linus applies the updated
+fix below into the pinctrl tree after pulling in the the tag I
+posted for "pinctrl-single-for-linus-for-v3.13-signed".
+
+8< -----------------------
+
+From: Roger Quadros <rogerq@ti.com>
+Date: Fri, 11 Oct 2013 19:13:16 +0300
+Subject: [PATCH] pinctrl: single: call pcs_soc->rearm() whenever IRQ mask is changed
+
+On OMAPs the IO ring must be rearmed each time the pad wakeup
+configuration is changed. So call pcs_soc->rearm() from
+pcs_irq_set().
+
+As pinctrl-single is now an interrupt controller in some cases,
+we should follow the standards and keep the interrupts enabled
+constantly, and not just for wake-up events. The tracking of
+runtime vs wake-up interrupts can be handled separately for
+the automated runtime PM solution when we have it in the
+future.
+
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+[tony at atomide.com: removed wrong comment, updated description]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1604,6 +1604,9 @@ static inline void pcs_irq_set(struct pcs_soc_data *pcs_soc,
+ 		pcs->write(mask, pcswi->reg);
+ 		raw_spin_unlock(&pcs->lock);
+ 	}
++
++	if (pcs_soc->rearm)
++		pcs_soc->rearm();
+ }
+ 
+ /**
+@@ -1626,8 +1629,6 @@ static void pcs_irq_unmask(struct irq_data *d)
+ 	struct pcs_soc_data *pcs_soc = irq_data_get_irq_chip_data(d);
+ 
+ 	pcs_irq_set(pcs_soc, d->irq, true);
+-	if (pcs_soc->rearm)
+-		pcs_soc->rearm();
+ }
+ 
+ /**
+@@ -1678,11 +1679,6 @@ static int pcs_irq_handle(struct pcs_soc_data *pcs_soc)
+ 		}
+ 	}
+ 
+-	/*
+-	 * For debugging on omaps, you may want to call pcs_soc->rearm()
+-	 * here to see wake-up interrupts during runtime also.
+-	 */
+-
+ 	return count;
+ }
+ 
