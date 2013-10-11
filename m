@@ -1,97 +1,90 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Oct 2013 17:44:13 +0200
-Subject: [PATCH v5] gpio: Add MOXA ART GPIO driver
-In-Reply-To: <1381503190-5733-1-git-send-email-jonas.jensen@gmail.com>
-References: <1375103161-12460-1-git-send-email-jonas.jensen@gmail.com>
- <1381503190-5733-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <CACRpkda23nUF8i03RWePj+dGa9Wj6E1L8vfPMfxvnGkazfKS5w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Oct 2013 16:44:02 +0100
+Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2
+ page fault
+In-Reply-To: <CAAhSdy2nfnDuAZW6XWz0Xc4ehcU9YcHKLv7WVSCgk3+b8AD7Hw@mail.gmail.com>
+References: <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
+ <525667DB.7090705@arm.com> <20131010112425.GB21380@arm.com>
+ <CAAhSdy20=U3+LZd=3i8dfqfSEaX7V+2z_y641NBLj7PkYZBadQ@mail.gmail.com>
+ <20131011123839.GH12308@darko.cambridge.arm.com>
+ <CAAhSdy1Sm2N68ZB5r9BmansGYnUgFO0ZFdUL=XB7RhJ258AAFA@mail.gmail.com>
+ <20131011143721.GD15803@arm.com>
+ <CAAhSdy1RS58HxDD2sKC5NP=vZ-fn=Zc4qEYZoFHR2usGqiQMFA@mail.gmail.com>
+ <5258125E.4040709@arm.com>
+ <CAAhSdy2nfnDuAZW6XWz0Xc4ehcU9YcHKLv7WVSCgk3+b8AD7Hw@mail.gmail.com>
+Message-ID: <20131011154401.GE15803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 4:53 PM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+On Fri, Oct 11, 2013 at 04:32:48PM +0100, Anup Patel wrote:
+> On Fri, Oct 11, 2013 at 8:29 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > On 11/10/13 15:50, Anup Patel wrote:
+> >> On Fri, Oct 11, 2013 at 8:07 PM, Catalin Marinas
+> >> <catalin.marinas@arm.com> wrote:
+> >>> On Fri, Oct 11, 2013 at 03:27:16PM +0100, Anup Patel wrote:
+> >>>> On Fri, Oct 11, 2013 at 6:08 PM, Catalin Marinas
+> >>>> <catalin.marinas@arm.com> wrote:
+> >>>>> On Thu, Oct 10, 2013 at 05:09:03PM +0100, Anup Patel wrote:
+> >>>>>> Coming back to where we started, the actual problem was that when
+> >>>>>> Guest starts booting it sees wrong contents because it is runs with
+> >>>>>> MMU disable and correct contents are still in external L3 cache of X-Gene.
+> >>>>>
+> >>>>> That's one of the problems and I think the easiest to solve. Note that
+> >>>>> contents could still be in the L1/L2 (inner) cache since whole cache
+> >>>>> flushing by set/way isn't guaranteed in an MP context.
+> >>>>>
+> >>>>>> How about reconsidering the approach of flushing Guest RAM (entire or
+> >>>>>> portion of it) to PoC by VA once before the first run of a VCPU ?
+> >>>>>
+> >>>>> Flushing the entire guest RAM is not possible by set/way
+> >>>>> (architecturally) and not efficient by VA (though some benchmark would
+> >>>>> be good). Marc's patch defers this flushing when a page is faulted in
+> >>>>> (at stage 2) and I think it covers the initial boot.
+> >>>>>
+> >>>>>> OR
+> >>>>>> We can also have KVM API using which user space can flush portions
+> >>>>>> of Guest RAM before running the VCPU. (I think this was a suggestion
+> >>>>>> from Marc Z initially)
+> >>>>>
+> >>>>> This may not be enough. It indeed flushes the kernel image that gets
+> >>>>> loaded but the kernel would write other pages (bss, page tables etc.)
+> >>>>> with MMU disabled and those addresses may contain dirty cache lines that
+> >>>>> have not been covered by the initial kvmtool flush. So you basically
+> >>>>> need all guest non-cacheable accesses to be flushed.
+> >>>>>
+> >>>>> The other problems are the cacheable aliases that I mentioned, so even
+> >>>>> though the guest does non-cacheable accesses with the MMU off, the
+> >>>>> hardware can still allocate into the cache via the other mappings. In
+> >>>>> this case the guest needs to invalidate the areas of memory that it
+> >>>>> wrote with caches off (or just use the DC bit to force memory accesses
+> >>>>> with MMU off to be cacheable).
+> >>>>
+> >>>> Having looked at all the approaches, I would vote for the approach taken
+> >>>> by this patch.
+> >>>
+> >>> But this patch alone doesn't solve the other issues. OTOH, the DC bit
+> >>> would solve your initial problem and a few others.
+> >>
+> >> DC bit might solve the initial problem but it can be problematic because
+> >> setting DC bit would mean Guest would have Caching ON even when Guest
+> >> MMU is disabled. This will be more problematic if Guest is running a
+> >> bootloader (uboot, grub, UEFI, ..) which does pass-through access to a
+> >> DMA-capable device and we will have to change the bootloader in this
+> >> case and put explicit flushes in bootloader for running inside Guest.
+> >
+> > Well, as Catalin mentioned, we'll have to do some cache maintenance in
+> > the guest in any case.
+> 
+> This would also mean that we will have to change Guest bootloader for
+> running as Guest under KVM ARM64.
 
->     I agree it is a bit strange GPIO control is divided in two
->     separate registers. Unfortunately I can't offer an explanation
->     because the documentation is not publicly available.
->
->     The register responsible for doing enable/disable is located
->     at <0x98100100 0x4>, the clock register is very close at
->     <0x98100000 0x34>.
+Yes.
 
-If we don't know we have to guess.
+> In x86 world, everything that can run natively also runs as Guest OS
+> even if the Guest has pass-through devices.
 
-This layout makes me think that the IO-window at 0x98100000 is
-a power-clock-and-reset controller. It contains some register
-to latch the pins enable/disable them, or if this is even a clock
-gate? Are you sure about this? Is it now a gated clock, simply,
-so that this bit should be handled in the clock driver, i.e.
-this bit gets set by clk_enable() from the GPIO driver?
+I guess on x86 the I/O is also coherent, in which case we could use the
+DC bit.
 
-I am very suspicious about this especially since the GPIO
-driver is lacking clk_get() and friends.
-
-If it's not a clock gate, and you are convinced that you must still
-reach out into this range I think you want something like this:
-
-syscon: syscon at 98100000 {
-                compatible = "syscon";
-                reg = <0x98100000 0x1000>;
-};
-
-gpio: gpio at 98700000 {
-               gpio-controller;
-               #gpio-cells = <2>;
-               syscon = <&syscon>;
-               compatible = "moxa,moxart-gpio";
-               reg =   <0x98700000 0xC>,
-                       <0x98100100 0x4>;
-};
-
-Then the driver can use something like:
-
-        struct device_node *np = pdev->dev.of_node;
-        struct device_node *syscon_np;
-        struct regmap *regmap;
-        int err;
-
-        syscon_np = of_parse_phandle(np, "syscon", 0);
-        if (!syscon_np) {
-                pr_crit("no syscon node\n");
-                return -ENODEV;
-        }
-        regmap = syscon_node_to_regmap(syscon_np);
-        if (!regmap) {
-                pr_crit("could not locate syscon regmap\n");
-                return -ENODEV;
-        }
-
-Then update the registers using regmap_update_bits() and
-friends.
-
->     I don't think gpio_poweroff driver is right for this hardware
->     because the pin is not connected to anything that can do reset.
->     The old 2.6.9 kernel driver uses timer poll with eventual call
->     to userspace.
->
->     To test that it works, I added gpio_poweroff anyway, modified
->     with gpio_export() the pin can then be seen switching between
->     0 and 1 (on "cat /sys/class/gpio/gpio25/value").
-
-Hmmmm not quite following this...
-
-> +Required properties:
-> +
-> +- #gpio-cells : Should be 2, The first cell is the pin number and
-> +               the second cell is used to specify polarity:
-> +                       0 = active high
-> +                       1 = active low
-
-Could reference <dt-bindings/gpio/gpio.h> I guess?
-
-Oh well, no big deal.
-
-The driver as such is looking nice but now I strongly suspect
-it should clk_get/clk_prepare/clk_enable ... etc.
-
-Yours,
-Linus Walleij
+-- 
+Catalin
