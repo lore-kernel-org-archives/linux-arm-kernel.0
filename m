@@ -1,57 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Oct 2013 14:42:01 -0700
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.13
-In-Reply-To: <52584BF7.8060100@baylibre.com>
-References: <52582A67.6050108@baylibre.com>
- <20131011180324.GV29913@atomide.com>
- <52584BF7.8060100@baylibre.com>
-Message-ID: <20131011214201.GZ29913@atomide.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Fri, 11 Oct 2013 14:45:38 -0700
+Subject: [PATCH v8 5/5] ARM: tegra: support Trusted Foundations by default
+In-Reply-To: <1381527938-22840-1-git-send-email-acourbot@nvidia.com>
+References: <1381527938-22840-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1381527938-22840-6-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <bcousson@baylibre.com> [131011 12:13]:
-> Hi Tony,
-> 
-> On 11/10/2013 20:03, Tony Lindgren wrote:
-> >Hi Benoit,
-> >
-> >* Benoit Cousson <bcousson@baylibre.com> [131011 09:50]:
-> >>Add the minimal DTS support for DRA7xx based SoC core.
-> >>Add the initial support for N900 and gta04 phones.
-> >>Enable USB3 on OMAP5 evm board.
-> >>Add support for cryto accelerators
-> >>Add new IGEP AQUILA board
-> >>Add AM33XX EDMA support
-> >>Update HSUSB node to use the reset-gpios fmwk
-> >
-> >Looks good to me, but we're getting self-inflicted merge
-> >conflicts in two places now with Paul's hwmod changes,
-> >and my defconfig changes.
-> 
-> Damn!
+Support for Trusted Foundations is light and allows the kernel to run on
+a wider range of devices, so enable it by default.
 
-:)
- 
-> >Can you please respin without the following two patches:
-> >
-> >49bcd824c1c0db32fe4de0c1ba3ee36defdb11ca ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies
-> >736c4bb159c793b00331261438deb982cbac3c03 ARM: OMAP5: hwmod: add missing ocp2scp hwmod data
-> >
-> >I can pick the two patches above and apply after pulling in
-> >Paul's branch first.
-> 
-> OK, no problem.
-> 
-> >
-> >However, if other branches are based on this, then we just
-> >need to deal with the merge conflicts, and there's no point
-> >in redoing your branch.
-> 
-> Considering the patches, I don't see any dependency with the other
-> ones, as soon as they are pulled before the DTS changes.
-> 
-> I'll do that ASAP and repost.
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/configs/tegra_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-OK thanks! I'll cherry pick the above two commits then.
-
-Tony
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index ea042e8..dddb97b 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -32,6 +32,7 @@ CONFIG_PCI=y
+ CONFIG_PCI_MSI=y
+ CONFIG_PCI_TEGRA=y
+ CONFIG_PCIEPORTBUS=y
++CONFIG_TRUSTED_FOUNDATIONS=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+-- 
+1.8.4
