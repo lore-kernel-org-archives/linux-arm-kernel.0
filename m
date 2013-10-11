@@ -1,276 +1,159 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 11 Oct 2013 13:27:06 +0200
-Subject: [PATCH v4 14/17] clk: at91: add PMC smd clock
-In-Reply-To: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
-References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1381490826-14646-1-git-send-email-b.brezillon@overkiz.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 11 Oct 2013 12:11:59 +0100
+Subject: [PATCH V3] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware
+Message-ID: <1381489919-2508-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds at91 smd (Soft Modem) clock implementation using common clk
-framework.
+The memory pinning code in uaccess_with_memcpy.c does not check
+for HugeTLB or THP pmds, and will enter an infinite loop should
+a __copy_to_user or __clear_user occur against a huge page.
 
-Not used by any driver right now.
+This patch adds detection code for huge pages to pin_page_for_write.
+As this code can be executed in a fast path it refers to the actual
+pmds rather than the vma. If a HugeTLB or THP is found (they have
+the same pmd representation on ARM), the page table spinlock is
+taken to prevent modification whilst the page is pinned.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+On ARM, huge pages are only represented as pmds, thus no huge pud
+checks are performed. (For huge puds one would lock the page table
+in a similar manner as in the pmd case).
+
+Two helper functions are introduced; pmd_thp_or_huge will check
+whether or not a page is huge or transparent huge (which have the
+same pmd layout on ARM), and pmd_hugewillfault will detect whether
+or not a page fault will occur on write to the page.
+
+Running the following test (with the chunking from read_zero
+removed):
+ $ dd if=/dev/zero of=/dev/null bs=10M count=1024
+Gave:  2.3 GB/s backed by normal pages,
+       2.9 GB/s backed by huge pages,
+       5.1 GB/s backed by huge pages, with page mask=HPAGE_MASK.
+
+After some discussion, it was decided not to adopt the HPAGE_MASK,
+as this would have a significant detrimental effect on the overall
+system latency due to page_table_lock being held for too long.
+This could be revisited if split huge page locks are adopted.
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- arch/arm/mach-at91/Kconfig |    5 ++
- drivers/clk/at91/Makefile  |    1 +
- drivers/clk/at91/clk-smd.c |  173 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/at91/pmc.c     |    7 ++
- drivers/clk/at91/pmc.h     |    5 ++
- 5 files changed, 191 insertions(+)
- create mode 100644 drivers/clk/at91/clk-smd.c
+Changes in V3:
+pmd_hugewillfault and pmd_thp_or_huge were erroneously ommitted from
+pgtable-2level.h causing build problems. Empty stubs are added for now
+as we don't have huge page support for short descriptors.
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index b76dc4c..97033f7 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -39,6 +39,9 @@ config AT91_SAM9G45_RESET
- config AT91_SAM9_TIME
- 	bool
+Nicolas, can I please re-add your Reviewed-by to this?
+---
+ arch/arm/include/asm/pgtable-2level.h |  7 ++++++
+ arch/arm/include/asm/pgtable-3level.h |  3 +++
+ arch/arm/lib/uaccess_with_memcpy.c    | 41 ++++++++++++++++++++++++++++++++---
+ 3 files changed, 48 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+index f97ee02..86a659a 100644
+--- a/arch/arm/include/asm/pgtable-2level.h
++++ b/arch/arm/include/asm/pgtable-2level.h
+@@ -181,6 +181,13 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
  
-+config HAVE_AT91_SMD
-+	bool
-+
- config SOC_AT91SAM9
- 	bool
- 	select AT91_SAM9_TIME
-@@ -85,6 +88,7 @@ config SOC_SAMA5D3
- 	select HAVE_AT91_DBGU1
- 	select AT91_USE_OLD_CLK
- 	select HAVE_AT91_UTMI
-+	select HAVE_AT91_SMD
- 	select HAVE_AT91_USB_CLK
- 	help
- 	  Select this if you are using one of Atmel's SAMA5D3 family SoC.
-@@ -157,6 +161,7 @@ config SOC_AT91SAM9X5
- 	select SOC_AT91SAM9
- 	select AT91_USE_OLD_CLK
- 	select HAVE_AT91_UTMI
-+	select HAVE_AT91_SMD
- 	select HAVE_AT91_USB_CLK
- 	help
- 	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
-diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-index 61db058..0e92b71 100644
---- a/drivers/clk/at91/Makefile
-+++ b/drivers/clk/at91/Makefile
-@@ -9,3 +9,4 @@ obj-y += clk-system.o clk-peripheral.o
- obj-$(CONFIG_AT91_PROGRAMMABLE_CLOCKS)	+= clk-programmable.o
- obj-$(CONFIG_HAVE_AT91_UTMI)		+= clk-utmi.o
- obj-$(CONFIG_HAVE_AT91_USB_CLK)		+= clk-usb.o
-+obj-$(CONFIG_HAVE_AT91_SMD)		+= clk-smd.o
-diff --git a/drivers/clk/at91/clk-smd.c b/drivers/clk/at91/clk-smd.c
-new file mode 100644
-index 0000000..9f3fa39
---- /dev/null
-+++ b/drivers/clk/at91/clk-smd.c
-@@ -0,0 +1,173 @@
+ #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
+ 
 +/*
-+ * drivers/clk/at91/clk-smd.c
-+ *
-+ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
++ * We don't have huge page support for short descriptors, for the moment
++ * define empty stubs for use by pin_page_for_write.
 + */
++#define pmd_hugewillfault(pmd)	(0)
++#define pmd_thp_or_huge(pmd)	(0)
 +
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk/at91_pmc.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/io.h>
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* _ASM_PGTABLE_2LEVEL_H */
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 5689c18..39c54cf 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -206,6 +206,9 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ #define __HAVE_ARCH_PMD_WRITE
+ #define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
+ 
++#define pmd_hugewillfault(pmd)	(!pmd_young(pmd) || !pmd_write(pmd))
++#define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
 +
-+#include "pmc.h"
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+ #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+ #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
+diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
+index 025f742..3e58d71 100644
+--- a/arch/arm/lib/uaccess_with_memcpy.c
++++ b/arch/arm/lib/uaccess_with_memcpy.c
+@@ -18,6 +18,7 @@
+ #include <linux/hardirq.h> /* for in_atomic() */
+ #include <linux/gfp.h>
+ #include <linux/highmem.h>
++#include <linux/hugetlb.h>
+ #include <asm/current.h>
+ #include <asm/page.h>
+ 
+@@ -40,7 +41,35 @@ pin_page_for_write(const void __user *_addr, pte_t **ptep, spinlock_t **ptlp)
+ 		return 0;
+ 
+ 	pmd = pmd_offset(pud, addr);
+-	if (unlikely(pmd_none(*pmd) || pmd_bad(*pmd)))
++	if (unlikely(pmd_none(*pmd)))
++		return 0;
 +
-+#define SMD_SOURCE_MAX		2
++	/*
++	 * A pmd can be bad if it refers to a HugeTLB or THP page.
++	 *
++	 * Both THP and HugeTLB pages have the same pmd layout
++	 * and should not be manipulated by the pte functions.
++	 *
++	 * Lock the page table for the destination and check
++	 * to see that it's still huge and whether or not we will
++	 * need to fault on write, or if we have a splitting THP.
++	 */
++	if (unlikely(pmd_thp_or_huge(*pmd))) {
++		ptl = &current->mm->page_table_lock;
++		spin_lock(ptl);
++		if (unlikely(!pmd_thp_or_huge(*pmd)
++			|| pmd_hugewillfault(*pmd)
++			|| pmd_trans_splitting(*pmd))) {
++			spin_unlock(ptl);
++			return 0;
++		}
 +
-+#define SMD_DIV_SHIFT		8
-+#define SMD_MAX_DIV		0xf
-+
-+struct at91sam9x5_clk_smd {
-+	struct clk_hw hw;
-+	struct at91_pmc *pmc;
-+};
-+
-+#define to_at91sam9x5_clk_smd(hw) \
-+	container_of(hw, struct at91sam9x5_clk_smd, hw)
-+
-+static unsigned long at91sam9x5_clk_smd_recalc_rate(struct clk_hw *hw,
-+						    unsigned long parent_rate)
-+{
-+	u32 tmp;
-+	u8 smddiv;
-+	struct at91sam9x5_clk_smd *smd = to_at91sam9x5_clk_smd(hw);
-+	struct at91_pmc *pmc = smd->pmc;
-+
-+	tmp = pmc_read(pmc, AT91_PMC_SMD);
-+	smddiv = (tmp & AT91_PMC_SMD_DIV) >> SMD_DIV_SHIFT;
-+	return parent_rate / (smddiv + 1);
-+}
-+
-+static long at91sam9x5_clk_smd_round_rate(struct clk_hw *hw, unsigned long rate,
-+					  unsigned long *parent_rate)
-+{
-+	unsigned long div;
-+	unsigned long bestrate;
-+	unsigned long tmp;
-+
-+	if (rate >= *parent_rate)
-+		return *parent_rate;
-+
-+	div = *parent_rate / rate;
-+	if (div > SMD_MAX_DIV)
-+		return *parent_rate / (SMD_MAX_DIV + 1);
-+
-+	bestrate = *parent_rate / div;
-+	tmp = *parent_rate / (div + 1);
-+	if (bestrate - rate > rate - tmp)
-+		bestrate = tmp;
-+
-+	return bestrate;
-+}
-+
-+static int at91sam9x5_clk_smd_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	u32 tmp;
-+	struct at91sam9x5_clk_smd *smd = to_at91sam9x5_clk_smd(hw);
-+	struct at91_pmc *pmc = smd->pmc;
-+
-+	if (index > 1)
-+		return -EINVAL;
-+	tmp = pmc_read(pmc, AT91_PMC_SMD) & ~AT91_PMC_SMDS;
-+	if (index)
-+		tmp |= AT91_PMC_SMDS;
-+	pmc_write(pmc, AT91_PMC_SMD, tmp);
-+	return 0;
-+}
-+
-+static u8 at91sam9x5_clk_smd_get_parent(struct clk_hw *hw)
-+{
-+	struct at91sam9x5_clk_smd *smd = to_at91sam9x5_clk_smd(hw);
-+	struct at91_pmc *pmc = smd->pmc;
-+
-+	return pmc_read(pmc, AT91_PMC_SMD) & AT91_PMC_SMDS;
-+}
-+
-+static int at91sam9x5_clk_smd_set_rate(struct clk_hw *hw, unsigned long rate,
-+				       unsigned long parent_rate)
-+{
-+	u32 tmp;
-+	struct at91sam9x5_clk_smd *smd = to_at91sam9x5_clk_smd(hw);
-+	struct at91_pmc *pmc = smd->pmc;
-+	unsigned long div = parent_rate / rate;
-+
-+	if (parent_rate % rate || div < 1 || div > (SMD_MAX_DIV + 1))
-+		return -EINVAL;
-+	tmp = pmc_read(pmc, AT91_PMC_SMD) & ~AT91_PMC_SMD_DIV;
-+	tmp |= (div - 1) << SMD_DIV_SHIFT;
-+	pmc_write(pmc, AT91_PMC_SMD, tmp);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops at91sam9x5_smd_ops = {
-+	.recalc_rate = at91sam9x5_clk_smd_recalc_rate,
-+	.round_rate = at91sam9x5_clk_smd_round_rate,
-+	.get_parent = at91sam9x5_clk_smd_get_parent,
-+	.set_parent = at91sam9x5_clk_smd_set_parent,
-+	.set_rate = at91sam9x5_clk_smd_set_rate,
-+};
-+
-+static struct clk * __init
-+at91sam9x5_clk_register_smd(struct at91_pmc *pmc, const char *name,
-+			    const char **parent_names, u8 num_parents)
-+{
-+	struct at91sam9x5_clk_smd *smd;
-+	struct clk *clk = NULL;
-+	struct clk_init_data init;
-+
-+	smd = kzalloc(sizeof(*smd), GFP_KERNEL);
-+	if (!smd)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &at91sam9x5_smd_ops;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
-+	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
-+
-+	smd->hw.init = &init;
-+	smd->pmc = pmc;
-+
-+	clk = clk_register(NULL, &smd->hw);
-+	if (IS_ERR(clk))
-+		kfree(smd);
-+
-+	return clk;
-+}
-+
-+void __init of_at91sam9x5_clk_smd_setup(struct device_node *np,
-+					struct at91_pmc *pmc)
-+{
-+	struct clk *clk;
-+	int i;
-+	int num_parents;
-+	const char *parent_names[SMD_SOURCE_MAX];
-+	const char *name = np->name;
-+
-+	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-+	if (num_parents <= 0 || num_parents >= SMD_SOURCE_MAX)
-+		return;
-+
-+	for (i = 0; i < num_parents; i++) {
-+		parent_names[i] = of_clk_get_parent_name(np, i);
-+		if (!parent_names[i])
-+			return;
++		*ptep = NULL;
++		*ptlp = ptl;
++		return 1;
 +	}
 +
-+	of_property_read_string(np, "clock-output-names", &name);
-+
-+	clk = at91sam9x5_clk_register_smd(pmc, name, parent_names,
-+					  num_parents);
-+	if (IS_ERR(clk))
-+		return;
-+
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index dc0b1b6..00a4a51 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -290,6 +290,13 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
- 		.data = of_at91sam9x5_clk_usb_setup,
- 	},
- #endif
-+	/* SMD clock */
-+#if defined(CONFIG_HAVE_AT91_SMD)
-+	{
-+		.compatible = "atmel,at91sam9x5-clk-smd",
-+		.data = of_at91sam9x5_clk_smd_setup,
-+	},
-+#endif
- 	{ /*sentinel*/ }
- };
++	if (unlikely(pmd_bad(*pmd)))
+ 		return 0;
  
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index eba7334..d0b8b38 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -105,4 +105,9 @@ extern void __init of_at91sam9n12_clk_usb_setup(struct device_node *np,
- 						struct at91_pmc *pmc);
- #endif
+ 	pte = pte_offset_map_lock(current->mm, pmd, addr, &ptl);
+@@ -94,7 +123,10 @@ __copy_to_user_memcpy(void __user *to, const void *from, unsigned long n)
+ 		from += tocopy;
+ 		n -= tocopy;
  
-+#if defined(CONFIG_HAVE_AT91_SMD)
-+extern void __init of_at91sam9x5_clk_smd_setup(struct device_node *np,
-+					       struct at91_pmc *pmc);
-+#endif
-+
- #endif /* __PMC_H_ */
+-		pte_unmap_unlock(pte, ptl);
++		if (pte)
++			pte_unmap_unlock(pte, ptl);
++		else
++			spin_unlock(ptl);
+ 	}
+ 	if (!atomic)
+ 		up_read(&current->mm->mmap_sem);
+@@ -147,7 +179,10 @@ __clear_user_memset(void __user *addr, unsigned long n)
+ 		addr += tocopy;
+ 		n -= tocopy;
+ 
+-		pte_unmap_unlock(pte, ptl);
++		if (pte)
++			pte_unmap_unlock(pte, ptl);
++		else
++			spin_unlock(ptl);
+ 	}
+ 	up_read(&current->mm->mmap_sem);
+ 
 -- 
-1.7.9.5
+1.8.1.4
