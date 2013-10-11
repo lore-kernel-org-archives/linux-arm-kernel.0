@@ -1,43 +1,31 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 11 Oct 2013 09:33:22 +0200
-Subject: [PATCH V2] ARM: EXYNOS: Move arm core power down clock to
- exynos5250 common clock
-In-Reply-To: <1381470134-29410-1-git-send-email-amit.daniel@samsung.com>
-References: <1381470134-29410-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <4953642.S7P9jyspGP@amdn883>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 11 Oct 2013 15:38:09 +0800
+Subject: [PATCH 4/7] ARM: tegra: add LP1 support code for Tegra124
+In-Reply-To: <5255E4CD.1050509@wwwdotorg.org>
+References: <1381310411-11391-1-git-send-email-josephl@nvidia.com>
+ <1381310411-11391-5-git-send-email-josephl@nvidia.com>
+ <5255E4CD.1050509@wwwdotorg.org>
+Message-ID: <1381477089.5685.3.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
-
-On Friday 11 of October 2013 11:12:14 Amit Daniel Kachhap wrote:
-> Now with common clock support added for exynos5250 it is necessary to move
-> this code to exynos5250 common clock driver as clock registers should be
-> handled there. This change is tested in exynos5250 based arndale platform.
+On Thu, 2013-10-10 at 07:20 +0800, Stephen Warren wrote:
+> On 10/09/2013 03:20 AM, Joseph Lo wrote:
+> > The LP1 suspend procedure is the same with Tegra30 and Tegra114. Just
+> > need to update the difference of the register address, then we can
+> > continue to share the code.
+> > -	.rept (tegra30_sdram_pad_size - tegra114_sdram_pad_address) / 4
+> > +	.rept (tegra124_sdram_pad_address - tegra114_sdram_pad_address) / 4
 > 
-> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
-> Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> Acked-by: Kukjin Kim <kgene.kim@samsugn.com>
-
-nit: Typo in samsung. Probably something that Kukjin can fix up when
-applying, though.
-
-> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
+> I assume this is intended to reserve enough space to store all the saved
+> registers for the largest table of tegra30_sdram_pad_address,
+> tegra114_sdram_pad_address, tegra124_sdram_pad_address. I count more
+> entries in the existing Tegra114 table than the new Tegra124 table, so
+> I'm not sure this part of the change is correct.
 > 
-> Changes in V2:
-> * Rebased against linux-next tree.
-> * Removed un-used macros in regs-clock.h
-> 
->  arch/arm/mach-exynos/cpuidle.c                 |   35 --------------------
->  arch/arm/mach-exynos/include/mach/regs-clock.h |   16 ---------
->  drivers/clk/samsung/clk-exynos5250.c           |   42 ++++++++++++++++++++++++
->  3 files changed, 42 insertions(+), 51 deletions(-)
+> Is there no way to do a max(tegra30 size, tegra114 size, tegra124 size)
+> so you don't have to pick manually which size to reserve here?
 
-Otherwise
-
-Acked-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+I don't have a good way to achieve this, because we may have another new
+SoC that may continue re-use these codes. Hence I need to keep
+maintaining the max() function.
