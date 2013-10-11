@@ -1,60 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Oct 2013 17:54:18 +0200
-Subject: [PATCH v3 1/3] gpio: davinci: add OF support
-In-Reply-To: <CA+V-a8vyPyL0j0nPOZyjxrecusFzXovFPsNBLKYXns5ASWR-wg@mail.gmail.com>
-References: <1380902596-4693-1-git-send-email-sujithkv@ti.com>
- <1380902596-4693-2-git-send-email-sujithkv@ti.com>
- <CACRpkdYxegBSYXR1-98smUNnDXpyRHo_vuYdnr3r7zhawENiUA@mail.gmail.com>
- <CA+V-a8vyPyL0j0nPOZyjxrecusFzXovFPsNBLKYXns5ASWR-wg@mail.gmail.com>
-Message-ID: <CACRpkdYNexWWXuQ052xuQ4NOdXm2gt-+ByREKeGo-VAnbH4D2w@mail.gmail.com>
+Date: Fri, 11 Oct 2013 17:56:58 +0200
+Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
+In-Reply-To: <20131011154352.GO29913@atomide.com>
+References: <20131003054104.8941.88857.stgit@localhost>
+ <20131003054221.8941.87801.stgit@localhost>
+ <5256AA7F.8030005@ti.com> <20131010160018.GA29913@atomide.com>
+ <CACRpkdaG-PQA39XSjKUgM9TyeD7srgm_8s+NazrDKJ0gmNLcwg@mail.gmail.com>
+ <20131010162015.GC29913@atomide.com>
+ <CACRpkdYF83ghUf60Wmrti53UJ1bWV30GW_P9GjWnsOcZHbsv+Q@mail.gmail.com>
+ <5257BD3E.5000707@ti.com>
+ <CACRpkdYJNaiAAHhYatd6g5_wVt0QEUxOvsk6nQn9o=_i5zfWrA@mail.gmail.com>
+ <20131011154352.GO29913@atomide.com>
+Message-ID: <CACRpkdZhbadd5d4P+2B0_DktqK4CHzZPVJC8kPHZYUnp8TaxsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 4:59 PM, Prabhakar Lad
-<prabhakar.csengg@gmail.com> wrote:
-> On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Fri, Oct 4, 2013 at 6:03 PM, Prabhakar Lad
->> <prabhakar.csengg@gmail.com> wrote:
-
->>> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering
->>> starts.
+On Fri, Oct 11, 2013 at 5:43 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [131011 03:40]:
+>> On Fri, Oct 11, 2013 at 10:56 AM, Roger Quadros <rogerq@ti.com> wrote:
 >>
->> What is this?
+>> > The register handling is fine. But how do we deal with resource handling?
+>> > e.g. the block that has the deep-core registers might need to be clocked or powered
+>> > before the registers can be accessed.
 >>
->> If I have ever ACKed this I have been drunk. I take it back.
+>> Yeah I saw this in the code there.
 >>
-> here is the ACK https://patchwork.kernel.org/patch/2721181/
+>> In this case it seems syscon-type regmap access can be used to
+>> read/write the registers, so maybe the pin controller also need to
+>>  get a handle on some clock etc?
+>
+> Uhh, let's not go there.. The resource availability needs to be
+> handled transparently in regmap code and the reg provider hardware
+> module driver using runtime PM.
 
-And as suspected that version of the patch did not contain
-this strange node property.
-
-Don't keep my ACK on patches if you change basic stuff like
-that, they need to be re-acked, this runs the risk of abusing
-my trust amongst other subsystem maintainers who might
-go and merge this because "aha the GPIO maintainer
-thinks that this is OK".
-
->> This "base" is a Linux-specific thing and has no place in the
->> device tree, and shall not be there. You have to find some way to
->> avoid this, what do you think some other OS should do with
->> this value...
->>
->> All IRQs in Linux are assumed to be dynamically assigned numbers
->> nowadays, with a property like this you can never switch on
->> SPARSE_IRQ for the DaVinci.
->>
-> Can you point to any alternative solution if you have any ?
-
-First convert this GPIO driver to use an irqdomain to map
-HW IRQs to Linux IRQs, and grab a few IRQ descriptors
-dynamically off the irq descriptor heap.
-Example: commit
-a6c45b99a658521291cfb66ecf035cc58b38f206
-"pinctrl/coh901: use irqdomain, allocate irqdescs"
-
-Then on a longer term convert DaVinci to use dynamically
-allocated IRQs for all interrupt controllers, and move it over
-to SPARSE_IRQ so you know this works.
+OK we can surely discuss this with broonie, it makes sense to
+have regmap be able to do its deed transparently.
 
 Yours,
 Linus Walleij
