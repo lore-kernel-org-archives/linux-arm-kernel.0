@@ -1,305 +1,37 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 11 Oct 2013 09:37:45 +0200
-Subject: [PATCH v4 01/17] ARM: at91: move at91_pmc.h to
- include/linux/clk/at91_pmc.h
-In-Reply-To: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
-References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1381477081-6041-2-git-send-email-b.brezillon@overkiz.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Oct 2013 10:14:29 +0200
+Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <051069C10411E24D9749790C498526FA1BE027EA@SJEXCHMB12.corp.ad.broadcom.com>
+References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
+ <1380846199-12829-4-git-send-email-syin@broadcom.com>
+ <CACRpkdZah4fFuJL2Vh5JmbBCgnekg8MKqMWHzeheOx3N1Kzwng@mail.gmail.com>
+ <051069C10411E24D9749790C498526FA1BE027EA@SJEXCHMB12.corp.ad.broadcom.com>
+Message-ID: <CACRpkdarPC+LxAAezT2LRiz=Y2RduUsb75YYHUgq7HqePzkD3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves at91_pmc.h header from machine specific directory
-(arch/arm/mach-at91/include/mach/at91_pmc.h) to clk include directory
-(include/linux/clk/at91_pmc.h).
-We need this to avoid reference to machine specific headers in clk
-drivers.
+On Fri, Oct 11, 2013 at 1:48 AM, Sherman Yin <syin@broadcom.com> wrote:
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/mach-at91/at91rm9200.c                    |    2 +-
- arch/arm/mach-at91/at91sam9260.c                   |    2 +-
- arch/arm/mach-at91/at91sam9261.c                   |    2 +-
- arch/arm/mach-at91/at91sam9263.c                   |    2 +-
- arch/arm/mach-at91/at91sam9g45.c                   |    2 +-
- arch/arm/mach-at91/at91sam9n12.c                   |    2 +-
- arch/arm/mach-at91/at91sam9rl.c                    |    2 +-
- arch/arm/mach-at91/at91sam9x5.c                    |    2 +-
- arch/arm/mach-at91/clock.c                         |    2 +-
- arch/arm/mach-at91/pm.c                            |    2 +-
- arch/arm/mach-at91/pm_slowclock.S                  |    2 +-
- arch/arm/mach-at91/sama5d3.c                       |    2 +-
- arch/arm/mach-at91/setup.c                         |    2 +-
- drivers/usb/gadget/atmel_usba_udc.c                |    2 +-
- .../include/mach => include/linux/clk}/at91_pmc.h  |    2 +-
- 15 files changed, 15 insertions(+), 15 deletions(-)
- rename {arch/arm/mach-at91/include/mach => include/linux/clk}/at91_pmc.h (99%)
+>>> +static const struct capri_cfg_param capri_pinconf_params[] = {
+>>> +       {"brcm,hysteresis",     CAPRI_PINCONF_PARAM_HYST},
+>>> +       {"brcm,pull",           CAPRI_PINCONF_PARAM_PULL},
+>>> +       {"brcm,slew",           CAPRI_PINCONF_PARAM_SLEW},
+>>> +       {"brcm,input_dis",      CAPRI_PINCONF_PARAM_INPUT_DIS},
+>>> +       {"brcm,drive_str",      CAPRI_PINCONF_PARAM_DRV_STR},
+>>> +       {"brcm,pull_up_str",    CAPRI_PINCONF_PARAM_PULL_UP_STR},
+>>> +       {"brcm,mode",           CAPRI_PINCONF_PARAM_MODE},
+>>> +};
+>>
+>>As well as all this stuff...
+>
+> OK.  Will see if I can find something suitable for "input disable" and "mode"
 
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 4aad93d..102dac6 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -12,13 +12,13 @@
- 
- #include <linux/module.h>
- #include <linux/reboot.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
- #include <mach/at91rm9200.h>
--#include <mach/at91_pmc.h>
- #include <mach/at91_st.h>
- #include <mach/cpu.h>
- 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 5de6074..16d7817 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
-@@ -20,7 +21,6 @@
- #include <mach/cpu.h>
- #include <mach/at91_dbgu.h>
- #include <mach/at91sam9260.h>
--#include <mach/at91_pmc.h>
- 
- #include "at91_aic.h"
- #include "at91_rstc.h"
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 0e07932..c8f5958 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
-@@ -19,7 +20,6 @@
- #include <asm/system_misc.h>
- #include <mach/cpu.h>
- #include <mach/at91sam9261.h>
--#include <mach/at91_pmc.h>
- 
- #include "at91_aic.h"
- #include "at91_rstc.h"
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 6ce7d18..cd8ad95 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
-@@ -18,7 +19,6 @@
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
- #include <mach/at91sam9263.h>
--#include <mach/at91_pmc.h>
- 
- #include "at91_aic.h"
- #include "at91_rstc.h"
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 474ee04..9794b20 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -12,13 +12,13 @@
- 
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
- #include <mach/at91sam9g45.h>
--#include <mach/at91_pmc.h>
- #include <mach/cpu.h>
- 
- #include "at91_aic.h"
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index c7d670d..5b83c66 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -8,12 +8,12 @@
- 
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <mach/at91sam9n12.h>
--#include <mach/at91_pmc.h>
- #include <mach/cpu.h>
- 
- #include "board.h"
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index d4ec0d9..947da95 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -10,6 +10,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
-@@ -19,7 +20,6 @@
- #include <mach/cpu.h>
- #include <mach/at91_dbgu.h>
- #include <mach/at91sam9rl.h>
--#include <mach/at91_pmc.h>
- 
- #include "at91_aic.h"
- #include "at91_rstc.h"
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 916e5a1..a930d73 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -8,12 +8,12 @@
- 
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <mach/at91sam9x5.h>
--#include <mach/at91_pmc.h>
- #include <mach/cpu.h>
- 
- #include "board.h"
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 6b2630a..5f02aea 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -24,9 +24,9 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/of_address.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <mach/hardware.h>
--#include <mach/at91_pmc.h>
- #include <mach/cpu.h>
- 
- #include <asm/proc-fns.h>
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 15afb5d..692cacd 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -19,13 +19,13 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/irq.h>
- #include <linux/atomic.h>
- #include <asm/mach/time.h>
- #include <asm/mach/irq.h>
- 
--#include <mach/at91_pmc.h>
- #include <mach/cpu.h>
- 
- #include "at91_aic.h"
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 098c28d..2001877 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -13,8 +13,8 @@
-  */
- 
- #include <linux/linkage.h>
-+#include <linux/clk/at91_pmc.h>
- #include <mach/hardware.h>
--#include <mach/at91_pmc.h>
- #include <mach/at91_ramc.h>
- 
- 
-diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-index 4012797..0003949 100644
---- a/arch/arm/mach-at91/sama5d3.c
-+++ b/arch/arm/mach-at91/sama5d3.c
-@@ -9,12 +9,12 @@
- 
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <mach/sama5d3.h>
--#include <mach/at91_pmc.h>
- #include <mach/cpu.h>
- 
- #include "soc.h"
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index b17fbcf..41aa68b 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -11,6 +11,7 @@
- #include <linux/pm.h>
- #include <linux/of_address.h>
- #include <linux/pinctrl/machine.h>
-+#include <linux/clk/at91_pmc.h>
- 
- #include <asm/system_misc.h>
- #include <asm/mach/map.h>
-@@ -18,7 +19,6 @@
- #include <mach/hardware.h>
- #include <mach/cpu.h>
- #include <mach/at91_dbgu.h>
--#include <mach/at91_pmc.h>
- 
- #include "at91_shdwc.h"
- #include "soc.h"
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index 2cb52e0..9f71d9f 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -326,7 +326,7 @@ static int vbus_is_present(struct usba_udc *udc)
- 
- #if defined(CONFIG_ARCH_AT91SAM9RL)
- 
--#include <mach/at91_pmc.h>
-+#include <linux/clk/at91_pmc.h>
- 
- static void toggle_bias(int is_on)
- {
-diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/include/linux/clk/at91_pmc.h
-similarity index 99%
-rename from arch/arm/mach-at91/include/mach/at91_pmc.h
-rename to include/linux/clk/at91_pmc.h
-index c604cc6..00c45b3 100644
---- a/arch/arm/mach-at91/include/mach/at91_pmc.h
-+++ b/include/linux/clk/at91_pmc.h
-@@ -1,5 +1,5 @@
- /*
-- * arch/arm/mach-at91/include/mach/at91_pmc.h
-+ * include/linux/clk/at91_pmc.h
-  *
-  * Copyright (C) 2005 Ivan Kokshaysky
-  * Copyright (C) SAN People
--- 
-1.7.9.5
+Let's discuss this. What exactly does "input disable" and "mode"
+mean, in electrical terms?
+
+When you come down to what actually happens it may turn out that
+"input disable" is PIN_CONFIG_OUTPUT, which implicitly turns
+off input does it not?
+
+Yours,
+Linus Walleij
