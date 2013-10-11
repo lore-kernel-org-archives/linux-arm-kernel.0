@@ -1,79 +1,84 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 11 Oct 2013 19:15:33 +0300
-Subject: [PATCH 03/11] ARM: OMAP3: McBSP: do not access CM register directly
+Date: Fri, 11 Oct 2013 19:15:32 +0300
+Subject: [PATCH 02/11] ARM: OMAP3: clock: add API to enable/disable autoidle
+ for a single clock
 In-Reply-To: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
 References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381508141-15244-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1381508141-15244-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-McBSP driver require special hacks to enable/disable the autoidle feature
-for its interface clock for the proper function of the sidetone hardware.
-Currently the driver just writes CM registers directly, which should be
-avoided. Thus, changed the driver to use the new deny/allow_autoidle
-clock API calls.
+Some drivers require direct access to the autoidle functionality of the
+interface clocks. Added clock APIs for these, so that the drivers do not
+need to access CM registers directly.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-omap2/mcbsp.c |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/clock.c |   38 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/clock.h |    2 ++
+ 2 files changed, 40 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index 5d87680..b4ac3af 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -25,6 +25,7 @@
- 
- #include "soc.h"
- #include "omap_device.h"
-+#include "clock.h"
- 
- /*
-  * FIXME: Find a mechanism to enable/disable runtime the McBSP ICLK autoidle.
-@@ -33,22 +34,18 @@
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
- 
-+static struct clk *mcbsp_iclks[5];
-+
- static int omap3_enable_st_clock(unsigned int id, bool enable)
- {
--	unsigned int w;
--
- 	/*
- 	 * Sidetone uses McBSP ICLK - which must not idle when sidetones
- 	 * are enabled or sidetones start sounding ugly.
- 	 */
--	w = omap2_cm_read_mod_reg(OMAP3430_PER_MOD, CM_AUTOIDLE);
- 	if (enable)
--		w &= ~(1 << (id - 2));
-+		return omap2_clk_deny_idle(mcbsp_iclks[id]);
- 	else
--		w |= 1 << (id - 2);
--	omap2_cm_write_mod_reg(w, OMAP3430_PER_MOD, CM_AUTOIDLE);
--
--	return 0;
-+		return omap2_clk_allow_idle(mcbsp_iclks[id]);
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 0c38ca9..c7c5d31 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -543,6 +543,44 @@ int omap2_clk_disable_autoidle_all(void)
  }
  
- static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
-@@ -58,6 +55,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	struct omap_hwmod *oh_device[2];
- 	struct omap_mcbsp_platform_data *pdata = NULL;
- 	struct platform_device *pdev;
-+	char clk_name[11];
- 
- 	sscanf(oh->name, "mcbsp%d", &id);
- 
-@@ -99,6 +97,8 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 		oh_device[1] = omap_hwmod_lookup((
- 		(struct omap_mcbsp_dev_attr *)(oh->dev_attr))->sidetone);
- 		pdata->enable_st_clock = omap3_enable_st_clock;
-+		sprintf(clk_name, "mcbsp%d_ick", id);
-+		mcbsp_iclks[id] = clk_get(NULL, clk_name);
- 		count++;
- 	}
- 	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,
+ /**
++ * omap2_clk_deny_idle - disable autoidle on an OMAP clock
++ * @clk: struct clk * to disable autoidle for
++ *
++ * Disable autoidle on an OMAP clock.
++ */
++int omap2_clk_deny_idle(struct clk *clk)
++{
++	struct clk_hw_omap *c;
++
++	if (__clk_get_flags(clk) & CLK_IS_BASIC)
++		return -EINVAL;
++
++	c = to_clk_hw_omap(__clk_get_hw(clk));
++	if (c->ops && c->ops->deny_idle)
++		c->ops->deny_idle(c);
++	return 0;
++}
++
++/**
++ * omap2_clk_allow_idle - enable autoidle on an OMAP clock
++ * @clk: struct clk * to enable autoidle for
++ *
++ * Enable autoidle on an OMAP clock.
++ */
++int omap2_clk_allow_idle(struct clk *clk)
++{
++	struct clk_hw_omap *c;
++
++	if (__clk_get_flags(clk) & CLK_IS_BASIC)
++		return -EINVAL;
++
++	c = to_clk_hw_omap(__clk_get_hw(clk));
++	if (c->ops && c->ops->allow_idle)
++		c->ops->allow_idle(c);
++	return 0;
++}
++
++/**
+  * omap2_clk_enable_init_clocks - prepare & enable a list of clocks
+  * @clk_names: ptr to an array of strings of clock names to enable
+  * @num_clocks: number of clock names in @clk_names
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 7aa32cd..82916cc 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -411,6 +411,8 @@ void omap2_clk_dflt_find_idlest(struct clk_hw_omap *clk,
+ void omap2_init_clk_hw_omap_clocks(struct clk *clk);
+ int omap2_clk_enable_autoidle_all(void);
+ int omap2_clk_disable_autoidle_all(void);
++int omap2_clk_allow_idle(struct clk *clk);
++int omap2_clk_deny_idle(struct clk *clk);
+ void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
+ int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
+ void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
 -- 
 1.7.9.5
