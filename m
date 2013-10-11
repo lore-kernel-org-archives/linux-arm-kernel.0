@@ -1,34 +1,36 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 11 Oct 2013 11:05:28 -0500
-Subject: [PATCH v4 01/17] ARM: at91: move at91_pmc.h to
- include/linux/clk/at91_pmc.h
-In-Reply-To: <1381477081-6041-2-git-send-email-b.brezillon@overkiz.com>
-References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
- <1381477081-6041-2-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20131011160528.GV25706@radagast>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Oct 2013 09:11:17 -0700
+Subject: [PATCH V6 02/15] ARM: OMAP2+: AM33XX: add lateinit hook for
+ calling pm late init
+In-Reply-To: <5256C686.6000301@ti.com>
+References: <1381354144-7134-1-git-send-email-nm@ti.com>
+ <1381361098-8283-1-git-send-email-nm@ti.com>
+ <52563BD8.1060703@ti.com> <20131010133209.GA13105@kahuna>
+ <5256C5D2.9030302@ti.com> <5256C686.6000301@ti.com>
+Message-ID: <20131011161116.GS29913@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 09:37:45AM +0200, Boris BREZILLON wrote:
-> This patch moves at91_pmc.h header from machine specific directory
-> (arch/arm/mach-at91/include/mach/at91_pmc.h) to clk include directory
-> (include/linux/clk/at91_pmc.h).
-> We need this to avoid reference to machine specific headers in clk
-> drivers.
+* Joel Fernandes <joelf@ti.com> [131010 08:31]:
+> On 10/10/2013 10:20 AM, Joel Fernandes wrote:
+> > 
+> > Adding 6 lines of identical code for every platform seems redundant, I'd just
+> > define an omap_common_late_init for all platforms for now, and then fork off for
+> > the future differences. That way we save on LOC and readability in the header as
+> > well. Your call.
 > 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> I see a function of that name already exists. I guess you can leave your patch
+> as is then and not have to do this.
 
-for drivers/usb/gadget:
+Yeah but why not just call the common late_init function directly for the
+cases where we know it's never needed.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+If thoses will be populated in the later patches, then it's OK to add them.
 
+In any case, Nishant, can you please squash the late_init patches into a
+single patch and make sure it also applies on top of the omap-for-v3.13/quirk
+branch as there's been some changes to board-generic.c there.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131011/56b63bc7/attachment.sig>
+Regards,
+
+Tony
