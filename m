@@ -1,48 +1,24 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 11 Oct 2013 14:43:30 +0200
-Subject: [PATCH v2 0/6] ARM: at91: use new at91 clks for samad3 SoCs
-Message-ID: <1381495416-15928-1-git-send-email-b.brezillon@overkiz.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Oct 2013 14:44:43 +0200
+Subject: [PATCH 0/1] fix MVEBU GPIO driver bug causing kernel hang
+In-Reply-To: <5257DF2F.5030403@keymile.com>
+References: <1380717118-10860-1-git-send-email-gerlando.falauto@keymile.com>
+ <20131002144550.7d28376c@skate> <524C1C34.5050403@keymile.com>
+ <CACRpkda39HGthF6n-T8-Rv0nAug9bxi5sqeyTneKoSS9YmRVmw@mail.gmail.com>
+ <5257DF2F.5030403@keymile.com>
+Message-ID: <CACRpkdaHfanw=jsRxi=Xw5s-qpD0bmGB4QG=pihPLDbpQASbEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Oct 11, 2013 at 1:21 PM, Gerlando Falauto
+<gerlando.falauto@keymile.com> wrote:
 
-This patch series moves sama5d3 SoCs and boards to the new at91 clk framework
-(based on common clk framework).
+> My statement on patch [0/1] contained speculation about a driver which is
+> clearly unrelated (the main, generic, orion IRQ controller, which is *NOT*
+> what this patch is about).
 
-This patch series depends on following patch series:
-1) "ARM: at91/dt: split sama5d3 definition" (v1)
-3) "ARM: at91: move to common clk framework" (v4)
+OK I got it all wrong then, I'll wait for an ACK on patch 1/1 before
+applying though.
 
-Best Regards,
-
-Boris
-
-Changes since v1:
- - remove references to peripheral id macros
- - remove old clk definitions after moving to new clk framework
-
-Boris BREZILLON (6):
-  ARM: at91: prepare sama5 dt boards transition to common clk
-  ARM: at91: prepare common clk transition for sama5d3 SoC
-  ARM: at91/dt: define sama5d3 clocks
-  ARM: at91/dt: define sama5d3xek's main clk frequency
-  ARM: at91: move sama5d3 SoC to common clk
-  ARM: at91/dt: remove sama5 old clk material
-
- arch/arm/boot/dts/sama5d3.dtsi      |  331 ++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/sama5d3_can.dtsi  |   18 ++
- arch/arm/boot/dts/sama5d3_emac.dtsi |   10 +
- arch/arm/boot/dts/sama5d3_gmac.dtsi |   10 +
- arch/arm/boot/dts/sama5d3_lcd.dtsi  |   15 ++
- arch/arm/boot/dts/sama5d3_mci2.dtsi |   11 ++
- arch/arm/boot/dts/sama5d3_tcb1.dtsi |   12 ++
- arch/arm/boot/dts/sama5d3_uart.dtsi |   19 ++
- arch/arm/boot/dts/sama5d3xcm.dtsi   |   17 +-
- arch/arm/mach-at91/Kconfig          |    1 -
- arch/arm/mach-at91/board-dt-sama5.c |   10 +-
- arch/arm/mach-at91/sama5d3.c        |  342 -----------------------------------
- 12 files changed, 440 insertions(+), 356 deletions(-)
-
--- 
-1.7.9.5
+Yours,
+Linus Walleij
