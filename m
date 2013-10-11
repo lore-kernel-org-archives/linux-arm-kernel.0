@@ -1,179 +1,103 @@
-From: Paul.Chavent@onera.fr (Paul Chavent)
-Date: Fri, 11 Oct 2013 14:28:29 +0200
-Subject: [PATCH] ARM: davinci: usb: provide minimal support for da850. (v2)
-Message-ID: <1381494509-11676-1-git-send-email-paul.chavent@onera.fr>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Oct 2013 13:38:40 +0100
+Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
+ fault
+In-Reply-To: <CAAhSdy20=U3+LZd=3i8dfqfSEaX7V+2z_y641NBLj7PkYZBadQ@mail.gmail.com>
+References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy2E6aRndw88_S_3wfyTOYd5rQQTc4+Cw5Hd1DFXuM6EBA@mail.gmail.com>
+ <523063AC.8040803@arm.com> <20130911193855.GN9860@cbox>
+ <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
+ <525667DB.7090705@arm.com> <20131010112425.GB21380@arm.com>
+ <CAAhSdy20=U3+LZd=3i8dfqfSEaX7V+2z_y641NBLj7PkYZBadQ@mail.gmail.com>
+Message-ID: <20131011123839.GH12308@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As for the da830 and hawk boards, the da850 can provide minimalist usb
-1.1 implementation without enabling usb gadget and inventra HC.
+On Thu, Oct 10, 2013 at 05:09:03PM +0100, Anup Patel wrote:
+> On Thu, Oct 10, 2013 at 4:54 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Thu, Oct 10, 2013 at 09:39:55AM +0100, Marc Zyngier wrote:
+> >> On 10/10/13 05:51, Anup Patel wrote:
+> >> > Are you planning to go ahead with this approach ?
+> >>
+> >> [adding Catalin, as we heavily discussed this recently]
+> >>
+> >> Not as such, as it doesn't solve the full issue. It merely papers over
+> >> the whole "my cache is off" problem. More specifically, any kind of
+> >> speculative access from another CPU while caches are off in the guest
+> >> completely nukes the benefit of this patch.
+> >>
+> >> Also, turning the the caches off is another source of problems, as
+> >> speculation also screws up set/way invalidation.
+> >
+> > Indeed. The set/way operations trapping and broadcasting (or deferring)
+> > to other CPUs in software just happens to work but there is no
+> > guarantee, sooner or later we'll hit a problem. I'm even tempted to
+> > remove flush_dcache_all() calls on the booting path for the arm64
+> > kernel, we already require that whatever runs before Linux should
+> > clean&invalidate the caches.
+> >
+> > Basically, with KVM a VCPU even if running with caches/MMU disabled can
+> > still get speculative allocation into the cache. The reason for this is
+> > the other cacheable memory aliases created by the host kernel and
+> > qemu/kvmtool. I can't tell whether Xen has this issue but it may be
+> > easier in Xen to avoid memory aliases.
+> >
+> >> > We really need this patch for X-Gene L3 cache.
+> >>
+> >> So far, I can see two possibilities:
+> >> - either we mandate caches to be always on (DC bit, and you're not
+> >> allowed to turn the caches off).
+> >
+> > That's my preferred approach. For hotplug, idle, the guest would use an
+> > HVC call (PSCI) and the host takes care of re-enabling the DC bit. But
+> > we may not catch all cases (kexec probably).
+> >
+> >> - Or we mandate that caches are invalidated (by VA) for each write that
+> >> is performed with caches off.
+> >
+> > For some things like run-time code patching, on ARMv8 we need to do at
+> > least I-cache maintenance since the CPU can allocate into the I-cache
+> > (even if there are no aliases).
+> 
+> It seems all approaches considered so far have a corner case in
+> one-way or another.
 
-This patch is inspired by the hawk board implementation.
+Yes, we try to settle on the one with least corner cases.
 
-Signed-off-by: Paul Chavent <paul.chavent@onera.fr>
----
- arch/arm/mach-davinci/board-da850-evm.c | 135 ++++++++++++++++++++++++++++++++
- 1 file changed, 135 insertions(+)
+> Coming back to where we started, the actual problem was that when
+> Guest starts booting it sees wrong contents because it is runs with
+> MMU disable and correct contents are still in external L3 cache of X-Gene.
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index dd1fb24..43fcab8 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -62,6 +62,9 @@
- 
- #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
- 
-+#define DA850_USB1_VBUS_PIN		GPIO_TO_PIN(2, 4)
-+#define DA850_USB1_OC_PIN		GPIO_TO_PIN(6, 13)
-+
- static struct mtd_partition da850evm_spiflash_part[] = {
- 	[0] = {
- 		.name = "UBL",
-@@ -1431,6 +1434,137 @@ static __init int da850_wl12xx_init(void)
- 
- #endif /* CONFIG_DA850_WL12XX */
- 
-+#ifdef CONFIG_USB
-+
-+static irqreturn_t da850_usb_ocic_irq(int irq, void *dev_id);
-+static da8xx_ocic_handler_t da850_usb_ocic_handler;
-+
-+static const short da850_usb11_pins[] = {
-+	DA850_GPIO2_4, DA850_GPIO6_13,
-+	-1
-+};
-+
-+static int da850_usb_set_power(unsigned port, int on)
-+{
-+	gpio_set_value(DA850_USB1_VBUS_PIN, on);
-+	return 0;
-+}
-+
-+static int da850_usb_get_power(unsigned port)
-+{
-+	return gpio_get_value(DA850_USB1_VBUS_PIN);
-+}
-+
-+static int da850_usb_get_oci(unsigned port)
-+{
-+	return !gpio_get_value(DA850_USB1_OC_PIN);
-+}
-+
-+static int da850_usb_ocic_notify(da8xx_ocic_handler_t handler)
-+{
-+	int irq         = gpio_to_irq(DA850_USB1_OC_PIN);
-+	int error       = 0;
-+
-+	if (handler != NULL) {
-+		da850_usb_ocic_handler = handler;
-+
-+		error = request_irq(irq, da850_usb_ocic_irq,
-+					IRQF_DISABLED | IRQF_TRIGGER_RISING |
-+					IRQF_TRIGGER_FALLING,
-+					"OHCI over-current indicator", NULL);
-+		if (error)
-+			pr_err("%s: could not request IRQ to watch "
-+				"over-current indicator changes\n", __func__);
-+	} else {
-+		free_irq(irq, NULL);
-+	}
-+	return error;
-+}
-+
-+static struct da8xx_ohci_root_hub da850_usb11_pdata = {
-+	.set_power      = da850_usb_set_power,
-+	.get_power      = da850_usb_get_power,
-+	.get_oci        = da850_usb_get_oci,
-+	.ocic_notify    = da850_usb_ocic_notify,
-+	/* TPS2087 switch @ 5V */
-+	.potpgt         = (3 + 1) / 2,  /* 3 ms max */
-+};
-+
-+static irqreturn_t da850_usb_ocic_irq(int irq, void *dev_id)
-+{
-+	da850_usb_ocic_handler(&da850_usb11_pdata, 1);
-+	return IRQ_HANDLED;
-+}
-+
-+static __init void da850_usb_init(void)
-+{
-+	void __iomem *cfg_chip2_base;
-+	int ret;
-+	u32 val;
-+
-+	/*
-+	 * Set up USB clock/mode in the CFGCHIP2 register.
-+	 * USB2.0 PHY reference clock is 24 MHz
-+	 */
-+
-+	cfg_chip2_base = DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG);
-+
-+	val = readl(cfg_chip2_base);
-+
-+	val &= ~CFGCHIP2_REFFREQ;
-+	val |=  CFGCHIP2_REFFREQ_24MHZ;
-+
-+	writel(val, cfg_chip2_base);
-+
-+	/*
-+	 * Set up pin multiplexing
-+	 */
-+
-+	ret = davinci_cfg_reg_list(da850_usb11_pins);
-+	if (ret) {
-+		pr_warn("%s: USB 1.1 PinMux setup failed: %d\n", __func__, ret);
-+		return;
-+	}
-+
-+	ret = gpio_request_one(DA850_USB1_VBUS_PIN,
-+			GPIOF_DIR_OUT, "USB1 VBUS");
-+	if (ret < 0) {
-+		pr_err("%s: failed to request GPIO for USB 1.1 port "
-+			"power control: %d\n", __func__, ret);
-+		return;
-+	}
-+
-+	ret = gpio_request_one(DA850_USB1_OC_PIN,
-+			GPIOF_DIR_IN, "USB1 OC");
-+	if (ret < 0) {
-+		pr_err("%s: failed to request GPIO for USB 1.1 port "
-+			"over-current indicator: %d\n", __func__, ret);
-+		goto usb11_setup_oc_fail;
-+	}
-+
-+	ret = da8xx_register_usb11(&da850_usb11_pdata);
-+	if (ret) {
-+		pr_warn("%s: USB 1.1 registration failed: %d\n", __func__, ret);
-+		goto usb11_setup_fail;
-+	}
-+
-+	return;
-+
-+usb11_setup_fail:
-+	gpio_free(DA850_USB1_OC_PIN);
-+usb11_setup_oc_fail:
-+	gpio_free(DA850_USB1_VBUS_PIN);
-+}
-+
-+#else /* CONFIG_USB */
-+
-+static __init void da850_usb_init(void)
-+{
-+	return 0;
-+}
-+
-+#endif /* CONFIG_USB */
-+
- #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
- 
- static __init void da850_evm_init(void)
-@@ -1453,6 +1587,7 @@ static __init void da850_evm_init(void)
- 	if (ret)
- 		pr_warn("%s: I2C0 registration failed: %d\n", __func__, ret);
- 
-+	da850_usb_init();
- 
- 	ret = da8xx_register_watchdog();
- 	if (ret)
+That's one of the problems and I think the easiest to solve. Note that
+contents could still be in the L1/L2 (inner) cache since whole cache
+flushing by set/way isn't guaranteed in an MP context.
+
+> How about reconsidering the approach of flushing Guest RAM (entire or
+> portion of it) to PoC by VA once before the first run of a VCPU ?
+
+Flushing the entire guest RAM is not possible by set/way
+(architecturally) and not efficient by VA (though some benchmark would
+be good). Marc's patch defers this flushing when a page is faulted in
+(at stage 2) and I think it covers the initial boot.
+
+> OR
+> We can also have KVM API using which user space can flush portions
+> of Guest RAM before running the VCPU. (I think this was a suggestion
+> from Marc Z initially)
+
+This may not be enough. It indeed flushes the kernel image that gets
+loaded but the kernel would write other pages (bss, page tables etc.)
+with MMU disabled and those addresses may contain dirty cache lines that
+have not been covered by the initial kvmtool flush. So you basically
+need all guest non-cacheable accesses to be flushed.
+
+The other problems are the cacheable aliases that I mentioned, so even
+though the guest does non-cacheable accesses with the MMU off, the
+hardware can still allocate into the cache via the other mappings. In
+this case the guest needs to invalidate the areas of memory that it
+wrote with caches off (or just use the DC bit to force memory accesses
+with MMU off to be cacheable).
+
 -- 
-1.7.12.1
+Catalin
