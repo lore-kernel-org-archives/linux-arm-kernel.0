@@ -1,133 +1,83 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Oct 2013 15:59:42 +0100
-Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
- fault
-In-Reply-To: <CAAhSdy1RS58HxDD2sKC5NP=vZ-fn=Zc4qEYZoFHR2usGqiQMFA@mail.gmail.com>
-References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy2E6aRndw88_S_3wfyTOYd5rQQTc4+Cw5Hd1DFXuM6EBA@mail.gmail.com>
- <523063AC.8040803@arm.com>	<20130911193855.GN9860@cbox>
- <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
- <525667DB.7090705@arm.com>	<20131010112425.GB21380@arm.com>
- <CAAhSdy20=U3+LZd=3i8dfqfSEaX7V+2z_y641NBLj7PkYZBadQ@mail.gmail.com>
- <20131011123839.GH12308@darko.cambridge.arm.com>
- <CAAhSdy1Sm2N68ZB5r9BmansGYnUgFO0ZFdUL=XB7RhJ258AAFA@mail.gmail.com>
- <20131011143721.GD15803@arm.com>
- <CAAhSdy1RS58HxDD2sKC5NP=vZ-fn=Zc4qEYZoFHR2usGqiQMFA@mail.gmail.com>
-Message-ID: <5258125E.4040709@arm.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 11 Oct 2013 20:29:44 +0530
+Subject: [PATCH v3 1/3] gpio: davinci: add OF support
+In-Reply-To: <CACRpkdYxegBSYXR1-98smUNnDXpyRHo_vuYdnr3r7zhawENiUA@mail.gmail.com>
+References: <1380902596-4693-1-git-send-email-sujithkv@ti.com>
+ <1380902596-4693-2-git-send-email-sujithkv@ti.com>
+ <CACRpkdYxegBSYXR1-98smUNnDXpyRHo_vuYdnr3r7zhawENiUA@mail.gmail.com>
+Message-ID: <CA+V-a8vyPyL0j0nPOZyjxrecusFzXovFPsNBLKYXns5ASWR-wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/13 15:50, Anup Patel wrote:
-> On Fri, Oct 11, 2013 at 8:07 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->> On Fri, Oct 11, 2013 at 03:27:16PM +0100, Anup Patel wrote:
->>> On Fri, Oct 11, 2013 at 6:08 PM, Catalin Marinas
->>> <catalin.marinas@arm.com> wrote:
->>>> On Thu, Oct 10, 2013 at 05:09:03PM +0100, Anup Patel wrote:
->>>>> On Thu, Oct 10, 2013 at 4:54 PM, Catalin Marinas
->>>>> <catalin.marinas@arm.com> wrote:
->>>>>> On Thu, Oct 10, 2013 at 09:39:55AM +0100, Marc Zyngier wrote:
->>>>>>> On 10/10/13 05:51, Anup Patel wrote:
->>>>>>>> Are you planning to go ahead with this approach ?
->>>>>>>
->>>>>>> [adding Catalin, as we heavily discussed this recently]
->>>>>>>
->>>>>>> Not as such, as it doesn't solve the full issue. It merely papers over
->>>>>>> the whole "my cache is off" problem. More specifically, any kind of
->>>>>>> speculative access from another CPU while caches are off in the guest
->>>>>>> completely nukes the benefit of this patch.
->>>>>>>
->>>>>>> Also, turning the the caches off is another source of problems, as
->>>>>>> speculation also screws up set/way invalidation.
->>>>>>
->>>>>> Indeed. The set/way operations trapping and broadcasting (or deferring)
->>>>>> to other CPUs in software just happens to work but there is no
->>>>>> guarantee, sooner or later we'll hit a problem. I'm even tempted to
->>>>>> remove flush_dcache_all() calls on the booting path for the arm64
->>>>>> kernel, we already require that whatever runs before Linux should
->>>>>> clean&invalidate the caches.
->>>>>>
->>>>>> Basically, with KVM a VCPU even if running with caches/MMU disabled can
->>>>>> still get speculative allocation into the cache. The reason for this is
->>>>>> the other cacheable memory aliases created by the host kernel and
->>>>>> qemu/kvmtool. I can't tell whether Xen has this issue but it may be
->>>>>> easier in Xen to avoid memory aliases.
->>>>>>
->>>>>>>> We really need this patch for X-Gene L3 cache.
->>>>>>>
->>>>>>> So far, I can see two possibilities:
->>>>>>> - either we mandate caches to be always on (DC bit, and you're not
->>>>>>> allowed to turn the caches off).
->>>>>>
->>>>>> That's my preferred approach. For hotplug, idle, the guest would use an
->>>>>> HVC call (PSCI) and the host takes care of re-enabling the DC bit. But
->>>>>> we may not catch all cases (kexec probably).
->>>>>>
->>>>>>> - Or we mandate that caches are invalidated (by VA) for each write that
->>>>>>> is performed with caches off.
->>>>>>
->>>>>> For some things like run-time code patching, on ARMv8 we need to do at
->>>>>> least I-cache maintenance since the CPU can allocate into the I-cache
->>>>>> (even if there are no aliases).
->>>>>
->>>>> It seems all approaches considered so far have a corner case in
->>>>> one-way or another.
->>>>
->>>> Yes, we try to settle on the one with least corner cases.
->>>
->>> Ok.
->>>
->>>>
->>>>> Coming back to where we started, the actual problem was that when
->>>>> Guest starts booting it sees wrong contents because it is runs with
->>>>> MMU disable and correct contents are still in external L3 cache of X-Gene.
->>>>
->>>> That's one of the problems and I think the easiest to solve. Note that
->>>> contents could still be in the L1/L2 (inner) cache since whole cache
->>>> flushing by set/way isn't guaranteed in an MP context.
->>>>
->>>>> How about reconsidering the approach of flushing Guest RAM (entire or
->>>>> portion of it) to PoC by VA once before the first run of a VCPU ?
->>>>
->>>> Flushing the entire guest RAM is not possible by set/way
->>>> (architecturally) and not efficient by VA (though some benchmark would
->>>> be good). Marc's patch defers this flushing when a page is faulted in
->>>> (at stage 2) and I think it covers the initial boot.
->>>>
->>>>> OR
->>>>> We can also have KVM API using which user space can flush portions
->>>>> of Guest RAM before running the VCPU. (I think this was a suggestion
->>>>> from Marc Z initially)
->>>>
->>>> This may not be enough. It indeed flushes the kernel image that gets
->>>> loaded but the kernel would write other pages (bss, page tables etc.)
->>>> with MMU disabled and those addresses may contain dirty cache lines that
->>>> have not been covered by the initial kvmtool flush. So you basically
->>>> need all guest non-cacheable accesses to be flushed.
->>>>
->>>> The other problems are the cacheable aliases that I mentioned, so even
->>>> though the guest does non-cacheable accesses with the MMU off, the
->>>> hardware can still allocate into the cache via the other mappings. In
->>>> this case the guest needs to invalidate the areas of memory that it
->>>> wrote with caches off (or just use the DC bit to force memory accesses
->>>> with MMU off to be cacheable).
->>>
->>> Having looked at all the approaches, I would vote for the approach taken
->>> by this patch.
+Hi Linus ,
+
+On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Oct 4, 2013 at 6:03 PM, Prabhakar Lad
+> <prabhakar.csengg@gmail.com> wrote:
+>
+>> This patch adds OF parser support for davinci gpio
+>> driver and also appropriate documentation in gpio-davinci.txt
+>> located at Documentation/devicetree/bindings/gpio/.
 >>
->> But this patch alone doesn't solve the other issues. OTOH, the DC bit
->> would solve your initial problem and a few others.
-> 
-> DC bit might solve the initial problem but it can be problematic because
-> setting DC bit would mean Guest would have Caching ON even when Guest
-> MMU is disabled. This will be more problematic if Guest is running a
-> bootloader (uboot, grub, UEFI, ..) which does pass-through access to a
-> DMA-capable device and we will have to change the bootloader in this
-> case and put explicit flushes in bootloader for running inside Guest.
+>> Signed-off-by: KV Sujith <sujithkv@ti.com>
+>> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> ^Don't trust this guy.
+>
+>> [prabhakar.csengg at gmail.com: simplified the OF code and also
+>>                  the commit message]
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>> ---
+>>  .../devicetree/bindings/gpio/gpio-davinci.txt      |   34 +++++++++++
+>>  drivers/gpio/gpio-davinci.c                        |   60
+>> +++++++++++++++++++-
+>>  2 files changed, 91 insertions(+), 3 deletions(-)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> new file mode 100644
+>> index 0000000..87abd3b
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> @@ -0,0 +1,34 @@
+>> +Davinci GPIO controller bindings
+>> +
+>> +Required Properties:
+>> +- compatible: should be "ti,dm6441-gpio"
+>> +
+>> +- reg: Physical base address of the controller and the size of memory
+>> mapped
+>> +       registers.
+>> +
+>> +- gpio-controller : Marks the device node as a gpio controller.
+>> +
+>> +- interrupts: Array of GPIO interrupt number.
+>> +
+>> +- ngpio: The number of GPIO pins supported.
+>> +
+>> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering
+>> starts.
+>
+> What is this?
+>
+> If I have ever ACKed this I have been drunk. I take it back.
+>
+here is the ACK https://patchwork.kernel.org/patch/2721181/
 
-Well, as Catalin mentioned, we'll have to do some cache maintenance in
-the guest in any case.
+> This "base" is a Linux-specific thing and has no place in the
+> device tree, and shall not be there. You have to find some way to
+> avoid this, what do you think some other OS should do with
+> this value...
+>
+> All IRQs in Linux are assumed to be dynamically assigned numbers
+> nowadays, with a property like this you can never switch on
+> SPARSE_IRQ for the DaVinci.
+>
+Can you point to any alternative solution if you have any ?
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+--Prabhakar Lad
