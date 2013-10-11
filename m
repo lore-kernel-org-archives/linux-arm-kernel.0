@@ -1,7 +1,9 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 11 Oct 2013 13:15:52 +0200
-Subject: [PATCH 1/2] at91: add rtt irq fixup
-Message-ID: <1381490153-9706-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Fri, 11 Oct 2013 13:15:53 +0200
+Subject: [PATCH 2/2] at91: add rtc irq fixup
+In-Reply-To: <1381490153-9706-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1381490153-9706-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1381490153-9706-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,141 +18,183 @@ Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: Johan Hovold <jhovold@gmail.com>
 ---
- arch/arm/mach-at91/Makefile      |  2 +-
- arch/arm/mach-at91/at91sam9260.c |  1 +
- arch/arm/mach-at91/at91sam9261.c |  1 +
- arch/arm/mach-at91/at91sam9263.c |  2 ++
- arch/arm/mach-at91/at91sam9g45.c |  1 +
- arch/arm/mach-at91/at91sam9rl.c  |  1 +
- arch/arm/mach-at91/generic.h     |  1 +
- arch/arm/mach-at91/irq_fixup.c   | 33 +++++++++++++++++++++++++++++++++
- 8 files changed, 41 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-at91/irq_fixup.c
+ arch/arm/mach-at91/at91sam9g45.c              |  1 +
+ arch/arm/mach-at91/at91sam9n12.c              |  6 ++++++
+ arch/arm/mach-at91/at91sam9rl.c               |  1 +
+ arch/arm/mach-at91/at91sam9x5.c               |  6 ++++++
+ arch/arm/mach-at91/generic.h                  |  1 +
+ arch/arm/mach-at91/include/mach/at91sam9n12.h |  2 ++
+ arch/arm/mach-at91/include/mach/at91sam9x5.h  |  2 ++
+ arch/arm/mach-at91/include/mach/sama5d3.h     |  2 ++
+ arch/arm/mach-at91/irq_fixup.c                | 25 +++++++++++++++++++++++++
+ arch/arm/mach-at91/sama5d3.c                  |  6 ++++++
+ 10 files changed, 52 insertions(+)
 
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 3b0a953..1c8101c 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for the linux kernel.
- #
- 
--obj-y		:= irq.o gpio.o setup.o
-+obj-y		:= irq.o gpio.o setup.o irq_fixup.o
- obj-m		:=
- obj-n		:=
- obj-		:=
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 5de6074..ad637c7 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -346,6 +346,7 @@ static void __init at91sam9260_ioremap_registers(void)
- 
- static void __init at91sam9260_initialize(void)
- {
-+	at91_rtt_irq_fixup(AT91SAM9260_BASE_RTT);
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
- 
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 0e07932..772af58 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -288,6 +288,7 @@ static void __init at91sam9261_ioremap_registers(void)
- 
- static void __init at91sam9261_initialize(void)
- {
-+	at91_rtt_irq_fixup(AT91SAM9261_BASE_RTT);
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
- 
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 6ce7d18..e2c0bfb 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -325,6 +325,8 @@ static void __init at91sam9263_ioremap_registers(void)
- 
- static void __init at91sam9263_initialize(void)
- {
-+	at91_rtt_irq_fixup(AT91SAM9263_BASE_RTT0);
-+	at91_rtt_irq_fixup(AT91SAM9263_BASE_RTT1);
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
- 
 diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 474ee04..b3e2693 100644
+index b3e2693..654f9ab 100644
 --- a/arch/arm/mach-at91/at91sam9g45.c
 +++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -374,6 +374,7 @@ static void __init at91sam9g45_ioremap_registers(void)
- 
+@@ -375,6 +375,7 @@ static void __init at91sam9g45_ioremap_registers(void)
  static void __init at91sam9g45_initialize(void)
  {
-+	at91_rtt_irq_fixup(AT91SAM9G45_BASE_RTT);
+ 	at91_rtt_irq_fixup(AT91SAM9G45_BASE_RTT);
++	at91_rtc_irq_fixup(AT91SAM9G45_BASE_RTC);
  	arm_pm_idle = at91sam9_idle;
  	arm_pm_restart = at91sam9g45_restart;
  
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+index c7d670d1..98a1739 100644
+--- a/arch/arm/mach-at91/at91sam9n12.c
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -223,7 +223,13 @@ static void __init at91sam9n12_map_io(void)
+ 	at91_init_sram(0, AT91SAM9N12_SRAM_BASE, AT91SAM9N12_SRAM_SIZE);
+ }
+ 
++static void __init at91sam9n12_initialize(void)
++{
++	at91_rtc_irq_fixup(AT91SAM9N12_BASE_RTC);
++}
++
+ AT91_SOC_START(at91sam9n12)
+ 	.map_io = at91sam9n12_map_io,
+ 	.register_clocks = at91sam9n12_register_clocks,
++	.init = at91sam9n12_initialize,
+ AT91_SOC_END
 diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index d4ec0d9..01feae9 100644
+index 01feae9..6acd6a4 100644
 --- a/arch/arm/mach-at91/at91sam9rl.c
 +++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -291,6 +291,7 @@ static void __init at91sam9rl_ioremap_registers(void)
- 
+@@ -292,6 +292,7 @@ static void __init at91sam9rl_ioremap_registers(void)
  static void __init at91sam9rl_initialize(void)
  {
-+	at91_rtt_irq_fixup(AT91SAM9RL_BASE_RTT);
+ 	at91_rtt_irq_fixup(AT91SAM9RL_BASE_RTT);
++	at91_rtc_irq_fixup(AT91SAM9RL_BASE_RTC);
  	arm_pm_idle = at91sam9_idle;
  	arm_pm_restart = at91sam9_alt_restart;
  
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 916e5a1..26ef20a 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -322,6 +322,11 @@ static void __init at91sam9x5_map_io(void)
+ 	at91_init_sram(0, AT91SAM9X5_SRAM_BASE, AT91SAM9X5_SRAM_SIZE);
+ }
+ 
++static void __init at91sam9x5_initialize(void)
++{
++	at91_rtc_irq_fixup(AT91SAM9X5_BASE_RTC);
++}
++
+ /* --------------------------------------------------------------------
+  *  Interrupt initialization
+  * -------------------------------------------------------------------- */
+@@ -329,4 +334,5 @@ static void __init at91sam9x5_map_io(void)
+ AT91_SOC_START(at91sam9x5)
+ 	.map_io = at91sam9x5_map_io,
+ 	.register_clocks = at91sam9x5_register_clocks,
++	.init = at91sam9x5_initialize,
+ AT91_SOC_END
 diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index dc6e2f5..c7ad514 100644
+index c7ad514..7d377f3 100644
 --- a/arch/arm/mach-at91/generic.h
 +++ b/arch/arm/mach-at91/generic.h
-@@ -35,6 +35,7 @@ extern int  __init at91_aic_of_init(struct device_node *node,
- extern int  __init at91_aic5_of_init(struct device_node *node,
+@@ -36,6 +36,7 @@ extern int  __init at91_aic5_of_init(struct device_node *node,
  				    struct device_node *parent);
  
-+void at91_rtt_irq_fixup(uint32_t addr);
+ void at91_rtt_irq_fixup(uint32_t addr);
++void at91_rtc_irq_fixup(uint32_t addr);
  
   /* Timer */
  extern void at91rm9200_ioremap_st(u32 addr);
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9n12.h b/arch/arm/mach-at91/include/mach/at91sam9n12.h
+index d374b87..6a1d457 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9n12.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9n12.h
+@@ -48,6 +48,8 @@
+ #define AT91SAM9N12_BASE_USART2	0xf8024000
+ #define AT91SAM9N12_BASE_USART3	0xf8028000
+ 
++#define AT91SAM9N12_BASE_RTC	0xfffffeb0
++
+ /*
+  * Internal Memory.
+  */
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9x5.h b/arch/arm/mach-at91/include/mach/at91sam9x5.h
+index c75ee19..24e281c 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9x5.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9x5.h
+@@ -54,6 +54,8 @@
+ #define AT91SAM9X5_BASE_USART1	0xf8020000
+ #define AT91SAM9X5_BASE_USART2	0xf8024000
+ 
++#define AT91SAM9X5_BASE_RTC	0xfffffeb0
++
+ /*
+  * Internal Memory.
+  */
+diff --git a/arch/arm/mach-at91/include/mach/sama5d3.h b/arch/arm/mach-at91/include/mach/sama5d3.h
+index 31096a8..b5d045e 100644
+--- a/arch/arm/mach-at91/include/mach/sama5d3.h
++++ b/arch/arm/mach-at91/include/mach/sama5d3.h
+@@ -72,6 +72,8 @@
+ #define SAMA5D3_BASE_USART2	0xf8020000
+ #define SAMA5D3_BASE_USART3	0xf8024000
+ 
++#define SAMA5D3_BASE_RTC	0xfffffeb0
++
+ /*
+  * Internal Memory
+  */
 diff --git a/arch/arm/mach-at91/irq_fixup.c b/arch/arm/mach-at91/irq_fixup.c
-new file mode 100644
-index 0000000..a93588f
---- /dev/null
+index a93588f..38bdfec 100644
+--- a/arch/arm/mach-at91/irq_fixup.c
 +++ b/arch/arm/mach-at91/irq_fixup.c
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright (C) 2013 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Under GPLv2 only
-+ */
+@@ -31,3 +31,28 @@ void at91_rtt_irq_fixup(uint32_t addr)
+ 	writel(mr &~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN), reg);
+ 	iounmap(base);
+ }
 +
-+#include <linux/io.h>
-+#include <mach/at91_rtt.h>
 +
-+#include "generic.h"
++#define	AT91_RTC_IDR		0x24			/* Interrupt Disable Register */
 +
 +/*
-+ * As the RTT is powered by the backup power so if the interrupt
++ * As the RTC is powered by the backup power so if the interrupt
 + * is still on when the kernel start, the kernel will end up with
 + * dead lock interrupt that it can not clear. Because the interrupt line is
 + * shared with the basic timer (PIT) on AT91_ID_SYS.
 + */
-+void at91_rtt_irq_fixup(uint32_t addr)
++void at91_rtc_irq_fixup(uint32_t addr)
 +{
 +	void __iomem *reg;
 +	void __iomem *base;
-+	u32 mr;
 +
-+	base = ioremap(addr, 16);
++	base = ioremap(addr, 256);
 +	if (!base)
 +		return;
 +
-+	reg = base + AT91_RTT_MR;
-+	mr = readl(reg);
++	reg = base + AT91_RTC_IDR;
 +
-+	writel(mr &~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN), reg);
++	writel(0x5, reg);
++
 +	iounmap(base);
 +}
+diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
+index 4012797..548b37d 100644
+--- a/arch/arm/mach-at91/sama5d3.c
++++ b/arch/arm/mach-at91/sama5d3.c
+@@ -371,7 +371,13 @@ static void __init sama5d3_map_io(void)
+ 	at91_init_sram(0, SAMA5D3_SRAM_BASE, SAMA5D3_SRAM_SIZE);
+ }
+ 
++static void __init sama5d3_initialize(void)
++{
++	at91_rtc_irq_fixup(SAMA5D3_BASE_RTC);
++}
++
+ AT91_SOC_START(sama5d3)
+ 	.map_io = sama5d3_map_io,
+ 	.register_clocks = sama5d3_register_clocks,
++	.init = sama5d3_initialize,
+ AT91_SOC_END
 -- 
 1.8.4.rc3
