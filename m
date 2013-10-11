@@ -1,149 +1,94 @@
-From: amit.kachhap@gmail.com (Amit Kachhap)
-Date: Fri, 11 Oct 2013 09:57:45 +0530
-Subject: [RESEND PATCH 1/3] ARM: EXYNOS: Move arm core power down clock to
- exynos5250 common clock
-In-Reply-To: <16865865.dEQ4lomChq@amdc1032>
-References: <1363240979-1939-2-git-send-email-amit.daniel@samsung.com>
- <150e01ce6831$44d94920$ce8bdb60$%kim@samsung.com>
- <CADGdYn7sZMp13K-WcoHJ13FyXnkVbHjhg5LNcofiYPDTgxsHNg@mail.gmail.com>
- <16865865.dEQ4lomChq@amdc1032>
-Message-ID: <CADGdYn5ZB8s0QfhYovhNqOv8AyHNwgyKvdYeGYz3NKXtQiBHOA@mail.gmail.com>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Thu, 10 Oct 2013 21:44:11 -0700
+Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
+In-Reply-To: <201310110418.56460.marex@denx.de>
+References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
+ <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
+ <201310110413.02354.marex@denx.de>
+ <201310110418.56460.marex@denx.de>
+Message-ID: <CAE9FiQXKgkwgzA0ciRyahObDHvnFtEJxzOhHRo6gytdeKQ-XQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomeij,
+On Thu, Oct 10, 2013 at 7:18 PM, Marek Vasut <marex@denx.de> wrote:
 
-Yes these patches have missed 2 merge windows and still not merged.
+> And so does the probe log (but the pcieport failure still persists):
+>
 
-Mike:
-I am re-basing these patches on linux-next. Please merge them.
+> pci_bus 0000:04: bus scan returning with max=04
+> pci_bus 0000:04: busn_res: [bus 04-ff] end is updated to 04
+> pci_bus 0000:02: bus scan returning with max=04
+> pci_bus 0000:02: busn_res: [bus 02-ff] end is updated to 04
+> pci_bus 0000:01: bus scan returning with max=04
+> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 04
+> pci_bus 0000:00: bus scan returning with max=04
+> pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 04
+> PCI: Device 0000:00:00.0 not available because of resource collisions
+> pcieport: probe of 0000:00:00.0 failed with error -22
 
-Regards,
-Amit
+load pcieport driver too early.
 
-On Wed, Oct 9, 2013 at 3:18 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> Mike:
->
-> Could you please apply this patch? It is few months overdue..
->
-> Amit:
->
-> This patch no longer applies to -next. Could you please refresh and resend it?
->
-> You can add:
->
->         Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->
-> while at it.
->
-> Thanks.
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
-> On Friday, August 16, 2013 10:22:44 AM amit daniel kachhap wrote:
->> Hi Mike,
->>
->> Please merge this patch as it is pending since last merge window.
->>
->> Thanks,
->> Amit
->>
->> On Thu, Jun 13, 2013 at 5:56 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > Amit Daniel Kachhap wrote:
->> >>
->> >> Now with common clock support added for exynos5250 it is necessary to move
->> >> this code to exynos5250 common clock driver as clock registers should be
->> >> handled there. This change is tested in exynos5250 based arndale platform.
->> >>
->> >> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
->> >> Cc: Thomas Abraham <thomas.abraham@linaro.org>
->> >> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> >
->> > Hmm...I'm not sure it's better to handle the ARM core power down clock in
->> > common clock but the clock registers should be handled in one part, clock.
->> >
->> > Acked-by: Kukjin Kim <kgene.kim@samsugn.com>
->> >
->> > Mike, the mach-exynos/cpuidle.c is not touched in samsung tree at this
->> > moment, so this patch will not create any conflict between samsung and clk.
->> >
->> > Thanks,
->> > - Kukjin
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> PCI: Device 0000:00:00.0 not available because of resource collisions
+> pci 0000:00:00.0: Error enabling bridge (-22), continuing
+> PCI: enabling device 0000:01:00.0 (0140 -> 0143)
+> pcieport 0000:01:00.0: enabling bus mastering
+> PCI: Device 0000:00:00.0 not available because of resource collisions
+> pci 0000:00:00.0: Error enabling bridge (-22), continuing
+> PCI: Device 0000:00:00.0 not available because of resource collisions
+> pci 0000:00:00.0: Error enabling bridge (-22), continuing
+> pci 0000:03:00.0: calling quirk_e100_interrupt+0x0/0x20c
+> pci 0000:00:00.0: fixup irq: got 155
+> pci 0000:00:00.0: assigning IRQ 155
+> pcieport 0000:01:00.0: fixup irq: got 0
+> pcieport 0000:01:00.0: assigning IRQ 00
+> pcieport 0000:02:01.0: fixup irq: got 0
+> pcieport 0000:02:01.0: assigning IRQ 00
+> pcieport 0000:02:02.0: fixup irq: got 0
+> pcieport 0000:02:02.0: assigning IRQ 00
+> pci 0000:03:00.0: fixup irq: got 155
+> pci 0000:03:00.0: assigning IRQ 155
+> pci 0000:00:00.0: BAR 8: assigned [mem 0x01000000-0x01bfffff]
+> pci 0000:00:00.0: BAR 0: assigned [mem 0x01c00000-0x01cfffff]
+> pci 0000:00:00.0: BAR 0: set to [mem 0x01c00000-0x01cfffff] (PCI address
+> [0x1c00000-0x1c
+> fffff])
+> pci 0000:00:00.0: BAR 6: assigned [mem 0x01d00000-0x01d0ffff pref]
+> pci 0000:00:00.0: BAR 7: assigned [io  0x1000-0x1fff]
+> pcieport 0000:01:00.0: BAR 8: assigned [mem 0x01000000-0x01bfffff]
+> pcieport 0000:01:00.0: BAR 7: assigned [io  0x1000-0x1fff]
+> pcieport 0000:02:01.0: BAR 8: assigned [mem 0x01000000-0x01bfffff]
+> pcieport 0000:02:01.0: BAR 7: assigned [io  0x1000-0x1fff]
+> pci 0000:03:00.0: BAR 0: assigned [mem 0x01000000-0x017fffff]
+> pci 0000:03:00.0: BAR 0: set to [mem 0x01000000-0x017fffff] (PCI address
+> [0x1000000-0x17
+> fffff])
+> pci 0000:03:00.0: BAR 3: assigned [mem 0x01800000-0x01803fff]
+> pci 0000:03:00.0: BAR 3: set to [mem 0x01800000-0x01803fff] (PCI address
+> [0x1800000-0x18
+> 03fff])
+> pci 0000:03:00.0: BAR 2: assigned [io  0x1000-0x101f]
+> pci 0000:03:00.0: BAR 2: set to [io  0x1000-0x101f] (PCI address
+> [0x1000-0x101f])
+> pci 0000:00:00.0: PCI bridge to [bus 01-04]
+> pci 0000:00:00.0:   bridge window [io  0x1000-0x1fff]
+> pci 0000:00:00.0:   bridge window [mem 0x01000000-0x01bfffff]
+> pci 0000:00:00.0: PCI bridge to [bus 01-04]
+> pci 0000:00:00.0:   bridge window [io  0x1000-0x1fff]
+> pci 0000:00:00.0:   bridge window [mem 0x01000000-0x01bfffff]
+> pci_bus 0000:00: resource 4 [io  0x1000-0x10000]
+> pci_bus 0000:00: resource 5 [mem 0x01000000-0x01efffff]
+> pci_bus 0000:01: resource 0 [io  0x1000-0x1fff]
+> pci_bus 0000:01: resource 1 [mem 0x01000000-0x01bfffff]
+> pci_bus 0000:02: resource 0 [io  0x1000-0x1fff]
+> pci_bus 0000:02: resource 1 [mem 0x01000000-0x01bfffff]
+> pci_bus 0000:03: resource 0 [io  0x1000-0x1fff]
+> pci_bus 0000:03: resource 1 [mem 0x01000000-0x01bfffff]
 
+Looks your arch call pci_assign_unassigned_resources() too late.
 
-On Wed, Oct 9, 2013 at 3:18 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> Mike:
->
-> Could you please apply this patch? It is few months overdue..
->
-> Amit:
->
-> This patch no longer applies to -next. Could you please refresh and resend it?
->
-> You can add:
->
->         Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->
-> while at it.
->
-> Thanks.
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
-> On Friday, August 16, 2013 10:22:44 AM amit daniel kachhap wrote:
->> Hi Mike,
->>
->> Please merge this patch as it is pending since last merge window.
->>
->> Thanks,
->> Amit
->>
->> On Thu, Jun 13, 2013 at 5:56 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > Amit Daniel Kachhap wrote:
->> >>
->> >> Now with common clock support added for exynos5250 it is necessary to move
->> >> this code to exynos5250 common clock driver as clock registers should be
->> >> handled there. This change is tested in exynos5250 based arndale platform.
->> >>
->> >> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
->> >> Cc: Thomas Abraham <thomas.abraham@linaro.org>
->> >> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> >
->> > Hmm...I'm not sure it's better to handle the ARM core power down clock in
->> > common clock but the clock registers should be handled in one part, clock.
->> >
->> > Acked-by: Kukjin Kim <kgene.kim@samsugn.com>
->> >
->> > Mike, the mach-exynos/cpuidle.c is not touched in samsung tree at this
->> > moment, so this patch will not create any conflict between samsung and clk.
->> >
->> > Thanks,
->> > - Kukjin
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+you should have call it with fs_initcall()...
+
+please try to boot with "debug ignore_loglevel initcall_debug" to sort out
+the initcall sequence.
+
+Yinghai
