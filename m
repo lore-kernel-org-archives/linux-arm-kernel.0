@@ -1,55 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Oct 2013 08:48:05 -0700
-Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
-In-Reply-To: <52581CA7.20606@ti.com>
-References: <20131003054104.8941.88857.stgit@localhost>
- <20131003054221.8941.87801.stgit@localhost>
- <5256AA7F.8030005@ti.com> <20131010160018.GA29913@atomide.com>
- <CACRpkdaG-PQA39XSjKUgM9TyeD7srgm_8s+NazrDKJ0gmNLcwg@mail.gmail.com>
- <20131010162015.GC29913@atomide.com>
- <CACRpkdYF83ghUf60Wmrti53UJ1bWV30GW_P9GjWnsOcZHbsv+Q@mail.gmail.com>
- <5257BD3E.5000707@ti.com> <20131011153654.GN29913@atomide.com>
- <52581CA7.20606@ti.com>
-Message-ID: <20131011154804.GP29913@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Oct 2013 17:54:18 +0200
+Subject: [PATCH v3 1/3] gpio: davinci: add OF support
+In-Reply-To: <CA+V-a8vyPyL0j0nPOZyjxrecusFzXovFPsNBLKYXns5ASWR-wg@mail.gmail.com>
+References: <1380902596-4693-1-git-send-email-sujithkv@ti.com>
+ <1380902596-4693-2-git-send-email-sujithkv@ti.com>
+ <CACRpkdYxegBSYXR1-98smUNnDXpyRHo_vuYdnr3r7zhawENiUA@mail.gmail.com>
+ <CA+V-a8vyPyL0j0nPOZyjxrecusFzXovFPsNBLKYXns5ASWR-wg@mail.gmail.com>
+Message-ID: <CACRpkdYNexWWXuQ052xuQ4NOdXm2gt-+ByREKeGo-VAnbH4D2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Balaji T K <balajitk@ti.com> [131011 08:51]:
-> On Friday 11 October 2013 09:06 PM, Tony Lindgren wrote:
-> >>>What the pin control driver should do is control the pins. Whether the registers
-> >>>are spread out in the entire IO-memory does not matter. We did have one system
-> >>>which placed the IO-muxing together with each peripheral (!) and I did
-> >>>still want
-> >>>that to be handled by a single pinctrl driver picking out windows to all these
-> >>>IO-ranges.
-> >>>
-> >>>Things like the PRM which has (my guess) a gazillion registers related to its
-> >>>deep-core SoC stuff should be handled by things like
-> >>>drivers/mfd/syscon.c, which means it is dead simple for some other driver
-> >>>using "just this one register" in that range to get a handle at it and poke it
-> >>>using syscon_node_to_regmap() (just derference an ampersand ref)
-> >>>syscon_regmap_lookup_by_compatible() (use a compatible string)
-> >>>all returning a regmap * that you can use to poke these registers.
-> >>
-> >>The register handling is fine. But how do we deal with resource handling?
-> >>e.g. the block that has the deep-core registers might need to be clocked or powered
-> >>before the registers can be accessed.
-> >
-> >Right, that's the key issue here. The register access would have to be conditional
-> >based on the hardware modules PM state. Otherwise we'll have hard to trace hangs
-> >and oopses.
-> >
-> Hi Tony,
-> 
-> How are the clocks/power state currently handled in case of omap4_pmx_core,
-> omap4_pmx_wkup register access via pinctrl-single ?
+On Fri, Oct 11, 2013 at 4:59 PM, Prabhakar Lad
+<prabhakar.csengg@gmail.com> wrote:
+> On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Fri, Oct 4, 2013 at 6:03 PM, Prabhakar Lad
+>> <prabhakar.csengg@gmail.com> wrote:
 
-It's currently always on during runtime and managed in for the whole SCM
-by mach-omap2/control.c. Then there's a separate SCM register that triggers
-the save and restore of the padconf registers in hardware for off-idle
-along with other SCM related things, see the *_control_save/restore_context()
-functions.
+>>> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering
+>>> starts.
+>>
+>> What is this?
+>>
+>> If I have ever ACKed this I have been drunk. I take it back.
+>>
+> here is the ACK https://patchwork.kernel.org/patch/2721181/
 
-Regards,
+And as suspected that version of the patch did not contain
+this strange node property.
 
-Tony
+Don't keep my ACK on patches if you change basic stuff like
+that, they need to be re-acked, this runs the risk of abusing
+my trust amongst other subsystem maintainers who might
+go and merge this because "aha the GPIO maintainer
+thinks that this is OK".
+
+>> This "base" is a Linux-specific thing and has no place in the
+>> device tree, and shall not be there. You have to find some way to
+>> avoid this, what do you think some other OS should do with
+>> this value...
+>>
+>> All IRQs in Linux are assumed to be dynamically assigned numbers
+>> nowadays, with a property like this you can never switch on
+>> SPARSE_IRQ for the DaVinci.
+>>
+> Can you point to any alternative solution if you have any ?
+
+First convert this GPIO driver to use an irqdomain to map
+HW IRQs to Linux IRQs, and grab a few IRQ descriptors
+dynamically off the irq descriptor heap.
+Example: commit
+a6c45b99a658521291cfb66ecf035cc58b38f206
+"pinctrl/coh901: use irqdomain, allocate irqdescs"
+
+Then on a longer term convert DaVinci to use dynamically
+allocated IRQs for all interrupt controllers, and move it over
+to SPARSE_IRQ so you know this works.
+
+Yours,
+Linus Walleij
