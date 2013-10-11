@@ -1,40 +1,56 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 11 Oct 2013 13:49:10 +0200
-Subject: [PATCH v4 17/17] ARM: at91: add new compatible strings for pmc driver
-In-Reply-To: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
-References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1381492150-14842-1-git-send-email-b.brezillon@overkiz.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 11 Oct 2013 13:55:04 +0200
+Subject: [PATCH 2/2] PCI: imx6: Fix the clock for PCIe
+In-Reply-To: <000c01cec652$55adbb30$01093190$%han@samsung.com>
+References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
+ <1381457552-6575-2-git-send-email-marex@denx.de>
+ <000c01cec652$55adbb30$01093190$%han@samsung.com>
+Message-ID: <201310111355.04746.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new compatible string for PMC node to prepare the
-transition to common clk.
+Dear Jingoo Han,
 
-These compatible string come from pmc driver in clk subsystem and are
-needed to provide new device tree compatibility with old at91 clks
-(device tree using common clks will use the new compatible strings).
+> On Friday, October 11, 2013 11:13 AM, Marek Vasut wrote:
+> > The clk #205 are lvds_sel, not lvds_gate , so fix this. Moreover,
+> > the PCIe needs lvds_gate for successful operation, so make the PCIe
+> > driver enable (set as output) the lvds_gate .
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Frank Li <lznuaa@gmail.com>
+> > Cc: Richard Zhu <r65037@freescale.com>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Sean Cross <xobs@kosagi.com>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Tim Harvey <tharvey@gateworks.com>
+> > Cc: Yinghai Lu <yinghai@kernel.org>
+> > ---
+> > 
+> >  arch/arm/boot/dts/imx6qdl.dtsi |  6 +++---
+> >  drivers/pci/host/pci-imx6.c    | 19 ++++++++++++++++++-
+> >  2 files changed, 21 insertions(+), 4 deletions(-)
+> 
+> Hi Marek Vasut,
+> 
+> How about splitting this patch into two patches such as
+> arch part and driver part?
+> 
+> It is because driver part was merged into PCI tree by Bjorn Helgaas,[1]
+> and arch part was merged into i.MX tree by Shawn Guo.[2]
+> Thus, your patch can make the conflict issue.
+> 
+> For example,
+>   [PATCH 1/2] ARM: dts: imx6qdl: Fix the clock for PCIe
+>   [PATCH 2/2] PCI: imx6: Fix the clock for PCIe
+> 
+> Then, 1st patch can be merged to i.MX tree, and 2nd patch can be merged
+> to PCI tree.
+> 
+> If I am wrong, please let me know kindly. :-)
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/clock.c |    5 +++++
- 1 file changed, 5 insertions(+)
+By all means, you're right. Is the patch addressing the issue correctly (if we 
+ignore that it's not split)? Shawn?
 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 5f02aea..72b2579 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -884,6 +884,11 @@ static int __init at91_pmc_init(unsigned long main_clock)
- #if defined(CONFIG_OF)
- static struct of_device_id pmc_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-pmc" },
-+	{ .compatible = "atmel,at91sam9260-pmc" },
-+	{ .compatible = "atmel,at91sam9g45-pmc" },
-+	{ .compatible = "atmel,at91sam9n12-pmc" },
-+	{ .compatible = "atmel,at91sam9x5-pmc" },
-+	{ .compatible = "atmel,sama5d3-pmc" },
- 	{ /*sentinel*/ }
- };
- 
--- 
-1.7.9.5
+Best regards,
+Marek Vasut
