@@ -1,64 +1,99 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri, 11 Oct 2013 04:13:02 +0200
-Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
-In-Reply-To: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
-References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
- <201310101939.44295.marex@denx.de>
- <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
-Message-ID: <201310110413.02354.marex@denx.de>
+Date: Fri, 11 Oct 2013 04:12:32 +0200
+Subject: [PATCH 2/2] PCI: imx6: Fix the clock for PCIe
+In-Reply-To: <1381457552-6575-1-git-send-email-marex@denx.de>
+References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
+ <1381457552-6575-1-git-send-email-marex@denx.de>
+Message-ID: <1381457552-6575-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+The clk #205 are lvds_sel, not lvds_gate , so fix this. Moreover,
+the PCIe needs lvds_gate for successful operation, so make the PCIe
+driver enable (set as output) the lvds_gate .
 
-> On Thu, Oct 10, 2013 at 11:39 AM, Marek Vasut <marex@denx.de> wrote:
-> > Hi Bjorn,
-> > 
-> >> [+cc Yinghai]
-> >> 
-> >> On Thu, Oct 10, 2013 at 9:58 AM, Marek Vasut <marex@denx.de> wrote:
-> >> >> On Thu, Oct 10, 2013 at 4:25 AM, Marek Vasut <marex@denx.de> wrote:
-> >> > I tried you suggestion, this is what I got now (and with V7 of the
-> >> > patches):
-> >> > 
-> >> > Note that my topology is: rootport->2_port_switch->ethernet_chip , the
-> >> > other port of the switch is not used .
-> >> > 
-> >> > imx6q-pcie 1ffc000.pcie: phy link never came up
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Frank Li <lznuaa@gmail.com>
+Cc: Richard Zhu <r65037@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Sean Cross <xobs@kosagi.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Tim Harvey <tharvey@gateworks.com>
+Cc: Yinghai Lu <yinghai@kernel.org>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi |  6 +++---
+ drivers/pci/host/pci-imx6.c    | 19 ++++++++++++++++++-
+ 2 files changed, 21 insertions(+), 4 deletions(-)
 
-After discussing with Tim a little, looks like a clock bit was missing. The 
-above line was the cause of all the issues. Now I can probe the bus, but I still 
-need more patches:
-
-This dirty patch here limits the PCIe operation to GEN1 only. It's based on this 
-Freescale patch [1]. Without this change, the PCIe switch is not detected. Any 
-idea why? (I also had to increase the PHY startup delay to get GEN1 going).
-
-[1] https://www.osadl.org/monitoring/patches/r8s7/1342-ENGR00180230-MX6-PCIE-
-enlarge-the-eye-diagram-and-fo.patch
-
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 3d8874a..b8601ea 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -127,9 +127,9 @@
+ 				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+ 			num-lanes = <1>;
+ 			interrupts = <0 123 0x04>;
+-			clocks = <&clks 189>, <&clks 187>, <&clks 205>, <&clks 144>;
+-			clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
+-			status = "disabled";
++			clocks = <&clks 189>, <&clks 187>, <&clks 205>, <&clks 144>, <&clks 207>;
++			clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_sel", "pcie_axi", "lvds_gate";
++			status = "okay";
+ 		};
+ 
+ 		pmu {
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 32b30ca..df2838b 100644
+index 8e7adce..32b30ca 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -330,13 +330,16 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+@@ -35,6 +35,7 @@ struct imx6_pcie {
+ 	int			power_on_gpio;
+ 	int			wake_up_gpio;
+ 	int			disable_gpio;
++	struct clk		*lvds_sel;
+ 	struct clk		*lvds_gate;
+ 	struct clk		*sata_ref_100m;
+ 	struct clk		*pcie_ref_125m;
+@@ -255,6 +256,12 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 		goto err_pcie_ref;
+ 	}
  
-        dw_pcie_setup_rc(pp);
- 
-+// Enable GEN1
-+writel(((readl(pp->dbi_base + 0x7c) & 0xfffffff0) | 0x1), pp->dbi_base + 0x7c);
++	ret = clk_prepare_enable(imx6_pcie->lvds_sel);
++	if (ret) {
++		dev_err(pp->dev, "unable to enable lvds_sel\n");
++		goto err_lvds_sel;
++	}
 +
-        regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-                        IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
+ 	ret = clk_prepare_enable(imx6_pcie->lvds_gate);
+ 	if (ret) {
+ 		dev_err(pp->dev, "unable to enable lvds_gate\n");
+@@ -273,8 +280,10 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 	return 0;
  
-        while (!dw_pcie_link_up(pp)) {
-                usleep_range(100, 1000);
-                count++;
--               if (count >= 10) {
-+               if (count >= 200) {
-                        dev_err(pp->dev, "phy link never came up\n");
-                        dev_dbg(pp->dev,
-                                "DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
-
-Best regards,
-Marek Vasut
+ err_pcie_axi:
+-	clk_disable_unprepare(imx6_pcie->lvds_gate);
++	clk_disable_unprepare(imx6_pcie->lvds_sel);
+ err_lvds_gate:
++	clk_disable_unprepare(imx6_pcie->lvds_gate);
++err_lvds_sel:
+ 	clk_disable_unprepare(imx6_pcie->pcie_ref_125m);
+ err_pcie_ref:
+ 	clk_disable_unprepare(imx6_pcie->sata_ref_100m);
+@@ -498,6 +507,14 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* Fetch clocks */
++	imx6_pcie->lvds_sel = devm_clk_get(&pdev->dev, "lvds_sel");
++	if (IS_ERR(imx6_pcie->lvds_sel)) {
++		dev_err(&pdev->dev,
++			"lvds_sel clock select missing or invalid\n");
++		ret = PTR_ERR(imx6_pcie->lvds_sel);
++		goto err;
++	}
++
+ 	imx6_pcie->lvds_gate = devm_clk_get(&pdev->dev, "lvds_gate");
+ 	if (IS_ERR(imx6_pcie->lvds_gate)) {
+ 		dev_err(&pdev->dev,
+-- 
+1.8.4.rc3
