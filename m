@@ -1,34 +1,179 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Oct 2013 13:28:46 +0100
-Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
- "include/asm/atomic.h"
-In-Reply-To: <CAFLxGvwsx2YfNHiGtjWsANfVW74PT3KneLA-T6SpY4NEp_OSUA@mail.gmail.com>
-References: <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
- <20131010100733.GH3817@mudshark.cambridge.arm.com>
- <52568998.2080108@asianux.com>
- <20131010142305.GG6199@mudshark.cambridge.arm.com>
- <525751E2.3020207@asianux.com>
- <20131011104419.GE14732@mudshark.cambridge.arm.com>
- <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
- <CAFLxGvwsx2YfNHiGtjWsANfVW74PT3KneLA-T6SpY4NEp_OSUA@mail.gmail.com>
-Message-ID: <20131011122846.GK14732@mudshark.cambridge.arm.com>
+From: Paul.Chavent@onera.fr (Paul Chavent)
+Date: Fri, 11 Oct 2013 14:28:29 +0200
+Subject: [PATCH] ARM: davinci: usb: provide minimal support for da850. (v2)
+Message-ID: <1381494509-11676-1-git-send-email-paul.chavent@onera.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 01:08:17PM +0100, Richard Weinberger wrote:
-> On Fri, Oct 11, 2013 at 1:47 PM, Chen Gang <gang.chen@asianux.com> wrote:
-> > In current kernel wide source code, except other architectures, only
-> > s390 scsi drivers use atomic_clear_mask(), and arm/arm64 need not
-> > support s390 drivers.
-> >
-> > So remove atomic_clear_mask() from "arm[64]/include/asm/atomic.h".
-> 
-> Is it really worth removing such a primitive?
-> If someone needs it later he has to implement it from scratch and
-> introduces bugs...
+As for the da830 and hawk boards, the da850 can provide minimalist usb
+1.1 implementation without enabling usb gadget and inventra HC.
 
-The version we have (on ARM64 anyway) already has bugs. Given the choice
-between fixing code that has no callers and simply removing it, I'd go for
-the latter.
+This patch is inspired by the hawk board implementation.
 
-Will
+Signed-off-by: Paul Chavent <paul.chavent@onera.fr>
+---
+ arch/arm/mach-davinci/board-da850-evm.c | 135 ++++++++++++++++++++++++++++++++
+ 1 file changed, 135 insertions(+)
+
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index dd1fb24..43fcab8 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -62,6 +62,9 @@
+ 
+ #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
+ 
++#define DA850_USB1_VBUS_PIN		GPIO_TO_PIN(2, 4)
++#define DA850_USB1_OC_PIN		GPIO_TO_PIN(6, 13)
++
+ static struct mtd_partition da850evm_spiflash_part[] = {
+ 	[0] = {
+ 		.name = "UBL",
+@@ -1431,6 +1434,137 @@ static __init int da850_wl12xx_init(void)
+ 
+ #endif /* CONFIG_DA850_WL12XX */
+ 
++#ifdef CONFIG_USB
++
++static irqreturn_t da850_usb_ocic_irq(int irq, void *dev_id);
++static da8xx_ocic_handler_t da850_usb_ocic_handler;
++
++static const short da850_usb11_pins[] = {
++	DA850_GPIO2_4, DA850_GPIO6_13,
++	-1
++};
++
++static int da850_usb_set_power(unsigned port, int on)
++{
++	gpio_set_value(DA850_USB1_VBUS_PIN, on);
++	return 0;
++}
++
++static int da850_usb_get_power(unsigned port)
++{
++	return gpio_get_value(DA850_USB1_VBUS_PIN);
++}
++
++static int da850_usb_get_oci(unsigned port)
++{
++	return !gpio_get_value(DA850_USB1_OC_PIN);
++}
++
++static int da850_usb_ocic_notify(da8xx_ocic_handler_t handler)
++{
++	int irq         = gpio_to_irq(DA850_USB1_OC_PIN);
++	int error       = 0;
++
++	if (handler != NULL) {
++		da850_usb_ocic_handler = handler;
++
++		error = request_irq(irq, da850_usb_ocic_irq,
++					IRQF_DISABLED | IRQF_TRIGGER_RISING |
++					IRQF_TRIGGER_FALLING,
++					"OHCI over-current indicator", NULL);
++		if (error)
++			pr_err("%s: could not request IRQ to watch "
++				"over-current indicator changes\n", __func__);
++	} else {
++		free_irq(irq, NULL);
++	}
++	return error;
++}
++
++static struct da8xx_ohci_root_hub da850_usb11_pdata = {
++	.set_power      = da850_usb_set_power,
++	.get_power      = da850_usb_get_power,
++	.get_oci        = da850_usb_get_oci,
++	.ocic_notify    = da850_usb_ocic_notify,
++	/* TPS2087 switch @ 5V */
++	.potpgt         = (3 + 1) / 2,  /* 3 ms max */
++};
++
++static irqreturn_t da850_usb_ocic_irq(int irq, void *dev_id)
++{
++	da850_usb_ocic_handler(&da850_usb11_pdata, 1);
++	return IRQ_HANDLED;
++}
++
++static __init void da850_usb_init(void)
++{
++	void __iomem *cfg_chip2_base;
++	int ret;
++	u32 val;
++
++	/*
++	 * Set up USB clock/mode in the CFGCHIP2 register.
++	 * USB2.0 PHY reference clock is 24 MHz
++	 */
++
++	cfg_chip2_base = DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG);
++
++	val = readl(cfg_chip2_base);
++
++	val &= ~CFGCHIP2_REFFREQ;
++	val |=  CFGCHIP2_REFFREQ_24MHZ;
++
++	writel(val, cfg_chip2_base);
++
++	/*
++	 * Set up pin multiplexing
++	 */
++
++	ret = davinci_cfg_reg_list(da850_usb11_pins);
++	if (ret) {
++		pr_warn("%s: USB 1.1 PinMux setup failed: %d\n", __func__, ret);
++		return;
++	}
++
++	ret = gpio_request_one(DA850_USB1_VBUS_PIN,
++			GPIOF_DIR_OUT, "USB1 VBUS");
++	if (ret < 0) {
++		pr_err("%s: failed to request GPIO for USB 1.1 port "
++			"power control: %d\n", __func__, ret);
++		return;
++	}
++
++	ret = gpio_request_one(DA850_USB1_OC_PIN,
++			GPIOF_DIR_IN, "USB1 OC");
++	if (ret < 0) {
++		pr_err("%s: failed to request GPIO for USB 1.1 port "
++			"over-current indicator: %d\n", __func__, ret);
++		goto usb11_setup_oc_fail;
++	}
++
++	ret = da8xx_register_usb11(&da850_usb11_pdata);
++	if (ret) {
++		pr_warn("%s: USB 1.1 registration failed: %d\n", __func__, ret);
++		goto usb11_setup_fail;
++	}
++
++	return;
++
++usb11_setup_fail:
++	gpio_free(DA850_USB1_OC_PIN);
++usb11_setup_oc_fail:
++	gpio_free(DA850_USB1_VBUS_PIN);
++}
++
++#else /* CONFIG_USB */
++
++static __init void da850_usb_init(void)
++{
++	return 0;
++}
++
++#endif /* CONFIG_USB */
++
+ #define DA850EVM_SATA_REFCLKPN_RATE	(100 * 1000 * 1000)
+ 
+ static __init void da850_evm_init(void)
+@@ -1453,6 +1587,7 @@ static __init void da850_evm_init(void)
+ 	if (ret)
+ 		pr_warn("%s: I2C0 registration failed: %d\n", __func__, ret);
+ 
++	da850_usb_init();
+ 
+ 	ret = da8xx_register_watchdog();
+ 	if (ret)
+-- 
+1.7.12.1
