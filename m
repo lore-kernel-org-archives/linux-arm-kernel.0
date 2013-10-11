@@ -1,139 +1,247 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 11 Oct 2013 09:37:44 +0200
-Subject: [PATCH v4 00/17] ARM: at91: move to common clk framework
-Message-ID: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
+Date: Fri, 11 Oct 2013 09:37:46 +0200
+Subject: [PATCH v4 02/17] ARM: at91: add Kconfig options for common clk support
+In-Reply-To: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
+References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1381477081-6041-3-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch adds the following Kconfig options to prepare the transition to
+common clk framework:
 
-This patch series is the 4th version of the new at91 clock implementation
-(using common clk framework).
+- AT91_USE_OLD_CLK: this option is selected by every SoC which does not
+  support new at91 clks based on common clk framework (SoC which does not
+  define the clock tree in its device tree).
+  This options is also selected when the user choose non dt boards support
+  (new at91 clks can only be registered from a device tree definition).
 
-Most of the clock provided by the PMC (Power Management Controller) are
-implemented :
-- main clock (main oscillator)
-- pll clocks
-- master clock
-- programmable clocks
-- utmi clock
-- peripheral clocks
-- system clocks
+- COMMON_CLK_AT91: this option cannot be selected directly. Instead it is
+  enabled if these 3 conditions are met:
+   * at least one of the selected SoCs have a PMC (Power Management
+     Controller) Unit
+   * device tree support is enabled
+   * the old at91 clk implementation is disabled (every selected SoC define
+     its clks in its device tree and non dt boards support is disabled)
 
-This implementation is only compatible with device tree definition.
-The goal is to define the whole clock tree in the device tree.
+- OLD_CLK_AT91: this option cannot be selected directly. Instead it is
+  enabled if these 2 conditions are met:
+   * at least one of the selected SoCs have a PMC (Power Management
+     Controller) Unit
+   * at least one of the selected SoCs does not define its clks in its
+     device tree or non dt-boards support is enabled
 
-Could a dt maintainer take a look at these dt bindinds.
+This patch selects AT91_USE_OLD_CLK in all currently supported SoCs. These
+selects will be removed after clk definitions are properly added in each
+soc's device tree.
+It also selects AT91_USE_OLD_CLK in all non-dt boards support.
 
-This patch series is based on linus tree (but should apply correctly on
-linux-next) and has been tested on sama5d31ek.
+AT91_PMC_UNIT references are replaced by OLD_CLK_AT91, because PMC Unit is
+enabled for both old and common clk implementations, and old clk
+implementation should not be compiled if COMMON_CLK is enabled.
 
-Best Regards,
-Boris
+To avoid future link errors, a new stub is created for at91_dt_clock_init
+function if OLD_CLK_AT91 is disabled.
 
-Changes since v3:
- - simplify master clk implementation (drop set_rate/parent support)
- - fix bug in set_rate function of pll driver
- - fix coding style issues
- - define macros and constants where needed
- - remove peripheral id macro references
- - remove sam9g35 specific handling (sam9g35 = sam9x5)
- - rework main clk prepare function to handle automatic rate calculation
+A new check is added in dt init functions (setup.c) to prepare for SoCs
+supporting new clk implementation. These SoCs won't setup the
+register_clocks callback (clk registration is done using of_clk_init).
 
-Changes since v2:
- - fix several bugs in clk implementations
- - drop non-dt boards support
- - split the series to ease review and tests:
-   * 1 patch series for new clk implementations (this series)
-   * 1 patch series to move each at91 SoC to common clk framework (coming soon)
- - modify dt-bindings (add atmel,clk- prefix to atmel specific properties)
- - add clk macros for dt-bindings
- - add pmc framework (helper function to access pmc registers)
- - add interrupt support to enable passive wait in clk_prepare functions
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/mach-at91/Kconfig        |   21 +++++++++++++++++++++
+ arch/arm/mach-at91/Kconfig.non_dt |    6 ++++++
+ arch/arm/mach-at91/Makefile       |    2 +-
+ arch/arm/mach-at91/generic.h      |    3 ++-
+ arch/arm/mach-at91/setup.c        |    6 ++++--
+ 5 files changed, 34 insertions(+), 4 deletions(-)
 
-Changes since v1:
- - fix bugs in pll, programmable and system clock implementations
-   (wrong bit position).
- - add usb clock configuration support (ohci and udc drivers +
-   clk_lookup for non dt boards)
- - rework of the system clock interfaces (no need to define a parent clock,
-   system clock is a gate with no rate info)
- - change system, peripheral and programmable clk dt bindings (1 master node
-   and multiple child nodes each defining a system/peripheral or prog clock)
- - fix bugs in sama5 dt definition
-
-Boris BREZILLON (17):
-  ARM: at91: move at91_pmc.h to include/linux/clk/at91_pmc.h
-  ARM: at91: add Kconfig options for common clk support
-  clk: at91: add PMC base support
-  clk: at91: add PMC macro file for dt definitions
-  clk: at91: add PMC main clock
-  clk: at91: add PMC pll clocks
-  clk: at91: add PMC master clock
-  clk: at91: add PMC system clocks
-  clk: at91: add PMC peripheral clocks
-  clk: at91: add peripheral clk macros for peripheral clk dt bindings
-  clk: at91: add PMC programmable clocks
-  clk: at91: add PMC utmi clock
-  clk: at91: add PMC usb clock
-  clk: at91: add PMC smd clock
-  clk: at91: add PMC clk device tree binding doc.
-  ARM: at91: move pit timer to common clk framework
-  ARM: at91: add new compatible strings for pmc driver
-
- .../devicetree/bindings/clock/at91-clock.txt       |  328 ++++++++++++
- arch/arm/mach-at91/Kconfig                         |   44 ++
- arch/arm/mach-at91/Kconfig.non_dt                  |    6 +
- arch/arm/mach-at91/Makefile                        |    2 +-
- arch/arm/mach-at91/at91rm9200.c                    |    2 +-
- arch/arm/mach-at91/at91sam9260.c                   |    2 +-
- arch/arm/mach-at91/at91sam9261.c                   |    2 +-
- arch/arm/mach-at91/at91sam9263.c                   |    2 +-
- arch/arm/mach-at91/at91sam926x_time.c              |   14 +-
- arch/arm/mach-at91/at91sam9g45.c                   |    2 +-
- arch/arm/mach-at91/at91sam9n12.c                   |    2 +-
- arch/arm/mach-at91/at91sam9rl.c                    |    2 +-
- arch/arm/mach-at91/at91sam9x5.c                    |    2 +-
- arch/arm/mach-at91/clock.c                         |    7 +-
- arch/arm/mach-at91/generic.h                       |    3 +-
- arch/arm/mach-at91/pm.c                            |    2 +-
- arch/arm/mach-at91/pm_slowclock.S                  |    2 +-
- arch/arm/mach-at91/sama5d3.c                       |    2 +-
- arch/arm/mach-at91/setup.c                         |    8 +-
- drivers/clk/Makefile                               |    1 +
- drivers/clk/at91/Makefile                          |   12 +
- drivers/clk/at91/clk-main.c                        |  189 +++++++
- drivers/clk/at91/clk-master.c                      |  278 ++++++++++
- drivers/clk/at91/clk-peripheral.c                  |  407 +++++++++++++++
- drivers/clk/at91/clk-pll.c                         |  539 ++++++++++++++++++++
- drivers/clk/at91/clk-plldiv.c                      |  137 +++++
- drivers/clk/at91/clk-programmable.c                |  423 +++++++++++++++
- drivers/clk/at91/clk-smd.c                         |  173 +++++++
- drivers/clk/at91/clk-system.c                      |  193 +++++++
- drivers/clk/at91/clk-usb.c                         |  400 +++++++++++++++
- drivers/clk/at91/clk-utmi.c                        |  162 ++++++
- drivers/clk/at91/pmc.c                             |  372 ++++++++++++++
- drivers/clk/at91/pmc.h                             |  113 ++++
- drivers/usb/gadget/atmel_usba_udc.c                |    2 +-
- include/dt-bindings/clk/at91.h                     |   28 +
- .../include/mach => include/linux/clk}/at91_pmc.h  |    4 +-
- 36 files changed, 3847 insertions(+), 20 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/at91-clock.txt
- create mode 100644 drivers/clk/at91/Makefile
- create mode 100644 drivers/clk/at91/clk-main.c
- create mode 100644 drivers/clk/at91/clk-master.c
- create mode 100644 drivers/clk/at91/clk-peripheral.c
- create mode 100644 drivers/clk/at91/clk-pll.c
- create mode 100644 drivers/clk/at91/clk-plldiv.c
- create mode 100644 drivers/clk/at91/clk-programmable.c
- create mode 100644 drivers/clk/at91/clk-smd.c
- create mode 100644 drivers/clk/at91/clk-system.c
- create mode 100644 drivers/clk/at91/clk-usb.c
- create mode 100644 drivers/clk/at91/clk-utmi.c
- create mode 100644 drivers/clk/at91/pmc.c
- create mode 100644 drivers/clk/at91/pmc.h
- create mode 100644 include/dt-bindings/clk/at91.h
- rename {arch/arm/mach-at91/include/mach => include/linux/clk}/at91_pmc.h (98%)
-
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 699b71e..85b53a4 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -6,10 +6,22 @@ config HAVE_AT91_DBGU0
+ config HAVE_AT91_DBGU1
+ 	bool
+ 
++config AT91_USE_OLD_CLK
++	bool
++
+ config AT91_PMC_UNIT
+ 	bool
+ 	default !ARCH_AT91X40
+ 
++config COMMON_CLK_AT91
++	bool
++	default AT91_PMC_UNIT && USE_OF && !AT91_USE_OLD_CLK
++	select COMMON_CLK
++
++config OLD_CLK_AT91
++	bool
++	default AT91_PMC_UNIT && AT91_USE_OLD_CLK
++
+ config AT91_SAM9_ALT_RESET
+ 	bool
+ 	default !ARCH_AT91X40
+@@ -65,6 +77,7 @@ config SOC_SAMA5D3
+ 	select SOC_SAMA5
+ 	select HAVE_FB_ATMEL
+ 	select HAVE_AT91_DBGU1
++	select AT91_USE_OLD_CLK
+ 	help
+ 	  Select this if you are using one of Atmel's SAMA5D3 family SoC.
+ 	  This support covers SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35.
+@@ -78,11 +91,13 @@ config SOC_AT91RM9200
+ 	select HAVE_AT91_DBGU0
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
++	select AT91_USE_OLD_CLK
+ 
+ config SOC_AT91SAM9260
+ 	bool "AT91SAM9260, AT91SAM9XE or AT91SAM9G20"
+ 	select HAVE_AT91_DBGU0
+ 	select SOC_AT91SAM9
++	select AT91_USE_OLD_CLK
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9260, AT91SAM9XE
+ 	  or AT91SAM9G20 SoC.
+@@ -92,6 +107,7 @@ config SOC_AT91SAM9261
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
++	select AT91_USE_OLD_CLK
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9261 or AT91SAM9G10 SoC.
+ 
+@@ -100,18 +116,21 @@ config SOC_AT91SAM9263
+ 	select HAVE_AT91_DBGU1
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
++	select AT91_USE_OLD_CLK
+ 
+ config SOC_AT91SAM9RL
+ 	bool "AT91SAM9RL"
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
++	select AT91_USE_OLD_CLK
+ 
+ config SOC_AT91SAM9G45
+ 	bool "AT91SAM9G45 or AT91SAM9M10 families"
+ 	select HAVE_AT91_DBGU1
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
++	select AT91_USE_OLD_CLK
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9G45 family SoC.
+ 	  This support covers AT91SAM9G45, AT91SAM9G46, AT91SAM9M10 and AT91SAM9M11.
+@@ -121,6 +140,7 @@ config SOC_AT91SAM9X5
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
++	select AT91_USE_OLD_CLK
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
+ 	  This means that your SAM9 name finishes with a '5' (except if it is
+@@ -133,6 +153,7 @@ config SOC_AT91SAM9N12
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_FB_ATMEL
+ 	select SOC_AT91SAM9
++	select AT91_USE_OLD_CLK
+ 	help
+ 	  Select this if you are using Atmel's AT91SAM9N12 SoC.
+ 
+diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
+index ca900be..b736b57 100644
+--- a/arch/arm/mach-at91/Kconfig.non_dt
++++ b/arch/arm/mach-at91/Kconfig.non_dt
+@@ -12,26 +12,32 @@ config ARCH_AT91_NONE
+ config ARCH_AT91RM9200
+ 	bool "AT91RM9200"
+ 	select SOC_AT91RM9200
++	select AT91_USE_OLD_CLK
+ 
+ config ARCH_AT91SAM9260
+ 	bool "AT91SAM9260 or AT91SAM9XE or AT91SAM9G20"
+ 	select SOC_AT91SAM9260
++	select AT91_USE_OLD_CLK
+ 
+ config ARCH_AT91SAM9261
+ 	bool "AT91SAM9261 or AT91SAM9G10"
+ 	select SOC_AT91SAM9261
++	select AT91_USE_OLD_CLK
+ 
+ config ARCH_AT91SAM9263
+ 	bool "AT91SAM9263"
+ 	select SOC_AT91SAM9263
++	select AT91_USE_OLD_CLK
+ 
+ config ARCH_AT91SAM9RL
+ 	bool "AT91SAM9RL"
+ 	select SOC_AT91SAM9RL
++	select AT91_USE_OLD_CLK
+ 
+ config ARCH_AT91SAM9G45
+ 	bool "AT91SAM9G45"
+ 	select SOC_AT91SAM9G45
++	select AT91_USE_OLD_CLK
+ 
+ config ARCH_AT91X40
+ 	bool "AT91x40"
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 3b0a953..8539411 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -7,7 +7,7 @@ obj-m		:=
+ obj-n		:=
+ obj-		:=
+ 
+-obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
++obj-$(CONFIG_OLD_CLK_AT91)	+= clock.o
+ obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
+ obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
+ obj-$(CONFIG_AT91_SAM9_TIME)	+= at91sam926x_time.o
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index dc6e2f5..375c42e 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -44,11 +44,12 @@ extern void at91sam926x_pit_init(void);
+ extern void at91x40_timer_init(void);
+ 
+  /* Clocks */
+-#ifdef CONFIG_AT91_PMC_UNIT
++#ifdef CONFIG_OLD_CLK_AT91
+ extern int __init at91_clock_init(unsigned long main_clock);
+ extern int __init at91_dt_clock_init(void);
+ #else
+ static int inline at91_clock_init(unsigned long main_clock) { return 0; }
++static int inline at91_dt_clock_init(void) { return 0; }
+ #endif
+ struct device;
+ 
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 41aa68b..06052fc 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -483,7 +483,8 @@ void __init at91rm9200_dt_initialize(void)
+ 	at91_dt_clock_init();
+ 
+ 	/* Register the processor-specific clocks */
+-	at91_boot_soc.register_clocks();
++	if (at91_boot_soc.register_clocks)
++		at91_boot_soc.register_clocks();
+ 
+ 	at91_boot_soc.init();
+ }
+@@ -498,7 +499,8 @@ void __init at91_dt_initialize(void)
+ 	at91_dt_clock_init();
+ 
+ 	/* Register the processor-specific clocks */
+-	at91_boot_soc.register_clocks();
++	if (at91_boot_soc.register_clocks)
++		at91_boot_soc.register_clocks();
+ 
+ 	if (at91_boot_soc.init)
+ 		at91_boot_soc.init();
 -- 
 1.7.9.5
