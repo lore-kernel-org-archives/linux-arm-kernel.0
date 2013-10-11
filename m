@@ -1,220 +1,71 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 11 Oct 2013 19:15:40 +0300
-Subject: [PATCH 10/11] ARM: OMAP3: PRM: move PRCM interrupt handler helper to
- PRM driver
-In-Reply-To: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
-References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381508141-15244-11-git-send-email-t-kristo@ti.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 11 Oct 2013 21:48:44 +0530
+Subject: [PATCH v3 1/3] gpio: davinci: add OF support
+In-Reply-To: <CACRpkdYNexWWXuQ052xuQ4NOdXm2gt-+ByREKeGo-VAnbH4D2w@mail.gmail.com>
+References: <1380902596-4693-1-git-send-email-sujithkv@ti.com>
+ <1380902596-4693-2-git-send-email-sujithkv@ti.com>
+ <CACRpkdYxegBSYXR1-98smUNnDXpyRHo_vuYdnr3r7zhawENiUA@mail.gmail.com>
+ <CA+V-a8vyPyL0j0nPOZyjxrecusFzXovFPsNBLKYXns5ASWR-wg@mail.gmail.com>
+ <CACRpkdYNexWWXuQ052xuQ4NOdXm2gt-+ByREKeGo-VAnbH4D2w@mail.gmail.com>
+Message-ID: <CA+V-a8vH7VXqz=2cz-uD=YfRBRYrJ10K1Aptw28vV8gP+PiT2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PM core code should not directly access PRM registers. Thus move the
-PRCM interrupt handler helper out of the core PM code to PRM driver,
-and use the new API from the core.
+Hi Linus,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c  |   65 ++-------------------------------
- arch/arm/mach-omap2/prm3xxx.c |   79 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prm3xxx.h |    2 ++
- 3 files changed, 83 insertions(+), 63 deletions(-)
+On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Oct 11, 2013 at 4:59 PM, Prabhakar Lad
+> <prabhakar.csengg@gmail.com> wrote:
+>> On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Fri, Oct 4, 2013 at 6:03 PM, Prabhakar Lad
+>>> <prabhakar.csengg@gmail.com> wrote:
+>
+>>>> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering
+>>>> starts.
+>>>
+>>> What is this?
+>>>
+>>> If I have ever ACKed this I have been drunk. I take it back.
+>>>
+>> here is the ACK https://patchwork.kernel.org/patch/2721181/
+>
+> And as suspected that version of the patch did not contain
+> this strange node property.
+>
+The property did exist in the patch 'intc_irq_num', I just renamed
+it and gave a proper description to it.
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 4320541..6a5302a 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -132,60 +132,11 @@ static void omap3_save_secure_ram_context(void)
- 	}
- }
- 
--/*
-- * PRCM Interrupt Handler Helper Function
-- *
-- * The purpose of this function is to clear any wake-up events latched
-- * in the PRCM PM_WKST_x registers. It is possible that a wake-up event
-- * may occur whilst attempting to clear a PM_WKST_x register and thus
-- * set another bit in this register. A while loop is used to ensure
-- * that any peripheral wake-up events occurring while attempting to
-- * clear the PM_WKST_x are detected and cleared.
-- */
--static int prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
--{
--	u32 wkst, fclk, iclk, clken;
--	u16 wkst_off = (regs == 3) ? OMAP3430ES2_PM_WKST3 : PM_WKST1;
--	u16 grpsel_off = (regs == 3) ?
--		OMAP3430ES2_PM_MPUGRPSEL3 : OMAP3430_PM_MPUGRPSEL;
--	int c = 0;
--
--	wkst = omap2_prm_read_mod_reg(module, wkst_off);
--	wkst &= omap2_prm_read_mod_reg(module, grpsel_off);
--	wkst &= ~ignore_bits;
--	if (wkst) {
--		iclk = omap3_cm_read_module_clken(module, regs, false);
--		fclk = omap3_cm_read_module_clken(module, regs, true);
--		while (wkst) {
--			clken = wkst;
--			omap3_cm_write_module_clken(module, regs, false,
--						    iclk | clken);
--			/*
--			 * For USBHOST, we don't know whether HOST1 or
--			 * HOST2 woke us up, so enable both f-clocks
--			 */
--			if (module == OMAP3430ES2_USBHOST_MOD)
--				clken |= 1 << OMAP3430ES2_EN_USBHOST2_SHIFT;
--			omap3_cm_write_module_clken(module, regs, true,
--						    fclk | clken);
--			omap2_prm_write_mod_reg(wkst, module, wkst_off);
--			wkst = omap2_prm_read_mod_reg(module, wkst_off);
--			wkst &= ~ignore_bits;
--			c++;
--		}
--		omap3_cm_write_module_clken(module, regs, false, iclk);
--		omap3_cm_write_module_clken(module, regs, true, fclk);
--	}
--
--	return c;
--}
--
- static irqreturn_t _prcm_int_handle_io(int irq, void *unused)
- {
- 	int c;
- 
--	c = prcm_clear_mod_irqs(WKUP_MOD, 1,
--		~(OMAP3430_ST_IO_MASK | OMAP3430_ST_IO_CHAIN_MASK));
-+	c = omap3_prcm_clear_io_irq();
- 
- 	return c ? IRQ_HANDLED : IRQ_NONE;
- }
-@@ -194,19 +145,7 @@ static irqreturn_t _prcm_int_handle_wakeup(int irq, void *unused)
- {
- 	int c;
- 
--	/*
--	 * Clear all except ST_IO and ST_IO_CHAIN for wkup module,
--	 * these are handled in a separate handler to avoid acking
--	 * IO events before parsing in mux code
--	 */
--	c = prcm_clear_mod_irqs(WKUP_MOD, 1,
--		OMAP3430_ST_IO_MASK | OMAP3430_ST_IO_CHAIN_MASK);
--	c += prcm_clear_mod_irqs(CORE_MOD, 1, 0);
--	c += prcm_clear_mod_irqs(OMAP3430_PER_MOD, 1, 0);
--	if (omap_rev() > OMAP3430_REV_ES1_0) {
--		c += prcm_clear_mod_irqs(CORE_MOD, 3, 0);
--		c += prcm_clear_mod_irqs(OMAP3430ES2_USBHOST_MOD, 1, 0);
--	}
-+	c = omap3_prcm_clear_wkup_irq();
- 
- 	return c ? IRQ_HANDLED : IRQ_NONE;
- }
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 3813e9a..50177e9 100644
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -27,6 +27,7 @@
- #include "cm2xxx_3xxx.h"
- #include "prm-regbits-34xx.h"
- #include "cm3xxx.h"
-+#include "cm-regbits-34xx.h"
- #include "control.h"
- 
- static const struct omap_prcm_irq omap3_prcm_irqs[] = {
-@@ -399,6 +400,84 @@ struct pwrdm_ops omap3_pwrdm_operations = {
- };
- 
- /**
-+ * omap3_prcm_clear_mod_irqs: PRCM interrupt handler helper function
-+ * @module: module offset
-+ * @regs: register index
-+ * @ignore_bits: bit-mask to ignore while checking wakeup status
-+ *
-+ * The purpose of this function is to clear any wake-up events latched
-+ * in the PRCM PM_WKST_x registers. It is possible that a wake-up event
-+ * may occur whilst attempting to clear a PM_WKST_x register and thus
-+ * set another bit in this register. A while loop is used to ensure
-+ * that any peripheral wake-up events occurring while attempting to
-+ * clear the PM_WKST_x are detected and cleared.
-+ */
-+static int omap3_prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
-+{
-+	u32 wkst, fclk, iclk, clken;
-+	u16 wkst_off = (regs == 3) ? OMAP3430ES2_PM_WKST3 : PM_WKST1;
-+	u16 grpsel_off = (regs == 3) ?
-+		OMAP3430ES2_PM_MPUGRPSEL3 : OMAP3430_PM_MPUGRPSEL;
-+	int c = 0;
-+
-+	wkst = omap2_prm_read_mod_reg(module, wkst_off);
-+	wkst &= omap2_prm_read_mod_reg(module, grpsel_off);
-+	wkst &= ~ignore_bits;
-+	if (wkst) {
-+		iclk = omap3_cm_read_module_clken(module, regs, false);
-+		fclk = omap3_cm_read_module_clken(module, regs, true);
-+		while (wkst) {
-+			clken = wkst;
-+			omap3_cm_write_module_clken(module, regs, false,
-+						    iclk | clken);
-+			/*
-+			 * For USBHOST, we don't know whether HOST1 or
-+			 * HOST2 woke us up, so enable both f-clocks
-+			 */
-+			if (module == OMAP3430ES2_USBHOST_MOD)
-+				clken |= 1 << OMAP3430ES2_EN_USBHOST2_SHIFT;
-+			omap3_cm_write_module_clken(module, regs, true,
-+						    fclk | clken);
-+			omap2_prm_write_mod_reg(wkst, module, wkst_off);
-+			wkst = omap2_prm_read_mod_reg(module, wkst_off);
-+			wkst &= ~ignore_bits;
-+			c++;
-+		}
-+		omap3_cm_write_module_clken(module, regs, false, iclk);
-+		omap3_cm_write_module_clken(module, regs, true, fclk);
-+	}
-+
-+	return c;
-+}
-+
-+int omap3_prcm_clear_io_irq(void)
-+{
-+	return omap3_prcm_clear_mod_irqs(WKUP_MOD, 1,
-+		~(OMAP3430_ST_IO_MASK | OMAP3430_ST_IO_CHAIN_MASK));
-+}
-+
-+int omap3_prcm_clear_wkup_irq(void)
-+{
-+	int c;
-+
-+	/*
-+	 * Clear all except ST_IO and ST_IO_CHAIN for wkup module,
-+	 * these are handled in a separate handler to avoid acking
-+	 * IO events before parsing in mux code
-+	 */
-+	c = omap3_prcm_clear_mod_irqs(WKUP_MOD, 1,
-+		OMAP3430_ST_IO_MASK | OMAP3430_ST_IO_CHAIN_MASK);
-+	c += omap3_prcm_clear_mod_irqs(CORE_MOD, 1, 0);
-+	c += omap3_prcm_clear_mod_irqs(OMAP3430_PER_MOD, 1, 0);
-+	if (omap_rev() > OMAP3430_REV_ES1_0) {
-+		c += omap3_prcm_clear_mod_irqs(CORE_MOD, 3, 0);
-+		c += omap3_prcm_clear_mod_irqs(OMAP3430ES2_USBHOST_MOD, 1, 0);
-+	}
-+
-+	return c;
-+}
-+
-+/**
-  * omap3_prcm_force_idle_iva: ensure IVA is in idle so it can be put into
-  *                           retention
-  *
-diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
-index 1befb23..c7d1616 100644
---- a/arch/arm/mach-omap2/prm3xxx.h
-+++ b/arch/arm/mach-omap2/prm3xxx.h
-@@ -154,6 +154,8 @@ extern void omap3xxx_prm_restore_irqen(u32 *saved_mask);
- 
- extern void omap3xxx_prm_dpll3_reset(void);
- 
-+extern int omap3_prcm_clear_io_irq(void);
-+extern int omap3_prcm_clear_wkup_irq(void);
- extern void omap3_prm_force_idle_iva(void);
- 
- extern int __init omap3xxx_prm_init(void);
+> Don't keep my ACK on patches if you change basic stuff like
+> that, they need to be re-acked, this runs the risk of abusing
+> my trust amongst other subsystem maintainers who might
+> go and merge this because "aha the GPIO maintainer
+> thinks that this is OK".
+>
+Agreed, I carry forwarded the ACK since it had minor changes.
+
+>>> This "base" is a Linux-specific thing and has no place in the
+>>> device tree, and shall not be there. You have to find some way to
+>>> avoid this, what do you think some other OS should do with
+>>> this value...
+>>>
+>>> All IRQs in Linux are assumed to be dynamically assigned numbers
+>>> nowadays, with a property like this you can never switch on
+>>> SPARSE_IRQ for the DaVinci.
+>>>
+>> Can you point to any alternative solution if you have any ?
+>
+> First convert this GPIO driver to use an irqdomain to map
+> HW IRQs to Linux IRQs, and grab a few IRQ descriptors
+> dynamically off the irq descriptor heap.
+> Example: commit
+> a6c45b99a658521291cfb66ecf035cc58b38f206
+> "pinctrl/coh901: use irqdomain, allocate irqdescs"
+>
+> Then on a longer term convert DaVinci to use dynamically
+> allocated IRQs for all interrupt controllers, and move it over
+> to SPARSE_IRQ so you know this works.
+>
+Thanks for the pointers.
 -- 
-1.7.9.5
+Regards,
+--Prabhakar Lad
