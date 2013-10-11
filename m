@@ -1,31 +1,49 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 11 Oct 2013 15:38:09 +0800
-Subject: [PATCH 4/7] ARM: tegra: add LP1 support code for Tegra124
-In-Reply-To: <5255E4CD.1050509@wwwdotorg.org>
-References: <1381310411-11391-1-git-send-email-josephl@nvidia.com>
- <1381310411-11391-5-git-send-email-josephl@nvidia.com>
- <5255E4CD.1050509@wwwdotorg.org>
-Message-ID: <1381477089.5685.3.camel@jlo-ubuntu-64.nvidia.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 11 Oct 2013 09:27:26 +0200
+Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
+ device tree
+Message-ID: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-10-10 at 07:20 +0800, Stephen Warren wrote:
-> On 10/09/2013 03:20 AM, Joseph Lo wrote:
-> > The LP1 suspend procedure is the same with Tegra30 and Tegra114. Just
-> > need to update the difference of the register address, then we can
-> > continue to share the code.
-> > -	.rept (tegra30_sdram_pad_size - tegra114_sdram_pad_address) / 4
-> > +	.rept (tegra124_sdram_pad_address - tegra114_sdram_pad_address) / 4
-> 
-> I assume this is intended to reserve enough space to store all the saved
-> registers for the largest table of tegra30_sdram_pad_address,
-> tegra114_sdram_pad_address, tegra124_sdram_pad_address. I count more
-> entries in the existing Tegra114 table than the new Tegra124 table, so
-> I'm not sure this part of the change is correct.
-> 
-> Is there no way to do a max(tegra30 size, tegra114 size, tegra124 size)
-> so you don't have to pick manually which size to reserve here?
+Hi all!
 
-I don't have a good way to achieve this, because we may have another new
-SoC that may continue re-use these codes. Hence I need to keep
-maintaining the max() function.
+Benjamin Herrenschmidt pointed a few issues in the proposed design of
+device tree bindings for contiguous memory allocator and reserved memory
+regions:
+https://lkml.org/lkml/2013/9/15/151
+http://www.spinics.net/lists/arm-kernel/msg273548.html
+
+Some time has passed, but there is still no consensus on the bindings
+for the reserved memory and various drawback of this solution has been
+shown, so in my opinion the best I can do now is to revert them
+completely and start from scratch again later.
+
+This patch series reverts patches related to device tree bindings
+proposed in the following thread:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/263216
+and merged by commit 64c353864e3f7ccba0ade1bd6f562f9a3bc7e68d ("Merge
+branch 'for-v3.12' of git://git.linaro.org/people/mszyprowski/linux-dma-mapping").
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+Marek Szyprowski (2):
+  Revert "ARM: init: add support for reserved memory defined by device tree"
+  Revert "drivers: of: add initialization code for dma reserved memory"
+
+ Documentation/devicetree/bindings/memory.txt |  168 -------------------------
+ arch/arm/mm/init.c                           |    3 -
+ drivers/of/Kconfig                           |    6 -
+ drivers/of/Makefile                          |    1 -
+ drivers/of/of_reserved_mem.c                 |  173 --------------------------
+ drivers/of/platform.c                        |    4 -
+ include/linux/of_reserved_mem.h              |   14 ---
+ 7 files changed, 369 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/memory.txt
+ delete mode 100644 drivers/of/of_reserved_mem.c
+ delete mode 100644 include/linux/of_reserved_mem.h
+
+-- 
+1.7.9.5
