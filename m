@@ -1,181 +1,131 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 11 Oct 2013 19:15:41 +0300
-Subject: [PATCH 11/11] ARM: OMAP2+: CM: move direct register write macros to
- internal header
+Date: Fri, 11 Oct 2013 19:15:34 +0300
+Subject: [PATCH 04/11] ARM: OMAP3: CM/control: move CM scratchpad save to CM
+ driver
 In-Reply-To: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
 References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381508141-15244-12-git-send-email-t-kristo@ti.com>
+Message-ID: <1381508141-15244-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The direct register access macros should not be exposed to CM clients.
-Thus, move the register macros to their own file and only include these
-to the cm_*.c files.
+OMAP3 PM code for off-mode currently saves the scratchpad contents for CM
+registers within OMAP control module driver. However, as we are separating
+CM code into its own driver, this must be moved also. This patch adds a
+new API for saving the CM scratchpad contents and uses this from the high
+level scratchpad save function.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm2xxx.c      |    1 +
- arch/arm/mach-omap2/cm2xxx_3xxx.h |   48 --------------------------
- arch/arm/mach-omap2/cm3xxx.c      |    1 +
- arch/arm/mach-omap2/cm_internal.h |   67 +++++++++++++++++++++++++++++++++++++
- 4 files changed, 69 insertions(+), 48 deletions(-)
- create mode 100644 arch/arm/mach-omap2/cm_internal.h
+ arch/arm/mach-omap2/cm3xxx.c  |   22 +++++++++++++++++++++
+ arch/arm/mach-omap2/cm3xxx.h  |    1 +
+ arch/arm/mach-omap2/control.c |   43 ++++-------------------------------------
+ 3 files changed, 27 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
-index ce25abb..c7facf1 100644
---- a/arch/arm/mach-omap2/cm2xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx.c
-@@ -26,6 +26,7 @@
- #include "cm2xxx.h"
- #include "cm-regbits-24xx.h"
- #include "clockdomain.h"
-+#include "cm_internal.h"
- 
- /* CM_AUTOIDLE_PLL.AUTO_* bit values for DPLLs */
- #define DPLL_AUTOIDLE_DISABLE				0x0
-diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.h b/arch/arm/mach-omap2/cm2xxx_3xxx.h
-index bfbd16f..b40b5bd 100644
---- a/arch/arm/mach-omap2/cm2xxx_3xxx.h
-+++ b/arch/arm/mach-omap2/cm2xxx_3xxx.h
-@@ -48,54 +48,6 @@
- 
- #ifndef __ASSEMBLER__
- 
--#include <linux/io.h>
--
--static inline u32 omap2_cm_read_mod_reg(s16 module, u16 idx)
--{
--	return __raw_readl(cm_base + module + idx);
--}
--
--static inline void omap2_cm_write_mod_reg(u32 val, s16 module, u16 idx)
--{
--	__raw_writel(val, cm_base + module + idx);
--}
--
--/* Read-modify-write a register in a CM module. Caller must lock */
--static inline u32 omap2_cm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
--					    s16 idx)
--{
--	u32 v;
--
--	v = omap2_cm_read_mod_reg(module, idx);
--	v &= ~mask;
--	v |= bits;
--	omap2_cm_write_mod_reg(v, module, idx);
--
--	return v;
--}
--
--/* Read a CM register, AND it, and shift the result down to bit 0 */
--static inline u32 omap2_cm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
--{
--	u32 v;
--
--	v = omap2_cm_read_mod_reg(domain, idx);
--	v &= mask;
--	v >>= __ffs(mask);
--
--	return v;
--}
--
--static inline u32 omap2_cm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
--{
--	return omap2_cm_rmw_mod_reg_bits(bits, bits, module, idx);
--}
--
--static inline u32 omap2_cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
--{
--	return omap2_cm_rmw_mod_reg_bits(bits, 0x0, module, idx);
--}
--
- extern int omap2xxx_cm_apll54_enable(void);
- extern void omap2xxx_cm_apll54_disable(void);
- extern int omap2xxx_cm_apll96_enable(void);
 diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index b0509b9..ccd29ba 100644
+index 9061c30..f6f0288 100644
 --- a/arch/arm/mach-omap2/cm3xxx.c
 +++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -26,6 +26,7 @@
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
- #include "clockdomain.h"
-+#include "cm_internal.h"
+@@ -636,6 +636,28 @@ void omap3_cm_restore_context(void)
+ 			       OMAP3_CM_CLKOUT_CTRL_OFFSET);
+ }
  
- static const u8 omap3xxx_cm_idlest_offs[] = {
- 	CM_IDLEST1, CM_IDLEST2, OMAP2430_CM_IDLEST3
-diff --git a/arch/arm/mach-omap2/cm_internal.h b/arch/arm/mach-omap2/cm_internal.h
-new file mode 100644
-index 0000000..929157d
---- /dev/null
-+++ b/arch/arm/mach-omap2/cm_internal.h
-@@ -0,0 +1,67 @@
-+/*
-+ * OMAP2+ Clock Management (CM) internal header
-+ *
-+ * Copyright (C) 2007-2013 Texas Instruments, Inc.
-+ * Copyright (C) 2007-2010 Nokia Corporation
-+ * Paul Walmsley
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * The CM hardware modules on the OMAP2/3 are quite similar to each
-+ * other.  The CM modules/instances on OMAP4 are quite different, so
-+ * they are handled in a separate file.
-+ */
-+
-+#ifndef __ARCH_ARM_MACH_OMAP2_CM_INTERNAL_H
-+#define __ARCH_ARM_MACH_OMAP2_CM_INTERNAL_H
-+
-+#include <linux/io.h>
-+
-+static inline u32 omap2_cm_read_mod_reg(s16 module, u16 idx)
++void omap3_cm_save_scratchpad_contents(u32 *ptr)
 +{
-+	return __raw_readl(cm_base + module + idx);
++	*ptr++ = omap2_cm_read_mod_reg(CORE_MOD, CM_CLKSEL);
++	*ptr++ = omap2_cm_read_mod_reg(WKUP_MOD, CM_CLKSEL);
++	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
++
++	/*
++	 * As per erratum i671, ROM code does not respect the PER DPLL
++	 * programming scheme if CM_AUTOIDLE_PLL..AUTO_PERIPH_DPLL == 1.
++	 * Then,  in anycase, clear these bits to avoid extra latencies.
++	 */
++	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE) &
++		~OMAP3430_AUTO_PERIPH_DPLL_MASK;
++	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL1_PLL);
++	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL2_PLL);
++	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL3);
++	*ptr++ = omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKEN_PLL);
++	*ptr++ = omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_AUTOIDLE_PLL);
++	*ptr++ = omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKSEL1_PLL);
++	*ptr++ = omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKSEL2_PLL);
 +}
 +
-+static inline void omap2_cm_write_mod_reg(u32 val, s16 module, u16 idx)
-+{
-+	__raw_writel(val, cm_base + module + idx);
-+}
+ /*
+  *
+  */
+diff --git a/arch/arm/mach-omap2/cm3xxx.h b/arch/arm/mach-omap2/cm3xxx.h
+index e8e146f..8224c91 100644
+--- a/arch/arm/mach-omap2/cm3xxx.h
++++ b/arch/arm/mach-omap2/cm3xxx.h
+@@ -83,6 +83,7 @@ extern int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
+ 
+ extern void omap3_cm_save_context(void);
+ extern void omap3_cm_restore_context(void);
++extern void omap3_cm_save_scratchpad_contents(u32 *ptr);
+ 
+ extern int __init omap3xxx_cm_init(void);
+ 
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 31e0dfe..a597114 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -46,17 +46,7 @@ struct omap3_scratchpad {
+ struct omap3_scratchpad_prcm_block {
+ 	u32 prm_clksrc_ctrl;
+ 	u32 prm_clksel;
+-	u32 cm_clksel_core;
+-	u32 cm_clksel_wkup;
+-	u32 cm_clken_pll;
+-	u32 cm_autoidle_pll;
+-	u32 cm_clksel1_pll;
+-	u32 cm_clksel2_pll;
+-	u32 cm_clksel3_pll;
+-	u32 cm_clken_pll_mpu;
+-	u32 cm_autoidle_pll_mpu;
+-	u32 cm_clksel1_pll_mpu;
+-	u32 cm_clksel2_pll_mpu;
++	u32 cm_contents[11];
+ 	u32 prcm_block_size;
+ };
+ 
+@@ -347,34 +337,9 @@ void omap3_save_scratchpad_contents(void)
+ 	prcm_block_contents.prm_clksel =
+ 		omap2_prm_read_mod_reg(OMAP3430_CCR_MOD,
+ 				       OMAP3_PRM_CLKSEL_OFFSET);
+-	prcm_block_contents.cm_clksel_core =
+-			omap2_cm_read_mod_reg(CORE_MOD, CM_CLKSEL);
+-	prcm_block_contents.cm_clksel_wkup =
+-			omap2_cm_read_mod_reg(WKUP_MOD, CM_CLKSEL);
+-	prcm_block_contents.cm_clken_pll =
+-			omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
+-	/*
+-	 * As per erratum i671, ROM code does not respect the PER DPLL
+-	 * programming scheme if CM_AUTOIDLE_PLL..AUTO_PERIPH_DPLL == 1.
+-	 * Then,  in anycase, clear these bits to avoid extra latencies.
+-	 */
+-	prcm_block_contents.cm_autoidle_pll =
+-			omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE) &
+-			~OMAP3430_AUTO_PERIPH_DPLL_MASK;
+-	prcm_block_contents.cm_clksel1_pll =
+-			omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL1_PLL);
+-	prcm_block_contents.cm_clksel2_pll =
+-			omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL2_PLL);
+-	prcm_block_contents.cm_clksel3_pll =
+-			omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL3);
+-	prcm_block_contents.cm_clken_pll_mpu =
+-			omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKEN_PLL);
+-	prcm_block_contents.cm_autoidle_pll_mpu =
+-			omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_AUTOIDLE_PLL);
+-	prcm_block_contents.cm_clksel1_pll_mpu =
+-			omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKSEL1_PLL);
+-	prcm_block_contents.cm_clksel2_pll_mpu =
+-			omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKSEL2_PLL);
 +
-+/* Read-modify-write a register in a CM module. Caller must lock */
-+static inline u32 omap2_cm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
-+					    s16 idx)
-+{
-+	u32 v;
++	omap3_cm_save_scratchpad_contents(prcm_block_contents.cm_contents);
 +
-+	v = omap2_cm_read_mod_reg(module, idx);
-+	v &= ~mask;
-+	v |= bits;
-+	omap2_cm_write_mod_reg(v, module, idx);
-+
-+	return v;
-+}
-+
-+/* Read a CM register, AND it, and shift the result down to bit 0 */
-+static inline u32 omap2_cm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
-+{
-+	u32 v;
-+
-+	v = omap2_cm_read_mod_reg(domain, idx);
-+	v &= mask;
-+	v >>= __ffs(mask);
-+
-+	return v;
-+}
-+
-+static inline u32 omap2_cm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
-+{
-+	return omap2_cm_rmw_mod_reg_bits(bits, bits, module, idx);
-+}
-+
-+static inline u32 omap2_cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
-+{
-+	return omap2_cm_rmw_mod_reg_bits(bits, 0x0, module, idx);
-+}
-+#endif
+ 	prcm_block_contents.prcm_block_size = 0x0;
+ 
+ 	/* Populate the SDRC block contents */
 -- 
 1.7.9.5
