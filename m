@@ -1,89 +1,149 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Thu, 10 Oct 2013 23:21:30 -0400
-Subject: [PATCH 2/5] usb: gadget: s3c-hsotg: support configurable UTMI
- PHY width
-In-Reply-To: <5256FAFA.1020509@linaro.org>
-References: <1381140752-312-1-git-send-email-matt.porter@linaro.org>
- <1381140752-312-3-git-send-email-matt.porter@linaro.org>
- <20131010152922.GF28375@radagast> <5256DBD0.8030008@linaro.org>
- <20131010174620.GC19802@radagast>
- <A2CA0424C0A6F04399FB9E1CD98E030458E16893@US01WEMBX2.internal.synopsys.com>
- <5256FAFA.1020509@linaro.org>
-Message-ID: <52576EBA.9000502@linaro.org>
+From: amit.kachhap@gmail.com (Amit Kachhap)
+Date: Fri, 11 Oct 2013 09:57:45 +0530
+Subject: [RESEND PATCH 1/3] ARM: EXYNOS: Move arm core power down clock to
+ exynos5250 common clock
+In-Reply-To: <16865865.dEQ4lomChq@amdc1032>
+References: <1363240979-1939-2-git-send-email-amit.daniel@samsung.com>
+ <150e01ce6831$44d94920$ce8bdb60$%kim@samsung.com>
+ <CADGdYn7sZMp13K-WcoHJ13FyXnkVbHjhg5LNcofiYPDTgxsHNg@mail.gmail.com>
+ <16865865.dEQ4lomChq@amdc1032>
+Message-ID: <CADGdYn5ZB8s0QfhYovhNqOv8AyHNwgyKvdYeGYz3NKXtQiBHOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2013 03:07 PM, Matt Porter wrote:
-> On 10/10/2013 01:57 PM, Paul Zimmerman wrote:
->>> From: Felipe Balbi [mailto:balbi at ti.com]
->>> Sent: Thursday, October 10, 2013 10:46 AM
->>>
->>> On Thu, Oct 10, 2013 at 12:54:40PM -0400, Matt Porter wrote:
->>>> On 10/10/2013 11:29 AM, Felipe Balbi wrote:
->>>>> On Mon, Oct 07, 2013 at 06:12:29AM -0400, Matt Porter wrote:
->>>>>> Extend dwc2 binding with an optional utmi phy width property.
->>>>>> Enable the s3c-hsotg.c driver to use standard dwc2 binding
->>>>>> and enable configuration of the UTMI phy width based on the
->>>>>> property.
->>>>>>
->>>>>> Signed-off-by: Matt Porter <matt.porter@linaro.org>
->>>>>> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
->>>>>> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
->>>>>> ---
->>>>>>   Documentation/devicetree/bindings/staging/dwc2.txt |  4 ++++
->>>>>>   drivers/usb/gadget/s3c-hsotg.c                     | 18
->>>>>> +++++++++++++++++-
->>>>>>   drivers/usb/gadget/s3c-hsotg.h                     |  1 +
->>>>>>   3 files changed, 22 insertions(+), 1 deletion(-)
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/staging/dwc2.txt
->>> b/Documentation/devicetree/bindings/staging/dwc2.txt
->>>>>> index 1a1b7cf..fb6b8ee 100644
->>>>>> --- a/Documentation/devicetree/bindings/staging/dwc2.txt
->>>>>> +++ b/Documentation/devicetree/bindings/staging/dwc2.txt
->>>>>> @@ -6,10 +6,14 @@ Required properties:
->>>>>>   - reg : Should contain 1 register range (address and length)
->>>>>>   - interrupts : Should contain 1 interrupt
->>>>>>
->>>>>> +Optional properties:
->>>>>> +- snps,phy-utmi-width: Must contain the UTMI data width (either 8
->>>>>> or 16)
->>>>>
->>>>> isn't this available in any of the configuration registers ?
->>>>
->>>> Yes and no. HWCFG4 has a UTMI data width field. However, it has 3
->>>> valid states, "8", "16", or "8 or 16". The BCM281xx implementation is
->>>> set to the latter and the attached phy is 8-bit.
->>>>
->>>> Looking at dwc2 prior to Matthijs Kooijman's patch [1] which starts
->>>> validating the value of phy_utmi_width in that driver, the pci.c
->>>> dwc2_module_params .phy_utmi_width field there even had the comment,
->>>> "/* 16 bits - NOT DETECTABLE */". The autodetect code in
->>>> dwc2_set_param_phy_utmi_width() will fail if HWCFG4 has the "8 or 16"
->>>> option as it just decides to default to a phy width of 16 if nothing
->>>> is configured by the platform glue. This property would also allow
->>>> this issue to be addressed in that driver.
->>>
->>> fair enough, but I'd really like to hear from DT folks if your suggested
->>> binding is acceptable. It seems like we can equally argue that it's a SW
->>> configuration or HW description.
->>
->> It's definitely a HW description - the width of the UTMI data connection.
->>
->> But, which PHY is this? Does it have a register that could tell what
->> the data width is? The dwc2 core has an (optional) PHY Vendor Control
->> Register that allows reading the PHY registers.
+Hi Bartlomeij,
+
+Yes these patches have missed 2 merge windows and still not merged.
+
+Mike:
+I am re-basing these patches on linux-next. Please merge them.
+
+Regards,
+Amit
+
+On Wed, Oct 9, 2013 at 3:18 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
 >
-> This is the integrated PHY on the bcm28155 part (the entire
-> bcm281xx/11351 family shares it). My register doc doesn't show the
-> optional PHY vendor control register as being present in this dwc2
-> implementation. I'll track down with the design team if this is
-> accurate...but it appears we can't go that route.
+> Hi,
+>
+> Mike:
+>
+> Could you please apply this patch? It is few months overdue..
+>
+> Amit:
+>
+> This patch no longer applies to -next. Could you please refresh and resend it?
+>
+> You can add:
+>
+>         Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>
+> while at it.
+>
+> Thanks.
+>
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>
+> On Friday, August 16, 2013 10:22:44 AM amit daniel kachhap wrote:
+>> Hi Mike,
+>>
+>> Please merge this patch as it is pending since last merge window.
+>>
+>> Thanks,
+>> Amit
+>>
+>> On Thu, Jun 13, 2013 at 5:56 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > Amit Daniel Kachhap wrote:
+>> >>
+>> >> Now with common clock support added for exynos5250 it is necessary to move
+>> >> this code to exynos5250 common clock driver as clock registers should be
+>> >> handled there. This change is tested in exynos5250 based arndale platform.
+>> >>
+>> >> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+>> >> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+>> >> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> >
+>> > Hmm...I'm not sure it's better to handle the ARM core power down clock in
+>> > common clock but the clock registers should be handled in one part, clock.
+>> >
+>> > Acked-by: Kukjin Kim <kgene.kim@samsugn.com>
+>> >
+>> > Mike, the mach-exynos/cpuidle.c is not touched in samsung tree at this
+>> > moment, so this patch will not create any conflict between samsung and clk.
+>> >
+>> > Thanks,
+>> > - Kukjin
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-The design team confirmed that we do not have any registers that can be 
-accessed via the PHY Vendor Control Register. All PHY control registers 
-are implemented in the MMIO control block which is supported in the PHY 
-control driver later in this series.They also confirmed there's no other 
-way to detect that it's an 8-bit data path.
 
--Matt
+On Wed, Oct 9, 2013 at 3:18 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> Hi,
+>
+> Mike:
+>
+> Could you please apply this patch? It is few months overdue..
+>
+> Amit:
+>
+> This patch no longer applies to -next. Could you please refresh and resend it?
+>
+> You can add:
+>
+>         Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>
+> while at it.
+>
+> Thanks.
+>
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>
+> On Friday, August 16, 2013 10:22:44 AM amit daniel kachhap wrote:
+>> Hi Mike,
+>>
+>> Please merge this patch as it is pending since last merge window.
+>>
+>> Thanks,
+>> Amit
+>>
+>> On Thu, Jun 13, 2013 at 5:56 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > Amit Daniel Kachhap wrote:
+>> >>
+>> >> Now with common clock support added for exynos5250 it is necessary to move
+>> >> this code to exynos5250 common clock driver as clock registers should be
+>> >> handled there. This change is tested in exynos5250 based arndale platform.
+>> >>
+>> >> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+>> >> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+>> >> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> >
+>> > Hmm...I'm not sure it's better to handle the ARM core power down clock in
+>> > common clock but the clock registers should be handled in one part, clock.
+>> >
+>> > Acked-by: Kukjin Kim <kgene.kim@samsugn.com>
+>> >
+>> > Mike, the mach-exynos/cpuidle.c is not touched in samsung tree at this
+>> > moment, so this patch will not create any conflict between samsung and clk.
+>> >
+>> > Thanks,
+>> > - Kukjin
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
