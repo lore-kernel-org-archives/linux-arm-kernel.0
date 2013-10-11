@@ -1,64 +1,47 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 11 Oct 2013 09:18:26 +0800
-Subject: [PATCH 3/3] arm64: include: asm: atomic.h: use 'unsigned int'
- and 'atomic_t' instead of 'unsigned long' for atomic_clear_mask()
-In-Reply-To: <20131010142305.GG6199@mudshark.cambridge.arm.com>
-References: <52561137.3070608@asianux.com> <5256117A.4000009@asianux.com>
- <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
- <20131010100733.GH3817@mudshark.cambridge.arm.com>
- <52568998.2080108@asianux.com>
- <20131010142305.GG6199@mudshark.cambridge.arm.com>
-Message-ID: <525751E2.3020207@asianux.com>
+From: b35083@freescale.com (Jingchang Lu)
+Date: Fri, 11 Oct 2013 09:53:40 +0800
+Subject: [PATCH RESEND 1/3] ARM: imx: Add DMAMUX clock for Vybrid vf610 SoC
+Message-ID: <1381456421-7620-1-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2013 10:23 PM, Will Deacon wrote:
-> On Thu, Oct 10, 2013 at 12:03:52PM +0100, Chen Gang wrote:
->> On 10/10/2013 06:07 PM, Will Deacon wrote:
->>> On Thu, Oct 10, 2013 at 03:35:21AM +0100, Chen Gang wrote:
->>>> In current kernel wide source, for arm64, only s390 scsi drivers use
->>>> atomic_clear_mask(), now, s390 itself need use 'unsigned int' and
->>>> 'atomic_t', so need match s390's atomic_clear_mask().
->>>>
->>>>
->>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->>>> ---
->>>>  arch/arm64/include/asm/atomic.h |   13 +++++++------
->>>>  1 files changed, 7 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
->>>> index 8363644..58808fc 100644
->>>> --- a/arch/arm64/include/asm/atomic.h
->>>> +++ b/arch/arm64/include/asm/atomic.h
->>>> @@ -126,16 +126,17 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
->>>>  	return oldval;
->>>>  }
->>>>  
->>>> -static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
->>>> +static inline void atomic_clear_mask(unsigned int mask, atomic_t *ptr)
->>>>  {
->>>> -	unsigned long tmp, tmp2;
->>>> +	unsigned int tmp;
->>>
->>> Same comment here as for ARM; I think you want a signed int.
->>>
->>
->> OK, replied in patch 2/3 for ARM.
->>
->> BTW: do arm64 need atomic_clear_mask()?
-> 
-> No. Neither ARM nor arm64 need this function.
-> 
+Signed-off-by: Jingchang Lu <b35083@freescale.com>
+---
+ arch/arm/mach-imx/clk-vf610.c           | 5 +++++
+ include/dt-bindings/clock/vf610-clock.h | 6 +++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-OK, thank you for your confirmation.
-
-Hmm... can we remove atomic_clear_mask() from ARM and arm64? (in my
-opinion, if not need, better to remove it).
-
-> Will
-> 
-> 
-
-Thanks.
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index b169a39..29f88a2 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -298,6 +298,11 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
+ 	clk[VF610_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
+ 
++	clk[VF610_CLK_DMAMUX0] = imx_clk_gate2("dmamux0", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(4));
++	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
++	clk[VF610_CLK_DMAMUX2] = imx_clk_gate2("dmamux2", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(1));
++	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(2));
++
+ 	clk_set_parent(clk[VF610_CLK_QSPI0_SEL], clk[VF610_CLK_PLL1_PFD4]);
+ 	clk_set_rate(clk[VF610_CLK_QSPI0_X4_DIV], clk_get_rate(clk[VF610_CLK_QSPI0_SEL]) / 2);
+ 	clk_set_rate(clk[VF610_CLK_QSPI0_X2_DIV], clk_get_rate(clk[VF610_CLK_QSPI0_X4_DIV]) / 2);
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index 4aa2b48..a916029 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -160,6 +160,10 @@
+ #define VF610_CLK_GPU2D			147
+ #define VF610_CLK_ENET0			148
+ #define VF610_CLK_ENET1			149
+-#define VF610_CLK_END			150
++#define VF610_CLK_DMAMUX0		150
++#define VF610_CLK_DMAMUX1		151
++#define VF610_CLK_DMAMUX2		152
++#define VF610_CLK_DMAMUX3		153
++#define VF610_CLK_END			154
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
-Chen Gang
+1.8.0
