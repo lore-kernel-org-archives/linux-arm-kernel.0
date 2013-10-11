@@ -1,50 +1,38 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 11 Oct 2013 10:41:25 +0200
-Subject: [PATCH v4 04/17] clk: at91: add PMC macro file for dt definitions
-In-Reply-To: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
-References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1381480885-11994-1-git-send-email-b.brezillon@overkiz.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 11 Oct 2013 11:45:39 +0300
+Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
+In-Reply-To: <20131010162314.GD29913@atomide.com>
+References: <20131003054104.8941.88857.stgit@localhost>
+ <20131003054221.8941.87801.stgit@localhost> <5256AA7F.8030005@ti.com>
+ <20131010160018.GA29913@atomide.com> <20131010162314.GD29913@atomide.com>
+Message-ID: <5257BAB3.50100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new macro file for PMC macros.
+On 10/10/2013 07:23 PM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [131010 09:09]:
+>> * Roger Quadros <rogerq@ti.com> [131010 06:32]:
+>>>
+>>> I tried testing this with the USB EHCI driver, but I'm not getting wake up interrupts
+>>> while the system is still running and only the EHCI controller is runtime suspended.
+>>>
+>>> It seems we need to somehow call _reconfigure_io_chain() to update the daisy chain
+>>> whenever the pad wakeup_enable bit is changed.
+>>
+>> Sounds like this is on omap3? Have you tried calling pcs_soc->rearm() in the
+>> pcs_irq_handle() like the comments there suggest? At least for me that keeps
+>> the wake-up interrupts continuously running on omap3 instead of just idle modes.
+>>
+>> Now on omap4, I've noticed the wake up interrupts are on all the time based on tests
+>> with the serial driver.
+> 
+> Oh, and if you're runtime suspending EHCI only, and if the EHCI module has
+> wake-up registers, it should be able to wake EHCI from retention on it's own
+> without a need for the io chain at all.
+> 
 
-This macro file includes the definitions of SR (status register) bit
-offsets and will be use to reference PMC irqs.
+The problem is that the asynchronous wake up mechanism for USB Host module is broken
+in the design so we have to rely on IO daisy chain every time. :(
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- include/dt-bindings/clk/at91.h |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 include/dt-bindings/clk/at91.h
-
-diff --git a/include/dt-bindings/clk/at91.h b/include/dt-bindings/clk/at91.h
-new file mode 100644
-index 0000000..0b4cb99
---- /dev/null
-+++ b/include/dt-bindings/clk/at91.h
-@@ -0,0 +1,22 @@
-+/*
-+ * This header provides constants for AT91 pmc status.
-+ *
-+ * The constants defined in this header are being used in dts.
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLK_AT91_H
-+#define _DT_BINDINGS_CLK_AT91_H
-+
-+#define AT91_PMC_MOSCS		0		/* MOSCS Flag */
-+#define AT91_PMC_LOCKA		1		/* PLLA Lock */
-+#define AT91_PMC_LOCKB		2		/* PLLB Lock */
-+#define AT91_PMC_MCKRDY		3		/* Master Clock */
-+#define AT91_PMC_LOCKU		6		/* UPLL Lock */
-+#define AT91_PMC_PCKRDY(id)	(8 + (id))	/* Programmable Clock */
-+#define AT91_PMC_MOSCSELS	16		/* Main Oscillator Selection */
-+#define AT91_PMC_MOSCRCS	17		/* Main On-Chip RC */
-+#define AT91_PMC_CFDEV		18		/* Clock Failure Detector Event */
-+
-+#endif
--- 
-1.7.9.5
+cheers,
+-roger
