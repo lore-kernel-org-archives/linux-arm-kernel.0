@@ -1,408 +1,192 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 11 Oct 2013 14:43:36 +0200
-Subject: [PATCH v2 6/6] ARM: at91/dt: remove old clk material
-In-Reply-To: <1381495416-15928-1-git-send-email-b.brezillon@overkiz.com>
-References: <1381495416-15928-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1381495416-15928-7-git-send-email-b.brezillon@overkiz.com>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Fri, 11 Oct 2013 18:22:34 +0530
+Subject: [RFC PATCH 3/4] ARM64: Big Endian fixes for kernel booting
+In-Reply-To: <1381494135-15085-4-git-send-email-ankit.jindal@linaro.org>
+References: <1381494135-15085-1-git-send-email-ankit.jindal@linaro.org>
+ <1381494135-15085-4-git-send-email-ankit.jindal@linaro.org>
+Message-ID: <CAPTm99W30nDDR0bLLy7vs+CDJ9apOxTOn9Wxi_9VRW9kixEQNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the old main clk node which is now useless as sama5d3
-SoCs and boards are no longer compatible with the old at91 clk
-implementations.
+On 11 October 2013 17:52, Ankit Jindal <ankit.jindal@linaro.org> wrote:
+>
+> - Enable appropriate bits for big endian kernel in SYSCTLR.EL2 and
+>   SYSCTLR.EL1 registers
+> - Swap entry point for secondary core for big endian kernel
+> - Set machine type to "aarch64b" for big endian and "aarch64l"
+>   for little endian.
+>
+> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
+> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
+> ---
+>  arch/arm64/include/asm/assembler.h |    7 +++++++
+>  arch/arm64/kernel/head.S           |   34 ++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/setup.c          |   19 +++++++++++++++----
+>  arch/arm64/kernel/smp_spin_table.c |    5 +++--
+>  arch/arm64/mm/proc.S               |    2 +-
+>  5 files changed, 60 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index 5aceb83..473faf3 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -22,6 +22,13 @@
+>
+>  #include <asm/ptrace.h>
+>
+> +/* Select code for any configuration running in BE mode */
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +#define ARM_BE(code...) code
+> +#else
+> +#define ARM_BE(code...)
+> +#endif
+> +
+>  /*
+>   * Stack pushing/popping (register pairs only). Equivalent to store decrement
+>   * before, load increment after.
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 7090c12..45dc50d 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -122,6 +122,7 @@
+>         .word   0                               // reserved
+>
+>  ENTRY(stext)
+> +       ARM_BE(bl      setend_be)
+>         mov     x21, x0                         // x21=FDT
+>         bl      __calc_phys_offset              // x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
+>         bl      el2_setup                       // Drop to EL1
+> @@ -148,6 +149,34 @@ ENTRY(stext)
+>  ENDPROC(stext)
+>
+>  /*
+> + * Set el0-el1-el2 to Big endian
+> + */
+> +
+> +#if defined(CONFIG_CPU_BIG_ENDIAN)
+> +ENTRY(setend_be)
+> +       mrs     x21, CurrentEL
+> +        cmp     x21, #PSR_MODE_EL2t
+> +       b.ne    setend_be_el1_el0
+> +
+> +setend_be_el2:
+> +       mrs     x21, sctlr_el2
+> +        mov     x22, #(1<<25)
+> +        orr     x21, x21, x22
+> +        msr     sctlr_el2, x21
+> +       isb
+> +
+> +setend_be_el1_el0:
+> +       mrs     x21, sctlr_el1
+> +        mov     x22, #(3<<24)
+> +        orr     x21, x21, x22
+> +        msr     sctlr_el1, x21
+> +       isb
+> +
+> +       ret
+> +ENDPROC(setend_be)
+> +#endif /* defined(CONFIG_CPU_BIG_ENDIAN) */
+> +
+> +/*
+>   * If we're fortunate enough to boot at EL2, ensure that the world is
+>   * sane before dropping to EL1.
+>   */
+> @@ -181,7 +210,11 @@ ENTRY(el2_setup)
+>
+>         /* sctlr_el1 */
+>         mov     x0, #0x0800                     // Set/clear RES{1,0} bits
+> +#if defined(CONFIG_CPU_BIG_ENDIAN)
+> +       movk    x0, #0x33d0, lsl #16
+> +#else
+>         movk    x0, #0x30d0, lsl #16
+> +#endif
+>         msr     sctlr_el1, x0
+>
+>         /* Coprocessor traps. */
+> @@ -235,6 +268,7 @@ ENTRY(__boot_cpu_mode)
+>          * cores are held until we're ready for them to initialise.
+>          */
+>  ENTRY(secondary_holding_pen)
+> +       ARM_BE(bl       setend_be)
+>         bl      __calc_phys_offset              // x24=phys offset
+>         bl      el2_setup                       // Drop to EL1
+>         mrs     x0, mpidr_el1
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 055cfb8..d47ae6d 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -64,6 +64,9 @@ static const char *cpu_name;
+>  static const char *machine_name;
+>  phys_addr_t __fdt_pointer __initdata;
+>
+> +static union { char c[8]; unsigned long l; } endian_test = { { 'l', '?', '?',  '?', '?', '?', '?','b' } };
+> +#define ENDIANNESS ((char)endian_test.l)
+> +
+>  /*
+>   * Standard memory resources
+>   */
+> @@ -117,8 +120,10 @@ static void __init setup_processor(void)
+>
+>         printk("CPU: %s [%08x] revision %d\n",
+>                cpu_name, read_cpuid_id(), read_cpuid_id() & 15);
+> -
+> -       sprintf(init_utsname()->machine, "aarch64");
+> +
+> +       snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
+> +                 "aarch64", ENDIANNESS);
+> +
+>         elf_hwcap = 0;
+>  }
+>
+> @@ -310,9 +315,15 @@ static const char *hwcap_str[] = {
+>  static int c_show(struct seq_file *m, void *v)
+>  {
+>         int i;
+> +#if 0
+> +       int num = 1;
+> +       char c;
+> +       char *cptr = (char *)&num;
+> +       c = (*cptr) ? 'l' : 'b';
+> +#endif
 
-It also remove old clock definitions (clock definitions using at91 old clk
-framework).
+Oops, forgot to remove this #if 0. Please ignore this small change.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/boot/dts/sama5d3xcm.dtsi |   11 --
- arch/arm/mach-at91/sama5d3.c      |  346 -------------------------------------
- 2 files changed, 357 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index dce5419..f55ed07 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -18,17 +18,6 @@
- 		reg = <0x20000000 0x20000000>;
- 	};
- 
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <12000000>;
--		};
--	};
--
- 	ahb {
- 		apb {
- 			spi0: spi at f0004000 {
-diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-index 3426098..ae58fea 100644
---- a/arch/arm/mach-at91/sama5d3.c
-+++ b/arch/arm/mach-at91/sama5d3.c
-@@ -21,349 +21,6 @@
- #include "generic.h"
- #include "sam9_smc.h"
- 
--#if defined(CONFIG_OLD_CLK_AT91)
--#include "clock.h"
--/* --------------------------------------------------------------------
-- *  Clocks
-- * -------------------------------------------------------------------- */
--
--/*
-- * The peripheral clocks.
-- */
--
--static struct clk pioA_clk = {
--	.name		= "pioA_clk",
--	.pid		= SAMA5D3_ID_PIOA,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioB_clk = {
--	.name		= "pioB_clk",
--	.pid		= SAMA5D3_ID_PIOB,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioC_clk = {
--	.name		= "pioC_clk",
--	.pid		= SAMA5D3_ID_PIOC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioD_clk = {
--	.name		= "pioD_clk",
--	.pid		= SAMA5D3_ID_PIOD,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioE_clk = {
--	.name		= "pioE_clk",
--	.pid		= SAMA5D3_ID_PIOE,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk usart0_clk = {
--	.name		= "usart0_clk",
--	.pid		= SAMA5D3_ID_USART0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk usart1_clk = {
--	.name		= "usart1_clk",
--	.pid		= SAMA5D3_ID_USART1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk usart2_clk = {
--	.name		= "usart2_clk",
--	.pid		= SAMA5D3_ID_USART2,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk usart3_clk = {
--	.name		= "usart3_clk",
--	.pid		= SAMA5D3_ID_USART3,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk uart0_clk = {
--	.name		= "uart0_clk",
--	.pid		= SAMA5D3_ID_UART0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk uart1_clk = {
--	.name		= "uart1_clk",
--	.pid		= SAMA5D3_ID_UART1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk twi0_clk = {
--	.name		= "twi0_clk",
--	.pid		= SAMA5D3_ID_TWI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk twi1_clk = {
--	.name		= "twi1_clk",
--	.pid		= SAMA5D3_ID_TWI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk twi2_clk = {
--	.name		= "twi2_clk",
--	.pid		= SAMA5D3_ID_TWI2,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk mmc0_clk = {
--	.name		= "mci0_clk",
--	.pid		= SAMA5D3_ID_HSMCI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk mmc1_clk = {
--	.name		= "mci1_clk",
--	.pid		= SAMA5D3_ID_HSMCI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk mmc2_clk = {
--	.name		= "mci2_clk",
--	.pid		= SAMA5D3_ID_HSMCI2,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk spi0_clk = {
--	.name		= "spi0_clk",
--	.pid		= SAMA5D3_ID_SPI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk spi1_clk = {
--	.name		= "spi1_clk",
--	.pid		= SAMA5D3_ID_SPI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk tcb0_clk = {
--	.name		= "tcb0_clk",
--	.pid		= SAMA5D3_ID_TC0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk tcb1_clk = {
--	.name		= "tcb1_clk",
--	.pid		= SAMA5D3_ID_TC1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk adc_clk = {
--	.name		= "adc_clk",
--	.pid		= SAMA5D3_ID_ADC,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk adc_op_clk = {
--	.name		= "adc_op_clk",
--	.type		= CLK_TYPE_PERIPHERAL,
--	.rate_hz	= 5000000,
--};
--static struct clk dma0_clk = {
--	.name		= "dma0_clk",
--	.pid		= SAMA5D3_ID_DMA0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk dma1_clk = {
--	.name		= "dma1_clk",
--	.pid		= SAMA5D3_ID_DMA1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk uhphs_clk = {
--	.name		= "uhphs",
--	.pid		= SAMA5D3_ID_UHPHS,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk udphs_clk = {
--	.name		= "udphs_clk",
--	.pid		= SAMA5D3_ID_UDPHS,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* gmac only for sama5d33, sama5d34, sama5d35 */
--static struct clk macb0_clk = {
--	.name		= "macb0_clk",
--	.pid		= SAMA5D3_ID_GMAC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* emac only for sama5d31, sama5d35 */
--static struct clk macb1_clk = {
--	.name		= "macb1_clk",
--	.pid		= SAMA5D3_ID_EMAC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* lcd only for sama5d31, sama5d33, sama5d34 */
--static struct clk lcdc_clk = {
--	.name		= "lcdc_clk",
--	.pid		= SAMA5D3_ID_LCDC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* isi only for sama5d33, sama5d35 */
--static struct clk isi_clk = {
--	.name		= "isi_clk",
--	.pid		= SAMA5D3_ID_ISI,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk can0_clk = {
--	.name		= "can0_clk",
--	.pid		= SAMA5D3_ID_CAN0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk can1_clk = {
--	.name		= "can1_clk",
--	.pid		= SAMA5D3_ID_CAN1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk ssc0_clk = {
--	.name		= "ssc0_clk",
--	.pid		= SAMA5D3_ID_SSC0,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk ssc1_clk = {
--	.name		= "ssc1_clk",
--	.pid		= SAMA5D3_ID_SSC1,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV2,
--};
--static struct clk sha_clk = {
--	.name		= "sha_clk",
--	.pid		= SAMA5D3_ID_SHA,
--	.type		= CLK_TYPE_PERIPHERAL,
--	.div		= AT91_PMC_PCR_DIV8,
--};
--static struct clk aes_clk = {
--	.name		= "aes_clk",
--	.pid		= SAMA5D3_ID_AES,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk tdes_clk = {
--	.name		= "tdes_clk",
--	.pid		= SAMA5D3_ID_TDES,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--
--static struct clk *periph_clocks[] __initdata = {
--	&pioA_clk,
--	&pioB_clk,
--	&pioC_clk,
--	&pioD_clk,
--	&pioE_clk,
--	&usart0_clk,
--	&usart1_clk,
--	&usart2_clk,
--	&usart3_clk,
--	&uart0_clk,
--	&uart1_clk,
--	&twi0_clk,
--	&twi1_clk,
--	&twi2_clk,
--	&mmc0_clk,
--	&mmc1_clk,
--	&mmc2_clk,
--	&spi0_clk,
--	&spi1_clk,
--	&tcb0_clk,
--	&tcb1_clk,
--	&adc_clk,
--	&adc_op_clk,
--	&dma0_clk,
--	&dma1_clk,
--	&uhphs_clk,
--	&udphs_clk,
--	&macb0_clk,
--	&macb1_clk,
--	&lcdc_clk,
--	&isi_clk,
--	&can0_clk,
--	&can1_clk,
--	&ssc0_clk,
--	&ssc1_clk,
--	&sha_clk,
--	&aes_clk,
--	&tdes_clk,
--};
--
--static struct clk pck0 = {
--	.name		= "pck0",
--	.pmc_mask	= AT91_PMC_PCK0,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 0,
--};
--
--static struct clk pck1 = {
--	.name		= "pck1",
--	.pmc_mask	= AT91_PMC_PCK1,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 1,
--};
--
--static struct clk pck2 = {
--	.name		= "pck2",
--	.pmc_mask	= AT91_PMC_PCK2,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 2,
--};
--
--static struct clk_lookup periph_clocks_lookups[] = {
--	/* lookup table for DT entries */
--	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
--	CLKDEV_CON_DEV_ID(NULL, "fffff200.gpio", &pioA_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioB_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioC_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioD_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioE_clk),
--	CLKDEV_CON_DEV_ID("usart", "f001c000.serial", &usart0_clk),
--	CLKDEV_CON_DEV_ID("usart", "f0020000.serial", &usart1_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8020000.serial", &usart2_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8024000.serial", &usart3_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f0014000.i2c", &twi0_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f0018000.i2c", &twi1_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f801c000.i2c", &twi2_clk),
--	CLKDEV_CON_DEV_ID("mci_clk", "f0000000.mmc", &mmc0_clk),
--	CLKDEV_CON_DEV_ID("mci_clk", "f8000000.mmc", &mmc1_clk),
--	CLKDEV_CON_DEV_ID("mci_clk", "f8004000.mmc", &mmc2_clk),
--	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi0_clk),
--	CLKDEV_CON_DEV_ID("spi_clk", "f8008000.spi", &spi1_clk),
--	CLKDEV_CON_DEV_ID("t0_clk", "f0010000.timer", &tcb0_clk),
--	CLKDEV_CON_DEV_ID("t0_clk", "f8014000.timer", &tcb1_clk),
--	CLKDEV_CON_DEV_ID("tsc_clk", "f8018000.tsadcc", &adc_clk),
--	CLKDEV_CON_DEV_ID("dma_clk", "ffffe600.dma-controller", &dma0_clk),
--	CLKDEV_CON_DEV_ID("dma_clk", "ffffe800.dma-controller", &dma1_clk),
--	CLKDEV_CON_DEV_ID("hclk", "600000.ohci", &uhphs_clk),
--	CLKDEV_CON_DEV_ID("ohci_clk", "600000.ohci", &uhphs_clk),
--	CLKDEV_CON_DEV_ID("ehci_clk", "700000.ehci", &uhphs_clk),
--	CLKDEV_CON_DEV_ID("pclk", "500000.gadget", &udphs_clk),
--	CLKDEV_CON_DEV_ID("hclk", "500000.gadget", &utmi_clk),
--	CLKDEV_CON_DEV_ID("hclk", "f0028000.ethernet", &macb0_clk),
--	CLKDEV_CON_DEV_ID("pclk", "f0028000.ethernet", &macb0_clk),
--	CLKDEV_CON_DEV_ID("hclk", "f802c000.ethernet", &macb1_clk),
--	CLKDEV_CON_DEV_ID("pclk", "f802c000.ethernet", &macb1_clk),
--	CLKDEV_CON_DEV_ID("pclk", "f0008000.ssc", &ssc0_clk),
--	CLKDEV_CON_DEV_ID("pclk", "f000c000.ssc", &ssc1_clk),
--	CLKDEV_CON_DEV_ID("can_clk", "f000c000.can", &can0_clk),
--	CLKDEV_CON_DEV_ID("can_clk", "f8010000.can", &can1_clk),
--	CLKDEV_CON_DEV_ID("sha_clk", "f8034000.sha", &sha_clk),
--	CLKDEV_CON_DEV_ID("aes_clk", "f8038000.aes", &aes_clk),
--	CLKDEV_CON_DEV_ID("tdes_clk", "f803c000.tdes", &tdes_clk),
--};
--
--static void __init sama5d3_register_clocks(void)
--{
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
--		clk_register(periph_clocks[i]);
--
--	clkdev_add_table(periph_clocks_lookups,
--			 ARRAY_SIZE(periph_clocks_lookups));
--
--	clk_register(&pck0);
--	clk_register(&pck1);
--	clk_register(&pck2);
--}
--#endif
--
- /* --------------------------------------------------------------------
-  *  AT91SAM9x5 processor initialization
-  * -------------------------------------------------------------------- */
-@@ -375,7 +32,4 @@ static void __init sama5d3_map_io(void)
- 
- AT91_SOC_START(sama5d3)
- 	.map_io = sama5d3_map_io,
--#if defined(CONFIG_OLD_CLK_AT91)
--	.register_clocks = sama5d3_register_clocks,
--#endif
- AT91_SOC_END
--- 
-1.7.9.5
+>
+> -       seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+> -                  cpu_name, read_cpuid_id() & 15, ELF_PLATFORM);
+> +       seq_printf(m, "Processor\t: %s rev %d (%s%c)\n",
+> +                  cpu_name, read_cpuid_id() & 15, ELF_PLATFORM, ENDIANNESS);
+>
+>         for_each_online_cpu(i) {
+>                 /*
+> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+> index 7c35fa6..7ad68bc 100644
+> --- a/arch/arm64/kernel/smp_spin_table.c
+> +++ b/arch/arm64/kernel/smp_spin_table.c
+> @@ -46,9 +46,10 @@ static int __init smp_spin_table_prepare_cpu(int cpu)
+>
+>         if (!cpu_release_addr[cpu])
+>                 return -ENODEV;
+> -
+> +
+>         release_addr = __va(cpu_release_addr[cpu]);
+> -       release_addr[0] = (void *)__pa(secondary_holding_pen);
+> +       release_addr[0] = (void *)cpu_to_le64(__pa(secondary_holding_pen));
+> +
+>         __flush_dcache_area(release_addr, sizeof(release_addr[0]));
+>
+>         /*
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index b1b31bb..380a707 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -166,5 +166,5 @@ ENDPROC(__cpu_setup)
+>          */
+>         .type   crval, #object
+>  crval:
+> -       .word   0x030802e2                      // clear
+> +       .word   0x000802e2                      // clear
+>         .word   0x0405d11d                      // set
+> --
+> 1.7.9.5
+>
