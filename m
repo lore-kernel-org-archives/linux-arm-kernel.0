@@ -1,45 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Oct 2013 17:26:50 +0100
-Subject: [PATCH] arm: vfp: always clear vfp_current_hw_state when
- forcing reload
-In-Reply-To: <CAFUV4K3de3p9jP1Oo=cafEuu64YmEzBXrAiiRWUauy0VeCEQ5w@mail.gmail.com>
-References: <1380751187-11257-1-git-send-email-zyy@motorola.com>
- <20131002221123.GC12758@n2100.arm.linux.org.uk>
- <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
- <CAFUV4K1CkzGZVEwkXGX38jG0HxerqQq--d-qFiqF9J6wi88xYQ@mail.gmail.com>
- <20131011120729.GW25034@n2100.arm.linux.org.uk>
- <CAFUV4K3de3p9jP1Oo=cafEuu64YmEzBXrAiiRWUauy0VeCEQ5w@mail.gmail.com>
-Message-ID: <20131011162650.GX25034@n2100.arm.linux.org.uk>
+From: balajitk@ti.com (Balaji T K)
+Date: Fri, 11 Oct 2013 22:14:34 +0530
+Subject: [PATCH v2 1/2] ARM: dts: dra7-evm: Add mmc1 node for micro-sd
+ support
+In-Reply-To: <5255A59C.5040301@ti.com>
+References: <1381163104-6318-1-git-send-email-balajitk@ti.com>
+ <5255A59C.5040301@ti.com>
+Message-ID: <52582AF2.6070502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 11:12:19AM -0500, Yuanyuan ZHONG wrote:
-> On Fri, Oct 11, 2013 at 7:07 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Oct 10, 2013 at 11:00:18AM -0500, Yuanyuan ZHONG wrote:
-> >> Hi Russell, et al
-> >>
-> >> If there is no further comments, I'll submit it to patch system.
-> >> Thanks.
-> >
-> > No, I still don't agree with your patch as being the correct fix.  Look
-> > at the code that you're creating:
-> >
-> >         if (vfp_state_in_hw(cpu, thread)) {
-> >                 fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-> >                 vfp_current_hw_state[cpu] = NULL;
-> >         }
-> > #ifdef CONFIG_SMP
-> >         thread->vfpstate.hard.cpu = NR_CPUS;
-> >         vfp_current_hw_state[cpu] = NULL;
-> > #endif
-> >
-> > So when SMP is enabled we unconditionally blat out the vfp_current_hw_state
-> > pointer for this CPU?
-> 
-> I think ensuring local vfp_current_hw_state is invalidated is what
-> vfp_force_reload() need to do when SMP is enabled.
+On Thursday 10 October 2013 12:21 AM, Sekhar Nori wrote:
+> On Monday 07 October 2013 09:55 PM, Balaji T K wrote:
+>> Add mmc1 dt node to dra7-evm board.
+>> Input for ldo1 regulator is controlled by gpio 5 of pcf8575 chip (0x21)
+>> on i2c1 bus. When dt support for gpio-pcf857x is available, input supply
+>> will be modelled as cascaded regulator.
+>>
+>> Signed-off-by: Balaji T K <balajitk@ti.com>
+>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>
+Hi Benoit,
 
-vfp_force_reload() is about asking for the state S on CPU N to be
-reloaded.  It is not about merely asking for the state on CPU N to
-be reloaded.
+Can you let me know if you have any comments on this patch series?
+
+Thanks and Regards
+Balaji T K
