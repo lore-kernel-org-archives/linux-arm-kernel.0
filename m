@@ -1,39 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Oct 2013 11:03:24 -0700
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.13
-In-Reply-To: <52582A67.6050108@baylibre.com>
-References: <52582A67.6050108@baylibre.com>
-Message-ID: <20131011180324.GV29913@atomide.com>
+From: zyy@motorola.com (Yuanyuan ZHONG)
+Date: Fri, 11 Oct 2013 13:08:34 -0500
+Subject: [PATCH] arm: vfp: always clear vfp_current_hw_state when forcing
+ reload
+In-Reply-To: <20131011162650.GX25034@n2100.arm.linux.org.uk>
+References: <1380751187-11257-1-git-send-email-zyy@motorola.com>
+ <20131002221123.GC12758@n2100.arm.linux.org.uk>
+ <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
+ <CAFUV4K1CkzGZVEwkXGX38jG0HxerqQq--d-qFiqF9J6wi88xYQ@mail.gmail.com>
+ <20131011120729.GW25034@n2100.arm.linux.org.uk>
+ <CAFUV4K3de3p9jP1Oo=cafEuu64YmEzBXrAiiRWUauy0VeCEQ5w@mail.gmail.com>
+ <20131011162650.GX25034@n2100.arm.linux.org.uk>
+Message-ID: <CAFUV4K3ANiEftwRhqT+WXfeTnLPgGvjqQP3OYgDAxMa6qVup3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Fri, Oct 11, 2013 at 11:26 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Oct 11, 2013 at 11:12:19AM -0500, Yuanyuan ZHONG wrote:
+>> On Fri, Oct 11, 2013 at 7:07 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Oct 10, 2013 at 11:00:18AM -0500, Yuanyuan ZHONG wrote:
+>> >> Hi Russell, et al
+>> >>
+>> >> If there is no further comments, I'll submit it to patch system.
+>> >> Thanks.
+>> >
+>> > No, I still don't agree with your patch as being the correct fix.  Look
+>> > at the code that you're creating:
+>> >
+>> >         if (vfp_state_in_hw(cpu, thread)) {
+>> >                 fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+>> >                 vfp_current_hw_state[cpu] = NULL;
+>> >         }
+>> > #ifdef CONFIG_SMP
+>> >         thread->vfpstate.hard.cpu = NR_CPUS;
+>> >         vfp_current_hw_state[cpu] = NULL;
+>> > #endif
+>> >
+>> > So when SMP is enabled we unconditionally blat out the vfp_current_hw_state
+>> > pointer for this CPU?
+>>
+>> I think ensuring local vfp_current_hw_state is invalidated is what
+>> vfp_force_reload() need to do when SMP is enabled.
+>
+> vfp_force_reload() is about asking for the state S on CPU N to be
+> reloaded.  It is not about merely asking for the state on CPU N to
+> be reloaded.
 
-* Benoit Cousson <bcousson@baylibre.com> [131011 09:50]:
-> Add the minimal DTS support for DRA7xx based SoC core.
-> Add the initial support for N900 and gta04 phones.
-> Enable USB3 on OMAP5 evm board.
-> Add support for cryto accelerators
-> Add new IGEP AQUILA board
-> Add AM33XX EDMA support
-> Update HSUSB node to use the reset-gpios fmwk
+Then this function cannot do what we need for cpu hotplug. At that
+time we don't know if the state S on CPU N is valid, we can only ask
+for the state on CPU N to be reloaded. How about this:
 
-Looks good to me, but we're getting self-inflicted merge
-conflicts in two places now with Paul's hwmod changes,
-and my defconfig changes.
-
-Can you please respin without the following two patches:
-
-49bcd824c1c0db32fe4de0c1ba3ee36defdb11ca ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies
-736c4bb159c793b00331261438deb982cbac3c03 ARM: OMAP5: hwmod: add missing ocp2scp hwmod data
-
-I can pick the two patches above and apply after pulling in
-Paul's branch first.
-
-However, if other branches are based on this, then we just
-need to deal with the merge conflicts, and there's no point
-in redoing your branch.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 52b8f40..efdd9e0 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -644,6 +644,7 @@ static int vfp_hotplug(struct notifier_block *b,
+unsigned long action,
+ {
+        if (action == CPU_DYING || action == CPU_DYING_FROZEN) {
+                vfp_force_reload((long)hcpu, current_thread_info());
++               vfp_current_hw_state[(long)hcpu] = NULL;
+        } else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+                vfp_enable(NULL);
+        return NOTIFY_OK;
