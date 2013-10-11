@@ -1,73 +1,48 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 11 Oct 2013 13:12:54 -0500
-Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
- device tree
-In-Reply-To: <1381477716.5630.74.camel@pasglop>
-References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
- <1381477716.5630.74.camel@pasglop>
-Message-ID: <83E50073-1BDF-4EB9-87D2-EFA427EFE756@codeaurora.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 11 Oct 2013 21:23:25 +0300
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+In-Reply-To: <alpine.DEB.2.02.1310111749180.27397@utopia.booyaka.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+ <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
+ <52525642.8010307@ti.com> <20131007154103.GW8949@atomide.com>
+ <20131007190322.GY8949@atomide.com>
+ <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
+ <alpine.DEB.2.02.1310091858411.30199@utopia.booyaka.com>
+ <525654AE.7060009@ti.com>
+ <alpine.DEB.2.02.1310111749180.27397@utopia.booyaka.com>
+Message-ID: <5258421D.8030006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/11/2013 08:54 PM, Paul Walmsley wrote:
+> On Thu, 10 Oct 2013, Tero Kristo wrote:
+>
+>> On 10/09/2013 09:59 PM, Paul Walmsley wrote:
+>>> Eh, one correction:
+>>>
+>>> On Wed, 9 Oct 2013, Paul Walmsley wrote:
+>>>
+>>>> We could easily wind up with kernels that won't boot at all when used
+>>>> with newer DT data.
+>>>
+>>> This is a misstatement of the issue: the concern here is that newer
+>>> kernels may not boot at all with older DT data - which could easily be in
+>>> locked areas of the flash or firmware.
+>>
+>> I wonder who would be crazy enough to put DT data into a locked area, and to
+>> what purpose. If you can update the kernel, there is no point locking down DT
+>> data, this will just cause you unnecessary misery.
+>
+> The DT data will be used by bootloaders also :-(
+>
+> In situations where the bootloaders are signed and locked, the security
+> people are also insisting that the DT data be signed and locked.
 
-On Oct 11, 2013, at 2:48 AM, Benjamin Herrenschmidt wrote:
+Well, even if you sign something, you can still update it. Writing any 
+software to true OTP memory is one way to commit suicide IMO. How many 
+nasty bugs have you seen with ROM code? Also, if people want to make 
+their custom security solutions which are not supported by the kernel, 
+why should the kernel care about it? We don't know the details, and 
+can't influence the design, so we can't prepare for it anyway.
 
-> On Fri, 2013-10-11 at 09:27 +0200, Marek Szyprowski wrote:
->> Hi all!
->> 
->> Benjamin Herrenschmidt pointed a few issues in the proposed design of
->> device tree bindings for contiguous memory allocator and reserved memory
->> regions:
->> https://lkml.org/lkml/2013/9/15/151
->> http://www.spinics.net/lists/arm-kernel/msg273548.html
-> 
-> Are you guys in Edinburgh ?
-> 
-> I'll be there from Tuesday PM (so really Wed) to Friday (fly out on
-> Sat). We should catch up, brainstorm and come up with something.
-> 
-> Cheers,
-> Ben.
-
-We can try and do it during the DT-summit, or find another time.
-
-- k
-
-> 
->> Some time has passed, but there is still no consensus on the bindings
->> for the reserved memory and various drawback of this solution has been
->> shown, so in my opinion the best I can do now is to revert them
->> completely and start from scratch again later.
->> 
->> This patch series reverts patches related to device tree bindings
->> proposed in the following thread:
->> http://thread.gmane.org/gmane.linux.ports.arm.kernel/263216
->> and merged by commit 64c353864e3f7ccba0ade1bd6f562f9a3bc7e68d ("Merge
->> branch 'for-v3.12' of git://git.linaro.org/people/mszyprowski/linux-dma-mapping").
->> 
->> Best regards
->> Marek Szyprowski
->> Samsung R&D Institute Poland
->> 
->> Marek Szyprowski (2):
->>  Revert "ARM: init: add support for reserved memory defined by device tree"
->>  Revert "drivers: of: add initialization code for dma reserved memory"
->> 
->> Documentation/devicetree/bindings/memory.txt |  168 -------------------------
->> arch/arm/mm/init.c                           |    3 -
->> drivers/of/Kconfig                           |    6 -
->> drivers/of/Makefile                          |    1 -
->> drivers/of/of_reserved_mem.c                 |  173 --------------------------
->> drivers/of/platform.c                        |    4 -
->> include/linux/of_reserved_mem.h              |   14 ---
->> 7 files changed, 369 deletions(-)
->> delete mode 100644 Documentation/devicetree/bindings/memory.txt
->> delete mode 100644 drivers/of/of_reserved_mem.c
->> delete mode 100644 include/linux/of_reserved_mem.h
->> 
-> 
-> 
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+-Tero
