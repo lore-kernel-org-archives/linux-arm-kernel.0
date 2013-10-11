@@ -1,30 +1,47 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Fri, 11 Oct 2013 13:59:00 +0200
-Subject: [PATCH] serial: prepare for 9bit data
-In-Reply-To: <20130926224755.GA15399@kroah.com>
-References: <1379938052-6026-1-git-send-email-jiri.prchal@aksignal.cz>
- <20130926224755.GA15399@kroah.com>
-Message-ID: <5257E804.6020800@aksignal.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Oct 2013 13:07:29 +0100
+Subject: [PATCH] arm: vfp: always clear vfp_current_hw_state when
+ forcing reload
+In-Reply-To: <CAFUV4K1CkzGZVEwkXGX38jG0HxerqQq--d-qFiqF9J6wi88xYQ@mail.gmail.com>
+References: <1380751187-11257-1-git-send-email-zyy@motorola.com>
+ <20131002221123.GC12758@n2100.arm.linux.org.uk>
+ <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
+ <CAFUV4K1CkzGZVEwkXGX38jG0HxerqQq--d-qFiqF9J6wi88xYQ@mail.gmail.com>
+Message-ID: <20131011120729.GW25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 10, 2013 at 11:00:18AM -0500, Yuanyuan ZHONG wrote:
+> Hi Russell, et al
+> 
+> If there is no further comments, I'll submit it to patch system.
+> Thanks.
 
+No, I still don't agree with your patch as being the correct fix.  Look
+at the code that you're creating:
 
-Dne 27.9.2013 00:47, Greg KH napsal(a):
-> On Mon, Sep 23, 2013 at 02:07:32PM +0200, Jiri Prchal wrote:
->> This patch adds 9bit data possibility for serial_core. Please confirm that I did it right way at right place. I'll make atmel_serial driver for 9bit data later.
->
-> Please wrap your lines properly.
->
-> I'd rather wait to add this type of patch _after_ you have tested it and
-> verified that your driver works, and take that patch at the same time.
->
-> Otherwise, this is just added cruft that no one is using, and I'd have
-> to remove it :)
-No one is using it because it is NOT implemented.
-Try to search internet for "9bit serial" to see how many people like to use it.
-But I probably not bother to do it and I'll try some tricks with parity.
-As many others.
+        if (vfp_state_in_hw(cpu, thread)) {
+                fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+                vfp_current_hw_state[cpu] = NULL;
+        }
+#ifdef CONFIG_SMP
+        thread->vfpstate.hard.cpu = NR_CPUS;
+        vfp_current_hw_state[cpu] = NULL;
+#endif
 
-Best regard
-Jiri
+So when SMP is enabled we unconditionally blat out the vfp_current_hw_state
+pointer for this CPU?
+
+What actually needs fixing is the call to this function in the hotplug
+thread:
+
+                vfp_force_reload((long)hcpu, current_thread_info());
+
+I'd suggest this becomes:
+
+		unsigned cpu = (long)hcpu;
+		if (vfp_current_hw_state[cpu])
+			vfp_force_reload(cpu, vfp_current_hw_state[cpu]);
+
+That will force the right hw_state to be forced to reload, rather than
+passing in the wrong thread state.
