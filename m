@@ -1,54 +1,95 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 11 Oct 2013 16:20:16 +0900
-Subject: [PATCH 2/2] PCI: imx6: Fix the clock for PCIe
-In-Reply-To: <1381457552-6575-2-git-send-email-marex@denx.de>
-References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
- <1381457552-6575-1-git-send-email-marex@denx.de>
- <1381457552-6575-2-git-send-email-marex@denx.de>
-Message-ID: <000c01cec652$55adbb30$01093190$%han@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 11 Oct 2013 09:26:34 +0200
+Subject: [PATCH 1/3] ahci: exynos: add ahci sata support on Exynos platform
+In-Reply-To: <000001cec64d$fa1cdca0$ee5695e0$%han@samsung.com>
+References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAKuRcOJi5C1C63Y41dSJ0-YsaTni1AL=d3qH2Cjz74C8ardEpQ@mail.gmail.com>
+ <000001cec64d$fa1cdca0$ee5695e0$%han@samsung.com>
+Message-ID: <5254874.hnE6mtQbvX@amdn883>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, October 11, 2013 11:13 AM, Marek Vasut wrote:
+Hi,
+
+On Friday 11 of October 2013 15:49:04 Jingoo Han wrote:
+> On Tuesday, October 08, 2013 8:45 PM, Yuvaraj Kumar wrote:
+> > On Fri, Oct 4, 2013 at 6:03 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> > > On Thursday, October 03, 2013 8:32 PM, Bartlomiej Zolnierkiewicz wrote:
+> > >> On Tuesday, October 01, 2013 12:03:01 PM Yuvaraj Kumar C D wrote:
+> > >> > Exynos5250 contains one Synopsys AHCI SATA controller.The avalaible
+> > >> > ahci_platform driver is not sufficient to handle the AHCI PHY and PHY
+> > >> > clock related initialization.
+> > >> >
+> > >> > This patch adds exynos specific ahci sata driver,contained the exynos
+> > >> > specific initialized codes, re-use the generic ahci_platform driver, and
+> > >> > keep the generic ahci_platform driver clean as much as possible.
+> > >> >
+> > >> > This patch depends on the below patch
+> > >> >     [1].drivers: phy: add generic PHY framework
+> > >> >             by Kishon Vijay Abraham I<kishon@ti.com>
+> > >> >
+> > >> > Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> > >> > ---
+> > >> >  drivers/ata/Kconfig       |    9 ++
+> > >> >  drivers/ata/Makefile      |    1 +
+> > >> >  drivers/ata/ahci_exynos.c |  226 +++++++++++++++++++++++++++++++++++++++++++++
+> > >> >  3 files changed, 236 insertions(+)
+> > >> >  create mode 100644 drivers/ata/ahci_exynos.c
+> > >> >
+> > >
+> > >
+> > > [.....]
+> > >
+> > >> > +   priv->phy = devm_phy_get(dev , "sata-phy");
+> > >> > +   if (IS_ERR(priv->phy))
+> > >> > +           return PTR_ERR(priv->phy);
+> > >
+> > > [.....]
+> > >
+> > >> Also please take a look at the following patch:
+> > >>
+> > >> https://lkml.org/lkml/2013/9/19/173
+> > >>
+> > >> it adds PHY support to ahci_platform driver, maybe it can be used
+> > >> for your needs as well.
+> > >
+> > > I also agree with Bartlomiej Zolnierkiewicz's opinion.
+> > > 'ahci_exynos.c' just calls PHY API, without any additional control
+> > > for Exynos AHCI IP.
+> > In addition to PHY handling,it also deals with the special clock
+> > sclk_sata which is not dealt in ahci_platform.c(certainly exynos
+> > specific).
 > 
-> The clk #205 are lvds_sel, not lvds_gate , so fix this. Moreover,
-> the PCIe needs lvds_gate for successful operation, so make the PCIe
-> driver enable (set as output) the lvds_gate .
+> Handling the special clock 'sclk_sata' is another issue.
+> Please, look at that other 'sclk_*'s are handled.
+> Also, if possible, please add 'the code handling the special clock'
+> to 'ahci_platform.c'.
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Frank Li <lznuaa@gmail.com>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Tim Harvey <tharvey@gateworks.com>
-> Cc: Yinghai Lu <yinghai@kernel.org>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi |  6 +++---
->  drivers/pci/host/pci-imx6.c    | 19 ++++++++++++++++++-
->  2 files changed, 21 insertions(+), 4 deletions(-)
+> > 
+> > Morever there is a wrapper driver to handle the platform specific
+> > things for the sata.Please refer the  patch[1]
+> > [1]ata: ti_sata: Add Texas Instruments SATA Wrapper driver
+> > https://lkml.org/lkml/2013/9/19/166
+> 
+> As Roger Quadros mentioned, 'ti_sata' driver will be dropped.
+> 
+> > [2]ahci_imx: add ahci sata support on imx platforms
+> > 
+> 
+> 'ahci_imx' is necessary, because 'ahci_imx' controls some
+> specific registers.
+> 
+> However, 'ahci_exynos.c' does not control any registers.
+> 
+> > I think, if we have platform specific driver like ahci_xxx.c , it
+> > would be better to handle the sata PHY in ahci_xxx.c so that we can
+> > retain and re-use the ahci_platform.c as it is.
+> 
+> I think that the platform specific driver like ahci_xxx.c is not
+> necessary, because 'ahci_exynos.c' does not control any special
+> registers.
 
-Hi Marek Vasut,
-
-How about splitting this patch into two patches such as
-arch part and driver part?
-
-It is because driver part was merged into PCI tree by Bjorn Helgaas,[1]
-and arch part was merged into i.MX tree by Shawn Guo.[2]
-Thus, your patch can make the conflict issue.
-
-For example,
-  [PATCH 1/2] ARM: dts: imx6qdl: Fix the clock for PCIe
-  [PATCH 2/2] PCI: imx6: Fix the clock for PCIe
-
-Then, 1st patch can be merged to i.MX tree, and 2nd patch can be merged
-to PCI tree.
-
-If I am wrong, please let me know kindly. :-)
-
-[1] http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=next&id=bb38919ec56e0758c3ae56dfc091dcde1391353e
-[2] https://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=commit;h=3a57291fa4ca7f7647d826f5b47082ef306d839f
+My big +1 to all the JIngoo's points above.
 
 Best regards,
-Jingoo Han
+Tomasz
