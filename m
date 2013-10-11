@@ -1,66 +1,73 @@
-From: zyy@motorola.com (Yuanyuan ZHONG)
-Date: Fri, 11 Oct 2013 13:08:34 -0500
-Subject: [PATCH] arm: vfp: always clear vfp_current_hw_state when forcing
- reload
-In-Reply-To: <20131011162650.GX25034@n2100.arm.linux.org.uk>
-References: <1380751187-11257-1-git-send-email-zyy@motorola.com>
- <20131002221123.GC12758@n2100.arm.linux.org.uk>
- <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
- <CAFUV4K1CkzGZVEwkXGX38jG0HxerqQq--d-qFiqF9J6wi88xYQ@mail.gmail.com>
- <20131011120729.GW25034@n2100.arm.linux.org.uk>
- <CAFUV4K3de3p9jP1Oo=cafEuu64YmEzBXrAiiRWUauy0VeCEQ5w@mail.gmail.com>
- <20131011162650.GX25034@n2100.arm.linux.org.uk>
-Message-ID: <CAFUV4K3ANiEftwRhqT+WXfeTnLPgGvjqQP3OYgDAxMa6qVup3A@mail.gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 11 Oct 2013 13:12:54 -0500
+Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
+ device tree
+In-Reply-To: <1381477716.5630.74.camel@pasglop>
+References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
+ <1381477716.5630.74.camel@pasglop>
+Message-ID: <83E50073-1BDF-4EB9-87D2-EFA427EFE756@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 11:26 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Oct 11, 2013 at 11:12:19AM -0500, Yuanyuan ZHONG wrote:
->> On Fri, Oct 11, 2013 at 7:07 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Thu, Oct 10, 2013 at 11:00:18AM -0500, Yuanyuan ZHONG wrote:
->> >> Hi Russell, et al
->> >>
->> >> If there is no further comments, I'll submit it to patch system.
->> >> Thanks.
->> >
->> > No, I still don't agree with your patch as being the correct fix.  Look
->> > at the code that you're creating:
->> >
->> >         if (vfp_state_in_hw(cpu, thread)) {
->> >                 fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
->> >                 vfp_current_hw_state[cpu] = NULL;
->> >         }
->> > #ifdef CONFIG_SMP
->> >         thread->vfpstate.hard.cpu = NR_CPUS;
->> >         vfp_current_hw_state[cpu] = NULL;
->> > #endif
->> >
->> > So when SMP is enabled we unconditionally blat out the vfp_current_hw_state
->> > pointer for this CPU?
->>
->> I think ensuring local vfp_current_hw_state is invalidated is what
->> vfp_force_reload() need to do when SMP is enabled.
->
-> vfp_force_reload() is about asking for the state S on CPU N to be
-> reloaded.  It is not about merely asking for the state on CPU N to
-> be reloaded.
 
-Then this function cannot do what we need for cpu hotplug. At that
-time we don't know if the state S on CPU N is valid, we can only ask
-for the state on CPU N to be reloaded. How about this:
+On Oct 11, 2013, at 2:48 AM, Benjamin Herrenschmidt wrote:
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 52b8f40..efdd9e0 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -644,6 +644,7 @@ static int vfp_hotplug(struct notifier_block *b,
-unsigned long action,
- {
-        if (action == CPU_DYING || action == CPU_DYING_FROZEN) {
-                vfp_force_reload((long)hcpu, current_thread_info());
-+               vfp_current_hw_state[(long)hcpu] = NULL;
-        } else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
-                vfp_enable(NULL);
-        return NOTIFY_OK;
+> On Fri, 2013-10-11 at 09:27 +0200, Marek Szyprowski wrote:
+>> Hi all!
+>> 
+>> Benjamin Herrenschmidt pointed a few issues in the proposed design of
+>> device tree bindings for contiguous memory allocator and reserved memory
+>> regions:
+>> https://lkml.org/lkml/2013/9/15/151
+>> http://www.spinics.net/lists/arm-kernel/msg273548.html
+> 
+> Are you guys in Edinburgh ?
+> 
+> I'll be there from Tuesday PM (so really Wed) to Friday (fly out on
+> Sat). We should catch up, brainstorm and come up with something.
+> 
+> Cheers,
+> Ben.
+
+We can try and do it during the DT-summit, or find another time.
+
+- k
+
+> 
+>> Some time has passed, but there is still no consensus on the bindings
+>> for the reserved memory and various drawback of this solution has been
+>> shown, so in my opinion the best I can do now is to revert them
+>> completely and start from scratch again later.
+>> 
+>> This patch series reverts patches related to device tree bindings
+>> proposed in the following thread:
+>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/263216
+>> and merged by commit 64c353864e3f7ccba0ade1bd6f562f9a3bc7e68d ("Merge
+>> branch 'for-v3.12' of git://git.linaro.org/people/mszyprowski/linux-dma-mapping").
+>> 
+>> Best regards
+>> Marek Szyprowski
+>> Samsung R&D Institute Poland
+>> 
+>> Marek Szyprowski (2):
+>>  Revert "ARM: init: add support for reserved memory defined by device tree"
+>>  Revert "drivers: of: add initialization code for dma reserved memory"
+>> 
+>> Documentation/devicetree/bindings/memory.txt |  168 -------------------------
+>> arch/arm/mm/init.c                           |    3 -
+>> drivers/of/Kconfig                           |    6 -
+>> drivers/of/Makefile                          |    1 -
+>> drivers/of/of_reserved_mem.c                 |  173 --------------------------
+>> drivers/of/platform.c                        |    4 -
+>> include/linux/of_reserved_mem.h              |   14 ---
+>> 7 files changed, 369 deletions(-)
+>> delete mode 100644 Documentation/devicetree/bindings/memory.txt
+>> delete mode 100644 drivers/of/of_reserved_mem.c
+>> delete mode 100644 include/linux/of_reserved_mem.h
+>> 
+> 
+> 
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
