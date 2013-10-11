@@ -1,44 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Oct 2013 09:01:46 -0700
-Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
-In-Reply-To: <CACRpkdZhbadd5d4P+2B0_DktqK4CHzZPVJC8kPHZYUnp8TaxsA@mail.gmail.com>
-References: <20131003054221.8941.87801.stgit@localhost>
- <5256AA7F.8030005@ti.com> <20131010160018.GA29913@atomide.com>
- <CACRpkdaG-PQA39XSjKUgM9TyeD7srgm_8s+NazrDKJ0gmNLcwg@mail.gmail.com>
- <20131010162015.GC29913@atomide.com>
- <CACRpkdYF83ghUf60Wmrti53UJ1bWV30GW_P9GjWnsOcZHbsv+Q@mail.gmail.com>
- <5257BD3E.5000707@ti.com>
- <CACRpkdYJNaiAAHhYatd6g5_wVt0QEUxOvsk6nQn9o=_i5zfWrA@mail.gmail.com>
- <20131011154352.GO29913@atomide.com>
- <CACRpkdZhbadd5d4P+2B0_DktqK4CHzZPVJC8kPHZYUnp8TaxsA@mail.gmail.com>
-Message-ID: <20131011160146.GR29913@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 11 Oct 2013 17:03:09 +0100
+Subject: [PATCH v4 0/5] dma: mxs-dma bugfixes and cleanup
+In-Reply-To: <CAOMZO5AG_efwTbtUjG8TPEY=_kyjrcZkEQV6XfZ6CLZ3_msWig@mail.gmail.com>
+References: <1381493539-31756-1-git-send-email-mpa@pengutronix.de>
+ <CAOMZO5AG_efwTbtUjG8TPEY=_kyjrcZkEQV6XfZ6CLZ3_msWig@mail.gmail.com>
+Message-ID: <20131011160309.GE2443@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [131011 09:05]:
-> On Fri, Oct 11, 2013 at 5:43 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Linus Walleij <linus.walleij@linaro.org> [131011 03:40]:
-> >> On Fri, Oct 11, 2013 at 10:56 AM, Roger Quadros <rogerq@ti.com> wrote:
-> >>
-> >> > The register handling is fine. But how do we deal with resource handling?
-> >> > e.g. the block that has the deep-core registers might need to be clocked or powered
-> >> > before the registers can be accessed.
-> >>
-> >> Yeah I saw this in the code there.
-> >>
-> >> In this case it seems syscon-type regmap access can be used to
-> >> read/write the registers, so maybe the pin controller also need to
-> >>  get a handle on some clock etc?
-> >
-> > Uhh, let's not go there.. The resource availability needs to be
-> > handled transparently in regmap code and the reg provider hardware
-> > module driver using runtime PM.
-> 
-> OK we can surely discuss this with broonie, it makes sense to
-> have regmap be able to do its deed transparently.
+On Fri, Oct 11, 2013 at 11:01:29AM -0300, Fabio Estevam wrote:
 
-Yes I think so too. Sounds like we need callbacks for the runtime PM
-checks to the "register provider" driver. Hwo knows, maybe those
-features are there already :)
+> The problem I see is that randomly the captured audio becomes
+> extremely noisy and loud (throughout the whole 10 seconds) and then in
+> the subsequent loop it becomes normal. This is very random and it
+> happens at a 1 or 2% failure rate.
 
-Tony
+This sounds like there's a problem with L/R sync or noise on the bit
+clock and the samples aren't being well aligned with the clock.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131011/416eef1c/attachment.sig>
