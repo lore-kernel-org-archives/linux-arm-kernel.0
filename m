@@ -1,91 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Oct 2013 20:35:18 +0100
-Subject: [RFC v2 PATCH 2/4] ARM64: add support for kernel mode NEON in
- atomic context
-In-Reply-To: <B07F01F7-2FCE-4161-BAF4-1183E1B07F4A@linaro.org>
-References: <1381344634-14917-1-git-send-email-ard.biesheuvel@linaro.org>
- <1381344634-14917-3-git-send-email-ard.biesheuvel@linaro.org>
- <20131011171446.GA18859@arm.com>
- <B07F01F7-2FCE-4161-BAF4-1183E1B07F4A@linaro.org>
-Message-ID: <C2D74641-A4F0-4CFB-A06C-AE79C05CCD1A@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 11 Oct 2013 12:51:37 -0700
+Subject: [GIT PULL] Keystone SOC updates for v3.13
+In-Reply-To: <52573885.9010007@ti.com> (Santosh Shilimkar's message of "Thu,
+ 10 Oct 2013 19:30:13 -0400")
+References: <1381267740-31874-1-git-send-email-santosh.shilimkar@ti.com>
+ <87wqlkn4kn.fsf@linaro.org> <52573885.9010007@ti.com>
+Message-ID: <87k3hj8u2e.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 Oct 2013, at 18:30, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 11 okt. 2013, at 19:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>> On Wed, Oct 09, 2013 at 07:50:32PM +0100, Ard Biesheuvel wrote:
->>> --- a/arch/arm64/include/asm/neon.h
->>> +++ b/arch/arm64/include/asm/neon.h
->>> @@ -8,7 +8,38 @@
->>> * published by the Free Software Foundation.
->>> */
->>> 
->>> +#include <linux/hardirq.h>
->>> +#include <linux/types.h>
->>> +#include <asm/fpsimd.h>
->>> +
->>> #define cpu_has_neon()        (1)
->>> 
->>> +#define DEFINE_NEON_STACK_REGS(a, num)                    \
->>> +    struct {                            \
->>> +        struct fpsimd_partial_state regs;            \
->>> +        __uint128_t vregs[(num) > 32 ? 32 : ((num) + 1) & ~1U];    \
->>> +    } a = { .regs.num_regs = sizeof(a.vregs) / sizeof(__uint128_t) }
->>> +
->>> +#define DEFINE_NEON_STACK_REGS_ALL(name)    DEFINE_NEON_STACK_REGS(name, 32)
->>> +
->>> void kernel_neon_begin(void);
->>> void kernel_neon_end(void);
->>> +
->>> +static inline void __kernel_neon_begin_atomic(struct fpsimd_partial_state *regs)
->>> +{
->>> +    if (!in_interrupt())
->>> +        kernel_neon_begin();
->>> +    else
->>> +        fpsimd_save_partial_state(regs);
->>> +}
->>> +
->>> +static inline void __kernel_neon_end_atomic(struct fpsimd_partial_state *regs)
->>> +{
->>> +    if (!in_interrupt())
->>> +        kernel_neon_end();
->>> +    else
->>> +        fpsimd_load_partial_state(regs);
->>> +}
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+
+> On Thursday 10 October 2013 06:28 PM, Kevin Hilman wrote:
+>> Hi Santosh,
 >> 
->> The _atomic suffix is a bit misleading (you basically mean no user
->> context). I wonder whether it's better to have some _fast/_slow variants
->> instead. Looking at the other two patches, you only need 2 or 4
->> registers to do the crypto stuff but if you are not in_interrupt(), you
->> basically save and restore the full NEON bank. I would say for such
->> cases just make kernel_neon_begin_fast() call which is safe in all
->> contexts and much faster.
-> 
-> I agree that the name is a bit misleading.
-> 
-> Regarding fast/slow: if you take the core aes cipher as an example, it
-> will likely be called from a loop somewhere, and (assuming lazy restore
-> gets merged at some point) you may be stacking and unstacking 2 or 4
-> registers many times while kernel_neon_begin() would just stack them
-> once and let the lazy restore unstack them only when needed.
-> 
-> This is probably a detail where arm and arm64 will be implemented
-> somewhat differently.  I would still like to align the api between the
-> two, if possible, so intrinsics or gcc vectorized code can be shared
-> easily.  However, as ARM has fewer use cases where using only 2
-> registers makes sense, (memcpy perhaps?) and already has lazy restore
-> wired up, I personally feel hooking into the lazy restore in the
-> !in_interrupt() case is still the best solution there.
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>> 
+>>> Olof,
+>>>
+>>> Please pull below Keystone SOC updates for v3.13. As discussed on irc, the
+>>> pull request is build on top of v3.13-rc4 because of dependent commit
+>>> c2b9e974{dma/Kconfig: Make TI_EDMA select TI_PRIV_EDMA}. The pull request
+>>> carries Kconfig update patch {dma: Allow TI_EDMA selectable for ARCH_KEYSTONE}
+>>> with Vinod Koul's ack as per alignment on the mailing list[1]. The clock
+>>> driver support is already applied by Mike to his 3.13 clk-next [2]
+>>>
+>>> The following changes since commit ef887009524c3631d804a2587ec204c4ff61a5b8:
+>>>
+>>>   ARM: keystone: Enable I2C and SPI bus support (2013-10-08 15:37:41 -0400)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc-for-arm-soc
+>>>
+>>> for you to fetch changes up to ef887009524c3631d804a2587ec204c4ff61a5b8:
+>>>
+>>>   ARM: keystone: Enable I2C and SPI bus support (2013-10-08 15:37:41 -0400)
+>>>
+>>> ----------------------------------------------------------------
+>>> SOC updates for Keystone II devices:
+>>>
+>>> - Clock tree support
+>>> - Clock management support using PM core
+>>> - Keystone config update for EMDA with ack from Vinod
+>>> - Enable SPI and I2C drivers
+>>>
+>>> ----------------------------------------------------------------
+>>>
+>>> Santosh Shilimkar (9):
+>>>   ARM: dts: keystone: Add clock tree data to devicetree
+>>>   ARM: dts: keystone: Add clock phandle to UART nodes
+>>>   ARM: keystone: Enable clock drivers
+>>>   ARM: keystone: add PM bus support for clock management
+>> 
+>> I still don't like this one.  Like I pointed out earlier[1], this
+>> doesn't really have anything to do with a bus, so it doesn't belong in
+>> drivers/bus (and the 'bus' naming throughout isn't right.)  IMO, it
+>> belongs in mach-keystone as the platform glue telling how the PM domains
+>> are hooked up on keystone.
+>> 
+> I did ask follow up question[2] back since I thought there is nothing
+> machine specific code in that. Thought you agreed to my argument.
 
-Lazy saving/restoring on context switch may not be beneficial on arm64
-and I don't want to enable it until I see some real user space
-benchmarks (not kernel crypto API benchmarks).
+Sorry for not replying further, I missed your response the first time
+around.
 
-The way kernel_neon_begin() is currently implemented on arm64 just saves
-the whole register bank, so being called in a loop it will be worse.
-What you could do is to save the register bank in kernel_neon_begin()
-only the first time, set a TIF flag and restore them when returning to
-user.  This way you can call it multiple times but only save/restore
-once.
+>> Please move it to mach-keystone, and s/pm_bus/pm_domain/ throughout
+>> since it has nothing to do with bus.  The 'bus' naming in davinci is
+>> leftover from the pre-pm_domain days when we were overriding functions
+>> of the platform_bus.
+>> 
+> But I respect your view and hence will send and updated pull request
+> with the above rename.
 
-Catalin
+Thanks for the respin.
+
+Kevin
