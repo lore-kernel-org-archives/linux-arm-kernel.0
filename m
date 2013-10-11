@@ -1,52 +1,42 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 11 Oct 2013 17:57:32 +0800
-Subject: [PATCH V2 4/4] ARM: tegra: enable CPU idle for Tegra124
-In-Reply-To: <1381485452-3561-1-git-send-email-josephl@nvidia.com>
-References: <1381485452-3561-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1381485452-3561-5-git-send-email-josephl@nvidia.com>
+Date: Fri, 11 Oct 2013 17:58:35 +0800
+Subject: [PATCH V2 0/4] 
+Message-ID: <1381485519-4027-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPUIdle function of Tegra124 is identical to Tegra114, so we share
-the same driver with Tegra114.
+This series adds the LP1 support for Tegra124. (suspend to LP2 also
+supported in this series)
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
+Note:
+This patch series depends on the patch series below.
+* [PATCH 0/5] Tegra124 clock support
+* [PATCH V2 0/6] ARM: tegra: basic support for Tegra124 SoC
+* [PATCH] ARM: tegra: add clock properties for devices of Tegra124
+* [PATCH] ARM: tegra: enable Tegra RTC as default for Tegra124
+* [PATCH 0/4] ARM: tegra: add CPU hot-plug and idle support for Tegra124
+
+Verified on Cardhu, Dalmore and Venice2 and with THUMB2_KERNEL as well.
+
 V2:
-* no change
----
- arch/arm/mach-tegra/Makefile  | 3 +++
- arch/arm/mach-tegra/cpuidle.c | 4 +++-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+* remove the patch of "enable Tegra RTC for Venice2"
+* add new patch of "re-calculate the LP1 data for Tegra30/114"
+* squash the 2 to 5 into patch 3/4 of this series
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 04ca2b3..de3748e 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -36,5 +36,8 @@ ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= cpuidle-tegra114.o
- endif
- obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= sleep-tegra30.o
-+ifeq ($(CONFIG_CPU_IDLE),y)
-+obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= cpuidle-tegra114.o
-+endif
- 
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-paz00.o
-diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
-index 0961dfc..7bc5d8d 100644
---- a/arch/arm/mach-tegra/cpuidle.c
-+++ b/arch/arm/mach-tegra/cpuidle.c
-@@ -39,7 +39,9 @@ void __init tegra_cpuidle_init(void)
- 			tegra30_cpuidle_init();
- 		break;
- 	case TEGRA114:
--		if (IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC))
-+	case TEGRA124:
-+		if (IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC) ||
-+		    IS_ENABLED(CONFIG_ARCH_TEGRA_124_SOC))
- 			tegra114_cpuidle_init();
- 		break;
- 	}
+Joseph Lo (4):
+  clk: tegra124: add suspend/resume function for tegra_cpu_car_ops
+  ARM: tegra: re-calculate the LP1 data for Tegra30/114
+  ARM: tegra: add LP1 support code for Tegra124
+  ARM: tegra: enable LP1 suspend mode for Venice2
+
+ arch/arm/boot/dts/tegra124-venice2.dts |  7 +++++
+ arch/arm/mach-tegra/Makefile           |  1 +
+ arch/arm/mach-tegra/flowctrl.c         |  2 ++
+ arch/arm/mach-tegra/iomap.h            |  3 +++
+ arch/arm/mach-tegra/pm.c               | 12 ++++++---
+ arch/arm/mach-tegra/sleep-tegra30.S    | 49 +++++++++++++++++++++++++---------
+ drivers/clk/tegra/clk-tegra124.c       | 27 +++++++++++++++++++
+ 7 files changed, 86 insertions(+), 15 deletions(-)
+
 -- 
 1.8.4
