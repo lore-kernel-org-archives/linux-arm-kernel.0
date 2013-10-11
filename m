@@ -1,262 +1,263 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 11 Oct 2013 17:30:18 +0800
-Subject: [PATCH 1/8] irqchip: add DesignWare APB ICTL interrupt controller
-In-Reply-To: <1381235073-17134-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131011173018.04caee22@xhacker>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri, 11 Oct 2013 11:41:41 +0200
+Subject: [PATCH v4 08/17] clk: at91: add PMC system clocks
+In-Reply-To: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
+References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1381484501-13420-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Oct 2013 05:24:26 -0700
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+This patch adds new at91 system clock implementation using common clk
+framework.
 
-> This adds an irqchip driver and corresponding devicetree binding for the
-> secondary interrupt controllers based on Synopsys DesignWare IP dw_apb_ictl.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> RFCv1->RFCv2:
-> - added copyright reference
-> 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  .../interrupt-controller/snps,dw-apb-ictl.txt      |   29 ++++
->  drivers/irqchip/Kconfig                            |    4 +
->  drivers/irqchip/Makefile                           |    1 +
->  drivers/irqchip/irq-dw-apb-ictl.c                  |  142
-> ++++++++++++++++++++ 4 files changed, 176 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
-> create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
-> b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
-> new file mode 100644 index 0000000..7ccd1ba --- /dev/null
-> +++
-> b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
-> @@ -0,0 +1,29 @@ +Synopsys DesignWare APB interrupt controller (dw_apb_ictl)
-> +
-> +Synopsys DesignWare provides interrupt controller IP for APB known as
-> +dw_apb_ictl. The IP is used as secondary interrupt controller in some SoCs
-> with +APB bus, e.g. Marvell Armada 1500.
-> +
-> +Required properties:
-> +- compatible: shall be "snps,dw-apb-ictl"
-> +- reg: base address of interrupt registers starting with ENABLE_LOW
-> register +- interrupt-controller: identifies the node as an interrupt
-> controller +- #interrupt-cells: number of cells to encode an interrupt
-> source, shall be 1 +- interrupts: interrupt reference to primary interrupt
-> controller +- interrupt-parent: (optional) reference specific primary
-> interrupt controller +
-> +The interrupt sources map to the corresponding bits in the interrupt
-> +registers, i.e.
-> +- 0 maps to bit 0 of low interrupts,
-> +- 1 maps to bit 1 of low interrupts,
-> +- 32 maps to bit 0 of high interrupts, and so on.
-> +
-> +Example:
-> +       aic: interrupt-controller at 3000 {
-> +               compatible = "snps,dw-apb-ictl";
-> +               reg = <0x3000 0xc00>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-> +       };
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 3792a1a..940638d 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -30,6 +30,10 @@ config ARM_VIC_NR
->           The maximum number of VICs available in the system, for
->           power management.
-> 
-> +config DW_APB_ICTL
-> +       bool
-> +       select IRQ_DOMAIN
-> +
->  config IMGPDC_IRQ
->         bool
->         select GENERIC_IRQ_CHIP
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index c60b901..6427323 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_MMP)                  += irq-mmp.o
->  obj-$(CONFIG_ARCH_MVEBU)               += irq-armada-370-xp.o
->  obj-$(CONFIG_ARCH_MXS)                 += irq-mxs.o
->  obj-$(CONFIG_ARCH_S3C24XX)             += irq-s3c24xx.o
-> +obj-$(CONFIG_DW_APB_ICTL)              += irq-dw-apb-ictl.o
->  obj-$(CONFIG_METAG)                    += irq-metag-ext.o
->  obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)   += irq-metag.o
->  obj-$(CONFIG_ARCH_MOXART)              += irq-moxart.o
-> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c
-> b/drivers/irqchip/irq-dw-apb-ictl.c new file mode 100644
-> index 0000000..bbcacee
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
-> @@ -0,0 +1,142 @@
-> +/*
-> + * Synopsys DW APB ICTL irqchip driver.
-> + *
-> + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> + *
-> + * based on GPL'ed 2.6 kernel sources
-> + *  (c) Marvell International Ltd.
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqchip/chained_irq.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +
-> +#include "irqchip.h"
-> +
-> +#define APB_INT_ENABLE_L       0x00
-> +#define APB_INT_ENABLE_H       0x04
-> +#define APB_INT_MASK_L         0x08
-> +#define APB_INT_MASK_H         0x0c
-> +#define APB_INT_FINALSTATUS_L  0x30
-> +#define APB_INT_FINALSTATUS_H  0x34
-> +
-> +static void dw_apb_ictl_handler(unsigned int irq, struct irq_desc *desc)
-> +{
-> +       struct irq_chip *chip = irq_get_chip(irq);
-> +       struct irq_chip_generic *gc = irq_get_handler_data(irq);
-> +       struct irq_domain *d = gc->private;
-> +       u32 stat;
-> +       int n;
-> +
-> +       chained_irq_enter(chip, desc);
-> +
-> +       for (n = 0; n < gc->num_ct; n++) {
-> +               stat = readl_relaxed(gc->reg_base +
-> +                                    APB_INT_FINALSTATUS_L + 4 * n);
-> +               while (stat) {
-> +                       u32 hwirq = ffs(stat) - 1;
-> +                       generic_handle_irq(irq_find_mapping(d,
-> +                                           gc->irq_base + hwirq + 32 * n));
-> +                       stat &= ~(1 << hwirq);
-> +               }
-> +       }
-> +
-> +       chained_irq_exit(chip, desc);
-> +}
-> +
-> +static int __init dw_apb_ictl_init(struct device_node *np,
-> +                                  struct device_node *parent)
-> +{
-> +       unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-> +       struct resource r;
-> +       struct irq_domain *domain;
-> +       struct irq_chip_generic *gc;
-> +       void __iomem *iobase;
-> +       int ret, nrirqs, irq;
-> +       u32 reg;
-> +
-> +       /* Map the parent interrupt for the chained handler */
-> +       irq = irq_of_parse_and_map(np, 0);
-> +       if (irq <= 0) {
-> +               pr_err("%s: unable to parse irq\n", np->name);
-> +               return -EINVAL;
-> +       }
-> +
-> +       ret = of_address_to_resource(np, 0, &r);
-> +       if (ret) {
-> +               pr_err("%s: unable to get resource\n", np->name);
-> +               return ret;
-> +       }
-> +
-> +       if (!request_mem_region(r.start, resource_size(&r), np->name)) {
-> +               pr_err("%s: unable to request mem region\n", np->name);
-> +               return -ENOMEM;
-> +       }
-> +
-> +       iobase = ioremap(r.start, resource_size(&r));
-> +       if (!iobase) {
-> +               pr_err("%s: unable to map resource\n", np->name);
-release_mem_region() is missing
-> +               return -ENOMEM;
-> +       }
-> +
-> +       /*
-> +        * DW IP can be configured to allow 2-64 irqs. We can determine
-> +        * the number of irqs supported by writing into enable register
-> +        * and look for bits not set, as corresponding flip-flops will
-> +        * have been removed by sythesis tool.
-> +        */
-> +
-> +       /* mask and enable all interrupts */
-> +       writel(~0, iobase + APB_INT_MASK_L);
-> +       writel(~0, iobase + APB_INT_MASK_H);
-> +       writel(~0, iobase + APB_INT_ENABLE_L);
-> +       writel(~0, iobase + APB_INT_ENABLE_H);
-> +
-> +       reg = readl(iobase + APB_INT_ENABLE_H);
-> +       if (reg)
-> +               nrirqs = 32 + fls(reg);
-> +       else
-> +               nrirqs = fls(readl(iobase + APB_INT_ENABLE_L));
-> +
-> +       domain = irq_domain_add_linear(np, nrirqs,
-> +                                      &irq_generic_chip_ops, NULL);
-> +       if (!domain) {
-> +               pr_err("%s: unable to add irq domain\n", np->name);
-iounmap() and release_mem_region() is missing
-> +               return -ENOMEM;
-> +       }
-> +
-> +       ret = irq_alloc_domain_generic_chips(domain, 32, (nrirqs > 32) ?
-> 2 : 1,
-> +                                            np->name, handle_level_irq,
-> clr, 0,
-> +                                            IRQ_GC_INIT_MASK_CACHE);
-> +       if (ret) {
-> +               pr_err("%s: unable to alloc irq domain gc\n", np->name);
-> +               return ret;
-> +       }
-> +
-> +       gc = irq_get_domain_generic_chip(domain, 0);
-> +       gc->private = domain;
-> +       gc->reg_base = iobase;
-> +
-> +       gc->chip_types[0].regs.mask = APB_INT_MASK_L;
-> +       gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
-> +       gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
-> +
-> +       if (nrirqs > 32) {
-> +               gc->chip_types[1].regs.mask = APB_INT_MASK_H;
-> +               gc->chip_types[1].chip.irq_mask = irq_gc_mask_set_bit;
-> +               gc->chip_types[1].chip.irq_unmask = irq_gc_mask_clr_bit;
-> +       }
-> +
-> +       irq_set_handler_data(irq, gc);
-> +       irq_set_chained_handler(irq, dw_apb_ictl_handler);
-> +
-> +       return 0;
-> +}
-> +IRQCHIP_DECLARE(dw_apb_ictl,
-> +               "snps,dw-apb-ictl", dw_apb_ictl_init);
-> --
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Some peripherals need to enable a "system" clock in order to work properly.
+Each system clock is given an id based on the bit position in SCER/SCDR
+registers.
+
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/clk/at91/Makefile     |    1 +
+ drivers/clk/at91/clk-system.c |  193 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/at91/pmc.c        |    5 ++
+ drivers/clk/at91/pmc.h        |    3 +
+ 4 files changed, 202 insertions(+)
+ create mode 100644 drivers/clk/at91/clk-system.c
+
+diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+index e28fb2b..c2b7068 100644
+--- a/drivers/clk/at91/Makefile
++++ b/drivers/clk/at91/Makefile
+@@ -4,3 +4,4 @@
+ 
+ obj-y += pmc.o
+ obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
++obj-y += clk-system.o
+diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+new file mode 100644
+index 0000000..603b4b1
+--- /dev/null
++++ b/drivers/clk/at91/clk-system.c
+@@ -0,0 +1,193 @@
++/*
++ * drivers/clk/at91/clk-system.c
++ *
++ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/clk/at91_pmc.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++
++#include "pmc.h"
++
++#define SYSTEM_MAX_ID		31
++
++#define to_clk_system(hw) container_of(hw, struct clk_system, hw)
++struct clk_system {
++	struct clk_hw hw;
++	struct at91_pmc *pmc;
++	u8 id;
++};
++
++static int clk_system_enable(struct clk_hw *hw)
++{
++	struct clk_system *sys = to_clk_system(hw);
++	struct at91_pmc *pmc = sys->pmc;
++
++	pmc_write(pmc, AT91_PMC_SCER, 1 << sys->id);
++	return 0;
++}
++
++static void clk_system_disable(struct clk_hw *hw)
++{
++	struct clk_system *sys = to_clk_system(hw);
++	struct at91_pmc *pmc = sys->pmc;
++
++	pmc_write(pmc, AT91_PMC_SCDR, 1 << sys->id);
++}
++
++static int clk_system_is_enabled(struct clk_hw *hw)
++{
++	struct clk_system *sys = to_clk_system(hw);
++	struct at91_pmc *pmc = sys->pmc;
++
++	return !!(pmc_read(pmc, AT91_PMC_SCSR) & (1 << sys->id));
++}
++
++static const struct clk_ops system_ops = {
++	.enable = clk_system_enable,
++	.disable = clk_system_disable,
++	.is_enabled = clk_system_is_enabled,
++};
++
++static struct clk * __init
++at91_clk_register_system(struct at91_pmc *pmc, const char *name,
++			 const char *parent_name, u8 id)
++{
++	struct clk_system *sys;
++	struct clk *clk = NULL;
++	struct clk_init_data init;
++
++	if (!parent_name || id > SYSTEM_MAX_ID)
++		return ERR_PTR(-EINVAL);
++
++	sys = kzalloc(sizeof(*sys), GFP_KERNEL);
++	if (!sys)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &system_ops;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++	/*
++	 * CLK_IGNORE_UNUSED is used to avoid ddrck switch off.
++	 * TODO : we should implement a driver supporting at91 ddr controller
++	 * (see drivers/memory) which would request and enable the ddrck clock.
++	 * When this is done we will be able to remove CLK_IGNORE_UNUSED flag.
++	 */
++	init.flags = CLK_IGNORE_UNUSED;
++
++	sys->id = id;
++	sys->hw.init = &init;
++	sys->pmc = pmc;
++
++	clk = clk_register(NULL, &sys->hw);
++	if (IS_ERR(clk))
++		kfree(sys);
++
++	return clk;
++}
++
++struct clk_system_data {
++	struct clk **clks;
++	u8 *ids;
++	unsigned int clk_num;
++};
++
++static struct clk * __init
++of_clk_src_system_get(struct of_phandle_args *clkspec, void *data)
++{
++	struct clk_system_data *clk_data = data;
++	unsigned int id = clkspec->args[0];
++	int i;
++
++	if (id > SYSTEM_MAX_ID)
++		goto err;
++
++	for (i = 0; i < clk_data->clk_num; i++) {
++		if (clk_data->ids[i] == id)
++			return clk_data->clks[i];
++	}
++
++err:
++	pr_err("%s: invalid clock id %d\n", __func__, id);
++	return ERR_PTR(-EINVAL);
++}
++
++static void __init
++of_at91_clk_sys_setup(struct device_node *np, struct at91_pmc *pmc)
++{
++	int i;
++	int num;
++	u32 id;
++	struct clk *clk;
++	u8 *ids;
++	struct clk **clks;
++	struct clk_system_data *clktab;
++	const char *name;
++	struct device_node *sysclknp;
++	const char *parent_name;
++
++	num = of_get_child_count(np);
++	if (num > (SYSTEM_MAX_ID + 1))
++		return;
++
++	clktab = kzalloc(sizeof(*clktab), GFP_KERNEL);
++	if (!clktab)
++		return;
++
++	ids = kzalloc(num * sizeof(*ids), GFP_KERNEL);
++	if (!ids)
++		goto out_free_clktab;
++
++	clks = kzalloc(num * sizeof(*clks), GFP_KERNEL);
++	if (!clks)
++		goto out_free_ids;
++
++	i = 0;
++	for_each_child_of_node(np, sysclknp) {
++		name = sysclknp->name;
++
++		if (of_property_read_u32(sysclknp, "atmel,clk-id", &id))
++			goto out_free_clks;
++
++		parent_name = of_clk_get_parent_name(sysclknp, 0);
++
++		clk = at91_clk_register_system(pmc, name, parent_name, id);
++		if (IS_ERR(clk))
++			goto out_free_clks;
++
++		clks[i] = clk;
++		ids[i] = id;
++
++		i++;
++	}
++
++	clktab->clk_num = num;
++	clktab->clks = clks;
++	clktab->ids = ids;
++	of_clk_add_provider(np, of_clk_src_system_get, clktab);
++	return;
++
++out_free_clks:
++	kfree(clks);
++out_free_ids:
++	kfree(ids);
++out_free_clktab:
++	kfree(clktab);
++}
++
++void __init of_at91rm9200_clk_sys_setup(struct device_node *np,
++					struct at91_pmc *pmc)
++{
++	of_at91_clk_sys_setup(np, pmc);
++}
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index 6f08879..ce76ba6 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -243,6 +243,11 @@ static const struct of_device_id pmc_clk_ids[] __initdata = {
+ 		.compatible = "atmel,at91sam9x5-clk-master",
+ 		.data = of_at91sam9x5_clk_master_setup,
+ 	},
++	/* System clocks */
++	{
++		.compatible = "atmel,at91rm9200-clk-system",
++		.data = of_at91rm9200_clk_sys_setup,
++	},
+ 	{ /*sentinel*/ }
+ };
+ 
+diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+index 2e1dcb8..f88ef41 100644
+--- a/drivers/clk/at91/pmc.h
++++ b/drivers/clk/at91/pmc.h
+@@ -74,4 +74,7 @@ extern void __init of_at91rm9200_clk_master_setup(struct device_node *np,
+ extern void __init of_at91sam9x5_clk_master_setup(struct device_node *np,
+ 						  struct at91_pmc *pmc);
+ 
++extern void __init of_at91rm9200_clk_sys_setup(struct device_node *np,
++					       struct at91_pmc *pmc);
++
+ #endif /* __PMC_H_ */
+-- 
+1.7.9.5
