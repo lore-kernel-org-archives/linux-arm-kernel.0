@@ -1,74 +1,81 @@
 From: matthew.leach@arm.com (Matthew Leach)
-Date: Fri, 11 Oct 2013 14:52:06 +0100
-Subject: [PATCH 00/14] AArch64 BE Support
-Message-ID: <1381499540-28794-1-git-send-email-matthew.leach@arm.com>
+Date: Fri, 11 Oct 2013 14:52:17 +0100
+Subject: [PATCH 11/14] arm64: big-endian: set correct endianess on kernel entry
+In-Reply-To: <1381499540-28794-1-git-send-email-matthew.leach@arm.com>
+References: <1381499540-28794-1-git-send-email-matthew.leach@arm.com>
+Message-ID: <1381499540-28794-12-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The endianness of memory accesses at EL2 and EL1 are configured by
+SCTLR_EL2.EE and SCTLR_EL1.EE respectively. When the kernel is booted,
+the state of SCTLR_EL{2,1}.EE is unknown, and thus the kernel must
+ensure that they are set before performing any memory accesses.
 
-This patch series adds big-endian support to the arm64 kernel. It has
-been tested successfully with LTP on both AArch32 and AArch64
-userspace configurations. There were no regressions reported over a
-little-endian system.
+This patch ensures that SCTLR_EL{2,1} are configured appropriately at
+boot for kernels of either endianness.
 
-The first patch (from Mark Rutland) clarifies the booting
-requirements, which is needed for a big-endian kernel boot. The bulk
-of the patches fix up issues in the architectural port, with the last
-patch fixing an endianness assumption in the smc91x network driver.
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+---
+ arch/arm64/kernel/head.S |   17 ++++++++++++++---
+ arch/arm64/mm/proc.S     |    4 ++--
+ 2 files changed, 16 insertions(+), 5 deletions(-)
 
-Whilst there is another series of BE patches currently on the list:
-
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204031.html
-
-we believe that our work is both more complete and has been subjected
-to substantial testing effort.
-
-All comments welcome,
-
-Matt
-
-Mark Rutland (1):
-  Docs: arm64: booting: clarify boot requirements
-
-Matthew Leach (6):
-  arm64: compat: correct register concatenation for syscall wrappers
-  arm64: big-endian: don't treat code as data when copying sigret code
-  arm64: asm: add CPU_LE & CPU_BE assembler helpers
-  arm64: head: create a new function for setting the boot_cpu_mode flag
-  arm64: big-endian: set correct endianess on kernel entry
-  arm64: big-endian: write CPU holding pen address as LE
-
-Will Deacon (7):
-  arm64: big-endian: add big-endian support to top-level arch Makefile
-  arm64: big-endian: fix byteorder include
-  arm64: ELF: add support for big-endian executables
-  arm64: setup: report ELF_PLATFORM as the machine for utsname
-  arm64: compat: add support for big-endian (BE8) AArch32 binaries
-  arm64: kconfig: allow CPU_BIG_ENDIAN to be selected
-  net: smc91x: dont't use SMC_outw for fixing up halfword-aligned data
-
- Documentation/arm64/booting.txt         |   45 +++++++++++++++++++---------
- arch/arm64/Kconfig                      |    5 ++++
- arch/arm64/Makefile                     |    6 ++++
- arch/arm64/include/asm/assembler.h      |   31 +++++++++++++++++++
- arch/arm64/include/asm/compat.h         |   14 +++++++++
- arch/arm64/include/asm/elf.h            |   18 ++++++++++++
- arch/arm64/include/asm/processor.h      |    5 ++++
- arch/arm64/include/asm/ptrace.h         |    1 +
- arch/arm64/include/asm/virt.h           |    3 +-
- arch/arm64/include/uapi/asm/byteorder.h |    4 +++
- arch/arm64/kernel/Makefile              |    2 +-
- arch/arm64/kernel/head.S                |   49 ++++++++++++++++++++++++-------
- arch/arm64/kernel/kuser32.S             |   42 ++++++++++++++++++++++++++
- arch/arm64/kernel/setup.c               |    2 +-
- arch/arm64/kernel/signal32.c            |   28 ------------------
- arch/arm64/kernel/smp_spin_table.c      |   11 ++++++-
- arch/arm64/kernel/sys32.S               |   22 +++++++-------
- arch/arm64/kernel/vdso.c                |    5 +++-
- arch/arm64/mm/proc.S                    |    4 +--
- drivers/net/ethernet/smsc/smc91x.h      |    6 ++--
- 20 files changed, 228 insertions(+), 75 deletions(-)
-
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index b3fcdf4..cd0ecb1 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -159,12 +159,22 @@ ENTRY(el2_setup)
+ 	mrs	x0, CurrentEL
+ 	cmp	x0, #PSR_MODE_EL2t
+ 	ccmp	x0, #PSR_MODE_EL2h, #0x4, ne
+-	b.eq	1f
++	b.ne	1f
++	mrs	x0, sctlr_el2
++CPU_BE(	orr	x0, x0, #(1 << 25)	)	// Set the EE bit for EL2
++CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
++	msr	sctlr_el2, x0
++	b	2f
++1:	mrs	x0, sctlr_el1
++CPU_BE(	orr	x0, x0, #(2 << 24)	)	// Set the EE and E0E bits for EL1
++CPU_LE(	bic	x0, x0, #(2 << 24)	)	// Clear the EE and E0E bits for EL1
++	msr	sctlr_el1, x0
+ 	mov	w20, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
++	isb
+ 	ret
+ 
+ 	/* Hyp configuration. */
+-1:	mov	x0, #(1 << 31)			// 64-bit EL1
++2:	mov	x0, #(1 << 31)			// 64-bit EL1
+ 	msr	hcr_el2, x0
+ 
+ 	/* Generic timers. */
+@@ -181,7 +191,8 @@ ENTRY(el2_setup)
+ 
+ 	/* sctlr_el1 */
+ 	mov	x0, #0x0800			// Set/clear RES{1,0} bits
+-	movk	x0, #0x30d0, lsl #16
++CPU_BE(	movk	x0, #0x33d0, lsl #16	)	// Set EE and E0E on BE systems
++CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 	msr	sctlr_el1, x0
+ 
+ 	/* Coprocessor traps. */
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index b1b31bb..421b99f 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -162,9 +162,9 @@ ENDPROC(__cpu_setup)
+ 	 *       CE0      XWHW CZ     ME TEEA S
+ 	 * .... .IEE .... NEAI TE.I ..AD DEN0 ACAM
+ 	 * 0011 0... 1101 ..0. ..0. 10.. .... .... < hardware reserved
+-	 * .... .100 .... 01.1 11.1 ..01 0001 1101 < software settings
++	 * .... .1.. .... 01.1 11.1 ..01 0001 1101 < software settings
+ 	 */
+ 	.type	crval, #object
+ crval:
+-	.word	0x030802e2			// clear
++	.word	0x000802e2			// clear
+ 	.word	0x0405d11d			// set
 -- 
 1.7.9.5
