@@ -1,53 +1,97 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Oct 2013 08:43:53 -0700
-Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
-In-Reply-To: <CACRpkdYJNaiAAHhYatd6g5_wVt0QEUxOvsk6nQn9o=_i5zfWrA@mail.gmail.com>
-References: <20131003054104.8941.88857.stgit@localhost>
- <20131003054221.8941.87801.stgit@localhost>
- <5256AA7F.8030005@ti.com> <20131010160018.GA29913@atomide.com>
- <CACRpkdaG-PQA39XSjKUgM9TyeD7srgm_8s+NazrDKJ0gmNLcwg@mail.gmail.com>
- <20131010162015.GC29913@atomide.com>
- <CACRpkdYF83ghUf60Wmrti53UJ1bWV30GW_P9GjWnsOcZHbsv+Q@mail.gmail.com>
- <5257BD3E.5000707@ti.com>
- <CACRpkdYJNaiAAHhYatd6g5_wVt0QEUxOvsk6nQn9o=_i5zfWrA@mail.gmail.com>
-Message-ID: <20131011154352.GO29913@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Oct 2013 17:44:13 +0200
+Subject: [PATCH v5] gpio: Add MOXA ART GPIO driver
+In-Reply-To: <1381503190-5733-1-git-send-email-jonas.jensen@gmail.com>
+References: <1375103161-12460-1-git-send-email-jonas.jensen@gmail.com>
+ <1381503190-5733-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <CACRpkda23nUF8i03RWePj+dGa9Wj6E1L8vfPMfxvnGkazfKS5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [131011 03:40]:
-> On Fri, Oct 11, 2013 at 10:56 AM, Roger Quadros <rogerq@ti.com> wrote:
-> 
-> > The register handling is fine. But how do we deal with resource handling?
-> > e.g. the block that has the deep-core registers might need to be clocked or powered
-> > before the registers can be accessed.
-> 
-> Yeah I saw this in the code there.
-> 
-> In this case it seems syscon-type regmap access can be used to
-> read/write the registers, so maybe the pin controller also need to
->  get a handle on some clock etc?
+On Fri, Oct 11, 2013 at 4:53 PM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
 
-Uhh, let's not go there.. The resource availability needs to be
-handled transparently in regmap code and the reg provider hardware
-module driver using runtime PM.
+>     I agree it is a bit strange GPIO control is divided in two
+>     separate registers. Unfortunately I can't offer an explanation
+>     because the documentation is not publicly available.
+>
+>     The register responsible for doing enable/disable is located
+>     at <0x98100100 0x4>, the clock register is very close at
+>     <0x98100000 0x34>.
 
-> The general idea is however that large monolitic "drivers" for a
-> certain IO-range such as arch/arm/mach-omap2/prm3xxx.c
-> doesn't scale - we saw this with the Ux500 PRCMU driver in
-> mfd/* to the point that our patches to extend it were NACK:ed
-> until we refactor it. This stuff in mach-omap2 is in the same bad
-> design pattern, and need to get out of it.
-> 
-> The approach chosen for the Ux500 PRCMU was to distribute
-> out the driver into the places where it's actually used, like the
-> clock driver etc. The accessor functions to do some stuff over
-> in the PRCMU was just adding a layer of cruft.
+If we don't know we have to guess.
 
-Yes I'm all in favor of having a minimal PRM core driver that manages
-resources and provides register access services in a controlled way
-to it's client drivers. As long as the emphasis is "in a controlled
-way".
+This layout makes me think that the IO-window at 0x98100000 is
+a power-clock-and-reset controller. It contains some register
+to latch the pins enable/disable them, or if this is even a clock
+gate? Are you sure about this? Is it now a gated clock, simply,
+so that this bit should be handled in the clock driver, i.e.
+this bit gets set by clk_enable() from the GPIO driver?
 
-Regards,
+I am very suspicious about this especially since the GPIO
+driver is lacking clk_get() and friends.
 
-Tony
+If it's not a clock gate, and you are convinced that you must still
+reach out into this range I think you want something like this:
+
+syscon: syscon at 98100000 {
+                compatible = "syscon";
+                reg = <0x98100000 0x1000>;
+};
+
+gpio: gpio at 98700000 {
+               gpio-controller;
+               #gpio-cells = <2>;
+               syscon = <&syscon>;
+               compatible = "moxa,moxart-gpio";
+               reg =   <0x98700000 0xC>,
+                       <0x98100100 0x4>;
+};
+
+Then the driver can use something like:
+
+        struct device_node *np = pdev->dev.of_node;
+        struct device_node *syscon_np;
+        struct regmap *regmap;
+        int err;
+
+        syscon_np = of_parse_phandle(np, "syscon", 0);
+        if (!syscon_np) {
+                pr_crit("no syscon node\n");
+                return -ENODEV;
+        }
+        regmap = syscon_node_to_regmap(syscon_np);
+        if (!regmap) {
+                pr_crit("could not locate syscon regmap\n");
+                return -ENODEV;
+        }
+
+Then update the registers using regmap_update_bits() and
+friends.
+
+>     I don't think gpio_poweroff driver is right for this hardware
+>     because the pin is not connected to anything that can do reset.
+>     The old 2.6.9 kernel driver uses timer poll with eventual call
+>     to userspace.
+>
+>     To test that it works, I added gpio_poweroff anyway, modified
+>     with gpio_export() the pin can then be seen switching between
+>     0 and 1 (on "cat /sys/class/gpio/gpio25/value").
+
+Hmmmm not quite following this...
+
+> +Required properties:
+> +
+> +- #gpio-cells : Should be 2, The first cell is the pin number and
+> +               the second cell is used to specify polarity:
+> +                       0 = active high
+> +                       1 = active low
+
+Could reference <dt-bindings/gpio/gpio.h> I guess?
+
+Oh well, no big deal.
+
+The driver as such is looking nice but now I strongly suspect
+it should clk_get/clk_prepare/clk_enable ... etc.
+
+Yours,
+Linus Walleij
