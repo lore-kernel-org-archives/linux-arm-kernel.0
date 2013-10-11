@@ -1,131 +1,220 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 11 Oct 2013 19:15:34 +0300
-Subject: [PATCH 04/11] ARM: OMAP3: CM/control: move CM scratchpad save to CM
- driver
+Date: Fri, 11 Oct 2013 19:15:40 +0300
+Subject: [PATCH 10/11] ARM: OMAP3: PRM: move PRCM interrupt handler helper to
+ PRM driver
 In-Reply-To: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
 References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381508141-15244-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1381508141-15244-11-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP3 PM code for off-mode currently saves the scratchpad contents for CM
-registers within OMAP control module driver. However, as we are separating
-CM code into its own driver, this must be moved also. This patch adds a
-new API for saving the CM scratchpad contents and uses this from the high
-level scratchpad save function.
+PM core code should not directly access PRM registers. Thus move the
+PRCM interrupt handler helper out of the core PM code to PRM driver,
+and use the new API from the core.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm3xxx.c  |   22 +++++++++++++++++++++
- arch/arm/mach-omap2/cm3xxx.h  |    1 +
- arch/arm/mach-omap2/control.c |   43 ++++-------------------------------------
- 3 files changed, 27 insertions(+), 39 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c  |   65 ++-------------------------------
+ arch/arm/mach-omap2/prm3xxx.c |   79 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm3xxx.h |    2 ++
+ 3 files changed, 83 insertions(+), 63 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index 9061c30..f6f0288 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -636,6 +636,28 @@ void omap3_cm_restore_context(void)
- 			       OMAP3_CM_CLKOUT_CTRL_OFFSET);
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 4320541..6a5302a 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -132,60 +132,11 @@ static void omap3_save_secure_ram_context(void)
+ 	}
  }
  
-+void omap3_cm_save_scratchpad_contents(u32 *ptr)
-+{
-+	*ptr++ = omap2_cm_read_mod_reg(CORE_MOD, CM_CLKSEL);
-+	*ptr++ = omap2_cm_read_mod_reg(WKUP_MOD, CM_CLKSEL);
-+	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
-+
-+	/*
-+	 * As per erratum i671, ROM code does not respect the PER DPLL
-+	 * programming scheme if CM_AUTOIDLE_PLL..AUTO_PERIPH_DPLL == 1.
-+	 * Then,  in anycase, clear these bits to avoid extra latencies.
-+	 */
-+	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE) &
-+		~OMAP3430_AUTO_PERIPH_DPLL_MASK;
-+	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL1_PLL);
-+	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL2_PLL);
-+	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL3);
-+	*ptr++ = omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKEN_PLL);
-+	*ptr++ = omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_AUTOIDLE_PLL);
-+	*ptr++ = omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKSEL1_PLL);
-+	*ptr++ = omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKSEL2_PLL);
-+}
-+
- /*
-  *
-  */
-diff --git a/arch/arm/mach-omap2/cm3xxx.h b/arch/arm/mach-omap2/cm3xxx.h
-index e8e146f..8224c91 100644
---- a/arch/arm/mach-omap2/cm3xxx.h
-+++ b/arch/arm/mach-omap2/cm3xxx.h
-@@ -83,6 +83,7 @@ extern int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
+-/*
+- * PRCM Interrupt Handler Helper Function
+- *
+- * The purpose of this function is to clear any wake-up events latched
+- * in the PRCM PM_WKST_x registers. It is possible that a wake-up event
+- * may occur whilst attempting to clear a PM_WKST_x register and thus
+- * set another bit in this register. A while loop is used to ensure
+- * that any peripheral wake-up events occurring while attempting to
+- * clear the PM_WKST_x are detected and cleared.
+- */
+-static int prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
+-{
+-	u32 wkst, fclk, iclk, clken;
+-	u16 wkst_off = (regs == 3) ? OMAP3430ES2_PM_WKST3 : PM_WKST1;
+-	u16 grpsel_off = (regs == 3) ?
+-		OMAP3430ES2_PM_MPUGRPSEL3 : OMAP3430_PM_MPUGRPSEL;
+-	int c = 0;
+-
+-	wkst = omap2_prm_read_mod_reg(module, wkst_off);
+-	wkst &= omap2_prm_read_mod_reg(module, grpsel_off);
+-	wkst &= ~ignore_bits;
+-	if (wkst) {
+-		iclk = omap3_cm_read_module_clken(module, regs, false);
+-		fclk = omap3_cm_read_module_clken(module, regs, true);
+-		while (wkst) {
+-			clken = wkst;
+-			omap3_cm_write_module_clken(module, regs, false,
+-						    iclk | clken);
+-			/*
+-			 * For USBHOST, we don't know whether HOST1 or
+-			 * HOST2 woke us up, so enable both f-clocks
+-			 */
+-			if (module == OMAP3430ES2_USBHOST_MOD)
+-				clken |= 1 << OMAP3430ES2_EN_USBHOST2_SHIFT;
+-			omap3_cm_write_module_clken(module, regs, true,
+-						    fclk | clken);
+-			omap2_prm_write_mod_reg(wkst, module, wkst_off);
+-			wkst = omap2_prm_read_mod_reg(module, wkst_off);
+-			wkst &= ~ignore_bits;
+-			c++;
+-		}
+-		omap3_cm_write_module_clken(module, regs, false, iclk);
+-		omap3_cm_write_module_clken(module, regs, true, fclk);
+-	}
+-
+-	return c;
+-}
+-
+ static irqreturn_t _prcm_int_handle_io(int irq, void *unused)
+ {
+ 	int c;
  
- extern void omap3_cm_save_context(void);
- extern void omap3_cm_restore_context(void);
-+extern void omap3_cm_save_scratchpad_contents(u32 *ptr);
+-	c = prcm_clear_mod_irqs(WKUP_MOD, 1,
+-		~(OMAP3430_ST_IO_MASK | OMAP3430_ST_IO_CHAIN_MASK));
++	c = omap3_prcm_clear_io_irq();
  
- extern int __init omap3xxx_cm_init(void);
+ 	return c ? IRQ_HANDLED : IRQ_NONE;
+ }
+@@ -194,19 +145,7 @@ static irqreturn_t _prcm_int_handle_wakeup(int irq, void *unused)
+ {
+ 	int c;
  
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index 31e0dfe..a597114 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -46,17 +46,7 @@ struct omap3_scratchpad {
- struct omap3_scratchpad_prcm_block {
- 	u32 prm_clksrc_ctrl;
- 	u32 prm_clksel;
--	u32 cm_clksel_core;
--	u32 cm_clksel_wkup;
--	u32 cm_clken_pll;
--	u32 cm_autoidle_pll;
--	u32 cm_clksel1_pll;
--	u32 cm_clksel2_pll;
--	u32 cm_clksel3_pll;
--	u32 cm_clken_pll_mpu;
--	u32 cm_autoidle_pll_mpu;
--	u32 cm_clksel1_pll_mpu;
--	u32 cm_clksel2_pll_mpu;
-+	u32 cm_contents[11];
- 	u32 prcm_block_size;
+-	/*
+-	 * Clear all except ST_IO and ST_IO_CHAIN for wkup module,
+-	 * these are handled in a separate handler to avoid acking
+-	 * IO events before parsing in mux code
+-	 */
+-	c = prcm_clear_mod_irqs(WKUP_MOD, 1,
+-		OMAP3430_ST_IO_MASK | OMAP3430_ST_IO_CHAIN_MASK);
+-	c += prcm_clear_mod_irqs(CORE_MOD, 1, 0);
+-	c += prcm_clear_mod_irqs(OMAP3430_PER_MOD, 1, 0);
+-	if (omap_rev() > OMAP3430_REV_ES1_0) {
+-		c += prcm_clear_mod_irqs(CORE_MOD, 3, 0);
+-		c += prcm_clear_mod_irqs(OMAP3430ES2_USBHOST_MOD, 1, 0);
+-	}
++	c = omap3_prcm_clear_wkup_irq();
+ 
+ 	return c ? IRQ_HANDLED : IRQ_NONE;
+ }
+diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
+index 3813e9a..50177e9 100644
+--- a/arch/arm/mach-omap2/prm3xxx.c
++++ b/arch/arm/mach-omap2/prm3xxx.c
+@@ -27,6 +27,7 @@
+ #include "cm2xxx_3xxx.h"
+ #include "prm-regbits-34xx.h"
+ #include "cm3xxx.h"
++#include "cm-regbits-34xx.h"
+ #include "control.h"
+ 
+ static const struct omap_prcm_irq omap3_prcm_irqs[] = {
+@@ -399,6 +400,84 @@ struct pwrdm_ops omap3_pwrdm_operations = {
  };
  
-@@ -347,34 +337,9 @@ void omap3_save_scratchpad_contents(void)
- 	prcm_block_contents.prm_clksel =
- 		omap2_prm_read_mod_reg(OMAP3430_CCR_MOD,
- 				       OMAP3_PRM_CLKSEL_OFFSET);
--	prcm_block_contents.cm_clksel_core =
--			omap2_cm_read_mod_reg(CORE_MOD, CM_CLKSEL);
--	prcm_block_contents.cm_clksel_wkup =
--			omap2_cm_read_mod_reg(WKUP_MOD, CM_CLKSEL);
--	prcm_block_contents.cm_clken_pll =
--			omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
--	/*
--	 * As per erratum i671, ROM code does not respect the PER DPLL
--	 * programming scheme if CM_AUTOIDLE_PLL..AUTO_PERIPH_DPLL == 1.
--	 * Then,  in anycase, clear these bits to avoid extra latencies.
--	 */
--	prcm_block_contents.cm_autoidle_pll =
--			omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE) &
--			~OMAP3430_AUTO_PERIPH_DPLL_MASK;
--	prcm_block_contents.cm_clksel1_pll =
--			omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL1_PLL);
--	prcm_block_contents.cm_clksel2_pll =
--			omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL2_PLL);
--	prcm_block_contents.cm_clksel3_pll =
--			omap2_cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL3);
--	prcm_block_contents.cm_clken_pll_mpu =
--			omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKEN_PLL);
--	prcm_block_contents.cm_autoidle_pll_mpu =
--			omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_AUTOIDLE_PLL);
--	prcm_block_contents.cm_clksel1_pll_mpu =
--			omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKSEL1_PLL);
--	prcm_block_contents.cm_clksel2_pll_mpu =
--			omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKSEL2_PLL);
+ /**
++ * omap3_prcm_clear_mod_irqs: PRCM interrupt handler helper function
++ * @module: module offset
++ * @regs: register index
++ * @ignore_bits: bit-mask to ignore while checking wakeup status
++ *
++ * The purpose of this function is to clear any wake-up events latched
++ * in the PRCM PM_WKST_x registers. It is possible that a wake-up event
++ * may occur whilst attempting to clear a PM_WKST_x register and thus
++ * set another bit in this register. A while loop is used to ensure
++ * that any peripheral wake-up events occurring while attempting to
++ * clear the PM_WKST_x are detected and cleared.
++ */
++static int omap3_prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
++{
++	u32 wkst, fclk, iclk, clken;
++	u16 wkst_off = (regs == 3) ? OMAP3430ES2_PM_WKST3 : PM_WKST1;
++	u16 grpsel_off = (regs == 3) ?
++		OMAP3430ES2_PM_MPUGRPSEL3 : OMAP3430_PM_MPUGRPSEL;
++	int c = 0;
 +
-+	omap3_cm_save_scratchpad_contents(prcm_block_contents.cm_contents);
++	wkst = omap2_prm_read_mod_reg(module, wkst_off);
++	wkst &= omap2_prm_read_mod_reg(module, grpsel_off);
++	wkst &= ~ignore_bits;
++	if (wkst) {
++		iclk = omap3_cm_read_module_clken(module, regs, false);
++		fclk = omap3_cm_read_module_clken(module, regs, true);
++		while (wkst) {
++			clken = wkst;
++			omap3_cm_write_module_clken(module, regs, false,
++						    iclk | clken);
++			/*
++			 * For USBHOST, we don't know whether HOST1 or
++			 * HOST2 woke us up, so enable both f-clocks
++			 */
++			if (module == OMAP3430ES2_USBHOST_MOD)
++				clken |= 1 << OMAP3430ES2_EN_USBHOST2_SHIFT;
++			omap3_cm_write_module_clken(module, regs, true,
++						    fclk | clken);
++			omap2_prm_write_mod_reg(wkst, module, wkst_off);
++			wkst = omap2_prm_read_mod_reg(module, wkst_off);
++			wkst &= ~ignore_bits;
++			c++;
++		}
++		omap3_cm_write_module_clken(module, regs, false, iclk);
++		omap3_cm_write_module_clken(module, regs, true, fclk);
++	}
 +
- 	prcm_block_contents.prcm_block_size = 0x0;
++	return c;
++}
++
++int omap3_prcm_clear_io_irq(void)
++{
++	return omap3_prcm_clear_mod_irqs(WKUP_MOD, 1,
++		~(OMAP3430_ST_IO_MASK | OMAP3430_ST_IO_CHAIN_MASK));
++}
++
++int omap3_prcm_clear_wkup_irq(void)
++{
++	int c;
++
++	/*
++	 * Clear all except ST_IO and ST_IO_CHAIN for wkup module,
++	 * these are handled in a separate handler to avoid acking
++	 * IO events before parsing in mux code
++	 */
++	c = omap3_prcm_clear_mod_irqs(WKUP_MOD, 1,
++		OMAP3430_ST_IO_MASK | OMAP3430_ST_IO_CHAIN_MASK);
++	c += omap3_prcm_clear_mod_irqs(CORE_MOD, 1, 0);
++	c += omap3_prcm_clear_mod_irqs(OMAP3430_PER_MOD, 1, 0);
++	if (omap_rev() > OMAP3430_REV_ES1_0) {
++		c += omap3_prcm_clear_mod_irqs(CORE_MOD, 3, 0);
++		c += omap3_prcm_clear_mod_irqs(OMAP3430ES2_USBHOST_MOD, 1, 0);
++	}
++
++	return c;
++}
++
++/**
+  * omap3_prcm_force_idle_iva: ensure IVA is in idle so it can be put into
+  *                           retention
+  *
+diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
+index 1befb23..c7d1616 100644
+--- a/arch/arm/mach-omap2/prm3xxx.h
++++ b/arch/arm/mach-omap2/prm3xxx.h
+@@ -154,6 +154,8 @@ extern void omap3xxx_prm_restore_irqen(u32 *saved_mask);
  
- 	/* Populate the SDRC block contents */
+ extern void omap3xxx_prm_dpll3_reset(void);
+ 
++extern int omap3_prcm_clear_io_irq(void);
++extern int omap3_prcm_clear_wkup_irq(void);
+ extern void omap3_prm_force_idle_iva(void);
+ 
+ extern int __init omap3xxx_prm_init(void);
 -- 
 1.7.9.5
