@@ -1,123 +1,163 @@
 From: matthew.leach@arm.com (Matthew Leach)
-Date: Fri, 11 Oct 2013 14:52:16 +0100
-Subject: [PATCH 10/14] arm64: head: create a new function for setting the
- boot_cpu_mode flag
+Date: Fri, 11 Oct 2013 14:52:14 +0100
+Subject: [PATCH 08/14] arm64: big-endian: don't treat code as data when
+ copying sigret code
 In-Reply-To: <1381499540-28794-1-git-send-email-matthew.leach@arm.com>
 References: <1381499540-28794-1-git-send-email-matthew.leach@arm.com>
-Message-ID: <1381499540-28794-11-git-send-email-matthew.leach@arm.com>
+Message-ID: <1381499540-28794-9-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the code for setting the __cpu_boot_mode flag is munged in
-with el2_setup. This makes things difficult on a BE bringup as a
-memory access has to have occurred before el2_setup which is the place
-that we'd like to set the endianess on the current EL.
+Currently the sigreturn compat code is copied to an offset in the
+vectors table. When using a BE kernel this data will be stored in the
+wrong endianess so when returning from a signal on a 32-bit BE system,
+arbitrary code will be executed.
 
-Create a new function for setting __cpu_boot_mode and have el2_setup
-return the mode the CPU. Also define a new constant in virt.h,
-BOOT_CPU_MODE_EL1, for readability.
+Instead of declaring the code inside a struct and copying that, use
+the assembler's .byte directives to store the code in the correct
+endianess regardless of platform endianess.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Matthew Leach <matthew.leach@arm.com>
 ---
- arch/arm64/include/asm/virt.h |    3 ++-
- arch/arm64/kernel/head.S      |   34 +++++++++++++++++++++++++---------
- 2 files changed, 27 insertions(+), 10 deletions(-)
+ arch/arm64/kernel/Makefile   |    2 +-
+ arch/arm64/kernel/kuser32.S  |   42 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/signal32.c |   28 ----------------------------
+ arch/arm64/kernel/vdso.c     |    5 ++++-
+ 4 files changed, 47 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 26e310c..130e2be 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -18,7 +18,8 @@
- #ifndef __ASM__VIRT_H
- #define __ASM__VIRT_H
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 7b4b564..7d45ad7 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -11,7 +11,7 @@ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+ 			   hyp-stub.o psci.o
  
--#define BOOT_CPU_MODE_EL2	(0x0e12b007)
-+#define BOOT_CPU_MODE_EL1	(0xe11)
-+#define BOOT_CPU_MODE_EL2	(0xe12)
- 
- #ifndef __ASSEMBLY__
- #include <asm/cacheflush.h>
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 7090c12..b3fcdf4 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -123,8 +123,9 @@
- 
- ENTRY(stext)
- 	mov	x21, x0				// x21=FDT
-+	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
- 	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
--	bl	el2_setup			// Drop to EL1
-+	bl	set_cpu_boot_mode_flag
- 	mrs	x22, midr_el1			// x22=cpuid
- 	mov	x0, x22
- 	bl	lookup_processor_type
-@@ -150,21 +151,20 @@ ENDPROC(stext)
- /*
-  * If we're fortunate enough to boot at EL2, ensure that the world is
-  * sane before dropping to EL1.
-+ *
-+ * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
-+ * booted in EL1 or EL2 respectively.
+-arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
++arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o  	\
+ 					   sys_compat.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o smp_psci.o
+diff --git a/arch/arm64/kernel/kuser32.S b/arch/arm64/kernel/kuser32.S
+index 8b69ecb..1e4905d 100644
+--- a/arch/arm64/kernel/kuser32.S
++++ b/arch/arm64/kernel/kuser32.S
+@@ -27,6 +27,9 @@
+  *
+  * See Documentation/arm/kernel_user_helpers.txt for formal definitions.
   */
- ENTRY(el2_setup)
- 	mrs	x0, CurrentEL
- 	cmp	x0, #PSR_MODE_EL2t
- 	ccmp	x0, #PSR_MODE_EL2h, #0x4, ne
--	ldr	x0, =__boot_cpu_mode		// Compute __boot_cpu_mode
--	add	x0, x0, x28
- 	b.eq	1f
--	str	wzr, [x0]			// Remember we don't have EL2...
-+	mov	w20, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
- 	ret
- 
- 	/* Hyp configuration. */
--1:	ldr	w1, =BOOT_CPU_MODE_EL2
--	str	w1, [x0, #4]			// This CPU has EL2
--	mov	x0, #(1 << 31)			// 64-bit EL1
-+1:	mov	x0, #(1 << 31)			// 64-bit EL1
- 	msr	hcr_el2, x0
- 
- 	/* Generic timers. */
-@@ -204,10 +204,25 @@ ENTRY(el2_setup)
- 		      PSR_MODE_EL1h)
- 	msr	spsr_el2, x0
- 	msr	elr_el2, lr
-+	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
- 	eret
- ENDPROC(el2_setup)
- 
- /*
-+ * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
-+ * in x20. See arch/arm64/include/asm/virt.h for more info.
-+ */
-+ENTRY(set_cpu_boot_mode_flag)
-+	ldr	x1, =__boot_cpu_mode		// Compute __boot_cpu_mode
-+	add	x1, x1, x28
-+	cmp	w20, #BOOT_CPU_MODE_EL2
-+	b.ne	1f
-+	add	x1, x1, #4
-+1:	str	w20, [x1]			// This CPU has booted in EL1
-+	ret
-+ENDPROC(set_cpu_boot_mode_flag)
++
++#include <asm/unistd32.h>
++
+ 	.align	5
+ 	.globl	__kuser_helper_start
+ __kuser_helper_start:
+@@ -75,3 +78,42 @@ __kuser_helper_version:			// 0xffff0ffc
+ 	.word	((__kuser_helper_end - __kuser_helper_start) >> 5)
+ 	.globl	__kuser_helper_end
+ __kuser_helper_end:
 +
 +/*
-  * We need to find out the CPU boot mode long after boot, so we need to
-  * store it in a writable variable.
-  *
-@@ -235,8 +250,9 @@ ENTRY(__boot_cpu_mode)
- 	 * cores are held until we're ready for them to initialise.
- 	 */
- ENTRY(secondary_holding_pen)
--	bl	__calc_phys_offset		// x24=phys offset
--	bl	el2_setup			// Drop to EL1
-+	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
-+	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
-+	bl	set_cpu_boot_mode_flag
- 	mrs	x0, mpidr_el1
- 	ldr     x1, =MPIDR_HWID_BITMASK
- 	and	x0, x0, x1
++ * AArch32 sigreturn code
++ *
++ * For ARM syscalls, the syscall number has to be loaded into r7.
++ * We do not support an OABI userspace.
++ *
++ * For Thumb syscalls, we also pass the syscall number via r7. We therefore
++ * need two 16-bit instructions.
++ */
++	.globl __aarch32_sigret_code_start
++__aarch32_sigret_code_start:
++
++	/*
++	 * ARM Code
++	 */
++	.byte	__NR_compat_sigreturn, 0x70, 0xa0, 0xe3	// mov	r7, #__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0x00, 0x00, 0xef	// svc	#__NR_compat_sigreturn
++
++	/*
++	 * Thumb code
++	 */
++	.byte	__NR_compat_sigreturn, 0x27			// svc	#__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0xdf			// mov	r7, #__NR_compat_sigreturn
++
++	/*
++	 * ARM code
++	 */
++	.byte	__NR_compat_rt_sigreturn, 0x70, 0xa0, 0xe3	// mov	r7, #__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0x00, 0x00, 0xef	// svc	#__NR_compat_rt_sigreturn
++
++	/*
++	 * Thumb code
++	 */
++	.byte	__NR_compat_rt_sigreturn, 0x27			// svc	#__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0xdf			// mov	r7, #__NR_compat_rt_sigreturn
++
++        .globl __aarch32_sigret_code_end
++__aarch32_sigret_code_end:
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index e393174..e8772c0 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -100,34 +100,6 @@ struct compat_rt_sigframe {
+ 
+ #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
+ 
+-/*
+- * For ARM syscalls, the syscall number has to be loaded into r7.
+- * We do not support an OABI userspace.
+- */
+-#define MOV_R7_NR_SIGRETURN	(0xe3a07000 | __NR_compat_sigreturn)
+-#define SVC_SYS_SIGRETURN	(0xef000000 | __NR_compat_sigreturn)
+-#define MOV_R7_NR_RT_SIGRETURN	(0xe3a07000 | __NR_compat_rt_sigreturn)
+-#define SVC_SYS_RT_SIGRETURN	(0xef000000 | __NR_compat_rt_sigreturn)
+-
+-/*
+- * For Thumb syscalls, we also pass the syscall number via r7. We therefore
+- * need two 16-bit instructions.
+- */
+-#define SVC_THUMB_SIGRETURN	(((0xdf00 | __NR_compat_sigreturn) << 16) | \
+-				   0x2700 | __NR_compat_sigreturn)
+-#define SVC_THUMB_RT_SIGRETURN	(((0xdf00 | __NR_compat_rt_sigreturn) << 16) | \
+-				   0x2700 | __NR_compat_rt_sigreturn)
+-
+-const compat_ulong_t aarch32_sigret_code[6] = {
+-	/*
+-	 * AArch32 sigreturn code.
+-	 * We don't construct an OABI SWI - instead we just set the imm24 field
+-	 * to the EABI syscall number so that we create a sane disassembly.
+-	 */
+-	MOV_R7_NR_SIGRETURN,    SVC_SYS_SIGRETURN,    SVC_THUMB_SIGRETURN,
+-	MOV_R7_NR_RT_SIGRETURN, SVC_SYS_RT_SIGRETURN, SVC_THUMB_RT_SIGRETURN,
+-};
+-
+ static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
+ {
+ 	compat_sigset_t	cset;
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index 6a389dc..65d40cf 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -58,7 +58,10 @@ static struct page *vectors_page[1];
+ static int alloc_vectors_page(void)
+ {
+ 	extern char __kuser_helper_start[], __kuser_helper_end[];
++	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
++
+ 	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
++	int sigret_sz = __aarch32_sigret_code_end - __aarch32_sigret_code_start;
+ 	unsigned long vpage;
+ 
+ 	vpage = get_zeroed_page(GFP_ATOMIC);
+@@ -72,7 +75,7 @@ static int alloc_vectors_page(void)
+ 
+ 	/* sigreturn code */
+ 	memcpy((void *)vpage + AARCH32_KERN_SIGRET_CODE_OFFSET,
+-		aarch32_sigret_code, sizeof(aarch32_sigret_code));
++               __aarch32_sigret_code_start, sigret_sz);
+ 
+ 	flush_icache_range(vpage, vpage + PAGE_SIZE);
+ 	vectors_page[0] = virt_to_page(vpage);
 -- 
 1.7.9.5
