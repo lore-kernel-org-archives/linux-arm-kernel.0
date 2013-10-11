@@ -1,124 +1,88 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 11 Oct 2013 19:15:35 +0300
-Subject: [PATCH 05/11] ARM: OMAP3: CM/PM: add API for accessing module clock
- enable registers
+Date: Fri, 11 Oct 2013 19:15:36 +0300
+Subject: [PATCH 06/11] ARM: OMAP3: CM/PM: add API for forcing IVA2 clk
+ enable/disable
 In-Reply-To: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
 References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381508141-15244-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1381508141-15244-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PRCM chain handler needs these to properly acknowledge wakeup events.
-Currently this functionality is implemented as direct register accesses,
-but as the CM code should eventually move to its own driver, separate
-API calls are now added for this purpose. PM core code is also changed
-to use these APIs.
+OMAP3 PM code directly writes to CM register space to enable/disable IVA2
+clock during boot during the IVA2 reset. Direct access shall be avoided,
+thus implement an API call for this, and change the PM core to use this.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm3xxx.c |   28 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/cm3xxx.h |    2 ++
- arch/arm/mach-omap2/pm34xx.c |   16 ++++++++--------
- 3 files changed, 38 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/cm3xxx.c |   10 ++++++++++
+ arch/arm/mach-omap2/cm3xxx.h |    1 +
+ arch/arm/mach-omap2/pm34xx.c |    7 +++----
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index f6f0288..f13742b 100644
+index f13742b..55bf939 100644
 --- a/arch/arm/mach-omap2/cm3xxx.c
 +++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -658,6 +658,34 @@ void omap3_cm_save_scratchpad_contents(u32 *ptr)
- 	*ptr++ = omap2_cm_read_mod_reg(MPU_MOD, OMAP3430_CM_CLKSEL2_PLL);
+@@ -686,6 +686,16 @@ u32 omap3_cm_write_module_clken(s16 module, u8 regs, bool fck, u32 val)
+ 	return omap3_cm_access_module_clken(module, regs, fck, val, true);
  }
  
-+static u32 omap3_cm_access_module_clken(s16 module, u8 regs, bool fck, u32 val,
-+					bool write)
++void omap3_cm_force_iva_clk(bool enable)
 +{
-+	u16 offset;
++	u32 val = 0;
 +
-+	if (fck)
-+		offset = (regs == 3) ? OMAP3430ES2_CM_FCLKEN3 : CM_FCLKEN1;
-+	else
-+		offset = (regs == 3) ? CM_ICLKEN3 : CM_ICLKEN1;
++	if (enable)
++		val = OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK;
 +
-+	if (write)
-+		omap2_cm_write_mod_reg(val, module, offset);
-+	else
-+		val = omap2_cm_read_mod_reg(module, offset);
-+
-+	return val;
-+}
-+
-+u32 omap3_cm_read_module_clken(s16 module, u8 regs, bool fck)
-+{
-+	return omap3_cm_access_module_clken(module, regs, fck, 0, false);
-+}
-+
-+u32 omap3_cm_write_module_clken(s16 module, u8 regs, bool fck, u32 val)
-+{
-+	return omap3_cm_access_module_clken(module, regs, fck, val, true);
++	omap2_cm_write_mod_reg(val, OMAP3430_IVA2_MOD, CM_FCLKEN);
 +}
 +
  /*
   *
   */
 diff --git a/arch/arm/mach-omap2/cm3xxx.h b/arch/arm/mach-omap2/cm3xxx.h
-index 8224c91..2481781 100644
+index 2481781..61fdfc7 100644
 --- a/arch/arm/mach-omap2/cm3xxx.h
 +++ b/arch/arm/mach-omap2/cm3xxx.h
-@@ -84,6 +84,8 @@ extern int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
- extern void omap3_cm_save_context(void);
- extern void omap3_cm_restore_context(void);
+@@ -86,6 +86,7 @@ extern void omap3_cm_restore_context(void);
  extern void omap3_cm_save_scratchpad_contents(u32 *ptr);
-+extern u32 omap3_cm_write_module_clken(s16 module, u8 regs, bool fck, u32 val);
-+extern u32 omap3_cm_read_module_clken(s16 module, u8 regs, bool fck);
+ extern u32 omap3_cm_write_module_clken(s16 module, u8 regs, bool fck, u32 val);
+ extern u32 omap3_cm_read_module_clken(s16 module, u8 regs, bool fck);
++extern void omap3_cm_force_iva_clk(bool enable);
  
  extern int __init omap3xxx_cm_init(void);
  
 diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 5a2d803..f3ba439 100644
+index f3ba439..ede058a 100644
 --- a/arch/arm/mach-omap2/pm34xx.c
 +++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -146,8 +146,6 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
+@@ -412,7 +412,7 @@ restore:
+ static void __init omap3_iva_idle(void)
  {
- 	u32 wkst, fclk, iclk, clken;
- 	u16 wkst_off = (regs == 3) ? OMAP3430ES2_PM_WKST3 : PM_WKST1;
--	u16 fclk_off = (regs == 3) ? OMAP3430ES2_CM_FCLKEN3 : CM_FCLKEN1;
--	u16 iclk_off = (regs == 3) ? CM_ICLKEN3 : CM_ICLKEN1;
- 	u16 grpsel_off = (regs == 3) ?
- 		OMAP3430ES2_PM_MPUGRPSEL3 : OMAP3430_PM_MPUGRPSEL;
- 	int c = 0;
-@@ -156,25 +154,27 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
- 	wkst &= omap2_prm_read_mod_reg(module, grpsel_off);
- 	wkst &= ~ignore_bits;
- 	if (wkst) {
--		iclk = omap2_cm_read_mod_reg(module, iclk_off);
--		fclk = omap2_cm_read_mod_reg(module, fclk_off);
-+		iclk = omap3_cm_read_module_clken(module, regs, false);
-+		fclk = omap3_cm_read_module_clken(module, regs, true);
- 		while (wkst) {
- 			clken = wkst;
--			omap2_cm_set_mod_reg_bits(clken, module, iclk_off);
-+			omap3_cm_write_module_clken(module, regs, false,
-+						    iclk | clken);
- 			/*
- 			 * For USBHOST, we don't know whether HOST1 or
- 			 * HOST2 woke us up, so enable both f-clocks
- 			 */
- 			if (module == OMAP3430ES2_USBHOST_MOD)
- 				clken |= 1 << OMAP3430ES2_EN_USBHOST2_SHIFT;
--			omap2_cm_set_mod_reg_bits(clken, module, fclk_off);
-+			omap3_cm_write_module_clken(module, regs, true,
-+						    fclk | clken);
- 			omap2_prm_write_mod_reg(wkst, module, wkst_off);
- 			wkst = omap2_prm_read_mod_reg(module, wkst_off);
- 			wkst &= ~ignore_bits;
- 			c++;
- 		}
--		omap2_cm_write_mod_reg(iclk, module, iclk_off);
--		omap2_cm_write_mod_reg(fclk, module, fclk_off);
-+		omap3_cm_write_module_clken(module, regs, false, iclk);
-+		omap3_cm_write_module_clken(module, regs, true, fclk);
- 	}
+ 	/* ensure IVA2 clock is disabled */
+-	omap2_cm_write_mod_reg(0, OMAP3430_IVA2_MOD, CM_FCLKEN);
++	omap3_cm_force_iva_clk(false);
  
- 	return c;
+ 	/* if no clock activity, nothing else to do */
+ 	if (!(omap2_cm_read_mod_reg(OMAP3430_IVA2_MOD, OMAP3430_CM_CLKSTST) &
+@@ -426,8 +426,7 @@ static void __init omap3_iva_idle(void)
+ 			  OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+ 
+ 	/* Enable IVA2 clock */
+-	omap2_cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK,
+-			 OMAP3430_IVA2_MOD, CM_FCLKEN);
++	omap3_cm_force_iva_clk(true);
+ 
+ 	/* Set IVA2 boot mode to 'idle' */
+ 	omap_ctrl_writel(OMAP3_IVA2_BOOTMOD_IDLE,
+@@ -437,7 +436,7 @@ static void __init omap3_iva_idle(void)
+ 	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+ 
+ 	/* Disable IVA2 clock */
+-	omap2_cm_write_mod_reg(0, OMAP3430_IVA2_MOD, CM_FCLKEN);
++	omap3_cm_force_iva_clk(false);
+ 
+ 	/* Reset IVA2 */
+ 	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
 -- 
 1.7.9.5
