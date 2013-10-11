@@ -1,107 +1,61 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 11 Oct 2013 17:00:51 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: hwmod changes for v3.13
-Message-ID: <alpine.DEB.2.02.1310111659500.27397@utopia.booyaka.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Oct 2013 18:14:46 +0100
+Subject: [RFC v2 PATCH 2/4] ARM64: add support for kernel mode NEON in
+ atomic context
+In-Reply-To: <1381344634-14917-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1381344634-14917-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1381344634-14917-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20131011171446.GA18859@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Wed, Oct 09, 2013 at 07:50:32PM +0100, Ard Biesheuvel wrote:
+> --- a/arch/arm64/include/asm/neon.h
+> +++ b/arch/arm64/include/asm/neon.h
+> @@ -8,7 +8,38 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/hardirq.h>
+> +#include <linux/types.h>
+> +#include <asm/fpsimd.h>
+> +
+>  #define cpu_has_neon()		(1)
+>  
+> +#define DEFINE_NEON_STACK_REGS(a, num)					\
+> +	struct {							\
+> +		struct fpsimd_partial_state regs;			\
+> +		__uint128_t vregs[(num) > 32 ? 32 : ((num) + 1) & ~1U];	\
+> +	} a = { .regs.num_regs = sizeof(a.vregs) / sizeof(__uint128_t) }
+> +
+> +#define DEFINE_NEON_STACK_REGS_ALL(name)	DEFINE_NEON_STACK_REGS(name, 32)
+> +
+>  void kernel_neon_begin(void);
+>  void kernel_neon_end(void);
+> +
+> +static inline void __kernel_neon_begin_atomic(struct fpsimd_partial_state *regs)
+> +{
+> +	if (!in_interrupt())
+> +		kernel_neon_begin();
+> +	else
+> +		fpsimd_save_partial_state(regs);
+> +}
+> +
+> +static inline void __kernel_neon_end_atomic(struct fpsimd_partial_state *regs)
+> +{
+> +	if (!in_interrupt())
+> +		kernel_neon_end();
+> +	else
+> +		fpsimd_load_partial_state(regs);
+> +}
 
-Hi Tony,
+The _atomic suffix is a bit misleading (you basically mean no user
+context). I wonder whether it's better to have some _fast/_slow variants
+instead. Looking at the other two patches, you only need 2 or 4
+registers to do the crypto stuff but if you are not in_interrupt(), you
+basically save and restore the full NEON bank. I would say for such
+cases just make kernel_neon_begin_fast() call which is safe in all
+contexts and much faster.
 
-The following changes since commit d0e639c9e06d44e713170031fe05fb60ebe680af:
-
-  Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13/hwmod
-
-for you to fetch changes up to ace1e3ec4a2540c783e65884bb7be9cd45a0a295:
-
-  ARM: AM33xx: hwmod: Add RNG module data (2013-10-09 09:02:51 -0600)
-
-- ----------------------------------------------------------------
-Some OMAP hwmod changes for 3.13.  Significant changes here include:
-
-- - support for moving some of the hwmod flags to DT data
-
-- - support for the SSI, hardware spinlock, USB host/TLL, and RNG IP
-  blocks for various OMAPs
-
-- - a fix that again decouples hwmod data changes from unrelated DT data
-  patchsets
-
-Basic test logs are available at:
-
-http://www.pwsan.com/omap/testlogs/prcm_fixes_v3.13/20131009094936/
-
-The summary reports that the 4460varsomom boots are failing, but this looks
-incorrect - it's probably a bug in the validation scripts here.
-
-- ----------------------------------------------------------------
-Lokesh Vutla (1):
-      ARM: AM33xx: hwmod: Add RNG module data
-
-Rajendra Nayak (2):
-      ARM: OMAP2+: hwmod: cleanup HWMOD_INIT_NO_RESET usage
-      ARM: OMAP2+: hwmod: Extract no-idle and no-reset info from DT
-
-Roger Quadros (1):
-      ARM: OMAP5: hwmod data: Add USB Host and TLL modules
-
-Sebastian Reichel (1):
-      ARM: OMAP2+: hwmod data: Add SSI information
-
-Suman Anna (3):
-      ARM: OMAP2+: hwmod: check for module address space during init
-      ARM: OMAP5: hwmod data: Add spinlock data
-      ARM: AM33xx: hwmod_data: add the sysc configuration for spinlock
-
- arch/arm/mach-omap2/omap_hwmod.c           |  49 +++++---
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |  67 +++++++++--
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  48 ++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   6 +-
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 185 ++++++++++++++++++++++++++++-
- 5 files changed, 325 insertions(+), 30 deletions(-)
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc4 (d0e639c9e06d44e713170031fe05fb60ebe680af)):
-   text     data      bss    total  kernel
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-      0        0        0        0  omap1_defconfig_5912osk_only
-   +140    +1144        0    +1284  omap2plus_defconfig
-      0        0        0        0  omap2plus_defconfig_2430sdp_only
-   +140    +1168        0    +1308  omap2plus_defconfig_cpupm
-   +120        0        0     +120  omap2plus_defconfig_n800_multi_omap2xxx
-   +120        0        0     +120  omap2plus_defconfig_n800_only_a
-   +140    +1176        0    +1316  omap2plus_defconfig_no_pm
-  +4236     +912        0    +5148  omap2plus_defconfig_omap2_4_only
-  +4236    +1176        0    +5412  omap2plus_defconfig_omap3_4_only
-   +228     +184      -96     +316  rmk_omap3430_ldp_allnoconfig
-   +124     +264        0     +388  rmk_omap3430_ldp_oldconfig
-   +228       -4      -96     +128  rmk_omap4430_sdp_allnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc4 (d0e639c9e06d44e713170031fe05fb60ebe680af))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.14 (GNU/Linux)
-
-iQIcBAEBAgAGBQJSWC5wAAoJEMePsQ0LvSpLs+EP/0XG+FsqgeKnTYCpDtMQahPn
-kJqMMs4NYjt/zJ0IBHKQ2M0r2QxwvewKOEhyBdP9Z/v5rAbDp8qujSlTJv+Txt8I
-lowbWCqo1UbpdZHTCb6wf4P50F4s/dfsgIBopVsfnI/UBuALMo+ZzpHSfDIAtkMi
-aFPEn4tkrDFv/N5jxcF4l+KB6XJumRYv0rK2B+wYxhl0v3szSfpSFCVomjCxgGdw
-qd/X4CBf/ot3v5F5ePWK8EUHI/nO0xEYnuMNhoK4r3zFYBG+HLrHAW/XECqL/8iT
-Hcng4PggPLvV3FehsNHJWgNRmW2aiXZbPRS3Zvf0GjxUaQb1GVwz+hJj821rFl2Y
-AQnDUUmb5c+gvfYlPFrR/VzckZsn14nxnYwZl8gZqFVQbRjyUskBkHRKjKtDsQDW
-K62aCwbKVsAhyhPmjUUYwmjPM01k/slFvlFAr/puT9Uv6fSIFV2zaAdikOexFY+0
-oeTsW94l5POJ24KpfwGY5812KbAyjpulJuFMus4IKFiaZQ5ElEiPAipQJzV1Qv6S
-FEtzR0BEipXUT5Jp3hKGVbLcJdmJwGpBPhnoXtYGMlAezcq0Hoy5g0hMEPDaY8XW
-nEJgJdVUlj6Jp6Jva7R5uxAfJxctoXBh1YOBS4HfkT+VP7K1IC4JBpx7mLhThYW6
-oFHHRoVthqB0nyF/axHS
-=pWEm
------END PGP SIGNATURE-----
+-- 
+Catalin
