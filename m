@@ -1,43 +1,32 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Fri, 11 Oct 2013 12:44:16 +0200
-Subject: CONFIG_HZ=250 on Kirkwood
-Message-ID: <5257D680.6040400@keymile.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 11 Oct 2013 11:44:20 +0100
+Subject: [PATCH 3/3] arm64: include: asm: atomic.h: use 'unsigned int'
+ and 'atomic_t' instead of 'unsigned long' for atomic_clear_mask()
+In-Reply-To: <525751E2.3020207@asianux.com>
+References: <52561137.3070608@asianux.com> <5256117A.4000009@asianux.com>
+ <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
+ <20131010100733.GH3817@mudshark.cambridge.arm.com>
+ <52568998.2080108@asianux.com>
+ <20131010142305.GG6199@mudshark.cambridge.arm.com>
+ <525751E2.3020207@asianux.com>
+Message-ID: <20131011104419.GE14732@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 11, 2013 at 02:18:26AM +0100, Chen Gang wrote:
+> On 10/10/2013 10:23 PM, Will Deacon wrote:
+> > On Thu, Oct 10, 2013 at 12:03:52PM +0100, Chen Gang wrote:
+> >> BTW: do arm64 need atomic_clear_mask()?
+> > 
+> > No. Neither ARM nor arm64 need this function.
+> 
+> OK, thank you for your confirmation.
+> 
+> Hmm... can we remove atomic_clear_mask() from ARM and arm64? (in my
+> opinion, if not need, better to remove it).
 
-according to a statement from Russell King:
+Yes!
 
-commit b28748fb5d21d5d64c9ce31579ffbbd41f317042
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Sun Feb 17 14:40:33 2013 +0000
+I mentioned this a few times already...
 
-     ARM: add SCHED_HRTICK config option
-
-     As we don't include kernel/Kconfig.hz as this defines HZ values
-     unsuitable for ARM platforms, add the SCHED_HRTICK to properly 
-configure
-     the scheduler for hrtimer operation.
-
-     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-
-and to arch/arm/Kconfig:
-
-config HZ
-         int
-         default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
-                 ARCH_S5PV210 || ARCH_EXYNOS4
-         default AT91_TIMER_HZ if ARCH_AT91
-         default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
-         default 100
-
-the only safe value for CONFIG_HZ on Kirkwood would be 100.
-
-We would like to use CONFIG_HZ=250 on our Kirkwood devices and NOT use 
-the SCHED_HRTICK feature.
-Does anyone have know whether (and why) this would be a bad idea?
-
-Thanks a lot!
-Gerlando
+Will
