@@ -1,164 +1,181 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 11 Oct 2013 19:15:39 +0300
-Subject: [PATCH 09/11] ARM: OMAP3: PRM: move iva2 force idle functionality to
- PRM driver
+Date: Fri, 11 Oct 2013 19:15:41 +0300
+Subject: [PATCH 11/11] ARM: OMAP2+: CM: move direct register write macros to
+ internal header
 In-Reply-To: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
 References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1381508141-15244-10-git-send-email-t-kristo@ti.com>
+Message-ID: <1381508141-15244-12-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is correct location for this instead of the PM core, as it is accessing
-PRM registers directly.
+The direct register access macros should not be exposed to CM clients.
+Thus, move the register macros to their own file and only include these
+to the cm_*.c files.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/pm34xx.c  |   48 +----------------------------------------
- arch/arm/mach-omap2/prm3xxx.c |   45 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prm3xxx.h |    2 ++
- 3 files changed, 48 insertions(+), 47 deletions(-)
+ arch/arm/mach-omap2/cm2xxx.c      |    1 +
+ arch/arm/mach-omap2/cm2xxx_3xxx.h |   48 --------------------------
+ arch/arm/mach-omap2/cm3xxx.c      |    1 +
+ arch/arm/mach-omap2/cm_internal.h |   67 +++++++++++++++++++++++++++++++++++++
+ 4 files changed, 69 insertions(+), 48 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/cm_internal.h
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index a0c7e83..4320541 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -398,51 +398,6 @@ restore:
+diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
+index ce25abb..c7facf1 100644
+--- a/arch/arm/mach-omap2/cm2xxx.c
++++ b/arch/arm/mach-omap2/cm2xxx.c
+@@ -26,6 +26,7 @@
+ #include "cm2xxx.h"
+ #include "cm-regbits-24xx.h"
+ #include "clockdomain.h"
++#include "cm_internal.h"
  
- #endif /* CONFIG_SUSPEND */
+ /* CM_AUTOIDLE_PLL.AUTO_* bit values for DPLLs */
+ #define DPLL_AUTOIDLE_DISABLE				0x0
+diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.h b/arch/arm/mach-omap2/cm2xxx_3xxx.h
+index bfbd16f..b40b5bd 100644
+--- a/arch/arm/mach-omap2/cm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/cm2xxx_3xxx.h
+@@ -48,54 +48,6 @@
  
+ #ifndef __ASSEMBLER__
+ 
+-#include <linux/io.h>
 -
--/**
-- * omap3_iva_idle(): ensure IVA is in idle so it can be put into
-- *                   retention
-- *
-- * In cases where IVA2 is activated by bootcode, it may prevent
-- * full-chip retention or off-mode because it is not idle.  This
-- * function forces the IVA2 into idle state so it can go
-- * into retention/off and thus allow full-chip retention/off.
-- *
-- **/
--static void __init omap3_iva_idle(void)
+-static inline u32 omap2_cm_read_mod_reg(s16 module, u16 idx)
 -{
--	/* ensure IVA2 clock is disabled */
--	omap3_cm_force_iva_clk(false);
--
--	/* if no clock activity, nothing else to do */
--	if (!omap3_cm_is_iva_active())
--		return;
--
--	/* Reset IVA2 */
--	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
--			  OMAP3430_RST2_IVA2_MASK |
--			  OMAP3430_RST3_IVA2_MASK,
--			  OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
--
--	/* Enable IVA2 clock */
--	omap3_cm_force_iva_clk(true);
--
--	/* Set IVA2 boot mode to 'idle' */
--	omap3_ctrl_set_iva_bootmode_idle();
--
--	/* Un-reset IVA2 */
--	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
--
--	/* Disable IVA2 clock */
--	omap3_cm_force_iva_clk(false);
--
--	/* Reset IVA2 */
--	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
--			  OMAP3430_RST2_IVA2_MASK |
--			  OMAP3430_RST3_IVA2_MASK,
--			  OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+-	return __raw_readl(cm_base + module + idx);
 -}
 -
- static void __init omap3_d2d_idle(void)
- {
- 	u16 mask, padconf;
-@@ -546,8 +501,7 @@ static void __init prcm_setup_regs(void)
- 	/*
- 	 * We need to idle iva2_pwrdm even on am3703 with no iva2.
- 	 */
--	omap3_iva_idle();
+-static inline void omap2_cm_write_mod_reg(u32 val, s16 module, u16 idx)
+-{
+-	__raw_writel(val, cm_base + module + idx);
+-}
 -
-+	omap3_prm_force_idle_iva();
- 	omap3_d2d_idle();
- }
+-/* Read-modify-write a register in a CM module. Caller must lock */
+-static inline u32 omap2_cm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
+-					    s16 idx)
+-{
+-	u32 v;
+-
+-	v = omap2_cm_read_mod_reg(module, idx);
+-	v &= ~mask;
+-	v |= bits;
+-	omap2_cm_write_mod_reg(v, module, idx);
+-
+-	return v;
+-}
+-
+-/* Read a CM register, AND it, and shift the result down to bit 0 */
+-static inline u32 omap2_cm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
+-{
+-	u32 v;
+-
+-	v = omap2_cm_read_mod_reg(domain, idx);
+-	v &= mask;
+-	v >>= __ffs(mask);
+-
+-	return v;
+-}
+-
+-static inline u32 omap2_cm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
+-{
+-	return omap2_cm_rmw_mod_reg_bits(bits, bits, module, idx);
+-}
+-
+-static inline u32 omap2_cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
+-{
+-	return omap2_cm_rmw_mod_reg_bits(bits, 0x0, module, idx);
+-}
+-
+ extern int omap2xxx_cm_apll54_enable(void);
+ extern void omap2xxx_cm_apll54_disable(void);
+ extern int omap2xxx_cm_apll96_enable(void);
+diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
+index b0509b9..ccd29ba 100644
+--- a/arch/arm/mach-omap2/cm3xxx.c
++++ b/arch/arm/mach-omap2/cm3xxx.c
+@@ -26,6 +26,7 @@
+ #include "cm3xxx.h"
+ #include "cm-regbits-34xx.h"
+ #include "clockdomain.h"
++#include "cm_internal.h"
  
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 7721990..3813e9a 100644
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -26,6 +26,8 @@
- #include "prm2xxx_3xxx.h"
- #include "cm2xxx_3xxx.h"
- #include "prm-regbits-34xx.h"
-+#include "cm3xxx.h"
-+#include "control.h"
- 
- static const struct omap_prcm_irq omap3_prcm_irqs[] = {
- 	OMAP_PRCM_IRQ("wkup",	0,	0),
-@@ -396,6 +398,49 @@ struct pwrdm_ops omap3_pwrdm_operations = {
- 	.pwrdm_wait_transition	= omap2_pwrdm_wait_transition,
- };
- 
-+/**
-+ * omap3_prcm_force_idle_iva: ensure IVA is in idle so it can be put into
-+ *                           retention
+ static const u8 omap3xxx_cm_idlest_offs[] = {
+ 	CM_IDLEST1, CM_IDLEST2, OMAP2430_CM_IDLEST3
+diff --git a/arch/arm/mach-omap2/cm_internal.h b/arch/arm/mach-omap2/cm_internal.h
+new file mode 100644
+index 0000000..929157d
+--- /dev/null
++++ b/arch/arm/mach-omap2/cm_internal.h
+@@ -0,0 +1,67 @@
++/*
++ * OMAP2+ Clock Management (CM) internal header
 + *
-+ * In cases where IVA2 is activated by bootcode, it may prevent
-+ * full-chip retention or off-mode because it is not idle.  This
-+ * function forces the IVA2 into idle state so it can go
-+ * into retention/off and thus allow full-chip retention/off.
++ * Copyright (C) 2007-2013 Texas Instruments, Inc.
++ * Copyright (C) 2007-2010 Nokia Corporation
++ * Paul Walmsley
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * The CM hardware modules on the OMAP2/3 are quite similar to each
++ * other.  The CM modules/instances on OMAP4 are quite different, so
++ * they are handled in a separate file.
 + */
-+void __init omap3_prm_force_idle_iva(void)
++
++#ifndef __ARCH_ARM_MACH_OMAP2_CM_INTERNAL_H
++#define __ARCH_ARM_MACH_OMAP2_CM_INTERNAL_H
++
++#include <linux/io.h>
++
++static inline u32 omap2_cm_read_mod_reg(s16 module, u16 idx)
 +{
-+	/* ensure IVA2 clock is disabled */
-+	omap3_cm_force_iva_clk(false);
-+
-+	/* if no clock activity, nothing else to do */
-+	if (!omap3_cm_is_iva_active())
-+		return;
-+
-+	/* Reset IVA2 */
-+	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
-+				OMAP3430_RST2_IVA2_MASK |
-+				OMAP3430_RST3_IVA2_MASK,
-+				OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
-+
-+	/* Enable IVA2 clock */
-+	omap3_cm_force_iva_clk(true);
-+
-+	/* Set IVA2 boot mode to 'idle' */
-+	omap3_ctrl_set_iva_bootmode_idle();
-+
-+	/* Un-reset IVA2 */
-+	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
-+
-+	/* Disable IVA2 clock */
-+	omap3_cm_force_iva_clk(false);
-+
-+	/* Reset IVA2 */
-+	omap2_prm_write_mod_reg(OMAP3430_RST1_IVA2_MASK |
-+				OMAP3430_RST2_IVA2_MASK |
-+				OMAP3430_RST3_IVA2_MASK,
-+				OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
++	return __raw_readl(cm_base + module + idx);
 +}
 +
- /*
-  *
-  */
-diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
-index 277f717..1befb23 100644
---- a/arch/arm/mach-omap2/prm3xxx.h
-+++ b/arch/arm/mach-omap2/prm3xxx.h
-@@ -154,6 +154,8 @@ extern void omap3xxx_prm_restore_irqen(u32 *saved_mask);
- 
- extern void omap3xxx_prm_dpll3_reset(void);
- 
-+extern void omap3_prm_force_idle_iva(void);
++static inline void omap2_cm_write_mod_reg(u32 val, s16 module, u16 idx)
++{
++	__raw_writel(val, cm_base + module + idx);
++}
 +
- extern int __init omap3xxx_prm_init(void);
- extern u32 omap3xxx_prm_get_reset_sources(void);
- 
++/* Read-modify-write a register in a CM module. Caller must lock */
++static inline u32 omap2_cm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module,
++					    s16 idx)
++{
++	u32 v;
++
++	v = omap2_cm_read_mod_reg(module, idx);
++	v &= ~mask;
++	v |= bits;
++	omap2_cm_write_mod_reg(v, module, idx);
++
++	return v;
++}
++
++/* Read a CM register, AND it, and shift the result down to bit 0 */
++static inline u32 omap2_cm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask)
++{
++	u32 v;
++
++	v = omap2_cm_read_mod_reg(domain, idx);
++	v &= mask;
++	v >>= __ffs(mask);
++
++	return v;
++}
++
++static inline u32 omap2_cm_set_mod_reg_bits(u32 bits, s16 module, s16 idx)
++{
++	return omap2_cm_rmw_mod_reg_bits(bits, bits, module, idx);
++}
++
++static inline u32 omap2_cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
++{
++	return omap2_cm_rmw_mod_reg_bits(bits, 0x0, module, idx);
++}
++#endif
 -- 
 1.7.9.5
