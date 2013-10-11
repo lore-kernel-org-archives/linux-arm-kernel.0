@@ -1,89 +1,69 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 11 Oct 2013 11:01:29 -0300
-Subject: [PATCH v4 0/5] dma: mxs-dma bugfixes and cleanup
-In-Reply-To: <1381493539-31756-1-git-send-email-mpa@pengutronix.de>
-References: <1381493539-31756-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <CAOMZO5AG_efwTbtUjG8TPEY=_kyjrcZkEQV6XfZ6CLZ3_msWig@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Oct 2013 16:09:00 +0200
+Subject: [PATCH v3 1/3] gpio: davinci: add OF support
+In-Reply-To: <1380902596-4693-2-git-send-email-sujithkv@ti.com>
+References: <1380902596-4693-1-git-send-email-sujithkv@ti.com>
+ <1380902596-4693-2-git-send-email-sujithkv@ti.com>
+Message-ID: <CACRpkdYxegBSYXR1-98smUNnDXpyRHo_vuYdnr3r7zhawENiUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+On Fri, Oct 4, 2013 at 6:03 PM, Prabhakar Lad
+<prabhakar.csengg@gmail.com> wrote:
 
-[Also including alsa-devel and some other folks involved with mxs audio]
-
-On Fri, Oct 11, 2013 at 9:12 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> Hi,
+> This patch adds OF parser support for davinci gpio
+> driver and also appropriate documentation in gpio-davinci.txt
+> located at Documentation/devicetree/bindings/gpio/.
 >
-> v4 adds another patch to increase sound stability. Patch 3 ("dma: mxs-dma: Fix
-> channel reset hardware bug") decreases the number of channel stalls, but after
-> hours of repeated playback the bug still appears. The new patch ("dma: mxs: Use
-> semaphores for cyclic DMA") replaces reset channel usage with hardware
-> semaphore counter mechanism.
+> Signed-off-by: KV Sujith <sujithkv@ti.com>
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-How is the bug you are trying to solve manifest and how to reproduce it?
+^Don't trust this guy.
 
-I have been investigating an issue about sound stability on mx28 as well.
+> [prabhakar.csengg at gmail.com: simplified the OF code and also
+>                  the commit message]
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> ---
+>  .../devicetree/bindings/gpio/gpio-davinci.txt      |   34 +++++++++++
+>  drivers/gpio/gpio-davinci.c                        |   60 +++++++++++++++++++-
+>  2 files changed, 91 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> new file mode 100644
+> index 0000000..87abd3b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+> @@ -0,0 +1,34 @@
+> +Davinci GPIO controller bindings
+> +
+> +Required Properties:
+> +- compatible: should be "ti,dm6441-gpio"
+> +
+> +- reg: Physical base address of the controller and the size of memory mapped
+> +       registers.
+> +
+> +- gpio-controller : Marks the device node as a gpio controller.
+> +
+> +- interrupts: Array of GPIO interrupt number.
+> +
+> +- ngpio: The number of GPIO pins supported.
+> +
+> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering starts.
 
-The usecase I am doing is:
+What is this?
 
-while true
-do
-    arecord -D hw:0,1 -d 10 -f S16_LE -r 44100 -c 2 | aplay
-    sleep 2
-done
+If I have ever ACKed this I have been drunk. I take it back.
 
-(Record 10 seconds, sleep and keep in this loop forever).
+This "base" is a Linux-specific thing and has no place in the
+device tree, and shall not be there. You have to find some way to
+avoid this, what do you think some other OS should do with
+this value...
 
-The problem I see is that randomly the captured audio becomes
-extremely noisy and loud (throughout the whole 10 seconds) and then in
-the subsequent loop it becomes normal. This is very random and it
-happens at a 1 or 2% failure rate.
+All IRQs in Linux are assumed to be dynamically assigned numbers
+nowadays, with a property like this you can never switch on
+SPARSE_IRQ for the DaVinci.
 
-I tested your v3, but it did not help to fix this particular issue.
-
-I also tried experimenting with the SAIF IOMUX settings:
-
-index cda19c8..463fa92 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -545,9 +545,9 @@
-                         MX28_PAD_SAIF0_BITCLK__SAIF0_BITCLK
-                         MX28_PAD_SAIF0_SDATA0__SAIF0_SDATA0
-                     >;
--                    fsl,drive-strength = <MXS_DRIVE_12mA>;
-+                    fsl,drive-strength = <MXS_DRIVE_4mA>;
-                     fsl,voltage = <MXS_VOLTAGE_HIGH>;
--                    fsl,pull-up = <MXS_PULL_ENABLE>;
-+                    fsl,pull-up = <MXS_PULL_DISABLE>;
-                 };
-
-                 saif0_pins_b: saif0 at 1 {
-@@ -557,9 +557,9 @@
-                         MX28_PAD_SAIF0_BITCLK__SAIF0_BITCLK
-                         MX28_PAD_SAIF0_SDATA0__SAIF0_SDATA0
-                     >;
--                    fsl,drive-strength = <MXS_DRIVE_12mA>;
-+                    fsl,drive-strength = <MXS_DRIVE_4mA>;
-                     fsl,voltage = <MXS_VOLTAGE_HIGH>;
--                    fsl,pull-up = <MXS_PULL_ENABLE>;
-+                    fsl,pull-up = <MXS_PULL_DISABLE>;
-                 };
-
-                 saif1_pins_a: saif1 at 0 {
-@@ -567,9 +567,9 @@
-                     fsl,pinmux-ids = <
-                         MX28_PAD_SAIF1_SDATA0__SAIF1_SDATA0
-                     >;
--                    fsl,drive-strength = <MXS_DRIVE_12mA>;
-+                    fsl,drive-strength = <MXS_DRIVE_4mA>;
-                     fsl,voltage = <MXS_VOLTAGE_HIGH>;
--                    fsl,pull-up = <MXS_PULL_ENABLE>;
-+                    fsl,pull-up = <MXS_PULL_DISABLE>;
-                 };
-
-and my tests are showing a much better stability. Not able to get this
-problem after several hours.
-
-Regards,
-
-Fabio Estevam
+Yours,
+Linus Walleij
