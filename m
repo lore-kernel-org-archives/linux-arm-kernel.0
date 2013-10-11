@@ -1,42 +1,66 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 11 Oct 2013 11:11:32 +0100
-Subject: [PATCH V2] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware
-In-Reply-To: <20131011095751.GU25034@n2100.arm.linux.org.uk>
-References: <1380112289-19572-1-git-send-email-steve.capper@linaro.org>
- <20131011095751.GU25034@n2100.arm.linux.org.uk>
-Message-ID: <20131011101132.GA32526@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 11 Oct 2013 12:11:04 +0200
+Subject: [PATCH 3/3] ASoC: mxs-saif: Handle errors in trigger function
+In-Reply-To: <1381486264-1672-1-git-send-email-mpa@pengutronix.de>
+References: <1381486264-1672-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1381486264-1672-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 10:57:51AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Sep 25, 2013 at 01:31:29PM +0100, Steve Capper wrote:
-> > The memory pinning code in uaccess_with_memcpy.c does not check
-> > for HugeTLB or THP pmds, and will enter an infinite loop should
-> > a __copy_to_user or __clear_user occur against a huge page.
-> 
-> This patch causes a build error with certain configuration options:
-> 
-> arch/arm/lib/uaccess_with_memcpy.c: In function 'pin_page_for_write':
-> arch/arm/lib/uaccess_with_memcpy.c:57:2: error: implicit declaration of function 'pmd_thp_or_huge'
-> arch/arm/lib/uaccess_with_memcpy.c:60:3: error: implicit declaration of function 'pmd_hugewillfault'
-> 
-> found via a randconfig build, configuration:
-> 
-> http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=6265
-> 
-> > ---
-> >  arch/arm/include/asm/pgtable-3level.h |  3 +++
-> >  arch/arm/lib/uaccess_with_memcpy.c    | 41 ++++++++++++++++++++++++++++++++---
-> >  2 files changed, 41 insertions(+), 3 deletions(-)
-> 
-> As the macros are in pgtable-3level.h, this won't work with any configuration
-> using the 2level header file.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ sound/soc/mxs/mxs-saif.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
 
-Hi Russell,
-Apologies, that was careless rebasing on my part.
-
-Would you like a fix for this, or should I send a new patch?
-
-Thanks,
+diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+index c8ead01..fc3d89b 100644
+--- a/sound/soc/mxs/mxs-saif.c
++++ b/sound/soc/mxs/mxs-saif.c
+@@ -494,6 +494,7 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
+ 	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
+ 	struct mxs_saif *master_saif;
+ 	u32 delay;
++	int ret;
+ 
+ 	master_saif = mxs_saif_get_master(saif);
+ 	if (!master_saif)
+@@ -508,21 +509,32 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
+ 
+ 		dev_dbg(cpu_dai->dev, "start\n");
+ 
+-		clk_enable(master_saif->clk);
+-		if (!master_saif->mclk_in_use)
+-			__raw_writel(BM_SAIF_CTRL_RUN,
+-				master_saif->base + SAIF_CTRL + MXS_SET_ADDR);
++		ret = clk_enable(master_saif->clk);
++		if (ret) {
++			dev_err(saif->dev, "Failed to enable master clock\n");
++			return ret;
++		}
+ 
+ 		/*
+ 		 * If the saif's master is not himself, we also need to enable
+ 		 * itself clk for its internal basic logic to work.
+ 		 */
+ 		if (saif != master_saif) {
+-			clk_enable(saif->clk);
++			ret = clk_enable(saif->clk);
++			if (ret) {
++				dev_err(saif->dev, "Failed to enable master clock\n");
++				clk_disable(master_saif->clk);
++				return ret;
++			}
++
+ 			__raw_writel(BM_SAIF_CTRL_RUN,
+ 				saif->base + SAIF_CTRL + MXS_SET_ADDR);
+ 		}
+ 
++		if (!master_saif->mclk_in_use)
++			__raw_writel(BM_SAIF_CTRL_RUN,
++				master_saif->base + SAIF_CTRL + MXS_SET_ADDR);
++
+ 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+ 			/*
+ 			 * write data to saif data register to trigger
 -- 
-Steve
+1.8.4.rc3
