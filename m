@@ -1,45 +1,133 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 11 Oct 2013 17:46:12 +0300
-Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
-In-Reply-To: <1381402195-29257-2-git-send-email-kishon@ti.com>
-References: <1381402195-29257-1-git-send-email-kishon@ti.com>
- <1381402195-29257-2-git-send-email-kishon@ti.com>
-Message-ID: <52580F34.8030809@ti.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Fri, 11 Oct 2013 20:20:40 +0530
+Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
+ fault
+In-Reply-To: <20131011143721.GD15803@arm.com>
+References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy2E6aRndw88_S_3wfyTOYd5rQQTc4+Cw5Hd1DFXuM6EBA@mail.gmail.com>
+ <523063AC.8040803@arm.com> <20130911193855.GN9860@cbox>
+ <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
+ <525667DB.7090705@arm.com> <20131010112425.GB21380@arm.com>
+ <CAAhSdy20=U3+LZd=3i8dfqfSEaX7V+2z_y641NBLj7PkYZBadQ@mail.gmail.com>
+ <20131011123839.GH12308@darko.cambridge.arm.com>
+ <CAAhSdy1Sm2N68ZB5r9BmansGYnUgFO0ZFdUL=XB7RhJ258AAFA@mail.gmail.com>
+ <20131011143721.GD15803@arm.com>
+Message-ID: <CAAhSdy1RS58HxDD2sKC5NP=vZ-fn=Zc4qEYZoFHR2usGqiQMFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 11, 2013 at 8:07 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Oct 11, 2013 at 03:27:16PM +0100, Anup Patel wrote:
+>> On Fri, Oct 11, 2013 at 6:08 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > On Thu, Oct 10, 2013 at 05:09:03PM +0100, Anup Patel wrote:
+>> >> On Thu, Oct 10, 2013 at 4:54 PM, Catalin Marinas
+>> >> <catalin.marinas@arm.com> wrote:
+>> >> > On Thu, Oct 10, 2013 at 09:39:55AM +0100, Marc Zyngier wrote:
+>> >> >> On 10/10/13 05:51, Anup Patel wrote:
+>> >> >> > Are you planning to go ahead with this approach ?
+>> >> >>
+>> >> >> [adding Catalin, as we heavily discussed this recently]
+>> >> >>
+>> >> >> Not as such, as it doesn't solve the full issue. It merely papers over
+>> >> >> the whole "my cache is off" problem. More specifically, any kind of
+>> >> >> speculative access from another CPU while caches are off in the guest
+>> >> >> completely nukes the benefit of this patch.
+>> >> >>
+>> >> >> Also, turning the the caches off is another source of problems, as
+>> >> >> speculation also screws up set/way invalidation.
+>> >> >
+>> >> > Indeed. The set/way operations trapping and broadcasting (or deferring)
+>> >> > to other CPUs in software just happens to work but there is no
+>> >> > guarantee, sooner or later we'll hit a problem. I'm even tempted to
+>> >> > remove flush_dcache_all() calls on the booting path for the arm64
+>> >> > kernel, we already require that whatever runs before Linux should
+>> >> > clean&invalidate the caches.
+>> >> >
+>> >> > Basically, with KVM a VCPU even if running with caches/MMU disabled can
+>> >> > still get speculative allocation into the cache. The reason for this is
+>> >> > the other cacheable memory aliases created by the host kernel and
+>> >> > qemu/kvmtool. I can't tell whether Xen has this issue but it may be
+>> >> > easier in Xen to avoid memory aliases.
+>> >> >
+>> >> >> > We really need this patch for X-Gene L3 cache.
+>> >> >>
+>> >> >> So far, I can see two possibilities:
+>> >> >> - either we mandate caches to be always on (DC bit, and you're not
+>> >> >> allowed to turn the caches off).
+>> >> >
+>> >> > That's my preferred approach. For hotplug, idle, the guest would use an
+>> >> > HVC call (PSCI) and the host takes care of re-enabling the DC bit. But
+>> >> > we may not catch all cases (kexec probably).
+>> >> >
+>> >> >> - Or we mandate that caches are invalidated (by VA) for each write that
+>> >> >> is performed with caches off.
+>> >> >
+>> >> > For some things like run-time code patching, on ARMv8 we need to do at
+>> >> > least I-cache maintenance since the CPU can allocate into the I-cache
+>> >> > (even if there are no aliases).
+>> >>
+>> >> It seems all approaches considered so far have a corner case in
+>> >> one-way or another.
+>> >
+>> > Yes, we try to settle on the one with least corner cases.
+>>
+>> Ok.
+>>
+>> >
+>> >> Coming back to where we started, the actual problem was that when
+>> >> Guest starts booting it sees wrong contents because it is runs with
+>> >> MMU disable and correct contents are still in external L3 cache of X-Gene.
+>> >
+>> > That's one of the problems and I think the easiest to solve. Note that
+>> > contents could still be in the L1/L2 (inner) cache since whole cache
+>> > flushing by set/way isn't guaranteed in an MP context.
+>> >
+>> >> How about reconsidering the approach of flushing Guest RAM (entire or
+>> >> portion of it) to PoC by VA once before the first run of a VCPU ?
+>> >
+>> > Flushing the entire guest RAM is not possible by set/way
+>> > (architecturally) and not efficient by VA (though some benchmark would
+>> > be good). Marc's patch defers this flushing when a page is faulted in
+>> > (at stage 2) and I think it covers the initial boot.
+>> >
+>> >> OR
+>> >> We can also have KVM API using which user space can flush portions
+>> >> of Guest RAM before running the VCPU. (I think this was a suggestion
+>> >> from Marc Z initially)
+>> >
+>> > This may not be enough. It indeed flushes the kernel image that gets
+>> > loaded but the kernel would write other pages (bss, page tables etc.)
+>> > with MMU disabled and those addresses may contain dirty cache lines that
+>> > have not been covered by the initial kvmtool flush. So you basically
+>> > need all guest non-cacheable accesses to be flushed.
+>> >
+>> > The other problems are the cacheable aliases that I mentioned, so even
+>> > though the guest does non-cacheable accesses with the MMU off, the
+>> > hardware can still allocate into the cache via the other mappings. In
+>> > this case the guest needs to invalidate the areas of memory that it
+>> > wrote with caches off (or just use the DC bit to force memory accesses
+>> > with MMU off to be cacheable).
+>>
+>> Having looked at all the approaches, I would vote for the approach taken
+>> by this patch.
+>
+> But this patch alone doesn't solve the other issues. OTOH, the DC bit
+> would solve your initial problem and a few others.
 
-On 10/10/2013 01:49 PM, Kishon Vijay Abraham I wrote:
-> From: George Cherian <george.cherian@ti.com>
-> 
-> Added dr_mode property in dwc3 and set its default mode to device.
+DC bit might solve the initial problem but it can be problematic because
+setting DC bit would mean Guest would have Caching ON even when Guest
+MMU is disabled. This will be more problematic if Guest is running a
+bootloader (uboot, grub, UEFI, ..) which does pass-through access to a
+DMA-capable device and we will have to change the bootloader in this
+case and put explicit flushes in bootloader for running inside Guest.
 
-If there is a specific reason why this is not set to "otg", we need
-to explain it here.
+Also, having pass-through devices using VFIO (particularly PCIe devices)
+is very common use-case this days in x86 world.
 
-AFAIK the port is meant to be used as OTG port.
+>
+> --
+> Catalin
 
-> 
-> Signed-off-by: George Cherian <george.cherian@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/boot/dts/omap5.dtsi |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index 6d0a1d5..ef598af 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -652,6 +652,7 @@
->  				reg = <0x4a030000 0x10000>;
->  				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
->  				usb-phy = <&usb2_phy>, <&usb3_phy>;
-> +				dr_mode = "peripheral";
->  				tx-fifo-resize;
->  			};
->  		};
-> 
-
-cheers,
--roger
+--Anup
