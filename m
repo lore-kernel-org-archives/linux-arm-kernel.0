@@ -1,62 +1,57 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 11 Oct 2013 16:41:57 -0400 (EDT)
-Subject: [PATCH 14/14] net: smc91x: dont't use SMC_outw for fixing up
- halfword-aligned data
-In-Reply-To: <1381499540-28794-15-git-send-email-matthew.leach@arm.com>
-References: <1381499540-28794-1-git-send-email-matthew.leach@arm.com>
- <1381499540-28794-15-git-send-email-matthew.leach@arm.com>
-Message-ID: <alpine.LFD.2.03.1310111634010.3023@syhkavp.arg>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Oct 2013 14:42:01 -0700
+Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.13
+In-Reply-To: <52584BF7.8060100@baylibre.com>
+References: <52582A67.6050108@baylibre.com>
+ <20131011180324.GV29913@atomide.com>
+ <52584BF7.8060100@baylibre.com>
+Message-ID: <20131011214201.GZ29913@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Oct 2013, Matthew Leach wrote:
+* Benoit Cousson <bcousson@baylibre.com> [131011 12:13]:
+> Hi Tony,
+> 
+> On 11/10/2013 20:03, Tony Lindgren wrote:
+> >Hi Benoit,
+> >
+> >* Benoit Cousson <bcousson@baylibre.com> [131011 09:50]:
+> >>Add the minimal DTS support for DRA7xx based SoC core.
+> >>Add the initial support for N900 and gta04 phones.
+> >>Enable USB3 on OMAP5 evm board.
+> >>Add support for cryto accelerators
+> >>Add new IGEP AQUILA board
+> >>Add AM33XX EDMA support
+> >>Update HSUSB node to use the reset-gpios fmwk
+> >
+> >Looks good to me, but we're getting self-inflicted merge
+> >conflicts in two places now with Paul's hwmod changes,
+> >and my defconfig changes.
+> 
+> Damn!
 
-> From: Will Deacon <will.deacon@arm.com>
+:)
+ 
+> >Can you please respin without the following two patches:
+> >
+> >49bcd824c1c0db32fe4de0c1ba3ee36defdb11ca ARM: configs: omap2plus_defconfig: enable dwc3 and dependencies
+> >736c4bb159c793b00331261438deb982cbac3c03 ARM: OMAP5: hwmod: add missing ocp2scp hwmod data
+> >
+> >I can pick the two patches above and apply after pulling in
+> >Paul's branch first.
 > 
-> SMC_outw invokes an endian-aware I/O accessor, which may change the data
-> endianness before writing to the device. This is not suitable for data
-> transfers where the memory buffer is simply a string of bytes that does
-> not require any byte-swapping.
+> OK, no problem.
 > 
-> This patches fixes the smc91x SMC_PUSH_DATA macro so that it uses the
-> string I/O accessor for outputting the leading or trailing halfwords on
-> halfword-aligned buffers.
+> >
+> >However, if other branches are based on this, then we just
+> >need to deal with the merge conflicts, and there's no point
+> >in redoing your branch.
+> 
+> Considering the patches, I don't see any dependency with the other
+> ones, as soon as they are pulled before the DTS changes.
+> 
+> I'll do that ASAP and repost.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+OK thanks! I'll cherry pick the above two commits then.
 
-> 
-> Cc: <netdev@vger.kernel.org>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: David S. Miller <davem@davemloft.net>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/net/ethernet/smsc/smc91x.h |    6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
-> index 5730fe2..98eedb9 100644
-> --- a/drivers/net/ethernet/smsc/smc91x.h
-> +++ b/drivers/net/ethernet/smsc/smc91x.h
-> @@ -1124,8 +1124,7 @@ static const char * chip_ids[ 16 ] =  {
->  			void __iomem *__ioaddr = ioaddr;		\
->  			if (__len >= 2 && (unsigned long)__ptr & 2) {	\
->  				__len -= 2;				\
-> -				SMC_outw(*(u16 *)__ptr, ioaddr,		\
-> -					DATA_REG(lp));		\
-> +				SMC_outsw(ioaddr, DATA_REG(lp), __ptr, 1); \
->  				__ptr += 2;				\
->  			}						\
->  			if (SMC_CAN_USE_DATACS && lp->datacs)		\
-> @@ -1133,8 +1132,7 @@ static const char * chip_ids[ 16 ] =  {
->  			SMC_outsl(__ioaddr, DATA_REG(lp), __ptr, __len>>2); \
->  			if (__len & 2) {				\
->  				__ptr += (__len & ~3);			\
-> -				SMC_outw(*((u16 *)__ptr), ioaddr,	\
-> -					 DATA_REG(lp));		\
-> +				SMC_outsw(ioaddr, DATA_REG(lp), __ptr, 1); \
->  			}						\
->  		} else if (SMC_16BIT(lp))				\
->  			SMC_outsw(ioaddr, DATA_REG(lp), p, (l) >> 1);	\
-> -- 
-> 1.7.9.5
-> 
+Tony
