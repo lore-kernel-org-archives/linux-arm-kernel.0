@@ -1,42 +1,81 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 11 Oct 2013 17:58:35 +0800
-Subject: [PATCH V2 0/4] 
-Message-ID: <1381485519-4027-1-git-send-email-josephl@nvidia.com>
+Date: Fri, 11 Oct 2013 17:58:36 +0800
+Subject: [PATCH V2 1/4] clk: tegra124: add suspend/resume function for
+ tegra_cpu_car_ops
+In-Reply-To: <1381485519-4027-1-git-send-email-josephl@nvidia.com>
+References: <1381485519-4027-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1381485519-4027-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the LP1 support for Tegra124. (suspend to LP2 also
-supported in this series)
+Adding suspend/resume function for tegra_cpu_car_ops. We only save and
+restore the setting of the clock of CoreSight. Other clocks still need
+to be taken care by clock driver.
 
-Note:
-This patch series depends on the patch series below.
-* [PATCH 0/5] Tegra124 clock support
-* [PATCH V2 0/6] ARM: tegra: basic support for Tegra124 SoC
-* [PATCH] ARM: tegra: add clock properties for devices of Tegra124
-* [PATCH] ARM: tegra: enable Tegra RTC as default for Tegra124
-* [PATCH 0/4] ARM: tegra: add CPU hot-plug and idle support for Tegra124
-
-Verified on Cardhu, Dalmore and Venice2 and with THUMB2_KERNEL as well.
-
+Cc: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+---
 V2:
-* remove the patch of "enable Tegra RTC for Venice2"
-* add new patch of "re-calculate the LP1 data for Tegra30/114"
-* squash the 2 to 5 into patch 3/4 of this series
+* no change
+---
+ drivers/clk/tegra/clk-tegra124.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-Joseph Lo (4):
-  clk: tegra124: add suspend/resume function for tegra_cpu_car_ops
-  ARM: tegra: re-calculate the LP1 data for Tegra30/114
-  ARM: tegra: add LP1 support code for Tegra124
-  ARM: tegra: enable LP1 suspend mode for Venice2
-
- arch/arm/boot/dts/tegra124-venice2.dts |  7 +++++
- arch/arm/mach-tegra/Makefile           |  1 +
- arch/arm/mach-tegra/flowctrl.c         |  2 ++
- arch/arm/mach-tegra/iomap.h            |  3 +++
- arch/arm/mach-tegra/pm.c               | 12 ++++++---
- arch/arm/mach-tegra/sleep-tegra30.S    | 49 +++++++++++++++++++++++++---------
- drivers/clk/tegra/clk-tegra124.c       | 27 +++++++++++++++++++
- 7 files changed, 86 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+index c1c9330..66eb1f8a 100644
+--- a/drivers/clk/tegra/clk-tegra124.c
++++ b/drivers/clk/tegra/clk-tegra124.c
+@@ -28,6 +28,7 @@
+ #include "clk.h"
+ #include "clk-id.h"
+ 
++#define CLK_SOURCE_CSITE 0x1d4
+ #define CLK_SOURCE_EMC 0x19c
+ #define CLK_SOURCE_XUSB_SS_SRC 0x610
+ 
+@@ -109,6 +110,12 @@
+ /* Tegra CPU clock and reset control regs */
+ #define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS	0x470
+ 
++#ifdef CONFIG_PM_SLEEP
++static struct cpu_clk_suspend_context {
++	u32 clk_csite_src;
++} tegra124_cpu_clk_sctx;
++#endif
++
+ static void __iomem *clk_base;
+ static void __iomem *pmc_base;
+ 
+@@ -1139,9 +1146,29 @@ static void tegra124_disable_cpu_clock(u32 cpu)
+ 	/* flow controller would take care in the power sequence. */
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static void tegra124_cpu_clock_suspend(void)
++{
++	/* switch coresite to clk_m, save off original source */
++	tegra124_cpu_clk_sctx.clk_csite_src =
++				readl(clk_base + CLK_SOURCE_CSITE);
++	writel(3 << 30, clk_base + CLK_SOURCE_CSITE);
++}
++
++static void tegra124_cpu_clock_resume(void)
++{
++	writel(tegra124_cpu_clk_sctx.clk_csite_src,
++				clk_base + CLK_SOURCE_CSITE);
++}
++#endif
++
+ static struct tegra_cpu_car_ops tegra124_cpu_car_ops = {
+ 	.wait_for_reset	= tegra124_wait_cpu_in_reset,
+ 	.disable_clock	= tegra124_disable_cpu_clock,
++#ifdef CONFIG_PM_SLEEP
++	.suspend	= tegra124_cpu_clock_suspend,
++	.resume		= tegra124_cpu_clock_resume,
++#endif
+ };
+ 
+ static const struct of_device_id pmc_match[] __initconst = {
 -- 
 1.8.4
