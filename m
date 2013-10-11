@@ -1,80 +1,144 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 10 Oct 2013 20:10:58 -0400
-Subject: [PATCH 2/5] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20131010225331.GT25034@n2100.arm.linux.org.uk>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwVU-0000hu-09@rmk-PC.arm.linux.org.uk>
- <CAF6AEGsvBaX5+c1P=ups+k=d1F3r+JphgYOt5wb7pEM3mihOQw@mail.gmail.com>
- <20131010215951.GS25034@n2100.arm.linux.org.uk>
- <CAF6AEGvNyD8-_t2y69a5Gjey7Jg_LXVYNgpYW1rsFFyTkABg=Q@mail.gmail.com>
- <20131010225331.GT25034@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGvb-oeQqYF-XyZ1PjCaqojJ=DurLVGkZxUFwC_WveoTwg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 10 Oct 2013 20:15:22 -0400
+Subject: [PATCH v2 4/4] ARM: keystone: add PM bus support for clock
+ management
+In-Reply-To: <1377819404-9671-5-git-send-email-santosh.shilimkar@ti.com>
+References: <1377819404-9671-1-git-send-email-santosh.shilimkar@ti.com>
+ <1377819404-9671-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <5257431A.5090301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 10, 2013 at 6:53 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Oct 10, 2013 at 06:23:26PM -0400, Rob Clark wrote:
->> On Thu, Oct 10, 2013 at 5:59 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Thu, Oct 10, 2013 at 05:25:15PM -0400, Rob Clark wrote:
->> >> probably this thread is applicable here too?
->> >>
->> >> https://lkml.org/lkml/2013/9/12/417
->> >>
->> >> (although.. we have at least a few  slightly differet variants on the
->> >> same errno -> VM_FAULT_x switch in different drivers.. maybe we should
->> >> do something better)
->> >
->> > Hmm.  It seems today's vm_insert_pfn() has the following error return
->> > values:
->> >
->> > -EFAULT - virtual address outside vma
->> > -EINVAL - track_pfn_insert() failure
->> > -ENOMEM - failed to get locked pte
->> > -EBUSY - entry already exists in pte
->> >
->> > So it seems my handling -EIO, -EAGAIN, -ERESTARTSYS and -EINTR are all
->> > redundant and can be removed.  I'm not sure if it makes sense for this
->> > to be generic - it looks like it's only Intel, gma500 and me who use
->> > this, and Intel handles more error codes (due to it calling other
->> > functions.)
->>
->> I just noticed msm and omapdrm are missing the -EBUSY case (have some
->> patches I need to send), which was why I mentioned this.  They do have
->> other error cases from other fxns, so maybe something generic/common
->> doesn't make sense..  but I realized i915 fixed the same issue a while
->> back, so somewhere common has the advantage of somehow not forgetting
->> to fix other drivers ;-)
->
-> Here's the promised delta:
+On Thursday 29 August 2013 07:36 PM, Santosh Shilimkar wrote:
+> Add runtime PM core support to Keystone SOCs by using the pm_clk
+> infrastructure of the PM core. Patch is based on Kevin's pm_domain
+> work on DaVinci SOCs.
+> 
+> Keystone SOC doesn't have depedency to enable clocks in early
+> in the boot and hence the clock and PM bus initialisation is done
+> at subsys_init() level.
+> 
+> Cc: Kevin Hilman <khilman@linaro.org>
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+For record, updated patch end of the email as discussed here [1]
 
-looks good.. I'll try to get to reviewing the rest of the series
-tomorrow, or at least before the end of the weekend
+Regards,
+Santosh
 
-Reviewed-by: Rob Clark <robdclark@gmail.com>
+[1] http://www.spinics.net/lists/arm-kernel/msg278991.html
 
-BR,
--R
 
->  drivers/gpu/drm/armada/armada_gem.c |    5 -----
->  1 files changed, 0 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/gpu/drm/armada/armada_gem.c b/drivers/gpu/drm/armada/armada_gem.c
-> index 02de7a4..1e74f70 100644
-> --- a/drivers/gpu/drm/armada/armada_gem.c
-> +++ b/drivers/gpu/drm/armada/armada_gem.c
-> @@ -25,12 +25,7 @@ static int armada_gem_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
->         ret = vm_insert_pfn(vma, addr, pfn);
->
->         switch (ret) {
-> -       case -EIO:
-> -       case -EAGAIN:
-> -               set_need_resched();
->         case 0:
-> -       case -ERESTARTSYS:
-> -       case -EINTR:
->         case -EBUSY:
->                 return VM_FAULT_NOPAGE;
->         case -ENOMEM:
->
+>From fc20ffe1213beb09bb7fb6687b404fe48183a55e Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Sun, 14 Jul 2013 17:17:39 -0400
+Subject: [PATCH 4/4] ARM: keystone: add PM domain support for clock
+ management
+
+Add runtime PM core support to Keystone SOCs by using the pm_clk
+infrastructure of the PM core. Patch is based on Kevin's pm_domain
+work on DaVinci SOCs.
+
+Keystone SOC doesn't have dependency to enable clocks in early
+in the boot and hence the clock and PM domain initialisation is done
+at subsys_init() level.
+
+Cc: Kevin Hilman <khilman@linaro.org>
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-keystone/Makefile    |    3 ++
+ arch/arm/mach-keystone/pm_domain.c |   70 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 73 insertions(+)
+ create mode 100644 arch/arm/mach-keystone/pm_domain.c
+
+diff --git a/arch/arm/mach-keystone/Makefile b/arch/arm/mach-keystone/Makefile
+index ddc52b0..25d9239 100644
+--- a/arch/arm/mach-keystone/Makefile
++++ b/arch/arm/mach-keystone/Makefile
+@@ -4,3 +4,6 @@ plus_sec := $(call as-instr,.arch_extension sec,+sec)
+ AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
+ 
+ obj-$(CONFIG_SMP)			+= platsmp.o
++
++# PM domain driver for Keystone SOCs
++obj-$(CONFIG_ARCH_KEYSTONE)		+= pm_domain.o
+diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
+new file mode 100644
+index 0000000..beac3fb
+--- /dev/null
++++ b/arch/arm/mach-keystone/pm_domain.c
+@@ -0,0 +1,70 @@
++/*
++ * PM domain driver for Keystone2 devices
++ *
++ * Copyright 2013 Texas Instruments, Inc.
++ *	Santosh Shilimkar <santosh.shillimkar@ti.com>
++ *
++ * Based on Kevins work on DAVINCI SOCs
++ *	Kevin Hilman <khilman@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/pm_runtime.h>
++#include <linux/pm_clock.h>
++#include <linux/platform_device.h>
++#include <linux/clk-provider.h>
++
++#ifdef CONFIG_PM_RUNTIME
++static int keystone_pm_runtime_suspend(struct device *dev)
++{
++	int ret;
++
++	dev_dbg(dev, "%s\n", __func__);
++
++	ret = pm_generic_runtime_suspend(dev);
++	if (ret)
++		return ret;
++
++	ret = pm_clk_suspend(dev);
++	if (ret) {
++		pm_generic_runtime_resume(dev);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int keystone_pm_runtime_resume(struct device *dev)
++{
++	dev_dbg(dev, "%s\n", __func__);
++
++	pm_clk_resume(dev);
++
++	return pm_generic_runtime_resume(dev);
++}
++#endif
++
++static struct dev_pm_domain keystone_pm_domain = {
++	.ops = {
++		SET_RUNTIME_PM_OPS(keystone_pm_runtime_suspend,
++				   keystone_pm_runtime_resume, NULL)
++		USE_PLATFORM_PM_SLEEP_OPS
++	},
++};
++
++static struct pm_clk_notifier_block platform_domain_notifier = {
++	.pm_domain = &keystone_pm_domain,
++};
++
++int __init keystone_pm_runtime_init(void)
++{
++	of_clk_init(NULL);
++	pm_clk_add_notifier(&platform_bus_type, &platform_domain_notifier);
++
++	return 0;
++}
++subsys_initcall(keystone_pm_runtime_init);
+-- 
+1.7.9.5
