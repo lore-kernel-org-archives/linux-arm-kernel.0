@@ -1,69 +1,34 @@
 From: ankit.jindal@linaro.org (Ankit Jindal)
-Date: Fri, 11 Oct 2013 17:52:12 +0530
-Subject: [RFC PATCH 1/4] ARM64: Add Kconfig option to enable Big Endian kernel
+Date: Fri, 11 Oct 2013 17:52:13 +0530
+Subject: [RFC PATCH 2/4] ARM64: Include appropriate byteorder for Big Endian
 In-Reply-To: <1381494135-15085-1-git-send-email-ankit.jindal@linaro.org>
 References: <1381494135-15085-1-git-send-email-ankit.jindal@linaro.org>
-Message-ID: <1381494135-15085-2-git-send-email-ankit.jindal@linaro.org>
+Message-ID: <1381494135-15085-3-git-send-email-ankit.jindal@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Kconfig options and relevant Big Endian compiler flags.
+Use generic big_endian.h when using big endian compiler.
 
 Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
 Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
 ---
- arch/arm64/Kconfig    |    2 ++
- arch/arm64/Makefile   |    7 +++++++
- arch/arm64/mm/Kconfig |    7 +++++++
- 3 files changed, 16 insertions(+)
- create mode 100644 arch/arm64/mm/Kconfig
+ arch/arm64/include/uapi/asm/byteorder.h |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index f558058..2214ab9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -285,6 +285,8 @@ config SYSVIPC_COMPAT
+diff --git a/arch/arm64/include/uapi/asm/byteorder.h b/arch/arm64/include/uapi/asm/byteorder.h
+index 2b92046..dc19e95 100644
+--- a/arch/arm64/include/uapi/asm/byteorder.h
++++ b/arch/arm64/include/uapi/asm/byteorder.h
+@@ -16,6 +16,10 @@
+ #ifndef __ASM_BYTEORDER_H
+ #define __ASM_BYTEORDER_H
  
- endmenu
++#ifdef __AARCH64EB__
++#include <linux/byteorder/big_endian.h>
++#else
+ #include <linux/byteorder/little_endian.h>
++#endif
  
-+source "arch/arm64/mm/Kconfig"
-+
- source "net/Kconfig"
- 
- source "drivers/Kconfig"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index d90cf79..c92b0f9 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -20,9 +20,16 @@ LIBGCC 		:= $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
- KBUILD_DEFCONFIG := defconfig
- 
- KBUILD_CFLAGS	+= -mgeneral-regs-only
-+
-+ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
-+KBUILD_CPPFLAGS += -mbig-endian
-+AS              += -EB
-+LD              += -EB
-+else
- KBUILD_CPPFLAGS	+= -mlittle-endian
- AS		+= -EL
- LD		+= -EL
-+endif
- 
- comma = ,
- 
-diff --git a/arch/arm64/mm/Kconfig b/arch/arm64/mm/Kconfig
-new file mode 100644
-index 0000000..e4122ac
---- /dev/null
-+++ b/arch/arm64/mm/Kconfig
-@@ -0,0 +1,7 @@
-+config CPU_BIG_ENDIAN
-+        bool "Build big-endian kernel"
-+        help
-+          Say Y if you plan on running a kernel in big-endian mode.
-+          Note that your board must be properly built and your board
-+          port must properly enable any big-endian related features
-+          of your chipset/board/processor.
+ #endif	/* __ASM_BYTEORDER_H */
 -- 
 1.7.9.5
