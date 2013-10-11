@@ -1,36 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 11 Oct 2013 09:40:54 -0600
-Subject: [PATCH 4/7] ARM: tegra: add LP1 support code for Tegra124
-In-Reply-To: <1381477089.5685.3.camel@jlo-ubuntu-64.nvidia.com>
-References: <1381310411-11391-1-git-send-email-josephl@nvidia.com>	
- <1381310411-11391-5-git-send-email-josephl@nvidia.com>	
- <5255E4CD.1050509@wwwdotorg.org>
- <1381477089.5685.3.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <52581C06.5090707@wwwdotorg.org>
+From: balajitk@ti.com (Balaji T K)
+Date: Fri, 11 Oct 2013 21:13:35 +0530
+Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
+In-Reply-To: <20131011153654.GN29913@atomide.com>
+References: <20131003054104.8941.88857.stgit@localhost>
+ <20131003054221.8941.87801.stgit@localhost> <5256AA7F.8030005@ti.com>
+ <20131010160018.GA29913@atomide.com>
+ <CACRpkdaG-PQA39XSjKUgM9TyeD7srgm_8s+NazrDKJ0gmNLcwg@mail.gmail.com>
+ <20131010162015.GC29913@atomide.com>
+ <CACRpkdYF83ghUf60Wmrti53UJ1bWV30GW_P9GjWnsOcZHbsv+Q@mail.gmail.com>
+ <5257BD3E.5000707@ti.com> <20131011153654.GN29913@atomide.com>
+Message-ID: <52581CA7.20606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2013 01:38 AM, Joseph Lo wrote:
-> On Thu, 2013-10-10 at 07:20 +0800, Stephen Warren wrote:
->> On 10/09/2013 03:20 AM, Joseph Lo wrote:
->>> The LP1 suspend procedure is the same with Tegra30 and Tegra114. Just
->>> need to update the difference of the register address, then we can
->>> continue to share the code.
->>> -	.rept (tegra30_sdram_pad_size - tegra114_sdram_pad_address) / 4
->>> +	.rept (tegra124_sdram_pad_address - tegra114_sdram_pad_address) / 4
+On Friday 11 October 2013 09:06 PM, Tony Lindgren wrote:
+>>> What the pin control driver should do is control the pins. Whether the registers
+>>> are spread out in the entire IO-memory does not matter. We did have one system
+>>> which placed the IO-muxing together with each peripheral (!) and I did
+>>> still want
+>>> that to be handled by a single pinctrl driver picking out windows to all these
+>>> IO-ranges.
+>>>
+>>> Things like the PRM which has (my guess) a gazillion registers related to its
+>>> deep-core SoC stuff should be handled by things like
+>>> drivers/mfd/syscon.c, which means it is dead simple for some other driver
+>>> using "just this one register" in that range to get a handle at it and poke it
+>>> using syscon_node_to_regmap() (just derference an ampersand ref)
+>>> syscon_regmap_lookup_by_compatible() (use a compatible string)
+>>> all returning a regmap * that you can use to poke these registers.
 >>
->> I assume this is intended to reserve enough space to store all the saved
->> registers for the largest table of tegra30_sdram_pad_address,
->> tegra114_sdram_pad_address, tegra124_sdram_pad_address. I count more
->> entries in the existing Tegra114 table than the new Tegra124 table, so
->> I'm not sure this part of the change is correct.
->>
->> Is there no way to do a max(tegra30 size, tegra114 size, tegra124 size)
->> so you don't have to pick manually which size to reserve here?
-> 
-> I don't have a good way to achieve this, because we may have another new
-> SoC that may continue re-use these codes. Hence I need to keep
-> maintaining the max() function.
+>> The register handling is fine. But how do we deal with resource handling?
+>> e.g. the block that has the deep-core registers might need to be clocked or powered
+>> before the registers can be accessed.
+>
+> Right, that's the key issue here. The register access would have to be conditional
+> based on the hardware modules PM state. Otherwise we'll have hard to trace hangs
+> and oopses.
+>
+Hi Tony,
 
-Sure, but adding one entry to the max function is better than manually
-calculating the size of each array and performing the max yourself.
+How are the clocks/power state currently handled in case of omap4_pmx_core,
+omap4_pmx_wkup register access via pinctrl-single ?
+
+Thanks and Regards,
+Balaji T K
