@@ -1,47 +1,96 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 11 Oct 2013 01:30:52 -0500
-Subject: [PATCH 1/2] ARM: dts: omap5-uevm: remove always_on,
- boot_on from smps10_out1
-In-Reply-To: <52579723.6080209@ti.com>
-References: <1381402195-29257-1-git-send-email-kishon@ti.com>
- <20131010141949.GA13277@kahuna> <52579723.6080209@ti.com>
-Message-ID: <CAGo_u6odWJ9UKwgaVu2YZzZKuYbveBoGDf99L=rJoK1-9KJ0SA@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 11 Oct 2013 15:49:04 +0900
+Subject: [PATCH 1/3] ahci: exynos: add ahci sata support on Exynos platform
+In-Reply-To: <CAKuRcOJi5C1C63Y41dSJ0-YsaTni1AL=d3qH2Cjz74C8ardEpQ@mail.gmail.com>
+References: <1380609183-21430-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1380609183-21430-2-git-send-email-yuvaraj.cd@samsung.com>
+ <1534631.KrL0vInDuc@amdc1032>
+ <003f01cec099$4eb706b0$ec251410$%han@samsung.com>
+ <CAKuRcOJi5C1C63Y41dSJ0-YsaTni1AL=d3qH2Cjz74C8ardEpQ@mail.gmail.com>
+Message-ID: <000001cec64d$fa1cdca0$ee5695e0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 1:13 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->
->> regulator-boot-on indicates that PMIC enables it by default as part of
->> OTP or some internal behavior -> Looking at the measurements done on
->> uEVM and OTP information -> regulator-boot-on should be kept here.
->
-> No. Actually I don?t want PMIC to enable it by default. I want the palmas-usb
-> driver to handle it.
-> Enabling it by default makes palmas-usb to detect VBUS interrupt. This should
-> ideally be detected only when you connect a host cable.
-> Btw I didn't exactly get why you want regulator-boot-on should be kept here.
+On Tuesday, October 08, 2013 8:45 PM, Yuvaraj Kumar wrote:
+> On Fri, Oct 4, 2013 at 6:03 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> > On Thursday, October 03, 2013 8:32 PM, Bartlomiej Zolnierkiewicz wrote:
+> >> On Tuesday, October 01, 2013 12:03:01 PM Yuvaraj Kumar C D wrote:
+> >> > Exynos5250 contains one Synopsys AHCI SATA controller.The avalaible
+> >> > ahci_platform driver is not sufficient to handle the AHCI PHY and PHY
+> >> > clock related initialization.
+> >> >
+> >> > This patch adds exynos specific ahci sata driver,contained the exynos
+> >> > specific initialized codes, re-use the generic ahci_platform driver, and
+> >> > keep the generic ahci_platform driver clean as much as possible.
+> >> >
+> >> > This patch depends on the below patch
+> >> >     [1].drivers: phy: add generic PHY framework
+> >> >             by Kishon Vijay Abraham I<kishon@ti.com>
+> >> >
+> >> > Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> >> > ---
+> >> >  drivers/ata/Kconfig       |    9 ++
+> >> >  drivers/ata/Makefile      |    1 +
+> >> >  drivers/ata/ahci_exynos.c |  226 +++++++++++++++++++++++++++++++++++++++++++++
+> >> >  3 files changed, 236 insertions(+)
+> >> >  create mode 100644 drivers/ata/ahci_exynos.c
+> >> >
+> >
+> >
+> > [.....]
+> >
+> >> > +   priv->phy = devm_phy_get(dev , "sata-phy");
+> >> > +   if (IS_ERR(priv->phy))
+> >> > +           return PTR_ERR(priv->phy);
+> >
+> > [.....]
+> >
+> >> Also please take a look at the following patch:
+> >>
+> >> https://lkml.org/lkml/2013/9/19/173
+> >>
+> >> it adds PHY support to ahci_platform driver, maybe it can be used
+> >> for your needs as well.
+> >
+> > I also agree with Bartlomiej Zolnierkiewicz's opinion.
+> > 'ahci_exynos.c' just calls PHY API, without any additional control
+> > for Exynos AHCI IP.
+> In addition to PHY handling,it also deals with the special clock
+> sclk_sata which is not dealt in ahci_platform.c(certainly exynos
+> specific).
 
-binding description states:
-- regulator-boot-on: bootloader/firmware enabled regulator
-Further info: include/linux/regulator/machine.h
-* @boot_on: Set if the regulator is enabled when the system is initially
-*           started.  If the regulator is not enabled by the hardware or
-*           bootloader then it will be enabled when the constraints are
-*           applied.
+Handling the special clock 'sclk_sata' is another issue.
+Please, look at that other 'sclk_*'s are handled.
+Also, if possible, please add 'the code handling the special clock'
+to 'ahci_platform.c'.
 
-What that means is that it is enabled by firmware/bootloader (in our
-case One Time Program {OTP} inside Palmas) when the system switches on
-even before the kernel starts. and we know SMPS10 is autoenabled by
-Palmas OTP configuration even before first instruction in A15
-executes.
+> 
+> Morever there is a wrapper driver to handle the platform specific
+> things for the sata.Please refer the  patch[1]
+> [1]ata: ti_sata: Add Texas Instruments SATA Wrapper driver
+> https://lkml.org/lkml/2013/9/19/166
 
-I think you misunderstand this to mean that you'd like the regulator
-to be *switched on* automatically at kernel boot by regulator
-framework - there is no reasoning why we'd want such a binding since
-we'd expect drivers to do their job of requesting and enabling
-regulators on need..
+As Roger Quadros mentioned, 'ti_sata' driver will be dropped.
 
-Hope this helps. Let me know if I misunderstood something here.
+> [2]ahci_imx: add ahci sata support on imx platforms
+> 
 
-Regards,
-Nishanth Menon
+'ahci_imx' is necessary, because 'ahci_imx' controls some
+specific registers.
+
+However, 'ahci_exynos.c' does not control any registers.
+
+> I think, if we have platform specific driver like ahci_xxx.c , it
+> would be better to handle the sata PHY in ahci_xxx.c so that we can
+> retain and re-use the ahci_platform.c as it is.
+
+I think that the platform specific driver like ahci_xxx.c is not
+necessary, because 'ahci_exynos.c' does not control any special
+registers.
+
+Best regards,
+Jingoo Han
+
+> 
+> Further comments will be much appreciated.
+> 
