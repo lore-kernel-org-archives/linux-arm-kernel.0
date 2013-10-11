@@ -1,57 +1,36 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 11 Oct 2013 12:31:46 +0200
-Subject: [PATCH 2/3] ASoC: mxs-saif: Store saif state
-In-Reply-To: <1381486264-1672-3-git-send-email-mpa@pengutronix.de>
-References: <1381486264-1672-1-git-send-email-mpa@pengutronix.de>
- <1381486264-1672-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <20131011123146.73ff30ce@ipc1.ka-ro>
+From: richard.zhuhongxing@gmail.com (Richard Zhu)
+Date: Fri, 11 Oct 2013 18:37:10 +0800
+Subject: [PATCH v3 0/1] ahci: imx: setup power saving methods
+Message-ID: <1381487831-30090-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+v3: ahci: imx: setup power saving methods
+ - Thanks for Tejun's suggestions.
+ override the error_handler by ahci_imx_error_handler, to do
+ the complete SATA device detection, enter into PDDQ mode,
+ if there is no any SATA device.
 
-> Trigger commands may be passed multiple times. To avoid errors with
-> clk_enable/disable, store the saif state and return if saif is already
-> running/stopped.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  sound/soc/mxs/mxs-saif.c | 8 ++++++++
->  sound/soc/mxs/mxs-saif.h | 5 +++++
->  2 files changed, 13 insertions(+)
-> 
-> diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-> index b56b8a0..c8ead01 100644
-> --- a/sound/soc/mxs/mxs-saif.c
-> +++ b/sound/soc/mxs/mxs-saif.c
-> @@ -503,6 +503,9 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
->  	case SNDRV_PCM_TRIGGER_START:
->  	case SNDRV_PCM_TRIGGER_RESUME:
->  	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-> +		if (saif->state == MXS_SAIF_STATE_RUNNING)
-> +			return 0;
-> +
->  		dev_dbg(cpu_dai->dev, "start\n");
->  
->  		clk_enable(master_saif->clk);
-> @@ -543,6 +546,7 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
->  		}
->  
->  		master_saif->ongoing = 1;
-> +		saif->state = MXS_SAIF_STATE_RUNNING;
->
-It seems to me that you could use the already existing variable
-'ongoing' that already reflects the state like you need it.
+ - minor modifications:
+   - The format of the copyright is changed, because that the
+   original one can't pass fsl internal patch reivew without
+   the character '(c)'.
+   - Change the module parameters to be more readable.
+
+V2: http://www.spinics.net/lists/linux-ide/msg46606.html
+ - kernel build option is replaced by the module parameter(ahci-imx.hp) 
+
+v1: http://www.spinics.net/lists/linux-ide/msg46389.html
+ * Disable sata phy internal pll reference clock when
+ sysetem enter into suspend mode, enable it after resume.
+ * Enter into test power down mode when there is no sata disk
+ detected on the port and 'AHCI_IMX_PHY_POWER_DOWN_MODE' is
+ enabled.
+
+This patch is based on for-next branch of
+"http://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git"
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+[v3] ahci: imx: setup power saving methods
+drivers/ata/ahci_imx.c |  125 +++++++++++++++++++++++++++++++++++++++++++++++-
+1 files changed, 123 insertions(+), 2 deletions(-)
