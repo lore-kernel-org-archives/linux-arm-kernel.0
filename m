@@ -1,121 +1,107 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 11 Oct 2013 17:54:44 +0100
-Subject: [PATCH 2/7] kvmtool: virt_queue: handle guest endianness
-In-Reply-To: <20131011145047.GO14732@mudshark.cambridge.arm.com>
-References: <1381502195-8263-1-git-send-email-marc.zyngier@arm.com>
- <1381502195-8263-3-git-send-email-marc.zyngier@arm.com>
- <20131011145047.GO14732@mudshark.cambridge.arm.com>
-Message-ID: <52582D54.1070302@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 11 Oct 2013 17:00:51 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: hwmod changes for v3.13
+Message-ID: <alpine.DEB.2.02.1310111659500.27397@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/13 15:50, Will Deacon wrote:
-> On Fri, Oct 11, 2013 at 03:36:30PM +0100, Marc Zyngier wrote:
->> Wrap all accesses to virt_queue data structures shared between
->> host and guest with byte swapping helpers.
->>
->> Should the architecture only support one endianness, these helpers
->> are reduced to the identity function.
->>
->> Cc: Pekka Enberg <penberg@kernel.org>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   tools/kvm/include/kvm/virtio.h | 189 ++++++++++++++++++++++++++++++++++++++++-
->>   tools/kvm/virtio/core.c        |  59 +++++++------
->>   2 files changed, 219 insertions(+), 29 deletions(-)
->>
->> diff --git a/tools/kvm/include/kvm/virtio.h b/tools/kvm/include/kvm/virtio.h
->> index d6b0f47..04ec137 100644
->> --- a/tools/kvm/include/kvm/virtio.h
->> +++ b/tools/kvm/include/kvm/virtio.h
->> @@ -1,6 +1,8 @@
->>   #ifndef KVM__VIRTIO_H
->>   #define KVM__VIRTIO_H
->>
->> +#include <endian.h>
->> +
->>   #include <linux/virtio_ring.h>
->>   #include <linux/virtio_pci.h>
->>
->> @@ -29,15 +31,194 @@ struct virt_queue {
->>   	u16		endian;
->>   };
->>
->> +/*
->> + * The default policy is not to cope with the guest endianness.
->> + * It also helps not breaking archs that do not care about supporting
->> + * such a configuration.
->> + */
->
-> Jesus Marc, are you *trying* to crash my preprocessor? Seriously though,
-> maybe this is better done as a block:
->
-> #if __BYTE_ORDER == __BIG_ENDIAN
-> #define	virtio_le16toh(x)	le16toh(x)
-> #define virtio_be16toh(x)
-> [...]
->
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-The preprocessor magic to turn the functions into one-liners is pretty 
-gruesome in itself, though...
+Hi Tony,
 
->> +#ifndef VIRTIO_RING_ENDIAN
->> +#define VIRTIO_RING_ENDIAN 0
->> +#endif
->> +
->> +#if (VIRTIO_RING_ENDIAN & ((1UL << VIRTIO_RING_F_GUEST_LE) | (1UL << VIRTIO_RING_F_GUEST_BE)))
->> +
->> +#ifndef __BYTE_ORDER
->> +#error "No byteorder? Giving up..."
->> +#endif
+The following changes since commit d0e639c9e06d44e713170031fe05fb60ebe680af:
 
-#ifdef __BYTE_ORDER
-#if __BYTE_ORDER == __BIG_ENDIAN
-#define BYTEORDER_TOKEN	be
-#define ENDIAN_OPPOSITE	VIRTIO_ENDIAN_LE
-#else
-#define BYTEORDER_TOKEN	le
-#define ENDIAN_OPPOSITE	VIRTIO_ENDIAN_BE
-#endif
-#define _CAT3(a,b,c)	a##b##c
-#define CAT3(a,b,c)	_CAT3(a,b,c)
-#define vio_gtoh(size, val) (endian==ENDIAN_OPPOSITE) ?\
-	CAT3(BYTEORDER_TOKEN,size,toh(val)) : val
-#define vio_htog(size, val) (endian==ENDIAN_OPPOSITE) ?\
-	CAT3(hto,BYTEORDER_TOKEN,size(val)) : val
-#else
-#error "No byteorder? Giving up..."
-#endif
+  Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
 
->> +
->> +
->> +static inline __u16 __virtio_guest_to_host_u16(u16 endian, __u16 val)
->> +{
->> +#if __BYTE_ORDER == __BIG_ENDIAN
->> +	if (endian == VIRTIO_ENDIAN_LE)
->> +		return le16toh(val);
->> +#else
->> +	if (endian == VIRTIO_ENDIAN_BE)
->> +		return be16toh(val);
->> +#endif
+are available in the git repository at:
 
-{
-	return vio_gtoh(16, val);
-}
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13/hwmod
 
-On the upside however, it does remove all the duplication and keep all 
-the mess in one place.
+for you to fetch changes up to ace1e3ec4a2540c783e65884bb7be9cd45a0a295:
 
-Robin.
+  ARM: AM33xx: hwmod: Add RNG module data (2013-10-09 09:02:51 -0600)
 
->
-> Then you can just use the endian parameter to do the right thing.
->
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+- ----------------------------------------------------------------
+Some OMAP hwmod changes for 3.13.  Significant changes here include:
+
+- - support for moving some of the hwmod flags to DT data
+
+- - support for the SSI, hardware spinlock, USB host/TLL, and RNG IP
+  blocks for various OMAPs
+
+- - a fix that again decouples hwmod data changes from unrelated DT data
+  patchsets
+
+Basic test logs are available at:
+
+http://www.pwsan.com/omap/testlogs/prcm_fixes_v3.13/20131009094936/
+
+The summary reports that the 4460varsomom boots are failing, but this looks
+incorrect - it's probably a bug in the validation scripts here.
+
+- ----------------------------------------------------------------
+Lokesh Vutla (1):
+      ARM: AM33xx: hwmod: Add RNG module data
+
+Rajendra Nayak (2):
+      ARM: OMAP2+: hwmod: cleanup HWMOD_INIT_NO_RESET usage
+      ARM: OMAP2+: hwmod: Extract no-idle and no-reset info from DT
+
+Roger Quadros (1):
+      ARM: OMAP5: hwmod data: Add USB Host and TLL modules
+
+Sebastian Reichel (1):
+      ARM: OMAP2+: hwmod data: Add SSI information
+
+Suman Anna (3):
+      ARM: OMAP2+: hwmod: check for module address space during init
+      ARM: OMAP5: hwmod data: Add spinlock data
+      ARM: AM33xx: hwmod_data: add the sysc configuration for spinlock
+
+ arch/arm/mach-omap2/omap_hwmod.c           |  49 +++++---
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |  67 +++++++++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  48 ++++++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   6 +-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 185 ++++++++++++++++++++++++++++-
+ 5 files changed, 325 insertions(+), 30 deletions(-)
+
+vmlinux object size
+(delta in bytes from test_v3.12-rc4 (d0e639c9e06d44e713170031fe05fb60ebe680af)):
+   text     data      bss    total  kernel
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+   +140    +1144        0    +1284  omap2plus_defconfig
+      0        0        0        0  omap2plus_defconfig_2430sdp_only
+   +140    +1168        0    +1308  omap2plus_defconfig_cpupm
+   +120        0        0     +120  omap2plus_defconfig_n800_multi_omap2xxx
+   +120        0        0     +120  omap2plus_defconfig_n800_only_a
+   +140    +1176        0    +1316  omap2plus_defconfig_no_pm
+  +4236     +912        0    +5148  omap2plus_defconfig_omap2_4_only
+  +4236    +1176        0    +5412  omap2plus_defconfig_omap3_4_only
+   +228     +184      -96     +316  rmk_omap3430_ldp_allnoconfig
+   +124     +264        0     +388  rmk_omap3430_ldp_oldconfig
+   +228       -4      -96     +128  rmk_omap4430_sdp_allnoconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.12-rc4 (d0e639c9e06d44e713170031fe05fb60ebe680af))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.14 (GNU/Linux)
+
+iQIcBAEBAgAGBQJSWC5wAAoJEMePsQ0LvSpLs+EP/0XG+FsqgeKnTYCpDtMQahPn
+kJqMMs4NYjt/zJ0IBHKQ2M0r2QxwvewKOEhyBdP9Z/v5rAbDp8qujSlTJv+Txt8I
+lowbWCqo1UbpdZHTCb6wf4P50F4s/dfsgIBopVsfnI/UBuALMo+ZzpHSfDIAtkMi
+aFPEn4tkrDFv/N5jxcF4l+KB6XJumRYv0rK2B+wYxhl0v3szSfpSFCVomjCxgGdw
+qd/X4CBf/ot3v5F5ePWK8EUHI/nO0xEYnuMNhoK4r3zFYBG+HLrHAW/XECqL/8iT
+Hcng4PggPLvV3FehsNHJWgNRmW2aiXZbPRS3Zvf0GjxUaQb1GVwz+hJj821rFl2Y
+AQnDUUmb5c+gvfYlPFrR/VzckZsn14nxnYwZl8gZqFVQbRjyUskBkHRKjKtDsQDW
+K62aCwbKVsAhyhPmjUUYwmjPM01k/slFvlFAr/puT9Uv6fSIFV2zaAdikOexFY+0
+oeTsW94l5POJ24KpfwGY5812KbAyjpulJuFMus4IKFiaZQ5ElEiPAipQJzV1Qv6S
+FEtzR0BEipXUT5Jp3hKGVbLcJdmJwGpBPhnoXtYGMlAezcq0Hoy5g0hMEPDaY8XW
+nEJgJdVUlj6Jp6Jva7R5uxAfJxctoXBh1YOBS4HfkT+VP7K1IC4JBpx7mLhThYW6
+oFHHRoVthqB0nyF/axHS
+=pWEm
+-----END PGP SIGNATURE-----
