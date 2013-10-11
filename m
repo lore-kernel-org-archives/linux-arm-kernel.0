@@ -1,115 +1,248 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Fri, 11 Oct 2013 19:57:16 +0530
-Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
- fault
-In-Reply-To: <20131011123839.GH12308@darko.cambridge.arm.com>
-References: <1378806670-2467-1-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy2E6aRndw88_S_3wfyTOYd5rQQTc4+Cw5Hd1DFXuM6EBA@mail.gmail.com>
- <523063AC.8040803@arm.com> <20130911193855.GN9860@cbox>
- <CAAhSdy0EZpzGOpVFOo-GWPs97XLHB8_uTZ7BTu0gP958y8JPeA@mail.gmail.com>
- <525667DB.7090705@arm.com> <20131010112425.GB21380@arm.com>
- <CAAhSdy20=U3+LZd=3i8dfqfSEaX7V+2z_y641NBLj7PkYZBadQ@mail.gmail.com>
- <20131011123839.GH12308@darko.cambridge.arm.com>
-Message-ID: <CAAhSdy1Sm2N68ZB5r9BmansGYnUgFO0ZFdUL=XB7RhJ258AAFA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 11 Oct 2013 15:35:01 +0100
+Subject: [PATCH] arm/arm64: KVM: MMIO support for BE guest
+Message-ID: <1381502101-7974-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 6:08 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Oct 10, 2013 at 05:09:03PM +0100, Anup Patel wrote:
->> On Thu, Oct 10, 2013 at 4:54 PM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > On Thu, Oct 10, 2013 at 09:39:55AM +0100, Marc Zyngier wrote:
->> >> On 10/10/13 05:51, Anup Patel wrote:
->> >> > Are you planning to go ahead with this approach ?
->> >>
->> >> [adding Catalin, as we heavily discussed this recently]
->> >>
->> >> Not as such, as it doesn't solve the full issue. It merely papers over
->> >> the whole "my cache is off" problem. More specifically, any kind of
->> >> speculative access from another CPU while caches are off in the guest
->> >> completely nukes the benefit of this patch.
->> >>
->> >> Also, turning the the caches off is another source of problems, as
->> >> speculation also screws up set/way invalidation.
->> >
->> > Indeed. The set/way operations trapping and broadcasting (or deferring)
->> > to other CPUs in software just happens to work but there is no
->> > guarantee, sooner or later we'll hit a problem. I'm even tempted to
->> > remove flush_dcache_all() calls on the booting path for the arm64
->> > kernel, we already require that whatever runs before Linux should
->> > clean&invalidate the caches.
->> >
->> > Basically, with KVM a VCPU even if running with caches/MMU disabled can
->> > still get speculative allocation into the cache. The reason for this is
->> > the other cacheable memory aliases created by the host kernel and
->> > qemu/kvmtool. I can't tell whether Xen has this issue but it may be
->> > easier in Xen to avoid memory aliases.
->> >
->> >> > We really need this patch for X-Gene L3 cache.
->> >>
->> >> So far, I can see two possibilities:
->> >> - either we mandate caches to be always on (DC bit, and you're not
->> >> allowed to turn the caches off).
->> >
->> > That's my preferred approach. For hotplug, idle, the guest would use an
->> > HVC call (PSCI) and the host takes care of re-enabling the DC bit. But
->> > we may not catch all cases (kexec probably).
->> >
->> >> - Or we mandate that caches are invalidated (by VA) for each write that
->> >> is performed with caches off.
->> >
->> > For some things like run-time code patching, on ARMv8 we need to do at
->> > least I-cache maintenance since the CPU can allocate into the I-cache
->> > (even if there are no aliases).
->>
->> It seems all approaches considered so far have a corner case in
->> one-way or another.
->
-> Yes, we try to settle on the one with least corner cases.
+Do the necessary byteswap when host and guest have different
+views of the universe. Actually, the only case we need to take
+care of is when the guest is BE. All the other cases are naturally
+handled.
 
-Ok.
+Also be careful about endianness when the data is being memcopy-ed
+from/to the run buffer.
 
->
->> Coming back to where we started, the actual problem was that when
->> Guest starts booting it sees wrong contents because it is runs with
->> MMU disable and correct contents are still in external L3 cache of X-Gene.
->
-> That's one of the problems and I think the easiest to solve. Note that
-> contents could still be in the L1/L2 (inner) cache since whole cache
-> flushing by set/way isn't guaranteed in an MP context.
->
->> How about reconsidering the approach of flushing Guest RAM (entire or
->> portion of it) to PoC by VA once before the first run of a VCPU ?
->
-> Flushing the entire guest RAM is not possible by set/way
-> (architecturally) and not efficient by VA (though some benchmark would
-> be good). Marc's patch defers this flushing when a page is faulted in
-> (at stage 2) and I think it covers the initial boot.
->
->> OR
->> We can also have KVM API using which user space can flush portions
->> of Guest RAM before running the VCPU. (I think this was a suggestion
->> from Marc Z initially)
->
-> This may not be enough. It indeed flushes the kernel image that gets
-> loaded but the kernel would write other pages (bss, page tables etc.)
-> with MMU disabled and those addresses may contain dirty cache lines that
-> have not been covered by the initial kvmtool flush. So you basically
-> need all guest non-cacheable accesses to be flushed.
->
-> The other problems are the cacheable aliases that I mentioned, so even
-> though the guest does non-cacheable accesses with the MMU off, the
-> hardware can still allocate into the cache via the other mappings. In
-> this case the guest needs to invalidate the areas of memory that it
-> wrote with caches off (or just use the DC bit to force memory accesses
-> with MMU off to be cacheable).
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_emulate.h   | 41 ++++++++++++++++++++
+ arch/arm/kvm/mmio.c                  | 74 ++++++++++++++++++++++++++++++------
+ arch/arm64/include/asm/kvm_emulate.h | 48 +++++++++++++++++++++++
+ 3 files changed, 152 insertions(+), 11 deletions(-)
 
-Having looked at all the approaches, I would vote for the approach taken
-by this patch.
-
->
-> --
-> Catalin
-
---Anup
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index a464e8d..8a6be05 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -157,4 +157,45 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
+ 	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
+ }
+ 
++static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
++{
++	return !!(*vcpu_cpsr(vcpu) & PSR_E_BIT);
++}
++
++static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
++						    unsigned long data,
++						    unsigned int len)
++{
++	if (kvm_vcpu_is_be(vcpu)) {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return be16_to_cpu(data & 0xffff);
++		default:
++			return be32_to_cpu(data);
++		}
++	}
++
++	return data;		/* Leave LE untouched */
++}
++
++static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
++						    unsigned long data,
++						    unsigned int len)
++{
++	if (kvm_vcpu_is_be(vcpu)) {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return cpu_to_be16(data & 0xffff);
++		default:
++			return cpu_to_be32(data);
++		}
++	}
++
++	return data;		/* Leave LE untouched */
++}
++
+ #endif /* __ARM_KVM_EMULATE_H__ */
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 0c25d94..5f65c95 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -33,28 +33,49 @@
+  */
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	unsigned long *dest;
+ 	unsigned int len;
+ 	int mask;
+ 
+ 	if (!run->mmio.is_write) {
+-		dest = vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt);
+-		*dest = 0;
++		unsigned long data = 0;
+ 
+ 		len = run->mmio.len;
+ 		if (len > sizeof(unsigned long))
+ 			return -EINVAL;
+ 
+-		memcpy(dest, run->mmio.data, len);
+-
+-		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
+-				*((u64 *)run->mmio.data));
++		switch (run->mmio.len) {
++		case 1:
++			data = run->mmio.data[0];
++			break;
++		case 2: {
++			u16 hword;
++			memcpy(&hword, run->mmio.data, len);
++			data = hword;
++			break;
++		}
++		case 4: {
++			u32 word;
++			memcpy(&word, run->mmio.data, len);
++			data = word;
++			break;
++		}
++		case 8: {
++			u64 dword;
++			memcpy(&dword, run->mmio.data, len);
++			data = dword;
++			break;
++		}
++		}
+ 
+ 		if (vcpu->arch.mmio_decode.sign_extend &&
+ 		    len < sizeof(unsigned long)) {
+ 			mask = 1U << ((len * 8) - 1);
+-			*dest = (*dest ^ mask) - mask;
++			data = (data ^ mask) - mask;
+ 		}
++
++		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
++			       data);
++		*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = vcpu_data_host_to_guest(vcpu, data, len);
+ 	}
+ 
+ 	return 0;
+@@ -105,6 +126,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		 phys_addr_t fault_ipa)
+ {
+ 	struct kvm_exit_mmio mmio;
++	unsigned long data;
+ 	unsigned long rt;
+ 	int ret;
+ 
+@@ -125,13 +147,43 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	}
+ 
+ 	rt = vcpu->arch.mmio_decode.rt;
++	data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), mmio.len);
++
+ 	trace_kvm_mmio((mmio.is_write) ? KVM_TRACE_MMIO_WRITE :
+ 					 KVM_TRACE_MMIO_READ_UNSATISFIED,
+ 			mmio.len, fault_ipa,
+-			(mmio.is_write) ? *vcpu_reg(vcpu, rt) : 0);
++			(mmio.is_write) ? data : 0);
++
++	if (mmio.is_write) {
++		void *datap = NULL;
++		union {
++			u8	byte;
++			u16	hword;
++			u32	word;
++			u64	dword;
++		} tmp;
++
++		switch (mmio.len) {
++		case 1:
++			tmp.byte	= data;
++			datap		= &tmp.byte;
++			break;
++		case 2:
++			tmp.hword	= data;
++			datap		= &tmp.hword;
++			break;
++		case 4:
++			tmp.word	= data;
++			datap		= &tmp.word;
++			break;
++		case 8:
++			tmp.dword	= data;
++			datap		= &tmp.dword;
++			break;
++		}
+ 
+-	if (mmio.is_write)
+-		memcpy(mmio.data, vcpu_reg(vcpu, rt), mmio.len);
++		memcpy(mmio.data, datap, mmio.len);
++	}
+ 
+ 	if (vgic_handle_mmio(vcpu, run, &mmio))
+ 		return 1;
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index eec0738..3a7d058 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -177,4 +177,52 @@ static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
+ 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
+ }
+ 
++static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
++{
++	if (vcpu_mode_is_32bit(vcpu))
++		return !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_E_BIT);
++
++	return !!(vcpu_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
++}
++
++static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
++						    unsigned long data,
++						    unsigned int len)
++{
++	if (kvm_vcpu_is_be(vcpu)) {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return be16_to_cpu(data & 0xffff);
++		case 4:
++			return be32_to_cpu(data & ((1UL << 32) - 1));
++		default:
++			return be64_to_cpu(data);
++		}
++	}
++
++	return data;		/* Leave LE untouched */
++}
++
++static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
++						    unsigned long data,
++						    unsigned int len)
++{
++	if (kvm_vcpu_is_be(vcpu)) {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return cpu_to_be16(data & 0xffff);
++		case 4:
++			return cpu_to_be32(data & ((1UL << 32) - 1));
++		default:
++			return cpu_to_be64(data);
++		}
++	}
++
++	return data;		/* Leave LE untouched */
++}
++
+ #endif /* __ARM64_KVM_EMULATE_H__ */
+-- 
+1.8.2.3
