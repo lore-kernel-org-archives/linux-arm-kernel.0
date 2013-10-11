@@ -1,30 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Oct 2013 17:44:11 -0700
-Subject: [PATCH 1/2] ARM: OMAP2+: Run make savedefconfig on
- omap2plus_defconfig to shrink it
-In-Reply-To: <5257415A.7090600@ti.com>
-References: <20131010230325.8152.27727.stgit@localhost>
- <20131010230440.8152.29871.stgit@localhost>
- <5257415A.7090600@ti.com>
-Message-ID: <20131011004411.GL29913@atomide.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 10 Oct 2013 20:59:15 -0400
+Subject: [GIT PULL] ARM: mm: Extend the runtime patch stub for PAE systems
+Message-ID: <1381453155-10567-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mugunthan V N <mugunthanvnm@ti.com> [131010 17:15]:
-> On Thursday 10 October 2013 06:04 PM, Tony Lindgren wrote:
-> > -CONFIG_TI_DAVINCI_MDIO=y
-> > -CONFIG_TI_DAVINCI_CPDMA=y
-> > -CONFIG_TI_CPSW=y
-> > -CONFIG_AT803X_PHY=y
-> Can you keep the above defines as AM335x EVM, Beagle bone, Beagle bone
-> black can use ethernet with omap2plus_defconfig
+Russell,
 
-I think they should get automatically selected by
-default with make omap2plus_defconfig, I don't think make
-savedefconfig removes any selected features.
+Please pull below series to extend the existing ARM v2p runtime patching for
+64 bit. Needed for LPAE machines which have physical memory beyond 4GB.
 
-Maybe check it though with this patch?
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
 
-Regards,
+  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 
-Tony
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for-rmk/arm-mm-lpae
+
+for you to fetch changes up to a77e0c7b2774fd52ce6bf25c2c3ffdccb7b110ff:
+
+  ARM: mm: Recreate kernel mappings in early_paging_init() (2013-10-10 20:28:19 -0400)
+
+----------------------------------------------------------------
+Santosh Shilimkar (4):
+      ARM: mm: use phys_addr_t appropriately in p2v and v2p conversions
+      ARM: mm: Introduce virt_to_idmap() with an arch hook
+      ARM: mm: Move the idmap print to appropriate place in the code
+      ARM: mm: Recreate kernel mappings in early_paging_init()
+
+Sricharan R (1):
+      ARM: mm: Correct virt_to_phys patching for 64 bit physical addresses
+
+ arch/arm/include/asm/mach/arch.h |    1 +
+ arch/arm/include/asm/memory.h    |   75 +++++++++++++++++++++++++++++-----
+ arch/arm/kernel/armksyms.c       |    1 +
+ arch/arm/kernel/head.S           |   63 +++++++++++++++++++++--------
+ arch/arm/kernel/setup.c          |    4 ++
+ arch/arm/kernel/smp.c            |    2 +-
+ arch/arm/mm/idmap.c              |    8 ++--
+ arch/arm/mm/mmu.c                |   82 ++++++++++++++++++++++++++++++++++++++
+ 8 files changed, 206 insertions(+), 30 deletions(-)
