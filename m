@@ -1,43 +1,64 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Oct 2013 20:59:15 -0400
-Subject: [GIT PULL] ARM: mm: Extend the runtime patch stub for PAE systems
-Message-ID: <1381453155-10567-1-git-send-email-santosh.shilimkar@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 11 Oct 2013 09:18:26 +0800
+Subject: [PATCH 3/3] arm64: include: asm: atomic.h: use 'unsigned int'
+ and 'atomic_t' instead of 'unsigned long' for atomic_clear_mask()
+In-Reply-To: <20131010142305.GG6199@mudshark.cambridge.arm.com>
+References: <52561137.3070608@asianux.com> <5256117A.4000009@asianux.com>
+ <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
+ <20131010100733.GH3817@mudshark.cambridge.arm.com>
+ <52568998.2080108@asianux.com>
+ <20131010142305.GG6199@mudshark.cambridge.arm.com>
+Message-ID: <525751E2.3020207@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On 10/10/2013 10:23 PM, Will Deacon wrote:
+> On Thu, Oct 10, 2013 at 12:03:52PM +0100, Chen Gang wrote:
+>> On 10/10/2013 06:07 PM, Will Deacon wrote:
+>>> On Thu, Oct 10, 2013 at 03:35:21AM +0100, Chen Gang wrote:
+>>>> In current kernel wide source, for arm64, only s390 scsi drivers use
+>>>> atomic_clear_mask(), now, s390 itself need use 'unsigned int' and
+>>>> 'atomic_t', so need match s390's atomic_clear_mask().
+>>>>
+>>>>
+>>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/atomic.h |   13 +++++++------
+>>>>  1 files changed, 7 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
+>>>> index 8363644..58808fc 100644
+>>>> --- a/arch/arm64/include/asm/atomic.h
+>>>> +++ b/arch/arm64/include/asm/atomic.h
+>>>> @@ -126,16 +126,17 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
+>>>>  	return oldval;
+>>>>  }
+>>>>  
+>>>> -static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
+>>>> +static inline void atomic_clear_mask(unsigned int mask, atomic_t *ptr)
+>>>>  {
+>>>> -	unsigned long tmp, tmp2;
+>>>> +	unsigned int tmp;
+>>>
+>>> Same comment here as for ARM; I think you want a signed int.
+>>>
+>>
+>> OK, replied in patch 2/3 for ARM.
+>>
+>> BTW: do arm64 need atomic_clear_mask()?
+> 
+> No. Neither ARM nor arm64 need this function.
+> 
 
-Please pull below series to extend the existing ARM v2p runtime patching for
-64 bit. Needed for LPAE machines which have physical memory beyond 4GB.
+OK, thank you for your confirmation.
 
-The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+Hmm... can we remove atomic_clear_mask() from ARM and arm64? (in my
+opinion, if not need, better to remove it).
 
-  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+> Will
+> 
+> 
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for-rmk/arm-mm-lpae
-
-for you to fetch changes up to a77e0c7b2774fd52ce6bf25c2c3ffdccb7b110ff:
-
-  ARM: mm: Recreate kernel mappings in early_paging_init() (2013-10-10 20:28:19 -0400)
-
-----------------------------------------------------------------
-Santosh Shilimkar (4):
-      ARM: mm: use phys_addr_t appropriately in p2v and v2p conversions
-      ARM: mm: Introduce virt_to_idmap() with an arch hook
-      ARM: mm: Move the idmap print to appropriate place in the code
-      ARM: mm: Recreate kernel mappings in early_paging_init()
-
-Sricharan R (1):
-      ARM: mm: Correct virt_to_phys patching for 64 bit physical addresses
-
- arch/arm/include/asm/mach/arch.h |    1 +
- arch/arm/include/asm/memory.h    |   75 +++++++++++++++++++++++++++++-----
- arch/arm/kernel/armksyms.c       |    1 +
- arch/arm/kernel/head.S           |   63 +++++++++++++++++++++--------
- arch/arm/kernel/setup.c          |    4 ++
- arch/arm/kernel/smp.c            |    2 +-
- arch/arm/mm/idmap.c              |    8 ++--
- arch/arm/mm/mmu.c                |   82 ++++++++++++++++++++++++++++++++++++++
- 8 files changed, 206 insertions(+), 30 deletions(-)
+Thanks.
+-- 
+Chen Gang
