@@ -1,39 +1,19 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Fri, 11 Oct 2013 15:03:12 +0200
-Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
- "include/asm/atomic.h"
-In-Reply-To: <20131011122846.GK14732@mudshark.cambridge.arm.com>
-References: <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
- <20131010100733.GH3817@mudshark.cambridge.arm.com>
- <52568998.2080108@asianux.com>
- <20131010142305.GG6199@mudshark.cambridge.arm.com>
- <525751E2.3020207@asianux.com>
- <20131011104419.GE14732@mudshark.cambridge.arm.com>
- <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
- <CAFLxGvwsx2YfNHiGtjWsANfVW74PT3KneLA-T6SpY4NEp_OSUA@mail.gmail.com>
- <20131011122846.GK14732@mudshark.cambridge.arm.com>
-Message-ID: <5257F710.5090706@nod.at>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Fri, 11 Oct 2013 15:13:39 +0200
+Subject: [PATCH 3/5] [media] s3c-camif: Use CONFIG_ARCH_S3C64XX to check
+ for S3C64xx support
+In-Reply-To: <1380392497-27406-3-git-send-email-tomasz.figa@gmail.com>
+References: <1380392497-27406-1-git-send-email-tomasz.figa@gmail.com>
+ <1380392497-27406-3-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <5257F983.9060904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 11.10.2013 14:28, schrieb Will Deacon:
-> On Fri, Oct 11, 2013 at 01:08:17PM +0100, Richard Weinberger wrote:
->> On Fri, Oct 11, 2013 at 1:47 PM, Chen Gang <gang.chen@asianux.com> wrote:
->>> In current kernel wide source code, except other architectures, only
->>> s390 scsi drivers use atomic_clear_mask(), and arm/arm64 need not
->>> support s390 drivers.
->>>
->>> So remove atomic_clear_mask() from "arm[64]/include/asm/atomic.h".
->>
->> Is it really worth removing such a primitive?
->> If someone needs it later he has to implement it from scratch and
->> introduces bugs...
-> 
-> The version we have (on ARM64 anyway) already has bugs. Given the choice
-> between fixing code that has no callers and simply removing it, I'd go for
-> the latter.
+On 09/28/2013 08:21 PM, Tomasz Figa wrote:
+> Since CONFIG_PLAT_S3C64XX is going to be removed, this patch modifies
+> the Kconfig entry of s3c-camif driver to use the proper way of checking
+> for S3C64xx support - CONFIG_ARCH_S3C64XX.
+>
+> Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
 
-Yeah, if it's broken and has no real users, send it to hell. :)
-
-Thanks,
-//richard
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
