@@ -1,44 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Oct 2013 08:18:39 -0700
-Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
-In-Reply-To: <52580438.4040002@ti.com>
-References: <20131003054104.8941.88857.stgit@localhost>
- <20131003054221.8941.87801.stgit@localhost>
- <5256AA7F.8030005@ti.com> <20131010160018.GA29913@atomide.com>
- <5257BB8C.5080001@ti.com> <52580438.4040002@ti.com>
-Message-ID: <20131011151838.GM29913@atomide.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Fri, 11 Oct 2013 08:24:51 -0700
+Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
+In-Reply-To: <201310111644.22844.marex@denx.de>
+References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
+ <201310110418.56460.marex@denx.de>
+ <CAE9FiQXKgkwgzA0ciRyahObDHvnFtEJxzOhHRo6gytdeKQ-XQQ@mail.gmail.com>
+ <201310111644.22844.marex@denx.de>
+Message-ID: <CAJ+vNU0HJs9NxPy8Erer1ZUzCAkzhQn+c0atmEZ=ZZWLgXb6Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [131011 07:07]:
-> On 10/11/2013 11:49 AM, Roger Quadros wrote:
-> > On 10/10/2013 07:00 PM, Tony Lindgren wrote:
-> >>
-> >> Well the irq_set_wake() should only be needed for suspend and resume. For runtime PM
-> >> the wake-events should be always enabled by default as pointed out by Alan Stern
-> >> a while back.
-> > 
-> > Right, but we need to update the WAKEUP_EN bit in the pad control register for that
-> > to work, no?. This is something we are not doing in the driver.
-> 
-> OK sorry, just figured out that we are doing it indeed in pcs_irq_set().
-> Wasn't able to test it yet with USB. But I don't see any issues except that
-> pcs_soc->rearm() needs to be called from pcs_irq_set() instead of from pcs_irq_unmask().
+Marek,
 
-Hmm that sounds like a different behaviour compared to what I'm seeing
-on omap3. Care to send a little fix on top of these patches so I can
-test it with my set up too? 
+Looks like you and I are getting the same results now.  Device
+enumeration is working fine through the switch however when I attempt
+to use a device behind the switch (gige adapter in my case) I find
+that I get a few interrupts to that devices irq handler then the
+system hangs (like what occurs when a read is done to dbi without the
+pcie controllers clock running).
 
-It seems that the only difference would be that we're calling rearm()
-after both masking and unmasking, which seemed unnecessary to me earlier.
- 
-> After that you can add my
-> 
-> Reviewed-by: Roger Quadros <rogerq@ti.com>
+Anyone have any ideas?
 
-Thanks, for testing, sorry I already pushed them out after Kevin
-ran his PM tests on them.
+Tim
 
-Regards,
-
-Tony
+On Fri, Oct 11, 2013 at 7:44 AM, Marek Vasut <marex@denx.de> wrote:
+> Hi Yinghai,
+>
+>> On Thu, Oct 10, 2013 at 7:18 PM, Marek Vasut <marex@denx.de> wrote:
+>> > And so does the probe log (but the pcieport failure still persists):
+>> >
+>> >
+>> > pci_bus 0000:04: bus scan returning with max=04
+>> > pci_bus 0000:04: busn_res: [bus 04-ff] end is updated to 04
+>> > pci_bus 0000:02: bus scan returning with max=04
+>> > pci_bus 0000:02: busn_res: [bus 02-ff] end is updated to 04
+>> > pci_bus 0000:01: bus scan returning with max=04
+>> > pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 04
+>> > pci_bus 0000:00: bus scan returning with max=04
+>> > pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 04
+>> > PCI: Device 0000:00:00.0 not available because of resource collisions
+>> > pcieport: probe of 0000:00:00.0 failed with error -22
+>>
+>> load pcieport driver too early.
+>
+> OK
+>
+> [...]
+>
+>> > pci_bus 0000:00: resource 4 [io  0x1000-0x10000]
+>> > pci_bus 0000:00: resource 5 [mem 0x01000000-0x01efffff]
+>> > pci_bus 0000:01: resource 0 [io  0x1000-0x1fff]
+>> > pci_bus 0000:01: resource 1 [mem 0x01000000-0x01bfffff]
+>> > pci_bus 0000:02: resource 0 [io  0x1000-0x1fff]
+>> > pci_bus 0000:02: resource 1 [mem 0x01000000-0x01bfffff]
+>> > pci_bus 0000:03: resource 0 [io  0x1000-0x1fff]
+>> > pci_bus 0000:03: resource 1 [mem 0x01000000-0x01bfffff]
+>>
+>> Looks your arch call pci_assign_unassigned_resources() too late.
+>>
+>> you should have call it with fs_initcall()...
+>
+> You're right, the pci_assign_unassigned_resources() is called from probe() call
+> of the MX6 PCIe driver, which is called from module_init().
+>
+> imx6_pcie_init() -> imx6_pcie_probe() -> imx6_add_pcie_port() ->
+> dw_pcie_host_init() -> pci_assign_unassigned_resources()
+>
+>> please try to boot with "debug ignore_loglevel initcall_debug" to sort out
+>> the initcall sequence.
+>
+> Yes, probing the MX6 PCIe driver in fs_initcall() actually fixed my issues:
+>
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 32b30ca..771892a 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+>
+> @@ -587,7 +590,7 @@ static int __init imx6_pcie_init(void)
+>  {
+>         return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
+>  }
+> -module_init(imx6_pcie_init);
+> +fs_initcall(imx6_pcie_init);
+>
+>  MODULE_AUTHOR("Sean Cross <xobs@kosagi.com>");
+>  MODULE_DESCRIPTION("Freescale i.MX6 PCIe host controller driver");
+>
+> Best regards,
+> Marek Vasut
