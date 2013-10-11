@@ -1,38 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 11 Oct 2013 12:40:13 -0600
-Subject: [PATCH V2 0/4]
-In-Reply-To: <1381485519-4027-1-git-send-email-josephl@nvidia.com>
-References: <1381485519-4027-1-git-send-email-josephl@nvidia.com>
-Message-ID: <5258460D.7060505@wwwdotorg.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 11 Oct 2013 21:46:29 +0300
+Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
+In-Reply-To: <alpine.DEB.2.02.1310111749180.27397@utopia.booyaka.com>
+References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
+ <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
+ <52525642.8010307@ti.com> <20131007154103.GW8949@atomide.com>
+ <20131007190322.GY8949@atomide.com>
+ <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
+ <alpine.DEB.2.02.1310091858411.30199@utopia.booyaka.com>
+ <525654AE.7060009@ti.com>
+ <alpine.DEB.2.02.1310111749180.27397@utopia.booyaka.com>
+Message-ID: <52584785.2020504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2013 03:58 AM, Joseph Lo wrote:
-> This series adds the LP1 support for Tegra124. (suspend to LP2 also
-> supported in this series)
-> 
-> Note:
-> This patch series depends on the patch series below.
-> * [PATCH 0/5] Tegra124 clock support
-> * [PATCH V2 0/6] ARM: tegra: basic support for Tegra124 SoC
-> * [PATCH] ARM: tegra: add clock properties for devices of Tegra124
-> * [PATCH] ARM: tegra: enable Tegra RTC as default for Tegra124
-> * [PATCH 0/4] ARM: tegra: add CPU hot-plug and idle support for Tegra124
-> 
-> Verified on Cardhu, Dalmore and Venice2 and with THUMB2_KERNEL as well.
+On 10/11/2013 08:54 PM, Paul Walmsley wrote:
+> On Thu, 10 Oct 2013, Tero Kristo wrote:
+>
+>> On 10/09/2013 09:59 PM, Paul Walmsley wrote:
+>>> Eh, one correction:
+>>>
+>>> On Wed, 9 Oct 2013, Paul Walmsley wrote:
+>>>
+>>>> We could easily wind up with kernels that won't boot at all when used
+>>>> with newer DT data.
+>>>
+>>> This is a misstatement of the issue: the concern here is that newer
+>>> kernels may not boot at all with older DT data - which could easily be in
+>>> locked areas of the flash or firmware.
+>>
+>> I wonder who would be crazy enough to put DT data into a locked area, and to
+>> what purpose. If you can update the kernel, there is no point locking down DT
+>> data, this will just cause you unnecessary misery.
+>
+> The DT data will be used by bootloaders also :-(
+>
+> In situations where the bootloaders are signed and locked, the security
+> people are also insisting that the DT data be signed and locked.
 
-I have applied patches 2-3 to Tegra's for-3.13/soc branch, and patch 4
-to Tegra's for-3.13/dt branch.
+Oh yea, one additional note you probably have missed. Mike asked us to 
+fall back to vendor specific bindings at around v6 or so of this set. 
+Take a look at v8, we have dropped the use of generic bindings, we are 
+not trying to declare those with this set. This set introduces vendor 
+specific bindings only, and even these are claimed 'unstable', which 
+should be enough to discourage people from burning those to OTP type memory.
 
-I have not applied patch 1, since that's a clock driver change. Please
-work with Mike and/or Peter to send that patch through the clock tree.
-In general, if there aren't any compile-time or run-time dependencies
-(for existing features, not new ones) between patches, patches for
-different subsystems should be sent separately, rather than as a
-combined series.
-
-Note that "[PATCH] ARM: tegra: add clock properties for devices of
-Tegra124" is not yet applied; I'm waiting for Peter's Tegra124 clock
-series to be finalized before applying that. There's no compile-time
-dependency here, and the patch only enables new features without
-breaking existing ones, so there's no bisection issue here.
+-Tero
