@@ -1,66 +1,37 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 11 Oct 2013 12:11:04 +0200
-Subject: [PATCH 3/3] ASoC: mxs-saif: Handle errors in trigger function
+Date: Fri, 11 Oct 2013 12:11:02 +0200
+Subject: [PATCH 1/3] ASoC: snd_soc_dai_ops trigger function description
 In-Reply-To: <1381486264-1672-1-git-send-email-mpa@pengutronix.de>
 References: <1381486264-1672-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1381486264-1672-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1381486264-1672-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a comment to the trigger function in snd_soc_dai_ops struct about
+possible command sequences.
+
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/mxs/mxs-saif.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+ include/sound/soc-dai.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index c8ead01..fc3d89b 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -494,6 +494,7 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
- 	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
- 	struct mxs_saif *master_saif;
- 	u32 delay;
-+	int ret;
- 
- 	master_saif = mxs_saif_get_master(saif);
- 	if (!master_saif)
-@@ -508,21 +509,32 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
- 
- 		dev_dbg(cpu_dai->dev, "start\n");
- 
--		clk_enable(master_saif->clk);
--		if (!master_saif->mclk_in_use)
--			__raw_writel(BM_SAIF_CTRL_RUN,
--				master_saif->base + SAIF_CTRL + MXS_SET_ADDR);
-+		ret = clk_enable(master_saif->clk);
-+		if (ret) {
-+			dev_err(saif->dev, "Failed to enable master clock\n");
-+			return ret;
-+		}
- 
- 		/*
- 		 * If the saif's master is not himself, we also need to enable
- 		 * itself clk for its internal basic logic to work.
- 		 */
- 		if (saif != master_saif) {
--			clk_enable(saif->clk);
-+			ret = clk_enable(saif->clk);
-+			if (ret) {
-+				dev_err(saif->dev, "Failed to enable master clock\n");
-+				clk_disable(master_saif->clk);
-+				return ret;
-+			}
-+
- 			__raw_writel(BM_SAIF_CTRL_RUN,
- 				saif->base + SAIF_CTRL + MXS_SET_ADDR);
- 		}
- 
-+		if (!master_saif->mclk_in_use)
-+			__raw_writel(BM_SAIF_CTRL_RUN,
-+				master_saif->base + SAIF_CTRL + MXS_SET_ADDR);
-+
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
- 			/*
- 			 * write data to saif data register to trigger
+diff --git a/include/sound/soc-dai.h b/include/sound/soc-dai.h
+index ae9a227..0f2e5da 100644
+--- a/include/sound/soc-dai.h
++++ b/include/sound/soc-dai.h
+@@ -166,6 +166,13 @@ struct snd_soc_dai_ops {
+ 		struct snd_soc_dai *);
+ 	int (*prepare)(struct snd_pcm_substream *,
+ 		struct snd_soc_dai *);
++	/*
++	 * NOTE: Commands passed to the trigger function are not necessarily
++	 * compatible with the current state of the dai. For example this
++	 * sequence of commands is possible: START STOP STOP.
++	 * So do not unconditionally use refcounting functions in the trigger
++	 * function, e.g. clk_enable/disable.
++	 */
+ 	int (*trigger)(struct snd_pcm_substream *, int,
+ 		struct snd_soc_dai *);
+ 	int (*bespoke_trigger)(struct snd_pcm_substream *, int,
 -- 
 1.8.4.rc3
