@@ -1,61 +1,103 @@
-From: a.motakis@virtualopensystems.com (Antonios Motakis)
-Date: Fri, 11 Oct 2013 15:24:46 +0200
-Subject: [PATCH 1/2] ARM: SMMU: add devices attached to the SMMU to an IOMMU
- group
-Message-ID: <1381497887-14586-1-git-send-email-a.motakis@virtualopensystems.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 11 Oct 2013 08:37:31 -0500
+Subject: [PATCH 2/5] usb: gadget: s3c-hsotg: support configurable UTMI
+ PHY width
+In-Reply-To: <52576EBA.9000502@linaro.org>
+References: <1381140752-312-1-git-send-email-matt.porter@linaro.org>
+ <1381140752-312-3-git-send-email-matt.porter@linaro.org>
+ <20131010152922.GF28375@radagast> <5256DBD0.8030008@linaro.org>
+ <20131010174620.GC19802@radagast>
+ <A2CA0424C0A6F04399FB9E1CD98E030458E16893@US01WEMBX2.internal.synopsys.com>
+ <5256FAFA.1020509@linaro.org> <52576EBA.9000502@linaro.org>
+Message-ID: <20131011133731.GD25706@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU groups are expected by certain users of the IOMMU API,
-e.g. VFIO. Add new devices found by the SMMU driver to an IOMMU
-group to satisfy those users.
+Hi,
 
-Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
----
- drivers/iommu/arm-smmu.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+On Thu, Oct 10, 2013 at 11:21:30PM -0400, Matt Porter wrote:
+> On 10/10/2013 03:07 PM, Matt Porter wrote:
+> >On 10/10/2013 01:57 PM, Paul Zimmerman wrote:
+> >>>From: Felipe Balbi [mailto:balbi at ti.com]
+> >>>Sent: Thursday, October 10, 2013 10:46 AM
+> >>>
+> >>>On Thu, Oct 10, 2013 at 12:54:40PM -0400, Matt Porter wrote:
+> >>>>On 10/10/2013 11:29 AM, Felipe Balbi wrote:
+> >>>>>On Mon, Oct 07, 2013 at 06:12:29AM -0400, Matt Porter wrote:
+> >>>>>>Extend dwc2 binding with an optional utmi phy width property.
+> >>>>>>Enable the s3c-hsotg.c driver to use standard dwc2 binding
+> >>>>>>and enable configuration of the UTMI phy width based on the
+> >>>>>>property.
+> >>>>>>
+> >>>>>>Signed-off-by: Matt Porter <matt.porter@linaro.org>
+> >>>>>>Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> >>>>>>Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> >>>>>>---
+> >>>>>>  Documentation/devicetree/bindings/staging/dwc2.txt |  4 ++++
+> >>>>>>  drivers/usb/gadget/s3c-hsotg.c                     | 18
+> >>>>>>+++++++++++++++++-
+> >>>>>>  drivers/usb/gadget/s3c-hsotg.h                     |  1 +
+> >>>>>>  3 files changed, 22 insertions(+), 1 deletion(-)
+> >>>>>>
+> >>>>>>diff --git a/Documentation/devicetree/bindings/staging/dwc2.txt
+> >>>b/Documentation/devicetree/bindings/staging/dwc2.txt
+> >>>>>>index 1a1b7cf..fb6b8ee 100644
+> >>>>>>--- a/Documentation/devicetree/bindings/staging/dwc2.txt
+> >>>>>>+++ b/Documentation/devicetree/bindings/staging/dwc2.txt
+> >>>>>>@@ -6,10 +6,14 @@ Required properties:
+> >>>>>>  - reg : Should contain 1 register range (address and length)
+> >>>>>>  - interrupts : Should contain 1 interrupt
+> >>>>>>
+> >>>>>>+Optional properties:
+> >>>>>>+- snps,phy-utmi-width: Must contain the UTMI data width (either 8
+> >>>>>>or 16)
+> >>>>>
+> >>>>>isn't this available in any of the configuration registers ?
+> >>>>
+> >>>>Yes and no. HWCFG4 has a UTMI data width field. However, it has 3
+> >>>>valid states, "8", "16", or "8 or 16". The BCM281xx implementation is
+> >>>>set to the latter and the attached phy is 8-bit.
+> >>>>
+> >>>>Looking at dwc2 prior to Matthijs Kooijman's patch [1] which starts
+> >>>>validating the value of phy_utmi_width in that driver, the pci.c
+> >>>>dwc2_module_params .phy_utmi_width field there even had the comment,
+> >>>>"/* 16 bits - NOT DETECTABLE */". The autodetect code in
+> >>>>dwc2_set_param_phy_utmi_width() will fail if HWCFG4 has the "8 or 16"
+> >>>>option as it just decides to default to a phy width of 16 if nothing
+> >>>>is configured by the platform glue. This property would also allow
+> >>>>this issue to be addressed in that driver.
+> >>>
+> >>>fair enough, but I'd really like to hear from DT folks if your suggested
+> >>>binding is acceptable. It seems like we can equally argue that it's a SW
+> >>>configuration or HW description.
+> >>
+> >>It's definitely a HW description - the width of the UTMI data connection.
+> >>
+> >>But, which PHY is this? Does it have a register that could tell what
+> >>the data width is? The dwc2 core has an (optional) PHY Vendor Control
+> >>Register that allows reading the PHY registers.
+> >
+> >This is the integrated PHY on the bcm28155 part (the entire
+> >bcm281xx/11351 family shares it). My register doc doesn't show the
+> >optional PHY vendor control register as being present in this dwc2
+> >implementation. I'll track down with the design team if this is
+> >accurate...but it appears we can't go that route.
+> 
+> The design team confirmed that we do not have any registers that can
+> be accessed via the PHY Vendor Control Register. All PHY control
+> registers are implemented in the MMIO control block which is
+> supported in the PHY control driver later in this series.They also
+> confirmed there's no other way to detect that it's an 8-bit data
+> path.
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 0f45a48..8b71332 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1502,6 +1502,8 @@ static int arm_smmu_add_device(struct device *dev)
- {
- 	struct arm_smmu_device *child, *parent, *smmu;
- 	struct arm_smmu_master *master = NULL;
-+	struct iommu_group *group;
-+	int ret;
- 
- 	spin_lock(&arm_smmu_devices_lock);
- 	list_for_each_entry(parent, &arm_smmu_devices, list) {
-@@ -1534,13 +1536,27 @@ static int arm_smmu_add_device(struct device *dev)
- 	if (!master)
- 		return -ENODEV;
- 
-+	group = iommu_group_get(dev);
-+
-+	if (!group) {
-+		group = iommu_group_alloc();
-+		if (IS_ERR(group)) {
-+			dev_err(dev, "Failed to allocate IOMMU group\n");
-+			return PTR_ERR(group);
-+		}
-+	}
-+
-+	ret = iommu_group_add_device(group, dev);
-+	iommu_group_put(group);
- 	dev->archdata.iommu = smmu;
--	return 0;
-+
-+	return ret;
- }
- 
- static void arm_smmu_remove_device(struct device *dev)
- {
- 	dev->archdata.iommu = NULL;
-+	iommu_group_remove_device(dev);
- }
- 
- static struct iommu_ops arm_smmu_ops = {
+then we need the DT binding, let's see what DT maintainers say.
+
 -- 
-1.8.1.2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131011/e050f9b3/attachment.sig>
