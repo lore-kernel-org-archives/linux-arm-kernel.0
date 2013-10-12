@@ -1,100 +1,42 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Sat, 12 Oct 2013 02:16:17 +0000
-Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
-In-Reply-To: <CAJ+vNU0HJs9NxPy8Erer1ZUzCAkzhQn+c0atmEZ=ZZWLgXb6Kw@mail.gmail.com>
-References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
- <201310110418.56460.marex@denx.de>
- <CAE9FiQXKgkwgzA0ciRyahObDHvnFtEJxzOhHRo6gytdeKQ-XQQ@mail.gmail.com>
- <201310111644.22844.marex@denx.de>
- <CAJ+vNU0HJs9NxPy8Erer1ZUzCAkzhQn+c0atmEZ=ZZWLgXb6Kw@mail.gmail.com>
-Message-ID: <0E83723C55F66F43A6041464FE31119D40A9C9@039-SN2MPN1-011.039d.mgd.msft.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 12 Oct 2013 02:19:57 +0000 (UTC)
+Subject: [PATCH 00/11] ARM: OMAP2+: CM cleanup series
+In-Reply-To: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
+References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1310120139280.27397@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim:
-As I know that the clock of pcie controller should be always running.
-There are not clock gate on/off operations in host driver after the initialization.
+Hi
+
+On Fri, 11 Oct 2013, Tero Kristo wrote:
+
+> A small cleanup set for CM. This basically gets rid of the omap2_cm_*
+> register accesses from the random code locations, and gathers these
+> under cm2xxx.c and cm3xxx.c. This is done in preparation for creating
+> a separate CM driver. The set also contains a couple of PRM cleanups
+> which I decided to take care of at the same time due to overlapping
+> code (PRCM interrupt handler + DSP reset.)
+> 
+> TODO: cleanup dsp bridge code (arch/arm/mach-omap2/dsp.c.)
+> 
+> Tested on OMAP3 beagle + 3.12-rc3.
+
+Looks like at least one patch has a dependency on your DT clk patches:
+
+Importing patch "clk-ti-add-dt-alias-clock" ... 
+error: drivers/clk/ti/Makefile: does not exist in index
+error: include/linux/clk/ti.h: does not exist in index
+stg import: Diff does not apply cleanly
+
+Tried compiling the rest, but the build broke:
+
+arch/arm/mach-omap2/mcbsp.c: In function 'omap3_enable_st_clock':
+arch/arm/mach-omap2/mcbsp.c:46:3: error: implicit declaration of function 'omap2_clk_deny_idle'
+arch/arm/mach-omap2/mcbsp.c:48:3: error: implicit declaration of function 'omap2_clk_allow_idle'
+make[1]: *** [arch/arm/mach-omap2/mcbsp.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
+make: *** Waiting for unfinished jobs....
 
 
-Best Regards
-Richard Zhu
-
-
------Original Message-----
-From: Tim Harvey [mailto:tharvey at gateworks.com] 
-Sent: Friday, October 11, 2013 11:25 PM
-To: Marek Vasut
-Cc: Yinghai Lu; Bjorn Helgaas; Zhu Richard-R65037; linux-arm-kernel at lists.infradead.org; Shawn Guo; linux-pci at vger.kernel.org; Frank Li; Sean Cross; Sascha Hauer
-Subject: Re: [PATCH v7 0/2] Add PCIe support for i.MX6q
-
-Marek,
-
-Looks like you and I are getting the same results now.  Device enumeration is working fine through the switch however when I attempt to use a device behind the switch (gige adapter in my case) I find that I get a few interrupts to that devices irq handler then the system hangs (like what occurs when a read is done to dbi without the pcie controllers clock running).
-
-Anyone have any ideas?
-
-Tim
-
-On Fri, Oct 11, 2013 at 7:44 AM, Marek Vasut <marex@denx.de> wrote:
-> Hi Yinghai,
->
->> On Thu, Oct 10, 2013 at 7:18 PM, Marek Vasut <marex@denx.de> wrote:
->> > And so does the probe log (but the pcieport failure still persists):
->> >
->> >
->> > pci_bus 0000:04: bus scan returning with max=04 pci_bus 0000:04: 
->> > busn_res: [bus 04-ff] end is updated to 04 pci_bus 0000:02: bus 
->> > scan returning with max=04 pci_bus 0000:02: busn_res: [bus 02-ff] 
->> > end is updated to 04 pci_bus 0000:01: bus scan returning with 
->> > max=04 pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 04 
->> > pci_bus 0000:00: bus scan returning with max=04 pci_bus 0000:00: 
->> > busn_res: [bus 00-ff] end is updated to 04
->> > PCI: Device 0000:00:00.0 not available because of resource 
->> > collisions
->> > pcieport: probe of 0000:00:00.0 failed with error -22
->>
->> load pcieport driver too early.
->
-> OK
->
-> [...]
->
->> > pci_bus 0000:00: resource 4 [io  0x1000-0x10000] pci_bus 0000:00: 
->> > resource 5 [mem 0x01000000-0x01efffff] pci_bus 0000:01: resource 0 
->> > [io  0x1000-0x1fff] pci_bus 0000:01: resource 1 [mem 
->> > 0x01000000-0x01bfffff] pci_bus 0000:02: resource 0 [io  
->> > 0x1000-0x1fff] pci_bus 0000:02: resource 1 [mem 
->> > 0x01000000-0x01bfffff] pci_bus 0000:03: resource 0 [io  
->> > 0x1000-0x1fff] pci_bus 0000:03: resource 1 [mem 
->> > 0x01000000-0x01bfffff]
->>
->> Looks your arch call pci_assign_unassigned_resources() too late.
->>
->> you should have call it with fs_initcall()...
->
-> You're right, the pci_assign_unassigned_resources() is called from 
-> probe() call of the MX6 PCIe driver, which is called from module_init().
->
-> imx6_pcie_init() -> imx6_pcie_probe() -> imx6_add_pcie_port() ->
-> dw_pcie_host_init() -> pci_assign_unassigned_resources()
->
->> please try to boot with "debug ignore_loglevel initcall_debug" to 
->> sort out the initcall sequence.
->
-> Yes, probing the MX6 PCIe driver in fs_initcall() actually fixed my issues:
->
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c 
-> index 32b30ca..771892a 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
->
-> @@ -587,7 +590,7 @@ static int __init imx6_pcie_init(void)  {
->         return platform_driver_probe(&imx6_pcie_driver, 
-> imx6_pcie_probe);  } -module_init(imx6_pcie_init);
-> +fs_initcall(imx6_pcie_init);
->
->  MODULE_AUTHOR("Sean Cross <xobs@kosagi.com>");  
-> MODULE_DESCRIPTION("Freescale i.MX6 PCIe host controller driver");
->
-> Best regards,
-> Marek Vasut
+- Paul
