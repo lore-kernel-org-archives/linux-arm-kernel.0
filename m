@@ -1,24 +1,79 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 12 Oct 2013 13:33:29 +0100
-Subject: [PATCH RESEND 0/3] ARM: S3C24XX: add missing dma-devices and
- warning fix
-In-Reply-To: <15184009.9QsSDOGPSA@amdn883>
-References: <201310111059.19791.heiko@sntech.de> <15184009.9QsSDOGPSA@amdn883>
-Message-ID: <20131012123329.GL2443@sirena.org.uk>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Sat, 12 Oct 2013 18:56:08 +0530
+Subject: [RESEND PATCH V2 1/2] ARM: dts: AM33xx: Add RNG node
+In-Reply-To: <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
+References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
+ <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
+Message-ID: <52594DF0.1050002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 12, 2013 at 06:36:36AM +0200, Tomasz Figa wrote:
+Hi Benoit,
+On Thursday 29 August 2013 06:22 PM, Lokesh Vutla wrote:
+> Add the AM33xx RNG module's device tree data.
+> Also add Documentation file describing the data
+> for the RNG module.
+Seems you missed this patch. Please consider this for this merge window.
+Patch 2/2 is already taken by Paul.
+Without this patch AM335x boot will crash as I mentioned in my cover letter.
 
-> Big thanks for this series and the one adding DMA engine support for
-> S3C24xx. It would be great if someone could test this on affected
-> platforms, so we could finally drop the old S3C-DMA nonsense.
-
-Did the s3c64xx pl08x stuff get merged?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131012/aa9cd86c/attachment.sig>
+Thanks and regards,
+Lokesh
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+> Changes since V1:
+> - Drop "status=disabled" entry in dt node, Since
+>   RNG is present on all AM33xx platforms.
+> 
+>  .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
+>  arch/arm/boot/dts/am33xx.dtsi                      |    7 +++++++
+>  2 files changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+> new file mode 100644
+> index 0000000..6a62acd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+> @@ -0,0 +1,22 @@
+> +OMAP SoC HWRNG Module
+> +
+> +Required properties:
+> +
+> +- compatible : Should contain entries for this and backward compatible
+> +  RNG versions:
+> +  - "ti,omap2-rng" for OMAP2.
+> +  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
+> +  Note that these two versions are incompatible.
+> +- ti,hwmods: Name of the hwmod associated with the RNG module
+> +- reg : Offset and length of the register set for the module
+> +- interrupts : the interrupt number for the RNG module.
+> +		Only used for "ti,omap4-rng".
+> +
+> +Example:
+> +/* AM335x */
+> +rng: rng at 48310000 {
+> +	compatible = "ti,omap4-rng";
+> +	ti,hwmods = "rng";
+> +	reg = <0x48310000 0x2000>;
+> +	interrupts = <111>;
+> +};
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 38b446b..26ebe30 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -530,5 +530,12 @@
+>  			#size-cells = <1>;
+>  			status = "disabled";
+>  		};
+> +
+> +		rng: rng at 48310000 {
+> +			compatible = "ti,omap4-rng";
+> +			ti,hwmods = "rng";
+> +			reg = <0x48310000 0x2000>;
+> +			interrupts = <111>;
+> +		};
+>  	};
+>  };
+> 
