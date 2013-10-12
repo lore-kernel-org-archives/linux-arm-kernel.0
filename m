@@ -1,60 +1,54 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 12 Oct 2013 17:09:38 +0800
-Subject: [PATCH 04/12] usb: phy: add notify suspend and resume callback
+Date: Sat, 12 Oct 2013 17:09:36 +0800
+Subject: [PATCH 02/12] usb: phy-mxs: Enable IC fixes for mx6 SoC serial
 In-Reply-To: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1381568986-19802-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1381568986-19802-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They are used to notify PHY that the controller enters suspend
-or finishes resume.
+After adding IC fixes bits, some PHY bugs are fixed by
+IC logic.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- include/linux/usb/phy.h |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index 6c0b1c5..a747960 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -116,6 +116,11 @@ struct usb_phy {
- 			enum usb_device_speed speed);
- 	int	(*notify_disconnect)(struct usb_phy *x,
- 			enum usb_device_speed speed);
-+	int	(*notify_suspend)(struct usb_phy *x,
-+			enum usb_device_speed speed);
-+	int	(*notify_resume)(struct usb_phy *x,
-+			enum usb_device_speed speed);
-+
- };
+diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+index 87ba429..831b13e 100644
+--- a/drivers/usb/phy/phy-mxs-usb.c
++++ b/drivers/usb/phy/phy-mxs-usb.c
+@@ -29,6 +29,10 @@
+ #define HW_USBPHY_CTRL_SET			0x34
+ #define HW_USBPHY_CTRL_CLR			0x38
  
- /**
-@@ -282,6 +287,24 @@ usb_phy_notify_disconnect(struct usb_phy *x, enum usb_device_speed speed)
- 		return 0;
++#define HW_USBPHY_IP				0x90
++#define HW_USBPHY_IP_SET			0x94
++#define HW_USBPHY_IP_CLR			0x98
++
+ #define BM_USBPHY_CTRL_SFTRST			BIT(31)
+ #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
+ #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
+@@ -40,6 +44,8 @@
+ #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+ #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+ 
++#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
++
+ #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+ 
+ enum imx_phy_type {
+@@ -118,6 +124,10 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+ 		BM_USBPHY_CTRL_ENUTMILEVEL3,
+ 	       base + HW_USBPHY_CTRL_SET);
+ 
++	/* Enable IC solution */
++	if (is_mx6q_phy(mxs_phy) || is_mx6sl_phy(mxs_phy))
++		writel(BM_USBPHY_IP_FIX, base + HW_USBPHY_IP_SET);
++
+ 	return 0;
  }
  
-+static inline int usb_phy_notify_suspend
-+	(struct usb_phy *x, enum usb_device_speed speed)
-+{
-+	if (x && x->notify_suspend)
-+		return x->notify_suspend(x, speed);
-+	else
-+		return 0;
-+}
-+
-+static inline int usb_phy_notify_resume
-+	(struct usb_phy *x, enum usb_device_speed speed)
-+{
-+	if (x && x->notify_resume)
-+		return x->notify_resume(x, speed);
-+	else
-+		return 0;
-+}
-+
- /* notifiers */
- static inline int
- usb_register_notifier(struct usb_phy *x, struct notifier_block *nb)
 -- 
 1.7.1
