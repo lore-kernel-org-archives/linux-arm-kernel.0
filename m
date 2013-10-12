@@ -1,38 +1,40 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 12 Oct 2013 17:09:44 +0800
-Subject: [PATCH 10/12] ARM: dts: imx6: add anatop phandle for usbphy
+Date: Sat, 12 Oct 2013 17:09:45 +0800
+Subject: [PATCH 11/12] usb: phy-mxs: update binding for adding disconnect line
+ property
 In-Reply-To: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1381568986-19802-11-git-send-email-peter.chen@freescale.com>
+Message-ID: <1381568986-19802-12-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add anatop phandle for usbphy
+This property is used to disconnect line between USB PHY and
+USB controller.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/usb/mxs-phy.txt |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ef51342..145ece2 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -541,6 +541,7 @@
- 				reg = <0x020c9000 0x1000>;
- 				interrupts = <0 44 0x04>;
- 				clocks = <&clks 182>;
-+				fsl,anatop = <&anatop>;
- 			};
+diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+index 1a9bd85..099b0bb 100644
+--- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
++++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+@@ -5,6 +5,9 @@ Required properties:
+ - reg: Should contain registers location and length
+ - interrupts: Should contain phy interrupt
+ - fsl,anatop: phandle for anatop register
++- disconnect_line_without_vbus: needs to disconnect
++connection between USB PHY and controller, it can avoid
++unexpected wakeup interrupt when the PHY is out of power
  
- 			usbphy2: usbphy at 020ca000 {
-@@ -548,6 +549,7 @@
- 				reg = <0x020ca000 0x1000>;
- 				interrupts = <0 45 0x04>;
- 				clocks = <&clks 183>;
-+				fsl,anatop = <&anatop>;
- 			};
- 
- 			snvs at 020cc000 {
+ Example:
+ usbphy1: usbphy at 020c9000 {
+@@ -12,4 +15,5 @@ usbphy1: usbphy at 020c9000 {
+ 	reg = <0x020c9000 0x1000>;
+ 	interrupts = <0 44 0x04>;
+ 	fsl,anatop = <&anatop>;
++	disconnect_line_without_vbus;
+ };
 -- 
 1.7.1
