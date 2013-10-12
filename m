@@ -1,40 +1,34 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 12 Oct 2013 17:09:45 +0800
-Subject: [PATCH 11/12] usb: phy-mxs: update binding for adding disconnect line
- property
+Date: Sat, 12 Oct 2013 17:09:46 +0800
+Subject: [PATCH 12/12] ARM: dts: imx6: Add disconnect_line_without_vbus
+ property for usbphy
 In-Reply-To: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1381568986-19802-12-git-send-email-peter.chen@freescale.com>
+Message-ID: <1381568986-19802-13-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This property is used to disconnect line between USB PHY and
-USB controller.
+When the vbus is not there and the PHY is out of power, we need to
+disconnect connection between USB PHY and USB controller, otherwise
+the unexpected USB wakeup will occur due to dp/dm change at device
+mode.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- Documentation/devicetree/bindings/usb/mxs-phy.txt |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-index 1a9bd85..099b0bb 100644
---- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-+++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-@@ -5,6 +5,9 @@ Required properties:
- - reg: Should contain registers location and length
- - interrupts: Should contain phy interrupt
- - fsl,anatop: phandle for anatop register
-+- disconnect_line_without_vbus: needs to disconnect
-+connection between USB PHY and controller, it can avoid
-+unexpected wakeup interrupt when the PHY is out of power
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 145ece2..b95ab40 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -542,6 +542,7 @@
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks 182>;
+ 				fsl,anatop = <&anatop>;
++				disconnect_line_without_vbus;
+ 			};
  
- Example:
- usbphy1: usbphy at 020c9000 {
-@@ -12,4 +15,5 @@ usbphy1: usbphy at 020c9000 {
- 	reg = <0x020c9000 0x1000>;
- 	interrupts = <0 44 0x04>;
- 	fsl,anatop = <&anatop>;
-+	disconnect_line_without_vbus;
- };
+ 			usbphy2: usbphy at 020ca000 {
 -- 
 1.7.1
