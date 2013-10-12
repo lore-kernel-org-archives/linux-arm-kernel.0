@@ -1,54 +1,110 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 12 Oct 2013 17:09:40 +0800
-Subject: [PATCH 06/12] usb: phy: Add set_wakeup API
+Date: Sat, 12 Oct 2013 17:09:39 +0800
+Subject: [PATCH 05/12] usb: phy-mxs: Add implementation of nofity_suspend and
+ notify_resume
 In-Reply-To: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1381568986-19802-7-git-send-email-peter.chen@freescale.com>
+Message-ID: <1381568986-19802-6-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This API is used to set wakeup enable at PHY registers, in that
-case, the PHY can be waken up from suspend due to external events,
-like vbus change, dp/dm change and id change.
+Add notify_suspend and notify_resume according to different SoCs.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- include/linux/usb/phy.h |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |   73 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 73 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index a747960..c6ebe1d 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -111,6 +111,13 @@ struct usb_phy {
- 	int	(*set_suspend)(struct usb_phy *x,
- 				int suspend);
- 
-+	/*
-+	 * Set wakeup enable for PHY, in that case, the PHY can be
-+	 * waken up from suspend status due to external events,
-+	 * like vbus change, dp/dm change and id.
-+	 */
-+	int	(*set_wakeup)(struct usb_phy *x, bool enabled);
-+
- 	/* notify phy connect status change */
- 	int	(*notify_connect)(struct usb_phy *x,
- 			enum usb_device_speed speed);
-@@ -270,6 +277,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
+diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+index e0b0de0..8661dae 100644
+--- a/drivers/usb/phy/phy-mxs-usb.c
++++ b/drivers/usb/phy/phy-mxs-usb.c
+@@ -197,6 +197,78 @@ static int mxs_phy_on_disconnect(struct usb_phy *phy,
+ 	return 0;
  }
  
- static inline int
-+usb_phy_set_wakeup(struct usb_phy *x, bool enabled)
++static int mxs_phy_on_suspend_workaround(struct usb_phy *phy,
++		enum usb_device_speed speed)
 +{
-+	if (x && x->set_wakeup)
-+		return x->set_wakeup(x, enabled);
-+	else
-+		return 0;
++	dev_dbg(phy->dev, "%s speed device has suspended\n",
++		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
++
++	/* delay 4ms to wait bus entering idle */
++	usleep_range(4000, 5000);
++
++	/*
++	 * Workaround for wakeup signal between portsc.suspendM
++	 * and PHY enters low power mode.
++	 */
++	writel_relaxed(0xffffffff, phy->io_priv + HW_USBPHY_PWD);
++	writel_relaxed(0, phy->io_priv + HW_USBPHY_PWD);
++
++	if (speed == USB_SPEED_HIGH)
++		writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
++				phy->io_priv + HW_USBPHY_CTRL_CLR);
++
++	return 0;
 +}
 +
-+static inline int
- usb_phy_notify_connect(struct usb_phy *x, enum usb_device_speed speed)
++static int mxs_phy_on_suspend(struct usb_phy *phy,
++		enum usb_device_speed speed)
++{
++	dev_dbg(phy->dev, "%s speed device has suspended\n",
++		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
++
++	if (speed == USB_SPEED_HIGH)
++		writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
++				phy->io_priv + HW_USBPHY_CTRL_CLR);
++
++	return 0;
++}
++
++/*
++ * The resume signal must be finished here.
++ */
++static int mxs_phy_on_resume(struct usb_phy *phy,
++		enum usb_device_speed speed)
++{
++	dev_dbg(phy->dev, "%s speed device has resumed\n",
++		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
++
++	if (speed == USB_SPEED_HIGH) {
++		/* Make sure the device has switched to High-Speed mode */
++		udelay(500);
++		writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
++				phy->io_priv + HW_USBPHY_CTRL_SET);
++	}
++
++	return 0;
++}
++
++/*
++ * For mxs PHY, there are two PHY issues related to suspend/resume.
++ * For mx23 and mx28, both of two issues are existed.
++ * For mx6q and mx6dl, only one issue is existed.
++ * For mx6 sololite, none issue is existed.
++ */
++static void mxs_phy_workaround(struct mxs_phy *mxs_phy)
++{
++	if (is_mx23_phy(mxs_phy)) {
++		mxs_phy->phy.notify_suspend = mxs_phy_on_suspend_workaround;
++		mxs_phy->phy.notify_resume = mxs_phy_on_resume;
++	} else if (is_mx6q_phy(mxs_phy)) {
++		mxs_phy->phy.notify_suspend = mxs_phy_on_suspend;
++		mxs_phy->phy.notify_resume = mxs_phy_on_resume;
++	}
++}
++
+ static int mxs_phy_probe(struct platform_device *pdev)
  {
- 	if (x && x->notify_connect)
+ 	struct resource *res;
+@@ -257,6 +329,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+ 
+ 	mxs_phy->clk = clk;
+ 	mxs_phy->devtype = pdev->id_entry->driver_data;
++	mxs_phy_workaround(mxs_phy);
+ 
+ 	platform_set_drvdata(pdev, &mxs_phy->phy);
+ 
 -- 
 1.7.1
