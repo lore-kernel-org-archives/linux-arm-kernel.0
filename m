@@ -1,36 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 12 Oct 2013 04:30:04 +0200
-Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D40A9C9@039-SN2MPN1-011.039d.mgd.msft.net>
-References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
- <CAJ+vNU0HJs9NxPy8Erer1ZUzCAkzhQn+c0atmEZ=ZZWLgXb6Kw@mail.gmail.com>
- <0E83723C55F66F43A6041464FE31119D40A9C9@039-SN2MPN1-011.039d.mgd.msft.net>
-Message-ID: <201310120430.04282.marex@denx.de>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Sat, 12 Oct 2013 04:52:02 +0200
+Subject: [PATCH] ARM: timer-sp: remove deprecated IRQF_DISABLED
+Message-ID: <1381546322-4632-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+This patch proposes to remove the use of the IRQF_DISABLED flag
 
-> Hi Tim:
-> As I know that the clock of pcie controller should be always running.
-> There are not clock gate on/off operations in host driver after the
-> initialization.
+It's a NOOP since 2.6.35 and it will be removed one day.
 
-I think the problem might happen when the PCIe device (Ethernet adapter) is bus-
-master and either initiates PCIe->AXI->memory write or memory->AXI->PCIe read 
-transfer. This is because when the Intel ethernet (igb) is probed, it only uses 
-the MEM window that's mapped into the AXI space (that window at 0x01100000). On 
-the other hand, when some packet is transfered, the Intel controller operates 
-with structures in DRAM directly. And the stall only happens when the interface 
-either receives or attempts to send a packet.
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/common/timer-sp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Is this theory of mine even reasonable? If this doesn't work properly, could 
-this stall the CPU? How can I check if this works correctly? What can I try if 
-it does not?
-
-Thanks!
-
-btw. Please be careful about the top-posting ;-)
-
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+index e901d0f..ce922d0 100644
+--- a/arch/arm/common/timer-sp.c
++++ b/arch/arm/common/timer-sp.c
+@@ -175,7 +175,7 @@ static struct clock_event_device sp804_clockevent = {
+ 
+ static struct irqaction sp804_timer_irq = {
+ 	.name		= "timer",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= sp804_timer_interrupt,
+ 	.dev_id		= &sp804_clockevent,
+ };
+-- 
+1.8.1.2
