@@ -1,73 +1,100 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Sat, 12 Oct 2013 10:09:50 +0800
-Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
- "include/asm/atomic.h"
-In-Reply-To: <5258A7AC.4060902@asianux.com>
-References: <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
- <20131010100733.GH3817@mudshark.cambridge.arm.com>
- <52568998.2080108@asianux.com>
- <20131010142305.GG6199@mudshark.cambridge.arm.com>
- <525751E2.3020207@asianux.com>
- <20131011104419.GE14732@mudshark.cambridge.arm.com>
- <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
- <CAFLxGvwsx2YfNHiGtjWsANfVW74PT3KneLA-T6SpY4NEp_OSUA@mail.gmail.com>
- <20131011122846.GK14732@mudshark.cambridge.arm.com> <5257F710.5090706@nod.at>
- <5258A7AC.4060902@asianux.com>
-Message-ID: <5258AF6E.9010708@asianux.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Sat, 12 Oct 2013 02:16:17 +0000
+Subject: [PATCH v7 0/2] Add PCIe support for i.MX6q
+In-Reply-To: <CAJ+vNU0HJs9NxPy8Erer1ZUzCAkzhQn+c0atmEZ=ZZWLgXb6Kw@mail.gmail.com>
+References: <1380165887-13506-1-git-send-email-shawn.guo@linaro.org>
+ <201310110418.56460.marex@denx.de>
+ <CAE9FiQXKgkwgzA0ciRyahObDHvnFtEJxzOhHRo6gytdeKQ-XQQ@mail.gmail.com>
+ <201310111644.22844.marex@denx.de>
+ <CAJ+vNU0HJs9NxPy8Erer1ZUzCAkzhQn+c0atmEZ=ZZWLgXb6Kw@mail.gmail.com>
+Message-ID: <0E83723C55F66F43A6041464FE31119D40A9C9@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2013 09:36 AM, Chen Gang wrote:
-> On 10/11/2013 09:03 PM, Richard Weinberger wrote:
->> Am 11.10.2013 14:28, schrieb Will Deacon:
->>> On Fri, Oct 11, 2013 at 01:08:17PM +0100, Richard Weinberger wrote:
->>>> On Fri, Oct 11, 2013 at 1:47 PM, Chen Gang <gang.chen@asianux.com> wrote:
->>>>> In current kernel wide source code, except other architectures, only
->>>>> s390 scsi drivers use atomic_clear_mask(), and arm/arm64 need not
->>>>> support s390 drivers.
->>>>>
->>>>> So remove atomic_clear_mask() from "arm[64]/include/asm/atomic.h".
->>>>
->>>> Is it really worth removing such a primitive?
->>>> If someone needs it later he has to implement it from scratch and
->>>> introduces bugs...
->>>
->>> The version we have (on ARM64 anyway) already has bugs. Given the choice
->>> between fixing code that has no callers and simply removing it, I'd go for
->>> the latter.
->>
->> Yeah, if it's broken and has no real users, send it to hell. :)
->>
-> 
-> OK, thanks.
-> 
-> 
-> Hmm... at least, the original API definition is not well enough: "need
-> use 'unsigned int' and 'atomic_t' instead of 'unsigned long' for the
-> type of parameters".
-> 
-> But can we say "under arm64, it must be a bug"? (although I agree it is
-> very easy to let callers miss using it -- then may cause issue).
-> 
-> In my opinion, it belongs to "API definition issue" not implementation
-> bug: "if all callers are carefully enough, it will not make issues"
-> (e.g. in "./kernel" sub-system, we can meet many such kinds of things).
-> 
-
-For "./kernel" sub-system, it really it is, if necessary, I can provide
-3 samples.  ;-)
-
-> 
-> 
-> Thanks.
-> 
->> Thanks,
->> //richard
->>
->>
->>
-> 
+Hi Tim:
+As I know that the clock of pcie controller should be always running.
+There are not clock gate on/off operations in host driver after the initialization.
 
 
--- 
-Chen Gang
+Best Regards
+Richard Zhu
+
+
+-----Original Message-----
+From: Tim Harvey [mailto:tharvey at gateworks.com] 
+Sent: Friday, October 11, 2013 11:25 PM
+To: Marek Vasut
+Cc: Yinghai Lu; Bjorn Helgaas; Zhu Richard-R65037; linux-arm-kernel at lists.infradead.org; Shawn Guo; linux-pci at vger.kernel.org; Frank Li; Sean Cross; Sascha Hauer
+Subject: Re: [PATCH v7 0/2] Add PCIe support for i.MX6q
+
+Marek,
+
+Looks like you and I are getting the same results now.  Device enumeration is working fine through the switch however when I attempt to use a device behind the switch (gige adapter in my case) I find that I get a few interrupts to that devices irq handler then the system hangs (like what occurs when a read is done to dbi without the pcie controllers clock running).
+
+Anyone have any ideas?
+
+Tim
+
+On Fri, Oct 11, 2013 at 7:44 AM, Marek Vasut <marex@denx.de> wrote:
+> Hi Yinghai,
+>
+>> On Thu, Oct 10, 2013 at 7:18 PM, Marek Vasut <marex@denx.de> wrote:
+>> > And so does the probe log (but the pcieport failure still persists):
+>> >
+>> >
+>> > pci_bus 0000:04: bus scan returning with max=04 pci_bus 0000:04: 
+>> > busn_res: [bus 04-ff] end is updated to 04 pci_bus 0000:02: bus 
+>> > scan returning with max=04 pci_bus 0000:02: busn_res: [bus 02-ff] 
+>> > end is updated to 04 pci_bus 0000:01: bus scan returning with 
+>> > max=04 pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 04 
+>> > pci_bus 0000:00: bus scan returning with max=04 pci_bus 0000:00: 
+>> > busn_res: [bus 00-ff] end is updated to 04
+>> > PCI: Device 0000:00:00.0 not available because of resource 
+>> > collisions
+>> > pcieport: probe of 0000:00:00.0 failed with error -22
+>>
+>> load pcieport driver too early.
+>
+> OK
+>
+> [...]
+>
+>> > pci_bus 0000:00: resource 4 [io  0x1000-0x10000] pci_bus 0000:00: 
+>> > resource 5 [mem 0x01000000-0x01efffff] pci_bus 0000:01: resource 0 
+>> > [io  0x1000-0x1fff] pci_bus 0000:01: resource 1 [mem 
+>> > 0x01000000-0x01bfffff] pci_bus 0000:02: resource 0 [io  
+>> > 0x1000-0x1fff] pci_bus 0000:02: resource 1 [mem 
+>> > 0x01000000-0x01bfffff] pci_bus 0000:03: resource 0 [io  
+>> > 0x1000-0x1fff] pci_bus 0000:03: resource 1 [mem 
+>> > 0x01000000-0x01bfffff]
+>>
+>> Looks your arch call pci_assign_unassigned_resources() too late.
+>>
+>> you should have call it with fs_initcall()...
+>
+> You're right, the pci_assign_unassigned_resources() is called from 
+> probe() call of the MX6 PCIe driver, which is called from module_init().
+>
+> imx6_pcie_init() -> imx6_pcie_probe() -> imx6_add_pcie_port() ->
+> dw_pcie_host_init() -> pci_assign_unassigned_resources()
+>
+>> please try to boot with "debug ignore_loglevel initcall_debug" to 
+>> sort out the initcall sequence.
+>
+> Yes, probing the MX6 PCIe driver in fs_initcall() actually fixed my issues:
+>
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c 
+> index 32b30ca..771892a 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+>
+> @@ -587,7 +590,7 @@ static int __init imx6_pcie_init(void)  {
+>         return platform_driver_probe(&imx6_pcie_driver, 
+> imx6_pcie_probe);  } -module_init(imx6_pcie_init);
+> +fs_initcall(imx6_pcie_init);
+>
+>  MODULE_AUTHOR("Sean Cross <xobs@kosagi.com>");  
+> MODULE_DESCRIPTION("Freescale i.MX6 PCIe host controller driver");
+>
+> Best regards,
+> Marek Vasut
