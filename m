@@ -1,69 +1,81 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 12 Oct 2013 17:35:02 +0800
-Subject: [PATCH 00/11] Add power management support for chipidea
-Message-ID: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
+Date: Sat, 12 Oct 2013 17:35:05 +0800
+Subject: [PATCH 03/11] usb: chipidea: usbmisc_imx: remove the controller's
+ clock information
+In-Reply-To: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
+References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1381570513-24927-4-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Currently, the usbmisc is just an API supplier for controller
+driver, the controller calls related APIs to handle different
+things among the SoCs, before calling it, the clock must
+be on. So the clock operation is useless for usbmisc, it also
+increases the difficulties to manage the clock, especially at
+runtime power management situation.
 
-This serial adds power management (system & runtime) for chipidea core.
-With this, the chipidea controller can be at low power mode when it is not in
-use, and the chipidea controller can be the system wakeup source. 
-It needs to depend on my patch[1], since [1] adds some common PHY APIs, and
-this serial uses it.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/chipidea/usbmisc_imx.c |   18 ------------------
+ 1 files changed, 0 insertions(+), 18 deletions(-)
 
-It has been verified at Freescale i.mx6Q SabreSD platform, I will verify
-it at other FSL platforms during the patch review.
-
-Hi Alan,
-
-Due to chipidea core and imx concontroller needs some special operations
-during the standard ehci routine, I override .hub_control, .bus_suspend,
-and .bus_resume.
-
-There is one special thing is I use flag ehci->bus_suspended to know it
-was a global suspend before due to I need to notify PHY when the suspend
-has finished (portsc.suspendM is set) and the resume signal has finished
-(portsc.fpr is cleared) for high speed device, but there are two places
-will send suspend/resume, and I don't want to patch ehci-hub.c (if you think
-patch ehci-hub.c is a good way, I can do it).
-
-The related host patches:
-
-  usb: chipidea: host: add quirk for ehci operation
-  usb: chipidea: host: add ehci quirk for imx controller
-
-Hi Shawn,
-
-The last two are devicetree related to enable runtime pm.
-
-Peter Chen (11):
-  usb: chipidea: Add power management support
-  usb: chipidea: imx: add power management support
-  usb: chipidea: usbmisc_imx: remove the controller's clock information
-  usb: chipidea: add wakeup interrupt handler
-  usb: chipidea: usbmisc_imx: add set_wakup API
-  usb: chipidea: imx: call set_wakeup when necessary
-  usb: chipidea: host: add quirk for ehci operation
-  usb: chipidea: host: add ehci quirk for imx controller
-  usb: chipidea: imx: Enable CI_HDRC_IMX_EHCI_QUIRK if the phy has
-    notify APIs
-  usb: chipidea: imx: add binding for supporting runtime pm
-  ARM: dts: imx6qdl-sabresd: Enable runtime pm for usbotg and usb host
-    1
-
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |    2 +
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |    2 +
- drivers/usb/chipidea/ci.h                          |    3 +
- drivers/usb/chipidea/ci_hdrc_imx.c                 |  140 +++++++++++++++-
- drivers/usb/chipidea/ci_hdrc_imx.h                 |    1 +
- drivers/usb/chipidea/core.c                        |  139 +++++++++++++++
- drivers/usb/chipidea/host.c                        |  180 ++++++++++++++++++++
- drivers/usb/chipidea/otg.c                         |    5 +
- drivers/usb/chipidea/usbmisc_imx.c                 |   59 +++++--
- include/linux/usb/chipidea.h                       |    2 +
- 10 files changed, 512 insertions(+), 21 deletions(-)
-
-[1] Add power management support for MXS PHY:
-http://marc.info/?l=linux-usb&m=138156975205686&w=2
+diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+index 8a1094b..1fd9a12 100644
+--- a/drivers/usb/chipidea/usbmisc_imx.c
++++ b/drivers/usb/chipidea/usbmisc_imx.c
+@@ -11,7 +11,6 @@
+ 
+ #include <linux/module.h>
+ #include <linux/of_platform.h>
+-#include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
+@@ -40,7 +39,6 @@ struct usbmisc_ops {
+ struct imx_usbmisc {
+ 	void __iomem *base;
+ 	spinlock_t lock;
+-	struct clk *clk;
+ 	const struct usbmisc_ops *ops;
+ };
+ 
+@@ -177,7 +175,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
+ {
+ 	struct resource	*res;
+ 	struct imx_usbmisc *data;
+-	int ret;
+ 	struct of_device_id *tmp_dev;
+ 
+ 	if (usbmisc)
+@@ -194,20 +191,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
+ 	if (IS_ERR(data->base))
+ 		return PTR_ERR(data->base);
+ 
+-	data->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(data->clk)) {
+-		dev_err(&pdev->dev,
+-			"failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+-		return PTR_ERR(data->clk);
+-	}
+-
+-	ret = clk_prepare_enable(data->clk);
+-	if (ret) {
+-		dev_err(&pdev->dev,
+-			"clk_prepare_enable failed, err=%d\n", ret);
+-		return ret;
+-	}
+-
+ 	tmp_dev = (struct of_device_id *)
+ 		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
+ 	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
+@@ -218,7 +201,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
+ 
+ static int usbmisc_imx_remove(struct platform_device *pdev)
+ {
+-	clk_disable_unprepare(usbmisc->clk);
+ 	usbmisc = NULL;
+ 	return 0;
+ }
+-- 
+1.7.1
