@@ -1,61 +1,88 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sat, 12 Oct 2013 11:38:16 +0200
-Subject: [PATCH 02/12] usb: phy-mxs: Enable IC fixes for mx6 SoC serial
-In-Reply-To: <1381568986-19802-3-git-send-email-peter.chen@freescale.com>
+Date: Sat, 12 Oct 2013 11:42:06 +0200
+Subject: [PATCH 05/12] usb: phy-mxs: Add implementation of nofity_suspend
+ and notify_resume
+In-Reply-To: <1381568986-19802-6-git-send-email-peter.chen@freescale.com>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
- <1381568986-19802-3-git-send-email-peter.chen@freescale.com>
-Message-ID: <201310121138.16584.marex@denx.de>
+ <1381568986-19802-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <201310121142.07174.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Peter Chen,
 
-> After adding IC fixes bits, some PHY bugs are fixed by
-> IC logic.
-
-Can you please elaborate what those bits do exactly ? They seem like a magic 
-stuff to me thus far, which is not exactly helpful . I can't find them in the 
-datasheet either.
-
+> Add notify_suspend and notify_resume according to different SoCs.
+> 
 > Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  drivers/usb/phy/phy-mxs-usb.c |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
+>  drivers/usb/phy/phy-mxs-usb.c |   73
+> +++++++++++++++++++++++++++++++++++++++++ 1 files changed, 73
+> insertions(+), 0 deletions(-)
 > 
 > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index 87ba429..831b13e 100644
+> index e0b0de0..8661dae 100644
 > --- a/drivers/usb/phy/phy-mxs-usb.c
 > +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -29,6 +29,10 @@
->  #define HW_USBPHY_CTRL_SET			0x34
->  #define HW_USBPHY_CTRL_CLR			0x38
-> 
-> +#define HW_USBPHY_IP				0x90
-> +#define HW_USBPHY_IP_SET			0x94
-> +#define HW_USBPHY_IP_CLR			0x98
-> +
->  #define BM_USBPHY_CTRL_SFTRST			BIT(31)
->  #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
->  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
-> @@ -40,6 +44,8 @@
->  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
->  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
-> 
-> +#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
-> +
->  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
-> 
->  enum imx_phy_type {
-> @@ -118,6 +124,10 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
->  		BM_USBPHY_CTRL_ENUTMILEVEL3,
->  	       base + HW_USBPHY_CTRL_SET);
-> 
-> +	/* Enable IC solution */
-> +	if (is_mx6q_phy(mxs_phy) || is_mx6sl_phy(mxs_phy))
-> +		writel(BM_USBPHY_IP_FIX, base + HW_USBPHY_IP_SET);
-> +
+> @@ -197,6 +197,78 @@ static int mxs_phy_on_disconnect(struct usb_phy *phy,
 >  	return 0;
 >  }
+> 
+> +static int mxs_phy_on_suspend_workaround(struct usb_phy *phy,
+> +		enum usb_device_speed speed)
+> +{
+> +	dev_dbg(phy->dev, "%s speed device has suspended\n",
+> +		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
 
-Best regards,
-Marek Vasut
+HS : FS/LS you mean?
+
+> +
+> +	/* delay 4ms to wait bus entering idle */
+> +	usleep_range(4000, 5000);
+> +
+> +	/*
+> +	 * Workaround for wakeup signal between portsc.suspendM
+> +	 * and PHY enters low power mode.
+> +	 */
+> +	writel_relaxed(0xffffffff, phy->io_priv + HW_USBPHY_PWD);
+> +	writel_relaxed(0, phy->io_priv + HW_USBPHY_PWD);
+> +
+> +	if (speed == USB_SPEED_HIGH)
+> +		writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
+> +				phy->io_priv + HW_USBPHY_CTRL_CLR);
+> +
+> +	return 0;
+> +}
+
+[...]
+
+> +/*
+> + * For mxs PHY, there are two PHY issues related to suspend/resume.
+> + * For mx23 and mx28, both of two issues are existed.
+> + * For mx6q and mx6dl, only one issue is existed.
+> + * For mx6 sololite, none issue is existed.
+> + */
+> +static void mxs_phy_workaround(struct mxs_phy *mxs_phy)
+> +{
+> +	if (is_mx23_phy(mxs_phy)) {
+
+This is_mx23_phy() returns 1 for mx28 too? It's not too clear, not even from the 
+comment above, a short comment here would help for sure.
+
+> +		mxs_phy->phy.notify_suspend = mxs_phy_on_suspend_workaround;
+> +		mxs_phy->phy.notify_resume = mxs_phy_on_resume;
+> +	} else if (is_mx6q_phy(mxs_phy)) {
+> +		mxs_phy->phy.notify_suspend = mxs_phy_on_suspend;
+> +		mxs_phy->phy.notify_resume = mxs_phy_on_resume;
+> +	}
+> +}
+> +
+>  static int mxs_phy_probe(struct platform_device *pdev)
+>  {
+>  	struct resource *res;
+> @@ -257,6 +329,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+> 
+>  	mxs_phy->clk = clk;
+>  	mxs_phy->devtype = pdev->id_entry->driver_data;
+> +	mxs_phy_workaround(mxs_phy);
+> 
+>  	platform_set_drvdata(pdev, &mxs_phy->phy);
