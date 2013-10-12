@@ -1,30 +1,53 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 12 Oct 2013 17:00:10 +0200
-Subject: [PATCH 2/2] tty/serial: at91: add a fallback option to
- determine uart/usart property
-In-Reply-To: <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
-References: <a58fe8bc7fdd128a2f9cf60785f81ebde4c0c247.1381394411.git.nicolas.ferre@atmel.com>
- <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
-Message-ID: <20131012170010.537982fb@skate>
+Date: Sat, 12 Oct 2013 17:05:23 +0200
+Subject: [PATCH 11/12] usb: phy-mxs: update binding for adding
+ disconnect line property
+In-Reply-To: <1381568986-19802-12-git-send-email-peter.chen@freescale.com>
+References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
+ <1381568986-19802-12-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131012170523.13726549@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Nicolas Ferre,
+Dear Peter Chen,
 
-On Thu, 10 Oct 2013 10:43:32 +0200, Nicolas Ferre wrote:
-> On older SoC, the "name" field is not filled in the register map.
-> Fix the way to figure out if the serial port is an uart or an usart for these
-> older products (with corresponding properties).
+On Sat, 12 Oct 2013 17:09:45 +0800, Peter Chen wrote:
+> This property is used to disconnect line between USB PHY and
+> USB controller.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/usb/mxs-phy.txt |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> index 1a9bd85..099b0bb 100644
+> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> @@ -5,6 +5,9 @@ Required properties:
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain phy interrupt
+>  - fsl,anatop: phandle for anatop register
+> +- disconnect_line_without_vbus: needs to disconnect
+> +connection between USB PHY and controller, it can avoid
+> +unexpected wakeup interrupt when the PHY is out of power
+>  
+>  Example:
+>  usbphy1: usbphy at 020c9000 {
+> @@ -12,4 +15,5 @@ usbphy1: usbphy at 020c9000 {
+>  	reg = <0x020c9000 0x1000>;
+>  	interrupts = <0 44 0x04>;
+>  	fsl,anatop = <&anatop>;
+> +	disconnect_line_without_vbus;
+>  };
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Device Tree properties use "-" as a separator, not "_". So, it should
+be:
 
-On a Calao USB-A9263 board. Without this patch, 3.12-rc4 doesn't
-boot properly on this board, it 'hangs' while configuring the serial
-port.
+	disconnect-line-without-vbus
 
-Best regards,
+Also, all your patches touching Device Tree bindings should be Cc'ed to
+the devicetree@ mailing list.
 
 Thomas
 -- 
