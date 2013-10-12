@@ -1,65 +1,49 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Sat, 12 Oct 2013 09:36:44 +0800
-Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
- "include/asm/atomic.h"
-In-Reply-To: <5257F710.5090706@nod.at>
-References: <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
- <20131010100733.GH3817@mudshark.cambridge.arm.com>
- <52568998.2080108@asianux.com>
- <20131010142305.GG6199@mudshark.cambridge.arm.com>
- <525751E2.3020207@asianux.com>
- <20131011104419.GE14732@mudshark.cambridge.arm.com>
- <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
- <CAFLxGvwsx2YfNHiGtjWsANfVW74PT3KneLA-T6SpY4NEp_OSUA@mail.gmail.com>
- <20131011122846.GK14732@mudshark.cambridge.arm.com> <5257F710.5090706@nod.at>
-Message-ID: <5258A7AC.4060902@asianux.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Oct 2013 18:44:57 -0700
+Subject: [GIT PULL 1/6] omap non-urgent fixes for v3.13 merge window
+Message-ID: <pull-1381542299-305003>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2013 09:03 PM, Richard Weinberger wrote:
-> Am 11.10.2013 14:28, schrieb Will Deacon:
->> On Fri, Oct 11, 2013 at 01:08:17PM +0100, Richard Weinberger wrote:
->>> On Fri, Oct 11, 2013 at 1:47 PM, Chen Gang <gang.chen@asianux.com> wrote:
->>>> In current kernel wide source code, except other architectures, only
->>>> s390 scsi drivers use atomic_clear_mask(), and arm/arm64 need not
->>>> support s390 drivers.
->>>>
->>>> So remove atomic_clear_mask() from "arm[64]/include/asm/atomic.h".
->>>
->>> Is it really worth removing such a primitive?
->>> If someone needs it later he has to implement it from scratch and
->>> introduces bugs...
->>
->> The version we have (on ARM64 anyway) already has bugs. Given the choice
->> between fixing code that has no callers and simply removing it, I'd go for
->> the latter.
-> 
-> Yeah, if it's broken and has no real users, send it to hell. :)
-> 
+The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
 
-OK, thanks.
+  Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
 
+are available in the git repository at:
 
-Hmm... at least, the original API definition is not well enough: "need
-use 'unsigned int' and 'atomic_t' instead of 'unsigned long' for the
-type of parameters".
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/fixes-not-urgent-signed
 
-But can we say "under arm64, it must be a bug"? (although I agree it is
-very easy to let callers miss using it -- then may cause issue).
+for you to fetch changes up to 8ff875e7f93e900e7a7e78f1c9c05a22b33c27cf:
 
-In my opinion, it belongs to "API definition issue" not implementation
-bug: "if all callers are carefully enough, it will not make issues"
-(e.g. in "./kernel" sub-system, we can meet many such kinds of things).
+  ARM: mach-omap1: Fix omap1510_fpga_init_irq() implicit declarations. (2013-10-08 11:04:22 -0700)
 
+----------------------------------------------------------------
+Fixes for omaps that were not considered urgent for the -rc series.
+Just minor build fixes, removal of dead code, and a patch to
+use the die ID for increasing boot time entropy.
 
+----------------------------------------------------------------
+Bartlomiej Zolnierkiewicz (1):
+      ARM: OMAP1: fix incorrect placement of __initdata tag
 
-Thanks.
+Linus Walleij (1):
+      ARM: OMAP2+: throw the die id into the entropy pool
 
-> Thanks,
-> //richard
-> 
-> 
-> 
+Majunath Goudar (1):
+      ARM: mach-omap1: Fix omap1510_fpga_init_irq() implicit declarations.
 
--- 
-Chen Gang
+Michael Opdenacker (1):
+      ARM: OMAP: remove deprecated IRQF_DISABLED
+
+ arch/arm/mach-omap1/common.h   |  3 +++
+ arch/arm/mach-omap1/fpga.c     |  3 +--
+ arch/arm/mach-omap1/gpio15xx.c |  8 ++++----
+ arch/arm/mach-omap1/gpio16xx.c | 22 +++++++++++-----------
+ arch/arm/mach-omap1/gpio7xx.c  | 30 +++++++++++++++---------------
+ arch/arm/mach-omap1/pm.c       |  1 -
+ arch/arm/mach-omap1/time.c     |  2 +-
+ arch/arm/mach-omap1/timer32k.c |  2 +-
+ arch/arm/mach-omap2/id.c       | 12 ++++++++++++
+ arch/arm/mach-omap2/timer.c    |  2 +-
+ arch/arm/plat-omap/dma.c       |  1 -
+ 11 files changed, 49 insertions(+), 37 deletions(-)
