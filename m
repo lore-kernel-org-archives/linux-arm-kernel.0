@@ -1,61 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 12 Oct 2013 17:29:00 +0200
-Subject: [PATCHv2 1/9] ARM: kirkwood: convert d2net_v2 to DT
-In-Reply-To: <20130813095830.GI27165@e106331-lin.cambridge.arm.com>
-References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1375369655-1310-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130813095830.GI27165@e106331-lin.cambridge.arm.com>
-Message-ID: <20131012172900.787c68eb@skate>
+From: balajitk@ti.com (Balaji T K)
+Date: Sat, 12 Oct 2013 21:07:03 +0530
+Subject: [PATCH v2 1/2] ARM: dts: dra7-evm: Add mmc1 node for micro-sd
+ support
+In-Reply-To: <52584E87.3030809@baylibre.com>
+References: <1381163104-6318-1-git-send-email-balajitk@ti.com>
+ <5255A59C.5040301@ti.com> <52582AF2.6070502@ti.com>
+ <52584E87.3030809@baylibre.com>
+Message-ID: <52596C9F.5060403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark Rutland,
+On Saturday 12 October 2013 12:46 AM, Benoit Cousson wrote:
+> Hi Balaji,
+>
+> On 11/10/2013 18:44, Balaji T K wrote:
+>> On Thursday 10 October 2013 12:21 AM, Sekhar Nori wrote:
+>>> On Monday 07 October 2013 09:55 PM, Balaji T K wrote:
+>>>> Add mmc1 dt node to dra7-evm board.
+>>>> Input for ldo1 regulator is controlled by gpio 5 of pcf8575 chip (0x21)
+>>>> on i2c1 bus. When dt support for gpio-pcf857x is available, input supply
+>>>> will be modelled as cascaded regulator.
+>>>>
+>>>> Signed-off-by: Balaji T K <balajitk@ti.com>
+>>>
+>>> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>>>
+>> Hi Benoit,
+>>
+>> Can you let me know if you have any comments on this patch series?
+>
+> The series looks good, and I've just applied it for 3.13.
+>
+Thanks Benoit
 
-On Tue, 13 Aug 2013 10:58:30 +0100, Mark Rutland wrote:
-
-> > +       regulators {
-> > +               compatible = "simple-bus";
-> > +               pinctrl-0 = <&pmx_sata_power>;
-> > +               pinctrl-names = "default";
-> > +               #address-cells = <1>;
-> > +               #size-cells = <0>;
-> 
-> That's not really a simple-bus if there's no mapping to the parent's
-> address space (and it represents a completely different concept of
-> address).
-
-Right, but I guess it is needed for the child nodes to be considered as
-platform devices. There are already gazillions of .dts doing this in
-arch/arm/boot/dts, not only Kirkwood platforms, but also Tegra
-platforms, i.MX platforms and a bunch of others. While I admit it
-doesn't look the most appropriate representation, I believe that
-considering the number of existing users, solving this problem is a
-separate matter to the conversion of the d2net_v2 to the Device Tree.
-
-> Could you explain what the pinctrl's doing here? I couldn't see what
-> code would be handling that given the node will get probed as a
-> simple-bus and the regulator-fixed binding doesn't mention anything
-> about the parent node.
-
-Right, the pinctrl should be one-level down, in the DT sub-node that
-describes the regulator, so that it get automatically configured
-because the regulator driver is a platform_driver.
-
-I'll fix this.
-
-> > +
-> > +               sata0_power: regulator at 1 {
-> > +                       compatible = "regulator-fixed";
-> > +                       reg = <1>;
-> 
-> Do we even need the unit-address?
-
-No, I'll fix this one as well.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+- Balaji T K
