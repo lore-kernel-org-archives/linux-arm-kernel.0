@@ -1,22 +1,23 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 12 Oct 2013 21:45:14 +0000 (UTC)
-Subject: [PATCH 00/11] ARM: OMAP2+: CM cleanup series
-In-Reply-To: <52592207.4070508@ti.com>
-References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1310120139280.27397@utopia.booyaka.com>
- <52592207.4070508@ti.com>
-Message-ID: <alpine.DEB.2.02.1310122135240.27397@utopia.booyaka.com>
+Date: Sat, 12 Oct 2013 21:51:19 +0000 (UTC)
+Subject: [RESEND PATCH V2 1/2] ARM: dts: AM33xx: Add RNG node
+In-Reply-To: <52594DF0.1050002@ti.com>
+References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
+ <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
+ <52594DF0.1050002@ti.com>
+Message-ID: <alpine.DEB.2.02.1310122148520.27397@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Sat, 12 Oct 2013, Lokesh Vutla wrote:
 
-On Sat, 12 Oct 2013, Tero Kristo wrote:
+> Seems you missed this patch. Please consider this for this merge window.
+> Patch 2/2 is already taken by Paul.
+> Without this patch AM335x boot will crash as I mentioned in my cover letter.
 
-> Hmm what? No it doesn't have any dependency. At most, there could be merge
-> conflicts between the two, as this is completely separated set.
+That won't happen since this patch from Suman got merged:
 
-Thanks, looks like I accidentally mixed this set with your other one.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg96447.html
 
 
 - Paul
