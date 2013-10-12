@@ -1,55 +1,137 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sat, 12 Oct 2013 21:28:37 +0300
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20131012182837.GC2089@redhat.com>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Sat, 12 Oct 2013 14:14:44 -0700
+Subject: [PATCHv5 2/4] ARM: msm: Add support for APQ8074 Dragonboard
+Message-ID: <1381612484-760-1-git-send-email-rvaswani@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 03:36:08PM +0100, Marc Zyngier wrote:
-> This small patch series adds just enough kernel infrastructure and
-> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
-> that the host actually supports such madness.
-> 
-> This has been tested on arm64, with some fixes to KVM and a set of
-> changes to kvmtool, both which I am posting separately.
-> 
-> A branch containing all the relevant changes is at:
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/be-on-le-3.12-rc4
-> 
-> Cc: Rusty Russell <rusty@rustcorp.com.au>
-> Cc: Michael S. Tsirkin <mst@redhat.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
+This patch adds basic board support for APQ8074 Dragonboard
+which belongs to the Snapdragon 800 family.
+For now, just support a basic machine with device tree.
 
-We are changing the spec to make everything LE instead of
-the native endian.
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+---
+ arch/arm/boot/dts/Makefile                     |  3 ++-
+ arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 +++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi            | 35 ++++++++++++++++++++++++++
+ arch/arm/mach-msm/Kconfig                      | 13 ++++++++++
+ arch/arm/mach-msm/board-dt.c                   |  9 +++++++
+ 5 files changed, 65 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
 
-I think that'll fix the issue in a cleaner way.
-
-> Marc Zyngier (3):
->   virtio: let the guest report its endianess if advertized by the host
->   virtio: mmio: fix signature checking for BE guests
->   virtio: mmio: access configuration space as little-endian
-> 
->  drivers/block/virtio_blk.c             |  6 +--
->  drivers/char/virtio_console.c          |  4 +-
->  drivers/lguest/lguest_device.c         |  8 +++-
->  drivers/net/caif/caif_virtio.c         |  2 +-
->  drivers/net/virtio_net.c               |  2 +-
->  drivers/remoteproc/remoteproc_virtio.c |  8 +++-
->  drivers/s390/kvm/kvm_virtio.c          |  8 +++-
->  drivers/s390/kvm/virtio_ccw.c          |  9 +++-
->  drivers/scsi/virtio_scsi.c             |  4 +-
->  drivers/virtio/virtio_balloon.c        |  8 ++--
->  drivers/virtio/virtio_mmio.c           | 88 ++++++++++++++++++++++++++++++----
->  drivers/virtio/virtio_pci.c            |  8 +++-
->  drivers/virtio/virtio_ring.c           |  8 ++++
->  include/linux/virtio_config.h          | 19 ++++----
->  include/uapi/linux/virtio_ring.h       |  8 ++++
->  net/9p/trans_virtio.c                  |  4 +-
->  16 files changed, 150 insertions(+), 44 deletions(-)
-> 
-> -- 
-> 1.8.2.3
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 000cf76..e71a3ec 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -102,7 +102,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
+ 	kirkwood-openblocks_a6.dtb
+ dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
+ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+-	msm8960-cdp.dtb
++	msm8960-cdp.dtb \
++	qcom-apq8074-dragonboard.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+ 	armada-370-mirabox.dtb \
+ 	armada-370-netgear-rn102.dtb \
+diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+new file mode 100644
+index 0000000..13ac3e2
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+@@ -0,0 +1,6 @@
++#include "qcom-msm8974.dtsi"
++
++/ {
++	model = "Qualcomm APQ8074 Dragonboard";
++	compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
++};
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+new file mode 100644
+index 0000000..e0fd55a
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -0,0 +1,35 @@
++/dts-v1/;
++
++#include "skeleton.dtsi"
++
++/ {
++	model = "Qualcomm MSM8974";
++	compatible = "qcom,msm8974";
++	interrupt-parent = <&intc>;
++
++	soc: soc { };
++};
++
++&soc {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++	compatible = "simple-bus";
++
++	intc: interrupt-controller at f9000000 {
++		compatible = "qcom,msm-qgic2";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		reg = <0xf9000000 0x1000>,
++		      <0xf9002000 0x1000>;
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts = <1 2 0xf08>,
++			     <1 3 0xf08>,
++			     <1 4 0xf08>,
++			     <1 1 0xf08>;
++		clock-frequency = <19200000>;
++	};
++};
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 2586c28..086bcb9 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -64,6 +64,19 @@ config ARCH_MSM_DT
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 
++config ARCH_MSM8974
++	bool "MSM8974"
++	select ARM_GIC
++	select CPU_V7
++	select HAVE_ARM_ARCH_TIMER
++	select HAVE_SMP
++	select MSM_SCM if SMP
++	select USE_OF
++
++config ARCH_MSM_DT
++	def_bool y
++	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
++
+ config MSM_HAS_DEBUG_UART_HS
+ 	bool
+ 
+diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
+index 266a280..5211e80 100644
+--- a/arch/arm/mach-msm/board-dt.c
++++ b/arch/arm/mach-msm/board-dt.c
+@@ -26,7 +26,16 @@ static const char * const msm_dt_match[] __initconst = {
+ 	NULL
+ };
+ 
++static const char * const apq8074_dt_match[] __initconst = {
++	"qcom,apq8074-dragonboard",
++	NULL
++};
++
+ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.smp = smp_ops(msm_smp_ops),
+ 	.dt_compat = msm_dt_match,
+ MACHINE_END
++
++DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
++	.dt_compat = apq8074_dt_match,
++MACHINE_END
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
