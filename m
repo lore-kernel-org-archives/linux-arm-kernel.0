@@ -1,42 +1,33 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 12 Oct 2013 10:40:37 -0400 (EDT)
-Subject: [PATCH 10/11] usb: chipidea: imx: add binding for supporting
- runtime pm
-In-Reply-To: <1381570513-24927-11-git-send-email-peter.chen@freescale.com>
-Message-ID: <Pine.LNX.4.44L0.1310121039250.25996-100000@netrider.rowland.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 12 Oct 2013 17:00:10 +0200
+Subject: [PATCH 2/2] tty/serial: at91: add a fallback option to
+ determine uart/usart property
+In-Reply-To: <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
+References: <a58fe8bc7fdd128a2f9cf60785f81ebde4c0c247.1381394411.git.nicolas.ferre@atmel.com>
+ <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
+Message-ID: <20131012170010.537982fb@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 Oct 2013, Peter Chen wrote:
+Dear Nicolas Ferre,
 
-> Add property for supporting runtime power management
+On Thu, 10 Oct 2013 10:43:32 +0200, Nicolas Ferre wrote:
+> On older SoC, the "name" field is not filled in the register map.
+> Fix the way to figure out if the serial port is an uart or an usart for these
+> older products (with corresponding properties).
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> index b4b5b79..f666598 100644
-> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> @@ -18,6 +18,7 @@ Optional properties:
->  - vbus-supply: regulator for vbus
->  - disable-over-current: disable over current detect
->  - external-vbus-divider: enables off-chip resistor divider for Vbus
-> +- supports_runtime_pm: enable runtime pm support
->  
->  Examples:
->  usb at 02184000 { /* USB OTG */
-> @@ -28,4 +29,5 @@ usb at 02184000 { /* USB OTG */
->  	fsl,usbmisc = <&usbmisc 0>;
->  	disable-over-current;
->  	external-vbus-divider;
-> +	supports_runtime_pm;
->  };
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-This does not sound like a property of the hardware.  What's the 
-_hardware_ difference between parts that support runtime PM and parts 
-that don't?
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Alan Stern
+On a Calao USB-A9263 board. Without this patch, 3.12-rc4 doesn't
+boot properly on this board, it 'hangs' while configuring the serial
+port.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
