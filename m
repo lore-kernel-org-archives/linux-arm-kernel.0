@@ -1,86 +1,56 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 12 Oct 2013 17:26:42 +0200
+Date: Sat, 12 Oct 2013 17:29:00 +0200
 Subject: [PATCHv2 1/9] ARM: kirkwood: convert d2net_v2 to DT
-In-Reply-To: <20130802143139.GZ9916@kw.sim.vm.gnt>
+In-Reply-To: <20130813095830.GI27165@e106331-lin.cambridge.arm.com>
 References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <1375369655-1310-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130802143139.GZ9916@kw.sim.vm.gnt>
-Message-ID: <20131012172642.0a507069@skate>
+ <20130813095830.GI27165@e106331-lin.cambridge.arm.com>
+Message-ID: <20131012172900.787c68eb@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Simon Guinot,
+Dear Mark Rutland,
 
-I'm resuming work on this platform on other Kirkwood boards, so it's
-time to finally answer this e-mail.
+On Tue, 13 Aug 2013 10:58:30 +0100, Mark Rutland wrote:
 
-On Fri, 2 Aug 2013 16:31:39 +0200, Simon Guinot wrote:
-
-> Thanks for this patch. I have tested on by d2net_v2 board and it is
-> almost good. Please, see below for my comments.
-
-Thanks for testing!
-
-> > +	memory {
-> > +		device_type = "memory";
-> > +		/* TODO: verify memory installed on board */
-> > +		reg = <0x00000000 0x20000000>;
+> > +       regulators {
+> > +               compatible = "simple-bus";
+> > +               pinctrl-0 = <&pmx_sata_power>;
+> > +               pinctrl-names = "default";
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
 > 
-> The board only provides 256MB of memory (0x100000000).
+> That's not really a simple-bus if there's no mapping to the parent's
+> address space (and it represents a completely different concept of
+> address).
 
-Will fix.
+Right, but I guess it is needed for the child nodes to be considered as
+platform devices. There are already gazillions of .dts doing this in
+arch/arm/boot/dts, not only Kirkwood platforms, but also Tegra
+platforms, i.MX platforms and a bunch of others. While I admit it
+doesn't look the most appropriate representation, I believe that
+considering the number of existing users, solving this problem is a
+separate matter to the conversion of the d2net_v2 to the Device Tree.
 
-> > +			pmx_leds: pmx-leds {
-> > +				marvell,pins = "mpp12";
-> > +				marvell,function = "gpo";
+> Could you explain what the pinctrl's doing here? I couldn't see what
+> code would be handling that given the node will get probed as a
+> simple-bus and the regulator-fixed binding doesn't mention anything
+> about the parent node.
+
+Right, the pinctrl should be one-level down, in the DT sub-node that
+describes the regulator, so that it get automatically configured
+because the regulator driver is a platform_driver.
+
+I'll fix this.
+
+> > +
+> > +               sata0_power: regulator at 1 {
+> > +                       compatible = "regulator-fixed";
+> > +                       reg = <1>;
 > 
-> "gpo" is not valid for the 6281 SoC. You could use "gpio" instead.
+> Do we even need the unit-address?
 
-Will fix.
-
-
-> > +		fail {
-> > +			label = "d2net_v2:red:fail";
-> > +			gpios = <&gpio0 12 0>;
-> > +			default-state = "on";
-> 
-> "keep" is a better default-state. Else, blue and red are melted for the
-> front LED.
-
-Ok, will change.
-
-> > +		sata0_power: regulator at 1 {
-> > +			compatible = "regulator-fixed";
-> > +			reg = <1>;
-> > +			regulator-name = "SATA0 Power";
-> > +			regulator-min-microvolt = <5000000>;
-> > +			regulator-max-microvolt = <5000000>;
-> > +			enable-active-high;
-> > +			regulator-always-on;
-> > +			regulator-boot-on;
-> > +			gpio = <&gpio0 16 0>;
-> 
-> I don't know the regulator API at all. But is that possible to allow a
-> user to enable/disable the SATA0 power ? If yes, then it should be great
-> to have the appropriate setting.
-
-The regulator subsystem has a userspace interface in sysfs. See
-Documentation/ABI/testing/sysfs-class-regulator. I don't think there's
-anything special needed in the DT to get the regulator exposed in sysfs.
-
-> > -config MACH_D2NET_V2
-> > -	bool "LaCie d2 Network v2 NAS Board"
-> > -	select KIRKWOOD_LEGACY
-> > -	help
-> > -	  Say 'Y' here if you want your kernel to support the
-> > -	  LaCie d2 Network v2 NAS.
-> 
-> Before removing this option, we need to fix the Kconfig dependencies for
-> the LED driver leds-ns2. I will send a patch to do that.
-
-Your patch has been taken and is part of 3.12-rc, so this part is fixed.
-
-I'll resend soon an updated version with the changes.
+No, I'll fix this one as well.
 
 Thanks!
 
