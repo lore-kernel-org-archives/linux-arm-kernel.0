@@ -1,51 +1,36 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Sat, 12 Oct 2013 13:18:47 +0300
-Subject: [PATCH 00/11] ARM: OMAP2+: CM cleanup series
-In-Reply-To: <alpine.DEB.2.02.1310120139280.27397@utopia.booyaka.com>
-References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1310120139280.27397@utopia.booyaka.com>
-Message-ID: <52592207.4070508@ti.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Sat, 12 Oct 2013 15:52:06 +0530
+Subject: [PATCH v2] ARM: OMAP2+: wakeupgen: AM43x adaptation
+In-Reply-To: <1381302753-7045-1-git-send-email-afzal@ti.com>
+References: <1381302753-7045-1-git-send-email-afzal@ti.com>
+Message-ID: <525922CE.6080200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2013 05:19 AM, Paul Walmsley wrote:
-> Hi
->
-> On Fri, 11 Oct 2013, Tero Kristo wrote:
->
->> A small cleanup set for CM. This basically gets rid of the omap2_cm_*
->> register accesses from the random code locations, and gathers these
->> under cm2xxx.c and cm3xxx.c. This is done in preparation for creating
->> a separate CM driver. The set also contains a couple of PRM cleanups
->> which I decided to take care of at the same time due to overlapping
->> code (PRCM interrupt handler + DSP reset.)
->>
->> TODO: cleanup dsp bridge code (arch/arm/mach-omap2/dsp.c.)
->>
->> Tested on OMAP3 beagle + 3.12-rc3.
->
-> Looks like at least one patch has a dependency on your DT clk patches:
->
-> Importing patch "clk-ti-add-dt-alias-clock" ...
-> error: drivers/clk/ti/Makefile: does not exist in index
-> error: include/linux/clk/ti.h: does not exist in index
-> stg import: Diff does not apply cleanly
+Hi Tony,
 
-Hmm what? No it doesn't have any dependency. At most, there could be 
-merge conflicts between the two, as this is completely separated set.
+On Wednesday 09 October 2013 12:42 PM, Afzal Mohammed wrote:
+> AM43x has 224 interrupts and 7 banks, make it as maximum values. Keep
+> default values as earlier, if am43x is detected, update interrupts and
+> banks accordingly.
+> 
+> Also AM43x has only one cpu, ensure that clearing bitmask at wakeupgen
+> is done only for the single existing cpu, existing code assumes that
+> there are two cpu's.
+> 
+> If bitmask is cleared in wakeupgen for the nonexistent second cpu,
+> an imprecise abort happens as soon as Kernel switches to user space.
+> It was rootcaused by Sekhar Nori <nsekhar@ti.com>.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+> 
+> v2:
+> 1. make AM43x adaptation such that changes required for new SoC addition is less
+> 2. avoid usage of am43x local variable, use soc_is_am43xx() instead
 
--Tero
+Seems you missed this one, please consider this for the coming merge
+window. Without this AM43x would not boot to prompt.
 
->
-> Tried compiling the rest, but the build broke:
->
-> arch/arm/mach-omap2/mcbsp.c: In function 'omap3_enable_st_clock':
-> arch/arm/mach-omap2/mcbsp.c:46:3: error: implicit declaration of function 'omap2_clk_deny_idle'
-> arch/arm/mach-omap2/mcbsp.c:48:3: error: implicit declaration of function 'omap2_clk_allow_idle'
-> make[1]: *** [arch/arm/mach-omap2/mcbsp.o] Error 1
-> make: *** [arch/arm/mach-omap2] Error 2
-> make: *** Waiting for unfinished jobs....
->
->
-> - Paul
->
+Regards
+Afzal
