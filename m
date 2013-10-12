@@ -1,79 +1,42 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Sat, 12 Oct 2013 18:56:08 +0530
-Subject: [RESEND PATCH V2 1/2] ARM: dts: AM33xx: Add RNG node
-In-Reply-To: <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
-References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
- <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
-Message-ID: <52594DF0.1050002@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 12 Oct 2013 10:40:37 -0400 (EDT)
+Subject: [PATCH 10/11] usb: chipidea: imx: add binding for supporting
+ runtime pm
+In-Reply-To: <1381570513-24927-11-git-send-email-peter.chen@freescale.com>
+Message-ID: <Pine.LNX.4.44L0.1310121039250.25996-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-On Thursday 29 August 2013 06:22 PM, Lokesh Vutla wrote:
-> Add the AM33xx RNG module's device tree data.
-> Also add Documentation file describing the data
-> for the RNG module.
-Seems you missed this patch. Please consider this for this merge window.
-Patch 2/2 is already taken by Paul.
-Without this patch AM335x boot will crash as I mentioned in my cover letter.
+On Sat, 12 Oct 2013, Peter Chen wrote:
 
-Thanks and regards,
-Lokesh
+> Add property for supporting runtime power management
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
-> Changes since V1:
-> - Drop "status=disabled" entry in dt node, Since
->   RNG is present on all AM33xx platforms.
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
->  .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
->  arch/arm/boot/dts/am33xx.dtsi                      |    7 +++++++
->  2 files changed, 29 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
-> new file mode 100644
-> index 0000000..6a62acd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
-> @@ -0,0 +1,22 @@
-> +OMAP SoC HWRNG Module
-> +
-> +Required properties:
-> +
-> +- compatible : Should contain entries for this and backward compatible
-> +  RNG versions:
-> +  - "ti,omap2-rng" for OMAP2.
-> +  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
-> +  Note that these two versions are incompatible.
-> +- ti,hwmods: Name of the hwmod associated with the RNG module
-> +- reg : Offset and length of the register set for the module
-> +- interrupts : the interrupt number for the RNG module.
-> +		Only used for "ti,omap4-rng".
-> +
-> +Example:
-> +/* AM335x */
-> +rng: rng at 48310000 {
-> +	compatible = "ti,omap4-rng";
-> +	ti,hwmods = "rng";
-> +	reg = <0x48310000 0x2000>;
-> +	interrupts = <111>;
-> +};
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 38b446b..26ebe30 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -530,5 +530,12 @@
->  			#size-cells = <1>;
->  			status = "disabled";
->  		};
-> +
-> +		rng: rng at 48310000 {
-> +			compatible = "ti,omap4-rng";
-> +			ti,hwmods = "rng";
-> +			reg = <0x48310000 0x2000>;
-> +			interrupts = <111>;
-> +		};
->  	};
+> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> index b4b5b79..f666598 100644
+> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> @@ -18,6 +18,7 @@ Optional properties:
+>  - vbus-supply: regulator for vbus
+>  - disable-over-current: disable over current detect
+>  - external-vbus-divider: enables off-chip resistor divider for Vbus
+> +- supports_runtime_pm: enable runtime pm support
+>  
+>  Examples:
+>  usb at 02184000 { /* USB OTG */
+> @@ -28,4 +29,5 @@ usb at 02184000 { /* USB OTG */
+>  	fsl,usbmisc = <&usbmisc 0>;
+>  	disable-over-current;
+>  	external-vbus-divider;
+> +	supports_runtime_pm;
 >  };
-> 
+
+This does not sound like a property of the hardware.  What's the 
+_hardware_ difference between parts that support runtime PM and parts 
+that don't?
+
+Alan Stern
