@@ -1,89 +1,36 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 12 Oct 2013 17:35:08 +0800
-Subject: [PATCH 06/11] usb: chipidea: imx: call set_wakeup when necessary
+Date: Sat, 12 Oct 2013 17:35:11 +0800
+Subject: [PATCH 09/11] usb: chipidea: imx: Enable CI_HDRC_IMX_EHCI_QUIRK if
+ the phy has notify APIs
 In-Reply-To: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
 References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1381570513-24927-7-git-send-email-peter.chen@freescale.com>
+Message-ID: <1381570513-24927-10-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Disable wakeup after probe
-- Enable wakeup during the suspend
-- Disable wakeup after controller is active
+If the PHY has .notify_suspend and .notify_resume, it means this
+imx usb controller needs to add quirks for standard ehci routine.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci_hdrc_imx.c |   36 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 36 insertions(+), 0 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_imx.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 9f66f93..0424cbf 100644
+index 0424cbf..c2e0d73 100644
 --- a/drivers/usb/chipidea/ci_hdrc_imx.c
 +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -157,6 +157,15 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 		}
- 	}
+@@ -118,6 +118,11 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
  
-+	if (data->usbmisc_data) {
-+		ret = imx_usbmisc_set_wakeup(data->usbmisc_data, false);
-+		if (ret) {
-+			dev_err(&pdev->dev, "usbmisc set_wakeup failed, ret=%d\n",
-+					ret);
-+			goto disable_device;
-+		}
-+	}
+ 	pdata.phy = data->phy;
+ 
++	/* notify APIs are used for adding quirks at standard EHCI routine */
++	if (pdata.phy && pdata.phy->notify_suspend
++			&& pdata.phy->notify_resume)
++		pdata.flags |= CI_HDRC_IMX_EHCI_QUIRK;
 +
- 	platform_set_drvdata(pdev, data);
- 
- 	device_set_wakeup_capable(&pdev->dev, true);
-@@ -194,12 +203,23 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
- static int imx_controller_suspend(struct device *dev)
- {
- 	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-+	int ret;
- 
- 	dev_dbg(dev, "at %s\n", __func__);
- 
- 	if (atomic_read(&data->in_lpm))
- 		return 0;
- 
-+	if (data->usbmisc_data) {
-+		ret = imx_usbmisc_set_wakeup(data->usbmisc_data, true);
-+		if (ret) {
-+			dev_err(dev,
-+				"usbmisc set_wakeup failed, ret=%d\n",
-+				ret);
-+			return ret;
-+		}
-+	}
-+
- 	clk_disable_unprepare(data->clk);
- 
- 	atomic_set(&data->in_lpm, 1);
-@@ -221,8 +241,24 @@ static int imx_controller_resume(struct device *dev)
- 	if (ret)
- 		return ret;
- 
-+	if (data->usbmisc_data) {
-+		ret = imx_usbmisc_set_wakeup(data->usbmisc_data, false);
-+		if (ret) {
-+			dev_err(dev,
-+				"usbmisc set_wakeup failed, ret=%d\n",
-+				ret);
-+			ret = -EINVAL;
-+			goto clk_disable;
-+		}
-+	}
-+
- 	atomic_set(&data->in_lpm, 0);
- 
-+	return 0;
-+
-+clk_disable:
-+	clk_disable_unprepare(data->clk);
-+
- 	return ret;
- }
- 
+ 	if (of_find_property(np, "supports_runtime_pm", NULL)) {
+ 		pdata.flags |= CI_HDRC_SUPPORTS_RUNTIME_PM;
+ 		data->supports_runtime_pm = true;
 -- 
 1.7.1
