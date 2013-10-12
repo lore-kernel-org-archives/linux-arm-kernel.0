@@ -1,73 +1,65 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Oct 2013 20:37:05 -0400
-Subject: [PATCH V5] ARM: OMAP5/DRA7: realtime_counter: Configure CNTFRQ
- register
-In-Reply-To: <20131012003433.GJ29913@atomide.com>
-References: <1381391028-4189-1-git-send-email-r.sricharan@ti.com>
- <5256A7AE.6000605@ti.com> <20131010171540.GG29913@atomide.com>
- <20131012003433.GJ29913@atomide.com>
-Message-ID: <525899B1.7040206@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Sat, 12 Oct 2013 09:36:44 +0800
+Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
+ "include/asm/atomic.h"
+In-Reply-To: <5257F710.5090706@nod.at>
+References: <5256121A.9030504@asianux.com> <52561269.60900@asianux.com>
+ <20131010100733.GH3817@mudshark.cambridge.arm.com>
+ <52568998.2080108@asianux.com>
+ <20131010142305.GG6199@mudshark.cambridge.arm.com>
+ <525751E2.3020207@asianux.com>
+ <20131011104419.GE14732@mudshark.cambridge.arm.com>
+ <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
+ <CAFLxGvwsx2YfNHiGtjWsANfVW74PT3KneLA-T6SpY4NEp_OSUA@mail.gmail.com>
+ <20131011122846.GK14732@mudshark.cambridge.arm.com> <5257F710.5090706@nod.at>
+Message-ID: <5258A7AC.4060902@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 October 2013 08:34 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [131010 10:23]:
->> * Santosh Shilimkar <santosh.shilimkar@ti.com> [131010 06:20]:
->>> On Thursday 10 October 2013 03:43 AM, Sricharan R wrote:
->>>> From: R Sricharan <r.sricharan@ti.com>
+On 10/11/2013 09:03 PM, Richard Weinberger wrote:
+> Am 11.10.2013 14:28, schrieb Will Deacon:
+>> On Fri, Oct 11, 2013 at 01:08:17PM +0100, Richard Weinberger wrote:
+>>> On Fri, Oct 11, 2013 at 1:47 PM, Chen Gang <gang.chen@asianux.com> wrote:
+>>>> In current kernel wide source code, except other architectures, only
+>>>> s390 scsi drivers use atomic_clear_mask(), and arm/arm64 need not
+>>>> support s390 drivers.
 >>>>
->>>> The realtime counter called master counter, produces the count
->>>> used by the private timer peripherals in the MPU_CLUSTER. The
->>>> CNTFRQ per cpu register is used to denote the frequency of the counter.
->>>> Currently the frequency value is passed from the
->>>> DT file, but this is not scalable when we have other non-DT guest
->>>> OS. This register must be set to the right value by the
->>>> secure rom code. Setting this register helps in propagating the right
->>>> frequency value across OSes.
->>>>
->>>> More discussions and the reason for adding this in a non-DT
->>>> way can be seen from below.
->>>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg93832.html
->>>>
->>>> So configuring this secure register for all the cpus here.
->>>>
->>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> Cc: Nishanth Menon <nm@ti.com>
->>>> Cc: Rajendra Nayak <rnayak@ti.com>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Cc: Tony Lindgren <tony@atomide.com>
->>>> Tested-by: Nishanth Menon <nm@ti.com>
->>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->>>> ---
->>>>  [V5] Removed the use of extern variable in omap-smp.c
->>>>       as per suggestion from Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>
->>> Thanks for the updates Sricharan. Looks fine now.
+>>>> So remove atomic_clear_mask() from "arm[64]/include/asm/atomic.h".
 >>>
->>> Tony, Can you apply this version if you are fine with it.
+>>> Is it really worth removing such a primitive?
+>>> If someone needs it later he has to implement it from scratch and
+>>> introduces bugs...
 >>
->> Yes thanks looks good to me now. Applying into omap-for-v3.13/soc.
+>> The version we have (on ARM64 anyway) already has bugs. Given the choice
+>> between fixing code that has no callers and simply removing it, I'd go for
+>> the latter.
 > 
-> Grr, had to apply the following fix on top of this for some configs.
+> Yeah, if it's broken and has no real users, send it to hell. :)
 > 
-Looks like Sricharan missed some builds. Sorry for the trouble Tony.
 
-> 
-> 8< ---------------------------
-> 
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Fri, 11 Oct 2013 17:28:04 -0700
-> Subject: [PATCH] ARM: OMAP2+: Fix build error for realtime counter init if not enabled
-> 
-> Otherwise we can get an error with some configs:
-> 
-> arch/arm/mach-omap2/timer.c:73: undefined reference to `omap_smc1'
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-Looks fine to me. Thanks 
+OK, thanks.
 
-Regards,
-Santosh
+
+Hmm... at least, the original API definition is not well enough: "need
+use 'unsigned int' and 'atomic_t' instead of 'unsigned long' for the
+type of parameters".
+
+But can we say "under arm64, it must be a bug"? (although I agree it is
+very easy to let callers miss using it -- then may cause issue).
+
+In my opinion, it belongs to "API definition issue" not implementation
+bug: "if all callers are carefully enough, it will not make issues"
+(e.g. in "./kernel" sub-system, we can meet many such kinds of things).
+
+
+
+Thanks.
+
+> Thanks,
+> //richard
+> 
+> 
+> 
+
+-- 
+Chen Gang
