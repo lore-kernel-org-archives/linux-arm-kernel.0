@@ -1,169 +1,195 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 12 Oct 2013 17:35:04 +0800
-Subject: [PATCH 02/11] usb: chipidea: imx: add power management support
+Date: Sat, 12 Oct 2013 17:35:10 +0800
+Subject: [PATCH 08/11] usb: chipidea: host: add ehci quirk for imx controller
 In-Reply-To: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
 References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1381570513-24927-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <1381570513-24927-9-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add system and runtime power management support for imx gluy layer.
+When the port goes to suspend or finishes resme, it needs to
+notify PHY, it is not a standard EHCI operation, so we add a
+quirk for it.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci_hdrc_imx.c |   99 ++++++++++++++++++++++++++++++++++-
- 1 files changed, 96 insertions(+), 3 deletions(-)
+ drivers/usb/chipidea/host.c  |  129 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/usb/chipidea.h |    1 +
+ 2 files changed, 130 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 023d3cb..9f66f93 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -28,6 +28,8 @@ struct ci_hdrc_imx_data {
- 	struct platform_device *ci_pdev;
- 	struct clk *clk;
- 	struct imx_usbmisc_data *usbmisc_data;
-+	atomic_t in_lpm;
-+	bool supports_runtime_pm;
- };
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index cbe95fc..42a0bd4 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -34,6 +34,10 @@
  
- /* Common functions shared by usbmisc drivers */
-@@ -82,6 +84,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 				  CI_HDRC_DISABLE_STREAMING,
- 	};
- 	int ret;
-+	struct device_node *np = pdev->dev.of_node;
+ static struct hc_driver __read_mostly ci_ehci_hc_driver;
+ static int (*orig_bus_suspend)(struct usb_hcd *hcd);
++static int (*orig_bus_resume)(struct usb_hcd *hcd);
++static int (*orig_hub_control)(struct usb_hcd *hcd,
++				u16 typeReq, u16 wValue, u16 wIndex,
++				char *buf, u16 wLength);
  
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data) {
-@@ -115,6 +118,11 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 
- 	pdata.phy = data->phy;
- 
-+	if (of_find_property(np, "supports_runtime_pm", NULL)) {
-+		pdata.flags |= CI_HDRC_SUPPORTS_RUNTIME_PM;
-+		data->supports_runtime_pm = true;
-+	}
-+
- 	if (!pdev->dev.dma_mask)
- 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
- 	if (!pdev->dev.coherent_dma_mask)
-@@ -151,8 +159,12 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, data);
- 
--	pm_runtime_no_callbacks(&pdev->dev);
--	pm_runtime_enable(&pdev->dev);
-+	device_set_wakeup_capable(&pdev->dev, true);
-+
-+	if (data->supports_runtime_pm) {
-+		pm_runtime_set_active(&pdev->dev);
-+		pm_runtime_enable(&pdev->dev);
-+	}
+ static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
+ {
+@@ -75,12 +79,131 @@ static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
+ 				 */
+ 				udelay(125);
+ 			}
++			if (hcd->phy && test_bit(port, &ehci->bus_suspended)
++				&& (ehci_port_speed(ehci, portsc) ==
++					USB_PORT_STAT_HIGH_SPEED))
++				/*
++				 * notify the USB PHY, it is for global
++				 * suspend case.
++				 */
++				usb_phy_notify_suspend(hcd->phy,
++					USB_SPEED_HIGH);
+ 		}
+ 	}
  
  	return 0;
+ }
  
-@@ -167,13 +179,93 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
- {
- 	struct ci_hdrc_imx_data *data = platform_get_drvdata(pdev);
- 
--	pm_runtime_disable(&pdev->dev);
- 	ci_hdrc_remove_device(data->ci_pdev);
-+	if (data->supports_runtime_pm) {
-+		pm_runtime_get_sync(&pdev->dev);
-+		pm_runtime_disable(&pdev->dev);
-+		pm_runtime_put_noidle(&pdev->dev);
++static int ci_imx_ehci_bus_resume(struct usb_hcd *hcd)
++{
++	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++	int port;
++
++	int ret = orig_bus_resume(hcd);
++
++	if (ret)
++		return ret;
++
++	port = HCS_N_PORTS(ehci->hcs_params);
++	while (port--) {
++		u32 __iomem *reg = &ehci->regs->port_status[port];
++		u32 portsc = ehci_readl(ehci, reg);
++		/*
++		 * Notify PHY after resume signal has finished, it is
++		 * for global suspend case.
++		 */
++		if (hcd->phy
++			&& test_bit(port, &ehci->bus_suspended)
++			&& (portsc & PORT_CONNECT)
++			&& (ehci_port_speed(ehci, portsc) ==
++				USB_PORT_STAT_HIGH_SPEED))
++			/* notify the USB PHY */
++			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
 +	}
-+	clk_disable_unprepare(data->clk);
 +
 +	return 0;
 +}
 +
-+#ifdef CONFIG_PM
-+static int imx_controller_suspend(struct device *dev)
++/* The below code is based on tegra ehci driver */
++static int ci_imx_ehci_hub_control(
++	struct usb_hcd	*hcd,
++	u16		typeReq,
++	u16		wValue,
++	u16		wIndex,
++	char		*buf,
++	u16		wLength
++)
 +{
-+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
++	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
++	u32 __iomem	*status_reg;
++	u32		temp;
++	unsigned long	flags;
++	int		retval = 0;
 +
-+	dev_dbg(dev, "at %s\n", __func__);
++	status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
 +
-+	if (atomic_read(&data->in_lpm))
-+		return 0;
++	spin_lock_irqsave(&ehci->lock, flags);
 +
- 	clk_disable_unprepare(data->clk);
- 
-+	atomic_set(&data->in_lpm, 1);
++	if (typeReq == SetPortFeature && wValue == USB_PORT_FEAT_SUSPEND) {
++		temp = ehci_readl(ehci, status_reg);
++		if ((temp & PORT_PE) == 0 || (temp & PORT_RESET) != 0) {
++			retval = -EPIPE;
++			goto done;
++		}
 +
- 	return 0;
- }
- 
-+static int imx_controller_resume(struct device *dev)
-+{
-+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-+	int ret = 0;
++		temp &= ~(PORT_RWC_BITS | PORT_WKCONN_E);
++		temp |= PORT_WKDISC_E | PORT_WKOC_E;
++		ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
 +
-+	dev_dbg(dev, "at %s\n", __func__);
++		/*
++		 * If a transaction is in progress, there may be a delay in
++		 * suspending the port. Poll until the port is suspended.
++		 */
++		if (ehci_handshake(ehci, status_reg, PORT_SUSPEND,
++						PORT_SUSPEND, 5000))
++			ehci_err(ehci, "timeout waiting for SUSPEND\n");
 +
-+	if (!atomic_read(&data->in_lpm))
-+		return 0;
++		spin_unlock_irqrestore(&ehci->lock, flags);
++		if (ehci_port_speed(ehci, temp) ==
++				USB_PORT_STAT_HIGH_SPEED && hcd->phy) {
++			/* notify the USB PHY */
++			usb_phy_notify_suspend(hcd->phy, USB_SPEED_HIGH);
++		}
++		spin_lock_irqsave(&ehci->lock, flags);
 +
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret)
-+		return ret;
-+
-+	atomic_set(&data->in_lpm, 0);
-+
-+	return ret;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int ci_hdrc_imx_suspend(struct device *dev)
-+{
-+	return imx_controller_suspend(dev);
-+}
-+
-+static int ci_hdrc_imx_resume(struct device *dev)
-+{
-+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = imx_controller_resume(dev);
-+	if (!ret && data->supports_runtime_pm) {
-+		pm_runtime_disable(dev);
-+		pm_runtime_set_active(dev);
-+		pm_runtime_enable(dev);
++		set_bit((wIndex & 0xff) - 1, &ehci->suspended_ports);
++		goto done;
 +	}
 +
-+	return ret;
-+}
-+#endif /* CONFIG_PM_SLEEP */
++	/*
++	 * After resume has finished, it needs do some post resume
++	 * operation for some SoCs.
++	 */
++	else if (typeReq == ClearPortFeature &&
++					wValue == USB_PORT_FEAT_C_SUSPEND) {
 +
-+#ifdef CONFIG_PM_RUNTIME
-+static int ci_hdrc_imx_runtime_suspend(struct device *dev)
-+{
-+	return imx_controller_suspend(dev);
++		/* Make sure the resume has finished, it should be finished */
++		if (ehci_handshake(ehci, status_reg, PORT_RESUME, 0, 25000))
++			ehci_err(ehci, "timeout waiting for resume\n");
++
++		temp = ehci_readl(ehci, status_reg);
++
++		if (ehci_port_speed(ehci, temp) ==
++				USB_PORT_STAT_HIGH_SPEED && hcd->phy) {
++			/* notify the USB PHY */
++			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
++		}
++	}
++
++	spin_unlock_irqrestore(&ehci->lock, flags);
++
++	/* Handle the hub control events here */
++	return orig_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
++done:
++	spin_unlock_irqrestore(&ehci->lock, flags);
++	return retval;
 +}
 +
-+static int ci_hdrc_imx_runtime_resume(struct device *dev)
-+{
-+	return imx_controller_resume(dev);
-+}
-+#endif /* CONFIG_PM_RUNTIME */
-+
-+#endif /* CONFIG_PM */
-+static const struct dev_pm_ops ci_hdrc_imx_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(ci_hdrc_imx_suspend, ci_hdrc_imx_resume)
-+	SET_RUNTIME_PM_OPS(ci_hdrc_imx_runtime_suspend,
-+			ci_hdrc_imx_runtime_resume, NULL)
-+};
- static const struct of_device_id ci_hdrc_imx_dt_ids[] = {
- 	{ .compatible = "fsl,imx27-usb", },
- 	{ /* sentinel */ }
-@@ -187,6 +279,7 @@ static struct platform_driver ci_hdrc_imx_driver = {
- 		.name = "imx_usb",
- 		.owner = THIS_MODULE,
- 		.of_match_table = ci_hdrc_imx_dt_ids,
-+		.pm = &ci_hdrc_imx_pm_ops,
- 	 },
- };
+ static irqreturn_t host_irq(struct ci_hdrc *ci)
+ {
+ 	return usb_hcd_irq(ci->irq, ci->hcd);
+@@ -180,8 +303,14 @@ int ci_hdrc_host_init(struct ci_hdrc *ci)
+ 	ehci_init_driver(&ci_ehci_hc_driver, NULL);
  
+ 	orig_bus_suspend = ci_ehci_hc_driver.bus_suspend;
++	orig_bus_resume = ci_ehci_hc_driver.bus_resume;
++	orig_hub_control = ci_ehci_hc_driver.hub_control;
+ 
+ 	ci_ehci_hc_driver.bus_suspend = ci_ehci_bus_suspend;
++	if (ci->platdata->flags & CI_HDRC_IMX_EHCI_QUIRK) {
++		ci_ehci_hc_driver.bus_resume = ci_imx_ehci_bus_resume;
++		ci_ehci_hc_driver.hub_control = ci_imx_ehci_hub_control;
++	}
+ 
+ 	return 0;
+ }
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 667b46c..8ce3daf 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -25,6 +25,7 @@ struct ci_hdrc_platform_data {
+ 	 * but otg is not supported (no register otgsc).
+ 	 */
+ #define CI_HDRC_DUAL_ROLE_NOT_OTG	BIT(4)
++#define CI_HDRC_IMX_EHCI_QUIRK		BIT(5)
+ 	enum usb_dr_mode	dr_mode;
+ #define CI_HDRC_CONTROLLER_RESET_EVENT		0
+ #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
 -- 
 1.7.1
