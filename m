@@ -1,69 +1,34 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 12 Oct 2013 17:51:39 +0200
-Subject: [PATCH 2/2] ARM: at91: cpuidle: Move driver to drivers/cpuidle
-In-Reply-To: <1381593099-1184-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1381593099-1184-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1381593099-1184-2-git-send-email-daniel.lezcano@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 12 Oct 2013 11:19:13 -0700
+Subject: [PATCH] cpufreq: sa11x0: Fix build
+In-Reply-To: <CAKohpo=9t2BZsiDowKei9w7Mi92g41ZWNe7R9-G=vf0JS3X8Uw@mail.gmail.com>
+References: <1381056329-3382-1-git-send-email-broonie@kernel.org>
+ <CAKohpo=9t2BZsiDowKei9w7Mi92g41ZWNe7R9-G=vf0JS3X8Uw@mail.gmail.com>
+Message-ID: <CAOesGMgdbptgfV+SVJHSxPShHe+cjVsr+6-pBVqtwkjPfUxeZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the cpuidle driver code has no more the dependency with the pm code, the
-'standby' callback being passed as a parameter to the device's platform data,
-we can move the cpuidle driver in the drivers/cpuidle directory.
+On Sun, Oct 6, 2013 at 7:54 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 06/10/2013, Mark Brown <broonie@kernel.org> wrote:
+>> From: Mark Brown <broonie@linaro.org>
+>>
+>> Commit 22c8b4f140 (cpufreq: sa11x0: Expose frequency table) added use of
+>> struct cpufreq_frequency_table to mach-sa1100/generic.h but did not ensure
+>> that the struct was declared, causing build failures on machines using that
+>> header. Fix this.
+>>
+>> Reported-by: Olof's autobuilder <build@lixom.net>
+>> Signed-off-by: Mark Brown <broonie@linaro.org>
+>> ---
+>>
+>> The relevant commit is in the cpufreq tree in -next.
+>
+> I have already sent relevant fix to Rafael for this, which
+> looks similar to this.. And I am waiting for Rafael to merge
+> it with offending commit...
 
-Tested-on usb-a9263 (at91sam9263)
+Things are still broken (or broken again). Can we please see this
+patch show up in next soon?
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-at91/Makefile                        |    1 -
- drivers/cpuidle/Kconfig.arm                        |    6 ++++++
- drivers/cpuidle/Makefile                           |    1 +
- .../cpuidle.c => drivers/cpuidle/cpuidle-at91.c    |    0
- 4 files changed, 7 insertions(+), 1 deletion(-)
- rename arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/cpuidle-at91.c (100%)
 
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 3b0a953..c1b7370 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -98,7 +98,6 @@ obj-y				+= leds.o
- # Power Management
- obj-$(CONFIG_PM)		+= pm.o
- obj-$(CONFIG_AT91_SLOW_CLOCK)	+= pm_slowclock.o
--obj-$(CONFIG_CPU_IDLE)	+= cpuidle.o
- 
- ifeq ($(CONFIG_PM_DEBUG),y)
- CFLAGS_pm.o += -DDEBUG
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 8e36603..edecfc8 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -27,6 +27,12 @@ config ARM_U8500_CPUIDLE
- 	help
- 	  Select this to enable cpuidle for ST-E u8500 processors
- 
-+config ARM_AT91_CPUIDLE
-+        bool "Cpu Idle Driver for the AT91 processors"
-+	depends on ARCH_AT91
-+	help
-+	  Select this to enable cpuidle for AT91 processors
-+
- config CPU_IDLE_BIG_LITTLE
- 	bool "Support for ARM big.LITTLE processors"
- 	depends on ARCH_VEXPRESS_TC2_PM
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index cea5ef5..60c4ae5 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -11,4 +11,5 @@ obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
- obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
- obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
-+obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
- obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)	+= cpuidle-big_little.o
-diff --git a/arch/arm/mach-at91/cpuidle.c b/drivers/cpuidle/cpuidle-at91.c
-similarity index 100%
-rename from arch/arm/mach-at91/cpuidle.c
-rename to drivers/cpuidle/cpuidle-at91.c
--- 
-1.7.9.5
+-Olof
