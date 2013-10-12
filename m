@@ -1,110 +1,36 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 12 Oct 2013 17:09:39 +0800
-Subject: [PATCH 05/12] usb: phy-mxs: Add implementation of nofity_suspend and
- notify_resume
+Date: Sat, 12 Oct 2013 17:09:43 +0800
+Subject: [PATCH 09/12] usb: phy-mxs: update binding for adding anatop phandle
 In-Reply-To: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1381568986-19802-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1381568986-19802-10-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add notify_suspend and notify_resume according to different SoCs.
+Add anatop phandle which is used to access anatop registers to
+control PHY's power and other USB operations.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   73 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 73 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index e0b0de0..8661dae 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -197,6 +197,78 @@ static int mxs_phy_on_disconnect(struct usb_phy *phy,
- 	return 0;
- }
+diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+index 5835b27..1a9bd85 100644
+--- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
++++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+@@ -4,10 +4,12 @@ Required properties:
+ - compatible: Should be "fsl,imx23-usbphy"
+ - reg: Should contain registers location and length
+ - interrupts: Should contain phy interrupt
++- fsl,anatop: phandle for anatop register
  
-+static int mxs_phy_on_suspend_workaround(struct usb_phy *phy,
-+		enum usb_device_speed speed)
-+{
-+	dev_dbg(phy->dev, "%s speed device has suspended\n",
-+		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
-+
-+	/* delay 4ms to wait bus entering idle */
-+	usleep_range(4000, 5000);
-+
-+	/*
-+	 * Workaround for wakeup signal between portsc.suspendM
-+	 * and PHY enters low power mode.
-+	 */
-+	writel_relaxed(0xffffffff, phy->io_priv + HW_USBPHY_PWD);
-+	writel_relaxed(0, phy->io_priv + HW_USBPHY_PWD);
-+
-+	if (speed == USB_SPEED_HIGH)
-+		writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-+				phy->io_priv + HW_USBPHY_CTRL_CLR);
-+
-+	return 0;
-+}
-+
-+static int mxs_phy_on_suspend(struct usb_phy *phy,
-+		enum usb_device_speed speed)
-+{
-+	dev_dbg(phy->dev, "%s speed device has suspended\n",
-+		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
-+
-+	if (speed == USB_SPEED_HIGH)
-+		writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-+				phy->io_priv + HW_USBPHY_CTRL_CLR);
-+
-+	return 0;
-+}
-+
-+/*
-+ * The resume signal must be finished here.
-+ */
-+static int mxs_phy_on_resume(struct usb_phy *phy,
-+		enum usb_device_speed speed)
-+{
-+	dev_dbg(phy->dev, "%s speed device has resumed\n",
-+		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
-+
-+	if (speed == USB_SPEED_HIGH) {
-+		/* Make sure the device has switched to High-Speed mode */
-+		udelay(500);
-+		writel_relaxed(BM_USBPHY_CTRL_ENHOSTDISCONDETECT,
-+				phy->io_priv + HW_USBPHY_CTRL_SET);
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * For mxs PHY, there are two PHY issues related to suspend/resume.
-+ * For mx23 and mx28, both of two issues are existed.
-+ * For mx6q and mx6dl, only one issue is existed.
-+ * For mx6 sololite, none issue is existed.
-+ */
-+static void mxs_phy_workaround(struct mxs_phy *mxs_phy)
-+{
-+	if (is_mx23_phy(mxs_phy)) {
-+		mxs_phy->phy.notify_suspend = mxs_phy_on_suspend_workaround;
-+		mxs_phy->phy.notify_resume = mxs_phy_on_resume;
-+	} else if (is_mx6q_phy(mxs_phy)) {
-+		mxs_phy->phy.notify_suspend = mxs_phy_on_suspend;
-+		mxs_phy->phy.notify_resume = mxs_phy_on_resume;
-+	}
-+}
-+
- static int mxs_phy_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-@@ -257,6 +329,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 
- 	mxs_phy->clk = clk;
- 	mxs_phy->devtype = pdev->id_entry->driver_data;
-+	mxs_phy_workaround(mxs_phy);
- 
- 	platform_set_drvdata(pdev, &mxs_phy->phy);
- 
+ Example:
+ usbphy1: usbphy at 020c9000 {
+ 	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+ 	reg = <0x020c9000 0x1000>;
+ 	interrupts = <0 44 0x04>;
++	fsl,anatop = <&anatop>;
+ };
 -- 
 1.7.1
