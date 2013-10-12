@@ -1,75 +1,39 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sat, 12 Oct 2013 11:44:59 +0200
-Subject: [PATCH 07/12] usb: phy-mxs: Add implementation of set_wakeup
-In-Reply-To: <1381568986-19802-8-git-send-email-peter.chen@freescale.com>
+Date: Sat, 12 Oct 2013 11:47:06 +0200
+Subject: [PATCH 11/12] usb: phy-mxs: update binding for adding disconnect
+ line property
+In-Reply-To: <1381568986-19802-12-git-send-email-peter.chen@freescale.com>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
- <1381568986-19802-8-git-send-email-peter.chen@freescale.com>
-Message-ID: <201310121144.59501.marex@denx.de>
+ <1381568986-19802-12-git-send-email-peter.chen@freescale.com>
+Message-ID: <201310121147.07217.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Peter Chen,
 
-> When we need the PHY can be waken up by external signals,
-> we can call this API. Besides, we call mxs_phy_disconnect_line
-> at this API to close the connection between USB PHY and
-> controller, after that, the line state from controller is SE0.
-> Once the PHY is out of power, without calling mxs_phy_disconnect_line,
-> there are unknown wakeups due to dp/dm floating at device mode.
+> This property is used to disconnect line between USB PHY and
+> USB controller.
 > 
 > Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  drivers/usb/phy/phy-mxs-usb.c |   82
-> ++++++++++++++++++++++++++++++++++++++++- 1 files changed, 81
-> insertions(+), 1 deletions(-)
-
-[...]
-
-> +static int mxs_phy_set_wakeup(struct usb_phy *x, bool enabled)
-> +{
-> +	struct mxs_phy *mxs_phy = to_mxs_phy(x);
-> +	u32 value = BM_USBPHY_CTRL_ENVBUSCHG_WKUP |
-> +			BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
-> +				BM_USBPHY_CTRL_ENIDCHG_WKUP;
-
-Does this stuff pass checkpatch at all? I mean, this alignment seems a bit 
-strange.
-
-> +	if (enabled) {
-> +		mxs_phy_disconnect_line(mxs_phy, true);
-> +		writel_relaxed(value, x->io_priv + HW_USBPHY_CTRL_SET);
-> +	} else {
-> +		writel_relaxed(value, x->io_priv + HW_USBPHY_CTRL_CLR);
-> +		mxs_phy_disconnect_line(mxs_phy, false);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int mxs_phy_on_connect(struct usb_phy *phy,
->  		enum usb_device_speed speed)
->  {
-> @@ -315,6 +390,10 @@ static int mxs_phy_probe(struct platform_device *pdev)
->  		}
->  	}
+>  Documentation/devicetree/bindings/usb/mxs-phy.txt |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 > 
-> +	if (of_find_property(np, "disconnect_line_without_vbus", NULL) &&
-> +			mxs_phy->regmap_anatop)
+> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> b/Documentation/devicetree/bindings/usb/mxs-phy.txt index 1a9bd85..099b0bb
+> 100644
+> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> @@ -5,6 +5,9 @@ Required properties:
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain phy interrupt
+>  - fsl,anatop: phandle for anatop register
+> +- disconnect_line_without_vbus: needs to disconnect
+> +connection between USB PHY and controller, it can avoid
+> +unexpected wakeup interrupt when the PHY is out of power
 
-You might want to introduce a variable here to make the condition shorter:
+Uh oh, this might needs some rewording. I didn't understand the reason for this 
+prop before I checked the 12/12 patch.
 
-var = of_find....
-if (var && mxs_phy->...)
-
-> +		mxs_phy->disconnect_line_without_vbus_is_needed = true;
-> +
->  	mxs_phy->phy.io_priv		= base;
->  	mxs_phy->phy.dev		= &pdev->dev;
->  	mxs_phy->phy.label		= DRIVER_NAME;
-> @@ -324,6 +403,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
->  	mxs_phy->phy.notify_connect	= mxs_phy_on_connect;
->  	mxs_phy->phy.notify_disconnect	= mxs_phy_on_disconnect;
->  	mxs_phy->phy.type		= USB_PHY_TYPE_USB2;
-> +	mxs_phy->phy.set_wakeup		= mxs_phy_set_wakeup;
-> 
->  	ATOMIC_INIT_NOTIFIER_HEAD(&mxs_phy->phy.notifier);
+Best regards,
+Marek Vasut
