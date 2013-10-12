@@ -1,7 +1,7 @@
 From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Sat, 12 Oct 2013 05:21:40 +0200
-Subject: [PATCH] ARM: LPC32xx: remove deprecated IRQF_DISABLED
-Message-ID: <1381548100-5035-1-git-send-email-michael.opdenacker@free-electrons.com>
+Date: Sat, 12 Oct 2013 05:24:59 +0200
+Subject: [PATCH] ARM: mmp: remove deprecated IRQF_DISABLED
+Message-ID: <1381548299-5093-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +11,21 @@ It's a NOOP since 2.6.35 and it will be removed one day.
 
 Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 ---
- arch/arm/mach-lpc32xx/timer.c | 2 +-
+ arch/arm/mach-mmp/time.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-lpc32xx/timer.c b/arch/arm/mach-lpc32xx/timer.c
-index 20eab63..4e58372 100644
---- a/arch/arm/mach-lpc32xx/timer.c
-+++ b/arch/arm/mach-lpc32xx/timer.c
-@@ -90,7 +90,7 @@ static irqreturn_t lpc32xx_timer_interrupt(int irq, void *dev_id)
+diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
+index 7ac41e8..6aacc9b 100644
+--- a/arch/arm/mach-mmp/time.c
++++ b/arch/arm/mach-mmp/time.c
+@@ -186,7 +186,7 @@ static void __init timer_config(void)
  
- static struct irqaction lpc32xx_timer_irq = {
- 	.name		= "LPC32XX Timer Tick",
+ static struct irqaction timer_irq = {
+ 	.name		= "timer",
 -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
 +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= lpc32xx_timer_interrupt,
+ 	.handler	= timer_interrupt,
+ 	.dev_id		= &ckevt,
  };
- 
 -- 
 1.8.1.2
