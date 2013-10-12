@@ -1,39 +1,40 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 12 Oct 2013 17:35:13 +0800
-Subject: [PATCH 11/11] ARM: dts: imx6qdl-sabresd: Enable runtime pm for usbotg
- and usb host 1
-In-Reply-To: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
-References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1381570513-24927-12-git-send-email-peter.chen@freescale.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 12 Oct 2013 12:06:24 +0200
+Subject: [PATCH v5 2/4] media: s5p-tv: Restore vpll clock rate
+In-Reply-To: <5243055C.7070205@samsung.com>
+References: <1379775649-6331-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <1379775649-6331-3-git-send-email-m.krawczuk@partner.samsung.com>
+ <5243055C.7070205@samsung.com>
+Message-ID: <52591F20.10506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable runtime power management support for usbotg and usb host 1.
+On 09/25/2013 05:46 PM, Tomasz Stanislawski wrote:
+> Hi,
+>
+> As you can see sdo, hdmi and mixer are saparate drivers that are
+> parts of s5p-tv drivers set. Could you rename commit name to
+> 'media: s5p-tv: sdo: Restore vpll clock rate after streamoff'
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Patch applied with the above commit summary line and checkpatch error
+as below fixed. Please always run scripts/checkpatch.pl before submitting
+patches.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 64e454b..c8c57db 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -215,6 +215,7 @@
- 
- &usbh1 {
- 	vbus-supply = <&reg_usb_h1_vbus>;
-+	supports_runtime_pm;
- 	status = "okay";
- };
- 
-@@ -223,6 +224,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbotg_2>;
- 	disable-over-current;
-+	supports_runtime_pm;
- 	status = "okay";
- };
- 
--- 
-1.7.1
+$ scripts/checkpatch.pl v5-2-4-media-s5p-tv-Restore-vpll-clock-rate.patch
+ERROR: trailing whitespace
+#67: FILE: drivers/media/platform/s5p-tv/sdo_drv.c:220:
++^I$
+
+total: 1 errors, 0 warnings, 50 lines checked
+
+NOTE: whitespace errors detected, you may wish to use scripts/cleanpatch or
+       scripts/cleanfile
+
+v5-2-4-media-s5p-tv-Restore-vpll-clock-rate.patch has style problems, 
+please review.
+
+If any of these errors are false positives, please report
+
+--
+Thanks,
+Sylwester
