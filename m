@@ -1,28 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 13 Oct 2013 19:00:59 +0100
-Subject: [RFC 06/23] mm/memblock: Add memblock early memory allocation apis
-In-Reply-To: <20131013175648.GC5253@mtj.dyndns.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Sun, 13 Oct 2013 14:02:27 -0400
+Subject: [RFC 07/23] mm/memblock: debug: correct displaying of upper
+ memory boundary
+In-Reply-To: <1381615146-20342-8-git-send-email-santosh.shilimkar@ti.com>
 References: <1381615146-20342-1-git-send-email-santosh.shilimkar@ti.com>
- <1381615146-20342-7-git-send-email-santosh.shilimkar@ti.com>
- <20131013175648.GC5253@mtj.dyndns.org>
-Message-ID: <20131013180058.GG25034@n2100.arm.linux.org.uk>
+ <1381615146-20342-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131013180227.GD5253@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 13, 2013 at 01:56:48PM -0400, Tejun Heo wrote:
-> Hello,
+On Sat, Oct 12, 2013 at 05:58:50PM -0400, Santosh Shilimkar wrote:
+> From: Grygorii Strashko <grygorii.strashko@ti.com>
 > 
-> On Sat, Oct 12, 2013 at 05:58:49PM -0400, Santosh Shilimkar wrote:
-> > Introduce memblock early memory allocation APIs which allow to support
-> > LPAE extension on 32 bits archs. More over, this is the next step
+> When debugging is enabled (cmdline has "memblock=debug") the memblock
+> will display upper memory boundary per each allocated/freed memory range
+> wrongly. For example:
+>  memblock_reserve: [0x0000009e7e8000-0x0000009e7ed000] _memblock_early_alloc_try_nid_nopanic+0xfc/0x12c
 > 
-> LPAE isn't something people outside arm circle would understand.
-> Let's stick to highmem.
+> The 0x0000009e7ed000 is displayed instead of 0x0000009e7ecfff
+> 
+> Hence, correct this by changing formula used to calculate upper memory
+> boundary to (u64)base + size - 1 instead of  (u64)base + size everywhere
+> in the debug messages.
 
-LPAE != highmem.  Two totally different things, unless you believe
-system memory always starts at physical address zero, which is very
-far from the case on the majority of ARM platforms.
+I kinda prefer base + size because it's easier to actually know the
+size but yeah, it should have been [base, base + size) and other
+places use base + size - 1 notation so it probably is better to stick
+to that.  Maybe move this one to the beginning of the series?
 
-So replacing LPAE with "highmem" is pure misrepresentation and is
-inaccurate.  PAE might be a better term, and is also the x86 term
-for this.
+Acked-by: Tejun Heo <tj@kernel.org>
+
+Thanks.
+
+-- 
+tejun
