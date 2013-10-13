@@ -1,60 +1,111 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 14 Oct 2013 06:56:50 +0900
-Subject: [GIT PULL] Samsung fixes-1 for v3.12
-Message-ID: <525B1722.5060001@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 13 Oct 2013 23:48:40 +0100
+Subject: [RFC v2 PATCH 2/4] ARM64: add support for kernel mode NEON in
+ atomic context
+In-Reply-To: <alpine.LFD.2.03.1310111546560.3023@syhkavp.arg>
+References: <1381344634-14917-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1381344634-14917-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20131011171446.GA18859@arm.com>
+ <B07F01F7-2FCE-4161-BAF4-1183E1B07F4A@linaro.org>
+ <C2D74641-A4F0-4CFB-A06C-AE79C05CCD1A@arm.com>
+ <alpine.LFD.2.03.1310111546560.3023@syhkavp.arg>
+Message-ID: <BF9D971A-6CB6-4135-BCBD-349B080E6BAA@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+On 11 Oct 2013, at 21:09, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Fri, 11 Oct 2013, Catalin Marinas wrote:
+>> On 11 Oct 2013, at 18:30, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>> On 11 okt. 2013, at 19:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>>>>> On Wed, Oct 09, 2013 at 07:50:32PM +0100, Ard Biesheuvel wrote:
+>>>>> --- a/arch/arm64/include/asm/neon.h
+>>>>> +++ b/arch/arm64/include/asm/neon.h
+>>>>> @@ -8,7 +8,38 @@
+>>>>> * published by the Free Software Foundation.
+>>>>> */
+>>>>> 
+>>>>> +#include <linux/hardirq.h>
+>>>>> +#include <linux/types.h>
+>>>>> +#include <asm/fpsimd.h>
+>>>>> +
+>>>>> #define cpu_has_neon()        (1)
+>>>>> 
+>>>>> +#define DEFINE_NEON_STACK_REGS(a, num)                    \
+>>>>> +    struct {                            \
+>>>>> +        struct fpsimd_partial_state regs;            \
+>>>>> +        __uint128_t vregs[(num) > 32 ? 32 : ((num) + 1) & ~1U];    \
+>>>>> +    } a = { .regs.num_regs = sizeof(a.vregs) / sizeof(__uint128_t) }
+>>>>> +
+>>>>> +#define DEFINE_NEON_STACK_REGS_ALL(name)    DEFINE_NEON_STACK_REGS(name, 32)
+>>>>> +
+>>>>> void kernel_neon_begin(void);
+>>>>> void kernel_neon_end(void);
+>>>>> +
+>>>>> +static inline void __kernel_neon_begin_atomic(struct fpsimd_partial_state *regs)
+>>>>> +{
+>>>>> +    if (!in_interrupt())
+>>>>> +        kernel_neon_begin();
+>>>>> +    else
+>>>>> +        fpsimd_save_partial_state(regs);
+>>>>> +}
+>>>>> +
+>>>>> +static inline void __kernel_neon_end_atomic(struct fpsimd_partial_state *regs)
+>>>>> +{
+>>>>> +    if (!in_interrupt())
+>>>>> +        kernel_neon_end();
+>>>>> +    else
+>>>>> +        fpsimd_load_partial_state(regs);
+>>>>> +}
+>>>> 
+>>>> The _atomic suffix is a bit misleading (you basically mean no user
+>>>> context). I wonder whether it's better to have some _fast/_slow variants
+>>>> instead. Looking at the other two patches, you only need 2 or 4
+>>>> registers to do the crypto stuff but if you are not in_interrupt(), you
+>>>> basically save and restore the full NEON bank. I would say for such
+>>>> cases just make kernel_neon_begin_fast() call which is safe in all
+>>>> contexts and much faster.
+>>> 
+>>> I agree that the name is a bit misleading.
+>>> 
+>>> Regarding fast/slow: if you take the core aes cipher as an example, it
+>>> will likely be called from a loop somewhere, and (assuming lazy restore
+>>> gets merged at some point) you may be stacking and unstacking 2 or 4
+>>> registers many times while kernel_neon_begin() would just stack them
+>>> once and let the lazy restore unstack them only when needed.
+>>> 
+>>> This is probably a detail where arm and arm64 will be implemented
+>>> somewhat differently.  I would still like to align the api between the
+>>> two, if possible, so intrinsics or gcc vectorized code can be shared
+>>> easily.  However, as ARM has fewer use cases where using only 2
+>>> registers makes sense, (memcpy perhaps?) and already has lazy restore
+>>> wired up, I personally feel hooking into the lazy restore in the
+>>> !in_interrupt() case is still the best solution there.
+>> 
+>> Lazy saving/restoring on context switch may not be beneficial on arm64
+>> and I don't want to enable it until I see some real user space
+>> benchmarks (not kernel crypto API benchmarks).
+> 
+> I think it is more important to establish the API semantics here.  
+> Implementation may vary afterwards.
+> 
+> The difference right now between kernel_neon_begin() and 
+> __kernel_neon_begin_atomic() is that the later can be stacked while the 
+> former cannot.  
 
-   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+How much stacking do we need?  If we limit the nesting to two levels
+(process and IRQ context), we could pre-allocate per-CPU
+fpsimd_state structures for interrupt context and always use the same
+API. About softirqs, do we need another level of nesting?
 
-are available in the git repository at:
+> Maybe the API should be kernel_neon_begin() and 
+> kernel_neon_begin_partial(nb_regs), the former being a simple alias to 
+> the later with the full register set as argument.  And then the actual 
+> register saving method (whether it is an atomic context or not, the 
+> number of registers, etc.) could be handled and optimized internally 
+> instead of exposing such implementation constraints to users of the API.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-fixes-1
+It could be more efficient to always specify the number of registers to
+be saved/restored even for kernel_neon_begin().  But I haven't paid much
+attention to the register use in the actual crypto algorithms.
 
-for you to fetch changes up to b7f8c479e112cc09422aac2bda923a86b381fcc0:
-
-   ARM: dts: fix PL330 MDMA1 address in DT for Universal C210 board 
-(2013-10-08 07:09:52 +0900)
-
-----------------------------------------------------------------
-Fixes for v3.12
-- fix UART for switching FIFO
-- correct typo 'samsung,pin-drv'
-- correct typo 'earlyprintk'
-- remove DP PHY for supporting dptx-phy on exynos5250
-- cpufreq regulator lookup for exynos4210-origen and trats
-- fix PL330 MDMA1 address for universal c210 board
-
-----------------------------------------------------------------
-Al Stone (1):
-       ARM: dts: Correct typo in use of samsung,pin-drv for exynos5250
-
-Alexander Shiyan (1):
-       ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo function
-
-Bartlomiej Zolnierkiewicz (1):
-       ARM: dts: fix PL330 MDMA1 address in DT for Universal C210 board
-
-Jingoo Han (1):
-       ARM: dts: Remove DP PHY node from exynos5250.dtsi
-
-Tomasz Figa (1):
-       ARM: dts: Work around lack of cpufreq regulator lookup for 
-exynos4210-origen and trats boards
-
-Youngmin Nam (1):
-       ARM: dts: Fix a typo on Exynos5440 DTS files
-
-  arch/arm/boot/dts/exynos4210-origen.dts         |  7 +++-
-  arch/arm/boot/dts/exynos4210-trats.dts          |  7 +++-
-  arch/arm/boot/dts/exynos4210-universal_c210.dts |  4 +++
-  arch/arm/boot/dts/exynos5250-pinctrl.dtsi       | 44 
-++++++++++++-------------
-  arch/arm/boot/dts/exynos5250.dtsi               | 13 +++-----
-  arch/arm/boot/dts/exynos5440-sd5v1.dts          |  2 +-
-  arch/arm/boot/dts/exynos5440-ssdk5440.dts       |  2 +-
-  arch/arm/plat-samsung/include/plat/uncompress.h |  2 ++
-  8 files changed, 47 insertions(+), 34 deletions(-)
+Catalin
