@@ -1,39 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 13 Oct 2013 11:03:50 +0100
-Subject: [PATCH v3 3/3] ARM: add support for bit sliced AES using NEON
- instructions
-In-Reply-To: <1380913419-13296-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1380913419-13296-1-git-send-email-ard.biesheuvel@linaro.org>
- <1380913419-13296-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20131013100350.GZ25034@n2100.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sun, 13 Oct 2013 12:13:50 +0200
+Subject: [PATCH] clocksource: at91/tc: remove deprecated IRQF_DISABLED
+In-Reply-To: <525A679A.2060408@overkiz.com>
+References: <1381639559-6981-1-git-send-email-michael.opdenacker@free-electrons.com>
+ <525A679A.2060408@overkiz.com>
+Message-ID: <525A725E.5070308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 04, 2013 at 09:03:39PM +0200, Ard Biesheuvel wrote:
-> diff --git a/arch/arm/crypto/aesbs-glue.c b/arch/arm/crypto/aesbs-glue.c
-> new file mode 100644
-> index 0000000..4522366
-> --- /dev/null
-> +++ b/arch/arm/crypto/aesbs-glue.c
-> @@ -0,0 +1,434 @@
-> +/*
-> + * linux/arch/arm/crypto/aesbs-glue.c - glue code for NEON bit sliced AES
-> + *
-> + * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <asm/neon.h>
-> +#include <crypto/aes.h>
-> +#include <crypto/ablk_helper.h>
+On 10/13/2013 11:27 AM, boris brezillon wrote:
+> Hello Micheal,
+>
+> This flag has been removed in a recent submission (see
+> https://lkml.org/lkml/2013/10/2/202), and, if I'm correct, is on his way
+> for mainlining.
 
-This header file doesn't appear to exist, and so causes this build error:
+Yes, it has been merged in the tip tree:
 
-  CC      arch/arm/crypto/aesbs-glue.o
-arch/arm/crypto/aesbs-glue.c:13:32: fatal error: crypto/ablk_helper.h: No such fcompilation terminated.
-make[2]: *** [arch/arm/crypto/aesbs-glue.o] Error 1
-make[2]: Target `__build' not remade because of errors.
-make[1]: *** [arch/arm/crypto] Error 2
+https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=timers/core&id=f51380a75652a4600b34ce384c4ff89ce0a15132
+
+> On 13/10/2013 06:45, Michael Opdenacker wrote:
+>> This patch proposes to remove the use of the IRQF_DISABLED flag
+>>
+>> It's a NOOP since 2.6.35 and it will be removed one day.
+>>
+>> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+>> ---
+>>   drivers/clocksource/tcb_clksrc.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clocksource/tcb_clksrc.c
+>> b/drivers/clocksource/tcb_clksrc.c
+>> index 8a61872..2efeb3b 100644
+>> --- a/drivers/clocksource/tcb_clksrc.c
+>> +++ b/drivers/clocksource/tcb_clksrc.c
+>> @@ -180,7 +180,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
+>>
+>>   static struct irqaction tc_irqaction = {
+>>       .name        = "tc_clkevt",
+>> -    .flags        = IRQF_TIMER | IRQF_DISABLED,
+>> +    .flags        = IRQF_TIMER,
+>>       .handler    = ch2_irq,
+>>   };
+>>
+>>
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
