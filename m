@@ -1,46 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 12 Oct 2013 18:11:16 -0700
-Subject: [PATCH v3 0/2] KVM/ARM Huge pages support
-In-Reply-To: <52543F61.9050507@arm.com>
-References: <1380903201-32644-1-git-send-email-christoffer.dall@linaro.org>
- <52543F61.9050507@arm.com>
-Message-ID: <20131013011116.GB8200@cbox>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Sun, 13 Oct 2013 06:39:54 +0200
+Subject: [PATCH] clocksource: vt8500: remove deprecated IRQF_DISABLED
+Message-ID: <1381639194-6861-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 06:22:41PM +0100, Marc Zyngier wrote:
-> On 04/10/13 17:13, Christoffer Dall wrote:
-> > This small series adds support for Transparent Huge Pages and hugetlbfs
-> > pages for KVM on the arm and arm64 architectures.
-> > 
-> > Measurements have shown that using huge pages in for stage-2 mappings
-> > provides up to more than 15% performance increase for some workloads.
-> > 
-> > The patch series applies to kvm/next, but depends on the patch sent
-> > earlier:
-> > http://marc.info/?l=kvm&m=138074894126934&w=2
-> > 
-> > The whole thing can also be cloned from here:
-> > git://git.linaro.org/people/cdall/linux-kvm-arm.git kvm-arm-hugepages-v3
-> > 
-> > See the patches for changelogs.
-> > 
-> > Christoffer Dall (2):
-> >   KVM: ARM: Support hugetlbfs backed huge pages
-> >   KVM: ARM: Transparent huge page (THP) support
-> > 
-> >  arch/arm/include/asm/kvm_mmu.h         |  17 ++-
-> >  arch/arm/include/asm/pgtable-3level.h  |   2 +
-> >  arch/arm/kvm/mmu.c                     | 223 +++++++++++++++++++++++++++------
-> >  arch/arm64/include/asm/kvm_mmu.h       |  12 +-
-> >  arch/arm64/include/asm/pgtable-hwdef.h |   2 +
-> >  5 files changed, 212 insertions(+), 44 deletions(-)
-> 
-> Looks good to me. For the series:
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-Thanks, waiting for the kvm huge page defines patch series to be applied
-to kvm/next before I apply this.
+This patch proposes to remove the use of the IRQF_DISABLED flag
 
--Christoffer
+It's a NOOP since 2.6.35 and it will be removed one day.
+
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ drivers/clocksource/vt8500_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
+index 64f553f..414063f 100644
+--- a/drivers/clocksource/vt8500_timer.c
++++ b/drivers/clocksource/vt8500_timer.c
+@@ -124,7 +124,7 @@ static irqreturn_t vt8500_timer_interrupt(int irq, void *dev_id)
+ 
+ static struct irqaction irq = {
+ 	.name    = "vt8500_timer",
+-	.flags   = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.flags   = IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler = vt8500_timer_interrupt,
+ 	.dev_id  = &clockevent,
+ };
+-- 
+1.8.1.2
