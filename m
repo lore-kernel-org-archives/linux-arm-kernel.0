@@ -1,7 +1,7 @@
 From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Sun, 13 Oct 2013 06:45:59 +0200
-Subject: [PATCH] clocksource: at91/tc: remove deprecated IRQF_DISABLED
-Message-ID: <1381639559-6981-1-git-send-email-michael.opdenacker@free-electrons.com>
+Date: Sun, 13 Oct 2013 07:00:00 +0200
+Subject: [PATCH] dma: coh901318: remove deprecated IRQF_DISABLED
+Message-ID: <1381640400-7146-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +11,21 @@ It's a NOOP since 2.6.35 and it will be removed one day.
 
 Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 ---
- drivers/clocksource/tcb_clksrc.c | 2 +-
+ drivers/dma/coh901318.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 8a61872..2efeb3b 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -180,7 +180,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
+diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+index 31011d2..3025b91 100644
+--- a/drivers/dma/coh901318.c
++++ b/drivers/dma/coh901318.c
+@@ -2694,7 +2694,7 @@ static int __init coh901318_probe(struct platform_device *pdev)
+ 	if (irq < 0)
+ 		return irq;
  
- static struct irqaction tc_irqaction = {
- 	.name		= "tc_clkevt",
--	.flags		= IRQF_TIMER | IRQF_DISABLED,
-+	.flags		= IRQF_TIMER,
- 	.handler	= ch2_irq,
- };
- 
+-	err = devm_request_irq(&pdev->dev, irq, dma_irq_handler, IRQF_DISABLED,
++	err = devm_request_irq(&pdev->dev, irq, dma_irq_handler, 0,
+ 			       "coh901318", base);
+ 	if (err)
+ 		return err;
 -- 
 1.8.1.2
