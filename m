@@ -1,25 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 13 Oct 2013 11:19:45 +0200
-Subject: [PATCH 2/2] ARM: at91: cpuidle: Move driver to drivers/cpuidle
-In-Reply-To: <1381593099-1184-2-git-send-email-daniel.lezcano@linaro.org>
-References: <1381593099-1184-1-git-send-email-daniel.lezcano@linaro.org>
- <1381593099-1184-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20131013111945.0251a3cc@skate>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Sun, 13 Oct 2013 11:27:54 +0200
+Subject: [PATCH] clocksource: at91/tc: remove deprecated IRQF_DISABLED
+In-Reply-To: <1381639559-6981-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1381639559-6981-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <525A679A.2060408@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Daniel Lezcano,
+Hello Micheal,
 
-On Sat, 12 Oct 2013 17:51:39 +0200, Daniel Lezcano wrote:
+This flag has been removed in a recent submission (see 
+https://lkml.org/lkml/2013/10/2/202), and, if I'm correct, is on his way 
+for mainlining.
 
-> +config ARM_AT91_CPUIDLE
-> +        bool "Cpu Idle Driver for the AT91 processors"
+Best Regards,
 
-Nitpick: indentation is done with spaces here, while it should be one
-tab.
+Boris
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+On 13/10/2013 06:45, Michael Opdenacker wrote:
+> This patch proposes to remove the use of the IRQF_DISABLED flag
+>
+> It's a NOOP since 2.6.35 and it will be removed one day.
+>
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+> ---
+>   drivers/clocksource/tcb_clksrc.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index 8a61872..2efeb3b 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -180,7 +180,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
+>
+>   static struct irqaction tc_irqaction = {
+>   	.name		= "tc_clkevt",
+> -	.flags		= IRQF_TIMER | IRQF_DISABLED,
+> +	.flags		= IRQF_TIMER,
+>   	.handler	= ch2_irq,
+>   };
+>
+>
