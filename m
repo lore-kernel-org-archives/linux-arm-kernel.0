@@ -1,40 +1,38 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sun, 13 Oct 2013 14:42:12 -0400
-Subject: [RFC 06/23] mm/memblock: Add memblock early memory allocation apis
-In-Reply-To: <20131013180058.GG25034@n2100.arm.linux.org.uk>
-References: <1381615146-20342-1-git-send-email-santosh.shilimkar@ti.com>
- <1381615146-20342-7-git-send-email-santosh.shilimkar@ti.com>
- <20131013175648.GC5253@mtj.dyndns.org>
- <20131013180058.GG25034@n2100.arm.linux.org.uk>
-Message-ID: <20131013184212.GA18075@htj.dyndns.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 13 Oct 2013 21:17:01 +0200
+Subject: [PATCH] net/ethernet: cpsw: Bugfix interrupts before enabling napi
+Message-ID: <1381691821-25498-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 13, 2013 at 07:00:59PM +0100, Russell King - ARM Linux wrote:
-> On Sun, Oct 13, 2013 at 01:56:48PM -0400, Tejun Heo wrote:
-> > Hello,
-> > 
-> > On Sat, Oct 12, 2013 at 05:58:49PM -0400, Santosh Shilimkar wrote:
-> > > Introduce memblock early memory allocation APIs which allow to support
-> > > LPAE extension on 32 bits archs. More over, this is the next step
-> > 
-> > LPAE isn't something people outside arm circle would understand.
-> > Let's stick to highmem.
-> 
-> LPAE != highmem.  Two totally different things, unless you believe
-> system memory always starts at physical address zero, which is very
-> far from the case on the majority of ARM platforms.
-> 
-> So replacing LPAE with "highmem" is pure misrepresentation and is
-> inaccurate.  PAE might be a better term, and is also the x86 term
-> for this.
+If interrupts happen before napi_enable was called, the driver will not
+work as expected. Network transmissions are impossible in this state.
+This bug can be reproduced easily by restarting the network interface in
+a loop. After some time any network transmissions on the network
+interface will fail.
 
-Ah, right, forgot about the base address.  Let's please spell out the
-requirements then.  Briefly explaining both aspects (non-zero base
-addr & highmem) and why the existing bootmem based interfaced can't
-serve them would be helpful to later readers.
+This patch fixes the bug by enabling napi before enabling the network
+interface interrupts.
 
-Thanks.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/net/ethernet/ti/cpsw.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 804846e..fccd9d4 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -1169,9 +1169,9 @@ static int cpsw_ndo_open(struct net_device *ndev)
+ 		}
+ 	}
+ 
++	napi_enable(&priv->napi);
+ 	cpdma_ctlr_start(priv->dma);
+ 	cpsw_intr_enable(priv);
+-	napi_enable(&priv->napi);
+ 	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_RX);
+ 	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
+ 
 -- 
-tejun
+1.8.4.rc3
