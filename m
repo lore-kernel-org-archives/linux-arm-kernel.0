@@ -1,44 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 13 Oct 2013 16:02:41 -0700
-Subject: [GIT PULL] Samsung fixes-1 for v3.12
-In-Reply-To: <525B1722.5060001@samsung.com>
-References: <525B1722.5060001@samsung.com>
-Message-ID: <CAOesGMirL+uR0xL9o0oqhfVa4KKsDeaCjkJyarAJr5vmZPg4Eg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Oct 2013 00:45:07 +0100
+Subject: [PATCH] ARM: timer-sp: remove deprecated IRQF_DISABLED
+In-Reply-To: <1381546322-4632-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1381546322-4632-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <20131013234507.GH25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+If you want to either send these to the patch system, or alternatively
+collect them up in a git tree somewhere for me and/or arm-soc to pull...
 
-On Sun, Oct 13, 2013 at 2:56 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Alexander Shiyan (1):
->       ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo function
-
-What's the regression that this is fixing? As far as I can tell, the
-code has been the same since 2008. Or did something surrounding it
-change?
-
->
-> Bartlomiej Zolnierkiewicz (1):
->       ARM: dts: fix PL330 MDMA1 address in DT for Universal C210 board
->
-> Jingoo Han (1):
->       ARM: dts: Remove DP PHY node from exynos5250.dtsi
-
-You are sending this in pretty late. Please be careful about conflicts
-due to this late revert, in particular if you plan on re-introducing
-something in 3.13.
-
-> Tomasz Figa (1):
->       ARM: dts: Work around lack of cpufreq regulator lookup for
-> exynos4210-origen and trats boards
->
-> Youngmin Nam (1):
->       ARM: dts: Fix a typo on Exynos5440 DTS files
-
-This is a bad patch subject, it can be way more specific. Also, this
-is a good reason not to have these elaborate bootargs in the DTS, in
-particular for modern platforms -- the bootargs should come from
-firmware for your platform.
-
-
--Olof
+On Sat, Oct 12, 2013 at 04:52:02AM +0200, Michael Opdenacker wrote:
+> This patch proposes to remove the use of the IRQF_DISABLED flag
+> 
+> It's a NOOP since 2.6.35 and it will be removed one day.
+> 
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+> ---
+>  arch/arm/common/timer-sp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+> index e901d0f..ce922d0 100644
+> --- a/arch/arm/common/timer-sp.c
+> +++ b/arch/arm/common/timer-sp.c
+> @@ -175,7 +175,7 @@ static struct clock_event_device sp804_clockevent = {
+>  
+>  static struct irqaction sp804_timer_irq = {
+>  	.name		= "timer",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>  	.handler	= sp804_timer_interrupt,
+>  	.dev_id		= &sp804_clockevent,
+>  };
+> -- 
+> 1.8.1.2
+> 
