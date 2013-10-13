@@ -1,10 +1,10 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 13 Oct 2013 18:17:47 +0200
-Subject: [PATCH 1/4] drivers/gpu/drm/tilcdc: don't use
+Date: Sun, 13 Oct 2013 18:17:48 +0200
+Subject: [PATCH 2/4] drivers/mmc/host: don't use
  devm_pinctrl_get_select_default() in probe
 In-Reply-To: <1381681071-6021-1-git-send-email-wsa@the-dreams.de>
 References: <1381681071-6021-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1381681071-6021-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <1381681071-6021-3-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,103 +14,107 @@ we can rely on device core for setting the default pins. Compile tested only.
 Acked-by: Linus Walleij <linus.walleij@linaro.org> (personally at LCE13)
 Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 6 ------
- drivers/gpu/drm/tilcdc/tilcdc_slave.c  | 6 ------
- drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 6 ------
- 3 files changed, 18 deletions(-)
+ drivers/mmc/host/mvsdio.c          | 7 +------
+ drivers/mmc/host/omap_hsmmc.c      | 7 -------
+ drivers/mmc/host/sdhci-esdhc-imx.c | 8 --------
+ 3 files changed, 1 insertion(+), 21 deletions(-)
 
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.c b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-index 86c6732..f0ff5f8 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-@@ -16,7 +16,6 @@
-  */
- 
- #include <linux/pinctrl/pinmux.h>
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 06c5b0b..8c9f448 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -25,7 +25,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/slot-gpio.h>
 -#include <linux/pinctrl/consumer.h>
- #include <linux/backlight.h>
- #include <video/display_timing.h>
- #include <video/of_display_timing.h>
-@@ -358,7 +357,6 @@ static int panel_probe(struct platform_device *pdev)
- 	struct device_node *node = pdev->dev.of_node;
- 	struct panel_module *panel_mod;
- 	struct tilcdc_module *mod;
+ 
+ #include <asm/sizes.h>
+ #include <asm/unaligned.h>
+@@ -685,7 +684,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 	const struct mbus_dram_target_info *dram;
+ 	struct resource *r;
+ 	int ret, irq;
 -	struct pinctrl *pinctrl;
- 	int ret = -EINVAL;
++	int gpio_card_detect, gpio_write_protect;
  
- 
-@@ -376,10 +374,6 @@ static int panel_probe(struct platform_device *pdev)
- 
- 	tilcdc_module_init(mod, "panel", &panel_module_ops);
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	irq = platform_get_irq(pdev, 0);
+@@ -702,10 +701,6 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 	host->mmc = mmc;
+ 	host->dev = &pdev->dev;
  
 -	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
 -	if (IS_ERR(pinctrl))
--		dev_warn(&pdev->dev, "pins are not configured\n");
+-		dev_warn(&pdev->dev, "no pins associated\n");
 -
- 
- 	panel_mod->timings = of_get_display_timings(node);
- 	if (!panel_mod->timings) {
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_slave.c b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-index 595068b..4f3c969 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-@@ -17,7 +17,6 @@
- 
- #include <linux/i2c.h>
- #include <linux/pinctrl/pinmux.h>
--#include <linux/pinctrl/consumer.h>
- #include <drm/drm_encoder_slave.h>
- 
- #include "tilcdc_drv.h"
-@@ -320,7 +319,6 @@ static int slave_probe(struct platform_device *pdev)
- 	struct device_node *i2c_node;
- 	struct slave_module *slave_mod;
- 	struct tilcdc_module *mod;
--	struct pinctrl *pinctrl;
- 	uint32_t i2c_phandle;
- 	struct i2c_adapter *slavei2c;
- 	int ret = -EINVAL;
-@@ -366,10 +364,6 @@ static int slave_probe(struct platform_device *pdev)
- 
- 	tilcdc_module_init(mod, "slave", &slave_module_ops);
- 
--	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
--	if (IS_ERR(pinctrl))
--		dev_warn(&pdev->dev, "pins are not configured\n");
--
- 	tilcdc_slave_probedefer(false);
- 
- 	return 0;
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-index c38b56b..20f3d89 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-@@ -19,7 +19,6 @@
+ 	/*
+ 	 * Some non-DT platforms do not pass a clock, and the clock
+ 	 * frequency is passed through platform_data. On DT platforms,
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 6ac63df..f6606cf 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -38,7 +38,6 @@
+ #include <linux/io.h>
  #include <linux/gpio.h>
- #include <linux/of_gpio.h>
- #include <linux/pinctrl/pinmux.h>
+ #include <linux/regulator/consumer.h>
 -#include <linux/pinctrl/consumer.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/platform_data/mmc-omap.h>
  
- #include "tilcdc_drv.h"
- 
-@@ -326,7 +325,6 @@ static int tfp410_probe(struct platform_device *pdev)
- 	struct device_node *i2c_node;
- 	struct tfp410_module *tfp410_mod;
- 	struct tilcdc_module *mod;
+@@ -1777,7 +1776,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 	const struct of_device_id *match;
+ 	dma_cap_mask_t mask;
+ 	unsigned tx_req, rx_req;
 -	struct pinctrl *pinctrl;
- 	uint32_t i2c_phandle;
- 	int ret = -EINVAL;
  
-@@ -344,10 +342,6 @@ static int tfp410_probe(struct platform_device *pdev)
+ 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
+ 	if (match) {
+@@ -1996,11 +1994,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
  
- 	tilcdc_module_init(mod, "tfp410", &tfp410_module_ops);
+ 	omap_hsmmc_disable_irq(host);
  
 -	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
 -	if (IS_ERR(pinctrl))
--		dev_warn(&pdev->dev, "pins are not configured\n");
+-		dev_warn(&pdev->dev,
+-			"pins are not configured from the driver\n");
 -
- 	if (of_property_read_u32(node, "i2c", &i2c_phandle)) {
- 		dev_err(&pdev->dev, "could not get i2c bus phandle\n");
- 		goto fail;
+ 	omap_hsmmc_protect_card(host);
+ 
+ 	mmc_add_host(mmc);
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index abc8cf0..0ac8b1a 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -25,7 +25,6 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_gpio.h>
+-#include <linux/pinctrl/consumer.h>
+ #include <linux/platform_data/mmc-esdhc-imx.h>
+ #include "sdhci-pltfm.h"
+ #include "sdhci-esdhc.h"
+@@ -80,7 +79,6 @@ struct pltfm_imx_data {
+ 	int flags;
+ 	u32 scratchpad;
+ 	enum imx_esdhc_type devtype;
+-	struct pinctrl *pinctrl;
+ 	struct esdhc_platform_data boarddata;
+ 	struct clk *clk_ipg;
+ 	struct clk *clk_ahb;
+@@ -568,12 +566,6 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 	clk_prepare_enable(imx_data->clk_ipg);
+ 	clk_prepare_enable(imx_data->clk_ahb);
+ 
+-	imx_data->pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+-	if (IS_ERR(imx_data->pinctrl)) {
+-		err = PTR_ERR(imx_data->pinctrl);
+-		goto disable_clk;
+-	}
+-
+ 	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
+ 
+ 	if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
 -- 
 1.8.4.rc3
