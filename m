@@ -1,33 +1,17 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 12 Oct 2013 23:28:42 +0100
-Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
- "include/asm/atomic.h"
-In-Reply-To: <20131011165530.GS14732@mudshark.cambridge.arm.com>
-References: <5256117A.4000009@asianux.com> <5256121A.9030504@asianux.com>
- <52561269.60900@asianux.com>
- <20131010100733.GH3817@mudshark.cambridge.arm.com>
- <52568998.2080108@asianux.com>
- <20131010142305.GG6199@mudshark.cambridge.arm.com>
- <525751E2.3020207@asianux.com>
- <20131011104419.GE14732@mudshark.cambridge.arm.com>
- <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
- <20131011165530.GS14732@mudshark.cambridge.arm.com>
-Message-ID: <794E70F6-80D3-4100-A0FF-A6F34AFB9A59@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sun, 13 Oct 2013 06:09:38 +0530
+Subject: [PATCH] cpufreq: sa11x0: Fix build
+In-Reply-To: <CAOesGMgdbptgfV+SVJHSxPShHe+cjVsr+6-pBVqtwkjPfUxeZg@mail.gmail.com>
+References: <1381056329-3382-1-git-send-email-broonie@kernel.org>
+ <CAKohpo=9t2BZsiDowKei9w7Mi92g41ZWNe7R9-G=vf0JS3X8Uw@mail.gmail.com>
+ <CAOesGMgdbptgfV+SVJHSxPShHe+cjVsr+6-pBVqtwkjPfUxeZg@mail.gmail.com>
+Message-ID: <CAKohpomTJJcSAOF-tv0h8iquToiTN9O11GrVSx3LzXGYk4ENkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 Oct 2013, at 17:55, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Oct 11, 2013 at 12:47:05PM +0100, Chen Gang wrote:
->> In current kernel wide source code, except other architectures, only
->> s390 scsi drivers use atomic_clear_mask(), and arm/arm64 need not
->> support s390 drivers.
->> 
->> So remove atomic_clear_mask() from "arm[64]/include/asm/atomic.h".
-> 
->  Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Catalin, are you happy for me to send this via the ARM tree?
+On 12/10/2013, Olof Johansson <olof@lixom.net> wrote:
+> Things are still broken (or broken again). Can we please see this
+> patch show up in next soon?
 
-Fine by me.
-
-Catalin
+Its just applied today by rafael..
+b37e4d1 cpufreq: sa11x0: Fix build breakage after "Expose frequency table"
