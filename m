@@ -1,80 +1,31 @@
-From: zyy@motorola.com (Yuanyuan ZHONG)
-Date: Sun, 13 Oct 2013 00:32:07 -0500
-Subject: [PATCH] arm: vfp: always clear vfp_current_hw_state when forcing
- reload
-In-Reply-To: <CAFUV4K3ANiEftwRhqT+WXfeTnLPgGvjqQP3OYgDAxMa6qVup3A@mail.gmail.com>
-References: <1380751187-11257-1-git-send-email-zyy@motorola.com>
- <20131002221123.GC12758@n2100.arm.linux.org.uk>
- <CAFUV4K3dsVDtHhQtuZ6yEQHxxHXaa9LODBZuGFipjAKumF4abQ@mail.gmail.com>
- <CAFUV4K1CkzGZVEwkXGX38jG0HxerqQq--d-qFiqF9J6wi88xYQ@mail.gmail.com>
- <20131011120729.GW25034@n2100.arm.linux.org.uk>
- <CAFUV4K3de3p9jP1Oo=cafEuu64YmEzBXrAiiRWUauy0VeCEQ5w@mail.gmail.com>
- <20131011162650.GX25034@n2100.arm.linux.org.uk>
- <CAFUV4K3ANiEftwRhqT+WXfeTnLPgGvjqQP3OYgDAxMa6qVup3A@mail.gmail.com>
-Message-ID: <CAFUV4K3tB4zD-J+-JKLckoTAJpYUqGmZ6zxEJa3wn=yzLEJZjA@mail.gmail.com>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Sun, 13 Oct 2013 07:58:39 +0200
+Subject: [PATCH] [media] s5p-mfc: remove deprecated IRQF_DISABLED
+Message-ID: <1381643919-9016-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 1:08 PM, Yuanyuan ZHONG <zyy@motorola.com> wrote:
-> On Fri, Oct 11, 2013 at 11:26 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Fri, Oct 11, 2013 at 11:12:19AM -0500, Yuanyuan ZHONG wrote:
->>> On Fri, Oct 11, 2013 at 7:07 AM, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>> > On Thu, Oct 10, 2013 at 11:00:18AM -0500, Yuanyuan ZHONG wrote:
->>> >> Hi Russell, et al
->>> >>
->>> >> If there is no further comments, I'll submit it to patch system.
->>> >> Thanks.
->>> >
->>> > No, I still don't agree with your patch as being the correct fix.  Look
->>> > at the code that you're creating:
->>> >
->>> >         if (vfp_state_in_hw(cpu, thread)) {
->>> >                 fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
->>> >                 vfp_current_hw_state[cpu] = NULL;
->>> >         }
->>> > #ifdef CONFIG_SMP
->>> >         thread->vfpstate.hard.cpu = NR_CPUS;
->>> >         vfp_current_hw_state[cpu] = NULL;
->>> > #endif
->>> >
->>> > So when SMP is enabled we unconditionally blat out the vfp_current_hw_state
->>> > pointer for this CPU?
->>>
->>> I think ensuring local vfp_current_hw_state is invalidated is what
->>> vfp_force_reload() need to do when SMP is enabled.
->>
->> vfp_force_reload() is about asking for the state S on CPU N to be
->> reloaded.  It is not about merely asking for the state on CPU N to
->> be reloaded.
->
-> Then this function cannot do what we need for cpu hotplug. At that
-> time we don't know if the state S on CPU N is valid, we can only ask
-> for the state on CPU N to be reloaded. How about this:
->
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 52b8f40..efdd9e0 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -644,6 +644,7 @@ static int vfp_hotplug(struct notifier_block *b,
-> unsigned long action,
->  {
->         if (action == CPU_DYING || action == CPU_DYING_FROZEN) {
->                 vfp_force_reload((long)hcpu, current_thread_info());
-> +               vfp_current_hw_state[(long)hcpu] = NULL;
->         } else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
->                 vfp_enable(NULL);
->         return NOTIFY_OK;
+This patch proposes to remove the use of the IRQF_DISABLED flag
 
-The vfp_force_reload() here does nothing. We can remove it and this this becomes
+It's a NOOP since 2.6.35 and it will be removed one day.
 
-static int vfp_hotplug(struct notifier_block *b, unsigned long action,
-        void *hcpu)
-{
-        if (action == CPU_DYING || action == CPU_DYING_FROZEN)
-                vfp_current_hw_state[(long)hcpu] = NULL;
-        else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
-                vfp_enable(NULL);
-        return NOTIFY_OK;
-}
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index 084263d..4660d24 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -1101,7 +1101,7 @@ static int s5p_mfc_probe(struct platform_device *pdev)
+ 	}
+ 	dev->irq = res->start;
+ 	ret = devm_request_irq(&pdev->dev, dev->irq, s5p_mfc_irq,
+-					IRQF_DISABLED, pdev->name, dev);
++					0, pdev->name, dev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to install irq (%d)\n", ret);
+ 		goto err_res;
+-- 
+1.8.1.2
