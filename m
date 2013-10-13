@@ -1,153 +1,165 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Sun, 13 Oct 2013 19:17:11 +0200
-Subject: [RFC PATCH RESEND 2/2] clk: add accuracy support for fixed clock
-In-Reply-To: <1381684631-10835-1-git-send-email-b.brezillon@overkiz.com>
-References: <1381684631-10835-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1381684631-10835-3-git-send-email-b.brezillon@overkiz.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Sun, 13 Oct 2013 13:56:48 -0400
+Subject: [RFC 06/23] mm/memblock: Add memblock early memory allocation apis
+In-Reply-To: <1381615146-20342-7-git-send-email-santosh.shilimkar@ti.com>
+References: <1381615146-20342-1-git-send-email-santosh.shilimkar@ti.com>
+ <1381615146-20342-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20131013175648.GC5253@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for accuracy retrieval on fixed clocks.
-It also adds a new dt property called 'clock-accuracy' to define the clock
-accuracy.
+Hello,
 
-This can be usefull for oscillator (RC, crystal, ...) definitions which are
-always given an accuracy characteristic.
+On Sat, Oct 12, 2013 at 05:58:49PM -0400, Santosh Shilimkar wrote:
+> Introduce memblock early memory allocation APIs which allow to support
+> LPAE extension on 32 bits archs. More over, this is the next step
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- .../devicetree/bindings/clock/fixed-clock.txt      |    3 ++
- drivers/clk/clk-fixed-rate.c                       |   43 +++++++++++++++++---
- include/linux/clk-provider.h                       |    3 ++
- 3 files changed, 43 insertions(+), 6 deletions(-)
+LPAE isn't something people outside arm circle would understand.
+Let's stick to highmem.
 
-diff --git a/Documentation/devicetree/bindings/clock/fixed-clock.txt b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-index 0b1fe78..48ea0ad 100644
---- a/Documentation/devicetree/bindings/clock/fixed-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-@@ -10,6 +10,8 @@ Required properties:
- - clock-frequency : frequency of clock in Hz. Should be a single cell.
- 
- Optional properties:
-+- clock-accuracy : accuracy of clock in ppb (parts per billion).
-+		   Should be a single cell.
- - gpios : From common gpio binding; gpio connection to clock enable pin.
- - clock-output-names : From common clock binding.
- 
-@@ -18,4 +20,5 @@ Example:
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <1000000000>;
-+		clock-accuracy = <100>;
- 	};
-diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-index 1ed591a..0fc56ab 100644
---- a/drivers/clk/clk-fixed-rate.c
-+++ b/drivers/clk/clk-fixed-rate.c
-@@ -34,22 +34,31 @@ static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
- 	return to_clk_fixed_rate(hw)->fixed_rate;
- }
- 
-+static unsigned long clk_fixed_rate_recalc_accuracy(struct clk_hw *hw,
-+		unsigned long parent_accuracy)
-+{
-+	return to_clk_fixed_rate(hw)->fixed_accuracy;
-+}
-+
- const struct clk_ops clk_fixed_rate_ops = {
- 	.recalc_rate = clk_fixed_rate_recalc_rate,
-+	.recalc_accuracy = clk_fixed_rate_recalc_accuracy,
- };
- EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
- 
- /**
-- * clk_register_fixed_rate - register fixed-rate clock with the clock framework
-+ * clk_register_fixed_rate_with_accuracy - register fixed-rate clock with the
-+ *					   clock framework
-  * @dev: device that is registering this clock
-  * @name: name of this clock
-  * @parent_name: name of clock's parent
-  * @flags: framework-specific flags
-  * @fixed_rate: non-adjustable clock rate
-+ * @fixed_accuracy: non-adjustable clock rate
-  */
--struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
--		const char *parent_name, unsigned long flags,
--		unsigned long fixed_rate)
-+struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate, unsigned long fixed_accuracy)
- {
- 	struct clk_fixed_rate *fixed;
- 	struct clk *clk;
-@@ -70,16 +79,33 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
- 
- 	/* struct clk_fixed_rate assignments */
- 	fixed->fixed_rate = fixed_rate;
-+	fixed->fixed_accuracy = fixed_accuracy;
- 	fixed->hw.init = &init;
- 
- 	/* register the clock */
- 	clk = clk_register(dev, &fixed->hw);
--
- 	if (IS_ERR(clk))
- 		kfree(fixed);
- 
- 	return clk;
- }
-+EXPORT_SYMBOL_GPL(clk_register_fixed_rate_with_accuracy);
-+
-+/**
-+ * clk_register_fixed_rate - register fixed-rate clock with the clock framework
-+ * @dev: device that is registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of clock's parent
-+ * @flags: framework-specific flags
-+ * @fixed_rate: non-adjustable clock rate
-+ */
-+struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate)
-+{
-+	return clk_register_fixed_rate_with_accuracy(dev, name, parent_name,
-+						     flags, fixed_rate, 0);
-+}
- EXPORT_SYMBOL_GPL(clk_register_fixed_rate);
- 
- #ifdef CONFIG_OF
-@@ -91,13 +117,18 @@ void of_fixed_clk_setup(struct device_node *node)
- 	struct clk *clk;
- 	const char *clk_name = node->name;
- 	u32 rate;
-+	u32 accuracy = 0;
- 
- 	if (of_property_read_u32(node, "clock-frequency", &rate))
- 		return;
- 
-+	of_property_read_u32(node, "clock-accuracy", &accuracy);
-+
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 
--	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
-+	clk = clk_register_fixed_rate_with_accuracy(NULL, clk_name, NULL,
-+						    CLK_IS_ROOT, rate,
-+						    accuracy);
- 	if (!IS_ERR(clk))
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- }
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 942811d..67878a4 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -212,6 +212,9 @@ extern const struct clk_ops clk_fixed_rate_ops;
- struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		unsigned long fixed_rate);
-+struct clk *clk_register_fixed_rate_with_accuracy(struct device *dev,
-+		const char *name, const char *parent_name, unsigned long flags,
-+		unsigned long fixed_rate, unsigned long fixed_accuracy);
- 
- void of_fixed_clk_setup(struct device_node *np);
- 
+> to get rid of NO_BOOTMEM memblock wrapper(nobootmem.c) and directly use
+> memblock APIs.
+> 
+> The proposed interface will became active if both CONFIG_HAVE_MEMBLOCK
+> and CONFIG_NO_BOOTMEM are specified by arch. In case !CONFIG_NO_BOOTMEM,
+> the memblock() wrappers will fallback to the existing bootmem apis so
+> that arch's noy converted to NO_BOOTMEM continue to work as is.
+              ^^^
+             typo
+
+> +/* FIXME: Move to memblock.h at a point where we remove nobootmem.c */
+> +void *memblock_early_alloc_try_nid_nopanic(int nid, phys_addr_t size,
+> +		phys_addr_t align, phys_addr_t from, phys_addr_t max_addr);
+> +void *memblock_early_alloc_try_nid(int nid, phys_addr_t size,
+> +		phys_addr_t align, phys_addr_t from, phys_addr_t max_addr);
+
+Wouldn't it make more sense to put @nid at the end.  @size is the main
+parameter here and it gets confusing with _alloc_node() interface as
+the positions of paramters change.  Plus, kmalloc_node() puts @node at
+the end too.
+
+> +void __memblock_free_early(phys_addr_t base, phys_addr_t size);
+> +void __memblock_free_late(phys_addr_t base, phys_addr_t size);
+
+Would it be possible to drop "early"?  It's redundant and makes the
+function names unnecessarily long.  When memblock is enabled, these
+are basically doing about the same thing as memblock_alloc() and
+friends, right?  Wouldn't it make more sense to define these as
+memblock_alloc_XXX()?
+
+> +#define memblock_early_alloc(x) \
+> +	memblock_early_alloc_try_nid(MAX_NUMNODES, x, SMP_CACHE_BYTES, \
+> +			BOOTMEM_LOW_LIMIT, BOOTMEM_ALLOC_ACCESSIBLE)
+> +#define memblock_early_alloc_align(x, align) \
+> +	memblock_early_alloc_try_nid(MAX_NUMNODES, x, align, \
+> +			BOOTMEM_LOW_LIMIT, BOOTMEM_ALLOC_ACCESSIBLE)
+> +#define memblock_early_alloc_nopanic(x) \
+> +	memblock_early_alloc_try_nid_nopanic(MAX_NUMNODES, x, SMP_CACHE_BYTES, \
+> +			BOOTMEM_LOW_LIMIT, BOOTMEM_ALLOC_ACCESSIBLE)
+> +#define memblock_early_alloc_pages(x) \
+> +	memblock_early_alloc_try_nid(MAX_NUMNODES, x, PAGE_SIZE, \
+> +			BOOTMEM_LOW_LIMIT, BOOTMEM_ALLOC_ACCESSIBLE)
+> +#define memblock_early_alloc_pages_nopanic(x) \
+> +	memblock_early_alloc_try_nid_nopanic(MAX_NUMNODES, x, PAGE_SIZE, \
+> +			BOOTMEM_LOW_LIMIT, BOOTMEM_ALLOC_ACCESSIBLE)
+
+I always felt a bit weird about _pages() interface.  It says pages but
+takes bytes in size.  Maybe we're better off just converting the
+current _pages users to _alloc_align()?
+
+> +#define memblock_early_alloc_node(nid, x) \
+> +	memblock_early_alloc_try_nid(nid, x, SMP_CACHE_BYTES, \
+> +			BOOTMEM_LOW_LIMIT, BOOTMEM_ALLOC_ACCESSIBLE)
+> +#define memblock_early_alloc_node_nopanic(nid, x) \
+> +	memblock_early_alloc_try_nid_nopanic(nid, x, SMP_CACHE_BYTES, \
+> +			BOOTMEM_LOW_LIMIT, BOOTMEM_ALLOC_ACCESSIBLE)
+
+Ditto as above.  Maybe @nid can be moved to the end?
+
+> +static void * __init _memblock_early_alloc_try_nid_nopanic(int nid,
+> +				phys_addr_t size, phys_addr_t align,
+> +				phys_addr_t from, phys_addr_t max_addr)
+> +{
+> +	phys_addr_t alloc;
+> +	void *ptr;
+> +
+> +	if (WARN_ON_ONCE(slab_is_available())) {
+> +		if (nid == MAX_NUMNODES)
+
+Shouldn't we be using NUMA_NO_NODE?
+
+> +			return kzalloc(size, GFP_NOWAIT);
+> +		else
+> +			return kzalloc_node(size, GFP_NOWAIT, nid);
+
+And kzalloc_node() understands NUMA_NO_NODE.
+
+> +	}
+> +
+> +	if (WARN_ON(!align))
+> +		align = __alignof__(long long);
+
+Wouldn't SMP_CACHE_BYTES make more sense?  Also, I'm not sure we
+actually want WARN on it.  Interpreting 0 as "default align" isn't
+that weird.
+
+> +	/* align @size to avoid excessive fragmentation on reserved array */
+> +	size = round_up(size, align);
+> +
+> +again:
+> +	alloc = memblock_find_in_range_node(from, max_addr, size, align, nid);
+> +	if (alloc)
+> +		goto done;
+> +
+> +	if (nid != MAX_NUMNODES) {
+> +		alloc =
+> +			memblock_find_in_range_node(from, max_addr, size,
+> +						    align, MAX_NUMNODES);
+> +		if (alloc)
+> +			goto done;
+> +	}
+> +
+> +	if (from) {
+> +		from = 0;
+> +		goto again;
+> +	} else {
+> +		goto error;
+> +	}
+> +
+> +done:
+> +	memblock_reserve(alloc, size);
+> +	ptr = phys_to_virt(alloc);
+> +	memset(ptr, 0, size);
+
+What if the address is high?  Don't we need kmapping here?
+
+> +
+> +	/*
+> +	 * The min_count is set to 0 so that bootmem allocated blocks
+> +	 * are never reported as leaks.
+> +	 */
+> +	kmemleak_alloc(ptr, size, 0, 0);
+> +
+> +	return ptr;
+> +
+> +error:
+> +	return NULL;
+> +}
+> +
+> +void * __init memblock_early_alloc_try_nid_nopanic(int nid,
+> +				phys_addr_t size, phys_addr_t align,
+> +				phys_addr_t from, phys_addr_t max_addr)
+> +{
+> +	memblock_dbg("%s: %llu bytes align=0x%llx nid=%d from=0x%llx max_addr=0x%llx %pF\n",
+> +			__func__, (u64)size, (u64)align, nid, (u64)from,
+> +			(u64)max_addr, (void *)_RET_IP_);
+> +	return _memblock_early_alloc_try_nid_nopanic(nid, size,
+> +						align, from, max_addr);
+
+Do we need the extra level of wrapping?  Just implement
+alloc_try_nid_nopanic() here and make the panicky version call it?
+
+Thanks.
+
 -- 
-1.7.9.5
+tejun
