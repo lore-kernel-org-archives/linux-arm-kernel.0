@@ -1,66 +1,41 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Sun, 13 Oct 2013 22:50:27 +0800
-Subject: [PATCH v2 7/7] jump_label: use defined macros instead of hard-coding
- for better readability
-In-Reply-To: <1381675827-1610-1-git-send-email-liuj97@gmail.com>
-References: <1381675827-1610-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1381675827-1610-8-git-send-email-liuj97@gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 13 Oct 2013 20:23:06 +0530
+Subject: [PATCH] dma: coh901318: remove deprecated IRQF_DISABLED
+In-Reply-To: <1381640400-7146-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1381640400-7146-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <20131013145306.GG2954@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiang Liu <jiang.liu@huawei.com>
+On Sun, Oct 13, 2013 at 07:00:00AM +0200, Michael Opdenacker wrote:
+> This patch proposes to remove the use of the IRQF_DISABLED flag
+> 
+> It's a NOOP since 2.6.35 and it will be removed one day.
+Applied, thanks
 
-Use macro JUMP_LABEL_TRUE_BRANCH instead of hard-coding for better
-readability.
+~Vinod
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Jiang Liu <liuj97@gmail.com>
----
- include/linux/jump_label.h | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+> 
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+> ---
+>  drivers/dma/coh901318.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+> index 31011d2..3025b91 100644
+> --- a/drivers/dma/coh901318.c
+> +++ b/drivers/dma/coh901318.c
+> @@ -2694,7 +2694,7 @@ static int __init coh901318_probe(struct platform_device *pdev)
+>  	if (irq < 0)
+>  		return irq;
+>  
+> -	err = devm_request_irq(&pdev->dev, irq, dma_irq_handler, IRQF_DISABLED,
+> +	err = devm_request_irq(&pdev->dev, irq, dma_irq_handler, 0,
+>  			       "coh901318", base);
+>  	if (err)
+>  		return err;
+> -- 
+> 1.8.1.2
+> 
 
-diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
-index a507907..6e54029 100644
---- a/include/linux/jump_label.h
-+++ b/include/linux/jump_label.h
-@@ -74,18 +74,21 @@ struct module;
- #include <linux/atomic.h>
- #ifdef HAVE_JUMP_LABEL
- 
--#define JUMP_LABEL_TRUE_BRANCH 1UL
-+#define JUMP_LABEL_TYPE_FALSE_BRANCH	0UL
-+#define JUMP_LABEL_TYPE_TRUE_BRANCH	1UL
-+#define JUMP_LABEL_TYPE_MASK		1UL
- 
- static
- inline struct jump_entry *jump_label_get_entries(struct static_key *key)
- {
- 	return (struct jump_entry *)((unsigned long)key->entries
--						& ~JUMP_LABEL_TRUE_BRANCH);
-+						& ~JUMP_LABEL_TYPE_MASK);
- }
- 
- static inline bool jump_label_get_branch_default(struct static_key *key)
- {
--	if ((unsigned long)key->entries & JUMP_LABEL_TRUE_BRANCH)
-+	if (((unsigned long)key->entries & JUMP_LABEL_TYPE_MASK) ==
-+	    JUMP_LABEL_TYPE_TRUE_BRANCH)
- 		return true;
- 	return false;
- }
-@@ -116,9 +119,11 @@ extern void static_key_slow_dec(struct static_key *key);
- extern void jump_label_apply_nops(struct module *mod);
- 
- #define STATIC_KEY_INIT_TRUE ((struct static_key) \
--	{ .enabled = ATOMIC_INIT(1), .entries = (void *)1 })
-+	{ .enabled = ATOMIC_INIT(1), \
-+	  .entries = (void *)JUMP_LABEL_TYPE_TRUE_BRANCH })
- #define STATIC_KEY_INIT_FALSE ((struct static_key) \
--	{ .enabled = ATOMIC_INIT(0), .entries = (void *)0 })
-+	{ .enabled = ATOMIC_INIT(0), \
-+	  .entries = (void *)JUMP_LABEL_TYPE_FALSE_BRANCH })
- 
- #else  /* !HAVE_JUMP_LABEL */
- 
 -- 
-1.8.1.2
