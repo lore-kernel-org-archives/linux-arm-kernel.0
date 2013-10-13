@@ -1,48 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 13 Oct 2013 14:15:03 +0200
-Subject: [RFC v3 PATCH 7/7] lib/raid6: port NEON implementation to updated
- kmode NEON api
-In-Reply-To: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1381666503-23726-8-git-send-email-ard.biesheuvel@linaro.org>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Sun, 13 Oct 2013 22:20:17 +0800
+Subject: [RFT PATCH v2 1/4] arm64: fix possible invalid FPSIMD initialization
+ state
+Message-ID: <1381674029-430-1-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- lib/raid6/neon.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+From: Jiang Liu <jiang.liu@huawei.com>
 
-diff --git a/lib/raid6/neon.c b/lib/raid6/neon.c
-index 36ad470..172b53f 100644
---- a/lib/raid6/neon.c
-+++ b/lib/raid6/neon.c
-@@ -13,8 +13,8 @@
- #ifdef __KERNEL__
- #include <asm/neon.h>
- #else
--#define kernel_neon_begin()
--#define kernel_neon_end()
-+#define kernel_neon_begin(s)
-+#define kernel_neon_end(s)
- #define cpu_has_neon()		(1)
- #endif
+If context switching happens during executing fpsimd_flush_thread(),
+stale value in FPSIMD registers will be saved into current thread's
+fpsimd_state by fpsimd_thread_switch(). That may cause invalid
+initialization state for the new process, so disable preemption
+when executing fpsimd_flush_thread().
+
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Cc: Jiang Liu <liuj97@gmail.com>
+---
+ arch/arm64/kernel/fpsimd.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 1f2e4d5..bb785d2 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -80,8 +80,10 @@ void fpsimd_thread_switch(struct task_struct *next)
  
-@@ -33,12 +33,13 @@
- 	static void raid6_neon ## _n ## _gen_syndrome(int disks,	\
- 					size_t bytes, void **ptrs)	\
- 	{								\
-+		DEFINE_NEON_REGSTACK(s);				\
- 		void raid6_neon ## _n  ## _gen_syndrome_real(int,	\
- 						unsigned long, void**);	\
--		kernel_neon_begin();					\
-+		kernel_neon_begin(s);					\
- 		raid6_neon ## _n ## _gen_syndrome_real(disks,		\
- 					(unsigned long)bytes, ptrs);	\
--		kernel_neon_end();					\
-+		kernel_neon_end(s);					\
- 	}								\
- 	struct raid6_calls const raid6_neonx ## _n = {			\
- 		raid6_neon ## _n ## _gen_syndrome,			\
+ void fpsimd_flush_thread(void)
+ {
++	preempt_disable();
+ 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+ 	fpsimd_load_state(&current->thread.fpsimd_state);
++	preempt_enable();
+ }
+ 
+ #ifdef CONFIG_KERNEL_MODE_NEON
 -- 
 1.8.1.2
