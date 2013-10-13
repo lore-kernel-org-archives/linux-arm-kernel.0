@@ -1,49 +1,70 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 13 Oct 2013 18:17:50 +0200
-Subject: [PATCH 4/4] sound/soc/atmel: don't use
- devm_pinctrl_get_select_default() in probe
+Date: Sun, 13 Oct 2013 18:17:49 +0200
+Subject: [PATCH 3/4] drivers/pwm: don't use devm_pinctrl_get_select_default()
+ in probe
 In-Reply-To: <1381681071-6021-1-git-send-email-wsa@the-dreams.de>
 References: <1381681071-6021-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1381681071-6021-5-git-send-email-wsa@the-dreams.de>
+Message-ID: <1381681071-6021-4-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Since commit ab78029 (drivers/pinctrl: grab default handles from device core),
-we can rely on device core for setting the default pins.
+we can rely on device core for setting the default pins. Compile tested only.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org> (personally at LCE13)
 Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- sound/soc/atmel/atmel_wm8904.c | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/pwm/pwm-tiecap.c   | 6 ------
+ drivers/pwm/pwm-tiehrpwm.c | 6 ------
+ 2 files changed, 12 deletions(-)
 
-diff --git a/sound/soc/atmel/atmel_wm8904.c b/sound/soc/atmel/atmel_wm8904.c
-index 7222380..b4e3690 100644
---- a/sound/soc/atmel/atmel_wm8904.c
-+++ b/sound/soc/atmel/atmel_wm8904.c
-@@ -12,7 +12,6 @@
- #include <linux/module.h>
- #include <linux/of.h>
+diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+index c2e2e58..4e5c3d1 100644
+--- a/drivers/pwm/pwm-tiecap.c
++++ b/drivers/pwm/pwm-tiecap.c
+@@ -26,7 +26,6 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/pwm.h>
  #include <linux/of_device.h>
 -#include <linux/pinctrl/consumer.h>
  
- #include <sound/soc.h>
+ #include "pwm-tipwmss.h"
  
-@@ -155,15 +154,8 @@ static int atmel_asoc_wm8904_probe(struct platform_device *pdev)
- 	struct snd_soc_card *card = &atmel_asoc_wm8904_card;
- 	struct snd_soc_dai_link *dailink = &atmel_asoc_wm8904_dailink;
- 	struct clk *clk_src;
+@@ -208,11 +207,6 @@ static int ecap_pwm_probe(struct platform_device *pdev)
+ 	struct clk *clk;
+ 	struct ecap_pwm_chip *pc;
+ 	u16 status;
 -	struct pinctrl *pinctrl;
- 	int id, ret;
- 
--	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
--	if (IS_ERR(pinctrl)) {
--		dev_err(&pdev->dev, "failed to request pinctrl\n");
--		return PTR_ERR(pinctrl);
--	}
 -
- 	card->dev = &pdev->dev;
- 	ret = atmel_asoc_wm8904_dt_init(pdev);
- 	if (ret) {
+-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+-	if (IS_ERR(pinctrl))
+-		dev_warn(&pdev->dev, "unable to select pin group\n");
+ 
+ 	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+ 	if (!pc) {
+diff --git a/drivers/pwm/pwm-tiehrpwm.c b/drivers/pwm/pwm-tiehrpwm.c
+index 084f552..a4d8f51 100644
+--- a/drivers/pwm/pwm-tiehrpwm.c
++++ b/drivers/pwm/pwm-tiehrpwm.c
+@@ -26,7 +26,6 @@
+ #include <linux/clk.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/of_device.h>
+-#include <linux/pinctrl/consumer.h>
+ 
+ #include "pwm-tipwmss.h"
+ 
+@@ -439,11 +438,6 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
+ 	struct clk *clk;
+ 	struct ehrpwm_pwm_chip *pc;
+ 	u16 status;
+-	struct pinctrl *pinctrl;
+-
+-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+-	if (IS_ERR(pinctrl))
+-		dev_warn(&pdev->dev, "unable to select pin group\n");
+ 
+ 	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+ 	if (!pc) {
 -- 
 1.8.4.rc3
