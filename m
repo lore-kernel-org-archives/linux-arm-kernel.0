@@ -1,73 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 13 Oct 2013 12:30:49 +0100
-Subject: [PATCH v3 3/3] ARM: add support for bit sliced AES using NEON
- instructions
-In-Reply-To: <CAKv+Gu--TmG3FxAHSYN_RG2FiLabFRCdp4vn1nrMOdOdfzgMwA@mail.gmail.com>
-References: <1380913419-13296-1-git-send-email-ard.biesheuvel@linaro.org>
- <1380913419-13296-4-git-send-email-ard.biesheuvel@linaro.org>
- <20131013100350.GZ25034@n2100.arm.linux.org.uk>
- <CAKv+Gu8gzRjOMhKoydR3DqMqHqREDC7ZHNn9AZcdxGOWE_N9Vw@mail.gmail.com>
- <20131013111457.GB25034@n2100.arm.linux.org.uk>
- <CAKv+Gu81Bb8jzVUgyS_=meJNLQaxydLLRR-5n5gY8b-reofzUQ@mail.gmail.com>
- <20131013112239.GD25034@n2100.arm.linux.org.uk>
- <CAKv+Gu--TmG3FxAHSYN_RG2FiLabFRCdp4vn1nrMOdOdfzgMwA@mail.gmail.com>
-Message-ID: <20131013113049.GE25034@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 13 Oct 2013 14:14:56 +0200
+Subject: [RFC v3 PATCH 0/7] ARM[64]: kernel mode NEON in atomic contexts
+Message-ID: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 13, 2013 at 01:28:01PM +0200, Ard Biesheuvel wrote:
-> On 13 October 2013 13:22, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sun, Oct 13, 2013 at 01:19:29PM +0200, Ard Biesheuvel wrote:
-> >> On 13 October 2013 13:14, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > On Sun, Oct 13, 2013 at 12:21:49PM +0200, Ard Biesheuvel wrote:
-> >> >> On 13 October 2013 12:03, Russell King - ARM Linux
-> >> >> <linux@arm.linux.org.uk> wrote:
-> >> >> > On Fri, Oct 04, 2013 at 09:03:39PM +0200, Ard Biesheuvel wrote:
-> >> >>
-> >> >> [...]
-> >> >>
-> >> >> >> +#include <asm/neon.h>
-> >> >> >> +#include <crypto/aes.h>
-> >> >> >> +#include <crypto/ablk_helper.h>
-> >> >> >
-> >> >> > This header file doesn't appear to exist, and so causes this build error:
-> >> >> >
-> >> >>
-> >> >> Hi Russell,
-> >> >>
-> >> >> This is expected.
-> >> >>
-> >> >> Perhaps I should have addressed this differently, but I had put the
-> >> >> following in my pull request
-> >> >>
-> >> >> !! NOTE !!: this series build-depends on patch a62b01cd (crypto: create generic
-> >> >> version of ablk_helper) which is in linux-next but not yet in mainline.
-> >> >>
-> >> >> expecting you to either defer pulling it or handle the
-> >> >> cross-dependency in some other way.
-> >> >
-> >> > Where can I find that commit?
-> >>
-> >> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/crypto?id=a62b01cd6cc1feb5e80d64d6937c291473ed82cb
-> >
-> > I need a git tree I can pull with this commit in (and preferably without
-> > much in the way of dependencies.)  Commits in linux-next are not deemed
-> > to be stable.
-> 
-> This one perhaps?
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/herbert/cryptodev-2.6.git/commit/?id=a62b01cd6cc1feb5e80d64d6937c291473ed82cb
-> 
-> Unfortunately, it has a string of unrelated commits between this one
-> and the first one already appearing in mainline.
-> However, as it originates in Herbert's tree (including Herbert's
-> signoff) and it mostly only adds files, cherry-picking should be
-> relatively trouble free in this case (if that is an option at all)
+Take #3 of this RFC series.
 
-Herbert,
+Instead of having additional separate versions of kernel_neon_begin/end, the
+existing ones now have been modified to always take a preallocated stack area
+as an argument.
 
-Could I have a git URL to pull the above commit please?
+The stack area is allocated by DEFINE_NEON_REGSTACK[_PARTIAL](varname), where
+the partial version takes an additional int num_regs indicating how many
+registers need to be freed up.
 
-Thanks.
+In the !in_interrupt() case, these functions operate as before, and the regstack
+is defined to minimal size in this case as it will remain unused anyway. In the
+in_interrupt() case, 'num_regs' (or all) NEON registers are stacked/unstacked
+using the allocated stack region.
+
+Patches #1 and #4 implement the above for ARM and ARM64, respectively. Patch #3
+implements the optimization for ARM64 suggested by Catalin, which has no lazy
+restore, potentially resulting in lots of unnecessary stack/unstack sequences
+otherwise.
+
+The remaining patches are existing or new users of this API, for reference.
+
+Ard Biesheuvel (7):
+  ARM: add support for kernel mode NEON in atomic context
+  ARM: port NEON version of xor_blocks() to new kmode NEON api
+  ARM64: defer reloading a task's FPSIMD state to userland resume
+  ARM64: add support for kernel mode NEON in atomic context
+  ARM64: add Crypto Extensions based synchronous core AES cipher
+  ARM64: add Crypto Extensions based synchronous AES in CCM mode
+  lib/raid6: port NEON implementation to updated kmode NEON api
+
+ arch/arm/include/asm/fpstate.h        |  12 +
+ arch/arm/include/asm/neon.h           |  32 ++-
+ arch/arm/include/asm/xor.h            |  48 ++--
+ arch/arm/vfp/vfphw.S                  |  45 ++++
+ arch/arm/vfp/vfpmodule.c              |  55 +++--
+ arch/arm64/Makefile                   |  11 +-
+ arch/arm64/crypto/Makefile            |  14 ++
+ arch/arm64/crypto/aes-sync.c          | 453 ++++++++++++++++++++++++++++++++++
+ arch/arm64/crypto/aesce-ccm.S         | 186 ++++++++++++++
+ arch/arm64/include/asm/fpsimd.h       |  17 ++
+ arch/arm64/include/asm/fpsimdmacros.h |  35 +++
+ arch/arm64/include/asm/neon.h         |  31 ++-
+ arch/arm64/include/asm/thread_info.h  |   4 +-
+ arch/arm64/kernel/entry-fpsimd.S      |  24 ++
+ arch/arm64/kernel/entry.S             |   2 +-
+ arch/arm64/kernel/fpsimd.c            |  34 +--
+ arch/arm64/kernel/signal.c            |   2 +
+ lib/raid6/neon.c                      |   9 +-
+ 18 files changed, 932 insertions(+), 82 deletions(-)
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/aes-sync.c
+ create mode 100644 arch/arm64/crypto/aesce-ccm.S
+
+-- 
+1.8.1.2
