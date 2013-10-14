@@ -1,90 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 14 Oct 2013 18:27:59 +0000 (UTC)
-Subject: [PATCHv7 00/36] ARM: OMAP: clock data conversion to DT
-In-Reply-To: <525C063C.9080908@ti.com>
-References: <1380098922-30340-1-git-send-email-t-kristo@ti.com>
- <524EE00F.7010208@ti.com> <20131007021556.GV8949@atomide.com>
- <52525642.8010307@ti.com> <20131007154103.GW8949@atomide.com>
- <20131007190322.GY8949@atomide.com>
- <alpine.DEB.2.02.1310091551540.30199@utopia.booyaka.com>
- <alpine.DEB.2.02.1310091858411.30199@utopia.booyaka.com>
- <525654AE.7060009@ti.com>
- <alpine.DEB.2.02.1310111749180.27397@utopia.booyaka.com>
- <52584785.2020504@ti.com>
- <alpine.DEB.2.02.1310112226130.27397@utopia.booyaka.com>
- <525923AB.4030807@ti.com>
- <alpine.DEB.2.02.1310132023240.27397@utopia.booyaka.com>
- <525C063C.9080908@ti.com>
-Message-ID: <alpine.DEB.2.02.1310141824380.22465@utopia.booyaka.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Oct 2013 20:28:29 +0200
+Subject: Is next/cleanup of arm-soc tree stable?
+In-Reply-To: <87mwmb930y.fsf@linaro.org>
+References: <20131014161309.GG27668@S2101-09.ap.freescale.net>
+ <87mwmb930y.fsf@linaro.org>
+Message-ID: <525C37CD.7020604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Oct 2013, Tero Kristo wrote:
-
-> On 10/14/2013 02:45 AM, Paul Walmsley wrote:
+On 10/14/2013 07:27 PM, Kevin Hilman wrote:
+> Shawn Guo <shawn.guo@linaro.org> writes:
 >
-> > 8. A few random comments about the individual clock binding data formats
-> > themselves, based on a quick look:
-> > 
-> > A. It seems pretty odd and unnecessarily obscure to do something like
-> > this:
-> > 
-> > dpll_usb_ck: dpll_usb_ck at ... {
-> >         ...
-> >         reg = <0x4a008180 0x4>, <0x4a008184 0x4>, <0x4a008188 0x4>,
-> > <0x4a00818c 0x4>;
-> >         ...
-> > };
-> >
-> > It's at least self-documenting to do something like this:
-> > 
-> > dpll_usb_ck: dpll_usb_ck at ... {
-> >         ...
-> >         control-reg = < ... >;
-> >         idlest-reg = < ... >;
-> >         .. etc. ..
-> > };
-> 
-> Some earlier version had something along these lines, but it was turned down.
-> I had also reg-names as documentation purposes along, but this was unnecessary
-> and was dropped also.
-> 
-> > Which itself might not even be needed, depending on how the DPLL control
-> > code is implemented.  For example, if the relative offsets are always the
-> > same for all OMAP4-family devices, maybe there's not even a need to
-> > explicitly encode that into the DT data.
-> 
-> If I want to get rid of these, I need to add extra compatible strings for the
-> dpll types. There are several weird register offsets for omap3/am3 devices.
-> omap4/5/dra7/am4 behave more sanely.
-> 
-> > B. Seems like you can remove the "ti," prefix on the properties, since
-> > they have no pretentions at genericity: they are specific to the
-> > PRCM/CM/PRM IP block data, and registered by those drivers.
-> 
-> Can or should? It seems existing bindings use "ti," prefix even on non-generic
-> bindings, meaning if I look at any other data in DT.
+>> Olof, Kevin,
+>>
+>> Per reports from linux-next folks, it seems that my imx/soc branch
+>> conflicts with Sebastian's clk-of-init-v2_for-3.13 quite badly.  I'm
+>> considering to rebase my imx/soc branch on arm-soc next/cleanup branch
+>> to solve the conflicts.  But is the branch stable, or do I have to base
+>> on Sebastian's clk-of-init-v2_for-3.13 branch (assume it's stable)?
+>
+> Generally, the next/* branches are not stable.
+>
+> It would be better if you could get a commitment from Sebastian for a
+> immutable branch and base directly on that.
 
-My comments in #8 are just regarding minor issues that don't seem
-right.  I don't have a significant objection to staying with the
-existing property names here if you think that they are important.
+Shawn,
 
-> > C. Looks like the patches use the property "autoidle-low" to indicate that
-> > the autoidle bit should be inverted.  "Low" seems like the wrong
-> > expression here - it invokes the actual voltage logic level of a hardware
-> > signal, and we have no idea whether the hardware signal is using a low
-> > voltage or a high voltage to express this condition.  Would suggest
-> > something like 'invert-autoidle-bit' instead.
-> >
-> > D. Regarding "ti,index-starts-at-one", it seems best to explicitly state
-> > which index starts at one.  The code mentions a "mux index" so please
-> > consider renaming this something like "mux-index-starts-at-one" or
-> > "one-based-mux-index"
-> 
-> The index is explicitly defined by the clock node where this is present. If it
-> is a mux-clock, then it is for mux-index. If for divider clock, it is index
-> for the divider.
+I sent a PR for the above a while ago [1]. I am not going to touch this
+branch at all. Compared to what will go into -next, the was a section
+mismatch fixup patch for nomadik requested by Olof.
 
+If you or Kevin want me to prepare (different) rebased branch, I can
+do that. Otherwise, I suggest to just pull the existing branch as a
+dependency.
 
+Sebastian
 
-- Paul
+[1] http://www.spinics.net/lists/arm-kernel/msg276175.html
