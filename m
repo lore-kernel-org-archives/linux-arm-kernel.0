@@ -1,35 +1,49 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 14 Oct 2013 17:55:10 -0500
-Subject: [Ksummit-2013-discuss] [ARM attend] Any news on agenda? Device
- tree documentation discussion
-In-Reply-To: <CAGsJ_4yimRbt-iu+CFvwWTywLhMaWoj7U5rwM9hgqYtbzft-7g@mail.gmail.com>
-References: <F5184659D418E34EA12B1903EE5EF5FD8538E865C1@seldmbx02.corpusers.net>
- <CAOesGMhVjw0y50McCPPLeFvcr0NNkCO+BszT4zZELWYSgb0-GQ@mail.gmail.com>
- <CAGsJ_4yimRbt-iu+CFvwWTywLhMaWoj7U5rwM9hgqYtbzft-7g@mail.gmail.com>
-Message-ID: <D3E652BC-3B57-4555-B4FF-C86E53FCF9E6@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 14 Oct 2013 17:59:33 -0500
+Subject: [PATCH v3 12/13] usb: phy: msm: Properly check core interrupt
+ number
+In-Reply-To: <1381764280-28420-13-git-send-email-iivanov@mm-sol.com>
+References: <1381764280-28420-1-git-send-email-iivanov@mm-sol.com>
+ <1381764280-28420-13-git-send-email-iivanov@mm-sol.com>
+Message-ID: <20131014225933.GF7446@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Oct 14, 2013, at 5:51 PM, Barry Song wrote:
-
-> 2013/9/20 Olof Johansson <olof@lixom.net>:
->> On Wed, Sep 18, 2013 at 2:35 PM, Bird, Tim <Tim.Bird@sonymobile.com> wrote:
->>> I'm interested in the ARM kernel summit - particularly any
->>> sessions having to do with device tree. Is there an agenda or
->>> session list available for the ARM summit yet?
->> 
->> No, I asked the KS PC a while back for the rough outline (break times,
->> etc), but I'm guessing they might not have them yet either.
+On Mon, Oct 14, 2013 at 06:24:39PM +0300, Ivan T. Ivanov wrote:
+> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 > 
-> hi Olof, any update about the agenda?
+> IRQ with number 0 is valid case, so check for negative
 
-Grant posted an agenda here:
+not entirelly correct... IRQ 0 isn't supposed to be used as a linux IRQ
+number IIRC.
 
-http://lists.linuxfoundation.org/pipermail/ksummit-2013-discuss/2013-October/001573.html
+> numbers instead.
+> 
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> ---
+>  drivers/usb/phy/phy-msm-usb.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
+> index ca2abe6..f34c8a9 100644
+> --- a/drivers/usb/phy/phy-msm-usb.c
+> +++ b/drivers/usb/phy/phy-msm-usb.c
+> @@ -1415,7 +1415,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+>  	dev_info(&pdev->dev, "OTG regs = %p\n", motg->regs);
+>  
+>  	motg->irq = platform_get_irq(pdev, 0);
+> -	if (!motg->irq) {
+> +	if (motg->irq < 0) {
 
-- k
+this check is correct though, since platform_get_irq() will return
+-ENXIO if it doesn't find IRQ resource.
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131014/cdf9488b/attachment-0001.sig>
