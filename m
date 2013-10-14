@@ -1,28 +1,59 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 14 Oct 2013 20:10:22 +0300
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <525C20E8.6080409@redhat.com>
-References: <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
- <525BFBF9.5010804@arm.com>
- <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
- <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
- <525C09D1.8060103@arm.com> <525C0C21.2070001@redhat.com>
- <525C0F99.8030909@arm.com> <525C20E8.6080409@redhat.com>
-Message-ID: <20131014171022.GA13807@redhat.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 14 Oct 2013 19:09:51 +0200
+Subject: [PATCH 2/3] ARM: at91/dt/trivial: before sama5d3, Atmel MPU were
+ using at91 prefix
+In-Reply-To: <a7f43a96aaf83c3348dc631c71c54729f9d0e9e0.1381769174.git.nicolas.ferre@atmel.com>
+References: <ba9872c3bb29c9a06f06caa8e0b4528329f07675.1381769174.git.nicolas.ferre@atmel.com>
+ <a7f43a96aaf83c3348dc631c71c54729f9d0e9e0.1381769174.git.nicolas.ferre@atmel.com>
+Message-ID: <20131014170951.GJ11420@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 06:50:48PM +0200, Paolo Bonzini wrote:
-> Il 14/10/2013 17:36, Marc Zyngier ha scritto:
-> >> > 
-> >> > Devices are fine in QEMU, it's only the "generic" parts (rings) that are
-> >> > missing AFAICT.
-> > So if I understand correctly how it works, target endianness is set at
-> > compile time, and you have a BE specific QEMU?
+On 18:46 Mon 14 Oct     , Nicolas Ferre wrote:
+> Change the sha/aes/tdes compatibility string to match common
+> case for the at91sam9g45 family which is to keep the at91 prefix.
 > 
-> Yes.  Though as Alex said, this will have to change for PPC
-> little-endian support.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/boot/dts/sama5d3.dtsi | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> Paolo
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index b2aabff..99bd4a6 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -342,19 +342,19 @@
+>  			};
+>  
+>  			sha at f8034000 {
+> -				compatible = "atmel,sam9g46-sha";
+> +				compatible = "atmel,at91sam9g46-sha";
+>  				reg = <0xf8034000 0x100>;
+>  				interrupts = <42 IRQ_TYPE_LEVEL_HIGH 0>;
+>  			};
+>  
+>  			aes at f8038000 {
+> -				compatible = "atmel,sam9g46-aes";
+> +				compatible = "atmel,at91sam9g46-aes";
+>  				reg = <0xf8038000 0x100>;
+>  				interrupts = <43 IRQ_TYPE_LEVEL_HIGH 0>;
+>  			};
+>  
+>  			tdes at f803c000 {
+> -				compatible = "atmel,sam9g46-tdes";
+> +				compatible = "atmel,at91sam9g46-tdes";
+>  				reg = <0xf803c000 0x100>;
+>  				interrupts = <44 IRQ_TYPE_LEVEL_HIGH 0>;
+you keep the previous compatible in the driver too for backword compatiblity
 
-Or we'll just say that this platform requires virtio 1.0.
+Best Regards,
+J.
+>  			};
+> -- 
+> 1.8.2.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
