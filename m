@@ -1,95 +1,234 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Mon, 14 Oct 2013 20:42:28 +0000
-Subject: [PATCH 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
-In-Reply-To: <Pine.LNX.4.44L0.1310141630370.6851-100000@netrider.rowland.org>
-References: <CAOesGMhiMD2_OOdR1_GDrJUWgU-qU9MyirhGtxXiWRQcMWy8+g@mail.gmail.com>
- <Pine.LNX.4.44L0.1310141630370.6851-100000@netrider.rowland.org>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817DABD8C@P3PWEX4MB008.ex4.secureserver.net>
+From: binmlist@gmail.com (Bin Liu)
+Date: Mon, 14 Oct 2013 15:43:35 -0500
+Subject: [RFC] usb: musb: dsps, OTG detection
+In-Reply-To: <20131014152226.GA32062@pengutronix.de>
+References: <1381757734-2976-1-git-send-email-mpa@pengutronix.de>
+ <CADYTM3bY91tcp7yWteQZo9C5==fSjPv2ncqqUo7fzfA2=YRnaw@mail.gmail.com>
+ <20131014152226.GA32062@pengutronix.de>
+Message-ID: <CADYTM3Yidf0CDLnrGkE=nhKtQWa2DUAy3O7oY4JU3XpS=vAGFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 14, 2013 1:35 PM, Alan Stern wrote:
-> On Mon, 14 Oct 2013, Olof Johansson wrote:
+On Mon, Oct 14, 2013 at 10:22 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> Hi,
 >
->> Hi, Greg,
->> 
->> [Adding ep93xx maintainers as well]
->> 
->> On Wed, Oct 2, 2013 at 3:15 AM, Majunath Goudar <csmanjuvijay@gmail.com> wrote:
->>> From: Manjunath Goudar <manjunath.goudar@linaro.org>
->>>
->>> Suspend scenario in case of ohci-ep93xx glue was not
->>> properly handled as it was not suspending generic part
->>> of ohci controller. Alan Stern suggested, properly handle
->>> ohci-ep93xx suspend scenario.
->>>
->>> Calling explicitly the ohci_suspend() routine in
->>> ohci_hcd_ep93xx_drv_suspend() will ensure proper handling of
->>> suspend scenario.
+> On Mon, Oct 14, 2013 at 08:54:09AM -0500, Bin Liu wrote:
+>> On Mon, Oct 14, 2013 at 8:35 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+>> > The USB Controller does not support ID pin change interrupts. So we have
+>> > to use a polling function to detect changes of A/B device state
+>> > (otg_timer). This poll function has to check in several states if a
+>> > other device type might be connected to the USB port. This check is
+>> > triggered by manually starting/stopping a USB Session.
+>>
+>> I think this is an arguable approach. Toggling the SESSION in
+>> otg_timer() causes voltage pulses on VBUS, which will not pass the USB
+>> certification.
 >
->>> --- a/drivers/usb/host/ohci-ep93xx.c
->>> +++ b/drivers/usb/host/ohci-ep93xx.c
->>> @@ -112,13 +112,20 @@ static int ohci_hcd_ep93xx_drv_suspend(struct platform_device *pdev, pm_message_
->>>  {
->>>         struct usb_hcd *hcd = platform_get_drvdata(pdev);
->>>         struct ohci_hcd *ohci = hcd_to_ohci(hcd);
->>> +       bool do_wakeup = device_may_wakeup(&pdev->dev);
->>> +       int ret;
->>>
->>>         if (time_before(jiffies, ohci->next_statechange))
->>>                 msleep(5);
->>>         ohci->next_statechange = jiffies;
->>>
->>> -       clk_disable(usb_host_clock);
->>> -       return 0;
->>> +       ret = ohci_suspend(hcd, do_wakeup);
->>> +       if (ret)
->>> +               return ret;
->>> +
->>> +       ep93xx_stop_hc(&pdev->dev);
->>> +
->>> +       return ret;
->>>  }
->> 
->> This patch showed up in -next today (or maybe a while ago and I didn't
->> notice). It's causing a build failure on ep93xx:
->> 
->> From http://arm-soc.lixom.net/buildlogs/next-thierry/v3.12-rc5-5366-gba2e8c2/buildall.arm.ep93xx_defconfig.log.failed:
->> 
->> drivers/usb/host/ohci-ep93xx.c: In function 'ohci_hcd_ep93xx_drv_suspend':
->> drivers/usb/host/ohci-ep93xx.c:126:2: error: implicit declaration of
->> function 'ep93xx_stop_hc'
->> 
->> 
->> It's really confusing though, because Majunath has posted this patch
->> three times. The first time it had the ep93xx_stop_hc() call in there,
->> the second patch (labelled V2) did not, and the third(?) version,
->> without version label, also lacked it. No revision log in the patch,
->> and no comments on it.
->
-> In fact he has posted it a lot more than 3 times, and the version 
-> numbers (or lack thereof) are definitely confusing.
->
-> The reason for the build failure is that Manjanuth started work on this 
-> patch many months ago -- back in the spring.  At that time the 
-> ep93xx_stop_hc() routine did exist.
->
-> But commit af3f233fd27b (usb: ohci-ep93xx: tidy up driver (*probe) and 
->  (*remove)), dated July 1, removed it.  Manjunath never updated his 
-> patch in response.
->
->> But it does seem like the wrong version was merged based on build results.
->
-> No, it's a rebasing failure, not a wrong version.
+> This is only done when no device is connected, so I am not sure if it is
+> important. Unfortunately we do not see the A/B state changes until
 
-Alan,
+That is right, and I don't think it hurts. The only problem is that
+the USB certification test sees the VBUS pulses and fails.
 
-As an alternative to this patch, I have successfully used the ohci-platform
-driver on the ep93xx. This does move a bit of glue code into the ep93xx
-core (arch/arm/mach-ep93xx/core.c) but it removes the ohci-ep93xx glue
-driver completely.
+> toggling the SESSION. Is there another way to check this?
 
-I can post a patch for this shortly if you would like.
+Unfortunately, toggling SESSION in b_idle is the only way I am aware of.
+
+>
+>>
+>> I have not seen any products required the dynamic dual role switching
+>> yet. It always fixed in either device mode or host mode.
+>
+> OTG is explicitly listed in the devicetree bindings documentation, so
+> I think the driver should be able to detect different roles.
+
+Yes, MUSB supports OTG. But I have not seen anyone use OTG yet, and I
+not sure if it is a good idea to add the OTG support, but fail the usb
+certification test.
 
 Regards,
-Hartley
+-Bin.
+
+>
+> Regards,
+>
+> Markus Pargmann
+>
+>>
+>> Regards,
+>> -Bin.
+>>
+>> >
+>> > So in A mode, we cancel the currently running session which also
+>> > disables the possibility to detect new devices via interrupt. In B mode,
+>> > we start a session to check for ID-Pin and possibly connected devices.
+>> >
+>> > Whenever a real USB session ends, we have to trigger the otg_timer poll
+>> > function again.
+>> >
+>> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+>> > ---
+>> >  drivers/usb/musb/musb_dsps.c | 84 ++++++++++++++++++++++++++++++++++++++++----
+>> >  1 file changed, 78 insertions(+), 6 deletions(-)
+>> >
+>> > diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+>> > index b24b697..0245e8d 100644
+>> > --- a/drivers/usb/musb/musb_dsps.c
+>> > +++ b/drivers/usb/musb/musb_dsps.c
+>> > @@ -178,6 +178,43 @@ static const struct file_operations musb_regdump_fops = {
+>> >
+>> >  #endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
+>> >
+>> > +/*
+>> > + * Compare driver and hardware mode and update driver state if necessary.
+>> > + * Not all hardware changes actually reach the driver through interrupts.
+>> > + */
+>> > +static void dsps_update_mode(struct musb *musb)
+>> > +{
+>> > +       u8 devctl;
+>> > +
+>> > +       devctl = dsps_readb(musb->mregs, MUSB_DEVCTL);
+>> > +
+>> > +       switch (musb->xceiv->state) {
+>> > +       case OTG_STATE_A_IDLE:
+>> > +               if (devctl & MUSB_DEVCTL_BDEVICE) {
+>> > +                       dev_dbg(musb->controller, "detected controller state B, software state A\n");
+>> > +                       musb->xceiv->state = OTG_STATE_B_IDLE;
+>> > +               }
+>> > +               break;
+>> > +       case OTG_STATE_B_IDLE:
+>> > +               if (!(devctl & MUSB_DEVCTL_BDEVICE)) {
+>> > +                       dev_dbg(musb->controller, "detected controller state A, software state B\n");
+>> > +                       musb->xceiv->state = OTG_STATE_A_IDLE;
+>> > +               }
+>> > +               break;
+>> > +       default:
+>> > +               if (!(devctl & MUSB_DEVCTL_SESSION)) {
+>> > +                       dev_dbg(musb->controller, "detected controller out of session (%x), software state %s\n",
+>> > +                               devctl,
+>> > +                               usb_otg_state_string(musb->xceiv->state));
+>> > +                       if (devctl & MUSB_DEVCTL_BDEVICE)
+>> > +                               musb->xceiv->state = OTG_STATE_B_IDLE;
+>> > +                       else
+>> > +                               musb->xceiv->state = OTG_STATE_A_IDLE;
+>> > +               }
+>> > +               break;
+>> > +       }
+>> > +}
+>> > +
+>> >  /**
+>> >   * dsps_musb_enable - enable interrupts
+>> >   */
+>> > @@ -229,6 +266,8 @@ static void otg_timer(unsigned long _musb)
+>> >         u8 devctl;
+>> >         unsigned long flags;
+>> >
+>> > +       dsps_update_mode(musb);
+>> > +
+>> >         /*
+>> >          * We poll because DSPS IP's won't expose several OTG-critical
+>> >          * status change events (from the transceiver) otherwise.
+>> > @@ -239,6 +278,16 @@ static void otg_timer(unsigned long _musb)
+>> >
+>> >         spin_lock_irqsave(&musb->lock, flags);
+>> >         switch (musb->xceiv->state) {
+>> > +       case OTG_STATE_A_IDLE:
+>> > +       case OTG_STATE_A_WAIT_VRISE:
+>> > +               /*
+>> > +                * Poll the devctl register to know when the controller switches
+>> > +                * back to B state.
+>> > +                */
+>> > +               musb_writeb(mregs, MUSB_DEVCTL,
+>> > +                               devctl & (~MUSB_DEVCTL_SESSION));
+>> > +               mod_timer(&glue->timer, jiffies + wrp->poll_seconds * HZ);
+>> > +               break;
+>> >         case OTG_STATE_A_WAIT_BCON:
+>> >                 devctl &= ~MUSB_DEVCTL_SESSION;
+>> >                 dsps_writeb(musb->mregs, MUSB_DEVCTL, devctl);
+>> > @@ -251,6 +300,8 @@ static void otg_timer(unsigned long _musb)
+>> >                         musb->xceiv->state = OTG_STATE_A_IDLE;
+>> >                         MUSB_HST_MODE(musb);
+>> >                 }
+>> > +               mod_timer(&glue->timer,
+>> > +                               jiffies + wrp->poll_seconds * HZ);
+>> >                 break;
+>> >         case OTG_STATE_A_WAIT_VFALL:
+>> >                 musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
+>> > @@ -258,12 +309,24 @@ static void otg_timer(unsigned long _musb)
+>> >                             MUSB_INTR_VBUSERROR << wrp->usb_shift);
+>> >                 break;
+>> >         case OTG_STATE_B_IDLE:
+>> > +               /*
+>> > +                * There's no ID-changed IRQ, so we have no good way to tell
+>> > +                * when to switch to the A-Default state machine (by setting
+>> > +                * the DEVCTL.Session bit).
+>> > +                *
+>> > +                * Workaround:  whenever we're in B_IDLE, try setting the
+>> > +                * session flag every few seconds.  If it works, ID was
+>> > +                * grounded and we're now in the A-Default state machine.
+>> > +                *
+>> > +                * NOTE: setting the session flag is _supposed_ to trigger
+>> > +                * SRP but clearly it doesn't.
+>> > +                */
+>> > +               musb_writeb(mregs, MUSB_DEVCTL, devctl | MUSB_DEVCTL_SESSION);
+>> >                 devctl = dsps_readb(mregs, MUSB_DEVCTL);
+>> > -               if (devctl & MUSB_DEVCTL_BDEVICE)
+>> > -                       mod_timer(&glue->timer,
+>> > -                                       jiffies + wrp->poll_seconds * HZ);
+>> > -               else
+>> > +               if (!(devctl & MUSB_DEVCTL_BDEVICE))
+>> >                         musb->xceiv->state = OTG_STATE_A_IDLE;
+>> > +               mod_timer(&glue->timer,
+>> > +                               jiffies + wrp->poll_seconds * HZ);
+>> >                 break;
+>> >         default:
+>> >                 break;
+>> > @@ -376,7 +439,6 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
+>> >                         MUSB_HST_MODE(musb);
+>> >                         musb->xceiv->otg->default_a = 1;
+>> >                         musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
+>> > -                       del_timer(&glue->timer);
+>> >                 } else {
+>> >                         musb->is_active = 0;
+>> >                         MUSB_DEV_MODE(musb);
+>> > @@ -397,8 +459,16 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
+>> >                 ret |= musb_interrupt(musb);
+>> >
+>> >         /* Poll for ID change */
+>> > -       if (musb->xceiv->state == OTG_STATE_B_IDLE)
+>> > +       switch (musb->xceiv->state) {
+>> > +       case OTG_STATE_A_IDLE:
+>> > +       case OTG_STATE_A_WAIT_BCON:
+>> > +       case OTG_STATE_A_WAIT_VRISE:
+>> > +       case OTG_STATE_B_IDLE:
+>> >                 mod_timer(&glue->timer, jiffies + wrp->poll_seconds * HZ);
+>> > +               break;
+>> > +       default:
+>> > +               break;
+>> > +       }
+>> >  out:
+>> >         spin_unlock_irqrestore(&musb->lock, flags);
+>> >
+>> > @@ -479,6 +549,8 @@ static int dsps_musb_init(struct musb *musb)
+>> >
+>> >         dev_info(dev, "%s:%d %s: OK\n", __FILE__, __LINE__, __func__);
+>> >
+>> > +       musb->xceiv->otg->default_a = 0;
+>> > +
+>> >         return 0;
+>> >  }
+>> >
+>> > --
+>> > 1.8.4.rc3
+>> >
+>> > --
+>> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+>> > the body of a message to majordomo at vger.kernel.org
+>> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
