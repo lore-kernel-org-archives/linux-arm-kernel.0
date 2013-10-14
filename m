@@ -1,109 +1,33 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Oct 2013 12:03:08 +0100
-Subject: [PATCH v2 11/13] arm64: enable generic clockevent broadcast
-In-Reply-To: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1381748590-14279-12-git-send-email-lorenzo.pieralisi@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 14 Oct 2013 18:30:09 +0800
+Subject: [PATCH] clk / clkdev: fix the comments in clk_register_clkdev
+Message-ID: <1381746609-21498-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms with power management capabilities, timers that are shut
-down when a CPU enters deep C-states must be emulated using an always-on
-timer and a timer IPI to relay the timer IRQ to target CPUs on an SMP
-system.
+'dev_id' in the comments of clk_register_clkdev should
+be 'dev_fmt' here.
 
-This patch enables the generic clockevents broadcast infrastructure for
-arm64, by providing the required Kconfig entries and adding the timer
-IPI infrastructure.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/Kconfig               |  2 ++
- arch/arm64/include/asm/hardirq.h |  2 +-
- arch/arm64/kernel/smp.c          | 17 +++++++++++++++++
- 3 files changed, 20 insertions(+), 1 deletion(-)
+ drivers/clk/clkdev.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bcf88e4..be88acd 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1,6 +1,7 @@
- config ARM64
- 	def_bool y
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-+	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
- 	select ARCH_WANT_FRAME_POINTERS
-@@ -12,6 +13,7 @@ config ARM64
- 	select COMMON_CLK
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
- 	select GENERIC_CLOCKEVENTS
-+	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_IOMAP
- 	select GENERIC_IRQ_PROBE
- 	select GENERIC_IRQ_SHOW
-diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
-index 990c051..ae4801d 100644
---- a/arch/arm64/include/asm/hardirq.h
-+++ b/arch/arm64/include/asm/hardirq.h
-@@ -20,7 +20,7 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
- 
--#define NR_IPI	4
-+#define NR_IPI	5
- 
- typedef struct {
- 	unsigned int __softirq_pending;
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index d5488f8..2ed691e 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -61,6 +61,7 @@ enum ipi_msg_type {
- 	IPI_CALL_FUNC,
- 	IPI_CALL_FUNC_SINGLE,
- 	IPI_CPU_STOP,
-+	IPI_TIMER,
- };
- 
- /*
-@@ -447,6 +448,7 @@ static const char *ipi_types[NR_IPI] = {
- 	S(IPI_CALL_FUNC, "Function call interrupts"),
- 	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
- 	S(IPI_CPU_STOP, "CPU stop interrupts"),
-+	S(IPI_TIMER, "Timer broadcast interrupts"),
- };
- 
- void show_ipi_list(struct seq_file *p, int prec)
-@@ -532,6 +534,14 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		irq_exit();
- 		break;
- 
-+#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-+	case IPI_TIMER:
-+		irq_enter();
-+		tick_receive_broadcast();
-+		irq_exit();
-+		break;
-+#endif
-+
- 	default:
- 		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
- 		break;
-@@ -544,6 +554,13 @@ void smp_send_reschedule(int cpu)
- 	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
- }
- 
-+#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-+void tick_broadcast(const struct cpumask *mask)
-+{
-+	smp_cross_call(mask, IPI_TIMER);
-+}
-+#endif
-+
- void smp_send_stop(void)
- {
- 	unsigned long timeout;
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 442a313..825b52b 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -270,9 +270,9 @@ EXPORT_SYMBOL(clkdev_drop);
+  * clk_register_clkdev - register one clock lookup for a struct clk
+  * @clk: struct clk to associate with all clk_lookups
+  * @con_id: connection ID string on device
+- * @dev_id: format string describing device name
++ * @dev_fmt: format string describing device name
+  *
+- * con_id or dev_id may be NULL as a wildcard, just as in the rest of
++ * con_id or dev_fmt may be NULL as a wildcard, just as in the rest of
+  * clkdev.
+  *
+  * To make things easier for mass registration, we detect error clks
 -- 
-1.8.4
+1.7.9.5
