@@ -1,63 +1,144 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Oct 2013 15:50:38 +0200
-Subject: [PATCH v2 2/3] usb: musb: Bugfix of_node assignment
+Date: Mon, 14 Oct 2013 15:50:39 +0200
+Subject: [PATCH v2 3/3] usb: musb: dsps, debugfs files
 In-Reply-To: <1381758639-30300-1-git-send-email-mpa@pengutronix.de>
 References: <1381758639-30300-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1381758639-30300-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1381758639-30300-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not safe to assign the of_node to a device without driver. The
-device is matched against a list of drivers and the of_node could lead
-to a DT match with the parent driver.
+debugfs files to show the contents of important dsps registers.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/usb/musb/musb_core.c | 12 +++++++++++-
- drivers/usb/musb/musb_dsps.c |  1 -
- 2 files changed, 11 insertions(+), 2 deletions(-)
+ drivers/usb/musb/musb_dsps.c | 87 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
 
-diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-index baa4f6a..a26eccd 100644
---- a/drivers/usb/musb/musb_core.c
-+++ b/drivers/usb/musb/musb_core.c
-@@ -1962,6 +1962,7 @@ static int musb_probe(struct platform_device *pdev)
- 	int		irq = platform_get_irq_byname(pdev, "mc");
- 	struct resource	*iomem;
- 	void __iomem	*base;
-+	int ret;
+diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+index 189e52c..43b22ab 100644
+--- a/drivers/usb/musb/musb_dsps.c
++++ b/drivers/usb/musb/musb_dsps.c
+@@ -46,6 +46,8 @@
+ #include <linux/of_irq.h>
+ #include <linux/usb/of.h>
  
- 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!iomem || irq <= 0)
-@@ -1971,7 +1972,16 @@ static int musb_probe(struct platform_device *pdev)
- 	if (IS_ERR(base))
- 		return PTR_ERR(base);
- 
--	return musb_init_controller(dev, irq, base);
-+	if (dev->parent)
-+		dev->of_node = dev->parent->of_node;
++#include <linux/debugfs.h>
 +
-+	ret = musb_init_controller(dev, irq, base);
-+	if (ret) {
-+		dev->of_node = NULL;
-+		return ret;
+ #include "musb_core.h"
+ 
+ static const struct of_device_id musb_dsps_of_match[];
+@@ -121,6 +123,61 @@ struct dsps_glue {
+ 	unsigned long last_timer;    /* last timer data for each instance */
+ };
+ 
++#if IS_ENABLED(CONFIG_DEBUG_FS)
++
++struct musb_register_map {
++	char			*name;
++	unsigned		offset;
++};
++
++static const struct musb_register_map musb_regmap[] = {
++	{ "revision",		0x00 },
++	{ "control",		0x14 },
++	{ "status",		0x18 },
++	{ "eoi",		0x24 },
++	{ "intr0_stat",		0x30 },
++	{ "intr1_stat",		0x34 },
++	{ "intr0_set",		0x38 },
++	{ "intr1_set",		0x3c },
++	{ "txmode",		0x70 },
++	{ "rxmode",		0x74 },
++	{ "autoreq",		0xd0 },
++	{ "srpfixtime",		0xd4 },
++	{ "tdown",		0xd8 },
++	{ "phy_utmi",		0xe0 },
++	{ "mode",		0xe8 },
++	{  }	/* Terminating Entry */
++};
++
++static int musb_regdump_show(struct seq_file *s, void *unused)
++{
++	struct musb		*musb = s->private;
++	unsigned		i;
++
++	seq_puts(s, "MUSB (M)HDRC dsps Register Dump\n");
++
++	for (i = 0; i < ARRAY_SIZE(musb_regmap); i++) {
++		u32 val = musb_readl(musb->ctrl_base, musb_regmap[i].offset);
++		seq_printf(s, "%-12s: %08x\n", musb_regmap[i].name, val);
 +	}
 +
 +	return 0;
++}
++
++static int musb_regdump_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, musb_regdump_show, inode->i_private);
++}
++
++static const struct file_operations musb_regdump_fops = {
++	.open			= musb_regdump_open,
++	.read			= seq_read,
++	.llseek			= seq_lseek,
++	.release		= single_release,
++};
++
++#endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
++
+ /**
+  * dsps_musb_enable - enable interrupts
+  */
+@@ -348,6 +405,31 @@ out:
+ 	return ret;
  }
  
- static int musb_remove(struct platform_device *pdev)
-diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-index bd4138d..189e52c 100644
---- a/drivers/usb/musb/musb_dsps.c
-+++ b/drivers/usb/musb/musb_dsps.c
-@@ -483,7 +483,6 @@ static int dsps_create_musb_pdev(struct dsps_glue *glue,
- 	musb->dev.parent		= dev;
- 	musb->dev.dma_mask		= &musb_dmamask;
- 	musb->dev.coherent_dma_mask	= musb_dmamask;
--	musb->dev.of_node		= of_node_get(dn);
++#if IS_ENABLED(CONFIG_DEBUG_FS)
++static int dsps_musb_dbg_init(struct musb *musb)
++{
++	struct dentry *root;
++	struct dentry *file;
++	char buf[128];
++
++	sprintf(buf, "%s.dsps", dev_name(musb->controller));
++	root = debugfs_create_dir(buf, NULL);
++	if (!root)
++		return -ENOMEM;
++
++	file = debugfs_create_file("regdump", S_IRUGO, root, musb,
++			&musb_regdump_fops);
++	if (!file)
++		return -ENOMEM;
++	return 0;
++}
++#else
++static int dsps_musb_dbg_init(struct musb *musb)
++{
++	return 0;
++}
++#endif
++
+ static int dsps_musb_init(struct musb *musb)
+ {
+ 	struct device *dev = musb->controller;
+@@ -357,6 +439,7 @@ static int dsps_musb_init(struct musb *musb)
+ 	void __iomem *reg_base;
+ 	struct resource *r;
+ 	u32 rev, val;
++	int ret;
  
- 	glue->musb = musb;
+ 	r = platform_get_resource_byname(parent, IORESOURCE_MEM, "control");
+ 	if (!r)
+@@ -390,6 +473,10 @@ static int dsps_musb_init(struct musb *musb)
+ 	val &= ~(1 << wrp->otg_disable);
+ 	dsps_writel(musb->ctrl_base, wrp->phy_utmi, val);
+ 
++	ret = dsps_musb_dbg_init(musb);
++	if (ret)
++		return ret;
++
+ 	return 0;
+ }
  
 -- 
 1.8.4.rc3
