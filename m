@@ -1,252 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 14 Oct 2013 18:35:33 +0200
-Subject: [PATCH] crypto: atmel-aes - add support for Device Tree
-Message-ID: <1381768533-31756-1-git-send-email-nicolas.ferre@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Oct 2013 10:35:58 -0600
+Subject: [PATCH 03/10] clk: tegra: Staticize local variables in clk-pll.c
+In-Reply-To: <20131014081533.GZ4233@tbergstrom-lnx.Nvidia.com>
+References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
+ <1381231068-6053-3-git-send-email-sachin.kamat@linaro.org>
+ <52542E34.6020806@wwwdotorg.org>
+ <20131010111328.GS4233@tbergstrom-lnx.Nvidia.com>
+ <5256D0CA.9010906@wwwdotorg.org>
+ <20131014081533.GZ4233@tbergstrom-lnx.Nvidia.com>
+Message-ID: <525C1D6E.5070802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Device Tree and use of the DMA DT API to
-get the needed channels.
-Documentation is added for these DT nodes.
+On 10/14/2013 02:15 AM, Peter De Schrijver wrote:
+> On Thu, Oct 10, 2013 at 06:07:38PM +0200, Stephen Warren wrote:
+>> On 10/10/2013 05:13 AM, Peter De Schrijver wrote:
+>>> On Tue, Oct 08, 2013 at 06:09:24PM +0200, Stephen Warren wrote:
+>>>> On 10/08/2013 05:17 AM, Sachin Kamat wrote:
+>>>>> Local variables used only in this file are made static.
+>>>>
+>>>
+>>> Conceptually they are still exported. So I think it's counterintuitive to
+>>> declare them static. Unless you expect namespace problems, I would rather
+>>> leave it as is.
+>>
+>> I forget exactly which symbols this patch changed, but presumably
+>> they're only exported via pointers rather than by symbol name, and isn't
+>> that exactly what static is for?
+> 
+> They are indeed exported using a pointer. depends on how you look at it I
+> guess, but I see static as 'local to this file only' which isn't really
+> true if you hand out pointers to others.
 
-Initial code by: Nicolas Royer and Eukrea.
-
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- .../devicetree/bindings/crypto/atmel-crypto.txt    |  23 ++++
- drivers/crypto/atmel-aes.c                         | 143 ++++++++++++++-------
- 2 files changed, 117 insertions(+), 49 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/crypto/atmel-crypto.txt
-
-diff --git a/Documentation/devicetree/bindings/crypto/atmel-crypto.txt b/Documentation/devicetree/bindings/crypto/atmel-crypto.txt
-new file mode 100644
-index 0000000..d273f0b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/atmel-crypto.txt
-@@ -0,0 +1,23 @@
-+* Atmel HW cryptographic accelerators
-+
-+These are the HW cryptographic accelerators found on some Atmel products.
-+
-+* Advanced Encryption Standard (AES)
-+
-+Required properties:
-+- compatible : Should be "atmel,at91sam9g46-aes".
-+- reg: Should contain AES registers location and length.
-+- interrupts: Should contain the IRQ line for the AES.
-+- dmas: List of two DMA specifiers as described in
-+        atmel-dma.txt and dma.txt files.
-+- dma-names: Contains one identifier string for each DMA specifier
-+             in the dmas property.
-+
-+Example:
-+aes at f8038000 {
-+	compatible = "atmel,at91sam9g46-aes";
-+	reg = <0xf8038000 0x100>;
-+	interrupts = <43 4 0>;
-+	dmas = <&dma1 2 18>,
-+	       <&dma1 2 19>;
-+	dma-names = "tx", "rx";
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index c1efd91..d7c9e31 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -30,6 +30,7 @@
- #include <linux/irq.h>
- #include <linux/scatterlist.h>
- #include <linux/dma-mapping.h>
-+#include <linux/of_device.h>
- #include <linux/delay.h>
- #include <linux/crypto.h>
- #include <linux/cryptohash.h>
-@@ -39,6 +40,7 @@
- #include <crypto/hash.h>
- #include <crypto/internal/hash.h>
- #include <linux/platform_data/crypto-atmel.h>
-+#include <dt-bindings/dma/at91.h>
- #include "atmel-aes-regs.h"
- 
- #define CFB8_BLOCK_SIZE		1
-@@ -747,59 +749,50 @@ static int atmel_aes_dma_init(struct atmel_aes_dev *dd,
- 	struct crypto_platform_data *pdata)
- {
- 	int err = -ENOMEM;
--	dma_cap_mask_t mask_in, mask_out;
-+	dma_cap_mask_t mask;
-+
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
-+
-+	/* Try to grab 2 DMA channels */
-+	dd->dma_lch_in.chan = dma_request_slave_channel_compat(mask,
-+			atmel_aes_filter, &pdata->dma_slave->rxdata, dd->dev, "tx");
-+	if (!dd->dma_lch_in.chan)
-+		goto err_dma_in;
-+
-+	dd->dma_lch_in.dma_conf.direction = DMA_MEM_TO_DEV;
-+	dd->dma_lch_in.dma_conf.dst_addr = dd->phys_base +
-+		AES_IDATAR(0);
-+	dd->dma_lch_in.dma_conf.src_maxburst = dd->caps.max_burst_size;
-+	dd->dma_lch_in.dma_conf.src_addr_width =
-+		DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	dd->dma_lch_in.dma_conf.dst_maxburst = dd->caps.max_burst_size;
-+	dd->dma_lch_in.dma_conf.dst_addr_width =
-+		DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	dd->dma_lch_in.dma_conf.device_fc = false;
-+
-+	dd->dma_lch_out.chan = dma_request_slave_channel_compat(mask,
-+			atmel_aes_filter, &pdata->dma_slave->txdata, dd->dev, "rx");
-+	if (!dd->dma_lch_out.chan)
-+		goto err_dma_out;
-+
-+	dd->dma_lch_out.dma_conf.direction = DMA_DEV_TO_MEM;
-+	dd->dma_lch_out.dma_conf.src_addr = dd->phys_base +
-+		AES_ODATAR(0);
-+	dd->dma_lch_out.dma_conf.src_maxburst = dd->caps.max_burst_size;
-+	dd->dma_lch_out.dma_conf.src_addr_width =
-+		DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	dd->dma_lch_out.dma_conf.dst_maxburst = dd->caps.max_burst_size;
-+	dd->dma_lch_out.dma_conf.dst_addr_width =
-+		DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	dd->dma_lch_out.dma_conf.device_fc = false;
- 
--	if (pdata && pdata->dma_slave->txdata.dma_dev &&
--		pdata->dma_slave->rxdata.dma_dev) {
--
--		/* Try to grab 2 DMA channels */
--		dma_cap_zero(mask_in);
--		dma_cap_set(DMA_SLAVE, mask_in);
--
--		dd->dma_lch_in.chan = dma_request_channel(mask_in,
--				atmel_aes_filter, &pdata->dma_slave->rxdata);
--
--		if (!dd->dma_lch_in.chan)
--			goto err_dma_in;
--
--		dd->dma_lch_in.dma_conf.direction = DMA_MEM_TO_DEV;
--		dd->dma_lch_in.dma_conf.dst_addr = dd->phys_base +
--			AES_IDATAR(0);
--		dd->dma_lch_in.dma_conf.src_maxburst = dd->caps.max_burst_size;
--		dd->dma_lch_in.dma_conf.src_addr_width =
--			DMA_SLAVE_BUSWIDTH_4_BYTES;
--		dd->dma_lch_in.dma_conf.dst_maxburst = dd->caps.max_burst_size;
--		dd->dma_lch_in.dma_conf.dst_addr_width =
--			DMA_SLAVE_BUSWIDTH_4_BYTES;
--		dd->dma_lch_in.dma_conf.device_fc = false;
--
--		dma_cap_zero(mask_out);
--		dma_cap_set(DMA_SLAVE, mask_out);
--		dd->dma_lch_out.chan = dma_request_channel(mask_out,
--				atmel_aes_filter, &pdata->dma_slave->txdata);
--
--		if (!dd->dma_lch_out.chan)
--			goto err_dma_out;
--
--		dd->dma_lch_out.dma_conf.direction = DMA_DEV_TO_MEM;
--		dd->dma_lch_out.dma_conf.src_addr = dd->phys_base +
--			AES_ODATAR(0);
--		dd->dma_lch_out.dma_conf.src_maxburst = dd->caps.max_burst_size;
--		dd->dma_lch_out.dma_conf.src_addr_width =
--			DMA_SLAVE_BUSWIDTH_4_BYTES;
--		dd->dma_lch_out.dma_conf.dst_maxburst = dd->caps.max_burst_size;
--		dd->dma_lch_out.dma_conf.dst_addr_width =
--			DMA_SLAVE_BUSWIDTH_4_BYTES;
--		dd->dma_lch_out.dma_conf.device_fc = false;
--
--		return 0;
--	} else {
--		return -ENODEV;
--	}
-+	return 0;
- 
- err_dma_out:
- 	dma_release_channel(dd->dma_lch_in.chan);
- err_dma_in:
-+	dev_warn(dd->dev, "no DMA channel available\n");
- 	return err;
- }
- 
-@@ -1261,6 +1254,47 @@ static void atmel_aes_get_cap(struct atmel_aes_dev *dd)
- 	}
- }
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id atmel_aes_dt_ids[] = {
-+	{ .compatible = "atmel,at91sam9g46-aes" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, atmel_aes_dt_ids);
-+
-+static struct crypto_platform_data *atmel_aes_of_init(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct crypto_platform_data *pdata;
-+
-+	if (!np) {
-+		dev_err(&pdev->dev, "device node not found\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "could not allocate memory for pdata\n");
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	pdata->dma_slave = devm_kzalloc(&pdev->dev,
-+					sizeof(*(pdata->dma_slave)),
-+					GFP_KERNEL);
-+	if (!pdata->dma_slave) {
-+		dev_err(&pdev->dev, "could not allocate memory for dma_slave\n");
-+		devm_kfree(&pdev->dev, pdata);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	return pdata;
-+}
-+#else
-+static inline struct crypto_platform_data *atmel_aes_of_init(struct platform_device *pdev)
-+{
-+	return ERR_PTR(-EINVAL);
-+}
-+#endif
-+
- static int atmel_aes_probe(struct platform_device *pdev)
- {
- 	struct atmel_aes_dev *aes_dd;
-@@ -1272,6 +1306,14 @@ static int atmel_aes_probe(struct platform_device *pdev)
- 
- 	pdata = pdev->dev.platform_data;
- 	if (!pdata) {
-+		pdata = atmel_aes_of_init(pdev);
-+		if (IS_ERR(pdata)) {
-+			err = PTR_ERR(pdata);
-+			goto aes_dd_err;
-+		}
-+	}
-+
-+	if (!pdata->dma_slave) {
- 		err = -ENXIO;
- 		goto aes_dd_err;
- 	}
-@@ -1358,7 +1400,9 @@ static int atmel_aes_probe(struct platform_device *pdev)
- 	if (err)
- 		goto err_algs;
- 
--	dev_info(dev, "Atmel AES\n");
-+	dev_info(dev, "Atmel AES - Using %s, %s for DMA transfers\n",
-+			dma_chan_name(aes_dd->dma_lch_in.chan),
-+			dma_chan_name(aes_dd->dma_lch_out.chan));
- 
- 	return 0;
- 
-@@ -1424,6 +1468,7 @@ static struct platform_driver atmel_aes_driver = {
- 	.driver		= {
- 		.name	= "atmel_aes",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(atmel_aes_dt_ids),
- 	},
- };
- 
--- 
-1.8.2.2
+Yes, static specifically means "the symbol name is local to this file".
+It says nothing about the data behind the symbol name.
