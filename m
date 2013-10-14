@@ -1,27 +1,35 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Mon, 14 Oct 2013 13:48:29 +0200
-Subject: [PATCH] net/ethernet: cpsw: Bugfix interrupts before enabling napi
-In-Reply-To: <1381691821-25498-1-git-send-email-mpa@pengutronix.de> (Markus
- Pargmann's message of "Sun, 13 Oct 2013 21:17:01 +0200")
-References: <1381691821-25498-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <8738o4rs36.fsf@dell.be.48ers.dk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Oct 2013 13:08:37 +0100
+Subject: [PATCH v3 3/3] ARM: add support for bit sliced AES using NEON
+ instructions
+In-Reply-To: <20131014112921.GA15084@gondor.apana.org.au>
+References: <1380913419-13296-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1380913419-13296-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20131013100350.GZ25034@n2100.arm.linux.org.uk>
+ <CAKv+Gu8gzRjOMhKoydR3DqMqHqREDC7ZHNn9AZcdxGOWE_N9Vw@mail.gmail.com>
+ <20131013111457.GB25034@n2100.arm.linux.org.uk>
+ <CAKv+Gu81Bb8jzVUgyS_=meJNLQaxydLLRR-5n5gY8b-reofzUQ@mail.gmail.com>
+ <20131013112239.GD25034@n2100.arm.linux.org.uk>
+ <CAKv+Gu--TmG3FxAHSYN_RG2FiLabFRCdp4vn1nrMOdOdfzgMwA@mail.gmail.com>
+ <20131013113049.GE25034@n2100.arm.linux.org.uk>
+ <20131014112921.GA15084@gondor.apana.org.au>
+Message-ID: <20131014120837.GM25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Markus" == Markus Pargmann <mpa@pengutronix.de> writes:
+On Mon, Oct 14, 2013 at 07:29:21PM +0800, Herbert Xu wrote:
+> On Sun, Oct 13, 2013 at 12:30:49PM +0100, Russell King - ARM Linux wrote:
+> > Herbert,
+> > 
+> > Could I have a git URL to pull the above commit please?
+> 
+> Russell, do you want me to revert this patch from cryptodev?
+> Otherwise I'm not quite sure what you want me to do here.
 
- Markus> If interrupts happen before napi_enable was called, the driver will not
- Markus> work as expected. Network transmissions are impossible in this state.
- Markus> This bug can be reproduced easily by restarting the network interface in
- Markus> a loop. After some time any network transmissions on the network
- Markus> interface will fail.
+I'd like to pull a branch from you containing this commit to solve the
+build error I'm getting with my tree, so I can continue testing my tree.
+At the moment, this is an additional unnecessary cause of randconfig
+build failures.
 
- Markus> This patch fixes the bug by enabling napi before enabling the network
- Markus> interface interrupts.
-
- Markus> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-
--- 
-Bye, Peter Korsgaard
+The problem I have is that Ard's crypto patches got put into a public
+stable branch so I can't drop them.
