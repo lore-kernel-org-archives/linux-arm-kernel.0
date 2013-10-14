@@ -1,50 +1,33 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 14 Oct 2013 09:46:25 +0100
-Subject: [PATCH 2/3] virtio: mmio: fix signature checking for BE guests
-In-Reply-To: <1381502171-8187-3-git-send-email-marc.zyngier@arm.com>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <1381502171-8187-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1381740385.3247.6.camel@hornet>
+From: philippe.retornaz@epfl.ch (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
+Date: Mon, 14 Oct 2013 10:47:51 +0200
+Subject: [PATCH 1/1] dma: imx-sdma: setup dma mask
+In-Reply-To: <20131013234812.GI25034@n2100.arm.linux.org.uk>
+References: <1380623464-24652-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1380623464-24652-2-git-send-email-philippe.retornaz@epfl.ch>
+ <20131013161801.GP2954@intel.com>
+ <20131013234812.GI25034@n2100.arm.linux.org.uk>
+Message-ID: <525BAFB7.8030402@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-10-11 at 15:36 +0100, Marc Zyngier wrote:
-> As virtio-mmio config registers are specified to be little-endian,
-> using readl() to read the magic value and then memcmp() to check it
-> fails on BE (as readl() has an implicit swab).
-> 
-> Fix it by encoding the magic value as an integer instead of a string.
-> 
-> Cc: Rusty Russell <rusty@rustcorp.com.au>
-> Cc: Michael S. Tsirkin <mst@redhat.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/virtio/virtio_mmio.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-> index 1ba0d68..57f24fd 100644
-> --- a/drivers/virtio/virtio_mmio.c
-> +++ b/drivers/virtio/virtio_mmio.c
-> @@ -470,7 +470,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
->  
->  	/* Check magic value */
->  	magic = readl(vm_dev->base + VIRTIO_MMIO_MAGIC_VALUE);
-> -	if (memcmp(&magic, "virt", 4) != 0) {
-> +	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
->  		dev_warn(&pdev->dev, "Wrong magic value 0x%08lx!\n", magic);
->  		return -ENODEV;
->  	}
+Le 14/10/2013 01:48, Russell King - ARM Linux a ?crit :
+> On Sun, Oct 13, 2013 at 09:48:01PM +0530, Vinod Koul wrote:
+>> On Tue, Oct 01, 2013 at 12:31:04PM +0200, Philippe R?tornaz wrote:
+>>> The dma mask is not configured in the current code.
+>>> This was triggered by soc-dmaengine-pcm which allocate the dma
+>>> buffers with the imx-sdma as device.
+>>> This commit fix audio on imx31.
+>>>
+>>> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+>> This needs to go thru Russell's tree, that has the below API
+>>
+>> Acked-by Vinod Koul <vinod.koul@intel.com>
+>
+> Indeed.
 
-The new spec will clarify this:
+It's in the patch system with id 7857/1
+I hope I got it right.... First time I'm using your patch system.
 
-* 0x000 | R | MagicValue
-  Magic value. Must be 0x74726976 (a Little Endian equivalent
-  of a "virt" string).
+Thanks,
 
-... but I like the 'v'i'r't' characters still being there :-)
-
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-
-Pawe?
+Philippe
