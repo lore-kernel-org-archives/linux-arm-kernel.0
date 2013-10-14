@@ -1,129 +1,54 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 14 Oct 2013 10:31:51 +0200
-Subject: [PATCH 5/5] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
-In-Reply-To: <1381739024-24924-6-git-send-email-shawn.guo@linaro.org>
-References: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
- <1381739024-24924-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1381739511.4093.124.camel@weser.hi.pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 14 Oct 2013 10:42:16 +0200
+Subject: [PATCH 01/11] usb: chipidea: Add power management support
+In-Reply-To: <20131014075547.GA26191@shlinux1.ap.freescale.net>
+References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
+ <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
+ <20131014100458.4f577d01@ipc1.ka-ro>
+ <20131014075547.GA26191@shlinux1.ap.freescale.net>
+Message-ID: <20131014084216.GY30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-Am Montag, den 14.10.2013, 16:23 +0800 schrieb Shawn Guo:
-> We now have 'flags' in struct pltfm_imx_data to identify the features
-> and quirks for ESDHC variants running on different i.MX SoCs.  The enum
-> imx_esdhc_type can be eliminated by interpreting the ESDHC variants with
-> the ESDHC_FLAG_* flags.
+On Mon, Oct 14, 2013 at 03:55:48PM +0800, Peter Chen wrote:
+> On Mon, Oct 14, 2013 at 10:04:58AM +0200, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Peter Chen wrote:
+> > > This commit adds runtime and system power management support for
+> > > chipidea core. The runtime pm support is controlled by glue
+> > > layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
+> > > 
+> > [...]
+> > > +#ifdef CONFIG_PM
+> > > +static int ci_controller_suspend(struct device *dev)
+> > > +{
+> > > +	struct ci_hdrc *ci = dev_get_drvdata(dev);
+> > > +
+> > > +	dev_dbg(dev, "at %s\n", __func__);
+> > > +
+> > > +	if (atomic_read(&ci->in_lpm))
+> > > +		return 0;
+> > > +
+> > What does this 'atomic_read()' buy you over just testing/assinging a
+> > simple integer. Note that just because the function has 'atomic' in
+> > its name the sequence:
+> > 	atomic_read();
+> > ...
+> > 	atomic_set();
+> > does not magically become an atomic operation.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   52 +++++-------------------------------
->  1 file changed, 6 insertions(+), 46 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index f1e1385..f2cd5b0 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -100,18 +100,15 @@
->   */
->  #define ESDHC_FLAG_USDHC		BIT(3)
->  
-> -enum imx_esdhc_type {
-> -	IMX25_ESDHC,
-> -	IMX35_ESDHC,
-> -	IMX51_ESDHC,
-> -	IMX53_ESDHC,
-> -	IMX6Q_USDHC,
-> -};
-> +#define IMX25_ESDHC	(ESDHC_FLAG_NO_DMAS_BITS | ESDHC_FLAG_ENGCM07207)
-> +#define IMX35_ESDHC	(ESDHC_FLAG_ENGCM07207)
-> +#define IMX51_ESDHC	(0)
-> +#define IMX53_ESDHC	(ESDHC_FLAG_MULTIBLK_NO_INT)
-> +#define IMX6Q_USDHC	(ESDHC_FLAG_USDHC)
->  
-This looks really nasty to me, especially with the needed void pointer
-cast you added in the previous patch.
+> I just want the read and set are atomic, not the operations
+> between atomic_read and atomic_set.
 
-Can you please introduce a proper driver data struct, with the flags
-field in it? This will make this thing a lot cleaner, more future proof
-and shouldn't add any overhead in the generated code.
+It makes no sense to use atomic operations here. atomic types are to
+atomically read/modify/write variables. If all you ever do is
+atomic_read and atomic_set then you can use a simple bool variable.
 
-Regards,
-Lucas
->  struct pltfm_imx_data {
->  	int flags;
->  	u32 scratchpad;
-> -	enum imx_esdhc_type devtype;
->  	struct pinctrl *pinctrl;
->  	struct pinctrl_state *pins_default;
->  	struct pinctrl_state *pins_100mhz;
-> @@ -154,31 +151,6 @@ static const struct of_device_id imx_esdhc_dt_ids[] = {
->  };
->  MODULE_DEVICE_TABLE(of, imx_esdhc_dt_ids);
->  
-> -static inline int is_imx25_esdhc(struct pltfm_imx_data *data)
-> -{
-> -	return data->devtype == IMX25_ESDHC;
-> -}
-> -
-> -static inline int is_imx35_esdhc(struct pltfm_imx_data *data)
-> -{
-> -	return data->devtype == IMX35_ESDHC;
-> -}
-> -
-> -static inline int is_imx51_esdhc(struct pltfm_imx_data *data)
-> -{
-> -	return data->devtype == IMX51_ESDHC;
-> -}
-> -
-> -static inline int is_imx53_esdhc(struct pltfm_imx_data *data)
-> -{
-> -	return data->devtype == IMX53_ESDHC;
-> -}
-> -
-> -static inline int is_imx6q_usdhc(struct pltfm_imx_data *data)
-> -{
-> -	return data->devtype == IMX6Q_USDHC;
-> -}
-> -
->  static inline int esdhc_is_usdhc(struct pltfm_imx_data *data)
->  {
->  	return !!(data->flags & ESDHC_FLAG_USDHC);
-> @@ -866,19 +838,10 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  		goto free_sdhci;
->  	}
->  
-> -	imx_data->devtype = of_id ? (enum imx_esdhc_type) of_id->data :
-> +	imx_data->flags = of_id ? (int) of_id->data :
->  				    pdev->id_entry->driver_data;
->  	pltfm_host->priv = imx_data;
->  
-> -	if (is_imx25_esdhc(imx_data))
-> -		imx_data->flags |= ESDHC_FLAG_NO_DMAS_BITS;
-> -
-> -	if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
-> -		imx_data->flags |= ESDHC_FLAG_ENGCM07207;
-> -
-> -	if (is_imx6q_usdhc(imx_data))
-> -		imx_data->flags |= ESDHC_FLAG_USDHC;
-> -
->  	imx_data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
->  	if (IS_ERR(imx_data->clk_ipg)) {
->  		err = PTR_ERR(imx_data->clk_ipg);
-> @@ -924,9 +887,6 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
->  			| SDHCI_QUIRK_BROKEN_ADMA;
->  
-> -	if (is_imx53_esdhc(imx_data))
-> -		imx_data->flags |= ESDHC_FLAG_MULTIBLK_NO_INT;
-> -
->  	/*
->  	 * The imx6q ROM code will change the default watermark level setting
->  	 * to something insane.  Change it back here.
+Sascha
 
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
 Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
