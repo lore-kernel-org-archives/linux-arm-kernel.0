@@ -1,43 +1,217 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 14 Oct 2013 17:22:09 +0200
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <525C09D1.8060103@arm.com>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
- <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
- <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
- <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
- <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
- <525C09D1.8060103@arm.com>
-Message-ID: <525C0C21.2070001@redhat.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 14 Oct 2013 17:22:26 +0200
+Subject: [RFC] usb: musb: dsps, OTG detection
+In-Reply-To: <CADYTM3bY91tcp7yWteQZo9C5==fSjPv2ncqqUo7fzfA2=YRnaw@mail.gmail.com>
+References: <1381757734-2976-1-git-send-email-mpa@pengutronix.de>
+ <CADYTM3bY91tcp7yWteQZo9C5==fSjPv2ncqqUo7fzfA2=YRnaw@mail.gmail.com>
+Message-ID: <20131014152226.GA32062@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 14/10/2013 17:12, Marc Zyngier ha scritto:
-> On 14/10/13 15:56, Paolo Bonzini wrote:
->> Il 14/10/2013 16:52, Marc Zyngier ha scritto:
->>>>> Sure. And I imagine this traps back into the kernel to read some
->>>>> register and find out what the endianness of the accessing CPU is?
->>>>
->>>> Not yet. To be exact, it does the below today. But all virtio device
->>>> emulation is 100% guest endianness unaware. This helper is the only
->>>> piece of code where it gets any idea what endianness the guest has. So
->>>> by checking for references to it in the code you know where endianness
->>>> is an issue. And that's only in the config space.
->>>
->>> Only config space? How do you deal with virtio ring descriptors, for
->>> example?
->>
->> They also use guest endianness, but do not use virtio_is_big_endian()
->> (yet?) so Alex missed them.
-> 
-> Yeah, I thought as much. There is a whole bunch of things that need byte
-> swapping, both at the virtio level itself, and at the device level as well.
-> 
-> Grep-ing for __u{16,32,64} through include/uapi/linux/virtio* shows the
-> extent of the disaster.
+Hi,
 
-Devices are fine in QEMU, it's only the "generic" parts (rings) that are
-missing AFAICT.
+On Mon, Oct 14, 2013 at 08:54:09AM -0500, Bin Liu wrote:
+> On Mon, Oct 14, 2013 at 8:35 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> > The USB Controller does not support ID pin change interrupts. So we have
+> > to use a polling function to detect changes of A/B device state
+> > (otg_timer). This poll function has to check in several states if a
+> > other device type might be connected to the USB port. This check is
+> > triggered by manually starting/stopping a USB Session.
+> 
+> I think this is an arguable approach. Toggling the SESSION in
+> otg_timer() causes voltage pulses on VBUS, which will not pass the USB
+> certification.
 
-Paolo
+This is only done when no device is connected, so I am not sure if it is
+important. Unfortunately we do not see the A/B state changes until
+toggling the SESSION. Is there another way to check this?
+
+> 
+> I have not seen any products required the dynamic dual role switching
+> yet. It always fixed in either device mode or host mode.
+
+OTG is explicitly listed in the devicetree bindings documentation, so
+I think the driver should be able to detect different roles.
+
+Regards,
+
+Markus Pargmann
+
+> 
+> Regards,
+> -Bin.
+> 
+> >
+> > So in A mode, we cancel the currently running session which also
+> > disables the possibility to detect new devices via interrupt. In B mode,
+> > we start a session to check for ID-Pin and possibly connected devices.
+> >
+> > Whenever a real USB session ends, we have to trigger the otg_timer poll
+> > function again.
+> >
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  drivers/usb/musb/musb_dsps.c | 84 ++++++++++++++++++++++++++++++++++++++++----
+> >  1 file changed, 78 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+> > index b24b697..0245e8d 100644
+> > --- a/drivers/usb/musb/musb_dsps.c
+> > +++ b/drivers/usb/musb/musb_dsps.c
+> > @@ -178,6 +178,43 @@ static const struct file_operations musb_regdump_fops = {
+> >
+> >  #endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
+> >
+> > +/*
+> > + * Compare driver and hardware mode and update driver state if necessary.
+> > + * Not all hardware changes actually reach the driver through interrupts.
+> > + */
+> > +static void dsps_update_mode(struct musb *musb)
+> > +{
+> > +       u8 devctl;
+> > +
+> > +       devctl = dsps_readb(musb->mregs, MUSB_DEVCTL);
+> > +
+> > +       switch (musb->xceiv->state) {
+> > +       case OTG_STATE_A_IDLE:
+> > +               if (devctl & MUSB_DEVCTL_BDEVICE) {
+> > +                       dev_dbg(musb->controller, "detected controller state B, software state A\n");
+> > +                       musb->xceiv->state = OTG_STATE_B_IDLE;
+> > +               }
+> > +               break;
+> > +       case OTG_STATE_B_IDLE:
+> > +               if (!(devctl & MUSB_DEVCTL_BDEVICE)) {
+> > +                       dev_dbg(musb->controller, "detected controller state A, software state B\n");
+> > +                       musb->xceiv->state = OTG_STATE_A_IDLE;
+> > +               }
+> > +               break;
+> > +       default:
+> > +               if (!(devctl & MUSB_DEVCTL_SESSION)) {
+> > +                       dev_dbg(musb->controller, "detected controller out of session (%x), software state %s\n",
+> > +                               devctl,
+> > +                               usb_otg_state_string(musb->xceiv->state));
+> > +                       if (devctl & MUSB_DEVCTL_BDEVICE)
+> > +                               musb->xceiv->state = OTG_STATE_B_IDLE;
+> > +                       else
+> > +                               musb->xceiv->state = OTG_STATE_A_IDLE;
+> > +               }
+> > +               break;
+> > +       }
+> > +}
+> > +
+> >  /**
+> >   * dsps_musb_enable - enable interrupts
+> >   */
+> > @@ -229,6 +266,8 @@ static void otg_timer(unsigned long _musb)
+> >         u8 devctl;
+> >         unsigned long flags;
+> >
+> > +       dsps_update_mode(musb);
+> > +
+> >         /*
+> >          * We poll because DSPS IP's won't expose several OTG-critical
+> >          * status change events (from the transceiver) otherwise.
+> > @@ -239,6 +278,16 @@ static void otg_timer(unsigned long _musb)
+> >
+> >         spin_lock_irqsave(&musb->lock, flags);
+> >         switch (musb->xceiv->state) {
+> > +       case OTG_STATE_A_IDLE:
+> > +       case OTG_STATE_A_WAIT_VRISE:
+> > +               /*
+> > +                * Poll the devctl register to know when the controller switches
+> > +                * back to B state.
+> > +                */
+> > +               musb_writeb(mregs, MUSB_DEVCTL,
+> > +                               devctl & (~MUSB_DEVCTL_SESSION));
+> > +               mod_timer(&glue->timer, jiffies + wrp->poll_seconds * HZ);
+> > +               break;
+> >         case OTG_STATE_A_WAIT_BCON:
+> >                 devctl &= ~MUSB_DEVCTL_SESSION;
+> >                 dsps_writeb(musb->mregs, MUSB_DEVCTL, devctl);
+> > @@ -251,6 +300,8 @@ static void otg_timer(unsigned long _musb)
+> >                         musb->xceiv->state = OTG_STATE_A_IDLE;
+> >                         MUSB_HST_MODE(musb);
+> >                 }
+> > +               mod_timer(&glue->timer,
+> > +                               jiffies + wrp->poll_seconds * HZ);
+> >                 break;
+> >         case OTG_STATE_A_WAIT_VFALL:
+> >                 musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
+> > @@ -258,12 +309,24 @@ static void otg_timer(unsigned long _musb)
+> >                             MUSB_INTR_VBUSERROR << wrp->usb_shift);
+> >                 break;
+> >         case OTG_STATE_B_IDLE:
+> > +               /*
+> > +                * There's no ID-changed IRQ, so we have no good way to tell
+> > +                * when to switch to the A-Default state machine (by setting
+> > +                * the DEVCTL.Session bit).
+> > +                *
+> > +                * Workaround:  whenever we're in B_IDLE, try setting the
+> > +                * session flag every few seconds.  If it works, ID was
+> > +                * grounded and we're now in the A-Default state machine.
+> > +                *
+> > +                * NOTE: setting the session flag is _supposed_ to trigger
+> > +                * SRP but clearly it doesn't.
+> > +                */
+> > +               musb_writeb(mregs, MUSB_DEVCTL, devctl | MUSB_DEVCTL_SESSION);
+> >                 devctl = dsps_readb(mregs, MUSB_DEVCTL);
+> > -               if (devctl & MUSB_DEVCTL_BDEVICE)
+> > -                       mod_timer(&glue->timer,
+> > -                                       jiffies + wrp->poll_seconds * HZ);
+> > -               else
+> > +               if (!(devctl & MUSB_DEVCTL_BDEVICE))
+> >                         musb->xceiv->state = OTG_STATE_A_IDLE;
+> > +               mod_timer(&glue->timer,
+> > +                               jiffies + wrp->poll_seconds * HZ);
+> >                 break;
+> >         default:
+> >                 break;
+> > @@ -376,7 +439,6 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
+> >                         MUSB_HST_MODE(musb);
+> >                         musb->xceiv->otg->default_a = 1;
+> >                         musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
+> > -                       del_timer(&glue->timer);
+> >                 } else {
+> >                         musb->is_active = 0;
+> >                         MUSB_DEV_MODE(musb);
+> > @@ -397,8 +459,16 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
+> >                 ret |= musb_interrupt(musb);
+> >
+> >         /* Poll for ID change */
+> > -       if (musb->xceiv->state == OTG_STATE_B_IDLE)
+> > +       switch (musb->xceiv->state) {
+> > +       case OTG_STATE_A_IDLE:
+> > +       case OTG_STATE_A_WAIT_BCON:
+> > +       case OTG_STATE_A_WAIT_VRISE:
+> > +       case OTG_STATE_B_IDLE:
+> >                 mod_timer(&glue->timer, jiffies + wrp->poll_seconds * HZ);
+> > +               break;
+> > +       default:
+> > +               break;
+> > +       }
+> >  out:
+> >         spin_unlock_irqrestore(&musb->lock, flags);
+> >
+> > @@ -479,6 +549,8 @@ static int dsps_musb_init(struct musb *musb)
+> >
+> >         dev_info(dev, "%s:%d %s: OK\n", __FILE__, __LINE__, __func__);
+> >
+> > +       musb->xceiv->otg->default_a = 0;
+> > +
+> >         return 0;
+> >  }
+> >
+> > --
+> > 1.8.4.rc3
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
