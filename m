@@ -1,25 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Oct 2013 16:19:38 +0100
-Subject: [PATCH v2 0/7] Optimize jump label implementation on ARM64
-In-Reply-To: <1381675827-1610-1-git-send-email-liuj97@gmail.com>
-References: <1381675827-1610-1-git-send-email-liuj97@gmail.com>
-Message-ID: <20131014151938.GJ10491@mudshark.cambridge.arm.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 14 Oct 2013 17:22:09 +0200
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <525C09D1.8060103@arm.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
+ <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
+ <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
+ <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+ <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
+ <525C09D1.8060103@arm.com>
+Message-ID: <525C0C21.2070001@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 13, 2013 at 03:50:20PM +0100, Jiang Liu wrote:
-> From: Jiang Liu <jiang.liu@huawei.com>
+Il 14/10/2013 17:12, Marc Zyngier ha scritto:
+> On 14/10/13 15:56, Paolo Bonzini wrote:
+>> Il 14/10/2013 16:52, Marc Zyngier ha scritto:
+>>>>> Sure. And I imagine this traps back into the kernel to read some
+>>>>> register and find out what the endianness of the accessing CPU is?
+>>>>
+>>>> Not yet. To be exact, it does the below today. But all virtio device
+>>>> emulation is 100% guest endianness unaware. This helper is the only
+>>>> piece of code where it gets any idea what endianness the guest has. So
+>>>> by checking for references to it in the code you know where endianness
+>>>> is an issue. And that's only in the config space.
+>>>
+>>> Only config space? How do you deal with virtio ring descriptors, for
+>>> example?
+>>
+>> They also use guest endianness, but do not use virtio_is_big_endian()
+>> (yet?) so Alex missed them.
 > 
-> This patchset tries to optimize arch specfic jump label implementation
-> for ARM64 by dynamic kernel text patching.
+> Yeah, I thought as much. There is a whole bunch of things that need byte
+> swapping, both at the virtio level itself, and at the device level as well.
 > 
-> To enable this feature, your toolchain must support "asm goto" extension
-> and "%c" constraint extesion. Current GCC for AARCH64 doesn't support
-> "%c", so you need a GCC patch similiar to this:
-> http://gcc.gnu.org/viewcvs/gcc/trunk/gcc/config/arm/arm.c?view=patch&r1=175293&r2=175565&pathrev=175565
-> http://gcc.gnu.org/bugzilla/show_bug.cgi?id=48637
+> Grep-ing for __u{16,32,64} through include/uapi/linux/virtio* shows the
+> extent of the disaster.
 
-Right, but this is just for the ARM (AArch32) backend afaict. Are there any
-plans for upstream GCC to support this constraint for AArch64?
+Devices are fine in QEMU, it's only the "generic" parts (rings) that are
+missing AFAICT.
 
-Will
+Paolo
