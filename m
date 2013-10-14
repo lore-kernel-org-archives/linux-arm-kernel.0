@@ -1,72 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 14 Oct 2013 09:34:37 +0200
-Subject: [GIT PULL] fixes for integer rounding in timer core
-In-Reply-To: <20131008153147.GR10079@pengutronix.de>
-References: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
- <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5253D9A1.1080106@pengutronix.de>
- <20131008153147.GR10079@pengutronix.de>
-Message-ID: <20131014073436.GX10079@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 14 Oct 2013 09:38:59 +0200
+Subject: [PATCH 0/5] ARM:at91:enable sound on at91sam9n12ek board
+In-Reply-To: <1381729113-29714-1-git-send-email-voice.shen@atmel.com>
+References: <1381729113-29714-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <525B9F93.9040001@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus, hello Ingo,
+On 14/10/2013 07:38, Bo Shen :
+> This patch series enable sound on at91sam9n12ek board with wm8904 codec
+>
+>
+> Bo Shen (5):
+>    ARM: at91: add at91sam9n12 ssc clock in look up table
+>    ARM: at91: add ssc dma parameter for at91sam9n12
+>    ARM: at91: enable wm8904 on at91sam9n12ek board
+>    ARM: at91: enable ssc on at91sam9n12ek board
+>    ARM: at91: add sound support on at91sam9n12ek board
 
-On Tue, Oct 08, 2013 at 05:31:47PM +0200, Uwe Kleine-K?nig wrote:
-> > What's the status of this patch?
-> I pinged Thomas about it already via irc, but I didn't get a response up
-> to now. It would be great to get that into 3.12. To make it easy for
-> Thomas, here is a pull request that includes the fix and converts
-> at91rm9200 back to clockevents_config_and_register dropping one of the
-> workarounds for the fixed bug.
-> 
-> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
-> 
->   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux.git tags/timer-for-tip
-> 
-> for you to fetch changes up to b58c4b70121070f45eefa739ecbb58d57da1c4d9:
-> 
->   ARM: at91: rm9200: switch back to clockevents_config_and_register (2013-10-08 16:58:22 +0200)
-> 
-> ----------------------------------------------------------------
-> The first patch in this pull request fixes an old integer rounding bug in the
-> timer core that was (and still is) worked around in a few arch's timer code.
-> The second patch drops such a work around now that the core is fixed.
-It would be nice to get that fix into 3.12, but Thomas stopped
-responding nearly a month ago---his last mail in this thread[1] dates back
-to September 20.
+Great!
 
-Can one of you please take it directly?
+And on the whole patch series:
 
-Thanks
-Uwe
- 
-[1] http://thread.gmane.org/gmane.linux.kernel/1563370/
-> ----------------------------------------------------------------
-> Thomas Gleixner (1):
->       clockevents: Sanitize ticks to nsec conversion
-> 
-> Uwe Kleine-K?nig (1):
->       ARM: at91: rm9200: switch back to clockevents_config_and_register
-> 
->  arch/arm/mach-at91/at91rm9200_time.c |  7 ++--
->  kernel/time/clockevents.c            | 65 +++++++++++++++++++++++++++---------
->  2 files changed, 52 insertions(+), 20 deletions(-)
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+I stack it on at91-3.13-dt branch.
+
+Thanks.
+
+>
+>   arch/arm/boot/dts/at91sam9n12.dtsi  |    3 +++
+>   arch/arm/boot/dts/at91sam9n12ek.dts |   34 ++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-at91/at91sam9n12.c    |    1 +
+>   3 files changed, 38 insertions(+)
+>
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Nicolas Ferre
