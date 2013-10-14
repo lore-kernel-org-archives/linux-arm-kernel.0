@@ -1,36 +1,156 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 14 Oct 2013 10:35:58 -0600
-Subject: [PATCH 03/10] clk: tegra: Staticize local variables in clk-pll.c
-In-Reply-To: <20131014081533.GZ4233@tbergstrom-lnx.Nvidia.com>
-References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
- <1381231068-6053-3-git-send-email-sachin.kamat@linaro.org>
- <52542E34.6020806@wwwdotorg.org>
- <20131010111328.GS4233@tbergstrom-lnx.Nvidia.com>
- <5256D0CA.9010906@wwwdotorg.org>
- <20131014081533.GZ4233@tbergstrom-lnx.Nvidia.com>
-Message-ID: <525C1D6E.5070802@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 14 Oct 2013 18:36:13 +0200
+Subject: [PATCH v3 12/14] cpuidle: mvebu: Add initial CPU idle support
+ for Armada 370/XP SoC
+In-Reply-To: <1381759106-15004-13-git-send-email-gregory.clement@free-electrons.com>
+References: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
+ <1381759106-15004-13-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20131014183613.7fd18395@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2013 02:15 AM, Peter De Schrijver wrote:
-> On Thu, Oct 10, 2013 at 06:07:38PM +0200, Stephen Warren wrote:
->> On 10/10/2013 05:13 AM, Peter De Schrijver wrote:
->>> On Tue, Oct 08, 2013 at 06:09:24PM +0200, Stephen Warren wrote:
->>>> On 10/08/2013 05:17 AM, Sachin Kamat wrote:
->>>>> Local variables used only in this file are made static.
->>>>
->>>
->>> Conceptually they are still exported. So I think it's counterintuitive to
->>> declare them static. Unless you expect namespace problems, I would rather
->>> leave it as is.
->>
->> I forget exactly which symbols this patch changed, but presumably
->> they're only exported via pointers rather than by symbol name, and isn't
->> that exactly what static is for?
-> 
-> They are indeed exported using a pointer. depends on how you look at it I
-> guess, but I see static as 'local to this file only' which isn't really
-> true if you hand out pointers to others.
+Dear Gregory CLEMENT,
 
-Yes, static specifically means "the symbol name is local to this file".
-It says nothing about the data behind the symbol name.
+On Mon, 14 Oct 2013 15:58:24 +0200, Gregory CLEMENT wrote:
+> +#include <linux/cpuidle.h>
+> +#include <linux/module.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/suspend.h>
+> +#include <asm/suspend.h>
+> +#include <linux/smp.h>
+> +#include <asm/cpuidle.h>
+> +#include <asm/smp_plat.h>
+> +#include <linux/armada-370-xp-pmsu.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define ARMADA_370_XP_MAX_STATES	3
+> +#define ARMADA_370_XP_FLAG_DEEP_IDLE	0x10000
+> +
+> +extern void v7_flush_dcache_all(void);
+
+This function is no longer called by the driver, it seems.
+
+> +/* Functions defined in suspend-armada-370-xp.S */
+> +int armada_370_xp_cpu_resume(unsigned long);
+> +int armada_370_xp_cpu_suspend(unsigned long);
+
+So the PMSU functions have their prototype in a header in <linux/...>,
+but not those ones. Why chose one solution for some functions, and
+another one for these functions?
+
+> +static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
+> +				struct cpuidle_driver *drv,
+> +				int index)
+> +{
+> +	bool deepidle = false;
+> +	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
+> +
+> +	armada_370_xp_pmsu_set_start_addr(armada_370_xp_cpu_resume, hw_cpu);
+> +
+> +	if (drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE)
+> +		deepidle = true;
+
+This could also be written as:
+
+	deepidle = drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE;
+
+which allows to remove the deepidle = false initialization. But I agree
+this is rather a matter of taste, so I don't mind if you chose to keep
+your implementation.
+
+> +
+> +	cpu_suspend(deepidle, armada_370_xp_cpu_suspend);
+> +
+> +	armada_370_xp_pmsu_idle_restore();
+> +
+> +	return index;
+> +}
+> +
+> +static struct cpuidle_driver armada_370_xp_idle_driver = {
+> +	.name			= "armada_370_xp_idle",
+> +	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+> +	.states[1]		= {
+> +		.enter			= armada_370_xp_enter_idle,
+> +		.exit_latency		= 10,
+> +		.power_usage		= 50,
+> +		.target_residency	= 100,
+> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
+> +		.name			= "MV CPU IDLE",
+> +		.desc			= "CPU power down",
+> +	},
+> +	.states[2]		= {
+> +		.enter			= armada_370_xp_enter_idle,
+> +		.exit_latency		= 100,
+> +		.power_usage		= 5,
+> +		.target_residency	= 1000,
+> +		.flags			= CPUIDLE_FLAG_TIME_VALID |
+> +						ARMADA_370_XP_FLAG_DEEP_IDLE,
+> +		.name			= "MV CPU DEEP IDLE",
+> +		.desc			= "CPU and L2 Fabric power down",
+> +	},
+> +	.state_count = ARMADA_370_XP_MAX_STATES,
+> +};
+> +
+> +static int armada_370_xp_cpuidle_probe(struct platform_device *pdev)
+> +{
+> +	if (!of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-pmsu"))
+> +		return -ENODEV;
+> +
+> +	if (!of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
+> +		return -ENODEV;
+
+I am wondering if those checks shouldn't be done by the core mach-mvebu
+code before registering the cpuidle platform device, and only register
+it if all the prerequisites are available.
+
+> +	pr_info("Initializing Armada-XP CPU power management ");
+
+Not sure this message is really useful, but if it is, it should be
+using dev_info(), it should not have a trailing space, and it should
+probably not be called "CPU power management", but really "cpuidle" or
+something like that. "CPU power management" is a very fuzzy term, which
+could be confused with cpufreq, for example.
+
+> +
+> +	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
+> +
+> +	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
+> +}
+> +
+> +static int armada_370_xp_cpuidle_remove(struct platform_device *pdev)
+> +{
+> +	cpuidle_unregister(&armada_370_xp_idle_driver);
+> +	return 0;
+> +}
+> +
+> +
+
+One too many empty line here.
+
+> +static struct platform_driver armada_370_xp_cpuidle_plat_driver = {
+> +	.driver = {
+> +		.name = "cpuidle-armada-370-xp",
+> +		.owner = THIS_MODULE,
+> +	},
+> +	.probe = armada_370_xp_cpuidle_probe,
+> +	.remove = armada_370_xp_cpuidle_remove,
+> +};
+> +
+> +
+
+One too many empty line here.
+
+> +module_platform_driver(armada_370_xp_cpuidle_plat_driver);
+> +
+> +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
+> +MODULE_DESCRIPTION("Armada 370/XP cpu idle driver");
+> +MODULE_LICENSE("GPL");
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
