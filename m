@@ -1,149 +1,43 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 14 Oct 2013 16:27:19 +0200
-Subject: [PATCH 1/2] ARM: at91: cpuidle: convert to platform driver
-In-Reply-To: <525BFD31.3020406@linaro.org>
-References: <1381593099-1184-1-git-send-email-daniel.lezcano@linaro.org>
- <20131014140406.GH11420@ns203013.ovh.net>
- <525BFD31.3020406@linaro.org>
-Message-ID: <20131014142719.GI11420@ns203013.ovh.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 14 Oct 2013 16:26:36 +0200
+Subject: [PATCH v3 05/14] ARM: mvebu: Make ll_set_cpu_coherent() more
+ configurable
+In-Reply-To: <1381759106-15004-6-git-send-email-gregory.clement@free-electrons.com>
+References: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
+ <1381759106-15004-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20131014162636.1f486053@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:18 Mon 14 Oct     , Daniel Lezcano wrote:
-> On 10/14/2013 04:04 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >On 17:51 Sat 12 Oct     , Daniel Lezcano wrote:
-> >>Use the platform driver model to separate the cpuidle specific code from
-> >>the low level pm code. It allows to remove the dependency between
-> >>these two components.
-> >>
-> >>Tested-on usb-a9263 (at91sam9263)
-> >>
-> >>Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >>---
-> >>  arch/arm/mach-at91/cpuidle.c |   29 +++++++++++++++--------------
-> >>  arch/arm/mach-at91/pm.c      |   16 +++++++++++++++-
-> >>  2 files changed, 30 insertions(+), 15 deletions(-)
-> >>
-> >>diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
-> >>index 4ec6a6d..6cdc76d 100644
-> >>--- a/arch/arm/mach-at91/cpuidle.c
-> >>+++ b/arch/arm/mach-at91/cpuidle.c
-> >>@@ -21,26 +21,17 @@
-> >>  #include <linux/export.h>
-> >>  #include <asm/proc-fns.h>
-> >>  #include <asm/cpuidle.h>
-> >>-#include <mach/cpu.h>
-> >>-
-> >>-#include "pm.h"
-> >>
-> >>  #define AT91_MAX_STATES	2
-> >>
-> >>+static void (*at91_standby)(void);
-> >>+
-> >>  /* Actual code that puts the SoC in different idle states */
-> >>  static int at91_enter_idle(struct cpuidle_device *dev,
-> >>  			struct cpuidle_driver *drv,
-> >>  			       int index)
-> >>  {
-> >>-	if (cpu_is_at91rm9200())
-> >>-		at91rm9200_standby();
-> >>-	else if (cpu_is_at91sam9g45())
-> >>-		at91sam9g45_standby();
-> >>-	else if (cpu_is_at91sam9263())
-> >>-		at91sam9263_standby();
-> >>-	else
-> >>-		at91sam9_standby();
-> >>-
-> >>+	at91_standby();
-> >>  	return index;
-> >>  }
-> >>
-> >>@@ -60,9 +51,19 @@ static struct cpuidle_driver at91_idle_driver = {
-> >>  };
-> >>
-> >>  /* Initialize CPU idle by registering the idle states */
-> >>-static int __init at91_init_cpuidle(void)
-> >>+static int __init at91_cpuidle_probe(struct platform_device *dev)
-> >>  {
-> >>+	at91_standby = (void *)(dev->dev.platform_data);
-> >>+	
-> >>  	return cpuidle_register(&at91_idle_driver, NULL);
-> >>  }
-> >>
-> >>-device_initcall(at91_init_cpuidle);
-> >>+static struct platform_driver at91_cpuidle_driver = {
-> >>+	.driver = {
-> >>+		.name = "cpuidle-at91",
-> >>+		.owner = THIS_MODULE,
-> >>+	},
-> >>+	.probe = at91_cpuidle_probe,
-> >>+};
-> >>+
-> >>+module_platform_driver(at91_cpuidle_driver);
-> >>diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> >>index 15afb5d..debdbf8 100644
-> >>--- a/arch/arm/mach-at91/pm.c
-> >>+++ b/arch/arm/mach-at91/pm.c
-> >>@@ -314,6 +314,10 @@ static const struct platform_suspend_ops at91_pm_ops = {
-> >>  	.end	= at91_pm_end,
-> >>  };
-> >>
-> >>+static struct platform_device at91_cpuidle_device = {
-> >>+	.name = "cpuidle-at91",
-> >>+};
-> >>+
-> >>  static int __init at91_pm_init(void)
-> >>  {
-> >>  #ifdef CONFIG_AT91_SLOW_CLOCK
-> >>@@ -323,8 +327,18 @@ static int __init at91_pm_init(void)
-> >>  	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
-> >>
-> >>  	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
-> >>-	if (cpu_is_at91rm9200())
-> >>+	if (cpu_is_at91rm9200()) {
-> >>+		at91_cpuidle_device.dev.platform_data = at91rm9200_standby;
-> >>  		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
-> >>+	} else if (cpu_is_at91sam9g45()) {
-> >>+		at91_cpuidle_device.dev.platform_data = at91sam9g45_standby;
-> >>+	} else if (cpu_is_at91sam9263()) {
-> >>+		at91_cpuidle_device.dev.platform_data = at91sam9263_standby;
-> >>+	} else {
-> >>+		at91_cpuidle_device.dev.platform_data = at91sam9_standby;
-> >no this is too dangerous when adding new SoC
-> >
-> >you must list the supported SoC
-> >
-> >and I prefer to move this code to the SoC init structure
-> 
-> Do you mean register the platform_device in eg.
-> at91rm9200_initialize with the right platform data ?
-> 
-yes as example
+Dear Gregory CLEMENT,
 
-Best Regards,
-J.
+On Mon, 14 Oct 2013 15:58:17 +0200, Gregory CLEMENT wrote:
+> ll_set_cpu_coherent does two things to set the coherency for a CPU:
 > 
-> >so we can drop the if/else if/elsee
-> >
-> >and drop the issue of adding new and the arch_initcall
-> >
-> >Best Regards,
-> >J.
-> >>+	}
-> >>+	
-> >>+	platform_device_register(&at91_cpuidle_device);
-> >>
-> >>  	suspend_set_ops(&at91_pm_ops);
-> >>
-> >>--
-> >>1.7.9.5
-> >>
+> - Adding the CPU to the SMP group 0
+> - Enabling the snooping on the CPU
 > 
-> 
-> -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
+> Only the second part is needed when coming back from a CPU Idle. This
+> commit allows to choose to do the first part or not.
+
+I am not a fan of this change: those two boolean arguments are really
+mystical. If a function does do things, and sometimes must be called to
+do one thing, and sometimes for two things, it is really calling for a
+split of the functions (with potentially the second function calling the
+first, or the two functions being called in a row when needed).
+
+Let's have two functions:
+
+	ll_set_cpu_smp_group();
+	ll_set_cpu_coherent();
+
+at initialization time, both functions are called. On the exit path of
+idle, only the second one is called.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
