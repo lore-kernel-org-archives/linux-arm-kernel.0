@@ -1,71 +1,137 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Oct 2013 15:13:13 +0100
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <20131014140527.GB5106@redhat.com>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
- <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
- <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
-Message-ID: <525BFBF9.5010804@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 14 Oct 2013 16:14:12 +0200
+Subject: [PATCH v2 11/12] cpuidle: mvebu: Add initial CPU idle support
+ for Armada 370/XP SoC
+In-Reply-To: <20130913161654.GA5408@e102568-lin.cambridge.arm.com>
+References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
+ <1379066801-16276-12-git-send-email-gregory.clement@free-electrons.com>
+ <20130913161654.GA5408@e102568-lin.cambridge.arm.com>
+Message-ID: <525BFC34.6020300@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/13 15:05, Michael S. Tsirkin wrote:
-> On Mon, Oct 14, 2013 at 02:49:10PM +0100, Marc Zyngier wrote:
->> On 14/10/13 14:39, Alexander Graf wrote:
->>>
->>> On 14.10.2013, at 15:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>
->>>> On 14/10/13 14:10, Alexander Graf wrote:
->>>>>
->>>>> On 14.10.2013, at 15:03, Paolo Bonzini <pbonzini@redhat.com> wrote:
->>>>>
->>>>>> Il 11/10/2013 16:36, Marc Zyngier ha scritto:
->>>>>>> This small patch series adds just enough kernel infrastructure and
->>>>>>> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
->>>>>>> that the host actually supports such madness.
->>>>>>
->>>>>> More precisely, it allows the guest drivers to pick the endianness they
->>>>>> prefer.  Mixed-endian virtio works fine on QEMU with e.g. a mips guest
->>>>>> in emulation mode, because then any given QEMU binary will always use
->>>>>> the same endianness (e.g. big for qemu-system-mips).
->>>>>
->>>>> We have the same problem (runtime switchable endianness) on PowerPC. IBM POWER is gaining Little Endian support in Linux now, so we could easily end up with an LE guest on a BE host.
->>>>>
->>>>> IIRC the way we're going to solve this is to hack up virtio_is_big_endian() to evaluate the first CPU's endianness mode (which will always be the same as all other CPU's endianness mode due to hypercall restrictions).
->>>>
->>>> I have implemented something similar for MMIO emulation in KVM/arm
->>>> (except that I only care about the faulting CPU).
->>>>
->>>> See my initial patch for that:
->>>> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-October/007359.html
->>>>
->>>> That doesn't really change the non-trapping virtio accesses, though.
->>>> Where is this virtio_is_big_endian() thing?
->>>
->>> It's in QEMU's exec.c. It only gets used for config space access that goes through PCI though. Is there any other place where virtio specifies native endianness today?
->>
->> That's the main problem. Today's virtio flavour doesn't specify anything
->> about endianness, and that is what I'm adding. Or rather (as Paolo put
->> it), the prefered endianness of the virtio driver.
->>
->> So once (and if) this flags are in place, you always know what you're
->> dealing with. And because it is virtio-centric, you can implement it in
->> an architecture independent way.
->>
->> Also, most of my life revolves around kvmtool. QEMU is hardly on my
->> radar, these days (for reasons that are neither technical, nor relevant
->> to this forum). So it is important to me that the solution is platform
->> emulation agnostic.
->>
->> 	M.
+Hi Lorenzo,
+[...]
+>> +       if (index == MV_CPU_DEEP_IDLE)
+>> +               deepidle = true;
+>> +
+>> +       cpu_suspend(deepidle, armada_370_xp_cpu_suspend);
+>> +
+>> +       cpu_init();
 > 
-> f you like, you should be able to implement virtio_is_big_endian
-> in kvmtool too.
+> I do not think cpu_init() is needed. Either core resumes through
+> cpu_resume, and there cpu_init() is called for you, or there is no
+> reason to call cpu_init() since CPU was not shutdown.
 
-Sure. And I imagine this traps back into the kernel to read some
-register and find out what the endianness of the accessing CPU is?
+You're right: I have removed it on the new version I have just sent.
 
-	M.
+
+[...]
+
+>> @@ -0,0 +1,91 @@
+>> +/*
+>> + * CPU idle low level implementation for Marvell Armada 370 and Armada XP SoCs
+>> + *
+>> + * Copyright (C) 2013 Marvell
+>> + *
+>> + * Nadav Haklai <nadavh@marvell.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + *
+>> + */
+>> +#include <linux/linkage.h>
+>> +
+>> +
+>> +/*
+>> +* armadaxp_cpu_suspend: enter cpu deepIdle state
+>> +* input:
+>> +*/
+>> +ENTRY(armada_370_xp_cpu_suspend)
+>> +/* Save ARM registers */
+>> +       stmfd   sp!, {r4 - r11, lr}     @ save registers on stack
+>> +
+>> +       bl armada_370_xp_pmsu_idle_prepare
+>> +       /*
+>> +        * Invalidate L1 data cache. Even though only invalidate is
+>> +        * necessary exported flush API is used here. Doing clean
+>> +        * on already clean cache would be almost NOP.
+>> +        */
+>> +       bl v7_flush_dcache_all
+>> +
+>> +       /*
+>> +        * Clear the SCTLR.C bit to prevent further data cache
+>> +        * allocation. Clearing SCTLR.C would make all the data accesses
+>> +        * strongly ordered and would not hit the cache.
+>> +        */
+>> +       mrc     p15, 0, r0, c1, c0, 0
+>> +       bic     r0, r0, #(1 << 2)       @ Disable the C bit
+>> +       mcr     p15, 0, r0, c1, c0, 0
+>> +       isb
+>> +
+>> +       bl v7_flush_dcache_all
+>> +
+> 
+> This code looks familiar and the first cache flush is not needed.
+> 
+> look at arch/arm/mach-vexpress/tc2_pm.c -> tc2_pm_down()
+> 
+> I know that probably the SMP bit in ACTLR is managed differently in this
+> architecture but still, cache flushing should still apply and the TC2
+> sequence is the proper one, unless you explain to me why that does not
+> work on this chipset.
+
+Here we follow the advices you gave in your presentation at Linaro Connect
+Q2-2012: "Idling ARMs in a Busy World: Linux Power Management for ARM
+multi-cluster systems"
+http://www.linaro.org/documents/download/84a5990d6f227c90e3d3a3ad2af0e22c4fd1d0bd4a6c7
+at p21.
+
+Quoting the author of the original version od the code :
+"Since the second flush is almost NOPs, I preferred to keep them both in the same sequence."
+
+
+> 
+>> +       /* Data memory barrier and Data sync barrier */
+>> +       dsb
+>> +       dmb
+>> +
+>> +       bl armada_370_xp_disable_snoop_ena
+>> +
+>> +       dsb                             @ Data Synchronization Barrier
+>> +
+>> +/*
+>> + * ===================================
+>> + * == WFI instruction => Enter idle ==
+>> + * ===================================
+>> + */
+>> +
+>> +       wfi                             @ wait for interrupt
+> 
+> Here core is running out of coherency and I do not see any tlb invalidation in
+> the resume path from non-OFF mode. Please can you elaborate on this ?
+> 
+
+The TLB invalidation should take place in /arch/arm/kernel/suspend.c  cpu_suspend( )
+in case the return value is 0 caused by cpu_suspend_abort.
+Did we missed something?
+
+[...]
+> 
+> I have further comments on the set (in particular on the inner workings
+> of coherency and how CPUs get in and out of idle - ie how this is
+> managed by the power controller) but I will keep them for next version,
+> when the first set of review comments is addressed.
+> 
+
+You can make your comments on the last version I have just sent.
+
+Thanks for your review
+
+Gregory
 -- 
-Jazz is not dead. It just smells funny...
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
