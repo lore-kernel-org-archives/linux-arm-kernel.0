@@ -1,71 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 Oct 2013 15:58:16 +0200
-Subject: [PATCH v3 04/14] ARM: mvebu: Remove the unused argument of
- set_cpu_coherent()
-In-Reply-To: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1381759106-15004-5-git-send-email-gregory.clement@free-electrons.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Mon, 14 Oct 2013 21:58:36 +0800
+Subject: [RFT PATCH v2 1/4] arm64: fix possible invalid FPSIMD
+ initialization state
+In-Reply-To: <20131014135457.GE7682@arm.com>
+References: <1381674029-430-1-git-send-email-liuj97@gmail.com>
+ <20131014135457.GE7682@arm.com>
+Message-ID: <525BF88C.4070608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-set_cpu_coherent() took the SMP group ID as parameter. But this
-parameter was never used, and the CPU always use the SMP group 0. So
-we can remove this parameter.
+On 10/14/2013 09:54 PM, Catalin Marinas wrote:
+> On Sun, Oct 13, 2013 at 03:20:17PM +0100, Jiang Liu wrote:
+>> From: Jiang Liu <jiang.liu@huawei.com>
+>>
+>> If context switching happens during executing fpsimd_flush_thread(),
+>> stale value in FPSIMD registers will be saved into current thread's
+>> fpsimd_state by fpsimd_thread_switch(). That may cause invalid
+>> initialization state for the new process, so disable preemption
+>> when executing fpsimd_flush_thread().
+>>
+>> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+>> Cc: Jiang Liu <liuj97@gmail.com>
+> 
+> That's already in mainline (3.12-rc4).
+> 
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/coherency.c | 4 ++--
- arch/arm/mach-mvebu/coherency.h | 2 +-
- arch/arm/mach-mvebu/platsmp.c   | 2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 1836ba4..8c9e84d 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -45,7 +45,7 @@ static struct of_device_id of_coherency_table[] = {
- /* Function defined in coherency_ll.S */
- int ll_set_cpu_coherent(bool use_virt_addr);
- 
--int set_cpu_coherent(int smp_group_id)
-+int set_cpu_coherent(void)
- {
- 	if (!coherency_base) {
- 		pr_warn("Can't make current CPU cache coherent.\n");
-@@ -139,7 +139,7 @@ int __init coherency_init(void)
- 		sync_cache_w(&coherency_phys_base);
- 		coherency_base = of_iomap(np, 0);
- 		coherency_cpu_base = of_iomap(np, 1);
--		set_cpu_coherent(0);
-+		set_cpu_coherent();
- 		of_node_put(np);
- 	}
- 
-diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
-index d4bc067..700376e 100644
---- a/arch/arm/mach-mvebu/coherency.h
-+++ b/arch/arm/mach-mvebu/coherency.h
-@@ -14,7 +14,7 @@
- #ifndef __MACH_370_XP_COHERENCY_H
- #define __MACH_370_XP_COHERENCY_H
- 
--int set_cpu_coherent(int smp_group_id);
-+int set_cpu_coherent(void);
- int coherency_init(void);
- 
- #endif	/* __MACH_370_XP_COHERENCY_H */
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index 1b86e03..a0fe97e 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -102,7 +102,7 @@ void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
- 
- 	set_secondary_cpus_clock();
- 	flush_cache_all();
--	set_cpu_coherent(0);
-+	set_cpu_coherent();
- 
- 	/*
- 	 * In order to boot the secondary CPUs we need to ensure
--- 
-1.8.1.2
+Hi Catalin,
+	I haven't noticed that yet, sorry for the noise:)
+Thanks!
+Gerry
