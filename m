@@ -1,54 +1,72 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 14 Oct 2013 20:47:00 +0800
-Subject: [PATCH v3 3/3] ARM: add support for bit sliced AES using NEON
- instructions
-In-Reply-To: <20131014121926.GN25034@n2100.arm.linux.org.uk>
-References: <CAKv+Gu8gzRjOMhKoydR3DqMqHqREDC7ZHNn9AZcdxGOWE_N9Vw@mail.gmail.com>
- <20131013111457.GB25034@n2100.arm.linux.org.uk>
- <CAKv+Gu81Bb8jzVUgyS_=meJNLQaxydLLRR-5n5gY8b-reofzUQ@mail.gmail.com>
- <20131013112239.GD25034@n2100.arm.linux.org.uk>
- <CAKv+Gu--TmG3FxAHSYN_RG2FiLabFRCdp4vn1nrMOdOdfzgMwA@mail.gmail.com>
- <20131013113049.GE25034@n2100.arm.linux.org.uk>
- <20131014112921.GA15084@gondor.apana.org.au>
- <20131014120837.GM25034@n2100.arm.linux.org.uk>
- <20131014121021.GA15351@gondor.apana.org.au>
- <20131014121926.GN25034@n2100.arm.linux.org.uk>
-Message-ID: <20131014124700.GA15660@gondor.apana.org.au>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Mon, 14 Oct 2013 14:46:48 +0200
+Subject: [PATCH v5 0/4] Add I2C support to ST SoCs
+Message-ID: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 01:19:26PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 14, 2013 at 08:10:21PM +0800, Herbert Xu wrote:
-> > On Mon, Oct 14, 2013 at 01:08:37PM +0100, Russell King - ARM Linux wrote:
-> > > On Mon, Oct 14, 2013 at 07:29:21PM +0800, Herbert Xu wrote:
-> > > > On Sun, Oct 13, 2013 at 12:30:49PM +0100, Russell King - ARM Linux wrote:
-> > > > > Herbert,
-> > > > > 
-> > > > > Could I have a git URL to pull the above commit please?
-> > > > 
-> > > > Russell, do you want me to revert this patch from cryptodev?
-> > > > Otherwise I'm not quite sure what you want me to do here.
-> > > 
-> > > I'd like to pull a branch from you containing this commit to solve the
-> > > build error I'm getting with my tree, so I can continue testing my tree.
-> > > At the moment, this is an additional unnecessary cause of randconfig
-> > > build failures.
-> > 
-> > I don't have a branch that contains just this patch so perhaps it
-> > would be easiest if I just reverted it?
-> 
-> Well, I don't have it either.
+The goal of this series is to add I2C support to ST SoCs.
+The DT definition is added for STiH415 and STiH416 SoCs on
+B2000 and B2020 boards.
 
-Oh you were talking about the ablk_helper patch, and not some ARM
-patch that sneaked into the crypto tree.
+The series has been tested working on STiH416-B2020 board.
+It applies on top of v3.12-rc5.
 
-As it's a crypto driver that's being added then it should go
-through the crypto tree.  If it depends on some ARM bits that's
-only in linux-next then I could try to merge that, assuming the
-underlying ARM tree is stable.
+Changes since v4:
+  - Fixed IRQ flags to level high triggering as reported by Stephen Gallimore
+  - Revert back to generic DT properties for Anti-glitch filtering. Their DT
+    binding documentation will be updated when i2c DT binding docuementation
+    will be created (In Wolfram's ToDo list)
+  - Rebased on v3.12-rc5
 
-Thanks,
+Changes since v3:
+  - Switch back to vendor specific DT properties regarding the anti-glitch
+    filter configuration, as this IP is the only one having such a filter
+  - Add DT binding documentation regarding pinctrl-related properties
+  - Move recommended properties to optional properties in DT binding
+    documentation
+  - Rebased on v3.12-rc4
+
+Changes since v2:
+  - Create generic DT property for Anti-glitch filtering configuration
+  - Sort i2c-st entries in Makefile and Kconfig
+  - Various cosmetics changes
+  - Return IRQ_NONE in case of spurious interrupt
+  - Use INIT_COMPLETION instead of init_completion in st_i2c_xfer_msg
+  - Simplify st_i2c_xfer as proposed by Wolfram
+  - Fix PM ops issues
+  - Change author name to myself and fix license to GPL v2
+  - Include .h file content into the .c file
+
+Changes since v1:
+  - Anti-glitch filtering simplified (Only HW Anti-glitch is kept)
+  - Update I2C timings to comply with I2C specification
+  - Handle spurious interrupts properly
+  - DT binding updates taking into account Stephen's comments
+  - Use "clock-names" property to comply with GCF
+  - DT cosmetic changes reported by Lee and Gabriel 
+
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+
+Maxime Coquelin (4):
+  i2c: busses: i2c-st: Add ST I2C controller
+  ARM: STi: Supply I2C configuration to STiH416 SoC
+  ARM: STi: Supply I2C configuration to STiH415 SoC
+  ARM: STi: Add I2C config to B2000 and B2020 boards
+
+ Documentation/devicetree/bindings/i2c/i2c-st.txt |   38 +
+ arch/arm/boot/dts/stih415-pinctrl.dtsi           |   36 +
+ arch/arm/boot/dts/stih415.dtsi                   |   53 ++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |   35 +
+ arch/arm/boot/dts/stih416.dtsi                   |   53 ++
+ arch/arm/boot/dts/stih41x-b2000.dtsi             |    9 +
+ arch/arm/boot/dts/stih41x-b2020.dtsi             |   22 +
+ drivers/i2c/busses/Kconfig                       |   10 +
+ drivers/i2c/busses/Makefile                      |    1 +
+ drivers/i2c/busses/i2c-st.c                      |  867 ++++++++++++++++++++++
+ 10 files changed, 1124 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-st.txt
+ create mode 100644 drivers/i2c/busses/i2c-st.c
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.7.9.5
