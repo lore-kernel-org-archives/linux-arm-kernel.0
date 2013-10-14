@@ -1,96 +1,284 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 15 Oct 2013 01:18:15 +0200
-Subject: [PATCH 7/8] ARM: add Armada 1500 and Sony NSZ-GS7 device tree
- files
-In-Reply-To: <525C7A91.9060101@gmail.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-8-git-send-email-sebastian.hesselbarth@gmail.com>
- <525C7A91.9060101@gmail.com>
-Message-ID: <525C7BB7.8000209@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 15 Oct 2013 01:25:39 +0200
+Subject: [PATCH V2 1/2] ARM: at91: cpuidle: convert to platform driver
+In-Reply-To: <1381781721-11866-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1381781721-11866-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20131014232539.GM11420@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2013 01:13 AM, Sebastian Hesselbarth wrote:
-> On 10/08/2013 02:24 PM, Sebastian Hesselbarth wrote:
->> This adds very basic device tree files for the Marvell Armada 1500 SoC
->> (88DE3100) and the Sony NSZ-GS7 GoogleTV board. Currently, SoC only has
->> nodes for cpus, some clocks, l2 cache controller, local timer, apb
->> timers,
->> uart, and interrupt controllers. The Sony NSZ-GS7 is a GoogleTV consumer
->> device comprising the Armada 1500 SoC above.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Reviewed-by: Jason Cooper <jason@lakedaemon.net>
->> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->> Changelog:
->> RCFv2->v1:
->> - switch to (soon to be) correct "marvell,pj4b" cpu compatible
->> - reference fixed-clock for uarts instead of hard-coded clock-frequency
->> - disable timers except two for clksrc and clkevt
->> RFCv1->RFCv2:
->> - add binding documentation (Reported by Jason Cooper)
->> - change l2cc from aurora to tauros3 (Reported by Thomas Petazzoni)
->> - add copyright reference
->> - adapt compatibles to mach-berlin instead of mach-mvebu
->>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-doc at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>   .../devicetree/bindings/arm/marvell,berlin.txt     |   23 ++
->>   arch/arm/boot/dts/Makefile                         |    2 +
->>   arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts      |   29 +++
->>   arch/arm/boot/dts/mv88de3100.dtsi                  |  227
->> ++++++++++++++++++++
->>   4 files changed, 281 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/arm/marvell,berlin.txt
->>   create mode 100644 arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts
->>   create mode 100644 arch/arm/boot/dts/mv88de3100.dtsi
->>
->> diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
->> b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
->> new file mode 100644
->> index 0000000..e389cba
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
->> @@ -0,0 +1,23 @@
->> +Marvell Berlin (88DE3xxx) family SoCs Device Tree Bindings
->> +---------------------------------------------------------------
->> +
->> +Boards with a SoC of the Marvell Berlin (88DE3xxx) family, e.g.
->> Armada 1500
->> +shall have the following properties:
->> +
->> +* Required root node properties:
->> +compatible: must contain "marvell,berlin"
->> +
->> +In addition, the above compatible shall be extended with the specific
->> +SoC and board used. Currently known SoC compatibles are:
->> +    "marvell,88de3100"    for Marvell 88DE3100 (Armada 1500),
->> +    "marvell,88de3010"    for Marvell 88DE3010 (Armada 1000),
->> +    "marvell,88de3005"    for Marvell 88DE3005 (Armada 1500-mini)
->
-> Jisheng,
+On 22:15 Mon 14 Oct     , Daniel Lezcano wrote:
+> Using the platform driver model is a good way to separate the cpuidle specific
+> code from the low level pm code. It allows to remove the dependency between
+> these two components.
+> 
+> The platform_device is located in the pm code and a 'set' function has been
+> added to set the standby function from the AT91_SOC_START initialization
+> function. Each SoC with a cpuidle driver will set the standby function in the
+> platform_data field at init time. Then pm code will register the cpuidle
+> platform device.
+> 
+> The cpuidle driver will register the platform_driver and use the device's
+> platform_data as a standby callback in the idle path.
 
-(adding Jisheng to Cc, missed that)
+I've an issue while re-reading the pm code
 
-> I am trying to follow your request to get rid of 88DExxxx numbering and
-> replace it where possible with berlin type-of names.
->
-> For the above, I have:
-> "marvell,berlin-bg2" for Marvell Armada 1500 (BG2, 88DE3100)
-> "marvell,berlin-bg2cd" for Marvell Armada 1500-mini (BG2CD, 88DE3005)
->
-> I cannot pin down Armada 1000 in the BG naming scheme. It would be great
-> if you provide info here on how Marvell would like to see the
-> compatibles.
->
-> Sebastian
->
+we use the xx_standby for 2 drivers cpuidle and suspend/resume
+
+with all the cpu_is_xxxx
+
+so you need to do one more step in this series
+by cleaning up the PM_SUSPEND_STANDBY to as you put a function pointer with
+the correct one in pm.c
+
+otherwise looks good
+
+Best Regards,
+J.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-at91/at91rm9200.c  |    3 +++
+>  arch/arm/mach-at91/at91sam9260.c |    3 +++
+>  arch/arm/mach-at91/at91sam9261.c |    3 +++
+>  arch/arm/mach-at91/at91sam9263.c |    3 +++
+>  arch/arm/mach-at91/at91sam9g45.c |    3 +++
+>  arch/arm/mach-at91/at91sam9rl.c  |    3 +++
+>  arch/arm/mach-at91/cpuidle.c     |   29 +++++++++++++++--------------
+>  arch/arm/mach-at91/pm.c          |   12 ++++++++++++
+>  arch/arm/mach-at91/pm.h          |    4 ++++
+>  9 files changed, 49 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index 4aad93d..0d234f2 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -27,6 +27,7 @@
+>  #include "generic.h"
+>  #include "clock.h"
+>  #include "sam9_smc.h"
+> +#include "pm.h"
+>  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -337,6 +338,8 @@ static void __init at91rm9200_initialize(void)
+>  	/* Initialize GPIO subsystem */
+>  	at91_gpio_init(at91rm9200_gpio,
+>  		cpu_is_at91rm9200_bga() ? AT91RM9200_BGA : AT91RM9200_PQFP);
+> +
+> +	at91_pm_set_standby(at91rm9200_standby);
+>  }
+>  
+>  
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index 5de6074..ffe9ce7 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -28,6 +28,7 @@
+>  #include "generic.h"
+>  #include "clock.h"
+>  #include "sam9_smc.h"
+> +#include "pm.h"
+>  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -351,6 +352,8 @@ static void __init at91sam9260_initialize(void)
+>  
+>  	/* Register GPIO subsystem */
+>  	at91_gpio_init(at91sam9260_gpio, 3);
+> +
+> +	at91_pm_set_standby(at91sam9_standby);
+>  }
+>  
+>  /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> index 0e07932..1edbb6f 100644
+> --- a/arch/arm/mach-at91/at91sam9261.c
+> +++ b/arch/arm/mach-at91/at91sam9261.c
+> @@ -27,6 +27,7 @@
+>  #include "generic.h"
+>  #include "clock.h"
+>  #include "sam9_smc.h"
+> +#include "pm.h"
+>  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -293,6 +294,8 @@ static void __init at91sam9261_initialize(void)
+>  
+>  	/* Register GPIO subsystem */
+>  	at91_gpio_init(at91sam9261_gpio, 3);
+> +
+> +	at91_pm_set_sandby(at91sam9_standby);
+>  }
+>  
+>  /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+> index 6ce7d18..8c81c89 100644
+> --- a/arch/arm/mach-at91/at91sam9263.c
+> +++ b/arch/arm/mach-at91/at91sam9263.c
+> @@ -26,6 +26,7 @@
+>  #include "generic.h"
+>  #include "clock.h"
+>  #include "sam9_smc.h"
+> +#include "pm.h"
+>  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -330,6 +331,8 @@ static void __init at91sam9263_initialize(void)
+>  
+>  	/* Register GPIO subsystem */
+>  	at91_gpio_init(at91sam9263_gpio, 5);
+> +
+> +	at91_pm_set_standby(at91sam9263_standby);
+>  }
+>  
+>  /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index 474ee04..8460f52 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -26,6 +26,7 @@
+>  #include "generic.h"
+>  #include "clock.h"
+>  #include "sam9_smc.h"
+> +#include "pm.h"
+>  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -379,6 +380,8 @@ static void __init at91sam9g45_initialize(void)
+>  
+>  	/* Register GPIO subsystem */
+>  	at91_gpio_init(at91sam9g45_gpio, 5);
+> +
+> +	at91_pm_set_standby(at91sam9g45_standby);
+>  }
+>  
+>  /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+> index d4ec0d9..c7986e4 100644
+> --- a/arch/arm/mach-at91/at91sam9rl.c
+> +++ b/arch/arm/mach-at91/at91sam9rl.c
+> @@ -27,6 +27,7 @@
+>  #include "generic.h"
+>  #include "clock.h"
+>  #include "sam9_smc.h"
+> +#include "pm.h"
+>  
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+> @@ -296,6 +297,8 @@ static void __init at91sam9rl_initialize(void)
+>  
+>  	/* Register GPIO subsystem */
+>  	at91_gpio_init(at91sam9rl_gpio, 4);
+> +
+> +	at91_pm_set_standby(at91sam9_standby);
+>  }
+>  
+>  /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+> index 4ec6a6d..a077437 100644
+> --- a/arch/arm/mach-at91/cpuidle.c
+> +++ b/arch/arm/mach-at91/cpuidle.c
+> @@ -21,26 +21,17 @@
+>  #include <linux/export.h>
+>  #include <asm/proc-fns.h>
+>  #include <asm/cpuidle.h>
+> -#include <mach/cpu.h>
+> -
+> -#include "pm.h"
+>  
+>  #define AT91_MAX_STATES	2
+>  
+> +static void (*at91_standby)(void);
+> +
+>  /* Actual code that puts the SoC in different idle states */
+>  static int at91_enter_idle(struct cpuidle_device *dev,
+>  			struct cpuidle_driver *drv,
+>  			       int index)
+>  {
+> -	if (cpu_is_at91rm9200())
+> -		at91rm9200_standby();
+> -	else if (cpu_is_at91sam9g45())
+> -		at91sam9g45_standby();
+> -	else if (cpu_is_at91sam9263())
+> -		at91sam9263_standby();
+> -	else
+> -		at91sam9_standby();
+> -
+> +	at91_standby();
+>  	return index;
+>  }
+>  
+> @@ -60,9 +51,19 @@ static struct cpuidle_driver at91_idle_driver = {
+>  };
+>  
+>  /* Initialize CPU idle by registering the idle states */
+> -static int __init at91_init_cpuidle(void)
+> +static int at91_cpuidle_probe(struct platform_device *dev)
+>  {
+> +	at91_standby = (void *)(dev->dev.platform_data);
+> +	
+>  	return cpuidle_register(&at91_idle_driver, NULL);
+>  }
+>  
+> -device_initcall(at91_init_cpuidle);
+> +static struct platform_driver at91_cpuidle_driver = {
+> +	.driver = {
+> +		.name = "cpuidle-at91",
+> +		.owner = THIS_MODULE,
+> +	},
+> +	.probe = at91_cpuidle_probe,
+> +};
+> +
+> +module_platform_driver(at91_cpuidle_driver);
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 15afb5d..f753ace 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -314,6 +314,15 @@ static const struct platform_suspend_ops at91_pm_ops = {
+>  	.end	= at91_pm_end,
+>  };
+>  
+> +static struct platform_device at91_cpuidle_device = {
+> +	.name = "cpuidle-at91",
+> +};
+> +
+> +void at91_pm_set_standby(void (*at91_standby)(void))
+> +{
+> +	at91_cpuidle_device.dev.platform_data = at91_standby;	
+> +}
+> +
+>  static int __init at91_pm_init(void)
+>  {
+>  #ifdef CONFIG_AT91_SLOW_CLOCK
+> @@ -325,6 +334,9 @@ static int __init at91_pm_init(void)
+>  	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+>  	if (cpu_is_at91rm9200())
+>  		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+> +	
+> +	if (at91_cpuidle_device.dev.platform_data)
+> +		platform_device_register(&at91_cpuidle_device);
+>  
+>  	suspend_set_ops(&at91_pm_ops);
+>  
+> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+> index 2f5908f..76dd1a7 100644
+> --- a/arch/arm/mach-at91/pm.h
+> +++ b/arch/arm/mach-at91/pm.h
+> @@ -11,9 +11,13 @@
+>  #ifndef __ARCH_ARM_MACH_AT91_PM
+>  #define __ARCH_ARM_MACH_AT91_PM
+>  
+> +#include <asm/proc-fns.h>
+> +
+>  #include <mach/at91_ramc.h>
+>  #include <mach/at91rm9200_sdramc.h>
+>  
+> +extern void at91_pm_set_standby(void (*at91_standby)(void));
+> +
+>  /*
+>   * The AT91RM9200 goes into self-refresh mode with this command, and will
+>   * terminate self-refresh automatically on the next SDRAM access.
+> -- 
+> 1.7.9.5
+> 
