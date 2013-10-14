@@ -1,70 +1,47 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Mon, 14 Oct 2013 14:41:59 -0700
-Subject: [PATCH] ARM: bcm_defconfig: Run "make savedefconfig"
-Message-ID: <1381786919-31286-1-git-send-email-tim.kryger@linaro.org>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Mon, 14 Oct 2013 19:43:36 +1030
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <525BAA40.8070103@arm.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <20131012182837.GC2089@redhat.com> <525BAA40.8070103@arm.com>
+Message-ID: <87iox0b4fz.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several of the options in bcm_defconfig have gotten out of date so
-regenerate it with "make savedefconfig" to keep things fresh.
+Marc Zyngier <marc.zyngier@arm.com> writes:
+> Hi Michael,
+>
+> On 12/10/13 19:28, Michael S. Tsirkin wrote:
+>> On Fri, Oct 11, 2013 at 03:36:08PM +0100, Marc Zyngier wrote:
+>>> This small patch series adds just enough kernel infrastructure and
+>>> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
+>>> that the host actually supports such madness.
+>>>
+>>> This has been tested on arm64, with some fixes to KVM and a set of
+>>> changes to kvmtool, both which I am posting separately.
+>>>
+>>> A branch containing all the relevant changes is at:
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/be-on-le-3.12-rc4
+>>>
+>>> Cc: Rusty Russell <rusty@rustcorp.com.au>
+>>> Cc: Michael S. Tsirkin <mst@redhat.com>
+>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>> 
+>> We are changing the spec to make everything LE instead of
+>> the native endian.
+>> 
+>> I think that'll fix the issue in a cleaner way.
+>
+> While I agree that it would solve the issue completely, it would also
+> break all BE users. Is that really an option?
+>
+> The whole goal of this series is to implement something that gracefully
+> falls back to what we have today, not breaking anything in the process.
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
----
- arch/arm/configs/bcm_defconfig | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+Pawel was in favor of incrementing the version number.
 
-diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-index efb0132..3a138af 100644
---- a/arch/arm/configs/bcm_defconfig
-+++ b/arch/arm/configs/bcm_defconfig
-@@ -1,4 +1,3 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_LOCALVERSION_AUTO is not set
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
-@@ -25,11 +24,8 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_PARTITION_ADVANCED=y
--CONFIG_EFI_PARTITION=y
- CONFIG_ARCH_BCM=y
--CONFIG_ARCH_BCM_MOBILE=y
- CONFIG_ARM_THUMBEE=y
--CONFIG_ARM_ERRATA_743622=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
-@@ -51,7 +47,6 @@ CONFIG_UNIX_DIAG=y
- CONFIG_NET_KEY=y
- CONFIG_INET=y
- CONFIG_IP_MULTICAST=y
--CONFIG_ARPD=y
- CONFIG_SYN_COOKIES=y
- CONFIG_TCP_MD5SIG=y
- CONFIG_IPV6=y
-@@ -96,7 +91,6 @@ CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_MMC_BLOCK_MINORS=32
- CONFIG_MMC_TEST=y
- CONFIG_MMC_SDHCI=y
--CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-@@ -118,12 +112,12 @@ CONFIG_CONFIGFS_FS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
--CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
- CONFIG_DETECT_HUNG_TASK=y
- CONFIG_DEFAULT_HUNG_TASK_TIMEOUT=110
- CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
--CONFIG_DEBUG_INFO=y
- # CONFIG_FTRACE is not set
- CONFIG_CRC_CCITT=y
- CONFIG_CRC_T10DIF=y
--- 
-1.8.0.1
+OTOH, clearly there are no big endian users at the moment, since they
+fail the magic tests...
+
+Cheers,
+Rusty.
