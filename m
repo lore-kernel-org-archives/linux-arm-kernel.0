@@ -1,52 +1,138 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 14 Oct 2013 11:33:54 +0900
-Subject: [PATCH 1/2] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <201310140317.56961.marex@denx.de>
-References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
- <000501cec870$9aebcc80$d0c36580$%han@samsung.com>
- <201310140244.48433.marex@denx.de> <201310140317.56961.marex@denx.de>
-Message-ID: <000401cec885$d3567fb0$7a037f10$%han@samsung.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Mon, 14 Oct 2013 02:39:01 +0000
+Subject: [v3] ahci: imx: setup power saving methods
+In-Reply-To: <20131013201634.GF18075@htj.dyndns.org>
+References: <1381487831-30090-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1381487831-30090-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <20131013201634.GF18075@htj.dyndns.org>
+Message-ID: <0E83723C55F66F43A6041464FE31119D40E14F@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 14, 2013 10:18 AM, Marek Vasut wrote:
-> > > On Saturday, October 12, 2013 6:29 PM, Marek Vasut wrote:
-> > > > > On Fri, Oct 11, 2013 at 04:12:31AM +0200, Marek Vasut wrote:
+Hi Tejun:
+Thanks for your review comments.
 
-[.....]
+Best Regards
+Richard Zhu
 
-> > > +cc Kishon Vijay Abraham I, Pratyush Anand, Mohit KUMAR
-> > >
-> > > Yes, right.
-> > > "reset-gpio" property can be moved to an optional property.
-> > > Also, the patch to fix 'Designware' part such as 'designware-pcie.txt'
-> > > can be shared with other related people as below.
-> > >
-> > >   - Samsung Exynos PCIe: Jingoo Han
-> > >   - ST Spear PCIe: Pratyush Anand, Mohit KUMAR
-> > >   - TI OMAP PCIe: Kishon Vijay Abraham I
-> >
-> > I'm in the process of rebasing the patches on top of next 2013-10-10. Right
-> > now I'm getting a crash in __write_msi_msg() when my Intel "igb" reports
-> > "enabling bus mastering" . Any quick idea? Seems like this MSI support is
-> > new in the pcie- designware.c .
-> >
-> > I'll just start plumbing to see what it is.
-> 
-> Looks like irq_alloc_descs() return -EEXIST for me in assign_irq() . Noone
-> checks the return value of it , so it can fail later on ;-) Now, why does it
-> return -EEXIST in the first place? I'm sure someone more experienced with PCI
-> would know right away .
 
-Hi Marek,
+-----Original Message-----
+From: Tejun Heo [mailto:htejun at gmail.com] On Behalf Of Tejun Heo
+Sent: Monday, October 14, 2013 4:17 AM
+To: Richard Zhu
+Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; linux-ide at vger.kernel.org; Zhu Richard-R65037
+Subject: Re: [v3] ahci: imx: setup power saving methods
 
-How about applying the following patch, which was made by Pratyush Anand? :-)
-I am not sure; however, the patch resolved some problems that were found on
-OMAP PCIe and Exynos PCIe, when MSI is enabled.
+Hello,
 
-"PCI: designware: Add irq_create_mapping()"
+On Fri, Oct 11, 2013 at 06:37:11PM +0800, Richard Zhu wrote:
+> @@ -1,6 +1,6 @@
+>  /*
+> + * copyright (c) 2013 Freescale Semiconductor, Inc.
+>   * Freescale IMX AHCI SATA platform driver
+> - * Copyright 2013 Freescale Semiconductor, Inc.
 
-http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-exynos&id=904d0e7889933fb48d921c998fd1cabb3a9d6635
+Forgot to mention the above in the commit message?
+[Richard] Ok, I would add change-note in the commit message.
 
-Best regards,
-Jingoo Han
+> +static void ahci_imx_error_handler(struct ata_port *ap); static void 
+> +ahci_host_stop(struct ata_host *host);
+
+Please put the ops definition below the function defs so that the above aren't necessary.
+[Richard] Accept.
+
+> +static void ahci_imx_error_handler(struct ata_port *ap) {
+> +	u32 reg_val;
+> +	struct ata_device *dev;
+> +	struct ata_host *host = dev_get_drvdata(ap->dev);
+> +	struct ahci_host_priv *hpriv = host->private_data;
+> +	void __iomem *mmio = hpriv->mmio;
+> +	struct imx_ahci_priv *imxpriv = dev_get_drvdata(ap->dev->parent);
+> +
+> +	/* wrapper of the ahci_error_handler */
+> +	if (!(ap->pflags & ATA_PFLAG_FROZEN)) {
+> +		/* restart engine */
+> +		ahci_stop_engine(ap);
+> +		ahci_start_engine(ap);
+> +	}
+
+Please export ahci_error_handler() and use that instead of duplicating this part.
+[Richard] Ok, accept.
+
+> +
+> +	sata_pmp_error_handler(ap);
+> +
+> +	if (!ata_dev_enabled(ap->link.device))
+> +		ahci_stop_engine(ap);
+> +	/* end of wrapper */
+> +
+> +	if (!(imxpriv->first_time) || ahci_imx_hotplug)
+> +		return;
+> +
+> +	imxpriv->first_time = false;
+> +
+> +	ata_for_each_dev(dev, &ap->link, ENABLED)
+> +		return;
+> +	/* DISABLE LINK to save power consumption */
+
+A bit more explanation would be nice.  ie. briefly explain why it can't be part of usual LPM.
+[Richard] no problem, I would add the explanation later. Thanks.
+
+> +	reg_val = readl(mmio + PORT_PHY_CTL);
+> +	writel(reg_val | PORT_PHY_CTL_PDDQ_LOC, mmio + PORT_PHY_CTL);
+> +	regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+> +			IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+> +			!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+> +	clk_disable_unprepare(imxpriv->sata_ref_clk);
+> +	imxpriv->no_device = true;
+> +}
+> +
+> +static void ahci_host_stop(struct ata_host *host) {
+> +	struct device *dev = host->dev;
+> +	struct ahci_platform_data *pdata = dev_get_platdata(dev);
+> +	struct ahci_host_priv *hpriv = host->private_data;
+> +
+> +	if (pdata && pdata->exit)
+> +		pdata->exit(dev);
+> +
+> +	if (!IS_ERR(hpriv->clk)) {
+> +		clk_disable_unprepare(hpriv->clk);
+> +		clk_put(hpriv->clk);
+> +	}
+> +}
+
+Please do not duplicate functions like this.  Why not export and inherit from ahci_platform_ops?
+[Richard] Ok, I would export and inherit from ahci_platform_ops.
+
+>  static int imx6q_sata_init(struct device *dev, void __iomem *mmio)  {
+>  	int ret = 0;
+> -	unsigned int reg_val;
+> +	u32 reg_val;
+
+Hah?  Why is this chunk in this patch?
+[Richard] Would be removed later. Thanks.
+
+> +static int imx_ahci_suspend(struct device *dev) {
+> +	struct imx_ahci_priv *imxpriv =  dev_get_drvdata(dev->parent);
+> +
+> +	if (!(imxpriv->no_device)) {
+
+Please lose the unnecessary parantheses.
+[Richard] Would be removed later. Thanks.
+
+> +		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+> +				IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+> +				!IMX6Q_GPR13_SATA_MPLL_CLK_EN);
+> +		clk_disable_unprepare(imxpriv->sata_ref_clk);
+> +	}
+
+Some comment of what's going on would be nice.
+
+Other than the above, looks good to me.
+[Richard] Ok, no problem, comments would be added in next version.
+Thanks again. :).
+
+Thanks.
+
+--
+tejun
