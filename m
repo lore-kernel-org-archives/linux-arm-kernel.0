@@ -1,78 +1,44 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 Oct 2013 15:58:20 +0200
-Subject: [PATCH v3 08/14] ARM: mvebu: Allow to power down L2 cache controller
- in idle mode
+Date: Mon, 14 Oct 2013 15:58:25 +0200
+Subject: [PATCH v3 13/14] ARM: mvebu: register the cpuidle driver for the
+ Armada XP SoCs
 In-Reply-To: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1381759106-15004-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1381759106-15004-14-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds an exported function which allows to power down the
-L2 cache controller and the Coherency Fabric when the CPU goes into
-deep idle mode.
-
-This feature is part of the Power Management Service Unit of the
-Armada 370 and Armada XP SoCs.
+The cpuidle is a platform driver so we have to register the device
+during the initialization of the boards.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c         | 14 ++++++++++++++
- include/linux/armada-370-xp-pmsu.h | 16 ++++++++++++++++
- 2 files changed, 30 insertions(+)
- create mode 100644 include/linux/armada-370-xp-pmsu.h
+ arch/arm/mach-mvebu/armada-370-xp.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index f6b00fb..445c9a0 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -30,6 +30,9 @@ static void __iomem *pmsu_fabric_base;
- #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
- #define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index e2acff9..885d511 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -29,6 +29,10 @@
+ #include "common.h"
+ #include "coherency.h"
  
-+#define L2C_NFABRIC_PM_CTL		    0x4
-+#define L2C_NFABRIC_PM_CTL_PWR_DOWN	    BIT(20)
++static struct platform_device armada_xp_cpuidle_device = {
++	.name = "cpuidle-armada-370-xp",
++};
 +
- static struct of_device_id of_pmsu_table[] = {
- 	{.compatible = "marvell,armada-370-xp-pmsu"},
- 	{ /* end of list */ },
-@@ -78,4 +81,15 @@ int __init armada_370_xp_pmsu_init(void)
- 	return 0;
+ static void __init armada_370_xp_map_io(void)
+ {
+ 	debug_ll_io_init();
+@@ -48,6 +52,8 @@ static void __init armada_370_xp_timer_and_clk_init(void)
+ static void __init armada_370_xp_dt_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	if (of_machine_is_compatible("marvell,armadaxp"))
++		platform_device_register(&armada_xp_cpuidle_device);
  }
  
-+void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
-+{
-+	int reg;
-+
-+	/* Enable L2 & Fabric powerdown in Deep-Idle mode - Fabric */
-+	reg = readl(pmsu_fabric_base + L2C_NFABRIC_PM_CTL);
-+	reg |= L2C_NFABRIC_PM_CTL_PWR_DOWN;
-+	writel(reg, pmsu_fabric_base + L2C_NFABRIC_PM_CTL);
-+}
-+EXPORT_SYMBOL_GPL(armada_370_xp_pmsu_enable_l2_powerdown_onidle);
-+
- early_initcall(armada_370_xp_pmsu_init);
-diff --git a/include/linux/armada-370-xp-pmsu.h b/include/linux/armada-370-xp-pmsu.h
-new file mode 100644
-index 0000000..f85cbf7
---- /dev/null
-+++ b/include/linux/armada-370-xp-pmsu.h
-@@ -0,0 +1,16 @@
-+/*
-+ * Power Management Service Unit (PMSU) support for Armada 370/XP platforms.
-+ *
-+ * Copyright (C) 2013 Marvell
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __ARMADA_370_XP__PMSU_H
-+#define __ARMADA_370_XP__PMSU_H
-+
-+void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void);
-+
-+#endif	/* __ARMADA_370_XP__PMSU_H */
+ static const char * const armada_370_xp_dt_compat[] = {
 -- 
 1.8.1.2
