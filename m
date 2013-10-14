@@ -1,25 +1,31 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 14 Oct 2013 16:56:29 +0200
-Subject: [PATCH 4/4] sound/soc/atmel: don't use
- devm_pinctrl_get_select_default() in probe
-In-Reply-To: <20131014131748.GU2443@sirena.org.uk>
-References: <1381681071-6021-1-git-send-email-wsa@the-dreams.de>
- <1381681071-6021-5-git-send-email-wsa@the-dreams.de>
- <20131014131748.GU2443@sirena.org.uk>
-Message-ID: <20131014145629.GA17351@katana>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 14 Oct 2013 16:56:34 +0200
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <525C0514.5030103@arm.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
+ <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
+ <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
+ <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+ <525C0514.5030103@arm.com>
+Message-ID: <525C0622.8040504@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Il 14/10/2013 16:52, Marc Zyngier ha scritto:
+> > > Sure. And I imagine this traps back into the kernel to read some
+> > > register and find out what the endianness of the accessing CPU is?
+> > 
+> > Not yet. To be exact, it does the below today. But all virtio device
+> > emulation is 100% guest endianness unaware. This helper is the only
+> > piece of code where it gets any idea what endianness the guest has. So
+> > by checking for references to it in the code you know where endianness
+> > is an issue. And that's only in the config space.
+> 
+> Only config space? How do you deal with virtio ring descriptors, for
+> example?
 
-> Applied, thanks.  Please use subject lines appropriate to the subsystem.
+They also use guest endianness, but do not use virtio_is_big_endian()
+(yet?) so Alex missed them.
 
-That's quite a nut to crack with a generated patch series running over
-the whole tree. I wonder if it is really worth the effort?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131014/4332a29e/attachment.sig>
+Paolo
