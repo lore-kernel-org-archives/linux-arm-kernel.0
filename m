@@ -1,46 +1,76 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 14 Oct 2013 17:22:07 +0800
-Subject: [PATCH 09/12] usb: phy-mxs: update binding for adding anatop
- phandle
-In-Reply-To: <1381568986-19802-10-git-send-email-peter.chen@freescale.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 14 Oct 2013 17:09:56 +0800
+Subject: [PATCH 02/12] usb: phy-mxs: Enable IC fixes for mx6 SoC serial
+In-Reply-To: <20131014090953.GC27668@S2101-09.ap.freescale.net>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
- <1381568986-19802-10-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131014092205.GD27668@S2101-09.ap.freescale.net>
+ <1381568986-19802-3-git-send-email-peter.chen@freescale.com>
+ <20131014090953.GC27668@S2101-09.ap.freescale.net>
+Message-ID: <20131014090955.GC26191@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 12, 2013 at 05:09:43PM +0800, Peter Chen wrote:
-> Add anatop phandle which is used to access anatop registers to
-> control PHY's power and other USB operations.
+On Mon, Oct 14, 2013 at 05:09:55PM +0800, Shawn Guo wrote:
+> On Sat, Oct 12, 2013 at 05:09:36PM +0800, Peter Chen wrote:
+> > After adding IC fixes bits, some PHY bugs are fixed by
+> > IC logic.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/phy/phy-mxs-usb.c |   10 ++++++++++
+> >  1 files changed, 10 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> > index 87ba429..831b13e 100644
+> > --- a/drivers/usb/phy/phy-mxs-usb.c
+> > +++ b/drivers/usb/phy/phy-mxs-usb.c
+> > @@ -29,6 +29,10 @@
+> >  #define HW_USBPHY_CTRL_SET			0x34
+> >  #define HW_USBPHY_CTRL_CLR			0x38
+> >  
+> > +#define HW_USBPHY_IP				0x90
+> > +#define HW_USBPHY_IP_SET			0x94
+> > +#define HW_USBPHY_IP_CLR			0x98
+> > +
+> >  #define BM_USBPHY_CTRL_SFTRST			BIT(31)
+> >  #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
+> >  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
+> > @@ -40,6 +44,8 @@
+> >  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+> >  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+> >  
+> > +#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
+> > +
+> >  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+> >  
+> >  enum imx_phy_type {
+> > @@ -118,6 +124,10 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+> >  		BM_USBPHY_CTRL_ENUTMILEVEL3,
+> >  	       base + HW_USBPHY_CTRL_SET);
+> >  
+> > +	/* Enable IC solution */
+> > +	if (is_mx6q_phy(mxs_phy) || is_mx6sl_phy(mxs_phy))
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+> Am I missing any dependency/patches here?  Where were is_mx6q_phy() and
+> is_mx6sl_phy() introduced?
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> index 5835b27..1a9bd85 100644
-> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> @@ -4,10 +4,12 @@ Required properties:
->  - compatible: Should be "fsl,imx23-usbphy"
->  - reg: Should contain registers location and length
->  - interrupts: Should contain phy interrupt
-> +- fsl,anatop: phandle for anatop register
+> Shawn
+> 
+> > +		writel(BM_USBPHY_IP_FIX, base + HW_USBPHY_IP_SET);
+> > +
+> >  	return 0;
+> >  }
+> >  
+> > -- 
+> > 1.7.1
+> > 
+> > 
 
-It's only required for imx6 phy not necessarily for imx23/28 phy, right?
+Oh, sorry. I forget to put below one to this serial.
+Will do at v2
 
-Shawn
+http://marc.info/?l=linux-usb&m=137871552016298&w=2
 
->  
->  Example:
->  usbphy1: usbphy at 020c9000 {
->  	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
->  	reg = <0x020c9000 0x1000>;
->  	interrupts = <0 44 0x04>;
-> +	fsl,anatop = <&anatop>;
->  };
-> -- 
-> 1.7.1
-> 
-> 
+-- 
+
+Best Regards,
+Peter Chen
