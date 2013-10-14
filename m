@@ -1,76 +1,178 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 14 Oct 2013 13:45:24 +0800
-Subject: [PATCH] input: qt1070: add power management ops
-In-Reply-To: <520B2921.3000906@atmel.com>
-References: <1376379826-28808-1-git-send-email-voice.shen@atmel.com>
- <520B2921.3000906@atmel.com>
-Message-ID: <525B84F4.4000405@atmel.com>
+From: vkale@apm.com (Vinayak Kale)
+Date: Mon, 14 Oct 2013 12:16:29 +0530
+Subject: [PATCH] arm64: perf: add support for percpu pmu interrupt
+Message-ID: <1381733189-2745-1-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+This patch adds support for irq registration when pmu interrupt type is PPI.
+The patch also fixes ARMV8_EVTYPE_* macros since evtCount field width is
+10bits.
 
-On 8/14/2013 14:52, Nicolas Ferre wrote:
-> On 13/08/2013 09:43, Bo Shen :
->> Add power management ops for qt1070, it maybe a wakeup source
->>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Vinayak Kale <vkale@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+---
+ arch/arm64/kernel/perf_event.c |  108 +++++++++++++++++++++++++++++-----------
+ 1 file changed, 78 insertions(+), 30 deletions(-)
 
-Would this patch be applied with Nicolas' ACK?
-
-Best Regards,
-Bo Shen
-
->> ---
->>   drivers/input/keyboard/qt1070.c |   25 +++++++++++++++++++++++++
->>   1 file changed, 25 insertions(+)
->>
->> diff --git a/drivers/input/keyboard/qt1070.c
->> b/drivers/input/keyboard/qt1070.c
->> index 42b773b..deefe5a 100644
->> --- a/drivers/input/keyboard/qt1070.c
->> +++ b/drivers/input/keyboard/qt1070.c
->> @@ -243,6 +243,30 @@ static int qt1070_remove(struct i2c_client *client)
->>       return 0;
->>   }
->>
->> +#ifdef CONFIG_PM_SLEEP
->> +static int qt1070_suspend(struct device *dev)
->> +{
->> +    struct qt1070_data *data = dev_get_drvdata(dev);
->> +
->> +    if (device_may_wakeup(dev))
->> +        enable_irq_wake(data->irq);
->> +
->> +    return 0;
->> +}
->> +
->> +static int qt1070_resume(struct device *dev)
->> +{
->> +    struct qt1070_data *data = dev_get_drvdata(dev);
->> +
->> +    if (device_may_wakeup(dev))
->> +        disable_irq_wake(data->irq);
->> +
->> +    return 0;
->> +}
->> +#endif
->> +
->> +static SIMPLE_DEV_PM_OPS(qt1070_pm_ops, qt1070_suspend, qt1070_resume);
->> +
->>   static const struct i2c_device_id qt1070_id[] = {
->>       { "qt1070", 0 },
->>       { },
->> @@ -253,6 +277,7 @@ static struct i2c_driver qt1070_driver = {
->>       .driver    = {
->>           .name    = "qt1070",
->>           .owner    = THIS_MODULE,
->> +        .pm    = &qt1070_pm_ops,
->>       },
->>       .id_table    = qt1070_id,
->>       .probe        = qt1070_probe,
->>
->
->
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index cea1594..ba3706d 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -363,22 +363,53 @@ validate_group(struct perf_event *event)
+ }
+ 
+ static void
++armpmu_disable_percpu_irq(void *data)
++{
++	struct arm_pmu *armpmu = (struct arm_pmu *)data;
++	struct platform_device *pmu_device = armpmu->plat_device;
++	int irq = platform_get_irq(pmu_device, 0);
++
++	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
++	disable_percpu_irq(irq);
++}
++
++static void
+ armpmu_release_hardware(struct arm_pmu *armpmu)
+ {
+ 	int i, irq, irqs;
+ 	struct platform_device *pmu_device = armpmu->plat_device;
+ 
+-	irqs = min(pmu_device->num_resources, num_possible_cpus());
++	irq = platform_get_irq(pmu_device, 0);
+ 
+-	for (i = 0; i < irqs; ++i) {
+-		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+-			continue;
+-		irq = platform_get_irq(pmu_device, i);
+-		if (irq >= 0)
+-			free_irq(irq, armpmu);
++	if (irq >= 16 && irq <= 31) {
++		on_each_cpu(armpmu_disable_percpu_irq, (void *)armpmu, 1);
++
++		free_percpu_irq(irq, armpmu);
++	} else {
++		irqs = min(pmu_device->num_resources, num_possible_cpus());
++
++		for (i = 0; i < irqs; ++i) {
++			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
++				continue;
++			irq = platform_get_irq(pmu_device, i);
++			if (irq >= 0)
++				free_irq(irq, armpmu);
++		}
+ 	}
+ }
+ 
++static void
++armpmu_enable_percpu_irq(void *data)
++{
++	struct arm_pmu *armpmu = (struct arm_pmu *)data;
++	struct platform_device *pmu_device = armpmu->plat_device;
++	int irq = platform_get_irq(pmu_device, 0);
++
++	enable_percpu_irq(irq, 0);
++
++	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
++}
++
+ static int
+ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+ {
+@@ -396,36 +427,53 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+ 		return -ENODEV;
+ 	}
+ 
+-	for (i = 0; i < irqs; ++i) {
+-		err = 0;
+-		irq = platform_get_irq(pmu_device, i);
+-		if (irq < 0)
+-			continue;
++	irq = platform_get_irq(pmu_device, 0);
+ 
++	if (irq >= 16 && irq <= 31) {
+ 		/*
+-		 * If we have a single PMU interrupt that we can't shift,
+-		 * assume that we're running on a uniprocessor machine and
+-		 * continue. Otherwise, continue without this interrupt.
++		 * percpu PMU interrupt.
+ 		 */
+-		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+-			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+-				    irq, i);
+-			continue;
+-		}
+-
+-		err = request_irq(irq, armpmu->handle_irq,
+-				  IRQF_NOBALANCING,
+-				  "arm-pmu", armpmu);
++		err = request_percpu_irq(irq, armpmu->handle_irq,
++						"arm-pmu", armpmu);
+ 		if (err) {
+ 			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+-				irq);
++					irq);
+ 			armpmu_release_hardware(armpmu);
+ 			return err;
+ 		}
+ 
+-		cpumask_set_cpu(i, &armpmu->active_irqs);
++		on_each_cpu(armpmu_enable_percpu_irq, (void *)armpmu, 1);
++	} else {
++		for (i = 0; i < irqs; ++i) {
++			err = 0;
++			irq = platform_get_irq(pmu_device, i);
++			if (irq < 0)
++				continue;
++
++			/*
++			 * If we have a single PMU interrupt that we can't shift,
++			 * assume that we're running on a uniprocessor machine and
++			 * continue. Otherwise, continue without this interrupt.
++			 */
++			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
++				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
++						irq, i);
++				continue;
++			}
++
++			err = request_irq(irq, armpmu->handle_irq,
++					IRQF_NOBALANCING,
++					"arm-pmu", armpmu);
++			if (err) {
++				pr_err("unable to request IRQ%d for ARM PMU counters\n",
++						irq);
++				armpmu_release_hardware(armpmu);
++				return err;
++			}
++
++			cpumask_set_cpu(i, &armpmu->active_irqs);
++		}
+ 	}
+-
+ 	return 0;
+ }
+ 
+@@ -784,8 +832,8 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ /*
+  * PMXEVTYPER: Event selection reg
+  */
+-#define	ARMV8_EVTYPE_MASK	0xc80000ff	/* Mask for writable bits */
+-#define	ARMV8_EVTYPE_EVENT	0xff		/* Mask for EVENT bits */
++#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
++#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
+ 
+ /*
+  * Event filters for PMUv3
+@@ -1175,7 +1223,7 @@ static void armv8pmu_reset(void *info)
+ static int armv8_pmuv3_map_event(struct perf_event *event)
+ {
+ 	return map_cpu_event(event, &armv8_pmuv3_perf_map,
+-				&armv8_pmuv3_perf_cache_map, 0xFF);
++				&armv8_pmuv3_perf_cache_map, 0x3FF);
+ }
+ 
+ static struct arm_pmu armv8pmu = {
+-- 
+1.7.9.5
