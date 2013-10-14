@@ -1,115 +1,49 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Mon, 14 Oct 2013 23:30:00 +0800
-Subject: [RFT PATCH v2 2/4] arm64: restore FPSIMD to default state for
- kernel and signal contexts
-In-Reply-To: <20131014151638.GI10491@mudshark.cambridge.arm.com>
-References: <1381674029-430-1-git-send-email-liuj97@gmail.com>
- <1381674029-430-2-git-send-email-liuj97@gmail.com>
- <20131014151638.GI10491@mudshark.cambridge.arm.com>
-Message-ID: <525C0DF8.8040306@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Oct 2013 16:36:57 +0100
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <525C0C21.2070001@redhat.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
+ <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
+ <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
+ <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+ <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
+ <525C09D1.8060103@arm.com> <525C0C21.2070001@redhat.com>
+Message-ID: <525C0F99.8030909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2013 11:16 PM, Will Deacon wrote:
-> On Sun, Oct 13, 2013 at 03:20:18PM +0100, Jiang Liu wrote:
->> From: Jiang Liu <jiang.liu@huawei.com>
+On 14/10/13 16:22, Paolo Bonzini wrote:
+> Il 14/10/2013 17:12, Marc Zyngier ha scritto:
+>> On 14/10/13 15:56, Paolo Bonzini wrote:
+>>> Il 14/10/2013 16:52, Marc Zyngier ha scritto:
+>>>>>> Sure. And I imagine this traps back into the kernel to read some
+>>>>>> register and find out what the endianness of the accessing CPU is?
+>>>>>
+>>>>> Not yet. To be exact, it does the below today. But all virtio device
+>>>>> emulation is 100% guest endianness unaware. This helper is the only
+>>>>> piece of code where it gets any idea what endianness the guest has. So
+>>>>> by checking for references to it in the code you know where endianness
+>>>>> is an issue. And that's only in the config space.
+>>>>
+>>>> Only config space? How do you deal with virtio ring descriptors, for
+>>>> example?
+>>>
+>>> They also use guest endianness, but do not use virtio_is_big_endian()
+>>> (yet?) so Alex missed them.
 >>
->> Restore FPSIMD control and status registers to default values
->> when creating new FPSIMD contexts for kernel context and reset
->> FPSIMD status register when creating FPSIMD context for signal
->> handling, otherwise the stale value in FPSIMD control and status
->> registers may affect the new kernal or signal handling contexts.
+>> Yeah, I thought as much. There is a whole bunch of things that need byte
+>> swapping, both at the virtio level itself, and at the device level as well.
 >>
->> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
->> Cc: Jiang Liu <liuj97@gmail.com>
->> ---
->>  arch/arm64/include/asm/fpsimd.h | 16 ++++++++++++++++
->>  arch/arm64/kernel/fpsimd.c      | 11 +++++++++--
->>  arch/arm64/kernel/signal.c      |  1 +
->>  arch/arm64/kernel/signal32.c    |  1 +
->>  4 files changed, 27 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
->> index c43b4ac..b2dc30f 100644
->> --- a/arch/arm64/include/asm/fpsimd.h
->> +++ b/arch/arm64/include/asm/fpsimd.h
->> @@ -50,8 +50,24 @@ struct fpsimd_state {
->>  #define VFP_STATE_SIZE		((32 * 8) + 4)
->>  #endif
->>  
->> +#define	AARCH64_FPCR_DEFAULT_VAL	0
->> +
->>  struct task_struct;
->>  
->> +static inline void fpsimd_init_hw_state(void)
->> +{
->> +	int val = AARCH64_FPCR_DEFAULT_VAL;
->> +
->> +	asm ("msr fpcr, %x0\n"
->> +	     "msr fpsr, xzr\n"
->> +             : : "r"(val));
->> +}
->> +
->> +static inline void fpsimd_clear_fpsr(void)
->> +{
->> +	asm ("msr fpsr, xzr\n");
->> +}
+>> Grep-ing for __u{16,32,64} through include/uapi/linux/virtio* shows the
+>> extent of the disaster.
 > 
-> You have pretty weak asm constraints here...
-Hi Will,
-	We will add an explicit "volatile" here. But according to GCC docs, it
-should have the same effect:
-An asm instruction without any output operands is treated identically to
-a volatile asm instruction.
-Thanks!
-Gerry
+> Devices are fine in QEMU, it's only the "generic" parts (rings) that are
+> missing AFAICT.
 
-> 
->>  extern void fpsimd_save_state(struct fpsimd_state *state);
->>  extern void fpsimd_load_state(struct fpsimd_state *state);
->>  
->> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> index bb785d2..12a25e5 100644
->> --- a/arch/arm64/kernel/fpsimd.c
->> +++ b/arch/arm64/kernel/fpsimd.c
->> @@ -80,9 +80,14 @@ void fpsimd_thread_switch(struct task_struct *next)
->>  
->>  void fpsimd_flush_thread(void)
->>  {
->> +	struct fpsimd_state *state = &current->thread.fpsimd_state;
->> +
->>  	preempt_disable();
->> -	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
->> -	fpsimd_load_state(&current->thread.fpsimd_state);
->> +	memset(state, 0, sizeof(struct fpsimd_state));
->> +#if (AARCH64_FPCR_DEFAULT_VAL != 0)
->> +	state->fpcr = AARCH64_FPCR_DEFAULT_VAL;
->> +#endif
->> +	fpsimd_load_state(state);
->>  	preempt_enable();
->>  }
->>  
->> @@ -99,6 +104,8 @@ void kernel_neon_begin(void)
->>  
->>  	if (current->mm)
->>  		fpsimd_save_state(&current->thread.fpsimd_state);
->> +
->> +	fpsimd_init_hw_state();
->>  }
->>  EXPORT_SYMBOL(kernel_neon_begin);
->>  
->> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
->> index 890a591..4ee231e 100644
->> --- a/arch/arm64/kernel/signal.c
->> +++ b/arch/arm64/kernel/signal.c
->> @@ -52,6 +52,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
->>  
->>  	/* dump the hardware registers to the fpsimd_state structure */
->>  	fpsimd_save_state(fpsimd);
->> +	fpsimd_clear_fpsr();
-> 
-> ... so I reckon GCC could reorder these two calls, resulting in corruption
-> of the saved state register.
-> 
-> Will
-> 
+So if I understand correctly how it works, target endianness is set at
+compile time, and you have a BE specific QEMU?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
