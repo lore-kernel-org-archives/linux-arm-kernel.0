@@ -1,58 +1,27 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Mon, 14 Oct 2013 22:11:06 +0000
-Subject: [PATCH] usb: ohci: remove ep93xx bus glue platform driver
-In-Reply-To: <525C69AC.1010004@gmail.com>
-References: <201310141435.31147.hartleys@visionengravers.com>
- <525C69AC.1010004@gmail.com>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817DAC0CC@P3PWEX4MB008.ex4.secureserver.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Oct 2013 16:12:49 -0600
+Subject: [PATCH v8 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <1381527938-22840-2-git-send-email-acourbot@nvidia.com>
+References: <1381527938-22840-1-git-send-email-acourbot@nvidia.com>
+ <1381527938-22840-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <525C6C61.5090306@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 14, 2013 3:01 PM, Ryan Mallon wrote:
-> On 15/10/13 08:35, H Hartley Sweeten wrote:
->> Convert ep93xx to use the OHCI platform driver and remove the
->> ohci-ep93xx bus glue driver.
->> 
->> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->> Cc: Alan Stern <stern@rowland.harvard.edu>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Ryan Mallon <rmallon@gmail.com>
->> ---
->
->> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
->> index b3f20d7..2c8f2db 100644
->> --- a/drivers/usb/host/Kconfig
->> +++ b/drivers/usb/host/Kconfig
->> @@ -472,7 +472,7 @@ config USB_CNS3XXX_OHCI
->>  
->>  config USB_OHCI_HCD_PLATFORM
->>  	tristate "Generic OHCI driver for a platform device"
->> -	default n
->> +	default y if ARCH_EP93XX
->
-> Shouldn't we select USB_OHCI_HCD_PLATFORM, e.g. something like:
->
-> 	config ARCH_EP93XX_USB
->		tristate "USB OHCI support"
->		default y
->		select USB_OHCI_HCD_PLATFORM
->
-> In arch/arm/mach-ep93xx/Kconfig rather than polluting
-> drivers/usb/host/Kconfig with arch specific stuff?
+On 10/11/2013 03:45 PM, Alexandre Courbot wrote:
+> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> can be invoked using the same SMC-based API on all supported
+> platforms. This patch adds initial basic support for Trusted
+> Foundations using the ARM firmware API. Current features are limited
+> to the ability to boot secondary processors.
+> 
+> Note: The API followed by Trusted Foundations does *not* follow the SMC
+> calling conventions. It has nothing to do with PSCI neither and is only
+> relevant to devices that use Trusted Foundations (like most Tegra-based
+> retail devices).
 
-I wasn't sure where the best place to enable 
-USB_OHCI_HCD_PLATFORM would be.
+Russell, are you OK with this patch? Is it OK if I take it through the
+Tegra tree, or would you like to take it through your tree and give me a
+stable branch I can apply the rest on top of?
 
-Currently USB support on the EP93xx only needs USB_OHCI_HCD
-enabled, which is already enabled in the ep93xx_defconfig. I'm not
-sure if adding the config option above would create a problem where
-the user would need to enable USB_OHCI_HCD in drivers/usb then 
-have to go back to the arch stuff to enable ARCH_EP93XX_USB.
-
-With the default y above they just have to enable USB_OHCI_HCD
-like they currently do.
-
-I'm hoping Alan can provide some feedback.
-
-Regards,
-Hartley
+Thanks.
