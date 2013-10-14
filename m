@@ -1,99 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 14 Oct 2013 11:55:43 -0700
-Subject: [PATCH v4 05/17] arch_timer: Move to generic sched_clock framework
-In-Reply-To: <87k3hf7kvb.fsf@linaro.org>
-References: <1374189690-10810-1-git-send-email-sboyd@codeaurora.org>	<1374189690-10810-6-git-send-email-sboyd@codeaurora.org>
- <87k3hf7kvb.fsf@linaro.org>
-Message-ID: <525C3E2F.2030109@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 14 Oct 2013 15:02:47 -0400
+Subject: [PATCH] unset twsi option3 for gconfig as well
+In-Reply-To: <525C3B65.30501@gmail.com>
+References: <1381706847-32762-1-git-send-email-roel.kluin@gmail.com>
+ <CACRpkdb8ibOm61D_iGkOkbas1475n4k5jptnRH7VFk=9+pipHQ@mail.gmail.com>
+ <20131014091230.65047d00@skate> <525C3B65.30501@gmail.com>
+Message-ID: <20131014190247.GN5402@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/13 11:44, Kevin Hilman wrote:
-> Stephen Boyd <sboyd@codeaurora.org> writes:
->
->> Register with the generic sched_clock framework now that it
->> supports 64 bits. This fixes two problems with the current
->> sched_clock support for machines using the architected timers.
->> First off, we don't subtract the start value from subsequent
->> sched_clock calls so we can potentially start off with
->> sched_clock returning gigantic numbers. Second, there is no
->> support for suspend/resume handling so problems such as discussed
->> in 6a4dae5 (ARM: 7565/1: sched: stop sched_clock() during
->> suspend, 2012-10-23) can happen without this patch. Finally, it
->> allows us to move the sched_clock setup into drivers clocksource
->> out of the arch ports.
->>
->> Cc: Christopher Covington <cov@codeaurora.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> A boot failure on Exynos5/Arndale showed up in next-20131014[1], and a
-> subsequent bisect has fingered this patch as the culprit.  
->
-> I haven't had a chance to debug this any further, but wanted to share in
-> case someone else can debug.  
->
-> The console log is below, but don't think there is much useful there as
-> it shows nothing after the 'Starting kernel ...' from u-boot.
+On Mon, Oct 14, 2013 at 08:43:49PM +0200, Sebastian Hesselbarth wrote:
+...
+> You know a good way to determine how far it should go back to -stable?
 
-debug_ll output would be nice. Anyway, that patch looks "weird". It is
-definitely not what I sent out. Most notably, this hunk jumps out
+$ git blame -L 338,338 drivers/pinctrl/mvebu/pinctrl-dove.c
+c9f95ced drivers/pinctrl/pinctrl-dove.c (Sebastian Hesselbarth
+2012-09-13 17:41:44 +0200 338)   gcfg2 &= ~(DOVE_TWSI_ENABLE_OPTION2 |
+DOVE_TWSI_ENABLE_OPTION2);
 
-@@ -471,6 +472,15 @@ static int __init arch_timer_register(void)
-                goto out;
-        }
- 
-+       clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-+       cyclecounter.mult = clocksource_counter.mult;
-+       cyclecounter.shift = clocksource_counter.shift;
-+       timecounter_init(&timecounter, &cyclecounter,
-+                        arch_counter_get_cntvct());
-+
-+       /* 56 bits minimum, so we assume worst case rollover */
-+       sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-+
-        if (arch_timer_use_virtual) {
-                ppi = arch_timer_ppi[VIRT_PPI];
-                err = request_percpu_irq(ppi, arch_timer_handler_virt,
+$ git tag --contains c9f95ced | grep '^v[23]\.[0-9][0-9]*' | sed -r -e
+'s/^(v[23]\.[0-9][0-9]*).*$/\1.x/' | sort -uV
+v3.7.x
+v3.8.x
+v3.9.x
+v3.10.x
+v3.11.x
+v3.12.x
 
+so it should get flagged for v3.7 and newer.
 
-Which is adding the clocksource_register_hz() and timecounter_init()
-call twice. It should only be adding the sched_clock_register() call and
-the sched_clock_register() call should be in arch_counter_register().
-Can you try this patch?
+Watch out for really old stuff, the regex above doesn't properly handle
+v2.6.XX.x...
 
-----8<----
+hth,
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 5d52789..865ecd8 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -420,6 +420,9 @@ static void __init arch_counter_register(unsigned type)
- 	cyclecounter.mult = clocksource_counter.mult;
- 	cyclecounter.shift = clocksource_counter.shift;
- 	timecounter_init(&timecounter, &cyclecounter, start_count);
-+
-+	/* 56 bits minimum, so we assume worst case rollover */
-+	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
- }
- 
- static void arch_timer_stop(struct clock_event_device *clk)
-@@ -472,15 +475,6 @@ static int __init arch_timer_register(void)
- 		goto out;
- 	}
- 
--	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
--	cyclecounter.mult = clocksource_counter.mult;
--	cyclecounter.shift = clocksource_counter.shift;
--	timecounter_init(&timecounter, &cyclecounter,
--			 arch_counter_get_cntvct());
--
--	/* 56 bits minimum, so we assume worst case rollover */
--	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
--
- 	if (arch_timer_use_virtual) {
- 		ppi = arch_timer_ppi[VIRT_PPI];
- 		err = request_percpu_irq(ppi, arch_timer_handler_virt,
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Jason.
