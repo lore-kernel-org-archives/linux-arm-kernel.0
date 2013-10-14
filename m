@@ -1,25 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Oct 2013 11:10:20 +0200
-Subject: [PATCH] ARM: ux500: u8500_defconfig: add missing cpuidle option
-In-Reply-To: <1380540996-18521-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1380540996-18521-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CACRpkdZ856omBFmLTQoPH_QkobkYj4tAgvHEmVZzA8+SOvYwRA@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 14 Oct 2013 17:04:21 +0800
+Subject: [PATCH 01/11] usb: chipidea: Add power management support
+In-Reply-To: <20131014084216.GY30088@pengutronix.de>
+References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
+ <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
+ <20131014100458.4f577d01@ipc1.ka-ro>
+ <20131014075547.GA26191@shlinux1.ap.freescale.net>
+ <20131014084216.GY30088@pengutronix.de>
+Message-ID: <20131014090420.GB26191@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 30, 2013 at 1:36 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
+On Mon, Oct 14, 2013 at 10:42:16AM +0200, Sascha Hauer wrote:
+> On Mon, Oct 14, 2013 at 03:55:48PM +0800, Peter Chen wrote:
+> > On Mon, Oct 14, 2013 at 10:04:58AM +0200, Lothar Wa?mann wrote:
+> > > Hi,
+> > > 
+> > > Peter Chen wrote:
+> > > > This commit adds runtime and system power management support for
+> > > > chipidea core. The runtime pm support is controlled by glue
+> > > > layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
+> > > > 
+> > > [...]
+> > > > +#ifdef CONFIG_PM
+> > > > +static int ci_controller_suspend(struct device *dev)
+> > > > +{
+> > > > +	struct ci_hdrc *ci = dev_get_drvdata(dev);
+> > > > +
+> > > > +	dev_dbg(dev, "at %s\n", __func__);
+> > > > +
+> > > > +	if (atomic_read(&ci->in_lpm))
+> > > > +		return 0;
+> > > > +
+> > > What does this 'atomic_read()' buy you over just testing/assinging a
+> > > simple integer. Note that just because the function has 'atomic' in
+> > > its name the sequence:
+> > > 	atomic_read();
+> > > ...
+> > > 	atomic_set();
+> > > does not magically become an atomic operation.
+> > 
+> > I just want the read and set are atomic, not the operations
+> > between atomic_read and atomic_set.
+> 
+> It makes no sense to use atomic operations here. atomic types are to
+> atomically read/modify/write variables. If all you ever do is
+> atomic_read and atomic_set then you can use a simple bool variable.
+> 
 
-> With the commit d3f2950f2adeea3da0317e952914b59adaa4cdb3, the option
-> ARM_U8500_CPUIDLE was added to the Kconfig but not reflected in the
-> default config file, hence the cpuidle driver is no longer enabled
-> since this commit.
->
-> Enable it again by adding the missing option in the default config file.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+It is for ARM, but for other platforms, it may not.
 
-Patch applied. Sorry for taking so long...
+-- 
 
-Yours,
-Linus Walleij
+Best Regards,
+Peter Chen
