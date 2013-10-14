@@ -1,14 +1,12 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Oct 2013 18:40:30 +0100
+Date: Mon, 14 Oct 2013 18:38:24 +0100
 Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
 In-Reply-To: <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
 References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
  <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20131014174030.GU25034@n2100.arm.linux.org.uk>
+Message-ID: <20131014173824.GT25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Another thing that my build testing (and use on cubox-i) picked up:
 
 On Thu, Oct 03, 2013 at 03:51:26PM -0300, Fabio Estevam wrote:
 > diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
@@ -23,5 +21,40 @@ On Thu, Oct 03, 2013 at 03:51:26PM -0300, Fabio Estevam wrote:
 > +&hdmi {
 > +	crtcs = <&ipu1 0>, <&ipu1 1>;
 > +}
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index f024ef2..d2467f5 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -159,3 +159,7 @@
+>  		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+>  	};
+>  };
+> +
+> +&hdmi {
+> +	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+> +};
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index ccd55c2..b148cb3 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -1301,6 +1301,16 @@
+>  				};
+>  			};
+>  
+> +			hdmi: hdmi at 0120000 {
+> +				compatible = "fsl,imx6q-hdmi";
+> +				reg = <0x00120000 0x9000>;
+> +				interrupts = <0 115 0x04>;
+> +				gpr = <&gpr>;
+> +				clocks = <&clks 123>, <&clks 124>;
+> +				clock-names = "iahb", "isfr";
+> +				status = "disabled";
+> +			};
+> +
+>  			dcic1: dcic at 020e4000 {
+>  				reg = <0x020e4000 0x4000>;
+>  				interrupts = <0 124 0x04>;
 
-Missing semi-colon.
+Shouldn't the above be in patch 1 (or 1.5) rather than patch 2?  Patch 2
+advertises itself as adding support for the wandboard, but in actual
+fact it's adding the generic bits too.
