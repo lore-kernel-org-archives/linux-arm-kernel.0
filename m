@@ -1,63 +1,48 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Oct 2013 09:41:23 +0800
-Subject: [PATCH 07/12] usb: phy-mxs: Add implementation of set_wakeup
-In-Reply-To: <201310121144.59501.marex@denx.de>
+Date: Mon, 14 Oct 2013 09:44:31 +0800
+Subject: [PATCH 11/12] usb: phy-mxs: update binding for adding
+ disconnect line property
+In-Reply-To: <201310121147.07217.marex@denx.de>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
- <1381568986-19802-8-git-send-email-peter.chen@freescale.com>
- <201310121144.59501.marex@denx.de>
-Message-ID: <20131014014122.GE3879@shlinux1.ap.freescale.net>
+ <1381568986-19802-12-git-send-email-peter.chen@freescale.com>
+ <201310121147.07217.marex@denx.de>
+Message-ID: <20131014014430.GF3879@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 12, 2013 at 11:44:59AM +0200, Marek Vasut wrote:
+On Sat, Oct 12, 2013 at 11:47:06AM +0200, Marek Vasut wrote:
+> Dear Peter Chen,
 > 
-> > +static int mxs_phy_set_wakeup(struct usb_phy *x, bool enabled)
-> > +{
-> > +	struct mxs_phy *mxs_phy = to_mxs_phy(x);
-> > +	u32 value = BM_USBPHY_CTRL_ENVBUSCHG_WKUP |
-> > +			BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
-> > +				BM_USBPHY_CTRL_ENIDCHG_WKUP;
-> 
-> Does this stuff pass checkpatch at all? I mean, this alignment seems a bit 
-> strange.
-
-Yes, it passed.
-
-	u32 value = BM_USBPHY_CTRL_ENVBUSCHG_WKUP |
-			BM_USBPHY_CTRL_ENDPDMCHG_WKUP | /* two tabs for last line */
-				BM_USBPHY_CTRL_ENIDCHG_WKUP; /* one tab for last line */
-
-Any better suggestions?
-
-> 
-> > +	if (enabled) {
-> > +		mxs_phy_disconnect_line(mxs_phy, true);
-> > +		writel_relaxed(value, x->io_priv + HW_USBPHY_CTRL_SET);
-> > +	} else {
-> > +		writel_relaxed(value, x->io_priv + HW_USBPHY_CTRL_CLR);
-> > +		mxs_phy_disconnect_line(mxs_phy, false);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >  static int mxs_phy_on_connect(struct usb_phy *phy,
-> >  		enum usb_device_speed speed)
-> >  {
-> > @@ -315,6 +390,10 @@ static int mxs_phy_probe(struct platform_device *pdev)
-> >  		}
-> >  	}
+> > This property is used to disconnect line between USB PHY and
+> > USB controller.
 > > 
-> > +	if (of_find_property(np, "disconnect_line_without_vbus", NULL) &&
-> > +			mxs_phy->regmap_anatop)
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  Documentation/devicetree/bindings/usb/mxs-phy.txt |    4 ++++
+> >  1 files changed, 4 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > b/Documentation/devicetree/bindings/usb/mxs-phy.txt index 1a9bd85..099b0bb
+> > 100644
+> > --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > @@ -5,6 +5,9 @@ Required properties:
+> >  - reg: Should contain registers location and length
+> >  - interrupts: Should contain phy interrupt
+> >  - fsl,anatop: phandle for anatop register
+> > +- disconnect_line_without_vbus: needs to disconnect
+> > +connection between USB PHY and controller, it can avoid
+> > +unexpected wakeup interrupt when the PHY is out of power
 > 
-> You might want to introduce a variable here to make the condition shorter:
+> Uh oh, this might needs some rewording. I didn't understand the reason for this 
+> prop before I checked the 12/12 patch.
 > 
-> var = of_find....
-> if (var && mxs_phy->...)
 
-I will change.
+So, the better sequence like below, correct?
 
+Binding doc patch
+source code change patch
+dts file patch
 
 -- 
 
