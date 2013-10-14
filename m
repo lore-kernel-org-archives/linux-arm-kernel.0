@@ -1,95 +1,23 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 14 Oct 2013 02:44:48 +0200
-Subject: [PATCH 1/2] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <000501cec870$9aebcc80$d0c36580$%han@samsung.com>
-References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
- <201310121128.31801.marex@denx.de>
- <000501cec870$9aebcc80$d0c36580$%han@samsung.com>
-Message-ID: <201310140244.48433.marex@denx.de>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Mon, 14 Oct 2013 09:09:01 +0800
+Subject: [PATCH 1/9] i2c: i2c-designware-platdrv: replace
+ platform_driver_probe to support deferred probing
+In-Reply-To: <1381264542-29396-2-git-send-email-wsa@the-dreams.de>
+References: <1381264542-29396-1-git-send-email-wsa@the-dreams.de>
+ <1381264542-29396-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <CAMj5BkgLEe5ODb7KRhb8F0b7JjG6Tf8AdheokO2jyQLbSj7_mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Han,
+On Wed, Oct 9, 2013 at 4:35 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> Subsystems like pinctrl and gpio rightfully make use of deferred probing at
+> core level. Now, deferred drivers won't be retried if they don't have a .probe
+> function specified in the driver struct. Fix this driver to have that, so the
+> devices it supports won't get lost in a deferred probe.
+>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-> On Saturday, October 12, 2013 6:29 PM, Marek Vasut wrote:
-> > > On Fri, Oct 11, 2013 at 04:12:31AM +0200, Marek Vasut wrote:
-> > > > Some boards do not have a PCIe reset GPIO. To avoid probe
-> > > > failure on these boards, make the reset GPIO optional as
-> > > > well.
-> > > > 
-> > > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > > Cc: Frank Li <lznuaa@gmail.com>
-> > > > Cc: Richard Zhu <r65037@freescale.com>
-> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > Cc: Sean Cross <xobs@kosagi.com>
-> > > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > > Cc: Tim Harvey <tharvey@gateworks.com>
-> > > > Cc: Yinghai Lu <yinghai@kernel.org>
-> > > > ---
-> > > > 
-> > > >  drivers/pci/host/pci-imx6.c | 29 +++++++++++++++--------------
-> > > >  1 file changed, 15 insertions(+), 14 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/pci/host/pci-imx6.c
-> > > > b/drivers/pci/host/pci-imx6.c index d3639aa..8e7adce 100644
-> > > > --- a/drivers/pci/host/pci-imx6.c
-> > > > +++ b/drivers/pci/host/pci-imx6.c
-> > > > @@ -220,9 +220,12 @@ static int imx6_pcie_assert_core_reset(struct
-> > > > pcie_port *pp)
-> > > > 
-> > > >  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-> > > >  	
-> > > >  			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
-> > > > 
-> > > > -	gpio_set_value(imx6_pcie->reset_gpio, 0);
-> > > > -	msleep(100);
-> > > > -	gpio_set_value(imx6_pcie->reset_gpio, 1);
-> > > > +	/* Some boards don't have PCIe reset GPIO. */
-> > > > +	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> > > > +		gpio_set_value(imx6_pcie->reset_gpio, 0);
-> > > > +		msleep(100);
-> > > > +		gpio_set_value(imx6_pcie->reset_gpio, 1);
-> > > > +	}
-> > > > 
-> > > >  	return 0;
-> > > >  
-> > > >  }
-> > > > 
-> > > > @@ -447,17 +450,15 @@ static int __init imx6_pcie_probe(struct
-> > > > platform_device *pdev)
-> > > > 
-> > > >  	/* Fetch GPIOs */
-> > > >  	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
-> > > > 
-> > > > -	if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
-> > > > -		dev_err(&pdev->dev, "no reset-gpio defined\n");
-> > > > -		ret = -ENODEV;
-> > > > -	}
-> > > 
-> > > The 'reset-gpio' is documented as a required property in bindings doc
-> > > Documentation/devicetree/bindings/pci/designware-pcie.txt.  You need
-> > > to update bindings doc if you turn it into an optional property.
-> > 
-> > That's true, thanks for pointing it out!
-> 
-> +cc Kishon Vijay Abraham I, Pratyush Anand, Mohit KUMAR
-> 
-> Yes, right.
-> "reset-gpio" property can be moved to an optional property.
-> Also, the patch to fix 'Designware' part such as 'designware-pcie.txt'
-> can be shared with other related people as below.
-> 
->   - Samsung Exynos PCIe: Jingoo Han
->   - ST Spear PCIe: Pratyush Anand, Mohit KUMAR
->   - TI OMAP PCIe: Kishon Vijay Abraham I
+Acked-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 
-I'm in the process of rebasing the patches on top of next 2013-10-10. Right now 
-I'm getting a crash in __write_msi_msg() when my Intel "igb" reports "enabling 
-bus mastering" . Any quick idea? Seems like this MSI support is new in the pcie-
-designware.c .
-
-I'll just start plumbing to see what it is.
-
-Best regards,
-Marek Vasut
+Thanks
