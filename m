@@ -1,56 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Oct 2013 11:44:39 +0100
-Subject: [PATCH 01/11] usb: chipidea: Add power management support
-In-Reply-To: <20131014075547.GA26191@shlinux1.ap.freescale.net>
-References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
- <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
- <20131014100458.4f577d01@ipc1.ka-ro>
- <20131014075547.GA26191@shlinux1.ap.freescale.net>
-Message-ID: <20131014104439.GJ25034@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 14 Oct 2013 11:50:59 +0100
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <20131014104604.GC30954@redhat.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <20131012182837.GC2089@redhat.com> <525BAA40.8070103@arm.com>
+ <20131014085931.GB30954@redhat.com> <1381741495.3247.18.camel@hornet>
+ <20131014104604.GC30954@redhat.com>
+Message-ID: <1381747859.3247.33.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 03:55:48PM +0800, Peter Chen wrote:
-> On Mon, Oct 14, 2013 at 10:04:58AM +0200, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Peter Chen wrote:
-> > > This commit adds runtime and system power management support for
-> > > chipidea core. The runtime pm support is controlled by glue
-> > > layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
-> > > 
-> > [...]
-> > > +#ifdef CONFIG_PM
-> > > +static int ci_controller_suspend(struct device *dev)
-> > > +{
-> > > +	struct ci_hdrc *ci = dev_get_drvdata(dev);
-> > > +
-> > > +	dev_dbg(dev, "at %s\n", __func__);
-> > > +
-> > > +	if (atomic_read(&ci->in_lpm))
-> > > +		return 0;
-> > > +
-> > What does this 'atomic_read()' buy you over just testing/assinging a
-> > simple integer. Note that just because the function has 'atomic' in
-> > its name the sequence:
-> > 	atomic_read();
-> > ...
-> > 	atomic_set();
-> > does not magically become an atomic operation.
+On Mon, 2013-10-14 at 11:46 +0100, Michael S. Tsirkin wrote:
+> What I meant is that under the proposed scheme, users with
+> existing v1 drivers must configure a v1 device explicitly.
 > 
-> I just want the read and set are atomic, not the operations
-> between atomic_read and atomic_set.
+> According to the plan, drivers will be updated so they can
+> work with both v1 devices and new v2 devices.
+> 
+> But if you configure a v2 device, old drivers
+> will not work.
 
-There is nothing magical about atomic_read() or atomic_set():
+That's correct, yes. If qemu 2015(16? 17?).01 will provide v2 devices
+only, kernel 3.11 is not going to recognize any of them.
 
-#define atomic_read(v)  (*(volatile int *)&(v)->counter)
-#define atomic_set(v,i) (((v)->counter) = (i))
+What will happen in reality, though, is that the implementation of the
+Linux v1/v2 driver will pre-date *any* v2 device by far. First
+implementation of v1 devices appeared almost 2 years after the driver
+appeared. It will take year for people to upgrade to v2, and probably
+only after they experience problems with page-based addressing mode.
 
-You might as well just read and write the variable directly if you're
-going to do this.  The atomicity of atomic_t comes from the *other*
-operations which can be done on an atomic_t, not from some magical
-macro which starts with the name "atomic_".
+I think I can live with this.
 
-Lesson 1: whenever you see atomic_read() and atomic_set() in a patch
-be very very very suspicious; it's 99% of times plainly wrong and a
-sign of something being totally broken.
+Pawe?
