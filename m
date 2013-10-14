@@ -1,125 +1,131 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 14 Oct 2013 15:25:22 +0300
-Subject: [PATCH v3 1/3] gpio: davinci: add OF support
-In-Reply-To: <CA+V-a8vH7VXqz=2cz-uD=YfRBRYrJ10K1Aptw28vV8gP+PiT2g@mail.gmail.com>
-References: <1380902596-4693-1-git-send-email-sujithkv@ti.com>	<1380902596-4693-2-git-send-email-sujithkv@ti.com>	<CACRpkdYxegBSYXR1-98smUNnDXpyRHo_vuYdnr3r7zhawENiUA@mail.gmail.com>	<CA+V-a8vyPyL0j0nPOZyjxrecusFzXovFPsNBLKYXns5ASWR-wg@mail.gmail.com>	<CACRpkdYNexWWXuQ052xuQ4NOdXm2gt-+ByREKeGo-VAnbH4D2w@mail.gmail.com>
- <CA+V-a8vH7VXqz=2cz-uD=YfRBRYrJ10K1Aptw28vV8gP+PiT2g@mail.gmail.com>
-Message-ID: <525BE2B2.8020105@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Oct 2013 13:34:36 +0100
+Subject: [PATCH] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <1381733189-2745-1-git-send-email-vkale@apm.com>
+References: <1381733189-2745-1-git-send-email-vkale@apm.com>
+Message-ID: <20131014123436.GA10491@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar Lad,
+Hi Vinayak,
 
-On 10/11/2013 07:18 PM, Prabhakar Lad wrote:
-> Hi Linus,
+On Mon, Oct 14, 2013 at 07:46:29AM +0100, Vinayak Kale wrote:
+> This patch adds support for irq registration when pmu interrupt type is PPI.
+> The patch also fixes ARMV8_EVTYPE_* macros since evtCount field width is
+> 10bits.
 > 
-> On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Fri, Oct 11, 2013 at 4:59 PM, Prabhakar Lad
->> <prabhakar.csengg@gmail.com> wrote:
->>> On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
->>>> On Fri, Oct 4, 2013 at 6:03 PM, Prabhakar Lad
->>>> <prabhakar.csengg@gmail.com> wrote:
->>
->>>>> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering
->>>>> starts.
->>>>
->>>> What is this?
->>>>
->>>> If I have ever ACKed this I have been drunk. I take it back.
->>>>
->>> here is the ACK https://patchwork.kernel.org/patch/2721181/
->>
->> And as suspected that version of the patch did not contain
->> this strange node property.
->>
-> The property did exist in the patch 'intc_irq_num', I just renamed
-> it and gave a proper description to it.
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> ---
+>  arch/arm64/kernel/perf_event.c |  108 +++++++++++++++++++++++++++++-----------
+>  1 file changed, 78 insertions(+), 30 deletions(-)
 > 
->> Don't keep my ACK on patches if you change basic stuff like
->> that, they need to be re-acked, this runs the risk of abusing
->> my trust amongst other subsystem maintainers who might
->> go and merge this because "aha the GPIO maintainer
->> thinks that this is OK".
->>
-> Agreed, I carry forwarded the ACK since it had minor changes.
-> 
->>>> This "base" is a Linux-specific thing and has no place in the
->>>> device tree, and shall not be there. You have to find some way to
->>>> avoid this, what do you think some other OS should do with
->>>> this value...
->>>>
->>>> All IRQs in Linux are assumed to be dynamically assigned numbers
->>>> nowadays, with a property like this you can never switch on
->>>> SPARSE_IRQ for the DaVinci.
->>>>
->>> Can you point to any alternative solution if you have any ?
->>
->> First convert this GPIO driver to use an irqdomain to map
->> HW IRQs to Linux IRQs, and grab a few IRQ descriptors
->> dynamically off the irq descriptor heap.
->> Example: commit
->> a6c45b99a658521291cfb66ecf035cc58b38f206
->> "pinctrl/coh901: use irqdomain, allocate irqdescs"
->>
->> Then on a longer term convert DaVinci to use dynamically
->> allocated IRQs for all interrupt controllers, and move it over
->> to SPARSE_IRQ so you know this works.
->>
-> Thanks for the pointers.
-> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index cea1594..ba3706d 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -363,22 +363,53 @@ validate_group(struct perf_event *event)
+>  }
 
-Could it be possible to use "interrupts" and "interrupt-names" to identify
-assigned banked & unbanked IRQs?
+[...]
 
-For example DM646x (http://www.ti.com/lit/ug/sprueq8a/sprueq8a.pdf):
+>  static int
+>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  {
+> @@ -396,36 +427,53 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  		return -ENODEV;
+>  	}
+>  
+> -	for (i = 0; i < irqs; ++i) {
+> -		err = 0;
+> -		irq = platform_get_irq(pmu_device, i);
+> -		if (irq < 0)
+> -			continue;
+> +	irq = platform_get_irq(pmu_device, 0);
+>  
+> +	if (irq >= 16 && irq <= 31) {
 
-interrupts = <48 IRQ_TYPE_EDGE_BOTH>,
-             <49 IRQ_TYPE_EDGE_BOTH>,
-             <50 IRQ_TYPE_EDGE_BOTH>,
-             <51 IRQ_TYPE_EDGE_BOTH>,
-             <52 IRQ_TYPE_EDGE_BOTH>,
-             <53 IRQ_TYPE_EDGE_BOTH>,
-             <54 IRQ_TYPE_EDGE_BOTH>,
-             <55 IRQ_TYPE_EDGE_BOTH>,
-             <56 IRQ_TYPE_EDGE_BOTH>,
-             <57 IRQ_TYPE_EDGE_BOTH>,
-             <58 IRQ_TYPE_EDGE_BOTH>;
-interrupt-names = "gpio0", "gpio1", "gpio2", "gpio3", "gpio4", "gpio5", "gpio6", "gpio7", "bank0", "bank1", "bank2";
+This is horribly GIC specific and will break in the face of IRQ domains
+(since this is a virtual interrupt number).
 
-For example OMAP-L138 (http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf):
+>  		/*
+> -		 * If we have a single PMU interrupt that we can't shift,
+> -		 * assume that we're running on a uniprocessor machine and
+> -		 * continue. Otherwise, continue without this interrupt.
+> +		 * percpu PMU interrupt.
+>  		 */
+> -		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+> -			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+> -				    irq, i);
+> -			continue;
+> -		}
+> -
+> -		err = request_irq(irq, armpmu->handle_irq,
+> -				  IRQF_NOBALANCING,
+> -				  "arm-pmu", armpmu);
+> +		err = request_percpu_irq(irq, armpmu->handle_irq,
+> +						"arm-pmu", armpmu);
 
-interrupts = <42 IRQ_TYPE_EDGE_BOTH>,
-             <43 IRQ_TYPE_EDGE_BOTH>,
-             <44 IRQ_TYPE_EDGE_BOTH>,
-             <45 IRQ_TYPE_EDGE_BOTH>,
-             <46 IRQ_TYPE_EDGE_BOTH>,
-             <47 IRQ_TYPE_EDGE_BOTH>,
-             <48 IRQ_TYPE_EDGE_BOTH>,
-             <49 IRQ_TYPE_EDGE_BOTH>,
-             <50 IRQ_TYPE_EDGE_BOTH>;
+This is broken -- the dev_id *must* be a __percpu variable for percpu irqs.
 
-interrupt-names = "bank0", "bank1", "bank2", "bank3", "bank4", "bank5", "bank6", "bank7", "bank8";
+>  		if (err) {
+>  			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+> -				irq);
+> +					irq);
+>  			armpmu_release_hardware(armpmu);
+>  			return err;
+>  		}
+>  
+> -		cpumask_set_cpu(i, &armpmu->active_irqs);
+> +		on_each_cpu(armpmu_enable_percpu_irq, (void *)armpmu, 1);
+> +	} else {
+> +		for (i = 0; i < irqs; ++i) {
+> +			err = 0;
+> +			irq = platform_get_irq(pmu_device, i);
+> +			if (irq < 0)
+> +				continue;
+> +
+> +			/*
+> +			 * If we have a single PMU interrupt that we can't shift,
+> +			 * assume that we're running on a uniprocessor machine and
+> +			 * continue. Otherwise, continue without this interrupt.
+> +			 */
+> +			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+> +				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+> +						irq, i);
+> +				continue;
+> +			}
+> +
+> +			err = request_irq(irq, armpmu->handle_irq,
+> +					IRQF_NOBALANCING,
+> +					"arm-pmu", armpmu);
 
-For example Keystone 66AK2E05/02
- (http://www.ti.com/lit/ds/sprs865a/sprs865a.pdf and http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf):
+A better way to do this is to try request_percpu_irq first. If that fails,
+then try request_irq. However, the error reporting out of request_percpu_irq
+could do with some cleanup (rather than just return -EINVAL) so we can
+detect the difference between `this interrupt isn't per-cpu' and `this
+per-cpu interrupt is invalid'. This can help us avoid the WARN_ON in
+request_irq when it is passed a per-cpu interrupt.
 
-interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-             <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-[..]
-             <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
-             <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -784,8 +832,8 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+>  /*
+>   * PMXEVTYPER: Event selection reg
+>   */
+> -#define	ARMV8_EVTYPE_MASK	0xc80000ff	/* Mask for writable bits */
+> -#define	ARMV8_EVTYPE_EVENT	0xff		/* Mask for EVENT bits */
+> +#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
+> +#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
+>  
+>  /*
+>   * Event filters for PMUv3
+> @@ -1175,7 +1223,7 @@ static void armv8pmu_reset(void *info)
+>  static int armv8_pmuv3_map_event(struct perf_event *event)
+>  {
+>  	return map_cpu_event(event, &armv8_pmuv3_perf_map,
+> -				&armv8_pmuv3_perf_cache_map, 0xFF);
+> +				&armv8_pmuv3_perf_cache_map, 0x3FF);
+>  }
 
+What's all this?
 
-interrupt-names = "gpio0", "gpio1", [...], "gpio30", "gpio31";
-
-So then, following properties would not be needed at all, because all inf. can be
-taken from interrupt's properties: 
-+- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering starts.
-+- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt line to processor.
-
-It should work good if Davinci-gpio driver will be converted to use
-linear IRQ domains for banked irqs.
-
-
-Regards,
--grygorii
+Will
