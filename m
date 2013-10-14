@@ -1,52 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 14 Oct 2013 15:46:07 -0600
-Subject: [PATCH] ARM: tegra: add GPIO controller to tegra124.dtsi
-Message-ID: <1381787167-3011-1-git-send-email-swarren@wwwdotorg.org>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 15 Oct 2013 09:01:16 +1100
+Subject: [PATCH] usb: ohci: remove ep93xx bus glue platform driver
+In-Reply-To: <201310141435.31147.hartleys@visionengravers.com>
+References: <201310141435.31147.hartleys@visionengravers.com>
+Message-ID: <525C69AC.1010004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 15/10/13 08:35, H Hartley Sweeten wrote:
+> Convert ep93xx to use the OHCI platform driver and remove the
+> ohci-ep93xx bus glue driver.
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> ---
 
-The Tegra124 GPIO controller is identical to Tegra30, so copy the
-DT node from tegra30.dtsi to tegra124.dtsi.
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index b3f20d7..2c8f2db 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -472,7 +472,7 @@ config USB_CNS3XXX_OHCI
+>  
+>  config USB_OHCI_HCD_PLATFORM
+>  	tristate "Generic OHCI driver for a platform device"
+> -	default n
+> +	default y if ARCH_EP93XX
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra124.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Shouldn't we select USB_OHCI_HCD_PLATFORM, e.g. something like:
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index f824248..b741300 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -1,3 +1,4 @@
-+#include <dt-bindings/gpio/tegra-gpio.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- #include "skeleton.dtsi"
-@@ -29,6 +30,23 @@
- 			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
-+	gpio: gpio at 6000d000 {
-+		compatible = "nvidia,tegra124-gpio", "nvidia,tegra30-gpio";
-+		reg = <0x6000d000 0x1000>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+	};
-+
- 	/*
- 	 * There are two serial driver i.e. 8250 based simple serial
- 	 * driver and APB DMA based serial driver for higher baudrate
--- 
-1.8.1.5
+	config ARCH_EP93XX_USB
+		tristate "USB OHCI support"
+		default y
+		select USB_OHCI_HCD_PLATFORM
+
+In arch/arm/mach-ep93xx/Kconfig rather than polluting
+drivers/usb/host/Kconfig with arch specific stuff?
+
+~Ryan
