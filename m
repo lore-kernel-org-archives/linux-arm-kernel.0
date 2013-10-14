@@ -1,31 +1,64 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Oct 2013 21:07:48 +0200
-Subject: [PATCH 3/3] clocksource: sun4i: remove IRQF_DISABLED
+Date: Mon, 14 Oct 2013 21:07:47 +0200
+Subject: [PATCH 2/3] clocksource: sun4i: Report the minimum tick that we can
+ program
 In-Reply-To: <1381777668-32565-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1381777668-32565-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1381777668-32565-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1381777668-32565-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IRQF_DISABLED is a no-op nowadays, so we can safely remove it.
+We need to wait for at least 2 clock cycles whenever we reprogram our
+clockevent timer. Report that the minimum number of ticks we can handle
+is 3 ticks, and remove 3 ticks to the interval programmed to reflect
+this.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clocksource/sun4i_timer.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 46008f9..2fb4695 100644
+index 8ead025..46008f9 100644
 --- a/drivers/clocksource/sun4i_timer.c
 +++ b/drivers/clocksource/sun4i_timer.c
-@@ -133,7 +133,7 @@ static irqreturn_t sun4i_timer_interrupt(int irq, void *dev_id)
+@@ -37,6 +37,8 @@
+ #define TIMER_INTVAL_REG(val)	(0x10 * (val) + 0x14)
+ #define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
  
- static struct irqaction sun4i_timer_irq = {
- 	.name = "sun4i_timer0",
--	.flags = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.flags = IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler = sun4i_timer_interrupt,
- 	.dev_id = &sun4i_clockevent,
- };
++#define TIMER_SYNC_TICKS	3
++
+ static void __iomem *timer_base;
+ static u32 ticks_per_jiffy;
+ 
+@@ -50,7 +52,7 @@ static void sun4i_clkevt_sync(void)
+ {
+ 	u32 old = readl(timer_base + TIMER_CNTVAL_REG(1));
+ 
+-	while ((old - readl(timer_base + TIMER_CNTVAL_REG(1))) < 3)
++	while ((old - readl(timer_base + TIMER_CNTVAL_REG(1))) < TIMER_SYNC_TICKS)
+ 		cpu_relax();
+ }
+ 
+@@ -104,7 +106,7 @@ static int sun4i_clkevt_next_event(unsigned long evt,
+ 				   struct clock_event_device *unused)
+ {
+ 	sun4i_clkevt_time_stop(0);
+-	sun4i_clkevt_time_setup(0, evt);
++	sun4i_clkevt_time_setup(0, evt - TIMER_SYNC_TICKS);
+ 	sun4i_clkevt_time_start(0, false);
+ 
+ 	return 0;
+@@ -187,8 +189,8 @@ static void __init sun4i_timer_init(struct device_node *node)
+ 
+ 	sun4i_clockevent.cpumask = cpumask_of(0);
+ 
+-	clockevents_config_and_register(&sun4i_clockevent, rate, 0x1,
+-					0xffffffff);
++	clockevents_config_and_register(&sun4i_clockevent, rate,
++					TIMER_SYNC_TICKS, 0xffffffff);
+ }
+ CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
+ 		       sun4i_timer_init);
 -- 
 1.8.4
