@@ -1,44 +1,52 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Oct 2013 09:58:11 +0800
-Subject: [PATCH 02/12] usb: phy-mxs: Enable IC fixes for mx6 SoC serial
-In-Reply-To: <201310140407.11129.marex@denx.de>
-References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
- <201310121138.16584.marex@denx.de>
- <20131014013119.GB3879@shlinux1.ap.freescale.net>
- <201310140407.11129.marex@denx.de>
-Message-ID: <20131014015810.GH3879@shlinux1.ap.freescale.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 14 Oct 2013 11:33:54 +0900
+Subject: [PATCH 1/2] PCI: imx6: Make reset-gpio optional
+In-Reply-To: <201310140317.56961.marex@denx.de>
+References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
+ <000501cec870$9aebcc80$d0c36580$%han@samsung.com>
+ <201310140244.48433.marex@denx.de> <201310140317.56961.marex@denx.de>
+Message-ID: <000401cec885$d3567fb0$7a037f10$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 04:07:10AM +0200, Marek Vasut wrote:
-> Dear Peter Chen,
+On Monday, October 14, 2013 10:18 AM, Marek Vasut wrote:
+> > > On Saturday, October 12, 2013 6:29 PM, Marek Vasut wrote:
+> > > > > On Fri, Oct 11, 2013 at 04:12:31AM +0200, Marek Vasut wrote:
+
+[.....]
+
+> > > +cc Kishon Vijay Abraham I, Pratyush Anand, Mohit KUMAR
+> > >
+> > > Yes, right.
+> > > "reset-gpio" property can be moved to an optional property.
+> > > Also, the patch to fix 'Designware' part such as 'designware-pcie.txt'
+> > > can be shared with other related people as below.
+> > >
+> > >   - Samsung Exynos PCIe: Jingoo Han
+> > >   - ST Spear PCIe: Pratyush Anand, Mohit KUMAR
+> > >   - TI OMAP PCIe: Kishon Vijay Abraham I
+> >
+> > I'm in the process of rebasing the patches on top of next 2013-10-10. Right
+> > now I'm getting a crash in __write_msi_msg() when my Intel "igb" reports
+> > "enabling bus mastering" . Any quick idea? Seems like this MSI support is
+> > new in the pcie- designware.c .
+> >
+> > I'll just start plumbing to see what it is.
 > 
-> > On Sat, Oct 12, 2013 at 11:38:16AM +0200, Marek Vasut wrote:
-> > > Hi,
-> > > 
-> > > > After adding IC fixes bits, some PHY bugs are fixed by
-> > > > IC logic.
-> > > 
-> > > Can you please elaborate what those bits do exactly ? They seem like a
-> > > magic stuff to me thus far, which is not exactly helpful . I can't find
-> > > them in the datasheet either.
-> > 
-> > Yes, these bits are added at late TO verion for i.mx 6, and these TO
-> > versions will be for mass production, unfortunately, the related doc
-> > update may be forgotten.
-> > 
-> > These two bits are related to two PHY bugs, two PHY bugs are still existed
-> > at mx28 and mx23, one bug is fixed at mx6dq and mx6dl, and both of two
-> > bugs are fixed at later mx6 (like mx6sololite and later SoCs), but the IC
-> > fixes are not enabled by default, it needs software opens it.
-> 
-> Sure, I get it. But what exactly does that bit do? Can you add a proper (and 
-> likely beefy) comment into the code to supplement the missing parts in the 
-> datasheet?
+> Looks like irq_alloc_descs() return -EEXIST for me in assign_irq() . Noone
+> checks the return value of it , so it can fail later on ;-) Now, why does it
+> return -EEXIST in the first place? I'm sure someone more experienced with PCI
+> would know right away .
 
-OK, I will add them at v2.
+Hi Marek,
 
--- 
+How about applying the following patch, which was made by Pratyush Anand? :-)
+I am not sure; however, the patch resolved some problems that were found on
+OMAP PCIe and Exynos PCIe, when MSI is enabled.
 
-Best Regards,
-Peter Chen
+"PCI: designware: Add irq_create_mapping()"
+
+http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-exynos&id=904d0e7889933fb48d921c998fd1cabb3a9d6635
+
+Best regards,
+Jingoo Han
