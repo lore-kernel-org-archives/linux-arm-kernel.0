@@ -1,89 +1,70 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 14 Oct 2013 03:21:51 +0000 (UTC)
-Subject: OMAP baseline test results for v3.12-rc5
-Message-ID: <alpine.DEB.2.02.1310140320420.22465@utopia.booyaka.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 14 Oct 2013 05:23:15 +0200
+Subject: [PATCH 1/2] PCI: imx6: Make reset-gpio optional
+In-Reply-To: <000401cec885$d3567fb0$7a037f10$%han@samsung.com>
+References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
+ <201310140317.56961.marex@denx.de>
+ <000401cec885$d3567fb0$7a037f10$%han@samsung.com>
+Message-ID: <201310140523.15623.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Han,
 
-Here are some basic OMAP test results for Linux v3.12-rc5.
-Logs and other details at:
+> On Monday, October 14, 2013 10:18 AM, Marek Vasut wrote:
+> > > > On Saturday, October 12, 2013 6:29 PM, Marek Vasut wrote:
+> > > > > > On Fri, Oct 11, 2013 at 04:12:31AM +0200, Marek Vasut wrote:
+> [.....]
+> 
+> > > > +cc Kishon Vijay Abraham I, Pratyush Anand, Mohit KUMAR
+> > > > 
+> > > > Yes, right.
+> > > > "reset-gpio" property can be moved to an optional property.
+> > > > Also, the patch to fix 'Designware' part such as
+> > > > 'designware-pcie.txt' can be shared with other related people as
+> > > > below.
+> > > > 
+> > > >   - Samsung Exynos PCIe: Jingoo Han
+> > > >   - ST Spear PCIe: Pratyush Anand, Mohit KUMAR
+> > > >   - TI OMAP PCIe: Kishon Vijay Abraham I
+> > > 
+> > > I'm in the process of rebasing the patches on top of next 2013-10-10.
+> > > Right now I'm getting a crash in __write_msi_msg() when my Intel "igb"
+> > > reports "enabling bus mastering" . Any quick idea? Seems like this MSI
+> > > support is new in the pcie- designware.c .
+> > > 
+> > > I'll just start plumbing to see what it is.
+> > 
+> > Looks like irq_alloc_descs() return -EEXIST for me in assign_irq() .
+> > Noone checks the return value of it , so it can fail later on ;-) Now,
+> > why does it return -EEXIST in the first place? I'm sure someone more
+> > experienced with PCI would know right away .
+> 
+> Hi Marek,
+> 
+> How about applying the following patch, which was made by Pratyush Anand?
+> :-) I am not sure; however, the patch resolved some problems that were
+> found on OMAP PCIe and Exynos PCIe, when MSI is enabled.
+> 
+> "PCI: designware: Add irq_create_mapping()"
+> 
+> http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/h
+> ost-exynos&id=904d0e7889933fb48d921c998fd1cabb3a9d6635
 
-    http://www.pwsan.com/omap/testlogs/test_v3.12-rc5/20131013203109/
+Wow, thanks! I'll check it once I get some sleep, I've been at it for too long 
+now.
 
+btw. do you happen to have any idea why would the whole system freeze when I do 
+"ifconfig up" on my PCIe-connected intel i210 ethernet adapter (driven by the 
+"igb" driver)? It seems that upon reception or transmission of a single packet, 
+the whole system freezes to a point where not even JTAG can break (halt) the CPU 
+so I can figure out what the problem is. Interestingly enough, the whole probe 
+routine of the "igb" driver finishes correctly, the hard-freeze only happens 
+shortly after I see that the link is up. Any new ideas on why this might happen 
+would be really helpful. Just for completeness, it seems Tim has the same issue 
+on Marvell Yucon card (sky2 driver).
 
-Test summary
-------------
+Thank you for your help again!
 
-Build: uImage:
-    Pass (14/14): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only, omap2plus_defconfig,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig
-
-Build: uImage+dtb:
-    Pass ( 3/ 3): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es
-
-Build: zImage:
-    Pass ( 2/ 2): omap2plus_defconfig, omap2plus_defconfig_am33xx_only
-
-Boot to userspace:
-    skip ( 1/ 1): 5912osk
-    Pass (11/11): 2430sdp, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 2/ 5): 3530es3beagle, 37xxevm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 5): 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 2/ 5): 3530es3beagle, 37xxevm
-
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc4 (d0e639c9e06d44e713170031fe05fb60ebe680af)):
-   text     data      bss    total  kernel
-    +92        0        0      +92  omap1_defconfig
-    +92       -8        0      +84  omap1_defconfig_1510innovator_only
-    +92      +16        0     +108  omap1_defconfig_5912osk_only
-   +444        0        0     +444  omap2plus_defconfig
-   +228      -16        0     +212  omap2plus_defconfig_2430sdp_only
-   +508        0        0     +508  omap2plus_defconfig_cpupm
-   +256       -8        0     +248  omap2plus_defconfig_n800_multi_omap2xxx
-   +288        0        0     +288  omap2plus_defconfig_n800_only_a
-   +476       +8        0     +484  omap2plus_defconfig_no_pm
-   +356      -16        0     +340  omap2plus_defconfig_omap2_4_only
-   +508        0        0     +508  omap2plus_defconfig_omap3_4_only
-    +96       +4      -72      +28  rmk_omap3430_ldp_allnoconfig
-    +28       +8        0      +36  rmk_omap3430_ldp_oldconfig
-    -44       -8      -16      -68  rmk_omap4430_sdp_allnoconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc4 (d0e639c9e06d44e713170031fe05fb60ebe680af))
-  avail  rsrvd   high  freed  board          kconfig
-    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
+Best regards,
+Marek Vasut
