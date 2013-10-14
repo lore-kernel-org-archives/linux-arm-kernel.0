@@ -1,46 +1,50 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 14 Oct 2013 10:44:46 +0200
-Subject: [PATCH 5/5] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
-In-Reply-To: <1381739024-24924-6-git-send-email-shawn.guo@linaro.org>
-References: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
- <1381739024-24924-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20131014104446.60dbf1d7@ipc1.ka-ro>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 14 Oct 2013 09:46:25 +0100
+Subject: [PATCH 2/3] virtio: mmio: fix signature checking for BE guests
+In-Reply-To: <1381502171-8187-3-git-send-email-marc.zyngier@arm.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <1381502171-8187-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1381740385.3247.6.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Shawn Guo wrote:
-> We now have 'flags' in struct pltfm_imx_data to identify the features
-> and quirks for ESDHC variants running on different i.MX SoCs.  The enum
-> imx_esdhc_type can be eliminated by interpreting the ESDHC variants with
-> the ESDHC_FLAG_* flags.
+On Fri, 2013-10-11 at 15:36 +0100, Marc Zyngier wrote:
+> As virtio-mmio config registers are specified to be little-endian,
+> using readl() to read the magic value and then memcmp() to check it
+> fails on BE (as readl() has an implicit swab).
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Fix it by encoding the magic value as an integer instead of a string.
+> 
+> Cc: Rusty Russell <rusty@rustcorp.com.au>
+> Cc: Michael S. Tsirkin <mst@redhat.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   52 +++++-------------------------------
->  1 file changed, 6 insertions(+), 46 deletions(-)
+>  drivers/virtio/virtio_mmio.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index f1e1385..f2cd5b0 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -100,18 +100,15 @@
-[...]
-> +#define IMX35_ESDHC	(ESDHC_FLAG_ENGCM07207)
-> +#define IMX51_ESDHC	(0)
-> +#define IMX53_ESDHC	(ESDHC_FLAG_MULTIBLK_NO_INT)
-> +#define IMX6Q_USDHC	(ESDHC_FLAG_USDHC)
+> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> index 1ba0d68..57f24fd 100644
+> --- a/drivers/virtio/virtio_mmio.c
+> +++ b/drivers/virtio/virtio_mmio.c
+> @@ -470,7 +470,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
 >  
-Useless parenthesis.
+>  	/* Check magic value */
+>  	magic = readl(vm_dev->base + VIRTIO_MMIO_MAGIC_VALUE);
+> -	if (memcmp(&magic, "virt", 4) != 0) {
+> +	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
+>  		dev_warn(&pdev->dev, "Wrong magic value 0x%08lx!\n", magic);
+>  		return -ENODEV;
+>  	}
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+The new spec will clarify this:
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+* 0x000 | R | MagicValue
+  Magic value. Must be 0x74726976 (a Little Endian equivalent
+  of a "virt" string).
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+... but I like the 'v'i'r't' characters still being there :-)
+
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+
+Pawe?
