@@ -1,69 +1,68 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 Oct 2013 16:01:36 +0200
-Subject: [PATCH v2 11/12] cpuidle: mvebu: Add initial CPU idle support
- for Armada 370/XP SoC
-In-Reply-To: <5235EEE1.8020501@linaro.org>
-References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
- <1379066801-16276-12-git-send-email-gregory.clement@free-electrons.com>
- <52333112.2050003@linaro.org> <5235C587.4030802@free-electrons.com>
- <5235EEE1.8020501@linaro.org>
-Message-ID: <525BF940.2010403@free-electrons.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 14 Oct 2013 17:05:27 +0300
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <525BF656.7020207@arm.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <525BEBB4.4050603@redhat.com>
+ <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
+ <525BF089.9050408@arm.com>
+ <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
+ <525BF656.7020207@arm.com>
+Message-ID: <20131014140527.GB5106@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/2013 19:31, Daniel Lezcano wrote:
-Hi Daniel,
-
->>>> +	.state_count = ARMADA_370_XP_MAX_STATES,
->>>> +};
->>>
->>> What about the local timers ? Are they shutdown ?
->>
->> I need to chekc it.
+On Mon, Oct 14, 2013 at 02:49:10PM +0100, Marc Zyngier wrote:
+> On 14/10/13 14:39, Alexander Graf wrote:
+> > 
+> > On 14.10.2013, at 15:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > 
+> >> On 14/10/13 14:10, Alexander Graf wrote:
+> >>>
+> >>> On 14.10.2013, at 15:03, Paolo Bonzini <pbonzini@redhat.com> wrote:
+> >>>
+> >>>> Il 11/10/2013 16:36, Marc Zyngier ha scritto:
+> >>>>> This small patch series adds just enough kernel infrastructure and
+> >>>>> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
+> >>>>> that the host actually supports such madness.
+> >>>>
+> >>>> More precisely, it allows the guest drivers to pick the endianness they
+> >>>> prefer.  Mixed-endian virtio works fine on QEMU with e.g. a mips guest
+> >>>> in emulation mode, because then any given QEMU binary will always use
+> >>>> the same endianness (e.g. big for qemu-system-mips).
+> >>>
+> >>> We have the same problem (runtime switchable endianness) on PowerPC. IBM POWER is gaining Little Endian support in Linux now, so we could easily end up with an LE guest on a BE host.
+> >>>
+> >>> IIRC the way we're going to solve this is to hack up virtio_is_big_endian() to evaluate the first CPU's endianness mode (which will always be the same as all other CPU's endianness mode due to hypercall restrictions).
+> >>
+> >> I have implemented something similar for MMIO emulation in KVM/arm
+> >> (except that I only care about the faulting CPU).
+> >>
+> >> See my initial patch for that:
+> >> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-October/007359.html
+> >>
+> >> That doesn't really change the non-trapping virtio accesses, though.
+> >> Where is this virtio_is_big_endian() thing?
+> > 
+> > It's in QEMU's exec.c. It only gets used for config space access that goes through PCI though. Is there any other place where virtio specifies native endianness today?
 > 
-> Ok, if it is the case, there is the flag CPUIDLE_FLAG_TIMER_STOP to tell
-> the cpuidle framework to switch to the broadcast timer with this state.
-
-I have just sent a new version taking into account all your remarks, expect
-this one. The timers used on Armada 370/XP are only the locale timer then
-they are not shutdown when the CPUs go to idle.
-
-Regards,
-
-Gregory
-
+> That's the main problem. Today's virtio flavour doesn't specify anything
+> about endianness, and that is what I'm adding. Or rather (as Paolo put
+> it), the prefered endianness of the virtio driver.
 > 
->>>> +static int __init armada_370_xp_cpuidle_init(void)
->>>> +{
->>>> +	if (!of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-pmsu"))
->>>> +		return -ENODEV;
->>>> +
->>>> +	if (!of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
->>>> +		return -ENODEV;
->>>> +
->>>> +	pr_info("Initializing Armada-XP CPU power management ");
->>>> +
->>>> +	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
->>>> +
->>>> +	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
->>>> +}
->>>> +
->>>> +module_init(armada_370_xp_cpuidle_init);
->>>
->>> Isn't it possible to replace it by module_platform_driver ? like ux500
->>> or kirkwood ?
->>
->> It should be possible indeed, I will check it.
+> So once (and if) this flags are in place, you always know what you're
+> dealing with. And because it is virtio-centric, you can implement it in
+> an architecture independent way.
 > 
-> That would be great. It is a nicer approach for the single zImage IMHO.
+> Also, most of my life revolves around kvmtool. QEMU is hardly on my
+> radar, these days (for reasons that are neither technical, nor relevant
+> to this forum). So it is important to me that the solution is platform
+> emulation agnostic.
 > 
-> Thanks !
->   -- Daniel
-> 
+> 	M.
 
+f you like, you should be able to implement virtio_is_big_endian
+in kvmtool too.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> -- 
+> Jazz is not dead. It just smells funny...
