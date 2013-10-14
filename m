@@ -1,64 +1,192 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Oct 2013 21:07:47 +0200
-Subject: [PATCH 2/3] clocksource: sun4i: Report the minimum tick that we can
- program
-In-Reply-To: <1381777668-32565-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1381777668-32565-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1381777668-32565-3-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 14 Oct 2013 21:23:26 +0200
+Subject: [PATCH v2 1/4] reset: Add Allwinner A31 Reset Controller Driver
+In-Reply-To: <1381778609-4191-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1381778609-4191-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1381778609-4191-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to wait for at least 2 clock cycles whenever we reprogram our
-clockevent timer. Report that the minimum number of ticks we can handle
-is 3 ticks, and remove 3 ticks to the interval programmed to reflect
-this.
+The Allwinner A31 has an IP maintaining a few other IPs in the SoC in
+reset by default. Among these IPs are the High Speed Timers, hence why
+we can't use the regular driver construct, and need to call the
+registering function directly during machine initialisation.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/reset/Makefile      |   1 +
+ drivers/reset/reset-sunxi.c | 156 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 157 insertions(+)
+ create mode 100644 drivers/reset/reset-sunxi.c
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 8ead025..46008f9 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -37,6 +37,8 @@
- #define TIMER_INTVAL_REG(val)	(0x10 * (val) + 0x14)
- #define TIMER_CNTVAL_REG(val)	(0x10 * (val) + 0x18)
- 
-+#define TIMER_SYNC_TICKS	3
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 1e2d83f..f216b74 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_RESET_CONTROLLER) += core.o
++obj-$(CONFIG_ARCH_SUNXI) += reset-sun6i.o
+diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+new file mode 100644
+index 0000000..5bbd59a
+--- /dev/null
++++ b/drivers/reset/reset-sunxi.c
+@@ -0,0 +1,156 @@
++/*
++ * Allwinner SoCs Reset Controller driver
++ *
++ * Copyright 2013 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
- static void __iomem *timer_base;
- static u32 ticks_per_jiffy;
- 
-@@ -50,7 +52,7 @@ static void sun4i_clkevt_sync(void)
- {
- 	u32 old = readl(timer_base + TIMER_CNTVAL_REG(1));
- 
--	while ((old - readl(timer_base + TIMER_CNTVAL_REG(1))) < 3)
-+	while ((old - readl(timer_base + TIMER_CNTVAL_REG(1))) < TIMER_SYNC_TICKS)
- 		cpu_relax();
- }
- 
-@@ -104,7 +106,7 @@ static int sun4i_clkevt_next_event(unsigned long evt,
- 				   struct clock_event_device *unused)
- {
- 	sun4i_clkevt_time_stop(0);
--	sun4i_clkevt_time_setup(0, evt);
-+	sun4i_clkevt_time_setup(0, evt - TIMER_SYNC_TICKS);
- 	sun4i_clkevt_time_start(0, false);
- 
- 	return 0;
-@@ -187,8 +189,8 @@ static void __init sun4i_timer_init(struct device_node *node)
- 
- 	sun4i_clockevent.cpumask = cpumask_of(0);
- 
--	clockevents_config_and_register(&sun4i_clockevent, rate, 0x1,
--					0xffffffff);
-+	clockevents_config_and_register(&sun4i_clockevent, rate,
-+					TIMER_SYNC_TICKS, 0xffffffff);
- }
- CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
- 		       sun4i_timer_init);
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/slab.h>
++#include <linux/types.h>
++
++struct sunxi_reset_data {
++	void __iomem				*membase;
++	struct reset_controller_dev		rcdev;
++};
++
++static int sunxi_reset_assert(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct sunxi_reset_data *data = container_of(rcdev,
++						     struct sunxi_reset_data,
++						     rcdev);
++	int bank = id / BITS_PER_LONG;
++	int offset = id % BITS_PER_LONG;
++	u32 reg = readl(data->membase + (bank * 4));
++
++	writel(reg & ~BIT(offset), data->membase + (bank * 4));
++
++	return 0;
++}
++
++static int sunxi_reset_deassert(struct reset_controller_dev *rcdev,
++				unsigned long id)
++{
++	struct sunxi_reset_data *data = container_of(rcdev,
++						     struct sunxi_reset_data,
++						     rcdev);
++	int bank = id / BITS_PER_LONG;
++	int offset = id % BITS_PER_LONG;
++	u32 reg = readl(data->membase + (bank * 4));
++
++	writel(reg | BIT(offset), data->membase + (bank * 4));
++
++	return 0;
++}
++
++static struct reset_control_ops sunxi_reset_ops = {
++	.assert		= sunxi_reset_assert,
++	.deassert	= sunxi_reset_deassert,
++};
++
++static int sunxi_reset_init(struct device_node *np)
++{
++	struct sunxi_reset_data *data;
++	struct resource res;
++	resource_size_t size;
++	int ret;
++
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	ret = of_address_to_resource(np, 0, &res);
++	if (ret)
++		goto err_alloc;
++
++	size = resource_size(&res);
++	data->membase = ioremap(res.start, size);
++	if (!data->membase) {
++		ret = -ENOMEM;
++		goto err_alloc;
++	}
++
++	data->rcdev.owner = THIS_MODULE;
++	data->rcdev.nr_resets = size * 32;
++	data->rcdev.ops = &sunxi_reset_ops;
++	data->rcdev.of_node = np;
++	reset_controller_register(&data->rcdev);
++
++	return 0;
++
++err_alloc:
++	kfree(data);
++	return ret;
++};
++
++/*
++ * These are the reset controller we need to initialize early on in
++ * our system, before we can even think of using a regular device
++ * driver for it.
++ */
++static const struct of_device_id sunxi_early_reset_dt_ids[] __initdata = {
++	{ .compatible = "allwinner,sun6i-a31-ahb1-reset", },
++	{ /* sentinel */ },
++};
++
++void __init sun6i_reset_init(void)
++{
++	struct device_node *np;
++
++	for_each_matching_node(np, sunxi_early_reset_dt_ids)
++		sunxi_reset_init(np);
++}
++
++/*
++ * And these are the controllers we can register through the regular
++ * device model.
++ */
++static const struct of_device_id sunxi_reset_dt_ids[] = {
++	 { .compatible = "allwinner,sun4i-clock-reset", },
++	 { /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, sunxi_reset_dt_ids);
++
++static int sunxi_reset_probe(struct platform_device *pdev)
++{
++	return sunxi_reset_init(pdev->dev.of_node);
++}
++
++static int sunxi_reset_remove(struct platform_device *pdev)
++{
++	struct sunxi_reset_data *data = platform_get_drvdata(pdev);
++
++	reset_controller_unregister(&data->rcdev);
++	iounmap(data->membase);
++	kfree(data);
++
++	return 0;
++}
++
++static struct platform_driver sunxi_reset_driver = {
++	.probe	= sunxi_reset_probe,
++	.remove	= sunxi_reset_remove,
++	.driver = {
++		.name		= "sunxi-reset",
++		.owner		= THIS_MODULE,
++		.of_match_table	= sunxi_reset_dt_ids,
++	},
++};
++module_platform_driver(sunxi_reset_driver);
++
++MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
++MODULE_DESCRIPTION("Allwinner SoCs Reset Controller Driver");
++MODULE_LICENSE("GPL");
 -- 
 1.8.4
