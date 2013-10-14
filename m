@@ -1,56 +1,51 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 14 Oct 2013 10:53:23 +0200
-Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
-In-Reply-To: <20131009073633.GH1356@kw.sim.vm.gnt>
-References: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
- <20131003122307.GV31178@titan.lakedaemon.net>
- <20131009073633.GH1356@kw.sim.vm.gnt>
-Message-ID: <20131014085323.GL1356@kw.sim.vm.gnt>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 14 Oct 2013 11:59:31 +0300
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <525BAA40.8070103@arm.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <20131012182837.GC2089@redhat.com> <525BAA40.8070103@arm.com>
+Message-ID: <20131014085931.GB30954@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 09, 2013 at 09:36:33AM +0200, Simon Guinot wrote:
-> On Thu, Oct 03, 2013 at 08:23:07AM -0400, Jason Cooper wrote:
-> > Simon,
-> > 
-> > On Thu, Oct 03, 2013 at 12:05:02PM +0200, Simon Guinot wrote:
-> > > This patch fixes the tclk frequency array for the Armada-370 SoC.
-> > > This bug has been introduced by commit 6b72333d
-> > > ("clk: mvebu: add Armada 370 SoC-centric clock init").
-> > > 
-> > > A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
-> > > i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
-> > > 
-> > > About the mvneta Ethernet driver, note that the tclk frequency is used
-> > > to compute the Rx time coalescence. Then, this bug harms the coalescence
-> > > configuration and also degrades the networking performances with the
-> > > default values.
-> > > 
-> > > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > > Cc: Andrew Lunn <andrew@lunn.ch>
-> > > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > > Cc: Jason Cooper <jason@lakedaemon.net>
-> > > Cc: stable at vger.kernel.org
-> > > ---
-> > >  drivers/clk/mvebu/armada-370.c |    4 ++--
-> > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > Much better, thanks!
-> > 
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > 
-> > This can be applied to v3.11 onwards.
+On Mon, Oct 14, 2013 at 09:24:32AM +0100, Marc Zyngier wrote:
+> Hi Michael,
 > 
-> Hi Mike,
+> On 12/10/13 19:28, Michael S. Tsirkin wrote:
+> > On Fri, Oct 11, 2013 at 03:36:08PM +0100, Marc Zyngier wrote:
+> >> This small patch series adds just enough kernel infrastructure and
+> >> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
+> >> that the host actually supports such madness.
+> >>
+> >> This has been tested on arm64, with some fixes to KVM and a set of
+> >> changes to kvmtool, both which I am posting separately.
+> >>
+> >> A branch containing all the relevant changes is at:
+> >> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/be-on-le-3.12-rc4
+> >>
+> >> Cc: Rusty Russell <rusty@rustcorp.com.au>
+> >> Cc: Michael S. Tsirkin <mst@redhat.com>
+> >> Cc: Pawel Moll <pawel.moll@arm.com>
+> > 
+> > We are changing the spec to make everything LE instead of
+> > the native endian.
+> > 
+> > I think that'll fix the issue in a cleaner way.
 > 
-> Please consider applying this patch.
+> While I agree that it would solve the issue completely, it would also
+> break all BE users. Is that really an option?
 
-Ping ?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131014/7acad144/attachment.sig>
+I proposed several ways to create "transitional devices"
+which can detect and switch to old interface at run-time.
+
+Pawel thinks that's not necessary so ...
+
+
+> The whole goal of this series is to implement something that gracefully
+> falls back to what we have today, not breaking anything in the process.
+> 
+> Cheers,
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
