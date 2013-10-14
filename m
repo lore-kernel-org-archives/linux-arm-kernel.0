@@ -1,47 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Oct 2013 12:01:08 +0100
-Subject: [PATCH 01/11] usb: chipidea: Add power management support
-In-Reply-To: <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
-References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
- <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131014110108.GL25034@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 14 Oct 2013 12:02:58 +0100
+Subject: [PATCH v2 01/13] arm64: kernel: add MPIDR_EL1 accessors macros
+In-Reply-To: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1381748590-14279-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 12, 2013 at 05:35:03PM +0800, Peter Chen wrote:
-> This commit adds runtime and system power management support for
-> chipidea core. The runtime pm support is controlled by glue
-> layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
+In order to simplify access to different affinity levels within the
+MPIDR_EL1 register values, this patch implements some preprocessor
+macros that allow to retrieve the MPIDR_EL1 affinity level value according
+to the level passed as input parameter.
 
-Let's look at the locking.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm64/include/asm/cputype.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-1. Runtime PM.  These callbacks are locked with a spinlock, which holds
-   dev->power.lock.  This lock is taken either with or without disabling
-   IRQs depending on whether runtime PM is IRQ safe or not.
-
-2. Normal PM.  These callbacks are locked by holding dev->mutex.
-
-Now, there's a little bit of protection between these two operations -
-when normal PM places a device into a low power state, it 'gets' a
-reference on the runtime PM to ensure no runtime PM transitions occur
-while normal PM is active.  (See pm_runtime_get_noresume() in
-device_prepare().)  This is only dropped when the normal PM resumes the
-device.
-
-Moreover, all runtime PM events are flushed before the suspend callback
-occurs (see the pm_runtime_barrier() in __device_suspend()).
-
-What that means is that you can't receive any runtime PM events while
-you are in your suspend/resume callbacks.  So, each call is mutually
-exclusive.
-
-So, runtime PM callbacks vs normal PM callbacks for any single device
-are all called with mutual exclusion - you won't have two running at
-any time.
-
-Hence, for the reasons stated previously about the non-atomic nature of
-atomic_read()/atomic_set(), there's even more reasons that their use
-here is just mere obfuscation: the accesses to this state tracking
-variable is already guaranteed to be single-threaded by core code, so
-the use of atomic_read()/atomic_set() just adds additional needless
-confusion to this code.
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 5fe138e..2c9e295 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -30,6 +30,16 @@
+ 
+ #define MPIDR_HWID_BITMASK	0xff00ffffff
+ 
++#define MPIDR_LEVEL_BITS 8
++#define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
++
++#define MPIDR_LEVEL_SHIFT(level) ({					\
++	(level == 3) ? 32 : MPIDR_LEVEL_BITS * level;			\
++})
++
++#define MPIDR_AFFINITY_LEVEL(mpidr, level)				\
++	((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)	\
++
+ #define read_cpuid(reg) ({						\
+ 	u64 __val;							\
+ 	asm("mrs	%0, " reg : "=r" (__val));			\
+-- 
+1.8.4
