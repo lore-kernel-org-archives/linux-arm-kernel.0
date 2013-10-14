@@ -1,39 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Oct 2013 17:41:34 +0100
-Subject: [PATCH v2 0/7] Optimize jump label implementation on ARM64
-In-Reply-To: <20131014160419.GS25034@n2100.arm.linux.org.uk>
-References: <1381675827-1610-1-git-send-email-liuj97@gmail.com>
- <20131014154044.GR25034@n2100.arm.linux.org.uk>
- <525C1469.4000906@gmail.com>
- <20131014160419.GS25034@n2100.arm.linux.org.uk>
-Message-ID: <20131014164134.GP10491@mudshark.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 14 Oct 2013 18:46:35 +0200
+Subject: [PATCH 1/3] ARM: at91/dt/trivial: use macro for AES irq type
+Message-ID: <ba9872c3bb29c9a06f06caa8e0b4528329f07675.1381769174.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 05:04:20PM +0100, Russell King - ARM Linux wrote:
-> > On 10/14/2013 11:40 PM, Russell King - ARM Linux wrote:
-> |  In the simplest case, a `%' followed by a digit N says to output
-> | operand N at that point in the string.
-> | 
-> |  `%' followed by a letter and a digit says to output an operand in an
-> | alternate fashion.  Four letters have standard, built-in meanings
-> | described below.  The machine description macro `PRINT_OPERAND' can
-> | define additional letters with nonstandard meanings.
-> | 
-> |  `%cDIGIT' can be used to substitute an operand that is a constant
-> | value without the syntax that normally indicates an immediate operand.
-> | ...
-> |  `%lDIGIT' is used to substitute a `label_ref' into a jump instruction.
-> 
-> %lDIGIT is used (but not commented upon) in the gcc extended asm
-> documentation where it talks about asm gotos, so there's probably a doc
-> bug here too about whether these options should be described in the
-> main doc as well.
-> 
-> Nevertheness, this section is documenting the _internals_ of gcc, and
-> it seems perverse for a gcc backend to ignore something that is
-> documented as being a standard part of gcc.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I'll make sure this gets fixed.
-
-Will
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index ca956b6..b2aabff 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -350,7 +350,7 @@
+ 			aes at f8038000 {
+ 				compatible = "atmel,sam9g46-aes";
+ 				reg = <0xf8038000 0x100>;
+-				interrupts = <43 4 0>;
++				interrupts = <43 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			tdes at f803c000 {
+-- 
+1.8.2.2
