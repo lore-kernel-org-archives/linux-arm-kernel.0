@@ -1,63 +1,69 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 Oct 2013 15:58:26 +0200
-Subject: [PATCH v3 14/14] ARM: dts: mvebu: Add a new set of registers to the
- PMSU node
-In-Reply-To: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1381759106-15004-15-git-send-email-gregory.clement@free-electrons.com>
+Date: Mon, 14 Oct 2013 16:01:36 +0200
+Subject: [PATCH v2 11/12] cpuidle: mvebu: Add initial CPU idle support
+ for Armada 370/XP SoC
+In-Reply-To: <5235EEE1.8020501@linaro.org>
+References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
+ <1379066801-16276-12-git-send-email-gregory.clement@free-electrons.com>
+ <52333112.2050003@linaro.org> <5235C587.4030802@free-electrons.com>
+ <5235EEE1.8020501@linaro.org>
+Message-ID: <525BF940.2010403@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Power Management Unit Service block also controls the Coherency
-Fabric subsystem. This new set of registers is needed for the CPU idle
-implementation for the Armada XP, it allows to enter in a deep CPU
-idle state where the Coherency Fabric and the L2 cache are powerdown.
+On 15/09/2013 19:31, Daniel Lezcano wrote:
+Hi Daniel,
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt | 12 +++++++-----
- arch/arm/boot/dts/armada-xp.dtsi                             |  2 +-
- 2 files changed, 8 insertions(+), 6 deletions(-)
+>>>> +	.state_count = ARMADA_370_XP_MAX_STATES,
+>>>> +};
+>>>
+>>> What about the local timers ? Are they shutdown ?
+>>
+>> I need to chekc it.
+> 
+> Ok, if it is the case, there is the flag CPUIDLE_FLAG_TIMER_STOP to tell
+> the cpuidle framework to switch to the broadcast timer with this state.
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-index 926b4d6..8a9db0c 100644
---- a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-@@ -7,14 +7,16 @@ Required properties:
- - compatible: "marvell,armada-370-xp-pmsu"
- 
- - reg: Should contain PMSU registers location and length. First pair
--  for the per-CPU SW Reset Control registers, second pair for the
--  Power Management Service Unit.
-+  for the per-CPU SW Reset Control registers, second pair for the CPU
-+  Power Management Service Unit registers, third pair for the Fabric Power
-+  Management Service Unit registers.
- 
- Example:
- 
--armada-370-xp-pmsu at d0022000 {
-+armada-370-xp-pmsu at 22000 {
- 	compatible = "marvell,armada-370-xp-pmsu";
--	reg = <0xd0022100 0x430>,
--	      <0xd0020800 0x20>;
-+	reg = <0x22100 0x430>,
-+	      <0x20800 0x20>,
-+	      <0x22000 0x24>;
- };
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 3058522..25ec8cd 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -48,7 +48,7 @@
- 
- 			armada-370-xp-pmsu at 22000 {
- 				compatible = "marvell,armada-370-xp-pmsu";
--				reg = <0x22100 0x430>, <0x20800 0x20>;
-+				reg = <0x22100 0x430>, <0x20800 0x20>, <0x22000 0x24>;
- 			};
- 
- 			serial at 12200 {
+I have just sent a new version taking into account all your remarks, expect
+this one. The timers used on Armada 370/XP are only the locale timer then
+they are not shutdown when the CPUs go to idle.
+
+Regards,
+
+Gregory
+
+> 
+>>>> +static int __init armada_370_xp_cpuidle_init(void)
+>>>> +{
+>>>> +	if (!of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-pmsu"))
+>>>> +		return -ENODEV;
+>>>> +
+>>>> +	if (!of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
+>>>> +		return -ENODEV;
+>>>> +
+>>>> +	pr_info("Initializing Armada-XP CPU power management ");
+>>>> +
+>>>> +	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
+>>>> +
+>>>> +	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
+>>>> +}
+>>>> +
+>>>> +module_init(armada_370_xp_cpuidle_init);
+>>>
+>>> Isn't it possible to replace it by module_platform_driver ? like ux500
+>>> or kirkwood ?
+>>
+>> It should be possible indeed, I will check it.
+> 
+> That would be great. It is a nicer approach for the single zImage IMHO.
+> 
+> Thanks !
+>   -- Daniel
+> 
+
+
 -- 
-1.8.1.2
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
