@@ -1,82 +1,78 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 Oct 2013 08:49:46 -0700
-Subject: [PATCH 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
-In-Reply-To: <1380708947-15966-6-git-send-email-csmanjuvijay@gmail.com>
-References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
- <1380708947-15966-6-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <CAOesGMhiMD2_OOdR1_GDrJUWgU-qU9MyirhGtxXiWRQcMWy8+g@mail.gmail.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Mon, 14 Oct 2013 23:50:48 +0800
+Subject: [RFT PATCH v2 2/4] arm64: restore FPSIMD to default state for
+ kernel and signal contexts
+In-Reply-To: <20131014153921.GK10491@mudshark.cambridge.arm.com>
+References: <1381674029-430-1-git-send-email-liuj97@gmail.com>
+ <1381674029-430-2-git-send-email-liuj97@gmail.com>
+ <20131014151638.GI10491@mudshark.cambridge.arm.com>
+ <525C0DF8.8040306@gmail.com>
+ <20131014153921.GK10491@mudshark.cambridge.arm.com>
+Message-ID: <525C12D8.1030505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Greg,
+On 10/14/2013 11:39 PM, Will Deacon wrote:
+> On Mon, Oct 14, 2013 at 04:30:00PM +0100, Jiang Liu wrote:
+>> On 10/14/2013 11:16 PM, Will Deacon wrote:
+>>> On Sun, Oct 13, 2013 at 03:20:18PM +0100, Jiang Liu wrote:
+>>>> From: Jiang Liu <jiang.liu@huawei.com>
+>>>>
+>>>> Restore FPSIMD control and status registers to default values
+>>>> when creating new FPSIMD contexts for kernel context and reset
+>>>> FPSIMD status register when creating FPSIMD context for signal
+>>>> handling, otherwise the stale value in FPSIMD control and status
+>>>> registers may affect the new kernal or signal handling contexts.
+>>>>
+>>>> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+>>>> Cc: Jiang Liu <liuj97@gmail.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/fpsimd.h | 16 ++++++++++++++++
+>>>>  arch/arm64/kernel/fpsimd.c      | 11 +++++++++--
+>>>>  arch/arm64/kernel/signal.c      |  1 +
+>>>>  arch/arm64/kernel/signal32.c    |  1 +
+>>>>  4 files changed, 27 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+>>>> index c43b4ac..b2dc30f 100644
+>>>> --- a/arch/arm64/include/asm/fpsimd.h
+>>>> +++ b/arch/arm64/include/asm/fpsimd.h
+>>>> @@ -50,8 +50,24 @@ struct fpsimd_state {
+>>>>  #define VFP_STATE_SIZE		((32 * 8) + 4)
+>>>>  #endif
+>>>>  
+>>>> +#define	AARCH64_FPCR_DEFAULT_VAL	0
+>>>> +
+>>>>  struct task_struct;
+>>>>  
+>>>> +static inline void fpsimd_init_hw_state(void)
+>>>> +{
+>>>> +	int val = AARCH64_FPCR_DEFAULT_VAL;
+>>>> +
+>>>> +	asm ("msr fpcr, %x0\n"
+>>>> +	     "msr fpsr, xzr\n"
+>>>> +             : : "r"(val));
+>>>> +}
+>>>> +
+>>>> +static inline void fpsimd_clear_fpsr(void)
+>>>> +{
+>>>> +	asm ("msr fpsr, xzr\n");
+>>>> +}
+>>>
+>>> You have pretty weak asm constraints here...
+>> Hi Will,
+>> 	We will add an explicit "volatile" here. But according to GCC docs, it
+>> should have the same effect:
+>> An asm instruction without any output operands is treated identically to
+>> a volatile asm instruction.
+> 
+> I don't think volatile is enough to prevent re-ordering across a function
+> call; it just prevents the block from being optimised away entirely and/or
+> reordered with respect to other volatile statements.
+> 
+> A "memory" clobber should do the trick in this case.
+Thanks for education, will fix it in next version.
 
-[Adding ep93xx maintainers as well]
-
-On Wed, Oct 2, 2013 at 3:15 AM, Majunath Goudar <csmanjuvijay@gmail.com> wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
->
-> Suspend scenario in case of ohci-ep93xx glue was not
-> properly handled as it was not suspending generic part
-> of ohci controller. Alan Stern suggested, properly handle
-> ohci-ep93xx suspend scenario.
->
-> Calling explicitly the ohci_suspend() routine in
-> ohci_hcd_ep93xx_drv_suspend() will ensure proper handling of
-> suspend scenario.
->
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
-> ---
->  drivers/usb/host/ohci-ep93xx.c |   11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/usb/host/ohci-ep93xx.c b/drivers/usb/host/ohci-ep93xx.c
-> index 492f681..08409bf 100644
-> --- a/drivers/usb/host/ohci-ep93xx.c
-> +++ b/drivers/usb/host/ohci-ep93xx.c
-> @@ -112,13 +112,20 @@ static int ohci_hcd_ep93xx_drv_suspend(struct platform_device *pdev, pm_message_
->  {
->         struct usb_hcd *hcd = platform_get_drvdata(pdev);
->         struct ohci_hcd *ohci = hcd_to_ohci(hcd);
-> +       bool do_wakeup = device_may_wakeup(&pdev->dev);
-> +       int ret;
->
->         if (time_before(jiffies, ohci->next_statechange))
->                 msleep(5);
->         ohci->next_statechange = jiffies;
->
-> -       clk_disable(usb_host_clock);
-> -       return 0;
-> +       ret = ohci_suspend(hcd, do_wakeup);
-> +       if (ret)
-> +               return ret;
-> +
-> +       ep93xx_stop_hc(&pdev->dev);
-> +
-> +       return ret;
->  }
-
-This patch showed up in -next today (or maybe a while ago and I didn't
-notice). It's causing a build failure on ep93xx:
-
->From http://arm-soc.lixom.net/buildlogs/next-thierry/v3.12-rc5-5366-gba2e8c2/buildall.arm.ep93xx_defconfig.log.failed:
-
-drivers/usb/host/ohci-ep93xx.c: In function 'ohci_hcd_ep93xx_drv_suspend':
-drivers/usb/host/ohci-ep93xx.c:126:2: error: implicit declaration of
-function 'ep93xx_stop_hc'
-
-
-It's really confusing though, because Majunath has posted this patch
-three times. The first time it had the ep93xx_stop_hc() call in there,
-the second patch (labelled V2) did not, and the third(?) version,
-without version label, also lacked it. No revision log in the patch,
-and no comments on it.
-
-But it does seem like the wrong version was merged based on build results.
-
-
--Olof
+> 
+> Will
+> 
