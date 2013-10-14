@@ -1,39 +1,41 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 14 Oct 2013 20:28:29 +0200
-Subject: Is next/cleanup of arm-soc tree stable?
-In-Reply-To: <87mwmb930y.fsf@linaro.org>
-References: <20131014161309.GG27668@S2101-09.ap.freescale.net>
- <87mwmb930y.fsf@linaro.org>
-Message-ID: <525C37CD.7020604@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 14 Oct 2013 18:32:21 +0000
+Subject: [PATCH] MAINTAINERS: ARM: mvebu: add Sebastian Hesselbarth
+Message-ID: <1381775541-24027-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2013 07:27 PM, Kevin Hilman wrote:
-> Shawn Guo <shawn.guo@linaro.org> writes:
->
->> Olof, Kevin,
->>
->> Per reports from linux-next folks, it seems that my imx/soc branch
->> conflicts with Sebastian's clk-of-init-v2_for-3.13 quite badly.  I'm
->> considering to rebase my imx/soc branch on arm-soc next/cleanup branch
->> to solve the conflicts.  But is the branch stable, or do I have to base
->> on Sebastian's clk-of-init-v2_for-3.13 branch (assume it's stable)?
->
-> Generally, the next/* branches are not stable.
->
-> It would be better if you could get a commitment from Sebastian for a
-> immutable branch and base directly on that.
+Sebastian is a hobbyist who has done a lot of heavy lifting converting
+mach-dove to devicetree, and assisting others with patches pertaining to
+mvebu.
 
-Shawn,
+It is hoped that he will continue this work, and also assist the current
+mvebu maintainers with patch wrangling and pull request submissions.
 
-I sent a PR for the above a while ago [1]. I am not going to touch this
-branch at all. Compared to what will go into -next, the was a section
-mismatch fixup patch for nomadik requested by Olof.
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
-If you or Kevin want me to prepare (different) rebased branch, I can
-do that. Otherwise, I suggest to just pull the existing branch as a
-dependency.
-
-Sebastian
-
-[1] http://www.spinics.net/lists/arm-kernel/msg276175.html
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 8a0cbf3..7a45039 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1009,6 +1009,7 @@ ARM/Marvell Armada 370 and Armada XP SOC support
+ M:	Jason Cooper <jason@lakedaemon.net>
+ M:	Andrew Lunn <andrew@lunn.ch>
+ M:	Gregory Clement <gregory.clement@free-electrons.com>
++M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-mvebu/
+@@ -1016,6 +1017,7 @@ F:	arch/arm/mach-mvebu/
+ ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
+ M:	Jason Cooper <jason@lakedaemon.net>
+ M:	Andrew Lunn <andrew@lunn.ch>
++M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-dove/
+-- 
+1.8.3.2
