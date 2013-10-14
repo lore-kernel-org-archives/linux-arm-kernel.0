@@ -1,38 +1,71 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 14 Oct 2013 04:07:10 +0200
-Subject: [PATCH 02/12] usb: phy-mxs: Enable IC fixes for mx6 SoC serial
-In-Reply-To: <20131014013119.GB3879@shlinux1.ap.freescale.net>
+Date: Mon, 14 Oct 2013 04:08:51 +0200
+Subject: [PATCH 05/12] usb: phy-mxs: Add implementation of nofity_suspend
+ and notify_resume
+In-Reply-To: <20131014013651.GD3879@shlinux1.ap.freescale.net>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
- <201310121138.16584.marex@denx.de>
- <20131014013119.GB3879@shlinux1.ap.freescale.net>
-Message-ID: <201310140407.11129.marex@denx.de>
+ <201310121142.07174.marex@denx.de>
+ <20131014013651.GD3879@shlinux1.ap.freescale.net>
+Message-ID: <201310140408.51758.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Peter Chen,
 
-> On Sat, Oct 12, 2013 at 11:38:16AM +0200, Marek Vasut wrote:
-> > Hi,
+> On Sat, Oct 12, 2013 at 11:42:06AM +0200, Marek Vasut wrote:
+> > Dear Peter Chen,
 > > 
-> > > After adding IC fixes bits, some PHY bugs are fixed by
-> > > IC logic.
+> > > Add notify_suspend and notify_resume according to different SoCs.
+> > > 
+> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > ---
+> > > 
+> > >  drivers/usb/phy/phy-mxs-usb.c |   73
+> > > 
+> > > +++++++++++++++++++++++++++++++++++++++++ 1 files changed, 73
+> > > insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/drivers/usb/phy/phy-mxs-usb.c
+> > > b/drivers/usb/phy/phy-mxs-usb.c index e0b0de0..8661dae 100644
+> > > --- a/drivers/usb/phy/phy-mxs-usb.c
+> > > +++ b/drivers/usb/phy/phy-mxs-usb.c
+> > > @@ -197,6 +197,78 @@ static int mxs_phy_on_disconnect(struct usb_phy
+> > > *phy,
+> > > 
+> > >  	return 0;
+> > >  
+> > >  }
+> > > 
+> > > +static int mxs_phy_on_suspend_workaround(struct usb_phy *phy,
+> > > +		enum usb_device_speed speed)
+> > > +{
+> > > +	dev_dbg(phy->dev, "%s speed device has suspended\n",
+> > > +		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
 > > 
-> > Can you please elaborate what those bits do exactly ? They seem like a
-> > magic stuff to me thus far, which is not exactly helpful . I can't find
-> > them in the datasheet either.
+> > HS : FS/LS you mean?
 > 
-> Yes, these bits are added at late TO verion for i.mx 6, and these TO
-> versions will be for mass production, unfortunately, the related doc
-> update may be forgotten.
+> Yes, it is what I mean.
+> OK, I will change to HS and FS/LS.
 > 
-> These two bits are related to two PHY bugs, two PHY bugs are still existed
-> at mx28 and mx23, one bug is fixed at mx6dq and mx6dl, and both of two
-> bugs are fixed at later mx6 (like mx6sololite and later SoCs), but the IC
-> fixes are not enabled by default, it needs software opens it.
+> > > +/*
+> > > + * For mxs PHY, there are two PHY issues related to suspend/resume.
+> > > + * For mx23 and mx28, both of two issues are existed.
+> > > + * For mx6q and mx6dl, only one issue is existed.
+> > > + * For mx6 sololite, none issue is existed.
+> > > + */
+> > > +static void mxs_phy_workaround(struct mxs_phy *mxs_phy)
+> > > +{
+> > > +	if (is_mx23_phy(mxs_phy)) {
+> > 
+> > This is_mx23_phy() returns 1 for mx28 too? It's not too clear, not even
+> > from the comment above, a short comment here would help for sure.
+> 
+> mx23 and mx28 PHY are the same PHY, so the fixes are the same.
+> Anything I need to add?
 
-Sure, I get it. But what exactly does that bit do? Can you add a proper (and 
-likely beefy) comment into the code to supplement the missing parts in the 
-datasheet?
+I believe it's OK. But identifying MX28 PHY via is_mx23_phy() might be a little 
+confusing. I'm just trying to keep this driver flushed out of my brain here and 
+do an unbiased review ;-)
 
 Best regards,
 Marek Vasut
