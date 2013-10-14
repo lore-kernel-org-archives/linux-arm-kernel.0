@@ -1,114 +1,80 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 14 Oct 2013 13:15:28 +0200
-Subject: [PATCH v5] gpio: Add MOXA ART GPIO driver
-In-Reply-To: <CACRpkda23nUF8i03RWePj+dGa9Wj6E1L8vfPMfxvnGkazfKS5w@mail.gmail.com>
-References: <1375103161-12460-1-git-send-email-jonas.jensen@gmail.com>
- <1381503190-5733-1-git-send-email-jonas.jensen@gmail.com>
- <CACRpkda23nUF8i03RWePj+dGa9Wj6E1L8vfPMfxvnGkazfKS5w@mail.gmail.com>
-Message-ID: <CACmBeS1NoyHWhS5ydONf3x_z8SQu5-vh_XzMazuY9-uYXdg_wQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 Oct 2013 12:26:03 +0100
+Subject: [PATCHv2 1/9] ARM: kirkwood: convert d2net_v2 to DT
+In-Reply-To: <20131012172900.787c68eb@skate>
+References: <1375369655-1310-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1375369655-1310-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130813095830.GI27165@e106331-lin.cambridge.arm.com>
+ <20131012172900.787c68eb@skate>
+Message-ID: <20131014112603.GA31708@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you for the replies.
+On Sat, Oct 12, 2013 at 04:29:00PM +0100, Thomas Petazzoni wrote:
+> Dear Mark Rutland,
+> 
 
-On 11 October 2013 17:44, Linus Walleij <linus.walleij@linaro.org> wrote:
->>     The register responsible for doing enable/disable is located
->>     at <0x98100100 0x4>, the clock register is very close at
->>     <0x98100000 0x34>.
->
-> If we don't know we have to guess.
->
-> This layout makes me think that the IO-window at 0x98100000 is
-> a power-clock-and-reset controller. It contains some register
-> to latch the pins enable/disable them, or if this is even a clock
-> gate? Are you sure about this? Is it now a gated clock, simply,
-> so that this bit should be handled in the clock driver, i.e.
-> this bit gets set by clk_enable() from the GPIO driver?
+Hi Thomas,
 
-The IO-window at 0x98100000 contains registers that are read to
-determine PLL and APB clock frequencies. Sorry I don't know more than
-that.
+> On Tue, 13 Aug 2013 10:58:30 +0100, Mark Rutland wrote:
+> 
+> > > +       regulators {
+> > > +               compatible = "simple-bus";
+> > > +               pinctrl-0 = <&pmx_sata_power>;
+> > > +               pinctrl-names = "default";
+> > > +               #address-cells = <1>;
+> > > +               #size-cells = <0>;
+> > 
+> > That's not really a simple-bus if there's no mapping to the parent's
+> > address space (and it represents a completely different concept of
+> > address).
+> 
+> Right, but I guess it is needed for the child nodes to be considered as
+> platform devices. There are already gazillions of .dts doing this in
+> arch/arm/boot/dts, not only Kirkwood platforms, but also Tegra
+> platforms, i.MX platforms and a bunch of others. While I admit it
+> doesn't look the most appropriate representation, I believe that
+> considering the number of existing users, solving this problem is a
+> separate matter to the conversion of the d2net_v2 to the Device Tree.
 
-This is part of a pending patch adding the clock driver:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/203494.html
+With regards to the general abuse of simple-bus, I think that's
+something we need to fix up. I don't think the fact that something is
+generally abused is a good reason for continuing to abuse it. We already
+have enough maintenance nightmares and there's no reason to add to that.
 
-Arnd made a similar comment suggesting syscon back when MMC mapped the
-same register:
-https://groups.google.com/d/msg/linux.kernel/eeS7vhMWMAc/zNYhzyKilh8J
+> 
+> > Could you explain what the pinctrl's doing here? I couldn't see what
+> > code would be handling that given the node will get probed as a
+> > simple-bus and the regulator-fixed binding doesn't mention anything
+> > about the parent node.
+> 
+> Right, the pinctrl should be one-level down, in the DT sub-node that
+> describes the regulator, so that it get automatically configured
+> because the regulator driver is a platform_driver.
+> 
+> I'll fix this.
 
-I think I prefer to have this in the clock driver opposed to using syscon.
+Ok.
 
-The one downside I can see, individual control of the pins would be
-lost? Does it make sense to enable all pins once? this is acceptable
-for at least UC-7112-LX, it doesn't need to disable/enable pins beyond
-the initial clk_enable().
+> 
+> > > +
+> > > +               sata0_power: regulator at 1 {
+> > > +                       compatible = "regulator-fixed";
+> > > +                       reg = <1>;
+> > 
+> > Do we even need the unit-address?
+> 
+> No, I'll fix this one as well.
 
-I say the above because I currently have nothing that requires
-individual pin control. However, I removed one line from MMC that
-turned out to be unnecessary. That line directly access the "PMU"
-register disabling pins 10-17 with the following comment:
+As the regulator is now not in any address space as such, I'm happier
+having it in a simple-bus (as we won't even need to hack in a kludge to
+prevent addresses being translated when the driver doesn't expect it).
+However, if we have a simple bus we should define the mapping to the
+parent address space using ranges (for one thing ePAPR lists ranges as
+required for simple-bus).
 
-"
-/* change I/O multiplexing to SD, so the GPIO 17-10 will be fail */
-moxart_gpio_mp_clear(0xff << 10);
-"
-http://code.google.com/p/linux-2-6-9-moxart/source/browse/drivers/mmc/host/moxasd.c#619
+That said, is there any reason to place the regulators under a
+simple-bus at all? They could just live under the root of the tree.
 
-
->>     I don't think gpio_poweroff driver is right for this hardware
->>     because the pin is not connected to anything that can do reset.
->>     The old 2.6.9 kernel driver uses timer poll with eventual call
->>     to userspace.
->>
->>     To test that it works, I added gpio_poweroff anyway, modified
->>     with gpio_export() the pin can then be seen switching between
->>     0 and 1 (on "cat /sys/class/gpio/gpio25/value").
->
-> Hmmmm not quite following this...
-
-I'll try to elaborate. What happens in gpio_poweroff driver does not
-look like something that can reset the hardware. Reset on UC-7112-LX
-is implemented using the same register as the watchdog, in platform
-code hooked up to arm_pm_restart.
-
-The old sources "solved" this by polling the reset pin with eventual
-call_usermodehelper (/sbin/reboot):
-http://code.google.com/p/linux-2-6-9-moxart/source/browse/drivers/char/moxa_watchdog.c#174
-
-What was previously in a kernel driver, would now be solved in userspace?
-
-gpio_export() allowed me to verify the pin number, pressing reset
-toggles the value.
-
-Adding the gpio-leds driver, that pin was automatically exported to
-sysfs, that got me thinking:
-
-How do I export the reset button to sysfs? Should gpio_export() be
-added to platform code?
-
-
-from drivers/power/reset/gpio-poweroff.c:
-
-static void gpio_poweroff_do_poweroff(void)
-{
-        BUG_ON(!gpio_is_valid(gpio_num));
-
-        /* drive it active, also inactive->active edge */
-        gpio_direction_output(gpio_num, !gpio_active_low);
-        mdelay(100);
-        /* drive inactive, also active->inactive edge */
-        gpio_set_value(gpio_num, gpio_active_low);
-        mdelay(100);
-
-        /* drive it active, also inactive->active edge */
-        gpio_set_value(gpio_num, !gpio_active_low);
-
-        /* give it some time */
-        mdelay(3000);
-
-        WARN_ON(1);
-}
-
-
-Regards,
-Jonas
+Cheers,
+Mark.
