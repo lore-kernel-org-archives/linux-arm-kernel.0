@@ -1,324 +1,40 @@
-From: v.tyrtov@samsung.com (Vyacheslav Tyrtov)
-Date: Mon, 14 Oct 2013 19:08:25 +0400
-Subject: [PATCH v2 4/4] ARM: dts: Add initial device tree support for
- EXYNOS5410
-In-Reply-To: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
-References: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
-Message-ID: <1381763305-7085-5-git-send-email-v.tyrtov@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Oct 2013 16:12:17 +0100
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <525C0622.8040504@redhat.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
+ <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
+ <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
+ <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+ <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
+Message-ID: <525C09D1.8060103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tarek Dakhran <t.dakhran@samsung.com>
+On 14/10/13 15:56, Paolo Bonzini wrote:
+> Il 14/10/2013 16:52, Marc Zyngier ha scritto:
+>>>> Sure. And I imagine this traps back into the kernel to read some
+>>>> register and find out what the endianness of the accessing CPU is?
+>>>
+>>> Not yet. To be exact, it does the below today. But all virtio device
+>>> emulation is 100% guest endianness unaware. This helper is the only
+>>> piece of code where it gets any idea what endianness the guest has. So
+>>> by checking for references to it in the code you know where endianness
+>>> is an issue. And that's only in the config space.
+>>
+>> Only config space? How do you deal with virtio ring descriptors, for
+>> example?
+> 
+> They also use guest endianness, but do not use virtio_is_big_endian()
+> (yet?) so Alex missed them.
 
-Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
+Yeah, I thought as much. There is a whole bunch of things that need byte
+swapping, both at the virtio level itself, and at the device level as well.
 
-Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
----
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/exynos5410-smdk5410.dts |  65 ++++++++++
- arch/arm/boot/dts/exynos5410.dtsi         | 209 ++++++++++++++++++++++++++++++
- 3 files changed, 275 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
- create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+Grep-ing for __u{16,32,64} through include/uapi/linux/virtio* shows the
+extent of the disaster.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 802720e..e991739 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -63,6 +63,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos5250-arndale.dtb \
- 	exynos5250-smdk5250.dtb \
- 	exynos5250-snow.dtb \
-+	exynos5410-smdk5410.dtb \
- 	exynos5420-smdk5420.dtb \
- 	exynos5440-sd5v1.dtb \
- 	exynos5440-ssdk5440.dtb
-diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-new file mode 100644
-index 0000000..c3d0b32
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-@@ -0,0 +1,65 @@
-+/*
-+ * SAMSUNG SMDK5410 board device tree source
-+ *
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+#include "exynos5410.dtsi"
-+/ {
-+	model = "Samsung SMDK5410 board based on EXYNOS5410";
-+	compatible = "samsung,smdk5410", "samsung,exynos5410";
-+
-+	memory {
-+		reg = <0x40000000 0x80000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySAC2,115200";
-+	};
-+
-+	fixed-rate-clocks {
-+		oscclk {
-+			compatible = "samsung,clock-oscclk";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+
-+	mmc at 12200000 {
-+		status = "okay";
-+		num-slots = <1>;
-+		supports-highspeed;
-+		broken-cd;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-ciu-div = <3>;
-+		samsung,dw-mshc-sdr-timing = <2 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <8>;
-+		};
-+	};
-+
-+	mmc at 12220000 {
-+		status = "okay";
-+		num-slots = <1>;
-+		supports-highspeed;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-ciu-div = <3>;
-+		samsung,dw-mshc-sdr-timing = <2 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <4>;
-+			disable-wp;
-+		};
-+	};
-+
-+};
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-new file mode 100644
-index 0000000..92a5a73
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -0,0 +1,209 @@
-+/*
-+ * SAMSUNG EXYNOS5410 SoC device tree source
-+ *
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
-+ * EXYNOS5410 based board files can include this file and provide
-+ * values for board specfic bindings.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <dt-bindings/clock/exynos5410.h>
-+#include "exynos5.dtsi"
-+/ {
-+	compatible = "samsung,exynos5410";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+			cci-control-port = <&cci_control2>;
-+			clock-frequency = <1600000000>;
-+		};
-+
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+			cci-control-port = <&cci_control2>;
-+			clock-frequency = <1600000000>;
-+		};
-+
-+		CPU2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <2>;
-+			cci-control-port = <&cci_control2>;
-+			clock-frequency = <1600000000>;
-+		};
-+
-+		CPU3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <3>;
-+			cci-control-port = <&cci_control2>;
-+			clock-frequency = <1600000000>;
-+		};
-+
-+		CPU4: cpu at 100 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x100>;
-+			cci-control-port = <&cci_control1>;
-+			clock-frequency = <1200000000>;
-+		};
-+
-+		CPU5: cpu at 101 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x101>;
-+			cci-control-port = <&cci_control1>;
-+			clock-frequency = <1200000000>;
-+		};
-+
-+		CPU6: cpu at 102 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x102>;
-+			cci-control-port = <&cci_control1>;
-+			clock-frequency = <1200000000>;
-+		};
-+
-+		CPU7: cpu at 103 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x103>;
-+			cci-control-port = <&cci_control1>;
-+			clock-frequency = <1200000000>;
-+		};
-+	};
-+
-+	cci at 10D20000 {
-+		compatible = "arm,cci-400";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x10D20000 0x1000>;
-+		ranges = <0 0x10D20000 0x6000>;
-+
-+		cci_control0: slave-if at 1000 {
-+			compatible = "arm,cci-400-ctrl-if";
-+			interface-type = "ace-lite";
-+			reg = <0x1000 0x1000>;
-+		};
-+
-+		cci_control1: slave-if at 4000 {
-+			compatible = "arm,cci-400-ctrl-if";
-+			interface-type = "ace";
-+			reg = <0x4000 0x1000>;
-+		};
-+
-+		cci_control2: slave-if at 5000 {
-+			compatible = "arm,cci-400-ctrl-if";
-+			interface-type = "ace";
-+			reg = <0x5000 0x1000>;
-+		};
-+	};
-+
-+	clock: clock-controller at 10010000 {
-+		compatible = "samsung,exynos5410-clock";
-+		reg = <0x10010000 0x30000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	mct at 101C0000 {
-+		compatible = "samsung,exynos4210-mct";
-+		reg = <0x101C0000 0xB00>;
-+		interrupt-controller;
-+		#interrups-cells = <1>;
-+		interrupt-parent = <&mct_map>;
-+		interrupts = <0>, <1>, <2>, <3>,
-+			<4>, <5>, <6>, <7>,
-+			<8>, <9>, <10>, <11>;
-+		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MCT>;
-+		clock-names = "fin_pll", "mct";
-+
-+		mct_map: mct-map {
-+			#interrupt-cells = <1>;
-+			#address-cells = <0>;
-+			#size-cells = <0>;
-+			interrupt-map = <0 &combiner 23 3>,
-+					<1 &combiner 23 4>,
-+					<2 &combiner 25 2>,
-+					<3 &combiner 25 3>,
-+					<4 &gic 0 120 0>,
-+					<5 &gic 0 121 0>,
-+					<6 &gic 0 122 0>,
-+					<7 &gic 0 123 0>,
-+					<8 &gic 0 128 0>,
-+					<9 &gic 0 129 0>,
-+					<10 &gic 0 130 0>,
-+					<11 &gic 0 131 0>;
-+		};
-+	};
-+
-+	mmc_0: mmc at 12200000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		interrupts = <0 75 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x12200000 0x1000>;
-+		clocks = <&clock CLK_MMC0>, <&clock CLK_SCLK_MMC0>;
-+		clock-names = "biu", "ciu";
-+		fifo-depth = <0x80>;
-+		status = "disabled";
-+	};
-+
-+	mmc_1: mmc at 12210000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		interrupts = <0 76 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x12210000 0x1000>;
-+		clocks = <&clock CLK_MMC1>, <&clock CLK_SCLK_MMC1>;
-+		clock-names = "biu", "ciu";
-+		fifo-depth = <0x80>;
-+		status = "disabled";
-+	};
-+
-+	mmc_2: mmc at 12220000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		interrupts = <0 77 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x12220000 0x1000>;
-+		clocks = <&clock CLK_MMC2>, <&clock CLK_SCLK_MMC2>;
-+		clock-names = "biu", "ciu";
-+		fifo-depth = <0x80>;
-+		status = "disabled";
-+	};
-+
-+	serial at 12C00000 {
-+		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
-+		clock-names = "uart", "clk_uart_baud0";
-+	};
-+
-+	serial at 12C10000 {
-+		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
-+		clock-names = "uart", "clk_uart_baud0";
-+	};
-+
-+	serial at 12C20000 {
-+		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
-+		clock-names = "uart", "clk_uart_baud0";
-+	};
-+
-+	serial at 12C30000 {
-+		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
-+		clock-names = "uart", "clk_uart_baud0";
-+	};
-+
-+};
+	M.
 -- 
-1.8.1.5
+Jazz is not dead. It just smells funny...
