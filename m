@@ -1,64 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 14 Oct 2013 17:09:55 +0800
-Subject: [PATCH 02/12] usb: phy-mxs: Enable IC fixes for mx6 SoC serial
-In-Reply-To: <1381568986-19802-3-git-send-email-peter.chen@freescale.com>
-References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
- <1381568986-19802-3-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131014090953.GC27668@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 Oct 2013 11:10:20 +0200
+Subject: [PATCH] ARM: ux500: u8500_defconfig: add missing cpuidle option
+In-Reply-To: <1380540996-18521-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1380540996-18521-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CACRpkdZ856omBFmLTQoPH_QkobkYj4tAgvHEmVZzA8+SOvYwRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 12, 2013 at 05:09:36PM +0800, Peter Chen wrote:
-> After adding IC fixes bits, some PHY bugs are fixed by
-> IC logic.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/phy/phy-mxs-usb.c |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index 87ba429..831b13e 100644
-> --- a/drivers/usb/phy/phy-mxs-usb.c
-> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -29,6 +29,10 @@
->  #define HW_USBPHY_CTRL_SET			0x34
->  #define HW_USBPHY_CTRL_CLR			0x38
->  
-> +#define HW_USBPHY_IP				0x90
-> +#define HW_USBPHY_IP_SET			0x94
-> +#define HW_USBPHY_IP_CLR			0x98
-> +
->  #define BM_USBPHY_CTRL_SFTRST			BIT(31)
->  #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
->  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
-> @@ -40,6 +44,8 @@
->  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
->  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
->  
-> +#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
-> +
->  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
->  
->  enum imx_phy_type {
-> @@ -118,6 +124,10 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
->  		BM_USBPHY_CTRL_ENUTMILEVEL3,
->  	       base + HW_USBPHY_CTRL_SET);
->  
-> +	/* Enable IC solution */
-> +	if (is_mx6q_phy(mxs_phy) || is_mx6sl_phy(mxs_phy))
+On Mon, Sep 30, 2013 at 1:36 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
 
-Am I missing any dependency/patches here?  Where were is_mx6q_phy() and
-is_mx6sl_phy() introduced?
+> With the commit d3f2950f2adeea3da0317e952914b59adaa4cdb3, the option
+> ARM_U8500_CPUIDLE was added to the Kconfig but not reflected in the
+> default config file, hence the cpuidle driver is no longer enabled
+> since this commit.
+>
+> Enable it again by adding the missing option in the default config file.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Shawn
+Patch applied. Sorry for taking so long...
 
-> +		writel(BM_USBPHY_IP_FIX, base + HW_USBPHY_IP_SET);
-> +
->  	return 0;
->  }
->  
-> -- 
-> 1.7.1
-> 
-> 
+Yours,
+Linus Walleij
