@@ -1,63 +1,64 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 14 Oct 2013 11:04:55 +0200
-Subject: [PATCH v2 1/2] clk/zynq/clkc: Add 'fclk-enable' feature
-In-Reply-To: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <525BB3B7.7000802@monstr.eu>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 14 Oct 2013 17:09:55 +0800
+Subject: [PATCH 02/12] usb: phy-mxs: Enable IC fixes for mx6 SoC serial
+In-Reply-To: <1381568986-19802-3-git-send-email-peter.chen@freescale.com>
+References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
+ <1381568986-19802-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131014090953.GC27668@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2013 07:10 PM, Soren Brinkmann wrote:
-> In some use cases Zynq's FPGA clocks are used as static clock
-> generators for IP in the FPGA part of the SOC for which no Linux driver
-> exists and would control those clocks. To avoid automatic
-> gating of these clocks in such cases a new property - fclk-enable - is
-> added to the clock controller's DT description to accomodate such use
-> cases. It's value is a bitmask, where a set bit results in enabling
-> the corresponding FCLK through the clkc.
+On Sat, Oct 12, 2013 at 05:09:36PM +0800, Peter Chen wrote:
+> After adding IC fixes bits, some PHY bugs are fixed by
+> IC logic.
 > 
-> FPGA clocks are handled following the rules below:
-> 
-> If an FCLK is not enabled by bootloaders, that FCLK will be disabled in
-> Linux. Drivers can enable and control it through the CCF as usual.
-> 
-> If an FCLK is enabled by bootloaders AND the corresponding bit in the
-> 'fclk-enable' DT property is set, that FCLK will be enabled by the clkc,
-> resulting in an off by one reference count for that clock. Ensuring it
-> will always be running.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
-> v2:
->  - change default value for fclk-enable to '0'
-> ---
->  Documentation/devicetree/bindings/clock/zynq-7000.txt |  4 ++++
->  drivers/clk/zynq/clkc.c                               | 18 +++++++++++++++---
->  2 files changed, 19 insertions(+), 3 deletions(-)
+>  drivers/usb/phy/phy-mxs-usb.c |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index 87ba429..831b13e 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -29,6 +29,10 @@
+>  #define HW_USBPHY_CTRL_SET			0x34
+>  #define HW_USBPHY_CTRL_CLR			0x38
+>  
+> +#define HW_USBPHY_IP				0x90
+> +#define HW_USBPHY_IP_SET			0x94
+> +#define HW_USBPHY_IP_CLR			0x98
+> +
+>  #define BM_USBPHY_CTRL_SFTRST			BIT(31)
+>  #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
+>  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
+> @@ -40,6 +44,8 @@
+>  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+>  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+>  
+> +#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
+> +
+>  #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+>  
+>  enum imx_phy_type {
+> @@ -118,6 +124,10 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+>  		BM_USBPHY_CTRL_ENUTMILEVEL3,
+>  	       base + HW_USBPHY_CTRL_SET);
+>  
+> +	/* Enable IC solution */
+> +	if (is_mx6q_phy(mxs_phy) || is_mx6sl_phy(mxs_phy))
 
-For both patches:
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+Am I missing any dependency/patches here?  Where were is_mx6q_phy() and
+is_mx6sl_phy() introduced?
 
-Mike: Can you please add both these patches to your tree?
-There shouldn't be any conflict with DT patch itself.
-But if you don't want to add 2/2 through your tree, I am also fine
-with taking this through my zynq tree.
+Shawn
 
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131014/3feca7a2/attachment.sig>
+> +		writel(BM_USBPHY_IP_FIX, base + HW_USBPHY_IP_SET);
+> +
+>  	return 0;
+>  }
+>  
+> -- 
+> 1.7.1
+> 
+> 
