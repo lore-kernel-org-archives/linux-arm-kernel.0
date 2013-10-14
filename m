@@ -1,70 +1,90 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 14 Oct 2013 14:00:54 -0400
-Subject: [PATCH v2 4/4] ARM: keystone: add PM bus support for clock
- management
-In-Reply-To: <87hacj92ra.fsf@linaro.org>
-References: <1377819404-9671-1-git-send-email-santosh.shilimkar@ti.com>
- <1377819404-9671-5-git-send-email-santosh.shilimkar@ti.com>
- <5257431A.5090301@ti.com> <87hacj92ra.fsf@linaro.org>
-Message-ID: <525C3156.7090908@ti.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Mon, 14 Oct 2013 23:32:22 +0530
+Subject: [PATCH] arm: omap2+: hwmod: Add qspi data for am437x.
+Message-ID: <1381773742-3931-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 October 2013 01:32 PM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> On Thursday 29 August 2013 07:36 PM, Santosh Shilimkar wrote:
->>> Add runtime PM core support to Keystone SOCs by using the pm_clk
->>> infrastructure of the PM core. Patch is based on Kevin's pm_domain
->>> work on DaVinci SOCs.
->>>
->>> Keystone SOC doesn't have depedency to enable clocks in early
->>> in the boot and hence the clock and PM bus initialisation is done
->>> at subsys_init() level.
->>>
->>> Cc: Kevin Hilman <khilman@linaro.org>
->>>
->>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> ---
->> For record, updated patch end of the email as discussed here [1]
-> 
-> Unfortunately, this one broke boot for muilti_v7_defconfig:
-> 
->    http://lists.linaro.org/pipermail/kernel-build-reports/2013-October/000652.html
->
-Damn. Sorry about that.
+Add hwmod data for qspi for AM437x.
 
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+This was tested on AM437x EPOS EVM with Afzal's v6 of AM43x PRCM
+basic support and tero's DT clock series.
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c |   34 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prcm43xx.h             |    1 +
+ 2 files changed, 35 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index 6500d43..0a5f7a7 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -316,6 +316,32 @@ static struct omap_hwmod am43xx_gpio5_hwmod = {
+ 	.dev_attr	= &gpio_dev_attr,
+ };
  
-> [...]
-> 
->> +int __init keystone_pm_runtime_init(void)
->> +{
->> +	of_clk_init(NULL);
->> +	pm_clk_add_notifier(&platform_bus_type, &platform_domain_notifier);
->> +
->> +	return 0;
->> +}
->> +subsys_initcall(keystone_pm_runtime_init);
-> 
-> The reason is this initcall which runs on *all* platforms, so needs some
-> sort of platform specific check.  
-> 
-> The patch below does the trick, but I'm not sure if you want to match on
-> something more specific for this check.  If you're OK, with this, I'll
-> add it to next/soc with your ack.
-> 
-> Kevin
-> 
-> From 435ed298c804048548276b60fd5efdf697f6b82f Mon Sep 17 00:00:00 2001
-> From: Kevin Hilman <khilman@linaro.org>
-> Date: Mon, 14 Oct 2013 10:30:11 -0700
-> Subject: [PATCH] ARM: keystone: fix PM domain initcall to be keystone only
-> 
-> initcalls need to have platform specific checks so they are not run in
-> multi-platform builds.
-> 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Looks right. Thanks a lot Kevin.
++static struct omap_hwmod_class_sysconfig am43xx_qspi_sysc = {
++	.sysc_offs      = 0x0010,
++	.sysc_flags     = SYSC_HAS_SIDLEMODE,
++	.idlemodes      = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
++				SIDLE_SMART_WKUP),
++	.sysc_fields    = &omap_hwmod_sysc_type2,
++};
++
++static struct omap_hwmod_class am43xx_qspi_hwmod_class = {
++	.name   = "qspi",
++	.sysc   = &am43xx_qspi_sysc,
++};
++
++static struct omap_hwmod am43xx_qspi_hwmod = {
++	.name           = "qspi",
++	.class          = &am43xx_qspi_hwmod_class,
++	.clkdm_name     = "l3s_clkdm",
++	.main_clk       = "l3s_gclk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = AM43XX_CM_PER_QSPI_CLKCTRL_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
++		},
++	},
++};
++
+ /* Interfaces */
+ static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+ 	.master		= &am33xx_l3_main_hwmod,
+@@ -520,6 +546,13 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__gpio5 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
++	.master         = &am33xx_l3_s_hwmod,
++	.slave          = &am43xx_qspi_hwmod,
++	.clk            = "l3s_gclk",
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l4_wkup__synctimer,
+ 	&am43xx_l4_ls__timer8,
+@@ -559,6 +592,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am43xx_l4_wkup__i2c1,
+ 	&am43xx_l4_wkup__gpio0,
+ 	&am43xx_l4_wkup__wd_timer1,
++	&am43xx_l3_s__qspi,
+ 	&am33xx_l4_per__dcan0,
+ 	&am33xx_l4_per__dcan1,
+ 	&am33xx_l4_per__gpio1,
+diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+index f0636ec..976191a 100644
+--- a/arch/arm/mach-omap2/prcm43xx.h
++++ b/arch/arm/mach-omap2/prcm43xx.h
+@@ -106,6 +106,7 @@
+ #define AM43XX_CM_WKUP_L4WKUP_CLKCTRL_OFFSET		0x0220
+ #define AM43XX_CM_RTC_RTC_CLKCTRL_OFFSET		0x0020
+ #define AM43XX_CM_PER_MMC2_CLKCTRL_OFFSET		0x0248
++#define AM43XX_CM_PER_QSPI_CLKCTRL_OFFSET               0x0258
+ #define AM43XX_CM_PER_GPMC_CLKCTRL_OFFSET		0x0220
+ #define AM43XX_CM_PER_MCASP0_CLKCTRL_OFFSET		0x0238
+ #define AM43XX_CM_PER_MCASP1_CLKCTRL_OFFSET		0x0240
+-- 
+1.7.1
