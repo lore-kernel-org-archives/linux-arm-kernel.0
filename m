@@ -1,413 +1,252 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 14 Oct 2013 18:30:56 +0200
-Subject: [PATCH 1/2] ARM: at91: cpuidle: convert to platform driver
-In-Reply-To: <20131014142719.GI11420@ns203013.ovh.net>
-References: <1381593099-1184-1-git-send-email-daniel.lezcano@linaro.org>
- <20131014140406.GH11420@ns203013.ovh.net> <525BFD31.3020406@linaro.org>
- <20131014142719.GI11420@ns203013.ovh.net>
-Message-ID: <525C1C40.7010508@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 14 Oct 2013 18:35:33 +0200
+Subject: [PATCH] crypto: atmel-aes - add support for Device Tree
+Message-ID: <1381768533-31756-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2013 04:27 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 16:18 Mon 14 Oct     , Daniel Lezcano wrote:
->> On 10/14/2013 04:04 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> On 17:51 Sat 12 Oct     , Daniel Lezcano wrote:
->>>> Use the platform driver model to separate the cpuidle specific code from
->>>> the low level pm code. It allows to remove the dependency between
->>>> these two components.
->>>>
->>>> Tested-on usb-a9263 (at91sam9263)
->>>>
->>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Add support for Device Tree and use of the DMA DT API to
+get the needed channels.
+Documentation is added for these DT nodes.
 
-[ ... ]
+Initial code by: Nicolas Royer and Eukrea.
 
->>>> ---
->>>>   	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
->>>> -	if (cpu_is_at91rm9200())
->>>> +	if (cpu_is_at91rm9200()) {
->>>> +		at91_cpuidle_device.dev.platform_data = at91rm9200_standby;
->>>>   		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
->>>> +	} else if (cpu_is_at91sam9g45()) {
->>>> +		at91_cpuidle_device.dev.platform_data = at91sam9g45_standby;
->>>> +	} else if (cpu_is_at91sam9263()) {
->>>> +		at91_cpuidle_device.dev.platform_data = at91sam9263_standby;
->>>> +	} else {
->>>> +		at91_cpuidle_device.dev.platform_data = at91sam9_standby;
->>> no this is too dangerous when adding new SoC
->>>
->>> you must list the supported SoC
->>>
->>> and I prefer to move this code to the SoC init structure
->>
->> Do you mean register the platform_device in eg.
->> at91rm9200_initialize with the right platform data ?
->>
-> yes as example
->
-> Best Regards,
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ .../devicetree/bindings/crypto/atmel-crypto.txt    |  23 ++++
+ drivers/crypto/atmel-aes.c                         | 143 ++++++++++++++-------
+ 2 files changed, 117 insertions(+), 49 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/crypto/atmel-crypto.txt
 
-Hi Jean-Christophe,
-
-I did the changes but there are different drawbacks with the approach.
-The first one is the AT91_SOC_START is too early to call the 
-platform_device_register. The second one is we have multiple declaration 
-of the platform_device which is not really nice.
-
-I found the following solution:
-
-The platform_device is static in pm.c, there is a at91_pm_set_standby 
-function. All AT91_SOC_START call at91_pm_set_standby with the right 
-standby function callback, which in turns set the platform data for the 
-cpuidle platform device. When the init call for pm is made, it registers 
-the platform device.
-
-That has the benefit to encapsulate the platform device and having it in 
-a single place and also we have the information to remove the { if then 
-else } statements we have in 'at91_pm_enter's case block for 
-PM_SUSPEND_STANDBY.
-
-Does it sound ok for you ?
-
-Thanks
-   -- Daniel
-
-diff --git a/arch/arm/mach-at91/at91rm9200.c 
-b/arch/arm/mach-at91/at91rm9200.c
-index 4aad93d..0d234f2 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -27,6 +27,7 @@
-  #include "generic.h"
-  #include "clock.h"
-  #include "sam9_smc.h"
-+#include "pm.h"
-
-  /* --------------------------------------------------------------------
-   *  Clocks
-@@ -337,6 +338,8 @@ static void __init at91rm9200_initialize(void)
-  	/* Initialize GPIO subsystem */
-  	at91_gpio_init(at91rm9200_gpio,
-  		cpu_is_at91rm9200_bga() ? AT91RM9200_BGA : AT91RM9200_PQFP);
+diff --git a/Documentation/devicetree/bindings/crypto/atmel-crypto.txt b/Documentation/devicetree/bindings/crypto/atmel-crypto.txt
+new file mode 100644
+index 0000000..d273f0b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/atmel-crypto.txt
+@@ -0,0 +1,23 @@
++* Atmel HW cryptographic accelerators
 +
-+	at91_pm_set_standby(at91rm9200_standby);
-  }
-
-
-diff --git a/arch/arm/mach-at91/at91sam9260.c 
-b/arch/arm/mach-at91/at91sam9260.c
-index 5de6074..9fd7aa6 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -28,6 +28,7 @@
-  #include "generic.h"
-  #include "clock.h"
-  #include "sam9_smc.h"
-+#include "pm.h"
-
-  /* --------------------------------------------------------------------
-   *  Clocks
-@@ -307,7 +308,6 @@ static struct at91_gpio_bank at91sam9260_gpio[] 
-__initdata = {
-  /* --------------------------------------------------------------------
-   *  AT91SAM9260 processor initialization
-   * -------------------------------------------------------------------- */
++These are the HW cryptographic accelerators found on some Atmel products.
++
++* Advanced Encryption Standard (AES)
++
++Required properties:
++- compatible : Should be "atmel,at91sam9g46-aes".
++- reg: Should contain AES registers location and length.
++- interrupts: Should contain the IRQ line for the AES.
++- dmas: List of two DMA specifiers as described in
++        atmel-dma.txt and dma.txt files.
++- dma-names: Contains one identifier string for each DMA specifier
++             in the dmas property.
++
++Example:
++aes at f8038000 {
++	compatible = "atmel,at91sam9g46-aes";
++	reg = <0xf8038000 0x100>;
++	interrupts = <43 4 0>;
++	dmas = <&dma1 2 18>,
++	       <&dma1 2 19>;
++	dma-names = "tx", "rx";
+diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
+index c1efd91..d7c9e31 100644
+--- a/drivers/crypto/atmel-aes.c
++++ b/drivers/crypto/atmel-aes.c
+@@ -30,6 +30,7 @@
+ #include <linux/irq.h>
+ #include <linux/scatterlist.h>
+ #include <linux/dma-mapping.h>
++#include <linux/of_device.h>
+ #include <linux/delay.h>
+ #include <linux/crypto.h>
+ #include <linux/cryptohash.h>
+@@ -39,6 +40,7 @@
+ #include <crypto/hash.h>
+ #include <crypto/internal/hash.h>
+ #include <linux/platform_data/crypto-atmel.h>
++#include <dt-bindings/dma/at91.h>
+ #include "atmel-aes-regs.h"
+ 
+ #define CFB8_BLOCK_SIZE		1
+@@ -747,59 +749,50 @@ static int atmel_aes_dma_init(struct atmel_aes_dev *dd,
+ 	struct crypto_platform_data *pdata)
+ {
+ 	int err = -ENOMEM;
+-	dma_cap_mask_t mask_in, mask_out;
++	dma_cap_mask_t mask;
++
++	dma_cap_zero(mask);
++	dma_cap_set(DMA_SLAVE, mask);
++
++	/* Try to grab 2 DMA channels */
++	dd->dma_lch_in.chan = dma_request_slave_channel_compat(mask,
++			atmel_aes_filter, &pdata->dma_slave->rxdata, dd->dev, "tx");
++	if (!dd->dma_lch_in.chan)
++		goto err_dma_in;
++
++	dd->dma_lch_in.dma_conf.direction = DMA_MEM_TO_DEV;
++	dd->dma_lch_in.dma_conf.dst_addr = dd->phys_base +
++		AES_IDATAR(0);
++	dd->dma_lch_in.dma_conf.src_maxburst = dd->caps.max_burst_size;
++	dd->dma_lch_in.dma_conf.src_addr_width =
++		DMA_SLAVE_BUSWIDTH_4_BYTES;
++	dd->dma_lch_in.dma_conf.dst_maxburst = dd->caps.max_burst_size;
++	dd->dma_lch_in.dma_conf.dst_addr_width =
++		DMA_SLAVE_BUSWIDTH_4_BYTES;
++	dd->dma_lch_in.dma_conf.device_fc = false;
++
++	dd->dma_lch_out.chan = dma_request_slave_channel_compat(mask,
++			atmel_aes_filter, &pdata->dma_slave->txdata, dd->dev, "rx");
++	if (!dd->dma_lch_out.chan)
++		goto err_dma_out;
++
++	dd->dma_lch_out.dma_conf.direction = DMA_DEV_TO_MEM;
++	dd->dma_lch_out.dma_conf.src_addr = dd->phys_base +
++		AES_ODATAR(0);
++	dd->dma_lch_out.dma_conf.src_maxburst = dd->caps.max_burst_size;
++	dd->dma_lch_out.dma_conf.src_addr_width =
++		DMA_SLAVE_BUSWIDTH_4_BYTES;
++	dd->dma_lch_out.dma_conf.dst_maxburst = dd->caps.max_burst_size;
++	dd->dma_lch_out.dma_conf.dst_addr_width =
++		DMA_SLAVE_BUSWIDTH_4_BYTES;
++	dd->dma_lch_out.dma_conf.device_fc = false;
+ 
+-	if (pdata && pdata->dma_slave->txdata.dma_dev &&
+-		pdata->dma_slave->rxdata.dma_dev) {
 -
-  static void __init at91sam9xe_map_io(void)
-  {
-  	unsigned long sram_size;
-@@ -351,6 +351,8 @@ static void __init at91sam9260_initialize(void)
-
-  	/* Register GPIO subsystem */
-  	at91_gpio_init(at91sam9260_gpio, 3);
-+
-+	at91_pm_set_standby(at91sam9_standby);
-  }
-
-  /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9261.c 
-b/arch/arm/mach-at91/at91sam9261.c
-index 0e07932..1edbb6f 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -27,6 +27,7 @@
-  #include "generic.h"
-  #include "clock.h"
-  #include "sam9_smc.h"
-+#include "pm.h"
-
-  /* --------------------------------------------------------------------
-   *  Clocks
-@@ -293,6 +294,8 @@ static void __init at91sam9261_initialize(void)
-
-  	/* Register GPIO subsystem */
-  	at91_gpio_init(at91sam9261_gpio, 3);
-+
-+	at91_pm_set_sandby(at91sam9_standby);
-  }
-
-  /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9263.c 
-b/arch/arm/mach-at91/at91sam9263.c
-index 6ce7d18..b222d59 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -26,6 +26,7 @@
-  #include "generic.h"
-  #include "clock.h"
-  #include "sam9_smc.h"
-+#include "pm.h"
-
-  /* --------------------------------------------------------------------
-   *  Clocks
-@@ -304,7 +305,6 @@ static struct at91_gpio_bank at91sam9263_gpio[] 
-__initdata = {
-  /* --------------------------------------------------------------------
-   *  AT91SAM9263 processor initialization
-   * -------------------------------------------------------------------- */
+-		/* Try to grab 2 DMA channels */
+-		dma_cap_zero(mask_in);
+-		dma_cap_set(DMA_SLAVE, mask_in);
 -
-  static void __init at91sam9263_map_io(void)
-  {
-  	at91_init_sram(0, AT91SAM9263_SRAM0_BASE, AT91SAM9263_SRAM0_SIZE);
-@@ -330,6 +330,8 @@ static void __init at91sam9263_initialize(void)
-
-  	/* Register GPIO subsystem */
-  	at91_gpio_init(at91sam9263_gpio, 5);
-+
-+	at91_pm_set_standby(at91sam9263_standby);
-  }
-
-  /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9g45.c 
-b/arch/arm/mach-at91/at91sam9g45.c
-index 474ee04..4186f37 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -26,6 +26,7 @@
-  #include "generic.h"
-  #include "clock.h"
-  #include "sam9_smc.h"
-+#include "pm.h"
-
-  /* --------------------------------------------------------------------
-   *  Clocks
-@@ -355,7 +356,6 @@ static struct at91_gpio_bank at91sam9g45_gpio[] 
-__initdata = {
-  /* --------------------------------------------------------------------
-   *  AT91SAM9G45 processor initialization
-   * -------------------------------------------------------------------- */
+-		dd->dma_lch_in.chan = dma_request_channel(mask_in,
+-				atmel_aes_filter, &pdata->dma_slave->rxdata);
 -
-  static void __init at91sam9g45_map_io(void)
-  {
-  	at91_init_sram(0, AT91SAM9G45_SRAM_BASE, AT91SAM9G45_SRAM_SIZE);
-@@ -379,6 +379,8 @@ static void __init at91sam9g45_initialize(void)
-
-  	/* Register GPIO subsystem */
-  	at91_gpio_init(at91sam9g45_gpio, 5);
-+
-+	at91_pm_set_standby(at91sam9g45_standby);
-  }
-
-  /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9n12.c 
-b/arch/arm/mach-at91/at91sam9n12.c
-index c7d670d..cc61e09 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -21,6 +21,7 @@
-  #include "generic.h"
-  #include "clock.h"
-  #include "sam9_smc.h"
-+#include "pm.h"
-
-  /* --------------------------------------------------------------------
-   *  Clocks
-@@ -217,13 +218,18 @@ static void __init at91sam9n12_register_clocks(void)
-  /* --------------------------------------------------------------------
-   *  AT91SAM9N12 processor initialization
-   * -------------------------------------------------------------------- */
+-		if (!dd->dma_lch_in.chan)
+-			goto err_dma_in;
 -
-  static void __init at91sam9n12_map_io(void)
-  {
-  	at91_init_sram(0, AT91SAM9N12_SRAM_BASE, AT91SAM9N12_SRAM_SIZE);
-  }
-
-+static void __init at91sam9n12_initialize(void)
-+{
-+	at91_pm_set_standby(at91sam9_standby);
-+}
-+
-  AT91_SOC_START(at91sam9n12)
-  	.map_io = at91sam9n12_map_io,
-  	.register_clocks = at91sam9n12_register_clocks,
-+	.init = at91sam9n12_initialize,
-  AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9rl.c 
-b/arch/arm/mach-at91/at91sam9rl.c
-index d4ec0d9..b0c8cb6 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -27,6 +27,7 @@
-  #include "generic.h"
-  #include "clock.h"
-  #include "sam9_smc.h"
-+#include "pm.h"
-
-  /* --------------------------------------------------------------------
-   *  Clocks
-@@ -261,7 +262,6 @@ static struct at91_gpio_bank at91sam9rl_gpio[] 
-__initdata = {
-  /* --------------------------------------------------------------------
-   *  AT91SAM9RL processor initialization
-   * -------------------------------------------------------------------- */
+-		dd->dma_lch_in.dma_conf.direction = DMA_MEM_TO_DEV;
+-		dd->dma_lch_in.dma_conf.dst_addr = dd->phys_base +
+-			AES_IDATAR(0);
+-		dd->dma_lch_in.dma_conf.src_maxburst = dd->caps.max_burst_size;
+-		dd->dma_lch_in.dma_conf.src_addr_width =
+-			DMA_SLAVE_BUSWIDTH_4_BYTES;
+-		dd->dma_lch_in.dma_conf.dst_maxburst = dd->caps.max_burst_size;
+-		dd->dma_lch_in.dma_conf.dst_addr_width =
+-			DMA_SLAVE_BUSWIDTH_4_BYTES;
+-		dd->dma_lch_in.dma_conf.device_fc = false;
 -
-  static void __init at91sam9rl_map_io(void)
-  {
-  	unsigned long sram_size;
-@@ -296,6 +296,8 @@ static void __init at91sam9rl_initialize(void)
-
-  	/* Register GPIO subsystem */
-  	at91_gpio_init(at91sam9rl_gpio, 4);
-+
-+	at91_pm_set_standby(at91sam9_standby);
-  }
-
-  /* --------------------------------------------------------------------
-diff --git a/arch/arm/mach-at91/at91sam9x5.c 
-b/arch/arm/mach-at91/at91sam9x5.c
-index 916e5a1..9ef7bc6 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -21,6 +21,7 @@
-  #include "generic.h"
-  #include "clock.h"
-  #include "sam9_smc.h"
-+#include "pm.h"
-
-  /* --------------------------------------------------------------------
-   *  Clocks
-@@ -316,12 +317,15 @@ static void __init at91sam9x5_register_clocks(void)
-  /* --------------------------------------------------------------------
-   *  AT91SAM9x5 processor initialization
-   * -------------------------------------------------------------------- */
+-		dma_cap_zero(mask_out);
+-		dma_cap_set(DMA_SLAVE, mask_out);
+-		dd->dma_lch_out.chan = dma_request_channel(mask_out,
+-				atmel_aes_filter, &pdata->dma_slave->txdata);
 -
-  static void __init at91sam9x5_map_io(void)
-  {
-  	at91_init_sram(0, AT91SAM9X5_SRAM_BASE, AT91SAM9X5_SRAM_SIZE);
-  }
-
-+static void __init at91sam9x5_initialize(void)
-+{
-+	at91_pm_set_standby(at91sam9_standby);
-+}
-  /* --------------------------------------------------------------------
-   *  Interrupt initialization
-   * -------------------------------------------------------------------- */
-@@ -329,4 +333,5 @@ static void __init at91sam9x5_map_io(void)
-  AT91_SOC_START(at91sam9x5)
-  	.map_io = at91sam9x5_map_io,
-  	.register_clocks = at91sam9x5_register_clocks,
-+	.init = at91sam9x5_initialize,
-  AT91_SOC_END
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index debdbf8..42b955c 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -318,6 +318,11 @@ static struct platform_device at91_cpuidle_device = {
-  	.name = "cpuidle-at91",
-  };
-
-+void at91_pm_set_standby(void (*at91_standby)(void))
-+{
-+	at91_cpuidle_device.dev.platform_data = at91_standby;	
-+}
-+
-  static int __init at91_pm_init(void)
-  {
-  #ifdef CONFIG_AT91_SLOW_CLOCK
-@@ -327,16 +332,8 @@ static int __init at91_pm_init(void)
-  	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow 
-clock mode)" : ""));
-
-  	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
--	if (cpu_is_at91rm9200()) {
--		at91_cpuidle_device.dev.platform_data = at91rm9200_standby;
-+	if (cpu_is_at91rm9200())
-  		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
--	} else if (cpu_is_at91sam9g45()) {
--		at91_cpuidle_device.dev.platform_data = at91sam9g45_standby;
--	} else if (cpu_is_at91sam9263()) {
--		at91_cpuidle_device.dev.platform_data = at91sam9263_standby;
+-		if (!dd->dma_lch_out.chan)
+-			goto err_dma_out;
+-
+-		dd->dma_lch_out.dma_conf.direction = DMA_DEV_TO_MEM;
+-		dd->dma_lch_out.dma_conf.src_addr = dd->phys_base +
+-			AES_ODATAR(0);
+-		dd->dma_lch_out.dma_conf.src_maxburst = dd->caps.max_burst_size;
+-		dd->dma_lch_out.dma_conf.src_addr_width =
+-			DMA_SLAVE_BUSWIDTH_4_BYTES;
+-		dd->dma_lch_out.dma_conf.dst_maxburst = dd->caps.max_burst_size;
+-		dd->dma_lch_out.dma_conf.dst_addr_width =
+-			DMA_SLAVE_BUSWIDTH_4_BYTES;
+-		dd->dma_lch_out.dma_conf.device_fc = false;
+-
+-		return 0;
 -	} else {
--		at91_cpuidle_device.dev.platform_data = at91sam9_standby;
+-		return -ENODEV;
 -	}
-  	
-  	platform_device_register(&at91_cpuidle_device);
-
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 2f5908f..76dd1a7 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -11,9 +11,13 @@
-  #ifndef __ARCH_ARM_MACH_AT91_PM
-  #define __ARCH_ARM_MACH_AT91_PM
-
-+#include <asm/proc-fns.h>
++	return 0;
+ 
+ err_dma_out:
+ 	dma_release_channel(dd->dma_lch_in.chan);
+ err_dma_in:
++	dev_warn(dd->dev, "no DMA channel available\n");
+ 	return err;
+ }
+ 
+@@ -1261,6 +1254,47 @@ static void atmel_aes_get_cap(struct atmel_aes_dev *dd)
+ 	}
+ }
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id atmel_aes_dt_ids[] = {
++	{ .compatible = "atmel,at91sam9g46-aes" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, atmel_aes_dt_ids);
 +
-  #include <mach/at91_ramc.h>
-  #include <mach/at91rm9200_sdramc.h>
-
-+extern void at91_pm_set_standby(void (*at91_standby)(void));
-+
-  /*
-   * The AT91RM9200 goes into self-refresh mode with this command, and will
-   * terminate self-refresh automatically on the next SDRAM access.
-diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-index 4012797..9a53db6 100644
---- a/arch/arm/mach-at91/sama5d3.c
-+++ b/arch/arm/mach-at91/sama5d3.c
-@@ -21,6 +21,7 @@
-  #include "generic.h"
-  #include "clock.h"
-  #include "sam9_smc.h"
-+#include "pm.h"
-
-  /* --------------------------------------------------------------------
-   *  Clocks
-@@ -365,13 +366,18 @@ static void __init sama5d3_register_clocks(void)
-  /* --------------------------------------------------------------------
-   *  AT91SAM9x5 processor initialization
-   * -------------------------------------------------------------------- */
--
-  static void __init sama5d3_map_io(void)
-  {
-  	at91_init_sram(0, SAMA5D3_SRAM_BASE, SAMA5D3_SRAM_SIZE);
-  }
-
-+static void __init sama5d3_initialize(void)
++static struct crypto_platform_data *atmel_aes_of_init(struct platform_device *pdev)
 +{
-+	at91_set_standby(at91sam9_standby);
-+}
++	struct device_node *np = pdev->dev.of_node;
++	struct crypto_platform_data *pdata;
 +
-  AT91_SOC_START(sama5d3)
-  	.map_io = sama5d3_map_io,
-  	.register_clocks = sama5d3_register_clocks,
-+	.init = sama5d3_initialize,
-  AT91_SOC_END
-
-
->>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>
->> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->> <http://twitter.com/#!/linaroorg> Twitter |
->> <http://www.linaro.org/linaro-blog/> Blog
->>
-
-
++	if (!np) {
++		dev_err(&pdev->dev, "device node not found\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata) {
++		dev_err(&pdev->dev, "could not allocate memory for pdata\n");
++		return ERR_PTR(-ENOMEM);
++	}
++
++	pdata->dma_slave = devm_kzalloc(&pdev->dev,
++					sizeof(*(pdata->dma_slave)),
++					GFP_KERNEL);
++	if (!pdata->dma_slave) {
++		dev_err(&pdev->dev, "could not allocate memory for dma_slave\n");
++		devm_kfree(&pdev->dev, pdata);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	return pdata;
++}
++#else
++static inline struct crypto_platform_data *atmel_aes_of_init(struct platform_device *pdev)
++{
++	return ERR_PTR(-EINVAL);
++}
++#endif
++
+ static int atmel_aes_probe(struct platform_device *pdev)
+ {
+ 	struct atmel_aes_dev *aes_dd;
+@@ -1272,6 +1306,14 @@ static int atmel_aes_probe(struct platform_device *pdev)
+ 
+ 	pdata = pdev->dev.platform_data;
+ 	if (!pdata) {
++		pdata = atmel_aes_of_init(pdev);
++		if (IS_ERR(pdata)) {
++			err = PTR_ERR(pdata);
++			goto aes_dd_err;
++		}
++	}
++
++	if (!pdata->dma_slave) {
+ 		err = -ENXIO;
+ 		goto aes_dd_err;
+ 	}
+@@ -1358,7 +1400,9 @@ static int atmel_aes_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto err_algs;
+ 
+-	dev_info(dev, "Atmel AES\n");
++	dev_info(dev, "Atmel AES - Using %s, %s for DMA transfers\n",
++			dma_chan_name(aes_dd->dma_lch_in.chan),
++			dma_chan_name(aes_dd->dma_lch_out.chan));
+ 
+ 	return 0;
+ 
+@@ -1424,6 +1468,7 @@ static struct platform_driver atmel_aes_driver = {
+ 	.driver		= {
+ 		.name	= "atmel_aes",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(atmel_aes_dt_ids),
+ 	},
+ };
+ 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.2.2
