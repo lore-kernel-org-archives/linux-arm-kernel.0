@@ -1,60 +1,76 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 14 Oct 2013 13:38:33 +0800
-Subject: [PATCH 5/5] ARM: at91: add sound support on at91sam9n12ek board
-In-Reply-To: <1381729113-29714-1-git-send-email-voice.shen@atmel.com>
-References: <1381729113-29714-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1381729113-29714-6-git-send-email-voice.shen@atmel.com>
+Date: Mon, 14 Oct 2013 13:45:24 +0800
+Subject: [PATCH] input: qt1070: add power management ops
+In-Reply-To: <520B2921.3000906@atmel.com>
+References: <1376379826-28808-1-git-send-email-voice.shen@atmel.com>
+ <520B2921.3000906@atmel.com>
+Message-ID: <525B84F4.4000405@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sound support on at91sam9n12ek board with wm8904 as codec.
+Hi Dmitry,
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
+On 8/14/2013 14:52, Nicolas Ferre wrote:
+> On 13/08/2013 09:43, Bo Shen :
+>> Add power management ops for qt1070, it maybe a wakeup source
+>>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
----
- arch/arm/boot/dts/at91sam9n12ek.dts |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Would this patch be applied with Nicolas' ACK?
 
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index 391c532..e9487f6 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -91,6 +91,13 @@
- 							<AT91_PIOA 2 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
- 					};
- 				};
-+
-+				sound {
-+					pinctrl_pck0_as_audio_mck: pck0_as_audio_mck {
-+						atmel,pins =
-+							<AT91_PIOB 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+				};
- 			};
- 
- 			spi0: spi at f0000000 {
-@@ -151,4 +158,22 @@
- 			gpio-key,wakeup;
- 		};
- 	};
-+
-+	sound {
-+		compatible = "atmel,asoc-wm8904";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pck0_as_audio_mck>;
-+
-+		atmel,model = "wm8904 @ AT91SAM9N12";
-+		atmel,audio-routing =
-+			"Headphone Jack", "HPOUTL",
-+			"Headphone Jack", "HPOUTR",
-+			"IN2L", "Line In Jack",
-+			"IN2R", "Line In Jack",
-+			"Mic", "MICBIAS",
-+			"IN1L", "Mic";
-+
-+		atmel,ssc-controller = <&ssc0>;
-+		atmel,audio-codec = <&wm8904>;
-+	};
- };
--- 
-1.7.9.5
+Best Regards,
+Bo Shen
+
+>> ---
+>>   drivers/input/keyboard/qt1070.c |   25 +++++++++++++++++++++++++
+>>   1 file changed, 25 insertions(+)
+>>
+>> diff --git a/drivers/input/keyboard/qt1070.c
+>> b/drivers/input/keyboard/qt1070.c
+>> index 42b773b..deefe5a 100644
+>> --- a/drivers/input/keyboard/qt1070.c
+>> +++ b/drivers/input/keyboard/qt1070.c
+>> @@ -243,6 +243,30 @@ static int qt1070_remove(struct i2c_client *client)
+>>       return 0;
+>>   }
+>>
+>> +#ifdef CONFIG_PM_SLEEP
+>> +static int qt1070_suspend(struct device *dev)
+>> +{
+>> +    struct qt1070_data *data = dev_get_drvdata(dev);
+>> +
+>> +    if (device_may_wakeup(dev))
+>> +        enable_irq_wake(data->irq);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +static int qt1070_resume(struct device *dev)
+>> +{
+>> +    struct qt1070_data *data = dev_get_drvdata(dev);
+>> +
+>> +    if (device_may_wakeup(dev))
+>> +        disable_irq_wake(data->irq);
+>> +
+>> +    return 0;
+>> +}
+>> +#endif
+>> +
+>> +static SIMPLE_DEV_PM_OPS(qt1070_pm_ops, qt1070_suspend, qt1070_resume);
+>> +
+>>   static const struct i2c_device_id qt1070_id[] = {
+>>       { "qt1070", 0 },
+>>       { },
+>> @@ -253,6 +277,7 @@ static struct i2c_driver qt1070_driver = {
+>>       .driver    = {
+>>           .name    = "qt1070",
+>>           .owner    = THIS_MODULE,
+>> +        .pm    = &qt1070_pm_ops,
+>>       },
+>>       .id_table    = qt1070_id,
+>>       .probe        = qt1070_probe,
+>>
+>
+>
