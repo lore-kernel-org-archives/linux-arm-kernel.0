@@ -1,63 +1,23 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Mon, 14 Oct 2013 21:15:35 +0530
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <525C0C21.2070001@redhat.com>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <525BEBB4.4050603@redhat.com>
- <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
- <525BF089.9050408@arm.com>
- <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
- <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
- <525BFBF9.5010804@arm.com>
- <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
- <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
- <525C09D1.8060103@arm.com> <525C0C21.2070001@redhat.com>
-Message-ID: <CAAhSdy27fK2sNvvAhEPuzH22twALZWjnnSNdc1Jv3xZBoLiJtw@mail.gmail.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Mon, 14 Oct 2013 23:57:29 +0800
+Subject: [PATCH v2 0/7] Optimize jump label implementation on ARM64
+In-Reply-To: <20131014154044.GR25034@n2100.arm.linux.org.uk>
+References: <1381675827-1610-1-git-send-email-liuj97@gmail.com>
+ <20131014154044.GR25034@n2100.arm.linux.org.uk>
+Message-ID: <525C1469.4000906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 8:52 PM, Paolo Bonzini <pbonzini@redhat.com> wrote:
-> Il 14/10/2013 17:12, Marc Zyngier ha scritto:
->> On 14/10/13 15:56, Paolo Bonzini wrote:
->>> Il 14/10/2013 16:52, Marc Zyngier ha scritto:
->>>>>> Sure. And I imagine this traps back into the kernel to read some
->>>>>> register and find out what the endianness of the accessing CPU is?
->>>>>
->>>>> Not yet. To be exact, it does the below today. But all virtio device
->>>>> emulation is 100% guest endianness unaware. This helper is the only
->>>>> piece of code where it gets any idea what endianness the guest has. So
->>>>> by checking for references to it in the code you know where endianness
->>>>> is an issue. And that's only in the config space.
->>>>
->>>> Only config space? How do you deal with virtio ring descriptors, for
->>>> example?
->>>
->>> They also use guest endianness, but do not use virtio_is_big_endian()
->>> (yet?) so Alex missed them.
->>
->> Yeah, I thought as much. There is a whole bunch of things that need byte
->> swapping, both at the virtio level itself, and at the device level as well.
->>
->> Grep-ing for __u{16,32,64} through include/uapi/linux/virtio* shows the
->> extent of the disaster.
->
-> Devices are fine in QEMU, it's only the "generic" parts (rings) that are
-> missing AFAICT.
-
-We need to take care of endianness of "device" specific descriptors in
-a VirtIO device.
-
-For example:
-In VirtIO Net device, the guest sends "struct virtio_net_hdr" for each Tx
-packet which describes the Tx offloads needed for packet and other info.
-
->
-> Paolo
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
-
---
-Anup
+On 10/14/2013 11:40 PM, Russell King - ARM Linux wrote:
+> On Sun, Oct 13, 2013 at 10:50:20PM +0800, Jiang Liu wrote:
+>> To enable this feature, your toolchain must support "asm goto" extension
+>> and "%c" constraint extesion. Current GCC for AARCH64 doesn't support
+>> "%c", so you need a GCC patch similiar to this:
+> 
+> Oh god, not that again.  I've no idea why ARM stuff has such a problem with
+> supporting this very useful "%c" GCC constraint.  Aarch32 didn't for ages
+> consequently we now have horrid hacks around it in the kernel source
+> because our compilers suck.  Seems Aarch64 is doomed to repeat the same
+> stupid mistakes. :(
+> 
+We need to do the same trick for ARM64 too:)
