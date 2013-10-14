@@ -1,45 +1,47 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 14 Oct 2013 12:53:42 +0200
-Subject: [PATCH 2/2] ARM: at91: cpuidle: Move driver to drivers/cpuidle
-In-Reply-To: <3135182.xhXUMRLLGy@amdc1032>
-References: <1381593099-1184-1-git-send-email-daniel.lezcano@linaro.org>
- <20131013111945.0251a3cc@skate> <525A732D.3080708@linaro.org>
- <3135182.xhXUMRLLGy@amdc1032>
-Message-ID: <525BCD36.5050401@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Oct 2013 12:01:08 +0100
+Subject: [PATCH 01/11] usb: chipidea: Add power management support
+In-Reply-To: <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
+References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
+ <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131014110108.GL25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2013 12:20 PM, Bartlomiej Zolnierkiewicz wrote:
->
-> Hi Daniel,
->
-> On Sunday, October 13, 2013 12:17:17 PM Daniel Lezcano wrote:
->> On 10/13/2013 11:19 AM, Thomas Petazzoni wrote:
->>> Dear Daniel Lezcano,
->>>
->>> On Sat, 12 Oct 2013 17:51:39 +0200, Daniel Lezcano wrote:
->>>
->>>> +config ARM_AT91_CPUIDLE
->>>> +        bool "Cpu Idle Driver for the AT91 processors"
->>>
->>> Nitpick: indentation is done with spaces here, while it should be one
->>> tab.
->>
->> Ah, right. Fixed for the V2.
->
-> Could you also please add 'default y' to preserve the old behavior?
-> (the at91 cpuidle support was always built-in for CONFIG_CPU_IDLE=y)
+On Sat, Oct 12, 2013 at 05:35:03PM +0800, Peter Chen wrote:
+> This commit adds runtime and system power management support for
+> chipidea core. The runtime pm support is controlled by glue
+> layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
 
-Yes, sure.
+Let's look at the locking.
 
-Thanks for the review.
+1. Runtime PM.  These callbacks are locked with a spinlock, which holds
+   dev->power.lock.  This lock is taken either with or without disabling
+   IRQs depending on whether runtime PM is IRQ safe or not.
 
-   -- Daniel
+2. Normal PM.  These callbacks are locked by holding dev->mutex.
 
+Now, there's a little bit of protection between these two operations -
+when normal PM places a device into a low power state, it 'gets' a
+reference on the runtime PM to ensure no runtime PM transitions occur
+while normal PM is active.  (See pm_runtime_get_noresume() in
+device_prepare().)  This is only dropped when the normal PM resumes the
+device.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Moreover, all runtime PM events are flushed before the suspend callback
+occurs (see the pm_runtime_barrier() in __device_suspend()).
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+What that means is that you can't receive any runtime PM events while
+you are in your suspend/resume callbacks.  So, each call is mutually
+exclusive.
+
+So, runtime PM callbacks vs normal PM callbacks for any single device
+are all called with mutual exclusion - you won't have two running at
+any time.
+
+Hence, for the reasons stated previously about the non-atomic nature of
+atomic_read()/atomic_set(), there's even more reasons that their use
+here is just mere obfuscation: the accesses to this state tracking
+variable is already guaranteed to be single-threaded by core code, so
+the use of atomic_read()/atomic_set() just adds additional needless
+confusion to this code.
