@@ -1,35 +1,46 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 14 Oct 2013 12:20:11 +0300
-Subject: [PATCH 1/1] ARM: dts: omap3: Adapt USB OTG to generic PHY
- framework
-In-Reply-To: <20131010153427.GI28375@radagast>
-References: <1381152493-28055-1-git-send-email-rogerq@ti.com>
- <1381152493-28055-2-git-send-email-rogerq@ti.com>
- <20131010153427.GI28375@radagast>
-Message-ID: <525BB74B.2040702@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 14 Oct 2013 17:22:07 +0800
+Subject: [PATCH 09/12] usb: phy-mxs: update binding for adding anatop
+ phandle
+In-Reply-To: <1381568986-19802-10-git-send-email-peter.chen@freescale.com>
+References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
+ <1381568986-19802-10-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131014092205.GD27668@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-
-On 10/10/2013 06:34 PM, Felipe Balbi wrote:
-> On Mon, Oct 07, 2013 at 04:28:13PM +0300, Roger Quadros wrote:
->> The generic PHY framewrok expects different properties than the
->> old USB PHY framework. Supply those properties.
->>
->> Fixes USB OTG port on GAT04 and N900 after the Generic PHY framework was
->> merged in greg/usb-next. [1]
->>
->> [1] - https://lkml.org/lkml/2013/9/27/581
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
+On Sat, Oct 12, 2013 at 05:09:43PM +0800, Peter Chen wrote:
+> Add anatop phandle which is used to access anatop registers to
+> control PHY's power and other USB operations.
 > 
-> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
+> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> index 5835b27..1a9bd85 100644
+> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> @@ -4,10 +4,12 @@ Required properties:
+>  - compatible: Should be "fsl,imx23-usbphy"
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain phy interrupt
+> +- fsl,anatop: phandle for anatop register
 
-Could you please pick this one for 3.13? Thanks.
+It's only required for imx6 phy not necessarily for imx23/28 phy, right?
 
-I don't see it in your 3.13 take 2 pull request.
+Shawn
 
-cheers,
--roger
+>  
+>  Example:
+>  usbphy1: usbphy at 020c9000 {
+>  	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+>  	reg = <0x020c9000 0x1000>;
+>  	interrupts = <0 44 0x04>;
+> +	fsl,anatop = <&anatop>;
+>  };
+> -- 
+> 1.7.1
+> 
+> 
