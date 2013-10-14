@@ -1,18 +1,19 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Oct 2013 09:44:31 +0800
+Date: Mon, 14 Oct 2013 09:45:54 +0800
 Subject: [PATCH 11/12] usb: phy-mxs: update binding for adding
  disconnect line property
-In-Reply-To: <201310121147.07217.marex@denx.de>
+In-Reply-To: <20131012170523.13726549@skate>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
  <1381568986-19802-12-git-send-email-peter.chen@freescale.com>
- <201310121147.07217.marex@denx.de>
-Message-ID: <20131014014430.GF3879@shlinux1.ap.freescale.net>
+ <20131012170523.13726549@skate>
+Message-ID: <20131014014553.GG3879@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 12, 2013 at 11:47:06AM +0200, Marek Vasut wrote:
+On Sat, Oct 12, 2013 at 05:05:23PM +0200, Thomas Petazzoni wrote:
 > Dear Peter Chen,
 > 
+> On Sat, 12 Oct 2013 17:09:45 +0800, Peter Chen wrote:
 > > This property is used to disconnect line between USB PHY and
 > > USB controller.
 > > 
@@ -21,9 +22,8 @@ On Sat, Oct 12, 2013 at 11:47:06AM +0200, Marek Vasut wrote:
 > >  Documentation/devicetree/bindings/usb/mxs-phy.txt |    4 ++++
 > >  1 files changed, 4 insertions(+), 0 deletions(-)
 > > 
-> > diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> > b/Documentation/devicetree/bindings/usb/mxs-phy.txt index 1a9bd85..099b0bb
-> > 100644
+> > diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > index 1a9bd85..099b0bb 100644
 > > --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
 > > +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
 > > @@ -5,6 +5,9 @@ Required properties:
@@ -33,16 +33,26 @@ On Sat, Oct 12, 2013 at 11:47:06AM +0200, Marek Vasut wrote:
 > > +- disconnect_line_without_vbus: needs to disconnect
 > > +connection between USB PHY and controller, it can avoid
 > > +unexpected wakeup interrupt when the PHY is out of power
+> >  
+> >  Example:
+> >  usbphy1: usbphy at 020c9000 {
+> > @@ -12,4 +15,5 @@ usbphy1: usbphy at 020c9000 {
+> >  	reg = <0x020c9000 0x1000>;
+> >  	interrupts = <0 44 0x04>;
+> >  	fsl,anatop = <&anatop>;
+> > +	disconnect_line_without_vbus;
+> >  };
 > 
-> Uh oh, this might needs some rewording. I didn't understand the reason for this 
-> prop before I checked the 12/12 patch.
+> Device Tree properties use "-" as a separator, not "_". So, it should
+> be:
+> 
+> 	disconnect-line-without-vbus
+> 
+> Also, all your patches touching Device Tree bindings should be Cc'ed to
+> the devicetree@ mailing list.
 > 
 
-So, the better sequence like below, correct?
-
-Binding doc patch
-source code change patch
-dts file patch
+Thanks, I will change, and cc DT ML and maintainer, thanks.
 
 -- 
 
