@@ -1,74 +1,35 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 14 Oct 2013 11:15:00 +0300
-Subject: [PATCH] pinctrl: single: call pcs_soc->rearm() whenever IRQ mask
- is changed
-In-Reply-To: <20131011172128.GT29913@atomide.com>
-References: <1381507996-15021-1-git-send-email-rogerq@ti.com>
- <20131011172128.GT29913@atomide.com>
-Message-ID: <525BA804.3010901@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 14 Oct 2013 11:15:33 +0300
+Subject: [PATCH 03/10] clk: tegra: Staticize local variables in clk-pll.c
+In-Reply-To: <5256D0CA.9010906@wwwdotorg.org>
+References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
+ <1381231068-6053-3-git-send-email-sachin.kamat@linaro.org>
+ <52542E34.6020806@wwwdotorg.org>
+ <20131010111328.GS4233@tbergstrom-lnx.Nvidia.com>
+ <5256D0CA.9010906@wwwdotorg.org>
+Message-ID: <20131014081533.GZ4233@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2013 08:21 PM, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [131011 09:21]:
->> On OMAPs the IO ring must be rearmed each time the pad wakeup
->> configuration is changed. So call pcs_soc->rearm() from
->> pcs_irq_set().
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>  drivers/pinctrl/pinctrl-single.c |    5 +++--
->>  1 files changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
->> index c2aada7..1800e47 100644
->> --- a/drivers/pinctrl/pinctrl-single.c
->> +++ b/drivers/pinctrl/pinctrl-single.c
->> @@ -1604,6 +1604,9 @@ static inline void pcs_irq_set(struct pcs_soc_data *pcs_soc,
->>  		pcs->write(mask, pcswi->reg);
->>  		raw_spin_unlock(&pcs->lock);
->>  	}
->> +
->> +	if (pcs_soc->rearm)
->> +		pcs_soc->rearm();
->>  }
->>  
->>  /**
->> @@ -1626,8 +1629,6 @@ static void pcs_irq_unmask(struct irq_data *d)
->>  	struct pcs_soc_data *pcs_soc = irq_data_get_irq_chip_data(d);
->>  
->>  	pcs_irq_set(pcs_soc, d->irq, true);
->> -	if (pcs_soc->rearm)
->> -		pcs_soc->rearm();
->>  }
+On Thu, Oct 10, 2013 at 06:07:38PM +0200, Stephen Warren wrote:
+> On 10/10/2013 05:13 AM, Peter De Schrijver wrote:
+> > On Tue, Oct 08, 2013 at 06:09:24PM +0200, Stephen Warren wrote:
+> >> On 10/08/2013 05:17 AM, Sachin Kamat wrote:
+> >>> Local variables used only in this file are made static.
+> >>
+> > 
+> > Conceptually they are still exported. So I think it's counterintuitive to
+> > declare them static. Unless you expect namespace problems, I would rather
+> > leave it as is.
 > 
-> This seems to cause the wake-up interrupts to happen also during
-> runtime for me, which makes the omap3 behave the same way as omap4
-> already does.
-> 
-> However, the concern I have is that we only want the io chain
-> wake-up happen during idle and not during runtime.. So counting
-> on the io chain in your EHCI driver during runtime would require
-> also additional tracking of idle wake up events vs runtime wake-up
-> events somewhere once we have the automatic solution for runtime PM.
-> That is to avoid spurious interrupts during runtime.
+> I forget exactly which symbols this patch changed, but presumably
+> they're only exported via pointers rather than by symbol name, and isn't
+> that exactly what static is for?
 
-Right. It is upto the driver to disable the irq when it is not interested
-in the wake up interrupts.
+They are indeed exported using a pointer. depends on how you look at it I
+guess, but I see static as 'local to this file only' which isn't really
+true if you hand out pointers to others.
 
-> 
-> In any case, since this is an interrupt controller now, we should
-> just follow the Linux standard for interrupt controllers, so if
-> you do a request_irq() on it, you really should get interrupts.
-> 
-> I've updated the patch a litte below to also remove the now bogus
-> comment, and to update the description.
-> 
-> So considering all that, I suggest that Linus applies the updated
-> fix below into the pinctrl tree after pulling in the the tag I
-> posted for "pinctrl-single-for-linus-for-v3.13-signed".
+Cheers,
 
-Great. Thanks.
-
-cheers,
--roger
+Peter.
