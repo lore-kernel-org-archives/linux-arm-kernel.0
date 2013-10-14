@@ -1,82 +1,116 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 14 Oct 2013 15:59:21 +0200
-Subject: [PATCH 2/2] tty/serial: at91: add a fallback option to determine
- uart/usart property
-In-Reply-To: <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
-References: <a58fe8bc7fdd128a2f9cf60785f81ebde4c0c247.1381394411.git.nicolas.ferre@atmel.com>
- <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
-Message-ID: <20131014135921.GG11420@ns203013.ovh.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 14 Oct 2013 15:58:14 +0200
+Subject: [PATCH v3 02/14] ARM: mvebu: ll_set_cpu_coherent no more uses the
+ coherency address as parameter
+In-Reply-To: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1381759106-15004-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:43 Thu 10 Oct     , Nicolas Ferre wrote:
-> On older SoC, the "name" field is not filled in the register map.
-> Fix the way to figure out if the serial port is an uart or an usart for these
-> older products (with corresponding properties).
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  drivers/tty/serial/atmel_serial.c | 19 ++++++++++++++++++-
->  include/linux/atmel_serial.h      |  1 +
->  2 files changed, 19 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 6b0f75e..c7d99af 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -99,6 +99,7 @@ static void atmel_stop_rx(struct uart_port *port);
->  #define UART_PUT_RTOR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_RTOR)
->  #define UART_PUT_TTGR(port, v)	__raw_writel(v, (port)->membase + ATMEL_US_TTGR)
->  #define UART_GET_IP_NAME(port)	__raw_readl((port)->membase + ATMEL_US_NAME)
-> +#define UART_GET_IP_VERSION(port) __raw_readl((port)->membase + ATMEL_US_VERSION)
->  
->   /* PDC registers */
->  #define UART_PUT_PTCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_PTCR)
-> @@ -1503,6 +1504,7 @@ static void atmel_get_ip_name(struct uart_port *port)
->  {
->  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  	int name = UART_GET_IP_NAME(port);
-> +	u32 version;
->  	int usart, uart;
->  	/* usart and uart ascii */
->  	usart = 0x55534152;
-> @@ -1517,7 +1519,22 @@ static void atmel_get_ip_name(struct uart_port *port)
->  		dev_dbg(port->dev, "This is uart\n");
->  		atmel_port->is_usart = false;
->  	} else {
-> -		dev_err(port->dev, "Not supported ip name, set to uart\n");
-> +		/* fallback for older SoCs: use version field */
-> +		version = UART_GET_IP_VERSION(port);
-> +		switch (version) {
-> +		case 0x302:
-> +		case 0x10213:
-> +			dev_dbg(port->dev, "This version is usart\n");
-> +			atmel_port->is_usart = true;
-> +			break;
-> +		case 0x203:
-> +		case 0x10202:
-> +			dev_dbg(port->dev, "This version is uart\n");
-> +			atmel_port->is_usart = false;
-> +			break;
-> +		default:
-> +			dev_err(port->dev, "Not supported ip name nor version, set to uart\n");
+Until now the calling functions of ll_set_cpu_coherent() have to know
+the base address of the coherency registers. This commit doesn't
+expose anymore this address, and replace the argument by a flag to
+indicate if we have to use the physical or the virtual address.
 
-it's not really an error a dev_warn is more oppropriate
-> +		}
->  	}
->  }
->  
-> diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
-> index be201ca..00beddf 100644
-> --- a/include/linux/atmel_serial.h
-> +++ b/include/linux/atmel_serial.h
-> @@ -125,5 +125,6 @@
->  #define ATMEL_US_IF		0x4c			/* IrDA Filter Register */
->  
->  #define ATMEL_US_NAME		0xf0			/* Ip Name */
-> +#define ATMEL_US_VERSION	0xfc			/* Ip Version */
->  
->  #endif
-> -- 
-> 1.8.2.2
-> 
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c    |  6 +++---
+ arch/arm/mach-mvebu/coherency_ll.S | 18 +++++++++++++++++-
+ arch/arm/mach-mvebu/headsmp.S      | 10 ++--------
+ 3 files changed, 22 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 58adf2f..d492fb3 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -29,7 +29,7 @@
+ #include "armada-370-xp.h"
+ 
+ unsigned long coherency_phys_base;
+-static void __iomem *coherency_base;
++void __iomem *coherency_base;
+ static void __iomem *coherency_cpu_base;
+ 
+ /* Coherency fabric registers */
+@@ -43,7 +43,7 @@ static struct of_device_id of_coherency_table[] = {
+ };
+ 
+ /* Function defined in coherency_ll.S */
+-int ll_set_cpu_coherent(void __iomem *base_addr, unsigned int hw_cpu_id);
++int ll_set_cpu_coherent(bool use_virt_addr, unsigned int hw_cpu_id);
+ 
+ int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
+ {
+@@ -53,7 +53,7 @@ int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
+ 		return 1;
+ 	}
+ 
+-	return ll_set_cpu_coherent(coherency_base, hw_cpu_id);
++	return ll_set_cpu_coherent(true, hw_cpu_id);
+ }
+ 
+ static inline void mvebu_hwcc_sync_io_barrier(void)
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 5476669..8d4e22f 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -22,10 +22,22 @@
+ 
+ 	.text
+ /*
+- * r0: Coherency fabric base register address
++ * r0: if r0==0 => physical addres, else virtual address
+  * r1: HW CPU id
+  */
+ ENTRY(ll_set_cpu_coherent)
++	cmp	r0, #0
++	bne	1f
++    /* use physical address */
++	adr	r0, 3f
++	ldr	r3, [r0]
++	ldr	r0, [r0, r3]
++	b	2f
++1:
++    /* use virtual address */
++	ldr	r0, =(coherency_base)
++	ldr	r0, [r0]
++2:
+ 	/* Create bit by cpu index */
+ 	mov	r3, #(1 << 24)
+ 	lsl	r1, r3, r1
+@@ -53,3 +65,7 @@ ENTRY(ll_set_cpu_coherent)
+ 	mov	r0, #0
+ 	mov	pc, lr
+ ENDPROC(ll_set_cpu_coherent)
++
++	.align 2
++3:
++	.long	coherency_phys_base - .
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index 8a1b0c9..bffaabc 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -27,10 +27,8 @@
+  * startup
+  */
+ ENTRY(armada_xp_secondary_startup)
+-	/* Get coherency fabric base physical address */
+-	adr	r0, 1f
+-	ldr	r1, [r0]
+-	ldr	r0, [r0, r1]
++	/* Use physical addrss */
++	mov	r0, #0
+ 
+ 	/* Read CPU id */
+ 	mrc     p15, 0, r1, c0, c0, 5
+@@ -41,7 +39,3 @@ ENTRY(armada_xp_secondary_startup)
+ 	b	secondary_startup
+ 
+ ENDPROC(armada_xp_secondary_startup)
+-
+-	.align 2
+-1:
+-	.long	coherency_phys_base - .
+-- 
+1.8.1.2
