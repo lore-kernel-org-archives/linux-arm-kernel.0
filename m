@@ -1,40 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 14 Oct 2013 09:38:59 +0200
-Subject: [PATCH 0/5] ARM:at91:enable sound on at91sam9n12ek board
-In-Reply-To: <1381729113-29714-1-git-send-email-voice.shen@atmel.com>
-References: <1381729113-29714-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <525B9F93.9040001@atmel.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 14 Oct 2013 10:04:58 +0200
+Subject: [PATCH 01/11] usb: chipidea: Add power management support
+In-Reply-To: <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
+References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
+ <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131014100458.4f577d01@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/2013 07:38, Bo Shen :
-> This patch series enable sound on at91sam9n12ek board with wm8904 codec
->
->
-> Bo Shen (5):
->    ARM: at91: add at91sam9n12 ssc clock in look up table
->    ARM: at91: add ssc dma parameter for at91sam9n12
->    ARM: at91: enable wm8904 on at91sam9n12ek board
->    ARM: at91: enable ssc on at91sam9n12ek board
->    ARM: at91: add sound support on at91sam9n12ek board
+Hi,
 
-Great!
-
-And on the whole patch series:
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-I stack it on at91-3.13-dt branch.
-
-Thanks.
-
->
->   arch/arm/boot/dts/at91sam9n12.dtsi  |    3 +++
->   arch/arm/boot/dts/at91sam9n12ek.dts |   34 ++++++++++++++++++++++++++++++++++
->   arch/arm/mach-at91/at91sam9n12.c    |    1 +
->   3 files changed, 38 insertions(+)
->
+Peter Chen wrote:
+> This commit adds runtime and system power management support for
+> chipidea core. The runtime pm support is controlled by glue
+> layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
+> 
+[...]
+> +#ifdef CONFIG_PM
+> +static int ci_controller_suspend(struct device *dev)
+> +{
+> +	struct ci_hdrc *ci = dev_get_drvdata(dev);
+> +
+> +	dev_dbg(dev, "at %s\n", __func__);
+> +
+> +	if (atomic_read(&ci->in_lpm))
+> +		return 0;
+> +
+What does this 'atomic_read()' buy you over just testing/assinging a
+simple integer. Note that just because the function has 'atomic' in
+its name the sequence:
+	atomic_read();
+...
+	atomic_set();
+does not magically become an atomic operation.
 
 
+Lothar Wa?mann
 -- 
-Nicolas Ferre
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
