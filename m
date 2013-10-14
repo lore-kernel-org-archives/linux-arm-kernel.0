@@ -1,33 +1,56 @@
-From: philippe.retornaz@epfl.ch (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
-Date: Mon, 14 Oct 2013 10:47:51 +0200
-Subject: [PATCH 1/1] dma: imx-sdma: setup dma mask
-In-Reply-To: <20131013234812.GI25034@n2100.arm.linux.org.uk>
-References: <1380623464-24652-1-git-send-email-philippe.retornaz@epfl.ch>
- <1380623464-24652-2-git-send-email-philippe.retornaz@epfl.ch>
- <20131013161801.GP2954@intel.com>
- <20131013234812.GI25034@n2100.arm.linux.org.uk>
-Message-ID: <525BAFB7.8030402@epfl.ch>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 14 Oct 2013 10:53:23 +0200
+Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
+In-Reply-To: <20131009073633.GH1356@kw.sim.vm.gnt>
+References: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
+ <20131003122307.GV31178@titan.lakedaemon.net>
+ <20131009073633.GH1356@kw.sim.vm.gnt>
+Message-ID: <20131014085323.GL1356@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 14/10/2013 01:48, Russell King - ARM Linux a ?crit :
-> On Sun, Oct 13, 2013 at 09:48:01PM +0530, Vinod Koul wrote:
->> On Tue, Oct 01, 2013 at 12:31:04PM +0200, Philippe R?tornaz wrote:
->>> The dma mask is not configured in the current code.
->>> This was triggered by soc-dmaengine-pcm which allocate the dma
->>> buffers with the imx-sdma as device.
->>> This commit fix audio on imx31.
->>>
->>> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
->> This needs to go thru Russell's tree, that has the below API
->>
->> Acked-by Vinod Koul <vinod.koul@intel.com>
->
-> Indeed.
+On Wed, Oct 09, 2013 at 09:36:33AM +0200, Simon Guinot wrote:
+> On Thu, Oct 03, 2013 at 08:23:07AM -0400, Jason Cooper wrote:
+> > Simon,
+> > 
+> > On Thu, Oct 03, 2013 at 12:05:02PM +0200, Simon Guinot wrote:
+> > > This patch fixes the tclk frequency array for the Armada-370 SoC.
+> > > This bug has been introduced by commit 6b72333d
+> > > ("clk: mvebu: add Armada 370 SoC-centric clock init").
+> > > 
+> > > A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
+> > > i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
+> > > 
+> > > About the mvneta Ethernet driver, note that the tclk frequency is used
+> > > to compute the Rx time coalescence. Then, this bug harms the coalescence
+> > > configuration and also degrades the networking performances with the
+> > > default values.
+> > > 
+> > > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> > > Cc: Andrew Lunn <andrew@lunn.ch>
+> > > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > Cc: Jason Cooper <jason@lakedaemon.net>
+> > > Cc: stable at vger.kernel.org
+> > > ---
+> > >  drivers/clk/mvebu/armada-370.c |    4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > Much better, thanks!
+> > 
+> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > 
+> > This can be applied to v3.11 onwards.
+> 
+> Hi Mike,
+> 
+> Please consider applying this patch.
 
-It's in the patch system with id 7857/1
-I hope I got it right.... First time I'm using your patch system.
-
-Thanks,
-
-Philippe
+Ping ?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131014/7acad144/attachment.sig>
