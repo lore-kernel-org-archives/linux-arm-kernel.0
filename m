@@ -1,42 +1,41 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Tue, 15 Oct 2013 09:32:47 +1030
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <1381747859.3247.33.camel@hornet>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <20131012182837.GC2089@redhat.com> <525BAA40.8070103@arm.com>
- <20131014085931.GB30954@redhat.com> <1381741495.3247.18.camel@hornet>
- <20131014104604.GC30954@redhat.com> <1381747859.3247.33.camel@hornet>
-Message-ID: <877gdfbgmg.fsf@rustcorp.com.au>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 15 Oct 2013 10:36:56 +1100
+Subject: [PATCH] ARM: ep93xx: remove deprecated IRQF_DISABLED
+In-Reply-To: <DC148C5AA1CEBA4E87973D432B1C2D8817DAB036@P3PWEX4MB008.ex4.secureserver.net>
+References: <1381547439-4888-1-git-send-email-michael.opdenacker@free-electrons.com>
+ <DC148C5AA1CEBA4E87973D432B1C2D8817DAB036@P3PWEX4MB008.ex4.secureserver.net>
+Message-ID: <525C8018.3070805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pawel Moll <pawel.moll@arm.com> writes:
-> On Mon, 2013-10-14 at 11:46 +0100, Michael S. Tsirkin wrote:
->> What I meant is that under the proposed scheme, users with
->> existing v1 drivers must configure a v1 device explicitly.
->> 
->> According to the plan, drivers will be updated so they can
->> work with both v1 devices and new v2 devices.
->> 
->> But if you configure a v2 device, old drivers
->> will not work.
->
-> That's correct, yes. If qemu 2015(16? 17?).01 will provide v2 devices
-> only, kernel 3.11 is not going to recognize any of them.
->
-> What will happen in reality, though, is that the implementation of the
-> Linux v1/v2 driver will pre-date *any* v2 device by far. First
-> implementation of v1 devices appeared almost 2 years after the driver
-> appeared. It will take year for people to upgrade to v2, and probably
-> only after they experience problems with page-based addressing mode.
->
-> I think I can live with this.
+On 15/10/13 02:47, Hartley Sweeten wrote:
+> On Friday, October 11, 2013 8:11 PM, Michael Opdenacker wrote:
+>> This patch proposes to remove the use of the IRQF_DISABLED flag
+>>
+>> It's a NOOP since 2.6.35 and it will be removed one day.
+>>
+>> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+>> ---
+>>  arch/arm/mach-ep93xx/core.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+>> index 3f12b88..fcc965f 100644
+>> --- a/arch/arm/mach-ep93xx/core.c
+>> +++ b/arch/arm/mach-ep93xx/core.c
+>> @@ -136,7 +136,7 @@ static irqreturn_t ep93xx_timer_interrupt(int irq, void *dev_id)
+>>  
+>>  static struct irqaction ep93xx_timer_irq = {
+>>  	.name		= "ep93xx timer",
+>> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+>> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>>  	.handler	= ep93xx_timer_interrupt,
+>>  };
+>>  
+> 
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-Yes, this makes sense.  In particular, MMIO doesn't have any users you
-don't control at this point.
+Applied to ep93xx-fixes.
 
-I expect it to be less than 2 years to get into qemu, but there'll be no
-compelling reason to use v2 devices for at least that long.
-
-Cheers,
-Rusty.
+Thanks,
+~Ryan
