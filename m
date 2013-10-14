@@ -1,86 +1,142 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Mon, 14 Oct 2013 16:16:17 +0200
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <525BFBF9.5010804@arm.com>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
- <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
- <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
- <525BFBF9.5010804@arm.com>
-Message-ID: <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 14 Oct 2013 16:18:25 +0200
+Subject: [PATCH 1/2] ARM: at91: cpuidle: convert to platform driver
+In-Reply-To: <20131014140406.GH11420@ns203013.ovh.net>
+References: <1381593099-1184-1-git-send-email-daniel.lezcano@linaro.org>
+ <20131014140406.GH11420@ns203013.ovh.net>
+Message-ID: <525BFD31.3020406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/14/2013 04:04 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:51 Sat 12 Oct     , Daniel Lezcano wrote:
+>> Use the platform driver model to separate the cpuidle specific code from
+>> the low level pm code. It allows to remove the dependency between
+>> these two components.
+>>
+>> Tested-on usb-a9263 (at91sam9263)
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>   arch/arm/mach-at91/cpuidle.c |   29 +++++++++++++++--------------
+>>   arch/arm/mach-at91/pm.c      |   16 +++++++++++++++-
+>>   2 files changed, 30 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+>> index 4ec6a6d..6cdc76d 100644
+>> --- a/arch/arm/mach-at91/cpuidle.c
+>> +++ b/arch/arm/mach-at91/cpuidle.c
+>> @@ -21,26 +21,17 @@
+>>   #include <linux/export.h>
+>>   #include <asm/proc-fns.h>
+>>   #include <asm/cpuidle.h>
+>> -#include <mach/cpu.h>
+>> -
+>> -#include "pm.h"
+>>
+>>   #define AT91_MAX_STATES	2
+>>
+>> +static void (*at91_standby)(void);
+>> +
+>>   /* Actual code that puts the SoC in different idle states */
+>>   static int at91_enter_idle(struct cpuidle_device *dev,
+>>   			struct cpuidle_driver *drv,
+>>   			       int index)
+>>   {
+>> -	if (cpu_is_at91rm9200())
+>> -		at91rm9200_standby();
+>> -	else if (cpu_is_at91sam9g45())
+>> -		at91sam9g45_standby();
+>> -	else if (cpu_is_at91sam9263())
+>> -		at91sam9263_standby();
+>> -	else
+>> -		at91sam9_standby();
+>> -
+>> +	at91_standby();
+>>   	return index;
+>>   }
+>>
+>> @@ -60,9 +51,19 @@ static struct cpuidle_driver at91_idle_driver = {
+>>   };
+>>
+>>   /* Initialize CPU idle by registering the idle states */
+>> -static int __init at91_init_cpuidle(void)
+>> +static int __init at91_cpuidle_probe(struct platform_device *dev)
+>>   {
+>> +	at91_standby = (void *)(dev->dev.platform_data);
+>> +	
+>>   	return cpuidle_register(&at91_idle_driver, NULL);
+>>   }
+>>
+>> -device_initcall(at91_init_cpuidle);
+>> +static struct platform_driver at91_cpuidle_driver = {
+>> +	.driver = {
+>> +		.name = "cpuidle-at91",
+>> +		.owner = THIS_MODULE,
+>> +	},
+>> +	.probe = at91_cpuidle_probe,
+>> +};
+>> +
+>> +module_platform_driver(at91_cpuidle_driver);
+>> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+>> index 15afb5d..debdbf8 100644
+>> --- a/arch/arm/mach-at91/pm.c
+>> +++ b/arch/arm/mach-at91/pm.c
+>> @@ -314,6 +314,10 @@ static const struct platform_suspend_ops at91_pm_ops = {
+>>   	.end	= at91_pm_end,
+>>   };
+>>
+>> +static struct platform_device at91_cpuidle_device = {
+>> +	.name = "cpuidle-at91",
+>> +};
+>> +
+>>   static int __init at91_pm_init(void)
+>>   {
+>>   #ifdef CONFIG_AT91_SLOW_CLOCK
+>> @@ -323,8 +327,18 @@ static int __init at91_pm_init(void)
+>>   	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+>>
+>>   	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+>> -	if (cpu_is_at91rm9200())
+>> +	if (cpu_is_at91rm9200()) {
+>> +		at91_cpuidle_device.dev.platform_data = at91rm9200_standby;
+>>   		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+>> +	} else if (cpu_is_at91sam9g45()) {
+>> +		at91_cpuidle_device.dev.platform_data = at91sam9g45_standby;
+>> +	} else if (cpu_is_at91sam9263()) {
+>> +		at91_cpuidle_device.dev.platform_data = at91sam9263_standby;
+>> +	} else {
+>> +		at91_cpuidle_device.dev.platform_data = at91sam9_standby;
+> no this is too dangerous when adding new SoC
+>
+> you must list the supported SoC
+>
+> and I prefer to move this code to the SoC init structure
 
-On 14.10.2013, at 16:13, Marc Zyngier <marc.zyngier@arm.com> wrote:
-
-> On 14/10/13 15:05, Michael S. Tsirkin wrote:
->> On Mon, Oct 14, 2013 at 02:49:10PM +0100, Marc Zyngier wrote:
->>> On 14/10/13 14:39, Alexander Graf wrote:
->>>> 
->>>> On 14.10.2013, at 15:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> 
->>>>> On 14/10/13 14:10, Alexander Graf wrote:
->>>>>> 
->>>>>> On 14.10.2013, at 15:03, Paolo Bonzini <pbonzini@redhat.com> wrote:
->>>>>> 
->>>>>>> Il 11/10/2013 16:36, Marc Zyngier ha scritto:
->>>>>>>> This small patch series adds just enough kernel infrastructure and
->>>>>>>> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
->>>>>>>> that the host actually supports such madness.
->>>>>>> 
->>>>>>> More precisely, it allows the guest drivers to pick the endianness they
->>>>>>> prefer.  Mixed-endian virtio works fine on QEMU with e.g. a mips guest
->>>>>>> in emulation mode, because then any given QEMU binary will always use
->>>>>>> the same endianness (e.g. big for qemu-system-mips).
->>>>>> 
->>>>>> We have the same problem (runtime switchable endianness) on PowerPC. IBM POWER is gaining Little Endian support in Linux now, so we could easily end up with an LE guest on a BE host.
->>>>>> 
->>>>>> IIRC the way we're going to solve this is to hack up virtio_is_big_endian() to evaluate the first CPU's endianness mode (which will always be the same as all other CPU's endianness mode due to hypercall restrictions).
->>>>> 
->>>>> I have implemented something similar for MMIO emulation in KVM/arm
->>>>> (except that I only care about the faulting CPU).
->>>>> 
->>>>> See my initial patch for that:
->>>>> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-October/007359.html
->>>>> 
->>>>> That doesn't really change the non-trapping virtio accesses, though.
->>>>> Where is this virtio_is_big_endian() thing?
->>>> 
->>>> It's in QEMU's exec.c. It only gets used for config space access that goes through PCI though. Is there any other place where virtio specifies native endianness today?
->>> 
->>> That's the main problem. Today's virtio flavour doesn't specify anything
->>> about endianness, and that is what I'm adding. Or rather (as Paolo put
->>> it), the prefered endianness of the virtio driver.
->>> 
->>> So once (and if) this flags are in place, you always know what you're
->>> dealing with. And because it is virtio-centric, you can implement it in
->>> an architecture independent way.
->>> 
->>> Also, most of my life revolves around kvmtool. QEMU is hardly on my
->>> radar, these days (for reasons that are neither technical, nor relevant
->>> to this forum). So it is important to me that the solution is platform
->>> emulation agnostic.
->>> 
->>> 	M.
->> 
->> f you like, you should be able to implement virtio_is_big_endian
->> in kvmtool too.
-> 
-> Sure. And I imagine this traps back into the kernel to read some
-> register and find out what the endianness of the accessing CPU is?
-
-Not yet. To be exact, it does the below today. But all virtio device emulation is 100% guest endianness unaware. This helper is the only piece of code where it gets any idea what endianness the guest has. So by checking for references to it in the code you know where endianness is an issue. And that's only in the config space.
+Do you mean register the platform_device in eg. at91rm9200_initialize 
+with the right platform data ?
 
 
-Alex
+> so we can drop the if/else if/elsee
+>
+> and drop the issue of adding new and the arch_initcall
+>
+> Best Regards,
+> J.
+>> +	}
+>> +	
+>> +	platform_device_register(&at91_cpuidle_device);
+>>
+>>   	suspend_set_ops(&at91_pm_ops);
+>>
+>> --
+>> 1.7.9.5
+>>
 
 
-bool virtio_is_big_endian(void)
-{
-#if defined(TARGET_WORDS_BIGENDIAN)
-    return true;
-#else
-    return false;
-#endif
-}
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
