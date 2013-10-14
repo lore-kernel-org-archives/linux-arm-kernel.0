@@ -1,217 +1,104 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Oct 2013 17:22:26 +0200
-Subject: [RFC] usb: musb: dsps, OTG detection
-In-Reply-To: <CADYTM3bY91tcp7yWteQZo9C5==fSjPv2ncqqUo7fzfA2=YRnaw@mail.gmail.com>
-References: <1381757734-2976-1-git-send-email-mpa@pengutronix.de>
- <CADYTM3bY91tcp7yWteQZo9C5==fSjPv2ncqqUo7fzfA2=YRnaw@mail.gmail.com>
-Message-ID: <20131014152226.GA32062@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Oct 2013 16:23:45 +0100
+Subject: [RFT PATCH v2 2/4] arm64: restore FPSIMD to default state for
+ kernel and signal contexts
+In-Reply-To: <1381674029-430-2-git-send-email-liuj97@gmail.com>
+References: <1381674029-430-1-git-send-email-liuj97@gmail.com>
+ <1381674029-430-2-git-send-email-liuj97@gmail.com>
+Message-ID: <20131014152345.GF7682@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Oct 14, 2013 at 08:54:09AM -0500, Bin Liu wrote:
-> On Mon, Oct 14, 2013 at 8:35 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> > The USB Controller does not support ID pin change interrupts. So we have
-> > to use a polling function to detect changes of A/B device state
-> > (otg_timer). This poll function has to check in several states if a
-> > other device type might be connected to the USB port. This check is
-> > triggered by manually starting/stopping a USB Session.
+On Sun, Oct 13, 2013 at 03:20:18PM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
 > 
-> I think this is an arguable approach. Toggling the SESSION in
-> otg_timer() causes voltage pulses on VBUS, which will not pass the USB
-> certification.
-
-This is only done when no device is connected, so I am not sure if it is
-important. Unfortunately we do not see the A/B state changes until
-toggling the SESSION. Is there another way to check this?
-
+> Restore FPSIMD control and status registers to default values
+> when creating new FPSIMD contexts for kernel context and reset
+> FPSIMD status register when creating FPSIMD context for signal
+> handling, otherwise the stale value in FPSIMD control and status
+> registers may affect the new kernal or signal handling contexts.
 > 
-> I have not seen any products required the dynamic dual role switching
-> yet. It always fixed in either device mode or host mode.
-
-OTG is explicitly listed in the devicetree bindings documentation, so
-I think the driver should be able to detect different roles.
-
-Regards,
-
-Markus Pargmann
-
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/include/asm/fpsimd.h | 16 ++++++++++++++++
+>  arch/arm64/kernel/fpsimd.c      | 11 +++++++++--
+>  arch/arm64/kernel/signal.c      |  1 +
+>  arch/arm64/kernel/signal32.c    |  1 +
+>  4 files changed, 27 insertions(+), 2 deletions(-)
 > 
-> Regards,
-> -Bin.
-> 
-> >
-> > So in A mode, we cancel the currently running session which also
-> > disables the possibility to detect new devices via interrupt. In B mode,
-> > we start a session to check for ID-Pin and possibly connected devices.
-> >
-> > Whenever a real USB session ends, we have to trigger the otg_timer poll
-> > function again.
-> >
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  drivers/usb/musb/musb_dsps.c | 84 ++++++++++++++++++++++++++++++++++++++++----
-> >  1 file changed, 78 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-> > index b24b697..0245e8d 100644
-> > --- a/drivers/usb/musb/musb_dsps.c
-> > +++ b/drivers/usb/musb/musb_dsps.c
-> > @@ -178,6 +178,43 @@ static const struct file_operations musb_regdump_fops = {
-> >
-> >  #endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
-> >
-> > +/*
-> > + * Compare driver and hardware mode and update driver state if necessary.
-> > + * Not all hardware changes actually reach the driver through interrupts.
-> > + */
-> > +static void dsps_update_mode(struct musb *musb)
-> > +{
-> > +       u8 devctl;
-> > +
-> > +       devctl = dsps_readb(musb->mregs, MUSB_DEVCTL);
-> > +
-> > +       switch (musb->xceiv->state) {
-> > +       case OTG_STATE_A_IDLE:
-> > +               if (devctl & MUSB_DEVCTL_BDEVICE) {
-> > +                       dev_dbg(musb->controller, "detected controller state B, software state A\n");
-> > +                       musb->xceiv->state = OTG_STATE_B_IDLE;
-> > +               }
-> > +               break;
-> > +       case OTG_STATE_B_IDLE:
-> > +               if (!(devctl & MUSB_DEVCTL_BDEVICE)) {
-> > +                       dev_dbg(musb->controller, "detected controller state A, software state B\n");
-> > +                       musb->xceiv->state = OTG_STATE_A_IDLE;
-> > +               }
-> > +               break;
-> > +       default:
-> > +               if (!(devctl & MUSB_DEVCTL_SESSION)) {
-> > +                       dev_dbg(musb->controller, "detected controller out of session (%x), software state %s\n",
-> > +                               devctl,
-> > +                               usb_otg_state_string(musb->xceiv->state));
-> > +                       if (devctl & MUSB_DEVCTL_BDEVICE)
-> > +                               musb->xceiv->state = OTG_STATE_B_IDLE;
-> > +                       else
-> > +                               musb->xceiv->state = OTG_STATE_A_IDLE;
-> > +               }
-> > +               break;
-> > +       }
-> > +}
-> > +
-> >  /**
-> >   * dsps_musb_enable - enable interrupts
-> >   */
-> > @@ -229,6 +266,8 @@ static void otg_timer(unsigned long _musb)
-> >         u8 devctl;
-> >         unsigned long flags;
-> >
-> > +       dsps_update_mode(musb);
-> > +
-> >         /*
-> >          * We poll because DSPS IP's won't expose several OTG-critical
-> >          * status change events (from the transceiver) otherwise.
-> > @@ -239,6 +278,16 @@ static void otg_timer(unsigned long _musb)
-> >
-> >         spin_lock_irqsave(&musb->lock, flags);
-> >         switch (musb->xceiv->state) {
-> > +       case OTG_STATE_A_IDLE:
-> > +       case OTG_STATE_A_WAIT_VRISE:
-> > +               /*
-> > +                * Poll the devctl register to know when the controller switches
-> > +                * back to B state.
-> > +                */
-> > +               musb_writeb(mregs, MUSB_DEVCTL,
-> > +                               devctl & (~MUSB_DEVCTL_SESSION));
-> > +               mod_timer(&glue->timer, jiffies + wrp->poll_seconds * HZ);
-> > +               break;
-> >         case OTG_STATE_A_WAIT_BCON:
-> >                 devctl &= ~MUSB_DEVCTL_SESSION;
-> >                 dsps_writeb(musb->mregs, MUSB_DEVCTL, devctl);
-> > @@ -251,6 +300,8 @@ static void otg_timer(unsigned long _musb)
-> >                         musb->xceiv->state = OTG_STATE_A_IDLE;
-> >                         MUSB_HST_MODE(musb);
-> >                 }
-> > +               mod_timer(&glue->timer,
-> > +                               jiffies + wrp->poll_seconds * HZ);
-> >                 break;
-> >         case OTG_STATE_A_WAIT_VFALL:
-> >                 musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
-> > @@ -258,12 +309,24 @@ static void otg_timer(unsigned long _musb)
-> >                             MUSB_INTR_VBUSERROR << wrp->usb_shift);
-> >                 break;
-> >         case OTG_STATE_B_IDLE:
-> > +               /*
-> > +                * There's no ID-changed IRQ, so we have no good way to tell
-> > +                * when to switch to the A-Default state machine (by setting
-> > +                * the DEVCTL.Session bit).
-> > +                *
-> > +                * Workaround:  whenever we're in B_IDLE, try setting the
-> > +                * session flag every few seconds.  If it works, ID was
-> > +                * grounded and we're now in the A-Default state machine.
-> > +                *
-> > +                * NOTE: setting the session flag is _supposed_ to trigger
-> > +                * SRP but clearly it doesn't.
-> > +                */
-> > +               musb_writeb(mregs, MUSB_DEVCTL, devctl | MUSB_DEVCTL_SESSION);
-> >                 devctl = dsps_readb(mregs, MUSB_DEVCTL);
-> > -               if (devctl & MUSB_DEVCTL_BDEVICE)
-> > -                       mod_timer(&glue->timer,
-> > -                                       jiffies + wrp->poll_seconds * HZ);
-> > -               else
-> > +               if (!(devctl & MUSB_DEVCTL_BDEVICE))
-> >                         musb->xceiv->state = OTG_STATE_A_IDLE;
-> > +               mod_timer(&glue->timer,
-> > +                               jiffies + wrp->poll_seconds * HZ);
-> >                 break;
-> >         default:
-> >                 break;
-> > @@ -376,7 +439,6 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
-> >                         MUSB_HST_MODE(musb);
-> >                         musb->xceiv->otg->default_a = 1;
-> >                         musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
-> > -                       del_timer(&glue->timer);
-> >                 } else {
-> >                         musb->is_active = 0;
-> >                         MUSB_DEV_MODE(musb);
-> > @@ -397,8 +459,16 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
-> >                 ret |= musb_interrupt(musb);
-> >
-> >         /* Poll for ID change */
-> > -       if (musb->xceiv->state == OTG_STATE_B_IDLE)
-> > +       switch (musb->xceiv->state) {
-> > +       case OTG_STATE_A_IDLE:
-> > +       case OTG_STATE_A_WAIT_BCON:
-> > +       case OTG_STATE_A_WAIT_VRISE:
-> > +       case OTG_STATE_B_IDLE:
-> >                 mod_timer(&glue->timer, jiffies + wrp->poll_seconds * HZ);
-> > +               break;
-> > +       default:
-> > +               break;
-> > +       }
-> >  out:
-> >         spin_unlock_irqrestore(&musb->lock, flags);
-> >
-> > @@ -479,6 +549,8 @@ static int dsps_musb_init(struct musb *musb)
-> >
-> >         dev_info(dev, "%s:%d %s: OK\n", __FILE__, __LINE__, __func__);
-> >
-> > +       musb->xceiv->otg->default_a = 0;
-> > +
-> >         return 0;
-> >  }
-> >
-> > --
-> > 1.8.4.rc3
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index c43b4ac..b2dc30f 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -50,8 +50,24 @@ struct fpsimd_state {
+>  #define VFP_STATE_SIZE		((32 * 8) + 4)
+>  #endif
+>  
+> +#define	AARCH64_FPCR_DEFAULT_VAL	0
+> +
+>  struct task_struct;
+>  
+> +static inline void fpsimd_init_hw_state(void)
+> +{
+> +	int val = AARCH64_FPCR_DEFAULT_VAL;
+> +
+> +	asm ("msr fpcr, %x0\n"
+> +	     "msr fpsr, xzr\n"
+> +             : : "r"(val));
+> +}
+
+These could go in the fpsimd.c file, they are not used outside it.
+
+> +
+> +static inline void fpsimd_clear_fpsr(void)
+> +{
+> +	asm ("msr fpsr, xzr\n");
+> +}
+> +
+>  extern void fpsimd_save_state(struct fpsimd_state *state);
+>  extern void fpsimd_load_state(struct fpsimd_state *state);
+>  
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index bb785d2..12a25e5 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -80,9 +80,14 @@ void fpsimd_thread_switch(struct task_struct *next)
+>  
+>  void fpsimd_flush_thread(void)
+>  {
+> +	struct fpsimd_state *state = &current->thread.fpsimd_state;
+> +
+>  	preempt_disable();
+> -	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+> -	fpsimd_load_state(&current->thread.fpsimd_state);
+> +	memset(state, 0, sizeof(struct fpsimd_state));
+> +#if (AARCH64_FPCR_DEFAULT_VAL != 0)
+> +	state->fpcr = AARCH64_FPCR_DEFAULT_VAL;
+> +#endif
+
+Better to write as:
+
+	if (AARCH64_FPCR_DEFAULT_VAL)
+		state->fpcr = AARCH64_FPCR_DEFAULT_VAL;
+
+The compiler should optimise it out.
+
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index 890a591..4ee231e 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -52,6 +52,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
+>  
+>  	/* dump the hardware registers to the fpsimd_state structure */
+>  	fpsimd_save_state(fpsimd);
+> +	fpsimd_clear_fpsr();
+
+That's the wrong place for such call. This function is supposed to save
+the existing FP context and not modify it. Ideally we should do this as
+with the other registers, just restoring them when returning to user.
+But I wouldn't add fpsr to pt_regs, so somewhere like handle_signal()
+should be OK.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
