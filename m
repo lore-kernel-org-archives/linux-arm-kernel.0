@@ -1,28 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 14 Oct 2013 19:34:01 +0000 (UTC)
-Subject: [PATCH] arm: omap2+: hwmod: Add qspi data for am437x.
-In-Reply-To: <1381773742-3931-1-git-send-email-sourav.poddar@ti.com>
-References: <1381773742-3931-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <alpine.DEB.2.02.1310141933130.22465@utopia.booyaka.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 14 Oct 2013 12:38:01 -0700
+Subject: Tegra baseline test results for v3.12-rc5
+Message-ID: <525C4819.9030000@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Here are some basic Tegra test results for Linux v3.12-rc5.
+Logs and other details at:
 
-On Mon, 14 Oct 2013, Sourav Poddar wrote:
-
-> Add hwmod data for qspi for AM437x.
-> 
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
-> This was tested on AM437x EPOS EVM with Afzal's v6 of AM43x PRCM
-> basic support and tero's DT clock series.
-
-Could you please rebase this on top of George Cherian's patch:
-
-"[PATCH] ARM: OMAP2+: hwmod: Add USB hwmod data for AM437x."
-
-?
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12-rc5/20131014120118/
 
 
-- Paul
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.12-rc4 (d0e639c9e06d44e713170031fe05fb60ebe680af)):
+    text     data      bss    total  kernel
+    +172        0        0     +172  multi_v7_defconfig
+    +548       -8        0     +540  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.12-rc4 (d0e639c9e06d44e713170031fe05fb60ebe680af))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
