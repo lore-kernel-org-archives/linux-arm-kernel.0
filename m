@@ -1,127 +1,95 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Oct 2013 16:06:46 +0100
-Subject: [PATCH v2 11/12] cpuidle: mvebu: Add initial CPU idle support
- for Armada 370/XP SoC
-In-Reply-To: <525BFC34.6020300@free-electrons.com>
-References: <1379066801-16276-1-git-send-email-gregory.clement@free-electrons.com>
- <1379066801-16276-12-git-send-email-gregory.clement@free-electrons.com>
- <20130913161654.GA5408@e102568-lin.cambridge.arm.com>
- <525BFC34.6020300@free-electrons.com>
-Message-ID: <20131014150646.GC9996@e102568-lin.cambridge.arm.com>
+From: v.tyrtov@samsung.com (Vyacheslav Tyrtov)
+Date: Mon, 14 Oct 2013 19:08:21 +0400
+Subject: [PATCH v2 0/4] Exynos 5410 Dual cluster support
+Message-ID: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+The series of patches represent support of Exynos 5410 SoC
+    
+The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture.
+Patches allow all 8 CPU cores (4 x A7 and 4 x A15) to run at the same time
+    
+Patches add new platform description, support of clock controller,
+dual cluster support and device tree for Exynos 5410 
+   
+Has been build on v3.12-rc5.
+Has been tested on Exynos 5410 reference board (exynos_defconfig).
+    
+Thanks,
+	Vyacheslav.
 
-[CC'ed Nico for the cache cleaning inline asm macros]
 
-On Mon, Oct 14, 2013 at 03:14:12PM +0100, Gregory CLEMENT wrote:
+Changelog:
 
-[...]
+v2:
+	In drivers/clk/samsung/clk-exynos5410.c
+1. Clock driver converted to use preprocessor macros instead of enums.
+   Clock IDs now defined in include/dt-bindings/clock/exynos5410.h.
+2. Unused spinlock removed.
+3. Function exynos5410_clk_init defined as static.
+   Struct exynos5410_fixed_rate_ext_clks defined as static.
+   Struct exynos5410_mux_clks defined as static.
+   Struct exynos5410_div_clks defined as static.
+   Struct exynos5410_gate_clks defined as static.
+4. Removed aliases.
+5. Pll's magic register offsets defined as preprocessor macros.
+6. Redundant check of device_node pointer removed.
+	
+	In arch/arm/boot/dts/exynos5410.dtsi
+1. dwmmcX nodes renamed to mmc.
+   dwmmc_X renamed to mmc_X.
+   dwmmc status="disabled" field added.
+   fifo-depth field moved from arch/arm/boot/dts/exynos5410-smdk5410.dts
+2. Blank lines added where necessary.
+3. cpu@ suffixes corrected.
+4. edcs node removed.
+5. Hexadecimal characters case corrected.
+6. Clock IDs replaced with preprocessor macros.
+	
+	In arch/arm/boot/dts/exynos5410-smdk5410.dts
+1. status = "okay" field added to mmc nodes.
+	
+	In arch/arm/mach-exynos/edcs.c
+1. "kfs_" prefix replaced with "edcs_"
+2. EDCS_CPUS_PER_CLUSTER and EDCS_CLUSTERS defined instead of MCPM's values.
+3. Cache handling sequence borrowed from arch/arm/mach-vexpress/tc2_pm.c
+4. mcpm_sync_init() call added.
+5. power management functions reworked.
+	
+	Other
+1. Documentation/devicetree/bindings/clock/exynos5410-clock.txt corrected.
+2. Removed smdk5410_defconfig. Instead SOC_EXYNOS5410 now selects MCPM and
+   ARM_CCI in arch/arm/mach-exynos/Kconfig.
+3. edcs_status driver removed.
 
-> >> +ENTRY(armada_370_xp_cpu_suspend)
-> >> +/* Save ARM registers */
-> >> +       stmfd   sp!, {r4 - r11, lr}     @ save registers on stack
-> >> +
-> >> +       bl armada_370_xp_pmsu_idle_prepare
-> >> +       /*
-> >> +        * Invalidate L1 data cache. Even though only invalidate is
-> >> +        * necessary exported flush API is used here. Doing clean
-> >> +        * on already clean cache would be almost NOP.
-> >> +        */
-> >> +       bl v7_flush_dcache_all
-> >> +
-> >> +       /*
-> >> +        * Clear the SCTLR.C bit to prevent further data cache
-> >> +        * allocation. Clearing SCTLR.C would make all the data accesses
-> >> +        * strongly ordered and would not hit the cache.
-> >> +        */
-> >> +       mrc     p15, 0, r0, c1, c0, 0
-> >> +       bic     r0, r0, #(1 << 2)       @ Disable the C bit
-> >> +       mcr     p15, 0, r0, c1, c0, 0
-> >> +       isb
-> >> +
-> >> +       bl v7_flush_dcache_all
-> >> +
-> > 
-> > This code looks familiar and the first cache flush is not needed.
-> > 
-> > look at arch/arm/mach-vexpress/tc2_pm.c -> tc2_pm_down()
-> > 
-> > I know that probably the SMP bit in ACTLR is managed differently in this
-> > architecture but still, cache flushing should still apply and the TC2
-> > sequence is the proper one, unless you explain to me why that does not
-> > work on this chipset.
-> 
-> Here we follow the advices you gave in your presentation at Linaro Connect
-> Q2-2012: "Idling ARMs in a Busy World: Linux Power Management for ARM
-> multi-cluster systems"
-> http://www.linaro.org/documents/download/84a5990d6f227c90e3d3a3ad2af0e22c4fd1d0bd4a6c7
-> at p21.
-> 
-> Quoting the author of the original version od the code :
-> "Since the second flush is almost NOPs, I preferred to keep them both in the same sequence."
->
+Tarek Dakhran (4):
+  ARM: EXYNOS: Add support for EXYNOS5410 SoC
+  clk: exynos5410: register clocks using common clock framework
+  ARM: EXYNOS: add Exynos Dual Cluster Support
+  ARM: dts: Add initial device tree support for EXYNOS5410
 
-This code comes from arch/arm/mach-omap2/sleep44xx.S
+ .../devicetree/bindings/clock/exynos5410-clock.txt |  37 +++
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |  65 +++++
+ arch/arm/boot/dts/exynos5410.dtsi                  | 209 ++++++++++++++++
+ arch/arm/mach-exynos/Kconfig                       |  12 +
+ arch/arm/mach-exynos/Makefile                      |   2 +
+ arch/arm/mach-exynos/common.c                      |  18 ++
+ arch/arm/mach-exynos/edcs.c                        | 270 +++++++++++++++++++++
+ arch/arm/mach-exynos/include/mach/map.h            |   1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |   1 +
+ arch/arm/plat-samsung/include/plat/cpu.h           |   8 +
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos5410.c               | 251 +++++++++++++++++++
+ include/dt-bindings/clock/exynos5410.h             | 175 +++++++++++++
+ 14 files changed, 1051 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+ create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+ create mode 100644 arch/arm/mach-exynos/edcs.c
+ create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+ create mode 100644 include/dt-bindings/clock/exynos5410.h
 
-First flush is not necessary and should be removed, from here and from
-the file above as well; the proper sequence is in:
-
-arch/arm/mach-vexpress/tc2_pm.c
-
-(which is described in the presentation link you provided)
-
-and Nico also managed to write inline assembly macros that are meant
-to be upstreamed soon to carry out the cache cleaning ops you need
-here.
-
-I understand that the second clean is _almost_ NOPs, but that's no good
-reason to write the sequence this way. I will repeat myself: first flush
-is not necessary and as such should be removed.
-
-> > 
-> >> +       /* Data memory barrier and Data sync barrier */
-> >> +       dsb
-> >> +       dmb
-> >> +
-> >> +       bl armada_370_xp_disable_snoop_ena
-> >> +
-> >> +       dsb                             @ Data Synchronization Barrier
-> >> +
-> >> +/*
-> >> + * ===================================
-> >> + * == WFI instruction => Enter idle ==
-> >> + * ===================================
-> >> + */
-> >> +
-> >> +       wfi                             @ wait for interrupt
-> > 
-> > Here core is running out of coherency and I do not see any tlb invalidation in
-> > the resume path from non-OFF mode. Please can you elaborate on this ?
-> > 
-> 
-> The TLB invalidation should take place in /arch/arm/kernel/suspend.c  cpu_suspend( )
-> in case the return value is 0 caused by cpu_suspend_abort.
-> Did we missed something?
-
-Yes, you did, cpu_suspend_abort returns 1 (ie failure), so no tlb invalidation
-is carried out in cpu_suspend(); tlbs are invalidated only when core resumes
-through cpu_resume. I do not have details of the coherent interconnect used
-in this board/chip, but if the power down procedure fails and the core has
-run outside coherency in the idle thread, tlbs must be invalidated.
-
-> > I have further comments on the set (in particular on the inner workings
-> > of coherency and how CPUs get in and out of idle - ie how this is
-> > managed by the power controller) but I will keep them for next version,
-> > when the first set of review comments is addressed.
-> > 
-> 
-> You can make your comments on the last version I have just sent.
-
-Ok, cheers.
-
-> Thanks for your review
-
-Thank you,
-Lorenzo
+-- 
+1.8.1.5
