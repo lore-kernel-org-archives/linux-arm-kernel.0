@@ -1,87 +1,62 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 14 Oct 2013 09:02:00 +0900
-Subject: [PATCH 1/2] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <201310121128.31801.marex@denx.de>
-References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
- <1381457552-6575-1-git-send-email-marex@denx.de>
- <20131012071959.GB21305@S2101-09.ap.freescale.net>
- <201310121128.31801.marex@denx.de>
-Message-ID: <000501cec870$9aebcc80$d0c36580$%han@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 14 Oct 2013 09:24:54 +0900
+Subject: [GIT PULL] Samsung fixes-1 for v3.12
+In-Reply-To: <CAOesGMirL+uR0xL9o0oqhfVa4KKsDeaCjkJyarAJr5vmZPg4Eg@mail.gmail.com>
+References: <525B1722.5060001@samsung.com>
+ <CAOesGMirL+uR0xL9o0oqhfVa4KKsDeaCjkJyarAJr5vmZPg4Eg@mail.gmail.com>
+Message-ID: <16f101cec873$ce47a880$6ad6f980$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, October 12, 2013 6:29 PM, Marek Vasut wrote:
-> > On Fri, Oct 11, 2013 at 04:12:31AM +0200, Marek Vasut wrote:
-> > > Some boards do not have a PCIe reset GPIO. To avoid probe
-> > > failure on these boards, make the reset GPIO optional as
-> > > well.
-> > >
-> > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > Cc: Frank Li <lznuaa@gmail.com>
-> > > Cc: Richard Zhu <r65037@freescale.com>
-> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Cc: Sean Cross <xobs@kosagi.com>
-> > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Tim Harvey <tharvey@gateworks.com>
-> > > Cc: Yinghai Lu <yinghai@kernel.org>
-> > > ---
-> > >
-> > >  drivers/pci/host/pci-imx6.c | 29 +++++++++++++++--------------
-> > >  1 file changed, 15 insertions(+), 14 deletions(-)
-> > >
-> > > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> > > index d3639aa..8e7adce 100644
-> > > --- a/drivers/pci/host/pci-imx6.c
-> > > +++ b/drivers/pci/host/pci-imx6.c
-> > > @@ -220,9 +220,12 @@ static int imx6_pcie_assert_core_reset(struct
-> > > pcie_port *pp)
-> > >
-> > >  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-> > >
-> > >  			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
-> > >
-> > > -	gpio_set_value(imx6_pcie->reset_gpio, 0);
-> > > -	msleep(100);
-> > > -	gpio_set_value(imx6_pcie->reset_gpio, 1);
-> > > +	/* Some boards don't have PCIe reset GPIO. */
-> > > +	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> > > +		gpio_set_value(imx6_pcie->reset_gpio, 0);
-> > > +		msleep(100);
-> > > +		gpio_set_value(imx6_pcie->reset_gpio, 1);
-> > > +	}
-> > >
-> > >  	return 0;
-> > >
-> > >  }
-> > >
-> > > @@ -447,17 +450,15 @@ static int __init imx6_pcie_probe(struct
-> > > platform_device *pdev)
-> > >
-> > >  	/* Fetch GPIOs */
-> > >  	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
-> > >
-> > > -	if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
-> > > -		dev_err(&pdev->dev, "no reset-gpio defined\n");
-> > > -		ret = -ENODEV;
-> > > -	}
-> >
-> > The 'reset-gpio' is documented as a required property in bindings doc
-> > Documentation/devicetree/bindings/pci/designware-pcie.txt.  You need
-> > to update bindings doc if you turn it into an optional property.
+Olof Johansson wrote:
 > 
-> That's true, thanks for pointing it out!
+> Hi,
+> 
+Hi,
 
-+cc Kishon Vijay Abraham I, Pratyush Anand, Mohit KUMAR
+> On Sun, Oct 13, 2013 at 2:56 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Alexander Shiyan (1):
+> >       ARM: SAMSUNG: Fix switching FIFO in arch_enable_uart_fifo function
+> 
+> What's the regression that this is fixing? As far as I can tell, the
+> code has been the same since 2008. Or did something surrounding it
+> change?
+> 
+Yeah, you're right. Actually I has queued it into non-critical before but
+missed to sent out. OK, I agree with you and let me sort out again.
 
-Yes, right.
-"reset-gpio" property can be moved to an optional property.
-Also, the patch to fix 'Designware' part such as 'designware-pcie.txt'
-can be shared with other related people as below.
+> >
+> > Bartlomiej Zolnierkiewicz (1):
+> >       ARM: dts: fix PL330 MDMA1 address in DT for Universal C210 board
+> >
+> > Jingoo Han (1):
+> >       ARM: dts: Remove DP PHY node from exynos5250.dtsi
+> 
+> You are sending this in pretty late. Please be careful about conflicts
+> due to this late revert, in particular if you plan on re-introducing
+> something in 3.13.
+> 
+As you know, unfortunately, DP PHY node change applied in DTS without
+changing driver in 3.12 so current 3.12 kernel cannot support it. I want
+3.12 kernel to support it properly and yes, I have a plan to re-introduce DP
+PHY node in 3.13. BTW if you have objection, maybe I will send it to stable
+3.12 instead...
 
-  - Samsung Exynos PCIe: Jingoo Han
-  - ST Spear PCIe: Pratyush Anand, Mohit KUMAR
-  - TI OMAP PCIe: Kishon Vijay Abraham I
+> > Tomasz Figa (1):
+> >       ARM: dts: Work around lack of cpufreq regulator lookup for
+> > exynos4210-origen and trats boards
+> >
+> > Youngmin Nam (1):
+> >       ARM: dts: Fix a typo on Exynos5440 DTS files
+> 
+> This is a bad patch subject, it can be way more specific. Also, this
+> is a good reason not to have these elaborate bootargs in the DTS, in
+> particular for modern platforms -- the bootargs should come from
+> firmware for your platform.
+> 
+Agreed. The subject should be clear...Anyway current bootargs in DTS is
+wrong so I think, it should be fixed, I agree with you about bootargs
+though.
 
-Best regards,
-Jingoo Han
+Thanks,
+Kukjin
