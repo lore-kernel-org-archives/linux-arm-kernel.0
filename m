@@ -1,234 +1,274 @@
 From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Mon, 14 Oct 2013 18:24:34 +0300
-Subject: [PATCH v3 07/13] usb: phy: msm: Replace custom enum usb_mode_type
- with enum usb_dr_mode
+Date: Mon, 14 Oct 2013 18:24:37 +0300
+Subject: [PATCH v3 10/13] usb: phy: msm: Switch clock consumer strings
 In-Reply-To: <1381764280-28420-1-git-send-email-iivanov@mm-sol.com>
 References: <1381764280-28420-1-git-send-email-iivanov@mm-sol.com>
-Message-ID: <1381764280-28420-8-git-send-email-iivanov@mm-sol.com>
+Message-ID: <1381764280-28420-11-git-send-email-iivanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 
+Replace the USB specific clock names in driver
+with the more standard 'core' and 'iface' ... names.
+
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
 ---
- arch/arm/mach-msm/board-msm7x30.c |    2 +-
- arch/arm/mach-msm/board-qsd8x50.c |    2 +-
- drivers/usb/phy/phy-msm-usb.c     |   40 ++++++++++++++++++-------------------
- include/linux/usb/msm_hsusb.h     |   19 ++----------------
- 4 files changed, 24 insertions(+), 39 deletions(-)
+ arch/arm/mach-msm/devices-msm7x00.c |    4 +-
+ arch/arm/mach-msm/devices-msm7x30.c |    8 ++--
+ arch/arm/mach-msm/devices-qsd8x50.c |    6 +--
+ drivers/usb/phy/phy-msm-usb.c       |   79 +++++++++++++++++++----------------
+ include/linux/usb/msm_hsusb.h       |   14 +++----
+ 5 files changed, 58 insertions(+), 53 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
-index 46de789..0c4c200 100644
---- a/arch/arm/mach-msm/board-msm7x30.c
-+++ b/arch/arm/mach-msm/board-msm7x30.c
-@@ -95,7 +95,7 @@ static int hsusb_phy_clk_reset(struct clk *phy_clk)
+diff --git a/arch/arm/mach-msm/devices-msm7x00.c b/arch/arm/mach-msm/devices-msm7x00.c
+index d83404d..e7274e1 100644
+--- a/arch/arm/mach-msm/devices-msm7x00.c
++++ b/arch/arm/mach-msm/devices-msm7x00.c
+@@ -461,8 +461,8 @@ static struct clk_pcom_desc msm_clocks_7x01a[] = {
+ 	CLK_PCOM("core",	UART3_CLK,	"msm_serial.2", OFF),
+ 	CLK_PCOM("uart1dm_clk",	UART1DM_CLK,	NULL, OFF),
+ 	CLK_PCOM("uart2dm_clk",	UART2DM_CLK,	NULL, 0),
+-	CLK_PCOM("usb_hs_clk",	USB_HS_CLK,	"msm_hsusb", OFF),
+-	CLK_PCOM("usb_hs_pclk",	USB_HS_P_CLK,	"msm_hsusb", OFF),
++	CLK_PCOM("core",	USB_HS_CLK,	"msm_hsusb", OFF),
++	CLK_PCOM("iface",	USB_HS_P_CLK,	"msm_hsusb", OFF),
+ 	CLK_PCOM("usb_otg_clk",	USB_OTG_CLK,	NULL, 0),
+ 	CLK_PCOM("vdc_clk",	VDC_CLK,	NULL, OFF ),
+ 	CLK_PCOM("vfe_clk",	VFE_CLK,	NULL, OFF),
+diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
+index c15ea8a..b7d00fa 100644
+--- a/arch/arm/mach-msm/devices-msm7x30.c
++++ b/arch/arm/mach-msm/devices-msm7x30.c
+@@ -212,10 +212,10 @@ static struct clk_pcom_desc msm_clocks_7x30[] = {
+ 	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
+ 	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
+ 	CLK_PCOM("core",	UART2_CLK,	"msm_serial.1", 0),
+-	CLK_PCOM("usb_phy_clk",	USB_PHY_CLK,	NULL, 0),
+-	CLK_PCOM("usb_hs_clk",		USB_HS_CLK,		NULL, OFF),
+-	CLK_PCOM("usb_hs_pclk",		USB_HS_P_CLK,		NULL, OFF),
+-	CLK_PCOM("usb_hs_core_clk",	USB_HS_CORE_CLK,	NULL, OFF),
++	CLK_PCOM("phy",	USB_PHY_CLK,	NULL, 0),
++	CLK_PCOM("core",		USB_HS_CLK,		NULL, OFF),
++	CLK_PCOM("iface",		USB_HS_P_CLK,		NULL, OFF),
++	CLK_PCOM("alt_core",	USB_HS_CORE_CLK,	NULL, OFF),
+ 	CLK_PCOM("usb_hs2_clk",		USB_HS2_CLK,		NULL, OFF),
+ 	CLK_PCOM("usb_hs2_pclk",	USB_HS2_P_CLK,		NULL, OFF),
+ 	CLK_PCOM("usb_hs2_core_clk",	USB_HS2_CORE_CLK,	NULL, OFF),
+diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
+index 9e1e9ce..c9614b8 100644
+--- a/arch/arm/mach-msm/devices-qsd8x50.c
++++ b/arch/arm/mach-msm/devices-qsd8x50.c
+@@ -363,8 +363,8 @@ static struct clk_pcom_desc msm_clocks_8x50[] = {
+ 	CLK_PCOM("core",	UART3_CLK,	"msm_serial.2", OFF),
+ 	CLK_PCOM("uartdm_clk",	UART1DM_CLK,	NULL, OFF),
+ 	CLK_PCOM("uartdm_clk",	UART2DM_CLK,	NULL, 0),
+-	CLK_PCOM("usb_hs_clk",	USB_HS_CLK,	NULL, OFF),
+-	CLK_PCOM("usb_hs_pclk",	USB_HS_P_CLK,	NULL, OFF),
++	CLK_PCOM("core",	USB_HS_CLK,	NULL, OFF),
++	CLK_PCOM("iface",	USB_HS_P_CLK,	NULL, OFF),
+ 	CLK_PCOM("usb_otg_clk",	USB_OTG_CLK,	NULL, 0),
+ 	CLK_PCOM("vdc_clk",	VDC_CLK,	NULL, OFF | CLK_MIN),
+ 	CLK_PCOM("vfe_clk",	VFE_CLK,	NULL, OFF),
+@@ -374,7 +374,7 @@ static struct clk_pcom_desc msm_clocks_8x50[] = {
+ 	CLK_PCOM("usb_hs2_pclk",	USB_HS2_P_CLK,	NULL, OFF),
+ 	CLK_PCOM("usb_hs3_clk",	USB_HS3_CLK,	NULL, OFF),
+ 	CLK_PCOM("usb_hs3_pclk",	USB_HS3_P_CLK,	NULL, OFF),
+-	CLK_PCOM("usb_phy_clk",	USB_PHY_CLK,	NULL, 0),
++	CLK_PCOM("phy",	USB_PHY_CLK,	NULL, 0),
+ };
  
- static struct msm_otg_platform_data msm_otg_pdata = {
- 	.phy_init_seq		= hsusb_phy_init_seq,
--	.mode                   = USB_PERIPHERAL,
-+	.mode                   = USB_DR_MODE_PERIPHERAL,
- 	.otg_control		= OTG_PHY_CONTROL,
- 	.link_clk_reset		= hsusb_link_clk_reset,
- 	.phy_clk_reset		= hsusb_phy_clk_reset,
-diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-index 9169ec3..4c74861 100644
---- a/arch/arm/mach-msm/board-qsd8x50.c
-+++ b/arch/arm/mach-msm/board-qsd8x50.c
-@@ -116,7 +116,7 @@ static int hsusb_phy_clk_reset(struct clk *phy_clk)
- 
- static struct msm_otg_platform_data msm_otg_pdata = {
- 	.phy_init_seq		= hsusb_phy_init_seq,
--	.mode                   = USB_PERIPHERAL,
-+	.mode                   = USB_DR_MODE_PERIPHERAL,
- 	.otg_control		= OTG_PHY_CONTROL,
- 	.link_clk_reset		= hsusb_link_clk_reset,
- 	.phy_clk_reset		= hsusb_phy_clk_reset,
+ static struct pcom_clk_pdata msm_clock_8x50_pdata = {
 diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-index 46800c0..2aca042 100644
+index c1020d9..0bd3ba5 100644
 --- a/drivers/usb/phy/phy-msm-usb.c
 +++ b/drivers/usb/phy/phy-msm-usb.c
-@@ -372,10 +372,10 @@ static int msm_otg_reset(struct usb_phy *phy)
+@@ -262,7 +262,7 @@ static int msm_otg_link_clk_reset(struct msm_otg *motg, bool assert)
+ 	if (!motg->pdata->link_clk_reset)
+ 		return ret;
  
- 	if (pdata->otg_control == OTG_PHY_CONTROL) {
- 		val = readl(USB_OTGSC);
--		if (pdata->mode == USB_OTG) {
-+		if (pdata->mode == USB_DR_MODE_OTG) {
- 			ulpi_val = ULPI_INT_IDGRD | ULPI_INT_SESS_VALID;
- 			val |= OTGSC_IDIE | OTGSC_BSVIE;
--		} else if (pdata->mode == USB_PERIPHERAL) {
-+		} else if (pdata->mode == USB_DR_MODE_PERIPHERAL) {
- 			ulpi_val = ULPI_INT_SESS_VALID;
- 			val |= OTGSC_BSVIE;
- 		}
-@@ -636,7 +636,7 @@ static int msm_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
- 	 * Fail host registration if this board can support
- 	 * only peripheral configuration.
+-	ret = motg->pdata->link_clk_reset(motg->clk, assert);
++	ret = motg->pdata->link_clk_reset(motg->core_clk, assert);
+ 	if (ret)
+ 		dev_err(motg->phy.dev, "usb link clk reset failed\n");
+ 
+@@ -276,7 +276,7 @@ static int msm_otg_phy_clk_reset(struct msm_otg *motg)
+ 	if (!motg->pdata->phy_clk_reset)
+ 		return ret;
+ 
+-	ret = motg->pdata->phy_clk_reset(motg->phy_reset_clk);
++	ret = motg->pdata->phy_clk_reset(motg->phy_clk);
+ 	if (ret)
+ 		dev_err(motg->phy.dev, "usb phy clk assert failed\n");
+ 
+@@ -459,10 +459,10 @@ static int msm_otg_suspend(struct msm_otg *motg)
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL)
+ 		writel(readl(USB_PHY_CTRL) | PHY_RETEN, USB_PHY_CTRL);
+ 
+-	clk_disable_unprepare(motg->pclk);
+-	clk_disable_unprepare(motg->clk);
+-	if (!IS_ERR(motg->core_clk))
+-		clk_disable_unprepare(motg->core_clk);
++	clk_disable_unprepare(motg->iface_clk);
++	clk_disable_unprepare(motg->core_clk);
++	if (!IS_ERR(motg->alt_core_clk))
++		clk_disable_unprepare(motg->alt_core_clk);
+ 
+ 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
+@@ -493,10 +493,10 @@ static int msm_otg_resume(struct msm_otg *motg)
+ 	if (!atomic_read(&motg->in_lpm))
+ 		return 0;
+ 
+-	clk_prepare_enable(motg->pclk);
+-	clk_prepare_enable(motg->clk);
+-	if (!IS_ERR(motg->core_clk))
+-		clk_prepare_enable(motg->core_clk);
++	clk_prepare_enable(motg->iface_clk);
++	clk_prepare_enable(motg->core_clk);
++	if (!IS_ERR(motg->alt_core_clk))
++		clk_prepare_enable(motg->alt_core_clk);
+ 
+ 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
+@@ -1372,16 +1372,16 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 	phy = &motg->phy;
+ 	phy->dev = &pdev->dev;
+ 
+-	motg->phy_reset_clk = devm_clk_get(&pdev->dev, "usb_phy_clk");
+-	if (IS_ERR(motg->phy_reset_clk)) {
+-		dev_err(&pdev->dev, "failed to get usb_phy_clk\n");
+-		return PTR_ERR(motg->phy_reset_clk);
++	motg->phy_clk = devm_clk_get(&pdev->dev, "phy");
++	if (IS_ERR(motg->phy_clk)) {
++		dev_err(&pdev->dev, "failed to get phy clock\n");
++		return PTR_ERR(motg->phy_clk);
+ 	}
+ 
+-	motg->clk = devm_clk_get(&pdev->dev, "usb_hs_clk");
+-	if (IS_ERR(motg->clk)) {
+-		dev_err(&pdev->dev, "failed to get usb_hs_clk\n");
+-		return PTR_ERR(motg->clk);
++	motg->core_clk = devm_clk_get(&pdev->dev, "core");
++	if (IS_ERR(motg->core_clk)) {
++		dev_err(&pdev->dev, "failed to get core clock\n");
++		return PTR_ERR(motg->core_clk);
+ 	}
+ 
+ 	/*
+@@ -1390,18 +1390,22 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 	 * operation and USB core cannot tolerate frequency changes on
+ 	 * CORE CLK.
  	 */
--	if (motg->pdata->mode == USB_PERIPHERAL) {
-+	if (motg->pdata->mode == USB_DR_MODE_PERIPHERAL) {
- 		dev_info(otg->phy->dev, "Host mode is not supported\n");
- 		return -ENODEV;
+-	motg->pclk = devm_clk_get(&pdev->dev, "usb_hs_pclk");
+-	if (IS_ERR(motg->pclk)) {
+-		dev_err(&pdev->dev, "failed to get usb_hs_pclk\n");
+-		return PTR_ERR(motg->pclk);
++
++	motg->iface_clk = devm_clk_get(&pdev->dev, "iface");
++	if (IS_ERR(motg->iface_clk)) {
++		dev_err(&pdev->dev, "failed to get iface clock\n");
++		return PTR_ERR(motg->iface_clk);
  	}
-@@ -665,7 +665,7 @@ static int msm_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
- 	 * Kick the state machine work, if peripheral is not supported
- 	 * or peripheral is already registered with us.
+ 
+ 	/*
+-	 * USB core clock is not present on all MSM chips. This
++	 * USB alt_core clock is not present on all MSM chips. This
+ 	 * clock is introduced to remove the dependency on AXI
+ 	 * bus frequency.
++	 *
++	 * Targets on which link uses asynchronous reset methodology,
++	 * free running clock is not required during the reset.
  	 */
--	if (motg->pdata->mode == USB_HOST || otg->gadget) {
-+	if (motg->pdata->mode == USB_DR_MODE_HOST || otg->gadget) {
- 		pm_runtime_get_sync(otg->phy->dev);
- 		schedule_work(&motg->sm_work);
- 	}
-@@ -709,7 +709,7 @@ static int msm_otg_set_peripheral(struct usb_otg *otg,
- 	 * Fail peripheral registration if this board can support
- 	 * only host configuration.
- 	 */
--	if (motg->pdata->mode == USB_HOST) {
-+	if (motg->pdata->mode == USB_DR_MODE_HOST) {
- 		dev_info(otg->phy->dev, "Peripheral mode is not supported\n");
- 		return -ENODEV;
- 	}
-@@ -734,7 +734,7 @@ static int msm_otg_set_peripheral(struct usb_otg *otg,
- 	 * Kick the state machine work, if host is not supported
- 	 * or host is already registered with us.
- 	 */
--	if (motg->pdata->mode == USB_PERIPHERAL || otg->host) {
-+	if (motg->pdata->mode == USB_DR_MODE_PERIPHERAL || otg->host) {
- 		pm_runtime_get_sync(otg->phy->dev);
- 		schedule_work(&motg->sm_work);
- 	}
-@@ -1055,7 +1055,7 @@ static void msm_otg_init_sm(struct msm_otg *motg)
- 	u32 otgsc = readl(USB_OTGSC);
+-	motg->core_clk = devm_clk_get(&pdev->dev, "usb_hs_core_clk");
++	motg->alt_core_clk = devm_clk_get(&pdev->dev, "alt_core");
  
- 	switch (pdata->mode) {
--	case USB_OTG:
-+	case USB_DR_MODE_OTG:
- 		if (pdata->otg_control == OTG_PHY_CONTROL) {
- 			if (otgsc & OTGSC_ID)
- 				set_bit(ID, &motg->inputs);
-@@ -1067,21 +1067,21 @@ static void msm_otg_init_sm(struct msm_otg *motg)
- 			else
- 				clear_bit(B_SESS_VLD, &motg->inputs);
- 		} else if (pdata->otg_control == OTG_USER_CONTROL) {
--			if (pdata->default_mode == USB_HOST) {
--				clear_bit(ID, &motg->inputs);
--			} else if (pdata->default_mode == USB_PERIPHERAL) {
-+			if (pdata->default_mode == USB_DR_MODE_PERIPHERAL) {
- 				set_bit(ID, &motg->inputs);
- 				set_bit(B_SESS_VLD, &motg->inputs);
-+			} else if (pdata->default_mode == USB_DR_MODE_HOST) {
-+				clear_bit(ID, &motg->inputs);
- 			} else {
- 				set_bit(ID, &motg->inputs);
- 				clear_bit(B_SESS_VLD, &motg->inputs);
- 			}
- 		}
- 		break;
--	case USB_HOST:
-+	case USB_DR_MODE_HOST:
- 		clear_bit(ID, &motg->inputs);
- 		break;
--	case USB_PERIPHERAL:
-+	case USB_DR_MODE_PERIPHERAL:
- 		set_bit(ID, &motg->inputs);
- 		if (otgsc & OTGSC_BSV)
- 			set_bit(B_SESS_VLD, &motg->inputs);
-@@ -1257,7 +1257,7 @@ static ssize_t msm_otg_mode_write(struct file *file, const char __user *ubuf,
- 	char buf[16];
- 	struct usb_otg *otg = motg->phy.otg;
- 	int status = count;
--	enum usb_mode_type req_mode;
-+	enum usb_dr_mode req_mode;
- 
- 	memset(buf, 0x00, sizeof(buf));
- 
-@@ -1267,18 +1267,18 @@ static ssize_t msm_otg_mode_write(struct file *file, const char __user *ubuf,
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	motg->regs = devm_ioremap_resource(&pdev->dev, res);
+@@ -1434,13 +1438,13 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 		return PTR_ERR(motg->v1p8);
  	}
  
- 	if (!strncmp(buf, "host", 4)) {
--		req_mode = USB_HOST;
-+		req_mode = USB_DR_MODE_HOST;
- 	} else if (!strncmp(buf, "peripheral", 10)) {
--		req_mode = USB_PERIPHERAL;
-+		req_mode = USB_DR_MODE_PERIPHERAL;
- 	} else if (!strncmp(buf, "none", 4)) {
--		req_mode = USB_NONE;
-+		req_mode = USB_DR_MODE_UNKNOWN;
- 	} else {
- 		status = -EINVAL;
- 		goto out;
- 	}
+-	clk_set_rate(motg->clk, 60000000);
++	clk_set_rate(motg->core_clk, 60000000);
  
- 	switch (req_mode) {
--	case USB_NONE:
-+	case USB_DR_MODE_UNKNOWN:
- 		switch (otg->phy->state) {
- 		case OTG_STATE_A_HOST:
- 		case OTG_STATE_B_PERIPHERAL:
-@@ -1289,7 +1289,7 @@ static ssize_t msm_otg_mode_write(struct file *file, const char __user *ubuf,
- 			goto out;
- 		}
- 		break;
--	case USB_PERIPHERAL:
-+	case USB_DR_MODE_PERIPHERAL:
- 		switch (otg->phy->state) {
- 		case OTG_STATE_B_IDLE:
- 		case OTG_STATE_A_HOST:
-@@ -1300,7 +1300,7 @@ static ssize_t msm_otg_mode_write(struct file *file, const char __user *ubuf,
- 			goto out;
- 		}
- 		break;
--	case USB_HOST:
-+	case USB_DR_MODE_HOST:
- 		switch (otg->phy->state) {
- 		case OTG_STATE_B_IDLE:
- 		case OTG_STATE_B_PERIPHERAL:
-@@ -1515,7 +1515,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, motg);
- 	device_init_wakeup(&pdev->dev, 1);
+-	clk_prepare_enable(motg->clk);
+-	clk_prepare_enable(motg->pclk);
++	clk_prepare_enable(motg->core_clk);
++	clk_prepare_enable(motg->iface_clk);
  
--	if (motg->pdata->mode == USB_OTG &&
-+	if (motg->pdata->mode == USB_DR_MODE_OTG &&
- 			motg->pdata->otg_control == OTG_USER_CONTROL) {
- 		ret = msm_otg_debugfs_init(motg);
- 		if (ret)
+-	if (!IS_ERR(motg->core_clk))
+-		clk_prepare_enable(motg->core_clk);
++	if (!IS_ERR(motg->alt_core_clk))
++		clk_prepare_enable(motg->alt_core_clk);
+ 
+ 	ret = msm_hsusb_init_vddcx(motg, 1);
+ 	if (ret) {
+@@ -1506,10 +1510,10 @@ disable_ldo:
+ disable_vddcx:
+ 	msm_hsusb_init_vddcx(motg, 0);
+ disable_clks:
+-	clk_disable_unprepare(motg->pclk);
+-	clk_disable_unprepare(motg->clk);
+-	if (!IS_ERR(motg->core_clk))
+-		clk_disable_unprepare(motg->core_clk);
++	clk_disable_unprepare(motg->iface_clk);
++	clk_disable_unprepare(motg->core_clk);
++	if (!IS_ERR(motg->alt_core_clk))
++		clk_disable_unprepare(motg->alt_core_clk);
+ 	return ret;
+ }
+ 
+@@ -1550,10 +1554,11 @@ static int msm_otg_remove(struct platform_device *pdev)
+ 	if (cnt >= PHY_SUSPEND_TIMEOUT_USEC)
+ 		dev_err(phy->dev, "Unable to suspend PHY\n");
+ 
+-	clk_disable_unprepare(motg->pclk);
+-	clk_disable_unprepare(motg->clk);
+-	if (!IS_ERR(motg->core_clk))
+-		clk_disable_unprepare(motg->core_clk);
++	clk_disable_unprepare(motg->iface_clk);
++	clk_disable_unprepare(motg->core_clk);
++	if (!IS_ERR(motg->alt_core_clk))
++		clk_disable_unprepare(motg->alt_core_clk);
++
+ 	msm_hsusb_ldo_init(motg, 0);
+ 
+ 	pm_runtime_set_suspended(&pdev->dev);
 diff --git a/include/linux/usb/msm_hsusb.h b/include/linux/usb/msm_hsusb.h
-index 8705b01..f9d512e 100644
+index 262ed80..f1b98f2 100644
 --- a/include/linux/usb/msm_hsusb.h
 +++ b/include/linux/usb/msm_hsusb.h
-@@ -23,21 +23,6 @@
- #include <linux/clk.h>
- 
- /**
-- * Supported USB modes
-- *
-- * USB_PERIPHERAL       Only peripheral mode is supported.
-- * USB_HOST             Only host mode is supported.
-- * USB_OTG              OTG mode is supported.
-- *
-- */
--enum usb_mode_type {
--	USB_NONE = 0,
--	USB_PERIPHERAL,
--	USB_HOST,
--	USB_OTG,
--};
--
--/**
-  * OTG control
-  *
-  * OTG_NO_CONTROL	Id/VBUS notifications not required. Useful in host
-@@ -130,9 +115,9 @@ struct msm_otg_platform_data {
- 	int *phy_init_seq;
- 	void (*vbus_power)(bool on);
- 	unsigned power_budget;
--	enum usb_mode_type mode;
-+	enum usb_dr_mode mode;
- 	enum otg_control_type otg_control;
--	enum usb_mode_type default_mode;
-+	enum usb_dr_mode default_mode;
- 	enum msm_usb_phy_type phy_type;
- 	void (*setup_gpio)(enum usb_otg_state state);
- 	char *pclk_src_name;
+@@ -124,10 +124,10 @@ struct msm_otg_platform_data {
+  * @otg: USB OTG Transceiver structure.
+  * @pdata: otg device platform data.
+  * @irq: IRQ number assigned for HSUSB controller.
+- * @clk: clock struct of usb_hs_clk.
+- * @pclk: clock struct of usb_hs_pclk.
+- * @phy_reset_clk: clock struct of usb_phy_clk.
+- * @core_clk: clock struct of usb_hs_core_clk.
++ * @core_clk: reference to core clock struct.
++ * @iface_clk: reference to interface clock struct.
++ * @phy_clk: reference to PHY clock struct.
++ * @alt_core_clk: reference to alternative clock struct
+  * @regs: ioremapped register base address.
+  * @inputs: OTG state machine inputs(Id, SessValid etc).
+  * @sm_work: OTG state machine work.
+@@ -144,10 +144,10 @@ struct msm_otg {
+ 	struct usb_phy phy;
+ 	struct msm_otg_platform_data *pdata;
+ 	int irq;
+-	struct clk *clk;
+-	struct clk *pclk;
+-	struct clk *phy_reset_clk;
+ 	struct clk *core_clk;
++	struct clk *iface_clk;
++	struct clk *phy_clk;
++	struct clk *alt_core_clk;
+ 	void __iomem *regs;
+ #define ID		0
+ #define B_SESS_VLD	1
 -- 
 1.7.9.5
