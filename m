@@ -1,23 +1,44 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 14 Oct 2013 16:50:12 -0400 (EDT)
-Subject: [PATCH 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
-In-Reply-To: <DC148C5AA1CEBA4E87973D432B1C2D8817DABD8C@P3PWEX4MB008.ex4.secureserver.net>
-Message-ID: <Pine.LNX.4.44L0.1310141647140.6851-100000@netrider.rowland.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Oct 2013 21:23:28 +0200
+Subject: [PATCH v2 3/4] ARM: sunxi: Register the A31 reset IP in init_time
+In-Reply-To: <1381778609-4191-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1381778609-4191-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1381778609-4191-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Oct 2013, Hartley Sweeten wrote:
+The A31 has a reset IP that maintains a few other IPs in reset by
+default. Among these IPs are the UARTs, and most notably the timers. We
+thus need to register the reset driver before initializing the timers so
+that the reset timer can use the reset framework.
 
-> Alan,
-> 
-> As an alternative to this patch, I have successfully used the ohci-platform
-> driver on the ep93xx. This does move a bit of glue code into the ep93xx
-> core (arch/arm/mach-ep93xx/core.c) but it removes the ohci-ep93xx glue
-> driver completely.
-> 
-> I can post a patch for this shortly if you would like.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-sunxi/sunxi.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-That would be great!  It would save me the trouble of fixing 
-Manjanuth's patch and it would remove a source file too!
-
-Alan Stern
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index f184f6c..2e79736 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -142,9 +142,17 @@ static const char * const sun6i_board_dt_compat[] = {
+ 	NULL,
+ };
+ 
++extern void __init sun6i_reset_init(void);
++static void __init sun6i_timer_init(void)
++{
++	sunxi_init_clocks();
++	sun6i_reset_init();
++	clocksource_of_init();
++}
++
+ DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
+ 	.init_machine	= sunxi_dt_init,
+-	.init_time	= sunxi_timer_init,
++	.init_time	= sun6i_timer_init,
+ 	.dt_compat	= sun6i_board_dt_compat,
+ 	.restart	= sun6i_restart,
+ MACHINE_END
+-- 
+1.8.4
