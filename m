@@ -1,40 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Oct 2013 13:48:37 +0100
-Subject: [PATCH 2/2] ARM: SMMU: return NULL on error in
- arm_smmu_iova_to_phys
-In-Reply-To: <1381497887-14586-2-git-send-email-a.motakis@virtualopensystems.com>
-References: <1381497887-14586-1-git-send-email-a.motakis@virtualopensystems.com>
- <1381497887-14586-2-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <20131014124837.GD10491@mudshark.cambridge.arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 14 Oct 2013 14:49:21 +0200
+Subject: [PATCH] ARM: dts: am33xx, change usb ctrl module label
+Message-ID: <1381754961-3252-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 02:24:47PM +0100, Antonios Motakis wrote:
-> The return value of arm_smmu_iova_to_phys is directly passed to the
-> user of the IOMMU API via iommu_iova_to_phys; however the ARM SMMU
-> driver returns -EINVAL on error, which is not consistent with the
-> rest of the drivers implementing the IOMMU API. VFIO also relies on
-> the call returning NULL when a page has not been mapped already.
-> 
-> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-> ---
->  drivers/iommu/arm-smmu.c | 5 +----
->  1 file changed, 1 insertion(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 8b71332..fe81b20 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1480,10 +1480,7 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
->  
->  err_unlock:
->  	spin_unlock(&smmu_domain->lock);
-> -	dev_warn(smmu->dev,
-> -		 "invalid (corrupt?) page tables detected for iova 0x%llx\n",
-> -		 (unsigned long long)iova);
-> -	return -EINVAL;
-> +	return NULL;
+Control module is not usb specific. This patch changes the label to
+usb_ctrl_mod.
 
-Why are you removing the warning message?
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/boot/dts/am33xx.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Will
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index f9c5da9..14510ee 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -346,7 +346,7 @@
+ 			ti,hwmods = "usb_otg_hs";
+ 			status = "disabled";
+ 
+-			ctrl_mod: control at 44e10000 {
++			usb_ctrl_mod: control at 44e10000 {
+ 				compatible = "ti,am335x-usb-ctrl-module";
+ 				reg = <0x44e10620 0x10
+ 					0x44e10648 0x4>;
+@@ -359,7 +359,7 @@
+ 				reg = <0x47401300 0x100>;
+ 				reg-names = "phy";
+ 				status = "disabled";
+-				ti,ctrl_mod = <&ctrl_mod>;
++				ti,ctrl_mod = <&usb_ctrl_mod>;
+ 			};
+ 
+ 			usb0: usb at 47401000 {
+@@ -407,7 +407,7 @@
+ 				reg = <0x47401b00 0x100>;
+ 				reg-names = "phy";
+ 				status = "disabled";
+-				ti,ctrl_mod = <&ctrl_mod>;
++				ti,ctrl_mod = <&usb_ctrl_mod>;
+ 			};
+ 
+ 			usb1: usb at 47401800 {
+-- 
+1.8.4.rc3
