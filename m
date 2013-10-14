@@ -1,129 +1,132 @@
 From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Mon, 14 Oct 2013 18:24:32 +0300
-Subject: [PATCH v3 05/13] usb: phy: msm: Fix WARNING: quoted string split
- across lines
+Date: Mon, 14 Oct 2013 18:24:36 +0300
+Subject: [PATCH v3 09/13] usb: phy: msm: Remove unused pclk_src_name
 In-Reply-To: <1381764280-28420-1-git-send-email-iivanov@mm-sol.com>
 References: <1381764280-28420-1-git-send-email-iivanov@mm-sol.com>
-Message-ID: <1381764280-28420-6-git-send-email-iivanov@mm-sol.com>
+Message-ID: <1381764280-28420-10-git-send-email-iivanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 
-This fixes checkpatch.pl warnings.
+There are no references to 'pclk_src_name' in plaform code,
+so it is unused.
 
 Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
 ---
- drivers/usb/phy/phy-msm-usb.c |   33 +++++++++++----------------------
- 1 file changed, 11 insertions(+), 22 deletions(-)
+ drivers/usb/phy/phy-msm-usb.c |   26 +-------------------------
+ include/linux/usb/msm_hsusb.h |    5 -----
+ 2 files changed, 1 insertion(+), 30 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-index b77441b..28cab03 100644
+index 4a23cfa..c1020d9 100644
 --- a/drivers/usb/phy/phy-msm-usb.c
 +++ b/drivers/usb/phy/phy-msm-usb.c
-@@ -67,8 +67,7 @@ static int msm_hsusb_init_vddcx(struct msm_otg *motg, int init)
- 				USB_PHY_VDD_DIG_VOL_MIN,
- 				USB_PHY_VDD_DIG_VOL_MAX);
- 		if (ret) {
--			dev_err(motg->phy.dev, "unable to set the voltage "
--					"for hsusb vddcx\n");
-+			dev_err(motg->phy.dev, "Cannot set vddcx voltage\n");
- 			return ret;
- 		}
+@@ -464,9 +464,6 @@ static int msm_otg_suspend(struct msm_otg *motg)
+ 	if (!IS_ERR(motg->core_clk))
+ 		clk_disable_unprepare(motg->core_clk);
  
-@@ -79,8 +78,7 @@ static int msm_hsusb_init_vddcx(struct msm_otg *motg, int init)
- 		ret = regulator_set_voltage(motg->vddcx, 0,
- 			USB_PHY_VDD_DIG_VOL_MAX);
- 		if (ret)
--			dev_err(motg->phy.dev, "unable to set the voltage "
--					"for hsusb vddcx\n");
-+			dev_err(motg->phy.dev, "Cannot set vddcx voltage\n");
- 		ret = regulator_disable(motg->vddcx);
- 		if (ret)
- 			dev_err(motg->phy.dev, "unable to disable hsusb vddcx\n");
-@@ -97,8 +95,7 @@ static int msm_hsusb_ldo_init(struct msm_otg *motg, int init)
- 		rc = regulator_set_voltage(motg->v3p3, USB_PHY_3P3_VOL_MIN,
- 				USB_PHY_3P3_VOL_MAX);
- 		if (rc) {
--			dev_err(motg->phy.dev, "unable to set voltage level "
--					"for hsusb 3p3\n");
-+			dev_err(motg->phy.dev, "Cannot set v3p3 voltage\n");
- 			goto exit;
- 		}
- 		rc = regulator_enable(motg->v3p3);
-@@ -109,8 +106,7 @@ static int msm_hsusb_ldo_init(struct msm_otg *motg, int init)
- 		rc = regulator_set_voltage(motg->v1p8, USB_PHY_1P8_VOL_MIN,
- 				USB_PHY_1P8_VOL_MAX);
- 		if (rc) {
--			dev_err(motg->phy.dev, "unable to set voltage level "
--					"for hsusb 1p8\n");
-+			dev_err(motg->phy.dev, "Cannot set v1p8 voltage\n");
- 			goto disable_3p3;
- 		}
- 		rc = regulator_enable(motg->v1p8);
-@@ -144,8 +140,7 @@ static int msm_hsusb_config_vddcx(struct msm_otg *motg, int high)
+-	if (!IS_ERR(motg->pclk_src))
+-		clk_disable_unprepare(motg->pclk_src);
+-
+ 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
+ 		msm_hsusb_ldo_set_mode(motg, 0);
+@@ -496,9 +493,6 @@ static int msm_otg_resume(struct msm_otg *motg)
+ 	if (!atomic_read(&motg->in_lpm))
+ 		return 0;
  
- 	ret = regulator_set_voltage(motg->vddcx, min_vol, max_vol);
- 	if (ret) {
--		pr_err("%s: unable to set the voltage for regulator "
--			"HSUSB_VDDCX\n", __func__);
-+		dev_err(motg->phy.dev, "Cannot set vddcx voltage\n");
- 		return ret;
+-	if (!IS_ERR(motg->pclk_src))
+-		clk_prepare_enable(motg->pclk_src);
+-
+ 	clk_prepare_enable(motg->pclk);
+ 	clk_prepare_enable(motg->clk);
+ 	if (!IS_ERR(motg->core_clk))
+@@ -1394,17 +1388,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 	 * If USB Core is running its protocol engine based on CORE CLK,
+ 	 * CORE CLK  must be running at >55Mhz for correct HSUSB
+ 	 * operation and USB core cannot tolerate frequency changes on
+-	 * CORE CLK. For such USB cores, vote for maximum clk frequency
+-	 * on pclk source
++	 * CORE CLK.
+ 	 */
+-	 motg->pclk_src = ERR_PTR(-ENOENT);
+-	 if (motg->pdata->pclk_src_name) {
+-		motg->pclk_src = devm_clk_get(&pdev->dev,
+-					motg->pdata->pclk_src_name);
+-		if (IS_ERR(motg->pclk_src))
+-			return PTR_ERR(motg->pclk_src);
+-	}
+-
+ 	motg->pclk = devm_clk_get(&pdev->dev, "usb_hs_pclk");
+ 	if (IS_ERR(motg->pclk)) {
+ 		dev_err(&pdev->dev, "failed to get usb_hs_pclk\n");
+@@ -1450,10 +1435,6 @@ static int __init msm_otg_probe(struct platform_device *pdev)
  	}
  
-@@ -163,15 +158,13 @@ static int msm_hsusb_ldo_set_mode(struct msm_otg *motg, int on)
- 		ret = regulator_set_optimum_mode(motg->v1p8,
- 				USB_PHY_1P8_HPM_LOAD);
- 		if (ret < 0) {
--			pr_err("%s: Unable to set HPM of the regulator "
--				"HSUSB_1p8\n", __func__);
-+			pr_err("Could not set HPM for v1p8\n");
- 			return ret;
- 		}
- 		ret = regulator_set_optimum_mode(motg->v3p3,
- 				USB_PHY_3P3_HPM_LOAD);
- 		if (ret < 0) {
--			pr_err("%s: Unable to set HPM of the regulator "
--				"HSUSB_3p3\n", __func__);
-+			pr_err("Could not set HPM for v3p3\n");
- 			regulator_set_optimum_mode(motg->v1p8,
- 				USB_PHY_1P8_LPM_LOAD);
- 			return ret;
-@@ -180,13 +173,11 @@ static int msm_hsusb_ldo_set_mode(struct msm_otg *motg, int on)
- 		ret = regulator_set_optimum_mode(motg->v1p8,
- 				USB_PHY_1P8_LPM_LOAD);
- 		if (ret < 0)
--			pr_err("%s: Unable to set LPM of the regulator "
--				"HSUSB_1p8\n", __func__);
-+			pr_err("Could not set LPM for v1p8\n");
- 		ret = regulator_set_optimum_mode(motg->v3p3,
- 				USB_PHY_3P3_LPM_LOAD);
- 		if (ret < 0)
--			pr_err("%s: Unable to set LPM of the regulator "
--				"HSUSB_3p3\n", __func__);
-+			pr_err("Could not set LPM for v3p3\n");
- 	}
+ 	clk_set_rate(motg->clk, 60000000);
+-	if (!IS_ERR(motg->pclk_src)) {
+-		clk_set_rate(motg->pclk_src, INT_MAX);
+-		clk_prepare_enable(motg->pclk_src);
+-	}
  
- 	pr_debug("reg (%s)\n", on ? "HPM" : "LPM");
-@@ -546,8 +537,7 @@ static int msm_otg_resume(struct msm_otg *motg)
- 		 * PHY. USB state can not be restored. Re-insertion
- 		 * of USB cable is the only way to get USB working.
- 		 */
--		dev_err(phy->dev, "Unable to resume USB."
--				"Re-plugin the cable\n");
-+		dev_err(phy->dev, "Unable to resume USB. Re-plugin the cable\n");
- 		msm_otg_reset(phy);
- 	}
+ 	clk_prepare_enable(motg->clk);
+ 	clk_prepare_enable(motg->pclk);
+@@ -1529,8 +1510,6 @@ disable_clks:
+ 	clk_disable_unprepare(motg->clk);
+ 	if (!IS_ERR(motg->core_clk))
+ 		clk_disable_unprepare(motg->core_clk);
+-	if (!IS_ERR(motg->pclk_src))
+-		clk_disable_unprepare(motg->pclk_src);
+ 	return ret;
+ }
  
-@@ -1529,8 +1519,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
- 			motg->pdata->otg_control == OTG_USER_CONTROL) {
- 		ret = msm_otg_debugfs_init(motg);
- 		if (ret)
--			dev_dbg(&pdev->dev, "mode debugfs file is"
--					"not available\n");
-+			dev_dbg(&pdev->dev, "Can not create mode change file\n");
- 	}
+@@ -1575,9 +1554,6 @@ static int msm_otg_remove(struct platform_device *pdev)
+ 	clk_disable_unprepare(motg->clk);
+ 	if (!IS_ERR(motg->core_clk))
+ 		clk_disable_unprepare(motg->core_clk);
+-	if (!IS_ERR(motg->pclk_src))
+-		clk_disable_unprepare(motg->pclk_src);
+-
+ 	msm_hsusb_ldo_init(motg, 0);
  
- 	pm_runtime_set_active(&pdev->dev);
+ 	pm_runtime_set_suspended(&pdev->dev);
+diff --git a/include/linux/usb/msm_hsusb.h b/include/linux/usb/msm_hsusb.h
+index 72c5830..262ed80 100644
+--- a/include/linux/usb/msm_hsusb.h
++++ b/include/linux/usb/msm_hsusb.h
+@@ -106,8 +106,6 @@ enum usb_chg_type {
+  * @power_budget: VBUS power budget in mA (0 will be treated as 500mA).
+  * @mode: Supported mode (OTG/peripheral/host).
+  * @otg_control: OTG switch controlled by user/Id pin
+- * @pclk_src_name: pclk is derived from ebi1_usb_clk in case of 7x27 and 8k
+- *              dfab_usb_hs_clk in case of 8660 and 8960.
+  */
+ struct msm_otg_platform_data {
+ 	int *phy_init_seq;
+@@ -117,7 +115,6 @@ struct msm_otg_platform_data {
+ 	enum otg_control_type otg_control;
+ 	enum msm_usb_phy_type phy_type;
+ 	void (*setup_gpio)(enum usb_otg_state state);
+-	char *pclk_src_name;
+ 	int (*link_clk_reset)(struct clk *link_clk, bool assert);
+ 	int (*phy_clk_reset)(struct clk *phy_clk);
+ };
+@@ -129,7 +126,6 @@ struct msm_otg_platform_data {
+  * @irq: IRQ number assigned for HSUSB controller.
+  * @clk: clock struct of usb_hs_clk.
+  * @pclk: clock struct of usb_hs_pclk.
+- * @pclk_src: pclk source for voting.
+  * @phy_reset_clk: clock struct of usb_phy_clk.
+  * @core_clk: clock struct of usb_hs_core_clk.
+  * @regs: ioremapped register base address.
+@@ -150,7 +146,6 @@ struct msm_otg {
+ 	int irq;
+ 	struct clk *clk;
+ 	struct clk *pclk;
+-	struct clk *pclk_src;
+ 	struct clk *phy_reset_clk;
+ 	struct clk *core_clk;
+ 	void __iomem *regs;
 -- 
 1.7.9.5
