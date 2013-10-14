@@ -1,33 +1,21 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Oct 2013 15:29:00 +0200
-Subject: [PATCH 1/3] usb: musb: Handle nullpointer
-In-Reply-To: <1381757342-13324-1-git-send-email-mpa@pengutronix.de>
-References: <1381757342-13324-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1381757342-13324-2-git-send-email-mpa@pengutronix.de>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 14 Oct 2013 15:29:26 +0200
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <525BF089.9050408@arm.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
+ <525BF089.9050408@arm.com>
+Message-ID: <525BF1B6.5050206@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the device is connected to a host without a gadget driver,
-otg->gadget is NULL.
+Il 14/10/2013 15:24, Marc Zyngier ha scritto:
+> See my initial patch for that:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-October/007359.html
+> 
+> That doesn't really change the non-trapping virtio accesses, though.
+> Where is this virtio_is_big_endian() thing?
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/usb/musb/musb_core.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+In QEMU.
 
-diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-index 18e877f..baa4f6a 100644
---- a/drivers/usb/musb/musb_core.c
-+++ b/drivers/usb/musb/musb_core.c
-@@ -654,7 +654,8 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
- 				break;
- 		case OTG_STATE_B_PERIPHERAL:
- 			musb_g_suspend(musb);
--			musb->is_active = otg->gadget->b_hnp_enable;
-+			musb->is_active = otg->gadget &&
-+					otg->gadget->b_hnp_enable;
- 			if (musb->is_active) {
- 				musb->xceiv->state = OTG_STATE_B_WAIT_ACON;
- 				dev_dbg(musb->controller, "HNP: Setting timer for b_ase0_brst\n");
--- 
-1.8.4.rc3
+Paolo
