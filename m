@@ -1,60 +1,38 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Oct 2013 09:45:54 +0800
-Subject: [PATCH 11/12] usb: phy-mxs: update binding for adding
- disconnect line property
-In-Reply-To: <20131012170523.13726549@skate>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 14 Oct 2013 04:07:10 +0200
+Subject: [PATCH 02/12] usb: phy-mxs: Enable IC fixes for mx6 SoC serial
+In-Reply-To: <20131014013119.GB3879@shlinux1.ap.freescale.net>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
- <1381568986-19802-12-git-send-email-peter.chen@freescale.com>
- <20131012170523.13726549@skate>
-Message-ID: <20131014014553.GG3879@shlinux1.ap.freescale.net>
+ <201310121138.16584.marex@denx.de>
+ <20131014013119.GB3879@shlinux1.ap.freescale.net>
+Message-ID: <201310140407.11129.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 12, 2013 at 05:05:23PM +0200, Thomas Petazzoni wrote:
-> Dear Peter Chen,
-> 
-> On Sat, 12 Oct 2013 17:09:45 +0800, Peter Chen wrote:
-> > This property is used to disconnect line between USB PHY and
-> > USB controller.
+Dear Peter Chen,
+
+> On Sat, Oct 12, 2013 at 11:38:16AM +0200, Marek Vasut wrote:
+> > Hi,
 > > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  Documentation/devicetree/bindings/usb/mxs-phy.txt |    4 ++++
-> >  1 files changed, 4 insertions(+), 0 deletions(-)
+> > > After adding IC fixes bits, some PHY bugs are fixed by
+> > > IC logic.
 > > 
-> > diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> > index 1a9bd85..099b0bb 100644
-> > --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> > +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> > @@ -5,6 +5,9 @@ Required properties:
-> >  - reg: Should contain registers location and length
-> >  - interrupts: Should contain phy interrupt
-> >  - fsl,anatop: phandle for anatop register
-> > +- disconnect_line_without_vbus: needs to disconnect
-> > +connection between USB PHY and controller, it can avoid
-> > +unexpected wakeup interrupt when the PHY is out of power
-> >  
-> >  Example:
-> >  usbphy1: usbphy at 020c9000 {
-> > @@ -12,4 +15,5 @@ usbphy1: usbphy at 020c9000 {
-> >  	reg = <0x020c9000 0x1000>;
-> >  	interrupts = <0 44 0x04>;
-> >  	fsl,anatop = <&anatop>;
-> > +	disconnect_line_without_vbus;
-> >  };
+> > Can you please elaborate what those bits do exactly ? They seem like a
+> > magic stuff to me thus far, which is not exactly helpful . I can't find
+> > them in the datasheet either.
 > 
-> Device Tree properties use "-" as a separator, not "_". So, it should
-> be:
+> Yes, these bits are added at late TO verion for i.mx 6, and these TO
+> versions will be for mass production, unfortunately, the related doc
+> update may be forgotten.
 > 
-> 	disconnect-line-without-vbus
-> 
-> Also, all your patches touching Device Tree bindings should be Cc'ed to
-> the devicetree@ mailing list.
-> 
+> These two bits are related to two PHY bugs, two PHY bugs are still existed
+> at mx28 and mx23, one bug is fixed at mx6dq and mx6dl, and both of two
+> bugs are fixed at later mx6 (like mx6sololite and later SoCs), but the IC
+> fixes are not enabled by default, it needs software opens it.
 
-Thanks, I will change, and cc DT ML and maintainer, thanks.
+Sure, I get it. But what exactly does that bit do? Can you add a proper (and 
+likely beefy) comment into the code to supplement the missing parts in the 
+datasheet?
 
--- 
-
-Best Regards,
-Peter Chen
+Best regards,
+Marek Vasut
