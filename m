@@ -1,39 +1,48 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 14 Oct 2013 14:36:33 -0400
-Subject: [PATCH] ARM: mvebu: dts: remove unneeded linux,default-state
- from led nodes
-In-Reply-To: <20131014182821.GD25095@lunn.ch>
-References: <1381774047-23354-1-git-send-email-jason@lakedaemon.net>
- <20131014182821.GD25095@lunn.ch>
-Message-ID: <20131014183633.GK5402@titan.lakedaemon.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Oct 2013 20:43:49 +0200
+Subject: [PATCH] unset twsi option3 for gconfig as well
+In-Reply-To: <20131014091230.65047d00@skate>
+References: <1381706847-32762-1-git-send-email-roel.kluin@gmail.com>
+ <CACRpkdb8ibOm61D_iGkOkbas1475n4k5jptnRH7VFk=9+pipHQ@mail.gmail.com>
+ <20131014091230.65047d00@skate>
+Message-ID: <525C3B65.30501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 08:28:21PM +0200, Andrew Lunn wrote:
-> On Mon, Oct 14, 2013 at 06:07:27PM +0000, Jason Cooper wrote:
-> > Generally, power LEDs should indicate when power is applied, and go out
-> > once power is removed.  _Not_ annoy the developer with migraine-inducing
-> > blinking reminicent of some badly animated television series designed to
-> > sell sugar to children.
-> > 
-> > On a more serious note, most of these OS-specific properties aren't
-> > necessary and should be removed.  I left two that are legitimately tying
-> > disk LEDs to disk activity.  Other than that, we keep the state the
-> > bootloader left them in until userspace changes the state via sysfs.
-> 
-> Hi Jason
-> 
-> Do you know what happens with "keep" and the bootloader setting the
-> LED to hardware blink? I'm just wondering if some of these default-on,
-> are actually disabling hardware blinking and making it constant on?
+On 10/14/2013 09:12 AM, Thomas Petazzoni wrote:
+> On Mon, 14 Oct 2013 09:08:11 +0200, Linus Walleij wrote:
+>> Please include Thomas & Sebastian on the To: line when posting
+>> patches to this driver.
+>
+> ... and you should quote the entire e-mail so it's easier for us to see
+> what it is all about :-))
+>
+> Sebastian, the original e-mail is at
+> http://www.spinics.net/lists/kernel/msg1618853.html.
+>
+> Since this is a Dove-specific pinctrl issue, and Sebastian is the one
+> knowing about Dove, I'll let him answer.
 
-hmmm, good question.  I'll let this patch sit for some time since it is
-trivial and doesn't conflict with anything in mvebu/dt.  We'll see if
-anyone says anything.
+Roel,
 
-Regardless of the outcome, 'default-state = "on";' can be used instead
-for that scenario.
+thanks for the typo catch! Next time please always describe what and
+why your patches are doing. No matter how simple the fix is. Also,
+try to narrow down Cc recipients, e.g. Grant, Rob, and devtree ML
+love to not getting bugged with this.
+(removed them from Cc, added LAKML)
 
-thx,
+@Linus:
+I guess the typo is there from the beginning. You know a good way to
+determine how far it should go back to -stable?
 
-Jason.
+Please apply with following commit msg (or request a proper v2):
+
+"""
+This fixes a typo which left twsi config3 option enabled.
+"""
+
+and
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+Sebastian
