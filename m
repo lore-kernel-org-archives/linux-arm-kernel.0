@@ -1,68 +1,35 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 14 Oct 2013 03:39:36 +0200
-Subject: [PATCH 10/11] usb: chipidea: imx: add binding for supporting
- runtime pm
-In-Reply-To: <20131014012206.GA3879@shlinux1.ap.freescale.net>
-References: <1381570513-24927-11-git-send-email-peter.chen@freescale.com>
- <Pine.LNX.4.44L0.1310121039250.25996-100000@netrider.rowland.org>
- <20131014012206.GA3879@shlinux1.ap.freescale.net>
-Message-ID: <201310140339.37042.marex@denx.de>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 14 Oct 2013 09:31:20 +0800
+Subject: [PATCH 02/12] usb: phy-mxs: Enable IC fixes for mx6 SoC serial
+In-Reply-To: <201310121138.16584.marex@denx.de>
+References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
+ <1381568986-19802-3-git-send-email-peter.chen@freescale.com>
+ <201310121138.16584.marex@denx.de>
+Message-ID: <20131014013119.GB3879@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Peter Chen,
-
-> On Sat, Oct 12, 2013 at 10:40:37AM -0400, Alan Stern wrote:
-> > On Sat, 12 Oct 2013, Peter Chen wrote:
-> > > Add property for supporting runtime power management
-> > > 
-> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > ---
-> > > 
-> > >  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    2 ++
-> > >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> > > b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt index
-> > > b4b5b79..f666598 100644
-> > > --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> > > +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> > > 
-> > > @@ -18,6 +18,7 @@ Optional properties:
-> > >  - vbus-supply: regulator for vbus
-> > >  - disable-over-current: disable over current detect
-> > >  - external-vbus-divider: enables off-chip resistor divider for Vbus
-> > > 
-> > > +- supports_runtime_pm: enable runtime pm support
-> > > 
-> > >  Examples:
-> > >  usb at 02184000 { /* USB OTG */
-> > > 
-> > > @@ -28,4 +29,5 @@ usb at 02184000 { /* USB OTG */
-> > > 
-> > >  	fsl,usbmisc = <&usbmisc 0>;
-> > >  	disable-over-current;
-> > >  	external-vbus-divider;
-> > > 
-> > > +	supports_runtime_pm;
-> > > 
-> > >  };
-> > 
-> > This does not sound like a property of the hardware.  What's the
-> > _hardware_ difference between parts that support runtime PM and parts
-> > that don't?
+On Sat, Oct 12, 2013 at 11:38:16AM +0200, Marek Vasut wrote:
+> Hi,
 > 
-> Thanks.
+> > After adding IC fixes bits, some PHY bugs are fixed by
+> > IC logic.
 > 
-> From my point, all hardware using chipidea core should support runtime pm.
-> But some of platforms need special glue layer operations to support
-> it, it will break other platforms if enable chipidea core runtime pm.
-> Since device tree describes hardware property, maybe I should move
-> it to glue layer, or do you have any suggestions?
+> Can you please elaborate what those bits do exactly ? They seem like a magic 
+> stuff to me thus far, which is not exactly helpful . I can't find them in the 
+> datasheet either.
+> 
 
-You should certainly move it out of DT. This is linux-specific property, it has 
-nothing to do with HW. The best course of action would be to fix those platforms 
-that are broken by runtime PM.
+Yes, these bits are added at late TO verion for i.mx 6, and these TO versions
+will be for mass production, unfortunately, the related doc update may be 
+forgotten.
 
-Best regards,
-Marek Vasut
+These two bits are related to two PHY bugs, two PHY bugs are still existed
+at mx28 and mx23, one bug is fixed at mx6dq and mx6dl, and both of two
+bugs are fixed at later mx6 (like mx6sololite and later SoCs), but the IC
+fixes are not enabled by default, it needs software opens it.
+
+-- 
+
+Best Regards,
+Peter Chen
