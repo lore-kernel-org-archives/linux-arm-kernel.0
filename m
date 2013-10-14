@@ -1,97 +1,56 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 14 Oct 2013 03:17:56 +0200
-Subject: [PATCH 1/2] PCI: imx6: Make reset-gpio optional
-In-Reply-To: <201310140244.48433.marex@denx.de>
-References: <CAErSpo5e5ZyVqGOHR9p568k7_Qx4tBQCBjQvWvL+xGCqFLHHKQ@mail.gmail.com>
- <000501cec870$9aebcc80$d0c36580$%han@samsung.com>
- <201310140244.48433.marex@denx.de>
-Message-ID: <201310140317.56961.marex@denx.de>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 14 Oct 2013 09:22:07 +0800
+Subject: [PATCH 10/11] usb: chipidea: imx: add binding for supporting
+ runtime pm
+In-Reply-To: <Pine.LNX.4.44L0.1310121039250.25996-100000@netrider.rowland.org>
+References: <1381570513-24927-11-git-send-email-peter.chen@freescale.com>
+ <Pine.LNX.4.44L0.1310121039250.25996-100000@netrider.rowland.org>
+Message-ID: <20131014012206.GA3879@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Han,
-
-> > On Saturday, October 12, 2013 6:29 PM, Marek Vasut wrote:
-> > > > On Fri, Oct 11, 2013 at 04:12:31AM +0200, Marek Vasut wrote:
-> > > > > Some boards do not have a PCIe reset GPIO. To avoid probe
-> > > > > failure on these boards, make the reset GPIO optional as
-> > > > > well.
-> > > > > 
-> > > > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > > > Cc: Frank Li <lznuaa@gmail.com>
-> > > > > Cc: Richard Zhu <r65037@freescale.com>
-> > > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > > Cc: Sean Cross <xobs@kosagi.com>
-> > > > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > > > Cc: Tim Harvey <tharvey@gateworks.com>
-> > > > > Cc: Yinghai Lu <yinghai@kernel.org>
-> > > > > ---
-> > > > > 
-> > > > >  drivers/pci/host/pci-imx6.c | 29 +++++++++++++++--------------
-> > > > >  1 file changed, 15 insertions(+), 14 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/pci/host/pci-imx6.c
-> > > > > b/drivers/pci/host/pci-imx6.c index d3639aa..8e7adce 100644
-> > > > > --- a/drivers/pci/host/pci-imx6.c
-> > > > > +++ b/drivers/pci/host/pci-imx6.c
-> > > > > @@ -220,9 +220,12 @@ static int imx6_pcie_assert_core_reset(struct
-> > > > > pcie_port *pp)
-> > > > > 
-> > > > >  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-> > > > >  	
-> > > > >  			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
-> > > > > 
-> > > > > -	gpio_set_value(imx6_pcie->reset_gpio, 0);
-> > > > > -	msleep(100);
-> > > > > -	gpio_set_value(imx6_pcie->reset_gpio, 1);
-> > > > > +	/* Some boards don't have PCIe reset GPIO. */
-> > > > > +	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> > > > > +		gpio_set_value(imx6_pcie->reset_gpio, 0);
-> > > > > +		msleep(100);
-> > > > > +		gpio_set_value(imx6_pcie->reset_gpio, 1);
-> > > > > +	}
-> > > > > 
-> > > > >  	return 0;
-> > > > >  
-> > > > >  }
-> > > > > 
-> > > > > @@ -447,17 +450,15 @@ static int __init imx6_pcie_probe(struct
-> > > > > platform_device *pdev)
-> > > > > 
-> > > > >  	/* Fetch GPIOs */
-> > > > >  	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
-> > > > > 
-> > > > > -	if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
-> > > > > -		dev_err(&pdev->dev, "no reset-gpio defined\n");
-> > > > > -		ret = -ENODEV;
-> > > > > -	}
-> > > > 
-> > > > The 'reset-gpio' is documented as a required property in bindings doc
-> > > > Documentation/devicetree/bindings/pci/designware-pcie.txt.  You need
-> > > > to update bindings doc if you turn it into an optional property.
-> > > 
-> > > That's true, thanks for pointing it out!
-> > 
-> > +cc Kishon Vijay Abraham I, Pratyush Anand, Mohit KUMAR
-> > 
-> > Yes, right.
-> > "reset-gpio" property can be moved to an optional property.
-> > Also, the patch to fix 'Designware' part such as 'designware-pcie.txt'
-> > can be shared with other related people as below.
-> > 
-> >   - Samsung Exynos PCIe: Jingoo Han
-> >   - ST Spear PCIe: Pratyush Anand, Mohit KUMAR
-> >   - TI OMAP PCIe: Kishon Vijay Abraham I
+On Sat, Oct 12, 2013 at 10:40:37AM -0400, Alan Stern wrote:
+> On Sat, 12 Oct 2013, Peter Chen wrote:
 > 
-> I'm in the process of rebasing the patches on top of next 2013-10-10. Right
-> now I'm getting a crash in __write_msi_msg() when my Intel "igb" reports
-> "enabling bus mastering" . Any quick idea? Seems like this MSI support is
-> new in the pcie- designware.c .
+> > Add property for supporting runtime power management
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> > index b4b5b79..f666598 100644
+> > --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> > +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> > @@ -18,6 +18,7 @@ Optional properties:
+> >  - vbus-supply: regulator for vbus
+> >  - disable-over-current: disable over current detect
+> >  - external-vbus-divider: enables off-chip resistor divider for Vbus
+> > +- supports_runtime_pm: enable runtime pm support
+> >  
+> >  Examples:
+> >  usb at 02184000 { /* USB OTG */
+> > @@ -28,4 +29,5 @@ usb at 02184000 { /* USB OTG */
+> >  	fsl,usbmisc = <&usbmisc 0>;
+> >  	disable-over-current;
+> >  	external-vbus-divider;
+> > +	supports_runtime_pm;
+> >  };
 > 
-> I'll just start plumbing to see what it is.
+> This does not sound like a property of the hardware.  What's the 
+> _hardware_ difference between parts that support runtime PM and parts 
+> that don't?
 
-Looks like irq_alloc_descs() return -EEXIST for me in assign_irq() . Noone 
-checks the return value of it , so it can fail later on ;-) Now, why does it 
-return -EEXIST in the first place? I'm sure someone more experienced with PCI 
-would know right away .
+Thanks.
+
+>From my point, all hardware using chipidea core should support runtime pm.
+But some of platforms need special glue layer operations to support
+it, it will break other platforms if enable chipidea core runtime pm.
+Since device tree describes hardware property, maybe I should move
+it to glue layer, or do you have any suggestions?
+
+-- 
+
+Best Regards,
+Peter Chen
