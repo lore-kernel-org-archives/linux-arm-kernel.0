@@ -1,156 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Oct 2013 18:36:13 +0200
-Subject: [PATCH v3 12/14] cpuidle: mvebu: Add initial CPU idle support
- for Armada 370/XP SoC
-In-Reply-To: <1381759106-15004-13-git-send-email-gregory.clement@free-electrons.com>
-References: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
- <1381759106-15004-13-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20131014183613.7fd18395@skate>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Oct 2013 17:37:53 +0100
+Subject: [PATCH 4/4] sound/soc/atmel: don't use
+ devm_pinctrl_get_select_default() in probe
+In-Reply-To: <20131014145629.GA17351@katana>
+References: <1381681071-6021-1-git-send-email-wsa@the-dreams.de>
+ <1381681071-6021-5-git-send-email-wsa@the-dreams.de>
+ <20131014131748.GU2443@sirena.org.uk>
+ <20131014145629.GA17351@katana>
+Message-ID: <20131014163753.GF2443@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On Mon, Oct 14, 2013 at 04:56:29PM +0200, Wolfram Sang wrote:
 
-On Mon, 14 Oct 2013 15:58:24 +0200, Gregory CLEMENT wrote:
-> +#include <linux/cpuidle.h>
-> +#include <linux/module.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/suspend.h>
-> +#include <asm/suspend.h>
-> +#include <linux/smp.h>
-> +#include <asm/cpuidle.h>
-> +#include <asm/smp_plat.h>
-> +#include <linux/armada-370-xp-pmsu.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define ARMADA_370_XP_MAX_STATES	3
-> +#define ARMADA_370_XP_FLAG_DEEP_IDLE	0x10000
-> +
-> +extern void v7_flush_dcache_all(void);
+> > Applied, thanks.  Please use subject lines appropriate to the subsystem.
 
-This function is no longer called by the driver, it seems.
+> That's quite a nut to crack with a generated patch series running over
+> the whole tree. I wonder if it is really worth the effort?
 
-> +/* Functions defined in suspend-armada-370-xp.S */
-> +int armada_370_xp_cpu_resume(unsigned long);
-> +int armada_370_xp_cpu_suspend(unsigned long);
-
-So the PMSU functions have their prototype in a header in <linux/...>,
-but not those ones. Why chose one solution for some functions, and
-another one for these functions?
-
-> +static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
-> +				struct cpuidle_driver *drv,
-> +				int index)
-> +{
-> +	bool deepidle = false;
-> +	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
-> +
-> +	armada_370_xp_pmsu_set_start_addr(armada_370_xp_cpu_resume, hw_cpu);
-> +
-> +	if (drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE)
-> +		deepidle = true;
-
-This could also be written as:
-
-	deepidle = drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE;
-
-which allows to remove the deepidle = false initialization. But I agree
-this is rather a matter of taste, so I don't mind if you chose to keep
-your implementation.
-
-> +
-> +	cpu_suspend(deepidle, armada_370_xp_cpu_suspend);
-> +
-> +	armada_370_xp_pmsu_idle_restore();
-> +
-> +	return index;
-> +}
-> +
-> +static struct cpuidle_driver armada_370_xp_idle_driver = {
-> +	.name			= "armada_370_xp_idle",
-> +	.states[0]		= ARM_CPUIDLE_WFI_STATE,
-> +	.states[1]		= {
-> +		.enter			= armada_370_xp_enter_idle,
-> +		.exit_latency		= 10,
-> +		.power_usage		= 50,
-> +		.target_residency	= 100,
-> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
-> +		.name			= "MV CPU IDLE",
-> +		.desc			= "CPU power down",
-> +	},
-> +	.states[2]		= {
-> +		.enter			= armada_370_xp_enter_idle,
-> +		.exit_latency		= 100,
-> +		.power_usage		= 5,
-> +		.target_residency	= 1000,
-> +		.flags			= CPUIDLE_FLAG_TIME_VALID |
-> +						ARMADA_370_XP_FLAG_DEEP_IDLE,
-> +		.name			= "MV CPU DEEP IDLE",
-> +		.desc			= "CPU and L2 Fabric power down",
-> +	},
-> +	.state_count = ARMADA_370_XP_MAX_STATES,
-> +};
-> +
-> +static int armada_370_xp_cpuidle_probe(struct platform_device *pdev)
-> +{
-> +	if (!of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-pmsu"))
-> +		return -ENODEV;
-> +
-> +	if (!of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
-> +		return -ENODEV;
-
-I am wondering if those checks shouldn't be done by the core mach-mvebu
-code before registering the cpuidle platform device, and only register
-it if all the prerequisites are available.
-
-> +	pr_info("Initializing Armada-XP CPU power management ");
-
-Not sure this message is really useful, but if it is, it should be
-using dev_info(), it should not have a trailing space, and it should
-probably not be called "CPU power management", but really "cpuidle" or
-something like that. "CPU power management" is a very fuzzy term, which
-could be confused with cpufreq, for example.
-
-> +
-> +	armada_370_xp_pmsu_enable_l2_powerdown_onidle();
-> +
-> +	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
-> +}
-> +
-> +static int armada_370_xp_cpuidle_remove(struct platform_device *pdev)
-> +{
-> +	cpuidle_unregister(&armada_370_xp_idle_driver);
-> +	return 0;
-> +}
-> +
-> +
-
-One too many empty line here.
-
-> +static struct platform_driver armada_370_xp_cpuidle_plat_driver = {
-> +	.driver = {
-> +		.name = "cpuidle-armada-370-xp",
-> +		.owner = THIS_MODULE,
-> +	},
-> +	.probe = armada_370_xp_cpuidle_probe,
-> +	.remove = armada_370_xp_cpuidle_remove,
-> +};
-> +
-> +
-
-One too many empty line here.
-
-> +module_platform_driver(armada_370_xp_cpuidle_plat_driver);
-> +
-> +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
-> +MODULE_DESCRIPTION("Armada 370/XP cpu idle driver");
-> +MODULE_LICENSE("GPL");
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+I think it's probably worth the effort to add something to put rules for
+these things in MAINTAINERS, it'd cover 90% of cases.  If you're sending
+only one of a big series with a subject line that won't pattern match
+that's a good way to get stuff dropped on the floor.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131014/f19038b2/attachment.sig>
