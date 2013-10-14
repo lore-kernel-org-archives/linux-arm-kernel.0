@@ -1,25 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Oct 2013 16:44:02 +0100
-Subject: [RFT PATCH v2 3/4] arm64: reduce duplicated code when
- saving/restoring FPSIMD for signal handling
-In-Reply-To: <1381674029-430-3-git-send-email-liuj97@gmail.com>
-References: <1381674029-430-1-git-send-email-liuj97@gmail.com>
- <1381674029-430-3-git-send-email-liuj97@gmail.com>
-Message-ID: <20131014154401.GG7682@arm.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Mon, 14 Oct 2013 15:47:55 +0000
+Subject: [PATCH] ARM: ep93xx: remove deprecated IRQF_DISABLED
+In-Reply-To: <1381547439-4888-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1381547439-4888-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817DAB036@P3PWEX4MB008.ex4.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 13, 2013 at 03:20:19PM +0100, Jiang Liu wrote:
-> +void fpsimd_prepare_sigctx(struct fpsimd_state *state)
-> +{
-> +	/* dump the hardware registers to the fpsimd_state structure */
-> +	fpsimd_save_state(state);
-> +	fpsimd_clear_fpsr();
-> +}
+On Friday, October 11, 2013 8:11 PM, Michael Opdenacker wrote:
+> This patch proposes to remove the use of the IRQF_DISABLED flag
+>
+> It's a NOOP since 2.6.35 and it will be removed one day.
+>
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+> ---
+>  arch/arm/mach-ep93xx/core.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 3f12b88..fcc965f 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -136,7 +136,7 @@ static irqreturn_t ep93xx_timer_interrupt(int irq, void *dev_id)
+>  
+>  static struct irqaction ep93xx_timer_irq = {
+>  	.name		= "ep93xx timer",
+> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+>  	.handler	= ep93xx_timer_interrupt,
+>  };
+>  
 
-What don't particularly like is that you save the FP context and then
-corrupt it. Can we get preempted after this function and before we save
-it on the signal stack?
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
--- 
-Catalin
+Thanks
