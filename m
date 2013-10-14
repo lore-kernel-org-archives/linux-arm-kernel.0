@@ -1,55 +1,52 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Mon, 14 Oct 2013 19:41:07 +1030
-Subject: [PATCH 2/3] virtio: mmio: fix signature checking for BE guests
-In-Reply-To: <1381740385.3247.6.camel@hornet>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <1381502171-8187-3-git-send-email-marc.zyngier@arm.com>
- <1381740385.3247.6.camel@hornet>
-Message-ID: <87li1wb4k4.fsf@rustcorp.com.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Oct 2013 15:46:07 -0600
+Subject: [PATCH] ARM: tegra: add GPIO controller to tegra124.dtsi
+Message-ID: <1381787167-3011-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pawel Moll <pawel.moll@arm.com> writes:
-> On Fri, 2013-10-11 at 15:36 +0100, Marc Zyngier wrote:
->> As virtio-mmio config registers are specified to be little-endian,
->> using readl() to read the magic value and then memcmp() to check it
->> fails on BE (as readl() has an implicit swab).
->> 
->> Fix it by encoding the magic value as an integer instead of a string.
->> 
->> Cc: Rusty Russell <rusty@rustcorp.com.au>
->> Cc: Michael S. Tsirkin <mst@redhat.com>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  drivers/virtio/virtio_mmio.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->> 
->> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
->> index 1ba0d68..57f24fd 100644
->> --- a/drivers/virtio/virtio_mmio.c
->> +++ b/drivers/virtio/virtio_mmio.c
->> @@ -470,7 +470,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
->>  
->>  	/* Check magic value */
->>  	magic = readl(vm_dev->base + VIRTIO_MMIO_MAGIC_VALUE);
->> -	if (memcmp(&magic, "virt", 4) != 0) {
->> +	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
->>  		dev_warn(&pdev->dev, "Wrong magic value 0x%08lx!\n", magic);
->>  		return -ENODEV;
->>  	}
->
-> The new spec will clarify this:
->
-> * 0x000 | R | MagicValue
->   Magic value. Must be 0x74726976 (a Little Endian equivalent
->   of a "virt" string).
->
-> ... but I like the 'v'i'r't' characters still being there :-)
->
-> Acked-by: Pawel Moll <pawel.moll@arm.com>
+From: Stephen Warren <swarren@nvidia.com>
 
-Applied, thanks.
+The Tegra124 GPIO controller is identical to Tegra30, so copy the
+DT node from tegra30.dtsi to tegra124.dtsi.
 
-Cheers,
-Rusty.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra124.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index f824248..b741300 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -1,3 +1,4 @@
++#include <dt-bindings/gpio/tegra-gpio.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+ #include "skeleton.dtsi"
+@@ -29,6 +30,23 @@
+ 			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
+ 
++	gpio: gpio at 6000d000 {
++		compatible = "nvidia,tegra124-gpio", "nvidia,tegra30-gpio";
++		reg = <0x6000d000 0x1000>;
++		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++	};
++
+ 	/*
+ 	 * There are two serial driver i.e. 8250 based simple serial
+ 	 * driver and APB DMA based serial driver for higher baudrate
+-- 
+1.8.1.5
