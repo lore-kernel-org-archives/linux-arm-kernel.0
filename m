@@ -1,30 +1,30 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 14 Oct 2013 13:28:37 +0800
-Subject: [PATCH 4/4] sound/soc/atmel: don't use
- devm_pinctrl_get_select_default() in probe
-In-Reply-To: <1381681071-6021-5-git-send-email-wsa@the-dreams.de>
-References: <1381681071-6021-1-git-send-email-wsa@the-dreams.de>
- <1381681071-6021-5-git-send-email-wsa@the-dreams.de>
-Message-ID: <525B8105.6090303@atmel.com>
+Date: Mon, 14 Oct 2013 13:38:29 +0800
+Subject: [PATCH 1/5] ARM: at91: add at91sam9n12 ssc clock in look up table
+In-Reply-To: <1381729113-29714-1-git-send-email-voice.shen@atmel.com>
+References: <1381729113-29714-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <1381729113-29714-2-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram Sang,
+Add at91sam9n12 ssc clock in look up table
 
-On 10/14/2013 00:17, Wolfram Sang wrote:
-> Since commit ab78029 (drivers/pinctrl: grab default handles from device core),
-> we can rely on device core for setting the default pins.
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org> (personally at LCE13)
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->   sound/soc/atmel/atmel_wm8904.c | 8 --------
->   1 file changed, 8 deletions(-)
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+ arch/arm/mach-at91/at91sam9n12.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Tested OK on at91sam9n12ek and sama5d3xek board.
-Thanks.
-
-Acked-by: Bo Shen <voice.shen@atmel.com>
-
-Best Regards,
-Bo Shen
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+index c7d670d..2d895a2 100644
+--- a/arch/arm/mach-at91/at91sam9n12.c
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -169,6 +169,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb_clk),
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb_clk),
+ 	CLKDEV_CON_DEV_ID("mci_clk", "f0008000.mmc", &mmc_clk),
++	CLKDEV_CON_DEV_ID(NULL, "f0010000.ssc", &ssc_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
+-- 
+1.7.9.5
