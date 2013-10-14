@@ -1,96 +1,51 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Mon, 14 Oct 2013 09:00:57 +0000
-Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <20131010154414.GY2954@intel.com>
-References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
- <B56CDBE15CE27145A4B77D2D24263E8522EFE6@039-SN1MPN1-004.039d.mgd.msft.net>
- <20131010154414.GY2954@intel.com>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E852336EE@039-SN1MPN1-004.039d.mgd.msft.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 14 Oct 2013 10:04:55 +0100
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <20131014085931.GB30954@redhat.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <20131012182837.GC2089@redhat.com> <525BAA40.8070103@arm.com>
+ <20131014085931.GB30954@redhat.com>
+Message-ID: <1381741495.3247.18.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Rob,
-  Could you please help review the devicetree binding?
-  Thanks!
+On Mon, 2013-10-14 at 09:59 +0100, Michael S. Tsirkin wrote:
+> On Mon, Oct 14, 2013 at 09:24:32AM +0100, Marc Zyngier wrote:
+> > Hi Michael,
+> > 
+> > On 12/10/13 19:28, Michael S. Tsirkin wrote:
+> > > On Fri, Oct 11, 2013 at 03:36:08PM +0100, Marc Zyngier wrote:
+> > >> This small patch series adds just enough kernel infrastructure and
+> > >> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
+> > >> that the host actually supports such madness.
+> > >>
+> > >> This has been tested on arm64, with some fixes to KVM and a set of
+> > >> changes to kvmtool, both which I am posting separately.
+> > >>
+> > >> A branch containing all the relevant changes is at:
+> > >> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/be-on-le-3.12-rc4
+> > >>
+> > >> Cc: Rusty Russell <rusty@rustcorp.com.au>
+> > >> Cc: Michael S. Tsirkin <mst@redhat.com>
+> > >> Cc: Pawel Moll <pawel.moll@arm.com>
+> > > 
+> > > We are changing the spec to make everything LE instead of
+> > > the native endian.
+> > > 
+> > > I think that'll fix the issue in a cleaner way.
+> > 
+> > While I agree that it would solve the issue completely, it would also
+> > break all BE users. Is that really an option?
+> 
+> I proposed several ways to create "transitional devices"
+> which can detect and switch to old interface at run-time.
+> 
+> Pawel thinks that's not necessary so ...
 
-Best Regards,
-Jingchang
+Don't wipe yourself with my name, please.
 
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Thursday, October 10, 2013 11:44 PM
-> To: Lu Jingchang-B35083
-> Cc: shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org
-> Subject: Re: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-> 
-> On Thu, Oct 10, 2013 at 09:39:04AM +0000, Lu Jingchang-B35083 wrote:
-> > Hi, Vinod,
-> >
-> >   Could you please help review this patch? Could it be merged into your
-> next tree?
-> >   Thanks!
-> Where is the patch 1 & 2 of the series, I dont sem to find it.
-> Also I need ACK from one of the DT maintainers on the binding before I
-> can carry
-> this
-> 
-> --
-> ~Vinod
-> >
-> >
-> > Best Regards,
-> > Jingchang
-> >
-> >
-> > > -----Original Message-----
-> > > From: Lu Jingchang-B35083
-> > > Sent: Wednesday, September 18, 2013 5:58 PM
-> > > To: vinod.koul at intel.com
-> > > Cc: shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-arm-
-> > > kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu Jingchang-
-> > > B35083; Wang Huan-B18965
-> > > Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
-> > >
-> > > Add Freescale enhanced direct memory(eDMA) controller support.
-> > > The eDMA controller deploys DMAMUXs routing DMA request sources(slot)
-> > > to eDMA channels.
-> > > This module can be found on Vybrid and LS-1 SoCs.
-> > >
-> > > Signed-off-by: Alison Wang <b18965@freescale.com>
-> > > Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> > > ---
-> > > changes in v6:
-> > >   holding lock in dma_control to prevent race.
-> > >
-> > > changes in v5:
-> > >   config slave_id when dmaengine_slave_config intead of channel
-> request.
-> > >   adding residue calculation and dma pause/resume device control.
-> > >
-> > > changes in v4:
-> > >   using exact compatible string in binding document.
-> > >
-> > > changes in v3:
-> > >   handle all pending interrupt one time.
-> > >   add protect lock on dma transfer complete handling.
-> > >   change desc and tcd alloc flag to GFP_NOWAIT.
-> > >   add sanity check and error messages.
-> > >
-> > > changes in v2:
-> > >   using generic dma-channels property instead of fsl,dma-channel.
-> > >   rename the binding document to fsl-edma.txt.
-> > >
-> > >
-> > >  Documentation/devicetree/bindings/dma/fsl-edma.txt |  84 ++
-> > >  drivers/dma/Kconfig                                |  10 +
-> > >  drivers/dma/Makefile                               |   1 +
-> > >  drivers/dma/fsl-edma.c                             | 944
-> > > +++++++++++++++++++++
-> > >  4 files changed, 1039 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/dma/fsl-
-> edma.txt
-> > >  create mode 100644 drivers/dma/fsl-edma.c
-> >
-> 
-> --
+You forgot to mention that the devices are versioned and the behavior of
+the legacy devices remains unchanged. No existing implementation will be
+broken.
+
+Pawe?
