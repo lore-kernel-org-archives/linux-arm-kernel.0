@@ -1,48 +1,27 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 14 Oct 2013 18:46:37 +0200
-Subject: [PATCH 3/3] ARM: at91/dt/sama5d3: add DMA information to SHA/AES/TDES
- nodes
-In-Reply-To: <ba9872c3bb29c9a06f06caa8e0b4528329f07675.1381769174.git.nicolas.ferre@atmel.com>
-References: <ba9872c3bb29c9a06f06caa8e0b4528329f07675.1381769174.git.nicolas.ferre@atmel.com>
-Message-ID: <269bcba07a15338d3e7a3699ed25c4e775f7fca0.1381769174.git.nicolas.ferre@atmel.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 14 Oct 2013 18:50:48 +0200
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <525C0F99.8030909@arm.com>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
+ <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
+ <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
+ <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+ <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
+ <525C09D1.8060103@arm.com> <525C0C21.2070001@redhat.com>
+ <525C0F99.8030909@arm.com>
+Message-ID: <525C20E8.6080409@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/sama5d3.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Il 14/10/2013 17:36, Marc Zyngier ha scritto:
+>> > 
+>> > Devices are fine in QEMU, it's only the "generic" parts (rings) that are
+>> > missing AFAICT.
+> So if I understand correctly how it works, target endianness is set at
+> compile time, and you have a BE specific QEMU?
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 99bd4a6..aca3893 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -345,18 +345,26 @@
- 				compatible = "atmel,at91sam9g46-sha";
- 				reg = <0xf8034000 0x100>;
- 				interrupts = <42 IRQ_TYPE_LEVEL_HIGH 0>;
-+				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(17)>;
-+				dma-names = "tx";
- 			};
- 
- 			aes at f8038000 {
- 				compatible = "atmel,at91sam9g46-aes";
- 				reg = <0xf8038000 0x100>;
- 				interrupts = <43 IRQ_TYPE_LEVEL_HIGH 0>;
-+				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(18)>,
-+				       <&dma1 2 AT91_DMA_CFG_PER_ID(19)>;
-+				dma-names = "tx", "rx";
- 			};
- 
- 			tdes at f803c000 {
- 				compatible = "atmel,at91sam9g46-tdes";
- 				reg = <0xf803c000 0x100>;
- 				interrupts = <44 IRQ_TYPE_LEVEL_HIGH 0>;
-+				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(20)>,
-+				       <&dma1 2 AT91_DMA_CFG_PER_ID(21)>;
-+				dma-names = "tx", "rx";
- 			};
- 
- 			dma0: dma-controller at ffffe600 {
--- 
-1.8.2.2
+Yes.  Though as Alex said, this will have to change for PPC
+little-endian support.
+
+Paolo
