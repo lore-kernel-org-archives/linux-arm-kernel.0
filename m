@@ -1,66 +1,77 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 14 Oct 2013 15:19:38 -0700
-Subject: [GIT PULL v2]socfpga: DTS updates for v3.13
-In-Reply-To: <1381357034-14768-1-git-send-email-dinguyen@altera.com>
- (dinguyen@altera.com's message of "Wed, 9 Oct 2013 17:17:14 -0500")
-References: <1381357034-14768-1-git-send-email-dinguyen@altera.com>
-Message-ID: <87r4bn4hs5.fsf@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 15 Oct 2013 00:23:59 +0200
+Subject: [PATCH v3 3/3] ARM: add support for bit sliced AES using NEON
+ instructions
+In-Reply-To: <20131014152826.GP25034@n2100.arm.linux.org.uk>
+References: <CAKv+Gu81Bb8jzVUgyS_=meJNLQaxydLLRR-5n5gY8b-reofzUQ@mail.gmail.com>
+ <20131013112239.GD25034@n2100.arm.linux.org.uk>
+ <CAKv+Gu--TmG3FxAHSYN_RG2FiLabFRCdp4vn1nrMOdOdfzgMwA@mail.gmail.com>
+ <20131013113049.GE25034@n2100.arm.linux.org.uk>
+ <20131014112921.GA15084@gondor.apana.org.au>
+ <20131014120837.GM25034@n2100.arm.linux.org.uk>
+ <20131014121021.GA15351@gondor.apana.org.au>
+ <20131014121926.GN25034@n2100.arm.linux.org.uk>
+ <20131014124700.GA15660@gondor.apana.org.au>
+ <20131014125019.GO25034@n2100.arm.linux.org.uk>
+ <20131014152826.GP25034@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu9z-32q9n4iAzFABpXwX04dkFkOpkP9mC8he4RQgZVzuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<dinguyen@altera.com> writes:
+Hi Russell,
 
-> Hi Kevin, Olof, and Arnd:
->
-> Please consider these DTS updates for the Altera SOCFPGA platform for v3.13:
->
-> v2:
-> Replace my Acked-by: with my Signed-off-by: for the patches from Steffen
-> Trumtrar.
+If you're still interested, I have cherry-picked the commit from
+Herbert's tree on top of the branch you pulled from me.
 
-Thanks for the update.
+git://git.linaro.org/people/ardbiesheuvel/linux-arm.git arm-aesbs
 
-> v1:
-> Five of the six patches do NOT have an Ack from the DTS maintainers. I have
-> sent the patches out for review, but since these patches do not change
-> bindings nor add new ones, I don't think they will get too much attention.
->
-> Thanks,
->
-> Dinh
->
-> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
->
->   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
->
-> are available in the git repository at:
->
->   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dts-updates-for-v3.13
->
-> for you to fetch changes up to 163a036468c2eb8f30658dff6c0de6c959f79b0d:
->
->   dts: socfpga: Add support for Altera's SOCFPGA Arria V board (2013-10-09 16:58:31 -0500)
->
-> ----------------------------------------------------------------
-> Updates to dts file structure for Altera's SOCFPGA
->
-> * Does not include any new bindings or bindings change
-> * Add dts file for a SOCFPGA with an Arria V FPGA
-> * Add a clocks property for the TWD timer
-> * Add support for Terasic SocKit Board which has Cyclone5 FPGA
-> * From Steffen Trumtrar:
-> "This series includes some minor cleanups (indentation and clock labels) and
-> reorders the socfpga dts hierarchy from:
-> 	socfpga.dtsi
-> 	-> socfpga_$board.dts
-> 	-> socfpga_$otherboard.dts
-> to
-> 	socfpga.dtsi
-> 	-> socfpga_cyclone5.dtsi
-> 	--> socfpga_cyclone5_$board.dts
-> 	--> socfpga_cyclone5_$otherboard.dts
-> "
 
-Pulled into next/dt.
+Regards,
+Ard.
 
-Kevin
+
+
+On 14 October 2013 17:28, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Oct 14, 2013 at 01:50:19PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Oct 14, 2013 at 08:47:00PM +0800, Herbert Xu wrote:
+>> > On Mon, Oct 14, 2013 at 01:19:26PM +0100, Russell King - ARM Linux wrote:
+>> > > On Mon, Oct 14, 2013 at 08:10:21PM +0800, Herbert Xu wrote:
+>> > > > On Mon, Oct 14, 2013 at 01:08:37PM +0100, Russell King - ARM Linux wrote:
+>> > > > > On Mon, Oct 14, 2013 at 07:29:21PM +0800, Herbert Xu wrote:
+>> > > > > > On Sun, Oct 13, 2013 at 12:30:49PM +0100, Russell King - ARM Linux wrote:
+>> > > > > > > Herbert,
+>> > > > > > >
+>> > > > > > > Could I have a git URL to pull the above commit please?
+>> > > > > >
+>> > > > > > Russell, do you want me to revert this patch from cryptodev?
+>> > > > > > Otherwise I'm not quite sure what you want me to do here.
+>> > > > >
+>> > > > > I'd like to pull a branch from you containing this commit to solve the
+>> > > > > build error I'm getting with my tree, so I can continue testing my tree.
+>> > > > > At the moment, this is an additional unnecessary cause of randconfig
+>> > > > > build failures.
+>> > > >
+>> > > > I don't have a branch that contains just this patch so perhaps it
+>> > > > would be easiest if I just reverted it?
+>> > >
+>> > > Well, I don't have it either.
+>> >
+>> > Oh you were talking about the ablk_helper patch, and not some ARM
+>> > patch that sneaked into the crypto tree.
+>> >
+>> > As it's a crypto driver that's being added then it should go
+>> > through the crypto tree.  If it depends on some ARM bits that's
+>> > only in linux-next then I could try to merge that, assuming the
+>> > underlying ARM tree is stable.
+>>
+>> You're not listening to me.  I've had enough of trying to discuss this
+>> sensibly.  I'm reverting all of Ard's work, and my commit to fix up a
+>> missing .gitignore entry afterwards.  Congratuations.
+>
+> Scrap that, I can't revert the merge resulting from the pull, because it
+> brought in everything between -rc1 and rc3, and git is trying to revert
+> everything in mainline between those two when I try and re-merge this
+> branch.
+>
+> So I can't revert this.
