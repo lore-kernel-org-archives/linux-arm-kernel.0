@@ -1,54 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 14 Oct 2013 10:42:16 +0200
-Subject: [PATCH 01/11] usb: chipidea: Add power management support
-In-Reply-To: <20131014075547.GA26191@shlinux1.ap.freescale.net>
-References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
- <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
- <20131014100458.4f577d01@ipc1.ka-ro>
- <20131014075547.GA26191@shlinux1.ap.freescale.net>
-Message-ID: <20131014084216.GY30088@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Oct 2013 09:43:04 +0100
+Subject: [PATCH] ARM: KVM: drop arbitrary limitation to 4 CPU VMs
+In-Reply-To: <20131013010956.GA8200@cbox>
+References: <1381252628-17840-1-git-send-email-marc.zyngier@arm.com>
+ <20131013010956.GA8200@cbox>
+Message-ID: <525BAE98.8050505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 03:55:48PM +0800, Peter Chen wrote:
-> On Mon, Oct 14, 2013 at 10:04:58AM +0200, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Peter Chen wrote:
-> > > This commit adds runtime and system power management support for
-> > > chipidea core. The runtime pm support is controlled by glue
-> > > layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
-> > > 
-> > [...]
-> > > +#ifdef CONFIG_PM
-> > > +static int ci_controller_suspend(struct device *dev)
-> > > +{
-> > > +	struct ci_hdrc *ci = dev_get_drvdata(dev);
-> > > +
-> > > +	dev_dbg(dev, "at %s\n", __func__);
-> > > +
-> > > +	if (atomic_read(&ci->in_lpm))
-> > > +		return 0;
-> > > +
-> > What does this 'atomic_read()' buy you over just testing/assinging a
-> > simple integer. Note that just because the function has 'atomic' in
-> > its name the sequence:
-> > 	atomic_read();
-> > ...
-> > 	atomic_set();
-> > does not magically become an atomic operation.
+On 13/10/13 02:09, Christoffer Dall wrote:
+> On Tue, Oct 08, 2013 at 06:17:08PM +0100, Marc Zyngier wrote:
+>> It appears we have an arbitrary limitation where we refuse to
+>> create more than 4 virtual A15 in a single VM.
+>>
+>> This limitation doesn't make much sense (the number 4 probably
+>> comes from the maximum number of CPUs in a A15 cluster, but
+>> KVM doesn't have any notion of cluster), and directly
+>> contradicts CONFIG_MAX_VCPUS.
 > 
-> I just want the read and set are atomic, not the operations
-> between atomic_read and atomic_set.
+> So this comes from the early days where I looked at the A15 TRM and the
+> MPIDR bit field for the CPU ID is limited to 2 bits.  Exactly because
+> I wasn't sure what remifications (if any) it would have to start
+> populating this register with cluster id = (vcpu_id / 4) and cpu id =
+> (vcpu_id % 4) I put this nice arbitrary restriction in there.
+> 
+> I think we need to fix how we show this register to the guest
+> otherwise... No?
 
-It makes no sense to use atomic operations here. atomic types are to
-atomically read/modify/write variables. If all you ever do is
-atomic_read and atomic_set then you can use a simple bool variable.
+I don't see this being an issue, but if we really want to be 100% true
+to the A15/A7 TRM, we can always compute MPIDR that way, and adjust
+L2CTLR as well.
 
-Sascha
+That will require some userspace change in kvmtool though (need to
+change the DT generator to cope with the cluster ID).
 
+	M.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Jazz is not dead. It just smells funny...
