@@ -1,40 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Oct 2013 16:12:17 +0100
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <525C0622.8040504@redhat.com>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
- <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
- <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
- <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
- <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
-Message-ID: <525C09D1.8060103@arm.com>
+From: a.motakis@virtualopensystems.com (Antonios Motakis)
+Date: Mon, 14 Oct 2013 17:13:15 +0200
+Subject: [PATCH 1/2] ARM: SMMU: add devices attached to the SMMU to an
+ IOMMU group
+In-Reply-To: <20131014124815.GC10491@mudshark.cambridge.arm.com>
+References: <1381497887-14586-1-git-send-email-a.motakis@virtualopensystems.com>
+ <20131014124815.GC10491@mudshark.cambridge.arm.com>
+Message-ID: <CAG8rG2wftreREPnCbH8cKtsHD4TXBFAYGfY0ZMmsX3UW757r4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/13 15:56, Paolo Bonzini wrote:
-> Il 14/10/2013 16:52, Marc Zyngier ha scritto:
->>>> Sure. And I imagine this traps back into the kernel to read some
->>>> register and find out what the endianness of the accessing CPU is?
->>>
->>> Not yet. To be exact, it does the below today. But all virtio device
->>> emulation is 100% guest endianness unaware. This helper is the only
->>> piece of code where it gets any idea what endianness the guest has. So
->>> by checking for references to it in the code you know where endianness
->>> is an issue. And that's only in the config space.
->>
->> Only config space? How do you deal with virtio ring descriptors, for
->> example?
-> 
-> They also use guest endianness, but do not use virtio_is_big_endian()
-> (yet?) so Alex missed them.
+On Mon, Oct 14, 2013 at 2:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+>
+> Hi Antonios,
+>
+> On Fri, Oct 11, 2013 at 02:24:46PM +0100, Antonios Motakis wrote:
+> > IOMMU groups are expected by certain users of the IOMMU API,
+> > e.g. VFIO. Add new devices found by the SMMU driver to an IOMMU
+> > group to satisfy those users.
+>
+> Cheers for looking at this: VFIO has been on my TODO list for some time.
+>
+> > Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c | 18 +++++++++++++++++-
+> >  1 file changed, 17 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 0f45a48..8b71332 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -1502,6 +1502,8 @@ static int arm_smmu_add_device(struct device *dev)
+> >  {
+> >       struct arm_smmu_device *child, *parent, *smmu;
+> >       struct arm_smmu_master *master = NULL;
+> > +     struct iommu_group *group;
+> > +     int ret;
+> >
+> >       spin_lock(&arm_smmu_devices_lock);
+> >       list_for_each_entry(parent, &arm_smmu_devices, list) {
+> > @@ -1534,13 +1536,27 @@ static int arm_smmu_add_device(struct device *dev)
+> >       if (!master)
+> >               return -ENODEV;
+> >
+> > +     group = iommu_group_get(dev);
+>
+> I'm not especially familiar with IOMMU groups (I understand them as the
+> minimum translation granularity, which would mean single StreamID for the
+> ARM SMMU), but under what circumstances would you expect to receive a
+> non-NULL group here? I can't see any other code adding devices to groups
+> (outside of other drivers)...
+>
+Hi Will,
 
-Yeah, I thought as much. There is a whole bunch of things that need byte
-swapping, both at the virtio level itself, and at the device level as well.
+You are right, only other IOMMU drivers will add a device to a group.
+There was a discussion about this when I posted a similar patch for
+the Exynos System MMU driver, see
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/185675.html
 
-Grep-ing for __u{16,32,64} through include/uapi/linux/virtio* shows the
-extent of the disaster.
+The idea is to check in the case of add_device() being called multiple
+times, which is not the case most of the time, but still a sane
+safeguard.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Will
