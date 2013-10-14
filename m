@@ -1,284 +1,170 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 15 Oct 2013 01:25:39 +0200
-Subject: [PATCH V2 1/2] ARM: at91: cpuidle: convert to platform driver
-In-Reply-To: <1381781721-11866-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1381781721-11866-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20131014232539.GM11420@ns203013.ovh.net>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Tue, 15 Oct 2013 09:53:17 +1030
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <20131014171022.GA13807@redhat.com>
+References: <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
+ <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+ <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
+ <525C09D1.8060103@arm.com> <525C0C21.2070001@redhat.com>
+ <525C0F99.8030909@arm.com> <525C20E8.6080409@redhat.com>
+ <20131014171022.GA13807@redhat.com>
+Message-ID: <874n8jbfoa.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:15 Mon 14 Oct     , Daniel Lezcano wrote:
-> Using the platform driver model is a good way to separate the cpuidle specific
-> code from the low level pm code. It allows to remove the dependency between
-> these two components.
-> 
-> The platform_device is located in the pm code and a 'set' function has been
-> added to set the standby function from the AT91_SOC_START initialization
-> function. Each SoC with a cpuidle driver will set the standby function in the
-> platform_data field at init time. Then pm code will register the cpuidle
-> platform device.
-> 
-> The cpuidle driver will register the platform_driver and use the device's
-> platform_data as a standby callback in the idle path.
+"Michael S. Tsirkin" <mst@redhat.com> writes:
+> On Mon, Oct 14, 2013 at 06:50:48PM +0200, Paolo Bonzini wrote:
+>> Il 14/10/2013 17:36, Marc Zyngier ha scritto:
+>> >> > 
+>> >> > Devices are fine in QEMU, it's only the "generic" parts (rings) that are
+>> >> > missing AFAICT.
+>> > So if I understand correctly how it works, target endianness is set at
+>> > compile time, and you have a BE specific QEMU?
+>> 
+>> Yes.  Though as Alex said, this will have to change for PPC
+>> little-endian support.
+>> 
+>> Paolo
+>
+> Or we'll just say that this platform requires virtio 1.0.
 
-I've an issue while re-reading the pm code
+To come full circle, I have implemented virtio support for BE PPC in
+qemu :) And we'll be supporting pre-1.0 for the moment. I'm awaiting
+some ppc-specific hooks, but it could be merged without them.
 
-we use the xx_standby for 2 drivers cpuidle and suspend/resume
+It's icky: we don't really want to use the current endianness of the
+CPU, since in theory a BE kernel could be running an LE process.  So at
+the time of virtio device reset (the first thing the Linux drivers do)
+we read the endianness of the interrupt entry point, which is presumably
+the OS endianness.
 
-with all the cpu_is_xxxx
+The result looks like this.  In virtio_reset(void *opaque):
 
-so you need to do one more step in this series
-by cleaning up the PM_SUSPEND_STANDBY to as you put a function pointer with
-the correct one in pm.c
+        /* We assume all devices are the same endian. */
+        virtio_byteswap = virtio_get_byteswap();
 
-otherwise looks good
+And accessors like this are used in all virtio devices and routines:
 
-Best Regards,
-J.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-at91/at91rm9200.c  |    3 +++
->  arch/arm/mach-at91/at91sam9260.c |    3 +++
->  arch/arm/mach-at91/at91sam9261.c |    3 +++
->  arch/arm/mach-at91/at91sam9263.c |    3 +++
->  arch/arm/mach-at91/at91sam9g45.c |    3 +++
->  arch/arm/mach-at91/at91sam9rl.c  |    3 +++
->  arch/arm/mach-at91/cpuidle.c     |   29 +++++++++++++++--------------
->  arch/arm/mach-at91/pm.c          |   12 ++++++++++++
->  arch/arm/mach-at91/pm.h          |    4 ++++
->  9 files changed, 49 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> index 4aad93d..0d234f2 100644
-> --- a/arch/arm/mach-at91/at91rm9200.c
-> +++ b/arch/arm/mach-at91/at91rm9200.c
-> @@ -27,6 +27,7 @@
->  #include "generic.h"
->  #include "clock.h"
->  #include "sam9_smc.h"
-> +#include "pm.h"
->  
->  /* --------------------------------------------------------------------
->   *  Clocks
-> @@ -337,6 +338,8 @@ static void __init at91rm9200_initialize(void)
->  	/* Initialize GPIO subsystem */
->  	at91_gpio_init(at91rm9200_gpio,
->  		cpu_is_at91rm9200_bga() ? AT91RM9200_BGA : AT91RM9200_PQFP);
-> +
-> +	at91_pm_set_standby(at91rm9200_standby);
->  }
->  
->  
-> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-> index 5de6074..ffe9ce7 100644
-> --- a/arch/arm/mach-at91/at91sam9260.c
-> +++ b/arch/arm/mach-at91/at91sam9260.c
-> @@ -28,6 +28,7 @@
->  #include "generic.h"
->  #include "clock.h"
->  #include "sam9_smc.h"
-> +#include "pm.h"
->  
->  /* --------------------------------------------------------------------
->   *  Clocks
-> @@ -351,6 +352,8 @@ static void __init at91sam9260_initialize(void)
->  
->  	/* Register GPIO subsystem */
->  	at91_gpio_init(at91sam9260_gpio, 3);
-> +
-> +	at91_pm_set_standby(at91sam9_standby);
->  }
->  
->  /* --------------------------------------------------------------------
-> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-> index 0e07932..1edbb6f 100644
-> --- a/arch/arm/mach-at91/at91sam9261.c
-> +++ b/arch/arm/mach-at91/at91sam9261.c
-> @@ -27,6 +27,7 @@
->  #include "generic.h"
->  #include "clock.h"
->  #include "sam9_smc.h"
-> +#include "pm.h"
->  
->  /* --------------------------------------------------------------------
->   *  Clocks
-> @@ -293,6 +294,8 @@ static void __init at91sam9261_initialize(void)
->  
->  	/* Register GPIO subsystem */
->  	at91_gpio_init(at91sam9261_gpio, 3);
-> +
-> +	at91_pm_set_sandby(at91sam9_standby);
->  }
->  
->  /* --------------------------------------------------------------------
-> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-> index 6ce7d18..8c81c89 100644
-> --- a/arch/arm/mach-at91/at91sam9263.c
-> +++ b/arch/arm/mach-at91/at91sam9263.c
-> @@ -26,6 +26,7 @@
->  #include "generic.h"
->  #include "clock.h"
->  #include "sam9_smc.h"
-> +#include "pm.h"
->  
->  /* --------------------------------------------------------------------
->   *  Clocks
-> @@ -330,6 +331,8 @@ static void __init at91sam9263_initialize(void)
->  
->  	/* Register GPIO subsystem */
->  	at91_gpio_init(at91sam9263_gpio, 5);
-> +
-> +	at91_pm_set_standby(at91sam9263_standby);
->  }
->  
->  /* --------------------------------------------------------------------
-> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> index 474ee04..8460f52 100644
-> --- a/arch/arm/mach-at91/at91sam9g45.c
-> +++ b/arch/arm/mach-at91/at91sam9g45.c
-> @@ -26,6 +26,7 @@
->  #include "generic.h"
->  #include "clock.h"
->  #include "sam9_smc.h"
-> +#include "pm.h"
->  
->  /* --------------------------------------------------------------------
->   *  Clocks
-> @@ -379,6 +380,8 @@ static void __init at91sam9g45_initialize(void)
->  
->  	/* Register GPIO subsystem */
->  	at91_gpio_init(at91sam9g45_gpio, 5);
-> +
-> +	at91_pm_set_standby(at91sam9g45_standby);
->  }
->  
->  /* --------------------------------------------------------------------
-> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-> index d4ec0d9..c7986e4 100644
-> --- a/arch/arm/mach-at91/at91sam9rl.c
-> +++ b/arch/arm/mach-at91/at91sam9rl.c
-> @@ -27,6 +27,7 @@
->  #include "generic.h"
->  #include "clock.h"
->  #include "sam9_smc.h"
-> +#include "pm.h"
->  
->  /* --------------------------------------------------------------------
->   *  Clocks
-> @@ -296,6 +297,8 @@ static void __init at91sam9rl_initialize(void)
->  
->  	/* Register GPIO subsystem */
->  	at91_gpio_init(at91sam9rl_gpio, 4);
-> +
-> +	at91_pm_set_standby(at91sam9_standby);
->  }
->  
->  /* --------------------------------------------------------------------
-> diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
-> index 4ec6a6d..a077437 100644
-> --- a/arch/arm/mach-at91/cpuidle.c
-> +++ b/arch/arm/mach-at91/cpuidle.c
-> @@ -21,26 +21,17 @@
->  #include <linux/export.h>
->  #include <asm/proc-fns.h>
->  #include <asm/cpuidle.h>
-> -#include <mach/cpu.h>
-> -
-> -#include "pm.h"
->  
->  #define AT91_MAX_STATES	2
->  
-> +static void (*at91_standby)(void);
-> +
->  /* Actual code that puts the SoC in different idle states */
->  static int at91_enter_idle(struct cpuidle_device *dev,
->  			struct cpuidle_driver *drv,
->  			       int index)
->  {
-> -	if (cpu_is_at91rm9200())
-> -		at91rm9200_standby();
-> -	else if (cpu_is_at91sam9g45())
-> -		at91sam9g45_standby();
-> -	else if (cpu_is_at91sam9263())
-> -		at91sam9263_standby();
-> -	else
-> -		at91sam9_standby();
-> -
-> +	at91_standby();
->  	return index;
->  }
->  
-> @@ -60,9 +51,19 @@ static struct cpuidle_driver at91_idle_driver = {
->  };
->  
->  /* Initialize CPU idle by registering the idle states */
-> -static int __init at91_init_cpuidle(void)
-> +static int at91_cpuidle_probe(struct platform_device *dev)
->  {
-> +	at91_standby = (void *)(dev->dev.platform_data);
-> +	
->  	return cpuidle_register(&at91_idle_driver, NULL);
->  }
->  
-> -device_initcall(at91_init_cpuidle);
-> +static struct platform_driver at91_cpuidle_driver = {
-> +	.driver = {
-> +		.name = "cpuidle-at91",
-> +		.owner = THIS_MODULE,
-> +	},
-> +	.probe = at91_cpuidle_probe,
-> +};
-> +
-> +module_platform_driver(at91_cpuidle_driver);
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index 15afb5d..f753ace 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -314,6 +314,15 @@ static const struct platform_suspend_ops at91_pm_ops = {
->  	.end	= at91_pm_end,
->  };
->  
-> +static struct platform_device at91_cpuidle_device = {
-> +	.name = "cpuidle-at91",
-> +};
-> +
-> +void at91_pm_set_standby(void (*at91_standby)(void))
-> +{
-> +	at91_cpuidle_device.dev.platform_data = at91_standby;	
-> +}
-> +
->  static int __init at91_pm_init(void)
->  {
->  #ifdef CONFIG_AT91_SLOW_CLOCK
-> @@ -325,6 +334,9 @@ static int __init at91_pm_init(void)
->  	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
->  	if (cpu_is_at91rm9200())
->  		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
-> +	
-> +	if (at91_cpuidle_device.dev.platform_data)
-> +		platform_device_register(&at91_cpuidle_device);
->  
->  	suspend_set_ops(&at91_pm_ops);
->  
-> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-> index 2f5908f..76dd1a7 100644
-> --- a/arch/arm/mach-at91/pm.h
-> +++ b/arch/arm/mach-at91/pm.h
-> @@ -11,9 +11,13 @@
->  #ifndef __ARCH_ARM_MACH_AT91_PM
->  #define __ARCH_ARM_MACH_AT91_PM
->  
-> +#include <asm/proc-fns.h>
-> +
->  #include <mach/at91_ramc.h>
->  #include <mach/at91rm9200_sdramc.h>
->  
-> +extern void at91_pm_set_standby(void (*at91_standby)(void));
-> +
->  /*
->   * The AT91RM9200 goes into self-refresh mode with this command, and will
->   * terminate self-refresh automatically on the next SDRAM access.
-> -- 
-> 1.7.9.5
-> 
+	/* Initialized by virtio_get_byteswap() at any virtio device reset. */
+	extern bool virtio_byteswap;
+	
+	static inline uint16_t virtio_lduw_phys(hwaddr pa)
+	{
+	    if (virtio_byteswap) {
+	        return bswap16(lduw_phys(pa));
+	    }
+	    return lduw_phys(pa);
+	    
+	}
+	
+	static inline uint32_t virtio_ldl_phys(hwaddr pa)
+	{
+	    if (virtio_byteswap) {
+	        return bswap32(ldl_phys(pa));
+	    }
+	    return ldl_phys(pa);
+	}
+	
+	static inline uint64_t virtio_ldq_phys(hwaddr pa)
+	{
+	    if (virtio_byteswap) {
+	        return bswap64(ldq_phys(pa));
+	    }
+	    return ldq_phys(pa);
+	}
+	
+	static inline void virtio_stw_phys(hwaddr pa, uint16_t value)
+	{
+	    if (virtio_byteswap) {
+	        stw_phys(pa, bswap16(value));
+	    } else {
+	        stw_phys(pa, value);
+	    }
+	}
+	
+	static inline void virtio_stl_phys(hwaddr pa, uint32_t value)
+	{
+	    if (virtio_byteswap) {
+	        stl_phys(pa, bswap32(value));
+	    } else {
+	        stl_phys(pa, value);
+	    }
+	}
+	
+	static inline void virtio_stw_p(void *ptr, uint16_t v)
+	{
+	    if (virtio_byteswap) {
+	        stw_p(ptr, bswap16(v));
+	    } else {
+	        stw_p(ptr, v);
+	    }
+	}
+	
+	static inline void virtio_stl_p(void *ptr, uint32_t v)
+	{
+	    if (virtio_byteswap) {
+	        stl_p(ptr, bswap32(v));
+	    } else {
+	        stl_p(ptr, v);
+	    }
+	}
+	
+	static inline void virtio_stq_p(void *ptr, uint64_t v)
+	{
+	    if (virtio_byteswap) {
+	        stq_p(ptr, bswap64(v));
+	    } else {
+	        stq_p(ptr, v);
+	    }
+	}
+	
+	static inline int virtio_lduw_p(const void *ptr)
+	{
+	    if (virtio_byteswap) {
+	        return bswap16(lduw_p(ptr));
+	    } else {
+	        return lduw_p(ptr);
+	    }
+	}
+	
+	static inline int virtio_ldl_p(const void *ptr)
+	{
+	    if (virtio_byteswap) {
+	        return bswap32(ldl_p(ptr));
+	    } else {
+	        return ldl_p(ptr);
+	    }
+	}
+	
+	static inline uint64_t virtio_ldq_p(const void *ptr)
+	{
+	    if (virtio_byteswap) {
+	        return bswap64(ldq_p(ptr));
+	    } else {
+	        return ldq_p(ptr);
+	    }
+	}
+	
+	static inline uint32_t virtio_tswap32(uint32_t s)
+	{
+	    if (virtio_byteswap) {
+	        return bswap32(tswap32(s));
+	    } else {
+	        return tswap32(s);
+	    }
+	}
+	
+	static inline void virtio_tswap32s(uint32_t *s)
+	{
+	    tswap32s(s);
+	    if (virtio_byteswap) {
+	        *s = bswap32(*s);
+	    }
+	}
+
+There are obvious optimizations to this, such as making virtio_byteswap
+a compile time constant on non-endian-ambivalent targets, but this is
+the current approach.
+
+Cheers,
+Rusty.
