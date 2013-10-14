@@ -1,83 +1,120 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Oct 2013 12:03:03 +0100
-Subject: [PATCH v2 06/13] arm64: kernel: implement fpsimd CPU PM notifier
-In-Reply-To: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1381748590-14279-7-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Mon, 14 Oct 2013 12:02:57 +0100
+Subject: [PATCH v2 00/13] arm64: suspend/resume implementation
+Message-ID: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU enters a low power state, its FP register content is lost.
-This patch adds a notifier to save the FP context on CPU shutdown
-and restore it on CPU resume. The context is saved and restored only
-if the suspending thread is not a kernel thread, mirroring the current
-context switch behaviour.
+This series is v2 of a previous posting:
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm64/kernel/fpsimd.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/195267.html
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index bb785d2..4aef42a 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -17,6 +17,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/cpu_pm.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/sched.h>
-@@ -113,6 +114,39 @@ EXPORT_SYMBOL(kernel_neon_end);
- 
- #endif /* CONFIG_KERNEL_MODE_NEON */
- 
-+#ifdef CONFIG_CPU_PM
-+static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
-+				  unsigned long cmd, void *v)
-+{
-+	switch (cmd) {
-+	case CPU_PM_ENTER:
-+		if (current->mm)
-+			fpsimd_save_state(&current->thread.fpsimd_state);
-+		break;
-+	case CPU_PM_EXIT:
-+		if (current->mm)
-+			fpsimd_load_state(&current->thread.fpsimd_state);
-+		break;
-+	case CPU_PM_ENTER_FAILED:
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block fpsimd_cpu_pm_notifier_block = {
-+	.notifier_call = fpsimd_cpu_pm_notifier,
-+};
-+
-+static void fpsimd_pm_init(void)
-+{
-+	cpu_pm_register_notifier(&fpsimd_cpu_pm_notifier_block);
-+}
-+
-+#else
-+static inline void fpsimd_pm_init(void) { }
-+#endif /* CONFIG_CPU_PM */
-+
- /*
-  * FP/SIMD support code initialisation.
-  */
-@@ -131,6 +165,8 @@ static int __init fpsimd_init(void)
- 	else
- 		elf_hwcap |= HWCAP_ASIMD;
- 
-+	fpsimd_pm_init();
-+
- 	return 0;
- }
- late_initcall(fpsimd_init);
+Patchset depends on M.Rutland arm64 CPU hotplug series:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204154.html
+
+CPU idle driver and PSCI suspend implementation used for testing are not
+published as part of this series since they depend on standardization
+of PSCI bindings for C-states; code can be made available on a separate branch
+if required.
+
+v2 changes:
+
+- Rebased to 3.12-rc4
+- Changed cpu_suspend prototype
+- Added macros to save/restore CPU registers
+- Improved register/load/store scheduling in context save/restore
+- Changed Kconfig option
+- Refactored the stack allocation and context struct layout
+- Fixed a bug in cpu_suspend return path
+- Added tick broadcast support
+- Dropped RFC tag
+
+This patch series provides an implementation of suspend/resume and
+related CPU PM notifiers for the arm64 architecture. The implementation
+has been tweaked and code made a bit more generic wrt ARM 32 bits
+version. The cpu_suspend call prototype accepts a single parameter that
+is translated by the CPU operations suspend protocol backend into a
+series of protocol (eg PSCI) specific parameters and function calls.
+This allows for generic suspend-to-RAM and CPU idle drivers, where the
+platform complexity is hidden behind the CPU ops suspend protocol
+implementation.
+
+The context restore split between processor specific functions and
+generic code has been kept similar to arm32 as well, since this makes
+sense from a functionality perspective, even though there is just a
+an architecture specific save/restore implementation for arm64, for v8.
+Code that deals with turning on the MMU and returning from suspend is kept
+in the same file as the the suspend method itself, so that assembly code is
+self contained in a single file and separated from the interface.
+
+The CPU register context is allocated on the stack; this behaviour is
+the same as in the arm 32-bit port, even though context could have been
+allocated statically as a NR_CPUS array of struct and the context
+addresses stored once of all in the context pointers array after virtual
+to physical conversion. Current solution uses the stack, since there is
+no need to allocate additional context space for context that can be
+easily saved on the suspend threads stacks, with no additional memory
+requirement.
+
+Cache flushing is kept to a minimum; the cpu_suspend method cleans only the
+few bytes of context to DRAM that need to be retrieved with the MMU off,
+the remainder of cache cleaning is delegated to suspend finishers.
+
+The series also provides patches to simplify the MPIDR_EL1 management
+and MPIDR_EL1 hashing that are integrated to the series but are also useful
+as stand alone code.
+
+Code has been tested on AEM v8 models and a simple CPU idle driver that
+enables a C-state where CPUs are shutdown when wfi is hit.
+
+KVM CPU PM notifier has been tested using kvm-tools, and by booting a KVM guest
+on a host with deep idle states enabled.
+
+HW breakpoint CPU PM notifier has been tested using a simple perf test that
+sets up per-cpu watchpoints and checks the proper behaviour when deep idle
+states are enabled.
+
+Lorenzo Pieralisi (13):
+  arm64: kernel: add MPIDR_EL1 accessors macros
+  arm64: kernel: build MPIDR_EL1 hash function data structure
+  arm64: kernel: suspend/resume registers save/restore
+  arm64: kernel: cpu_{suspend/resume} implementation
+  arm64: add CPU PM infrastructure selection
+  arm64: kernel: implement fpsimd CPU PM notifier
+  arm: kvm: implement CPU PM notifier
+  arm64: kernel: implement debug monitors CPU PM notifiers
+  arm64: kernel: refactor code to install/uninstall breakpoints
+  arm64: kernel: implement HW breakpoints CPU PM notifier
+  arm64: enable generic clockevent broadcast
+  arm64: kernel: add CPU idle call
+  arm64: add CPU power management menu/entries
+
+ arch/arm/kvm/arm.c                     |  30 +++++
+ arch/arm64/Kconfig                     |  21 ++++
+ arch/arm64/include/asm/cpu_ops.h       |   6 +
+ arch/arm64/include/asm/cputype.h       |  10 ++
+ arch/arm64/include/asm/hardirq.h       |   2 +-
+ arch/arm64/include/asm/proc-fns.h      |   3 +
+ arch/arm64/include/asm/smp_plat.h      |  13 +++
+ arch/arm64/include/asm/suspend.h       |  36 ++++++
+ arch/arm64/include/asm/suspendmacros.h |  75 ++++++++++++
+ arch/arm64/kernel/Makefile             |   1 +
+ arch/arm64/kernel/asm-offsets.c        |  11 ++
+ arch/arm64/kernel/debug-monitors.c     |  38 ++++++
+ arch/arm64/kernel/fpsimd.c             |  36 ++++++
+ arch/arm64/kernel/hw_breakpoint.c      | 205 ++++++++++++++++++++++++---------
+ arch/arm64/kernel/process.c            |   7 +-
+ arch/arm64/kernel/setup.c              |  70 +++++++++++
+ arch/arm64/kernel/sleep.S              | 191 ++++++++++++++++++++++++++++++
+ arch/arm64/kernel/smp.c                |  17 +++
+ arch/arm64/kernel/suspend.c            |  93 +++++++++++++++
+ arch/arm64/mm/proc.S                   |  30 +++++
+ 20 files changed, 836 insertions(+), 59 deletions(-)
+ create mode 100644 arch/arm64/include/asm/suspend.h
+ create mode 100644 arch/arm64/include/asm/suspendmacros.h
+ create mode 100644 arch/arm64/kernel/sleep.S
+ create mode 100644 arch/arm64/kernel/suspend.c
+
 -- 
 1.8.4
