@@ -1,201 +1,109 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Oct 2013 12:03:06 +0100
-Subject: [PATCH v2 09/13] arm64: kernel: refactor code to install/uninstall
- breakpoints
+Date: Mon, 14 Oct 2013 12:03:08 +0100
+Subject: [PATCH v2 11/13] arm64: enable generic clockevent broadcast
 In-Reply-To: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1381748590-14279-10-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1381748590-14279-12-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the code executed to install and uninstall breakpoints is
-common and can be factored out in a function that through a runtime
-operations type provides the requested implementation.
+On platforms with power management capabilities, timers that are shut
+down when a CPU enters deep C-states must be emulated using an always-on
+timer and a timer IPI to relay the timer IRQ to target CPUs on an SMP
+system.
 
-This patch creates a common function that can be used to install/uninstall
-breakpoints and defines the set of operations that can be carried out
-through it.
+This patch enables the generic clockevents broadcast infrastructure for
+arm64, by providing the required Kconfig entries and adding the timer
+IPI infrastructure.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/kernel/hw_breakpoint.c | 142 +++++++++++++++++++++++---------------
- 1 file changed, 88 insertions(+), 54 deletions(-)
+ arch/arm64/Kconfig               |  2 ++
+ arch/arm64/include/asm/hardirq.h |  2 +-
+ arch/arm64/kernel/smp.c          | 17 +++++++++++++++++
+ 3 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index 329218c..84d1e62 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -169,15 +169,63 @@ static enum debug_el debug_exception_level(int privilege)
- 	}
- }
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index bcf88e4..be88acd 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1,6 +1,7 @@
+ config ARM64
+ 	def_bool y
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
++	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+@@ -12,6 +13,7 @@ config ARM64
+ 	select COMMON_CLK
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+ 	select GENERIC_CLOCKEVENTS
++	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+ 	select GENERIC_IOMAP
+ 	select GENERIC_IRQ_PROBE
+ 	select GENERIC_IRQ_SHOW
+diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+index 990c051..ae4801d 100644
+--- a/arch/arm64/include/asm/hardirq.h
++++ b/arch/arm64/include/asm/hardirq.h
+@@ -20,7 +20,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
  
--/*
-- * Install a perf counter breakpoint.
-+enum hw_breakpoint_ops {
-+	HW_BREAKPOINT_INSTALL,
-+	HW_BREAKPOINT_UNINSTALL
-+};
-+
-+/**
-+ * hw_breakpoint_slot_setup - Find and setup a perf slot according to
-+ *			      operations
-+ *
-+ * @slots: pointer to array of slots
-+ * @max_slots: max number of slots
-+ * @bp: perf_event to setup
-+ * @ops: operation to be carried out on the slot
-+ *
-+ * Return:
-+ *	slot index on success
-+ *	-ENOSPC if no slot is available/matches
-+ *	-EINVAL on wrong operations parameter
-  */
--int arch_install_hw_breakpoint(struct perf_event *bp)
-+static int hw_breakpoint_slot_setup(struct perf_event **slots, int max_slots,
-+				    struct perf_event *bp,
-+				    enum hw_breakpoint_ops ops)
-+{
-+	int i;
-+	struct perf_event **slot;
-+
-+	for (i = 0; i < max_slots; ++i) {
-+		slot = &slots[i];
-+		switch (ops) {
-+		case HW_BREAKPOINT_INSTALL:
-+			if (!*slot) {
-+				*slot = bp;
-+				return i;
-+			}
-+			break;
-+		case HW_BREAKPOINT_UNINSTALL:
-+			if (*slot == bp) {
-+				*slot = NULL;
-+				return i;
-+			}
-+			break;
-+		default:
-+			pr_warn_once("Unhandled hw breakpoint ops %d\n", ops);
-+			return -EINVAL;
-+		}
-+	}
-+	return -ENOSPC;
-+}
-+
-+static int hw_breakpoint_control(struct perf_event *bp,
-+				 enum hw_breakpoint_ops ops)
- {
- 	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
--	struct perf_event **slot, **slots;
-+	struct perf_event **slots;
- 	struct debug_info *debug_info = &current->thread.debug;
- 	int i, max_slots, ctrl_reg, val_reg, reg_enable;
-+	enum debug_el dbg_el = debug_exception_level(info->ctrl.privilege);
- 	u32 ctrl;
+-#define NR_IPI	4
++#define NR_IPI	5
  
- 	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
-@@ -196,67 +244,53 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
- 		reg_enable = !debug_info->wps_disabled;
- 	}
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index d5488f8..2ed691e 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -61,6 +61,7 @@ enum ipi_msg_type {
+ 	IPI_CALL_FUNC,
+ 	IPI_CALL_FUNC_SINGLE,
+ 	IPI_CPU_STOP,
++	IPI_TIMER,
+ };
  
--	for (i = 0; i < max_slots; ++i) {
--		slot = &slots[i];
-+	i = hw_breakpoint_slot_setup(slots, max_slots, bp, ops);
+ /*
+@@ -447,6 +448,7 @@ static const char *ipi_types[NR_IPI] = {
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+ 	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
++	S(IPI_TIMER, "Timer broadcast interrupts"),
+ };
  
--		if (!*slot) {
--			*slot = bp;
--			break;
--		}
--	}
-+	if (WARN_ONCE(i < 0, "Can't find any breakpoint slot"))
-+		return i;
+ void show_ipi_list(struct seq_file *p, int prec)
+@@ -532,6 +534,14 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
  
--	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot"))
--		return -ENOSPC;
-+	switch (ops) {
-+	case HW_BREAKPOINT_INSTALL:
-+		/*
-+		 * Ensure debug monitors are enabled at the correct exception
-+		 * level.
-+		 */
-+		enable_debug_monitors(dbg_el);
- 
--	/* Ensure debug monitors are enabled@the correct exception level.  */
--	enable_debug_monitors(debug_exception_level(info->ctrl.privilege));
-+		/* Setup the address register. */
-+		write_wb_reg(val_reg, i, info->address);
- 
--	/* Setup the address register. */
--	write_wb_reg(val_reg, i, info->address);
-+		/* Setup the control register. */
-+		ctrl = encode_ctrl_reg(info->ctrl);
-+		write_wb_reg(ctrl_reg, i,
-+			     reg_enable ? ctrl | 0x1 : ctrl & ~0x1);
++#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
++	case IPI_TIMER:
++		irq_enter();
++		tick_receive_broadcast();
++		irq_exit();
 +		break;
-+	case HW_BREAKPOINT_UNINSTALL:
-+		/* Reset the control register. */
-+		write_wb_reg(ctrl_reg, i, 0);
- 
--	/* Setup the control register. */
--	ctrl = encode_ctrl_reg(info->ctrl);
--	write_wb_reg(ctrl_reg, i, reg_enable ? ctrl | 0x1 : ctrl & ~0x1);
-+		/*
-+		 * Release the debug monitors for the correct exception
-+		 * level.
-+		 */
-+		disable_debug_monitors(dbg_el);
-+		break;
-+	}
- 
- 	return 0;
++#endif
++
+ 	default:
+ 		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
+ 		break;
+@@ -544,6 +554,13 @@ void smp_send_reschedule(int cpu)
+ 	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
  }
  
--void arch_uninstall_hw_breakpoint(struct perf_event *bp)
-+/*
-+ * Install a perf counter breakpoint.
-+ */
-+int arch_install_hw_breakpoint(struct perf_event *bp)
- {
--	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
--	struct perf_event **slot, **slots;
--	int i, max_slots, base;
--
--	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
--		/* Breakpoint */
--		base = AARCH64_DBG_REG_BCR;
--		slots = __get_cpu_var(bp_on_reg);
--		max_slots = core_num_brps;
--	} else {
--		/* Watchpoint */
--		base = AARCH64_DBG_REG_WCR;
--		slots = __get_cpu_var(wp_on_reg);
--		max_slots = core_num_wrps;
--	}
--
--	/* Remove the breakpoint. */
--	for (i = 0; i < max_slots; ++i) {
--		slot = &slots[i];
--
--		if (*slot == bp) {
--			*slot = NULL;
--			break;
--		}
--	}
--
--	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot"))
--		return;
--
--	/* Reset the control register. */
--	write_wb_reg(base, i, 0);
-+	return hw_breakpoint_control(bp, HW_BREAKPOINT_INSTALL);
-+}
- 
--	/* Release the debug monitors for the correct exception level.  */
--	disable_debug_monitors(debug_exception_level(info->ctrl.privilege));
-+void arch_uninstall_hw_breakpoint(struct perf_event *bp)
++#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
++void tick_broadcast(const struct cpumask *mask)
 +{
-+	hw_breakpoint_control(bp, HW_BREAKPOINT_UNINSTALL);
- }
- 
- static int get_hbp_len(u8 hbp_len)
++	smp_cross_call(mask, IPI_TIMER);
++}
++#endif
++
+ void smp_send_stop(void)
+ {
+ 	unsigned long timeout;
 -- 
 1.8.4
