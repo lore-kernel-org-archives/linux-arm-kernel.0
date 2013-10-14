@@ -1,26 +1,27 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 14 Oct 2013 10:27:09 -0700
-Subject: Is next/cleanup of arm-soc tree stable?
-In-Reply-To: <20131014161309.GG27668@S2101-09.ap.freescale.net> (Shawn Guo's
- message of "Tue, 15 Oct 2013 00:13:11 +0800")
-References: <20131014161309.GG27668@S2101-09.ap.freescale.net>
-Message-ID: <87mwmb930y.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Oct 2013 18:40:30 +0100
+Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
+In-Reply-To: <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20131014174030.GU25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo <shawn.guo@linaro.org> writes:
+Another thing that my build testing (and use on cubox-i) picked up:
 
-> Olof, Kevin,
->
-> Per reports from linux-next folks, it seems that my imx/soc branch
-> conflicts with Sebastian's clk-of-init-v2_for-3.13 quite badly.  I'm
-> considering to rebase my imx/soc branch on arm-soc next/cleanup branch
-> to solve the conflicts.  But is the branch stable, or do I have to base
-> on Sebastian's clk-of-init-v2_for-3.13 branch (assume it's stable)?
+On Thu, Oct 03, 2013 at 03:51:26PM -0300, Fabio Estevam wrote:
+> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> index 9e8ae11..65e54b4 100644
+> --- a/arch/arm/boot/dts/imx6dl.dtsi
+> +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> @@ -88,3 +88,7 @@
+>  		crtcs = <&ipu1 0>, <&ipu1 1>;
+>  	};
+>  };
+> +
+> +&hdmi {
+> +	crtcs = <&ipu1 0>, <&ipu1 1>;
+> +}
 
-Generally, the next/* branches are not stable.
-
-It would be better if you could get a commitment from Sebastian for a
-immutable branch and base directly on that.
-
-Kevin
+Missing semi-colon.
