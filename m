@@ -1,32 +1,96 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 14 Oct 2013 09:51:48 +0100
-Subject: [PATCH V3] ARM: mm: make UACCESS_WITH_MEMCPY huge page aware
-In-Reply-To: <alpine.LFD.2.03.1310111615570.3023@syhkavp.arg>
-References: <1381489919-2508-1-git-send-email-steve.capper@linaro.org>
- <alpine.LFD.2.03.1310111615570.3023@syhkavp.arg>
-Message-ID: <20131014085147.GA8228@linaro.org>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Mon, 14 Oct 2013 09:00:57 +0000
+Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
+In-Reply-To: <20131010154414.GY2954@intel.com>
+References: <1379498279-16096-1-git-send-email-b35083@freescale.com>
+ <B56CDBE15CE27145A4B77D2D24263E8522EFE6@039-SN1MPN1-004.039d.mgd.msft.net>
+ <20131010154414.GY2954@intel.com>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E852336EE@039-SN1MPN1-004.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 04:16:15PM -0400, Nicolas Pitre wrote:
-> On Fri, 11 Oct 2013, Steve Capper wrote:
-> 
+Hi, Rob,
+  Could you please help review the devicetree binding?
+  Thanks!
 
-[ ... ]
+Best Regards,
+Jingchang
 
-> > Changes in V3:
-> > pmd_hugewillfault and pmd_thp_or_huge were erroneously ommitted from
-> > pgtable-2level.h causing build problems. Empty stubs are added for now
-> > as we don't have huge page support for short descriptors.
-> > 
-> > Nicolas, can I please re-add your Reviewed-by to this?
+> -----Original Message-----
+> From: Vinod Koul [mailto:vinod.koul at intel.com]
+> Sent: Thursday, October 10, 2013 11:44 PM
+> To: Lu Jingchang-B35083
+> Cc: shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org
+> Subject: Re: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
 > 
-> Yes.
+> On Thu, Oct 10, 2013 at 09:39:04AM +0000, Lu Jingchang-B35083 wrote:
+> > Hi, Vinod,
+> >
+> >   Could you please help review this patch? Could it be merged into your
+> next tree?
+> >   Thanks!
+> Where is the patch 1 & 2 of the series, I dont sem to find it.
+> Also I need ACK from one of the DT maintainers on the binding before I
+> can carry
+> this
 > 
+> --
+> ~Vinod
+> >
+> >
+> > Best Regards,
+> > Jingchang
+> >
+> >
+> > > -----Original Message-----
+> > > From: Lu Jingchang-B35083
+> > > Sent: Wednesday, September 18, 2013 5:58 PM
+> > > To: vinod.koul at intel.com
+> > > Cc: shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-arm-
+> > > kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu Jingchang-
+> > > B35083; Wang Huan-B18965
+> > > Subject: [PATCH v6 3/3] dma: Add Freescale eDMA engine driver support
+> > >
+> > > Add Freescale enhanced direct memory(eDMA) controller support.
+> > > The eDMA controller deploys DMAMUXs routing DMA request sources(slot)
+> > > to eDMA channels.
+> > > This module can be found on Vybrid and LS-1 SoCs.
+> > >
+> > > Signed-off-by: Alison Wang <b18965@freescale.com>
+> > > Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> > > ---
+> > > changes in v6:
+> > >   holding lock in dma_control to prevent race.
+> > >
+> > > changes in v5:
+> > >   config slave_id when dmaengine_slave_config intead of channel
+> request.
+> > >   adding residue calculation and dma pause/resume device control.
+> > >
+> > > changes in v4:
+> > >   using exact compatible string in binding document.
+> > >
+> > > changes in v3:
+> > >   handle all pending interrupt one time.
+> > >   add protect lock on dma transfer complete handling.
+> > >   change desc and tcd alloc flag to GFP_NOWAIT.
+> > >   add sanity check and error messages.
+> > >
+> > > changes in v2:
+> > >   using generic dma-channels property instead of fsl,dma-channel.
+> > >   rename the binding document to fsl-edma.txt.
+> > >
+> > >
+> > >  Documentation/devicetree/bindings/dma/fsl-edma.txt |  84 ++
+> > >  drivers/dma/Kconfig                                |  10 +
+> > >  drivers/dma/Makefile                               |   1 +
+> > >  drivers/dma/fsl-edma.c                             | 944
+> > > +++++++++++++++++++++
+> > >  4 files changed, 1039 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/dma/fsl-
+> edma.txt
+> > >  create mode 100644 drivers/dma/fsl-edma.c
+> >
 > 
-
-Thanks, this is now in the system as: 7858/1.
-
-Cheers,
--- 
-Steve
+> --
