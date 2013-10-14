@@ -1,104 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Oct 2013 16:16:38 +0100
-Subject: [RFT PATCH v2 2/4] arm64: restore FPSIMD to default state for
- kernel and signal contexts
-In-Reply-To: <1381674029-430-2-git-send-email-liuj97@gmail.com>
-References: <1381674029-430-1-git-send-email-liuj97@gmail.com>
- <1381674029-430-2-git-send-email-liuj97@gmail.com>
-Message-ID: <20131014151638.GI10491@mudshark.cambridge.arm.com>
+From: a.motakis@virtualopensystems.com (Antonios Motakis)
+Date: Mon, 14 Oct 2013 17:17:51 +0200
+Subject: [PATCH 2/2] ARM: SMMU: return NULL on error in
+ arm_smmu_iova_to_phys
+In-Reply-To: <20131014124837.GD10491@mudshark.cambridge.arm.com>
+References: <1381497887-14586-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1381497887-14586-2-git-send-email-a.motakis@virtualopensystems.com>
+ <20131014124837.GD10491@mudshark.cambridge.arm.com>
+Message-ID: <CAG8rG2yE=xWmYP_bOy7=jzWEQKNkbgk-9_Jecnx_XXx=jC9i_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 13, 2013 at 03:20:18PM +0100, Jiang Liu wrote:
-> From: Jiang Liu <jiang.liu@huawei.com>
-> 
-> Restore FPSIMD control and status registers to default values
-> when creating new FPSIMD contexts for kernel context and reset
-> FPSIMD status register when creating FPSIMD context for signal
-> handling, otherwise the stale value in FPSIMD control and status
-> registers may affect the new kernal or signal handling contexts.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Jiang Liu <liuj97@gmail.com>
-> ---
->  arch/arm64/include/asm/fpsimd.h | 16 ++++++++++++++++
->  arch/arm64/kernel/fpsimd.c      | 11 +++++++++--
->  arch/arm64/kernel/signal.c      |  1 +
->  arch/arm64/kernel/signal32.c    |  1 +
->  4 files changed, 27 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index c43b4ac..b2dc30f 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -50,8 +50,24 @@ struct fpsimd_state {
->  #define VFP_STATE_SIZE		((32 * 8) + 4)
->  #endif
->  
-> +#define	AARCH64_FPCR_DEFAULT_VAL	0
-> +
->  struct task_struct;
->  
-> +static inline void fpsimd_init_hw_state(void)
-> +{
-> +	int val = AARCH64_FPCR_DEFAULT_VAL;
-> +
-> +	asm ("msr fpcr, %x0\n"
-> +	     "msr fpsr, xzr\n"
-> +             : : "r"(val));
-> +}
-> +
-> +static inline void fpsimd_clear_fpsr(void)
-> +{
-> +	asm ("msr fpsr, xzr\n");
-> +}
+On Mon, Oct 14, 2013 at 2:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Oct 11, 2013 at 02:24:47PM +0100, Antonios Motakis wrote:
+>> The return value of arm_smmu_iova_to_phys is directly passed to the
+>> user of the IOMMU API via iommu_iova_to_phys; however the ARM SMMU
+>> driver returns -EINVAL on error, which is not consistent with the
+>> rest of the drivers implementing the IOMMU API. VFIO also relies on
+>> the call returning NULL when a page has not been mapped already.
+>>
+>> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 5 +----
+>>  1 file changed, 1 insertion(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 8b71332..fe81b20 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -1480,10 +1480,7 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
+>>
+>>  err_unlock:
+>>       spin_unlock(&smmu_domain->lock);
+>> -     dev_warn(smmu->dev,
+>> -              "invalid (corrupt?) page tables detected for iova 0x%llx\n",
+>> -              (unsigned long long)iova);
+>> -     return -EINVAL;
+>> +     return NULL;
+>
+> Why are you removing the warning message?
 
-You have pretty weak asm constraints here...
+VFIO will exercise this code path every time when mapping DMA memory.
+This is normal and VFIO *expects* the function to fail - it is only if
+the function succeeds that VFIO needs to back down from the DMA
+mapping and fail.
 
->  extern void fpsimd_save_state(struct fpsimd_state *state);
->  extern void fpsimd_load_state(struct fpsimd_state *state);
->  
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index bb785d2..12a25e5 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -80,9 +80,14 @@ void fpsimd_thread_switch(struct task_struct *next)
->  
->  void fpsimd_flush_thread(void)
->  {
-> +	struct fpsimd_state *state = &current->thread.fpsimd_state;
-> +
->  	preempt_disable();
-> -	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
-> -	fpsimd_load_state(&current->thread.fpsimd_state);
-> +	memset(state, 0, sizeof(struct fpsimd_state));
-> +#if (AARCH64_FPCR_DEFAULT_VAL != 0)
-> +	state->fpcr = AARCH64_FPCR_DEFAULT_VAL;
-> +#endif
-> +	fpsimd_load_state(state);
->  	preempt_enable();
->  }
->  
-> @@ -99,6 +104,8 @@ void kernel_neon_begin(void)
->  
->  	if (current->mm)
->  		fpsimd_save_state(&current->thread.fpsimd_state);
-> +
-> +	fpsimd_init_hw_state();
->  }
->  EXPORT_SYMBOL(kernel_neon_begin);
->  
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index 890a591..4ee231e 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -52,6 +52,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
->  
->  	/* dump the hardware registers to the fpsimd_state structure */
->  	fpsimd_save_state(fpsimd);
-> +	fpsimd_clear_fpsr();
+This means that there would be a warning every time a VFIO user maps
+some memory for DMA use, even though nothing went wrong.
 
-... so I reckon GCC could reorder these two calls, resulting in corruption
-of the saved state register.
-
-Will
+>
+> Will
