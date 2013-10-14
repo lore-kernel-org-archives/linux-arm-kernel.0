@@ -1,132 +1,196 @@
 From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Mon, 14 Oct 2013 18:24:36 +0300
-Subject: [PATCH v3 09/13] usb: phy: msm: Remove unused pclk_src_name
+Date: Mon, 14 Oct 2013 18:24:40 +0300
+Subject: [PATCH v3 13/13] usb: phy: msm: Add device tree support and binding
+ information
 In-Reply-To: <1381764280-28420-1-git-send-email-iivanov@mm-sol.com>
 References: <1381764280-28420-1-git-send-email-iivanov@mm-sol.com>
-Message-ID: <1381764280-28420-10-git-send-email-iivanov@mm-sol.com>
+Message-ID: <1381764280-28420-14-git-send-email-iivanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 
-There are no references to 'pclk_src_name' in plaform code,
-so it is unused.
+Allows MSM OTG controller to be specified via device tree.
 
 Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
 ---
- drivers/usb/phy/phy-msm-usb.c |   26 +-------------------------
- include/linux/usb/msm_hsusb.h |    5 -----
- 2 files changed, 1 insertion(+), 30 deletions(-)
+ .../devicetree/bindings/usb/msm-hsusb.txt          |   58 +++++++++++++++++++
+ drivers/usb/phy/phy-msm-usb.c                      |   59 ++++++++++++++++++--
+ 2 files changed, 112 insertions(+), 5 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/usb/msm-hsusb.txt b/Documentation/devicetree/bindings/usb/msm-hsusb.txt
+index 5ea26c6..4ed8d1a 100644
+--- a/Documentation/devicetree/bindings/usb/msm-hsusb.txt
++++ b/Documentation/devicetree/bindings/usb/msm-hsusb.txt
+@@ -15,3 +15,61 @@ Example EHCI controller device node:
+ 		usb-phy = <&usb_otg>;
+ 	};
+ 
++
++OTG:
++
++Required properties:
++- compatible:	should contain "qcom,hsusb-otg"
++- regs:			offset and length of the register set in the memory map
++- interrupts:	interrupt-specifier for the OTG interrupt.
++
++- clocks:		A list of phandle + clock-specifier pairs for the
++				clocks listed in clock-names
++- clock-names:	Should contain the following:
++  "phy"			USB PHY reference clock
++  "core"		Protocol engine clock
++  "iface"		Interface bus clock
++  "alt_core"	Optional: Protocol engine clock for targets with asynchronous
++				reset methodology.
++
++- dr_mode:		One of "host", "peripheral" or "otg". Defaults to "otg"
++
++- vdccx-supply:	phandle to the regulator for the vdd supply for
++				digital circuit operation.
++- v1p8-supply:	phandle to the regulator for the 1.8V supply
++- v3p3-supply:	phandle to the regulator for the 3.3V supply
++
++- qcom,phy-type: PHY type can be one of
++				1 - Chipidea 45nm PHY
++				2 - Synopsis 28nm PHY
++
++- qcom,otg-control: OTG control (VBUS and ID notifications) can be one of
++				1 - PHY control
++				2 - PMIC control
++				3 - User control (via debugfs)
++
++Optional properties:
++- qcom,phy-init-sequence: PHY configuration sequence. val, reg pairs
++				terminate with -1
++
++Example HSUSB OTG controller device node:
++
++	usb at f9a55000 {
++		compatible = "qcom,hsusb-otg";
++		reg = <0xf9a55000 0x400>;
++		interrupts = <0 134 0>;;
++		dr_mode = "peripheral";
++
++		clocks = <&gcc GCC_XO_CLK>, <&gcc GCC_USB_HS_SYSTEM_CLK>,
++				<&gcc GCC_USB_HS_AHB_CLK>;
++
++		clock-names = "phy", "core", "iface";
++
++		vddcx-supply = <&pm8841_s2_corner>;
++		v1p8-supply = <&pm8941_l6>;
++		v3p3-supply = <&pm8941_l24>;
++
++		qcom,otg-control = <1>;
++		qcom,phy-type = <2>;
++		qcom,phy-init-sequence = <0x01 0x90 0xffffffff>;
++	};
 diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-index 4a23cfa..c1020d9 100644
+index f34c8a9..1ecea6f 100644
 --- a/drivers/usb/phy/phy-msm-usb.c
 +++ b/drivers/usb/phy/phy-msm-usb.c
-@@ -464,9 +464,6 @@ static int msm_otg_suspend(struct msm_otg *motg)
- 	if (!IS_ERR(motg->core_clk))
- 		clk_disable_unprepare(motg->core_clk);
+@@ -30,9 +30,11 @@
+ #include <linux/debugfs.h>
+ #include <linux/seq_file.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
  
--	if (!IS_ERR(motg->pclk_src))
--		clk_disable_unprepare(motg->pclk_src);
--
- 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
- 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
- 		msm_hsusb_ldo_set_mode(motg, 0);
-@@ -496,9 +493,6 @@ static int msm_otg_resume(struct msm_otg *motg)
- 	if (!atomic_read(&motg->in_lpm))
- 		return 0;
- 
--	if (!IS_ERR(motg->pclk_src))
--		clk_prepare_enable(motg->pclk_src);
--
- 	clk_prepare_enable(motg->pclk);
- 	clk_prepare_enable(motg->clk);
- 	if (!IS_ERR(motg->core_clk))
-@@ -1394,17 +1388,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
- 	 * If USB Core is running its protocol engine based on CORE CLK,
- 	 * CORE CLK  must be running at >55Mhz for correct HSUSB
- 	 * operation and USB core cannot tolerate frequency changes on
--	 * CORE CLK. For such USB cores, vote for maximum clk frequency
--	 * on pclk source
-+	 * CORE CLK.
- 	 */
--	 motg->pclk_src = ERR_PTR(-ENOENT);
--	 if (motg->pdata->pclk_src_name) {
--		motg->pclk_src = devm_clk_get(&pdev->dev,
--					motg->pdata->pclk_src_name);
--		if (IS_ERR(motg->pclk_src))
--			return PTR_ERR(motg->pclk_src);
--	}
--
- 	motg->pclk = devm_clk_get(&pdev->dev, "usb_hs_pclk");
- 	if (IS_ERR(motg->pclk)) {
- 		dev_err(&pdev->dev, "failed to get usb_hs_pclk\n");
-@@ -1450,10 +1435,6 @@ static int __init msm_otg_probe(struct platform_device *pdev)
- 	}
- 
- 	clk_set_rate(motg->clk, 60000000);
--	if (!IS_ERR(motg->pclk_src)) {
--		clk_set_rate(motg->pclk_src, INT_MAX);
--		clk_prepare_enable(motg->pclk_src);
--	}
- 
- 	clk_prepare_enable(motg->clk);
- 	clk_prepare_enable(motg->pclk);
-@@ -1529,8 +1510,6 @@ disable_clks:
- 	clk_disable_unprepare(motg->clk);
- 	if (!IS_ERR(motg->core_clk))
- 		clk_disable_unprepare(motg->core_clk);
--	if (!IS_ERR(motg->pclk_src))
--		clk_disable_unprepare(motg->pclk_src);
- 	return ret;
+ #include <linux/usb.h>
+ #include <linux/usb/otg.h>
++#include <linux/usb/of.h>
+ #include <linux/usb/ulpi.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/hcd.h>
+@@ -1342,17 +1344,57 @@ static void msm_otg_debugfs_cleanup(void)
+ 	debugfs_remove(msm_otg_dbg_root);
  }
  
-@@ -1575,9 +1554,6 @@ static int msm_otg_remove(struct platform_device *pdev)
- 	clk_disable_unprepare(motg->clk);
- 	if (!IS_ERR(motg->core_clk))
- 		clk_disable_unprepare(motg->core_clk);
--	if (!IS_ERR(motg->pclk_src))
--		clk_disable_unprepare(motg->pclk_src);
--
- 	msm_hsusb_ldo_init(motg, 0);
++struct msm_otg_platform_data *msm_otg_dt_to_pdata(struct platform_device *pdev)
++{
++	struct msm_otg_platform_data *pdata;
++	struct device_node *node = pdev->dev.of_node;
++	int len = 0;
++	u32 val;
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata) {
++		dev_err(&pdev->dev, "unable to allocate platform data\n");
++		return NULL;
++	}
++
++	pdata->mode = of_usb_get_dr_mode(node);
++	if (pdata->mode == USB_DR_MODE_UNKNOWN)
++		pdata->mode = USB_DR_MODE_OTG;
++
++	pdata->otg_control = OTG_PHY_CONTROL;
++	if (!of_property_read_u32(node, "qcom,otg-control", &val))
++		pdata->otg_control = val;
++
++	pdata->phy_type = CI_45NM_INTEGRATED_PHY;
++	if (!of_property_read_u32(node, "qcom,phy-type", &val))
++		pdata->phy_type = val;
++
++	if (!of_get_property(node, "qcom,phy-init-sequence", &len) || !len)
++		return pdata;
++
++	pdata->phy_init_seq = devm_kzalloc(&pdev->dev, len, GFP_KERNEL);
++	if (!pdata->phy_init_seq)
++		return pdata;
++
++	of_property_read_u32_array(node, "qcom,phy-init-sequence",
++				   pdata->phy_init_seq,
++				   len / sizeof(*pdata->phy_init_seq));
++	return pdata;
++}
++
+ static int __init msm_otg_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0;
++	struct msm_otg_platform_data *pdata;
+ 	struct resource *res;
+ 	struct msm_otg *motg;
+ 	struct usb_phy *phy;
  
- 	pm_runtime_set_suspended(&pdev->dev);
-diff --git a/include/linux/usb/msm_hsusb.h b/include/linux/usb/msm_hsusb.h
-index 72c5830..262ed80 100644
---- a/include/linux/usb/msm_hsusb.h
-+++ b/include/linux/usb/msm_hsusb.h
-@@ -106,8 +106,6 @@ enum usb_chg_type {
-  * @power_budget: VBUS power budget in mA (0 will be treated as 500mA).
-  * @mode: Supported mode (OTG/peripheral/host).
-  * @otg_control: OTG switch controlled by user/Id pin
-- * @pclk_src_name: pclk is derived from ebi1_usb_clk in case of 7x27 and 8k
-- *              dfab_usb_hs_clk in case of 8660 and 8960.
-  */
- struct msm_otg_platform_data {
- 	int *phy_init_seq;
-@@ -117,7 +115,6 @@ struct msm_otg_platform_data {
- 	enum otg_control_type otg_control;
- 	enum msm_usb_phy_type phy_type;
- 	void (*setup_gpio)(enum usb_otg_state state);
--	char *pclk_src_name;
- 	int (*link_clk_reset)(struct clk *link_clk, bool assert);
- 	int (*phy_clk_reset)(struct clk *phy_clk);
+-	dev_info(&pdev->dev, "msm_otg probe\n");
+-	if (!dev_get_platdata(&pdev->dev)) {
+-		dev_err(&pdev->dev, "No platform data given. Bailing out\n");
+-		return -ENODEV;
++	pdata = dev_get_platdata(&pdev->dev);
++	if (!pdata) {
++		pdata = msm_otg_dt_to_pdata(pdev);
++		if (!pdata)
++			return -ENOMEM;
+ 	}
+ 
+ 	motg = devm_kzalloc(&pdev->dev, sizeof(struct msm_otg), GFP_KERNEL);
+@@ -1368,7 +1410,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-	motg->pdata = dev_get_platdata(&pdev->dev);
++	motg->pdata = pdata;
+ 	phy = &motg->phy;
+ 	phy->dev = &pdev->dev;
+ 
+@@ -1643,6 +1685,12 @@ static const struct dev_pm_ops msm_otg_dev_pm_ops = {
  };
-@@ -129,7 +126,6 @@ struct msm_otg_platform_data {
-  * @irq: IRQ number assigned for HSUSB controller.
-  * @clk: clock struct of usb_hs_clk.
-  * @pclk: clock struct of usb_hs_pclk.
-- * @pclk_src: pclk source for voting.
-  * @phy_reset_clk: clock struct of usb_phy_clk.
-  * @core_clk: clock struct of usb_hs_core_clk.
-  * @regs: ioremapped register base address.
-@@ -150,7 +146,6 @@ struct msm_otg {
- 	int irq;
- 	struct clk *clk;
- 	struct clk *pclk;
--	struct clk *pclk_src;
- 	struct clk *phy_reset_clk;
- 	struct clk *core_clk;
- 	void __iomem *regs;
+ #endif
+ 
++static struct of_device_id msm_otg_dt_match[] = {
++	{ .compatible = "qcom,hsusb-otg", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, msm_otg_dt_match);
++
+ static struct platform_driver msm_otg_driver = {
+ 	.probe = msm_otg_probe,
+ 	.remove = msm_otg_remove,
+@@ -1652,6 +1700,7 @@ static struct platform_driver msm_otg_driver = {
+ #ifdef CONFIG_PM
+ 		.pm = &msm_otg_dev_pm_ops,
+ #endif
++		.of_match_table = msm_otg_dt_match,
+ 	},
+ };
+ 
 -- 
 1.7.9.5
