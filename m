@@ -1,46 +1,165 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Oct 2013 13:36:12 +0100
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <87d2n88dps.fsf@rustcorp.com.au>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <87d2n88dps.fsf@rustcorp.com.au>
-Message-ID: <525BE53C.6010100@arm.com>
+From: george.cherian@ti.com (George Cherian)
+Date: Mon, 14 Oct 2013 18:06:24 +0530
+Subject: [PATCH] ARM: OMAP2+: hwmod: Add USB hwmod data for AM437x.
+Message-ID: <1381754184-11180-1-git-send-email-george.cherian@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/13 09:21, Rusty Russell wrote:
-> Marc Zyngier <marc.zyngier@arm.com> writes:
->> This small patch series adds just enough kernel infrastructure and
->> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
->> that the host actually supports such madness.
->>
->> This has been tested on arm64, with some fixes to KVM and a set of
->> changes to kvmtool, both which I am posting separately.
-> 
-> OK, so I already have a patch which supports config space accessors.
-> I've posted the series below, and since you want it, I'll put it in
-> virtio-next after more testing and rebasing...
+Add hwmod for USBSS and the OCP2SCP for AM437x.
+AM437x has got 2 instances of USBSS.
 
-Yes, that's definitely something I'd like to see being merged, as it
-would allow me to drop a significant chunk of changes.
+Signed-off-by: George Cherian <george.cherian@ti.com>
+---
+This was tested on AM437x EPOS EVM with Afzal's v6 of AM43x PRCM basic support 
+and Tero's DT clock Series 
 
-> But we won't be using feature bits for endianness, since we're defining
-> endian in the 1.0 spec (whether LE-everywhere or LE-for-mmio-and-PCI is
-> still debated).  Since we need to guess for backwards compat anyway,
-> let's keep doing this until v1.0?
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 105 +++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prcm43xx.h             |   4 ++
+ 2 files changed, 109 insertions(+)
 
-When is 1.0 going to happen? When will actual implementation of drivers
-and devices show up in my favourite platform emulation?
-
-Having a grand plan for the future is great, but I need something
-working right now, or at least fairly soonish... And I need it to be
-backward compatible, as none of the above is going to show up overnight.
-
-> (Yeah, I made this mess with "native endian".  I promise I have learnt
-> my lesson).
-
-Paracetamol bill coming you way... ;-)
-
-	M.
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index 6500d43..a58024d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -316,6 +316,79 @@ static struct omap_hwmod am43xx_gpio5_hwmod = {
+ 	.dev_attr	= &gpio_dev_attr,
+ };
+ 
++static struct omap_hwmod_class am43xx_ocp2scp_hwmod_class = {
++	.name	= "ocp2scp",
++};
++
++static struct omap_hwmod am43xx_ocp2scp0_hwmod = {
++	.name		= "ocp2scp0",
++	.class		= &am43xx_ocp2scp_hwmod_class,
++	.clkdm_name	= "l4ls_clkdm",
++	.main_clk	= "l4ls_gclk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = AM43XX_CM_PER_USBPHYOCP2SCP0_CLKCTRL_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++static struct omap_hwmod am43xx_ocp2scp1_hwmod = {
++	.name		= "ocp2scp1",
++	.class		= &am43xx_ocp2scp_hwmod_class,
++	.clkdm_name	= "l4ls_clkdm",
++	.main_clk	= "l4ls_gclk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs	= AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET,
++			.modulemode	= MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++static struct omap_hwmod_class_sysconfig am43xx_usb_otg_ss_sysc = {
++	.rev_offs	= 0x0000,
++	.sysc_offs	= 0x0010,
++	.sysc_flags	= (SYSC_HAS_DMADISABLE | SYSC_HAS_MIDLEMODE |
++				SYSC_HAS_SIDLEMODE),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
++				SIDLE_SMART_WKUP | MSTANDBY_FORCE |
++				MSTANDBY_NO | MSTANDBY_SMART |
++				MSTANDBY_SMART_WKUP),
++	.sysc_fields	= &omap_hwmod_sysc_type2,
++};
++
++static struct omap_hwmod_class am43xx_usb_otg_ss_hwmod_class = {
++	.name	= "usb_otg_ss",
++	.sysc	= &am43xx_usb_otg_ss_sysc,
++};
++
++static struct omap_hwmod am43xx_usb_otg_ss0_hwmod = {
++	.name		= "usb_otg_ss0",
++	.class		= &am43xx_usb_otg_ss_hwmod_class,
++	.clkdm_name	= "l3s_clkdm",
++	.main_clk	= "l3s_gclk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs	= AM43XX_CM_PER_USB_OTG_SS0_CLKCTRL_OFFSET,
++			.modulemode	= MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++static struct omap_hwmod am43xx_usb_otg_ss1_hwmod = {
++	.name		= "usb_otg_ss1",
++	.class		= &am43xx_usb_otg_ss_hwmod_class,
++	.clkdm_name	= "l3s_clkdm",
++	.main_clk	= "l3s_gclk",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs	= AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET,
++			.modulemode	= MODULEMODE_SWCTRL,
++		},
++	},
++};
++
+ /* Interfaces */
+ static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
+ 	.master		= &am33xx_l3_main_hwmod,
+@@ -520,6 +593,34 @@ static struct omap_hwmod_ocp_if am43xx_l4_ls__gpio5 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++static struct omap_hwmod_ocp_if am43xx_l4_ls__ocp2scp0 = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am43xx_ocp2scp0_hwmod,
++	.clk		= "l4ls_gclk",
++	.user		= OCP_USER_MPU,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l4_ls__ocp2scp1 = {
++	.master		= &am33xx_l4_ls_hwmod,
++	.slave		= &am43xx_ocp2scp1_hwmod,
++	.clk		= "l4ls_gclk",
++	.user		= OCP_USER_MPU,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l3_s__usbotgss0 = {
++	.master         = &am33xx_l3_s_hwmod,
++	.slave          = &am43xx_usb_otg_ss0_hwmod,
++	.clk            = "l3s_gclk",
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_ocp_if am43xx_l3_s__usbotgss1 = {
++	.master         = &am33xx_l3_s_hwmod,
++	.slave          = &am43xx_usb_otg_ss1_hwmod,
++	.clk            = "l3s_gclk",
++	.user           = OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l4_wkup__synctimer,
+ 	&am43xx_l4_ls__timer8,
+@@ -608,6 +709,10 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_cpgmac0__mdio,
+ 	&am33xx_l3_main__sha0,
+ 	&am33xx_l3_main__aes0,
++	&am43xx_l4_ls__ocp2scp0,
++	&am43xx_l4_ls__ocp2scp1,
++	&am43xx_l3_s__usbotgss0,
++	&am43xx_l3_s__usbotgss1,
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+index f0636ec..0d66a6e 100644
+--- a/arch/arm/mach-omap2/prcm43xx.h
++++ b/arch/arm/mach-omap2/prcm43xx.h
+@@ -137,5 +137,9 @@
+ #define AM43XX_CM_PER_SPI4_CLKCTRL_OFFSET		0x0520
+ #define AM43XX_CM_PER_GPIO4_CLKCTRL_OFFSET		0x0490
+ #define AM43XX_CM_PER_GPIO5_CLKCTRL_OFFSET		0x0498
++#define AM43XX_CM_PER_USB_OTG_SS0_CLKCTRL_OFFSET	0x0260
++#define AM43XX_CM_PER_USBPHYOCP2SCP0_CLKCTRL_OFFSET	0x05B8
++#define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
++#define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
+ 
+ #endif
 -- 
-Jazz is not dead. It just smells funny...
+1.8.1
