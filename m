@@ -1,46 +1,60 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 14 Oct 2013 09:48:49 -0400
-Subject: [RFC 06/23] mm/memblock: Add memblock early memory allocation apis
-In-Reply-To: <20131013184212.GA18075@htj.dyndns.org>
-References: <1381615146-20342-1-git-send-email-santosh.shilimkar@ti.com>
- <1381615146-20342-7-git-send-email-santosh.shilimkar@ti.com>
- <20131013175648.GC5253@mtj.dyndns.org>
- <20131013180058.GG25034@n2100.arm.linux.org.uk>
- <20131013184212.GA18075@htj.dyndns.org>
-Message-ID: <525BF641.3000300@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Oct 2013 14:49:10 +0100
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
+ <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
+Message-ID: <525BF656.7020207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 October 2013 02:42 PM, Tejun Heo wrote:
-> On Sun, Oct 13, 2013 at 07:00:59PM +0100, Russell King - ARM Linux wrote:
->> On Sun, Oct 13, 2013 at 01:56:48PM -0400, Tejun Heo wrote:
->>> Hello,
->>>
->>> On Sat, Oct 12, 2013 at 05:58:49PM -0400, Santosh Shilimkar wrote:
->>>> Introduce memblock early memory allocation APIs which allow to support
->>>> LPAE extension on 32 bits archs. More over, this is the next step
->>>
->>> LPAE isn't something people outside arm circle would understand.
->>> Let's stick to highmem.
->>
->> LPAE != highmem.  Two totally different things, unless you believe
->> system memory always starts at physical address zero, which is very
->> far from the case on the majority of ARM platforms.
->>
-thanks Russell for clarification.
-
->> So replacing LPAE with "highmem" is pure misrepresentation and is
->> inaccurate.  PAE might be a better term, and is also the x86 term
->> for this.
+On 14/10/13 14:39, Alexander Graf wrote:
 > 
-> Ah, right, forgot about the base address.  Let's please spell out the
-> requirements then.  Briefly explaining both aspects (non-zero base
-> addr & highmem) and why the existing bootmem based interfaced can't
-> serve them would be helpful to later readers.
+> On 14.10.2013, at 15:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > 
-OK. Will try to describe bit more in the next version.Cover letter had
-some of the information on the requirement which I will also
-mention in the patch commit in next version.
+>> On 14/10/13 14:10, Alexander Graf wrote:
+>>>
+>>> On 14.10.2013, at 15:03, Paolo Bonzini <pbonzini@redhat.com> wrote:
+>>>
+>>>> Il 11/10/2013 16:36, Marc Zyngier ha scritto:
+>>>>> This small patch series adds just enough kernel infrastructure and
+>>>>> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
+>>>>> that the host actually supports such madness.
+>>>>
+>>>> More precisely, it allows the guest drivers to pick the endianness they
+>>>> prefer.  Mixed-endian virtio works fine on QEMU with e.g. a mips guest
+>>>> in emulation mode, because then any given QEMU binary will always use
+>>>> the same endianness (e.g. big for qemu-system-mips).
+>>>
+>>> We have the same problem (runtime switchable endianness) on PowerPC. IBM POWER is gaining Little Endian support in Linux now, so we could easily end up with an LE guest on a BE host.
+>>>
+>>> IIRC the way we're going to solve this is to hack up virtio_is_big_endian() to evaluate the first CPU's endianness mode (which will always be the same as all other CPU's endianness mode due to hypercall restrictions).
+>>
+>> I have implemented something similar for MMIO emulation in KVM/arm
+>> (except that I only care about the faulting CPU).
+>>
+>> See my initial patch for that:
+>> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-October/007359.html
+>>
+>> That doesn't really change the non-trapping virtio accesses, though.
+>> Where is this virtio_is_big_endian() thing?
+> 
+> It's in QEMU's exec.c. It only gets used for config space access that goes through PCI though. Is there any other place where virtio specifies native endianness today?
 
-Regards,
-Santosh
+That's the main problem. Today's virtio flavour doesn't specify anything
+about endianness, and that is what I'm adding. Or rather (as Paolo put
+it), the prefered endianness of the virtio driver.
+
+So once (and if) this flags are in place, you always know what you're
+dealing with. And because it is virtio-centric, you can implement it in
+an architecture independent way.
+
+Also, most of my life revolves around kvmtool. QEMU is hardly on my
+radar, these days (for reasons that are neither technical, nor relevant
+to this forum). So it is important to me that the solution is platform
+emulation agnostic.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
