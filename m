@@ -1,27 +1,23 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 14 Oct 2013 18:50:48 +0200
-Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
-In-Reply-To: <525C0F99.8030909@arm.com>
-References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
- <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
- <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
- <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
- <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
- <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
- <525C09D1.8060103@arm.com> <525C0C21.2070001@redhat.com>
- <525C0F99.8030909@arm.com>
-Message-ID: <525C20E8.6080409@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Oct 2013 18:02:16 +0100
+Subject: [PATCH 0/3] ASoC: mxs-saif error handling
+In-Reply-To: <1381486264-1672-1-git-send-email-mpa@pengutronix.de>
+References: <1381486264-1672-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131014170216.GI2443@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 14/10/2013 17:36, Marc Zyngier ha scritto:
->> > 
->> > Devices are fine in QEMU, it's only the "generic" parts (rings) that are
->> > missing AFAICT.
-> So if I understand correctly how it works, target endianness is set at
-> compile time, and you have a BE specific QEMU?
+On Fri, Oct 11, 2013 at 12:11:01PM +0200, Markus Pargmann wrote:
+> Hi,
+> 
+> This series contains error handling patches for mxs-saif. The first patch is
+> a comment about the possible command sequence of trigger functions.
 
-Yes.  Though as Alex said, this will have to change for PPC
-little-endian support.
-
-Paolo
+Applied all, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131014/bc5d4e6b/attachment.sig>
