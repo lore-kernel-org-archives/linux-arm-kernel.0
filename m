@@ -1,68 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 14 Oct 2013 12:23:36 +0200
-Subject: [PATCH 01/11] usb: chipidea: Add power management support
-In-Reply-To: <20131014090420.GB26191@shlinux1.ap.freescale.net>
-References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
- <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
- <20131014100458.4f577d01@ipc1.ka-ro>
- <20131014075547.GA26191@shlinux1.ap.freescale.net>
- <20131014084216.GY30088@pengutronix.de>
- <20131014090420.GB26191@shlinux1.ap.freescale.net>
-Message-ID: <20131014102336.GD30088@pengutronix.de>
+From: csmanjuvijay@gmail.com (Majunath Goudar)
+Date: Mon, 14 Oct 2013 15:52:27 +0530
+Subject: [PATCH] ARM: CCI : Fix implicit declaration of function error
+Message-ID: <1381746147-13830-1-git-send-email-manju.goudar@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 05:04:21PM +0800, Peter Chen wrote:
-> On Mon, Oct 14, 2013 at 10:42:16AM +0200, Sascha Hauer wrote:
-> > On Mon, Oct 14, 2013 at 03:55:48PM +0800, Peter Chen wrote:
-> > > On Mon, Oct 14, 2013 at 10:04:58AM +0200, Lothar Wa?mann wrote:
-> > > > Hi,
-> > > > 
-> > > > Peter Chen wrote:
-> > > > > This commit adds runtime and system power management support for
-> > > > > chipidea core. The runtime pm support is controlled by glue
-> > > > > layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
-> > > > > 
-> > > > [...]
-> > > > > +#ifdef CONFIG_PM
-> > > > > +static int ci_controller_suspend(struct device *dev)
-> > > > > +{
-> > > > > +	struct ci_hdrc *ci = dev_get_drvdata(dev);
-> > > > > +
-> > > > > +	dev_dbg(dev, "at %s\n", __func__);
-> > > > > +
-> > > > > +	if (atomic_read(&ci->in_lpm))
-> > > > > +		return 0;
-> > > > > +
-> > > > What does this 'atomic_read()' buy you over just testing/assinging a
-> > > > simple integer. Note that just because the function has 'atomic' in
-> > > > its name the sequence:
-> > > > 	atomic_read();
-> > > > ...
-> > > > 	atomic_set();
-> > > > does not magically become an atomic operation.
-> > > 
-> > > I just want the read and set are atomic, not the operations
-> > > between atomic_read and atomic_set.
-> > 
-> > It makes no sense to use atomic operations here. atomic types are to
-> > atomically read/modify/write variables. If all you ever do is
-> > atomic_read and atomic_set then you can use a simple bool variable.
-> > 
-> 
-> It is for ARM, but for other platforms, it may not.
+This patch adds a inline dummy implementations of_find_matching_node()
+in "#ifdef CONFIG_OF" else part. Without this patch,build system can
+lead to issues. This was discovered during randconfig testing,in which
+ARM_CCI was enabled w/o CONFIG_OF being enabled,leading to the following error:
 
-It is for other platforms aswell. Otherwise the kernel would break into
-pieces.
+CC      drivers/bus/arm-cci.o
+drivers/bus/arm-cci.c: In function ?cci_probe?:
+drivers/bus/arm-cci.c:971:2: error: implicit declaration of function
+?of_find_matching_node? [-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
+make[2]: *** [drivers/bus/arm-cci.o] Error 1
+make[1]: *** [drivers/bus] Error 2
+make: *** [drivers] Error 2
 
-You only need atomic ops when you want to atomically read/modify/write a
-variable.
+Signed-off-by: Manjunath Goudar <manju.goudar@lge.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+---
+ include/linux/of.h |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Sascha
-
-
+diff --git a/include/linux/of.h b/include/linux/of.h
+index f95aee3..2c57aa2 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -340,6 +340,13 @@ int of_device_is_stdout_path(struct device_node *dn);
+ 
+ #else /* CONFIG_OF */
+ 
++static inline struct device_node *of_find_matching_node(
++	struct device_node *from,
++	const struct of_device_id *matches)
++{
++	return NULL;
++}
++
+ static inline const char* of_node_full_name(struct device_node *np)
+ {
+ 	return "<no-node>";
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
