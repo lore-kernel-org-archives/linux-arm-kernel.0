@@ -1,35 +1,63 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 14 Oct 2013 21:27:59 +0800
-Subject: [PATCH 5/5] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
-In-Reply-To: <1381739511.4093.124.camel@weser.hi.pengutronix.de>
-References: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
- <1381739024-24924-6-git-send-email-shawn.guo@linaro.org>
- <1381739511.4093.124.camel@weser.hi.pengutronix.de>
-Message-ID: <20131014132757.GF27668@S2101-09.ap.freescale.net>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 14 Oct 2013 15:29:01 +0200
+Subject: [PATCH 2/3] usb: musb: Bugfix of_node assignment
+In-Reply-To: <1381757342-13324-1-git-send-email-mpa@pengutronix.de>
+References: <1381757342-13324-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1381757342-13324-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 10:31:51AM +0200, Lucas Stach wrote:
-> > +#define IMX25_ESDHC	(ESDHC_FLAG_NO_DMAS_BITS | ESDHC_FLAG_ENGCM07207)
-> > +#define IMX35_ESDHC	(ESDHC_FLAG_ENGCM07207)
-> > +#define IMX51_ESDHC	(0)
-> > +#define IMX53_ESDHC	(ESDHC_FLAG_MULTIBLK_NO_INT)
-> > +#define IMX6Q_USDHC	(ESDHC_FLAG_USDHC)
-> >  
-> This looks really nasty to me, especially with the needed void pointer
-> cast you added in the previous patch.
+It is not safe to assign the of_node to a device without driver. The
+device is matched against a list of drivers and the of_node could lead
+to a DT match with the parent driver.
 
-Yes, it does, when you look at from of_device_id.data.  But keep it in
-mind, that platform_device_id.driver data is type kernel_ulong_t not
-void *.  So while we add a structure with the flags field in it to save
-the cast on of_device_id.data, we will have to add a cast for
-platform_device_id.driver.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/usb/musb/musb_core.c | 12 +++++++++++-
+ drivers/usb/musb/musb_dsps.c |  1 -
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-> Can you please introduce a proper driver data struct, with the flags
-> field in it? This will make this thing a lot cleaner, more future proof
-> and shouldn't add any overhead in the generated code.
-
-But I agree with you that using a data structure is more future proof,
-so will do in v2.
-
-Shawn
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index baa4f6a..a26eccd 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -1962,6 +1962,7 @@ static int musb_probe(struct platform_device *pdev)
+ 	int		irq = platform_get_irq_byname(pdev, "mc");
+ 	struct resource	*iomem;
+ 	void __iomem	*base;
++	int ret;
+ 
+ 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!iomem || irq <= 0)
+@@ -1971,7 +1972,16 @@ static int musb_probe(struct platform_device *pdev)
+ 	if (IS_ERR(base))
+ 		return PTR_ERR(base);
+ 
+-	return musb_init_controller(dev, irq, base);
++	if (dev->parent)
++		dev->of_node = dev->parent->of_node;
++
++	ret = musb_init_controller(dev, irq, base);
++	if (ret) {
++		dev->of_node = NULL;
++		return ret;
++	}
++
++	return 0;
+ }
+ 
+ static int musb_remove(struct platform_device *pdev)
+diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+index bd4138d..189e52c 100644
+--- a/drivers/usb/musb/musb_dsps.c
++++ b/drivers/usb/musb/musb_dsps.c
+@@ -483,7 +483,6 @@ static int dsps_create_musb_pdev(struct dsps_glue *glue,
+ 	musb->dev.parent		= dev;
+ 	musb->dev.dma_mask		= &musb_dmamask;
+ 	musb->dev.coherent_dma_mask	= musb_dmamask;
+-	musb->dev.of_node		= of_node_get(dn);
+ 
+ 	glue->musb = musb;
+ 
+-- 
+1.8.4.rc3
