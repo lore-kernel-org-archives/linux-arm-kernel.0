@@ -1,86 +1,48 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Oct 2013 12:03:05 +0100
-Subject: [PATCH v2 08/13] arm64: kernel: implement debug monitors CPU PM
- notifiers
+Date: Mon, 14 Oct 2013 12:03:09 +0100
+Subject: [PATCH v2 12/13] arm64: kernel: add CPU idle call
 In-Reply-To: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1381748590-14279-9-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1381748590-14279-13-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is shutdown either through CPU idle or suspend to RAM, the
-content of debug monitor registers must be reset or restored to proper
-values when CPU resume from low power states. This patch implements a
-CPU PM notifier that allows to restore the content of debug monitor
-registers to allow proper suspend/resume operations.
+When CPU idle is enabled, the architectural idle call should go through
+the idle subsystem to allow CPUs to enter idle states defined
+by the platform CPU idle back-end operations.
+
+This patch, mirroring other archs behaviour, adds the CPU idle call to the
+architectural arch_cpu_idle implementation for arm64.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/kernel/debug-monitors.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm64/kernel/process.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cbfacf7..28ce685 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -19,6 +19,7 @@
-  */
- 
- #include <linux/cpu.h>
-+#include <linux/cpu_pm.h>
- #include <linux/debugfs.h>
- #include <linux/hardirq.h>
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index de17c89..50491ec 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -33,6 +33,7 @@
+ #include <linux/kallsyms.h>
  #include <linux/init.h>
-@@ -154,6 +155,42 @@ static struct notifier_block os_lock_nb = {
- 	.notifier_call = os_lock_notify,
- };
- 
-+#ifdef CONFIG_CPU_PM
-+static DEFINE_PER_CPU(u32, mdscr);
-+
-+static int dm_cpu_pm_notify(struct notifier_block *self, unsigned long action,
-+			    void *v)
-+{
-+	switch (action) {
-+	case CPU_PM_ENTER:
-+		__get_cpu_var(mdscr) = mdscr_read();
-+		break;
-+	case CPU_PM_EXIT:
-+		clear_os_lock(NULL);
-+		mdscr_write(__get_cpu_var(mdscr));
-+		break;
-+	case CPU_PM_ENTER_FAILED:
-+	default:
-+		return NOTIFY_DONE;
+ #include <linux/cpu.h>
++#include <linux/cpuidle.h>
+ #include <linux/elfcore.h>
+ #include <linux/pm.h>
+ #include <linux/tick.h>
+@@ -98,8 +99,10 @@ void arch_cpu_idle(void)
+ 	 * This should do all the clock switching and wait for interrupt
+ 	 * tricks
+ 	 */
+-	cpu_do_idle();
+-	local_irq_enable();
++	if (cpuidle_idle_call()) {
++		cpu_do_idle();
++		local_irq_enable();
 +	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block dm_cpu_pm_nb = {
-+	.notifier_call = dm_cpu_pm_notify,
-+};
-+
-+static void __init debug_monitors_pm_init(void)
-+{
-+	cpu_pm_register_notifier(&dm_cpu_pm_nb);
-+}
-+#else
-+static inline void debug_monitors_pm_init(void)
-+{
-+}
-+#endif
-+
- static int debug_monitors_init(void)
- {
- 	/* Clear the OS lock. */
-@@ -162,6 +199,7 @@ static int debug_monitors_init(void)
- 
- 	/* Register hotplug handler. */
- 	register_cpu_notifier(&os_lock_nb);
-+	debug_monitors_pm_init();
- 	return 0;
  }
- postcore_initcall(debug_monitors_init);
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
 -- 
 1.8.4
