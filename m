@@ -1,51 +1,25 @@
-From: a.motakis@virtualopensystems.com (Antonios Motakis)
-Date: Mon, 14 Oct 2013 17:17:51 +0200
-Subject: [PATCH 2/2] ARM: SMMU: return NULL on error in
- arm_smmu_iova_to_phys
-In-Reply-To: <20131014124837.GD10491@mudshark.cambridge.arm.com>
-References: <1381497887-14586-1-git-send-email-a.motakis@virtualopensystems.com>
- <1381497887-14586-2-git-send-email-a.motakis@virtualopensystems.com>
- <20131014124837.GD10491@mudshark.cambridge.arm.com>
-Message-ID: <CAG8rG2yE=xWmYP_bOy7=jzWEQKNkbgk-9_Jecnx_XXx=jC9i_Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Oct 2013 16:19:38 +0100
+Subject: [PATCH v2 0/7] Optimize jump label implementation on ARM64
+In-Reply-To: <1381675827-1610-1-git-send-email-liuj97@gmail.com>
+References: <1381675827-1610-1-git-send-email-liuj97@gmail.com>
+Message-ID: <20131014151938.GJ10491@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 2:48 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Oct 11, 2013 at 02:24:47PM +0100, Antonios Motakis wrote:
->> The return value of arm_smmu_iova_to_phys is directly passed to the
->> user of the IOMMU API via iommu_iova_to_phys; however the ARM SMMU
->> driver returns -EINVAL on error, which is not consistent with the
->> rest of the drivers implementing the IOMMU API. VFIO also relies on
->> the call returning NULL when a page has not been mapped already.
->>
->> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
->> ---
->>  drivers/iommu/arm-smmu.c | 5 +----
->>  1 file changed, 1 insertion(+), 4 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index 8b71332..fe81b20 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1480,10 +1480,7 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
->>
->>  err_unlock:
->>       spin_unlock(&smmu_domain->lock);
->> -     dev_warn(smmu->dev,
->> -              "invalid (corrupt?) page tables detected for iova 0x%llx\n",
->> -              (unsigned long long)iova);
->> -     return -EINVAL;
->> +     return NULL;
->
-> Why are you removing the warning message?
+On Sun, Oct 13, 2013 at 03:50:20PM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
+> 
+> This patchset tries to optimize arch specfic jump label implementation
+> for ARM64 by dynamic kernel text patching.
+> 
+> To enable this feature, your toolchain must support "asm goto" extension
+> and "%c" constraint extesion. Current GCC for AARCH64 doesn't support
+> "%c", so you need a GCC patch similiar to this:
+> http://gcc.gnu.org/viewcvs/gcc/trunk/gcc/config/arm/arm.c?view=patch&r1=175293&r2=175565&pathrev=175565
+> http://gcc.gnu.org/bugzilla/show_bug.cgi?id=48637
 
-VFIO will exercise this code path every time when mapping DMA memory.
-This is normal and VFIO *expects* the function to fail - it is only if
-the function succeeds that VFIO needs to back down from the DMA
-mapping and fail.
+Right, but this is just for the ARM (AArch32) backend afaict. Are there any
+plans for upstream GCC to support this constraint for AArch64?
 
-This means that there would be a warning every time a VFIO user maps
-some memory for DMA use, even though nothing went wrong.
-
->
-> Will
+Will
