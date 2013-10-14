@@ -1,61 +1,63 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 14 Oct 2013 09:36:52 +0800
-Subject: [PATCH 05/12] usb: phy-mxs: Add implementation of
- nofity_suspend and notify_resume
-In-Reply-To: <201310121142.07174.marex@denx.de>
+Date: Mon, 14 Oct 2013 09:41:23 +0800
+Subject: [PATCH 07/12] usb: phy-mxs: Add implementation of set_wakeup
+In-Reply-To: <201310121144.59501.marex@denx.de>
 References: <1381568986-19802-1-git-send-email-peter.chen@freescale.com>
- <1381568986-19802-6-git-send-email-peter.chen@freescale.com>
- <201310121142.07174.marex@denx.de>
-Message-ID: <20131014013651.GD3879@shlinux1.ap.freescale.net>
+ <1381568986-19802-8-git-send-email-peter.chen@freescale.com>
+ <201310121144.59501.marex@denx.de>
+Message-ID: <20131014014122.GE3879@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 12, 2013 at 11:42:06AM +0200, Marek Vasut wrote:
-> Dear Peter Chen,
+On Sat, Oct 12, 2013 at 11:44:59AM +0200, Marek Vasut wrote:
 > 
-> > Add notify_suspend and notify_resume according to different SoCs.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/phy/phy-mxs-usb.c |   73
-> > +++++++++++++++++++++++++++++++++++++++++ 1 files changed, 73
-> > insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> > index e0b0de0..8661dae 100644
-> > --- a/drivers/usb/phy/phy-mxs-usb.c
-> > +++ b/drivers/usb/phy/phy-mxs-usb.c
-> > @@ -197,6 +197,78 @@ static int mxs_phy_on_disconnect(struct usb_phy *phy,
-> >  	return 0;
-> >  }
-> > 
-> > +static int mxs_phy_on_suspend_workaround(struct usb_phy *phy,
-> > +		enum usb_device_speed speed)
+> > +static int mxs_phy_set_wakeup(struct usb_phy *x, bool enabled)
 > > +{
-> > +	dev_dbg(phy->dev, "%s speed device has suspended\n",
-> > +		(speed == USB_SPEED_HIGH) ? "high" : "non-high");
+> > +	struct mxs_phy *mxs_phy = to_mxs_phy(x);
+> > +	u32 value = BM_USBPHY_CTRL_ENVBUSCHG_WKUP |
+> > +			BM_USBPHY_CTRL_ENDPDMCHG_WKUP |
+> > +				BM_USBPHY_CTRL_ENIDCHG_WKUP;
 > 
-> HS : FS/LS you mean?
+> Does this stuff pass checkpatch at all? I mean, this alignment seems a bit 
+> strange.
 
-Yes, it is what I mean.
-OK, I will change to HS and FS/LS.
+Yes, it passed.
+
+	u32 value = BM_USBPHY_CTRL_ENVBUSCHG_WKUP |
+			BM_USBPHY_CTRL_ENDPDMCHG_WKUP | /* two tabs for last line */
+				BM_USBPHY_CTRL_ENIDCHG_WKUP; /* one tab for last line */
+
+Any better suggestions?
 
 > 
-> > +/*
-> > + * For mxs PHY, there are two PHY issues related to suspend/resume.
-> > + * For mx23 and mx28, both of two issues are existed.
-> > + * For mx6q and mx6dl, only one issue is existed.
-> > + * For mx6 sololite, none issue is existed.
-> > + */
-> > +static void mxs_phy_workaround(struct mxs_phy *mxs_phy)
-> > +{
-> > +	if (is_mx23_phy(mxs_phy)) {
+> > +	if (enabled) {
+> > +		mxs_phy_disconnect_line(mxs_phy, true);
+> > +		writel_relaxed(value, x->io_priv + HW_USBPHY_CTRL_SET);
+> > +	} else {
+> > +		writel_relaxed(value, x->io_priv + HW_USBPHY_CTRL_CLR);
+> > +		mxs_phy_disconnect_line(mxs_phy, false);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  static int mxs_phy_on_connect(struct usb_phy *phy,
+> >  		enum usb_device_speed speed)
+> >  {
+> > @@ -315,6 +390,10 @@ static int mxs_phy_probe(struct platform_device *pdev)
+> >  		}
+> >  	}
+> > 
+> > +	if (of_find_property(np, "disconnect_line_without_vbus", NULL) &&
+> > +			mxs_phy->regmap_anatop)
 > 
-> This is_mx23_phy() returns 1 for mx28 too? It's not too clear, not even from the 
-> comment above, a short comment here would help for sure.
+> You might want to introduce a variable here to make the condition shorter:
+> 
+> var = of_find....
+> if (var && mxs_phy->...)
 
-mx23 and mx28 PHY are the same PHY, so the fixes are the same.
-Anything I need to add?
+I will change.
+
 
 -- 
 
