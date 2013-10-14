@@ -1,85 +1,85 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Oct 2013 16:44:15 +0200
-Subject: [PATCH v3 08/14] ARM: mvebu: Allow to power down L2 cache
- controller in idle mode
-In-Reply-To: <1381759106-15004-9-git-send-email-gregory.clement@free-electrons.com>
-References: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
- <1381759106-15004-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20131014164415.59e250fb@skate>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Oct 2013 15:52:04 +0100
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <525BEBB4.4050603@redhat.com> <FAC2ABD2-F4AE-49D5-A787-F28391D910D7@suse.de>
+ <525BF089.9050408@arm.com> <2CDDB541-0E92-4452-831E-0B29B24A7C89@suse.de>
+ <525BF656.7020207@arm.com> <20131014140527.GB5106@redhat.com>
+ <525BFBF9.5010804@arm.com> <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+Message-ID: <525C0514.5030103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
-
-On Mon, 14 Oct 2013 15:58:20 +0200, Gregory CLEMENT wrote:
-> This commit adds an exported function which allows to power down the
-> L2 cache controller and the Coherency Fabric when the CPU goes into
-> deep idle mode.
-
-This comment is slightly misleading I believe: it explains that this
-function should be called every time you want to power down the L2
-cache and the coherency fabric. However, looking at the cpuidle driver
-code, it seems that this function only ever gets called in the
-->probe() function, and what it really does is that it adjusts the PMSU
-configuration to automatically power down the L2 and coherency fabric
-when we enter a certain idle state.
-
-> This feature is part of the Power Management Service Unit of the
-> Armada 370 and Armada XP SoCs.
+On 14/10/13 15:16, Alexander Graf wrote:
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/pmsu.c         | 14 ++++++++++++++
->  include/linux/armada-370-xp-pmsu.h | 16 ++++++++++++++++
->  2 files changed, 30 insertions(+)
->  create mode 100644 include/linux/armada-370-xp-pmsu.h
+> On 14.10.2013, at 16:13, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > 
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index f6b00fb..445c9a0 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -30,6 +30,9 @@ static void __iomem *pmsu_fabric_base;
->  #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
->  #define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
->  
-> +#define L2C_NFABRIC_PM_CTL		    0x4
-> +#define L2C_NFABRIC_PM_CTL_PWR_DOWN	    BIT(20)
-> +
->  static struct of_device_id of_pmsu_table[] = {
->  	{.compatible = "marvell,armada-370-xp-pmsu"},
->  	{ /* end of list */ },
-> @@ -78,4 +81,15 @@ int __init armada_370_xp_pmsu_init(void)
->  	return 0;
->  }
->  
-> +void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
-> +{
-> +	int reg;
+>> On 14/10/13 15:05, Michael S. Tsirkin wrote:
+>>> On Mon, Oct 14, 2013 at 02:49:10PM +0100, Marc Zyngier wrote:
+>>>> On 14/10/13 14:39, Alexander Graf wrote:
+>>>>>
+>>>>> On 14.10.2013, at 15:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>>
+>>>>>> On 14/10/13 14:10, Alexander Graf wrote:
+>>>>>>>
+>>>>>>> On 14.10.2013, at 15:03, Paolo Bonzini <pbonzini@redhat.com> wrote:
+>>>>>>>
+>>>>>>>> Il 11/10/2013 16:36, Marc Zyngier ha scritto:
+>>>>>>>>> This small patch series adds just enough kernel infrastructure and
+>>>>>>>>> fixes to allow a BE guest to use virtio-mmio on a LE host, provided
+>>>>>>>>> that the host actually supports such madness.
+>>>>>>>>
+>>>>>>>> More precisely, it allows the guest drivers to pick the endianness they
+>>>>>>>> prefer.  Mixed-endian virtio works fine on QEMU with e.g. a mips guest
+>>>>>>>> in emulation mode, because then any given QEMU binary will always use
+>>>>>>>> the same endianness (e.g. big for qemu-system-mips).
+>>>>>>>
+>>>>>>> We have the same problem (runtime switchable endianness) on PowerPC. IBM POWER is gaining Little Endian support in Linux now, so we could easily end up with an LE guest on a BE host.
+>>>>>>>
+>>>>>>> IIRC the way we're going to solve this is to hack up virtio_is_big_endian() to evaluate the first CPU's endianness mode (which will always be the same as all other CPU's endianness mode due to hypercall restrictions).
+>>>>>>
+>>>>>> I have implemented something similar for MMIO emulation in KVM/arm
+>>>>>> (except that I only care about the faulting CPU).
+>>>>>>
+>>>>>> See my initial patch for that:
+>>>>>> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-October/007359.html
+>>>>>>
+>>>>>> That doesn't really change the non-trapping virtio accesses, though.
+>>>>>> Where is this virtio_is_big_endian() thing?
+>>>>>
+>>>>> It's in QEMU's exec.c. It only gets used for config space access that goes through PCI though. Is there any other place where virtio specifies native endianness today?
+>>>>
+>>>> That's the main problem. Today's virtio flavour doesn't specify anything
+>>>> about endianness, and that is what I'm adding. Or rather (as Paolo put
+>>>> it), the prefered endianness of the virtio driver.
+>>>>
+>>>> So once (and if) this flags are in place, you always know what you're
+>>>> dealing with. And because it is virtio-centric, you can implement it in
+>>>> an architecture independent way.
+>>>>
+>>>> Also, most of my life revolves around kvmtool. QEMU is hardly on my
+>>>> radar, these days (for reasons that are neither technical, nor relevant
+>>>> to this forum). So it is important to me that the solution is platform
+>>>> emulation agnostic.
+>>>>
+>>>> 	M.
+>>>
+>>> f you like, you should be able to implement virtio_is_big_endian
+>>> in kvmtool too.
+>>
+>> Sure. And I imagine this traps back into the kernel to read some
+>> register and find out what the endianness of the accessing CPU is?
+> 
+> Not yet. To be exact, it does the below today. But all virtio device
+> emulation is 100% guest endianness unaware. This helper is the only
+> piece of code where it gets any idea what endianness the guest has. So
+> by checking for references to it in the code you know where endianness
+> is an issue. And that's only in the config space.
 
-u32 ?
+Only config space? How do you deal with virtio ring descriptors, for
+example?
 
-> +
-> +	/* Enable L2 & Fabric powerdown in Deep-Idle mode - Fabric */
-> +	reg = readl(pmsu_fabric_base + L2C_NFABRIC_PM_CTL);
-> +	reg |= L2C_NFABRIC_PM_CTL_PWR_DOWN;
-> +	writel(reg, pmsu_fabric_base + L2C_NFABRIC_PM_CTL);
-> +}
-> +EXPORT_SYMBOL_GPL(armada_370_xp_pmsu_enable_l2_powerdown_onidle);
-
-We don't need to have thiS EXPORT_SYMBOL_GPL. The cpuidle driver has a
-'bool' Kconfig option, so it will also be built into the kernel and
-never be built as a module.
-
-I am also wondering if it is really useful to expose this function. If
-it's just called at initialization, why not do it in the mach-mvebu
-code directly, before registering the cpuidle driver? (I'm not sure
-about this one, just proposing, it makes one less SoC-specific function
-exposed to the world).
-
-Best regards,
-
-Thomas
+	M.
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
