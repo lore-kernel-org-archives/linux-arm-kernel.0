@@ -1,50 +1,142 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Oct 2013 13:48:16 +0100
-Subject: [PATCH 1/2] ARM: SMMU: add devices attached to the SMMU to an
- IOMMU group
-In-Reply-To: <1381497887-14586-1-git-send-email-a.motakis@virtualopensystems.com>
-References: <1381497887-14586-1-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <20131014124815.GC10491@mudshark.cambridge.arm.com>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Mon, 14 Oct 2013 14:46:50 +0200
+Subject: [PATCH v5 2/4] ARM: STi: Supply I2C configuration to STiH416 SoC
+In-Reply-To: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
+References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1381754813-4679-3-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antonios,
+This patch supplies I2C configuration to STiH416 SoC.
 
-On Fri, Oct 11, 2013 at 02:24:46PM +0100, Antonios Motakis wrote:
-> IOMMU groups are expected by certain users of the IOMMU API,
-> e.g. VFIO. Add new devices found by the SMMU driver to an IOMMU
-> group to satisfy those users.
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+---
+ arch/arm/boot/dts/stih416-pinctrl.dtsi |   35 +++++++++++++++++++++
+ arch/arm/boot/dts/stih416.dtsi         |   53 ++++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+)
 
-Cheers for looking at this: VFIO has been on my TODO list for some time.
-
-> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-> ---
->  drivers/iommu/arm-smmu.c | 18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 0f45a48..8b71332 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1502,6 +1502,8 @@ static int arm_smmu_add_device(struct device *dev)
->  {
->  	struct arm_smmu_device *child, *parent, *smmu;
->  	struct arm_smmu_master *master = NULL;
-> +	struct iommu_group *group;
-> +	int ret;
->  
->  	spin_lock(&arm_smmu_devices_lock);
->  	list_for_each_entry(parent, &arm_smmu_devices, list) {
-> @@ -1534,13 +1536,27 @@ static int arm_smmu_add_device(struct device *dev)
->  	if (!master)
->  		return -ENODEV;
->  
-> +	group = iommu_group_get(dev);
-
-I'm not especially familiar with IOMMU groups (I understand them as the
-minimum translation granularity, which would mean single StreamID for the
-ARM SMMU), but under what circumstances would you expect to receive a
-non-NULL group here? I can't see any other code adding devices to groups
-(outside of other drivers)...
-
-Will
+diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+index 0f246c9..b29ff4b 100644
+--- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+@@ -97,6 +97,24 @@
+ 					};
+ 				};
+ 			};
++
++			sbc_i2c0 {
++				pinctrl_sbc_i2c0_default: sbc_i2c0-default {
++					st,pins {
++						sda = <&PIO4 6 ALT1 BIDIR>;
++						scl = <&PIO4 5 ALT1 BIDIR>;
++					};
++				};
++			};
++
++			sbc_i2c1 {
++				pinctrl_sbc_i2c1_default: sbc_i2c1-default {
++					st,pins {
++						sda = <&PIO3 2 ALT2 BIDIR>;
++						scl = <&PIO3 1 ALT2 BIDIR>;
++					};
++				};
++			};
+ 		};
+ 
+ 		pin-controller-front {
+@@ -175,6 +193,23 @@
+ 				};
+ 			};
+ 
++			i2c0 {
++				pinctrl_i2c0_default: i2c0-default {
++					st,pins {
++						sda = <&PIO9 3 ALT1 BIDIR>;
++						scl = <&PIO9 2 ALT1 BIDIR>;
++					};
++				};
++			};
++
++			i2c1 {
++				pinctrl_i2c1_default: i2c1-default {
++					st,pins {
++						sda = <&PIO12 1 ALT1 BIDIR>;
++						scl = <&PIO12 0 ALT1 BIDIR>;
++					};
++				};
++			};
+ 		};
+ 
+ 		pin-controller-rear {
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 1a0326e..04afd1e 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -9,6 +9,7 @@
+ #include "stih41x.dtsi"
+ #include "stih416-clock.dtsi"
+ #include "stih416-pinctrl.dtsi"
++#include <dt-bindings/interrupt-controller/arm-gic.h>
+ / {
+ 	L2: cache-controller {
+ 		compatible = "arm,pl310-cache";
+@@ -92,5 +93,57 @@
+ 			pinctrl-0 	= <&pinctrl_sbc_serial1>;
+ 			clocks          = <&CLK_SYSIN>;
+ 		};
++
++		i2c at fed40000 {
++			compatible	= "st,comms-ssc-i2c";
++			reg		= <0xfed40000 0x110>;
++			interrupts	=  <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
++			clocks		= <&CLK_S_ICN_REG_0>;
++			clock-names	= "ssc";
++			clock-frequency = <400000>;
++			pinctrl-names	= "default";
++			pinctrl-0	= <&pinctrl_i2c0_default>;
++
++			status		= "disabled";
++		};
++
++		i2c at fed41000 {
++			compatible	= "st,comms-ssc-i2c";
++			reg		= <0xfed41000 0x110>;
++			interrupts	=  <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
++			clocks		= <&CLK_S_ICN_REG_0>;
++			clock-names	= "ssc";
++			clock-frequency = <400000>;
++			pinctrl-names	= "default";
++			pinctrl-0	= <&pinctrl_i2c1_default>;
++
++			status		= "disabled";
++		};
++
++		i2c at fe540000 {
++			compatible	= "st,comms-ssc-i2c";
++			reg		= <0xfe540000 0x110>;
++			interrupts	=  <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>;
++			clocks		= <&CLK_SYSIN>;
++			clock-names	= "ssc";
++			clock-frequency = <400000>;
++			pinctrl-names	= "default";
++			pinctrl-0	= <&pinctrl_sbc_i2c0_default>;
++
++			status		= "disabled";
++		};
++
++		i2c at fe541000 {
++			compatible	= "st,comms-ssc-i2c";
++			reg		= <0xfe541000 0x110>;
++			interrupts	=  <GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH>;
++			clocks		= <&CLK_SYSIN>;
++			clock-names	= "ssc";
++			clock-frequency = <400000>;
++			pinctrl-names	= "default";
++			pinctrl-0	= <&pinctrl_sbc_i2c1_default>;
++
++			status		= "disabled";
++		};
+ 	};
+ };
+-- 
+1.7.9.5
