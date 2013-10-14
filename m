@@ -1,178 +1,72 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Mon, 14 Oct 2013 12:16:29 +0530
-Subject: [PATCH] arm64: perf: add support for percpu pmu interrupt
-Message-ID: <1381733189-2745-1-git-send-email-vkale@apm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 14 Oct 2013 09:34:37 +0200
+Subject: [GIT PULL] fixes for integer rounding in timer core
+In-Reply-To: <20131008153147.GR10079@pengutronix.de>
+References: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
+ <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5253D9A1.1080106@pengutronix.de>
+ <20131008153147.GR10079@pengutronix.de>
+Message-ID: <20131014073436.GX10079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for irq registration when pmu interrupt type is PPI.
-The patch also fixes ARMV8_EVTYPE_* macros since evtCount field width is
-10bits.
+Hello Linus, hello Ingo,
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
----
- arch/arm64/kernel/perf_event.c |  108 +++++++++++++++++++++++++++++-----------
- 1 file changed, 78 insertions(+), 30 deletions(-)
+On Tue, Oct 08, 2013 at 05:31:47PM +0200, Uwe Kleine-K?nig wrote:
+> > What's the status of this patch?
+> I pinged Thomas about it already via irc, but I didn't get a response up
+> to now. It would be great to get that into 3.12. To make it easy for
+> Thomas, here is a pull request that includes the fix and converts
+> at91rm9200 back to clockevents_config_and_register dropping one of the
+> workarounds for the fixed bug.
+> 
+> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+> 
+>   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/ukl/linux.git tags/timer-for-tip
+> 
+> for you to fetch changes up to b58c4b70121070f45eefa739ecbb58d57da1c4d9:
+> 
+>   ARM: at91: rm9200: switch back to clockevents_config_and_register (2013-10-08 16:58:22 +0200)
+> 
+> ----------------------------------------------------------------
+> The first patch in this pull request fixes an old integer rounding bug in the
+> timer core that was (and still is) worked around in a few arch's timer code.
+> The second patch drops such a work around now that the core is fixed.
+It would be nice to get that fix into 3.12, but Thomas stopped
+responding nearly a month ago---his last mail in this thread[1] dates back
+to September 20.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index cea1594..ba3706d 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -363,22 +363,53 @@ validate_group(struct perf_event *event)
- }
+Can one of you please take it directly?
+
+Thanks
+Uwe
  
- static void
-+armpmu_disable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = (struct arm_pmu *)data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
-+	disable_percpu_irq(irq);
-+}
-+
-+static void
- armpmu_release_hardware(struct arm_pmu *armpmu)
- {
- 	int i, irq, irqs;
- 	struct platform_device *pmu_device = armpmu->plat_device;
- 
--	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+	irq = platform_get_irq(pmu_device, 0);
- 
--	for (i = 0; i < irqs; ++i) {
--		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
--			continue;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
--			free_irq(irq, armpmu);
-+	if (irq >= 16 && irq <= 31) {
-+		on_each_cpu(armpmu_disable_percpu_irq, (void *)armpmu, 1);
-+
-+		free_percpu_irq(irq, armpmu);
-+	} else {
-+		irqs = min(pmu_device->num_resources, num_possible_cpus());
-+
-+		for (i = 0; i < irqs; ++i) {
-+			if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
-+				continue;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq >= 0)
-+				free_irq(irq, armpmu);
-+		}
- 	}
- }
- 
-+static void
-+armpmu_enable_percpu_irq(void *data)
-+{
-+	struct arm_pmu *armpmu = (struct arm_pmu *)data;
-+	struct platform_device *pmu_device = armpmu->plat_device;
-+	int irq = platform_get_irq(pmu_device, 0);
-+
-+	enable_percpu_irq(irq, 0);
-+
-+	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
-+}
-+
- static int
- armpmu_reserve_hardware(struct arm_pmu *armpmu)
- {
-@@ -396,36 +427,53 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
- 		return -ENODEV;
- 	}
- 
--	for (i = 0; i < irqs; ++i) {
--		err = 0;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq < 0)
--			continue;
-+	irq = platform_get_irq(pmu_device, 0);
- 
-+	if (irq >= 16 && irq <= 31) {
- 		/*
--		 * If we have a single PMU interrupt that we can't shift,
--		 * assume that we're running on a uniprocessor machine and
--		 * continue. Otherwise, continue without this interrupt.
-+		 * percpu PMU interrupt.
- 		 */
--		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
--			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
--				    irq, i);
--			continue;
--		}
--
--		err = request_irq(irq, armpmu->handle_irq,
--				  IRQF_NOBALANCING,
--				  "arm-pmu", armpmu);
-+		err = request_percpu_irq(irq, armpmu->handle_irq,
-+						"arm-pmu", armpmu);
- 		if (err) {
- 			pr_err("unable to request IRQ%d for ARM PMU counters\n",
--				irq);
-+					irq);
- 			armpmu_release_hardware(armpmu);
- 			return err;
- 		}
- 
--		cpumask_set_cpu(i, &armpmu->active_irqs);
-+		on_each_cpu(armpmu_enable_percpu_irq, (void *)armpmu, 1);
-+	} else {
-+		for (i = 0; i < irqs; ++i) {
-+			err = 0;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq < 0)
-+				continue;
-+
-+			/*
-+			 * If we have a single PMU interrupt that we can't shift,
-+			 * assume that we're running on a uniprocessor machine and
-+			 * continue. Otherwise, continue without this interrupt.
-+			 */
-+			if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-+				pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+						irq, i);
-+				continue;
-+			}
-+
-+			err = request_irq(irq, armpmu->handle_irq,
-+					IRQF_NOBALANCING,
-+					"arm-pmu", armpmu);
-+			if (err) {
-+				pr_err("unable to request IRQ%d for ARM PMU counters\n",
-+						irq);
-+				armpmu_release_hardware(armpmu);
-+				return err;
-+			}
-+
-+			cpumask_set_cpu(i, &armpmu->active_irqs);
-+		}
- 	}
--
- 	return 0;
- }
- 
-@@ -784,8 +832,8 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- /*
-  * PMXEVTYPER: Event selection reg
-  */
--#define	ARMV8_EVTYPE_MASK	0xc80000ff	/* Mask for writable bits */
--#define	ARMV8_EVTYPE_EVENT	0xff		/* Mask for EVENT bits */
-+#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
-+#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
- 
- /*
-  * Event filters for PMUv3
-@@ -1175,7 +1223,7 @@ static void armv8pmu_reset(void *info)
- static int armv8_pmuv3_map_event(struct perf_event *event)
- {
- 	return map_cpu_event(event, &armv8_pmuv3_perf_map,
--				&armv8_pmuv3_perf_cache_map, 0xFF);
-+				&armv8_pmuv3_perf_cache_map, 0x3FF);
- }
- 
- static struct arm_pmu armv8pmu = {
+[1] http://thread.gmane.org/gmane.linux.kernel/1563370/
+> ----------------------------------------------------------------
+> Thomas Gleixner (1):
+>       clockevents: Sanitize ticks to nsec conversion
+> 
+> Uwe Kleine-K?nig (1):
+>       ARM: at91: rm9200: switch back to clockevents_config_and_register
+> 
+>  arch/arm/mach-at91/at91rm9200_time.c |  7 ++--
+>  kernel/time/clockevents.c            | 65 +++++++++++++++++++++++++++---------
+>  2 files changed, 52 insertions(+), 20 deletions(-)
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
