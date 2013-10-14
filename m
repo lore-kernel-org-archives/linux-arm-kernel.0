@@ -1,126 +1,65 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 14 Oct 2013 17:50:39 -0500
-Subject: [PATCH v2 3/3] usb: musb: dsps, debugfs files
-In-Reply-To: <1381758639-30300-4-git-send-email-mpa@pengutronix.de>
-References: <1381758639-30300-1-git-send-email-mpa@pengutronix.de>
- <1381758639-30300-4-git-send-email-mpa@pengutronix.de>
-Message-ID: <20131014225039.GC7446@radagast>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Oct 2013 23:50:29 +0100
+Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
+In-Reply-To: <20131014174030.GU25034@n2100.arm.linux.org.uk>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
+ <20131014174030.GU25034@n2100.arm.linux.org.uk>
+Message-ID: <20131014225029.GV25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Oct 14, 2013 at 03:50:39PM +0200, Markus Pargmann wrote:
-> debugfs files to show the contents of important dsps registers.
+On Mon, Oct 14, 2013 at 06:40:30PM +0100, Russell King - ARM Linux wrote:
+> Another thing that my build testing (and use on cubox-i) picked up:
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/usb/musb/musb_dsps.c | 87 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 87 insertions(+)
+> On Thu, Oct 03, 2013 at 03:51:26PM -0300, Fabio Estevam wrote:
+> > diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> > index 9e8ae11..65e54b4 100644
+> > --- a/arch/arm/boot/dts/imx6dl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> > @@ -88,3 +88,7 @@
+> >  		crtcs = <&ipu1 0>, <&ipu1 1>;
+> >  	};
+> >  };
+> > +
+> > +&hdmi {
+> > +	crtcs = <&ipu1 0>, <&ipu1 1>;
+> > +}
 > 
-> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-> index 189e52c..43b22ab 100644
-> --- a/drivers/usb/musb/musb_dsps.c
-> +++ b/drivers/usb/musb/musb_dsps.c
-> @@ -46,6 +46,8 @@
->  #include <linux/of_irq.h>
->  #include <linux/usb/of.h>
->  
-> +#include <linux/debugfs.h>
-> +
->  #include "musb_core.h"
->  
->  static const struct of_device_id musb_dsps_of_match[];
-> @@ -121,6 +123,61 @@ struct dsps_glue {
->  	unsigned long last_timer;    /* last timer data for each instance */
->  };
->  
-> +#if IS_ENABLED(CONFIG_DEBUG_FS)
-> +
-> +struct musb_register_map {
-> +	char			*name;
-> +	unsigned		offset;
-> +};
-> +
-> +static const struct musb_register_map musb_regmap[] = {
-> +	{ "revision",		0x00 },
-> +	{ "control",		0x14 },
-> +	{ "status",		0x18 },
-> +	{ "eoi",		0x24 },
-> +	{ "intr0_stat",		0x30 },
-> +	{ "intr1_stat",		0x34 },
-> +	{ "intr0_set",		0x38 },
-> +	{ "intr1_set",		0x3c },
-> +	{ "txmode",		0x70 },
-> +	{ "rxmode",		0x74 },
-> +	{ "autoreq",		0xd0 },
-> +	{ "srpfixtime",		0xd4 },
-> +	{ "tdown",		0xd8 },
-> +	{ "phy_utmi",		0xe0 },
-> +	{ "mode",		0xe8 },
-> +	{  }	/* Terminating Entry */
-> +};
-> +
-> +static int musb_regdump_show(struct seq_file *s, void *unused)
-> +{
-> +	struct musb		*musb = s->private;
-> +	unsigned		i;
-> +
-> +	seq_puts(s, "MUSB (M)HDRC dsps Register Dump\n");
-> +
-> +	for (i = 0; i < ARRAY_SIZE(musb_regmap); i++) {
-> +		u32 val = musb_readl(musb->ctrl_base, musb_regmap[i].offset);
-> +		seq_printf(s, "%-12s: %08x\n", musb_regmap[i].name, val);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int musb_regdump_open(struct inode *inode, struct file *file)
-> +{
-> +	return single_open(file, musb_regdump_show, inode->i_private);
-> +}
-> +
-> +static const struct file_operations musb_regdump_fops = {
-> +	.open			= musb_regdump_open,
-> +	.read			= seq_read,
-> +	.llseek			= seq_lseek,
-> +	.release		= single_release,
-> +};
-> +
-> +#endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
-> +
->  /**
->   * dsps_musb_enable - enable interrupts
->   */
-> @@ -348,6 +405,31 @@ out:
->  	return ret;
->  }
->  
-> +#if IS_ENABLED(CONFIG_DEBUG_FS)
-> +static int dsps_musb_dbg_init(struct musb *musb)
-> +{
-> +	struct dentry *root;
-> +	struct dentry *file;
-> +	char buf[128];
-> +
-> +	sprintf(buf, "%s.dsps", dev_name(musb->controller));
-> +	root = debugfs_create_dir(buf, NULL);
-> +	if (!root)
-> +		return -ENOMEM;
-> +
-> +	file = debugfs_create_file("regdump", S_IRUGO, root, musb,
-> +			&musb_regdump_fops);
+> Missing semi-colon.
 
-there is a generic regdump utility for debugfs, please use that instead.
-At least drivers/usb/dwc3/debugfs is using it.
+Okay, next question(s).
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131014/2004655a/attachment-0001.sig>
+1. How well tested is any of this imx-drm stuff?
+
+2. What sort of testing has it been subject to?
+
+Answers to these two questions may help stop me wasting a lot of time
+chasing what is a really weird bug.
+
+So, I have X up and running on the Cubox-i carrier-1, using the imx-drm
+stuff (I've slightly hacked my xf86-armada X driver to get this working.)
+This works fine - it detects the connectors, selects an appropriate
+video mode and produces a picture of the correct shape and size.
+
+However... I see really weird effects colouring effects - almost like
+water over the image.  It's certain colour transitions in the image
+which seem to trigger this.  There are also certain pixels which
+"twinkle".
+
+Text looks very strange too.  Rather than the font being crisp and clear,
+it looks like there's red and green shift to it - but its not that it's
+all shifted in that way.
+
+Now, if I use the modetest utility from libdrm-2.4.43 to display a SMPTE
+test pattern, this again looks right, but there are several vertical
+single pixel lines of noise.  The most striking one is below the upper
+red bar in the lower dark area.  I have a single pixel noisy vertical
+line.
+
+I've tried the kernel which Rabeeh supplied, which is based on BSP 4.1.0,
+and this works fine as far as I can tell with the same image (though,
+it's a little difficult converting the XWD dump to something that can
+be directly poked into /dev/fb0..., although this results in R/B swap.)
+
+Any ideas where to start looking?
