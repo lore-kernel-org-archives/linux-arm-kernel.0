@@ -1,31 +1,59 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Mon, 14 Oct 2013 21:58:36 +0800
-Subject: [RFT PATCH v2 1/4] arm64: fix possible invalid FPSIMD
- initialization state
-In-Reply-To: <20131014135457.GE7682@arm.com>
-References: <1381674029-430-1-git-send-email-liuj97@gmail.com>
- <20131014135457.GE7682@arm.com>
-Message-ID: <525BF88C.4070608@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 14 Oct 2013 15:58:18 +0200
+Subject: [PATCH v3 06/14] ARM: mvebu: Low level functions to disable cache
+ snooping
+In-Reply-To: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1381759106-15004-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1381759106-15004-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2013 09:54 PM, Catalin Marinas wrote:
-> On Sun, Oct 13, 2013 at 03:20:17PM +0100, Jiang Liu wrote:
->> From: Jiang Liu <jiang.liu@huawei.com>
->>
->> If context switching happens during executing fpsimd_flush_thread(),
->> stale value in FPSIMD registers will be saved into current thread's
->> fpsimd_state by fpsimd_thread_switch(). That may cause invalid
->> initialization state for the new process, so disable preemption
->> when executing fpsimd_flush_thread().
->>
->> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
->> Cc: Jiang Liu <liuj97@gmail.com>
-> 
-> That's already in mainline (3.12-rc4).
-> 
+When going to deep idle we need to disable the SoC snooping by
+"hand". Playing with the coherency fabric requires to use assembly
+code to be sure that the compiler doesn't reorder the instructions nor
+do wrong optimization.
 
-Hi Catalin,
-	I haven't noticed that yet, sorry for the noise:)
-Thanks!
-Gerry
+This function will be called by the low level (in assembly) part of
+the CPU idle functions.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency_ll.S | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 1526b94..3fb426e 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -73,6 +73,28 @@ ENTRY(ll_set_cpu_coherent)
+ 	mov	pc, lr
+ ENDPROC(ll_set_cpu_coherent)
+ 
++/*
++ * r0: if r0==0 => physical addres, else virtual address
++ */
++ENTRY(armada_370_xp_disable_snoop_ena)
++	ldr	r0, =(coherency_base)
++	ldr	r0, [r0]
++	/* Enable SnoopEna - Exclusive */
++	mrc	15, 0, r1, cr0, cr0, 5
++	and	r1, r1, #15
++	mov	r2, #(1 << 24)
++	lsl	r2, r2, r1
++
++1:
++	ldrex	r1, [r0]
++	bic	r1, r1, r2
++	strex	r3, r1, [r0]
++	cmp	r3, #0
++	bne 1b
++
++	mov pc, lr
++ENDPROC(armada_370_xp_disable_snoop_ena)
++
+ 	.align 2
+ 3:
+-	.long	coherency_phys_base - .
++		.long	coherency_phys_base - .
+-- 
+1.8.1.2
