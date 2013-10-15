@@ -1,173 +1,41 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 15 Oct 2013 09:12:21 -0500
-Subject: [PATCH 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
- Framework
-In-Reply-To: <525D4B46.4070302@ti.com>
-References: <1378136591-7463-3-git-send-email-kishon@ti.com>
- <525814A9.7060106@ti.com> <525BB8C0.1070802@ti.com>
- <525BC5A9.3060904@ti.com> <20131015115741.GD11380@radagast>
- <525D30C2.8060208@ti.com> <20131015131934.GG11380@radagast>
- <525D47C3.207@ti.com> <20131015135655.GK11380@radagast>
- <525D4B46.4070302@ti.com>
-Message-ID: <20131015141221.GM11380@radagast>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 15 Oct 2013 07:13:52 -0700
+Subject: [PATCH] ARM: shmobile: Genmai defconfig
+In-Reply-To: <CANqRtoTWSb_MkVGbUpSQ1vtaF+ojsUKBzkyUCt5CTGAnerTsUQ@mail.gmail.com>
+ (Magnus Damm's message of "Tue, 15 Oct 2013 11:00:02 +0900")
+References: <cover.1381300141.git.horms+renesas@verge.net.au>
+ <bb416e1d7416861bece0335f543c590d9af09c79.1381300141.git.horms+renesas@verge.net.au>
+ <87vc0z4i8j.fsf@linaro.org>
+ <CANqRtoTWSb_MkVGbUpSQ1vtaF+ojsUKBzkyUCt5CTGAnerTsUQ@mail.gmail.com>
+Message-ID: <87siw239lr.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 05:03:50PM +0300, Roger Quadros wrote:
-> On 10/15/2013 04:56 PM, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Tue, Oct 15, 2013 at 04:48:51PM +0300, Roger Quadros wrote:
-> >> On 10/15/2013 04:19 PM, Felipe Balbi wrote:
-> >>> Hi,
-> >>>
-> >>> On Tue, Oct 15, 2013 at 03:10:42PM +0300, Roger Quadros wrote:
-> >>>>>>>>> @@ -665,6 +669,9 @@ struct dwc3 {
-> >>>>>>>>>  	struct usb_phy		*usb2_phy;
-> >>>>>>>>>  	struct usb_phy		*usb3_phy;
-> >>>>>>>>>  
-> >>>>>>>>> +	struct phy		*usb2_generic_phy;
-> >>>>>>>>> +	struct phy		*usb3_generic_phy;
-> >>>>>>>>> +
-> >>>>>>>>>  	void __iomem		*regs;
-> >>>>>>>>>  	size_t			regs_size;
-> >>>>>>>>>  
-> >>>>>>>>>
-> >>>>>>>
-> >>>>>>> Do you have any suggestions on how to get only individual PHYs? like only
-> >>>>>>> usb2phy or usb3phy?
-> >>>>>>
-> >>>>>> My earlier understanding was that both PHYs are needed only if .speed is "super-speed"
-> >>>>>> and only usb2phy is needed for "high-speed". But as per Vivek's email it seems
-> >>>>>> Samsung's exynos5 SoC doesn't need usb2phy for "super-speed".
-> >>>>>>
-> >>>>>> So to keeps things flexible, I can propose the following approach
-> >>>>>> - if speed == 'high-speed' usb2phy must be present. usb3phy will be ignored if supplied.
-> >>>>>> - if speed == 'super-speed' usb3phy must be present and usb2phy is optional but must be
-> >>>>>> initialized if supplied.
-> >>>>>> - if speed is not specified, we default to 'super-speed'.
-> >>>>>>
-> >>>>>> Felipe, does this address the issue you were facing with OMAP5?
-> >>>>>
-> >>>>> on OMAP5 we cannot skip USB3 PHY initialization. But then it becomes a
-> >>>>> question of supporting a test feature (in OMAP5 case it would be cool to
-> >>>>> force controller to lower speeds for testing) or coping with a broken
-> >>>>> DTS.
-> >>>>>
-> >>>>
-> >>>> I don't think we can protect ourselves from all possible broken
-> >>>> configurations of DTS.
-> >>>> I would vote for simplicity and maximum flexibility.
-> >>>>
-> >>>> So IMO we should just depend on DTS to provide the phys that are
-> >>>> needed by the platform.
-> >>>> In the driver we initialize whatever PHY is provided and don't
-> >>>> complain if any or even all PHYs are missing.
-> >>>
-> >>> considering that DTS is an ABI, I really think eventually we *will* have
-> >>> broken DTBs burned into ROM and we will have to find ways to work with
-> >>> those too. Same thing already happens today with ACPI tables.
-> >>>
-> >>>> If this is not good enough then could you please suggest an
-> >>>> alternative? Thanks.
-> >>>
-> >>> The alternative would be to mandate nop xceiv for the "missing" PHY, but
-> >>> that doesn't solve anything, really, as DTS authors might still forget
-> >>> about the NOP xceiv and you can argue that forcing NOP xceiv would be a
-> >>> SW configuration.
-> >>>
-> >>> So, perhaps we go with the approach that all PHYs are optional, and
-> >>> here's my original patch which makes USB3 PHY optional:
-> >>>
-> >>> commit 979b84f96e4b7559b596b2933ae198aba267f260
-> >>> Author: Felipe Balbi <balbi@ti.com>
-> >>> Date:   Sun Jun 30 18:39:23 2013 +0300
-> >>>
-> >>>     usb: dwc3: core: make USB3 PHY optional
-> >>>     
-> >>>     If we want a port to work at any speed lower
-> >>>     than Superspeed, it makes no sense to even
-> >>>     initialize/power up the USB3 transceiver,
-> >>>     provided it won't be used.
-> >>>     
-> >>>     We can use the oportunity to save some power
-> >>>     and leave the superspeed transceiver powered
-> >>>     off.
-> >>>     
-> >>>     There is at least one such case which is
-> >>>     Texas Instruments' AM437x which has one
-> >>>     of its USB3 ports without a matching USB3
-> >>>     PHY (that port is hardwired to work on USB2
-> >>>     only).
-> >>>     
-> >>>     Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >>>
-> >>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> >>> index 74f9cf0..7a5ab93 100644
-> >>> --- a/drivers/usb/dwc3/core.c
-> >>> +++ b/drivers/usb/dwc3/core.c
-> >>> @@ -387,16 +387,34 @@ static int dwc3_probe(struct platform_device *pdev)
-> >>>  	if (node) {
-> >>>  		dwc->maximum_speed = of_usb_get_maximum_speed(node);
-> >>>  
-> >>> -		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
-> >>> -		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
-> >>> +		switch (dwc->maximum_speed) {
-> >>> +		case USB_SPEED_SUPER:
-> >>> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
-> >>> +			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
-> >>> +			break;
-> >>> +		case USB_SPEED_HIGH:
-> >>> +		case USB_SPEED_FULL:
-> >>> +		case USB_SPEED_LOW:
-> >>> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
-> >>> +			break;
-> >>> +		}
-> >>>  
-> >>>  		dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
-> >>>  		dwc->dr_mode = of_usb_get_dr_mode(node);
-> >>>  	} else if (pdata) {
-> >>>  		dwc->maximum_speed = pdata->maximum_speed;
-> >>>  
-> >>> -		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-> >>> -		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
-> >>> +		switch (dwc->maximum_speed) {
-> >>> +		case USB_SPEED_SUPER:
-> >>> +			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-> >>> +			dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
-> >>> +			break;
-> >>> +		case USB_SPEED_HIGH:
-> >>> +		case USB_SPEED_FULL:
-> >>> +		case USB_SPEED_LOW:
-> >>> +			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-> >>> +			break;
-> >>> +		}
-> >>
-> >> What if we try to get both PHYs irrespective of 'maximum_speed' but based
-> >> on presence of phandle/pdata. That way there is some control in the adaptation code (dts/pdata)
-> >> as to which PHYs needs to be initialized for that particular instance.
-> >>
-> >> This is because there doesn't seem to be a consensus between different designs.
-> >> e.g. omap5 needs both phys for 'high-speed' whereas exynos5250 needs just the
-> >> usb3 phy for 'super-speed'
-> > 
-> > sure, can you write such a patch ? If it gets to my inbox in a couple
-> > hours I guess I can still review and take it upstream on v3.13,
-> > otherwise it's only on v3.14 :-(
-> 
-> As this patch from Kishon is already touching this area, it would be best if
-> he can send a v2 with this feature.
+Magnus Damm <magnus.damm@gmail.com> writes:
 
-Alright, and so I'll wait a little longer.
+> On Tue, Oct 15, 2013 at 7:09 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Simon Horman <horms+renesas@verge.net.au> writes:
+>>
+>>> From: Magnus Damm <damm@opensource.se>
+>>>
+>>> Add a defconfig for the Genmai board. In the future this board will
+>>> use a shared defconfig for multiplatform, but until CCF is implemented
+>>> this will be used.
+>>
+>> How far in the future are we talking about?
+>
+> My plan is to implement and upstream CCF for r7s72100 now in Q4 of 2013.
 
-cheers
+Great, thanks for the update.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131015/7737d707/attachment-0001.sig>
+>> There's already 9 defconfigs for SH-mobile.  Is this *really* the last
+>> one before multi-platform support?
+>
+> Yes, it is! From this time all the mach-shmobile boards have to be
+> multi-platform from the start.
+
+OK, then we'll take this as the last one.
+
+Thanks,
+
+Kevin
