@@ -1,66 +1,38 @@
-From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Tue, 15 Oct 2013 18:49:55 +0530
-Subject: [PATCH V2 0/7] USB: OHCI:Properly handle ohci_suspend()routine in bus
- glue
-In-Reply-To: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1381843202-28707-1-git-send-email-csmanjuvijay@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 15 Oct 2013 12:41:16 +0100
+Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
+ device tree
+In-Reply-To: <83E50073-1BDF-4EB9-87D2-EFA427EFE756@codeaurora.org>
+References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
+ <1381477716.5630.74.camel@pasglop>
+ <83E50073-1BDF-4EB9-87D2-EFA427EFE756@codeaurora.org>
+Message-ID: <20131015114116.74FF0C4009A@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Majunath Goudar <manju.goudar@lge.com>
+On Fri, 11 Oct 2013 13:12:54 -0500, Kumar Gala <galak@codeaurora.org> wrote:
+> 
+> On Oct 11, 2013, at 2:48 AM, Benjamin Herrenschmidt wrote:
+> 
+> > On Fri, 2013-10-11 at 09:27 +0200, Marek Szyprowski wrote:
+> >> Hi all!
+> >> 
+> >> Benjamin Herrenschmidt pointed a few issues in the proposed design of
+> >> device tree bindings for contiguous memory allocator and reserved memory
+> >> regions:
+> >> https://lkml.org/lkml/2013/9/15/151
+> >> http://www.spinics.net/lists/arm-kernel/msg273548.html
+> > 
+> > Are you guys in Edinburgh ?
+> > 
+> > I'll be there from Tuesday PM (so really Wed) to Friday (fly out on
+> > Sat). We should catch up, brainstorm and come up with something.
+> > 
+> > Cheers,
+> > Ben.
+> 
+> We can try and do it during the DT-summit, or find another time.
 
-Suspend scenario in case of ohci bus glue was not properly handled as
-it was not suspending generic part of ohci controller. Alan Stern suggested,
-properly handle ohci suspend scenario.
+Let's plan on Wednesday afternoon.
 
-Calling explicitly the ohci_suspend()routine will ensure proper handling
-of suspend scenario.
-
-V1->V2:
-       -This version is fixing the ohci-ep93xx build error reported by Olof Johansson:
-
-        drivers/usb/host/ohci-ep93xx.c: In function 'ohci_hcd_ep93xx_drv_suspend':
-        drivers/usb/host/ohci-ep93xx.c:126:2: error: implicit declaration of
-        function 'ep93xx_stop_hc'
-      
-        Due to the build failure on  "[PATCH 5/11] USB: OHCI: Properly handle 
-        ohci-ep93xx suspend" following patches were reverted.
-        [PATCH 1/11]USB: OHCI: Properly handle OHCI controller suspend
-        [PATCH 2/11] USB: OHCI: Properly handle ohci-at91 suspend
-        [PATCH 3/11] USB: OHCI: Properly handle ohci-s3c2410 suspend
-        [PATCH 4/11] USB: OHCI: Properly handle ohci-da8xx suspend
-        [PATCH 5/11] USB: OHCI: Properly handle ohci-ep93xx suspend  
-        [PATCH 6/11] USB: OHCI: Properly handle ohci-exynos suspend
-        [PATCH 11/11] USB: OHCI: Properly handle ohci-spear suspend
-   
-        The following 4 patches are fine and present in usb-next
-        Commit id "10abfa13"[PATCH 7/11] Properly handle ohci-omap suspend.
-        Commit id "39dbd7df"[PATCH 8/11] Properly handle ohci-platform suspend.
-        Commit id "4ceaa893"[PATCH 9/11] Properly handle ohci-pxa suspend.
-        Commit id "f3c60599"[PATCH 10/11] Properly handle ohci-sm501 suspend.
-    
-        This patch set is working properly.  
- 
-Majunath Goudar (1):
-  USB: OHCI: Properly handle ohci-ep93xx suspend
-
-Manjunath Goudar (6):
-  USB: OHCI: Properly handle OHCI controller suspend
-  USB: OHCI: Properly handle ohci-at91 suspend
-  USB: OHCI: Properly handle ohci-s3c2410 suspend
-  USB: OHCI: Properly handle ohci-da8xx suspend
-  USB: OHCI: Properly handle ohci-exynos suspend
-  USB: OHCI: Properly handle ohci-spear suspend
-
- drivers/usb/host/ohci-at91.c    |   10 ++++++++--
- drivers/usb/host/ohci-da8xx.c   |   15 +++++++++++----
- drivers/usb/host/ohci-ep93xx.c  |    7 +++++--
- drivers/usb/host/ohci-exynos.c  |   20 +++++---------------
- drivers/usb/host/ohci-hcd.c     |    9 ++++++++-
- drivers/usb/host/ohci-s3c2410.c |   21 ++++-----------------
- drivers/usb/host/ohci-spear.c   |   12 +++++++++---
- 7 files changed, 50 insertions(+), 44 deletions(-)
-
--- 
-1.7.9.5
+g.
