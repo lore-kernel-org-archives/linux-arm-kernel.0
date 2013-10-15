@@ -1,64 +1,42 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 15 Oct 2013 08:22:50 -0500
-Subject: [RESEND PATCHv2 1/3] arm: socfpga: Set the SDMMC clock phase
- in system manager
-In-Reply-To: <201310151450.48650.arnd@arndb.de>
-References: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
- <201310151450.48650.arnd@arndb.de>
-Message-ID: <525D41AA.7060503@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 15 Oct 2013 15:27:42 +0200
+Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
+ device tree
+In-Reply-To: <20131015114035.6CA5FC40098@trevor.secretlab.ca>
+References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
+ <20131015114035.6CA5FC40098@trevor.secretlab.ca>
+Message-ID: <525D42CE.5010008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello,
 
-On 10/15/13 7:50 AM, Arnd Bergmann wrote:
-> On Monday 14 October 2013, dinguyen at altera.com wrote:
->> +void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(u32 drvsel, u32 smplsel)
->> +{
->> +       u32 hs_timing;
->> +
->> +       hs_timing = SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel);
->> +       writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
->> +}
->> +EXPORT_SYMBOL(socfpga_sysmgr_set_dwmmc_drvsel_smpsel);
-> This looks like the wrong approach. What are you trying to do? If you want to
-> set a clock, please use the clk API.
-I can't use the clk API because this function is setting up a clock 
-phase bit for the SD/MMC
-clock that is used to clock the card, not the IP. This register is 
-located outside the SD/MMC
-and the clock manager.
-
-Just to refresh your memory on this topic:
-I tried to use the syscon approach that you suggested:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/168470.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170423.html
-
-But this approach was rejected by Stephen Warren because we wanted to 
-the SD driver to be automonous
-of registers outside its IP:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/194014.html
-
-So I went with the approach of exposing a platform API so that the 
-SD/MMC platform specific
-code can call it.
-
-The system manager has a plethora of registers that controls other IPs 
-on the SOC, so I kinda thought
-syscon was the way to go with this. A driver for this IP did not make 
-sense to me.
-
-Please advise if you know of another approach?
-
-Thanks,
-Dinh
-
-
-
-
-
-
+On 2013-10-15 13:40, Grant Likely wrote:
+> On Fri, 11 Oct 2013 09:27:26 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > Hi all!
+> >
+> > Benjamin Herrenschmidt pointed a few issues in the proposed design of
+> > device tree bindings for contiguous memory allocator and reserved memory
+> > regions:
+> > https://lkml.org/lkml/2013/9/15/151
+> > http://www.spinics.net/lists/arm-kernel/msg273548.html
+> >
+> > Some time has passed, but there is still no consensus on the bindings
+> > for the reserved memory and various drawback of this solution has been
+> > shown, so in my opinion the best I can do now is to revert them
+> > completely and start from scratch again later.
 >
-> 	Arnd
+> I had some fixup patches that I was getting ready to post, but your
+> right. We're really late to be doing anything like that. I've applied
+> the reverts and we'll plan on hammering something out in Edinburgh next
+> week so that it can be merged for v3.13
+
+Sadly I won't be able to go to Edinburgh because of other business trip 
+the same time. However Tomasz Figa will be there for the whole week, he 
+will also attend DT-summit, so I hope that you will manage to find a 
+consensus. I will implement whatever you will agree then.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
