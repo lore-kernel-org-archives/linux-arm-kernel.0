@@ -1,41 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Oct 2013 20:06:38 +0200
-Subject: [PATCH v10 2/7] ARM: hi3xxx: add board support with device tree
-In-Reply-To: <CAD6h2NR6umVpgYM2t2pwrwP8-Jk-e3Kfng-7oymPJ44cNmuk-w@mail.gmail.com>
-References: <1381828577-27998-1-git-send-email-haojian.zhuang@linaro.org>
- <201310151500.36959.arnd@arndb.de>
- <CAD6h2NR6umVpgYM2t2pwrwP8-Jk-e3Kfng-7oymPJ44cNmuk-w@mail.gmail.com>
-Message-ID: <201310152006.38824.arnd@arndb.de>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 15 Oct 2013 14:09:19 -0400
+Subject: [RFC PATCH 1/4] ARM64: Add Kconfig option to enable Big Endian
+ kernel
+In-Reply-To: <1381494135-15085-2-git-send-email-ankit.jindal@linaro.org>
+References: <1381494135-15085-1-git-send-email-ankit.jindal@linaro.org>
+ <1381494135-15085-2-git-send-email-ankit.jindal@linaro.org>
+Message-ID: <525D84CF.4060705@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 October 2013, Haojian Zhuang wrote:
-> On 15 October 2013 21:00, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 15 October 2013, Haojian Zhuang wrote:
-> >>
-> >> Add board support with device tree for Hisilicon Hi3620 SoC platform.
-> >>
-> >> Changelog:
-> >> v10:
-> >> 1. Add .map_io() & debug_ll_io_init() back. Since debug_ll_io_init() is
-> >> only called if .map_io() isn't assigned. Use .map_io() to setup static
-> >> IO mapping that is used in clock driver.
-> >>
-> >
-> > This seems like a step in the wrong direction. Why would you want to use
-> > a static I/O mapping in the clock driver?
-> >
-> 
-> Because Stephen & Kevin asked me to use unit address in DTS file. They
-> also require me to use reg property to present real hardware address
-> in DTS file.
+Hi Ankit,
 
-Ah, so it's just an optimization, not required to make the clock driver
-work, I misread that. Can you add a comment near the hi3620_io_desc
-definition and verify that it still works without it?
+On 10/11/2013 08:22 AM, Ankit Jindal wrote:
+> This patch adds Kconfig options and relevant Big Endian compiler flags.
+[...]
+> diff --git a/arch/arm64/mm/Kconfig b/arch/arm64/mm/Kconfig
+> new file mode 100644
+> index 0000000..e4122ac
+> --- /dev/null
+> +++ b/arch/arm64/mm/Kconfig
+> @@ -0,0 +1,7 @@
+> +config CPU_BIG_ENDIAN
+> +        bool "Build big-endian kernel"
+> +        help
+> +          Say Y if you plan on running a kernel in big-endian mode.
+> +          Note that your board must be properly built [...]
 
-I would also recommend to extend that static mapping to the entire
-0xfc800000-0xfcbfffff range, or whatever you can use to get the most
-I/O devices with a small number of TLB entries.
+What makes a board properly built and how can a user determine whether their
+board is?
 
-	Arnd
+> +                                                [...] and your board
+> +          port must properly enable any big-endian related features
+> +          of your chipset/board/processor.
+
+What is a board port for arm64?
+
+Thanks,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
