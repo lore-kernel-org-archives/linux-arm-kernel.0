@@ -1,66 +1,92 @@
 From: dave.long@linaro.org (David Long)
-Date: Tue, 15 Oct 2013 17:04:16 -0400
-Subject: [PATCH v2 01/13] uprobes: move function declarations out of arch
-In-Reply-To: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1381871068-27660-2-git-send-email-dave.long@linaro.org>
+Date: Tue, 15 Oct 2013 17:04:15 -0400
+Subject: [PATCH v2 00/13] uprobes: Add uprobes support for ARM
+Message-ID: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-Move the function declarations from the arch header to the common
-header, since only the function bodies are architecture-specific.
-These changes are from Vincent Rabin's uprobes patch.
+This patch series adds basic uprobes support to ARM. It is based on patches
+developed earlier by Rabin Vincent. That approach of adding hooks into
+the kprobes instruction parsing code was not well received. This approach
+separates the ARM instruction parsing code in kprobes out into a separate set
+of functions which can be used by both kprobes and uprobes. Both kprobes and
+uprobes then provide their own semantic action tables to process the results of
+the parsing.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
-Signed-off-by: David A. Long <dave.long@linaro.org>
----
- arch/x86/include/asm/uprobes.h | 7 -------
- include/linux/uprobes.h        | 8 ++++++++
- 2 files changed, 8 insertions(+), 7 deletions(-)
+The following changes have been made for v2:
 
-diff --git a/arch/x86/include/asm/uprobes.h b/arch/x86/include/asm/uprobes.h
-index 6e51979..b20b4d6 100644
---- a/arch/x86/include/asm/uprobes.h
-+++ b/arch/x86/include/asm/uprobes.h
-@@ -49,11 +49,4 @@ struct arch_uprobe_task {
- 	unsigned int			saved_tf;
- };
- 
--extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
--extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
--extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
--extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
--extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
--extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
--extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
- #endif	/* _ASM_UPROBES_H */
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index 06f28be..9fd60c5 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -30,6 +30,7 @@
- struct vm_area_struct;
- struct mm_struct;
- struct inode;
-+struct notifier_block;
- 
- #ifdef CONFIG_ARCH_SUPPORTS_UPROBES
- # include <asm/uprobes.h>
-@@ -125,6 +126,13 @@ extern void uprobe_notify_resume(struct pt_regs *regs);
- extern bool uprobe_deny_signal(void);
- extern bool __weak arch_uprobe_skip_sstep(struct arch_uprobe *aup, struct pt_regs *regs);
- extern void uprobe_clear_state(struct mm_struct *mm);
-+extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
-+extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
-+extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
-+extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
- #else /* !CONFIG_UPROBES */
- struct uprobes_state {
- };
+1) The last dependencies of uprobes on kprobes have been removed and the two
+features may now be independently configured.
+2) The larger changes have been separated into a few stages.
+3) Use of "void *" has been replaced with an appropriate pointer type
+in various places.
+4) The arm kprobes-test module has been changed to work better with a
+thumb-mode kernel.
+
+These patches are based on v3.12-rc5.
+
+
+David A. Long (11):
+  uprobes: move function declarations out of arch
+  uprobes: allow ignoring of probe hits
+  uprobes: allow arch access to xol slot
+  ARM: move shared uprobe/kprobe definitions into new include file
+  ARM: move generic thumb instruction parsing code to new files for use
+    by other features
+  ARM: use a function table for determining instruction interpreter
+    actions
+  ARM: Disable jprobe selftests in thumb kernels
+  kprobes: Remove uneeded kernel dependency on struct arch_specific_insn
+  ARM: Finish renaming ARM kprobes APIs for sharing with uprobes
+  ARM: add uprobes support
+  ARM: Remove uprobes dependency on kprobes
+
+Rabin Vincent (2):
+  uprobes: allow arch-specific initialization
+  uprobes: add arch write opcode hook
+
+ arch/arm/Kconfig                   |    3 +
+ arch/arm/include/asm/kprobes.h     |   15 +-
+ arch/arm/include/asm/probes.h      |   25 +
+ arch/arm/include/asm/ptrace.h      |    6 +
+ arch/arm/include/asm/thread_info.h |    5 +-
+ arch/arm/include/asm/uprobes.h     |   34 ++
+ arch/arm/kernel/Makefile           |    7 +-
+ arch/arm/kernel/kprobes-arm.c      |  813 +++----------------------
+ arch/arm/kernel/kprobes-common.c   |  469 +--------------
+ arch/arm/kernel/kprobes-test.c     |   13 +-
+ arch/arm/kernel/kprobes-thumb.c    | 1156 ++++++------------------------------
+ arch/arm/kernel/kprobes.c          |   25 +-
+ arch/arm/kernel/kprobes.h          |  397 +------------
+ arch/arm/kernel/probes-arm.c       |  742 +++++++++++++++++++++++
+ arch/arm/kernel/probes-arm.h       |   72 +++
+ arch/arm/kernel/probes-thumb.c     |  877 +++++++++++++++++++++++++++
+ arch/arm/kernel/probes-thumb.h     |   95 +++
+ arch/arm/kernel/probes.c           |  459 ++++++++++++++
+ arch/arm/kernel/probes.h           |  395 ++++++++++++
+ arch/arm/kernel/signal.c           |    4 +
+ arch/arm/kernel/uprobes-arm.c      |  220 +++++++
+ arch/arm/kernel/uprobes.c          |  201 +++++++
+ arch/arm/kernel/uprobes.h          |   25 +
+ arch/powerpc/include/asm/uprobes.h |    1 -
+ arch/x86/include/asm/uprobes.h     |    7 -
+ include/linux/kprobes.h            |    7 +-
+ include/linux/uprobes.h            |   17 +
+ kernel/events/uprobes.c            |   58 +-
+ 28 files changed, 3573 insertions(+), 2575 deletions(-)
+ create mode 100644 arch/arm/include/asm/probes.h
+ create mode 100644 arch/arm/include/asm/uprobes.h
+ create mode 100644 arch/arm/kernel/probes-arm.c
+ create mode 100644 arch/arm/kernel/probes-arm.h
+ create mode 100644 arch/arm/kernel/probes-thumb.c
+ create mode 100644 arch/arm/kernel/probes-thumb.h
+ create mode 100644 arch/arm/kernel/probes.c
+ create mode 100644 arch/arm/kernel/probes.h
+ create mode 100644 arch/arm/kernel/uprobes-arm.c
+ create mode 100644 arch/arm/kernel/uprobes.c
+ create mode 100644 arch/arm/kernel/uprobes.h
+
 -- 
 1.8.1.2
