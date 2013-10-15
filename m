@@ -1,92 +1,71 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 15 Oct 2013 14:24:32 -0400
-Subject: [RFC PATCH 3/4] ARM64: Big Endian fixes for kernel booting
-In-Reply-To: <1381494135-15085-4-git-send-email-ankit.jindal@linaro.org>
-References: <1381494135-15085-1-git-send-email-ankit.jindal@linaro.org>
- <1381494135-15085-4-git-send-email-ankit.jindal@linaro.org>
-Message-ID: <525D8860.7080204@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 Oct 2013 11:43:32 -0700
+Subject: [PATCH 5/8] ARM: dts: Add basic support for TMDSEVM3730
+ (Mistral AM/DM37x EVM)
+In-Reply-To: <20131010222053.9063.81702.stgit@localhost>
+References: <20131010221833.9063.49904.stgit@localhost>
+ <20131010222053.9063.81702.stgit@localhost>
+Message-ID: <20131015184306.GC11234@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ankit,
+* Tony Lindgren <tony@atomide.com> [131010 15:29]:
+> I've tested the serial, MMC, smsc911x, wl12xx, and off-idle support
+> with the pinctrl patches, so it probably works better than the
+> board-*.c files ever did. Also the board-omap3evm.c file is broken
+> for the DSS, and has been for a while. Patches are welcome to fix
+> it in this .dts file, let's just drop the board-*.c file for this.
 
-On 10/11/2013 08:22 AM, Ankit Jindal wrote:
-> - Enable appropriate bits for big endian kernel in SYSCTLR.EL2 and
->   SYSCTLR.EL1 registers
-> - Swap entry point for secondary core for big endian kernel
-> - Set machine type to "aarch64b" for big endian and "aarch64l"
->   for little endian.
-[...]
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -122,6 +122,7 @@
->  	.word	0				// reserved
->  
->  ENTRY(stext)
-> +	ARM_BE(bl      setend_be)
->  	mov	x21, x0				// x21=FDT
->  	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
->  	bl	el2_setup			// Drop to EL1
-> @@ -148,6 +149,34 @@ ENTRY(stext)
->  ENDPROC(stext)
->  
->  /*
-> + * Set el0-el1-el2 to Big endian
-> + */
+Oops, the NAND I did not test and the copied partition map is
+different from the board file. Here's the updated partition map.
+I've tested the NAND using ubifs on the last partition.
 
-It might be helpful to say why this has to be done (each level needs to be set
-up before it's used?) and maybe list them in the order they're set up in.
+I'm folding in the following fix as I did not push it out yet.
 
-> +#if defined(CONFIG_CPU_BIG_ENDIAN)
-> +ENTRY(setend_be)
-> +	mrs     x21, CurrentEL
-> +        cmp     x21, #PSR_MODE_EL2t
-> +	b.ne  	setend_be_el1_el0
+Regards,
 
-Make sure to use tabs rather than spaces and run checkpatch.pl.
+Tony
 
-> +
-> +setend_be_el2:
-> +	mrs     x21, sctlr_el2
-> +        mov     x22, #(1<<25)
-> +        orr     x21, x21, x22
-> +        msr     sctlr_el2, x21
-> +	isb
-> +
-> +setend_be_el1_el0:
-> +	mrs     x21, sctlr_el1
-> +        mov     x22, #(3<<24)
-> +        orr     x21, x21, x22
-> +        msr     sctlr_el1, x21
-> +	isb
-> +
-> +	ret
-> +ENDPROC(setend_be)
-> +#endif /* defined(CONFIG_CPU_BIG_ENDIAN) */
-> +
-> +/*
->   * If we're fortunate enough to boot at EL2, ensure that the world is
->   * sane before dropping to EL1.
->   */
-> @@ -181,7 +210,11 @@ ENTRY(el2_setup)
->  
->  	/* sctlr_el1 */
->  	mov	x0, #0x0800			// Set/clear RES{1,0} bits
-> +#if defined(CONFIG_CPU_BIG_ENDIAN)
-> +	movk	x0, #0x33d0, lsl #16
-> +#else
->  	movk	x0, #0x30d0, lsl #16
-> +#endif
->  	msr	sctlr_el1, x0
 
-This may be easier to read if the magic number were ifdef'ed instead of the code.
-
-[...]
-
-Thanks,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+--- a/arch/arm/boot/dts/omap3-evm-37xx.dts
++++ b/arch/arm/boot/dts/omap3-evm-37xx.dts
+@@ -94,7 +94,7 @@
+ 		 <5 0 0x2c000000 0x01000000>;
+ 
+ 	nand at 0,0 {
+-		linux,mtd-name= "micron,mt29c4g96maz";
++		linux,mtd-name= "hynix,h8kds0un0mer-4em";
+ 		reg = <0 0 0>;
+ 		nand-bus-width = <16>;
+ 		ti,nand-ecc-opt = "bch8";
+@@ -118,24 +118,24 @@
+ 		#size-cells = <1>;
+ 
+ 		partition at 0 {
+-			label = "SPL";
+-			reg = <0 0x100000>;
++			label = "X-Loader";
++			reg = <0 0x80000>;
+ 		};
+ 		partition at 0x80000 {
+ 			label = "U-Boot";
+-			reg = <0x100000 0x180000>;
++			reg = <0x80000 0x1c0000>;
+ 		};
+ 		partition at 0x1c0000 {
+ 			label = "Environment";
+-			reg = <0x280000 0x100000>;
++			reg = <0x240000 0x40000>;
+ 		};
+ 		partition at 0x280000 {
+ 			label = "Kernel";
+-			reg = <0x380000 0x300000>;
++			reg = <0x280000 0x500000>;
+ 		};
+ 		partition at 0x780000 {
+ 			label = "Filesystem";
+-			reg = <0x680000 0x1f980000>;
++			reg = <0x780000 0x1f880000>;
+ 		};
+ 	};
+ 
