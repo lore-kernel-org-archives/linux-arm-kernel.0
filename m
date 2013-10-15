@@ -1,46 +1,26 @@
-From: richard.zhuhongxing@gmail.com (Richard Zhu)
-Date: Tue, 15 Oct 2013 10:44:53 +0800
-Subject: [PATCH v4 0/1] ahci: imx: setup power saving methods
-Message-ID: <1381805094-14723-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 14 Oct 2013 23:47:17 -0300
+Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
+In-Reply-To: <20131014173824.GT25034@n2100.arm.linux.org.uk>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
+ <20131014173824.GT25034@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5BRmXav-qj4DqvTJASfU98sJ3zpHHZBk7s4pCkDd0Z85Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v4: ahci: imx: setup power saving methods
- - Thanks for Tejun's review and comments firstly.
- - add copyright modification note in the commit message
- - export ahci_error_handler and ahci_platform_ops
- - add more detailed comments.
+On Mon, Oct 14, 2013 at 2:38 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-v3: http://www.spinics.net/lists/linux-ide/msg46641.html
- - Thanks for Tejun's suggestions.
- override the error_handler by ahci_imx_error_handler, to do
- the complete SATA device detection, enter into PDDQ mode,
- if there is no any SATA device.
+> Shouldn't the above be in patch 1 (or 1.5) rather than patch 2?  Patch 2
+> advertises itself as adding support for the wandboard, but in actual
+> fact it's adding the generic bits too.
 
- - minor modifications:
-   - The format of the copyright is changed, because that the
-   original one can't pass fsl internal patch reivew without
-   the character '(c)'.
-   - Change the module parameters to be more readable.
+Thanks for your review. Will address your comments in v3.
 
-V2: http://www.spinics.net/lists/linux-ide/msg46606.html
- - kernel build option is replaced by the module parameter(ahci-imx.hp) 
+Philipp Zabel mentioned that he will move imx-drm out of staging, so
+will send v3 after Philipp's patch gets into linux-next.
 
-v1: http://www.spinics.net/lists/linux-ide/msg46389.html
- * Disable sata phy internal pll reference clock when
- sysetem enter into suspend mode, enable it after resume.
- * Enter into test power down mode when there is no sata disk
- detected on the port and 'AHCI_IMX_PHY_POWER_DOWN_MODE' is
- enabled.
+Regards,
 
-This patch is based on for-next branch of
-"http://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git"
-
-
-[v4] ahci: imx: setup power saving methods
----
- drivers/ata/ahci.h          |    2 +
- drivers/ata/ahci_imx.c      |  101 ++++++++++++++++++++++++++++++++++++++++++-
- drivers/ata/ahci_platform.c |    3 +-
- drivers/ata/libahci.c       |    4 +-
- 4 files changed, 106 insertions(+), 4 deletions(-)
+Fabio Estevam
