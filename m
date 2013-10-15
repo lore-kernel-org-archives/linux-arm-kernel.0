@@ -1,49 +1,58 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 15 Oct 2013 19:41:20 +0200
-Subject: [PATCH 6/7] clk: samsung: exynos5250: Correct parent list of audio
- muxes
-In-Reply-To: <1381858881-25611-1-git-send-email-t.figa@samsung.com>
-References: <1381858881-25611-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1381858881-25611-7-git-send-email-t.figa@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Oct 2013 18:46:29 +0100
+Subject: [RFC v3 PATCH 1/7] ARM: add support for kernel mode NEON in
+ atomic context
+In-Reply-To: <CAKv+Gu-heuH7cqt96bSwSsu_BY0zqbW1qLYP9W0fAdbU=3W9Lw@mail.gmail.com>
+References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1381666503-23726-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20131015172604.GA4765@arm.com>
+ <CAKv+Gu-heuH7cqt96bSwSsu_BY0zqbW1qLYP9W0fAdbU=3W9Lw@mail.gmail.com>
+Message-ID: <20131015174629.GC4765@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to SoC documentation, input 5 of mout_audio muxes is connected
-to xxti (named fin_pll in the driver). This patch corrects defined
-parent arrays to match SoC documentation.
+On Tue, Oct 15, 2013 at 06:30:50PM +0100, Ard Biesheuvel wrote:
+> On 15 October 2013 19:26, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Sun, Oct 13, 2013 at 01:14:57PM +0100, Ard Biesheuvel wrote:
+> >> diff --git a/arch/arm/include/asm/neon.h b/arch/arm/include/asm/neon.h
+> >> index 8f730fe..800d85c 100644
+> >> --- a/arch/arm/include/asm/neon.h
+> >> +++ b/arch/arm/include/asm/neon.h
+> >> @@ -8,10 +8,30 @@
+> >>   * published by the Free Software Foundation.
+> >>   */
+> >>
+> >> +#include <linux/types.h>
+> >> +#include <linux/hardirq.h>
+> >> +#include <asm/fpstate.h>
+> >>  #include <asm/hwcap.h>
+> >>
+> >>  #define cpu_has_neon()               (!!(elf_hwcap & HWCAP_NEON))
+> >>
+> >> +/*
+> >> + * Avoid wasting stack space by making the size of the allocated area depend on
+> >> + * whether we are currently running in process context. (If this is the case, we
+> >> + * will use the normal preserve/restore mechanism, leaving the allocated stack
+> >> + * space unused.)
+> >> + */
+> >> +#define __QREG_SIZE(num)     \
+> >> +     ((!in_interrupt()) ? 0 : (num) > 16 ? 256 : 16 * (((num) + 1) & ~1U))
+> >> +
+> >> +#define DEFINE_NEON_REGSTACK_PARTIAL(v, num)         \
+> >> +     struct {                                        \
+> >> +             struct vfp_partial_state regs;          \
+> >> +             u8 qregs[__QREG_SIZE(num)];             \
+> >> +     } v
+> >
+> > Oh, interesting gcc feature. What does it generate?
+> >
+> 
+> Well, it's not a feature particular to GCC, as far as I am aware. The
+> anonymous struct is just runtime variably sized depending on
+> in_interrupt() and the requested number of registers.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/clk/samsung/clk-exynos5250.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+OK, it looks like it's valid C99. I was worried the compiler may
+generate something like an alloca() library call.
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index 05e3a94..1290da9 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -207,19 +207,19 @@ PNAME(mout_group1_p)	= { "fin_pll", "fin_pll", "sclk_hdmi27m",
- 				"none", "none", "none",
- 				"none" };
- PNAME(mout_audio0_p)	= { "cdclk0", "fin_pll", "sclk_hdmi27m", "sclk_dptxphy",
--				"sclk_uhostphy", "sclk_hdmiphy",
-+				"sclk_uhostphy", "fin_pll",
- 				"mout_mpll_user", "mout_epll", "mout_vpll",
- 				"mout_cpll", "none", "none",
- 				"none", "none", "none",
- 				"none" };
- PNAME(mout_audio1_p)	= { "cdclk1", "fin_pll", "sclk_hdmi27m", "sclk_dptxphy",
--				"sclk_uhostphy", "sclk_hdmiphy",
-+				"sclk_uhostphy", "fin_pll",
- 				"mout_mpll_user", "mout_epll", "mout_vpll",
- 				"mout_cpll", "none", "none",
- 				"none", "none", "none",
- 				"none" };
- PNAME(mout_audio2_p)	= { "cdclk2", "fin_pll", "sclk_hdmi27m", "sclk_dptxphy",
--				"sclk_uhostphy", "sclk_hdmiphy",
-+				"sclk_uhostphy", "fin_pll",
- 				"mout_mpll_user", "mout_epll", "mout_vpll",
- 				"mout_cpll", "none", "none",
- 				"none", "none", "none",
 -- 
-1.8.3.2
+Catalin
