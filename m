@@ -1,101 +1,80 @@
 From: dave.long@linaro.org (David Long)
-Date: Tue, 15 Oct 2013 17:04:20 -0400
-Subject: [PATCH v2 05/13] uprobes: add arch write opcode hook
+Date: Tue, 15 Oct 2013 17:04:17 -0400
+Subject: [PATCH v2 02/13] uprobes: allow ignoring of probe hits
 In-Reply-To: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
 References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1381871068-27660-6-git-send-email-dave.long@linaro.org>
+Message-ID: <1381871068-27660-3-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin@rab.in>
+From: "David A. Long" <dave.long@linaro.org>
 
-Allow arches to write the opcode with a custom function.  ARM needs to
-customize the swbp instruction depending on the condition code of the
-instruction it replaces.
+Allow arches to decided to ignore a probe hit.  ARM will use this to
+only call handlers if the conditions to execute a conditionally executed
+instruction are satisfied.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
+Upleveled for v3.12-rc4.
+
 Signed-off-by: David A. Long <dave.long@linaro.org>
 ---
- include/linux/uprobes.h |  3 +++
- kernel/events/uprobes.c | 21 ++++++++++++++++-----
- 2 files changed, 19 insertions(+), 5 deletions(-)
+ include/linux/uprobes.h |  1 +
+ kernel/events/uprobes.c | 17 ++++++++++++-----
+ 2 files changed, 13 insertions(+), 5 deletions(-)
 
 diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index a28dcbe..34375da 100644
+index 9fd60c5..80116c9 100644
 --- a/include/linux/uprobes.h
 +++ b/include/linux/uprobes.h
-@@ -136,6 +136,9 @@ extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_
- extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
- extern void __weak arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr);
- extern int __weak arch_uprobes_init(void);
-+extern void __weak arch_uprobe_write_opcode(struct arch_uprobe *auprobe,
-+					    void *vaddr,
-+					    uprobe_opcode_t opcode);
+@@ -133,6 +133,7 @@ extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
+ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
+ extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+ extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
++extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
  #else /* !CONFIG_UPROBES */
  struct uprobes_state {
  };
 diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index 9734a5f..cb01d82 100644
+index ad8e1bd..3955172 100644
 --- a/kernel/events/uprobes.c
 +++ b/kernel/events/uprobes.c
-@@ -248,6 +248,12 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
-  * have fixed length instructions.
-  */
+@@ -1732,9 +1732,6 @@ static void handle_swbp(struct pt_regs *regs)
+ 		return;
+ 	}
  
-+void __weak arch_uprobe_write_opcode(struct arch_uprobe *auprobe, void *vaddr,
-+				     uprobe_opcode_t opcode)
-+{
-+	memcpy(vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
-+}
+-	/* change it in advance for ->handler() and restart */
+-	instruction_pointer_set(regs, bp_vaddr);
+-
+ 	/*
+ 	 * TODO: move copy_insn/etc into _register and remove this hack.
+ 	 * After we hit the bp, _unregister + _register can install the
+@@ -1742,16 +1739,26 @@ static void handle_swbp(struct pt_regs *regs)
+ 	 */
+ 	smp_rmb(); /* pairs with wmb() in install_breakpoint() */
+ 	if (unlikely(!test_bit(UPROBE_COPY_INSN, &uprobe->flags)))
+-		goto out;
++		goto restart;
+ 
+ 	handler_chain(uprobe, regs);
 +
- /*
-  * write_opcode - write the opcode at a given virtual address.
-  * @mm: the probed process address space.
-@@ -260,11 +266,12 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
-  * For mm @mm, write the opcode at @vaddr.
-  * Return 0 (success) or a negative errno.
-  */
--static int write_opcode(struct mm_struct *mm, unsigned long vaddr,
--			uprobe_opcode_t opcode)
-+static int write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
-+			unsigned long vaddr, uprobe_opcode_t opcode)
- {
- 	struct page *old_page, *new_page;
- 	struct vm_area_struct *vma;
-+	void *vaddr_new;
- 	int ret;
++	if (arch_uprobe_ignore(&uprobe->arch, regs))
++		goto out;
++
+ 	if (can_skip_sstep(uprobe, regs))
+ 		goto out;
  
- retry:
-@@ -285,7 +292,10 @@ retry:
- 	__SetPageUptodate(new_page);
+ 	if (!pre_ssout(uprobe, regs, bp_vaddr))
+ 		return;
  
- 	copy_highpage(new_page, old_page);
--	copy_to_page(new_page, vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
-+	vaddr_new = kmap_atomic(new_page);
-+	arch_uprobe_write_opcode(auprobe, vaddr_new + (vaddr & ~PAGE_MASK),
-+				 opcode);
-+	kunmap_atomic(vaddr_new);
- 
- 	ret = anon_vma_prepare(vma);
- 	if (ret)
-@@ -314,7 +324,7 @@ put_old:
-  */
- int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
- {
--	return write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
-+	return write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
+-	/* can_skip_sstep() succeeded, or restart if can't singlestep */
++restart:
++	/*
++	 * cannot singlestep; cannot skip instruction;
++	 * re-execute the instruction.
++	 */
++	instruction_pointer_set(regs, bp_vaddr);
++
+ out:
+ 	put_uprobe(uprobe);
  }
- 
- /**
-@@ -329,7 +339,8 @@ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned
- int __weak
- set_orig_insn(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
- {
--	return write_opcode(mm, vaddr, *(uprobe_opcode_t *)auprobe->insn);
-+	return write_opcode(auprobe, mm, vaddr,
-+			    *(uprobe_opcode_t *)auprobe->insn);
- }
- 
- static int match_uprobe(struct uprobe *l, struct uprobe *r)
 -- 
 1.8.1.2
