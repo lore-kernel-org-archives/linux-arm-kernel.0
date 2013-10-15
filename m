@@ -1,94 +1,46 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 15 Oct 2013 17:03:15 +0200
-Subject: [PATCH] arch_timer: Do not register arch_sys_counter twice
-In-Reply-To: <20131015142313.GC850@mudshark.cambridge.arm.com>
-References: <1381843911-31962-1-git-send-email-treding@nvidia.com>
- <20131015142313.GC850@mudshark.cambridge.arm.com>
-Message-ID: <20131015150314.GA10535@ulmo.nvidia.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Oct 2013 09:10:27 -0600
+Subject: [PATCH 03/10] clk: tegra: Staticize local variables in clk-pll.c
+In-Reply-To: <20131015082924.GC19540@tbergstrom-lnx.Nvidia.com>
+References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
+ <1381231068-6053-3-git-send-email-sachin.kamat@linaro.org>
+ <52542E34.6020806@wwwdotorg.org>
+ <20131010111328.GS4233@tbergstrom-lnx.Nvidia.com>
+ <5256D0CA.9010906@wwwdotorg.org>
+ <20131014081533.GZ4233@tbergstrom-lnx.Nvidia.com>
+ <525C1D6E.5070802@wwwdotorg.org>
+ <20131015082924.GC19540@tbergstrom-lnx.Nvidia.com>
+Message-ID: <525D5AE3.9050706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 03:23:14PM +0100, Will Deacon wrote:
-> On Tue, Oct 15, 2013 at 02:31:51PM +0100, Thierry Reding wrote:
-> > Commit 65cd4f6 (arch_timer: Move to generic sched_clock framework) added
-> > code to register the arch_sys_counter in arch_timer_register() but it is
-> > already registered in arch_counter_register(). This results in the timer
-> > being added to the clocksource list twice, therefore causing an infinite
-> > loop in the list.
-> > 
-> > Remove the duplicate registration and register the scheduler clock after
-> > the original registration instead.
-> > 
-> > This fixes a hang during boot on Tegra114 (Cortex-A15).
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> > While I've only tested this on Tegra114, I suspect the same hang during
-> > boot happens for all processors that use this clock source.
-> > 
-> >  drivers/clocksource/arm_arch_timer.c | 12 +++---------
-> >  1 file changed, 3 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> > index f655036..95fb944 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -436,6 +436,9 @@ static void __init arch_counter_register(unsigned type)
-> >  	cyclecounter.mult = clocksource_counter.mult;
-> >  	cyclecounter.shift = clocksource_counter.shift;
-> >  	timecounter_init(&timecounter, &cyclecounter, start_count);
-> > +
-> > +	/* 56 bits minimum, so we assume worst case rollover */
-> > +	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-> >  }
-> >  
-> >  static void arch_timer_stop(struct clock_event_device *clk)
-> > @@ -515,15 +518,6 @@ static int __init arch_timer_register(void)
-> >  		goto out;
-> >  	}
-> >  
-> > -	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-> > -	cyclecounter.mult = clocksource_counter.mult;
-> > -	cyclecounter.shift = clocksource_counter.shift;
-> > -	timecounter_init(&timecounter, &cyclecounter,
-> > -			 arch_counter_get_cntvct());
-> > -
-> > -	/* 56 bits minimum, so we assume worst case rollover */
-> > -	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-> > -
-> >  	if (arch_timer_use_virtual) {
-> >  		ppi = arch_timer_ppi[VIRT_PPI];
-> >  		err = request_percpu_irq(ppi, arch_timer_handler_virt,
+On 10/15/2013 02:29 AM, Peter De Schrijver wrote:
+> On Mon, Oct 14, 2013 at 06:35:58PM +0200, Stephen Warren wrote:
+>> On 10/14/2013 02:15 AM, Peter De Schrijver wrote:
+>>> On Thu, Oct 10, 2013 at 06:07:38PM +0200, Stephen Warren wrote:
+>>>> On 10/10/2013 05:13 AM, Peter De Schrijver wrote:
+>>>>> On Tue, Oct 08, 2013 at 06:09:24PM +0200, Stephen Warren wrote:
+>>>>>> On 10/08/2013 05:17 AM, Sachin Kamat wrote:
+>>>>>>> Local variables used only in this file are made static.
+>>>>>>
+>>>>>
+>>>>> Conceptually they are still exported. So I think it's counterintuitive to
+>>>>> declare them static. Unless you expect namespace problems, I would rather
+>>>>> leave it as is.
+>>>>
+>>>> I forget exactly which symbols this patch changed, but presumably
+>>>> they're only exported via pointers rather than by symbol name, and isn't
+>>>> that exactly what static is for?
+>>>
+>>> They are indeed exported using a pointer. depends on how you look at it I
+>>> guess, but I see static as 'local to this file only' which isn't really
+>>> true if you hand out pointers to others.
+>>
+>> Yes, static specifically means "the symbol name is local to this file".
+>> It says nothing about the data behind the symbol name.
 > 
-> Excuse my ignorance, but I'm failing to apply either this patch or the one
-> that Stephen Boyd proposed:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204665.html
+> I would still prefer the symbol visibility to have some relation with how
+> the data is used.
 
-Hehe, that patch is exactly the same as this one. =)
-
-> The second hunk (deletions) doesn't apply at all, and if I just apply the
-> first hunk then things won't compile. Which tree is this against?
-
-This is on top of today's linux-next[0] and will probably apply to
-yesterday's linux-next too. I think that perhaps the patch or the one
-that Stephen proposed himself should be squashed with the original
-because that caused the breakage in the first place. From what I gather
-from the mailing thread you linked to above it seems like John took an
-earlier patch from Stephen and rebased it on top of something more
-recent and that didn't work out as expected.
-
-Ingo, any chance you could take this patch and squash it into the patch
-mentioned above? Applying it as a separate fix will break bisectability
-inbetween both patches.
-
-Thierry
-
-[0]: git://gitorious.org/thierryreding/linux-next.git
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131015/cab67725/attachment.sig>
+No, if the *symbol* is not used, it should be static. There's absolutely
+zero benefit from having a visible symbol if it isn't used.
