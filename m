@@ -1,68 +1,62 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 15 Oct 2013 09:50:31 +0200
-Subject: [PATCH V3 2/3] ARM: at91: cpuidle: Move driver to drivers/cpuidle
+Date: Tue, 15 Oct 2013 09:50:32 +0200
+Subject: [PATCH V3 3/3] ARM: at91: pm: use standby callback instead of cpu_is
 In-Reply-To: <1381823432-24944-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1381823432-24944-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1381823432-24944-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1381823432-24944-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the cpuidle driver code has no more the dependency with the pm code, the
-'standby' callback being passed as a parameter to the device's platform data,
-we can move the cpuidle driver in the drivers/cpuidle directory.
+The cpuidle's platform_device has the standby function set for the correct
+SoC when supported in the platform data. Remove the { if then else } statements
+in the at91_pm_enter by using directly the standby ops.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-at91/Makefile                        |    1 -
- drivers/cpuidle/Kconfig.arm                        |    7 +++++++
- drivers/cpuidle/Makefile                           |    1 +
- .../cpuidle.c => drivers/cpuidle/cpuidle-at91.c    |    0
- 4 files changed, 8 insertions(+), 1 deletion(-)
- rename arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/cpuidle-at91.c (100%)
+ arch/arm/mach-at91/pm.c |   16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 3b0a953..c1b7370 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -98,7 +98,6 @@ obj-y				+= leds.o
- # Power Management
- obj-$(CONFIG_PM)		+= pm.o
- obj-$(CONFIG_AT91_SLOW_CLOCK)	+= pm_slowclock.o
--obj-$(CONFIG_CPU_IDLE)	+= cpuidle.o
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 76f8cbf..baeb4a4a 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -39,6 +39,8 @@
+ #include "at91_rstc.h"
+ #include "at91_shdwc.h"
  
- ifeq ($(CONFIG_PM_DEBUG),y)
- CFLAGS_pm.o += -DDEBUG
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 8e36603..33a745e 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -27,6 +27,13 @@ config ARM_U8500_CPUIDLE
- 	help
- 	  Select this to enable cpuidle for ST-E u8500 processors
- 
-+config ARM_AT91_CPUIDLE
-+	bool "Cpu Idle Driver for the AT91 processors"
-+	default y
-+	depends on ARCH_AT91
-+	help
-+	  Select this to enable cpuidle for AT91 processors
++static void (*at91_pm_standby)(void);
 +
- config CPU_IDLE_BIG_LITTLE
- 	bool "Support for ARM big.LITTLE processors"
- 	depends on ARCH_VEXPRESS_TC2_PM
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index cea5ef5..60c4ae5 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -11,4 +11,5 @@ obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
- obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
- obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
-+obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
- obj-$(CONFIG_CPU_IDLE_BIG_LITTLE)	+= cpuidle-big_little.o
-diff --git a/arch/arm/mach-at91/cpuidle.c b/drivers/cpuidle/cpuidle-at91.c
-similarity index 100%
-rename from arch/arm/mach-at91/cpuidle.c
-rename to drivers/cpuidle/cpuidle-at91.c
+ static void __init show_reset_status(void)
+ {
+ 	static char reset[] __initdata = "reset";
+@@ -266,14 +268,8 @@ static int at91_pm_enter(suspend_state_t state)
+ 			 * For ARM 926 based chips, this requirement is weaker
+ 			 * as at91sam9 can access a RAM in self-refresh mode.
+ 			 */
+-			if (cpu_is_at91rm9200())
+-				at91rm9200_standby();
+-			else if (cpu_is_at91sam9g45())
+-				at91sam9g45_standby();
+-			else if (cpu_is_at91sam9263())
+-				at91sam9263_standby();
+-			else
+-				at91sam9_standby();
++			if (at91_pm_standby)
++				at91_pm_standby();
+ 			break;
+ 
+ 		case PM_SUSPEND_ON:
+@@ -335,8 +331,10 @@ static int __init at91_pm_init(void)
+ 	if (cpu_is_at91rm9200())
+ 		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+ 	
+-	if (at91_cpuidle_device.dev.platform_data)
++	if (at91_cpuidle_device.dev.platform_data) {
++		at91_pm_standby = at91_cpuidle_device.dev.platform_data;
+ 		platform_device_register(&at91_cpuidle_device);
++	}
+ 
+ 	suspend_set_ops(&at91_pm_ops);
+ 
 -- 
 1.7.9.5
