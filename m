@@ -1,65 +1,59 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 15 Oct 2013 13:51:11 -0600
-Subject: [PATCH RESEND] PCI: mvebu - Support a bridge with no IO port
- window
-In-Reply-To: <20131003140648.52734cfc@skate>
-References: <1380650281-16175-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1380650281-16175-2-git-send-email-jgunthorpe@obsidianresearch.com>
- <20131003140648.52734cfc@skate>
-Message-ID: <20131015195111.GB30106@obsidianresearch.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 16 Oct 2013 01:24:10 +0530
+Subject: [PATCH v2 0/7] Make dwc3 use Generic PHY Framework
+Message-ID: <1381866857-3861-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 02:06:48PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Gunthorpe,
-> 
-> On Tue,  1 Oct 2013 11:58:01 -0600, Jason Gunthorpe wrote:
-> > Make pcie-io-aperture and the IO port MBUS ID in ranges optional.
-> > If not provided the bridge reports to Linux that IO space mapping is
-> > not supported and refuses to configure an IO mbus window.
-> > 
-> > This allows both complete disable (do not specify pcie-io-aperture) and
-> > per-port disable (do not specify a IO target ranges entry for the port)
-> > 
-> > Most PCIE devices these days do not require IO support to function,
-> > so having an option to disable it in the driver is useful.
-> > 
-> > This depends on 'bus: mvebu-mbus: Fix optional pcie-mem/io-aperture properties'
-> > to work properly.
-> 
-> This doesn't work here, I get multiple warnings "Attempt to set IO when
-> IO is disabled" :
+Felipe,
 
-Okay, I looked into this.
+Looks like most of the patches are dependent on Generic PHY Framework except
+the first one. Let me know if I have to take these patches with your ACK or
+you'll take it yourself.
+******************************************************************
+Modified dwc3 core to find PHYs only if the platform indicates that it has 
+to use a PHY. Adapted DWC3 and USB3 PHY to use Generic PHY framework. Also 
+changed the name of USB3 PHY driver to PIPE3 PHY driver since the same driver 
+has to be used for SATA and PCIE too.
 
-The warnings are caused by the bogus mvebu_has_ioport you noted, 
-and this is also required:
+Changes from v1:
+* The logic in which the driver detects the presence of PHYs has changed.
+* patch ordering has changed
+* udelay is replaced with usleep_range
+* A patch to remove set_suspend callback which was deferred from Generic
+PHY Framework series has been included.
 
-        /* Are the new iobase/iolimit values invalid? */
--       if (port->bridge.iolimit < port->bridge.iobase ||
-+       if (port->bridge.iolimit <= port->bridge.iobase ||
-            port->bridge.iolimitupper < port->bridge.iobaseupper) {
+Kishon Vijay Abraham I (7):
+  usb: dwc3: get "usb_phy" only if the platform indicates the presence
+    of PHY's
+  usb: dwc3: adapt dwc3 core to use Generic PHY Framework
+  Documentation: dt bindings: move ..usb/usb-phy.txt to
+    ..phy/ti-phy.txt
+  drivers: phy: usb3/pipe3: Adapt pipe3 driver to Generic PHY Framework
+  usb: phy: omap-usb2: remove *set_suspend* callback from omap-usb2
+  phy: omap-usb2: move omap_usb.h from linux/usb/ to linux/phy/
+  arm/dts: added dt properties to adapt to the new phy framwork
 
-> >  	case PCI_IO_BASE:
-> > -		*value = (bridge->secondary_status << 16 |
-> > -			  bridge->iolimit          <<  8 |
-> > -			  bridge->iobase);
-> > +		if (!mvebu_has_ioport(port))
-> > +			*value = 0;
-> > +		else
-> > +			*value = (bridge->secondary_status << 16 |
-> > +				  bridge->iolimit          <<  8 |
-> > +				  bridge->iobase);
-> 
-> While I do understand that you're returning 0 for iolimit and iobase,
-> I'm not sure why the secondary status is affected by the value of
-> mvebu_has_ioport().
+ .../bindings/{usb/usb-phy.txt => phy/ti-phy.txt}   |    9 +-
+ Documentation/devicetree/bindings/usb/dwc3.txt     |    6 +-
+ arch/arm/boot/dts/omap5.dtsi                       |    5 +-
+ drivers/phy/Kconfig                                |   10 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-omap-usb2.c                        |   27 +--
+ .../phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c}     |  206 +++++++++++---------
+ drivers/usb/dwc3/Kconfig                           |    2 +
+ drivers/usb/dwc3/core.c                            |  124 ++++++++----
+ drivers/usb/dwc3/core.h                            |    7 +
+ drivers/usb/dwc3/platform_data.h                   |    4 +
+ drivers/usb/phy/Kconfig                            |   11 --
+ drivers/usb/phy/Makefile                           |    1 -
+ include/linux/{usb => phy}/omap_usb.h              |    3 -
+ include/linux/{usb/omap_usb.h => phy/ti_pipe3.h}   |   33 +---
+ 15 files changed, 248 insertions(+), 201 deletions(-)
+ rename Documentation/devicetree/bindings/{usb/usb-phy.txt => phy/ti-phy.txt} (86%)
+ rename drivers/{usb/phy/phy-omap-usb3.c => phy/phy-ti-pipe3.c} (57%)
+ copy include/linux/{usb => phy}/omap_usb.h (95%)
+ rename include/linux/{usb/omap_usb.h => phy/ti_pipe3.h} (53%)
 
-This is an error, of sorts. 0 is actually the correct value for 
-secondary status with the current capabilities of the driver.. I'll
-fix it here as you noted and send a patch to fix that up separately.
-
-New patches in a sec..
-
-Thanks,
-Jason
+-- 
+1.7.10.4
