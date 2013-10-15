@@ -1,69 +1,132 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Oct 2013 15:23:14 +0100
-Subject: [PATCH] arch_timer: Do not register arch_sys_counter twice
-In-Reply-To: <1381843911-31962-1-git-send-email-treding@nvidia.com>
-References: <1381843911-31962-1-git-send-email-treding@nvidia.com>
-Message-ID: <20131015142313.GC850@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Oct 2013 15:38:49 +0100
+Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2
+ page fault
+In-Reply-To: <CAAhSdy3u2KUwdSWniDq=vCfXi6u44FhjKUA96RZPjCMiDaDA5A@mail.gmail.com>
+References: <20131010112425.GB21380@arm.com>
+ <CAAhSdy20=U3+LZd=3i8dfqfSEaX7V+2z_y641NBLj7PkYZBadQ@mail.gmail.com>
+ <20131011123839.GH12308@darko.cambridge.arm.com>
+ <CAAhSdy1Sm2N68ZB5r9BmansGYnUgFO0ZFdUL=XB7RhJ258AAFA@mail.gmail.com>
+ <20131011143721.GD15803@arm.com>
+ <CAAhSdy1RS58HxDD2sKC5NP=vZ-fn=Zc4qEYZoFHR2usGqiQMFA@mail.gmail.com>
+ <5258125E.4040709@arm.com>
+ <CAAhSdy2nfnDuAZW6XWz0Xc4ehcU9YcHKLv7WVSCgk3+b8AD7Hw@mail.gmail.com>
+ <20131011154401.GE15803@arm.com>
+ <CAAhSdy3u2KUwdSWniDq=vCfXi6u44FhjKUA96RZPjCMiDaDA5A@mail.gmail.com>
+Message-ID: <20131015143848.GA1591@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 02:31:51PM +0100, Thierry Reding wrote:
-> Commit 65cd4f6 (arch_timer: Move to generic sched_clock framework) added
-> code to register the arch_sys_counter in arch_timer_register() but it is
-> already registered in arch_counter_register(). This results in the timer
-> being added to the clocksource list twice, therefore causing an infinite
-> loop in the list.
+On Sat, Oct 12, 2013 at 07:24:17PM +0100, Anup Patel wrote:
+> On Fri, Oct 11, 2013 at 9:14 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Fri, Oct 11, 2013 at 04:32:48PM +0100, Anup Patel wrote:
+> >> On Fri, Oct 11, 2013 at 8:29 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> > On 11/10/13 15:50, Anup Patel wrote:
+> >> >> On Fri, Oct 11, 2013 at 8:07 PM, Catalin Marinas
+> >> >> <catalin.marinas@arm.com> wrote:
+> >> >>> On Fri, Oct 11, 2013 at 03:27:16PM +0100, Anup Patel wrote:
+> >> >>>> On Fri, Oct 11, 2013 at 6:08 PM, Catalin Marinas
+> >> >>>> <catalin.marinas@arm.com> wrote:
+> >> >>>>> On Thu, Oct 10, 2013 at 05:09:03PM +0100, Anup Patel wrote:
+> >> >>>>>> Coming back to where we started, the actual problem was that when
+> >> >>>>>> Guest starts booting it sees wrong contents because it is runs with
+> >> >>>>>> MMU disable and correct contents are still in external L3 cache of X-Gene.
+> >> >>>>>
+> >> >>>>> That's one of the problems and I think the easiest to solve. Note that
+> >> >>>>> contents could still be in the L1/L2 (inner) cache since whole cache
+> >> >>>>> flushing by set/way isn't guaranteed in an MP context.
+> >> >>>>>
+> >> >>>>>> How about reconsidering the approach of flushing Guest RAM (entire or
+> >> >>>>>> portion of it) to PoC by VA once before the first run of a VCPU ?
+> >> >>>>>
+> >> >>>>> Flushing the entire guest RAM is not possible by set/way
+> >> >>>>> (architecturally) and not efficient by VA (though some benchmark would
+> >> >>>>> be good). Marc's patch defers this flushing when a page is faulted in
+> >> >>>>> (at stage 2) and I think it covers the initial boot.
+> >> >>>>>
+> >> >>>>>> OR
+> >> >>>>>> We can also have KVM API using which user space can flush portions
+> >> >>>>>> of Guest RAM before running the VCPU. (I think this was a suggestion
+> >> >>>>>> from Marc Z initially)
+> >> >>>>>
+> >> >>>>> This may not be enough. It indeed flushes the kernel image that gets
+> >> >>>>> loaded but the kernel would write other pages (bss, page tables etc.)
+> >> >>>>> with MMU disabled and those addresses may contain dirty cache lines that
+> >> >>>>> have not been covered by the initial kvmtool flush. So you basically
+> >> >>>>> need all guest non-cacheable accesses to be flushed.
+> >> >>>>>
+> >> >>>>> The other problems are the cacheable aliases that I mentioned, so even
+> >> >>>>> though the guest does non-cacheable accesses with the MMU off, the
+> >> >>>>> hardware can still allocate into the cache via the other mappings. In
+> >> >>>>> this case the guest needs to invalidate the areas of memory that it
+> >> >>>>> wrote with caches off (or just use the DC bit to force memory accesses
+> >> >>>>> with MMU off to be cacheable).
+> >> >>>>
+> >> >>>> Having looked at all the approaches, I would vote for the approach taken
+> >> >>>> by this patch.
+> >> >>>
+> >> >>> But this patch alone doesn't solve the other issues. OTOH, the DC bit
+> >> >>> would solve your initial problem and a few others.
+> >> >>
+> >> >> DC bit might solve the initial problem but it can be problematic because
+> >> >> setting DC bit would mean Guest would have Caching ON even when Guest
+> >> >> MMU is disabled. This will be more problematic if Guest is running a
+> >> >> bootloader (uboot, grub, UEFI, ..) which does pass-through access to a
+> >> >> DMA-capable device and we will have to change the bootloader in this
+> >> >> case and put explicit flushes in bootloader for running inside Guest.
+> >> >
+> >> > Well, as Catalin mentioned, we'll have to do some cache maintenance in
+> >> > the guest in any case.
+> >>
+> >> This would also mean that we will have to change Guest bootloader for
+> >> running as Guest under KVM ARM64.
+> >
+> > Yes.
+> >
+> >> In x86 world, everything that can run natively also runs as Guest OS
+> >> even if the Guest has pass-through devices.
+> >
+> > I guess on x86 the I/O is also coherent, in which case we could use the
+> > DC bit.
 > 
-> Remove the duplicate registration and register the scheduler clock after
-> the original registration instead.
+> We need to go ahead with some approach hence, if you are inclined
+> towards DC bit approach then let us go with that approach.
 > 
-> This fixes a hang during boot on Tegra114 (Cortex-A15).
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> While I've only tested this on Tegra114, I suspect the same hang during
-> boot happens for all processors that use this clock source.
-> 
->  drivers/clocksource/arm_arch_timer.c | 12 +++---------
->  1 file changed, 3 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index f655036..95fb944 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -436,6 +436,9 @@ static void __init arch_counter_register(unsigned type)
->  	cyclecounter.mult = clocksource_counter.mult;
->  	cyclecounter.shift = clocksource_counter.shift;
->  	timecounter_init(&timecounter, &cyclecounter, start_count);
-> +
-> +	/* 56 bits minimum, so we assume worst case rollover */
-> +	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
->  }
->  
->  static void arch_timer_stop(struct clock_event_device *clk)
-> @@ -515,15 +518,6 @@ static int __init arch_timer_register(void)
->  		goto out;
->  	}
->  
-> -	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-> -	cyclecounter.mult = clocksource_counter.mult;
-> -	cyclecounter.shift = clocksource_counter.shift;
-> -	timecounter_init(&timecounter, &cyclecounter,
-> -			 arch_counter_get_cntvct());
-> -
-> -	/* 56 bits minimum, so we assume worst case rollover */
-> -	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-> -
->  	if (arch_timer_use_virtual) {
->  		ppi = arch_timer_ppi[VIRT_PPI];
->  		err = request_percpu_irq(ppi, arch_timer_handler_virt,
+> For the DC bit approach, I request to document somewhere the limitation
+> (or corner case) about Guest bootloader accessing DMA-capable device.
 
-Excuse my ignorance, but I'm failing to apply either this patch or the one
-that Stephen Boyd proposed:
+I think we could avoid the DC bit but still use some part of that patch.
+Another problem with DC is run-time code patching where the guest MMU is
+disabled, the guest may not do D-cache maintenance.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204665.html
+So, the proposal:
 
-The second hunk (deletions) doesn't apply at all, and if I just apply the
-first hunk then things won't compile. Which tree is this against?
+1. Clean+invalidate D-cache for pages mapped into the stage 2 for the
+   first time (if the access is non-cacheable). Covered by this patch.
+2. Track guest's use of the MMU registers (SCTLR etc.) and detect when
+   the stage 1 is enabled. When stage 1 is enabled, clean+invalidate the
+   D-cache again for the all pages already mapped in stage 2 (in case we
+   had speculative loads).
 
-Will
+The above allow the guest OS to run the boot code with MMU disabled and
+then enable the MMU. If the guest needs to disable the MMU or caches
+after boot, we either ask the guest for a Hyp call or we extend point 2
+above to detect disabling (though that's not very efficient). Guest
+power management via PSCI already implies Hyp calls, it's more for kexec
+where you have a soft reset.
+
+This only needs to be done for the primary CPU (or until the first CPU
+enabled the MMU). Once a CPU enabled its MMU, the others will have
+to cope with speculative loads into the cache anyway (if secondary VCPU
+are started by a PSCI HVC call, we can probably ignore the trapping of
+MMU register access anyway).
+
+Note that we don't cover the I-cache. On ARMv8 you can get speculative
+loads into the I-cache even if it is disabled, so it needs to be
+invalidated explicitly before the MMU or the I-cache is enabled.
+
+Comments?
+
+-- 
+Catalin
