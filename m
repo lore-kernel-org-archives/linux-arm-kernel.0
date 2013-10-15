@@ -1,74 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 Oct 2013 21:30:43 -0700
-Subject: [GIT PULL 3/6] omap hwmod changes for v3.13 merge window
-In-Reply-To: <CAGa+x84a2b4DWqu0YT=NVt_SMYpyPkL1ZdzTXnocoZZjNzi9mw@mail.gmail.com>
-References: <5258a9a6.4a17e00a.5fb3.ffff9bf3SMTPIN_ADDED_MISSING@mx.google.com>
- <87a9ib4gmb.fsf@linaro.org> <20131015041130.GB25997@quad.lixom.net>
- <CAGa+x84a2b4DWqu0YT=NVt_SMYpyPkL1ZdzTXnocoZZjNzi9mw@mail.gmail.com>
-Message-ID: <CAOesGMiob0maOAG0pirB_0Rj2EeA-2ao++ZGf4Zg7SVbcmcOpA@mail.gmail.com>
+Date: Mon, 14 Oct 2013 21:32:08 -0700
+Subject: [PATCH 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
+In-Reply-To: <DC148C5AA1CEBA4E87973D432B1C2D8817DABF0B@P3PWEX4MB008.ex4.secureserver.net>
+References: <DC148C5AA1CEBA4E87973D432B1C2D8817DABD8C@P3PWEX4MB008.ex4.secureserver.net>
+ <Pine.LNX.4.44L0.1310141647140.6851-100000@netrider.rowland.org>
+ <DC148C5AA1CEBA4E87973D432B1C2D8817DABF0B@P3PWEX4MB008.ex4.secureserver.net>
+Message-ID: <CAOesGMjXzJef=tVi_bi06H_o9g+EB=bMe3i-TkDt9C9RN5zyVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 9:25 PM, Kevin Hilman <khilman@linaro.org> wrote:
->
-> On Oct 14, 2013 9:12 PM, "Olof Johansson" <olof@lixom.net> wrote:
+On Mon, Oct 14, 2013 at 2:07 PM, Hartley Sweeten
+<HartleyS@visionengravers.com> wrote:
+> On Monday, October 14, 2013 1:50 PM, Alan Stern wrote:
+>> On Mon, 14 Oct 2013, Hartley Sweeten wrote:
+>>> As an alternative to this patch, I have successfully used the ohci-platform
+>>> driver on the ep93xx. This does move a bit of glue code into the ep93xx
+>>> core (arch/arm/mach-ep93xx/core.c) but it removes the ohci-ep93xx glue
+>>> driver completely.
+>>>
+>>> I can post a patch for this shortly if you would like.
 >>
->> On Mon, Oct 14, 2013 at 03:44:44PM -0700, Kevin Hilman wrote:
->> > Tony Lindgren <tony@atomide.com> writes:
->> >
->> > > The following changes since commit
->> > > d0e639c9e06d44e713170031fe05fb60ebe680af:
->> > >
->> > >   Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
->> > >
->> > > are available in the git repository at:
->> > >
->> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap
->> > > tags/omap-for-v3.13/hwmod-signed
->> > >
->> > > for you to fetch changes up to
->> > > 254f57a92987b6cde6004f58d6b847813dfb9e0e:
->> > >
->> > >   ARM: OMAP5: hwmod: add missing ocp2scp hwmod data (2013-10-11
->> > > 15:37:05 -0700)
->> > >
->> > > ----------------------------------------------------------------
->> > > omap hwmod related changes via Paul Walmsley <paul@pwsan.com>:
->> > >
->> > > Some OMAP hwmod changes for 3.13.  Significant changes here include:
->> > >
->> > > - support for moving some of the hwmod flags to DT data
->> > >
->> > > - support for the SSI, hardware spinlock, USB host/TLL, and RNG IP
->> > >   blocks for various OMAPs
->> > >
->> > > - a fix that again decouples hwmod data changes from unrelated DT data
->> > >   patchsets
->> > >
->> > > Basic test logs are available at:
->> > >
->> > > http://www.pwsan.com/omap/testlogs/prcm_fixes_v3.13/20131009094936/
->> > >
->> > > ----------------------------------------------------------------
->> >
->> > Pulled into next/soc,
->> >
->> > Thanks,
->> >
->> > Kevin
->>
->> Hm, looks like my BBB hit this on v3.12-rc4-493-g1a9df23, which is pushed
->> to
->> to-build but not for-next yet. I'm guessing this might be what Kevin
->> pinged me
->> about on IRC today but I was out and unavailable most of the day.
+>> That would be great!  It would save me the trouble of fixing
+>> Manjanuth's patch and it would remove a source file too!
 >
-> Hmmm... mine seems to have booted fine on that build...
-> http://lists.linaro.org/pipermail/kernel-build-reports/2013-October/000666.html
+> The only thing I'm not sure about use where to enable the
+> USB_OHCI_HCD_PLATFORM driver for ARCH_EP93XX.
+>
+> Right now the ohci-ep93xx glue driver is enabled automatically
+> when USB_OHCI_HCD is enabled due to the ifdefery. I can add
+> a new config option similar to the other users of
+> USB_OHCI_HCD_PLATFORM but I was wondering if there is a
+> cleaner way.
 
-Well, it's a WARN_ON() not a panic, so my script probably shouldn't
-have aborted the boot (and your script should have reported it :-).
-Check your local log to see if you have something in there?
+Given that we're trying to reduce code under arch/arm and move it out
+to driver directories instead, I'm not sure this is a step in the
+right direction. :-) I guess it depends on how much code we're talking
+about here, so let's take that discussion once patches are posted.
 
 
 -Olof
