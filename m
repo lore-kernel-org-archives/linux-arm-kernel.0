@@ -1,90 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Oct 2013 12:11:46 +0100
-Subject: [PATCH 2/6] of: add function to check against a list of
- compatible strings
-In-Reply-To: <201310151247.50408.heiko@sntech.de>
-References: <201310151246.49402.heiko@sntech.de>
- <201310151247.50408.heiko@sntech.de>
-Message-ID: <20131015111145.GE19196@e106331-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Oct 2013 12:15:13 +0100
+Subject: [PATCH 01/11] usb: chipidea: Add power management support
+In-Reply-To: <20131015021814.GA3254@shlinux1.ap.freescale.net>
+References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
+ <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
+ <20131014110108.GL25034@n2100.arm.linux.org.uk>
+ <20131015021814.GA3254@shlinux1.ap.freescale.net>
+Message-ID: <20131015111512.GA25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Tue, Oct 15, 2013 at 10:18:15AM +0800, Peter Chen wrote:
+> So, the lessons for this topic are:
+> 
+> - If one atomic variable's operation only includes one instruction like
+> atomic_read and atomic_set, it is not meaningful for using atomic
+> operation, we can just use bool instead of it.
 
-On Tue, Oct 15, 2013 at 11:47:50AM +0100, Heiko St?bner wrote:
-> The basic of functions already provide a of_device_is_compatible to check
-> if a device's compatible property contains a specific one. But sometimes
-> it's also necessary to check if the device is compatible to one out of a
-> list of compatible devices.
-> 
-> Therefore add of_device_is_any_of that reuses the compatible check of
-> of_device_is_compatible but checks against a list of compatible strings
-> without the locking overhead of calling of_device_is_compatible multiple
-> times.
+The lesson here is that these are 100% equivalent as far as safety from
+races is concerned:
 
-I don't think we need this -- we already have of_match_node, and you can
-use it to achieve the same result.
+	a = atomic_read(&v);		a = v->counter;
 
-Thanks,
-Mark.
+	atomic_set(&v, b);		v->counter = b;
 
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/of/base.c  |   21 +++++++++++++++++++++
->  include/linux/of.h |    2 ++
->  2 files changed, 23 insertions(+)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 865d3f6..589f43e 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -366,6 +366,27 @@ int of_device_is_compatible(const struct device_node *device,
->  EXPORT_SYMBOL(of_device_is_compatible);
->  
->  /**
-> + * Checks if any of the given "compat" strings matches one of the strings
-> + * in the device's "compatible" property.
-> + */
-> +int of_device_is_any_of(const struct device_node *device,
-> +			const char * const *compat, int num) {
-> +	unsigned long flags;
-> +	int res = 0, i;
-> +
-> +	raw_spin_lock_irqsave(&devtree_lock, flags);
-> +	for (i = 0; i < num; i++) {
-> +		if (__of_device_is_compatible(device, compat[i])) {
-> +			res = 1;
-> +			break;
-> +		}
-> +	}
-> +	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-> +	return res;
-> +}
-> +EXPORT_SYMBOL(of_device_is_any_of);
-> +
-> +/**
->   * of_machine_is_compatible - Test root of device tree for a given compatible value
->   * @compat: compatible string to look for in root node's compatible property.
->   *
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index f95aee3..5bf7c9a 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -262,6 +262,8 @@ extern int of_property_count_strings(struct device_node *np,
->  				     const char *propname);
->  extern int of_device_is_compatible(const struct device_node *device,
->  				   const char *);
-> +extern int of_device_is_any_of(const struct device_node *device,
-> +			       const char * const *compat, int num);
->  extern int of_device_is_available(const struct device_node *device);
->  extern const void *of_get_property(const struct device_node *node,
->  				const char *name,
-> -- 
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+and in general, whenever atomic_read() gets used it's almost certainly
+a sign of a bug.
+
+Consider this (similar has been submitted):
+
+	a = atomic_read(&v);
+	if (a != 0)
+		a += 1;
+
+	atomic_set(&v, a);
+
+and people have thought that somehow this is magically safe from races
+because they're using atomic_t, and somehow that saves the universe.
+The above is in fact no safer than:
+
+	a = *v;
+	if (a != 0)
+		a += 1;
+	*v = a;
+
+The only thing that using atomic_* does is add a false sense of security
+and a level of obfuscation to catch the unwary reviewer.
+
+The reason is quite simple: a single access read in itself is atomic.
+Either it has read the value, or it hasn't.  A single access store is
+itself atomic.  Either the data has been written, or it hasn't.  The
+issue is _always_ what you do around it.
