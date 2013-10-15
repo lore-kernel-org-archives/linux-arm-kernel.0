@@ -1,14 +1,15 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 Oct 2013 18:06:36 +0200
-Subject: [PATCH 2/6] PCI: imx6: Fix the clock for PCIe
+Date: Tue, 15 Oct 2013 18:06:37 +0200
+Subject: [PATCH 3/6] ARM: dts: imx6qdl: Fix the clock for PCIe
 In-Reply-To: <1381853200-5534-1-git-send-email-marex@denx.de>
 References: <1381853200-5534-1-git-send-email-marex@denx.de>
-Message-ID: <1381853200-5534-3-git-send-email-marex@denx.de>
+Message-ID: <1381853200-5534-4-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCIe needs lvds_gate for successful operation, so make the PCIe
-driver enable (set as output) the lvds_gate .
+The clk #205 are lvds_sel, not lvds_gate , so fix this. Moreover,
+the PCIe needs lvds_gate for successful operation, so supply these
+clock to the PCIe driver.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -26,60 +27,23 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- drivers/pci/host/pci-imx6.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 728989a..94e4d0f 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -35,6 +35,7 @@ struct imx6_pcie {
- 	int			power_on_gpio;
- 	int			wake_up_gpio;
- 	int			disable_gpio;
-+	struct clk		*lvds_sel;
- 	struct clk		*lvds_gate;
- 	struct clk		*sata_ref_100m;
- 	struct clk		*pcie_ref_125m;
-@@ -255,6 +256,12 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
- 		goto err_pcie_ref;
- 	}
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 6e1113e..4497f3e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -127,8 +127,8 @@
+ 				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+ 			num-lanes = <1>;
+ 			interrupts = <0 123 0x04>;
+-			clocks = <&clks 189>, <&clks 187>, <&clks 206>, <&clks 144>;
+-			clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
++			clocks = <&clks 189>, <&clks 187>, <&clks 206>, <&clks 144>, <&clks 204>;
++			clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_sel", "pcie_axi", "lvds_gate";
+ 			status = "disabled";
+ 		};
  
-+	ret = clk_prepare_enable(imx6_pcie->lvds_sel);
-+	if (ret) {
-+		dev_err(pp->dev, "unable to enable lvds_sel\n");
-+		goto err_lvds_sel;
-+	}
-+
- 	ret = clk_prepare_enable(imx6_pcie->lvds_gate);
- 	if (ret) {
- 		dev_err(pp->dev, "unable to enable lvds_gate\n");
-@@ -273,8 +280,10 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
- 	return 0;
- 
- err_pcie_axi:
--	clk_disable_unprepare(imx6_pcie->lvds_gate);
-+	clk_disable_unprepare(imx6_pcie->lvds_sel);
- err_lvds_gate:
-+	clk_disable_unprepare(imx6_pcie->lvds_gate);
-+err_lvds_sel:
- 	clk_disable_unprepare(imx6_pcie->pcie_ref_125m);
- err_pcie_ref:
- 	clk_disable_unprepare(imx6_pcie->sata_ref_100m);
-@@ -497,6 +506,14 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Fetch clocks */
-+	imx6_pcie->lvds_sel = devm_clk_get(&pdev->dev, "lvds_sel");
-+	if (IS_ERR(imx6_pcie->lvds_sel)) {
-+		dev_err(&pdev->dev,
-+			"lvds_sel clock select missing or invalid\n");
-+		ret = PTR_ERR(imx6_pcie->lvds_sel);
-+		goto err;
-+	}
-+
- 	imx6_pcie->lvds_gate = devm_clk_get(&pdev->dev, "lvds_gate");
- 	if (IS_ERR(imx6_pcie->lvds_gate)) {
- 		dev_err(&pdev->dev,
 -- 
 1.8.4.rc3
