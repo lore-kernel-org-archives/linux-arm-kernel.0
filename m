@@ -1,51 +1,121 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Oct 2013 01:24:17 +0530
-Subject: [PATCH v2 7/7] arm/dts: added dt properties to adapt to the new phy
- framwork
-In-Reply-To: <1381866857-3861-1-git-send-email-kishon@ti.com>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
-Message-ID: <1381866857-3861-8-git-send-email-kishon@ti.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Tue, 15 Oct 2013 22:04:17 +0200
+Subject: [PATCH v6 0/5] clk: clock deregistration support
+In-Reply-To: <3160771.O1gFkR91vK@avalon>
+References: <1377874402-2944-1-git-send-email-s.nawrocki@samsung.com>
+ <52420664.2040604@gmail.com> <3160771.O1gFkR91vK@avalon>
+Message-ID: <525D9FC1.2040204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added device tree bindings for dwc3, usb2 and usb3 PHYs. The documentation
-of these can be found at Documentation/devicetree/bindings/phy/phy-bindings.txt
-and Documentation/devicetree/bindings/phy/ti-phy.txt.
+Hi,
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+(adding linux-media mailing list at Cc)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index edc801f..998f198 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -661,7 +661,8 @@
- 				compatible = "snps,dwc3";
- 				reg = <0x4a030000 0x10000>;
- 				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
--				usb-phy = <&usb2_phy>, <&usb3_phy>;
-+				phys = <&usb2_phy>, <&usb3_phy>;
-+				phy-names = "usb2-phy", "usb3-phy";
- 				tx-fifo-resize;
- 			};
- 		};
-@@ -677,6 +678,7 @@
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a084000 0x7c>;
- 				ctrl-module = <&omap_control_usb2phy>;
-+				#phy-cells = <0>;
- 			};
- 
- 			usb3_phy: usb3phy at 4a084400 {
-@@ -686,6 +688,7 @@
- 				      <0x4a084c00 0x40>;
- 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
- 				ctrl-module = <&omap_control_usb3phy>;
-+				#phy-cells = <0>;
- 			};
- 		};
- 
--- 
-1.7.10.4
+On 09/25/2013 11:47 AM, Laurent Pinchart wrote:
+> On Tuesday 24 September 2013 23:38:44 Sylwester Nawrocki wrote:
+[...]
+>> The only issue I found might be at the omap3isp driver, which provides
+>> clock to its sub-drivers and takes reference on the sub-driver modules.
+>> When sub-driver calls clk_get() all modules would get locked in memory,
+>> due to circular reference. One solution to that could be to pass NULL
+>> struct device pointer, as in the below patch.
+>
+> Doesn't that introduce race conditions ? If the sub-drivers require the clock,
+> they want to be sure that the clock won't disappear beyond their backs. I
+> agree that the circular dependency needs to be solved somehow, but we probably
+> need a more generic solution. The problem will become more widespread in the
+> future with DT-based device instantiation in both V4L2 and KMS.
+
+I'm wondering whether subsystems and drivers itself should be written so
+they deal with such dependencies they are aware of.
+
+There is similar situation in the regulator API, regulator_get() simply
+takes a reference on a module providing the regulator object.
+
+Before a "more generic solution" is available, what do you think about
+keeping obtaining a reference on a clock provider module in clk_get() and
+doing clk_get(), clk_prepare_enable(), ..., clk_unprepare_disable(),
+clk_put() in sub-driver whenever a clock is actively used, to avoid
+permanent circular reference ?
+
+--
+Thanks,
+Sylwester
+
+>> ---------8<------------------
+>>   From ca5963041aad67e31324cb5d4d5e2cfce1706d4f Mon Sep 17 00:00:00 2001
+>> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>> Date: Thu, 19 Sep 2013 23:52:04 +0200
+>> Subject: [PATCH] omap3isp: Pass NULL device pointer to clk_register()
+>>
+>> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>> ---
+>>    drivers/media/platform/omap3isp/isp.c |   15 ++++++++++-----
+>>    drivers/media/platform/omap3isp/isp.h |    1 +
+>>    2 files changed, 11 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/omap3isp/isp.c
+>> b/drivers/media/platform/omap3isp/isp.c
+>> index df3a0ec..d7f3c98 100644
+>> --- a/drivers/media/platform/omap3isp/isp.c
+>> +++ b/drivers/media/platform/omap3isp/isp.c
+>> @@ -290,9 +290,11 @@ static int isp_xclk_init(struct isp_device *isp)
+>>    	struct clk_init_data init;
+>>    	unsigned int i;
+>>
+>> +	for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i)
+>> +		isp->xclks[i] = ERR_PTR(-EINVAL);
+>> +
+>>    	for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
+>>    		struct isp_xclk *xclk =&isp->xclks[i];
+>> -		struct clk *clk;
+>>
+>>    		xclk->isp = isp;
+>>    		xclk->id = i == 0 ? ISP_XCLK_A : ISP_XCLK_B;
+>> @@ -306,9 +308,9 @@ static int isp_xclk_init(struct isp_device *isp)
+>>
+>>    		xclk->hw.init =&init;
+>>
+>> -		clk = devm_clk_register(isp->dev,&xclk->hw);
+>> -		if (IS_ERR(clk))
+>> -			return PTR_ERR(clk);
+>> +		xclk->clk = clk_register(NULL,&xclk->hw);
+>> +		if (IS_ERR(xclk->clk))
+>> +			return PTR_ERR(xclk->clk);
+>>
+>>    		if (pdata->xclks[i].con_id == NULL&&
+>>    		pdata->xclks[i].dev_id == NULL)
+>> @@ -320,7 +322,7 @@ static int isp_xclk_init(struct isp_device *isp)
+>>
+>>    		xclk->lookup->con_id = pdata->xclks[i].con_id;
+>>    		xclk->lookup->dev_id = pdata->xclks[i].dev_id;
+>> -		xclk->lookup->clk = clk;
+>> +		xclk->lookup->clk = xclk->clk;
+>>
+>>    		clkdev_add(xclk->lookup);
+>>    	}
+>> @@ -335,6 +337,9 @@ static void isp_xclk_cleanup(struct isp_device *isp)
+>>    	for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
+>>    		struct isp_xclk *xclk =&isp->xclks[i];
+>>
+>> +		if (!IS_ERR(xclk->clk))
+>> +			clk_unregister(xclk->clk);
+>> +
+>>    		if (xclk->lookup)
+>>    			clkdev_drop(xclk->lookup);
+>>    	}
+>> diff --git a/drivers/media/platform/omap3isp/isp.h
+>> b/drivers/media/platform/omap3isp/isp.h
+>> index cd3eff4..1498f2b 100644
+>> --- a/drivers/media/platform/omap3isp/isp.h
+>> +++ b/drivers/media/platform/omap3isp/isp.h
+>> @@ -135,6 +135,7 @@ struct isp_xclk {
+>>    	struct isp_device *isp;
+>>    	struct clk_hw hw;
+>>    	struct clk_lookup *lookup;
+>> +	struct clk *clk;
+>>    	enum isp_xclk_id id;
+>>
+>>    	spinlock_t lock;	/* Protects enabled and divider */
+>> ---------8<------------------
