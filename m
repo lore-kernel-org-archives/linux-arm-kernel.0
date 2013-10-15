@@ -1,94 +1,117 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 15 Oct 2013 19:09:22 +0200
-Subject: [PATCH 4/8] ARM: add Marvell Berlin SoC familiy to Marvell doc
-In-Reply-To: <20131015111039.6a7e664b@xhacker>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <525C7993.40408@gmail.com> <20131015111039.6a7e664b@xhacker>
-Message-ID: <525D76C2.1020406@gmail.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Tue, 15 Oct 2013 10:20:41 -0700
+Subject: [PATCH v8 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <20131015110725.GZ25034@n2100.arm.linux.org.uk>
+References: <1381527938-22840-1-git-send-email-acourbot@nvidia.com>
+ <1381527938-22840-2-git-send-email-acourbot@nvidia.com>
+ <20131015110725.GZ25034@n2100.arm.linux.org.uk>
+Message-ID: <525D7969.5060908@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2013 05:10 AM, Jisheng Zhang wrote:
-> Hi Sebastian,
+On 10/15/2013 04:07 AM, Russell King - ARM Linux wrote:
+> On Fri, Oct 11, 2013 at 02:45:34PM -0700, Alexandre Courbot wrote:
+>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+>> can be invoked using the same SMC-based API on all supported
+>> platforms. This patch adds initial basic support for Trusted
+>> Foundations using the ARM firmware API. Current features are limited
+>> to the ability to boot secondary processors.
+>>
+>> Note: The API followed by Trusted Foundations does *not* follow the SMC
+>> calling conventions. It has nothing to do with PSCI neither and is only
+>> relevant to devices that use Trusted Foundations (like most Tegra-based
+>> retail devices).
+>>
+>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>>   .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
+>>   .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>>   arch/arm/Kconfig                                   |  2 +
+>>   arch/arm/Makefile                                  |  1 +
+>>   arch/arm/firmware/Kconfig                          | 28 ++++++++
+>>   arch/arm/firmware/Makefile                         |  1 +
+>>   arch/arm/firmware/trusted_foundations.c            | 79 ++++++++++++++++++++++
+>>   arch/arm/include/asm/trusted_foundations.h         | 68 +++++++++++++++++++
+>>   8 files changed, 200 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>>   create mode 100644 arch/arm/firmware/Kconfig
+>>   create mode 100644 arch/arm/firmware/Makefile
+>>   create mode 100644 arch/arm/firmware/trusted_foundations.c
+>>   create mode 100644 arch/arm/include/asm/trusted_foundations.h
 >
-> On Mon, 14 Oct 2013 16:09:07 -0700
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> Is having this under arch/arm appropriate?  What happens if the API
+> gets re-used on ARM64 for example?  Would drivers/firmware be a better
+> cross-arch location for this?
+
+The reason why this has been put into arch/arm is that the firmware_ops 
+feature this patch depends also resides there 
+(arch/arm/include/asm/firmware.h).
+
+On the other hand it might also make sense to move firmware_ops out of 
+ARM since I don't see anything ARM-specific with it. Tomasz, could we 
+have your thoughts on this?
+
+>> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+>> new file mode 100644
+>> index 0000000..c6f20bd
+>> --- /dev/null
+>> +++ b/arch/arm/include/asm/trusted_foundations.h
+>> @@ -0,0 +1,68 @@
+>> +/*
+>> + * Copyright (c) 2013, NVIDIA Corporation.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + */
+>> +
+>> +/*
+>> + * Support for the Trusted Foundations secure monitor.
+>> + *
+>> + * Trusted Foundation comes active on some ARM consumer devices (most
+>> + * Tegra-based devices sold on the market are concerned). Such devices can only
+>> + * perform some basic operations, like setting the CPU reset vector, through
+>> + * SMC calls to the secure monitor. The calls are completely specific to
+>> + * Trusted Foundations, and do *not* follow the SMC calling convention or the
+>> + * PSCI standard.
+>> + */
+>> +
+>> +#ifndef __ASM_ARM_TRUSTED_FOUNDATIONS_H
+>> +#define __ASM_ARM_TRUSTED_FOUNDATIONS_H
+>> +
+>> +#include <linux/kconfig.h>
+>> +
+>> +struct trusted_foundations_platform_data {
+>> +	unsigned int version_major;
+>> +	unsigned int version_minor;
+>> +};
+>> +
+>> +#if IS_ENABLED(CONFIG_TRUSTED_FOUNDATIONS)
+>> +
+>> +void register_trusted_foundations(struct trusted_foundations_platform_data *pd);
+>> +void of_register_trusted_foundations(void);
+>> +
+>> +#else /* CONFIG_TRUSTED_FOUNDATIONS */
+>> +
+>> +#include <linux/printk.h>
+>> +#include <linux/of.h>
+>> +#include <asm/bug.h>
 >
->> On 10/08/2013 02:24 PM, Sebastian Hesselbarth wrote:
->>> This adds known facts and rumors about the Marvell Berlin (88DE3xxx) SoC
->>> family to the Marvell SoC documentation.
->>>
->>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> Reviewed-by: Jason Cooper <jason@lakedaemon.net>
->>> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
->>> ---
->>> Changelog:
->>> RFCv2->v1:
->>> - move Berlin below PXA/MMP[23] where it belongs to
->>> - add note about IP (re-)used in Berlin SoCs
->>> RFCv1->RFCv2:
->>> - initial patch
->>>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Rob Landley <rob@landley.net>
->>> Cc: linux-doc at vger.kernel.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> ---
->>>    Documentation/arm/Marvell/README |   29 +++++++++++++++++++++++++++++
->>>    1 file changed, 29 insertions(+)
->>>
->>> diff --git a/Documentation/arm/Marvell/README
->>> b/Documentation/arm/Marvell/README index 8f08a86..993c45d 100644
->>> --- a/Documentation/arm/Marvell/README
->>> +++ b/Documentation/arm/Marvell/README
->>> @@ -210,6 +210,35 @@ MMP/MMP2 family (communication processor)
->>>       Linux kernel mach directory: arch/arm/mach-mmp
->>>       Linux kernel plat directory: arch/arm/plat-pxa
->>>
->>> +Berlin family (Digital Entertainment)
->>> +-------------------------------------
->>> +
->>> +  Flavors:
->>> +	88DE3005, Armada 1500-mini
->>> +		Design name:	BG2CD(A0)
->>> +		Core:		ARM Cortex-A9, PL310 L2CC
->>> +		Homepage:
->>> http://www.marvell.com/digital-entertainment/armada-1500-mini/
->>> +	88DE3010, Armada 1000
->>> +		Design name:	BG2(?)
->>> +		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
->>> +		Product Brief:
->>> http://www.marvell.com/digital-entertainment/assets/armada_1000_pb.pdf
->>> +	88DE3100, Armada 1500
->>> +		Design name:	BG2(A0)
->>> +		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
->>> +		Homepage:
->>> http://www.marvell.com/digital-entertainment/armada-1500/
->>> +		Product Brief:
->>> http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
->>> +	88DE????
->>> +		Design name:	BG3
->>> +		Core:		ARM Cortex-A15, CA15 integrated L2CC
->>
->> Jisheng,
->>
->> can you comment on the above and fill in the missing pieces?
->>
->> Especially, if we want to base device tree compatibles later, we should
->> make it right in the first place.
->>
+> Please move these up along side the other #include - having includes depend
+> on config symbols is an additional unnecessary source of fragility.
 >
-> Sorry, I can't leak some information now. So could we remove the BG3 and 88DE3010 sections?
-> I promise I will update those information when I submit BG3 enable patches in near future.
+> Secondly, please use linux/*.h includes in preference to asm/*.h where the
+> linux/*.h include picks up the corresponding asm/*.h include.  In this case,
+> that should be linux/bug.h, not asm/bug.h.
 
-Ok, but I leave the place-holders above for you to remember ;)
+Will do, thanks!
 
-One last question: Can you at least tell what pl310 revision (e.g. r0p0
-or r2p0) Tauros3's aux_ctrl is compatible with?
-
-Sebastian
+Alex.
