@@ -1,57 +1,61 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Wed, 16 Oct 2013 01:38:09 +0300
-Subject: .align may cause data to be interpreted as instructions
-Message-ID: <525DC3D1.5030300@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 15 Oct 2013 23:42:44 +0100
+Subject: [PATCH v2 01/10] of/irq: Rework of_irq_count()
+In-Reply-To: <CAL_JsqLE8aj511oF-gK7Gu5QfmHsQO3+oJ0KFkv0wmuo7i6eiw@mail.gmail.com>
+References: <1379510692-32435-1-git-send-email-treding@nvidia.com>
+ <1379510692-32435-2-git-send-email-treding@nvidia.com>
+ <CAL_JsqLE8aj511oF-gK7Gu5QfmHsQO3+oJ0KFkv0wmuo7i6eiw@mail.gmail.com>
+Message-ID: <20131015224245.0B071C40099@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Sun, 22 Sep 2013 16:19:27 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Sep 18, 2013 at 8:24 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > The of_irq_to_resource() helper that is used to implement of_irq_count()
+> > tries to resolve interrupts and in fact creates a mapping for resolved
+> > interrupts. That's pretty heavy lifting for something that claims to
+> > just return the number of interrupts requested by a given device node.
+> >
+> > Instead, use the more lightweight of_irq_map_one(), which, despite the
+> > name, doesn't create an actual mapping. Perhaps a better name would be
+> > of_irq_translate_one().
+> >
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> 
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-I was debugging kprobes-test for BE8 and noticed that some data fields
-are stored in LE instead of BE. It happens because these data fields
-get interpreted as instructions.
+Applied (and fixed to match the of_irq_map_one --> of_irq_parse_one
+rename that I'm going to merge in v3.13).
 
-Is it a known issue?
+g.
 
-For example:
-test_align_fail_data:
-	bx	lr
-	.byte 0xaa
-	.align
-	.word 0x12345678
-
-I would expect to see something like this:
-00000000 <test_align_fail_data>:
-   0:	e12fff1e 	bx	lr
-   4:	aa          	.byte	0xaa
-   5:	00          	.byte	0x00
-   6:	0000      	.short	0x0000
-   8:	12345678 	.word	0x12345678
-
-But instead I have:
-00000000 <test_align_fail_data>:
-   0:	e12fff1e 	bx	lr
-   4:	aa          	.byte	0xaa
-   5:	00          	.byte	0x00
-   6:	0000      	.short	0x0000
-   8:	12345678 	eorsne	r5, r4, #120, 12	; 0x7800000
-
-As a result the word 0x12345678 will be stored in LE.
-
-I've run several tests and here are my observations:
-- Double ".align" fixes the issue :)
-- Behavior is the same for LE/BE, ARM/Thumb, GCC 4.4.1/4.6.x/4.8.2
-- Size of alignment doesn't matter.
-- Issue happens only if previous data is not instruction-aligned and
-    0's are added before NOPs.
-- Explicit filling with 0's (.align , 0) fixes the issue, but as a side
-    effect data @0x4 is interpreted as a single ".word 0xaa000000"
-    instead of ".byte .byte .short". I'm not sure if there can be any
-    functional difference because of this.
-- Issue doesn't happen if there is no instructions before data
-  (no "bx lr" in the example).
-- Issue doesn't happen if data after .align is defined as
-    ".type <symbol>,%object".
-
--- 
-Taras Kondratiuk
+> 
+> > ---
+> >  drivers/of/irq.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> > index 1752988..5f44388 100644
+> > --- a/drivers/of/irq.c
+> > +++ b/drivers/of/irq.c
+> > @@ -368,9 +368,10 @@ EXPORT_SYMBOL_GPL(of_irq_to_resource);
+> >   */
+> >  int of_irq_count(struct device_node *dev)
+> >  {
+> > +       struct of_irq irq;
+> >         int nr = 0;
+> >
+> > -       while (of_irq_to_resource(dev, nr, NULL))
+> > +       while (of_irq_map_one(dev, nr, &irq) == 0)
+> >                 nr++;
+> >
+> >         return nr;
+> > --
+> > 1.8.4
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
