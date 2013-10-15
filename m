@@ -1,80 +1,58 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 15 Oct 2013 07:00:59 -0700
-Subject: [GIT PULL 3/6] omap hwmod changes for v3.13 merge window
-In-Reply-To: <CAOesGMiob0maOAG0pirB_0Rj2EeA-2ao++ZGf4Zg7SVbcmcOpA@mail.gmail.com>
-References: <5258a9a6.4a17e00a.5fb3.ffff9bf3SMTPIN_ADDED_MISSING@mx.google.com>
- <87a9ib4gmb.fsf@linaro.org> <20131015041130.GB25997@quad.lixom.net>
- <CAGa+x84a2b4DWqu0YT=NVt_SMYpyPkL1ZdzTXnocoZZjNzi9mw@mail.gmail.com>
- <CAOesGMiob0maOAG0pirB_0Rj2EeA-2ao++ZGf4Zg7SVbcmcOpA@mail.gmail.com>
-Message-ID: <CAGa+x86S2_2qT+76TMBKD5dvJf0d2fDW5=XXrdUSsqwfxzwqSw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 15 Oct 2013 16:06:42 +0200
+Subject: [RFC v3 PATCH 0/7] ARM[64]: kernel mode NEON in atomic contexts
+In-Reply-To: <CAKv+Gu-rbNmwJf09JVUYYyJjoGrJqpsrv=x_wWMJ6r-EofbYDQ@mail.gmail.com>
+References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.03.1310142353210.1873@syhkavp.arg>
+ <CAKv+Gu-rbNmwJf09JVUYYyJjoGrJqpsrv=x_wWMJ6r-EofbYDQ@mail.gmail.com>
+Message-ID: <CAKv+Gu85Vg1UZd7Vky_d7A5oTBSygXhtD5uF7R+c8cdCFdRgQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 9:30 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Oct 14, 2013 at 9:25 PM, Kevin Hilman <khilman@linaro.org> wrote:
+On 15 October 2013 15:13, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 15 October 2013 06:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> On Sun, 13 Oct 2013, Ard Biesheuvel wrote:
 >>
->> On Oct 14, 2013 9:12 PM, "Olof Johansson" <olof@lixom.net> wrote:
->>>
->>> On Mon, Oct 14, 2013 at 03:44:44PM -0700, Kevin Hilman wrote:
->>> > Tony Lindgren <tony@atomide.com> writes:
->>> >
->>> > > The following changes since commit
->>> > > d0e639c9e06d44e713170031fe05fb60ebe680af:
->>> > >
->>> > >   Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
->>> > >
->>> > > are available in the git repository at:
->>> > >
->>> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap
->>> > > tags/omap-for-v3.13/hwmod-signed
->>> > >
->>> > > for you to fetch changes up to
->>> > > 254f57a92987b6cde6004f58d6b847813dfb9e0e:
->>> > >
->>> > >   ARM: OMAP5: hwmod: add missing ocp2scp hwmod data (2013-10-11
->>> > > 15:37:05 -0700)
->>> > >
->>> > > ----------------------------------------------------------------
->>> > > omap hwmod related changes via Paul Walmsley <paul@pwsan.com>:
->>> > >
->>> > > Some OMAP hwmod changes for 3.13.  Significant changes here include:
->>> > >
->>> > > - support for moving some of the hwmod flags to DT data
->>> > >
->>> > > - support for the SSI, hardware spinlock, USB host/TLL, and RNG IP
->>> > >   blocks for various OMAPs
->>> > >
->>> > > - a fix that again decouples hwmod data changes from unrelated DT data
->>> > >   patchsets
->>> > >
->>> > > Basic test logs are available at:
->>> > >
->>> > > http://www.pwsan.com/omap/testlogs/prcm_fixes_v3.13/20131009094936/
->>> > >
->>> > > ----------------------------------------------------------------
->>> >
->>> > Pulled into next/soc,
->>> >
->>> > Thanks,
->>> >
->>> > Kevin
->>>
->>> Hm, looks like my BBB hit this on v3.12-rc4-493-g1a9df23, which is pushed
->>> to
->>> to-build but not for-next yet. I'm guessing this might be what Kevin
->>> pinged me
->>> about on IRC today but I was out and unavailable most of the day.
+>>> Instead of having additional separate versions of kernel_neon_begin/end, the
+>>> existing ones now have been modified to always take a preallocated stack area
+>>> as an argument.
 >>
->> Hmmm... mine seems to have booted fine on that build...
->> http://lists.linaro.org/pipermail/kernel-build-reports/2013-October/000666.html
+>> The problem with this approach is that you break git bisect by making
+>> the kernel unbuildable when this series is partially applied.  Either
+>> you make kernel_neon_begin/end into wrappers with no argument around the
+>> new interface, or you change all users at the same time as the
+>> interface.  One big principle is not to break the kernel build in the
+>> middle of a patch series when altering an existing interface.
+>>
 >
-> Well, it's a WARN_ON() not a panic, so my script probably shouldn't
-> have aborted the boot (and your script should have reported it :-).
+> I see.
+>
+>>> The stack area is allocated by DEFINE_NEON_REGSTACK[_PARTIAL](varname), where
+>>> the partial version takes an additional int num_regs indicating how many
+>>> registers need to be freed up.
+>>>
+>>> In the !in_interrupt() case, these functions operate as before, and the regstack
+>>> is defined to minimal size in this case as it will remain unused anyway. In the
+>>> in_interrupt() case, 'num_regs' (or all) NEON registers are stacked/unstacked
+>>> using the allocated stack region.
+>>
+>> Would have been nice to have the stack simply be a NULL pointer when
+>> !in_interrupt() or when the number of regs is 0.  This would remove the
+>> need for a runtime check on !num_regs.  I don't see an obvious way to
+>> accomplish that right now though.
+>>
+>
+> We could address both of these issues by implementing Catalin's
+> suggestion to reserve per-process vfp_states[] for both irq and
+> softirq context in addition to the ordinary one, but it would waste a
+> lot of space imo. What is your take on that?
+>
 
-Yes indeed, it's been on my todo list to catch/report those.
+Replying to self: two per-cpu vfp_states, one for irq and one for
+softirq, is probably the best approach here. I still need to add
+kernel_neon_begin_partial() in this case, but the existing users can
+remain unmodified.
+I will do a v4 by end of next week.
 
-> Check your local log to see if you have something in there?
-
-Yup, there are a few backtraces due to the warns.
-
-Kevin
+Regards,
+Ard.
