@@ -1,119 +1,100 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 15 Oct 2013 07:37:48 -0500
-Subject: [RESEND PATCHv2 1/3] arm: socfpga: Set the SDMMC clock phase
- in system manager
-In-Reply-To: <525CE5FD.8070107@samsung.com>
-References: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
- <525CE5FD.8070107@samsung.com>
-Message-ID: <525D371C.3070201@gmail.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 15 Oct 2013 14:44:34 +0200
+Subject: [PATCH 2/6] of: add function to check against a list of
+ compatible strings
+In-Reply-To: <20131015111145.GE19196@e106331-lin.cambridge.arm.com>
+References: <201310151246.49402.heiko@sntech.de>
+ <201310151247.50408.heiko@sntech.de>
+ <20131015111145.GE19196@e106331-lin.cambridge.arm.com>
+Message-ID: <201310151444.35011.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoo,
+Am Dienstag, 15. Oktober 2013, 13:11:46 schrieb Mark Rutland:
+> Hi Heiko,
+> 
+> On Tue, Oct 15, 2013 at 11:47:50AM +0100, Heiko St?bner wrote:
+> > The basic of functions already provide a of_device_is_compatible to check
+> > if a device's compatible property contains a specific one. But sometimes
+> > it's also necessary to check if the device is compatible to one out of a
+> > list of compatible devices.
+> > 
+> > Therefore add of_device_is_any_of that reuses the compatible check of
+> > of_device_is_compatible but checks against a list of compatible strings
+> > without the locking overhead of calling of_device_is_compatible multiple
+> > times.
+> 
+> I don't think we need this -- we already have of_match_node, and you can
+> use it to achieve the same result.
 
-On 10/15/13 1:51 AM, Jaehoon Chung wrote:
-> Hi Dinh,
->
-> On 10/15/2013 04:47 AM, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> Add functionality in the System Manager to set the SDR settings for the
->> SD/MMC IP.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->> Cc: Pavel Machek <pavel@denx.de>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Olof Johansson <olof@lixom.net>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Stephen Warren <swarren@wwwdotorg.org>
->> Cc: Ian Campbell <ian.campbell@citrix.com>
->> Cc: Chris Ball <cjb@laptop.org>
->> Cc: Jaehoon Chung <jh80.chung@samsung.com>
->> Cc: Seungwon Jeon <tgih.jun@samsung.com>
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-mmc at vger.kernel.org
->> CC: linux-arm-kernel at lists.infradead.org
->>
->> ---
->> v2:
->> - Have socfpga_sysmgr_set_dwmmc_drvsel_smpsel() take in the SDR settings
->> directly so that it does not have to walk the DTB.
->> ---
->>   arch/arm/mach-socfpga/Makefile     |    2 +-
->>   arch/arm/mach-socfpga/core.h       |    6 ++++++
->>   arch/arm/mach-socfpga/system_mgr.c |   28 ++++++++++++++++++++++++++++
->>   3 files changed, 35 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm/mach-socfpga/system_mgr.c
->>
->> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
->> index 6dd7a93..e4ff8b9 100644
->> --- a/arch/arm/mach-socfpga/Makefile
->> +++ b/arch/arm/mach-socfpga/Makefile
->> @@ -2,5 +2,5 @@
->>   # Makefile for the linux kernel.
->>   #
->>   
->> -obj-y					:= socfpga.o
->> +obj-y					:= socfpga.o system_mgr.o
->>   obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
->> diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
->> index 572b8f7..b05fa6a 100644
->> --- a/arch/arm/mach-socfpga/core.h
->> +++ b/arch/arm/mach-socfpga/core.h
->> @@ -44,4 +44,10 @@ extern unsigned long cpu1start_addr;
->>   
->>   #define SOCFPGA_SCU_VIRT_BASE   0xfffec000
->>   
->> +/* SDMMC Group for System Manager defines */
->> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET             0x108
->> +#define DRV_CLK_PHASE_SHIFT_SEL_MASK    0x7
-> I didn't see where this define is used. When do this use?
-It's not used at all. I will remove.
+You are right of course, of_match_node does exactly what needed.
 
-Thanks for the review.
-Dinh
->
-> Best Regards,
-> Jaehoon Chung
->
->> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
->> +	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
->> +
->>   #endif
->> diff --git a/arch/arm/mach-socfpga/system_mgr.c b/arch/arm/mach-socfpga/system_mgr.c
->> new file mode 100644
->> index 0000000..9fdce1d
->> --- /dev/null
->> +++ b/arch/arm/mach-socfpga/system_mgr.c
->> @@ -0,0 +1,28 @@
->> +/*
->> + * Copyright Altera Corporation (C) 2013. All Rights Reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +#include <linux/of_platform.h>
->> +#include <asm/mach/map.h>
->> +
->> +#include "core.h"
->> +
->> +void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(u32 drvsel, u32 smplsel)
->> +{
->> +	u32 hs_timing;
->> +
->> +	hs_timing = SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel);
->> +	writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
->> +}
->> +EXPORT_SYMBOL(socfpga_sysmgr_set_dwmmc_drvsel_smpsel);
->>
+
+Thanks
+Heiko
+
+
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  drivers/of/base.c  |   21 +++++++++++++++++++++
+> >  include/linux/of.h |    2 ++
+> >  2 files changed, 23 insertions(+)
+> > 
+> > diff --git a/drivers/of/base.c b/drivers/of/base.c
+> > index 865d3f6..589f43e 100644
+> > --- a/drivers/of/base.c
+> > +++ b/drivers/of/base.c
+> > @@ -366,6 +366,27 @@ int of_device_is_compatible(const struct device_node
+> > *device,
+> > 
+> >  EXPORT_SYMBOL(of_device_is_compatible);
+> >  
+> >  /**
+> > 
+> > + * Checks if any of the given "compat" strings matches one of the
+> > strings + * in the device's "compatible" property.
+> > + */
+> > +int of_device_is_any_of(const struct device_node *device,
+> > +			const char * const *compat, int num) {
+> > +	unsigned long flags;
+> > +	int res = 0, i;
+> > +
+> > +	raw_spin_lock_irqsave(&devtree_lock, flags);
+> > +	for (i = 0; i < num; i++) {
+> > +		if (__of_device_is_compatible(device, compat[i])) {
+> > +			res = 1;
+> > +			break;
+> > +		}
+> > +	}
+> > +	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+> > +	return res;
+> > +}
+> > +EXPORT_SYMBOL(of_device_is_any_of);
+> > +
+> > +/**
+> > 
+> >   * of_machine_is_compatible - Test root of device tree for a given
+> >   compatible value * @compat: compatible string to look for in root
+> >   node's compatible property. *
+> > 
+> > diff --git a/include/linux/of.h b/include/linux/of.h
+> > index f95aee3..5bf7c9a 100644
+> > --- a/include/linux/of.h
+> > +++ b/include/linux/of.h
+> > @@ -262,6 +262,8 @@ extern int of_property_count_strings(struct
+> > device_node *np,
+> > 
+> >  				     const char *propname);
+> >  
+> >  extern int of_device_is_compatible(const struct device_node *device,
+> >  
+> >  				   const char *);
+> > 
+> > +extern int of_device_is_any_of(const struct device_node *device,
+> > +			       const char * const *compat, int num);
+> > 
+> >  extern int of_device_is_available(const struct device_node *device);
+> >  extern const void *of_get_property(const struct device_node *node,
+> >  
+> >  				const char *name,
