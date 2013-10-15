@@ -1,187 +1,41 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 15 Oct 2013 12:42:17 +0900
-Subject: [PATCH] sh-pfc: r8a7791 PFC support
-In-Reply-To: <1876860.l29tzQeBi6@avalon>
-References: <20131008040824.3480.69707.sendpatchset@w520>
- <1876860.l29tzQeBi6@avalon>
-Message-ID: <CANqRtoTS-=GUZ2HqyDRenTa7PnSfY8hN1j4U58L0JxzQamg+cA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 15 Oct 2013 00:01:09 -0400 (EDT)
+Subject: [RFC v3 PATCH 0/7] ARM[64]: kernel mode NEON in atomic
+ contexts
+In-Reply-To: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.03.1310142353210.1873@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Sun, 13 Oct 2013, Ard Biesheuvel wrote:
 
-On Thu, Oct 10, 2013 at 7:41 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
->
-> Thank you for the patch.
->
-> On Tuesday 08 October 2013 13:08:24 Magnus Damm wrote:
->> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
->>
->> Add PFC support for the r8a7791 SoC including pin groups for
->> on-chip devices such as MSIOF, SCIF, USB, MMC, VIN, SDHI, DU.
->>
->> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
->> Signed-off-by: Kunihito Higashiyama <kunihito.higashiyama.ur@renesas.com>
->> Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
->> Signed-off-by: Nobuyuki HIRAI <nobuyuki.hirai.xe@renesas.com>
->> Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
->> Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
->> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
->> [damm at opensource.se: Forward ported to upstream, reused existing sh-pfc
->> macros] Signed-off-by: Magnus Damm <damm@opensource.se>
->
-> I'll trust you for having reviewed all the data tables :-D
->
->> ---
->>
->>  Written against renesas-devel-20131004
->>
->>  Based on the following broken out patches from BSP v0.5.0:
->>  0739, 0766, 0771, 0774, 0777, 0782, 0798, 1056, 1057, 1235, 1261, 1271
->>
->>  drivers/pinctrl/sh-pfc/Kconfig       |    5
->>  drivers/pinctrl/sh-pfc/Makefile      |    1
->>  drivers/pinctrl/sh-pfc/core.c        |    3
->>  drivers/pinctrl/sh-pfc/core.h        |    1
->>  drivers/pinctrl/sh-pfc/pfc-r8a7791.c | 4327 +++++++++++++++++++++++++++++++
->>  5 files changed, 4337 insertions(+)
->>
->
-> [snip]
->
->> --- 0001/drivers/pinctrl/sh-pfc/core.c
->> +++ work/drivers/pinctrl/sh-pfc/core.c        2013-10-08 12:43:03.000000000 +0900
->> @@ -558,6 +558,9 @@ static const struct platform_device_id s
->>  #ifdef CONFIG_PINCTRL_PFC_R8A7790
->>       { "pfc-r8a7790", (kernel_ulong_t)&r8a7790_pinmux_info },
->>  #endif
->> +#ifdef CONFIG_PINCTRL_PFC_R8A7791
->> +     { "pfc-r8a7791", (kernel_ulong_t)&r8a7791_pinmux_info },
->> +#endif
->>  #ifdef CONFIG_PINCTRL_PFC_SH7203
->>       { "pfc-sh7203", (kernel_ulong_t)&sh7203_pinmux_info },
->>  #endif
->
-> You should also update the sh_pfc_of_table array.
+> Take #3 of this RFC series.
+> 
+> Instead of having additional separate versions of kernel_neon_begin/end, the
+> existing ones now have been modified to always take a preallocated stack area
+> as an argument.
 
-Ok, thanks, I will!
+The problem with this approach is that you break git bisect by making
+the kernel unbuildable when this series is partially applied.  Either
+you make kernel_neon_begin/end into wrappers with no argument around the
+new interface, or you change all users at the same time as the
+interface.  One big principle is not to break the kernel build in the
+middle of a patch series when altering an existing interface.
 
->> --- /dev/null
->> +++ work/drivers/pinctrl/sh-pfc/pfc-r8a7791.c 2013-10-08
-> 12:46:46.000000000
->> +0900 @@ -0,0 +1,4327 @@
->> +/*
->> + * arch/arm/cpu/armv7/rmobile/pfc-r8a7791.c
->
-> The file seems to have moved :-) You can probably just remove the file name,
-> it doesn't add much and only asks for getting outdated.
+> The stack area is allocated by DEFINE_NEON_REGSTACK[_PARTIAL](varname), where
+> the partial version takes an additional int num_regs indicating how many
+> registers need to be freed up.
+> 
+> In the !in_interrupt() case, these functions operate as before, and the regstack
+> is defined to minimal size in this case as it will remain unused anyway. In the
+> in_interrupt() case, 'num_regs' (or all) NEON registers are stacked/unstacked
+> using the allocated stack region.
 
-Yes, I agree. I will fix.
+Would have been nice to have the stack simply be a NULL pointer when 
+!in_interrupt() or when the number of regs is 0.  This would remove the 
+need for a runtime check on !num_regs.  I don't see an obvious way to 
+accomplish that right now though.
 
->> + *     This file is r8a7791 processor support - PFC hardware block.
->> + *
->> + * Copyright (C) 2013 Renesas Electronics Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2
->> + * as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program; if not, write to the Free Software Foundation,
->> + * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
->
-> You can remove the last two paragraphs.
 
-Ok!
-
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/platform_data/gpio-rcar.h>
->> +
->> +#include "core.h"
->> +#include "sh_pfc.h"
->
-> [snip]
->
->> +static struct sh_pfc_pin pinmux_pins[] = {
->> +     PINMUX_GPIO_GP_ALL(),
->> +};
->
-> [snip]
->
->> +/* - ETH
->> -------------------------------------------------------------------- */
->> +static const unsigned int eth_link_pins[] = {
->> +     /* LINK */
->> +     RCAR_GP_PIN(5, 18),
->> +};
->> +static const unsigned int eth_link_mux[] = {
->> +     ETH_LINK_MARK,
->> +};
->> +static const unsigned int eth_magic_pins[] = {
->> +     /* MAGIC */
->
-> I've seen an errata for a different SoC that renamed the ethernet "magic" pin
-> to "wol" (wake-on-lan). Could you check whether that has been done for R8A7791
-> as well ?
-
-Thanks, I will look into this and sync with the r8a7790 PFC table if needed!
-
->> +/* - VIN0
-
-> The red, green and blue signals need to be used together, shouldn't they be
-> grouped ?
-
-> Same for hsync and vsync. You could also s/_signal// here and below.
-
->> +/* - VIN1
-
-> No synchronization signals for vin1 ?
-
-Thanks for checking the VIN bits. I believe your comments are all
-valid, and I propose that I simply remove the VIN portions and request
-people to address your commends and submit support for this
-independently. I hope that is OK with you.
-
->> +static const struct sh_pfc_pin_group pinmux_groups[] = {
->> +     SH_PFC_PIN_GROUP(du_rgb666),
->> +     SH_PFC_PIN_GROUP(du_rgb888),
->> +     SH_PFC_PIN_GROUP(du_clk_out_0),
->> +     SH_PFC_PIN_GROUP(du_clk_out_1),
->> +     SH_PFC_PIN_GROUP(du_sync_1),
->> +     SH_PFC_PIN_GROUP(du_cde_disp),
->> +     SH_PFC_PIN_GROUP(du1_clk_in),
->> +     SH_PFC_PIN_GROUP(du0_clk_in),
->
-> du0 should come before du1.
-
-Sure.
-
->> +static const char * const du1_groups[] = {
->> +     "du1_clk_in",
->> +};
->> +
->> +static const char * const du0_groups[] = {
->> +     "du0_clk_in",
->> +};
->
-> And here too.
-
-Ok, I will fix that.
-
-If you don't mind then I will address the minor things myself and drop
-the VIN portion and then resend it as V2.
-
-Thanks for your review!
-
-Cheers,
-
-/ magnus
+Nicolas
