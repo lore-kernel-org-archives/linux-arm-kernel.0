@@ -1,15 +1,19 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 Oct 2013 18:06:39 +0200
-Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
+Date: Tue, 15 Oct 2013 18:06:38 +0200
+Subject: [PATCH 4/6] PCI: imx6: Probe the PCIe in fs_initcall()
 In-Reply-To: <1381853200-5534-1-git-send-email-marex@denx.de>
 References: <1381853200-5534-1-git-send-email-marex@denx.de>
-Message-ID: <1381853200-5534-6-git-send-email-marex@denx.de>
+Message-ID: <1381853200-5534-5-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without forcing the PCIe core into Gen1 operation, the PCIe switch
-attached directly to the PCIe port is not recognised at all. The
-PCIe switch is Gen2 capable to make this issue even more puzzling.
+Probe the PCIe driver in fs_initcall() instead of module_init()
+to assure that pci_assign_unassigned_resources(); will be called
+early. This function is called in dw_pcie_host_init(), which is
+in turn called from imx6_add_pcie_port(), which is called from
+imx6_pcie_probe() . If this is not called early, we will hit
+resource collisions since pcieport driver is then probed way too
+late.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -27,45 +31,21 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- drivers/pci/host/pci-imx6.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ drivers/pci/host/pci-imx6.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index ca8c5de..8402e9a 100644
+index 94e4d0f..ca8c5de 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -321,6 +321,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+@@ -586,7 +586,7 @@ static int __init imx6_pcie_init(void)
  {
- 	int count = 0;
- 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
-+	uint32_t tmp;
+ 	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
+ }
+-module_init(imx6_pcie_init);
++fs_initcall(imx6_pcie_init);
  
- 	imx6_pcie_assert_core_reset(pp);
- 
-@@ -330,13 +331,23 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
- 
- 	dw_pcie_setup_rc(pp);
- 
-+	/*
-+	 * FIXME:
-+	 * Force Gen1 operation. In case the IP block is in Gen2 operation
-+	 * mode, it does not detect the PCIe switch at all.
-+	 */
-+	tmp = readl(pp->dbi_base + 0x7c);
-+	tmp &= ~0xf;
-+	tmp |= 0x1;
-+	writel(tmp, pp->dbi_base + 0x7c);
-+
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
- 			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
- 
- 	while (!dw_pcie_link_up(pp)) {
- 		usleep_range(100, 1000);
- 		count++;
--		if (count >= 10) {
-+		if (count >= 200) {
- 			dev_err(pp->dev, "phy link never came up\n");
- 			dev_dbg(pp->dev,
- 				"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
+ MODULE_AUTHOR("Sean Cross <xobs@kosagi.com>");
+ MODULE_DESCRIPTION("Freescale i.MX6 PCIe host controller driver");
 -- 
 1.8.4.rc3
