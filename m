@@ -1,52 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 Oct 2013 10:11:59 -0600
-Subject: [PATCH v8 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <20131015110725.GZ25034@n2100.arm.linux.org.uk>
-References: <1381527938-22840-1-git-send-email-acourbot@nvidia.com>
- <1381527938-22840-2-git-send-email-acourbot@nvidia.com>
- <20131015110725.GZ25034@n2100.arm.linux.org.uk>
-Message-ID: <525D694F.3070803@wwwdotorg.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 15 Oct 2013 18:14:12 +0200
+Subject: arm64 ioremap question
+In-Reply-To: <20131015155216.GD25034@n2100.arm.linux.org.uk>
+References: <1381850404.27955.9.camel@deneb.redhat.com>
+ <20131015155216.GD25034@n2100.arm.linux.org.uk>
+Message-ID: <1381853652.4093.10.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2013 05:07 AM, Russell King - ARM Linux wrote:
-> On Fri, Oct 11, 2013 at 02:45:34PM -0700, Alexandre Courbot wrote:
->> Trusted Foundations is a TrustZone-based secure monitor for ARM that
->> can be invoked using the same SMC-based API on all supported
->> platforms. This patch adds initial basic support for Trusted
->> Foundations using the ARM firmware API. Current features are limited
->> to the ability to boot secondary processors.
->>
->> Note: The API followed by Trusted Foundations does *not* follow the SMC
->> calling conventions. It has nothing to do with PSCI neither and is only
->> relevant to devices that use Trusted Foundations (like most Tegra-based
->> retail devices).
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->> ---
->>  .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
->>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->>  arch/arm/Kconfig                                   |  2 +
->>  arch/arm/Makefile                                  |  1 +
->>  arch/arm/firmware/Kconfig                          | 28 ++++++++
->>  arch/arm/firmware/Makefile                         |  1 +
->>  arch/arm/firmware/trusted_foundations.c            | 79 ++++++++++++++++++++++
->>  arch/arm/include/asm/trusted_foundations.h         | 68 +++++++++++++++++++
->>  8 files changed, 200 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->>  create mode 100644 arch/arm/firmware/Kconfig
->>  create mode 100644 arch/arm/firmware/Makefile
->>  create mode 100644 arch/arm/firmware/trusted_foundations.c
->>  create mode 100644 arch/arm/include/asm/trusted_foundations.h
+Am Dienstag, den 15.10.2013, 16:52 +0100 schrieb Russell King - ARM
+Linux:
+> On Tue, Oct 15, 2013 at 11:20:04AM -0400, Mark Salter wrote:
+> > ioremap() has a test to prevent RAM from being remapped:
+> > 
+> > 	/*
+> > 	 * Don't allow RAM to be mapped.
+> > 	 */
+> > 	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+> > 		return NULL;
+> > 
+> > 
+> > Is this really necessary even for reserved pages which are not being
+> > used for anything else?
 > 
-> Is having this under arch/arm appropriate?  What happens if the API
-> gets re-used on ARM64 for example?  Would drivers/firmware be a better
-> cross-arch location for this?
+> It helps to stop the abuse of using ioremap() on normal memory, which has
+> happened soo much in Aarch32 for years.  Unfortuantely, bad habbits die
+> hard.
+> 
+> "Reserved pages not being used for anything else" are still mapped, and
+> still subject to speculative fetches.
 
-That's probably a better location, yes.
+Only slightly related to the issue here, but I'm really wondering if the
+speculative fill can happen on real implementations.
+I'm well aware that there is nothing in the arch preventing a
+speculative fill on a cached alias, but at least for the A9
+implementation the ARM infocenter claims that the prefetcher will not
+cross a 4KB boundary [1].
+So as long as we are talking about full pages, having a conflicting
+mapping should not cause any issues as long as you don't touch the
+memory region explicitly through the cached mapping.
 
-BTW, drivers/firmware/ doesn't seem to have an overall maintainer. Who
-should Alex send the patch to, or should I just take this patch throught
-the Tegra tree once the files are moved?
+I know that we generally aim to avoid basing any kernel infrastructure
+on such vague guarantees, but I'm really wondering if my analysis is
+correct or is there anything I'm overlooking here?
+
+Regards,
+Lucas
+
+[1]
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388i/CBBIAAAA.html
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
