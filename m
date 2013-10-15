@@ -1,73 +1,30 @@
-From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Tue, 15 Oct 2013 18:49:59 +0530
-Subject: [PATCH V2 4/7] USB: OHCI: Properly handle ohci-da8xx suspend
-In-Reply-To: <1381843202-28707-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
- <1381843202-28707-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1381843202-28707-5-git-send-email-csmanjuvijay@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 15 Oct 2013 12:40:35 +0100
+Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
+ device tree
+In-Reply-To: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
+References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20131015114035.6CA5FC40098@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Manjunath Goudar <manjunath.goudar@linaro.org>
+On Fri, 11 Oct 2013 09:27:26 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Hi all!
+> 
+> Benjamin Herrenschmidt pointed a few issues in the proposed design of
+> device tree bindings for contiguous memory allocator and reserved memory
+> regions:
+> https://lkml.org/lkml/2013/9/15/151
+> http://www.spinics.net/lists/arm-kernel/msg273548.html
+> 
+> Some time has passed, but there is still no consensus on the bindings
+> for the reserved memory and various drawback of this solution has been
+> shown, so in my opinion the best I can do now is to revert them
+> completely and start from scratch again later.
 
-Suspend scenario in case of ohci-da8xx glue was not
-properly handled as it was not suspending generic part
-of ohci controller. Alan Stern suggested, properly handle
-ohci-da8xx suspend scenario.
+I had some fixup patches that I was getting ready to post, but your
+right. We're really late to be doing anything like that. I've applied
+the reverts and we'll plan on hammering something out in Edinburgh next
+week so that it can be merged for v3.13
 
-Calling explicitly the ohci_suspend()
-routine in ohci_da8xx_suspend() will ensure proper
-handling of suspend scenario.
-
-V1->V2:
-      -No change.
-       Due to the build failure on ep93xx reverted this patch.
-       This patch is needed as Alan Stern suggestion.
-
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
----
- drivers/usb/host/ohci-da8xx.c |   15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
-index 9be59f1..f8238a4 100644
---- a/drivers/usb/host/ohci-da8xx.c
-+++ b/drivers/usb/host/ohci-da8xx.c
-@@ -406,19 +406,26 @@ static int ohci_hcd_da8xx_drv_remove(struct platform_device *dev)
- }
- 
- #ifdef CONFIG_PM
--static int ohci_da8xx_suspend(struct platform_device *dev, pm_message_t message)
-+static int ohci_da8xx_suspend(struct platform_device *pdev,
-+				pm_message_t message)
- {
--	struct usb_hcd	*hcd	= platform_get_drvdata(dev);
-+	struct usb_hcd	*hcd	= platform_get_drvdata(pdev);
- 	struct ohci_hcd	*ohci	= hcd_to_ohci(hcd);
-+	bool		do_wakeup	= device_may_wakeup(&pdev->dev);
-+	int		ret;
- 
- 	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
- 	ohci->next_statechange = jiffies;
- 
-+	ret = ohci_suspend(hcd, do_wakeup);
-+	if (ret)
-+		return ret;
-+
- 	ohci_da8xx_clock(0);
- 	hcd->state = HC_STATE_SUSPENDED;
--	dev->dev.power.power_state = PMSG_SUSPEND;
--	return 0;
-+
-+	return ret;
- }
- 
- static int ohci_da8xx_resume(struct platform_device *dev)
--- 
-1.7.9.5
+g.
