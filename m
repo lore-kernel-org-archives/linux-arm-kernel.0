@@ -1,26 +1,22 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 15 Oct 2013 11:06:50 +0800
-Subject: [PATCH 7/8] ARM: add Armada 1500 and Sony NSZ-GS7 device tree
- files
-In-Reply-To: <525C7A91.9060101@gmail.com>
+Date: Tue, 15 Oct 2013 11:10:39 +0800
+Subject: [PATCH 4/8] ARM: add Marvell Berlin SoC familiy to Marvell doc
+In-Reply-To: <525C7993.40408@gmail.com>
 References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1381235073-17134-8-git-send-email-sebastian.hesselbarth@gmail.com>
- <525C7A91.9060101@gmail.com>
-Message-ID: <20131015110650.250ca5f8@xhacker>
+ <1381235073-17134-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <525C7993.40408@gmail.com>
+Message-ID: <20131015111039.6a7e664b@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sebastian,
 
-On Mon, 14 Oct 2013 16:13:21 -0700
+On Mon, 14 Oct 2013 16:09:07 -0700
 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
 > On 10/08/2013 02:24 PM, Sebastian Hesselbarth wrote:
-> > This adds very basic device tree files for the Marvell Armada 1500 SoC
-> > (88DE3100) and the Sony NSZ-GS7 GoogleTV board. Currently, SoC only has
-> > nodes for cpus, some clocks, l2 cache controller, local timer, apb timers,
-> > uart, and interrupt controllers. The Sony NSZ-GS7 is a GoogleTV consumer
-> > device comprising the Armada 1500 SoC above.
+> > This adds known facts and rumors about the Marvell Berlin (88DE3xxx) SoC
+> > family to the Marvell SoC documentation.
 > >
 > > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > > Reviewed-by: Jason Cooper <jason@lakedaemon.net>
@@ -28,68 +24,66 @@ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 > > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 > > ---
 > > Changelog:
-> > RCFv2->v1:
-> > - switch to (soon to be) correct "marvell,pj4b" cpu compatible
-> > - reference fixed-clock for uarts instead of hard-coded clock-frequency
-> > - disable timers except two for clksrc and clkevt
+> > RFCv2->v1:
+> > - move Berlin below PXA/MMP[23] where it belongs to
+> > - add note about IP (re-)used in Berlin SoCs
 > > RFCv1->RFCv2:
-> > - add binding documentation (Reported by Jason Cooper)
-> > - change l2cc from aurora to tauros3 (Reported by Thomas Petazzoni)
-> > - add copyright reference
-> > - adapt compatibles to mach-berlin instead of mach-mvebu
+> > - initial patch
 > >
 > > Cc: Jason Cooper <jason@lakedaemon.net>
 > > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: devicetree at vger.kernel.org
+> > Cc: Rob Landley <rob@landley.net>
 > > Cc: linux-doc at vger.kernel.org
 > > Cc: linux-arm-kernel at lists.infradead.org
 > > Cc: linux-kernel at vger.kernel.org
 > > ---
-> >   .../devicetree/bindings/arm/marvell,berlin.txt     |   23 ++
-> >   arch/arm/boot/dts/Makefile                         |    2 +
-> >   arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts      |   29 +++
-> >   arch/arm/boot/dts/mv88de3100.dtsi                  |  227
-> > ++++++++++++++++++++ 4 files changed, 281 insertions(+)
-> >   create mode 100644
-> > Documentation/devicetree/bindings/arm/marvell,berlin.txt create mode
-> > 100644 arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts create mode 100644
-> > arch/arm/boot/dts/mv88de3100.dtsi
+> >   Documentation/arm/Marvell/README |   29 +++++++++++++++++++++++++++++
+> >   1 file changed, 29 insertions(+)
 > >
-> > diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-> > b/Documentation/devicetree/bindings/arm/marvell,berlin.txt new file mode
-> > 100644 index 0000000..e389cba
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-> > @@ -0,0 +1,23 @@
-> > +Marvell Berlin (88DE3xxx) family SoCs Device Tree Bindings
-> > +---------------------------------------------------------------
+> > diff --git a/Documentation/arm/Marvell/README
+> > b/Documentation/arm/Marvell/README index 8f08a86..993c45d 100644
+> > --- a/Documentation/arm/Marvell/README
+> > +++ b/Documentation/arm/Marvell/README
+> > @@ -210,6 +210,35 @@ MMP/MMP2 family (communication processor)
+> >      Linux kernel mach directory: arch/arm/mach-mmp
+> >      Linux kernel plat directory: arch/arm/plat-pxa
+> >
+> > +Berlin family (Digital Entertainment)
+> > +-------------------------------------
 > > +
-> > +Boards with a SoC of the Marvell Berlin (88DE3xxx) family, e.g. Armada
-> > 1500 +shall have the following properties:
-> > +
-> > +* Required root node properties:
-> > +compatible: must contain "marvell,berlin"
-> > +
-> > +In addition, the above compatible shall be extended with the specific
-> > +SoC and board used. Currently known SoC compatibles are:
-> > +    "marvell,88de3100"	for Marvell 88DE3100 (Armada 1500),
-> > +    "marvell,88de3010"	for Marvell 88DE3010 (Armada 1000),
-> > +    "marvell,88de3005"	for Marvell 88DE3005 (Armada 1500-mini)
+> > +  Flavors:
+> > +	88DE3005, Armada 1500-mini
+> > +		Design name:	BG2CD(A0)
+> > +		Core:		ARM Cortex-A9, PL310 L2CC
+> > +		Homepage:
+> > http://www.marvell.com/digital-entertainment/armada-1500-mini/
+> > +	88DE3010, Armada 1000
+> > +		Design name:	BG2(?)
+> > +		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
+> > +		Product Brief:
+> > http://www.marvell.com/digital-entertainment/assets/armada_1000_pb.pdf
+> > +	88DE3100, Armada 1500
+> > +		Design name:	BG2(A0)
+> > +		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
+> > +		Homepage:
+> > http://www.marvell.com/digital-entertainment/armada-1500/
+> > +		Product Brief:
+> > http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
+> > +	88DE????
+> > +		Design name:	BG3
+> > +		Core:		ARM Cortex-A15, CA15 integrated L2CC
 > 
 > Jisheng,
 > 
-> I am trying to follow your request to get rid of 88DExxxx numbering and
-> replace it where possible with berlin type-of names.
-Thanks for your help.
+> can you comment on the above and fill in the missing pieces?
 > 
-> For the above, I have:
-> "marvell,berlin-bg2" for Marvell Armada 1500 (BG2, 88DE3100)
-We prefer "marvell,berlin2" for BG2
-> "marvell,berlin-bg2cd" for Marvell Armada 1500-mini (BG2CD, 88DE3005)
-we prefer "marvell,berlin2cd" for BG2CD, "marvell,berlin2ct" for BG2CT,
-and "marvell,berlin3" for BG3, etc.
+> Especially, if we want to base device tree compatibles later, we should
+> make it right in the first place.
+> 
 
+Sorry, I can't leak some information now. So could we remove the BG3 and 88DE3010 sections?
+I promise I will update those information when I submit BG3 enable patches in near future.
 
 Thanks,
 Jisheng
