@@ -1,33 +1,42 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 15 Oct 2013 08:15:45 -0700
-Subject: [PATCH 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
-In-Reply-To: <CAKsNYyzFe+o0ctNYyHhL7m71LnAC4WTKbkfN37WHmLBRjgj9+w@mail.gmail.com>
-References: <DC148C5AA1CEBA4E87973D432B1C2D8817DABD8C@P3PWEX4MB008.ex4.secureserver.net>
- <Pine.LNX.4.44L0.1310141647140.6851-100000@netrider.rowland.org>
- <DC148C5AA1CEBA4E87973D432B1C2D8817DABF0B@P3PWEX4MB008.ex4.secureserver.net>
- <CAOesGMjXzJef=tVi_bi06H_o9g+EB=bMe3i-TkDt9C9RN5zyVA@mail.gmail.com>
- <CAKsNYyzFe+o0ctNYyHhL7m71LnAC4WTKbkfN37WHmLBRjgj9+w@mail.gmail.com>
-Message-ID: <20131015151545.GC18794@kroah.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 15 Oct 2013 18:14:43 +0300
+Subject: [PATCH v2 0/7] Tegra124 clock support
+Message-ID: <1381850098-12357-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 10:34:53AM +0530, manju goudar wrote:
-> Alan,
-> 
-> I am very sorry for this mistake.
-> I will fix this issue and sending back series.
-> 
-> Greg,
-> I am really sorry ?:((
-> Next time I will not make this kind of mistake.
-> If any issue reported related to my patches I will
-> fix it and send back to you.?
-> Now I am using my personal id to support my patches.
+This series introduces support for the Tegra124 CAR clocks.                                                                                                    
+Based on '[PATCH v3 00/12] Introduce common infra for tegra clocks'                                                                                            
 
-Thanks for continuing to work on this, that's great to hear.  Please
-test your patches on all arches that you are modifying, simple build
-bugs shouldn't happen.
+changes since v1:
 
-thanks,
++ suspend/resume for LP1 (Joseph Lo)
++ fixed some comments
++ account for changes to the common infra code
 
-greg k-h
+Joseph Lo (2):
+  clk: tegra124: add wait_for_reset and disable_clock for
+    tegra_cpu_car_ops
+  clk: tegra124: add suspend/resume function for tegra_cpu_car_ops
+
+Peter De Schrijver (5):
+  clk: tegra: Add support for PLLSS
+  clk: tegra: Add periph regs bank X
+  clk: tegra124: Add common clk IDs to clk-id.h
+  clk: tegra124: Add new peripheral clocks
+  clk: tegra124: Add support for Tegra124 clocks
+
+ drivers/clk/tegra/Makefile               |    1 +
+ drivers/clk/tegra/clk-id.h               |   20 +
+ drivers/clk/tegra/clk-pll.c              |  172 ++++
+ drivers/clk/tegra/clk-tegra-periph.c     |   55 ++
+ drivers/clk/tegra/clk-tegra124.c         | 1430 ++++++++++++++++++++++++++++++
+ drivers/clk/tegra/clk.c                  |   10 +
+ drivers/clk/tegra/clk.h                  |    5 +
+ include/dt-bindings/clock/tegra124-car.h |  341 +++++++
+ 8 files changed, 2034 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/tegra/clk-tegra124.c
+ create mode 100644 include/dt-bindings/clock/tegra124-car.h
+
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
