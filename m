@@ -1,111 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Oct 2013 23:22:20 +0200
-Subject: [PATCH 5/5] ARM: ux500: adjust the TC3589x devices to the binding
-Message-ID: <1381872140-23509-1-git-send-email-linus.walleij@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 16 Oct 2013 07:30:37 +0900
+Subject: [GIT PULL v2] Samsung-fixes for v3.12
+Message-ID: <525DC20D.4080302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TC3589x devices appearing in the ST Ericsson device trees
-are adjusted to use the new binding so this is in a good shape,
-and we add the keypad on the TVK1281618 UIB so this is working
-again.
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 39 +++++++++++++++++++++++++-----
- arch/arm/boot/dts/ste-hrefprev60.dtsi      |  8 +++---
- 2 files changed, 37 insertions(+), 10 deletions(-)
+   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
 
-diff --git a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-index 76d3ef1..4c539bb 100644
---- a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-+++ b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-@@ -15,26 +15,53 @@
- 
- / {
- 	soc {
--		/* Add Synaptics touch screen, TC35892 keypad etc here */
-+		/* Add Synaptics touch screen, TC35893 keypad etc here */
- 		i2c at 80004000 {
--			tc3589x at 44 {
--				compatible = "tc3589x";
-+			tc35893 at 44 {
-+				compatible = "toshiba,tc35893";
- 				reg = <0x44>;
- 				interrupt-parent = <&gpio6>;
- 				interrupts = <26 IRQ_TYPE_EDGE_RISING>;
- 
- 				interrupt-controller;
--				#interrupt-cells = <2>;
-+				#interrupt-cells = <1>;
- 
- 				tc3589x_gpio {
--					compatible = "tc3589x-gpio";
--					interrupts = <0 IRQ_TYPE_EDGE_RISING>;
-+					compatible = "toshiba,tc3589x-gpio";
-+					interrupts = <0>;
- 
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
- 					gpio-controller;
- 					#gpio-cells = <2>;
- 				};
-+				tc3589x_keypad {
-+					compatible = "toshiba,tc3589x-keypad";
-+					interrupts = <6>;
-+					debounce-delay-ms = <4>;
-+					keypad,num-columns = /bits/ 8 <8>;
-+					keypad,num-rows = /bits/ 8 <8>;
-+					linux,no-autorepeat;
-+					linux,wakeup;
-+					linux,keymap = <0x0301006b
-+						        0x04010066
-+							0x06040072
-+							0x040200d7
-+							0x0303006a
-+							0x0205000e
-+							0x0607008b
-+							0x0500001c
-+							0x0403000b
-+							0x03040034
-+							0x05020067
-+							0x0305006c
-+							0x040500e7
-+							0x0005009e
-+							0x06020073
-+							0x01030039
-+							0x07060069
-+							0x050500d9>;
-+				};
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-index b2cd7bc..6b271a4 100644
---- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-@@ -28,18 +28,18 @@
- 				reg = <0x33>;
- 			};
- 
--			tc3589x at 42 {
--				compatible = "tc3589x";
-+			tc35892 at 42 {
-+				compatible = "toshiba,tc35892";
- 				reg = <0x42>;
- 				interrupt-parent = <&gpio6>;
- 				interrupts = <25 IRQ_TYPE_EDGE_RISING>;
- 
- 				interrupt-controller;
--				#interrupt-cells = <2>;
-+				#interrupt-cells = <1>;
- 
- 				tc3589x_gpio: tc3589x_gpio {
- 					compatible = "tc3589x-gpio";
--					interrupts = <0 IRQ_TYPE_EDGE_RISING>;
-+					interrupts = <0>;
- 
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
--- 
-1.8.3.1
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-fixes-v2
+
+for you to fetch changes up to 22c98592094e6c149b05cc13d4d6ec495e6f5879:
+
+   ARM: dts: fix PL330 MDMA1 address in DT for Universal C210 board 
+(2013-10-16 07:25:41 +0900)
+
+----------------------------------------------------------------
+Fixes for v3.12
+- correct typo 'samsung,pin-drv'
+- correct typo 'earlyprintk'
+- cpufreq regulator lookup for exynos4210-origen and trats
+- fix PL330 MDMA1 address for universal c210 board
+
+----------------------------------------------------------------
+Al Stone (1):
+       ARM: dts: Correct typo in use of samsung,pin-drv for exynos5250
+
+Bartlomiej Zolnierkiewicz (1):
+       ARM: dts: fix PL330 MDMA1 address in DT for Universal C210 board
+
+Tomasz Figa (1):
+       ARM: dts: Work around lack of cpufreq regulator lookup for 
+exynos4210-origen and trats boards
+
+Youngmin Nam (1):
+       ARM: dts: Fix typo earlyprintk in exynos5440-sd5v1 and ssdk5440 
+boards
+
+  arch/arm/boot/dts/exynos4210-origen.dts         |  7 +++-
+  arch/arm/boot/dts/exynos4210-trats.dts          |  7 +++-
+  arch/arm/boot/dts/exynos4210-universal_c210.dts |  4 +++
+  arch/arm/boot/dts/exynos5250-pinctrl.dtsi       | 44 
+++++++++++++-------------
+  arch/arm/boot/dts/exynos5440-sd5v1.dts          |  2 +-
+  arch/arm/boot/dts/exynos5440-ssdk5440.dts       |  2 +-
+  6 files changed, 40 insertions(+), 26 deletions(-)
