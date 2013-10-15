@@ -1,65 +1,187 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 15 Oct 2013 00:20:57 -0300
-Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
-In-Reply-To: <20131014225029.GV25034@n2100.arm.linux.org.uk>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
- <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
- <20131014174030.GU25034@n2100.arm.linux.org.uk>
- <20131014225029.GV25034@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5DWa8UjzToTuhqH_1ZuRiUXvjp8HOZaw0b1C8ah-+EdGg@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 15 Oct 2013 12:42:17 +0900
+Subject: [PATCH] sh-pfc: r8a7791 PFC support
+In-Reply-To: <1876860.l29tzQeBi6@avalon>
+References: <20131008040824.3480.69707.sendpatchset@w520>
+ <1876860.l29tzQeBi6@avalon>
+Message-ID: <CANqRtoTS-=GUZ2HqyDRenTa7PnSfY8hN1j4U58L0JxzQamg+cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 7:50 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hi Laurent,
 
-> Okay, next question(s).
+On Thu, Oct 10, 2013 at 7:41 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Magnus,
 >
-> 1. How well tested is any of this imx-drm stuff?
+> Thank you for the patch.
 >
-> 2. What sort of testing has it been subject to?
-
-Most of my tests with the imx-drm driver have been through the LVDS
-panel so far.
-
-For HDMI, I haven't gone through too much of testing yet, only basic
-raw framebuffer at full HD resolution.
-
-I know Tony/Robert (and Sascha) and some folks at the Wandboard
-mailing list have also tested HDMI with the previous version of the
-HDMI driver that was posted by Tony.
-
-> Answers to these two questions may help stop me wasting a lot of time
-> chasing what is a really weird bug.
+> On Tuesday 08 October 2013 13:08:24 Magnus Damm wrote:
+>> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+>>
+>> Add PFC support for the r8a7791 SoC including pin groups for
+>> on-chip devices such as MSIOF, SCIF, USB, MMC, VIN, SDHI, DU.
+>>
+>> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+>> Signed-off-by: Kunihito Higashiyama <kunihito.higashiyama.ur@renesas.com>
+>> Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
+>> Signed-off-by: Nobuyuki HIRAI <nobuyuki.hirai.xe@renesas.com>
+>> Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+>> Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+>> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+>> [damm at opensource.se: Forward ported to upstream, reused existing sh-pfc
+>> macros] Signed-off-by: Magnus Damm <damm@opensource.se>
 >
-> So, I have X up and running on the Cubox-i carrier-1, using the imx-drm
-> stuff (I've slightly hacked my xf86-armada X driver to get this working.)
-> This works fine - it detects the connectors, selects an appropriate
-> video mode and produces a picture of the correct shape and size.
+> I'll trust you for having reviewed all the data tables :-D
 >
-> However... I see really weird effects colouring effects - almost like
-> water over the image.  It's certain colour transitions in the image
-> which seem to trigger this.  There are also certain pixels which
-> "twinkle".
+>> ---
+>>
+>>  Written against renesas-devel-20131004
+>>
+>>  Based on the following broken out patches from BSP v0.5.0:
+>>  0739, 0766, 0771, 0774, 0777, 0782, 0798, 1056, 1057, 1235, 1261, 1271
+>>
+>>  drivers/pinctrl/sh-pfc/Kconfig       |    5
+>>  drivers/pinctrl/sh-pfc/Makefile      |    1
+>>  drivers/pinctrl/sh-pfc/core.c        |    3
+>>  drivers/pinctrl/sh-pfc/core.h        |    1
+>>  drivers/pinctrl/sh-pfc/pfc-r8a7791.c | 4327 +++++++++++++++++++++++++++++++
+>>  5 files changed, 4337 insertions(+)
+>>
 >
-> Text looks very strange too.  Rather than the font being crisp and clear,
-> it looks like there's red and green shift to it - but its not that it's
-> all shifted in that way.
+> [snip]
 >
-> Now, if I use the modetest utility from libdrm-2.4.43 to display a SMPTE
-> test pattern, this again looks right, but there are several vertical
-> single pixel lines of noise.  The most striking one is below the upper
-> red bar in the lower dark area.  I have a single pixel noisy vertical
-> line.
+>> --- 0001/drivers/pinctrl/sh-pfc/core.c
+>> +++ work/drivers/pinctrl/sh-pfc/core.c        2013-10-08 12:43:03.000000000 +0900
+>> @@ -558,6 +558,9 @@ static const struct platform_device_id s
+>>  #ifdef CONFIG_PINCTRL_PFC_R8A7790
+>>       { "pfc-r8a7790", (kernel_ulong_t)&r8a7790_pinmux_info },
+>>  #endif
+>> +#ifdef CONFIG_PINCTRL_PFC_R8A7791
+>> +     { "pfc-r8a7791", (kernel_ulong_t)&r8a7791_pinmux_info },
+>> +#endif
+>>  #ifdef CONFIG_PINCTRL_PFC_SH7203
+>>       { "pfc-sh7203", (kernel_ulong_t)&sh7203_pinmux_info },
+>>  #endif
+>
+> You should also update the sh_pfc_of_table array.
 
-Ok, interesting. Will run a video test pattern via gstreamer
-videotestsrc plugin to see how it behaves.
+Ok, thanks, I will!
 
-I am travelling tomorrow, so it will be at last in 2 weeks that I will
-be able to access a mx6 hardware.
+>> --- /dev/null
+>> +++ work/drivers/pinctrl/sh-pfc/pfc-r8a7791.c 2013-10-08
+> 12:46:46.000000000
+>> +0900 @@ -0,0 +1,4327 @@
+>> +/*
+>> + * arch/arm/cpu/armv7/rmobile/pfc-r8a7791.c
+>
+> The file seems to have moved :-) You can probably just remove the file name,
+> it doesn't add much and only asks for getting outdated.
 
-In the meantime, maybe one of the folks in Cc could share some ideas.
+Yes, I agree. I will fix.
 
-Regards,
+>> + *     This file is r8a7791 processor support - PFC hardware block.
+>> + *
+>> + * Copyright (C) 2013 Renesas Electronics Corporation
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2
+>> + * as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program; if not, write to the Free Software Foundation,
+>> + * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+>
+> You can remove the last two paragraphs.
 
-Fabio Estevam
+Ok!
+
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/platform_data/gpio-rcar.h>
+>> +
+>> +#include "core.h"
+>> +#include "sh_pfc.h"
+>
+> [snip]
+>
+>> +static struct sh_pfc_pin pinmux_pins[] = {
+>> +     PINMUX_GPIO_GP_ALL(),
+>> +};
+>
+> [snip]
+>
+>> +/* - ETH
+>> -------------------------------------------------------------------- */
+>> +static const unsigned int eth_link_pins[] = {
+>> +     /* LINK */
+>> +     RCAR_GP_PIN(5, 18),
+>> +};
+>> +static const unsigned int eth_link_mux[] = {
+>> +     ETH_LINK_MARK,
+>> +};
+>> +static const unsigned int eth_magic_pins[] = {
+>> +     /* MAGIC */
+>
+> I've seen an errata for a different SoC that renamed the ethernet "magic" pin
+> to "wol" (wake-on-lan). Could you check whether that has been done for R8A7791
+> as well ?
+
+Thanks, I will look into this and sync with the r8a7790 PFC table if needed!
+
+>> +/* - VIN0
+
+> The red, green and blue signals need to be used together, shouldn't they be
+> grouped ?
+
+> Same for hsync and vsync. You could also s/_signal// here and below.
+
+>> +/* - VIN1
+
+> No synchronization signals for vin1 ?
+
+Thanks for checking the VIN bits. I believe your comments are all
+valid, and I propose that I simply remove the VIN portions and request
+people to address your commends and submit support for this
+independently. I hope that is OK with you.
+
+>> +static const struct sh_pfc_pin_group pinmux_groups[] = {
+>> +     SH_PFC_PIN_GROUP(du_rgb666),
+>> +     SH_PFC_PIN_GROUP(du_rgb888),
+>> +     SH_PFC_PIN_GROUP(du_clk_out_0),
+>> +     SH_PFC_PIN_GROUP(du_clk_out_1),
+>> +     SH_PFC_PIN_GROUP(du_sync_1),
+>> +     SH_PFC_PIN_GROUP(du_cde_disp),
+>> +     SH_PFC_PIN_GROUP(du1_clk_in),
+>> +     SH_PFC_PIN_GROUP(du0_clk_in),
+>
+> du0 should come before du1.
+
+Sure.
+
+>> +static const char * const du1_groups[] = {
+>> +     "du1_clk_in",
+>> +};
+>> +
+>> +static const char * const du0_groups[] = {
+>> +     "du0_clk_in",
+>> +};
+>
+> And here too.
+
+Ok, I will fix that.
+
+If you don't mind then I will address the minor things myself and drop
+the VIN portion and then resend it as V2.
+
+Thanks for your review!
+
+Cheers,
+
+/ magnus
