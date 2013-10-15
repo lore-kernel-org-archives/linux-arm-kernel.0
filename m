@@ -1,64 +1,78 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 Oct 2013 11:14:42 -0700
-Subject: [PATCH v2 0/7] Tegra124 clock support
-In-Reply-To: <1381850098-12357-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1381850098-12357-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <CAOesGMiXDqO9tKaj1s_hN32q_bPdLVojWPe2LweURDq-b2784w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Oct 2013 20:18:10 +0200
+Subject: [PATCH v10 3/7] ARM: dts: enable hi4511 with device tree
+In-Reply-To: <1381828577-27998-4-git-send-email-haojian.zhuang@linaro.org>
+References: <1381828577-27998-1-git-send-email-haojian.zhuang@linaro.org>
+ <1381828577-27998-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <201310152018.10908.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[devicetree to bcc]
+On Tuesday 15 October 2013, Haojian Zhuang wrote:
+> Enable Hisilicon Hi4511 development platform with device tree support.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Peter,
+Based on my other mail, some more comments here:
 
-Please don't post driver/platform patches to the devicetree list. Only
-bindings updates should be posted here.
+> +/ {
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
 
-Otherwise the volume of patches make the people who need to see the
-and review the bindings run for the hills. :-)
+Since all clocks are in the fc802000 page, I would prefer using a non-empty
+ranges to map the clocks into their own address space, like
+
+		ranges = <0 0xfc802000 0x1000>;
 
 
--Olof
+> +		timer4_mux: timer4_mux at fc802018 {
+> +			compatible = "hisilicon,clk-mux";
+> +			#clock-cells = <0>;
+> +			clocks = <&osc32k &timerclk45>;
+> +			clock-output-names = "timer4_mux";
+> +			reg = <0xfc802018 0x4>;
+> +			clkmux-mask = <0x3>;
+> +			clkmux-table = <0 0x1>;
+> +		};
 
-On Tue, Oct 15, 2013 at 8:14 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> This series introduces support for the Tegra124 CAR clocks.
-> Based on '[PATCH v3 00/12] Introduce common infra for tegra clocks'
->
-> changes since v1:
->
-> + suspend/resume for LP1 (Joseph Lo)
-> + fixed some comments
-> + account for changes to the common infra code
->
-> Joseph Lo (2):
->   clk: tegra124: add wait_for_reset and disable_clock for
->     tegra_cpu_car_ops
->   clk: tegra124: add suspend/resume function for tegra_cpu_car_ops
->
-> Peter De Schrijver (5):
->   clk: tegra: Add support for PLLSS
->   clk: tegra: Add periph regs bank X
->   clk: tegra124: Add common clk IDs to clk-id.h
->   clk: tegra124: Add new peripheral clocks
->   clk: tegra124: Add support for Tegra124 clocks
->
->  drivers/clk/tegra/Makefile               |    1 +
->  drivers/clk/tegra/clk-id.h               |   20 +
->  drivers/clk/tegra/clk-pll.c              |  172 ++++
->  drivers/clk/tegra/clk-tegra-periph.c     |   55 ++
->  drivers/clk/tegra/clk-tegra124.c         | 1430 ++++++++++++++++++++++++++++++
->  drivers/clk/tegra/clk.c                  |   10 +
->  drivers/clk/tegra/clk.h                  |    5 +
->  include/dt-bindings/clock/tegra124-car.h |  341 +++++++
->  8 files changed, 2034 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/tegra/clk-tegra124.c
->  create mode 100644 include/dt-bindings/clock/tegra124-car.h
->
-> --
-> 1.7.7.rc0.72.g4b5ea.dirty
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+which would turn this into 
+
+		timer4_mux: timer4_mux at 18 {
+			...
+			reg = <0x18 0x4>;
+			...
+		};
+
+The code would not be impacted by this.
+
+On a related note, I find it strange that you have multiple devices with the
+same register. Normally, we try to have device node names be generic,
+e.g. 'clock at 18' rather than 'timer4_mux at 18', but that won't work if the
+register is the same for all of them. Maybe some DT expert can comment
+on this.
+
+> +
+> +	amba {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "arm,amba-bus";
+> +		interrupt-parent = <&gic>;
+> +		ranges;
+> +
+> +		L2: l2-cache {
+> +			compatible = "arm,pl310-cache";
+> +			reg = <0xfc10000 0x100000>;
+> +			interrupts = <0 15 4>;
+> +			cache-unified;
+> +			cache-level = <2>;
+> +		};
+
+For this node, we could use the same trick with the non-empty ranges, since
+all amba devices seem to be in the 0xfc000000 range.
+
+If you do that, it probably makes sense to move the clock controller under here
+as well.
+
+	Arnd
