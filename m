@@ -1,46 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 Oct 2013 09:10:27 -0600
-Subject: [PATCH 03/10] clk: tegra: Staticize local variables in clk-pll.c
-In-Reply-To: <20131015082924.GC19540@tbergstrom-lnx.Nvidia.com>
-References: <1381231068-6053-1-git-send-email-sachin.kamat@linaro.org>
- <1381231068-6053-3-git-send-email-sachin.kamat@linaro.org>
- <52542E34.6020806@wwwdotorg.org>
- <20131010111328.GS4233@tbergstrom-lnx.Nvidia.com>
- <5256D0CA.9010906@wwwdotorg.org>
- <20131014081533.GZ4233@tbergstrom-lnx.Nvidia.com>
- <525C1D6E.5070802@wwwdotorg.org>
- <20131015082924.GC19540@tbergstrom-lnx.Nvidia.com>
-Message-ID: <525D5AE3.9050706@wwwdotorg.org>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 15 Oct 2013 08:15:45 -0700
+Subject: [PATCH 05/11] USB: OHCI: Properly handle ohci-ep93xx suspend
+In-Reply-To: <CAKsNYyzFe+o0ctNYyHhL7m71LnAC4WTKbkfN37WHmLBRjgj9+w@mail.gmail.com>
+References: <DC148C5AA1CEBA4E87973D432B1C2D8817DABD8C@P3PWEX4MB008.ex4.secureserver.net>
+ <Pine.LNX.4.44L0.1310141647140.6851-100000@netrider.rowland.org>
+ <DC148C5AA1CEBA4E87973D432B1C2D8817DABF0B@P3PWEX4MB008.ex4.secureserver.net>
+ <CAOesGMjXzJef=tVi_bi06H_o9g+EB=bMe3i-TkDt9C9RN5zyVA@mail.gmail.com>
+ <CAKsNYyzFe+o0ctNYyHhL7m71LnAC4WTKbkfN37WHmLBRjgj9+w@mail.gmail.com>
+Message-ID: <20131015151545.GC18794@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2013 02:29 AM, Peter De Schrijver wrote:
-> On Mon, Oct 14, 2013 at 06:35:58PM +0200, Stephen Warren wrote:
->> On 10/14/2013 02:15 AM, Peter De Schrijver wrote:
->>> On Thu, Oct 10, 2013 at 06:07:38PM +0200, Stephen Warren wrote:
->>>> On 10/10/2013 05:13 AM, Peter De Schrijver wrote:
->>>>> On Tue, Oct 08, 2013 at 06:09:24PM +0200, Stephen Warren wrote:
->>>>>> On 10/08/2013 05:17 AM, Sachin Kamat wrote:
->>>>>>> Local variables used only in this file are made static.
->>>>>>
->>>>>
->>>>> Conceptually they are still exported. So I think it's counterintuitive to
->>>>> declare them static. Unless you expect namespace problems, I would rather
->>>>> leave it as is.
->>>>
->>>> I forget exactly which symbols this patch changed, but presumably
->>>> they're only exported via pointers rather than by symbol name, and isn't
->>>> that exactly what static is for?
->>>
->>> They are indeed exported using a pointer. depends on how you look at it I
->>> guess, but I see static as 'local to this file only' which isn't really
->>> true if you hand out pointers to others.
->>
->> Yes, static specifically means "the symbol name is local to this file".
->> It says nothing about the data behind the symbol name.
+On Tue, Oct 15, 2013 at 10:34:53AM +0530, manju goudar wrote:
+> Alan,
 > 
-> I would still prefer the symbol visibility to have some relation with how
-> the data is used.
+> I am very sorry for this mistake.
+> I will fix this issue and sending back series.
+> 
+> Greg,
+> I am really sorry ?:((
+> Next time I will not make this kind of mistake.
+> If any issue reported related to my patches I will
+> fix it and send back to you.?
+> Now I am using my personal id to support my patches.
 
-No, if the *symbol* is not used, it should be static. There's absolutely
-zero benefit from having a visible symbol if it isn't used.
+Thanks for continuing to work on this, that's great to hear.  Please
+test your patches on all arches that you are modifying, simple build
+bugs shouldn't happen.
+
+thanks,
+
+greg k-h
