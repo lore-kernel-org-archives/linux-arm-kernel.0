@@ -1,271 +1,107 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 15 Oct 2013 23:36:09 +0300
-Subject: [PATCH v3] ARM: dts: add minimal DT support for Nokia N950 & N9 phones
-Message-ID: <1381869369-14626-1-git-send-email-aaro.koskinen@iki.fi>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Tue, 15 Oct 2013 20:55:32 +0000
+Subject: [PATCH] usb: ohci: remove ep93xx bus glue platform driver
+In-Reply-To: <CAOesGMgDW6scSq7s__Cyu-V=o2xFAbR2zKgO4FF8Jd29CyWy_w@mail.gmail.com>
+References: <201310141435.31147.hartleys@visionengravers.com>
+ <CAOesGMgDW6scSq7s__Cyu-V=o2xFAbR2zKgO4FF8Jd29CyWy_w@mail.gmail.com>
+Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817DADDF6@P3PWEX4MB008.ex4.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add minimal DT support for Nokia N950 & N9 phones. The same functionality
-that is provided by the current board file should work: serial console,
-USB, OneNAND and MMC.
+On Tuesday, October 15, 2013 8:50 AM, Olof Johansson wrote:
+> On Mon, Oct 14, 2013 at 2:35 PM, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
+>> Convert ep93xx to use the OHCI platform driver and remove the
+>> ohci-ep93xx bus glue driver.
+>>
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> Cc: Alan Stern <stern@rowland.harvard.edu>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Ryan Mallon <rmallon@gmail.com>
+>> ---
+>>  arch/arm/mach-ep93xx/clock.c   |   2 +-
+>>  arch/arm/mach-ep93xx/core.c    |  45 +++++++++-
+>>  drivers/usb/host/Kconfig       |   2 +-
+>>  drivers/usb/host/ohci-ep93xx.c | 184 -----------------------------------------
+>>  drivers/usb/host/ohci-hcd.c    |  18 ----
+>>  5 files changed, 43 insertions(+), 208 deletions(-)
+>>  delete mode 100644 drivers/usb/host/ohci-ep93xx.c
+>>
+>> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+>> index c95dbce..39ef3b6 100644
+>> --- a/arch/arm/mach-ep93xx/clock.c
+>> +++ b/arch/arm/mach-ep93xx/clock.c
+>> @@ -212,7 +212,7 @@ static struct clk_lookup clocks[] = {
+>>         INIT_CK(NULL,                   "hclk",         &clk_h),
+>>         INIT_CK(NULL,                   "apb_pclk",     &clk_p),
+>>         INIT_CK(NULL,                   "pll2",         &clk_pll2),
+>> -       INIT_CK("ep93xx-ohci",          NULL,           &clk_usb_host),
+>> +       INIT_CK("ohci-platform",        NULL,           &clk_usb_host),
+>>         INIT_CK("ep93xx-keypad",        NULL,           &clk_keypad),
+>>         INIT_CK("ep93xx-fb",            NULL,           &clk_video),
+>>         INIT_CK("ep93xx-spi.0",         NULL,           &clk_spi),
+>> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+>> index 3f12b88..5489824 100644
+>> --- a/arch/arm/mach-ep93xx/core.c
+>> +++ b/arch/arm/mach-ep93xx/core.c
+>> @@ -36,6 +36,7 @@
+>>  #include <linux/export.h>
+>>  #include <linux/irqchip/arm-vic.h>
+>>  #include <linux/reboot.h>
+>> +#include <linux/usb/ohci_pdriver.h>
+>>
+>>  #include <mach/hardware.h>
+>>  #include <linux/platform_data/video-ep93xx.h>
+>> @@ -297,22 +298,58 @@ static struct platform_device ep93xx_rtc_device = {
+>>         .resource       = ep93xx_rtc_resource,
+>>  };
+>>
+>> +/*************************************************************************
+>> + * EP93xx OHCI USB Host
+>> + *************************************************************************/
+>> +
+>> +static struct clk *ep93xx_ohci_host_clock;
+>> +
+>> +static int ep93xx_ohci_power_on(struct platform_device *pdev)
+>> +{
+>> +       if (!ep93xx_ohci_host_clock) {
+>> +               ep93xx_ohci_host_clock = devm_clk_get(&pdev->dev, NULL);
+>> +               if (IS_ERR(ep93xx_ohci_host_clock))
+>> +                       return PTR_ERR(ep93xx_ohci_host_clock);
+>> +       }
+>> +
+>> +       clk_enable(ep93xx_ohci_host_clock);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static void ep93xx_ohci_power_off(struct platform_device *pdev)
+>> +{
+>> +       clk_disable(ep93xx_ohci_host_clock);
+>> +}
+>> +
+>> +static void ep93xx_ohci_power_suspend(struct platform_device *pdev)
+>> +{
+>> +       ep93xx_ohci_power_off(pdev);
+>> +}
+>> +
+>> +static struct usb_ohci_pdata ep93xx_ohci_pdata = {
+>> +       .power_on       = ep93xx_ohci_power_on,
+>> +       .power_off      = ep93xx_ohci_power_off,
+>> +       .power_suspend  = ep93xx_ohci_power_suspend,
+>> +};
+>
+> This is definitely not a show-stopper in any way, but since this is
+> just standard clock management, could you even move these clock ops
+> into the driver? Are any other platforms already doing similar things
+> so you could remove code from their platform that way as well, per
+> chance?
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
+It does not appear any of the other users of the ohci-platform driver do
+anything similar.
 
-	v3: Added Tony's ACK & properties for generic USB PHY framework.
+The clock ops could be moved into the driver but I will need to add a
+flag or something to the usb_ohci_pdata so that the platform can
+indicated that a clock is required and  the clock ops should be done.
 
-	Previous version: http://marc.info/?t=138005105700010&r=1&w=2
-
- arch/arm/boot/dts/Makefile           |   2 +
- arch/arm/boot/dts/omap3-n9.dts       |  18 ++++
- arch/arm/boot/dts/omap3-n950-n9.dtsi | 174 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-n950.dts     |  18 ++++
- 4 files changed, 212 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-n9.dts
- create mode 100644 arch/arm/boot/dts/omap3-n950-n9.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-n950.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9df7d2c..62d0f4d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -177,6 +177,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-gta04.dtb \
- 	omap3-igep0020.dtb \
- 	omap3-igep0030.dtb \
-+	omap3-n9.dtb \
-+	omap3-n950.dtb \
- 	omap4-panda.dtb \
- 	omap4-panda-a4.dtb \
- 	omap4-panda-es.dtb \
-diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
-new file mode 100644
-index 0000000..39828ce
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-n9.dts
-@@ -0,0 +1,18 @@
-+/*
-+ * omap3-n9.dts - Device Tree file for Nokia N9
-+ *
-+ * Written by: Aaro Koskinen <aaro.koskinen@iki.fi>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+#include "omap3-n950-n9.dtsi"
-+
-+/ {
-+	model = "Nokia N9";
-+	compatible = "nokia,omap3-n9", "ti,omap3";
-+};
-diff --git a/arch/arm/boot/dts/omap3-n950-n9.dtsi b/arch/arm/boot/dts/omap3-n950-n9.dtsi
-new file mode 100644
-index 0000000..94eb77d
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-n950-n9.dtsi
-@@ -0,0 +1,174 @@
-+/*
-+ * omap3-n950-n9.dtsi - Device Tree file for Nokia N950 & N9 (common stuff)
-+ *
-+ * Written by: Aaro Koskinen <aaro.koskinen@iki.fi>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "omap36xx.dtsi"
-+
-+/ {
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vcc>;
-+		};
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x40000000>; /* 1 GB */
-+	};
-+
-+	vemmc: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VEMMC";
-+		regulator-min-microvolt = <2900000>;
-+		regulator-max-microvolt = <2900000>;
-+		gpio = <&gpio5 29 0>; /* gpio line 157 */
-+		startup-delay-us = <150>;
-+		enable-active-high;
-+	};
-+};
-+
-+&omap3_pmx_core {
-+	mmc2_pins: pinmux_mmc2_pins {
-+		pinctrl-single,pins = <
-+			0x128 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_clk */
-+			0x12a (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_cmd */
-+			0x12c (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat0 */
-+			0x12e (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat1 */
-+			0x130 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat2 */
-+			0x132 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat3 */
-+		>;
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <2900000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+	};
-+};
-+
-+/include/ "twl4030.dtsi"
-+
-+&twl {
-+	compatible = "ti,twl5031";
-+};
-+
-+&twl_gpio {
-+	ti,pullups	= <0x000001>; /* BIT(0) */
-+	ti,pulldowns	= <0x008106>; /* BIT(1) | BIT(2) | BIT(8) | BIT(15) */
-+};
-+
-+&i2c2 {
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c3 {
-+	clock-frequency = <400000>;
-+};
-+
-+&mmc1 {
-+	status = "disabled";
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&vemmc>;
-+	bus-width = <4>;
-+	ti,non-removable;
-+};
-+
-+&mmc3 {
-+	status = "disabled";
-+};
-+
-+&usb_otg_hs {
-+	interface-type = <0>;
-+	usb-phy = <&usb2_phy>;
-+	phys = <&usb2_phy>;
-+	phy-names = "usb2-phy";
-+	mode = <3>;
-+	power = <50>;
-+};
-+
-+&gpmc {
-+	ranges = <0 0 0x04000000 0x20000000>;
-+
-+	onenand at 0,0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0 0 0x20000000>;
-+
-+		gpmc,sync-read;
-+		gpmc,sync-write;
-+		gpmc,burst-length = <16>;
-+		gpmc,burst-read;
-+		gpmc,burst-wrap;
-+		gpmc,burst-write;
-+		gpmc,device-width = <2>;
-+		gpmc,mux-add-data = <2>;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <87>;
-+		gpmc,cs-wr-off-ns = <87>;
-+		gpmc,adv-on-ns = <0>;
-+		gpmc,adv-rd-off-ns = <10>;
-+		gpmc,adv-wr-off-ns = <10>;
-+		gpmc,oe-on-ns = <15>;
-+		gpmc,oe-off-ns = <87>;
-+		gpmc,we-on-ns = <0>;
-+		gpmc,we-off-ns = <87>;
-+		gpmc,rd-cycle-ns = <112>;
-+		gpmc,wr-cycle-ns = <112>;
-+		gpmc,access-ns = <81>;
-+		gpmc,page-burst-access-ns = <15>;
-+		gpmc,bus-turnaround-ns = <0>;
-+		gpmc,cycle2cycle-delay-ns = <0>;
-+		gpmc,wait-monitoring-ns = <0>;
-+		gpmc,clk-activation-ns = <5>;
-+		gpmc,wr-data-mux-bus-ns = <30>;
-+		gpmc,wr-access-ns = <81>;
-+		gpmc,sync-clk-ps = <15000>;
-+
-+		/*
-+		 * MTD partition table corresponding to Nokia's MeeGo 1.2
-+		 * Harmattan release.
-+		 */
-+		partition at 0 {
-+			label = "bootloader";
-+			reg = <0x00000000 0x00100000>;
-+		};
-+		partition at 1 {
-+			label = "config";
-+			reg = <0x00100000 0x002c0000>;
-+		};
-+		partition at 2 {
-+			label = "kernel";
-+			reg = <0x003c0000 0x01000000>;
-+		};
-+		partition at 3 {
-+			label = "log";
-+			reg = <0x013c0000 0x00200000>;
-+		};
-+		partition at 4 {
-+			label = "var";
-+			reg = <0x015c0000 0x1ca40000>;
-+		};
-+		partition at 5 {
-+			label = "moslo";
-+			reg = <0x1e000000 0x02000000>;
-+		};
-+		partition at 6 {
-+			label = "omap2-onenand";
-+			reg = <0x00000000 0x20000000>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/omap3-n950.dts b/arch/arm/boot/dts/omap3-n950.dts
-new file mode 100644
-index 0000000..b076a52
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-n950.dts
-@@ -0,0 +1,18 @@
-+/*
-+ * omap3-n950.dts - Device Tree file for Nokia N950
-+ *
-+ * Written by: Aaro Koskinen <aaro.koskinen@iki.fi>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+#include "omap3-n950-n9.dtsi"
-+
-+/ {
-+	model = "Nokia N950";
-+	compatible = "nokia,omap3-n950", "ti,omap3";
-+};
--- 
-1.8.4.rc3
+Regards,
+Hartley
