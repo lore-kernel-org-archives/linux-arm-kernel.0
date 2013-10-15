@@ -1,72 +1,64 @@
-From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Tue, 15 Oct 2013 18:50:02 +0530
-Subject: [PATCH V2 7/7] USB: OHCI: Properly handle ohci-spear suspend
-In-Reply-To: <1381843202-28707-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
- <1381843202-28707-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1381843202-28707-8-git-send-email-csmanjuvijay@gmail.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 15 Oct 2013 08:22:50 -0500
+Subject: [RESEND PATCHv2 1/3] arm: socfpga: Set the SDMMC clock phase
+ in system manager
+In-Reply-To: <201310151450.48650.arnd@arndb.de>
+References: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
+ <201310151450.48650.arnd@arndb.de>
+Message-ID: <525D41AA.7060503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Manjunath Goudar <manjunath.goudar@linaro.org>
+Hi Arnd,
 
-Suspend scenario in case of ohci-spear glue was not
-properly handled as it was not suspending generic part
-of ohci controller.  Alan Stern suggested, properly handle
-ohci-spear suspend scenario.
+On 10/15/13 7:50 AM, Arnd Bergmann wrote:
+> On Monday 14 October 2013, dinguyen at altera.com wrote:
+>> +void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(u32 drvsel, u32 smplsel)
+>> +{
+>> +       u32 hs_timing;
+>> +
+>> +       hs_timing = SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel);
+>> +       writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
+>> +}
+>> +EXPORT_SYMBOL(socfpga_sysmgr_set_dwmmc_drvsel_smpsel);
+> This looks like the wrong approach. What are you trying to do? If you want to
+> set a clock, please use the clk API.
+I can't use the clk API because this function is setting up a clock 
+phase bit for the SD/MMC
+clock that is used to clock the card, not the IP. This register is 
+located outside the SD/MMC
+and the clock manager.
 
-Calling explicitly the ohci_suspend() routine in
-spear_ohci_hcd_drv_suspend() will ensure proper
-handling of suspend scenario.
+Just to refresh your memory on this topic:
+I tried to use the syscon approach that you suggested:
 
-V1->V2:
-      -No changes.
-       Due to the build failure on ep93xx reverted this patch.
-       This patch is needed as Alan Stern suggestion.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/168470.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170423.html
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
----
- drivers/usb/host/ohci-spear.c |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+But this approach was rejected by Stephen Warren because we wanted to 
+the SD driver to be automonous
+of registers outside its IP:
 
-diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
-index 31ff3fc..41148f8 100644
---- a/drivers/usb/host/ohci-spear.c
-+++ b/drivers/usb/host/ohci-spear.c
-@@ -130,20 +130,26 @@ static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
- }
- 
- #if defined(CONFIG_PM)
--static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
-+static int spear_ohci_hcd_drv_suspend(struct platform_device *pdev,
- 		pm_message_t message)
- {
--	struct usb_hcd *hcd = platform_get_drvdata(dev);
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
- 	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
-+	bool do_wakeup = device_may_wakeup(&pdev->dev);
-+	int ret;
- 
- 	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
- 	ohci->next_statechange = jiffies;
- 
-+	ret = ohci_suspend(hcd, do_wakeup);
-+	if (ret)
-+		return ret;
-+
- 	clk_disable_unprepare(sohci_p->clk);
- 
--	return 0;
-+	return ret;
- }
- 
- static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
--- 
-1.7.9.5
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/194014.html
+
+So I went with the approach of exposing a platform API so that the 
+SD/MMC platform specific
+code can call it.
+
+The system manager has a plethora of registers that controls other IPs 
+on the SOC, so I kinda thought
+syscon was the way to go with this. A driver for this IP did not make 
+sense to me.
+
+Please advise if you know of another approach?
+
+Thanks,
+Dinh
+
+
+
+
+
+
+>
+> 	Arnd
