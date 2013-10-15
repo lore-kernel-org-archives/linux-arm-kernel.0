@@ -1,57 +1,75 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Oct 2013 01:24:16 +0530
-Subject: [PATCH v2 6/7] phy: omap-usb2: move omap_usb.h from linux/usb/ to
- linux/phy/
+Date: Wed, 16 Oct 2013 01:24:15 +0530
+Subject: [PATCH v2 5/7] usb: phy: omap-usb2: remove *set_suspend* callback
+ from omap-usb2
 In-Reply-To: <1381866857-3861-1-git-send-email-kishon@ti.com>
 References: <1381866857-3861-1-git-send-email-kishon@ti.com>
-Message-ID: <1381866857-3861-7-git-send-email-kishon@ti.com>
+Message-ID: <1381866857-3861-6-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Moved omap_usb.h from linux/usb/ to linux/phy/.
-Also removed the unused members of struct omap_usb (after phy-omap-pipe3
-started using it's own header file)
+Now that omap-usb2 is adapted to the new generic PHY framework,
+*set_suspend* ops can be removed from omap-usb2 driver.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- drivers/phy/phy-omap-usb2.c           |    2 +-
- include/linux/{usb => phy}/omap_usb.h |    3 ---
- 2 files changed, 1 insertion(+), 4 deletions(-)
- rename include/linux/{usb => phy}/omap_usb.h (95%)
+This patch was deferred from Generic PHY framework series since dwc3 uses the
+same driver and it has to be adapted to the Generic PHY Framework.
+
+ drivers/phy/phy-omap-usb2.c |   25 -------------------------
+ 1 file changed, 25 deletions(-)
 
 diff --git a/drivers/phy/phy-omap-usb2.c b/drivers/phy/phy-omap-usb2.c
-index 9b3e867..d738dc3 100644
+index bfc5c33..9b3e867 100644
 --- a/drivers/phy/phy-omap-usb2.c
 +++ b/drivers/phy/phy-omap-usb2.c
-@@ -21,7 +21,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/io.h>
--#include <linux/usb/omap_usb.h>
-+#include <linux/phy/omap_usb.h>
- #include <linux/usb/phy_companion.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-diff --git a/include/linux/usb/omap_usb.h b/include/linux/phy/omap_usb.h
-similarity index 95%
-rename from include/linux/usb/omap_usb.h
-rename to include/linux/phy/omap_usb.h
-index 6ae2936..19d343c3 100644
---- a/include/linux/usb/omap_usb.h
-+++ b/include/linux/phy/omap_usb.h
-@@ -33,13 +33,10 @@ struct usb_dpll_params {
- struct omap_usb {
- 	struct usb_phy		phy;
- 	struct phy_companion	*comparator;
--	void __iomem		*pll_ctrl_base;
- 	struct device		*dev;
- 	struct device		*control_dev;
- 	struct clk		*wkupclk;
--	struct clk		*sys_clk;
- 	struct clk		*optclk;
--	u8			is_suspended:1;
- };
+@@ -98,28 +98,6 @@ static int omap_usb_set_peripheral(struct usb_otg *otg,
+ 	return 0;
+ }
  
- #define	phy_to_omapusb(x)	container_of((x), struct omap_usb, phy)
+-static int omap_usb2_suspend(struct usb_phy *x, int suspend)
+-{
+-	struct omap_usb *phy = phy_to_omapusb(x);
+-	int ret;
+-
+-	if (suspend && !phy->is_suspended) {
+-		omap_control_usb_phy_power(phy->control_dev, 0);
+-		pm_runtime_put_sync(phy->dev);
+-		phy->is_suspended = 1;
+-	} else if (!suspend && phy->is_suspended) {
+-		ret = pm_runtime_get_sync(phy->dev);
+-		if (ret < 0) {
+-			dev_err(phy->dev, "get_sync failed with err %d\n", ret);
+-			return ret;
+-		}
+-		omap_control_usb_phy_power(phy->control_dev, 1);
+-		phy->is_suspended = 0;
+-	}
+-
+-	return 0;
+-}
+-
+ static int omap_usb_power_off(struct phy *x)
+ {
+ 	struct omap_usb *phy = phy_get_drvdata(x);
+@@ -173,7 +151,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
+ 
+ 	phy->phy.dev		= phy->dev;
+ 	phy->phy.label		= "omap-usb2";
+-	phy->phy.set_suspend	= omap_usb2_suspend;
+ 	phy->phy.otg		= otg;
+ 	phy->phy.type		= USB_PHY_TYPE_USB2;
+ 
+@@ -195,8 +172,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	phy->control_dev = &control_pdev->dev;
+-
+-	phy->is_suspended	= 1;
+ 	omap_control_usb_phy_power(phy->control_dev, 0);
+ 
+ 	otg->set_host		= omap_usb_set_host;
 -- 
 1.7.10.4
