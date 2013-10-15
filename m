@@ -1,108 +1,123 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 15 Oct 2013 13:05:46 +0530
-Subject: [RFC PATCH 0/6] DRIVERS: IRQCHIP: Add support for crossbar IP
-In-Reply-To: <524AE536.5080307@ti.com>
-References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
- <52499441.1030403@gmail.com> <524AAE69.8060703@ti.com>
- <524AD290.207@gmail.com> <524AD4B7.7040700@ti.com>
- <524AE1FA.2050104@gmail.com> <524AE536.5080307@ti.com>
-Message-ID: <525CF052.4060508@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 15 Oct 2013 15:37:06 +0800
+Subject: [PATCH 07/10] mmc: sdhci-esdhc-imx: add delay line setting support
+In-Reply-To: <1381317616-1229-8-git-send-email-b29396@freescale.com>
+References: <1381317616-1229-1-git-send-email-b29396@freescale.com>
+ <1381317616-1229-8-git-send-email-b29396@freescale.com>
+Message-ID: <20131015073704.GB14908@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Wed, Oct 09, 2013 at 07:20:13PM +0800, Dong Aisheng wrote:
+> The DLL(Delay Line) is newly added to assist in sampling read data.
+> The DLL provides the ability to programmatically select a quantized
+> delay (in fractions of the clock period) regardless of on-chip variations
+> such as process, voltage and temperature (PVT).
+> 
+> This patch adds a user interface to set slave delay line via device tree.
+> It's usually used in high speed mode like mmc DDR mode when the signal
+> quality is not good caused by board design, e.g. the signal path is too long.
+> User can manual set delay line to find a suitable data sampling window
+> for card to work properly.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+>  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    1 +
+>  drivers/mmc/host/sdhci-esdhc-imx.c                 |   18 ++++++++++++++++++
+>  include/linux/platform_data/mmc-esdhc-imx.h        |    1 +
+>  3 files changed, 20 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> index 1dd6225..ebd3ff5 100644
+> --- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> @@ -12,6 +12,7 @@ Required properties:
+>  Optional properties:
+>  - fsl,cd-controller : Indicate to use controller internal card detection
+>  - fsl,wp-controller : Indicate to use controller internal write protection
+> +- fsl,delay-line : Specify delay line value of manual override for slave delay.
 
-On Tuesday 01 October 2013 08:37 PM, Santosh Shilimkar wrote:
-> On Tuesday 01 October 2013 10:53 AM, Rob Herring wrote:
->> On 10/01/2013 08:57 AM, Santosh Shilimkar wrote:
->>> On Tuesday 01 October 2013 09:48 AM, Rob Herring wrote:
->>>> On 10/01/2013 06:13 AM, Sricharan R wrote:
->>>>> Hi,
->>>>>
->>>>> On Monday 30 September 2013 08:39 PM, Rob Herring wrote:
->>>>>> On 09/30/2013 08:59 AM, Sricharan R wrote:
->>>>>>> Some socs have a large number of interrupts requests to service
->>>>>>> the needs of its many peripherals and subsystems. All of the interrupt
->>>>>>> requests lines from the subsystems are not needed at the same
->>>>>>> time, so they have to be muxed to the controllers appropriately.
->>>>>>> In such places a interrupt controllers are preceded by an
->>>>>>> IRQ CROSSBAR that provides flexibility in muxing the device interrupt
->>>>>>> requests to the controller inputs.
->>>>>>>
->>>>>>> This series models the peripheral interrupts that can be routed through
->>>>>>> the crossbar to the GIC as 'routable-irqs'. The routable irqs are added
->>>>>>> in a separate linear domain inside the GIC. The registered routable domain's
->>>>>>> callback are invoked as a part of the GIC's callback, which in turn should
->>>>>>> allocate a free irq line and configure the IP accordingly. So every peripheral
->>>>>>> in the dts files mentions the fixed crossbar number as its interrupt. A free
->>>>>>> gic line for that gets allocated and configured when the peripheral's interrupt
->>>>>>> is mapped.
->>>>>>>
->>>>>>> The minimal crossbar driver to track and allocate free GIC lines and configure the
->>>>>>> crossbar is added here, along with the DT bindings.
->>>>>> Seems like interrupt-map property is what you need here.
->>>>>>
->>>>>> http://devicetree.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
->>>>>>
->>>>>> Versatile Express also has an example.
->>>>>    OK, but the idea was not to tie up the crossbar<->interrupt numbers at the
->>>>>    DTS level, but to assign it dynamically during runtime. This was one of the
->>>>>   comments that came up with first crossbar support patches, which was assigning a
->>>>>   interrupt line to crossbar number in the DTS and setting it up in crossbar probe.
->>>> Is there an actual usecase on a single h/w design that you run out of
->>>> interrupts and it is a user decision which interrupts to use?
->>>>
->>> Yes. There are 240 peripheral interrupts connected out of which 160 can
->>> be used in this specific case. 
->> Yes, I understand the SOC connections. That does not answer my question.
->> The 240 interrupts are likely to be limited to fewer by board design,
->> pinmuxing, etc.
->>
-> yes limited by different board designs ...
->
->> How do you handle the 161st interrupt request? Will never happen? Just
->> rely on the random driver probe ordering?
->>
-> Well the board dts are expected to provide the peripheral support info to optimise it.
-> If a board actually has more than 160 peripherals available then in that
-> case the 161 interrupt will not be mapped. 
->  
->>>> You could fill in the interrupt-map at run-time. It would have to be
->>>> early (bootloader or early kernel init) and can't be at request_irq time.
->>>>
->>> Well all options are tried before coming up to the $subject solution.
->>> It was suggested by Thomas in the last review.
->>>  
->>>>>     https://lkml.org/lkml/2013/7/18/416
->>>>>
->>>>>    Since this approach of assigning in DTS was opposed, we moved to IRQCHIP and
->>>>>    that did not go as well. Finally was asked to handle this as a part of GIC driver with
->>>>>    a separate domain.
->>>>>    
->>>>>   http://www.spinics.net/lists/linux-omap/msg97085.html
->>>> This has nothing to do with the GIC, so it does not belong there.
->>>>
->>> Well the router makes connections from peripheral to GIC. Thomas can
->>> better explain it but I think since its doing irq routing for GIC on
->>> a given hardware, I don't see any issue having some generic map/unmap
->>> function in GIC. The actual implementation is still outside of GIC.
->> I read Thomas' reply as don't put this crap in his code.
->>
-> That was for the IRQCHIP based approach and as part of that review
-> Thomas suggested why not irqdomain and suggested a prototype code
-> as well.
->  
->> You can call it generic, but it is not. It is specific to the GIC and
->> looks like an abuse of irqdomains to me. Look where the function
->> declaration for register_routable_domain_ops is.
->>
-> I am not sure why you call it abuse of irqdomain since the map/unmap
-> are exactly the interfaces where the logical to physical irq
-> connections are made. Look at existing GIC code as well. I still
-> let Thomas give his expert comment whether it is abusive because it
-> it was, am sure he wouldn't have suggested that.
-  Is this inline with what you were suggesting and
-  is this approach fine ?
+It needs more documentation and should refer to the register bits in RM.
+Otherwise, I hardly think people will understand what it is.
 
-Regards,
- Sricharan
+>  
+>  Examples:
+>  
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index b6ae5c1..91b2d85 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -46,6 +46,11 @@
+>  /* Bits 3 and 6 are not SDHCI standard definitions */
+>  #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
+>  
+> +/* dll control register */
+> +#define ESDHC_DLL_CTRL			0x60
+> +#define ESDHC_DLL_OVERRIDE_VAL_SHIFT	9
+> +#define ESDHC_DLL_OVERRIDE_EN_SHIFT	8
+> +
+>  /* tune control register */
+>  #define ESDHC_TUNE_CTRL_STATUS		0x68
+>  #define  ESDHC_TUNE_CTRL_STEP		1
+> @@ -803,6 +808,7 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+>  {
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> +	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
+>  
+>  	switch (uhs) {
+>  	case MMC_TIMING_UHS_SDR12:
+> @@ -823,6 +829,15 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+>  				ESDHC_MIX_CTRL_DDREN,
+>  				host->ioaddr + ESDHC_MIX_CTRL);
+>  		imx_data->is_ddr = 1;
+> +		if (boarddata->delay_line) {
+> +			u32 v;
+> +			v = boarddata->delay_line <<
+> +				ESDHC_DLL_OVERRIDE_VAL_SHIFT |
+> +				(1 << ESDHC_DLL_OVERRIDE_EN_SHIFT);
+> +			if (is_imx53_esdhc(imx_data))
+> +				v <<= 1;
+
+Is the patch (series) tested on imx53?  Or is it just a note that imx53
+has different bit position? 
+
+> +			writel(v, host->ioaddr + ESDHC_DLL_CTRL);
+
+Is it safe to always write other bits as zero?
+
+Shawn
+
+> +		}
+>  		break;
+>  	}
+>  
+> @@ -887,6 +902,9 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+>  	else
+>  		boarddata->support_vsel = true;
+>  
+> +	if (of_property_read_u32(np, "fsl,delay-line", &boarddata->delay_line))
+> +		boarddata->delay_line = 0;
+> +
+>  	return 0;
+>  }
+>  #else
+> diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
+> index a0f5a8f..75f70f6 100644
+> --- a/include/linux/platform_data/mmc-esdhc-imx.h
+> +++ b/include/linux/platform_data/mmc-esdhc-imx.h
+> @@ -45,5 +45,6 @@ struct esdhc_platform_data {
+>  	int max_bus_width;
+>  	unsigned int f_max;
+>  	bool support_vsel;
+> +	unsigned int delay_line;
+>  };
+>  #endif /* __ASM_ARCH_IMX_ESDHC_H */
+> -- 
+> 1.7.2.rc3
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
