@@ -1,32 +1,17 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 Oct 2013 18:06:34 +0200
-Subject: [PATCH 0/6] PCI: imx6: Random fixes
-Message-ID: <1381853200-5534-1-git-send-email-marex@denx.de>
+Date: Tue, 15 Oct 2013 18:06:39 +0200
+Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
+In-Reply-To: <1381853200-5534-1-git-send-email-marex@denx.de>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+Message-ID: <1381853200-5534-6-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set of random fixes for the PCIe driver for i.MX6 . With these fixes, my
-setup with MX6Q -> PCIe bridge -> i210 ethernet adapter works as expected.
+Without forcing the PCIe core into Gen1 operation, the PCIe switch
+attached directly to the PCIe port is not recognised at all. The
+PCIe switch is Gen2 capable to make this issue even more puzzling.
 
-NOTE: I'm sure this will start some discussion. There are quite a few patches
-      that are more of a hacks. Shawn, I didn't ignore your remark about the
-      clock patches, I will test it ASAP, I just want to have these fixes in
-      the public so others can comment/test.
-
-Marek Vasut (6):
-  PCI: imx6: Make reset-gpio optional
-  PCI: imx6: Fix the clock for PCIe
-  ARM: dts: imx6qdl: Fix the clock for PCIe
-  PCI: imx6: Probe the PCIe in fs_initcall()
-  PCI: imx6: Force Gen1 operation
-  PCI: designware: Fix DT resource retrieval
-
- .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
- arch/arm/boot/dts/imx6qdl.dtsi                     |  4 +-
- drivers/pci/host/pci-imx6.c                        | 63 ++++++++++++++++------
- drivers/pci/host/pcie-designware.c                 | 17 +++---
- 4 files changed, 55 insertions(+), 31 deletions(-)
-
+Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Frank Li <lznuaa@gmail.com>
 Cc: Jingoo Han <jg1.han@samsung.com>
@@ -41,6 +26,46 @@ Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
 Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
+---
+ drivers/pci/host/pci-imx6.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index ca8c5de..8402e9a 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -321,6 +321,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+ {
+ 	int count = 0;
+ 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
++	uint32_t tmp;
+ 
+ 	imx6_pcie_assert_core_reset(pp);
+ 
+@@ -330,13 +331,23 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+ 
+ 	dw_pcie_setup_rc(pp);
+ 
++	/*
++	 * FIXME:
++	 * Force Gen1 operation. In case the IP block is in Gen2 operation
++	 * mode, it does not detect the PCIe switch at all.
++	 */
++	tmp = readl(pp->dbi_base + 0x7c);
++	tmp &= ~0xf;
++	tmp |= 0x1;
++	writel(tmp, pp->dbi_base + 0x7c);
++
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+ 			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
+ 
+ 	while (!dw_pcie_link_up(pp)) {
+ 		usleep_range(100, 1000);
+ 		count++;
+-		if (count >= 10) {
++		if (count >= 200) {
+ 			dev_err(pp->dev, "phy link never came up\n");
+ 			dev_dbg(pp->dev,
+ 				"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
 -- 
 1.8.4.rc3
