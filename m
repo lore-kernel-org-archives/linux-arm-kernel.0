@@ -1,63 +1,46 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 15 Oct 2013 08:49:11 +0200
-Subject: [PATCH 2/5] mmc: sdhci-esdhc-imx: add flag ESDHC_FLAG_ENGCM07207
-In-Reply-To: <1381739024-24924-3-git-send-email-shawn.guo@linaro.org>
-References: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
- <1381739024-24924-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1381819751.4243.5.camel@weser.hi.pengutronix.de>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Tue, 15 Oct 2013 08:53:22 +0200
+Subject: [PATCH 1/1] ARM: dts: omap3: Adapt USB OTG to generic PHY
+ framework
+In-Reply-To: <525BB74B.2040702@ti.com>
+References: <1381152493-28055-1-git-send-email-rogerq@ti.com>
+ <1381152493-28055-2-git-send-email-rogerq@ti.com>
+ <20131010153427.GI28375@radagast> <525BB74B.2040702@ti.com>
+Message-ID: <525CE662.3000704@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 14.10.2013, 16:23 +0800 schrieb Shawn Guo:
-> Add flag ESDHC_FLAG_ENGCM07207 for enabling the workaround for errata
-> ENGcm07207 and set the flag for i.MX25 and i.MX35 ESDHC.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index e046917..a5d7d15 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -89,6 +89,11 @@
->   * exeception. Bit1 of Vendor Spec registor is used to fix it.
->   */
->  #define ESDHC_FLAG_MULTIBLK_NO_INT	BIT(1)
-> +/*
-> + * The flag enables the workaround for ESDHC errata ENGcm07207 which
-> + * presents on i.MX25 and i.MX35.
+Hi Roger,
 
-s/presents/is present/
+On 14/10/2013 11:20, Roger Quadros wrote:
+> Hi Benoit,
+>
+> On 10/10/2013 06:34 PM, Felipe Balbi wrote:
+>> On Mon, Oct 07, 2013 at 04:28:13PM +0300, Roger Quadros wrote:
+>>> The generic PHY framewrok expects different properties than the
+>>> old USB PHY framework. Supply those properties.
+>>>
+>>> Fixes USB OTG port on GAT04 and N900 after the Generic PHY framework was
+>>> merged in greg/usb-next. [1]
+>>>
+>>> [1] - https://lkml.org/lkml/2013/9/27/581
+>>>
+>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>
+>> Acked-by: Felipe Balbi <balbi@ti.com>
+>>
+>
+> Could you please pick this one for 3.13? Thanks.
+>
+> I don't see it in your 3.13 take 2 pull request.
 
-> + */
-> +#define ESDHC_FLAG_ENGCM07207		BIT(2)
->  
->  enum imx_esdhc_type {
->  	IMX25_ESDHC,
-> @@ -865,6 +870,9 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  	if (is_imx25_esdhc(imx_data))
->  		imx_data->flags |= ESDHC_FLAG_NO_DMAS_BITS;
->  
-> +	if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
-> +		imx_data->flags |= ESDHC_FLAG_ENGCM07207;
-> +
->  	imx_data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
->  	if (IS_ERR(imx_data->clk_ipg)) {
->  		err = PTR_ERR(imx_data->clk_ipg);
-> @@ -905,7 +913,7 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  
->  	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
->  
-> -	if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
-> +	if (imx_data->flags & ESDHC_FLAG_ENGCM07207)
->  		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
->  		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
->  			| SDHCI_QUIRK_BROKEN_ADMA;
+It was not in it. I've just applied it.
+
+Thanks
+Benoit
 
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
