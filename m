@@ -1,54 +1,75 @@
 From: dave.long@linaro.org (David Long)
-Date: Tue, 15 Oct 2013 17:04:24 -0400
-Subject: [PATCH v2 09/13] ARM: Disable jprobe selftests in thumb kernels
+Date: Tue, 15 Oct 2013 17:04:21 -0400
+Subject: [PATCH v2 06/13] ARM: move shared uprobe/kprobe definitions into new
+ include file
 In-Reply-To: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
 References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1381871068-27660-10-git-send-email-dave.long@linaro.org>
+Message-ID: <1381871068-27660-7-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-jprobe kernel selftests are not supported for thumb kernels. Conditionally
-disable them in the kernel kprobes-test module.
+Separate the kprobe-only definitions from the definitions needed by
+both kprobes and uprobes.
 
 Signed-off-by: David A. Long <dave.long@linaro.org>
 ---
- arch/arm/kernel/kprobes-test.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/include/asm/kprobes.h | 15 +--------------
+ arch/arm/include/asm/probes.h  | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm/include/asm/probes.h
 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index 44a8a13..2144df1 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -358,6 +358,7 @@ static int test_kprobe(long (*func)(long, long))
- 	return 0;
- }
+diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
+index f82ec22..30fc11b 100644
+--- a/arch/arm/include/asm/kprobes.h
++++ b/arch/arm/include/asm/kprobes.h
+@@ -28,21 +28,8 @@
+ #define kretprobe_blacklist_size	0
  
-+#ifndef CONFIG_THUMB2_KERNEL
- static void __kprobes jprobe_func(long r0, long r1)
- {
- 	jprobe_func_called = test_func_instance;
-@@ -401,6 +402,7 @@ static int test_jprobe(long (*func)(long, long))
+ typedef u32 kprobe_opcode_t;
+-
+ struct kprobe;
+-typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
+-typedef unsigned long (kprobe_check_cc)(unsigned long);
+-typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
+-typedef void (kprobe_insn_fn_t)(void);
+-
+-/* Architecture specific copy of original instruction. */
+-struct arch_specific_insn {
+-	kprobe_opcode_t			*insn;
+-	kprobe_insn_handler_t		*insn_handler;
+-	kprobe_check_cc			*insn_check_cc;
+-	kprobe_insn_singlestep_t	*insn_singlestep;
+-	kprobe_insn_fn_t		*insn_fn;
+-};
++#include <asm/probes.h>
  
- 	return 0;
- }
+ struct prev_kprobe {
+ 	struct kprobe *kp;
+diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
+new file mode 100644
+index 0000000..21da148
+--- /dev/null
++++ b/arch/arm/include/asm/probes.h
+@@ -0,0 +1,18 @@
++#ifndef _ASM_PROBES_H
++#define _ASM_PROBES_H
++
++typedef void (kprobe_insn_handler_t)(struct kprobe *, struct pt_regs *);
++typedef unsigned long (kprobe_check_cc)(unsigned long);
++typedef void (kprobe_insn_singlestep_t)(struct kprobe *, struct pt_regs *);
++typedef void (kprobe_insn_fn_t)(void);
++
++/* Architecture specific copy of original instruction. */
++struct arch_specific_insn {
++	kprobe_opcode_t			*insn;
++	kprobe_insn_handler_t		*insn_handler;
++	kprobe_check_cc			*insn_check_cc;
++	kprobe_insn_singlestep_t	*insn_singlestep;
++	kprobe_insn_fn_t		*insn_fn;
++};
++
 +#endif
- 
- static int __kprobes
- kretprobe_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
-@@ -456,10 +458,12 @@ static int run_api_tests(long (*func)(long, long))
- 	if (ret < 0)
- 		return ret;
- 
-+#ifndef CONFIG_THUMB2_KERNEL
- 	pr_info("    jprobe\n");
- 	ret = test_jprobe(func);
- 	if (ret < 0)
- 		return ret;
-+#endif
- 
- 	pr_info("    kretprobe\n");
- 	ret = test_kretprobe(func);
 -- 
 1.8.1.2
