@@ -1,78 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Oct 2013 20:18:10 +0200
-Subject: [PATCH v10 3/7] ARM: dts: enable hi4511 with device tree
-In-Reply-To: <1381828577-27998-4-git-send-email-haojian.zhuang@linaro.org>
-References: <1381828577-27998-1-git-send-email-haojian.zhuang@linaro.org>
- <1381828577-27998-4-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <201310152018.10908.arnd@arndb.de>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 15 Oct 2013 14:24:32 -0400
+Subject: [RFC PATCH 3/4] ARM64: Big Endian fixes for kernel booting
+In-Reply-To: <1381494135-15085-4-git-send-email-ankit.jindal@linaro.org>
+References: <1381494135-15085-1-git-send-email-ankit.jindal@linaro.org>
+ <1381494135-15085-4-git-send-email-ankit.jindal@linaro.org>
+Message-ID: <525D8860.7080204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 October 2013, Haojian Zhuang wrote:
-> Enable Hisilicon Hi4511 development platform with device tree support.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Hi Ankit,
 
-Based on my other mail, some more comments here:
+On 10/11/2013 08:22 AM, Ankit Jindal wrote:
+> - Enable appropriate bits for big endian kernel in SYSCTLR.EL2 and
+>   SYSCTLR.EL1 registers
+> - Swap entry point for secondary core for big endian kernel
+> - Set machine type to "aarch64b" for big endian and "aarch64l"
+>   for little endian.
+[...]
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -122,6 +122,7 @@
+>  	.word	0				// reserved
+>  
+>  ENTRY(stext)
+> +	ARM_BE(bl      setend_be)
+>  	mov	x21, x0				// x21=FDT
+>  	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
+>  	bl	el2_setup			// Drop to EL1
+> @@ -148,6 +149,34 @@ ENTRY(stext)
+>  ENDPROC(stext)
+>  
+>  /*
+> + * Set el0-el1-el2 to Big endian
+> + */
 
-> +/ {
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
+It might be helpful to say why this has to be done (each level needs to be set
+up before it's used?) and maybe list them in the order they're set up in.
 
-Since all clocks are in the fc802000 page, I would prefer using a non-empty
-ranges to map the clocks into their own address space, like
+> +#if defined(CONFIG_CPU_BIG_ENDIAN)
+> +ENTRY(setend_be)
+> +	mrs     x21, CurrentEL
+> +        cmp     x21, #PSR_MODE_EL2t
+> +	b.ne  	setend_be_el1_el0
 
-		ranges = <0 0xfc802000 0x1000>;
-
-
-> +		timer4_mux: timer4_mux at fc802018 {
-> +			compatible = "hisilicon,clk-mux";
-> +			#clock-cells = <0>;
-> +			clocks = <&osc32k &timerclk45>;
-> +			clock-output-names = "timer4_mux";
-> +			reg = <0xfc802018 0x4>;
-> +			clkmux-mask = <0x3>;
-> +			clkmux-table = <0 0x1>;
-> +		};
-
-which would turn this into 
-
-		timer4_mux: timer4_mux at 18 {
-			...
-			reg = <0x18 0x4>;
-			...
-		};
-
-The code would not be impacted by this.
-
-On a related note, I find it strange that you have multiple devices with the
-same register. Normally, we try to have device node names be generic,
-e.g. 'clock at 18' rather than 'timer4_mux at 18', but that won't work if the
-register is the same for all of them. Maybe some DT expert can comment
-on this.
+Make sure to use tabs rather than spaces and run checkpatch.pl.
 
 > +
-> +	amba {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "arm,amba-bus";
-> +		interrupt-parent = <&gic>;
-> +		ranges;
+> +setend_be_el2:
+> +	mrs     x21, sctlr_el2
+> +        mov     x22, #(1<<25)
+> +        orr     x21, x21, x22
+> +        msr     sctlr_el2, x21
+> +	isb
 > +
-> +		L2: l2-cache {
-> +			compatible = "arm,pl310-cache";
-> +			reg = <0xfc10000 0x100000>;
-> +			interrupts = <0 15 4>;
-> +			cache-unified;
-> +			cache-level = <2>;
-> +		};
+> +setend_be_el1_el0:
+> +	mrs     x21, sctlr_el1
+> +        mov     x22, #(3<<24)
+> +        orr     x21, x21, x22
+> +        msr     sctlr_el1, x21
+> +	isb
+> +
+> +	ret
+> +ENDPROC(setend_be)
+> +#endif /* defined(CONFIG_CPU_BIG_ENDIAN) */
+> +
+> +/*
+>   * If we're fortunate enough to boot at EL2, ensure that the world is
+>   * sane before dropping to EL1.
+>   */
+> @@ -181,7 +210,11 @@ ENTRY(el2_setup)
+>  
+>  	/* sctlr_el1 */
+>  	mov	x0, #0x0800			// Set/clear RES{1,0} bits
+> +#if defined(CONFIG_CPU_BIG_ENDIAN)
+> +	movk	x0, #0x33d0, lsl #16
+> +#else
+>  	movk	x0, #0x30d0, lsl #16
+> +#endif
+>  	msr	sctlr_el1, x0
 
-For this node, we could use the same trick with the non-empty ranges, since
-all amba devices seem to be in the 0xfc000000 range.
+This may be easier to read if the magic number were ifdef'ed instead of the code.
 
-If you do that, it probably makes sense to move the clock controller under here
-as well.
+[...]
 
-	Arnd
+Thanks,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
