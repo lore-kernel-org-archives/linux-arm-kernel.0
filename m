@@ -1,40 +1,94 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 15 Oct 2013 12:00:04 -0500
-Subject: [PATCH] ARM: dts: OMAP5: Add i2c aliases
-Message-ID: <1381856405-30970-1-git-send-email-nm@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 15 Oct 2013 19:09:22 +0200
+Subject: [PATCH 4/8] ARM: add Marvell Berlin SoC familiy to Marvell doc
+In-Reply-To: <20131015111039.6a7e664b@xhacker>
+References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1381235073-17134-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <525C7993.40408@gmail.com> <20131015111039.6a7e664b@xhacker>
+Message-ID: <525D76C2.1020406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, i2c1 and i2c5 defer probe due to pinctrl dependencies.
-This changes the i2c ID each bus is registered with in i2c-dev
-interface.
+On 10/15/2013 05:10 AM, Jisheng Zhang wrote:
+> Hi Sebastian,
+>
+> On Mon, 14 Oct 2013 16:09:07 -0700
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>
+>> On 10/08/2013 02:24 PM, Sebastian Hesselbarth wrote:
+>>> This adds known facts and rumors about the Marvell Berlin (88DE3xxx) SoC
+>>> family to the Marvell SoC documentation.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> Reviewed-by: Jason Cooper <jason@lakedaemon.net>
+>>> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+>>> ---
+>>> Changelog:
+>>> RFCv2->v1:
+>>> - move Berlin below PXA/MMP[23] where it belongs to
+>>> - add note about IP (re-)used in Berlin SoCs
+>>> RFCv1->RFCv2:
+>>> - initial patch
+>>>
+>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Rob Landley <rob@landley.net>
+>>> Cc: linux-doc at vger.kernel.org
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-kernel at vger.kernel.org
+>>> ---
+>>>    Documentation/arm/Marvell/README |   29 +++++++++++++++++++++++++++++
+>>>    1 file changed, 29 insertions(+)
+>>>
+>>> diff --git a/Documentation/arm/Marvell/README
+>>> b/Documentation/arm/Marvell/README index 8f08a86..993c45d 100644
+>>> --- a/Documentation/arm/Marvell/README
+>>> +++ b/Documentation/arm/Marvell/README
+>>> @@ -210,6 +210,35 @@ MMP/MMP2 family (communication processor)
+>>>       Linux kernel mach directory: arch/arm/mach-mmp
+>>>       Linux kernel plat directory: arch/arm/plat-pxa
+>>>
+>>> +Berlin family (Digital Entertainment)
+>>> +-------------------------------------
+>>> +
+>>> +  Flavors:
+>>> +	88DE3005, Armada 1500-mini
+>>> +		Design name:	BG2CD(A0)
+>>> +		Core:		ARM Cortex-A9, PL310 L2CC
+>>> +		Homepage:
+>>> http://www.marvell.com/digital-entertainment/armada-1500-mini/
+>>> +	88DE3010, Armada 1000
+>>> +		Design name:	BG2(?)
+>>> +		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
+>>> +		Product Brief:
+>>> http://www.marvell.com/digital-entertainment/assets/armada_1000_pb.pdf
+>>> +	88DE3100, Armada 1500
+>>> +		Design name:	BG2(A0)
+>>> +		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
+>>> +		Homepage:
+>>> http://www.marvell.com/digital-entertainment/armada-1500/
+>>> +		Product Brief:
+>>> http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
+>>> +	88DE????
+>>> +		Design name:	BG3
+>>> +		Core:		ARM Cortex-A15, CA15 integrated L2CC
+>>
+>> Jisheng,
+>>
+>> can you comment on the above and fill in the missing pieces?
+>>
+>> Especially, if we want to base device tree compatibles later, we should
+>> make it right in the first place.
+>>
+>
+> Sorry, I can't leak some information now. So could we remove the BG3 and 88DE3010 sections?
+> I promise I will update those information when I submit BG3 enable patches in near future.
 
-As a result of this, many userspace tools break and there is no
-consistent manner to fix the same if the i2c dev interface have no
-consistent numbering. Provide alias to allow ordering the i2c devices
-correctly.
+Ok, but I leave the place-holders above for you to remember ;)
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+One last question: Can you at least tell what pl310 revision (e.g. r0p0
+or r2p0) Tauros3's aux_ctrl is compatible with?
 
- arch/arm/boot/dts/omap5.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index e18ee7e..8970deb 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -21,6 +21,11 @@
- 	interrupt-parent = <&gic>;
- 
- 	aliases {
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c2;
-+		i2c2 = &i2c3;
-+		i2c3 = &i2c4;
-+		i2c4 = &i2c5;
- 		serial0 = &uart1;
- 		serial1 = &uart2;
- 		serial2 = &uart3;
--- 
-1.7.9.5
+Sebastian
