@@ -1,53 +1,265 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 15 Oct 2013 09:46:18 +0200
-Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
-In-Reply-To: <20131014225029.GV25034@n2100.arm.linux.org.uk>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
- <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
- <20131014174030.GU25034@n2100.arm.linux.org.uk>
- <20131014225029.GV25034@n2100.arm.linux.org.uk>
-Message-ID: <20131015074618.GG30088@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 15 Oct 2013 09:50:30 +0200
+Subject: [PATCH V3 1/3] ARM: at91: cpuidle: convert to platform driver
+Message-ID: <1381823432-24944-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 11:50:29PM +0100, Russell King - ARM Linux wrote:
-> Answers to these two questions may help stop me wasting a lot of time
-> chasing what is a really weird bug.
-> 
-> So, I have X up and running on the Cubox-i carrier-1, using the imx-drm
-> stuff (I've slightly hacked my xf86-armada X driver to get this working.)
-> This works fine - it detects the connectors, selects an appropriate
-> video mode and produces a picture of the correct shape and size.
-> 
-> However... I see really weird effects colouring effects - almost like
-> water over the image.  It's certain colour transitions in the image
-> which seem to trigger this.  There are also certain pixels which
-> "twinkle".
-> 
-> Text looks very strange too.  Rather than the font being crisp and clear,
-> it looks like there's red and green shift to it - but its not that it's
-> all shifted in that way.
-> 
-> Now, if I use the modetest utility from libdrm-2.4.43 to display a SMPTE
-> test pattern, this again looks right, but there are several vertical
-> single pixel lines of noise.  The most striking one is below the upper
-> red bar in the lower dark area.  I have a single pixel noisy vertical
-> line.
-> 
-> I've tried the kernel which Rabeeh supplied, which is based on BSP 4.1.0,
-> and this works fine as far as I can tell with the same image (though,
-> it's a little difficult converting the XWD dump to something that can
-> be directly poked into /dev/fb0..., although this results in R/B swap.)
-> 
-> Any ideas where to start looking?
+Using the platform driver model is a good way to separate the cpuidle specific
+code from the low level pm code. It allows to remove the dependency between
+these two components.
 
-This sounds like the wrong clock polarity. Could you try inverting
-sig_cfg.clk_pol in imx-drm/ipuv3-crtc.c?
+The platform_device is located in the pm code and a 'set' function has been
+added to set the standby function from the AT91_SOC_START initialization
+function. Each SoC with a cpuidle driver will set the standby function in the
+platform_data field at init time. Then pm code will register the cpuidle
+platform device.
 
-Sascha
+The cpuidle driver will register the platform_driver and use the device's
+platform_data as a standby callback in the idle path.
 
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-at91/at91rm9200.c  |    3 +++
+ arch/arm/mach-at91/at91sam9260.c |    3 +++
+ arch/arm/mach-at91/at91sam9261.c |    3 +++
+ arch/arm/mach-at91/at91sam9263.c |    3 +++
+ arch/arm/mach-at91/at91sam9g45.c |    3 +++
+ arch/arm/mach-at91/at91sam9rl.c  |    3 +++
+ arch/arm/mach-at91/cpuidle.c     |   29 +++++++++++++++--------------
+ arch/arm/mach-at91/pm.c          |   12 ++++++++++++
+ arch/arm/mach-at91/pm.h          |    4 ++++
+ 9 files changed, 49 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index 4aad93d..0d234f2 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -27,6 +27,7 @@
+ #include "generic.h"
+ #include "clock.h"
+ #include "sam9_smc.h"
++#include "pm.h"
+ 
+ /* --------------------------------------------------------------------
+  *  Clocks
+@@ -337,6 +338,8 @@ static void __init at91rm9200_initialize(void)
+ 	/* Initialize GPIO subsystem */
+ 	at91_gpio_init(at91rm9200_gpio,
+ 		cpu_is_at91rm9200_bga() ? AT91RM9200_BGA : AT91RM9200_PQFP);
++
++	at91_pm_set_standby(at91rm9200_standby);
+ }
+ 
+ 
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 5de6074..ffe9ce7 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -28,6 +28,7 @@
+ #include "generic.h"
+ #include "clock.h"
+ #include "sam9_smc.h"
++#include "pm.h"
+ 
+ /* --------------------------------------------------------------------
+  *  Clocks
+@@ -351,6 +352,8 @@ static void __init at91sam9260_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9260_gpio, 3);
++
++	at91_pm_set_standby(at91sam9_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 0e07932..1edbb6f 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -27,6 +27,7 @@
+ #include "generic.h"
+ #include "clock.h"
+ #include "sam9_smc.h"
++#include "pm.h"
+ 
+ /* --------------------------------------------------------------------
+  *  Clocks
+@@ -293,6 +294,8 @@ static void __init at91sam9261_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9261_gpio, 3);
++
++	at91_pm_set_sandby(at91sam9_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 6ce7d18..8c81c89 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -26,6 +26,7 @@
+ #include "generic.h"
+ #include "clock.h"
+ #include "sam9_smc.h"
++#include "pm.h"
+ 
+ /* --------------------------------------------------------------------
+  *  Clocks
+@@ -330,6 +331,8 @@ static void __init at91sam9263_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9263_gpio, 5);
++
++	at91_pm_set_standby(at91sam9263_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 474ee04..8460f52 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -26,6 +26,7 @@
+ #include "generic.h"
+ #include "clock.h"
+ #include "sam9_smc.h"
++#include "pm.h"
+ 
+ /* --------------------------------------------------------------------
+  *  Clocks
+@@ -379,6 +380,8 @@ static void __init at91sam9g45_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9g45_gpio, 5);
++
++	at91_pm_set_standby(at91sam9g45_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index d4ec0d9..c7986e4 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -27,6 +27,7 @@
+ #include "generic.h"
+ #include "clock.h"
+ #include "sam9_smc.h"
++#include "pm.h"
+ 
+ /* --------------------------------------------------------------------
+  *  Clocks
+@@ -296,6 +297,8 @@ static void __init at91sam9rl_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9rl_gpio, 4);
++
++	at91_pm_set_standby(at91sam9_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+index 4ec6a6d..a077437 100644
+--- a/arch/arm/mach-at91/cpuidle.c
++++ b/arch/arm/mach-at91/cpuidle.c
+@@ -21,26 +21,17 @@
+ #include <linux/export.h>
+ #include <asm/proc-fns.h>
+ #include <asm/cpuidle.h>
+-#include <mach/cpu.h>
+-
+-#include "pm.h"
+ 
+ #define AT91_MAX_STATES	2
+ 
++static void (*at91_standby)(void);
++
+ /* Actual code that puts the SoC in different idle states */
+ static int at91_enter_idle(struct cpuidle_device *dev,
+ 			struct cpuidle_driver *drv,
+ 			       int index)
+ {
+-	if (cpu_is_at91rm9200())
+-		at91rm9200_standby();
+-	else if (cpu_is_at91sam9g45())
+-		at91sam9g45_standby();
+-	else if (cpu_is_at91sam9263())
+-		at91sam9263_standby();
+-	else
+-		at91sam9_standby();
+-
++	at91_standby();
+ 	return index;
+ }
+ 
+@@ -60,9 +51,19 @@ static struct cpuidle_driver at91_idle_driver = {
+ };
+ 
+ /* Initialize CPU idle by registering the idle states */
+-static int __init at91_init_cpuidle(void)
++static int at91_cpuidle_probe(struct platform_device *dev)
+ {
++	at91_standby = (void *)(dev->dev.platform_data);
++	
+ 	return cpuidle_register(&at91_idle_driver, NULL);
+ }
+ 
+-device_initcall(at91_init_cpuidle);
++static struct platform_driver at91_cpuidle_driver = {
++	.driver = {
++		.name = "cpuidle-at91",
++		.owner = THIS_MODULE,
++	},
++	.probe = at91_cpuidle_probe,
++};
++
++module_platform_driver(at91_cpuidle_driver);
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 15afb5d..76f8cbf 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -314,6 +314,15 @@ static const struct platform_suspend_ops at91_pm_ops = {
+ 	.end	= at91_pm_end,
+ };
+ 
++static struct platform_device at91_cpuidle_device = {
++	.name = "cpuidle-at91",
++};
++
++void at91_pm_set_standby(void (*at91_standby)(void))
++{
++	at91_cpuidle_device.dev.platform_data = at91_standby;
++}
++
+ static int __init at91_pm_init(void)
+ {
+ #ifdef CONFIG_AT91_SLOW_CLOCK
+@@ -325,6 +334,9 @@ static int __init at91_pm_init(void)
+ 	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+ 	if (cpu_is_at91rm9200())
+ 		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
++	
++	if (at91_cpuidle_device.dev.platform_data)
++		platform_device_register(&at91_cpuidle_device);
+ 
+ 	suspend_set_ops(&at91_pm_ops);
+ 
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index 2f5908f..76dd1a7 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -11,9 +11,13 @@
+ #ifndef __ARCH_ARM_MACH_AT91_PM
+ #define __ARCH_ARM_MACH_AT91_PM
+ 
++#include <asm/proc-fns.h>
++
+ #include <mach/at91_ramc.h>
+ #include <mach/at91rm9200_sdramc.h>
+ 
++extern void at91_pm_set_standby(void (*at91_standby)(void));
++
+ /*
+  * The AT91RM9200 goes into self-refresh mode with this command, and will
+  * terminate self-refresh automatically on the next SDRAM access.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
