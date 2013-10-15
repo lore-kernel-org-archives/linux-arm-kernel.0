@@ -1,96 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Oct 2013 10:21:50 +0100
-Subject: [PATCH] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <CAPrCYkc-ocBi6B6MP23gHqsovgQovvEWSv=khstS4wbD2dXzjw@mail.gmail.com>
-References: <1381733189-2745-1-git-send-email-vkale@apm.com>
- <20131014123436.GA10491@mudshark.cambridge.arm.com>
- <CAPrCYkc-ocBi6B6MP23gHqsovgQovvEWSv=khstS4wbD2dXzjw@mail.gmail.com>
-Message-ID: <20131015092149.GA30046@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Oct 2013 10:18:30 +0100
+Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
+In-Reply-To: <20131015074618.GG30088@pengutronix.de>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
+ <20131014174030.GU25034@n2100.arm.linux.org.uk>
+ <20131014225029.GV25034@n2100.arm.linux.org.uk>
+ <20131015074618.GG30088@pengutronix.de>
+Message-ID: <20131015091830.GW25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 07:33:25AM +0100, Vinayak Kale wrote:
-> On Mon, Oct 14, 2013 at 6:04 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Oct 14, 2013 at 07:46:29AM +0100, Vinayak Kale wrote:
-> >>               if (err) {
-> >>                       pr_err("unable to request IRQ%d for ARM PMU counters\n",
-> >> -                             irq);
-> >> +                                     irq);
-> >>                       armpmu_release_hardware(armpmu);
-> >>                       return err;
-> >>               }
-> >>
-> >> -             cpumask_set_cpu(i, &armpmu->active_irqs);
-> >> +             on_each_cpu(armpmu_enable_percpu_irq, (void *)armpmu, 1);
-> >> +     } else {
-> >> +             for (i = 0; i < irqs; ++i) {
-> >> +                     err = 0;
-> >> +                     irq = platform_get_irq(pmu_device, i);
-> >> +                     if (irq < 0)
-> >> +                             continue;
-> >> +
-> >> +                     /*
-> >> +                      * If we have a single PMU interrupt that we can't shift,
-> >> +                      * assume that we're running on a uniprocessor machine and
-> >> +                      * continue. Otherwise, continue without this interrupt.
-> >> +                      */
-> >> +                     if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-> >> +                             pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-> >> +                                             irq, i);
-> >> +                             continue;
-> >> +                     }
-> >> +
-> >> +                     err = request_irq(irq, armpmu->handle_irq,
-> >> +                                     IRQF_NOBALANCING,
-> >> +                                     "arm-pmu", armpmu);
-> >
-> > A better way to do this is to try request_percpu_irq first. If that fails,
-> > then try request_irq. However, the error reporting out of request_percpu_irq
-> > could do with some cleanup (rather than just return -EINVAL) so we can
-> > detect the difference between `this interrupt isn't per-cpu' and `this
-> > per-cpu interrupt is invalid'. This can help us avoid the WARN_ON in
-> > request_irq when it is passed a per-cpu interrupt.
-> >
+On Tue, Oct 15, 2013 at 09:46:18AM +0200, Sascha Hauer wrote:
+> On Mon, Oct 14, 2013 at 11:50:29PM +0100, Russell King - ARM Linux wrote:
+> > Answers to these two questions may help stop me wasting a lot of time
+> > chasing what is a really weird bug.
+> > 
+> > So, I have X up and running on the Cubox-i carrier-1, using the imx-drm
+> > stuff (I've slightly hacked my xf86-armada X driver to get this working.)
+> > This works fine - it detects the connectors, selects an appropriate
+> > video mode and produces a picture of the correct shape and size.
+> > 
+> > However... I see really weird effects colouring effects - almost like
+> > water over the image.  It's certain colour transitions in the image
+> > which seem to trigger this.  There are also certain pixels which
+> > "twinkle".
+> > 
+> > Text looks very strange too.  Rather than the font being crisp and clear,
+> > it looks like there's red and green shift to it - but its not that it's
+> > all shifted in that way.
+> > 
+> > Now, if I use the modetest utility from libdrm-2.4.43 to display a SMPTE
+> > test pattern, this again looks right, but there are several vertical
+> > single pixel lines of noise.  The most striking one is below the upper
+> > red bar in the lower dark area.  I have a single pixel noisy vertical
+> > line.
+> > 
+> > I've tried the kernel which Rabeeh supplied, which is based on BSP 4.1.0,
+> > and this works fine as far as I can tell with the same image (though,
+> > it's a little difficult converting the XWD dump to something that can
+> > be directly poked into /dev/fb0..., although this results in R/B swap.)
+> > 
+> > Any ideas where to start looking?
 > 
-> Trying request_percpu_irq first seems better. But if it fails then we
-> would straight away
-> assume it's not per-cpu interrupt and try request_irq. In this case we
-> may not be able to
-> detect 'this per-cpu interrupt is invalid' case.
+> This sounds like the wrong clock polarity. Could you try inverting
+> sig_cfg.clk_pol in imx-drm/ipuv3-crtc.c?
 
-Right, but you could have a patch to fix the core code as part of this
-series, as I hinted at above.
-
-> >> @@ -784,8 +832,8 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
-> >>  /*
-> >>   * PMXEVTYPER: Event selection reg
-> >>   */
-> >> -#define      ARMV8_EVTYPE_MASK       0xc80000ff      /* Mask for writable bits */
-> >> -#define      ARMV8_EVTYPE_EVENT      0xff            /* Mask for EVENT bits */
-> >> +#define      ARMV8_EVTYPE_MASK       0xc80003ff      /* Mask for writable bits */
-> >> +#define      ARMV8_EVTYPE_EVENT      0x3ff           /* Mask for EVENT bits */
-> >>
-> >>  /*
-> >>   * Event filters for PMUv3
-> >> @@ -1175,7 +1223,7 @@ static void armv8pmu_reset(void *info)
-> >>  static int armv8_pmuv3_map_event(struct perf_event *event)
-> >>  {
-> >>       return map_cpu_event(event, &armv8_pmuv3_perf_map,
-> >> -                             &armv8_pmuv3_perf_cache_map, 0xFF);
-> >> +                             &armv8_pmuv3_perf_cache_map, 0x3FF);
-> >>  }
-> >
-> > What's all this?
-> >
-> 
-> The evtCount (event number) field width is 10bits in event selection register.
-> So need to fix ARMV8_EVTYPE_* macros and related mask value.
-> 
-> From the subject of patch, one may think that the patch is specific
-> only to percpu irq changes (which is not true).
-> 
-> I had mentioned about fixing ARMV8_EVTYPE_* macros in patch description.
-
-Ok, please put this change in a separate patch.
-
-Will
+I tweaked it a different way - I used devmem2 to directly poke at the
+register.  Inverting bit 17 (iow, clearing it) seems to fix the
+problem.
