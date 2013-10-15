@@ -1,41 +1,73 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 15 Oct 2013 00:01:09 -0400 (EDT)
-Subject: [RFC v3 PATCH 0/7] ARM[64]: kernel mode NEON in atomic
- contexts
-In-Reply-To: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.03.1310142353210.1873@syhkavp.arg>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 14 Oct 2013 21:11:30 -0700
+Subject: [GIT PULL 3/6] omap hwmod changes for v3.13 merge window
+In-Reply-To: <87a9ib4gmb.fsf@linaro.org>
+References: <5258a9a6.4a17e00a.5fb3.ffff9bf3SMTPIN_ADDED_MISSING@mx.google.com>
+ <87a9ib4gmb.fsf@linaro.org>
+Message-ID: <20131015041130.GB25997@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 13 Oct 2013, Ard Biesheuvel wrote:
-
-> Take #3 of this RFC series.
+On Mon, Oct 14, 2013 at 03:44:44PM -0700, Kevin Hilman wrote:
+> Tony Lindgren <tony@atomide.com> writes:
 > 
-> Instead of having additional separate versions of kernel_neon_begin/end, the
-> existing ones now have been modified to always take a preallocated stack area
-> as an argument.
-
-The problem with this approach is that you break git bisect by making
-the kernel unbuildable when this series is partially applied.  Either
-you make kernel_neon_begin/end into wrappers with no argument around the
-new interface, or you change all users at the same time as the
-interface.  One big principle is not to break the kernel build in the
-middle of a patch series when altering an existing interface.
-
-> The stack area is allocated by DEFINE_NEON_REGSTACK[_PARTIAL](varname), where
-> the partial version takes an additional int num_regs indicating how many
-> registers need to be freed up.
+> > The following changes since commit d0e639c9e06d44e713170031fe05fb60ebe680af:
+> >
+> >   Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/hwmod-signed
+> >
+> > for you to fetch changes up to 254f57a92987b6cde6004f58d6b847813dfb9e0e:
+> >
+> >   ARM: OMAP5: hwmod: add missing ocp2scp hwmod data (2013-10-11 15:37:05 -0700)
+> >
+> > ----------------------------------------------------------------
+> > omap hwmod related changes via Paul Walmsley <paul@pwsan.com>:
+> >
+> > Some OMAP hwmod changes for 3.13.  Significant changes here include:
+> >
+> > - support for moving some of the hwmod flags to DT data
+> >
+> > - support for the SSI, hardware spinlock, USB host/TLL, and RNG IP
+> >   blocks for various OMAPs
+> >
+> > - a fix that again decouples hwmod data changes from unrelated DT data
+> >   patchsets
+> >
+> > Basic test logs are available at:
+> >
+> > http://www.pwsan.com/omap/testlogs/prcm_fixes_v3.13/20131009094936/
+> >
+> > ----------------------------------------------------------------
 > 
-> In the !in_interrupt() case, these functions operate as before, and the regstack
-> is defined to minimal size in this case as it will remain unused anyway. In the
-> in_interrupt() case, 'num_regs' (or all) NEON registers are stacked/unstacked
-> using the allocated stack region.
+> Pulled into next/soc,
+> 
+> Thanks,
+> 
+> Kevin
 
-Would have been nice to have the stack simply be a NULL pointer when 
-!in_interrupt() or when the number of regs is 0.  This would remove the 
-need for a runtime check on !num_regs.  I don't see an obvious way to 
-accomplish that right now though.
+Hm, looks like my BBB hit this on v3.12-rc4-493-g1a9df23, which is pushed to
+to-build but not for-next yet. I'm guessing this might be what Kevin pinged me
+about on IRC today but I was out and unavailable most of the day.
+
+[    0.169527] ------------[ cut here ]------------
+[    0.169585] WARNING: CPU: 0 PID: 1 at ../../arch/arm/mach-omap2/omap_hwmod.c:2438 _init+0x338/0x37c()
+[    0.169602] omap_hwmod: spinlock: doesn't have mpu register target base
+[    0.169616] Modules linked in:
+[    0.169647] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-rc4-00493-g1a9df23 #1
+[    0.169701] [<c001ba40>] (unwind_backtrace+0x0/0xec) from [<c0017b80>] (show_stack+0x10/0x14)
+[    0.169735] [<c0017b80>] (show_stack+0x10/0x14) from [<c051ad90>] (dump_stack+0x7c/0x94)
+[    0.169768] [<c051ad90>] (dump_stack+0x7c/0x94) from [<c0045be0>] (warn_slowpath_common+0x6c/0x90)
+[    0.169796] [<c0045be0>] (warn_slowpath_common+0x6c/0x90) from [<c0045c34>] (warn_slowpath_fmt+0x30/0x40)
+[    0.169825] [<c0045c34>] (warn_slowpath_fmt+0x30/0x40) from [<c076e868>] (_init+0x338/0x37c)
+[    0.169855] [<c076e868>] (_init+0x338/0x37c) from [<c076ed80>] (__omap_hwmod_setup_all+0x40/0x8c)
+[    0.169886] [<c076ed80>] (__omap_hwmod_setup_all+0x40/0x8c) from [<c0008848>] (do_one_initcall+0xe8/0x14c)
+[    0.169924] [<c0008848>] (do_one_initcall+0xe8/0x14c) from [<c0762b84>] (kernel_init_freeable+0x104/0x1c4)
+[    0.169963] [<c0762b84>] (kernel_init_freeable+0x104/0x1c4) from [<c0514c90>] (kernel_init+0x8/0x150)
+[    0.170002] [<c0514c90>] (kernel_init+0x8/0x150) from [<c0013bc8>] (ret_from_fork+0x14/0x2c)
+[    0.170221] ---[ end trace 1b75b31a2719ed1c ]---
 
 
-Nicolas
+-Olof
