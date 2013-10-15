@@ -1,53 +1,64 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 15 Oct 2013 10:46:37 -0400 (EDT)
+Date: Tue, 15 Oct 2013 10:48:59 -0400 (EDT)
 Subject: [PATCH] usb: ohci: remove ep93xx bus glue platform driver
-In-Reply-To: <DC148C5AA1CEBA4E87973D432B1C2D8817DAC0CC@P3PWEX4MB008.ex4.secureserver.net>
-Message-ID: <Pine.LNX.4.44L0.1310151040330.1377-100000@iolanthe.rowland.org>
+In-Reply-To: <201310141435.31147.hartleys@visionengravers.com>
+Message-ID: <Pine.LNX.4.44L0.1310151047100.1377-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Oct 2013, Hartley Sweeten wrote:
+On Mon, 14 Oct 2013, H Hartley Sweeten wrote:
 
-> >>  config USB_OHCI_HCD_PLATFORM
-> >>  	tristate "Generic OHCI driver for a platform device"
-> >> -	default n
-> >> +	default y if ARCH_EP93XX
-> >
-> > Shouldn't we select USB_OHCI_HCD_PLATFORM, e.g. something like:
-> >
-> > 	config ARCH_EP93XX_USB
-> >		tristate "USB OHCI support"
-> >		default y
-> >		select USB_OHCI_HCD_PLATFORM
-> >
-> > In arch/arm/mach-ep93xx/Kconfig rather than polluting
-> > drivers/usb/host/Kconfig with arch specific stuff?
+> Convert ep93xx to use the OHCI platform driver and remove the
+> ohci-ep93xx bus glue driver.
 > 
-> I wasn't sure where the best place to enable 
-> USB_OHCI_HCD_PLATFORM would be.
-> 
-> Currently USB support on the EP93xx only needs USB_OHCI_HCD
-> enabled, which is already enabled in the ep93xx_defconfig. I'm not
-> sure if adding the config option above would create a problem where
-> the user would need to enable USB_OHCI_HCD in drivers/usb then 
-> have to go back to the arch stuff to enable ARCH_EP93XX_USB.
-> 
-> With the default y above they just have to enable USB_OHCI_HCD
-> like they currently do.
-> 
-> I'm hoping Alan can provide some feedback.
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Ryan Mallon <rmallon@gmail.com>
 
-In the past this sort of thing has been done in two different ways, 
-depending on whether or not OHCI support was previously configurable.
+...
 
-In cases where it was, we kept the old Kconfig entry and made it select
-USB_OHCI_HCD_PLATFORM, but added a notice that the entry was now
-deprecated.  For example, in drivers/usb/host/Kconfig see the entry for
-USB_OHCI_ATH79.
+> @@ -297,22 +298,58 @@ static struct platform_device ep93xx_rtc_device = {
+>  	.resource	= ep93xx_rtc_resource,
+>  };
+>  
+> +/*************************************************************************
+> + * EP93xx OHCI USB Host
+> + *************************************************************************/
+> +
+> +static struct clk *ep93xx_ohci_host_clock;
+> +
+> +static int ep93xx_ohci_power_on(struct platform_device *pdev)
+> +{
+> +	if (!ep93xx_ohci_host_clock) {
+> +		ep93xx_ohci_host_clock = devm_clk_get(&pdev->dev, NULL);
+> +		if (IS_ERR(ep93xx_ohci_host_clock))
+> +			return PTR_ERR(ep93xx_ohci_host_clock);
+> +	}
+> +
+> +	clk_enable(ep93xx_ohci_host_clock);
+> +
+> +	return 0;
+> +}
+> +
+> +static void ep93xx_ohci_power_off(struct platform_device *pdev)
+> +{
+> +	clk_disable(ep93xx_ohci_host_clock);
+> +}
+> +
+> +static void ep93xx_ohci_power_suspend(struct platform_device *pdev)
+> +{
+> +	ep93xx_ohci_power_off(pdev);
+> +}
+> +
+> +static struct usb_ohci_pdata ep93xx_ohci_pdata = {
+> +	.power_on	= ep93xx_ohci_power_on,
+> +	.power_off	= ep93xx_ohci_power_off,
+> +	.power_suspend	= ep93xx_ohci_power_suspend,
+> +};
 
-In cases where support was always present (i.e., not configurable), we
-added an entry for USB_OHCI_HCD_PLATFORM to the platform's defconfig
-file.  For example, see arch/arm/configs/marzen_defconfig.  This is
-probably what you want to do.
+You don't need to have a separate ep93xx_ohci_power_suspend() routine.  
+Just initialize the method entry for .power_suspend to point to 
+ep93xx_ohci_power_off.
 
 Alan Stern
