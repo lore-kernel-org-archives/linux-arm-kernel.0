@@ -1,53 +1,28 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 15 Oct 2013 19:30:50 +0200
-Subject: [RFC v3 PATCH 1/7] ARM: add support for kernel mode NEON in
- atomic context
-In-Reply-To: <20131015172604.GA4765@arm.com>
-References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
- <1381666503-23726-2-git-send-email-ard.biesheuvel@linaro.org>
- <20131015172604.GA4765@arm.com>
-Message-ID: <CAKv+Gu-heuH7cqt96bSwSsu_BY0zqbW1qLYP9W0fAdbU=3W9Lw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 15 Oct 2013 19:41:14 +0200
+Subject: [PATCH 0/7] clk: samsung: Exynos 5250 clock clean-up
+Message-ID: <1381858881-25611-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 October 2013 19:26, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Sun, Oct 13, 2013 at 01:14:57PM +0100, Ard Biesheuvel wrote:
->> diff --git a/arch/arm/include/asm/neon.h b/arch/arm/include/asm/neon.h
->> index 8f730fe..800d85c 100644
->> --- a/arch/arm/include/asm/neon.h
->> +++ b/arch/arm/include/asm/neon.h
->> @@ -8,10 +8,30 @@
->>   * published by the Free Software Foundation.
->>   */
->>
->> +#include <linux/types.h>
->> +#include <linux/hardirq.h>
->> +#include <asm/fpstate.h>
->>  #include <asm/hwcap.h>
->>
->>  #define cpu_has_neon()               (!!(elf_hwcap & HWCAP_NEON))
->>
->> +/*
->> + * Avoid wasting stack space by making the size of the allocated area depend on
->> + * whether we are currently running in process context. (If this is the case, we
->> + * will use the normal preserve/restore mechanism, leaving the allocated stack
->> + * space unused.)
->> + */
->> +#define __QREG_SIZE(num)     \
->> +     ((!in_interrupt()) ? 0 : (num) > 16 ? 256 : 16 * (((num) + 1) & ~1U))
->> +
->> +#define DEFINE_NEON_REGSTACK_PARTIAL(v, num)         \
->> +     struct {                                        \
->> +             struct vfp_partial_state regs;          \
->> +             u8 qregs[__QREG_SIZE(num)];             \
->> +     } v
->
-> Oh, interesting gcc feature. What does it generate?
->
+This is a clean-up series for the Exynos 5250 clock driver. It consists
+mostly of stylistical fixes and also changes making the clock tree defined
+by the driver represent more closely the real clock tree of the SoC.
 
-Well, it's not a feature particular to GCC, as far as I am aware. The
-anonymous struct is just runtime variably sized depending on
-in_interrupt() and the requested number of registers.
+On Exynos 5250 based Arndale board:
+Tested-by: Tomasz Figa <t.figa@samsung.com>
+
+Tomasz Figa (7):
+  clk: samsung: exynos5250: Sort definitions by registers and bitfield
+  clk: samsung: exynos5250: Make names of mux and div clocks consistent
+  clk: samsung: exynos5250: Fix parents of gate clocks from GSCL domain
+  clk: samsung: exynos5250: Fix parent of gate clocks from DISP1 domain
+  clk: samsung: exynos5250: Add missing unpopulated mux parents
+  clk: samsung: exynos5250: Correct parent list of audio muxes
+  clk: samsung: exynos5250: Fix parents of gate clocks from MFC domain
+
+ drivers/clk/samsung/clk-exynos5250.c | 404 ++++++++++++++++++++++-------------
+ 1 file changed, 256 insertions(+), 148 deletions(-)
 
 -- 
-Ard.
+1.8.3.2
