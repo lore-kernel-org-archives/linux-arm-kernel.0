@@ -1,56 +1,116 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 15 Oct 2013 18:14:12 +0200
-Subject: arm64 ioremap question
-In-Reply-To: <20131015155216.GD25034@n2100.arm.linux.org.uk>
-References: <1381850404.27955.9.camel@deneb.redhat.com>
- <20131015155216.GD25034@n2100.arm.linux.org.uk>
-Message-ID: <1381853652.4093.10.camel@weser.hi.pengutronix.de>
+From: balajitk@ti.com (Balaji T K)
+Date: Tue, 15 Oct 2013 22:04:14 +0530
+Subject: [PATCH v3 3/4] mmc: omap_hsmmc: Remux pins to support SDIO
+ interrupt on AM335x
+In-Reply-To: <1380971830-21492-4-git-send-email-afenkart@gmail.com>
+References: <1380971830-21492-1-git-send-email-afenkart@gmail.com>
+ <1380971830-21492-4-git-send-email-afenkart@gmail.com>
+Message-ID: <525D6E86.1040208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 15.10.2013, 16:52 +0100 schrieb Russell King - ARM
-Linux:
-> On Tue, Oct 15, 2013 at 11:20:04AM -0400, Mark Salter wrote:
-> > ioremap() has a test to prevent RAM from being remapped:
-> > 
-> > 	/*
-> > 	 * Don't allow RAM to be mapped.
-> > 	 */
-> > 	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-> > 		return NULL;
-> > 
-> > 
-> > Is this really necessary even for reserved pages which are not being
-> > used for anything else?
-> 
-> It helps to stop the abuse of using ioremap() on normal memory, which has
-> happened soo much in Aarch32 for years.  Unfortuantely, bad habbits die
-> hard.
-> 
-> "Reserved pages not being used for anything else" are still mapped, and
-> still subject to speculative fetches.
+Thanks Andreas for the patch,
 
-Only slightly related to the issue here, but I'm really wondering if the
-speculative fill can happen on real implementations.
-I'm well aware that there is nothing in the arch preventing a
-speculative fill on a cached alias, but at least for the A9
-implementation the ARM infocenter claims that the prefetcher will not
-cross a 4KB boundary [1].
-So as long as we are talking about full pages, having a conflicting
-mapping should not cause any issues as long as you don't touch the
-memory region explicitly through the cached mapping.
+On Saturday 05 October 2013 04:47 PM, Andreas Fenkart wrote:
+> The am335x can't detect pending cirq in PM runtime suspend.
+> This patch reconfigures dat1 as a GPIO before going to suspend.
+> SDIO interrupts are detected with the GPIO, while in runtime
+> suspend, standard detection of the module block otherwise.
+>
+> Signed-off-by: Andreas Fenkart <afenkart@gmail.com>
+>
+> @@ -2293,23 +2440,66 @@ static int omap_hsmmc_resume(struct device *dev)
+>   static int omap_hsmmc_runtime_suspend(struct device *dev)
+>   {
+>   	struct omap_hsmmc_host *host;
+> +	unsigned long flags;
+> +	int ret = 0;
+>
+>   	host = platform_get_drvdata(to_platform_device(dev));
+>   	omap_hsmmc_context_save(host);
+>   	dev_dbg(dev, "disabled\n");
+>
+> -	return 0;
+> +	if (host->flags & HSMMC_SWAKEUP_QUIRK) {
+> +		spin_lock_irqsave(&host->irq_lock, flags);
+> +		OMAP_HSMMC_WRITE(host->base, ISE, 0);
+> +		OMAP_HSMMC_WRITE(host->base, IE, 0);
+> +		OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+> +		spin_unlock_irqrestore(&host->irq_lock, flags);
+> +
+> +		ret = pinctrl_select_state(host->pinctrl, host->idle);
+> +		if (ret < 0)
+> +			dev_warn(mmc_dev(host->mmc), "Unable to select idle pinmux\n");
+> +
+> +		enable_irq(mmc_slot(host).sdio_irq);
+> +	}
+> +
+> +	spin_lock_irqsave(&host->irq_lock, flags);
+> +	/* infinite loop, if irq not cleared in omap_hsmmc_enable_sdio_irq */
+> +	host->flags |= HSMMC_RUNTIME_SUSPENDED;
 
-I know that we generally aim to avoid basing any kernel infrastructure
-on such vague guarantees, but I'm really wondering if my analysis is
-correct or is there anything I'm overlooking here?
+Can you provide more details about the infinite loop and how it will get recovered.
 
-Regards,
-Lucas
-
-[1]
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388i/CBBIAAAA.html
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> +	spin_unlock_irqrestore(&host->irq_lock, flags);
+> +
+> +	return ret;
+>   }
+>
+>   static int omap_hsmmc_runtime_resume(struct device *dev)
+>   {
+>   	struct omap_hsmmc_host *host;
+> +	unsigned long flags;
+> +	int ret = 0;
+>
+>   	host = platform_get_drvdata(to_platform_device(dev));
+>   	omap_hsmmc_context_restore(host);
+>   	dev_dbg(dev, "enabled\n");
+>
+> -	return 0;
+> +	spin_lock_irqsave(&host->irq_lock, flags);
+> +	/* infinite loop, if irq not cleared in omap_hsmmc_enable_sdio_irq */
+> +	host->flags &= ~HSMMC_RUNTIME_SUSPENDED;
+> +	spin_unlock_irqrestore(&host->irq_lock, flags);
+> +
+> +	if (host->flags & HSMMC_SWAKEUP_QUIRK) {
+> +		disable_irq(mmc_slot(host).sdio_irq);
+> +
+> +		ret = pinctrl_select_state(host->pinctrl, host->active);
+> +		if (ret < 0)
+> +			dev_warn(mmc_dev(host->mmc), "Unable to select active pinmux\n");
+> +
+> +		spin_lock_irqsave(&host->irq_lock, flags);
+> +		if (host->flags & HSMMC_SDIO_IRQ_ENABLED) {
+> +			OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+> +			OMAP_HSMMC_WRITE(host->base, ISE, CIRQ_EN);
+> +			OMAP_HSMMC_WRITE(host->base, IE, CIRQ_EN);
+> +		}
+> +		spin_unlock_irqrestore(&host->irq_lock, flags);
+> +	}
+> +	return ret;
+>   }
+>
+>   static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
+> diff --git a/include/linux/platform_data/mmc-omap.h b/include/linux/platform_data/mmc-omap.h
+> index 2bf1b30..fd5fff5 100644
+> --- a/include/linux/platform_data/mmc-omap.h
+> +++ b/include/linux/platform_data/mmc-omap.h
+> @@ -115,6 +115,7 @@ struct omap_mmc_platform_data {
+>
+>   		int switch_pin;			/* gpio (card detect) */
+>   		int gpio_wp;			/* gpio (write protect) */
+> +		int gpio_cirq;			/* gpio (card irq) */
+>
+>   		int (*set_bus_mode)(struct device *dev, int slot, int bus_mode);
+>   		int (*set_power)(struct device *dev, int slot,
+> @@ -145,6 +146,9 @@ struct omap_mmc_platform_data {
+>   		int card_detect_irq;
+>   		int (*card_detect)(struct device *dev, int slot);
+>
+> +		/* SDIO IRQs */
+> +		int sdio_irq;
+> +
+>   		unsigned int ban_openended:1;
+>
+>   	} slots[OMAP_MMC_MAX_SLOTS];
+>
