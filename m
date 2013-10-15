@@ -1,47 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 15 Oct 2013 12:09:32 +0200
-Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
-In-Reply-To: <20131015100025.GX25034@n2100.arm.linux.org.uk>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
- <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
- <20131014173824.GT25034@n2100.arm.linux.org.uk>
- <CAOMZO5BRmXav-qj4DqvTJASfU98sJ3zpHHZBk7s4pCkDd0Z85Q@mail.gmail.com>
- <20131015100025.GX25034@n2100.arm.linux.org.uk>
-Message-ID: <20131015100931.GH30088@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Oct 2013 11:11:30 +0100
+Subject: [PATCH v2 01/13] arm64: kernel: add MPIDR_EL1 accessors macros
+In-Reply-To: <1381748590-14279-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1381748590-14279-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20131015101130.GA30411@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 11:00:26AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 14, 2013 at 11:47:17PM -0300, Fabio Estevam wrote:
-> > On Mon, Oct 14, 2013 at 2:38 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > 
-> > > Shouldn't the above be in patch 1 (or 1.5) rather than patch 2?  Patch 2
-> > > advertises itself as adding support for the wandboard, but in actual
-> > > fact it's adding the generic bits too.
-> > 
-> > Thanks for your review. Will address your comments in v3.
-> > 
-> > Philipp Zabel mentioned that he will move imx-drm out of staging, so
-> > will send v3 after Philipp's patch gets into linux-next.
+On Mon, Oct 14, 2013 at 12:02:58PM +0100, Lorenzo Pieralisi wrote:
+> In order to simplify access to different affinity levels within the
+> MPIDR_EL1 register values, this patch implements some preprocessor
+> macros that allow to retrieve the MPIDR_EL1 affinity level value according
+> to the level passed as input parameter.
 > 
-> That's unfortunate, especially given the bug with the clock polarity
-> (which, although I can tweak the register directly, it's not obvious
-> that changing the clk_pol initialisation is the correct solution.)
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm64/include/asm/cputype.h | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> There's also another issue here: the lack of DRM prime support.  As
-> you have a separate GPU and separate VPU, you really need dmabuf
-> support implemented so that you can hand your scanout buffers/overlays
-> to other subsystems.
+> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> index 5fe138e..2c9e295 100644
+> --- a/arch/arm64/include/asm/cputype.h
+> +++ b/arch/arm64/include/asm/cputype.h
+> @@ -30,6 +30,16 @@
+>  
+>  #define MPIDR_HWID_BITMASK	0xff00ffffff
+>  
+> +#define MPIDR_LEVEL_BITS 8
+> +#define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
+> +
+> +#define MPIDR_LEVEL_SHIFT(level) ({					\
+> +	(level == 3) ? 32 : MPIDR_LEVEL_BITS * level;			\
 
-See http://www.spinics.net/lists/linux-driver-devel/msg39324.html
+You can avoid the check if you do:
 
-Besides other things this adds prime support.
+  ((1 << level) >> 1) << 3)
 
-Sascha
+where that '3' is log2 MPIDR_LEVEL_BITS, so you could factor that out and
+redefine MPIDR_LEVEL_BITS in terms of a shift.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Will
