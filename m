@@ -1,24 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Oct 2013 14:50:48 +0200
-Subject: [RESEND PATCHv2 1/3] arm: socfpga: Set the SDMMC clock phase in
- system manager
-In-Reply-To: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
-References: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
-Message-ID: <201310151450.48650.arnd@arndb.de>
+Date: Tue, 15 Oct 2013 15:00:36 +0200
+Subject: [PATCH v10 2/7] ARM: hi3xxx: add board support with device tree
+In-Reply-To: <1381828577-27998-3-git-send-email-haojian.zhuang@linaro.org>
+References: <1381828577-27998-1-git-send-email-haojian.zhuang@linaro.org>
+ <1381828577-27998-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <201310151500.36959.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 October 2013, dinguyen at altera.com wrote:
-> +void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(u32 drvsel, u32 smplsel)
-> +{
-> +       u32 hs_timing;
-> +
-> +       hs_timing = SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel);
-> +       writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
-> +}
-> +EXPORT_SYMBOL(socfpga_sysmgr_set_dwmmc_drvsel_smpsel);
+On Tuesday 15 October 2013, Haojian Zhuang wrote:
+> 
+> Add board support with device tree for Hisilicon Hi3620 SoC platform.
+> 
+> Changelog:
+> v10:
+> 1. Add .map_io() & debug_ll_io_init() back. Since debug_ll_io_init() is
+> only called if .map_io() isn't assigned. Use .map_io() to setup static
+> IO mapping that is used in clock driver.
+> 
 
-This looks like the wrong approach. What are you trying to do? If you want to
-set a clock, please use the clk API.
+This seems like a step in the wrong direction. Why would you want to use
+a static I/O mapping in the clock driver?
 
 	Arnd
