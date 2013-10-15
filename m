@@ -1,92 +1,72 @@
 From: dave.long@linaro.org (David Long)
-Date: Tue, 15 Oct 2013 17:04:15 -0400
-Subject: [PATCH v2 00/13] uprobes: Add uprobes support for ARM
-Message-ID: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+Date: Tue, 15 Oct 2013 17:04:18 -0400
+Subject: [PATCH v2 03/13] uprobes: allow arch access to xol slot
+In-Reply-To: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+Message-ID: <1381871068-27660-4-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-This patch series adds basic uprobes support to ARM. It is based on patches
-developed earlier by Rabin Vincent. That approach of adding hooks into
-the kprobes instruction parsing code was not well received. This approach
-separates the ARM instruction parsing code in kprobes out into a separate set
-of functions which can be used by both kprobes and uprobes. Both kprobes and
-uprobes then provide their own semantic action tables to process the results of
-the parsing.
+Allow arches to customize how the instruction is filled into the xol
+slot.  ARM will use this to insert an undefined instruction after the
+real instruction in order to simulate a single step of the instruction
+without hardware support.
 
-The following changes have been made for v2:
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ include/linux/uprobes.h |  1 +
+ kernel/events/uprobes.c | 10 +++++++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-1) The last dependencies of uprobes on kprobes have been removed and the two
-features may now be independently configured.
-2) The larger changes have been separated into a few stages.
-3) Use of "void *" has been replaced with an appropriate pointer type
-in various places.
-4) The arm kprobes-test module has been changed to work better with a
-thumb-mode kernel.
-
-These patches are based on v3.12-rc5.
-
-
-David A. Long (11):
-  uprobes: move function declarations out of arch
-  uprobes: allow ignoring of probe hits
-  uprobes: allow arch access to xol slot
-  ARM: move shared uprobe/kprobe definitions into new include file
-  ARM: move generic thumb instruction parsing code to new files for use
-    by other features
-  ARM: use a function table for determining instruction interpreter
-    actions
-  ARM: Disable jprobe selftests in thumb kernels
-  kprobes: Remove uneeded kernel dependency on struct arch_specific_insn
-  ARM: Finish renaming ARM kprobes APIs for sharing with uprobes
-  ARM: add uprobes support
-  ARM: Remove uprobes dependency on kprobes
-
-Rabin Vincent (2):
-  uprobes: allow arch-specific initialization
-  uprobes: add arch write opcode hook
-
- arch/arm/Kconfig                   |    3 +
- arch/arm/include/asm/kprobes.h     |   15 +-
- arch/arm/include/asm/probes.h      |   25 +
- arch/arm/include/asm/ptrace.h      |    6 +
- arch/arm/include/asm/thread_info.h |    5 +-
- arch/arm/include/asm/uprobes.h     |   34 ++
- arch/arm/kernel/Makefile           |    7 +-
- arch/arm/kernel/kprobes-arm.c      |  813 +++----------------------
- arch/arm/kernel/kprobes-common.c   |  469 +--------------
- arch/arm/kernel/kprobes-test.c     |   13 +-
- arch/arm/kernel/kprobes-thumb.c    | 1156 ++++++------------------------------
- arch/arm/kernel/kprobes.c          |   25 +-
- arch/arm/kernel/kprobes.h          |  397 +------------
- arch/arm/kernel/probes-arm.c       |  742 +++++++++++++++++++++++
- arch/arm/kernel/probes-arm.h       |   72 +++
- arch/arm/kernel/probes-thumb.c     |  877 +++++++++++++++++++++++++++
- arch/arm/kernel/probes-thumb.h     |   95 +++
- arch/arm/kernel/probes.c           |  459 ++++++++++++++
- arch/arm/kernel/probes.h           |  395 ++++++++++++
- arch/arm/kernel/signal.c           |    4 +
- arch/arm/kernel/uprobes-arm.c      |  220 +++++++
- arch/arm/kernel/uprobes.c          |  201 +++++++
- arch/arm/kernel/uprobes.h          |   25 +
- arch/powerpc/include/asm/uprobes.h |    1 -
- arch/x86/include/asm/uprobes.h     |    7 -
- include/linux/kprobes.h            |    7 +-
- include/linux/uprobes.h            |   17 +
- kernel/events/uprobes.c            |   58 +-
- 28 files changed, 3573 insertions(+), 2575 deletions(-)
- create mode 100644 arch/arm/include/asm/probes.h
- create mode 100644 arch/arm/include/asm/uprobes.h
- create mode 100644 arch/arm/kernel/probes-arm.c
- create mode 100644 arch/arm/kernel/probes-arm.h
- create mode 100644 arch/arm/kernel/probes-thumb.c
- create mode 100644 arch/arm/kernel/probes-thumb.h
- create mode 100644 arch/arm/kernel/probes.c
- create mode 100644 arch/arm/kernel/probes.h
- create mode 100644 arch/arm/kernel/uprobes-arm.c
- create mode 100644 arch/arm/kernel/uprobes.c
- create mode 100644 arch/arm/kernel/uprobes.h
-
+diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
+index 80116c9..2556ab6 100644
+--- a/include/linux/uprobes.h
++++ b/include/linux/uprobes.h
+@@ -134,6 +134,7 @@ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned l
+ extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+ extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
+ extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
++extern void __weak arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr);
+ #else /* !CONFIG_UPROBES */
+ struct uprobes_state {
+ };
+diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+index 3955172..22d0121 100644
+--- a/kernel/events/uprobes.c
++++ b/kernel/events/uprobes.c
+@@ -1238,6 +1238,11 @@ static unsigned long xol_take_insn_slot(struct xol_area *area)
+ 	return slot_addr;
+ }
+ 
++void __weak arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr)
++{
++	memcpy(vaddr, auprobe->insn, MAX_UINSN_BYTES);
++}
++
+ /*
+  * xol_get_insn_slot - allocate a slot for xol.
+  * Returns the allocated slot address or 0.
+@@ -1246,6 +1251,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe)
+ {
+ 	struct xol_area *area;
+ 	unsigned long xol_vaddr;
++	void *kaddr;
+ 
+ 	area = get_xol_area();
+ 	if (!area)
+@@ -1256,7 +1262,9 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe)
+ 		return 0;
+ 
+ 	/* Initialize the slot */
+-	copy_to_page(area->page, xol_vaddr, uprobe->arch.insn, MAX_UINSN_BYTES);
++	kaddr = kmap_atomic(area->page);
++	arch_uprobe_xol_copy(&uprobe->arch, kaddr + (xol_vaddr & ~PAGE_MASK));
++	kunmap_atomic(kaddr);
+ 	/*
+ 	 * We probably need flush_icache_user_range() but it needs vma.
+ 	 * This should work on supported architectures too.
 -- 
 1.8.1.2
