@@ -1,84 +1,56 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 15 Oct 2013 14:19:14 -0500
-Subject: [RESEND PATCHv2 1/3] arm: socfpga: Set the SDMMC clock phase
- in system manager
-In-Reply-To: <201310152101.44669.arnd@arndb.de>
-References: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
- <201310151450.48650.arnd@arndb.de> <525D41AA.7060503@gmail.com>
- <201310152101.44669.arnd@arndb.de>
-Message-ID: <525D9532.6080503@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Oct 2013 13:19:44 -0600
+Subject: [PATCH v3 11/19] clk: tegra: move periph clocks to common file
+In-Reply-To: <1381848794-11761-12-git-send-email-pdeschrijver@nvidia.com>
+References: <1381848794-11761-1-git-send-email-pdeschrijver@nvidia.com>
+ <1381848794-11761-12-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <525D9550.2030701@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 10/15/2013 08:52 AM, Peter De Schrijver wrote:
+> Introduce a new file for peripheral clocks common between several Tegra
+> SoCs and move Tegra114 to this new infrastructure. Also PLLP and the PLLP_OUT
+> clocks will be initialized here.
 
-On 10/15/13 2:01 PM, Arnd Bergmann wrote:
-> On Tuesday 15 October 2013, Dinh Nguyen wrote:
->> Hi Arnd,
->>
->> On 10/15/13 7:50 AM, Arnd Bergmann wrote:
->>> On Monday 14 October 2013, dinguyen at altera.com wrote:
->>>> +void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(u32 drvsel, u32 smplsel)
->>>> +{
->>>> +       u32 hs_timing;
->>>> +
->>>> +       hs_timing = SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel);
->>>> +       writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
->>>> +}
->>>> +EXPORT_SYMBOL(socfpga_sysmgr_set_dwmmc_drvsel_smpsel);
->>> This looks like the wrong approach. What are you trying to do? If you want to
->>> set a clock, please use the clk API.
->> I can't use the clk API because this function is setting up a clock
->> phase bit for the SD/MMC
->> clock that is used to clock the card, not the IP. This register is
->> located outside the SD/MMC
->> and the clock manager.
->>
->> Just to refresh your memory on this topic:
->> I tried to use the syscon approach that you suggested:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/168470.html
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170423.html
-> Ah, thanks. I knew this problem had come up before, I just didn't remember
-> it was for socfpga.
->
->> But this approach was rejected by Stephen Warren because we wanted to
->> the SD driver to be automonous
->> of registers outside its IP:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/194014.html
->>
->> So I went with the approach of exposing a platform API so that the
->> SD/MMC platform specific
->> code can call it.
->>
->> The system manager has a plethora of registers that controls other IPs
->> on the SOC, so I kinda thought
->> syscon was the way to go with this. A driver for this IP did not make
->> sense to me.
->>
->> Please advise if you know of another approach?
-> I don't remember the details of what we have gone through before, but
-> I think this should still work:
->
-> 1 Create a "syscon" backend driver to control your "system manager", which
->    lets other drivers hook into it without calling a private API.
-Yes, if you look at drivers/mmc/host/dw_mmc-socfpga.c that is in the 
-mainline,
-it is hooking into the "system manager" through "syscon". Is this what you
-mean here?
+> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
 
-The problem is because of the SYSMGR_SDMMCGRP_CTRL_OFFSET define
-in this file. This means the SD/MMC driver needs information that is 
-outside of its IP.
+> @@ -966,22 +699,22 @@ static struct tegra_clk tegra114_clks[tegra_clk_max] __initdata = {
+>  	[tegra_clk_pwm] = { .dt_id = TEGRA114_CLK_PWM, .present = true },
+>  	[tegra_clk_i2s0] = { .dt_id = TEGRA114_CLK_I2S0, .present = true },
+>  	[tegra_clk_i2s2] = { .dt_id = TEGRA114_CLK_I2S2, .present = true },
+> -	[tegra_clk_epp] = { .dt_id = TEGRA114_CLK_EPP, .present = true },
+> -	[tegra_clk_gr2d] = { .dt_id = TEGRA114_CLK_GR2D, .present = true },
+> +	[tegra_clk_epp_8] = { .dt_id = TEGRA114_CLK_EPP, .present = true },
+> +	[tegra_clk_gr2d_8] = { .dt_id = TEGRA114_CLK_GR2D, .present = true },
+>  	[tegra_clk_usbd] = { .dt_id = TEGRA114_CLK_USBD, .present = true },
+>  	[tegra_clk_isp] = { .dt_id = TEGRA114_CLK_ISP, .present = true },
+> -	[tegra_clk_gr3d] = { .dt_id = TEGRA114_CLK_GR3D, .present = true },
+> +	[tegra_clk_gr3d_8] = { .dt_id = TEGRA114_CLK_GR3D, .present = true },
+...
 
-Dinh
-> 2 Create a trivial clock driver that is independent of your existing
->    clock driver and independent of the other drivers using the system
->    manager, by using syscon as the low-level interface.
-> 3 Make the sdmmc driver use the normal clock API and link its clock to the
->    driver from step 2 in the device tree.
->
-> Is this what you have tried before?
->
-> 	Arnd
+Why the need to edit this table in this patch? Why not just get it right
+in the previous patch, where it's first added?
+
+> @@ -2166,9 +1606,10 @@ static void __init tegra114_clock_init(struct device_node *np)
+>  
+>  	tegra114_fixed_clk_init(clk_base);
+>  	tegra114_pll_init(clk_base, pmc_base);
+> -	tegra114_periph_clk_init(clk_base);
+> +	tegra114_periph_clk_init(clk_base, pmc_base);
+>  	tegra_audio_clk_init(clk_base, pmc_base, tegra114_clks, &pll_a_params);
+>  	tegra114_pmc_clk_init(pmc_base);
+> +
+>  	tegra114_super_clk_init(clk_base);
+
+That seems like an unrelated whitespace change. There's one in the
+previous patch too:
+
+> @@ -502,7 +492,6 @@ static struct tegra_clk_pll_freq_table pll_a_freq_table[] = {
+>  	{0, 0, 0, 0, 0, 0},
+>  };
+>  
+> -
+>  static struct tegra_clk_pll_params pll_a_params = {
+>  	.input_min = 2000000,
+>  	.input_max = 31000000,
