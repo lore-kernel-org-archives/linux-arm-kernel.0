@@ -1,42 +1,58 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 15 Oct 2013 15:27:42 +0200
-Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
- device tree
-In-Reply-To: <20131015114035.6CA5FC40098@trevor.secretlab.ca>
-References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
- <20131015114035.6CA5FC40098@trevor.secretlab.ca>
-Message-ID: <525D42CE.5010008@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 15 Oct 2013 15:31:51 +0200
+Subject: [PATCH] arch_timer: Do not register arch_sys_counter twice
+Message-ID: <1381843911-31962-1-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Commit 65cd4f6 (arch_timer: Move to generic sched_clock framework) added
+code to register the arch_sys_counter in arch_timer_register() but it is
+already registered in arch_counter_register(). This results in the timer
+being added to the clocksource list twice, therefore causing an infinite
+loop in the list.
 
-On 2013-10-15 13:40, Grant Likely wrote:
-> On Fri, 11 Oct 2013 09:27:26 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > Hi all!
-> >
-> > Benjamin Herrenschmidt pointed a few issues in the proposed design of
-> > device tree bindings for contiguous memory allocator and reserved memory
-> > regions:
-> > https://lkml.org/lkml/2013/9/15/151
-> > http://www.spinics.net/lists/arm-kernel/msg273548.html
-> >
-> > Some time has passed, but there is still no consensus on the bindings
-> > for the reserved memory and various drawback of this solution has been
-> > shown, so in my opinion the best I can do now is to revert them
-> > completely and start from scratch again later.
->
-> I had some fixup patches that I was getting ready to post, but your
-> right. We're really late to be doing anything like that. I've applied
-> the reverts and we'll plan on hammering something out in Edinburgh next
-> week so that it can be merged for v3.13
+Remove the duplicate registration and register the scheduler clock after
+the original registration instead.
 
-Sadly I won't be able to go to Edinburgh because of other business trip 
-the same time. However Tomasz Figa will be there for the whole week, he 
-will also attend DT-summit, so I hope that you will manage to find a 
-consensus. I will implement whatever you will agree then.
+This fixes a hang during boot on Tegra114 (Cortex-A15).
 
-Best regards
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+While I've only tested this on Tegra114, I suspect the same hang during
+boot happens for all processors that use this clock source.
+
+ drivers/clocksource/arm_arch_timer.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index f655036..95fb944 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -436,6 +436,9 @@ static void __init arch_counter_register(unsigned type)
+ 	cyclecounter.mult = clocksource_counter.mult;
+ 	cyclecounter.shift = clocksource_counter.shift;
+ 	timecounter_init(&timecounter, &cyclecounter, start_count);
++
++	/* 56 bits minimum, so we assume worst case rollover */
++	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+ }
+ 
+ static void arch_timer_stop(struct clock_event_device *clk)
+@@ -515,15 +518,6 @@ static int __init arch_timer_register(void)
+ 		goto out;
+ 	}
+ 
+-	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+-	cyclecounter.mult = clocksource_counter.mult;
+-	cyclecounter.shift = clocksource_counter.shift;
+-	timecounter_init(&timecounter, &cyclecounter,
+-			 arch_counter_get_cntvct());
+-
+-	/* 56 bits minimum, so we assume worst case rollover */
+-	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+-
+ 	if (arch_timer_use_virtual) {
+ 		ppi = arch_timer_ppi[VIRT_PPI];
+ 		err = request_percpu_irq(ppi, arch_timer_handler_virt,
 -- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+1.8.4
