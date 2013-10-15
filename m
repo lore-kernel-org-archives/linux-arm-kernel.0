@@ -1,121 +1,166 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Tue, 15 Oct 2013 22:04:17 +0200
-Subject: [PATCH v6 0/5] clk: clock deregistration support
-In-Reply-To: <3160771.O1gFkR91vK@avalon>
-References: <1377874402-2944-1-git-send-email-s.nawrocki@samsung.com>
- <52420664.2040604@gmail.com> <3160771.O1gFkR91vK@avalon>
-Message-ID: <525D9FC1.2040204@gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 15 Oct 2013 14:16:22 -0600
+Subject: [PATCH v2] PCI: mvebu - Support a bridge with no IO port window
+Message-ID: <1381868182-8544-1-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Make pcie-io-aperture and the IO port MBUS ID in ranges optional.
+If not provided the bridge reports to Linux that IO space mapping is
+not supported and refuses to configure an IO mbus window.
 
-(adding linux-media mailing list at Cc)
+This allows both complete disable (do not specify pcie-io-aperture) and
+per-port disable (do not specify a IO target ranges entry for the port)
 
-On 09/25/2013 11:47 AM, Laurent Pinchart wrote:
-> On Tuesday 24 September 2013 23:38:44 Sylwester Nawrocki wrote:
-[...]
->> The only issue I found might be at the omap3isp driver, which provides
->> clock to its sub-drivers and takes reference on the sub-driver modules.
->> When sub-driver calls clk_get() all modules would get locked in memory,
->> due to circular reference. One solution to that could be to pass NULL
->> struct device pointer, as in the below patch.
->
-> Doesn't that introduce race conditions ? If the sub-drivers require the clock,
-> they want to be sure that the clock won't disappear beyond their backs. I
-> agree that the circular dependency needs to be solved somehow, but we probably
-> need a more generic solution. The problem will become more widespread in the
-> future with DT-based device instantiation in both V4L2 and KMS.
+Most PCIE devices these days do not require IO support to function,
+so having an option to disable it in the driver is useful.
 
-I'm wondering whether subsystems and drivers itself should be written so
-they deal with such dependencies they are aware of.
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ drivers/pci/host/pci-mvebu.c | 64 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 43 insertions(+), 21 deletions(-)
 
-There is similar situation in the regulator API, regulator_get() simply
-takes a reference on a module providing the regulator object.
+V2 changes:
+ - Fixed logic in mvebu_has_ioport [thomas]
+ - Included secondary_status in the IO_BASE reply [thomas]
+ - Fixed range check for disabled IO windows
 
-Before a "more generic solution" is available, what do you think about
-keeping obtaining a reference on a clock provider module in clk_get() and
-doing clk_get(), clk_prepare_enable(), ..., clk_unprepare_disable(),
-clk_put() in sub-driver whenever a clock is actively used, to avoid
-permanent circular reference ?
-
---
-Thanks,
-Sylwester
-
->> ---------8<------------------
->>   From ca5963041aad67e31324cb5d4d5e2cfce1706d4f Mon Sep 17 00:00:00 2001
->> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
->> Date: Thu, 19 Sep 2013 23:52:04 +0200
->> Subject: [PATCH] omap3isp: Pass NULL device pointer to clk_register()
->>
->> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
->> ---
->>    drivers/media/platform/omap3isp/isp.c |   15 ++++++++++-----
->>    drivers/media/platform/omap3isp/isp.h |    1 +
->>    2 files changed, 11 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/media/platform/omap3isp/isp.c
->> b/drivers/media/platform/omap3isp/isp.c
->> index df3a0ec..d7f3c98 100644
->> --- a/drivers/media/platform/omap3isp/isp.c
->> +++ b/drivers/media/platform/omap3isp/isp.c
->> @@ -290,9 +290,11 @@ static int isp_xclk_init(struct isp_device *isp)
->>    	struct clk_init_data init;
->>    	unsigned int i;
->>
->> +	for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i)
->> +		isp->xclks[i] = ERR_PTR(-EINVAL);
->> +
->>    	for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
->>    		struct isp_xclk *xclk =&isp->xclks[i];
->> -		struct clk *clk;
->>
->>    		xclk->isp = isp;
->>    		xclk->id = i == 0 ? ISP_XCLK_A : ISP_XCLK_B;
->> @@ -306,9 +308,9 @@ static int isp_xclk_init(struct isp_device *isp)
->>
->>    		xclk->hw.init =&init;
->>
->> -		clk = devm_clk_register(isp->dev,&xclk->hw);
->> -		if (IS_ERR(clk))
->> -			return PTR_ERR(clk);
->> +		xclk->clk = clk_register(NULL,&xclk->hw);
->> +		if (IS_ERR(xclk->clk))
->> +			return PTR_ERR(xclk->clk);
->>
->>    		if (pdata->xclks[i].con_id == NULL&&
->>    		pdata->xclks[i].dev_id == NULL)
->> @@ -320,7 +322,7 @@ static int isp_xclk_init(struct isp_device *isp)
->>
->>    		xclk->lookup->con_id = pdata->xclks[i].con_id;
->>    		xclk->lookup->dev_id = pdata->xclks[i].dev_id;
->> -		xclk->lookup->clk = clk;
->> +		xclk->lookup->clk = xclk->clk;
->>
->>    		clkdev_add(xclk->lookup);
->>    	}
->> @@ -335,6 +337,9 @@ static void isp_xclk_cleanup(struct isp_device *isp)
->>    	for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
->>    		struct isp_xclk *xclk =&isp->xclks[i];
->>
->> +		if (!IS_ERR(xclk->clk))
->> +			clk_unregister(xclk->clk);
->> +
->>    		if (xclk->lookup)
->>    			clkdev_drop(xclk->lookup);
->>    	}
->> diff --git a/drivers/media/platform/omap3isp/isp.h
->> b/drivers/media/platform/omap3isp/isp.h
->> index cd3eff4..1498f2b 100644
->> --- a/drivers/media/platform/omap3isp/isp.h
->> +++ b/drivers/media/platform/omap3isp/isp.h
->> @@ -135,6 +135,7 @@ struct isp_xclk {
->>    	struct isp_device *isp;
->>    	struct clk_hw hw;
->>    	struct clk_lookup *lookup;
->> +	struct clk *clk;
->>    	enum isp_xclk_id id;
->>
->>    	spinlock_t lock;	/* Protects enabled and divider */
->> ---------8<------------------
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index f2d61f5..09fc586 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -132,6 +132,11 @@ struct mvebu_pcie_port {
+ 	size_t iowin_size;
+ };
+ 
++static inline bool mvebu_has_ioport(struct mvebu_pcie_port *port)
++{
++	return port->io_target != -1 && port->io_attr != -1;
++}
++
+ static bool mvebu_pcie_link_up(struct mvebu_pcie_port *port)
+ {
+ 	return !(readl(port->base + PCIE_STAT_OFF) & PCIE_STAT_LINK_DOWN);
+@@ -278,7 +283,7 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+ 	phys_addr_t iobase;
+ 
+ 	/* Are the new iobase/iolimit values invalid? */
+-	if (port->bridge.iolimit < port->bridge.iobase ||
++	if (port->bridge.iolimit <= port->bridge.iobase ||
+ 	    port->bridge.iolimitupper < port->bridge.iobaseupper) {
+ 
+ 		/* If a window was configured, remove it */
+@@ -292,6 +297,12 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+ 		return;
+ 	}
+ 
++	if (!mvebu_has_ioport(port)) {
++		dev_WARN(&port->pcie->pdev->dev,
++			 "Attempt to set IO when IO is disabled\n");
++		return;
++	}
++
+ 	/*
+ 	 * We read the PCI-to-PCI bridge emulated registers, and
+ 	 * calculate the base address and size of the address decoding
+@@ -405,9 +416,12 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+ 		break;
+ 
+ 	case PCI_IO_BASE:
+-		*value = (bridge->secondary_status << 16 |
+-			  bridge->iolimit          <<  8 |
+-			  bridge->iobase);
++		if (!mvebu_has_ioport(port))
++			*value = bridge->secondary_status << 16;
++		else
++			*value = (bridge->secondary_status << 16 |
++				  bridge->iolimit          <<  8 |
++				  bridge->iobase);
+ 		break;
+ 
+ 	case PCI_MEMORY_BASE:
+@@ -465,6 +479,8 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+ 	switch (where & ~3) {
+ 	case PCI_COMMAND:
+ 		bridge->command = value & 0xffff;
++		if (!mvebu_has_ioport(port))
++			bridge->command &= ~PCI_COMMAND_IO;
+ 		break;
+ 
+ 	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+@@ -630,7 +646,9 @@ static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+ 	int i;
+ 
+-	pci_add_resource_offset(&sys->resources, &pcie->realio, sys->io_offset);
++	if (resource_size(&pcie->realio) != 0)
++		pci_add_resource_offset(&sys->resources, &pcie->realio,
++					sys->io_offset);
+ 	pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
+ 	pci_add_resource(&sys->resources, &pcie->busn);
+ 
+@@ -739,12 +757,17 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
+ #define DT_CPUADDR_TO_ATTR(cpuaddr)   (((cpuaddr) >> 48) & 0xFF)
+ 
+ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+-			      unsigned long type, int *tgt, int *attr)
++			      unsigned long type,
++			      unsigned int *tgt,
++			      unsigned int *attr)
+ {
+ 	const int na = 3, ns = 2;
+ 	const __be32 *range;
+ 	int rlen, nranges, rangesz, pna, i;
+ 
++	*tgt = -1;
++	*attr = -1;
++
+ 	range = of_get_property(np, "ranges", &rlen);
+ 	if (!range)
+ 		return -EINVAL;
+@@ -798,16 +821,15 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	mvebu_mbus_get_pcie_io_aperture(&pcie->io);
+-	if (resource_size(&pcie->io) == 0) {
+-		dev_err(&pdev->dev, "invalid I/O aperture size\n");
+-		return -EINVAL;
+-	}
+ 
+-	pcie->realio.flags = pcie->io.flags;
+-	pcie->realio.start = PCIBIOS_MIN_IO;
+-	pcie->realio.end = min_t(resource_size_t,
+-				  IO_SPACE_LIMIT,
+-				  resource_size(&pcie->io));
++	if (resource_size(&pcie->io) != 0) {
++		pcie->realio.flags = pcie->io.flags;
++		pcie->realio.start = PCIBIOS_MIN_IO;
++		pcie->realio.end = min_t(resource_size_t,
++					 IO_SPACE_LIMIT,
++					 resource_size(&pcie->io));
++	} else
++		pcie->realio = pcie->io;
+ 
+ 	/* Get the bus range */
+ 	ret = of_pci_parse_bus_range(np, &pcie->busn);
+@@ -864,12 +886,12 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
+-		ret = mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
+-					 &port->io_target, &port->io_attr);
+-		if (ret < 0) {
+-			dev_err(&pdev->dev, "PCIe%d.%d: cannot get tgt/attr for io window\n",
+-				port->port, port->lane);
+-			continue;
++		if (resource_size(&pcie->io) != 0)
++			mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
++					   &port->io_target, &port->io_attr);
++		else {
++			port->io_target = -1;
++			port->io_attr = -1;
+ 		}
+ 
+ 		port->base = mvebu_pcie_map_registers(pdev, child, port);
+-- 
+1.8.1.2
