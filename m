@@ -1,28 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Oct 2013 09:27:57 +0900
-Subject: [PATCH] ARM: shmobile: Genmai defconfig
-In-Reply-To: <87vc0z4i8j.fsf@linaro.org>
-References: <cover.1381300141.git.horms+renesas@verge.net.au>
- <bb416e1d7416861bece0335f543c590d9af09c79.1381300141.git.horms+renesas@verge.net.au>
- <87vc0z4i8j.fsf@linaro.org>
-Message-ID: <20131015002757.GI22321@verge.net.au>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Mon, 14 Oct 2013 19:34:34 -0500
+Subject: [PATCH] clk: socfpga: Remove check for "reg" property in
+ socfpga_clk_init
+Message-ID: <1381797274-4564-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 03:09:48PM -0700, Kevin Hilman wrote:
-> Simon Horman <horms+renesas@verge.net.au> writes:
-> 
-> > From: Magnus Damm <damm@opensource.se>
-> >
-> > Add a defconfig for the Genmai board. In the future this board will
-> > use a shared defconfig for multiplatform, but until CCF is implemented
-> > this will be used.
-> 
-> How far in the future are we talking about?
+From: Dinh Nguyen <dinguyen@altera.com>
 
-I believe we are talking about one or two release cycles.
+The function socfpga_clk_init() can support clocks that do not have a divider
+register, but a fixed-divider that can be read from DTS. Therefore, the "reg"
+property is not a failing condition for socfpga_clk_init().
 
-> There's already 9 defconfigs for SH-mobile.  Is this *really* the last
-> one before multi-platform support?
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/clk/socfpga/clk.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Yes, I believe it is.
+diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+index 5bb848c..7f846bf 100644
+--- a/drivers/clk/socfpga/clk.c
++++ b/drivers/clk/socfpga/clk.c
+@@ -121,9 +121,7 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
+ 	int rc;
+ 	u32 fixed_div;
+ 
+-	rc = of_property_read_u32(node, "reg", &reg);
+-	if (WARN_ON(rc))
+-		return NULL;
++	of_property_read_u32(node, "reg", &reg);
+ 
+ 	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
+ 	if (WARN_ON(!socfpga_clk))
+-- 
+1.7.9.5
