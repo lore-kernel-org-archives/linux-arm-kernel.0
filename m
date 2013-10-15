@@ -1,52 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Oct 2013 17:53:35 +0100
-Subject: arm64 ioremap question
-In-Reply-To: <1381853652.4093.10.camel@weser.hi.pengutronix.de>
-References: <1381850404.27955.9.camel@deneb.redhat.com>
- <20131015155216.GD25034@n2100.arm.linux.org.uk>
- <1381853652.4093.10.camel@weser.hi.pengutronix.de>
-Message-ID: <20131015165335.GF25034@n2100.arm.linux.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 15 Oct 2013 12:00:04 -0500
+Subject: [PATCH] ARM: dts: OMAP5: Add i2c aliases
+Message-ID: <1381856405-30970-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 06:14:12PM +0200, Lucas Stach wrote:
-> Am Dienstag, den 15.10.2013, 16:52 +0100 schrieb Russell King - ARM
-> Linux:
-> > On Tue, Oct 15, 2013 at 11:20:04AM -0400, Mark Salter wrote:
-> > > ioremap() has a test to prevent RAM from being remapped:
-> > > 
-> > > 	/*
-> > > 	 * Don't allow RAM to be mapped.
-> > > 	 */
-> > > 	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-> > > 		return NULL;
-> > > 
-> > > 
-> > > Is this really necessary even for reserved pages which are not being
-> > > used for anything else?
-> > 
-> > It helps to stop the abuse of using ioremap() on normal memory, which has
-> > happened soo much in Aarch32 for years.  Unfortuantely, bad habbits die
-> > hard.
-> > 
-> > "Reserved pages not being used for anything else" are still mapped, and
-> > still subject to speculative fetches.
-> 
-> Only slightly related to the issue here, but I'm really wondering if the
-> speculative fill can happen on real implementations.
-> I'm well aware that there is nothing in the arch preventing a
-> speculative fill on a cached alias, but at least for the A9
-> implementation the ARM infocenter claims that the prefetcher will not
-> cross a 4KB boundary [1].
-> So as long as we are talking about full pages, having a conflicting
-> mapping should not cause any issues as long as you don't touch the
-> memory region explicitly through the cached mapping.
-> 
-> I know that we generally aim to avoid basing any kernel infrastructure
-> on such vague guarantees, but I'm really wondering if my analysis is
-> correct or is there anything I'm overlooking here?
+Currently, i2c1 and i2c5 defer probe due to pinctrl dependencies.
+This changes the i2c ID each bus is registered with in i2c-dev
+interface.
 
-And I know where this is leading so frankly I'm not answering.  I don't
-want to see any more of people commenting out code like this in their
-vendor kernels because they don't care.  Sorry if I'm being unhelpful
-but I have experience of what happens here.
+As a result of this, many userspace tools break and there is no
+consistent manner to fix the same if the i2c dev interface have no
+consistent numbering. Provide alias to allow ordering the i2c devices
+correctly.
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+
+ arch/arm/boot/dts/omap5.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index e18ee7e..8970deb 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -21,6 +21,11 @@
+ 	interrupt-parent = <&gic>;
+ 
+ 	aliases {
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		i2c2 = &i2c3;
++		i2c3 = &i2c4;
++		i2c4 = &i2c5;
+ 		serial0 = &uart1;
+ 		serial1 = &uart2;
+ 		serial2 = &uart3;
+-- 
+1.7.9.5
