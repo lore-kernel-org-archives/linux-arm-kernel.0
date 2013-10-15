@@ -1,75 +1,170 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 15 Oct 2013 10:14:22 +0200
-Subject: [PATCH 2/3] ARM: at91/dt/trivial: before sama5d3, Atmel MPU were
- using at91 prefix
-In-Reply-To: <20131014170951.GJ11420@ns203013.ovh.net>
-References: <ba9872c3bb29c9a06f06caa8e0b4528329f07675.1381769174.git.nicolas.ferre@atmel.com>
- <a7f43a96aaf83c3348dc631c71c54729f9d0e9e0.1381769174.git.nicolas.ferre@atmel.com>
- <20131014170951.GJ11420@ns203013.ovh.net>
-Message-ID: <525CF95E.9040609@atmel.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 15 Oct 2013 13:53:33 +0530
+Subject: [PATCH v2 2/5] ARM: dts: omap: Add new bindings for OMAP
+In-Reply-To: <525CEE4E.6010601@baylibre.com>
+References: <1381313521-10422-1-git-send-email-rnayak@ti.com>
+ <1381313521-10422-3-git-send-email-rnayak@ti.com>
+ <525572A8.9060401@baylibre.com> <5255872A.30702@ti.com>
+ <52558842.6040409@baylibre.com> <525CEE4E.6010601@baylibre.com>
+Message-ID: <525CFB85.6080801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/2013 19:09, Jean-Christophe PLAGNIOL-VILLARD :
-> On 18:46 Mon 14 Oct     , Nicolas Ferre wrote:
->> Change the sha/aes/tdes compatibility string to match common
->> case for the at91sam9g45 family which is to keep the at91 prefix.
+On Tuesday 15 October 2013 12:57 PM, Benoit Cousson wrote:
+> Hi Rajendra,
+> 
+> On 09/10/2013 18:45, Benoit Cousson wrote:
+>> + A couple of DT maintainers
 >>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>   arch/arm/boot/dts/sama5d3.dtsi | 6 +++---
->>   1 file changed, 3 insertions(+), 3 deletions(-)
+>> On 09/10/2013 18:41, Rajendra Nayak wrote:
+>>> On Wednesday 09 October 2013 08:43 PM, Benoit Cousson wrote:
+>>>> Hi Rajendra,
+>>>>
+>>>> On 09/10/2013 12:11, Rajendra Nayak wrote:
+>>>>> On OMAP we have co-processor IPs, memory controllers,
+>>>>> GPIOs which control regulators and power switches to
+>>>>> PMIC, and SoC internal Bus IPs, some or most of which
+>>>>> should either not be reset or idled or both at init.
+>>>>> (In some cases there are erratas which prevent an IP
+>>>>> from being reset)
+>>>>> Have a way to pass this information from DT.
+>>>>
+>>>> Did you get some acked-by from the DT maintainers?
+>>>> Every new bindings must be carefully reviewed now.
+>>>
+>>> Nope, I haven't. The patches are on the list for a couple
+>>> of months now.
 >>
->> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
->> index b2aabff..99bd4a6 100644
->> --- a/arch/arm/boot/dts/sama5d3.dtsi
->> +++ b/arch/arm/boot/dts/sama5d3.dtsi
->> @@ -342,19 +342,19 @@
->>   			};
+>> Let's see if Mark and Rob are OK with that.
+> 
+> OK, I've just applied it after a small change in the subject:
+> 
+>  ARM: dts: omap: Add reset/idle on init bindings for OMAP
+> 
+> Is that OK for you?
+
+Yes, sounds good. Thanks Benoit.
+
+> 
+> Thanks,
+> Benoit
+> 
 >>
->>   			sha at f8034000 {
->> -				compatible = "atmel,sam9g46-sha";
->> +				compatible = "atmel,at91sam9g46-sha";
->>   				reg = <0xf8034000 0x100>;
->>   				interrupts = <42 IRQ_TYPE_LEVEL_HIGH 0>;
->>   			};
+>> Thanks,
+>> Benoit
 >>
->>   			aes at f8038000 {
->> -				compatible = "atmel,sam9g46-aes";
->> +				compatible = "atmel,at91sam9g46-aes";
->>   				reg = <0xf8038000 0x100>;
->>   				interrupts = <43 IRQ_TYPE_LEVEL_HIGH 0>;
->>   			};
+>>>
+>>>>
+>>>> Regards,
+>>>> Benoit
+>>>>
+>>>>>
+>>>>> Update the am33xx/omap4 and omap5 dtsi files with the
+>>>>> new bindings for modules which either should not be
+>>>>> idled. reset or both. A later patch would cleanup the
+>>>>> same information that exists today as part of the hwmod
+>>>>> data files.
+>>>>>
+>>>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>>>>> ---
+>>>>>    .../devicetree/bindings/arm/omap/omap.txt          |    3 ++-
+>>>>>    arch/arm/boot/dts/am33xx.dtsi                      |    2 ++
+>>>>>    arch/arm/boot/dts/omap4.dtsi                       |    3 +++
+>>>>>    arch/arm/boot/dts/omap5.dtsi                       |    2 ++
+>>>>>    4 files changed, 9 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>>>> b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>>>> index 91b7049..808c154 100644
+>>>>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>>>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>>>> @@ -21,7 +21,8 @@ Required properties:
+>>>>>    Optional properties:
+>>>>>    - ti,no_idle_on_suspend: When present, it prevents the PM to idle
+>>>>> the module
+>>>>>      during suspend.
+>>>>> -
+>>>>> +- ti,no-reset-on-init: When present, the module should not be reset
+>>>>> at init
+>>>>> +- ti,no-idle-on-init: When present, the module should not be idled
+>>>>> at init
+>>>>>
+>>>>>    Example:
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi
+>>>>> b/arch/arm/boot/dts/am33xx.dtsi
+>>>>> index f9c5da9..ec33ea0 100644
+>>>>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>>>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>>>>> @@ -607,6 +607,7 @@
+>>>>>                reg = <0x44d00000 0x4000    /* M3 UMEM */
+>>>>>                       0x44d80000 0x2000>;    /* M3 DMEM */
+>>>>>                ti,hwmods = "wkup_m3";
+>>>>> +            ti,no-reset-on-init;
+>>>>>            };
+>>>>>
+>>>>>            elm: elm at 48080000 {
+>>>>> @@ -637,6 +638,7 @@
+>>>>>            gpmc: gpmc at 50000000 {
+>>>>>                compatible = "ti,am3352-gpmc";
+>>>>>                ti,hwmods = "gpmc";
+>>>>> +            ti,no-idle-on-init;
+>>>>>                reg = <0x50000000 0x2000>;
+>>>>>                interrupts = <100>;
+>>>>>                gpmc,num-cs = <7>;
+>>>>> diff --git a/arch/arm/boot/dts/omap4.dtsi
+>>>>> b/arch/arm/boot/dts/omap4.dtsi
+>>>>> index 22d9f2b..e8fe797 100644
+>>>>> --- a/arch/arm/boot/dts/omap4.dtsi
+>>>>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>>>>> @@ -214,6 +214,7 @@
+>>>>>                gpmc,num-cs = <8>;
+>>>>>                gpmc,num-waitpins = <4>;
+>>>>>                ti,hwmods = "gpmc";
+>>>>> +            ti,no-idle-on-init;
+>>>>>            };
+>>>>>
+>>>>>            uart1: serial at 4806a000 {
+>>>>> @@ -492,6 +493,7 @@
+>>>>>                reg = <0x4c000000 0x100>;
+>>>>>                interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
+>>>>>                ti,hwmods = "emif1";
+>>>>> +            ti,no-idle-on-init;
+>>>>>                phy-type = <1>;
+>>>>>                hw-caps-read-idle-ctrl;
+>>>>>                hw-caps-ll-interface;
+>>>>> @@ -503,6 +505,7 @@
+>>>>>                reg = <0x4d000000 0x100>;
+>>>>>                interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+>>>>>                ti,hwmods = "emif2";
+>>>>> +            ti,no-idle-on-init;
+>>>>>                phy-type = <1>;
+>>>>>                hw-caps-read-idle-ctrl;
+>>>>>                hw-caps-ll-interface;
+>>>>> diff --git a/arch/arm/boot/dts/omap5.dtsi
+>>>>> b/arch/arm/boot/dts/omap5.dtsi
+>>>>> index 7cdea1b..a9d49df 100644
+>>>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>>>> @@ -607,6 +607,7 @@
+>>>>>            emif1: emif at 0x4c000000 {
+>>>>>                compatible    = "ti,emif-4d5";
+>>>>>                ti,hwmods    = "emif1";
+>>>>> +            ti,no-idle-on-init;
+>>>>>                phy-type    = <2>; /* DDR PHY type: Intelli PHY */
+>>>>>                reg = <0x4c000000 0x400>;
+>>>>>                interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
+>>>>> @@ -618,6 +619,7 @@
+>>>>>            emif2: emif at 0x4d000000 {
+>>>>>                compatible    = "ti,emif-4d5";
+>>>>>                ti,hwmods    = "emif2";
+>>>>> +            ti,no-idle-on-init;
+>>>>>                phy-type    = <2>; /* DDR PHY type: Intelli PHY */
+>>>>>                reg = <0x4d000000 0x400>;
+>>>>>                interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+>>>>>
+>>>>
+>>>
 >>
->>   			tdes at f803c000 {
->> -				compatible = "atmel,sam9g46-tdes";
->> +				compatible = "atmel,at91sam9g46-tdes";
->>   				reg = <0xf803c000 0x100>;
->>   				interrupts = <44 IRQ_TYPE_LEVEL_HIGH 0>;
-> you keep the previous compatible in the driver too for backword compatiblity
-
-No, as the consumer of the old compatibility string has never been sent 
-to mainline (or even mailing-list) and as the "dma" property is not 
-compatible with the one existing on our 3.6.9-based kernel.
-
-So, anyway the DT has to be changed for a move from 3.6.9 => 3.10. As I 
-do not want to bloat the DT forever, let's stick with this new 
-compatibility string.
-
-Bye,
-
-
->>   			};
->> --
->> 1.8.2.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
--- 
-Nicolas Ferre
+> 
+> 
