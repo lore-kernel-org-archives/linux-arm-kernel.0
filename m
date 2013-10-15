@@ -1,109 +1,281 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Tue, 15 Oct 2013 17:24:57 +0530
-Subject: [PATCH] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <20131015092149.GA30046@mudshark.cambridge.arm.com>
-References: <1381733189-2745-1-git-send-email-vkale@apm.com>
- <20131014123436.GA10491@mudshark.cambridge.arm.com>
- <CAPrCYkc-ocBi6B6MP23gHqsovgQovvEWSv=khstS4wbD2dXzjw@mail.gmail.com>
- <20131015092149.GA30046@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYkdyCSEcUvQ4y-62wvQvuffaN+kJrzq8H-n87_SMEANjUQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 15 Oct 2013 06:57:41 -0500
+Subject: [PATCH 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
+ Framework
+In-Reply-To: <525BC5A9.3060904@ti.com>
+References: <1378136591-7463-1-git-send-email-kishon@ti.com>
+ <1378136591-7463-3-git-send-email-kishon@ti.com>
+ <525814A9.7060106@ti.com> <525BB8C0.1070802@ti.com>
+ <525BC5A9.3060904@ti.com>
+Message-ID: <20131015115741.GD11380@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 2:51 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Oct 15, 2013 at 07:33:25AM +0100, Vinayak Kale wrote:
->> On Mon, Oct 14, 2013 at 6:04 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Mon, Oct 14, 2013 at 07:46:29AM +0100, Vinayak Kale wrote:
->> >>               if (err) {
->> >>                       pr_err("unable to request IRQ%d for ARM PMU counters\n",
->> >> -                             irq);
->> >> +                                     irq);
->> >>                       armpmu_release_hardware(armpmu);
->> >>                       return err;
->> >>               }
->> >>
->> >> -             cpumask_set_cpu(i, &armpmu->active_irqs);
->> >> +             on_each_cpu(armpmu_enable_percpu_irq, (void *)armpmu, 1);
->> >> +     } else {
->> >> +             for (i = 0; i < irqs; ++i) {
->> >> +                     err = 0;
->> >> +                     irq = platform_get_irq(pmu_device, i);
->> >> +                     if (irq < 0)
->> >> +                             continue;
->> >> +
->> >> +                     /*
->> >> +                      * If we have a single PMU interrupt that we can't shift,
->> >> +                      * assume that we're running on a uniprocessor machine and
->> >> +                      * continue. Otherwise, continue without this interrupt.
->> >> +                      */
->> >> +                     if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
->> >> +                             pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
->> >> +                                             irq, i);
->> >> +                             continue;
->> >> +                     }
->> >> +
->> >> +                     err = request_irq(irq, armpmu->handle_irq,
->> >> +                                     IRQF_NOBALANCING,
->> >> +                                     "arm-pmu", armpmu);
->> >
->> > A better way to do this is to try request_percpu_irq first. If that fails,
->> > then try request_irq. However, the error reporting out of request_percpu_irq
->> > could do with some cleanup (rather than just return -EINVAL) so we can
->> > detect the difference between `this interrupt isn't per-cpu' and `this
->> > per-cpu interrupt is invalid'. This can help us avoid the WARN_ON in
->> > request_irq when it is passed a per-cpu interrupt.
->> >
->>
->> Trying request_percpu_irq first seems better. But if it fails then we
->> would straight away
->> assume it's not per-cpu interrupt and try request_irq. In this case we
->> may not be able to
->> detect 'this per-cpu interrupt is invalid' case.
->
-> Right, but you could have a patch to fix the core code as part of this
-> series, as I hinted at above.
->
+Hi,
 
-Modifying core code to change return value of request_percpu_irq seems
-risky as other drivers might be checking the error code.
+On Mon, Oct 14, 2013 at 01:21:29PM +0300, Roger Quadros wrote:
+> +Vivek
+> 
+> On 10/14/2013 12:26 PM, Kishon Vijay Abraham I wrote:
+> > Hi Roger,
+> > 
+> > On Friday 11 October 2013 08:39 PM, Roger Quadros wrote:
+> >> Hi,
+> >>
+> >> On 09/02/2013 06:43 PM, Kishon Vijay Abraham I wrote:
+> >>> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
+> >>> power_on and power_off the following APIs are used phy_init(), phy_exit(),
+> >>> phy_power_on() and phy_power_off().
+> >>>
+> >>> However using the old USB phy library wont be removed till the PHYs of all
+> >>> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
+> >>>
+> >>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>> ---
+> >>>  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
+> >>>  drivers/usb/dwc3/Kconfig                       |    1 +
+> >>>  drivers/usb/dwc3/core.c                        |   49 ++++++++++++++++++++++++
+> >>>  drivers/usb/dwc3/core.h                        |    7 ++++
+> >>>  4 files changed, 61 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
+> >>> index e807635..471366d 100644
+> >>> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+> >>> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+> >>> @@ -6,11 +6,13 @@ Required properties:
+> >>>   - compatible: must be "snps,dwc3"
+> >>>   - reg : Address and length of the register set for the device
+> >>>   - interrupts: Interrupts used by the dwc3 controller.
+> >>> +
+> >>> +Optional properties:
+> >>>   - usb-phy : array of phandle for the PHY device.  The first element
+> >>>     in the array is expected to be a handle to the USB2/HS PHY and
+> >>>     the second element is expected to be a handle to the USB3/SS PHY
+> >>> -
+> >>> -Optional properties:
+> >>> + - phys: from the *Generic PHY* bindings
+> >>> + - phy-names: from the *Generic PHY* bindings
+> >>>   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
+> >>>  
+> >>>  This is usually a subnode to DWC3 glue to which it is connected.
+> >>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+> >>> index cfc16dd..ad7ce83 100644
+> >>> --- a/drivers/usb/dwc3/Kconfig
+> >>> +++ b/drivers/usb/dwc3/Kconfig
+> >>> @@ -3,6 +3,7 @@ config USB_DWC3
+> >>>  	depends on (USB || USB_GADGET) && GENERIC_HARDIRQS && HAS_DMA
+> >>>  	depends on EXTCON
+> >>>  	select USB_PHY
+> >>> +	select GENERIC_PHY
+> >>>  	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
+> >>>  	help
+> >>>  	  Say Y or M here if your system has a Dual Role SuperSpeed
+> >>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+> >>> index 428c29e..485d365 100644
+> >>> --- a/drivers/usb/dwc3/core.c
+> >>> +++ b/drivers/usb/dwc3/core.c
+> >>> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
+> >>>  
+> >>>  	usb_phy_init(dwc->usb2_phy);
+> >>>  	usb_phy_init(dwc->usb3_phy);
+> >>
+> >> How about adding
+> >> +	if (dwc->usb2_phy)
+> >> +		usb_phy_init(dwc->usb2_phy);
+> >> +	if (dwc->usb3_phy)
+> >> +		usb_phy_init(dwc->usb3_phy);
+> > 
+> > Thankfully that usb_phy_init will check if phy is NULL.
+> >>
+> >> both usb phy and generic phy shouldn't be present together.
+> > 
+> > ok.
+> >>
+> >>> +
+> >>> +	if (dwc->usb2_generic_phy)
+> >>> +		phy_init(dwc->usb2_generic_phy);
+> >>> +	if (dwc->usb3_generic_phy)
+> >>> +		phy_init(dwc->usb3_generic_phy);
+> >>> +
+> >>>  	mdelay(100);
+> >>>  
+> >>>  	/* Clear USB3 PHY reset */
+> >>> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
+> >>>  {
+> >>>  	usb_phy_shutdown(dwc->usb2_phy);
+> >>>  	usb_phy_shutdown(dwc->usb3_phy);
+> >>
+> >> here as well
+> >>
+> >>> +
+> >>> +	if (dwc->usb2_generic_phy)
+> >>> +		phy_power_off(dwc->usb2_generic_phy);
+> >>> +	if (dwc->usb3_generic_phy)
+> >>> +		phy_power_off(dwc->usb3_generic_phy);
+> >>>  }
+> >>>  
+> >>>  #define DWC3_ALIGN_MASK		(16 - 1)
+> >>> @@ -427,6 +438,23 @@ static int dwc3_probe(struct platform_device *pdev)
+> >>>  		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+> >>>  	}
+> >>>  
+> >>> +	if (of_property_read_bool(node, "phys") || pdata->has_phy) {
+> >>> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
+> >>> +		if (IS_ERR(dwc->usb2_generic_phy)) {
+> >>> +			dev_err(dev, "no usb2 phy configured yet");
+> >>> +			return PTR_ERR(dwc->usb2_generic_phy);
+> >>> +		}
+> >>> +
+> >>> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
+> >>> +		if (IS_ERR(dwc->usb3_generic_phy)) {
+> >>> +			dev_err(dev, "no usb3 phy configured yet");
+> >>> +			return PTR_ERR(dwc->usb3_generic_phy);
+> >>> +		}
+> >>
+> >> better to add
+> >> +		/* Don't use USB PHY if generic PHY was found */
+> >> +		dwc->usb2_phy = dwc->usb3_phy = NULL;
+> > 
+> > ok.
+> >>
+> >>> +	} else {
+> >>
+> >> not required as we've used kzalloc for dwc.
+> >>
+> >>> +		dwc->usb2_generic_phy = NULL;
+> >>> +		dwc->usb3_generic_phy = NULL;
+> >>> +	}
+> >>> +
+> >>>  	/* default to superspeed if no maximum_speed passed */
+> >>>  	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
+> >>>  		dwc->maximum_speed = USB_SPEED_SUPER;
+> >>> @@ -450,6 +478,11 @@ static int dwc3_probe(struct platform_device *pdev)
+> >>
+> >> if (dwc->usb2_phy)
+> >>
+> >>>  	usb_phy_set_suspend(dwc->usb2_phy, 0);
+> >>
+> >> if (dwc->usb3_phy)
+> >>
+> >>>  	usb_phy_set_suspend(dwc->usb3_phy, 0);
+> >>>  
+> >>> +	if (dwc->usb2_generic_phy)
+> >>> +		phy_power_on(dwc->usb2_generic_phy);
+> >>> +	if (dwc->usb3_generic_phy)
+> >>> +		phy_power_on(dwc->usb3_generic_phy);
+> >>> +
+> >>>  	spin_lock_init(&dwc->lock);
+> >>>  	platform_set_drvdata(pdev, dwc);
+> >>>  
+> >>> @@ -576,6 +609,11 @@ static int dwc3_remove(struct platform_device *pdev)
+> >>
+> >> if (dwc->usb2_phy)
+> >>>  	usb_phy_set_suspend(dwc->usb2_phy, 1);
+> >>
+> >> if (dwc->usb3_phy)
+> >>>  	usb_phy_set_suspend(dwc->usb3_phy, 1);
+> >>>  
+> >>> +	if (dwc->usb2_generic_phy)
+> >>> +		phy_power_off(dwc->usb2_generic_phy);
+> >>> +	if (dwc->usb3_generic_phy)
+> >>> +		phy_power_off(dwc->usb3_generic_phy);
+> >>> +
+> >>>  	pm_runtime_put(&pdev->dev);
+> >>>  	pm_runtime_disable(&pdev->dev);
+> >>>  
+> >>> @@ -673,6 +711,11 @@ static int dwc3_suspend(struct device *dev)
+> >>
+> >> if (dwc->usb3_phy)
+> >>>  	usb_phy_shutdown(dwc->usb3_phy);
+> >>
+> >> if (dwc->usb2_phy)
+> >>>  	usb_phy_shutdown(dwc->usb2_phy);
+> >>>  
+> >>> +	if (dwc->usb2_generic_phy)
+> >>> +		phy_exit(dwc->usb2_generic_phy);
+> >>> +	if (dwc->usb3_generic_phy)
+> >>> +		phy_exit(dwc->usb3_generic_phy);
+> >>> +
+> >>>  	return 0;
+> >>>  }
+> >>>  
+> >>> @@ -683,6 +726,12 @@ static int dwc3_resume(struct device *dev)
+> >>>  
+> >>
+> >> if (dwc->usb3_phy)
+> >>>  	usb_phy_init(dwc->usb3_phy);
+> >>
+> >> if (dwc->usb2_phy)
+> >>>  	usb_phy_init(dwc->usb2_phy);
+> >>> +
+> >>> +	if (dwc->usb2_generic_phy)
+> >>> +		phy_init(dwc->usb2_generic_phy);
+> >>> +	if (dwc->usb3_generic_phy)
+> >>> +		phy_init(dwc->usb3_generic_phy);
+> >>> +
+> >>>  	msleep(100);
+> >>>  
+> >>>  	spin_lock_irqsave(&dwc->lock, flags);
+> >>> diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
+> >>> index f8af8d4..01ec7d7 100644
+> >>> --- a/drivers/usb/dwc3/core.h
+> >>> +++ b/drivers/usb/dwc3/core.h
+> >>> @@ -31,6 +31,8 @@
+> >>>  #include <linux/usb/gadget.h>
+> >>>  #include <linux/usb/otg.h>
+> >>>  
+> >>> +#include <linux/phy/phy.h>
+> >>> +
+> >>>  /* Global constants */
+> >>>  #define DWC3_EP0_BOUNCE_SIZE	512
+> >>>  #define DWC3_ENDPOINTS_NUM	32
+> >>> @@ -613,6 +615,8 @@ struct dwc3_scratchpad_array {
+> >>>   * @dr_mode: requested mode of operation
+> >>>   * @usb2_phy: pointer to USB2 PHY
+> >>>   * @usb3_phy: pointer to USB3 PHY
+> >>> + * @usb2_generic_phy: pointer to USB2 PHY
+> >>> + * @usb3_generic_phy: pointer to USB3 PHY
+> >>>   * @dcfg: saved contents of DCFG register
+> >>>   * @gctl: saved contents of GCTL register
+> >>>   * @is_selfpowered: true when we are selfpowered
+> >>> @@ -665,6 +669,9 @@ struct dwc3 {
+> >>>  	struct usb_phy		*usb2_phy;
+> >>>  	struct usb_phy		*usb3_phy;
+> >>>  
+> >>> +	struct phy		*usb2_generic_phy;
+> >>> +	struct phy		*usb3_generic_phy;
+> >>> +
+> >>>  	void __iomem		*regs;
+> >>>  	size_t			regs_size;
+> >>>  
+> >>>
+> > 
+> > Do you have any suggestions on how to get only individual PHYs? like only
+> > usb2phy or usb3phy?
+> 
+> My earlier understanding was that both PHYs are needed only if .speed is "super-speed"
+> and only usb2phy is needed for "high-speed". But as per Vivek's email it seems
+> Samsung's exynos5 SoC doesn't need usb2phy for "super-speed".
+> 
+> So to keeps things flexible, I can propose the following approach
+> - if speed == 'high-speed' usb2phy must be present. usb3phy will be ignored if supplied.
+> - if speed == 'super-speed' usb3phy must be present and usb2phy is optional but must be
+> initialized if supplied.
+> - if speed is not specified, we default to 'super-speed'.
+> 
+> Felipe, does this address the issue you were facing with OMAP5?
 
-As you said, passing invalid ppi to request_irq would cause unwanted
-WARN_ON. But this would be rare case and platform specific. Can we
-just live with this WARN_ON in such rare cases?
+on OMAP5 we cannot skip USB3 PHY initialization. But then it becomes a
+question of supporting a test feature (in OMAP5 case it would be cool to
+force controller to lower speeds for testing) or coping with a broken
+DTS.
 
->> >> @@ -784,8 +832,8 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
->> >>  /*
->> >>   * PMXEVTYPER: Event selection reg
->> >>   */
->> >> -#define      ARMV8_EVTYPE_MASK       0xc80000ff      /* Mask for writable bits */
->> >> -#define      ARMV8_EVTYPE_EVENT      0xff            /* Mask for EVENT bits */
->> >> +#define      ARMV8_EVTYPE_MASK       0xc80003ff      /* Mask for writable bits */
->> >> +#define      ARMV8_EVTYPE_EVENT      0x3ff           /* Mask for EVENT bits */
->> >>
->> >>  /*
->> >>   * Event filters for PMUv3
->> >> @@ -1175,7 +1223,7 @@ static void armv8pmu_reset(void *info)
->> >>  static int armv8_pmuv3_map_event(struct perf_event *event)
->> >>  {
->> >>       return map_cpu_event(event, &armv8_pmuv3_perf_map,
->> >> -                             &armv8_pmuv3_perf_cache_map, 0xFF);
->> >> +                             &armv8_pmuv3_perf_cache_map, 0x3FF);
->> >>  }
->> >
->> > What's all this?
->> >
->>
->> The evtCount (event number) field width is 10bits in event selection register.
->> So need to fix ARMV8_EVTYPE_* macros and related mask value.
->>
->> From the subject of patch, one may think that the patch is specific
->> only to percpu irq changes (which is not true).
->>
->> I had mentioned about fixing ARMV8_EVTYPE_* macros in patch description.
->
-> Ok, please put this change in a separate patch.
->
-
-Okay.
-
-> Will
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131015/58c90742/attachment-0001.sig>
