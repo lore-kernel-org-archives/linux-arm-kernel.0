@@ -1,41 +1,28 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Tue, 15 Oct 2013 10:36:56 +1100
-Subject: [PATCH] ARM: ep93xx: remove deprecated IRQF_DISABLED
-In-Reply-To: <DC148C5AA1CEBA4E87973D432B1C2D8817DAB036@P3PWEX4MB008.ex4.secureserver.net>
-References: <1381547439-4888-1-git-send-email-michael.opdenacker@free-electrons.com>
- <DC148C5AA1CEBA4E87973D432B1C2D8817DAB036@P3PWEX4MB008.ex4.secureserver.net>
-Message-ID: <525C8018.3070805@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 15 Oct 2013 09:27:57 +0900
+Subject: [PATCH] ARM: shmobile: Genmai defconfig
+In-Reply-To: <87vc0z4i8j.fsf@linaro.org>
+References: <cover.1381300141.git.horms+renesas@verge.net.au>
+ <bb416e1d7416861bece0335f543c590d9af09c79.1381300141.git.horms+renesas@verge.net.au>
+ <87vc0z4i8j.fsf@linaro.org>
+Message-ID: <20131015002757.GI22321@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/13 02:47, Hartley Sweeten wrote:
-> On Friday, October 11, 2013 8:11 PM, Michael Opdenacker wrote:
->> This patch proposes to remove the use of the IRQF_DISABLED flag
->>
->> It's a NOOP since 2.6.35 and it will be removed one day.
->>
->> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
->> ---
->>  arch/arm/mach-ep93xx/core.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
->> index 3f12b88..fcc965f 100644
->> --- a/arch/arm/mach-ep93xx/core.c
->> +++ b/arch/arm/mach-ep93xx/core.c
->> @@ -136,7 +136,7 @@ static irqreturn_t ep93xx_timer_interrupt(int irq, void *dev_id)
->>  
->>  static struct irqaction ep93xx_timer_irq = {
->>  	.name		= "ep93xx timer",
->> -	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
->> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
->>  	.handler	= ep93xx_timer_interrupt,
->>  };
->>  
+On Mon, Oct 14, 2013 at 03:09:48PM -0700, Kevin Hilman wrote:
+> Simon Horman <horms+renesas@verge.net.au> writes:
 > 
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> > From: Magnus Damm <damm@opensource.se>
+> >
+> > Add a defconfig for the Genmai board. In the future this board will
+> > use a shared defconfig for multiplatform, but until CCF is implemented
+> > this will be used.
+> 
+> How far in the future are we talking about?
 
-Applied to ep93xx-fixes.
+I believe we are talking about one or two release cycles.
 
-Thanks,
-~Ryan
+> There's already 9 defconfigs for SH-mobile.  Is this *really* the last
+> one before multi-platform support?
+
+Yes, I believe it is.
