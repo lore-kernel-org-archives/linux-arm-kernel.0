@@ -1,67 +1,46 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 15 Oct 2013 10:18:15 +0800
-Subject: [PATCH 01/11] usb: chipidea: Add power management support
-In-Reply-To: <20131014110108.GL25034@n2100.arm.linux.org.uk>
-References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
- <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
- <20131014110108.GL25034@n2100.arm.linux.org.uk>
-Message-ID: <20131015021814.GA3254@shlinux1.ap.freescale.net>
+From: richard.zhuhongxing@gmail.com (Richard Zhu)
+Date: Tue, 15 Oct 2013 10:44:53 +0800
+Subject: [PATCH v4 0/1] ahci: imx: setup power saving methods
+Message-ID: <1381805094-14723-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 12:01:08PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Oct 12, 2013 at 05:35:03PM +0800, Peter Chen wrote:
-> > This commit adds runtime and system power management support for
-> > chipidea core. The runtime pm support is controlled by glue
-> > layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
-> 
-> Let's look at the locking.
-> 
-> 1. Runtime PM.  These callbacks are locked with a spinlock, which holds
->    dev->power.lock.  This lock is taken either with or without disabling
->    IRQs depending on whether runtime PM is IRQ safe or not.
-> 
-> 2. Normal PM.  These callbacks are locked by holding dev->mutex.
-> 
-> Now, there's a little bit of protection between these two operations -
-> when normal PM places a device into a low power state, it 'gets' a
-> reference on the runtime PM to ensure no runtime PM transitions occur
-> while normal PM is active.  (See pm_runtime_get_noresume() in
-> device_prepare().)  This is only dropped when the normal PM resumes the
-> device.
-> 
-> Moreover, all runtime PM events are flushed before the suspend callback
-> occurs (see the pm_runtime_barrier() in __device_suspend()).
-> 
-> What that means is that you can't receive any runtime PM events while
-> you are in your suspend/resume callbacks.  So, each call is mutually
-> exclusive.
-> 
-> So, runtime PM callbacks vs normal PM callbacks for any single device
-> are all called with mutual exclusion - you won't have two running at
-> any time.
-> 
-> Hence, for the reasons stated previously about the non-atomic nature of
-> atomic_read()/atomic_set(), there's even more reasons that their use
-> here is just mere obfuscation: the accesses to this state tracking
-> variable is already guaranteed to be single-threaded by core code, so
-> the use of atomic_read()/atomic_set() just adds additional needless
-> confusion to this code.
-> 
+v4: ahci: imx: setup power saving methods
+ - Thanks for Tejun's review and comments firstly.
+ - add copyright modification note in the commit message
+ - export ahci_error_handler and ahci_platform_ops
+ - add more detailed comments.
 
-Many Thanks, Russell.
+v3: http://www.spinics.net/lists/linux-ide/msg46641.html
+ - Thanks for Tejun's suggestions.
+ override the error_handler by ahci_imx_error_handler, to do
+ the complete SATA device detection, enter into PDDQ mode,
+ if there is no any SATA device.
 
-So, the lessons for this topic are:
+ - minor modifications:
+   - The format of the copyright is changed, because that the
+   original one can't pass fsl internal patch reivew without
+   the character '(c)'.
+   - Change the module parameters to be more readable.
 
-- If one atomic variable's operation only includes one instruction like
-atomic_read and atomic_set, it is not meaningful for using atomic
-operation, we can just use bool instead of it.
+V2: http://www.spinics.net/lists/linux-ide/msg46606.html
+ - kernel build option is replaced by the module parameter(ahci-imx.hp) 
 
-- The runtime pm itself, normal pm itself, runtime pm and normal pm
-are all already exclusion, we don't need protection for variables
-who are only used at pm situation.
+v1: http://www.spinics.net/lists/linux-ide/msg46389.html
+ * Disable sata phy internal pll reference clock when
+ sysetem enter into suspend mode, enable it after resume.
+ * Enter into test power down mode when there is no sata disk
+ detected on the port and 'AHCI_IMX_PHY_POWER_DOWN_MODE' is
+ enabled.
 
--- 
+This patch is based on for-next branch of
+"http://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git"
 
-Best Regards,
-Peter Chen
+
+[v4] ahci: imx: setup power saving methods
+---
+ drivers/ata/ahci.h          |    2 +
+ drivers/ata/ahci_imx.c      |  101 ++++++++++++++++++++++++++++++++++++++++++-
+ drivers/ata/ahci_platform.c |    3 +-
+ drivers/ata/libahci.c       |    4 +-
+ 4 files changed, 106 insertions(+), 4 deletions(-)
