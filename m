@@ -1,69 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Oct 2013 12:27:15 +0100
-Subject: [PATCH v2 08/13] arm64: kernel: implement debug monitors CPU PM
- notifiers
-In-Reply-To: <1381748590-14279-9-git-send-email-lorenzo.pieralisi@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 15 Oct 2013 12:43:52 +0100
+Subject: [PATCH v2 01/13] arm64: kernel: add MPIDR_EL1 accessors macros
+In-Reply-To: <20131015101130.GA30411@mudshark.cambridge.arm.com>
 References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1381748590-14279-9-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20131015112715.GC30411@mudshark.cambridge.arm.com>
+ <1381748590-14279-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20131015101130.GA30411@mudshark.cambridge.arm.com>
+Message-ID: <20131015114352.GB10527@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 12:03:05PM +0100, Lorenzo Pieralisi wrote:
-> When a CPU is shutdown either through CPU idle or suspend to RAM, the
-> content of debug monitor registers must be reset or restored to proper
-> values when CPU resume from low power states. This patch implements a
-> CPU PM notifier that allows to restore the content of debug monitor
-> registers to allow proper suspend/resume operations.
-
-How do you deal with pstate in this series? In particular, the single-step
-state machine is partially driven by bits in the SPSR, so you need to be
-careful with preserving that (may even require a dummy exception return...
-not sure).
-
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm64/kernel/debug-monitors.c | 38 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
+On Tue, Oct 15, 2013 at 11:11:30AM +0100, Will Deacon wrote:
+> On Mon, Oct 14, 2013 at 12:02:58PM +0100, Lorenzo Pieralisi wrote:
+> > In order to simplify access to different affinity levels within the
+> > MPIDR_EL1 register values, this patch implements some preprocessor
+> > macros that allow to retrieve the MPIDR_EL1 affinity level value according
+> > to the level passed as input parameter.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  arch/arm64/include/asm/cputype.h | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> > index 5fe138e..2c9e295 100644
+> > --- a/arch/arm64/include/asm/cputype.h
+> > +++ b/arch/arm64/include/asm/cputype.h
+> > @@ -30,6 +30,16 @@
+> >  
+> >  #define MPIDR_HWID_BITMASK	0xff00ffffff
+> >  
+> > +#define MPIDR_LEVEL_BITS 8
+> > +#define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
+> > +
+> > +#define MPIDR_LEVEL_SHIFT(level) ({					\
+> > +	(level == 3) ? 32 : MPIDR_LEVEL_BITS * level;			\
 > 
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index cbfacf7..28ce685 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -19,6 +19,7 @@
->   */
->  
->  #include <linux/cpu.h>
-> +#include <linux/cpu_pm.h>
->  #include <linux/debugfs.h>
->  #include <linux/hardirq.h>
->  #include <linux/init.h>
-> @@ -154,6 +155,42 @@ static struct notifier_block os_lock_nb = {
->  	.notifier_call = os_lock_notify,
->  };
->  
-> +#ifdef CONFIG_CPU_PM
-> +static DEFINE_PER_CPU(u32, mdscr);
-> +
-> +static int dm_cpu_pm_notify(struct notifier_block *self, unsigned long action,
-> +			    void *v)
-> +{
-> +	switch (action) {
-> +	case CPU_PM_ENTER:
-> +		__get_cpu_var(mdscr) = mdscr_read();
+> You can avoid the check if you do:
+> 
+>   ((1 << level) >> 1) << 3)
+> 
+> where that '3' is log2 MPIDR_LEVEL_BITS, so you could factor that out and
+> redefine MPIDR_LEVEL_BITS in terms of a shift.
 
-I'm concerned about simply saving/restoring the mdscr. Both the MDE and KDE
-bits are ref-counted for each CPU, so we'd need to guarantee no context
-switching between the CPU_PM_ENTER and CPU_PM_EXIT invocations of this
-notifier. Is that the case?
+Yes, that's ways neater, thank you.
 
-> +		break;
-> +	case CPU_PM_EXIT:
-> +		clear_os_lock(NULL);
-> +		mdscr_write(__get_cpu_var(mdscr));
-
-I think you should do this the other way round. Also, back to PSTATE, you
-need to take care when clearing the D bit, since you definitely want to
-either restore or zero the mdscr first.
-
-Will
+Lorenzo
