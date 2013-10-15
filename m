@@ -1,103 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Oct 2013 12:07:25 +0100
-Subject: [PATCH v8 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <1381527938-22840-2-git-send-email-acourbot@nvidia.com>
-References: <1381527938-22840-1-git-send-email-acourbot@nvidia.com>
- <1381527938-22840-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <20131015110725.GZ25034@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 15 Oct 2013 13:08:15 +0200
+Subject: [PATCH 4/5] ARM: rockchip: add support for rk3188 and Radxa Rock
+ board
+In-Reply-To: <201310151301.02290.heiko@sntech.de>
+References: <201310151258.53435.heiko@sntech.de>
+ <201310151301.02290.heiko@sntech.de>
+Message-ID: <201310151308.15489.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 02:45:34PM -0700, Alexandre Courbot wrote:
-> Trusted Foundations is a TrustZone-based secure monitor for ARM that
-> can be invoked using the same SMC-based API on all supported
-> platforms. This patch adds initial basic support for Trusted
-> Foundations using the ARM firmware API. Current features are limited
-> to the ability to boot secondary processors.
+Am Dienstag, 15. Oktober 2013, 13:01:02 schrieb Heiko St?bner:
+> Basic devicetree files for the rk3188 SoC. Also provided is a board
+> dts file for the upcoming Radxa Rock board using this SoC.
 > 
-> Note: The API followed by Trusted Foundations does *not* follow the SMC
-> calling conventions. It has nothing to do with PSCI neither and is only
-> relevant to devices that use Trusted Foundations (like most Tegra-based
-> retail devices).
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm/Kconfig                                   |  2 +
->  arch/arm/Makefile                                  |  1 +
->  arch/arm/firmware/Kconfig                          | 28 ++++++++
->  arch/arm/firmware/Makefile                         |  1 +
->  arch/arm/firmware/trusted_foundations.c            | 79 ++++++++++++++++++++++
->  arch/arm/include/asm/trusted_foundations.h         | 68 +++++++++++++++++++
->  8 files changed, 200 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
->  create mode 100644 arch/arm/firmware/Kconfig
->  create mode 100644 arch/arm/firmware/Makefile
->  create mode 100644 arch/arm/firmware/trusted_foundations.c
->  create mode 100644 arch/arm/include/asm/trusted_foundations.h
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Is having this under arch/arm appropriate?  What happens if the API
-gets re-used on ARM64 for example?  Would drivers/firmware be a better
-cross-arch location for this?
+[...]
 
-> diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
-> new file mode 100644
-> index 0000000..c6f20bd
-> --- /dev/null
-> +++ b/arch/arm/include/asm/trusted_foundations.h
-> @@ -0,0 +1,68 @@
-> +/*
-> + * Copyright (c) 2013, NVIDIA Corporation.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + */
+> +		pinctrl at 20008000 {
+> +			compatible = "rockchip,rk3188-pinctrl";
+> +			reg = <0x20008000 0xa0>,
+> +			      <0x20008164 0x1a0>;
+> +			reg-names = "base", "pull";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
 > +
-> +/*
-> + * Support for the Trusted Foundations secure monitor.
-> + *
-> + * Trusted Foundation comes active on some ARM consumer devices (most
-> + * Tegra-based devices sold on the market are concerned). Such devices can only
-> + * perform some basic operations, like setting the CPU reset vector, through
-> + * SMC calls to the secure monitor. The calls are completely specific to
-> + * Trusted Foundations, and do *not* follow the SMC calling convention or the
-> + * PSCI standard.
-> + */
+> +			gpio0: gpio0 at 0x2000a000 {
+> +				compatible = "rockchip,rk3188-gpio-bank0";
+> +				reg = <0x2000a000 0x100>,
+> +				      <0x20004064 0x8>;
+> +				interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk_gates8 9>;
 > +
-> +#ifndef __ASM_ARM_TRUSTED_FOUNDATIONS_H
-> +#define __ASM_ARM_TRUSTED_FOUNDATIONS_H
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
 > +
-> +#include <linux/kconfig.h>
-> +
-> +struct trusted_foundations_platform_data {
-> +	unsigned int version_major;
-> +	unsigned int version_minor;
-> +};
-> +
-> +#if IS_ENABLED(CONFIG_TRUSTED_FOUNDATIONS)
-> +
-> +void register_trusted_foundations(struct trusted_foundations_platform_data *pd);
-> +void of_register_trusted_foundations(void);
-> +
-> +#else /* CONFIG_TRUSTED_FOUNDATIONS */
-> +
-> +#include <linux/printk.h>
-> +#include <linux/of.h>
-> +#include <asm/bug.h>
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
 
-Please move these up along side the other #include - having includes depend
-on config symbols is an additional unnecessary source of fragility.
+Forgot to add, that this of course depends on the separate change to the 
+bindings of the pinctrl driver being suitable.
 
-Secondly, please use linux/*.h includes in preference to asm/*.h where the
-linux/*.h include picks up the corresponding asm/*.h include.  In this case,
-that should be linux/bug.h, not asm/bug.h.
+
+Heiko
