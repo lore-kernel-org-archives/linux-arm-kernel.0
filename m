@@ -1,19 +1,15 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 Oct 2013 18:06:38 +0200
-Subject: [PATCH 4/6] PCI: imx6: Probe the PCIe in fs_initcall()
+Date: Tue, 15 Oct 2013 18:06:35 +0200
+Subject: [PATCH 1/6] PCI: imx6: Make reset-gpio optional
 In-Reply-To: <1381853200-5534-1-git-send-email-marex@denx.de>
 References: <1381853200-5534-1-git-send-email-marex@denx.de>
-Message-ID: <1381853200-5534-5-git-send-email-marex@denx.de>
+Message-ID: <1381853200-5534-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probe the PCIe driver in fs_initcall() instead of module_init()
-to assure that pci_assign_unassigned_resources(); will be called
-early. This function is called in dw_pcie_host_init(), which is
-in turn called from imx6_add_pcie_port(), which is called from
-imx6_pcie_probe() . If this is not called early, we will hit
-resource collisions since pcieport driver is then probed way too
-late.
+Some boards do not have a PCIe reset GPIO. To avoid probe
+failure on these boards, make the reset GPIO optional as
+well.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -31,21 +27,71 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- drivers/pci/host/pci-imx6.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
+ drivers/pci/host/pci-imx6.c                        | 29 +++++++++++-----------
+ 2 files changed, 16 insertions(+), 15 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+index d5d26d4..b7a2279 100644
+--- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+@@ -19,9 +19,9 @@ Required properties:
+ 	to define the mapping of the PCIe interface to interrupt
+ 	numbers.
+ - num-lanes: number of lanes to use
+-- reset-gpio: gpio pin number of power good signal
+ 
+ Optional properties for fsl,imx6q-pcie
++- reset-gpio: gpio pin number of power good signal
+ - power-on-gpio: gpio pin number of power-enable signal
+ - wake-up-gpio: gpio pin number of incoming wakeup signal
+ - disable-gpio: gpio pin number of outgoing rfkill/endpoint disable signal
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 94e4d0f..ca8c5de 100644
+index 5afa922..728989a 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -586,7 +586,7 @@ static int __init imx6_pcie_init(void)
- {
- 	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
- }
--module_init(imx6_pcie_init);
-+fs_initcall(imx6_pcie_init);
+@@ -220,9 +220,12 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+ 			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
  
- MODULE_AUTHOR("Sean Cross <xobs@kosagi.com>");
- MODULE_DESCRIPTION("Freescale i.MX6 PCIe host controller driver");
+-	gpio_set_value(imx6_pcie->reset_gpio, 0);
+-	msleep(100);
+-	gpio_set_value(imx6_pcie->reset_gpio, 1);
++	/* Some boards don't have PCIe reset GPIO. */
++	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		gpio_set_value(imx6_pcie->reset_gpio, 0);
++		msleep(100);
++		gpio_set_value(imx6_pcie->reset_gpio, 1);
++	}
+ 
+ 	return 0;
+ }
+@@ -446,17 +449,15 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 
+ 	/* Fetch GPIOs */
+ 	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+-	if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
+-		dev_err(&pdev->dev, "no reset-gpio defined\n");
+-		ret = -ENODEV;
+-	}
+-	ret = devm_gpio_request_one(&pdev->dev,
+-				imx6_pcie->reset_gpio,
+-				GPIOF_OUT_INIT_LOW,
+-				"PCIe reset");
+-	if (ret) {
+-		dev_err(&pdev->dev, "unable to get reset gpio\n");
+-		goto err;
++	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		ret = devm_gpio_request_one(&pdev->dev,
++					imx6_pcie->reset_gpio,
++					GPIOF_OUT_INIT_LOW,
++					"PCIe reset");
++		if (ret) {
++			dev_err(&pdev->dev, "unable to get reset gpio\n");
++			goto err;
++		}
+ 	}
+ 
+ 	imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
 -- 
 1.8.4.rc3
