@@ -1,166 +1,34 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 15 Oct 2013 14:16:22 -0600
-Subject: [PATCH v2] PCI: mvebu - Support a bridge with no IO port window
-Message-ID: <1381868182-8544-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Date: Tue, 15 Oct 2013 14:16:30 -0600
+Subject: [PATCH] PCI: mvebu - The bridge secondary status register should be 0
+Message-ID: <1381868190-8595-1-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make pcie-io-aperture and the IO port MBUS ID in ranges optional.
-If not provided the bridge reports to Linux that IO space mapping is
-not supported and refuses to configure an IO mbus window.
+There are no writable bits in the secondary status register, only
+write 1 to clear bits. The driver never sets any of the write 1 to
+clear bits so the status register should always be 0, just remove
+the set from the write path.
 
-This allows both complete disable (do not specify pcie-io-aperture) and
-per-port disable (do not specify a IO target ranges entry for the port)
-
-Most PCIE devices these days do not require IO support to function,
-so having an option to disable it in the driver is useful.
+Someday the write 1 to clear bits should be copied/cleared directly
+from registers in the HW.
 
 Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
- drivers/pci/host/pci-mvebu.c | 64 +++++++++++++++++++++++++++++---------------
- 1 file changed, 43 insertions(+), 21 deletions(-)
-
-V2 changes:
- - Fixed logic in mvebu_has_ioport [thomas]
- - Included secondary_status in the IO_BASE reply [thomas]
- - Fixed range check for disabled IO windows
+ drivers/pci/host/pci-mvebu.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index f2d61f5..09fc586 100644
+index 09fc586..3e5cdbd 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -132,6 +132,11 @@ struct mvebu_pcie_port {
- 	size_t iowin_size;
- };
- 
-+static inline bool mvebu_has_ioport(struct mvebu_pcie_port *port)
-+{
-+	return port->io_target != -1 && port->io_attr != -1;
-+}
-+
- static bool mvebu_pcie_link_up(struct mvebu_pcie_port *port)
- {
- 	return !(readl(port->base + PCIE_STAT_OFF) & PCIE_STAT_LINK_DOWN);
-@@ -278,7 +283,7 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
- 	phys_addr_t iobase;
- 
- 	/* Are the new iobase/iolimit values invalid? */
--	if (port->bridge.iolimit < port->bridge.iobase ||
-+	if (port->bridge.iolimit <= port->bridge.iobase ||
- 	    port->bridge.iolimitupper < port->bridge.iobaseupper) {
- 
- 		/* If a window was configured, remove it */
-@@ -292,6 +297,12 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
- 		return;
- 	}
- 
-+	if (!mvebu_has_ioport(port)) {
-+		dev_WARN(&port->pcie->pdev->dev,
-+			 "Attempt to set IO when IO is disabled\n");
-+		return;
-+	}
-+
- 	/*
- 	 * We read the PCI-to-PCI bridge emulated registers, and
- 	 * calculate the base address and size of the address decoding
-@@ -405,9 +416,12 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+@@ -495,7 +495,6 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+ 		 */
+ 		bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
+ 		bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
+-		bridge->secondary_status = value >> 16;
+ 		mvebu_pcie_handle_iobase_change(port);
  		break;
  
- 	case PCI_IO_BASE:
--		*value = (bridge->secondary_status << 16 |
--			  bridge->iolimit          <<  8 |
--			  bridge->iobase);
-+		if (!mvebu_has_ioport(port))
-+			*value = bridge->secondary_status << 16;
-+		else
-+			*value = (bridge->secondary_status << 16 |
-+				  bridge->iolimit          <<  8 |
-+				  bridge->iobase);
- 		break;
- 
- 	case PCI_MEMORY_BASE:
-@@ -465,6 +479,8 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
- 	switch (where & ~3) {
- 	case PCI_COMMAND:
- 		bridge->command = value & 0xffff;
-+		if (!mvebu_has_ioport(port))
-+			bridge->command &= ~PCI_COMMAND_IO;
- 		break;
- 
- 	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
-@@ -630,7 +646,9 @@ static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	struct mvebu_pcie *pcie = sys_to_pcie(sys);
- 	int i;
- 
--	pci_add_resource_offset(&sys->resources, &pcie->realio, sys->io_offset);
-+	if (resource_size(&pcie->realio) != 0)
-+		pci_add_resource_offset(&sys->resources, &pcie->realio,
-+					sys->io_offset);
- 	pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
- 	pci_add_resource(&sys->resources, &pcie->busn);
- 
-@@ -739,12 +757,17 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
- #define DT_CPUADDR_TO_ATTR(cpuaddr)   (((cpuaddr) >> 48) & 0xFF)
- 
- static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
--			      unsigned long type, int *tgt, int *attr)
-+			      unsigned long type,
-+			      unsigned int *tgt,
-+			      unsigned int *attr)
- {
- 	const int na = 3, ns = 2;
- 	const __be32 *range;
- 	int rlen, nranges, rangesz, pna, i;
- 
-+	*tgt = -1;
-+	*attr = -1;
-+
- 	range = of_get_property(np, "ranges", &rlen);
- 	if (!range)
- 		return -EINVAL;
-@@ -798,16 +821,15 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 	}
- 
- 	mvebu_mbus_get_pcie_io_aperture(&pcie->io);
--	if (resource_size(&pcie->io) == 0) {
--		dev_err(&pdev->dev, "invalid I/O aperture size\n");
--		return -EINVAL;
--	}
- 
--	pcie->realio.flags = pcie->io.flags;
--	pcie->realio.start = PCIBIOS_MIN_IO;
--	pcie->realio.end = min_t(resource_size_t,
--				  IO_SPACE_LIMIT,
--				  resource_size(&pcie->io));
-+	if (resource_size(&pcie->io) != 0) {
-+		pcie->realio.flags = pcie->io.flags;
-+		pcie->realio.start = PCIBIOS_MIN_IO;
-+		pcie->realio.end = min_t(resource_size_t,
-+					 IO_SPACE_LIMIT,
-+					 resource_size(&pcie->io));
-+	} else
-+		pcie->realio = pcie->io;
- 
- 	/* Get the bus range */
- 	ret = of_pci_parse_bus_range(np, &pcie->busn);
-@@ -864,12 +886,12 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 			continue;
- 		}
- 
--		ret = mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
--					 &port->io_target, &port->io_attr);
--		if (ret < 0) {
--			dev_err(&pdev->dev, "PCIe%d.%d: cannot get tgt/attr for io window\n",
--				port->port, port->lane);
--			continue;
-+		if (resource_size(&pcie->io) != 0)
-+			mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
-+					   &port->io_target, &port->io_attr);
-+		else {
-+			port->io_target = -1;
-+			port->io_attr = -1;
- 		}
- 
- 		port->base = mvebu_pcie_map_registers(pdev, child, port);
 -- 
 1.8.1.2
