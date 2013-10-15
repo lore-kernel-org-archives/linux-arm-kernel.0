@@ -1,281 +1,106 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 15 Oct 2013 17:16:17 +0800
-Subject: [PATCH v10 7/7] ARM: hi3xxx: add hotplug support
-In-Reply-To: <1381828577-27998-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1381828577-27998-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1381828577-27998-8-git-send-email-haojian.zhuang@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 15 Oct 2013 11:19:18 +0200
+Subject: [PATCH 2/2] tty/serial: at91: add a fallback option to determine
+ uart/usart property
+In-Reply-To: <20131014135921.GG11420@ns203013.ovh.net>
+References: <a58fe8bc7fdd128a2f9cf60785f81ebde4c0c247.1381394411.git.nicolas.ferre@atmel.com>
+ <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
+ <20131014135921.GG11420@ns203013.ovh.net>
+Message-ID: <525D0896.6020907@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhangfei Gao <zhangfei.gao@linaro.org>
+On 14/10/2013 15:59, Jean-Christophe PLAGNIOL-VILLARD :
+> On 10:43 Thu 10 Oct     , Nicolas Ferre wrote:
+>> On older SoC, the "name" field is not filled in the register map.
+>> Fix the way to figure out if the serial port is an uart or an usart for these
+>> older products (with corresponding properties).
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>   drivers/tty/serial/atmel_serial.c | 19 ++++++++++++++++++-
+>>   include/linux/atmel_serial.h      |  1 +
+>>   2 files changed, 19 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index 6b0f75e..c7d99af 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -99,6 +99,7 @@ static void atmel_stop_rx(struct uart_port *port);
+>>   #define UART_PUT_RTOR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_RTOR)
+>>   #define UART_PUT_TTGR(port, v)	__raw_writel(v, (port)->membase + ATMEL_US_TTGR)
+>>   #define UART_GET_IP_NAME(port)	__raw_readl((port)->membase + ATMEL_US_NAME)
+>> +#define UART_GET_IP_VERSION(port) __raw_readl((port)->membase + ATMEL_US_VERSION)
+>>
+>>    /* PDC registers */
+>>   #define UART_PUT_PTCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_PTCR)
+>> @@ -1503,6 +1504,7 @@ static void atmel_get_ip_name(struct uart_port *port)
+>>   {
+>>   	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>>   	int name = UART_GET_IP_NAME(port);
+>> +	u32 version;
+>>   	int usart, uart;
+>>   	/* usart and uart ascii */
+>>   	usart = 0x55534152;
+>> @@ -1517,7 +1519,22 @@ static void atmel_get_ip_name(struct uart_port *port)
+>>   		dev_dbg(port->dev, "This is uart\n");
+>>   		atmel_port->is_usart = false;
+>>   	} else {
+>> -		dev_err(port->dev, "Not supported ip name, set to uart\n");
+>> +		/* fallback for older SoCs: use version field */
+>> +		version = UART_GET_IP_VERSION(port);
+>> +		switch (version) {
+>> +		case 0x302:
+>> +		case 0x10213:
+>> +			dev_dbg(port->dev, "This version is usart\n");
+>> +			atmel_port->is_usart = true;
+>> +			break;
+>> +		case 0x203:
+>> +		case 0x10202:
+>> +			dev_dbg(port->dev, "This version is uart\n");
+>> +			atmel_port->is_usart = false;
+>> +			break;
+>> +		default:
+>> +			dev_err(port->dev, "Not supported ip name nor version, set to uart\n");
+>
+> it's not really an error a dev_warn is more oppropriate
 
-Enable hotplug support on hi3xxx platform
+As we are already in -rc5 and that these fixes are critical for at91 
+platforms, I will not re-spin another patch just for this.
 
-How to test:
-cat proc/interrupts
-echo 0 > /sys/devices/system/cpu/cpuX/online
-cat proc/interrupts
-echo 1 > /sys/devices/system/cpu/cpuX/online
+Moreover, I have the feeling that if we end up in this case, it means 
+that we are in big troubles because the usart/uart included in the 
+product triggering this log is not known (I recall that newer products 
+do not have to hit these lines of code).
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Tested-by: Zhang Mingjun <zhang.mingjun@linaro.org>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/mach-hi3xxx/Makefile  |   1 +
- arch/arm/mach-hi3xxx/core.h    |   4 +
- arch/arm/mach-hi3xxx/hotplug.c | 200 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-hi3xxx/platsmp.c |   5 ++
- 4 files changed, 210 insertions(+)
- create mode 100644 arch/arm/mach-hi3xxx/hotplug.c
+With these 2 reasons, I prefer to keep my patch like it is.
 
-diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
-index 7a869a7..c9919e8 100644
---- a/arch/arm/mach-hi3xxx/Makefile
-+++ b/arch/arm/mach-hi3xxx/Makefile
-@@ -4,3 +4,4 @@
- 
- obj-y	+= hi3xxx.o
- obj-$(CONFIG_SMP)		+= platsmp.o
-+obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-diff --git a/arch/arm/mach-hi3xxx/core.h b/arch/arm/mach-hi3xxx/core.h
-index 226f020..af23ec2 100644
---- a/arch/arm/mach-hi3xxx/core.h
-+++ b/arch/arm/mach-hi3xxx/core.h
-@@ -8,4 +8,8 @@ extern int hi3xxx_get_cpu_jump(int cpu);
- extern void secondary_startup(void);
- extern struct smp_operations hi3xxx_smp_ops;
- 
-+extern void hi3xxx_cpu_die(unsigned int cpu);
-+extern int hi3xxx_cpu_kill(unsigned int cpu);
-+extern void hi3xxx_set_cpu(int cpu, bool enable);
-+
- #endif
-diff --git a/arch/arm/mach-hi3xxx/hotplug.c b/arch/arm/mach-hi3xxx/hotplug.c
-new file mode 100644
-index 0000000..5dc949e
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/hotplug.c
-@@ -0,0 +1,200 @@
-+/*
-+ * Copyright (c) 2013 Linaro Ltd.
-+ * Copyright (c) 2013 Hisilicon Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
-+#include "core.h"
-+
-+/* Sysctrl registers in Hi3620 SoC */
-+#define SCISOEN				0xc0
-+#define SCISODIS			0xc4
-+#define SCPERPWREN			0xd0
-+#define SCPERPWRDIS			0xd4
-+#define SCCPUCOREEN			0xf4
-+#define SCCPUCOREDIS			0xf8
-+#define SCPERCTRL0			0x200
-+#define SCCPURSTEN			0x410
-+#define SCCPURSTDIS			0x414
-+
-+/*
-+ * bit definition in SCISOEN/SCPERPWREN/...
-+ *
-+ * CPU2_ISO_CTRL	(1 << 5)
-+ * CPU3_ISO_CTRL	(1 << 6)
-+ * ...
-+ */
-+#define CPU2_ISO_CTRL			(1 << 5)
-+
-+/*
-+ * bit definition in SCPERCTRL0
-+ *
-+ * CPU0_WFI_MASK_CFG	(1 << 28)
-+ * CPU1_WFI_MASK_CFG	(1 << 29)
-+ * ...
-+ */
-+#define CPU0_WFI_MASK_CFG		(1 << 28)
-+
-+/*
-+ * bit definition in SCCPURSTEN/...
-+ *
-+ * CPU0_SRST_REQ_EN	(1 << 0)
-+ * CPU1_SRST_REQ_EN	(1 << 1)
-+ * ...
-+ */
-+#define CPU0_HPM_SRST_REQ_EN		(1 << 22)
-+#define CPU0_DBG_SRST_REQ_EN		(1 << 12)
-+#define CPU0_NEON_SRST_REQ_EN		(1 << 4)
-+#define CPU0_SRST_REQ_EN		(1 << 0)
-+
-+enum {
-+	HI3620_CTRL,
-+	ERROR_CTRL,
-+};
-+
-+static void __iomem *ctrl_base = NULL;
-+static int id;
-+
-+static void set_cpu_hi3620(int cpu, bool enable)
-+{
-+	u32 val = 0;
-+
-+	if (enable) {
-+		/* MTCMOS set */
-+		if ((cpu == 2) || (cpu == 3))
-+			writel_relaxed(CPU2_ISO_CTRL << (cpu - 2),
-+				       ctrl_base + SCPERPWREN);
-+		udelay(100);
-+
-+		/* Enable core */
-+		writel_relaxed(0x01 << cpu, ctrl_base + SCCPUCOREEN);
-+
-+		/* unreset */
-+		val = CPU0_DBG_SRST_REQ_EN | CPU0_NEON_SRST_REQ_EN
-+			| CPU0_SRST_REQ_EN;
-+		writel_relaxed(val << cpu, ctrl_base + SCCPURSTDIS);
-+		/* reset */
-+		val |= CPU0_HPM_SRST_REQ_EN;
-+		writel_relaxed(val << cpu, ctrl_base + SCCPURSTEN);
-+
-+		/* ISO disable */
-+		if ((cpu == 2) || (cpu == 3))
-+			writel_relaxed(CPU2_ISO_CTRL << (cpu - 2),
-+				       ctrl_base + SCISODIS);
-+		udelay(1);
-+
-+		/* WFI Mask */
-+		val = readl_relaxed(ctrl_base + SCPERCTRL0);
-+		val &= ~(CPU0_WFI_MASK_CFG << cpu);
-+		writel_relaxed(val, ctrl_base + SCPERCTRL0);
-+
-+		/* Unreset */
-+		val = CPU0_DBG_SRST_REQ_EN | CPU0_NEON_SRST_REQ_EN
-+			| CPU0_SRST_REQ_EN | CPU0_HPM_SRST_REQ_EN;
-+		writel_relaxed(val << cpu, ctrl_base + SCCPURSTDIS);
-+	} else {
-+		/* wfi mask */
-+		val = readl_relaxed(ctrl_base + SCPERCTRL0);
-+		val |= (CPU0_WFI_MASK_CFG << cpu);
-+		writel_relaxed(val, ctrl_base + SCPERCTRL0);
-+
-+		/* disable core*/
-+		writel_relaxed(0x01 << cpu, ctrl_base + SCCPUCOREDIS);
-+
-+		if ((cpu == 2) || (cpu == 3)) {
-+			/* iso enable */
-+			writel_relaxed(CPU2_ISO_CTRL << (cpu - 2),
-+				       ctrl_base + SCISOEN);
-+			udelay(1);
-+		}
-+
-+		/* reset */
-+		val = CPU0_DBG_SRST_REQ_EN | CPU0_NEON_SRST_REQ_EN
-+			| CPU0_SRST_REQ_EN | CPU0_HPM_SRST_REQ_EN;
-+		writel_relaxed(val << cpu, ctrl_base + SCCPURSTEN);
-+
-+		if ((cpu == 2) || (cpu == 3)) {
-+			/* MTCMOS unset */
-+			writel_relaxed(CPU2_ISO_CTRL << (cpu - 2),
-+				       ctrl_base + SCPERPWRDIS);
-+			udelay(100);
-+		}
-+	}
-+}
-+
-+static int hi3xxx_hotplug_init(void)
-+{
-+	struct device_node *node;
-+
-+	node = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
-+	if (node) {
-+		ctrl_base = of_iomap(node, 0);
-+		id = HI3620_CTRL;
-+		return 0;
-+	}
-+	id = ERROR_CTRL;
-+	return -ENOENT;
-+}
-+
-+void hi3xxx_set_cpu(int cpu, bool enable)
-+{
-+	if (!ctrl_base) {
-+		if (hi3xxx_hotplug_init() < 0)
-+			return;
-+	}
-+
-+	if (id == HI3620_CTRL)
-+		set_cpu_hi3620(cpu, enable);
-+}
-+
-+static inline void cpu_enter_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	flush_cache_all();
-+
-+	/*
-+	 * Turn off coherency and L1 D-cache
-+	 */
-+	asm volatile(
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, #0x40\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, #0x04\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	  : "=&r" (v)
-+	  : "r" (0)
-+	  : "cc");
-+}
-+
-+void hi3xxx_cpu_die(unsigned int cpu)
-+{
-+	cpu_enter_lowpower();
-+	hi3xxx_set_cpu_jump(cpu, phys_to_virt(0));
-+	cpu_do_idle();
-+
-+	/* We should have never returned from idle */
-+	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
-+}
-+
-+int hi3xxx_cpu_kill(unsigned int cpu)
-+{
-+	unsigned long timeout = jiffies + msecs_to_jiffies(50);
-+
-+	while (hi3xxx_get_cpu_jump(cpu))
-+		if (time_after(jiffies, timeout))
-+			return 0;
-+	hi3xxx_set_cpu(cpu, false);
-+	return 1;
-+}
-diff --git a/arch/arm/mach-hi3xxx/platsmp.c b/arch/arm/mach-hi3xxx/platsmp.c
-index a4d04c0..4357758 100644
---- a/arch/arm/mach-hi3xxx/platsmp.c
-+++ b/arch/arm/mach-hi3xxx/platsmp.c
-@@ -73,6 +73,7 @@ static void __init hi3xxx_smp_prepare_cpus(unsigned int max_cpus)
- 
- static int hi3xxx_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-+	hi3xxx_set_cpu(cpu, true);
- 	hi3xxx_set_cpu_jump(cpu, secondary_startup);
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 	return 0;
-@@ -81,4 +82,8 @@ static int hi3xxx_boot_secondary(unsigned int cpu, struct task_struct *idle)
- struct smp_operations hi3xxx_smp_ops __initdata = {
- 	.smp_prepare_cpus	= hi3xxx_smp_prepare_cpus,
- 	.smp_boot_secondary	= hi3xxx_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= hi3xxx_cpu_die,
-+	.cpu_kill		= hi3xxx_cpu_kill,
-+#endif
- };
+Greg, can you consider taking these two patches as regression fixes for 
+3.12 (with Tested-by tag from Thomas)?
+
+Thanks, bye,
+
+>> +		}
+>>   	}
+>>   }
+>>
+>> diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
+>> index be201ca..00beddf 100644
+>> --- a/include/linux/atmel_serial.h
+>> +++ b/include/linux/atmel_serial.h
+>> @@ -125,5 +125,6 @@
+>>   #define ATMEL_US_IF		0x4c			/* IrDA Filter Register */
+>>
+>>   #define ATMEL_US_NAME		0xf0			/* Ip Name */
+>> +#define ATMEL_US_VERSION	0xfc			/* Ip Version */
+>>
+>>   #endif
+>> --
+>> 1.8.2.2
+>>
+>
+>
+
+
 -- 
-1.8.1.2
+Nicolas Ferre
