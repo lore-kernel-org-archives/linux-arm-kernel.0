@@ -1,15 +1,14 @@
 From: marex@denx.de (Marek Vasut)
-Date: Tue, 15 Oct 2013 18:06:35 +0200
-Subject: [PATCH 1/6] PCI: imx6: Make reset-gpio optional
+Date: Tue, 15 Oct 2013 18:06:36 +0200
+Subject: [PATCH 2/6] PCI: imx6: Fix the clock for PCIe
 In-Reply-To: <1381853200-5534-1-git-send-email-marex@denx.de>
 References: <1381853200-5534-1-git-send-email-marex@denx.de>
-Message-ID: <1381853200-5534-2-git-send-email-marex@denx.de>
+Message-ID: <1381853200-5534-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards do not have a PCIe reset GPIO. To avoid probe
-failure on these boards, make the reset GPIO optional as
-well.
+The PCIe needs lvds_gate for successful operation, so make the PCIe
+driver enable (set as output) the lvds_gate .
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -27,71 +26,60 @@ Cc: Tim Harvey <tharvey@gateworks.com>
 Cc: Troy Kisky <troy.kisky@boundarydevices.com>
 Cc: Yinghai Lu <yinghai@kernel.org>
 ---
- .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
- drivers/pci/host/pci-imx6.c                        | 29 +++++++++++-----------
- 2 files changed, 16 insertions(+), 15 deletions(-)
+ drivers/pci/host/pci-imx6.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-index d5d26d4..b7a2279 100644
---- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-@@ -19,9 +19,9 @@ Required properties:
- 	to define the mapping of the PCIe interface to interrupt
- 	numbers.
- - num-lanes: number of lanes to use
--- reset-gpio: gpio pin number of power good signal
- 
- Optional properties for fsl,imx6q-pcie
-+- reset-gpio: gpio pin number of power good signal
- - power-on-gpio: gpio pin number of power-enable signal
- - wake-up-gpio: gpio pin number of incoming wakeup signal
- - disable-gpio: gpio pin number of outgoing rfkill/endpoint disable signal
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 5afa922..728989a 100644
+index 728989a..94e4d0f 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -220,9 +220,12 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
- 			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
- 
--	gpio_set_value(imx6_pcie->reset_gpio, 0);
--	msleep(100);
--	gpio_set_value(imx6_pcie->reset_gpio, 1);
-+	/* Some boards don't have PCIe reset GPIO. */
-+	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-+		gpio_set_value(imx6_pcie->reset_gpio, 0);
-+		msleep(100);
-+		gpio_set_value(imx6_pcie->reset_gpio, 1);
-+	}
- 
- 	return 0;
- }
-@@ -446,17 +449,15 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 
- 	/* Fetch GPIOs */
- 	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
--	if (!gpio_is_valid(imx6_pcie->reset_gpio)) {
--		dev_err(&pdev->dev, "no reset-gpio defined\n");
--		ret = -ENODEV;
--	}
--	ret = devm_gpio_request_one(&pdev->dev,
--				imx6_pcie->reset_gpio,
--				GPIOF_OUT_INIT_LOW,
--				"PCIe reset");
--	if (ret) {
--		dev_err(&pdev->dev, "unable to get reset gpio\n");
--		goto err;
-+	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-+		ret = devm_gpio_request_one(&pdev->dev,
-+					imx6_pcie->reset_gpio,
-+					GPIOF_OUT_INIT_LOW,
-+					"PCIe reset");
-+		if (ret) {
-+			dev_err(&pdev->dev, "unable to get reset gpio\n");
-+			goto err;
-+		}
+@@ -35,6 +35,7 @@ struct imx6_pcie {
+ 	int			power_on_gpio;
+ 	int			wake_up_gpio;
+ 	int			disable_gpio;
++	struct clk		*lvds_sel;
+ 	struct clk		*lvds_gate;
+ 	struct clk		*sata_ref_100m;
+ 	struct clk		*pcie_ref_125m;
+@@ -255,6 +256,12 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 		goto err_pcie_ref;
  	}
  
- 	imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
++	ret = clk_prepare_enable(imx6_pcie->lvds_sel);
++	if (ret) {
++		dev_err(pp->dev, "unable to enable lvds_sel\n");
++		goto err_lvds_sel;
++	}
++
+ 	ret = clk_prepare_enable(imx6_pcie->lvds_gate);
+ 	if (ret) {
+ 		dev_err(pp->dev, "unable to enable lvds_gate\n");
+@@ -273,8 +280,10 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 	return 0;
+ 
+ err_pcie_axi:
+-	clk_disable_unprepare(imx6_pcie->lvds_gate);
++	clk_disable_unprepare(imx6_pcie->lvds_sel);
+ err_lvds_gate:
++	clk_disable_unprepare(imx6_pcie->lvds_gate);
++err_lvds_sel:
+ 	clk_disable_unprepare(imx6_pcie->pcie_ref_125m);
+ err_pcie_ref:
+ 	clk_disable_unprepare(imx6_pcie->sata_ref_100m);
+@@ -497,6 +506,14 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* Fetch clocks */
++	imx6_pcie->lvds_sel = devm_clk_get(&pdev->dev, "lvds_sel");
++	if (IS_ERR(imx6_pcie->lvds_sel)) {
++		dev_err(&pdev->dev,
++			"lvds_sel clock select missing or invalid\n");
++		ret = PTR_ERR(imx6_pcie->lvds_sel);
++		goto err;
++	}
++
+ 	imx6_pcie->lvds_gate = devm_clk_get(&pdev->dev, "lvds_gate");
+ 	if (IS_ERR(imx6_pcie->lvds_gate)) {
+ 		dev_err(&pdev->dev,
 -- 
 1.8.4.rc3
