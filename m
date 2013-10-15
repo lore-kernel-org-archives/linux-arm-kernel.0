@@ -1,30 +1,61 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 15 Oct 2013 12:40:35 +0100
-Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
- device tree
-In-Reply-To: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
-References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20131015114035.6CA5FC40098@trevor.secretlab.ca>
+From: csmanjuvijay@gmail.com (Majunath Goudar)
+Date: Tue, 15 Oct 2013 18:50:00 +0530
+Subject: [PATCH V2 5/7] USB: OHCI: Properly handle ohci-ep93xx suspend
+In-Reply-To: <1381843202-28707-1-git-send-email-csmanjuvijay@gmail.com>
+References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
+ <1381843202-28707-1-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1381843202-28707-6-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Oct 2013 09:27:26 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hi all!
-> 
-> Benjamin Herrenschmidt pointed a few issues in the proposed design of
-> device tree bindings for contiguous memory allocator and reserved memory
-> regions:
-> https://lkml.org/lkml/2013/9/15/151
-> http://www.spinics.net/lists/arm-kernel/msg273548.html
-> 
-> Some time has passed, but there is still no consensus on the bindings
-> for the reserved memory and various drawback of this solution has been
-> shown, so in my opinion the best I can do now is to revert them
-> completely and start from scratch again later.
+From: Majunath Goudar <manju.goudar@lge.com>
 
-I had some fixup patches that I was getting ready to post, but your
-right. We're really late to be doing anything like that. I've applied
-the reverts and we'll plan on hammering something out in Edinburgh next
-week so that it can be merged for v3.13
+Suspend scenario in case of ohci-ep93xx glue was not
+properly handled as it was not suspending generic part
+of ohci controller. Alan Stern suggested, properly handle
+ohci-ep93xx suspend scenario.
 
-g.
+Calling explicitly the ohci_suspend() routine in
+ohci_hcd_ep93xx_drv_suspend() will ensure proper handling of
+suspend scenario.
+
+Signed-off-by: Manjunath Goudar <manju.goudar@lge.com>
+Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Greg KH <greg@kroah.com>
+Cc: linux-usb at vger.kernel.org
+
+V1->V2:
+   -Fixed Olof Johansson reported build error:
+   drivers/usb/host/ohci-ep93xx.c: In function 'ohci_hcd_ep93xx_drv_suspend':
+   drivers/usb/host/ohci-ep93xx.c:126:2: error: implicit declaration of
+   function 'ep93xx_stop_hc'
+---
+ drivers/usb/host/ohci-ep93xx.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-ep93xx.c b/drivers/usb/host/ohci-ep93xx.c
+index 492f681..77ebdc8 100644
+--- a/drivers/usb/host/ohci-ep93xx.c
++++ b/drivers/usb/host/ohci-ep93xx.c
+@@ -112,12 +112,15 @@ static int ohci_hcd_ep93xx_drv_suspend(struct platform_device *pdev, pm_message_
+ {
+ 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+ 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
++	bool do_wakeup = device_may_wakeup(&pdev->dev);
++	int ret;
+ 
+ 	if (time_before(jiffies, ohci->next_statechange))
+ 		msleep(5);
+ 	ohci->next_statechange = jiffies;
+-
+-	clk_disable(usb_host_clock);
++	ret = ohci_suspend(hcd, do_wakeup);
++	if (ret)
++		return ret;
+ 	return 0;
+ }
+ 
+-- 
+1.7.9.5
