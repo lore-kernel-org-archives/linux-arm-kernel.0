@@ -1,46 +1,43 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 15 Oct 2013 08:53:22 +0200
-Subject: [PATCH 1/1] ARM: dts: omap3: Adapt USB OTG to generic PHY
- framework
-In-Reply-To: <525BB74B.2040702@ti.com>
-References: <1381152493-28055-1-git-send-email-rogerq@ti.com>
- <1381152493-28055-2-git-send-email-rogerq@ti.com>
- <20131010153427.GI28375@radagast> <525BB74B.2040702@ti.com>
-Message-ID: <525CE662.3000704@baylibre.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 15 Oct 2013 08:50:44 +0200
+Subject: [PATCH 0/5] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
+In-Reply-To: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
+References: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1381819844.4243.7.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+Am Montag, den 14.10.2013, 16:23 +0800 schrieb Shawn Guo:
+> When I was reviewing Dong's imx6sl standard tuning patches, I found that
+> it's a little clumsy to use enum imx_esdhc_type for handling features
+> and quirks on different esdhc variants.  Instead, the approach used in
+> fec driver (drivers/net/ethernet/freescale/fec_main.c) should be more
+> scalable in the long run.  It defines flags for all those features and
+> quirks and creates a mapping between esdhc variant and the flags.
+> 
+> Actually, sdhci-esdhc-imx driver already has one such flag, i.e.
+> ESDHC_FLAG_MULTIBLK_NO_INT, but there is currently an unnecessary
+> translation between the flag and imx_esdhc_type.  The series creates
+> another 3 flags and identify features/quirks using these flags and then
+> eliminate enum imx_esdhc_type completely.
+> 
+Other than the comment on patch 2 this series, with the addition of
+patch 6/6 is
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-On 14/10/2013 11:20, Roger Quadros wrote:
-> Hi Benoit,
->
-> On 10/10/2013 06:34 PM, Felipe Balbi wrote:
->> On Mon, Oct 07, 2013 at 04:28:13PM +0300, Roger Quadros wrote:
->>> The generic PHY framewrok expects different properties than the
->>> old USB PHY framework. Supply those properties.
->>>
->>> Fixes USB OTG port on GAT04 and N900 after the Generic PHY framework was
->>> merged in greg/usb-next. [1]
->>>
->>> [1] - https://lkml.org/lkml/2013/9/27/581
->>>
->>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>
->> Acked-by: Felipe Balbi <balbi@ti.com>
->>
->
-> Could you please pick this one for 3.13? Thanks.
->
-> I don't see it in your 3.13 take 2 pull request.
-
-It was not in it. I've just applied it.
-
-Thanks
-Benoit
+> Shawn Guo (5):
+>   mmc: sdhci-esdhc-imx: add flag ESDHC_FLAG_NO_DMAS_BITS
+>   mmc: sdhci-esdhc-imx: add flag ESDHC_FLAG_ENGCM07207
+>   mmc: sdhci-esdhc-imx: add flag ESDHC_FLAG_USDHC
+>   mmc: sdhci-esdhc-imx: pdev->id_entry should be immutable
+>   mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
+> 
+>  drivers/mmc/host/sdhci-esdhc-imx.c |  108 +++++++++++++++---------------------
+>  1 file changed, 45 insertions(+), 63 deletions(-)
+> 
 
 -- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
