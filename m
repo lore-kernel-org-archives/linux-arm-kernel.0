@@ -1,64 +1,90 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 15 Oct 2013 10:48:59 -0400 (EDT)
-Subject: [PATCH] usb: ohci: remove ep93xx bus glue platform driver
-In-Reply-To: <201310141435.31147.hartleys@visionengravers.com>
-Message-ID: <Pine.LNX.4.44L0.1310151047100.1377-100000@iolanthe.rowland.org>
+From: valentin@compulab.co.il (Valentin Raevsky)
+Date: Tue, 15 Oct 2013 17:49:24 +0300
+Subject: [PATCH] ARM: dts: Add initial support for cm-fx6
+Message-ID: <1381848564-29839-1-git-send-email-valentin@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Oct 2013, H Hartley Sweeten wrote:
+Add initial support for cm-fx6 module.
 
-> Convert ep93xx to use the OHCI platform driver and remove the
-> ohci-ep93xx bus glue driver.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Ryan Mallon <rmallon@gmail.com>
+cm-fx6 is a module based on mx6q SoC with the following features:
+- Up to 4GB of DDR3
+- 1 LCD/DVI output port
+- 1 HDMI output port
+- 2 LVDS LCD ports
+- Gigabit Ethernet
+- Analog Audio
+- CAN
+- SATA
+- NAND
+- PCIE
 
-...
+This patch allows to boot up the module, configures the serial console,
+the Ethernet adapter and the hearbeat led.
 
-> @@ -297,22 +298,58 @@ static struct platform_device ep93xx_rtc_device = {
->  	.resource	= ep93xx_rtc_resource,
->  };
->  
-> +/*************************************************************************
-> + * EP93xx OHCI USB Host
-> + *************************************************************************/
-> +
-> +static struct clk *ep93xx_ohci_host_clock;
-> +
-> +static int ep93xx_ohci_power_on(struct platform_device *pdev)
-> +{
-> +	if (!ep93xx_ohci_host_clock) {
-> +		ep93xx_ohci_host_clock = devm_clk_get(&pdev->dev, NULL);
-> +		if (IS_ERR(ep93xx_ohci_host_clock))
-> +			return PTR_ERR(ep93xx_ohci_host_clock);
-> +	}
-> +
-> +	clk_enable(ep93xx_ohci_host_clock);
-> +
-> +	return 0;
-> +}
-> +
-> +static void ep93xx_ohci_power_off(struct platform_device *pdev)
-> +{
-> +	clk_disable(ep93xx_ohci_host_clock);
-> +}
-> +
-> +static void ep93xx_ohci_power_suspend(struct platform_device *pdev)
-> +{
-> +	ep93xx_ohci_power_off(pdev);
-> +}
-> +
-> +static struct usb_ohci_pdata ep93xx_ohci_pdata = {
-> +	.power_on	= ep93xx_ohci_power_on,
-> +	.power_off	= ep93xx_ohci_power_off,
-> +	.power_suspend	= ep93xx_ohci_power_suspend,
-> +};
+Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+ arch/arm/boot/dts/cm-fx6.dts |   51 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+ create mode 100644 arch/arm/boot/dts/cm-fx6.dts
 
-You don't need to have a separate ep93xx_ohci_power_suspend() routine.  
-Just initialize the method entry for .power_suspend to point to 
-ep93xx_ohci_power_off.
-
-Alan Stern
+diff --git a/arch/arm/boot/dts/cm-fx6.dts b/arch/arm/boot/dts/cm-fx6.dts
+new file mode 100644
+index 0000000..1080215
+--- /dev/null
++++ b/arch/arm/boot/dts/cm-fx6.dts
+@@ -0,0 +1,51 @@
++/*
++ * Copyright 2013 CompuLab Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++#include "imx6q.dtsi"
++
++/ {
++	model = "CompuLab CM-FX6";
++	compatible = "compulab,cm-fx6", "fsl,imx6q";
++
++	memory {
++		reg = <0x10000000 0x80000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		debug-led {
++			label = "Heartbeat";
++			gpios = <&gpio2 31 0>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&gpmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gpmi_nand_1>;
++	status = "okay";
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet_1>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4_1>;
++	status = "okay";
++};
+-- 
+1.7.9.5
