@@ -1,155 +1,57 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Oct 2013 01:24:11 +0530
-Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
- indicates the presence of PHY's
+Date: Wed, 16 Oct 2013 01:24:13 +0530
+Subject: [PATCH v2 3/7] Documentation: dt bindings: move ..usb/usb-phy.txt to
+ ..phy/ti-phy.txt
 In-Reply-To: <1381866857-3861-1-git-send-email-kishon@ti.com>
 References: <1381866857-3861-1-git-send-email-kishon@ti.com>
-Message-ID: <1381866857-3861-2-git-send-email-kishon@ti.com>
+Message-ID: <1381866857-3861-4-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There can be systems which does not have a external usb_phy, so get
-usb_phy only if dt data indicates the presence of PHY in the case of dt boot or
-if platform_data indicates the presence of PHY. Also remove checking if
-return value is -ENXIO since it's now changed to always enable usb_phy layer.
+Since now we have a separate folder for phy, move the PHY dt binding
+documentation of TI to that folder.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
-In usb_get_phy_by_phandle, index 0 always refers to usb2 phy and index 1 always
-refers to usb3 phy. Since we've lived so long with this, this patch will make
-an assumption that if only one entry is populated in *usb-phy* property, it will
-be usb2 phy and the next entry will be usb3 phy.
+ .../devicetree/bindings/{usb/usb-phy.txt => phy/ti-phy.txt}   |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+ rename Documentation/devicetree/bindings/{usb/usb-phy.txt => phy/ti-phy.txt} (86%)
 
- drivers/usb/dwc3/Kconfig         |    1 +
- drivers/usb/dwc3/core.c          |   72 ++++++++++++++++++++------------------
- drivers/usb/dwc3/platform_data.h |    2 ++
- 3 files changed, 41 insertions(+), 34 deletions(-)
-
-diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
-index 70fc430..8e385b4 100644
---- a/drivers/usb/dwc3/Kconfig
-+++ b/drivers/usb/dwc3/Kconfig
-@@ -1,6 +1,7 @@
- config USB_DWC3
- 	tristate "DesignWare USB3 DRD Core Support"
- 	depends on (USB || USB_GADGET) && HAS_DMA
-+	select USB_PHY
- 	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
- 	help
- 	  Say Y or M here if your system has a Dual Role SuperSpeed
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 474162e..cb91d70 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -354,6 +354,7 @@ static int dwc3_probe(struct platform_device *pdev)
- 	struct device_node	*node = dev->of_node;
- 	struct resource		*res;
- 	struct dwc3		*dwc;
-+	int			count;
+diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+similarity index 86%
+rename from Documentation/devicetree/bindings/usb/usb-phy.txt
+rename to Documentation/devicetree/bindings/phy/ti-phy.txt
+index c0245c8..355acf0 100644
+--- a/Documentation/devicetree/bindings/usb/usb-phy.txt
++++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+@@ -1,4 +1,4 @@
+-USB PHY
++TI PHY: DT DOCUMENTATION FOR PHYs in TI PLATFORMs
  
- 	int			ret = -ENOMEM;
+ OMAP USB2 PHY
  
-@@ -387,16 +388,49 @@ static int dwc3_probe(struct platform_device *pdev)
- 	if (node) {
- 		dwc->maximum_speed = of_usb_get_maximum_speed(node);
- 
--		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
--		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
-+		count = of_count_phandle_with_args(node, "usb-phy", NULL);
-+		switch (count) {
-+		case 2:
-+			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
-+				"usb-phy", 1);
-+			if (IS_ERR(dwc->usb3_phy)) {
-+				dev_err(dev, "usb3 phy not found\n");
-+				return PTR_ERR(dwc->usb3_phy);
-+			}
-+		case 1:
-+			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
-+				"usb-phy", 0);
-+			if (IS_ERR(dwc->usb2_phy)) {
-+				dev_err(dev, "usb2 phy not found\n");
-+				return PTR_ERR(dwc->usb2_phy);
-+			}
-+			break;
-+		default:
-+			dev_err(dev, "usb phy nodes not configured\n");
-+		}
- 
- 		dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
- 		dwc->dr_mode = of_usb_get_dr_mode(node);
- 	} else if (pdata) {
- 		dwc->maximum_speed = pdata->maximum_speed;
- 
--		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
--		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
-+		if (pdata->usb2_phy) {
-+			dwc->usb2_phy = devm_usb_get_phy(dev,
-+				USB_PHY_TYPE_USB2);
-+			if (IS_ERR(dwc->usb2_phy)) {
-+				dev_err(dev, "usb2 phy not found\n");
-+				return PTR_ERR(dwc->usb2_phy);
-+			}
-+		}
-+
-+		if (pdata->usb3_phy) {
-+			dwc->usb3_phy = devm_usb_get_phy(dev,
-+				USB_PHY_TYPE_USB3);
-+			if (IS_ERR(dwc->usb3_phy)) {
-+				dev_err(dev, "usb3 phy not found\n");
-+				return PTR_ERR(dwc->usb3_phy);
-+			}
-+		}
- 
- 		dwc->needs_fifo_resize = pdata->tx_fifo_resize;
- 		dwc->dr_mode = pdata->dr_mode;
-@@ -409,36 +443,6 @@ static int dwc3_probe(struct platform_device *pdev)
- 	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
- 		dwc->maximum_speed = USB_SPEED_SUPER;
- 
--	if (IS_ERR(dwc->usb2_phy)) {
--		ret = PTR_ERR(dwc->usb2_phy);
--
--		/*
--		 * if -ENXIO is returned, it means PHY layer wasn't
--		 * enabled, so it makes no sense to return -EPROBE_DEFER
--		 * in that case, since no PHY driver will ever probe.
--		 */
--		if (ret == -ENXIO)
--			return ret;
--
--		dev_err(dev, "no usb2 phy configured\n");
--		return -EPROBE_DEFER;
--	}
--
--	if (IS_ERR(dwc->usb3_phy)) {
--		ret = PTR_ERR(dwc->usb3_phy);
--
--		/*
--		 * if -ENXIO is returned, it means PHY layer wasn't
--		 * enabled, so it makes no sense to return -EPROBE_DEFER
--		 * in that case, since no PHY driver will ever probe.
--		 */
--		if (ret == -ENXIO)
--			return ret;
--
--		dev_err(dev, "no usb3 phy configured\n");
--		return -EPROBE_DEFER;
--	}
--
- 	dwc->xhci_resources[0].start = res->start;
- 	dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
- 					DWC3_XHCI_REGS_END;
-diff --git a/drivers/usb/dwc3/platform_data.h b/drivers/usb/dwc3/platform_data.h
-index 7db34f0..49ffa6d 100644
---- a/drivers/usb/dwc3/platform_data.h
-+++ b/drivers/usb/dwc3/platform_data.h
-@@ -24,4 +24,6 @@ struct dwc3_platform_data {
- 	enum usb_device_speed maximum_speed;
- 	enum usb_dr_mode dr_mode;
- 	bool tx_fifo_resize;
-+	bool usb2_phy;
-+	bool usb3_phy;
+@@ -21,10 +21,11 @@ usb2phy at 4a0ad080 {
+ 	#phy-cells = <0>;
  };
+ 
+-OMAP USB3 PHY
++TI PIPE3 PHY
+ 
+ Required properties:
+- - compatible: Should be "ti,omap-usb3"
++ - compatible: Should be "ti,phy-usb3", "ti,phy-pcie" or "ti,phy-sata".
++   "ti,omap-usb3" is deprecated.
+  - reg : Address and length of the register set for the device.
+  - reg-names: The names of the register addresses corresponding to the registers
+    filled in "reg".
+@@ -38,7 +39,7 @@ Optional properties:
+ This is usually a subnode of ocp2scp to which it is connected.
+ 
+ usb3phy at 4a084400 {
+-	compatible = "ti,omap-usb3";
++	compatible = "ti,phy-usb3";
+ 	reg = <0x4a084400 0x80>,
+ 	      <0x4a084800 0x64>,
+ 	      <0x4a084c00 0x40>;
 -- 
 1.7.10.4
