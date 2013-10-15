@@ -1,49 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 15 Oct 2013 15:13:33 +0200
-Subject: [RFC v3 PATCH 0/7] ARM[64]: kernel mode NEON in atomic contexts
-In-Reply-To: <alpine.LFD.2.03.1310142353210.1873@syhkavp.arg>
-References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.03.1310142353210.1873@syhkavp.arg>
-Message-ID: <CAKv+Gu-rbNmwJf09JVUYYyJjoGrJqpsrv=x_wWMJ6r-EofbYDQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 15 Oct 2013 10:17:07 -0300
+Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <20131015131038.GB25034@n2100.arm.linux.org.uk>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <20131003202751.GZ6192@mwanda>
+ <20131015131038.GB25034@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 October 2013 06:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Sun, 13 Oct 2013, Ard Biesheuvel wrote:
+On Tue, Oct 15, 2013 at 10:10 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Another point on patch 1.  Sorry, I don't have patch 1 to reply to, it
+> seems it was deleted from linux-arm-kernel's moderation queue.
 >
->> Instead of having additional separate versions of kernel_neon_begin/end, the
->> existing ones now have been modified to always take a preallocated stack area
->> as an argument.
+> drm_mode_connector_attach_encoder() is called too early, before the
+> base.id field in the encoder has been initialised.  This causes the
+> connectors encoder array to be empty, and userspace KMS to fail.
 >
-> The problem with this approach is that you break git bisect by making
-> the kernel unbuildable when this series is partially applied.  Either
-> you make kernel_neon_begin/end into wrappers with no argument around the
-> new interface, or you change all users at the same time as the
-> interface.  One big principle is not to break the kernel build in the
-> middle of a patch series when altering an existing interface.
+> There's also bugs in the CSC setting too - it runs off the end of the
+> array and gcc warns about this.  The code was clearly wrong.
 >
+> You may wish to combine this patch with patch 1 to sort all that out.
+> For the patch below:
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-I see.
+Thanks, Russell.
 
->> The stack area is allocated by DEFINE_NEON_REGSTACK[_PARTIAL](varname), where
->> the partial version takes an additional int num_regs indicating how many
->> registers need to be freed up.
->>
->> In the !in_interrupt() case, these functions operate as before, and the regstack
->> is defined to minimal size in this case as it will remain unused anyway. In the
->> in_interrupt() case, 'num_regs' (or all) NEON registers are stacked/unstacked
->> using the allocated stack region.
->
-> Would have been nice to have the stack simply be a NULL pointer when
-> !in_interrupt() or when the number of regs is 0.  This would remove the
-> need for a runtime check on !num_regs.  I don't see an obvious way to
-> accomplish that right now though.
->
+Will submit v3 when I am back to the office.
 
-We could address both of these issues by implementing Catalin's
-suggestion to reserve per-process vfp_states[] for both irq and
-softirq context in addition to the ordinary one, but it would waste a
-lot of space imo. What is your take on that?
+Regards,
 
--- 
-Ard.
+Fabio Estevam
