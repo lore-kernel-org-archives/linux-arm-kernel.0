@@ -1,72 +1,49 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 15 Oct 2013 09:51:21 -0700
-Subject: [PATCH] arch_timer: Do not register arch_sys_counter twice
-In-Reply-To: <1381843911-31962-1-git-send-email-treding@nvidia.com>
-References: <1381843911-31962-1-git-send-email-treding@nvidia.com>
-Message-ID: <525D7289.2010900@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Oct 2013 17:53:58 +0100
+Subject: [RFC v3 PATCH 0/7] ARM[64]: kernel mode NEON in atomic contexts
+In-Reply-To: <alpine.LFD.2.03.1310151104000.1873@syhkavp.arg>
+References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.03.1310142353210.1873@syhkavp.arg>
+ <CAKv+Gu-rbNmwJf09JVUYYyJjoGrJqpsrv=x_wWMJ6r-EofbYDQ@mail.gmail.com>
+ <alpine.LFD.2.03.1310151104000.1873@syhkavp.arg>
+Message-ID: <20131015165358.GF1591@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2013 06:31 AM, Thierry Reding wrote:
-> Commit 65cd4f6 (arch_timer: Move to generic sched_clock framework) added
-> code to register the arch_sys_counter in arch_timer_register() but it is
-> already registered in arch_counter_register(). This results in the timer
-> being added to the clocksource list twice, therefore causing an infinite
-> loop in the list.
->
-> Remove the duplicate registration and register the scheduler clock after
-> the original registration instead.
->
-> This fixes a hang during boot on Tegra114 (Cortex-A15).
->
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+On Tue, Oct 15, 2013 at 05:05:48PM +0100, Nicolas Pitre wrote:
+> On Tue, 15 Oct 2013, Ard Biesheuvel wrote:
+> 
+> > On 15 October 2013 06:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > > On Sun, 13 Oct 2013, Ard Biesheuvel wrote:
+> > >
+> > >> The stack area is allocated by DEFINE_NEON_REGSTACK[_PARTIAL](varname), where
+> > >> the partial version takes an additional int num_regs indicating how many
+> > >> registers need to be freed up.
+> > >>
+> > >> In the !in_interrupt() case, these functions operate as before, and the regstack
+> > >> is defined to minimal size in this case as it will remain unused anyway. In the
+> > >> in_interrupt() case, 'num_regs' (or all) NEON registers are stacked/unstacked
+> > >> using the allocated stack region.
+> > >
+> > > Would have been nice to have the stack simply be a NULL pointer when
+> > > !in_interrupt() or when the number of regs is 0.  This would remove the
+> > > need for a runtime check on !num_regs.  I don't see an obvious way to
+> > > accomplish that right now though.
+> > >
+> > 
+> > We could address both of these issues by implementing Catalin's
+> > suggestion to reserve per-process vfp_states[] for both irq and
+> > softirq context in addition to the ordinary one, but it would waste a
+> > lot of space imo. What is your take on that?
+> 
+> I agree that this would be rather wasteful.  I really like your current 
+> approach of dynamically allocating just the right amount of space on the 
+> stack.  I'm not a big fan of statically allocated memory which is 
+> seldomly used.
 
-Acked-by: John Stultz <john.stultz@linaro.org>
+I agree here, especially since we need to cover both soft and hard irqs.
+It would be about 1KB per CPU, not noticeable even on big systems but
+still looks like it's only going to be used rarely.
 
-Ingo/Thomas, apologies here, I miss-resolved the conflict updating
-Stephens' patch (and also didn't add a note in the commit about it!),
-which is causing issues in -next.
-
-Would you mind applying this to tip/timers/core?
-
-thanks
--john
-
-
-> ---
-> While I've only tested this on Tegra114, I suspect the same hang during
-> boot happens for all processors that use this clock source.
->
->  drivers/clocksource/arm_arch_timer.c | 12 +++---------
->  1 file changed, 3 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index f655036..95fb944 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -436,6 +436,9 @@ static void __init arch_counter_register(unsigned type)
->  	cyclecounter.mult = clocksource_counter.mult;
->  	cyclecounter.shift = clocksource_counter.shift;
->  	timecounter_init(&timecounter, &cyclecounter, start_count);
-> +
-> +	/* 56 bits minimum, so we assume worst case rollover */
-> +	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
->  }
->  
->  static void arch_timer_stop(struct clock_event_device *clk)
-> @@ -515,15 +518,6 @@ static int __init arch_timer_register(void)
->  		goto out;
->  	}
->  
-> -	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-> -	cyclecounter.mult = clocksource_counter.mult;
-> -	cyclecounter.shift = clocksource_counter.shift;
-> -	timecounter_init(&timecounter, &cyclecounter,
-> -			 arch_counter_get_cntvct());
-> -
-> -	/* 56 bits minimum, so we assume worst case rollover */
-> -	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-> -
->  	if (arch_timer_use_virtual) {
->  		ppi = arch_timer_ppi[VIRT_PPI];
->  		err = request_percpu_irq(ppi, arch_timer_handler_virt,
+-- 
+Catalin
