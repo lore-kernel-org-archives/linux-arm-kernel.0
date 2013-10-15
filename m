@@ -1,80 +1,47 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 15 Oct 2013 18:14:50 +0300
-Subject: [PATCH v2 7/7] clk: tegra124: add suspend/resume function for
- tegra_cpu_car_ops
-In-Reply-To: <1381850098-12357-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1381850098-12357-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1381850098-12357-8-git-send-email-pdeschrijver@nvidia.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 15 Oct 2013 08:19:03 -0700
+Subject: [PATCH V2 1/7] USB: OHCI: Properly handle OHCI controller suspend
+In-Reply-To: <1381843202-28707-2-git-send-email-csmanjuvijay@gmail.com>
+References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
+ <1381843202-28707-1-git-send-email-csmanjuvijay@gmail.com>
+ <1381843202-28707-2-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <20131015151903.GE18794@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joseph Lo <josephl@nvidia.com>
+On Tue, Oct 15, 2013 at 06:49:56PM +0530, Majunath Goudar wrote:
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+> 
+> Suspend scenario in case of OHCI was not properly
+> handled in ochi_suspend()routine. Alan Stern
+> suggested, properly handle OHCI suspend scenario.
+> 
+> This does generic proper handling of suspend
+> scenario to all OHCI SOC.
+> 
+> V1->V2:
+>      - No change. 
+>        Due to build failure on ep93xx reverted this patch. This patch is 
+>        needed as Alan mentioned, it is having common ohci suspend features 
+>        w/o this following patches(still in usb-next) are not useful.
+> 
+>         Commit id "10abfa13"[PATCH 7/11] Properly handle ohci-omap suspend.
+>         Commit id "39dbd7df"[PATCH 8/11] Properly handle ohci-platform suspend.
+>         Commit id "4ceaa893"[PATCH 9/11] Properly handle ohci-pxa suspend.
+>         Commit id "f3c60599"[PATCH 10/11] Properly handle ohci-sm501 suspend.
+>  
+> 
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
 
-Adding suspend/resume function for tegra_cpu_car_ops. We only save and
-restore the setting of the clock of CoreSight. Other clocks still need
-to be taken care by clock driver.
+This is an invalid email address, please don't continue to use it, I'm
+tired of seeing the bounce response :(
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
-Acked-by: Stephen Warren <swarren@nvidia.com>
----
- drivers/clk/tegra/clk-tegra124.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+And "v2" for this series?  Really?  I seem to recall many different
+versions of the series, so we should be on a much higher number by
+now...
 
-diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-index 22fce42..2a4c5c3 100644
---- a/drivers/clk/tegra/clk-tegra124.c
-+++ b/drivers/clk/tegra/clk-tegra124.c
-@@ -28,6 +28,7 @@
- #include "clk.h"
- #include "clk-id.h"
- 
-+#define CLK_SOURCE_CSITE 0x1d4
- #define CLK_SOURCE_EMC 0x19c
- #define CLK_SOURCE_XUSB_SS_SRC 0x610
- 
-@@ -117,6 +118,12 @@
- /* Tegra CPU clock and reset control regs */
- #define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS	0x470
- 
-+#ifdef CONFIG_PM_SLEEP
-+static struct cpu_clk_suspend_context {
-+	u32 clk_csite_src;
-+} tegra124_cpu_clk_sctx;
-+#endif
-+
- static void __iomem *clk_base;
- static void __iomem *pmc_base;
- 
-@@ -1308,9 +1315,29 @@ static void tegra124_disable_cpu_clock(u32 cpu)
- 	/* flow controller would take care in the power sequence. */
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static void tegra124_cpu_clock_suspend(void)
-+{
-+	/* switch coresite to clk_m, save off original source */
-+	tegra124_cpu_clk_sctx.clk_csite_src =
-+				readl(clk_base + CLK_SOURCE_CSITE);
-+	writel(3 << 30, clk_base + CLK_SOURCE_CSITE);
-+}
-+
-+static void tegra124_cpu_clock_resume(void)
-+{
-+	writel(tegra124_cpu_clk_sctx.clk_csite_src,
-+				clk_base + CLK_SOURCE_CSITE);
-+}
-+#endif
-+
- static struct tegra_cpu_car_ops tegra124_cpu_car_ops = {
- 	.wait_for_reset	= tegra124_wait_cpu_in_reset,
- 	.disable_clock	= tegra124_disable_cpu_clock,
-+#ifdef CONFIG_PM_SLEEP
-+	.suspend	= tegra124_cpu_clock_suspend,
-+	.resume		= tegra124_cpu_clock_resume,
-+#endif
- };
- 
- static const struct of_device_id pmc_match[] __initconst = {
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+How have you tested these patches?
+
+thanks,
+
+greg k-h
