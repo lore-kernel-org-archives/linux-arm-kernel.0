@@ -1,53 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Oct 2013 12:15:13 +0100
-Subject: [PATCH 01/11] usb: chipidea: Add power management support
-In-Reply-To: <20131015021814.GA3254@shlinux1.ap.freescale.net>
-References: <1381570513-24927-1-git-send-email-peter.chen@freescale.com>
- <1381570513-24927-2-git-send-email-peter.chen@freescale.com>
- <20131014110108.GL25034@n2100.arm.linux.org.uk>
- <20131015021814.GA3254@shlinux1.ap.freescale.net>
-Message-ID: <20131015111512.GA25034@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 15 Oct 2013 13:24:58 +0200
+Subject: [PATCH v2] ARM: mach-imx: clk-imx51-imx53: Remove return value
+ from mx53_clocks_init()
+In-Reply-To: <1381337700-22465-1-git-send-email-festevam@gmail.com>
+References: <1381337700-22465-1-git-send-email-festevam@gmail.com>
+Message-ID: <20131015112457.GO7856@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 10:18:15AM +0800, Peter Chen wrote:
-> So, the lessons for this topic are:
+On Wed, Oct 09, 2013 at 01:55:00PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> - If one atomic variable's operation only includes one instruction like
-> atomic_read and atomic_set, it is not meaningful for using atomic
-> operation, we can just use bool instead of it.
+> Commit 915cc59130b (Merge remote-tracking branch 'imx-mxs/for-next') tried to
+> fix a conflict, but missed to remove the return value from mx53_clocks_init(),
+> which causes the following build warning:
+> 
+> arch/arm/mach-imx/clk-imx51-imx53.c:579:2: warning: 'return' with a value, in function returning void [enabled by default]
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Explain that the warning came from conflict resolution instead.
+> 
+>  arch/arm/mach-imx/clk-imx51-imx53.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index fa4de9a..ce37af2 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -575,7 +575,5 @@ static void __init mx53_clocks_init(struct device_node *np)
+>  	WARN_ON(!base);
+>  	irq = irq_of_parse_and_map(np, 0);
+>  	mxc_timer_init(base, irq);
+> -
+> -	return 0;
+>  }
+>  CLK_OF_DECLARE(imx53_ccm, "fsl,imx53-ccm", mx53_clocks_init);
 
-The lesson here is that these are 100% equivalent as far as safety from
-races is concerned:
+Thanks, I've fixed that up in yesterday's linux-next merge conflict
+resolution.
 
-	a = atomic_read(&v);		a = v->counter;
-
-	atomic_set(&v, b);		v->counter = b;
-
-and in general, whenever atomic_read() gets used it's almost certainly
-a sign of a bug.
-
-Consider this (similar has been submitted):
-
-	a = atomic_read(&v);
-	if (a != 0)
-		a += 1;
-
-	atomic_set(&v, a);
-
-and people have thought that somehow this is magically safe from races
-because they're using atomic_t, and somehow that saves the universe.
-The above is in fact no safer than:
-
-	a = *v;
-	if (a != 0)
-		a += 1;
-	*v = a;
-
-The only thing that using atomic_* does is add a false sense of security
-and a level of obfuscation to catch the unwary reviewer.
-
-The reason is quite simple: a single access read in itself is atomic.
-Either it has read the value, or it hasn't.  A single access store is
-itself atomic.  Either the data has been written, or it hasn't.  The
-issue is _always_ what you do around it.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131015/b06a3307/attachment.sig>
