@@ -1,48 +1,33 @@
 From: dave.long@linaro.org (David Long)
-Date: Tue, 15 Oct 2013 17:04:25 -0400
-Subject: [PATCH v2 10/13] kprobes: Remove uneeded kernel dependency on struct
- arch_specific_insn
+Date: Tue, 15 Oct 2013 17:04:28 -0400
+Subject: [PATCH v2 13/13] ARM: Remove uprobes dependency on kprobes
 In-Reply-To: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
 References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1381871068-27660-11-git-send-email-dave.long@linaro.org>
+Message-ID: <1381871068-27660-14-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-Instead of depending on include/asm/kprobes.h to provide a dummy definition
-for struct arch_specific_insn, do so in include/linux/kprobes.h.
+Now that arm uprobes support has been made separate from the arm kprobes code
+the Kconfig can be changed to reflect that.
 
 Signed-off-by: David A. Long <dave.long@linaro.org>
 ---
- include/linux/kprobes.h | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
-index 925eaf2..4b5a74d 100644
---- a/include/linux/kprobes.h
-+++ b/include/linux/kprobes.h
-@@ -52,9 +52,6 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5b2cc2b..5f4b5d1 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -199,7 +199,6 @@ config NEED_DMA_MAP_STATE
+        def_bool y
  
- #else /* CONFIG_KPROBES */
- typedef int kprobe_opcode_t;
--struct arch_specific_insn {
--	int dummy;
--};
- #endif /* CONFIG_KPROBES */
+ config ARCH_SUPPORTS_UPROBES
+-	depends on KPROBES
+ 	def_bool y
  
- struct kprobe;
-@@ -110,7 +107,11 @@ struct kprobe {
- 	kprobe_opcode_t opcode;
- 
- 	/* copy of the original instruction */
-+#ifdef CONFIG_KPROBES
- 	struct arch_specific_insn ainsn;
-+#else
-+	int ainsn;
-+#endif
- 
- 	/*
- 	 * Indicates various status flags.
+ config ARCH_HAS_DMA_SET_COHERENT_MASK
 -- 
 1.8.1.2
