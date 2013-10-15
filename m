@@ -1,139 +1,280 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 15 Oct 2013 15:55:16 +0800
-Subject: [PATCH 07/10] mmc: sdhci-esdhc-imx: add delay line setting support
-In-Reply-To: <20131015073704.GB14908@S2101-09.ap.freescale.net>
-References: <1381317616-1229-1-git-send-email-b29396@freescale.com>
- <1381317616-1229-8-git-send-email-b29396@freescale.com>
- <20131015073704.GB14908@S2101-09.ap.freescale.net>
-Message-ID: <20131015075515.GC21188@b29396-Latitude-E6410>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 15 Oct 2013 10:57:16 +0300
+Subject: [PATCH 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
+ Framework
+In-Reply-To: <525CD324.8030107@ti.com>
+References: <1378136591-7463-1-git-send-email-kishon@ti.com>
+ <1378136591-7463-3-git-send-email-kishon@ti.com> <525814A9.7060106@ti.com>
+ <525BB8C0.1070802@ti.com> <525BC5A9.3060904@ti.com> <525CD324.8030107@ti.com>
+Message-ID: <525CF55C.4060604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 03:37:06PM +0800, Shawn Guo wrote:
-> On Wed, Oct 09, 2013 at 07:20:13PM +0800, Dong Aisheng wrote:
-> > The DLL(Delay Line) is newly added to assist in sampling read data.
-> > The DLL provides the ability to programmatically select a quantized
-> > delay (in fractions of the clock period) regardless of on-chip variations
-> > such as process, voltage and temperature (PVT).
-> > 
-> > This patch adds a user interface to set slave delay line via device tree.
-> > It's usually used in high speed mode like mmc DDR mode when the signal
-> > quality is not good caused by board design, e.g. the signal path is too long.
-> > User can manual set delay line to find a suitable data sampling window
-> > for card to work properly.
-> > 
-> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> > ---
-> >  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    1 +
-> >  drivers/mmc/host/sdhci-esdhc-imx.c                 |   18 ++++++++++++++++++
-> >  include/linux/platform_data/mmc-esdhc-imx.h        |    1 +
-> >  3 files changed, 20 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> > index 1dd6225..ebd3ff5 100644
-> > --- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> > @@ -12,6 +12,7 @@ Required properties:
-> >  Optional properties:
-> >  - fsl,cd-controller : Indicate to use controller internal card detection
-> >  - fsl,wp-controller : Indicate to use controller internal write protection
-> > +- fsl,delay-line : Specify delay line value of manual override for slave delay.
+On 10/15/2013 08:31 AM, Kishon Vijay Abraham I wrote:
+> Hi Roger,
 > 
-> It needs more documentation and should refer to the register bits in RM.
-> Otherwise, I hardly think people will understand what it is.
+> On Monday 14 October 2013 03:51 PM, Roger Quadros wrote:
+>> +Vivek
+>>
+>> On 10/14/2013 12:26 PM, Kishon Vijay Abraham I wrote:
+>>> Hi Roger,
+>>>
+>>> On Friday 11 October 2013 08:39 PM, Roger Quadros wrote:
+>>>> Hi,
+>>>>
+>>>> On 09/02/2013 06:43 PM, Kishon Vijay Abraham I wrote:
+>>>>> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
+>>>>> power_on and power_off the following APIs are used phy_init(), phy_exit(),
+>>>>> phy_power_on() and phy_power_off().
+>>>>>
+>>>>> However using the old USB phy library wont be removed till the PHYs of all
+>>>>> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
+>>>>>
+>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>>> ---
+>>>>>  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
+>>>>>  drivers/usb/dwc3/Kconfig                       |    1 +
+>>>>>  drivers/usb/dwc3/core.c                        |   49 ++++++++++++++++++++++++
+>>>>>  drivers/usb/dwc3/core.h                        |    7 ++++
+>>>>>  4 files changed, 61 insertions(+), 2 deletions(-)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>>>> index e807635..471366d 100644
+>>>>> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+>>>>> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>>>> @@ -6,11 +6,13 @@ Required properties:
+>>>>>   - compatible: must be "snps,dwc3"
+>>>>>   - reg : Address and length of the register set for the device
+>>>>>   - interrupts: Interrupts used by the dwc3 controller.
+>>>>> +
+>>>>> +Optional properties:
+>>>>>   - usb-phy : array of phandle for the PHY device.  The first element
+>>>>>     in the array is expected to be a handle to the USB2/HS PHY and
+>>>>>     the second element is expected to be a handle to the USB3/SS PHY
+>>>>> -
+>>>>> -Optional properties:
+>>>>> + - phys: from the *Generic PHY* bindings
+>>>>> + - phy-names: from the *Generic PHY* bindings
+>>>>>   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
+>>>>>  
+>>>>>  This is usually a subnode to DWC3 glue to which it is connected.
+>>>>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+>>>>> index cfc16dd..ad7ce83 100644
+>>>>> --- a/drivers/usb/dwc3/Kconfig
+>>>>> +++ b/drivers/usb/dwc3/Kconfig
+>>>>> @@ -3,6 +3,7 @@ config USB_DWC3
+>>>>>  	depends on (USB || USB_GADGET) && GENERIC_HARDIRQS && HAS_DMA
+>>>>>  	depends on EXTCON
+>>>>>  	select USB_PHY
+>>>>> +	select GENERIC_PHY
+>>>>>  	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
+>>>>>  	help
+>>>>>  	  Say Y or M here if your system has a Dual Role SuperSpeed
+>>>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>>>> index 428c29e..485d365 100644
+>>>>> --- a/drivers/usb/dwc3/core.c
+>>>>> +++ b/drivers/usb/dwc3/core.c
+>>>>> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
+>>>>>  
+>>>>>  	usb_phy_init(dwc->usb2_phy);
+>>>>>  	usb_phy_init(dwc->usb3_phy);
+>>>>
+>>>> How about adding
+>>>> +	if (dwc->usb2_phy)
+>>>> +		usb_phy_init(dwc->usb2_phy);
+>>>> +	if (dwc->usb3_phy)
+>>>> +		usb_phy_init(dwc->usb3_phy);
+>>>
+>>> Thankfully that usb_phy_init will check if phy is NULL.
+>>>>
+>>>> both usb phy and generic phy shouldn't be present together.
+>>>
+>>> ok.
+>>>>
+>>>>> +
+>>>>> +	if (dwc->usb2_generic_phy)
+>>>>> +		phy_init(dwc->usb2_generic_phy);
+>>>>> +	if (dwc->usb3_generic_phy)
+>>>>> +		phy_init(dwc->usb3_generic_phy);
+>>>>> +
+>>>>>  	mdelay(100);
+>>>>>  
+>>>>>  	/* Clear USB3 PHY reset */
+>>>>> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
+>>>>>  {
+>>>>>  	usb_phy_shutdown(dwc->usb2_phy);
+>>>>>  	usb_phy_shutdown(dwc->usb3_phy);
+>>>>
+>>>> here as well
+>>>>
+>>>>> +
+>>>>> +	if (dwc->usb2_generic_phy)
+>>>>> +		phy_power_off(dwc->usb2_generic_phy);
+>>>>> +	if (dwc->usb3_generic_phy)
+>>>>> +		phy_power_off(dwc->usb3_generic_phy);
+>>>>>  }
+>>>>>  
+>>>>>  #define DWC3_ALIGN_MASK		(16 - 1)
+>>>>> @@ -427,6 +438,23 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>>>  		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+>>>>>  	}
+>>>>>  
+>>>>> +	if (of_property_read_bool(node, "phys") || pdata->has_phy) {
+>>>>> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
+>>>>> +		if (IS_ERR(dwc->usb2_generic_phy)) {
+>>>>> +			dev_err(dev, "no usb2 phy configured yet");
+>>>>> +			return PTR_ERR(dwc->usb2_generic_phy);
+>>>>> +		}
+>>>>> +
+>>>>> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
+>>>>> +		if (IS_ERR(dwc->usb3_generic_phy)) {
+>>>>> +			dev_err(dev, "no usb3 phy configured yet");
+>>>>> +			return PTR_ERR(dwc->usb3_generic_phy);
+>>>>> +		}
+>>>>
+>>>> better to add
+>>>> +		/* Don't use USB PHY if generic PHY was found */
+>>>> +		dwc->usb2_phy = dwc->usb3_phy = NULL;
+>>>
+>>> ok.
+>>>>
+>>>>> +	} else {
+>>>>
+>>>> not required as we've used kzalloc for dwc.
+>>>>
+>>>>> +		dwc->usb2_generic_phy = NULL;
+>>>>> +		dwc->usb3_generic_phy = NULL;
+>>>>> +	}
+>>>>> +
+>>>>>  	/* default to superspeed if no maximum_speed passed */
+>>>>>  	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
+>>>>>  		dwc->maximum_speed = USB_SPEED_SUPER;
+>>>>> @@ -450,6 +478,11 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>>
+>>>> if (dwc->usb2_phy)
+>>>>
+>>>>>  	usb_phy_set_suspend(dwc->usb2_phy, 0);
+>>>>
+>>>> if (dwc->usb3_phy)
+>>>>
+>>>>>  	usb_phy_set_suspend(dwc->usb3_phy, 0);
+>>>>>  
+>>>>> +	if (dwc->usb2_generic_phy)
+>>>>> +		phy_power_on(dwc->usb2_generic_phy);
+>>>>> +	if (dwc->usb3_generic_phy)
+>>>>> +		phy_power_on(dwc->usb3_generic_phy);
+>>>>> +
+>>>>>  	spin_lock_init(&dwc->lock);
+>>>>>  	platform_set_drvdata(pdev, dwc);
+>>>>>  
+>>>>> @@ -576,6 +609,11 @@ static int dwc3_remove(struct platform_device *pdev)
+>>>>
+>>>> if (dwc->usb2_phy)
+>>>>>  	usb_phy_set_suspend(dwc->usb2_phy, 1);
+>>>>
+>>>> if (dwc->usb3_phy)
+>>>>>  	usb_phy_set_suspend(dwc->usb3_phy, 1);
+>>>>>  
+>>>>> +	if (dwc->usb2_generic_phy)
+>>>>> +		phy_power_off(dwc->usb2_generic_phy);
+>>>>> +	if (dwc->usb3_generic_phy)
+>>>>> +		phy_power_off(dwc->usb3_generic_phy);
+>>>>> +
+>>>>>  	pm_runtime_put(&pdev->dev);
+>>>>>  	pm_runtime_disable(&pdev->dev);
+>>>>>  
+>>>>> @@ -673,6 +711,11 @@ static int dwc3_suspend(struct device *dev)
+>>>>
+>>>> if (dwc->usb3_phy)
+>>>>>  	usb_phy_shutdown(dwc->usb3_phy);
+>>>>
+>>>> if (dwc->usb2_phy)
+>>>>>  	usb_phy_shutdown(dwc->usb2_phy);
+>>>>>  
+>>>>> +	if (dwc->usb2_generic_phy)
+>>>>> +		phy_exit(dwc->usb2_generic_phy);
+>>>>> +	if (dwc->usb3_generic_phy)
+>>>>> +		phy_exit(dwc->usb3_generic_phy);
+>>>>> +
+>>>>>  	return 0;
+>>>>>  }
+>>>>>  
+>>>>> @@ -683,6 +726,12 @@ static int dwc3_resume(struct device *dev)
+>>>>>  
+>>>>
+>>>> if (dwc->usb3_phy)
+>>>>>  	usb_phy_init(dwc->usb3_phy);
+>>>>
+>>>> if (dwc->usb2_phy)
+>>>>>  	usb_phy_init(dwc->usb2_phy);
+>>>>> +
+>>>>> +	if (dwc->usb2_generic_phy)
+>>>>> +		phy_init(dwc->usb2_generic_phy);
+>>>>> +	if (dwc->usb3_generic_phy)
+>>>>> +		phy_init(dwc->usb3_generic_phy);
+>>>>> +
+>>>>>  	msleep(100);
+>>>>>  
+>>>>>  	spin_lock_irqsave(&dwc->lock, flags);
+>>>>> diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
+>>>>> index f8af8d4..01ec7d7 100644
+>>>>> --- a/drivers/usb/dwc3/core.h
+>>>>> +++ b/drivers/usb/dwc3/core.h
+>>>>> @@ -31,6 +31,8 @@
+>>>>>  #include <linux/usb/gadget.h>
+>>>>>  #include <linux/usb/otg.h>
+>>>>>  
+>>>>> +#include <linux/phy/phy.h>
+>>>>> +
+>>>>>  /* Global constants */
+>>>>>  #define DWC3_EP0_BOUNCE_SIZE	512
+>>>>>  #define DWC3_ENDPOINTS_NUM	32
+>>>>> @@ -613,6 +615,8 @@ struct dwc3_scratchpad_array {
+>>>>>   * @dr_mode: requested mode of operation
+>>>>>   * @usb2_phy: pointer to USB2 PHY
+>>>>>   * @usb3_phy: pointer to USB3 PHY
+>>>>> + * @usb2_generic_phy: pointer to USB2 PHY
+>>>>> + * @usb3_generic_phy: pointer to USB3 PHY
+>>>>>   * @dcfg: saved contents of DCFG register
+>>>>>   * @gctl: saved contents of GCTL register
+>>>>>   * @is_selfpowered: true when we are selfpowered
+>>>>> @@ -665,6 +669,9 @@ struct dwc3 {
+>>>>>  	struct usb_phy		*usb2_phy;
+>>>>>  	struct usb_phy		*usb3_phy;
+>>>>>  
+>>>>> +	struct phy		*usb2_generic_phy;
+>>>>> +	struct phy		*usb3_generic_phy;
+>>>>> +
+>>>>>  	void __iomem		*regs;
+>>>>>  	size_t			regs_size;
+>>>>>  
+>>>>>
+>>>
+>>> Do you have any suggestions on how to get only individual PHYs? like only
+>>> usb2phy or usb3phy?
+>>
+>> My earlier understanding was that both PHYs are needed only if .speed is "super-speed"
+>> and only usb2phy is needed for "high-speed". But as per Vivek's email it seems
+>> Samsung's exynos5 SoC doesn't need usb2phy for "super-speed".
+>>
+>> So to keeps things flexible, I can propose the following approach
+>> - if speed == 'high-speed' usb2phy must be present. usb3phy will be ignored if supplied.
+>> - if speed == 'super-speed' usb3phy must be present and usb2phy is optional but must be
+>> initialized if supplied.
+>> - if speed is not specified, we default to 'super-speed'.
+>>
+>> Felipe, does this address the issue you were facing with OMAP5?
 > 
+> IIRC, even if the speed is high speed, you still need to power on the USB3 PHY.
+> Or else even high speed mode wasn't working in OMAP5.
 
-Ok, i could improve it a bit.
-But user may still need refer to spec to know the details.
+Maybe for OMAP5 we can somehow indicate to dwc3 core code that only 'super-speed' mode
+is supported by the platform. I'm not aware of any OMAP5 platform using the USB port as 'high-speed'.
 
-> >  
-> >  Examples:
-> >  
-> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > index b6ae5c1..91b2d85 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > @@ -46,6 +46,11 @@
-> >  /* Bits 3 and 6 are not SDHCI standard definitions */
-> >  #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
-> >  
-> > +/* dll control register */
-> > +#define ESDHC_DLL_CTRL			0x60
-> > +#define ESDHC_DLL_OVERRIDE_VAL_SHIFT	9
-> > +#define ESDHC_DLL_OVERRIDE_EN_SHIFT	8
-> > +
-> >  /* tune control register */
-> >  #define ESDHC_TUNE_CTRL_STATUS		0x68
-> >  #define  ESDHC_TUNE_CTRL_STEP		1
-> > @@ -803,6 +808,7 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
-> >  {
-> >  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> >  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> > +	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
-> >  
-> >  	switch (uhs) {
-> >  	case MMC_TIMING_UHS_SDR12:
-> > @@ -823,6 +829,15 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
-> >  				ESDHC_MIX_CTRL_DDREN,
-> >  				host->ioaddr + ESDHC_MIX_CTRL);
-> >  		imx_data->is_ddr = 1;
-> > +		if (boarddata->delay_line) {
-> > +			u32 v;
-> > +			v = boarddata->delay_line <<
-> > +				ESDHC_DLL_OVERRIDE_VAL_SHIFT |
-> > +				(1 << ESDHC_DLL_OVERRIDE_EN_SHIFT);
-> > +			if (is_imx53_esdhc(imx_data))
-> > +				v <<= 1;
-> 
-> Is the patch (series) tested on imx53?  Or is it just a note that imx53
-> has different bit position? 
+So there needs to be some mechanism for dwc3-<platform>.c to indicate to dwc3-core.c the
+speeds supported by the platform. e.g. via of_dev_auxdata through of_platform_populate()?
 
-Only tested on imx6sl.
-mx53 register offset is differet.
+If such data is not supplied, we assume that both speeds are supported.
 
-> 
-> > +			writel(v, host->ioaddr + ESDHC_DLL_CTRL);
-> 
-> Is it safe to always write other bits as zero?
-
-Right, for the feature this patch added, only OVERRIDE_VAL need to set.
-
-Regards
-Dong Aisheng
-
-> 
-> Shawn
-> 
-> > +		}
-> >  		break;
-> >  	}
-> >  
-> > @@ -887,6 +902,9 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
-> >  	else
-> >  		boarddata->support_vsel = true;
-> >  
-> > +	if (of_property_read_u32(np, "fsl,delay-line", &boarddata->delay_line))
-> > +		boarddata->delay_line = 0;
-> > +
-> >  	return 0;
-> >  }
-> >  #else
-> > diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
-> > index a0f5a8f..75f70f6 100644
-> > --- a/include/linux/platform_data/mmc-esdhc-imx.h
-> > +++ b/include/linux/platform_data/mmc-esdhc-imx.h
-> > @@ -45,5 +45,6 @@ struct esdhc_platform_data {
-> >  	int max_bus_width;
-> >  	unsigned int f_max;
-> >  	bool support_vsel;
-> > +	unsigned int delay_line;
-> >  };
-> >  #endif /* __ASM_ARCH_IMX_ESDHC_H */
-> > -- 
-> > 1.7.2.rc3
-> > 
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+cheers,
+-roger
