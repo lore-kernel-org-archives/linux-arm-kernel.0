@@ -1,259 +1,139 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 15 Oct 2013 09:55:39 +0200
-Subject: [RFC] usb: musb: dsps, OTG detection
-In-Reply-To: <CADYTM3Yidf0CDLnrGkE=nhKtQWa2DUAy3O7oY4JU3XpS=vAGFg@mail.gmail.com>
-References: <1381757734-2976-1-git-send-email-mpa@pengutronix.de>
- <CADYTM3bY91tcp7yWteQZo9C5==fSjPv2ncqqUo7fzfA2=YRnaw@mail.gmail.com>
- <20131014152226.GA32062@pengutronix.de>
- <CADYTM3Yidf0CDLnrGkE=nhKtQWa2DUAy3O7oY4JU3XpS=vAGFg@mail.gmail.com>
-Message-ID: <20131015075539.GB32062@pengutronix.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 15 Oct 2013 15:55:16 +0800
+Subject: [PATCH 07/10] mmc: sdhci-esdhc-imx: add delay line setting support
+In-Reply-To: <20131015073704.GB14908@S2101-09.ap.freescale.net>
+References: <1381317616-1229-1-git-send-email-b29396@freescale.com>
+ <1381317616-1229-8-git-send-email-b29396@freescale.com>
+ <20131015073704.GB14908@S2101-09.ap.freescale.net>
+Message-ID: <20131015075515.GC21188@b29396-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 03:43:35PM -0500, Bin Liu wrote:
-> On Mon, Oct 14, 2013 at 10:22 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> > Hi,
-> >
-> > On Mon, Oct 14, 2013 at 08:54:09AM -0500, Bin Liu wrote:
-> >> On Mon, Oct 14, 2013 at 8:35 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> >> > The USB Controller does not support ID pin change interrupts. So we have
-> >> > to use a polling function to detect changes of A/B device state
-> >> > (otg_timer). This poll function has to check in several states if a
-> >> > other device type might be connected to the USB port. This check is
-> >> > triggered by manually starting/stopping a USB Session.
-> >>
-> >> I think this is an arguable approach. Toggling the SESSION in
-> >> otg_timer() causes voltage pulses on VBUS, which will not pass the USB
-> >> certification.
-> >
-> > This is only done when no device is connected, so I am not sure if it is
-> > important. Unfortunately we do not see the A/B state changes until
+On Tue, Oct 15, 2013 at 03:37:06PM +0800, Shawn Guo wrote:
+> On Wed, Oct 09, 2013 at 07:20:13PM +0800, Dong Aisheng wrote:
+> > The DLL(Delay Line) is newly added to assist in sampling read data.
+> > The DLL provides the ability to programmatically select a quantized
+> > delay (in fractions of the clock period) regardless of on-chip variations
+> > such as process, voltage and temperature (PVT).
+> > 
+> > This patch adds a user interface to set slave delay line via device tree.
+> > It's usually used in high speed mode like mmc DDR mode when the signal
+> > quality is not good caused by board design, e.g. the signal path is too long.
+> > User can manual set delay line to find a suitable data sampling window
+> > for card to work properly.
+> > 
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > ---
+> >  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    1 +
+> >  drivers/mmc/host/sdhci-esdhc-imx.c                 |   18 ++++++++++++++++++
+> >  include/linux/platform_data/mmc-esdhc-imx.h        |    1 +
+> >  3 files changed, 20 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> > index 1dd6225..ebd3ff5 100644
+> > --- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> > @@ -12,6 +12,7 @@ Required properties:
+> >  Optional properties:
+> >  - fsl,cd-controller : Indicate to use controller internal card detection
+> >  - fsl,wp-controller : Indicate to use controller internal write protection
+> > +- fsl,delay-line : Specify delay line value of manual override for slave delay.
 > 
-> That is right, and I don't think it hurts. The only problem is that
-> the USB certification test sees the VBUS pulses and fails.
+> It needs more documentation and should refer to the register bits in RM.
+> Otherwise, I hardly think people will understand what it is.
 > 
-> > toggling the SESSION. Is there another way to check this?
-> 
-> Unfortunately, toggling SESSION in b_idle is the only way I am aware of.
-> 
-> >
-> >>
-> >> I have not seen any products required the dynamic dual role switching
-> >> yet. It always fixed in either device mode or host mode.
-> >
-> > OTG is explicitly listed in the devicetree bindings documentation, so
-> > I think the driver should be able to detect different roles.
-> 
-> Yes, MUSB supports OTG. But I have not seen anyone use OTG yet, and I
-> not sure if it is a good idea to add the OTG support, but fail the usb
-> certification test.
 
-For example beaglebone does not overwrite the dr_mode = "otg"; property
-of am33xx.dtsi and it is a device where OTG could be useful. You may
-want to connect beaglebone to a PC or a keyboard while the other usb
-port has a USB storage device attached. With the current implementation
-this is only possible if the host or device is connected when the driver
-is probing.
+Ok, i could improve it a bit.
+But user may still need refer to spec to know the details.
 
-I could limit the SESSION toggling to OTG mode. If someone needs a
-system that passes the USB certification test, he could simply set the
-correct dr_mode in the DT and the device would pass the test.
+> >  
+> >  Examples:
+> >  
+> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > index b6ae5c1..91b2d85 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > @@ -46,6 +46,11 @@
+> >  /* Bits 3 and 6 are not SDHCI standard definitions */
+> >  #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
+> >  
+> > +/* dll control register */
+> > +#define ESDHC_DLL_CTRL			0x60
+> > +#define ESDHC_DLL_OVERRIDE_VAL_SHIFT	9
+> > +#define ESDHC_DLL_OVERRIDE_EN_SHIFT	8
+> > +
+> >  /* tune control register */
+> >  #define ESDHC_TUNE_CTRL_STATUS		0x68
+> >  #define  ESDHC_TUNE_CTRL_STEP		1
+> > @@ -803,6 +808,7 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+> >  {
+> >  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> >  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> > +	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
+> >  
+> >  	switch (uhs) {
+> >  	case MMC_TIMING_UHS_SDR12:
+> > @@ -823,6 +829,15 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+> >  				ESDHC_MIX_CTRL_DDREN,
+> >  				host->ioaddr + ESDHC_MIX_CTRL);
+> >  		imx_data->is_ddr = 1;
+> > +		if (boarddata->delay_line) {
+> > +			u32 v;
+> > +			v = boarddata->delay_line <<
+> > +				ESDHC_DLL_OVERRIDE_VAL_SHIFT |
+> > +				(1 << ESDHC_DLL_OVERRIDE_EN_SHIFT);
+> > +			if (is_imx53_esdhc(imx_data))
+> > +				v <<= 1;
+> 
+> Is the patch (series) tested on imx53?  Or is it just a note that imx53
+> has different bit position? 
 
-Regards,
-
-Markus Pargmann
+Only tested on imx6sl.
+mx53 register offset is differet.
 
 > 
-> Regards,
-> -Bin.
+> > +			writel(v, host->ioaddr + ESDHC_DLL_CTRL);
 > 
-> >
-> > Regards,
-> >
-> > Markus Pargmann
-> >
-> >>
-> >> Regards,
-> >> -Bin.
-> >>
-> >> >
-> >> > So in A mode, we cancel the currently running session which also
-> >> > disables the possibility to detect new devices via interrupt. In B mode,
-> >> > we start a session to check for ID-Pin and possibly connected devices.
-> >> >
-> >> > Whenever a real USB session ends, we have to trigger the otg_timer poll
-> >> > function again.
-> >> >
-> >> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> >> > ---
-> >> >  drivers/usb/musb/musb_dsps.c | 84 ++++++++++++++++++++++++++++++++++++++++----
-> >> >  1 file changed, 78 insertions(+), 6 deletions(-)
-> >> >
-> >> > diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-> >> > index b24b697..0245e8d 100644
-> >> > --- a/drivers/usb/musb/musb_dsps.c
-> >> > +++ b/drivers/usb/musb/musb_dsps.c
-> >> > @@ -178,6 +178,43 @@ static const struct file_operations musb_regdump_fops = {
-> >> >
-> >> >  #endif /* IS_ENABLED(CONFIG_DEBUG_FS) */
-> >> >
-> >> > +/*
-> >> > + * Compare driver and hardware mode and update driver state if necessary.
-> >> > + * Not all hardware changes actually reach the driver through interrupts.
-> >> > + */
-> >> > +static void dsps_update_mode(struct musb *musb)
-> >> > +{
-> >> > +       u8 devctl;
-> >> > +
-> >> > +       devctl = dsps_readb(musb->mregs, MUSB_DEVCTL);
-> >> > +
-> >> > +       switch (musb->xceiv->state) {
-> >> > +       case OTG_STATE_A_IDLE:
-> >> > +               if (devctl & MUSB_DEVCTL_BDEVICE) {
-> >> > +                       dev_dbg(musb->controller, "detected controller state B, software state A\n");
-> >> > +                       musb->xceiv->state = OTG_STATE_B_IDLE;
-> >> > +               }
-> >> > +               break;
-> >> > +       case OTG_STATE_B_IDLE:
-> >> > +               if (!(devctl & MUSB_DEVCTL_BDEVICE)) {
-> >> > +                       dev_dbg(musb->controller, "detected controller state A, software state B\n");
-> >> > +                       musb->xceiv->state = OTG_STATE_A_IDLE;
-> >> > +               }
-> >> > +               break;
-> >> > +       default:
-> >> > +               if (!(devctl & MUSB_DEVCTL_SESSION)) {
-> >> > +                       dev_dbg(musb->controller, "detected controller out of session (%x), software state %s\n",
-> >> > +                               devctl,
-> >> > +                               usb_otg_state_string(musb->xceiv->state));
-> >> > +                       if (devctl & MUSB_DEVCTL_BDEVICE)
-> >> > +                               musb->xceiv->state = OTG_STATE_B_IDLE;
-> >> > +                       else
-> >> > +                               musb->xceiv->state = OTG_STATE_A_IDLE;
-> >> > +               }
-> >> > +               break;
-> >> > +       }
-> >> > +}
-> >> > +
-> >> >  /**
-> >> >   * dsps_musb_enable - enable interrupts
-> >> >   */
-> >> > @@ -229,6 +266,8 @@ static void otg_timer(unsigned long _musb)
-> >> >         u8 devctl;
-> >> >         unsigned long flags;
-> >> >
-> >> > +       dsps_update_mode(musb);
-> >> > +
-> >> >         /*
-> >> >          * We poll because DSPS IP's won't expose several OTG-critical
-> >> >          * status change events (from the transceiver) otherwise.
-> >> > @@ -239,6 +278,16 @@ static void otg_timer(unsigned long _musb)
-> >> >
-> >> >         spin_lock_irqsave(&musb->lock, flags);
-> >> >         switch (musb->xceiv->state) {
-> >> > +       case OTG_STATE_A_IDLE:
-> >> > +       case OTG_STATE_A_WAIT_VRISE:
-> >> > +               /*
-> >> > +                * Poll the devctl register to know when the controller switches
-> >> > +                * back to B state.
-> >> > +                */
-> >> > +               musb_writeb(mregs, MUSB_DEVCTL,
-> >> > +                               devctl & (~MUSB_DEVCTL_SESSION));
-> >> > +               mod_timer(&glue->timer, jiffies + wrp->poll_seconds * HZ);
-> >> > +               break;
-> >> >         case OTG_STATE_A_WAIT_BCON:
-> >> >                 devctl &= ~MUSB_DEVCTL_SESSION;
-> >> >                 dsps_writeb(musb->mregs, MUSB_DEVCTL, devctl);
-> >> > @@ -251,6 +300,8 @@ static void otg_timer(unsigned long _musb)
-> >> >                         musb->xceiv->state = OTG_STATE_A_IDLE;
-> >> >                         MUSB_HST_MODE(musb);
-> >> >                 }
-> >> > +               mod_timer(&glue->timer,
-> >> > +                               jiffies + wrp->poll_seconds * HZ);
-> >> >                 break;
-> >> >         case OTG_STATE_A_WAIT_VFALL:
-> >> >                 musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
-> >> > @@ -258,12 +309,24 @@ static void otg_timer(unsigned long _musb)
-> >> >                             MUSB_INTR_VBUSERROR << wrp->usb_shift);
-> >> >                 break;
-> >> >         case OTG_STATE_B_IDLE:
-> >> > +               /*
-> >> > +                * There's no ID-changed IRQ, so we have no good way to tell
-> >> > +                * when to switch to the A-Default state machine (by setting
-> >> > +                * the DEVCTL.Session bit).
-> >> > +                *
-> >> > +                * Workaround:  whenever we're in B_IDLE, try setting the
-> >> > +                * session flag every few seconds.  If it works, ID was
-> >> > +                * grounded and we're now in the A-Default state machine.
-> >> > +                *
-> >> > +                * NOTE: setting the session flag is _supposed_ to trigger
-> >> > +                * SRP but clearly it doesn't.
-> >> > +                */
-> >> > +               musb_writeb(mregs, MUSB_DEVCTL, devctl | MUSB_DEVCTL_SESSION);
-> >> >                 devctl = dsps_readb(mregs, MUSB_DEVCTL);
-> >> > -               if (devctl & MUSB_DEVCTL_BDEVICE)
-> >> > -                       mod_timer(&glue->timer,
-> >> > -                                       jiffies + wrp->poll_seconds * HZ);
-> >> > -               else
-> >> > +               if (!(devctl & MUSB_DEVCTL_BDEVICE))
-> >> >                         musb->xceiv->state = OTG_STATE_A_IDLE;
-> >> > +               mod_timer(&glue->timer,
-> >> > +                               jiffies + wrp->poll_seconds * HZ);
-> >> >                 break;
-> >> >         default:
-> >> >                 break;
-> >> > @@ -376,7 +439,6 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
-> >> >                         MUSB_HST_MODE(musb);
-> >> >                         musb->xceiv->otg->default_a = 1;
-> >> >                         musb->xceiv->state = OTG_STATE_A_WAIT_VRISE;
-> >> > -                       del_timer(&glue->timer);
-> >> >                 } else {
-> >> >                         musb->is_active = 0;
-> >> >                         MUSB_DEV_MODE(musb);
-> >> > @@ -397,8 +459,16 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
-> >> >                 ret |= musb_interrupt(musb);
-> >> >
-> >> >         /* Poll for ID change */
-> >> > -       if (musb->xceiv->state == OTG_STATE_B_IDLE)
-> >> > +       switch (musb->xceiv->state) {
-> >> > +       case OTG_STATE_A_IDLE:
-> >> > +       case OTG_STATE_A_WAIT_BCON:
-> >> > +       case OTG_STATE_A_WAIT_VRISE:
-> >> > +       case OTG_STATE_B_IDLE:
-> >> >                 mod_timer(&glue->timer, jiffies + wrp->poll_seconds * HZ);
-> >> > +               break;
-> >> > +       default:
-> >> > +               break;
-> >> > +       }
-> >> >  out:
-> >> >         spin_unlock_irqrestore(&musb->lock, flags);
-> >> >
-> >> > @@ -479,6 +549,8 @@ static int dsps_musb_init(struct musb *musb)
-> >> >
-> >> >         dev_info(dev, "%s:%d %s: OK\n", __FILE__, __LINE__, __func__);
-> >> >
-> >> > +       musb->xceiv->otg->default_a = 0;
-> >> > +
-> >> >         return 0;
-> >> >  }
-> >> >
-> >> > --
-> >> > 1.8.4.rc3
-> >> >
-> >> > --
-> >> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> >> > the body of a message to majordomo at vger.kernel.org
-> >> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >>
-> >
+> Is it safe to always write other bits as zero?
+
+Right, for the feature this patch added, only OVERRIDE_VAL need to set.
+
+Regards
+Dong Aisheng
+
+> 
+> Shawn
+> 
+> > +		}
+> >  		break;
+> >  	}
+> >  
+> > @@ -887,6 +902,9 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+> >  	else
+> >  		boarddata->support_vsel = true;
+> >  
+> > +	if (of_property_read_u32(np, "fsl,delay-line", &boarddata->delay_line))
+> > +		boarddata->delay_line = 0;
+> > +
+> >  	return 0;
+> >  }
+> >  #else
+> > diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
+> > index a0f5a8f..75f70f6 100644
+> > --- a/include/linux/platform_data/mmc-esdhc-imx.h
+> > +++ b/include/linux/platform_data/mmc-esdhc-imx.h
+> > @@ -45,5 +45,6 @@ struct esdhc_platform_data {
+> >  	int max_bus_width;
+> >  	unsigned int f_max;
+> >  	bool support_vsel;
+> > +	unsigned int delay_line;
+> >  };
+> >  #endif /* __ASM_ARCH_IMX_ESDHC_H */
+> > -- 
+> > 1.7.2.rc3
+> > 
+> > 
 > > --
-> > Pengutronix e.K.                           |                             |
-> > Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> > To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
