@@ -1,58 +1,173 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 15 Oct 2013 16:06:42 +0200
-Subject: [RFC v3 PATCH 0/7] ARM[64]: kernel mode NEON in atomic contexts
-In-Reply-To: <CAKv+Gu-rbNmwJf09JVUYYyJjoGrJqpsrv=x_wWMJ6r-EofbYDQ@mail.gmail.com>
-References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.03.1310142353210.1873@syhkavp.arg>
- <CAKv+Gu-rbNmwJf09JVUYYyJjoGrJqpsrv=x_wWMJ6r-EofbYDQ@mail.gmail.com>
-Message-ID: <CAKv+Gu85Vg1UZd7Vky_d7A5oTBSygXhtD5uF7R+c8cdCFdRgQg@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 15 Oct 2013 09:12:21 -0500
+Subject: [PATCH 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
+ Framework
+In-Reply-To: <525D4B46.4070302@ti.com>
+References: <1378136591-7463-3-git-send-email-kishon@ti.com>
+ <525814A9.7060106@ti.com> <525BB8C0.1070802@ti.com>
+ <525BC5A9.3060904@ti.com> <20131015115741.GD11380@radagast>
+ <525D30C2.8060208@ti.com> <20131015131934.GG11380@radagast>
+ <525D47C3.207@ti.com> <20131015135655.GK11380@radagast>
+ <525D4B46.4070302@ti.com>
+Message-ID: <20131015141221.GM11380@radagast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 October 2013 15:13, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 15 October 2013 06:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> On Sun, 13 Oct 2013, Ard Biesheuvel wrote:
->>
->>> Instead of having additional separate versions of kernel_neon_begin/end, the
->>> existing ones now have been modified to always take a preallocated stack area
->>> as an argument.
->>
->> The problem with this approach is that you break git bisect by making
->> the kernel unbuildable when this series is partially applied.  Either
->> you make kernel_neon_begin/end into wrappers with no argument around the
->> new interface, or you change all users at the same time as the
->> interface.  One big principle is not to break the kernel build in the
->> middle of a patch series when altering an existing interface.
->>
->
-> I see.
->
->>> The stack area is allocated by DEFINE_NEON_REGSTACK[_PARTIAL](varname), where
->>> the partial version takes an additional int num_regs indicating how many
->>> registers need to be freed up.
->>>
->>> In the !in_interrupt() case, these functions operate as before, and the regstack
->>> is defined to minimal size in this case as it will remain unused anyway. In the
->>> in_interrupt() case, 'num_regs' (or all) NEON registers are stacked/unstacked
->>> using the allocated stack region.
->>
->> Would have been nice to have the stack simply be a NULL pointer when
->> !in_interrupt() or when the number of regs is 0.  This would remove the
->> need for a runtime check on !num_regs.  I don't see an obvious way to
->> accomplish that right now though.
->>
->
-> We could address both of these issues by implementing Catalin's
-> suggestion to reserve per-process vfp_states[] for both irq and
-> softirq context in addition to the ordinary one, but it would waste a
-> lot of space imo. What is your take on that?
->
+On Tue, Oct 15, 2013 at 05:03:50PM +0300, Roger Quadros wrote:
+> On 10/15/2013 04:56 PM, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Tue, Oct 15, 2013 at 04:48:51PM +0300, Roger Quadros wrote:
+> >> On 10/15/2013 04:19 PM, Felipe Balbi wrote:
+> >>> Hi,
+> >>>
+> >>> On Tue, Oct 15, 2013 at 03:10:42PM +0300, Roger Quadros wrote:
+> >>>>>>>>> @@ -665,6 +669,9 @@ struct dwc3 {
+> >>>>>>>>>  	struct usb_phy		*usb2_phy;
+> >>>>>>>>>  	struct usb_phy		*usb3_phy;
+> >>>>>>>>>  
+> >>>>>>>>> +	struct phy		*usb2_generic_phy;
+> >>>>>>>>> +	struct phy		*usb3_generic_phy;
+> >>>>>>>>> +
+> >>>>>>>>>  	void __iomem		*regs;
+> >>>>>>>>>  	size_t			regs_size;
+> >>>>>>>>>  
+> >>>>>>>>>
+> >>>>>>>
+> >>>>>>> Do you have any suggestions on how to get only individual PHYs? like only
+> >>>>>>> usb2phy or usb3phy?
+> >>>>>>
+> >>>>>> My earlier understanding was that both PHYs are needed only if .speed is "super-speed"
+> >>>>>> and only usb2phy is needed for "high-speed". But as per Vivek's email it seems
+> >>>>>> Samsung's exynos5 SoC doesn't need usb2phy for "super-speed".
+> >>>>>>
+> >>>>>> So to keeps things flexible, I can propose the following approach
+> >>>>>> - if speed == 'high-speed' usb2phy must be present. usb3phy will be ignored if supplied.
+> >>>>>> - if speed == 'super-speed' usb3phy must be present and usb2phy is optional but must be
+> >>>>>> initialized if supplied.
+> >>>>>> - if speed is not specified, we default to 'super-speed'.
+> >>>>>>
+> >>>>>> Felipe, does this address the issue you were facing with OMAP5?
+> >>>>>
+> >>>>> on OMAP5 we cannot skip USB3 PHY initialization. But then it becomes a
+> >>>>> question of supporting a test feature (in OMAP5 case it would be cool to
+> >>>>> force controller to lower speeds for testing) or coping with a broken
+> >>>>> DTS.
+> >>>>>
+> >>>>
+> >>>> I don't think we can protect ourselves from all possible broken
+> >>>> configurations of DTS.
+> >>>> I would vote for simplicity and maximum flexibility.
+> >>>>
+> >>>> So IMO we should just depend on DTS to provide the phys that are
+> >>>> needed by the platform.
+> >>>> In the driver we initialize whatever PHY is provided and don't
+> >>>> complain if any or even all PHYs are missing.
+> >>>
+> >>> considering that DTS is an ABI, I really think eventually we *will* have
+> >>> broken DTBs burned into ROM and we will have to find ways to work with
+> >>> those too. Same thing already happens today with ACPI tables.
+> >>>
+> >>>> If this is not good enough then could you please suggest an
+> >>>> alternative? Thanks.
+> >>>
+> >>> The alternative would be to mandate nop xceiv for the "missing" PHY, but
+> >>> that doesn't solve anything, really, as DTS authors might still forget
+> >>> about the NOP xceiv and you can argue that forcing NOP xceiv would be a
+> >>> SW configuration.
+> >>>
+> >>> So, perhaps we go with the approach that all PHYs are optional, and
+> >>> here's my original patch which makes USB3 PHY optional:
+> >>>
+> >>> commit 979b84f96e4b7559b596b2933ae198aba267f260
+> >>> Author: Felipe Balbi <balbi@ti.com>
+> >>> Date:   Sun Jun 30 18:39:23 2013 +0300
+> >>>
+> >>>     usb: dwc3: core: make USB3 PHY optional
+> >>>     
+> >>>     If we want a port to work at any speed lower
+> >>>     than Superspeed, it makes no sense to even
+> >>>     initialize/power up the USB3 transceiver,
+> >>>     provided it won't be used.
+> >>>     
+> >>>     We can use the oportunity to save some power
+> >>>     and leave the superspeed transceiver powered
+> >>>     off.
+> >>>     
+> >>>     There is at least one such case which is
+> >>>     Texas Instruments' AM437x which has one
+> >>>     of its USB3 ports without a matching USB3
+> >>>     PHY (that port is hardwired to work on USB2
+> >>>     only).
+> >>>     
+> >>>     Signed-off-by: Felipe Balbi <balbi@ti.com>
+> >>>
+> >>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+> >>> index 74f9cf0..7a5ab93 100644
+> >>> --- a/drivers/usb/dwc3/core.c
+> >>> +++ b/drivers/usb/dwc3/core.c
+> >>> @@ -387,16 +387,34 @@ static int dwc3_probe(struct platform_device *pdev)
+> >>>  	if (node) {
+> >>>  		dwc->maximum_speed = of_usb_get_maximum_speed(node);
+> >>>  
+> >>> -		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+> >>> -		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+> >>> +		switch (dwc->maximum_speed) {
+> >>> +		case USB_SPEED_SUPER:
+> >>> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+> >>> +			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+> >>> +			break;
+> >>> +		case USB_SPEED_HIGH:
+> >>> +		case USB_SPEED_FULL:
+> >>> +		case USB_SPEED_LOW:
+> >>> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+> >>> +			break;
+> >>> +		}
+> >>>  
+> >>>  		dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
+> >>>  		dwc->dr_mode = of_usb_get_dr_mode(node);
+> >>>  	} else if (pdata) {
+> >>>  		dwc->maximum_speed = pdata->maximum_speed;
+> >>>  
+> >>> -		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+> >>> -		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+> >>> +		switch (dwc->maximum_speed) {
+> >>> +		case USB_SPEED_SUPER:
+> >>> +			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+> >>> +			dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+> >>> +			break;
+> >>> +		case USB_SPEED_HIGH:
+> >>> +		case USB_SPEED_FULL:
+> >>> +		case USB_SPEED_LOW:
+> >>> +			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+> >>> +			break;
+> >>> +		}
+> >>
+> >> What if we try to get both PHYs irrespective of 'maximum_speed' but based
+> >> on presence of phandle/pdata. That way there is some control in the adaptation code (dts/pdata)
+> >> as to which PHYs needs to be initialized for that particular instance.
+> >>
+> >> This is because there doesn't seem to be a consensus between different designs.
+> >> e.g. omap5 needs both phys for 'high-speed' whereas exynos5250 needs just the
+> >> usb3 phy for 'super-speed'
+> > 
+> > sure, can you write such a patch ? If it gets to my inbox in a couple
+> > hours I guess I can still review and take it upstream on v3.13,
+> > otherwise it's only on v3.14 :-(
+> 
+> As this patch from Kishon is already touching this area, it would be best if
+> he can send a v2 with this feature.
 
-Replying to self: two per-cpu vfp_states, one for irq and one for
-softirq, is probably the best approach here. I still need to add
-kernel_neon_begin_partial() in this case, but the existing users can
-remain unmodified.
-I will do a v4 by end of next week.
+Alright, and so I'll wait a little longer.
 
-Regards,
-Ard.
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131015/7737d707/attachment-0001.sig>
