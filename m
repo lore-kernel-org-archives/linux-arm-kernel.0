@@ -1,38 +1,36 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 14 Oct 2013 19:34:34 -0500
-Subject: [PATCH] clk: socfpga: Remove check for "reg" property in
- socfpga_clk_init
-Message-ID: <1381797274-4564-1-git-send-email-dinguyen@altera.com>
+Date: Mon, 14 Oct 2013 19:43:43 -0500
+Subject: [PATCHv2] arm: socfpga: Enable ARM_TWD for socfpga
+Message-ID: <1381797823-4755-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-The function socfpga_clk_init() can support clocks that do not have a divider
-register, but a fixed-divider that can be read from DTS. Therefore, the "reg"
-property is not a failing condition for socfpga_clk_init().
+Update SOCFPGA's Kconfig to include building the ARM TWD timer for
+SMP use.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Cc: Mike Turquette <mturquette@linaro.org>
+Reviewed-by: Pavel Machek <pavel@denx.de>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Olof Johansson <olof@lixom.net>
+CC: Kevin Hilman <khilman@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/clk/socfpga/clk.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/mach-socfpga/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index 5bb848c..7f846bf 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -121,9 +121,7 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
- 	int rc;
- 	u32 fixed_div;
- 
--	rc = of_property_read_u32(node, "reg", &reg);
--	if (WARN_ON(rc))
--		return NULL;
-+	of_property_read_u32(node, "reg", &reg);
- 
- 	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
- 	if (WARN_ON(!socfpga_clk))
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index dd86db4..823de65 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -11,6 +11,7 @@ config ARCH_SOCFPGA
+ 	select GENERIC_CLOCKEVENTS
+ 	select GPIO_PL061 if GPIOLIB
+ 	select HAVE_ARM_SCU
++	select HAVE_ARM_TWD if SMP
+ 	select HAVE_SMP
+ 	select MFD_SYSCON
+ 	select SPARSE_IRQ
 -- 
 1.7.9.5
