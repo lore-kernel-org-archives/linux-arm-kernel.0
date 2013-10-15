@@ -1,43 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Oct 2013 11:11:30 +0100
-Subject: [PATCH v2 01/13] arm64: kernel: add MPIDR_EL1 accessors macros
-In-Reply-To: <1381748590-14279-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1381748590-14279-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20131015101130.GA30411@mudshark.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 15 Oct 2013 12:17:22 +0200
+Subject: [PATCH 3/4] drivers/pwm: don't use
+ devm_pinctrl_get_select_default() in probe
+In-Reply-To: <1381681071-6021-4-git-send-email-wsa@the-dreams.de>
+References: <1381681071-6021-1-git-send-email-wsa@the-dreams.de>
+ <1381681071-6021-4-git-send-email-wsa@the-dreams.de>
+Message-ID: <20131015101722.GM7856@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 12:02:58PM +0100, Lorenzo Pieralisi wrote:
-> In order to simplify access to different affinity levels within the
-> MPIDR_EL1 register values, this patch implements some preprocessor
-> macros that allow to retrieve the MPIDR_EL1 affinity level value according
-> to the level passed as input parameter.
+On Sun, Oct 13, 2013 at 06:17:49PM +0200, Wolfram Sang wrote:
+> Since commit ab78029 (drivers/pinctrl: grab default handles from device core),
+> we can rely on device core for setting the default pins. Compile tested only.
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org> (personally at LCE13)
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 > ---
->  arch/arm64/include/asm/cputype.h | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index 5fe138e..2c9e295 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -30,6 +30,16 @@
->  
->  #define MPIDR_HWID_BITMASK	0xff00ffffff
->  
-> +#define MPIDR_LEVEL_BITS 8
-> +#define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
-> +
-> +#define MPIDR_LEVEL_SHIFT(level) ({					\
-> +	(level == 3) ? 32 : MPIDR_LEVEL_BITS * level;			\
+>  drivers/pwm/pwm-tiecap.c   | 6 ------
+>  drivers/pwm/pwm-tiehrpwm.c | 6 ------
+>  2 files changed, 12 deletions(-)
 
-You can avoid the check if you do:
+Applied, thanks.
 
-  ((1 << level) >> 1) << 3)
-
-where that '3' is log2 MPIDR_LEVEL_BITS, so you could factor that out and
-redefine MPIDR_LEVEL_BITS in terms of a shift.
-
-Will
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131015/633e8b9a/attachment.sig>
