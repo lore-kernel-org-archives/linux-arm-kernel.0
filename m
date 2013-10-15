@@ -1,135 +1,161 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 15 Oct 2013 07:02:31 -0700
-Subject: [PATCH 22/23] ARM: cci: driver need big endian fixes in asm code
-In-Reply-To: <525D1BE4.20104@codethink.co.uk>
-References: <20131015092637.GA2312@localhost.localdomain>
- <525D1BE4.20104@codethink.co.uk>
-Message-ID: <CAA3XUr37r9t-br3S9xGvB2p1XQ1w1BBD2c=2SydRVo1+u0Ronw@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 15 Oct 2013 17:03:50 +0300
+Subject: [PATCH 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
+ Framework
+In-Reply-To: <20131015135655.GK11380@radagast>
+References: <1378136591-7463-1-git-send-email-kishon@ti.com>
+ <1378136591-7463-3-git-send-email-kishon@ti.com> <525814A9.7060106@ti.com>
+ <525BB8C0.1070802@ti.com> <525BC5A9.3060904@ti.com>
+ <20131015115741.GD11380@radagast> <525D30C2.8060208@ti.com>
+ <20131015131934.GG11380@radagast> <525D47C3.207@ti.com>
+ <20131015135655.GK11380@radagast>
+Message-ID: <525D4B46.4070302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 October 2013 03:41, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 15/10/13 10:27, Dave Martin wrote:
+On 10/15/2013 04:56 PM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Tue, Oct 15, 2013 at 04:48:51PM +0300, Roger Quadros wrote:
+>> On 10/15/2013 04:19 PM, Felipe Balbi wrote:
+>>> Hi,
+>>>
+>>> On Tue, Oct 15, 2013 at 03:10:42PM +0300, Roger Quadros wrote:
+>>>>>>>>> @@ -665,6 +669,9 @@ struct dwc3 {
+>>>>>>>>>  	struct usb_phy		*usb2_phy;
+>>>>>>>>>  	struct usb_phy		*usb3_phy;
+>>>>>>>>>  
+>>>>>>>>> +	struct phy		*usb2_generic_phy;
+>>>>>>>>> +	struct phy		*usb3_generic_phy;
+>>>>>>>>> +
+>>>>>>>>>  	void __iomem		*regs;
+>>>>>>>>>  	size_t			regs_size;
+>>>>>>>>>  
+>>>>>>>>>
+>>>>>>>
+>>>>>>> Do you have any suggestions on how to get only individual PHYs? like only
+>>>>>>> usb2phy or usb3phy?
+>>>>>>
+>>>>>> My earlier understanding was that both PHYs are needed only if .speed is "super-speed"
+>>>>>> and only usb2phy is needed for "high-speed". But as per Vivek's email it seems
+>>>>>> Samsung's exynos5 SoC doesn't need usb2phy for "super-speed".
+>>>>>>
+>>>>>> So to keeps things flexible, I can propose the following approach
+>>>>>> - if speed == 'high-speed' usb2phy must be present. usb3phy will be ignored if supplied.
+>>>>>> - if speed == 'super-speed' usb3phy must be present and usb2phy is optional but must be
+>>>>>> initialized if supplied.
+>>>>>> - if speed is not specified, we default to 'super-speed'.
+>>>>>>
+>>>>>> Felipe, does this address the issue you were facing with OMAP5?
+>>>>>
+>>>>> on OMAP5 we cannot skip USB3 PHY initialization. But then it becomes a
+>>>>> question of supporting a test feature (in OMAP5 case it would be cool to
+>>>>> force controller to lower speeds for testing) or coping with a broken
+>>>>> DTS.
+>>>>>
+>>>>
+>>>> I don't think we can protect ourselves from all possible broken
+>>>> configurations of DTS.
+>>>> I would vote for simplicity and maximum flexibility.
+>>>>
+>>>> So IMO we should just depend on DTS to provide the phys that are
+>>>> needed by the platform.
+>>>> In the driver we initialize whatever PHY is provided and don't
+>>>> complain if any or even all PHYs are missing.
+>>>
+>>> considering that DTS is an ABI, I really think eventually we *will* have
+>>> broken DTBs burned into ROM and we will have to find ways to work with
+>>> those too. Same thing already happens today with ACPI tables.
+>>>
+>>>> If this is not good enough then could you please suggest an
+>>>> alternative? Thanks.
+>>>
+>>> The alternative would be to mandate nop xceiv for the "missing" PHY, but
+>>> that doesn't solve anything, really, as DTS authors might still forget
+>>> about the NOP xceiv and you can argue that forcing NOP xceiv would be a
+>>> SW configuration.
+>>>
+>>> So, perhaps we go with the approach that all PHYs are optional, and
+>>> here's my original patch which makes USB3 PHY optional:
+>>>
+>>> commit 979b84f96e4b7559b596b2933ae198aba267f260
+>>> Author: Felipe Balbi <balbi@ti.com>
+>>> Date:   Sun Jun 30 18:39:23 2013 +0300
+>>>
+>>>     usb: dwc3: core: make USB3 PHY optional
+>>>     
+>>>     If we want a port to work at any speed lower
+>>>     than Superspeed, it makes no sense to even
+>>>     initialize/power up the USB3 transceiver,
+>>>     provided it won't be used.
+>>>     
+>>>     We can use the oportunity to save some power
+>>>     and leave the superspeed transceiver powered
+>>>     off.
+>>>     
+>>>     There is at least one such case which is
+>>>     Texas Instruments' AM437x which has one
+>>>     of its USB3 ports without a matching USB3
+>>>     PHY (that port is hardwired to work on USB2
+>>>     only).
+>>>     
+>>>     Signed-off-by: Felipe Balbi <balbi@ti.com>
+>>>
+>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>> index 74f9cf0..7a5ab93 100644
+>>> --- a/drivers/usb/dwc3/core.c
+>>> +++ b/drivers/usb/dwc3/core.c
+>>> @@ -387,16 +387,34 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>  	if (node) {
+>>>  		dwc->maximum_speed = of_usb_get_maximum_speed(node);
+>>>  
+>>> -		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+>>> -		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+>>> +		switch (dwc->maximum_speed) {
+>>> +		case USB_SPEED_SUPER:
+>>> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+>>> +			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+>>> +			break;
+>>> +		case USB_SPEED_HIGH:
+>>> +		case USB_SPEED_FULL:
+>>> +		case USB_SPEED_LOW:
+>>> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+>>> +			break;
+>>> +		}
+>>>  
+>>>  		dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
+>>>  		dwc->dr_mode = of_usb_get_dr_mode(node);
+>>>  	} else if (pdata) {
+>>>  		dwc->maximum_speed = pdata->maximum_speed;
+>>>  
+>>> -		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+>>> -		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+>>> +		switch (dwc->maximum_speed) {
+>>> +		case USB_SPEED_SUPER:
+>>> +			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+>>> +			dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+>>> +			break;
+>>> +		case USB_SPEED_HIGH:
+>>> +		case USB_SPEED_FULL:
+>>> +		case USB_SPEED_LOW:
+>>> +			dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+>>> +			break;
+>>> +		}
 >>
->> On Mon, Oct 14, 2013 at 09:40:54PM -0400, Nicolas Pitre wrote:
->>>
->>> On Mon, 14 Oct 2013, Ben Dooks wrote:
->>>
->>>> On 08/10/13 23:34, Ben Dooks wrote:
->>>>>
->>>>> From: Victor Kamensky<victor.kamensky@linaro.org>
->>>>>
->>>>> cci_enable_port_for_self written in asm and it works with h/w
->>>>> registers that are in little endian format. When run in big
->>>>> endian mode it needs byte swap before/after it writes/reads
->>>>> to/from such registers
->>>>>
->>>>> CC: Lorenzon Pieralisi<lorenzo.pieralisi@arm.com>
->>>>> Signed-off-by: Victor Kamensky<victor.kamensky@linaro.org>
->>>>> Signed-off-by: Ben Dooks<ben.dooks@codethink.co.uk>
->>>>> ---
->>>>>    drivers/bus/arm-cci.c | 6 ++++++
->>>>>    1 file changed, 6 insertions(+)
->>>>>
->>>>> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
->>>>> index 2009266..6db173e 100644
->>>>> --- a/drivers/bus/arm-cci.c
->>>>> +++ b/drivers/bus/arm-cci.c
->>>>> @@ -281,6 +281,9 @@ asmlinkage void __naked
->>>>> cci_enable_port_for_self(void)
->>>>>         /* Enable the CCI port */
->>>>>    "    ldr     r0, [r0, %[offsetof_port_phys]] \n"
->>>>>    "    mov     r3, #"__stringify(CCI_ENABLE_REQ)" \n"
->>>>> +#ifdef __ARMEB__
->>>>> +"      rev     r3, r3 \n"
->>>>> +#endif /* __ARMEB__ */
->>>>>    "    str     r3, [r0, #"__stringify(CCI_PORT_CTRL)"] \n"
->>>>>
->>>>>         /* poll the status reg for completion */
->>>>> @@ -288,6 +291,9 @@ asmlinkage void __naked
->>>>> cci_enable_port_for_self(void)
->>>>>    "    ldr     r0, [r1] \n"
->>>>>    "    ldr     r0, [r0, r1]            @ cci_ctrl_base \n"
->>>>>    "4:  ldr     r1, [r0, #"__stringify(CCI_CTRL_STATUS)"] \n"
->>>>> +#ifdef __ARMEB__
->>>>> +"      rev     r1, r1 \n"
->>>>> +#endif /* __ARMEB__ */
->>>>>    "    tst     r1, #1 \n"
->>>>>    "    bne     4b \n"
->>>>
->>>>
->>>> I was just thinking if this would be a better way to change
->>>> the code:
->>>>
->>>> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
->>>> index 6db173e..2ad2511 100644
->>>> --- a/drivers/bus/arm-cci.c
->>>> +++ b/drivers/bus/arm-cci.c
->>>> @@ -280,10 +280,7 @@ asmlinkage void __naked
->>>> cci_enable_port_for_self(void)
->>>>
->>>>          /* Enable the CCI port */
->>>>   "      ldr     r0, [r0, %[offsetof_port_phys]] \n"
->>>> -"      mov     r3, #"__stringify(CCI_ENABLE_REQ)" \n"
->>>> -#ifdef __ARMEB__
->>>> -"      rev     r3, r3 \n"
->>>> -#endif /* __ARMEB__ */
->>>> +"      mov     r3, %[cci_enable_req]\n"
->>>>   "      str     r3, [r0, #"__stringify(CCI_PORT_CTRL)"] \n"
->>>>
->>>>          /* poll the status reg for completion */
->>>> @@ -291,10 +288,7 @@ asmlinkage void __naked
->>>> cci_enable_port_for_self(void)
->>>>   "      ldr     r0, [r1] \n"
->>>>   "      ldr     r0, [r0, r1]            @ cci_ctrl_base \n"
->>>>   "4:    ldr     r1, [r0, #"__stringify(CCI_CTRL_STATUS)"] \n"
->>>> -#ifdef __ARMEB__
->>>> -"      rev     r1, r1 \n"
->>>> -#endif /* __ARMEB__ */
->>>> -"      tst     r1, #1 \n"
->>>> +"      tst     r1, %[cci_control_status_bits] \n"
->>>>   "      bne     4b \n"
->>>>
->>>>   "      mov     r0, #0 \n"
->>>> @@ -307,6 +301,8 @@ asmlinkage void __naked
->>>> cci_enable_port_for_self(void)
->>>>   "7:    .word   cci_ctrl_phys - . \n"
->>>>          : :
->>>>          [sizeof_cpu_port] "i" (sizeof(cpu_port)),
->>>> +       [cci_enable_req] "i" cpu_to_le32(CCI_ENABLE_REQ),
->>>> +       [cci_control_status_bits] "i" cpu_to_le32(1),
->>>>
->>>> so swap the data bits before passing them into the code
->>>> which could also remove some of the use of the __stringify()
->>>> calls in there too.
->>>
->>> That certainly looks nicer to me.
->>>
->>>> It seems to compile ok, but is not complete.
->>>
->>>
->>> What do you mean?
+>> What if we try to get both PHYs irrespective of 'maximum_speed' but based
+>> on presence of phandle/pdata. That way there is some control in the adaptation code (dts/pdata)
+>> as to which PHYs needs to be initialized for that particular instance.
 >>
->>
->> Ditto -- this does look better that the other suggestions.  I forget that
->> there are something situations where the "i" constraint is actually
->> useful.
->
->
-> Well, it was a quick idea late last night, whilst not-sleeping from
-> a nasty cold that hasn't quite gone away. In that state I'm not going
-> to guarantee anything.
->
-> If Victor could re-work and test, then that'd be great and I can swap
-> out the last patch of the BE series.
+>> This is because there doesn't seem to be a consensus between different designs.
+>> e.g. omap5 needs both phys for 'high-speed' whereas exynos5250 needs just the
+>> usb3 phy for 'super-speed'
+> 
+> sure, can you write such a patch ? If it gets to my inbox in a couple
+> hours I guess I can still review and take it upstream on v3.13,
+> otherwise it's only on v3.14 :-(
 
-I've tested it yesterday. It works fine. Agreed, much nicer than others.
-Will code and post replacement patch today.
+As this patch from Kishon is already touching this area, it would be best if
+he can send a v2 with this feature.
 
-Thanks,
-Victor
-
->
-> --
-> Ben Dooks                               http://www.codethink.co.uk/
-> Senior Engineer                         Codethink - Providing Genius
+cheers,
+-roger
