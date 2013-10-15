@@ -1,55 +1,95 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 14 Oct 2013 22:07:21 -0500
-Subject: [PATCH v2 1/3] usb: musb: Handle nullpointer
-In-Reply-To: <CADYTM3Y22roDOAu3Lo=mdD3JRa2zTLx9HaCGyAfgc+T8yK9vHg@mail.gmail.com>
-References: <1381758639-30300-1-git-send-email-mpa@pengutronix.de>
- <1381758639-30300-2-git-send-email-mpa@pengutronix.de>
- <20131014224923.GB7446@radagast>
- <CADYTM3Y7JTLDA-tdig09hBDdXABgFExYpYzMj1wOn4r0tQzgzA@mail.gmail.com>
- <CADYTM3Y22roDOAu3Lo=mdD3JRa2zTLx9HaCGyAfgc+T8yK9vHg@mail.gmail.com>
-Message-ID: <20131015030721.GB9217@radagast>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 15 Oct 2013 11:06:50 +0800
+Subject: [PATCH 7/8] ARM: add Armada 1500 and Sony NSZ-GS7 device tree
+ files
+In-Reply-To: <525C7A91.9060101@gmail.com>
+References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1381235073-17134-8-git-send-email-sebastian.hesselbarth@gmail.com>
+ <525C7A91.9060101@gmail.com>
+Message-ID: <20131015110650.250ca5f8@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 09:00:33PM -0500, Bin Liu wrote:
-> On Mon, Oct 14, 2013 at 8:56 PM, Bin Liu <binmlist@gmail.com> wrote:
-> > On Mon, Oct 14, 2013 at 5:49 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >> On Mon, Oct 14, 2013 at 03:50:37PM +0200, Markus Pargmann wrote:
-> >>> When the device is connected to a host without a gadget driver,
-> >>> otg->gadget is NULL.
-> >>>
-> >>> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> >>> ---
-> >>>  drivers/usb/musb/musb_core.c | 3 ++-
-> >>>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-> >>> index 18e877f..baa4f6a 100644
-> >>> --- a/drivers/usb/musb/musb_core.c
-> >>> +++ b/drivers/usb/musb/musb_core.c
-> >>> @@ -654,7 +654,8 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
-> >>>                               break;
-> >>>               case OTG_STATE_B_PERIPHERAL:
-> >>
-> >> why would we be in B peripheral if we're host only ? Bug seems to be
-> >> else where.
+Hi Sebastian,
+
+On Mon, 14 Oct 2013 16:13:21 -0700
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+
+> On 10/08/2013 02:24 PM, Sebastian Hesselbarth wrote:
+> > This adds very basic device tree files for the Marvell Armada 1500 SoC
+> > (88DE3100) and the Sony NSZ-GS7 GoogleTV board. Currently, SoC only has
+> > nodes for cpus, some clocks, l2 cache controller, local timer, apb timers,
+> > uart, and interrupt controllers. The Sony NSZ-GS7 is a GoogleTV consumer
+> > device comprising the Armada 1500 SoC above.
 > >
-> > We are not host, we are in device mode.
+> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > Reviewed-by: Jason Cooper <jason@lakedaemon.net>
+> > Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > Changelog:
+> > RCFv2->v1:
+> > - switch to (soon to be) correct "marvell,pj4b" cpu compatible
+> > - reference fixed-clock for uarts instead of hard-coded clock-frequency
+> > - disable timers except two for clksrc and clkevt
+> > RFCv1->RFCv2:
+> > - add binding documentation (Reported by Jason Cooper)
+> > - change l2cc from aurora to tauros3 (Reported by Thomas Petazzoni)
+> > - add copyright reference
+> > - adapt compatibles to mach-berlin instead of mach-mvebu
 > >
-> > But I would think the proper fix should be not setting
-> > DEVCTL[SOFTCONN] until a gadget driver is loaded. Then the host will
-> > not see the device which does not have a gadget driver.
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: linux-doc at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-kernel at vger.kernel.org
+> > ---
+> >   .../devicetree/bindings/arm/marvell,berlin.txt     |   23 ++
+> >   arch/arm/boot/dts/Makefile                         |    2 +
+> >   arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts      |   29 +++
+> >   arch/arm/boot/dts/mv88de3100.dtsi                  |  227
+> > ++++++++++++++++++++ 4 files changed, 281 insertions(+)
+> >   create mode 100644
+> > Documentation/devicetree/bindings/arm/marvell,berlin.txt create mode
+> > 100644 arch/arm/boot/dts/mv88de3100-sony-nsz-gs7.dts create mode 100644
+> > arch/arm/boot/dts/mv88de3100.dtsi
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+> > b/Documentation/devicetree/bindings/arm/marvell,berlin.txt new file mode
+> > 100644 index 0000000..e389cba
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+> > @@ -0,0 +1,23 @@
+> > +Marvell Berlin (88DE3xxx) family SoCs Device Tree Bindings
+> > +---------------------------------------------------------------
+> > +
+> > +Boards with a SoC of the Marvell Berlin (88DE3xxx) family, e.g. Armada
+> > 1500 +shall have the following properties:
+> > +
+> > +* Required root node properties:
+> > +compatible: must contain "marvell,berlin"
+> > +
+> > +In addition, the above compatible shall be extended with the specific
+> > +SoC and board used. Currently known SoC compatibles are:
+> > +    "marvell,88de3100"	for Marvell 88DE3100 (Armada 1500),
+> > +    "marvell,88de3010"	for Marvell 88DE3010 (Armada 1000),
+> > +    "marvell,88de3005"	for Marvell 88DE3005 (Armada 1500-mini)
 > 
-> Sorry, I meant POWER[SOFTCONN] bit.
+> Jisheng,
+> 
+> I am trying to follow your request to get rid of 88DExxxx numbering and
+> replace it where possible with berlin type-of names.
+Thanks for your help.
+> 
+> For the above, I have:
+> "marvell,berlin-bg2" for Marvell Armada 1500 (BG2, 88DE3100)
+We prefer "marvell,berlin2" for BG2
+> "marvell,berlin-bg2cd" for Marvell Armada 1500-mini (BG2CD, 88DE3005)
+we prefer "marvell,berlin2cd" for BG2CD, "marvell,berlin2ct" for BG2CT,
+and "marvell,berlin3" for BG3, etc.
 
-I agree with you and my bad that I misread commit log.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131014/06cf6c3e/attachment.sig>
+Thanks,
+Jisheng
