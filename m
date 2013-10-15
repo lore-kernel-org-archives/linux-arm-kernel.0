@@ -1,100 +1,41 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 15 Oct 2013 14:44:34 +0200
-Subject: [PATCH 2/6] of: add function to check against a list of
- compatible strings
-In-Reply-To: <20131015111145.GE19196@e106331-lin.cambridge.arm.com>
-References: <201310151246.49402.heiko@sntech.de>
- <201310151247.50408.heiko@sntech.de>
- <20131015111145.GE19196@e106331-lin.cambridge.arm.com>
-Message-ID: <201310151444.35011.heiko@sntech.de>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 15 Oct 2013 08:47:50 -0400
+Subject: [v4] ahci: imx: setup power saving methods
+In-Reply-To: <1381805094-14723-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1381805094-14723-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+ <1381805094-14723-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <20131015124750.GB3141@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 15. Oktober 2013, 13:11:46 schrieb Mark Rutland:
-> Hi Heiko,
+On Tue, Oct 15, 2013 at 10:44:54AM +0800, Richard Zhu wrote:
+> From: Richard Zhu <r65037@freescale.com>
 > 
-> On Tue, Oct 15, 2013 at 11:47:50AM +0100, Heiko St?bner wrote:
-> > The basic of functions already provide a of_device_is_compatible to check
-> > if a device's compatible property contains a specific one. But sometimes
-> > it's also necessary to check if the device is compatible to one out of a
-> > list of compatible devices.
-> > 
-> > Therefore add of_device_is_any_of that reuses the compatible check of
-> > of_device_is_compatible but checks against a list of compatible strings
-> > without the locking overhead of calling of_device_is_compatible multiple
-> > times.
+> In order to save power consumption amap.
+> * Disable sata phy internal pll reference clock when
+> sysetem enter into suspend mode, enable it after resume.
+> * Setup module parameter used to enable imx ahci test power down
+> mode(PDDQ) or not, when there is no device detected on the port
+> * minor modifications:
+>   - The format of the copyright is changed, because that the
+>   original one can't pass fsl internal patch reivew without
+>   the character '(c)'.
+>   - exports ahci_platform_ops and ahci_error_handler
 > 
-> I don't think we need this -- we already have of_match_node, and you can
-> use it to achieve the same result.
+> NOTE:
+> - The hot-plug can't be supported when PDDQ mode is
+> ever enabled.
+> - module parameter usage how-to:
+>   * default: enable PDDQ mode when no device detected.
+>   * add "ahci-imx.hotplug=1" into kernel command line if
+>   your don't want to enable PDDQ mode when no device
+>   detected on the port.
+> 
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
 
-You are right of course, of_match_node does exactly what needed.
+Applied to libata/for-3.13 with minor modifications.
 
+Thanks.
 
-Thanks
-Heiko
-
-
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  drivers/of/base.c  |   21 +++++++++++++++++++++
-> >  include/linux/of.h |    2 ++
-> >  2 files changed, 23 insertions(+)
-> > 
-> > diff --git a/drivers/of/base.c b/drivers/of/base.c
-> > index 865d3f6..589f43e 100644
-> > --- a/drivers/of/base.c
-> > +++ b/drivers/of/base.c
-> > @@ -366,6 +366,27 @@ int of_device_is_compatible(const struct device_node
-> > *device,
-> > 
-> >  EXPORT_SYMBOL(of_device_is_compatible);
-> >  
-> >  /**
-> > 
-> > + * Checks if any of the given "compat" strings matches one of the
-> > strings + * in the device's "compatible" property.
-> > + */
-> > +int of_device_is_any_of(const struct device_node *device,
-> > +			const char * const *compat, int num) {
-> > +	unsigned long flags;
-> > +	int res = 0, i;
-> > +
-> > +	raw_spin_lock_irqsave(&devtree_lock, flags);
-> > +	for (i = 0; i < num; i++) {
-> > +		if (__of_device_is_compatible(device, compat[i])) {
-> > +			res = 1;
-> > +			break;
-> > +		}
-> > +	}
-> > +	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-> > +	return res;
-> > +}
-> > +EXPORT_SYMBOL(of_device_is_any_of);
-> > +
-> > +/**
-> > 
-> >   * of_machine_is_compatible - Test root of device tree for a given
-> >   compatible value * @compat: compatible string to look for in root
-> >   node's compatible property. *
-> > 
-> > diff --git a/include/linux/of.h b/include/linux/of.h
-> > index f95aee3..5bf7c9a 100644
-> > --- a/include/linux/of.h
-> > +++ b/include/linux/of.h
-> > @@ -262,6 +262,8 @@ extern int of_property_count_strings(struct
-> > device_node *np,
-> > 
-> >  				     const char *propname);
-> >  
-> >  extern int of_device_is_compatible(const struct device_node *device,
-> >  
-> >  				   const char *);
-> > 
-> > +extern int of_device_is_any_of(const struct device_node *device,
-> > +			       const char * const *compat, int num);
-> > 
-> >  extern int of_device_is_available(const struct device_node *device);
-> >  extern const void *of_get_property(const struct device_node *node,
-> >  
-> >  				const char *name,
+-- 
+tejun
