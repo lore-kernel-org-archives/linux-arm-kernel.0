@@ -1,105 +1,103 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 15 Oct 2013 18:42:50 +0200
-Subject: [PATCH] ARM: exynos: Allow wake-up using GIC interrupts
-Message-ID: <1381855370-7500-1-git-send-email-t.figa@samsung.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 15 Oct 2013 09:46:19 -0700
+Subject: [PATCH] arch_timer: Do not register arch_sys_counter twice
+In-Reply-To: <20131015150314.GA10535@ulmo.nvidia.com>
+References: <1381843911-31962-1-git-send-email-treding@nvidia.com>
+ <20131015142313.GC850@mudshark.cambridge.arm.com>
+ <20131015150314.GA10535@ulmo.nvidia.com>
+Message-ID: <525D715B.5090203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch restores the ability to receive wake-up events from internal
-GIC interrupts, e.g. RTC tick or alarm interrupts.
+On 10/15/2013 08:03 AM, Thierry Reding wrote:
+> On Tue, Oct 15, 2013 at 03:23:14PM +0100, Will Deacon wrote:
+>> On Tue, Oct 15, 2013 at 02:31:51PM +0100, Thierry Reding wrote:
+>>> Commit 65cd4f6 (arch_timer: Move to generic sched_clock framework) added
+>>> code to register the arch_sys_counter in arch_timer_register() but it is
+>>> already registered in arch_counter_register(). This results in the timer
+>>> being added to the clocksource list twice, therefore causing an infinite
+>>> loop in the list.
+>>>
+>>> Remove the duplicate registration and register the scheduler clock after
+>>> the original registration instead.
+>>>
+>>> This fixes a hang during boot on Tegra114 (Cortex-A15).
+>>>
+>>> Signed-off-by: Thierry Reding <treding@nvidia.com>
+>>> ---
+>>> While I've only tested this on Tegra114, I suspect the same hang during
+>>> boot happens for all processors that use this clock source.
+>>>
+>>>  drivers/clocksource/arm_arch_timer.c | 12 +++---------
+>>>  1 file changed, 3 insertions(+), 9 deletions(-)
+>>>
+>>> diff --git a/drivers/clocksource/arm_arch_timer.c
+b/drivers/clocksource/arm_arch_timer.c
+>>> index f655036..95fb944 100644
+>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>> @@ -436,6 +436,9 @@ static void __init
+arch_counter_register(unsigned type)
+>>>      cyclecounter.mult = clocksource_counter.mult;
+>>>      cyclecounter.shift = clocksource_counter.shift;
+>>>      timecounter_init(&timecounter, &cyclecounter, start_count);
+>>> +
+>>> +    /* 56 bits minimum, so we assume worst case rollover */
+>>> +    sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+>>>  }
+>>> 
+>>>  static void arch_timer_stop(struct clock_event_device *clk)
+>>> @@ -515,15 +518,6 @@ static int __init arch_timer_register(void)
+>>>          goto out;
+>>>      }
+>>> 
+>>> -    clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+>>> -    cyclecounter.mult = clocksource_counter.mult;
+>>> -    cyclecounter.shift = clocksource_counter.shift;
+>>> -    timecounter_init(&timecounter, &cyclecounter,
+>>> -             arch_counter_get_cntvct());
+>>> -
+>>> -    /* 56 bits minimum, so we assume worst case rollover */
+>>> -    sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+>>> -
+>>>      if (arch_timer_use_virtual) {
+>>>          ppi = arch_timer_ppi[VIRT_PPI];
+>>>          err = request_percpu_irq(ppi, arch_timer_handler_virt,
+>>
+>> Excuse my ignorance, but I'm failing to apply either this patch or
+the one
+>> that Stephen Boyd proposed:
+>>
+>>  
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204665.html
+>
+> Hehe, that patch is exactly the same as this one. =)
+>
+>> The second hunk (deletions) doesn't apply at all, and if I just apply the
+>> first hunk then things won't compile. Which tree is this against?
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/include/mach/pm-core.h |  1 -
- arch/arm/mach-exynos/pm.c                   | 55 +++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+), 1 deletion(-)
+The problem is from my merge to -tip.
 
-diff --git a/arch/arm/mach-exynos/include/mach/pm-core.h b/arch/arm/mach-exynos/include/mach/pm-core.h
-index 2b00833..be112ce 100644
---- a/arch/arm/mach-exynos/include/mach/pm-core.h
-+++ b/arch/arm/mach-exynos/include/mach/pm-core.h
-@@ -66,7 +66,6 @@ static inline void samsung_pm_saved_gpios(void)
- 
- /* Compatibility definitions to make plat-samsung/pm.c compile */
- #define IRQ_EINT_BIT(x)		1
--#define s3c_irqwake_intallow	0
- #define s3c_irqwake_eintallow	0
- 
- #endif /* __ASM_ARCH_PM_CORE_H */
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index c679db5..1f24e7f 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -212,14 +212,69 @@ static struct subsys_interface exynos_pm_interface = {
- 	.add_dev	= exynos_pm_add,
- };
- 
-+struct exynos_wkup_irq {
-+	unsigned int hwirq;
-+	u32 mask;
-+};
-+
-+static const struct exynos_wkup_irq exynos4_wkup_irq[] = {
-+	{ 76, BIT(1) }, /* RTC alarm */
-+	{ 77, BIT(2) }, /* RTC tick */
-+	{ /* sentinel */ },
-+};
-+
-+static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
-+	{ 75, BIT(1) }, /* RTC alarm */
-+	{ 76, BIT(2) }, /* RTC tick */
-+	{ /* sentinel */ },
-+};
-+
-+unsigned long s3c_irqwake_intallow;
-+
-+int s3c_irq_wake(struct irq_data *data, unsigned int state)
-+{
-+	const struct exynos_wkup_irq *wkup_irq;
-+
-+	if (soc_is_exynos5250())
-+		wkup_irq = exynos5250_wkup_irq;
-+	else
-+		wkup_irq = exynos4_wkup_irq;
-+
-+	while (wkup_irq->mask) {
-+		if (wkup_irq->hwirq == data->hwirq) {
-+			if (!state)
-+				s3c_irqwake_intmask |= wkup_irq->mask;
-+			else
-+				s3c_irqwake_intmask &= ~wkup_irq->mask;
-+			return 0;
-+		}
-+		++wkup_irq;
-+	}
-+
-+	return -ENOENT;
-+}
-+
- static __init int exynos_pm_drvinit(void)
- {
-+	const struct exynos_wkup_irq *wkup_irq;
- 	struct clk *pll_base;
- 	unsigned int tmp;
- 
- 	if (soc_is_exynos5440())
- 		return 0;
- 
-+	if (soc_is_exynos5250())
-+		wkup_irq = exynos5250_wkup_irq;
-+	else
-+		wkup_irq = exynos4_wkup_irq;
-+
-+	while (wkup_irq->mask) {
-+		s3c_irqwake_intallow |= wkup_irq->mask;
-+		++wkup_irq;
-+	}
-+
-+	gic_arch_extn.irq_set_wake = s3c_irq_wake;
-+
- 	s3c_pm_init();
- 
- 	/* All wakeup disable */
--- 
-1.8.3.2
+>
+> This is on top of today's linux-next[0] and will probably apply to
+> yesterday's linux-next too. I think that perhaps the patch or the one
+> that Stephen proposed himself should be squashed with the original
+> because that caused the breakage in the first place. From what I gather
+> from the mailing thread you linked to above it seems like John took an
+> earlier patch from Stephen and rebased it on top of something more
+> recent and that didn't work out as expected.
+
+Yes, again my apologies. When I applied Stephen's original patch to the
+recent tree, I mis-resolved the conflict.
+
+
+> Ingo, any chance you could take this patch and squash it into the patch
+> mentioned above? Applying it as a separate fix will break bisectability
+> inbetween both patches.
+
+I suspect Ingo won't squish down the fix onto the misresolved patch,
+since -tip usually preserves history. But hopefully we can get this
+merged quickly.
+
+Again, sorry for the trouble!
+-john
