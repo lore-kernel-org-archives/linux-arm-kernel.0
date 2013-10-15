@@ -1,49 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Oct 2013 17:53:58 +0100
-Subject: [RFC v3 PATCH 0/7] ARM[64]: kernel mode NEON in atomic contexts
-In-Reply-To: <alpine.LFD.2.03.1310151104000.1873@syhkavp.arg>
-References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.03.1310142353210.1873@syhkavp.arg>
- <CAKv+Gu-rbNmwJf09JVUYYyJjoGrJqpsrv=x_wWMJ6r-EofbYDQ@mail.gmail.com>
- <alpine.LFD.2.03.1310151104000.1873@syhkavp.arg>
-Message-ID: <20131015165358.GF1591@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Oct 2013 17:53:35 +0100
+Subject: arm64 ioremap question
+In-Reply-To: <1381853652.4093.10.camel@weser.hi.pengutronix.de>
+References: <1381850404.27955.9.camel@deneb.redhat.com>
+ <20131015155216.GD25034@n2100.arm.linux.org.uk>
+ <1381853652.4093.10.camel@weser.hi.pengutronix.de>
+Message-ID: <20131015165335.GF25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 05:05:48PM +0100, Nicolas Pitre wrote:
-> On Tue, 15 Oct 2013, Ard Biesheuvel wrote:
-> 
-> > On 15 October 2013 06:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > > On Sun, 13 Oct 2013, Ard Biesheuvel wrote:
-> > >
-> > >> The stack area is allocated by DEFINE_NEON_REGSTACK[_PARTIAL](varname), where
-> > >> the partial version takes an additional int num_regs indicating how many
-> > >> registers need to be freed up.
-> > >>
-> > >> In the !in_interrupt() case, these functions operate as before, and the regstack
-> > >> is defined to minimal size in this case as it will remain unused anyway. In the
-> > >> in_interrupt() case, 'num_regs' (or all) NEON registers are stacked/unstacked
-> > >> using the allocated stack region.
-> > >
-> > > Would have been nice to have the stack simply be a NULL pointer when
-> > > !in_interrupt() or when the number of regs is 0.  This would remove the
-> > > need for a runtime check on !num_regs.  I don't see an obvious way to
-> > > accomplish that right now though.
-> > >
+On Tue, Oct 15, 2013 at 06:14:12PM +0200, Lucas Stach wrote:
+> Am Dienstag, den 15.10.2013, 16:52 +0100 schrieb Russell King - ARM
+> Linux:
+> > On Tue, Oct 15, 2013 at 11:20:04AM -0400, Mark Salter wrote:
+> > > ioremap() has a test to prevent RAM from being remapped:
+> > > 
+> > > 	/*
+> > > 	 * Don't allow RAM to be mapped.
+> > > 	 */
+> > > 	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+> > > 		return NULL;
+> > > 
+> > > 
+> > > Is this really necessary even for reserved pages which are not being
+> > > used for anything else?
 > > 
-> > We could address both of these issues by implementing Catalin's
-> > suggestion to reserve per-process vfp_states[] for both irq and
-> > softirq context in addition to the ordinary one, but it would waste a
-> > lot of space imo. What is your take on that?
+> > It helps to stop the abuse of using ioremap() on normal memory, which has
+> > happened soo much in Aarch32 for years.  Unfortuantely, bad habbits die
+> > hard.
+> > 
+> > "Reserved pages not being used for anything else" are still mapped, and
+> > still subject to speculative fetches.
 > 
-> I agree that this would be rather wasteful.  I really like your current 
-> approach of dynamically allocating just the right amount of space on the 
-> stack.  I'm not a big fan of statically allocated memory which is 
-> seldomly used.
+> Only slightly related to the issue here, but I'm really wondering if the
+> speculative fill can happen on real implementations.
+> I'm well aware that there is nothing in the arch preventing a
+> speculative fill on a cached alias, but at least for the A9
+> implementation the ARM infocenter claims that the prefetcher will not
+> cross a 4KB boundary [1].
+> So as long as we are talking about full pages, having a conflicting
+> mapping should not cause any issues as long as you don't touch the
+> memory region explicitly through the cached mapping.
+> 
+> I know that we generally aim to avoid basing any kernel infrastructure
+> on such vague guarantees, but I'm really wondering if my analysis is
+> correct or is there anything I'm overlooking here?
 
-I agree here, especially since we need to cover both soft and hard irqs.
-It would be about 1KB per CPU, not noticeable even on big systems but
-still looks like it's only going to be used rarely.
-
--- 
-Catalin
+And I know where this is leading so frankly I'm not answering.  I don't
+want to see any more of people commenting out code like this in their
+vendor kernels because they don't care.  Sorry if I'm being unhelpful
+but I have experience of what happens here.
