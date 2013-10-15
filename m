@@ -1,41 +1,24 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 15 Oct 2013 08:47:50 -0400
-Subject: [v4] ahci: imx: setup power saving methods
-In-Reply-To: <1381805094-14723-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1381805094-14723-1-git-send-email-Hong-Xing.Zhu@freescale.com>
- <1381805094-14723-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20131015124750.GB3141@htj.dyndns.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Oct 2013 14:50:48 +0200
+Subject: [RESEND PATCHv2 1/3] arm: socfpga: Set the SDMMC clock phase in
+ system manager
+In-Reply-To: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
+References: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
+Message-ID: <201310151450.48650.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 10:44:54AM +0800, Richard Zhu wrote:
-> From: Richard Zhu <r65037@freescale.com>
-> 
-> In order to save power consumption amap.
-> * Disable sata phy internal pll reference clock when
-> sysetem enter into suspend mode, enable it after resume.
-> * Setup module parameter used to enable imx ahci test power down
-> mode(PDDQ) or not, when there is no device detected on the port
-> * minor modifications:
->   - The format of the copyright is changed, because that the
->   original one can't pass fsl internal patch reivew without
->   the character '(c)'.
->   - exports ahci_platform_ops and ahci_error_handler
-> 
-> NOTE:
-> - The hot-plug can't be supported when PDDQ mode is
-> ever enabled.
-> - module parameter usage how-to:
->   * default: enable PDDQ mode when no device detected.
->   * add "ahci-imx.hotplug=1" into kernel command line if
->   your don't want to enable PDDQ mode when no device
->   detected on the port.
-> 
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
+On Monday 14 October 2013, dinguyen at altera.com wrote:
+> +void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(u32 drvsel, u32 smplsel)
+> +{
+> +       u32 hs_timing;
+> +
+> +       hs_timing = SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel);
+> +       writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
+> +}
+> +EXPORT_SYMBOL(socfpga_sysmgr_set_dwmmc_drvsel_smpsel);
 
-Applied to libata/for-3.13 with minor modifications.
+This looks like the wrong approach. What are you trying to do? If you want to
+set a clock, please use the clk API.
 
-Thanks.
-
--- 
-tejun
+	Arnd
