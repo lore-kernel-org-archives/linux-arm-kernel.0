@@ -1,66 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 15 Oct 2013 16:54:00 +0800
-Subject: [PATCH 0/5] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
-In-Reply-To: <20131015073631.GA21188@b29396-Latitude-E6410>
-References: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
- <20131015073631.GA21188@b29396-Latitude-E6410>
-Message-ID: <20131015085358.GC14908@S2101-09.ap.freescale.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 15 Oct 2013 11:10:51 +0200
+Subject: [PATCH 1/2] tty/serial: at91: fix uart/usart selection for older
+ products
+In-Reply-To: <20131014135809.GF11420@ns203013.ovh.net>
+References: <a58fe8bc7fdd128a2f9cf60785f81ebde4c0c247.1381394411.git.nicolas.ferre@atmel.com>
+ <20131014135809.GF11420@ns203013.ovh.net>
+Message-ID: <525D069B.6000908@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 03:36:32PM +0800, Dong Aisheng wrote:
-> On Mon, Oct 14, 2013 at 04:23:39PM +0800, Shawn Guo wrote:
-> > When I was reviewing Dong's imx6sl standard tuning patches, I found that
-> > it's a little clumsy to use enum imx_esdhc_type for handling features
-> > and quirks on different esdhc variants.  
-> >
-> > Instead, the approach used in
-> > fec driver (drivers/net/ethernet/freescale/fec_main.c) should be more
-> > scalable in the long run.  It defines flags for all those features and
-> > quirks and creates a mapping between esdhc variant and the flags.
-> > 
-> 
-> It cause troubles if i try to rebase my patch series based on it
-> because esdhc/usdhc also have a lot register difference.
+On 14/10/2013 15:58, Jean-Christophe PLAGNIOL-VILLARD :
+> On 10:43 Thu 10 Oct     , Nicolas Ferre wrote:
+>> Since commit 055560b04a8cd063aea916fd083b7aec02c2adb8 (serial: at91:
+>> distinguish usart and uart) the older products which do not have a
+>> name field in their register map are unable to use their serial output.
+>> As the main console output is usually the serial interface (aka DBGU) it
+>> is pretty unfortunate.
+>> So, instead of failing during probe() we just silently configure the serial
+>> peripheral as an uart. It allows us to use these serial outputs.
+>> The proper solution is proposed in another patch.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>   drivers/tty/serial/atmel_serial.c | 9 ++-------
+>>   1 file changed, 2 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index d067285..6b0f75e 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -1499,7 +1499,7 @@ static void atmel_set_ops(struct uart_port *port)
+>>   /*
+>>    * Get ip name usart or uart
+>>    */
+>> -static int atmel_get_ip_name(struct uart_port *port)
+>> +static void atmel_get_ip_name(struct uart_port *port)
+>>   {
+>>   	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>>   	int name = UART_GET_IP_NAME(port);
+>> @@ -1518,10 +1518,7 @@ static int atmel_get_ip_name(struct uart_port *port)
+>>   		atmel_port->is_usart = false;
+>>   	} else {
+> 		a dev_warn here maybe
+>
+> usefull to known when we will have a new ip name and not yet wupported
 
-We now have data structure esdhc_soc_data, which can handle whatever
-differences between these variants.
+No, not here: next patch is oveloading this if/else directive.
 
-> Originally we could simply use is_imx*_usdhc to handle those tiny difference,
+>>   		dev_err(port->dev, "Not supported ip name, set to uart\n");
+>> -		return -EINVAL;
+>>   	}
+>> -
+>> -	return 0;
+>>   }
+>>
+>>   /*
+>> @@ -2405,9 +2402,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
+>>   	/*
+>>   	 * Get port name of usart or uart
+>>   	 */
+>> -	ret = atmel_get_ip_name(&port->uart);
+>> -	if (ret < 0)
+>> -		goto err_add_port;
+>> +	atmel_get_ip_name(&port->uart);
+>>
+>>   	return 0;
+>>
+>> --
+>> 1.8.2.2
+>>
+>
+>
 
-No.  The addition of is_imx6_usdhc() is a sign that we're not going to
-handle these differences easily.  Saying if a feature like std_tuning
-is only available on imx6sl and imx6slx, is_imx6_usdhc() will not fit
-then, and you need if (is_imx6sl_usdhc() || is_imx6slx_usdhc()) for it.
-Furthermore, think about it when you have imx7x come to play here,
-something like if (is_imx6sl_usdhc() || is_imx6slx_usdhc() ||
-is_imx7x_usdhc())?  The if-clause will become a mess sooner or later.
 
-> however, now if you eliminate the entire is_imx*_usdhc, we may have to
-> add a lot arbitrary and hard to naming flags for register offset/mask
-> different issue.
-> It does not make too much sense.
-> e.g. 
-> http://www.spinics.net/lists/arm-kernel/msg278507.html
-> http://permalink.gmane.org/gmane.linux.kernel.mmc/22934
-
-Having flags for them make sense to me.  By doing so, we can get the
-"characters" of particular SoC from reading its 'flags' variable.
-
-> Add maybe even more when we keep adding new features like:
-> mx5 DDR support and etc.(register offset is different between imx5&imx6)
-> It's hard to say how many similar cases left for me currently.
-
-The register difference introduced by adding new features can just be
-covered by the feature flag, I think.
-
-Shawn
-
-> Looking at fec_main.c, the flags seem more like for simply features.
-> Not the same complicated situation as esdhc/usdhc.
-> I'm not sure this is so suitable for esdhc/usdhc.
-> 
-> Due to the problems this patch may introduce, it's probably may be good
-> to stick the old way to me since i did not see quite neccessary to switch
-> to new way on current code.
-> Or you may find a better fix for this issue.
+-- 
+Nicolas Ferre
