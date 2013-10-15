@@ -1,66 +1,194 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 15 Oct 2013 15:36:32 +0800
-Subject: [PATCH 0/5] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
-In-Reply-To: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
-References: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20131015073631.GA21188@b29396-Latitude-E6410>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 15 Oct 2013 15:23:40 +0800
+Subject: [PATCH] serail: imx: optimization: remove the workqueues for DMA
+Message-ID: <1381821820-3845-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 04:23:39PM +0800, Shawn Guo wrote:
-> When I was reviewing Dong's imx6sl standard tuning patches, I found that
-> it's a little clumsy to use enum imx_esdhc_type for handling features
-> and quirks on different esdhc variants.  
->
-> Instead, the approach used in
-> fec driver (drivers/net/ethernet/freescale/fec_main.c) should be more
-> scalable in the long run.  It defines flags for all those features and
-> quirks and creates a mapping between esdhc variant and the flags.
-> 
+I worried that the delay of the sdma_run_channel0() maybe too long for
+interrupt context, so I added the workqueues for RX/TX DMA.
 
-It cause troubles if i try to rebase my patch series based on it
-because esdhc/usdhc also have a lot register difference.
+But tested with bluetooth device, I find that the delay of sdma_run_channel0()
+is about 8us (tested in imx6dl sabreauto board). I think the delay
+is acceptable.
 
-Originally we could simply use is_imx*_usdhc to handle those tiny difference,
-however, now if you eliminate the entire is_imx*_usdhc, we may have to
-add a lot arbitrary and hard to naming flags for register offset/mask
-different issue.
-It does not make too much sense.
-e.g. 
-http://www.spinics.net/lists/arm-kernel/msg278507.html
-http://permalink.gmane.org/gmane.linux.kernel.mmc/22934
-Add maybe even more when we keep adding new features like:
-mx5 DDR support and etc.(register offset is different between imx5&imx6)
-It's hard to say how many similar cases left for me currently.
+This patch removes the RX/TX workqueues for DMA, it makes the
+code more clear.
 
-Looking at fec_main.c, the flags seem more like for simply features.
-Not the same complicated situation as esdhc/usdhc.
-I'm not sure this is so suitable for esdhc/usdhc.
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+this patch depends on the patch set:
+http://marc.info/?l=linux-arm-kernel&m=138148839513375&w=2
 
-Due to the problems this patch may introduce, it's probably may be good
-to stick the old way to me since i did not see quite neccessary to switch
-to new way on current code.
-Or you may find a better fix for this issue.
+---
+ drivers/tty/serial/imx.c |   54 ++++++++-------------------------------------
+ 1 files changed, 10 insertions(+), 44 deletions(-)
 
-Regards
-Dong Aisheng
-
-> Actually, sdhci-esdhc-imx driver already has one such flag, i.e.
-> ESDHC_FLAG_MULTIBLK_NO_INT, but there is currently an unnecessary
-> translation between the flag and imx_esdhc_type.  The series creates
-> another 3 flags and identify features/quirks using these flags and then
-> eliminate enum imx_esdhc_type completely.
-> 
-> Shawn Guo (5):
->   mmc: sdhci-esdhc-imx: add flag ESDHC_FLAG_NO_DMAS_BITS
->   mmc: sdhci-esdhc-imx: add flag ESDHC_FLAG_ENGCM07207
->   mmc: sdhci-esdhc-imx: add flag ESDHC_FLAG_USDHC
->   mmc: sdhci-esdhc-imx: pdev->id_entry should be immutable
->   mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
-> 
->  drivers/mmc/host/sdhci-esdhc-imx.c |  108 +++++++++++++++---------------------
->  1 file changed, 45 insertions(+), 63 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 13c2c2d..bb84f8d 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -223,8 +223,7 @@ struct imx_port {
+ 	struct dma_chan		*dma_chan_rx, *dma_chan_tx;
+ 	struct scatterlist	rx_sgl, tx_sgl[2];
+ 	void			*rx_buf;
+-	unsigned int		rx_bytes, tx_bytes;
+-	struct work_struct	tsk_dma_rx, tsk_dma_tx;
++	unsigned int		tx_bytes;
+ 	unsigned int		dma_tx_nents;
+ 	wait_queue_head_t	dma_wait;
+ };
+@@ -505,32 +504,23 @@ static void dma_tx_callback(void *data)
+ 		dev_dbg(sport->port.dev, "exit in %s.\n", __func__);
+ 		return;
+ 	}
+-
+-	schedule_work(&sport->tsk_dma_tx);
+ }
+ 
+-static void dma_tx_work(struct work_struct *w)
++static void imx_dma_tx(struct imx_port *sport)
+ {
+-	struct imx_port *sport = container_of(w, struct imx_port, tsk_dma_tx);
+ 	struct circ_buf *xmit = &sport->port.state->xmit;
+ 	struct scatterlist *sgl = sport->tx_sgl;
+ 	struct dma_async_tx_descriptor *desc;
+ 	struct dma_chan	*chan = sport->dma_chan_tx;
+ 	struct device *dev = sport->port.dev;
+ 	enum dma_status status;
+-	unsigned long flags;
+ 	int ret;
+ 
+ 	status = dmaengine_tx_status(chan, (dma_cookie_t)0, NULL);
+ 	if (DMA_IN_PROGRESS == status)
+ 		return;
+ 
+-	spin_lock_irqsave(&sport->port.lock, flags);
+ 	sport->tx_bytes = uart_circ_chars_pending(xmit);
+-	if (sport->tx_bytes == 0) {
+-		spin_unlock_irqrestore(&sport->port.lock, flags);
+-		return;
+-	}
+ 
+ 	if (xmit->tail > xmit->head && xmit->head > 0) {
+ 		sport->dma_tx_nents = 2;
+@@ -542,7 +532,6 @@ static void dma_tx_work(struct work_struct *w)
+ 		sport->dma_tx_nents = 1;
+ 		sg_init_one(sgl, xmit->buf + xmit->tail, sport->tx_bytes);
+ 	}
+-	spin_unlock_irqrestore(&sport->port.lock, flags);
+ 
+ 	ret = dma_map_sg(dev, sgl, sport->dma_tx_nents, DMA_TO_DEVICE);
+ 	if (ret == 0) {
+@@ -609,11 +598,7 @@ static void imx_start_tx(struct uart_port *port)
+ 	}
+ 
+ 	if (sport->dma_is_enabled) {
+-		/*
+-		 * We may in the interrupt context, so arise a work_struct to
+-		 * do the real job.
+-		 */
+-		schedule_work(&sport->tsk_dma_tx);
++		imx_dma_tx(sport);
+ 		return;
+ 	}
+ 
+@@ -732,6 +717,7 @@ out:
+ 	return IRQ_HANDLED;
+ }
+ 
++static int start_rx_dma(struct imx_port *sport);
+ /*
+  * If the RXFIFO is filled with some data, and then we
+  * arise a DMA operation to receive them.
+@@ -750,7 +736,7 @@ static void imx_dma_rxint(struct imx_port *sport)
+ 		writel(temp, sport->port.membase + UCR1);
+ 
+ 		/* tell the DMA to receive the data. */
+-		schedule_work(&sport->tsk_dma_rx);
++		start_rx_dma(sport);
+ 	}
+ }
+ 
+@@ -872,22 +858,6 @@ static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
+ }
+ 
+ #define RX_BUF_SIZE	(PAGE_SIZE)
+-static int start_rx_dma(struct imx_port *sport);
+-static void dma_rx_work(struct work_struct *w)
+-{
+-	struct imx_port *sport = container_of(w, struct imx_port, tsk_dma_rx);
+-	struct tty_port *port = &sport->port.state->port;
+-
+-	if (sport->rx_bytes) {
+-		tty_insert_flip_string(port, sport->rx_buf, sport->rx_bytes);
+-		tty_flip_buffer_push(port);
+-		sport->rx_bytes = 0;
+-	}
+-
+-	if (sport->dma_is_rxing)
+-		start_rx_dma(sport);
+-}
+-
+ static void imx_rx_dma_done(struct imx_port *sport)
+ {
+ 	unsigned long temp;
+@@ -919,6 +889,7 @@ static void dma_rx_callback(void *data)
+ 	struct imx_port *sport = data;
+ 	struct dma_chan	*chan = sport->dma_chan_rx;
+ 	struct scatterlist *sgl = &sport->rx_sgl;
++	struct tty_port *port = &sport->port.state->port;
+ 	struct dma_tx_state state;
+ 	enum dma_status status;
+ 	unsigned int count;
+@@ -931,8 +902,10 @@ static void dma_rx_callback(void *data)
+ 	dev_dbg(sport->port.dev, "We get %d bytes.\n", count);
+ 
+ 	if (count) {
+-		sport->rx_bytes = count;
+-		schedule_work(&sport->tsk_dma_rx);
++		tty_insert_flip_string(port, sport->rx_buf, count);
++		tty_flip_buffer_push(port);
++
++		start_rx_dma(sport);
+ 	} else
+ 		imx_rx_dma_done(sport);
+ }
+@@ -1014,7 +987,6 @@ static int imx_uart_dma_init(struct imx_port *sport)
+ 		ret = -ENOMEM;
+ 		goto err;
+ 	}
+-	sport->rx_bytes = 0;
+ 
+ 	/* Prepare for TX : */
+ 	sport->dma_chan_tx = dma_request_slave_channel(dev, "tx");
+@@ -1045,11 +1017,7 @@ err:
+ static void imx_enable_dma(struct imx_port *sport)
+ {
+ 	unsigned long temp;
+-	struct tty_port *port = &sport->port.state->port;
+ 
+-	port->low_latency = 1;
+-	INIT_WORK(&sport->tsk_dma_tx, dma_tx_work);
+-	INIT_WORK(&sport->tsk_dma_rx, dma_rx_work);
+ 	init_waitqueue_head(&sport->dma_wait);
+ 
+ 	/* set UCR1 */
+@@ -1070,7 +1038,6 @@ static void imx_enable_dma(struct imx_port *sport)
+ static void imx_disable_dma(struct imx_port *sport)
+ {
+ 	unsigned long temp;
+-	struct tty_port *port = &sport->port.state->port;
+ 
+ 	/* clear UCR1 */
+ 	temp = readl(sport->port.membase + UCR1);
+@@ -1088,7 +1055,6 @@ static void imx_disable_dma(struct imx_port *sport)
+ 	writel(temp, sport->port.membase + UCR4);
+ 
+ 	sport->dma_is_enabled = 0;
+-	port->low_latency = 0;
+ }
+ 
+ /* half the RX buffer size */
+-- 
+1.7.2.rc3
