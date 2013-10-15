@@ -1,363 +1,65 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 14 Oct 2013 23:20:04 -0400
-Subject: [PATCH] ARM: trace: Add tracepoint for the Inter Processor
- Interrupt
-In-Reply-To: <1381758807-31139-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1381758807-31139-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20131014232004.5cbedbb8@gandalf.local.home>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 15 Oct 2013 00:20:57 -0300
+Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
+In-Reply-To: <20131014225029.GV25034@n2100.arm.linux.org.uk>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
+ <20131014174030.GU25034@n2100.arm.linux.org.uk>
+ <20131014225029.GV25034@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5DWa8UjzToTuhqH_1ZuRiUXvjp8HOZaw0b1C8ah-+EdGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Oct 2013 15:53:27 +0200
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+On Mon, Oct 14, 2013 at 7:50 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-> The Inter Processor Interrupt is used on ARM to tell another processor to do
-> a specific action. This is mainly used to emulate a timer interrupt on an idle
-> cpu, force a cpu to reschedule or run a function on another processor context.
-> 
-> Add a tracepoint when raising an IPI and in the entry/exit handler function.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/include/asm/smp.h   |    9 ++++
->  arch/arm/kernel/smp.c        |   34 ++++++++------
->  arch/arm64/include/asm/smp.h |    7 +++
->  arch/arm64/kernel/smp.c      |   21 +++++++--
->  include/trace/events/ipi.h   |  106 ++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 158 insertions(+), 19 deletions(-)
->  create mode 100644 include/trace/events/ipi.h
-> 
-> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-> index a8cae71c..788706c 100644
-> --- a/arch/arm/include/asm/smp.h
-> +++ b/arch/arm/include/asm/smp.h
-> @@ -18,6 +18,15 @@
->  # error "<asm/smp.h> included in non-SMP build"
->  #endif
->  
-> +enum ipi_msg_type {
-> +	IPI_WAKEUP,
-> +	IPI_TIMER,
-> +	IPI_RESCHEDULE,
-> +	IPI_CALL_FUNC,
-> +	IPI_CALL_FUNC_SINGLE,
-> +	IPI_CPU_STOP,
-> +};
-> +
->  #define raw_smp_processor_id() (current_thread_info()->cpu)
->  
->  struct seq_file;
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 72024ea..9ca8ce8 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -46,6 +46,9 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mpu.h>
->  
-> +#define CREATE_TRACE_POINTS
-> +#include <trace/events/ipi.h>
-> +
->  /*
->   * as from 2.5, kernels no longer have an init_tasks structure
->   * so we need some other way of telling a new secondary core
-> @@ -59,15 +62,6 @@ struct secondary_data secondary_data;
->   */
->  volatile int pen_release = -1;
->  
-> -enum ipi_msg_type {
-> -	IPI_WAKEUP,
-> -	IPI_TIMER,
-> -	IPI_RESCHEDULE,
-> -	IPI_CALL_FUNC,
-> -	IPI_CALL_FUNC_SINGLE,
-> -	IPI_CPU_STOP,
-> -};
-> -
->  static DECLARE_COMPLETION(cpu_running);
->  
->  static struct smp_operations smp_ops;
-> @@ -433,19 +427,25 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
->  		smp_cross_call = fn;
->  }
->  
-> +static void ipi_raise(const struct cpumask *mask, int ipinr)
-> +{
-> +	trace_ipi_raise(mask, ipinr);
-> +	smp_cross_call(mask, ipinr);
-> +}
-> +
->  void arch_send_call_function_ipi_mask(const struct cpumask *mask)
->  {
-> -	smp_cross_call(mask, IPI_CALL_FUNC);
-> +	ipi_raise(mask, IPI_CALL_FUNC);
->  }
->  
->  void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
->  {
-> -	smp_cross_call(mask, IPI_WAKEUP);
-> +	ipi_raise(mask, IPI_WAKEUP);
->  }
->  
->  void arch_send_call_function_single_ipi(int cpu)
->  {
-> -	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> +	ipi_raise(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
->  }
->  
->  static const char *ipi_types[NR_IPI] = {
-> @@ -487,7 +487,7 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
->  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
->  void tick_broadcast(const struct cpumask *mask)
->  {
-> -	smp_cross_call(mask, IPI_TIMER);
-> +	ipi_raise(mask, IPI_TIMER);
->  }
->  #endif
->  
-> @@ -528,6 +528,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  	unsigned int cpu = smp_processor_id();
->  	struct pt_regs *old_regs = set_irq_regs(regs);
->  
-> +	trace_ipi_handler_entry(ipinr);
-> +
->  	if (ipinr < NR_IPI)
->  		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
->  
-> @@ -571,11 +573,13 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  		break;
->  	}
->  	set_irq_regs(old_regs);
-> +
-> +	trace_ipi_handler_exit(ipinr);
->  }
->  
->  void smp_send_reschedule(int cpu)
->  {
-> -	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
-> +	ipi_raise(cpumask_of(cpu), IPI_RESCHEDULE);
->  }
->  
->  void smp_send_stop(void)
-> @@ -586,7 +590,7 @@ void smp_send_stop(void)
->  	cpumask_copy(&mask, cpu_online_mask);
->  	cpumask_clear_cpu(smp_processor_id(), &mask);
->  	if (!cpumask_empty(&mask))
-> -		smp_cross_call(&mask, IPI_CPU_STOP);
-> +		ipi_raise(&mask, IPI_CPU_STOP);
->  
->  	/* Wait up to one second for other CPUs to stop */
->  	timeout = USEC_PER_SEC;
-> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-> index 4b8023c..7ebaa3a 100644
-> --- a/arch/arm64/include/asm/smp.h
-> +++ b/arch/arm64/include/asm/smp.h
-> @@ -24,6 +24,13 @@
->  # error "<asm/smp.h> included in non-SMP build"
->  #endif
->  
-> +enum ipi_msg_type {
-> +	IPI_RESCHEDULE,
-> +	IPI_CALL_FUNC,
-> +	IPI_CALL_FUNC_SINGLE,
-> +	IPI_CPU_STOP,
-> +};
-> +
->  #define raw_smp_processor_id() (current_thread_info()->cpu)
->  
->  struct seq_file;
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 78db90d..c987b9f 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -48,6 +48,9 @@
->  #include <asm/tlbflush.h>
->  #include <asm/ptrace.h>
->  
-> +#define CREATE_TRACE_POINTS
-> +#include <trace/events/ipi.h>
-> +
->  /*
->   * as from 2.5, kernels no longer have an init_tasks structure
->   * so we need some other way of telling a new secondary core
-> @@ -426,14 +429,20 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
->  	smp_cross_call = fn;
->  }
->  
-> +static void ipi_raise(const struct cpumask *mask, int ipinr)
-> +{
-> +	trace_ipi_raise(mask, ipinr);
-> +	smp_cross_call(mask, ipinr);
-> +}
-> +
->  void arch_send_call_function_ipi_mask(const struct cpumask *mask)
->  {
-> -	smp_cross_call(mask, IPI_CALL_FUNC);
-> +	ipi_raise(mask, IPI_CALL_FUNC);
->  }
->  
->  void arch_send_call_function_single_ipi(int cpu)
->  {
-> -	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> +	ipi_raise(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
->  }
->  
->  static const char *ipi_types[NR_IPI] = {
-> @@ -501,6 +510,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  	unsigned int cpu = smp_processor_id();
->  	struct pt_regs *old_regs = set_irq_regs(regs);
->  
-> +	trace_ipi_handler_entry(ipinr);
-> +
->  	if (ipinr >= IPI_RESCHEDULE && ipinr < IPI_RESCHEDULE + NR_IPI)
->  		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_RESCHEDULE]);
->  
-> @@ -532,11 +543,13 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  		break;
->  	}
->  	set_irq_regs(old_regs);
-> +
-> +	trace_ipi_handler_exit(ipinr);
->  }
->  
->  void smp_send_reschedule(int cpu)
->  {
-> -	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
-> +	ipi_raise(cpumask_of(cpu), IPI_RESCHEDULE);
->  }
->  
->  void smp_send_stop(void)
-> @@ -549,7 +562,7 @@ void smp_send_stop(void)
->  		cpumask_copy(&mask, cpu_online_mask);
->  		cpu_clear(smp_processor_id(), mask);
->  
-> -		smp_cross_call(&mask, IPI_CPU_STOP);
-> +		ipi_raise(&mask, IPI_CPU_STOP);
->  	}
->  
->  	/* Wait up to one second for other CPUs to stop */
-> diff --git a/include/trace/events/ipi.h b/include/trace/events/ipi.h
-> new file mode 100644
-> index 0000000..4d6648a
-> --- /dev/null
-> +++ b/include/trace/events/ipi.h
-> @@ -0,0 +1,106 @@
-> +#undef TRACE_SYSTEM
-> +#define TRACE_SYSTEM ipi
-> +
-> +#if !defined(_TRACE_IPI_H) || defined(TRACE_HEADER_MULTI_READ)
-> +#define _TRACE_IPI_H
-> +
-> +#include <linux/tracepoint.h>
-> +
-> +struct cpumask;
-> +
-> +#define ipi_name(ipinr) { IPI_##ipinr, #ipinr }
-> +#define show_ipi_name(val)				\
-> +	__print_symbolic(val,				\
-> +			 ipi_name(WAKEUP),		\
-> +			 ipi_name(TIMER),		\
-> +			 ipi_name(RESCHEDULE),		\
-> +			 ipi_name(CALL_FUNC),		\
-> +			 ipi_name(CALL_FUNC_SINGLE),	\
-> +			 ipi_name(CPU_STOP))
-> +
-> +/**
-> + * ipi_handle_entry - called right before the IPI handler
-> + * @ipinr: the IPI number
-> + *
-> + * The @ipinr value must be valid and the action name associated with
-> + * the IPI value is given in the trace.
-> + */
-> +TRACE_EVENT_CONDITION(ipi_handler_entry,
-> +
-> +    TP_PROTO(int ipinr),
-> +
-> +    TP_ARGS(ipinr),
-> +
-> +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0),
-> +
-> +    TP_STRUCT__entry(
-> +        __field(unsigned int, ipinr)
-> +    ),
-> +
-> +    TP_fast_assign(
-> +        __entry->ipinr = ipinr;
-> +    ),
-> +
-> +    TP_printk("ipi=%d, name=%s", __entry->ipinr,
-> +	      show_ipi_name(__entry->ipinr))
-> +);
-> +
-> +/**
-> + * ipi_handle_exit - called right after the IPI handler
-> + * @ipinr: the IPI number
-> + *
-> + * The @ipinr value must be valid and the action name associated with
-> + * the IPI value is given in the trace.
-> + */
-> +TRACE_EVENT_CONDITION(ipi_handler_exit,
-> +
-> +    TP_PROTO(int ipinr),
-> +
-> +    TP_ARGS(ipinr),
-> +
-> +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0),
-> +
-> +    TP_STRUCT__entry(
-> +        __field(int, ipinr)
+> Okay, next question(s).
+>
+> 1. How well tested is any of this imx-drm stuff?
+>
+> 2. What sort of testing has it been subject to?
 
-Here you have "int" and above for the "*_entry" you have unsigned int.
-Is there a difference?
+Most of my tests with the imx-drm driver have been through the LVDS
+panel so far.
 
-If not, you should combine these two into a DECLARE_EVENT_CLASS() and
-then use DEFINE_EVENT_CONDITION() for the two tracepoints.
+For HDMI, I haven't gone through too much of testing yet, only basic
+raw framebuffer at full HD resolution.
 
-> +    ),
-> +
-> +    TP_fast_assign(
-> +        __entry->ipinr = ipinr;
-> +    ),
-> +
-> +    TP_printk("ipi=%d, name=%s", __entry->ipinr,
-> +	      show_ipi_name(__entry->ipinr))
-> +);
-> +
-> +/**
-> + * ipi_raise - called when a smp cross call is made
-> + * @ipinr: the IPI number
-> + * @cpumask: the recipients for the IPI
-> + *
-> + * The @ipinr value must be valid and the action name associated with
-> + * the IPI value is given in the trace.
-> + */
-> +TRACE_EVENT_CONDITION(ipi_raise,
-> +
-> +    TP_PROTO(const struct cpumask *cpumask, int ipinr),
-> +
-> +    TP_ARGS(cpumask, ipinr),
+I know Tony/Robert (and Sascha) and some folks at the Wandboard
+mailing list have also tested HDMI with the previous version of the
+HDMI driver that was posted by Tony.
 
-Why pass in the cpumask if it isn't used? Do you expect to hook
-something else to the tracepoint?
+> Answers to these two questions may help stop me wasting a lot of time
+> chasing what is a really weird bug.
+>
+> So, I have X up and running on the Cubox-i carrier-1, using the imx-drm
+> stuff (I've slightly hacked my xf86-armada X driver to get this working.)
+> This works fine - it detects the connectors, selects an appropriate
+> video mode and produces a picture of the correct shape and size.
+>
+> However... I see really weird effects colouring effects - almost like
+> water over the image.  It's certain colour transitions in the image
+> which seem to trigger this.  There are also certain pixels which
+> "twinkle".
+>
+> Text looks very strange too.  Rather than the font being crisp and clear,
+> it looks like there's red and green shift to it - but its not that it's
+> all shifted in that way.
+>
+> Now, if I use the modetest utility from libdrm-2.4.43 to display a SMPTE
+> test pattern, this again looks right, but there are several vertical
+> single pixel lines of noise.  The most striking one is below the upper
+> red bar in the lower dark area.  I have a single pixel noisy vertical
+> line.
 
--- Steve
+Ok, interesting. Will run a video test pattern via gstreamer
+videotestsrc plugin to see how it behaves.
 
-> +
-> +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0),
-> +
-> +    TP_STRUCT__entry(
-> +        __field(int, ipinr)
-> +    ),
-> +
-> +    TP_fast_assign(
-> +        __entry->ipinr = ipinr;
-> +    ),
-> +
-> +    TP_printk("ipi=%d, name=%s", __entry->ipinr, 
-> +	      show_ipi_name(__entry->ipinr))
-> +);
-> +
-> +#endif /* _TRACE_IPI_H */
-> +
-> +/* This part must be outside protection */
-> +#include <trace/define_trace.h>
+I am travelling tomorrow, so it will be at last in 2 weeks that I will
+be able to access a mx6 hardware.
+
+In the meantime, maybe one of the folks in Cc could share some ideas.
+
+Regards,
+
+Fabio Estevam
