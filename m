@@ -1,111 +1,63 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 15 Oct 2013 15:51:41 +0900
-Subject: [RESEND PATCHv2 1/3] arm: socfpga: Set the SDMMC clock phase in
- system manager
-In-Reply-To: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
-References: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
-Message-ID: <525CE5FD.8070107@samsung.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 15 Oct 2013 08:49:11 +0200
+Subject: [PATCH 2/5] mmc: sdhci-esdhc-imx: add flag ESDHC_FLAG_ENGCM07207
+In-Reply-To: <1381739024-24924-3-git-send-email-shawn.guo@linaro.org>
+References: <1381739024-24924-1-git-send-email-shawn.guo@linaro.org>
+ <1381739024-24924-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1381819751.4243.5.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
-
-On 10/15/2013 04:47 AM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+Am Montag, den 14.10.2013, 16:23 +0800 schrieb Shawn Guo:
+> Add flag ESDHC_FLAG_ENGCM07207 for enabling the workaround for errata
+> ENGcm07207 and set the flag for i.MX25 and i.MX35 ESDHC.
 > 
-> Add functionality in the System Manager to set the SDR settings for the
-> SD/MMC IP.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> Cc: Pavel Machek <pavel@denx.de>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Olof Johansson <olof@lixom.net>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ian.campbell@citrix.com>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> Cc: Seungwon Jeon <tgih.jun@samsung.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-mmc at vger.kernel.org
-> CC: linux-arm-kernel at lists.infradead.org
-> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
-> v2:
-> - Have socfpga_sysmgr_set_dwmmc_drvsel_smpsel() take in the SDR settings
-> directly so that it does not have to walk the DTB.
-> ---
->  arch/arm/mach-socfpga/Makefile     |    2 +-
->  arch/arm/mach-socfpga/core.h       |    6 ++++++
->  arch/arm/mach-socfpga/system_mgr.c |   28 ++++++++++++++++++++++++++++
->  3 files changed, 35 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/mach-socfpga/system_mgr.c
+>  drivers/mmc/host/sdhci-esdhc-imx.c |   10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
-> index 6dd7a93..e4ff8b9 100644
-> --- a/arch/arm/mach-socfpga/Makefile
-> +++ b/arch/arm/mach-socfpga/Makefile
-> @@ -2,5 +2,5 @@
->  # Makefile for the linux kernel.
->  #
->  
-> -obj-y					:= socfpga.o
-> +obj-y					:= socfpga.o system_mgr.o
->  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
-> diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-> index 572b8f7..b05fa6a 100644
-> --- a/arch/arm/mach-socfpga/core.h
-> +++ b/arch/arm/mach-socfpga/core.h
-> @@ -44,4 +44,10 @@ extern unsigned long cpu1start_addr;
->  
->  #define SOCFPGA_SCU_VIRT_BASE   0xfffec000
->  
-> +/* SDMMC Group for System Manager defines */
-> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET             0x108
-> +#define DRV_CLK_PHASE_SHIFT_SEL_MASK    0x7
-I didn't see where this define is used. When do this use?
-
-Best Regards,
-Jaehoon Chung
-
-> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
-> +	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
-> +
->  #endif
-> diff --git a/arch/arm/mach-socfpga/system_mgr.c b/arch/arm/mach-socfpga/system_mgr.c
-> new file mode 100644
-> index 0000000..9fdce1d
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/system_mgr.c
-> @@ -0,0 +1,28 @@
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index e046917..a5d7d15 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -89,6 +89,11 @@
+>   * exeception. Bit1 of Vendor Spec registor is used to fix it.
+>   */
+>  #define ESDHC_FLAG_MULTIBLK_NO_INT	BIT(1)
 > +/*
-> + * Copyright Altera Corporation (C) 2013. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + * The flag enables the workaround for ESDHC errata ENGcm07207 which
+> + * presents on i.MX25 and i.MX35.
+
+s/presents/is present/
+
 > + */
-> +#include <linux/of_platform.h>
-> +#include <asm/mach/map.h>
+> +#define ESDHC_FLAG_ENGCM07207		BIT(2)
+>  
+>  enum imx_esdhc_type {
+>  	IMX25_ESDHC,
+> @@ -865,6 +870,9 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  	if (is_imx25_esdhc(imx_data))
+>  		imx_data->flags |= ESDHC_FLAG_NO_DMAS_BITS;
+>  
+> +	if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
+> +		imx_data->flags |= ESDHC_FLAG_ENGCM07207;
 > +
-> +#include "core.h"
-> +
-> +void socfpga_sysmgr_set_dwmmc_drvsel_smpsel(u32 drvsel, u32 smplsel)
-> +{
-> +	u32 hs_timing;
-> +
-> +	hs_timing = SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel);
-> +	writel(hs_timing, sys_manager_base_addr + SYSMGR_SDMMCGRP_CTRL_OFFSET);
-> +}
-> +EXPORT_SYMBOL(socfpga_sysmgr_set_dwmmc_drvsel_smpsel);
-> 
+>  	imx_data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
+>  	if (IS_ERR(imx_data->clk_ipg)) {
+>  		err = PTR_ERR(imx_data->clk_ipg);
+> @@ -905,7 +913,7 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  
+>  	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
+>  
+> -	if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
+> +	if (imx_data->flags & ESDHC_FLAG_ENGCM07207)
+>  		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
+>  		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
+>  			| SDHCI_QUIRK_BROKEN_ADMA;
+
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
