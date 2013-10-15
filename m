@@ -1,57 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 16 Oct 2013 07:32:20 +0900
-Subject: [PATCH RESEND 0/3] ARM: S3C24XX: add missing dma-devices and
- warning fix
-In-Reply-To: <201310132011.11285.heiko@sntech.de>
-References: <201310111059.19791.heiko@sntech.de>
- <20131013145642.GJ2954@intel.com> <201310132011.11285.heiko@sntech.de>
-Message-ID: <525DC274.8090808@samsung.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Wed, 16 Oct 2013 01:38:09 +0300
+Subject: .align may cause data to be interpreted as instructions
+Message-ID: <525DC3D1.5030300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/13 03:11, Heiko St?bner wrote:
-> Am Sonntag, 13. Oktober 2013, 16:56:42 schrieb Vinod Koul:
->> On Fri, Oct 11, 2013 at 10:59:19AM +0200, Heiko St?bner wrote:
->>> [I messed up the linux-arm-kernel list address yesterday, so I resend it
->>> with a fixed address, sorry for the noise]
->>>
->>> When Olof reported the warning about the unused s3c2410_dma_resource, I
->>> thought the best way forward would be to simply implement the missing
->>> pieces and so it has users :-) .
->>>
->>> Therefore this series adds the necessary platform-devices for s3c2410,
->>> s3c2440 and s3c2442. This especially also includes the
->>> channel-constraints of those socs.
->>>
->>> As I do not have access to any of those socs these changes are of course
->>> compile-tested only.
->>
->> Do you want this to be applied thru dma or arm tree?
->
-> hmm, the original series went into the samsung tree for 3.13, so maybe this
-> addition should go the same way?
->
-I think so, let me pick this up into Samsung tree for v3.13.
+Hi
 
-Thanks,
-Kukjin
+I was debugging kprobes-test for BE8 and noticed that some data fields
+are stored in LE instead of BE. It happens because these data fields
+get interpreted as instructions.
 
->
-> Heiko
->
->
->> ~Vinod
->>
->>> Heiko Stuebner (3):
->>>    ARM: S3C24XX: Fix possible dma selection warning
->>>    dmaengine: s3c24xx-dma: add support for the s3c2410 type of controller
->>>    ARM: S3C24XX: add dma platformdata for s3c2410, s3c2440 and s3c2442
->>>
->>>   arch/arm/mach-s3c24xx/Kconfig             |    3 +-
->>>   arch/arm/mach-s3c24xx/common.c            |  100
->>>   +++++++++++++++++++++++++++++ arch/arm/mach-s3c24xx/common.h
->>>   |    2 +
->>>   drivers/dma/s3c24xx-dma.c                 |   10 +++
->>>   include/linux/platform_data/dma-s3c24xx.h |    3 +
->>>   sound/soc/samsung/Kconfig                 |    2 +-
->>>   6 files changed, 118 insertions(+), 2 deletions(-)
+Is it a known issue?
+
+For example:
+test_align_fail_data:
+	bx	lr
+	.byte 0xaa
+	.align
+	.word 0x12345678
+
+I would expect to see something like this:
+00000000 <test_align_fail_data>:
+   0:	e12fff1e 	bx	lr
+   4:	aa          	.byte	0xaa
+   5:	00          	.byte	0x00
+   6:	0000      	.short	0x0000
+   8:	12345678 	.word	0x12345678
+
+But instead I have:
+00000000 <test_align_fail_data>:
+   0:	e12fff1e 	bx	lr
+   4:	aa          	.byte	0xaa
+   5:	00          	.byte	0x00
+   6:	0000      	.short	0x0000
+   8:	12345678 	eorsne	r5, r4, #120, 12	; 0x7800000
+
+As a result the word 0x12345678 will be stored in LE.
+
+I've run several tests and here are my observations:
+- Double ".align" fixes the issue :)
+- Behavior is the same for LE/BE, ARM/Thumb, GCC 4.4.1/4.6.x/4.8.2
+- Size of alignment doesn't matter.
+- Issue happens only if previous data is not instruction-aligned and
+    0's are added before NOPs.
+- Explicit filling with 0's (.align , 0) fixes the issue, but as a side
+    effect data @0x4 is interpreted as a single ".word 0xaa000000"
+    instead of ".byte .byte .short". I'm not sure if there can be any
+    functional difference because of this.
+- Issue doesn't happen if there is no instructions before data
+  (no "bx lr" in the example).
+- Issue doesn't happen if data after .align is defined as
+    ".type <symbol>,%object".
+
+-- 
+Taras Kondratiuk
