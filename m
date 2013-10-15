@@ -1,161 +1,73 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Tue, 15 Oct 2013 12:03:25 +0530
-Subject: [PATCH] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <20131014123436.GA10491@mudshark.cambridge.arm.com>
-References: <1381733189-2745-1-git-send-email-vkale@apm.com>
- <20131014123436.GA10491@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYkc-ocBi6B6MP23gHqsovgQovvEWSv=khstS4wbD2dXzjw@mail.gmail.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Tue, 15 Oct 2013 09:38:31 +0300
+Subject: [PATCH 0/3] virtio-mmio: handle BE guests on LE hosts
+In-Reply-To: <874n8jbfoa.fsf@rustcorp.com.au>
+References: <525BFBF9.5010804@arm.com>
+ <8C68DB9E-8391-4CF2-BB82-A49BDA26998B@suse.de>
+ <525C0514.5030103@arm.com> <525C0622.8040504@redhat.com>
+ <525C09D1.8060103@arm.com> <525C0C21.2070001@redhat.com>
+ <525C0F99.8030909@arm.com> <525C20E8.6080409@redhat.com>
+ <20131014171022.GA13807@redhat.com>
+ <874n8jbfoa.fsf@rustcorp.com.au>
+Message-ID: <20131015063831.GA19143@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, Oct 15, 2013 at 09:53:17AM +1030, Rusty Russell wrote:
+> "Michael S. Tsirkin" <mst@redhat.com> writes:
+> > On Mon, Oct 14, 2013 at 06:50:48PM +0200, Paolo Bonzini wrote:
+> >> Il 14/10/2013 17:36, Marc Zyngier ha scritto:
+> >> >> > 
+> >> >> > Devices are fine in QEMU, it's only the "generic" parts (rings) that are
+> >> >> > missing AFAICT.
+> >> > So if I understand correctly how it works, target endianness is set at
+> >> > compile time, and you have a BE specific QEMU?
+> >> 
+> >> Yes.  Though as Alex said, this will have to change for PPC
+> >> little-endian support.
+> >> 
+> >> Paolo
+> >
+> > Or we'll just say that this platform requires virtio 1.0.
+> 
+> To come full circle, I have implemented virtio support for BE PPC in
+> qemu :) And we'll be supporting pre-1.0 for the moment. I'm awaiting
+> some ppc-specific hooks, but it could be merged without them.
+> 
+> It's icky: we don't really want to use the current endianness of the
+> CPU, since in theory a BE kernel could be running an LE process.  So at
+> the time of virtio device reset (the first thing the Linux drivers do)
+> we read the endianness of the interrupt entry point, which is presumably
+> the OS endianness.
 
-Thanks for your comments. Please see inline below.
+Indeed, ick.
+The next thing after reset is status write:
 
-On Mon, Oct 14, 2013 at 6:04 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Vinayak,
->
-> On Mon, Oct 14, 2013 at 07:46:29AM +0100, Vinayak Kale wrote:
->> This patch adds support for irq registration when pmu interrupt type is PPI.
->> The patch also fixes ARMV8_EVTYPE_* macros since evtCount field width is
->> 10bits.
->>
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
->> ---
->>  arch/arm64/kernel/perf_event.c |  108 +++++++++++++++++++++++++++++-----------
->>  1 file changed, 78 insertions(+), 30 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index cea1594..ba3706d 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -363,22 +363,53 @@ validate_group(struct perf_event *event)
->>  }
->
-> [...]
->
->>  static int
->>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>  {
->> @@ -396,36 +427,53 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->>               return -ENODEV;
->>       }
->>
->> -     for (i = 0; i < irqs; ++i) {
->> -             err = 0;
->> -             irq = platform_get_irq(pmu_device, i);
->> -             if (irq < 0)
->> -                     continue;
->> +     irq = platform_get_irq(pmu_device, 0);
->>
->> +     if (irq >= 16 && irq <= 31) {
->
-> This is horribly GIC specific and will break in the face of IRQ domains
-> (since this is a virtual interrupt number).
->
+        /* We always start by resetting the device, in case a previous
+         * driver messed it up.  This also tests that code path a
+         * little. */
+        dev->config->reset(dev);
 
-hmm, yes. I had not considered irq domain mapping.
+        /* Acknowledge that we've seen the device. */
+        add_status(dev, VIRTIO_CONFIG_S_ACKNOWLEDGE);
 
->>               /*
->> -              * If we have a single PMU interrupt that we can't shift,
->> -              * assume that we're running on a uniprocessor machine and
->> -              * continue. Otherwise, continue without this interrupt.
->> +              * percpu PMU interrupt.
->>                */
->> -             if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
->> -                     pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
->> -                                 irq, i);
->> -                     continue;
->> -             }
->> -
->> -             err = request_irq(irq, armpmu->handle_irq,
->> -                               IRQF_NOBALANCING,
->> -                               "arm-pmu", armpmu);
->> +             err = request_percpu_irq(irq, armpmu->handle_irq,
->> +                                             "arm-pmu", armpmu);
->
-> This is broken -- the dev_id *must* be a __percpu variable for percpu irqs.
->
+and mmio happens to use a 32 bit register for this:
 
-Yes, this needs to be fixed.
+	static void vm_set_status(struct virtio_device *vdev, u8 status)
+	{
+		struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
 
->>               if (err) {
->>                       pr_err("unable to request IRQ%d for ARM PMU counters\n",
->> -                             irq);
->> +                                     irq);
->>                       armpmu_release_hardware(armpmu);
->>                       return err;
->>               }
->>
->> -             cpumask_set_cpu(i, &armpmu->active_irqs);
->> +             on_each_cpu(armpmu_enable_percpu_irq, (void *)armpmu, 1);
->> +     } else {
->> +             for (i = 0; i < irqs; ++i) {
->> +                     err = 0;
->> +                     irq = platform_get_irq(pmu_device, i);
->> +                     if (irq < 0)
->> +                             continue;
->> +
->> +                     /*
->> +                      * If we have a single PMU interrupt that we can't shift,
->> +                      * assume that we're running on a uniprocessor machine and
->> +                      * continue. Otherwise, continue without this interrupt.
->> +                      */
->> +                     if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
->> +                             pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
->> +                                             irq, i);
->> +                             continue;
->> +                     }
->> +
->> +                     err = request_irq(irq, armpmu->handle_irq,
->> +                                     IRQF_NOBALANCING,
->> +                                     "arm-pmu", armpmu);
->
-> A better way to do this is to try request_percpu_irq first. If that fails,
-> then try request_irq. However, the error reporting out of request_percpu_irq
-> could do with some cleanup (rather than just return -EINVAL) so we can
-> detect the difference between `this interrupt isn't per-cpu' and `this
-> per-cpu interrupt is invalid'. This can help us avoid the WARN_ON in
-> request_irq when it is passed a per-cpu interrupt.
->
+		/* We should never be setting status to 0. */
+		BUG_ON(status == 0);
 
-Trying request_percpu_irq first seems better. But if it fails then we
-would straight away
-assume it's not per-cpu interrupt and try request_irq. In this case we
-may not be able to
-detect 'this per-cpu interrupt is invalid' case.
+		writel(status, vm_dev->base + VIRTIO_MMIO_STATUS);
+	}
 
->> @@ -784,8 +832,8 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
->>  /*
->>   * PMXEVTYPER: Event selection reg
->>   */
->> -#define      ARMV8_EVTYPE_MASK       0xc80000ff      /* Mask for writable bits */
->> -#define      ARMV8_EVTYPE_EVENT      0xff            /* Mask for EVENT bits */
->> +#define      ARMV8_EVTYPE_MASK       0xc80003ff      /* Mask for writable bits */
->> +#define      ARMV8_EVTYPE_EVENT      0x3ff           /* Mask for EVENT bits */
->>
->>  /*
->>   * Event filters for PMUv3
->> @@ -1175,7 +1223,7 @@ static void armv8pmu_reset(void *info)
->>  static int armv8_pmuv3_map_event(struct perf_event *event)
->>  {
->>       return map_cpu_event(event, &armv8_pmuv3_perf_map,
->> -                             &armv8_pmuv3_perf_cache_map, 0xFF);
->> +                             &armv8_pmuv3_perf_cache_map, 0x3FF);
->>  }
->
-> What's all this?
->
+so if we only care about mmio, we can use the status write
+to detect endian-ness: low byte set means LE, high byte set
+means BE, which seems cleaner.
 
-The evtCount (event number) field width is 10bits in event selection register.
-So need to fix ARMV8_EVTYPE_* macros and related mask value.
+Hmm?
 
->From the subject of patch, one may think that the patch is specific
-only to percpu irq changes (which is not true).
-
-I had mentioned about fixing ARMV8_EVTYPE_* macros in patch description.
-
-> Will
-
--Vinayak
+-- 
+MST
