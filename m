@@ -1,41 +1,69 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 15 Oct 2013 07:13:52 -0700
-Subject: [PATCH] ARM: shmobile: Genmai defconfig
-In-Reply-To: <CANqRtoTWSb_MkVGbUpSQ1vtaF+ojsUKBzkyUCt5CTGAnerTsUQ@mail.gmail.com>
- (Magnus Damm's message of "Tue, 15 Oct 2013 11:00:02 +0900")
-References: <cover.1381300141.git.horms+renesas@verge.net.au>
- <bb416e1d7416861bece0335f543c590d9af09c79.1381300141.git.horms+renesas@verge.net.au>
- <87vc0z4i8j.fsf@linaro.org>
- <CANqRtoTWSb_MkVGbUpSQ1vtaF+ojsUKBzkyUCt5CTGAnerTsUQ@mail.gmail.com>
-Message-ID: <87siw239lr.fsf@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Oct 2013 15:23:14 +0100
+Subject: [PATCH] arch_timer: Do not register arch_sys_counter twice
+In-Reply-To: <1381843911-31962-1-git-send-email-treding@nvidia.com>
+References: <1381843911-31962-1-git-send-email-treding@nvidia.com>
+Message-ID: <20131015142313.GC850@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Magnus Damm <magnus.damm@gmail.com> writes:
+On Tue, Oct 15, 2013 at 02:31:51PM +0100, Thierry Reding wrote:
+> Commit 65cd4f6 (arch_timer: Move to generic sched_clock framework) added
+> code to register the arch_sys_counter in arch_timer_register() but it is
+> already registered in arch_counter_register(). This results in the timer
+> being added to the clocksource list twice, therefore causing an infinite
+> loop in the list.
+> 
+> Remove the duplicate registration and register the scheduler clock after
+> the original registration instead.
+> 
+> This fixes a hang during boot on Tegra114 (Cortex-A15).
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> While I've only tested this on Tegra114, I suspect the same hang during
+> boot happens for all processors that use this clock source.
+> 
+>  drivers/clocksource/arm_arch_timer.c | 12 +++---------
+>  1 file changed, 3 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index f655036..95fb944 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -436,6 +436,9 @@ static void __init arch_counter_register(unsigned type)
+>  	cyclecounter.mult = clocksource_counter.mult;
+>  	cyclecounter.shift = clocksource_counter.shift;
+>  	timecounter_init(&timecounter, &cyclecounter, start_count);
+> +
+> +	/* 56 bits minimum, so we assume worst case rollover */
+> +	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+>  }
+>  
+>  static void arch_timer_stop(struct clock_event_device *clk)
+> @@ -515,15 +518,6 @@ static int __init arch_timer_register(void)
+>  		goto out;
+>  	}
+>  
+> -	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+> -	cyclecounter.mult = clocksource_counter.mult;
+> -	cyclecounter.shift = clocksource_counter.shift;
+> -	timecounter_init(&timecounter, &cyclecounter,
+> -			 arch_counter_get_cntvct());
+> -
+> -	/* 56 bits minimum, so we assume worst case rollover */
+> -	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+> -
+>  	if (arch_timer_use_virtual) {
+>  		ppi = arch_timer_ppi[VIRT_PPI];
+>  		err = request_percpu_irq(ppi, arch_timer_handler_virt,
 
-> On Tue, Oct 15, 2013 at 7:09 AM, Kevin Hilman <khilman@linaro.org> wrote:
->> Simon Horman <horms+renesas@verge.net.au> writes:
->>
->>> From: Magnus Damm <damm@opensource.se>
->>>
->>> Add a defconfig for the Genmai board. In the future this board will
->>> use a shared defconfig for multiplatform, but until CCF is implemented
->>> this will be used.
->>
->> How far in the future are we talking about?
->
-> My plan is to implement and upstream CCF for r7s72100 now in Q4 of 2013.
+Excuse my ignorance, but I'm failing to apply either this patch or the one
+that Stephen Boyd proposed:
 
-Great, thanks for the update.
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204665.html
 
->> There's already 9 defconfigs for SH-mobile.  Is this *really* the last
->> one before multi-platform support?
->
-> Yes, it is! From this time all the mach-shmobile boards have to be
-> multi-platform from the start.
+The second hunk (deletions) doesn't apply at all, and if I just apply the
+first hunk then things won't compile. Which tree is this against?
 
-OK, then we'll take this as the last one.
-
-Thanks,
-
-Kevin
+Will
