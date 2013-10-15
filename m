@@ -1,40 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Oct 2013 21:47:27 +0200
-Subject: [RESEND PATCHv2 1/3] arm: socfpga: Set the SDMMC clock phase in
- system manager
-In-Reply-To: <525D9532.6080503@gmail.com>
-References: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
- <201310152101.44669.arnd@arndb.de> <525D9532.6080503@gmail.com>
-Message-ID: <201310152147.27569.arnd@arndb.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 15 Oct 2013 13:51:11 -0600
+Subject: [PATCH RESEND] PCI: mvebu - Support a bridge with no IO port
+ window
+In-Reply-To: <20131003140648.52734cfc@skate>
+References: <1380650281-16175-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1380650281-16175-2-git-send-email-jgunthorpe@obsidianresearch.com>
+ <20131003140648.52734cfc@skate>
+Message-ID: <20131015195111.GB30106@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 October 2013, Dinh Nguyen wrote:
-> >
-> > 1 Create a "syscon" backend driver to control your "system manager", which
-> >    lets other drivers hook into it without calling a private API.
-> Yes, if you look at drivers/mmc/host/dw_mmc-socfpga.c that is in the 
-> mainline,
-> it is hooking into the "system manager" through "syscon". Is this what you
-> mean here?
+On Thu, Oct 03, 2013 at 02:06:48PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Gunthorpe,
+> 
+> On Tue,  1 Oct 2013 11:58:01 -0600, Jason Gunthorpe wrote:
+> > Make pcie-io-aperture and the IO port MBUS ID in ranges optional.
+> > If not provided the bridge reports to Linux that IO space mapping is
+> > not supported and refuses to configure an IO mbus window.
+> > 
+> > This allows both complete disable (do not specify pcie-io-aperture) and
+> > per-port disable (do not specify a IO target ranges entry for the port)
+> > 
+> > Most PCIE devices these days do not require IO support to function,
+> > so having an option to disable it in the driver is useful.
+> > 
+> > This depends on 'bus: mvebu-mbus: Fix optional pcie-mem/io-aperture properties'
+> > to work properly.
+> 
+> This doesn't work here, I get multiple warnings "Attempt to set IO when
+> IO is disabled" :
 
-No, because you directly hook into the syscon driver, rather than using
-a clock driver as the middle-man, see steps 2 and 3 below.
- 
-> The problem is because of the SYSMGR_SDMMCGRP_CTRL_OFFSET define
-> in this file. This means the SD/MMC driver needs information that is 
-> outside of its IP.
+Okay, I looked into this.
 
-Yes, this is not ideal because you don't really want that information
-in the sd/mmc driver. That driver should only know about the fact
-that it talks to a clock controller, not how it's implemented.
+The warnings are caused by the bogus mvebu_has_ioport you noted, 
+and this is also required:
 
-	Arnd
+        /* Are the new iobase/iolimit values invalid? */
+-       if (port->bridge.iolimit < port->bridge.iobase ||
++       if (port->bridge.iolimit <= port->bridge.iobase ||
+            port->bridge.iolimitupper < port->bridge.iobaseupper) {
 
-> > 2 Create a trivial clock driver that is independent of your existing
-> >    clock driver and independent of the other drivers using the system
-> >    manager, by using syscon as the low-level interface.
-> > 3 Make the sdmmc driver use the normal clock API and link its clock to the
-> >    driver from step 2 in the device tree.
-> >
-> > Is this what you have tried before?
+> >  	case PCI_IO_BASE:
+> > -		*value = (bridge->secondary_status << 16 |
+> > -			  bridge->iolimit          <<  8 |
+> > -			  bridge->iobase);
+> > +		if (!mvebu_has_ioport(port))
+> > +			*value = 0;
+> > +		else
+> > +			*value = (bridge->secondary_status << 16 |
+> > +				  bridge->iolimit          <<  8 |
+> > +				  bridge->iobase);
+> 
+> While I do understand that you're returning 0 for iolimit and iobase,
+> I'm not sure why the secondary status is affected by the value of
+> mvebu_has_ioport().
+
+This is an error, of sorts. 0 is actually the correct value for 
+secondary status with the current capabilities of the driver.. I'll
+fix it here as you noted and send a patch to fix that up separately.
+
+New patches in a sec..
+
+Thanks,
+Jason
