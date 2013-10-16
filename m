@@ -1,127 +1,107 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Oct 2013 21:58:16 +0530
-Subject: [PATCH 7/7] video: exynos_dp: Use the generic PHY driver
-In-Reply-To: <1381940896-9355-1-git-send-email-kishon@ti.com>
-References: <1381940896-9355-1-git-send-email-kishon@ti.com>
-Message-ID: <1381940896-9355-8-git-send-email-kishon@ti.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Thu, 17 Oct 2013 00:33:37 +0800
+Subject: [PATCH v3 3/7] arm64: move encode_insn_immediate() from module.c
+ to insn.c
+In-Reply-To: <20131016112222.GG5403@mudshark.cambridge.arm.com>
+References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
+ <1381893492-7135-4-git-send-email-liuj97@gmail.com>
+ <20131016112222.GG5403@mudshark.cambridge.arm.com>
+Message-ID: <525EBFE1.2060103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jingoo Han <jg1.han@samsung.com>
+On 10/16/2013 07:22 PM, Will Deacon wrote:
+> On Wed, Oct 16, 2013 at 04:18:08AM +0100, Jiang Liu wrote:
+>> From: Jiang Liu <jiang.liu@huawei.com>
+>>
+>> Function encode_insn_immediate() will be used by other instruction
+>> manipulate related functions, so move it into insn.c and rename it
+>> as aarch64_insn_encode_immediate().
+>>
+>> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+>> Cc: Jiang Liu <liuj97@gmail.com>
+>> ---
+>>  arch/arm64/include/asm/insn.h |  14 ++++
+>>  arch/arm64/kernel/insn.c      |  77 +++++++++++++++++++++
+>>  arch/arm64/kernel/module.c    | 151 +++++++++---------------------------------
+>>  3 files changed, 123 insertions(+), 119 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+>> index 2dfcdb4..8dc0a91 100644
+>> --- a/arch/arm64/include/asm/insn.h
+>> +++ b/arch/arm64/include/asm/insn.h
+>> @@ -28,6 +28,18 @@ enum aarch64_insn_class {
+>>                                          * system instructions */
+>>  };
+>>
+>> +enum aarch64_insn_imm_type {
+>> +       AARCH64_INSN_IMM_MOVNZ,
+>> +       AARCH64_INSN_IMM_MOVK,
+>> +       AARCH64_INSN_IMM_ADR,
+>> +       AARCH64_INSN_IMM_26,
+>> +       AARCH64_INSN_IMM_19,
+>> +       AARCH64_INSN_IMM_16,
+>> +       AARCH64_INSN_IMM_14,
+>> +       AARCH64_INSN_IMM_12,
+>> +       AARCH64_INSN_IMM_9,
+>> +};
+>> +
+>>  #define        __AARCH64_INSN_FUNCS(abbr, mask, val)   \
+>>  static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+>>  { return (code & (mask)) == (val); }   \
+>> @@ -47,6 +59,8 @@ __AARCH64_INSN_FUNCS(nop,     0xFFFFFFFF, 0xD503201F)
+>>  #undef __AARCH64_INSN_FUNCS
+>>
+>>  enum aarch64_insn_class aarch64_get_insn_class(u32 insn);
+>> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+>> +                                 u32 insn, u64 imm);
+>>  u32 aarch64_insn_read(void *addr);
+>>  void aarch64_insn_write(void *addr, u32 insn);
+>>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>> index ad4185f..90cc312 100644
+>> --- a/arch/arm64/kernel/insn.c
+>> +++ b/arch/arm64/kernel/insn.c
+>> @@ -179,3 +179,80 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+>>         else
+>>                 return aarch64_insn_patch_text_sync(addrs, insns, cnt);
+>>  }
+>> +
+>> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+>> +                                 u32 insn, u64 imm)
+>> +{
+>> +       u32 immlo, immhi, lomask, himask, mask;
+>> +       int shift;
+>> +
+>> +       switch (type) {
+>> +       case AARCH64_INSN_IMM_MOVNZ:
+>> +               /*
+>> +                * For signed MOVW relocations, we have to manipulate the
+>> +                * instruction encoding depending on whether or not the
+>> +                * immediate is less than zero.
+>> +                */
+>> +               insn &= ~(3 << 29);
+>> +               if ((s64)imm >= 0) {
+>> +                       /* >=0: Set the instruction to MOVZ (opcode 10b). */
+>> +                       insn |= 2 << 29;
+>> +               } else {
+>> +                       /*
+>> +                        * <0: Set the instruction to MOVN (opcode 00b).
+>> +                        *     Since we've masked the opcode already, we
+>> +                        *     don't need to do anything other than
+>> +                        *     inverting the new immediate field.
+>> +                        */
+>> +                       imm = ~imm;
+>> +               }
+> 
+> I'm really not comfortable with this. This code is performing static
+> relocations and re-encoding instructions as required by the AArch64 ELF
+> spec. That's not really what you'd expect from a generic instruction
+> encoder!
+Thanks for reminder, will move above code back into module.c.
+Thanks!
+Gerry
 
-Use the generic PHY API to control the DP PHY.
-
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- Documentation/devicetree/bindings/video/exynos_dp.txt |   17 +++++++++--------
- drivers/video/exynos/exynos_dp_core.c                 |   16 ++++++++++++----
- drivers/video/exynos/exynos_dp_core.h                 |    1 +
- 3 files changed, 22 insertions(+), 12 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
-index 84f10c1..3289d76 100644
---- a/Documentation/devicetree/bindings/video/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
-@@ -6,10 +6,10 @@ We use two nodes:
- 	-dptx-phy node(defined inside dp-controller node)
- 
- For the DP-PHY initialization, we use the dptx-phy node.
--Required properties for dptx-phy:
--	-reg:
-+Required properties for dptx-phy: deprecated, use phys and phy-names
-+	-reg: deprecated
- 		Base address of DP PHY register.
--	-samsung,enable-mask:
-+	-samsung,enable-mask: deprecated
- 		The bit-mask used to enable/disable DP PHY.
- 
- For the Panel initialization, we read data from dp-controller node.
-@@ -27,6 +27,10 @@ Required properties for dp-controller:
- 		from common clock binding: Shall be "dp".
- 	-interrupt-parent:
- 		phandle to Interrupt combiner node.
-+	-phys:
-+		from general PHY binding: the phandle for the PHY device.
-+	-phy-names:
-+		from general PHY binding: Should be "dp".
- 	-samsung,color-space:
- 		input video data format.
- 			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
-@@ -68,11 +72,8 @@ SOC specific portion:
- 		clocks = <&clock 342>;
- 		clock-names = "dp";
- 
--		dptx-phy {
--			reg = <0x10040720>;
--			samsung,enable-mask = <1>;
--		};
--
-+		phys = <&dp_phy>;
-+		phy-names = "dp";
- 	};
- 
- Board Specific portion:
-diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
-index 05fed7d..5e1a715 100644
---- a/drivers/video/exynos/exynos_dp_core.c
-+++ b/drivers/video/exynos/exynos_dp_core.c
-@@ -19,6 +19,7 @@
- #include <linux/interrupt.h>
- #include <linux/delay.h>
- #include <linux/of.h>
-+#include <linux/phy/phy.h>
- 
- #include "exynos_dp_core.h"
- 
-@@ -960,8 +961,11 @@ static int exynos_dp_dt_parse_phydata(struct exynos_dp_device *dp)
- 
- 	dp_phy_node = of_find_node_by_name(dp_phy_node, "dptx-phy");
- 	if (!dp_phy_node) {
--		dev_err(dp->dev, "could not find dptx-phy node\n");
--		return -ENODEV;
-+		dp->phy = devm_phy_get(dp->dev, "dp");
-+		if (IS_ERR(dp->phy))
-+			return PTR_ERR(dp->phy);
-+		else
-+			return 0;
- 	}
- 
- 	if (of_property_read_u32(dp_phy_node, "reg", &phy_base)) {
-@@ -992,7 +996,9 @@ err:
- 
- static void exynos_dp_phy_init(struct exynos_dp_device *dp)
- {
--	if (dp->phy_addr) {
-+	if (dp->phy) {
-+		phy_power_on(dp->phy);
-+	} else if (dp->phy_addr) {
- 		u32 reg;
- 
- 		reg = __raw_readl(dp->phy_addr);
-@@ -1003,7 +1009,9 @@ static void exynos_dp_phy_init(struct exynos_dp_device *dp)
- 
- static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
- {
--	if (dp->phy_addr) {
-+	if (dp->phy) {
-+		phy_power_off(dp->phy);
-+	} else if (dp->phy_addr) {
- 		u32 reg;
- 
- 		reg = __raw_readl(dp->phy_addr);
-diff --git a/drivers/video/exynos/exynos_dp_core.h b/drivers/video/exynos/exynos_dp_core.h
-index 56cfec8..607e36d 100644
---- a/drivers/video/exynos/exynos_dp_core.h
-+++ b/drivers/video/exynos/exynos_dp_core.h
-@@ -151,6 +151,7 @@ struct exynos_dp_device {
- 	struct video_info	*video_info;
- 	struct link_train	link_train;
- 	struct work_struct	hotplug_work;
-+	struct phy		*phy;
- };
- 
- /* exynos_dp_reg.c */
--- 
-1.7.10.4
+> 
+> Will
+> 
