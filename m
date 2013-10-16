@@ -1,179 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Oct 2013 12:11:30 +0100
-Subject: [PATCH v3 2/7] arm64: introduce interfaces to hotpatch kernel
- and module code
-In-Reply-To: <1381893492-7135-3-git-send-email-liuj97@gmail.com>
-References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
- <1381893492-7135-3-git-send-email-liuj97@gmail.com>
-Message-ID: <20131016111130.GE5403@mudshark.cambridge.arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 16 Oct 2013 12:13:28 +0100
+Subject: .align may cause data to be interpreted as instructions
+In-Reply-To: <525DC3D1.5030300@linaro.org>
+References: <525DC3D1.5030300@linaro.org>
+Message-ID: <525E74D8.3070008@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 04:18:07AM +0100, Jiang Liu wrote:
-> From: Jiang Liu <jiang.liu@huawei.com>
-> 
-> Introduce three interfaces to patch kernel and module code:
-> aarch64_insn_patch_text_nosync():
-> 	patch code without synchronization, it's caller's responsibility
-> 	to synchronize all CPUs if needed.
-> aarch64_insn_patch_text_sync():
-> 	patch code and always synchronize with stop_machine()
-> aarch64_insn_patch_text():
-> 	patch code and synchronize with stop_machine() if needed
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Jiang Liu <liuj97@gmail.com>
-> ---
->  arch/arm64/include/asm/insn.h |  7 +++-
->  arch/arm64/kernel/insn.c      | 95 +++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 101 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index e7d1bc8..2dfcdb4 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -47,7 +47,12 @@ __AARCH64_INSN_FUNCS(nop,	0xFFFFFFFF, 0xD503201F)
->  #undef	__AARCH64_INSN_FUNCS
->  
->  enum aarch64_insn_class aarch64_get_insn_class(u32 insn);
-> -
-> +u32 aarch64_insn_read(void *addr);
-> +void aarch64_insn_write(void *addr, u32 insn);
->  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
->  
-> +int aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[], int cnt);
-> +int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
-> +int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
-> +
->  #endif	/* _ASM_ARM64_INSN_H */
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 1be4d11..ad4185f 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -16,6 +16,8 @@
->   */
->  #include <linux/compiler.h>
->  #include <linux/kernel.h>
-> +#include <linux/stop_machine.h>
-> +#include <asm/cacheflush.h>
->  #include <asm/insn.h>
->  
->  /*
-> @@ -84,3 +86,96 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
->  	return __aarch64_insn_hotpatch_safe(old_insn) &&
->  	       __aarch64_insn_hotpatch_safe(new_insn);
->  }
-> +
-> +/*
-> + * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
-> + * little-endian. On the other hand, SCTLR_EL1.EE (bit 25, Exception Endianness)
-> + * flag controls endianness for EL1 explicit data accesses and stage 1
-> + * translation table walks as below:
-> + *	0: little-endian
-> + *	1: big-endian
-> + * So need to handle endianness when patching kernel code.
-> + */
-> +u32 __kprobes aarch64_insn_read(void *addr)
-> +{
-> +	u32 insn;
-> +
-> +#ifdef	__AARCH64EB__
-> +	insn = swab32(*(u32 *)addr);
-> +#else
-> +	insn = *(u32 *)addr;
-> +#endif
+On 15/10/13 23:38, Taras Kondratiuk wrote:
+> Hi
+>
+> I was debugging kprobes-test for BE8 and noticed that some data fields
+> are stored in LE instead of BE. It happens because these data fields
+> get interpreted as instructions.
+>
+> Is it a known issue?
 
-le32_to_cpu ?
+I reported the crashes to Tixy along with a different
+method of sovling the problem (changed to using pointers to
+the strings) a while ago. However it seems that nothing has
+happened to fix this.
 
-> +
-> +	return insn;
-> +}
-> +
-> +void __kprobes aarch64_insn_write(void *addr, u32 insn)
-> +{
-> +#ifdef	__AARCH64EB__
-> +	*(u32 *)addr = swab32(insn);
-> +#else
-> +	*(u32 *)addr = insn;
-> +#endif
-> +}
+Since kprobes seems to work with the fixed tests I forgot
+to follow up and prod Jon about looking into this problem.
 
-cpu_to_le32 ?
+Jon, if you are not interested in fixing this, then please
+let me know and we can get a patch sorted to fix it.
 
-> +int __kprobes aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[],
-> +					     int cnt)
-> +{
-> +	int i;
-> +	u32 *tp;
-> +
-> +	if (cnt <= 0)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; i < cnt; i++) {
-> +		tp = addrs[i];
-> +		/* A64 instructions must be word aligned */
-> +		if ((uintptr_t)tp & 0x3)
-> +			return -EINVAL;
-> +		aarch64_insn_write(tp, insns[i]);
-> +		flush_icache_range((uintptr_t)tp, (uintptr_t)tp + sizeof(u32));
+PS, I am going to leave this out of the current be8 patchset
+as I want to get that merged, and at the moment kprobes-test
+is not essential to getting the system started.
 
-What are you trying to achieve with this cache maintenance for the nosync
-case? If you're not synchronising, then you will always have races with the
-instruction patching, so I'd argue that this cache flush doesn't buy you
-anything.
+> For example:
+> test_align_fail_data:
+> 	bx	lr
+> 	.byte 0xaa
+> 	.align
+> 	.word 0x12345678
+>
+> I would expect to see something like this:
+> 00000000<test_align_fail_data>:
+>     0:	e12fff1e 	bx	lr
+>     4:	aa          	.byte	0xaa
+>     5:	00          	.byte	0x00
+>     6:	0000      	.short	0x0000
+>     8:	12345678 	.word	0x12345678
+>
+> But instead I have:
+> 00000000<test_align_fail_data>:
+>     0:	e12fff1e 	bx	lr
+>     4:	aa          	.byte	0xaa
+>     5:	00          	.byte	0x00
+>     6:	0000      	.short	0x0000
+>     8:	12345678 	eorsne	r5, r4, #120, 12	; 0x7800000
+>
+> As a result the word 0x12345678 will be stored in LE.
+>
+> I've run several tests and here are my observations:
+> - Double ".align" fixes the issue :)
+> - Behavior is the same for LE/BE, ARM/Thumb, GCC 4.4.1/4.6.x/4.8.2
+> - Size of alignment doesn't matter.
+> - Issue happens only if previous data is not instruction-aligned and
+>      0's are added before NOPs.
+> - Explicit filling with 0's (.align , 0) fixes the issue, but as a side
+>      effect data @0x4 is interpreted as a single ".word 0xaa000000"
+>      instead of ".byte .byte .short". I'm not sure if there can be any
+>      functional difference because of this.
+> - Issue doesn't happen if there is no instructions before data
+>    (no "bx lr" in the example).
+> - Issue doesn't happen if data after .align is defined as
+>      ".type<symbol>,%object".
 
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +struct aarch64_insn_patch {
-> +	void	**text_addrs;
-> +	u32	*new_insns;
-> +	int	insn_cnt;
-> +};
-> +
-> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
-> +{
-> +	struct aarch64_insn_patch *pp = arg;
-> +
-> +	return aarch64_insn_patch_text_nosync(pp->text_addrs, pp->new_insns,
-> +					      pp->insn_cnt);
-> +}
-> +
-> +int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
-> +{
-> +	struct aarch64_insn_patch patch = {
-> +		.text_addrs = addrs,
-> +		.new_insns = insns,
-> +		.insn_cnt = cnt,
-> +	};
-> +
-> +	if (cnt <= 0)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Execute __aarch64_insn_patch_text() on every online CPU,
-> +	 * which ensure serialization among all online CPUs.
-> +	 */
-> +	return stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
-> +}
-> +
-> +int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
-> +{
-> +	if (cnt == 1 && aarch64_insn_hotpatch_safe(aarch64_insn_read(addrs[0]),
-> +						   insns[0]))
-> +		return aarch64_insn_patch_text_nosync(addrs, insns, cnt);
-> +	else
-> +		return aarch64_insn_patch_text_sync(addrs, insns, cnt);
-> +}
+Thanks for getting down to a simple test case.
 
-The other way of doing this for cnt > 1 would be to patch in a branch to
-the insns array and then a branch over the original code at the end of the
-array. Obviously, this relies on insns being allocated somewhere persistent
-(and non-pageable!).
+My view is to fix this by not doing complicated things by trying
+to save a bit of space by embedding strings into the code. It is
+not as if we cannot get the compiler to put the strings into the
+relevant data area and give us a pointer we can use.
 
-I was wondering whether you could do something clever with BKPT, but
-everything I've thought of so far is racy.
+The code in this case is /not easy/ to follow and it would be nice
+if it could be cleaned up to just take the string as a argument to
+the test code instead of trying to find it via assembly magic.
 
-Will
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
