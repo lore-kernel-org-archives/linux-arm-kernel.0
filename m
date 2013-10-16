@@ -1,87 +1,104 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 16 Oct 2013 12:13:28 +0100
-Subject: .align may cause data to be interpreted as instructions
-In-Reply-To: <525DC3D1.5030300@linaro.org>
-References: <525DC3D1.5030300@linaro.org>
-Message-ID: <525E74D8.3070008@codethink.co.uk>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 16 Oct 2013 16:46:41 +0530
+Subject: [RESEND PATCH V2 1/2] ARM: dts: AM33xx: Add RNG node
+In-Reply-To: <525CE564.6010605@baylibre.com>
+References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
+ <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
+ <52594DF0.1050002@ti.com> <525CE564.6010605@baylibre.com>
+Message-ID: <525E7599.8010504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/13 23:38, Taras Kondratiuk wrote:
-> Hi
->
-> I was debugging kprobes-test for BE8 and noticed that some data fields
-> are stored in LE instead of BE. It happens because these data fields
-> get interpreted as instructions.
->
-> Is it a known issue?
++ Rob and Mark
+On Tuesday 15 October 2013 12:19 PM, Benoit Cousson wrote:
+> Hi Lokesh,
+> 
+> On 12/10/2013 15:26, Lokesh Vutla wrote:
+>> Hi Benoit,
+>> On Thursday 29 August 2013 06:22 PM, Lokesh Vutla wrote:
+>>> Add the AM33xx RNG module's device tree data.
+>>> Also add Documentation file describing the data
+>>> for the RNG module.
+Can you please review this patch..
 
-I reported the crashes to Tixy along with a different
-method of sovling the problem (changed to using pointers to
-the strings) a while ago. However it seems that nothing has
-happened to fix this.
-
-Since kprobes seems to work with the fixed tests I forgot
-to follow up and prod Jon about looking into this problem.
-
-Jon, if you are not interested in fixing this, then please
-let me know and we can get a patch sorted to fix it.
-
-PS, I am going to leave this out of the current be8 patchset
-as I want to get that merged, and at the moment kprobes-test
-is not essential to getting the system started.
-
-> For example:
-> test_align_fail_data:
-> 	bx	lr
-> 	.byte 0xaa
-> 	.align
-> 	.word 0x12345678
->
-> I would expect to see something like this:
-> 00000000<test_align_fail_data>:
->     0:	e12fff1e 	bx	lr
->     4:	aa          	.byte	0xaa
->     5:	00          	.byte	0x00
->     6:	0000      	.short	0x0000
->     8:	12345678 	.word	0x12345678
->
-> But instead I have:
-> 00000000<test_align_fail_data>:
->     0:	e12fff1e 	bx	lr
->     4:	aa          	.byte	0xaa
->     5:	00          	.byte	0x00
->     6:	0000      	.short	0x0000
->     8:	12345678 	eorsne	r5, r4, #120, 12	; 0x7800000
->
-> As a result the word 0x12345678 will be stored in LE.
->
-> I've run several tests and here are my observations:
-> - Double ".align" fixes the issue :)
-> - Behavior is the same for LE/BE, ARM/Thumb, GCC 4.4.1/4.6.x/4.8.2
-> - Size of alignment doesn't matter.
-> - Issue happens only if previous data is not instruction-aligned and
->      0's are added before NOPs.
-> - Explicit filling with 0's (.align , 0) fixes the issue, but as a side
->      effect data @0x4 is interpreted as a single ".word 0xaa000000"
->      instead of ".byte .byte .short". I'm not sure if there can be any
->      functional difference because of this.
-> - Issue doesn't happen if there is no instructions before data
->    (no "bx lr" in the example).
-> - Issue doesn't happen if data after .align is defined as
->      ".type<symbol>,%object".
-
-Thanks for getting down to a simple test case.
-
-My view is to fix this by not doing complicated things by trying
-to save a bit of space by embedding strings into the code. It is
-not as if we cannot get the compiler to put the strings into the
-relevant data area and give us a pointer we can use.
-
-The code in this case is /not easy/ to follow and it would be nice
-if it could be cleaned up to just take the string as a argument to
-the test code instead of trying to find it via assembly magic.
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Thanks and regards,
+Lokesh
+>> Seems you missed this patch. Please consider this for this merge window.
+> 
+> Indeed I missed it. Sorry :-(
+> 
+>> Patch 2/2 is already taken by Paul.
+>> Without this patch AM335x boot will crash as I mentioned in my cover letter.
+>>
+>> Thanks and regards,
+>> Lokesh
+>>>
+>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>> ---
+>>> Changes since V1:
+>>> - Drop "status=disabled" entry in dt node, Since
+>>>    RNG is present on all AM33xx platforms.
+>>>
+>>>   .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
+>>>   arch/arm/boot/dts/am33xx.dtsi                      |    7 +++++++
+>>>   2 files changed, 29 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
+> 
+> I do not see the acked-by for the binding part. You do need that for any new bindings nowadays.
+> 
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+>>> new file mode 100644
+>>> index 0000000..6a62acd
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+>>> @@ -0,0 +1,22 @@
+>>> +OMAP SoC HWRNG Module
+>>> +
+>>> +Required properties:
+>>> +
+>>> +- compatible : Should contain entries for this and backward compatible
+>>> +  RNG versions:
+>>> +  - "ti,omap2-rng" for OMAP2.
+>>> +  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
+>>> +  Note that these two versions are incompatible.
+>>> +- ti,hwmods: Name of the hwmod associated with the RNG module
+>>> +- reg : Offset and length of the register set for the module
+>>> +- interrupts : the interrupt number for the RNG module.
+>>> +        Only used for "ti,omap4-rng".
+>>> +
+>>> +Example:
+>>> +/* AM335x */
+>>> +rng: rng at 48310000 {
+>>> +    compatible = "ti,omap4-rng";
+>>> +    ti,hwmods = "rng";
+>>> +    reg = <0x48310000 0x2000>;
+>>> +    interrupts = <111>;
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>>> index 38b446b..26ebe30 100644
+>>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>>> @@ -530,5 +530,12 @@
+>>>               #size-cells = <1>;
+>>>               status = "disabled";
+>>>           };
+>>> +
+>>> +        rng: rng at 48310000 {
+>>> +            compatible = "ti,omap4-rng";
+>>> +            ti,hwmods = "rng";
+>>> +            reg = <0x48310000 0x2000>;
+>>> +            interrupts = <111>;
+>>> +        };
+>>>       };
+>>>   };
+>>>
+>>
+> 
+> It looks good to me, but it does not apply on my branch.
+> Please rebase it and repost with the proper acked-by.
+> 
+> Thanks,
+> Benoit
+> 
+> 
