@@ -1,39 +1,62 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 16 Oct 2013 07:35:16 +0530
-Subject: [PATCH RESEND 0/3] ARM: S3C24XX: add missing dma-devices and
- warning fix
-In-Reply-To: <525DC274.8090808@samsung.com>
-References: <201310111059.19791.heiko@sntech.de>
- <20131013145642.GJ2954@intel.com>
- <201310132011.11285.heiko@sntech.de> <525DC274.8090808@samsung.com>
-Message-ID: <20131016020516.GT2954@intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 16 Oct 2013 08:49:17 +0530
+Subject: [PATCH v2] ARM: davinci: convert to
+ clockevents_config_and_register
+In-Reply-To: <1381653390-22250-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <CA+V-a8v58_ixJ5s5d+tsf19qszD2tLGe8465kfQBKivRV+vRoQ@mail.gmail.com>
+ <1381653390-22250-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <525E05B5.8060801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 07:32:20AM +0900, Kukjin Kim wrote:
-> On 10/14/13 03:11, Heiko St?bner wrote:
-> >Am Sonntag, 13. Oktober 2013, 16:56:42 schrieb Vinod Koul:
-> >>On Fri, Oct 11, 2013 at 10:59:19AM +0200, Heiko St?bner wrote:
-> >>>[I messed up the linux-arm-kernel list address yesterday, so I resend it
-> >>>with a fixed address, sorry for the noise]
-> >>>
-> >>>When Olof reported the warning about the unused s3c2410_dma_resource, I
-> >>>thought the best way forward would be to simply implement the missing
-> >>>pieces and so it has users :-) .
-> >>>
-> >>>Therefore this series adds the necessary platform-devices for s3c2410,
-> >>>s3c2440 and s3c2442. This especially also includes the
-> >>>channel-constraints of those socs.
-> >>>
-> >>>As I do not have access to any of those socs these changes are of course
-> >>>compile-tested only.
-> >>
-> >>Do you want this to be applied thru dma or arm tree?
-> >
-> >hmm, the original series went into the samsung tree for 3.13, so maybe this
-> >addition should go the same way?
-> >
-> I think so, let me pick this up into Samsung tree for v3.13.
-Okay, sounds good. Ack for dmaengine patch sent
+On Sunday 13 October 2013 02:06 PM, Uwe Kleine-K?nig wrote:
+> clockevents_config_and_register is superior compared to setting
+> shift/mult and {min,max}_delta_ns by hand.
+> 
+> Tested-by: Prabhakar Lad <prabhakar.csengg@gmail.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Prabhakar Lad wrote:
+>> I have boot tested this patch on OMAP-L138 and tested the uptime
+>> (with min ticks set to 1), should that be enough ?
+> I don't know for sure, but I guess so. If you agree, here is an updated
+> patch.
+> 
+> Best regards
+> Uwe
+> 
+> 
+>  arch/arm/mach-davinci/time.c | 9 ++-------
+>  1 file changed, 2 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+> index 7a55b5c..29a1a5d 100644
+> --- a/arch/arm/mach-davinci/time.c
+> +++ b/arch/arm/mach-davinci/time.c
+> @@ -331,7 +331,6 @@ static void davinci_set_mode(enum clock_event_mode mode,
+>  
+>  static struct clock_event_device clockevent_davinci = {
+>  	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> -	.shift		= 32,
+>  	.set_next_event	= davinci_set_next_event,
+>  	.set_mode	= davinci_set_mode,
+>  };
+> @@ -397,14 +396,10 @@ void __init davinci_timer_init(void)
+>  
+>  	/* setup clockevent */
+>  	clockevent_davinci.name = id_to_name[timers[TID_CLOCKEVENT].id];
+> -	clockevent_davinci.mult = div_sc(davinci_clock_tick_rate, NSEC_PER_SEC,
+> -					 clockevent_davinci.shift);
+> -	clockevent_davinci.max_delta_ns =
+> -		clockevent_delta2ns(0xfffffffe, &clockevent_davinci);
+> -	clockevent_davinci.min_delta_ns = 50000; /* 50 usec */
+>  
+>  	clockevent_davinci.cpumask = cpumask_of(0);
+> -	clockevents_register_device(&clockevent_davinci);
+> +	clockevents_config_and_register(&clockevent_davinci,
+> +		davinci_clock_tick_rate, 1, 0xfffffffe);
 
-~Vinod
+checkpatch --strict complains about alignment of line break. Fixed locally.
+
+Thanks,
+Sekhar
