@@ -1,88 +1,105 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Wed, 16 Oct 2013 11:24:27 +0530
-Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
-In-Reply-To: <1381853200-5534-6-git-send-email-marex@denx.de>
-References: <1381853200-5534-1-git-send-email-marex@denx.de>
- <1381853200-5534-6-git-send-email-marex@denx.de>
-Message-ID: <20131016055427.GB2740@pratyush-vbox>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 16 Oct 2013 11:42:08 +0530
+Subject: [RESEND PATCH V2 1/2] ARM: dts: AM33xx: Add RNG node
+In-Reply-To: <525CE564.6010605@baylibre.com>
+References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
+ <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
+ <52594DF0.1050002@ti.com> <525CE564.6010605@baylibre.com>
+Message-ID: <525E2E38.4000304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 12:06:39AM +0800, Marek Vasut wrote:
-> Without forcing the PCIe core into Gen1 operation, the PCIe switch
-> attached directly to the PCIe port is not recognised at all. The
-> PCIe switch is Gen2 capable to make this issue even more puzzling.
+Hi Benoit,
+On Tuesday 15 October 2013 12:19 PM, Benoit Cousson wrote:
+> Hi Lokesh,
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Frank Li <lznuaa@gmail.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-> Cc: Pratyush Anand <pratyush.anand@st.com>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> Cc: Tim Harvey <tharvey@gateworks.com>
-> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-> Cc: Yinghai Lu <yinghai@kernel.org>
-> ---
->  drivers/pci/host/pci-imx6.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+> On 12/10/2013 15:26, Lokesh Vutla wrote:
+>> Hi Benoit,
+>> On Thursday 29 August 2013 06:22 PM, Lokesh Vutla wrote:
+>>> Add the AM33xx RNG module's device tree data.
+>>> Also add Documentation file describing the data
+>>> for the RNG module.
+>> Seems you missed this patch. Please consider this for this merge window.
 > 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index ca8c5de..8402e9a 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -321,6 +321,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
->  {
->  	int count = 0;
->  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
-> +	uint32_t tmp;
->  
->  	imx6_pcie_assert_core_reset(pp);
->  
-> @@ -330,13 +331,23 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
->  
->  	dw_pcie_setup_rc(pp);
->  
-> +	/*
-> +	 * FIXME:
-> +	 * Force Gen1 operation. In case the IP block is in Gen2 operation
-> +	 * mode, it does not detect the PCIe switch at all.
-> +	 */
-> +	tmp = readl(pp->dbi_base + 0x7c);
-> +	tmp &= ~0xf;
-> +	tmp |= 0x1;
-> +	writel(tmp, pp->dbi_base + 0x7c);
-> +
+> Indeed I missed it. Sorry :-(
+> 
+>> Patch 2/2 is already taken by Paul.
+>> Without this patch AM335x boot will crash as I mentioned in my cover letter.
+>>
+>> Thanks and regards,
+>> Lokesh
+>>>
+>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>> ---
+>>> Changes since V1:
+>>> - Drop "status=disabled" entry in dt node, Since
+>>>    RNG is present on all AM33xx platforms.
+>>>
+>>>   .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
+>>>   arch/arm/boot/dts/am33xx.dtsi                      |    7 +++++++
+>>>   2 files changed, 29 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
+> 
+> I do not see the acked-by for the binding part. You do need that for any new bindings nowadays.
+> 
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+>>> new file mode 100644
+>>> index 0000000..6a62acd
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+>>> @@ -0,0 +1,22 @@
+>>> +OMAP SoC HWRNG Module
+>>> +
+>>> +Required properties:
+>>> +
+>>> +- compatible : Should contain entries for this and backward compatible
+>>> +  RNG versions:
+>>> +  - "ti,omap2-rng" for OMAP2.
+>>> +  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
+>>> +  Note that these two versions are incompatible.
+>>> +- ti,hwmods: Name of the hwmod associated with the RNG module
+>>> +- reg : Offset and length of the register set for the module
+>>> +- interrupts : the interrupt number for the RNG module.
+>>> +        Only used for "ti,omap4-rng".
+>>> +
+>>> +Example:
+>>> +/* AM335x */
+>>> +rng: rng at 48310000 {
+>>> +    compatible = "ti,omap4-rng";
+>>> +    ti,hwmods = "rng";
+>>> +    reg = <0x48310000 0x2000>;
+>>> +    interrupts = <111>;
+>>> +};
+>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>>> index 38b446b..26ebe30 100644
+>>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>>> @@ -530,5 +530,12 @@
+>>>               #size-cells = <1>;
+>>>               status = "disabled";
+>>>           };
+>>> +
+>>> +        rng: rng at 48310000 {
+>>> +            compatible = "ti,omap4-rng";
+>>> +            ti,hwmods = "rng";
+>>> +            reg = <0x48310000 0x2000>;
+>>> +            interrupts = <111>;
+>>> +        };
+>>>       };
+>>>   };
+>>>
+>>
+> 
+> It looks good to me, but it does not apply on my branch.
+Can I take this as your Acked-by: ?
+Ok, Ill rebase on top of your tree and post it.
 
-Since you are forcing RC to work in GEN1, so you will not be able to
-connect any device at GEN2 now.
-
-Yes, There are some buggy PCIe devices which works with GEN1 only host.
-
-So better solution should be to initialize RC by default at GEN2 or
-highest speed. Further, a parameter say gen_only can be passed from
-DT to force GEN1 only mode.
-
-What do you say?
-
-Regards
-Pratyush
-
->  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->  			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
->  
->  	while (!dw_pcie_link_up(pp)) {
->  		usleep_range(100, 1000);
->  		count++;
-> -		if (count >= 10) {
-> +		if (count >= 200) {
->  			dev_err(pp->dev, "phy link never came up\n");
->  			dev_dbg(pp->dev,
->  				"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
-> -- 
-> 1.8.4.rc3
+Thanks and Regards,
+Lokesh
+> Please rebase it and repost with the proper acked-by.
+> 
+> Thanks,
+> Benoit
+> 
+> 
