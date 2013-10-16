@@ -1,76 +1,150 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 16 Oct 2013 16:19:47 +0200
-Subject: [GIT PULL] fixes for integer rounding in timer core
-In-Reply-To: <20131014073436.GX10079@pengutronix.de>
-References: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
- <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5253D9A1.1080106@pengutronix.de> <20131008153147.GR10079@pengutronix.de>
- <20131014073436.GX10079@pengutronix.de>
-Message-ID: <525EA083.2070006@atmel.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 16 Oct 2013 17:23:45 +0300
+Subject: [PATCH v2 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
+ Framework
+In-Reply-To: <525E9A11.7080501@ti.com>
+References: <1381866857-3861-1-git-send-email-kishon@ti.com>
+ <1381866857-3861-3-git-send-email-kishon@ti.com> <525E9232.9050502@ti.com>
+ <525E9A11.7080501@ti.com>
+Message-ID: <525EA171.9010402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/2013 09:34, Uwe Kleine-K?nig :
-> Hello Linus, hello Ingo,
->
-> On Tue, Oct 08, 2013 at 05:31:47PM +0200, Uwe Kleine-K?nig wrote:
->>> What's the status of this patch?
->> I pinged Thomas about it already via irc, but I didn't get a response up
->> to now. It would be great to get that into 3.12. To make it easy for
->> Thomas, here is a pull request that includes the fix and converts
->> at91rm9200 back to clockevents_config_and_register dropping one of the
->> workarounds for the fixed bug.
+On 10/16/2013 04:52 PM, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Wednesday 16 October 2013 06:48 PM, Roger Quadros wrote:
+>> Hi,
 >>
->> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+>> On 10/15/2013 10:54 PM, Kishon Vijay Abraham I wrote:
+>>> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
+>>> power_on and power_off the following APIs are used phy_init(), phy_exit(),
+>>> phy_power_on() and phy_power_off().
+>>>
+>>> However using the old USB phy library wont be removed till the PHYs of all
+>>> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
+>>>  drivers/usb/dwc3/Kconfig                       |    1 +
+>>>  drivers/usb/dwc3/core.c                        |   52 ++++++++++++++++++++++++
+>>>  drivers/usb/dwc3/core.h                        |    7 ++++
+>>>  drivers/usb/dwc3/platform_data.h               |    2 +
+>>>  5 files changed, 66 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>> index e807635..471366d 100644
+>>> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+>>> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+>>> @@ -6,11 +6,13 @@ Required properties:
+>>>   - compatible: must be "snps,dwc3"
+>>>   - reg : Address and length of the register set for the device
+>>>   - interrupts: Interrupts used by the dwc3 controller.
+>>> +
+>>> +Optional properties:
+>>>   - usb-phy : array of phandle for the PHY device.  The first element
+>>>     in the array is expected to be a handle to the USB2/HS PHY and
+>>>     the second element is expected to be a handle to the USB3/SS PHY
+>>> -
+>>> -Optional properties:
+>>> + - phys: from the *Generic PHY* bindings
+>>> + - phy-names: from the *Generic PHY* bindings
+>>>   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
+>>>  
+>>>  This is usually a subnode to DWC3 glue to which it is connected.
+>>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+>>> index 8e385b4..64eed6f 100644
+>>> --- a/drivers/usb/dwc3/Kconfig
+>>> +++ b/drivers/usb/dwc3/Kconfig
+>>> @@ -2,6 +2,7 @@ config USB_DWC3
+>>>  	tristate "DesignWare USB3 DRD Core Support"
+>>>  	depends on (USB || USB_GADGET) && HAS_DMA
+>>>  	select USB_PHY
+>>> +	select GENERIC_PHY
+>>>  	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
+>>>  	help
+>>>  	  Say Y or M here if your system has a Dual Role SuperSpeed
+>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>> index cb91d70..28bfa5b 100644
+>>> --- a/drivers/usb/dwc3/core.c
+>>> +++ b/drivers/usb/dwc3/core.c
+>>> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
+>>>  
+>>>  	usb_phy_init(dwc->usb2_phy);
+>>>  	usb_phy_init(dwc->usb3_phy);
+>>> +
+>>> +	if (dwc->usb2_generic_phy)
+>>> +		phy_init(dwc->usb2_generic_phy);
+>>> +	if (dwc->usb3_generic_phy)
+>>> +		phy_init(dwc->usb3_generic_phy);
+>>> +
 >>
->>    Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+>> dwc3_core_soft_reset() is called from dwc3_core_init() which is called from
+>> dwc3_probe() but before the PHYs are initialized.
 >>
->> are available in the git repository at:
+>> This will cause phy power_on() to be called before phy_init() which is wrong.
 >>
->>    git://git.pengutronix.de/git/ukl/linux.git tags/timer-for-tip
->>
->> for you to fetch changes up to b58c4b70121070f45eefa739ecbb58d57da1c4d9:
->>
->>    ARM: at91: rm9200: switch back to clockevents_config_and_register (2013-10-08 16:58:22 +0200)
->>
->> ----------------------------------------------------------------
->> The first patch in this pull request fixes an old integer rounding bug in the
->> timer core that was (and still is) worked around in a few arch's timer code.
->> The second patch drops such a work around now that the core is fixed.
-> It would be nice to get that fix into 3.12, but Thomas stopped
-> responding nearly a month ago---his last mail in this thread[1] dates back
-> to September 20.
->
-> Can one of you please take it directly?
 
-I second Uwe in his request (aka +1).
+You overlooked the above?
 
-Thanks, bye,
+>>>  	mdelay(100);
+>>>  
+>>>  	/* Clear USB3 PHY reset */
+>>> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
+>>>  {
+>>>  	usb_phy_shutdown(dwc->usb2_phy);
+>>>  	usb_phy_shutdown(dwc->usb3_phy);
+>>> +
+>>> +	if (dwc->usb2_generic_phy)
+>>> +		phy_power_off(dwc->usb2_generic_phy);
+>>> +	if (dwc->usb3_generic_phy)
+>>> +		phy_power_off(dwc->usb3_generic_phy);
+>>>  }
+>>>  
+>>>  #define DWC3_ALIGN_MASK		(16 - 1)
+>>> @@ -439,6 +450,26 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>  		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+>>>  	}
+>>>  
+>>> +	count = of_property_match_string(node, "phy-names", "usb2-phy");
+>>> +	if (count >= 0 || (pdata && pdata->usb2_generic_phy)) {
+>>> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
+>>> +		if (IS_ERR(dwc->usb2_generic_phy)) {
+>>> +			dev_err(dev, "no usb2 phy configured yet");
+>>> +			return PTR_ERR(dwc->usb2_generic_phy);
+>>> +		}
+>>> +		dwc->usb2_phy = NULL;
+>>> +	}
+>>> +
+>>> +	count = of_property_match_string(node, "phy-names", "usb3-phy");
+>>> +	if (count >= 0 || (pdata && pdata->usb3_generic_phy)) {
+>>> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
+>>> +		if (IS_ERR(dwc->usb3_generic_phy)) {
+>>> +			dev_err(dev, "no usb3 phy configured yet");
+>>> +			return PTR_ERR(dwc->usb3_generic_phy);
+>>> +		}
+>>> +		dwc->usb3_phy = NULL;
+>>> +	}
+>>> +
+>>
+>> There are a couple of issues here.
+>> - The above code must be executed only if it node is valid.
+> 
+> of_property_match_string will give a error value if the node is not present.
+> *count >= 0* can take care of this.
 
+OK. 
 
-> [1] http://thread.gmane.org/gmane.linux.kernel/1563370/
->> ----------------------------------------------------------------
->> Thomas Gleixner (1):
->>        clockevents: Sanitize ticks to nsec conversion
->>
->> Uwe Kleine-K?nig (1):
->>        ARM: at91: rm9200: switch back to clockevents_config_and_register
->>
->>   arch/arm/mach-at91/at91rm9200_time.c |  7 ++--
->>   kernel/time/clockevents.c            | 65 +++++++++++++++++++++++++++---------
->>   2 files changed, 52 insertions(+), 20 deletions(-)
->>
->> --
->> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
->> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+>> - We must either get both PHYs via old method or via new method and not support mix matching
+>> them. e.g. it is possible with this code that usb2_phy is set and usb3_generic_phy is set.
+> 
+> Why? As long as both the frameworks co-exist (and we support both in dwc3), I
+> don't see any reason why we shouldn't allow it. We can avoid adding a few more
+> checks by leaving it the way it is currently.
 
+Because it just doesn't seem elegant. Why would you want to even allow both types of PHY
+to be used simultaneously?
 
--- 
-Nicolas Ferre
+cheers,
+-roger
