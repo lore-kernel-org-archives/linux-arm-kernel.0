@@ -1,55 +1,79 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Oct 2013 11:21:12 -0600
-Subject: [PATCH v2 1/7] clk: tegra: Add support for PLLSS
-In-Reply-To: <20131016074829.GD5643@tbergstrom-lnx.Nvidia.com>
-References: <1381850098-12357-1-git-send-email-pdeschrijver@nvidia.com>
- <1381850098-12357-2-git-send-email-pdeschrijver@nvidia.com>
- <525DA373.6040805@wwwdotorg.org>
- <20131016074829.GD5643@tbergstrom-lnx.Nvidia.com>
-Message-ID: <525ECB08.4020201@wwwdotorg.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 16 Oct 2013 21:58:18 +0530
+Subject: [PATCH 00/28]: dmaengine: use DMA_COMPLETE for dma completion status
+Message-ID: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2013 01:48 AM, Peter De Schrijver wrote:
-> On Tue, Oct 15, 2013 at 10:20:03PM +0200, Stephen Warren wrote:
->> On 10/15/2013 09:14 AM, Peter De Schrijver wrote:
->>> Tegra124 introduces a new PLL type, PLLSS. Add support for it.
->>
->>> diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
->>
->>
->>> +static int clk_pllss_set_rate(struct clk_hw *hw, unsigned long rate,
->>> +				unsigned long parent_rate)
->>
->> This function seems pretty generic. Is it possible to share a bit more
->> code with any of the other pllXXX_set_rate() functions?
->>
->>> +struct clk *tegra_clk_register_pllss(const char *name, const char *parent_name,
->>> +				void __iomem *clk_base, unsigned long flags,
->>> +				struct tegra_clk_pll_params *pll_params,
->>> +				spinlock_t *lock)
->>
->>> +	val = pll_readl_base(pll);
->>> +	if (val & PLLSS_REF_SRC_SEL_MASK) {
->>> +		WARN(1, "Unknown parent selected for %s: %d\n", name,
->>> +			(val & PLLSS_REF_SRC_SEL_MASK) >>
->>> +			PLLSS_REF_SRC_SEL_SHIFT);
->>> +		kfree(pll);
->>> +		return ERR_PTR(-EINVAL);
->>> +	}
->>
->> If there's a field in HW that muxes the clock input between n clocks,
->> why does this function assume there's a single parent for this PLL, by
->> taking a "const char *parent_name" parameter?
->>
->> What happens if the bootloader changed this field in HW; is the kernel
->> simply not able to boot?
->>
-> 
-> This logic comes from downstream. I guess it means we're running in an
-> unvalidated configuration. Do you think we should expose all parents 
-> anyway? Even if not all configurations have been validated?
-> (which is quite likely)
+As we recently discussed in [1], the DMA_SUCCESS is an misnomer. The dmaengine
+does not acknowledge that dma completed succesfully. It can only signal dma was
+completed by it. Hence we should use DMA_COMPLTE as status instead of
+DMA_SUCCESS
 
-If we only support one particular parent, why not force the register
-field to the desired value, rather than failing?
+[1]: http://www.spinics.net/lists/arm-kernel/msg278346.html 
+
+Vinod Koul (28):
+  dmaengine: use DMA_COMPLETE for dma completion status
+  dmaengine: amba-pl08x: use DMA_COMPLETE for dma completion status
+  dmaengine: at_hdma: use DMA_COMPLETE for dma completion status
+  dmaengine: coh901318: use DMA_COMPLETE for dma completion status
+  dmaengine: cppi41: use DMA_COMPLETE for dma completion status
+  dmaengine: jz4740: use DMA_COMPLETE for dma completion status
+  dmaengine: dmatest: use DMA_COMPLETE for dma completion status
+  dmaengine: dw: use DMA_COMPLETE for dma completion status
+  dmaengine: edma: use DMA_COMPLETE for dma completion status
+  dmaengine: imx-dma: use DMA_COMPLETE for dma completion status
+  dmaengine: imx-sdma: use DMA_COMPLETE for dma completion status
+  dmaengine: intel_mid_dma: use DMA_COMPLETE for dma completion status
+  dmaengine: ioat: use DMA_COMPLETE for dma completion status
+  dmaengine: iop: use DMA_COMPLETE for dma completion status
+  dmaengine: k3dma: use DMA_COMPLETE for dma completion status
+  dmaengine: mmp_tdma: use DMA_COMPLETE for dma completion status
+  dmaengine: mv_xor: use DMA_COMPLETE for dma completion status
+  dmaengine: mxs-dma: use DMA_COMPLETE for dma completion status
+  dmaengine: omap: use DMA_COMPLETE for dma completion status
+  dmaengine: ppc4xx: use DMA_COMPLETE for dma completion status
+  dmaengine: sa11x0: use DMA_COMPLETE for dma completion status
+  dmaengine: sh: use DMA_COMPLETE for dma completion status
+  dmaengine: ste: use DMA_COMPLETE for dma completion status
+  dmaengine: tegra: use DMA_COMPLETE for dma completion status
+  dmaengine: txx9: use DMA_COMPLETE for dma completion status
+  async_tx: use DMA_COMPLETE for dma completion status
+  serial: sh: use DMA_COMPLETE for dma completion status
+  net: use DMA_COMPLETE for dma completion status
+
+ crypto/async_tx/async_tx.c    |    4 ++--
+ drivers/dma/amba-pl08x.c      |    4 ++--
+ drivers/dma/at_hdmac.c        |    2 +-
+ drivers/dma/coh901318.c       |    2 +-
+ drivers/dma/cppi41.c          |    2 +-
+ drivers/dma/dma-jz4740.c      |    2 +-
+ drivers/dma/dmaengine.c       |    2 +-
+ drivers/dma/dmatest.c         |    2 +-
+ drivers/dma/dw/core.c         |    4 ++--
+ drivers/dma/edma.c            |    2 +-
+ drivers/dma/imx-dma.c         |    2 +-
+ drivers/dma/imx-sdma.c        |    2 +-
+ drivers/dma/intel_mid_dma.c   |    4 ++--
+ drivers/dma/ioat/dma.c        |    4 ++--
+ drivers/dma/ioat/dma_v3.c     |    8 ++++----
+ drivers/dma/iop-adma.c        |   16 ++++++++--------
+ drivers/dma/k3dma.c           |    2 +-
+ drivers/dma/mmp_tdma.c        |    6 +++---
+ drivers/dma/mv_xor.c          |    6 +++---
+ drivers/dma/mxs-dma.c         |    6 +++---
+ drivers/dma/omap-dma.c        |    2 +-
+ drivers/dma/ppc4xx/adma.c     |    2 +-
+ drivers/dma/sa11x0-dma.c      |    2 +-
+ drivers/dma/sh/shdma-base.c   |    2 +-
+ drivers/dma/ste_dma40.c       |    2 +-
+ drivers/dma/tegra20-apb-dma.c |    4 ++--
+ drivers/dma/txx9dmac.c        |    4 ++--
+ drivers/tty/serial/sh-sci.c   |    2 +-
+ include/linux/dmaengine.h     |   12 ++++++------
+ net/ipv4/tcp.c                |    4 ++--
+ 30 files changed, 59 insertions(+), 59 deletions(-)
+
+
+Thanks
+~Vinod
