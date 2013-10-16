@@ -1,41 +1,30 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Wed, 16 Oct 2013 11:18:10 +0800
-Subject: [PATCH v3 5/7] arm64, jump label: detect %c support for ARM64
-In-Reply-To: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
-References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1381893492-7135-6-git-send-email-liuj97@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 16 Oct 2013 08:52:51 +0530
+Subject: [GIT PULL] DaVinci: an SoC update for v3.13
+Message-ID: <525E068B.4020304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiang Liu <jiang.liu@huawei.com>
+The following changes since commit 61e6cfa80de5760bbe406f4e815b7739205754d2:
 
-As commit a9468f30b5eac6 "ARM: 7333/2: jump label: detect %c
-support for ARM", this patch detects the same thing for ARM64
-because some ARM64 GCC versions have the same issue.
+  Linux 3.12-rc5 (2013-10-13 15:41:28 -0700)
 
-Some versions of ARM64 GCC which do support asm goto, do not
-support the %c specifier. Since we need the %c to support jump
-labels on ARM64, detect that too in the asm goto detection script
-to avoid build errors with these versions.
+are available in the git repository at:
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Jiang Liu <liuj97@gmail.com>
----
- scripts/gcc-goto.sh | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.13/soc-2
 
-diff --git a/scripts/gcc-goto.sh b/scripts/gcc-goto.sh
-index a2af2e8..c9469d3 100644
---- a/scripts/gcc-goto.sh
-+++ b/scripts/gcc-goto.sh
-@@ -5,7 +5,7 @@
- cat << "END" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
- int main(void)
- {
--#ifdef __arm__
-+#if defined(__arm__) || defined(__aarch64__)
- 	/*
- 	 * Not related to asm goto, but used by jump label
- 	 * and broken on some ARM GCC versions (see GCC Bug 48637).
--- 
-1.8.1.2
+for you to fetch changes up to 859236d017978bb95f3e2794aece57da3a40fe5c:
+
+  ARM: davinci: convert to clockevents_config_and_register (2013-10-16 06:14:55 +0530)
+
+----------------------------------------------------------------
+This pull request includes a patch to
+use clockevents_config_and_register()
+for registering the clockevent.
+
+----------------------------------------------------------------
+Uwe Kleine-K?nig (1):
+      ARM: davinci: convert to clockevents_config_and_register
+
+ arch/arm/mach-davinci/time.c |    9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
