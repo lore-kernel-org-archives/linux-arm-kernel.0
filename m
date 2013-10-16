@@ -1,56 +1,43 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Wed, 16 Oct 2013 14:47:08 -0700
-Subject: [RESEND PATCH v2 4/6] clocksource: kona: Add basic use of
- external clock
-In-Reply-To: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
-References: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1381960030-1640-5-git-send-email-tim.kryger@linaro.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 17 Oct 2013 06:51:46 +0900
+Subject: [PATCH] ARM: shmobile: Add r8a7790_register_pfc() function
+Message-ID: <20131016215146.4038.57618.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an clock handle is specified in the device tree, enable it and use
-it to determine the external clock frequency.
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Break out the r8a7790 PFC platform device creation code
+to increase readability and follow same style as r8a7791.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
- drivers/clocksource/bcm_kona_timer.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
-index 0d7d8c3..fd11f96 100644
---- a/drivers/clocksource/bcm_kona_timer.c
-+++ b/drivers/clocksource/bcm_kona_timer.c
-@@ -17,6 +17,7 @@
- #include <linux/jiffies.h>
- #include <linux/clockchips.h>
- #include <linux/types.h>
-+#include <linux/clk.h>
+ Written against renesas-devel-20131016
+
+ arch/arm/mach-shmobile/setup-r8a7790.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+--- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
++++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-10-04 19:01:46.000000000 +0900
+@@ -34,6 +34,10 @@ static const struct resource pfc_resourc
+ 	DEFINE_RES_MEM(0xe6060000, 0x250),
+ };
  
- #include <linux/io.h>
- #include <asm/mach/time.h>
-@@ -107,11 +108,18 @@ static const struct of_device_id bcm_timer_ids[] __initconst = {
- static void __init kona_timers_init(struct device_node *node)
- {
- 	u32 freq;
-+	struct clk *external_clk;
- 
--	if (!of_property_read_u32(node, "clock-frequency", &freq))
-+	external_clk = of_clk_get_by_name(node, NULL);
++#define r8a7790_register_pfc()						\
++	platform_device_register_simple("pfc-r8a7790", -1, pfc_resources, \
++					ARRAY_SIZE(pfc_resources))
 +
-+	if (!IS_ERR(external_clk)) {
-+		arch_timer_rate = clk_get_rate(external_clk);
-+		clk_prepare_enable(external_clk);
-+	} else if (!of_property_read_u32(node, "clock-frequency", &freq)) {
- 		arch_timer_rate = freq;
--	else
--		panic("clock-frequency not set in the .dts file");
-+	} else {
-+		panic("neither clock-frequency or clocks handle in .dts file");
-+	}
+ #define R8A7790_GPIO(idx)						\
+ static const struct resource r8a7790_gpio##idx##_resources[] __initconst = { \
+ 	DEFINE_RES_MEM(0xe6050000 + 0x1000 * (idx), 0x50),		\
+@@ -65,8 +69,7 @@ R8A7790_GPIO(5);
  
- 	/* Setup IRQ numbers */
- 	timers.tmr_irq = irq_of_parse_and_map(node, 0);
--- 
-1.8.0.1
+ void __init r8a7790_pinmux_init(void)
+ {
+-	platform_device_register_simple("pfc-r8a7790", -1, pfc_resources,
+-					ARRAY_SIZE(pfc_resources));
++	r8a7790_register_pfc();
+ 	r8a7790_register_gpio(0);
+ 	r8a7790_register_gpio(1);
+ 	r8a7790_register_gpio(2);
