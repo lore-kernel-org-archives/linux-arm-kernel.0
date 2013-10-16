@@ -1,83 +1,41 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 17 Oct 2013 01:56:26 +0400
-Subject: [PATCH v2 4/4] ARM: shmobile: BOCK-W reference: add Ether PFC
- settings
-In-Reply-To: <20130927043836.GB16541@verge.net.au>
-References: <201309070423.30672.sergei.shtylyov@cogentembedded.com>
- <201309070431.35908.sergei.shtylyov@cogentembedded.com>
- <CANqRtoRKFoS9tehteDGaTUYJ8fSBqAYJJDiLxZmoNB9W0N+Mpg@mail.gmail.com>
- <52305EA4.1060902@cogentembedded.com> <20130925044720.GB24243@verge.net.au>
- <5243073C.8070402@cogentembedded.com> <20130926015142.GB18396@verge.net.au>
- <52449CA2.8040509@cogentembedded.com> <20130927043836.GB16541@verge.net.au>
-Message-ID: <525F0B8A.7040703@cogentembedded.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 17 Oct 2013 06:58:19 +0900
+Subject: [PATCH] ARM: shmobile: Cosmetic update of Lager DT Reference
+Message-ID: <20131016215819.12718.54556.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Magnus Damm <damm@opensource.se>
 
-On 09/27/2013 08:38 AM, Simon Horman wrote:
+Clean up the Lager DT reference board code to make it match
+Koelsch DT reference including using the rcar-gen2 header.
 
-    Sorry for the very late reply: I was busy with other stuff and then had ~2 
-weeks of vacations...
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
->>>>>>>> Add the Ether pin group to bockw_pinctrl_map[].
+ Written against renesas-devel-20131016
 
->>>>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+ arch/arm/mach-shmobile/board-lager-reference.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
->>>>>>>> ---
->>>>>>>>   arch/arm/mach-shmobile/board-bockw-reference.c |    3 +++
->>>>>>>>   1 file changed, 3 insertions(+)
-
->>>>>>>> Index: renesas/arch/arm/mach-shmobile/board-bockw-reference.c
->>>>>>>> ===================================================================
->>>>>>>> --- renesas.orig/arch/arm/mach-shmobile/board-bockw-reference.c
->>>>>>>> +++ renesas/arch/arm/mach-shmobile/board-bockw-reference.c
->>>>>>>> @@ -29,6 +29,9 @@
->>>>>>>>    */
->>>>>>>>
->>>>>>>>   static const struct pinctrl_map bockw_pinctrl_map[] = {
->>>>>>>> +       /* Ether */
->>>>>>>> +       PIN_MAP_MUX_GROUP_DEFAULT("fde00000.ethernet", "pfc-r8a7778",
->>>>>>>> +                                 "ether_rmii", "ether"),
->>>>>>>>          /* SCIF0 */
->>>>>>>>          PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
->>>>>>>>                                    "scif0_data_a", "scif0"),
-
->>>>>>> Hi Sergei,
-
->>>>>>> Thanks for your patches. In general I think your series looks fine. I
->>>>>>> have a single comment, and that's about the pinctrl-related hunk
->>>>>>> above. I can see that this patch is for DT reference for Bock-W, so I
->>>>>>> expect the code to be in DT. Do you have any plans to use DT to
->>>>>>> describe the pinmux bits? Perhaps you have some incremental patch
->>>>>>> planned?
-
->>>>>>     No, I just repeated what I saw mechanically. Now I'm seeing some
->>>>>> evidence that PFC driver supports the device tree, so I probably
->>>>>> need to redo the patchset... let me study this question better.
-
->>>>> Ping.
-
->>>>     Sorry, I got distracted by other work and didn't advance much here.
->>>> Will try to respin the patchset before my vacation (next Monday).
->>>> Although the driver DT support patch have seemingly stalemated due
->>>> to the most recent comments...
-
->>> Thanks for the update.
-
->>> I guess the key is to move forward on the driver side, somehow.
-
->>     Do you mean we should grant Stephen's requests concerning clock
->> DT support before we add the DT support to the driver?
-
-> That seems like the most logical way forwards to me.
-
-    Why? Why R-Car I2C driver device tree support was accepted without this, 
-although the driver uses clocks directly? Why such discrimination is applied 
-only to the Ethernet driver?
-
-> Is the main issue that the clocks aren't accessible via DT at this time?
-
-    In the eyes of Stephen, yes.
-
-WBR, Sergei
+--- 0001/arch/arm/mach-shmobile/board-lager-reference.c
++++ work/arch/arm/mach-shmobile/board-lager-reference.c	2013-10-08 15:32:05.000000000 +0900
+@@ -20,16 +20,15 @@
+ 
+ #include <linux/init.h>
+ #include <linux/of_platform.h>
++#include <mach/rcar-gen2.h>
+ #include <mach/r8a7790.h>
+ #include <asm/mach/arch.h>
+ 
+ static void __init lager_add_standard_devices(void)
+ {
+-	/* clocks are setup late during boot in the case of DT */
+ 	r8a7790_clock_init();
+-
+ 	r8a7790_add_dt_devices();
+-        of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+ static const char *lager_boards_compat_dt[] __initdata = {
