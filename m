@@ -1,108 +1,79 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Oct 2013 17:17:24 -0500
-Subject: [RFC PATCH 4/5] ARM: psci: Add support for system reboot and
- poweroff
-In-Reply-To: <1381942954-22388-5-git-send-email-anup.patel@linaro.org>
-References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
- <1381942954-22388-5-git-send-email-anup.patel@linaro.org>
-Message-ID: <525F1074.8000208@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 17 Oct 2013 00:30:10 +0200
+Subject: [GIT PULL] ARM: cpuidle: at91 platform driver conversion
+In-Reply-To: <525F0E81.5030002@linaro.org>
+References: <525F0E81.5030002@linaro.org>
+Message-ID: <3663078.gUru3UG0Hv@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2013 12:02 PM, Anup Patel wrote:
-> We have PSCI SYSTEM_OFF and SYSTEM_RESET function call emulation
-> available when running as Guest using KVM ARM.
+On Thursday, October 17, 2013 12:09:05 AM Daniel Lezcano wrote:
 > 
-> This patch implements system reboot and poweroff using PSCI
-> SYSTEM_OFF and SYSTEM_RESET.
-
-I've done a similar patch [1] which also needs binding documentation to
-go with it. The last version of which there is no agreement on is here [2].
-
-Rob
-
-[1] http://www.spinics.net/lists/arm-kernel/msg262217.html
-[2] http://www.spinics.net/lists/devicetree/msg05348.html
-
->
+> Hi Rafael,
 > 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm/kernel/psci.c |   36 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
+> This pull request based on the pm-cpuidle branch contains the following:
 > 
-> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-> index 4693188..30d9d65 100644
-> --- a/arch/arm/kernel/psci.c
-> +++ b/arch/arm/kernel/psci.c
-> @@ -17,11 +17,13 @@
->  
->  #include <linux/init.h>
->  #include <linux/of.h>
-> +#include <linux/pm.h>
->  
->  #include <asm/compiler.h>
->  #include <asm/errno.h>
->  #include <asm/opcodes-sec.h>
->  #include <asm/opcodes-virt.h>
-> +#include <asm/system_misc.h>
->  #include <asm/psci.h>
->  
->  struct psci_operations psci_ops;
-> @@ -33,6 +35,8 @@ enum psci_function {
->  	PSCI_FN_CPU_ON,
->  	PSCI_FN_CPU_OFF,
->  	PSCI_FN_MIGRATE,
-> +	PSCI_FN_SYSTEM_OFF,
-> +	PSCI_FN_SYSTEM_RESET,
->  	PSCI_FN_MAX,
->  };
->  
-> @@ -153,6 +157,28 @@ static int psci_migrate(unsigned long cpuid)
->  	return psci_to_linux_errno(err);
->  }
->  
-> +static void psci_power_off(void)
-> +{
-> +	int err;
-> +	u32 fn;
-> +
-> +	fn = psci_function_id[PSCI_FN_SYSTEM_OFF];
-> +	err = invoke_psci_fn(fn, 0, 0, 0);
-> +	if (err)
-> +		pr_warning("%s: failed\n", __func__);
-> +}
-> +
-> +static void psci_restart(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> +	int err;
-> +	u32 fn;
-> +
-> +	fn = psci_function_id[PSCI_FN_SYSTEM_RESET];
-> +	err = invoke_psci_fn(fn, 0, 0, 0);
-> +	if (err)
-> +		pr_warning("%s: failed\n", __func__);
-> +}
-> +
->  static const struct of_device_id psci_of_match[] __initconst = {
->  	{ .compatible = "arm,psci",	},
->  	{},
-> @@ -204,6 +230,16 @@ void __init psci_init(void)
->  		psci_ops.migrate = psci_migrate;
->  	}
->  
-> +	if (!of_property_read_u32(np, "system_off", &id)) {
-> +		psci_function_id[PSCI_FN_SYSTEM_OFF] = id;
-> +		pm_power_off = psci_power_off;
-> +	}
-> +
-> +	if (!of_property_read_u32(np, "system_reset", &id)) {
-> +		psci_function_id[PSCI_FN_SYSTEM_RESET] = id;
-> +		arm_pm_restart = psci_restart;
-> +	}
-> +
->  out_put_node:
->  	of_node_put(np);
->  	return;
+>   * Daniel Lezcano converted cpuidle to a platform_driver for at91. The 
+> standby callback is stored in the platform_device's data field as a 
+> callback for the driver, so the pm specific code and the backend driver 
+> have no more dependency. Each SoC init function fills the right callback 
+> at init time. As there are no more dependency, we can move the driver in 
+> the drivers/cpuidle directory.
 > 
+>   * Jean-Christophe Plagnol-Villard and Nicolas Ferre made a cleanup on 
+> top of the patch described above and fixed up the ddr standby callback 
+> so more SoC are supported. Even if the modifications are in the 
+> mach-at91 directory, they asked these patches to be included through the 
+> PM tree as they depend on the platform_driver conversion.
+> 
+> Thanks !
+>    -- Daniel
+> 
+> 
+> The following changes since commit ac9f1cc2ce1a178696763444f2a2f8a0ec661772:
+> 
+>    Merge back earlier cpuidle material for v3.13. (2013-10-07 21:31:21 
+> +0200)
+> 
+> are available in the git repository at:
+> 
+> 
+>    git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
+> 
+> for you to fetch changes up to 6b625891c6b541080bdaad97bcb82bd9ecd9e44b:
+> 
+>    ARM: AT91: DT: pm: Select ram controller standby based on DT 
+> (2013-10-16 23:51:47 +0200)
+> 
+> ----------------------------------------------------------------
+> Daniel Lezcano (2):
+>        ARM: at91: cpuidle: Convert to platform driver
+>        ARM: at91: cpuidle: Move driver to drivers/cpuidle
+> 
+> Jean-Christophe PLAGNIOL-VILLARD (2):
+>        ARM: AT91: pm: Factorize standby function
+>        ARM: AT91: DT: pm: Select ram controller standby based on DT
+> 
+>   arch/arm/mach-at91/Makefile                        |    1 -
+>   arch/arm/mach-at91/at91rm9200.c                    |    2 +
+>   arch/arm/mach-at91/at91sam9260.c                   |    2 +
+>   arch/arm/mach-at91/at91sam9261.c                   |    2 +
+>   arch/arm/mach-at91/at91sam9263.c                   |    2 +
+>   arch/arm/mach-at91/at91sam9g45.c                   |    2 +
+>   arch/arm/mach-at91/at91sam9rl.c                    |    2 +
+>   arch/arm/mach-at91/pm.c                            |   27 ++++++---
+>   arch/arm/mach-at91/pm.h                            |   59 
+> ++++++++++----------
+>   arch/arm/mach-at91/setup.c                         |   14 ++++-
+>   drivers/cpuidle/Kconfig.arm                        |    7 +++
+>   drivers/cpuidle/Makefile                           |    1 +
+>   .../cpuidle.c => drivers/cpuidle/cpuidle-at91.c    |   29 +++++-----
+>   13 files changed, 93 insertions(+), 57 deletions(-)
+>   rename arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/cpuidle-at91.c 
+> (79%)
+
+Pulled, thanks Daniel!
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
