@@ -1,203 +1,321 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Thu, 17 Oct 2013 00:15:14 +0800
-Subject: [PATCH v3 2/7] arm64: introduce interfaces to hotpatch kernel
- and module code
-In-Reply-To: <20131016111130.GE5403@mudshark.cambridge.arm.com>
-References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
- <1381893492-7135-3-git-send-email-liuj97@gmail.com>
- <20131016111130.GE5403@mudshark.cambridge.arm.com>
-Message-ID: <525EBB92.2050103@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 Oct 2013 18:25:07 +0200
+Subject: [PATCH V4 1/2] ARM: at91: cpuidle: convert to platform driver
+In-Reply-To: <1381830109-1398-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1381830109-1398-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <525EBDE3.6080203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2013 07:11 PM, Will Deacon wrote:
-> On Wed, Oct 16, 2013 at 04:18:07AM +0100, Jiang Liu wrote:
->> From: Jiang Liu <jiang.liu@huawei.com>
->>
->> Introduce three interfaces to patch kernel and module code:
->> aarch64_insn_patch_text_nosync():
->> 	patch code without synchronization, it's caller's responsibility
->> 	to synchronize all CPUs if needed.
->> aarch64_insn_patch_text_sync():
->> 	patch code and always synchronize with stop_machine()
->> aarch64_insn_patch_text():
->> 	patch code and synchronize with stop_machine() if needed
->>
->> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
->> Cc: Jiang Liu <liuj97@gmail.com>
->> ---
->>  arch/arm64/include/asm/insn.h |  7 +++-
->>  arch/arm64/kernel/insn.c      | 95 +++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 101 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
->> index e7d1bc8..2dfcdb4 100644
->> --- a/arch/arm64/include/asm/insn.h
->> +++ b/arch/arm64/include/asm/insn.h
->> @@ -47,7 +47,12 @@ __AARCH64_INSN_FUNCS(nop,	0xFFFFFFFF, 0xD503201F)
->>  #undef	__AARCH64_INSN_FUNCS
->>  
->>  enum aarch64_insn_class aarch64_get_insn_class(u32 insn);
->> -
->> +u32 aarch64_insn_read(void *addr);
->> +void aarch64_insn_write(void *addr, u32 insn);
->>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
->>  
->> +int aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[], int cnt);
->> +int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
->> +int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
->> +
->>  #endif	/* _ASM_ARM64_INSN_H */
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->> index 1be4d11..ad4185f 100644
->> --- a/arch/arm64/kernel/insn.c
->> +++ b/arch/arm64/kernel/insn.c
->> @@ -16,6 +16,8 @@
->>   */
->>  #include <linux/compiler.h>
->>  #include <linux/kernel.h>
->> +#include <linux/stop_machine.h>
->> +#include <asm/cacheflush.h>
->>  #include <asm/insn.h>
->>  
->>  /*
->> @@ -84,3 +86,96 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
->>  	return __aarch64_insn_hotpatch_safe(old_insn) &&
->>  	       __aarch64_insn_hotpatch_safe(new_insn);
->>  }
->> +
->> +/*
->> + * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
->> + * little-endian. On the other hand, SCTLR_EL1.EE (bit 25, Exception Endianness)
->> + * flag controls endianness for EL1 explicit data accesses and stage 1
->> + * translation table walks as below:
->> + *	0: little-endian
->> + *	1: big-endian
->> + * So need to handle endianness when patching kernel code.
->> + */
->> +u32 __kprobes aarch64_insn_read(void *addr)
->> +{
->> +	u32 insn;
->> +
->> +#ifdef	__AARCH64EB__
->> +	insn = swab32(*(u32 *)addr);
->> +#else
->> +	insn = *(u32 *)addr;
->> +#endif
-> 
-> le32_to_cpu ?
-> 
->> +
->> +	return insn;
->> +}
->> +
->> +void __kprobes aarch64_insn_write(void *addr, u32 insn)
->> +{
->> +#ifdef	__AARCH64EB__
->> +	*(u32 *)addr = swab32(insn);
->> +#else
->> +	*(u32 *)addr = insn;
->> +#endif
->> +}
-> 
-> cpu_to_le32 ?
-Good suggestion, much more simpler.
+On 15/10/2013 11:41, Daniel Lezcano :
+> Using the platform driver model is a good way to separate the cpuidle specific
+> code from the low level pm code. It allows to remove the dependency between
+> these two components.
+>
+> The platform_device is located in the pm code and a 'set' function has been
+> added to set the standby function from the AT91_SOC_START initialization
+> function. Each SoC with a cpuidle driver will set the standby function in the
+> platform_data field at init time. Then pm code will register the cpuidle
+> platform device.
+>
+> The cpuidle driver will register the platform_driver and use the device's
+> platform_data as a standby callback in the idle path.
+>
+> The at91_pm_enter function contains a { if then else } based on cpu_is_xx
+> similar to what was in cpuidle. This is considered dangerous when adding a new
+> SoC. Like the cpuidle driver, a standby ops is defined and assigned when the
+> SoC init function specifies what is its standby function and reused in the
+> at91_pm_enter's 'case' block.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-> 
->> +int __kprobes aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[],
->> +					     int cnt)
->> +{
->> +	int i;
->> +	u32 *tp;
->> +
->> +	if (cnt <= 0)
->> +		return -EINVAL;
->> +
->> +	for (i = 0; i < cnt; i++) {
->> +		tp = addrs[i];
->> +		/* A64 instructions must be word aligned */
->> +		if ((uintptr_t)tp & 0x3)
->> +			return -EINVAL;
->> +		aarch64_insn_write(tp, insns[i]);
->> +		flush_icache_range((uintptr_t)tp, (uintptr_t)tp + sizeof(u32));
-> 
-> What are you trying to achieve with this cache maintenance for the nosync
-> case? If you're not synchronising, then you will always have races with the
-> instruction patching, so I'd argue that this cache flush doesn't buy you
-> anything.
-aarch64_insn_patch_text_nosync() may be used in cases of
-1) during early boot with only the master CPU running.
-2) during runtime with all other CPUs in controlled state, such as kgdb.
-3) patching hot-patching safe instructions
-So flush_icache_range() is used to support case 1 and ensure local CPU
-sees the new instructions.
+Daniel,
 
-> 
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +struct aarch64_insn_patch {
->> +	void	**text_addrs;
->> +	u32	*new_insns;
->> +	int	insn_cnt;
->> +};
->> +
->> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
->> +{
->> +	struct aarch64_insn_patch *pp = arg;
->> +
->> +	return aarch64_insn_patch_text_nosync(pp->text_addrs, pp->new_insns,
->> +					      pp->insn_cnt);
->> +}
->> +
->> +int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
->> +{
->> +	struct aarch64_insn_patch patch = {
->> +		.text_addrs = addrs,
->> +		.new_insns = insns,
->> +		.insn_cnt = cnt,
->> +	};
->> +
->> +	if (cnt <= 0)
->> +		return -EINVAL;
->> +
->> +	/*
->> +	 * Execute __aarch64_insn_patch_text() on every online CPU,
->> +	 * which ensure serialization among all online CPUs.
->> +	 */
->> +	return stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
->> +}
->> +
->> +int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
->> +{
->> +	if (cnt == 1 && aarch64_insn_hotpatch_safe(aarch64_insn_read(addrs[0]),
->> +						   insns[0]))
->> +		return aarch64_insn_patch_text_nosync(addrs, insns, cnt);
->> +	else
->> +		return aarch64_insn_patch_text_sync(addrs, insns, cnt);
->> +}
-> 
-> The other way of doing this for cnt > 1 would be to patch in a branch to
-> the insns array and then a branch over the original code at the end of the
-> array. Obviously, this relies on insns being allocated somewhere persistent
-> (and non-pageable!).
-Kprobe uses the optimization method described above, but it's rather
-complex and depends on the instructions in the insns array.
+You can add my :
 
-> 
-> I was wondering whether you could do something clever with BKPT, but
-> everything I've thought of so far is racy.
-Need more time to think about this optimization.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-According to my understanding, it's not safe to patch a normal
-instruction (non B, BL, SVC, HVC, SMC, NOP, BRK) with BRK too.
-If that's true, it will be challenging to avoid stop_machine()
-here.
+To your 2 patches and the additional 2 by Jean-Christophe. As said by 
+Jean-Christophe, it can be easier for us if you take the whole series 
+through your git tree.
 
-Thanks!
-Gerry
-> 
-> Will
-> 
+Thanks a lot to both of you.
+
+Bye,
+
+> ---
+>   arch/arm/mach-at91/at91rm9200.c  |    3 +++
+>   arch/arm/mach-at91/at91sam9260.c |    3 +++
+>   arch/arm/mach-at91/at91sam9261.c |    3 +++
+>   arch/arm/mach-at91/at91sam9263.c |    3 +++
+>   arch/arm/mach-at91/at91sam9g45.c |    3 +++
+>   arch/arm/mach-at91/at91sam9rl.c  |    3 +++
+>   arch/arm/mach-at91/cpuidle.c     |   29 +++++++++++++++--------------
+>   arch/arm/mach-at91/pm.c          |   27 +++++++++++++++++++--------
+>   arch/arm/mach-at91/pm.h          |    4 ++++
+>   9 files changed, 56 insertions(+), 22 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index 4aad93d..0d234f2 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -27,6 +27,7 @@
+>   #include "generic.h"
+>   #include "clock.h"
+>   #include "sam9_smc.h"
+> +#include "pm.h"
+>
+>   /* --------------------------------------------------------------------
+>    *  Clocks
+> @@ -337,6 +338,8 @@ static void __init at91rm9200_initialize(void)
+>   	/* Initialize GPIO subsystem */
+>   	at91_gpio_init(at91rm9200_gpio,
+>   		cpu_is_at91rm9200_bga() ? AT91RM9200_BGA : AT91RM9200_PQFP);
+> +
+> +	at91_pm_set_standby(at91rm9200_standby);
+>   }
+>
+>
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index 5de6074..ffe9ce7 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -28,6 +28,7 @@
+>   #include "generic.h"
+>   #include "clock.h"
+>   #include "sam9_smc.h"
+> +#include "pm.h"
+>
+>   /* --------------------------------------------------------------------
+>    *  Clocks
+> @@ -351,6 +352,8 @@ static void __init at91sam9260_initialize(void)
+>
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9260_gpio, 3);
+> +
+> +	at91_pm_set_standby(at91sam9_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> index 0e07932..1edbb6f 100644
+> --- a/arch/arm/mach-at91/at91sam9261.c
+> +++ b/arch/arm/mach-at91/at91sam9261.c
+> @@ -27,6 +27,7 @@
+>   #include "generic.h"
+>   #include "clock.h"
+>   #include "sam9_smc.h"
+> +#include "pm.h"
+>
+>   /* --------------------------------------------------------------------
+>    *  Clocks
+> @@ -293,6 +294,8 @@ static void __init at91sam9261_initialize(void)
+>
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9261_gpio, 3);
+> +
+> +	at91_pm_set_sandby(at91sam9_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+> index 6ce7d18..8c81c89 100644
+> --- a/arch/arm/mach-at91/at91sam9263.c
+> +++ b/arch/arm/mach-at91/at91sam9263.c
+> @@ -26,6 +26,7 @@
+>   #include "generic.h"
+>   #include "clock.h"
+>   #include "sam9_smc.h"
+> +#include "pm.h"
+>
+>   /* --------------------------------------------------------------------
+>    *  Clocks
+> @@ -330,6 +331,8 @@ static void __init at91sam9263_initialize(void)
+>
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9263_gpio, 5);
+> +
+> +	at91_pm_set_standby(at91sam9263_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index 474ee04..8460f52 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -26,6 +26,7 @@
+>   #include "generic.h"
+>   #include "clock.h"
+>   #include "sam9_smc.h"
+> +#include "pm.h"
+>
+>   /* --------------------------------------------------------------------
+>    *  Clocks
+> @@ -379,6 +380,8 @@ static void __init at91sam9g45_initialize(void)
+>
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9g45_gpio, 5);
+> +
+> +	at91_pm_set_standby(at91sam9g45_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+> index d4ec0d9..c7986e4 100644
+> --- a/arch/arm/mach-at91/at91sam9rl.c
+> +++ b/arch/arm/mach-at91/at91sam9rl.c
+> @@ -27,6 +27,7 @@
+>   #include "generic.h"
+>   #include "clock.h"
+>   #include "sam9_smc.h"
+> +#include "pm.h"
+>
+>   /* --------------------------------------------------------------------
+>    *  Clocks
+> @@ -296,6 +297,8 @@ static void __init at91sam9rl_initialize(void)
+>
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9rl_gpio, 4);
+> +
+> +	at91_pm_set_standby(at91sam9_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+> index 4ec6a6d..a077437 100644
+> --- a/arch/arm/mach-at91/cpuidle.c
+> +++ b/arch/arm/mach-at91/cpuidle.c
+> @@ -21,26 +21,17 @@
+>   #include <linux/export.h>
+>   #include <asm/proc-fns.h>
+>   #include <asm/cpuidle.h>
+> -#include <mach/cpu.h>
+> -
+> -#include "pm.h"
+>
+>   #define AT91_MAX_STATES	2
+>
+> +static void (*at91_standby)(void);
+> +
+>   /* Actual code that puts the SoC in different idle states */
+>   static int at91_enter_idle(struct cpuidle_device *dev,
+>   			struct cpuidle_driver *drv,
+>   			       int index)
+>   {
+> -	if (cpu_is_at91rm9200())
+> -		at91rm9200_standby();
+> -	else if (cpu_is_at91sam9g45())
+> -		at91sam9g45_standby();
+> -	else if (cpu_is_at91sam9263())
+> -		at91sam9263_standby();
+> -	else
+> -		at91sam9_standby();
+> -
+> +	at91_standby();
+>   	return index;
+>   }
+>
+> @@ -60,9 +51,19 @@ static struct cpuidle_driver at91_idle_driver = {
+>   };
+>
+>   /* Initialize CPU idle by registering the idle states */
+> -static int __init at91_init_cpuidle(void)
+> +static int at91_cpuidle_probe(struct platform_device *dev)
+>   {
+> +	at91_standby = (void *)(dev->dev.platform_data);
+> +	
+>   	return cpuidle_register(&at91_idle_driver, NULL);
+>   }
+>
+> -device_initcall(at91_init_cpuidle);
+> +static struct platform_driver at91_cpuidle_driver = {
+> +	.driver = {
+> +		.name = "cpuidle-at91",
+> +		.owner = THIS_MODULE,
+> +	},
+> +	.probe = at91_cpuidle_probe,
+> +};
+> +
+> +module_platform_driver(at91_cpuidle_driver);
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 15afb5d..9986542 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -39,6 +39,8 @@
+>   #include "at91_rstc.h"
+>   #include "at91_shdwc.h"
+>
+> +static void (*at91_pm_standby)(void);
+> +
+>   static void __init show_reset_status(void)
+>   {
+>   	static char reset[] __initdata = "reset";
+> @@ -266,14 +268,8 @@ static int at91_pm_enter(suspend_state_t state)
+>   			 * For ARM 926 based chips, this requirement is weaker
+>   			 * as at91sam9 can access a RAM in self-refresh mode.
+>   			 */
+> -			if (cpu_is_at91rm9200())
+> -				at91rm9200_standby();
+> -			else if (cpu_is_at91sam9g45())
+> -				at91sam9g45_standby();
+> -			else if (cpu_is_at91sam9263())
+> -				at91sam9263_standby();
+> -			else
+> -				at91sam9_standby();
+> +			if (at91_pm_standby)
+> +				at91_pm_standby();
+>   			break;
+>
+>   		case PM_SUSPEND_ON:
+> @@ -314,6 +310,18 @@ static const struct platform_suspend_ops at91_pm_ops = {
+>   	.end	= at91_pm_end,
+>   };
+>
+> +static struct platform_device at91_cpuidle_device = {
+> +	.name = "cpuidle-at91",
+> +};
+> +
+> +void at91_pm_set_standby(void (*at91_standby)(void))
+> +{
+> +	if (at91_standby) {
+> +		at91_cpuidle_device.dev.platform_data = at91_standby;
+> +		at91_pm_standby = at91_standby;
+> +	}
+> +}
+> +
+>   static int __init at91_pm_init(void)
+>   {
+>   #ifdef CONFIG_AT91_SLOW_CLOCK
+> @@ -325,6 +333,9 @@ static int __init at91_pm_init(void)
+>   	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+>   	if (cpu_is_at91rm9200())
+>   		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+> +	
+> +	if (at91_cpuidle_device.dev.platform_data)
+> +		platform_device_register(&at91_cpuidle_device);
+>
+>   	suspend_set_ops(&at91_pm_ops);
+>
+> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+> index 2f5908f..76dd1a7 100644
+> --- a/arch/arm/mach-at91/pm.h
+> +++ b/arch/arm/mach-at91/pm.h
+> @@ -11,9 +11,13 @@
+>   #ifndef __ARCH_ARM_MACH_AT91_PM
+>   #define __ARCH_ARM_MACH_AT91_PM
+>
+> +#include <asm/proc-fns.h>
+> +
+>   #include <mach/at91_ramc.h>
+>   #include <mach/at91rm9200_sdramc.h>
+>
+> +extern void at91_pm_set_standby(void (*at91_standby)(void));
+> +
+>   /*
+>    * The AT91RM9200 goes into self-refresh mode with this command, and will
+>    * terminate self-refresh automatically on the next SDRAM access.
+>
+
+
+-- 
+Nicolas Ferre
