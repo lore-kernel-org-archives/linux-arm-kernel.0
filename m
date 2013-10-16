@@ -1,52 +1,83 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 15 Oct 2013 17:49:34 -0700
-Subject: [PATCH 6/9] KVM: ARM: Fix calculation of virtual CPU ID
+Date: Tue, 15 Oct 2013 17:49:33 -0700
+Subject: [PATCH 5/9] KVM: Add documentation for KVM_ARM_PREFERRED_TARGET ioctl
 In-Reply-To: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
 References: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1381884577-24747-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1381884577-24747-6-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonathan Austin <jonathan.austin@arm.com>
+From: Anup Patel <anup.patel@linaro.org>
 
-KVM does not have a notion of multiple clusters for CPUs, just a linear
-array of CPUs. When using a system with cores in more than one cluster, the
-current method for calculating the virtual MPIDR will leak the (physical)
-cluster information into the virtual MPIDR. One effect of this is that
-Linux under KVM fails to boot multiple CPUs that aren't in the 0th cluster.
+To implement CPU=Host we have added KVM_ARM_PREFERRED_TARGET
+vm ioctl which provides information to user space required for
+creating VCPU matching underlying Host.
 
-This patch does away with exposing the real MPIDR fields in favour of simply
-using the virtual CPU number (but preserving the U bit, as before).
+This patch adds info related to this new KVM_ARM_PREFERRED_TARGET
+vm ioctl in the KVM API documentation.
 
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/coproc_a15.c |   11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+ Documentation/virtual/kvm/api.txt |   31 +++++++++++++++++++++++++++----
+ 1 file changed, 27 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
-index cf93472..bbd4b88 100644
---- a/arch/arm/kvm/coproc_a15.c
-+++ b/arch/arm/kvm/coproc_a15.c
-@@ -27,14 +27,11 @@
- static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
- {
- 	/*
--	 * Compute guest MPIDR:
--	 * (Even if we present only one VCPU to the guest on an SMP
--	 * host we don't set the U bit in the MPIDR, or vice versa, as
--	 * revealing the underlying hardware properties is likely to
--	 * be the best choice).
-+	 * Compute guest MPIDR. No need to mess around with different clusters
-+	 * but we read the 'U' bit from the underlying hardware directly.
- 	 */
--	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & ~MPIDR_LEVEL_MASK)
--		| (vcpu->vcpu_id & MPIDR_LEVEL_MASK);
-+	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & MPIDR_SMP_BITMASK)
-+					| vcpu->vcpu_id;
- }
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 858aecf..076b849 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2304,7 +2304,31 @@ Possible features:
+ 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
  
- #include "coproc.h"
+ 
+-4.83 KVM_GET_REG_LIST
++4.83 KVM_ARM_PREFERRED_TARGET
++
++Capability: basic
++Architectures: arm, arm64
++Type: vm ioctl
++Parameters: struct struct kvm_vcpu_init (out)
++Returns: 0 on success; -1 on error
++Errors:
++  ENODEV:    no preferred target available for the host
++
++This queries KVM for preferred CPU target type which can be emulated
++by KVM on underlying host.
++
++The ioctl returns struct kvm_vcpu_init instance containing information
++about preferred CPU target type and recommended features for it.  The
++kvm_vcpu_init->features bitmap returned will have feature bits set if
++the preferred target recommends setting these features, but this is
++not mandatory.
++
++The information returned by this ioctl can be used to prepare an instance
++of struct kvm_vcpu_init for KVM_ARM_VCPU_INIT ioctl which will result in
++in VCPU matching underlying host.
++
++
++4.84 KVM_GET_REG_LIST
+ 
+ Capability: basic
+ Architectures: arm, arm64
+@@ -2323,8 +2347,7 @@ struct kvm_reg_list {
+ This ioctl returns the guest registers that are supported for the
+ KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+ 
+-
+-4.84 KVM_ARM_SET_DEVICE_ADDR
++4.85 KVM_ARM_SET_DEVICE_ADDR
+ 
+ Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
+ Architectures: arm, arm64
+@@ -2362,7 +2385,7 @@ must be called after calling KVM_CREATE_IRQCHIP, but before calling
+ KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
+ base addresses will return -EEXIST.
+ 
+-4.85 KVM_PPC_RTAS_DEFINE_TOKEN
++4.86 KVM_PPC_RTAS_DEFINE_TOKEN
+ 
+ Capability: KVM_CAP_PPC_RTAS
+ Architectures: ppc
 -- 
 1.7.10.4
