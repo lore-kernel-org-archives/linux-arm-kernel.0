@@ -1,51 +1,49 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Thu, 17 Oct 2013 00:16:12 +0300
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 16 Oct 2013 22:17:14 +0100
 Subject: .align may cause data to be interpreted as instructions
-In-Reply-To: <1381943025.3419.59.camel@linaro1.home>
-References: <525DC3D1.5030300@linaro.org> <525E74D8.3070008@codethink.co.uk>	
- <1381939571.3419.44.camel@linaro1.home>
- <1381943025.3419.59.camel@linaro1.home>
-Message-ID: <525F021C.3060507@linaro.org>
+In-Reply-To: <525EFB48.40002@linaro.org> (Taras Kondratiuk's message of "Wed,
+ 16 Oct 2013 23:47:04 +0300")
+References: <20131016192512.GB21726@localhost.localdomain>
+ <525EFB48.40002@linaro.org>
+Message-ID: <yw1x38o03oh1.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2013 08:03 PM, Jon Medhurst (Tixy) wrote:
-> On Wed, 2013-10-16 at 17:06 +0100, Jon Medhurst (Tixy) wrote:
->> On Wed, 2013-10-16 at 12:13 +0100, Ben Dooks wrote:
->>> On 15/10/13 23:38, Taras Kondratiuk wrote:
->>>> Hi
->>>>
->>>> I was debugging kprobes-test for BE8 and noticed that some data fields
->>>> are stored in LE instead of BE. It happens because these data fields
->>>> get interpreted as instructions.
->>>>
->>>> Is it a known issue?
->>>
->>> I reported the crashes to Tixy along with a different
->>> method of sovling the problem (changed to using pointers to
->>> the strings) a while ago.
->>
->> I found that fix in the list archives:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186528.html
->>
->>>  However it seems that nothing has
->>> happened to fix this.
->>>
->>> Since kprobes seems to work with the fixed tests I forgot
->>> to follow up and prod Jon about looking into this problem.
->>
->> Sorry, I sorta forgot/ignored the issue, strange compiler problem with a
->> vague explanation on a big-endian kernel (who uses that ;-)
->>
->>> Jon, if you are not interested in fixing this, then please
->>> let me know and we can get a patch sorted to fix it.
->>
->> Looking at your old patch again, it looks good to me. 
-> 
-> Actually it's broken for thumb, the pointer to the title needs storing
-> at a 4 byte alignment, which presumably will make the problem we're
-> trying to workaround re-occur. I'll try and find some time to take a
-> look for a different way of doing things...
+Taras Kondratiuk <taras.kondratiuk@linaro.org> writes:
 
-Word alignment here doesn't cause the problem, so this patch should
-workaround the issue.
+> On 10/16/2013 10:25 PM, Dave Martin wrote:
+>> Unfortunately, objdump can and does get confused about data/instruction
+>> boundaries, so the output you see above may be misleading.
+>> 
+>> Displaying the symbol table with --special-syms will list the magic
+>> symbols that mark the instruction and data boundaries, to help debug
+>> this kind of situation.
+>> 
+>> 
+>> However, in this case, I think you've found a bug in the assembler,
+>> as shown below.
+>> 
+>> Before linking, the final $a symbol (indicating the start of ARM
+>> instructions) is at address 8, so in this case objdump is correct
+>> to show 0x12345678 as an instruction.
+>> 
+>> After linking, the mapping symbols ($[atd]) remain as before, and
+>> the linker has byteswapped this "instruction" (as it should).
+>> 
+>> This is likely related to the magic for inserting the extensible
+>> NOP-padding fragment which implements the .align in code sections.
+>> That is code, and requires a $a mapping symbol, but that somehow
+>> goes AWOL or gets displaced after the alignment padding ...
+>> 
+>> I can't quite get my head around what is going on in
+>> binutils/gas/config/tc-arm.c.  We would need to understand that
+>> before we can identify a reliable workaround.
+>
+> Thanks for confirming the issue.
+> Does it makes sense to file a GCC bug?
+
+It seems like a binutils (gas) bug to me.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
