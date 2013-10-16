@@ -1,261 +1,233 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 16 Oct 2013 17:33:07 +0200
-Subject: [PATCH v4 02/17] ARM: at91: add Kconfig options for common clk
- support
-In-Reply-To: <1381477081-6041-3-git-send-email-b.brezillon@overkiz.com>
-References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
- <1381477081-6041-3-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <525EB1B3.8070309@atmel.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed, 16 Oct 2013 23:36:25 +0800
+Subject: [PATCH v3 1/7] arm64: introduce basic aarch64 instruction decoding
+ helpers
+In-Reply-To: <20131016105142.GD5403@mudshark.cambridge.arm.com>
+References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
+ <1381893492-7135-2-git-send-email-liuj97@gmail.com>
+ <20131016105142.GD5403@mudshark.cambridge.arm.com>
+Message-ID: <525EB279.9050504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2013 09:37, Boris BREZILLON :
-> This patch adds the following Kconfig options to prepare the transition to
-> common clk framework:
->
-> - AT91_USE_OLD_CLK: this option is selected by every SoC which does not
->    support new at91 clks based on common clk framework (SoC which does not
->    define the clock tree in its device tree).
->    This options is also selected when the user choose non dt boards support
->    (new at91 clks can only be registered from a device tree definition).
->
-> - COMMON_CLK_AT91: this option cannot be selected directly. Instead it is
->    enabled if these 3 conditions are met:
->     * at least one of the selected SoCs have a PMC (Power Management
->       Controller) Unit
->     * device tree support is enabled
->     * the old at91 clk implementation is disabled (every selected SoC define
->       its clks in its device tree and non dt boards support is disabled)
->
-> - OLD_CLK_AT91: this option cannot be selected directly. Instead it is
->    enabled if these 2 conditions are met:
->     * at least one of the selected SoCs have a PMC (Power Management
->       Controller) Unit
->     * at least one of the selected SoCs does not define its clks in its
->       device tree or non dt-boards support is enabled
->
-> This patch selects AT91_USE_OLD_CLK in all currently supported SoCs. These
-> selects will be removed after clk definitions are properly added in each
-> soc's device tree.
-> It also selects AT91_USE_OLD_CLK in all non-dt boards support.
->
-> AT91_PMC_UNIT references are replaced by OLD_CLK_AT91, because PMC Unit is
-> enabled for both old and common clk implementations, and old clk
-> implementation should not be compiled if COMMON_CLK is enabled.
->
-> To avoid future link errors, a new stub is created for at91_dt_clock_init
-> function if OLD_CLK_AT91 is disabled.
->
-> A new check is added in dt init functions (setup.c) to prepare for SoCs
-> supporting new clk implementation. These SoCs won't setup the
-> register_clocks callback (clk registration is done using of_clk_init).
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+On 10/16/2013 06:51 PM, Will Deacon wrote:
+> On Wed, Oct 16, 2013 at 04:18:06AM +0100, Jiang Liu wrote:
+>> From: Jiang Liu <jiang.liu@huawei.com>
+>>
+>> Introduce basic aarch64 instruction decoding helper
+>> aarch64_get_insn_class() and aarch64_insn_hotpatch_safe().
+>>
+>> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+>> Cc: Jiang Liu <liuj97@gmail.com>
+>> ---
+>>  arch/arm64/include/asm/insn.h | 53 ++++++++++++++++++++++++++
+>>  arch/arm64/kernel/Makefile    |  2 +-
+>>  arch/arm64/kernel/insn.c      | 86 +++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 140 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm64/include/asm/insn.h
+>>  create mode 100644 arch/arm64/kernel/insn.c
+>>
+>> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+>> new file mode 100644
+>> index 0000000..e7d1bc8
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/insn.h
+>> @@ -0,0 +1,53 @@
+>> +/*
+>> + * Copyright (C) 2013 Huawei Ltd.
+>> + * Author: Jiang Liu <jiang.liu@huawei.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#ifndef	_ASM_ARM64_INSN_H
+>> +#define	_ASM_ARM64_INSN_H
+>> +#include <linux/types.h>
+>> +
+>> +enum aarch64_insn_class {
+>> +	AARCH64_INSN_CLS_UNKNOWN,	/* UNALLOCATED */
+>> +	AARCH64_INSN_CLS_DP_IMM,	/* Data processing - immediate */
+>> +	AARCH64_INSN_CLS_DP_REG,	/* Data processing - register */
+>> +	AARCH64_INSN_CLS_DP_FPSIMD,	/* Data processing - SIMD and FP */
+>> +	AARCH64_INSN_CLS_LDST,		/* Loads and stores */
+>> +	AARCH64_INSN_CLS_BR_SYS,	/* Branch, exception generation and
+>> +					 * system instructions */
+>> +};
+> 
+> Strictly speaking, these are encoding groups, not instruction classes.
+Hi Will,
+	Thanks for review.
+Will change it to "aarch64_insn_encoding_class.
 
-It seems that all cases are covered for a smooth transition to common 
-clock framework.
+> 
+>> +
+>> +#define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
+>> +static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+>> +{ return (code & (mask)) == (val); }	\
+>> +static __always_inline u32 aarch64_insn_get_##abbr##_mask(void) \
+>> +{ return (mask); } \
+>> +static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+>> +{ return (val); }
+>> +
+>> +__AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+>> +__AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
+>> +__AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
+>> +__AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
+>> +__AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
+>> +__AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
+>> +__AARCH64_INSN_FUNCS(nop,	0xFFFFFFFF, 0xD503201F)
+>> +
+>> +#undef	__AARCH64_INSN_FUNCS
+>> +
+>> +enum aarch64_insn_class aarch64_get_insn_class(u32 insn);
+>> +
+>> +bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>> +
+>> +#endif	/* _ASM_ARM64_INSN_H */
+>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+>> index 7b4b564..9af6cb3 100644
+>> --- a/arch/arm64/kernel/Makefile
+>> +++ b/arch/arm64/kernel/Makefile
+>> @@ -9,7 +9,7 @@ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>>  arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
+>>  			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+>>  			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+>> -			   hyp-stub.o psci.o
+>> +			   hyp-stub.o psci.o insn.o
+>>  
+>>  arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+>>  					   sys_compat.o
+>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>> new file mode 100644
+>> index 0000000..1be4d11
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/insn.c
+>> @@ -0,0 +1,86 @@
+>> +/*
+>> + * Copyright (C) 2013 Huawei Ltd.
+>> + * Author: Jiang Liu <jiang.liu@huawei.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#include <linux/compiler.h>
+>> +#include <linux/kernel.h>
+>> +#include <asm/insn.h>
+>> +
+>> +/*
+>> + * ARM Architecture Reference Manual ARMv8, Section C3.1
+>> + * AARCH64 main encoding table
+> 
+> AArch64.
+Fix it in next version.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+>> + *  Bit position
+>> + *   28 27 26 25	Encoding Group
+>> + *   0  0  -  -		Unallocated
+>> + *   1  0  0  -		Data processing, immediate
+>> + *   1  0  1  -		Branch, exception generation and system instructions
+>> + *   -  1  -  0		Loads and stores
+>> + *   -  1  0  1		Data processing - register
+>> + *   0  1  1  1		Data processing - SIMD and floating point
+>> + *   1  1  1  1		Data processing - SIMD and floating point
+>> + * "-" means "don't care"
+>> + */
+> 
+> This comment would probably be better off in the header file, along with the
+> mask/value pairs you use there. Failing that, the table below should at
+> least live alongside the enum type and mask/value stuff.
+Will move it into insn.h
 
-Thanks
+> 
+>> +static int aarch64_insn_cls[] = {
+>> +	AARCH64_INSN_CLS_UNKNOWN,
+>> +	AARCH64_INSN_CLS_UNKNOWN,
+>> +	AARCH64_INSN_CLS_UNKNOWN,
+>> +	AARCH64_INSN_CLS_UNKNOWN,
+>> +	AARCH64_INSN_CLS_LDST,
+>> +	AARCH64_INSN_CLS_DP_REG,
+>> +	AARCH64_INSN_CLS_LDST,
+>> +	AARCH64_INSN_CLS_DP_FPSIMD,
+>> +	AARCH64_INSN_CLS_DP_IMM,
+>> +	AARCH64_INSN_CLS_DP_IMM,
+>> +	AARCH64_INSN_CLS_BR_SYS,
+>> +	AARCH64_INSN_CLS_BR_SYS,
+>> +	AARCH64_INSN_CLS_LDST,
+>> +	AARCH64_INSN_CLS_DP_REG,
+>> +	AARCH64_INSN_CLS_LDST,
+>> +	AARCH64_INSN_CLS_DP_FPSIMD,
+>> +};
+>> +
+>> +enum aarch64_insn_class __kprobes aarch64_get_insn_class(u32 insn)
+>> +{
+>> +	return aarch64_insn_cls[(insn >> 25) & 0xf];
+>> +}
+>> +
+>> +static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+>> +{
+>> +	if (aarch64_get_insn_class(insn) != AARCH64_INSN_CLS_BR_SYS)
+>> +		return false;
+>> +
+>> +	return	aarch64_insn_is_b(insn) ||
+>> +		aarch64_insn_is_bl(insn) ||
+>> +		aarch64_insn_is_svc(insn) ||
+>> +		aarch64_insn_is_hvc(insn) ||
+>> +		aarch64_insn_is_smc(insn) ||
+>> +		aarch64_insn_is_brk(insn) ||
+>> +		aarch64_insn_is_nop(insn);
+>> +}
+>> +
+>> +/*
+>> + * ARMv8-A Section B2.6.5:
+>> + * Concurrent modification and execution of instructions can lead to the
+>> + * resulting instruction performing any behavior that can be achieved by
+>> + * executing any sequence of instructions that can be executed from the
+>> + * same Exception level, except where the instruction before modification
+>> + * and the instruction after modification is a B, BL, NOP, BKPT, SVC, HVC,
+>> + * or SMC instruction.
+>> + */
+>> +bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+>> +{
+>> +	return __aarch64_insn_hotpatch_safe(old_insn) &&
+>> +	       __aarch64_insn_hotpatch_safe(new_insn);
+> 
+> Take care here:
+> 
+> 	- This doesn't guarantee that CPUs exclusively see new_insn (they
+> 	  may see old_insn, even after patching)
+Good point. Still need some synchronization mechanism lighter than
+stop_machine(). How about kick_all_cpus_sync(), which should be lighter
+than stop_machine()?
 
-> ---
->   arch/arm/mach-at91/Kconfig        |   21 +++++++++++++++++++++
->   arch/arm/mach-at91/Kconfig.non_dt |    6 ++++++
->   arch/arm/mach-at91/Makefile       |    2 +-
->   arch/arm/mach-at91/generic.h      |    3 ++-
->   arch/arm/mach-at91/setup.c        |    6 ++++--
->   5 files changed, 34 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 699b71e..85b53a4 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -6,10 +6,22 @@ config HAVE_AT91_DBGU0
->   config HAVE_AT91_DBGU1
->   	bool
->
-> +config AT91_USE_OLD_CLK
-> +	bool
-> +
->   config AT91_PMC_UNIT
->   	bool
->   	default !ARCH_AT91X40
->
-> +config COMMON_CLK_AT91
-> +	bool
-> +	default AT91_PMC_UNIT && USE_OF && !AT91_USE_OLD_CLK
-> +	select COMMON_CLK
-> +
-> +config OLD_CLK_AT91
-> +	bool
-> +	default AT91_PMC_UNIT && AT91_USE_OLD_CLK
-> +
->   config AT91_SAM9_ALT_RESET
->   	bool
->   	default !ARCH_AT91X40
-> @@ -65,6 +77,7 @@ config SOC_SAMA5D3
->   	select SOC_SAMA5
->   	select HAVE_FB_ATMEL
->   	select HAVE_AT91_DBGU1
-> +	select AT91_USE_OLD_CLK
->   	help
->   	  Select this if you are using one of Atmel's SAMA5D3 family SoC.
->   	  This support covers SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35.
-> @@ -78,11 +91,13 @@ config SOC_AT91RM9200
->   	select HAVE_AT91_DBGU0
->   	select MULTI_IRQ_HANDLER
->   	select SPARSE_IRQ
-> +	select AT91_USE_OLD_CLK
->
->   config SOC_AT91SAM9260
->   	bool "AT91SAM9260, AT91SAM9XE or AT91SAM9G20"
->   	select HAVE_AT91_DBGU0
->   	select SOC_AT91SAM9
-> +	select AT91_USE_OLD_CLK
->   	help
->   	  Select this if you are using one of Atmel's AT91SAM9260, AT91SAM9XE
->   	  or AT91SAM9G20 SoC.
-> @@ -92,6 +107,7 @@ config SOC_AT91SAM9261
->   	select HAVE_AT91_DBGU0
->   	select HAVE_FB_ATMEL
->   	select SOC_AT91SAM9
-> +	select AT91_USE_OLD_CLK
->   	help
->   	  Select this if you are using one of Atmel's AT91SAM9261 or AT91SAM9G10 SoC.
->
-> @@ -100,18 +116,21 @@ config SOC_AT91SAM9263
->   	select HAVE_AT91_DBGU1
->   	select HAVE_FB_ATMEL
->   	select SOC_AT91SAM9
-> +	select AT91_USE_OLD_CLK
->
->   config SOC_AT91SAM9RL
->   	bool "AT91SAM9RL"
->   	select HAVE_AT91_DBGU0
->   	select HAVE_FB_ATMEL
->   	select SOC_AT91SAM9
-> +	select AT91_USE_OLD_CLK
->
->   config SOC_AT91SAM9G45
->   	bool "AT91SAM9G45 or AT91SAM9M10 families"
->   	select HAVE_AT91_DBGU1
->   	select HAVE_FB_ATMEL
->   	select SOC_AT91SAM9
-> +	select AT91_USE_OLD_CLK
->   	help
->   	  Select this if you are using one of Atmel's AT91SAM9G45 family SoC.
->   	  This support covers AT91SAM9G45, AT91SAM9G46, AT91SAM9M10 and AT91SAM9M11.
-> @@ -121,6 +140,7 @@ config SOC_AT91SAM9X5
->   	select HAVE_AT91_DBGU0
->   	select HAVE_FB_ATMEL
->   	select SOC_AT91SAM9
-> +	select AT91_USE_OLD_CLK
->   	help
->   	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
->   	  This means that your SAM9 name finishes with a '5' (except if it is
-> @@ -133,6 +153,7 @@ config SOC_AT91SAM9N12
->   	select HAVE_AT91_DBGU0
->   	select HAVE_FB_ATMEL
->   	select SOC_AT91SAM9
-> +	select AT91_USE_OLD_CLK
->   	help
->   	  Select this if you are using Atmel's AT91SAM9N12 SoC.
->
-> diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
-> index ca900be..b736b57 100644
-> --- a/arch/arm/mach-at91/Kconfig.non_dt
-> +++ b/arch/arm/mach-at91/Kconfig.non_dt
-> @@ -12,26 +12,32 @@ config ARCH_AT91_NONE
->   config ARCH_AT91RM9200
->   	bool "AT91RM9200"
->   	select SOC_AT91RM9200
-> +	select AT91_USE_OLD_CLK
->
->   config ARCH_AT91SAM9260
->   	bool "AT91SAM9260 or AT91SAM9XE or AT91SAM9G20"
->   	select SOC_AT91SAM9260
-> +	select AT91_USE_OLD_CLK
->
->   config ARCH_AT91SAM9261
->   	bool "AT91SAM9261 or AT91SAM9G10"
->   	select SOC_AT91SAM9261
-> +	select AT91_USE_OLD_CLK
->
->   config ARCH_AT91SAM9263
->   	bool "AT91SAM9263"
->   	select SOC_AT91SAM9263
-> +	select AT91_USE_OLD_CLK
->
->   config ARCH_AT91SAM9RL
->   	bool "AT91SAM9RL"
->   	select SOC_AT91SAM9RL
-> +	select AT91_USE_OLD_CLK
->
->   config ARCH_AT91SAM9G45
->   	bool "AT91SAM9G45"
->   	select SOC_AT91SAM9G45
-> +	select AT91_USE_OLD_CLK
->
->   config ARCH_AT91X40
->   	bool "AT91x40"
-> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-> index 3b0a953..8539411 100644
-> --- a/arch/arm/mach-at91/Makefile
-> +++ b/arch/arm/mach-at91/Makefile
-> @@ -7,7 +7,7 @@ obj-m		:=
->   obj-n		:=
->   obj-		:=
->
-> -obj-$(CONFIG_AT91_PMC_UNIT)	+= clock.o
-> +obj-$(CONFIG_OLD_CLK_AT91)	+= clock.o
->   obj-$(CONFIG_AT91_SAM9_ALT_RESET) += at91sam9_alt_reset.o
->   obj-$(CONFIG_AT91_SAM9G45_RESET) += at91sam9g45_reset.o
->   obj-$(CONFIG_AT91_SAM9_TIME)	+= at91sam926x_time.o
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> index dc6e2f5..375c42e 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -44,11 +44,12 @@ extern void at91sam926x_pit_init(void);
->   extern void at91x40_timer_init(void);
->
->    /* Clocks */
-> -#ifdef CONFIG_AT91_PMC_UNIT
-> +#ifdef CONFIG_OLD_CLK_AT91
->   extern int __init at91_clock_init(unsigned long main_clock);
->   extern int __init at91_dt_clock_init(void);
->   #else
->   static int inline at91_clock_init(unsigned long main_clock) { return 0; }
-> +static int inline at91_dt_clock_init(void) { return 0; }
->   #endif
->   struct device;
->
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index 41aa68b..06052fc 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -483,7 +483,8 @@ void __init at91rm9200_dt_initialize(void)
->   	at91_dt_clock_init();
->
->   	/* Register the processor-specific clocks */
-> -	at91_boot_soc.register_clocks();
-> +	if (at91_boot_soc.register_clocks)
-> +		at91_boot_soc.register_clocks();
->
->   	at91_boot_soc.init();
->   }
-> @@ -498,7 +499,8 @@ void __init at91_dt_initialize(void)
->   	at91_dt_clock_init();
->
->   	/* Register the processor-specific clocks */
-> -	at91_boot_soc.register_clocks();
-> +	if (at91_boot_soc.register_clocks)
-> +		at91_boot_soc.register_clocks();
->
->   	if (at91_boot_soc.init)
->   		at91_boot_soc.init();
->
+> 
+> 	- If you patch a conditional branch and change both the target address
+> 	  *and* the condition, you can get combinations of target/condition
+> 	  between old_insn and new_insn.
+> 
+> Then again, the jump_label code should always be patching between B and NOP
+> instructions, right?
+Yeah, should be safe for jump label because it only uses unconditional
+B and NOP.
 
-
--- 
-Nicolas Ferre
+> 
+> Will
+> 
