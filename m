@@ -1,45 +1,63 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 16 Oct 2013 14:51:12 +0200
-Subject: [PATCH v3 4/4] usb: musb: dsps, use devm_kzalloc
+Date: Wed, 16 Oct 2013 14:51:10 +0200
+Subject: [PATCH v3 2/4] usb: musb: Bugfix of_node assignment
 In-Reply-To: <1381927872-8181-1-git-send-email-mpa@pengutronix.de>
 References: <1381927872-8181-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1381927872-8181-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1381927872-8181-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It is not safe to assign the of_node to a device without driver. The
+device is matched against a list of drivers and the of_node could lead
+to a DT match with the parent driver.
+
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/usb/musb/musb_dsps.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/usb/musb/musb_core.c | 12 +++++++++++-
+ drivers/usb/musb/musb_dsps.c |  1 -
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-index 0680f0e..aae017c 100644
---- a/drivers/usb/musb/musb_dsps.c
-+++ b/drivers/usb/musb/musb_dsps.c
-@@ -597,7 +597,7 @@ static int dsps_probe(struct platform_device *pdev)
- 	wrp = match->data;
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index 7d40dec..651cce0 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -1958,6 +1958,7 @@ static int musb_probe(struct platform_device *pdev)
+ 	int		irq = platform_get_irq_byname(pdev, "mc");
+ 	struct resource	*iomem;
+ 	void __iomem	*base;
++	int ret;
  
- 	/* allocate glue */
--	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
-+	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
- 	if (!glue) {
- 		dev_err(&pdev->dev, "unable to allocate glue memory\n");
- 		return -ENOMEM;
-@@ -625,7 +625,6 @@ err3:
- 	pm_runtime_put(&pdev->dev);
- err2:
- 	pm_runtime_disable(&pdev->dev);
--	kfree(glue);
- 	return ret;
+ 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!iomem || irq <= 0)
+@@ -1967,7 +1968,16 @@ static int musb_probe(struct platform_device *pdev)
+ 	if (IS_ERR(base))
+ 		return PTR_ERR(base);
+ 
+-	return musb_init_controller(dev, irq, base);
++	if (dev->parent)
++		dev->of_node = dev->parent->of_node;
++
++	ret = musb_init_controller(dev, irq, base);
++	if (ret) {
++		dev->of_node = NULL;
++		return ret;
++	}
++
++	return 0;
  }
  
-@@ -638,7 +637,6 @@ static int dsps_remove(struct platform_device *pdev)
- 	/* disable usbss clocks */
- 	pm_runtime_put(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
--	kfree(glue);
+ static int musb_remove(struct platform_device *pdev)
+diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+index bd4138d..189e52c 100644
+--- a/drivers/usb/musb/musb_dsps.c
++++ b/drivers/usb/musb/musb_dsps.c
+@@ -483,7 +483,6 @@ static int dsps_create_musb_pdev(struct dsps_glue *glue,
+ 	musb->dev.parent		= dev;
+ 	musb->dev.dma_mask		= &musb_dmamask;
+ 	musb->dev.coherent_dma_mask	= musb_dmamask;
+-	musb->dev.of_node		= of_node_get(dn);
  
- 	debugfs_remove_recursive(glue->dbgfs_root);
+ 	glue->musb = musb;
  
 -- 
 1.8.4.rc3
