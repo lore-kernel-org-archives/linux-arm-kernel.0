@@ -1,53 +1,34 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 15 Oct 2013 21:50:34 -0700
-Subject: [PATCH v2] ARM: cci driver need big endian fixes in asm code
-In-Reply-To: <1381899034-420-1-git-send-email-victor.kamensky@linaro.org>
-References: <1381899034-420-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1381899034-420-2-git-send-email-victor.kamensky@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 15 Oct 2013 21:37:46 -0700
+Subject: [PATCH] KVM: ARM: Update comments for kvm_handle_wfi
+In-Reply-To: <6A3DF150A5B70D4F9B66A25E3F7C888D071BDCAD@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1381253894-18114-2-git-send-email-marc.zyngier@arm.com>
+ <1381886000-11140-1-git-send-email-christoffer.dall@linaro.org>
+ <6A3DF150A5B70D4F9B66A25E3F7C888D071BDCAD@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <20131016043746.GC24837@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cci_enable_port_for_self written in asm and it works with h/w
-registers that are in little endian format. When run in big
-endian mode it needs byteswaped constants before/after it
-writes/reads to/from such registers
+On Wed, Oct 16, 2013 at 04:19:45AM +0000, Bhushan Bharat-R65777 wrote:
+> 
+> 
+> > -----Original Message-----
+> > From: Christoffer Dall [mailto:christoffer.dall at linaro.org]
+> > Sent: Wednesday, October 16, 2013 6:43 AM
+> > To: Marc Zyngier
+> > Cc: kvmarm at lists.cs.columbia.edu; linux-arm-kernel at lists.infradead.org
+> > Subject: [PATCH] KVM: ARM: Update comments for kvm_handle_wfi
+> > 
+> > Update comments to reflect what is really going on and add the TWE bit to the
+> > comments in kvm_arm.h.
+> > 
+> > Also renames the function to kvm_handle_wfx like is done on arm64 for
+> > consistency and uber-correctness.
+> 
+> s/uber/user
+> 
+No, that was actually the German word "uber" (with the dots, but I
+didn't want to put them), with the meaning very very correct.  My
+attempt at humor failed here miserably I see :)
 
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
- drivers/bus/arm-cci.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 57b0bc6..4328c25 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -872,7 +872,7 @@ asmlinkage void __naked cci_enable_port_for_self(void)
- 
- 	/* Enable the CCI port */
- "	ldr	r0, [r0, %[offsetof_port_phys]] \n"
--"	mov	r3, #"__stringify(CCI_ENABLE_REQ)" \n"
-+"	mov	r3, %[cci_enable_req]\n"		   
- "	str	r3, [r0, #"__stringify(CCI_PORT_CTRL)"] \n"
- 
- 	/* poll the status reg for completion */
-@@ -880,7 +880,7 @@ asmlinkage void __naked cci_enable_port_for_self(void)
- "	ldr	r0, [r1] \n"
- "	ldr	r0, [r0, r1]		@ cci_ctrl_base \n"
- "4:	ldr	r1, [r0, #"__stringify(CCI_CTRL_STATUS)"] \n"
--"	tst	r1, #1 \n"
-+"	tst	r1, %[cci_control_status_bits] \n"			
- "	bne	4b \n"
- 
- "	mov	r0, #0 \n"
-@@ -893,6 +893,8 @@ asmlinkage void __naked cci_enable_port_for_self(void)
- "7:	.word	cci_ctrl_phys - . \n"
- 	: :
- 	[sizeof_cpu_port] "i" (sizeof(cpu_port)),
-+	[cci_enable_req] "i" cpu_to_le32(CCI_ENABLE_REQ),
-+	[cci_control_status_bits] "i" cpu_to_le32(1),
- #ifndef __ARMEB__
- 	[offsetof_cpu_port_mpidr_lsb] "i" (offsetof(struct cpu_port, mpidr)),
- #else
--- 
-1.8.1.4
+-Christoffer
