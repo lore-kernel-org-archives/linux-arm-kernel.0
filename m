@@ -1,71 +1,46 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 15 Oct 2013 18:13:20 -0700
-Subject: [PATCH] KVM: ARM: Update comments for kvm_handle_wfi
+Date: Tue, 15 Oct 2013 18:14:17 -0700
+Subject: [PATCH v2 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
 In-Reply-To: <1381253894-18114-2-git-send-email-marc.zyngier@arm.com>
-References: <1381253894-18114-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1381886000-11140-1-git-send-email-christoffer.dall@linaro.org>
+References: <1381253894-18114-1-git-send-email-marc.zyngier@arm.com>
+ <1381253894-18114-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20131016011417.GA24837@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update comments to reflect what is really going on and add the TWE bit
-to the comments in kvm_arm.h.
+On Tue, Oct 08, 2013 at 06:38:13PM +0100, Marc Zyngier wrote:
+> On an (even slightly) oversubscribed system, spinlocks are quickly
+> becoming a bottleneck, as some vcpus are spinning, waiting for a
+> lock to be released, while the vcpu holding the lock may not be
+> running at all.
+> 
+> This creates contention, and the observed slowdown is 40x for
+> hackbench. No, this isn't a typo.
+> 
+> The solution is to trap blocking WFEs and tell KVM that we're
+> now spinning. This ensures that other vpus will get a scheduling
+> boost, allowing the lock to be released more quickly. Also, using
+> CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT slightly improves the performance
+> when the VM is severely overcommited.
+> 
+> Quick test to estimate the performance: hackbench 1 process 1000
+> 
+> 2xA15 host (baseline):	1.843s
+> 
+> 2xA15 guest w/o patch:	2.083s
+> 4xA15 guest w/o patch:	80.212s
+> 8xA15 guest w/o patch:	Could not be bothered to find out
+> 
+> 2xA15 guest w/ patch:	2.102s
+> 4xA15 guest w/ patch:	3.205s
+> 8xA15 guest w/ patch:	6.887s
+> 
+> So we go from a 40x degradation to 1.5x in the 2x overcommit case,
+> which is vaguely more acceptable.
+> 
+Patch looks good, I can just apply it and add the other one I just send
+as a reply if there are no objections.
 
-Also renames the function to kvm_handle_wfx like is done on arm64 for
-consistency and uber-correctness.
+Sorry for the long turn-around on this one.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/include/asm/kvm_arm.h |    1 +
- arch/arm/kvm/handle_exit.c     |   14 ++++++++------
- 2 files changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index fe395b7..1d3153c 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -57,6 +57,7 @@
-  * TSC:		Trap SMC
-  * TSW:		Trap cache operations by set/way
-  * TWI:		Trap WFI
-+ * TWE:		Trap WFE
-  * TIDCP:	Trap L2CTLR/L2ECTLR
-  * BSU_IS:	Upgrade barriers to the inner shareable domain
-  * FB:		Force broadcast of all maintainance operations
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index c4c496f..a920790 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -73,15 +73,17 @@ static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
- }
- 
- /**
-- * kvm_handle_wfi - handle a wait-for-interrupts instruction executed by a guest
-+ * kvm_handle_wfx - handle a WFI or WFE instructions trapped in guests
-  * @vcpu:	the vcpu pointer
-  * @run:	the kvm_run structure pointer
-  *
-- * Simply sets the wait_for_interrupts flag on the vcpu structure, which will
-- * halt execution of world-switches and schedule other host processes until
-- * there is an incoming IRQ or FIQ to the VM.
-+ * WFE: Yield the CPU and come back to this vcpu when the scheduler
-+ * decides to.
-+ * WFI: Simply call kvm_vcpu_block(), which will halt execution of
-+ * world-switches and schedule other host processes until there is an
-+ * incoming IRQ or FIQ to the VM.
-  */
--static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
- 	trace_kvm_wfi(*vcpu_pc(vcpu));
- 	if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE)
-@@ -93,7 +95,7 @@ static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
- }
- 
- static exit_handle_fn arm_exit_handlers[] = {
--	[HSR_EC_WFI]		= kvm_handle_wfi,
-+	[HSR_EC_WFI]		= kvm_handle_wfx,
- 	[HSR_EC_CP15_32]	= kvm_handle_cp15_32,
- 	[HSR_EC_CP15_64]	= kvm_handle_cp15_64,
- 	[HSR_EC_CP14_MR]	= kvm_handle_cp14_access,
--- 
-1.7.10.4
+-Christoffer
