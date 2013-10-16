@@ -1,93 +1,160 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Oct 2013 11:06:16 -0600
-Subject: [PATCH v3 02/19] clk: tegra: simplify periph clock data
-In-Reply-To: <20131016150619.GM5643@tbergstrom-lnx.Nvidia.com>
-References: <1381848794-11761-1-git-send-email-pdeschrijver@nvidia.com>
- <1381848794-11761-3-git-send-email-pdeschrijver@nvidia.com>
- <525D8D7D.10301@wwwdotorg.org>
- <20131016150619.GM5643@tbergstrom-lnx.Nvidia.com>
-Message-ID: <525EC788.9000309@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Oct 2013 18:03:42 +0100
+Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <20131003202751.GZ6192@mwanda>
+ <20131015131038.GB25034@n2100.arm.linux.org.uk>
+ <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
+Message-ID: <20131016170341.GH25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2013 09:06 AM, Peter De Schrijver wrote:
-> On Tue, Oct 15, 2013 at 08:46:21PM +0200, Stephen Warren wrote:
->> On 10/15/2013 08:52 AM, Peter De Schrijver wrote:
->>> This patch determines the register bank for clock enable/disable and reset
->>> based on the clock ID instead of hardcoding it in the tables describing the
->>> clocks. This results in less data to be maintained in the tables, making the
->>> code easier to understand. The full benefit of the change will be realized once
->>> also other clocktypes will be table based.
->>
->>> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-
->>>  	for (i = 0; i < ARRAY_SIZE(tegra_periph_clk_list); i++) {
->>>  		data = &tegra_periph_clk_list[i];
->>> -		clk = tegra_clk_register_periph(data->name, data->parent_names,
->>> -				data->num_parents, &data->periph,
->>> -				clk_base, data->offset, data->flags);
->>> +
->>> +		clk = tegra_clk_register_periph(data->name,
->>> +			data->parent_names, data->num_parents, &data->periph,
->>> +			clk_base, data->offset, data->flags);
->>>  		clks[data->clk_id] = clk;
->>>  	}
->>>  
->>>  	for (i = 0; i < ARRAY_SIZE(tegra_periph_nodiv_clk_list); i++) {
->>>  		data = &tegra_periph_nodiv_clk_list[i];
->>> +
->>>  		clk = tegra_clk_register_periph_nodiv(data->name,
->>
->> Nit: Seems like an unrelated change, and inconsistent with the other
->> loop above.
+On Tue, Oct 15, 2013 at 10:17:07AM -0300, Fabio Estevam wrote:
+> On Tue, Oct 15, 2013 at 10:10 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Another point on patch 1.  Sorry, I don't have patch 1 to reply to, it
+> > seems it was deleted from linux-arm-kernel's moderation queue.
+> >
+> > drm_mode_connector_attach_encoder() is called too early, before the
+> > base.id field in the encoder has been initialised.  This causes the
+> > connectors encoder array to be empty, and userspace KMS to fail.
+> >
+> > There's also bugs in the CSC setting too - it runs off the end of the
+> > array and gcc warns about this.  The code was clearly wrong.
+> >
+> > You may wish to combine this patch with patch 1 to sort all that out.
+> > For the patch below:
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> Actually it makes it consistent. The previous loop added an empty line
-> between data = ... and tegra_clk_register_periph()
-
-Oh right, I see you added the blank line in the chunk about and I'd
-overlooked that. I guess it's fine.
-
->>> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
->>
->>> +struct tegra_clk_periph_regs * __init get_reg_bank(int clkid)
->>> +{
->>> +	int reg_bank = clkid / 32;
->>> +
->>> +	if (reg_bank < periph_banks)
->>> +		return &periph_regs[reg_bank];
->>> +	else {
->>> +		WARN_ON(1);
->>> +		return NULL;
->>> +	}
->>> +}
->>> +
->>> +int __init tegra_clk_periph_banks(int num)
->>> +{
->>> +	if (num > ARRAY_SIZE(periph_regs))
->>> +		return -EINVAL;
->>> +
->>> +	periph_banks = num;
->>> +
->>> +	return 0;
->>> +}
->>
->> Shouldn't the condition in tegra_clk_periph_banks() check against
->> periph_banks rather than ARRAY_SIZE(periph_regs)? I assume the calls to
+> Thanks, Russell.
 > 
-> periph_banks is initialized in tegra_clk_periph_banks(), so I don't see how
-> that would work?
+> Will submit v3 when I am back to the office.
 
-Yes, indeed!
+Okay, I still have a problem with HDMI: I have a magenta vertical line
+down the left hand side of the frame, the displayed frame is shifted
+right by the width of that line and the right hand side is missing some
+pixels.
 
->> tegra_clk_periph_banks() from tegra*_clock_init() are intended to ensure
->> that periph_regs is set up correctly in this file? I wonder if
->> s/tegra_clk_periph_banks/tegra_clk_validate_periph_bank_count/ isn't
->> called for?
-> 
-> Yes. The calls are intended to ensure that the clk-tegra* files, don't
-> refer to register banks which don't have addresses specified. This could happen
-> if a wrong periph clk ID would be specified for example. In later patches
-> we will also allocate memory based on the number of register banks.
+First off, the hsync position programmed into the HDMI registers appears
+to be wrong.
 
-Ah, so perhaps s/tegra_clk_periph_banks/tegra_clk_set_periph_banks/
-would make it more obvious what it's doing.
+I'm at a loss why imx-hdmi is obfuscated with a conversion from a
+drm_display_mode structure to a fb_videomode.  This adds additional
+confusion and additional opportunities for bugs; this is probably
+exactly why the hsync position is wrong.
+
+In CEA-861-B for 720p @60Hz:
+
+DE: ^^^^__________^^^^^^^
+HS: _______^^^___________
+         ^  ^  ^
+         |  |  220 clocks
+         |  40 clocks
+         110 clocks
+
+The IMX6 manual says HSYINCINDELAY0 is "Hsync active edge delay.  Integer
+number of pixel clock cycles from de non-active edge".  So, this should be
+110.  Yet it ends up being programmed as 220, leading to a magenta vertical
+bar down the left hand side of the display.
+
+Now, if you look at Documentation/fb/framebuffer.txt, in this case, the
+right margin should be 110 clocks, hsync len should be 40 and the left
+margin should be 220 clocks.
+
+However, this is not what your conversion to a fb_videomode does.  It
+reverses the left and right margin.  A similar confusion also exists
+in the conversion of the upper/lower margins too.
+
+The DRM model is this (for 720p @60Hz):
+
+0                             1280         1390 1430      1650
+|===============================|------------|---|----------|
+^                               ^            ^   ^          ^
+start                       hdisplay hsync_start hsync_end htotal
+
+The fb model is the same as the above but rotated:
+
+left margin            displayed            right margin hsync_len
+|----------|===============================|------------|---|
+
+So, the left margin is the bit between hsync_end and htotal, and the
+right margin is the bit between hdisplay and hsync_start.  Exactly
+the same analysis applies to the upper/lower margins.
+
+What I suggest is that the use of fb_videomode is entirely killed off
+in this driver to remove this layer of confusion and instead the DRM
+model is stuck to within this DRM driver.
+
+Now on to the next problem.  HSYNC/VSYNC polarity.
+
+So, this is the mode which is set:
+
+  1280x720 (0x41)   74.2MHz +HSync +VSync *current +preferred
+        h: width  1280 start 1390 end 1430 total 1650 skew    0 clock   45.0KHz
+        v: height  720 start  725 end  730 total  750           clock   60.0Hz
+
+Note the positive HSync and VSync polarity - this is correct, backed
+up by CEA-861-B.
+
+The IPU DI0 is configured thusly in its general control register:
+0x2640000 = 0x200006, which is what is set when the requested mode
+has DRM_MODE_FLAG_PHSYNC and DRM_MODE_FLAG_PVSYNC flags set.
+
+However, if we look at the HDMI config: 0x121000 = 0x18.  Active low
+hsync/vsync.  This is quite obvious when you look at the code -
+convert_to_video_timing() does *nothing* at all when converting the
+sync polarities, which means hdmi_av_composer() doesn't program them
+appropriately.  And yes, poking 0x78 into this register finally fixes
+the problem.
+
+Yet another reason why this silly conversion from one structure form
+to another is a Very Bad Idea.  Until I found this, I was merely going
+to send a patch to sort out convert_to_video_timing(), but quite frankly
+I'm going to kill this thing off right now.
+
+Another thing:
+
+static int imx_hdmi_setup(struct imx_hdmi *hdmi, struct drm_display_mode *mode)
+{
+        int ret;
+        convert_to_video_timing(&hdmi->fb_mode, mode);
+
+        hdmi_disable_overflow_interrupts(hdmi);
+        
+        hdmi->vic = 6;
+
+It's quite wrong to force every video mode set to be CEA mode 6.  IIRC,
+There is a function in DRM which will tell you the CEA mode number.
+Again, I'll fix this in my patch rewriting this bit of the driver to
+be correct.
+
+I'm also suspicious of the "HDMI Initialization Step" comments, because
+they make no sense:
+
+/* HDMI Initialization Step B.4 */
+static void imx_hdmi_enable_video_path(struct imx_hdmi *hdmi)
+{
+
+yet:
+
+        /* HDMI Initialization Step B.3 */
+        imx_hdmi_enable_video_path(hdmi);
+
+One's left wondering whether Step B.3 really is to just call a function
+with a particular name, but B.4 is to actually do something with the
+hardware.  I'm quite sure that if this is a documented procedure, that
+it doesn't say that and these comments are wrong (and probably the code
+too.)
+
+Even after all this, I still haven't got rid of that magenta line - in
+as far as I can tell, nothing has changed as a result of any of these
+(although reading back the register values, they're now much better.)
+What I do find is if I poke 0x78 back into the INVIDCONF register
+(which already contains 0x78) the magenta line disappears.
+
+I'm beginning to suspect that there's some ordering dependency that
+isn't being satisfied - but as the i.MX6Solo/DualLite manual doesn't
+seem to contain any of these details, I'm running out of ideas.
