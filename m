@@ -1,48 +1,42 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 16 Oct 2013 08:08:20 -0300
-Subject: [PATCH v2 1/4] clk: mvebu: Add Core Divider clock
-In-Reply-To: <20131008195933.GA2473@localhost>
-References: <1380224130-11868-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380224130-11868-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131002174332.GQ31178@titan.lakedaemon.net>
- <20131002180944.GC2365@localhost> <20131008195933.GA2473@localhost>
-Message-ID: <20131016110819.GC2518@localhost>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 16 Oct 2013 13:08:09 +0200
+Subject: [PATCH 0/9] Samsung clock PM consolidation part 1
+Message-ID: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 04:59:33PM -0300, Ezequiel Garcia wrote:
-> On Wed, Oct 02, 2013 at 03:09:44PM -0300, Ezequiel Garcia wrote:
-> > On Wed, Oct 02, 2013 at 01:43:32PM -0400, Jason Cooper wrote:
-> > > On Thu, Sep 26, 2013 at 04:35:27PM -0300, Ezequiel Garcia wrote:
-> > > > This commit introduces a new group of clocks present in Armada 370/XP
-> > > > SoCs (called "Core Divider" clocks) and add a provider for them.
-> > > > The only clock supported for now is the NAND clock (ndclk), but the
-> > > > infrastructure to add the rest is already set.
-> > > > 
-> > > > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > > ---
-> > > >  drivers/clk/mvebu/Kconfig       |   5 +
-> > > >  drivers/clk/mvebu/Makefile      |   1 +
-> > > >  drivers/clk/mvebu/clk-corediv.c | 223 ++++++++++++++++++++++++++++++++++++++++
-> > > >  3 files changed, 229 insertions(+)
-> > > >  create mode 100644 drivers/clk/mvebu/clk-corediv.c
-> > > 
-> > > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > > 
-> > 
-> > Mike: any comments on this?
-> 
-> ping?
-> 
-> I'd like to move along with the NAND driver for this controller and
-> -although these are not a hard requirement- it would be nice
-> to have them merged.
-> 
+This series reworks suspend/resume handling of Samsung clock drivers
+to cover more SoC specific aspects that are beyond simple register
+save and restore. The goal is to have all the suspend/resume code
+that touches the clock controller in single place, which is the
+clock driver.
 
-Mike? Any chance you pick these soon? It's been almost three-weeks since
-these patchset has been sent and I'm starting to forget the details of it ;)
+On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
+Arndale boards (except suspend/resume, which is broken because of
+unrelated reasons):
+
+Tested-by: Tomasz Figa <t.figa@samsung.com>
+
+Tomasz Figa (9):
+  clk: exynos4: Remove remnants of non-DT support
+  clk: samsung: Provide common helpers for register save/restore
+  clk: samsung: exynos4: Move suspend/resume handling to SoC driver
+  clk: samsung: exynos5250: Move suspend/resume handling to SoC driver
+  clk: samsung: exynos5420: Move suspend/resume handling to SoC driver
+  clk: samsung: s3c64xx: Move suspend/resume handling to SoC driver
+  clk: samsung: Drop old suspend/resume code
+  clk: samsung: exynos4: Add remaining suspend/resume handling
+  ARM: EXYNOS: pm: Drop legacy Exynos4 clock suspend/resume code
+
+ arch/arm/mach-exynos/pm.c            | 125 +-------------------------
+ drivers/clk/samsung/clk-exynos4.c    | 170 ++++++++++++++++++++++++++++++-----
+ drivers/clk/samsung/clk-exynos5250.c |  49 ++++++++--
+ drivers/clk/samsung/clk-exynos5420.c |  49 ++++++++--
+ drivers/clk/samsung/clk-exynos5440.c |   2 +-
+ drivers/clk/samsung/clk-s3c64xx.c    |  79 +++++++++++++---
+ drivers/clk/samsung/clk.c            |  71 ++++++---------
+ drivers/clk/samsung/clk.h            |  14 ++-
+ 8 files changed, 346 insertions(+), 213 deletions(-)
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.3.2
