@@ -1,104 +1,100 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 16 Oct 2013 16:46:41 +0530
-Subject: [RESEND PATCH V2 1/2] ARM: dts: AM33xx: Add RNG node
-In-Reply-To: <525CE564.6010605@baylibre.com>
-References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
- <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
- <52594DF0.1050002@ti.com> <525CE564.6010605@baylibre.com>
-Message-ID: <525E7599.8010504@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Oct 2013 12:22:22 +0100
+Subject: [PATCH v3 3/7] arm64: move encode_insn_immediate() from module.c
+ to insn.c
+In-Reply-To: <1381893492-7135-4-git-send-email-liuj97@gmail.com>
+References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
+ <1381893492-7135-4-git-send-email-liuj97@gmail.com>
+Message-ID: <20131016112222.GG5403@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Rob and Mark
-On Tuesday 15 October 2013 12:19 PM, Benoit Cousson wrote:
-> Hi Lokesh,
+On Wed, Oct 16, 2013 at 04:18:08AM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
 > 
-> On 12/10/2013 15:26, Lokesh Vutla wrote:
->> Hi Benoit,
->> On Thursday 29 August 2013 06:22 PM, Lokesh Vutla wrote:
->>> Add the AM33xx RNG module's device tree data.
->>> Also add Documentation file describing the data
->>> for the RNG module.
-Can you please review this patch..
+> Function encode_insn_immediate() will be used by other instruction
+> manipulate related functions, so move it into insn.c and rename it
+> as aarch64_insn_encode_immediate().
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/include/asm/insn.h |  14 ++++
+>  arch/arm64/kernel/insn.c      |  77 +++++++++++++++++++++
+>  arch/arm64/kernel/module.c    | 151 +++++++++---------------------------------
+>  3 files changed, 123 insertions(+), 119 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index 2dfcdb4..8dc0a91 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -28,6 +28,18 @@ enum aarch64_insn_class {
+>                                          * system instructions */
+>  };
+> 
+> +enum aarch64_insn_imm_type {
+> +       AARCH64_INSN_IMM_MOVNZ,
+> +       AARCH64_INSN_IMM_MOVK,
+> +       AARCH64_INSN_IMM_ADR,
+> +       AARCH64_INSN_IMM_26,
+> +       AARCH64_INSN_IMM_19,
+> +       AARCH64_INSN_IMM_16,
+> +       AARCH64_INSN_IMM_14,
+> +       AARCH64_INSN_IMM_12,
+> +       AARCH64_INSN_IMM_9,
+> +};
+> +
+>  #define        __AARCH64_INSN_FUNCS(abbr, mask, val)   \
+>  static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+>  { return (code & (mask)) == (val); }   \
+> @@ -47,6 +59,8 @@ __AARCH64_INSN_FUNCS(nop,     0xFFFFFFFF, 0xD503201F)
+>  #undef __AARCH64_INSN_FUNCS
+> 
+>  enum aarch64_insn_class aarch64_get_insn_class(u32 insn);
+> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+> +                                 u32 insn, u64 imm);
+>  u32 aarch64_insn_read(void *addr);
+>  void aarch64_insn_write(void *addr, u32 insn);
+>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index ad4185f..90cc312 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -179,3 +179,80 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+>         else
+>                 return aarch64_insn_patch_text_sync(addrs, insns, cnt);
+>  }
+> +
+> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+> +                                 u32 insn, u64 imm)
+> +{
+> +       u32 immlo, immhi, lomask, himask, mask;
+> +       int shift;
+> +
+> +       switch (type) {
+> +       case AARCH64_INSN_IMM_MOVNZ:
+> +               /*
+> +                * For signed MOVW relocations, we have to manipulate the
+> +                * instruction encoding depending on whether or not the
+> +                * immediate is less than zero.
+> +                */
+> +               insn &= ~(3 << 29);
+> +               if ((s64)imm >= 0) {
+> +                       /* >=0: Set the instruction to MOVZ (opcode 10b). */
+> +                       insn |= 2 << 29;
+> +               } else {
+> +                       /*
+> +                        * <0: Set the instruction to MOVN (opcode 00b).
+> +                        *     Since we've masked the opcode already, we
+> +                        *     don't need to do anything other than
+> +                        *     inverting the new immediate field.
+> +                        */
+> +                       imm = ~imm;
+> +               }
 
-Thanks and regards,
-Lokesh
->> Seems you missed this patch. Please consider this for this merge window.
-> 
-> Indeed I missed it. Sorry :-(
-> 
->> Patch 2/2 is already taken by Paul.
->> Without this patch AM335x boot will crash as I mentioned in my cover letter.
->>
->> Thanks and regards,
->> Lokesh
->>>
->>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>> ---
->>> Changes since V1:
->>> - Drop "status=disabled" entry in dt node, Since
->>>    RNG is present on all AM33xx platforms.
->>>
->>>   .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
->>>   arch/arm/boot/dts/am33xx.dtsi                      |    7 +++++++
->>>   2 files changed, 29 insertions(+)
->>>   create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
-> 
-> I do not see the acked-by for the binding part. You do need that for any new bindings nowadays.
-> 
->>>
->>> diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
->>> new file mode 100644
->>> index 0000000..6a62acd
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
->>> @@ -0,0 +1,22 @@
->>> +OMAP SoC HWRNG Module
->>> +
->>> +Required properties:
->>> +
->>> +- compatible : Should contain entries for this and backward compatible
->>> +  RNG versions:
->>> +  - "ti,omap2-rng" for OMAP2.
->>> +  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
->>> +  Note that these two versions are incompatible.
->>> +- ti,hwmods: Name of the hwmod associated with the RNG module
->>> +- reg : Offset and length of the register set for the module
->>> +- interrupts : the interrupt number for the RNG module.
->>> +        Only used for "ti,omap4-rng".
->>> +
->>> +Example:
->>> +/* AM335x */
->>> +rng: rng at 48310000 {
->>> +    compatible = "ti,omap4-rng";
->>> +    ti,hwmods = "rng";
->>> +    reg = <0x48310000 0x2000>;
->>> +    interrupts = <111>;
->>> +};
->>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->>> index 38b446b..26ebe30 100644
->>> --- a/arch/arm/boot/dts/am33xx.dtsi
->>> +++ b/arch/arm/boot/dts/am33xx.dtsi
->>> @@ -530,5 +530,12 @@
->>>               #size-cells = <1>;
->>>               status = "disabled";
->>>           };
->>> +
->>> +        rng: rng at 48310000 {
->>> +            compatible = "ti,omap4-rng";
->>> +            ti,hwmods = "rng";
->>> +            reg = <0x48310000 0x2000>;
->>> +            interrupts = <111>;
->>> +        };
->>>       };
->>>   };
->>>
->>
-> 
-> It looks good to me, but it does not apply on my branch.
-> Please rebase it and repost with the proper acked-by.
-> 
-> Thanks,
-> Benoit
-> 
-> 
+I'm really not comfortable with this. This code is performing static
+relocations and re-encoding instructions as required by the AArch64 ELF
+spec. That's not really what you'd expect from a generic instruction
+encoder!
+
+Will
