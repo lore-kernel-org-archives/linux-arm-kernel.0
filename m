@@ -1,91 +1,30 @@
-From: R65777@freescale.com (Bhushan Bharat-R65777)
-Date: Wed, 16 Oct 2013 04:19:45 +0000
-Subject: [PATCH] KVM: ARM: Update comments for kvm_handle_wfi
-In-Reply-To: <1381886000-11140-1-git-send-email-christoffer.dall@linaro.org>
-References: <1381253894-18114-2-git-send-email-marc.zyngier@arm.com>
- <1381886000-11140-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <6A3DF150A5B70D4F9B66A25E3F7C888D071BDCAD@039-SN2MPN1-013.039d.mgd.msft.net>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 15 Oct 2013 21:50:33 -0700
+Subject: [PATCH v2] ARM: cci driver need big endian fixes in asm code
+Message-ID: <1381899034-420-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi All,
 
+This is version 2 of cci big endian fix. Idea of this
+way of fixing was suggested by Ben Dooks [1]. Compared to
+previous solution this one does not use ifdefs and looks
+much cleaner.
 
-> -----Original Message-----
-> From: Christoffer Dall [mailto:christoffer.dall at linaro.org]
-> Sent: Wednesday, October 16, 2013 6:43 AM
-> To: Marc Zyngier
-> Cc: kvmarm at lists.cs.columbia.edu; linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH] KVM: ARM: Update comments for kvm_handle_wfi
-> 
-> Update comments to reflect what is really going on and add the TWE bit to the
-> comments in kvm_arm.h.
-> 
-> Also renames the function to kvm_handle_wfx like is done on arm64 for
-> consistency and uber-correctness.
+This was tested on TC2 both LE and BE, CONFIG_ARM_CCI
+was enabled.
 
-s/uber/user
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/203248.html
 
--Bharat
+Thanks,
+Victor
 
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_arm.h |    1 +
->  arch/arm/kvm/handle_exit.c     |   14 ++++++++------
->  2 files changed, 9 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-> index fe395b7..1d3153c 100644
-> --- a/arch/arm/include/asm/kvm_arm.h
-> +++ b/arch/arm/include/asm/kvm_arm.h
-> @@ -57,6 +57,7 @@
->   * TSC:		Trap SMC
->   * TSW:		Trap cache operations by set/way
->   * TWI:		Trap WFI
-> + * TWE:		Trap WFE
->   * TIDCP:	Trap L2CTLR/L2ECTLR
->   * BSU_IS:	Upgrade barriers to the inner shareable domain
->   * FB:		Force broadcast of all maintainance operations
-> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c index
-> c4c496f..a920790 100644
-> --- a/arch/arm/kvm/handle_exit.c
-> +++ b/arch/arm/kvm/handle_exit.c
-> @@ -73,15 +73,17 @@ static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct
-> kvm_run *run)  }
-> 
->  /**
-> - * kvm_handle_wfi - handle a wait-for-interrupts instruction executed by a
-> guest
-> + * kvm_handle_wfx - handle a WFI or WFE instructions trapped in guests
->   * @vcpu:	the vcpu pointer
->   * @run:	the kvm_run structure pointer
->   *
-> - * Simply sets the wait_for_interrupts flag on the vcpu structure, which will
-> - * halt execution of world-switches and schedule other host processes until
-> - * there is an incoming IRQ or FIQ to the VM.
-> + * WFE: Yield the CPU and come back to this vcpu when the scheduler
-> + * decides to.
-> + * WFI: Simply call kvm_vcpu_block(), which will halt execution of
-> + * world-switches and schedule other host processes until there is an
-> + * incoming IRQ or FIQ to the VM.
->   */
-> -static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
->  	trace_kvm_wfi(*vcpu_pc(vcpu));
->  	if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE) @@ -93,7 +95,7 @@ static int
-> kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)  }
-> 
->  static exit_handle_fn arm_exit_handlers[] = {
-> -	[HSR_EC_WFI]		= kvm_handle_wfi,
-> +	[HSR_EC_WFI]		= kvm_handle_wfx,
->  	[HSR_EC_CP15_32]	= kvm_handle_cp15_32,
->  	[HSR_EC_CP15_64]	= kvm_handle_cp15_64,
->  	[HSR_EC_CP14_MR]	= kvm_handle_cp14_access,
-> --
-> 1.7.10.4
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Victor Kamensky (1):
+  ARM: cci driver need big endian fixes in asm code
+
+ drivers/bus/arm-cci.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+-- 
+1.8.1.4
