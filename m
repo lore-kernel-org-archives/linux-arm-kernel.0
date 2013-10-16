@@ -1,121 +1,136 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 16 Oct 2013 23:20:24 +0200
-Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <20131016190211.GJ25034@n2100.arm.linux.org.uk>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
- <20131003202751.GZ6192@mwanda>
- <20131015131038.GB25034@n2100.arm.linux.org.uk>
- <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
- <20131016170341.GH25034@n2100.arm.linux.org.uk>
- <20131016180735.GI25034@n2100.arm.linux.org.uk>
- <20131016183107.GC18050@kroah.com>
- <20131016190211.GJ25034@n2100.arm.linux.org.uk>
-Message-ID: <20131016212024.GQ30088@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 16 Oct 2013 21:46:24 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2: add AM43xx hwmod and PRCM support
+Message-ID: <alpine.DEB.2.02.1310162145180.6538@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 08:02:11PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Oct 16, 2013 at 11:31:07AM -0700, Greg Kroah-Hartman wrote:
-> > On Wed, Oct 16, 2013 at 07:07:35PM +0100, Russell King - ARM Linux wrote:
-> > > Sorry, but I don't think imx-drm is driving the hardware correctly, and
-> > > I know that Greg wants it moved out of drivers/staging, but frankly it
-> > > seems to be far from ready for that.  Certainly the HDMI parts seems to
-> > > be especially problematical.
-> > 
-> > I want it out of staging if it's working properly.  Yours is the first
-> > report of it not working properly, and in fact, probably one of the
-> > first users of the driver, as I haven't gotten any reports of it working
-> > or not at all over the years.
-> 
-> Well, part of that is because I have this other thing called Armada DRM,
-> which is a similar thing to imx-drm, except for the Marvell Dove SoCs,
-> so it's been really quite easy to get a full Ubuntu 12.04 up and running
-> on the IMX SoC I have here.
-> 
-> As part of that effort, I'm now using my Armada DRM Xorg driver with
-> imx-drm to test this stuff out.  (Bearing in mind that IMX and Dove use
-> the same Vivante GPU, there's some sense in getting my Xorg Armada DRM
-> driver working on both.)
-> 
-> I'm not aware of there being any X drivers for imx-drm (google turns
-> up nothing), which might be a reason why it hasn't been well tested
-> and has also languished in drivers/staging for soo long.  Alternatively,
-> maybe my google searching sucks, or it is out there somewhere but
-> hidden from googlebot?
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-There is no X driver for imx-drm. I once tested it with the
-xf86-modesetting driver which worked with a few patches back then. These
-patches are now part of the modesetting driver.
+Hi Tony,
 
-We have a wrapper tool here which we use to configure the KMS part and
-pass the framebuffers to QT.
+The following changes since commit ace1e3ec4a2540c783e65884bb7be9cd45a0a295:
 
-> 
-> To be fair, so far most of the problems I'm finding are with the HDMI
-> addition to imx-drm rather than imx-drm itself: there's been the lockdep
-> problem and the clock polarity problem which the HDMI stuff discovered.
-> 
-> Looking at the todo list for moving it out of staging, we have:
-> 
-> - get DRM Maintainer review for this code
-> - Wait for common display framework to hit mainline and update the IPU
->   driver to use it. This will most probably make changes to the devicetree
->   bindings necessary.
-> - Factor out more code to common helper functions
-> - decide where to put the base driver. It is not specific to a subsystem
->   and would be used by DRM/KMS and media/V4L2
-> 
-> (1) is quite a difficult task: I'm waiting for a review of the Armada DRM
-> stuff, which I'm hoping will make the next merge window.  Rob Clark is
-> looking at that but has been distracted recently from completing it.
+  ARM: AM33xx: hwmod: Add RNG module data (2013-10-09 09:02:51 -0600)
 
-We have waited for quite a long time aswell before we decided to push
-the imx-drm driver to staging to at least get more exposure for the
-driver. The situation is, well... unsatisfying.
+are available in the git repository at:
 
-> 
-> (2) CDF... has been around in RFC according to LWN.net but doesn't seem to
-> make much in the way of progress from what I can see, despite there
-> allegedly being "many developers show[ing] interest in the first RFC".
-> CDF is over a year old now - first RFC 17 Aug 2012, second 22 Nov 2012,
-> third 9 Aug 2013.
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13/am43xx-support
 
->From what I heard Laurent is still committed to mainline CDF.
+for you to fetch changes up to 70b0d5f5838e0c9dfecabefe4ff43b5a2e7c1e8b:
 
-> 
-> (3) is an on-going effort and really isn't a reason for it to stay in
-> staging.
-> 
-> (4) is probably the biggest issue.  The problem there is that the IMX
-> display subsystem is very flexible: it's basically a set of DMA engines
-> on the front, and behind that a fair number of modules implementing
-> facilities like image rotation, display driving and image capture.
-> Display driving alone involves setting up waveforms and writing some
-> microcode to tell the thing what to do on certain events (like end
-> of frame etc.)  Hence it doesn't fit well into any particular "Linux"
-> subsystem.  In this regard, it's a victim of its own flexibility.
-> 
-> I think the biggest problem though is its complexity.  It doesn't fit
-> into the "single device for a card" model which DRM has.  It's made
-> up from several separate devices, which is all very well, but it leads
-> to it having its own private "framework" to glue all the different
-> devices together - which adds a layer of indirection and makes the code
-> harder to understand.
+  ARM: OMAP2: hwmod: Add qspi data for am437x. (2013-10-15 23:49:43 -0600)
 
-I tried adding generic stuff to DRM to support this and failed badly due
-to resistance of the maintainers. I didn't get much input what I should
-do better or different (besides a general "make it a helper library").
-Also nobody seemed to understand the problems I had with the multi device
-nature of the i.MX IPU.
+- ----------------------------------------------------------------
+Add hwmod and PRCM data for the TI AM43xx family of SoCs.
 
-I think we made ourselves comfortable with being in the kernel, even if
-it's only in staging. We should move forward instead and see how we get
-the driver into the kernel.
+Under normal circumstances, these patches would not be merged.
+The hwmod and PRCM data should be moved out either to DT data or
+to drivers/.  Also, the current implementation trades off lines
+of diff by dynamically rewriting static data at runtime, which is
+a bad practice - it causes future maintenance headaches.
+However, after speaking with my upstream, it sounds like it's
+better to merge these patches in their current state, due to long
+term considerations.
 
-Sascha
+Basic test logs are here:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+http://www.pwsan.com/omap/testlogs/am43xx_support_v3.13/20131015213706/
+
+Due to the lack of an AM43xx board and any available public
+documentation, it's impossible for me to review or test that
+platform in any meaningful way.  But at least the tests above
+verify that the patches don't affect existing platforms -
+particularly AM33xx.
+
+- ----------------------------------------------------------------
+Afzal Mohammed (7):
+      ARM: OMAP2+: hwmod: AM335x/AM43x: move common data
+      ARM: OMAP2+: hwmod: AM335x: runtime register update
+      ARM: OMAP2+: hwmod: AM335x: remove static register offs
+      ARM: OMAP2+: PRCM: AM43x definitions
+      ARM: OMAP2+: hwmod: AM43x support
+      ARM: OMAP2+: hwmod: AM43x operations
+      ARM: OMAP2+: AM43x: PRCM kbuild
+
+Ambresh K (3):
+      ARM: OMAP2+: PM: AM43x powerdomain data
+      ARM: OMAP2+: CM: AM43x clockdomain data
+      ARM: OMAP2+: AM43x PRCM init
+
+Ankur Kishore (1):
+      ARM: OMAP2+: CM: cm_inst offset s16->u16
+
+George Cherian (1):
+      ARM: OMAP2+: hwmod: Add USB hwmod data for AM437x.
+
+Sourav Poddar (1):
+      ARM: OMAP2: hwmod: Add qspi data for am437x.
+
+ arch/arm/mach-omap2/Makefile                       |    9 +-
+ arch/arm/mach-omap2/clockdomain.h                  |    4 +-
+ arch/arm/mach-omap2/clockdomains43xx_data.c        |  196 ++
+ arch/arm/mach-omap2/cm33xx.c                       |   16 +-
+ arch/arm/mach-omap2/cm33xx.h                       |   12 +-
+ arch/arm/mach-omap2/cminst44xx.c                   |   29 +-
+ arch/arm/mach-omap2/cminst44xx.h                   |   26 +-
+ arch/arm/mach-omap2/io.c                           |    6 +
+ arch/arm/mach-omap2/omap_hwmod.c                   |    8 +
+ arch/arm/mach-omap2/omap_hwmod.h                   |    1 +
+ .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  163 ++
+ .../omap_hwmod_33xx_43xx_interconnect_data.c       |  643 ++++++
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 1469 +++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         | 2263 ++------------------
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  758 +++++++
+ arch/arm/mach-omap2/powerdomain.h                  |    1 +
+ arch/arm/mach-omap2/powerdomains43xx_data.c        |  136 ++
+ arch/arm/mach-omap2/prcm43xx.h                     |  146 ++
+ 18 files changed, 3728 insertions(+), 2158 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clockdomains43xx_data.c
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+ create mode 100644 arch/arm/mach-omap2/powerdomains43xx_data.c
+ create mode 100644 arch/arm/mach-omap2/prcm43xx.h
+
+vmlinux object size
+(delta in bytes from prcm_fixes_v3.13 (ace1e3ec4a2540c783e65884bb7be9cd45a0a295)):
+   text     data      bss    total  kernel
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+  +1436      +88        0    +1524  omap2plus_defconfig
+      0        0        0        0  omap2plus_defconfig_2430sdp_only
+  +1500      +64        0    +1564  omap2plus_defconfig_cpupm
+      0        0        0        0  omap2plus_defconfig_n800_multi_omap2xxx
+      0        0        0        0  omap2plus_defconfig_n800_only_a
+  +1436      +88        0    +1524  omap2plus_defconfig_no_pm
+  +1436      +64        0    +1500  omap2plus_defconfig_omap2_4_only
+  +1428      +56        0    +1484  omap2plus_defconfig_omap3_4_only
+      0        0        0        0  rmk_omap3430_ldp_allnoconfig
+      0        0        0        0  rmk_omap3430_ldp_oldconfig
+      0      +64        0      +64  rmk_omap4430_sdp_allnoconfig
+
+Boot-time memory difference
+(delta in bytes from prcm_fixes_v3.13 (ace1e3ec4a2540c783e65884bb7be9cd45a0a295))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.15 (GNU/Linux)
+
+iQIcBAEBAgAGBQJSXwjfAAoJEMePsQ0LvSpLXE0P/3LcE5xgvbGgd4NFqIAgbMr6
+FoMFkCrl6UB2IIErv/OVDc/e9Uk0UqLUPnqsYT/YtRGyiADWDG9jaLgVC34oQwxF
+3Wlw+995SiAY9tl5T7/0i94jG3DbP9lfxOYT/f6DKWyju33DRaJ5dk1z3RlZmmhz
+dtqTYyBLYo/JSXPLU9dD74hJpM21/5yB/9dWVi2PCbLVWd2WCQXs89SdpjkxYls3
+zIbIPBPDJ5e6B3/U6r2AMMIk5mqtVMKxVyAPUVAYfmApdG1nqLEwjJi7V8aOa3mR
+kL0bBlMVTd3q8hP3pfYq66yyEZ3RjFW9Z1NcedoE86+d+QVcLgMAq/mZVGejWi2j
+5YQmd5km52kKaaS5arTLf2X7fs2N/pvsDUy7hOJZloaUKozvckzV/gGQS9zNuDTt
+mgbqdMHOpfms1/ObpW6B94KZRqyd7Uz+wnwYMwcR/ceb2xVXsxPXDca0Kf9N8o95
+QvDfUM/LH7nXB1Im4gO8poSqGHBe0cPQhTr1bKn3RtvYWU8kMUFV0+WDKG5eSr4g
+I3cFC/lSmwFgkvcAGs98mOmTilakVDMUYTorpzwuGf3BMAuVXsT/RfD30UztAGsQ
+iDw0XWdi76u2i80DRhXIEcfhCKle9QFqv3qV6e1CPnxlqnqm0X68kLvJSjEA5O2+
+YRZwSYti1ayKR0Ud0A1e
+=0AaK
+-----END PGP SIGNATURE-----
