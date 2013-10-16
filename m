@@ -1,48 +1,47 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 16 Oct 2013 10:39:07 -0500
-Subject: [PATCH V7 7/8] ARM: dts: DRA7: Add CPU OPP table
+Date: Wed, 16 Oct 2013 10:39:01 -0500
+Subject: [PATCH V7 1/8] ARM: OMAP3+: do not register non-dt OPP tables for
+ device tree boot
 In-Reply-To: <1381937948-27057-1-git-send-email-nm@ti.com>
 References: <1381937948-27057-1-git-send-email-nm@ti.com>
-Message-ID: <1381937948-27057-8-git-send-email-nm@ti.com>
+Message-ID: <1381937948-27057-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: J Keerthy <j-keerthy@ti.com>
+OMAP3+ supports both device tree and non-device tree boot.
+Device tree bindings for OMAP3+ is supposed to be added via dts following:
+Documentation/devicetree/bindings/power/opp.txt
 
-Add DT OPP table for DRA7xx family of devices. This data is decoded by
-OF with of_init_opp_table() helper function.
+Since we now have device tree entries for OMAP3+ cpu OPPs,
+The current code wrongly adds duplicate OPPs. So, dont register OPPs
+when booting using device tree.
 
-The data is based on DRA75x, DRA74x Data Manual revision F (Sept 2013).
-
-TODO: add OPP_HIGH after AVS-Class0 is functional
-NOTE: The voltage and frequency values work well only on NOM samples
-and it is mandatory to use ABB/AVS Class 0 support for all OPPs.
-
-Clock nodes are pending clock node alignment.
-
-[nm at ti.com: cleanups and rebase to latest]
 Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: J Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-omap2/opp.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 02e430b..92cbe3b 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -36,6 +36,12 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
+diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
+index bd41d59..82fd8c7 100644
+--- a/arch/arm/mach-omap2/opp.c
++++ b/arch/arm/mach-omap2/opp.c
+@@ -17,6 +17,7 @@
+  * GNU General Public License for more details.
+  */
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/opp.h>
+ #include <linux/cpu.h>
+ 
+@@ -40,6 +41,9 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+ {
+ 	int i, r;
+ 
++	if (of_have_populated_dt())
++		return -EINVAL;
 +
-+			operating-points = <
-+				/* kHz    uV */
-+				1000000	1060000
-+				1176000	1160000
-+				>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
+ 	if (!opp_def || !opp_def_size) {
+ 		pr_err("%s: invalid params!\n", __func__);
+ 		return -EINVAL;
 -- 
 1.7.9.5
