@@ -1,52 +1,50 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 17 Oct 2013 00:52:40 +0200
-Subject: [PATCH 1/5] cpufreq: arm-big-little: use clk_get instead of
- clk_get_sys
-In-Reply-To: <1381931563-16785-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1381931563-16785-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <1381931563-16785-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <2716826.jtNDRqEJYG@vostro.rjw.lan>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 17 Oct 2013 08:10:13 +0900
+Subject: [PATCH] phy: exynos-mipi-video: Fix phy_power_off() callback
+In-Reply-To: <1381943025-1036-1-git-send-email-s.nawrocki@samsung.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <1381943025-1036-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <000401cecac4$dea1a7a0$9be4f6e0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 16, 2013 02:52:39 PM Sudeep KarkadaNagesha wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On Thursday, October 17, 2013 2:04 AM, Sylwester Nawrocki wrote:
 > 
-> Currently clk_get_sys is used with cpu-cluster.<n> as the device id
-> which is incorrect. It should be connection/consumer ID instead.
+> Fix argument passed to the register setup helper function so
+> the phy is actually disabled. Now due to cut&paste error 1 is
+> passed to both phy_power_on() and phy_power_off().
 > 
-> It is possible to specify input clock in the cpu device node along
-> with the optional clock-name. clk_get_sys can't handle that.
-> 
-> This patch replaces clk_get_sys with clk_get to extend support for
-> clocks specified in the device tree cpu node.
-> 
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Reported by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-I've queued up this one for 3.13, for the rest of the series I need ACKs
-from the people in the CC list.
+Reviewed-by: Jingoo Han <jg1.han@samsung.com>
 
-Thanks!
+Best regards,
+Jingoo Han
 
 > ---
->  drivers/cpufreq/arm_big_little.c | 2 +-
+> 
+> This fixes a cut&paste typo which snicked in while doing very last
+> adaptation to latest version of the phy framework.
+> 
+> Thanks,
+> Sylwester
+> ---
+>  drivers/phy/phy-exynos-mipi-video.c |    2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-> index 3549f07..501a091 100644
-> --- a/drivers/cpufreq/arm_big_little.c
-> +++ b/drivers/cpufreq/arm_big_little.c
-> @@ -127,7 +127,7 @@ static int get_cluster_clk_and_freq_table(struct device *cpu_dev)
->  	}
->  
->  	name[12] = cluster + '0';
-> -	clk[cluster] = clk_get_sys(name, NULL);
-> +	clk[cluster] = clk_get(cpu_dev, name);
->  	if (!IS_ERR(clk[cluster])) {
->  		dev_dbg(cpu_dev, "%s: clk: %p & freq table: %p, cluster: %d\n",
->  				__func__, clk[cluster], freq_table[cluster],
+> diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
+> index b73b86a..0c5efab 100644
+> --- a/drivers/phy/phy-exynos-mipi-video.c
+> +++ b/drivers/phy/phy-exynos-mipi-video.c
+> @@ -93,7 +93,7 @@ static int exynos_mipi_video_phy_power_off(struct phy *phy)
+>  	struct video_phy_desc *phy_desc = phy_get_drvdata(phy);
+>  	struct exynos_mipi_video_phy *state = to_mipi_video_phy(phy_desc);
 > 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> -	return __set_phy_state(state, phy_desc->index, 1);
+> +	return __set_phy_state(state, phy_desc->index, 0);
+>  }
+> 
+>  static struct phy *exynos_mipi_video_phy_xlate(struct device *dev,
+> --
+> 1.7.9.5
