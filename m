@@ -1,53 +1,200 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Wed, 16 Oct 2013 16:54:36 +0200
-Subject: [PATCH v5 0/4] Add I2C support to ST SoCs
-In-Reply-To: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
-References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <525EA8AC.4010607@st.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 16 Oct 2013 17:04:24 +0200
+Subject: [PATCH 1/2] ARM: AT91: pm: factorize standby function
+In-Reply-To: <1381933497-20262-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1381830109-1398-1-git-send-email-daniel.lezcano@linaro.org>
+ <1381933497-20262-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <525EAAF8.8080005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On 10/16/2013 04:24 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Detect presence of second bank. So we do not need to have on function per SoC
+>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-On 10/14/2013 02:46 PM, Maxime COQUELIN wrote:
-> The goal of this series is to add I2C support to ST SoCs.
-> The DT definition is added for STiH415 and STiH416 SoCs on
-> B2000 and B2020 boards.
->
-> The series has been tested working on STiH416-B2020 board.
-> It applies on top of v3.12-rc5.
->
-> Changes since v4:
->    - Fixed IRQ flags to level high triggering as reported by Stephen Gallimore
->    - Revert back to generic DT properties for Anti-glitch filtering. Their DT
->      binding documentation will be updated when i2c DT binding docuementation
->      will be created (In Wolfram's ToDo list)
-Do you agree with this approach?
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Did you had time to review the driver?
+> ---
+>   arch/arm/mach-at91/at91sam9260.c |  2 +-
+>   arch/arm/mach-at91/at91sam9261.c |  2 +-
+>   arch/arm/mach-at91/at91sam9263.c |  2 +-
+>   arch/arm/mach-at91/at91sam9g45.c |  2 +-
+>   arch/arm/mach-at91/at91sam9rl.c  |  2 +-
+>   arch/arm/mach-at91/pm.h          | 55 ++++++++++++++++++----------------------
+>   6 files changed, 29 insertions(+), 36 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index ffe9ce7..3b43d56 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -353,7 +353,7 @@ static void __init at91sam9260_initialize(void)
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9260_gpio, 3);
+>
+> -	at91_pm_set_standby(at91sam9_standby);
+> +	at91_pm_set_standby(at91sam9_sdram_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> index 1edbb6f..a0857c3 100644
+> --- a/arch/arm/mach-at91/at91sam9261.c
+> +++ b/arch/arm/mach-at91/at91sam9261.c
+> @@ -295,7 +295,7 @@ static void __init at91sam9261_initialize(void)
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9261_gpio, 3);
+>
+> -	at91_pm_set_sandby(at91sam9_standby);
+> +	at91_pm_set_standby(at91sam9_sdram_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+> index 8c81c89..103a95b 100644
+> --- a/arch/arm/mach-at91/at91sam9263.c
+> +++ b/arch/arm/mach-at91/at91sam9263.c
+> @@ -332,7 +332,7 @@ static void __init at91sam9263_initialize(void)
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9263_gpio, 5);
+>
+> -	at91_pm_set_standby(at91sam9263_standby);
+> +	at91_pm_set_standby(at91sam9_sdram_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index 8460f52..f29731e 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -381,7 +381,7 @@ static void __init at91sam9g45_initialize(void)
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9g45_gpio, 5);
+>
+> -	at91_pm_set_standby(at91sam9g45_standby);
+> +	at91_pm_set_standby(at91_ddr_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+> index c7986e4..9e28f41 100644
+> --- a/arch/arm/mach-at91/at91sam9rl.c
+> +++ b/arch/arm/mach-at91/at91sam9rl.c
+> @@ -298,7 +298,7 @@ static void __init at91sam9rl_initialize(void)
+>   	/* Register GPIO subsystem */
+>   	at91_gpio_init(at91sam9rl_gpio, 4);
+>
+> -	at91_pm_set_standby(at91sam9_standby);
+> +	at91_pm_set_standby(at91sam9_sdram_standby);
+>   }
+>
+>   /* --------------------------------------------------------------------
+> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+> index 76dd1a7..3ed190c 100644
+> --- a/arch/arm/mach-at91/pm.h
+> +++ b/arch/arm/mach-at91/pm.h
+> @@ -49,16 +49,18 @@ static inline void at91rm9200_standby(void)
+>   /* We manage both DDRAM/SDRAM controllers, we need more than one value to
+>    * remember.
+>    */
+> -static inline void at91sam9g45_standby(void)
+> +static inline void at91_ddr_standby(void)
+>   {
+>   	/* Those two values allow us to delay self-refresh activation
+>   	 * to the maximum. */
+> -	u32 lpr0, lpr1;
+> -	u32 saved_lpr0, saved_lpr1;
+> +	u32 lpr0, lpr1 = 0;
+> +	u32 saved_lpr0, saved_lpr1 = 0;
+>
+> -	saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+> -	lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
+> -	lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
+> +	if (at91_ramc_base[1]) {
+> +		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+> +		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
+> +		lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
+> +	}
+>
+>   	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+>   	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
+> @@ -66,25 +68,29 @@ static inline void at91sam9g45_standby(void)
+>
+>   	/* self-refresh mode now */
+>   	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
+> -	at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
+> +	if (at91_ramc_base[1])
+> +		at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
+>
+>   	cpu_do_idle();
+>
+>   	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
+> -	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+> +	if (at91_ramc_base[1])
+> +		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+>   }
+>
+>   /* We manage both DDRAM/SDRAM controllers, we need more than one value to
+>    * remember.
+>    */
+> -static inline void at91sam9263_standby(void)
+> +static inline void at91sam9_sdram_standby(void)
+>   {
+> -	u32 lpr0, lpr1;
+> -	u32 saved_lpr0, saved_lpr1;
+> +	u32 lpr0, lpr1 = 0;
+> +	u32 saved_lpr0, saved_lpr1 = 0;
+>
+> -	saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
+> -	lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
+> -	lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
+> +	if (at91_ramc_base[1]) {
+> +		saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
+> +		lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
+> +		lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
+> +	}
+>
+>   	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
+>   	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
+> @@ -92,27 +98,14 @@ static inline void at91sam9263_standby(void)
+>
+>   	/* self-refresh mode now */
+>   	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
+> -	at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
+> +	if (at91_ramc_base[1])
+> +		at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
+>
+>   	cpu_do_idle();
+>
+>   	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
+> -	at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
+> -}
+> -
+> -static inline void at91sam9_standby(void)
+> -{
+> -	u32 saved_lpr, lpr;
+> -
+> -	saved_lpr = at91_ramc_read(0, AT91_SDRAMC_LPR);
+> -
+> -	lpr = saved_lpr & ~AT91_SDRAMC_LPCB;
+> -	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr |
+> -			AT91_SDRAMC_LPCB_SELF_REFRESH);
+> -
+> -	cpu_do_idle();
+> -
+> -	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr);
+> +	if (at91_ramc_base[1])
+> +		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
+>   }
+>
+>   #endif
+>
 
-Regards,
-Maxime
 
-> ...
->
-> Maxime Coquelin (4):
->    i2c: busses: i2c-st: Add ST I2C controller
->    ARM: STi: Supply I2C configuration to STiH416 SoC
->    ARM: STi: Supply I2C configuration to STiH415 SoC
->    ARM: STi: Add I2C config to B2000 and B2020 boards
->
->   Documentation/devicetree/bindings/i2c/i2c-st.txt |   38 +
->   arch/arm/boot/dts/stih415-pinctrl.dtsi           |   36 +
->   arch/arm/boot/dts/stih415.dtsi                   |   53 ++
->   arch/arm/boot/dts/stih416-pinctrl.dtsi           |   35 +
->   arch/arm/boot/dts/stih416.dtsi                   |   53 ++
->   arch/arm/boot/dts/stih41x-b2000.dtsi             |    9 +
->   arch/arm/boot/dts/stih41x-b2020.dtsi             |   22 +
->   drivers/i2c/busses/Kconfig                       |   10 +
->   drivers/i2c/busses/Makefile                      |    1 +
->   drivers/i2c/busses/i2c-st.c                      |  867 ++++++++++++++++++++++
->   10 files changed, 1124 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/i2c/i2c-st.txt
->   create mode 100644 drivers/i2c/busses/i2c-st.c
->
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
