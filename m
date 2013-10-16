@@ -1,285 +1,443 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Oct 2013 17:35:38 -0700
-Subject: [PATCH v3] ARM: dts: add minimal DT support for Nokia N950 &
- N9 phones
-In-Reply-To: <1381869369-14626-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1381869369-14626-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20131016003536.GA15154@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 15 Oct 2013 17:47:36 -0700
+Subject: [PATCH v2] usb: ohci: remove ep93xx bus glue platform driver
+Message-ID: <201310151747.37003.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [131015 13:36]:
-> Add minimal DT support for Nokia N950 & N9 phones. The same functionality
-> that is provided by the current board file should work: serial console,
-> USB, OneNAND and MMC.
-> 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+Convert ep93xx to use the OHCI platform driver and remove the
+ohci-ep93xx bus glue driver.
 
-Oh this is not yet merged, I'll pick this one into the
-omap-for-v3.13/board-removal as the board removal patch is
-already there.
+Enable CONFIG_OHCI_HCD_PLATFORM and refresh the ep93xx_defconfig
+so that USB is still enabled by default on the EP93xx platform.
 
-Regards,
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Ryan Mallon <rmallon@gmail.com>
+Cc: Olof Johansson <olof@lixom.net>
+---
+v2: Use the (*power_off) callback for (*power_suspend), as suggested
+    by Alan Stern.
+    Remove the Kconfig change to USB_OHCI_HCD_PLATFORM and refresh
+    the ep93xx_defconfig to enable this option, as suggested by Alan Stern.
 
-Tony
+ arch/arm/configs/ep93xx_defconfig |  17 +---
+ arch/arm/mach-ep93xx/clock.c      |   2 +-
+ arch/arm/mach-ep93xx/core.c       |  40 ++++++++-
+ drivers/usb/host/ohci-ep93xx.c    | 184 --------------------------------------
+ drivers/usb/host/ohci-hcd.c       |  18 ----
+ 5 files changed, 40 insertions(+), 221 deletions(-)
+ delete mode 100644 drivers/usb/host/ohci-ep93xx.c
 
-> ---
-> 
-> 	v3: Added Tony's ACK & properties for generic USB PHY framework.
-> 
-> 	Previous version: http://marc.info/?t=138005105700010&r=1&w=2
-> 
->  arch/arm/boot/dts/Makefile           |   2 +
->  arch/arm/boot/dts/omap3-n9.dts       |  18 ++++
->  arch/arm/boot/dts/omap3-n950-n9.dtsi | 174 +++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-n950.dts     |  18 ++++
->  4 files changed, 212 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap3-n9.dts
->  create mode 100644 arch/arm/boot/dts/omap3-n950-n9.dtsi
->  create mode 100644 arch/arm/boot/dts/omap3-n950.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 9df7d2c..62d0f4d 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -177,6 +177,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->  	omap3-gta04.dtb \
->  	omap3-igep0020.dtb \
->  	omap3-igep0030.dtb \
-> +	omap3-n9.dtb \
-> +	omap3-n950.dtb \
->  	omap4-panda.dtb \
->  	omap4-panda-a4.dtb \
->  	omap4-panda-es.dtb \
-> diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
-> new file mode 100644
-> index 0000000..39828ce
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-n9.dts
-> @@ -0,0 +1,18 @@
-> +/*
-> + * omap3-n9.dts - Device Tree file for Nokia N9
-> + *
-> + * Written by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "omap3-n950-n9.dtsi"
-> +
-> +/ {
-> +	model = "Nokia N9";
-> +	compatible = "nokia,omap3-n9", "ti,omap3";
-> +};
-> diff --git a/arch/arm/boot/dts/omap3-n950-n9.dtsi b/arch/arm/boot/dts/omap3-n950-n9.dtsi
-> new file mode 100644
-> index 0000000..94eb77d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-n950-n9.dtsi
-> @@ -0,0 +1,174 @@
-> +/*
-> + * omap3-n950-n9.dtsi - Device Tree file for Nokia N950 & N9 (common stuff)
-> + *
-> + * Written by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include "omap36xx.dtsi"
-> +
-> +/ {
-> +	cpus {
-> +		cpu at 0 {
-> +			cpu0-supply = <&vcc>;
-> +		};
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x80000000 0x40000000>; /* 1 GB */
-> +	};
-> +
-> +	vemmc: fixedregulator at 0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VEMMC";
-> +		regulator-min-microvolt = <2900000>;
-> +		regulator-max-microvolt = <2900000>;
-> +		gpio = <&gpio5 29 0>; /* gpio line 157 */
-> +		startup-delay-us = <150>;
-> +		enable-active-high;
-> +	};
-> +};
-> +
-> +&omap3_pmx_core {
-> +	mmc2_pins: pinmux_mmc2_pins {
-> +		pinctrl-single,pins = <
-> +			0x128 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_clk */
-> +			0x12a (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_cmd */
-> +			0x12c (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat0 */
-> +			0x12e (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat1 */
-> +			0x130 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat2 */
-> +			0x132 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat3 */
-> +		>;
-> +	};
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <2900000>;
-> +
-> +	twl: twl at 48 {
-> +		reg = <0x48>;
-> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +		interrupt-parent = <&intc>;
-> +	};
-> +};
-> +
-> +/include/ "twl4030.dtsi"
-> +
-> +&twl {
-> +	compatible = "ti,twl5031";
-> +};
-> +
-> +&twl_gpio {
-> +	ti,pullups	= <0x000001>; /* BIT(0) */
-> +	ti,pulldowns	= <0x008106>; /* BIT(1) | BIT(2) | BIT(8) | BIT(15) */
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <400000>;
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <400000>;
-> +};
-> +
-> +&mmc1 {
-> +	status = "disabled";
-> +};
-> +
-> +&mmc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc2_pins>;
-> +	vmmc-supply = <&vemmc>;
-> +	bus-width = <4>;
-> +	ti,non-removable;
-> +};
-> +
-> +&mmc3 {
-> +	status = "disabled";
-> +};
-> +
-> +&usb_otg_hs {
-> +	interface-type = <0>;
-> +	usb-phy = <&usb2_phy>;
-> +	phys = <&usb2_phy>;
-> +	phy-names = "usb2-phy";
-> +	mode = <3>;
-> +	power = <50>;
-> +};
-> +
-> +&gpmc {
-> +	ranges = <0 0 0x04000000 0x20000000>;
-> +
-> +	onenand at 0,0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0 0 0x20000000>;
-> +
-> +		gpmc,sync-read;
-> +		gpmc,sync-write;
-> +		gpmc,burst-length = <16>;
-> +		gpmc,burst-read;
-> +		gpmc,burst-wrap;
-> +		gpmc,burst-write;
-> +		gpmc,device-width = <2>;
-> +		gpmc,mux-add-data = <2>;
-> +		gpmc,cs-on-ns = <0>;
-> +		gpmc,cs-rd-off-ns = <87>;
-> +		gpmc,cs-wr-off-ns = <87>;
-> +		gpmc,adv-on-ns = <0>;
-> +		gpmc,adv-rd-off-ns = <10>;
-> +		gpmc,adv-wr-off-ns = <10>;
-> +		gpmc,oe-on-ns = <15>;
-> +		gpmc,oe-off-ns = <87>;
-> +		gpmc,we-on-ns = <0>;
-> +		gpmc,we-off-ns = <87>;
-> +		gpmc,rd-cycle-ns = <112>;
-> +		gpmc,wr-cycle-ns = <112>;
-> +		gpmc,access-ns = <81>;
-> +		gpmc,page-burst-access-ns = <15>;
-> +		gpmc,bus-turnaround-ns = <0>;
-> +		gpmc,cycle2cycle-delay-ns = <0>;
-> +		gpmc,wait-monitoring-ns = <0>;
-> +		gpmc,clk-activation-ns = <5>;
-> +		gpmc,wr-data-mux-bus-ns = <30>;
-> +		gpmc,wr-access-ns = <81>;
-> +		gpmc,sync-clk-ps = <15000>;
-> +
-> +		/*
-> +		 * MTD partition table corresponding to Nokia's MeeGo 1.2
-> +		 * Harmattan release.
-> +		 */
-> +		partition at 0 {
-> +			label = "bootloader";
-> +			reg = <0x00000000 0x00100000>;
-> +		};
-> +		partition at 1 {
-> +			label = "config";
-> +			reg = <0x00100000 0x002c0000>;
-> +		};
-> +		partition at 2 {
-> +			label = "kernel";
-> +			reg = <0x003c0000 0x01000000>;
-> +		};
-> +		partition at 3 {
-> +			label = "log";
-> +			reg = <0x013c0000 0x00200000>;
-> +		};
-> +		partition at 4 {
-> +			label = "var";
-> +			reg = <0x015c0000 0x1ca40000>;
-> +		};
-> +		partition at 5 {
-> +			label = "moslo";
-> +			reg = <0x1e000000 0x02000000>;
-> +		};
-> +		partition at 6 {
-> +			label = "omap2-onenand";
-> +			reg = <0x00000000 0x20000000>;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/omap3-n950.dts b/arch/arm/boot/dts/omap3-n950.dts
-> new file mode 100644
-> index 0000000..b076a52
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-n950.dts
-> @@ -0,0 +1,18 @@
-> +/*
-> + * omap3-n950.dts - Device Tree file for Nokia N950
-> + *
-> + * Written by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "omap3-n950-n9.dtsi"
-> +
-> +/ {
-> +	model = "Nokia N950";
-> +	compatible = "nokia,omap3-n950", "ti,omap3";
-> +};
-> -- 
-> 1.8.4.rc3
-> 
+diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
+index 806005a..6ac5ea7 100644
+--- a/arch/arm/configs/ep93xx_defconfig
++++ b/arch/arm/configs/ep93xx_defconfig
+@@ -1,15 +1,14 @@
+-CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_EXPERT=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_MODULE_FORCE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_PARTITION_ADVANCED=y
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_EP93XX=y
+ CONFIG_CRUNCH=y
+@@ -47,11 +46,8 @@ CONFIG_IPV6=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ # CONFIG_FW_LOADER is not set
+ CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_REDBOOT_PARTS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+@@ -67,15 +63,14 @@ CONFIG_SCSI=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_EP93XX_ETH=y
+ CONFIG_USB_RTL8150=y
+ # CONFIG_INPUT is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_AMBA_PL010=y
+ CONFIG_SERIAL_AMBA_PL010_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+@@ -86,9 +81,9 @@ CONFIG_WATCHDOG=y
+ CONFIG_EP93XX_WATCHDOG=y
+ CONFIG_USB=y
+ CONFIG_USB_DEBUG=y
+-CONFIG_USB_DEVICEFS=y
+ CONFIG_USB_DYNAMIC_MINORS=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_PLATFORM=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_SERIAL=y
+ CONFIG_USB_SERIAL_CONSOLE=y
+@@ -100,24 +95,18 @@ CONFIG_RTC_DRV_EP93XX=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_FS_XATTR is not set
+-CONFIG_INOTIFY=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+-CONFIG_PARTITION_ADVANCED=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_SLAB=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_MUTEXES=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+ CONFIG_DEBUG_LL=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+ CONFIG_LIBCRC32C=y
+diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+index c95dbce..39ef3b6 100644
+--- a/arch/arm/mach-ep93xx/clock.c
++++ b/arch/arm/mach-ep93xx/clock.c
+@@ -212,7 +212,7 @@ static struct clk_lookup clocks[] = {
+ 	INIT_CK(NULL,			"hclk",		&clk_h),
+ 	INIT_CK(NULL,			"apb_pclk",	&clk_p),
+ 	INIT_CK(NULL,			"pll2",		&clk_pll2),
+-	INIT_CK("ep93xx-ohci",		NULL,		&clk_usb_host),
++	INIT_CK("ohci-platform",	NULL,		&clk_usb_host),
+ 	INIT_CK("ep93xx-keypad",	NULL,		&clk_keypad),
+ 	INIT_CK("ep93xx-fb",		NULL,		&clk_video),
+ 	INIT_CK("ep93xx-spi.0",		NULL,		&clk_spi),
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 3f12b88..92d59c4 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -36,6 +36,7 @@
+ #include <linux/export.h>
+ #include <linux/irqchip/arm-vic.h>
+ #include <linux/reboot.h>
++#include <linux/usb/ohci_pdriver.h>
+ 
+ #include <mach/hardware.h>
+ #include <linux/platform_data/video-ep93xx.h>
+@@ -297,22 +298,53 @@ static struct platform_device ep93xx_rtc_device = {
+ 	.resource	= ep93xx_rtc_resource,
+ };
+ 
++/*************************************************************************
++ * EP93xx OHCI USB Host
++ *************************************************************************/
++
++static struct clk *ep93xx_ohci_host_clock;
++
++static int ep93xx_ohci_power_on(struct platform_device *pdev)
++{
++	if (!ep93xx_ohci_host_clock) {
++		ep93xx_ohci_host_clock = devm_clk_get(&pdev->dev, NULL);
++		if (IS_ERR(ep93xx_ohci_host_clock))
++			return PTR_ERR(ep93xx_ohci_host_clock);
++	}
++
++	clk_enable(ep93xx_ohci_host_clock);
++
++	return 0;
++}
++
++static void ep93xx_ohci_power_off(struct platform_device *pdev)
++{
++	clk_disable(ep93xx_ohci_host_clock);
++}
++
++static struct usb_ohci_pdata ep93xx_ohci_pdata = {
++	.power_on	= ep93xx_ohci_power_on,
++	.power_off	= ep93xx_ohci_power_off,
++	.power_suspend	= ep93xx_ohci_power_off,
++};
+ 
+ static struct resource ep93xx_ohci_resources[] = {
+ 	DEFINE_RES_MEM(EP93XX_USB_PHYS_BASE, 0x1000),
+ 	DEFINE_RES_IRQ(IRQ_EP93XX_USB),
+ };
+ 
++static u64 ep93xx_ohci_dma_mask = DMA_BIT_MASK(32);
+ 
+ static struct platform_device ep93xx_ohci_device = {
+-	.name		= "ep93xx-ohci",
++	.name		= "ohci-platform",
+ 	.id		= -1,
++	.num_resources	= ARRAY_SIZE(ep93xx_ohci_resources),
++	.resource	= ep93xx_ohci_resources,
+ 	.dev		= {
+-		.dma_mask		= &ep93xx_ohci_device.dev.coherent_dma_mask,
++		.dma_mask		= &ep93xx_ohci_dma_mask,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
++		.platform_data		= &ep93xx_ohci_pdata,
+ 	},
+-	.num_resources	= ARRAY_SIZE(ep93xx_ohci_resources),
+-	.resource	= ep93xx_ohci_resources,
+ };
+ 
+ 
+diff --git a/drivers/usb/host/ohci-ep93xx.c b/drivers/usb/host/ohci-ep93xx.c
+deleted file mode 100644
+index 84a20d5..0000000
+--- a/drivers/usb/host/ohci-ep93xx.c
++++ /dev/null
+@@ -1,184 +0,0 @@
+-/*
+- * OHCI HCD (Host Controller Driver) for USB.
+- *
+- * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
+- * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
+- * (C) Copyright 2002 Hewlett-Packard Company
+- *
+- * Bus Glue for ep93xx.
+- *
+- * Written by Christopher Hoover <ch@hpl.hp.com>
+- * Based on fragments of previous driver by Russell King et al.
+- *
+- * Modified for LH7A404 from ohci-sa1111.c
+- *  by Durgesh Pattamatta <pattamattad@sharpsec.com>
+- *
+- * Modified for pxa27x from ohci-lh7a404.c
+- *  by Nick Bane <nick@cecomputing.co.uk> 26-8-2004
+- *
+- * Modified for ep93xx from ohci-pxa27x.c
+- *  by Lennert Buytenhek <buytenh@wantstofly.org> 28-2-2006
+- *  Based on an earlier driver by Ray Lehtiniemi
+- *
+- * This file is licenced under the GPL.
+- */
+-
+-#include <linux/clk.h>
+-#include <linux/device.h>
+-#include <linux/signal.h>
+-#include <linux/platform_device.h>
+-
+-static struct clk *usb_host_clock;
+-
+-static int ohci_ep93xx_start(struct usb_hcd *hcd)
+-{
+-	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+-	int ret;
+-
+-	if ((ret = ohci_init(ohci)) < 0)
+-		return ret;
+-
+-	if ((ret = ohci_run(ohci)) < 0) {
+-		dev_err(hcd->self.controller, "can't start %s\n",
+-			hcd->self.bus_name);
+-		ohci_stop(hcd);
+-		return ret;
+-	}
+-
+-	return 0;
+-}
+-
+-static struct hc_driver ohci_ep93xx_hc_driver = {
+-	.description		= hcd_name,
+-	.product_desc		= "EP93xx OHCI",
+-	.hcd_priv_size		= sizeof(struct ohci_hcd),
+-	.irq			= ohci_irq,
+-	.flags			= HCD_USB11 | HCD_MEMORY,
+-	.start			= ohci_ep93xx_start,
+-	.stop			= ohci_stop,
+-	.shutdown		= ohci_shutdown,
+-	.urb_enqueue		= ohci_urb_enqueue,
+-	.urb_dequeue		= ohci_urb_dequeue,
+-	.endpoint_disable	= ohci_endpoint_disable,
+-	.get_frame_number	= ohci_get_frame,
+-	.hub_status_data	= ohci_hub_status_data,
+-	.hub_control		= ohci_hub_control,
+-#ifdef CONFIG_PM
+-	.bus_suspend		= ohci_bus_suspend,
+-	.bus_resume		= ohci_bus_resume,
+-#endif
+-	.start_port_reset	= ohci_start_port_reset,
+-};
+-
+-static int ohci_hcd_ep93xx_drv_probe(struct platform_device *pdev)
+-{
+-	struct usb_hcd *hcd;
+-	struct resource *res;
+-	int irq;
+-	int ret;
+-
+-	if (usb_disabled())
+-		return -ENODEV;
+-
+-	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0)
+-		return irq;
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res)
+-		return -ENXIO;
+-
+-	hcd = usb_create_hcd(&ohci_ep93xx_hc_driver, &pdev->dev, "ep93xx");
+-	if (!hcd)
+-		return -ENOMEM;
+-
+-	hcd->rsrc_start = res->start;
+-	hcd->rsrc_len = resource_size(res);
+-
+-	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(hcd->regs)) {
+-		ret = PTR_ERR(hcd->regs);
+-		goto err_put_hcd;
+-	}
+-
+-	usb_host_clock = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(usb_host_clock)) {
+-		ret = PTR_ERR(usb_host_clock);
+-		goto err_put_hcd;
+-	}
+-
+-	clk_enable(usb_host_clock);
+-
+-	ohci_hcd_init(hcd_to_ohci(hcd));
+-
+-	ret = usb_add_hcd(hcd, irq, 0);
+-	if (ret)
+-		goto err_clk_disable;
+-
+-	return 0;
+-
+-err_clk_disable:
+-	clk_disable(usb_host_clock);
+-err_put_hcd:
+-	usb_put_hcd(hcd);
+-
+-	return ret;
+-}
+-
+-static int ohci_hcd_ep93xx_drv_remove(struct platform_device *pdev)
+-{
+-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+-
+-	usb_remove_hcd(hcd);
+-	clk_disable(usb_host_clock);
+-	usb_put_hcd(hcd);
+-
+-	return 0;
+-}
+-
+-#ifdef CONFIG_PM
+-static int ohci_hcd_ep93xx_drv_suspend(struct platform_device *pdev, pm_message_t state)
+-{
+-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+-	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+-
+-	if (time_before(jiffies, ohci->next_statechange))
+-		msleep(5);
+-	ohci->next_statechange = jiffies;
+-
+-	clk_disable(usb_host_clock);
+-	return 0;
+-}
+-
+-static int ohci_hcd_ep93xx_drv_resume(struct platform_device *pdev)
+-{
+-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+-	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+-
+-	if (time_before(jiffies, ohci->next_statechange))
+-		msleep(5);
+-	ohci->next_statechange = jiffies;
+-
+-	clk_enable(usb_host_clock);
+-
+-	ohci_resume(hcd, false);
+-	return 0;
+-}
+-#endif
+-
+-
+-static struct platform_driver ohci_hcd_ep93xx_driver = {
+-	.probe		= ohci_hcd_ep93xx_drv_probe,
+-	.remove		= ohci_hcd_ep93xx_drv_remove,
+-	.shutdown	= usb_hcd_platform_shutdown,
+-#ifdef CONFIG_PM
+-	.suspend	= ohci_hcd_ep93xx_drv_suspend,
+-	.resume		= ohci_hcd_ep93xx_drv_resume,
+-#endif
+-	.driver		= {
+-		.name	= "ep93xx-ohci",
+-		.owner	= THIS_MODULE,
+-	},
+-};
+-
+-MODULE_ALIAS("platform:ep93xx-ohci");
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index 604cad1..5845c82 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1204,11 +1204,6 @@ MODULE_LICENSE ("GPL");
+ #define PLATFORM_DRIVER		ohci_hcd_pxa27x_driver
+ #endif
+ 
+-#ifdef CONFIG_ARCH_EP93XX
+-#include "ohci-ep93xx.c"
+-#define EP93XX_PLATFORM_DRIVER	ohci_hcd_ep93xx_driver
+-#endif
+-
+ #ifdef CONFIG_ARCH_AT91
+ #include "ohci-at91.c"
+ #define AT91_PLATFORM_DRIVER	ohci_hcd_at91_driver
+@@ -1344,12 +1339,6 @@ static int __init ohci_hcd_mod_init(void)
+ 		goto error_exynos;
+ #endif
+ 
+-#ifdef EP93XX_PLATFORM_DRIVER
+-	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
+-	if (retval < 0)
+-		goto error_ep93xx;
+-#endif
+-
+ #ifdef AT91_PLATFORM_DRIVER
+ 	retval = platform_driver_register(&AT91_PLATFORM_DRIVER);
+ 	if (retval < 0)
+@@ -1393,10 +1382,6 @@ static int __init ohci_hcd_mod_init(void)
+ 	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
+  error_at91:
+ #endif
+-#ifdef EP93XX_PLATFORM_DRIVER
+-	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+- error_ep93xx:
+-#endif
+ #ifdef EXYNOS_PLATFORM_DRIVER
+ 	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
+  error_exynos:
+@@ -1462,9 +1447,6 @@ static void __exit ohci_hcd_mod_exit(void)
+ #ifdef AT91_PLATFORM_DRIVER
+ 	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
+ #endif
+-#ifdef EP93XX_PLATFORM_DRIVER
+-	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+-#endif
+ #ifdef EXYNOS_PLATFORM_DRIVER
+ 	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
+ #endif
+-- 
+1.8.3.2
