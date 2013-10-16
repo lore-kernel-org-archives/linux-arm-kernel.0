@@ -1,139 +1,47 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Oct 2013 19:22:17 +0530
-Subject: [PATCH v2 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
- Framework
-In-Reply-To: <525E9232.9050502@ti.com>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
- <1381866857-3861-3-git-send-email-kishon@ti.com> <525E9232.9050502@ti.com>
-Message-ID: <525E9A11.7080501@ti.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 16 Oct 2013 14:52:38 +0100
+Subject: [PATCH 0/5] ARM: vexpress/TC2: cpufreq support
+Message-ID: <1381931563-16785-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+
 Hi,
 
-On Wednesday 16 October 2013 06:48 PM, Roger Quadros wrote:
-> Hi,
-> 
-> On 10/15/2013 10:54 PM, Kishon Vijay Abraham I wrote:
->> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
->> power_on and power_off the following APIs are used phy_init(), phy_exit(),
->> phy_power_on() and phy_power_off().
->>
->> However using the old USB phy library wont be removed till the PHYs of all
->> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
->>  drivers/usb/dwc3/Kconfig                       |    1 +
->>  drivers/usb/dwc3/core.c                        |   52 ++++++++++++++++++++++++
->>  drivers/usb/dwc3/core.h                        |    7 ++++
->>  drivers/usb/dwc3/platform_data.h               |    2 +
->>  5 files changed, 66 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
->> index e807635..471366d 100644
->> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
->> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
->> @@ -6,11 +6,13 @@ Required properties:
->>   - compatible: must be "snps,dwc3"
->>   - reg : Address and length of the register set for the device
->>   - interrupts: Interrupts used by the dwc3 controller.
->> +
->> +Optional properties:
->>   - usb-phy : array of phandle for the PHY device.  The first element
->>     in the array is expected to be a handle to the USB2/HS PHY and
->>     the second element is expected to be a handle to the USB3/SS PHY
->> -
->> -Optional properties:
->> + - phys: from the *Generic PHY* bindings
->> + - phy-names: from the *Generic PHY* bindings
->>   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
->>  
->>  This is usually a subnode to DWC3 glue to which it is connected.
->> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
->> index 8e385b4..64eed6f 100644
->> --- a/drivers/usb/dwc3/Kconfig
->> +++ b/drivers/usb/dwc3/Kconfig
->> @@ -2,6 +2,7 @@ config USB_DWC3
->>  	tristate "DesignWare USB3 DRD Core Support"
->>  	depends on (USB || USB_GADGET) && HAS_DMA
->>  	select USB_PHY
->> +	select GENERIC_PHY
->>  	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
->>  	help
->>  	  Say Y or M here if your system has a Dual Role SuperSpeed
->> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
->> index cb91d70..28bfa5b 100644
->> --- a/drivers/usb/dwc3/core.c
->> +++ b/drivers/usb/dwc3/core.c
->> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
->>  
->>  	usb_phy_init(dwc->usb2_phy);
->>  	usb_phy_init(dwc->usb3_phy);
->> +
->> +	if (dwc->usb2_generic_phy)
->> +		phy_init(dwc->usb2_generic_phy);
->> +	if (dwc->usb3_generic_phy)
->> +		phy_init(dwc->usb3_generic_phy);
->> +
-> 
-> dwc3_core_soft_reset() is called from dwc3_core_init() which is called from
-> dwc3_probe() but before the PHYs are initialized.
-> 
-> This will cause phy power_on() to be called before phy_init() which is wrong.
-> 
->>  	mdelay(100);
->>  
->>  	/* Clear USB3 PHY reset */
->> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
->>  {
->>  	usb_phy_shutdown(dwc->usb2_phy);
->>  	usb_phy_shutdown(dwc->usb3_phy);
->> +
->> +	if (dwc->usb2_generic_phy)
->> +		phy_power_off(dwc->usb2_generic_phy);
->> +	if (dwc->usb3_generic_phy)
->> +		phy_power_off(dwc->usb3_generic_phy);
->>  }
->>  
->>  #define DWC3_ALIGN_MASK		(16 - 1)
->> @@ -439,6 +450,26 @@ static int dwc3_probe(struct platform_device *pdev)
->>  		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
->>  	}
->>  
->> +	count = of_property_match_string(node, "phy-names", "usb2-phy");
->> +	if (count >= 0 || (pdata && pdata->usb2_generic_phy)) {
->> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
->> +		if (IS_ERR(dwc->usb2_generic_phy)) {
->> +			dev_err(dev, "no usb2 phy configured yet");
->> +			return PTR_ERR(dwc->usb2_generic_phy);
->> +		}
->> +		dwc->usb2_phy = NULL;
->> +	}
->> +
->> +	count = of_property_match_string(node, "phy-names", "usb3-phy");
->> +	if (count >= 0 || (pdata && pdata->usb3_generic_phy)) {
->> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
->> +		if (IS_ERR(dwc->usb3_generic_phy)) {
->> +			dev_err(dev, "no usb3 phy configured yet");
->> +			return PTR_ERR(dwc->usb3_generic_phy);
->> +		}
->> +		dwc->usb3_phy = NULL;
->> +	}
->> +
-> 
-> There are a couple of issues here.
-> - The above code must be executed only if it node is valid.
+The SPC(Serial Power Controller) on Versatile Express V2P-CA15_A7(TC2)
+not only controls low-power states, wake-up irqs and per-CPU jump addresses
+but also the CPU performance operating points which is essential to provide
+CPU DVFS. The M3 microcontroller can provide upto eight performance values,
+one set for each cluster (CA15 or CA7). Each of this value contains the
+frequency(kHz) and voltage(mV) at that performance level. It expects
+these performance level to be passed through the SPC PERF_LVL registers.
+    
+This patch series adds support to populate those OPPs, add them to the
+cpu devices and runtime programming of these performance levels through
+clock framework. It also adds a small interface cpufreq driver to validate
+the OPPs and register the arm_big_little cpufreq driver.
 
-of_property_match_string will give a error value if the node is not present.
-*count >= 0* can take care of this.
-> - We must either get both PHYs via old method or via new method and not support mix matching
-> them. e.g. it is possible with this code that usb2_phy is set and usb3_generic_phy is set.
+Regards,
+Sudeep
 
-Why? As long as both the frameworks co-exist (and we support both in dwc3), I
-don't see any reason why we shouldn't allow it. We can avoid adding a few more
-checks by leaving it the way it is currently.
+Sudeep KarkadaNagesha (5):
+  cpufreq: arm-big-little: use clk_get instead of clk_get_sys
+  ARM: vexpress/TC2: add support for CPU DVFS
+  ARM: vexpress/TC2: add cpu clock support
+  cpufreq: arm_big_little: add vexpress SPC interface driver
+  ARM: vexpress/TC2: register vexpress-spc cpufreq device
 
-Thanks
-Kishon
+ arch/arm/mach-vexpress/Kconfig         |   2 +
+ arch/arm/mach-vexpress/spc.c           | 361 ++++++++++++++++++++++++++++++++-
+ arch/arm/mach-vexpress/spc.h           |   2 +-
+ arch/arm/mach-vexpress/tc2_pm.c        |   7 +-
+ drivers/cpufreq/Kconfig.arm            |   8 +
+ drivers/cpufreq/Makefile               |   1 +
+ drivers/cpufreq/arm_big_little.c       |   2 +-
+ drivers/cpufreq/vexpress-spc-cpufreq.c |  69 +++++++
+ 8 files changed, 447 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/cpufreq/vexpress-spc-cpufreq.c
+
+-- 
+1.8.1.2
