@@ -1,39 +1,183 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Oct 2013 13:33:44 -0600
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
-References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
- <20131005190200.GZ12758@n2100.arm.linux.org.uk>
- <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
- <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
- <20131007111728.GM12758@n2100.arm.linux.org.uk>
- <20131007103936.GH2954@intel.com>
- <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
-Message-ID: <525EEA18.1010802@wwwdotorg.org>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 16 Oct 2013 12:37:42 -0700
+Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <20131016170341.GH25034@n2100.arm.linux.org.uk>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <20131003202751.GZ6192@mwanda>
+ <20131015131038.GB25034@n2100.arm.linux.org.uk>
+ <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
+ <20131016170341.GH25034@n2100.arm.linux.org.uk>
+Message-ID: <525EEB06.6080009@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2013 07:34 PM, Dan Williams wrote:
-> On Mon, Oct 7, 2013 at 3:39 AM, Vinod Koul <vinod.koul@intel.com> wrote:
->> On Mon, Oct 07, 2013 at 12:17:28PM +0100, Russell King - ARM Linux wrote:
-...
->>> What may be better is to change the wording here: not DMA_SUCCESS but
->>> DMA_COMPLETED.  That doesn't imply that it has been successful, merely
->>> that the DMA engine has finished with the transaction.
+On 10/16/2013 10:03 AM, Russell King - ARM Linux wrote:
+> On Tue, Oct 15, 2013 at 10:17:07AM -0300, Fabio Estevam wrote:
+>> On Tue, Oct 15, 2013 at 10:10 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> Another point on patch 1.  Sorry, I don't have patch 1 to reply to, it
+>>> seems it was deleted from linux-arm-kernel's moderation queue.
+>>>
+>>> drm_mode_connector_attach_encoder() is called too early, before the
+>>> base.id field in the encoder has been initialised.  This causes the
+>>> connectors encoder array to be empty, and userspace KMS to fail.
+>>>
+>>> There's also bugs in the CSC setting too - it runs off the end of the
+>>> array and gcc warns about this.  The code was clearly wrong.
+>>>
+>>> You may wish to combine this patch with patch 1 to sort all that out.
+>>> For the patch below:
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Thanks, Russell.
 >>
->> Agreed that its not indication of success but of DMA completetion. I have seen
->> cases where slave perhiphral got stuck while sending last FIFO but since DMA
->> finished transferiing to FIFO it says complete.
+>> Will submit v3 when I am back to the office.
+> Okay, I still have a problem with HDMI: I have a magenta vertical line
+> down the left hand side of the frame, the displayed frame is shifted
+> right by the width of that line and the right hand side is missing some
+> pixels.
+>
+> First off, the hsync position programmed into the HDMI registers appears
+> to be wrong.
+>
+> I'm at a loss why imx-hdmi is obfuscated with a conversion from a
+> drm_display_mode structure to a fb_videomode.  This adds additional
+> confusion and additional opportunities for bugs; this is probably
+> exactly why the hsync position is wrong.
+>
+> In CEA-861-B for 720p @60Hz:
+>
+> DE: ^^^^__________^^^^^^^
+> HS: _______^^^___________
+>           ^  ^  ^
+>           |  |  220 clocks
+>           |  40 clocks
+>           110 clocks
+>
+> The IMX6 manual says HSYINCINDELAY0 is "Hsync active edge delay.  Integer
+> number of pixel clock cycles from de non-active edge".  So, this should be
+> 110.  Yet it ends up being programmed as 220, leading to a magenta vertical
+> bar down the left hand side of the display.
+>
+> Now, if you look at Documentation/fb/framebuffer.txt, in this case, the
+> right margin should be 110 clocks, hsync len should be 40 and the left
+> margin should be 220 clocks.
+>
+> However, this is not what your conversion to a fb_videomode does.  It
+> reverses the left and right margin.  A similar confusion also exists
+> in the conversion of the upper/lower margins too.
+>
+> The DRM model is this (for 720p @60Hz):
+>
+> 0                             1280         1390 1430      1650
+> |===============================|------------|---|----------|
+> ^                               ^            ^   ^          ^
+> start                       hdisplay hsync_start hsync_end htotal
+>
+> The fb model is the same as the above but rotated:
+>
+> left margin            displayed            right margin hsync_len
+> |----------|===============================|------------|---|
+>
+> So, the left margin is the bit between hsync_end and htotal, and the
+> right margin is the bit between hdisplay and hsync_start.  Exactly
+> the same analysis applies to the upper/lower margins.
+>
+> What I suggest is that the use of fb_videomode is entirely killed off
+> in this driver to remove this layer of confusion and instead the DRM
+> model is stuck to within this DRM driver.
+>
+> Now on to the next problem.  HSYNC/VSYNC polarity.
+>
+> So, this is the mode which is set:
+>
+>    1280x720 (0x41)   74.2MHz +HSync +VSync *current +preferred
+>          h: width  1280 start 1390 end 1430 total 1650 skew    0 clock   45.0KHz
+>          v: height  720 start  725 end  730 total  750           clock   60.0Hz
+>
+> Note the positive HSync and VSync polarity - this is correct, backed
+> up by CEA-861-B.
+>
+> The IPU DI0 is configured thusly in its general control register:
+> 0x2640000 = 0x200006, which is what is set when the requested mode
+> has DRM_MODE_FLAG_PHSYNC and DRM_MODE_FLAG_PVSYNC flags set.
+>
+> However, if we look at the HDMI config: 0x121000 = 0x18.  Active low
+> hsync/vsync.  This is quite obvious when you look at the code -
+> convert_to_video_timing() does *nothing* at all when converting the
+> sync polarities, which means hdmi_av_composer() doesn't program them
+> appropriately.  And yes, poking 0x78 into this register finally fixes
+> the problem.
+>
+> Yet another reason why this silly conversion from one structure form
+> to another is a Very Bad Idea.  Until I found this, I was merely going
+> to send a patch to sort out convert_to_video_timing(), but quite frankly
+> I'm going to kill this thing off right now.
+>
+> Another thing:
+>
+> static int imx_hdmi_setup(struct imx_hdmi *hdmi, struct drm_display_mode *mode)
+> {
+>          int ret;
+>          convert_to_video_timing(&hdmi->fb_mode, mode);
+>
+>          hdmi_disable_overflow_interrupts(hdmi);
+>          
+>          hdmi->vic = 6;
+>
+> It's quite wrong to force every video mode set to be CEA mode 6.  IIRC,
+> There is a function in DRM which will tell you the CEA mode number.
+> Again, I'll fix this in my patch rewriting this bit of the driver to
+> be correct.
+>
+> I'm also suspicious of the "HDMI Initialization Step" comments, because
+> they make no sense:
+>
+> /* HDMI Initialization Step B.4 */
+> static void imx_hdmi_enable_video_path(struct imx_hdmi *hdmi)
+> {
+>
+> yet:
+>
+>          /* HDMI Initialization Step B.3 */
+>          imx_hdmi_enable_video_path(hdmi);
+>
+> One's left wondering whether Step B.3 really is to just call a function
+> with a particular name, but B.4 is to actually do something with the
+> hardware.  I'm quite sure that if this is a documented procedure, that
+> it doesn't say that and these comments are wrong (and probably the code
+> too.)
+>
+> Even after all this, I still haven't got rid of that magenta line - in
+> as far as I can tell, nothing has changed as a result of any of these
+> (although reading back the register values, they're now much better.)
+> What I do find is if I poke 0x78 back into the INVIDCONF register
+> (which already contains 0x78) the magenta line disappears.
+>
+> I'm beginning to suspect that there's some ordering dependency that
+> isn't being satisfied - but as the i.MX6Solo/DualLite manual doesn't
+> seem to contain any of these details, I'm running out of ideas.
+>
+> _______________________________________________
+>
+It sound to me like you hit errata "ERR004308 HDMI: 8000504668?The 
+arithmetic unit may get wrong video
+timing values although the FC_* registers hold correct values"
 
-In that case, the DMA *has* completed. DMA is the transfer into the
-FIFO, not the handling of the FIFO content by the peripheral.
 
->> Dan do you agree?
-> 
-> Yes, it's an indication of completion, not necessarily success.
+Also, checkout ERR005173, it says
+"Workarounds:
+The programming flow should be:
+1. Program all the controller registers including the frame composer 
+registers.
+2. Assert software resets
+3. Write (3 or 4 times) in FC_INVIDCONF the final value (this will make 
+sure that the update
+pulse for the fc_arithlogicunit_div that will update the 
+fc_arithlogicunit_div units is generated)
+4. If frame composer packet queue overflow still occurs, then repeat 
+steps 2 and 3"
 
-Surely by definition, a DMA can't *complete* without being successful.
-If the DMA failed, then it didn't complete, but rather must have been
-aborted or error'd out, without completing the whole transfer.
+
+Troy
