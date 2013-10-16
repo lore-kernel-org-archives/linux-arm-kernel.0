@@ -1,54 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Oct 2013 23:27:12 +0100
-Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <525EFF15.2010007@boundarydevices.com>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
- <20131003202751.GZ6192@mwanda>
- <20131015131038.GB25034@n2100.arm.linux.org.uk>
- <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
- <20131016170341.GH25034@n2100.arm.linux.org.uk>
- <525EEB06.6080009@boundarydevices.com>
- <20131016202750.GK25034@n2100.arm.linux.org.uk>
- <525EFF15.2010007@boundarydevices.com>
-Message-ID: <20131016222712.GM25034@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Oct 2013 23:30:30 +0100
+Subject: [PATCH] clk: s3c64xx: Fix aliases for SPI devices
+Message-ID: <1381962630-28802-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 02:03:17PM -0700, Troy Kisky wrote:
-> Freescale's kernel(imx_3.0.35_4.1.0) has this code
->
-> video/mxc_hdmi.c-/* Workaround to clear the overflow condition */
-> video/mxc_hdmi.c-static void mxc_hdmi_clear_overflow(void)
-> video/mxc_hdmi.c-{
-> video/mxc_hdmi.c-       int count;
-> video/mxc_hdmi.c-       u8 val;
-> video/mxc_hdmi.c-
-> video/mxc_hdmi.c-       /* TMDS software reset */
-> video/mxc_hdmi.c: hdmi_writeb((u8)~HDMI_MC_SWRSTZ_TMDSSWRST_REQ,  
-> HDMI_MC_SWRSTZ);
-> video/mxc_hdmi.c-
-> video/mxc_hdmi.c-       val = hdmi_readb(HDMI_FC_INVIDCONF);
-> video/mxc_hdmi.c-
-> video/mxc_hdmi.c-       if (cpu_is_mx6dl()) {
-> video/mxc_hdmi.c-                hdmi_writeb(val, HDMI_FC_INVIDCONF);
-> video/mxc_hdmi.c-                return;
-> video/mxc_hdmi.c-       }
-> video/mxc_hdmi.c-
-> video/mxc_hdmi.c-       for (count = 0 ; count < 5 ; count++)
-> video/mxc_hdmi.c-               hdmi_writeb(val, HDMI_FC_INVIDCONF);
-> video/mxc_hdmi.c-}
->
-> So, perhaps you need to move the software reset first.
+From: Mark Brown <broonie@linaro.org>
 
-Just tried that - and yes, it does work (I'm on i.MX 6Solo for which
-cpu_is_mx6dl() would return true.)  Well done!
+The clock aliases for SPI devices do not reflect the actual usage in the
+driver causing the SPI controller to fail to probe when the clock driver
+is in use, fix this up.
 
-Indeed yes, the workaround in the code Fabio has differs from the
-procedure given in the errata.
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ drivers/clk/samsung/clk-s3c64xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Note that this gives a new problem: we shouldn't use cpu_is_mx6dl()
-in drivers - differences like this should be specified via DT properties.
-I think we need this to recognise both fsl,imx6q-hdmi and fsl,imx6dl-hdmi
-so that this workaround can detect when its running on a Solo/DL SoC.
-
-Well, I now have quite a pile of patches for the hdmi code. :(
+diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+index 7d2c842..3cbd47c 100644
+--- a/drivers/clk/samsung/clk-s3c64xx.c
++++ b/drivers/clk/samsung/clk-s3c64xx.c
+@@ -356,8 +356,8 @@ static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
+ 	ALIAS(SCLK_MMC2, "s3c-sdhci.2", "mmc_busclk.2"),
+ 	ALIAS(SCLK_MMC1, "s3c-sdhci.1", "mmc_busclk.2"),
+ 	ALIAS(SCLK_MMC0, "s3c-sdhci.0", "mmc_busclk.2"),
+-	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi-bus"),
+-	ALIAS(SCLK_SPI0, "s3c6410-spi.0", "spi-bus"),
++	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi_busclk1"),
++	ALIAS(SCLK_SPI0, "s3c6410-spi.0", "spi_busclk0"),
+ 	ALIAS(SCLK_AUDIO1, "samsung-pcm.1", "audio-bus"),
+ 	ALIAS(SCLK_AUDIO1, "samsung-i2s.1", "audio-bus"),
+ 	ALIAS(SCLK_AUDIO0, "samsung-pcm.0", "audio-bus"),
+-- 
+1.8.4.rc3
