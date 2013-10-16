@@ -1,53 +1,51 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 16 Oct 2013 17:13:29 -0400 (EDT)
-Subject: [PATCH v2] usb: ohci: remove ep93xx bus glue platform driver
-In-Reply-To: <525EFD0B.2020607@gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1310161711310.1264-100000@iolanthe.rowland.org>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Thu, 17 Oct 2013 00:16:12 +0300
+Subject: .align may cause data to be interpreted as instructions
+In-Reply-To: <1381943025.3419.59.camel@linaro1.home>
+References: <525DC3D1.5030300@linaro.org> <525E74D8.3070008@codethink.co.uk>	
+ <1381939571.3419.44.camel@linaro1.home>
+ <1381943025.3419.59.camel@linaro1.home>
+Message-ID: <525F021C.3060507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Oct 2013, Ryan Mallon wrote:
-
-> > It's awfully hard to believe that enabling USB_OHCI_HCD_PLATFORM is 
-> > responsible for all those other changes.
+On 10/16/2013 08:03 PM, Jon Medhurst (Tixy) wrote:
+> On Wed, 2013-10-16 at 17:06 +0100, Jon Medhurst (Tixy) wrote:
+>> On Wed, 2013-10-16 at 12:13 +0100, Ben Dooks wrote:
+>>> On 15/10/13 23:38, Taras Kondratiuk wrote:
+>>>> Hi
+>>>>
+>>>> I was debugging kprobes-test for BE8 and noticed that some data fields
+>>>> are stored in LE instead of BE. It happens because these data fields
+>>>> get interpreted as instructions.
+>>>>
+>>>> Is it a known issue?
+>>>
+>>> I reported the crashes to Tixy along with a different
+>>> method of sovling the problem (changed to using pointers to
+>>> the strings) a while ago.
+>>
+>> I found that fix in the list archives:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186528.html
+>>
+>>>  However it seems that nothing has
+>>> happened to fix this.
+>>>
+>>> Since kprobes seems to work with the fixed tests I forgot
+>>> to follow up and prod Jon about looking into this problem.
+>>
+>> Sorry, I sorta forgot/ignored the issue, strange compiler problem with a
+>> vague explanation on a big-endian kernel (who uses that ;-)
+>>
+>>> Jon, if you are not interested in fixing this, then please
+>>> let me know and we can get a patch sorted to fix it.
+>>
+>> Looking at your old patch again, it looks good to me. 
 > 
-> 
-> The 'make savedefconfig' step minimises the defconfig by removing any
-> options that are implicitly selected or options that no longer exist.
-> E.g: 4d42942c: 'mtd: make MTD_CONCAT support mandatory' is responsible
-> for CONFIG_MTD_CONCAT disappearing from the defconfig. Looks the other
-> MTD options have also been removed.
+> Actually it's broken for thumb, the pointer to the title needs storing
+> at a 4 byte alignment, which presumably will make the problem we're
+> trying to workaround re-occur. I'll try and find some time to take a
+> look for a different way of doing things...
 
-...
-
-> In short, yes the 'make savedefconfig' step is annoying because it
-> creates weird diffs. However, the diffs are correct (cleaning up
-> unused options, etc). The diffs should be inspected to catch things
-> like the inotify case, but otherwise there should be no functional
-> changes.
-
-Sure, that's what I meant.  All that churn was caused by re-minimizing
-the defconfig file, not by adding USB_OHCI_HCD_PLATFORM.
-
-> > Maybe this should be done in two stages.  First create a patch that
-> > describes the differences resulting from:
-> > 
-> > make ARCH=arm ep93xx_defconfig
-> > make ARCH=arm savedefconfig
-> > mv defconfig arch/arm/configs/ep93xx_defconfig
-> 
-> >
-> > Then do this patch on top of that one.
-> > 
-> 
-> Yeah, I think a pre-patch for "ep93xx: make savedefconfig" would be
-> best.
-> 
-> Are you happy to collect all these patches once they are done? I
-> could take the ep93xx parts, but my tree typically only has a 
-> small handful of patches each merge window, so it is probably easier
-> if you grab them all.
-
-Greg KH and I can take both patches.
-
-Alan Stern
+Word alignment here doesn't cause the problem, so this patch should
+workaround the issue.
