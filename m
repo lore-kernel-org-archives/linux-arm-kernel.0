@@ -1,159 +1,54 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 16 Oct 2013 16:05:12 +0200
-Subject: [PATCH 6/6] PCI: designware: Fix DT resource retrieval
-In-Reply-To: <CAJ+vNU0e1LDFuqt_PCaycrrrD=dYRPU6fKEQZxkskO4hcJFcRw@mail.gmail.com>
-References: <1381853200-5534-1-git-send-email-marex@denx.de>
- <1381853200-5534-7-git-send-email-marex@denx.de>
- <CAJ+vNU0e1LDFuqt_PCaycrrrD=dYRPU6fKEQZxkskO4hcJFcRw@mail.gmail.com>
-Message-ID: <201310161605.12500.marex@denx.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 16 Oct 2013 16:12:33 +0200
+Subject: [PATCH] pinctrl: at91: correct a few typos
+Message-ID: <1381932753-32081-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/pinctrl/pinctrl-at91.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> On Tue, Oct 15, 2013 at 9:06 AM, Marek Vasut <marex@denx.de> wrote:
-> > The resource retrieval from the DT was not done right. This resulted
-> > in bogus values in the IO/MEM window configuration. I re-used the code
-> > implementation from pci-tegra.c to do the resource retrieval correctly.
-> > 
-> > This in turn resulted in very strange behavior on two different kinds
-> > of setup:
-> > 
-> > Setup #1:                             ,-------> Intel i210 (igb driver)
-> > 
-> >            i.MX6 root port -----> PCIe switch
-> >            
-> >                                       `-------> Empty slot
-> > 
-> > Setup #2:                             ,-------> Marvell Yukon (sky2
-> > driver)
-> > 
-> >            i.MX6 root port -----> PCIe switch
-> >            
-> >                                       `-------> Empty slot
-> > 
-> > Both setups expressed the same behavior. The system booted and the
-> > ethernet controllers were properly detected. After the controllers
-> > were configured and just after they reported "Ethernet Link Up", the
-> > entire system froze. It is now clear this happened because the resources
-> > were incorrectly configured, which in turn means the iATU was also not
-> > configured correctly.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Frank Li <lznuaa@gmail.com>
-> > Cc: Jingoo Han <jg1.han@samsung.com>
-> > Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
-> > Cc: Pratyush Anand <pratyush.anand@st.com>
-> > Cc: Richard Zhu <r65037@freescale.com>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Sean Cross <xobs@kosagi.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
-> > Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
-> > Cc: Tim Harvey <tharvey@gateworks.com>
-> > Cc: Troy Kisky <troy.kisky@boundarydevices.com>
-> > Cc: Yinghai Lu <yinghai@kernel.org>
-> > ---
-> > 
-> >  drivers/pci/host/pcie-designware.c | 17 ++++++-----------
-> >  1 file changed, 6 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/drivers/pci/host/pcie-designware.c
-> > b/drivers/pci/host/pcie-designware.c index 5d183ae..97c5951 100644
-> > --- a/drivers/pci/host/pcie-designware.c
-> > +++ b/drivers/pci/host/pcie-designware.c
-> > @@ -370,6 +370,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> > 
-> >         struct device_node *np = pp->dev->of_node;
-> >         struct of_pci_range range;
-> >         struct of_pci_range_parser parser;
-> > 
-> > +       struct resource res;
-> > 
-> >         u32 val;
-> >         
-> >         struct irq_domain *irq_domain;
-> > 
-> > @@ -381,28 +382,22 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> > 
-> >         /* Get the I/O and memory ranges from DT */
-> >         for_each_of_pci_range(&parser, &range) {
-> > 
-> > -               unsigned long restype = range.flags &
-> > IORESOURCE_TYPE_BITS; +               of_pci_range_to_resource(&range,
-> > np, &res);
-> > +               unsigned long restype = res.flags & IORESOURCE_TYPE_BITS;
-> > 
-> >                 if (restype == IORESOURCE_IO) {
-> > 
-> > -                       of_pci_range_to_resource(&range, np, &pp->io);
-> > +                       memcpy(&pp->io, &res, sizeof(res));
-> > 
-> >                         pp->io.name = "I/O";
-> > 
-> > -                       pp->io.start = max_t(resource_size_t,
-> > -                                            PCIBIOS_MIN_IO,
-> > -                                            range.pci_addr +
-> > global_io_offset); -                       pp->io.end =
-> > min_t(resource_size_t,
-> > -                                          IO_SPACE_LIMIT,
-> > -                                          range.pci_addr + range.size
-> > -                                          + global_io_offset);
-> 
-> Nak - removing the adjustment to io.start/io.end breaks the io space
-> mapping as the entire io-space allocation gets taken by the root
-> complex.  This causes any device that requests io space to fail to
-> obtain it (your igb driver from Setup1 apparently doesn't use io space
-> where my sky2 device from Setup2 above does).
-
-OK. I still think this kind of restype comparison is bogus. The range.flags and 
-IORESOURCE_.* do not match bit-wise. Do we agree on this part? I also agree -- 
-as disussed with you -- that there might be bugs in the DT bindings. I will 
-repost the V2s later tonight.
-
---->8---
-unsigned long restype = range.flags & IORESOURCE_TYPE_BITS;
-[...]
-if (restype == IORESOURCE_MEM) {
----8<---
-
-> If I put back the adjustment to io.start/io.end above my sky2 device
-> gets its io resource properly but still hangs the bus after a few
-> interrupts.  Are you sure you don't have other changes that you
-> haven't posted yet that could have addressed the hang you get when you
-> bring up your igb device?
-
-I'm absolutely positive. I double-checked this now. One more patch I have is 
-this IRQ fixup, but that's all.
-
-    pcie: correct the irq map when pcie switch is used
-
-> I agree that the the 'hang' we are seeing is a bus-hang caused by an
-> improper iATU mapping, however I'm not convinced its a dts parsing
-> issue.
-> 
-> Tim
-
-
-> > 
-> > -                       of_pci_range_to_resource(&range, np, &pp->mem);
-> > +                       memcpy(&pp->mem, &res, sizeof(res));
-> > 
-> >                         pp->mem.name = "MEM";
-> >                         pp->config.mem_size = resource_size(&pp->mem);
-> >                         pp->config.mem_bus_addr = range.pci_addr;
-> >                 
-> >                 }
-> >                 if (restype == 0) {
-> > 
-> > -                       of_pci_range_to_resource(&range, np, &pp->cfg);
-> > +                       memcpy(&pp->cfg, &res, sizeof(res));
-> > 
-> >                         pp->config.cfg0_size = resource_size(&pp->cfg)/2;
-> >                         pp->config.cfg1_size = resource_size(&pp->cfg)/2;
-> >                 
-> >                 }
-> > 
-> > --
-> > 1.8.4.rc3
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index f350fd2..ad48179 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -243,7 +243,7 @@ static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	int i;
+ 
+ 	/*
+-	 * first find the group of this node and check if we need create
++	 * first find the group of this node and check if we need to create
+ 	 * config maps for pins
+ 	 */
+ 	grp = at91_pinctrl_find_group_by_name(info, np->name);
+@@ -564,7 +564,7 @@ static int at91_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
+ 		info->functions[selector].name, info->groups[group].name);
+ 
+ 	/* first check that all the pins of the group are valid with a valid
+-	 * paramter */
++	 * parameter */
+ 	for (i = 0; i < npins; i++) {
+ 		pin = &pins_conf[i];
+ 		ret = pin_check_config(info, info->groups[group].name, i, pin);
+@@ -958,7 +958,7 @@ static int at91_pinctrl_probe_dt(struct platform_device *pdev,
+ 	at91_pinctrl_child_count(info, np);
+ 
+ 	if (info->nbanks < 1) {
+-		dev_err(&pdev->dev, "you need to specify atleast one gpio-controller\n");
++		dev_err(&pdev->dev, "you need to specify at least one gpio-controller\n");
+ 		return -EINVAL;
+ 	}
+ 
+@@ -1495,7 +1495,7 @@ static int at91_gpio_of_irq_setup(struct device_node *node,
+ 	if (at91_gpio->pioc_idx)
+ 		prev = gpio_chips[at91_gpio->pioc_idx - 1];
+ 
+-	/* The toplevel handler handles one bank of GPIOs, except
++	/* The top level handler handles one bank of GPIOs, except
+ 	 * on some SoC it can handles up to three...
+ 	 * We only set up the handler for the first of the list.
+ 	 */
+-- 
+1.8.1.2
