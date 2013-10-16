@@ -1,31 +1,40 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 16 Oct 2013 21:58:24 +0530
-Subject: [PATCH 06/28] dmaengine: jz4740: use DMA_COMPLETE for dma completion
- status
+Date: Wed, 16 Oct 2013 21:58:20 +0530
+Subject: [PATCH 02/28] dmaengine: amba-pl08x: use DMA_COMPLETE for dma
+ completion status
 In-Reply-To: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
 References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
-Message-ID: <1381940926-25564-7-git-send-email-vinod.koul@intel.com>
+Message-ID: <1381940926-25564-3-git-send-email-vinod.koul@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Vinod Koul <vinod.koul@intel.com>
-CC: Lars-Peter Clausen <lars@metafoo.de>
+CC: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/dma-jz4740.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/dma/amba-pl08x.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/dma-jz4740.c b/drivers/dma/dma-jz4740.c
-index b0c0c82..94c380f 100644
---- a/drivers/dma/dma-jz4740.c
-+++ b/drivers/dma/dma-jz4740.c
-@@ -491,7 +491,7 @@ static enum dma_status jz4740_dma_tx_status(struct dma_chan *c,
- 	unsigned long flags;
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 9b50257..4ee6533 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -1252,7 +1252,7 @@ static enum dma_status pl08x_dma_tx_status(struct dma_chan *chan,
+ 	size_t bytes = 0;
  
- 	status = dma_cookie_status(c, cookie, state);
--	if (status == DMA_SUCCESS || !state)
-+	if (status == DMA_COMPLETE || !state)
- 		return status;
+ 	ret = dma_cookie_status(chan, cookie, txstate);
+-	if (ret == DMA_SUCCESS)
++	if (ret == DMA_COMPLETE)
+ 		return ret;
  
- 	spin_lock_irqsave(&chan->vchan.lock, flags);
+ 	/*
+@@ -1267,7 +1267,7 @@ static enum dma_status pl08x_dma_tx_status(struct dma_chan *chan,
+ 
+ 	spin_lock_irqsave(&plchan->vc.lock, flags);
+ 	ret = dma_cookie_status(chan, cookie, txstate);
+-	if (ret != DMA_SUCCESS) {
++	if (ret != DMA_COMPLETE) {
+ 		vd = vchan_find_desc(&plchan->vc, cookie);
+ 		if (vd) {
+ 			/* On the issued list, so hasn't been processed yet */
 -- 
 1.7.0.4
