@@ -1,30 +1,53 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 15 Oct 2013 21:50:33 -0700
+Date: Tue, 15 Oct 2013 21:50:34 -0700
 Subject: [PATCH v2] ARM: cci driver need big endian fixes in asm code
-Message-ID: <1381899034-420-1-git-send-email-victor.kamensky@linaro.org>
+In-Reply-To: <1381899034-420-1-git-send-email-victor.kamensky@linaro.org>
+References: <1381899034-420-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1381899034-420-2-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+cci_enable_port_for_self written in asm and it works with h/w
+registers that are in little endian format. When run in big
+endian mode it needs byteswaped constants before/after it
+writes/reads to/from such registers
 
-This is version 2 of cci big endian fix. Idea of this
-way of fixing was suggested by Ben Dooks [1]. Compared to
-previous solution this one does not use ifdefs and looks
-much cleaner.
-
-This was tested on TC2 both LE and BE, CONFIG_ARM_CCI
-was enabled.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/203248.html
-
-Thanks,
-Victor
-
-Victor Kamensky (1):
-  ARM: cci driver need big endian fixes in asm code
-
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
  drivers/bus/arm-cci.c | 6 ++++--
  1 file changed, 4 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 57b0bc6..4328c25 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -872,7 +872,7 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+ 
+ 	/* Enable the CCI port */
+ "	ldr	r0, [r0, %[offsetof_port_phys]] \n"
+-"	mov	r3, #"__stringify(CCI_ENABLE_REQ)" \n"
++"	mov	r3, %[cci_enable_req]\n"		   
+ "	str	r3, [r0, #"__stringify(CCI_PORT_CTRL)"] \n"
+ 
+ 	/* poll the status reg for completion */
+@@ -880,7 +880,7 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+ "	ldr	r0, [r1] \n"
+ "	ldr	r0, [r0, r1]		@ cci_ctrl_base \n"
+ "4:	ldr	r1, [r0, #"__stringify(CCI_CTRL_STATUS)"] \n"
+-"	tst	r1, #1 \n"
++"	tst	r1, %[cci_control_status_bits] \n"			
+ "	bne	4b \n"
+ 
+ "	mov	r0, #0 \n"
+@@ -893,6 +893,8 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+ "7:	.word	cci_ctrl_phys - . \n"
+ 	: :
+ 	[sizeof_cpu_port] "i" (sizeof(cpu_port)),
++	[cci_enable_req] "i" cpu_to_le32(CCI_ENABLE_REQ),
++	[cci_control_status_bits] "i" cpu_to_le32(1),
+ #ifndef __ARMEB__
+ 	[offsetof_cpu_port_mpidr_lsb] "i" (offsetof(struct cpu_port, mpidr)),
+ #else
 -- 
 1.8.1.4
