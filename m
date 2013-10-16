@@ -1,50 +1,35 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 16 Oct 2013 10:30:49 -0400
-Subject: [RFC PATCH 1/4] ARM64: Add Kconfig option to enable Big Endian
- kernel
-In-Reply-To: <525E36F8.6080206@linaro.org>
-References: <1381494135-15085-1-git-send-email-ankit.jindal@linaro.org>
- <1381494135-15085-2-git-send-email-ankit.jindal@linaro.org>
- <525D84CF.4060705@codeaurora.org> <525E36F8.6080206@linaro.org>
-Message-ID: <525EA319.5030807@codeaurora.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 16 Oct 2013 17:34:48 +0300
+Subject: [PATCH v3 08/19] clk: tegra: add common infra for DT clocks
+In-Reply-To: <525D9117.9050009@wwwdotorg.org>
+References: <1381848794-11761-1-git-send-email-pdeschrijver@nvidia.com>
+ <1381848794-11761-9-git-send-email-pdeschrijver@nvidia.com>
+ <525D9117.9050009@wwwdotorg.org>
+Message-ID: <20131016143448.GK5643@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tushar,
-
-On 10/16/2013 02:49 AM, Tushar Jagad wrote:
-> Hi Christopher,
+On Tue, Oct 15, 2013 at 09:01:43PM +0200, Stephen Warren wrote:
+> On 10/15/2013 08:52 AM, Peter De Schrijver wrote:
+> > Introduce a common infrastructure for sharing clock initialization between
+> > SoCs.
 > 
-> On 10/15/2013 11:39 PM, Christopher Covington wrote:
+> > diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
 > 
->> What makes a board properly built and how can a user determine whether their
->> board is?
+> > +struct clk ** __init tegra_lookup_dt_id(int clk_id,
+> > +					struct tegra_clk *tegra_clk)
+> > +{
+> > +	if (tegra_clk[clk_id].present)
+> > +		return &clks[tegra_clk[clk_id].dt_id];
+> > +	else
+> > +		return NULL;
 > 
-> As of now this flag assumes that the bootloader is in LE mode. It is left to
-> the kernel to switch to BE mode. This flag makes the kernel set necessary
-> flags in SCTLR registers on entry.
+> Does this need range-checking? Or do we assume that since this is an
+> internal function, "clk_id" will never be out-of-range?
 
-I would suggest that you say that instead. The existing wording makes it sound
-strictly hardware related.
+That was my assumption indeed. I could add a range check if you think that's
+useful.
 
->>
->>> +                                                [...] and your board
->>> +          port must properly enable any big-endian related features
->>> +          of your chipset/board/processor.
->>
->> What is a board port for arm64?
-> 
-> This is a generic patch for the architecture. Each driver needs to make
-> necessary changes keeping the kernel endianness in mind. We have tested these
-> patches on our X-Gene platform.
+Cheers,
 
-Perhaps it would be clearer to say "drivers" instead of "board ports" then. I
-thought the comment was referring to code inside mach-* or plat-* directories.
-
-Regards,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Peter.
