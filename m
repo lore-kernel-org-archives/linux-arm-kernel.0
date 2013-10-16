@@ -1,39 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 16 Oct 2013 10:02:38 +0200
-Subject: [linux-sunxi] [PATCH v2 1/4] reset: Add Allwinner A31 Reset
- Controller Driver
-In-Reply-To: <CAPNxgga7N-RYXDEDoK_J3MhA+YvGf2H9GuHqSURQJV+hDPSAPw@mail.gmail.com>
-References: <1381778609-4191-1-git-send-email-maxime.ripard@free-electrons.com>
- <1381778609-4191-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAPNxgga7N-RYXDEDoK_J3MhA+YvGf2H9GuHqSURQJV+hDPSAPw@mail.gmail.com>
-Message-ID: <20131016080238.GC3041@lukather>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Wed, 16 Oct 2013 09:10:35 +0100
+Subject: [PATCH] clk: s3c64xx: Correct spi bus clock hookups
+In-Reply-To: <1785136.Xbc2LARBDy@flatron>
+References: <1381839982-3026-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
+ <1785136.Xbc2LARBDy@flatron>
+Message-ID: <20131016081035.GD20219@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 11:12:00PM +0200, Arokux X wrote:
-> On Mon, Oct 14, 2013 at 9:23 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The Allwinner A31 has an IP maintaining a few other IPs in the SoC in
-> > reset by default. Among these IPs are the High Speed Timers, hence why
-> > we can't use the regular driver construct, and need to call the
-> > registering function directly during machine initialisation.
++ samsung soc mailing list
+
+On Wed, Oct 16, 2013 at 12:52:42AM +0200, Tomasz Figa wrote:
+> Hi Charles,
 > 
-> Maybe it is better to have a more generic commit message here, since
-> this driver will be used for all the sunxi.
+> On Tuesday 15 of October 2013 13:26:22 Charles Keepax wrote:
+> >  	ALIAS(SCLK_MMC1, "s3c-sdhci.1", "mmc_busclk.2"),
+> >  	ALIAS(SCLK_MMC0, "s3c-sdhci.0", "mmc_busclk.2"),
+> > -	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi-bus"),
+> > -	ALIAS(SCLK_SPI0, "s3c6410-spi.0", "spi-bus"),
+> > +	ALIAS(PCLK_SPI1, "s3c6410-spi.1", "spi_busclk0"),
+> > +	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi_busclk1"),
+> > +	ALIAS(SCLK_SPI1_48, "s3c6410-spi.1", "spi_busclk2"),
+> 
+> ...according to the documentation, the order is different. The SPI_CLKSEL 
+> field of CLK_CFG register of the SPI block can have following values:
+> 0 - PCLK (aka PCLK_SPIx)
+> 1 - USBCLK (aka SCLK_SPIx_48)
+> 2 - Epll clock (aka SCLK_SPIx)
+> 
+> The index after spi_busclk corresponds to the value written to SPI_CLKSEL 
+> field, so your patch should be adjusted accordingly.
 
-Right. I'll change it.
+Hmm... will probably need to test this to see what happens the
+old clock setup was this:
 
-Thanks!
-Maxime
+	CLKDEV_INIT(NULL, "spi_busclk0", &clk_p),
+	CLKDEV_INIT("s3c6410-spi.0", "spi_busclk1", &clk_sclk_spi0.clk),
+	CLKDEV_INIT("s3c6410-spi.0", "spi_busclk2", &clk_48m_spi0),
+	CLKDEV_INIT("s3c6410-spi.1", "spi_busclk1", &clk_sclk_spi1.clk),
+	CLKDEV_INIT("s3c6410-spi.1", "spi_busclk2", &clk_48m_spi1),
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131016/d8f86f7e/attachment.sig>
+Which appears to differ from the documentation, that said though
+I would wager that only the first of those has really had much
+testing.
+
+> 
+> By the way, the USBCLK case is a bit strange, because it requires USB 
+> signal mask to be unmasked, which in turn needs USB PHY to be enabled, as 
+> otherwise some "unwanted leakage" can occur. Having to enable USB just to 
+> use SPI seems rather inconvenient (especially in terms of power 
+> consumption), so the usability of this clock is rather limited and it 
+> might be better not to let the driver know about it.
+
+Seems reasonable to drop this for now and it could be added back
+in if someone specifically needed to use it.
+
+Thanks,
+Charles
