@@ -1,51 +1,71 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed, 16 Oct 2013 09:08:17 +0800
-Subject: [PATCH v10 2/7] ARM: hi3xxx: add board support with device tree
-In-Reply-To: <201310152006.38824.arnd@arndb.de>
-References: <1381828577-27998-1-git-send-email-haojian.zhuang@linaro.org>
- <201310151500.36959.arnd@arndb.de>
- <CAD6h2NR6umVpgYM2t2pwrwP8-Jk-e3Kfng-7oymPJ44cNmuk-w@mail.gmail.com>
- <201310152006.38824.arnd@arndb.de>
-Message-ID: <CAD6h2NRvCdfNef_q=6JyNvv2ZsObmwmh=wgcKu=j6RokE3-sFg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 15 Oct 2013 18:13:20 -0700
+Subject: [PATCH] KVM: ARM: Update comments for kvm_handle_wfi
+In-Reply-To: <1381253894-18114-2-git-send-email-marc.zyngier@arm.com>
+References: <1381253894-18114-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1381886000-11140-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 October 2013 02:06, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 15 October 2013, Haojian Zhuang wrote:
->> On 15 October 2013 21:00, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Tuesday 15 October 2013, Haojian Zhuang wrote:
->> >>
->> >> Add board support with device tree for Hisilicon Hi3620 SoC platform.
->> >>
->> >> Changelog:
->> >> v10:
->> >> 1. Add .map_io() & debug_ll_io_init() back. Since debug_ll_io_init() is
->> >> only called if .map_io() isn't assigned. Use .map_io() to setup static
->> >> IO mapping that is used in clock driver.
->> >>
->> >
->> > This seems like a step in the wrong direction. Why would you want to use
->> > a static I/O mapping in the clock driver?
->> >
->>
->> Because Stephen & Kevin asked me to use unit address in DTS file. They
->> also require me to use reg property to present real hardware address
->> in DTS file.
->
-> Ah, so it's just an optimization, not required to make the clock driver
-> work, I misread that. Can you add a comment near the hi3620_io_desc
-> definition and verify that it still works without it?
->
-Yes, it can work without the IO table. The IO table could save a lot
-of virtual address space for IO mapping.
+Update comments to reflect what is really going on and add the TWE bit
+to the comments in kvm_arm.h.
 
-> I would also recommend to extend that static mapping to the entire
-> 0xfc800000-0xfcbfffff range, or whatever you can use to get the most
-> I/O devices with a small number of TLB entries.
->
->         Arnd
+Also renames the function to kvm_handle_wfx like is done on arm64 for
+consistency and uber-correctness.
 
-OK. I'll extend the static mapping to the entire range.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/include/asm/kvm_arm.h |    1 +
+ arch/arm/kvm/handle_exit.c     |   14 ++++++++------
+ 2 files changed, 9 insertions(+), 6 deletions(-)
 
-Regards
-Haojian
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index fe395b7..1d3153c 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -57,6 +57,7 @@
+  * TSC:		Trap SMC
+  * TSW:		Trap cache operations by set/way
+  * TWI:		Trap WFI
++ * TWE:		Trap WFE
+  * TIDCP:	Trap L2CTLR/L2ECTLR
+  * BSU_IS:	Upgrade barriers to the inner shareable domain
+  * FB:		Force broadcast of all maintainance operations
+diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+index c4c496f..a920790 100644
+--- a/arch/arm/kvm/handle_exit.c
++++ b/arch/arm/kvm/handle_exit.c
+@@ -73,15 +73,17 @@ static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ }
+ 
+ /**
+- * kvm_handle_wfi - handle a wait-for-interrupts instruction executed by a guest
++ * kvm_handle_wfx - handle a WFI or WFE instructions trapped in guests
+  * @vcpu:	the vcpu pointer
+  * @run:	the kvm_run structure pointer
+  *
+- * Simply sets the wait_for_interrupts flag on the vcpu structure, which will
+- * halt execution of world-switches and schedule other host processes until
+- * there is an incoming IRQ or FIQ to the VM.
++ * WFE: Yield the CPU and come back to this vcpu when the scheduler
++ * decides to.
++ * WFI: Simply call kvm_vcpu_block(), which will halt execution of
++ * world-switches and schedule other host processes until there is an
++ * incoming IRQ or FIQ to the VM.
+  */
+-static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	trace_kvm_wfi(*vcpu_pc(vcpu));
+ 	if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE)
+@@ -93,7 +95,7 @@ static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ }
+ 
+ static exit_handle_fn arm_exit_handlers[] = {
+-	[HSR_EC_WFI]		= kvm_handle_wfi,
++	[HSR_EC_WFI]		= kvm_handle_wfx,
+ 	[HSR_EC_CP15_32]	= kvm_handle_cp15_32,
+ 	[HSR_EC_CP15_64]	= kvm_handle_cp15_64,
+ 	[HSR_EC_CP14_MR]	= kvm_handle_cp14_access,
+-- 
+1.7.10.4
