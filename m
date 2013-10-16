@@ -1,49 +1,183 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 16 Oct 2013 14:36:32 +0100
-Subject: [PATCH 0/2] Versatile Express config update for 3.13
-Message-ID: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+Date: Wed, 16 Oct 2013 14:36:34 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Enable platform-specific options in
+ defconfig
+In-Reply-To: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+References: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1381930594-1701-3-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+This patch enables all drivers and alike to make defconfig-ed
+kernels use Versatile Express specific features, like power
+management services (PSCI, MCPM and cpuidle with drivers for
+DCCSB on Fast Models and SPC on TC2), CMA for frame buffer
+allocation, all virtio device drivers (for QEMU, KVM tools
+and Fast Models), MTD physmap drivers with squashfs and UBIFS
+for flash, I2C master, regulator and hwmon drivers and
+LEDs support with most useful triggers. The maximum
+amount of CPUs has been increased to 8 to facilitate
+big.Little systems.
 
-This micro-series updates the Versatile Express defconfig in two stages:
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/configs/vexpress_defconfig | 65 ++++++++++++++++++++++++-------------
+ 1 file changed, 42 insertions(+), 23 deletions(-)
 
-1. Makes the defconfig-ed kernels actually work on real boards and QEMU.
-2. Enables all platform-specific drivers and features.
-
-The first patch definitely should go in, as it is a de-facto bug fix.
-The second has been suggested to increase build coverage.
-
-I've tried to keep the changes to minimum. The patches can be also
-pulled as described below.
-
-Cheers!
-
-Pawel
-
-
-The following changes since commit 61e6cfa80de5760bbe406f4e815b7739205754d2:
-
-  Linux 3.12-rc5 (2013-10-13 15:41:28 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/defconfig-for-v3.13
-
-for you to fetch changes up to 04650cf989f418b7c28f94d63c0c174d34e0a9ad:
-
-  ARM: vexpress: Enable platform-specific options in defconfig (2013-10-16 14:23:25 +0100)
-
-----------------------------------------------------------------
-Fathi Boudra (1):
-  ARM: vexpress: Make defconfig work again
-
-Pawel Moll (1):
-  ARM: vexpress: Enable platform-specific options in defconfig
-
- arch/arm/configs/vexpress_defconfig | 72 +++++++++++++++++++++++--------------
- 1 file changed, 46 insertions(+), 26 deletions(-)
-
+diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+index 6d20bc1..f2535e3 100644
+--- a/arch/arm/configs/vexpress_defconfig
++++ b/arch/arm/configs/vexpress_defconfig
+@@ -1,4 +1,3 @@
+-CONFIG_EXPERIMENTAL=y
+ # CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_IKCONFIG=y
+@@ -8,11 +7,9 @@ CONFIG_CGROUPS=y
+ CONFIG_CPUSETS=y
+ # CONFIG_UTS_NS is not set
+ # CONFIG_IPC_NS is not set
+-# CONFIG_USER_NS is not set
+ # CONFIG_PID_NS is not set
+ # CONFIG_NET_NS is not set
+ CONFIG_BLK_DEV_INITRD=y
+-# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+ CONFIG_MODULES=y
+@@ -23,14 +20,22 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_VEXPRESS=y
+ CONFIG_ARCH_VEXPRESS_CA9X4=y
++CONFIG_ARCH_VEXPRESS_DCSCB=y
++CONFIG_ARCH_VEXPRESS_TC2_PM=y
+ # CONFIG_SWP_EMULATE is not set
+ CONFIG_SMP=y
++CONFIG_HAVE_ARM_ARCH_TIMER=y
++CONFIG_MCPM=y
+ CONFIG_VMSPLIT_2G=y
+-CONFIG_HOTPLUG_CPU=y
++CONFIG_NR_CPUS=8
++CONFIG_ARM_PSCI=y
+ CONFIG_AEABI=y
++CONFIG_CMA=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="console=ttyAMA0"
++CONFIG_CPU_IDLE=y
++CONFIG_CPU_IDLE_BIG_LITTLE=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+@@ -44,39 +49,46 @@ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_INET_LRO is not set
+ # CONFIG_IPV6 is not set
+ # CONFIG_WIRELESS is not set
++CONFIG_NET_9P=y
++CONFIG_NET_9P_VIRTIO=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+-CONFIG_MTD_ARM_INTEGRATOR=y
+-CONFIG_MISC_DEVICES=y
++CONFIG_MTD_RAM=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_UBI=y
++CONFIG_PROC_DEVICETREE=y
++CONFIG_VIRTIO_BLK=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+-# CONFIG_SCSI_LOWLEVEL is not set
++CONFIG_SCSI_VIRTIO=y
+ CONFIG_ATA=y
+ # CONFIG_SATA_PMP is not set
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
++CONFIG_VIRTIO_NET=y
++CONFIG_SMC91X=y
+ CONFIG_SMSC911X=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+ # CONFIG_WLAN is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_SERIO_SERPORT is not set
+ CONFIG_SERIO_AMBAKMI=y
++CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-CONFIG_LEGACY_PTY_COUNT=16
+-# CONFIG_HW_RANDOM is not set
+-# CONFIG_HWMON is not set
++CONFIG_VIRTIO_CONSOLE=y
++CONFIG_HW_RANDOM=y
++CONFIG_HW_RANDOM_VIRTIO=y
++CONFIG_I2C=y
++CONFIG_I2C_VERSATILE=y
++CONFIG_SENSORS_VEXPRESS=y
+ CONFIG_REGULATOR=y
++CONFIG_REGULATOR_VEXPRESS=y
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+@@ -105,14 +117,22 @@ CONFIG_HID_THRUSTMASTER=y
+ CONFIG_HID_ZEROPLUS=y
+ CONFIG_USB=y
+ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+-# CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_MON=y
+ CONFIG_USB_ISP1760_HCD=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
+ CONFIG_MMC_ARMMMCI=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PL031=y
++CONFIG_VIRTIO_BALLOON=y
++CONFIG_VIRTIO_MMIO=y
++CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+@@ -121,21 +141,20 @@ CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
++CONFIG_UBIFS_FS=y
+ CONFIG_CRAMFS=y
++CONFIG_SQUASHFS=y
++CONFIG_SQUASHFS_LZO=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+-# CONFIG_RPCSEC_GSS_KRB5 is not set
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+-CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DETECT_HUNG_TASK=y
+ # CONFIG_SCHED_DEBUG is not set
+-CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+ # CONFIG_CRYPTO_HW is not set
 -- 
 1.8.1.2
