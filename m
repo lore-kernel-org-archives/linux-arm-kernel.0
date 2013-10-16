@@ -1,47 +1,48 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 16 Oct 2013 18:53:36 +0300
-Subject: pull request for tegra clocks (resend with some CCs added this
- time)
-In-Reply-To: <20131016153550.GA22451@ulmo.nvidia.com>
-References: <20131015153620.GA12721@tbergstrom-lnx.Nvidia.com>
- <20131016153550.GA22451@ulmo.nvidia.com>
-Message-ID: <20131016155336.GN5643@tbergstrom-lnx.Nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 16 Oct 2013 10:56:09 -0500
+Subject: [PATCH] ARM: highbank: cpuidle: convert to platform driver
+In-Reply-To: <525E9652.6060103@linaro.org>
+References: <1380278865-27457-1-git-send-email-daniel.lezcano@linaro.org>
+ <CAL_Jsq+PoqWf5oAQosPg8N0WWHm-7c+JgDzpGD8OfMyKtvPJ0w@mail.gmail.com>
+ <52457F21.3030502@linaro.org> <525E9652.6060103@linaro.org>
+Message-ID: <CAL_Jsq+8ykh6xcwbuS+5gCZHv6zEKU4yEW_us+w_1+BoTOuisQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 05:35:51PM +0200, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Tue, Oct 15, 2013 at 06:36:20PM +0300, Peter De Schrijver wrote:
-> > The following changes since commit a0cf1abc25ac197dd97b857c0f6341066a8cb1cf:
-> > 
-> >   Add linux-next specific files for 20130927 (2013-09-27 18:48:50 +1000)
-> > 
-> > are available in the git repository at:
-> >   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-patches-0
-> > 
-> > Andrew Chew (1):
-> >       clk: tegra: Set the clk parent of host1x to pll_p
-> > 
-> > Mark Zhang (3):
-> >       clk: tegra: Correct sbc mux width & parent
-> >       clk: tegra: Fix vde/2d/3d clock src offset
-> >       clk: tegra: Set the clock parent of gr2d/gr3d to pll_c2
-> > 
-> > Peter De Schrijver (3):
-> >       ARM: tegra114: add missing clocks to binding
-> >       clk: tegra: replace enum tegra114_clk by binding header
-> >       clk: tegra: PLLE spread spectrum control
-> > 
-> > Thierry Reding (1):
-> >       clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d
-> 
-> I think this pull request is missing the initialization of the display
-> controller clocks (TEGRA114_CLK_DISP1 and TEGRA114_CLK_DISP2) from
-> Mikko's Dalmore HDMI series.
+On Wed, Oct 16, 2013 at 8:36 AM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 09/27/2013 02:50 PM, Daniel Lezcano wrote:
+>>
+>> On 09/27/2013 02:29 PM, Rob Herring wrote:
+>>>
+>>> On Fri, Sep 27, 2013 at 5:47 AM, Daniel Lezcano
+>>> <daniel.lezcano@linaro.org> wrote:
+>>>>
+>>>> As the ux500 and the kirkwood driver, make the calxeda driver a
+>>>> platform driver
+>>>>
+>>>> [Compiled only]
+>>>>
+>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>> ---
+>>>>   arch/arm/mach-highbank/highbank.c |    8 ++++++++
+>>>>   drivers/cpuidle/cpuidle-calxeda.c |   18 ++++++++++++------
+>>>>   2 files changed, 20 insertions(+), 6 deletions(-)
+>>>
+>>>
+>>> Looks fine to me, but this will conflict with my series. Perhaps I can
+>>> pick this up as part of that.
+>>
+>>
+>> Yes I agree, it makes sense.
+>
+>
+> Hi Rob,
+>
+> were you able to take the patch ? Where is the higbank git tree where I can
+> see these patches ? I looked at git://sources.calxeda.com/kernel/linux.git
+> #fox-next but they don't appear, is it the right one ?
 
-I don't think they were part of the original request to be included?
+I still need to send this series to arm-soc. I plan to do so this week.
 
-Cheers,
-
-Peter.
+Rob
