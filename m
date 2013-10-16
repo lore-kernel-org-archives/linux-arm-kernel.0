@@ -1,52 +1,34 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 15 Oct 2013 17:49:35 -0700
-Subject: [PATCH 7/9] KVM: ARM: fix the size of TTBCR_{T0SZ,T1SZ} masks
+Date: Tue, 15 Oct 2013 17:49:37 -0700
+Subject: [PATCH 9/9] KVM: ARM: Remove non-ASCII space characters
 In-Reply-To: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
 References: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1381884577-24747-8-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1381884577-24747-10-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonathan Austin <jonathan.austin@arm.com>
+Some strange character leaped into the documentation, which makes
+git-send-email behave quite strangely.  Get rid of this before it bites
+anyone else.
 
-The T{0,1}SZ fields of TTBCR are 3 bits wide when using the long descriptor
-format. Likewise, the T0SZ field of the HTCR is 3-bits. KVM currently
-defines TTBCR_T{0,1}SZ as 3, not 7.
-
-The T0SZ mask is used to calculate the value for the HTCR, both to pick out
-TTBCR.T0SZ and mask off the equivalent field in the HTCR during
-read-modify-write. The incorrect mask size causes the (UNKNOWN) reset value
-of HTCR.T0SZ to leak in to the calculated HTCR value. Linux will hang when
-initializing KVM if HTCR's reset value has bit 2 set (sometimes the case on
-A7/TC2)
-
-Fixing T0SZ allows A7 cores to boot and T1SZ is also fixed for completeness.
-
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_arm.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/virtual/kvm/api.txt |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index 64e9696..d556f03 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -95,12 +95,12 @@
- #define TTBCR_IRGN1	(3 << 24)
- #define TTBCR_EPD1	(1 << 23)
- #define TTBCR_A1	(1 << 22)
--#define TTBCR_T1SZ	(3 << 16)
-+#define TTBCR_T1SZ	(7 << 16)
- #define TTBCR_SH0	(3 << 12)
- #define TTBCR_ORGN0	(3 << 10)
- #define TTBCR_IRGN0	(3 << 8)
- #define TTBCR_EPD0	(1 << 7)
--#define TTBCR_T0SZ	3
-+#define TTBCR_T0SZ	(7 << 0)
- #define HTCR_MASK	(TTBCR_T0SZ | TTBCR_IRGN0 | TTBCR_ORGN0 | TTBCR_SH0)
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 076b849..a89a5ee 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2312,7 +2312,7 @@ Type: vm ioctl
+ Parameters: struct struct kvm_vcpu_init (out)
+ Returns: 0 on success; -1 on error
+ Errors:
+-  ENODEV:    no preferred target available for the host
++  ENODEV:    no preferred target available for the host
  
- /* Hyp System Trap Register */
+ This queries KVM for preferred CPU target type which can be emulated
+ by KVM on underlying host.
 -- 
 1.7.10.4
