@@ -1,82 +1,55 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 16 Oct 2013 00:40:08 -0700
-Subject: [PATCH v3 06/12] clk: msm: Add support for phase locked loops (PLLs)
+Date: Wed, 16 Oct 2013 00:40:11 -0700
+Subject: [PATCH v3 09/12] clk: msm: Add reset controller support
 In-Reply-To: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
 References: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1381909214-12693-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1381909214-12693-10-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for MSM's PLLs (phase locked loops). This is
-sufficient enough to be able to determine the rate the PLL is
-running at. We can add rate setting support later when it's
-needed.
+Reset controllers and clock controllers are combined into one IP
+block on qualcomm chipsets. Usually a reset signal is
+associated with each clock branch but sometimes a reset signal is
+associated with a handful of clocks. Either way the register
+interface is the same; set a bit to assert a reset and clear a
+bit to deassert a reset. Add support for these types of resets
+signals.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/Kconfig       |   2 +
- drivers/clk/Makefile      |   1 +
- drivers/clk/msm/Kconfig   |   5 ++
- drivers/clk/msm/Makefile  |   3 +
- drivers/clk/msm/clk-pll.c | 145 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/msm/clk-pll.h |  47 +++++++++++++++
- 6 files changed, 203 insertions(+)
- create mode 100644 drivers/clk/msm/Kconfig
- create mode 100644 drivers/clk/msm/Makefile
- create mode 100644 drivers/clk/msm/clk-pll.c
- create mode 100644 drivers/clk/msm/clk-pll.h
+ drivers/clk/msm/Kconfig  |  1 +
+ drivers/clk/msm/Makefile |  1 +
+ drivers/clk/msm/reset.c  | 63 ++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/msm/reset.h  | 37 ++++++++++++++++++++++++++++
+ 4 files changed, 102 insertions(+)
+ create mode 100644 drivers/clk/msm/reset.c
+ create mode 100644 drivers/clk/msm/reset.h
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 279407a..efb7606 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -93,6 +93,8 @@ config CLK_PPC_CORENET
- 	  This adds the clock driver support for Freescale PowerPC corenet
- 	  platforms using common clock framework.
- 
-+source "drivers/clk/msm/Kconfig"
-+
- endmenu
- 
- source "drivers/clk/mvebu/Kconfig"
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 7b11106..6838b07 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -20,6 +20,7 @@ obj-$(CONFIG_PLAT_SPEAR)	+= spear/
- obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
- obj-$(CONFIG_COMMON_CLK_VERSATILE) += versatile/
- obj-$(CONFIG_ARCH_SIRF)		+= clk-prima2.o
-+obj-$(CONFIG_COMMON_CLK_MSM)	+= msm/
- obj-$(CONFIG_PLAT_ORION)	+= mvebu/
- ifeq ($(CONFIG_COMMON_CLK), y)
- obj-$(CONFIG_ARCH_MMP)		+= mmp/
 diff --git a/drivers/clk/msm/Kconfig b/drivers/clk/msm/Kconfig
-new file mode 100644
-index 0000000..91558ce
---- /dev/null
+index 91558ce..5229c7e 100644
+--- a/drivers/clk/msm/Kconfig
 +++ b/drivers/clk/msm/Kconfig
-@@ -0,0 +1,5 @@
-+config COMMON_CLK_MSM
-+	tristate "Support for Qualcomm's MSM designs"
-+	depends on OF
-+	select REGMAP_MMIO
-+
+@@ -2,4 +2,5 @@ config COMMON_CLK_MSM
+ 	tristate "Support for Qualcomm's MSM designs"
+ 	depends on OF
+ 	select REGMAP_MMIO
++	select RESET_CONTROLLER
+ 
 diff --git a/drivers/clk/msm/Makefile b/drivers/clk/msm/Makefile
-new file mode 100644
-index 0000000..16b750f
---- /dev/null
+index e1cee29..8e4c799 100644
+--- a/drivers/clk/msm/Makefile
 +++ b/drivers/clk/msm/Makefile
-@@ -0,0 +1,3 @@
-+obj-$(CONFIG_COMMON_CLK_MSM) += clk-msm.o
-+
-+clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-pll.o
-diff --git a/drivers/clk/msm/clk-pll.c b/drivers/clk/msm/clk-pll.c
+@@ -4,3 +4,4 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-pll.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
++clk-msm-$(CONFIG_COMMON_CLK_MSM) += reset.o
+diff --git a/drivers/clk/msm/reset.c b/drivers/clk/msm/reset.c
 new file mode 100644
-index 0000000..9070350
+index 0000000..b875dad
 --- /dev/null
-+++ b/drivers/clk/msm/clk-pll.c
-@@ -0,0 +1,145 @@
++++ b/drivers/clk/msm/reset.c
+@@ -0,0 +1,63 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -90,144 +63,62 @@ index 0000000..9070350
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/kernel.h>
 +#include <linux/bitops.h>
-+#include <linux/err.h>
-+#include <linux/bug.h>
-+#include <linux/delay.h>
 +#include <linux/export.h>
-+#include <linux/clk-provider.h>
 +#include <linux/regmap.h>
++#include <linux/reset-controller.h>
++#include <linux/delay.h>
 +
-+#include <asm/div64.h>
++#include "reset.h"
 +
-+#include "clk-pll.h"
-+
-+#define PLL_OUTCTRL	BIT(0)
-+#define PLL_BYPASSNL	BIT(1)
-+#define PLL_RESET_N	BIT(2)
-+
-+static int clk_pll_enable(struct clk_hw *hw)
++static int msm_reset(struct reset_controller_dev *rcdev, unsigned long id)
 +{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	int ret;
-+
-+	/* Disable PLL bypass mode. */
-+	ret = regmap_update_bits(hw->regmap, pll->mode_reg, PLL_BYPASSNL,
-+				 PLL_BYPASSNL);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * H/W requires a 5us delay between disabling the bypass and
-+	 * de-asserting the reset. Delay 10us just to be safe.
-+	 */
-+	udelay(10);
-+
-+	/* De-assert active-low PLL reset. */
-+	ret = regmap_update_bits(hw->regmap, pll->mode_reg, PLL_RESET_N,
-+				 PLL_RESET_N);
-+	if (ret)
-+		return ret;
-+
-+	/* Wait until PLL is locked. */
-+	udelay(50);
-+
-+	/* Enable PLL output. */
-+	ret = regmap_update_bits(hw->regmap, pll->mode_reg, PLL_OUTCTRL,
-+				 PLL_OUTCTRL);
-+	if (ret)
-+		return ret;
-+
++	rcdev->ops->assert(rcdev, id);
++	udelay(1);
++	rcdev->ops->deassert(rcdev, id);
 +	return 0;
 +}
 +
-+static void clk_pll_disable(struct clk_hw *hw)
++static int
++msm_reset_assert(struct reset_controller_dev *rcdev, unsigned long id)
 +{
-+	struct clk_pll *pll = to_clk_pll(hw);
++	struct msm_reset_controller *rst;
++	const struct msm_reset_map *map;
 +	u32 mask;
 +
-+	mask = PLL_OUTCTRL | PLL_RESET_N | PLL_BYPASSNL;
-+	regmap_update_bits(hw->regmap, pll->mode_reg, mask, 0);
++	rst = to_msm_reset_controller(rcdev);
++	map = &rst->reset_map[id];
++	mask = BIT(map->bit);
++
++	return regmap_update_bits(rst->regmap, map->reg, mask, mask);
 +}
 +
-+static unsigned long
-+clk_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++static int
++msm_reset_deassert(struct reset_controller_dev *rcdev, unsigned long id)
 +{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	u32 l, m, n;
-+	unsigned long rate;
-+	u64 tmp;
++	struct msm_reset_controller *rst;
++	const struct msm_reset_map *map;
++	u32 mask;
 +
-+	regmap_read(hw->regmap, pll->l_reg, &l);
-+	regmap_read(hw->regmap, pll->m_reg, &m);
-+	regmap_read(hw->regmap, pll->n_reg, &n);
++	rst = to_msm_reset_controller(rcdev);
++	map = &rst->reset_map[id];
++	mask = BIT(map->bit);
 +
-+	l &= 0x3ff;
-+	m &= 0x7ffff;
-+	n &= 0x7ffff;
-+
-+	rate = parent_rate * l;
-+	if (n) {
-+		tmp = parent_rate;
-+		tmp *= m;
-+		do_div(tmp, n);
-+		rate += tmp;
-+	}
-+	return rate;
++	return regmap_update_bits(rst->regmap, map->reg, mask, 0);
 +}
 +
-+const struct clk_ops clk_pll_ops = {
-+	.enable = clk_pll_enable,
-+	.disable = clk_pll_disable,
-+	.recalc_rate = clk_pll_recalc_rate,
++struct reset_control_ops msm_reset_ops = {
++	.reset = msm_reset,
++	.assert = msm_reset_assert,
++	.deassert = msm_reset_deassert,
 +};
-+EXPORT_SYMBOL_GPL(clk_pll_ops);
-+
-+static int wait_for_pll(struct clk_pll *pll)
-+{
-+	u32 val;
-+	int count;
-+	int ret;
-+	const char *name = __clk_get_name(pll->hw.clk);
-+
-+	/* Wait for pll to enable. */
-+	for (count = 200; count > 0; count--) {
-+		ret = regmap_read(pll->hw.regmap, pll->status_reg, &val);
-+		if (ret)
-+			return ret;
-+		if (val & BIT(pll->status_bit))
-+			return 0;
-+		udelay(1);
-+	}
-+
-+	WARN(1, "%s didn't enable after voting for it!\n", name);
-+	return -ETIMEDOUT;
-+}
-+
-+static int clk_pll_vote_enable(struct clk_hw *hw)
-+{
-+	int ret;
-+	struct clk_pll *p = to_clk_pll(__clk_get_hw(__clk_get_parent(hw->clk)));
-+
-+	ret = clk_enable_regmap(hw);
-+	if (ret)
-+		return ret;
-+
-+	return wait_for_pll(p);
-+}
-+
-+const struct clk_ops clk_pll_vote_ops = {
-+	.enable = clk_pll_vote_enable,
-+	.disable = clk_disable_regmap,
-+};
-+EXPORT_SYMBOL_GPL(clk_pll_vote_ops);
-diff --git a/drivers/clk/msm/clk-pll.h b/drivers/clk/msm/clk-pll.h
++EXPORT_SYMBOL_GPL(msm_reset_ops);
+diff --git a/drivers/clk/msm/reset.h b/drivers/clk/msm/reset.h
 new file mode 100644
-index 0000000..9795aa8
+index 0000000..09de265
 --- /dev/null
-+++ b/drivers/clk/msm/clk-pll.h
-@@ -0,0 +1,47 @@
++++ b/drivers/clk/msm/reset.h
+@@ -0,0 +1,37 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -241,38 +132,28 @@ index 0000000..9795aa8
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef __MSM_CLK_PLL_H__
-+#define __MSM_CLK_PLL_H__
++#ifndef __MSM_CLK_RESET_H__
++#define __MSM_CLK_RESET_H__
 +
-+#include <linux/clk-provider.h>
++#include <linux/reset-controller.h>
 +
-+/**
-+ * struct clk_pll - phase locked loop (PLL)
-+ * @l_reg: L register
-+ * @m_reg: M register
-+ * @n_reg: N register
-+ * @config_reg: config register
-+ * @mode_reg: mode register
-+ * @status_reg: status register
-+ * @status_bit: ANDed with @status_reg to determine if PLL is enabled
-+ * @hw: handle between common and hardware-specific interfaces
-+ */
-+struct clk_pll {
-+	u32	l_reg;
-+	u32	m_reg;
-+	u32	n_reg;
-+	u32	config_reg;
-+	u32	mode_reg;
-+	u32	status_reg;
-+	u8	status_bit;
-+
-+	struct clk_hw	hw;
++struct msm_reset_map {
++	unsigned int reg;
++	u8 bit;
 +};
 +
-+extern const struct clk_ops clk_pll_ops;
-+extern const struct clk_ops clk_pll_vote_ops;
++struct regmap;
 +
-+#define to_clk_pll(_hw) container_of(_hw, struct clk_pll, hw)
++struct msm_reset_controller {
++	const struct msm_reset_map *reset_map;
++	struct regmap *regmap;
++	struct reset_controller_dev rcdev;
++};
++
++#define to_msm_reset_controller(r) \
++	container_of(r, struct msm_reset_controller, rcdev);
++
++extern struct reset_control_ops msm_reset_ops;
 +
 +#endif
 -- 
