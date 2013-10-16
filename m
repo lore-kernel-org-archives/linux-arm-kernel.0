@@ -1,68 +1,65 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 15 Oct 2013 17:49:31 -0700
-Subject: [PATCH 3/9] ARM64: KVM: Implement kvm_vcpu_preferred_target() function
+Date: Tue, 15 Oct 2013 17:49:32 -0700
+Subject: [PATCH 4/9] ARM/ARM64: KVM: Implement KVM_ARM_PREFERRED_TARGET ioctl
 In-Reply-To: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
 References: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1381884577-24747-4-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1381884577-24747-5-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Anup Patel <anup.patel@linaro.org>
 
-This patch implements kvm_vcpu_preferred_target() function for
-KVM ARM64 which will help us implement KVM_ARM_PREFERRED_TARGET
-ioctl for user space.
+For implementing CPU=host, we need a mechanism for querying
+preferred VCPU target type on underlying Host.
+
+This patch implements KVM_ARM_PREFERRED_TARGET vm ioctl which
+returns struct kvm_vcpu_init instance containing information
+about preferred VCPU target type and target specific features
+available for it.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_host.h |    1 +
- arch/arm64/kvm/guest.c            |   20 ++++++++++++++++++++
- 2 files changed, 21 insertions(+)
+ arch/arm/kvm/arm.c       |   13 +++++++++++++
+ include/uapi/linux/kvm.h |    1 +
+ 2 files changed, 14 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 0859a4d..4cc8c70 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -151,6 +151,7 @@ struct kvm_vcpu_stat {
- struct kvm_vcpu_init;
- int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
- 			const struct kvm_vcpu_init *init);
-+int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
- int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
- struct kvm_one_reg;
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 2c3ff67..3f0731e 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -248,6 +248,26 @@ int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
- 	return kvm_reset_vcpu(vcpu);
- }
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 9c697db..cc5adb9 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -797,6 +797,19 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 			return -EFAULT;
+ 		return kvm_vm_ioctl_set_device_addr(kvm, &dev_addr);
+ 	}
++	case KVM_ARM_PREFERRED_TARGET: {
++		int err;
++		struct kvm_vcpu_init init;
++
++		err = kvm_vcpu_preferred_target(&init);
++		if (err)
++			return err;
++
++		if (copy_to_user(argp, &init, sizeof(init)))
++			return -EFAULT;
++
++		return 0;
++	}
+ 	default:
+ 		return -EINVAL;
+ 	}
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 99c2533..e32e776 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -1012,6 +1012,7 @@ struct kvm_s390_ucas_mapping {
+ /* VM is being stopped by host */
+ #define KVM_KVMCLOCK_CTRL	  _IO(KVMIO,   0xad)
+ #define KVM_ARM_VCPU_INIT	  _IOW(KVMIO,  0xae, struct kvm_vcpu_init)
++#define KVM_ARM_PREFERRED_TARGET  _IOR(KVMIO,  0xaf, struct kvm_vcpu_init)
+ #define KVM_GET_REG_LIST	  _IOWR(KVMIO, 0xb0, struct kvm_reg_list)
  
-+int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
-+{
-+	int target = kvm_target_cpu();
-+
-+	if (target < 0)
-+		return -ENODEV;
-+
-+	memset(init, 0, sizeof(*init));
-+
-+	/*
-+	 * For now, we don't return any features.
-+	 * In future, we might use features to return target
-+	 * specific features available for the preferred
-+	 * target type.
-+	 */
-+	init->target = (__u32)target;
-+
-+	return 0;
-+}
-+
- int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
- {
- 	return -EINVAL;
+ #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
 -- 
 1.7.10.4
