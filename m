@@ -1,40 +1,81 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 16 Oct 2013 21:58:20 +0530
-Subject: [PATCH 02/28] dmaengine: amba-pl08x: use DMA_COMPLETE for dma
- completion status
+Date: Wed, 16 Oct 2013 21:58:19 +0530
+Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion status
 In-Reply-To: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
 References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
-Message-ID: <1381940926-25564-3-git-send-email-vinod.koul@intel.com>
+Message-ID: <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Vinod Koul <vinod.koul@intel.com>
-CC: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/dma/amba-pl08x.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+the DMA_SUCCESS is a misnomer as dmaengine indicates the transfer is complete and
+gives no guarantee of the transfer success. Hence we should use DMA_COMPLTE
+instead of DMA_SUCCESS
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 9b50257..4ee6533 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1252,7 +1252,7 @@ static enum dma_status pl08x_dma_tx_status(struct dma_chan *chan,
- 	size_t bytes = 0;
+Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+---
+ drivers/dma/dmaengine.c   |    2 +-
+ include/linux/dmaengine.h |   12 ++++++------
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 9162ac8..81d8765 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -1062,7 +1062,7 @@ dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx)
+ 	unsigned long dma_sync_wait_timeout = jiffies + msecs_to_jiffies(5000);
  
- 	ret = dma_cookie_status(chan, cookie, txstate);
--	if (ret == DMA_SUCCESS)
-+	if (ret == DMA_COMPLETE)
- 		return ret;
+ 	if (!tx)
+-		return DMA_SUCCESS;
++		return DMA_COMPLETE;
  
- 	/*
-@@ -1267,7 +1267,7 @@ static enum dma_status pl08x_dma_tx_status(struct dma_chan *chan,
+ 	while (tx->cookie == -EBUSY) {
+ 		if (time_after_eq(jiffies, dma_sync_wait_timeout)) {
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 0bc7275..4b460a6 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -45,13 +45,13 @@ static inline int dma_submit_error(dma_cookie_t cookie)
  
- 	spin_lock_irqsave(&plchan->vc.lock, flags);
- 	ret = dma_cookie_status(chan, cookie, txstate);
--	if (ret != DMA_SUCCESS) {
-+	if (ret != DMA_COMPLETE) {
- 		vd = vchan_find_desc(&plchan->vc, cookie);
- 		if (vd) {
- 			/* On the issued list, so hasn't been processed yet */
+ /**
+  * enum dma_status - DMA transaction status
+- * @DMA_SUCCESS: transaction completed successfully
++ * @DMA_COMPLETE: transaction completed
+  * @DMA_IN_PROGRESS: transaction not yet processed
+  * @DMA_PAUSED: transaction is paused
+  * @DMA_ERROR: transaction failed
+  */
+ enum dma_status {
+-	DMA_SUCCESS,
++	DMA_COMPLETE,
+ 	DMA_IN_PROGRESS,
+ 	DMA_PAUSED,
+ 	DMA_ERROR,
+@@ -979,10 +979,10 @@ static inline enum dma_status dma_async_is_complete(dma_cookie_t cookie,
+ {
+ 	if (last_complete <= last_used) {
+ 		if ((cookie <= last_complete) || (cookie > last_used))
+-			return DMA_SUCCESS;
++			return DMA_COMPLETE;
+ 	} else {
+ 		if ((cookie <= last_complete) && (cookie > last_used))
+-			return DMA_SUCCESS;
++			return DMA_COMPLETE;
+ 	}
+ 	return DMA_IN_PROGRESS;
+ }
+@@ -1013,11 +1013,11 @@ static inline struct dma_chan *dma_find_channel(enum dma_transaction_type tx_typ
+ }
+ static inline enum dma_status dma_sync_wait(struct dma_chan *chan, dma_cookie_t cookie)
+ {
+-	return DMA_SUCCESS;
++	return DMA_COMPLETE;
+ }
+ static inline enum dma_status dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx)
+ {
+-	return DMA_SUCCESS;
++	return DMA_COMPLETE;
+ }
+ static inline void dma_issue_pending_all(void)
+ {
 -- 
 1.7.0.4
