@@ -1,63 +1,104 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 16 Oct 2013 17:56:21 +0200
-Subject: pull request for tegra clocks (resend with some CCs added this
- time)
-In-Reply-To: <20131016155336.GN5643@tbergstrom-lnx.Nvidia.com>
-References: <20131015153620.GA12721@tbergstrom-lnx.Nvidia.com>
- <20131016153550.GA22451@ulmo.nvidia.com>
- <20131016155336.GN5643@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20131016155621.GC20211@ulmo.nvidia.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 16 Oct 2013 18:00:38 +0200
+Subject: [PATCH] cpufreq: exynos: Convert exynos-cpufreq to platform driver
+Message-ID: <1381939238-30398-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 06:53:36PM +0300, Peter De Schrijver wrote:
-> On Wed, Oct 16, 2013 at 05:35:51PM +0200, Thierry Reding wrote:
-> > * PGP Signed by an unknown key
-> > 
-> > On Tue, Oct 15, 2013 at 06:36:20PM +0300, Peter De Schrijver wrote:
-> > > The following changes since commit a0cf1abc25ac197dd97b857c0f6341066a8cb1cf:
-> > > 
-> > >   Add linux-next specific files for 20130927 (2013-09-27 18:48:50 +1000)
-> > > 
-> > > are available in the git repository at:
-> > >   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-patches-0
-> > > 
-> > > Andrew Chew (1):
-> > >       clk: tegra: Set the clk parent of host1x to pll_p
-> > > 
-> > > Mark Zhang (3):
-> > >       clk: tegra: Correct sbc mux width & parent
-> > >       clk: tegra: Fix vde/2d/3d clock src offset
-> > >       clk: tegra: Set the clock parent of gr2d/gr3d to pll_c2
-> > > 
-> > > Peter De Schrijver (3):
-> > >       ARM: tegra114: add missing clocks to binding
-> > >       clk: tegra: replace enum tegra114_clk by binding header
-> > >       clk: tegra: PLLE spread spectrum control
-> > > 
-> > > Thierry Reding (1):
-> > >       clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d
-> > 
-> > I think this pull request is missing the initialization of the display
-> > controller clocks (TEGRA114_CLK_DISP1 and TEGRA114_CLK_DISP2) from
-> > Mikko's Dalmore HDMI series.
-> 
-> I don't think they were part of the original request to be included?
+From: Lukasz Majewski <l.majewski@samsung.com>
 
-Not sure, I certainly sent it to Mike for inclusion at some point. I
-guess I can respin it on top of this pull request. There is another
-small patch required for gr3d on Tegra30 which I can rebase on top of
-this as well.
+To make the driver multiplatform-friendly, unconditional initialization
+in an initcall is replaced with a platform driver probed only if
+respective platform device is registered.
 
-Mike, do you want me to hold these back until you've merged Peter's
-Tegra series or would you rather take them all in one go? Until when
-will you be taking patches for 3.13?
+Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/common.c          |  5 +++++
+ arch/arm/mach-exynos/common.h          |  1 +
+ arch/arm/mach-exynos/mach-exynos4-dt.c |  1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c |  1 +
+ drivers/cpufreq/exynos-cpufreq.c       | 11 ++++++++++-
+ 5 files changed, 18 insertions(+), 1 deletion(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131016/38409f25/attachment.sig>
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index c17407b..4414d70 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -305,6 +305,11 @@ void __init exynos_cpuidle_init(void)
+ 	platform_device_register(&exynos_cpuidle);
+ }
+ 
++void __init exynos_cpufreq_init(void)
++{
++	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
++}
++
+ void __init exynos_init_late(void)
+ {
+ 	if (of_machine_is_compatible("samsung,exynos5440"))
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index b2ac188..61e5f3a 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -23,6 +23,7 @@ void exynos_init_io(void);
+ void exynos4_restart(enum reboot_mode mode, const char *cmd);
+ void exynos5_restart(enum reboot_mode mode, const char *cmd);
+ void exynos_cpuidle_init(void);
++void exynos_cpufreq_init(void);
+ void exynos_init_late(void);
+ 
+ void exynos_firmware_init(void);
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index 53a3dc3..2cbaf63 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -26,6 +26,7 @@
+ static void __init exynos4_dt_machine_init(void)
+ {
+ 	exynos_cpuidle_init();
++	exynos_cpufreq_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index c9f7dd1..9144549 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -48,6 +48,7 @@ static void __init exynos5_dt_machine_init(void)
+ 	}
+ 
+ 	exynos_cpuidle_init();
++	exynos_cpufreq_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+index 0ef13e8..706570e 100644
+--- a/drivers/cpufreq/exynos-cpufreq.c
++++ b/drivers/cpufreq/exynos-cpufreq.c
+@@ -17,6 +17,7 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/cpufreq.h>
+ #include <linux/suspend.h>
++#include <linux/platform_device.h>
+ 
+ #include <plat/cpu.h>
+ 
+@@ -277,4 +278,12 @@ err_vdd_arm:
+ 	kfree(exynos_info);
+ 	return -EINVAL;
+ }
+-late_initcall(exynos_cpufreq_init);
++
++static struct platform_driver exynos_cpufreq_platdrv = {
++	.driver = {
++		.name	= "exynos-cpufreq",
++		.owner	= THIS_MODULE,
++	},
++	.probe = exynos_cpufreq_init,
++};
++module_platform_driver(exynos_cpufreq_platdrv);
+-- 
+1.8.3.2
