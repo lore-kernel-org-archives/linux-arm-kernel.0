@@ -1,76 +1,58 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 16 Oct 2013 12:06:43 +0300
-Subject: [PATCH v3 00/19] Introduce common infra for tegra clocks
-In-Reply-To: <525D8009.5040907@wwwdotorg.org>
-References: <1381848794-11761-1-git-send-email-pdeschrijver@nvidia.com>
- <525D8009.5040907@wwwdotorg.org>
-Message-ID: <20131016090643.GI5643@tbergstrom-lnx.Nvidia.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 16 Oct 2013 11:10:59 +0200
+Subject: [PATCH] clk: s3c64xx: Correct spi bus clock hookups
+In-Reply-To: <20131016081035.GD20219@opensource.wolfsonmicro.com>
+References: <1381839982-3026-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
+ <1785136.Xbc2LARBDy@flatron>
+ <20131016081035.GD20219@opensource.wolfsonmicro.com>
+Message-ID: <1625192.kcLGqB93c8@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 07:48:57PM +0200, Stephen Warren wrote:
-> On 10/15/2013 08:52 AM, Peter De Schrijver wrote:
-> > This patchset introduces common infrastructure for clocks which exist in                                                                                       
-> > several Tegra SoCs. We also also move Tegra20, Tegra30 and Tegra114 to
-> > this new infrastructure.
+On Wednesday 16 of October 2013 09:10:35 Charles Keepax wrote:
+> + samsung soc mailing list
 > 
-> I took my local branch based on next-20131014, and applied the following:
-> 
-> * Joseph's "ARM: tegra: add clock properties for devices of Tegra124".
-> 
-> * The patches from your "pull request for tegra clocks" of today (I just
-> cherry-picked the commits rather than merging the pull request).
-> 
-> * Your patch series "Introduce common infra for tegra clocks" of today.
-> 
-> * Your patch series "Tegra124 clock support" of today.
-> 
-> The resultant branch is at:
-> git://github.com:swarren/linux-tegra.git linux-next_common
-> 
-> When building, I see a number of section mismatches:
-> 
-> > WARNING: drivers/clk/tegra/built-in.o(.text+0x534): Section mismatch in reference from the function _tegra_clk_register_periph() to the function .init.text:get_reg_bank()
-> > The function _tegra_clk_register_periph() references
-> > the function __init get_reg_bank().
-> > This is often because _tegra_clk_register_periph lacks a __init 
-> > annotation or the annotation of get_reg_bank is wrong.
+> On Wed, Oct 16, 2013 at 12:52:42AM +0200, Tomasz Figa wrote:
+> > Hi Charles,
 > > 
-> > WARNING: drivers/clk/tegra/built-in.o(.text+0x9ec): Section mismatch in reference from the function tegra_clk_register_periph_gate() to the function .init.text:get_reg_bank()
-> > The function tegra_clk_register_periph_gate() references
-> > the function __init get_reg_bank().
-> > This is often because tegra_clk_register_periph_gate lacks a __init 
-> > annotation or the annotation of get_reg_bank is wrong.
+> > On Tuesday 15 of October 2013 13:26:22 Charles Keepax wrote:
+> > >  	ALIAS(SCLK_MMC1, "s3c-sdhci.1", "mmc_busclk.2"),
+> > >  	ALIAS(SCLK_MMC0, "s3c-sdhci.0", "mmc_busclk.2"),
+> > > -	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi-bus"),
+> > > -	ALIAS(SCLK_SPI0, "s3c6410-spi.0", "spi-bus"),
+> > > +	ALIAS(PCLK_SPI1, "s3c6410-spi.1", "spi_busclk0"),
+> > > +	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi_busclk1"),
+> > > +	ALIAS(SCLK_SPI1_48, "s3c6410-spi.1", "spi_busclk2"),
+> > 
+> > ...according to the documentation, the order is different. The SPI_CLKSEL 
+> > field of CLK_CFG register of the SPI block can have following values:
+> > 0 - PCLK (aka PCLK_SPIx)
+> > 1 - USBCLK (aka SCLK_SPIx_48)
+> > 2 - Epll clock (aka SCLK_SPIx)
+> > 
+> > The index after spi_busclk corresponds to the value written to SPI_CLKSEL 
+> > field, so your patch should be adjusted accordingly.
 > 
-> There are more, but they refer to references from the same two
-> functions. You may need to add CONFIG_DEBUG_SECTION_MISMATCH=y to
-> .config to see these; I can't remember if that's included in
-> tegra_defconfig.
+> Hmm... will probably need to test this to see what happens the
+> old clock setup was this:
 > 
-> Testing on Venice2 (Tegra124): I see the following WARN during boot,
-> which I think is new relative to the internal branch you gave me yesterday:
+> 	CLKDEV_INIT(NULL, "spi_busclk0", &clk_p),
+> 	CLKDEV_INIT("s3c6410-spi.0", "spi_busclk1", &clk_sclk_spi0.clk),
+> 	CLKDEV_INIT("s3c6410-spi.0", "spi_busclk2", &clk_48m_spi0),
+> 	CLKDEV_INIT("s3c6410-spi.1", "spi_busclk1", &clk_sclk_spi1.clk),
+> 	CLKDEV_INIT("s3c6410-spi.1", "spi_busclk2", &clk_48m_spi1),
 > 
-> > [    0.295386] ------------[ cut here ]------------
-> > [    0.300450] WARNING: CPU: 0 PID: 1 at drivers/clk/tegra/clk.c:187 tegra_init_from_table+0x78/0x158()
-> > [    0.310362] Modules linked in:
-> > [    0.313740] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-rc5-next-20131014-05418-g30b9d55 #48
-> > [    0.323397] [<c0016644>] (unwind_backtrace+0x0/0x138) from [<c001225c>] (show_stack+0x10/0x14)
-> > [    0.332753] [<c001225c>] (show_stack+0x10/0x14) from [<c0572274>] (dump_stack+0x80/0xc0)
-> > [    0.341559] [<c0572274>] (dump_stack+0x80/0xc0) from [<c0025d54>] (warn_slowpath_common+0x64/0x88)
-> > [    0.351283] [<c0025d54>] (warn_slowpath_common+0x64/0x88) from [<c0025d94>] (warn_slowpath_null+0x1c/0x24)
-> > [    0.361768] [<c0025d94>] (warn_slowpath_null+0x1c/0x24) from [<c07b4c1c>] (tegra_init_from_table+0x78/0x158)
-> > [    0.372440] [<c07b4c1c>] (tegra_init_from_table+0x78/0x158) from [<c07b4e10>] (tegra_clocks_apply_init_table+0x18/0x20)
-> > [    0.384138] [<c07b4e10>] (tegra_clocks_apply_init_table+0x18/0x20) from [<c079f9cc>] (tegra_dt_init+0xc/0xd8)
-> > [    0.394903] [<c079f9cc>] (tegra_dt_init+0xc/0xd8) from [<c079a580>] (customize_machine+0x1c/0x40)
-> > [    0.404535] [<c079a580>] (customize_machine+0x1c/0x40) from [<c00089e0>] (do_one_initcall+0xec/0x19c)
-> > [    0.414551] [<c00089e0>] (do_one_initcall+0xec/0x19c) from [<c0798ba8>] (kernel_init_freeable+0xfc/0x1c8)
-> > [    0.424944] [<c0798ba8>] (kernel_init_freeable+0xfc/0x1c8) from [<c056d5a8>] (kernel_init+0x8/0xe4)
-> > [    0.434764] [<c056d5a8>] (kernel_init+0x8/0xe4) from [<c000f0f8>] (ret_from_fork+0x14/0x3c)
-> > [    0.443850] ---[ end trace 98c2207379d4cf99 ]---
-> 
+> Which appears to differ from the documentation, that said though
+> I would wager that only the first of those has really had much
+> testing.
 
-Did you see  'tegra_init_from_table: Failed to set parent pll_c2 of epp ' before? Tegra124 doesn't have EPP...
+I believe in 90% cases the driver simply used first available clock,
+which would be the PCLK, so I wouldn't be really surprised if operation
+on other clock sources weren't even tested.
 
-Cheers,
+If you have hardware to test this, especially with possibility of checking
+the SPI frequency I would really appreciate this, as I unfortunately don't
+have such.
 
-Peter.
+Best regards,
+Tomasz
