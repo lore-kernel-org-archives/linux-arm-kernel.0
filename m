@@ -1,38 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Oct 2013 09:27:27 +0200
-Subject: [PATCH v10 2/7] ARM: hi3xxx: add board support with device tree
-In-Reply-To: <CAD6h2NQ4fT7ycmxh+iLiBx4+u6+QB-H98309cRJLtRO3LGCbJg@mail.gmail.com>
-References: <1381828577-27998-1-git-send-email-haojian.zhuang@linaro.org>
- <CAD6h2NRvCdfNef_q=6JyNvv2ZsObmwmh=wgcKu=j6RokE3-sFg@mail.gmail.com>
- <CAD6h2NQ4fT7ycmxh+iLiBx4+u6+QB-H98309cRJLtRO3LGCbJg@mail.gmail.com>
-Message-ID: <201310160927.27412.arnd@arndb.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 16 Oct 2013 10:35:14 +0300
+Subject: [PATCH v3 10/19] clk: tegra: move audio clk to common file
+In-Reply-To: <525D93E8.1010903@wwwdotorg.org>
+References: <1381848794-11761-1-git-send-email-pdeschrijver@nvidia.com>
+ <1381848794-11761-11-git-send-email-pdeschrijver@nvidia.com>
+ <525D93E8.1010903@wwwdotorg.org>
+Message-ID: <20131016073514.GB5643@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 October 2013, Haojian Zhuang wrote:
-> Oh, no. I shouldn't extend the static mapping table to the entire range.
+On Tue, Oct 15, 2013 at 09:13:44PM +0200, Stephen Warren wrote:
+> On 10/15/2013 08:52 AM, Peter De Schrijver wrote:
+> > Move audio clocks and PLLA initialization to a common file so it can be used by
+> > multiple Tegra SoCs.
 > 
-> Most of the registers only need to map once in the probe() function
-> of the driver. Whether it's using static mapping or dynamic mapping,
-> there's no difference.
+> > diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+> 
+> > +static struct tegra_clk tegra114_clks[tegra_clk_max] __initdata = {
+> > +	[tegra_clk_rtc] = { .dt_id = TEGRA114_CLK_RTC, .present = true },
+> > +	[tegra_clk_timer] = { .dt_id = TEGRA114_CLK_TIMER, .present = true },
+> > +	[tegra_clk_uarta] = { .dt_id = TEGRA114_CLK_UARTA, .present = true },
+> ...
+> > @@ -2194,7 +2167,7 @@ static void __init tegra114_clock_init(struct device_node *np)
+> ...
+> > +	tegra_audio_clk_init(clk_base, pmc_base, tegra114_clks, &pll_a_params);
+> 
+> I think it's worth explaining in the commit description why an array of
+> not-remotely-audio-related clocks is being passed into an
+> audio-clock-initialization function.
+> 
 
-There is a small difference in that having a megabyte-sized mapping will
-reduce the number of TLB entries required for I/O access, which can
-improve performance slightly. Other platforms do it for this reason.
+This is mostly to avoid a build warning. I could put this in a separate file,
+but then, there won't be any user before this is merged.
 
->  The sysctrl register bank is used in both clock & platform
-> driver. Each clock node contains reg property, it needs to be parsed
-> by of_iomap(). Hotplug & SMP platform driver needs to parse sysctrl
-> register bank also. If I don't choose the static IO mapping for sysctrl
-> register bank, I have to define some global variable to store the
-> virtual address mapping. Or I have to cost lots of redundant virtual
-> address space for the same IO mapping.
+Cheers,
 
-It's a small cost, but your approach makes sense, just make sure
-you have a comment in the map_io code explaining it.
-
-> So I'll only keep the static IO mapping for sysctrl.
-
-I'd still choose the larger mapping, but I'll leave the decision to you.
-
-	Arnd
+Peter.
