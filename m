@@ -1,92 +1,54 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 16 Oct 2013 13:14:51 -0700
-Subject: [PATCH 2/2] tty/serial: at91: add a fallback option to determine
- uart/usart property
-In-Reply-To: <525D0896.6020907@atmel.com>
-References: <a58fe8bc7fdd128a2f9cf60785f81ebde4c0c247.1381394411.git.nicolas.ferre@atmel.com>
- <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
- <20131014135921.GG11420@ns203013.ovh.net>
- <525D0896.6020907@atmel.com>
-Message-ID: <20131016201451.GA21296@kroah.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 16 Oct 2013 13:16:57 -0700
+Subject: [GIT PULL] msm cleanups for v3.13
+Message-ID: <1381954617-2431-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 11:19:18AM +0200, Nicolas Ferre wrote:
-> On 14/10/2013 15:59, Jean-Christophe PLAGNIOL-VILLARD :
-> >On 10:43 Thu 10 Oct     , Nicolas Ferre wrote:
-> >>On older SoC, the "name" field is not filled in the register map.
-> >>Fix the way to figure out if the serial port is an uart or an usart for these
-> >>older products (with corresponding properties).
-> >>
-> >>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>---
-> >>  drivers/tty/serial/atmel_serial.c | 19 ++++++++++++++++++-
-> >>  include/linux/atmel_serial.h      |  1 +
-> >>  2 files changed, 19 insertions(+), 1 deletion(-)
-> >>
-> >>diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> >>index 6b0f75e..c7d99af 100644
-> >>--- a/drivers/tty/serial/atmel_serial.c
-> >>+++ b/drivers/tty/serial/atmel_serial.c
-> >>@@ -99,6 +99,7 @@ static void atmel_stop_rx(struct uart_port *port);
-> >>  #define UART_PUT_RTOR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_RTOR)
-> >>  #define UART_PUT_TTGR(port, v)	__raw_writel(v, (port)->membase + ATMEL_US_TTGR)
-> >>  #define UART_GET_IP_NAME(port)	__raw_readl((port)->membase + ATMEL_US_NAME)
-> >>+#define UART_GET_IP_VERSION(port) __raw_readl((port)->membase + ATMEL_US_VERSION)
-> >>
-> >>   /* PDC registers */
-> >>  #define UART_PUT_PTCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_PTCR)
-> >>@@ -1503,6 +1504,7 @@ static void atmel_get_ip_name(struct uart_port *port)
-> >>  {
-> >>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-> >>  	int name = UART_GET_IP_NAME(port);
-> >>+	u32 version;
-> >>  	int usart, uart;
-> >>  	/* usart and uart ascii */
-> >>  	usart = 0x55534152;
-> >>@@ -1517,7 +1519,22 @@ static void atmel_get_ip_name(struct uart_port *port)
-> >>  		dev_dbg(port->dev, "This is uart\n");
-> >>  		atmel_port->is_usart = false;
-> >>  	} else {
-> >>-		dev_err(port->dev, "Not supported ip name, set to uart\n");
-> >>+		/* fallback for older SoCs: use version field */
-> >>+		version = UART_GET_IP_VERSION(port);
-> >>+		switch (version) {
-> >>+		case 0x302:
-> >>+		case 0x10213:
-> >>+			dev_dbg(port->dev, "This version is usart\n");
-> >>+			atmel_port->is_usart = true;
-> >>+			break;
-> >>+		case 0x203:
-> >>+		case 0x10202:
-> >>+			dev_dbg(port->dev, "This version is uart\n");
-> >>+			atmel_port->is_usart = false;
-> >>+			break;
-> >>+		default:
-> >>+			dev_err(port->dev, "Not supported ip name nor version, set to uart\n");
-> >
-> >it's not really an error a dev_warn is more oppropriate
-> 
-> As we are already in -rc5 and that these fixes are critical for at91
-> platforms, I will not re-spin another patch just for this.
-> 
-> Moreover, I have the feeling that if we end up in this case, it
-> means that we are in big troubles because the usart/uart included in
-> the product triggering this log is not known (I recall that newer
-> products do not have to hit these lines of code).
-> 
-> With these 2 reasons, I prefer to keep my patch like it is.
-> 
-> Greg, can you consider taking these two patches as regression fixes
-> for 3.12 (with Tested-by tag from Thomas)?
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
 
-Is this really a regression from 3.11?  What's the worry about waiting
-for 3.13-rc1, getting this correct, and then backporting them to the
-3.12-stable trees?
+  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 
-I'd prefer that, so, please clean this up properly and resend it, with
-the tested-by: lines and I'll queue them up for 3.13-rc1.
+are available in the git repository at:
 
-thanks,
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-cleanup-for-3.13
 
-greg k-h
+for you to fetch changes up to 81cf1e061d001fab44dbaa85fc4fbfb6da6713a1:
+
+  ARM: msm: Rename msm devicetrees to have standard 'qcom' prefix (2013-09-25 13:02:56 -0700)
+
+----------------------------------------------------------------
+General cleanups for MSM for 3.13
+
+Some small cleanups for MSM.  Removes extraneous irq definitions that
+aren't used on DT targets, moves the single existing board file to
+board-dt.c in antipication of additional targets, and renames the
+existing DT files to have a common 'qcom' prefix.
+
+----------------------------------------------------------------
+Kumar Gala (1):
+      ARM: msm: Rename msm devicetrees to have standard 'qcom' prefix
+
+Rohit Vaswani (1):
+      ARM: msm: Create a common board-dt and config ARCH_MSM_DT
+
+Stephen Boyd (1):
+      ARM: msm: Remove irqs-*.h files for DT based targets
+
+ arch/arm/boot/dts/Makefile                         |   4 +-
+ .../{msm8660-surf.dts => qcom-msm8660-surf.dts}    |   0
+ .../dts/{msm8960-cdp.dts => qcom-msm8960-cdp.dts}  |   0
+ arch/arm/mach-msm/Kconfig                          |  13 +-
+ arch/arm/mach-msm/Makefile                         |   3 +-
+ arch/arm/mach-msm/board-dt-8660.c                  |  48 ----
+ arch/arm/mach-msm/{board-dt-8960.c => board-dt.c}  |  17 +-
+ arch/arm/mach-msm/include/mach/irqs-8960.h         | 277 ---------------------
+ arch/arm/mach-msm/include/mach/irqs-8x60.h         | 258 -------------------
+ arch/arm/mach-msm/include/mach/irqs.h              |   5 -
+ 10 files changed, 20 insertions(+), 605 deletions(-)
+ rename arch/arm/boot/dts/{msm8660-surf.dts => qcom-msm8660-surf.dts} (100%)
+ rename arch/arm/boot/dts/{msm8960-cdp.dts => qcom-msm8960-cdp.dts} (100%)
+ delete mode 100644 arch/arm/mach-msm/board-dt-8660.c
+ rename arch/arm/mach-msm/{board-dt-8960.c => board-dt.c} (64%)
+ delete mode 100644 arch/arm/mach-msm/include/mach/irqs-8960.h
+ delete mode 100644 arch/arm/mach-msm/include/mach/irqs-8x60.h
