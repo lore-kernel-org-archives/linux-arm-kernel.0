@@ -1,43 +1,42 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 16 Oct 2013 14:52:43 +0100
-Subject: [PATCH 5/5] ARM: vexpress/TC2: register vexpress-spc cpufreq device
+Date: Wed, 16 Oct 2013 14:52:39 +0100
+Subject: [PATCH 1/5] cpufreq: arm-big-little: use clk_get instead of
+ clk_get_sys
 In-Reply-To: <1381931563-16785-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1381931563-16785-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1381931563-16785-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1381931563-16785-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-This patch adds vexpress-spc platform device to enables the vexpress
-SPC cpufreq interface driver.
+Currently clk_get_sys is used with cpu-cluster.<n> as the device id
+which is incorrect. It should be connection/consumer ID instead.
+
+It is possible to specify input clock in the cpu device node along
+with the optional clock-name. clk_get_sys can't handle that.
+
+This patch replaces clk_get_sys with clk_get to extend support for
+clocks specified in the device tree cpu node.
 
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-Cc: Pawel Moll <Pawel.Moll@arm.com>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-vexpress/spc.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/cpufreq/arm_big_little.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
-index a8b8310..4ddfbfe 100644
---- a/arch/arm/mach-vexpress/spc.c
-+++ b/arch/arm/mach-vexpress/spc.c
-@@ -25,6 +25,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/opp.h>
-+#include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/semaphore.h>
- 
-@@ -532,6 +533,7 @@ static int __init ve_spc_clk_init(void)
- 			pr_warn("failed to initialise cpu%d opp table\n", cpu);
+diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
+index 3549f07..501a091 100644
+--- a/drivers/cpufreq/arm_big_little.c
++++ b/drivers/cpufreq/arm_big_little.c
+@@ -127,7 +127,7 @@ static int get_cluster_clk_and_freq_table(struct device *cpu_dev)
  	}
  
-+	platform_device_register_simple("vexpress-spc-cpufreq", -1, NULL, 0);
- 	return 0;
- }
- module_init(ve_spc_clk_init);
+ 	name[12] = cluster + '0';
+-	clk[cluster] = clk_get_sys(name, NULL);
++	clk[cluster] = clk_get(cpu_dev, name);
+ 	if (!IS_ERR(clk[cluster])) {
+ 		dev_dbg(cpu_dev, "%s: clk: %p & freq table: %p, cluster: %d\n",
+ 				__func__, clk[cluster], freq_table[cluster],
 -- 
 1.8.1.2
