@@ -1,136 +1,221 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Wed, 16 Oct 2013 11:26:45 +0800
-Subject: [PATCH v3 3/3] arm64: reuse FPSIMD hardware context if possible
-In-Reply-To: <1381894020-7912-1-git-send-email-liuj97@gmail.com>
-References: <1381894020-7912-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1381894020-7912-3-git-send-email-liuj97@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 15 Oct 2013 23:34:46 -0400 (EDT)
+Subject: [PATCH] ARM: cacheflush: consolidate single-CPU ARMv7 cache disabling
+ code
+Message-ID: <alpine.LFD.2.03.1310152327290.1873@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiang Liu <jiang.liu@huawei.com>
 
-Reuse FPSIMD hardware context if it hasn't been touched by other thread
-yet, so we can get rid of unnecessary FPSIMD context restores. This is
-especially useful when switching between kernel thread and user thread
-because kernel thread usaually doesn't touch FPSIMD registers.
+This code is becoming duplicated in many places.  So let's consolidate
+it into a handy macro that is known to be right and available for reuse.
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Jiang Liu <liuj97@gmail.com>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm64/include/asm/fpsimd.h |  2 ++
- arch/arm64/kernel/fpsimd.c      | 35 +++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/smp.c         |  1 +
- 3 files changed, 36 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 142084f..4356d6e 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -35,6 +35,7 @@ struct fpsimd_state {
- 			__uint128_t vregs[32];
- 			u32 fpsr;
- 			u32 fpcr;
-+			int last_cpu;
- 		};
- 	};
- };
-@@ -56,6 +57,7 @@ struct task_struct;
+I forgot which version this one is.  As far as I know, I've incorporated 
+most review comments, and ignored conflicting ones which tended to look 
+like bikeshedding and attempted to compensate for them with additional 
+code comments.
+
+ACK?
+
+ arch/arm/include/asm/cacheflush.h | 45 +++++++++++++++++++++++++++++++
+ arch/arm/mach-vexpress/dcscb.c    | 56 +++------------------------------------
+ arch/arm/mach-vexpress/tc2_pm.c   | 48 ++-------------------------------
+ 3 files changed, 51 insertions(+), 98 deletions(-)
+
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 15f2d5bf88..60a0a79b1a 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -435,4 +435,49 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
+ #define sync_cache_w(ptr) __sync_cache_range_w(ptr, sizeof *(ptr))
+ #define sync_cache_r(ptr) __sync_cache_range_r(ptr, sizeof *(ptr))
  
- extern void fpsimd_save_state(struct fpsimd_state *state);
- extern void fpsimd_load_state(struct fpsimd_state *state);
-+extern void fpsimd_reset_lazy_restore(void);
- 
- extern void fpsimd_dup_task_struct(struct task_struct *dst,
- 				   struct task_struct *src);
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index f43dd58..5e37d86 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -22,6 +22,7 @@
- #include <linux/sched.h>
- #include <linux/signal.h>
- #include <linux/hardirq.h>
-+#include <linux/percpu.h>
- 
- #include <asm/fpsimd.h>
- #include <asm/cputype.h>
-@@ -33,6 +34,13 @@
- #define FPEXC_IXF	(1 << 4)
- #define FPEXC_IDF	(1 << 7)
- 
-+static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_owner);
++/*
++ * Disabling cache access for one CPU in an ARMv7 SMP system is tricky.
++ * To do so we must:
++ *
++ * - Clear the SCTLR.C bit to prevent further cache allocations
++ * - Flush the desired level of cache
++ * - Clear the ACTLR "SMP" bit to disable local coherency
++ *
++ * ... and so without any intervening memory access in between those steps,
++ * not even to the stack.
++ *
++ * WARNING -- After this has been called:
++ *
++ * - No ldrex/strex (and similar) instructions must be used.
++ * - The CPU is obviously no longer coherent with the other CPUs.
++ * - This is unlikely to work as expected if Linux is running non-secure.
++ *
++ * Note:
++ *
++ * - This is known to apply to several ARMv7 processor implementations,
++ *   however some exceptions may exist.  Caveat emptor.
++ *
++ * - The clobber list is dictated by the call to v7_flush_dcache_*.
++ *   fp is preserved to the stack explicitly prior disabling the cache
++ *   since adding it to the clobber list is incompatible with having
++ *   CONFIG_FRAME_POINTER=y.
++ */
++#define v7_exit_coherency_flush(level) \
++	asm volatile( \
++	"str	fp, [sp, #-4]! \n\t" \
++	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR \n\t" \
++	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
++	"mcr	p15, 0, r0, c1, c0, 0	@ set SCTLR \n\t" \
++	"isb	\n\t" \
++	"bl	v7_flush_dcache_"__stringify(level)" \n\t" \
++	"clrex	\n\t" \
++	"mrc	p15, 0, r0, c1, c0, 1	@ get ACTLR \n\t" \
++	"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t" \
++	"mcr	p15, 0, r0, c1, c0, 1	@ set ACTLR \n\t" \
++	"isb	\n\t" \
++	"dsb	\n\t" \
++	"ldr	fp, [sp], #4" \
++	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
++	      "r9","r10","lr","memory" )
 +
-+static inline void fpsimd_set_last_cpu(struct fpsimd_state *state, int cpu)
-+{
-+	state->last_cpu = cpu;
-+}
-+
- static inline void fpsimd_init_hw_state(void)
- {
- 	int val = AARCH64_FPCR_DEFAULT_VAL;
-@@ -84,19 +92,41 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
- 	send_sig_info(SIGFPE, &info, current);
- }
+ #endif
+diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+index 3a6384c6c4..14d4996887 100644
+--- a/arch/arm/mach-vexpress/dcscb.c
++++ b/arch/arm/mach-vexpress/dcscb.c
+@@ -133,38 +133,8 @@ static void dcscb_power_down(void)
+ 	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
+ 		arch_spin_unlock(&dcscb_lock);
  
-+static void fpsimd_load_state_lazy(struct fpsimd_state *state)
-+{
-+	/* Could we reuse the hardware context? */
-+	if (state->last_cpu == smp_processor_id() &&
-+	    __this_cpu_read(fpsimd_owner) == state)
-+		return;
-+	fpsimd_load_state(state);
-+}
-+
-+static void fpsimd_save_state_lazy(struct fpsimd_state *state)
-+{
-+	fpsimd_save_state(state);
-+	fpsimd_set_last_cpu(state, smp_processor_id());
-+	__this_cpu_write(fpsimd_owner, state);
-+}
-+
-+void fpsimd_reset_lazy_restore(void)
-+{
-+	this_cpu_write(fpsimd_owner, NULL);
-+}
-+
- void fpsimd_dup_task_struct(struct task_struct *dst, struct task_struct *src)
- {
- 	fpsimd_save_state(&src->thread.fpsimd_state);
- 	*dst = *src;
-+	fpsimd_set_last_cpu(&dst->thread.fpsimd_state, -1);
- }
+-		/*
+-		 * Flush all cache levels for this cluster.
+-		 *
+-		 * To do so we do:
+-		 * - Clear the SCTLR.C bit to prevent further cache allocations
+-		 * - Flush the whole cache
+-		 * - Clear the ACTLR "SMP" bit to disable local coherency
+-		 *
+-		 * Let's do it in the safest possible way i.e. with
+-		 * no memory access within the following sequence
+-		 * including to the stack.
+-		 *
+-		 * Note: fp is preserved to the stack explicitly prior doing
+-		 * this since adding it to the clobber list is incompatible
+-		 * with having CONFIG_FRAME_POINTER=y.
+-		 */
+-		asm volatile(
+-		"str	fp, [sp, #-4]! \n\t"
+-		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+-		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+-		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+-		"isb	\n\t"
+-		"bl	v7_flush_dcache_all \n\t"
+-		"clrex	\n\t"
+-		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
+-		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+-		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+-		"isb	\n\t"
+-		"dsb	\n\t"
+-		"ldr	fp, [sp], #4"
+-		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+-		      "r9","r10","lr","memory");
++		/* Flush all cache levels for this cluster. */
++		v7_exit_coherency_flush(all);
  
- void fpsimd_thread_switch(struct task_struct *next)
- {
- 	/* check if not kernel threads */
- 	if (current->mm)
--		fpsimd_save_state(&current->thread.fpsimd_state);
-+		fpsimd_save_state_lazy(&current->thread.fpsimd_state);
- 	if (next->mm)
--		fpsimd_load_state(&next->thread.fpsimd_state);
-+		fpsimd_load_state_lazy(&next->thread.fpsimd_state);
- }
+ 		/*
+ 		 * This is a harmless no-op.  On platforms with a real
+@@ -183,26 +153,8 @@ static void dcscb_power_down(void)
+ 	} else {
+ 		arch_spin_unlock(&dcscb_lock);
  
- void fpsimd_flush_thread(void)
-@@ -107,6 +137,7 @@ void fpsimd_flush_thread(void)
- 	memset(state, 0, sizeof(struct fpsimd_state));
- 	if (AARCH64_FPCR_DEFAULT_VAL)
- 		state->fpcr = AARCH64_FPCR_DEFAULT_VAL;
-+	fpsimd_set_last_cpu(state, -1);
- 	fpsimd_load_state(state);
- 	preempt_enable();
- }
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 78db90d..aae15c4 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -183,6 +183,7 @@ asmlinkage void secondary_start_kernel(void)
- 	 */
- 	cpu_set_reserved_ttbr0();
- 	flush_tlb_all();
-+	fpsimd_reset_lazy_restore();
+-		/*
+-		 * Flush the local CPU cache.
+-		 * Let's do it in the safest possible way as above.
+-		 */
+-		asm volatile(
+-		"str	fp, [sp, #-4]! \n\t"
+-		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+-		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+-		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+-		"isb	\n\t"
+-		"bl	v7_flush_dcache_louis \n\t"
+-		"clrex	\n\t"
+-		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
+-		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+-		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+-		"isb	\n\t"
+-		"dsb	\n\t"
+-		"ldr	fp, [sp], #4"
+-		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+-		      "r9","r10","lr","memory");
++		/* Disable and flush the local CPU cache. */
++		v7_exit_coherency_flush(louis);
+ 	}
  
- 	preempt_disable();
- 	trace_hardirqs_off();
--- 
-1.8.1.2
+ 	__mcpm_cpu_down(cpu, cluster);
+diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+index e6eb481929..4eb92ebfd9 100644
+--- a/arch/arm/mach-vexpress/tc2_pm.c
++++ b/arch/arm/mach-vexpress/tc2_pm.c
+@@ -156,32 +156,7 @@ static void tc2_pm_down(u64 residency)
+ 			: : "r" (0x400) );
+ 		}
+ 
+-		/*
+-		 * We need to disable and flush the whole (L1 and L2) cache.
+-		 * Let's do it in the safest possible way i.e. with
+-		 * no memory access within the following sequence
+-		 * including the stack.
+-		 *
+-		 * Note: fp is preserved to the stack explicitly prior doing
+-		 * this since adding it to the clobber list is incompatible
+-		 * with having CONFIG_FRAME_POINTER=y.
+-		 */
+-		asm volatile(
+-		"str	fp, [sp, #-4]! \n\t"
+-		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+-		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+-		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+-		"isb	\n\t"
+-		"bl	v7_flush_dcache_all \n\t"
+-		"clrex	\n\t"
+-		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
+-		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+-		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+-		"isb	\n\t"
+-		"dsb	\n\t"
+-		"ldr	fp, [sp], #4"
+-		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+-		      "r9","r10","lr","memory");
++		v7_exit_coherency_flush(all);
+ 
+ 		cci_disable_port_by_cpu(mpidr);
+ 
+@@ -197,26 +172,7 @@ static void tc2_pm_down(u64 residency)
+ 
+ 		arch_spin_unlock(&tc2_pm_lock);
+ 
+-		/*
+-		 * We need to disable and flush only the L1 cache.
+-		 * Let's do it in the safest possible way as above.
+-		 */
+-		asm volatile(
+-		"str	fp, [sp, #-4]! \n\t"
+-		"mrc	p15, 0, r0, c1, c0, 0	@ get CR \n\t"
+-		"bic	r0, r0, #"__stringify(CR_C)" \n\t"
+-		"mcr	p15, 0, r0, c1, c0, 0	@ set CR \n\t"
+-		"isb	\n\t"
+-		"bl	v7_flush_dcache_louis \n\t"
+-		"clrex	\n\t"
+-		"mrc	p15, 0, r0, c1, c0, 1	@ get AUXCR \n\t"
+-		"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t"
+-		"mcr	p15, 0, r0, c1, c0, 1	@ set AUXCR \n\t"
+-		"isb	\n\t"
+-		"dsb	\n\t"
+-		"ldr	fp, [sp], #4"
+-		: : : "r0","r1","r2","r3","r4","r5","r6","r7",
+-		      "r9","r10","lr","memory");
++		v7_exit_coherency_flush(louis);
+ 	}
+ 
+ 	__mcpm_cpu_down(cpu, cluster);
