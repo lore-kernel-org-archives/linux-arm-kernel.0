@@ -1,63 +1,24 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 16 Oct 2013 14:51:10 +0200
-Subject: [PATCH v3 2/4] usb: musb: Bugfix of_node assignment
-In-Reply-To: <1381927872-8181-1-git-send-email-mpa@pengutronix.de>
-References: <1381927872-8181-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1381927872-8181-3-git-send-email-mpa@pengutronix.de>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Wed, 16 Oct 2013 18:28:36 +0530
+Subject: [PATCH] net/ethernet: cpsw: Bugfix interrupts before enabling napi
+In-Reply-To: <1381691821-25498-1-git-send-email-mpa@pengutronix.de>
+References: <1381691821-25498-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <525E8D7C.5050702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not safe to assign the of_node to a device without driver. The
-device is matched against a list of drivers and the of_node could lead
-to a DT match with the parent driver.
+On Monday 14 October 2013 12:47 AM, Markus Pargmann wrote:
+> If interrupts happen before napi_enable was called, the driver will not
+> work as expected. Network transmissions are impossible in this state.
+> This bug can be reproduced easily by restarting the network interface in
+> a loop. After some time any network transmissions on the network
+> interface will fail.
+>
+> This patch fixes the bug by enabling napi before enabling the network
+> interface interrupts.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/usb/musb/musb_core.c | 12 +++++++++++-
- drivers/usb/musb/musb_dsps.c |  1 -
- 2 files changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-index 7d40dec..651cce0 100644
---- a/drivers/usb/musb/musb_core.c
-+++ b/drivers/usb/musb/musb_core.c
-@@ -1958,6 +1958,7 @@ static int musb_probe(struct platform_device *pdev)
- 	int		irq = platform_get_irq_byname(pdev, "mc");
- 	struct resource	*iomem;
- 	void __iomem	*base;
-+	int ret;
- 
- 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!iomem || irq <= 0)
-@@ -1967,7 +1968,16 @@ static int musb_probe(struct platform_device *pdev)
- 	if (IS_ERR(base))
- 		return PTR_ERR(base);
- 
--	return musb_init_controller(dev, irq, base);
-+	if (dev->parent)
-+		dev->of_node = dev->parent->of_node;
-+
-+	ret = musb_init_controller(dev, irq, base);
-+	if (ret) {
-+		dev->of_node = NULL;
-+		return ret;
-+	}
-+
-+	return 0;
- }
- 
- static int musb_remove(struct platform_device *pdev)
-diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-index bd4138d..189e52c 100644
---- a/drivers/usb/musb/musb_dsps.c
-+++ b/drivers/usb/musb/musb_dsps.c
-@@ -483,7 +483,6 @@ static int dsps_create_musb_pdev(struct dsps_glue *glue,
- 	musb->dev.parent		= dev;
- 	musb->dev.dma_mask		= &musb_dmamask;
- 	musb->dev.coherent_dma_mask	= musb_dmamask;
--	musb->dev.of_node		= of_node_get(dn);
- 
- 	glue->musb = musb;
- 
--- 
-1.8.4.rc3
+Regards
+Mugunthan V N
