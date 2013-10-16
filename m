@@ -1,100 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Oct 2013 12:22:22 +0100
-Subject: [PATCH v3 3/7] arm64: move encode_insn_immediate() from module.c
- to insn.c
-In-Reply-To: <1381893492-7135-4-git-send-email-liuj97@gmail.com>
-References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
- <1381893492-7135-4-git-send-email-liuj97@gmail.com>
-Message-ID: <20131016112222.GG5403@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 Oct 2013 13:35:31 +0200
+Subject: [PATCH] unset twsi option3 for gconfig as well
+In-Reply-To: <525C3B65.30501@gmail.com>
+References: <1381706847-32762-1-git-send-email-roel.kluin@gmail.com>
+ <CACRpkdb8ibOm61D_iGkOkbas1475n4k5jptnRH7VFk=9+pipHQ@mail.gmail.com>
+ <20131014091230.65047d00@skate> <525C3B65.30501@gmail.com>
+Message-ID: <CACRpkdbfz=SGZUt8U=u_gMmiRoCmXDv=nfR47jjzeK=wBcRxbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 04:18:08AM +0100, Jiang Liu wrote:
-> From: Jiang Liu <jiang.liu@huawei.com>
-> 
-> Function encode_insn_immediate() will be used by other instruction
-> manipulate related functions, so move it into insn.c and rename it
-> as aarch64_insn_encode_immediate().
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Jiang Liu <liuj97@gmail.com>
-> ---
->  arch/arm64/include/asm/insn.h |  14 ++++
->  arch/arm64/kernel/insn.c      |  77 +++++++++++++++++++++
->  arch/arm64/kernel/module.c    | 151 +++++++++---------------------------------
->  3 files changed, 123 insertions(+), 119 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index 2dfcdb4..8dc0a91 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -28,6 +28,18 @@ enum aarch64_insn_class {
->                                          * system instructions */
->  };
-> 
-> +enum aarch64_insn_imm_type {
-> +       AARCH64_INSN_IMM_MOVNZ,
-> +       AARCH64_INSN_IMM_MOVK,
-> +       AARCH64_INSN_IMM_ADR,
-> +       AARCH64_INSN_IMM_26,
-> +       AARCH64_INSN_IMM_19,
-> +       AARCH64_INSN_IMM_16,
-> +       AARCH64_INSN_IMM_14,
-> +       AARCH64_INSN_IMM_12,
-> +       AARCH64_INSN_IMM_9,
-> +};
-> +
->  #define        __AARCH64_INSN_FUNCS(abbr, mask, val)   \
->  static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
->  { return (code & (mask)) == (val); }   \
-> @@ -47,6 +59,8 @@ __AARCH64_INSN_FUNCS(nop,     0xFFFFFFFF, 0xD503201F)
->  #undef __AARCH64_INSN_FUNCS
-> 
->  enum aarch64_insn_class aarch64_get_insn_class(u32 insn);
-> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
-> +                                 u32 insn, u64 imm);
->  u32 aarch64_insn_read(void *addr);
->  void aarch64_insn_write(void *addr, u32 insn);
->  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index ad4185f..90cc312 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -179,3 +179,80 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
->         else
->                 return aarch64_insn_patch_text_sync(addrs, insns, cnt);
->  }
-> +
-> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
-> +                                 u32 insn, u64 imm)
-> +{
-> +       u32 immlo, immhi, lomask, himask, mask;
-> +       int shift;
-> +
-> +       switch (type) {
-> +       case AARCH64_INSN_IMM_MOVNZ:
-> +               /*
-> +                * For signed MOVW relocations, we have to manipulate the
-> +                * instruction encoding depending on whether or not the
-> +                * immediate is less than zero.
-> +                */
-> +               insn &= ~(3 << 29);
-> +               if ((s64)imm >= 0) {
-> +                       /* >=0: Set the instruction to MOVZ (opcode 10b). */
-> +                       insn |= 2 << 29;
-> +               } else {
-> +                       /*
-> +                        * <0: Set the instruction to MOVN (opcode 00b).
-> +                        *     Since we've masked the opcode already, we
-> +                        *     don't need to do anything other than
-> +                        *     inverting the new immediate field.
-> +                        */
-> +                       imm = ~imm;
-> +               }
+On Mon, Oct 14, 2013 at 8:43 PM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
 
-I'm really not comfortable with this. This code is performing static
-relocations and re-encoding instructions as required by the AArch64 ELF
-spec. That's not really what you'd expect from a generic instruction
-encoder!
+> @Linus:
+> I guess the typo is there from the beginning. You know a good way to
+> determine how far it should go back to -stable?
 
-Will
+I just add CC: stable and the stable maintainers tend to figure
+this out.
+
+> Please apply with following commit msg (or request a proper v2):
+>
+> """
+> This fixes a typo which left twsi config3 option enabled.
+> """
+>
+> and
+>
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+OK patch applied and marked for stable.
+
+Yours,
+Linus Walleij
