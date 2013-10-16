@@ -1,173 +1,76 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 16 Oct 2013 09:59:29 +0100
-Subject: [PATCH v2 03/13] arm64: kernel: suspend/resume registers
- save/restore
-In-Reply-To: <20131015105907.GB30411@mudshark.cambridge.arm.com>
-References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1381748590-14279-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20131015105907.GB30411@mudshark.cambridge.arm.com>
-Message-ID: <20131016085929.GB4815@e102568-lin.cambridge.arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 16 Oct 2013 12:06:43 +0300
+Subject: [PATCH v3 00/19] Introduce common infra for tegra clocks
+In-Reply-To: <525D8009.5040907@wwwdotorg.org>
+References: <1381848794-11761-1-git-send-email-pdeschrijver@nvidia.com>
+ <525D8009.5040907@wwwdotorg.org>
+Message-ID: <20131016090643.GI5643@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 11:59:07AM +0100, Will Deacon wrote:
-> On Mon, Oct 14, 2013 at 12:03:00PM +0100, Lorenzo Pieralisi wrote:
-
-[...]
-
-> > +/*
-> > + * struct cpu_suspend_ctx must be 16-byte aligned since it is allocated on
-> > + * the stack, which must be 16-byte aligned on v8
-> > + */
-> > +struct cpu_suspend_ctx {
-> > +	/*
-> > +	 * This struct must be kept in sync with
-> > +	 * suspend_save_ctx/suspend_restore_ctx
-> > +	 * macros in asm/suspendmacros.h
-> > +	 */
-> > +	struct {
-> > +		u64 tpidr_el0;
-> > +		u64 tpidrro_el0;
-> > +		u64 contextidr_el1;
-> > +		u64 mair_el1;
-> > +		u64 cpacr_el1;
-> > +		u64 ttbr1_el1;
-> > +		u64 tcr_el1;
-> > +		u64 vbar_el1;
-> > +		u64 sctlr_el1;
-> > +	} ctx_regs;
+On Tue, Oct 15, 2013 at 07:48:57PM +0200, Stephen Warren wrote:
+> On 10/15/2013 08:52 AM, Peter De Schrijver wrote:
+> > This patchset introduces common infrastructure for clocks which exist in                                                                                       
+> > several Tegra SoCs. We also also move Tegra20, Tegra30 and Tegra114 to
+> > this new infrastructure.
 > 
-> There doesn't look like a lot of state here. What about EL2 registers used
-> by KVM? (in fact, I don't see how this interacts with KVM at all).
-
-Patch 7 implements a CPU PM notifier to restore KVM EL2 state upon resume from
-shutdown states, we discussed that with Marc and I think that's sufficient;
-KVM survives after successful shutdown and consequent save/restore cycle.
-
-> > +	u64 sp;
-> > +} __aligned(16);
-> > +#endif
-> > diff --git a/arch/arm64/include/asm/suspendmacros.h b/arch/arm64/include/asm/suspendmacros.h
-> > new file mode 100644
-> > index 0000000..9203e76
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/suspendmacros.h
-> > @@ -0,0 +1,75 @@
-> > +/*
-> > + * suspend state saving and restoring macros
-> > + *
-> > + * Copyright (C) 2013 ARM Ltd.
-> > + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +/*
-> > + * suspend_save_ctx - save registers required to suspend a cpu
-> > + *
-> > + * x0: register where context base address is stored
-> > + * macro clobbers {x2 - x10}
-> > + *
-> > + * Registers to be saved must be kept consistent with
-> > + * struct cpu_suspend_ctx
-> > + */
-> > +.macro suspend_save_ctx
-> > +	mrs	x2, tpidr_el0
-> > +	mrs	x3, tpidrro_el0
-> > +	mrs	x4, contextidr_el1
-> > +	mrs	x5, mair_el1
-> > +	mrs	x6, cpacr_el1
-> > +	mrs	x7, ttbr1_el1
-> > +	mrs	x8, tcr_el1
-> > +	mrs	x9, vbar_el1
-> > +	mrs	x10, sctlr_el1
-> > +	stp	x2, x3, [x0]
-> > +	stp	x4, x5, [x0, #16]
-> > +	stp	x6, x7, [x0, #32]
-> > +	stp	x8, x9, [x0, #48]
-> > +	str	x10, [x0, #64]
-> > +.endm
+> I took my local branch based on next-20131014, and applied the following:
 > 
-> You only need to care about contextidr_el1 if CONFIG_PID_IN_CONTEXTIDR. Then
-> again, you're not saving ttbr0, so you could rely on switch_mm to deal with
-> contextidr_el1 for you, no?
-
-Is contextidr_el1 "restored" in switch_mm or in contexidr_thread_switch() ?
-It seems to be the latter, so if I do not save/restore it, the idle or suspend
-thread might be running with the wrong contextidr_el1 until a context switch
-is executed in the resume path, or I misunderstood it.
-
-Yes, cpu_suspend() relies on switch_mm to restore the ttbr0_el1, and I use
-the identity map page tables to enable the MMU in cpu_resume().
-
-> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> > index b1b31bb..6ee3b99 100644
-> > --- a/arch/arm64/mm/proc.S
-> > +++ b/arch/arm64/mm/proc.S
-> > @@ -25,6 +25,7 @@
-> >  #include <asm/hwcap.h>
-> >  #include <asm/pgtable-hwdef.h>
-> >  #include <asm/pgtable.h>
-> > +#include <asm/suspendmacros.h>
-> >  
-> >  #include "proc-macros.S"
-> >  
-> > @@ -80,6 +81,35 @@ ENTRY(cpu_do_idle)
-> >  	ret
-> >  ENDPROC(cpu_do_idle)
-> >  
-> > +#ifdef CONFIG_ARM64_CPU_SUSPEND
-> > +/**
-> > + * cpu_do_suspend - save CPU registers context
-> > + * x0: virtual address of context pointer
-> > + */
-> > +ENTRY(cpu_do_suspend)
-> > +	suspend_save_ctx
-> > +	ret
-> > +ENDPROC(cpu_do_suspend)
-> > +
-> > +/**
-> > + * cpu_do_resume - restore CPU register context
-> > + *
-> > + *
-> > + * x0: Physical address of context pointer
-> > + * x1: ttbr0_el1 to be restored
-> > + *
-> > + * Returns:
-> > + *	sctlr_el1 value in x0
-> > + */
-> > +ENTRY(cpu_do_resume)
-> > +	tlbi	vmalle1is	// make sure tlb entries are invalidated
+> * Joseph's "ARM: tegra: add clock properties for devices of Tegra124".
 > 
-> Why? Is this just to be sure that the local TLB is invalid before enabling
-> the MMU? If so, you can use the non-shareable variant...
-
-Yes, that's what I thought in the first place, but then we went for the same
-semantics as flush_tlb_all() which is not really needed here, as you
-said it can be a non-shareable variant.
-
-> > +	suspend_restore_ctx
-> > +	isb
-> > +	dsb	sy
+> * The patches from your "pull request for tegra clocks" of today (I just
+> cherry-picked the commits rather than merging the pull request).
 > 
-> and make this a dsb nsh. Also, aren't the dsb and the isb the wrong way
-> round here?
+> * Your patch series "Introduce common infra for tegra clocks" of today.
+> 
+> * Your patch series "Tegra124 clock support" of today.
+> 
+> The resultant branch is at:
+> git://github.com:swarren/linux-tegra.git linux-next_common
+> 
+> When building, I see a number of section mismatches:
+> 
+> > WARNING: drivers/clk/tegra/built-in.o(.text+0x534): Section mismatch in reference from the function _tegra_clk_register_periph() to the function .init.text:get_reg_bank()
+> > The function _tegra_clk_register_periph() references
+> > the function __init get_reg_bank().
+> > This is often because _tegra_clk_register_periph lacks a __init 
+> > annotation or the annotation of get_reg_bank is wrong.
+> > 
+> > WARNING: drivers/clk/tegra/built-in.o(.text+0x9ec): Section mismatch in reference from the function tegra_clk_register_periph_gate() to the function .init.text:get_reg_bank()
+> > The function tegra_clk_register_periph_gate() references
+> > the function __init get_reg_bank().
+> > This is often because tegra_clk_register_periph_gate lacks a __init 
+> > annotation or the annotation of get_reg_bank is wrong.
+> 
+> There are more, but they refer to references from the same two
+> functions. You may need to add CONFIG_DEBUG_SECTION_MISMATCH=y to
+> .config to see these; I can't remember if that's included in
+> tegra_defconfig.
+> 
+> Testing on Venice2 (Tegra124): I see the following WARN during boot,
+> which I think is new relative to the internal branch you gave me yesterday:
+> 
+> > [    0.295386] ------------[ cut here ]------------
+> > [    0.300450] WARNING: CPU: 0 PID: 1 at drivers/clk/tegra/clk.c:187 tegra_init_from_table+0x78/0x158()
+> > [    0.310362] Modules linked in:
+> > [    0.313740] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-rc5-next-20131014-05418-g30b9d55 #48
+> > [    0.323397] [<c0016644>] (unwind_backtrace+0x0/0x138) from [<c001225c>] (show_stack+0x10/0x14)
+> > [    0.332753] [<c001225c>] (show_stack+0x10/0x14) from [<c0572274>] (dump_stack+0x80/0xc0)
+> > [    0.341559] [<c0572274>] (dump_stack+0x80/0xc0) from [<c0025d54>] (warn_slowpath_common+0x64/0x88)
+> > [    0.351283] [<c0025d54>] (warn_slowpath_common+0x64/0x88) from [<c0025d94>] (warn_slowpath_null+0x1c/0x24)
+> > [    0.361768] [<c0025d94>] (warn_slowpath_null+0x1c/0x24) from [<c07b4c1c>] (tegra_init_from_table+0x78/0x158)
+> > [    0.372440] [<c07b4c1c>] (tegra_init_from_table+0x78/0x158) from [<c07b4e10>] (tegra_clocks_apply_init_table+0x18/0x20)
+> > [    0.384138] [<c07b4e10>] (tegra_clocks_apply_init_table+0x18/0x20) from [<c079f9cc>] (tegra_dt_init+0xc/0xd8)
+> > [    0.394903] [<c079f9cc>] (tegra_dt_init+0xc/0xd8) from [<c079a580>] (customize_machine+0x1c/0x40)
+> > [    0.404535] [<c079a580>] (customize_machine+0x1c/0x40) from [<c00089e0>] (do_one_initcall+0xec/0x19c)
+> > [    0.414551] [<c00089e0>] (do_one_initcall+0xec/0x19c) from [<c0798ba8>] (kernel_init_freeable+0xfc/0x1c8)
+> > [    0.424944] [<c0798ba8>] (kernel_init_freeable+0xfc/0x1c8) from [<c056d5a8>] (kernel_init+0x8/0xe4)
+> > [    0.434764] [<c056d5a8>] (kernel_init+0x8/0xe4) from [<c000f0f8>] (ret_from_fork+0x14/0x3c)
+> > [    0.443850] ---[ end trace 98c2207379d4cf99 ]---
+> 
 
-Yes, I should swap them even if with the MMU off things do not change much
-(actually arm32 v7 resume code has them the wrong way around too so for
-consistency they should be swapped there too since the order is wrong).
+Did you see  'tegra_init_from_table: Failed to set parent pll_c2 of epp ' before? Tegra124 doesn't have EPP...
 
-Ok for the dsb nsh, that's what it is meant to be.
+Cheers,
 
-Thanks a lot,
-Lorenzo
+Peter.
