@@ -1,150 +1,201 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 16 Oct 2013 17:23:45 +0300
-Subject: [PATCH v2 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
- Framework
-In-Reply-To: <525E9A11.7080501@ti.com>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
- <1381866857-3861-3-git-send-email-kishon@ti.com> <525E9232.9050502@ti.com>
- <525E9A11.7080501@ti.com>
-Message-ID: <525EA171.9010402@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 16 Oct 2013 16:24:57 +0200
+Subject: [PATCH 2/2] ARM: AT91: DT: pm: select ram controller standby based on
+ DT
+In-Reply-To: <1381933497-20262-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1381830109-1398-1-git-send-email-daniel.lezcano@linaro.org>
+ <1381933497-20262-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1381933497-20262-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2013 04:52 PM, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Wednesday 16 October 2013 06:48 PM, Roger Quadros wrote:
->> Hi,
->>
->> On 10/15/2013 10:54 PM, Kishon Vijay Abraham I wrote:
->>> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
->>> power_on and power_off the following APIs are used phy_init(), phy_exit(),
->>> phy_power_on() and phy_power_off().
->>>
->>> However using the old USB phy library wont be removed till the PHYs of all
->>> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
->>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>>  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
->>>  drivers/usb/dwc3/Kconfig                       |    1 +
->>>  drivers/usb/dwc3/core.c                        |   52 ++++++++++++++++++++++++
->>>  drivers/usb/dwc3/core.h                        |    7 ++++
->>>  drivers/usb/dwc3/platform_data.h               |    2 +
->>>  5 files changed, 66 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
->>> index e807635..471366d 100644
->>> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
->>> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
->>> @@ -6,11 +6,13 @@ Required properties:
->>>   - compatible: must be "snps,dwc3"
->>>   - reg : Address and length of the register set for the device
->>>   - interrupts: Interrupts used by the dwc3 controller.
->>> +
->>> +Optional properties:
->>>   - usb-phy : array of phandle for the PHY device.  The first element
->>>     in the array is expected to be a handle to the USB2/HS PHY and
->>>     the second element is expected to be a handle to the USB3/SS PHY
->>> -
->>> -Optional properties:
->>> + - phys: from the *Generic PHY* bindings
->>> + - phy-names: from the *Generic PHY* bindings
->>>   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
->>>  
->>>  This is usually a subnode to DWC3 glue to which it is connected.
->>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
->>> index 8e385b4..64eed6f 100644
->>> --- a/drivers/usb/dwc3/Kconfig
->>> +++ b/drivers/usb/dwc3/Kconfig
->>> @@ -2,6 +2,7 @@ config USB_DWC3
->>>  	tristate "DesignWare USB3 DRD Core Support"
->>>  	depends on (USB || USB_GADGET) && HAS_DMA
->>>  	select USB_PHY
->>> +	select GENERIC_PHY
->>>  	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
->>>  	help
->>>  	  Say Y or M here if your system has a Dual Role SuperSpeed
->>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
->>> index cb91d70..28bfa5b 100644
->>> --- a/drivers/usb/dwc3/core.c
->>> +++ b/drivers/usb/dwc3/core.c
->>> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
->>>  
->>>  	usb_phy_init(dwc->usb2_phy);
->>>  	usb_phy_init(dwc->usb3_phy);
->>> +
->>> +	if (dwc->usb2_generic_phy)
->>> +		phy_init(dwc->usb2_generic_phy);
->>> +	if (dwc->usb3_generic_phy)
->>> +		phy_init(dwc->usb3_generic_phy);
->>> +
->>
->> dwc3_core_soft_reset() is called from dwc3_core_init() which is called from
->> dwc3_probe() but before the PHYs are initialized.
->>
->> This will cause phy power_on() to be called before phy_init() which is wrong.
->>
+Move non-dt selection to ioremap_registers init which is only called not
+non-dt board.
 
-You overlooked the above?
+So we can support sam9n12/sam9x5/sama5d3 too.
 
->>>  	mdelay(100);
->>>  
->>>  	/* Clear USB3 PHY reset */
->>> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
->>>  {
->>>  	usb_phy_shutdown(dwc->usb2_phy);
->>>  	usb_phy_shutdown(dwc->usb3_phy);
->>> +
->>> +	if (dwc->usb2_generic_phy)
->>> +		phy_power_off(dwc->usb2_generic_phy);
->>> +	if (dwc->usb3_generic_phy)
->>> +		phy_power_off(dwc->usb3_generic_phy);
->>>  }
->>>  
->>>  #define DWC3_ALIGN_MASK		(16 - 1)
->>> @@ -439,6 +450,26 @@ static int dwc3_probe(struct platform_device *pdev)
->>>  		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
->>>  	}
->>>  
->>> +	count = of_property_match_string(node, "phy-names", "usb2-phy");
->>> +	if (count >= 0 || (pdata && pdata->usb2_generic_phy)) {
->>> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
->>> +		if (IS_ERR(dwc->usb2_generic_phy)) {
->>> +			dev_err(dev, "no usb2 phy configured yet");
->>> +			return PTR_ERR(dwc->usb2_generic_phy);
->>> +		}
->>> +		dwc->usb2_phy = NULL;
->>> +	}
->>> +
->>> +	count = of_property_match_string(node, "phy-names", "usb3-phy");
->>> +	if (count >= 0 || (pdata && pdata->usb3_generic_phy)) {
->>> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
->>> +		if (IS_ERR(dwc->usb3_generic_phy)) {
->>> +			dev_err(dev, "no usb3 phy configured yet");
->>> +			return PTR_ERR(dwc->usb3_generic_phy);
->>> +		}
->>> +		dwc->usb3_phy = NULL;
->>> +	}
->>> +
->>
->> There are a couple of issues here.
->> - The above code must be executed only if it node is valid.
-> 
-> of_property_match_string will give a error value if the node is not present.
-> *count >= 0* can take care of this.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91rm9200.c  |  3 +--
+ arch/arm/mach-at91/at91sam9260.c |  3 +--
+ arch/arm/mach-at91/at91sam9261.c |  3 +--
+ arch/arm/mach-at91/at91sam9263.c |  3 +--
+ arch/arm/mach-at91/at91sam9g45.c |  3 +--
+ arch/arm/mach-at91/at91sam9rl.c  |  3 +--
+ arch/arm/mach-at91/setup.c       | 14 +++++++++++---
+ 7 files changed, 17 insertions(+), 15 deletions(-)
 
-OK. 
-
->> - We must either get both PHYs via old method or via new method and not support mix matching
->> them. e.g. it is possible with this code that usb2_phy is set and usb3_generic_phy is set.
-> 
-> Why? As long as both the frameworks co-exist (and we support both in dwc3), I
-> don't see any reason why we shouldn't allow it. We can avoid adding a few more
-> checks by leaving it the way it is currently.
-
-Because it just doesn't seem elegant. Why would you want to even allow both types of PHY
-to be used simultaneously?
-
-cheers,
--roger
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index 0d234f2..25805f2 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -328,6 +328,7 @@ static void __init at91rm9200_ioremap_registers(void)
+ {
+ 	at91rm9200_ioremap_st(AT91RM9200_BASE_ST);
+ 	at91_ioremap_ramc(0, AT91RM9200_BASE_MC, 256);
++	at91_pm_set_standby(at91rm9200_standby);
+ }
+ 
+ static void __init at91rm9200_initialize(void)
+@@ -338,8 +339,6 @@ static void __init at91rm9200_initialize(void)
+ 	/* Initialize GPIO subsystem */
+ 	at91_gpio_init(at91rm9200_gpio,
+ 		cpu_is_at91rm9200_bga() ? AT91RM9200_BGA : AT91RM9200_PQFP);
+-
+-	at91_pm_set_standby(at91rm9200_standby);
+ }
+ 
+ 
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 3b43d56..f8629a3 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -343,6 +343,7 @@ static void __init at91sam9260_ioremap_registers(void)
+ 	at91sam926x_ioremap_pit(AT91SAM9260_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
+ 	at91_ioremap_matrix(AT91SAM9260_BASE_MATRIX);
++	at91_pm_set_standby(at91sam9_sdram_standby);
+ }
+ 
+ static void __init at91sam9260_initialize(void)
+@@ -352,8 +353,6 @@ static void __init at91sam9260_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9260_gpio, 3);
+-
+-	at91_pm_set_standby(at91sam9_sdram_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index a0857c3..1f3867a 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -285,6 +285,7 @@ static void __init at91sam9261_ioremap_registers(void)
+ 	at91sam926x_ioremap_pit(AT91SAM9261_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
+ 	at91_ioremap_matrix(AT91SAM9261_BASE_MATRIX);
++	at91_pm_set_standby(at91sam9_sdram_standby);
+ }
+ 
+ static void __init at91sam9261_initialize(void)
+@@ -294,8 +295,6 @@ static void __init at91sam9261_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9261_gpio, 3);
+-
+-	at91_pm_set_standby(at91sam9_sdram_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 103a95b..90d455d 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -322,6 +322,7 @@ static void __init at91sam9263_ioremap_registers(void)
+ 	at91sam9_ioremap_smc(0, AT91SAM9263_BASE_SMC0);
+ 	at91sam9_ioremap_smc(1, AT91SAM9263_BASE_SMC1);
+ 	at91_ioremap_matrix(AT91SAM9263_BASE_MATRIX);
++	at91_pm_set_standby(at91sam9_sdram_standby);
+ }
+ 
+ static void __init at91sam9263_initialize(void)
+@@ -331,8 +332,6 @@ static void __init at91sam9263_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9263_gpio, 5);
+-
+-	at91_pm_set_standby(at91sam9_sdram_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index f29731e..e9bf0b8 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -371,6 +371,7 @@ static void __init at91sam9g45_ioremap_registers(void)
+ 	at91sam926x_ioremap_pit(AT91SAM9G45_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9G45_BASE_SMC);
+ 	at91_ioremap_matrix(AT91SAM9G45_BASE_MATRIX);
++	at91_pm_set_standby(at91_ddr_standby);
+ }
+ 
+ static void __init at91sam9g45_initialize(void)
+@@ -380,8 +381,6 @@ static void __init at91sam9g45_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9g45_gpio, 5);
+-
+-	at91_pm_set_standby(at91_ddr_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 9e28f41..88995af 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -288,6 +288,7 @@ static void __init at91sam9rl_ioremap_registers(void)
+ 	at91sam926x_ioremap_pit(AT91SAM9RL_BASE_PIT);
+ 	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
+ 	at91_ioremap_matrix(AT91SAM9RL_BASE_MATRIX);
++	at91_pm_set_standby(at91sam9_sdram_standby);
+ }
+ 
+ static void __init at91sam9rl_initialize(void)
+@@ -297,8 +298,6 @@ static void __init at91sam9rl_initialize(void)
+ 
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9rl_gpio, 4);
+-
+-	at91_pm_set_standby(at91sam9_sdram_standby);
+ }
+ 
+ /* --------------------------------------------------------------------
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index b17fbcf..094b345 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -23,6 +23,7 @@
+ #include "at91_shdwc.h"
+ #include "soc.h"
+ #include "generic.h"
++#include "pm.h"
+ 
+ struct at91_init_soc __initdata at91_boot_soc;
+ 
+@@ -376,15 +377,16 @@ static void at91_dt_rstc(void)
+ }
+ 
+ static struct of_device_id ramc_ids[] = {
+-	{ .compatible = "atmel,at91rm9200-sdramc" },
+-	{ .compatible = "atmel,at91sam9260-sdramc" },
+-	{ .compatible = "atmel,at91sam9g45-ddramc" },
++	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
++	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
++	{ .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
+ 	{ /*sentinel*/ }
+ };
+ 
+ static void at91_dt_ramc(void)
+ {
+ 	struct device_node *np;
++	const struct of_device_id *of_id;
+ 
+ 	np = of_find_matching_node(NULL, ramc_ids);
+ 	if (!np)
+@@ -396,6 +398,12 @@ static void at91_dt_ramc(void)
+ 	/* the controller may have 2 banks */
+ 	at91_ramc_base[1] = of_iomap(np, 1);
+ 
++	of_id = of_match_node(ramc_ids, np);
++	if (!of_id)
++		pr_warn("AT91: ramc no standby function available\n");
++	else
++		at91_pm_set_standby(of_id->data);
++
+ 	of_node_put(np);
+ }
+ 
+-- 
+1.8.4.rc3
