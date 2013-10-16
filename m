@@ -1,104 +1,237 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 16 Oct 2013 18:00:38 +0200
-Subject: [PATCH] cpufreq: exynos: Convert exynos-cpufreq to platform driver
-Message-ID: <1381939238-30398-1-git-send-email-t.figa@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 16 Oct 2013 18:04:03 +0200
+Subject: [PATCH 1/2] ARM: AT91: pm: factorize standby function
+In-Reply-To: <20131016154851.GB14104@ns203013.ovh.net>
+References: <1381830109-1398-1-git-send-email-daniel.lezcano@linaro.org>
+ <1381933497-20262-1-git-send-email-plagnioj@jcrosoft.com>
+ <525EAAF8.8080005@linaro.org> <20131016154851.GB14104@ns203013.ovh.net>
+Message-ID: <525EB8F3.2040104@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lukasz Majewski <l.majewski@samsung.com>
+On 10/16/2013 05:48 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:04 Wed 16 Oct     , Daniel Lezcano wrote:
+>> On 10/16/2013 04:24 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> Detect presence of second bank. So we do not need to have on function per SoC
+>>>
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>
+> as discuss with Nico please take via your tree with my Ack
+>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-To make the driver multiplatform-friendly, unconditional initialization
-in an initcall is replaced with a platform driver probed only if
-respective platform device is registered.
+As they are based on my previous patches:
 
-Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/common.c          |  5 +++++
- arch/arm/mach-exynos/common.h          |  1 +
- arch/arm/mach-exynos/mach-exynos4-dt.c |  1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c |  1 +
- drivers/cpufreq/exynos-cpufreq.c       | 11 ++++++++++-
- 5 files changed, 18 insertions(+), 1 deletion(-)
+[PATCH V4 1/2] ARM: at91: cpuidle: convert to platform driver
+[PATCH V4 2/2] ARM: at91: cpuidle: Move driver to drivers/cpuidle
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index c17407b..4414d70 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -305,6 +305,11 @@ void __init exynos_cpuidle_init(void)
- 	platform_device_register(&exynos_cpuidle);
- }
- 
-+void __init exynos_cpufreq_init(void)
-+{
-+	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
-+}
-+
- void __init exynos_init_late(void)
- {
- 	if (of_machine_is_compatible("samsung,exynos5440"))
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index b2ac188..61e5f3a 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -23,6 +23,7 @@ void exynos_init_io(void);
- void exynos4_restart(enum reboot_mode mode, const char *cmd);
- void exynos5_restart(enum reboot_mode mode, const char *cmd);
- void exynos_cpuidle_init(void);
-+void exynos_cpufreq_init(void);
- void exynos_init_late(void);
- 
- void exynos_firmware_init(void);
-diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-index 53a3dc3..2cbaf63 100644
---- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-@@ -26,6 +26,7 @@
- static void __init exynos4_dt_machine_init(void)
- {
- 	exynos_cpuidle_init();
-+	exynos_cpufreq_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index c9f7dd1..9144549 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -48,6 +48,7 @@ static void __init exynos5_dt_machine_init(void)
- 	}
- 
- 	exynos_cpuidle_init();
-+	exynos_cpufreq_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index 0ef13e8..706570e 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -17,6 +17,7 @@
- #include <linux/regulator/consumer.h>
- #include <linux/cpufreq.h>
- #include <linux/suspend.h>
-+#include <linux/platform_device.h>
- 
- #include <plat/cpu.h>
- 
-@@ -277,4 +278,12 @@ err_vdd_arm:
- 	kfree(exynos_info);
- 	return -EINVAL;
- }
--late_initcall(exynos_cpufreq_init);
-+
-+static struct platform_driver exynos_cpufreq_platdrv = {
-+	.driver = {
-+		.name	= "exynos-cpufreq",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe = exynos_cpufreq_init,
-+};
-+module_platform_driver(exynos_cpufreq_platdrv);
+Shall I assume they are acked-by you ?
+
+Shall I take the patch:
+
+[PATCH 2/2] ARM: AT91: DT: pm: select ram controller standby based on DT
+
+also with your acked-by ?
+
+Thanks
+   -- Daniel
+
+>>> ---
+>>>   arch/arm/mach-at91/at91sam9260.c |  2 +-
+>>>   arch/arm/mach-at91/at91sam9261.c |  2 +-
+>>>   arch/arm/mach-at91/at91sam9263.c |  2 +-
+>>>   arch/arm/mach-at91/at91sam9g45.c |  2 +-
+>>>   arch/arm/mach-at91/at91sam9rl.c  |  2 +-
+>>>   arch/arm/mach-at91/pm.h          | 55 ++++++++++++++++++----------------------
+>>>   6 files changed, 29 insertions(+), 36 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+>>> index ffe9ce7..3b43d56 100644
+>>> --- a/arch/arm/mach-at91/at91sam9260.c
+>>> +++ b/arch/arm/mach-at91/at91sam9260.c
+>>> @@ -353,7 +353,7 @@ static void __init at91sam9260_initialize(void)
+>>>   	/* Register GPIO subsystem */
+>>>   	at91_gpio_init(at91sam9260_gpio, 3);
+>>>
+>>> -	at91_pm_set_standby(at91sam9_standby);
+>>> +	at91_pm_set_standby(at91sam9_sdram_standby);
+>>>   }
+>>>
+>>>   /* --------------------------------------------------------------------
+>>> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+>>> index 1edbb6f..a0857c3 100644
+>>> --- a/arch/arm/mach-at91/at91sam9261.c
+>>> +++ b/arch/arm/mach-at91/at91sam9261.c
+>>> @@ -295,7 +295,7 @@ static void __init at91sam9261_initialize(void)
+>>>   	/* Register GPIO subsystem */
+>>>   	at91_gpio_init(at91sam9261_gpio, 3);
+>>>
+>>> -	at91_pm_set_sandby(at91sam9_standby);
+>>> +	at91_pm_set_standby(at91sam9_sdram_standby);
+>>>   }
+>>>
+>>>   /* --------------------------------------------------------------------
+>>> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+>>> index 8c81c89..103a95b 100644
+>>> --- a/arch/arm/mach-at91/at91sam9263.c
+>>> +++ b/arch/arm/mach-at91/at91sam9263.c
+>>> @@ -332,7 +332,7 @@ static void __init at91sam9263_initialize(void)
+>>>   	/* Register GPIO subsystem */
+>>>   	at91_gpio_init(at91sam9263_gpio, 5);
+>>>
+>>> -	at91_pm_set_standby(at91sam9263_standby);
+>>> +	at91_pm_set_standby(at91sam9_sdram_standby);
+>>>   }
+>>>
+>>>   /* --------------------------------------------------------------------
+>>> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+>>> index 8460f52..f29731e 100644
+>>> --- a/arch/arm/mach-at91/at91sam9g45.c
+>>> +++ b/arch/arm/mach-at91/at91sam9g45.c
+>>> @@ -381,7 +381,7 @@ static void __init at91sam9g45_initialize(void)
+>>>   	/* Register GPIO subsystem */
+>>>   	at91_gpio_init(at91sam9g45_gpio, 5);
+>>>
+>>> -	at91_pm_set_standby(at91sam9g45_standby);
+>>> +	at91_pm_set_standby(at91_ddr_standby);
+>>>   }
+>>>
+>>>   /* --------------------------------------------------------------------
+>>> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+>>> index c7986e4..9e28f41 100644
+>>> --- a/arch/arm/mach-at91/at91sam9rl.c
+>>> +++ b/arch/arm/mach-at91/at91sam9rl.c
+>>> @@ -298,7 +298,7 @@ static void __init at91sam9rl_initialize(void)
+>>>   	/* Register GPIO subsystem */
+>>>   	at91_gpio_init(at91sam9rl_gpio, 4);
+>>>
+>>> -	at91_pm_set_standby(at91sam9_standby);
+>>> +	at91_pm_set_standby(at91sam9_sdram_standby);
+>>>   }
+>>>
+>>>   /* --------------------------------------------------------------------
+>>> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+>>> index 76dd1a7..3ed190c 100644
+>>> --- a/arch/arm/mach-at91/pm.h
+>>> +++ b/arch/arm/mach-at91/pm.h
+>>> @@ -49,16 +49,18 @@ static inline void at91rm9200_standby(void)
+>>>   /* We manage both DDRAM/SDRAM controllers, we need more than one value to
+>>>    * remember.
+>>>    */
+>>> -static inline void at91sam9g45_standby(void)
+>>> +static inline void at91_ddr_standby(void)
+>>>   {
+>>>   	/* Those two values allow us to delay self-refresh activation
+>>>   	 * to the maximum. */
+>>> -	u32 lpr0, lpr1;
+>>> -	u32 saved_lpr0, saved_lpr1;
+>>> +	u32 lpr0, lpr1 = 0;
+>>> +	u32 saved_lpr0, saved_lpr1 = 0;
+>>>
+>>> -	saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+>>> -	lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
+>>> -	lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
+>>> +	if (at91_ramc_base[1]) {
+>>> +		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+>>> +		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
+>>> +		lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
+>>> +	}
+>>>
+>>>   	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+>>>   	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
+>>> @@ -66,25 +68,29 @@ static inline void at91sam9g45_standby(void)
+>>>
+>>>   	/* self-refresh mode now */
+>>>   	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
+>>> -	at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
+>>> +	if (at91_ramc_base[1])
+>>> +		at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
+>>>
+>>>   	cpu_do_idle();
+>>>
+>>>   	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
+>>> -	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+>>> +	if (at91_ramc_base[1])
+>>> +		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+>>>   }
+>>>
+>>>   /* We manage both DDRAM/SDRAM controllers, we need more than one value to
+>>>    * remember.
+>>>    */
+>>> -static inline void at91sam9263_standby(void)
+>>> +static inline void at91sam9_sdram_standby(void)
+>>>   {
+>>> -	u32 lpr0, lpr1;
+>>> -	u32 saved_lpr0, saved_lpr1;
+>>> +	u32 lpr0, lpr1 = 0;
+>>> +	u32 saved_lpr0, saved_lpr1 = 0;
+>>>
+>>> -	saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
+>>> -	lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
+>>> -	lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
+>>> +	if (at91_ramc_base[1]) {
+>>> +		saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
+>>> +		lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
+>>> +		lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
+>>> +	}
+>>>
+>>>   	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
+>>>   	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
+>>> @@ -92,27 +98,14 @@ static inline void at91sam9263_standby(void)
+>>>
+>>>   	/* self-refresh mode now */
+>>>   	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
+>>> -	at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
+>>> +	if (at91_ramc_base[1])
+>>> +		at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
+>>>
+>>>   	cpu_do_idle();
+>>>
+>>>   	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
+>>> -	at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
+>>> -}
+>>> -
+>>> -static inline void at91sam9_standby(void)
+>>> -{
+>>> -	u32 saved_lpr, lpr;
+>>> -
+>>> -	saved_lpr = at91_ramc_read(0, AT91_SDRAMC_LPR);
+>>> -
+>>> -	lpr = saved_lpr & ~AT91_SDRAMC_LPCB;
+>>> -	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr |
+>>> -			AT91_SDRAMC_LPCB_SELF_REFRESH);
+>>> -
+>>> -	cpu_do_idle();
+>>> -
+>>> -	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr);
+>>> +	if (at91_ramc_base[1])
+>>> +		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
+>>>   }
+>>>
+>>>   #endif
+>>>
+>>
+>>
+>> --
+>>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>
+>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>> <http://twitter.com/#!/linaroorg> Twitter |
+>> <http://www.linaro.org/linaro-blog/> Blog
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
 -- 
-1.8.3.2
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
