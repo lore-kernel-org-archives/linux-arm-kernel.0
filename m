@@ -1,30 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Oct 2013 11:02:50 -0600
-Subject: [PATCH v3 14/19] clk: tegra30: replace enum by binding header
-In-Reply-To: <20131016144618.GL5643@tbergstrom-lnx.Nvidia.com>
-References: <1381848794-11761-1-git-send-email-pdeschrijver@nvidia.com>
- <1381848794-11761-15-git-send-email-pdeschrijver@nvidia.com>
- <525D9A85.40102@wwwdotorg.org>
- <20131016144618.GL5643@tbergstrom-lnx.Nvidia.com>
-Message-ID: <525EC6BA.4040709@wwwdotorg.org>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Wed, 16 Oct 2013 22:32:29 +0530
+Subject: [RFC PATCH 0/5] PSCI system off and reset for KVM ARM/ARM64
+Message-ID: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2013 08:46 AM, Peter De Schrijver wrote:
-> On Tue, Oct 15, 2013 at 09:41:57PM +0200, Stephen Warren wrote:
->> On 10/15/2013 08:52 AM, Peter De Schrijver wrote:
->>> As the clock IDs are now specified in a header file, we can use those
->>> definitions instead of maintaining an internal enum.
->>
->> Nit: The patch subject should say "clk: tegra:" not "clk: tegra20:" so
->> that anyone looking at the tags in the subject has only one "tegra"
->> value to look at, not a whole bunch of them.
->>
->> Would it make sense to squash patches 15, 16, 18 together (and similar
->> for Tegra30) to avoid some churn i.e. the fact that the entire body of
->> tegra_periph_clk_list[] gets replaced twice?
-> 
-> You mean do all the changes for Tegra20 and Tegra30 in 1 patch per SoC?
+The Power State and Coordination Interface (PSCI) specification defines
+SYSTEM_OFF and SYSTEM_RESET functions for system poweroff and reboot.
 
-Yes. I think it'd make the patches smaller. But it's probably not a big
-deal if you disagree.
+This patchset adds:
+1. Emulation of PSCI SYSTEM_OFF and SYSTEM_RESET functions in 
+   KVM ARM/ARM64 by forwarding them to user space (QEMU or KVMTOOL)
+2. System poweroff and reboot using PSCI for ARM/ARM64 kernel
+
+Anup Patel (5):
+  ARM/ARM64: KVM: Update user space API header for PSCI emulation
+  ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and SYSTEM_RESET to user
+    space
+  KVM: Add documentation for KVM_EXIT_PSCI exit reason
+  ARM: psci: Add support for system reboot and poweroff
+  ARM64: psci: Add support for system reboot and poweroff
+
+ Documentation/virtual/kvm/api.txt |   13 +++++++++
+ arch/arm/include/asm/kvm_psci.h   |   25 +++++++++++++++-
+ arch/arm/include/uapi/asm/kvm.h   |    2 ++
+ arch/arm/kernel/psci.c            |   36 +++++++++++++++++++++++
+ arch/arm/kvm/arm.c                |   12 ++++++--
+ arch/arm/kvm/handle_exit.c        |   12 ++++++--
+ arch/arm/kvm/psci.c               |   57 ++++++++++++++++++++++++++++++++++---
+ arch/arm64/include/asm/kvm_psci.h |   25 +++++++++++++++-
+ arch/arm64/include/uapi/asm/kvm.h |    2 ++
+ arch/arm64/kernel/psci.c          |   36 +++++++++++++++++++++++
+ arch/arm64/kvm/handle_exit.c      |   24 ++++++++++++----
+ include/uapi/linux/kvm.h          |    7 +++++
+ 12 files changed, 233 insertions(+), 18 deletions(-)
+
+-- 
+1.7.9.5
