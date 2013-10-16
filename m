@@ -1,144 +1,113 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 16 Oct 2013 10:39:02 -0500
-Subject: [PATCH V7 2/8] ARM: OMAP2+: add missing lateinit hook for calling pm
- late init
+Date: Wed, 16 Oct 2013 10:39:08 -0500
+Subject: [PATCH V7 8/8] ARM: dts: OMAP3: add clock nodes for CPU
 In-Reply-To: <1381937948-27057-1-git-send-email-nm@ti.com>
 References: <1381937948-27057-1-git-send-email-nm@ti.com>
-Message-ID: <1381937948-27057-3-git-send-email-nm@ti.com>
+Message-ID: <1381937948-27057-9-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM335x, AM43xx, OMAP5 and DRA7 have missing late init hook. Introduce
-SoC specific hook with a call to OMAP2+ generic lateinit hook. This
-allows the generic late initializations such as cpufreq hooks to be
-active.
+OMAP34xx and OMAP36xx platforms use dpll1 clock. Add same to common
+definition.
 
-Based on out-of-tree patches that need to be introduced in
-mainline, this introduction allows us to provide the foundation for
-further SoC specific features as they are developed.
+AM33XX, OMAP443x, OMAP446x and OMAP447x platforms use dpll_mpu clock
+Add same to common definition.
+
+OMAP5, DRA7 platforms use dpll_mpu_ck clock for CPU. Add same to common
+definition.
 
 Cc: Benoit Cousson <bcousson@baylibre.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
+[nm at ti.com: keep in sync with clock node changes]
+[j-keerthy at ti.com: OMAP5 and DRA7 nodes]
+Signed-off-by: J Keerthy <j-keerthy@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/board-generic.c |    4 ++++
- arch/arm/mach-omap2/common.h        |    4 ++++
- arch/arm/mach-omap2/io.c            |   20 ++++++++++++++++++++
- 3 files changed, 28 insertions(+)
+ arch/arm/boot/dts/am33xx.dtsi |    4 ++++
+ arch/arm/boot/dts/dra7.dtsi   |    5 +++++
+ arch/arm/boot/dts/omap3.dtsi  |    5 +++++
+ arch/arm/boot/dts/omap4.dtsi  |    5 +++++
+ arch/arm/boot/dts/omap5.dtsi  |    6 ++++++
+ 5 files changed, 25 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 3017a9d..e366064 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -128,6 +128,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
- 	.init_irq	= omap_intc_of_init,
- 	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
-+	.init_late	= am33xx_init_late,
- 	.init_time	= omap3_gptimer_timer_init,
- 	.dt_compat	= am33xx_boards_compat,
- 	.restart	= am33xx_restart,
-@@ -167,6 +168,7 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
- 	.init_early	= omap5_init_early,
- 	.init_irq	= omap_gic_of_init,
- 	.init_machine	= omap_generic_init,
-+	.init_late	= omap5_init_late,
- 	.init_time	= omap5_realtime_timer_init,
- 	.dt_compat	= omap5_boards_compat,
- 	.restart	= omap44xx_restart,
-@@ -182,6 +184,7 @@ static const char *am43_boards_compat[] __initdata = {
- DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
- 	.map_io		= am33xx_map_io,
- 	.init_early	= am43xx_init_early,
-+	.init_late	= am43xx_init_late,
- 	.init_irq	= omap_gic_of_init,
- 	.init_machine	= omap_generic_init,
- 	.init_time	= omap3_sync32k_timer_init,
-@@ -200,6 +203,7 @@ DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
- 	.smp		= smp_ops(omap4_smp_ops),
- 	.map_io		= omap5_map_io,
- 	.init_early	= dra7xx_init_early,
-+	.init_late	= dra7xx_init_late,
- 	.init_irq	= omap_gic_of_init,
- 	.init_machine	= omap_generic_init,
- 	.init_time	= omap5_realtime_timer_init,
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index c6aebf0..f7644fe 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -98,6 +98,7 @@ void am35xx_init_early(void);
- void ti81xx_init_early(void);
- void am33xx_init_early(void);
- void am43xx_init_early(void);
-+void am43xx_init_late(void);
- void omap4430_init_early(void);
- void omap5_init_early(void);
- void omap3_init_late(void);	/* Do not use this one */
-@@ -109,8 +110,11 @@ void omap35xx_init_late(void);
- void omap3630_init_late(void);
- void am35xx_init_late(void);
- void ti81xx_init_late(void);
-+void am33xx_init_late(void);
-+void omap5_init_late(void);
- int omap2_common_pm_late_init(void);
- void dra7xx_init_early(void);
-+void dra7xx_init_late(void);
- 
- #ifdef CONFIG_SOC_BUS
- void omap_soc_device_init(void);
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index ff2113c..a2cbb44 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -583,6 +583,11 @@ void __init am33xx_init_early(void)
- 	omap_hwmod_init_postsetup();
- 	omap_clk_init = am33xx_clk_init;
- }
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 2a994d6..09f16a0 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -55,6 +55,10 @@
+ 				275000  1125000
+ 			>;
+ 			voltage-tolerance = <2>; /* 2 percentage */
 +
-+void __init am33xx_init_late(void)
-+{
-+	omap_common_late_init();
-+}
- #endif
- 
- #ifdef CONFIG_SOC_AM43XX
-@@ -596,6 +601,11 @@ void __init am43xx_init_early(void)
- 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE), NULL);
- 	omap3xxx_check_revision();
- }
++			clocks = <&dpll_mpu_ck>;
++			clock-names = "cpu";
 +
-+void __init am43xx_init_late(void)
-+{
-+	omap_common_late_init();
-+}
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
-@@ -651,6 +661,11 @@ void __init omap5_init_early(void)
- 	omap54xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
- }
+ 			clock-latency = <300000>; /* From omap-cpufreq driver */
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 92cbe3b..e723b52 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -42,6 +42,11 @@
+ 				1000000	1060000
+ 				1176000	1160000
+ 				>;
 +
-+void __init omap5_init_late(void)
-+{
-+	omap_common_late_init();
-+}
- #endif
- 
- #ifdef CONFIG_SOC_DRA7XX
-@@ -671,6 +686,11 @@ void __init dra7xx_init_early(void)
- 	dra7xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
- }
++			clocks = <&dpll_mpu_ck>;
++			clock-names = "cpu";
 +
-+void __init dra7xx_init_late(void)
-+{
-+	omap_common_late_init();
-+}
- #endif
++			clock-latency = <300000>; /* From omap-cpufreq driver */
+ 		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 7f5d8a8..4f3778a 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -32,6 +32,11 @@
+ 			compatible = "arm,cortex-a8";
+ 			device_type = "cpu";
+ 			reg = <0x0>;
++
++			clocks = <&dpll1_ck>;
++			clock-names = "cpu";
++
++			clock-latency = <300000>; /* From omap-cpufreq driver */
+ 		};
+ 	};
  
- 
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 17a3618..decff2a 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -32,6 +32,11 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x0>;
++
++			clocks = <&dpll_mpu_ck>;
++			clock-names = "cpu";
++
++			clock-latency = <300000>; /* From omap-cpufreq driver */
+ 		};
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a9";
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 69874de..e18ee7e 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -44,6 +44,12 @@
+ 				1000000 1060000
+ 				1500000 1250000
+ 			>;
++
++			clocks = <&dpll_mpu_ck>;
++			clock-names = "cpu";
++
++			clock-latency = <300000>; /* From omap-cpufreq driver */
++
+ 		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
 -- 
 1.7.9.5
