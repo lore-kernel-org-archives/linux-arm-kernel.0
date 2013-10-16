@@ -1,28 +1,39 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 16 Oct 2013 11:31:07 -0700
-Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <20131016180735.GI25034@n2100.arm.linux.org.uk>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
- <20131003202751.GZ6192@mwanda>
- <20131015131038.GB25034@n2100.arm.linux.org.uk>
- <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
- <20131016170341.GH25034@n2100.arm.linux.org.uk>
- <20131016180735.GI25034@n2100.arm.linux.org.uk>
-Message-ID: <20131016183107.GC18050@kroah.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 16 Oct 2013 20:32:53 +0200
+Subject: [PATCH] ARM: s3c64xx: Select CPU_V6K instead of CPU_V6
+In-Reply-To: <1380390554-4400-1-git-send-email-tomasz.figa@gmail.com>
+References: <1380390554-4400-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <3346618.t8I6lVv536@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 07:07:35PM +0100, Russell King - ARM Linux wrote:
-> Sorry, but I don't think imx-drm is driving the hardware correctly, and
-> I know that Greg wants it moved out of drivers/staging, but frankly it
-> seems to be far from ready for that.  Certainly the HDMI parts seems to
-> be especially problematical.
+Hi Kukjin,
 
-I want it out of staging if it's working properly.  Yours is the first
-report of it not working properly, and in fact, probably one of the
-first users of the driver, as I haven't gotten any reports of it working
-or not at all over the years.
+On Saturday 28 of September 2013 19:49:14 Tomasz Figa wrote:
+> All S3C64XX SoCs come with ARM1176JZF-s core, which fully supports
+> ARMv6K extensions. This patch lets the kernel use them on S3C6410 by
+> adding selection of CPU_V6K to ARCH_S3C64XX.
+> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  arch/arm/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-thanks,
+What do you think about this patch?
 
-greg k-h
+Best regards,
+Tomasz
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index b766dad..3a41bbb 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -728,7 +728,7 @@ config ARCH_S3C64XX
+>  	select CLKDEV_LOOKUP
+>  	select CLKSRC_SAMSUNG_PWM
+>  	select COMMON_CLK
+> -	select CPU_V6
+> +	select CPU_V6K
+>  	select GENERIC_CLOCKEVENTS
+>  	select GPIO_SAMSUNG
+>  	select HAVE_CLK
