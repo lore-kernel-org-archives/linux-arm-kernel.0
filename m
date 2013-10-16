@@ -1,67 +1,68 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 16 Oct 2013 20:33:59 +0200
-Subject: [PATCH] ARM: s3c64xx: mini6410: Correct card detect type for
- HSMMC1
-In-Reply-To: <1380471121-9478-1-git-send-email-tomasz.figa@gmail.com>
-References: <1380471121-9478-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1527511.ScaEHrLnaz@flatron>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 16 Oct 2013 11:45:48 -0700
+Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
+ status
+In-Reply-To: <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
+References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
+ <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
+ <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
+Message-ID: <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Wed, Oct 16, 2013 at 11:29 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> Hi Vinod,
+>
+> On Wed, 16 Oct 2013, Vinod Koul wrote:
+>
+>> the DMA_SUCCESS is a misnomer as dmaengine indicates the transfer is complete and
+>> gives no guarantee of the transfer success. Hence we should use DMA_COMPLTE
+>> instead of DMA_SUCCESS
+>>
+>> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+>> ---
+>>  drivers/dma/dmaengine.c   |    2 +-
+>>  include/linux/dmaengine.h |   12 ++++++------
+>>  2 files changed, 7 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+>> index 9162ac8..81d8765 100644
+>> --- a/drivers/dma/dmaengine.c
+>> +++ b/drivers/dma/dmaengine.c
+>> @@ -1062,7 +1062,7 @@ dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx)
+>>       unsigned long dma_sync_wait_timeout = jiffies + msecs_to_jiffies(5000);
+>>
+>>       if (!tx)
+>> -             return DMA_SUCCESS;
+>> +             return DMA_COMPLETE;
+>>
+>>       while (tx->cookie == -EBUSY) {
+>>               if (time_after_eq(jiffies, dma_sync_wait_timeout)) {
+>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>> index 0bc7275..4b460a6 100644
+>> --- a/include/linux/dmaengine.h
+>> +++ b/include/linux/dmaengine.h
+>> @@ -45,13 +45,13 @@ static inline int dma_submit_error(dma_cookie_t cookie)
+>>
+>>  /**
+>>   * enum dma_status - DMA transaction status
+>> - * @DMA_SUCCESS: transaction completed successfully
+>> + * @DMA_COMPLETE: transaction completed
+>>   * @DMA_IN_PROGRESS: transaction not yet processed
+>>   * @DMA_PAUSED: transaction is paused
+>>   * @DMA_ERROR: transaction failed
+>>   */
+>>  enum dma_status {
+>> -     DMA_SUCCESS,
+>> +     DMA_COMPLETE,
+>>       DMA_IN_PROGRESS,
+>>       DMA_PAUSED,
+>>       DMA_ERROR,
+>
+> Doesn't this break kernel compilation for a total of 27 commits? Or am I
+> missing anything?
 
-On Sunday 29 of September 2013 18:12:01 Tomasz Figa wrote:
-> According to board schematics, for HSMMC1 a GPIO line is used to detect
-> card presence, while currently it is being configured for internal card
-> detect line, which is multiplexed with card detect line of HSMMC0 and
-> thus breaking it.
-> 
-> This patch adds proper sdhci platform data setting card detect type to
-> external GPIO and fixing operation of HSMMC0.
-> 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-mini6410.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-
-Would you mind taking this patch to your tree?
-
-Best regards,
-Tomasz
-
-> diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c
-> b/arch/arm/mach-s3c64xx/mach-mini6410.c index 58d46a3..97ae470 100644
-> --- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-> @@ -36,7 +36,9 @@
->  #include <plat/devs.h>
->  #include <plat/fb.h>
->  #include <linux/platform_data/mtd-nand-s3c2410.h>
-> +#include <linux/platform_data/mmc-sdhci-s3c.h>
->  #include <plat/regs-serial.h>
-> +#include <plat/sdhci.h>
->  #include <linux/platform_data/touchscreen-s3c2410.h>
-> 
->  #include <video/platform_lcd.h>
-> @@ -214,6 +216,13 @@ static struct platform_device mini6410_lcd_powerdev
-> = { .dev.platform_data	= &mini6410_lcd_power_data,
->  };
-> 
-> +static struct s3c_sdhci_platdata mini6410_hsmmc1_pdata = {
-> +	.max_width		= 4,
-> +	.cd_type		= S3C_SDHCI_CD_GPIO,
-> +	.ext_cd_gpio		= S3C64XX_GPN(10),
-> +	.ext_cd_gpio_invert	= true,
-> +};
-> +
->  static struct platform_device *mini6410_devices[] __initdata = {
->  	&mini6410_device_eth,
->  	&s3c_device_hsmmc0,
-> @@ -321,6 +330,7 @@ static void __init mini6410_machine_init(void)
-> 
->  	s3c_nand_set_platdata(&mini6410_nand_info);
->  	s3c_fb_set_platdata(&mini6410_lcd_pdata[features.lcd_index]);
-> +	s3c_sdhci1_set_platdata(&mini6410_hsmmc1_pdata);
->  	s3c24xx_ts_set_platdata(NULL);
-> 
->  	/* configure nCS1 width to 16 bits */
+Yes, I think at the start DMA_COMPLETE should just be a alias for
+DMA_SUCCESS, then after all the driver renames are in delete
+DMA_SUCCESS.
