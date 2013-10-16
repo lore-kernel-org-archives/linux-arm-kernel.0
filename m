@@ -1,162 +1,44 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Wed, 16 Oct 2013 11:56:15 +0200
-Subject: [PATCH v3 2/3] ARM: at91: fix hanged boot due to early rtt-interrupt
-In-Reply-To: <1381917376-21107-1-git-send-email-jhovold@gmail.com>
-References: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
- <1381917376-21107-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1381917376-21107-3-git-send-email-jhovold@gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 16 Oct 2013 13:19:13 +0300
+Subject: [PATCH 1/1] ARM: dma-mapping: Drop GFP_COMP for DMA memory allocations
+Message-ID: <1381918756-10389-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure the RTT-interrupts are masked at boot by adding a new helper
-function to be used at SOC-init.
+arm_iommu_alloc_attrs wants to split pages after allocation in order
+to reduce the memory footprint. This does not work well with GFP_COMP
+pages, so drop this flag before allocation.
 
-This fixes hanged boot on all AT91 SOCs with an RTT, for example, if an
-RTT-alarm goes off after a non-clean shutdown (e.g. when using RTC
-wakeup).
+ref: ea2e7057c0234cfb8b09467d8f137760d371fc72:
 
-The RTC and RTT-peripherals are powered by backup power (VDDBU) (on all
-AT91 SOCs but RM9200) and are not reset on wake-up, user, watchdog or
-software reset. This means that their interrupts may be enabled during
-early boot if, for example, they where not disabled during a previous
-shutdown (e.g. due to a buggy driver or a non-clean shutdown such as a
-user reset). Furthermore, an RTC or RTT-alarm may also be active.
+    ARM: 7172/1: dma: Drop GFP_COMP for DMA memory allocations
 
-The RTC and RTT-interrupts use the shared system-interrupt line, which
-is also used by the PIT, and if an interrupt occurs before a handler
-(e.g. RTC-driver) has been installed this leads to the system interrupt
-being disabled and prevents the system from booting.
+    dma_alloc_coherent wants to split pages after allocation in order to
+    reduce the memory footprint. This does not work well with GFP_COMP
+    pages, so drop this flag before allocation.
 
-Note that when boot hangs due to an early RTC or RTT-interrupt, the only
-way to get the system to start again is to remove the backup power (e.g.
-battery) or to disable the interrupt manually from the bootloader. In
-particular, a user reset is not sufficient.
-
-Signed-off-by: Johan Hovold <jhovold@gmail.com>
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/mach-at91/at91sam9260.c |  2 ++
- arch/arm/mach-at91/at91sam9261.c |  2 ++
- arch/arm/mach-at91/at91sam9263.c |  3 +++
- arch/arm/mach-at91/at91sam9g45.c |  1 +
- arch/arm/mach-at91/at91sam9rl.c  |  1 +
- arch/arm/mach-at91/generic.h     |  1 +
- arch/arm/mach-at91/sysirq_mask.c | 24 ++++++++++++++++++++++++
- 7 files changed, 34 insertions(+)
+ arch/arm/mm/dma-mapping.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 5de6074..ae10d14 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -349,6 +349,8 @@ static void __init at91sam9260_initialize(void)
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index f5e1a84..955dd3e 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1321,6 +1321,13 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ 	struct page **pages;
+ 	void *addr = NULL;
  
-+	at91_sysirq_mask_rtt(AT91SAM9260_BASE_RTT);
++	/* Following is a work-around (a.k.a. hack) to prevent pages
++	 * with __GFP_COMP being passed to split_page() which cannot
++	 * handle them.  The real problem is that this flag probably
++	 * should be 0 on ARM as it is not supported on this
++	 * platform--see CONFIG_HUGETLB_PAGE. */
++	gfp &= ~(__GFP_COMP);
 +
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9260_gpio, 3);
- }
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 0e07932..e761e74 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -291,6 +291,8 @@ static void __init at91sam9261_initialize(void)
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
+ 	*handle = DMA_ERROR_CODE;
+ 	size = PAGE_ALIGN(size);
  
-+	at91_sysirq_mask_rtt(AT91SAM9261_BASE_RTT);
-+
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9261_gpio, 3);
- }
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 962768b..ad02281 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -330,6 +330,9 @@ static void __init at91sam9263_initialize(void)
- 	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
- 
-+	at91_sysirq_mask_rtt(AT91SAM9263_BASE_RTT0);
-+	at91_sysirq_mask_rtt(AT91SAM9263_BASE_RTT1);
-+
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9263_gpio, 5);
- }
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 8d4da6d..88e6f7b 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -380,6 +380,7 @@ static void __init at91sam9g45_initialize(void)
- 	arm_pm_restart = at91sam9g45_restart;
- 
- 	at91_sysirq_mask_rtc(AT91SAM9G45_BASE_RTC);
-+	at91_sysirq_mask_rtt(AT91SAM9G45_BASE_RTT);
- 
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9g45_gpio, 5);
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index b5a8c9d..301e172 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -295,6 +295,7 @@ static void __init at91sam9rl_initialize(void)
- 	arm_pm_restart = at91sam9_alt_restart;
- 
- 	at91_sysirq_mask_rtc(AT91SAM9RL_BASE_RTC);
-+	at91_sysirq_mask_rtt(AT91SAM9RL_BASE_RTT);
- 
- 	/* Register GPIO subsystem */
- 	at91_gpio_init(at91sam9rl_gpio, 4);
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 80269bd..26dee3c 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -35,6 +35,7 @@ extern int  __init at91_aic_of_init(struct device_node *node,
- extern int  __init at91_aic5_of_init(struct device_node *node,
- 				    struct device_node *parent);
- extern void __init at91_sysirq_mask_rtc(u32 rtc_base);
-+extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
- 
- 
-  /* Timer */
-diff --git a/arch/arm/mach-at91/sysirq_mask.c b/arch/arm/mach-at91/sysirq_mask.c
-index ee3e22c..2ba694f 100644
---- a/arch/arm/mach-at91/sysirq_mask.c
-+++ b/arch/arm/mach-at91/sysirq_mask.c
-@@ -21,6 +21,7 @@
-  */
- 
- #include <linux/io.h>
-+#include <mach/at91_rtt.h>
- 
- #include "generic.h"
- 
-@@ -45,3 +46,26 @@ void __init at91_sysirq_mask_rtc(u32 rtc_base)
- 
- 	iounmap(base);
- }
-+
-+void __init at91_sysirq_mask_rtt(u32 rtt_base)
-+{
-+	void __iomem *base;
-+	void __iomem *reg;
-+	u32 mode;
-+
-+	base = ioremap(rtt_base, 16);
-+	if (!base)
-+		return;
-+
-+	reg = base + AT91_RTT_MR;
-+
-+	mode = readl_relaxed(reg);
-+	if (mode & (AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN)) {
-+		pr_info("AT91: Disabling rtt irq\n");
-+		mode &= ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN);
-+		writel_relaxed(mode, reg);
-+		(void)readl_relaxed(reg);			/* flush */
-+	}
-+
-+	iounmap(base);
-+}
 -- 
-1.8.4
+1.8.1.5
