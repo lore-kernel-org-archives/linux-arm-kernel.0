@@ -1,62 +1,59 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 16 Oct 2013 08:49:17 +0530
-Subject: [PATCH v2] ARM: davinci: convert to
- clockevents_config_and_register
-In-Reply-To: <1381653390-22250-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <CA+V-a8v58_ixJ5s5d+tsf19qszD2tLGe8465kfQBKivRV+vRoQ@mail.gmail.com>
- <1381653390-22250-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <525E05B5.8060801@ti.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed, 16 Oct 2013 11:18:05 +0800
+Subject: [PATCH v3 0/7] Optimize jump label implementation for ARM64
+Message-ID: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 13 October 2013 02:06 PM, Uwe Kleine-K?nig wrote:
-> clockevents_config_and_register is superior compared to setting
-> shift/mult and {min,max}_delta_ns by hand.
-> 
-> Tested-by: Prabhakar Lad <prabhakar.csengg@gmail.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Prabhakar Lad wrote:
->> I have boot tested this patch on OMAP-L138 and tested the uptime
->> (with min ticks set to 1), should that be enough ?
-> I don't know for sure, but I guess so. If you agree, here is an updated
-> patch.
-> 
-> Best regards
-> Uwe
-> 
-> 
->  arch/arm/mach-davinci/time.c | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-> index 7a55b5c..29a1a5d 100644
-> --- a/arch/arm/mach-davinci/time.c
-> +++ b/arch/arm/mach-davinci/time.c
-> @@ -331,7 +331,6 @@ static void davinci_set_mode(enum clock_event_mode mode,
->  
->  static struct clock_event_device clockevent_davinci = {
->  	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> -	.shift		= 32,
->  	.set_next_event	= davinci_set_next_event,
->  	.set_mode	= davinci_set_mode,
->  };
-> @@ -397,14 +396,10 @@ void __init davinci_timer_init(void)
->  
->  	/* setup clockevent */
->  	clockevent_davinci.name = id_to_name[timers[TID_CLOCKEVENT].id];
-> -	clockevent_davinci.mult = div_sc(davinci_clock_tick_rate, NSEC_PER_SEC,
-> -					 clockevent_davinci.shift);
-> -	clockevent_davinci.max_delta_ns =
-> -		clockevent_delta2ns(0xfffffffe, &clockevent_davinci);
-> -	clockevent_davinci.min_delta_ns = 50000; /* 50 usec */
->  
->  	clockevent_davinci.cpumask = cpumask_of(0);
-> -	clockevents_register_device(&clockevent_davinci);
-> +	clockevents_config_and_register(&clockevent_davinci,
-> +		davinci_clock_tick_rate, 1, 0xfffffffe);
+From: Jiang Liu <jiang.liu@huawei.com>
 
-checkpatch --strict complains about alignment of line break. Fixed locally.
+This patchset tries to optimize arch specfic jump label implementation
+for ARM64 by dynamic kernel text patching.
 
-Thanks,
-Sekhar
+To enable this feature, your toolchain must support "asm goto" extension
+and "%c" constraint extesion. Current GCC for AARCH64 doesn't support
+"%c", so you need a GCC patch similiar to this:
+http://gcc.gnu.org/viewcvs/gcc/trunk/gcc/config/arm/arm.c?view=patch&r1=175293&r2=175565&pathrev=175565
+http://gcc.gnu.org/bugzilla/show_bug.cgi?id=48637
+
+It has been tested on ARM Fast mode and a real hardware platform.
+
+Any comments are welcomed!
+
+V2->V3:
+1) fix a bug in comparing signed and unsigned values
+2) detect big endian by checking __AARCH64EB__
+
+V1->V2: address review comments of V1
+1) refine comments
+2) add a new interface to always synchronize with stop_machine()
+   when patching code
+3) handle endian issue when patching code
+
+Jiang Liu (7):
+  arm64: introduce basic aarch64 instruction decoding helpers
+  arm64: introduce interfaces to hotpatch kernel and module code
+  arm64: move encode_insn_immediate() from module.c to insn.c
+  arm64: introduce aarch64_insn_gen_{nop|branch_imm}() helper functions
+  arm64, jump label: detect %c support for ARM64
+  arm64, jump label: optimize jump label implementation
+  jump_label: use defined macros instead of hard-coding for better
+    readability
+
+ arch/arm64/Kconfig                  |   1 +
+ arch/arm64/include/asm/insn.h       |  79 ++++++++++
+ arch/arm64/include/asm/jump_label.h |  52 +++++++
+ arch/arm64/kernel/Makefile          |   3 +-
+ arch/arm64/kernel/insn.c            | 285 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/jump_label.c      |  60 ++++++++
+ arch/arm64/kernel/module.c          | 151 ++++---------------
+ include/linux/jump_label.h          |  15 +-
+ scripts/gcc-goto.sh                 |   2 +-
+ 9 files changed, 522 insertions(+), 126 deletions(-)
+ create mode 100644 arch/arm64/include/asm/insn.h
+ create mode 100644 arch/arm64/include/asm/jump_label.h
+ create mode 100644 arch/arm64/kernel/insn.c
+ create mode 100644 arch/arm64/kernel/jump_label.c
+
+-- 
+1.8.1.2
