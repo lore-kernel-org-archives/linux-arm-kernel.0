@@ -1,64 +1,203 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 16 Oct 2013 19:13:13 +0300
-Subject: [PATCH v2 5/7] clk: tegra124: Add support for Tegra124 clocks
-In-Reply-To: <525DA5C3.5070903@wwwdotorg.org>
-References: <1381850098-12357-1-git-send-email-pdeschrijver@nvidia.com>
- <1381850098-12357-6-git-send-email-pdeschrijver@nvidia.com>
- <525DA5C3.5070903@wwwdotorg.org>
-Message-ID: <20131016161313.GO5643@tbergstrom-lnx.Nvidia.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Thu, 17 Oct 2013 00:15:14 +0800
+Subject: [PATCH v3 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <20131016111130.GE5403@mudshark.cambridge.arm.com>
+References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
+ <1381893492-7135-3-git-send-email-liuj97@gmail.com>
+ <20131016111130.GE5403@mudshark.cambridge.arm.com>
+Message-ID: <525EBB92.2050103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 10:29:55PM +0200, Stephen Warren wrote:
-> On 10/15/2013 09:14 AM, Peter De Schrijver wrote:
-> > Implement clock support for Tegra124.
+On 10/16/2013 07:11 PM, Will Deacon wrote:
+> On Wed, Oct 16, 2013 at 04:18:07AM +0100, Jiang Liu wrote:
+>> From: Jiang Liu <jiang.liu@huawei.com>
+>>
+>> Introduce three interfaces to patch kernel and module code:
+>> aarch64_insn_patch_text_nosync():
+>> 	patch code without synchronization, it's caller's responsibility
+>> 	to synchronize all CPUs if needed.
+>> aarch64_insn_patch_text_sync():
+>> 	patch code and always synchronize with stop_machine()
+>> aarch64_insn_patch_text():
+>> 	patch code and synchronize with stop_machine() if needed
+>>
+>> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+>> Cc: Jiang Liu <liuj97@gmail.com>
+>> ---
+>>  arch/arm64/include/asm/insn.h |  7 +++-
+>>  arch/arm64/kernel/insn.c      | 95 +++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 101 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+>> index e7d1bc8..2dfcdb4 100644
+>> --- a/arch/arm64/include/asm/insn.h
+>> +++ b/arch/arm64/include/asm/insn.h
+>> @@ -47,7 +47,12 @@ __AARCH64_INSN_FUNCS(nop,	0xFFFFFFFF, 0xD503201F)
+>>  #undef	__AARCH64_INSN_FUNCS
+>>  
+>>  enum aarch64_insn_class aarch64_get_insn_class(u32 insn);
+>> -
+>> +u32 aarch64_insn_read(void *addr);
+>> +void aarch64_insn_write(void *addr, u32 insn);
+>>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>>  
+>> +int aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[], int cnt);
+>> +int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+>> +int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+>> +
+>>  #endif	/* _ASM_ARM64_INSN_H */
+>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>> index 1be4d11..ad4185f 100644
+>> --- a/arch/arm64/kernel/insn.c
+>> +++ b/arch/arm64/kernel/insn.c
+>> @@ -16,6 +16,8 @@
+>>   */
+>>  #include <linux/compiler.h>
+>>  #include <linux/kernel.h>
+>> +#include <linux/stop_machine.h>
+>> +#include <asm/cacheflush.h>
+>>  #include <asm/insn.h>
+>>  
+>>  /*
+>> @@ -84,3 +86,96 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+>>  	return __aarch64_insn_hotpatch_safe(old_insn) &&
+>>  	       __aarch64_insn_hotpatch_safe(new_insn);
+>>  }
+>> +
+>> +/*
+>> + * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
+>> + * little-endian. On the other hand, SCTLR_EL1.EE (bit 25, Exception Endianness)
+>> + * flag controls endianness for EL1 explicit data accesses and stage 1
+>> + * translation table walks as below:
+>> + *	0: little-endian
+>> + *	1: big-endian
+>> + * So need to handle endianness when patching kernel code.
+>> + */
+>> +u32 __kprobes aarch64_insn_read(void *addr)
+>> +{
+>> +	u32 insn;
+>> +
+>> +#ifdef	__AARCH64EB__
+>> +	insn = swab32(*(u32 *)addr);
+>> +#else
+>> +	insn = *(u32 *)addr;
+>> +#endif
 > 
-> > diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+> le32_to_cpu ?
 > 
-> > +static struct pdiv_map pll12g_ssd_esd_p[] = {
-> > +	{ .pdiv = 1, .hw_val = 0 },
-> > +	{ .pdiv = 2, .hw_val = 1 },
-> ...
-> > +	{ .pdiv = 24, .hw_val = 13 },
-> > +	{ .pdiv = 32, .hw_val = 14 },
-> > +	{ .pdiv = 0, .hw_val = 15 },
-> > +};
+>> +
+>> +	return insn;
+>> +}
+>> +
+>> +void __kprobes aarch64_insn_write(void *addr, u32 insn)
+>> +{
+>> +#ifdef	__AARCH64EB__
+>> +	*(u32 *)addr = swab32(insn);
+>> +#else
+>> +	*(u32 *)addr = insn;
+>> +#endif
+>> +}
 > 
-> I'm curious why that last entry doesn't have .hw_val = 0, since I think
-> it's a sentinel value. For example, the last entry in pllxc_p[] does
-> have .hw_val = 0.
-> 
-> > diff --git a/include/dt-bindings/clock/tegra124-car.h b/include/dt-bindings/clock/tegra124-car.h
-> 
-> I think you also need to create
-> Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt in this
-> patch. All the other SoCs have their own binding file. That said, given
-> all the clock IDs have moved into <dt-bindings/clock/tegraNNN-car.h>,
-> perhaps we should just have a separate patch that removes the separate
-> bindings for Tegra30 and Tegra114, and simply add their compatible
-> values into the existing nvidia,tegra20-car.txt (and also make the
-> header file reference in that file more generic so it applies to any
-> Tegra SoC)?
+> cpu_to_le32 ?
+Good suggestion, much more simpler.
 
-Maybe yes...
 > 
-> > @@ -0,0 +1,341 @@
-> > +/*
-> > + * This header provides constants for binding nvidia,tegra124-car.
-> > + *
-> > + * The first 185 clocks are numbered to match the bits in the CAR's CLK_OUT_ENB
-> > + * registers.
+>> +int __kprobes aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[],
+>> +					     int cnt)
+>> +{
+>> +	int i;
+>> +	u32 *tp;
+>> +
+>> +	if (cnt <= 0)
+>> +		return -EINVAL;
+>> +
+>> +	for (i = 0; i < cnt; i++) {
+>> +		tp = addrs[i];
+>> +		/* A64 instructions must be word aligned */
+>> +		if ((uintptr_t)tp & 0x3)
+>> +			return -EINVAL;
+>> +		aarch64_insn_write(tp, insns[i]);
+>> +		flush_icache_range((uintptr_t)tp, (uintptr_t)tp + sizeof(u32));
 > 
-> Shouldn't that be 192 (== 185 * 32)? Perhaps some bits aren't allocated,
+> What are you trying to achieve with this cache maintenance for the nosync
+> case? If you're not synchronising, then you will always have races with the
+> instruction patching, so I'd argue that this cache flush doesn't buy you
+> anything.
+aarch64_insn_patch_text_nosync() may be used in cases of
+1) during early boot with only the master CPU running.
+2) during runtime with all other CPUs in controlled state, such as kgdb.
+3) patching hot-patching safe instructions
+So flush_icache_range() is used to support case 1 and ensure local CPU
+sees the new instructions.
 
-I guess you mean 6 * 32?
+> 
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +struct aarch64_insn_patch {
+>> +	void	**text_addrs;
+>> +	u32	*new_insns;
+>> +	int	insn_cnt;
+>> +};
+>> +
+>> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>> +{
+>> +	struct aarch64_insn_patch *pp = arg;
+>> +
+>> +	return aarch64_insn_patch_text_nosync(pp->text_addrs, pp->new_insns,
+>> +					      pp->insn_cnt);
+>> +}
+>> +
+>> +int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
+>> +{
+>> +	struct aarch64_insn_patch patch = {
+>> +		.text_addrs = addrs,
+>> +		.new_insns = insns,
+>> +		.insn_cnt = cnt,
+>> +	};
+>> +
+>> +	if (cnt <= 0)
+>> +		return -EINVAL;
+>> +
+>> +	/*
+>> +	 * Execute __aarch64_insn_patch_text() on every online CPU,
+>> +	 * which ensure serialization among all online CPUs.
+>> +	 */
+>> +	return stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
+>> +}
+>> +
+>> +int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+>> +{
+>> +	if (cnt == 1 && aarch64_insn_hotpatch_safe(aarch64_insn_read(addrs[0]),
+>> +						   insns[0]))
+>> +		return aarch64_insn_patch_text_nosync(addrs, insns, cnt);
+>> +	else
+>> +		return aarch64_insn_patch_text_sync(addrs, insns, cnt);
+>> +}
+> 
+> The other way of doing this for cnt > 1 would be to patch in a branch to
+> the insns array and then a branch over the original code at the end of the
+> array. Obviously, this relies on insns being allocated somewhere persistent
+> (and non-pageable!).
+Kprobe uses the optimization method described above, but it's rather
+complex and depends on the instructions in the insns array.
 
-> but in previous SoCs, I rounded the ID space for peripheral clocks up to
-> whole registers. I see that as far as the clock IDs, this is already
-> fine; it's just this description that says 185 not 192.
+> 
+> I was wondering whether you could do something clever with BKPT, but
+> everything I've thought of so far is racy.
+Need more time to think about this optimization.
 
-Ok.
+According to my understanding, it's not safe to patch a normal
+instruction (non B, BL, SVC, HVC, SMC, NOP, BRK) with BRK too.
+If that's true, it will be challenging to avoid stop_machine()
+here.
 
-Cheers,
-
-Peter.
+Thanks!
+Gerry
+> 
+> Will
+> 
