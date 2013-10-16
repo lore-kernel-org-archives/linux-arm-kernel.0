@@ -1,26 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 Oct 2013 13:47:12 +0200
-Subject: [PATCH v2 5/5] pinctrl: rockchip: emulate both edge triggered
- interrupts
-In-Reply-To: <201310160109.08771.heiko@sntech.de>
-References: <201310160106.42329.heiko@sntech.de>
- <201310160109.08771.heiko@sntech.de>
-Message-ID: <CACRpkdY88+21J3GaUSaZ5LYA5q2Xw+ak58UKe_8qaMucsT5cdw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 16 Oct 2013 14:06:17 +0200
+Subject: at91sam9g20-ek pinctrl conflicts
+In-Reply-To: <20131016110405.GH2443@sirena.org.uk>
+References: <20131016110405.GH2443@sirena.org.uk>
+Message-ID: <20131016120617.GB27808@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 1:09 AM, Heiko St?bner <heiko@sntech.de> wrote:
+On 12:04 Wed 16 Oct     , Mark Brown wrote:
+> Hi,
+> 
+> Booting an at91sam9g20-ek I see errors loading the MMC driver due to
+> conflicts with SPI:
+> 
+> pinctrl-at91 pinctrl.2: pin pioA1 already requested by fffc8000.spi; cannot claim for fffa8000.mmc
+> pinctrl-at91 pinctrl.2: pin-1 (fffa8000.mmc) status -22
+> pinctrl-at91 pinctrl.2: could not request pin 1 (pioA1) from group mmc0_slot1_cmd_dat0-0  on device pinctrl.2
 
-> The gpio interrupt controller on Rockchip socs can do edge triggers only
-> for single edges but not both. Nevertheless a lot of gpio users rely on
-> the availability of both-edge triggered interrupts - i.e. gpio-keys.
->
-> Therefore implement a solution similar to pinctrl-coh901 re-setting the
-> triggering edge depending on the gpio value in the interrupt demuxer.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+it's not really an error as the hw support both but not at the same time
+> 
+> One of the devices seems to be configured incorrectly here but I don't
+> have schematics so it's not immediately obvious which.
 
-Patch applied.
+it's SPI *or* MMC, on the default hw configuration it's mmc
 
-Yours,
-Linus Walleij
+Best Regards,
+J.
+> 
+> Thanks,
+> Mark
