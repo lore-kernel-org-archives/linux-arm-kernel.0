@@ -1,160 +1,178 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Oct 2013 18:03:42 +0100
-Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
- <20131003202751.GZ6192@mwanda>
- <20131015131038.GB25034@n2100.arm.linux.org.uk>
- <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
-Message-ID: <20131016170341.GH25034@n2100.arm.linux.org.uk>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Thu, 17 Oct 2013 01:11:45 +0800
+Subject: [PATCH v3 6/7] arm64,
+ jump label: optimize jump label implementation
+In-Reply-To: <20131016114608.GH5403@mudshark.cambridge.arm.com>
+References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
+ <1381893492-7135-7-git-send-email-liuj97@gmail.com>
+ <20131016114608.GH5403@mudshark.cambridge.arm.com>
+Message-ID: <525EC8D1.7000900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 10:17:07AM -0300, Fabio Estevam wrote:
-> On Tue, Oct 15, 2013 at 10:10 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Another point on patch 1.  Sorry, I don't have patch 1 to reply to, it
-> > seems it was deleted from linux-arm-kernel's moderation queue.
-> >
-> > drm_mode_connector_attach_encoder() is called too early, before the
-> > base.id field in the encoder has been initialised.  This causes the
-> > connectors encoder array to be empty, and userspace KMS to fail.
-> >
-> > There's also bugs in the CSC setting too - it runs off the end of the
-> > array and gcc warns about this.  The code was clearly wrong.
-> >
-> > You may wish to combine this patch with patch 1 to sort all that out.
-> > For the patch below:
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 10/16/2013 07:46 PM, Will Deacon wrote:
+> On Wed, Oct 16, 2013 at 04:18:11AM +0100, Jiang Liu wrote:
+>> From: Jiang Liu <jiang.liu@huawei.com>
+>>
+>> Optimize jump label implementation for ARM64 by dynamically patching
+>> kernel text.
+>>
+>> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+>> Cc: Jiang Liu <liuj97@gmail.com>
+>> ---
+>>  arch/arm64/Kconfig                  |  1 +
+>>  arch/arm64/include/asm/jump_label.h | 52 ++++++++++++++++++++++++++++++++
+>>  arch/arm64/kernel/Makefile          |  1 +
+>>  arch/arm64/kernel/jump_label.c      | 60 +++++++++++++++++++++++++++++++++++++
+>>  4 files changed, 114 insertions(+)
+>>  create mode 100644 arch/arm64/include/asm/jump_label.h
+>>  create mode 100644 arch/arm64/kernel/jump_label.c
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index c044548..da388e4 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -17,6 +17,7 @@ config ARM64
+>>  	select GENERIC_SMP_IDLE_THREAD
+>>  	select GENERIC_TIME_VSYSCALL
+>>  	select HARDIRQS_SW_RESEND
+>> +	select HAVE_ARCH_JUMP_LABEL
+>>  	select HAVE_ARCH_TRACEHOOK
+>>  	select HAVE_DEBUG_BUGVERBOSE
+>>  	select HAVE_DEBUG_KMEMLEAK
+>> diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
+>> new file mode 100644
+>> index 0000000..d268fab
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/jump_label.h
+>> @@ -0,0 +1,52 @@
+>> +/*
+>> + * Copyright (C) 2013 Huawei Ltd.
+>> + * Author: Jiang Liu <jiang.liu@huawei.com>
+>> + *
+>> + * Based on arch/arm/include/asm/jump_label.h
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#ifndef _ASM_ARM64_JUMP_LABEL_H
+>> +#define _ASM_ARM64_JUMP_LABEL_H
+>> +#include <linux/types.h>
+>> +
+>> +#ifdef __KERNEL__
+>> +
+>> +#define JUMP_LABEL_NOP_SIZE 4
+>> +
+>> +static __always_inline bool arch_static_branch(struct static_key *key)
+>> +{
+>> +	asm goto("1:\n\t"
+>> +		 "nop\n\t"
+>> +		 ".pushsection __jump_table,  \"aw\"\n\t"
+>> +		 ".align 3\n\t"
+>> +		 ".quad 1b, %l[l_yes], %c0\n\t"
+>> +		 ".popsection\n\t"
+>> +		 :  :  "i"(key) :  : l_yes);
+>> +
+>> +	return false;
+>> +l_yes:
+>> +	return true;
+>> +}
+>> +
+>> +#endif /* __KERNEL__ */
+>> +
+>> +typedef u64 jump_label_t;
+>> +
+>> +struct jump_entry {
+>> +	jump_label_t code;
+>> +	jump_label_t target;
+>> +	jump_label_t key;
+>> +};
+>> +
+>> +#endif	/* _ASM_ARM64_JUMP_LABEL_H */
+>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+>> index 9af6cb3..b7db65e 100644
+>> --- a/arch/arm64/kernel/Makefile
+>> +++ b/arch/arm64/kernel/Makefile
+>> @@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o smp_psci.o
+>>  arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+>>  arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+>>  arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+>> +arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+>>  
+>>  obj-y					+= $(arm64-obj-y) vdso/
+>>  obj-m					+= $(arm64-obj-m)
+>> diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
+>> new file mode 100644
+>> index 0000000..74cbc73
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/jump_label.c
+>> @@ -0,0 +1,60 @@
+>> +/*
+>> + * Copyright (C) 2013 Huawei Ltd.
+>> + * Author: Jiang Liu <jiang.liu@huawei.com>
+>> + *
+>> + * Based on arch/arm/kernel/jump_label.c
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#include <linux/kernel.h>
+>> +#include <linux/jump_label.h>
+>> +#include <asm/jump_label.h>
+>> +#include <asm/insn.h>
+>> +
+>> +#ifdef HAVE_JUMP_LABEL
+>> +
+>> +static void __arch_jump_label_transform(struct jump_entry *entry,
+>> +					enum jump_label_type type,
+>> +					bool is_static)
+>> +{
+>> +	void *addr = (void *)entry->code;
+>> +	u32 insn;
+>> +
+>> +	if (type == JUMP_LABEL_ENABLE) {
+>> +		/* no way out if instruction offset is out of range(+/-128M) */
+>> +		insn = aarch64_insn_gen_branch_imm(entry->code,
+>> +						   entry->target, 0);
+>> +		BUG_ON(!insn);
 > 
-> Thanks, Russell.
+> In this case, rather than BUG_ON, it would be better (somehow) to abort
+> optimisation and instead patch in a branch to the actual condition check.
+Hi Will,
+	The ARM64 virtual address arrangement already ensures that all
+kernel and module texts are within +/-128M, otherwise even module load
+will fail. So the BUG_ON() should never happen.
+
+Will add more comments into aarch64_insn_gen_branch_imm().
+
 > 
-> Will submit v3 when I am back to the office.
+>> +	} else {
+>> +		insn = aarch64_insn_gen_nop();
+> 
+> You could make the code more concise by limiting your patching ability to
+> branch immediates. Then a nop is simply a branch to the next instruction (I
+> doubt any modern CPUs will choke on this, whereas the architecture requires
+> a NOP to take time).
+I guess a NOP should be more effecient than a "B #4" on real CPUs:)
 
-Okay, I still have a problem with HDMI: I have a magenta vertical line
-down the left hand side of the frame, the displayed frame is shifted
-right by the width of that line and the right hand side is missing some
-pixels.
-
-First off, the hsync position programmed into the HDMI registers appears
-to be wrong.
-
-I'm at a loss why imx-hdmi is obfuscated with a conversion from a
-drm_display_mode structure to a fb_videomode.  This adds additional
-confusion and additional opportunities for bugs; this is probably
-exactly why the hsync position is wrong.
-
-In CEA-861-B for 720p @60Hz:
-
-DE: ^^^^__________^^^^^^^
-HS: _______^^^___________
-         ^  ^  ^
-         |  |  220 clocks
-         |  40 clocks
-         110 clocks
-
-The IMX6 manual says HSYINCINDELAY0 is "Hsync active edge delay.  Integer
-number of pixel clock cycles from de non-active edge".  So, this should be
-110.  Yet it ends up being programmed as 220, leading to a magenta vertical
-bar down the left hand side of the display.
-
-Now, if you look at Documentation/fb/framebuffer.txt, in this case, the
-right margin should be 110 clocks, hsync len should be 40 and the left
-margin should be 220 clocks.
-
-However, this is not what your conversion to a fb_videomode does.  It
-reverses the left and right margin.  A similar confusion also exists
-in the conversion of the upper/lower margins too.
-
-The DRM model is this (for 720p @60Hz):
-
-0                             1280         1390 1430      1650
-|===============================|------------|---|----------|
-^                               ^            ^   ^          ^
-start                       hdisplay hsync_start hsync_end htotal
-
-The fb model is the same as the above but rotated:
-
-left margin            displayed            right margin hsync_len
-|----------|===============================|------------|---|
-
-So, the left margin is the bit between hsync_end and htotal, and the
-right margin is the bit between hdisplay and hsync_start.  Exactly
-the same analysis applies to the upper/lower margins.
-
-What I suggest is that the use of fb_videomode is entirely killed off
-in this driver to remove this layer of confusion and instead the DRM
-model is stuck to within this DRM driver.
-
-Now on to the next problem.  HSYNC/VSYNC polarity.
-
-So, this is the mode which is set:
-
-  1280x720 (0x41)   74.2MHz +HSync +VSync *current +preferred
-        h: width  1280 start 1390 end 1430 total 1650 skew    0 clock   45.0KHz
-        v: height  720 start  725 end  730 total  750           clock   60.0Hz
-
-Note the positive HSync and VSync polarity - this is correct, backed
-up by CEA-861-B.
-
-The IPU DI0 is configured thusly in its general control register:
-0x2640000 = 0x200006, which is what is set when the requested mode
-has DRM_MODE_FLAG_PHSYNC and DRM_MODE_FLAG_PVSYNC flags set.
-
-However, if we look at the HDMI config: 0x121000 = 0x18.  Active low
-hsync/vsync.  This is quite obvious when you look at the code -
-convert_to_video_timing() does *nothing* at all when converting the
-sync polarities, which means hdmi_av_composer() doesn't program them
-appropriately.  And yes, poking 0x78 into this register finally fixes
-the problem.
-
-Yet another reason why this silly conversion from one structure form
-to another is a Very Bad Idea.  Until I found this, I was merely going
-to send a patch to sort out convert_to_video_timing(), but quite frankly
-I'm going to kill this thing off right now.
-
-Another thing:
-
-static int imx_hdmi_setup(struct imx_hdmi *hdmi, struct drm_display_mode *mode)
-{
-        int ret;
-        convert_to_video_timing(&hdmi->fb_mode, mode);
-
-        hdmi_disable_overflow_interrupts(hdmi);
-        
-        hdmi->vic = 6;
-
-It's quite wrong to force every video mode set to be CEA mode 6.  IIRC,
-There is a function in DRM which will tell you the CEA mode number.
-Again, I'll fix this in my patch rewriting this bit of the driver to
-be correct.
-
-I'm also suspicious of the "HDMI Initialization Step" comments, because
-they make no sense:
-
-/* HDMI Initialization Step B.4 */
-static void imx_hdmi_enable_video_path(struct imx_hdmi *hdmi)
-{
-
-yet:
-
-        /* HDMI Initialization Step B.3 */
-        imx_hdmi_enable_video_path(hdmi);
-
-One's left wondering whether Step B.3 really is to just call a function
-with a particular name, but B.4 is to actually do something with the
-hardware.  I'm quite sure that if this is a documented procedure, that
-it doesn't say that and these comments are wrong (and probably the code
-too.)
-
-Even after all this, I still haven't got rid of that magenta line - in
-as far as I can tell, nothing has changed as a result of any of these
-(although reading back the register values, they're now much better.)
-What I do find is if I poke 0x78 back into the INVIDCONF register
-(which already contains 0x78) the magenta line disappears.
-
-I'm beginning to suspect that there's some ordering dependency that
-isn't being satisfied - but as the i.MX6Solo/DualLite manual doesn't
-seem to contain any of these details, I'm running out of ideas.
+> 
+> Will
+> 
