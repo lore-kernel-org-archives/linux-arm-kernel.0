@@ -1,105 +1,36 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 16 Oct 2013 11:42:08 +0530
-Subject: [RESEND PATCH V2 1/2] ARM: dts: AM33xx: Add RNG node
-In-Reply-To: <525CE564.6010605@baylibre.com>
-References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
- <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
- <52594DF0.1050002@ti.com> <525CE564.6010605@baylibre.com>
-Message-ID: <525E2E38.4000304@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 16 Oct 2013 15:16:27 +0900
+Subject: [PATCH] sh-pfc: r8a7791 PFC support
+In-Reply-To: <17712286.HDNRip2xPu@avalon>
+References: <20131008040824.3480.69707.sendpatchset@w520>
+ <17712286.HDNRip2xPu@avalon>
+Message-ID: <20131016061626.GG15425@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-On Tuesday 15 October 2013 12:19 PM, Benoit Cousson wrote:
-> Hi Lokesh,
+On Thu, Oct 10, 2013 at 12:43:17AM +0200, Laurent Pinchart wrote:
+> Hi Magnus,
 > 
-> On 12/10/2013 15:26, Lokesh Vutla wrote:
->> Hi Benoit,
->> On Thursday 29 August 2013 06:22 PM, Lokesh Vutla wrote:
->>> Add the AM33xx RNG module's device tree data.
->>> Also add Documentation file describing the data
->>> for the RNG module.
->> Seems you missed this patch. Please consider this for this merge window.
+> On Tuesday 08 October 2013 13:08:24 Magnus Damm wrote:
+> > From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> > 
+> > Add PFC support for the r8a7791 SoC including pin groups for
+> > on-chip devices such as MSIOF, SCIF, USB, MMC, VIN, SDHI, DU.
+> > 
+> > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> > Signed-off-by: Kunihito Higashiyama <kunihito.higashiyama.ur@renesas.com>
+> > Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
+> > Signed-off-by: Nobuyuki HIRAI <nobuyuki.hirai.xe@renesas.com>
+> > Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+> > Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+> > Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+> > [damm at opensource.se: Forward ported to upstream, reused existing sh-pfc
+> > macros] Signed-off-by: Magnus Damm <damm@opensource.se>
 > 
-> Indeed I missed it. Sorry :-(
-> 
->> Patch 2/2 is already taken by Paul.
->> Without this patch AM335x boot will crash as I mentioned in my cover letter.
->>
->> Thanks and regards,
->> Lokesh
->>>
->>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>> ---
->>> Changes since V1:
->>> - Drop "status=disabled" entry in dt node, Since
->>>    RNG is present on all AM33xx platforms.
->>>
->>>   .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
->>>   arch/arm/boot/dts/am33xx.dtsi                      |    7 +++++++
->>>   2 files changed, 29 insertions(+)
->>>   create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
-> 
-> I do not see the acked-by for the binding part. You do need that for any new bindings nowadays.
-> 
->>>
->>> diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
->>> new file mode 100644
->>> index 0000000..6a62acd
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
->>> @@ -0,0 +1,22 @@
->>> +OMAP SoC HWRNG Module
->>> +
->>> +Required properties:
->>> +
->>> +- compatible : Should contain entries for this and backward compatible
->>> +  RNG versions:
->>> +  - "ti,omap2-rng" for OMAP2.
->>> +  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
->>> +  Note that these two versions are incompatible.
->>> +- ti,hwmods: Name of the hwmod associated with the RNG module
->>> +- reg : Offset and length of the register set for the module
->>> +- interrupts : the interrupt number for the RNG module.
->>> +        Only used for "ti,omap4-rng".
->>> +
->>> +Example:
->>> +/* AM335x */
->>> +rng: rng at 48310000 {
->>> +    compatible = "ti,omap4-rng";
->>> +    ti,hwmods = "rng";
->>> +    reg = <0x48310000 0x2000>;
->>> +    interrupts = <111>;
->>> +};
->>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->>> index 38b446b..26ebe30 100644
->>> --- a/arch/arm/boot/dts/am33xx.dtsi
->>> +++ b/arch/arm/boot/dts/am33xx.dtsi
->>> @@ -530,5 +530,12 @@
->>>               #size-cells = <1>;
->>>               status = "disabled";
->>>           };
->>> +
->>> +        rng: rng at 48310000 {
->>> +            compatible = "ti,omap4-rng";
->>> +            ti,hwmods = "rng";
->>> +            reg = <0x48310000 0x2000>;
->>> +            interrupts = <111>;
->>> +        };
->>>       };
->>>   };
->>>
->>
-> 
-> It looks good to me, but it does not apply on my branch.
-Can I take this as your Acked-by: ?
-Ok, Ill rebase on top of your tree and post it.
+> BTW, the patch was too big and didn't make it to the list :-/
 
-Thanks and Regards,
-Lokesh
-> Please rebase it and repost with the proper acked-by.
-> 
-> Thanks,
-> Benoit
-> 
-> 
+I got it it anyway but if it doesn't hit the list it won't show
+up in patchwork. And that is a minor problem for my work-flow
+
+Magnus, when you repost this please ping me about it to
+make sure it is on my radar.
