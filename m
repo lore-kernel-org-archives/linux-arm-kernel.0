@@ -1,93 +1,46 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 16 Oct 2013 21:58:32 +0530
-Subject: [PATCH 14/28] dmaengine: iop: use DMA_COMPLETE for dma completion
+Date: Wed, 16 Oct 2013 21:58:36 +0530
+Subject: [PATCH 18/28] dmaengine: mxs-dma: use DMA_COMPLETE for dma completion
  status
 In-Reply-To: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
 References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
-Message-ID: <1381940926-25564-15-git-send-email-vinod.koul@intel.com>
+Message-ID: <1381940926-25564-19-git-send-email-vinod.koul@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/dma/iop-adma.c |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/dma/mxs-dma.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/dma/iop-adma.c b/drivers/dma/iop-adma.c
-index dd8b44a..408fe6b 100644
---- a/drivers/dma/iop-adma.c
-+++ b/drivers/dma/iop-adma.c
-@@ -864,7 +864,7 @@ static enum dma_status iop_adma_status(struct dma_chan *chan,
- 	int ret;
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index ccd13df..7ab7cec 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -224,7 +224,7 @@ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
  
- 	ret = dma_cookie_status(chan, cookie, txstate);
--	if (ret == DMA_SUCCESS)
-+	if (ret == DMA_COMPLETE)
- 		return ret;
+ static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
+ {
+-	mxs_chan->status = DMA_SUCCESS;
++	mxs_chan->status = DMA_COMPLETE;
+ }
  
- 	iop_adma_slot_cleanup(iop_chan);
-@@ -983,7 +983,7 @@ static int iop_adma_memcpy_self_test(struct iop_adma_device *device)
- 	msleep(1);
+ static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
+@@ -312,12 +312,12 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+ 			if (mxs_chan->flags & MXS_DMA_SG_LOOP)
+ 				mxs_chan->status = DMA_IN_PROGRESS;
+ 			else
+-				mxs_chan->status = DMA_SUCCESS;
++				mxs_chan->status = DMA_COMPLETE;
+ 		}
  
- 	if (iop_adma_status(dma_chan, cookie, NULL) !=
--			DMA_SUCCESS) {
-+			DMA_COMPLETE) {
- 		dev_err(dma_chan->device->dev,
- 			"Self-test copy timed out, disabling\n");
- 		err = -ENODEV;
-@@ -1083,7 +1083,7 @@ iop_adma_xor_val_self_test(struct iop_adma_device *device)
- 	msleep(8);
+ 		stat1 &= ~(1 << channel);
  
- 	if (iop_adma_status(dma_chan, cookie, NULL) !=
--		DMA_SUCCESS) {
-+		DMA_COMPLETE) {
- 		dev_err(dma_chan->device->dev,
- 			"Self-test xor timed out, disabling\n");
- 		err = -ENODEV;
-@@ -1129,7 +1129,7 @@ iop_adma_xor_val_self_test(struct iop_adma_device *device)
- 	iop_adma_issue_pending(dma_chan);
- 	msleep(8);
+-		if (mxs_chan->status == DMA_SUCCESS)
++		if (mxs_chan->status == DMA_COMPLETE)
+ 			dma_cookie_complete(&mxs_chan->desc);
  
--	if (iop_adma_status(dma_chan, cookie, NULL) != DMA_SUCCESS) {
-+	if (iop_adma_status(dma_chan, cookie, NULL) != DMA_COMPLETE) {
- 		dev_err(dma_chan->device->dev,
- 			"Self-test zero sum timed out, disabling\n");
- 		err = -ENODEV;
-@@ -1158,7 +1158,7 @@ iop_adma_xor_val_self_test(struct iop_adma_device *device)
- 	iop_adma_issue_pending(dma_chan);
- 	msleep(8);
- 
--	if (iop_adma_status(dma_chan, cookie, NULL) != DMA_SUCCESS) {
-+	if (iop_adma_status(dma_chan, cookie, NULL) != DMA_COMPLETE) {
- 		dev_err(dma_chan->device->dev,
- 			"Self-test non-zero sum timed out, disabling\n");
- 		err = -ENODEV;
-@@ -1254,7 +1254,7 @@ iop_adma_pq_zero_sum_self_test(struct iop_adma_device *device)
- 	msleep(8);
- 
- 	if (iop_adma_status(dma_chan, cookie, NULL) !=
--		DMA_SUCCESS) {
-+		DMA_COMPLETE) {
- 		dev_err(dev, "Self-test pq timed out, disabling\n");
- 		err = -ENODEV;
- 		goto free_resources;
-@@ -1291,7 +1291,7 @@ iop_adma_pq_zero_sum_self_test(struct iop_adma_device *device)
- 	msleep(8);
- 
- 	if (iop_adma_status(dma_chan, cookie, NULL) !=
--		DMA_SUCCESS) {
-+		DMA_COMPLETE) {
- 		dev_err(dev, "Self-test pq-zero-sum timed out, disabling\n");
- 		err = -ENODEV;
- 		goto free_resources;
-@@ -1323,7 +1323,7 @@ iop_adma_pq_zero_sum_self_test(struct iop_adma_device *device)
- 	msleep(8);
- 
- 	if (iop_adma_status(dma_chan, cookie, NULL) !=
--		DMA_SUCCESS) {
-+		DMA_COMPLETE) {
- 		dev_err(dev, "Self-test !pq-zero-sum timed out, disabling\n");
- 		err = -ENODEV;
- 		goto free_resources;
+ 		/* schedule tasklet on this channel */
 -- 
 1.7.0.4
