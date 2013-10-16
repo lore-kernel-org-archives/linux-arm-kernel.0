@@ -1,35 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Oct 2013 23:30:30 +0100
-Subject: [PATCH] clk: s3c64xx: Fix aliases for SPI devices
-Message-ID: <1381962630-28802-1-git-send-email-broonie@kernel.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 17 Oct 2013 00:52:40 +0200
+Subject: [PATCH 1/5] cpufreq: arm-big-little: use clk_get instead of
+ clk_get_sys
+In-Reply-To: <1381931563-16785-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1381931563-16785-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1381931563-16785-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <2716826.jtNDRqEJYG@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Wednesday, October 16, 2013 02:52:39 PM Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> Currently clk_get_sys is used with cpu-cluster.<n> as the device id
+> which is incorrect. It should be connection/consumer ID instead.
+> 
+> It is possible to specify input clock in the cpu device node along
+> with the optional clock-name. clk_get_sys can't handle that.
+> 
+> This patch replaces clk_get_sys with clk_get to extend support for
+> clocks specified in the device tree cpu node.
+> 
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-The clock aliases for SPI devices do not reflect the actual usage in the
-driver causing the SPI controller to fail to probe when the clock driver
-is in use, fix this up.
+I've queued up this one for 3.13, for the rest of the series I need ACKs
+from the people in the CC list.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- drivers/clk/samsung/clk-s3c64xx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks!
 
-diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
-index 7d2c842..3cbd47c 100644
---- a/drivers/clk/samsung/clk-s3c64xx.c
-+++ b/drivers/clk/samsung/clk-s3c64xx.c
-@@ -356,8 +356,8 @@ static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
- 	ALIAS(SCLK_MMC2, "s3c-sdhci.2", "mmc_busclk.2"),
- 	ALIAS(SCLK_MMC1, "s3c-sdhci.1", "mmc_busclk.2"),
- 	ALIAS(SCLK_MMC0, "s3c-sdhci.0", "mmc_busclk.2"),
--	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi-bus"),
--	ALIAS(SCLK_SPI0, "s3c6410-spi.0", "spi-bus"),
-+	ALIAS(SCLK_SPI1, "s3c6410-spi.1", "spi_busclk1"),
-+	ALIAS(SCLK_SPI0, "s3c6410-spi.0", "spi_busclk0"),
- 	ALIAS(SCLK_AUDIO1, "samsung-pcm.1", "audio-bus"),
- 	ALIAS(SCLK_AUDIO1, "samsung-i2s.1", "audio-bus"),
- 	ALIAS(SCLK_AUDIO0, "samsung-pcm.0", "audio-bus"),
+> ---
+>  drivers/cpufreq/arm_big_little.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
+> index 3549f07..501a091 100644
+> --- a/drivers/cpufreq/arm_big_little.c
+> +++ b/drivers/cpufreq/arm_big_little.c
+> @@ -127,7 +127,7 @@ static int get_cluster_clk_and_freq_table(struct device *cpu_dev)
+>  	}
+>  
+>  	name[12] = cluster + '0';
+> -	clk[cluster] = clk_get_sys(name, NULL);
+> +	clk[cluster] = clk_get(cpu_dev, name);
+>  	if (!IS_ERR(clk[cluster])) {
+>  		dev_dbg(cpu_dev, "%s: clk: %p & freq table: %p, cluster: %d\n",
+>  				__func__, clk[cluster], freq_table[cluster],
+> 
 -- 
-1.8.4.rc3
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
