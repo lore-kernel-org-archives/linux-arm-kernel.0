@@ -1,48 +1,70 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 16 Oct 2013 10:39:05 -0500
-Subject: [PATCH V7 5/8] ARM: dts: dra7-evm: add smps123 supply for CPU
-In-Reply-To: <1381937948-27057-1-git-send-email-nm@ti.com>
-References: <1381937948-27057-1-git-send-email-nm@ti.com>
-Message-ID: <1381937948-27057-6-git-send-email-nm@ti.com>
+Date: Wed, 16 Oct 2013 10:39:00 -0500
+Subject: [PATCH V7 0/8] ARM: OMAP3+: support cpufreq-cpu0 for device tree boot
+Message-ID: <1381937948-27057-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: J Keerthy <j-keerthy@ti.com>
+Hi,
 
-regulator smps123 supply from Palmas PMIC powers CPU0 on DRA7 EVM.
+This series enables the use of cpufreq-cpu0 generic driver for all
+OMAP and related derivatives. Only patch#8 in the series, which
+introduces CPU clock nodes, depends on Tero's V8 patch series for clock
+nodes[1]
 
-[nm at ti.com: rebase to latest]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: J Keerthy <j-keerthy@ti.com>
----
- arch/arm/boot/dts/dra7-evm.dts |    4 ++++
- arch/arm/boot/dts/dra7.dtsi    |    2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+I will stop copy pasting the series complete history and point at [2].
 
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index 3abf5f4..5babba0 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -269,3 +269,7 @@
- 	vmmc-supply = <&mmc2_3v3>;
- 	bus-width = <8>;
- };
-+
-+&cpu0 {
-+	cpu0-supply = <&smps123_reg>;
-+};
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index c98997b..02e430b 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -32,7 +32,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
+Main changes since V6[3]:
+- squashed patches for a minimal set
+- i have organized the series such that 1 to 7 can immediately be merged
+  if desired:
+	- patches 1,2,3 can go to Tony's omap-for-v3.13/quirk [4]
+	- patches 4-7 can go to Benoit's for_3.13/dts [5]
+	- patch 8 needs to depend on [1] and should eventually go to [5]
+
+NOTES: obviously without clock nodes cpufreq will not function.
+
+Test Script: http://pastebin.com/VvJPjsne
+
+Test-log:
+BeagleBoard-XM (OMAP36xx): http://pastebin.com/XZDNaHPf
+PandaBoard-ES (OMAP4460): http://pastebin.com/qQCmA2ng
+BeagleBone-Black(AM335x): http://pastebin.com/98FX4uYW
+OMAP5uEVM (OMAP5432): http://pastebin.com/NXj3L636
+DRA7-EVM (DRA7xx): http://pastebin.com/0kKT3TXy
+
+J Keerthy (3):
+  ARM: dts: dra7-evm: add smps123 supply for CPU
+  ARM: dts: OMAP5: Add CPU OPP table
+  ARM: dts: DRA7: Add CPU OPP table
+
+Nishanth Menon (5):
+  ARM: OMAP3+: do not register non-dt OPP tables for device tree boot
+  ARM: OMAP2+: add missing lateinit hook for calling pm late init
+  ARM: OMAP3+: use cpu0-cpufreq driver in device tree supported boot
+  ARM: dts: omap5-uevm: add smps123 supply for CPU
+  ARM: dts: OMAP3: add clock nodes for CPU
+
+[1] http://marc.info/?t=138133284200006&r=1&w=2
+[2] http://marc.info/?l=linux-arm-kernel&m=136804009618594&w=2
+[3] http://marc.info/?l=devicetree&m=138135419203492&w=2
+[4] https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.13/quirk
+
+ arch/arm/boot/dts/am33xx.dtsi       |    4 ++++
+ arch/arm/boot/dts/dra7-evm.dts      |    4 ++++
+ arch/arm/boot/dts/dra7.dtsi         |   13 ++++++++++++-
+ arch/arm/boot/dts/omap3.dtsi        |    5 +++++
+ arch/arm/boot/dts/omap4.dtsi        |    5 +++++
+ arch/arm/boot/dts/omap5-uevm.dts    |    4 ++++
+ arch/arm/boot/dts/omap5.dtsi        |   15 ++++++++++++++-
+ arch/arm/mach-omap2/board-generic.c |    4 ++++
+ arch/arm/mach-omap2/common.h        |    4 ++++
+ arch/arm/mach-omap2/io.c            |   20 ++++++++++++++++++++
+ arch/arm/mach-omap2/opp.c           |    4 ++++
+ arch/arm/mach-omap2/pm.c            |   12 +++++++++---
+ 12 files changed, 89 insertions(+), 5 deletions(-)
+
+Regards,
+Nishanth Menon
 -- 
 1.7.9.5
