@@ -1,77 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 Oct 2013 14:27:13 +0200
-Subject: [GIT PULL] Integrator patches for v3.13
-Message-ID: <CACRpkdbdpJByijRjOZKpEB_5tZt9xro1DLmVXsgrixe9YJTbZg@mail.gmail.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Wed, 16 Oct 2013 15:38:12 +0300
+Subject: [GIT PULL] KVM/ARM Updates for kvm/next
+In-Reply-To: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
+References: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <20131016123812.GE15657@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Tue, Oct 15, 2013 at 05:49:28PM -0700, Christoffer Dall wrote:
+> Hi guys,
+> 
+> (You may want to make sure you actually pull this as opposed to picking
+> them off the mailing list, since the weird non-ASCII spaces in the
+> patches at least make both git send-email and git-am angry for me).
+> 
+Pulled, thanks.
 
-this is a second try at an Integrator patch stack for v3.13.
-This addresses the issues reported by Mark Rutland and
-adds two patches on top for some more things he wanted
-me to fix as well.
+> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+> 
+>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-for-3.13-1
+> 
+> for you to fetch changes up to a7265fb1751ffbfad553afc7f592a6dac6be48de:
+> 
+>   KVM: ARM: Remove non-ASCII space characters (2013-10-15 17:43:00 -0700)
+> 
+> ----------------------------------------------------------------
+> Updates for KVM/ARM including cpu=host and Cortex-A7 support
+> 
+> ----------------------------------------------------------------
+> Anup Patel (5):
+>       KVM: ARM: Fix typo in comments of inject_abt()
+>       ARM: KVM: Implement kvm_vcpu_preferred_target() function
+>       ARM64: KVM: Implement kvm_vcpu_preferred_target() function
+>       ARM/ARM64: KVM: Implement KVM_ARM_PREFERRED_TARGET ioctl
+>       KVM: Add documentation for KVM_ARM_PREFERRED_TARGET ioctl
+> 
+> Christoffer Dall (1):
+>       KVM: ARM: Remove non-ASCII space characters
+> 
+> Jonathan Austin (3):
+>       KVM: ARM: Fix calculation of virtual CPU ID
+>       KVM: ARM: fix the size of TTBCR_{T0SZ,T1SZ} masks
+>       KVM: ARM: Add support for Cortex-A7
+> 
+>  Documentation/virtual/kvm/api.txt |   31 ++++++++--
+>  arch/arm/include/asm/kvm_arm.h    |    4 +-
+>  arch/arm/include/asm/kvm_asm.h    |    2 +-
+>  arch/arm/include/asm/kvm_host.h   |    1 +
+>  arch/arm/include/uapi/asm/kvm.h   |    3 +-
+>  arch/arm/kvm/Makefile             |    2 +-
+>  arch/arm/kvm/arm.c                |   13 +++++
+>  arch/arm/kvm/coproc.c             |  114 ++++++++++++++++++++++++++++++++++++
+>  arch/arm/kvm/coproc_a15.c         |  117 +------------------------------------
+>  arch/arm/kvm/coproc_a7.c          |   54 +++++++++++++++++
+>  arch/arm/kvm/emulate.c            |    2 +-
+>  arch/arm/kvm/guest.c              |   24 +++++++-
+>  arch/arm/kvm/reset.c              |   15 ++---
+>  arch/arm64/include/asm/kvm_host.h |    1 +
+>  arch/arm64/kvm/guest.c            |   20 +++++++
+>  include/uapi/linux/kvm.h          |    1 +
+>  16 files changed, 270 insertions(+), 134 deletions(-)
+>  create mode 100644 arch/arm/kvm/coproc_a7.c
 
-Further this folds in a defconfig patch and the LED fix.
-The LED fix is DT-related, and the defconfig change is
-related to the LED fix, so they all belong in the same series.
-
-The cpufreq patch is ACKed by both cpufreq maintainers.
-
-Please pull this to some suitable branch in the
-ARM SoC tree.
-
-Yours,
-Linus Walleij
-
-The following changes since commit d0e639c9e06d44e713170031fe05fb60ebe680af:
-
-  Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/integrator-for-v3.13-2
-
-for you to fetch changes up to df36680f1a71eef97685c30eb9eaf55a6813b6cd:
-
-  ARM: integrator: core module registers from compatible strings
-(2013-10-16 14:10:14 +0200)
-
-----------------------------------------------------------------
-Integrator patches for the v3.13 kernel cycle:
-- Fix up the LED support
-- Update the Integrator defconfig
-- Remove ATAG boot path
-- Move some stuff over to the device tree
-
-----------------------------------------------------------------
-Linus Walleij (10):
-      ARM: integrator: get the CM control register by proxy
-      ARM: integrator: update defconfig
-      ARM: integrator: get the LM interrupts from DT
-      ARM: integrator: print the Linux IRQ in LL_DEBUG code
-      ARM: integrator: delete non-devicetree boot path
-      ARM: integrator: decommission the <mach/irqs.h> header
-      ARM: integrator: move CM base into device tree
-      cpufreq: probe the Integrator cpufreq driver from DT
-      ARM: integrator: use devm_ioremap() to remap CM
-      ARM: integrator: core module registers from compatible strings
-
- Documentation/devicetree/bindings/arm/arm-boards |  50 +++++-
- arch/arm/Kconfig                                 |   1 +
- arch/arm/boot/dts/integrator.dtsi                |   5 +
- arch/arm/boot/dts/integratorap.dts               |   5 +-
- arch/arm/boot/dts/integratorcp.dts               |   4 +-
- arch/arm/configs/integrator_defconfig            |  25 ++-
- arch/arm/mach-integrator/{include/mach => }/cm.h |   7 +-
- arch/arm/mach-integrator/core.c                  | 182 ++++++++++------------
- arch/arm/mach-integrator/include/mach/irqs.h     |  81 ----------
- arch/arm/mach-integrator/integrator_ap.c         | 152 ++-----------------
- arch/arm/mach-integrator/integrator_cp.c         | 185 ++---------------------
- arch/arm/mach-integrator/leds.c                  |   5 +-
- arch/arm/mach-integrator/pci_v3.c                | 127 ++++------------
- drivers/cpufreq/integrator-cpufreq.c             |  61 +++++---
- 14 files changed, 251 insertions(+), 639 deletions(-)
- rename arch/arm/mach-integrator/{include/mach => }/cm.h (88%)
- delete mode 100644 arch/arm/mach-integrator/include/mach/irqs.h
+--
+			Gleb.
