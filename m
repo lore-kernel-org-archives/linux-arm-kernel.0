@@ -1,105 +1,58 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Wed, 16 Oct 2013 14:14:55 +0200
-Subject: [PATCH] at91: serial: add usart3 in separat dtsi
-In-Reply-To: <1381913705-16098-1-git-send-email-jiri.prchal@aksignal.cz>
-References: <1381913705-16098-1-git-send-email-jiri.prchal@aksignal.cz>
-Message-ID: <525E833F.40206@overkiz.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 16 Oct 2013 14:19:54 +0200
+Subject: at91sam9g20-ek pinctrl conflicts
+In-Reply-To: <20131016120617.GB27808@ns203013.ovh.net>
+References: <20131016110405.GH2443@sirena.org.uk>
+ <20131016120617.GB27808@ns203013.ovh.net>
+Message-ID: <20131016121954.GC27808@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jiri,
+On 14:06 Wed 16 Oct     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 12:04 Wed 16 Oct     , Mark Brown wrote:
+> > Hi,
+> > 
+> > Booting an at91sam9g20-ek I see errors loading the MMC driver due to
+> > conflicts with SPI:
+> > 
+> > pinctrl-at91 pinctrl.2: pin pioA1 already requested by fffc8000.spi; cannot claim for fffa8000.mmc
+> > pinctrl-at91 pinctrl.2: pin-1 (fffa8000.mmc) status -22
+> > pinctrl-at91 pinctrl.2: could not request pin 1 (pioA1) from group mmc0_slot1_cmd_dat0-0  on device pinctrl.2
+> 
+> it's not really an error as the hw support both but not at the same time
+> > 
+> > One of the devices seems to be configured incorrectly here but I don't
+> > have schematics so it's not immediately obvious which.
+> 
+> it's SPI *or* MMC, on the default hw configuration it's mmc
 
-On 16/10/2013 10:55, Jiri Prchal wrote:
-> This patch adds usart3 for AT91SAM9G25 and X25.
-> Based on sugescion of Nicolas Ferre it's in separated dtsi file included in both
-> g25 and x25 files.
->
-> Signed-off-by:  <jiri.prchal@aksignal.cz>
-> ---
->   arch/arm/boot/dts/at91sam9g25.dtsi       |    1 +
->   arch/arm/boot/dts/at91sam9x25.dtsi       |    1 +
->   arch/arm/boot/dts/at91sam9x5-usart3.dtsi |   27 +++++++++++++++++++++++++++
->   3 files changed, 29 insertions(+)
->   create mode 100644 arch/arm/boot/dts/at91sam9x5-usart3.dtsi
->
-> diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
-> index b4ec6fe..980e9a7 100644
-> --- a/arch/arm/boot/dts/at91sam9g25.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g25.dtsi
-> @@ -7,6 +7,7 @@
->    */
->   
->   #include "at91sam9x5.dtsi"
-> +#include "at91sam9x5-usart3.dtsi"
->   
->   / {
->   	model = "Atmel AT91SAM9G25 SoC";
-> diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
-> index 49e94ab..3ac17ee 100644
-> --- a/arch/arm/boot/dts/at91sam9x25.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x25.dtsi
-> @@ -7,6 +7,7 @@
->    */
->   
->   #include "at91sam9x5.dtsi"
-> +#include "at91sam9x5-usart3.dtsi"
->   
->   / {
->   	model = "Atmel AT91SAM9X25 SoC";
-> diff --git a/arch/arm/boot/dts/at91sam9x5-usart3.dtsi b/arch/arm/boot/dts/at91sam9x5-usart3.dtsi
-> new file mode 100644
-> index 0000000..f5b6979
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91sam9x5-usart3.dtsi
-> @@ -0,0 +1,27 @@
-> +/*
-> + * at91sam9x5-usert3.dtsi - Device Tree Include file for AT91SAM9G25 or
-typo here : at91sam9x5-usert3.dtsi -> at91sam9x5-usart3.dts.
+this should fix the issue
 
-I won't complain about this, but some at91 dts(i) names already use "_" 
-instead of "-":
-- at91sam9g20ek_common.dtsi
-- at91sam9g20ek_2mmc.dts
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index 1373546..cb2c010 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -96,7 +96,6 @@
+                        };
 
-I personally prefer the hypen version, but I think it's up to Atmel 
-maintainers to decide which name sould be used.
-
-> + * AT91SAM9X25 SoC
-> + *
-> + * Copyright (C) 2013 Jiri Prchal <jiri.prchal@aksignal.cz>
-> + *
-> + * Licensed under GPLv2.
-> + */
-> +
-> +/ {
-> +	aliases {
-> +		serial4 = &usart3;
-> +	};
-> +
-> +	ahb {
-> +		apb {
-> +			usart3: serial at f8028000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xf8028000 0x200>;
-> +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart3>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +	};
-> +};
-I would have moved the the pinctrl definition in this file too.
-In fact, that's what I did in my patch ( 
-https://lkml.org/lkml/2013/8/7/252).
-
-Anyway, I'm not sure, but I think Nicolas already applied my patch in 
-his at91-3.13-cleanup branch.
-
-If this is not the case, I'll be pleased to add my Acked-by after you've 
-added the pinctrl definitions
-and fixed the the typo.
+                        spi0: spi at fffc8000 {
+-                               status = "okay";
+                                cs-gpios = <0>, <&pioC 11 0>, <0>, <0>;
+                                mtd_dataflash at 0 {
+                                        compatible = "atmel,at45", "atmel,dataflash";
 
 Best Regards,
-
-Boris
+J.
+> 
+> Best Regards,
+> J.
+> > 
+> > Thanks,
+> > Mark
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
