@@ -1,114 +1,139 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 16 Oct 2013 15:50:16 +0200
-Subject: [PATCH] at91: serial: add usart3 in separat dtsi
-In-Reply-To: <525E833F.40206@overkiz.com>
-References: <1381913705-16098-1-git-send-email-jiri.prchal@aksignal.cz>
- <525E833F.40206@overkiz.com>
-Message-ID: <525E9998.5090703@atmel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 16 Oct 2013 19:22:17 +0530
+Subject: [PATCH v2 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
+ Framework
+In-Reply-To: <525E9232.9050502@ti.com>
+References: <1381866857-3861-1-git-send-email-kishon@ti.com>
+ <1381866857-3861-3-git-send-email-kishon@ti.com> <525E9232.9050502@ti.com>
+Message-ID: <525E9A11.7080501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/10/2013 14:14, boris brezillon :
-> Hello Jiri,
->
-> On 16/10/2013 10:55, Jiri Prchal wrote:
->> This patch adds usart3 for AT91SAM9G25 and X25.
->> Based on sugescion of Nicolas Ferre it's in separated dtsi file included in both
->> g25 and x25 files.
+Hi,
+
+On Wednesday 16 October 2013 06:48 PM, Roger Quadros wrote:
+> Hi,
+> 
+> On 10/15/2013 10:54 PM, Kishon Vijay Abraham I wrote:
+>> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
+>> power_on and power_off the following APIs are used phy_init(), phy_exit(),
+>> phy_power_on() and phy_power_off().
 >>
->> Signed-off-by:  <jiri.prchal@aksignal.cz>
+>> However using the old USB phy library wont be removed till the PHYs of all
+>> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 >> ---
->>    arch/arm/boot/dts/at91sam9g25.dtsi       |    1 +
->>    arch/arm/boot/dts/at91sam9x25.dtsi       |    1 +
->>    arch/arm/boot/dts/at91sam9x5-usart3.dtsi |   27 +++++++++++++++++++++++++++
->>    3 files changed, 29 insertions(+)
->>    create mode 100644 arch/arm/boot/dts/at91sam9x5-usart3.dtsi
+>>  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
+>>  drivers/usb/dwc3/Kconfig                       |    1 +
+>>  drivers/usb/dwc3/core.c                        |   52 ++++++++++++++++++++++++
+>>  drivers/usb/dwc3/core.h                        |    7 ++++
+>>  drivers/usb/dwc3/platform_data.h               |    2 +
+>>  5 files changed, 66 insertions(+), 2 deletions(-)
 >>
->> diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
->> index b4ec6fe..980e9a7 100644
->> --- a/arch/arm/boot/dts/at91sam9g25.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9g25.dtsi
->> @@ -7,6 +7,7 @@
->>     */
->>
->>    #include "at91sam9x5.dtsi"
->> +#include "at91sam9x5-usart3.dtsi"
->>
->>    / {
->>    	model = "Atmel AT91SAM9G25 SoC";
->> diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
->> index 49e94ab..3ac17ee 100644
->> --- a/arch/arm/boot/dts/at91sam9x25.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9x25.dtsi
->> @@ -7,6 +7,7 @@
->>     */
->>
->>    #include "at91sam9x5.dtsi"
->> +#include "at91sam9x5-usart3.dtsi"
->>
->>    / {
->>    	model = "Atmel AT91SAM9X25 SoC";
->> diff --git a/arch/arm/boot/dts/at91sam9x5-usart3.dtsi b/arch/arm/boot/dts/at91sam9x5-usart3.dtsi
->> new file mode 100644
->> index 0000000..f5b6979
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/at91sam9x5-usart3.dtsi
->> @@ -0,0 +1,27 @@
->> +/*
->> + * at91sam9x5-usert3.dtsi - Device Tree Include file for AT91SAM9G25 or
-> typo here : at91sam9x5-usert3.dtsi -> at91sam9x5-usart3.dts.
->
-> I won't complain about this, but some at91 dts(i) names already use "_"
-> instead of "-":
-> - at91sam9g20ek_common.dtsi
-> - at91sam9g20ek_2mmc.dts
->
-> I personally prefer the hypen version, but I think it's up to Atmel
-> maintainers to decide which name sould be used.
->
->> + * AT91SAM9X25 SoC
->> + *
->> + * Copyright (C) 2013 Jiri Prchal <jiri.prchal@aksignal.cz>
->> + *
->> + * Licensed under GPLv2.
->> + */
+>> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
+>> index e807635..471366d 100644
+>> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+>> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+>> @@ -6,11 +6,13 @@ Required properties:
+>>   - compatible: must be "snps,dwc3"
+>>   - reg : Address and length of the register set for the device
+>>   - interrupts: Interrupts used by the dwc3 controller.
 >> +
->> +/ {
->> +	aliases {
->> +		serial4 = &usart3;
->> +	};
+>> +Optional properties:
+>>   - usb-phy : array of phandle for the PHY device.  The first element
+>>     in the array is expected to be a handle to the USB2/HS PHY and
+>>     the second element is expected to be a handle to the USB3/SS PHY
+>> -
+>> -Optional properties:
+>> + - phys: from the *Generic PHY* bindings
+>> + - phy-names: from the *Generic PHY* bindings
+>>   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
+>>  
+>>  This is usually a subnode to DWC3 glue to which it is connected.
+>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+>> index 8e385b4..64eed6f 100644
+>> --- a/drivers/usb/dwc3/Kconfig
+>> +++ b/drivers/usb/dwc3/Kconfig
+>> @@ -2,6 +2,7 @@ config USB_DWC3
+>>  	tristate "DesignWare USB3 DRD Core Support"
+>>  	depends on (USB || USB_GADGET) && HAS_DMA
+>>  	select USB_PHY
+>> +	select GENERIC_PHY
+>>  	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
+>>  	help
+>>  	  Say Y or M here if your system has a Dual Role SuperSpeed
+>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>> index cb91d70..28bfa5b 100644
+>> --- a/drivers/usb/dwc3/core.c
+>> +++ b/drivers/usb/dwc3/core.c
+>> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
+>>  
+>>  	usb_phy_init(dwc->usb2_phy);
+>>  	usb_phy_init(dwc->usb3_phy);
 >> +
->> +	ahb {
->> +		apb {
->> +			usart3: serial at f8028000 {
->> +				compatible = "atmel,at91sam9260-usart";
->> +				reg = <0xf8028000 0x200>;
->> +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
->> +				pinctrl-names = "default";
->> +				pinctrl-0 = <&pinctrl_usart3>;
->> +				status = "disabled";
->> +			};
->> +		};
->> +	};
->> +};
-> I would have moved the the pinctrl definition in this file too.
-> In fact, that's what I did in my patch (
-> https://lkml.org/lkml/2013/8/7/252).
->
-> Anyway, I'm not sure, but I think Nicolas already applied my patch in
-> his at91-3.13-cleanup branch.
+>> +	if (dwc->usb2_generic_phy)
+>> +		phy_init(dwc->usb2_generic_phy);
+>> +	if (dwc->usb3_generic_phy)
+>> +		phy_init(dwc->usb3_generic_phy);
+>> +
+> 
+> dwc3_core_soft_reset() is called from dwc3_core_init() which is called from
+> dwc3_probe() but before the PHYs are initialized.
+> 
+> This will cause phy power_on() to be called before phy_init() which is wrong.
+> 
+>>  	mdelay(100);
+>>  
+>>  	/* Clear USB3 PHY reset */
+>> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
+>>  {
+>>  	usb_phy_shutdown(dwc->usb2_phy);
+>>  	usb_phy_shutdown(dwc->usb3_phy);
+>> +
+>> +	if (dwc->usb2_generic_phy)
+>> +		phy_power_off(dwc->usb2_generic_phy);
+>> +	if (dwc->usb3_generic_phy)
+>> +		phy_power_off(dwc->usb3_generic_phy);
+>>  }
+>>  
+>>  #define DWC3_ALIGN_MASK		(16 - 1)
+>> @@ -439,6 +450,26 @@ static int dwc3_probe(struct platform_device *pdev)
+>>  		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+>>  	}
+>>  
+>> +	count = of_property_match_string(node, "phy-names", "usb2-phy");
+>> +	if (count >= 0 || (pdata && pdata->usb2_generic_phy)) {
+>> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
+>> +		if (IS_ERR(dwc->usb2_generic_phy)) {
+>> +			dev_err(dev, "no usb2 phy configured yet");
+>> +			return PTR_ERR(dwc->usb2_generic_phy);
+>> +		}
+>> +		dwc->usb2_phy = NULL;
+>> +	}
+>> +
+>> +	count = of_property_match_string(node, "phy-names", "usb3-phy");
+>> +	if (count >= 0 || (pdata && pdata->usb3_generic_phy)) {
+>> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
+>> +		if (IS_ERR(dwc->usb3_generic_phy)) {
+>> +			dev_err(dev, "no usb3 phy configured yet");
+>> +			return PTR_ERR(dwc->usb3_generic_phy);
+>> +		}
+>> +		dwc->usb3_phy = NULL;
+>> +	}
+>> +
+> 
+> There are a couple of issues here.
+> - The above code must be executed only if it node is valid.
 
-Absolutely, this feature is already included in Boris' patch series. You 
-can have a look here:
+of_property_match_string will give a error value if the node is not present.
+*count >= 0* can take care of this.
+> - We must either get both PHYs via old method or via new method and not support mix matching
+> them. e.g. it is possible with this code that usb2_phy is set and usb3_generic_phy is set.
 
-https://github.com/at91linux/linux-at91/commit/d195608acc78db293468694ed5225a39e440429d
+Why? As long as both the frameworks co-exist (and we support both in dwc3), I
+don't see any reason why we shouldn't allow it. We can avoid adding a few more
+checks by leaving it the way it is currently.
 
-> If this is not the case, I'll be pleased to add my Acked-by after you've
-> added the pinctrl definitions
-> and fixed the the typo.
-
-No need to resend it.
-
-Best regards,
--- 
-Nicolas Ferre
+Thanks
+Kishon
