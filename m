@@ -1,86 +1,148 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 16 Oct 2013 13:08:11 +0200
-Subject: [PATCH 2/9] clk: samsung: Provide common helpers for register
- save/restore
+Date: Wed, 16 Oct 2013 13:08:15 +0200
+Subject: [PATCH 6/9] clk: samsung: s3c64xx: Move suspend/resume handling to SoC
+ driver
 In-Reply-To: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
 References: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1381921698-5060-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1381921698-5060-7-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As suspend/resume handlers are being moved to SoC specific code, due to
-differencies in suspend/resume handling of particular SoCs, to minimize
-code duplication this patch provides common register save/restore
-helpers that save/restore given list of registers of clock controller.
+Since there are multiple differences in how suspend/resume of particular
+Exynos SoCs must be handled, SoC driver is better place for
+suspend/resume handlers and so this patch moves them.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/samsung/clk.c | 32 ++++++++++++++++++++++++++++++++
- drivers/clk/samsung/clk.h | 10 ++++++++++
- 2 files changed, 42 insertions(+)
+ drivers/clk/samsung/clk-s3c64xx.c | 79 +++++++++++++++++++++++++++++++++------
+ 1 file changed, 68 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-index f503f32..c0a716b 100644
---- a/drivers/clk/samsung/clk.c
-+++ b/drivers/clk/samsung/clk.c
-@@ -22,6 +22,38 @@ static struct clk_onecell_data clk_data;
- #endif
+diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+index 7d2c842..3189101 100644
+--- a/drivers/clk/samsung/clk-s3c64xx.c
++++ b/drivers/clk/samsung/clk-s3c64xx.c
+@@ -13,6 +13,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/syscore_ops.h>
  
- #ifdef CONFIG_PM_SLEEP
-+void samsung_clk_save(void __iomem *base,
-+				    struct samsung_clk_reg_dump *rd,
-+				    unsigned int num_regs)
+ #include <dt-bindings/clock/samsung,s3c64xx-clock.h>
+ 
+@@ -61,6 +62,13 @@ enum s3c64xx_plls {
+ 	apll, mpll, epll,
+ };
+ 
++static void __iomem *reg_base;
++static bool is_s3c6400;
++
++#ifdef CONFIG_PM_SLEEP
++static struct samsung_clk_reg_dump *s3c64xx_save_common;
++static struct samsung_clk_reg_dump *s3c64xx_save_soc;
++
+ /*
+  * List of controller registers to be saved and restored during
+  * a suspend/resume cycle.
+@@ -87,6 +95,60 @@ static unsigned long s3c6410_clk_regs[] __initdata = {
+ 	MEM0_GATE,
+ };
+ 
++static int s3c64xx_clk_suspend(void)
 +{
-+	for (; num_regs > 0; --num_regs, ++rd)
-+		rd->value = readl(base + rd->offset);
++	samsung_clk_save(reg_base, s3c64xx_save_common,
++				ARRAY_SIZE(s3c64xx_clk_regs));
++
++	if (!is_s3c6400)
++		samsung_clk_save(reg_base, s3c64xx_save_soc,
++					ARRAY_SIZE(s3c6410_clk_regs));
++
++	return 0;
 +}
 +
-+void samsung_clk_restore(void __iomem *base,
-+				      const struct samsung_clk_reg_dump *rd,
-+				      unsigned int num_regs)
++static void s3c64xx_clk_resume(void)
 +{
-+	for (; num_regs > 0; --num_regs, ++rd)
-+		writel(rd->value, base + rd->offset);
++	samsung_clk_restore(reg_base, s3c64xx_save_common,
++				ARRAY_SIZE(s3c64xx_clk_regs));
++
++	if (!is_s3c6400)
++		samsung_clk_restore(reg_base, s3c64xx_save_soc,
++					ARRAY_SIZE(s3c6410_clk_regs));
 +}
 +
-+struct samsung_clk_reg_dump *samsung_clk_alloc_reg_dump(unsigned long *rdump,
-+							unsigned long nr_rdump)
++static struct syscore_ops s3c64xx_clk_syscore_ops = {
++	.suspend = s3c64xx_clk_suspend,
++	.resume = s3c64xx_clk_resume,
++};
++
++static void s3c64xx_clk_sleep_init(void)
 +{
-+	struct samsung_clk_reg_dump *rd;
-+	unsigned int i;
++	s3c64xx_save_common = samsung_clk_alloc_reg_dump(s3c64xx_clk_regs,
++						ARRAY_SIZE(s3c64xx_clk_regs));
++	if (!s3c64xx_save_common)
++		goto err_warn;
 +
-+	rd = kcalloc(nr_rdump, sizeof(*rd), GFP_KERNEL);
-+	if (!rd)
-+		return NULL;
++	if (!is_s3c6400) {
++		s3c64xx_save_soc = samsung_clk_alloc_reg_dump(s3c6410_clk_regs,
++						ARRAY_SIZE(s3c6410_clk_regs));
++		if (!s3c64xx_save_soc)
++			goto err_soc;
++	}
 +
-+	for (i = 0; i < nr_rdump; ++i)
-+		rd[i].offset = rdump[i];
++	register_syscore_ops(&s3c64xx_clk_syscore_ops);
++	return;
 +
-+	return rd;
++err_soc:
++	kfree(s3c64xx_save_common);
++err_warn:
++	pr_warn("%s: failed to allocate sleep save data, no sleep support!\n",
++		__func__);
 +}
++#else
++static void s3c64xx_clk_sleep_init(void) {}
++#endif
 +
- static struct samsung_clk_reg_dump *reg_dump;
- static unsigned long nr_reg_dump;
+ /* List of parent clocks common for all S3C64xx SoCs. */
+ PNAME(spi_mmc_p)	= { "mout_epll", "dout_mpll", "fin_pll", "clk27m" };
+ PNAME(uart_p)		= { "mout_epll", "dout_mpll" };
+@@ -391,11 +453,11 @@ static void __init s3c64xx_clk_register_fixed_ext(unsigned long fin_pll_f,
  
-diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-index 31b4174..ec8d46b 100644
---- a/drivers/clk/samsung/clk.h
-+++ b/drivers/clk/samsung/clk.h
-@@ -340,4 +340,14 @@ extern void __init samsung_clk_register_pll(struct samsung_pll_clock *pll_list,
+ /* Register s3c64xx clocks. */
+ void __init s3c64xx_clk_init(struct device_node *np, unsigned long xtal_f,
+-			     unsigned long xusbxti_f, bool is_s3c6400,
+-			     void __iomem *reg_base)
++			     unsigned long xusbxti_f, bool s3c6400,
++			     void __iomem *base)
+ {
+-	unsigned long *soc_regs = NULL;
+-	unsigned long nr_soc_regs = 0;
++	reg_base = base;
++	is_s3c6400 = s3c6400;
  
- extern unsigned long _get_rate(const char *clk_name);
+ 	if (np) {
+ 		reg_base = of_iomap(np, 0);
+@@ -403,13 +465,7 @@ void __init s3c64xx_clk_init(struct device_node *np, unsigned long xtal_f,
+ 			panic("%s: failed to map registers\n", __func__);
+ 	}
  
-+extern void samsung_clk_save(void __iomem *base,
-+			     struct samsung_clk_reg_dump *rd,
-+			     unsigned int num_regs);
-+extern void samsung_clk_restore(void __iomem *base,
-+				const struct samsung_clk_reg_dump *rd,
-+				unsigned int num_regs);
-+extern struct samsung_clk_reg_dump *samsung_clk_alloc_reg_dump(
-+							unsigned long *rdump,
-+							unsigned long nr_rdump);
-+
- #endif /* __SAMSUNG_CLK_H */
+-	if (!is_s3c6400) {
+-		soc_regs = s3c6410_clk_regs;
+-		nr_soc_regs = ARRAY_SIZE(s3c6410_clk_regs);
+-	}
+-
+-	samsung_clk_init(np, reg_base, NR_CLKS, s3c64xx_clk_regs,
+-			ARRAY_SIZE(s3c64xx_clk_regs), soc_regs, nr_soc_regs);
++	samsung_clk_init(np, reg_base, NR_CLKS, NULL, 0, NULL, 0);
+ 
+ 	/* Register external clocks. */
+ 	if (!np)
+@@ -452,6 +508,7 @@ void __init s3c64xx_clk_init(struct device_node *np, unsigned long xtal_f,
+ 
+ 	samsung_clk_register_alias(s3c64xx_clock_aliases,
+ 					ARRAY_SIZE(s3c64xx_clock_aliases));
++	s3c64xx_clk_sleep_init();
+ 
+ 	pr_info("%s clocks: apll = %lu, mpll = %lu\n"
+ 		"\tepll = %lu, arm_clk = %lu\n",
 -- 
 1.8.3.2
