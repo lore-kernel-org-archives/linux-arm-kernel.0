@@ -1,65 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 16 Oct 2013 09:20:59 +0200
-Subject: [PATCH v2 2/3] ARM: dts: imx6qdl-wandboard: Add HDMI support
-In-Reply-To: <20131015103500.GY25034@n2100.arm.linux.org.uk>
-References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
- <1380826287-30253-2-git-send-email-fabio.estevam@freescale.com>
- <20131014174030.GU25034@n2100.arm.linux.org.uk>
- <20131014225029.GV25034@n2100.arm.linux.org.uk>
- <20131015074618.GG30088@pengutronix.de>
- <20131015091830.GW25034@n2100.arm.linux.org.uk>
- <20131015103500.GY25034@n2100.arm.linux.org.uk>
-Message-ID: <20131016072059.GD17135@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 Oct 2013 09:26:56 +0200
+Subject: [PATCH v10 3/7] ARM: dts: enable hi4511 with device tree
+In-Reply-To: <201310152018.10908.arnd@arndb.de>
+References: <1381828577-27998-1-git-send-email-haojian.zhuang@linaro.org>
+ <1381828577-27998-4-git-send-email-haojian.zhuang@linaro.org>
+ <201310152018.10908.arnd@arndb.de>
+Message-ID: <CACRpkdZ5qWiM7xp-Wc1jtQYvEOGyA11pvR80ds6NtHXP-U6AtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 11:35:00AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 15, 2013 at 10:18:30AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Oct 15, 2013 at 09:46:18AM +0200, Sascha Hauer wrote:
-> > > This sounds like the wrong clock polarity. Could you try inverting
-> > > sig_cfg.clk_pol in imx-drm/ipuv3-crtc.c?
-> > 
-> > I tweaked it a different way - I used devmem2 to directly poke at the
-> > register.  Inverting bit 17 (iow, clearing it) seems to fix the
-> > problem.
-> 
-> As a follow-up, the driver says this:
-> 
->         unsigned clk_pol:1;     /* true = rising edge */
-> 
-> This is interpreted by the ipu-di.c driver as:
-> 
->         if (!sig->clk_pol)
->                 di_gen |= DI_GEN_POLARITY_DISP_CLK;
-> 
-> note the inversion.  U-boot does something slightly different here
-> (apparantly it describes clk_pol in the same way though):
-> 
->                 if (sig.clk_pol)
->                         di_gen |= DI_GEN_POL_CLK;
-> 
-> It's also reported that u-boot sets sig.clk_pol when
-> FB_SYNC_CLK_LAT_FALL bit is not set (which confirms that clk_pol
-> indicates rising edge active.)
-> 
-> Now, the confusing bit.  The docs for the imx6s/dl say that bit 17
-> when set is "active high" vs clear "active low".  This appears to
-> define a level active state.  The code seems to define an edge
-> instead.  What's more is that u-boot and the kernel seem to describe
-> 'clk_pol' in the same way yet interpret it differently.
-> 
-> Should that inversion in the kernel be there?
+On Tue, Oct 15, 2013 at 8:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 15 October 2013, Haojian Zhuang wrote:
 
-I could measure the pin with an oscilloscope on some board using
-the parallel display output. That should how this bit really behaves
-and we can cleanup the comments and/or code.
+> Since all clocks are in the fc802000 page, I would prefer using a non-empty
+> ranges to map the clocks into their own address space, like
+>
+>                 ranges = <0 0xfc802000 0x1000>;
+>
+>
+>> +             timer4_mux: timer4_mux at fc802018 {
+>> +                     compatible = "hisilicon,clk-mux";
+>> +                     #clock-cells = <0>;
+>> +                     clocks = <&osc32k &timerclk45>;
+>> +                     clock-output-names = "timer4_mux";
+>> +                     reg = <0xfc802018 0x4>;
+>> +                     clkmux-mask = <0x3>;
+>> +                     clkmux-table = <0 0x1>;
+>> +             };
+>
+> which would turn this into
+>
+>                 timer4_mux: timer4_mux at 18 {
+>                         ...
+>                         reg = <0x18 0x4>;
+>                         ...
+>                 };
+>
+> The code would not be impacted by this.
 
-Won't have time for this before Edinburgh though.
+I'd rather question the addition of a reg =<>; specifier
+for each and every clock.
 
-Sascha
+Knowing the offsets of each and every register in a
+memory-mapped device is usually overdesign, and
+goes from specifying register base to specifying
+register offsets and to me that is overspecifying.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I'd rather give each clock a unique ID or something,
+then let the driver know the offsets, and specify the
+base and size in the top node.
+
+This becomes more obvious with a second silicon
+revision moving the registers around - with this
+design all of the clocks need updating, but if you're
+lucky with less knowledge in the DTS you only need
+a new compatible string and the knowledge of the new
+whereabout for the regs is kept in the driver.
+
+Yours,
+Linus Walleij
