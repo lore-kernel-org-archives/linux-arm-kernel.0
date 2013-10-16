@@ -1,33 +1,32 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 16 Oct 2013 21:10:52 +0200
-Subject: [PATCH v2 1/8] spi: s3c64xx: Do not require legacy DMA API in case of
- S3C64XX
+Date: Wed, 16 Oct 2013 21:10:55 +0200
+Subject: [PATCH v2 4/8] clk: samsung: s3c64xx: Add aliases for DMA clocks
 In-Reply-To: <1381950659-12703-1-git-send-email-tomasz.figa@gmail.com>
 References: <1381950659-12703-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1381950659-12703-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1381950659-12703-5-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With support for amba-pl08x driver, on S3C64xx the generic DMA engine
-API can be used instead of the private s3c-dma interface.
+This patch adds clkdev aliases for clocks used by PL08x DMA driver.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/spi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/samsung/clk-s3c64xx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index eb1f1ef..760d7b6 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -395,7 +395,7 @@ config SPI_S3C24XX_FIQ
- config SPI_S3C64XX
- 	tristate "Samsung S3C64XX series type SPI"
- 	depends on PLAT_SAMSUNG
--	select S3C64XX_DMA if ARCH_S3C64XX
-+	select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
- 	help
- 	  SPI driver for Samsung S3C64XX and newer SoCs.
- 
+diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+index 7d2c842..06cf105 100644
+--- a/drivers/clk/samsung/clk-s3c64xx.c
++++ b/drivers/clk/samsung/clk-s3c64xx.c
+@@ -332,7 +332,9 @@ static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
+ 	ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "hsmmc"),
+ 	ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "mmc_busclk.0"),
+ 	ALIAS(HCLK_DMA1, NULL, "dma1"),
++	ALIAS(HCLK_DMA1, "dma-pl080s.1", "apb_pclk"),
+ 	ALIAS(HCLK_DMA0, NULL, "dma0"),
++	ALIAS(HCLK_DMA0, "dma-pl080s.0", "apb_pclk"),
+ 	ALIAS(HCLK_CAMIF, "s3c-camif", "camif"),
+ 	ALIAS(HCLK_LCD, "s3c-fb", "lcd"),
+ 	ALIAS(PCLK_SPI1, "s3c6410-spi.1", "spi"),
 -- 
 1.8.3.2
