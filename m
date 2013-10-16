@@ -1,26 +1,100 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 16 Oct 2013 11:26:37 -0700
-Subject: [PATCH 3/4] ARM: debug: msm: Add DEBUG_LL support for ARCH_MSM8974
-In-Reply-To: <1380841557-2673-4-git-send-email-rvaswani@codeaurora.org>
-References: <1380841557-2673-1-git-send-email-rvaswani@codeaurora.org>
- <1380841557-2673-4-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <20131016182637.GA21292@codeaurora.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 16 Oct 2013 20:29:37 +0200 (CEST)
+Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
+ status
+In-Reply-To: <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
+References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
+ <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
+Message-ID: <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 04:05:56PM -0700, Rohit Vaswani wrote:
->Add debug uart support for MSM8974. This patch adds a Kconfig
->entry and the base address for the debug uart.
->
->Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
->---
-> arch/arm/Kconfig.debug       | 9 +++++++++
-> arch/arm/include/debug/msm.S | 5 +++++
-> 2 files changed, 14 insertions(+)
+Hi Vinod,
 
-Acked-by: David Brown <davidb@codeaurora.org>
+On Wed, 16 Oct 2013, Vinod Koul wrote:
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> the DMA_SUCCESS is a misnomer as dmaengine indicates the transfer is complete and
+> gives no guarantee of the transfer success. Hence we should use DMA_COMPLTE
+> instead of DMA_SUCCESS
+> 
+> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+> ---
+>  drivers/dma/dmaengine.c   |    2 +-
+>  include/linux/dmaengine.h |   12 ++++++------
+>  2 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> index 9162ac8..81d8765 100644
+> --- a/drivers/dma/dmaengine.c
+> +++ b/drivers/dma/dmaengine.c
+> @@ -1062,7 +1062,7 @@ dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx)
+>  	unsigned long dma_sync_wait_timeout = jiffies + msecs_to_jiffies(5000);
+>  
+>  	if (!tx)
+> -		return DMA_SUCCESS;
+> +		return DMA_COMPLETE;
+>  
+>  	while (tx->cookie == -EBUSY) {
+>  		if (time_after_eq(jiffies, dma_sync_wait_timeout)) {
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 0bc7275..4b460a6 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -45,13 +45,13 @@ static inline int dma_submit_error(dma_cookie_t cookie)
+>  
+>  /**
+>   * enum dma_status - DMA transaction status
+> - * @DMA_SUCCESS: transaction completed successfully
+> + * @DMA_COMPLETE: transaction completed
+>   * @DMA_IN_PROGRESS: transaction not yet processed
+>   * @DMA_PAUSED: transaction is paused
+>   * @DMA_ERROR: transaction failed
+>   */
+>  enum dma_status {
+> -	DMA_SUCCESS,
+> +	DMA_COMPLETE,
+>  	DMA_IN_PROGRESS,
+>  	DMA_PAUSED,
+>  	DMA_ERROR,
+
+Doesn't this break kernel compilation for a total of 27 commits? Or am I 
+missing anything?
+
+Thanks
+Guennadi
+
+> @@ -979,10 +979,10 @@ static inline enum dma_status dma_async_is_complete(dma_cookie_t cookie,
+>  {
+>  	if (last_complete <= last_used) {
+>  		if ((cookie <= last_complete) || (cookie > last_used))
+> -			return DMA_SUCCESS;
+> +			return DMA_COMPLETE;
+>  	} else {
+>  		if ((cookie <= last_complete) && (cookie > last_used))
+> -			return DMA_SUCCESS;
+> +			return DMA_COMPLETE;
+>  	}
+>  	return DMA_IN_PROGRESS;
+>  }
+> @@ -1013,11 +1013,11 @@ static inline struct dma_chan *dma_find_channel(enum dma_transaction_type tx_typ
+>  }
+>  static inline enum dma_status dma_sync_wait(struct dma_chan *chan, dma_cookie_t cookie)
+>  {
+> -	return DMA_SUCCESS;
+> +	return DMA_COMPLETE;
+>  }
+>  static inline enum dma_status dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx)
+>  {
+> -	return DMA_SUCCESS;
+> +	return DMA_COMPLETE;
+>  }
+>  static inline void dma_issue_pending_all(void)
+>  {
+> -- 
+> 1.7.0.4
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
