@@ -1,443 +1,62 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 15 Oct 2013 17:47:36 -0700
-Subject: [PATCH v2] usb: ohci: remove ep93xx bus glue platform driver
-Message-ID: <201310151747.37003.hartleys@visionengravers.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 15 Oct 2013 17:49:28 -0700
+Subject: [GIT PULL] KVM/ARM Updates for kvm/next
+Message-ID: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert ep93xx to use the OHCI platform driver and remove the
-ohci-ep93xx bus glue driver.
+Hi guys,
 
-Enable CONFIG_OHCI_HCD_PLATFORM and refresh the ep93xx_defconfig
-so that USB is still enabled by default on the EP93xx platform.
+(You may want to make sure you actually pull this as opposed to picking
+them off the mailing list, since the weird non-ASCII spaces in the
+patches at least make both git send-email and git-am angry for me).
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Ryan Mallon <rmallon@gmail.com>
-Cc: Olof Johansson <olof@lixom.net>
----
-v2: Use the (*power_off) callback for (*power_suspend), as suggested
-    by Alan Stern.
-    Remove the Kconfig change to USB_OHCI_HCD_PLATFORM and refresh
-    the ep93xx_defconfig to enable this option, as suggested by Alan Stern.
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
- arch/arm/configs/ep93xx_defconfig |  17 +---
- arch/arm/mach-ep93xx/clock.c      |   2 +-
- arch/arm/mach-ep93xx/core.c       |  40 ++++++++-
- drivers/usb/host/ohci-ep93xx.c    | 184 --------------------------------------
- drivers/usb/host/ohci-hcd.c       |  18 ----
- 5 files changed, 40 insertions(+), 221 deletions(-)
- delete mode 100644 drivers/usb/host/ohci-ep93xx.c
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
 
-diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
-index 806005a..6ac5ea7 100644
---- a/arch/arm/configs/ep93xx_defconfig
-+++ b/arch/arm/configs/ep93xx_defconfig
-@@ -1,15 +1,14 @@
--CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_EXPERT=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_EP93XX=y
- CONFIG_CRUNCH=y
-@@ -47,11 +46,8 @@ CONFIG_IPV6=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- # CONFIG_FW_LOADER is not set
- CONFIG_MTD=y
--CONFIG_MTD_CONCAT=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_REDBOOT_PARTS=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
-@@ -67,15 +63,14 @@ CONFIG_SCSI=y
- # CONFIG_SCSI_PROC_FS is not set
- CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
- CONFIG_EP93XX_ETH=y
- CONFIG_USB_RTL8150=y
- # CONFIG_INPUT is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_AMBA_PL010=y
- CONFIG_SERIAL_AMBA_PL010_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
-@@ -86,9 +81,9 @@ CONFIG_WATCHDOG=y
- CONFIG_EP93XX_WATCHDOG=y
- CONFIG_USB=y
- CONFIG_USB_DEBUG=y
--CONFIG_USB_DEVICEFS=y
- CONFIG_USB_DYNAMIC_MINORS=y
- CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_OHCI_HCD_PLATFORM=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_SERIAL=y
- CONFIG_USB_SERIAL_CONSOLE=y
-@@ -100,24 +95,18 @@ CONFIG_RTC_DRV_EP93XX=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
--CONFIG_INOTIFY=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_ROOT_NFS=y
--CONFIG_PARTITION_ADVANCED=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_SLAB=y
- CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
- CONFIG_DEBUG_LL=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
- CONFIG_LIBCRC32C=y
-diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-index c95dbce..39ef3b6 100644
---- a/arch/arm/mach-ep93xx/clock.c
-+++ b/arch/arm/mach-ep93xx/clock.c
-@@ -212,7 +212,7 @@ static struct clk_lookup clocks[] = {
- 	INIT_CK(NULL,			"hclk",		&clk_h),
- 	INIT_CK(NULL,			"apb_pclk",	&clk_p),
- 	INIT_CK(NULL,			"pll2",		&clk_pll2),
--	INIT_CK("ep93xx-ohci",		NULL,		&clk_usb_host),
-+	INIT_CK("ohci-platform",	NULL,		&clk_usb_host),
- 	INIT_CK("ep93xx-keypad",	NULL,		&clk_keypad),
- 	INIT_CK("ep93xx-fb",		NULL,		&clk_video),
- 	INIT_CK("ep93xx-spi.0",		NULL,		&clk_spi),
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 3f12b88..92d59c4 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -36,6 +36,7 @@
- #include <linux/export.h>
- #include <linux/irqchip/arm-vic.h>
- #include <linux/reboot.h>
-+#include <linux/usb/ohci_pdriver.h>
- 
- #include <mach/hardware.h>
- #include <linux/platform_data/video-ep93xx.h>
-@@ -297,22 +298,53 @@ static struct platform_device ep93xx_rtc_device = {
- 	.resource	= ep93xx_rtc_resource,
- };
- 
-+/*************************************************************************
-+ * EP93xx OHCI USB Host
-+ *************************************************************************/
-+
-+static struct clk *ep93xx_ohci_host_clock;
-+
-+static int ep93xx_ohci_power_on(struct platform_device *pdev)
-+{
-+	if (!ep93xx_ohci_host_clock) {
-+		ep93xx_ohci_host_clock = devm_clk_get(&pdev->dev, NULL);
-+		if (IS_ERR(ep93xx_ohci_host_clock))
-+			return PTR_ERR(ep93xx_ohci_host_clock);
-+	}
-+
-+	clk_enable(ep93xx_ohci_host_clock);
-+
-+	return 0;
-+}
-+
-+static void ep93xx_ohci_power_off(struct platform_device *pdev)
-+{
-+	clk_disable(ep93xx_ohci_host_clock);
-+}
-+
-+static struct usb_ohci_pdata ep93xx_ohci_pdata = {
-+	.power_on	= ep93xx_ohci_power_on,
-+	.power_off	= ep93xx_ohci_power_off,
-+	.power_suspend	= ep93xx_ohci_power_off,
-+};
- 
- static struct resource ep93xx_ohci_resources[] = {
- 	DEFINE_RES_MEM(EP93XX_USB_PHYS_BASE, 0x1000),
- 	DEFINE_RES_IRQ(IRQ_EP93XX_USB),
- };
- 
-+static u64 ep93xx_ohci_dma_mask = DMA_BIT_MASK(32);
- 
- static struct platform_device ep93xx_ohci_device = {
--	.name		= "ep93xx-ohci",
-+	.name		= "ohci-platform",
- 	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(ep93xx_ohci_resources),
-+	.resource	= ep93xx_ohci_resources,
- 	.dev		= {
--		.dma_mask		= &ep93xx_ohci_device.dev.coherent_dma_mask,
-+		.dma_mask		= &ep93xx_ohci_dma_mask,
- 		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+		.platform_data		= &ep93xx_ohci_pdata,
- 	},
--	.num_resources	= ARRAY_SIZE(ep93xx_ohci_resources),
--	.resource	= ep93xx_ohci_resources,
- };
- 
- 
-diff --git a/drivers/usb/host/ohci-ep93xx.c b/drivers/usb/host/ohci-ep93xx.c
-deleted file mode 100644
-index 84a20d5..0000000
---- a/drivers/usb/host/ohci-ep93xx.c
-+++ /dev/null
-@@ -1,184 +0,0 @@
--/*
-- * OHCI HCD (Host Controller Driver) for USB.
-- *
-- * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
-- * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
-- * (C) Copyright 2002 Hewlett-Packard Company
-- *
-- * Bus Glue for ep93xx.
-- *
-- * Written by Christopher Hoover <ch@hpl.hp.com>
-- * Based on fragments of previous driver by Russell King et al.
-- *
-- * Modified for LH7A404 from ohci-sa1111.c
-- *  by Durgesh Pattamatta <pattamattad@sharpsec.com>
-- *
-- * Modified for pxa27x from ohci-lh7a404.c
-- *  by Nick Bane <nick@cecomputing.co.uk> 26-8-2004
-- *
-- * Modified for ep93xx from ohci-pxa27x.c
-- *  by Lennert Buytenhek <buytenh@wantstofly.org> 28-2-2006
-- *  Based on an earlier driver by Ray Lehtiniemi
-- *
-- * This file is licenced under the GPL.
-- */
--
--#include <linux/clk.h>
--#include <linux/device.h>
--#include <linux/signal.h>
--#include <linux/platform_device.h>
--
--static struct clk *usb_host_clock;
--
--static int ohci_ep93xx_start(struct usb_hcd *hcd)
--{
--	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
--	int ret;
--
--	if ((ret = ohci_init(ohci)) < 0)
--		return ret;
--
--	if ((ret = ohci_run(ohci)) < 0) {
--		dev_err(hcd->self.controller, "can't start %s\n",
--			hcd->self.bus_name);
--		ohci_stop(hcd);
--		return ret;
--	}
--
--	return 0;
--}
--
--static struct hc_driver ohci_ep93xx_hc_driver = {
--	.description		= hcd_name,
--	.product_desc		= "EP93xx OHCI",
--	.hcd_priv_size		= sizeof(struct ohci_hcd),
--	.irq			= ohci_irq,
--	.flags			= HCD_USB11 | HCD_MEMORY,
--	.start			= ohci_ep93xx_start,
--	.stop			= ohci_stop,
--	.shutdown		= ohci_shutdown,
--	.urb_enqueue		= ohci_urb_enqueue,
--	.urb_dequeue		= ohci_urb_dequeue,
--	.endpoint_disable	= ohci_endpoint_disable,
--	.get_frame_number	= ohci_get_frame,
--	.hub_status_data	= ohci_hub_status_data,
--	.hub_control		= ohci_hub_control,
--#ifdef CONFIG_PM
--	.bus_suspend		= ohci_bus_suspend,
--	.bus_resume		= ohci_bus_resume,
--#endif
--	.start_port_reset	= ohci_start_port_reset,
--};
--
--static int ohci_hcd_ep93xx_drv_probe(struct platform_device *pdev)
--{
--	struct usb_hcd *hcd;
--	struct resource *res;
--	int irq;
--	int ret;
--
--	if (usb_disabled())
--		return -ENODEV;
--
--	irq = platform_get_irq(pdev, 0);
--	if (irq < 0)
--		return irq;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res)
--		return -ENXIO;
--
--	hcd = usb_create_hcd(&ohci_ep93xx_hc_driver, &pdev->dev, "ep93xx");
--	if (!hcd)
--		return -ENOMEM;
--
--	hcd->rsrc_start = res->start;
--	hcd->rsrc_len = resource_size(res);
--
--	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(hcd->regs)) {
--		ret = PTR_ERR(hcd->regs);
--		goto err_put_hcd;
--	}
--
--	usb_host_clock = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(usb_host_clock)) {
--		ret = PTR_ERR(usb_host_clock);
--		goto err_put_hcd;
--	}
--
--	clk_enable(usb_host_clock);
--
--	ohci_hcd_init(hcd_to_ohci(hcd));
--
--	ret = usb_add_hcd(hcd, irq, 0);
--	if (ret)
--		goto err_clk_disable;
--
--	return 0;
--
--err_clk_disable:
--	clk_disable(usb_host_clock);
--err_put_hcd:
--	usb_put_hcd(hcd);
--
--	return ret;
--}
--
--static int ohci_hcd_ep93xx_drv_remove(struct platform_device *pdev)
--{
--	struct usb_hcd *hcd = platform_get_drvdata(pdev);
--
--	usb_remove_hcd(hcd);
--	clk_disable(usb_host_clock);
--	usb_put_hcd(hcd);
--
--	return 0;
--}
--
--#ifdef CONFIG_PM
--static int ohci_hcd_ep93xx_drv_suspend(struct platform_device *pdev, pm_message_t state)
--{
--	struct usb_hcd *hcd = platform_get_drvdata(pdev);
--	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
--
--	if (time_before(jiffies, ohci->next_statechange))
--		msleep(5);
--	ohci->next_statechange = jiffies;
--
--	clk_disable(usb_host_clock);
--	return 0;
--}
--
--static int ohci_hcd_ep93xx_drv_resume(struct platform_device *pdev)
--{
--	struct usb_hcd *hcd = platform_get_drvdata(pdev);
--	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
--
--	if (time_before(jiffies, ohci->next_statechange))
--		msleep(5);
--	ohci->next_statechange = jiffies;
--
--	clk_enable(usb_host_clock);
--
--	ohci_resume(hcd, false);
--	return 0;
--}
--#endif
--
--
--static struct platform_driver ohci_hcd_ep93xx_driver = {
--	.probe		= ohci_hcd_ep93xx_drv_probe,
--	.remove		= ohci_hcd_ep93xx_drv_remove,
--	.shutdown	= usb_hcd_platform_shutdown,
--#ifdef CONFIG_PM
--	.suspend	= ohci_hcd_ep93xx_drv_suspend,
--	.resume		= ohci_hcd_ep93xx_drv_resume,
--#endif
--	.driver		= {
--		.name	= "ep93xx-ohci",
--		.owner	= THIS_MODULE,
--	},
--};
--
--MODULE_ALIAS("platform:ep93xx-ohci");
-diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 604cad1..5845c82 100644
---- a/drivers/usb/host/ohci-hcd.c
-+++ b/drivers/usb/host/ohci-hcd.c
-@@ -1204,11 +1204,6 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		ohci_hcd_pxa27x_driver
- #endif
- 
--#ifdef CONFIG_ARCH_EP93XX
--#include "ohci-ep93xx.c"
--#define EP93XX_PLATFORM_DRIVER	ohci_hcd_ep93xx_driver
--#endif
--
- #ifdef CONFIG_ARCH_AT91
- #include "ohci-at91.c"
- #define AT91_PLATFORM_DRIVER	ohci_hcd_at91_driver
-@@ -1344,12 +1339,6 @@ static int __init ohci_hcd_mod_init(void)
- 		goto error_exynos;
- #endif
- 
--#ifdef EP93XX_PLATFORM_DRIVER
--	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
--	if (retval < 0)
--		goto error_ep93xx;
--#endif
--
- #ifdef AT91_PLATFORM_DRIVER
- 	retval = platform_driver_register(&AT91_PLATFORM_DRIVER);
- 	if (retval < 0)
-@@ -1393,10 +1382,6 @@ static int __init ohci_hcd_mod_init(void)
- 	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
-  error_at91:
- #endif
--#ifdef EP93XX_PLATFORM_DRIVER
--	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
-- error_ep93xx:
--#endif
- #ifdef EXYNOS_PLATFORM_DRIVER
- 	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
-  error_exynos:
-@@ -1462,9 +1447,6 @@ static void __exit ohci_hcd_mod_exit(void)
- #ifdef AT91_PLATFORM_DRIVER
- 	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
- #endif
--#ifdef EP93XX_PLATFORM_DRIVER
--	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
--#endif
- #ifdef EXYNOS_PLATFORM_DRIVER
- 	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
- #endif
--- 
-1.8.3.2
+are available in the git repository at:
+
+  git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-for-3.13-1
+
+for you to fetch changes up to a7265fb1751ffbfad553afc7f592a6dac6be48de:
+
+  KVM: ARM: Remove non-ASCII space characters (2013-10-15 17:43:00 -0700)
+
+----------------------------------------------------------------
+Updates for KVM/ARM including cpu=host and Cortex-A7 support
+
+----------------------------------------------------------------
+Anup Patel (5):
+      KVM: ARM: Fix typo in comments of inject_abt()
+      ARM: KVM: Implement kvm_vcpu_preferred_target() function
+      ARM64: KVM: Implement kvm_vcpu_preferred_target() function
+      ARM/ARM64: KVM: Implement KVM_ARM_PREFERRED_TARGET ioctl
+      KVM: Add documentation for KVM_ARM_PREFERRED_TARGET ioctl
+
+Christoffer Dall (1):
+      KVM: ARM: Remove non-ASCII space characters
+
+Jonathan Austin (3):
+      KVM: ARM: Fix calculation of virtual CPU ID
+      KVM: ARM: fix the size of TTBCR_{T0SZ,T1SZ} masks
+      KVM: ARM: Add support for Cortex-A7
+
+ Documentation/virtual/kvm/api.txt |   31 ++++++++--
+ arch/arm/include/asm/kvm_arm.h    |    4 +-
+ arch/arm/include/asm/kvm_asm.h    |    2 +-
+ arch/arm/include/asm/kvm_host.h   |    1 +
+ arch/arm/include/uapi/asm/kvm.h   |    3 +-
+ arch/arm/kvm/Makefile             |    2 +-
+ arch/arm/kvm/arm.c                |   13 +++++
+ arch/arm/kvm/coproc.c             |  114 ++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/coproc_a15.c         |  117 +------------------------------------
+ arch/arm/kvm/coproc_a7.c          |   54 +++++++++++++++++
+ arch/arm/kvm/emulate.c            |    2 +-
+ arch/arm/kvm/guest.c              |   24 +++++++-
+ arch/arm/kvm/reset.c              |   15 ++---
+ arch/arm64/include/asm/kvm_host.h |    1 +
+ arch/arm64/kvm/guest.c            |   20 +++++++
+ include/uapi/linux/kvm.h          |    1 +
+ 16 files changed, 270 insertions(+), 134 deletions(-)
+ create mode 100644 arch/arm/kvm/coproc_a7.c
