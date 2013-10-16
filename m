@@ -1,46 +1,41 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Oct 2013 18:47:08 +0530
-Subject: [PATCH v2 2/2] ARM: dts: omap5: Add dr_mode for dwc3
-In-Reply-To: <1381816199-7966-1-git-send-email-kishon@ti.com>
-References: <52580F34.8030809@ti.com>
- <1381816199-7966-1-git-send-email-kishon@ti.com>
-Message-ID: <525E91D4.30509@ti.com>
+Date: Wed, 16 Oct 2013 18:47:58 +0530
+Subject: [PATCH 1/2] ARM: dts: omap5-uevm: remove always_on, boot_on from
+ smps10_out1
+In-Reply-To: <1381402195-29257-1-git-send-email-kishon@ti.com>
+References: <1381402195-29257-1-git-send-email-kishon@ti.com>
+Message-ID: <525E9206.9010501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Benoit,
 
-On Tuesday 15 October 2013 11:19 AM, Kishon Vijay Abraham I wrote:
-> From: George Cherian <george.cherian@ti.com>
-> 
-> Added dr_mode property in dwc3 and set its default mode to device.
-> Currently dwc3 driver doesn't have support for OTG mode. So explicitly
-> setting to peripheral even dwc3 is a OTG controller since OMAP5 has
-> already got an EHCI host.
-> 
-> Signed-off-by: George Cherian <george.cherian@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On Thursday 10 October 2013 04:19 PM, Kishon Vijay Abraham I wrote:
+> smps10 should be enabled only in the case of host mode. So stop
+> doing always_on, boot_on from smps10_out1. The driver will enable it in host
+> mode.
 
-Can you take this patch for 3.13?
+Can you take this patch too?
 
 Thanks
 Kishon
-> ---
-> Changes from v1:
-> Changed the commit log to explain why dr_mode was not set to OTG.
->  arch/arm/boot/dts/omap5.dtsi |    1 +
->  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index 6d0a1d5..ef598af 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -652,6 +652,7 @@
->  				reg = <0x4a030000 0x10000>;
->  				interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
->  				usb-phy = <&usb2_phy>, <&usb3_phy>;
-> +				dr_mode = "peripheral";
->  				tx-fifo-resize;
->  			};
->  		};
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/boot/dts/omap5-uevm.dts |    2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> index d784b3a..e06a04a 100644
+> --- a/arch/arm/boot/dts/omap5-uevm.dts
+> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> @@ -334,8 +334,6 @@
+>  					regulator-name = "smps10_out1";
+>  					regulator-min-microvolt = <5000000>;
+>  					regulator-max-microvolt = <5000000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+>  				};
+>  
+>  				ldo1_reg: ldo1 {
 > 
