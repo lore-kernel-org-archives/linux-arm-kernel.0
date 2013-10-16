@@ -1,58 +1,64 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 16 Oct 2013 18:01:04 +0200
-Subject: [PATCH] ARM: highbank: cpuidle: convert to platform driver
-In-Reply-To: <CAL_Jsq+8ykh6xcwbuS+5gCZHv6zEKU4yEW_us+w_1+BoTOuisQ@mail.gmail.com>
-References: <1380278865-27457-1-git-send-email-daniel.lezcano@linaro.org>	<CAL_Jsq+PoqWf5oAQosPg8N0WWHm-7c+JgDzpGD8OfMyKtvPJ0w@mail.gmail.com>	<52457F21.3030502@linaro.org>	<525E9652.6060103@linaro.org>
- <CAL_Jsq+8ykh6xcwbuS+5gCZHv6zEKU4yEW_us+w_1+BoTOuisQ@mail.gmail.com>
-Message-ID: <525EB840.5050607@linaro.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 16 Oct 2013 19:13:13 +0300
+Subject: [PATCH v2 5/7] clk: tegra124: Add support for Tegra124 clocks
+In-Reply-To: <525DA5C3.5070903@wwwdotorg.org>
+References: <1381850098-12357-1-git-send-email-pdeschrijver@nvidia.com>
+ <1381850098-12357-6-git-send-email-pdeschrijver@nvidia.com>
+ <525DA5C3.5070903@wwwdotorg.org>
+Message-ID: <20131016161313.GO5643@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2013 05:56 PM, Rob Herring wrote:
-> On Wed, Oct 16, 2013 at 8:36 AM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On 09/27/2013 02:50 PM, Daniel Lezcano wrote:
->>>
->>> On 09/27/2013 02:29 PM, Rob Herring wrote:
->>>>
->>>> On Fri, Sep 27, 2013 at 5:47 AM, Daniel Lezcano
->>>> <daniel.lezcano@linaro.org> wrote:
->>>>>
->>>>> As the ux500 and the kirkwood driver, make the calxeda driver a
->>>>> platform driver
->>>>>
->>>>> [Compiled only]
->>>>>
->>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>> ---
->>>>>    arch/arm/mach-highbank/highbank.c |    8 ++++++++
->>>>>    drivers/cpuidle/cpuidle-calxeda.c |   18 ++++++++++++------
->>>>>    2 files changed, 20 insertions(+), 6 deletions(-)
->>>>
->>>>
->>>> Looks fine to me, but this will conflict with my series. Perhaps I can
->>>> pick this up as part of that.
->>>
->>>
->>> Yes I agree, it makes sense.
->>
->>
->> Hi Rob,
->>
->> were you able to take the patch ? Where is the higbank git tree where I can
->> see these patches ? I looked at git://sources.calxeda.com/kernel/linux.git
->> #fox-next but they don't appear, is it the right one ?
->
-> I still need to send this series to arm-soc. I plan to do so this week.
+On Tue, Oct 15, 2013 at 10:29:55PM +0200, Stephen Warren wrote:
+> On 10/15/2013 09:14 AM, Peter De Schrijver wrote:
+> > Implement clock support for Tegra124.
+> 
+> > diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+> 
+> > +static struct pdiv_map pll12g_ssd_esd_p[] = {
+> > +	{ .pdiv = 1, .hw_val = 0 },
+> > +	{ .pdiv = 2, .hw_val = 1 },
+> ...
+> > +	{ .pdiv = 24, .hw_val = 13 },
+> > +	{ .pdiv = 32, .hw_val = 14 },
+> > +	{ .pdiv = 0, .hw_val = 15 },
+> > +};
+> 
+> I'm curious why that last entry doesn't have .hw_val = 0, since I think
+> it's a sentinel value. For example, the last entry in pllxc_p[] does
+> have .hw_val = 0.
+> 
+> > diff --git a/include/dt-bindings/clock/tegra124-car.h b/include/dt-bindings/clock/tegra124-car.h
+> 
+> I think you also need to create
+> Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt in this
+> patch. All the other SoCs have their own binding file. That said, given
+> all the clock IDs have moved into <dt-bindings/clock/tegraNNN-car.h>,
+> perhaps we should just have a separate patch that removes the separate
+> bindings for Tegra30 and Tegra114, and simply add their compatible
+> values into the existing nvidia,tegra20-car.txt (and also make the
+> header file reference in that file more generic so it applies to any
+> Tegra SoC)?
 
-Ok, thanks.
+Maybe yes...
+> 
+> > @@ -0,0 +1,341 @@
+> > +/*
+> > + * This header provides constants for binding nvidia,tegra124-car.
+> > + *
+> > + * The first 185 clocks are numbered to match the bits in the CAR's CLK_OUT_ENB
+> > + * registers.
+> 
+> Shouldn't that be 192 (== 185 * 32)? Perhaps some bits aren't allocated,
 
-   -- Daniel
+I guess you mean 6 * 32?
 
+> but in previous SoCs, I rounded the ID space for peripheral clocks up to
+> whole registers. I see that as far as the clock IDs, this is already
+> fine; it's just this description that says 185 not 192.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Ok.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Cheers,
+
+Peter.
