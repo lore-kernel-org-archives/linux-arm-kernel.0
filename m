@@ -1,33 +1,129 @@
 From: tim.kryger@linaro.org (Tim Kryger)
-Date: Wed, 16 Oct 2013 14:47:09 -0700
-Subject: [RESEND PATCH v2 5/6] ARM: dts: Specify clocks for timer on bcm11351
+Date: Wed, 16 Oct 2013 14:47:05 -0700
+Subject: [RESEND PATCH v2 1/6] ARM: dts: Declare clocks as fixed on
+ bcm11351
 In-Reply-To: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
 References: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1381960030-1640-6-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1381960030-1640-2-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify the external clock label in the timer node.
+Declare clocks that are enabled and configured by bootloaders as fixed
+rate clocks in the DTS such that device drivers may use standard clock
+function calls.
 
 Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
 Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 Reviewed-by: Matt Porter <matt.porter@linaro.org>
 ---
- arch/arm/boot/dts/bcm11351.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm11351.dtsi | 97 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
 
 diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 193659c..39c1395 100644
+index 98e6bc0..c6464fb 100644
 --- a/arch/arm/boot/dts/bcm11351.dtsi
 +++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -95,7 +95,7 @@
- 		compatible = "brcm,kona-timer";
- 		reg = <0x35006000 0x1000>;
- 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
--		clock-frequency = <32768>;
-+		clocks = <&hub_timer_clk>;
+@@ -126,4 +126,101 @@
+ 		status = "disabled";
  	};
  
- 	sdio1: sdio at 3f180000 {
++	clocks {
++		bsc1_clk: bsc1 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		bsc2_clk: bsc2 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		bsc3_clk: bsc3 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		pmu_bsc_clk: pmu_bsc {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		hub_timer_clk: hub_timer {
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			#clock-cells = <0>;
++		};
++
++		pwm_clk: pwm {
++			compatible = "fixed-clock";
++			clock-frequency = <26000000>;
++			#clock-cells = <0>;
++		};
++
++		sdio1_clk: sdio1 {
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++			#clock-cells = <0>;
++		};
++
++		sdio2_clk: sdio2 {
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++			#clock-cells = <0>;
++		};
++
++		sdio3_clk: sdio3 {
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++			#clock-cells = <0>;
++		};
++
++		sdio4_clk: sdio4 {
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++			#clock-cells = <0>;
++		};
++
++		tmon_1m_clk: tmon_1m {
++			compatible = "fixed-clock";
++			clock-frequency = <1000000>;
++			#clock-cells = <0>;
++		};
++
++		uartb_clk: uartb {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		uartb2_clk: uartb2 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		uartb3_clk: uartb3 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		uartb4_clk: uartb4 {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		usb_otg_ahb_clk: usb_otg_ahb {
++			compatible = "fixed-clock";
++			clock-frequency = <52000000>;
++			#clock-cells = <0>;
++		};
++	};
+ };
 -- 
 1.8.0.1
