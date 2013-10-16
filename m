@@ -1,66 +1,119 @@
 From: liuj97@gmail.com (Jiang Liu)
-Date: Wed, 16 Oct 2013 11:18:12 +0800
-Subject: [PATCH v3 7/7] jump_label: use defined macros instead of hard-coding
- for better readability
-In-Reply-To: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
-References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1381893492-7135-8-git-send-email-liuj97@gmail.com>
+Date: Wed, 16 Oct 2013 11:26:43 +0800
+Subject: [PATCH v3 1/3] arm64: restore FPSIMD to default state for kernel and
+ signal contexts
+Message-ID: <1381894020-7912-1-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jiang Liu <jiang.liu@huawei.com>
 
-Use macro JUMP_LABEL_TRUE_BRANCH instead of hard-coding for better
-readability.
+Restore FPSIMD control and status registers to default values
+when creating new FPSIMD contexts for kernel context and reset
+FPSIMD status register when creating FPSIMD context for signal
+handling, otherwise the stale value in FPSIMD control and status
+registers may affect the new kernal or signal handling contexts.
 
 Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
 Cc: Jiang Liu <liuj97@gmail.com>
 ---
- include/linux/jump_label.h | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/fpsimd.h |  4 ++++
+ arch/arm64/kernel/fpsimd.c      | 30 ++++++++++++++++++++++++++++--
+ arch/arm64/kernel/signal.c      |  1 +
+ 3 files changed, 33 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
-index a507907..6e54029 100644
---- a/include/linux/jump_label.h
-+++ b/include/linux/jump_label.h
-@@ -74,18 +74,21 @@ struct module;
- #include <linux/atomic.h>
- #ifdef HAVE_JUMP_LABEL
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index c43b4ac..b3c12fd 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -50,6 +50,8 @@ struct fpsimd_state {
+ #define VFP_STATE_SIZE		((32 * 8) + 4)
+ #endif
  
--#define JUMP_LABEL_TRUE_BRANCH 1UL
-+#define JUMP_LABEL_TYPE_FALSE_BRANCH	0UL
-+#define JUMP_LABEL_TYPE_TRUE_BRANCH	1UL
-+#define JUMP_LABEL_TYPE_MASK		1UL
++#define	AARCH64_FPCR_DEFAULT_VAL	0
++
+ struct task_struct;
  
- static
- inline struct jump_entry *jump_label_get_entries(struct static_key *key)
+ extern void fpsimd_save_state(struct fpsimd_state *state);
+@@ -58,6 +60,8 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
+ extern void fpsimd_thread_switch(struct task_struct *next);
+ extern void fpsimd_flush_thread(void);
+ 
++extern void fpsimd_init_sigctx(struct fpsimd_state *state);
++
+ #endif
+ 
+ #endif
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index bb785d2..9daee2c 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -33,6 +33,21 @@
+ #define FPEXC_IXF	(1 << 4)
+ #define FPEXC_IDF	(1 << 7)
+ 
++static inline void fpsimd_init_hw_state(void)
++{
++	int val = AARCH64_FPCR_DEFAULT_VAL;
++
++	asm volatile ("msr fpcr, %x0\n"
++		      "msr fpsr, xzr\n"
++		      : : "r"(val) : "memory");
++}
++
++static inline void fpsimd_clear_fpsr(void)
++{
++	asm volatile ("msr fpsr, xzr\n"
++		      : : : "memory");
++}
++
+ /*
+  * Trapped FP/ASIMD access.
+  */
+@@ -80,12 +95,21 @@ void fpsimd_thread_switch(struct task_struct *next)
+ 
+ void fpsimd_flush_thread(void)
  {
- 	return (struct jump_entry *)((unsigned long)key->entries
--						& ~JUMP_LABEL_TRUE_BRANCH);
-+						& ~JUMP_LABEL_TYPE_MASK);
++	struct fpsimd_state *state = &current->thread.fpsimd_state;
++
+ 	preempt_disable();
+-	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+-	fpsimd_load_state(&current->thread.fpsimd_state);
++	memset(state, 0, sizeof(struct fpsimd_state));
++	if (AARCH64_FPCR_DEFAULT_VAL)
++		state->fpcr = AARCH64_FPCR_DEFAULT_VAL;
++	fpsimd_load_state(state);
+ 	preempt_enable();
  }
  
- static inline bool jump_label_get_branch_default(struct static_key *key)
- {
--	if ((unsigned long)key->entries & JUMP_LABEL_TRUE_BRANCH)
-+	if (((unsigned long)key->entries & JUMP_LABEL_TYPE_MASK) ==
-+	    JUMP_LABEL_TYPE_TRUE_BRANCH)
- 		return true;
- 	return false;
++void fpsimd_init_sigctx(struct fpsimd_state *state)
++{
++	fpsimd_clear_fpsr();
++}
++
+ #ifdef CONFIG_KERNEL_MODE_NEON
+ 
+ /*
+@@ -99,6 +123,8 @@ void kernel_neon_begin(void)
+ 
+ 	if (current->mm)
+ 		fpsimd_save_state(&current->thread.fpsimd_state);
++
++	fpsimd_init_hw_state();
  }
-@@ -116,9 +119,11 @@ extern void static_key_slow_dec(struct static_key *key);
- extern void jump_label_apply_nops(struct module *mod);
+ EXPORT_SYMBOL(kernel_neon_begin);
  
- #define STATIC_KEY_INIT_TRUE ((struct static_key) \
--	{ .enabled = ATOMIC_INIT(1), .entries = (void *)1 })
-+	{ .enabled = ATOMIC_INIT(1), \
-+	  .entries = (void *)JUMP_LABEL_TYPE_TRUE_BRANCH })
- #define STATIC_KEY_INIT_FALSE ((struct static_key) \
--	{ .enabled = ATOMIC_INIT(0), .entries = (void *)0 })
-+	{ .enabled = ATOMIC_INIT(0), \
-+	  .entries = (void *)JUMP_LABEL_TYPE_FALSE_BRANCH })
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 890a591..f2c83e8 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -320,6 +320,7 @@ static void handle_signal(unsigned long sig, struct k_sigaction *ka,
+ 	 * handler.
+ 	 */
+ 	user_fastforward_single_step(tsk);
++	fpsimd_init_sigctx(&tsk->thread.fpsimd_state);
  
- #else  /* !HAVE_JUMP_LABEL */
- 
+ 	signal_delivered(sig, info, ka, regs, 0);
+ }
 -- 
 1.8.1.2
