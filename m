@@ -1,79 +1,66 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 17 Oct 2013 00:30:10 +0200
-Subject: [GIT PULL] ARM: cpuidle: at91 platform driver conversion
-In-Reply-To: <525F0E81.5030002@linaro.org>
-References: <525F0E81.5030002@linaro.org>
-Message-ID: <3663078.gUru3UG0Hv@vostro.rjw.lan>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 16 Oct 2013 15:11:32 -0700
+Subject: [RFC PATCH 1/5] ARM/ARM64: KVM: Update user space API header for
+ PSCI emulation
+In-Reply-To: <1381942954-22388-2-git-send-email-anup.patel@linaro.org>
+References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
+ <1381942954-22388-2-git-send-email-anup.patel@linaro.org>
+Message-ID: <20131016221132.GE24837@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 17, 2013 12:09:05 AM Daniel Lezcano wrote:
+On Wed, Oct 16, 2013 at 10:32:30PM +0530, Anup Patel wrote:
+> Update user space API interface headers for providing information to
+> user space needed to emulate PSCI function calls in user space (i.e.
+> QEMU or KVMTOOL).
 > 
-> Hi Rafael,
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  include/uapi/linux/kvm.h |    7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> This pull request based on the pm-cpuidle branch contains the following:
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index e32e776..dae2664 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -171,6 +171,7 @@ struct kvm_pit_config {
+>  #define KVM_EXIT_WATCHDOG         21
+>  #define KVM_EXIT_S390_TSCH        22
+>  #define KVM_EXIT_EPR              23
+> +#define KVM_EXIT_PSCI             24
+>  
+>  /* For KVM_EXIT_INTERNAL_ERROR */
+>  /* Emulate instruction failed. */
+> @@ -301,6 +302,12 @@ struct kvm_run {
+>  		struct {
+>  			__u32 epr;
+>  		} epr;
+> +		/* KVM_EXIT_PSCI */
+> +		struct {
+> +			__u32 fn;
+> +			__u64 args[7];
+> +			__u64 ret[4];
+> +		} psci;
+>  		/* Fix the size of the union. */
+>  		char padding[256];
+>  	};
+> -- 
+> 1.7.9.5
 > 
->   * Daniel Lezcano converted cpuidle to a platform_driver for at91. The 
-> standby callback is stored in the platform_device's data field as a 
-> callback for the driver, so the pm specific code and the backend driver 
-> have no more dependency. Each SoC init function fills the right callback 
-> at init time. As there are no more dependency, we can move the driver in 
-> the drivers/cpuidle directory.
-> 
->   * Jean-Christophe Plagnol-Villard and Nicolas Ferre made a cleanup on 
-> top of the patch described above and fixed up the ddr standby callback 
-> so more SoC are supported. Even if the modifications are in the 
-> mach-at91 directory, they asked these patches to be included through the 
-> PM tree as they depend on the platform_driver conversion.
-> 
-> Thanks !
->    -- Daniel
-> 
-> 
-> The following changes since commit ac9f1cc2ce1a178696763444f2a2f8a0ec661772:
-> 
->    Merge back earlier cpuidle material for v3.13. (2013-10-07 21:31:21 
-> +0200)
-> 
-> are available in the git repository at:
-> 
-> 
->    git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
-> 
-> for you to fetch changes up to 6b625891c6b541080bdaad97bcb82bd9ecd9e44b:
-> 
->    ARM: AT91: DT: pm: Select ram controller standby based on DT 
-> (2013-10-16 23:51:47 +0200)
-> 
-> ----------------------------------------------------------------
-> Daniel Lezcano (2):
->        ARM: at91: cpuidle: Convert to platform driver
->        ARM: at91: cpuidle: Move driver to drivers/cpuidle
-> 
-> Jean-Christophe PLAGNIOL-VILLARD (2):
->        ARM: AT91: pm: Factorize standby function
->        ARM: AT91: DT: pm: Select ram controller standby based on DT
-> 
->   arch/arm/mach-at91/Makefile                        |    1 -
->   arch/arm/mach-at91/at91rm9200.c                    |    2 +
->   arch/arm/mach-at91/at91sam9260.c                   |    2 +
->   arch/arm/mach-at91/at91sam9261.c                   |    2 +
->   arch/arm/mach-at91/at91sam9263.c                   |    2 +
->   arch/arm/mach-at91/at91sam9g45.c                   |    2 +
->   arch/arm/mach-at91/at91sam9rl.c                    |    2 +
->   arch/arm/mach-at91/pm.c                            |   27 ++++++---
->   arch/arm/mach-at91/pm.h                            |   59 
-> ++++++++++----------
->   arch/arm/mach-at91/setup.c                         |   14 ++++-
->   drivers/cpuidle/Kconfig.arm                        |    7 +++
->   drivers/cpuidle/Makefile                           |    1 +
->   .../cpuidle.c => drivers/cpuidle/cpuidle-at91.c    |   29 +++++-----
->   13 files changed, 93 insertions(+), 57 deletions(-)
->   rename arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/cpuidle-at91.c 
-> (79%)
+I am also wondering if this is not solving a very specific need without
+thinking a little more carefully about this problem.
 
-Pulled, thanks Daniel!
+We have previously discussed the need for some secure side emulation
+in QEMU, and I think perhaps we need something more generic which allows
+user space to handle SMC calls and/or allows user space to "inject" some
+secure world runtime that the kernel can run in a partially or fully
+isolated container to handle SMC calls.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Peter raised this issue previously and pointed to a proposal he had as
+well.
+
+Is there a technical reason why we need something specifically directed
+to PSCI?
+
+-Christoffer
