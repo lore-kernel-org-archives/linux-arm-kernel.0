@@ -1,84 +1,54 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 16 Oct 2013 22:08:58 +0530
-Subject: [PATCH v2] ARM: davinci: convert to
- clockevents_config_and_register
-In-Reply-To: <20131016075009.GZ10079@pengutronix.de>
-References: <CA+V-a8v58_ixJ5s5d+tsf19qszD2tLGe8465kfQBKivRV+vRoQ@mail.gmail.com>
- <1381653390-22250-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <525E05B5.8060801@ti.com> <20131016075009.GZ10079@pengutronix.de>
-Message-ID: <525EC122.8040409@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 16 Oct 2013 09:53:52 -0700
+Subject: [PATCH] ARM: KVM: drop arbitrary limitation to 4 CPU VMs
+In-Reply-To: <525E6144.3060004@arm.com>
+References: <1381252628-17840-1-git-send-email-marc.zyngier@arm.com>
+ <20131013010956.GA8200@cbox> <525BAE98.8050505@arm.com>
+ <20131015232108.GD20547@cbox> <525E6144.3060004@arm.com>
+Message-ID: <CAMJs5B9ezNiG8t_SPGHVf1AgSPTuFHzK5khmGgAHzGUsBw+-3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 October 2013 01:20 PM, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Wed, Oct 16, 2013 at 08:49:17AM +0530, Sekhar Nori wrote:
->> On Sunday 13 October 2013 02:06 PM, Uwe Kleine-K?nig wrote:
->>> clockevents_config_and_register is superior compared to setting
->>> shift/mult and {min,max}_delta_ns by hand.
+On 16 October 2013 02:49, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 16/10/13 00:21, Christoffer Dall wrote:
+>> On Mon, Oct 14, 2013 at 09:43:04AM +0100, Marc Zyngier wrote:
+>>> On 13/10/13 02:09, Christoffer Dall wrote:
+>>>> On Tue, Oct 08, 2013 at 06:17:08PM +0100, Marc Zyngier wrote:
+>>>>> It appears we have an arbitrary limitation where we refuse to
+>>>>> create more than 4 virtual A15 in a single VM.
+>>>>>
+>>>>> This limitation doesn't make much sense (the number 4 probably
+>>>>> comes from the maximum number of CPUs in a A15 cluster, but
+>>>>> KVM doesn't have any notion of cluster), and directly
+>>>>> contradicts CONFIG_MAX_VCPUS.
+>>>>
+>>>> So this comes from the early days where I looked at the A15 TRM and the
+>>>> MPIDR bit field for the CPU ID is limited to 2 bits.  Exactly because
+>>>> I wasn't sure what remifications (if any) it would have to start
+>>>> populating this register with cluster id = (vcpu_id / 4) and cpu id =
+>>>> (vcpu_id % 4) I put this nice arbitrary restriction in there.
+>>>>
+>>>> I think we need to fix how we show this register to the guest
+>>>> otherwise... No?
 >>>
->>> Tested-by: Prabhakar Lad <prabhakar.csengg@gmail.com>
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>> ---
->>> Prabhakar Lad wrote:
->>>> I have boot tested this patch on OMAP-L138 and tested the uptime
->>>> (with min ticks set to 1), should that be enough ?
->>> I don't know for sure, but I guess so. If you agree, here is an updated
->>> patch.
->>>
->>> Best regards
->>> Uwe
->>>
->>>
->>>  arch/arm/mach-davinci/time.c | 9 ++-------
->>>  1 file changed, 2 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
->>> index 7a55b5c..29a1a5d 100644
->>> --- a/arch/arm/mach-davinci/time.c
->>> +++ b/arch/arm/mach-davinci/time.c
->>> @@ -331,7 +331,6 @@ static void davinci_set_mode(enum clock_event_mode mode,
->>>  
->>>  static struct clock_event_device clockevent_davinci = {
->>>  	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
->>> -	.shift		= 32,
->>>  	.set_next_event	= davinci_set_next_event,
->>>  	.set_mode	= davinci_set_mode,
->>>  };
->>> @@ -397,14 +396,10 @@ void __init davinci_timer_init(void)
->>>  
->>>  	/* setup clockevent */
->>>  	clockevent_davinci.name = id_to_name[timers[TID_CLOCKEVENT].id];
->>> -	clockevent_davinci.mult = div_sc(davinci_clock_tick_rate, NSEC_PER_SEC,
->>> -					 clockevent_davinci.shift);
->>> -	clockevent_davinci.max_delta_ns =
->>> -		clockevent_delta2ns(0xfffffffe, &clockevent_davinci);
->>> -	clockevent_davinci.min_delta_ns = 50000; /* 50 usec */
->>>  
->>>  	clockevent_davinci.cpumask = cpumask_of(0);
->>> -	clockevents_register_device(&clockevent_davinci);
->>> +	clockevents_config_and_register(&clockevent_davinci,
->>> +		davinci_clock_tick_rate, 1, 0xfffffffe);
+>>> I don't see this being an issue, but if we really want to be 100% true
+>>> to the A15/A7 TRM, we can always compute MPIDR that way, and adjust
+>>> L2CTLR as well.
 >>
->> checkpatch --strict complains about alignment of line break. Fixed locally.
-> I used the same style as in other places in that file.
-
-Okay, but I prefer to fix for new code.
-
-> 
-> Another thought that came to me is that it's probably worth mentioning
-> that the min_delta_ns is changed from 50 usec to 1 hw tick. Something
-> like:
-> 
-> 	Note that the minimum delay is changed from 50 us to 1 hw tick
-> 	(which corresponds to 42 ns assuming a 24 MHz clock). It's
-> 	expected that the old value was miscalculated.
-> 
-> That would be interesting in case that the patch results in regressions.
-
-Too late as I already sent my pull request. Adding this to patch
-description would have been nice, I agree.
-
-Thanks,
-Sekhar
+>> Even with mach-virt we're still pretending to be an A15/A7 right? I
+>> think we should adhere to that.  Is there some other reason why people
+>> shouldn't generally expect MPIDR to be correct (merging this code to KVM
+>> and running in a VM notwithstanding)?
+>
+> Yes, it is probably better to adhere to the law of least surprise. I'm
+> reworking this patch and will repost (slightly longer) the series.
+>
+>>>
+>>> That will require some userspace change in kvmtool though (need to
+>>> change the DT generator to cope with the cluster ID).
+>>>
+>> That would be the less fun part...
+>
+> Actually, it is surprisingly easy once the kernel does the right thing.
+>
+Great ;)
