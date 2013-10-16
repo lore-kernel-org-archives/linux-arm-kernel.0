@@ -1,65 +1,52 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 15 Oct 2013 17:49:32 -0700
-Subject: [PATCH 4/9] ARM/ARM64: KVM: Implement KVM_ARM_PREFERRED_TARGET ioctl
+Date: Tue, 15 Oct 2013 17:49:34 -0700
+Subject: [PATCH 6/9] KVM: ARM: Fix calculation of virtual CPU ID
 In-Reply-To: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
 References: <1381884577-24747-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1381884577-24747-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1381884577-24747-7-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anup Patel <anup.patel@linaro.org>
+From: Jonathan Austin <jonathan.austin@arm.com>
 
-For implementing CPU=host, we need a mechanism for querying
-preferred VCPU target type on underlying Host.
+KVM does not have a notion of multiple clusters for CPUs, just a linear
+array of CPUs. When using a system with cores in more than one cluster, the
+current method for calculating the virtual MPIDR will leak the (physical)
+cluster information into the virtual MPIDR. One effect of this is that
+Linux under KVM fails to boot multiple CPUs that aren't in the 0th cluster.
 
-This patch implements KVM_ARM_PREFERRED_TARGET vm ioctl which
-returns struct kvm_vcpu_init instance containing information
-about preferred VCPU target type and target specific features
-available for it.
+This patch does away with exposing the real MPIDR fields in favour of simply
+using the virtual CPU number (but preserving the U bit, as before).
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/arm.c       |   13 +++++++++++++
- include/uapi/linux/kvm.h |    1 +
- 2 files changed, 14 insertions(+)
+ arch/arm/kvm/coproc_a15.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9c697db..cc5adb9 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -797,6 +797,19 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 			return -EFAULT;
- 		return kvm_vm_ioctl_set_device_addr(kvm, &dev_addr);
- 	}
-+	case KVM_ARM_PREFERRED_TARGET: {
-+		int err;
-+		struct kvm_vcpu_init init;
-+
-+		err = kvm_vcpu_preferred_target(&init);
-+		if (err)
-+			return err;
-+
-+		if (copy_to_user(argp, &init, sizeof(init)))
-+			return -EFAULT;
-+
-+		return 0;
-+	}
- 	default:
- 		return -EINVAL;
- 	}
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 99c2533..e32e776 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -1012,6 +1012,7 @@ struct kvm_s390_ucas_mapping {
- /* VM is being stopped by host */
- #define KVM_KVMCLOCK_CTRL	  _IO(KVMIO,   0xad)
- #define KVM_ARM_VCPU_INIT	  _IOW(KVMIO,  0xae, struct kvm_vcpu_init)
-+#define KVM_ARM_PREFERRED_TARGET  _IOR(KVMIO,  0xaf, struct kvm_vcpu_init)
- #define KVM_GET_REG_LIST	  _IOWR(KVMIO, 0xb0, struct kvm_reg_list)
+diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
+index cf93472..bbd4b88 100644
+--- a/arch/arm/kvm/coproc_a15.c
++++ b/arch/arm/kvm/coproc_a15.c
+@@ -27,14 +27,11 @@
+ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+ {
+ 	/*
+-	 * Compute guest MPIDR:
+-	 * (Even if we present only one VCPU to the guest on an SMP
+-	 * host we don't set the U bit in the MPIDR, or vice versa, as
+-	 * revealing the underlying hardware properties is likely to
+-	 * be the best choice).
++	 * Compute guest MPIDR. No need to mess around with different clusters
++	 * but we read the 'U' bit from the underlying hardware directly.
+ 	 */
+-	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & ~MPIDR_LEVEL_MASK)
+-		| (vcpu->vcpu_id & MPIDR_LEVEL_MASK);
++	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & MPIDR_SMP_BITMASK)
++					| vcpu->vcpu_id;
+ }
  
- #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
+ #include "coproc.h"
 -- 
 1.7.10.4
