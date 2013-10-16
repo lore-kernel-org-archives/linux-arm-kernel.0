@@ -1,120 +1,246 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 16 Oct 2013 00:40:03 -0700
-Subject: [PATCH v3 01/12] clk: Fix debugfs reparenting NULL pointer dereference
+Date: Wed, 16 Oct 2013 00:40:10 -0700
+Subject: [PATCH v3 08/12] clk: msm: Add support for branches/gate clocks
 In-Reply-To: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
 References: <1381909214-12693-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1381909214-12693-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1381909214-12693-9-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding clocks from a kernel module can cause a NULL pointer
-dereference if the parent of a clock is added after the clock is
-added. This happens because __clk_init() iterates over the list
-of orphans and reparents the orphans to the clock being
-registered before creating the debugfs entry for the clock.
-Create the debugfs entry first before reparenting the orphans.
-
-Unable to handle kernel NULL pointer dereference at virtual address 00000028
-pgd = ef3e4000
-[00000028] *pgd=bf810831
-Internal error: Oops: 17 [#1] PREEMPT SMP ARM
-Modules linked in: mmcc_8960(+)
-CPU: 0 PID: 52 Comm: modprobe Not tainted 3.12.0-rc2-00023-g1021a28-dirty #659
-task: ef319200 ti: ef3a6000 task.ti: ef3a6000
-PC is at lock_rename+0x24/0xc4
-LR is at debugfs_rename+0x34/0x208
-pc : [<c0317238>]    lr : [<c047dfe4>]    psr: 00000013
-sp : ef3a7b88  ip : ef3a7ba8  fp : ef3a7ba4
-r10: ef3d51cc  r9 : ef3bc680  r8 : ef3d5210
-r7 : ef3bc640  r6 : eee287e0  r5 : eee287e0  r4 : 00000000
-r3 : ef3bc640  r2 : 00000000  r1 : eee287e0  r0 : 00000000
-Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 10c5787d  Table: af3e406a  DAC: 00000015
-Process modprobe (pid: 52, stack limit = 0xef3a6240)
-Stack: (0xef3a7b88 to 0xef3a8000)
-7b80:                   ef3bc640 ee4047e0 00000000 eee287e0 ef3a7bec ef3a7ba8
-7ba0: c047dfe4 c0317220 ef3bc680 ef3d51cc ef3a7bdc ef3a7bc0 c06e29d0 c0268784
-7bc0: c08946e8 ef3d5210 00000000 ef3bc700 ef3d5290 ef3d5210 ef3bc680 ef3d51cc
-7be0: ef3a7c0c ef3a7bf0 c05b9e9c c047dfbc 00000000 00000000 ef3d5210 ef3d5290
-7c00: ef3a7c24 ef3a7c10 c05baebc c05b9e30 00000001 00000001 ef3a7c64 ef3a7c28
-7c20: c05bb124 c05bae9c bf000cd8 ef3bc7c0 000000d0 c0ff129c bf001774 00000002
-7c40: ef3bc740 ef3d5290 ef0f9a10 bf001774 bf00042c 00000061 ef3a7c8c ef3a7c68
-7c60: c05bb480 c05baed8 bf001774 ef3d5290 ef0f9a10 bf001774 ef38bc10 ef0f9a00
-7c80: ef3a7cac ef3a7c90 c05bb5a8 c05bb3a0 bf001774 00000062 ef0f9a10 ef38bc18
-7ca0: ef3a7cec ef3a7cb0 bf00010c c05bb56c 00000000 ef38ba00 00000000 ef3d60d0
-7cc0: ef3a7cdc c0fefc24 ef0f9a10 c0a091c0 bf000d24 00000000 bf0029f0 bf006000
-7ce0: ef3a7cfc ef3a7cf0 c05156c0 bf000040 ef3a7d2c ef3a7d00 c0513f5c c05156a8
-7d00: ef3a7d2c ef0f9a10 ef0f9a10 bf000d24 ef0f9a44 c09ca588 00000000 bf006000
-7d20: ef3a7d4c ef3a7d30 c05142b8 c0513ecc ef0fd25c 00000000 bf000d24 c0514214
-7d40: ef3a7d74 ef3a7d50 c0512030 c0514220 ef0050a8 ef0fd250 ef0050f8 bf000d24
-7d60: ef37c100 c09ed150 ef3a7d84 ef3a7d78 c05139c8 c0511fd8 ef3a7
-7d80: c051344c c05139a8 bf000864 c09ca588 ef3a7db4 bf000d24 bf002
-7da0: c09ca588 00000000 ef3a7dcc ef3a7db8 c05149dc c0513360 ef3a7
-7dc0: ef3a7ddc ef3a7dd0 c0515914 c0514960 ef3a7dec ef3a7de0 bf006
-7de0: ef3a7e74 ef3a7df0 c0208800 bf00600c ef3a7e1c ef3a7e00 c04c5
-7e00: ffffffff c09d46c4 00000000 bf0029a8 ef3a7e34 ef3a7e20 c024c
-7e20: ffffffff c09d46c4 ef3a7e5c ef3a7e38 c024e2fc c024ce40 00000
-7e40: ef3a7f48 bf0029b4 bf0029a8 271aeb1c ef3a7f48 bf0029a8 00000001 ef383c00
-7e60: bf0029f0 00000001 ef3a7f3c ef3a7e78 c028fac4 c0208718 bf0029b4 00007fff
-7e80: c028cd58 000000d2 f0065000 00000000 ef3a7ebc 00000000 00000000 bf0029b4
-7ea0: 00000000 bf0029ac bf0029b4 ef3a6000 ef3a7efc c08bf128 00000000 00000000
-7ec0: 00000000 00000000 00000000 00000000 6e72656b 00006c65 00000000 00000000
-7ee0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-7f00: 00000000 00000000 00000000 271aeb1c ef3a7f2c 00016376 b6f38008 001d3774
-7f20: 00000080 c020f968 ef3a6000 00000000 ef3a7fa4 ef3a7f40 c02904dc c028e178
-7f40: c020f898 010ccfa8 f0065000 00016376 f0073f60 f0073d7d f007a1e8 00002b24
-7f60: 000039e4 00000000 00000000 00000000 0000002f 00000030 00000019 00000016
-7f80: 00000012 00000000 00000000 010de1b2 b6f38008 010ccfa8 00000000 ef3a7fa8
-7fa0: c020f6c0 c0290434 010de1b2 b6f38008 b6f38008 00016376 001d3774 00000000
-7fc0: 010de1b2 b6f38008 010ccfa8 00000080 010de1b2 bedb6f90 010de1c9 0001d8dc
-7fe0: 0000000c bedb674c 0001ce30 000094c4 60000010 b6f38008 00000008 0000001d
-[<c0317238>] (lock_rename+0x24/0xc4) from [<c047dfe4>] (debugfs_rename+0x34/0x208)
-[<c047dfe4>] (debugfs_rename+0x34/0x208) from [<c05b9e9c>] (clk_debug_reparent+0x78/0xc0)
-[<c05baebc>] (__clk_reparent+0x2c/0x3c) from [<c05bb124>] (__clk_init+0x258/0x4c8)
-[<c05bb124>] (__clk_init+0x258/0x4c8) from [<c05bb480>] (_clk_register+0xec/0x1cc)
-[<c05bb480>] (_clk_register+0xec/0x1cc) from [<c05bb5a8>] (devm_clk_register+0x48/0x7c)
-[<c05bb5a8>] (devm_clk_register+0x48/0x7c) from [<bf00010c>] (msm_mmcc_8960_probe+0xd8/0x190 [mmcc_8960])
-[<bf00010c>] (msm_mmcc_8960_probe+0xd8/0x190 [mmcc_8960]) from [<c05156c0>] (platform_drv_probe+0x24/0x28)
-[<c05156c0>] (platform_drv_probe+0x24/0x28) from [<c0513f5c>] (driver_probe_device+0x9c/0x354)
-[<c0513f5c>] (driver_probe_device+0x9c/0x354) from [<c05142b8>] (__driver_attach+0xa4/0xa8)
-[<c05142b8>] (__driver_attach+0xa4/0xa8) from [<c0512030>] (bus_for_each_dev+0x64/0x98)
-[<c0512030>] (bus_for_each_dev+0x64/0x98) from [<c05139c8>] (driver_attach+0x2c/0x30)
-[<c05139c8>] (driver_attach+0x2c/0x30) from [<c051344c>] (bus_add_driver+0xf8/0x2a8)
-[<c051344c>] (bus_add_driver+0xf8/0x2a8) from [<c05149dc>] (driver_register+0x88/0x104)
-[<c05149dc>] (driver_register+0x88/0x104) from [<c0515914>] (__platform_driver_register+0x58/0x6c)
-[<c0515914>] (__platform_driver_register+0x58/0x6c) from [<bf006018>] (msm_mmcc_8960_driver_init+0x18/0x24 [mmcc_8960])
-[<bf006018>] (msm_mmcc_8960_driver_init+0x18/0x24 [mmcc_8960]) from [<c0208800>] (do_one_initcall+0xf4/0x1b8)
-[<c0208800>] (do_one_initcall+0xf4/0x1b8) from [<c028fac4>] (load_module+0x1958/0x22bc)
-[<c028fac4>] (load_module+0x1958/0x22bc) from [<c02904dc>] (SyS_init_module+0xb4/0x120)
-[<c02904dc>] (SyS_init_module+0xb4/0x120) from [<c020f6c0>] (ret_fast_syscall+0x0/0x48)
-Code: e1500001 e1a04000 e1a05001 0a000021 (e5903028)
-
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/clk/msm/Makefile     |   1 +
+ drivers/clk/msm/clk-branch.c | 152 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/msm/clk-branch.h |  52 +++++++++++++++
+ 3 files changed, 205 insertions(+)
+ create mode 100644 drivers/clk/msm/clk-branch.c
+ create mode 100644 drivers/clk/msm/clk-branch.h
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index a004769..fbb5d59 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1737,6 +1737,7 @@ int __clk_init(struct device *dev, struct clk *clk)
- 	else
- 		clk->rate = 0;
- 
-+	clk_debug_register(clk);
- 	/*
- 	 * walk the list of orphan clocks and reparent any that are children of
- 	 * this clock
-@@ -1767,8 +1768,6 @@ int __clk_init(struct device *dev, struct clk *clk)
- 	if (clk->ops->init)
- 		clk->ops->init(clk->hw);
- 
--	clk_debug_register(clk);
--
- out:
- 	clk_prepare_unlock();
- 
+diff --git a/drivers/clk/msm/Makefile b/drivers/clk/msm/Makefile
+index fb78ac9..e1cee29 100644
+--- a/drivers/clk/msm/Makefile
++++ b/drivers/clk/msm/Makefile
+@@ -3,3 +3,4 @@ obj-$(CONFIG_COMMON_CLK_MSM) += clk-msm.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-pll.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
++clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
+diff --git a/drivers/clk/msm/clk-branch.c b/drivers/clk/msm/clk-branch.c
+new file mode 100644
+index 0000000..a6906bc
+--- /dev/null
++++ b/drivers/clk/msm/clk-branch.c
+@@ -0,0 +1,152 @@
++/*
++ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/delay.h>
++#include <linux/export.h>
++#include <linux/clk-provider.h>
++#include <linux/regmap.h>
++
++#include "clk-branch.h"
++
++static bool clk_branch_in_hwcg_mode(const struct clk_branch *br)
++{
++	u32 val;
++
++	if (!br->hwcg_reg)
++		return 0;
++
++	regmap_read(br->hw.regmap, br->hwcg_reg, &val);
++
++	return !!(val & BIT(br->hwcg_bit));
++}
++
++static bool clk_branch_check_halt(const struct clk_branch *br, bool enabling)
++{
++	bool invert = (br->halt_check == BRANCH_HALT_ENABLE);
++	u32 val;
++
++	regmap_read(br->hw.regmap, br->halt_reg, &val);
++
++	val &= BIT(br->halt_bit);
++	if (invert)
++		val = !val;
++
++	return !!val == !enabling;
++}
++
++#define BRANCH_CLK_OFF			BIT(31)
++#define BRANCH_NOC_FSM_STATUS_SHIFT	28
++#define BRANCH_NOC_FSM_STATUS_MASK	0x7
++#define BRANCH_NOC_FSM_STATUS_ON	(0x2 << BRANCH_NOC_FSM_STATUS_SHIFT)
++
++static bool clk_branch2_check_halt(const struct clk_branch *br, bool enabling)
++{
++	u32 val;
++	u32 mask;
++
++	mask = BRANCH_NOC_FSM_STATUS_MASK << BRANCH_NOC_FSM_STATUS_SHIFT;
++	mask |= BRANCH_CLK_OFF;
++
++	regmap_read(br->hw.regmap, br->halt_reg, &val);
++
++	if (enabling) {
++		val &= mask;
++		return (val & BRANCH_CLK_OFF) == 0 ||
++			val == BRANCH_NOC_FSM_STATUS_ON;
++	} else {
++		return val & BRANCH_CLK_OFF;
++	}
++}
++
++static int clk_branch_wait(const struct clk_branch *br, bool enabling,
++		bool (check_halt)(const struct clk_branch *, bool))
++{
++	bool voted = br->halt_check & BRANCH_VOTED;
++	const char *name = __clk_get_name(br->hw.clk);
++
++	/* Skip checking halt bit if the clock is in hardware gated mode */
++	if (clk_branch_in_hwcg_mode(br))
++		return 0;
++
++	if (br->halt_check == BRANCH_HALT_DELAY || (!enabling && voted)) {
++		udelay(10);
++	} else if (br->halt_check == BRANCH_HALT_ENABLE ||
++		   br->halt_check == BRANCH_HALT ||
++		   (enabling && voted)) {
++		int count = 200;
++
++		while (count-- > 0) {
++			if (check_halt(br, enabling))
++				return 0;
++			udelay(1);
++		}
++		WARN(1, "%s status stuck at 'o%s'", name,
++				enabling ? "ff" : "n");
++		return -EBUSY;
++	}
++	return 0;
++}
++
++static int clk_branch_toggle(struct clk_hw *hw, bool en,
++		bool (check_halt)(const struct clk_branch *, bool))
++{
++	struct clk_branch *br = to_clk_branch(hw);
++	int ret;
++
++	if (en) {
++		ret = clk_enable_regmap(hw);
++		if (ret)
++			return ret;
++	} else {
++		clk_disable_regmap(hw);
++	}
++
++	return clk_branch_wait(br, en, check_halt);
++}
++
++static int clk_branch_enable(struct clk_hw *hw)
++{
++	return clk_branch_toggle(hw, true, clk_branch_check_halt);
++}
++
++static void clk_branch_disable(struct clk_hw *hw)
++{
++	clk_branch_toggle(hw, false, clk_branch_check_halt);
++}
++
++const struct clk_ops clk_branch_ops = {
++	.enable = clk_branch_enable,
++	.disable = clk_branch_disable,
++	.is_enabled = clk_is_enabled_regmap,
++};
++EXPORT_SYMBOL_GPL(clk_branch_ops);
++
++static int clk_branch2_enable(struct clk_hw *hw)
++{
++	return clk_branch_toggle(hw, true, clk_branch2_check_halt);
++}
++
++static void clk_branch2_disable(struct clk_hw *hw)
++{
++	clk_branch_toggle(hw, false, clk_branch2_check_halt);
++}
++
++const struct clk_ops clk_branch2_ops = {
++	.enable = clk_branch2_enable,
++	.disable = clk_branch2_disable,
++	.is_enabled = clk_is_enabled_regmap,
++};
++EXPORT_SYMBOL_GPL(clk_branch2_ops);
+diff --git a/drivers/clk/msm/clk-branch.h b/drivers/clk/msm/clk-branch.h
+new file mode 100644
+index 0000000..d117ce2
+--- /dev/null
++++ b/drivers/clk/msm/clk-branch.h
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __MSM_CLK_BRANCH_H__
++#define __MSM_CLK_BRANCH_H__
++
++#include <linux/clk-provider.h>
++
++/**
++ * struct clk_branch - gating clock with status bit and dynamic hardware gating
++ *
++ * @hwcg_reg: dynamic hardware clock gating register
++ * @hwcg_bit: ORed with @hwcg_reg to enable dynamic hardware clock gating
++ * @halt_reg: halt register
++ * @halt_bit: ANDed with @halt_reg to test for clock halted
++ * @halt_check: type of halt checking to perform
++ * @hw: handle between common and hardware-specific interfaces
++ *
++ * Clock which can gate its output.
++ */
++struct clk_branch {
++	u32	hwcg_reg;
++	u32	halt_reg;
++	u8	hwcg_bit;
++	u8	halt_bit;
++	u8	halt_check;
++#define BRANCH_VOTED			BIT(7) /* Delay on disable */
++#define BRANCH_HALT			0 /* pol: 1 = halt */
++#define BRANCH_HALT_VOTED		(BRANCH_HALT | BRANCH_VOTED)
++#define BRANCH_HALT_ENABLE		1 /* pol: 0 = halt */
++#define BRANCH_HALT_ENABLE_VOTED	(BRANCH_HALT_ENABLE | BRANCH_VOTED)
++#define BRANCH_HALT_DELAY		2 /* No bit to check; just delay */
++
++	struct clk_hw	hw;
++};
++
++extern const struct clk_ops clk_branch_ops;
++extern const struct clk_ops clk_branch2_ops;
++
++#define to_clk_branch(_hw) container_of(_hw, struct clk_branch, hw)
++
++#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
