@@ -1,23 +1,53 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 16 Oct 2013 15:00:16 -0700
-Subject: [PATCH 1/4] ARM: debug: Create CONFIG_DEBUG_MSM_UART and
- re-organize the selects for MSM
-In-Reply-To: <1380841557-2673-2-git-send-email-rvaswani@codeaurora.org>
-References: <1380841557-2673-1-git-send-email-rvaswani@codeaurora.org>
- <1380841557-2673-2-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <20131016220016.GA6326@codeaurora.org>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Wed, 16 Oct 2013 15:01:49 -0700
+Subject: [RESEND PATCH 4/4] ARM: dts: bcm28155-ap: Enable all the i2c
+ busses
+In-Reply-To: <1381960909-1735-1-git-send-email-tim.kryger@linaro.org>
+References: <1381960909-1735-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1381960909-1735-5-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 03, 2013 at 04:05:54PM -0700, Rohit Vaswani wrote:
->Create the hidden config DEBUG_MSM_UART and clean-up the default selection
->for CONFIG_DEBUG_LL_INCLUDE.
->
->Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+Enable all available i2c busses.
 
-Acked-by: David Brown <davidb@codeaurora.org>
+Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Christian Daudt <csd@broadcom.com>
+Reviewed-by: Matt Porter <matt.porter@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+---
+ arch/arm/boot/dts/bcm28155-ap.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
+diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
+index 08e47c2..bab302d 100644
+--- a/arch/arm/boot/dts/bcm28155-ap.dts
++++ b/arch/arm/boot/dts/bcm28155-ap.dts
+@@ -27,6 +27,26 @@
+ 		status = "okay";
+ 	};
+ 
++	i2c at 3e016000 {
++		status="okay";
++		clock-frequency = <400000>;
++	};
++
++	i2c at 3e017000 {
++		status="okay";
++		clock-frequency = <400000>;
++	};
++
++	i2c at 3e018000 {
++		status="okay";
++		clock-frequency = <400000>;
++	};
++
++	i2c at 3500d000 {
++		status="okay";
++		clock-frequency = <400000>;
++	};
++
+ 	sdio1: sdio at 3f180000 {
+ 		max-frequency = <48000000>;
+ 		status = "okay";
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.0.1
