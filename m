@@ -1,28 +1,33 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Oct 2013 12:04:05 +0100
-Subject: at91sam9g20-ek pinctrl conflicts
-Message-ID: <20131016110405.GH2443@sirena.org.uk>
+Date: Wed, 16 Oct 2013 12:04:07 +0100
+Subject: [PATCH] MAINTAINERS: Add patterns for DTS files for AT91
+Message-ID: <1381921447-21811-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Mark Brown <broonie@linaro.org>
 
-Booting an at91sam9g20-ek I see errors loading the MMC driver due to
-conflicts with SPI:
+Help ensure updates to the DTS files for AT91 machines and devices get
+sent to the maintainers by adding patterns to the MAINTAINERS entry for
+the architecture.
 
-pinctrl-at91 pinctrl.2: pin pioA1 already requested by fffc8000.spi; cannot claim for fffa8000.mmc
-pinctrl-at91 pinctrl.2: pin-1 (fffa8000.mmc) status -22
-pinctrl-at91 pinctrl.2: could not request pin 1 (pioA1) from group mmc0_slot1_cmd_dat0-0  on device pinctrl.2
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
-One of the devices seems to be configured incorrectly here but I don't
-have schematics so it's not immediately obvious which.
-
-Thanks,
-Mark
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131016/4682f89b/attachment-0001.sig>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index d5714d0..c610fb8 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -777,6 +777,8 @@ W:	http://maxim.org.za/at91_26.html
+ W:	http://www.linux4sam.org
+ S:	Supported
+ F:	arch/arm/mach-at91/
++F:	arch/arm/boot/dts/at91*.dts
++F:	arch/arm/boot/dts/at91*.dtsi
+ 
+ ARM/CALXEDA HIGHBANK ARCHITECTURE
+ M:	Rob Herring <rob.herring@calxeda.com>
+-- 
+1.8.4.rc3
