@@ -1,78 +1,34 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 17 Oct 2013 00:09:05 +0200
-Subject: [GIT PULL] ARM: cpuidle: at91 platform driver conversion
-Message-ID: <525F0E81.5030002@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 16 Oct 2013 15:15:03 -0700
+Subject: [PATCH v2 0/4] Exynos 5410 Dual cluster support
+In-Reply-To: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
+ (Vyacheslav Tyrtov's message of "Mon, 14 Oct 2013 19:08:21 +0400")
+References: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
+Message-ID: <87k3hc3lso.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Vyacheslav Tyrtov <v.tyrtov@samsung.com> writes:
 
-Hi Rafael,
+> The series of patches represent support of Exynos 5410 SoC
+>     
+> The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture.
+> Patches allow all 8 CPU cores (4 x A7 and 4 x A15) to run at the same time
+>     
+> Patches add new platform description, support of clock controller,
+> dual cluster support and device tree for Exynos 5410 
+>    
+> Has been build on v3.12-rc5.
+> Has been tested on Exynos 5410 reference board (exynos_defconfig).
 
-This pull request based on the pm-cpuidle branch contains the following:
+Has anyone tried this on the exynos5410 based odroid-xu yet?  
 
-  * Daniel Lezcano converted cpuidle to a platform_driver for at91. The 
-standby callback is stored in the platform_device's data field as a 
-callback for the driver, so the pm specific code and the backend driver 
-have no more dependency. Each SoC init function fills the right callback 
-at init time. As there are no more dependency, we can move the driver in 
-the drivers/cpuidle directory.
+I tried booting this on my recently arrived odroid-xu, but am not
+getting it to boot.
 
-  * Jean-Christophe Plagnol-Villard and Nicolas Ferre made a cleanup on 
-top of the patch described above and fixed up the ddr standby callback 
-so more SoC are supported. Even if the modifications are in the 
-mach-at91 directory, they asked these patches to be included through the 
-PM tree as they depend on the platform_driver conversion.
+I'm not yet terribly familiar with this SoC, what are the settings 
+needed for DEBUG_LL on this board?
 
-Thanks !
-   -- Daniel
+Thanks,
 
-
-The following changes since commit ac9f1cc2ce1a178696763444f2a2f8a0ec661772:
-
-   Merge back earlier cpuidle material for v3.13. (2013-10-07 21:31:21 
-+0200)
-
-are available in the git repository at:
-
-
-   git://git.linaro.org/people/dlezcano/linux.git cpuidle/arm-next
-
-for you to fetch changes up to 6b625891c6b541080bdaad97bcb82bd9ecd9e44b:
-
-   ARM: AT91: DT: pm: Select ram controller standby based on DT 
-(2013-10-16 23:51:47 +0200)
-
-----------------------------------------------------------------
-Daniel Lezcano (2):
-       ARM: at91: cpuidle: Convert to platform driver
-       ARM: at91: cpuidle: Move driver to drivers/cpuidle
-
-Jean-Christophe PLAGNIOL-VILLARD (2):
-       ARM: AT91: pm: Factorize standby function
-       ARM: AT91: DT: pm: Select ram controller standby based on DT
-
-  arch/arm/mach-at91/Makefile                        |    1 -
-  arch/arm/mach-at91/at91rm9200.c                    |    2 +
-  arch/arm/mach-at91/at91sam9260.c                   |    2 +
-  arch/arm/mach-at91/at91sam9261.c                   |    2 +
-  arch/arm/mach-at91/at91sam9263.c                   |    2 +
-  arch/arm/mach-at91/at91sam9g45.c                   |    2 +
-  arch/arm/mach-at91/at91sam9rl.c                    |    2 +
-  arch/arm/mach-at91/pm.c                            |   27 ++++++---
-  arch/arm/mach-at91/pm.h                            |   59 
-++++++++++----------
-  arch/arm/mach-at91/setup.c                         |   14 ++++-
-  drivers/cpuidle/Kconfig.arm                        |    7 +++
-  drivers/cpuidle/Makefile                           |    1 +
-  .../cpuidle.c => drivers/cpuidle/cpuidle-at91.c    |   29 +++++-----
-  13 files changed, 93 insertions(+), 57 deletions(-)
-  rename arch/arm/mach-at91/cpuidle.c => drivers/cpuidle/cpuidle-at91.c 
-(79%)
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Kevin
