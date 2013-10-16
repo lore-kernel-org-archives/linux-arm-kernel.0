@@ -1,46 +1,38 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 16 Oct 2013 21:58:36 +0530
-Subject: [PATCH 18/28] dmaengine: mxs-dma: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
-References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
-Message-ID: <1381940926-25564-19-git-send-email-vinod.koul@intel.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 16 Oct 2013 13:48:50 -0400
+Subject: [PATCH 1/2] ARM: vexpress: Make defconfig work again
+In-Reply-To: <1381930594-1701-2-git-send-email-pawel.moll@arm.com>
+References: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+ <1381930594-1701-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <525ED182.6080505@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Vinod Koul <vinod.koul@intel.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/dma/mxs-dma.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+Hi Pawel, Fathi,
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index ccd13df..7ab7cec 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -224,7 +224,7 @@ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
- 
- static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
- {
--	mxs_chan->status = DMA_SUCCESS;
-+	mxs_chan->status = DMA_COMPLETE;
- }
- 
- static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
-@@ -312,12 +312,12 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
- 			if (mxs_chan->flags & MXS_DMA_SG_LOOP)
- 				mxs_chan->status = DMA_IN_PROGRESS;
- 			else
--				mxs_chan->status = DMA_SUCCESS;
-+				mxs_chan->status = DMA_COMPLETE;
- 		}
- 
- 		stat1 &= ~(1 << channel);
- 
--		if (mxs_chan->status == DMA_SUCCESS)
-+		if (mxs_chan->status == DMA_COMPLETE)
- 			dma_cookie_complete(&mxs_chan->desc);
- 
- 		/* schedule tasklet on this channel */
+On 10/16/2013 09:36 AM, Pawel Moll wrote:
+> From: Fathi Boudra <fathi.boudra@linaro.org>
+> 
+> This patch updates the Versatile Express defconfig to a level
+> which makes it possible to run a defconfig-ed kernel work
+> on the board and in QEMU with modern userspace. It does:
+> 
+> - update cmdline to contain "console=ttyAMA0" only
+> - enable devtmpfs filesystem
+> - enable voltage regulator support
+> - enable ext4 filesystem
+> - disable low level debug and early printk
+> 
+> Signed-off-by: Fathi Boudra <fathi.boudra@linaro.org>
+> [PM: removed DEBUG_LL - it doesn't work on qemu]
+
+Does DEBUG_LL/EARLY_PRINTK break boot on QEMU? If not, why not leave it in for
+folks using other emulators, hardware, and maybe future versions of QEMU?
+
+Thanks,
+Christopher
+
 -- 
-1.7.0.4
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
