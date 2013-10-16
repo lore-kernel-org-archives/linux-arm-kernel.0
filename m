@@ -1,107 +1,39 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 16 Oct 2013 14:25:15 -0500
-Subject: [PATCHv5 2/4] ARM: msm: Add support for APQ8074 Dragonboard
-In-Reply-To: <1381612484-760-1-git-send-email-rvaswani@codeaurora.org>
-References: <1381612484-760-1-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <9460811C-9EA6-4536-9C8C-3E31FDD36F37@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 16 Oct 2013 13:33:44 -0600
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
+References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
+ <20131005190200.GZ12758@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
+ <20131005233137.GA12758@n2100.arm.linux.org.uk>
+ <20131006052029.GE2954@intel.com>
+ <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
+ <20131007111728.GM12758@n2100.arm.linux.org.uk>
+ <20131007103936.GH2954@intel.com>
+ <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
+Message-ID: <525EEA18.1010802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/08/2013 07:34 PM, Dan Williams wrote:
+> On Mon, Oct 7, 2013 at 3:39 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> On Mon, Oct 07, 2013 at 12:17:28PM +0100, Russell King - ARM Linux wrote:
+...
+>>> What may be better is to change the wording here: not DMA_SUCCESS but
+>>> DMA_COMPLETED.  That doesn't imply that it has been successful, merely
+>>> that the DMA engine has finished with the transaction.
+>>
+>> Agreed that its not indication of success but of DMA completetion. I have seen
+>> cases where slave perhiphral got stuck while sending last FIFO but since DMA
+>> finished transferiing to FIFO it says complete.
 
-On Oct 12, 2013, at 4:14 PM, Rohit Vaswani wrote:
+In that case, the DMA *has* completed. DMA is the transfer into the
+FIFO, not the handling of the FIFO content by the peripheral.
 
-> This patch adds basic board support for APQ8074 Dragonboard
-> which belongs to the Snapdragon 800 family.
-> For now, just support a basic machine with device tree.
+>> Dan do you agree?
 > 
-> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> ---
-> arch/arm/boot/dts/Makefile                     |  3 ++-
-> arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 +++++
-> arch/arm/boot/dts/qcom-msm8974.dtsi            | 35 ++++++++++++++++++++++++++
-> arch/arm/mach-msm/Kconfig                      | 13 ++++++++++
-> arch/arm/mach-msm/board-dt.c                   |  9 +++++++
-> 5 files changed, 65 insertions(+), 1 deletion(-)
-> create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
-> create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 000cf76..e71a3ec 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -102,7 +102,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
-> 	kirkwood-openblocks_a6.dtb
-> dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
-> dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
-> -	msm8960-cdp.dtb
-> +	msm8960-cdp.dtb \
-> +	qcom-apq8074-dragonboard.dtb
-> dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
-> 	armada-370-mirabox.dtb \
-> 	armada-370-netgear-rn102.dtb \
-> diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
-> new file mode 100644
-> index 0000000..13ac3e2
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
-> @@ -0,0 +1,6 @@
-> +#include "qcom-msm8974.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm APQ8074 Dragonboard";
-> +	compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
-> +};
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> new file mode 100644
-> index 0000000..e0fd55a
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -0,0 +1,35 @@
-> +/dts-v1/;
-> +
-> +#include "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm MSM8974";
-> +	compatible = "qcom,msm8974";
-> +	interrupt-parent = <&intc>;
-> +
-> +	soc: soc { };
+> Yes, it's an indication of completion, not necessarily success.
 
-Was there an answer to Olof's question about:
-
-For files that include this it's ok to use the &phandle syntax, but in this
-base dtsi, please use proper structure. In other words, move the contents of
-the soc node up above instead.
-
-> +};
-> +
-> +&soc {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges;
-> +	compatible = "simple-bus";
-> +
-> +	intc: interrupt-controller at f9000000 {
-> +		compatible = "qcom,msm-qgic2";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		reg = <0xf9000000 0x1000>,
-> +		      <0xf9002000 0x1000>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv7-timer";
-> +		interrupts = <1 2 0xf08>,
-> +			     <1 3 0xf08>,
-> +			     <1 4 0xf08>,
-> +			     <1 1 0xf08>;
-> +		clock-frequency = <19200000>;
-> +	};
-> +};
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Surely by definition, a DMA can't *complete* without being successful.
+If the DMA failed, then it didn't complete, but rather must have been
+aborted or error'd out, without completing the whole transfer.
