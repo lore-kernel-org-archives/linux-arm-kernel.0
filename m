@@ -1,68 +1,55 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 16 Oct 2013 11:45:48 -0700
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
-References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
- <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
- <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
-Message-ID: <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Oct 2013 20:56:49 +0200
+Subject: [RESEND PATCHv2 1/3] arm: socfpga: Set the SDMMC clock phase in
+ system manager
+In-Reply-To: <525DA3BE.2030304@gmail.com>
+References: <1381780051-1826-1-git-send-email-dinguyen@altera.com>
+ <201310152147.27569.arnd@arndb.de> <525DA3BE.2030304@gmail.com>
+Message-ID: <201310162056.49706.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 11:29 AM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> Hi Vinod,
->
-> On Wed, 16 Oct 2013, Vinod Koul wrote:
->
->> the DMA_SUCCESS is a misnomer as dmaengine indicates the transfer is complete and
->> gives no guarantee of the transfer success. Hence we should use DMA_COMPLTE
->> instead of DMA_SUCCESS
->>
->> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
->> ---
->>  drivers/dma/dmaengine.c   |    2 +-
->>  include/linux/dmaengine.h |   12 ++++++------
->>  2 files changed, 7 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
->> index 9162ac8..81d8765 100644
->> --- a/drivers/dma/dmaengine.c
->> +++ b/drivers/dma/dmaengine.c
->> @@ -1062,7 +1062,7 @@ dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx)
->>       unsigned long dma_sync_wait_timeout = jiffies + msecs_to_jiffies(5000);
->>
->>       if (!tx)
->> -             return DMA_SUCCESS;
->> +             return DMA_COMPLETE;
->>
->>       while (tx->cookie == -EBUSY) {
->>               if (time_after_eq(jiffies, dma_sync_wait_timeout)) {
->> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
->> index 0bc7275..4b460a6 100644
->> --- a/include/linux/dmaengine.h
->> +++ b/include/linux/dmaengine.h
->> @@ -45,13 +45,13 @@ static inline int dma_submit_error(dma_cookie_t cookie)
->>
->>  /**
->>   * enum dma_status - DMA transaction status
->> - * @DMA_SUCCESS: transaction completed successfully
->> + * @DMA_COMPLETE: transaction completed
->>   * @DMA_IN_PROGRESS: transaction not yet processed
->>   * @DMA_PAUSED: transaction is paused
->>   * @DMA_ERROR: transaction failed
->>   */
->>  enum dma_status {
->> -     DMA_SUCCESS,
->> +     DMA_COMPLETE,
->>       DMA_IN_PROGRESS,
->>       DMA_PAUSED,
->>       DMA_ERROR,
->
-> Doesn't this break kernel compilation for a total of 27 commits? Or am I
-> missing anything?
+On Tuesday 15 October 2013, Dinh Nguyen wrote:
+> This makes sense for the SD/MMC driver, but do you think I can use the 
+> same approach for
+> other drivers that this system manager touches?
 
-Yes, I think at the start DMA_COMPLETE should just be a alias for
-DMA_SUCCESS, then after all the driver renames are in delete
-DMA_SUCCESS.
+It might not be as straightforward for every driver, but something like
+this should work at least for some of the more interesting ones. For the
+rest, you can have a system manager driver that exports functions.
+
+> i.e. The ethernet IP's 
+> PHY setting is controlled
+> by a register that is in the system manager as well.
+>
+> I have submitted this patch for enabling ethernet. It is making use of 
+> the driver platform specific
+> driver calls to touch the system manager.
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/200173.html
+
+I definitely don't want to see auxdata getting used for stuff like this.
+
+In case of the ethernet driver, I suspect an SoC specific PHY driver would
+be the right approach.
+ 
+> Just wondering if that is right approach for the ethernet driver? If 
+> not, then I think I may have
+> to come up with a generic system manager driver so that it can be used 
+> for other IPs.
+
+The general way of handling this should be to see if there is a subsystem
+available for handling a particular feature. In case of clk and phy, we
+have those subsystems, so it's a matter of writing an appropriate driver
+that communicates with the high-level drivers using that.
+
+I don't know what other features are provided by the system manager that
+might need a different solution, but if you can't come up with a nice
+solution, you can either have an soc specific portion in the device driver
+(as you suggested for sdmmc first), or you can have that platform specific
+mfd driver exporting some functions.
+If the functionality is actually something common but doesn't have a
+subsystem in Linux yet, the "right" approach might also be to introduce
+a new subsystem, which I realize can be a lot of work.
+
+	Arnd
