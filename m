@@ -1,74 +1,60 @@
-From: tushar.jagad@linaro.org (Tushar Jagad)
-Date: Wed, 16 Oct 2013 12:34:48 +0530
-Subject: [RFC PATCH 3/4] ARM64: Big Endian fixes for kernel booting
-In-Reply-To: <525D8860.7080204@codeaurora.org>
-References: <1381494135-15085-1-git-send-email-ankit.jindal@linaro.org>
- <1381494135-15085-4-git-send-email-ankit.jindal@linaro.org>
- <525D8860.7080204@codeaurora.org>
-Message-ID: <525E3A90.4070809@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Oct 2013 08:08:43 +0100
+Subject: [PATCH v2 1/2] ARM: KVM: Yield CPU when vcpu executes a WFE
+In-Reply-To: <20131016011417.GA24837@cbox>
+References: <1381253894-18114-1-git-send-email-marc.zyngier@arm.com>
+ <1381253894-18114-2-git-send-email-marc.zyngier@arm.com>
+ <20131016011417.GA24837@cbox>
+Message-ID: <cf01fd5b6960de5ab6568961dc11099e@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
-
-On 10/15/2013 11:54 PM, Christopher Covington wrote:
->>   /*
->> + * Set el0-el1-el2 to Big endian
->> + */
->
-> It might be helpful to say why this has to be done (each level needs to be set
-> up before it's used?) and maybe list them in the order they're set up in.
-
-Sure will cover more details in the comment.
-
->> +#if defined(CONFIG_CPU_BIG_ENDIAN)
->> +ENTRY(setend_be)
->> +	mrs     x21, CurrentEL
->> +        cmp     x21, #PSR_MODE_EL2t
->> +	b.ne  	setend_be_el1_el0
->
-> Make sure to use tabs rather than spaces and run checkpatch.pl.
-
-Somehow this got skipped. Thanks for pointing it out.
-
->
->> +
->> +setend_be_el2:
->> +	mrs     x21, sctlr_el2
->> +        mov     x22, #(1<<25)
->> +        orr     x21, x21, x22
->> +        msr     sctlr_el2, x21
->> +	isb
->> +
->> +setend_be_el1_el0:
->> +	mrs     x21, sctlr_el1
->> +        mov     x22, #(3<<24)
->> +        orr     x21, x21, x22
->> +        msr     sctlr_el1, x21
->> +	isb
->> +
->> +	ret
->> +ENDPROC(setend_be)
->> +#endif /* defined(CONFIG_CPU_BIG_ENDIAN) */
->> +
->> +/*
->>    * If we're fortunate enough to boot at EL2, ensure that the world is
->>    * sane before dropping to EL1.
->>    */
->> @@ -181,7 +210,11 @@ ENTRY(el2_setup)
+On 2013-10-16 02:14, Christoffer Dall wrote:
+> On Tue, Oct 08, 2013 at 06:38:13PM +0100, Marc Zyngier wrote:
+>> On an (even slightly) oversubscribed system, spinlocks are quickly
+>> becoming a bottleneck, as some vcpus are spinning, waiting for a
+>> lock to be released, while the vcpu holding the lock may not be
+>> running at all.
 >>
->>   	/* sctlr_el1 */
->>   	mov	x0, #0x0800			// Set/clear RES{1,0} bits
->> +#if defined(CONFIG_CPU_BIG_ENDIAN)
->> +	movk	x0, #0x33d0, lsl #16
->> +#else
->>   	movk	x0, #0x30d0, lsl #16
->> +#endif
->>   	msr	sctlr_el1, x0
->
-> This may be easier to read if the magic number were ifdef'ed instead of the code.
+>> This creates contention, and the observed slowdown is 40x for
+>> hackbench. No, this isn't a typo.
+>>
+>> The solution is to trap blocking WFEs and tell KVM that we're
+>> now spinning. This ensures that other vpus will get a scheduling
+>> boost, allowing the lock to be released more quickly. Also, using
+>> CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT slightly improves the 
+>> performance
+>> when the VM is severely overcommited.
+>>
+>> Quick test to estimate the performance: hackbench 1 process 1000
+>>
+>> 2xA15 host (baseline):	1.843s
+>>
+>> 2xA15 guest w/o patch:	2.083s
+>> 4xA15 guest w/o patch:	80.212s
+>> 8xA15 guest w/o patch:	Could not be bothered to find out
+>>
+>> 2xA15 guest w/ patch:	2.102s
+>> 4xA15 guest w/ patch:	3.205s
+>> 8xA15 guest w/ patch:	6.887s
+>>
+>> So we go from a 40x degradation to 1.5x in the 2x overcommit case,
+>> which is vaguely more acceptable.
+>>
+> Patch looks good, I can just apply it and add the other one I just 
+> send
+> as a reply if there are no objections.
 
-Will change this as well.
+Yeah, I missed the updated comments on this one, thanks for taking care 
+of it.
+
+> Sorry for the long turn-around on this one.
+
+No worries. As long as it goes in, I'm happy. It makes such a 
+difference on my box, it is absolutely mind boggling.
+
+Thanks,
+
+          M.
 -- 
-Regards,
-Tushar
+Fast, cheap, reliable. Pick two.
