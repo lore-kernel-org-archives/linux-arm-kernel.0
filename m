@@ -1,48 +1,58 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 16 Oct 2013 17:06:11 +0100
-Subject: .align may cause data to be interpreted as instructions
-In-Reply-To: <525E74D8.3070008@codethink.co.uk>
-References: <525DC3D1.5030300@linaro.org> <525E74D8.3070008@codethink.co.uk>
-Message-ID: <1381939571.3419.44.camel@linaro1.home>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 16 Oct 2013 18:01:04 +0200
+Subject: [PATCH] ARM: highbank: cpuidle: convert to platform driver
+In-Reply-To: <CAL_Jsq+8ykh6xcwbuS+5gCZHv6zEKU4yEW_us+w_1+BoTOuisQ@mail.gmail.com>
+References: <1380278865-27457-1-git-send-email-daniel.lezcano@linaro.org>	<CAL_Jsq+PoqWf5oAQosPg8N0WWHm-7c+JgDzpGD8OfMyKtvPJ0w@mail.gmail.com>	<52457F21.3030502@linaro.org>	<525E9652.6060103@linaro.org>
+ <CAL_Jsq+8ykh6xcwbuS+5gCZHv6zEKU4yEW_us+w_1+BoTOuisQ@mail.gmail.com>
+Message-ID: <525EB840.5050607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-10-16 at 12:13 +0100, Ben Dooks wrote:
-> On 15/10/13 23:38, Taras Kondratiuk wrote:
-> > Hi
-> >
-> > I was debugging kprobes-test for BE8 and noticed that some data fields
-> > are stored in LE instead of BE. It happens because these data fields
-> > get interpreted as instructions.
-> >
-> > Is it a known issue?
-> 
-> I reported the crashes to Tixy along with a different
-> method of sovling the problem (changed to using pointers to
-> the strings) a while ago.
-
-I found that fix in the list archives:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186528.html
-
->  However it seems that nothing has
-> happened to fix this.
+On 10/16/2013 05:56 PM, Rob Herring wrote:
+> On Wed, Oct 16, 2013 at 8:36 AM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> On 09/27/2013 02:50 PM, Daniel Lezcano wrote:
+>>>
+>>> On 09/27/2013 02:29 PM, Rob Herring wrote:
+>>>>
+>>>> On Fri, Sep 27, 2013 at 5:47 AM, Daniel Lezcano
+>>>> <daniel.lezcano@linaro.org> wrote:
+>>>>>
+>>>>> As the ux500 and the kirkwood driver, make the calxeda driver a
+>>>>> platform driver
+>>>>>
+>>>>> [Compiled only]
+>>>>>
+>>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>> ---
+>>>>>    arch/arm/mach-highbank/highbank.c |    8 ++++++++
+>>>>>    drivers/cpuidle/cpuidle-calxeda.c |   18 ++++++++++++------
+>>>>>    2 files changed, 20 insertions(+), 6 deletions(-)
+>>>>
+>>>>
+>>>> Looks fine to me, but this will conflict with my series. Perhaps I can
+>>>> pick this up as part of that.
+>>>
+>>>
+>>> Yes I agree, it makes sense.
+>>
+>>
+>> Hi Rob,
+>>
+>> were you able to take the patch ? Where is the higbank git tree where I can
+>> see these patches ? I looked at git://sources.calxeda.com/kernel/linux.git
+>> #fox-next but they don't appear, is it the right one ?
 >
-> Since kprobes seems to work with the fixed tests I forgot
-> to follow up and prod Jon about looking into this problem.
+> I still need to send this series to arm-soc. I plan to do so this week.
 
-Sorry, I sorta forgot/ignored the issue, strange compiler problem with a
-vague explanation on a big-endian kernel (who uses that ;-)
+Ok, thanks.
 
-> Jon, if you are not interested in fixing this, then please
-> let me know and we can get a patch sorted to fix it.
+   -- Daniel
 
-Looking at your old patch again, it looks good to me. So if someone
-could post this to the lists again, with the commit message updated to
-have a clearer explanation as to the symptoms, e.g. some of Taras'
-analysis, that would be good. It should go to the list again to give
-people another chance to comment...
-
-Thanks
 
 -- 
-Tixy
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
