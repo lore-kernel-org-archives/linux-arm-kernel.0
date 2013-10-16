@@ -1,49 +1,41 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 16 Oct 2013 18:03:45 +0100
-Subject: .align may cause data to be interpreted as instructions
-In-Reply-To: <1381939571.3419.44.camel@linaro1.home>
-References: <525DC3D1.5030300@linaro.org> <525E74D8.3070008@codethink.co.uk>
- <1381939571.3419.44.camel@linaro1.home>
-Message-ID: <1381943025.3419.59.camel@linaro1.home>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 16 Oct 2013 19:03:45 +0200
+Subject: [PATCH] phy: exynos-mipi-video: Fix phy_power_off() callback
+In-Reply-To: <1381940896-9355-1-git-send-email-kishon@ti.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+Message-ID: <1381943025-1036-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-10-16 at 17:06 +0100, Jon Medhurst (Tixy) wrote:
-> On Wed, 2013-10-16 at 12:13 +0100, Ben Dooks wrote:
-> > On 15/10/13 23:38, Taras Kondratiuk wrote:
-> > > Hi
-> > >
-> > > I was debugging kprobes-test for BE8 and noticed that some data fields
-> > > are stored in LE instead of BE. It happens because these data fields
-> > > get interpreted as instructions.
-> > >
-> > > Is it a known issue?
-> > 
-> > I reported the crashes to Tixy along with a different
-> > method of sovling the problem (changed to using pointers to
-> > the strings) a while ago.
-> 
-> I found that fix in the list archives:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/186528.html
-> 
-> >  However it seems that nothing has
-> > happened to fix this.
-> >
-> > Since kprobes seems to work with the fixed tests I forgot
-> > to follow up and prod Jon about looking into this problem.
-> 
-> Sorry, I sorta forgot/ignored the issue, strange compiler problem with a
-> vague explanation on a big-endian kernel (who uses that ;-)
-> 
-> > Jon, if you are not interested in fixing this, then please
-> > let me know and we can get a patch sorted to fix it.
-> 
-> Looking at your old patch again, it looks good to me. 
+Fix argument passed to the register setup helper function so
+the phy is actually disabled. Now due to cut&paste error 1 is
+passed to both phy_power_on() and phy_power_off().
 
-Actually it's broken for thumb, the pointer to the title needs storing
-at a 4 byte alignment, which presumably will make the problem we're
-trying to workaround re-occur. I'll try and find some time to take a
-look for a different way of doing things...
+Reported by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
 
+This fixes a cut&paste typo which snicked in while doing very last
+adaptation to latest version of the phy framework.
+
+Thanks,
+Sylwester
+---
+ drivers/phy/phy-exynos-mipi-video.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
+index b73b86a..0c5efab 100644
+--- a/drivers/phy/phy-exynos-mipi-video.c
++++ b/drivers/phy/phy-exynos-mipi-video.c
+@@ -93,7 +93,7 @@ static int exynos_mipi_video_phy_power_off(struct phy *phy)
+ 	struct video_phy_desc *phy_desc = phy_get_drvdata(phy);
+ 	struct exynos_mipi_video_phy *state = to_mipi_video_phy(phy_desc);
+ 
+-	return __set_phy_state(state, phy_desc->index, 1);
++	return __set_phy_state(state, phy_desc->index, 0);
+ }
+ 
+ static struct phy *exynos_mipi_video_phy_xlate(struct device *dev,
 -- 
-Tixy
+1.7.9.5
