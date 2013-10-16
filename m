@@ -1,55 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Oct 2013 10:49:56 +0100
-Subject: [PATCH] ARM: KVM: drop arbitrary limitation to 4 CPU VMs
-In-Reply-To: <20131015232108.GD20547@cbox>
-References: <1381252628-17840-1-git-send-email-marc.zyngier@arm.com>
- <20131013010956.GA8200@cbox> <525BAE98.8050505@arm.com>
- <20131015232108.GD20547@cbox>
-Message-ID: <525E6144.3060004@arm.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Wed, 16 Oct 2013 11:56:13 +0200
+Subject: [PATCH v3 0/3] ARM: at91: fix hanged boot
+In-Reply-To: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
+References: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
+Message-ID: <1381917376-21107-1-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/10/13 00:21, Christoffer Dall wrote:
-> On Mon, Oct 14, 2013 at 09:43:04AM +0100, Marc Zyngier wrote:
->> On 13/10/13 02:09, Christoffer Dall wrote:
->>> On Tue, Oct 08, 2013 at 06:17:08PM +0100, Marc Zyngier wrote:
->>>> It appears we have an arbitrary limitation where we refuse to
->>>> create more than 4 virtual A15 in a single VM.
->>>>
->>>> This limitation doesn't make much sense (the number 4 probably
->>>> comes from the maximum number of CPUs in a A15 cluster, but
->>>> KVM doesn't have any notion of cluster), and directly
->>>> contradicts CONFIG_MAX_VCPUS.
->>>
->>> So this comes from the early days where I looked at the A15 TRM and the
->>> MPIDR bit field for the CPU ID is limited to 2 bits.  Exactly because
->>> I wasn't sure what remifications (if any) it would have to start
->>> populating this register with cluster id = (vcpu_id / 4) and cpu id =
->>> (vcpu_id % 4) I put this nice arbitrary restriction in there.
->>>
->>> I think we need to fix how we show this register to the guest
->>> otherwise... No?
->>
->> I don't see this being an issue, but if we really want to be 100% true
->> to the A15/A7 TRM, we can always compute MPIDR that way, and adjust
->> L2CTLR as well.
-> 
-> Even with mach-virt we're still pretending to be an A15/A7 right? I
-> think we should adhere to that.  Is there some other reason why people
-> shouldn't generally expect MPIDR to be correct (merging this code to KVM
-> and running in a VM notwithstanding)?
+These patches fix a few severe issues affecting most AT91 SOCs where
+boot can hang after a non-general reset, and where the only way to get
+the system booting again is to do a general reset -- something which
+could require physically removing any backup battery.
 
-Yes, it is probably better to adhere to the law of least surprise. I'm
-reworking this patch and will repost (slightly longer) the series.
+The problems stem from the fact that the RTC and RTT-peripherals are
+powered by backup power (VDDBU) and are not reset on wake-up, user,
+watchdog or software reset. Consequently, RTC and RTT-alarms and their
+interrupts may be enabled at boot, leading to a system lock-up when an
+interrupt arrives on the shared system-interrupt line before the
+appropriate handler (e.g. RTC-driver) has been installed.
 
->>
->> That will require some userspace change in kvmtool though (need to
->> change the DT generator to cope with the cluster ID).
->>
-> That would be the less fun part...
+The easiest way to trigger this is to simply wake up from an RTC-alarm
+on at91sam9g45. The RTC-driver currently does not disable interrupts at
+shutdown so even after a clean shut-down the system will always hang
+after waking up.
 
-Actually, it is surprisingly easy once the kernel does the right thing.
+The more general problem can be triggered, for example, by doing a
+user-reset while updating the RTC-time or if an RTC or RTT-alarm goes
+off after a non-clean shutdown.
 
-	M.
+To fix this I add two helper functions to be called called by arch-code
+to mask the relevant interrupts before enabling the system interrupt at
+early boot.
+
+The patches have been tested on at91sam9g45 and compile-tested for the
+other SOCs.
+
+Johan
+
+
+v2:
+ - add DT-support
+ - make sys_irq_mask non-mandatory
+
+v3
+ - rebase on v3.12-rc5
+ - drop DT-support (interrupt masking is needed even if RTC or RTT nodes
+   are missing)
+ - drop dedicated SOC-initialiser and call helpers directly from init
+ - drop revert-patch of move of RTC-register definitions to drivers/ and
+   copy the two needed definitions instead
+ - move helper functions from setup.c to a separate file
+ - add fix for new sama5d3 SOC
+ - add a register read back to make sure write has reached the devices
+ - split fix in two patches for RTC and RTT, respectively
+
+
+Johan Hovold (3):
+  ARM: at91: fix hanged boot due to early rtc-interrupt
+  ARM: at91: fix hanged boot due to early rtt-interrupt
+  ARM: at91/rtc: disable interrupts at shutdown
+
+ arch/arm/mach-at91/Makefile                   |  2 +-
+ arch/arm/mach-at91/at91sam9260.c              |  2 +
+ arch/arm/mach-at91/at91sam9261.c              |  2 +
+ arch/arm/mach-at91/at91sam9263.c              |  3 ++
+ arch/arm/mach-at91/at91sam9g45.c              |  3 ++
+ arch/arm/mach-at91/at91sam9n12.c              |  6 +++
+ arch/arm/mach-at91/at91sam9rl.c               |  3 ++
+ arch/arm/mach-at91/at91sam9x5.c               |  6 +++
+ arch/arm/mach-at91/generic.h                  |  2 +
+ arch/arm/mach-at91/include/mach/at91sam9n12.h |  5 ++
+ arch/arm/mach-at91/include/mach/at91sam9x5.h  |  5 ++
+ arch/arm/mach-at91/include/mach/sama5d3.h     |  5 ++
+ arch/arm/mach-at91/sama5d3.c                  |  6 +++
+ arch/arm/mach-at91/sysirq_mask.c              | 71 +++++++++++++++++++++++++++
+ drivers/rtc/rtc-at91rm9200.c                  |  9 ++++
+ 15 files changed, 129 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-at91/sysirq_mask.c
+
 -- 
-Jazz is not dead. It just smells funny...
+1.8.4
