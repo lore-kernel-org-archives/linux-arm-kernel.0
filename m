@@ -1,33 +1,45 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 16 Oct 2013 14:51:08 +0200
-Subject: [PATCH v3 0/0] usb: musb bugfixes
-Message-ID: <1381927872-8181-1-git-send-email-mpa@pengutronix.de>
+Date: Wed, 16 Oct 2013 14:51:12 +0200
+Subject: [PATCH v3 4/4] usb: musb: dsps, use devm_kzalloc
+In-Reply-To: <1381927872-8181-1-git-send-email-mpa@pengutronix.de>
+References: <1381927872-8181-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1381927872-8181-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/usb/musb/musb_dsps.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-the series contains two bugfixes and some debugfs file operations for dsps
-similar to the musb core regdump debugfs file.
-
-Regards,
-
-Markus Pargmann
-
-Changes in v3:
-- Using debugfs_reg32 for regdump debug file
-- Added a patch to replace kzalloc with devm_kzalloc
-- otg->gadget_driver NULL pointer handling was replaced by a musb_g_reset
-  patch to force IDLE states when no gadget driver is loaded.
-
-
-Markus Pargmann (4):
-      usb: musb: gadget, stay IDLE without gadget driver
-      usb: musb: Bugfix of_node assignment
-      usb: musb: dsps, debugfs files
-      usb: musb: dsps, use devm_kzalloc
-
- drivers/usb/musb/musb_core.c   | 15 ++++++++---
- drivers/usb/musb/musb_dsps.c   | 60 +++++++++++++++++++++++++++++++++++++++---
- drivers/usb/musb/musb_gadget.c | 14 ++++++++--
- 3 files changed, 79 insertions(+), 10 deletions(-)
+diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+index 0680f0e..aae017c 100644
+--- a/drivers/usb/musb/musb_dsps.c
++++ b/drivers/usb/musb/musb_dsps.c
+@@ -597,7 +597,7 @@ static int dsps_probe(struct platform_device *pdev)
+ 	wrp = match->data;
+ 
+ 	/* allocate glue */
+-	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
++	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+ 	if (!glue) {
+ 		dev_err(&pdev->dev, "unable to allocate glue memory\n");
+ 		return -ENOMEM;
+@@ -625,7 +625,6 @@ err3:
+ 	pm_runtime_put(&pdev->dev);
+ err2:
+ 	pm_runtime_disable(&pdev->dev);
+-	kfree(glue);
+ 	return ret;
+ }
+ 
+@@ -638,7 +637,6 @@ static int dsps_remove(struct platform_device *pdev)
+ 	/* disable usbss clocks */
+ 	pm_runtime_put(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+-	kfree(glue);
+ 
+ 	debugfs_remove_recursive(glue->dbgfs_root);
+ 
+-- 
+1.8.4.rc3
