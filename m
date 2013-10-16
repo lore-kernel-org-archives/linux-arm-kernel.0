@@ -1,69 +1,125 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Oct 2013 21:58:09 +0530
-Subject: [PATCH 0/7] video phy's adaptation to *generic phy framework*
-Message-ID: <1381940896-9355-1-git-send-email-kishon@ti.com>
+Date: Wed, 16 Oct 2013 21:58:11 +0530
+Subject: [PATCH 2/7] exynos4-is: Use the generic MIPI CSIS PHY driver
+In-Reply-To: <1381940896-9355-1-git-send-email-kishon@ti.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+Message-ID: <1381940896-9355-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 
-This series includes video PHY adaptation to Generic PHY Framework.
-With the adaptation they were able to get rid of plat data callbacks.
+Use the generic PHY API instead of the platform callback
+to control the MIPI CSIS DPHY.
 
-Since you've taken the Generic PHY Framework, I think this series should
-also go into your tree.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/media/platform/exynos4-is/Kconfig     |    2 +-
+ drivers/media/platform/exynos4-is/mipi-csis.c |   13 ++++++++++---
+ include/linux/platform_data/mipi-csis.h       |    9 ---------
+ 3 files changed, 11 insertions(+), 13 deletions(-)
 
-We should thank Sylwester for actively testing and giving comments from
-the initial versions of Generic Phy Framework. Both Sylwester and Jingoo
-had been floating many revisions of their adaptation to Generic PHY
-Framework.
-
-This has been in my repo for quite some time and has got acks from
-samsung maintainer and video maintainer.
-
-If you want me to change anything, please let me know.
-
-This patch series can be found @
-git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git testing
-
-Jingoo Han (3):
-  phy: Add driver for Exynos DP PHY
-  video: exynos_dp: remove non-DT support for Exynos Display Port
-  video: exynos_dp: Use the generic PHY driver
-
-Sylwester Nawrocki (4):
-  phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
-  exynos4-is: Use the generic MIPI CSIS PHY driver
-  video: exynos_mipi_dsim: Use the generic PHY driver
-  ARM: Samsung: Remove the MIPI PHY setup code
-
- .../devicetree/bindings/phy/samsung-phy.txt        |   22 +++
- .../devicetree/bindings/video/exynos_dp.txt        |   17 +-
- arch/arm/mach-exynos/include/mach/regs-pmu.h       |    5 -
- arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    4 -
- arch/arm/plat-samsung/Kconfig                      |    5 -
- arch/arm/plat-samsung/Makefile                     |    1 -
- arch/arm/plat-samsung/setup-mipiphy.c              |   60 -------
- drivers/media/platform/exynos4-is/Kconfig          |    2 +-
- drivers/media/platform/exynos4-is/mipi-csis.c      |   13 +-
- drivers/phy/Kconfig                                |   13 ++
- drivers/phy/Makefile                               |    8 +-
- drivers/phy/phy-exynos-dp-video.c                  |  111 ++++++++++++
- drivers/phy/phy-exynos-mipi-video.c                |  176 ++++++++++++++++++++
- drivers/video/exynos/Kconfig                       |    3 +-
- drivers/video/exynos/exynos_dp_core.c              |  132 ++++-----------
- drivers/video/exynos/exynos_dp_core.h              |  110 ++++++++++++
- drivers/video/exynos/exynos_dp_reg.c               |    2 -
- drivers/video/exynos/exynos_mipi_dsi.c             |   19 ++-
- include/linux/platform_data/mipi-csis.h            |    9 -
- include/video/exynos_dp.h                          |  131 ---------------
- include/video/exynos_mipi_dsim.h                   |    5 +-
- 21 files changed, 508 insertions(+), 340 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/samsung-phy.txt
- delete mode 100644 arch/arm/plat-samsung/setup-mipiphy.c
- create mode 100644 drivers/phy/phy-exynos-dp-video.c
- create mode 100644 drivers/phy/phy-exynos-mipi-video.c
- delete mode 100644 include/video/exynos_dp.h
-
+diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+index 53ad0f0..d2d3b4b 100644
+--- a/drivers/media/platform/exynos4-is/Kconfig
++++ b/drivers/media/platform/exynos4-is/Kconfig
+@@ -29,7 +29,7 @@ config VIDEO_S5P_FIMC
+ config VIDEO_S5P_MIPI_CSIS
+ 	tristate "S5P/EXYNOS MIPI-CSI2 receiver (MIPI-CSIS) driver"
+ 	depends on REGULATOR
+-	select S5P_SETUP_MIPIPHY
++	select GENERIC_PHY
+ 	help
+ 	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC MIPI-CSI2
+ 	  receiver (MIPI-CSIS) devices.
+diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
+index 0914230..9fc2af6 100644
+--- a/drivers/media/platform/exynos4-is/mipi-csis.c
++++ b/drivers/media/platform/exynos4-is/mipi-csis.c
+@@ -20,6 +20,7 @@
+ #include <linux/memory.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/phy/phy.h>
+ #include <linux/platform_data/mipi-csis.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -180,6 +181,7 @@ struct csis_drvdata {
+  * @sd: v4l2_subdev associated with CSIS device instance
+  * @index: the hardware instance index
+  * @pdev: CSIS platform device
++ * @phy: pointer to the CSIS generic PHY
+  * @regs: mmaped I/O registers memory
+  * @supplies: CSIS regulator supplies
+  * @clock: CSIS clocks
+@@ -203,6 +205,7 @@ struct csis_state {
+ 	struct v4l2_subdev sd;
+ 	u8 index;
+ 	struct platform_device *pdev;
++	struct phy *phy;
+ 	void __iomem *regs;
+ 	struct regulator_bulk_data supplies[CSIS_NUM_SUPPLIES];
+ 	struct clk *clock[NUM_CSIS_CLOCKS];
+@@ -779,8 +782,8 @@ static int s5pcsis_parse_dt(struct platform_device *pdev,
+ 					"samsung,csis-wclk");
+ 
+ 	state->num_lanes = endpoint.bus.mipi_csi2.num_data_lanes;
+-
+ 	of_node_put(node);
++
+ 	return 0;
+ }
+ #else
+@@ -829,6 +832,10 @@ static int s5pcsis_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
++	state->phy = devm_phy_get(dev, "csis");
++	if (IS_ERR(state->phy))
++		return PTR_ERR(state->phy);
++
+ 	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	state->regs = devm_ioremap_resource(dev, mem_res);
+ 	if (IS_ERR(state->regs))
+@@ -922,7 +929,7 @@ static int s5pcsis_pm_suspend(struct device *dev, bool runtime)
+ 	mutex_lock(&state->lock);
+ 	if (state->flags & ST_POWERED) {
+ 		s5pcsis_stop_stream(state);
+-		ret = s5p_csis_phy_enable(state->index, false);
++		ret = phy_power_off(state->phy);
+ 		if (ret)
+ 			goto unlock;
+ 		ret = regulator_bulk_disable(CSIS_NUM_SUPPLIES,
+@@ -958,7 +965,7 @@ static int s5pcsis_pm_resume(struct device *dev, bool runtime)
+ 					    state->supplies);
+ 		if (ret)
+ 			goto unlock;
+-		ret = s5p_csis_phy_enable(state->index, true);
++		ret = phy_power_on(state->phy);
+ 		if (!ret) {
+ 			state->flags |= ST_POWERED;
+ 		} else {
+diff --git a/include/linux/platform_data/mipi-csis.h b/include/linux/platform_data/mipi-csis.h
+index bf34e17..c2fd902 100644
+--- a/include/linux/platform_data/mipi-csis.h
++++ b/include/linux/platform_data/mipi-csis.h
+@@ -25,13 +25,4 @@ struct s5p_platform_mipi_csis {
+ 	u8 hs_settle;
+ };
+ 
+-/**
+- * s5p_csis_phy_enable - global MIPI-CSI receiver D-PHY control
+- * @id:     MIPI-CSIS harware instance index (0...1)
+- * @on:     true to enable D-PHY and deassert its reset
+- *          false to disable D-PHY
+- * @return: 0 on success, or negative error code on failure
+- */
+-int s5p_csis_phy_enable(int id, bool on);
+-
+ #endif /* __PLAT_SAMSUNG_MIPI_CSIS_H_ */
 -- 
 1.7.10.4
