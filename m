@@ -1,46 +1,88 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 16 Oct 2013 11:10:28 +0530
-Subject: [PATCH v2] clk: exynos5420: fix cpll clock register offsets
-In-Reply-To: <1380186395-28814-1-git-send-email-chander.kashyap@linaro.org>
-References: <1380186395-28814-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CANuQgHFPB4C69C1sDFPVx6E8XjMhbqs-75R9xq1LP0=yO9C4zg@mail.gmail.com>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Wed, 16 Oct 2013 11:24:27 +0530
+Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
+In-Reply-To: <1381853200-5534-6-git-send-email-marex@denx.de>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+ <1381853200-5534-6-git-send-email-marex@denx.de>
+Message-ID: <20131016055427.GB2740@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 September 2013 14:36, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> Fixes cpll control and lock register offset values for Exynos5420 SoC.
->
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+On Wed, Oct 16, 2013 at 12:06:39AM +0800, Marek Vasut wrote:
+> Without forcing the PCIe core into Gen1 operation, the PCIe switch
+> attached directly to the PCIe port is not recognised at all. The
+> PCIe switch is Gen2 capable to make this issue even more puzzling.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Frank Li <lznuaa@gmail.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Mohit KUMAR <Mohit.KUMAR@st.com>
+> Cc: Pratyush Anand <pratyush.anand@st.com>
+> Cc: Richard Zhu <r65037@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Sean Cross <xobs@kosagi.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Siva Reddy Kallam <siva.kallam@samsung.com>
+> Cc: Srikanth T Shivanand <ts.srikanth@samsung.com>
+> Cc: Tim Harvey <tharvey@gateworks.com>
+> Cc: Troy Kisky <troy.kisky@boundarydevices.com>
+> Cc: Yinghai Lu <yinghai@kernel.org>
 > ---
-> Changes Since v1:
->         - Fixed patch subject as per Kukgin suggestion.
->
->  drivers/clk/samsung/clk-exynos5420.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 86dfc64..892aac0 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -730,8 +730,8 @@ struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
->  struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
->         [apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
->                 APLL_CON0, NULL),
-> -       [cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
-> -               MPLL_CON0, NULL),
-> +       [cpll] = PLL(pll_2550, fout_cpll, "fout_cpll", "fin_pll", CPLL_LOCK,
-> +               CPLL_CON0, NULL),
->         [dpll] = PLL(pll_2550, fout_dpll, "fout_dpll", "fin_pll", DPLL_LOCK,
->                 DPLL_CON0, NULL),
->         [epll] = PLL(pll_2650, fout_epll, "fout_epll", "fin_pll", EPLL_LOCK,
-> --
-> 1.7.9.5
->
+>  drivers/pci/host/pci-imx6.c | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index ca8c5de..8402e9a 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -321,6 +321,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+>  {
+>  	int count = 0;
+>  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+> +	uint32_t tmp;
+>  
+>  	imx6_pcie_assert_core_reset(pp);
+>  
+> @@ -330,13 +331,23 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+>  
+>  	dw_pcie_setup_rc(pp);
+>  
+> +	/*
+> +	 * FIXME:
+> +	 * Force Gen1 operation. In case the IP block is in Gen2 operation
+> +	 * mode, it does not detect the PCIe switch at all.
+> +	 */
+> +	tmp = readl(pp->dbi_base + 0x7c);
+> +	tmp &= ~0xf;
+> +	tmp |= 0x1;
+> +	writel(tmp, pp->dbi_base + 0x7c);
+> +
 
+Since you are forcing RC to work in GEN1, so you will not be able to
+connect any device at GEN2 now.
 
-Mike, can you please take this patch.
+Yes, There are some buggy PCIe devices which works with GEN1 only host.
 
--- 
-with warm regards,
-Chander Kashyap
+So better solution should be to initialize RC by default at GEN2 or
+highest speed. Further, a parameter say gen_only can be passed from
+DT to force GEN1 only mode.
+
+What do you say?
+
+Regards
+Pratyush
+
+>  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>  			IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
+>  
+>  	while (!dw_pcie_link_up(pp)) {
+>  		usleep_range(100, 1000);
+>  		count++;
+> -		if (count >= 10) {
+> +		if (count >= 200) {
+>  			dev_err(pp->dev, "phy link never came up\n");
+>  			dev_dbg(pp->dev,
+>  				"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
+> -- 
+> 1.8.4.rc3
