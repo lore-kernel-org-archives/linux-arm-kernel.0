@@ -1,112 +1,135 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 17 Oct 2013 14:16:44 -0400 (EDT)
-Subject: [PATCH v2 3/4] ARM: EXYNOS: add Exynos Dual Cluster Support
-In-Reply-To: <52600A7D.2000809@linaro.org>
-References: <20131017143204.GE2442@localhost.localdomain>
- <52600A7D.2000809@linaro.org>
-Message-ID: <alpine.LFD.2.03.1310171345300.1873@syhkavp.arg>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Thu, 17 Oct 2013 11:25:10 -0700
+Subject: [PATCHv6 2/4] ARM: msm: Add support for APQ8074 Dragonboard
+Message-ID: <1382034310-31147-1-git-send-email-rvaswani@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Oct 2013, Daniel Lezcano wrote:
+This patch adds basic board support for APQ8074 Dragonboard
+which belongs to the Snapdragon 800 family.
+For now, just support a basic machine with device tree.
 
-> On 10/17/2013 04:32 PM, Dave Martin wrote:
-> > On Thu, Oct 17, 2013 at 12:45:29PM +0200, Daniel Lezcano wrote:
-> > > On 10/14/2013 05:08 PM, Vyacheslav Tyrtov wrote:
-> > > > From: Tarek Dakhran <t.dakhran@samsung.com>
-> > > > 
-> > > > Add EDCS(Exynos Dual Cluster Support) for Samsung Exynos5410 SoC.
-> > > > This enables all 8 cores, 4 x A7 and 4 x A15 run at the same time.
-> > 
-> > [...]
-> > 
-> > > > +	__mcpm_cpu_down(cpu, cluster);
-> > > > +
-> > > > +	if (!skip_wfi) {
-> > > > +		exynos_core_power_down(cpu, cluster);
-> > > > +		wfi();
-> > > > +	}
-> > > > +}
-> > > 
-> > > I did not looked line by line but these functions looks very similar
-> > > than the tc2_pm.c's function. no ?
-> > 
-> > This is true.
-> > 
-> > > May be some code consolidation could be considered here.
-> > > 
-> > > Added Nico and Lorenzo in Cc.
-> > > 
-> > > Thanks
-> > >    -- Daniel
-> > 
-> > Nico can commnent further, but I think the main concern here was that
-> > this code shouldn't be factored prematurely.
-> 
-> I do not share this opinion.
-> 
-> > There are many low-level platform specifics involved here, so it's
-> > hard to be certain that all platforms could fit into a more abstracted
-> > framework until we have some evidence to look at.
-> > 
-> > This could be revisited when we have a few diverse MCPM ports to
-> > compare.
-> 
-> I am worried about seeing more and more duplicated code around the ARM arch
-> (eg. arm[64]/kernel/smp.c arm64/kernel/smp.c).
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+---
+ arch/arm/boot/dts/Makefile                     |  3 ++-
+ arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  6 +++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi            | 33 ++++++++++++++++++++++++++
+ arch/arm/mach-msm/Kconfig                      | 11 ++++++++-
+ arch/arm/mach-msm/board-dt.c                   |  9 +++++++
+ 5 files changed, 60 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974.dtsi
 
-I didn't look too closely at those files so can't comment much on them.
-
-> The cpuidle drivers have been duplicated and it took a while before
-> refactoring them, and it is not finished. The hotplug code have been
-> duplicated and now it is very difficult to factor it out.
-> 
-> A lot of work have been done to consolidate the code across the different SoC
-> since the last 2 years.
-> 
-> If we let duplicate code populate the different files, they will belong to
-> different maintainers, thus different trees. Each SoC contributors will tend
-> to add their small changes making the code to diverge more and more and making
-> difficult to re-factor it later.
-> 
-> I am in favor of preventing duplicate code entering in the kernel and force
-> the contributors to improve the kernel in general, not just the small part
-> they are supposed to work on. Otherwise, we are letting the kernel to fork
-> itself, internally...
-
-Now I'm going to comment.
-
-What you say above is perfectly right.  As a general principle, we want 
-good consolidation.  That's the theory.
-
-However you need to know what needs to be consolidated in the first 
-place.  In practice you cannot consolidate duplicated code if that code 
-doesn't exist. In the cpuidle and hotplug cases it is very easy now to 
-see what kind of consolidation should have been done after the facts.  
-I'm sure that 10 years ago that wasn't as obvious.
-
-In the MCPM case we didn't know up front what exactly would end up being 
-duplicated in each machine specific backend.  And to some extent we 
-still don't know as there is very few backends merged into mainline at 
-this point (I know more of them exist out of tree but I didn't see the 
-code yet). Right now we have only 2 such backends and some duplication 
-was already identified, hence the patch to abstract the v7 cache 
-flushing I posted recently.
-
-Another possibility for consolidation in the MCPM backends is the last 
-man determination.  However we've seen that the PSCI compatibility 
-backend doesn't need that and abstracting that just yet might be 
-premature, possibly making interaction with PSCI very awkward.
-
-So it is very important to get the right balance between code 
-duplication and over-engineering.  Premature abstractions do fall into 
-the over-engineering category and it is just as bad.  Above all it is 
-most important to be vigilant and take care of duplicated code before it 
-gets too big.
-
-In the past we've seen bad code duplication in some subsystems because 
-no one was looking at the big picture.  In the MCPM case I'm watching. 
-And in this case we're far from being in a critical situation.
-
-
-Nicolas
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 000cf76..e71a3ec 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -102,7 +102,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
+ 	kirkwood-openblocks_a6.dtb
+ dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
+ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+-	msm8960-cdp.dtb
++	msm8960-cdp.dtb \
++	qcom-apq8074-dragonboard.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+ 	armada-370-mirabox.dtb \
+ 	armada-370-netgear-rn102.dtb \
+diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+new file mode 100644
+index 0000000..13ac3e2
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+@@ -0,0 +1,6 @@
++#include "qcom-msm8974.dtsi"
++
++/ {
++	model = "Qualcomm APQ8074 Dragonboard";
++	compatible = "qcom,apq8074-dragonboard", "qcom,apq8074";
++};
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+new file mode 100644
+index 0000000..2ebb4f0
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -0,0 +1,33 @@
++/dts-v1/;
++
++#include "skeleton.dtsi"
++
++/ {
++	model = "Qualcomm MSM8974";
++	compatible = "qcom,msm8974";
++	interrupt-parent = <&intc>;
++
++	soc: soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		compatible = "simple-bus";
++
++		intc: interrupt-controller at f9000000 {
++			compatible = "qcom,msm-qgic2";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0xf9000000 0x1000>,
++			      <0xf9002000 0x1000>;
++		};
++
++		timer {
++			compatible = "arm,armv7-timer";
++			interrupts = <1 2 0xf08>,
++				     <1 3 0xf08>,
++				     <1 4 0xf08>,
++				     <1 1 0xf08>;
++			clock-frequency = <19200000>;
++		};
++	};
++};
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 2586c28..5e5782d 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -58,9 +58,18 @@ config ARCH_MSM8960
+ 	select GPIO_MSM_V2
+ 	select MSM_SCM if SMP
+ 
++config ARCH_MSM8974
++	bool "MSM8974"
++	select ARM_GIC
++	select CPU_V7
++	select HAVE_ARM_ARCH_TIMER
++	select HAVE_SMP
++	select MSM_SCM if SMP
++	select USE_OF
++
+ config ARCH_MSM_DT
+ 	def_bool y
+-	depends on (ARCH_MSM8X60 || ARCH_MSM8960)
++	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 
+diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
+index 266a280..5211e80 100644
+--- a/arch/arm/mach-msm/board-dt.c
++++ b/arch/arm/mach-msm/board-dt.c
+@@ -26,7 +26,16 @@ static const char * const msm_dt_match[] __initconst = {
+ 	NULL
+ };
+ 
++static const char * const apq8074_dt_match[] __initconst = {
++	"qcom,apq8074-dragonboard",
++	NULL
++};
++
+ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.smp = smp_ops(msm_smp_ops),
+ 	.dt_compat = msm_dt_match,
+ MACHINE_END
++
++DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
++	.dt_compat = apq8074_dt_match,
++MACHINE_END
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
