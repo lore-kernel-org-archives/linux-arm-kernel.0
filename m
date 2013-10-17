@@ -1,37 +1,45 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 Oct 2013 13:08:01 -0600
-Subject: [GIT PULL 6/6] MAINTAINERS: Tegra updates, and driver ownership
-In-Reply-To: <1382036881-23339-1-git-send-email-swarren@wwwdotorg.org>
-References: <1382036881-23339-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1382036881-23339-6-git-send-email-swarren@wwwdotorg.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 17 Oct 2013 15:10:33 -0400 (EDT)
+Subject: [PATCH 2/2 v3] usb: ohci: remove ep93xx bus glue platform driver
+In-Reply-To: <201310171125.50024.hartleys@visionengravers.com>
+Message-ID: <Pine.LNX.4.44L0.1310171506210.2436-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Overhaul of MAINTAINERS for Tegra. This adds Thierry as a Tegra core
-maintainer, and adds specific entries for most individual Tegra-specific
-device drivers, pointing at relevant people. The tegradrm section is
-updated to be Supported since Thierry is now employed to work on this.
+On Thu, 17 Oct 2013, H Hartley Sweeten wrote:
 
-This branch is based on v3.12-rc1.
+> Convert ep93xx to use the OHCI platform driver and remove the
+> ohci-ep93xx bus glue driver.
+> 
+> Enable CONFIG_OHCI_HCD_PLATFORM in the ep93xx_defconfig so that USB
+> is still enabled by default on the EP93xx platform.
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-----------------------------------------------------------------
+> +/*************************************************************************
+> + * EP93xx OHCI USB Host
+> + *************************************************************************/
+> +
+> +static struct clk *ep93xx_ohci_host_clock;
+> +
+> +static int ep93xx_ohci_power_on(struct platform_device *pdev)
+> +{
+> +	if (!ep93xx_ohci_host_clock) {
+> +		ep93xx_ohci_host_clock = devm_clk_get(&pdev->dev, NULL);
+> +		if (IS_ERR(ep93xx_ohci_host_clock))
+> +			return PTR_ERR(ep93xx_ohci_host_clock);
+> +	}
+> +
+> +	clk_enable(ep93xx_ohci_host_clock);
+> +
+> +	return 0;
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+Wasn't this supposed to be changed to:
 
-  Linux 3.12-rc1
+	return clk_enable(ep93xx_ohci_host_clock);
 
-are available in the git repository at:
+?  Otherwise it looks fine.  After fixing this, you can add
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.13-maintainers
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-for you to fetch changes up to d44c346ee9c9b37ff0ea28e816062cd1439bf05d:
-
-  MAINTAINERS: Tegra updates, and driver ownership
-
-----------------------------------------------------------------
-
-Stephen Warren (1):
-      MAINTAINERS: Tegra updates, and driver ownership
-
- MAINTAINERS | 62 ++++++++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 60 insertions(+), 2 deletions(-)
+Alan Stern
