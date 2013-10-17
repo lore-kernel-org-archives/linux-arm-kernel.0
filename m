@@ -1,45 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Oct 2013 08:31:59 -0400
-Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
-In-Reply-To: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
-References: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20131017123159.GA22434@titan.lakedaemon.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 17 Oct 2013 14:32:03 +0200
+Subject: sun4i_handle_irq: WARNING at net/ipv4/tcp_input.c:2711
+ tcp_fastretrans_alert
+In-Reply-To: <CACQ1gAinSoTCTtf9Y6TL=vtEm1jnJgis0n=y=frNtuPxue9-ng@mail.gmail.com>
+References: <20130821094432.GA28249@lnx-rg> <20130823182116.GE1230@lukather>
+ <CACQ1gAinSoTCTtf9Y6TL=vtEm1jnJgis0n=y=frNtuPxue9-ng@mail.gmail.com>
+Message-ID: <20131017123203.GM3041@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+Hi Richard
 
-I going to go ahead a take this through my tree.  I'll hold it off until
-my last pull request for the merge window (I'm guessing about a week).
-If you object, just let me know before then and I'll drop it.
+On Thu, Oct 17, 2013 at 01:46:49PM +0200, Richard Genoud wrote:
+> > Hmmm, that seems pretty far from the network/interrupt drivers, and it
+> > looks like other users have seen this on !ARM machines:
+> > http://forums.gentoo.org/viewtopic-p-7379928.html
+> > https://bugzilla.redhat.com/show_bug.cgi?id=989251
+> >
+> > There's a patch in the redhat's bugzilla, could you try to apply it and
+> > see if it solves your problem?
+> >
+> > Maybe the netdev guys will have other ideas as well.
+> For the record, I set:
+> net.ipv4.tcp_early_retrans = 2
+> net.ipv4.tcp_frto = 0
+> And I didn't see the warning any more.
+> It's seems that a patch is on it's way. I'll try it instead of setting
+> the sysctl.
+> http://thread.gmane.org/gmane.linux.network/286793
 
+Ah, I wanted to ask you about the status of this.
 
-On Thu, Oct 03, 2013 at 12:05:02PM +0200, Simon Guinot wrote:
-> This patch fixes the tclk frequency array for the Armada-370 SoC.
-> This bug has been introduced by commit 6b72333d
-> ("clk: mvebu: add Armada 370 SoC-centric clock init").
-> 
-> A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
-> i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
-> 
-> About the mvneta Ethernet driver, note that the tclk frequency is used
-> to compute the Rx time coalescence. Then, this bug harms the coalescence
-> configuration and also degrades the networking performances with the
-> default values.
-> 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: stable at vger.kernel.org
-> ---
->  drivers/clk/mvebu/armada-370.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks for the follow-up,
+Maxime
 
-Applied to mvebu/drivers for v3.13 and flagged for stable going back to
-v3.11.  Also added Gregory's Ack.
-
-thx,
-
-Jason.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/bff5e6d3/attachment.sig>
