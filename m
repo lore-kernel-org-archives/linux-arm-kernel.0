@@ -1,48 +1,53 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 17 Oct 2013 18:43:29 +0100
-Subject: [PATCH v8 14/19] ASoC: Samsung: Rename dma_ops by samsung_dma_ops
+Date: Thu, 17 Oct 2013 18:43:34 +0100
+Subject: [PATCH v8 19/19] swiotlb-xen: static inline xen_phys_to_bus,
+ xen_bus_to_phys, xen_virt_to_bus and range_straddles_page_boundary
 In-Reply-To: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
-Message-ID: <1382031814-8782-14-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1382031814-8782-19-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Grall <julien.grall@linaro.org>
+This functions are small and called frequently. Static inline them.
 
-The commit "arm: introduce a global dma_ops pointer" introduce compilation issue
-when CONFIG_SND_SOC_SAMSUNG is enabled.
-
-sound/soc/samsung/dma.c:345:27: error: conflicting types for 'dma_ops'
-/local/home/julien/works/arndale/linux/arch/arm/include/asm/dma-mapping.h:16:28:
-note: previous declaration of 'dma_ops' was here
-
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- sound/soc/samsung/dma.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/xen/swiotlb-xen.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-index 21b7926..827c0d8 100644
---- a/sound/soc/samsung/dma.c
-+++ b/sound/soc/samsung/dma.c
-@@ -341,7 +341,7 @@ static int dma_mmap(struct snd_pcm_substream *substream,
- 				     runtime->dma_bytes);
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index 6d9ca61..9045517 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -72,17 +72,17 @@ static unsigned long xen_io_tlb_nslabs;
+ 
+ static u64 start_dma_addr;
+ 
+-static dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
++static inline dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
+ {
+ 	return phys_to_machine(XPADDR(paddr)).maddr;
  }
  
--static struct snd_pcm_ops dma_ops = {
-+static struct snd_pcm_ops samsung_dma_ops = {
- 	.open		= dma_open,
- 	.close		= dma_close,
- 	.ioctl		= snd_pcm_lib_ioctl,
-@@ -428,7 +428,7 @@ out:
+-static phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
++static inline phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
+ {
+ 	return machine_to_phys(XMADDR(baddr)).paddr;
  }
  
- static struct snd_soc_platform_driver samsung_asoc_platform = {
--	.ops		= &dma_ops,
-+	.ops		= &samsung_dma_ops,
- 	.pcm_new	= dma_new,
- 	.pcm_free	= dma_free_dma_buffers,
- };
+-static dma_addr_t xen_virt_to_bus(void *address)
++static inline dma_addr_t xen_virt_to_bus(void *address)
+ {
+ 	return xen_phys_to_bus(virt_to_phys(address));
+ }
+@@ -105,7 +105,7 @@ static int check_pages_physically_contiguous(unsigned long pfn,
+ 	return 1;
+ }
+ 
+-static int range_straddles_page_boundary(phys_addr_t p, size_t size)
++static inline int range_straddles_page_boundary(phys_addr_t p, size_t size)
+ {
+ 	unsigned long pfn = PFN_DOWN(p);
+ 	unsigned int offset = p & ~PAGE_MASK;
 -- 
 1.7.2.5
