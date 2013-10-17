@@ -1,33 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Oct 2013 10:43:19 +0100
-Subject: [PATCH v3 1/7] arm64: introduce basic aarch64 instruction
- decoding helpers
-In-Reply-To: <525EC98A.6090802@gmail.com>
-References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
- <1381893492-7135-2-git-send-email-liuj97@gmail.com>
- <20131016105142.GD5403@mudshark.cambridge.arm.com>
- <525EB279.9050504@gmail.com> <525EC98A.6090802@gmail.com>
-Message-ID: <20131017094318.GC18765@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Oct 2013 10:50:36 +0100
+Subject: [RFC PATCH 4/5] ARM: psci: Add support for system reboot and
+ poweroff
+In-Reply-To: <CAAhSdy3VdRnuGEMzeDrAigkD=FM+rp4VL9yC+QVaRaJRAbEunQ@mail.gmail.com>
+References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
+ <1381942954-22388-5-git-send-email-anup.patel@linaro.org>
+ <525F1074.8000208@gmail.com>
+ <CAAhSdy3VdRnuGEMzeDrAigkD=FM+rp4VL9yC+QVaRaJRAbEunQ@mail.gmail.com>
+Message-ID: <525FB2EC.4010406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 06:14:50PM +0100, Jiang Liu wrote:
-> On 10/16/2013 11:36 PM, Jiang Liu wrote:
-> > On 10/16/2013 06:51 PM, Will Deacon wrote:
-> >> Take care here:
-> >>
-> >> 	- This doesn't guarantee that CPUs exclusively see new_insn (they
-> >> 	  may see old_insn, even after patching)
-> > Good point. Still need some synchronization mechanism lighter than
-> > stop_machine(). How about kick_all_cpus_sync(), which should be lighter
-> > than stop_machine()?
-> For jump label, x86 uses three smp_call_function() to replace a
-> stop_machine(). Seems it's valuable for us to use just one
-> kick_all_cpus_sync() to avoid a stop_machine().
+On 17/10/13 06:08, Anup Patel wrote:
+> On Thu, Oct 17, 2013 at 3:47 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 10/16/2013 12:02 PM, Anup Patel wrote:
+>>> We have PSCI SYSTEM_OFF and SYSTEM_RESET function call emulation
+>>> available when running as Guest using KVM ARM.
+>>>
+>>> This patch implements system reboot and poweroff using PSCI
+>>> SYSTEM_OFF and SYSTEM_RESET.
+>>
+>> I've done a similar patch [1] which also needs binding documentation to
+>> go with it. The last version of which there is no agreement on is here [2].
+>>
+>> Rob
+>>
+>> [1] http://www.spinics.net/lists/arm-kernel/msg262217.html
+>> [2] http://www.spinics.net/lists/devicetree/msg05348.html
+> 
+> Thanks, for the early warning.
+> 
+> I would be happy to go with your patch since you have already the device tree
+> bindings covered.
+> 
+> IMHO, we should try to go ahead with existing scheme of PSCI device tree
+> bindings for SYSTEM_OFF and SYSTEM_RESET. Later anyone can propose
+> revised PSCI device tree bindings. Its not nice to hold off good changes just
+> because people don't agree on the device tree bindings.
 
-Yes, the exception return after handling the IPI from kick_all_cpus_sync
-should be enough to synchronise the pipeline, providing that all cache
-maintenance by the CPU writing the new instructions has completed (if you're
-using flush_icache_range then you're fine).
+*Shrug*
 
-Will
+DT is an ABI. Even more for virtualization. It can't be revised without
+keeping the old version alive. Once it is in, it is for good, and we
+have support it forever. So we'd better get it right from the beginning,
+no matter how long it takes.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
