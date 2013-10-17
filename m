@@ -1,35 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Oct 2013 11:13:26 +0100
-Subject: change_page_attr() implementation for ARM?
-In-Reply-To: <20131017.080523.1821831578701162178.hdoyu@nvidia.com>
-References: <20131017.080523.1821831578701162178.hdoyu@nvidia.com>
-Message-ID: <20131017101325.GD23462@arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 17 Oct 2013 11:16:26 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Enable platform-specific options in
+ defconfig
+In-Reply-To: <525ED38C.9040700@codeaurora.org>
+References: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+ <1381930594-1701-3-git-send-email-pawel.moll@arm.com>
+ <525ED38C.9040700@codeaurora.org>
+Message-ID: <1382004986.27517.109.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 06:05:23AM +0100, Hiroshi Doyu wrote:
-> I found a bit old discussion[1] about CPA support on ARM32(Cortex-A9).
+On Wed, 2013-10-16 at 18:57 +0100, Christopher Covington wrote:
+> > @@ -121,21 +141,20 @@ CONFIG_EXT4_FS=y
+> >  CONFIG_VFAT_FS=y
+> >  CONFIG_TMPFS=y
+> >  CONFIG_JFFS2_FS=y
+> > +CONFIG_UBIFS_FS=y
+> >  CONFIG_CRAMFS=y
+> > +CONFIG_SQUASHFS=y
+> > +CONFIG_SQUASHFS_LZO=y
+> >  CONFIG_NFS_FS=y
+> > -CONFIG_NFS_V3=y
+> >  CONFIG_ROOT_NFS=y
 > 
-> It seesm that CPA API on ARM wasn't possible because maintaining
-> multiple pagetables under SMP is difficult. Instead currently we are
-> using precallocated memory via DMA API.
-> 
-> Is this situation still same for Cortex-A15 and ARM64? If the
-> mismatched aliasing problem doesn't happen, is CPA API feasible?
+> Isn't CONFIG_9P_FS=y needed for VirtIO passthrough filesystem support?
 
-On ARMv7+LPAE and AArch64 we use separate TTBR1 for the kernel (linear)
-mapping so in theory you could implement change_page_attr(). The
-mismatched aliases restriction still exists but it is clarified on what
-is and isn't allowed (so you can have Normal non-cacheable and Normal
-cacheable aliases, as long as you take care of removing any dirty cache
-lines that could potentially corrupt your data). The DMA API already
-takes care of this.
+Yes, I think you're right. I've expected 9P_VFS and NET_9P select or
+depend on each other.
 
-My (other) problem with change_page_attr() is that its not a standard
-in-kernel API. Powerpc and s390 implement change_page_attr() but with
-different arguments while x86 has change_page_attr_(set|clear).
+Thanks for pointing this out!
 
-So, is the DMA API not enough for what you need?
-
--- 
-Catalin
+Pawe?
