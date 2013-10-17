@@ -1,24 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Oct 2013 08:54:14 -0400
-Subject: [PATCH] arm: plat-orion: remove deprecated IRQF_DISABLED
-In-Reply-To: <1381549760-5432-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1381549760-5432-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <20131017125414.GB22434@titan.lakedaemon.net>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 17 Oct 2013 15:03:16 +0200
+Subject: [PATCH] ARM: imx27: add missing #pwm-cells property
+Message-ID: <1382014996-18084-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 12, 2013 at 05:49:20AM +0200, Michael Opdenacker wrote:
-> This patch proposes to remove the use of the IRQF_DISABLED flag
-> 
-> It's a NOOP since 2.6.35 and it will be removed one day.
-> 
-> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
-> ---
->  arch/arm/plat-orion/time.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+The pwm-node is missing its #pwm-cells property. The pwm-framework will
+complain about this.
 
-Applied to mvebu/soc
+Add the missing property.
 
-thx,
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/boot/dts/imx27.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Jason.
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index b7a1c6d..826231e 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -123,6 +123,7 @@
+ 			};
+ 
+ 			pwm: pwm at 10006000 {
++				#pwm-cells = <2>;
+ 				compatible = "fsl,imx27-pwm";
+ 				reg = <0x10006000 0x1000>;
+ 				interrupts = <23>;
+-- 
+1.8.4.rc3
