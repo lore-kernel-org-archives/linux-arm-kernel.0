@@ -1,50 +1,79 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 17 Oct 2013 09:47:41 +0200
-Subject: [PATCH 0/4] socfpga: Enable SD/MMC support
-In-Reply-To: <1381969961-12679-1-git-send-email-dinguyen@altera.com>
-References: <1381969961-12679-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20131017074741.GK14042@pengutronix.de>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 17 Oct 2013 09:50:05 +0200
+Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
+In-Reply-To: <525BBF75.5010305@free-electrons.com>
+References: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
+ <20131003122307.GV31178@titan.lakedaemon.net>
+ <20131009073633.GH1356@kw.sim.vm.gnt>
+ <20131014085323.GL1356@kw.sim.vm.gnt>
+ <525BBF75.5010305@free-electrons.com>
+Message-ID: <20131017075005.GA23849@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, Oct 14, 2013 at 11:55:01AM +0200, Gregory CLEMENT wrote:
+> On 14/10/2013 10:53, Simon Guinot wrote:
+> > On Wed, Oct 09, 2013 at 09:36:33AM +0200, Simon Guinot wrote:
+> >> On Thu, Oct 03, 2013 at 08:23:07AM -0400, Jason Cooper wrote:
+> >>> Simon,
+> >>>
+> >>> On Thu, Oct 03, 2013 at 12:05:02PM +0200, Simon Guinot wrote:
+> >>>> This patch fixes the tclk frequency array for the Armada-370 SoC.
+> >>>> This bug has been introduced by commit 6b72333d
+> >>>> ("clk: mvebu: add Armada 370 SoC-centric clock init").
+> >>>>
+> >>>> A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
+> >>>> i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
+> >>>>
+> >>>> About the mvneta Ethernet driver, note that the tclk frequency is used
+> >>>> to compute the Rx time coalescence. Then, this bug harms the coalescence
+> >>>> configuration and also degrades the networking performances with the
+> >>>> default values.
+> >>>>
+> >>>> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> >>>> Cc: Andrew Lunn <andrew@lunn.ch>
+> >>>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >>>> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> >>>> Cc: Jason Cooper <jason@lakedaemon.net>
+> >>>> Cc: stable at vger.kernel.org
+> >>>> ---
+> >>>>  drivers/clk/mvebu/armada-370.c |    4 ++--
+> >>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >>>
+> >>> Much better, thanks!
+> >>>
+> >>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> >>>
+> >>> This can be applied to v3.11 onwards.
+> >>
+> >> Hi Mike,
+> >>
+> >> Please consider applying this patch.
+> > 
+> > Ping ?
+> 
+> Mike,
+> 
+> this bug could be very annoying. We had some issue recently with i2c,
+> and I am pretty sure it was caused by this wrong rate.
+> So it would be nice to have this fix in 3.12, and then on the stable
+> branches.
+> 
+> Of course you can also add my:
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-On Wed, Oct 16, 2013 at 07:32:37PM -0500, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Hi,
-> 
-> This patch series enables support for the Synopsys SD/MMC driver that is
-> on the Altera SOCFPGA platform. The reason why this series has 4 patches
-> is to implement Arnd's suggestion:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204982.html
-> 
-> To summarize Arnd's suggestion:
-> 
-> 1. Create a backend syscon driver to control the system manager.
-> 2. Create a clock driver independent of the SOCFPGA clock driver that
->    uses syscon as the low-level interface.
-> 3. Make the sdmmc driver use the normal clock API and link its clock to
->    the driver step 2 in the device tree.
-> 
-> The end approach is a bit different because I did not find the need for a
-> syscon driver for the system manager. Since the system manager had already
-> been iomap already in the SOCFPGA platform code, I just reused it in the
-> new clock driver.
-> 
+Well, it seems that Mike is not available this days.
 
-What about the usbgrp, pinmuxgrp, nandgrp, etc. ?
-Those are all registers for different subsystems, that are located/controlled by
-the systemmgr.
-With Arnd's approach they all could call that low-level interface, instead of
-having a special case for every IP core. Isn't that the whole idea behind syscon?
+Given that this patch is a trivial one-liner, maybe that someone else
+can pick it ?
 
-Regards,
-Steffen
+Thanks in advance.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/69bd1a63/attachment.sig>
