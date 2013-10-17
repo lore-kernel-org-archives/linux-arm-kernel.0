@@ -1,33 +1,64 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 17 Oct 2013 18:43:17 +0100
-Subject: [PATCH v8 02/19] arm64: define DMA_ERROR_CODE
+Date: Thu, 17 Oct 2013 18:43:24 +0100
+Subject: [PATCH v8 09/19] arm64/xen: get_dma_ops: return xen_dma_ops if we are
+ running as xen_initial_domain
 In-Reply-To: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
-Message-ID: <1382031814-8782-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1382031814-8782-9-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+We can't simply override arm_dma_ops with xen_dma_ops because devices
+are allowed to have their own dma_ops and they take precedence over
+arm_dma_ops. When running on Xen as initial domain, we always want
+xen_dma_ops to be the one in use.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 CC: will.deacon at arm.com
 
-Changes in v8:
-- cast to dma_addr_t before returning.
+Changes in v7:
+- return xen_dma_ops only if we are the initial domain;
+- rename __get_dma_ops to __generic_dma_ops.
 ---
- arch/arm64/include/asm/dma-mapping.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm64/include/asm/dma-mapping.h |   13 ++++++++++++-
+ 1 files changed, 12 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 8d18100..59206b1 100644
+index 59206b1..fd0c0c0 100644
 --- a/arch/arm64/include/asm/dma-mapping.h
 +++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -25,6 +25,7 @@
+@@ -23,12 +23,15 @@
  
+ #include <asm-generic/dma-coherent.h>
+ 
++#include <xen/xen.h>
++#include <asm/xen/hypervisor.h>
++
  #define ARCH_HAS_DMA_GET_REQUIRED_MASK
  
-+#define DMA_ERROR_CODE	(~(dma_addr_t)0)
+ #define DMA_ERROR_CODE	(~(dma_addr_t)0)
  extern struct dma_map_ops *dma_ops;
  
- static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+-static inline struct dma_map_ops *get_dma_ops(struct device *dev)
++static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+ {
+ 	if (unlikely(!dev) || !dev->archdata.dma_ops)
+ 		return dma_ops;
+@@ -36,6 +39,14 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+ 		return dev->archdata.dma_ops;
+ }
+ 
++static inline struct dma_map_ops *get_dma_ops(struct device *dev)
++{
++	if (xen_initial_domain())
++		return xen_dma_ops;
++	else
++		return __generic_dma_ops(dev);
++}
++
+ #include <asm-generic/dma-mapping-common.h>
+ 
+ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
 -- 
 1.7.2.5
