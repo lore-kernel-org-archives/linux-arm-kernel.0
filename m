@@ -1,34 +1,85 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 17 Oct 2013 14:07:12 +0200
-Subject: New big-endian patch series against 3.12-rc4
-In-Reply-To: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20131017140712.6312f71a@skate>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Oct 2013 13:11:35 +0100
+Subject: [PATCH v4 3/7] arm64: move encode_insn_immediate() from module.c
+ to insn.c
+In-Reply-To: <1381990781-27814-4-git-send-email-liuj97@gmail.com>
+References: <1381990781-27814-1-git-send-email-liuj97@gmail.com>
+ <1381990781-27814-4-git-send-email-liuj97@gmail.com>
+Message-ID: <20131017121135.GK18765@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben,
+On Thu, Oct 17, 2013 at 07:19:36AM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
+> 
+> Function encode_insn_immediate() will be used by other instruction
+> manipulate related functions, so move it into insn.c and rename it
+> as aarch64_insn_encode_immediate().
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/include/asm/insn.h |  14 ++++
+>  arch/arm64/kernel/insn.c      |  58 ++++++++++++++++
+>  arch/arm64/kernel/module.c    | 152 +++++++++++++-----------------------------
+>  3 files changed, 117 insertions(+), 107 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index fc439b9..d62b601 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -42,6 +42,18 @@ enum aarch64_insn_encoding_class {
+>                                          * system instructions */
+>  };
+> 
+> +enum aarch64_insn_imm_type {
+> +       AARCH64_INSN_IMM_MOVK,
+> +       AARCH64_INSN_IMM_ADR,
+> +       AARCH64_INSN_IMM_26,
+> +       AARCH64_INSN_IMM_19,
+> +       AARCH64_INSN_IMM_16,
+> +       AARCH64_INSN_IMM_14,
+> +       AARCH64_INSN_IMM_12,
+> +       AARCH64_INSN_IMM_9,
+> +       AARCH64_INSN_IMM_MAX
+> +};
+> +
+>  #define        __AARCH64_INSN_FUNCS(abbr, mask, val)   \
+>  static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+>  { return (code & (mask)) == (val); }   \
+> @@ -80,6 +92,8 @@ static __always_inline void aarch64_insn_write(void *addr, u32 insn)
+>  }
+> 
+>  enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+> +                                 u32 insn, u64 imm);
+>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+> 
+>  int aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[], int cnt);
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 8dd5fbe..344d23ed 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -147,3 +147,61 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+> 
+>         return ret;
+>  }
+> +
+> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+> +                                 u32 insn, u64 imm)
+> +{
+> +       u32 immlo, immhi, lomask, himask, mask;
+> +       int shift;
+> +
+> +       switch (type) {
+> +       case AARCH64_INSN_IMM_MOVK:
+> +               mask = BIT(16) - 1;
+> +               shift = 5;
+> +               break;
 
-On Wed,  9 Oct 2013 00:34:16 +0200, Ben Dooks wrote:
+This is just AARCH64_INSN_IMM_16 now that we're not dealing with MOV
+relocations. You can kill INSN_IMM_MOVK in the enum.
 
-> Russell, if possible could this go into -next and then if everything
-> I can issue a pull request for it.
+The rest of the patch looks fine.
 
-Shall I suggest that you post the patches into Russell patch's system?
-
-Your patch set has been around for a long while, has received Acked-by,
-Reviewed-by and/or Tested-by from a number of different people,
-including core ARM persons, so I believe it's time to push them through
-Russell patch's system, to at least get some reaction from Russell,
-since he has apparently completely ignored your pull requests until now.
-
-Maybe Nicolas or Will can comment on the best way to make things move
-forward with this patch set.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
