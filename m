@@ -1,22 +1,34 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 17 Oct 2013 14:21:47 +0200
-Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
- Interface driver.
-In-Reply-To: <525FD4C7.3050806@tabi.org>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
- <525FD4C7.3050806@tabi.org>
-Message-ID: <525FD65B.3040004@metafoo.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 17 Oct 2013 14:20:53 +0200
+Subject: New big-endian patch series against 3.12-rc4
+In-Reply-To: <20131017121529.GL18765@mudshark.cambridge.arm.com>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20131017140712.6312f71a@skate>
+ <20131017121529.GL18765@mudshark.cambridge.arm.com>
+Message-ID: <20131017142053.66eb5e3b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2013 02:15 PM, Timur Tabi wrote:
-> Xiubo Li wrote:
->> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +    sai->base = devm_ioremap_resource(&pdev->dev, res);
+Dear Will Deacon,
+
+On Thu, 17 Oct 2013 13:15:30 +0100, Will Deacon wrote:
+
+> > Maybe Nicolas or Will can comment on the best way to make things
+> > move forward with this patch set.
 > 
-> Why not use of_iomap()?
+> There are a good number of acks on this now, so I think a pull
+> request to rmk with the latest version based on something like -rc3
+> (since that's where devel-stable is) would be the best thing to do.
+> Then they can enjoy some time in -next and we can iron out any
+> conflicts that might crop up.
 
-Because it won't check for conflicting resource regions.
+Well, the e-mail I was replying to was already a pull request sent to
+rmk, and there has been a number of other similar pull requests made by
+Ben during the previous iterations, and there has never been any
+reaction from rmk (as far as I can remember, of course).
 
-- Lars
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
