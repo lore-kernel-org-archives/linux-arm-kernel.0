@@ -1,43 +1,108 @@
-From: srinivas.kandagatla@st.com (srinivas kandagatla)
-Date: Thu, 17 Oct 2013 10:33:33 +0100
-Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <525F915D.9020501@st.com>
-References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
- <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
- <20131016151419.GA14104@ns203013.ovh.net> <525F915D.9020501@st.com>
-Message-ID: <525FAEED.7030207@st.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 17 Oct 2013 11:42:08 +0200
+Subject: [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
+In-Reply-To: <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
+References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
+ <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20131017114208.595a4224@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/13 08:27, Maxime COQUELIN wrote:
-> ...
->>> >> +
->>> >> +static struct of_device_id st_i2c_match[] = {
->>> >> +     { .compatible = "st,comms-ssc-i2c", },
->> > the rules is to put the first soc that use the ip in the compatible
->> > as st,sti7100-scc-i2c
-> Ok. There are no plans to upstream the SH4 platforms, it will only 
-> remains in stlinux.com.
-> Maybe I can set the first ARM platform (STiH415)?
-> That would give st,stih415-ssc-i2c.
-NAK, for st,stih415-ssc-i2c naming.
+Hi,
 
-IMO, this makes sense when the same IP integration done on different SOC
-changes slightly/very differently.
+Xiubo Li <Li.Xiubo@freescale.com> wrote:
+[...]
+> diff --git a/sound/soc/fsl/fsl-pcm-dma.c b/sound/soc/fsl/fsl-pcm-dma.c
+> new file mode 100644
+> index 0000000..c4d925e
+> --- /dev/null
+> +++ b/sound/soc/fsl/fsl-pcm-dma.c
+> @@ -0,0 +1,51 @@
+[...]
+> +
+> +static int fsl_sai_probe(struct platform_device *pdev)
+> +{
+> +	struct of_phandle_args	dma_args;
+> +	int index;
+> +	struct resource *res;
+> +	struct fsl_sai *sai;
+> +	int ret = 0;
+> +	struct device_node *np = pdev->dev.of_node;
+> +
+> +	sai = devm_kzalloc(&pdev->dev, sizeof(*sai), GFP_KERNEL);
+> +	if (!sai)
+> +		return -ENOMEM;
+> +
+> +	sai->fbt = FSL_SAI_FBT_MSB;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	sai->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(sai->base)) {
+> +		ret = PTR_ERR(sai->base);
+> +		return ret;
+>
+could be:
+		return PTR_ERR(sai->base);
 
-But in this case the "comms" IP remains unchanged across all the SOCs.
+[...]
+> +static const struct of_device_id fsl_sai_ids[] = {
+> +	{ .compatible = "fsl,vf610-sai", },
+> +	{ /*sentinel*/ },
+>
+The comma after the last entry in a struct initializer is there to make
+patches that append another entry cleaner. Since this entry is and
+always must be the last entry, the comma is useless here.
 
-I would still prefer "st,comms-ssc-i2c", allowing a single device driver
-to match against several SoCs. ST "comms" IP it is integrated across all
-the STi series of SoCs, so we don't want to add new entry in compatible
-for every new SOC.
+> diff --git a/sound/soc/fsl/fsl-sai.h b/sound/soc/fsl/fsl-sai.h
+> new file mode 100644
+> index 0000000..ab76a8e
+> --- /dev/null
+> +++ b/sound/soc/fsl/fsl-sai.h
+> @@ -0,0 +1,127 @@
+> +/*
+> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __FSL_SAI_H
+> +#define __FSL_SAI_H
+> +
+> +#include <sound/dmaengine_pcm.h>
+> +
+> +#define FSL_SAI_FORMATS (SNDRV_PCM_FMTBIT_S16_LE |\
+> +			 SNDRV_PCM_FMTBIT_S20_3LE |\
+> +			 SNDRV_PCM_FMTBIT_S24_LE)
+> +
+> +#define FSL_SAI_DMABUF_SIZE	(32 * 1024)
+> +#define TCD_NUMBER		4
+> +#define EDMA_PRIO_HIGH          6
+> +
+strange indentation with mixed spaces and tabs.
+
+> +/* SAI Transmit and Recieve Configuration 2 Register */
+> +#define SAI_TCR2		0x08
+> +#define SAI_RCR2		0x88
+> +#define SAI_CR2_SYNC		BIT(30)
+> +#define SAI_CR2_MSEL_MASK	(0xff << 26)
+> +#define SAI_CR2_MSEL_BUS	0
+> +#define SAI_CR2_MSEL_MCLK1	BIT(26)
+> +#define SAI_CR2_MSEL_MCLK2	BIT(27)
+> +#define SAI_CR2_MSEL_MCLK3	(BIT(26)|BIT(27))
+>
+spaces around '|'?
 
 
-Thanks,
-srini
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-> 
-> Thanks for the review,
-> Maxime
-> 
->> >
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
