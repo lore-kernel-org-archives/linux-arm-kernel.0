@@ -1,25 +1,30 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 17 Oct 2013 13:51:31 +0900
-Subject: [PATCH] sh-pfc: r8a7791 PFC support V2
-In-Reply-To: <20131017010241.GF21728@verge.net.au>
-References: <20131016214605.3868.54890.sendpatchset@w520>
- <20131017010241.GF21728@verge.net.au>
-Message-ID: <CANqRtoSGCyif30u_VGnervy49=s7SHoCifcOE73GnpnuWvODNw@mail.gmail.com>
+Date: Thu, 17 Oct 2013 13:53:30 +0900
+Subject: [PATCH] ARM: shmobile: Cosmetic update of Lager DT Reference
+In-Reply-To: <20131017010657.GH21728@verge.net.au>
+References: <20131016215819.12718.54556.sendpatchset@w520>
+ <20131017010657.GH21728@verge.net.au>
+Message-ID: <CANqRtoRHyqp24QCPixxOmokcBusmru6Wx16d7jvGv8L9crctOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Simon,
 
-On Thu, Oct 17, 2013 at 10:02 AM, Simon Horman <horms@verge.net.au> wrote:
-> Hi Magnus,
+On Thu, Oct 17, 2013 at 10:06 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Oct 17, 2013 at 06:58:19AM +0900, Magnus Damm wrote:
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> Clean up the Lager DT reference board code to make it match
+>> Koelsch DT reference including using the rcar-gen2 header.
 >
-> this is just a minor nit and not even about the code.
->
-> In future would it be at all possible for you to place V2 after PATCH,
-> e.g. [PATCH V2] ? This would make my life ever so slightly easier.
+> This is getting dangerously close to churn.
+> Do you really want me to take this change?
 
-Sure, will do. You told me this before, my apologies for not remembering!
+I don't mind so much, but I think that the idea of keeping Lager and
+Koelsch in the same style makes sense. Would you prefer to split this
+up in several patches? There is some whitespace damage and also the
+header file inclusion style is different from Koelsch.
 
-Thanks,
+Cheers,
 
 / magnus
