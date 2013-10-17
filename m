@@ -1,44 +1,94 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Oct 2013 09:59:50 -0400
-Subject: [GIT PULL] ARM: mvebu: dt changes for v3.13 (round 3)
-Message-ID: <20131017135950.GH22434@titan.lakedaemon.net>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Thu, 17 Oct 2013 18:02:05 +0400
+Subject: [PATCH v2 0/4] Exynos 5410 Dual cluster support
+In-Reply-To: <20131017130435.GG3061@cat.local>
+References: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
+ <87k3hc3lso.fsf@linaro.org> <20131017130435.GG3061@cat.local>
+Message-ID: <525FEDDD.8000301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On 17.10.2013 17:04, Aliaksei Katovich wrote:
+> hi Kevin;
+>
+>> Vyacheslav Tyrtov <v.tyrtov@samsung.com> writes:
+>>
+>>> The series of patches represent support of Exynos 5410 SoC
+>>>      
+>>> The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture.
+>>> Patches allow all 8 CPU cores (4 x A7 and 4 x A15) to run at the same time
+>>>      
+>>> Patches add new platform description, support of clock controller,
+>>> dual cluster support and device tree for Exynos 5410
+>>>     
+>>> Has been build on v3.12-rc5.
+>>> Has been tested on Exynos 5410 reference board (exynos_defconfig).
+>> Has anyone tried this on the exynos5410 based odroid-xu yet?
+>>
+>> I tried booting this on my recently arrived odroid-xu, but am not
+>> getting it to boot.
+> 	I am able to boot my odroid-xu+e to busybox with these patches applied
+> 	against 3.12-rc5: exynos_defconfig and exynos5410-smdk5410.dtb were
+> 	used.
+>
+> 	However there seem to be some issues with virq allocations, like this:
+>
+> <snippet>
+> Starting kernel ...
+>                     
+> [    0.000000] [<c0014d48>] (unwind_backtrace+0x0/0xf8) from [<c00117d0>] (show_stack+0x10/0x14)
+> [    0.000000] [<c00117d0>] (show_stack+0x10/0x14) from [<c0363488>] (dump_stack+0x6c/0xac)
+> [    0.000000] [<c0363488>] (dump_stack+0x6c/0xac) from [<c001e330>] (warn_slowpath_common+0x64/0x88)
+> [    0.000000] [<c001e330>] (warn_slowpath_common+0x64/0x88) from [<c001e3e8>] (warn_slowpath_fmt+0x30/0x40)
+> [    0.000000] [<c001e3e8>] (warn_slowpath_fmt+0x30/0x40) from [<c005a1b4>] (irq_domain_associate+0x128/0x1a8)
+> [    0.000000] [<c005a1b4>] (irq_domain_associate+0x128/0x1a8) from [<c005a508>] (irq_domain_associate_many+0x30/0x3c
+> )
+> [    0.000000] [<c005a508>] (irq_domain_associate_many+0x30/0x3c) from [<c005a768>] (irq_domain_add_simple+0x78/0x90)
+> [    0.000000] [<c005a768>] (irq_domain_add_simple+0x78/0x90) from [<c04b044c>] (combiner_of_init+0xb4/0x198)
+> [    0.000000] [<c04b044c>] (combiner_of_init+0xb4/0x198) from [<c04b6938>] (of_irq_init+0x278/0x2a0)
+> [    0.000000] [<c04b6938>] (of_irq_init+0x278/0x2a0) from [<c049b8fc>] (start_kernel+0x18c/0x384)
+> [    0.000000] [<c049b8fc>] (start_kernel+0x18c/0x384) from [<40008074>] (0x40008074)
+> [    0.000000] ---[ end trace 1b75b31a2719edcd ]---
+> [    0.000000] ------------[ cut here ]------------
+> [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/irq/irqdomain.c:278 irq_domain_associate+0x128/0x1a8()
+> [    0.000000] error: virq337 is not allocated
+> [    0.000000] Modules linked in:
+> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W    3.12.0-rc5-00004-g1cb405f #1
+> [    0.000000] [<c0014d48>] (unwind_backtrace+0x0/0xf8) from [<c00117d0>] (show_stack+0x10/0x14)
+> [    0.000000] [<c00117d0>] (show_stack+0x10/0x14) from [<c0363488>] (dump_stack+0x6c/0xac)
+> [    0.000000] [<c0363488>] (dump_stack+0x6c/0xac) from [<c001e330>] (warn_slowpath_common+0x64/0x88)
+> [    0.000000] [<c001e330>] (warn_slowpath_common+0x64/0x88) from [<c001e3e8>] (warn_slowpath_fmt+0x30/0x40)
+> [    0.000000] [<c001e3e8>] (warn_slowpath_fmt+0x30/0x40) from [<c005a1b4>] (irq_domain_associate+0x128/0x1a8)
+> [    0.000000] [<c005a1b4>] (irq_domain_associate+0x128/0x1a8) from [<c005a508>] (irq_domain_associate_many+0x30/0x3c
+> )
+> [    0.000000] [<c005a508>] (irq_domain_associate_many+0x30/0x3c) from [<c005a768>] (irq_domain_add_simple+0x78/0x90)
+> [    0.000000] [<c005a768>] (irq_domain_add_simple+0x78/0x90) from [<c04b044c>] (combiner_of_init+0xb4/0x198)
+> [    0.000000] [<c04b044c>] (combiner_of_init+0xb4/0x198) from [<c04b6938>] (of_irq_init+0x278/0x2a0)
+> [    0.000000] [<c04b6938>] (of_irq_init+0x278/0x2a0) from [<c049b8fc>] (start_kernel+0x18c/0x384)
+> [    0.000000] [<c049b8fc>] (start_kernel+0x18c/0x384) from [<40008074>] (0x40008074)
+> [    0.000000] ---[ end trace 1b75b31a2719edce ]---
+> [    0.000000] ------------[ cut here ]------------
+> </snippet>
+>
+> 	You can check full boot log here http://sprunge.us/NKcU
+>
+> --
+> Aliaksei
+>
+>> I'm not yet terribly familiar with this SoC, what are the settings
+>> needed for DEBUG_LL on this board?
+>>
+>> Thanks,
+>>
+>> Kevin
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+Also change NR_CPUS to 8 in kernel config, so you will get 8 cores 
+booted instead of 2.
 
-Nothing exciting here, just making dove better. :)
-
-thx,
-
-Jason.
-
-
-The following changes since commit 7837feff0d881835309fced7a7c4b5f32866d632:
-
-  arm: mvebu: add support for the Armada XP Matrix board (2013-10-03 15:13:01 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/dt-3.13-3
-
-for you to fetch changes up to 1deb122c724edfd799a4d7d0b88ff14c365c9e69:
-
-  ARM: Dove: fix bad properties of the si5351 clkout2 used by Cubox audio (2013-10-09 13:22:41 +0000)
-
-----------------------------------------------------------------
-mvebu dt changes for v3.13 (round 3)
-
- - dove
-    - add audio devices
-    - fix bad properties of si5351 clkout2 for CuBox
-
-----------------------------------------------------------------
-Jean-Francois Moine (3):
-      ARM: Dove: Add the audio devices in DT
-      ARM: Dove: Add the audio device to the Cubox DT
-      ARM: Dove: fix bad properties of the si5351 clkout2 used by Cubox audio
-
- arch/arm/boot/dts/dove-cubox.dts | 18 ++++++++++--------
- arch/arm/boot/dts/dove.dtsi      | 28 ++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+), 8 deletions(-)
+Best regards,
+     Tarek Dakhran
