@@ -1,29 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Oct 2013 09:12:01 -0400
-Subject: [PATCH] PCI: mvebu - The bridge secondary status register
- should be 0
-In-Reply-To: <1381868190-8595-1-git-send-email-jgunthorpe@obsidianresearch.com>
-References: <1381868190-8595-1-git-send-email-jgunthorpe@obsidianresearch.com>
-Message-ID: <20131017131201.GE22434@titan.lakedaemon.net>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 17 Oct 2013 16:12:44 +0300
+Subject: [PATCH v3 0/7] Tegra124 clock support
+Message-ID: <1382015565-20139-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 02:16:30PM -0600, Jason Gunthorpe wrote:
-> There are no writable bits in the secondary status register, only
-> write 1 to clear bits. The driver never sets any of the write 1 to
-> clear bits so the status register should always be 0, just remove
-> the set from the write path.
-> 
-> Someday the write 1 to clear bits should be copied/cleared directly
-> from registers in the HW.
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> ---
->  drivers/pci/host/pci-mvebu.c | 1 -
->  1 file changed, 1 deletion(-)
+This series introduces support for the Tegra124 CAR clocks.
+Based on '[PATCH v4 00/15] Introduce common infra for tegra clocks'
 
-Applied to mvebu/drivers
+changes since v1:
 
-thx,
++ suspend/resume for LP1 (Joseph Lo)
++ fixed some comments
++ account for changes to the common infra code
 
-Jason.
+changes since v2:
+
++ simplified PLLSS support
++ added binding document
++ minor fixes
+
+Joseph Lo (2):
+  clk: tegra124: add wait_for_reset and disable_clock for
+    tegra_cpu_car_ops
+  clk: tegra124: add suspend/resume function for tegra_cpu_car_ops
+
+Peter De Schrijver (5):
+  clk: tegra: Add support for PLLSS
+  clk: tegra: Add periph regs bank X
+  clk: tegra124: Add common clk IDs to clk-id.h
+  clk: tegra124: Add new peripheral clocks
+  clk: tegra124: Add support for Tegra124 clocks
+
+ .../bindings/clock/nvidia,tegra124-car.txt         |   59 +
+ drivers/clk/tegra/Makefile                         |    1 +
+ drivers/clk/tegra/clk-id.h                         |   20 +
+ drivers/clk/tegra/clk-pll.c                        |  124 ++
+ drivers/clk/tegra/clk-tegra-periph.c               |   54 +
+ drivers/clk/tegra/clk-tegra124.c                   | 1428 ++++++++++++++++++++
+ drivers/clk/tegra/clk.c                            |   10 +
+ drivers/clk/tegra/clk.h                            |    5 +
+ include/dt-bindings/clock/tegra124-car.h           |  340 +++++
+ 9 files changed, 2041 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt
+ create mode 100644 drivers/clk/tegra/clk-tegra124.c
+ create mode 100644 include/dt-bindings/clock/tegra124-car.h
+
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
