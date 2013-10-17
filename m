@@ -1,172 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Oct 2013 12:38:26 +0100
-Subject: [PATCH v4 2/7] arm64: introduce interfaces to hotpatch kernel
- and module code
-In-Reply-To: <1381990781-27814-3-git-send-email-liuj97@gmail.com>
-References: <1381990781-27814-1-git-send-email-liuj97@gmail.com>
- <1381990781-27814-3-git-send-email-liuj97@gmail.com>
-Message-ID: <20131017113826.GJ18765@mudshark.cambridge.arm.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 17 Oct 2013 13:46:49 +0200
+Subject: sun4i_handle_irq: WARNING at net/ipv4/tcp_input.c:2711
+ tcp_fastretrans_alert
+In-Reply-To: <20130823182116.GE1230@lukather>
+References: <20130821094432.GA28249@lnx-rg> <20130823182116.GE1230@lukather>
+Message-ID: <CACQ1gAinSoTCTtf9Y6TL=vtEm1jnJgis0n=y=frNtuPxue9-ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Tixy for stop_machine() question below]
+2013/8/23 Maxime Ripard <maxime.ripard@free-electrons.com>:
+> Hi Richard,
+>
+> On Wed, Aug 21, 2013 at 11:47:20AM +0200, Richard GENOUD wrote:
+>> Hi Maxime, Stephan
+>>
+>> I just realise that, *sometimes*, I have some warnings on my cubieboard
+>> (6 since the 22 of july, and the board is runnning 24/24).
+>
+> Wow, I'm impressed it worked this fine actually :)
+>
+>> It has happened also on 3.10 + emac patches.
+>> Here it is:
+>> [27224.060000] ------------[ cut here ]------------
+>> [27224.070000] WARNING: CPU: 0 PID: 0 at net/ipv4/tcp_input.c:2711 tcp_fastretrans_alert+0x717/0x734()
+>> [27224.080000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.11.0-rc6-00010-g54f11ec #8
+>> [27224.080000] [<c000f231>] (unwind_backtrace+0x1/0x98) from [<c000e2b7>] (show_stack+0xb/0xc)
+>> [27224.090000] [<c000e2b7>] (show_stack+0xb/0xc) from [<c0013cd3>] (warn_slowpath_common+0x43/0x5c)
+>> [27224.100000] [<c0013cd3>] (warn_slowpath_common+0x43/0x5c) from [<c0013d6d>] (warn_slowpath_null+0x11/0x14)
+>> [27224.110000] [<c0013d6d>] (warn_slowpath_null+0x11/0x14) from [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734)
+>> [27224.120000] [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734) from [<c015f32b>] (tcp_ack+0x6af/0x984)
+>> [27224.130000] [<c015f32b>] (tcp_ack+0x6af/0x984) from [<c015fcab>] (tcp_rcv_established+0x93/0x3ec)
+>> [27224.140000] [<c015fcab>] (tcp_rcv_established+0x93/0x3ec) from [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160)
+>> [27224.150000] [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160) from [<c0167129>] (tcp_v4_rcv+0x4e9/0x500)
+>> [27224.160000] [<c0167129>] (tcp_v4_rcv+0x4e9/0x500) from [<c015025d>] (ip_local_deliver_finish+0x79/0x180)
+>> [27224.170000] [<c015025d>] (ip_local_deliver_finish+0x79/0x180) from [<c01500a1>] (ip_rcv_finish+0xc9/0x20c)
+>> [27224.180000] [<c01500a1>] (ip_rcv_finish+0xc9/0x20c) from [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc)
+>> [27224.190000] [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc) from [<c0129a8b>] (process_backlog+0x5b/0xd0)
+>> [27224.200000] [<c0129a8b>] (process_backlog+0x5b/0xd0) from [<c012bc6f>] (net_rx_action+0x5f/0xe8)
+>> [27224.200000] [<c012bc6f>] (net_rx_action+0x5f/0xe8) from [<c0015fc9>] (__do_softirq+0x91/0x134)
+>> [27224.210000] [<c0015fc9>] (__do_softirq+0x91/0x134) from [<c0016251>] (irq_exit+0x59/0x80)
+>> [27224.220000] [<c0016251>] (irq_exit+0x59/0x80) from [<c000d00d>] (handle_IRQ+0x21/0x54)
+>> [27224.230000] [<c000d00d>] (handle_IRQ+0x21/0x54) from [<c00083ef>] (sun4i_handle_irq+0x1f/0x30)
+>> [27224.240000] [<c00083ef>] (sun4i_handle_irq+0x1f/0x30) from [<c000ea1b>] (__irq_svc+0x3b/0x5c)
+>> [27224.250000] Exception stack(0xc0287f70 to 0xc0287fb8)
+>> [27224.250000] 7f60:                                     00000000 00000000 00000000 00000000
+>> [27224.260000] 7f80: c0286000 c02ad7fd 00000001 c02ad7fd c028e084 413fc082 00000000 00000000
+>> [27224.270000] 7fa0: 01000000 c0287fb8 c000d115 c000d116 40000033 ffffffff
+>> [27224.270000] [<c000ea1b>] (__irq_svc+0x3b/0x5c) from [<c000d116>] (arch_cpu_idle+0x16/0x1c)
+>> [27224.280000] [<c000d116>] (arch_cpu_idle+0x16/0x1c) from [<c002e69d>] (cpu_startup_entry+0x35/0xa0)
+>> [27224.290000] [<c002e69d>] (cpu_startup_entry+0x35/0xa0) from [<c026f75f>] (start_kernel+0x1af/0x1f0)
+>> [27224.300000] ---[ end trace 15641276e08fba8a ]---
+>
+> Hmmm, that seems pretty far from the network/interrupt drivers, and it
+> looks like other users have seen this on !ARM machines:
+> http://forums.gentoo.org/viewtopic-p-7379928.html
+> https://bugzilla.redhat.com/show_bug.cgi?id=989251
+>
+> There's a patch in the redhat's bugzilla, could you try to apply it and
+> see if it solves your problem?
+>
+> Maybe the netdev guys will have other ideas as well.
+For the record, I set:
+net.ipv4.tcp_early_retrans = 2
+net.ipv4.tcp_frto = 0
+And I didn't see the warning any more.
+It's seems that a patch is on it's way. I'll try it instead of setting
+the sysctl.
+http://thread.gmane.org/gmane.linux.network/286793
 
-On Thu, Oct 17, 2013 at 07:19:35AM +0100, Jiang Liu wrote:
-> From: Jiang Liu <jiang.liu@huawei.com>
-> 
-> Introduce three interfaces to patch kernel and module code:
-> aarch64_insn_patch_text_nosync():
-> 	patch code without synchronization, it's caller's responsibility
-> 	to synchronize all CPUs if needed.
-> aarch64_insn_patch_text_sync():
-> 	patch code and always synchronize with stop_machine()
-> aarch64_insn_patch_text():
-> 	patch code and synchronize with stop_machine() if needed
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Jiang Liu <liuj97@gmail.com>
-> ---
->  arch/arm64/include/asm/insn.h | 24 +++++++++++++-
->  arch/arm64/kernel/insn.c      | 77 +++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 100 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index 6190016..fc439b9 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -60,8 +60,30 @@ __AARCH64_INSN_FUNCS(nop,	0xFFFFFFFF, 0xD503201F)
->  
->  #undef	__AARCH64_INSN_FUNCS
->  
-> -enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
-> +/*
-> + * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
-> + * little-endian. On the other hand, SCTLR_EL1.EE (bit 25, Exception Endianness)
-> + * flag controls endianness for EL1 explicit data accesses and stage 1
-> + * translation table walks as below:
-> + *	0: little-endian
-> + *	1: big-endian
-> + * So need to handle endianness when patching kernel code.
-> + */
-
-You can delete this comment now that we're using the helpers...
-
-> +static __always_inline u32 aarch64_insn_read(void *addr)
-> +{
-> +	return le32_to_cpu(*(u32 *)addr);
-> +}
->  
-> +static __always_inline void aarch64_insn_write(void *addr, u32 insn)
-> +{
-> +	*(u32 *)addr = cpu_to_le32(insn);
-> +}
-
-... then just inline these calls directly.
-
-> +enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
->  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
->  
-> +int aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[], int cnt);
-> +int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
-> +int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
-> +
->  #endif	/* _ASM_ARM64_INSN_H */
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 1c501f3..8dd5fbe 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -16,6 +16,9 @@
->   */
->  #include <linux/compiler.h>
->  #include <linux/kernel.h>
-> +#include <linux/smp.h>
-> +#include <linux/stop_machine.h>
-> +#include <asm/cacheflush.h>
->  #include <asm/insn.h>
->  
->  static int aarch64_insn_encoding_cls[] = {
-> @@ -70,3 +73,77 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
->  	return __aarch64_insn_hotpatch_safe(old_insn) &&
->  	       __aarch64_insn_hotpatch_safe(new_insn);
->  }
-> +
-> +int __kprobes aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[],
-> +					     int cnt)
-> +{
-> +	int i;
-> +	u32 *tp;
-> +
-> +	if (cnt <= 0)
-> +		return -EINVAL;
-
-Isn't cnt always 1 for the _nosync patching? Can you just drop the argument
-and simplify this code? Patching a sequence without syncing is always racy.
-
-> +	for (i = 0; i < cnt; i++) {
-> +		tp = addrs[i];
-> +		/* A64 instructions must be word aligned */
-> +		if ((uintptr_t)tp & 0x3)
-> +			return -EINVAL;
-> +		aarch64_insn_write(tp, insns[i]);
-> +		flush_icache_range((uintptr_t)tp, (uintptr_t)tp + sizeof(u32));
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +struct aarch64_insn_patch {
-> +	void	**text_addrs;
-> +	u32	*new_insns;
-> +	int	insn_cnt;
-> +};
-> +
-> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
-> +{
-> +	struct aarch64_insn_patch *pp = arg;
-> +
-> +	return aarch64_insn_patch_text_nosync(pp->text_addrs, pp->new_insns,
-> +					      pp->insn_cnt);
-> +}
-> +
-> +int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
-> +{
-> +	struct aarch64_insn_patch patch = {
-> +		.text_addrs = addrs,
-> +		.new_insns = insns,
-> +		.insn_cnt = cnt,
-> +	};
-> +
-> +	if (cnt <= 0)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Execute __aarch64_insn_patch_text() on every online CPU,
-> +	 * which ensure serialization among all online CPUs.
-> +	 */
-> +	return stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
-> +}
-
-Whoa, whoa, whoa! The comment here is wrong -- we only run the patching on
-*one* CPU, which is the right thing to do. However, the arch/arm/ call to
-stop_machine in kprobes does actually run the patching code on *all* the
-online cores (including the cache flushing!). I think this is to work around
-cores without hardware cache maintenance broadcasting, but that could easily
-be called out specially (like we do in patch.c) and the flushing could be
-separated from the patching too.
-
-> +int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
-> +{
-> +	int ret;
-> +
-> +	if (cnt == 1 && aarch64_insn_hotpatch_safe(aarch64_insn_read(addrs[0]),
-> +						   insns[0])) {
-
-You could make aarch64_insn_hotpatch_safe take the cnt parameter and return
-false if cnt != 1.
-
-> +		/*
-> +		 * It doesn't guarantee all CPUs see the new instruction
-
-"It"? You mean the ARMv8 architecture?
-
-Will
+Richard.
