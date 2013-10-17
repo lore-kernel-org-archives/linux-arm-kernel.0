@@ -1,65 +1,35 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Thu, 17 Oct 2013 15:07:39 +0100
-Subject: [PATCH v2 2/3] arm: Add [U]EFI runtime services support
-In-Reply-To: <1380799481-5470-3-git-send-email-leif.lindholm@linaro.org>
-References: <1380799481-5470-1-git-send-email-leif.lindholm@linaro.org>
- <1380799481-5470-3-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20131017140739.GI10834@console-pimps.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 17 Oct 2013 15:10:03 +0100
+Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
+ Interface driver.
+In-Reply-To: <525FEB7A.5040406@metafoo.de>
+References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
+ <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
+ <525FD4C7.3050806@tabi.org> <525FD65B.3040004@metafoo.de>
+ <525FE48B.7020709@tabi.org> <525FE728.90403@metafoo.de>
+ <525FE815.1040300@tabi.org> <525FEB7A.5040406@metafoo.de>
+Message-ID: <20131017141003.GO2443@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 03 Oct, at 12:24:40PM, Leif Lindholm wrote:
-> +/*
-> + * If you need to (temporarily) support buggy firmware.
-> + */
-> +#define KEEP_BOOT_SERVICES_REGIONS
+On Thu, Oct 17, 2013 at 03:51:54PM +0200, Lars-Peter Clausen wrote:
+> On 10/17/2013 03:37 PM, Timur Tabi wrote:
 
-Have you seen firmware that requires this? I'm just curious more than
-anything else.
+> > I understand that, but I'm trying to figure out why of_iomap() is okay for
+> > hundreds of other drivers, but not this one.  I've used it dozens of times
+> > myself, without ever worrying about overlapping regions.
 
-> +/*
-> + * Returns 1 if 'facility' is enabled, 0 otherwise.
-> + */
-> +int efi_enabled(int facility)
-> +{
-> +	return test_bit(facility, &arm_efi_facility) != 0;
-> +}
-> +EXPORT_SYMBOL(efi_enabled);
+> The driver would work fine with just of_iomap(). But the resource range
+> check comes basically for free and it does help to catch errors, so I'd
+> recommend on using it rather than not using it.
 
-This should move to drivers/firmware/efi/efi.c. Let me write a patch
-that moves the x86 stuff out of arch/x86 and means you can get rid of
-this hunk.
-
-> +/*
-> + * Called explicitly from init/mm.c
-> + */
-
-That's init/main.c.
-
-> +void __init efi_enter_virtual_mode(void)
-> +{
-> +	efi_status_t status;
-> +
-> +	if (!efi_enabled(EFI_BOOT)) {
-> +		pr_info("EFI services will not be available.\n");
-> +		return;
-
-This is dead code as PATCH 3 does,
-
-diff --git a/init/main.c b/init/main.c
-index af310af..ec6d76e 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -875,6 +875,10 @@ static noinline void __init
-kernel_init_freeable(void)
-	smp_prepare_cpus(setup_max_cpus);
-
-	do_pre_smp_initcalls();
-+
-+	if (IS_ENABLED(CONFIG_ARM) && efi_enabled(EFI_BOOT))
-+		efi_enter_virtual_mode();
-+
-
-
--- 
-Matt Fleming, Intel Open Source Technology Center
+There's also the fact that it's a devm_ function which means less error
+handling code that we can break which is nice.  There's probably a case
+for an improved OF helper here...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/204d832d/attachment.sig>
