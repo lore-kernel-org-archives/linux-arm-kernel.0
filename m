@@ -1,30 +1,51 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 17 Oct 2013 19:55:24 +0200
-Subject: [PATCH 1/1] irqchip: exynos: Remove hardcoded irqbase
-In-Reply-To: <1382007881-1161-1-git-send-email-sachin.kamat@linaro.org>
-References: <1382007881-1161-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1392351.iKvAGkUsrS@flatron>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Oct 2013 11:01:30 -0700
+Subject: [GIT PULL] ARM: OMAP2: add AM43xx hwmod and PRCM support
+In-Reply-To: <alpine.DEB.2.02.1310162145180.6538@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1310162145180.6538@utopia.booyaka.com>
+Message-ID: <20131017180129.GD15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
-
-On Thursday 17 of October 2013 16:34:41 Sachin Kamat wrote:
-> Now that Exynos platforms are DT only, hard-coded irqbase is not
-> necessary.
+* Paul Walmsley <paul@pwsan.com> [131016 14:46]:
+> Hi Tony,
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
->  drivers/irqchip/exynos-combiner.c |    9 +--------
->  1 file changed, 1 insertion(+), 8 deletions(-)
+> The following changes since commit ace1e3ec4a2540c783e65884bb7be9cd45a0a295:
+> 
+>   ARM: AM33xx: hwmod: Add RNG module data (2013-10-09 09:02:51 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13/am43xx-support
+> 
+> for you to fetch changes up to 70b0d5f5838e0c9dfecabefe4ff43b5a2e7c1e8b:
+> 
+>   ARM: OMAP2: hwmod: Add qspi data for am437x. (2013-10-15 23:49:43 -0600)
+> 
+> ----------------------------------------------------------------
+> Add hwmod and PRCM data for the TI AM43xx family of SoCs.
+> 
+> Under normal circumstances, these patches would not be merged.
+> The hwmod and PRCM data should be moved out either to DT data or
+> to drivers/.  Also, the current implementation trades off lines
+> of diff by dynamically rewriting static data at runtime, which is
+> a bad practice - it causes future maintenance headaches.
+> However, after speaking with my upstream, it sounds like it's
+> better to merge these patches in their current state, due to long
+> term considerations.
+> 
+> Basic test logs are here:
+> 
+> http://www.pwsan.com/omap/testlogs/am43xx_support_v3.13/20131015213706/
+> 
+> Due to the lack of an AM43xx board and any available public
+> documentation, it's impossible for me to review or test that
+> platform in any meaningful way.  But at least the tests above
+> verify that the patches don't affect existing platforms -
+> particularly AM33xx.
 
-A patch like this has been already submitted by Chander Kashyap and it was 
-supposed to be already applied by Kukjin:
+Thanks, I've pulled this into omap-for-v3.13/hwmod.
 
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/23312/focus=23442
+Regards,
 
-I'm not sure why it is not yet in Samsung tree, so I pinged original 
-thread.
-
-Best regards,
-Tomasz
+Tony
