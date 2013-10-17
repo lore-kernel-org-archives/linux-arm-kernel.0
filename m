@@ -1,50 +1,22 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 17 Oct 2013 08:10:13 +0900
-Subject: [PATCH] phy: exynos-mipi-video: Fix phy_power_off() callback
-In-Reply-To: <1381943025-1036-1-git-send-email-s.nawrocki@samsung.com>
-References: <1381940896-9355-1-git-send-email-kishon@ti.com>
- <1381943025-1036-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <000401cecac4$dea1a7a0$9be4f6e0$%han@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 17 Oct 2013 09:07:52 +0900
+Subject: [PATCH] serial8250-em: convert to clk_prepare/unprepare
+In-Reply-To: <20131016200651.GA26506@kroah.com>
+References: <1381206268-3914-1-git-send-email-horms+renesas@verge.net.au>
+ <20131016200651.GA26506@kroah.com>
+Message-ID: <20131017000752.GT22321@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 17, 2013 2:04 AM, Sylwester Nawrocki wrote:
+On Wed, Oct 16, 2013 at 01:06:51PM -0700, Greg Kroah-Hartman wrote:
+> On Tue, Oct 08, 2013 at 01:24:27PM +0900, Simon Horman wrote:
+> > Hi Greg,
+> > 
+> > please consider this enhancement from Kuribayashi-san for serial8250-em.
+> > 
+> > Also, please let me know if you would like us to handle serial patches
+> > a different way.
 > 
-> Fix argument passed to the register setup helper function so
-> the phy is actually disabled. Now due to cut&paste error 1 is
-> passed to both phy_power_on() and phy_power_off().
-> 
-> Reported by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> No, this works for me, if it works for you, that's fine with me.
 
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
-
-Best regards,
-Jingoo Han
-
-> ---
-> 
-> This fixes a cut&paste typo which snicked in while doing very last
-> adaptation to latest version of the phy framework.
-> 
-> Thanks,
-> Sylwester
-> ---
->  drivers/phy/phy-exynos-mipi-video.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
-> index b73b86a..0c5efab 100644
-> --- a/drivers/phy/phy-exynos-mipi-video.c
-> +++ b/drivers/phy/phy-exynos-mipi-video.c
-> @@ -93,7 +93,7 @@ static int exynos_mipi_video_phy_power_off(struct phy *phy)
->  	struct video_phy_desc *phy_desc = phy_get_drvdata(phy);
->  	struct exynos_mipi_video_phy *state = to_mipi_video_phy(phy_desc);
-> 
-> -	return __set_phy_state(state, phy_desc->index, 1);
-> +	return __set_phy_state(state, phy_desc->index, 0);
->  }
-> 
->  static struct phy *exynos_mipi_video_phy_xlate(struct device *dev,
-> --
-> 1.7.9.5
+Thanks, it works for me too.
