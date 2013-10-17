@@ -1,18 +1,32 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Thu, 17 Oct 2013 22:18:33 +0800
-Subject: [PATCH 15/28] dmaengine: k3dma: use DMA_COMPLETE for dma
- completion status
-In-Reply-To: <1381940926-25564-16-git-send-email-vinod.koul@intel.com>
-References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
- <1381940926-25564-16-git-send-email-vinod.koul@intel.com>
-Message-ID: <CAMj5BkjbEo8WJ8TENmoZUY4Eoh6h3H=asT91_qWBg1x-AxO=_w@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 17 Oct 2013 22:18:06 +0800
+Subject: [RFC/query] ARM: enable AUTO_ZRELADDR at 16MB aligned of RAM ?
+Message-ID: <20131017221806.514ca45a@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 12:28 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
-> CC: Zhangfei Gao <zhangfei.gao@linaro.org>
+Hi all,
 
-Thanks Vinod
+I need your help about where the 128MB limitation of AUTO_ZRELADDR comes from? IOW,
+why 
+                mov     r4, pc
+                and     r4, r4, #0xf8000000
 
- Acked-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+rather than
+                mov     r4, pc
+                and     r4, r4, #0xff000000
+
+
+Can we make the following change to arch/arm/boot/compressed/head.S?
+
+ 		@ determine final kernel image address
+ 		mov	r4, pc
+-		and	r4, r4, #0xf8000000
++		and	r4, r4, #0xff000000
+ 		add	r4, r4, #TEXT_OFFSET
+ #else
+ 		ldr	r4, =zreladdr
+
+
+Thanks in advance,
+Jisheng
