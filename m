@@ -1,117 +1,54 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 17 Oct 2013 11:15:02 +0200
-Subject: [PATCH v2 11/13] arm64: enable generic clockevent broadcast
-In-Reply-To: <1381748590-14279-12-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Thu, 17 Oct 2013 11:20:46 +0200
+Subject: [PATCH v2 12/13] arm64: kernel: add CPU idle call
+In-Reply-To: <1381748590-14279-13-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1381748590-14279-12-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <525FAA96.90600@linaro.org>
+ <1381748590-14279-13-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <525FABEE.9070100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/14/2013 01:03 PM, Lorenzo Pieralisi wrote:
-> On platforms with power management capabilities, timers that are shut
-> down when a CPU enters deep C-states must be emulated using an always-on
-> timer and a timer IPI to relay the timer IRQ to target CPUs on an SMP
-> system.
+> When CPU idle is enabled, the architectural idle call should go through
+> the idle subsystem to allow CPUs to enter idle states defined
+> by the platform CPU idle back-end operations.
 >
-> This patch enables the generic clockevents broadcast infrastructure for
-> arm64, by providing the required Kconfig entries and adding the timer
-> IPI infrastructure.
+> This patch, mirroring other archs behaviour, adds the CPU idle call to the
+> architectural arch_cpu_idle implementation for arm64.
 >
 > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
 Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-sidenote: there is more and more duplicated code between arm and arm64.
-
 > ---
->   arch/arm64/Kconfig               |  2 ++
->   arch/arm64/include/asm/hardirq.h |  2 +-
->   arch/arm64/kernel/smp.c          | 17 +++++++++++++++++
->   3 files changed, 20 insertions(+), 1 deletion(-)
+>   arch/arm64/kernel/process.c | 7 +++++--
+>   1 file changed, 5 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index bcf88e4..be88acd 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1,6 +1,7 @@
->   config ARM64
->   	def_bool y
->   	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-> +	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->   	select ARCH_WANT_OPTIONAL_GPIOLIB
->   	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
->   	select ARCH_WANT_FRAME_POINTERS
-> @@ -12,6 +13,7 @@ config ARM64
->   	select COMMON_CLK
->   	select CPU_PM if (SUSPEND || CPU_IDLE)
->   	select GENERIC_CLOCKEVENTS
-> +	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
->   	select GENERIC_IOMAP
->   	select GENERIC_IRQ_PROBE
->   	select GENERIC_IRQ_SHOW
-> diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
-> index 990c051..ae4801d 100644
-> --- a/arch/arm64/include/asm/hardirq.h
-> +++ b/arch/arm64/include/asm/hardirq.h
-> @@ -20,7 +20,7 @@
->   #include <linux/threads.h>
->   #include <asm/irq.h>
->
-> -#define NR_IPI	4
-> +#define NR_IPI	5
->
->   typedef struct {
->   	unsigned int __softirq_pending;
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index d5488f8..2ed691e 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -61,6 +61,7 @@ enum ipi_msg_type {
->   	IPI_CALL_FUNC,
->   	IPI_CALL_FUNC_SINGLE,
->   	IPI_CPU_STOP,
-> +	IPI_TIMER,
->   };
->
->   /*
-> @@ -447,6 +448,7 @@ static const char *ipi_types[NR_IPI] = {
->   	S(IPI_CALL_FUNC, "Function call interrupts"),
->   	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
->   	S(IPI_CPU_STOP, "CPU stop interrupts"),
-> +	S(IPI_TIMER, "Timer broadcast interrupts"),
->   };
->
->   void show_ipi_list(struct seq_file *p, int prec)
-> @@ -532,6 +534,14 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->   		irq_exit();
->   		break;
->
-> +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-> +	case IPI_TIMER:
-> +		irq_enter();
-> +		tick_receive_broadcast();
-> +		irq_exit();
-> +		break;
-> +#endif
-> +
->   	default:
->   		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
->   		break;
-> @@ -544,6 +554,13 @@ void smp_send_reschedule(int cpu)
->   	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index de17c89..50491ec 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -33,6 +33,7 @@
+>   #include <linux/kallsyms.h>
+>   #include <linux/init.h>
+>   #include <linux/cpu.h>
+> +#include <linux/cpuidle.h>
+>   #include <linux/elfcore.h>
+>   #include <linux/pm.h>
+>   #include <linux/tick.h>
+> @@ -98,8 +99,10 @@ void arch_cpu_idle(void)
+>   	 * This should do all the clock switching and wait for interrupt
+>   	 * tricks
+>   	 */
+> -	cpu_do_idle();
+> -	local_irq_enable();
+> +	if (cpuidle_idle_call()) {
+> +		cpu_do_idle();
+> +		local_irq_enable();
+> +	}
 >   }
 >
-> +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-> +void tick_broadcast(const struct cpumask *mask)
-> +{
-> +	smp_cross_call(mask, IPI_TIMER);
-> +}
-> +#endif
-> +
->   void smp_send_stop(void)
->   {
->   	unsigned long timeout;
+>   #ifdef CONFIG_HOTPLUG_CPU
 >
 
 
