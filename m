@@ -1,40 +1,34 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Thu, 17 Oct 2013 22:40:32 +0800
-Subject: [PATCH v3 6/7] arm64,
- jump label: optimize jump label implementation
-In-Reply-To: <20131017093944.GB18765@mudshark.cambridge.arm.com>
-References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
- <1381893492-7135-7-git-send-email-liuj97@gmail.com>
- <20131016114608.GH5403@mudshark.cambridge.arm.com>
- <525EC8D1.7000900@gmail.com>
- <20131017093944.GB18765@mudshark.cambridge.arm.com>
-Message-ID: <525FF6E0.7070000@gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 17 Oct 2013 08:41:12 -0600
+Subject: [PATCH v2] PCI: mvebu - Support a bridge with no IO port window
+In-Reply-To: <20131017131031.GD22434@titan.lakedaemon.net>
+References: <1381868182-8544-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <20131017131031.GD22434@titan.lakedaemon.net>
+Message-ID: <20131017144112.GA28343@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2013 05:39 PM, Will Deacon wrote:
-> On Wed, Oct 16, 2013 at 06:11:45PM +0100, Jiang Liu wrote:
->> On 10/16/2013 07:46 PM, Will Deacon wrote:
->>>
->>>> +	} else {
->>>> +		insn = aarch64_insn_gen_nop();
->>>
->>> You could make the code more concise by limiting your patching ability to
->>> branch immediates. Then a nop is simply a branch to the next instruction (I
->>> doubt any modern CPUs will choke on this, whereas the architecture requires
->>> a NOP to take time).
->> I guess a NOP should be more effecient than a "B #4" on real CPUs:)
+On Thu, Oct 17, 2013 at 09:10:31AM -0400, Jason Cooper wrote:
+> On Tue, Oct 15, 2013 at 02:16:22PM -0600, Jason Gunthorpe wrote:
+> > Make pcie-io-aperture and the IO port MBUS ID in ranges optional.
+> > If not provided the bridge reports to Linux that IO space mapping is
+> > not supported and refuses to configure an IO mbus window.
+> > 
+> > This allows both complete disable (do not specify pcie-io-aperture) and
+> > per-port disable (do not specify a IO target ranges entry for the port)
+> > 
+> > Most PCIE devices these days do not require IO support to function,
+> > so having an option to disable it in the driver is useful.
+> > 
+> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> >  drivers/pci/host/pci-mvebu.c | 64 +++++++++++++++++++++++++++++---------------
+> >  1 file changed, 43 insertions(+), 21 deletions(-)
 > 
-> Well, I was actually questioning that. A NOP *has* to take time (the
-> architecture prevents implementations from discaring it) whereas a static,
-> unconditional branch will likely be discarded early on by CPUs with even
-> simple branch prediction logic.
-I naively thought "NOP" is cheaper than a "B" :(
-Will use a "B #1" to replace "NOP".
+> Applied to mvebu/drivers
 
-Thanks!
-Gerry
+If possible, Thomas should test this, IMHO. My hardware here
+completely lacks IO port windows so I cannot meaningfully test that
+aspect of the change.
 
-> 
-> Will
-> 
+Thanks,
+Jason
