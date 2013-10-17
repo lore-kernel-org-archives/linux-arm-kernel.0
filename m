@@ -1,368 +1,95 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 17 Oct 2013 08:37:51 +0200
-Subject: [PATCH v2 7/8] ARM: add Armada 1500 and Sony NSZ-GS7 device tree files
-In-Reply-To: <1381235073-17134-8-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1381235073-17134-8-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1381991872-8199-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Thu, 17 Oct 2013 12:15:00 +0530
+Subject: [RFC PATCH 1/5] ARM/ARM64: KVM: Update user space API header for
+ PSCI emulation
+In-Reply-To: <20131016221132.GE24837@cbox>
+References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
+ <1381942954-22388-2-git-send-email-anup.patel@linaro.org>
+ <20131016221132.GE24837@cbox>
+Message-ID: <CAAhSdy2jgz24HEH1_CGCEYSGoBuy-4bA-ACYxLEWwCD33a9_XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds very basic device tree files for the Marvell Armada 1500 SoC
-(Berlin BG2) and the Sony NSZ-GS7 GoogleTV board. Currently, SoC only has
-nodes for cpus, some clocks, l2 cache controller, local timer, apb timers,
-uart, and interrupt controllers. The Sony NSZ-GS7 is a GoogleTV consumer
-device comprising the Armada 1500 SoC above.
+On Thu, Oct 17, 2013 at 3:41 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Wed, Oct 16, 2013 at 10:32:30PM +0530, Anup Patel wrote:
+>> Update user space API interface headers for providing information to
+>> user space needed to emulate PSCI function calls in user space (i.e.
+>> QEMU or KVMTOOL).
+>>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> ---
+>>  include/uapi/linux/kvm.h |    7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index e32e776..dae2664 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -171,6 +171,7 @@ struct kvm_pit_config {
+>>  #define KVM_EXIT_WATCHDOG         21
+>>  #define KVM_EXIT_S390_TSCH        22
+>>  #define KVM_EXIT_EPR              23
+>> +#define KVM_EXIT_PSCI             24
+>>
+>>  /* For KVM_EXIT_INTERNAL_ERROR */
+>>  /* Emulate instruction failed. */
+>> @@ -301,6 +302,12 @@ struct kvm_run {
+>>               struct {
+>>                       __u32 epr;
+>>               } epr;
+>> +             /* KVM_EXIT_PSCI */
+>> +             struct {
+>> +                     __u32 fn;
+>> +                     __u64 args[7];
+>> +                     __u64 ret[4];
+>> +             } psci;
+>>               /* Fix the size of the union. */
+>>               char padding[256];
+>>       };
+>> --
+>> 1.7.9.5
+>>
+> I am also wondering if this is not solving a very specific need without
+> thinking a little more carefully about this problem.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reviewed-by: Jason Cooper <jason@lakedaemon.net>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-Reviewed-by: Jisheng Zhang <jszhang@marvell.com>
----
-Changelog:
-v1->v2:
-- add "arm,pl310-cache" compatible to l2cc (Suggested by Mark Rutland)
-- replace 88DE3xxx numbering with SoC variant name
-  (Requested by Jisheng Zhang)
-RCFv2->v1:
-- switch to (soon to be) correct "marvell,pj4b" cpu compatible
-- reference fixed-clock for uarts instead of hard-coded clock-frequency
-- disable timers except two for clksrc and clkevt
-RFCv1->RFCv2:
-- add binding documentation (Reported by Jason Cooper)
-- change l2cc from aurora to tauros3 (Reported by Thomas Petazzoni)
-- add copyright reference
-- adapt compatibles to mach-berlin instead of mach-mvebu
+No, its not solving a specific problem.
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Jisheng Zhang <jszhang@marvell.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- .../devicetree/bindings/arm/marvell,berlin.txt     |   24 +++
- arch/arm/boot/dts/Makefile                         |    2 +
- arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |   29 +++
- arch/arm/boot/dts/berlin2.dtsi                     |  227 ++++++++++++++++++++
- 4 files changed, 282 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
- create mode 100644 arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
- create mode 100644 arch/arm/boot/dts/berlin2.dtsi
+In fact, its more general because we pass complete info required to
+emulate a PSCI call in user space.
+(Please refer PSCI calling convention)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-new file mode 100644
-index 0000000..737afa5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-@@ -0,0 +1,24 @@
-+Marvell Berlin SoC Family Device Tree Bindings
-+---------------------------------------------------------------
-+
-+Boards with a SoC of the Marvell Berlin family, e.g. Armada 1500
-+shall have the following properties:
-+
-+* Required root node properties:
-+compatible: must contain "marvell,berlin"
-+
-+In addition, the above compatible shall be extended with the specific
-+SoC and board used. Currently known SoC compatibles are:
-+    "marvell,berlin2"      for Marvell Armada 1500 (BG2, 88DE3100),
-+    "marvell,berlin2cd"    for Marvell Armada 1500-mini (BG2CD, 88DE3005)
-+    "marvell,berlin2ct"    for Marvell Armada ? (BG2CT, 88DE????)
-+    "marvell,berlin3"      for Marvell Armada ? (BG3, 88DE????)
-+
-+* Example:
-+
-+/ {
-+	model = "Sony NSZ-GS7";
-+	compatible = "sony,nsz-gs7", "marvell,berlin2", "marvell,berlin";
-+
-+	...
-+}
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 802720e..c9c1a6c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -46,6 +46,8 @@ dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
- dtb-$(CONFIG_ARCH_BCM) += bcm11351-brt.dtb \
- 	bcm28155-ap.dtb
-+dtb-$(CONFIG_ARCH_BERLIN) += \
-+	berlin2-sony-nsz-gs7.dtb
- dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
- dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
-diff --git a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-new file mode 100644
-index 0000000..c72bfd4
---- /dev/null
-+++ b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-@@ -0,0 +1,29 @@
-+/*
-+ * Device Tree file for Sony NSZ-GS7
-+ *
-+ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+
-+#include "berlin2.dtsi"
-+
-+/ {
-+	model = "Sony NSZ-GS7";
-+	compatible = "sony,nsz-gs7", "marvell,berlin2", "marvell,berlin";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000>; /* 1 GB */
-+	};
-+};
-+
-+&uart0 { status = "okay"; };
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-new file mode 100644
-index 0000000..56a1af2
---- /dev/null
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -0,0 +1,227 @@
-+/*
-+ * Device Tree Include file for Marvell Armada 1500 (Berlin BG2) SoC
-+ *
-+ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ *
-+ * based on GPL'ed 2.6 kernel sources
-+ *  (c) Marvell International Ltd.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "Marvell Armada 1500 (BG2) SoC";
-+	compatible = "marvell,berlin2", "marvell,berlin";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "marvell,pj4b";
-+			device_type = "cpu";
-+			next-level-cache = <&l2>;
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "marvell,pj4b";
-+			device_type = "cpu";
-+			next-level-cache = <&l2>;
-+			reg = <1>;
-+		};
-+	};
-+
-+	clocks {
-+		smclk: sysmgr-clock {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
-+
-+		cfgclk: cfg-clock {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <100000000>;
-+		};
-+
-+		sysclk: system-clock {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <400000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		interrupt-parent = <&gic>;
-+
-+		ranges = <0 0xf7000000 0x1000000>;
-+
-+		l2: l2-cache-controller at ac0000 {
-+			compatible = "marvell,tauros3-cache", "arm,pl310-cache";
-+			reg = <0xac0000 0x1000>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+
-+		gic: interrupt-controller at ad1000 {
-+			compatible = "arm,cortex-a9-gic";
-+			reg = <0xad1000 0x1000>, <0xad0100 0x0100>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
-+
-+		local-timer at ad0600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0xad0600 0x20>;
-+			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysclk>;
-+		};
-+
-+		apb at e80000 {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			ranges = <0 0xe80000 0x10000>;
-+			interrupt-parent = <&aic>;
-+
-+			timer0: timer at 2c00 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c00 0x14>;
-+				interrupts = <8>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "okay";
-+			};
-+
-+			timer1: timer at 2c14 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c14 0x14>;
-+				interrupts = <9>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "okay";
-+			};
-+
-+			timer2: timer at 2c28 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c28 0x14>;
-+				interrupts = <10>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer3: timer at 2c3c {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c3c 0x14>;
-+				interrupts = <11>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer4: timer at 2c50 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c50 0x14>;
-+				interrupts = <12>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer5: timer at 2c64 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c64 0x14>;
-+				interrupts = <13>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer6: timer at 2c78 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c78 0x14>;
-+				interrupts = <14>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer7: timer at 2c8c {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c8c 0x14>;
-+				interrupts = <15>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			aic: interrupt-controller at 3000 {
-+				compatible = "snps,dw-apb-ictl";
-+				reg = <0x3000 0xc00>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+
-+		apb at fc0000 {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			ranges = <0 0xfc0000 0x10000>;
-+			interrupt-parent = <&sic>;
-+
-+			uart0: serial at 9000 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0x9000 0x100>;
-+				reg-shift = <2>;
-+				reg-io-width = <1>;
-+				interrupts = <8>;
-+				clocks = <&smclk>;
-+				status = "disabled";
-+			};
-+
-+			uart1: serial at a000 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0xa000 0x100>;
-+				reg-shift = <2>;
-+				reg-io-width = <1>;
-+				interrupts = <9>;
-+				clocks = <&smclk>;
-+				status = "disabled";
-+			};
-+
-+			uart2: serial at b000 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0xb000 0x100>;
-+				reg-shift = <2>;
-+				reg-io-width = <1>;
-+				interrupts = <10>;
-+				clocks = <&smclk>;
-+				status = "disabled";
-+			};
-+
-+			sic: interrupt-controller at e000 {
-+				compatible = "snps,dw-apb-ictl";
-+				reg = <0xe000 0x400>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+	};
-+};
--- 
-1.7.10.4
+>
+> We have previously discussed the need for some secure side emulation
+> in QEMU, and I think perhaps we need something more generic which allows
+> user space to handle SMC calls and/or allows user space to "inject" some
+> secure world runtime that the kernel can run in a partially or fully
+> isolated container to handle SMC calls.
+>
+> Peter raised this issue previously and pointed to a proposal he had as
+> well.
+
+If required we can have an additional field in kvm_run->psci which tells
+whether the PSCI call is an SMC call or HVC call.
+
+>
+> Is there a technical reason why we need something specifically directed
+> to PSCI?
+
+Its quite natural to add this to PSCI emulation in KVM ARM/ARM64 instead
+of adding a separate VirtIO device for System reboot and System poweroff.
+
+Also in the process of implementing SYSTEM_OFF and SYSTEM_RESET
+emulation in user space we would also have an infrastructure for adding
+emulation of new PSCI calls in user space.
+
+--
+Anup
+
+>
+> -Christoffer
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
