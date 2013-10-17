@@ -1,35 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 17 Oct 2013 09:45:39 -0400
-Subject: [PATCH 1/2] Revert "ARM: OMAP4+: CPUidle: Deprecate use of
- omap4_mpuss_read_prev_context_state()"
-In-Reply-To: <525FACB7.9000903@ti.com>
-References: <1382000776-15897-2-git-send-email-grygorii.strashko@ti.com>
- <525FACB7.9000903@ti.com>
-Message-ID: <525FEA03.50407@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Oct 2013 14:47:01 +0100
+Subject: [RESEND PATCH v2 0/6] Update Kona drivers to use clocks
+In-Reply-To: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
+References: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <20131017134701.GC24056@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 October 2013 05:24 AM, Grygorii Strashko wrote:
-> The same workaround as ff999b8a0983ee15668394ed49e38d3568fc6859
-> "ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC control register change."
-> need to be applied not only when system is booting, but when MPU hits OSWR state through CPUIdle too.
+On Wed, Oct 16, 2013 at 10:47:04PM +0100, Tim Kryger wrote:
+> This series declares the clocks present on bcm11351 (aka bcm281xx) SoCs
+> to be fixed at the rates configured by development bootloaders and then
+> updates the Kona drivers to make use of clock calls where appropriate.
 > 
-> Unfortunately, commit "ARM: OMAP4+: CPUidle: Deprecate use of
-> omap4_mpuss_read_prev_context_state()" prevents us from implementing workaround
-> for this ROM code bug, because it should be applied only (and only)
-> when MPU really hits OSWR and its was lost context.
+> This patch series depends on the following three commits being present:
 > 
-> Hence revert commit e7457253494fff660a72bc0cedeee97491ccd173
-> "ARM: OMAP4+: CPUidle: Deprecate use of omap4_mpuss_read_prev_context_state()".
+> https://lkml.org/lkml/2013/9/18/409
+> https://lkml.org/lkml/2013/9/20/305
+> http://www.spinics.net/lists/arm-kernel/msg274973.html
 > 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Reported-and-Tested-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
-NAK.. Lets not add this which will make the code
-movement to drivers/idle difficult. This can be handled..
-See comments on 2/2.
+> Changes in v2:
+>   - Renamed bsc4_clk to pmu_bsc_clk
+> 
+> Tim Kryger (6):
+>   ARM: dts: Declare clocks as fixed on bcm11351
+>   ARM: dts: Specify clocks for UARTs on bcm11351
+>   ARM: dts: Specify clocks for SDHCIs on bcm11351
+>   clocksource: kona: Add basic use of external clock
+>   ARM: dts: Specify clocks for timer on bcm11351
+>   mmc: sdhci-bcm-kona: Add basic use of clocks
+> 
+>  arch/arm/boot/dts/bcm11351.dtsi      | 111 +++++++++++++++++++++++++++++++++--
+>  drivers/clocksource/bcm_kona_timer.c |  14 ++++-
+>  drivers/mmc/host/sdhci-bcm-kona.c    |  30 +++++++++-
 
-Regards,
-Santosh
+This requires a description in the binding documents, so we can figure
+out which clocks we need to describe, and how to describe them.
+
+Thanks,
+Mark.
