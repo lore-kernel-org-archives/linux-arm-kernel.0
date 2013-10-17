@@ -1,37 +1,36 @@
 From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Thu, 17 Oct 2013 17:01:11 +0800
-Subject: [PATCHv1 2/8] ARM: dts: Add Freescale SAI ALSA SoC Digital Audio
- Interface node for VF610.
+Date: Thu, 17 Oct 2013 17:01:12 +0800
+Subject: [PATCHv1 3/8] ARM: dts: Enables SAI ALSA SoC DAI device for Vybrid
+ VF610 TOWER board.
 In-Reply-To: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
 References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1382000477-17304-3-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1382000477-17304-4-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the SAI's edma mux Tx and Rx support.
+This patch add and enable SAI device.
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
 Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 ---
- arch/arm/boot/dts/vf610.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vf610-twr.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 18e3a4c..391f180 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -151,9 +151,11 @@
- 			sai2: sai at 40031000 {
- 				compatible = "fsl,vf610-sai";
- 				reg = <0x40031000 0x1000>;
--				interrupts = <0 86 0x04>;
- 				clocks = <&clks VF610_CLK_SAI2>;
- 				clock-names = "sai";
-+				dma-names = "tx", "rx";
-+				dmas = <&edma0 0 VF610_EDMA_MUXID0_SAI2_TX>,
-+					<&edma0 0 VF610_EDMA_MUXID0_SAI2_RX>;
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index 1a58678..e4106dd 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -57,6 +57,12 @@
+ 	status = "okay";
+ };
  
++&sai2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2_1>;
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1_1>;
 -- 
 1.8.0
