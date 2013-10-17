@@ -1,210 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Oct 2013 15:19:47 +0800
-Subject: [PATCH v2 4/4] mmc: sdhci-esdhc-imx: create struct esdhc_soc_data
-In-Reply-To: <1381994387-9656-1-git-send-email-shawn.guo@linaro.org>
-References: <1381994387-9656-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1381994387-9656-5-git-send-email-shawn.guo@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 17 Oct 2013 09:18:38 +0200
+Subject: [PATCH] ARM: omap2: irq, AM33XX add missing register check
+Message-ID: <1381994318-10207-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a struct esdhc_soc_data with moving 'flags' field from
-pltfm_imx_data into it, and pass the pointer of this SoC specific data
-structure through of_device_id.data directly, so that the translation
-from enum imx_esdhc_type to flags can be saved.
+am33xx has a INTC_PENDING_IRQ3 register that is not checked for pending
+interrupts. This patch adds AM33XX to the ifdef of SOCs that have to
+check this register.
 
-With the change, enum imx_esdhc_type can be eliminated, since we can
-implement the is_imx*_esdhc() by checking the esdhc_soc_data pointer.
-The unused is_imx35_esdhc() and is_imx51_esdhc() are also removed, and the
-others are kept there as we will need to use them to handle some small
-register differences later, where use of new flags might be a little
-overkilled.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |   86 +++++++++++++++++-------------------
- 1 file changed, 41 insertions(+), 45 deletions(-)
+ arch/arm/mach-omap2/irq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 83023fa..c84c808 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -95,22 +95,37 @@
-  */
- #define ESDHC_FLAG_USDHC		BIT(3)
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 3926f37..e022a86 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -233,7 +233,7 @@ static inline void omap_intc_handle_irq(void __iomem *base_addr, struct pt_regs
+ 			goto out;
  
--enum imx_esdhc_type {
--	IMX25_ESDHC,
--	IMX35_ESDHC,
--	IMX51_ESDHC,
--	IMX53_ESDHC,
--	IMX6Q_USDHC,
-+struct esdhc_soc_data {
-+	u32 flags;
-+};
-+
-+static struct esdhc_soc_data esdhc_imx25_data = {
-+	.flags = ESDHC_FLAG_ENGCM07207,
-+};
-+
-+static struct esdhc_soc_data esdhc_imx35_data = {
-+	.flags = ESDHC_FLAG_ENGCM07207,
-+};
-+
-+static struct esdhc_soc_data esdhc_imx51_data = {
-+	.flags = 0,
-+};
-+
-+static struct esdhc_soc_data esdhc_imx53_data = {
-+	.flags = ESDHC_FLAG_MULTIBLK_NO_INT,
-+};
-+
-+static struct esdhc_soc_data usdhc_imx6q_data = {
-+	.flags = ESDHC_FLAG_USDHC,
- };
- 
- struct pltfm_imx_data {
--	int flags;
- 	u32 scratchpad;
--	enum imx_esdhc_type devtype;
- 	struct pinctrl *pinctrl;
- 	struct pinctrl_state *pins_default;
- 	struct pinctrl_state *pins_100mhz;
- 	struct pinctrl_state *pins_200mhz;
-+	const struct esdhc_soc_data *socdata;
- 	struct esdhc_platform_data boarddata;
- 	struct clk *clk_ipg;
- 	struct clk *clk_ahb;
-@@ -126,13 +141,13 @@ struct pltfm_imx_data {
- static struct platform_device_id imx_esdhc_devtype[] = {
- 	{
- 		.name = "sdhci-esdhc-imx25",
--		.driver_data = IMX25_ESDHC,
-+		.driver_data = (kernel_ulong_t) &esdhc_imx25_data,
- 	}, {
- 		.name = "sdhci-esdhc-imx35",
--		.driver_data = IMX35_ESDHC,
-+		.driver_data = (kernel_ulong_t) &esdhc_imx35_data,
- 	}, {
- 		.name = "sdhci-esdhc-imx51",
--		.driver_data = IMX51_ESDHC,
-+		.driver_data = (kernel_ulong_t) &esdhc_imx51_data,
- 	}, {
- 		/* sentinel */
- 	}
-@@ -140,43 +155,33 @@ static struct platform_device_id imx_esdhc_devtype[] = {
- MODULE_DEVICE_TABLE(platform, imx_esdhc_devtype);
- 
- static const struct of_device_id imx_esdhc_dt_ids[] = {
--	{ .compatible = "fsl,imx25-esdhc", .data = (void *) IMX25_ESDHC, },
--	{ .compatible = "fsl,imx35-esdhc", .data = (void *) IMX35_ESDHC, },
--	{ .compatible = "fsl,imx51-esdhc", .data = (void *) IMX51_ESDHC, },
--	{ .compatible = "fsl,imx53-esdhc", .data = (void *) IMX53_ESDHC, },
--	{ .compatible = "fsl,imx6q-usdhc", .data = (void *) IMX6Q_USDHC, },
-+	{ .compatible = "fsl,imx25-esdhc", .data = &esdhc_imx25_data, },
-+	{ .compatible = "fsl,imx35-esdhc", .data = &esdhc_imx35_data, },
-+	{ .compatible = "fsl,imx51-esdhc", .data = &esdhc_imx51_data, },
-+	{ .compatible = "fsl,imx53-esdhc", .data = &esdhc_imx53_data, },
-+	{ .compatible = "fsl,imx6q-usdhc", .data = &usdhc_imx6q_data, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, imx_esdhc_dt_ids);
- 
- static inline int is_imx25_esdhc(struct pltfm_imx_data *data)
- {
--	return data->devtype == IMX25_ESDHC;
--}
--
--static inline int is_imx35_esdhc(struct pltfm_imx_data *data)
--{
--	return data->devtype == IMX35_ESDHC;
--}
--
--static inline int is_imx51_esdhc(struct pltfm_imx_data *data)
--{
--	return data->devtype == IMX51_ESDHC;
-+	return data->socdata == &esdhc_imx25_data;
- }
- 
- static inline int is_imx53_esdhc(struct pltfm_imx_data *data)
- {
--	return data->devtype == IMX53_ESDHC;
-+	return data->socdata == &esdhc_imx53_data;
- }
- 
- static inline int is_imx6q_usdhc(struct pltfm_imx_data *data)
- {
--	return data->devtype == IMX6Q_USDHC;
-+	return data->socdata == &usdhc_imx6q_data;
- }
- 
- static inline int esdhc_is_usdhc(struct pltfm_imx_data *data)
- {
--	return !!(data->flags & ESDHC_FLAG_USDHC);
-+	return !!(data->socdata->flags & ESDHC_FLAG_USDHC);
- }
- 
- static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, int reg)
-@@ -274,7 +279,7 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 		}
- 	}
- 
--	if (unlikely((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-+	if (unlikely((imx_data->socdata->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
- 				&& (reg == SDHCI_INT_STATUS)
- 				&& (val & SDHCI_INT_DATA_END))) {
- 			u32 v;
-@@ -373,7 +378,7 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 		writel(new_val , host->ioaddr + ESDHC_MIX_CTRL);
- 		return;
- 	case SDHCI_TRANSFER_MODE:
--		if ((imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-+		if ((imx_data->socdata->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
- 				&& (host->cmd->opcode == SD_IO_RW_EXTENDED)
- 				&& (host->cmd->data->blocks > 1)
- 				&& (host->cmd->data->flags & MMC_DATA_READ)) {
-@@ -405,7 +410,7 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 			val |= SDHCI_CMD_ABORTCMD;
- 
- 		if ((host->cmd->opcode == MMC_SET_BLOCK_COUNT) &&
--		    (imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT))
-+		    (imx_data->socdata->flags & ESDHC_FLAG_MULTIBLK_NO_INT))
- 			imx_data->multiblock_status = MULTIBLK_IN_PROCESS;
- 
- 		if (esdhc_is_usdhc(imx_data))
-@@ -861,16 +866,10 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 		goto free_sdhci;
- 	}
- 
--	imx_data->devtype = of_id ? (enum imx_esdhc_type) of_id->data :
--				    pdev->id_entry->driver_data;
-+	imx_data->socdata = of_id ? of_id->data : (struct esdhc_soc_data *)
-+						  pdev->id_entry->driver_data;
- 	pltfm_host->priv = imx_data;
- 
--	if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
--		imx_data->flags |= ESDHC_FLAG_ENGCM07207;
--
--	if (is_imx6q_usdhc(imx_data))
--		imx_data->flags |= ESDHC_FLAG_USDHC;
--
- 	imx_data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
- 	if (IS_ERR(imx_data->clk_ipg)) {
- 		err = PTR_ERR(imx_data->clk_ipg);
-@@ -911,14 +910,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 
- 	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
- 
--	if (imx_data->flags & ESDHC_FLAG_ENGCM07207)
-+	if (imx_data->socdata->flags & ESDHC_FLAG_ENGCM07207)
- 		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
- 		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
- 			| SDHCI_QUIRK_BROKEN_ADMA;
- 
--	if (is_imx53_esdhc(imx_data))
--		imx_data->flags |= ESDHC_FLAG_MULTIBLK_NO_INT;
--
- 	/*
- 	 * The imx6q ROM code will change the default watermark level setting
- 	 * to something insane.  Change it back here.
+ 		irqnr = readl_relaxed(base_addr + 0xd8);
+-#ifdef CONFIG_SOC_TI81XX
++#if IS_ENABLED(CONFIG_SOC_TI81XX) || IS_ENABLED(CONFIG_SOC_AM33XX)
+ 		if (irqnr)
+ 			goto out;
+ 		irqnr = readl_relaxed(base_addr + 0xf8);
 -- 
-1.7.9.5
+1.8.4.rc3
