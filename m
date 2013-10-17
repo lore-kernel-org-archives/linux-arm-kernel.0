@@ -1,119 +1,126 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 17 Oct 2013 14:01:36 +0400
-Subject: [PATCH 2/3] ALSA: ASoC: pxa: fix pxa2xx-ac97 DAI initialization order
-In-Reply-To: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
-References: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1382004097-6350-2-git-send-email-dbaryshkov@gmail.com>
+Date: Thu, 17 Oct 2013 14:01:35 +0400
+Subject: [PATCH 1/3] ALSA: pxa: slightly refactor reset handling
+Message-ID: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After recent changes to codec/DAI initialization order changes, codec
-driver (wm9712 in my case) tries to access codec prior to
-pxa2xx_ac97_hw_probe() being called (because DAIs are probed after all
-codecs are probed). Move hw-related probe/remove/suspend/resume
-functions to pxa2xx-ac97 driver level, instead of DAI level.
+PXA25x also shows some problems when using interrupts during reset
+handling. Thus do not use interrupts on all pxa kinds (to detect codec
+ready state). Instead use a common mdelay-loop on all platforms to
+detect codecs becoming ready.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- sound/soc/pxa/pxa2xx-ac97.c | 56 ++++++++++++++++++++-------------------------
- 1 file changed, 25 insertions(+), 31 deletions(-)
+ sound/arm/pxa2xx-ac97-lib.c | 27 ++++++++++-----------------
+ 1 file changed, 10 insertions(+), 17 deletions(-)
 
-diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
-index f1059d9..ae956e3 100644
---- a/sound/soc/pxa/pxa2xx-ac97.c
-+++ b/sound/soc/pxa/pxa2xx-ac97.c
-@@ -89,33 +89,6 @@ static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_mic_mono_in = {
- 	.filter_data	= &pxa2xx_ac97_pcm_aux_mic_mono_req,
- };
- 
--#ifdef CONFIG_PM
--static int pxa2xx_ac97_suspend(struct snd_soc_dai *dai)
--{
--	return pxa2xx_ac97_hw_suspend();
--}
--
--static int pxa2xx_ac97_resume(struct snd_soc_dai *dai)
--{
--	return pxa2xx_ac97_hw_resume();
--}
--
--#else
--#define pxa2xx_ac97_suspend	NULL
--#define pxa2xx_ac97_resume	NULL
--#endif
--
--static int pxa2xx_ac97_probe(struct snd_soc_dai *dai)
--{
--	return pxa2xx_ac97_hw_probe(to_platform_device(dai->dev));
--}
--
--static int pxa2xx_ac97_remove(struct snd_soc_dai *dai)
--{
--	pxa2xx_ac97_hw_remove(to_platform_device(dai->dev));
--	return 0;
--}
--
- static int pxa2xx_ac97_hw_params(struct snd_pcm_substream *substream,
- 				 struct snd_pcm_hw_params *params,
- 				 struct snd_soc_dai *cpu_dai)
-@@ -185,10 +158,6 @@ static struct snd_soc_dai_driver pxa_ac97_dai_driver[] = {
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index e6f4633..99a4668 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -117,8 +117,7 @@ static inline void pxa_ac97_warm_pxa25x(void)
  {
- 	.name = "pxa2xx-ac97",
- 	.ac97_control = 1,
--	.probe = pxa2xx_ac97_probe,
--	.remove = pxa2xx_ac97_remove,
--	.suspend = pxa2xx_ac97_suspend,
--	.resume = pxa2xx_ac97_resume,
- 	.playback = {
- 		.stream_name = "AC97 Playback",
- 		.channels_min = 2,
-@@ -246,6 +215,12 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
- 		return -ENXIO;
- 	}
+ 	gsr_bits = 0;
  
-+	ret = pxa2xx_ac97_hw_probe(pdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "PXA2xx AC97 hw probe error (%d)\n", ret);
-+		return ret;
-+	}
-+
- 	ret = snd_soc_set_ac97_ops(&pxa2xx_ac97_ops);
- 	if (ret != 0)
- 		return ret;
-@@ -262,15 +237,34 @@ static int pxa2xx_ac97_dev_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_component(&pdev->dev);
- 	snd_soc_set_ac97_ops(NULL);
-+	pxa2xx_ac97_hw_remove(pdev);
- 	return 0;
+-	GCR |= GCR_WARM_RST | GCR_PRIRDY_IEN | GCR_SECRDY_IEN;
+-	wait_event_timeout(gsr_wq, gsr_bits & (GSR_PCR | GSR_SCR), 1);
++	GCR |= GCR_WARM_RST;
  }
  
-+#ifdef CONFIG_PM_SLEEP
-+static int pxa2xx_ac97_dev_suspend(struct device *dev)
-+{
-+	return pxa2xx_ac97_hw_suspend();
-+}
-+
-+static int pxa2xx_ac97_dev_resume(struct device *dev)
-+{
-+	return pxa2xx_ac97_hw_resume();
-+}
-+
-+static SIMPLE_DEV_PM_OPS(pxa2xx_ac97_pm_ops,
-+		pxa2xx_ac97_dev_suspend, pxa2xx_ac97_dev_resume);
-+#endif
-+
- static struct platform_driver pxa2xx_ac97_driver = {
- 	.probe		= pxa2xx_ac97_dev_probe,
- 	.remove		= pxa2xx_ac97_dev_remove,
- 	.driver		= {
- 		.name	= "pxa2xx-ac97",
- 		.owner	= THIS_MODULE,
-+#ifdef CONFIG_PM_SLEEP
-+		.pm	= &pxa2xx_ac97_pm_ops,
-+#endif
- 	},
- };
+ static inline void pxa_ac97_cold_pxa25x(void)
+@@ -129,8 +128,6 @@ static inline void pxa_ac97_cold_pxa25x(void)
+ 	gsr_bits = 0;
  
+ 	GCR = GCR_COLD_RST;
+-	GCR |= GCR_CDONE_IE|GCR_SDONE_IE;
+-	wait_event_timeout(gsr_wq, gsr_bits & (GSR_PCR | GSR_SCR), 1);
+ }
+ #endif
+ 
+@@ -149,8 +146,6 @@ static inline void pxa_ac97_warm_pxa27x(void)
+ 
+ static inline void pxa_ac97_cold_pxa27x(void)
+ {
+-	unsigned int timeout;
+-
+ 	GCR &=  GCR_COLD_RST;  /* clear everything but nCRST */
+ 	GCR &= ~GCR_COLD_RST;  /* then assert nCRST */
+ 
+@@ -161,29 +156,20 @@ static inline void pxa_ac97_cold_pxa27x(void)
+ 	udelay(5);
+ 	clk_disable(ac97conf_clk);
+ 	GCR = GCR_COLD_RST | GCR_WARM_RST;
+-	timeout = 100;     /* wait for the codec-ready bit to be set */
+-	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
+-		mdelay(1);
+ }
+ #endif
+ 
+ #ifdef CONFIG_PXA3xx
+ static inline void pxa_ac97_warm_pxa3xx(void)
+ {
+-	int timeout = 100;
+-
+ 	gsr_bits = 0;
+ 
+ 	/* Can't use interrupts */
+ 	GCR |= GCR_WARM_RST;
+-	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
+-		mdelay(1);
+ }
+ 
+ static inline void pxa_ac97_cold_pxa3xx(void)
+ {
+-	int timeout = 1000;
+-
+ 	/* Hold CLKBPB for 100us */
+ 	GCR = 0;
+ 	GCR = GCR_CLKBPB;
+@@ -199,14 +185,13 @@ static inline void pxa_ac97_cold_pxa3xx(void)
+ 	GCR &= ~(GCR_PRIRDY_IEN|GCR_SECRDY_IEN);
+ 
+ 	GCR = GCR_WARM_RST | GCR_COLD_RST;
+-	while (!(GSR & (GSR_PCR | GSR_SCR)) && timeout--)
+-		mdelay(10);
+ }
+ #endif
+ 
+ bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
+ {
+ 	unsigned long gsr;
++	unsigned int timeout = 100;
+ 
+ #ifdef CONFIG_PXA25x
+ 	if (cpu_is_pxa25x())
+@@ -224,6 +209,10 @@ bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
+ 	else
+ #endif
+ 		BUG();
++
++	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
++		mdelay(1);
++
+ 	gsr = GSR | gsr_bits;
+ 	if (!(gsr & (GSR_PCR | GSR_SCR))) {
+ 		printk(KERN_INFO "%s: warm reset timeout (GSR=%#lx)\n",
+@@ -239,6 +228,7 @@ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_warm_reset);
+ bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
+ {
+ 	unsigned long gsr;
++	unsigned int timeout = 1000;
+ 
+ #ifdef CONFIG_PXA25x
+ 	if (cpu_is_pxa25x())
+@@ -257,6 +247,9 @@ bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
+ #endif
+ 		BUG();
+ 
++	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
++		mdelay(1);
++
+ 	gsr = GSR | gsr_bits;
+ 	if (!(gsr & (GSR_PCR | GSR_SCR))) {
+ 		printk(KERN_INFO "%s: cold reset timeout (GSR=%#lx)\n",
 -- 
 1.8.4.rc3
