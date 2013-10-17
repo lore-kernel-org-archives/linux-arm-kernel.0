@@ -1,71 +1,136 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 17 Oct 2013 15:19:46 +0800
-Subject: [PATCH v2 3/4] mmc: sdhci-esdhc-imx: pdev->id_entry should be
- immutable
-In-Reply-To: <1381994387-9656-1-git-send-email-shawn.guo@linaro.org>
-References: <1381994387-9656-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1381994387-9656-4-git-send-email-shawn.guo@linaro.org>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Thu, 17 Oct 2013 09:27:25 +0200
+Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <20131016151419.GA14104@ns203013.ovh.net>
+References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
+ <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
+ <20131016151419.GA14104@ns203013.ovh.net>
+Message-ID: <525F915D.9020501@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a good practice, device driver should not modify pdev->id_entry but
-keep it immutable.  Let's assign of_device_id.data with imx_esdhc_type
-constants directly, so that we do not have to manipulate pdev->id_entry
-in .probe().
+Hi Jean-Christophe,
 
-As the result, sdhci-esdhc-imx53 and sdhci-usdhc-imx6q can be removed
-from platform_device_id table now, since they will only probe from
-device tree.
+On 10/16/2013 05:14 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 2421ac7..83023fa 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -134,23 +134,17 @@ static struct platform_device_id imx_esdhc_devtype[] = {
- 		.name = "sdhci-esdhc-imx51",
- 		.driver_data = IMX51_ESDHC,
- 	}, {
--		.name = "sdhci-esdhc-imx53",
--		.driver_data = IMX53_ESDHC,
--	}, {
--		.name = "sdhci-usdhc-imx6q",
--		.driver_data = IMX6Q_USDHC,
--	}, {
- 		/* sentinel */
- 	}
- };
- MODULE_DEVICE_TABLE(platform, imx_esdhc_devtype);
- 
- static const struct of_device_id imx_esdhc_dt_ids[] = {
--	{ .compatible = "fsl,imx25-esdhc", .data = &imx_esdhc_devtype[IMX25_ESDHC], },
--	{ .compatible = "fsl,imx35-esdhc", .data = &imx_esdhc_devtype[IMX35_ESDHC], },
--	{ .compatible = "fsl,imx51-esdhc", .data = &imx_esdhc_devtype[IMX51_ESDHC], },
--	{ .compatible = "fsl,imx53-esdhc", .data = &imx_esdhc_devtype[IMX53_ESDHC], },
--	{ .compatible = "fsl,imx6q-usdhc", .data = &imx_esdhc_devtype[IMX6Q_USDHC], },
-+	{ .compatible = "fsl,imx25-esdhc", .data = (void *) IMX25_ESDHC, },
-+	{ .compatible = "fsl,imx35-esdhc", .data = (void *) IMX35_ESDHC, },
-+	{ .compatible = "fsl,imx51-esdhc", .data = (void *) IMX51_ESDHC, },
-+	{ .compatible = "fsl,imx53-esdhc", .data = (void *) IMX53_ESDHC, },
-+	{ .compatible = "fsl,imx6q-usdhc", .data = (void *) IMX6Q_USDHC, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, imx_esdhc_dt_ids);
-@@ -867,9 +861,8 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 		goto free_sdhci;
- 	}
- 
--	if (of_id)
--		pdev->id_entry = of_id->data;
--	imx_data->devtype = pdev->id_entry->driver_data;
-+	imx_data->devtype = of_id ? (enum imx_esdhc_type) of_id->data :
-+				    pdev->id_entry->driver_data;
- 	pltfm_host->priv = imx_data;
- 
- 	if (is_imx25_esdhc(imx_data) || is_imx35_esdhc(imx_data))
--- 
-1.7.9.5
+...
+>> +
+>> +static inline void st_i2c_set_bits(void __iomem *reg, u32 mask)
+>> +{
+>> +     writel(readl(reg) | mask, reg);
+>> +}
+>> +
+>> +static inline void st_i2c_clr_bits(void __iomem *reg, u32 mask)
+>> +{
+>> +     writel(readl(reg) & ~mask, reg);
+> use set_bit api and use relaxed version
+Using the set_bit api here does not match with the purpose of these 
+functions.
+We want to be able to set/clear multiple bits, and AFAICS the set_bit 
+api does not
+provide this possibility.
+
+I took example on i2c-nomadik for these functions.
+
+>> +}
+>> +
+>> +/* From I2C Specifications v0.5 */
+>> +static struct st_i2c_timings i2c_timings[] = {
+>> +     [I2C_MODE_STANDARD] = {
+>> +             .rate                   = 100000,
+>> +             .rep_start_hold         = 4000,
+>> +             .rep_start_setup        = 4700,
+>> +             .start_hold             = 4000,
+>> +             .data_setup_time        = 250,
+>> +             .stop_setup_time        = 4000,
+>> +             .bus_free_time          = 4700,
+>> +     },
+>> +     [I2C_MODE_FAST] = {
+>> +             .rate                   = 400000,
+>> +             .rep_start_hold         = 600,
+>> +             .rep_start_setup        = 600,
+>> +             .start_hold             = 600,
+>> +             .data_setup_time        = 100,
+>> +             .stop_setup_time        = 600,
+>> +             .bus_free_time          = 1300,
+>> +     },
+>> +};
+> so how do you plane to support other rate that 100k and 400k?
+The SSC IP only supports Standard and Fast modes.
+There are no plans to support faster modes.
+>> +
+>> +static void st_i2c_flush_rx_fifo(struct st_i2c_dev *i2c_dev)
+>> +{
+>> +     int count, i;
+>> +
+>> +     /*
+>> +      * Counter only counts up to 7 but fifo size is 8...
+>> +      * When fifo is full, counter is 0 and RIR bit of status register is
+>> +      * set
+>> +      */
+>> +     if (readl(i2c_dev->base + SSC_STA) & SSC_STA_RIR)
+>> +             count = SSC_RXFIFO_SIZE;
+>> +     else
+>> +             count = readl(i2c_dev->base + SSC_RX_FSTAT) &
+>> +                     SSC_RX_FSTAT_STATUS;
+>> +
+>> +     for (i = 0; i < count; i++)
+>> +             readl(i2c_dev->base + SSC_RBUF);
+> use readsl
+Since the read content is flushed, I prefer keeping it as it is instead 
+of allocating
+a buffer of the FIFO's size.
+>
+> use relaxed version as much as possible
+I was not comfortable with the different possibilities (_raw_readl, 
+readl_relaxed, readl...).
+I found this interresting discussion: 
+_http://comments.gmane.org/gmane.linux.ports.arm.kernel/117626
+ From what I understood, you are right, I should be able to use 
+readl_relaxed everywhere.
+
+Maybe I should perform a readl on the interrupt mask register before 
+returning from the interrupt handler,
+in order to ensure that the write to the IEN register is effective 
+before the IRQ for the device is re-enabled at GIC level.
+Maybe this could avoid the few spurious interrupts I face sometimes, I 
+will have a try.
+
+>> +}
+>> +
+...
+>> +
+>> +static int st_i2c_wait_free_bus(struct st_i2c_dev *i2c_dev)
+>> +{
+>> +     u32 sta;
+>> +     int i;
+>> +
+>> +     for (i = 0; i < 10; i++) {
+>> +             sta = readl(i2c_dev->base + SSC_STA);
+>> +             if (!(sta & SSC_STA_BUSY))
+>> +                     return 0;
+>> +
+>> +             usleep_range(2000, 4000);
+> can not use interrupt?
+Sadly, no.
+There is no interrupt linked to the busy bit.
+>> +     }
+>> +
+...
+>> +
+>> +static struct of_device_id st_i2c_match[] = {
+>> +     { .compatible = "st,comms-ssc-i2c", },
+> the rules is to put the first soc that use the ip in the compatible
+> as st,sti7100-scc-i2c
+Ok. There are no plans to upstream the SH4 platforms, it will only 
+remains in stlinux.com.
+Maybe I can set the first ARM platform (STiH415)?
+That would give st,stih415-ssc-i2c.
+
+Thanks for the review,
+Maxime
+
+>
+> Best Regards,
+> J.
