@@ -1,45 +1,50 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 Oct 2013 08:54:56 -0600
-Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
-In-Reply-To: <CAEPRUYqfpdp1GqxBgx-q=hyvQDe4uyi6okzHPW2QmfmPG_Z3NQ@mail.gmail.com>
-References: <1380846199-12829-1-git-send-email-syin@broadcom.com>	<1380846199-12829-4-git-send-email-syin@broadcom.com>
- <CAEPRUYqfpdp1GqxBgx-q=hyvQDe4uyi6okzHPW2QmfmPG_Z3NQ@mail.gmail.com>
-Message-ID: <525FFA40.9050901@wwwdotorg.org>
+Date: Thu, 17 Oct 2013 08:55:41 -0600
+Subject: [PATCH] DMA: extend documentation to provide more API details
+In-Reply-To: <20131017051636.GB14013@intel.com>
+References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
+ <20131005190200.GZ12758@n2100.arm.linux.org.uk>
+ <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
+ <20131005233137.GA12758@n2100.arm.linux.org.uk>
+ <20131006052029.GE2954@intel.com>
+ <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
+ <20131007111728.GM12758@n2100.arm.linux.org.uk>
+ <20131007103936.GH2954@intel.com>
+ <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
+ <525EEA18.1010802@wwwdotorg.org> <20131017051636.GB14013@intel.com>
+Message-ID: <525FFA6D.8080806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2013 12:03 AM, Christian Daudt wrote:
-> On Thu, Oct 3, 2013 at 5:23 PM, Sherman Yin <syin@broadcom.com> wrote:
->> Adds pinctrl driver for Broadcom Capri (BCM281xx) SoCs.
+On 10/16/2013 11:16 PM, Vinod Koul wrote:
+> On Wed, Oct 16, 2013 at 01:33:44PM -0600, Stephen Warren wrote:
+>> On 10/08/2013 07:34 PM, Dan Williams wrote:
+>>> On Mon, Oct 7, 2013 at 3:39 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+>>>> On Mon, Oct 07, 2013 at 12:17:28PM +0100, Russell King - ARM Linux wrote:
+>> ...
+>>>>> What may be better is to change the wording here: not DMA_SUCCESS but
+>>>>> DMA_COMPLETED.  That doesn't imply that it has been successful, merely
+>>>>> that the DMA engine has finished with the transaction.
+>>>>
+>>>> Agreed that its not indication of success but of DMA completetion. I have seen
+>>>> cases where slave perhiphral got stuck while sending last FIFO but since DMA
+>>>> finished transferiing to FIFO it says complete.
 >>
->> Signed-off-by: Sherman Yin <syin@broadcom.com>
->> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
->> Reviewed-by: Matt Porter <matt.porter@linaro.org>
->> ---
->>  arch/arm/mach-bcm/Kconfig       |    2 +
->>  drivers/pinctrl/Kconfig         |   10 +
->>  drivers/pinctrl/Makefile        |    1 +
->>  drivers/pinctrl/pinctrl-capri.c | 1727 +++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 1740 insertions(+)
->>  create mode 100644 drivers/pinctrl/pinctrl-capri.c
+>> In that case, the DMA *has* completed. DMA is the transfer into the
+>> FIFO, not the handling of the FIFO content by the peripheral.
 >>
->> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
->> index 69d67f7..2546365 100644
->> --- a/arch/arm/mach-bcm/Kconfig
->> +++ b/arch/arm/mach-bcm/Kconfig
->> @@ -10,6 +10,8 @@ config ARCH_BCM
->>         select GENERIC_CLOCKEVENTS
->>         select GENERIC_TIME
->>         select GPIO_BCM
->> +       select PINCTRL
->> +       select PINCTRL_CAPRI
->>         select SPARSE_IRQ
->>         select TICK_ONESHOT
->>         select CACHE_L2X0
-> 
-> On your subsequent patchset pls move this from Kconfig to
-> arm/configs/bcm_defconfig, and break that modification into a separate
-> patch from the drivers/* modification.
+>>>> Dan do you agree?
+>>>
+>>> Yes, it's an indication of completion, not necessarily success.
+>>
+>> Surely by definition, a DMA can't *complete* without being successful.
+>> If the DMA failed, then it didn't complete, but rather must have been
+>> aborted or error'd out, without completing the whole transfer.
+>
+> DMA means transferring of data, and that is what DMA compeletion would mean.
+> Once the data has left the DMA FIFO, we don't know if it filled up the memory
+> propery or get stuck in periphral FIFO, the dmaengine would have no knowledge or
+> control of it. So it can't claim the transfer was success from a data point of
+> view, hence the rename now!
 
-The other SoCs I'm familiar with all select this from their ARCH_xxx
-config symbol.
+Well, I obviously don't agreee, but I guess I won't bother pursuing this.
