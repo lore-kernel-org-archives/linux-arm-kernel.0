@@ -1,22 +1,29 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 17 Oct 2013 07:05:23 +0200
-Subject: change_page_attr() implementation for ARM?
-Message-ID: <20131017.080523.1821831578701162178.hdoyu@nvidia.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 17 Oct 2013 10:29:45 +0530
+Subject: [PATCH] cpufreq: exynos: Convert exynos-cpufreq to platform driver
+In-Reply-To: <1381939238-30398-1-git-send-email-t.figa@samsung.com>
+References: <1381939238-30398-1-git-send-email-t.figa@samsung.com>
+Message-ID: <CAK9yfHwW+ofX5f8hHF=MYQn=CUMyiHvg4iAH-cHFW7JQ5Qnscw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tomasz, Lukasz,
 
-I found a bit old discussion[1] about CPA support on ARM32(Cortex-A9).
+On 16 October 2013 21:30, Tomasz Figa <t.figa@samsung.com> wrote:
+> From: Lukasz Majewski <l.majewski@samsung.com>
+>
+> +static struct platform_driver exynos_cpufreq_platdrv = {
+> +       .driver = {
+> +               .name   = "exynos-cpufreq",
+> +               .owner  = THIS_MODULE,
+> +       },
+> +       .probe = exynos_cpufreq_init,
 
-It seesm that CPA API on ARM wasn't possible because maintaining
-multiple pagetables under SMP is difficult. Instead currently we are
-using precallocated memory via DMA API.
+I think the prototype of this function should be changed to:
+static int __init exynos_cpufreq_init(struct platform_device *pdev)
 
-Is this situation still same for Cortex-A15 and ARM64? If the
-mismatched aliasing problem doesn't happen, is CPA API feasible?
+to avoid compilation warnings.
 
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-October/069275.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-October/069315.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-October/069318.html
+-- 
+With warm regards,
+Sachin
