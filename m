@@ -1,74 +1,119 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Thu, 17 Oct 2013 10:57:48 +0100
-Subject: [PATCH 2/2] ARM: vexpress: Enable platform-specific options in
- defconfig
-In-Reply-To: <1381930594-1701-3-git-send-email-pawel.moll@arm.com>
-References: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
- <1381930594-1701-3-git-send-email-pawel.moll@arm.com>
-Message-ID: <525FB49C.7040607@arm.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 17 Oct 2013 14:01:36 +0400
+Subject: [PATCH 2/3] ALSA: ASoC: pxa: fix pxa2xx-ac97 DAI initialization order
+In-Reply-To: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
+References: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1382004097-6350-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+After recent changes to codec/DAI initialization order changes, codec
+driver (wm9712 in my case) tries to access codec prior to
+pxa2xx_ac97_hw_probe() being called (because DAIs are probed after all
+codecs are probed). Move hw-related probe/remove/suspend/resume
+functions to pxa2xx-ac97 driver level, instead of DAI level.
 
-On 16/10/13 14:36, Pawel Moll wrote:
-> This patch enables all drivers and alike to make defconfig-ed
-> kernels use Versatile Express specific features, like power
-> management services (PSCI, MCPM and cpuidle with drivers for
-> DCCSB on Fast Models and SPC on TC2), CMA for frame buffer
-> allocation, all virtio device drivers (for QEMU, KVM tools
-> and Fast Models), MTD physmap drivers with squashfs and UBIFS
-> for flash, I2C master, regulator and hwmon drivers and
-> LEDs support with most useful triggers. The maximum
-> amount of CPUs has been increased to 8 to facilitate
-> big.Little systems.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  arch/arm/configs/vexpress_defconfig | 65 ++++++++++++++++++++++++-------------
->  1 file changed, 42 insertions(+), 23 deletions(-)
-> 
-> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-> index 6d20bc1..f2535e3 100644
-> --- a/arch/arm/configs/vexpress_defconfig
-> +++ b/arch/arm/configs/vexpress_defconfig
-[snip]
-> @@ -44,39 +49,46 @@ CONFIG_IP_PNP_BOOTP=y
->  # CONFIG_INET_LRO is not set
->  # CONFIG_IPV6 is not set
->  # CONFIG_WIRELESS is not set
-> +CONFIG_NET_9P=y
-> +CONFIG_NET_9P_VIRTIO=y
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
->  CONFIG_DEVTMPFS=y
->  CONFIG_MTD=y
-> -CONFIG_MTD_CONCAT=y
-> -CONFIG_MTD_PARTITIONS=y
->  CONFIG_MTD_CMDLINE_PARTS=y
-> -CONFIG_MTD_CHAR=y
->  CONFIG_MTD_BLOCK=y
->  CONFIG_MTD_CFI=y
->  CONFIG_MTD_CFI_INTELEXT=y
->  CONFIG_MTD_CFI_AMDSTD=y
-> -CONFIG_MTD_ARM_INTEGRATOR=y
-> -CONFIG_MISC_DEVICES=y
-> +CONFIG_MTD_RAM=y
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ sound/soc/pxa/pxa2xx-ac97.c | 56 ++++++++++++++++++++-------------------------
+ 1 file changed, 25 insertions(+), 31 deletions(-)
 
-
-> +CONFIG_MTD_PHYSMAP=y
-> +CONFIG_MTD_PHYSMAP_OF=y
-
-This could cause issues with CPUIdle on TC2. Since TC2 reset vector is in NOR
-flash, NOR flash has to be in Read mode when CPU resets and enter reset vector.
-But what I have seen is that NOR flash is left in Read Identifier Mode after the
-driver is initialised. So we need to make sure NOR device is in Read mode
-whenever CPU enters deeper C-states and also may have to register notifiers
-which seems overkill IMO. Most of the platform have separate(or secure) flash
-for this reason.
-Is it possible to disable flash on TC2 only in it's DT something like
-         flash at 0,00000000 {
-                status = "disabled";
-         };	
-
-Regards,
-Sudeep
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index f1059d9..ae956e3 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -89,33 +89,6 @@ static struct snd_dmaengine_dai_dma_data pxa2xx_ac97_pcm_mic_mono_in = {
+ 	.filter_data	= &pxa2xx_ac97_pcm_aux_mic_mono_req,
+ };
+ 
+-#ifdef CONFIG_PM
+-static int pxa2xx_ac97_suspend(struct snd_soc_dai *dai)
+-{
+-	return pxa2xx_ac97_hw_suspend();
+-}
+-
+-static int pxa2xx_ac97_resume(struct snd_soc_dai *dai)
+-{
+-	return pxa2xx_ac97_hw_resume();
+-}
+-
+-#else
+-#define pxa2xx_ac97_suspend	NULL
+-#define pxa2xx_ac97_resume	NULL
+-#endif
+-
+-static int pxa2xx_ac97_probe(struct snd_soc_dai *dai)
+-{
+-	return pxa2xx_ac97_hw_probe(to_platform_device(dai->dev));
+-}
+-
+-static int pxa2xx_ac97_remove(struct snd_soc_dai *dai)
+-{
+-	pxa2xx_ac97_hw_remove(to_platform_device(dai->dev));
+-	return 0;
+-}
+-
+ static int pxa2xx_ac97_hw_params(struct snd_pcm_substream *substream,
+ 				 struct snd_pcm_hw_params *params,
+ 				 struct snd_soc_dai *cpu_dai)
+@@ -185,10 +158,6 @@ static struct snd_soc_dai_driver pxa_ac97_dai_driver[] = {
+ {
+ 	.name = "pxa2xx-ac97",
+ 	.ac97_control = 1,
+-	.probe = pxa2xx_ac97_probe,
+-	.remove = pxa2xx_ac97_remove,
+-	.suspend = pxa2xx_ac97_suspend,
+-	.resume = pxa2xx_ac97_resume,
+ 	.playback = {
+ 		.stream_name = "AC97 Playback",
+ 		.channels_min = 2,
+@@ -246,6 +215,12 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
+ 		return -ENXIO;
+ 	}
+ 
++	ret = pxa2xx_ac97_hw_probe(pdev);
++	if (ret) {
++		dev_err(&pdev->dev, "PXA2xx AC97 hw probe error (%d)\n", ret);
++		return ret;
++	}
++
+ 	ret = snd_soc_set_ac97_ops(&pxa2xx_ac97_ops);
+ 	if (ret != 0)
+ 		return ret;
+@@ -262,15 +237,34 @@ static int pxa2xx_ac97_dev_remove(struct platform_device *pdev)
+ {
+ 	snd_soc_unregister_component(&pdev->dev);
+ 	snd_soc_set_ac97_ops(NULL);
++	pxa2xx_ac97_hw_remove(pdev);
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int pxa2xx_ac97_dev_suspend(struct device *dev)
++{
++	return pxa2xx_ac97_hw_suspend();
++}
++
++static int pxa2xx_ac97_dev_resume(struct device *dev)
++{
++	return pxa2xx_ac97_hw_resume();
++}
++
++static SIMPLE_DEV_PM_OPS(pxa2xx_ac97_pm_ops,
++		pxa2xx_ac97_dev_suspend, pxa2xx_ac97_dev_resume);
++#endif
++
+ static struct platform_driver pxa2xx_ac97_driver = {
+ 	.probe		= pxa2xx_ac97_dev_probe,
+ 	.remove		= pxa2xx_ac97_dev_remove,
+ 	.driver		= {
+ 		.name	= "pxa2xx-ac97",
+ 		.owner	= THIS_MODULE,
++#ifdef CONFIG_PM_SLEEP
++		.pm	= &pxa2xx_ac97_pm_ops,
++#endif
+ 	},
+ };
+ 
+-- 
+1.8.4.rc3
