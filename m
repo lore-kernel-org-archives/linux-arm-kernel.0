@@ -1,133 +1,172 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Thu, 17 Oct 2013 17:00:50 +0530
-Subject: [RFC PATCH 1/5] ARM/ARM64: KVM: Update user space API header for
- PSCI emulation
-In-Reply-To: <525FC82D.7030904@arm.com>
-References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
- <1381942954-22388-2-git-send-email-anup.patel@linaro.org>
- <20131016221132.GE24837@cbox>
- <CAAhSdy2jgz24HEH1_CGCEYSGoBuy-4bA-ACYxLEWwCD33a9_XQ@mail.gmail.com>
- <525FA41F.1050204@arm.com>
- <CAAhSdy1o9nYu9Mp18M+wTtZGHJkge0eDA6oqyt-J9wYYEqXtGg@mail.gmail.com>
- <525FC82D.7030904@arm.com>
-Message-ID: <CAAhSdy1quhekbE6nXWWK7B4Ak3PjN+FVRMnQqj8gk1urPgKDkg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Oct 2013 12:38:26 +0100
+Subject: [PATCH v4 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <1381990781-27814-3-git-send-email-liuj97@gmail.com>
+References: <1381990781-27814-1-git-send-email-liuj97@gmail.com>
+ <1381990781-27814-3-git-send-email-liuj97@gmail.com>
+Message-ID: <20131017113826.GJ18765@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 4:51 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 17/10/13 12:10, Anup Patel wrote:
->> On Thu, Oct 17, 2013 at 2:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On 17/10/13 07:45, Anup Patel wrote:
->>>> On Thu, Oct 17, 2013 at 3:41 AM, Christoffer Dall
->>>> <christoffer.dall@linaro.org> wrote:
->>>>> On Wed, Oct 16, 2013 at 10:32:30PM +0530, Anup Patel wrote:
->>>>>> Update user space API interface headers for providing information to
->>>>>> user space needed to emulate PSCI function calls in user space (i.e.
->>>>>> QEMU or KVMTOOL).
->>>>>>
->>>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>>>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>>>>> ---
->>>>>>  include/uapi/linux/kvm.h |    7 +++++++
->>>>>>  1 file changed, 7 insertions(+)
->>>>>>
->>>>>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->>>>>> index e32e776..dae2664 100644
->>>>>> --- a/include/uapi/linux/kvm.h
->>>>>> +++ b/include/uapi/linux/kvm.h
->>>>>> @@ -171,6 +171,7 @@ struct kvm_pit_config {
->>>>>>  #define KVM_EXIT_WATCHDOG         21
->>>>>>  #define KVM_EXIT_S390_TSCH        22
->>>>>>  #define KVM_EXIT_EPR              23
->>>>>> +#define KVM_EXIT_PSCI             24
->>>>>>
->>>>>>  /* For KVM_EXIT_INTERNAL_ERROR */
->>>>>>  /* Emulate instruction failed. */
->>>>>> @@ -301,6 +302,12 @@ struct kvm_run {
->>>>>>               struct {
->>>>>>                       __u32 epr;
->>>>>>               } epr;
->>>>>> +             /* KVM_EXIT_PSCI */
->>>>>> +             struct {
->>>>>> +                     __u32 fn;
->>>>>> +                     __u64 args[7];
->>>>>> +                     __u64 ret[4];
->>>>>> +             } psci;
->>>>>>               /* Fix the size of the union. */
->>>>>>               char padding[256];
->>>>>>       };
->>>>>> --
->>>>>> 1.7.9.5
->>>>>>
->>>>> I am also wondering if this is not solving a very specific need without
->>>>> thinking a little more carefully about this problem.
->>>>
->>>> No, its not solving a specific problem.
->>>>
->>>> In fact, its more general because we pass complete info required to
->>>> emulate a PSCI call in user space.
->>>> (Please refer PSCI calling convention)
->>>>
->>>>>
->>>>> We have previously discussed the need for some secure side emulation
->>>>> in QEMU, and I think perhaps we need something more generic which allows
->>>>> user space to handle SMC calls and/or allows user space to "inject" some
->>>>> secure world runtime that the kernel can run in a partially or fully
->>>>> isolated container to handle SMC calls.
->>>>>
->>>>> Peter raised this issue previously and pointed to a proposal he had as
->>>>> well.
->>>>
->>>> If required we can have an additional field in kvm_run->psci which tells
->>>> whether the PSCI call is an SMC call or HVC call.
->>>>
->>>>>
->>>>> Is there a technical reason why we need something specifically directed
->>>>> to PSCI?
->>>>
->>>> Its quite natural to add this to PSCI emulation in KVM ARM/ARM64 instead
->>>> of adding a separate VirtIO device for System reboot and System poweroff.
->>>>
->>>> Also in the process of implementing SYSTEM_OFF and SYSTEM_RESET
->>>> emulation in user space we would also have an infrastructure for adding
->>>> emulation of new PSCI calls in user space.
->>>
->>> And I strongly oppose to that. It creates consistency issues (what if
->>> userspace implements one version of PSCI, and the kernel another?), and
->>> also some really horrible situations: Imagine you implement the SUSPEND
->>> operation in userspace, and want to wake the vcpu up with an interrupt.
->>> You'd end-up having to keep track of the state in the kernel, having to
->>> forward the interrupt event to userspace...
->>
->> It is not about emulating all PSCI functions in user space. Its about forwarding
->> system-level PSCI functions or PSCI functions which cannot be emulated in
->> kernel to user space.
->
-> The CPU parts of PSCI can perfectly be implemented in the kernel.
+[adding Tixy for stop_machine() question below]
 
-Agreed. This patches does the same.
+On Thu, Oct 17, 2013 at 07:19:35AM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
+> 
+> Introduce three interfaces to patch kernel and module code:
+> aarch64_insn_patch_text_nosync():
+> 	patch code without synchronization, it's caller's responsibility
+> 	to synchronize all CPUs if needed.
+> aarch64_insn_patch_text_sync():
+> 	patch code and always synchronize with stop_machine()
+> aarch64_insn_patch_text():
+> 	patch code and synchronize with stop_machine() if needed
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/include/asm/insn.h | 24 +++++++++++++-
+>  arch/arm64/kernel/insn.c      | 77 +++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 100 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index 6190016..fc439b9 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -60,8 +60,30 @@ __AARCH64_INSN_FUNCS(nop,	0xFFFFFFFF, 0xD503201F)
+>  
+>  #undef	__AARCH64_INSN_FUNCS
+>  
+> -enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+> +/*
+> + * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
+> + * little-endian. On the other hand, SCTLR_EL1.EE (bit 25, Exception Endianness)
+> + * flag controls endianness for EL1 explicit data accesses and stage 1
+> + * translation table walks as below:
+> + *	0: little-endian
+> + *	1: big-endian
+> + * So need to handle endianness when patching kernel code.
+> + */
 
->
-> Then you can return something to userspace indicating what just
-> happened. And it doesn't have to be PSCI specific.
+You can delete this comment now that we're using the helpers...
 
-Are you suggesting that everytime we want to emulate some new
-PSCI call with help from user space (e.g. SYSTEM_OFF and
-SYSTEM_RESET), we add new exit reasons and just keep on
-increasing KVM exit reasons ?
+> +static __always_inline u32 aarch64_insn_read(void *addr)
+> +{
+> +	return le32_to_cpu(*(u32 *)addr);
+> +}
+>  
+> +static __always_inline void aarch64_insn_write(void *addr, u32 insn)
+> +{
+> +	*(u32 *)addr = cpu_to_le32(insn);
+> +}
 
-Why can't the exit reason and exit info in struct kvm_run be
-PSCI specific ?
+... then just inline these calls directly.
 
-On the contrary, it will be good to have exit reason and exit info
-PSCI specific because we have PSCI specification which tells
-how it is to be emulated ?
+> +enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>  
+> +int aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[], int cnt);
+> +int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+> +int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+> +
+>  #endif	/* _ASM_ARM64_INSN_H */
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 1c501f3..8dd5fbe 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -16,6 +16,9 @@
+>   */
+>  #include <linux/compiler.h>
+>  #include <linux/kernel.h>
+> +#include <linux/smp.h>
+> +#include <linux/stop_machine.h>
+> +#include <asm/cacheflush.h>
+>  #include <asm/insn.h>
+>  
+>  static int aarch64_insn_encoding_cls[] = {
+> @@ -70,3 +73,77 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+>  	return __aarch64_insn_hotpatch_safe(old_insn) &&
+>  	       __aarch64_insn_hotpatch_safe(new_insn);
+>  }
+> +
+> +int __kprobes aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[],
+> +					     int cnt)
+> +{
+> +	int i;
+> +	u32 *tp;
+> +
+> +	if (cnt <= 0)
+> +		return -EINVAL;
 
---
-Anup
+Isn't cnt always 1 for the _nosync patching? Can you just drop the argument
+and simplify this code? Patching a sequence without syncing is always racy.
 
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
+> +	for (i = 0; i < cnt; i++) {
+> +		tp = addrs[i];
+> +		/* A64 instructions must be word aligned */
+> +		if ((uintptr_t)tp & 0x3)
+> +			return -EINVAL;
+> +		aarch64_insn_write(tp, insns[i]);
+> +		flush_icache_range((uintptr_t)tp, (uintptr_t)tp + sizeof(u32));
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +struct aarch64_insn_patch {
+> +	void	**text_addrs;
+> +	u32	*new_insns;
+> +	int	insn_cnt;
+> +};
+> +
+> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+> +{
+> +	struct aarch64_insn_patch *pp = arg;
+> +
+> +	return aarch64_insn_patch_text_nosync(pp->text_addrs, pp->new_insns,
+> +					      pp->insn_cnt);
+> +}
+> +
+> +int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
+> +{
+> +	struct aarch64_insn_patch patch = {
+> +		.text_addrs = addrs,
+> +		.new_insns = insns,
+> +		.insn_cnt = cnt,
+> +	};
+> +
+> +	if (cnt <= 0)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * Execute __aarch64_insn_patch_text() on every online CPU,
+> +	 * which ensure serialization among all online CPUs.
+> +	 */
+> +	return stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
+> +}
+
+Whoa, whoa, whoa! The comment here is wrong -- we only run the patching on
+*one* CPU, which is the right thing to do. However, the arch/arm/ call to
+stop_machine in kprobes does actually run the patching code on *all* the
+online cores (including the cache flushing!). I think this is to work around
+cores without hardware cache maintenance broadcasting, but that could easily
+be called out specially (like we do in patch.c) and the flushing could be
+separated from the patching too.
+
+> +int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+> +{
+> +	int ret;
+> +
+> +	if (cnt == 1 && aarch64_insn_hotpatch_safe(aarch64_insn_read(addrs[0]),
+> +						   insns[0])) {
+
+You could make aarch64_insn_hotpatch_safe take the cnt parameter and return
+false if cnt != 1.
+
+> +		/*
+> +		 * It doesn't guarantee all CPUs see the new instruction
+
+"It"? You mean the ARMv8 architecture?
+
+Will
