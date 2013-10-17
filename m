@@ -1,95 +1,121 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 17 Oct 2013 13:35:43 -0400
-Subject: [PATCH 5/7] jump_label: relax branch hinting restrictions
-In-Reply-To: <1382004631-25895-6-git-send-email-rkrcmar@redhat.com>
-References: <1382004631-25895-1-git-send-email-rkrcmar@redhat.com>
- <1382004631-25895-6-git-send-email-rkrcmar@redhat.com>
-Message-ID: <20131017133543.7e4e8d45@gandalf.local.home>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 17 Oct 2013 19:34:33 +0200
+Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
+In-Reply-To: <0E83723C55F66F43A6041464FE31119D40F6D8@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+ <201310161557.41041.marex@denx.de>
+ <0E83723C55F66F43A6041464FE31119D40F6D8@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <201310171934.34021.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Oct 2013 12:10:28 +0200
-Radim Kr?m?? <rkrcmar@redhat.com> wrote:
+Hi Richard,
 
-> We implemented the optimized branch selection in higher levels of api.
-> That made static_keys very unintuitive, so this patch introduces another
-> element to jump_table, carrying one bit that tells the underlying code
-> which branch to optimize.
+> Hi Marek:
+> > -----Original Message-----
 > 
-> It is now possible to select optimized branch for every jump_entry.
+> [...]
 > 
-> Current side effect is 1/3 increase increase in space, we could:
-> * use bitmasks and selectors on 2+ aligned code/struct.
->   - aligning jump target is easy, but because it is not done by default
->     and few bytes in .text are much worse that few kilos in .data,
->     I chose not to
->   - data is probably aligned by default on all current architectures,
->     but programmer can force misalignment of static_key
-> * optimize each architecture independently
->   - I can't test everything and this patch shouldn't break anything, so
->     others can contribute in the future
-> * choose something worse, like packing or splitting
-> * ignore
+> > > > ---
+> > > > 
+> > > >  drivers/pci/host/pci-imx6.c | 13 ++++++++++++-
+> > > >  1 file changed, 12 insertions(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/drivers/pci/host/pci-imx6.c
+> > > > b/drivers/pci/host/pci-imx6.c index ca8c5de..8402e9a 100644
+> > > > --- a/drivers/pci/host/pci-imx6.c
+> > > > +++ b/drivers/pci/host/pci-imx6.c
+> > > > @@ -321,6 +321,7 @@ static void imx6_pcie_host_init(struct pcie_port
+> > > > *pp)
+> > > > 
+> > > >  {
+> > > >  
+> > > >  	int count = 0;
+> > > >  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+> > > > 
+> > > > +	uint32_t tmp;
+> > > > 
+> > > >  	imx6_pcie_assert_core_reset(pp);
+> > > > 
+> > > > @@ -330,13 +331,23 @@ static void imx6_pcie_host_init(struct
+> > > > pcie_port
+> > > > *pp)
+> > > > 
+> > > >  	dw_pcie_setup_rc(pp);
+> > > > 
+> > > > +	/*
+> > > > +	 * FIXME:
+> > > > +	 * Force Gen1 operation. In case the IP block is in Gen2 
+operation
+> > > > +	 * mode, it does not detect the PCIe switch at all.
+> > > > +	 */
+> > > > +	tmp = readl(pp->dbi_base + 0x7c);
+> > > > +	tmp &= ~0xf;
+> > > > +	tmp |= 0x1;
+> > > > +	writel(tmp, pp->dbi_base + 0x7c);
+> > > > +
+> > > 
+> > > Since you are forcing RC to work in GEN1, so you will not be able to
+> > > connect any device at GEN2 now.
+> > 
+> > I'd rather prefer to know WHY if the RC is operating in Gen2 mode by
+> > default, I cannot see the PCIe switch (Pericom PI7C9X2G303) connected to
+> > it. I was unable to figure this out. Tim pointed out this thread [1] ,
+> > so it might be related in some way.
+> > 
+> > [1] https://community.freescale.com/message/316162#316162
+> > 
+> > I tried switching the PCIe RC to Gen2 operation right after LinkUp by
+> > writing this register with 0x2 again and re-issuing the LinkUp check,
+> > which passed and the status register reported Gen2 operation, but then
+> > the PCIe Intel NIC connected to the downstream port of the Pericom
+> > switch still reported Gen1 operation for some reason.
 > 
-> proof: example & x86_64 disassembly: (F = ffffffff)
-> 
->   struct static_key flexible_feature;
->   noinline void jump_label_experiment(void) {
->   	if ( static_key_false(&flexible_feature))
->   	     asm ("push 0xa1");
->   	else asm ("push 0xa0");
->   	if (!static_key_false(&flexible_feature))
->   	     asm ("push 0xb0");
->   	else asm ("push 0xb1");
->   	if ( static_key_true(&flexible_feature))
->   	     asm ("push 0xc1");
->   	else asm ("push 0xc0");
->   	if (!static_key_true(&flexible_feature))
->   	     asm ("push 0xd0");
->   	else asm ("push 0xd1");
->   }
-> 
->   Disassembly of section .text: (push marked by "->")
-> 
->   F81002000 <jump_label_experiment>:
->   F81002000:       e8 7b 29 75 00          callq  F81754980 <__fentry__>
->   F81002005:       55                      push   %rbp
->   F81002006:       48 89 e5                mov    %rsp,%rbp
->   F81002009:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
->   F8100200e: ->    ff 34 25 a0 00 00 00    pushq  0xa0
->   F81002015:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
->   F8100201a: ->    ff 34 25 b0 00 00 00    pushq  0xb0
->   F81002021:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
->   F81002026: ->    ff 34 25 c1 00 00 00    pushq  0xc1
->   F8100202d:       0f 1f 00                nopl   (%rax)
->   F81002030:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
->   F81002035: ->    ff 34 25 d1 00 00 00    pushq  0xd1
->   F8100203c:       5d                      pop    %rbp
->   F8100203d:       0f 1f 00                nopl   (%rax)
->   F81002040:       c3                      retq
+>  [Richard] Is your Inetl NIC GEN1 EP device?
 
-This looks exactly like what we want. I take it this is with your
-patch. What was the result before the patch?
+Yes, the i210 is PCIe v2.1 (2.5GT/s) x1 device.
 
--- Steve
-
->   F81002041:       0f 1f 80 00 00 00 00    nopl   0x0(%rax)
->   F81002048: ->    ff 34 25 d0 00 00 00    pushq  0xd0
->   F8100204f:       5d                      pop    %rbp
->   F81002050:       c3                      retq
->   F81002051:       0f 1f 80 00 00 00 00    nopl   0x0(%rax)
->   F81002058: ->    ff 34 25 c0 00 00 00    pushq  0xc0
->   F8100205f:       90                      nop
->   F81002060:       eb cb                   jmp    F8100202d <[...]+0x2d>
->   F81002062:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
->   F81002068: ->    ff 34 25 b1 00 00 00    pushq  0xb1
->   F8100206f:       90                      nop
->   F81002070:       eb af                   jmp    F81002021 <[...]+0x21>
->   F81002072:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
->   F81002078: ->    ff 34 25 a1 00 00 00    pushq  0xa1
->   F8100207f:       90                      nop
->   F81002080:       eb 93                   jmp    F81002015 <[...]+0x15>
->   F81002082:       66 66 66 66 66 2e 0f    [...]
->   F81002089:       1f 84 00 00 00 00 00
+> > > Yes, There are some buggy PCIe devices which works with GEN1 only host.
+> > 
+> > The pericom one is Gen2 according to it's datasheet.
 > 
->   Contents of section .data: (relevant part of embedded __jump_table)
+> [Richard] Yes, it is. Pericom's PI7C9X2G303EL is GEN2 PCIe switch.
+> It had been verified on FSL's 3.0.35 releases.
+
+Verified how? What does it mean?
+
+Note that when I followed [1] in this manner:
+
+1) Force GEN1 mode
+2) Wait for PHY link up
+3) Allow GEN2 mode
+4) Start GEN2 speed change
+5) Wait for PHY link up
+
+my devices were detected and the link between pericom and mx6 was operating in 
+gen2 mode. Thus I suspect we might need to start the port in Gen1 mode and 
+switch to Gen2 only after link is up. Does that make sense?
+
+https://community.freescale.com/thread/304284
+
+> > > So better solution should be to initialize RC by default at GEN2 or
+> > > highest speed. Further, a parameter say gen_only can be passed from DT
+> > > to force GEN1 only mode.
+> > > 
+> > > What do you say?
+> > 
+> > I say I'd like to know the root cause of this problem. This Gen2 fix was
+> > pulled from one of the myriad variants of the FSL PCIe driver, so
+> > apparently this issue happens to other people as well. But why and how
+> > to properly fix this so the whole PCIe bus does operate in Gen2 mode, I
+> > cannot tell :-(
+> 
+> [Richard] GEN2 mode had been verified in FSL 3.0.35 kernel releases before.
+> I don't know why it can't work in GEN2 mode in the latest kernel.
+> BTW, Based on for-next branch of shawn's git reops and applied Merak's
+> patch-set, my PI7C9X2G303EL with intel e1000e network card plugged can't
+> be detected at all. :(.
+
+I think we're still fighting some issue with resource mappings here. We also 
+agreed with Tim that my patches are incomplete. I will send out a new version 
+ASAP.
