@@ -1,64 +1,36 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 17 Oct 2013 18:43:24 +0100
-Subject: [PATCH v8 09/19] arm64/xen: get_dma_ops: return xen_dma_ops if we are
- running as xen_initial_domain
-In-Reply-To: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
-Message-ID: <1382031814-8782-9-git-send-email-stefano.stabellini@eu.citrix.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 17 Oct 2013 10:53:02 -0700 (PDT)
+Subject: [PATCH v2] irqchip: exynos-combiner: remove hard-coded irq_base
+ value
+In-Reply-To: <02c701ceba75$f95b1900$ec114b00$@org>
+References: <1379937815-21746-1-git-send-email-chander.kashyap@linaro.org>
+ <02c701ceba75$f95b1900$ec114b00$@org>
+Message-ID: <1949846.N3fAUHQ1Nx@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can't simply override arm_dma_ops with xen_dma_ops because devices
-are allowed to have their own dma_ops and they take precedence over
-arm_dma_ops. When running on Xen as initial domain, we always want
-xen_dma_ops to be the one in use.
+Hi Kukjin,
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: will.deacon at arm.com
+On Thursday 26 of September 2013 14:05:09 Kukjin Kim wrote:
+> Chander Kashyap wrote:
+> > Replace irq_domain_add_simple with "irq_domain_add_linear" in order to
+> > use linear irq domain, and to remove hardcoded irq_base_value.
+> > 
+> > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> > ---
+> > 
+> > Changes since v1:
+> > 	- Replaced irq_domain_add_simple with irq_domain_add_linear,
+> > 	
+> > 	  as suggested by Tomasz
+> >  
+> >  drivers/irqchip/exynos-combiner.c |   15 +++------------
+> >  1 file changed, 3 insertions(+), 12 deletions(-)
+[snip]
+> 
+> Looks nice to me, applied with Tomasz's review.
 
-Changes in v7:
-- return xen_dma_ops only if we are the initial domain;
-- rename __get_dma_ops to __generic_dma_ops.
----
- arch/arm64/include/asm/dma-mapping.h |   13 ++++++++++++-
- 1 files changed, 12 insertions(+), 1 deletions(-)
+I don't see this patch in your tree. Did you apply it in the end?
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 59206b1..fd0c0c0 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -23,12 +23,15 @@
- 
- #include <asm-generic/dma-coherent.h>
- 
-+#include <xen/xen.h>
-+#include <asm/xen/hypervisor.h>
-+
- #define ARCH_HAS_DMA_GET_REQUIRED_MASK
- 
- #define DMA_ERROR_CODE	(~(dma_addr_t)0)
- extern struct dma_map_ops *dma_ops;
- 
--static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-+static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
- {
- 	if (unlikely(!dev) || !dev->archdata.dma_ops)
- 		return dma_ops;
-@@ -36,6 +39,14 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
- 		return dev->archdata.dma_ops;
- }
- 
-+static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-+{
-+	if (xen_initial_domain())
-+		return xen_dma_ops;
-+	else
-+		return __generic_dma_ops(dev);
-+}
-+
- #include <asm-generic/dma-mapping-common.h>
- 
- static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
--- 
-1.7.2.5
+Best regards,
+Tomasz
