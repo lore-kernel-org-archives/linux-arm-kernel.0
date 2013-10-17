@@ -1,350 +1,63 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 17 Oct 2013 18:43:18 +0100
-Subject: [PATCH v8 03/19] arm/xen,arm64/xen: introduce p2m
+Date: Thu, 17 Oct 2013 18:43:22 +0100
+Subject: [PATCH v8 07/19] swiotlb-xen: introduce xen_swiotlb_set_dma_mask
 In-Reply-To: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
-Message-ID: <1382031814-8782-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1382031814-8782-7-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce physical to machine and machine to physical tracking
-mechanisms based on rbtrees for arm/xen and arm64/xen.
-
-We need it because any guests on ARM are an autotranslate guests,
-therefore a physical address is potentially different from a machine
-address. When programming a device to do DMA, we need to be
-extra-careful to use machine addresses rather than physical addresses to
-program the device. Therefore we need to know the physical to machine
-mappings.
-
-For the moment we assume that dom0 starts with a 1:1 physical to machine
-mapping, in other words physical addresses correspond to machine
-addresses. However when mapping a foreign grant reference, obviously the
-1:1 model doesn't work anymore. So at the very least we need to be able
-to track grant mappings.
-
-We need locking to protect accesses to the two trees.
+Implement xen_swiotlb_set_dma_mask, use it for set_dma_mask on arm.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-Changes in v8:
-- move pfn_to_mfn and mfn_to_pfn to page.h as static inline functions;
-- no need to walk the tree if phys_to_mach.rb_node is NULL;
-- correctly handle multipage p2m entries;
-- substitute the spin_lock with a rwlock.
 ---
- arch/arm/include/asm/xen/page.h |   49 ++++++++--
- arch/arm/xen/Makefile           |    2 +-
- arch/arm/xen/p2m.c              |  208 +++++++++++++++++++++++++++++++++++++++
- arch/arm64/xen/Makefile         |    2 +-
- 4 files changed, 252 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/xen/p2m.c
+ arch/arm/xen/mm.c         |    1 +
+ drivers/xen/swiotlb-xen.c |   12 ++++++++++++
+ include/xen/swiotlb-xen.h |    2 ++
+ 3 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index 359a7b5..d1b5dd5 100644
---- a/arch/arm/include/asm/xen/page.h
-+++ b/arch/arm/include/asm/xen/page.h
-@@ -7,11 +7,10 @@
- #include <linux/pfn.h>
- #include <linux/types.h>
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+index d56b8c6..0d69b87 100644
+--- a/arch/arm/xen/mm.c
++++ b/arch/arm/xen/mm.c
+@@ -51,6 +51,7 @@ static struct dma_map_ops xen_swiotlb_dma_ops = {
+ 	.map_page = xen_swiotlb_map_page,
+ 	.unmap_page = xen_swiotlb_unmap_page,
+ 	.dma_supported = xen_swiotlb_dma_supported,
++	.set_dma_mask = xen_swiotlb_set_dma_mask,
+ };
  
-+#include <xen/xen.h>
- #include <xen/interface/grant_table.h>
- 
--#define pfn_to_mfn(pfn)			(pfn)
- #define phys_to_machine_mapping_valid(pfn) (1)
--#define mfn_to_pfn(mfn)			(mfn)
- #define mfn_to_virt(m)			(__va(mfn_to_pfn(m) << PAGE_SHIFT))
- 
- #define pte_mfn	    pte_pfn
-@@ -32,6 +31,44 @@ typedef struct xpaddr {
- 
- #define INVALID_P2M_ENTRY      (~0UL)
- 
-+unsigned long __pfn_to_mfn(unsigned long pfn);
-+unsigned long __mfn_to_pfn(unsigned long mfn);
-+extern struct rb_root phys_to_mach;
-+
-+static inline unsigned long pfn_to_mfn(unsigned long pfn)
-+{
-+	unsigned long mfn;
-+	
-+	if (phys_to_mach.rb_node != NULL) {
-+		mfn = __pfn_to_mfn(pfn);
-+		if (mfn != INVALID_P2M_ENTRY)
-+			return mfn;
-+	}
-+
-+	if (xen_initial_domain())
-+		return pfn;
-+	else
-+		return INVALID_P2M_ENTRY;
-+}
-+
-+static inline unsigned long mfn_to_pfn(unsigned long mfn)
-+{
-+	unsigned long pfn;
-+
-+	if (phys_to_mach.rb_node != NULL) {
-+		pfn = __mfn_to_pfn(mfn);
-+		if (pfn != INVALID_P2M_ENTRY)
-+			return pfn;
-+	}
-+
-+	if (xen_initial_domain())
-+		return mfn;
-+	else
-+		return INVALID_P2M_ENTRY;
-+}
-+
-+#define mfn_to_local_pfn(mfn) mfn_to_pfn(mfn)
-+
- static inline xmaddr_t phys_to_machine(xpaddr_t phys)
- {
- 	unsigned offset = phys.paddr & ~PAGE_MASK;
-@@ -76,11 +113,9 @@ static inline int m2p_remove_override(struct page *page, bool clear_pte)
- 	return 0;
+ int __init xen_mm_init(void)
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index f0fc1a4..d8ef0bf 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -608,3 +608,15 @@ xen_swiotlb_dma_supported(struct device *hwdev, u64 mask)
+ 	return xen_virt_to_bus(xen_io_tlb_end - 1) <= mask;
  }
- 
--static inline bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn)
--{
--	BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
--	return true;
--}
-+bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn);
-+bool __set_phys_to_machine_multi(unsigned long pfn, unsigned long mfn,
-+		unsigned long nr_pages);
- 
- static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
- {
-diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-index 4384103..21e6ff5 100644
---- a/arch/arm/xen/Makefile
-+++ b/arch/arm/xen/Makefile
-@@ -1 +1 @@
--obj-y		:= enlighten.o hypercall.o grant-table.o
-+obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o
-diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
-new file mode 100644
-index 0000000..5df4a9a
---- /dev/null
-+++ b/arch/arm/xen/p2m.c
-@@ -0,0 +1,208 @@
-+#include <linux/bootmem.h>
-+#include <linux/gfp.h>
-+#include <linux/export.h>
-+#include <linux/rwlock.h>
-+#include <linux/slab.h>
-+#include <linux/types.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/vmalloc.h>
-+#include <linux/swiotlb.h>
+ EXPORT_SYMBOL_GPL(xen_swiotlb_dma_supported);
 +
-+#include <xen/xen.h>
-+#include <xen/interface/memory.h>
-+#include <xen/swiotlb-xen.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/xen/page.h>
-+#include <asm/xen/hypercall.h>
-+#include <asm/xen/interface.h>
-+
-+struct xen_p2m_entry {
-+	unsigned long pfn;
-+	unsigned long mfn;
-+	unsigned long nr_pages;
-+	struct rb_node rbnode_mach;
-+	struct rb_node rbnode_phys;
-+};
-+
-+rwlock_t p2m_lock;
-+struct rb_root phys_to_mach = RB_ROOT;
-+static struct rb_root mach_to_phys = RB_ROOT;
-+
-+static int xen_add_phys_to_mach_entry(struct xen_p2m_entry *new)
++int
++xen_swiotlb_set_dma_mask(struct device *dev, u64 dma_mask)
 +{
-+	struct rb_node **link = &phys_to_mach.rb_node;
-+	struct rb_node *parent = NULL;
-+	struct xen_p2m_entry *entry;
-+	int rc = 0;
++	if (!dev->dma_mask || !xen_swiotlb_dma_supported(dev, dma_mask))
++		return -EIO;
 +
-+	while (*link) {
-+		parent = *link;
-+		entry = rb_entry(parent, struct xen_p2m_entry, rbnode_phys);
++	*dev->dma_mask = dma_mask;
 +
-+		if (new->mfn == entry->mfn)
-+			goto err_out;
-+		if (new->pfn == entry->pfn)
-+			goto err_out;
-+
-+		if (new->pfn < entry->pfn)
-+			link = &(*link)->rb_left;
-+		else
-+			link = &(*link)->rb_right;
-+	}
-+	rb_link_node(&new->rbnode_phys, parent, link);
-+	rb_insert_color(&new->rbnode_phys, &phys_to_mach);
-+	goto out;
-+
-+err_out:
-+	rc = -EINVAL;
-+	pr_warn("%s: cannot add pfn=%pa -> mfn=%pa: pfn=%pa -> mfn=%pa already exists\n",
-+			__func__, &new->pfn, &new->mfn, &entry->pfn, &entry->mfn);
-+out:
-+	return rc;
-+}
-+
-+unsigned long __pfn_to_mfn(unsigned long pfn)
-+{
-+	struct rb_node *n = phys_to_mach.rb_node;
-+	struct xen_p2m_entry *entry;
-+	unsigned long irqflags;
-+
-+	read_lock_irqsave(&p2m_lock, irqflags);
-+	while (n) {
-+		entry = rb_entry(n, struct xen_p2m_entry, rbnode_phys);
-+		if (entry->pfn <= pfn &&
-+				entry->pfn + entry->nr_pages > pfn) {
-+			read_unlock_irqrestore(&p2m_lock, irqflags);
-+			return entry->mfn + (pfn - entry->pfn);
-+		}
-+		if (pfn < entry->pfn)
-+			n = n->rb_left;
-+		else
-+			n = n->rb_right;
-+	}
-+	read_unlock_irqrestore(&p2m_lock, irqflags);
-+
-+	return INVALID_P2M_ENTRY;
-+}
-+EXPORT_SYMBOL_GPL(__pfn_to_mfn);
-+
-+static int xen_add_mach_to_phys_entry(struct xen_p2m_entry *new)
-+{
-+	struct rb_node **link = &mach_to_phys.rb_node;
-+	struct rb_node *parent = NULL;
-+	struct xen_p2m_entry *entry;
-+	int rc = 0;
-+
-+	while (*link) {
-+		parent = *link;
-+		entry = rb_entry(parent, struct xen_p2m_entry, rbnode_mach);
-+
-+		if (new->mfn == entry->mfn)
-+			goto err_out;
-+		if (new->pfn == entry->pfn)
-+			goto err_out;
-+
-+		if (new->mfn < entry->mfn)
-+			link = &(*link)->rb_left;
-+		else
-+			link = &(*link)->rb_right;
-+	}
-+	rb_link_node(&new->rbnode_mach, parent, link);
-+	rb_insert_color(&new->rbnode_mach, &mach_to_phys);
-+	goto out;
-+
-+err_out:
-+	rc = -EINVAL;
-+	pr_warn("%s: cannot add pfn=%pa -> mfn=%pa: pfn=%pa -> mfn=%pa already exists\n",
-+			__func__, &new->pfn, &new->mfn, &entry->pfn, &entry->mfn);
-+out:
-+	return rc;
-+}
-+
-+unsigned long __mfn_to_pfn(unsigned long mfn)
-+{
-+	struct rb_node *n = mach_to_phys.rb_node;
-+	struct xen_p2m_entry *entry;
-+	unsigned long irqflags;
-+
-+	read_lock_irqsave(&p2m_lock, irqflags);
-+	while (n) {
-+		entry = rb_entry(n, struct xen_p2m_entry, rbnode_mach);
-+		if (entry->mfn <= mfn &&
-+				entry->mfn + entry->nr_pages > mfn) {
-+			read_unlock_irqrestore(&p2m_lock, irqflags);
-+			return entry->pfn + (mfn - entry->mfn);
-+		}
-+		if (mfn < entry->mfn)
-+			n = n->rb_left;
-+		else
-+			n = n->rb_right;
-+	}
-+	read_unlock_irqrestore(&p2m_lock, irqflags);
-+
-+	return INVALID_P2M_ENTRY;
-+}
-+EXPORT_SYMBOL_GPL(__mfn_to_pfn);
-+
-+bool __set_phys_to_machine_multi(unsigned long pfn,
-+		unsigned long mfn, unsigned long nr_pages)
-+{
-+	int rc;
-+	unsigned long irqflags;
-+	struct xen_p2m_entry *p2m_entry;
-+	struct rb_node *n = phys_to_mach.rb_node;
-+
-+	if (mfn == INVALID_P2M_ENTRY) {
-+		write_lock_irqsave(&p2m_lock, irqflags);
-+		while (n) {
-+			p2m_entry = rb_entry(n, struct xen_p2m_entry, rbnode_phys);
-+			if (p2m_entry->pfn <= pfn &&
-+					p2m_entry->pfn + p2m_entry->nr_pages > pfn) {
-+				rb_erase(&p2m_entry->rbnode_mach, &mach_to_phys);
-+				rb_erase(&p2m_entry->rbnode_phys, &phys_to_mach);
-+				write_unlock_irqrestore(&p2m_lock, irqflags);
-+				kfree(p2m_entry);	
-+				return true;
-+			}
-+			if (pfn < p2m_entry->pfn)
-+				n = n->rb_left;
-+			else
-+				n = n->rb_right;
-+		}
-+		write_unlock_irqrestore(&p2m_lock, irqflags);
-+		return true;
-+	}
-+
-+	p2m_entry = kzalloc(sizeof(struct xen_p2m_entry), GFP_NOWAIT);
-+	if (!p2m_entry) {
-+		pr_warn("cannot allocate xen_p2m_entry\n");
-+		return false;
-+	}
-+	p2m_entry->pfn = pfn;
-+	p2m_entry->nr_pages = nr_pages;
-+	p2m_entry->mfn = mfn;
-+
-+	write_lock_irqsave(&p2m_lock, irqflags);
-+	if ((rc = xen_add_phys_to_mach_entry(p2m_entry) < 0) ||
-+		(rc = xen_add_mach_to_phys_entry(p2m_entry) < 0)) {
-+		write_unlock_irqrestore(&p2m_lock, irqflags);
-+		return false;
-+	}
-+	write_unlock_irqrestore(&p2m_lock, irqflags);
-+	return true;
-+}
-+EXPORT_SYMBOL_GPL(__set_phys_to_machine_multi);
-+
-+bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-+{
-+	return __set_phys_to_machine_multi(pfn, mfn, 1);
-+}
-+EXPORT_SYMBOL_GPL(__set_phys_to_machine);
-+
-+int p2m_init(void)
-+{
-+	rwlock_init(&p2m_lock);
 +	return 0;
 +}
-+arch_initcall(p2m_init);
-diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
-index be24040..cd866b0 100644
---- a/arch/arm64/xen/Makefile
-+++ b/arch/arm64/xen/Makefile
-@@ -1,2 +1,2 @@
--xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o)
-+xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o)
- obj-y		:= xen-arm.o hypercall.o
++EXPORT_SYMBOL_GPL(xen_swiotlb_set_dma_mask);
+diff --git a/include/xen/swiotlb-xen.h b/include/xen/swiotlb-xen.h
+index de8bcc6..7b64465 100644
+--- a/include/xen/swiotlb-xen.h
++++ b/include/xen/swiotlb-xen.h
+@@ -55,4 +55,6 @@ xen_swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t dma_addr);
+ extern int
+ xen_swiotlb_dma_supported(struct device *hwdev, u64 mask);
+ 
++extern int
++xen_swiotlb_set_dma_mask(struct device *dev, u64 dma_mask);
+ #endif /* __LINUX_SWIOTLB_XEN_H */
 -- 
 1.7.2.5
