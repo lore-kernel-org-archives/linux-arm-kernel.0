@@ -1,369 +1,118 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 17 Oct 2013 09:58:10 +0200
-Subject: [PATCH V2] ARM: trace: Add tracepoint for the Inter Processor
- Interrupt
-In-Reply-To: <1381839042-3533-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1381839042-3533-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <525F9892.7000608@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 17 Oct 2013 10:27:30 +0200
+Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <20131016190211.GJ25034@n2100.arm.linux.org.uk>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <20131003202751.GZ6192@mwanda>
+ <20131015131038.GB25034@n2100.arm.linux.org.uk>
+ <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
+ <20131016170341.GH25034@n2100.arm.linux.org.uk>
+ <20131016180735.GI25034@n2100.arm.linux.org.uk>
+ <20131016183107.GC18050@kroah.com>
+ <20131016190211.GJ25034@n2100.arm.linux.org.uk>
+Message-ID: <1381998450.4093.36.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2013 02:10 PM, Daniel Lezcano wrote:
-> The Inter Processor Interrupt is used on ARM to tell another processor to do
-> a specific action. This is mainly used to emulate a timer interrupt on an idle
-> cpu, force a cpu to reschedule or run a function on another processor context.
->
-> Add a tracepoint when raising an IPI and in the entry/exit handler functions.
->
-> When a cpu raises an IPI, the targeted cpus is an interesting information, the
-> cpumask conversion in hexa is added in the trace using the cpumask_scnprintf
-> function.
->
-> Tested-on Vexpress TC2 (5 processors).
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
+Hi Russell,
 
-Hi Steven,
+Am Mittwoch, den 16.10.2013, 20:02 +0100 schrieb Russell King - ARM
+Linux:
+> On Wed, Oct 16, 2013 at 11:31:07AM -0700, Greg Kroah-Hartman wrote:
+> > On Wed, Oct 16, 2013 at 07:07:35PM +0100, Russell King - ARM Linux wrote:
+> > > Sorry, but I don't think imx-drm is driving the hardware correctly, and
+> > > I know that Greg wants it moved out of drivers/staging, but frankly it
+> > > seems to be far from ready for that.  Certainly the HDMI parts seems to
+> > > be especially problematical.
+> > 
+> > I want it out of staging if it's working properly.  Yours is the first
+> > report of it not working properly, and in fact, probably one of the
+> > first users of the driver, as I haven't gotten any reports of it working
+> > or not at all over the years.
+> 
+> Well, part of that is because I have this other thing called Armada DRM,
+> which is a similar thing to imx-drm, except for the Marvell Dove SoCs,
+> so it's been really quite easy to get a full Ubuntu 12.04 up and running
+> on the IMX SoC I have here.
+> 
+> As part of that effort, I'm now using my Armada DRM Xorg driver with
+> imx-drm to test this stuff out.  (Bearing in mind that IMX and Dove use
+> the same Vivante GPU, there's some sense in getting my Xorg Armada DRM
+> driver working on both.)
+> 
+> I'm not aware of there being any X drivers for imx-drm (google turns
+> up nothing), which might be a reason why it hasn't been well tested
+> and has also languished in drivers/staging for soo long.  Alternatively,
+> maybe my google searching sucks, or it is out there somewhere but
+> hidden from googlebot?
+> 
 
-does this V2 patch sound good for you ?
+X.Org isn't the center of the world anymore. For some general purpose
+distros this might still hold true for some time, but certainly not for
+the use-cases we test this driver with.
 
-Thanks
-   -- Daniel
+For most of our embedded use-cases we currently use the FBdev emulation
+(phasing this out at the moment) or the apps are sitting right on top of
+the raw KMS APIs, rather than on top of a display server.
+We also did some experiments with Wayland (Weston) on top of imx-drm,
+which worked quite well.
 
->   arch/arm/include/asm/smp.h   |    9 ++++
->   arch/arm/kernel/smp.c        |   34 ++++++++------
->   arch/arm64/include/asm/smp.h |    7 +++
->   arch/arm64/kernel/smp.c      |   21 +++++++--
->   include/trace/events/ipi.h   |  104 ++++++++++++++++++++++++++++++++++++++++++
->   5 files changed, 156 insertions(+), 19 deletions(-)
->   create mode 100644 include/trace/events/ipi.h
->
-> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-> index a8cae71c..788706c 100644
-> --- a/arch/arm/include/asm/smp.h
-> +++ b/arch/arm/include/asm/smp.h
-> @@ -18,6 +18,15 @@
->   # error "<asm/smp.h> included in non-SMP build"
->   #endif
->
-> +enum ipi_msg_type {
-> +	IPI_WAKEUP,
-> +	IPI_TIMER,
-> +	IPI_RESCHEDULE,
-> +	IPI_CALL_FUNC,
-> +	IPI_CALL_FUNC_SINGLE,
-> +	IPI_CPU_STOP,
-> +};
-> +
->   #define raw_smp_processor_id() (current_thread_info()->cpu)
->
->   struct seq_file;
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 72024ea..9ca8ce8 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -46,6 +46,9 @@
->   #include <asm/mach/arch.h>
->   #include <asm/mpu.h>
->
-> +#define CREATE_TRACE_POINTS
-> +#include <trace/events/ipi.h>
-> +
->   /*
->    * as from 2.5, kernels no longer have an init_tasks structure
->    * so we need some other way of telling a new secondary core
-> @@ -59,15 +62,6 @@ struct secondary_data secondary_data;
->    */
->   volatile int pen_release = -1;
->
-> -enum ipi_msg_type {
-> -	IPI_WAKEUP,
-> -	IPI_TIMER,
-> -	IPI_RESCHEDULE,
-> -	IPI_CALL_FUNC,
-> -	IPI_CALL_FUNC_SINGLE,
-> -	IPI_CPU_STOP,
-> -};
-> -
->   static DECLARE_COMPLETION(cpu_running);
->
->   static struct smp_operations smp_ops;
-> @@ -433,19 +427,25 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
->   		smp_cross_call = fn;
->   }
->
-> +static void ipi_raise(const struct cpumask *mask, int ipinr)
-> +{
-> +	trace_ipi_raise(mask, ipinr);
-> +	smp_cross_call(mask, ipinr);
-> +}
-> +
->   void arch_send_call_function_ipi_mask(const struct cpumask *mask)
->   {
-> -	smp_cross_call(mask, IPI_CALL_FUNC);
-> +	ipi_raise(mask, IPI_CALL_FUNC);
->   }
->
->   void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
->   {
-> -	smp_cross_call(mask, IPI_WAKEUP);
-> +	ipi_raise(mask, IPI_WAKEUP);
->   }
->
->   void arch_send_call_function_single_ipi(int cpu)
->   {
-> -	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> +	ipi_raise(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
->   }
->
->   static const char *ipi_types[NR_IPI] = {
-> @@ -487,7 +487,7 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
->   #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
->   void tick_broadcast(const struct cpumask *mask)
->   {
-> -	smp_cross_call(mask, IPI_TIMER);
-> +	ipi_raise(mask, IPI_TIMER);
->   }
->   #endif
->
-> @@ -528,6 +528,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->   	unsigned int cpu = smp_processor_id();
->   	struct pt_regs *old_regs = set_irq_regs(regs);
->
-> +	trace_ipi_handler_entry(ipinr);
-> +
->   	if (ipinr < NR_IPI)
->   		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
->
-> @@ -571,11 +573,13 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->   		break;
->   	}
->   	set_irq_regs(old_regs);
-> +
-> +	trace_ipi_handler_exit(ipinr);
->   }
->
->   void smp_send_reschedule(int cpu)
->   {
-> -	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
-> +	ipi_raise(cpumask_of(cpu), IPI_RESCHEDULE);
->   }
->
->   void smp_send_stop(void)
-> @@ -586,7 +590,7 @@ void smp_send_stop(void)
->   	cpumask_copy(&mask, cpu_online_mask);
->   	cpumask_clear_cpu(smp_processor_id(), &mask);
->   	if (!cpumask_empty(&mask))
-> -		smp_cross_call(&mask, IPI_CPU_STOP);
-> +		ipi_raise(&mask, IPI_CPU_STOP);
->
->   	/* Wait up to one second for other CPUs to stop */
->   	timeout = USEC_PER_SEC;
-> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-> index 4b8023c..7ebaa3a 100644
-> --- a/arch/arm64/include/asm/smp.h
-> +++ b/arch/arm64/include/asm/smp.h
-> @@ -24,6 +24,13 @@
->   # error "<asm/smp.h> included in non-SMP build"
->   #endif
->
-> +enum ipi_msg_type {
-> +	IPI_RESCHEDULE,
-> +	IPI_CALL_FUNC,
-> +	IPI_CALL_FUNC_SINGLE,
-> +	IPI_CPU_STOP,
-> +};
-> +
->   #define raw_smp_processor_id() (current_thread_info()->cpu)
->
->   struct seq_file;
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 78db90d..c987b9f 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -48,6 +48,9 @@
->   #include <asm/tlbflush.h>
->   #include <asm/ptrace.h>
->
-> +#define CREATE_TRACE_POINTS
-> +#include <trace/events/ipi.h>
-> +
->   /*
->    * as from 2.5, kernels no longer have an init_tasks structure
->    * so we need some other way of telling a new secondary core
-> @@ -426,14 +429,20 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
->   	smp_cross_call = fn;
->   }
->
-> +static void ipi_raise(const struct cpumask *mask, int ipinr)
-> +{
-> +	trace_ipi_raise(mask, ipinr);
-> +	smp_cross_call(mask, ipinr);
-> +}
-> +
->   void arch_send_call_function_ipi_mask(const struct cpumask *mask)
->   {
-> -	smp_cross_call(mask, IPI_CALL_FUNC);
-> +	ipi_raise(mask, IPI_CALL_FUNC);
->   }
->
->   void arch_send_call_function_single_ipi(int cpu)
->   {
-> -	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
-> +	ipi_raise(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
->   }
->
->   static const char *ipi_types[NR_IPI] = {
-> @@ -501,6 +510,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->   	unsigned int cpu = smp_processor_id();
->   	struct pt_regs *old_regs = set_irq_regs(regs);
->
-> +	trace_ipi_handler_entry(ipinr);
-> +
->   	if (ipinr >= IPI_RESCHEDULE && ipinr < IPI_RESCHEDULE + NR_IPI)
->   		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_RESCHEDULE]);
->
-> @@ -532,11 +543,13 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->   		break;
->   	}
->   	set_irq_regs(old_regs);
-> +
-> +	trace_ipi_handler_exit(ipinr);
->   }
->
->   void smp_send_reschedule(int cpu)
->   {
-> -	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
-> +	ipi_raise(cpumask_of(cpu), IPI_RESCHEDULE);
->   }
->
->   void smp_send_stop(void)
-> @@ -549,7 +562,7 @@ void smp_send_stop(void)
->   		cpumask_copy(&mask, cpu_online_mask);
->   		cpu_clear(smp_processor_id(), mask);
->
-> -		smp_cross_call(&mask, IPI_CPU_STOP);
-> +		ipi_raise(&mask, IPI_CPU_STOP);
->   	}
->
->   	/* Wait up to one second for other CPUs to stop */
-> diff --git a/include/trace/events/ipi.h b/include/trace/events/ipi.h
-> new file mode 100644
-> index 0000000..80b734b
-> --- /dev/null
-> +++ b/include/trace/events/ipi.h
-> @@ -0,0 +1,104 @@
-> +#undef TRACE_SYSTEM
-> +#define TRACE_SYSTEM ipi
-> +
-> +#if !defined(_TRACE_IPI_H) || defined(TRACE_HEADER_MULTI_READ)
-> +#define _TRACE_IPI_H
-> +
-> +#include <linux/tracepoint.h>
-> +
-> +#define ipi_name(ipinr) { IPI_##ipinr, #ipinr }
-> +#define show_ipi_name(val)				\
-> +	__print_symbolic(val,				\
-> +			 ipi_name(WAKEUP),		\
-> +			 ipi_name(TIMER),		\
-> +			 ipi_name(RESCHEDULE),		\
-> +			 ipi_name(CALL_FUNC),		\
-> +			 ipi_name(CALL_FUNC_SINGLE),	\
-> +			 ipi_name(CPU_STOP))
-> +
-> +DECLARE_EVENT_CLASS(ipi,
-> +
-> +    TP_PROTO(int ipinr),
-> +
-> +    TP_ARGS(ipinr),
-> +
-> +    TP_STRUCT__entry(
-> +	    __field(int, ipinr)
-> +    ),
-> +
-> +    TP_fast_assign(
-> +	    __entry->ipinr = ipinr;
-> +    ),
-> +
-> +    TP_printk("ipi=%d, name=%s", __entry->ipinr,
-> +	      show_ipi_name(__entry->ipinr))
-> +);
-> +
-> +/**
-> + * ipi_handle_entry - called right before the IPI handler
-> + * @ipinr: the IPI number
-> + *
-> + * The @ipinr value must be valid and the action name associated with
-> + * the IPI value is given in the trace.
-> + */
-> +DEFINE_EVENT_CONDITION(ipi, ipi_handler_entry,
-> +
-> +    TP_PROTO(int ipinr),
-> +
-> +    TP_ARGS(ipinr),
-> +
-> +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0)
-> +);
-> +
-> +/**
-> + * ipi_handle_exit - called right after the IPI handler
-> + * @ipinr: the IPI number
-> + *
-> + * The @ipinr value must be valid and the action name associated with
-> + * the IPI value is given in the trace.
-> + */
-> +DEFINE_EVENT_CONDITION(ipi, ipi_handler_exit,
-> +
-> +    TP_PROTO(int ipinr),
-> +
-> +    TP_ARGS(ipinr),
-> +
-> +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0)
-> +);
-> +
-> +/**
-> + * ipi_raise - called when a smp cross call is made
-> + * @ipinr: the IPI number
-> + * @cpumask: the recipients for the IPI
-> + *
-> + * The @ipinr value must be valid and the action name associated with
-> + * the IPI value is given in the trace as well as the cpumask of the
-> + * targeted cpus.
-> + */
-> +TRACE_EVENT_CONDITION(ipi_raise,
-> +
-> +    TP_PROTO(const struct cpumask *cpumask, int ipinr),
-> +
-> +    TP_ARGS(cpumask, ipinr),
-> +
-> +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0),
-> +
-> +    TP_STRUCT__entry(
-> +	    __field(int, ipinr)
-> +	    __array(char, cpumask, NR_CPUS)
-> +    ),
-> +
-> +    TP_fast_assign(
-> +	    __entry->ipinr = ipinr;
-> +	    cpumask_scnprintf(__entry->cpumask,
-> +			      ARRAY_SIZE(__entry->cpumask), cpumask);
-> +    ),
-> +
-> +    TP_printk("ipi=%d, cpumask=0x%s, name=%s", __entry->ipinr, __entry->cpumask,
-> +	      show_ipi_name(__entry->ipinr))
-> +);
-> +
-> +#endif /* _TRACE_IPI_H */
-> +
-> +/* This part must be outside protection */
-> +#include <trace/define_trace.h>
->
+There might be dragons hiding in some corners for the more general
+purpose use-cases and we are happy to have you test the driver and
+provide valuable reports.
 
+> To be fair, so far most of the problems I'm finding are with the HDMI
+> addition to imx-drm rather than imx-drm itself: there's been the lockdep
+> problem and the clock polarity problem which the HDMI stuff discovered.
+> 
+> Looking at the todo list for moving it out of staging, we have:
+> 
+> - get DRM Maintainer review for this code
+> - Wait for common display framework to hit mainline and update the IPU
+>   driver to use it. This will most probably make changes to the devicetree
+>   bindings necessary.
+> - Factor out more code to common helper functions
+> - decide where to put the base driver. It is not specific to a subsystem
+>   and would be used by DRM/KMS and media/V4L2
+> 
+> (1) is quite a difficult task: I'm waiting for a review of the Armada DRM
+> stuff, which I'm hoping will make the next merge window.  Rob Clark is
+> looking at that but has been distracted recently from completing it.
+> 
+> (2) CDF... has been around in RFC according to LWN.net but doesn't seem to
+> make much in the way of progress from what I can see, despite there
+> allegedly being "many developers show[ing] interest in the first RFC".
+> CDF is over a year old now - first RFC 17 Aug 2012, second 22 Nov 2012,
+> third 9 Aug 2013.
+> 
+
+Philipp has a prototype of CDF on imx-drm working internally and I
+suspect he will be able to post patches shortly after ELCE.
+
+> (3) is an on-going effort and really isn't a reason for it to stay in
+> staging.
+> 
+> (4) is probably the biggest issue.  The problem there is that the IMX
+> display subsystem is very flexible: it's basically a set of DMA engines
+> on the front, and behind that a fair number of modules implementing
+> facilities like image rotation, display driving and image capture.
+> Display driving alone involves setting up waveforms and writing some
+> microcode to tell the thing what to do on certain events (like end
+> of frame etc.)  Hence it doesn't fit well into any particular "Linux"
+> subsystem.  In this regard, it's a victim of its own flexibility.
+
+We are aiming to do the same thing as the Tegra host1x driver: move the
+IPU core to drivers/gpu and export API for other drivers to use. This
+may mean we still have to keep the DRM part in staging (at least until
+the CDF thing is sorted, as this prevents us from setting the devicetree
+bindings in stone), but at least should be a step in the right
+direction.
+
+Regards,
+Lucas
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
