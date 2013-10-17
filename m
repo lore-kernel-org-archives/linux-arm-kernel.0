@@ -1,120 +1,179 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 17 Oct 2013 17:33:10 +0200
-Subject: [PATCH 2/2] tty/serial: at91: add a fallback option to determine
- uart/usart property
-In-Reply-To: <20131017141346.GA22104@kroah.com>
-References: <a58fe8bc7fdd128a2f9cf60785f81ebde4c0c247.1381394411.git.nicolas.ferre@atmel.com>
- <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
- <20131014135921.GG11420@ns203013.ovh.net> <525D0896.6020907@atmel.com>
- <20131016201451.GA21296@kroah.com> <525F9CEF.9020904@atmel.com>
- <20131017141346.GA22104@kroah.com>
-Message-ID: <52600336.4050401@atmel.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Thu, 17 Oct 2013 23:38:48 +0800
+Subject: [PATCH v4 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <20131017113826.GJ18765@mudshark.cambridge.arm.com>
+References: <1381990781-27814-1-git-send-email-liuj97@gmail.com>
+ <1381990781-27814-3-git-send-email-liuj97@gmail.com>
+ <20131017113826.GJ18765@mudshark.cambridge.arm.com>
+Message-ID: <52600488.3090401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/2013 16:13, Greg Kroah-Hartman :
-> On Thu, Oct 17, 2013 at 10:16:47AM +0200, Nicolas Ferre wrote:
->> On 16/10/2013 22:14, Greg Kroah-Hartman :
->>> On Tue, Oct 15, 2013 at 11:19:18AM +0200, Nicolas Ferre wrote:
->>>> On 14/10/2013 15:59, Jean-Christophe PLAGNIOL-VILLARD :
->>>>> On 10:43 Thu 10 Oct     , Nicolas Ferre wrote:
->>>>>> On older SoC, the "name" field is not filled in the register map.
->>>>>> Fix the way to figure out if the serial port is an uart or an usart for these
->>>>>> older products (with corresponding properties).
->>>>>>
->>>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>>>> ---
->>>>>>    drivers/tty/serial/atmel_serial.c | 19 ++++++++++++++++++-
->>>>>>    include/linux/atmel_serial.h      |  1 +
->>>>>>    2 files changed, 19 insertions(+), 1 deletion(-)
->>>>>>
->>>>>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->>>>>> index 6b0f75e..c7d99af 100644
->>>>>> --- a/drivers/tty/serial/atmel_serial.c
->>>>>> +++ b/drivers/tty/serial/atmel_serial.c
->>>>>> @@ -99,6 +99,7 @@ static void atmel_stop_rx(struct uart_port *port);
->>>>>>    #define UART_PUT_RTOR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_RTOR)
->>>>>>    #define UART_PUT_TTGR(port, v)	__raw_writel(v, (port)->membase + ATMEL_US_TTGR)
->>>>>>    #define UART_GET_IP_NAME(port)	__raw_readl((port)->membase + ATMEL_US_NAME)
->>>>>> +#define UART_GET_IP_VERSION(port) __raw_readl((port)->membase + ATMEL_US_VERSION)
->>>>>>
->>>>>>     /* PDC registers */
->>>>>>    #define UART_PUT_PTCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_PTCR)
->>>>>> @@ -1503,6 +1504,7 @@ static void atmel_get_ip_name(struct uart_port *port)
->>>>>>    {
->>>>>>    	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->>>>>>    	int name = UART_GET_IP_NAME(port);
->>>>>> +	u32 version;
->>>>>>    	int usart, uart;
->>>>>>    	/* usart and uart ascii */
->>>>>>    	usart = 0x55534152;
->>>>>> @@ -1517,7 +1519,22 @@ static void atmel_get_ip_name(struct uart_port *port)
->>>>>>    		dev_dbg(port->dev, "This is uart\n");
->>>>>>    		atmel_port->is_usart = false;
->>>>>>    	} else {
->>>>>> -		dev_err(port->dev, "Not supported ip name, set to uart\n");
->>>>>> +		/* fallback for older SoCs: use version field */
->>>>>> +		version = UART_GET_IP_VERSION(port);
->>>>>> +		switch (version) {
->>>>>> +		case 0x302:
->>>>>> +		case 0x10213:
->>>>>> +			dev_dbg(port->dev, "This version is usart\n");
->>>>>> +			atmel_port->is_usart = true;
->>>>>> +			break;
->>>>>> +		case 0x203:
->>>>>> +		case 0x10202:
->>>>>> +			dev_dbg(port->dev, "This version is uart\n");
->>>>>> +			atmel_port->is_usart = false;
->>>>>> +			break;
->>>>>> +		default:
->>>>>> +			dev_err(port->dev, "Not supported ip name nor version, set to uart\n");
->>>>>
->>>>> it's not really an error a dev_warn is more oppropriate
->>>>
->>>> As we are already in -rc5 and that these fixes are critical for at91
->>>> platforms, I will not re-spin another patch just for this.
->>>>
->>>> Moreover, I have the feeling that if we end up in this case, it
->>>> means that we are in big troubles because the usart/uart included in
->>>> the product triggering this log is not known (I recall that newer
->>>> products do not have to hit these lines of code).
->>>>
->>>> With these 2 reasons, I prefer to keep my patch like it is.
->>>>
->>>> Greg, can you consider taking these two patches as regression fixes
->>>> for 3.12 (with Tested-by tag from Thomas)?
->>>
->>> Is this really a regression from 3.11?
+On 10/17/2013 07:38 PM, Will Deacon wrote:
+> [adding Tixy for stop_machine() question below]
+> 
+> On Thu, Oct 17, 2013 at 07:19:35AM +0100, Jiang Liu wrote:
+>> From: Jiang Liu <jiang.liu@huawei.com>
 >>
->> Yes it is. Commit id that I am referring to in patch 1/2
->> (055560b04a8cd063aea916fd083b7aec02c2adb8) hit the mainline in 3.12-rc
->> time-frame.
->
-> Ok.
->
->>> What's the worry about waiting
->>> for 3.13-rc1, getting this correct, and then backporting them to the
->>> 3.12-stable trees?
+>> Introduce three interfaces to patch kernel and module code:
+>> aarch64_insn_patch_text_nosync():
+>> 	patch code without synchronization, it's caller's responsibility
+>> 	to synchronize all CPUs if needed.
+>> aarch64_insn_patch_text_sync():
+>> 	patch code and always synchronize with stop_machine()
+>> aarch64_insn_patch_text():
+>> 	patch code and synchronize with stop_machine() if needed
 >>
->> It will break all older at91 in 3.12-final. Moreover, I do think that
->> the actual patches are bringing an incorrect solution and I do not plan
->> to have a better one (which one?) for 3.13...
+>> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+>> Cc: Jiang Liu <liuj97@gmail.com>
+>> ---
+>>  arch/arm64/include/asm/insn.h | 24 +++++++++++++-
+>>  arch/arm64/kernel/insn.c      | 77 +++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 100 insertions(+), 1 deletion(-)
 >>
->>> I'd prefer that, so, please clean this up properly and resend it, with
->>> the tested-by: lines and I'll queue them up for 3.13-rc1.
->>
->> I do not know what to cleanup. Anyway, tell me if you want that I resend
->> the series of 2 patches with the "Tested-by" tag included.
->
-> I thought there was some dev_warn() changes that were asked for...
+>> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+>> index 6190016..fc439b9 100644
+>> --- a/arch/arm64/include/asm/insn.h
+>> +++ b/arch/arm64/include/asm/insn.h
+>> @@ -60,8 +60,30 @@ __AARCH64_INSN_FUNCS(nop,	0xFFFFFFFF, 0xD503201F)
+>>  
+>>  #undef	__AARCH64_INSN_FUNCS
+>>  
+>> -enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+>> +/*
+>> + * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
+>> + * little-endian. On the other hand, SCTLR_EL1.EE (bit 25, Exception Endianness)
+>> + * flag controls endianness for EL1 explicit data accesses and stage 1
+>> + * translation table walks as below:
+>> + *	0: little-endian
+>> + *	1: big-endian
+>> + * So need to handle endianness when patching kernel code.
+>> + */
+> 
+> You can delete this comment now that we're using the helpers...
+> 
+>> +static __always_inline u32 aarch64_insn_read(void *addr)
+>> +{
+>> +	return le32_to_cpu(*(u32 *)addr);
+>> +}
+>>  
+>> +static __always_inline void aarch64_insn_write(void *addr, u32 insn)
+>> +{
+>> +	*(u32 *)addr = cpu_to_le32(insn);
+>> +}
+> 
+> ... then just inline these calls directly.
+> 
+>> +enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+>>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>>  
+>> +int aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[], int cnt);
+>> +int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+>> +int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+>> +
+>>  #endif	/* _ASM_ARM64_INSN_H */
+>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>> index 1c501f3..8dd5fbe 100644
+>> --- a/arch/arm64/kernel/insn.c
+>> +++ b/arch/arm64/kernel/insn.c
+>> @@ -16,6 +16,9 @@
+>>   */
+>>  #include <linux/compiler.h>
+>>  #include <linux/kernel.h>
+>> +#include <linux/smp.h>
+>> +#include <linux/stop_machine.h>
+>> +#include <asm/cacheflush.h>
+>>  #include <asm/insn.h>
+>>  
+>>  static int aarch64_insn_encoding_cls[] = {
+>> @@ -70,3 +73,77 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+>>  	return __aarch64_insn_hotpatch_safe(old_insn) &&
+>>  	       __aarch64_insn_hotpatch_safe(new_insn);
+>>  }
+>> +
+>> +int __kprobes aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[],
+>> +					     int cnt)
+>> +{
+>> +	int i;
+>> +	u32 *tp;
+>> +
+>> +	if (cnt <= 0)
+>> +		return -EINVAL;
+> 
+> Isn't cnt always 1 for the _nosync patching? Can you just drop the argument
+> and simplify this code? Patching a sequence without syncing is always racy.
+Will drop the third parameter and simplify the code.
 
-Asked for, but I do not agree (my arguments above).
+> 
+>> +	for (i = 0; i < cnt; i++) {
+>> +		tp = addrs[i];
+>> +		/* A64 instructions must be word aligned */
+>> +		if ((uintptr_t)tp & 0x3)
+>> +			return -EINVAL;
+>> +		aarch64_insn_write(tp, insns[i]);
+>> +		flush_icache_range((uintptr_t)tp, (uintptr_t)tp + sizeof(u32));
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +struct aarch64_insn_patch {
+>> +	void	**text_addrs;
+>> +	u32	*new_insns;
+>> +	int	insn_cnt;
+>> +};
+>> +
+>> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>> +{
+>> +	struct aarch64_insn_patch *pp = arg;
+>> +
+>> +	return aarch64_insn_patch_text_nosync(pp->text_addrs, pp->new_insns,
+>> +					      pp->insn_cnt);
+>> +}
+>> +
+>> +int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
+>> +{
+>> +	struct aarch64_insn_patch patch = {
+>> +		.text_addrs = addrs,
+>> +		.new_insns = insns,
+>> +		.insn_cnt = cnt,
+>> +	};
+>> +
+>> +	if (cnt <= 0)
+>> +		return -EINVAL;
+>> +
+>> +	/*
+>> +	 * Execute __aarch64_insn_patch_text() on every online CPU,
+>> +	 * which ensure serialization among all online CPUs.
+>> +	 */
+>> +	return stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
+>> +}
+> 
+> Whoa, whoa, whoa! The comment here is wrong -- we only run the patching on
+> *one* CPU, which is the right thing to do. However, the arch/arm/ call to
+> stop_machine in kprobes does actually run the patching code on *all* the
+> online cores (including the cache flushing!). I think this is to work around
+> cores without hardware cache maintenance broadcasting, but that could easily
+> be called out specially (like we do in patch.c) and the flushing could be
+> separated from the patching too.
+> 
+>> +int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+>> +{
+>> +	int ret;
+>> +
+>> +	if (cnt == 1 && aarch64_insn_hotpatch_safe(aarch64_insn_read(addrs[0]),
+>> +						   insns[0])) {
+> 
+> You could make aarch64_insn_hotpatch_safe take the cnt parameter and return
+> false if cnt != 1.
+> 
+>> +		/*
+>> +		 * It doesn't guarantee all CPUs see the new instruction
+> 
+> "It"? You mean the ARMv8 architecture?
+Yes, I mean ARMv8 architecture.
 
-> Anyway, please resend them if you want me to take them for any tree as I
-> no longer have them in my queue.
-
-Okay, I re-send you them right now.
-
-Thanks, bye,
--- 
-Nicolas Ferre
+> 
+> Will
+> 
