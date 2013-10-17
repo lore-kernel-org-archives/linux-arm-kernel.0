@@ -1,77 +1,381 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Wed, 16 Oct 2013 22:46:52 -0700
-Subject: [PATCH] ARM: bcm_defconfig: Run "make savedefconfig"
-In-Reply-To: <1381786919-31286-1-git-send-email-tim.kryger@linaro.org>
-References: <1381786919-31286-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <CAEPRUYqMi70_pqJpMrZ11A0pAE8otkU7DbDN8_4-KdHYkcE9CA@mail.gmail.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Thu, 17 Oct 2013 11:22:21 +0530
+Subject: [RFC PATCH 2/5] ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and
+ SYSTEM_RESET to user space
+In-Reply-To: <20131016222211.GF24837@cbox>
+References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
+ <1381942954-22388-3-git-send-email-anup.patel@linaro.org>
+ <20131016222211.GF24837@cbox>
+Message-ID: <CAAhSdy2qVqLEsrL1Mp+1TRBtoEg+w_wa7Rj+X91zLXXJcoK46w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 2:41 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> Several of the options in bcm_defconfig have gotten out of date so
-> regenerate it with "make savedefconfig" to keep things fresh.
+On Thu, Oct 17, 2013 at 3:52 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Wed, Oct 16, 2013 at 10:32:31PM +0530, Anup Patel wrote:
+>> The PSCI SYSTEM_OFF and SYSTEM_RESET functions are VM or Guest level
+>> functions hence cannot be emulated by the in-kernel PSCI emulation code.
+>>
+>> To tackle this, we forward PSCI SYSTEM_OFF and SYSTEM_RESET function
+>> calls from Guest to user space (i.e. QEMU or KVMTOOL) via KVM run
+>> structure with KVM_EXIT_PSCI exit reason.
+>>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> ---
+>>  arch/arm/include/asm/kvm_psci.h   |   25 +++++++++++++++-
+>>  arch/arm/include/uapi/asm/kvm.h   |    2 ++
+>>  arch/arm/kvm/arm.c                |   12 ++++++--
+>>  arch/arm/kvm/handle_exit.c        |   12 ++++++--
+>>  arch/arm/kvm/psci.c               |   57 ++++++++++++++++++++++++++++++++++---
+>>  arch/arm64/include/asm/kvm_psci.h |   25 +++++++++++++++-
+>>  arch/arm64/include/uapi/asm/kvm.h |    2 ++
+>>  arch/arm64/kvm/handle_exit.c      |   24 ++++++++++++----
+>>  8 files changed, 141 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
+>> index 9a83d98..783566f 100644
+>> --- a/arch/arm/include/asm/kvm_psci.h
+>> +++ b/arch/arm/include/asm/kvm_psci.h
+>> @@ -18,6 +18,29 @@
+>>  #ifndef __ARM_KVM_PSCI_H__
+>>  #define __ARM_KVM_PSCI_H__
+>>
+>> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
+>> +#include <linux/kvm_host.h>
+>> +#include <asm/kvm_asm.h>
+>> +#include <asm/kvm_arm.h>
+>> +
+>> +/*
+>> + * The in-kernel PSCI emulation code wants to use a copy of run->psci,
+>> + * which is an anonymous type. Use our own type instead.
+>> + */
+>> +struct kvm_exit_psci {
+>> +     u32             fn;
+>> +     u64             args[7];
+>> +};
+>> +
+>> +static inline void kvm_prepare_psci(struct kvm_run *run,
+>> +                                 struct kvm_exit_psci *psci)
+>> +{
+>> +     run->psci.fn = psci->fn;
+>> +     memcpy(&run->psci.args, &psci->args, sizeof(run->psci.args));
+>> +     memset(&run->psci.ret, 0, sizeof(run->psci.ret));
+>> +     run->exit_reason = KVM_EXIT_PSCI;
+>> +}
+>> +
+>> +int kvm_handle_psci_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> +int kvm_psci_call(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>
+>>  #endif /* __ARM_KVM_PSCI_H__ */
+>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+>> index c1ee007..205cf0e 100644
+>> --- a/arch/arm/include/uapi/asm/kvm.h
+>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>> @@ -171,6 +171,8 @@ struct kvm_arch_memory_slot {
+>>  #define KVM_PSCI_FN_CPU_OFF          KVM_PSCI_FN(1)
+>>  #define KVM_PSCI_FN_CPU_ON           KVM_PSCI_FN(2)
+>>  #define KVM_PSCI_FN_MIGRATE          KVM_PSCI_FN(3)
+>> +#define KVM_PSCI_FN_SYSTEM_OFF               KVM_PSCI_FN(4)
+>> +#define KVM_PSCI_FN_SYSTEM_RESET     KVM_PSCI_FN(5)
+>>
+>>  #define KVM_PSCI_RET_SUCCESS         0
+>>  #define KVM_PSCI_RET_NI                      ((unsigned long)-1)
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index cc5adb9..5ffd9a3 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -459,7 +459,7 @@ static void update_vttbr(struct kvm *kvm)
+>>       spin_unlock(&kvm_vmid_lock);
+>>  }
+>>
+>> -static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+>> +static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu, struct kvm_run *run)
 >
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> ---
->  arch/arm/configs/bcm_defconfig | 10 ++--------
->  1 file changed, 2 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-> index efb0132..3a138af 100644
-> --- a/arch/arm/configs/bcm_defconfig
-> +++ b/arch/arm/configs/bcm_defconfig
-> @@ -1,4 +1,3 @@
-> -CONFIG_EXPERIMENTAL=y
->  # CONFIG_LOCALVERSION_AUTO is not set
->  # CONFIG_SWAP is not set
->  CONFIG_SYSVIPC=y
-> @@ -25,11 +24,8 @@ CONFIG_MODULES=y
->  CONFIG_MODULE_UNLOAD=y
->  # CONFIG_BLK_DEV_BSG is not set
->  CONFIG_PARTITION_ADVANCED=y
-> -CONFIG_EFI_PARTITION=y
->  CONFIG_ARCH_BCM=y
-> -CONFIG_ARCH_BCM_MOBILE=y
->  CONFIG_ARM_THUMBEE=y
-> -CONFIG_ARM_ERRATA_743622=y
->  CONFIG_PREEMPT=y
->  CONFIG_AEABI=y
->  # CONFIG_OABI_COMPAT is not set
-> @@ -51,7 +47,6 @@ CONFIG_UNIX_DIAG=y
->  CONFIG_NET_KEY=y
->  CONFIG_INET=y
->  CONFIG_IP_MULTICAST=y
-> -CONFIG_ARPD=y
->  CONFIG_SYN_COOKIES=y
->  CONFIG_TCP_MD5SIG=y
->  CONFIG_IPV6=y
-> @@ -96,7 +91,6 @@ CONFIG_MMC_UNSAFE_RESUME=y
->  CONFIG_MMC_BLOCK_MINORS=32
->  CONFIG_MMC_TEST=y
->  CONFIG_MMC_SDHCI=y
-> -CONFIG_MMC_SDHCI_PLTFM=y
->  CONFIG_MMC_SDHCI_BCM_KONA=y
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
-> @@ -118,12 +112,12 @@ CONFIG_CONFIGFS_FS=y
->  CONFIG_NLS_CODEPAGE_437=y
->  CONFIG_NLS_ISO8859_1=y
->  CONFIG_PRINTK_TIME=y
-> -CONFIG_MAGIC_SYSRQ=y
-> +CONFIG_DEBUG_INFO=y
->  CONFIG_DEBUG_FS=y
-> +CONFIG_MAGIC_SYSRQ=y
->  CONFIG_DETECT_HUNG_TASK=y
->  CONFIG_DEFAULT_HUNG_TASK_TIMEOUT=110
->  CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
-> -CONFIG_DEBUG_INFO=y
->  # CONFIG_FTRACE is not set
->  CONFIG_CRC_CCITT=y
->  CONFIG_CRC_T10DIF=y
-> --
+> why this change?  run can always be derived from vcpu->run.
 
-Reviewed-by: Christian Daudt <bcm@fixthebug.org>
-Applied to armsoc/for-3.13/soc
- thanks,
-   csd
+Because thats how kvm_handle_mmio_return() and handle_exit() are
+implemented.
+
+If you think this is inappropriate then function prototypes for
+kvm_handle_mmio_return() and handle_exit() should also change.
+
+IMHO, we should be consistent in usage of vcpu->run.
+
+>
+>>  {
+>>       if (likely(vcpu->arch.has_run_once))
+>>               return 0;
+>> @@ -483,7 +483,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+>>        */
+>>       if (test_and_clear_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features)) {
+>>               *vcpu_reg(vcpu, 0) = KVM_PSCI_FN_CPU_OFF;
+>> -             kvm_psci_call(vcpu);
+>> +             kvm_psci_call(vcpu, run);
+>>       }
+>>
+>>       return 0;
+>> @@ -520,7 +520,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>       if (unlikely(!kvm_vcpu_initialized(vcpu)))
+>>               return -ENOEXEC;
+>>
+>> -     ret = kvm_vcpu_first_run_init(vcpu);
+>> +     ret = kvm_vcpu_first_run_init(vcpu, vcpu->run);
+>>       if (ret)
+>>               return ret;
+>>
+>> @@ -530,6 +530,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>                       return ret;
+>>       }
+>>
+>> +     if (run->exit_reason == KVM_EXIT_PSCI) {
+>> +             ret = kvm_handle_psci_return(vcpu, vcpu->run);
+>> +             if (ret)
+>> +                     return ret;
+>> +     }
+>> +
+>>       if (vcpu->sigset_active)
+>>               sigprocmask(SIG_SETMASK, &vcpu->sigset, &sigsaved);
+>>
+>> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+>> index df4c82d..1a12e6c 100644
+>> --- a/arch/arm/kvm/handle_exit.c
+>> +++ b/arch/arm/kvm/handle_exit.c
+>> @@ -40,14 +40,20 @@ static int handle_svc_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>
+>>  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  {
+>> +     int ret;
+>> +
+>>       trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
+>>                     kvm_vcpu_hvc_get_imm(vcpu));
+>>
+>> -     if (kvm_psci_call(vcpu))
+>> +     ret = kvm_psci_call(vcpu, run);
+>> +     if (!ret)
+>> +             return 1;
+>> +     else if (ret == -EINVAL) {
+>> +             kvm_inject_undefined(vcpu);
+>>               return 1;
+>> +     }
+>>
+>> -     kvm_inject_undefined(vcpu);
+>> -     return 1;
+>> +     return 0;
+>>  }
+>>
+>>  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+>> index 86a693a..72c23a7 100644
+>> --- a/arch/arm/kvm/psci.c
+>> +++ b/arch/arm/kvm/psci.c
+>> @@ -71,6 +71,45 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>>       return KVM_PSCI_RET_SUCCESS;
+>>  }
+>>
+>> +static void kvm_psci_system_off(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +     struct kvm_exit_psci psci;
+>> +
+>> +     psci.fn = KVM_PSCI_FN_SYSTEM_OFF;
+>> +     memset(&psci.args, 0, sizeof(psci.args));
+>> +     kvm_prepare_psci(run, &psci);
+>> +}
+>> +
+>> +static void kvm_psci_system_reset(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +     struct kvm_exit_psci psci;
+>> +
+>> +     psci.fn = KVM_PSCI_FN_SYSTEM_RESET;
+>> +     memset(&psci.args, 0, sizeof(psci.args));
+>> +     kvm_prepare_psci(run, &psci);
+>> +}
+>> +
+>> +/**
+>> + * kvm_handle_psci_return -- Handle PSCI after user space emulation
+>> + * @vcpu: The VCPU pointer
+>> + * @run:  The VCPU run struct containing the psci data
+>> + *
+>> + * This should only be called after returning from userspace for
+>> + * PSCI emulation.
+>> + */
+>> +int kvm_handle_psci_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +     /*
+>> +      * Currently, the PSCI functions passed to user space for emulation
+>> +      * are SYSTEM_OFF and SYSTEM_RESET. These PSCI functions are not
+>> +      * expected to return back after emulating in user space hence by
+>> +      * default we return -EINVAL to avoid user space from doing RUN ioctl
+>> +      * after handling KVM_EXIT_PSCI.
+>> +      */
+>> +
+>> +     return -EINVAL;
+>> +}
+>> +
+>
+> why would reset not return back after emulation?
+>
+> also, do we need to impose this check or can we get rid of this all
+> together, if user space messes up, it's up to user space...
+
+Yes, I think we should allow SYSTEM_RESET to return. I'll update this
+with a check.
+
+Actually, when we reach here we also need to update X0-X3 (for ARM R0-R3)
+with return values in run->psci. I'll add this in subsequent revision.
+
+>
+> Are there any of the other PSCI functions that need specific handling in
+> the kernel on the return path?
+
+So far only SYSTEM_RESET and SYSTEM_OFF as per current PSCI spec.
+
+I think people might be also be interested in emulating vendor specific PSCI
+calls in user space (QEMU or KVMTOOL or Some proprietary software).
+
+>
+>>  /**
+>>   * kvm_psci_call - handle PSCI call if r0 value is in range
+>>   * @vcpu: Pointer to the VCPU struct
+>> @@ -81,8 +120,9 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>>   * function number specified in r0 is withing the PSCI range, and false
+>>   * otherwise.
+>>   */
+>> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
+>> +int kvm_psci_call(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>
+> why add run here as well?
+
+Please see my previous comments.
+
+--
+Anup
+
+>
+>>  {
+>> +     int ret = 0;
+>>       unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>>       unsigned long val;
+>>
+>> @@ -98,11 +138,20 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+>>       case KVM_PSCI_FN_MIGRATE:
+>>               val = KVM_PSCI_RET_NI;
+>>               break;
+>> -
+>> +     case KVM_PSCI_FN_SYSTEM_OFF:
+>> +             kvm_psci_system_off(vcpu, run);
+>> +             val = KVM_PSCI_RET_SUCCESS;
+>> +             ret = -EINTR;
+>> +             break;
+>> +     case KVM_PSCI_FN_SYSTEM_RESET:
+>> +             kvm_psci_system_reset(vcpu, run);
+>> +             val = KVM_PSCI_RET_SUCCESS;
+>> +             ret = -EINTR;
+>> +             break;
+>>       default:
+>> -             return false;
+>> +             return -EINVAL;
+>>       }
+>>
+>>       *vcpu_reg(vcpu, 0) = val;
+>> -     return true;
+>> +     return ret;
+>>  }
+>> diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
+>> index e301a48..db90649 100644
+>> --- a/arch/arm64/include/asm/kvm_psci.h
+>> +++ b/arch/arm64/include/asm/kvm_psci.h
+>> @@ -18,6 +18,29 @@
+>>  #ifndef __ARM64_KVM_PSCI_H__
+>>  #define __ARM64_KVM_PSCI_H__
+>>
+>> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
+>> +#include <linux/kvm_host.h>
+>> +#include <asm/kvm_asm.h>
+>> +#include <asm/kvm_arm.h>
+>> +
+>> +/*
+>> + * The in-kernel PSCI emulation code wants to use a copy of run->psci,
+>> + * which is an anonymous type. Use our own type instead.
+>> + */
+>> +struct kvm_exit_psci {
+>> +     u32             fn;
+>> +     u64             args[7];
+>> +};
+>> +
+>> +static inline void kvm_prepare_psci(struct kvm_run *run,
+>> +                                 struct kvm_exit_psci *psci)
+>> +{
+>> +     run->psci.fn = psci->fn;
+>> +     memcpy(&run->psci.args, &psci->args, sizeof(run->psci.args));
+>> +     memset(&run->psci.ret, 0, sizeof(run->psci.ret));
+>> +     run->exit_reason = KVM_EXIT_PSCI;
+>> +}
+>> +
+>> +int kvm_handle_psci_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> +int kvm_psci_call(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>
+>>  #endif /* __ARM64_KVM_PSCI_H__ */
+>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>> index d9f026b..f678902 100644
+>> --- a/arch/arm64/include/uapi/asm/kvm.h
+>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>> @@ -158,6 +158,8 @@ struct kvm_arch_memory_slot {
+>>  #define KVM_PSCI_FN_CPU_OFF          KVM_PSCI_FN(1)
+>>  #define KVM_PSCI_FN_CPU_ON           KVM_PSCI_FN(2)
+>>  #define KVM_PSCI_FN_MIGRATE          KVM_PSCI_FN(3)
+>> +#define KVM_PSCI_FN_SYSTEM_OFF               KVM_PSCI_FN(4)
+>> +#define KVM_PSCI_FN_SYSTEM_RESET     KVM_PSCI_FN(5)
+>>
+>>  #define KVM_PSCI_RET_SUCCESS         0
+>>  #define KVM_PSCI_RET_NI                      ((unsigned long)-1)
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index 9beaca0..28e20bb 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -30,20 +30,32 @@ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
+>>
+>>  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  {
+>> -     if (kvm_psci_call(vcpu))
+>> +     int ret;
+>> +
+>> +     ret = kvm_psci_call(vcpu, run);
+>> +     if (!ret)
+>> +             return 1;
+>> +     else if (ret == -EINVAL) {
+>> +             kvm_inject_undefined(vcpu);
+>>               return 1;
+>> +     }
+>>
+>> -     kvm_inject_undefined(vcpu);
+>> -     return 1;
+>> +     return 0;
+>>  }
+>>
+>>  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  {
+>> -     if (kvm_psci_call(vcpu))
+>> +     int ret;
+>> +
+>> +     ret = kvm_psci_call(vcpu, run);
+>> +     if (!ret)
+>> +             return 1;
+>> +     else if (ret == -EINVAL) {
+>> +             kvm_inject_undefined(vcpu);
+>>               return 1;
+>> +     }
+>>
+>> -     kvm_inject_undefined(vcpu);
+>> -     return 1;
+>> +     return 0;
+>>  }
+>>
+>>  /**
+>> --
+>> 1.7.9.5
+>>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
