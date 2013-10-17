@@ -1,98 +1,242 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 17 Oct 2013 18:43:20 +0100
-Subject: [PATCH v8 05/19] xen: make xen_create_contiguous_region return the
- dma address
+Date: Thu, 17 Oct 2013 18:43:21 +0100
+Subject: [PATCH v8 06/19] xen/arm,arm64: enable SWIOTLB_XEN
 In-Reply-To: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
-Message-ID: <1382031814-8782-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1382031814-8782-6-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify xen_create_contiguous_region to return the dma address of the
-newly contiguous buffer.
+Xen on arm and arm64 needs SWIOTLB_XEN: when running on Xen we need to
+program the hardware with mfns rather than pfns for dma addresses.
+Remove SWIOTLB_XEN dependency on X86 and PCI and make XEN select
+SWIOTLB_XEN on arm and arm64.
+
+At the moment always rely on swiotlb-xen, but when Xen starts supporting
+hardware IOMMUs we'll be able to avoid it conditionally on the presence
+of an IOMMU on the platform.
+
+Implement xen_create_contiguous_region on arm and arm64: for the moment
+we assume that dom0 has been mapped 1:1 (physical addresses == machine
+addresses) therefore we don't need to call XENMEM_exchange. Simply
+return the physical address as dma address.
+
+Initialize the xen-swiotlb from xen_early_init (before the native
+dma_ops are initialized), set xen_dma_ops to &xen_swiotlb_dma_ops.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
+
+Changes in v8:
+- assume dom0 is mapped 1:1, no need to call XENMEM_exchange.
+
+Changes in v7:
+- call __set_phys_to_machine_multi from xen_create_contiguous_region and
+xen_destroy_contiguous_region to update the P2M;
+- don't call XENMEM_unpin, it has been removed;
+- call XENMEM_exchange instead of XENMEM_exchange_and_pin;
+- set nr_exchanged to 0 before calling the hypercall.
+
+Changes in v6:
+- introduce and export xen_dma_ops;
+- call xen_mm_init from as arch_initcall.
 
 Changes in v4:
-- use virt_to_machine instead of virt_to_bus.
----
- arch/x86/xen/mmu.c        |    4 +++-
- drivers/xen/swiotlb-xen.c |    6 +++---
- include/xen/xen-ops.h     |    3 ++-
- 3 files changed, 8 insertions(+), 5 deletions(-)
+- remove redefinition of DMA_ERROR_CODE;
+- update the code to use XENMEM_exchange_and_pin and XENMEM_unpin;
+- add a note about hardware IOMMU in the commit message.
 
-diff --git a/arch/x86/xen/mmu.c b/arch/x86/xen/mmu.c
-index fdc3ba2..6c34d7c 100644
---- a/arch/x86/xen/mmu.c
-+++ b/arch/x86/xen/mmu.c
-@@ -2329,7 +2329,8 @@ static int xen_exchange_memory(unsigned long extents_in, unsigned int order_in,
+Changes in v3:
+- code style changes;
+- warn on XENMEM_put_dma_buf failures.
+---
+ arch/arm/Kconfig                      |    1 +
+ arch/arm/include/asm/xen/hypervisor.h |    2 +
+ arch/arm/include/asm/xen/page.h       |    1 +
+ arch/arm/xen/Makefile                 |    2 +-
+ arch/arm/xen/mm.c                     |   64 +++++++++++++++++++++++++++++++++
+ arch/arm64/Kconfig                    |    1 +
+ arch/arm64/xen/Makefile               |    2 +-
+ drivers/xen/Kconfig                   |    1 -
+ drivers/xen/swiotlb-xen.c             |   15 ++++++++
+ 9 files changed, 86 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/xen/mm.c
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c0bfb33..2c9d112 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1848,6 +1848,7 @@ config XEN
+ 	depends on CPU_V7 && !CPU_V6
+ 	depends on !GENERIC_ATOMIC64
+ 	select ARM_PSCI
++	select SWIOTLB_XEN
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+ 
+diff --git a/arch/arm/include/asm/xen/hypervisor.h b/arch/arm/include/asm/xen/hypervisor.h
+index d7ab99a..1317ee4 100644
+--- a/arch/arm/include/asm/xen/hypervisor.h
++++ b/arch/arm/include/asm/xen/hypervisor.h
+@@ -16,4 +16,6 @@ static inline enum paravirt_lazy_mode paravirt_get_lazy_mode(void)
+ 	return PARAVIRT_LAZY_NONE;
  }
  
- int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
--				 unsigned int address_bits)
++extern struct dma_map_ops *xen_dma_ops;
++
+ #endif /* _ASM_ARM_XEN_HYPERVISOR_H */
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index d1b5dd5..5d0e4c5 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -6,6 +6,7 @@
+ 
+ #include <linux/pfn.h>
+ #include <linux/types.h>
++#include <linux/dma-mapping.h>
+ 
+ #include <xen/xen.h>
+ #include <xen/interface/grant_table.h>
+diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+index 21e6ff5..1296952 100644
+--- a/arch/arm/xen/Makefile
++++ b/arch/arm/xen/Makefile
+@@ -1 +1 @@
+-obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o
++obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o mm.o
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+new file mode 100644
+index 0000000..d56b8c6
+--- /dev/null
++++ b/arch/arm/xen/mm.c
+@@ -0,0 +1,64 @@
++#include <linux/bootmem.h>
++#include <linux/gfp.h>
++#include <linux/export.h>
++#include <linux/slab.h>
++#include <linux/types.h>
++#include <linux/dma-mapping.h>
++#include <linux/vmalloc.h>
++#include <linux/swiotlb.h>
++
++#include <xen/xen.h>
++#include <xen/interface/memory.h>
++#include <xen/swiotlb-xen.h>
++
++#include <asm/cacheflush.h>
++#include <asm/xen/page.h>
++#include <asm/xen/hypercall.h>
++#include <asm/xen/interface.h>
++
++int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
 +				 unsigned int address_bits,
 +				 dma_addr_t *dma_handle)
- {
- 	unsigned long *in_frames = discontig_frames, out_frame;
- 	unsigned long  flags;
-@@ -2368,6 +2369,7 @@ int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
++{
++	if (!xen_initial_domain())
++		return -EINVAL;
++
++	/* we assume that dom0 is mapped 1:1 for now */
++	*dma_handle = virt_to_phys(pstart);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(xen_create_contiguous_region);
++
++void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
++{
++	return;
++}
++EXPORT_SYMBOL_GPL(xen_destroy_contiguous_region);
++
++struct dma_map_ops *xen_dma_ops;
++EXPORT_SYMBOL_GPL(xen_dma_ops);
++
++static struct dma_map_ops xen_swiotlb_dma_ops = {
++	.mapping_error = xen_swiotlb_dma_mapping_error,
++	.alloc = xen_swiotlb_alloc_coherent,
++	.free = xen_swiotlb_free_coherent,
++	.sync_single_for_cpu = xen_swiotlb_sync_single_for_cpu,
++	.sync_single_for_device = xen_swiotlb_sync_single_for_device,
++	.sync_sg_for_cpu = xen_swiotlb_sync_sg_for_cpu,
++	.sync_sg_for_device = xen_swiotlb_sync_sg_for_device,
++	.map_sg = xen_swiotlb_map_sg_attrs,
++	.unmap_sg = xen_swiotlb_unmap_sg_attrs,
++	.map_page = xen_swiotlb_map_page,
++	.unmap_page = xen_swiotlb_unmap_page,
++	.dma_supported = xen_swiotlb_dma_supported,
++};
++
++int __init xen_mm_init(void)
++{
++	if (!xen_initial_domain())
++		return 0;
++	xen_swiotlb_init(1, false);
++	xen_dma_ops = &xen_swiotlb_dma_ops;
++	return 0;
++}
++arch_initcall(xen_mm_init);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9737e97..aa1f6fb 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -209,6 +209,7 @@ config XEN_DOM0
+ config XEN
+ 	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
+ 	depends on ARM64 && OF
++	select SWIOTLB_XEN
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
  
- 	spin_unlock_irqrestore(&xen_reservation_lock, flags);
+diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
+index cd866b0..74a8d87 100644
+--- a/arch/arm64/xen/Makefile
++++ b/arch/arm64/xen/Makefile
+@@ -1,2 +1,2 @@
+-xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o)
++xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o mm.o)
+ obj-y		:= xen-arm.o hypercall.o
+diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+index 9e02d60..7e83688 100644
+--- a/drivers/xen/Kconfig
++++ b/drivers/xen/Kconfig
+@@ -140,7 +140,6 @@ config XEN_GRANT_DEV_ALLOC
  
-+	*dma_handle = virt_to_machine(vstart).maddr;
- 	return success ? 0 : -ENOMEM;
- }
- EXPORT_SYMBOL_GPL(xen_create_contiguous_region);
+ config SWIOTLB_XEN
+ 	def_bool y
+-	depends on PCI && X86
+ 	select SWIOTLB
+ 
+ config XEN_TMEM
 diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-index 1b2277c..b72f31c 100644
+index b72f31c..f0fc1a4 100644
 --- a/drivers/xen/swiotlb-xen.c
 +++ b/drivers/xen/swiotlb-xen.c
-@@ -126,6 +126,7 @@ xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
- {
- 	int i, rc;
- 	int dma_bits;
-+	dma_addr_t dma_handle;
+@@ -42,12 +42,27 @@
+ #include <xen/page.h>
+ #include <xen/xen-ops.h>
+ #include <xen/hvc-console.h>
++#include <asm/dma-mapping.h>
+ /*
+  * Used to do a quick range check in swiotlb_tbl_unmap_single and
+  * swiotlb_tbl_sync_single_*, to see if the memory was in fact allocated by this
+  * API.
+  */
  
- 	dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
- 
-@@ -137,7 +138,7 @@ xen_swiotlb_fixup(void *buf, size_t size, unsigned long nslabs)
- 			rc = xen_create_contiguous_region(
- 				(unsigned long)buf + (i << IO_TLB_SHIFT),
- 				get_order(slabs << IO_TLB_SHIFT),
--				dma_bits);
-+				dma_bits, &dma_handle);
- 		} while (rc && dma_bits++ < max_dma_bits);
- 		if (rc)
- 			return rc;
-@@ -294,11 +295,10 @@ xen_swiotlb_alloc_coherent(struct device *hwdev, size_t size,
- 		*dma_handle = dev_addr;
- 	else {
- 		if (xen_create_contiguous_region(vstart, order,
--						 fls64(dma_mask)) != 0) {
-+						 fls64(dma_mask), dma_handle) != 0) {
- 			free_pages(vstart, order);
- 			return NULL;
- 		}
--		*dma_handle = virt_to_machine(ret).maddr;
- 	}
- 	memset(ret, 0, size);
- 	return ret;
-diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-index d6fe062..9ef704d 100644
---- a/include/xen/xen-ops.h
-+++ b/include/xen/xen-ops.h
-@@ -20,7 +20,8 @@ int xen_setup_shutdown_event(void);
- 
- extern unsigned long *xen_contiguous_bitmap;
- int xen_create_contiguous_region(unsigned long vstart, unsigned int order,
--				unsigned int address_bits);
-+				unsigned int address_bits,
-+				dma_addr_t *dma_handle);
- 
- void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order);
- 
++#ifndef CONFIG_X86
++static unsigned long dma_alloc_coherent_mask(struct device *dev,
++					    gfp_t gfp)
++{
++	unsigned long dma_mask = 0;
++
++	dma_mask = dev->coherent_dma_mask;
++	if (!dma_mask)
++		dma_mask = (gfp & GFP_DMA) ? DMA_BIT_MASK(24) : DMA_BIT_MASK(32);
++
++	return dma_mask;
++}
++#endif
++
+ static char *xen_io_tlb_start, *xen_io_tlb_end;
+ static unsigned long xen_io_tlb_nslabs;
+ /*
 -- 
 1.7.2.5
