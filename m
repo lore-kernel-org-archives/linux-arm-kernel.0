@@ -1,89 +1,74 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 17 Oct 2013 11:46:30 +0200
-Subject: [PATCHv1 8/8] Documentation: Add device tree bindings for
- Freescale VF610 sound.
-In-Reply-To: <1382000477-17304-9-git-send-email-Li.Xiubo@freescale.com>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-9-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1382003190.4093.38.camel@weser.hi.pengutronix.de>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Thu, 17 Oct 2013 10:57:48 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Enable platform-specific options in
+ defconfig
+In-Reply-To: <1381930594-1701-3-git-send-email-pawel.moll@arm.com>
+References: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+ <1381930594-1701-3-git-send-email-pawel.moll@arm.com>
+Message-ID: <525FB49C.7040607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 17.10.2013, 17:01 +0800 schrieb Xiubo Li:
-> This adds the Document for Freescale VF610 sound driver under
-> Documentation/devicetree/bindings/sound/.
+Hi Pawel,
+
+On 16/10/13 14:36, Pawel Moll wrote:
+> This patch enables all drivers and alike to make defconfig-ed
+> kernels use Versatile Express specific features, like power
+> management services (PSCI, MCPM and cpuidle with drivers for
+> DCCSB on Fast Models and SPC on TC2), CMA for frame buffer
+> allocation, all virtio device drivers (for QEMU, KVM tools
+> and Fast Models), MTD physmap drivers with squashfs and UBIFS
+> for flash, I2C master, regulator and hwmon drivers and
+> LEDs support with most useful triggers. The maximum
+> amount of CPUs has been increased to 8 to facilitate
+> big.Little systems.
 > 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 > ---
->  .../devicetree/bindings/sound/fsl-sgtl5000.txt     | 52 ++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/fsl-sgtl5000.txt
+>  arch/arm/configs/vexpress_defconfig | 65 ++++++++++++++++++++++++-------------
+>  1 file changed, 42 insertions(+), 23 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/fsl-sgtl5000.txt b/Documentation/devicetree/bindings/sound/fsl-sgtl5000.txt
-> new file mode 100644
-> index 0000000..43e350f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/fsl-sgtl5000.txt
+> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+> index 6d20bc1..f2535e3 100644
+> --- a/arch/arm/configs/vexpress_defconfig
+> +++ b/arch/arm/configs/vexpress_defconfig
+[snip]
+> @@ -44,39 +49,46 @@ CONFIG_IP_PNP_BOOTP=y
+>  # CONFIG_INET_LRO is not set
+>  # CONFIG_IPV6 is not set
+>  # CONFIG_WIRELESS is not set
+> +CONFIG_NET_9P=y
+> +CONFIG_NET_9P_VIRTIO=y
+>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+>  CONFIG_DEVTMPFS=y
+>  CONFIG_MTD=y
+> -CONFIG_MTD_CONCAT=y
+> -CONFIG_MTD_PARTITIONS=y
+>  CONFIG_MTD_CMDLINE_PARTS=y
+> -CONFIG_MTD_CHAR=y
+>  CONFIG_MTD_BLOCK=y
+>  CONFIG_MTD_CFI=y
+>  CONFIG_MTD_CFI_INTELEXT=y
+>  CONFIG_MTD_CFI_AMDSTD=y
+> -CONFIG_MTD_ARM_INTEGRATOR=y
+> -CONFIG_MISC_DEVICES=y
+> +CONFIG_MTD_RAM=y
 
-This document name is overly generic, there are more than one FSL
-platforms with SGTL5000 codecs. Please include the vf610 here.
 
-> @@ -0,0 +1,52 @@
-> +Freescale VF610 audio complex with SGTL5000 codec
-> +
-> +Required properties:
-> +- compatible: "fsl,vf610-sgtl5000"
-> +- model: The user-visible name of this sound complex.
-> +- saif-controllers: The phandle list of the SAI controller.
-> +- audio-codec: The phandle of the SGTL5000 audio codec.
-> +- audio-routing : A list of the connections between audio components.
-> +  Each entry is a pair of strings, the first being the connection's sink,
-> +  the second being the connection's source. Valid names could be power
-> +  supplies, SGTL5000 pins, and the jacks on the board:
-> +
-> +  -- Power supplies:
-> +     * Mic Bias
-> +
-> +  -- SGTL5000 pins:
-> +     * MIC_IN
-> +     * LINE_IN
-> +     * HP_OUT
-> +     * LINE_OUT
-> +
-> +  -- Board connectors:
-> +     * Mic Jack
-> +     * Line In Jack
-> +     * Headphone Jack
-> +     * Line Out Jack
-> +     * Ext Spk
-> +
-> +Example:
-> +
-> +sound {
-> +	compatible = "fsl,vf610-sgtl5000";
-> +	model = "vf610-sgtl5000";
-> +	saif-controller = <&sai2>;
-> +	audio-codec = <&codec>;
-> +	audio-routing =
-> +		"MIC_IN", "Mic Jack",
-> +		"Mic Jack", "Mic Bias",
-> +		"LINE_IN", "Line In Jack",
-> +		"Headphone Jack", "HP_OUT",
-> +		"Ext Spk", "LINE_OUT";
-> +};
-> +
-> +&i2c0 {
-> +	...
-> +
-> +	codec: sgtl5000 at 0a {
-> +	       compatible = "fsl,sgtl5000";
-> +	       reg = <0x0a>;
-> +	       clocks = <&clks VF610_CLK_SAI2>;
-> +       };
-> +};
+> +CONFIG_MTD_PHYSMAP=y
+> +CONFIG_MTD_PHYSMAP_OF=y
 
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This could cause issues with CPUIdle on TC2. Since TC2 reset vector is in NOR
+flash, NOR flash has to be in Read mode when CPU resets and enter reset vector.
+But what I have seen is that NOR flash is left in Read Identifier Mode after the
+driver is initialised. So we need to make sure NOR device is in Read mode
+whenever CPU enters deeper C-states and also may have to register notifiers
+which seems overkill IMO. Most of the platform have separate(or secure) flash
+for this reason.
+Is it possible to disable flash on TC2 only in it's DT something like
+         flash at 0,00000000 {
+                status = "disabled";
+         };	
+
+Regards,
+Sudeep
