@@ -1,60 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 17 Oct 2013 11:20:46 +0200
-Subject: [PATCH v2 12/13] arm64: kernel: add CPU idle call
-In-Reply-To: <1381748590-14279-13-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1381748590-14279-13-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <525FABEE.9070100@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Oct 2013 10:21:11 +0100
+Subject: [RFC PATCH 2/5] ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and
+ SYSTEM_RESET to user space
+In-Reply-To: <CAFEAcA-xqobnEmHnda5Psr4XH+3vAUr3K9Cnv_uhB7itBbNgfw@mail.gmail.com>
+References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
+ <1381942954-22388-3-git-send-email-anup.patel@linaro.org>
+ <525FA1D3.8060001@arm.com>
+ <CAFEAcA-xqobnEmHnda5Psr4XH+3vAUr3K9Cnv_uhB7itBbNgfw@mail.gmail.com>
+Message-ID: <525FAC07.4060306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2013 01:03 PM, Lorenzo Pieralisi wrote:
-> When CPU idle is enabled, the architectural idle call should go through
-> the idle subsystem to allow CPUs to enter idle states defined
-> by the platform CPU idle back-end operations.
->
-> This patch, mirroring other archs behaviour, adds the CPU idle call to the
-> architectural arch_cpu_idle implementation for arm64.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+On 17/10/13 10:10, Peter Maydell wrote:
+> On 17 October 2013 09:37, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 16/10/13 18:02, Anup Patel wrote:
+>>> The PSCI SYSTEM_OFF and SYSTEM_RESET functions are VM or Guest level
+>>> functions hence cannot be emulated by the in-kernel PSCI emulation code.
+>>
+>> Why can't we implement system-wide functionality in the kernel? I fail
+>> to see the issue here.
+> 
+> Because the kernel isn't emulating the whole board, and you need
+> to power off or reset the whole board, not just the CPUs.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+In which case we can forward a generic event, once KVM has dealt with
+the CPUs.
 
-> ---
->   arch/arm64/kernel/process.c | 7 +++++--
->   1 file changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index de17c89..50491ec 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -33,6 +33,7 @@
->   #include <linux/kallsyms.h>
->   #include <linux/init.h>
->   #include <linux/cpu.h>
-> +#include <linux/cpuidle.h>
->   #include <linux/elfcore.h>
->   #include <linux/pm.h>
->   #include <linux/tick.h>
-> @@ -98,8 +99,10 @@ void arch_cpu_idle(void)
->   	 * This should do all the clock switching and wait for interrupt
->   	 * tricks
->   	 */
-> -	cpu_do_idle();
-> -	local_irq_enable();
-> +	if (cpuidle_idle_call()) {
-> +		cpu_do_idle();
-> +		local_irq_enable();
-> +	}
->   }
->
->   #ifdef CONFIG_HOTPLUG_CPU
->
+>> I'm really not keen on this approach. Having part of the PSCI
+>> implementation offloaded to userspace means we don't have a complete
+>> implementation in KVM anymore, and we end-up duplicating functionality
+>> all over the place.
+>>
+>> Also, OFF and RESET are not PSCI specific concepts, and could be
+>> implemented in various ways. I'm more inclined to return a
+>> *standardized* exit code that the various platforms can interpret.
+> 
+> Maybe we should have a more generic "kernel can't handle this,
+> toss it to userspace" API? That might also fit in with supporting
+> guests that want to make SMC calls to an emulated monitor...
 
+Indeed.
 
+	M.
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Jazz is not dead. It just smells funny...
