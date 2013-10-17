@@ -1,20 +1,15 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 17 Oct 2013 17:02:03 +0200
-Subject: [Patch v2][ 05/37] fbdev: Add the lacking FB_SYNC_* for matching the
- DISPLAY_FLAGS_*
+Date: Thu, 17 Oct 2013 17:02:04 +0200
+Subject: [Patch v2][ 06/37] video: backlight: gpio-backlight: Add DT support.
 In-Reply-To: <1382022155-21954-1-git-send-email-denis@eukrea.com>
 References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382022155-21954-6-git-send-email-denis@eukrea.com>
+Message-ID: <1382022155-21954-7-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without that fix, drivers using the fb_videomode_from_videomode
-  function will not be able to get certain information because
-  some DISPLAY_FLAGS_* have no corresponding FB_SYNC_*.
-
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
@@ -26,37 +21,169 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- drivers/video/fbmon.c   |    4 ++++
- include/uapi/linux/fb.h |    2 ++
- 2 files changed, 6 insertions(+)
+ .../bindings/video/backlight/gpio-backlight.txt    |   18 +++++
+ drivers/video/backlight/gpio_backlight.c           |   73 ++++++++++++++++++--
+ 2 files changed, 84 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
 
-diff --git a/drivers/video/fbmon.c b/drivers/video/fbmon.c
-index 6103fa6..29a9ed0 100644
---- a/drivers/video/fbmon.c
-+++ b/drivers/video/fbmon.c
-@@ -1402,6 +1402,10 @@ int fb_videomode_from_videomode(const struct videomode *vm,
- 		fbmode->sync |= FB_SYNC_HOR_HIGH_ACT;
- 	if (vm->flags & DISPLAY_FLAGS_VSYNC_HIGH)
- 		fbmode->sync |= FB_SYNC_VERT_HIGH_ACT;
-+	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
-+		fbmode->sync |= FB_SYNC_DE_HIGH_ACT;
-+	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
-+		fbmode->sync |= FB_SYNC_PIXDAT_HIGH_ACT;
- 	if (vm->flags & DISPLAY_FLAGS_INTERLACED)
- 		fbmode->vmode |= FB_VMODE_INTERLACED;
- 	if (vm->flags & DISPLAY_FLAGS_DOUBLESCAN)
-diff --git a/include/uapi/linux/fb.h b/include/uapi/linux/fb.h
-index fb795c3..30487df 100644
---- a/include/uapi/linux/fb.h
-+++ b/include/uapi/linux/fb.h
-@@ -215,6 +215,8 @@ struct fb_bitfield {
- 					/* vtotal = 144d/288n/576i => PAL  */
- 					/* vtotal = 121d/242n/484i => NTSC */
- #define FB_SYNC_ON_GREEN	32	/* sync on green */
-+#define FB_SYNC_DE_HIGH_ACT	64	/* data enable high active */
-+#define FB_SYNC_PIXDAT_HIGH_ACT	64	/* data enable high active */
+diff --git a/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+new file mode 100644
+index 0000000..362dd40
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+@@ -0,0 +1,18 @@
++gpio-backlight bindings
++
++Required properties:
++  - compatible: "gpio-backlight"
++  - gpios: describes the gpio that is used for enabling/disabling the backlight
++     (see GPIO binding[0] for more details).
++  - default-brightness-level: the default brightness level (can be 0(off) or
++      1(on) since GPIOs only support theses levels).
++
++[0]: Documentation/devicetree/bindings/gpio/gpio.txt
++
++Example:
++
++	backlight {
++		compatible = "gpio-backlight";
++		gpios = <&gpio3 4 0>;
++		default-brightness-level = <1>;
++	};
+diff --git a/drivers/video/backlight/gpio_backlight.c b/drivers/video/backlight/gpio_backlight.c
+index 81fb127..f5d31e7 100644
+--- a/drivers/video/backlight/gpio_backlight.c
++++ b/drivers/video/backlight/gpio_backlight.c
+@@ -13,6 +13,8 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
+ #include <linux/platform_data/gpio_backlight.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+@@ -23,6 +25,7 @@ struct gpio_backlight {
  
- #define FB_VMODE_NONINTERLACED  0	/* non interlaced */
- #define FB_VMODE_INTERLACED	1	/* interlaced	*/
+ 	int gpio;
+ 	int active;
++	int def_value;
+ };
+ 
+ static int gpio_backlight_update_status(struct backlight_device *bl)
+@@ -60,6 +63,43 @@ static const struct backlight_ops gpio_backlight_ops = {
+ 	.check_fb	= gpio_backlight_check_fb,
+ };
+ 
++static int gpio_backlight_probe_dt(struct platform_device *pdev,
++				   struct gpio_backlight *gbl)
++{
++	struct device_node *np = pdev->dev.of_node;
++	enum of_gpio_flags gpio_flags;
++	int ret;
++
++	gbl->fbdev = NULL;
++	gbl->gpio = of_get_gpio_flags(np, 0, &gpio_flags);
++
++	gbl->active = (gpio_flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1;
++
++	if (gbl->gpio == -EPROBE_DEFER) {
++		return ERR_PTR(-EPROBE_DEFER);
++	} else if (gbl->gpio < 0) {
++		dev_err(&pdev->dev, "Error: gpios is a required parameter.\n");
++		return gbl->gpio;
++	}
++
++	ret = of_property_read_u32(np, "default-brightness-level",
++				   &gbl->def_value);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Error: default-brightness-level "
++			"is a required parameter.\n");
++		return ret;
++	}
++
++	if (gbl->def_value < 0 || gbl->def_value > 1) {
++		dev_err(&pdev->dev, "Error: Invalid "
++			"default-brightness-level value. Its value can be "
++			"either 0(off) or 1(on).\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int gpio_backlight_probe(struct platform_device *pdev)
+ {
+ 	struct gpio_backlight_platform_data *pdata =
+@@ -67,10 +107,12 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 	struct backlight_properties props;
+ 	struct backlight_device *bl;
+ 	struct gpio_backlight *gbl;
++	struct device_node *np = pdev->dev.of_node;
+ 	int ret;
+ 
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "failed to find platform data\n");
++	if (!pdata && !np) {
++		dev_err(&pdev->dev, "failed to find platform data or device "
++			"tree node.\n");
+ 		return -ENODEV;
+ 	}
+ 
+@@ -79,14 +121,21 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	gbl->dev = &pdev->dev;
+-	gbl->fbdev = pdata->fbdev;
+-	gbl->gpio = pdata->gpio;
+-	gbl->active = pdata->active_low ? 0 : 1;
++
++	if (np) {
++		ret = gpio_backlight_probe_dt(pdev, gbl);
++		if (ret)
++			return ret;
++	} else {
++		gbl->fbdev = pdata->fbdev;
++		gbl->gpio = pdata->gpio;
++		gbl->active = pdata->active_low ? 0 : 1;
++	}
+ 
+ 	ret = devm_gpio_request_one(gbl->dev, gbl->gpio, GPIOF_DIR_OUT |
+ 				    (gbl->active ? GPIOF_INIT_LOW
+ 						 : GPIOF_INIT_HIGH),
+-				    pdata->name);
++				    pdata ? pdata->name : "backlight");
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "unable to request GPIO\n");
+ 		return ret;
+@@ -103,17 +152,27 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 		return PTR_ERR(bl);
+ 	}
+ 
+-	bl->props.brightness = pdata->def_value;
++	if (np)
++		bl->props.brightness = gbl->def_value;
++	else
++		bl->props.brightness = pdata->def_value;
++
+ 	backlight_update_status(bl);
+ 
+ 	platform_set_drvdata(pdev, bl);
+ 	return 0;
+ }
+ 
++static struct of_device_id gpio_backlight_of_match[] = {
++	{ .compatible = "gpio-backlight" },
++	{ /* sentinel */ }
++};
++
+ static struct platform_driver gpio_backlight_driver = {
+ 	.driver		= {
+ 		.name		= "gpio-backlight",
+ 		.owner		= THIS_MODULE,
++		.of_match_table = of_match_ptr(gpio_backlight_of_match),
+ 	},
+ 	.probe		= gpio_backlight_probe,
+ };
 -- 
 1.7.9.5
