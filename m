@@ -1,48 +1,62 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 17 Oct 2013 17:02:02 +0200
-Subject: [Patch v2][ 04/37] [media] v4l2: add new V4L2_PIX_FMT_RGB666 pixel
- format.
+Date: Thu, 17 Oct 2013 17:02:03 +0200
+Subject: [Patch v2][ 05/37] fbdev: Add the lacking FB_SYNC_* for matching the
+ DISPLAY_FLAGS_*
 In-Reply-To: <1382022155-21954-1-git-send-email-denis@eukrea.com>
 References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382022155-21954-5-git-send-email-denis@eukrea.com>
+Message-ID: <1382022155-21954-6-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That new macro is needed by the imx_drm staging driver
-  for supporting the QVGA display of the eukrea-cpuimx51 board.
+Without that fix, drivers using the fb_videomode_from_videomode
+  function will not be able to get certain information because
+  some DISPLAY_FLAGS_* have no corresponding FB_SYNC_*.
 
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
 Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Stephen Warren <swarren@wwwdotorg.org>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Cc: devicetree at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: driverdev-devel at linuxdriverproject.org
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
-Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: linux-media at vger.kernel.org
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- include/uapi/linux/videodev2.h |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/video/fbmon.c   |    4 ++++
+ include/uapi/linux/fb.h |    2 ++
+ 2 files changed, 6 insertions(+)
 
-diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-index 437f1b0..e8ff410 100644
---- a/include/uapi/linux/videodev2.h
-+++ b/include/uapi/linux/videodev2.h
-@@ -294,6 +294,7 @@ struct v4l2_pix_format {
- #define V4L2_PIX_FMT_RGB555X v4l2_fourcc('R', 'G', 'B', 'Q') /* 16  RGB-5-5-5 BE  */
- #define V4L2_PIX_FMT_RGB565X v4l2_fourcc('R', 'G', 'B', 'R') /* 16  RGB-5-6-5 BE  */
- #define V4L2_PIX_FMT_BGR666  v4l2_fourcc('B', 'G', 'R', 'H') /* 18  BGR-6-6-6	  */
-+#define V4L2_PIX_FMT_RGB666  v4l2_fourcc('R', 'G', 'B', 'H') /* 18  RGB-6-6-6	  */
- #define V4L2_PIX_FMT_BGR24   v4l2_fourcc('B', 'G', 'R', '3') /* 24  BGR-8-8-8     */
- #define V4L2_PIX_FMT_RGB24   v4l2_fourcc('R', 'G', 'B', '3') /* 24  RGB-8-8-8     */
- #define V4L2_PIX_FMT_BGR32   v4l2_fourcc('B', 'G', 'R', '4') /* 32  BGR-8-8-8-8   */
+diff --git a/drivers/video/fbmon.c b/drivers/video/fbmon.c
+index 6103fa6..29a9ed0 100644
+--- a/drivers/video/fbmon.c
++++ b/drivers/video/fbmon.c
+@@ -1402,6 +1402,10 @@ int fb_videomode_from_videomode(const struct videomode *vm,
+ 		fbmode->sync |= FB_SYNC_HOR_HIGH_ACT;
+ 	if (vm->flags & DISPLAY_FLAGS_VSYNC_HIGH)
+ 		fbmode->sync |= FB_SYNC_VERT_HIGH_ACT;
++	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
++		fbmode->sync |= FB_SYNC_DE_HIGH_ACT;
++	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
++		fbmode->sync |= FB_SYNC_PIXDAT_HIGH_ACT;
+ 	if (vm->flags & DISPLAY_FLAGS_INTERLACED)
+ 		fbmode->vmode |= FB_VMODE_INTERLACED;
+ 	if (vm->flags & DISPLAY_FLAGS_DOUBLESCAN)
+diff --git a/include/uapi/linux/fb.h b/include/uapi/linux/fb.h
+index fb795c3..30487df 100644
+--- a/include/uapi/linux/fb.h
++++ b/include/uapi/linux/fb.h
+@@ -215,6 +215,8 @@ struct fb_bitfield {
+ 					/* vtotal = 144d/288n/576i => PAL  */
+ 					/* vtotal = 121d/242n/484i => NTSC */
+ #define FB_SYNC_ON_GREEN	32	/* sync on green */
++#define FB_SYNC_DE_HIGH_ACT	64	/* data enable high active */
++#define FB_SYNC_PIXDAT_HIGH_ACT	64	/* data enable high active */
+ 
+ #define FB_VMODE_NONINTERLACED  0	/* non interlaced */
+ #define FB_VMODE_INTERLACED	1	/* interlaced	*/
 -- 
 1.7.9.5
