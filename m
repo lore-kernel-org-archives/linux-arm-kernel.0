@@ -1,43 +1,46 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Thu, 17 Oct 2013 19:12:08 +0530
-Subject: [PATCH 3/9] clk: samsung: exynos4: Move suspend/resume handling
- to SoC driver
-In-Reply-To: <1381921698-5060-4-git-send-email-t.figa@samsung.com>
-References: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
- <1381921698-5060-4-git-send-email-t.figa@samsung.com>
-Message-ID: <CAKew6eV7Hd1x1+YLR9rjzNgYu0t=9Q8BG23VUvhPJTf77bsRXQ@mail.gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 17 Oct 2013 16:43:31 +0300
+Subject: [PATCH 08/28] dmaengine: dw: use DMA_COMPLETE for dma
+ completion status
+In-Reply-To: <1381940926-25564-9-git-send-email-vinod.koul@intel.com>
+References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
+ <1381940926-25564-9-git-send-email-vinod.koul@intel.com>
+Message-ID: <1382017411.29062.142.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Wed, 2013-10-16 at 21:58 +0530, Vinod Koul wrote:
+> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+> CC: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> CC: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/dma/dw/core.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/dw/core.c b/drivers/dma/dw/core.c
+> index 89eb89f..2c29331 100644
+> --- a/drivers/dma/dw/core.c
+> +++ b/drivers/dma/dw/core.c
+> @@ -1098,13 +1098,13 @@ dwc_tx_status(struct dma_chan *chan,
+>  	enum dma_status		ret;
+>  
+>  	ret = dma_cookie_status(chan, cookie, txstate);
+> -	if (ret == DMA_SUCCESS)
+> +	if (ret == DMA_COMPLETE)
+>  		return ret;
+>  
+>  	dwc_scan_descriptors(to_dw_dma(chan->device), dwc);
+>  
+>  	ret = dma_cookie_status(chan, cookie, txstate);
+> -	if (ret != DMA_SUCCESS)
+> +	if (ret != DMA_COMPLETE)
+>  		dma_set_residue(txstate, dwc_get_residue(dwc));
+>  
+>  	if (dwc->paused && ret == DMA_IN_PROGRESS)
 
-[ ... ]
->  /*
->   * list of controller registers to be saved and restored during a
->   * suspend/resume cycle.
-> @@ -288,6 +299,70 @@ static unsigned long exynos4_clk_regs[] __initdata = {
->         GATE_IP_CPU,
->  };
->
-> +static int exynos4_clk_suspend(void)
-> +{
-> +       samsung_clk_save(reg_base, exynos4_save_common,
-> +                               ARRAY_SIZE(exynos4_clk_regs));
+Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-a doubt here, Is sizeof(exynos4_clk_regs) works with
-exynos4_clk_regs[] as __initdata ?
 
-> +
-> +       if (exynos4_soc == EXYNOS4210)
-> +               samsung_clk_save(reg_base, exynos4_save_soc,
-> +                                       ARRAY_SIZE(exynos4210_clk_save));
-
-[ ... ]
-> +static void exynos4_clk_sleep_init(void)
-
-I think, this fuction can be placed in __init section.
-
-Same in other patches as well.
-
-Regards,
-Yadwinder
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
