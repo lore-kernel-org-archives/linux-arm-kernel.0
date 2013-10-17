@@ -1,73 +1,40 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 17 Oct 2013 16:39:57 +0200 (CEST)
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <20131017142755.GA4477@breakpoint.cc>
-References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
- <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
- <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
- <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
- <20131017020745.GA14013@intel.com> <20131017142755.GA4477@breakpoint.cc>
-Message-ID: <Pine.LNX.4.64.1310171638030.27369@axis700.grange>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Thu, 17 Oct 2013 22:40:32 +0800
+Subject: [PATCH v3 6/7] arm64,
+ jump label: optimize jump label implementation
+In-Reply-To: <20131017093944.GB18765@mudshark.cambridge.arm.com>
+References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
+ <1381893492-7135-7-git-send-email-liuj97@gmail.com>
+ <20131016114608.GH5403@mudshark.cambridge.arm.com>
+ <525EC8D1.7000900@gmail.com>
+ <20131017093944.GB18765@mudshark.cambridge.arm.com>
+Message-ID: <525FF6E0.7070000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian
-
-On Thu, 17 Oct 2013, Sebastian Andrzej Siewior wrote:
-
-> On Thu, Oct 17, 2013 at 07:37:45AM +0530, Vinod Koul wrote:
-> > index 0bc7275..683c380 100644
-> > --- a/include/linux/dmaengine.h
-> > +++ b/include/linux/dmaengine.h
-> > @@ -45,16 +45,17 @@ static inline int dma_submit_error(dma_cookie_t cookie)
-> >  
-> >  /**
-> >   * enum dma_status - DMA transaction status
-> > - * @DMA_SUCCESS: transaction completed successfully
-> > + * @DMA_COMPLETE: transaction completed
-> >   * @DMA_IN_PROGRESS: transaction not yet processed
-> >   * @DMA_PAUSED: transaction is paused
-> >   * @DMA_ERROR: transaction failed
-> >   */
-> >  enum dma_status {
-> > -	DMA_SUCCESS,
-> > +	DMA_COMPLETE,
-> >  	DMA_IN_PROGRESS,
-> >  	DMA_PAUSED,
-> >  	DMA_ERROR,
-> > +	DMA_SUCCESS,
-> >  };
+On 10/17/2013 05:39 PM, Will Deacon wrote:
+> On Wed, Oct 16, 2013 at 06:11:45PM +0100, Jiang Liu wrote:
+>> On 10/16/2013 07:46 PM, Will Deacon wrote:
+>>>
+>>>> +	} else {
+>>>> +		insn = aarch64_insn_gen_nop();
+>>>
+>>> You could make the code more concise by limiting your patching ability to
+>>> branch immediates. Then a nop is simply a branch to the next instruction (I
+>>> doubt any modern CPUs will choke on this, whereas the architecture requires
+>>> a NOP to take time).
+>> I guess a NOP should be more effecient than a "B #4" on real CPUs:)
 > 
-> There are some drivers which compare against == or != DMA_SUCCESS. Shouldn't this
-> become
->   enum dma_status {
->  -	DMA_SUCCESS,
->  +	DMA_COMPLETE = 0, DMA_SUCCESS = 0,
->   	DMA_IN_PROGRESS,
->   	DMA_PAUSED,
->   	DMA_ERROR,
->   };
+> Well, I was actually questioning that. A NOP *has* to take time (the
+> architecture prevents implementations from discaring it) whereas a static,
+> unconditional branch will likely be discarded early on by CPUs with even
+> simple branch prediction logic.
+I naively thought "NOP" is cheaper than a "B" :(
+Will use a "B #1" to replace "NOP".
+
+Thanks!
+Gerry
+
 > 
-> so nothing breaks during the transition?
-
-Good catch. I would do
-
- enum dma_status {
--	DMA_SUCCESS,
-+	DMA_COMPLETE,
- 	DMA_IN_PROGRESS,
- 	DMA_PAUSED,
- 	DMA_ERROR,
- };
- 
-+ #define DMA_SUCCESS DMA_COMPLETE
-
-and then just remove the last line again
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+> Will
+> 
