@@ -1,58 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 17 Oct 2013 17:47:44 +0200
-Subject: [PATCH v4 04/17] clk: at91: add PMC macro file for dt definitions
-In-Reply-To: <1381480885-11994-1-git-send-email-b.brezillon@overkiz.com>
-References: <1381477081-6041-1-git-send-email-b.brezillon@overkiz.com>
- <1381480885-11994-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <526006A0.1080704@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 17 Oct 2013 16:53:08 +0100
+Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <20131017141957.GE14104@ns203013.ovh.net>
+References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
+ <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
+ <20131016151419.GA14104@ns203013.ovh.net> <525F915D.9020501@st.com>
+ <525FAEED.7030207@st.com> <20131017141957.GE14104@ns203013.ovh.net>
+Message-ID: <20131017155308.GQ19112@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2013 10:41, Boris BREZILLON :
-> This patch adds a new macro file for PMC macros.
->
-> This macro file includes the definitions of SR (status register) bit
-> offsets and will be use to reference PMC irqs.
->
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+On Thu, 17 Oct 2013, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> On 10:33 Thu 17 Oct     , srinivas kandagatla wrote:
+> > On 17/10/13 08:27, Maxime COQUELIN wrote:
+> > > ...
+> > >>> >> +
+> > >>> >> +static struct of_device_id st_i2c_match[] = {
+> > >>> >> +     { .compatible = "st,comms-ssc-i2c", },
+> > >> > the rules is to put the first soc that use the ip in the compatible
+> > >> > as st,sti7100-scc-i2c
+> > > Ok. There are no plans to upstream the SH4 platforms, it will only 
+> > > remains in stlinux.com.
+> > > Maybe I can set the first ARM platform (STiH415)?
+> > > That would give st,stih415-ssc-i2c.
+> > NAK, for st,stih415-ssc-i2c naming.
+> > 
+> > IMO, this makes sense when the same IP integration done on different SOC
+> > changes slightly/very differently.
+> > 
+> > But in this case the "comms" IP remains unchanged across all the SOCs.
+> > 
+> > I would still prefer "st,comms-ssc-i2c", allowing a single device driver
+> > to match against several SoCs. ST "comms" IP it is integrated across all
+> > the STi series of SoCs, so we don't want to add new entry in compatible
+> > for every new SOC.
+> 
+> you never need this you always the first SoC that's all
+> 
+> see other bindings on at91 as example sorry NACK
 
-> ---
->   include/dt-bindings/clk/at91.h |   22 ++++++++++++++++++++++
->   1 file changed, 22 insertions(+)
->   create mode 100644 include/dt-bindings/clk/at91.h
->
-> diff --git a/include/dt-bindings/clk/at91.h b/include/dt-bindings/clk/at91.h
-> new file mode 100644
-> index 0000000..0b4cb99
-> --- /dev/null
-> +++ b/include/dt-bindings/clk/at91.h
-> @@ -0,0 +1,22 @@
-> +/*
-> + * This header provides constants for AT91 pmc status.
-> + *
-> + * The constants defined in this header are being used in dts.
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_CLK_AT91_H
-> +#define _DT_BINDINGS_CLK_AT91_H
-> +
-> +#define AT91_PMC_MOSCS		0		/* MOSCS Flag */
-> +#define AT91_PMC_LOCKA		1		/* PLLA Lock */
-> +#define AT91_PMC_LOCKB		2		/* PLLB Lock */
-> +#define AT91_PMC_MCKRDY		3		/* Master Clock */
-> +#define AT91_PMC_LOCKU		6		/* UPLL Lock */
-> +#define AT91_PMC_PCKRDY(id)	(8 + (id))	/* Programmable Clock */
-> +#define AT91_PMC_MOSCSELS	16		/* Main Oscillator Selection */
-> +#define AT91_PMC_MOSCRCS	17		/* Main On-Chip RC */
-> +#define AT91_PMC_CFDEV		18		/* Clock Failure Detector Event */
-> +
-> +#endif
->
+I'm guessing that using the first SoC is an I2C'isum.
 
+Guys, if you don't want to be too specific, just make it as generic as
+possible whilest still using the SoC as a POR: st,stih41x-ssc-i2c will
+do for now, as it covers all current bases.
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
