@@ -1,51 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Oct 2013 11:01:30 -0700
-Subject: [GIT PULL] ARM: OMAP2: add AM43xx hwmod and PRCM support
-In-Reply-To: <alpine.DEB.2.02.1310162145180.6538@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1310162145180.6538@utopia.booyaka.com>
-Message-ID: <20131017180129.GD15154@atomide.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 17 Oct 2013 18:43:33 +0100
+Subject: [PATCH v8 18/19] swiotlb-xen: no need to do execute two bus_to_phys
+ translations in a row
+In-Reply-To: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+Message-ID: <1382031814-8782-18-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [131016 14:46]:
-> Hi Tony,
-> 
-> The following changes since commit ace1e3ec4a2540c783e65884bb7be9cd45a0a295:
-> 
->   ARM: AM33xx: hwmod: Add RNG module data (2013-10-09 09:02:51 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13/am43xx-support
-> 
-> for you to fetch changes up to 70b0d5f5838e0c9dfecabefe4ff43b5a2e7c1e8b:
-> 
->   ARM: OMAP2: hwmod: Add qspi data for am437x. (2013-10-15 23:49:43 -0600)
-> 
-> ----------------------------------------------------------------
-> Add hwmod and PRCM data for the TI AM43xx family of SoCs.
-> 
-> Under normal circumstances, these patches would not be merged.
-> The hwmod and PRCM data should be moved out either to DT data or
-> to drivers/.  Also, the current implementation trades off lines
-> of diff by dynamically rewriting static data at runtime, which is
-> a bad practice - it causes future maintenance headaches.
-> However, after speaking with my upstream, it sounds like it's
-> better to merge these patches in their current state, due to long
-> term considerations.
-> 
-> Basic test logs are here:
-> 
-> http://www.pwsan.com/omap/testlogs/am43xx_support_v3.13/20131015213706/
-> 
-> Due to the lack of an AM43xx board and any available public
-> documentation, it's impossible for me to review or test that
-> platform in any meaningful way.  But at least the tests above
-> verify that the patches don't affect existing platforms -
-> particularly AM33xx.
+xen_unmap_single calls xen_bus_to_phys, then passes dev_addr to
+is_xen_swiotlb_buffer that calls xen_bus_to_phys again.
+xen_bus_to_phys is potentially a slow operation that might involve
+walking a tree.
+We can avoid calling xen_bus_to_phys twice by removing the
+is_xen_swiotlb_buffer call and doing the check directly in
+xen_unmap_single using the physical address.
 
-Thanks, I've pulled this into omap-for-v3.13/hwmod.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ drivers/xen/swiotlb-xen.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index 4d50058..6d9ca61 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -426,8 +426,8 @@ static void xen_unmap_single(struct device *hwdev, dma_addr_t dev_addr,
+ 
+ 	xen_dma_unmap_page(hwdev, paddr, size, dir, attrs);
+ 
+-	/* NOTE: We use dev_addr here, not paddr! */
+-	if (is_xen_swiotlb_buffer(dev_addr)) {
++	if (paddr >= virt_to_phys(xen_io_tlb_start) &&
++		paddr < virt_to_phys(xen_io_tlb_end)) {
+ 		swiotlb_tbl_unmap_single(hwdev, paddr, size, dir);
+ 		return;
+ 	}
+-- 
+1.7.2.5
