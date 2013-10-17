@@ -1,131 +1,37 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 17 Oct 2013 14:03:27 +0400
-Subject: [PATCH] arm: pxa: tosa: fix keys mapping
-Message-ID: <1382004207-6933-1-git-send-email-dbaryshkov@gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 17 Oct 2013 11:07:45 +0100
+Subject: [PATCH 1/2] ARM: vexpress: Make defconfig work again
+In-Reply-To: <525ED182.6080505@codeaurora.org>
+References: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+ <1381930594-1701-2-git-send-email-pawel.moll@arm.com>
+ <525ED182.6080505@codeaurora.org>
+Message-ID: <1382004465.27517.107.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When converting from tosa-keyboard driver to matrix keyboard, tosa keys
-received extra 1 column shift. Replace that with correct values to make
-keyboard work again.
+On Wed, 2013-10-16 at 18:48 +0100, Christopher Covington wrote:
+> > - disable low level debug and early printk
+> > 
+> > Signed-off-by: Fathi Boudra <fathi.boudra@linaro.org>
+> > [PM: removed DEBUG_LL - it doesn't work on qemu]
+> 
+> Does DEBUG_LL/EARLY_PRINTK break boot on QEMU? If not, why not leave it in for
+> folks using other emulators, hardware, and maybe future versions of QEMU?
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-pxa/tosa.c | 102 +++++++++++++++++++++++------------------------
- 1 file changed, 51 insertions(+), 51 deletions(-)
+Yep, unfortunately it does break qemu boot. And generally DEBUG_LL is
+considered to be a development-only option and in it was pointed out in
+many discussion that people using it must exactly know what are they
+doing. Definitely not a candidate for a defconfig.
 
-diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index 0206b91..ef5557b 100644
---- a/arch/arm/mach-pxa/tosa.c
-+++ b/arch/arm/mach-pxa/tosa.c
-@@ -425,57 +425,57 @@ static struct platform_device tosa_power_device = {
-  * Tosa Keyboard
-  */
- static const uint32_t tosakbd_keymap[] = {
--	KEY(0, 2, KEY_W),
--	KEY(0, 6, KEY_K),
--	KEY(0, 7, KEY_BACKSPACE),
--	KEY(0, 8, KEY_P),
--	KEY(1, 1, KEY_Q),
--	KEY(1, 2, KEY_E),
--	KEY(1, 3, KEY_T),
--	KEY(1, 4, KEY_Y),
--	KEY(1, 6, KEY_O),
--	KEY(1, 7, KEY_I),
--	KEY(1, 8, KEY_COMMA),
--	KEY(2, 1, KEY_A),
--	KEY(2, 2, KEY_D),
--	KEY(2, 3, KEY_G),
--	KEY(2, 4, KEY_U),
--	KEY(2, 6, KEY_L),
--	KEY(2, 7, KEY_ENTER),
--	KEY(2, 8, KEY_DOT),
--	KEY(3, 1, KEY_Z),
--	KEY(3, 2, KEY_C),
--	KEY(3, 3, KEY_V),
--	KEY(3, 4, KEY_J),
--	KEY(3, 5, TOSA_KEY_ADDRESSBOOK),
--	KEY(3, 6, TOSA_KEY_CANCEL),
--	KEY(3, 7, TOSA_KEY_CENTER),
--	KEY(3, 8, TOSA_KEY_OK),
--	KEY(3, 9, KEY_LEFTSHIFT),
--	KEY(4, 1, KEY_S),
--	KEY(4, 2, KEY_R),
--	KEY(4, 3, KEY_B),
--	KEY(4, 4, KEY_N),
--	KEY(4, 5, TOSA_KEY_CALENDAR),
--	KEY(4, 6, TOSA_KEY_HOMEPAGE),
--	KEY(4, 7, KEY_LEFTCTRL),
--	KEY(4, 8, TOSA_KEY_LIGHT),
--	KEY(4, 10, KEY_RIGHTSHIFT),
--	KEY(5, 1, KEY_TAB),
--	KEY(5, 2, KEY_SLASH),
--	KEY(5, 3, KEY_H),
--	KEY(5, 4, KEY_M),
--	KEY(5, 5, TOSA_KEY_MENU),
--	KEY(5, 7, KEY_UP),
--	KEY(5, 11, TOSA_KEY_FN),
--	KEY(6, 1, KEY_X),
--	KEY(6, 2, KEY_F),
--	KEY(6, 3, KEY_SPACE),
--	KEY(6, 4, KEY_APOSTROPHE),
--	KEY(6, 5, TOSA_KEY_MAIL),
--	KEY(6, 6, KEY_LEFT),
--	KEY(6, 7, KEY_DOWN),
--	KEY(6, 8, KEY_RIGHT),
-+	KEY(0, 1, KEY_W),
-+	KEY(0, 5, KEY_K),
-+	KEY(0, 6, KEY_BACKSPACE),
-+	KEY(0, 7, KEY_P),
-+	KEY(1, 0, KEY_Q),
-+	KEY(1, 1, KEY_E),
-+	KEY(1, 2, KEY_T),
-+	KEY(1, 3, KEY_Y),
-+	KEY(1, 5, KEY_O),
-+	KEY(1, 6, KEY_I),
-+	KEY(1, 7, KEY_COMMA),
-+	KEY(2, 0, KEY_A),
-+	KEY(2, 1, KEY_D),
-+	KEY(2, 2, KEY_G),
-+	KEY(2, 3, KEY_U),
-+	KEY(2, 5, KEY_L),
-+	KEY(2, 6, KEY_ENTER),
-+	KEY(2, 7, KEY_DOT),
-+	KEY(3, 0, KEY_Z),
-+	KEY(3, 1, KEY_C),
-+	KEY(3, 2, KEY_V),
-+	KEY(3, 3, KEY_J),
-+	KEY(3, 4, TOSA_KEY_ADDRESSBOOK),
-+	KEY(3, 5, TOSA_KEY_CANCEL),
-+	KEY(3, 6, TOSA_KEY_CENTER),
-+	KEY(3, 7, TOSA_KEY_OK),
-+	KEY(3, 8, KEY_LEFTSHIFT),
-+	KEY(4, 0, KEY_S),
-+	KEY(4, 1, KEY_R),
-+	KEY(4, 2, KEY_B),
-+	KEY(4, 3, KEY_N),
-+	KEY(4, 4, TOSA_KEY_CALENDAR),
-+	KEY(4, 5, TOSA_KEY_HOMEPAGE),
-+	KEY(4, 6, KEY_LEFTCTRL),
-+	KEY(4, 7, TOSA_KEY_LIGHT),
-+	KEY(4, 9, KEY_RIGHTSHIFT),
-+	KEY(5, 0, KEY_TAB),
-+	KEY(5, 1, KEY_SLASH),
-+	KEY(5, 2, KEY_H),
-+	KEY(5, 3, KEY_M),
-+	KEY(5, 4, TOSA_KEY_MENU),
-+	KEY(5, 6, KEY_UP),
-+	KEY(5, 10, TOSA_KEY_FN),
-+	KEY(6, 0, KEY_X),
-+	KEY(6, 1, KEY_F),
-+	KEY(6, 2, KEY_SPACE),
-+	KEY(6, 3, KEY_APOSTROPHE),
-+	KEY(6, 4, TOSA_KEY_MAIL),
-+	KEY(6, 5, KEY_LEFT),
-+	KEY(6, 6, KEY_DOWN),
-+	KEY(6, 7, KEY_RIGHT),
- };
- 
- static struct matrix_keymap_data tosakbd_keymap_data = {
--- 
-1.8.4.rc3
+As to the details of the problem, the memory map detection heuristics
+has been crafted do match the V2P-CA9 board processor revision, and qemu
+returns a different one. Just a nuisance, but very hard to debug if
+things go wrong. And before you ask, I'd rather remove the detection
+code completely than change it yet another time, which will have the
+same result - no DEBUG_LL enabled in defconfig because one will have to
+explicitly select one of two options. Pick the wrong one and you're back
+in the same place - nothing work and you don't know where.
+
+Thanks for looking at the patch!
+
+Pawel
