@@ -1,190 +1,223 @@
 From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Thu, 17 Oct 2013 16:47:46 +0530
-Subject: [PATCH RFC v4 1/6] arm64: support single-step and breakpoint handler
- hooks
+Date: Thu, 17 Oct 2013 16:47:49 +0530
+Subject: [PATCH RFC 4/6] arm64: Add kernel return probes support(kretprobes)
 In-Reply-To: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
 References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
-Message-ID: <1382008671-4515-2-git-send-email-sandeepa.prabhu@linaro.org>
+Message-ID: <1382008671-4515-5-git-send-email-sandeepa.prabhu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AArch64 Single Steping and Breakpoint debug exceptions will be
-used by multiple debug framworks like kprobes & kgdb.
+AArch64 ISA does not instructions to pop PC register value
+from stack(like ARM v7 has ldmia {...,pc}) without using
+one of the general purpose registers. This means return probes
+cannot return to the actual return address directly without
+modifying register context, and without trapping into debug exception.
 
-This patch implements the hooks for those frameworks to register
-their own handlers for handling breakpoint and single step events.
+So like many other architectures, we prepare a global routine
+with NOPs, which serve as trampoline to hack away the
+function return address, by placing an extra kprobe on the
+trampoline entry.
 
-Reworked the debug exception handler in entry.S: do_dbg to route
-software breakpoint (BRK64) exception to do_debug_exception()
+The pre-handler of this special trampoline' kprobe execute return
+probe handler functions and restore original return address in ELR_EL1,
+this way, saved pt_regs still hold the original register context to be
+carried back to the probed kernel function.
 
 Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
 ---
- arch/arm64/include/asm/debug-monitors.h | 21 ++++++++
- arch/arm64/kernel/debug-monitors.c      | 86 ++++++++++++++++++++++++++++++++-
- arch/arm64/kernel/entry.S               |  2 +
- 3 files changed, 108 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig               |   1 +
+ arch/arm64/include/asm/kprobes.h |   1 +
+ arch/arm64/include/asm/ptrace.h  |   5 ++
+ arch/arm64/kernel/kprobes.c      | 125 ++++++++++++++++++++++++++++++++++++++-
+ 4 files changed, 129 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index a2232d0..6231479 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -62,6 +62,27 @@ struct task_struct;
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 2e89059..73eff55 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -28,6 +28,7 @@ config ARM64
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_KPROBES if !XIP_KERNEL
++	select HAVE_KRETPROBES if (HAVE_KPROBES)
+ 	select IRQ_DOMAIN
+ 	select MODULES_USE_ELF_RELA
+ 	select NO_BOOTMEM
+diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+index 9b491d0..eaca849 100644
+--- a/arch/arm64/include/asm/kprobes.h
++++ b/arch/arm64/include/asm/kprobes.h
+@@ -55,5 +55,6 @@ void arch_remove_kprobe(struct kprobe *);
+ int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
+ int kprobe_exceptions_notify(struct notifier_block *self,
+ 			     unsigned long val, void *data);
++void kretprobe_trampoline(void);
  
- #define DBG_ARCH_ID_RESERVED	0	/* In case of ptrace ABI updates. */
+ #endif /* _ARM_KPROBES_H */
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 89f1727..58b2589 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -166,6 +166,11 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
+ #define instruction_pointer(regs)	(regs)->pc
+ #define stack_pointer(regs)		((regs)->sp)
  
-+#define DBG_HOOK_HANDLED	0
-+#define DBG_HOOK_ERROR		1
-+
-+struct step_hook {
-+	struct list_head node;
-+	int (*fn)(struct pt_regs *regs, unsigned int esr);
-+};
-+
-+void register_step_hook(struct step_hook *hook);
-+void unregister_step_hook(struct step_hook *hook);
-+
-+struct break_hook {
-+	struct list_head node;
-+	u32 esr_val;
-+	u32 esr_mask;
-+	int (*fn)(struct pt_regs *regs, unsigned int esr);
-+};
-+
-+void register_break_hook(struct break_hook *hook);
-+void unregister_break_hook(struct break_hook *hook);
-+
- u8 debug_monitors_arch(void);
- 
- void enable_debug_monitors(enum debug_el el);
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cbfacf7..e42ad5f 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -188,6 +188,48 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
- 	regs->pstate = spsr;
- }
- 
-+/* EL1 Single Step Handler hooks */
-+static LIST_HEAD(step_hook);
-+DEFINE_RWLOCK(step_hook_lock);
-+
-+void register_step_hook(struct step_hook *hook)
++static inline long regs_return_value(struct pt_regs *regs)
 +{
-+	write_lock(&step_hook_lock);
-+	list_add(&hook->node, &step_hook);
-+	write_unlock(&step_hook_lock);
++	return regs->regs[0];
 +}
 +
-+void unregister_step_hook(struct step_hook *hook)
-+{
-+	write_lock(&step_hook_lock);
-+	list_del(&hook->node);
-+	write_unlock(&step_hook_lock);
-+}
-+
-+/*
-+ * Call registered single step handers
-+ * There is no Syndrome info to check for determining the handler.
-+ * So we call all the registered handlers, until the right handler is
-+ * found which returns zero.
-+ */
-+static int call_step_hook(struct pt_regs *regs, unsigned int esr)
-+{
-+	struct step_hook *hook;
-+	int retval = DBG_HOOK_ERROR;
-+
-+	read_lock(&step_hook_lock);
-+
-+	list_for_each_entry(hook, &step_hook, node)	{
-+		retval = hook->fn(regs, esr);
-+		if (retval == DBG_HOOK_HANDLED)
-+			break;
-+	}
-+
-+	read_unlock(&step_hook_lock);
-+
-+	return retval;
-+}
-+
- static int single_step_handler(unsigned long addr, unsigned int esr,
- 			       struct pt_regs *regs)
- {
-@@ -215,7 +257,10 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 		 */
- 		user_rewind_single_step(current);
- 	} else {
--		/* TODO: route to KGDB */
-+		/* call registered single step handlers */
-+		if (call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
-+			return 0;
-+
- 		pr_warning("Unexpected kernel single-step exception at EL1\n");
+ #ifdef CONFIG_SMP
+ extern unsigned long profile_pc(struct pt_regs *regs);
+ #else
+diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+index 1fa8690..0a6f31f 100644
+--- a/arch/arm64/kernel/kprobes.c
++++ b/arch/arm64/kernel/kprobes.c
+@@ -219,9 +219,16 @@ static void __kprobes setup_singlestep(struct kprobe *p,
+ 
  		/*
- 		 * Re-enable stepping since we know that we will be
-@@ -227,11 +272,50 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 		 * Needs restoring of return address after stepping xol.
++		 * If this happens to be a return probe, the exception
++		 * return address would have been hacked by the pre_handler
++		 * to point to trampoline, so we shall restore trampoline
++		 * address after stepping. Other cases, it is just next pc.
+ 		 */
+-		p->ainsn.restore.addr = instruction_pointer(regs) +
+-				sizeof(kprobe_opcode_t);
++		if ((long)p->addr == instruction_pointer(regs))
++			p->ainsn.restore.addr = instruction_pointer(regs) +
++				sizeof(kprobe_opcode_t); /* next pc */
++		else	/* hacked ret addr, could be kretprobe */
++			p->ainsn.restore.addr = regs->pc;
+ 
+ 		p->ainsn.restore.type = RESTORE_PC;
+ 
+@@ -542,6 +549,117 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
  	return 0;
  }
  
-+
-+static LIST_HEAD(break_hook);
-+DEFINE_RWLOCK(break_hook_lock);
-+
-+void register_break_hook(struct break_hook *hook)
++/*
++ * Kretprobes: kernel return probes handling
++ *
++ * AArch64 mode does not support popping the PC value from the
++ * stack like on ARM 32-bit (ldmia {..,pc}), so atleast one
++ * register need to be used to achieve branching/return.
++ * It means return probes cannot return back to the original
++ * return address directly without modifying the register context.
++ *
++ * So like other architectures, we prepare a global routine
++ * with NOPs, which serve as trampoline address that hack away the
++ * function return, with the exact register context.
++ * Placing a kprobe on trampoline routine entry will trap again to
++ * execute return probe handlers and restore original return address
++ * in ELR_EL1, this way saved pt_regs still hold the original
++ * register values to be carried back to the caller.
++ */
++static void __used kretprobe_trampoline_holder(void)
 +{
-+	write_lock(&break_hook_lock);
-+	list_add(&hook->node, &break_hook);
-+	write_unlock(&break_hook_lock);
++	asm volatile (".global kretprobe_trampoline\n"
++			"kretprobe_trampoline:\n"
++			"NOP\n\t"
++			"NOP\n\t");
 +}
 +
-+void unregister_break_hook(struct break_hook *hook)
++static int __kprobes
++trampoline_probe_handler(struct kprobe *p, struct pt_regs *regs)
 +{
-+	write_lock(&break_hook_lock);
-+	list_del(&hook->node);
-+	write_unlock(&break_hook_lock);
++	struct kretprobe_instance *ri = NULL;
++	struct hlist_head *head, empty_rp;
++	struct hlist_node *tmp;
++	unsigned long flags, orig_ret_addr = 0;
++	unsigned long trampoline_address =
++		(unsigned long)&kretprobe_trampoline;
++
++	INIT_HLIST_HEAD(&empty_rp);
++	kretprobe_hash_lock(current, &head, &flags);
++
++	/*
++	 * It is possible to have multiple instances associated with a given
++	 * task either because multiple functions in the call path have
++	 * a return probe installed on them, and/or more than one return
++	 * probe was registered for a target function.
++	 *
++	 * We can handle this because:
++	 *     - instances are always inserted at the head of the list
++	 *     - when multiple return probes are registered for the same
++	 *       function, the first instance's ret_addr will point to the
++	 *       real return address, and all the rest will point to
++	 *       kretprobe_trampoline
++	 */
++	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
++		if (ri->task != current)
++			/* another task is sharing our hash bucket */
++			continue;
++
++		if (ri->rp && ri->rp->handler) {
++			__get_cpu_var(current_kprobe) = &ri->rp->kp;
++			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
++			ri->rp->handler(ri, regs);
++			__get_cpu_var(current_kprobe) = NULL;
++		}
++
++		orig_ret_addr = (unsigned long)ri->ret_addr;
++		recycle_rp_inst(ri, &empty_rp);
++
++		if (orig_ret_addr != trampoline_address)
++			/*
++			 * This is the real return address. Any other
++			 * instances associated with this task are for
++			 * other calls deeper on the call stack
++			 */
++			break;
++	}
++
++	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
++	/* restore the original return address */
++	instruction_pointer(regs) = orig_ret_addr;
++	reset_current_kprobe();
++	kretprobe_hash_unlock(current, &flags);
++	preempt_enable_no_resched();
++
++	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
++		hlist_del(&ri->hlist);
++		kfree(ri);
++	}
++
++	/* return 1 so that post handlers not called */
++	return 1;
 +}
 +
-+static int call_break_hook(struct pt_regs *regs, unsigned int esr)
++void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
++				      struct pt_regs *regs)
 +{
-+	struct break_hook *hook;
-+	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
++	ri->ret_addr = (kprobe_opcode_t *)
++		(instruction_pointer(regs) + sizeof(kprobe_opcode_t));
 +
-+	read_lock(&break_hook_lock);
-+	list_for_each_entry(hook, &break_hook, node)
-+		if ((esr & hook->esr_mask) == hook->esr_val)
-+			fn = hook->fn;
-+	read_unlock(&break_hook_lock);
-+
-+	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
++	/* Replace the return addr with trampoline addr */
++	instruction_pointer(regs) = (unsigned long)&kretprobe_trampoline;
 +}
 +
- static int brk_handler(unsigned long addr, unsigned int esr,
- 		       struct pt_regs *regs)
- {
- 	siginfo_t info;
++static struct kprobe trampoline = {
++	.addr = (kprobe_opcode_t *) &kretprobe_trampoline,
++	.pre_handler = trampoline_probe_handler
++};
++
++int __kprobes arch_trampoline_kprobe(struct kprobe *p)
++{
++	return p->addr == (kprobe_opcode_t *) &kretprobe_trampoline;
++}
++
+ /* Break Handler hook */
+ static struct break_hook kprobes_break_hook = {
+ 	.esr_mask = BRK64_ESR_MASK,
+@@ -559,5 +677,6 @@ int __init arch_init_kprobes()
+ 	register_break_hook(&kprobes_break_hook);
+ 	register_step_hook(&kprobes_step_hook);
  
-+	/* call the registered breakpoint handler */
-+	if (call_break_hook(regs, esr) == DBG_HOOK_HANDLED)
-+		return 0;
-+
-+	pr_warn("unexpected brk exception at %lx, esr=0x%x\n",
-+			(long)instruction_pointer(regs), esr);
-+
- 	if (!user_mode(regs))
- 		return -EFAULT;
- 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 3881fd1..7fbc510 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -288,6 +288,8 @@ el1_dbg:
- 	/*
- 	 * Debug exception handling
- 	 */
-+	cmp	x24, #ESR_EL1_EC_BRK64		// if BRK64
-+	cinc	x24, x24, eq			// set bit '0'
- 	tbz	x24, #0, el1_inv		// EL1 only
- 	mrs	x0, far_el1
- 	mov	x2, sp				// struct pt_regs
+-	return 0;
++	/* register trampoline for kret probe */
++	return register_kprobe(&trampoline);
+ }
 -- 
 1.8.1.2
