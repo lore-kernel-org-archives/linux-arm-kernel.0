@@ -1,107 +1,109 @@
-From: steev@pwnieexpress.com (Steev Klimaszewski)
-Date: Wed, 16 Oct 2013 20:45:50 -0500
-Subject: [PATCH] ARM: dts: Add initial support for cm-fx6
-In-Reply-To: <1381848564-29839-1-git-send-email-valentin@compulab.co.il>
-References: <1381848564-29839-1-git-send-email-valentin@compulab.co.il>
-Message-ID: <CAKCjkJY=6mCKnxtzEgosVEYP9D3X51UAw9etr-H=j=22E=WhzA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 17 Oct 2013 07:37:45 +0530
+Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
+ status
+In-Reply-To: <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
+References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
+ <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
+ <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
+ <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
+Message-ID: <20131017020745.GA14013@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 9:49 AM, Valentin Raevsky
-<valentin@compulab.co.il> wrote:
-> Add initial support for cm-fx6 module.
->
-> cm-fx6 is a module based on mx6q SoC with the following features:
-> - Up to 4GB of DDR3
-> - 1 LCD/DVI output port
-> - 1 HDMI output port
-> - 2 LVDS LCD ports
-> - Gigabit Ethernet
-> - Analog Audio
-> - CAN
-> - SATA
-> - NAND
-> - PCIE
->
-> This patch allows to boot up the module, configures the serial console,
-> the Ethernet adapter and the hearbeat led.
->
-> Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
->  arch/arm/boot/dts/cm-fx6.dts |   51 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 arch/arm/boot/dts/cm-fx6.dts
->
-> diff --git a/arch/arm/boot/dts/cm-fx6.dts b/arch/arm/boot/dts/cm-fx6.dts
-> new file mode 100644
-> index 0000000..1080215
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/cm-fx6.dts
-> @@ -0,0 +1,51 @@
-> +/*
-> + * Copyright 2013 CompuLab Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx6q.dtsi"
-> +
-> +/ {
-> +       model = "CompuLab CM-FX6";
-> +       compatible = "compulab,cm-fx6", "fsl,imx6q";
-> +
-> +       memory {
-> +               reg = <0x10000000 0x80000000>;
-> +       };
-> +
-> +       leds {
-> +               compatible = "gpio-leds";
-> +
-> +               debug-led {
-> +                       label = "Heartbeat";
-> +                       gpios = <&gpio2 31 0>;
-> +                       linux,default-trigger = "heartbeat";
-> +               };
-> +       };
-> +};
-> +
-> +&gpmi {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_gpmi_nand_1>;
-> +       status = "okay";
-> +};
-> +
-> +&fec {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_enet_1>;
-> +       phy-mode = "rgmii";
-> +       status = "okay";
-> +};
-> +
-> +&uart4 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart4_1>;
-> +       status = "okay";
-> +};
-> --
-> 1.7.9.5
->
+On Wed, Oct 16, 2013 at 11:45:48AM -0700, Dan Williams wrote:
+> On Wed, Oct 16, 2013 at 11:29 AM, Guennadi Liakhovetski
+> >
+> > Doesn't this break kernel compilation for a total of 27 commits? Or am I
+> > missing anything?
+> 
+> Yes, I think at the start DMA_COMPLETE should just be a alias for
+> DMA_SUCCESS, then after all the driver renames are in delete
+> DMA_SUCCESS.
+Oops, taht was bad of me. ffixes in v2 and sending patch 29 for removal case
 
-Hi Valentin,
+--
 
-Completely skipped over this, as I wasn't sure what the cm-fx6 was.
-Could we maybe mention that this is commonly referred to as the
-Utilite?
+>From 7768309422a1345d32857974fe8b57805adfd561 Mon Sep 17 00:00:00 2001
+From: Vinod Koul <vinod.koul@intel.com>
+Date: Wed, 16 Oct 2013 13:29:02 +0530
+Subject: [PATCH] dmaengine: use DMA_COMPLETE for dma completion status
+
+the DMA_SUCCESS is a misnomer as dmaengine indicates the transfer is complete and
+gives no guarantee of the transfer success. Hence we should use DMA_COMPLTE
+instead of DMA_SUCCESS
+
+Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+---
+ drivers/dma/dmaengine.c   |    2 +-
+ include/linux/dmaengine.h |   13 +++++++------
+ 2 files changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 9162ac8..81d8765 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -1062,7 +1062,7 @@ dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx)
+ 	unsigned long dma_sync_wait_timeout = jiffies + msecs_to_jiffies(5000);
+ 
+ 	if (!tx)
+-		return DMA_SUCCESS;
++		return DMA_COMPLETE;
+ 
+ 	while (tx->cookie == -EBUSY) {
+ 		if (time_after_eq(jiffies, dma_sync_wait_timeout)) {
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 0bc7275..683c380 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -45,16 +45,17 @@ static inline int dma_submit_error(dma_cookie_t cookie)
+ 
+ /**
+  * enum dma_status - DMA transaction status
+- * @DMA_SUCCESS: transaction completed successfully
++ * @DMA_COMPLETE: transaction completed
+  * @DMA_IN_PROGRESS: transaction not yet processed
+  * @DMA_PAUSED: transaction is paused
+  * @DMA_ERROR: transaction failed
+  */
+ enum dma_status {
+-	DMA_SUCCESS,
++	DMA_COMPLETE,
+ 	DMA_IN_PROGRESS,
+ 	DMA_PAUSED,
+ 	DMA_ERROR,
++	DMA_SUCCESS,
+ };
+ 
+ /**
+@@ -979,10 +980,10 @@ static inline enum dma_status dma_async_is_complete(dma_cookie_t cookie,
+ {
+ 	if (last_complete <= last_used) {
+ 		if ((cookie <= last_complete) || (cookie > last_used))
+-			return DMA_SUCCESS;
++			return DMA_COMPLETE;
+ 	} else {
+ 		if ((cookie <= last_complete) && (cookie > last_used))
+-			return DMA_SUCCESS;
++			return DMA_COMPLETE;
+ 	}
+ 	return DMA_IN_PROGRESS;
+ }
+@@ -1013,11 +1014,11 @@ static inline struct dma_chan *dma_find_channel(enum dma_transaction_type tx_typ
+ }
+ static inline enum dma_status dma_sync_wait(struct dma_chan *chan, dma_cookie_t cookie)
+ {
+-	return DMA_SUCCESS;
++	return DMA_COMPLETE;
+ }
+ static inline enum dma_status dma_wait_for_async_tx(struct dma_async_tx_descriptor *tx)
+ {
+-	return DMA_SUCCESS;
++	return DMA_COMPLETE;
+ }
+ static inline void dma_issue_pending_all(void)
+ {
+-- 
+1.7.0.4
 
 -- 
-This e-mail and any attachments are for the sole use of the intended 
-recipients(s) and may be confidential. Use of any Pwnie Express product 
-signifies your agreement to the Rapid Focus Security EULA<http://pwnieexpress.com/pdfs/RFSEULA.pdf>and is subject to export controls under the U.S. Commerce Department's 
-Export Administration Regulations ("EAR").
