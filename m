@@ -1,100 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Oct 2013 09:47:27 +0100
-Subject: [RFC PATCH 1/5] ARM/ARM64: KVM: Update user space API header
- for PSCI emulation
-In-Reply-To: <CAAhSdy2jgz24HEH1_CGCEYSGoBuy-4bA-ACYxLEWwCD33a9_XQ@mail.gmail.com>
-References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
- <1381942954-22388-2-git-send-email-anup.patel@linaro.org>
- <20131016221132.GE24837@cbox>
- <CAAhSdy2jgz24HEH1_CGCEYSGoBuy-4bA-ACYxLEWwCD33a9_XQ@mail.gmail.com>
-Message-ID: <525FA41F.1050204@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Oct 2013 09:45:13 +0100
+Subject: [PATCH v2 1/3] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
+References: <1380826287-30253-1-git-send-email-fabio.estevam@freescale.com>
+ <20131003202751.GZ6192@mwanda>
+ <20131015131038.GB25034@n2100.arm.linux.org.uk>
+ <CAOMZO5BDEFAKue9b94+wCQSk+1V04P9Oz_yrqG5XLZ532L+VUg@mail.gmail.com>
+Message-ID: <20131017084513.GN25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/13 07:45, Anup Patel wrote:
-> On Thu, Oct 17, 2013 at 3:41 AM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
->> On Wed, Oct 16, 2013 at 10:32:30PM +0530, Anup Patel wrote:
->>> Update user space API interface headers for providing information to
->>> user space needed to emulate PSCI function calls in user space (i.e.
->>> QEMU or KVMTOOL).
->>>
->>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>> ---
->>>  include/uapi/linux/kvm.h |    7 +++++++
->>>  1 file changed, 7 insertions(+)
->>>
->>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->>> index e32e776..dae2664 100644
->>> --- a/include/uapi/linux/kvm.h
->>> +++ b/include/uapi/linux/kvm.h
->>> @@ -171,6 +171,7 @@ struct kvm_pit_config {
->>>  #define KVM_EXIT_WATCHDOG         21
->>>  #define KVM_EXIT_S390_TSCH        22
->>>  #define KVM_EXIT_EPR              23
->>> +#define KVM_EXIT_PSCI             24
->>>
->>>  /* For KVM_EXIT_INTERNAL_ERROR */
->>>  /* Emulate instruction failed. */
->>> @@ -301,6 +302,12 @@ struct kvm_run {
->>>               struct {
->>>                       __u32 epr;
->>>               } epr;
->>> +             /* KVM_EXIT_PSCI */
->>> +             struct {
->>> +                     __u32 fn;
->>> +                     __u64 args[7];
->>> +                     __u64 ret[4];
->>> +             } psci;
->>>               /* Fix the size of the union. */
->>>               char padding[256];
->>>       };
->>> --
->>> 1.7.9.5
->>>
->> I am also wondering if this is not solving a very specific need without
->> thinking a little more carefully about this problem.
-> 
-> No, its not solving a specific problem.
-> 
-> In fact, its more general because we pass complete info required to
-> emulate a PSCI call in user space.
-> (Please refer PSCI calling convention)
-> 
->>
->> We have previously discussed the need for some secure side emulation
->> in QEMU, and I think perhaps we need something more generic which allows
->> user space to handle SMC calls and/or allows user space to "inject" some
->> secure world runtime that the kernel can run in a partially or fully
->> isolated container to handle SMC calls.
->>
->> Peter raised this issue previously and pointed to a proposal he had as
->> well.
-> 
-> If required we can have an additional field in kvm_run->psci which tells
-> whether the PSCI call is an SMC call or HVC call.
-> 
->>
->> Is there a technical reason why we need something specifically directed
->> to PSCI?
-> 
-> Its quite natural to add this to PSCI emulation in KVM ARM/ARM64 instead
-> of adding a separate VirtIO device for System reboot and System poweroff.
-> 
-> Also in the process of implementing SYSTEM_OFF and SYSTEM_RESET
-> emulation in user space we would also have an infrastructure for adding
-> emulation of new PSCI calls in user space.
+Okay, next problem...
 
-And I strongly oppose to that. It creates consistency issues (what if
-userspace implements one version of PSCI, and the kernel another?), and
-also some really horrible situations: Imagine you implement the SUSPEND
-operation in userspace, and want to wake the vcpu up with an interrupt.
-You'd end-up having to keep track of the state in the kernel, having to
-forward the interrupt event to userspace...
+As I described via the Cubox-i community last night on google+...
 
-So really, no.
+I'm now at the point where certain resolutions and refreshes work fine
+(eg, 720p @ 50 or 60Hz, 1366x768, 1024x768).
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Others either don't display (1080p, 800x600, 848x480, 640x480), or have
+speckles, a line of corruption that flashes up, and blanks (576p @50 Hz,
+480p @60Hz), possibly a result of loss of signal.
+
+I've been looking at the DMFC, suspecting a fifo problem, but that to me
+looks fine - we seem to always allocate 4 slots, with each slot having a
+bandwidth of 99Mpixels each.  This in theory should give a maximum of
+396Mpixels, which is more than plenty.  The bandwidth calculation is
+probably wrong though - the peak bandwidth is actually the pixel clock
+since this is the rate at which pixels have to be supplied during a line,
+not the refresh * hdisplayed * vdisplayed - that's the average bandwidth
+over a full frame.
+
+However, if it was a DMFC problem, and as this only carries pixel data,
+I'd expect that not to cause loss of signal.
+
+I've checked the phy MPLL settings back to the manual for certain problem
+clock rates, and they also seem fine.  I've polled the status register to
+see whether it's unstable, and it appears to remain locked.
+
+I think I should probe the HDMI signals, particularly the clock signal to
+see if that provides any useful clues.
