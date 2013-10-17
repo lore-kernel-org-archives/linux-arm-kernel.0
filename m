@@ -1,71 +1,141 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 17 Oct 2013 13:46:49 +0200
-Subject: sun4i_handle_irq: WARNING at net/ipv4/tcp_input.c:2711
- tcp_fastretrans_alert
-In-Reply-To: <20130823182116.GE1230@lukather>
-References: <20130821094432.GA28249@lnx-rg> <20130823182116.GE1230@lukather>
-Message-ID: <CACQ1gAinSoTCTtf9Y6TL=vtEm1jnJgis0n=y=frNtuPxue9-ng@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 17 Oct 2013 13:49:53 +0200
+Subject: [RFC PATCH 1/5] ARM/ARM64: KVM: Update user space API header for
+ PSCI emulation
+In-Reply-To: <CAAhSdy1quhekbE6nXWWK7B4Ak3PjN+FVRMnQqj8gk1urPgKDkg@mail.gmail.com>
+References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
+ <1381942954-22388-2-git-send-email-anup.patel@linaro.org>
+ <20131016221132.GE24837@cbox>
+ <CAAhSdy2jgz24HEH1_CGCEYSGoBuy-4bA-ACYxLEWwCD33a9_XQ@mail.gmail.com>
+ <525FA41F.1050204@arm.com>
+ <CAAhSdy1o9nYu9Mp18M+wTtZGHJkge0eDA6oqyt-J9wYYEqXtGg@mail.gmail.com>
+ <525FC82D.7030904@arm.com>
+ <CAAhSdy1quhekbE6nXWWK7B4Ak3PjN+FVRMnQqj8gk1urPgKDkg@mail.gmail.com>
+Message-ID: <F0B97457-E92C-4A3D-8466-F7B13F96DE44@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/8/23 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> Hi Richard,
->
-> On Wed, Aug 21, 2013 at 11:47:20AM +0200, Richard GENOUD wrote:
->> Hi Maxime, Stephan
->>
->> I just realise that, *sometimes*, I have some warnings on my cubieboard
->> (6 since the 22 of july, and the board is runnning 24/24).
->
-> Wow, I'm impressed it worked this fine actually :)
->
->> It has happened also on 3.10 + emac patches.
->> Here it is:
->> [27224.060000] ------------[ cut here ]------------
->> [27224.070000] WARNING: CPU: 0 PID: 0 at net/ipv4/tcp_input.c:2711 tcp_fastretrans_alert+0x717/0x734()
->> [27224.080000] CPU: 0 PID: 0 Comm: swapper Not tainted 3.11.0-rc6-00010-g54f11ec #8
->> [27224.080000] [<c000f231>] (unwind_backtrace+0x1/0x98) from [<c000e2b7>] (show_stack+0xb/0xc)
->> [27224.090000] [<c000e2b7>] (show_stack+0xb/0xc) from [<c0013cd3>] (warn_slowpath_common+0x43/0x5c)
->> [27224.100000] [<c0013cd3>] (warn_slowpath_common+0x43/0x5c) from [<c0013d6d>] (warn_slowpath_null+0x11/0x14)
->> [27224.110000] [<c0013d6d>] (warn_slowpath_null+0x11/0x14) from [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734)
->> [27224.120000] [<c015eadf>] (tcp_fastretrans_alert+0x717/0x734) from [<c015f32b>] (tcp_ack+0x6af/0x984)
->> [27224.130000] [<c015f32b>] (tcp_ack+0x6af/0x984) from [<c015fcab>] (tcp_rcv_established+0x93/0x3ec)
->> [27224.140000] [<c015fcab>] (tcp_rcv_established+0x93/0x3ec) from [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160)
->> [27224.150000] [<c0165621>] (tcp_v4_do_rcv+0xa1/0x160) from [<c0167129>] (tcp_v4_rcv+0x4e9/0x500)
->> [27224.160000] [<c0167129>] (tcp_v4_rcv+0x4e9/0x500) from [<c015025d>] (ip_local_deliver_finish+0x79/0x180)
->> [27224.170000] [<c015025d>] (ip_local_deliver_finish+0x79/0x180) from [<c01500a1>] (ip_rcv_finish+0xc9/0x20c)
->> [27224.180000] [<c01500a1>] (ip_rcv_finish+0xc9/0x20c) from [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc)
->> [27224.190000] [<c0129493>] (__netif_receive_skb_core+0x287/0x3dc) from [<c0129a8b>] (process_backlog+0x5b/0xd0)
->> [27224.200000] [<c0129a8b>] (process_backlog+0x5b/0xd0) from [<c012bc6f>] (net_rx_action+0x5f/0xe8)
->> [27224.200000] [<c012bc6f>] (net_rx_action+0x5f/0xe8) from [<c0015fc9>] (__do_softirq+0x91/0x134)
->> [27224.210000] [<c0015fc9>] (__do_softirq+0x91/0x134) from [<c0016251>] (irq_exit+0x59/0x80)
->> [27224.220000] [<c0016251>] (irq_exit+0x59/0x80) from [<c000d00d>] (handle_IRQ+0x21/0x54)
->> [27224.230000] [<c000d00d>] (handle_IRQ+0x21/0x54) from [<c00083ef>] (sun4i_handle_irq+0x1f/0x30)
->> [27224.240000] [<c00083ef>] (sun4i_handle_irq+0x1f/0x30) from [<c000ea1b>] (__irq_svc+0x3b/0x5c)
->> [27224.250000] Exception stack(0xc0287f70 to 0xc0287fb8)
->> [27224.250000] 7f60:                                     00000000 00000000 00000000 00000000
->> [27224.260000] 7f80: c0286000 c02ad7fd 00000001 c02ad7fd c028e084 413fc082 00000000 00000000
->> [27224.270000] 7fa0: 01000000 c0287fb8 c000d115 c000d116 40000033 ffffffff
->> [27224.270000] [<c000ea1b>] (__irq_svc+0x3b/0x5c) from [<c000d116>] (arch_cpu_idle+0x16/0x1c)
->> [27224.280000] [<c000d116>] (arch_cpu_idle+0x16/0x1c) from [<c002e69d>] (cpu_startup_entry+0x35/0xa0)
->> [27224.290000] [<c002e69d>] (cpu_startup_entry+0x35/0xa0) from [<c026f75f>] (start_kernel+0x1af/0x1f0)
->> [27224.300000] ---[ end trace 15641276e08fba8a ]---
->
-> Hmmm, that seems pretty far from the network/interrupt drivers, and it
-> looks like other users have seen this on !ARM machines:
-> http://forums.gentoo.org/viewtopic-p-7379928.html
-> https://bugzilla.redhat.com/show_bug.cgi?id=989251
->
-> There's a patch in the redhat's bugzilla, could you try to apply it and
-> see if it solves your problem?
->
-> Maybe the netdev guys will have other ideas as well.
-For the record, I set:
-net.ipv4.tcp_early_retrans = 2
-net.ipv4.tcp_frto = 0
-And I didn't see the warning any more.
-It's seems that a patch is on it's way. I'll try it instead of setting
-the sysctl.
-http://thread.gmane.org/gmane.linux.network/286793
 
-Richard.
+On 17.10.2013, at 13:30, Anup Patel <anup@brainfault.org> wrote:
+
+> On Thu, Oct 17, 2013 at 4:51 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 17/10/13 12:10, Anup Patel wrote:
+>>> On Thu, Oct 17, 2013 at 2:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> On 17/10/13 07:45, Anup Patel wrote:
+>>>>> On Thu, Oct 17, 2013 at 3:41 AM, Christoffer Dall
+>>>>> <christoffer.dall@linaro.org> wrote:
+>>>>>> On Wed, Oct 16, 2013 at 10:32:30PM +0530, Anup Patel wrote:
+>>>>>>> Update user space API interface headers for providing information to
+>>>>>>> user space needed to emulate PSCI function calls in user space (i.e.
+>>>>>>> QEMU or KVMTOOL).
+>>>>>>> 
+>>>>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>>>>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>>>>>> ---
+>>>>>>> include/uapi/linux/kvm.h |    7 +++++++
+>>>>>>> 1 file changed, 7 insertions(+)
+>>>>>>> 
+>>>>>>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>>>>>>> index e32e776..dae2664 100644
+>>>>>>> --- a/include/uapi/linux/kvm.h
+>>>>>>> +++ b/include/uapi/linux/kvm.h
+>>>>>>> @@ -171,6 +171,7 @@ struct kvm_pit_config {
+>>>>>>> #define KVM_EXIT_WATCHDOG         21
+>>>>>>> #define KVM_EXIT_S390_TSCH        22
+>>>>>>> #define KVM_EXIT_EPR              23
+>>>>>>> +#define KVM_EXIT_PSCI             24
+>>>>>>> 
+>>>>>>> /* For KVM_EXIT_INTERNAL_ERROR */
+>>>>>>> /* Emulate instruction failed. */
+>>>>>>> @@ -301,6 +302,12 @@ struct kvm_run {
+>>>>>>>              struct {
+>>>>>>>                      __u32 epr;
+>>>>>>>              } epr;
+>>>>>>> +             /* KVM_EXIT_PSCI */
+>>>>>>> +             struct {
+>>>>>>> +                     __u32 fn;
+>>>>>>> +                     __u64 args[7];
+>>>>>>> +                     __u64 ret[4];
+>>>>>>> +             } psci;
+>>>>>>>              /* Fix the size of the union. */
+>>>>>>>              char padding[256];
+>>>>>>>      };
+>>>>>>> --
+>>>>>>> 1.7.9.5
+>>>>>>> 
+>>>>>> I am also wondering if this is not solving a very specific need without
+>>>>>> thinking a little more carefully about this problem.
+>>>>> 
+>>>>> No, its not solving a specific problem.
+>>>>> 
+>>>>> In fact, its more general because we pass complete info required to
+>>>>> emulate a PSCI call in user space.
+>>>>> (Please refer PSCI calling convention)
+>>>>> 
+>>>>>> 
+>>>>>> We have previously discussed the need for some secure side emulation
+>>>>>> in QEMU, and I think perhaps we need something more generic which allows
+>>>>>> user space to handle SMC calls and/or allows user space to "inject" some
+>>>>>> secure world runtime that the kernel can run in a partially or fully
+>>>>>> isolated container to handle SMC calls.
+>>>>>> 
+>>>>>> Peter raised this issue previously and pointed to a proposal he had as
+>>>>>> well.
+>>>>> 
+>>>>> If required we can have an additional field in kvm_run->psci which tells
+>>>>> whether the PSCI call is an SMC call or HVC call.
+>>>>> 
+>>>>>> 
+>>>>>> Is there a technical reason why we need something specifically directed
+>>>>>> to PSCI?
+>>>>> 
+>>>>> Its quite natural to add this to PSCI emulation in KVM ARM/ARM64 instead
+>>>>> of adding a separate VirtIO device for System reboot and System poweroff.
+>>>>> 
+>>>>> Also in the process of implementing SYSTEM_OFF and SYSTEM_RESET
+>>>>> emulation in user space we would also have an infrastructure for adding
+>>>>> emulation of new PSCI calls in user space.
+>>>> 
+>>>> And I strongly oppose to that. It creates consistency issues (what if
+>>>> userspace implements one version of PSCI, and the kernel another?), and
+>>>> also some really horrible situations: Imagine you implement the SUSPEND
+>>>> operation in userspace, and want to wake the vcpu up with an interrupt.
+>>>> You'd end-up having to keep track of the state in the kernel, having to
+>>>> forward the interrupt event to userspace...
+>>> 
+>>> It is not about emulating all PSCI functions in user space. Its about forwarding
+>>> system-level PSCI functions or PSCI functions which cannot be emulated in
+>>> kernel to user space.
+>> 
+>> The CPU parts of PSCI can perfectly be implemented in the kernel.
+> 
+> Agreed. This patches does the same.
+> 
+>> 
+>> Then you can return something to userspace indicating what just
+>> happened. And it doesn't have to be PSCI specific.
+> 
+> Are you suggesting that everytime we want to emulate some new
+> PSCI call with help from user space (e.g. SYSTEM_OFF and
+> SYSTEM_RESET), we add new exit reasons and just keep on
+> increasing KVM exit reasons ?
+> 
+> Why can't the exit reason and exit info in struct kvm_run be
+> PSCI specific ?
+> 
+> On the contrary, it will be good to have exit reason and exit info
+> PSCI specific because we have PSCI specification which tells
+> how it is to be emulated ?
+
+I completely agree with Marc that split-brain ownership of any address space (and PSCI is basically one) is a very bad idea.
+
+However, so far the only solution I've seen mentioned is that the kernel owns PSCI (read: decodes it) and then drives user space with explicit commands.
+
+Couldn't we reverse this logic? User space owns PSCI. By default all PSCI calls go to user space. If a PSCI call makes more sense to be executed by kvm, it can explicitly route it to be handled by kvm instead.
+
+That way the owner is still at a single spot and we can fast path the few cases that may be performance critical or a lot easier to handle in kvm.
+
+The good part about this is that we get consistency in QEMU with the TCG PSCI handlers along the way.
+
+
+Alex
