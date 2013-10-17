@@ -1,42 +1,77 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 17 Oct 2013 18:30:37 +0200
-Subject: [PATCH 3/8] clk: max77686: Refactor successful exit of probe function
+Date: Thu, 17 Oct 2013 18:30:38 +0200
+Subject: [PATCH 4/8] clk: max77686: Make max77686_clk_register() return struct
+ clk *
 In-Reply-To: <1382027442-1992-1-git-send-email-t.figa@samsung.com>
 References: <1382027442-1992-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1382027442-1992-4-git-send-email-t.figa@samsung.com>
+Message-ID: <1382027442-1992-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function can simply return 0, without jumping to a separate label,
-which does exactly the same. This patch does not introduce any
-functional change, just a clean-up.
+As a preparation for further patches, this patch modifies the clock
+registration helper function to return a pointer to the newly registered
+clock. No functional change is done to the driver.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/clk-max77686.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/clk/clk-max77686.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index e40ecdb..5d78460 100644
+index 5d78460..2e6ba0e 100644
 --- a/drivers/clk/clk-max77686.c
 +++ b/drivers/clk/clk-max77686.c
-@@ -178,7 +178,7 @@ static int max77686_clk_probe(struct platform_device *pdev)
+@@ -112,27 +112,26 @@ static struct clk_init_data max77686_clks_init[MAX77686_CLKS_NUM] = {
+ 	},
+ };
  
- 	platform_set_drvdata(pdev, max77686_clks);
+-static int max77686_clk_register(struct device *dev,
++static struct clk *max77686_clk_register(struct device *dev,
+ 				struct max77686_clk *max77686)
+ {
+ 	struct clk *clk;
+ 	struct clk_hw *hw = &max77686->hw;
  
--	goto out;
-+	return 0;
+ 	clk = clk_register(dev, hw);
+-
+ 	if (IS_ERR(clk))
+-		return -ENOMEM;
++		return clk;
  
- err_clk_pmic:
- 	clkdev_drop(max77686_clks[MAX77686_CLK_CP]->lookup);
-@@ -187,7 +187,6 @@ err_clk_cp:
- 	clkdev_drop(max77686_clks[MAX77686_CLK_AP]->lookup);
- 	kfree(max77686_clks[MAX77686_CLK_AP]->hw.clk);
- err_clk_ap:
--out:
- 	return ret;
+ 	max77686->lookup = kzalloc(sizeof(struct clk_lookup), GFP_KERNEL);
+ 	if (!max77686->lookup)
+-		return -ENOMEM;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	max77686->lookup->con_id = hw->init->name;
+ 	max77686->lookup->clk = clk;
+ 
+ 	clkdev_add(max77686->lookup);
+ 
+-	return 0;
++	return clk;
  }
  
+ static int max77686_clk_probe(struct platform_device *pdev)
+@@ -154,12 +153,16 @@ static int max77686_clk_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
++		struct clk *clk;
++
+ 		max77686_clks[i]->iodev = iodev;
+ 		max77686_clks[i]->mask = 1 << i;
+ 		max77686_clks[i]->hw.init = &max77686_clks_init[i];
+ 
+-		ret = max77686_clk_register(&pdev->dev, max77686_clks[i]);
+-		if (ret) {
++		clk = max77686_clk_register(&pdev->dev, max77686_clks[i]);
++		if (IS_ERR(clk)) {
++			ret = PTR_ERR(clk);
++
+ 			switch (i) {
+ 			case MAX77686_CLK_AP:
+ 				dev_err(&pdev->dev, "Fail to register CLK_AP\n");
 -- 
 1.8.3.2
