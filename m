@@ -1,34 +1,53 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 17 Oct 2013 08:41:12 -0600
-Subject: [PATCH v2] PCI: mvebu - Support a bridge with no IO port window
-In-Reply-To: <20131017131031.GD22434@titan.lakedaemon.net>
-References: <1381868182-8544-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20131017131031.GD22434@titan.lakedaemon.net>
-Message-ID: <20131017144112.GA28343@obsidianresearch.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 17 Oct 2013 19:18:46 +0530
+Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
+ status
+In-Reply-To: <20131017142755.GA4477@breakpoint.cc>
+References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
+ <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
+ <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
+ <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
+ <20131017020745.GA14013@intel.com>
+ <20131017142755.GA4477@breakpoint.cc>
+Message-ID: <20131017134846.GG14013@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 09:10:31AM -0400, Jason Cooper wrote:
-> On Tue, Oct 15, 2013 at 02:16:22PM -0600, Jason Gunthorpe wrote:
-> > Make pcie-io-aperture and the IO port MBUS ID in ranges optional.
-> > If not provided the bridge reports to Linux that IO space mapping is
-> > not supported and refuses to configure an IO mbus window.
-> > 
-> > This allows both complete disable (do not specify pcie-io-aperture) and
-> > per-port disable (do not specify a IO target ranges entry for the port)
-> > 
-> > Most PCIE devices these days do not require IO support to function,
-> > so having an option to disable it in the driver is useful.
-> > 
-> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> >  drivers/pci/host/pci-mvebu.c | 64 +++++++++++++++++++++++++++++---------------
-> >  1 file changed, 43 insertions(+), 21 deletions(-)
+On Thu, Oct 17, 2013 at 04:27:55PM +0200, Sebastian Andrzej Siewior wrote:
+> On Thu, Oct 17, 2013 at 07:37:45AM +0530, Vinod Koul wrote:
+> > index 0bc7275..683c380 100644
+> > --- a/include/linux/dmaengine.h
+> > +++ b/include/linux/dmaengine.h
+> > @@ -45,16 +45,17 @@ static inline int dma_submit_error(dma_cookie_t cookie)
+> >  
+> >  /**
+> >   * enum dma_status - DMA transaction status
+> > - * @DMA_SUCCESS: transaction completed successfully
+> > + * @DMA_COMPLETE: transaction completed
+> >   * @DMA_IN_PROGRESS: transaction not yet processed
+> >   * @DMA_PAUSED: transaction is paused
+> >   * @DMA_ERROR: transaction failed
+> >   */
+> >  enum dma_status {
+> > -	DMA_SUCCESS,
+> > +	DMA_COMPLETE,
+> >  	DMA_IN_PROGRESS,
+> >  	DMA_PAUSED,
+> >  	DMA_ERROR,
+> > +	DMA_SUCCESS,
+> >  };
 > 
-> Applied to mvebu/drivers
+> There are some drivers which compare against == or != DMA_SUCCESS. Shouldn't this
+> become
+>   enum dma_status {
+>  -	DMA_SUCCESS,
+>  +	DMA_COMPLETE = 0, DMA_SUCCESS = 0,
+>   	DMA_IN_PROGRESS,
+>   	DMA_PAUSED,
+>   	DMA_ERROR,
+>   };
+> 
+> so nothing breaks during the transition?
+Yes i missed it in first place update the patch to fix that
 
-If possible, Thomas should test this, IMHO. My hardware here
-completely lacks IO port windows so I cannot meaningfully test that
-aspect of the change.
-
-Thanks,
-Jason
+~Vinod
