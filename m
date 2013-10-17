@@ -1,50 +1,86 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Thu, 17 Oct 2013 16:27:55 +0200
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <20131017020745.GA14013@intel.com>
-References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
- <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
- <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
- <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
- <20131017020745.GA14013@intel.com>
-Message-ID: <20131017142755.GA4477@breakpoint.cc>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Thu, 17 Oct 2013 16:31:21 +0200
+Subject: [PATCH v2 2/3] arm: Add [U]EFI runtime services support
+In-Reply-To: <20131017140739.GI10834@console-pimps.org>
+References: <1380799481-5470-1-git-send-email-leif.lindholm@linaro.org>
+ <1380799481-5470-3-git-send-email-leif.lindholm@linaro.org>
+ <20131017140739.GI10834@console-pimps.org>
+Message-ID: <20131017143121.GJ1557@rocoto.smurfnet.nu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 07:37:45AM +0530, Vinod Koul wrote:
-> index 0bc7275..683c380 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -45,16 +45,17 @@ static inline int dma_submit_error(dma_cookie_t cookie)
->  
->  /**
->   * enum dma_status - DMA transaction status
-> - * @DMA_SUCCESS: transaction completed successfully
-> + * @DMA_COMPLETE: transaction completed
->   * @DMA_IN_PROGRESS: transaction not yet processed
->   * @DMA_PAUSED: transaction is paused
->   * @DMA_ERROR: transaction failed
->   */
->  enum dma_status {
-> -	DMA_SUCCESS,
-> +	DMA_COMPLETE,
->  	DMA_IN_PROGRESS,
->  	DMA_PAUSED,
->  	DMA_ERROR,
-> +	DMA_SUCCESS,
->  };
+On Thu, Oct 17, 2013 at 03:07:39PM +0100, Matt Fleming wrote:
+> > +/*
+> > + * If you need to (temporarily) support buggy firmware.
+> > + */
+> > +#define KEEP_BOOT_SERVICES_REGIONS
+> 
+> Have you seen firmware that requires this? I'm just curious more than
+> anything else.
 
-There are some drivers which compare against == or != DMA_SUCCESS. Shouldn't this
-become
-  enum dma_status {
- -	DMA_SUCCESS,
- +	DMA_COMPLETE = 0, DMA_SUCCESS = 0,
-  	DMA_IN_PROGRESS,
-  	DMA_PAUSED,
-  	DMA_ERROR,
-  };
+Not really.
+I _think_ I saw it on a debug build of a development platform once.
+That coincided with me seeing a post on linux-efi about some laptop
+that broke unless boot services regions were preserved, so I decided
+to put it in there for any future debugging.
+ 
+> > +/*
+> > + * Returns 1 if 'facility' is enabled, 0 otherwise.
+> > + */
+> > +int efi_enabled(int facility)
+> > +{
+> > +	return test_bit(facility, &arm_efi_facility) != 0;
+> > +}
+> > +EXPORT_SYMBOL(efi_enabled);
+> 
+> This should move to drivers/firmware/efi/efi.c. Let me write a patch
+> that moves the x86 stuff out of arch/x86 and means you can get rid of
+> this hunk.
+ 
+Excellent, thanks!
 
-so nothing breaks during the transition?
+> > +/*
+> > + * Called explicitly from init/mm.c
+> > + */
+> 
+> That's init/main.c.
+ 
+*cough*, right.
 
-Sebastian
+> > +void __init efi_enter_virtual_mode(void)
+> > +{
+> > +	efi_status_t status;
+> > +
+> > +	if (!efi_enabled(EFI_BOOT)) {
+> > +		pr_info("EFI services will not be available.\n");
+> > +		return;
+> 
+> This is dead code as PATCH 3 does,
+> 
+> diff --git a/init/main.c b/init/main.c
+> index af310af..ec6d76e 100644
+> --- a/init/main.c
+> +++ b/init/main.c
+> @@ -875,6 +875,10 @@ static noinline void __init
+> kernel_init_freeable(void)
+> 	smp_prepare_cpus(setup_max_cpus);
+> 
+> 	do_pre_smp_initcalls();
+> +
+> +	if (IS_ENABLED(CONFIG_ARM) && efi_enabled(EFI_BOOT))
+> +		efi_enter_virtual_mode();
+> +
+
+True.
+
+However, this call site is likely to change in the future (preferably
+to an early_initcall), if we redesign the memory mapping to be reusable
+after kexec(). At which point the test in efi_enter_virtual_mode() will
+make sense again.
+
+Could I change the test in init/main.c to do
+     if (IS_ENABLED(CONFIG_ARM) && IS_ENABLED(CONFIG_EFI))
+instead?
+
+/
+    Leif
