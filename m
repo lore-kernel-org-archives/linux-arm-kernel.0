@@ -1,105 +1,91 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Oct 2013 13:00:21 -0700
-Subject: [GIT PULL 2/2] omap changes for am43xx hwmod for v3.13 merge window
-In-Reply-To: <pull-1382040021-802435>
-Message-ID: <mailman.9.1382040061.1056.linux-arm-kernel@lists.infradead.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 17 Oct 2013 13:00:37 -0700
+Subject: [PATCH v2 0/4] Exynos 5410 Dual cluster support
+In-Reply-To: <20131017130435.GG3061@cat.local> (Aliaksei Katovich's message of
+ "Thu, 17 Oct 2013 16:04:35 +0300")
+References: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
+ <87k3hc3lso.fsf@linaro.org> <20131017130435.GG3061@cat.local>
+Message-ID: <87zjq71xcq.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 254f57a92987b6cde6004f58d6b847813dfb9e0e:
+Aliaksei Katovich <aliaksei.katovich@gmail.com> writes:
 
-  ARM: OMAP5: hwmod: add missing ocp2scp hwmod data (2013-10-11 15:37:05 -0700)
+> hi Kevin;
+>
+>> Vyacheslav Tyrtov <v.tyrtov@samsung.com> writes:
+>> 
+>> > The series of patches represent support of Exynos 5410 SoC
+>> >     
+>> > The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture.
+>> > Patches allow all 8 CPU cores (4 x A7 and 4 x A15) to run at the same time
+>> >     
+>> > Patches add new platform description, support of clock controller,
+>> > dual cluster support and device tree for Exynos 5410 
+>> >    
+>> > Has been build on v3.12-rc5.
+>> > Has been tested on Exynos 5410 reference board (exynos_defconfig).
+>> 
+>> Has anyone tried this on the exynos5410 based odroid-xu yet?  
+>> 
+>> I tried booting this on my recently arrived odroid-xu, but am not
+>> getting it to boot.
+>
+> 	I am able to boot my odroid-xu+e to busybox with these patches applied
+> 	against 3.12-rc5: exynos_defconfig and exynos5410-smdk5410.dtb were
+> 	used.
+>
+> 	However there seem to be some issues with virq allocations, like this:
 
-are available in the git repository at:
+Ah, I've seen the same thing, but for me it doesn't boot reliably.
+Sometimes there's an immediate fault like this[1], and once in a rare
+while, it starts to boot and I see the same virq errors.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/am43xx-hwmod-signed
+Curious what you guys are using for boot loaders.  I found some
+pre-build u-boot binaries along with the necessary BL1/2 binary blobs in
+the hardkernel kernel repo: https://github.com/hardkernel/linux.git
+branch: origin/odroidxu-3.4.y
+path: tools/hardkernel/u-boot-pre-built
 
-for you to fetch changes up to 811e7c87340b75dce5c488d9496075b00853942b:
+Unfortunatly, that u-boot doesn't have usb networking support built in
+so I couln't use u-boot to tftp the kernel, so I was able to use fasboot
+to load the kernel/ramdisk, but it's very flaky.
 
-  Merge tag 'for-v3.13/am43xx-support' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.13/hwmod (2013-10-17 10:37:27 -0700)
+Do you have an pointers of where to get a known working bootloader.
+Ideally, a u-boot with networking/tftp support would be ideal.
 
-----------------------------------------------------------------
+Thanks,
 
-Changes needed for am43xx for the hwmod data.
+Kevin
 
-This will be the last new set of hwmod data for any SoC
-as future SoCs will use a driver and device tree based
-approach. But before that can be dealt with, we need to
-first sort out the pending driver/clk issues.
+[1]
+USB cable Connected![0x4]
+Starting download of 10008576 bytes
+.........
+downloading of 10008576 bytes finished
+Kernel size: 00296bc5
+Ramdisk size: 006f3c00
+Booting kernel..
+## Booting kernel from Legacy Image at 40008000 ...
+   Image Name:   Linux
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    2714501 Bytes = 2.6 MiB
+   Load Address: 40008000
+   Entry Point:  40008000
+   Verifying Checksum ... OK
+   XIP Kernel Image ... OK
+OK 
 
-Queued by Paul Walmsley <paul@pwsan.com>:
+Starting kernel ...
 
-Add hwmod and PRCM data for the TI AM43xx family of SoCs.
+undefined instruction
+pc : [<4000800c>]          lr : [<bfc65df4>]
+sp : bfb5bbc8  ip : 00000000     fp : 00001251
+r10: 00000000  r9 : 00000000     r8 : bfb5bf30
+r7 : 00000000  r6 : 00000000     r5 : 40008000  r4 : bfcabac0
+r3 : bfb5bfa8  r2 : 40000100     r1 : 00001251  r0 : 00000000
+Flags: nZCv  IRQs off  FIQs off  Mode SVC_32
+Resetting CPU ...
 
-Under normal circumstances, these patches would not be merged.
-The hwmod and PRCM data should be moved out either to DT data or
-to drivers/.  Also, the current implementation trades off lines
-of diff by dynamically rewriting static data at runtime, which is
-a bad practice - it causes future maintenance headaches.
-However, after speaking with my upstream, it sounds like it's
-better to merge these patches in their current state, due to long
-term considerations.
-
-Basic test logs are here:
-
-http://www.pwsan.com/omap/testlogs/am43xx_support_v3.13/20131015213706/
-
-Due to the lack of an AM43xx board and any available public
-documentation, it's impossible for me to review or test that
-platform in any meaningful way.  But at least the tests above
-verify that the patches don't affect existing platforms -
-particularly AM33xx.
-
-----------------------------------------------------------------
-Afzal Mohammed (7):
-      ARM: OMAP2+: hwmod: AM335x/AM43x: move common data
-      ARM: OMAP2+: hwmod: AM335x: runtime register update
-      ARM: OMAP2+: hwmod: AM335x: remove static register offs
-      ARM: OMAP2+: PRCM: AM43x definitions
-      ARM: OMAP2+: hwmod: AM43x support
-      ARM: OMAP2+: hwmod: AM43x operations
-      ARM: OMAP2+: AM43x: PRCM kbuild
-
-Ambresh K (3):
-      ARM: OMAP2+: PM: AM43x powerdomain data
-      ARM: OMAP2+: CM: AM43x clockdomain data
-      ARM: OMAP2+: AM43x PRCM init
-
-Ankur Kishore (1):
-      ARM: OMAP2+: CM: cm_inst offset s16->u16
-
-George Cherian (1):
-      ARM: OMAP2+: hwmod: Add USB hwmod data for AM437x.
-
-Sourav Poddar (1):
-      ARM: OMAP2: hwmod: Add qspi data for am437x.
-
-Tony Lindgren (1):
-      Merge tag 'for-v3.13/am43xx-support' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.13/hwmod
-
- arch/arm/mach-omap2/Makefile                       |    9 +-
- arch/arm/mach-omap2/clockdomain.h                  |    4 +-
- arch/arm/mach-omap2/clockdomains43xx_data.c        |  196 ++
- arch/arm/mach-omap2/cm33xx.c                       |   16 +-
- arch/arm/mach-omap2/cm33xx.h                       |   12 +-
- arch/arm/mach-omap2/cminst44xx.c                   |   29 +-
- arch/arm/mach-omap2/cminst44xx.h                   |   26 +-
- arch/arm/mach-omap2/io.c                           |    6 +
- arch/arm/mach-omap2/omap_hwmod.c                   |    8 +
- arch/arm/mach-omap2/omap_hwmod.h                   |    1 +
- .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  163 ++
- .../omap_hwmod_33xx_43xx_interconnect_data.c       |  643 ++++++
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 1469 +++++++++++++
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         | 2263 ++------------------
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  758 +++++++
- arch/arm/mach-omap2/powerdomain.h                  |    1 +
- arch/arm/mach-omap2/powerdomains43xx_data.c        |  136 ++
- arch/arm/mach-omap2/prcm43xx.h                     |  146 ++
- 18 files changed, 3728 insertions(+), 2158 deletions(-)
- create mode 100644 arch/arm/mach-omap2/clockdomains43xx_data.c
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_43xx_data.c
- create mode 100644 arch/arm/mach-omap2/powerdomains43xx_data.c
- create mode 100644 arch/arm/mach-omap2/prcm43xx.h
+emmc resetting ...
+resetting ...
