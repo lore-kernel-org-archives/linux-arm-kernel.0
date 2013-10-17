@@ -1,136 +1,78 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Thu, 17 Oct 2013 09:27:25 +0200
-Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <20131016151419.GA14104@ns203013.ovh.net>
-References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
- <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
- <20131016151419.GA14104@ns203013.ovh.net>
-Message-ID: <525F915D.9020501@st.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 17 Oct 2013 09:29:21 +0200
+Subject: [PATCH v2 1/1] ARM: imx: i.mx6d/q: disable the double linefill
+ feature of PL310
+In-Reply-To: <1379294943-15664-1-git-send-email-r64343@freescale.com>
+References: <1379294943-15664-1-git-send-email-r64343@freescale.com>
+Message-ID: <525F91D1.5040304@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
-
-On 10/16/2013 05:14 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-
-
-...
->> +
->> +static inline void st_i2c_set_bits(void __iomem *reg, u32 mask)
->> +{
->> +     writel(readl(reg) | mask, reg);
->> +}
->> +
->> +static inline void st_i2c_clr_bits(void __iomem *reg, u32 mask)
->> +{
->> +     writel(readl(reg) & ~mask, reg);
-> use set_bit api and use relaxed version
-Using the set_bit api here does not match with the purpose of these 
-functions.
-We want to be able to set/clear multiple bits, and AFAICS the set_bit 
-api does not
-provide this possibility.
-
-I took example on i2c-nomadik for these functions.
-
->> +}
->> +
->> +/* From I2C Specifications v0.5 */
->> +static struct st_i2c_timings i2c_timings[] = {
->> +     [I2C_MODE_STANDARD] = {
->> +             .rate                   = 100000,
->> +             .rep_start_hold         = 4000,
->> +             .rep_start_setup        = 4700,
->> +             .start_hold             = 4000,
->> +             .data_setup_time        = 250,
->> +             .stop_setup_time        = 4000,
->> +             .bus_free_time          = 4700,
->> +     },
->> +     [I2C_MODE_FAST] = {
->> +             .rate                   = 400000,
->> +             .rep_start_hold         = 600,
->> +             .rep_start_setup        = 600,
->> +             .start_hold             = 600,
->> +             .data_setup_time        = 100,
->> +             .stop_setup_time        = 600,
->> +             .bus_free_time          = 1300,
->> +     },
->> +};
-> so how do you plane to support other rate that 100k and 400k?
-The SSC IP only supports Standard and Fast modes.
-There are no plans to support faster modes.
->> +
->> +static void st_i2c_flush_rx_fifo(struct st_i2c_dev *i2c_dev)
->> +{
->> +     int count, i;
->> +
->> +     /*
->> +      * Counter only counts up to 7 but fifo size is 8...
->> +      * When fifo is full, counter is 0 and RIR bit of status register is
->> +      * set
->> +      */
->> +     if (readl(i2c_dev->base + SSC_STA) & SSC_STA_RIR)
->> +             count = SSC_RXFIFO_SIZE;
->> +     else
->> +             count = readl(i2c_dev->base + SSC_RX_FSTAT) &
->> +                     SSC_RX_FSTAT_STATUS;
->> +
->> +     for (i = 0; i < count; i++)
->> +             readl(i2c_dev->base + SSC_RBUF);
-> use readsl
-Since the read content is flushed, I prefer keeping it as it is instead 
-of allocating
-a buffer of the FIFO's size.
+On 16.09.2013 03:29, Jason Liu wrote:
+> The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
+> The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
+> But according to ARM PL310 errata: 752271
+> ID: 752271: Double linefill feature can cause data corruption
+> Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
+> Workaround: The only workaround to this erratum is to disable the
+> double linefill feature. This is the default behavior.
 >
-> use relaxed version as much as possible
-I was not comfortable with the different possibilities (_raw_readl, 
-readl_relaxed, readl...).
-I found this interresting discussion: 
-_http://comments.gmane.org/gmane.linux.ports.arm.kernel/117626
- From what I understood, you are right, I should be able to use 
-readl_relaxed everywhere.
-
-Maybe I should perform a readl on the interrupt mask register before 
-returning from the interrupt handler,
-in order to ensure that the write to the IEN register is effective 
-before the IRQ for the device is re-enabled at GIC level.
-Maybe this could avoid the few spurious interrupts I face sometimes, I 
-will have a try.
-
->> +}
->> +
-...
->> +
->> +static int st_i2c_wait_free_bus(struct st_i2c_dev *i2c_dev)
->> +{
->> +     u32 sta;
->> +     int i;
->> +
->> +     for (i = 0; i < 10; i++) {
->> +             sta = readl(i2c_dev->base + SSC_STA);
->> +             if (!(sta & SSC_STA_BUSY))
->> +                     return 0;
->> +
->> +             usleep_range(2000, 4000);
-> can not use interrupt?
-Sadly, no.
-There is no interrupt linked to the busy bit.
->> +     }
->> +
-...
->> +
->> +static struct of_device_id st_i2c_match[] = {
->> +     { .compatible = "st,comms-ssc-i2c", },
-> the rules is to put the first soc that use the ip in the compatible
-> as st,sti7100-scc-i2c
-Ok. There are no plans to upstream the SH4 platforms, it will only 
-remains in stlinux.com.
-Maybe I can set the first ARM platform (STiH415)?
-That would give st,stih415-ssc-i2c.
-
-Thanks for the review,
-Maxime
-
+> without this patch, you will meet the following error when run the
+> memtester application at: http://pyropus.ca/software/memtester/
 >
-> Best Regards,
-> J.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365664.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365668.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x0136566c.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365670.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365674.
+> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365678.
+>
+> Signed-off-by: Jason Liu <r64343@freescale.com>
+>
+> ---
+> V2:
+> - disable the L2 doulbe linefill explicitly on i.MX6Q by using &= mask
+> - using the cpu_is_imx6q() instead of checking through DT
+> ---
+>   arch/arm/mach-imx/system.c |   11 +++++++++++
+>   1 file changed, 11 insertions(+)
+>
+> diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+> index 64ff37e..80c177c 100644
+> --- a/arch/arm/mach-imx/system.c
+> +++ b/arch/arm/mach-imx/system.c
+> @@ -117,6 +117,17 @@ void __init imx_init_l2cache(void)
+>   	/* Configure the L2 PREFETCH and POWER registers */
+>   	val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
+>   	val |= 0x70800000;
+> +	/*
+> +	 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
+> +	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
+> +	 * But according to ARM PL310 errata: 752271
+> +	 * ID: 752271: Double linefill feature can cause data corruption
+> +	 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
+> +	 * Workaround: The only workaround to this erratum is to disable the
+> +	 * double linefill feature. This is the default behavior.
+> +	 */
+> +	if (cpu_is_imx6q())
+> +		val &= ~(1 << 30 | 1 << 23);
+
+Since you sent this patch I was wondering why you touch Bit 23, too.
+
+Having access to the manual, now (CoreLink? Level 2 Cache Controller
+L2C-310 Revision: r3p3 ARM DDI 0246H (ID080112)) it states on page 2-39 
+(section Double linefill issuing):
+
+"You can control this feature (the double linefill) using Bits 30, 27, 
+and 23 of the Prefetch Control Register. Bit 23, and Bit 27 are only 
+used if you set Bit 30 HIGH."
+
+I.e. to my understanding
+
+val &= ~(1 << 30);
+
+should be sufficient here?
+
+Best regards
+
+Dirk
