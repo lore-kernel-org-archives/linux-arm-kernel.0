@@ -1,78 +1,50 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 17 Oct 2013 09:29:21 +0200
-Subject: [PATCH v2 1/1] ARM: imx: i.mx6d/q: disable the double linefill
- feature of PL310
-In-Reply-To: <1379294943-15664-1-git-send-email-r64343@freescale.com>
-References: <1379294943-15664-1-git-send-email-r64343@freescale.com>
-Message-ID: <525F91D1.5040304@de.bosch.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 17 Oct 2013 09:47:41 +0200
+Subject: [PATCH 0/4] socfpga: Enable SD/MMC support
+In-Reply-To: <1381969961-12679-1-git-send-email-dinguyen@altera.com>
+References: <1381969961-12679-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20131017074741.GK14042@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.09.2013 03:29, Jason Liu wrote:
-> The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
-> The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
-> But according to ARM PL310 errata: 752271
-> ID: 752271: Double linefill feature can cause data corruption
-> Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
-> Workaround: The only workaround to this erratum is to disable the
-> double linefill feature. This is the default behavior.
->
-> without this patch, you will meet the following error when run the
-> memtester application at: http://pyropus.ca/software/memtester/
->
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365664.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365668.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x0136566c.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365670.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365674.
-> FAILURE: 0x00100000 != 0x00200000 at offset 0x01365678.
->
-> Signed-off-by: Jason Liu <r64343@freescale.com>
->
-> ---
-> V2:
-> - disable the L2 doulbe linefill explicitly on i.MX6Q by using &= mask
-> - using the cpu_is_imx6q() instead of checking through DT
-> ---
->   arch/arm/mach-imx/system.c |   11 +++++++++++
->   1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-> index 64ff37e..80c177c 100644
-> --- a/arch/arm/mach-imx/system.c
-> +++ b/arch/arm/mach-imx/system.c
-> @@ -117,6 +117,17 @@ void __init imx_init_l2cache(void)
->   	/* Configure the L2 PREFETCH and POWER registers */
->   	val = readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
->   	val |= 0x70800000;
-> +	/*
-> +	 * The L2 cache controller(PL310) version on the i.MX6D/Q is r3p1-50rel0
-> +	 * The L2 cache controller(PL310) version on the i.MX6DL/SOLO/SL is r3p2
-> +	 * But according to ARM PL310 errata: 752271
-> +	 * ID: 752271: Double linefill feature can cause data corruption
-> +	 * Fault Status: Present in: r3p0, r3p1, r3p1-50rel0. Fixed in r3p2
-> +	 * Workaround: The only workaround to this erratum is to disable the
-> +	 * double linefill feature. This is the default behavior.
-> +	 */
-> +	if (cpu_is_imx6q())
-> +		val &= ~(1 << 30 | 1 << 23);
+Hi!
 
-Since you sent this patch I was wondering why you touch Bit 23, too.
+On Wed, Oct 16, 2013 at 07:32:37PM -0500, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Hi,
+> 
+> This patch series enables support for the Synopsys SD/MMC driver that is
+> on the Altera SOCFPGA platform. The reason why this series has 4 patches
+> is to implement Arnd's suggestion:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204982.html
+> 
+> To summarize Arnd's suggestion:
+> 
+> 1. Create a backend syscon driver to control the system manager.
+> 2. Create a clock driver independent of the SOCFPGA clock driver that
+>    uses syscon as the low-level interface.
+> 3. Make the sdmmc driver use the normal clock API and link its clock to
+>    the driver step 2 in the device tree.
+> 
+> The end approach is a bit different because I did not find the need for a
+> syscon driver for the system manager. Since the system manager had already
+> been iomap already in the SOCFPGA platform code, I just reused it in the
+> new clock driver.
+> 
 
-Having access to the manual, now (CoreLink? Level 2 Cache Controller
-L2C-310 Revision: r3p3 ARM DDI 0246H (ID080112)) it states on page 2-39 
-(section Double linefill issuing):
+What about the usbgrp, pinmuxgrp, nandgrp, etc. ?
+Those are all registers for different subsystems, that are located/controlled by
+the systemmgr.
+With Arnd's approach they all could call that low-level interface, instead of
+having a special case for every IP core. Isn't that the whole idea behind syscon?
 
-"You can control this feature (the double linefill) using Bits 30, 27, 
-and 23 of the Prefetch Control Register. Bit 23, and Bit 27 are only 
-used if you set Bit 30 HIGH."
+Regards,
+Steffen
 
-I.e. to my understanding
-
-val &= ~(1 << 30);
-
-should be sufficient here?
-
-Best regards
-
-Dirk
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
