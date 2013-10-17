@@ -1,79 +1,36 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 17 Oct 2013 09:50:05 +0200
-Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
-In-Reply-To: <525BBF75.5010305@free-electrons.com>
-References: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
- <20131003122307.GV31178@titan.lakedaemon.net>
- <20131009073633.GH1356@kw.sim.vm.gnt>
- <20131014085323.GL1356@kw.sim.vm.gnt>
- <525BBF75.5010305@free-electrons.com>
-Message-ID: <20131017075005.GA23849@kw.sim.vm.gnt>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 17 Oct 2013 10:52:34 +0300
+Subject: [PATCH v3 00/19] Introduce common infra for tegra clocks
+In-Reply-To: <525EC973.7060802@wwwdotorg.org>
+References: <1381848794-11761-1-git-send-email-pdeschrijver@nvidia.com>
+ <525D8009.5040907@wwwdotorg.org>
+ <20131016090643.GI5643@tbergstrom-lnx.Nvidia.com>
+ <525EC973.7060802@wwwdotorg.org>
+Message-ID: <20131017075233.GP5643@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 14, 2013 at 11:55:01AM +0200, Gregory CLEMENT wrote:
-> On 14/10/2013 10:53, Simon Guinot wrote:
-> > On Wed, Oct 09, 2013 at 09:36:33AM +0200, Simon Guinot wrote:
-> >> On Thu, Oct 03, 2013 at 08:23:07AM -0400, Jason Cooper wrote:
-> >>> Simon,
-> >>>
-> >>> On Thu, Oct 03, 2013 at 12:05:02PM +0200, Simon Guinot wrote:
-> >>>> This patch fixes the tclk frequency array for the Armada-370 SoC.
-> >>>> This bug has been introduced by commit 6b72333d
-> >>>> ("clk: mvebu: add Armada 370 SoC-centric clock init").
-> >>>>
-> >>>> A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
-> >>>> i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
-> >>>>
-> >>>> About the mvneta Ethernet driver, note that the tclk frequency is used
-> >>>> to compute the Rx time coalescence. Then, this bug harms the coalescence
-> >>>> configuration and also degrades the networking performances with the
-> >>>> default values.
-> >>>>
-> >>>> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> >>>> Cc: Andrew Lunn <andrew@lunn.ch>
-> >>>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >>>> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >>>> Cc: Jason Cooper <jason@lakedaemon.net>
-> >>>> Cc: stable at vger.kernel.org
-> >>>> ---
-> >>>>  drivers/clk/mvebu/armada-370.c |    4 ++--
-> >>>>  1 file changed, 2 insertions(+), 2 deletions(-)
-> >>>
-> >>> Much better, thanks!
-> >>>
-> >>> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> >>>
-> >>> This can be applied to v3.11 onwards.
+On Wed, Oct 16, 2013 at 07:14:27PM +0200, Stephen Warren wrote:
+> On 10/16/2013 03:06 AM, Peter De Schrijver wrote:
+> > On Tue, Oct 15, 2013 at 07:48:57PM +0200, Stephen Warren wrote:
+> >> On 10/15/2013 08:52 AM, Peter De Schrijver wrote:
+> >>> This patchset introduces common infrastructure for clocks which exist in                                                                                       
+> >>> several Tegra SoCs. We also also move Tegra20, Tegra30 and Tegra114 to
+> >>> this new infrastructure.
+> ...
+> >> Testing on Venice2 (Tegra124): I see the following WARN during boot,
+> >> which I think is new relative to the internal branch you gave me yesterday:
 > >>
-> >> Hi Mike,
-> >>
-> >> Please consider applying this patch.
-> > 
-> > Ping ?
+> >>> [    0.300450] WARNING: CPU: 0 PID: 1 at drivers/clk/tegra/clk.c:187 tegra_init_from_table+0x78/0x158()
+> ...
+> >>> [    0.372440] [<c07b4c1c>] (tegra_init_from_table+0x78/0x158) from [<c07b4e10>] (tegra_clocks_apply_init_table+0x18/0x20)
+> >>> [    0.384138] [<c07b4e10>] (tegra_clocks_apply_init_table+0x18/0x20) from [<c079f9cc>] (tegra_dt_init+0xc/0xd8)
+> >>> [    0.394903] [<c079f9cc>] (tegra_dt_init+0xc/0xd8) from [<c079a580>] (customize_machine+0x1c/0x40)
+> ...
+> > Did you see  'tegra_init_from_table: Failed to set parent pll_c2 of epp ' before? Tegra124 doesn't have EPP...
 > 
-> Mike,
-> 
-> this bug could be very annoying. We had some issue recently with i2c,
-> and I am pretty sure it was caused by this wrong rate.
-> So it would be nice to have this fix in 3.12, and then on the stable
-> branches.
-> 
-> Of course you can also add my:
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Yes, I get exactly that message. Sorry, I forgot to paste in the most
+> relevant line:-( I assume fixing this simply means removing an entry in
+> the init table in clk-tegra124.c, so should be simple.
 
-Well, it seems that Mike is not available this days.
-
-Given that this patch is a trivial one-liner, maybe that someone else
-can pick it ?
-
-Thanks in advance.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/69bd1a63/attachment.sig>
+Yep. Part of the next version.
