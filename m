@@ -1,231 +1,155 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 17 Oct 2013 08:37:43 +0200
-Subject: [PATCH v2 3/8] ARM: l2x0: add Marvell Tauros3 support
-In-Reply-To: <1381235073-17134-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1381235073-17134-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1381991863-8165-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Thu, 17 Oct 2013 08:37:58 +0200
+Subject: [PATCH v2 8/8] ARM: add initial support for Marvell Berlin SoCs
+In-Reply-To: <1381235073-17134-9-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1381235073-17134-9-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1381991878-8233-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Marvell Tauros3 cache controller which
-is compatible with pl310 cache controller but broadcasts L1 cache
-operations to L2 cache. While updating the binding documentation,
-clean up the list of possible compatibles. Also reorder driver
-compatibles to allow non-ARM derivated to be compatible to ARM
-cache controller compatibles.
+This adds initial support for the Marvell Berlin (88DE3xxx) SoC family
+and basic machine setup for Armada 1500 (88DE3100) SoCs.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Jason Cooper <jason@lakedaemon.net>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
 Changelog:
 v1->v2:
-- add tauros3 data without outer cache ops (Suggested by Jisheng Zhang)
-- reorder compatibles to allow derivates to be compatible with ARM
-  controllers (Suggested by Mark Rutland)
+- replace 88DE3xxx numbering with SoC variant name
+  (Requested by Jisheng Zhang)
+- remove LOCAL_TIMERS dependency (Suggested by Dinh Nguyen)
+RFCv2->v1:
+- remove custom .init_time, adds dependency for arch-wide of_clk_init call
+RFCv1->RFCv2:
+- nuke .map_io (Reported by Arnd Bergmann)
+- add copyright reference
+- switch to mach-berlin instead of mach-mvebu
 
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jisheng Zhang <jszhang@marvell.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- Documentation/devicetree/bindings/arm/l2cc.txt |   23 +++++------
- arch/arm/include/asm/hardware/cache-l2x0.h     |    1 +
- arch/arm/mm/cache-l2x0.c                       |   49 ++++++++++++++++++++----
- arch/arm/mm/cache-tauros3.h                    |   41 ++++++++++++++++++++
- 4 files changed, 95 insertions(+), 19 deletions(-)
- create mode 100644 arch/arm/mm/cache-tauros3.h
+ arch/arm/Kconfig              |    2 ++
+ arch/arm/Makefile             |    1 +
+ arch/arm/mach-berlin/Kconfig  |   23 +++++++++++++++++++++++
+ arch/arm/mach-berlin/Makefile |    1 +
+ arch/arm/mach-berlin/berlin.c |   39 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 66 insertions(+)
+ create mode 100644 arch/arm/mach-berlin/Kconfig
+ create mode 100644 arch/arm/mach-berlin/Makefile
+ create mode 100644 arch/arm/mach-berlin/berlin.c
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index c0c7626..b513cb8 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -7,20 +7,21 @@ The ARM L2 cache representation in the device tree should be done as follows:
- Required properties:
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1ad6fb6..5692426 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -932,6 +932,8 @@ source "arch/arm/mach-bcm/Kconfig"
  
- - compatible : should be one of:
--	"arm,pl310-cache"
--	"arm,l220-cache"
--	"arm,l210-cache"
--	"marvell,aurora-system-cache": Marvell Controller designed to be
-+  "arm,pl310-cache"
-+  "arm,l220-cache"
-+  "arm,l210-cache"
-+  "bcm,bcm11351-a2-pl310-cache": DEPRECATED by "brcm,bcm11351-a2-pl310-cache"
-+  "brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
-+     offset needs to be added to the address before passing down to the L2
-+     cache controller
-+  "marvell,aurora-system-cache": Marvell Controller designed to be
-      compatible with the ARM one, with system cache mode (meaning
-      maintenance operations on L1 are broadcasted to the L2 and L2
-      performs the same operation).
--	"marvell,"aurora-outer-cache: Marvell Controller designed to be
--	 compatible with the ARM one with outer cache mode.
--	"brcm,bcm11351-a2-pl310-cache": For Broadcom bcm11351 chipset where an
--	offset needs to be added to the address before passing down to the L2
--	cache controller
--	"bcm,bcm11351-a2-pl310-cache": DEPRECATED by
--	                               "brcm,bcm11351-a2-pl310-cache"
-+  "marvell,aurora-outer-cache": Marvell Controller designed to be
-+     compatible with the ARM one with outer cache mode.
-+  "marvell,tauros3-cache": Marvell Tauros3 cache controller, compatible
-+     with arm,pl310-cache controller.
- - cache-unified : Specifies the cache is a unified cache.
- - cache-level : Should be set to 2 for a level 2 cache.
- - reg : Physical base address and size of cache controller's memory mapped
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 3b2c40b..6795ff7 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -131,6 +131,7 @@ struct l2x0_regs {
- 	unsigned long prefetch_ctrl;
- 	unsigned long pwr_ctrl;
- 	unsigned long ctrl;
-+	unsigned long aux2_ctrl;
- };
+ source "arch/arm/mach-bcm2835/Kconfig"
  
- extern struct l2x0_regs l2x0_saved_regs;
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 447da6f..a70a4f5 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -25,6 +25,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include "cache-tauros3.h"
- #include "cache-aurora-l2.h"
- 
- #define CACHE_LINE_SIZE		32
-@@ -767,6 +768,14 @@ static void aurora_save(void)
- 	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
- }
- 
-+static void __init tauros3_save(void)
-+{
-+	l2x0_saved_regs.aux2_ctrl =
-+		readl_relaxed(l2x0_base + TAUROS3_AUX2_CTRL);
-+	l2x0_saved_regs.prefetch_ctrl =
-+		readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
-+}
++source "arch/arm/mach-berlin/Kconfig"
 +
- static void l2x0_resume(void)
- {
- 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-@@ -821,6 +830,18 @@ static void aurora_resume(void)
- 	}
- }
+ source "arch/arm/mach-clps711x/Kconfig"
  
-+static void tauros3_resume(void)
-+{
-+	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-+		writel_relaxed(l2x0_saved_regs.aux2_ctrl,
-+			       l2x0_base + TAUROS3_AUX2_CTRL);
-+		writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
-+			       l2x0_base + L2X0_PREFETCH_CTRL);
-+	}
-+
-+	l2x0_resume();
-+}
-+
- static void __init aurora_broadcast_l2_commands(void)
- {
- 	__u32 u;
-@@ -906,6 +927,15 @@ static const struct l2x0_of_data aurora_no_outer_data = {
- 	},
- };
- 
-+static const struct l2x0_of_data tauros3_data = {
-+	.setup = NULL,
-+	.save  = tauros3_save,
-+	/* Tauros3 broadcasts L1 cache operations to L2 */
-+	.outer_cache = {
-+		.resume      = tauros3_resume,
-+	},
-+};
-+
- static const struct l2x0_of_data bcm_l2x0_data = {
- 	.setup = pl310_of_setup,
- 	.save  = pl310_save,
-@@ -922,17 +952,20 @@ static const struct l2x0_of_data bcm_l2x0_data = {
- };
- 
- static const struct of_device_id l2x0_ids[] __initconst = {
-+	{ .compatible = "bcm,bcm11351-a2-pl310-cache", /* deprecated name */
-+	  .data = (void *)&bcm_l2x0_data},
-+	{ .compatible = "brcm,bcm11351-a2-pl310-cache",
-+	  .data = (void *)&bcm_l2x0_data},
-+	{ .compatible = "marvell,aurora-outer-cache",
-+	  .data = (void *)&aurora_with_outer_data},
-+	{ .compatible = "marvell,aurora-system-cache",
-+	  .data = (void *)&aurora_no_outer_data},
-+	{ .compatible = "marvell,tauros3-cache",
-+	  .data = (void *)&tauros3_data },
-+	/* keep ARM compatibles below non-ARM derivates */
- 	{ .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
- 	{ .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
- 	{ .compatible = "arm,l210-cache", .data = (void *)&l2x0_data },
--	{ .compatible = "marvell,aurora-system-cache",
--	  .data = (void *)&aurora_no_outer_data},
--	{ .compatible = "marvell,aurora-outer-cache",
--	  .data = (void *)&aurora_with_outer_data},
--	{ .compatible = "brcm,bcm11351-a2-pl310-cache",
--	  .data = (void *)&bcm_l2x0_data},
--	{ .compatible = "bcm,bcm11351-a2-pl310-cache", /* deprecated name */
--	  .data = (void *)&bcm_l2x0_data},
- 	{}
- };
- 
-diff --git a/arch/arm/mm/cache-tauros3.h b/arch/arm/mm/cache-tauros3.h
+ source "arch/arm/mach-cns3xxx/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a37a50f..3ba332b 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -147,6 +147,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
+ machine-$(CONFIG_ARCH_AT91)		+= at91
+ machine-$(CONFIG_ARCH_BCM)		+= bcm
+ machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
++machine-$(CONFIG_ARCH_BERLIN)		+= berlin
+ machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
+ machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
+ machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
+diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
 new file mode 100644
-index 0000000..02c0a97
+index 0000000..bdd5383
 --- /dev/null
-+++ b/arch/arm/mm/cache-tauros3.h
-@@ -0,0 +1,41 @@
++++ b/arch/arm/mach-berlin/Kconfig
+@@ -0,0 +1,23 @@
++config ARCH_BERLIN
++	bool "Marvell Berlin SoCs" if ARCH_MULTI_V7
++	select GENERIC_CLOCKEVENTS
++	select GENERIC_IRQ_CHIP
++	select COMMON_CLK
++	select DW_APB_ICTL
++	select DW_APB_TIMER_OF
++
++if ARCH_BERLIN
++
++menu "Marvell Berlin SoC variants"
++
++config MACH_BERLIN_BG2
++	bool "Marvell Armada 1500 (BG2)"
++	select ARM_GIC
++	select CACHE_L2X0
++	select CPU_PJ4B
++	select HAVE_ARM_TWD if SMP
++	select HAVE_SMP
++
++endmenu
++
++endif
+diff --git a/arch/arm/mach-berlin/Makefile b/arch/arm/mach-berlin/Makefile
+new file mode 100644
+index 0000000..ab69fe9
+--- /dev/null
++++ b/arch/arm/mach-berlin/Makefile
+@@ -0,0 +1 @@
++obj-y += berlin.o
+diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+new file mode 100644
+index 0000000..16c2942
+--- /dev/null
++++ b/arch/arm/mach-berlin/berlin.c
+@@ -0,0 +1,39 @@
 +/*
-+ * Marvell Tauros3 cache controller includes
++ * Device Tree support for Marvell Berlin SoCs.
 + *
 + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 + *
 + * based on GPL'ed 2.6 kernel sources
 + *  (c) Marvell International Ltd.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
 +
-+#ifndef __ASM_ARM_HARDWARE_TAUROS3_H
-+#define __ASM_ARM_HARDWARE_TAUROS3_H
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of_platform.h>
++#include <asm/hardware/cache-l2x0.h>
++#include <asm/mach/arch.h>
 +
-+/*
-+ * Marvell Tauros3 L2CC is compatible with PL310 r0p0
-+ * but with PREFETCH_CTRL (r2p0) and an additional event counter.
-+ * Also, there is AUX2_CTRL for some Marvell specific control.
-+ */
++static void __init berlin_init_machine(void)
++{
++	/*
++	 * with DT probing for L2CCs, berlin_init_machine can be removed.
++	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
++	 */
++	l2x0_of_init(0x70c00000, 0xfeffffff);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
 +
-+#define TAUROS3_EVENT_CNT2_CFG		0x224
-+#define TAUROS3_EVENT_CNT2_VAL		0x228
-+#define TAUROS3_INV_ALL			0x780
-+#define TAUROS3_CLEAN_ALL		0x784
-+#define TAUROS3_AUX2_CTRL		0x820
++static const char * const berlin_dt_compat[] = {
++	"marvell,berlin",
++	NULL,
++};
 +
-+/* Registers shifts and masks */
-+#define TAUROS3_AUX2_CTRL_LINEFILL_BURST8_EN	(1 << 2)
-+
-+#endif
++DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
++	.dt_compat      = berlin_dt_compat,
++	.init_machine   = berlin_init_machine,
++MACHINE_END
 -- 
 1.7.10.4
