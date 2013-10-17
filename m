@@ -1,63 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Oct 2013 15:25:45 -0400
-Subject: [PATCH v2 1/4] clk: mvebu: Add Core Divider clock
-In-Reply-To: <20131017191852.GA8832@localhost>
-References: <1380224130-11868-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380224130-11868-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131002174332.GQ31178@titan.lakedaemon.net>
- <20131002180944.GC2365@localhost> <20131008195933.GA2473@localhost>
- <20131016110819.GC2518@localhost> <20131017191852.GA8832@localhost>
-Message-ID: <20131017192545.GJ22434@titan.lakedaemon.net>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Thu, 17 Oct 2013 21:36:04 +0200
+Subject: [GIT PULL] Uncritical Rockchip fixes for 3.13
+Message-ID: <201310172136.04553.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 04:18:53PM -0300, Ezequiel Garcia wrote:
-> On Wed, Oct 16, 2013 at 08:08:19AM -0300, Ezequiel Garcia wrote:
-> > On Tue, Oct 08, 2013 at 04:59:33PM -0300, Ezequiel Garcia wrote:
-> > > On Wed, Oct 02, 2013 at 03:09:44PM -0300, Ezequiel Garcia wrote:
-> > > > On Wed, Oct 02, 2013 at 01:43:32PM -0400, Jason Cooper wrote:
-> > > > > On Thu, Sep 26, 2013 at 04:35:27PM -0300, Ezequiel Garcia wrote:
-> > > > > > This commit introduces a new group of clocks present in Armada 370/XP
-> > > > > > SoCs (called "Core Divider" clocks) and add a provider for them.
-> > > > > > The only clock supported for now is the NAND clock (ndclk), but the
-> > > > > > infrastructure to add the rest is already set.
-> > > > > > 
-> > > > > > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > > > > ---
-> > > > > >  drivers/clk/mvebu/Kconfig       |   5 +
-> > > > > >  drivers/clk/mvebu/Makefile      |   1 +
-> > > > > >  drivers/clk/mvebu/clk-corediv.c | 223 ++++++++++++++++++++++++++++++++++++++++
-> > > > > >  3 files changed, 229 insertions(+)
-> > > > > >  create mode 100644 drivers/clk/mvebu/clk-corediv.c
-> > > > > 
-> > > > > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > > > > 
-> > > > 
-> > > > Mike: any comments on this?
-> > > 
-> > > ping?
-> > > 
-> > > I'd like to move along with the NAND driver for this controller and
-> > > -although these are not a hard requirement- it would be nice
-> > > to have them merged.
-> > > 
-> > 
-> > Mike? Any chance you pick these soon? It's been almost three-weeks since
-> > these patchset has been sent and I'm starting to forget the details of it ;)
-> 
-> Jason: It seems Mike went on 'stealth mode' so I'm wondering if you would
-> consider taking this patchset through you (given it's for our SoCs).
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
 
-I considered it, and it didn't sit well with me.  I don't mind taking a
-bugfix, everyone wants to see those moved along.  However, this is an
-entirely new driver.  Yes, it's scope of use is limited, but I'd prefer
-to let the maintainer review the driver before agreeing to maintain it.
-Otherwise, I'd be forcing him to maintain something he hasn't even
-looked at.  :(
+  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 
-I know it sucks, but we're going to wait for Mike.
+are available in the git repository at:
 
-thx,
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.13-rockchip-fixes
 
-Jason.
+for you to fetch changes up to 1b6dc1e478c85e6028ce3a918d484ecbcd52173e:
+
+  ARM: rockchip: remove obsolete rockchip,config properties (2013-10-14 21:01:53 +0200)
+
+----------------------------------------------------------------
+Romoval of obsolete (never used) dt properties
+and fix for the selection of the TWD.
+
+----------------------------------------------------------------
+Heiko Stuebner (2):
+      ARM: rockchip: fix wrong use of non-existent CONFIG_LOCAL_TIMERS
+      ARM: rockchip: remove obsolete rockchip,config properties
+
+ arch/arm/boot/dts/rk3066a.dtsi |   22 ----------------------
+ arch/arm/mach-rockchip/Kconfig |    3 +--
+ 2 files changed, 1 insertion(+), 24 deletions(-)
