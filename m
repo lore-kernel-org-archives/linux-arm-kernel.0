@@ -1,121 +1,66 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 17 Oct 2013 17:02:00 +0200
-Subject: [Patch v2][ 02/37] dma: ipu: Add devicetree support.
+Date: Thu, 17 Oct 2013 17:02:01 +0200
+Subject: [Patch v2][ 03/37] drm: Add the lacking DRM_MODE_FLAG_* for matching
+ the DISPLAY_FLAGS_*
 In-Reply-To: <1382022155-21954-1-git-send-email-denis@eukrea.com>
 References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382022155-21954-3-git-send-email-denis@eukrea.com>
+Message-ID: <1382022155-21954-4-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
+Without that fix, drivers using the drm_display_mode_from_videomode
+  function will not be able to get certain information because
+  some DISPLAY_FLAGS_* have no corresponding DRM_MODE_FLAG_*.
+
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: driverdev-devel at linuxdriverproject.org
+Cc: David Airlie <airlied@linux.ie>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- .../devicetree/bindings/dma/fsl-imx-ipu.txt        |   53 ++++++++++++++++++++
- drivers/dma/ipu/ipu_idmac.c                        |    8 +++
- 2 files changed, 61 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/fsl-imx-ipu.txt
+ drivers/gpu/drm/drm_modes.c |    9 +++++++++
+ include/uapi/drm/drm_mode.h |    4 ++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-ipu.txt b/Documentation/devicetree/bindings/dma/fsl-imx-ipu.txt
-new file mode 100644
-index 0000000..a901c33
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/fsl-imx-ipu.txt
-@@ -0,0 +1,53 @@
-+* Freescale Image Processing Unit DMA support for i.MX3x.
+diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+index b073315..353aaae 100644
+--- a/drivers/gpu/drm/drm_modes.c
++++ b/drivers/gpu/drm/drm_modes.c
+@@ -537,6 +537,15 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
+ 		dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
+ 	if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
+ 		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
++	if (vm->flags & DISPLAY_FLAGS_DE_LOW)
++		dmode->flags |= DRM_MODE_FLAG_NDATEN;
++	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
++		dmode->flags |= DRM_MODE_FLAG_PDATEN;
++	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
++		dmode->flags |= DRM_MODE_FLAG_PPIXDATEDGE;
++	if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
++		dmode->flags |= DRM_MODE_FLAG_NPIXDATEDGE;
 +
-+This document will only describe differences to the generic DMA Controller and
-+DMA request bindings as described in dma/dma.txt .
-+
-+This dma driver supports the imx31 and imx35 devices.
-+
-+* DMA controller
-+
-+Required properties:
-+- compatible : Should be "fsl,imx31-ipu".
-+- reg : Should contain DMA registers location and length
-+- interrupts : First item should be DMA interrupt, second one is optional and
-+    should contain DMA Error interrupt.
-+- #dma-cells : Has to be 1. The ipu driver does not support anything else.
-+
-+Optional properties:
-+- dma-channels : Number of DMA channels supported. Should be 32.
-+- #dma-requests : Number of DMA requests supported.
-+
-+Example:
-+
-+	ipu: ipu at 53fc0000 {
-+		compatible = "fsl,imx31-ipu";
-+		reg = <	0x53fc0000 0x5f
-+			0x53fc0088 0x2b >;
-+		interrupts = <42 41>;
-+		dma-channels = <32>;
-+		#dma-cells = <1>;
-+		clocks = <&clks 55>;
-+		clock-names = "";
-+		status = "disabled";
-+	};
-+
-+* DMA client
-+
-+Clients have to specify the DMA requests with phandles in a list.
-+
-+Required properties:
-+- dmas: List of one or more DMA request specifiers. One DMA request specifier
-+    consists of a phandle to the DMA controller followed by the integer
-+    specifying the request line.
-+- dma-names: List of string identifiers for the DMA requests. For the correct
-+    names, have a look at the specific client driver.
-+
-+Example:
-+
-+	lcdc: mx3fb at 53fc00b4 {
-+		...
-+		dmas = <&ipu 14>;
-+		dma-names = "tx";
-+		...
-+	};
-diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
-index cb9c0bc..d853ee1 100644
---- a/drivers/dma/ipu/ipu_idmac.c
-+++ b/drivers/dma/ipu/ipu_idmac.c
-@@ -22,6 +22,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/dma/ipu-dma.h>
+ 	drm_mode_set_name(dmode);
  
- #include "../dmaengine.h"
-@@ -1768,6 +1769,12 @@ static int ipu_remove(struct platform_device *pdev)
  	return 0;
- }
+diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
+index bafe612..13843c7 100644
+--- a/include/uapi/drm/drm_mode.h
++++ b/include/uapi/drm/drm_mode.h
+@@ -66,6 +66,10 @@
+ #define DRM_MODE_FLAG_3D_L_DEPTH_GFX_GFX_DEPTH	(1<<19)
+ #define DRM_MODE_FLAG_3D_TOP_AND_BOTTOM		(1<<20)
+ #define DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF	(1<<21)
++#define DRM_MODE_FLAG_PDATEN			(1<<22)
++#define DRM_MODE_FLAG_NDATEN			(1<<23)
++#define DRM_MODE_FLAG_PPIXDATEDGE		(1<<24)
++#define DRM_MODE_FLAG_NPIXDATEDGE		(1<<25)
  
-+static const struct of_device_id ipu_dma_of_dev_id[] = {
-+	{ .compatible = "fsl,imx31-ipu", },
-+	{ /* Sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, ipu_dma_of_dev_id);
-+
- /*
-  * We need two MEM resources - with IPU-common and Image Converter registers,
-  * including PF_CONF and IDMAC_* registers, and two IRQs - function and error
-@@ -1775,6 +1782,7 @@ static int ipu_remove(struct platform_device *pdev)
- static struct platform_driver ipu_platform_driver = {
- 	.driver = {
- 		.name	= "ipu-core",
-+		.of_match_table = of_match_ptr(ipu_dma_of_dev_id),
- 		.owner	= THIS_MODULE,
- 	},
- 	.remove		= ipu_remove,
+ /* DPMS flags */
+ /* bit compatible with the xorg definitions. */
 -- 
 1.7.9.5
