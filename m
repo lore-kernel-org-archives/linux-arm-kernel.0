@@ -1,68 +1,91 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 17 Oct 2013 11:34:53 -0700
-Subject: [RFC PATCH 2/5] ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and
- SYSTEM_RESET to user space
-In-Reply-To: <525FAC07.4060306@arm.com>
-References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
- <1381942954-22388-3-git-send-email-anup.patel@linaro.org>
- <525FA1D3.8060001@arm.com>
- <CAFEAcA-xqobnEmHnda5Psr4XH+3vAUr3K9Cnv_uhB7itBbNgfw@mail.gmail.com>
- <525FAC07.4060306@arm.com>
-Message-ID: <20131017183453.GO24837@cbox>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Thu, 17 Oct 2013 13:37:26 -0500
+Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
+ device tree
+In-Reply-To: <1381477716.5630.74.camel@pasglop>
+References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
+ <1381477716.5630.74.camel@pasglop>
+Message-ID: <CAHCPf3s63Jh6YSo2vqJ-4OwfTBGRBcQPAVzw_FK1uU3jpTK+Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 10:21:11AM +0100, Marc Zyngier wrote:
-> On 17/10/13 10:10, Peter Maydell wrote:
-> > On 17 October 2013 09:37, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >> On 16/10/13 18:02, Anup Patel wrote:
-> >>> The PSCI SYSTEM_OFF and SYSTEM_RESET functions are VM or Guest level
-> >>> functions hence cannot be emulated by the in-kernel PSCI emulation code.
-> >>
-> >> Why can't we implement system-wide functionality in the kernel? I fail
-> >> to see the issue here.
-> > 
-> > Because the kernel isn't emulating the whole board, and you need
-> > to power off or reset the whole board, not just the CPUs.
-> 
-> In which case we can forward a generic event, once KVM has dealt with
-> the CPUs.
-> 
-> >> I'm really not keen on this approach. Having part of the PSCI
-> >> implementation offloaded to userspace means we don't have a complete
-> >> implementation in KVM anymore, and we end-up duplicating functionality
-> >> all over the place.
-> >>
-> >> Also, OFF and RESET are not PSCI specific concepts, and could be
-> >> implemented in various ways. I'm more inclined to return a
-> >> *standardized* exit code that the various platforms can interpret.
-> > 
-> > Maybe we should have a more generic "kernel can't handle this,
-> > toss it to userspace" API? That might also fit in with supporting
-> > guests that want to make SMC calls to an emulated monitor...
-> 
-> Indeed.
-> 
-Agreed as well.  That's what I was trying to say with a more generic
-solution, and exiting on a subset of SMC/HVC calls for PSCI is a weird
-compromise.
+On Fri, Oct 11, 2013 at 2:48 AM, Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+> On Fri, 2013-10-11 at 09:27 +0200, Marek Szyprowski wrote:
+>> Hi all!
+>>
+>> Benjamin Herrenschmidt pointed a few issues in the proposed design of
+>> device tree bindings for contiguous memory allocator and reserved memory
+>> regions:
+>> https://lkml.org/lkml/2013/9/15/151
+>> http://www.spinics.net/lists/arm-kernel/msg273548.html
+>
+> Are you guys in Edinburgh ?
+>
+> I'll be there from Tuesday PM (so really Wed) to Friday (fly out on
+> Sat). We should catch up, brainstorm and come up with something.
+>
+> Cheers,
+> Ben.
 
-After all, PSCI is nothing more than acting on SMC or HVC calls, and I'm
-quite sure there will be a need for user space to emulate handling of
-SMC calls sooner or later, and that is the interface we need.
+This may be late, but please can you consider re-using the CHRP
+reserved node (i.e. device_type = "reserved")?
 
-We may end up with both kernel and user space support for PSCI in that
-case, but naturally it would always be *either* the kernel handling the
-whole thing, *or* user space handling the whole thing.
+Since it does exactly the same thing, is well defined since the dark ages?
 
-In both cases we may need extra functionality to communicate between
-user space and KVM, such as suspending a vcpu from user space and waking
-it up on in-kernel generated timer interrupts, or, conversely, telling
-user space that there was a PSCI call to turn off the system.
+It's CHRP 1.7 section 5.9 by the way (just before /chosen gets defined).
 
->From my point of view the most difficult part to figure out is how to
-support general handling of secure monitor services in user space.  I
-don't see any particular problems with expanding the exit reasons with
-things like "turn off VM" or "reset VM"?
+It would solve a selection of the issues; and require zero binding
+work except describing perhaps a couple freakish Linux-specific
+properties that may be only as intrusive as, say, linux,initrd would
+be in /chosen.
 
--Christoffer
+The most effective, multi-OS way of using it ("available" property not
+currently implemented in Linux for some reason, but it could come in
+so handy - not only because it matches the way Linux resource
+structures are handled)
+
+memory at 0x70000000 {
+   device_type = "memory";
+   reg = <0x70000000 0x40000000>;
+   available = <0x70000000 0x10000000
+                     0x90000000 0x1ffc00000>; /* top 16KiB of memory
+is where the secure firmware keeps it's mailboxes */
+};
+
+freaky-codec-memory: reserved at 0x80000000 {
+    device_type = "reserved";
+    reg = <0x80000000 0x10000000>;
+    available = <0x80000000 0x8000000
+                      0x88000000 0x8000000>; /* two 128MiB buffers */
+    non-objectionable-mark-as-contiguous-property-name-here;
+    cacheable;
+};
+
+Any driver that has, previously, required a bunch of it's own memory
+carved out of DDR *should* be gaining a phandle reference to that
+reserved node however it likes (it would be up to that devices'
+binding).
+
+On Linux under CMA, it may well be ignored and just stuffed into the
+generic CMA regions, and the driver MAY allocate anywhere it likes,
+but it COULD ask for memory based on a region phandle or, horribly, by
+name (since there's no other way to search for it, the OF "name" for
+reserved SHALL be "reserved") and be given memory in that region
+defined by the reserved node if it had any addressing restrictions.
+
+/videodecoder at 0x43f01000 {
+    compatible = "freaky,codec";
+    :
+    decode-buffer = &freaky-codec-memory;
+};
+
+On another OS it may manually map and use a custom allocator for that
+memory region, since otherwise the OS would not have even looked at
+it.
+
+Also this discussion of Jeremy Kerr's proposal seems to be 'missing'
+on Google. Do you happen to have a link to it?
+
+Thanks,
+Matt Sealey <neko@bakuhatsu.net>
