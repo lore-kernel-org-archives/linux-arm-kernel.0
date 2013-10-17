@@ -1,42 +1,42 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 17 Oct 2013 18:30:36 +0200
-Subject: [PATCH 2/8] clk: max77686: Provide .recalc_rate() operation
+Date: Thu, 17 Oct 2013 18:30:37 +0200
+Subject: [PATCH 3/8] clk: max77686: Refactor successful exit of probe function
 In-Reply-To: <1382027442-1992-1-git-send-email-t.figa@samsung.com>
 References: <1382027442-1992-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1382027442-1992-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1382027442-1992-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is usually nice to know frequency of a clock, so this patch adds a
-.recalc_rate() callback returning rates of provided clocks.
+The function can simply return 0, without jumping to a separate label,
+which does exactly the same. This patch does not introduce any
+functional change, just a clean-up.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/clk-max77686.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/clk/clk-max77686.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index e39d463..e40ecdb 100644
+index e40ecdb..5d78460 100644
 --- a/drivers/clk/clk-max77686.c
 +++ b/drivers/clk/clk-max77686.c
-@@ -81,10 +81,17 @@ static int max77686_clk_is_prepared(struct clk_hw *hw)
- 	return val & max77686->mask;
+@@ -178,7 +178,7 @@ static int max77686_clk_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, max77686_clks);
+ 
+-	goto out;
++	return 0;
+ 
+ err_clk_pmic:
+ 	clkdev_drop(max77686_clks[MAX77686_CLK_CP]->lookup);
+@@ -187,7 +187,6 @@ err_clk_cp:
+ 	clkdev_drop(max77686_clks[MAX77686_CLK_AP]->lookup);
+ 	kfree(max77686_clks[MAX77686_CLK_AP]->hw.clk);
+ err_clk_ap:
+-out:
+ 	return ret;
  }
  
-+static unsigned long max77686_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	return 32768;
-+}
-+
- static struct clk_ops max77686_clk_ops = {
- 	.prepare	= max77686_clk_prepare,
- 	.unprepare	= max77686_clk_unprepare,
- 	.is_prepared	= max77686_clk_is_prepared,
-+	.recalc_rate	= max77686_recalc_rate,
- };
- 
- static struct clk_init_data max77686_clks_init[MAX77686_CLKS_NUM] = {
 -- 
 1.8.3.2
