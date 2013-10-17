@@ -1,40 +1,36 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 17 Oct 2013 12:28:35 +0300
-Subject: [PATCH 0/2] OMAP4460: cpuidle: Workaround for ROM bug because
- of CA9 r2pX GIC control register change
-In-Reply-To: <525FACA9.3060405@ti.com>
-References: <1382000776-15897-1-git-send-email-grygorii.strashko@ti.com>
- <525FACA9.3060405@ti.com>
-Message-ID: <525FADC3.4090505@ti.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 17 Oct 2013 10:31:38 +0100
+Subject: [RFC PATCH 2/5] ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and
+ SYSTEM_RESET to user space
+In-Reply-To: <525FAC07.4060306@arm.com>
+References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
+ <1381942954-22388-3-git-send-email-anup.patel@linaro.org>
+ <525FA1D3.8060001@arm.com>
+ <CAFEAcA-xqobnEmHnda5Psr4XH+3vAUr3K9Cnv_uhB7itBbNgfw@mail.gmail.com>
+ <525FAC07.4060306@arm.com>
+Message-ID: <CAFEAcA-0nY-Ck35zx_vbfkfrRxqfHs_5C2AABhWGoO88vmPqOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, forgot to mention that patches are based on 4a10c2a Linux 3.12-rc2
+On 17 October 2013 10:21, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 17/10/13 10:10, Peter Maydell wrote:
+>> On 17 October 2013 09:37, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 16/10/13 18:02, Anup Patel wrote:
+>>>> The PSCI SYSTEM_OFF and SYSTEM_RESET functions are VM or Guest level
+>>>> functions hence cannot be emulated by the in-kernel PSCI emulation code.
+>>>
+>>> Why can't we implement system-wide functionality in the kernel? I fail
+>>> to see the issue here.
+>>
+>> Because the kernel isn't emulating the whole board, and you need
+>> to power off or reset the whole board, not just the CPUs.
+>
+> In which case we can forward a generic event, once KVM has dealt with
+> the CPUs.
 
-On 10/17/2013 12:23 PM, Grygorii Strashko wrote:
-> The same workaround as ff999b8a0983ee15668394ed49e38d3568fc6859
-> "ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC control register change."
-> need to be applied not only when system is booting, but when
-> MPU hits OSWR state through CPUIdle too.
->
-> Now the same issue is reproduced on boards PandaES and Tablet/Blaze with
-> SOM OMAP4460 ES1.0 when CONFIG_CPU_IDLE is enabled.
-> - GIC distributor is disabled
-> - scheduling is not performed any more
->
-> Grygorii Strashko (2):
->    Revert "ARM: OMAP4+: CPUidle: Deprecate use of omap4_mpuss_read_prev_context_state()"
->    ARM: OMAP4460: cpuidle: WA for ROM bug because of CA9 r2pX gic control register change
->
->   arch/arm/mach-omap2/common.h              |    6 +++++
->   arch/arm/mach-omap2/cpuidle44xx.c         |   35 +++++++++++++++++++++++++++--
->   arch/arm/mach-omap2/omap-mpuss-lowpower.c |   14 ++++++++++++
->   arch/arm/mach-omap2/omap4-common.c        |    6 +++++
->   4 files changed, 59 insertions(+), 2 deletions(-)
->
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
->
-> Regards,
-> -grygorii
->
+Ideally per-CPU reset should be driven by userspace, incidentally.
+We ought to have an ioctl for "hey, reset this CPU': at the moment
+we have to fake it up by having QEMU feed the CPU back the register
+values it read on powerup, which is kind of ugly.
+
+-- PMM
