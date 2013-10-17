@@ -1,37 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 17 Oct 2013 14:29:27 +0200
-Subject: New big-endian patch series against 3.12-rc4
-In-Reply-To: <20131017122758.GM18765@mudshark.cambridge.arm.com>
-References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
- <20131017140712.6312f71a@skate>
- <20131017121529.GL18765@mudshark.cambridge.arm.com>
- <20131017142053.66eb5e3b@skate>
- <20131017122758.GM18765@mudshark.cambridge.arm.com>
-Message-ID: <20131017142927.47b91c32@skate>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 Oct 2013 08:31:59 -0400
+Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
+In-Reply-To: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
+References: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20131017123159.GA22434@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Will Deacon,
+Mike,
 
-On Thu, 17 Oct 2013 13:27:58 +0100, Will Deacon wrote:
+I going to go ahead a take this through my tree.  I'll hold it off until
+my last pull request for the merge window (I'm guessing about a week).
+If you object, just let me know before then and I'll drop it.
 
-> > Well, the e-mail I was replying to was already a pull request sent
-> > to rmk, and there has been a number of other similar pull requests
-> > made by Ben during the previous iterations, and there has never
-> > been any reaction from rmk (as far as I can remember, of course).
+
+On Thu, Oct 03, 2013 at 12:05:02PM +0200, Simon Guinot wrote:
+> This patch fixes the tclk frequency array for the Armada-370 SoC.
+> This bug has been introduced by commit 6b72333d
+> ("clk: mvebu: add Armada 370 SoC-centric clock init").
 > 
-> Hmm, the email doesn't have [GIT PULL] in the subject and I don't see
-> linux+pull at arm.linux.org.uk in the to/cc list, so maybe that explain
-> why it's not getting picked up!
+> A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
+> i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
+> 
+> About the mvneta Ethernet driver, note that the tclk frequency is used
+> to compute the Rx time coalescence. Then, this bug harms the coalescence
+> configuration and also degrades the networking performances with the
+> default values.
+> 
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: stable at vger.kernel.org
+> ---
+>  drivers/clk/mvebu/armada-370.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Ok. So Ben, it'd be great if you could repost a pull request by
-following those recommendations. If you need help, let me know, I can
-probably dedicate a bit of time to help pushing the BE stuff if needed.
+Applied to mvebu/drivers for v3.13 and flagged for stable going back to
+v3.11.  Also added Gregory's Ack.
 
-Best regards,
+thx,
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason.
