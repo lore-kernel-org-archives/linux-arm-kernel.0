@@ -1,91 +1,59 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Thu, 17 Oct 2013 13:37:26 -0500
-Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
- device tree
-In-Reply-To: <1381477716.5630.74.camel@pasglop>
-References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
- <1381477716.5630.74.camel@pasglop>
-Message-ID: <CAHCPf3s63Jh6YSo2vqJ-4OwfTBGRBcQPAVzw_FK1uU3jpTK+Ow@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 17 Oct 2013 13:58:21 -0500
+Subject: [GIT PULL] Highbank updates for 3.13
+Message-ID: <5260334D.30009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 2:48 AM, Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
-> On Fri, 2013-10-11 at 09:27 +0200, Marek Szyprowski wrote:
->> Hi all!
->>
->> Benjamin Herrenschmidt pointed a few issues in the proposed design of
->> device tree bindings for contiguous memory allocator and reserved memory
->> regions:
->> https://lkml.org/lkml/2013/9/15/151
->> http://www.spinics.net/lists/arm-kernel/msg273548.html
->
-> Are you guys in Edinburgh ?
->
-> I'll be there from Tuesday PM (so really Wed) to Friday (fly out on
-> Sat). We should catch up, brainstorm and come up with something.
->
-> Cheers,
-> Ben.
+Kevin, Olof,
 
-This may be late, but please can you consider re-using the CHRP
-reserved node (i.e. device_type = "reserved")?
+Please pull. Doing merge with arm-soc/for-next, there's a trivial merge
+conflict with highbank.c includes.
 
-Since it does exactly the same thing, is well defined since the dark ages?
+Rob
 
-It's CHRP 1.7 section 5.9 by the way (just before /chosen gets defined).
+The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
 
-It would solve a selection of the issues; and require zero binding
-work except describing perhaps a couple freakish Linux-specific
-properties that may be only as intrusive as, say, linux,initrd would
-be in /chosen.
+  Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
 
-The most effective, multi-OS way of using it ("available" property not
-currently implemented in Linux for some reason, but it could come in
-so handy - not only because it matches the way Linux resource
-structures are handled)
+are available in the git repository at:
 
-memory at 0x70000000 {
-   device_type = "memory";
-   reg = <0x70000000 0x40000000>;
-   available = <0x70000000 0x10000000
-                     0x90000000 0x1ffc00000>; /* top 16KiB of memory
-is where the secure firmware keeps it's mailboxes */
-};
+  git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
+tags/highbank-for-3.13
 
-freaky-codec-memory: reserved at 0x80000000 {
-    device_type = "reserved";
-    reg = <0x80000000 0x10000000>;
-    available = <0x80000000 0x8000000
-                      0x88000000 0x8000000>; /* two 128MiB buffers */
-    non-objectionable-mark-as-contiguous-property-name-here;
-    cacheable;
-};
+for you to fetch changes up to 78bbca1a54bd05f7c7d38a306073a3ee7f866e51:
 
-Any driver that has, previously, required a bunch of it's own memory
-carved out of DDR *should* be gaining a phandle reference to that
-reserved node however it likes (it would be up to that devices'
-binding).
+  dts: calxeda: add ARM PSCI binding (2013-10-01 16:34:17 -0500)
 
-On Linux under CMA, it may well be ignored and just stuffed into the
-generic CMA regions, and the driver MAY allocate anywhere it likes,
-but it COULD ask for memory based on a region phandle or, horribly, by
-name (since there's no other way to search for it, the OF "name" for
-reserved SHALL be "reserved") and be given memory in that region
-defined by the reserved node if it had any addressing restrictions.
+----------------------------------------------------------------
+Highbank platform updates for 3.13
 
-/videodecoder at 0x43f01000 {
-    compatible = "freaky,codec";
-    :
-    decode-buffer = &freaky-codec-memory;
-};
+- convert Calxeda cpuidle driver to a platform driver and to use PSCI
+- convert highbank smp_ops and suspend to PSCI
 
-On another OS it may manually map and use a custom allocator for that
-memory region, since otherwise the OS would not have even looked at
-it.
+----------------------------------------------------------------
+Daniel Lezcano (1):
+      ARM: highbank: cpuidle: convert to platform driver
 
-Also this discussion of Jeremy Kerr's proposal seems to be 'missing'
-on Google. Do you happen to have a link to it?
+Rob Herring (5):
+      cpuidle: calxeda: add cpu_pm_enter/exit calls
+      cpuidle: calxeda: add support to use PSCI calls
+      ARM: PSCI: remove unnecessary include of arm-gic.h
+      ARM: highbank: adapt to use ARM PSCI calls
+      dts: calxeda: add ARM PSCI binding
 
-Thanks,
-Matt Sealey <neko@bakuhatsu.net>
+ arch/arm/boot/dts/ecx-common.dtsi |  8 +++++
+ arch/arm/kernel/psci_smp.c        |  1 -
+ arch/arm/mach-highbank/Kconfig    |  1 +
+ arch/arm/mach-highbank/Makefile   |  2 --
+ arch/arm/mach-highbank/core.h     |  4 ---
+ arch/arm/mach-highbank/highbank.c | 24 ++++++--------
+ arch/arm/mach-highbank/hotplug.c  | 37 ---------------------
+ arch/arm/mach-highbank/platsmp.c  | 68
+---------------------------------------
+ arch/arm/mach-highbank/pm.c       | 27 ++++++----------
+ drivers/cpuidle/Kconfig.arm       |  2 +-
+ drivers/cpuidle/cpuidle-calxeda.c | 61 +++++++++++++----------------------
+ 11 files changed, 50 insertions(+), 185 deletions(-)
+ delete mode 100644 arch/arm/mach-highbank/hotplug.c
+ delete mode 100644 arch/arm/mach-highbank/platsmp.c
