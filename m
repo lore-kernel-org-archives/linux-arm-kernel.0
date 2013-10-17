@@ -1,68 +1,37 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 17 Oct 2013 13:07:58 -0600
-Subject: [GIT PULL 3/6] ARM: tegra: core SoC support changes for 3.13
+Date: Thu, 17 Oct 2013 13:08:01 -0600
+Subject: [GIT PULL 6/6] MAINTAINERS: Tegra updates, and driver ownership
 In-Reply-To: <1382036881-23339-1-git-send-email-swarren@wwwdotorg.org>
 References: <1382036881-23339-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1382036881-23339-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1382036881-23339-6-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch includes:
-* SoC fuse values are used as device randomness at boot.
-* Initial support for the Tegra124 SoC is added. When coupled with an
-  appropriate clock driver, which should also be merged for 3.13, we are
-  able to boot to user-space using an initrd.
-* The powergate code gains support for Tegra114.
+Overhaul of MAINTAINERS for Tegra. This adds Thierry as a Tegra core
+maintainer, and adds specific entries for most individual Tegra-specific
+device drivers, pointing at relevant people. The tegradrm section is
+updated to be Supported since Thierry is now employed to work on this.
 
-This branch is based on previous pull request tegra-for-3.13-cleanup.
+This branch is based on v3.12-rc1.
 
 ----------------------------------------------------------------
 
-The following changes since commit b6bda4e0d23815cb711c16085e03cb23c6d49f21:
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
-  ARM: tegra: fix ARCH_TEGRA_114_SOC select sort order
+  Linux 3.12-rc1
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.13-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tegra-for-3.13-maintainers
 
-for you to fetch changes up to 8d25979dcd10479ebfb9ce01b3c824f4c7659f73:
+for you to fetch changes up to d44c346ee9c9b37ff0ea28e816062cd1439bf05d:
 
-  ARM: tegra: Add Tegra114 powergate support
+  MAINTAINERS: Tegra updates, and driver ownership
 
 ----------------------------------------------------------------
 
-Joseph Lo (7):
-      ARM: tegra: add Tegra124 SoC support
-      ARM: tegra: add PMC compatible value for Tegra124
-      ARM: tegra: CPU hotplug support for Tegra124
-      ARM: tegra: make tegra_resume can work with current and later chips
-      ARM: tegra: enable CPU idle for Tegra124
-      ARM: tegra: re-calculate the LP1 data for Tegra30/114
-      ARM: tegra: add LP1 support code for Tegra124
-
 Stephen Warren (1):
-      ARM: tegra: add fuses as device randomness
+      MAINTAINERS: Tegra updates, and driver ownership
 
-Thierry Reding (3):
-      ARM: tegra: Remove duplicate powergate defines
-      ARM: tegra: Constify list of CPU domains
-      ARM: tegra: Add Tegra114 powergate support
-
- arch/arm/mach-tegra/Kconfig         | 10 +++++-
- arch/arm/mach-tegra/Makefile        |  5 +++
- arch/arm/mach-tegra/cpuidle.c       |  4 ++-
- arch/arm/mach-tegra/flowctrl.c      |  2 ++
- arch/arm/mach-tegra/fuse.c          | 54 ++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/fuse.h          |  1 +
- arch/arm/mach-tegra/hotplug.c       |  2 ++
- arch/arm/mach-tegra/iomap.h         |  3 ++
- arch/arm/mach-tegra/platsmp.c       |  2 ++
- arch/arm/mach-tegra/pm.c            | 12 +++++--
- arch/arm/mach-tegra/pmc.c           |  8 ++---
- arch/arm/mach-tegra/powergate.c     | 48 ++++++++++++++++++++++++++--
- arch/arm/mach-tegra/reset-handler.S | 13 +++-----
- arch/arm/mach-tegra/sleep-tegra30.S | 49 ++++++++++++++++++++++-------
- arch/arm/mach-tegra/tegra.c         |  1 +
- include/linux/tegra-powergate.h     |  9 +++++-
- 16 files changed, 188 insertions(+), 35 deletions(-)
+ MAINTAINERS | 62 ++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 60 insertions(+), 2 deletions(-)
