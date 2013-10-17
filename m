@@ -1,52 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Oct 2013 09:39:44 -0400
-Subject: [GIT PULL] ARM: mvebu: driver changes for v3.13 (round 2)
-Message-ID: <20131017133944.GF22434@titan.lakedaemon.net>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Thu, 17 Oct 2013 19:12:08 +0530
+Subject: [PATCH 3/9] clk: samsung: exynos4: Move suspend/resume handling
+ to SoC driver
+In-Reply-To: <1381921698-5060-4-git-send-email-t.figa@samsung.com>
+References: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
+ <1381921698-5060-4-git-send-email-t.figa@samsung.com>
+Message-ID: <CAKew6eV7Hd1x1+YLR9rjzNgYu0t=9Q8BG23VUvhPJTf77bsRXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+Hi Tomasz,
 
-Here's the next round of driver changes for mvebu.  As previously
-arranged with Bjorn, we're taking the pci-mvebu.c changes this time
-around since the previous pull request had pci changes depending on
-changes in irqchip.
+[ ... ]
+>  /*
+>   * list of controller registers to be saved and restored during a
+>   * suspend/resume cycle.
+> @@ -288,6 +299,70 @@ static unsigned long exynos4_clk_regs[] __initdata = {
+>         GATE_IP_CPU,
+>  };
+>
+> +static int exynos4_clk_suspend(void)
+> +{
+> +       samsung_clk_save(reg_base, exynos4_save_common,
+> +                               ARRAY_SIZE(exynos4_clk_regs));
 
-thx,
+a doubt here, Is sizeof(exynos4_clk_regs) works with
+exynos4_clk_regs[] as __initdata ?
 
-Jason.
+> +
+> +       if (exynos4_soc == EXYNOS4210)
+> +               samsung_clk_save(reg_base, exynos4_save_soc,
+> +                                       ARRAY_SIZE(exynos4210_clk_save));
 
+[ ... ]
+> +static void exynos4_clk_sleep_init(void)
 
-The following changes since commit 96ae0b548672adc12431312718835e77472f5bf0:
+I think, this fuction can be placed in __init section.
 
-  ARM: mvebu: fix gated clock documentation (2013-10-08 15:17:56 +0000)
+Same in other patches as well.
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/drivers-3.13-2
-
-for you to fetch changes up to f5072dfbac053200c8865c4fb15e4f020b7b5d1d:
-
-  PCI: mvebu: make local functions static (2013-10-08 17:57:40 +0000)
-
-----------------------------------------------------------------
-mvebu driver changes for v3.13 (round 2)
-
- - mvebu
-    - pcie
-       - dynamic link up detection
-       - add IO wrappers
-       - declare some local functions static
-
-----------------------------------------------------------------
-Jason Gunthorpe (1):
-      PCI: mvebu: Dynamically detect if the PEX link is up to enable hot plug
-
-Jingoo Han (1):
-      PCI: mvebu: make local functions static
-
-Seungwon Jeon (1):
-      PCI: mvebu: add I/O access wrappers
-
- drivers/pci/host/pci-mvebu.c | 128 +++++++++++++++++++++++--------------------
- 1 file changed, 69 insertions(+), 59 deletions(-)
+Regards,
+Yadwinder
