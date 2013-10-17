@@ -1,32 +1,59 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 17 Oct 2013 15:15:43 -0700
-Subject: [PATCH v4 02/15] clk: tegra: simplify periph clock data
-In-Reply-To: <1382013526-12800-3-git-send-email-pdeschrijver@nvidia.com>
-References: <1382013526-12800-1-git-send-email-pdeschrijver@nvidia.com>
- <1382013526-12800-3-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <CAL1qeaGg+XdCWSp4yjWTFxXjhj8a+_dFwpT+B_H+GQ_CWZ50-A@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 17 Oct 2013 15:20:57 -0700
+Subject: [GIT PULL] ARM: mvebu: soc changes for v3.13 (round 2)
+In-Reply-To: <20131017135409.GG22434@titan.lakedaemon.net> (Jason Cooper's
+ message of "Thu, 17 Oct 2013 09:54:09 -0400")
+References: <20131017135409.GG22434@titan.lakedaemon.net>
+Message-ID: <87ob6nzghi.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Jason Cooper <jason@lakedaemon.net> writes:
 
-> @@ -2346,6 +2247,9 @@ static void __init tegra114_clock_init(struct device_node *np)
->         if (tegra114_osc_clk_init(clk_base) < 0)
->                 return;
+> Guys,
 >
-> +       if (tegra_clk_set_periph_banks(5) < 0)
-
-Maybe it would be better to have a #define for this (e.g.
-TEGRAxxx_CLK_PERIPH_BANKS)?  Same goes for t20 and t30.
-
->  /* Global data of Tegra CPU CAR ops */
->  static struct tegra_cpu_car_ops dummy_car_ops;
->  struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
+> The only thing exciting here is the workaround for the mv643xx_eth bug.
+> Whenever you shut off it's clock (and folks have good reason to do
+> this), it loses it's mac address.  In the happy, ideal boot-from-DT
+> world, this isn't a problem, since the bootloader will set
+> local-mac-address in the DT.  However, we aren't in that world (yet).
 >
-> +int *periph_clk_enb_refcnt;
+> We've been tossing around different solutions to the problem over the
+> past year or so, and this one seems a) the least painful, and b) most in
+> line with what the future will hold.  eg, the driver (on reload or
+> resume) will need to read the mac address from the DT, regardless of how
+> the mac address got there.
+>
+> thx,
+>
+> Jason.
+>
+> The following changes since commit e1cb367de27ca5c186b0f120c3c10a4a0e8edd2e:
+>
+>   ARM: kirkwood: Add standby support (2013-10-08 15:41:52 +0000)
+>
+> are available in the git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/soc-3.13-2
+>
+> for you to fetch changes up to d7f5baeedbdb48d4f5bb2b4f6f56f32b7f2f7aff:
+>
+>   Documentation: arm/Marvell: clarify Armada SoCs that match 78xx0 pattern (2013-10-08 17:27:59 +0000)
+>
+> ----------------------------------------------------------------
+> mvebu soc changes for v3.13 (round 2)
+>
+>  - kirkwood
+>     - remove mbus init, pcie clk init
+>     - retain MAC addr for DT ethernet (work around broken IP)
+>     - docs: clarify Armada SoCs
 
-This changes seems unrelated.  Perhaps it should go in the one that
-makes the common periph_clk_enb_refcnt?
+Pulled into next/soc.
+
+This had a minor conflict in board-dt.c with Sebastian's clk-of-init
+branch that's part of next/cleanup.  Please double check my conflict
+resolution (currently in our to-build branch, not yet pushed to for-next)
 
 Thanks,
-Andrew
+
+Kevin
