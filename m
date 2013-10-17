@@ -1,49 +1,59 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 17 Oct 2013 10:46:36 +0530
-Subject: [PATCH] DMA: extend documentation to provide more API details
-In-Reply-To: <525EEA18.1010802@wwwdotorg.org>
-References: <Pine.LNX.4.64.1310051925170.8097@axis700.grange>
- <20131005190200.GZ12758@n2100.arm.linux.org.uk>
- <Pine.LNX.4.64.1310052203060.8097@axis700.grange>
- <20131005233137.GA12758@n2100.arm.linux.org.uk>
- <20131006052029.GE2954@intel.com>
- <Pine.LNX.4.64.1310071233340.20796@axis700.grange>
- <20131007111728.GM12758@n2100.arm.linux.org.uk>
- <20131007103936.GH2954@intel.com>
- <CAA9_cmdSh8j5rmzZ=SsOG_pRa+Aq1odEEWKvVNOUv9G0Ma=dEw@mail.gmail.com>
- <525EEA18.1010802@wwwdotorg.org>
-Message-ID: <20131017051636.GB14013@intel.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 17 Oct 2013 08:14:56 +0200
+Subject: [RESEND PATCH v2 2/6] ARM: dts: Specify clocks for UARTs on
+ bcm11351
+In-Reply-To: <CAEPRUYrzAow1yr58jOp5ead7BkQx-K7yaLLzSHPwqYVu=aZFEQ@mail.gmail.com>
+References: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
+ <1381960030-1640-3-git-send-email-tim.kryger@linaro.org>
+ <CAEPRUYrzAow1yr58jOp5ead7BkQx-K7yaLLzSHPwqYVu=aZFEQ@mail.gmail.com>
+Message-ID: <525F8060.4040900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 01:33:44PM -0600, Stephen Warren wrote:
-> On 10/08/2013 07:34 PM, Dan Williams wrote:
-> > On Mon, Oct 7, 2013 at 3:39 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> >> On Mon, Oct 07, 2013 at 12:17:28PM +0100, Russell King - ARM Linux wrote:
-> ...
-> >>> What may be better is to change the wording here: not DMA_SUCCESS but
-> >>> DMA_COMPLETED.  That doesn't imply that it has been successful, merely
-> >>> that the DMA engine has finished with the transaction.
-> >>
-> >> Agreed that its not indication of success but of DMA completetion. I have seen
-> >> cases where slave perhiphral got stuck while sending last FIFO but since DMA
-> >> finished transferiing to FIFO it says complete.
-> 
-> In that case, the DMA *has* completed. DMA is the transfer into the
-> FIFO, not the handling of the FIFO content by the peripheral.
-> 
-> >> Dan do you agree?
-> > 
-> > Yes, it's an indication of completion, not necessarily success.
-> 
-> Surely by definition, a DMA can't *complete* without being successful.
-> If the DMA failed, then it didn't complete, but rather must have been
-> aborted or error'd out, without completing the whole transfer.
-DMA means transferring of data, and that is what DMA compeletion would mean.
-Once the data has left the DMA FIFO, we don't know if it filled up the memory
-propery or get stuck in periphral FIFO, the dmaengine would have no knowledge or
-control of it. So it can't claim the transfer was success from a data point of
-view, hence the rename now!
+On 10/17/2013 07:41 AM, Christian Daudt wrote:
+> On Wed, Oct 16, 2013 at 2:47 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+>> Rather than declaring the frequency of the external clock, specify the
+>> label of the clock such that the driver may determine the frequency on
+>> its own.
+>>
+>> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+>> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>> ---
+>>   arch/arm/boot/dts/bcm11351.dtsi | 8 ++++----
+>>   1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+>> index c6464fb..ce65367 100644
+>> --- a/arch/arm/boot/dts/bcm11351.dtsi
+>> +++ b/arch/arm/boot/dts/bcm11351.dtsi
+>> @@ -43,7 +43,7 @@
+>>                  compatible = "brcm,bcm11351-dw-apb-uart", "snps,dw-apb-uart";
+>>                  status = "disabled";
+>>                  reg = <0x3e000000 0x1000>;
+>> -               clock-frequency = <13000000>;
+>> +               clocks = <&uartb_clk>;
+>>                  interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+>>                  reg-shift = <2>;
+>>                  reg-io-width = <4>;
+>
+> Hi Sebastian,
+>   this patch series (and a subsequent one from Tim) both rely on your
+> "ARM: provide common arch init for DT clocks" patchset in order to
+> work. Will that patchset be in 3.13 ? I don't want to pull the dt mods
+> unless they are as they break the boot without them.
 
-~Vinod
--- 
+Christian,
+
+here is the pull request [1], pull [2], and stable commitment for the
+branch [3]. You can merge that branch too and name the dependency when
+you send your PR, arm-soc maintainers will sort it out.
+
+Besides a small section mismatch fixup for nomadik that Olof requested,
+I guess it is in.
+
+Sebastian
+
+[1] http://www.spinics.net/lists/arm-kernel/msg276175.html
+[2] http://www.spinics.net/lists/arm-kernel/msg277816.html
+[3] http://www.spinics.net/lists/arm-kernel/msg279736.html
