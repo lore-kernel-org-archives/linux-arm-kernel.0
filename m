@@ -1,162 +1,123 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 17 Oct 2013 18:13:17 +0900
-Subject: Regression since v3.11 on ARM shmobile ape6evm board
-Message-ID: <20131017091317.GA30729@verge.net.au>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 17 Oct 2013 11:15:02 +0200
+Subject: [PATCH v2 11/13] arm64: enable generic clockevent broadcast
+In-Reply-To: <1381748590-14279-12-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1381748590-14279-12-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <525FAA96.90600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/14/2013 01:03 PM, Lorenzo Pieralisi wrote:
+> On platforms with power management capabilities, timers that are shut
+> down when a CPU enters deep C-states must be emulated using an always-on
+> timer and a timer IPI to relay the timer IRQ to target CPUs on an SMP
+> system.
+>
+> This patch enables the generic clockevents broadcast infrastructure for
+> arm64, by providing the required Kconfig entries and adding the timer
+> IPI infrastructure.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-I have noticed what appears to be a regression since v3.11
-in Thierry Reding's next-20131017.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-The effect, when booting the ape6evm board which is based on the r8a73a4
-using its defconfig is that the boot does not proceed past the bootloader.
+sidenote: there is more and more duplicated code between arm and arm64.
 
-I see the following:
+> ---
+>   arch/arm64/Kconfig               |  2 ++
+>   arch/arm64/include/asm/hardirq.h |  2 +-
+>   arch/arm64/kernel/smp.c          | 17 +++++++++++++++++
+>   3 files changed, 20 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index bcf88e4..be88acd 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1,6 +1,7 @@
+>   config ARM64
+>   	def_bool y
+>   	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> +	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+>   	select ARCH_WANT_OPTIONAL_GPIOLIB
+>   	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+>   	select ARCH_WANT_FRAME_POINTERS
+> @@ -12,6 +13,7 @@ config ARM64
+>   	select COMMON_CLK
+>   	select CPU_PM if (SUSPEND || CPU_IDLE)
+>   	select GENERIC_CLOCKEVENTS
+> +	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+>   	select GENERIC_IOMAP
+>   	select GENERIC_IRQ_PROBE
+>   	select GENERIC_IRQ_SHOW
+> diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+> index 990c051..ae4801d 100644
+> --- a/arch/arm64/include/asm/hardirq.h
+> +++ b/arch/arm64/include/asm/hardirq.h
+> @@ -20,7 +20,7 @@
+>   #include <linux/threads.h>
+>   #include <asm/irq.h>
+>
+> -#define NR_IPI	4
+> +#define NR_IPI	5
+>
+>   typedef struct {
+>   	unsigned int __softirq_pending;
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index d5488f8..2ed691e 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -61,6 +61,7 @@ enum ipi_msg_type {
+>   	IPI_CALL_FUNC,
+>   	IPI_CALL_FUNC_SINGLE,
+>   	IPI_CPU_STOP,
+> +	IPI_TIMER,
+>   };
+>
+>   /*
+> @@ -447,6 +448,7 @@ static const char *ipi_types[NR_IPI] = {
+>   	S(IPI_CALL_FUNC, "Function call interrupts"),
+>   	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
+>   	S(IPI_CPU_STOP, "CPU stop interrupts"),
+> +	S(IPI_TIMER, "Timer broadcast interrupts"),
+>   };
+>
+>   void show_ipi_list(struct seq_file *p, int prec)
+> @@ -532,6 +534,14 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>   		irq_exit();
+>   		break;
+>
+> +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+> +	case IPI_TIMER:
+> +		irq_enter();
+> +		tick_receive_broadcast();
+> +		irq_exit();
+> +		break;
+> +#endif
+> +
+>   	default:
+>   		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
+>   		break;
+> @@ -544,6 +554,13 @@ void smp_send_reschedule(int cpu)
+>   	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
+>   }
+>
+> +#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+> +void tick_broadcast(const struct cpumask *mask)
+> +{
+> +	smp_cross_call(mask, IPI_TIMER);
+> +}
+> +#endif
+> +
+>   void smp_send_stop(void)
+>   {
+>   	unsigned long timeout;
+>
 
-## Booting kernel from Legacy Image at 41000000 ...
-   Image Name:   Linux-3.12.0-rc1-00012-g65cd4f6
-   Image Type:   ARM Linux Kernel Image (uncompressed)
-   Data Size:    2208640 Bytes = 2.1 MiB
-   Load Address: 40008000
-   Entry Point:  40008000
-   Verifying Checksum ... OK
-   Loading Kernel Image ... OK
-OK
 
-Starting kernel ...
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-I have not investigated the problem any further.
-
-
-commit 65cd4f6c99c1170bd0114dbd71b978012ea44d28
-Author: Stephen Boyd <sboyd@codeaurora.org>
-Date:   Thu Jul 18 16:21:18 2013 -0700
-
-    arch_timer: Move to generic sched_clock framework
-    
-    Register with the generic sched_clock framework now that it
-    supports 64 bits. This fixes two problems with the current
-    sched_clock support for machines using the architected timers.
-    First off, we don't subtract the start value from subsequent
-    sched_clock calls so we can potentially start off with
-    sched_clock returning gigantic numbers. Second, there is no
-    support for suspend/resume handling so problems such as discussed
-    in 6a4dae5 (ARM: 7565/1: sched: stop sched_clock() during
-    suspend, 2012-10-23) can happen without this patch. Finally, it
-    allows us to move the sched_clock setup into drivers clocksource
-    out of the arch ports.
-    
-    Cc: Christopher Covington <cov@codeaurora.org>
-    Cc: Catalin Marinas <catalin.marinas@arm.com>
-    Acked-by: Will Deacon <will.deacon@arm.com>
-    Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-    Signed-off-by: John Stultz <john.stultz@linaro.org>
-
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 221f07b..1791f12 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -11,7 +11,6 @@
- #include <linux/init.h>
- #include <linux/types.h>
- #include <linux/errno.h>
--#include <linux/sched_clock.h>
- 
- #include <asm/delay.h>
- 
-@@ -22,13 +21,6 @@ static unsigned long arch_timer_read_counter_long(void)
- 	return arch_timer_read_counter();
- }
- 
--static u32 sched_clock_mult __read_mostly;
--
--static unsigned long long notrace arch_timer_sched_clock(void)
--{
--	return arch_timer_read_counter() * sched_clock_mult;
--}
--
- static struct delay_timer arch_delay_timer;
- 
- static void __init arch_timer_delay_timer_register(void)
-@@ -48,11 +40,5 @@ int __init arch_timer_arch_init(void)
- 
- 	arch_timer_delay_timer_register();
- 
--	/* Cache the sched_clock multiplier to save a divide in the hot path. */
--	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
--	sched_clock_func = arch_timer_sched_clock;
--	pr_info("sched_clock: ARM arch timer >56 bits at %ukHz, resolution %uns\n",
--		arch_timer_rate / 1000, sched_clock_mult);
--
- 	return 0;
- }
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c044548..35fd0eb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -14,6 +14,7 @@ config ARM64
- 	select GENERIC_IOMAP
- 	select GENERIC_IRQ_PROBE
- 	select GENERIC_IRQ_SHOW
-+	select GENERIC_SCHED_CLOCK
- 	select GENERIC_SMP_IDLE_THREAD
- 	select GENERIC_TIME_VSYSCALL
- 	select HARDIRQS_SW_RESEND
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index 03dc371..29c39d5 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -61,13 +61,6 @@ unsigned long profile_pc(struct pt_regs *regs)
- EXPORT_SYMBOL(profile_pc);
- #endif
- 
--static u64 sched_clock_mult __read_mostly;
--
--unsigned long long notrace sched_clock(void)
--{
--	return arch_timer_read_counter() * sched_clock_mult;
--}
--
- void __init time_init(void)
- {
- 	u32 arch_timer_rate;
-@@ -78,9 +71,6 @@ void __init time_init(void)
- 	if (!arch_timer_rate)
- 		panic("Unable to initialise architected timer.\n");
- 
--	/* Cache the sched_clock multiplier to save a divide in the hot path. */
--	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
--
- 	/* Calibrate the delay loop directly */
- 	lpj_fine = arch_timer_rate / HZ;
- }
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index fbd9ccd..5d52789 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -19,6 +19,7 @@
- #include <linux/of_address.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-+#include <linux/sched_clock.h>
- 
- #include <asm/arch_timer.h>
- #include <asm/virt.h>
-@@ -471,6 +472,15 @@ static int __init arch_timer_register(void)
- 		goto out;
- 	}
- 
-+	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-+	cyclecounter.mult = clocksource_counter.mult;
-+	cyclecounter.shift = clocksource_counter.shift;
-+	timecounter_init(&timecounter, &cyclecounter,
-+			 arch_counter_get_cntvct());
-+
-+	/* 56 bits minimum, so we assume worst case rollover */
-+	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-+
- 	if (arch_timer_use_virtual) {
- 		ppi = arch_timer_ppi[VIRT_PPI];
- 		err = request_percpu_irq(ppi, arch_timer_handler_virt,
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
