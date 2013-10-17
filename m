@@ -1,149 +1,174 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 17 Oct 2013 16:13:16 +0300
-Subject: [PATCH v3 3/7] clk: tegra124: Add common clk IDs to clk-id.h
+Date: Thu, 17 Oct 2013 16:13:14 +0300
+Subject: [PATCH v3 1/7] clk: tegra: Add support for PLLSS
 In-Reply-To: <1382015600-20178-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1382015600-20178-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1382015600-20178-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1382015600-20178-2-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra124 introduces a number of a new clocks. Introduce the corresponding
-the IDs for them.
+Tegra124 introduces a new PLL type, PLLSS. Add support for it.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- drivers/clk/tegra/clk-id.h |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+ drivers/clk/tegra/clk-pll.c |  124 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/tegra/clk.h     |    5 ++
+ 2 files changed, 129 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-id.h b/drivers/clk/tegra/clk-id.h
-index 22e2e8e..836b054 100644
---- a/drivers/clk/tegra/clk-id.h
-+++ b/drivers/clk/tegra/clk-id.h
-@@ -7,8 +7,10 @@
- enum clk_id {
- 	tegra_clk_actmon,
- 	tegra_clk_adx,
-+	tegra_clk_adx1,
- 	tegra_clk_afi,
- 	tegra_clk_amx,
-+	tegra_clk_amx1,
- 	tegra_clk_apbdma,
- 	tegra_clk_apbif,
- 	tegra_clk_audio0,
-@@ -35,6 +37,7 @@ enum clk_id {
- 	tegra_clk_cilcd,
- 	tegra_clk_cile,
- 	tegra_clk_clk_32k,
-+	tegra_clk_clk72Mhz,
- 	tegra_clk_clk_m,
- 	tegra_clk_clk_m_div2,
- 	tegra_clk_clk_m_div4,
-@@ -44,6 +47,8 @@ enum clk_id {
- 	tegra_clk_clk_out_2_mux,
- 	tegra_clk_clk_out_3,
- 	tegra_clk_clk_out_3_mux,
-+	tegra_clk_cml0,
-+	tegra_clk_cml1,
- 	tegra_clk_csi,
- 	tegra_clk_csite,
- 	tegra_clk_csus,
-@@ -58,6 +63,7 @@ enum clk_id {
- 	tegra_clk_disp1,
- 	tegra_clk_disp2,
- 	tegra_clk_dp2,
-+	tegra_clk_dpaux,
- 	tegra_clk_dsia,
- 	tegra_clk_dsialp,
- 	tegra_clk_dsia_mux,
-@@ -66,6 +72,7 @@ enum clk_id {
- 	tegra_clk_dsib_mux,
- 	tegra_clk_dtv,
- 	tegra_clk_emc,
-+	tegra_clk_entropy,
- 	tegra_clk_epp,
- 	tegra_clk_epp_8,
- 	tegra_clk_extern1,
-@@ -73,6 +80,7 @@ enum clk_id {
- 	tegra_clk_extern3,
- 	tegra_clk_fuse,
- 	tegra_clk_fuse_burn,
-+	tegra_clk_gpu,
- 	tegra_clk_gr2d,
- 	tegra_clk_gr2d_8,
- 	tegra_clk_gr3d,
-@@ -82,6 +90,7 @@ enum clk_id {
- 	tegra_clk_hda2codec_2x,
- 	tegra_clk_hda2hdmi,
- 	tegra_clk_hdmi,
-+	tegra_clk_hdmi_audio,
- 	tegra_clk_host1x,
- 	tegra_clk_host1x_8,
- 	tegra_clk_i2c1,
-@@ -89,6 +98,7 @@ enum clk_id {
- 	tegra_clk_i2c3,
- 	tegra_clk_i2c4,
- 	tegra_clk_i2c5,
-+	tegra_clk_i2c6,
- 	tegra_clk_i2cslow,
- 	tegra_clk_i2s0,
- 	tegra_clk_i2s0_sync,
-@@ -101,6 +111,8 @@ enum clk_id {
- 	tegra_clk_i2s4,
- 	tegra_clk_i2s4_sync,
- 	tegra_clk_isp,
-+	tegra_clk_isp_8,
-+	tegra_clk_ispb,
- 	tegra_clk_kbc,
- 	tegra_clk_kfuse,
- 	tegra_clk_la,
-@@ -115,17 +127,20 @@ enum clk_id {
- 	tegra_clk_ndspeed_8,
- 	tegra_clk_nor,
- 	tegra_clk_owr,
-+	tegra_clk_pcie,
- 	tegra_clk_pclk,
- 	tegra_clk_pll_a,
- 	tegra_clk_pll_a_out0,
- 	tegra_clk_pll_c,
- 	tegra_clk_pll_c2,
- 	tegra_clk_pll_c3,
-+	tegra_clk_pll_c4,
- 	tegra_clk_pll_c_out1,
- 	tegra_clk_pll_d,
- 	tegra_clk_pll_d2,
- 	tegra_clk_pll_d2_out0,
- 	tegra_clk_pll_d_out0,
-+	tegra_clk_pll_dp,
- 	tegra_clk_pll_e_out0,
- 	tegra_clk_pll_m,
- 	tegra_clk_pll_m_out1,
-@@ -135,6 +150,7 @@ enum clk_id {
- 	tegra_clk_pll_p_out2_int,
- 	tegra_clk_pll_p_out3,
- 	tegra_clk_pll_p_out4,
-+	tegra_clk_pll_p_out5,
- 	tegra_clk_pll_ref,
- 	tegra_clk_pll_re_out,
- 	tegra_clk_pll_re_vco,
-@@ -169,6 +185,7 @@ enum clk_id {
- 	tegra_clk_sdmmc4,
- 	tegra_clk_se,
- 	tegra_clk_soc_therm,
-+	tegra_clk_sor0,
- 	tegra_clk_spdif,
- 	tegra_clk_spdif_2x,
- 	tegra_clk_spdif_in,
-@@ -195,8 +212,11 @@ enum clk_id {
- 	tegra_clk_vfir,
- 	tegra_clk_vi,
- 	tegra_clk_vi_8,
-+	tegra_clk_vic03,
-+	tegra_clk_vim2_clk,
- 	tegra_clk_vimclk_sync,
- 	tegra_clk_vi_sensor,
-+	tegra_clk_vi_sensor2,
- 	tegra_clk_vi_sensor_8,
- 	tegra_clk_xusb_dev,
- 	tegra_clk_xusb_dev_src,
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index c38c0df..2147e2e 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -137,6 +137,36 @@
+ #define PMC_SATA_PWRGT_PLLE_IDDQ_VALUE BIT(5)
+ #define PMC_SATA_PWRGT_PLLE_IDDQ_SWCTL BIT(4)
+ 
++#define PLLSS_MISC_KCP		0
++#define PLLSS_MISC_KVCO		0
++#define PLLSS_MISC_SETUP	0
++#define PLLSS_EN_SDM		0
++#define PLLSS_EN_SSC		0
++#define PLLSS_EN_DITHER2	0
++#define PLLSS_EN_DITHER		1
++#define PLLSS_SDM_RESET		0
++#define PLLSS_CLAMP		0
++#define PLLSS_SDM_SSC_MAX	0
++#define PLLSS_SDM_SSC_MIN	0
++#define PLLSS_SDM_SSC_STEP	0
++#define PLLSS_SDM_DIN		0
++#define PLLSS_MISC_DEFAULT ((PLLSS_MISC_KCP << 25) | \
++			    (PLLSS_MISC_KVCO << 24) | \
++			    PLLSS_MISC_SETUP)
++#define PLLSS_CFG_DEFAULT ((PLLSS_EN_SDM << 31) | \
++			   (PLLSS_EN_SSC << 30) | \
++			   (PLLSS_EN_DITHER2 << 29) | \
++			   (PLLSS_EN_DITHER << 28) | \
++			   (PLLSS_SDM_RESET) << 27 | \
++			   (PLLSS_CLAMP << 22))
++#define PLLSS_CTRL1_DEFAULT \
++			((PLLSS_SDM_SSC_MAX << 16) | PLLSS_SDM_SSC_MIN)
++#define PLLSS_CTRL2_DEFAULT \
++			((PLLSS_SDM_SSC_STEP << 16) | PLLSS_SDM_DIN)
++#define PLLSS_LOCK_OVERRIDE	BIT(24)
++#define PLLSS_REF_SRC_SEL_SHIFT	25
++#define PLLSS_REF_SRC_SEL_MASK	(3 << PLLSS_REF_SRC_SEL_SHIFT)
++
+ #define pll_readl(offset, p) readl_relaxed(p->clk_base + offset)
+ #define pll_readl_base(p) pll_readl(p->params->base_reg, p)
+ #define pll_readl_misc(p) pll_readl(p->params->misc_reg, p)
+@@ -1698,3 +1728,97 @@ struct clk *tegra_clk_register_plle_tegra114(const char *name,
+ 	return clk;
+ }
+ #endif
++
++const struct clk_ops tegra_clk_pllss_ops = {
++	.is_enabled = clk_pll_is_enabled,
++	.enable = clk_pll_iddq_enable,
++	.disable = clk_pll_iddq_disable,
++	.recalc_rate = clk_pll_recalc_rate,
++	.round_rate = clk_pll_ramp_round_rate,
++	.set_rate = clk_pllxc_set_rate,
++};
++
++struct clk *tegra_clk_register_pllss(const char *name, const char *parent_name,
++				void __iomem *clk_base, unsigned long flags,
++				struct tegra_clk_pll_params *pll_params,
++				spinlock_t *lock)
++{
++	struct tegra_clk_pll *pll;
++	struct clk *clk, *parent;
++	struct tegra_clk_pll_freq_table cfg;
++	unsigned long parent_rate;
++	u32 val;
++	int i;
++
++	if (!pll_params->div_nmp)
++		return ERR_PTR(-EINVAL);
++
++	parent = __clk_lookup(parent_name);
++	if (IS_ERR(parent)) {
++		WARN(1, "parent clk %s of %s must be registered first\n",
++			name, parent_name);
++		return ERR_PTR(-EINVAL);
++	}
++
++	pll_params->flags = TEGRA_PLL_HAS_LOCK_ENABLE | TEGRA_PLL_USE_LOCK;
++	pll = _tegra_init_pll(clk_base, NULL, pll_params, lock);
++	if (IS_ERR(pll))
++		return ERR_CAST(pll);
++
++	_get_pll_mnp(pll, &cfg);
++	if (cfg.n > 1) {
++		WARN(1, "%s should not be initialized\n", name);
++		kfree(pll);
++		return ERR_PTR(-EINVAL);
++	}
++
++	val = pll_readl_base(pll);
++	val &= ~PLLSS_REF_SRC_SEL_MASK;
++	pll_writel_base(val, pll);
++
++	parent_rate = __clk_get_rate(parent);
++
++	pll_params->vco_min = _clip_vco_min(pll_params->vco_min, parent_rate);
++
++	/* initialize PLL to minimum rate */
++
++	cfg.m = _pll_fixed_mdiv(pll_params, parent_rate);
++	cfg.n = cfg.m * pll_params->vco_min / parent_rate;
++
++	for (i = 0; pll_params->pdiv_tohw[i].pdiv; i++)
++		;
++	if (!i) {
++		kfree(pll);
++		return ERR_PTR(-EINVAL);
++	}
++
++	cfg.p = pll_params->pdiv_tohw[i-1].hw_val;
++
++	_update_pll_mnp(pll, &cfg);
++
++	pll_writel_misc(PLLSS_MISC_DEFAULT, pll);
++	pll_writel(PLLSS_CFG_DEFAULT, pll_params->ext_misc_reg[0], pll);
++	pll_writel(PLLSS_CTRL1_DEFAULT, pll_params->ext_misc_reg[1], pll);
++	pll_writel(PLLSS_CTRL1_DEFAULT, pll_params->ext_misc_reg[2], pll);
++
++	val = pll_readl_base(pll);
++	if (val & PLL_BASE_ENABLE) {
++		if (val & BIT(pll_params->iddq_bit_idx)) {
++			WARN(1, "%s is on but IDDQ set\n", name);
++			kfree(pll);
++			return ERR_PTR(-EINVAL);
++		}
++	} else
++		val |= BIT(pll_params->iddq_bit_idx);
++
++	val &= ~PLLSS_LOCK_OVERRIDE;
++	pll_writel_base(val, pll);
++
++	clk = _tegra_clk_register_pll(pll, name, parent_name, flags,
++					&tegra_clk_pllss_ops);
++
++	if (IS_ERR(clk))
++		kfree(pll);
++
++	return clk;
++}
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index 05abfc5..7f110ac 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -298,6 +298,11 @@ struct clk *tegra_clk_register_plle_tegra114(const char *name,
+ 				struct tegra_clk_pll_params *pll_params,
+ 				spinlock_t *lock);
+ 
++struct clk *tegra_clk_register_pllss(const char *name, const char *parent_name,
++			   void __iomem *clk_base, unsigned long flags,
++			   struct tegra_clk_pll_params *pll_params,
++			   spinlock_t *lock);
++
+ /**
+  * struct tegra_clk_pll_out - PLL divider down clock
+  *
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
