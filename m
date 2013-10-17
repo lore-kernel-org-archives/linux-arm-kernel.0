@@ -1,25 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 18 Oct 2013 00:36:07 +0100
-Subject: [PATCH 1/3] ALSA: pxa: slightly refactor reset handling
-In-Reply-To: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
-References: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20131017233607.GW2443@sirena.org.uk>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 18 Oct 2013 08:37:34 +0900
+Subject: [PATCH] ARM: s3c64xx: Select CPU_V6K instead of CPU_V6
+In-Reply-To: <3346618.t8I6lVv536@flatron>
+References: <1380390554-4400-1-git-send-email-tomasz.figa@gmail.com>
+ <3346618.t8I6lVv536@flatron>
+Message-ID: <1e2901cecb91$db24edd0$916ec970$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 02:01:35PM +0400, Dmitry Eremin-Solenikov wrote:
-> PXA25x also shows some problems when using interrupts during reset
-> handling. Thus do not use interrupts on all pxa kinds (to detect codec
-> ready state). Instead use a common mdelay-loop on all platforms to
-> detect codecs becoming ready.
+Tomasz Figa wrote:
+> 
+> Hi Kukjin,
+> 
+> On Saturday 28 of September 2013 19:49:14 Tomasz Figa wrote:
+> > All S3C64XX SoCs come with ARM1176JZF-s core, which fully supports
+> > ARMv6K extensions. This patch lets the kernel use them on S3C6410 by
+> > adding selection of CPU_V6K to ARCH_S3C64XX.
+> >
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > ---
+> >  arch/arm/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> What do you think about this patch?
+> 
+Yeah, ARM1176JZF-s is correct. Applied.
 
-Applied all, thanks.  I'm somewhat surprised nobody noticed the reset
-issues on the pxa25x before - this stuff all got really heavily tested
-back in the day.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131018/98e1ba80/attachment.sig>
+Thanks,
+Kukjin
+
+> Best regards,
+> Tomasz
+> 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index b766dad..3a41bbb 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -728,7 +728,7 @@ config ARCH_S3C64XX
+> >  	select CLKDEV_LOOKUP
+> >  	select CLKSRC_SAMSUNG_PWM
+> >  	select COMMON_CLK
+> > -	select CPU_V6
+> > +	select CPU_V6K
+> >  	select GENERIC_CLOCKEVENTS
+> >  	select GPIO_SAMSUNG
+> >  	select HAVE_CLK
