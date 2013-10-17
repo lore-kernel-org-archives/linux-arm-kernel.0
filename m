@@ -1,31 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Oct 2013 10:39:44 +0100
-Subject: [PATCH v3 6/7] arm64, jump label: optimize jump label
- implementation
-In-Reply-To: <525EC8D1.7000900@gmail.com>
-References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
- <1381893492-7135-7-git-send-email-liuj97@gmail.com>
- <20131016114608.GH5403@mudshark.cambridge.arm.com>
- <525EC8D1.7000900@gmail.com>
-Message-ID: <20131017093944.GB18765@mudshark.cambridge.arm.com>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Thu, 17 Oct 2013 10:33:33 +0100
+Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <525F915D.9020501@st.com>
+References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
+ <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
+ <20131016151419.GA14104@ns203013.ovh.net> <525F915D.9020501@st.com>
+Message-ID: <525FAEED.7030207@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 06:11:45PM +0100, Jiang Liu wrote:
-> On 10/16/2013 07:46 PM, Will Deacon wrote:
-> > 
-> >> +	} else {
-> >> +		insn = aarch64_insn_gen_nop();
-> > 
-> > You could make the code more concise by limiting your patching ability to
-> > branch immediates. Then a nop is simply a branch to the next instruction (I
-> > doubt any modern CPUs will choke on this, whereas the architecture requires
-> > a NOP to take time).
-> I guess a NOP should be more effecient than a "B #4" on real CPUs:)
+On 17/10/13 08:27, Maxime COQUELIN wrote:
+> ...
+>>> >> +
+>>> >> +static struct of_device_id st_i2c_match[] = {
+>>> >> +     { .compatible = "st,comms-ssc-i2c", },
+>> > the rules is to put the first soc that use the ip in the compatible
+>> > as st,sti7100-scc-i2c
+> Ok. There are no plans to upstream the SH4 platforms, it will only 
+> remains in stlinux.com.
+> Maybe I can set the first ARM platform (STiH415)?
+> That would give st,stih415-ssc-i2c.
+NAK, for st,stih415-ssc-i2c naming.
 
-Well, I was actually questioning that. A NOP *has* to take time (the
-architecture prevents implementations from discaring it) whereas a static,
-unconditional branch will likely be discarded early on by CPUs with even
-simple branch prediction logic.
+IMO, this makes sense when the same IP integration done on different SOC
+changes slightly/very differently.
 
-Will
+But in this case the "comms" IP remains unchanged across all the SOCs.
+
+I would still prefer "st,comms-ssc-i2c", allowing a single device driver
+to match against several SoCs. ST "comms" IP it is integrated across all
+the STi series of SoCs, so we don't want to add new entry in compatible
+for every new SOC.
+
+
+Thanks,
+srini
+
+> 
+> Thanks for the review,
+> Maxime
+> 
+>> >
