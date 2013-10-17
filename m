@@ -1,96 +1,23 @@
-From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Thu, 17 Oct 2013 19:05:12 +0530
-Subject: [PATCH V3 5/6] USB: OHCI: Properly handle ohci-exynos suspend
-In-Reply-To: <1382016913-10872-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
- <1382016913-10872-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1382016913-10872-6-git-send-email-csmanjuvijay@gmail.com>
+From: timur@tabi.org (Timur Tabi)
+Date: Thu, 17 Oct 2013 08:37:25 -0500
+Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
+ Interface driver.
+In-Reply-To: <525FE728.90403@metafoo.de>
+References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
+ <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
+ <525FD4C7.3050806@tabi.org> <525FD65B.3040004@metafoo.de>
+ <525FE48B.7020709@tabi.org> <525FE728.90403@metafoo.de>
+Message-ID: <525FE815.1040300@tabi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-exynos glue was not
-properly handled as it was not suspending generic part
-of ohci controller. Alan Stern suggested, properly handle
-ohci-exynos suspend scenario.
+Lars-Peter Clausen wrote:
+>> >Maybe I've been out of the loop for too long, but why is that a particular
+>> >problem with this driver?
 
-Calling explicitly the ohci_suspend() routine in
-exynos_ohci_suspend() will ensure proper handling of suspend
-scenario.
+> It is usually something you'd want to check in general to make sure that you
+> don't have multiple device that access the same iomem region at the same time.
 
-V1->V2:
-      -No changes.
-       Due to the build failure on ep93xx reverted this patch.
-       This patch is needed as Alan Stern suggestion.
-
-V2->V3:
-      -No changes.
-      As a build failure on "ep93xx proper suspend patch"
-      and Linaro id bounced. Rewrote this patch on top of latest
-      Greg usb-next branch. This patch not gives any build error. 
-      Patch is required for ohci-exynos proper suspending as Alan 
-      mentioned.
-
-      Initially when I wrote this patch I was working in Linaro, 
-      now I am not part of Linaro that is why Linaro id is bouncing. 
-      Sending this patch from personal mail id.
-
-Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-usb at vger.kernel.org
----
- drivers/usb/host/ohci-exynos.c |   22 ++++++----------------
- 1 file changed, 6 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-index a87baed..4b5c8bd 100644
---- a/drivers/usb/host/ohci-exynos.c
-+++ b/drivers/usb/host/ohci-exynos.c
-@@ -192,23 +192,14 @@ static int exynos_ohci_suspend(struct device *dev)
- 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
- 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
- 	struct platform_device *pdev = to_platform_device(dev);
-+	bool do_wakeup = device_may_wakeup(dev);
- 	unsigned long flags;
--	int rc = 0;
-+	int rc = ohci_suspend(hcd, do_wakeup);
- 
--	/*
--	 * Root hub was already suspended. Disable irq emission and
--	 * mark HW unaccessible, bail out if RH has been resumed. Use
--	 * the spinlock to properly synchronize with possible pending
--	 * RH suspend or resume activity.
--	 */
--	spin_lock_irqsave(&ohci->lock, flags);
--	if (ohci->rh_state != OHCI_RH_SUSPENDED &&
--			ohci->rh_state != OHCI_RH_HALTED) {
--		rc = -EINVAL;
--		goto fail;
--	}
-+	if (rc)
-+		return rc;
- 
--	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-+	spin_lock_irqsave(&ohci->lock, flags);
- 
- 	if (exynos_ohci->otg)
- 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
-@@ -217,10 +208,9 @@ static int exynos_ohci_suspend(struct device *dev)
- 
- 	clk_disable_unprepare(exynos_ohci->clk);
- 
--fail:
- 	spin_unlock_irqrestore(&ohci->lock, flags);
- 
--	return rc;
-+	return 0;
- }
- 
- static int exynos_ohci_resume(struct device *dev)
--- 
-1.7.9.5
+I understand that, but I'm trying to figure out why of_iomap() is okay 
+for hundreds of other drivers, but not this one.  I've used it dozens of 
+times myself, without ever worrying about overlapping regions.
