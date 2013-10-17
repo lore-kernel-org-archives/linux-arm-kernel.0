@@ -1,45 +1,28 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 17 Oct 2013 15:32:36 -0700
-Subject: [GIT PULL] Highbank updates for 3.13
-In-Reply-To: <5260334D.30009@gmail.com> (Rob Herring's message of "Thu, 17 Oct
- 2013 13:58:21 -0500")
-References: <5260334D.30009@gmail.com>
-Message-ID: <87k3hbzfy3.fsf@linaro.org>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Thu, 17 Oct 2013 15:33:13 -0700
+Subject: [PATCH v4 05/15] clk: tegra: move some PLLC and PLLXC init to
+ clk-pll.c
+In-Reply-To: <1382013526-12800-6-git-send-email-pdeschrijver@nvidia.com>
+References: <1382013526-12800-1-git-send-email-pdeschrijver@nvidia.com>
+ <1382013526-12800-6-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <CAL1qeaHsun=6NP4fk4tLCDr5XkLn71-y273Qz5hcfMagek3ZPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robherring2@gmail.com> writes:
+Hi Peter,
 
-> Kevin, Olof,
->
-> Please pull. Doing merge with arm-soc/for-next, there's a trivial merge
-> conflict with highbank.c includes.
->
-> Rob
->
-> The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
->
->   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
-> tags/highbank-for-3.13
->
-> for you to fetch changes up to 78bbca1a54bd05f7c7d38a306073a3ee7f866e51:
->
->   dts: calxeda: add ARM PSCI binding (2013-10-01 16:34:17 -0500)
->
-> ----------------------------------------------------------------
-> Highbank platform updates for 3.13
->
-> - convert Calxeda cpuidle driver to a platform driver and to use PSCI
-> - convert highbank smp_ops and suspend to PSCI
->
-> ----------------------------------------------------------------
+> +       val = readl_relaxed(clk_base + pll_params->base_reg);
+> +       val_iddq = readl_relaxed(clk_base + pll_params->iddq_reg);
+> +
+> +       if (val & BIT(30))
 
-Pulled into next/soc.
+BIT(30) -> PLL_BASE_ENABLE?
+
+> +               WARN_ON(val_iddq & BIT(pll_params->iddq_bit_idx));
+> +       else {
+> +               val_iddq |= BIT(pll_params->iddq_bit_idx);
+> +               writel_relaxed(val_iddq, clk_base + pll_params->iddq_reg);
+> +       }
 
 Thanks,
-
-Kevin
+Andrew
