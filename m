@@ -1,163 +1,131 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 17 Oct 2013 14:01:37 +0400
-Subject: [PATCH 3/3] ALSA: ASoC: pxa: add asoc pm callbacks to pxa audio
- drivers
-In-Reply-To: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
-References: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1382004097-6350-3-git-send-email-dbaryshkov@gmail.com>
+Date: Thu, 17 Oct 2013 14:03:27 +0400
+Subject: [PATCH] arm: pxa: tosa: fix keys mapping
+Message-ID: <1382004207-6933-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After convertion to snd_soc_register_card, platform driver should
-reference snd_soc_pm_ops callbacks to properly suspend/resume sound
-hardware. This was missed during conversion of PXA sound devices.
+When converting from tosa-keyboard driver to matrix keyboard, tosa keys
+received extra 1 column shift. Replace that with correct values to make
+keyboard work again.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- sound/soc/pxa/brownstone.c     | 1 +
- sound/soc/pxa/corgi.c          | 1 +
- sound/soc/pxa/e740_wm9705.c    | 1 +
- sound/soc/pxa/e750_wm9705.c    | 1 +
- sound/soc/pxa/e800_wm9712.c    | 1 +
- sound/soc/pxa/imote2.c         | 1 +
- sound/soc/pxa/mioa701_wm9713.c | 1 +
- sound/soc/pxa/palm27x.c        | 1 +
- sound/soc/pxa/poodle.c         | 1 +
- sound/soc/pxa/tosa.c           | 1 +
- sound/soc/pxa/ttc-dkb.c        | 1 +
- 11 files changed, 11 insertions(+)
+ arch/arm/mach-pxa/tosa.c | 102 +++++++++++++++++++++++------------------------
+ 1 file changed, 51 insertions(+), 51 deletions(-)
 
-diff --git a/sound/soc/pxa/brownstone.c b/sound/soc/pxa/brownstone.c
-index 5b7d969..08acdc2 100644
---- a/sound/soc/pxa/brownstone.c
-+++ b/sound/soc/pxa/brownstone.c
-@@ -163,6 +163,7 @@ static struct platform_driver mmp_driver = {
- 	.driver		= {
- 		.name	= "brownstone-audio",
- 		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- 	.probe		= brownstone_probe,
- 	.remove		= brownstone_remove,
-diff --git a/sound/soc/pxa/corgi.c b/sound/soc/pxa/corgi.c
-index f4cce1e..1853d41 100644
---- a/sound/soc/pxa/corgi.c
-+++ b/sound/soc/pxa/corgi.c
-@@ -329,6 +329,7 @@ static struct platform_driver corgi_driver = {
- 	.driver		= {
- 		.name	= "corgi-audio",
- 		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- 	.probe		= corgi_probe,
- 	.remove		= corgi_remove,
-diff --git a/sound/soc/pxa/e740_wm9705.c b/sound/soc/pxa/e740_wm9705.c
-index 70d799b..44b5c09 100644
---- a/sound/soc/pxa/e740_wm9705.c
-+++ b/sound/soc/pxa/e740_wm9705.c
-@@ -178,6 +178,7 @@ static struct platform_driver e740_driver = {
- 	.driver		= {
- 		.name	= "e740-audio",
- 		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- 	.probe		= e740_probe,
- 	.remove		= e740_remove,
-diff --git a/sound/soc/pxa/e750_wm9705.c b/sound/soc/pxa/e750_wm9705.c
-index f94d2ab..c34e447 100644
---- a/sound/soc/pxa/e750_wm9705.c
-+++ b/sound/soc/pxa/e750_wm9705.c
-@@ -160,6 +160,7 @@ static struct platform_driver e750_driver = {
- 	.driver		= {
- 		.name	= "e750-audio",
- 		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- 	.probe		= e750_probe,
- 	.remove		= e750_remove,
-diff --git a/sound/soc/pxa/e800_wm9712.c b/sound/soc/pxa/e800_wm9712.c
-index 8768a64..3137f80 100644
---- a/sound/soc/pxa/e800_wm9712.c
-+++ b/sound/soc/pxa/e800_wm9712.c
-@@ -150,6 +150,7 @@ static struct platform_driver e800_driver = {
- 	.driver		= {
- 		.name	= "e800-audio",
- 		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- 	.probe		= e800_probe,
- 	.remove		= e800_remove,
-diff --git a/sound/soc/pxa/imote2.c b/sound/soc/pxa/imote2.c
-index eef1f7b..fd2f4ed 100644
---- a/sound/soc/pxa/imote2.c
-+++ b/sound/soc/pxa/imote2.c
-@@ -91,6 +91,7 @@ static struct platform_driver imote2_driver = {
- 	.driver		= {
- 		.name	= "imote2-audio",
- 		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- 	.probe		= imote2_probe,
- 	.remove		= imote2_remove,
-diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
-index bbea778..160c524 100644
---- a/sound/soc/pxa/mioa701_wm9713.c
-+++ b/sound/soc/pxa/mioa701_wm9713.c
-@@ -215,6 +215,7 @@ static struct platform_driver mioa701_wm9713_driver = {
- 	.driver		= {
- 		.name		= "mioa701-wm9713",
- 		.owner		= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
+diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
+index 0206b91..ef5557b 100644
+--- a/arch/arm/mach-pxa/tosa.c
++++ b/arch/arm/mach-pxa/tosa.c
+@@ -425,57 +425,57 @@ static struct platform_device tosa_power_device = {
+  * Tosa Keyboard
+  */
+ static const uint32_t tosakbd_keymap[] = {
+-	KEY(0, 2, KEY_W),
+-	KEY(0, 6, KEY_K),
+-	KEY(0, 7, KEY_BACKSPACE),
+-	KEY(0, 8, KEY_P),
+-	KEY(1, 1, KEY_Q),
+-	KEY(1, 2, KEY_E),
+-	KEY(1, 3, KEY_T),
+-	KEY(1, 4, KEY_Y),
+-	KEY(1, 6, KEY_O),
+-	KEY(1, 7, KEY_I),
+-	KEY(1, 8, KEY_COMMA),
+-	KEY(2, 1, KEY_A),
+-	KEY(2, 2, KEY_D),
+-	KEY(2, 3, KEY_G),
+-	KEY(2, 4, KEY_U),
+-	KEY(2, 6, KEY_L),
+-	KEY(2, 7, KEY_ENTER),
+-	KEY(2, 8, KEY_DOT),
+-	KEY(3, 1, KEY_Z),
+-	KEY(3, 2, KEY_C),
+-	KEY(3, 3, KEY_V),
+-	KEY(3, 4, KEY_J),
+-	KEY(3, 5, TOSA_KEY_ADDRESSBOOK),
+-	KEY(3, 6, TOSA_KEY_CANCEL),
+-	KEY(3, 7, TOSA_KEY_CENTER),
+-	KEY(3, 8, TOSA_KEY_OK),
+-	KEY(3, 9, KEY_LEFTSHIFT),
+-	KEY(4, 1, KEY_S),
+-	KEY(4, 2, KEY_R),
+-	KEY(4, 3, KEY_B),
+-	KEY(4, 4, KEY_N),
+-	KEY(4, 5, TOSA_KEY_CALENDAR),
+-	KEY(4, 6, TOSA_KEY_HOMEPAGE),
+-	KEY(4, 7, KEY_LEFTCTRL),
+-	KEY(4, 8, TOSA_KEY_LIGHT),
+-	KEY(4, 10, KEY_RIGHTSHIFT),
+-	KEY(5, 1, KEY_TAB),
+-	KEY(5, 2, KEY_SLASH),
+-	KEY(5, 3, KEY_H),
+-	KEY(5, 4, KEY_M),
+-	KEY(5, 5, TOSA_KEY_MENU),
+-	KEY(5, 7, KEY_UP),
+-	KEY(5, 11, TOSA_KEY_FN),
+-	KEY(6, 1, KEY_X),
+-	KEY(6, 2, KEY_F),
+-	KEY(6, 3, KEY_SPACE),
+-	KEY(6, 4, KEY_APOSTROPHE),
+-	KEY(6, 5, TOSA_KEY_MAIL),
+-	KEY(6, 6, KEY_LEFT),
+-	KEY(6, 7, KEY_DOWN),
+-	KEY(6, 8, KEY_RIGHT),
++	KEY(0, 1, KEY_W),
++	KEY(0, 5, KEY_K),
++	KEY(0, 6, KEY_BACKSPACE),
++	KEY(0, 7, KEY_P),
++	KEY(1, 0, KEY_Q),
++	KEY(1, 1, KEY_E),
++	KEY(1, 2, KEY_T),
++	KEY(1, 3, KEY_Y),
++	KEY(1, 5, KEY_O),
++	KEY(1, 6, KEY_I),
++	KEY(1, 7, KEY_COMMA),
++	KEY(2, 0, KEY_A),
++	KEY(2, 1, KEY_D),
++	KEY(2, 2, KEY_G),
++	KEY(2, 3, KEY_U),
++	KEY(2, 5, KEY_L),
++	KEY(2, 6, KEY_ENTER),
++	KEY(2, 7, KEY_DOT),
++	KEY(3, 0, KEY_Z),
++	KEY(3, 1, KEY_C),
++	KEY(3, 2, KEY_V),
++	KEY(3, 3, KEY_J),
++	KEY(3, 4, TOSA_KEY_ADDRESSBOOK),
++	KEY(3, 5, TOSA_KEY_CANCEL),
++	KEY(3, 6, TOSA_KEY_CENTER),
++	KEY(3, 7, TOSA_KEY_OK),
++	KEY(3, 8, KEY_LEFTSHIFT),
++	KEY(4, 0, KEY_S),
++	KEY(4, 1, KEY_R),
++	KEY(4, 2, KEY_B),
++	KEY(4, 3, KEY_N),
++	KEY(4, 4, TOSA_KEY_CALENDAR),
++	KEY(4, 5, TOSA_KEY_HOMEPAGE),
++	KEY(4, 6, KEY_LEFTCTRL),
++	KEY(4, 7, TOSA_KEY_LIGHT),
++	KEY(4, 9, KEY_RIGHTSHIFT),
++	KEY(5, 0, KEY_TAB),
++	KEY(5, 1, KEY_SLASH),
++	KEY(5, 2, KEY_H),
++	KEY(5, 3, KEY_M),
++	KEY(5, 4, TOSA_KEY_MENU),
++	KEY(5, 6, KEY_UP),
++	KEY(5, 10, TOSA_KEY_FN),
++	KEY(6, 0, KEY_X),
++	KEY(6, 1, KEY_F),
++	KEY(6, 2, KEY_SPACE),
++	KEY(6, 3, KEY_APOSTROPHE),
++	KEY(6, 4, TOSA_KEY_MAIL),
++	KEY(6, 5, KEY_LEFT),
++	KEY(6, 6, KEY_DOWN),
++	KEY(6, 7, KEY_RIGHT),
  };
  
-diff --git a/sound/soc/pxa/palm27x.c b/sound/soc/pxa/palm27x.c
-index e1ffcdd..3284c4b 100644
---- a/sound/soc/pxa/palm27x.c
-+++ b/sound/soc/pxa/palm27x.c
-@@ -181,6 +181,7 @@ static struct platform_driver palm27x_wm9712_driver = {
- 	.driver		= {
- 		.name		= "palm27x-asoc",
- 		.owner		= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- };
- 
-diff --git a/sound/soc/pxa/poodle.c b/sound/soc/pxa/poodle.c
-index fafe463..c93e138 100644
---- a/sound/soc/pxa/poodle.c
-+++ b/sound/soc/pxa/poodle.c
-@@ -303,6 +303,7 @@ static struct platform_driver poodle_driver = {
- 	.driver		= {
- 		.name	= "poodle-audio",
- 		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- 	.probe		= poodle_probe,
- 	.remove		= poodle_remove,
-diff --git a/sound/soc/pxa/tosa.c b/sound/soc/pxa/tosa.c
-index a3fe191..1d9c2ed 100644
---- a/sound/soc/pxa/tosa.c
-+++ b/sound/soc/pxa/tosa.c
-@@ -275,6 +275,7 @@ static struct platform_driver tosa_driver = {
- 	.driver		= {
- 		.name	= "tosa-audio",
- 		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- 	.probe		= tosa_probe,
- 	.remove		= tosa_remove,
-diff --git a/sound/soc/pxa/ttc-dkb.c b/sound/soc/pxa/ttc-dkb.c
-index 13c9ee0..0b535b5 100644
---- a/sound/soc/pxa/ttc-dkb.c
-+++ b/sound/soc/pxa/ttc-dkb.c
-@@ -160,6 +160,7 @@ static struct platform_driver ttc_dkb_driver = {
- 	.driver		= {
- 		.name	= "ttc-dkb-audio",
- 		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
- 	},
- 	.probe		= ttc_dkb_probe,
- 	.remove		= ttc_dkb_remove,
+ static struct matrix_keymap_data tosakbd_keymap_data = {
 -- 
 1.8.4.rc3
