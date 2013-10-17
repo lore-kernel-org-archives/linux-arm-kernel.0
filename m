@@ -1,22 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 17 Oct 2013 09:07:52 +0900
-Subject: [PATCH] serial8250-em: convert to clk_prepare/unprepare
-In-Reply-To: <20131016200651.GA26506@kroah.com>
-References: <1381206268-3914-1-git-send-email-horms+renesas@verge.net.au>
- <20131016200651.GA26506@kroah.com>
-Message-ID: <20131017000752.GT22321@verge.net.au>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 16 Oct 2013 19:31:20 -0500
+Subject: [PATCH 09/28] dmaengine: edma: use DMA_COMPLETE for dma completion
+ status
+In-Reply-To: <1381940926-25564-10-git-send-email-vinod.koul@intel.com>
+References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
+ <1381940926-25564-10-git-send-email-vinod.koul@intel.com>
+Message-ID: <525F2FD8.9090008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 01:06:51PM -0700, Greg Kroah-Hartman wrote:
-> On Tue, Oct 08, 2013 at 01:24:27PM +0900, Simon Horman wrote:
-> > Hi Greg,
-> > 
-> > please consider this enhancement from Kuribayashi-san for serial8250-em.
-> > 
-> > Also, please let me know if you would like us to handle serial patches
-> > a different way.
-> 
-> No, this works for me, if it works for you, that's fine with me.
+On 10/16/2013 11:28 AM, Vinod Koul wrote:
+> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+> CC: Joel Fernandes <joelf@ti.com>
 
-Thanks, it works for me too.
+The audio davinci-pcm driver once converted to dmaengine usage would be the
+first user of tx_status so I will get to testing this patch better then.
+
+Anyway, with this patch applied I compile-tested and boot-tested it and it
+doesn't appear to break anything.
+
+Tested-by: Joel Fernandes <joelf@ti.com>
+
+thanks,
+
+-Joel
