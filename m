@@ -1,126 +1,163 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 17 Oct 2013 14:01:35 +0400
-Subject: [PATCH 1/3] ALSA: pxa: slightly refactor reset handling
-Message-ID: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
+Date: Thu, 17 Oct 2013 14:01:37 +0400
+Subject: [PATCH 3/3] ALSA: ASoC: pxa: add asoc pm callbacks to pxa audio
+ drivers
+In-Reply-To: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
+References: <1382004097-6350-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1382004097-6350-3-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PXA25x also shows some problems when using interrupts during reset
-handling. Thus do not use interrupts on all pxa kinds (to detect codec
-ready state). Instead use a common mdelay-loop on all platforms to
-detect codecs becoming ready.
+After convertion to snd_soc_register_card, platform driver should
+reference snd_soc_pm_ops callbacks to properly suspend/resume sound
+hardware. This was missed during conversion of PXA sound devices.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- sound/arm/pxa2xx-ac97-lib.c | 27 ++++++++++-----------------
- 1 file changed, 10 insertions(+), 17 deletions(-)
+ sound/soc/pxa/brownstone.c     | 1 +
+ sound/soc/pxa/corgi.c          | 1 +
+ sound/soc/pxa/e740_wm9705.c    | 1 +
+ sound/soc/pxa/e750_wm9705.c    | 1 +
+ sound/soc/pxa/e800_wm9712.c    | 1 +
+ sound/soc/pxa/imote2.c         | 1 +
+ sound/soc/pxa/mioa701_wm9713.c | 1 +
+ sound/soc/pxa/palm27x.c        | 1 +
+ sound/soc/pxa/poodle.c         | 1 +
+ sound/soc/pxa/tosa.c           | 1 +
+ sound/soc/pxa/ttc-dkb.c        | 1 +
+ 11 files changed, 11 insertions(+)
 
-diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-index e6f4633..99a4668 100644
---- a/sound/arm/pxa2xx-ac97-lib.c
-+++ b/sound/arm/pxa2xx-ac97-lib.c
-@@ -117,8 +117,7 @@ static inline void pxa_ac97_warm_pxa25x(void)
- {
- 	gsr_bits = 0;
+diff --git a/sound/soc/pxa/brownstone.c b/sound/soc/pxa/brownstone.c
+index 5b7d969..08acdc2 100644
+--- a/sound/soc/pxa/brownstone.c
++++ b/sound/soc/pxa/brownstone.c
+@@ -163,6 +163,7 @@ static struct platform_driver mmp_driver = {
+ 	.driver		= {
+ 		.name	= "brownstone-audio",
+ 		.owner	= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ 	.probe		= brownstone_probe,
+ 	.remove		= brownstone_remove,
+diff --git a/sound/soc/pxa/corgi.c b/sound/soc/pxa/corgi.c
+index f4cce1e..1853d41 100644
+--- a/sound/soc/pxa/corgi.c
++++ b/sound/soc/pxa/corgi.c
+@@ -329,6 +329,7 @@ static struct platform_driver corgi_driver = {
+ 	.driver		= {
+ 		.name	= "corgi-audio",
+ 		.owner	= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ 	.probe		= corgi_probe,
+ 	.remove		= corgi_remove,
+diff --git a/sound/soc/pxa/e740_wm9705.c b/sound/soc/pxa/e740_wm9705.c
+index 70d799b..44b5c09 100644
+--- a/sound/soc/pxa/e740_wm9705.c
++++ b/sound/soc/pxa/e740_wm9705.c
+@@ -178,6 +178,7 @@ static struct platform_driver e740_driver = {
+ 	.driver		= {
+ 		.name	= "e740-audio",
+ 		.owner	= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ 	.probe		= e740_probe,
+ 	.remove		= e740_remove,
+diff --git a/sound/soc/pxa/e750_wm9705.c b/sound/soc/pxa/e750_wm9705.c
+index f94d2ab..c34e447 100644
+--- a/sound/soc/pxa/e750_wm9705.c
++++ b/sound/soc/pxa/e750_wm9705.c
+@@ -160,6 +160,7 @@ static struct platform_driver e750_driver = {
+ 	.driver		= {
+ 		.name	= "e750-audio",
+ 		.owner	= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ 	.probe		= e750_probe,
+ 	.remove		= e750_remove,
+diff --git a/sound/soc/pxa/e800_wm9712.c b/sound/soc/pxa/e800_wm9712.c
+index 8768a64..3137f80 100644
+--- a/sound/soc/pxa/e800_wm9712.c
++++ b/sound/soc/pxa/e800_wm9712.c
+@@ -150,6 +150,7 @@ static struct platform_driver e800_driver = {
+ 	.driver		= {
+ 		.name	= "e800-audio",
+ 		.owner	= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ 	.probe		= e800_probe,
+ 	.remove		= e800_remove,
+diff --git a/sound/soc/pxa/imote2.c b/sound/soc/pxa/imote2.c
+index eef1f7b..fd2f4ed 100644
+--- a/sound/soc/pxa/imote2.c
++++ b/sound/soc/pxa/imote2.c
+@@ -91,6 +91,7 @@ static struct platform_driver imote2_driver = {
+ 	.driver		= {
+ 		.name	= "imote2-audio",
+ 		.owner	= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ 	.probe		= imote2_probe,
+ 	.remove		= imote2_remove,
+diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
+index bbea778..160c524 100644
+--- a/sound/soc/pxa/mioa701_wm9713.c
++++ b/sound/soc/pxa/mioa701_wm9713.c
+@@ -215,6 +215,7 @@ static struct platform_driver mioa701_wm9713_driver = {
+ 	.driver		= {
+ 		.name		= "mioa701-wm9713",
+ 		.owner		= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ };
  
--	GCR |= GCR_WARM_RST | GCR_PRIRDY_IEN | GCR_SECRDY_IEN;
--	wait_event_timeout(gsr_wq, gsr_bits & (GSR_PCR | GSR_SCR), 1);
-+	GCR |= GCR_WARM_RST;
- }
+diff --git a/sound/soc/pxa/palm27x.c b/sound/soc/pxa/palm27x.c
+index e1ffcdd..3284c4b 100644
+--- a/sound/soc/pxa/palm27x.c
++++ b/sound/soc/pxa/palm27x.c
+@@ -181,6 +181,7 @@ static struct platform_driver palm27x_wm9712_driver = {
+ 	.driver		= {
+ 		.name		= "palm27x-asoc",
+ 		.owner		= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ };
  
- static inline void pxa_ac97_cold_pxa25x(void)
-@@ -129,8 +128,6 @@ static inline void pxa_ac97_cold_pxa25x(void)
- 	gsr_bits = 0;
- 
- 	GCR = GCR_COLD_RST;
--	GCR |= GCR_CDONE_IE|GCR_SDONE_IE;
--	wait_event_timeout(gsr_wq, gsr_bits & (GSR_PCR | GSR_SCR), 1);
- }
- #endif
- 
-@@ -149,8 +146,6 @@ static inline void pxa_ac97_warm_pxa27x(void)
- 
- static inline void pxa_ac97_cold_pxa27x(void)
- {
--	unsigned int timeout;
--
- 	GCR &=  GCR_COLD_RST;  /* clear everything but nCRST */
- 	GCR &= ~GCR_COLD_RST;  /* then assert nCRST */
- 
-@@ -161,29 +156,20 @@ static inline void pxa_ac97_cold_pxa27x(void)
- 	udelay(5);
- 	clk_disable(ac97conf_clk);
- 	GCR = GCR_COLD_RST | GCR_WARM_RST;
--	timeout = 100;     /* wait for the codec-ready bit to be set */
--	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
--		mdelay(1);
- }
- #endif
- 
- #ifdef CONFIG_PXA3xx
- static inline void pxa_ac97_warm_pxa3xx(void)
- {
--	int timeout = 100;
--
- 	gsr_bits = 0;
- 
- 	/* Can't use interrupts */
- 	GCR |= GCR_WARM_RST;
--	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
--		mdelay(1);
- }
- 
- static inline void pxa_ac97_cold_pxa3xx(void)
- {
--	int timeout = 1000;
--
- 	/* Hold CLKBPB for 100us */
- 	GCR = 0;
- 	GCR = GCR_CLKBPB;
-@@ -199,14 +185,13 @@ static inline void pxa_ac97_cold_pxa3xx(void)
- 	GCR &= ~(GCR_PRIRDY_IEN|GCR_SECRDY_IEN);
- 
- 	GCR = GCR_WARM_RST | GCR_COLD_RST;
--	while (!(GSR & (GSR_PCR | GSR_SCR)) && timeout--)
--		mdelay(10);
- }
- #endif
- 
- bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
- {
- 	unsigned long gsr;
-+	unsigned int timeout = 100;
- 
- #ifdef CONFIG_PXA25x
- 	if (cpu_is_pxa25x())
-@@ -224,6 +209,10 @@ bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
- 	else
- #endif
- 		BUG();
-+
-+	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
-+		mdelay(1);
-+
- 	gsr = GSR | gsr_bits;
- 	if (!(gsr & (GSR_PCR | GSR_SCR))) {
- 		printk(KERN_INFO "%s: warm reset timeout (GSR=%#lx)\n",
-@@ -239,6 +228,7 @@ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_warm_reset);
- bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
- {
- 	unsigned long gsr;
-+	unsigned int timeout = 1000;
- 
- #ifdef CONFIG_PXA25x
- 	if (cpu_is_pxa25x())
-@@ -257,6 +247,9 @@ bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
- #endif
- 		BUG();
- 
-+	while (!((GSR | gsr_bits) & (GSR_PCR | GSR_SCR)) && timeout--)
-+		mdelay(1);
-+
- 	gsr = GSR | gsr_bits;
- 	if (!(gsr & (GSR_PCR | GSR_SCR))) {
- 		printk(KERN_INFO "%s: cold reset timeout (GSR=%#lx)\n",
+diff --git a/sound/soc/pxa/poodle.c b/sound/soc/pxa/poodle.c
+index fafe463..c93e138 100644
+--- a/sound/soc/pxa/poodle.c
++++ b/sound/soc/pxa/poodle.c
+@@ -303,6 +303,7 @@ static struct platform_driver poodle_driver = {
+ 	.driver		= {
+ 		.name	= "poodle-audio",
+ 		.owner	= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ 	.probe		= poodle_probe,
+ 	.remove		= poodle_remove,
+diff --git a/sound/soc/pxa/tosa.c b/sound/soc/pxa/tosa.c
+index a3fe191..1d9c2ed 100644
+--- a/sound/soc/pxa/tosa.c
++++ b/sound/soc/pxa/tosa.c
+@@ -275,6 +275,7 @@ static struct platform_driver tosa_driver = {
+ 	.driver		= {
+ 		.name	= "tosa-audio",
+ 		.owner	= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ 	.probe		= tosa_probe,
+ 	.remove		= tosa_remove,
+diff --git a/sound/soc/pxa/ttc-dkb.c b/sound/soc/pxa/ttc-dkb.c
+index 13c9ee0..0b535b5 100644
+--- a/sound/soc/pxa/ttc-dkb.c
++++ b/sound/soc/pxa/ttc-dkb.c
+@@ -160,6 +160,7 @@ static struct platform_driver ttc_dkb_driver = {
+ 	.driver		= {
+ 		.name	= "ttc-dkb-audio",
+ 		.owner	= THIS_MODULE,
++		.pm     = &snd_soc_pm_ops,
+ 	},
+ 	.probe		= ttc_dkb_probe,
+ 	.remove		= ttc_dkb_remove,
 -- 
 1.8.4.rc3
