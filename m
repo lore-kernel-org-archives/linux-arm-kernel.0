@@ -1,40 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Oct 2013 14:47:01 +0100
-Subject: [RESEND PATCH v2 0/6] Update Kona drivers to use clocks
-In-Reply-To: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
-References: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <20131017134701.GC24056@e106331-lin.cambridge.arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 17 Oct 2013 15:51:54 +0200
+Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
+ Interface driver.
+In-Reply-To: <525FE815.1040300@tabi.org>
+References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
+ <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
+ <525FD4C7.3050806@tabi.org> <525FD65B.3040004@metafoo.de>
+ <525FE48B.7020709@tabi.org> <525FE728.90403@metafoo.de>
+ <525FE815.1040300@tabi.org>
+Message-ID: <525FEB7A.5040406@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 10:47:04PM +0100, Tim Kryger wrote:
-> This series declares the clocks present on bcm11351 (aka bcm281xx) SoCs
-> to be fixed at the rates configured by development bootloaders and then
-> updates the Kona drivers to make use of clock calls where appropriate.
+On 10/17/2013 03:37 PM, Timur Tabi wrote:
+> Lars-Peter Clausen wrote:
+>>> >Maybe I've been out of the loop for too long, but why is that a particular
+>>> >problem with this driver?
 > 
-> This patch series depends on the following three commits being present:
+>> It is usually something you'd want to check in general to make sure that you
+>> don't have multiple device that access the same iomem region at the same
+>> time.
 > 
-> https://lkml.org/lkml/2013/9/18/409
-> https://lkml.org/lkml/2013/9/20/305
-> http://www.spinics.net/lists/arm-kernel/msg274973.html
-> 
-> Changes in v2:
->   - Renamed bsc4_clk to pmu_bsc_clk
-> 
-> Tim Kryger (6):
->   ARM: dts: Declare clocks as fixed on bcm11351
->   ARM: dts: Specify clocks for UARTs on bcm11351
->   ARM: dts: Specify clocks for SDHCIs on bcm11351
->   clocksource: kona: Add basic use of external clock
->   ARM: dts: Specify clocks for timer on bcm11351
->   mmc: sdhci-bcm-kona: Add basic use of clocks
-> 
->  arch/arm/boot/dts/bcm11351.dtsi      | 111 +++++++++++++++++++++++++++++++++--
->  drivers/clocksource/bcm_kona_timer.c |  14 ++++-
->  drivers/mmc/host/sdhci-bcm-kona.c    |  30 +++++++++-
+> I understand that, but I'm trying to figure out why of_iomap() is okay for
+> hundreds of other drivers, but not this one.  I've used it dozens of times
+> myself, without ever worrying about overlapping regions.
 
-This requires a description in the binding documents, so we can figure
-out which clocks we need to describe, and how to describe them.
+The driver would work fine with just of_iomap(). But the resource range
+check comes basically for free and it does help to catch errors, so I'd
+recommend on using it rather than not using it.
 
-Thanks,
-Mark.
+- Lars
