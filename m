@@ -1,35 +1,115 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Oct 2013 15:10:03 +0100
-Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
- Interface driver.
-In-Reply-To: <525FEB7A.5040406@metafoo.de>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
- <525FD4C7.3050806@tabi.org> <525FD65B.3040004@metafoo.de>
- <525FE48B.7020709@tabi.org> <525FE728.90403@metafoo.de>
- <525FE815.1040300@tabi.org> <525FEB7A.5040406@metafoo.de>
-Message-ID: <20131017141003.GO2443@sirena.org.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 17 Oct 2013 07:13:46 -0700
+Subject: [PATCH 2/2] tty/serial: at91: add a fallback option to determine
+ uart/usart property
+In-Reply-To: <525F9CEF.9020904@atmel.com>
+References: <a58fe8bc7fdd128a2f9cf60785f81ebde4c0c247.1381394411.git.nicolas.ferre@atmel.com>
+ <64f8f1db6f888456be8ee410a7e9bb9851d070a5.1381394411.git.nicolas.ferre@atmel.com>
+ <20131014135921.GG11420@ns203013.ovh.net>
+ <525D0896.6020907@atmel.com> <20131016201451.GA21296@kroah.com>
+ <525F9CEF.9020904@atmel.com>
+Message-ID: <20131017141346.GA22104@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 03:51:54PM +0200, Lars-Peter Clausen wrote:
-> On 10/17/2013 03:37 PM, Timur Tabi wrote:
+On Thu, Oct 17, 2013 at 10:16:47AM +0200, Nicolas Ferre wrote:
+> On 16/10/2013 22:14, Greg Kroah-Hartman :
+> > On Tue, Oct 15, 2013 at 11:19:18AM +0200, Nicolas Ferre wrote:
+> >> On 14/10/2013 15:59, Jean-Christophe PLAGNIOL-VILLARD :
+> >>> On 10:43 Thu 10 Oct     , Nicolas Ferre wrote:
+> >>>> On older SoC, the "name" field is not filled in the register map.
+> >>>> Fix the way to figure out if the serial port is an uart or an usart for these
+> >>>> older products (with corresponding properties).
+> >>>>
+> >>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >>>> ---
+> >>>>   drivers/tty/serial/atmel_serial.c | 19 ++++++++++++++++++-
+> >>>>   include/linux/atmel_serial.h      |  1 +
+> >>>>   2 files changed, 19 insertions(+), 1 deletion(-)
+> >>>>
+> >>>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> >>>> index 6b0f75e..c7d99af 100644
+> >>>> --- a/drivers/tty/serial/atmel_serial.c
+> >>>> +++ b/drivers/tty/serial/atmel_serial.c
+> >>>> @@ -99,6 +99,7 @@ static void atmel_stop_rx(struct uart_port *port);
+> >>>>   #define UART_PUT_RTOR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_RTOR)
+> >>>>   #define UART_PUT_TTGR(port, v)	__raw_writel(v, (port)->membase + ATMEL_US_TTGR)
+> >>>>   #define UART_GET_IP_NAME(port)	__raw_readl((port)->membase + ATMEL_US_NAME)
+> >>>> +#define UART_GET_IP_VERSION(port) __raw_readl((port)->membase + ATMEL_US_VERSION)
+> >>>>
+> >>>>    /* PDC registers */
+> >>>>   #define UART_PUT_PTCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_PTCR)
+> >>>> @@ -1503,6 +1504,7 @@ static void atmel_get_ip_name(struct uart_port *port)
+> >>>>   {
+> >>>>   	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> >>>>   	int name = UART_GET_IP_NAME(port);
+> >>>> +	u32 version;
+> >>>>   	int usart, uart;
+> >>>>   	/* usart and uart ascii */
+> >>>>   	usart = 0x55534152;
+> >>>> @@ -1517,7 +1519,22 @@ static void atmel_get_ip_name(struct uart_port *port)
+> >>>>   		dev_dbg(port->dev, "This is uart\n");
+> >>>>   		atmel_port->is_usart = false;
+> >>>>   	} else {
+> >>>> -		dev_err(port->dev, "Not supported ip name, set to uart\n");
+> >>>> +		/* fallback for older SoCs: use version field */
+> >>>> +		version = UART_GET_IP_VERSION(port);
+> >>>> +		switch (version) {
+> >>>> +		case 0x302:
+> >>>> +		case 0x10213:
+> >>>> +			dev_dbg(port->dev, "This version is usart\n");
+> >>>> +			atmel_port->is_usart = true;
+> >>>> +			break;
+> >>>> +		case 0x203:
+> >>>> +		case 0x10202:
+> >>>> +			dev_dbg(port->dev, "This version is uart\n");
+> >>>> +			atmel_port->is_usart = false;
+> >>>> +			break;
+> >>>> +		default:
+> >>>> +			dev_err(port->dev, "Not supported ip name nor version, set to uart\n");
+> >>>
+> >>> it's not really an error a dev_warn is more oppropriate
+> >>
+> >> As we are already in -rc5 and that these fixes are critical for at91
+> >> platforms, I will not re-spin another patch just for this.
+> >>
+> >> Moreover, I have the feeling that if we end up in this case, it
+> >> means that we are in big troubles because the usart/uart included in
+> >> the product triggering this log is not known (I recall that newer
+> >> products do not have to hit these lines of code).
+> >>
+> >> With these 2 reasons, I prefer to keep my patch like it is.
+> >>
+> >> Greg, can you consider taking these two patches as regression fixes
+> >> for 3.12 (with Tested-by tag from Thomas)?
+> >
+> > Is this really a regression from 3.11?
+> 
+> Yes it is. Commit id that I am referring to in patch 1/2 
+> (055560b04a8cd063aea916fd083b7aec02c2adb8) hit the mainline in 3.12-rc 
+> time-frame.
 
-> > I understand that, but I'm trying to figure out why of_iomap() is okay for
-> > hundreds of other drivers, but not this one.  I've used it dozens of times
-> > myself, without ever worrying about overlapping regions.
+Ok.
 
-> The driver would work fine with just of_iomap(). But the resource range
-> check comes basically for free and it does help to catch errors, so I'd
-> recommend on using it rather than not using it.
+> > What's the worry about waiting
+> > for 3.13-rc1, getting this correct, and then backporting them to the
+> > 3.12-stable trees?
+> 
+> It will break all older at91 in 3.12-final. Moreover, I do think that 
+> the actual patches are bringing an incorrect solution and I do not plan 
+> to have a better one (which one?) for 3.13...
+> 
+> > I'd prefer that, so, please clean this up properly and resend it, with
+> > the tested-by: lines and I'll queue them up for 3.13-rc1.
+> 
+> I do not know what to cleanup. Anyway, tell me if you want that I resend 
+> the series of 2 patches with the "Tested-by" tag included.
 
-There's also the fact that it's a devm_ function which means less error
-handling code that we can break which is nice.  There's probably a case
-for an improved OF helper here...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/204d832d/attachment.sig>
+I thought there was some dev_warn() changes that were asked for...
+
+Anyway, please resend them if you want me to take them for any tree as I
+no longer have them in my queue.
+
+thanks,
+
+greg k-h
