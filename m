@@ -1,23 +1,52 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Thu, 17 Oct 2013 08:37:25 -0500
-Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
- Interface driver.
-In-Reply-To: <525FE728.90403@metafoo.de>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
- <525FD4C7.3050806@tabi.org> <525FD65B.3040004@metafoo.de>
- <525FE48B.7020709@tabi.org> <525FE728.90403@metafoo.de>
-Message-ID: <525FE815.1040300@tabi.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 Oct 2013 09:39:44 -0400
+Subject: [GIT PULL] ARM: mvebu: driver changes for v3.13 (round 2)
+Message-ID: <20131017133944.GF22434@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lars-Peter Clausen wrote:
->> >Maybe I've been out of the loop for too long, but why is that a particular
->> >problem with this driver?
+Guys,
 
-> It is usually something you'd want to check in general to make sure that you
-> don't have multiple device that access the same iomem region at the same time.
+Here's the next round of driver changes for mvebu.  As previously
+arranged with Bjorn, we're taking the pci-mvebu.c changes this time
+around since the previous pull request had pci changes depending on
+changes in irqchip.
 
-I understand that, but I'm trying to figure out why of_iomap() is okay 
-for hundreds of other drivers, but not this one.  I've used it dozens of 
-times myself, without ever worrying about overlapping regions.
+thx,
+
+Jason.
+
+
+The following changes since commit 96ae0b548672adc12431312718835e77472f5bf0:
+
+  ARM: mvebu: fix gated clock documentation (2013-10-08 15:17:56 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/drivers-3.13-2
+
+for you to fetch changes up to f5072dfbac053200c8865c4fb15e4f020b7b5d1d:
+
+  PCI: mvebu: make local functions static (2013-10-08 17:57:40 +0000)
+
+----------------------------------------------------------------
+mvebu driver changes for v3.13 (round 2)
+
+ - mvebu
+    - pcie
+       - dynamic link up detection
+       - add IO wrappers
+       - declare some local functions static
+
+----------------------------------------------------------------
+Jason Gunthorpe (1):
+      PCI: mvebu: Dynamically detect if the PEX link is up to enable hot plug
+
+Jingoo Han (1):
+      PCI: mvebu: make local functions static
+
+Seungwon Jeon (1):
+      PCI: mvebu: add I/O access wrappers
+
+ drivers/pci/host/pci-mvebu.c | 128 +++++++++++++++++++++++--------------------
+ 1 file changed, 69 insertions(+), 59 deletions(-)
