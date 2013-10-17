@@ -1,35 +1,154 @@
-From: cinifr@gmail.com (Fan Rong)
-Date: Fri, 18 Oct 2013 00:37:04 +0800
-Subject: [Add SMP support for Allwinner A20: PATCH V5 0/3] 
-Message-ID: <1382027827-10080-1-git-send-email-cinifr@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Oct 2013 11:38:28 -0500
+Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
+ indicates the presence of PHY's
+In-Reply-To: <1381866857-3861-2-git-send-email-kishon@ti.com>
+References: <1381866857-3861-1-git-send-email-kishon@ti.com>
+ <1381866857-3861-2-git-send-email-kishon@ti.com>
+Message-ID: <20131017163828.GH11611@gimli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V1 V2:
-The patchs add smp support for Allwinner A20. It add cpuregister node in dts for smp configure. The patchs also add a options for phy count timer to replace vir count timer as ARM arch timer clocksource.
-V3 Changes since V2:
-It delete platform.h and delete some code in platsmp.c that's not necessary. It delete phy count timer support because most linux kernel platform want to use vir count timer especially for kvm. SMP need arch timer as clocksource, It does use virtual counter timer and  no longer use physical counter timer, so bootloader ***must*** set CNTVOFF register for a20 before kernel booting. I have add support set CNTVOFF register for uboot, if you want to test it in a20 board, you need update your sunxi uboot from: https://groups.google.com/forum/#!topic/linux-sunxi/O0Za7H5_jQI
-V4 Changes since V3:
-It use smp_prepare_cpus replacing early_init as cpuconfigure map init funcation caller and use sun7i replacing sunxi7i as funcation name and variable name.
-V5 Changes since V4:
-Move smp from struct DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)") to struct DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family") in file sunxi.c
+Hi,
 
-*** BLURB HERE ***
+On Wed, Oct 16, 2013 at 01:24:11AM +0530, Kishon Vijay Abraham I wrote:
+> There can be systems which does not have a external usb_phy, so get
+> usb_phy only if dt data indicates the presence of PHY in the case of dt boot or
+> if platform_data indicates the presence of PHY. Also remove checking if
+> return value is -ENXIO since it's now changed to always enable usb_phy layer.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Fan Rong (3):
-  Add smp support for Allwinner A20(sunxi 7i).
-  Add cpuconfig nodes in dts for smp configure.
-  Add arch count timer node in dts for Allwinner A20(sunxi 7i).
+I'm fine with this patch, but one comment below:
 
- arch/arm/boot/dts/sun7i-a20.dtsi |  15 ++++++
- arch/arm/mach-sunxi/Makefile     |   2 +
- arch/arm/mach-sunxi/headsmp.S    |  18 +++++++
- arch/arm/mach-sunxi/platsmp.c    | 114 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-sunxi/sunxi.c      |   3 ++
- 5 files changed, 152 insertions(+)
- create mode 100644 arch/arm/mach-sunxi/headsmp.S
- create mode 100644 arch/arm/mach-sunxi/platsmp.c
- mode change 100644 => 100755 arch/arm/mach-sunxi/sunxi.c
+> @@ -387,16 +388,49 @@ static int dwc3_probe(struct platform_device *pdev)
+>  	if (node) {
+>  		dwc->maximum_speed = of_usb_get_maximum_speed(node);
+>  
+> -		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+> -		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+> +		count = of_count_phandle_with_args(node, "usb-phy", NULL);
+> +		switch (count) {
+> +		case 2:
+> +			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
+> +				"usb-phy", 1);
+> +			if (IS_ERR(dwc->usb3_phy)) {
+> +				dev_err(dev, "usb3 phy not found\n");
+> +				return PTR_ERR(dwc->usb3_phy);
+> +			}
+> +		case 1:
+> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
+> +				"usb-phy", 0);
+> +			if (IS_ERR(dwc->usb2_phy)) {
+> +				dev_err(dev, "usb2 phy not found\n");
+> +				return PTR_ERR(dwc->usb2_phy);
+> +			}
+> +			break;
+> +		default:
+> +			dev_err(dev, "usb phy nodes not configured\n");
+> +		}
+>  
+>  		dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
+>  		dwc->dr_mode = of_usb_get_dr_mode(node);
+>  	} else if (pdata) {
+>  		dwc->maximum_speed = pdata->maximum_speed;
+>  
+> -		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+> -		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+> +		if (pdata->usb2_phy) {
+> +			dwc->usb2_phy = devm_usb_get_phy(dev,
+> +				USB_PHY_TYPE_USB2);
+> +			if (IS_ERR(dwc->usb2_phy)) {
+> +				dev_err(dev, "usb2 phy not found\n");
+> +				return PTR_ERR(dwc->usb2_phy);
+> +			}
+> +		}
+> +
+> +		if (pdata->usb3_phy) {
+> +			dwc->usb3_phy = devm_usb_get_phy(dev,
+> +				USB_PHY_TYPE_USB3);
+> +			if (IS_ERR(dwc->usb3_phy)) {
+> +				dev_err(dev, "usb3 phy not found\n");
+> +				return PTR_ERR(dwc->usb3_phy);
+> +			}
+> +		}
+>  
+>  		dwc->needs_fifo_resize = pdata->tx_fifo_resize;
+>  		dwc->dr_mode = pdata->dr_mode;
+> @@ -409,36 +443,6 @@ static int dwc3_probe(struct platform_device *pdev)
+>  	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
+>  		dwc->maximum_speed = USB_SPEED_SUPER;
+>  
+> -	if (IS_ERR(dwc->usb2_phy)) {
+> -		ret = PTR_ERR(dwc->usb2_phy);
+> -
+> -		/*
+> -		 * if -ENXIO is returned, it means PHY layer wasn't
+> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
+> -		 * in that case, since no PHY driver will ever probe.
+> -		 */
+> -		if (ret == -ENXIO)
+> -			return ret;
+> -
+> -		dev_err(dev, "no usb2 phy configured\n");
+> -		return -EPROBE_DEFER;
+> -	}
+> -
+> -	if (IS_ERR(dwc->usb3_phy)) {
+> -		ret = PTR_ERR(dwc->usb3_phy);
+> -
+> -		/*
+> -		 * if -ENXIO is returned, it means PHY layer wasn't
+> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
+> -		 * in that case, since no PHY driver will ever probe.
+> -		 */
+> -		if (ret == -ENXIO)
+> -			return ret;
+> -
+> -		dev_err(dev, "no usb3 phy configured\n");
+> -		return -EPROBE_DEFER;
+> -	}
+
+the idea for doing the error checking here was actually to avoid
+duplicating it in all previous cases, as you did. Please keep the error
+checking here and you're good to go.
+
+> -
+>  	dwc->xhci_resources[0].start = res->start;
+>  	dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
+>  					DWC3_XHCI_REGS_END;
+> diff --git a/drivers/usb/dwc3/platform_data.h b/drivers/usb/dwc3/platform_data.h
+> index 7db34f0..49ffa6d 100644
+> --- a/drivers/usb/dwc3/platform_data.h
+> +++ b/drivers/usb/dwc3/platform_data.h
+> @@ -24,4 +24,6 @@ struct dwc3_platform_data {
+>  	enum usb_device_speed maximum_speed;
+>  	enum usb_dr_mode dr_mode;
+>  	bool tx_fifo_resize;
+> +	bool usb2_phy;
+> +	bool usb3_phy;
+
+This would look better as a quirks flag, then we could:
+
+unsigned long quirks;
+#define DWC3_QUIRK_NO_USB3_PHY	BIT(0)
+#define DWC3_QUIRK_NO_USB2_PHY	BIT(1)
+
+...
+
+if (!test_bit(DWC3_QUIRK_NO_USB3_PHY), &dwc->quirks &&
+	dwc->has_usb3_phy) {
+	grab_usb3_phy();
+}
+
+cheers
 
 -- 
-1.8.1.2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/4f0f6f56/attachment.sig>
