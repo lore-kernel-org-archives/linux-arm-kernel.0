@@ -1,71 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Oct 2013 15:13:09 +0100
-Subject: [RESEND PATCH v2 6/6] mmc: sdhci-bcm-kona: Add basic use of clocks
-In-Reply-To: <1381960030-1640-7-git-send-email-tim.kryger@linaro.org>
-References: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
- <1381960030-1640-7-git-send-email-tim.kryger@linaro.org>
-Message-ID: <20131017141309.GG24056@e106331-lin.cambridge.arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 17 Oct 2013 16:16:29 +0200
+Subject: [PATCH 3/9] clk: samsung: exynos4: Move suspend/resume handling to
+ SoC driver
+In-Reply-To: <CAKew6eV7Hd1x1+YLR9rjzNgYu0t=9Q8BG23VUvhPJTf77bsRXQ@mail.gmail.com>
+References: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
+ <1381921698-5060-4-git-send-email-t.figa@samsung.com>
+ <CAKew6eV7Hd1x1+YLR9rjzNgYu0t=9Q8BG23VUvhPJTf77bsRXQ@mail.gmail.com>
+Message-ID: <1821539.dxQ3vs372W@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 10:47:10PM +0100, Tim Kryger wrote:
-> Enable the external clock needed by the host controller during the
-> probe and disable it during the remove.
-
-This requires a biding document update.
-
-I note that the binding is already incomplete (it does not describe the
-interrupts or reg).
-
+On Thursday 17 of October 2013 19:12:08 Yadwinder Singh Brar wrote:
+> Hi Tomasz,
 > 
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> ---
->  drivers/mmc/host/sdhci-bcm-kona.c | 30 ++++++++++++++++++++++++++++--
->  1 file changed, 28 insertions(+), 2 deletions(-)
+> [ ... ]
+> >  /*
+> >   * list of controller registers to be saved and restored during a
+> >   * suspend/resume cycle.
+> > @@ -288,6 +299,70 @@ static unsigned long exynos4_clk_regs[] __initdata = {
+> >         GATE_IP_CPU,
+> >  };
+> >
+> > +static int exynos4_clk_suspend(void)
+> > +{
+> > +       samsung_clk_save(reg_base, exynos4_save_common,
+> > +                               ARRAY_SIZE(exynos4_clk_regs));
 > 
-> diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
-> index 85472d3..91db099 100644
-> --- a/drivers/mmc/host/sdhci-bcm-kona.c
-> +++ b/drivers/mmc/host/sdhci-bcm-kona.c
-> @@ -54,6 +54,7 @@
->  
->  struct sdhci_bcm_kona_dev {
->  	struct mutex	write_lock; /* protect back to back writes */
-> +	struct clk	*external_clk;
+> a doubt here, Is sizeof(exynos4_clk_regs) works with
+> exynos4_clk_regs[] as __initdata ?
 
-Is this the only clock input the unit has?
+Hmm, this is a compile time constant, so I don't see why it couldn't work.
 
-Are there any other external resources the device needs (e.g. gpios,
-regulators)?
+> > +
+> > +       if (exynos4_soc == EXYNOS4210)
+> > +               samsung_clk_save(reg_base, exynos4_save_soc,
+> > +                                       ARRAY_SIZE(exynos4210_clk_save));
+> 
+> [ ... ]
+> > +static void exynos4_clk_sleep_init(void)
+> 
+> I think, this fuction can be placed in __init section.
 
->  };
->  
->  
-> @@ -252,11 +253,29 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
->  	mmc_of_parse(host->mmc);
->  
->  	if (!host->mmc->f_max) {
-> -		dev_err(&pdev->dev, "Missing max-freq for SDHCI cfg\n");
-> +		dev_err(dev, "Missing max-freq for SDHCI cfg\n");
+That's right. Thanks for pointing this out.
 
-This seems like an unrelated change.
-
->  		ret = -ENXIO;
->  		goto err_pltfm_free;
->  	}
->  
-> +	/* Get and enable the external clock */
-> +	kona_dev->external_clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(kona_dev->external_clk)) {
-> +		dev_err(dev, "Failed to get external clock\n");
-> +		ret = PTR_ERR(kona_dev->external_clk);
-> +		goto err_pltfm_free;
-
-This seems like a pretty clear breakage of existing DTBs.
-
-Why?
-
-Thanks,
-Mark.
+Best regards,
+Tomasz
