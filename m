@@ -1,61 +1,203 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 17 Oct 2013 15:23:08 +0530
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <Pine.LNX.4.64.1310170851230.27369@axis700.grange>
-References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
- <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
- <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
- <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
- <20131017020745.GA14013@intel.com>
- <Pine.LNX.4.64.1310170851230.27369@axis700.grange>
-Message-ID: <20131017095308.GF14013@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Oct 2013 11:47:38 +0100
+Subject: [PATCH v4 1/7] arm64: introduce basic aarch64 instruction
+ decoding helpers
+In-Reply-To: <1381990781-27814-2-git-send-email-liuj97@gmail.com>
+References: <1381990781-27814-1-git-send-email-liuj97@gmail.com>
+ <1381990781-27814-2-git-send-email-liuj97@gmail.com>
+Message-ID: <20131017104737.GI18765@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 10:27:13AM +0200, Guennadi Liakhovetski wrote:
-> On Thu, 17 Oct 2013, Vinod Koul wrote:
+On Thu, Oct 17, 2013 at 07:19:34AM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
 > 
-> > On Wed, Oct 16, 2013 at 11:45:48AM -0700, Dan Williams wrote:
-> > > On Wed, Oct 16, 2013 at 11:29 AM, Guennadi Liakhovetski
-> > > >
-> > > > Doesn't this break kernel compilation for a total of 27 commits? Or am I
-> > > > missing anything?
-> > > 
-> > > Yes, I think at the start DMA_COMPLETE should just be a alias for
-> > > DMA_SUCCESS, then after all the driver renames are in delete
-> > > DMA_SUCCESS.
-> > Oops, taht was bad of me. ffixes in v2 and sending patch 29 for removal case
+> Introduce basic aarch64 instruction decoding helper
+> aarch64_get_insn_class() and aarch64_insn_hotpatch_safe().
 > 
-> Ok, yes, this should work now. I'm wondering though - is DMA_COMPLTE 
-> really a better name? AFAICS, we can only differentiate between 2 
-> possibilities with the current API: a transfer is "in progress" - between 
-> last used and last completed, and "unknown" - either completed, or 
-> aborted, or not yet submitted - if the cookie is larger, than last 
-> completed and we assume, that it has wrapped.
-well, once you submit N, and chekcing status, if you get last > N, then you
-assume it completed. If last is M then M is completed and M + 1 running and rest
-in queue. You know which one is last submitted in client
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/include/asm/insn.h | 67 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/Makefile    |  2 +-
+>  arch/arm64/kernel/insn.c      | 72 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 140 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/include/asm/insn.h
+>  create mode 100644 arch/arm64/kernel/insn.c
+> 
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> new file mode 100644
+> index 0000000..6190016
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -0,0 +1,67 @@
+> +/*
+> + * Copyright (C) 2013 Huawei Ltd.
+> + * Author: Jiang Liu <jiang.liu@huawei.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef	_ASM_ARM64_INSN_H
+> +#define	_ASM_ARM64_INSN_H
 
-> Actually for a driver, that I'm currently working on, I implemented a 
-> cache of N last cookies (e.g. 128), which is a bitfield, where I just 
-> record a 1, if that descriptor has failed, and a 0, if completed 
-> successfully. That way I can report one of 4 states: cookie on queue, 
-> completed successfully, failed, unknown. I'm not sure, whether I'll keep 
-> this in the final version, this doesn't really fit the present dmaengine 
-> API concept. We could make this generic, if desired. Otherwise your 
-> proposed error callback should help too. But in either case I think with 
-> the current implementation we cannot find out whether a specific cookie 
-> completed successfully or failed.
-The propsed error callback will tell you if dmaengine detected a failure or not.
-That should with above cover well
+We've tried to be consistent using __ASM_<name>_H here.
 
-> One more observation: I looked at a couple of drivers, using the DMA_ERROR 
-> state. E.g. mmp_tdma.c, mxs-dma.c. They store errors in a .status field in 
-> their private data. Then they return that status in their 
-> .device_tx_status() methods - independent on the cookie! This doesn't look 
-> right to me... at_hdmac.c does something similarly strange.
-Yup bunch of ones arent being good citizens..
+> +#include <linux/types.h>
+> +
+> +/*
+> + * ARM Architecture Reference Manual ARMv8, Section C3.1
+> + * AArch64 main encoding table
+> + *  Bit position
+> + *   28 27 26 25	Encoding Group
+> + *   0  0  -  -		Unallocated
+> + *   1  0  0  -		Data processing, immediate
+> + *   1  0  1  -		Branch, exception generation and system instructions
+> + *   -  1  -  0		Loads and stores
+> + *   -  1  0  1		Data processing - register
+> + *   0  1  1  1		Data processing - SIMD and floating point
+> + *   1  1  1  1		Data processing - SIMD and floating point
+> + * "-" means "don't care"
+> + */
+> +enum aarch64_insn_encoding_class {
+> +	AARCH64_INSN_CLS_UNKNOWN,	/* UNALLOCATED */
+> +	AARCH64_INSN_CLS_DP_IMM,	/* Data processing - immediate */
+> +	AARCH64_INSN_CLS_DP_REG,	/* Data processing - register */
+> +	AARCH64_INSN_CLS_DP_FPSIMD,	/* Data processing - SIMD and FP */
+> +	AARCH64_INSN_CLS_LDST,		/* Loads and stores */
+> +	AARCH64_INSN_CLS_BR_SYS,	/* Branch, exception generation and
+> +					 * system instructions */
+> +};
+> +
+> +#define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
+> +static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+> +{ return (code & (mask)) == (val); }	\
+> +static __always_inline u32 aarch64_insn_get_##abbr##_mask(void) \
+> +{ return (mask); } \
+> +static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+> +{ return (val); }
+> +
+> +__AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+> +__AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
+> +__AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
+> +__AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
+> +__AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
+> +__AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
+> +__AARCH64_INSN_FUNCS(nop,	0xFFFFFFFF, 0xD503201F)
+> +
+> +#undef	__AARCH64_INSN_FUNCS
+> +
+> +enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+> +
+> +bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+> +
+> +#endif	/* _ASM_ARM64_INSN_H */
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 7b4b564..9af6cb3 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -9,7 +9,7 @@ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
+>  			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+>  			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+> -			   hyp-stub.o psci.o
+> +			   hyp-stub.o psci.o insn.o
+>  
+>  arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+>  					   sys_compat.o
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> new file mode 100644
+> index 0000000..1c501f3
+> --- /dev/null
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -0,0 +1,72 @@
+> +/*
+> + * Copyright (C) 2013 Huawei Ltd.
+> + * Author: Jiang Liu <jiang.liu@huawei.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/compiler.h>
+> +#include <linux/kernel.h>
+> +#include <asm/insn.h>
+> +
+> +static int aarch64_insn_encoding_cls[] = {
+> +	AARCH64_INSN_CLS_UNKNOWN,
+> +	AARCH64_INSN_CLS_UNKNOWN,
+> +	AARCH64_INSN_CLS_UNKNOWN,
+> +	AARCH64_INSN_CLS_UNKNOWN,
+> +	AARCH64_INSN_CLS_LDST,
+> +	AARCH64_INSN_CLS_DP_REG,
+> +	AARCH64_INSN_CLS_LDST,
+> +	AARCH64_INSN_CLS_DP_FPSIMD,
+> +	AARCH64_INSN_CLS_DP_IMM,
+> +	AARCH64_INSN_CLS_DP_IMM,
+> +	AARCH64_INSN_CLS_BR_SYS,
+> +	AARCH64_INSN_CLS_BR_SYS,
+> +	AARCH64_INSN_CLS_LDST,
+> +	AARCH64_INSN_CLS_DP_REG,
+> +	AARCH64_INSN_CLS_LDST,
+> +	AARCH64_INSN_CLS_DP_FPSIMD,
+> +};
+> +
+> +enum aarch64_insn_encoding_class __kprobes aarch64_get_insn_class(u32 insn)
+> +{
+> +	return aarch64_insn_encoding_cls[(insn >> 25) & 0xf];
+> +}
 
-~Vinod
--- 
+For some reason, I just read `cls' as `count leading set', so you could just
+use `class' here to help lazy readers like me :)
+
+> +static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+> +{
+> +	if (aarch64_get_insn_class(insn) != AARCH64_INSN_CLS_BR_SYS)
+> +		return false;
+> +
+> +	return	aarch64_insn_is_b(insn) ||
+> +		aarch64_insn_is_bl(insn) ||
+> +		aarch64_insn_is_svc(insn) ||
+> +		aarch64_insn_is_hvc(insn) ||
+> +		aarch64_insn_is_smc(insn) ||
+> +		aarch64_insn_is_brk(insn) ||
+> +		aarch64_insn_is_nop(insn);
+> +}
+> +
+> +/*
+> + * ARMv8-A Section B2.6.5:
+> + * Concurrent modification and execution of instructions can lead to the
+> + * resulting instruction performing any behavior that can be achieved by
+> + * executing any sequence of instructions that can be executed from the
+> + * same Exception level, except where the instruction before modification
+> + * and the instruction after modification is a B, BL, NOP, BKPT, SVC, HVC,
+> + * or SMC instruction.
+> + */
+> +bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+> +{
+> +	return __aarch64_insn_hotpatch_safe(old_insn) &&
+> +	       __aarch64_insn_hotpatch_safe(new_insn);
+> +}
+
+With those cosmetic changes:
+
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
+
+Will
