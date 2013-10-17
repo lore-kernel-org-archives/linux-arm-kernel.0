@@ -1,47 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 17 Oct 2013 14:32:03 +0200
-Subject: sun4i_handle_irq: WARNING at net/ipv4/tcp_input.c:2711
- tcp_fastretrans_alert
-In-Reply-To: <CACQ1gAinSoTCTtf9Y6TL=vtEm1jnJgis0n=y=frNtuPxue9-ng@mail.gmail.com>
-References: <20130821094432.GA28249@lnx-rg> <20130823182116.GE1230@lukather>
- <CACQ1gAinSoTCTtf9Y6TL=vtEm1jnJgis0n=y=frNtuPxue9-ng@mail.gmail.com>
-Message-ID: <20131017123203.GM3041@lukather>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 17 Oct 2013 15:38:35 +0300
+Subject: [PATCH v4 04/15] clk: tegra: Add TEGRA_PERIPH_NO_DIV flag
+In-Reply-To: <1382013526-12800-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1382013526-12800-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1382013526-12800-5-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard
+This flag indicates the peripheral clock does not have a divider. It will
+simplify the initialization tables and avoids some very similar code.
 
-On Thu, Oct 17, 2013 at 01:46:49PM +0200, Richard Genoud wrote:
-> > Hmmm, that seems pretty far from the network/interrupt drivers, and it
-> > looks like other users have seen this on !ARM machines:
-> > http://forums.gentoo.org/viewtopic-p-7379928.html
-> > https://bugzilla.redhat.com/show_bug.cgi?id=989251
-> >
-> > There's a patch in the redhat's bugzilla, could you try to apply it and
-> > see if it solves your problem?
-> >
-> > Maybe the netdev guys will have other ideas as well.
-> For the record, I set:
-> net.ipv4.tcp_early_retrans = 2
-> net.ipv4.tcp_frto = 0
-> And I didn't see the warning any more.
-> It's seems that a patch is on it's way. I'll try it instead of setting
-> the sysctl.
-> http://thread.gmane.org/gmane.linux.network/286793
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk-periph.c |   11 ++++++++---
+ drivers/clk/tegra/clk.h        |    1 +
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 
-Ah, I wanted to ask you about the status of this.
-
-Thanks for the follow-up,
-Maxime
-
+diff --git a/drivers/clk/tegra/clk-periph.c b/drivers/clk/tegra/clk-periph.c
+index 5102d5e..b5feccc 100644
+--- a/drivers/clk/tegra/clk-periph.c
++++ b/drivers/clk/tegra/clk-periph.c
+@@ -173,12 +173,16 @@ const struct clk_ops tegra_clk_periph_nodiv_ops = {
+ static struct clk *_tegra_clk_register_periph(const char *name,
+ 			const char **parent_names, int num_parents,
+ 			struct tegra_clk_periph *periph,
+-			void __iomem *clk_base, u32 offset, bool div,
++			void __iomem *clk_base, u32 offset,
+ 			unsigned long flags)
+ {
+ 	struct clk *clk;
+ 	struct clk_init_data init;
+ 	struct tegra_clk_periph_regs *bank;
++	bool div = !(periph->gate.flags & TEGRA_PERIPH_NO_DIV);
++
++	flags |= periph->gate.flags & TEGRA_PERIPH_NO_DIV ?
++			CLK_SET_RATE_PARENT : 0;
+ 
+ 	init.name = name;
+ 	init.ops = div ? &tegra_clk_periph_ops : &tegra_clk_periph_nodiv_ops;
+@@ -216,7 +220,7 @@ struct clk *tegra_clk_register_periph(const char *name,
+ 		u32 offset, unsigned long flags)
+ {
+ 	return _tegra_clk_register_periph(name, parent_names, num_parents,
+-			periph, clk_base, offset, true, flags);
++			periph, clk_base, offset, flags);
+ }
+ 
+ struct clk *tegra_clk_register_periph_nodiv(const char *name,
+@@ -224,6 +228,7 @@ struct clk *tegra_clk_register_periph_nodiv(const char *name,
+ 		struct tegra_clk_periph *periph, void __iomem *clk_base,
+ 		u32 offset)
+ {
++	periph->gate.flags |= TEGRA_PERIPH_NO_DIV;
+ 	return _tegra_clk_register_periph(name, parent_names, num_parents,
+-			periph, clk_base, offset, false, CLK_SET_RATE_PARENT);
++			periph, clk_base, offset, CLK_SET_RATE_PARENT);
+ }
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index 997357e..a826720 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -397,6 +397,7 @@ struct tegra_clk_periph_gate {
+ #define TEGRA_PERIPH_MANUAL_RESET BIT(1)
+ #define TEGRA_PERIPH_ON_APB BIT(2)
+ #define TEGRA_PERIPH_WAR_1005168 BIT(3)
++#define TEGRA_PERIPH_NO_DIV BIT(4)
+ 
+ void tegra_periph_reset(struct tegra_clk_periph_gate *gate, bool assert);
+ extern const struct clk_ops tegra_clk_periph_gate_ops;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/bff5e6d3/attachment.sig>
+1.7.7.rc0.72.g4b5ea.dirty
