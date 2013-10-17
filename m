@@ -1,65 +1,109 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 17 Oct 2013 16:49:29 +0200
-Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <525FF498.3060202@st.com>
-References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
- <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
- <20131016151419.GA14104@ns203013.ovh.net> <525F915D.9020501@st.com>
- <525FAEED.7030207@st.com> <20131017141957.GE14104@ns203013.ovh.net>
- <525FF498.3060202@st.com>
-Message-ID: <1382021369.4093.44.camel@weser.hi.pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Oct 2013 09:54:26 -0500
+Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
+ indicates the presence of PHY's
+In-Reply-To: <525E943E.3080706@ti.com>
+References: <1381866857-3861-1-git-send-email-kishon@ti.com>
+ <1381866857-3861-2-git-send-email-kishon@ti.com>
+ <525E8E93.9010503@ti.com> <525E9046.3090209@ti.com>
+ <525E943E.3080706@ti.com>
+Message-ID: <20131017145425.GE11611@gimli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 17.10.2013, 15:30 +0100 schrieb srinivas kandagatla:
-[...]
-> Sorry to ask this but, Where is this requirement coming from?
-> I have not spotted any thing as such in ePAPR specs.
+On Wed, Oct 16, 2013 at 04:27:26PM +0300, Roger Quadros wrote:
+> On 10/16/2013 04:10 PM, Kishon Vijay Abraham I wrote:
+> > Hi roger,
+> > 
+> > On Wednesday 16 October 2013 06:33 PM, Roger Quadros wrote:
+> >> Hi Kishon,
+> >>
+> >> On 10/15/2013 10:54 PM, Kishon Vijay Abraham I wrote:
+> >>> There can be systems which does not have a external usb_phy, so get
+> >>> usb_phy only if dt data indicates the presence of PHY in the case of dt boot or
+> >>> if platform_data indicates the presence of PHY. Also remove checking if
+> >>> return value is -ENXIO since it's now changed to always enable usb_phy layer.
+> >>>
+> >>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>> ---
+> >>> In usb_get_phy_by_phandle, index 0 always refers to usb2 phy and index 1 always
+> >>> refers to usb3 phy. Since we've lived so long with this, this patch will make
+> >>> an assumption that if only one entry is populated in *usb-phy* property, it will
+> >>> be usb2 phy and the next entry will be usb3 phy.
+> >>>
+> >>>  drivers/usb/dwc3/Kconfig         |    1 +
+> >>>  drivers/usb/dwc3/core.c          |   72 ++++++++++++++++++++------------------
+> >>>  drivers/usb/dwc3/platform_data.h |    2 ++
+> >>>  3 files changed, 41 insertions(+), 34 deletions(-)
+> >>>
+> >>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+> >>> index 70fc430..8e385b4 100644
+> >>> --- a/drivers/usb/dwc3/Kconfig
+> >>> +++ b/drivers/usb/dwc3/Kconfig
+> >>> @@ -1,6 +1,7 @@
+> >>>  config USB_DWC3
+> >>>  	tristate "DesignWare USB3 DRD Core Support"
+> >>>  	depends on (USB || USB_GADGET) && HAS_DMA
+> >>> +	select USB_PHY
+> >>>  	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
+> >>>  	help
+> >>>  	  Say Y or M here if your system has a Dual Role SuperSpeed
+> >>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+> >>> index 474162e..cb91d70 100644
+> >>> --- a/drivers/usb/dwc3/core.c
+> >>> +++ b/drivers/usb/dwc3/core.c
+> >>> @@ -354,6 +354,7 @@ static int dwc3_probe(struct platform_device *pdev)
+> >>>  	struct device_node	*node = dev->of_node;
+> >>>  	struct resource		*res;
+> >>>  	struct dwc3		*dwc;
+> >>> +	int			count;
+> >>>  
+> >>>  	int			ret = -ENOMEM;
+> >>>  
+> >>> @@ -387,16 +388,49 @@ static int dwc3_probe(struct platform_device *pdev)
+> >>>  	if (node) {
+> >>>  		dwc->maximum_speed = of_usb_get_maximum_speed(node);
+> >>>  
+> >>> -		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+> >>> -		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+> >>> +		count = of_count_phandle_with_args(node, "usb-phy", NULL);
+> >>> +		switch (count) {
+> >>> +		case 2:
+> >>> +			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
+> >>> +				"usb-phy", 1);
+> >>> +			if (IS_ERR(dwc->usb3_phy)) {
+> >>> +				dev_err(dev, "usb3 phy not found\n");
+> >>> +				return PTR_ERR(dwc->usb3_phy);
+> >>> +			}
+> >>> +		case 1:
+> >>> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
+> >>> +				"usb-phy", 0);
+> >>> +			if (IS_ERR(dwc->usb2_phy)) {
+> >>> +				dev_err(dev, "usb2 phy not found\n");
+> >>> +				return PTR_ERR(dwc->usb2_phy);
+> >>> +			}
+> >>> +			break;
+> >>
+> >> In the Exynos case, there is only 1 phy and it is the USB3 phy. This code
+> >> will wrongly treat it as usb2_phy.
+> > 
+> > That was the case even before this patch no? Unfortunately the old USB PHY
+> > library doesn't have APIs to get PHYs in a better way. If we try modifying the
+> > USB PHY library, it'll be kind of duplicating what is already there in the
+> > Generic PHY library. I'd rather prefer Exynos guys to use the new framework.
 > 
-> 
-> All the spec says is.
-> ===
-> The compatible property value consists of one or more strings that
-> define the specific programming model for the device. This list of
-> strings should be used by a client program for device driver selection.
-> The property value consists of a concatenated list of null terminated
-> strings, *from most specific to most general.* They allow a device to
-> express its compatibility with a family of similar devices, potentially
-> allowing a single device driver to match against several devices.
-> The recommended format is ?manufacturer,model?, where manufacturer is a
-> string describing the name of the manufacturer (such as an OUI), and
-> model specifies the model number.
-> 
-> Example:
-> compatible = ?fsl,mpc8641-uart?, ?ns16550";
-> In this example, an operating system would first try to locate a device
-> driver that supported fsl,mpc8641-uart. If a driver was not found, it
-> would then try to locate a driver that supported the more general
-> ns16550 device type.
-> ===
-> 
-> The more general compatible string in this case is "st,comms-ssc-i2c",
-> rather than the first soc name.
-> How can a first SOC name be more general?
-> 
-> As this driver is not very specific to StiH415, it is generic driver for
-> ST comms-ssc-i2c block.
-> 
+> OK. I agree with you.
+> Do you know if there are users of dwc3 other than exynos5250 and omap5?
+> If not, we should get rid of the old USB PHY altogether.
 
-You just can't know if someone in the future decides to subtly change
-the register layout or make some other incompatible change to the
-comms-ssc-i2c block.
+Intel's Baytrail, at least. But they don't use DT.
 
-So as a general rule of thumb you take the first SoC where a particular
-IP block appeared as the compatible string, so you can just pick the
-name of the SoC where the incompatible change was made as the next
-string and not need to invent generic and unspecific comms-ssc-i2c-v2
-compatibles.
-
-Regards,
-Lucas
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/e02c7e58/attachment-0001.sig>
