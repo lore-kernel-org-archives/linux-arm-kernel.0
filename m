@@ -1,37 +1,58 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 17 Oct 2013 11:27:13 -0400
-Subject: [PATCH v3 6/7] arm64, jump label: optimize jump label
- implementation
-In-Reply-To: <525FF6E0.7070000@gmail.com>
-References: <1381893492-7135-1-git-send-email-liuj97@gmail.com>
- <1381893492-7135-7-git-send-email-liuj97@gmail.com>
- <20131016114608.GH5403@mudshark.cambridge.arm.com>
- <525EC8D1.7000900@gmail.com>
- <20131017093944.GB18765@mudshark.cambridge.arm.com>
- <525FF6E0.7070000@gmail.com>
-Message-ID: <20131017112713.2638910f@gandalf.local.home>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Thu, 17 Oct 2013 08:31:31 -0700
+Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <525FFA40.9050901@wwwdotorg.org>
+References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
+ <1380846199-12829-4-git-send-email-syin@broadcom.com>
+ <CAEPRUYqfpdp1GqxBgx-q=hyvQDe4uyi6okzHPW2QmfmPG_Z3NQ@mail.gmail.com>
+ <525FFA40.9050901@wwwdotorg.org>
+Message-ID: <CAEPRUYq5DA982AqAmrUpsb3qc30VaFBawaXKTp2pcDvdbM-S1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Oct 2013 22:40:32 +0800
-Jiang Liu <liuj97@gmail.com> wrote:
+On Thu, Oct 17, 2013 at 7:54 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/17/2013 12:03 AM, Christian Daudt wrote:
+>> On Thu, Oct 3, 2013 at 5:23 PM, Sherman Yin <syin@broadcom.com> wrote:
+>>> Adds pinctrl driver for Broadcom Capri (BCM281xx) SoCs.
+>>>
+>>> Signed-off-by: Sherman Yin <syin@broadcom.com>
+>>> Reviewed-by: Christian Daudt <bcm@fixthebug.org>
+>>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>>> ---
+>>>  arch/arm/mach-bcm/Kconfig       |    2 +
+>>>  drivers/pinctrl/Kconfig         |   10 +
+>>>  drivers/pinctrl/Makefile        |    1 +
+>>>  drivers/pinctrl/pinctrl-capri.c | 1727 +++++++++++++++++++++++++++++++++++++++
+>>>  4 files changed, 1740 insertions(+)
+>>>  create mode 100644 drivers/pinctrl/pinctrl-capri.c
+>>>
+>>> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+>>> index 69d67f7..2546365 100644
+>>> --- a/arch/arm/mach-bcm/Kconfig
+>>> +++ b/arch/arm/mach-bcm/Kconfig
+>>> @@ -10,6 +10,8 @@ config ARCH_BCM
+>>>         select GENERIC_CLOCKEVENTS
+>>>         select GENERIC_TIME
+>>>         select GPIO_BCM
+>>> +       select PINCTRL
+>>> +       select PINCTRL_CAPRI
+>>>         select SPARSE_IRQ
+>>>         select TICK_ONESHOT
+>>>         select CACHE_L2X0
+>>
+>> On your subsequent patchset pls move this from Kconfig to
+>> arm/configs/bcm_defconfig, and break that modification into a separate
+>> patch from the drivers/* modification.
+>
+> The other SoCs I'm familiar with all select this from their ARCH_xxx
+> config symbol.
+>
+I had a discussion on what is best left under ARCH and what is best
+left to defconfig with Kevin Hilman a while back and the conclusion
+was that any config not strictly required for bootup is best left to
+defconfig. This will allow multiplatform kernels to switch to using
+them as loadable modules later on, something not possible with configs
+put under ARCH_xxx.
 
-
-> >>> You could make the code more concise by limiting your patching ability to
-> >>> branch immediates. Then a nop is simply a branch to the next instruction (I
-> >>> doubt any modern CPUs will choke on this, whereas the architecture requires
-> >>> a NOP to take time).
-> >> I guess a NOP should be more effecient than a "B #4" on real CPUs:)
-> > 
-> > Well, I was actually questioning that. A NOP *has* to take time (the
-> > architecture prevents implementations from discaring it) whereas a static,
-> > unconditional branch will likely be discarded early on by CPUs with even
-> > simple branch prediction logic.
-> I naively thought "NOP" is cheaper than a "B" :(
-> Will use a "B #1" to replace "NOP".
-> 
-
-Really?? What's the purpose of a NOP then? It seems to me that an
-architecture is broken if a NOP is slower than a static branch.
-
--- Steve
+ Thanks,
+    csd
