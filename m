@@ -1,85 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Oct 2013 13:11:35 +0100
-Subject: [PATCH v4 3/7] arm64: move encode_insn_immediate() from module.c
- to insn.c
-In-Reply-To: <1381990781-27814-4-git-send-email-liuj97@gmail.com>
-References: <1381990781-27814-1-git-send-email-liuj97@gmail.com>
- <1381990781-27814-4-git-send-email-liuj97@gmail.com>
-Message-ID: <20131017121135.GK18765@mudshark.cambridge.arm.com>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Thu, 17 Oct 2013 08:14:54 -0400
+Subject: [RESEND PATCH 3/4] ARM: dts: bcm281xx: Add i2c busses
+In-Reply-To: <CAEPRUYqqxLevwM6dRpGUnfCgF2qZ_NVTDYTzKoFg+zbOPggfMQ@mail.gmail.com>
+References: <1381960909-1735-1-git-send-email-tim.kryger@linaro.org>
+ <1381960909-1735-4-git-send-email-tim.kryger@linaro.org>
+ <CAEPRUYqqxLevwM6dRpGUnfCgF2qZ_NVTDYTzKoFg+zbOPggfMQ@mail.gmail.com>
+Message-ID: <20131017121454.GZ2721@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 07:19:36AM +0100, Jiang Liu wrote:
-> From: Jiang Liu <jiang.liu@huawei.com>
-> 
-> Function encode_insn_immediate() will be used by other instruction
-> manipulate related functions, so move it into insn.c and rename it
-> as aarch64_insn_encode_immediate().
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Jiang Liu <liuj97@gmail.com>
-> ---
->  arch/arm64/include/asm/insn.h |  14 ++++
->  arch/arm64/kernel/insn.c      |  58 ++++++++++++++++
->  arch/arm64/kernel/module.c    | 152 +++++++++++++-----------------------------
->  3 files changed, 117 insertions(+), 107 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index fc439b9..d62b601 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -42,6 +42,18 @@ enum aarch64_insn_encoding_class {
->                                          * system instructions */
->  };
-> 
-> +enum aarch64_insn_imm_type {
-> +       AARCH64_INSN_IMM_MOVK,
-> +       AARCH64_INSN_IMM_ADR,
-> +       AARCH64_INSN_IMM_26,
-> +       AARCH64_INSN_IMM_19,
-> +       AARCH64_INSN_IMM_16,
-> +       AARCH64_INSN_IMM_14,
-> +       AARCH64_INSN_IMM_12,
-> +       AARCH64_INSN_IMM_9,
-> +       AARCH64_INSN_IMM_MAX
-> +};
-> +
->  #define        __AARCH64_INSN_FUNCS(abbr, mask, val)   \
->  static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
->  { return (code & (mask)) == (val); }   \
-> @@ -80,6 +92,8 @@ static __always_inline void aarch64_insn_write(void *addr, u32 insn)
->  }
-> 
->  enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
-> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
-> +                                 u32 insn, u64 imm);
->  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
-> 
->  int aarch64_insn_patch_text_nosync(void *addrs[], u32 insns[], int cnt);
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 8dd5fbe..344d23ed 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -147,3 +147,61 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
-> 
->         return ret;
->  }
-> +
-> +u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
-> +                                 u32 insn, u64 imm)
-> +{
-> +       u32 immlo, immhi, lomask, himask, mask;
-> +       int shift;
-> +
-> +       switch (type) {
-> +       case AARCH64_INSN_IMM_MOVK:
-> +               mask = BIT(16) - 1;
-> +               shift = 5;
-> +               break;
+On Wed, Oct 16, 2013 at 09:32:51PM -0700, Christian Daudt wrote:
+> Hi Tim,
+>  This patch does not work as it relies on the yet-unmerged clock code
+> for bcm11351. This patch does not apply to -rc, and when tweaked it
+> does not compile as it references  non-existent bsc_clks.
+>  Has the clk patches been submitted yet ? Applying this will have to
+> wait until those have been accepted.
 
-This is just AARCH64_INSN_IMM_16 now that we're not dealing with MOV
-relocations. You can kill INSN_IMM_MOVK in the enum.
+Hi Christian, Tim mentioned the dependencies in the cover letter.
+Sebastian's series, for which the pull request is already sent, and then
+Tim's own fixed clock series that is pending some review.
 
-The rest of the patch looks fine.
+-Matt
 
-Will
+> On Wed, Oct 16, 2013 at 3:01 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> > Add the DTS nodes for all the i2c busses in the SoC.
+> >
+> > Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> > Reviewed-by: Christian Daudt <csd@broadcom.com>
+> > Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> > Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/bcm11351.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 40 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+> > index 1246885..4bfd7e3 100644
+> > --- a/arch/arm/boot/dts/bcm11351.dtsi
+> > +++ b/arch/arm/boot/dts/bcm11351.dtsi
+> > @@ -146,6 +146,46 @@
+> >                 status = "disabled";
+> >         };
+> >
+> > +       i2c at 3e016000 {
+> > +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
+> > +               reg = <0x3e016000 0x80>;
+> > +               interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +               clocks = <&bsc1_clk>;
+> > +               status = "disabled";
+> > +       };
+> > +
+> > +       i2c at 3e017000 {
+> > +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
+> > +               reg = <0x3e017000 0x80>;
+> > +               interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +               clocks = <&bsc2_clk>;
+> > +               status = "disabled";
+> > +       };
+> > +
+> > +       i2c at 3e018000 {
+> > +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
+> > +               reg = <0x3e018000 0x80>;
+> > +               interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +               clocks = <&bsc3_clk>;
+> > +               status = "disabled";
+> > +       };
+> > +
+> > +       i2c at 3500d000 {
+> > +               compatible = "brcm,bcm11351-i2c", "brcm,kona-i2c";
+> > +               reg = <0x3500d000 0x80>;
+> > +               interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +               clocks = <&pmu_bsc_clk>;
+> > +               status = "disabled";
+> > +       };
+> > +
+> >         clocks {
+> >                 bsc1_clk: bsc1 {
+> >                         compatible = "fixed-clock";
+> > --
+> > 1.8.0.1
+> >
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
