@@ -1,88 +1,128 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 17 Oct 2013 18:30:40 +0200
-Subject: [PATCH 6/8] clk: max77686: Refactor driver data handling
+Date: Thu, 17 Oct 2013 18:30:41 +0200
+Subject: [PATCH 7/8] clk: max77686: Register OF clock provider
 In-Reply-To: <1382027442-1992-1-git-send-email-t.figa@samsung.com>
 References: <1382027442-1992-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1382027442-1992-7-git-send-email-t.figa@samsung.com>
+Message-ID: <1382027442-1992-8-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a prerequisite for further patch adding OF clock provider support to
-the driver, this patch changes the driver to store an array of struct
-clk * as driver data.
+If max77686 chip is instantiated from device tree, it is desirable to
+have an OF clock provider to allow device tree based look-up of clocks.
+This patch adds OF clock provider registration to the clk-max77686
+driver.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/clk-max77686.c | 26 ++++++++++++++------------
- 1 file changed, 14 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/clock/maxim,max77686.txt   | 38 ++++++++++++++++++++++
+ Documentation/devicetree/bindings/mfd/max77686.txt |  3 ++
+ drivers/clk/clk-max77686.c                         | 24 ++++++++++++++
+ 3 files changed, 65 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77686.txt
 
+diff --git a/Documentation/devicetree/bindings/clock/maxim,max77686.txt b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
+new file mode 100644
+index 0000000..96ce71b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/maxim,max77686.txt
+@@ -0,0 +1,38 @@
++Binding for Maxim MAX77686 32k clock generator block
++
++This is a part of device tree bindings of MAX77686 multi-function device.
++More information can be found in bindings/mfd/max77686.txt file.
++
++The MAX77686 contains three 32.768khz clock outputs that can be controlled
++(gated/ungated) over I2C.
++
++Following properties should be presend in main device node of the MFD chip.
++
++Required properties:
++- #clock-cells: simple one-cell clock specifier format is used, where the
++  only cell is used as an index of the clock inside the provider. Following
++  indices are allowed:
++    - 0: 32khz_ap clock,
++    - 1: 32khz_cp clock,
++    - 2: 32khz_pmic clock.
++
++Example: Node of the MFD chip
++
++	max77686: max77686 at 09 {
++		compatible = "maxim,max77686";
++		interrupt-parent = <&wakeup_eint>;
++		interrupts = <26 0>;
++		reg = <0x09>;
++		#clock-cells = <1>;
++
++		/* ... */
++	};
++
++Example: Clock consumer node
++
++	foo at 0 {
++		compatible = "bar,foo";
++		/* ... */
++		clock-names = "my-clock";
++		clocks = <&max77686 2>;
++	};
+diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
+index c6a3469..678f3cf 100644
+--- a/Documentation/devicetree/bindings/mfd/max77686.txt
++++ b/Documentation/devicetree/bindings/mfd/max77686.txt
+@@ -7,6 +7,9 @@ different i2c slave address,presently for which we are statically creating i2c
+ client while probing.This document describes the binding for mfd device and
+ PMIC submodule.
+ 
++Binding for the built-in 32k clock generator block is defined separately
++in bindings/clk/maxim,max77686.txt file.
++
+ Required properties:
+ - compatible : Must be "maxim,max77686";
+ - reg : Specifies the i2c slave address of PMIC block.
 diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index 81b3680..3cf38dc 100644
+index 3cf38dc..3d7e8dd 100644
 --- a/drivers/clk/clk-max77686.c
 +++ b/drivers/clk/clk-max77686.c
-@@ -137,12 +137,13 @@ static struct clk *max77686_clk_register(struct device *dev,
- static int max77686_clk_probe(struct platform_device *pdev)
- {
- 	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
--	struct max77686_clk **max77686_clks;
-+	struct max77686_clk *max77686_clks[MAX77686_CLKS_NUM];
-+	struct clk **clocks;
- 	int i, ret;
+@@ -169,6 +169,26 @@ static int max77686_clk_probe(struct platform_device *pdev)
  
--	max77686_clks = devm_kzalloc(&pdev->dev, sizeof(struct max77686_clk *)
-+	clocks = devm_kzalloc(&pdev->dev, sizeof(struct clk *)
- 					* MAX77686_CLKS_NUM, GFP_KERNEL);
--	if (!max77686_clks)
-+	if (!clocks)
- 		return -ENOMEM;
+ 	platform_set_drvdata(pdev, clocks);
  
- 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
-@@ -153,22 +154,20 @@ static int max77686_clk_probe(struct platform_device *pdev)
- 	}
- 
- 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
--		struct clk *clk;
--
- 		max77686_clks[i]->iodev = iodev;
- 		max77686_clks[i]->mask = 1 << i;
- 		max77686_clks[i]->hw.init = &max77686_clks_init[i];
- 
--		clk = max77686_clk_register(&pdev->dev, max77686_clks[i]);
--		if (IS_ERR(clk)) {
--			ret = PTR_ERR(clk);
-+		clocks[i] = max77686_clk_register(&pdev->dev, max77686_clks[i]);
-+		if (IS_ERR(clocks[i])) {
-+			ret = PTR_ERR(clocks[i]);
- 			dev_err(&pdev->dev, "failed to register %s\n",
- 				max77686_clks[i]->hw.init->name);
- 			goto err_clocks;
- 		}
- 	}
- 
--	platform_set_drvdata(pdev, max77686_clks);
-+	platform_set_drvdata(pdev, clocks);
- 
++	if (iodev->dev->of_node) {
++		struct clk_onecell_data *of_data;
++
++		of_data = devm_kzalloc(&pdev->dev,
++					sizeof(*of_data), GFP_KERNEL);
++		if (!of_data) {
++			ret = -ENOMEM;
++			goto err_clocks;
++		}
++
++		of_data->clks = clocks;
++		of_data->clk_num = MAX77686_CLKS_NUM;
++		ret = of_clk_add_provider(iodev->dev->of_node,
++					of_clk_src_onecell_get, of_data);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to register OF clock provider\n");
++			goto err_clocks;
++		}
++	}
++
  	return 0;
  
-@@ -183,12 +182,15 @@ err_clocks:
+ err_clocks:
+@@ -182,9 +202,13 @@ err_clocks:
  
  static int max77686_clk_remove(struct platform_device *pdev)
  {
--	struct max77686_clk **max77686_clks = platform_get_drvdata(pdev);
-+	struct clk **clocks = platform_get_drvdata(pdev);
++	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+ 	struct clk **clocks = platform_get_drvdata(pdev);
  	int i;
  
- 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
--		clkdev_drop(max77686_clks[i]->lookup);
--		clk_unregister(max77686_clks[i]->hw.clk);
-+		struct clk_hw *hw = __clk_get_hw(clocks[i]);
-+		struct max77686_clk *max77686 = to_max77686_clk(hw);
++	if (iodev->dev->of_node)
++		of_clk_del_provider(iodev->dev->of_node);
 +
-+		clkdev_drop(max77686->lookup);
-+		clk_unregister(clocks[i]);
- 	}
- 	return 0;
- }
+ 	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
+ 		struct clk_hw *hw = __clk_get_hw(clocks[i]);
+ 		struct max77686_clk *max77686 = to_max77686_clk(hw);
 -- 
 1.8.3.2
