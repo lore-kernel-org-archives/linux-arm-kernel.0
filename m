@@ -1,58 +1,38 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 17 Oct 2013 14:47:34 -0700
-Subject: [GIT PULL] Integrator patches for v3.13
-In-Reply-To: <CACRpkdbdpJByijRjOZKpEB_5tZt9xro1DLmVXsgrixe9YJTbZg@mail.gmail.com>
- (Linus Walleij's message of "Wed, 16 Oct 2013 14:27:13 +0200")
-References: <CACRpkdbdpJByijRjOZKpEB_5tZt9xro1DLmVXsgrixe9YJTbZg@mail.gmail.com>
-Message-ID: <87k3hb1seh.fsf@linaro.org>
+Date: Thu, 17 Oct 2013 14:51:22 -0700
+Subject: [GIT PULL] msm cleanups for v3.13
+In-Reply-To: <1381954617-2431-1-git-send-email-davidb@codeaurora.org> (David
+ Brown's message of "Wed, 16 Oct 2013 13:16:57 -0700")
+References: <1381954617-2431-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <87fvrz1s85.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+David Brown <davidb@codeaurora.org> writes:
 
-> Hi ARM SoC folks,
+> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
 >
-> this is a second try at an Integrator patch stack for v3.13.
-> This addresses the issues reported by Mark Rutland and
-> adds two patches on top for some more things he wanted
-> me to fix as well.
->
-> Further this folds in a defconfig patch and the LED fix.
-> The LED fix is DT-related, and the defconfig change is
-> related to the LED fix, so they all belong in the same series.
->
-> The cpufreq patch is ACKed by both cpufreq maintainers.
->
-> Please pull this to some suitable branch in the
-> ARM SoC tree.
->
-> Yours,
-> Linus Walleij
->
-> The following changes since commit d0e639c9e06d44e713170031fe05fb60ebe680af:
->
->   Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
+>   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/integrator-for-v3.13-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-cleanup-for-3.13
 >
-> for you to fetch changes up to df36680f1a71eef97685c30eb9eaf55a6813b6cd:
+> for you to fetch changes up to 81cf1e061d001fab44dbaa85fc4fbfb6da6713a1:
 >
->   ARM: integrator: core module registers from compatible strings
-> (2013-10-16 14:10:14 +0200)
+>   ARM: msm: Rename msm devicetrees to have standard 'qcom' prefix (2013-09-25 13:02:56 -0700)
 >
 > ----------------------------------------------------------------
-> Integrator patches for the v3.13 kernel cycle:
-> - Fix up the LED support
-> - Update the Integrator defconfig
-> - Remove ATAG boot path
-> - Move some stuff over to the device tree
+> General cleanups for MSM for 3.13
+>
+> Some small cleanups for MSM.  Removes extraneous irq definitions that
+> aren't used on DT targets, moves the single existing board file to
+> board-dt.c in antipication of additional targets, and renames the
+> existing DT files to have a common 'qcom' prefix.
 >
 > ----------------------------------------------------------------
 
-Pulled into next/soc,
+Pulled into next/cleanup,
 
 Thanks,
 
