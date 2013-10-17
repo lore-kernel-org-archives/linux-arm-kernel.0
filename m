@@ -1,27 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Oct 2013 11:34:09 +0100
-Subject: [PATCH v2 2/8] ASoC: Samsung: Do not require legacy DMA API in
- case of S3C64XX
-In-Reply-To: <1381950659-12703-3-git-send-email-tomasz.figa@gmail.com>
-References: <1381950659-12703-1-git-send-email-tomasz.figa@gmail.com>
- <1381950659-12703-3-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20131017103409.GM2443@sirena.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 17 Oct 2013 11:38:41 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Enable platform-specific options in
+ defconfig
+In-Reply-To: <525FB49C.7040607@arm.com>
+References: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+ <1381930594-1701-3-git-send-email-pawel.moll@arm.com>
+ <525FB49C.7040607@arm.com>
+Message-ID: <1382006321.27517.119.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 09:10:53PM +0200, Tomasz Figa wrote:
-> With support for amba-pl08x driver, on S3C64xx the generic DMA engine
-> API can be used instead of the private s3c-dma interface.
+On Thu, 2013-10-17 at 10:57 +0100, Sudeep KarkadaNagesha wrote:
+> > +CONFIG_MTD_PHYSMAP=y
+> > +CONFIG_MTD_PHYSMAP_OF=y
 > 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> This could cause issues with CPUIdle on TC2. Since TC2 reset vector is in NOR
+> flash, NOR flash has to be in Read mode when CPU resets and enter reset vector.
+> But what I have seen is that NOR flash is left in Read Identifier Mode after the
+> driver is initialised. So we need to make sure NOR device is in Read mode
+> whenever CPU enters deeper C-states and also may have to register notifiers
+> which seems overkill IMO. Most of the platform have separate(or secure) flash
+> for this reason.
 
-Acked-by: Mark Brown <broonie@linaro.org>
+Oh boy, yes, I remember this now.
 
-in case we can get this into v3.13.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/af3ec6b3/attachment-0001.sig>
+> Is it possible to disable flash on TC2 only in it's DT something like
+>          flash at 0,00000000 {
+>                 status = "disabled";
+>          };	
+
+But flash is innocent, really... I may just remove CPU_IDLE for the time
+being.
+
+Pawe?
