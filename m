@@ -1,45 +1,87 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 17 Oct 2013 15:10:33 -0400 (EDT)
-Subject: [PATCH 2/2 v3] usb: ohci: remove ep93xx bus glue platform driver
-In-Reply-To: <201310171125.50024.hartleys@visionengravers.com>
-Message-ID: <Pine.LNX.4.44L0.1310171506210.2436-100000@iolanthe.rowland.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 17 Oct 2013 14:16:37 -0500
+Subject: [PATCH v2] TTY: hvc_dcc: probe for a JTAG connection before
+ registering
+In-Reply-To: <1380074758-19808-1-git-send-email-robherring2@gmail.com>
+References: <1379968234-23373-1-git-send-email-robherring2@gmail.com>
+ <1380074758-19808-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CAL_JsqK0hPtoD22fw3J+TmgNwJeJUYwjB9i1C4n817GvuOxQxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Oct 2013, H Hartley Sweeten wrote:
+On Tue, Sep 24, 2013 at 9:05 PM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Enabling the ARM DCC console and using without a JTAG connection will
+> simply hang the system. Since distros like to turn on all options, this
+> is a reoccurring problem to debug. We can do better by checking if
+> anything is attached and handling characters. There is no way to probe
+> this, so send a newline and check that it is handled.
+>
+> Cc: Paolo Pisati <paolo.pisati@canonical.com>
+> Cc: Tim Gardner <tim.gardner@canonical.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.cz>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+> v2: use time_is_after_jiffies
+>
+>  drivers/tty/hvc/hvc_dcc.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
 
-> Convert ep93xx to use the OHCI platform driver and remove the
-> ohci-ep93xx bus glue driver.
-> 
-> Enable CONFIG_OHCI_HCD_PLATFORM in the ep93xx_defconfig so that USB
-> is still enabled by default on the EP93xx platform.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Greg, Jiri,
 
-> +/*************************************************************************
-> + * EP93xx OHCI USB Host
-> + *************************************************************************/
-> +
-> +static struct clk *ep93xx_ohci_host_clock;
-> +
-> +static int ep93xx_ohci_power_on(struct platform_device *pdev)
+Can you please apply.
+
+Rob
+
+>
+> diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+> index 44fbeba..3502a7b 100644
+> --- a/drivers/tty/hvc/hvc_dcc.c
+> +++ b/drivers/tty/hvc/hvc_dcc.c
+> @@ -86,6 +86,21 @@ static int hvc_dcc_get_chars(uint32_t vt, char *buf, int count)
+>         return i;
+>  }
+>
+> +static bool hvc_dcc_check(void)
 > +{
-> +	if (!ep93xx_ohci_host_clock) {
-> +		ep93xx_ohci_host_clock = devm_clk_get(&pdev->dev, NULL);
-> +		if (IS_ERR(ep93xx_ohci_host_clock))
-> +			return PTR_ERR(ep93xx_ohci_host_clock);
-> +	}
+> +       unsigned long time = jiffies + (HZ / 10);
 > +
-> +	clk_enable(ep93xx_ohci_host_clock);
+> +       /* Write a test character to check if it is handled */
+> +       __dcc_putchar('\n');
 > +
-> +	return 0;
-
-Wasn't this supposed to be changed to:
-
-	return clk_enable(ep93xx_ohci_host_clock);
-
-?  Otherwise it looks fine.  After fixing this, you can add
-
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-
-Alan Stern
+> +       while (time_is_after_jiffies(time)) {
+> +               if (!(__dcc_getstatus() & DCC_STATUS_TX))
+> +                       return true;
+> +       }
+> +
+> +       return false;
+> +}
+> +
+>  static const struct hv_ops hvc_dcc_get_put_ops = {
+>         .get_chars = hvc_dcc_get_chars,
+>         .put_chars = hvc_dcc_put_chars,
+> @@ -93,6 +108,9 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
+>
+>  static int __init hvc_dcc_console_init(void)
+>  {
+> +       if (!hvc_dcc_check())
+> +               return -ENODEV;
+> +
+>         hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+>         return 0;
+>  }
+> @@ -100,6 +118,9 @@ console_initcall(hvc_dcc_console_init);
+>
+>  static int __init hvc_dcc_init(void)
+>  {
+> +       if (!hvc_dcc_check())
+> +               return -ENODEV;
+> +
+>         hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+>         return 0;
+>  }
+> --
+> 1.8.1.2
+>
