@@ -1,53 +1,38 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 17 Oct 2013 16:19:57 +0200
-Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <525FAEED.7030207@st.com>
-References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
- <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
- <20131016151419.GA14104@ns203013.ovh.net> <525F915D.9020501@st.com>
- <525FAEED.7030207@st.com>
-Message-ID: <20131017141957.GE14104@ns203013.ovh.net>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Thu, 17 Oct 2013 19:52:32 +0530
+Subject: [PATCH 3/9] clk: samsung: exynos4: Move suspend/resume handling
+ to SoC driver
+In-Reply-To: <1821539.dxQ3vs372W@amdc1227>
+References: <1381921698-5060-1-git-send-email-t.figa@samsung.com>
+ <1381921698-5060-4-git-send-email-t.figa@samsung.com>
+ <CAKew6eV7Hd1x1+YLR9rjzNgYu0t=9Q8BG23VUvhPJTf77bsRXQ@mail.gmail.com>
+ <1821539.dxQ3vs372W@amdc1227>
+Message-ID: <CAKew6eV0sjR5QQipUTD+361jHuRZ9wxo80veBdphZ=Uo-L+2MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:33 Thu 17 Oct     , srinivas kandagatla wrote:
-> On 17/10/13 08:27, Maxime COQUELIN wrote:
-> > ...
-> >>> >> +
-> >>> >> +static struct of_device_id st_i2c_match[] = {
-> >>> >> +     { .compatible = "st,comms-ssc-i2c", },
-> >> > the rules is to put the first soc that use the ip in the compatible
-> >> > as st,sti7100-scc-i2c
-> > Ok. There are no plans to upstream the SH4 platforms, it will only 
-> > remains in stlinux.com.
-> > Maybe I can set the first ARM platform (STiH415)?
-> > That would give st,stih415-ssc-i2c.
-> NAK, for st,stih415-ssc-i2c naming.
-> 
-> IMO, this makes sense when the same IP integration done on different SOC
-> changes slightly/very differently.
-> 
-> But in this case the "comms" IP remains unchanged across all the SOCs.
-> 
-> I would still prefer "st,comms-ssc-i2c", allowing a single device driver
-> to match against several SoCs. ST "comms" IP it is integrated across all
-> the STi series of SoCs, so we don't want to add new entry in compatible
-> for every new SOC.
+On Thu, Oct 17, 2013 at 7:46 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> On Thursday 17 of October 2013 19:12:08 Yadwinder Singh Brar wrote:
+>> Hi Tomasz,
+>>
+>> [ ... ]
+>> >  /*
+>> >   * list of controller registers to be saved and restored during a
+>> >   * suspend/resume cycle.
+>> > @@ -288,6 +299,70 @@ static unsigned long exynos4_clk_regs[] __initdata = {
+>> >         GATE_IP_CPU,
+>> >  };
+>> >
+>> > +static int exynos4_clk_suspend(void)
+>> > +{
+>> > +       samsung_clk_save(reg_base, exynos4_save_common,
+>> > +                               ARRAY_SIZE(exynos4_clk_regs));
+>>
+>> a doubt here, Is sizeof(exynos4_clk_regs) works with
+>> exynos4_clk_regs[] as __initdata ?
+>
+> Hmm, this is a compile time constant, so I don't see why it couldn't work.
+>
 
-you never need this you always the first SoC that's all
-
-see other bindings on at91 as example sorry NACK
-
-Best Regards,
-J.
-> 
-> 
-> Thanks,
-> srini
-> 
-> > 
-> > Thanks for the review,
-> > Maxime
-> > 
-> >> >
-> 
+why this doubt came in mind is sizeof() is a operator.. like we can
+use sizeof(x++).
