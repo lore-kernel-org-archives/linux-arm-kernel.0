@@ -1,63 +1,63 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 17 Oct 2013 09:52:42 +0200
-Subject: [PATCH] ARM: dts: mxs: add auart2 pinmux to imx28.dtsi
-In-Reply-To: <1381939443-7318-1-git-send-email-aida.mynzhasova@skitlab.ru>
-References: <1381939443-7318-1-git-send-email-aida.mynzhasova@skitlab.ru>
-Message-ID: <20131017095242.155725b6@ipc1.ka-ro>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 17 Oct 2013 10:57:43 +0300
+Subject: [PATCH v2 1/7] clk: tegra: Add support for PLLSS
+In-Reply-To: <525ECB08.4020201@wwwdotorg.org>
+References: <1381850098-12357-1-git-send-email-pdeschrijver@nvidia.com>
+ <1381850098-12357-2-git-send-email-pdeschrijver@nvidia.com>
+ <525DA373.6040805@wwwdotorg.org>
+ <20131016074829.GD5643@tbergstrom-lnx.Nvidia.com>
+ <525ECB08.4020201@wwwdotorg.org>
+Message-ID: <20131017075743.GQ5643@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Aida Mynzhasova <aida.mynzhasova@skitlab.ru> wrote:
-> Add auart2 pins configuration on its main pads
+On Wed, Oct 16, 2013 at 07:21:12PM +0200, Stephen Warren wrote:
+> On 10/16/2013 01:48 AM, Peter De Schrijver wrote:
+> > On Tue, Oct 15, 2013 at 10:20:03PM +0200, Stephen Warren wrote:
+> >> On 10/15/2013 09:14 AM, Peter De Schrijver wrote:
+> >>> Tegra124 introduces a new PLL type, PLLSS. Add support for it.
+> >>
+> >>> diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+> >>
+> >>
+> >>> +static int clk_pllss_set_rate(struct clk_hw *hw, unsigned long rate,
+> >>> +				unsigned long parent_rate)
+> >>
+> >> This function seems pretty generic. Is it possible to share a bit more
+> >> code with any of the other pllXXX_set_rate() functions?
+> >>
+> >>> +struct clk *tegra_clk_register_pllss(const char *name, const char *parent_name,
+> >>> +				void __iomem *clk_base, unsigned long flags,
+> >>> +				struct tegra_clk_pll_params *pll_params,
+> >>> +				spinlock_t *lock)
+> >>
+> >>> +	val = pll_readl_base(pll);
+> >>> +	if (val & PLLSS_REF_SRC_SEL_MASK) {
+> >>> +		WARN(1, "Unknown parent selected for %s: %d\n", name,
+> >>> +			(val & PLLSS_REF_SRC_SEL_MASK) >>
+> >>> +			PLLSS_REF_SRC_SEL_SHIFT);
+> >>> +		kfree(pll);
+> >>> +		return ERR_PTR(-EINVAL);
+> >>> +	}
+> >>
+> >> If there's a field in HW that muxes the clock input between n clocks,
+> >> why does this function assume there's a single parent for this PLL, by
+> >> taking a "const char *parent_name" parameter?
+> >>
+> >> What happens if the bootloader changed this field in HW; is the kernel
+> >> simply not able to boot?
+> >>
+> > 
+> > This logic comes from downstream. I guess it means we're running in an
+> > unvalidated configuration. Do you think we should expose all parents 
+> > anyway? Even if not all configurations have been validated?
+> > (which is quite likely)
 > 
-> Signed-off-by: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
-> ---
->  arch/arm/boot/dts/imx28.dtsi | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 7363fde..81102b2 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -320,6 +320,19 @@
->  					fsl,pull-up = <0>;
->  				};
->  
-> +				auart2_pins_a: auart2 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x3080 /* MX28_PAD_AUART2_RX__AUART2_RX	*/
-> +						0x3090 /* MX28_PAD_AUART2_TX__AUART2_TX */
-> +						0x30a0 /* MX28_PAD_AUART2_CTS__AUART2_CTS */
-> +						0x30b0 /* MX28_PAD_AUART2_RTS__AUART2_RTS */
->
-Since commit 27572a2f ARM: dts: mxs: add pinctrl header files
-it is no longer necessary to specify the padconfig values as numbers.
-You should use the symbolic names instead.
+> If we only support one particular parent, why not force the register
+> field to the desired value, rather than failing?
 
-> +					>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-Also these should be:
-                                        fsl,drive-strength = <MXS_DRIVE_4mA>;
-                                        fsl,voltage = <MXS_VOLTAGE_HIGH>;
-                                        fsl,pull-up = <MXS_PULL_DISABLE>;
+Sounds reasonable indeed. I will do that in the next version.
 
-You probably should rebase your patch to a more recent version of
-linux-next.
+Cheers,
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Peter.
