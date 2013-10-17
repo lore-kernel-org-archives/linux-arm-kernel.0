@@ -1,41 +1,27 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 17 Oct 2013 12:28:46 +0200
-Subject: change_page_attr() implementation for ARM?
-In-Reply-To: <20131017101325.GD23462@arm.com>
-References: <20131017.080523.1821831578701162178.hdoyu@nvidia.com><20131017101325.GD23462@arm.com>
-Message-ID: <20131017.132846.130167893941132236.hdoyu@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 17 Oct 2013 11:33:43 +0100
+Subject: [PATCH v2 1/8] spi: s3c64xx: Do not require legacy DMA API in
+ case of S3C64XX
+In-Reply-To: <1381950659-12703-2-git-send-email-tomasz.figa@gmail.com>
+References: <1381950659-12703-1-git-send-email-tomasz.figa@gmail.com>
+ <1381950659-12703-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20131017103343.GL2443@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> wrote @ Thu, 17 Oct 2013 12:13:26 +0200:
-
-> On Thu, Oct 17, 2013 at 06:05:23AM +0100, Hiroshi Doyu wrote:
-> > I found a bit old discussion[1] about CPA support on ARM32(Cortex-A9).
-> > 
-> > It seesm that CPA API on ARM wasn't possible because maintaining
-> > multiple pagetables under SMP is difficult. Instead currently we are
-> > using precallocated memory via DMA API.
-> > 
-> > Is this situation still same for Cortex-A15 and ARM64? If the
-> > mismatched aliasing problem doesn't happen, is CPA API feasible?
+On Wed, Oct 16, 2013 at 09:10:52PM +0200, Tomasz Figa wrote:
+> With support for amba-pl08x driver, on S3C64xx the generic DMA engine
+> API can be used instead of the private s3c-dma interface.
 > 
-> On ARMv7+LPAE and AArch64 we use separate TTBR1 for the kernel (linear)
-> mapping so in theory you could implement change_page_attr(). The
-> mismatched aliases restriction still exists but it is clarified on what
-> is and isn't allowed (so you can have Normal non-cacheable and Normal
-> cacheable aliases, as long as you take care of removing any dirty cache
-> lines that could potentially corrupt your data). The DMA API already
-> takes care of this.
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-Ok
+Acked-by: Mark Brown <broonie@linaro.org>
 
-> My (other) problem with change_page_attr() is that its not a standard
-> in-kernel API. Powerpc and s390 implement change_page_attr() but with
-> different arguments while x86 has change_page_attr_(set|clear).
-> 
-> So, is the DMA API not enough for what you need?
-
-One of the possible usages may be to have buffers with some specific
-page attributes, which could save some of cache maintenances, mainly
-for better performance. For example, manipulating pagetables and some
-special buffers shared by GPU.
+in case we can get this into v3.13.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131017/d99de089/attachment.sig>
