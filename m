@@ -1,85 +1,15 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 16 Oct 2013 19:32:39 -0500
-Subject: [PATCH 2/4] arm: dts: Add a system manager compatible property
-In-Reply-To: <1381969961-12679-1-git-send-email-dinguyen@altera.com>
-References: <1381969961-12679-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1381969961-12679-3-git-send-email-dinguyen@altera.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 17 Oct 2013 10:02:43 +0900
+Subject: [PATCH] sh-pfc: r8a7791 PFC support V2
+In-Reply-To: <20131016214605.3868.54890.sendpatchset@w520>
+References: <20131016214605.3868.54890.sendpatchset@w520>
+Message-ID: <20131017010241.GF21728@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+Hi Magnus,
 
-The "altr,sysmgr-sdmmc-sdr" compatible property is used for the SOCFPGA
-clk-sysmgr driver. This property represents the register inside the
-system manager that controls the clock phase of the SD/MMC driver.
+this is just a minor nit and not even about the code.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Cc: Pavel Machek <pavel@denx.de>
-CC: Arnd Bergmann <arnd@arndb.de>
-Cc: Mike Turquette <mturquette@linaro.org>
-CC: Olof Johansson <olof@lixom.net>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
-Cc: Seungwon Jeon <tgih.jun@samsung.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-mmc at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
----
- .../bindings/arm/altera/socfpga-system.txt         |   10 ++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |   12 ++++++++++--
- 2 files changed, 20 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
-index f4d04a0..7a6c7ed 100644
---- a/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
-@@ -5,9 +5,19 @@ Required properties:
- - reg : Should contain 1 register ranges(address and length)
- - cpu1-start-addr : CPU1 start address in hex.
- 
-+Optional properties:
-+- compatible = "altr,sysmgr-sdmmc-sdr". This compatible property is used
-+to represent the clock phase settings for the SD/MMC IP.
-+
- Example:
- 	 sysmgr at ffd08000 {
- 		compatible = "altr,sys-mgr";
- 		reg = <0xffd08000 0x1000>;
- 		cpu1-start-addr = <0xffd080c4>;
-+
-+		sysmgr_sdr_mmc: sysmgr_sdr_mmc {
-+			#clock-cells = <0>;
-+			compatible = "altr,sysmgr-sdmmc-sdr";
-+			reg = <0x108 1>;
-+		};
- 	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index e273fa9..0662d04 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -521,8 +521,16 @@
- 			};
- 
- 		sysmgr at ffd08000 {
--				compatible = "altr,sys-mgr";
--				reg = <0xffd08000 0x4000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "altr,sys-mgr";
-+			reg = <0xffd08000 0x4000>;
-+
-+			sysmgr_sdr_mmc: sysmgr_sdr_mmc {
-+				#clock-cells = <0>;
-+				compatible = "altr,sysmgr-sdmmc-sdr";
-+				reg = <0x108 1>;
- 			};
-+		};
- 	};
- };
--- 
-1.7.9.5
+In future would it be at all possible for you to place V2 after PATCH,
+e.g. [PATCH V2] ? This would make my life ever so slightly easier.
