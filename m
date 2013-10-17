@@ -1,56 +1,84 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 17 Oct 2013 23:52:15 +0400
-Subject: =?UTF-8?B?UmU6IGlteC1kcm06IEFkZCBIRE1JIHN1cHBvcnQ=?=
-In-Reply-To: <20131017193948.GT25034@n2100.arm.linux.org.uk>
-References: <52602EEA.6060402@prisktech.co.nz>
- <20131017193948.GT25034@n2100.arm.linux.org.uk>
-Message-ID: <1382039535.976669051@f130.i.mail.ru>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Oct 2013 13:00:21 -0700
+Subject: [GIT PULL 1/2] omap board removal for some omap3 boards for v3.13
+ merge window
+Message-ID: <pull-1382040021-802435>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Little bit late to the party, but here is the patch for the latest  
-> > version of the HDMI driver I was working on. Having had a quick flick  
-> > through the mailing list I see Russell has noticed a few of the problems  
-> > I had earlier on, which are resolved in my later work. Thought this  
-> > might be useful to help you tidy things up.
-...
-> Now, I notice that the FSL 4.1.0 stuff appears to try and decide
-> which of the two clock inputs to use for the DI module, something
-> which isn't done in the driver in staging.  Also there's the commented
-> out stuff:
-> 
-> #ifdef WTF_IS_THIS
->         /*
->          * Freescale has this in their Kernel. It is neither clear what
->          * it does nor why it does it
->          */
->         if (div & 0x10)
->                 div &= ~0x7;
->         else {
->                 /* Round up divider if it gets us closer to desired pix clk */
->                 if ((div & 0xC) == 0xC) {
->                         div += 0x10;
->                         div &= ~0xF;
->                 }
->         }
-> #endif
-> 
-> Quite simply, the "div" value is as follows:
-> 
-> bits 11:4 - integer divider
-> bits  3:0 - fractional part
-> 
-> So, what this is saying is that for any _odd_ integer divider, we want
-> to either divide by the odd divider, or odd.5 - but no other fractional
-> values.  Otherwise, if the divider is an even integer divider, and the
-> fractional part is greater than .75, we want to round that up.  (It may
-> also be that the final div & ~0xf should be outside that second if
-> statement.)
-> 
-> It could be that the fractional divider is broken and doesn't work
-> correctly with the values that this is trying to avoid.
+The following changes since commit f41509ad0d4c11d0911630440749d409ce2aa1aa:
 
-This problem has been described by me, but solution hung in the air:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/176424.html
+  Merge branches 'omap-for-v3.13/dt' and 'omap-for-v3.13/quirk' into omap-for-v3.13/board-removal (2013-10-14 11:33:07 -0700)
 
----
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/board-removal-signed
+
+for you to fetch changes up to f0c09b7c3b4e6b2fe501b3e888797b470de8320c:
+
+  ARM: OMAP2+: Remove legacy support for zoom platforms (2013-10-15 17:38:21 -0700)
+
+----------------------------------------------------------------
+Changes needed to drop legacy booting support for some
+omap3 boards.
+
+Note that that these are based on a merge of the
+following for the dependencies:
+
+- v3.12-rc5 for fixes to pinctrl mask
+- omap-for-v3.13/dt-signed to avoid pointless merge conflicts
+- omap-for-v3.13/quirk-signed for legacy pdata handling
+
+----------------------------------------------------------------
+Aaro Koskinen (2):
+      ARM: dts: add minimal DT support for Nokia N950 & N9 phones
+      ARM: OMAP2: delete board-rm680
+
+Tony Lindgren (6):
+      ARM: dts: Shared file for omap GPMC connected smsc911x
+      ARM: dts: Add common support for omap3-evm
+      ARM: dts: Add basic support for TMDSEVM3730 (Mistral AM/DM37x EVM)
+      ARM: dts: Add basic support for zoom3
+      ARM: OMAP2+: Remove legacy booting support for omap3 EVM
+      ARM: OMAP2+: Remove legacy support for zoom platforms
+
+ arch/arm/boot/dts/Makefile                   |   4 +
+ arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi    |  52 ++
+ arch/arm/boot/dts/omap-zoom-common.dtsi      |  33 ++
+ arch/arm/boot/dts/omap3-evm-37xx.dts         | 146 ++++++
+ arch/arm/boot/dts/omap3-evm-common.dtsi      |  96 ++++
+ arch/arm/boot/dts/omap3-evm.dts              |  58 +-
+ arch/arm/boot/dts/omap3-igep0020.dts         |  45 +-
+ arch/arm/boot/dts/omap3-n9.dts               |  18 +
+ arch/arm/boot/dts/omap3-n950-n9.dtsi         | 174 ++++++
+ arch/arm/boot/dts/omap3-n950.dts             |  18 +
+ arch/arm/boot/dts/omap3-zoom3.dts            | 217 ++++++++
+ arch/arm/mach-omap2/Kconfig                  |  33 --
+ arch/arm/mach-omap2/Makefile                 |  11 -
+ arch/arm/mach-omap2/board-3630sdp.c          | 225 --------
+ arch/arm/mach-omap2/board-ldp.c              |   3 +-
+ arch/arm/mach-omap2/board-omap3evm.c         | 756 ---------------------------
+ arch/arm/mach-omap2/board-rm680.c            | 167 ------
+ arch/arm/mach-omap2/board-zoom-debugboard.c  | 139 -----
+ arch/arm/mach-omap2/board-zoom-display.c     |  71 ---
+ arch/arm/mach-omap2/board-zoom-peripherals.c | 360 -------------
+ arch/arm/mach-omap2/board-zoom.c             | 159 ------
+ arch/arm/mach-omap2/board-zoom.h             |  10 -
+ 22 files changed, 763 insertions(+), 2032 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi
+ create mode 100644 arch/arm/boot/dts/omap-zoom-common.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-evm-37xx.dts
+ create mode 100644 arch/arm/boot/dts/omap3-evm-common.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-n9.dts
+ create mode 100644 arch/arm/boot/dts/omap3-n950-n9.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-n950.dts
+ create mode 100644 arch/arm/boot/dts/omap3-zoom3.dts
+ delete mode 100644 arch/arm/mach-omap2/board-3630sdp.c
+ delete mode 100644 arch/arm/mach-omap2/board-omap3evm.c
+ delete mode 100644 arch/arm/mach-omap2/board-rm680.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom-debugboard.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom-display.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom-peripherals.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom.h
