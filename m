@@ -1,46 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Oct 2013 10:21:11 +0100
-Subject: [RFC PATCH 2/5] ARM/ARM64: KVM: Forward PSCI SYSTEM_OFF and
- SYSTEM_RESET to user space
-In-Reply-To: <CAFEAcA-xqobnEmHnda5Psr4XH+3vAUr3K9Cnv_uhB7itBbNgfw@mail.gmail.com>
-References: <1381942954-22388-1-git-send-email-anup.patel@linaro.org>
- <1381942954-22388-3-git-send-email-anup.patel@linaro.org>
- <525FA1D3.8060001@arm.com>
- <CAFEAcA-xqobnEmHnda5Psr4XH+3vAUr3K9Cnv_uhB7itBbNgfw@mail.gmail.com>
-Message-ID: <525FAC07.4060306@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 17 Oct 2013 11:21:29 +0200
+Subject: [PATCH v2 13/13] arm64: add CPU power management menu/entries
+In-Reply-To: <1381748590-14279-14-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1381748590-14279-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1381748590-14279-14-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <525FAC19.40503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/13 10:10, Peter Maydell wrote:
-> On 17 October 2013 09:37, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 16/10/13 18:02, Anup Patel wrote:
->>> The PSCI SYSTEM_OFF and SYSTEM_RESET functions are VM or Guest level
->>> functions hence cannot be emulated by the in-kernel PSCI emulation code.
->>
->> Why can't we implement system-wide functionality in the kernel? I fail
->> to see the issue here.
-> 
-> Because the kernel isn't emulating the whole board, and you need
-> to power off or reset the whole board, not just the CPUs.
+On 10/14/2013 01:03 PM, Lorenzo Pieralisi wrote:
+> This patch provides a menu for CPU power management options in the
+> arm64 Kconfig and adds an entry to enable the generic CPU idle configuration.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-In which case we can forward a generic event, once KVM has dealt with
-the CPUs.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
->> I'm really not keen on this approach. Having part of the PSCI
->> implementation offloaded to userspace means we don't have a complete
->> implementation in KVM anymore, and we end-up duplicating functionality
->> all over the place.
->>
->> Also, OFF and RESET are not PSCI specific concepts, and could be
->> implemented in various ways. I'm more inclined to return a
->> *standardized* exit code that the various platforms can interpret.
-> 
-> Maybe we should have a more generic "kernel can't handle this,
-> toss it to userspace" API? That might also fit in with supporting
-> guests that want to make SMC calls to an emulated monitor...
+> ---
+>   arch/arm64/Kconfig | 6 ++++++
+>   1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index be88acd..785132d 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -288,6 +288,12 @@ config ARM64_CPU_SUSPEND
+>
+>   endmenu
+>
+> +menu "CPU Power Management"
+> +
+> +source "drivers/cpuidle/Kconfig"
+> +
+> +endmenu
+> +
+>   source "net/Kconfig"
+>
+>   source "drivers/Kconfig"
+>
 
-Indeed.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
