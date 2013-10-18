@@ -1,34 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Oct 2013 08:35:42 -0700
-Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
-In-Reply-To: <5260E606.2030903@ti.com>
-References: <20131010160018.GA29913@atomide.com>
- <CACRpkdaG-PQA39XSjKUgM9TyeD7srgm_8s+NazrDKJ0gmNLcwg@mail.gmail.com>
- <20131010162015.GC29913@atomide.com>
- <CACRpkdYF83ghUf60Wmrti53UJ1bWV30GW_P9GjWnsOcZHbsv+Q@mail.gmail.com>
- <5257BD3E.5000707@ti.com>
- <CACRpkdYJNaiAAHhYatd6g5_wVt0QEUxOvsk6nQn9o=_i5zfWrA@mail.gmail.com>
- <20131011154352.GO29913@atomide.com>
- <CACRpkdZhbadd5d4P+2B0_DktqK4CHzZPVJC8kPHZYUnp8TaxsA@mail.gmail.com>
- <20131011160146.GR29913@atomide.com> <5260E606.2030903@ti.com>
-Message-ID: <20131018153541.GJ15154@atomide.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 18 Oct 2013 17:38:12 +0200
+Subject: [PATCH] ASoC: kirkwood: add S/PDIF support
+In-Reply-To: <20131018124832.GK2443@sirena.org.uk>
+References: <20130924124122.64834b2a@armhf>
+ <20131018003439.GG2443@sirena.org.uk>
+ <20131018103019.GW25034@n2100.arm.linux.org.uk>
+ <20131018124832.GK2443@sirena.org.uk>
+Message-ID: <20131018173812.74a23b52@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Balaji T K <balajitk@ti.com> [131018 00:41]:
+On Fri, 18 Oct 2013 13:48:32 +0100
+Mark Brown <broonie@kernel.org> wrote:
+
+> > "widgets that manage the enable of the S/PDIF and I2S interfaces between
+> > the FE and BE DAIs" is exactly what I did and you told me that was wrong.
+> > Make up your fscking mind.  
 > 
-> Any conclusion on using regmap for omap control module non-mux registers ?
+> No, this is not the case.  The major problem with your last set of
+> patches was that they did not create any back end DAIs, instead they
+> created purely DAPM routes from the single traditional DAI out to
+> widgets in the CODEC.  What I'm asking Jean-Francois to do above is
+> create and use back end DAIs.
 
-I don't think anybody has even started looking into a SCM driver
-yet considering there are tons of other issues to sort out.
+Mark,
 
-If you're thinking about implementing the MMC PBIAS driver, I would
-just implement it as a standalone driver. It seems that the PBIAS
-interface to the MMC driver can be just regulator framework.
+I think I understood what you mean. I am testing my system with this
+new approach and I will submit a new patch as soon as it works.
 
-Then when we have the SCM driver available, this driver can be
-updated to coordinate things with the core SCM driver.
-
-Regards,
-
-Tony
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
