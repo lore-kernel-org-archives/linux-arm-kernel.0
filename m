@@ -1,46 +1,52 @@
-From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Fri, 18 Oct 2013 16:37:49 +0530
-Subject: [PATCH v3 4/4] KGDB: make kgdb_breakpoint() as noinline
-In-Reply-To: <1382094469-7971-1-git-send-email-vijay.kilari@gmail.com>
-References: <1382094469-7971-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1382094469-7971-5-git-send-email-vijay.kilari@gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 18 Oct 2013 18:54:13 +0800
+Subject: [PATCH v2 0/8] mmc: sdhci-esdhc-imx: add std tuning for mx6sl and DDR
+ mode support
+Message-ID: <1382093661-4074-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+The i.MX6SL supports standard tuning as defined in standard host control spec v3.0.
+So this patch series add std tuning support for i.MX6SL.
+(NOTE i.MX6SL can also work on the old manual tuning mode as i.MX6Q/DL)
+In the meanwhile, it also adds DDR mode support.
+Then SD3.0 cards which can only support DDR50 can work properly now
+with this patch series.
 
-The function kgdb_breakpoint() sets up break point at
-compile time by calling arch_kgdb_breakpoint();
-Though this call is surrounded by wmb() barrier,
-the compile can still re-order the break point,
-because this scheduling barrier is not a code motion
-barrier in gcc.
+Patch 1~3 add stardard tuning support for i.MX6SL.
+Patch 4~5 add DDR mode and delay line support
+Patch 6~8 some other related minor fixes.
 
-Making kgdb_breakpoint() as noinline solves this problem
-of code reording around break point instruction and also
-avoids problem of being called as inline function from
-other places
+Tested on i.MX6SL EVK board.
 
-More details about discussion on this can be found here
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/269732
+The patch series is generated based on the latest mmc-next branch with Shawn's
+(1)[PATCH v2 0/4] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type in Chris' tree.
 
-Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
----
- kernel/debug/debug_core.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+1. http://www.spinics.net/lists/arm-kernel/msg280517.html
 
-diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
-index 0506d44..359ce6a 100644
---- a/kernel/debug/debug_core.c
-+++ b/kernel/debug/debug_core.c
-@@ -1006,7 +1006,7 @@ int dbg_io_get_char(void)
-  * otherwise as a quick means to stop program execution and "break" into
-  * the debugger.
-  */
--void kgdb_breakpoint(void)
-+noinline void kgdb_breakpoint(void)
- {
- 	atomic_inc(&kgdb_setting_breakpoint);
- 	wmb(); /* Sync point before breakpoint */
+ChangeLog:
+v1->v2:
+ - Only a few minor changes on patch 1 and 5 based on comments from Shawn
+   while other patches have no change.
+ - rebase on Shawn's patch series
+   [PATCH v2 0/4] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
+
+Dong Aisheng (8):
+  mmc: sdhci-esdhc-imx: add std tuning support for mx6sl
+  mmc: sdhci-esdhc-imx: fix reading cap_1 register value for mx6sl
+  mmc: sdhci: report error once the maximum tuning loops exhausted or
+    timeout
+  mmc: sdhci-esdhc-imx: add DDR mode support for mx6
+  mmc: sdhci-esdhc-imx: add delay line setting support
+  mmc: sdhci-esdhc-imx: enable SDR50 tuning for imx6q/dl
+  mmc: sdhci-esdhc-imx: add preset value quirk for mx6
+  mmc: sdhci: remove unneeded call when have preset value quirk
+
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    5 +
+ drivers/mmc/host/sdhci-esdhc-imx.c                 |  134 +++++++++++++++++---
+ drivers/mmc/host/sdhci.c                           |    4 +-
+ include/linux/platform_data/mmc-esdhc-imx.h        |    1 +
+ 4 files changed, 122 insertions(+), 22 deletions(-)
+
 -- 
-1.7.9.5
+1.7.2.rc3
