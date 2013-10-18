@@ -1,45 +1,26 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 Oct 2013 12:06:50 +0100
-Subject: [PATCH 2/5] clk: ux500: fix erroneous bit assignment
-In-Reply-To: <1382087097-31627-1-git-send-email-linus.walleij@linaro.org>
-References: <1382087097-31627-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20131018110650.GX19112@lee--X1>
+Date: Fri, 18 Oct 2013 12:07:23 +0100
+Subject: [PATCH 3/5] ARM: ux500: fix clock for GPIO blocks 6 and 7
+In-Reply-To: <20131018110557.GW19112@lee--X1>
+References: <1382087112-31665-1-git-send-email-linus.walleij@linaro.org>
+ <20131018110557.GW19112@lee--X1>
+Message-ID: <20131018110723.GY19112@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Oct 2013, Linus Walleij wrote:
+On Fri, 18 Oct 2013, Lee Jones wrote:
 
-> Due to a typo or similar, the peripheral group 2 clock 11
-> gate was set to bit 1 instead of bit 11. We need to fix this
-> to be able to set the correct enable bit in the device tree:
-> when trying to correct the bit assignment in the device tree,
-> the system would hang.
+> On Fri, 18 Oct 2013, Linus Walleij wrote:
 > 
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Mike: seeking an ACK for this as it needs to be taken into
-> ARM SoC with the rest of the fixes so as not to cause
-> bisection problems between the trees.
-> ---
->  drivers/clk/ux500/u8500_of_clk.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> > The clock assignment in the device tree for GPIO blocks 6
+> > and 7 was incorrect, indicating this was managed by bit 1 on
+> > PRCC 2 while it was in fact bit 11 on PRCC 2.
 > 
-> diff --git a/drivers/clk/ux500/u8500_of_clk.c b/drivers/clk/ux500/u8500_of_clk.c
-> index b768b50..cdeff29 100644
-> --- a/drivers/clk/ux500/u8500_of_clk.c
-> +++ b/drivers/clk/ux500/u8500_of_clk.c
-> @@ -339,7 +339,7 @@ void u8500_of_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
->  
->  	clk = clk_reg_prcc_pclk("p2_pclk11", "per2clk", clkrst2_base,
->  				BIT(11), 0);
-> -	PRCC_PCLK_STORE(clk, 2, 1);
-> +	PRCC_PCLK_STORE(clk, 2, 11);
+> Nice catch.
+> 
+> It's also wrong in the driver:
 
-Ah, you found it already. Nice.
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Sorry, forgot this: Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
 Lee Jones
