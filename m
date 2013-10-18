@@ -1,70 +1,94 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 18 Oct 2013 13:22:18 +0100
-Subject: [PATCH v8 08/19] arm/xen: get_dma_ops: return xen_dma_ops if we
- are running as xen_initial_domain
-In-Reply-To: <1382031814-8782-8-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Fri, 18 Oct 2013 13:23:59 +0100
+Subject: [PATCH v8 16/19] arm,arm64: do not always merge biovec if we
+ are running on Xen
+In-Reply-To: <1382031814-8782-16-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
- <1382031814-8782-8-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <alpine.DEB.2.02.1310181319300.26077@kaball.uk.xensource.com>
+ <1382031814-8782-16-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.DEB.2.02.1310181322301.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Russell, Catalin,
 are you OK with this patch?
+
+It shouldn't have any impact when running on native, only on Xen.
 
 
 On Thu, 17 Oct 2013, Stefano Stabellini wrote:
-> We can't simply override arm_dma_ops with xen_dma_ops because devices
-> are allowed to have their own dma_ops and they take precedence over
-> arm_dma_ops. When running on Xen as initial domain, we always want
-> xen_dma_ops to be the one in use.
+> This is similar to what it is done on X86: biovecs are prevented from merging
+> otherwise every dma requests would be forced to bounce on the swiotlb buffer.
 > 
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-> CC: will.deacon at arm.com
-> CC: linux at arm.linux.org.uk
+> 
 > 
 > Changes in v7:
-> - return xen_dma_ops only if we are the initial domain;
-> - rename __get_dma_ops to __generic_dma_ops.
+> - remove the extra autotranslate check in biomerge.c.
 > ---
->  arch/arm/include/asm/dma-mapping.h |   13 ++++++++++++-
->  1 files changed, 12 insertions(+), 1 deletions(-)
+>  arch/arm/include/asm/io.h   |    8 ++++++++
+>  arch/arm64/include/asm/io.h |    9 +++++++++
+>  2 files changed, 17 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 01b5a3d..f5945d4 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -12,17 +12,28 @@
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index d070741..c45effc 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -24,9 +24,11 @@
+>  #ifdef __KERNEL__
+>  
+>  #include <linux/types.h>
+> +#include <linux/blk_types.h>
+>  #include <asm/byteorder.h>
 >  #include <asm/memory.h>
->  #include <asm/cacheflush.h>
+>  #include <asm-generic/pci_iomap.h>
+> +#include <xen/xen.h>
+>  
+>  /*
+>   * ISA I/O bus memory addresses are 1:1 with the physical address.
+> @@ -372,6 +374,12 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+>  #define BIOVEC_MERGEABLE(vec1, vec2)	\
+>  	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
+>  
+> +extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+> +				      const struct bio_vec *vec2);
+> +#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+> +	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+> +	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
+> +
+>  #ifdef CONFIG_MMU
+>  #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
+>  extern int valid_phys_addr_range(phys_addr_t addr, size_t size);
+> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> index 1d12f89..c163287b 100644
+> --- a/arch/arm64/include/asm/io.h
+> +++ b/arch/arm64/include/asm/io.h
+> @@ -22,11 +22,14 @@
+>  #ifdef __KERNEL__
+>  
+>  #include <linux/types.h>
+> +#include <linux/blk_types.h>
+>  
+>  #include <asm/byteorder.h>
+>  #include <asm/barrier.h>
+>  #include <asm/pgtable.h>
 >  
 > +#include <xen/xen.h>
-> +#include <asm/xen/hypervisor.h>
 > +
->  #define DMA_ERROR_CODE	(~0)
->  extern struct dma_map_ops arm_dma_ops;
->  extern struct dma_map_ops arm_coherent_dma_ops;
+>  /*
+>   * Generic IO read/write.  These perform native-endian accesses.
+>   */
+> @@ -263,5 +266,11 @@ extern int devmem_is_allowed(unsigned long pfn);
+>   */
+>  #define xlate_dev_kmem_ptr(p)	p
 >  
-> -static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> +static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
->  {
->  	if (dev && dev->archdata.dma_ops)
->  		return dev->archdata.dma_ops;
->  	return &arm_dma_ops;
->  }
->  
-> +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> +{
-> +	if (xen_initial_domain())
-> +		return xen_dma_ops;
-> +	else
-> +		return __generic_dma_ops(dev);
-> +}
+> +extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+> +				      const struct bio_vec *vec2);
+> +#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+> +	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+> +	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
 > +
->  static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
->  {
->  	BUG_ON(!dev);
+>  #endif	/* __KERNEL__ */
+>  #endif	/* __ASM_IO_H */
 > -- 
 > 1.7.2.5
 > 
