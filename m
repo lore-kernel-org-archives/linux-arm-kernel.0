@@ -1,69 +1,62 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 18 Oct 2013 20:02:37 -0300
-Subject: [PATCH v2 10/27] mtd: nand: pxa3xx: Replace host->page_size by
- mtd->writesize
+Date: Fri, 18 Oct 2013 20:02:38 -0300
+Subject: [PATCH v2 11/27] mtd: nand: pxa3xx: Disable OOB on arbitrary length
+ commands
 In-Reply-To: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1382137374-21251-11-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1382137374-21251-12-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to privately store the device page size as it's
-available in mtd structure field mtd->writesize.
-Also, this removes the hardcoded page size value, leaving the
-auto-detected value only.
+READID, STATUS and PARAM (aka ONFI read paramater page) don't read
+the OOB area. Set the oob_size to zero and prevent it.
+Also, add a comment clarifying the use of pxa3xx_set_datasize()
+which is only applicable on data read/write commands.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index fe2e27c..83ba036 100644
+index 83ba036..95e2ce3 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -149,7 +149,6 @@ struct pxa3xx_nand_host {
- 	void			*info_data;
+@@ -302,6 +302,11 @@ static void pxa3xx_nand_set_timing(struct pxa3xx_nand_host *host,
+ 	nand_writel(info, NDTR1CS0, ndtr1);
+ }
  
- 	/* page size of attached chip */
--	unsigned int		page_size;
- 	int			use_ecc;
- 	int			cs;
++/*
++ * Set the data and OOB size, depending on the selected
++ * spare and ECC configuration.
++ * Only applicable to READ0, READOOB and PAGEPROG commands.
++ */
+ static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
+ {
+ 	int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
+@@ -661,6 +666,7 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 		info->ndcb1 = (column & 0xFF);
+ 		info->ndcb3 = 256;
+ 		info->data_size = 256;
++		info->oob_size = 0;
+ 		break;
  
-@@ -612,12 +611,12 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
- 			info->buf_start += mtd->writesize;
+ 	case NAND_CMD_READID:
+@@ -671,6 +677,7 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 		info->ndcb1 = (column & 0xFF);
  
- 		/* Second command setting for large pages */
--		if (host->page_size >= PAGE_CHUNK_SIZE)
-+		if (mtd->writesize >= PAGE_CHUNK_SIZE)
- 			info->ndcb0 |= NDCB0_DBC | (NAND_CMD_READSTART << 8);
+ 		info->data_size = 8;
++		info->oob_size = 0;
+ 		break;
+ 	case NAND_CMD_STATUS:
+ 		info->buf_count = 1;
+@@ -679,6 +686,7 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 				| command;
  
- 	case NAND_CMD_SEQIN:
- 		/* small page addr setting */
--		if (unlikely(host->page_size < PAGE_CHUNK_SIZE)) {
-+		if (unlikely(mtd->writesize < PAGE_CHUNK_SIZE)) {
- 			info->ndcb1 = ((page_addr & 0xFFFFFF) << 8)
- 					| (column & 0xFF);
+ 		info->data_size = 8;
++		info->oob_size = 0;
+ 		break;
  
-@@ -891,7 +890,6 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
- 	}
- 
- 	/* calculate flash information */
--	host->page_size = f->page_size;
- 	host->read_id_bytes = (f->page_size == 2048) ? 4 : 2;
- 
- 	/* calculate addressing information */
-@@ -930,11 +928,9 @@ static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
- 	if (ndcr & NDCR_PAGE_SZ) {
- 		/* Controller's FIFO size */
- 		info->fifo_size = 2048;
--		host->page_size = 2048;
- 		host->read_id_bytes = 4;
- 	} else {
- 		info->fifo_size = 512;
--		host->page_size = 512;
- 		host->read_id_bytes = 2;
- 	}
- 
+ 	case NAND_CMD_ERASE1:
 -- 
 1.8.1.5
