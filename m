@@ -1,85 +1,167 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Fri, 18 Oct 2013 17:32:08 +0900
-Subject: [PATCH RFC v2 0/6] ARM64: Add kernel probes(Kprobes) support
-In-Reply-To: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
-Message-ID: <5260F208.9000800@hitachi.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 18 Oct 2013 10:36:11 +0200
+Subject: [Patch v2][ 15/37] Input: tsc2007: Add device tree support.
+In-Reply-To: <1382022155-21954-16-git-send-email-denis@eukrea.com>
+References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
+ <1382022155-21954-16-git-send-email-denis@eukrea.com>
+Message-ID: <20131018103611.4c6baabb@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/10/17 20:17), Sandeepa Prabhu wrote:
-> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
-> and return probes(kretprobes) support for ARM64.
-> 
-> Kprobes mechanism make use of software breakpoint and single stepping
-> support available in ARM v8 kernel.
-> 
+Hi,
 
-Thank you! This looks much better for me now. ;)
+Denis Carikli <denis@eukrea.com> wrote:
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+> new file mode 100644
+> index 0000000..d67b33f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+> @@ -0,0 +1,44 @@
+> +* Texas Instruments tsc2007 touchscreen controller
+> +
+> +Required properties:
+> +- compatible: must be "ti,tsc2007".
+> +- reg: I2C address of the chip.
+> +- pinctrl-0: Should specify pin control groups used for this controller
+> +  (see pinctrl bindings[0]).
+> +- pinctrl-names: Should contain only one value - "default"
+> +  (see pinctrl bindings[0]).
+> +- interrupt-parent: the phandle for the interrupt controller
+> +  (see interrupt binding[1]).
+> +- interrupts: interrupt to which the chip is connected
+> +  (see interrupt binding[1]).
+> +- x-plate-ohms: X-plate resistance in ohms.
+> +
+There is already a property 'ti,x-plate-ohms' (used for ads7846).
+Should this be used here too instead of inventing a new one?
 
-> This patchset make use of (and dependant upon) dynamic kernel patching 
-> feature published in patch series: https://lkml.org/lkml/2013/10/15/891
-> 
-> changes: v1 -> v2
->  1. Implemented review comments on v1
->  2. Debug montior hooks implementation is changed to use rwlocks
->     instead of rcu and spinlock.
+[...]
+> @@ -175,10 +192,10 @@ static irqreturn_t tsc2007_soft_irq(int irq, void *handle)
+>  
+>  		/* pen is down, continue with the measurement */
+>  		tsc2007_read_values(ts, &tc);
+> -
+>  		rt = tsc2007_calculate_pressure(ts, &tc);
+>  
+> -		if (rt == 0 && !ts->get_pendown_state) {
+> +		if ((ts->of && rt == 0 && ts->gpio < 0) ||
+... && !gpio_is_valid(ts->gpio)) ||
+for consistency?
 
-Eventually, we'd better reconsider using rcu there, or prohibit probing
-readlock related functions. For the first step, this will be good.
+> @@ -273,34 +294,64 @@ static void tsc2007_close(struct input_dev *input_dev)
+>  	tsc2007_stop(ts);
+>  }
+>  
+> -static int tsc2007_probe(struct i2c_client *client,
+> -				   const struct i2c_device_id *id)
+> +#ifdef CONFIG_OF
+> +static int tsc2007_probe_dt(struct i2c_client *client, struct tsc2007 *ts,
+> +			    struct device_node *np)
+>  {
+> -	struct tsc2007 *ts;
+> -	struct tsc2007_platform_data *pdata = client->dev.platform_data;
+> -	struct input_dev *input_dev;
+> -	int err;
+> -
+> -	if (!pdata) {
+> -		dev_err(&client->dev, "platform data is required!\n");
+> +	int err = 0;
+> +	u32 val32;
+> +	u64 val64;
+> +
+> +	if (!of_property_read_u32(np, "max-rt", &val32))
+> +		ts->max_rt = val32;
+> +	else
+> +		ts->max_rt = MAX_12BIT;
+> +
+> +	if (!of_property_read_u32(np, "fuzzy", &val32))
+> +		ts->fuzzy = val32;
+> +
+> +	if (!of_property_read_u64(np, "poll-period", &val64))
+> +		ts->poll_period = val64;
+> +	else
+> +		ts->poll_period = 1;
+> +
+> +	if (!of_property_read_u32(np, "x-plate-ohms", &val32)) {
+> +		ts->x_plate_ohms = val32;
+> +	} else {
+> +		dev_err(&client->dev,
+> +			"x-plate-ohms is not set up in the devicetree."
+> +			" (err %d).", err);
+>
+It's a bad habit to split messages like this, since it makes it harder
+to grep the kernel source for a message in a logfile.
 
->  3. Enabled recursing in kprobes handler for kprobes re-enter support.
->  4. Re-split the patchset to seperate single-stepping, simulation and 
->     kretprobes features.
->  5. instruction simulation is made independent of 'struct kprobes'
->  6. Added 'Linaro Copyright' statements in new added files.
->  7. Used arm64 instead of aarch64 in file names and comments.
-> 
-> Tested on ARM v8 fast model with sample modules from: samples/kprobes/
-> 
-> Sandeepa Prabhu (6):
->   arm64: support single-step and breakpoint handler hooks
->   arm64: Kprobes with single stepping support
->   arm64: Kprobes instruction simulation support
->   arm64: Add kernel return probes support(kretprobes)
->   arm64: Enable kprobes support for arm64 platform
->   kprobes: Add cases for arm and arm64 in sample module
-> 
->  arch/arm64/Kconfig                      |   2 +
->  arch/arm64/configs/defconfig            |  20 +-
->  arch/arm64/include/asm/debug-monitors.h |  21 +
->  arch/arm64/include/asm/kprobes.h        |  60 +++
->  arch/arm64/include/asm/probes.h         |  50 +++
->  arch/arm64/include/asm/ptrace.h         |   6 +
->  arch/arm64/kernel/Makefile              |   2 +
->  arch/arm64/kernel/condn-helpers.c       | 120 ++++++
->  arch/arm64/kernel/debug-monitors.c      |  86 +++-
->  arch/arm64/kernel/entry.S               |   2 +
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (!i2c_check_functionality(client->adapter,
+> -				     I2C_FUNC_SMBUS_READ_WORD_DATA))
+> -		return -EIO;
+> +	ts->gpio = of_get_gpio(np, 0);
+> +	if (!gpio_is_valid(ts->gpio))
+> +		dev_err(&client->dev, "GPIO not found "
+> +			"(of_get_gpio returned %d)\n", ts->gpio);
+>  
+dito (at least you should be consistent putting the space either in the
+end of the first line or in the beginning of the next line!)
+
+[...]
+> @@ -309,13 +360,59 @@ static int tsc2007_probe(struct i2c_client *client,
+>  	ts->poll_period       = pdata->poll_period ? : 1;
+>  	ts->get_pendown_state = pdata->get_pendown_state;
+>  	ts->clear_penirq      = pdata->clear_penirq;
+> +	ts->fuzzy             = pdata->fuzzy;
+>  
+>  	if (pdata->x_plate_ohms == 0) {
+>  		dev_err(&client->dev, "x_plate_ohms is not set up in platform data");
+> -		err = -EINVAL;
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Used to detect if it is probed trough the device tree,
+> +	 * in order to be able to use that information in the IRQ handler.
+> +	 */
+> +	ts->of = 0;
+> +
+> +	return 0;
+> +}
+> +
+> +static int tsc2007_probe(struct i2c_client *client,
+> +			 const struct i2c_device_id *id)
+> +{
+> +	struct device_node *np = client->dev.of_node;
+> +	struct tsc2007_platform_data *pdata = client->dev.platform_data;
+> +	struct tsc2007 *ts;
+> +	struct input_dev *input_dev;
+> +	int err = 0;
+> +
+> +	ts = kzalloc(sizeof(struct tsc2007), GFP_KERNEL);
+>
+devm_kzalloc()?
+
+> @@ -389,10 +494,19 @@ static const struct i2c_device_id tsc2007_idtable[] = {
+>  
+>  MODULE_DEVICE_TABLE(i2c, tsc2007_idtable);
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id tsc2007_of_match[] = {
+> +	{ .compatible = "ti,tsc2007" },
+> +	{ /* sentinel */ },
+>
+the redundant comma after the last entry in a struct initializer is
+useful to ease adding more entries lateron. Since the empty entry
+always has to be the last one, the comma doesn't make any sense here.
 
 
->  arch/arm64/kernel/kprobes-arm64.c       | 313 +++++++++++++++
->  arch/arm64/kernel/kprobes-arm64.h       |  30 ++
-
-One comment, this name looks a bit wired. Since it seems that these are
-for instruction decoding, can we merge it with probe-decode.h and
-rename it as probe-decode.{h,c}? When we implement uprobes, we still
-can expand it (add the decoding table for uprobes in the probe-decode.c).
-
->  arch/arm64/kernel/kprobes.c             | 682 ++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/kprobes.h             |  30 ++
->  arch/arm64/kernel/probes-decode.h       | 110 ++++++
->  arch/arm64/kernel/simulate-insn.c       | 184 +++++++++
->  arch/arm64/kernel/simulate-insn.h       |  33 ++
->  arch/arm64/kernel/vmlinux.lds.S         |   1 +
->  samples/kprobes/kprobe_example.c        |  16 +
->  19 files changed, 1756 insertions(+), 12 deletions(-)
-
-BTW, is there any public git repository which has this series?
-
-Thank you again!
-
+Lothar Wa?mann
 -- 
-Masami HIRAMATSU
-IT Management Research Dept. Linux Technology Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
