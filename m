@@ -1,38 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Oct 2013 09:45:35 -0700
-Subject: [PATCH] serial: omap: Add support for optional wake-up interrupt
-In-Reply-To: <20131018163740.GP15154@atomide.com>
-References: <20131017232820.GG15154@atomide.com> <20131018161916.GF18921@gimli>
- <20131018163740.GP15154@atomide.com>
-Message-ID: <20131018164535.GQ15154@atomide.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 18 Oct 2013 09:49:15 -0700
+Subject: [BUILD BROKEN] Current Linus' master and -next don't build for
+ imx_v6_v7_defconfig
+In-Reply-To: <CAGa+x86+qfWBou2jkEjz10ix95m89cxnyyFOPwryF27YezeoPw@mail.gmail.com>
+References: <Pine.LNX.4.64.1310181632160.9158@axis700.grange>
+ <CAGa+x86+qfWBou2jkEjz10ix95m89cxnyyFOPwryF27YezeoPw@mail.gmail.com>
+Message-ID: <20131018164915.GA29015@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [131018 09:38]:
-> * Felipe Balbi <balbi@ti.com> [131018 09:19]:
-> > > @@ -786,7 +813,10 @@ static void serial_omap_shutdown(struct uart_port *port)
-> > >  
-> > >  	pm_runtime_mark_last_busy(up->dev);
-> > >  	pm_runtime_put_autosuspend(up->dev);
-> > > -	free_irq(up->port.irq, up);
-> > > +
-> > > +	for (i = 0; i < ARRAY_SIZE(up->irqs); i++)
-> > > +		if (up->irqs[i])
-> > > +			devm_free_irq(up->port.dev, up->irqs[i], up);
-> > 
-> > do you need this at all if you're using devm_* ?
+On Fri, Oct 18, 2013 at 08:14:36AM -0700, Kevin Hilman wrote:
+> On Fri, Oct 18, 2013 at 7:59 AM, Guennadi Liakhovetski
+> <g.liakhovetski@gmx.de> wrote:
 > 
-> So it seems, startup and shutdown are managed by serial_core and
-> that's what at least clps711x.c serial driver is doing.
+> > On current Linus' tree as of 04919af as well as -next since 16.10, IIRC,
+> > compilation is broken for i.MX3*, including the default
+> > imx_v6_v7_defconfig. The toolchain used is
+> >
+> > arm-none-linux-gnueabi-gcc (Sourcery CodeBench Lite 2012.09-64) 4.7.2
+> 
+> Just for another data point, I'm not seeing this in my builds
+> (arm-linux-gnueabi-gcc (Ubuntu/Linaro 4.7.2-1ubuntu1) 4.7.2) and we're
+> not seeing this in Olof's autobuilds either for latest mainline[1] or
+> latest next-thierry[2].  I belive Olof is using vanilla gcc 4.8.1.
+> 
+> Kevin
+> 
+I don't see the problem either, using "arm-poky-linux-gnueabi-gcc (GCC) 4.7.2"
+from Yocto 1.4.2.
 
-And that means devm_* in this case does not really help us
-here..
-
-I guess we could keep the IRQ requested from probe, but
-there's probably a reason why it's done in startup/shutdown.
-
-So I'll just drop the devm_* changes for now.
-
-Regards,
-
-Tony
+Guenter
