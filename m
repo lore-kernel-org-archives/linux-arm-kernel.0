@@ -1,56 +1,81 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Fri, 18 Oct 2013 17:51:15 +0200
-Subject: [RFC 0/1] Device Tree Schema Source format proposal
-In-Reply-To: <9610740.2oBMxfeRkE@amdc1227>
-References: <9610740.2oBMxfeRkE@amdc1227>
-Message-ID: <526158F3.4060104@baylibre.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Oct 2013 08:53:07 -0700
+Subject: [GIT PULL 1/2] omap board removal for some omap3 boards for
+ v3.13 merge window
+In-Reply-To: <CAAwP0s0hMPQ-s1p2VZy4+PRSRKZHL40q5AewEmFqoofP=pNiaQ@mail.gmail.com>
+References: <526041db.41abe00a.33b7.00a1SMTPIN_ADDED_BROKEN@mx.google.com>
+ <87hacews6o.fsf@linaro.org> <20131018152450.GI15154@atomide.com>
+ <CAAwP0s0hMPQ-s1p2VZy4+PRSRKZHL40q5AewEmFqoofP=pNiaQ@mail.gmail.com>
+Message-ID: <20131018155306.GK15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+* Javier Martinez Canillas <martinez.javier@gmail.com> [131018 08:46]:
+> On Fri, Oct 18, 2013 at 5:24 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Kevin Hilman <khilman@linaro.org> [131018 07:49]:
+> >> Hi Tony,
+> >>
+> >> Tony Lindgren <tony@atomide.com> writes:
+> >>
+> >> > The following changes since commit f41509ad0d4c11d0911630440749d409ce2aa1aa:
+> >> >
+> >> >   Merge branches 'omap-for-v3.13/dt' and 'omap-for-v3.13/quirk' into omap-for-v3.13/board-removal (2013-10-14 11:33:07 -0700)
+> >> >
+> >> > are available in the git repository at:
+> >> >
+> >> >
+> >> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/board-removal-signed
+> >> >
+> >> > for you to fetch changes up to f0c09b7c3b4e6b2fe501b3e888797b470de8320c:
+> >> >
+> >> >   ARM: OMAP2+: Remove legacy support for zoom platforms (2013-10-15 17:38:21 -0700)
+> >> >
+> >> > ----------------------------------------------------------------
+> >> > Changes needed to drop legacy booting support for some
+> >> > omap3 boards.
+> >> >
+> >> > Note that that these are based on a merge of the
+> >> > following for the dependencies:
+> >> >
+> >> > - v3.12-rc5 for fixes to pinctrl mask
+> >> > - omap-for-v3.13/dt-signed to avoid pointless merge conflicts
+> >> > - omap-for-v3.13/quirk-signed for legacy pdata handling
+> >> >
+> >> > ----------------------------------------------------------------
+> >> > Aaro Koskinen (2):
+> >> >       ARM: dts: add minimal DT support for Nokia N950 & N9 phones
+> >> >       ARM: OMAP2: delete board-rm680
+> >> >
+> >> > Tony Lindgren (6):
+> >> >       ARM: dts: Shared file for omap GPMC connected smsc911x
+> >> >       ARM: dts: Add common support for omap3-evm
+> >> >       ARM: dts: Add basic support for TMDSEVM3730 (Mistral AM/DM37x EVM)
+> >> >       ARM: dts: Add basic support for zoom3
+> >>
+> >> This patch introduces a build failure when compiling the DTBs:
+> >>
+> >>   [...]
+> >>   DTC     arch/arm/boot/dts/omap3-zoom3.dtb
+> >> ERROR (phandle_references): Reference to non-existent node or label "wl12xx_gpio"
+> >
+> > Oops sorry, looks like the common support for omap3-evm has a
+> > pinctrl entry that should be in the omap3-evm-37xx only. I guess
+> > I did not run make dtbs after adding the omap3-evm-37xx parts.
+> > The patch below fixes it for me.
+> >
+> > Do you want a new pull request or just the fix below?
+> >
+> 
+> Hi Tony,
+> 
+> If you do a new pull request, it would be great if you can include:
+> 
+> [PATCH v2 1/1] ARM: OMAP2+: remove legacy support for IGEP boards [1]
 
-I'm glad you're back, we were missing you on that topic :-)
+Sure I can do that, let's wait and see what Kevin prefers though.
 
-On 18/10/2013 16:56, Tomasz Figa wrote:
-> Hi All,
->
-> Since the ARM Kernel Summit in Edinburgh is coming by big steps and we
-> need some food for thought for discussions that will be happening there,
-> I am posting my work in progress on Device Tree Schema Source format.
->
-> I know I've been supposed to actively work on this and come up with
-> something working long time ago already, but due to unexpected
-> circumstances (aka neverending streams of other work) I could spend way
-> less time than I wanted on it.
->
-> How miserably I failed can be seen on an example of Benoit's and Fabien's
-> attempt to solve this problem that has likely taken much less time and
-> is in an already working state.
+Regards,
 
-That was more a proof of concept that helped us checking our assumptions 
-and the feasibility. Based on the first feedbacks, we were working on a 
-slightly different v2, that will anyway not be ready for ELCE. Your 
-inputs are thus very welcome and will help progressing and converging on 
-the schema definition.
-Well, at least, I hope :-)
-
-> So here I am, posting whatever I have done till now to present my ideas
-> that came to my mind while working on this and possibly allow wider
-> discussion on this topic.
-
-Great, I'll review that during the flight to be able to discuss that 
-next week.
-
-> A work in progress text on DTSS format will be sent in a follow-up
-> message, for clarity.
-
-Thanks,
-See you next week,
-
-Benoit
-
--- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+Tony
+ 
+> [1]: https://patchwork.kernel.org/patch/3068681/
