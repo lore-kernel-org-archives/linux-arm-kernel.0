@@ -1,57 +1,53 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Fri, 18 Oct 2013 16:33:13 +0530
-Subject: [PATCH] genirq: error reporting for non-percpu interrupt in
- request_percpu_irq()
-In-Reply-To: <20131018103117.GA3296@mudshark.cambridge.arm.com>
-References: <1382090789-18177-1-git-send-email-vkale@apm.com>
- <20131018103117.GA3296@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYkcFBL5Rxf9z9L5PHULk_oSZX9ANBaG8dxyzGD_xhMeGpw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 18 Oct 2013 12:03:14 +0100
+Subject: [PATCH 4/5] ARM: ux500: fix I2C4 clock bit
+In-Reply-To: <1382087123-31702-1-git-send-email-linus.walleij@linaro.org>
+References: <1382087123-31702-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20131018110314.GV19112@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Fri, 18 Oct 2013, Linus Walleij wrote:
 
+> The PCLK for I2C4 is controlled by bit 10 in the PCKEN registers
+> while the KCLK is controlled by bit 9 on the KCKEN, it's
+> one of these odd assymetric things. Correct the PCLK bit to 10.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/boot/dts/ste-dbx5x0.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+> index 5112f4c..b7d1738 100644
+> --- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
+> +++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+> @@ -694,7 +694,7 @@
+>  
+>  			clock-frequency = <400000>;
+>  
+> -			clocks = <&prcc_kclk 1 9>, <&prcc_pclk 1 9>;
+> +			clocks = <&prcc_kclk 1 10>, <&prcc_pclk 1 9>;
+>  			clock-names = "i2cclk", "apb_pclk";
+>  		};
+>  
 
-On Fri, Oct 18, 2013 at 4:01 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Oct 18, 2013 at 11:06:29AM +0100, Vinayak Kale wrote:
->> Return a separate error code when a non-percpu interrupt is passed to
->> request_percpu_irq().
->>
->> Suggested-by: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> ---
->>  kernel/irq/manage.c |    6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
->> index 514bcfd..c2713ae 100644
->> --- a/kernel/irq/manage.c
->> +++ b/kernel/irq/manage.c
->> @@ -1671,10 +1671,12 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
->>               return -EINVAL;
->>
->>       desc = irq_to_desc(irq);
->> -     if (!desc || !irq_settings_can_request(desc) ||
->> -         !irq_settings_is_per_cpu_devid(desc))
->> +     if (!desc || !irq_settings_can_request(desc))
->>               return -EINVAL;
->>
->> +     if (!irq_settings_is_per_cpu_devid(desc))
->> +             return -EPERM;
->
-> <bikeshedding> I reckon -ENODEV is clearer here. </bikeshedding>
+NACK: Bit 10 is MSP1
 
-I looked at the issue as "operation not allowed since interrupt is
-non-percpu" and I found below comment for EPERM in
-'include/uapi/asm-generic/errno-base.h' . So thought this error code
-could be more fitting.
+        clk = clk_reg_prcc_kclk("p1_i2c4_kclk", "i2cclk",
+                        clkrst1_base, BIT(9), CLK_SET_RATE_GATE);
+        clk_register_clkdev(clk, NULL, "nmk-i2c.4");
+        PRCC_KCLK_STORE(clk, 1, 9);
+ 
+        clk = clk_reg_prcc_kclk("p1_msp3_kclk", "msp1clk",
+                        clkrst1_base, BIT(10), CLK_SET_RATE_GATE);
+        clk_register_clkdev(clk, NULL, "msp3");
+        clk_register_clkdev(clk, NULL, "ux500-msp-i2s.3");
+        PRCC_KCLK_STORE(clk, 1, 10);
 
-#define EPERM            1      /* Operation not permitted */
-
->
-> Also, there's a counterpart to this code in request_threaded_irq, where I
-> think we should do something similar.
-
-So in request_threaded_irq, we would still keep the WARN_ON for percpu
-interrupt and return a different error code. Is my understanding
-correct?
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
