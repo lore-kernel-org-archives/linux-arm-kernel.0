@@ -1,42 +1,44 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Fri, 18 Oct 2013 18:29:06 +0530
-Subject: [PATCH] arm64: perf: fix event number mask
-Message-ID: <1382101146-16033-1-git-send-email-vkale@apm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 18 Oct 2013 14:07:11 +0100
+Subject: [RFC PATCH 0/2] Implement get_user_pages_fast for ARM
+Message-ID: <1382101634-4723-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes ARMV8_EVTYPE_* macros since evtCount (event number)
-field width is 10bits in event selection register.
+This patch series implements get_user_pages_fast on ARM. Unlike other
+architectures, we do not use IPIs/disabled IRQs as a blocking
+mechanism to protect the page table walker. Instead an atomic counter
+is used to indicate how many fast gup walkers are active on an address
+space, and any code that would cause them problems (THP splitting or
+code that could free a page table page) spins on positive values of
+this counter.
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
----
- arch/arm64/kernel/perf_event.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+This series also addresses an assumption made in kernel/futex.c that
+THP page splitting can be blocked by disabling the IRQs on a processor
+by introducing arch_block_thp_split and arch_unblock_thp_split.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index cea1594..5d14470 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -784,8 +784,8 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- /*
-  * PMXEVTYPER: Event selection reg
-  */
--#define	ARMV8_EVTYPE_MASK	0xc80000ff	/* Mask for writable bits */
--#define	ARMV8_EVTYPE_EVENT	0xff		/* Mask for EVENT bits */
-+#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
-+#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
- 
- /*
-  * Event filters for PMUv3
-@@ -1175,7 +1175,8 @@ static void armv8pmu_reset(void *info)
- static int armv8_pmuv3_map_event(struct perf_event *event)
- {
- 	return map_cpu_event(event, &armv8_pmuv3_perf_map,
--				&armv8_pmuv3_perf_cache_map, 0xFF);
-+				&armv8_pmuv3_perf_cache_map,
-+				ARMV8_EVTYPE_EVENT);
- }
- 
- static struct arm_pmu armv8pmu = {
+As well as fixing a problem where futexes on THP tails cause hangs on
+ARM, I expect this series to also be beneficial for direct-IO, and for
+KVM (the hva_to_pfn fast path uses __get_user_pages_fast).
+
+Any comments would be greatly appreciated.
+
+Steve Capper (2):
+  thp: Introduce arch_(un)block_thp_split
+  arm: mm: implement get_user_pages_fast
+
+ arch/arm/include/asm/mmu.h            |   1 +
+ arch/arm/include/asm/pgalloc.h        |   9 ++
+ arch/arm/include/asm/pgtable-2level.h |   1 +
+ arch/arm/include/asm/pgtable-3level.h |  21 +++
+ arch/arm/include/asm/pgtable.h        |  18 +++
+ arch/arm/include/asm/tlb.h            |   8 ++
+ arch/arm/mm/Makefile                  |   2 +-
+ arch/arm/mm/gup.c                     | 234 ++++++++++++++++++++++++++++++++++
+ include/linux/huge_mm.h               |  16 +++
+ kernel/futex.c                        |   6 +-
+ 10 files changed, 312 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mm/gup.c
+
 -- 
-1.7.9.5
+1.8.1.4
