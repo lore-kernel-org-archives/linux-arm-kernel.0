@@ -1,100 +1,85 @@
-From: srinivas.kandagatla@st.com (srinivas kandagatla)
-Date: Fri, 18 Oct 2013 09:22:52 +0100
-Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <1382021369.4093.44.camel@weser.hi.pengutronix.de>
-References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
- <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
- <20131016151419.GA14104@ns203013.ovh.net> <525F915D.9020501@st.com>
- <525FAEED.7030207@st.com> <20131017141957.GE14104@ns203013.ovh.net>
- <525FF498.3060202@st.com> <1382021369.4093.44.camel@weser.hi.pengutronix.de>
-Message-ID: <5260EFDC.804@st.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Fri, 18 Oct 2013 17:32:08 +0900
+Subject: [PATCH RFC v2 0/6] ARM64: Add kernel probes(Kprobes) support
+In-Reply-To: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+Message-ID: <5260F208.9000800@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/13 15:49, Lucas Stach wrote:
-> Am Donnerstag, den 17.10.2013, 15:30 +0100 schrieb srinivas kandagatla:
-> [...]
->> Sorry to ask this but, Where is this requirement coming from?
->> I have not spotted any thing as such in ePAPR specs.
->>
->>
->> All the spec says is.
->> ===
->> The compatible property value consists of one or more strings that
->> define the specific programming model for the device. This list of
->> strings should be used by a client program for device driver selection.
->> The property value consists of a concatenated list of null terminated
->> strings, *from most specific to most general.* They allow a device to
->> express its compatibility with a family of similar devices, potentially
->> allowing a single device driver to match against several devices.
->> The recommended format is ?manufacturer,model?, where manufacturer is a
->> string describing the name of the manufacturer (such as an OUI), and
->> model specifies the model number.
->>
->> Example:
->> compatible = ?fsl,mpc8641-uart?, ?ns16550";
->> In this example, an operating system would first try to locate a device
->> driver that supported fsl,mpc8641-uart. If a driver was not found, it
->> would then try to locate a driver that supported the more general
->> ns16550 device type.
->> ===
->>
->> The more general compatible string in this case is "st,comms-ssc-i2c",
->> rather than the first soc name.
->> How can a first SOC name be more general?
->>
->> As this driver is not very specific to StiH415, it is generic driver for
->> ST comms-ssc-i2c block.
->>
+(2013/10/17 20:17), Sandeepa Prabhu wrote:
+> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+> and return probes(kretprobes) support for ARM64.
 > 
-> You just can't know if someone in the future decides to subtly change
-> the register layout or make some other incompatible change to the
-> comms-ssc-i2c block.
+> Kprobes mechanism make use of software breakpoint and single stepping
+> support available in ARM v8 kernel.
 > 
-This is not the case for comms-ssc-i2c block, This IP is kind of reused
-from past 10+ years(I think!!). Am not predicting the future here, but I
-am making a informed guess from past experience that this IP would not
-change in future.
 
-Am still not happy with the idea of using first SoC for the compatible
-for following reasons:
+Thank you! This looks much better for me now. ;)
 
-1> Generic IPs can be integrated into various vendor SoCs. For example
-synopsis IP can be integrated by ST parts and other non-ST parts. What
-would be the first SoC name in this case?
-
-2> Looking at example like "arm,pl310-cache", "arm,l220-cache"... or any
-other generic ips, why are these IPs not encoding the first SoC name in
-there compatible string? I think the answer is generic IP.
-
-3> IMHO, the idea of first SoC might solve the problem you described,
-but why would some one know about the first SoC when this was available.
-In this case this IP was available may be 10+ years back on an ST40
-platform. Having such old SoC names in compatible strings in the device
-trees for a modern chip looks bit confusing.
-
-4> ST generic drivers which are in kernel still use st,<IP> name, so I
-would like this consistency across all the st drivers (at least the ones
-which are going to be used by mach-sti platforms).
-
-5> ePAPR spec clearly says that compatible string should contain "most
-specific to most general" names. In this case using more generic name
-makes more sense than having a specific name because its generic IP.
-Allowing a single device driver to match against several devices.
-
-6> IMHO, the compatible string should be "vendor,<IP-name>-<IP-version>"
-rather than first SoC.
-
-
-Thanks,
-srini
-
-> So as a general rule of thumb you take the first SoC where a particular
-> IP block appeared as the compatible string, so you can just pick the
-> name of the SoC where the incompatible change was made as the next
-> string and not need to invent generic and unspecific comms-ssc-i2c-v2
-> compatibles.
+> This patchset make use of (and dependant upon) dynamic kernel patching 
+> feature published in patch series: https://lkml.org/lkml/2013/10/15/891
 > 
-> Regards,
-> Lucas
+> changes: v1 -> v2
+>  1. Implemented review comments on v1
+>  2. Debug montior hooks implementation is changed to use rwlocks
+>     instead of rcu and spinlock.
+
+Eventually, we'd better reconsider using rcu there, or prohibit probing
+readlock related functions. For the first step, this will be good.
+
+>  3. Enabled recursing in kprobes handler for kprobes re-enter support.
+>  4. Re-split the patchset to seperate single-stepping, simulation and 
+>     kretprobes features.
+>  5. instruction simulation is made independent of 'struct kprobes'
+>  6. Added 'Linaro Copyright' statements in new added files.
+>  7. Used arm64 instead of aarch64 in file names and comments.
 > 
+> Tested on ARM v8 fast model with sample modules from: samples/kprobes/
+> 
+> Sandeepa Prabhu (6):
+>   arm64: support single-step and breakpoint handler hooks
+>   arm64: Kprobes with single stepping support
+>   arm64: Kprobes instruction simulation support
+>   arm64: Add kernel return probes support(kretprobes)
+>   arm64: Enable kprobes support for arm64 platform
+>   kprobes: Add cases for arm and arm64 in sample module
+> 
+>  arch/arm64/Kconfig                      |   2 +
+>  arch/arm64/configs/defconfig            |  20 +-
+>  arch/arm64/include/asm/debug-monitors.h |  21 +
+>  arch/arm64/include/asm/kprobes.h        |  60 +++
+>  arch/arm64/include/asm/probes.h         |  50 +++
+>  arch/arm64/include/asm/ptrace.h         |   6 +
+>  arch/arm64/kernel/Makefile              |   2 +
+>  arch/arm64/kernel/condn-helpers.c       | 120 ++++++
+>  arch/arm64/kernel/debug-monitors.c      |  86 +++-
+>  arch/arm64/kernel/entry.S               |   2 +
+
+
+>  arch/arm64/kernel/kprobes-arm64.c       | 313 +++++++++++++++
+>  arch/arm64/kernel/kprobes-arm64.h       |  30 ++
+
+One comment, this name looks a bit wired. Since it seems that these are
+for instruction decoding, can we merge it with probe-decode.h and
+rename it as probe-decode.{h,c}? When we implement uprobes, we still
+can expand it (add the decoding table for uprobes in the probe-decode.c).
+
+>  arch/arm64/kernel/kprobes.c             | 682 ++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/kprobes.h             |  30 ++
+>  arch/arm64/kernel/probes-decode.h       | 110 ++++++
+>  arch/arm64/kernel/simulate-insn.c       | 184 +++++++++
+>  arch/arm64/kernel/simulate-insn.h       |  33 ++
+>  arch/arm64/kernel/vmlinux.lds.S         |   1 +
+>  samples/kprobes/kprobe_example.c        |  16 +
+>  19 files changed, 1756 insertions(+), 12 deletions(-)
+
+BTW, is there any public git repository which has this series?
+
+Thank you again!
+
+-- 
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
