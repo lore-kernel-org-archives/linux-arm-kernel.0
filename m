@@ -1,62 +1,31 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 18 Oct 2013 20:02:38 -0300
-Subject: [PATCH v2 11/27] mtd: nand: pxa3xx: Disable OOB on arbitrary length
- commands
-In-Reply-To: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1382137374-21251-12-git-send-email-ezequiel.garcia@free-electrons.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 18 Oct 2013 15:57:02 -0700
+Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
+In-Reply-To: <CAGa+x86aS+C8iEb1P4ZYxPBix=Anjh4JZoAof=R-i9fGw=bq6w@mail.gmail.com>
+References: <1381296747.2040.17.camel@joe-AO722>
+ <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
+ <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
+ <CAGa+x86aS+C8iEb1P4ZYxPBix=Anjh4JZoAof=R-i9fGw=bq6w@mail.gmail.com>
+Message-ID: <20131018225702.GA13090@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-READID, STATUS and PARAM (aka ONFI read paramater page) don't read
-the OOB area. Set the oob_size to zero and prevent it.
-Also, add a comment clarifying the use of pxa3xx_set_datasize()
-which is only applicable on data read/write commands.
+On Fri, Oct 18, 2013 at 10:04:11AM -0700, Kevin Hilman wrote:
+> > A handful of boot panics on ARM platforms were bisected to point at
+> > the version of this commit that's in linux-next (commit
+> > 64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
+> > makes things happy again.
+> >
+> > Upon further digging, it seems that users of devres_alloc() are
+> > relying on the previous behavior of having the memory zero'd which is
+> > no longer the case after $SUBJECT patch.  The change below on top of
+> > -next makes these ARM boards happy again.
+> 
+> Oops, it should've fixed __devres_alloc() also.  Updated patch below.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/mtd/nand/pxa3xx_nand.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Can you send this in a format that I can apply it in?  It was whitespace
+damaged.
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 83ba036..95e2ce3 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -302,6 +302,11 @@ static void pxa3xx_nand_set_timing(struct pxa3xx_nand_host *host,
- 	nand_writel(info, NDTR1CS0, ndtr1);
- }
- 
-+/*
-+ * Set the data and OOB size, depending on the selected
-+ * spare and ECC configuration.
-+ * Only applicable to READ0, READOOB and PAGEPROG commands.
-+ */
- static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
- {
- 	int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
-@@ -661,6 +666,7 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
- 		info->ndcb1 = (column & 0xFF);
- 		info->ndcb3 = 256;
- 		info->data_size = 256;
-+		info->oob_size = 0;
- 		break;
- 
- 	case NAND_CMD_READID:
-@@ -671,6 +677,7 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
- 		info->ndcb1 = (column & 0xFF);
- 
- 		info->data_size = 8;
-+		info->oob_size = 0;
- 		break;
- 	case NAND_CMD_STATUS:
- 		info->buf_count = 1;
-@@ -679,6 +686,7 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
- 				| command;
- 
- 		info->data_size = 8;
-+		info->oob_size = 0;
- 		break;
- 
- 	case NAND_CMD_ERASE1:
--- 
-1.8.1.5
+thanks,
+
+greg k-h
