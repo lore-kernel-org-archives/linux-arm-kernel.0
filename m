@@ -1,52 +1,33 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 18 Oct 2013 22:13:15 +0200
-Subject: [PATCH 6/6] documentation/iommu: Update description of ARM System MMU
- binding
-In-Reply-To: <1382127195-15261-1-git-send-email-andreas.herrmann@calxeda.com>
-References: <1382127195-15261-1-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <1382127195-15261-7-git-send-email-andreas.herrmann@calxeda.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Fri, 18 Oct 2013 13:25:12 -0700
+Subject: [RESEND PATCH v2 5/6] ARM: dts: Specify clocks for timer on
+ bcm11351
+In-Reply-To: <20131017140659.GF24056@e106331-lin.cambridge.arm.com>
+References: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
+ <1381960030-1640-6-git-send-email-tim.kryger@linaro.org>
+ <20131017140659.GF24056@e106331-lin.cambridge.arm.com>
+Message-ID: <CAAYSxho6shrzABy+G-Q8djcVMjxE4nvcoHUkGBDgwU8X0A0zFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds descriptions fore new properties of device tree
-binding for the ARM SMMU architecture. These properties control
-arm-smmu driver options.
+On Thu, Oct 17, 2013 at 7:06 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+>> index 193659c..39c1395 100644
+>> --- a/arch/arm/boot/dts/bcm11351.dtsi
+>> +++ b/arch/arm/boot/dts/bcm11351.dtsi
+>> @@ -95,7 +95,7 @@
+>>               compatible = "brcm,kona-timer";
+>>               reg = <0x35006000 0x1000>;
+>>               interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+>> -             clock-frequency = <32768>;
+>> +             clocks = <&hub_timer_clk>;
+>
+> This should probably be after the code change that enables support for a
+> clocks property.
+>
+> Thanks,
+> Mark.
 
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
----
- .../devicetree/bindings/iommu/arm,smmu.txt         |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+This is already the case.
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index e34c6cd..de88cf9 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -48,6 +48,17 @@ conditions.
-                   from the mmu-masters towards memory) node for this
-                   SMMU.
- 
-+- arm,smmu-isolate-devices : Enable device isolation for all masters
-+                             of this SMMU. Ie. each master will be
-+                             attached to its own iommu domain.
-+
-+- arm,smmu-secure-config-access : Enable proper handling of buggy
-+                                  implementations that always use
-+                                  secure access to SMMU configuration
-+                                  registers. In this case non-secure
-+                                  aliases of secure registers have to
-+                                  be used during SMMU configuration.
-+
- Example:
- 
-         smmu {
-@@ -67,4 +78,5 @@ Example:
-                  */
-                 mmu-masters = <&dma0 0xd01d 0xd01e>,
-                               <&dma1 0xd11c>;
-+                arm,smmu-isolate-devices;
-         };
--- 
-1.7.9.5
+The driver change is patch 4 and this dts change is patch 5 of the series.
