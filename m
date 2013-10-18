@@ -1,76 +1,53 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Fri, 18 Oct 2013 17:45:47 +0200
-Subject: [GIT PULL 1/2] omap board removal for some omap3 boards for v3.13
- merge window
-In-Reply-To: <20131018152450.GI15154@atomide.com>
-References: <526041db.41abe00a.33b7.00a1SMTPIN_ADDED_BROKEN@mx.google.com>
- <87hacews6o.fsf@linaro.org> <20131018152450.GI15154@atomide.com>
-Message-ID: <CAAwP0s0hMPQ-s1p2VZy4+PRSRKZHL40q5AewEmFqoofP=pNiaQ@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 18 Oct 2013 16:46:00 +0100
+Subject: [PATCH v8 08/19] arm/xen: get_dma_ops: return xen_dma_ops if we
+ are running as xen_initial_domain
+In-Reply-To: <20131018154246.GB25034@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-8-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1310181319300.26077@kaball.uk.xensource.com>
+ <20131018154246.GB25034@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1310181643260.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 5:24 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Kevin Hilman <khilman@linaro.org> [131018 07:49]:
->> Hi Tony,
->>
->> Tony Lindgren <tony@atomide.com> writes:
->>
->> > The following changes since commit f41509ad0d4c11d0911630440749d409ce2aa1aa:
->> >
->> >   Merge branches 'omap-for-v3.13/dt' and 'omap-for-v3.13/quirk' into omap-for-v3.13/board-removal (2013-10-14 11:33:07 -0700)
->> >
->> > are available in the git repository at:
->> >
->> >
->> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/board-removal-signed
->> >
->> > for you to fetch changes up to f0c09b7c3b4e6b2fe501b3e888797b470de8320c:
->> >
->> >   ARM: OMAP2+: Remove legacy support for zoom platforms (2013-10-15 17:38:21 -0700)
->> >
->> > ----------------------------------------------------------------
->> > Changes needed to drop legacy booting support for some
->> > omap3 boards.
->> >
->> > Note that that these are based on a merge of the
->> > following for the dependencies:
->> >
->> > - v3.12-rc5 for fixes to pinctrl mask
->> > - omap-for-v3.13/dt-signed to avoid pointless merge conflicts
->> > - omap-for-v3.13/quirk-signed for legacy pdata handling
->> >
->> > ----------------------------------------------------------------
->> > Aaro Koskinen (2):
->> >       ARM: dts: add minimal DT support for Nokia N950 & N9 phones
->> >       ARM: OMAP2: delete board-rm680
->> >
->> > Tony Lindgren (6):
->> >       ARM: dts: Shared file for omap GPMC connected smsc911x
->> >       ARM: dts: Add common support for omap3-evm
->> >       ARM: dts: Add basic support for TMDSEVM3730 (Mistral AM/DM37x EVM)
->> >       ARM: dts: Add basic support for zoom3
->>
->> This patch introduces a build failure when compiling the DTBs:
->>
->>   [...]
->>   DTC     arch/arm/boot/dts/omap3-zoom3.dtb
->> ERROR (phandle_references): Reference to non-existent node or label "wl12xx_gpio"
->
-> Oops sorry, looks like the common support for omap3-evm has a
-> pinctrl entry that should be in the omap3-evm-37xx only. I guess
-> I did not run make dtbs after adding the omap3-evm-37xx parts.
-> The patch below fixes it for me.
->
-> Do you want a new pull request or just the fix below?
->
+On Fri, 18 Oct 2013, Russell King - ARM Linux wrote:
+> On Fri, Oct 18, 2013 at 01:22:18PM +0100, Stefano Stabellini wrote:
+> > Russell,
+> > are you OK with this patch?
+> 
+> Only concern is why the change is soo large.
+> 
+> > > -static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> > > +static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+> > >  {
+> > >  	if (dev && dev->archdata.dma_ops)
+> > >  		return dev->archdata.dma_ops;
+> > >  	return &arm_dma_ops;
+> > >  }
+> > >  
+> > > +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> > > +{
+> > > +	if (xen_initial_domain())
+> > > +		return xen_dma_ops;
+> > > +	else
+> > > +		return __generic_dma_ops(dev);
+> > > +}
+> > > +
+> 
+> What's wrong with:
+> 
+>  static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+>  {
+> +	if (xen_initial_domain())
+> +		return xen_dma_ops;
+>  	if (dev && dev->archdata.dma_ops)
+>  		return dev->archdata.dma_ops;
+>  	return &arm_dma_ops;
+>  }
 
-Hi Tony,
 
-If you do a new pull request, it would be great if you can include:
-
-[PATCH v2 1/1] ARM: OMAP2+: remove legacy support for IGEP boards [1]
-
-Thanks a lot and best regards,
-Javier
-
-[1]: https://patchwork.kernel.org/patch/3068681/
+xen_dma_ops functions might have to call back the native implementation.
+With the above there is no way for a xen_dma_ops function to get to
+archdata.dma_ops or arm_dma_ops.
+This is the reason why this patch introduces __generic_dma_ops.
