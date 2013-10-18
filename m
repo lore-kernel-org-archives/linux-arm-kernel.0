@@ -1,105 +1,72 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Fri, 18 Oct 2013 19:09:43 +0530
-Subject: [PATCH 1/1] arm: dra7xx: Add hwmod data for MDIO and CPSW
-Message-ID: <1382103583-11177-1-git-send-email-mugunthanvnm@ti.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 18 Oct 2013 14:44:22 +0100
+Subject: [PATCH v4 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <20131018085638.GA2858@mudshark.cambridge.arm.com>
+References: <1381990781-27814-1-git-send-email-liuj97@gmail.com>
+ <1381990781-27814-3-git-send-email-liuj97@gmail.com>
+ <20131017113826.GJ18765@mudshark.cambridge.arm.com>
+ <1382023441.19506.66.camel@linaro1.home>
+ <20131018085638.GA2858@mudshark.cambridge.arm.com>
+Message-ID: <1382103862.3394.46.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding hwmod data for CPSW and MDIO which is present in DRA7xx SoC
+On Fri, 2013-10-18 at 09:56 +0100, Will Deacon wrote:
+> Hi Tixy,
+> 
+> On Thu, Oct 17, 2013 at 04:24:01PM +0100, Jon Medhurst (Tixy) wrote:
+> > On Thu, 2013-10-17 at 12:38 +0100, Will Deacon wrote:
+> > > On Thu, Oct 17, 2013 at 07:19:35AM +0100, Jiang Liu wrote:
+> > > > +	/*
+> > > > +	 * Execute __aarch64_insn_patch_text() on every online CPU,
+> > > > +	 * which ensure serialization among all online CPUs.
+> > > > +	 */
+> > > > +	return stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
+> > > > +}
+> > > 
+> > > Whoa, whoa, whoa! The comment here is wrong -- we only run the patching on
+> > > *one* CPU, which is the right thing to do. However, the arch/arm/ call to
+> > > stop_machine in kprobes does actually run the patching code on *all* the
+> > > online cores (including the cache flushing!). I think this is to work around
+> > > cores without hardware cache maintenance broadcasting, but that could easily
+> > > be called out specially (like we do in patch.c) and the flushing could be
+> > > separated from the patching too.
+> > [...]
+> > 
+> > For code modifications done in 32bit ARM kprobes (and ftrace) I'm not
+> > sure we ever actually resolved the possible cache flushing issues. If
+> > there was specific reasons for flushing on all cores I can't remember
+> > them, sorry. I have a suspicion that doing so was a case of sticking
+> > with what the code was already doing, and flushing on all cores seemed
+> > safest to guard against problems we hadn't thought about.
+> 
+> [...]
+> 
+> > Sorry, I don't think I've added much light on things here have I?
+> 
+> I think you missed the bit I was confused about :) Flushing the cache on
+> each core is necessary if cache_ops_need_broadcast, so I can understand why
+> you'd have code to do that. The bit I don't understand is that you actually
+> patch the instruction on each core too!
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 64 +++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+This is only happens when removing a kprobe with __arch_disarm_kprobe().
+We can't just use the intelligent patch_text() function there because we
+want to always force stop machine to be used as this prevents the case
+where a CPU a hits the probe, starts executing it's handler then another
+CPU whips away the probe from under it.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index db32d53..9a8191b 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -273,6 +273,55 @@ static struct omap_hwmod dra7xx_ctrl_module_wkup_hwmod = {
- };
- 
- /*
-+ * 'gmac' class
-+ * cpsw/gmac sub system
-+ */
-+static struct omap_hwmod_class_sysconfig dra7xx_gmac_sysc = {
-+	.rev_offs	= 0x0,
-+	.sysc_offs	= 0x8,
-+	.syss_offs	= 0x4,
-+	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
-+			   SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | MSTANDBY_FORCE |
-+			   MSTANDBY_NO),
-+	.sysc_fields	= &omap_hwmod_sysc_type3,
-+};
-+
-+static struct omap_hwmod_class dra7xx_gmac_hwmod_class = {
-+	.name		= "gmac",
-+	.sysc		= &dra7xx_gmac_sysc,
-+};
-+
-+static struct omap_hwmod dra7xx_gmac_hwmod = {
-+	.name		= "gmac",
-+	.class		= &dra7xx_gmac_hwmod_class,
-+	.clkdm_name	= "gmac_clkdm",
-+	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
-+	.main_clk	= "dpll_gmac_ck",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs	= DRA7XX_CM_GMAC_GMAC_CLKCTRL_OFFSET,
-+			.context_offs	= DRA7XX_RM_GMAC_GMAC_CONTEXT_OFFSET,
-+			.modulemode	= MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-+ * 'mdio' class
-+ */
-+static struct omap_hwmod_class dra7xx_mdio_hwmod_class = {
-+	.name		= "davinci_mdio",
-+};
-+
-+static struct omap_hwmod dra7xx_mdio_hwmod = {
-+	.name		= "davinci_mdio",
-+	.class		= &dra7xx_mdio_hwmod_class,
-+	.clkdm_name	= "gmac_clkdm",
-+	.main_clk	= "dpll_gmac_ck",
-+};
-+
-+/*
-  * 'dcan' class
-  *
-  */
-@@ -2000,6 +2049,19 @@ static struct omap_hwmod_ocp_if dra7xx_l4_wkup__ctrl_module_wkup = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__cpgmac0 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_gmac_hwmod,
-+	.clk		= "dpll_gmac_ck",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+static struct omap_hwmod_ocp_if dra7xx_gmac__mdio = {
-+	.master		= &dra7xx_gmac_hwmod,
-+	.slave		= &dra7xx_mdio_hwmod,
-+	.user		= OCP_USER_MPU,
-+};
-+
- /* l4_wkup -> dcan1 */
- static struct omap_hwmod_ocp_if dra7xx_l4_wkup__dcan1 = {
- 	.master		= &dra7xx_l4_wkup_hwmod,
-@@ -2653,6 +2715,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_wkup__ctrl_module_wkup,
- 	&dra7xx_l4_wkup__dcan1,
- 	&dra7xx_l4_per2__dcan2,
-+	&dra7xx_l4_per2__cpgmac0,
-+	&dra7xx_gmac__mdio,
- 	&dra7xx_l4_cfg__dma_system,
- 	&dra7xx_l3_main_1__dss,
- 	&dra7xx_l3_main_1__dispc,
+That explains why we use stop_machine, but not why all CPU's must modify
+the instruction. I think it's a case of just that it's simpler to do
+that unconditionally rather than add extra code for the
+cache_ops_need_broadcast() case. I mean, stop_machine() is a sledge
+hammer, which stalls the whole system until the next scheduler tick, and
+then gets every CPU to busy wait, so there's not much incentive to try
+and optimise the code to avoid a memory write + cacheline flush on each
+core.
+
+This reminds me, I'm sure I heard rumours quite some time ago that Paul
+McKenney was thinking of trying to do away with stop_machine...?
+
 -- 
-1.8.4.1.516.g1d25dd4
+Tixy
