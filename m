@@ -1,39 +1,66 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 18 Oct 2013 17:04:22 +0200
-Subject: [PATCH 01/11] =?UTF-8?q?of:=20add=20vendor=20prefix=20for=20Eukr=C3?=
- =?UTF-8?q?=A9a=20Electromatique.?=
-Message-ID: <1382108672-23269-1-git-send-email-denis@eukrea.com>
+From: a.motakis@virtualopensystems.com (Antonios Motakis)
+Date: Fri, 18 Oct 2013 17:08:29 +0200
+Subject: [PATCH v2] ARM: SMMU: add devices attached to the SMMU to an IOMMU
+ group
+Message-ID: <1382108910-18049-1-git-send-email-a.motakis@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trivial patch to add Eukr?a Electromatique to the list
-of devicetree vendor prefixes.
+IOMMU groups are expected by certain users of the IOMMU API,
+e.g. VFIO. Add new devices found by the SMMU driver to an IOMMU
+group to satisfy those users.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
+Changes from v1:
+ * Added check that dev->archdata.iommu has not been set already by an IOMMU
+   driver. This way we can also skip checking for an existing IOMMU group.
+
+Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
 ---
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/iommu/arm-smmu.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 2956800..a0329cf 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -25,6 +25,7 @@ denx	Denx Software Engineering
- emmicro	EM Microelectronic
- epson	Seiko Epson Corp.
- est	ESTeem Wireless Modems
-+eukrea  Eukr?a Electromatique
- fsl	Freescale Semiconductor
- GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 0f45a48..6762885 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1502,6 +1502,13 @@ static int arm_smmu_add_device(struct device *dev)
+ {
+ 	struct arm_smmu_device *child, *parent, *smmu;
+ 	struct arm_smmu_master *master = NULL;
++	struct iommu_group *group;
++	int ret;
++
++	if (dev->archdata.iommu) {
++		dev_warn(dev, "IOMMU driver already assigned to device\n");
++		return -EINVAL;
++	}
+ 
+ 	spin_lock(&arm_smmu_devices_lock);
+ 	list_for_each_entry(parent, &arm_smmu_devices, list) {
+@@ -1534,13 +1541,23 @@ static int arm_smmu_add_device(struct device *dev)
+ 	if (!master)
+ 		return -ENODEV;
+ 
++	group = iommu_group_alloc();
++	if (IS_ERR(group)) {
++		dev_err(dev, "Failed to allocate IOMMU group\n");
++		return PTR_ERR(group);
++	}
++
++	ret = iommu_group_add_device(group, dev);
++	iommu_group_put(group);
+ 	dev->archdata.iommu = smmu;
+-	return 0;
++
++	return ret;
+ }
+ 
+ static void arm_smmu_remove_device(struct device *dev)
+ {
+ 	dev->archdata.iommu = NULL;
++	iommu_group_remove_device(dev);
+ }
+ 
+ static struct iommu_ops arm_smmu_ops = {
 -- 
-1.7.9.5
+1.8.1.2
