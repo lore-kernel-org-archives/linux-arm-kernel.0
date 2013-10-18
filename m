@@ -1,35 +1,39 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 18 Oct 2013 19:48:49 +0800
-Subject: [PATCH v3 7/8] mmc: sdhci-esdhc-imx: add preset value quirk for mx6
-In-Reply-To: <1382096930-7964-1-git-send-email-b29396@freescale.com>
-References: <1382096930-7964-1-git-send-email-b29396@freescale.com>
-Message-ID: <1382096930-7964-8-git-send-email-b29396@freescale.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 18 Oct 2013 15:18:29 +0300
+Subject: [PATCH v4 03/15] clk: tegra: common periph_clk_enb_refcnt and clks
+In-Reply-To: <CAL1qeaFrm50m0a3csY=04MNQENM_DY5fgBrq5bdsm8dHnLj1gA@mail.gmail.com>
+References: <1382013526-12800-1-git-send-email-pdeschrijver@nvidia.com>
+ <1382013526-12800-4-git-send-email-pdeschrijver@nvidia.com>
+ <CAL1qeaFrm50m0a3csY=04MNQENM_DY5fgBrq5bdsm8dHnLj1gA@mail.gmail.com>
+Message-ID: <20131018121829.GA25591@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 does not support preset value feature.
+On Fri, Oct 18, 2013 at 12:26:20AM +0200, Andrew Bresticker wrote:
+> Hi Peter,
+> 
+> >  static void __init tegra30_clock_init(struct device_node *np)
+> >  {
+> >         struct device_node *node;
+> > -       int i;
+> >
+> >         clk_base = of_iomap(np, 0);
+> >         if (!clk_base) {
+> > @@ -1916,8 +1910,11 @@ static void __init tegra30_clock_init(struct device_node *np)
+> >                 BUG();
+> >         }
+> >
+> > -       if (tegra_clk_set_periph_banks(5) < 0)
+> > +       clks = tegra_clk_init(clk_max, 5);
+> > +       if (!clks) {
+> > +               WARN_ON(1);
+> 
+> Really minor nit: it seems strange that we WARN here for t30, but not
+> for t114 or t20.
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+There used to be a warning for all 3, but I removed it and apparently forgot
+t30.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 1d1fcb2..461a4c3 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -1006,8 +1006,10 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	 * The imx6q ROM code will change the default watermark level setting
- 	 * to something insane.  Change it back here.
- 	 */
--	if (esdhc_is_usdhc(imx_data))
-+	if (esdhc_is_usdhc(imx_data)) {
- 		writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-+		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
-+	}
- 
- 	if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING)
- 		sdhci_esdhc_ops.platform_execute_tuning =
--- 
-1.7.2.rc3
+Cheers,
+
+Peter.
