@@ -1,100 +1,75 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 18 Oct 2013 20:02:40 -0300
-Subject: [PATCH v2 13/27] mtd: nand: pxa3xx: Add bad block handling
+Date: Fri, 18 Oct 2013 20:02:46 -0300
+Subject: [PATCH v2 19/27] mtd: nand: pxa3xx: Move the data buffer clean to
+ prepare_start_command()
 In-Reply-To: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1382137374-21251-14-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1382137374-21251-20-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for flash-based bad block table using Marvell's
-custom in-flash bad block table layout. The support is enabled
-a 'flash_bbt' platform data or device tree parameter.
+To allow future support of multiple page reading/writing, move the data
+buffer clean out of prepare_set_command().
+
+This is done to prevent the data buffer from being cleaned on every command
+preparation, when a multiple command sequence is implemented to read/write
+pages larger than the FIFO size (2 KiB).
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c                | 33 +++++++++++++++++++++++++++
- include/linux/platform_data/mtd-nand-pxa3xx.h |  3 +++
- 2 files changed, 36 insertions(+)
+ drivers/mtd/nand/pxa3xx_nand.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 1ceccb6..451ebb6 100644
+index 2858d10..e6222f1 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -24,6 +24,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_mtd.h>
+@@ -614,6 +614,9 @@ static void set_command_address(struct pxa3xx_nand_info *info,
  
- #if defined(CONFIG_ARCH_PXA) || defined(CONFIG_ARCH_MMP)
- #define ARCH_HAS_DMA
-@@ -245,6 +246,29 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
- { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
- };
- 
-+static u8 bbt_pattern[] = {'M', 'V', 'B', 'b', 't', '0' };
-+static u8 bbt_mirror_pattern[] = {'1', 't', 'b', 'B', 'V', 'M' };
+ static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
+ {
++	struct pxa3xx_nand_host *host = info->host[info->cs];
++	struct mtd_info *mtd = host->mtd;
 +
-+static struct nand_bbt_descr bbt_main_descr = {
-+	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
-+		| NAND_BBT_2BIT | NAND_BBT_VERSION,
-+	.offs =	8,
-+	.len = 6,
-+	.veroffs = 14,
-+	.maxblocks = 8,		/* Last 8 blocks in each chip */
-+	.pattern = bbt_pattern
-+};
+ 	/* reset data and oob column point to handle data */
+ 	info->buf_start		= 0;
+ 	info->buf_count		= 0;
+@@ -638,6 +641,19 @@ static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
+ 		info->ndcb2 = 0;
+ 		break;
+ 	}
 +
-+static struct nand_bbt_descr bbt_mirror_descr = {
-+	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
-+		| NAND_BBT_2BIT | NAND_BBT_VERSION,
-+	.offs =	8,
-+	.len = 6,
-+	.veroffs = 14,
-+	.maxblocks = 8,		/* Last 8 blocks in each chip */
-+	.pattern = bbt_mirror_pattern
-+};
++	/*
++	 * If we are about to isse a read command, or about to set
++	 * the write address, then clean the data buffer.
++	 */
++	if (command == NAND_CMD_READ0 ||
++	    command == NAND_CMD_READOOB ||
++	    command == NAND_CMD_SEQIN) {
 +
- /* Define a default flash type setting serve as flash detecting only */
- #define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
- 
-@@ -1129,6 +1153,14 @@ KEEP_CONFIG:
- 
- 	if (nand_scan_ident(mtd, 1, def))
- 		return -ENODEV;
-+
-+	if (pdata->flash_bbt) {
-+		chip->bbt_options |= NAND_BBT_USE_FLASH |
-+				     NAND_BBT_NO_OOB_BBM;
-+		chip->bbt_td = &bbt_main_descr;
-+		chip->bbt_md = &bbt_mirror_descr;
++		info->buf_count = mtd->writesize + mtd->oobsize;
++		memset(info->data_buff, 0xFF, info->buf_count);
 +	}
 +
- 	/* calculate addressing information */
- 	if (mtd->writesize >= 2048)
- 		host->col_addr_cycles = 2;
-@@ -1324,6 +1356,7 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
- 	if (of_get_property(np, "marvell,nand-keep-config", NULL))
- 		pdata->keep_config = 1;
- 	of_property_read_u32(np, "num-cs", &pdata->num_cs);
-+	pdata->flash_bbt = of_get_nand_on_flash_bbt(np);
+ }
  
- 	pdev->dev.platform_data = pdata;
+ static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
+@@ -679,16 +695,11 @@ static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
+ 			info->ndcb0 |= NDCB0_DBC | (NAND_CMD_READSTART << 8);
  
-diff --git a/include/linux/platform_data/mtd-nand-pxa3xx.h b/include/linux/platform_data/mtd-nand-pxa3xx.h
-index ffb8019..a941471 100644
---- a/include/linux/platform_data/mtd-nand-pxa3xx.h
-+++ b/include/linux/platform_data/mtd-nand-pxa3xx.h
-@@ -55,6 +55,9 @@ struct pxa3xx_nand_platform_data {
- 	/* indicate how many chip selects will be used */
- 	int	num_cs;
+ 		set_command_address(info, mtd->writesize, column, page_addr);
+-		info->buf_count = mtd->writesize + mtd->oobsize;
+-		memset(info->data_buff, 0xFF, info->buf_count);
+ 		break;
  
-+	/* use an flash-based bad block table */
-+	bool	flash_bbt;
-+
- 	const struct mtd_partition		*parts[NUM_CHIP_SELECT];
- 	unsigned int				nr_parts[NUM_CHIP_SELECT];
+ 	case NAND_CMD_SEQIN:
  
+ 		set_command_address(info, mtd->writesize, column, page_addr);
+-		info->buf_count = mtd->writesize + mtd->oobsize;
+-		memset(info->data_buff, 0xFF, info->buf_count);
+-
+ 		break;
+ 
+ 	case NAND_CMD_PAGEPROG:
 -- 
 1.8.1.5
