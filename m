@@ -1,44 +1,66 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 18 Oct 2013 08:23:41 -0700
-Subject: [GIT PULL] at91: dt for 3.13 #1
-In-Reply-To: <1382108324-9080-1-git-send-email-nicolas.ferre@atmel.com>
- (Nicolas Ferre's message of "Fri, 18 Oct 2013 16:58:44 +0200")
-References: <1382108324-9080-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <874n8ewqki.fsf@linaro.org>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Fri, 18 Oct 2013 23:19:54 +0800
+Subject: [PATCH v5 0/7] Optimize jump label implementation for ARM64
+Message-ID: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> writes:
+From: Jiang Liu <jiang.liu@huawei.com>
 
-> Arnd, Olof, Kevin,
->
-> First AT91 DT-related pull-request for 3.13. These patches will not mess with my other
-> "cleanup" pull-request sent today.
-> It allows to enable sound on the at91sam9n12ek board.
->
-> Thanks, best regards,
->
-> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
->
->   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
->
-> are available in the git repository at:
->
->   git://github.com/at91linux/linux-at91.git tags/at91-dt
->
-> for you to fetch changes up to e483341ce82750a1b526b65b7178213dcf967a7a:
->
->   ARM: at91: remove pinctrl conflict between mmc and SPI for at91sam9g20ek (2013-10-18 16:50:13 +0200)
->
-> ----------------------------------------------------------------
-> First DT series for 3.13
-> - addition of sound for at91sam9n12
-> - a little fix for MMC vs. SPI on at91sam9g20ek
->
-> ----------------------------------------------------------------
+This patchset tries to optimize arch specfic jump label implementation
+for ARM64 by dynamic kernel text patching.
 
-Pulled into next/dt.
+To enable this feature, your toolchain must support "asm goto" extension
+and "%c" constraint extesion. Current GCC for AARCH64 doesn't support
+"%c", and there's a patch for it now:
+http://gcc.gnu.org/ml/gcc-patches/2013-10/msg01314.html
 
-Thanks,
+It has been tested on ARM Fast mode and a real hardware platform.
 
-Kevin
+Any comments are welcomed!
+
+V4->V5:
+1) rework the stop_machine() related code
+2) rework aarch64_insn_gen_nop()
+
+V3->V4:
+1) resolve a race condition in kernel text patching
+2) address other review comments
+
+V2->V3:
+1) fix a bug in comparing signed and unsigned values
+2) detect big endian by checking __AARCH64EB__
+
+V1->V2: address review comments of V1
+1) refine comments
+2) add a new interface to always synchronize with stop_machine()
+   when patching code
+3) handle endian issue when patching code
+
+Jiang Liu (7):
+  arm64: introduce basic aarch64 instruction decoding helpers
+  arm64: introduce interfaces to hotpatch kernel and module code
+  arm64: move encode_insn_immediate() from module.c to insn.c
+  arm64: introduce aarch64_insn_gen_{nop|branch_imm}() helper functions
+  arm64, jump label: detect %c support for ARM64
+  arm64, jump label: optimize jump label implementation
+  jump_label: use defined macros instead of hard-coding for better
+    readability
+
+ arch/arm64/Kconfig                  |   1 +
+ arch/arm64/include/asm/insn.h       | 121 +++++++++++++++++
+ arch/arm64/include/asm/jump_label.h |  52 +++++++
+ arch/arm64/kernel/Makefile          |   3 +-
+ arch/arm64/kernel/insn.c            | 263 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/jump_label.c      |  58 ++++++++
+ arch/arm64/kernel/module.c          | 153 +++++++--------------
+ include/linux/jump_label.h          |  15 +-
+ scripts/gcc-goto.sh                 |   2 +-
+ 9 files changed, 554 insertions(+), 114 deletions(-)
+ create mode 100644 arch/arm64/include/asm/insn.h
+ create mode 100644 arch/arm64/include/asm/jump_label.h
+ create mode 100644 arch/arm64/kernel/insn.c
+ create mode 100644 arch/arm64/kernel/jump_label.c
+
+-- 
+1.8.1.2
