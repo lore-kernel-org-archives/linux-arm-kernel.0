@@ -1,65 +1,63 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 18 Oct 2013 13:27:06 +0200
-Subject: [GIT PULL] ARM: mvebu: soc changes for v3.13 (round 2)
-In-Reply-To: <87ob6nzghi.fsf@linaro.org>
-References: <20131017135409.GG22434@titan.lakedaemon.net>
- <87ob6nzghi.fsf@linaro.org>
-Message-ID: <52611B0A.5040303@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 18 Oct 2013 13:30:40 +0200
+Subject: [PATCH 4/5] ARM: ux500: fix I2C4 clock bit
+In-Reply-To: <20131018110314.GV19112@lee--X1>
+References: <1382087123-31702-1-git-send-email-linus.walleij@linaro.org>
+ <20131018110314.GV19112@lee--X1>
+Message-ID: <CACRpkdYwndBD7dAVC6EitOQ4HHVoP1fhmVztV5g78bLQoeOiqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2013 12:20 AM, Kevin Hilman wrote:
-> Jason Cooper <jason@lakedaemon.net> writes:
+On Fri, Oct 18, 2013 at 1:03 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Fri, 18 Oct 2013, Linus Walleij wrote:
 >
->> Guys,
+>> The PCLK for I2C4 is controlled by bit 10 in the PCKEN registers
+>> while the KCLK is controlled by bit 9 on the KCKEN, it's
+>> one of these odd assymetric things. Correct the PCLK bit to 10.
 >>
->> The only thing exciting here is the workaround for the mv643xx_eth bug.
->> Whenever you shut off it's clock (and folks have good reason to do
->> this), it loses it's mac address.  In the happy, ideal boot-from-DT
->> world, this isn't a problem, since the bootloader will set
->> local-mac-address in the DT.  However, we aren't in that world (yet).
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/ste-dbx5x0.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> We've been tossing around different solutions to the problem over the
->> past year or so, and this one seems a) the least painful, and b) most in
->> line with what the future will hold.  eg, the driver (on reload or
->> resume) will need to read the mac address from the DT, regardless of how
->> the mac address got there.
+>> diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+>> index 5112f4c..b7d1738 100644
+>> --- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
+>> +++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+>> @@ -694,7 +694,7 @@
 >>
->> thx,
+>>                       clock-frequency = <400000>;
 >>
->> Jason.
+>> -                     clocks = <&prcc_kclk 1 9>, <&prcc_pclk 1 9>;
+>> +                     clocks = <&prcc_kclk 1 10>, <&prcc_pclk 1 9>;
+>>                       clock-names = "i2cclk", "apb_pclk";
+>>               };
 >>
->> The following changes since commit e1cb367de27ca5c186b0f120c3c10a4a0e8edd2e:
->>
->>    ARM: kirkwood: Add standby support (2013-10-08 15:41:52 +0000)
->>
->> are available in the git repository at:
->>
->>    git://git.infradead.org/linux-mvebu.git tags/soc-3.13-2
->>
->> for you to fetch changes up to d7f5baeedbdb48d4f5bb2b4f6f56f32b7f2f7aff:
->>
->>    Documentation: arm/Marvell: clarify Armada SoCs that match 78xx0 pattern (2013-10-08 17:27:59 +0000)
->>
->> ----------------------------------------------------------------
->> mvebu soc changes for v3.13 (round 2)
->>
->>   - kirkwood
->>      - remove mbus init, pcie clk init
->>      - retain MAC addr for DT ethernet (work around broken IP)
->>      - docs: clarify Armada SoCs
 >
-> Pulled into next/soc.
+> NACK: Bit 10 is MSP1
+
+You mean MSP3?
+
+>         clk = clk_reg_prcc_kclk("p1_i2c4_kclk", "i2cclk",
+>                         clkrst1_base, BIT(9), CLK_SET_RATE_GATE);
+>         clk_register_clkdev(clk, NULL, "nmk-i2c.4");
+>         PRCC_KCLK_STORE(clk, 1, 9);
 >
-> This had a minor conflict in board-dt.c with Sebastian's clk-of-init
-> branch that's part of next/cleanup.  Please double check my conflict
-> resolution (currently in our to-build branch, not yet pushed to for-next)
+>         clk = clk_reg_prcc_kclk("p1_msp3_kclk", "msp1clk",
+>                         clkrst1_base, BIT(10), CLK_SET_RATE_GATE);
+>         clk_register_clkdev(clk, NULL, "msp3");
+>         clk_register_clkdev(clk, NULL, "ux500-msp-i2s.3");
+>         PRCC_KCLK_STORE(clk, 1, 10);
 
-Resolution looks sane to me.
+This does not correspond to the datasheet, which says MSP3
+is at bit 11. Oh that is *another* assymetric thing.
 
-While looking at it, I realized that we forgot to remove now obsolete
-kirkwood_legacy_clk_init. I shove a patch to Jason soon, if it makes
-it into v3.13 great, if not, it will not break anything and can wait
-for v3.14.
+I'll make a combined
+patch that fix both things and double-check with the older
+clock framework so we get this 100% right.
 
-Sebastian
+Ulf: any hints?
+
+Yours,
+Linus Walleij
