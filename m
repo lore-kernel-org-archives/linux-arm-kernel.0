@@ -1,252 +1,106 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 18 Oct 2013 18:54:23 +0200
-Subject: [PATCHv3][ 2/2] ARM: dts: Add support for the cpuimx51 board from
- Eukrea and its baseboard.
-In-Reply-To: <1382115263-7990-1-git-send-email-denis@eukrea.com>
-References: <1382115263-7990-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382115263-7990-2-git-send-email-denis@eukrea.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 18 Oct 2013 09:57:43 -0700
+Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
+In-Reply-To: <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
+References: <1381296747.2040.17.camel@joe-AO722>
+ <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
+Message-ID: <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following devices/functionalities were added:
- * Main and secondary UARTs.
- * i2c and the pcf8563 device.
- * Ethernet.
- * NAND.
- * The BP1 button.
- * The LED.
- * Watchdog
- * SD.
+On Fri, Oct 11, 2013 at 1:11 PM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Tue, 08 Oct 2013 22:32:27 -0700 Joe Perches <joe@perches.com> wrote:
+>
+>> Currently, devm_ managed memory only supports kzalloc.
+>>
+>> Convert the devm_kzalloc implementation to devm_kmalloc
+>> and remove the complete memset to 0 but still set the
+>> initial struct devres header and whatever padding before
+>> data to 0.
+>>
+>> Add the other normal alloc variants as static inlines with
+>> __GFP_ZERO added to the gfp flag where appropriate:
+>>
+>>       devm_kzalloc
+>>       devm_kcalloc
+>>       devm_kmalloc_array
+>>
+>> Add gfp.h to device.h for the newly added static inlines.
+>>
+>> ...
+>>
+>> --- a/drivers/base/devres.c
+>> +++ b/drivers/base/devres.c
+>> @@ -91,7 +91,8 @@ static __always_inline struct devres * alloc_dr(dr_release_t release,
+>>       if (unlikely(!dr))
+>>               return NULL;
+>>
+>> -     memset(dr, 0, tot_size);
+>> +     memset(dr, 0, offsetof(struct devres, data));
+>
+> Well, this does make some assumptions about devres layout.  It would
+> have been cleaner to do
+>
+>         memset(&dr.node, 0, sizeof(dr.node));
+>
+> but whatever.
+>
+> I made some changelog changes.
+>
+> I agree that including devm_kmalloc_array() might be going a bit far
+> (it's the lack of devm_kmalloc which matters most).  But
+> devm_kmalloc_array() is inlined and is hence basically cost-free until
+> someone actually uses it.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v2->v3:
-- This patch was splitted, the part that enabled the display, the audio, and
-  the touchscreen was removed and will be submited in a new patch
-  serie(because they depend on changes touching other subsystems).
-- Added a cosmetic linebreak between and the ssi2 and the uart1 nodes.
----
- arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi       |   63 ++++++++++
- .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |  132 ++++++++++++++++++++
- 2 files changed, 195 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
- create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+A handful of boot panics on ARM platforms were bisected to point at
+the version of this commit that's in linux-next (commit
+64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
+makes things happy again.
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-new file mode 100644
-index 0000000..8638656
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-@@ -0,0 +1,63 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include "imx51.dtsi"
-+
-+/ {
-+	model = "Eukrea CPUIMX51";
-+	compatible = "eukrea,cpuimx51", "fsl,imx51";
-+
-+	memory {
-+		reg = <0x90000000 0x10000000>; /* 256M */
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec_2>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1>;
-+	status = "okay";
-+
-+	pcf8563 at 51 {
-+		compatible = "nxp,pcf8563";
-+		reg = <0x51>;
-+	};
-+};
-+
-+&iomuxc {
-+	tsc2007 {
-+		pinctrl_tsc2007_1: tsc2007grp-1 {
-+			fsl,pins = <
-+				MX51_PAD_GPIO_NAND__GPIO_NAND 0x1f5
-+				MX51_PAD_NANDF_D8__GPIO4_0 0x1f5
-+			>;
-+		};
-+	};
-+};
-+
-+&nfc {
-+	nand-bus-width = <8>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-new file mode 100644
-index 0000000..64d8082
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-@@ -0,0 +1,132 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+/dts-v1/;
-+#include "imx51-eukrea-cpuimx51.dtsi"
-+
-+/ {
-+	model = "Eukrea CPUIMX51";
-+	compatible = "eukrea,mbimxsd51","eukrea,cpuimx51", "fsl,imx51";
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpiokeys_1>;
-+
-+		button-1 {
-+			label = "BP1";
-+			gpios = <&gpio3 31 1>;
-+			linux,code = <256>;
-+			gpio-key,wakeup;
-+			linux,input-type = <1>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpioled>;
-+
-+		led1 {
-+			label = "led1";
-+			gpios = <&gpio3 30 1>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux_1>;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1_1 &pinctrl_esdhc1_cd>;
-+	fsl,cd-controller;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	tlv320aic23: codec at 1a {
-+		compatible = "ti,tlv320aic23";
-+		reg = <0x1a>;
-+	};
-+};
-+
-+&iomuxc {
-+	backlight {
-+		pinctrl_backlight_1: backlightgrp-1 {
-+			fsl,pins = <
-+				MX51_PAD_DI1_D1_CS__GPIO3_4 0x1f5
-+			>;
-+		};
-+	};
-+
-+	esdhc1 {
-+		pinctrl_esdhc1_cd: esdhc1_cd {
-+			fsl,pins = <
-+				MX51_PAD_GPIO1_0__SD1_CD 0x20d5
-+			>;
-+		};
-+	};
-+
-+	gpio-keys {
-+		pinctrl_gpiokeys_1: gpiokeysgrp-1 {
-+			fsl,pins = <
-+				MX51_PAD_NANDF_D9__GPIO3_31 0x1f5
-+			>;
-+		};
-+	};
-+
-+	leds {
-+		pinctrl_gpioled: gpioledgrp-1 {
-+			fsl,pins = <
-+				MX51_PAD_NANDF_D10__GPIO3_30 0x80000000
-+			>;
-+		};
-+	};
-+
-+	reg_lcd_3v3 {
-+		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
-+			fsl,pins = <
-+				MX51_PAD_CSI1_D9__GPIO3_13 0x1f5
-+			>;
-+		};
-+	};
-+};
-+
-+&ssi2 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3_2 &pinctrl_uart3_rtscts_2>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
+Upon further digging, it seems that users of devres_alloc() are
+relying on the previous behavior of having the memory zero'd which is
+no longer the case after $SUBJECT patch.  The change below on top of
+-next makes these ARM boards happy again.
+
+Kevin
+
+[1]
+>From 16489e16c8efdda791e96bd591e455e7c7739f98 Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@linaro.org>
+Date: Fri, 18 Oct 2013 09:41:39 -0700
+Subject: [PATCH] devres: restore zeroing behavior of devres_alloc()
+
+commit 64c862a8 (devres: add kernel standard devm_k.alloc functions) changed
+the default behavior of alloc_dr() to no longer zero the allocated
+memory.  However,
+only the devm.k.alloc() function were modified to pass in __GFP_ZERO
+which leaves
+any users of devres_alloc() or __devres_alloc() with potentially wrong
+assumptions
+about memory being zero'd upon allocation.
+
+To fix, add __GFP_ZERO to devres_alloc() calls to preserve previous
+behavior of zero'ing memory upon allocation.
+
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/base/devres.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/base/devres.c b/drivers/base/devres.c
+index 37e67a2..e3fe8be 100644
+--- a/drivers/base/devres.c
++++ b/drivers/base/devres.c
+@@ -136,7 +136,7 @@ void * devres_alloc(dr_release_t release, size_t
+size, gfp_t gfp)
+ {
+  struct devres *dr;
+
+- dr = alloc_dr(release, size, gfp);
++ dr = alloc_dr(release, size, gfp | __GFP_ZERO);
+  if (unlikely(!dr))
+  return NULL;
+  return dr->data;
 -- 
-1.7.9.5
+1.8.3
