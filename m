@@ -1,58 +1,73 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 18 Oct 2013 10:11:27 -0700
-Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
-In-Reply-To: <1382115973.2041.3.camel@joe-AO722>
-References: <1381296747.2040.17.camel@joe-AO722>
- <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
- <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
- <1382115973.2041.3.camel@joe-AO722>
-Message-ID: <CAGa+x87cDqigMAGb+7+46Ea1dRMWDi1O_84JZsmOKRb=1dSfTQ@mail.gmail.com>
+Date: Fri, 18 Oct 2013 10:13:59 -0700
+Subject: [GIT PULL 1/2] omap board removal for some omap3 boards for v3.13
+ merge window
+In-Reply-To: <20131018152450.GI15154@atomide.com>
+References: <526041db.41abe00a.33b7.00a1SMTPIN_ADDED_BROKEN@mx.google.com>
+ <87hacews6o.fsf@linaro.org> <20131018152450.GI15154@atomide.com>
+Message-ID: <CAGa+x87ykteWQ_T_-q6ANnPa4yCD3EF1uBKZ-hRYaPTJh_7x0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 10:06 AM, Joe Perches <joe@perches.com> wrote:
-> On Fri, 2013-10-18 at 09:57 -0700, Kevin Hilman wrote:
-> []
->> A handful of boot panics on ARM platforms were bisected to point at
->> the version of this commit that's in linux-next (commit
->> 64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
->> makes things happy again.
+On Fri, Oct 18, 2013 at 8:24 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Kevin Hilman <khilman@linaro.org> [131018 07:49]:
+>> Hi Tony,
 >>
->> Upon further digging, it seems that users of devres_alloc() are
->> relying on the previous behavior of having the memory zero'd which is
->> no longer the case after $SUBJECT patch.  The change below on top of
->> -next makes these ARM boards happy again.
-> []
->> commit 64c862a8 (devres: add kernel standard devm_k.alloc functions) changed
->> the default behavior of alloc_dr() to no longer zero the allocated
->> memory.  However,
->> only the devm.k.alloc() function were modified to pass in __GFP_ZERO
->> which leaves
->> any users of devres_alloc() or __devres_alloc() with potentially wrong
->> assumptions
->> about memory being zero'd upon allocation.
+>> Tony Lindgren <tony@atomide.com> writes:
 >>
->> To fix, add __GFP_ZERO to devres_alloc() calls to preserve previous
->> behavior of zero'ing memory upon allocation.
-> []
->> diff --git a/drivers/base/devres.c b/drivers/base/devres.c
-> []
->> @@ -136,7 +136,7 @@ void * devres_alloc(dr_release_t release, size_t
->> size, gfp_t gfp)
->>  {
->>   struct devres *dr;
+>> > The following changes since commit f41509ad0d4c11d0911630440749d409ce2aa1aa:
+>> >
+>> >   Merge branches 'omap-for-v3.13/dt' and 'omap-for-v3.13/quirk' into omap-for-v3.13/board-removal (2013-10-14 11:33:07 -0700)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >
+>> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/board-removal-signed
+>> >
+>> > for you to fetch changes up to f0c09b7c3b4e6b2fe501b3e888797b470de8320c:
+>> >
+>> >   ARM: OMAP2+: Remove legacy support for zoom platforms (2013-10-15 17:38:21 -0700)
+>> >
+>> > ----------------------------------------------------------------
+>> > Changes needed to drop legacy booting support for some
+>> > omap3 boards.
+>> >
+>> > Note that that these are based on a merge of the
+>> > following for the dependencies:
+>> >
+>> > - v3.12-rc5 for fixes to pinctrl mask
+>> > - omap-for-v3.13/dt-signed to avoid pointless merge conflicts
+>> > - omap-for-v3.13/quirk-signed for legacy pdata handling
+>> >
+>> > ----------------------------------------------------------------
+>> > Aaro Koskinen (2):
+>> >       ARM: dts: add minimal DT support for Nokia N950 & N9 phones
+>> >       ARM: OMAP2: delete board-rm680
+>> >
+>> > Tony Lindgren (6):
+>> >       ARM: dts: Shared file for omap GPMC connected smsc911x
+>> >       ARM: dts: Add common support for omap3-evm
+>> >       ARM: dts: Add basic support for TMDSEVM3730 (Mistral AM/DM37x EVM)
+>> >       ARM: dts: Add basic support for zoom3
 >>
->> - dr = alloc_dr(release, size, gfp);
->> + dr = alloc_dr(release, size, gfp | __GFP_ZERO);
->>   if (unlikely(!dr))
->>   return NULL;
->>   return dr->data;
+>> This patch introduces a build failure when compiling the DTBs:
+>>
+>>   [...]
+>>   DTC     arch/arm/boot/dts/omap3-zoom3.dtb
+>> ERROR (phandle_references): Reference to non-existent node or label "wl12xx_gpio"
 >
-> Wouldn't the __devres_alloc need that too?
+> Oops sorry, looks like the common support for omap3-evm has a
+> pinctrl entry that should be in the omap3-evm-37xx only. I guess
+> I did not run make dtbs after adding the omap3-evm-37xx parts.
+> The patch below fixes it for me.
+>
+> Do you want a new pull request or just the fix below?
 
-Yeah,  I had mentioned __devres_alloc() in the changelog, but missed
-it in the actual patch. :(
-Anyways, I had quickly sent an updated patch, but our mails must've
-crossed paths.
+Thanks for the fix.
+
+I'd prefer a new pull req so we don't have a broken build in the
+middle of the series.
+
+Thanks,
 
 Kevin
