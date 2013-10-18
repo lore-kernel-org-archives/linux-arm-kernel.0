@@ -1,45 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Oct 2013 09:06:15 -0700
-Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
-In-Reply-To: <52615AD4.7040306@ti.com>
-References: <20131010162015.GC29913@atomide.com>
- <CACRpkdYF83ghUf60Wmrti53UJ1bWV30GW_P9GjWnsOcZHbsv+Q@mail.gmail.com>
- <5257BD3E.5000707@ti.com>
- <CACRpkdYJNaiAAHhYatd6g5_wVt0QEUxOvsk6nQn9o=_i5zfWrA@mail.gmail.com>
- <20131011154352.GO29913@atomide.com>
- <CACRpkdZhbadd5d4P+2B0_DktqK4CHzZPVJC8kPHZYUnp8TaxsA@mail.gmail.com>
- <20131011160146.GR29913@atomide.com> <5260E606.2030903@ti.com>
- <20131018153541.GJ15154@atomide.com> <52615AD4.7040306@ti.com>
-Message-ID: <20131018160615.GM15154@atomide.com>
+Date: Fri, 18 Oct 2013 09:06:57 -0700
+Subject: [PATCH v3] ARM: dts: add minimal DT support for Nokia N950 &
+ N9 phones
+In-Reply-To: <52615A5D.7030002@baylibre.com>
+References: <1381869369-14626-1-git-send-email-aaro.koskinen@iki.fi>
+ <20131016003536.GA15154@atomide.com>
+ <52615A5D.7030002@baylibre.com>
+Message-ID: <20131018160656.GN15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Balaji T K <balajitk@ti.com> [131018 08:59]:
-> On Friday 18 October 2013 09:05 PM, Tony Lindgren wrote:
-> >* Balaji T K <balajitk@ti.com> [131018 00:41]:
+* Benoit Cousson <bcousson@baylibre.com> [131018 08:57]:
+> On 16/10/2013 02:35, Tony Lindgren wrote:
+> >* Aaro Koskinen <aaro.koskinen@iki.fi> [131015 13:36]:
+> >>Add minimal DT support for Nokia N950 & N9 phones. The same functionality
+> >>that is provided by the current board file should work: serial console,
+> >>USB, OneNAND and MMC.
 > >>
-> >>Any conclusion on using regmap for omap control module non-mux registers ?
+> >>Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> >>Acked-by: Tony Lindgren <tony@atomide.com>
 > >
-> >I don't think anybody has even started looking into a SCM driver
-> >yet considering there are tons of other issues to sort out.
-> >
-> >If you're thinking about implementing the MMC PBIAS driver, I would
-> >just implement it as a standalone driver. It seems that the PBIAS
-> >interface to the MMC driver can be just regulator framework.
-> >
-> Hi Tony,
+> >Oh this is not yet merged, I'll pick this one into the
+> >omap-for-v3.13/board-removal as the board removal patch is
+> >already there.
 > 
-> I am testing pbias regulator, Just thinking whether it should be
-> using regmap api or direct readl/writel
+> Just to be sure. Does that mean that you'll take care of that one,
+> and thus I do not have to queue it?
 
-OK either or should work. It seems that can easily be changed
-later on though.
- 
-> >Then when we have the SCM driver available, this driver can be
-> >updated to coordinate things with the core SCM driver.
-> 
-> Do you see regmap getting used for the SCM driver ?
+Yes I have it already in omap-for-v3.13/board-removal.
 
-Yes eventually :)
+Regards,
 
 Tony
