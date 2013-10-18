@@ -1,62 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Oct 2013 16:48:47 +0100
-Subject: [PATCH v8 08/19] arm/xen: get_dma_ops: return xen_dma_ops if
- we are running as xen_initial_domain
-In-Reply-To: <alpine.DEB.2.02.1310181643260.26077@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
- <1382031814-8782-8-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1310181319300.26077@kaball.uk.xensource.com>
- <20131018154246.GB25034@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1310181643260.26077@kaball.uk.xensource.com>
-Message-ID: <20131018154847.GD25034@n2100.arm.linux.org.uk>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Fri, 18 Oct 2013 17:51:15 +0200
+Subject: [RFC 0/1] Device Tree Schema Source format proposal
+In-Reply-To: <9610740.2oBMxfeRkE@amdc1227>
+References: <9610740.2oBMxfeRkE@amdc1227>
+Message-ID: <526158F3.4060104@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 04:46:00PM +0100, Stefano Stabellini wrote:
-> On Fri, 18 Oct 2013, Russell King - ARM Linux wrote:
-> > On Fri, Oct 18, 2013 at 01:22:18PM +0100, Stefano Stabellini wrote:
-> > > Russell,
-> > > are you OK with this patch?
-> > 
-> > Only concern is why the change is soo large.
-> > 
-> > > > -static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> > > > +static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
-> > > >  {
-> > > >  	if (dev && dev->archdata.dma_ops)
-> > > >  		return dev->archdata.dma_ops;
-> > > >  	return &arm_dma_ops;
-> > > >  }
-> > > >  
-> > > > +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> > > > +{
-> > > > +	if (xen_initial_domain())
-> > > > +		return xen_dma_ops;
-> > > > +	else
-> > > > +		return __generic_dma_ops(dev);
-> > > > +}
-> > > > +
-> > 
-> > What's wrong with:
-> > 
-> >  static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> >  {
-> > +	if (xen_initial_domain())
-> > +		return xen_dma_ops;
-> >  	if (dev && dev->archdata.dma_ops)
-> >  		return dev->archdata.dma_ops;
-> >  	return &arm_dma_ops;
-> >  }
-> 
-> 
-> xen_dma_ops functions might have to call back the native implementation.
-> With the above there is no way for a xen_dma_ops function to get to
-> archdata.dma_ops or arm_dma_ops.
-> This is the reason why this patch introduces __generic_dma_ops.
+Hi Tomasz,
 
-Ah, that's fine then, but having that described in the commit message
-would be useful.
+I'm glad you're back, we were missing you on that topic :-)
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 18/10/2013 16:56, Tomasz Figa wrote:
+> Hi All,
+>
+> Since the ARM Kernel Summit in Edinburgh is coming by big steps and we
+> need some food for thought for discussions that will be happening there,
+> I am posting my work in progress on Device Tree Schema Source format.
+>
+> I know I've been supposed to actively work on this and come up with
+> something working long time ago already, but due to unexpected
+> circumstances (aka neverending streams of other work) I could spend way
+> less time than I wanted on it.
+>
+> How miserably I failed can be seen on an example of Benoit's and Fabien's
+> attempt to solve this problem that has likely taken much less time and
+> is in an already working state.
 
-Thanks.
+That was more a proof of concept that helped us checking our assumptions 
+and the feasibility. Based on the first feedbacks, we were working on a 
+slightly different v2, that will anyway not be ready for ELCE. Your 
+inputs are thus very welcome and will help progressing and converging on 
+the schema definition.
+Well, at least, I hope :-)
+
+> So here I am, posting whatever I have done till now to present my ideas
+> that came to my mind while working on this and possibly allow wider
+> discussion on this topic.
+
+Great, I'll review that during the flight to be able to discuss that 
+next week.
+
+> A work in progress text on DTSS format will be sent in a follow-up
+> message, for clarity.
+
+Thanks,
+See you next week,
+
+Benoit
+
+-- 
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
