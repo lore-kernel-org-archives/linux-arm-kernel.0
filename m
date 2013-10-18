@@ -1,104 +1,105 @@
-From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
-Date: Fri, 18 Oct 2013 09:30:56 +0200
-Subject: [PATCH 5/7] jump_label: relax branch hinting restrictions
-In-Reply-To: <20131017133543.7e4e8d45@gandalf.local.home>
-References: <1382004631-25895-1-git-send-email-rkrcmar@redhat.com>
- <1382004631-25895-6-git-send-email-rkrcmar@redhat.com>
- <20131017133543.7e4e8d45@gandalf.local.home>
-Message-ID: <20131018073050.GA24114@hpx.cz>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Fri, 18 Oct 2013 00:27:51 -0700
+Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
+In-Reply-To: <0E83723C55F66F43A6041464FE31119D40FC99@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
+ <1379319655-20210-4-git-send-email-xobs@kosagi.com>
+ <CAJ+vNU36neHP77dVnqSP=+oMxaU=-6PxWQ8Afni-tTRjNTkM_A@mail.gmail.com>
+ <0E83723C55F66F43A6041464FE31119D40FC99@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <CAJ+vNU13FA5s7tt-yEnBYNSBV+FHmHqZNoykFq8aF=O=TvqTnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013-10-17 13:35-0400, Steven Rostedt:
-> On Thu, 17 Oct 2013 12:10:28 +0200
-> Radim Kr?m?? <rkrcmar@redhat.com> wrote:
-> 
-> > We implemented the optimized branch selection in higher levels of api.
-> > That made static_keys very unintuitive, so this patch introduces another
-> > element to jump_table, carrying one bit that tells the underlying code
-> > which branch to optimize.
-> > 
-> > It is now possible to select optimized branch for every jump_entry.
-> > 
-> > Current side effect is 1/3 increase increase in space, we could:
-> > * use bitmasks and selectors on 2+ aligned code/struct.
-> >   - aligning jump target is easy, but because it is not done by default
-> >     and few bytes in .text are much worse that few kilos in .data,
-> >     I chose not to
-> >   - data is probably aligned by default on all current architectures,
-> >     but programmer can force misalignment of static_key
-> > * optimize each architecture independently
-> >   - I can't test everything and this patch shouldn't break anything, so
-> >     others can contribute in the future
-> > * choose something worse, like packing or splitting
-> > * ignore
-> > 
-> > proof: example & x86_64 disassembly: (F = ffffffff)
-> > 
-> >   struct static_key flexible_feature;
-> >   noinline void jump_label_experiment(void) {
-> >   	if ( static_key_false(&flexible_feature))
-> >   	     asm ("push 0xa1");
-> >   	else asm ("push 0xa0");
-> >   	if (!static_key_false(&flexible_feature))
-> >   	     asm ("push 0xb0");
-> >   	else asm ("push 0xb1");
-> >   	if ( static_key_true(&flexible_feature))
-> >   	     asm ("push 0xc1");
-> >   	else asm ("push 0xc0");
-> >   	if (!static_key_true(&flexible_feature))
-> >   	     asm ("push 0xd0");
-> >   	else asm ("push 0xd1");
-> >   }
-> > 
-> >   Disassembly of section .text: (push marked by "->")
-> > 
-> >   F81002000 <jump_label_experiment>:
-> >   F81002000:       e8 7b 29 75 00          callq  F81754980 <__fentry__>
-> >   F81002005:       55                      push   %rbp
-> >   F81002006:       48 89 e5                mov    %rsp,%rbp
-> >   F81002009:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
-> >   F8100200e: ->    ff 34 25 a0 00 00 00    pushq  0xa0
-> >   F81002015:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
-> >   F8100201a: ->    ff 34 25 b0 00 00 00    pushq  0xb0
-> >   F81002021:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
-> >   F81002026: ->    ff 34 25 c1 00 00 00    pushq  0xc1
-> >   F8100202d:       0f 1f 00                nopl   (%rax)
-> >   F81002030:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
-> >   F81002035: ->    ff 34 25 d1 00 00 00    pushq  0xd1
-> >   F8100203c:       5d                      pop    %rbp
-> >   F8100203d:       0f 1f 00                nopl   (%rax)
-> >   F81002040:       c3                      retq
-> 
-> This looks exactly like what we want. I take it this is with your
-> patch. What was the result before the patch?
+On Thu, Oct 17, 2013 at 11:34 PM, Zhu Richard-R65037
+<r65037@freescale.com> wrote:
 
-Yes, this is after the patch.
+[...]
 
-The branches would (should) be the same without patch, but
-static_key_true() was defined as !static_key_false(), so this piece of
-code was invalid before, because half of them would be patched to use
-the wrong branch.
+> Hi Tim:
+> Regarding to my experience, the difference shouldn't be related with the bus hang.
+> Here are my DT region setup when I trying to bring up imx6 pcie on 3.1x kernel by my own driver.
+>                         clock-names = "pcie_axi", "pcie_ref", "pcie_bus_in", "pcie_bus_out";
+>                         #address-cells = <3>;
+>                         #size-cells = <2>;
+>                         ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000   /* configuration space */
+>                                   0x81000000 0 0          0x01f80000 0 0x00010000   /* downstream I/O */
+>                                   0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+>                         num-lanes = <1>;
+>
+> It works sometimes, although that there is random kernel panic and system hang(log is pasted below):(
+> LOGS, when pericom's PI7C9X2G303EL and Intel e1000e network card is used.
+> ...
+> imx-pcie 1ffc000.pcie: legacy_irq 155
+> imx-pcie 1ffc000.pcie: map [mem 0x01ffc000-0x01ffffff]
+> IMX PCIe port: link up.
+> PCI host bridge to bus 0000:00
+> pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
+> pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+> pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
+> PCI: bus0: Fast back to back transfers disabled
+> PCI: bus1: Fast back to back transfers disabled
+> pci 0000:01:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> PCI: bus2: Fast back to back transfers disabled
+> pci 0000:02:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> pci 0000:02:02.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> PCI: bus3: Fast back to back transfers disabled
+> PCI: bus4: Fast back to back transfers enabled
+> pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff 64bit]
+> pci 0000:00:00.0: BAR 8: assigned [mem 0x01100000-0x012fffff]
+> pci 0000:00:00.0: BAR 6: assigned [mem 0x01300000-0x0130ffff pref]
+> pci 0000:00:00.0: BAR 7: assigned [io  0x1000-0x1fff]
+> pci 0000:01:00.0: BAR 8: assigned [mem 0x01100000-0x012fffff]
+> pci 0000:01:00.0: BAR 7: assigned [io  0x1000-0x1fff]
+> pci 0000:02:01.0: BAR 8: assigned [mem 0x01100000-0x012fffff]
+> pci 0000:02:01.0: BAR 7: assigned [io  0x1000-0x1fff]
+> pci 0000:03:00.0: BAR 1: assigned [mem 0x01100000-0x011fffff]
+> pci 0000:03:00.0: BAR 0: assigned [mem 0x01200000-0x0121ffff]
+> pci 0000:03:00.0: BAR 3: assigned [mem 0x01220000-0x01223fff]
+> pci 0000:03:00.0: BAR 2: assigned [io  0x1000-0x101f]
+> pci 0000:02:01.0: PCI bridge to [bus 03]
+> pci 0000:02:01.0:   bridge window [io  0x1000-0x1fff]
+> pci 0000:02:01.0:   bridge window [mem 0x01100000-0x012fffff]
+> pci 0000:02:02.0: PCI bridge to [bus 04]
+> pci 0000:01:00.0: PCI bridge to [bus 02-04]
+> pci 0000:01:00.0:   bridge window [io  0x1000-0x1fff]
+> pci 0000:01:00.0:   bridge window [mem 0x01100000-0x012fffff]
+> pci 0000:00:00.0: PCI bridge to [bus 01-04]
+> pci 0000:00:00.0:   bridge window [io  0x1000-0x1fff]
+> pci 0000:00:00.0:   bridge window [mem 0x01100000-0x012fffff]
+> PCI: enabling device 0000:01:00.0 (0140 -> 0143)
+> PCI: enabling device 0000:02:01.0 (0140 -> 0143)
+> PCI: enabling device 0000:02:02.0 (0140 -> 0143)
+> ...
+> e1000e: Intel(R) PRO/1000 Network Driver - 2.3.2-k
+> e1000e: Copyright(c) 1999 - 2013 Intel Corporation.
+> e1000e 0000:03:00.0: Disabling ASPM L0s L1
+> PCI: enabling device 0000:03:00.0 (0140 -> 0142)
+> e1000e 0000:03:00.0: Interrupt Throttling Rate (ints/sec) set to dynamic conservative mode
+> e1000e 0000:03:00.0 eth1: registered PHC clock
+> e1000e 0000:03:00.0 eth1: (PCI Express:2.5GT/s:Width x1) 00:1b:21:3a:18:8b
+> e1000e 0000:03:00.0 eth1: Intel(R) PRO/1000 Network Connection
+> e1000e 0000:03:00.0 eth1: MAC: 3, PHY: 8, PBA No: E42641-005
+> igb: Intel(R) Gigabit Ethernet Network Driver - version 5.0.3-k
+> igb: Copyright (c) 2007-2013 Intel Corporation.
+> ...
+>
+> ALSA device list:
+>   #0: wm8962-audio
+> VFS: Mounted root (nfs filesystem) on device 0:11.
+> devtmpfs: mounted
+> Freeing unused kernel memory: 324K (8082d000 - 8087e000)
+> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b  <-- Kernel panic here randomly. Same phenomena when the root-fs is located in SD.
 
-> -- Steve
-> 
-> >   F81002041:       0f 1f 80 00 00 00 00    nopl   0x0(%rax)
-> >   F81002048: ->    ff 34 25 d0 00 00 00    pushq  0xd0
-> >   F8100204f:       5d                      pop    %rbp
-> >   F81002050:       c3                      retq
-> >   F81002051:       0f 1f 80 00 00 00 00    nopl   0x0(%rax)
-> >   F81002058: ->    ff 34 25 c0 00 00 00    pushq  0xc0
-> >   F8100205f:       90                      nop
-> >   F81002060:       eb cb                   jmp    F8100202d <[...]+0x2d>
-> >   F81002062:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
-> >   F81002068: ->    ff 34 25 b1 00 00 00    pushq  0xb1
-> >   F8100206f:       90                      nop
-> >   F81002070:       eb af                   jmp    F81002021 <[...]+0x21>
-> >   F81002072:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
-> >   F81002078: ->    ff 34 25 a1 00 00 00    pushq  0xa1
-> >   F8100207f:       90                      nop
-> >   F81002080:       eb 93                   jmp    F81002015 <[...]+0x15>
-> >   F81002082:       66 66 66 66 66 2e 0f    [...]
-> >   F81002089:       1f 84 00 00 00 00 00
-> > 
-> >   Contents of section .data: (relevant part of embedded __jump_table)
+Richard,
+
+I would suspect this is the imprecise abort issue.  Please see my
+patch (http://thread.gmane.org/gmane.linux.kernel.pci/26159) resolves
+that for you and reply to that thread if so.
+
+I believe that the imprecise abort's only occurs if you have a PCIe
+switch on the bus - is this your topology and if so are you
+experiencing any issues with devices behind the bus that use io
+regions?  If you do have a switch, perhaps you can provide me with an
+'lspci -v' for comparison.
+
+Tim
