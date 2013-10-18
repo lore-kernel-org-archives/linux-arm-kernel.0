@@ -1,51 +1,44 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 18 Oct 2013 17:17:02 +0200
-Subject: [PATCHv3][ 11/11] ARM: imx_v4_v5_defconfig: Enable gpio regulator and
- gpio button/keyboard.
-In-Reply-To: <1382109422-24454-1-git-send-email-denis@eukrea.com>
-References: <1382109422-24454-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382109422-24454-11-git-send-email-denis@eukrea.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 18 Oct 2013 08:23:41 -0700
+Subject: [GIT PULL] at91: dt for 3.13 #1
+In-Reply-To: <1382108324-9080-1-git-send-email-nicolas.ferre@atmel.com>
+ (Nicolas Ferre's message of "Fri, 18 Oct 2013 16:58:44 +0200")
+References: <1382108324-9080-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <874n8ewqki.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eukrea mbimxsd25 has a gpio regulator for enabling its
-  LCD display, it also has a gpio button.
+Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 
-We enable the respective drivers in order to be able to use theses
-  features with this configuration.
+> Arnd, Olof, Kevin,
+>
+> First AT91 DT-related pull-request for 3.13. These patches will not mess with my other
+> "cleanup" pull-request sent today.
+> It allows to enable sound on the at91sam9n12ek board.
+>
+> Thanks, best regards,
+>
+> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+>
+>   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+>
+> are available in the git repository at:
+>
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+>
+> for you to fetch changes up to e483341ce82750a1b526b65b7178213dcf967a7a:
+>
+>   ARM: at91: remove pinctrl conflict between mmc and SPI for at91sam9g20ek (2013-10-18 16:50:13 +0200)
+>
+> ----------------------------------------------------------------
+> First DT series for 3.13
+> - addition of sound for at91sam9n12
+> - a little fix for MMC vs. SPI on at91sam9g20ek
+>
+> ----------------------------------------------------------------
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v2->v3:
-- The two commits touching imx_v4_v5_defconfig were squashed.
----
- arch/arm/configs/imx_v4_v5_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+Pulled into next/dt.
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index e958ebe..6309ee5 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -91,6 +91,7 @@ CONFIG_SMSC911X=y
- CONFIG_SMSC_PHY=y
- # CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=y
-+CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_IMX=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
-@@ -118,6 +119,7 @@ CONFIG_IMX2_WDT=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
--- 
-1.7.9.5
+Thanks,
+
+Kevin
