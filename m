@@ -1,78 +1,40 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 17 Oct 2013 20:20:45 -0400
-Subject: [PATCH 5/5] DRM: Armada: add support for drm tda19988 driver
-In-Reply-To: <20131008173418.0fc21d60@armhf>
-References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
- <E1VSwYO-0000iT-CU@rmk-PC.arm.linux.org.uk>
- <20131007111807.5e86ea6e@armhf>
- <20131007094404.GI12758@n2100.arm.linux.org.uk>
- <20131007124820.2189a4c3@armhf>
- <20131007110902.GL12758@n2100.arm.linux.org.uk>
- <CAF6AEGsqGYj7_tZdzrsmUxExs6wm838dYPFhBdc8wqVC6mTxmg@mail.gmail.com>
- <20131008111913.09bfe93e@armhf>
- <20131008094939.GD25034@n2100.arm.linux.org.uk>
- <20131008173418.0fc21d60@armhf>
-Message-ID: <CAF6AEGsGMzc8iUZMFqsWdhbS_fSwg38eLfaOG515WNxXg029FA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 18 Oct 2013 01:34:39 +0100
+Subject: [PATCH] ASoC: kirkwood: add S/PDIF support
+In-Reply-To: <20130924124122.64834b2a@armhf>
+References: <20130924124122.64834b2a@armhf>
+Message-ID: <20131018003439.GG2443@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 8, 2013 at 11:34 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> On Tue, 8 Oct 2013 10:49:39 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->
->> On Tue, Oct 08, 2013 at 11:19:13AM +0200, Jean-Francois Moine wrote:
->> > The Cubox is an open platform, and I use it just like a desktop PC.
->> > When its required drivers will be in the mainline, I will do the same
->> > as I do with PCs: I will not recompile a specific kernel each time
->> > there are kernel bugs or security issues. Instead, I will just upgrade
->> > my system from my distributor (Debian), and, in the packages, there
->> > will be a generic mvebu kernel as there is already one for Marvell
->> > Armada 370/xp, Freescale iMX5x/iMX6 (linux-image-3.10-3-armmp).
->> > But, for that, all the Cubox specific stuff must be described in a DT.
->>
->> Which scenario is better:
->>
->> 1. To have something in mainline which is capable of driving the hardware,
->>    but may need some additional work to make it useful for DT based setups.
->>
->> or
->>
->> 2. To have nothing.
->>
->> Now, you may prefer to have nothing, but personally, I prefer there to be
->> forward progress.  Forward progress means getting some kind of DRM driver
->> into mainline.  Yes, it may not work with DT setups yet, but - as per
->> the discussions that have happened _endlessly_ on this topic, it's
->> something that can be resolved at a later date.
->>
->> We _still_ haven't worked out how to properly deal with the TDA998x
->> driver (or indeed any DRM based outputs) in a DT based setup, and all
->> the time that problem exists, it won't be possible to write a proper
->> stable DT binding for this.
->>
->> So please, get off your hobby horse about this and allow us to make some
->> modicum of progress.
->
-> You forgot:
->
-> 3. To have all patches ready for submission and have a working DT driven
->    Cubox kernel.
+On Tue, Sep 24, 2013 at 12:41:22PM +0200, Jean-Francois Moine wrote:
 
-No need to block this patch on DT support for all platforms that can
-use this driver.  I don't see an issue with removing non-DT support
-later if it is no longer needed, or adding DT support in a future
-patch for platforms which can use it.  So this patch looks fine to me.
+> This patch adds S/PDIF input/output for mvebu DT boards.
 
-Signed-off-by: Rob Clark <robdclark@gmail.com
+This got less discussion than I was expecting and then slipped under a
+lot of other patches in my queue while that was timing out, sorry...  in
+any case, this still has the issue that it used a single DAI and a
+single DAI link to represent two physical DAIs and their links.
 
+Please as covered in the prior threads on this either implement DPCM or
+implement two traditional DAIs which can't be used simultaneously (which
+should be simpler and can then be built on incrementally).
 
-> I will submit a patch to add DT to the tda998x driver as soon as I have
-> checked the new audio properties we talked about yesterday.
->
-> Normally, this should have no impact on your Armada drm driver, and,
-> yes, I will add DT to your driver as soon as it will be accepted
-> (sorry to not ack it now: I had no time yet to have a look at it).
->
-> --
-> Ken ar c'henta? |             ** Breizh ha Linux atav! **
-> Jef             |               http://moinejf.free.fr/
+The last set of DPCMish patches was reported to work so should be a
+fairly small refactoring away from being OK - the main thing is to
+create back end DAIs for the physical links and then put the widgets
+that manage the enable of the S/PDIF and I2S interfaces between the FE
+and BE DAIs instead of directly connecting them to widgets on the CODEC.
+
+For two traditional DAIs it should just be a case of duplicating the DAI
+with a differnet ID then setting the enable bits based on the ID of the
+DAI in use and ideally adding some code to check that they're not both
+active (or that limit can be enforced by only having machine drivers
+that use one or the other).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131018/48776b99/attachment.sig>
