@@ -1,39 +1,70 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 18 Oct 2013 15:18:29 +0300
-Subject: [PATCH v4 03/15] clk: tegra: common periph_clk_enb_refcnt and clks
-In-Reply-To: <CAL1qeaFrm50m0a3csY=04MNQENM_DY5fgBrq5bdsm8dHnLj1gA@mail.gmail.com>
-References: <1382013526-12800-1-git-send-email-pdeschrijver@nvidia.com>
- <1382013526-12800-4-git-send-email-pdeschrijver@nvidia.com>
- <CAL1qeaFrm50m0a3csY=04MNQENM_DY5fgBrq5bdsm8dHnLj1gA@mail.gmail.com>
-Message-ID: <20131018121829.GA25591@tbergstrom-lnx.Nvidia.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 18 Oct 2013 13:22:18 +0100
+Subject: [PATCH v8 08/19] arm/xen: get_dma_ops: return xen_dma_ops if we
+ are running as xen_initial_domain
+In-Reply-To: <1382031814-8782-8-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-8-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.DEB.2.02.1310181319300.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 12:26:20AM +0200, Andrew Bresticker wrote:
-> Hi Peter,
+Russell,
+are you OK with this patch?
+
+
+On Thu, 17 Oct 2013, Stefano Stabellini wrote:
+> We can't simply override arm_dma_ops with xen_dma_ops because devices
+> are allowed to have their own dma_ops and they take precedence over
+> arm_dma_ops. When running on Xen as initial domain, we always want
+> xen_dma_ops to be the one in use.
 > 
-> >  static void __init tegra30_clock_init(struct device_node *np)
-> >  {
-> >         struct device_node *node;
-> > -       int i;
-> >
-> >         clk_base = of_iomap(np, 0);
-> >         if (!clk_base) {
-> > @@ -1916,8 +1910,11 @@ static void __init tegra30_clock_init(struct device_node *np)
-> >                 BUG();
-> >         }
-> >
-> > -       if (tegra_clk_set_periph_banks(5) < 0)
-> > +       clks = tegra_clk_init(clk_max, 5);
-> > +       if (!clks) {
-> > +               WARN_ON(1);
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
+> CC: will.deacon at arm.com
+> CC: linux at arm.linux.org.uk
 > 
-> Really minor nit: it seems strange that we WARN here for t30, but not
-> for t114 or t20.
-
-There used to be a warning for all 3, but I removed it and apparently forgot
-t30.
-
-Cheers,
-
-Peter.
+> Changes in v7:
+> - return xen_dma_ops only if we are the initial domain;
+> - rename __get_dma_ops to __generic_dma_ops.
+> ---
+>  arch/arm/include/asm/dma-mapping.h |   13 ++++++++++++-
+>  1 files changed, 12 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 01b5a3d..f5945d4 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -12,17 +12,28 @@
+>  #include <asm/memory.h>
+>  #include <asm/cacheflush.h>
+>  
+> +#include <xen/xen.h>
+> +#include <asm/xen/hypervisor.h>
+> +
+>  #define DMA_ERROR_CODE	(~0)
+>  extern struct dma_map_ops arm_dma_ops;
+>  extern struct dma_map_ops arm_coherent_dma_ops;
+>  
+> -static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> +static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+>  {
+>  	if (dev && dev->archdata.dma_ops)
+>  		return dev->archdata.dma_ops;
+>  	return &arm_dma_ops;
+>  }
+>  
+> +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> +{
+> +	if (xen_initial_domain())
+> +		return xen_dma_ops;
+> +	else
+> +		return __generic_dma_ops(dev);
+> +}
+> +
+>  static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+>  {
+>  	BUG_ON(!dev);
+> -- 
+> 1.7.2.5
+> 
