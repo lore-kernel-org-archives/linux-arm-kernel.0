@@ -1,32 +1,129 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 18 Oct 2013 19:46:01 +0800
-Subject: [PATCH v2 0/8] mmc: sdhci-esdhc-imx: add std tuning for mx6sl
- and DDR mode support
-In-Reply-To: <1382093661-4074-1-git-send-email-b29396@freescale.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 18 Oct 2013 19:30:47 +0800
+Subject: [PATCH v2 5/8] mmc: sdhci-esdhc-imx: add delay line setting
+ support
+In-Reply-To: <20131018114233.GD6043@S2101-09.ap.freescale.net>
 References: <1382093661-4074-1-git-send-email-b29396@freescale.com>
-Message-ID: <20131018114553.GE6043@S2101-09.ap.freescale.net>
+ <1382093661-4074-6-git-send-email-b29396@freescale.com>
+ <20131018114233.GD6043@S2101-09.ap.freescale.net>
+Message-ID: <20131018113046.GE22289@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 06:54:13PM +0800, Dong Aisheng wrote:
-> ChangeLog:
-> v1->v2:
->  - Only a few minor changes on patch 1 and 5 based on comments from Shawn
->    while other patches have no change.
->  - rebase on Shawn's patch series
->    [PATCH v2 0/4] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
+On Fri, Oct 18, 2013 at 07:42:35PM +0800, Shawn Guo wrote:
+> On Fri, Oct 18, 2013 at 06:54:18PM +0800, Dong Aisheng wrote:
+> > The DLL(Delay Line) is newly added to assist in sampling read data.
+> > The DLL provides the ability to programmatically select a quantized
+> > delay (in fractions of the clock period) regardless of on-chip variations
+> > such as process, voltage and temperature (PVT).
+> > 
+> > This patch adds a user interface to set slave delay line via device tree.
+> > It's usually used in high speed mode like mmc DDR mode when the signal
+> > quality is not good caused by board design, e.g. the signal path is too long.
+> > User can manual set delay line to find a suitable data sampling window
+> > for card to work properly.
+> > 
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > ---
+> >  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    5 +++++
+> >  drivers/mmc/host/sdhci-esdhc-imx.c                 |   18 ++++++++++++++++++
+> >  include/linux/platform_data/mmc-esdhc-imx.h        |    1 +
+> >  3 files changed, 24 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> > index 1dd6225..78a45c5 100644
+> > --- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> > @@ -12,6 +12,11 @@ Required properties:
+> >  Optional properties:
+> >  - fsl,cd-controller : Indicate to use controller internal card detection
+> >  - fsl,wp-controller : Indicate to use controller internal write protection
+> > +- fsl,delay-line : Specify the number of delay cells for override mode.
+> > +  This is used to set the clock delay for DLL(Delay Line) on override mode
+> > +  to select a proper data sampling window in case the clock quality is not good
+> > +  due to signal path is too long on the board.
+> > +  please refer to DLL chapter in RM for details.
 > 
-> Dong Aisheng (8):
->   mmc: sdhci-esdhc-imx: add std tuning support for mx6sl
->   mmc: sdhci-esdhc-imx: fix reading cap_1 register value for mx6sl
->   mmc: sdhci: report error once the maximum tuning loops exhausted or
->     timeout
->   mmc: sdhci-esdhc-imx: add DDR mode support for mx6
->   mmc: sdhci-esdhc-imx: add delay line setting support
->   mmc: sdhci-esdhc-imx: enable SDR50 tuning for imx6q/dl
->   mmc: sdhci-esdhc-imx: add preset value quirk for mx6
->   mmc: sdhci: remove unneeded call when have preset value quirk
+> It might be better to reword it like:
+> 
+> Please refer to eSDHC/uSDHC DLL_CTRL register bit field
+> DLL_CTRL_SLV_OVERRIDE_VAL in Reference Manual for details.
+> 
 
-Other than 2 small comments I gave on patch #1 and #5, for the series:
+There is a DLL (Delay Line) chapter in the reference manual which
+has more detailed descriptions on the delay line including override mode.
+So i think it may be better to point user to the DLL chapter for understanding,
+then naturally user will refer to register for bit defines later too.
+Does it make sense?
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Regards
+Dong Aisheng
+
+> >  
+> >  Examples:
+> >  
+> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > index c5c26bd..87d202b 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > @@ -46,6 +46,11 @@
+> >  /* Bits 3 and 6 are not SDHCI standard definitions */
+> >  #define  ESDHC_MIX_CTRL_SDHCI_MASK	0xb7
+> >  
+> > +/* dll control register */
+> > +#define ESDHC_DLL_CTRL			0x60
+> > +#define ESDHC_DLL_OVERRIDE_VAL_SHIFT	9
+> > +#define ESDHC_DLL_OVERRIDE_EN_SHIFT	8
+> > +
+> >  /* tune control register */
+> >  #define ESDHC_TUNE_CTRL_STATUS		0x68
+> >  #define  ESDHC_TUNE_CTRL_STEP		1
+> > @@ -817,6 +822,7 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+> >  {
+> >  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> >  	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> > +	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
+> >  
+> >  	switch (uhs) {
+> >  	case MMC_TIMING_UHS_SDR12:
+> > @@ -837,6 +843,15 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+> >  				ESDHC_MIX_CTRL_DDREN,
+> >  				host->ioaddr + ESDHC_MIX_CTRL);
+> >  		imx_data->is_ddr = 1;
+> > +		if (boarddata->delay_line) {
+> > +			u32 v;
+> > +			v = boarddata->delay_line <<
+> > +				ESDHC_DLL_OVERRIDE_VAL_SHIFT |
+> > +				(1 << ESDHC_DLL_OVERRIDE_EN_SHIFT);
+> > +			if (is_imx53_esdhc(imx_data))
+> > +				v <<= 1;
+> > +			writel(v, host->ioaddr + ESDHC_DLL_CTRL);
+> > +		}
+> >  		break;
+> >  	}
+> >  
+> > @@ -901,6 +916,9 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+> >  	else
+> >  		boarddata->support_vsel = true;
+> >  
+> > +	if (of_property_read_u32(np, "fsl,delay-line", &boarddata->delay_line))
+> > +		boarddata->delay_line = 0;
+> > +
+> >  	return 0;
+> >  }
+> >  #else
+> > diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
+> > index a0f5a8f..75f70f6 100644
+> > --- a/include/linux/platform_data/mmc-esdhc-imx.h
+> > +++ b/include/linux/platform_data/mmc-esdhc-imx.h
+> > @@ -45,5 +45,6 @@ struct esdhc_platform_data {
+> >  	int max_bus_width;
+> >  	unsigned int f_max;
+> >  	bool support_vsel;
+> > +	unsigned int delay_line;
+> >  };
+> >  #endif /* __ASM_ARCH_IMX_ESDHC_H */
+> > -- 
+> > 1.7.2.rc3
+> > 
+> > 
