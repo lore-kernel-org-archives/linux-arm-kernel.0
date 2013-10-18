@@ -1,191 +1,58 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 18 Oct 2013 19:10:50 +0200
-Subject: [PATCHv3] video: backlight: gpio-backlight: Add DT support.
-Message-ID: <1382116250-8808-1-git-send-email-denis@eukrea.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 18 Oct 2013 10:11:27 -0700
+Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
+In-Reply-To: <1382115973.2041.3.camel@joe-AO722>
+References: <1381296747.2040.17.camel@joe-AO722>
+ <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
+ <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
+ <1382115973.2041.3.camel@joe-AO722>
+Message-ID: <CAGa+x87cDqigMAGb+7+46Ea1dRMWDi1O_84JZsmOKRb=1dSfTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Richard Purdie <rpurdie@rpsys.net>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v2->v3:
-- The dev_err are not split between multiples lines anymore, in order to
-  improve grepping. Thanks to Lothar Wa?mann for the advise.
----
- .../bindings/video/backlight/gpio-backlight.txt    |   18 +++++
- drivers/video/backlight/gpio_backlight.c           |   72 ++++++++++++++++++--
- 2 files changed, 83 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+On Fri, Oct 18, 2013 at 10:06 AM, Joe Perches <joe@perches.com> wrote:
+> On Fri, 2013-10-18 at 09:57 -0700, Kevin Hilman wrote:
+> []
+>> A handful of boot panics on ARM platforms were bisected to point at
+>> the version of this commit that's in linux-next (commit
+>> 64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
+>> makes things happy again.
+>>
+>> Upon further digging, it seems that users of devres_alloc() are
+>> relying on the previous behavior of having the memory zero'd which is
+>> no longer the case after $SUBJECT patch.  The change below on top of
+>> -next makes these ARM boards happy again.
+> []
+>> commit 64c862a8 (devres: add kernel standard devm_k.alloc functions) changed
+>> the default behavior of alloc_dr() to no longer zero the allocated
+>> memory.  However,
+>> only the devm.k.alloc() function were modified to pass in __GFP_ZERO
+>> which leaves
+>> any users of devres_alloc() or __devres_alloc() with potentially wrong
+>> assumptions
+>> about memory being zero'd upon allocation.
+>>
+>> To fix, add __GFP_ZERO to devres_alloc() calls to preserve previous
+>> behavior of zero'ing memory upon allocation.
+> []
+>> diff --git a/drivers/base/devres.c b/drivers/base/devres.c
+> []
+>> @@ -136,7 +136,7 @@ void * devres_alloc(dr_release_t release, size_t
+>> size, gfp_t gfp)
+>>  {
+>>   struct devres *dr;
+>>
+>> - dr = alloc_dr(release, size, gfp);
+>> + dr = alloc_dr(release, size, gfp | __GFP_ZERO);
+>>   if (unlikely(!dr))
+>>   return NULL;
+>>   return dr->data;
+>
+> Wouldn't the __devres_alloc need that too?
 
-diff --git a/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
-new file mode 100644
-index 0000000..362dd40
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
-@@ -0,0 +1,18 @@
-+gpio-backlight bindings
-+
-+Required properties:
-+  - compatible: "gpio-backlight"
-+  - gpios: describes the gpio that is used for enabling/disabling the backlight
-+     (see GPIO binding[0] for more details).
-+  - default-brightness-level: the default brightness level (can be 0(off) or
-+      1(on) since GPIOs only support theses levels).
-+
-+[0]: Documentation/devicetree/bindings/gpio/gpio.txt
-+
-+Example:
-+
-+	backlight {
-+		compatible = "gpio-backlight";
-+		gpios = <&gpio3 4 0>;
-+		default-brightness-level = <1>;
-+	};
-diff --git a/drivers/video/backlight/gpio_backlight.c b/drivers/video/backlight/gpio_backlight.c
-index 81fb127..3bf38a0 100644
---- a/drivers/video/backlight/gpio_backlight.c
-+++ b/drivers/video/backlight/gpio_backlight.c
-@@ -13,6 +13,8 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- #include <linux/platform_data/gpio_backlight.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-@@ -23,6 +25,7 @@ struct gpio_backlight {
- 
- 	int gpio;
- 	int active;
-+	int def_value;
- };
- 
- static int gpio_backlight_update_status(struct backlight_device *bl)
-@@ -60,6 +63,42 @@ static const struct backlight_ops gpio_backlight_ops = {
- 	.check_fb	= gpio_backlight_check_fb,
- };
- 
-+static int gpio_backlight_probe_dt(struct platform_device *pdev,
-+				   struct gpio_backlight *gbl)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	enum of_gpio_flags gpio_flags;
-+	int ret;
-+
-+	gbl->fbdev = NULL;
-+	gbl->gpio = of_get_gpio_flags(np, 0, &gpio_flags);
-+
-+	gbl->active = (gpio_flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1;
-+
-+	if (gbl->gpio == -EPROBE_DEFER) {
-+		return ERR_PTR(-EPROBE_DEFER);
-+	} else if (gbl->gpio < 0) {
-+		dev_err(&pdev->dev, "Error: gpios is a required parameter.\n");
-+		return gbl->gpio;
-+	}
-+
-+	ret = of_property_read_u32(np, "default-brightness-level",
-+				   &gbl->def_value);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev,
-+			"Error: default-brightness-level is a required parameter.\n");
-+		return ret;
-+	}
-+
-+	if (gbl->def_value < 0 || gbl->def_value > 1) {
-+		dev_err(&pdev->dev,
-+			"Error: Invalid default-brightness-level value. Its value can be either 0(off) or 1(on).\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static int gpio_backlight_probe(struct platform_device *pdev)
- {
- 	struct gpio_backlight_platform_data *pdata =
-@@ -67,10 +106,12 @@ static int gpio_backlight_probe(struct platform_device *pdev)
- 	struct backlight_properties props;
- 	struct backlight_device *bl;
- 	struct gpio_backlight *gbl;
-+	struct device_node *np = pdev->dev.of_node;
- 	int ret;
- 
--	if (!pdata) {
--		dev_err(&pdev->dev, "failed to find platform data\n");
-+	if (!pdata && !np) {
-+		dev_err(&pdev->dev,
-+			"failed to find platform data or device tree node.\n");
- 		return -ENODEV;
- 	}
- 
-@@ -79,14 +120,21 @@ static int gpio_backlight_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	gbl->dev = &pdev->dev;
--	gbl->fbdev = pdata->fbdev;
--	gbl->gpio = pdata->gpio;
--	gbl->active = pdata->active_low ? 0 : 1;
-+
-+	if (np) {
-+		ret = gpio_backlight_probe_dt(pdev, gbl);
-+		if (ret)
-+			return ret;
-+	} else {
-+		gbl->fbdev = pdata->fbdev;
-+		gbl->gpio = pdata->gpio;
-+		gbl->active = pdata->active_low ? 0 : 1;
-+	}
- 
- 	ret = devm_gpio_request_one(gbl->dev, gbl->gpio, GPIOF_DIR_OUT |
- 				    (gbl->active ? GPIOF_INIT_LOW
- 						 : GPIOF_INIT_HIGH),
--				    pdata->name);
-+				    pdata ? pdata->name : "backlight");
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "unable to request GPIO\n");
- 		return ret;
-@@ -103,17 +151,27 @@ static int gpio_backlight_probe(struct platform_device *pdev)
- 		return PTR_ERR(bl);
- 	}
- 
--	bl->props.brightness = pdata->def_value;
-+	if (np)
-+		bl->props.brightness = gbl->def_value;
-+	else
-+		bl->props.brightness = pdata->def_value;
-+
- 	backlight_update_status(bl);
- 
- 	platform_set_drvdata(pdev, bl);
- 	return 0;
- }
- 
-+static struct of_device_id gpio_backlight_of_match[] = {
-+	{ .compatible = "gpio-backlight" },
-+	{ /* sentinel */ }
-+};
-+
- static struct platform_driver gpio_backlight_driver = {
- 	.driver		= {
- 		.name		= "gpio-backlight",
- 		.owner		= THIS_MODULE,
-+		.of_match_table = of_match_ptr(gpio_backlight_of_match),
- 	},
- 	.probe		= gpio_backlight_probe,
- };
--- 
-1.7.9.5
+Yeah,  I had mentioned __devres_alloc() in the changelog, but missed
+it in the actual patch. :(
+Anyways, I had quickly sent an updated patch, but our mails must've
+crossed paths.
+
+Kevin
