@@ -1,38 +1,47 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 17 Oct 2013 22:04:57 -0700
-Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
-In-Reply-To: <1381853200-5534-6-git-send-email-marex@denx.de>
-References: <1381853200-5534-1-git-send-email-marex@denx.de>
- <1381853200-5534-6-git-send-email-marex@denx.de>
-Message-ID: <CAJ+vNU2_=qVP4mvzwcjBRMxo88Qa+8OQqqwo1f9SqVxSNyavgA@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 18 Oct 2013 11:01:00 +0530
+Subject: [PATCH] phy: exynos-mipi-video: Fix phy_power_off() callback
+In-Reply-To: <1381943025-1036-1-git-send-email-s.nawrocki@samsung.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <1381943025-1036-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <5260C794.7040605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 9:06 AM, Marek Vasut <marex@denx.de> wrote:
-> Without forcing the PCIe core into Gen1 operation, the PCIe switch
-> attached directly to the PCIe port is not recognised at all. The
-> PCIe switch is Gen2 capable to make this issue even more puzzling.
->
-[...]
->
->         while (!dw_pcie_link_up(pp)) {
->                 usleep_range(100, 1000);
->                 count++;
-> -               if (count >= 10) {
-> +               if (count >= 200) {
->                         dev_err(pp->dev, "phy link never came up\n");
->                         dev_dbg(pp->dev,
->                                 "DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
-> --
-> 1.8.4.rc3
->
+Hi Greg,
 
-Marek,
+On Wednesday 16 October 2013 10:33 PM, Sylwester Nawrocki wrote:
+> Fix argument passed to the register setup helper function so
+> the phy is actually disabled. Now due to cut&paste error 1 is
+> passed to both phy_power_on() and phy_power_off().
 
-Can you split this patch out?  I found that with the PLX PEX860x PCIe
-switches I have on the i.MX6 RC I needed this longer wait for link as
-well, but I don't think this is related to gen1/gen2.
-
-Thanks,
-
-Tim
+Can you take this patch?
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> 
+> Reported by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+> 
+> This fixes a cut&paste typo which snicked in while doing very last
+> adaptation to latest version of the phy framework.
+> 
+> Thanks,
+> Sylwester
+> ---
+>  drivers/phy/phy-exynos-mipi-video.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
+> index b73b86a..0c5efab 100644
+> --- a/drivers/phy/phy-exynos-mipi-video.c
+> +++ b/drivers/phy/phy-exynos-mipi-video.c
+> @@ -93,7 +93,7 @@ static int exynos_mipi_video_phy_power_off(struct phy *phy)
+>  	struct video_phy_desc *phy_desc = phy_get_drvdata(phy);
+>  	struct exynos_mipi_video_phy *state = to_mipi_video_phy(phy_desc);
+>  
+> -	return __set_phy_state(state, phy_desc->index, 1);
+> +	return __set_phy_state(state, phy_desc->index, 0);
+>  }
+>  
+>  static struct phy *exynos_mipi_video_phy_xlate(struct device *dev,
+> 
