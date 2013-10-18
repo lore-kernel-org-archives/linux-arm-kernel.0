@@ -1,46 +1,54 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 18 Oct 2013 15:00:04 +0300
-Subject: [PATCH] ARM: dts: omap3-beagle: Adapt USB OTG to generic PHY
- framework
-In-Reply-To: <1381142810-14541-1-git-send-email-rogerq@ti.com>
-References: <1381142810-14541-1-git-send-email-rogerq@ti.com>
-Message-ID: <526122C4.4090702@ti.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 18 Oct 2013 19:48:42 +0800
+Subject: [PATCH v3 0/8] mmc: sdhci-esdhc-imx: add std tuning for mx6sl and DDR
+ mode support
+Message-ID: <1382096930-7964-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+The i.MX6SL supports standard tuning as defined in standard host control spec v3.0.
+So this patch series add std tuning support for i.MX6SL.
+(NOTE i.MX6SL can also work on the old manual tuning mode as i.MX6Q/DL)
+In the meanwhile, it also adds DDR mode support.
+Then SD3.0 cards which can only support DDR50 can work properly now
+with this patch series.
 
-Could you please include this one for 3.13?
-Without this OTG port will be broken for beagle. Thanks.
+Patch 1~3 add stardard tuning support for i.MX6SL.
+Patch 4~5 add DDR mode and delay line support
+Patch 6~8 some other related minor fixes.
 
-cheers,
--roger
+Tested on i.MX6SL EVK board.
 
-On 10/07/2013 01:46 PM, Roger Quadros wrote:
-> The generic PHY framewrok expects different properties than the
-> old USB PHY framework. Supply those properties.
-> 
-> Fixes USB OTG port on beagle after the Generic PHY framework was
-> merged in greg/usb-next. [1]
-> 
-> [1] - https://lkml.org/lkml/2013/9/27/581
-> 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  arch/arm/boot/dts/omap3-beagle.dts |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index 7669c16..fa532aa 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -173,6 +173,8 @@
->  &usb_otg_hs {
->  	interface-type = <0>;
->  	usb-phy = <&usb2_phy>;
-> +	phys = <&usb2_phy>;
-> +	phy-names = "usb2-phy";
->  	mode = <3>;
->  	power = <50>;
->  };
-> 
+The patch series is generated based on the latest mmc-next branch with Shawn's
+(1)[PATCH v2 0/4] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type in Chris' tree.
+
+1. http://www.spinics.net/lists/arm-kernel/msg280517.html
+
+ChangeLog:
+v2->v3:
+ - Minor changes from Shawn's comments
+v1->v2:
+ - Only a few minor changes on patch 1 and 5 based on comments from Shawn
+   while other patches have no change.
+ - rebase on Shawn's patch series
+   [PATCH v2 0/4] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
+
+Dong Aisheng (8):
+  mmc: sdhci-esdhc-imx: add std tuning support for mx6sl
+  mmc: sdhci-esdhc-imx: fix reading cap_1 register value for mx6sl
+  mmc: sdhci: report error once the maximum tuning loops exhausted or
+    timeout
+  mmc: sdhci-esdhc-imx: add DDR mode support for mx6
+  mmc: sdhci-esdhc-imx: add delay line setting support
+  mmc: sdhci-esdhc-imx: enable SDR50 tuning for imx6q/dl
+  mmc: sdhci-esdhc-imx: add preset value quirk for mx6
+  mmc: sdhci: remove unneeded call when have preset value quirk
+
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    5 +
+ drivers/mmc/host/sdhci-esdhc-imx.c                 |  134 +++++++++++++++++---
+ drivers/mmc/host/sdhci.c                           |    4 +-
+ include/linux/platform_data/mmc-esdhc-imx.h        |    1 +
+ 4 files changed, 122 insertions(+), 22 deletions(-)
+
+-- 
+1.7.2.rc3
