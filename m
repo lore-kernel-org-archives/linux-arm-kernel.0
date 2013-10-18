@@ -1,32 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 18 Oct 2013 11:04:20 +0200
-Subject: [PATCH 1/5] ARM: ux500: fix clock for GPIO block 8
-Message-ID: <1382087060-31584-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 18 Oct 2013 11:04:57 +0200
+Subject: [PATCH 2/5] clk: ux500: fix erroneous bit assignment
+Message-ID: <1382087097-31627-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock assignment in the device tree for GPIO block 8 was
-incorrect, indicating this was managed by bit 1 on PRCC 6
-while it was in fact bit 1 on PRCC 5.
+Due to a typo or similar, the peripheral group 2 clock 11
+gate was set to bit 1 instead of bit 11. We need to fix this
+to be able to set the correct enable bit in the device tree:
+when trying to correct the bit assignment in the device tree,
+the system would hang.
 
 Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 2 +-
+Mike: seeking an ACK for this as it needs to be taken into
+ARM SoC with the rest of the fixes so as not to cause
+bisection problems between the trees.
+---
+ drivers/clk/ux500/u8500_of_clk.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index 2ef30c1..55abf12 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -227,7 +227,7 @@
- 			#gpio-cells = <2>;
- 			gpio-bank = <8>;
+diff --git a/drivers/clk/ux500/u8500_of_clk.c b/drivers/clk/ux500/u8500_of_clk.c
+index b768b50..cdeff29 100644
+--- a/drivers/clk/ux500/u8500_of_clk.c
++++ b/drivers/clk/ux500/u8500_of_clk.c
+@@ -339,7 +339,7 @@ void u8500_of_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
  
--			clocks = <&prcc_pclk 6 1>;
-+			clocks = <&prcc_pclk 5 1>;
- 		};
+ 	clk = clk_reg_prcc_pclk("p2_pclk11", "per2clk", clkrst2_base,
+ 				BIT(11), 0);
+-	PRCC_PCLK_STORE(clk, 2, 1);
++	PRCC_PCLK_STORE(clk, 2, 11);
  
- 		pinctrl {
+ 	clk = clk_reg_prcc_pclk("p2_pclk12", "per2clk", clkrst2_base,
+ 				BIT(12), 0);
 -- 
 1.8.3.1
