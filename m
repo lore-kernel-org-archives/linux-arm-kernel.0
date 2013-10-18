@@ -1,36 +1,44 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 18 Oct 2013 06:46:22 -0700
-Subject: [GIT PULL] Uncritical Rockchip fixes for 3.13
-In-Reply-To: <201310172136.04553.heiko@sntech.de> ("Heiko =?utf-8?Q?St?=
- =?utf-8?Q?=C3=BCbner=22's?= message
- of "Thu, 17 Oct 2013 21:36:04 +0200")
-References: <201310172136.04553.heiko@sntech.de>
-Message-ID: <8761suy9n5.fsf@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 18 Oct 2013 14:48:29 +0100
+Subject: [PATCH] ASoC: kirkwood: add S/PDIF support
+In-Reply-To: <20131018125638.GX25034@n2100.arm.linux.org.uk>
+References: <20130924124122.64834b2a@armhf>
+ <20131018003439.GG2443@sirena.org.uk>
+ <20131018103019.GW25034@n2100.arm.linux.org.uk>
+ <20131018124832.GK2443@sirena.org.uk>
+ <20131018125638.GX25034@n2100.arm.linux.org.uk>
+Message-ID: <20131018134829.GQ2443@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner <heiko@sntech.de> writes:
+On Fri, Oct 18, 2013 at 01:56:38PM +0100, Russell King - ARM Linux wrote:
 
-> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
->
->   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.13-rockchip-fixes
->
-> for you to fetch changes up to 1b6dc1e478c85e6028ce3a918d484ecbcd52173e:
->
->   ARM: rockchip: remove obsolete rockchip,config properties (2013-10-14 21:01:53 +0200)
->
-> ----------------------------------------------------------------
-> Romoval of obsolete (never used) dt properties
-> and fix for the selection of the TWD.
->
-> ----------------------------------------------------------------
+> Let me remind you that I had a definition of what a front end and a back
+> end DAI was from Liam, and your definition is at odds with that.
 
-Pulled into fixes-non-critical,
+Could you please provide some detail on this?  I was aware that you were
+for a time confused about this but had not been aware of the source of
+the confusion.
 
-Thanks,
+> I am still of the opinion that you don't know what you're talking about
+> most of the time, and nothing has changed in that regard, and I still
+> regard you as a completely  obstructive and unhelpful person.
 
-Kevin
+> And I think you're just wrong on what you've said above.  But... I've
+> basically given up any hope of progressing that code after months of
+> pissing around with your obstructive attitude, and I've elected (and
+> others) to maintain it completely out of mainline for the forseeable
+> future - hopefully until you get replaced by someone who can be more
+> assistive and helpful.
+
+Once more, please be civil and constructive - a confrontational approach
+has not been helping here.  If you are intent on behaving in this
+fashion please at least try to avoid disrupting others who are
+interested in working in mainline.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131018/9af58d56/attachment.sig>
