@@ -1,64 +1,66 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Fri, 18 Oct 2013 17:59:56 +0200
-Subject: [PATCH] ARM: dts: omap3-beagle: Adapt USB OTG to generic PHY
- framework
-In-Reply-To: <526122C4.4090702@ti.com>
-References: <1381142810-14541-1-git-send-email-rogerq@ti.com>
- <526122C4.4090702@ti.com>
-Message-ID: <52615AFC.5070203@baylibre.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 18 Oct 2013 16:59:47 +0100
+Subject: [PATCH v8 08/19] arm/xen: get_dma_ops: return xen_dma_ops if we
+ are running as xen_initial_domain
+In-Reply-To: <20131018154847.GD25034@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-8-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1310181319300.26077@kaball.uk.xensource.com>
+ <20131018154246.GB25034@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1310181643260.26077@kaball.uk.xensource.com>
+ <20131018154847.GD25034@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1310181658020.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+On Fri, 18 Oct 2013, Russell King - ARM Linux wrote:
+> On Fri, Oct 18, 2013 at 04:46:00PM +0100, Stefano Stabellini wrote:
+> > On Fri, 18 Oct 2013, Russell King - ARM Linux wrote:
+> > > On Fri, Oct 18, 2013 at 01:22:18PM +0100, Stefano Stabellini wrote:
+> > > > Russell,
+> > > > are you OK with this patch?
+> > > 
+> > > Only concern is why the change is soo large.
+> > > 
+> > > > > -static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> > > > > +static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+> > > > >  {
+> > > > >  	if (dev && dev->archdata.dma_ops)
+> > > > >  		return dev->archdata.dma_ops;
+> > > > >  	return &arm_dma_ops;
+> > > > >  }
+> > > > >  
+> > > > > +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> > > > > +{
+> > > > > +	if (xen_initial_domain())
+> > > > > +		return xen_dma_ops;
+> > > > > +	else
+> > > > > +		return __generic_dma_ops(dev);
+> > > > > +}
+> > > > > +
+> > > 
+> > > What's wrong with:
+> > > 
+> > >  static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> > >  {
+> > > +	if (xen_initial_domain())
+> > > +		return xen_dma_ops;
+> > >  	if (dev && dev->archdata.dma_ops)
+> > >  		return dev->archdata.dma_ops;
+> > >  	return &arm_dma_ops;
+> > >  }
+> > 
+> > 
+> > xen_dma_ops functions might have to call back the native implementation.
+> > With the above there is no way for a xen_dma_ops function to get to
+> > archdata.dma_ops or arm_dma_ops.
+> > This is the reason why this patch introduces __generic_dma_ops.
+> 
+> Ah, that's fine then, but having that described in the commit message
+> would be useful.
+> 
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Thanks.
 
-On 18/10/2013 14:00, Roger Quadros wrote:
-> Hi Benoit,
->
-> Could you please include this one for 3.13?
-> Without this OTG port will be broken for beagle. Thanks.
->
-
-I've just applied it.
-
-Thanks,
-Benoit
-
-> cheers,
-> -roger
->
-> On 10/07/2013 01:46 PM, Roger Quadros wrote:
->> The generic PHY framewrok expects different properties than the
->> old USB PHY framework. Supply those properties.
->>
->> Fixes USB OTG port on beagle after the Generic PHY framework was
->> merged in greg/usb-next. [1]
->>
->> [1] - https://lkml.org/lkml/2013/9/27/581
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>   arch/arm/boot/dts/omap3-beagle.dts |    2 ++
->>   1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
->> index 7669c16..fa532aa 100644
->> --- a/arch/arm/boot/dts/omap3-beagle.dts
->> +++ b/arch/arm/boot/dts/omap3-beagle.dts
->> @@ -173,6 +173,8 @@
->>   &usb_otg_hs {
->>   	interface-type = <0>;
->>   	usb-phy = <&usb2_phy>;
->> +	phys = <&usb2_phy>;
->> +	phy-names = "usb2-phy";
->>   	mode = <3>;
->>   	power = <50>;
->>   };
->>
->
-
-
--- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+Thank you. I'll add a note to the commit message.
