@@ -1,66 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Oct 2013 19:22:20 +0200
-Subject: [GIT PULL] Allwinner sunXi DT changes for 3.13
-Message-ID: <20131018172220.GA14740@lukather>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 18 Oct 2013 19:27:29 +0200
+Subject: [PATCH] ARM: kirkwood: remove lagacy clk workarounds
+In-Reply-To: <20131018161743.GA29595@localhost>
+References: <1382097253-15624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131018144741.GL22434@titan.lakedaemon.net>
+ <20131018161743.GA29595@localhost>
+Message-ID: <52616F81.8060504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin, Olof,
+On 10/18/2013 06:17 PM, Ezequiel Garcia wrote:
+> On Fri, Oct 18, 2013 at 10:47:41AM -0400, Jason Cooper wrote:
+>> On Fri, Oct 18, 2013 at 01:54:13PM +0200, Sebastian Hesselbarth wrote:
+>>> With legacy devices converted to DT and a proper ethernet MAC
+>>> workaround, we can now remove the clk workarounds for legacy
+>>> devices. While at it, also cleanup the list of includes.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> ---
+>>> As a follow-up patch for latest mvebu PRs, this patch is based on
+>>>   git://git.infradead.org/linux-mvebu.git tags/soc-3.13-2
+>>>
+>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>> Cc: Andrew Lunn <andrew@lunn.ch>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Kevin Hilman <khilman@linaro.org>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-kernel at vger.kernel.org
+>>> ---
+>>>   arch/arm/mach-kirkwood/board-dt.c |   42 ++----------------------------------
+>>>   1 files changed, 3 insertions(+), 39 deletions(-)
+>>
+>> Applied to mvebu/soc
+>>
+>
+> Weird: I've tried to do this clean-up myself and my usual tests with network
+> built as a module failed somehow. Maybe I missed something and did something
+> stupid?
 
-Please pull the following DT changes for the 3.13 merge window.
+Ezequiel,
 
-Thanks,
-Maxime
+you need commits
+b5d82db net: mv643xx_eth: fix missing device_node for port devices
+f564412 net: mv643xx_eth: fix orphaned statistics timer crash
+041b4dd net: mv643xx_eth: update statistics timer from timer context only
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+from git://git.kernel.org/pub/scm/linux/kernel/git/davem/net.git master
 
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+Those are the three net driver fixes and have not yet been pulled into
+mainline linux.
 
-are available in the git repository at:
+Can you re-test with those three applied (or you can just merge in
+above master)? I am compiling right now and will report.
 
-  https://github.com/mripard/linux.git tags/sunxi-dt-for-3.13
-
-for you to fetch changes up to 01ed6632a554dfdf4a9fc3c593ce4ff7255ed161:
-
-  ARM: sunxi: dts: Add support for the cubieboard3, the CubieTruck (2013-10-08 11:35:19 +0200)
-
-----------------------------------------------------------------
-Allwinner sunXi SoCs device tree changes for 3.13
-
-This DT series sees the introduction of the cubietruck DT, plus the addition of
-the i2c controller for the A20 based boards, and of the Security ID found in
-all the Allwinner SoCs but the A31.
-
-----------------------------------------------------------------
-Maxime Ripard (4):
-      ARM: sun7i: Enable the I2C controllers
-      ARM: sun7i: Add the pin muxing options for the I2C controllers
-      ARM: sun7i: cubieboard2: Enable the I2C controllers
-      ARM: sun7i: olinuxino-micro: Enable the I2C controllers
-
-Oliver Schinagl (2):
-      ARM: sunxi: dt: Add sunxi-sid to dts for sun4i, sun5i and sun7i
-      ARM: sunxi: dts: Add support for the cubieboard3, the CubieTruck
-
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/sun4i-a10.dtsi                |  5 ++
- arch/arm/boot/dts/sun5i-a10s.dtsi               |  5 ++
- arch/arm/boot/dts/sun5i-a13.dtsi                |  5 ++
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 12 +++++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 63 ++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 18 +++++++
- arch/arm/boot/dts/sun7i-a20.dtsi                | 71 +++++++++++++++++++++++++
- 8 files changed, 180 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131018/cc2a7f01/attachment-0001.sig>
+Sebastian
