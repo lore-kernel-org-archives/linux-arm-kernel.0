@@ -1,45 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Oct 2013 18:19:04 +0100
-Subject: [PATCH 2/4] ARM: KVM: Fix MPIDR computing to support virtual clusters
-In-Reply-To: <1382116746-8757-1-git-send-email-marc.zyngier@arm.com>
-References: <1382116746-8757-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1382116746-8757-3-git-send-email-marc.zyngier@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Oct 2013 19:17:36 +0200
+Subject: [GIT PULL] Allwinner sunXi defconfig changes for 3.13
+Message-ID: <20131018171736.GA14559@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to support more than 4 A7 or A15 CPUs,
-we need to fix the MPIDR computing to reflect the fact that
-both A15 and A7 can only exist in clusters of at most 4 CPUs.
+Hi Olof, Kevin,
 
-Fix the MPIDR computing to allow virtual clusters to be exposed
-to the guest.
+Please pull the following changes for the 3.13 merge window.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/coproc.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+Thanks!
+Maxime
 
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index a629f2c..631e6bd 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -74,11 +74,13 @@ int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
- static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
- {
- 	/*
--	 * Compute guest MPIDR. No need to mess around with different clusters
--	 * but we read the 'U' bit from the underlying hardware directly.
-+	 * Compute guest MPIDR. We build a virtual cluster out of the
-+	 * vcpu_id, but we read the 'U' bit from the underlying
-+	 * hardware directly.
- 	 */
--	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & MPIDR_SMP_BITMASK)
--					| vcpu->vcpu_id;
-+	vcpu->arch.cp15[c0_MPIDR] = ((read_cpuid_mpidr() & MPIDR_SMP_BITMASK) |
-+				     ((vcpu->vcpu_id >> 2) << MPIDR_LEVEL_BITS) |
-+				     (vcpu->vcpu_id & 3));
- }
- 
- /* TRM entries A7:4.3.31 A15:4.3.28 - RO WI */
+
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  https://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.13
+
+for you to fetch changes up to 2ce4ec7a076203f39016553b6c51248f9c721071:
+
+  ARM: sunxi: Add a defconfig for the Allwinner SoCs (2013-10-08 11:39:44 +0200)
+
+----------------------------------------------------------------
+Allwinner sunXi defconfig changes for 3.13
+
+This pull request only see the introduction of a sunxi_defconfig.
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: sunxi: Add a defconfig for the Allwinner SoCs
+
+ arch/arm/configs/sunxi_defconfig | 61 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 arch/arm/configs/sunxi_defconfig
+
 -- 
-1.8.2.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131018/2da704e3/attachment.sig>
