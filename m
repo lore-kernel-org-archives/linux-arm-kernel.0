@@ -1,122 +1,157 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 18 Oct 2013 16:25:47 -0400 (EDT)
-Subject: [PATCH] ARM: cacheflush: consolidate single-CPU ARMv7 cache
- disabling code
-In-Reply-To: <20131018104448.GA2315@localhost.localdomain>
-References: <20131018104448.GA2315@localhost.localdomain>
-Message-ID: <alpine.LFD.2.03.1310181559320.1951@syhkavp.arg>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 18 Oct 2013 22:33 +0200
+Subject: [PATCH] sh-pfc: r8a7791 PFC support V2
+In-Reply-To: <20131016214605.3868.54890.sendpatchset@w520>
+References: <20131016214605.3868.54890.sendpatchset@w520>
+Message-ID: <1428789.AD4dgYWceb@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Oct 2013, Dave Martin wrote:
+Hi Magnus,
 
-> On Tue, Oct 15, 2013 at 11:34:46PM -0400, Nicolas Pitre wrote:
-> > 
-> > This code is becoming duplicated in many places.  So let's consolidate
-> > it into a handy macro that is known to be right and available for reuse.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> > 
-> > I forgot which version this one is.  As far as I know, I've incorporated 
-> > most review comments, and ignored conflicting ones which tended to look 
-> > like bikeshedding and attempted to compensate for them with additional 
+Thanks for the patch.
+
+On Thursday 17 October 2013 06:46:05 Magnus Damm wrote:
+> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
 > 
-> Whoever can you be referring to? :)
-
-Who knows... ;-)
-
-> I think the discussion about whether there was some way to improve this
-> was worth having ... but the answer definitely seemed to be no.
-
-Certainly.
-
-> > code comments.
-> > 
-> > ACK?
-> > 
-> >  arch/arm/include/asm/cacheflush.h | 45 +++++++++++++++++++++++++++++++
-> >  arch/arm/mach-vexpress/dcscb.c    | 56 +++------------------------------------
-> >  arch/arm/mach-vexpress/tc2_pm.c   | 48 ++-------------------------------
-> >  3 files changed, 51 insertions(+), 98 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> > index 15f2d5bf88..60a0a79b1a 100644
-> > --- a/arch/arm/include/asm/cacheflush.h
-> > +++ b/arch/arm/include/asm/cacheflush.h
-> > @@ -435,4 +435,49 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
-> >  #define sync_cache_w(ptr) __sync_cache_range_w(ptr, sizeof *(ptr))
-> >  #define sync_cache_r(ptr) __sync_cache_range_r(ptr, sizeof *(ptr))
-> >  
-> > +/*
-> > + * Disabling cache access for one CPU in an ARMv7 SMP system is tricky.
-> > + * To do so we must:
-> > + *
-> > + * - Clear the SCTLR.C bit to prevent further cache allocations
-> > + * - Flush the desired level of cache
-> > + * - Clear the ACTLR "SMP" bit to disable local coherency
-> > + *
-> > + * ... and so without any intervening memory access in between those steps,
-> > + * not even to the stack.
-> > + *
-> > + * WARNING -- After this has been called:
-> > + *
-> > + * - No ldrex/strex (and similar) instructions must be used.
-> > + * - The CPU is obviously no longer coherent with the other CPUs.
-> > + * - This is unlikely to work as expected if Linux is running non-secure.
-> > + *
-> > + * Note:
-> > + *
-> > + * - This is known to apply to several ARMv7 processor implementations,
-> > + *   however some exceptions may exist.  Caveat emptor.
+> Add PFC support for the r8a7791 SoC V2 including pin groups for
+> on-chip devices such as MSIOF, SCIF, USB, MMC, SDHI, DU.
 > 
-> Is it worth listing CPUs for which we know this works?  (i.e., A15, A7)
-> That could get misleading if the list is not kept up to date, though.
-
-That's what I think.  And some people would interpret it as "this works 
-only for A15 and A7".
-
-
-
+> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> Signed-off-by: Kunihito Higashiyama <kunihito.higashiyama.ur@renesas.com>
+> Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
+> Signed-off-by: Nobuyuki HIRAI <nobuyuki.hirai.xe@renesas.com>
+> Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+> Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+> [damm at opensource.se: Forward ported to upstream, minor fixes]
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
 > 
-> > + *
-> > + * - The clobber list is dictated by the call to v7_flush_dcache_*.
-> > + *   fp is preserved to the stack explicitly prior disabling the cache
-> > + *   since adding it to the clobber list is incompatible with having
-> > + *   CONFIG_FRAME_POINTER=y.
-> > + */
-> > +#define v7_exit_coherency_flush(level) \
-> > +	asm volatile( \
-> > +	"str	fp, [sp, #-4]! \n\t" \
-> > +	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR \n\t" \
-> > +	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
-> > +	"mcr	p15, 0, r0, c1, c0, 0	@ set SCTLR \n\t" \
-> > +	"isb	\n\t" \
-> > +	"bl	v7_flush_dcache_"__stringify(level)" \n\t" \
-> > +	"clrex	\n\t" \
-> > +	"mrc	p15, 0, r0, c1, c0, 1	@ get ACTLR \n\t" \
-> > +	"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t" \
-> > +	"mcr	p15, 0, r0, c1, c0, 1	@ set ACTLR \n\t" \
-> > +	"isb	\n\t" \
-> > +	"dsb	\n\t" \
-> > +	"ldr	fp, [sp], #4" \
-> > +	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
-> > +	      "r9","r10","lr","memory" )
+>  Written against renesas-devel-20131016
 > 
-> Should we put r12 in the clobber list too?
+>  Based on the following broken out patches from BSP v0.5.0:
+>  0739, 0766, 0771, 0774, 0777, 0782, 0798, 1056, 1057, 1235, 1261, 1271
 > 
-> I think that the linker shouldn't introduce an r12-clobbering trampoline
-> in practice unless the kernel text gets big (>16MB), but if we can add
-> it here without the compiler complaining about register pressuse it might
-> save some debugging headaches in the future.
+>  Changes since V1:
+>  - Added r8a7791 PFC to OF table
+>  - Remove left over incorrect filename in pfc-r8a7791.c
+>  - Made GPL header shorter
+>  - Kept ETH magic pin as-is (data sheet 0.5.0), added it to eth_groups[]
+>  - Dropped VIN support
+>  - Rearranged DU order, added du0 and du1 to pinmux_functions[]
+> 
+>  drivers/pinctrl/sh-pfc/Kconfig       |    5
+>  drivers/pinctrl/sh-pfc/Makefile      |    1
+>  drivers/pinctrl/sh-pfc/core.c        |    9
+>  drivers/pinctrl/sh-pfc/core.h        |    1
+>  drivers/pinctrl/sh-pfc/pfc-r8a7791.c | 4214 +++++++++++++++++++++++++++++++
+>  5 files changed, 4230 insertions(+)
 
-OK.  I'll just save it on the stack alongside fp.
+[snip]
 
+> --- /dev/null
+> +++ work/drivers/pinctrl/sh-pfc/pfc-r8a7791.c	2013-10-17 
+06:35:00.000000000
 
-Nicolas
-> With that change (or a reason not to do it), Ack.
+[snip]
 
-Thanks.
+> +/* - DU
+> --------------------------------------------------------------------- */
+> +static const unsigned int du_rgb666_pins[] = {
+> +	/* R[7:2], G[7:2], B[7:2] */
+> +	RCAR_GP_PIN(3, 7),  RCAR_GP_PIN(3, 6),  RCAR_GP_PIN(3, 5),
+> +	RCAR_GP_PIN(3, 4),  RCAR_GP_PIN(3, 3),  RCAR_GP_PIN(3, 2),
+> +	RCAR_GP_PIN(3, 15), RCAR_GP_PIN(3, 14), RCAR_GP_PIN(3, 13),
+> +	RCAR_GP_PIN(3, 12), RCAR_GP_PIN(3, 11), RCAR_GP_PIN(3, 10),
+> +	RCAR_GP_PIN(3, 23), RCAR_GP_PIN(3, 22), RCAR_GP_PIN(3, 21),
+> +	RCAR_GP_PIN(3, 20), RCAR_GP_PIN(3, 19), RCAR_GP_PIN(3, 18),
+> +};
+> +static const unsigned int du_rgb666_mux[] = {
+> +	DU1_DR7_MARK, DU1_DR6_MARK, DU1_DR5_MARK, DU1_DR4_MARK,
+> +	DU1_DR3_MARK, DU1_DR2_MARK,
+> +	DU1_DG7_MARK, DU1_DG6_MARK, DU1_DG5_MARK, DU1_DG4_MARK,
+> +	DU1_DG3_MARK, DU1_DG2_MARK,
+> +	DU1_DB7_MARK, DU1_DB6_MARK, DU1_DB5_MARK, DU1_DB4_MARK,
+> +	DU1_DB3_MARK, DU1_DB2_MARK,
+> +};
+> +static const unsigned int du_rgb888_pins[] = {
+> +	/* R[7:0], G[7:0], B[7:0] */
+> +	RCAR_GP_PIN(3, 7),  RCAR_GP_PIN(3, 6),  RCAR_GP_PIN(3, 5),
+> +	RCAR_GP_PIN(3, 4),  RCAR_GP_PIN(3, 3),  RCAR_GP_PIN(3, 2),
+> +	RCAR_GP_PIN(3, 1),  RCAR_GP_PIN(3, 0),
+> +	RCAR_GP_PIN(3, 15), RCAR_GP_PIN(3, 14), RCAR_GP_PIN(3, 13),
+> +	RCAR_GP_PIN(3, 12), RCAR_GP_PIN(3, 11), RCAR_GP_PIN(3, 10),
+> +	RCAR_GP_PIN(3, 9),  RCAR_GP_PIN(3, 8),
+> +	RCAR_GP_PIN(3, 23), RCAR_GP_PIN(3, 22), RCAR_GP_PIN(3, 21),
+> +	RCAR_GP_PIN(3, 20), RCAR_GP_PIN(3, 19), RCAR_GP_PIN(3, 18),
+> +	RCAR_GP_PIN(3, 17), RCAR_GP_PIN(3, 16),
+> +};
+> +static const unsigned int du_rgb888_mux[] = {
+> +	DU1_DR7_MARK, DU1_DR6_MARK, DU1_DR5_MARK, DU1_DR4_MARK,
+> +	DU1_DR3_MARK, DU1_DR2_MARK, DU1_DR1_MARK, DU1_DR0_MARK,
+> +	DU1_DG7_MARK, DU1_DG6_MARK, DU1_DG5_MARK, DU1_DG4_MARK,
+> +	DU1_DG3_MARK, DU1_DG2_MARK, DU1_DG1_MARK, DU1_DG0_MARK,
+> +	DU1_DB7_MARK, DU1_DB6_MARK, DU1_DB5_MARK, DU1_DB4_MARK,
+> +	DU1_DB3_MARK, DU1_DB2_MARK, DU1_DB1_MARK, DU1_DB0_MARK,
+> +};
+> +static const unsigned int du_clk_out_0_pins[] = {
+> +	/* CLKOUT */
+> +	RCAR_GP_PIN(3, 25),
+> +};
+> +static const unsigned int du_clk_out_0_mux[] = {
+> +	DU1_DOTCLKOUT0_MARK
+> +};
+> +static const unsigned int du_clk_out_1_pins[] = {
+> +	/* CLKOUT */
+> +	RCAR_GP_PIN(3, 26),
+> +};
+> +static const unsigned int du_clk_out_1_mux[] = {
+> +	DU1_DOTCLKOUT1_MARK
+> +};
+> +static const unsigned int du_sync_1_pins[] = {
+> +	/* EXVSYNC/VSYNC, EXHSYNC/HSYNC, EXDISP/EXODDF/EXCDE */
+> +	RCAR_GP_PIN(3, 29), RCAR_GP_PIN(3, 28), RCAR_GP_PIN(3, 27),
+> +};
+> +static const unsigned int du_sync_1_mux[] = {
+> +	DU1_EXODDF_DU1_ODDF_DISP_CDE_MARK,
+> +	DU1_EXVSYNC_DU1_VSYNC_MARK, DU1_EXHSYNC_DU1_HSYNC_MARK
+> +};
+> +static const unsigned int du_cde_disp_pins[] = {
+> +	/* CDE DISP */
+> +	RCAR_GP_PIN(3, 31), RCAR_GP_PIN(3, 30),
+> +};
+> +static const unsigned int du0_clk_in_pins[] = {
+> +	/* CLKIN */
+> +	RCAR_GP_PIN(6, 31),
+> +};
+> +static const unsigned int du0_clk_in_mux[] = {
+> +	DU0_DOTCLKIN_MARK
+> +};
+> +static const unsigned int du_cde_disp_mux[] = {
+> +	DU1_CDE_MARK, DU1_DISP_MARK
+> +};
+> +static const unsigned int du1_clk_in_pins[] = {
+> +	/* CLKIN */
+> +	RCAR_GP_PIN(7, 20), RCAR_GP_PIN(7, 19), RCAR_GP_PIN(3, 24),
+> +};
+> +static const unsigned int du1_clk_in_mux[] = {
+> +	DU1_DOTCLKIN_C_MARK, DU1_DOTCLKIN_B_MARK, DU1_DOTCLKIN_MARK
+> +};
 
+I'm still a bit unsure about the DU pin groups. Would it be possible to get 
+access to the SoC datasheet ?
 
-Nicolas
+In the worst case I can take the patch as-is and fix any issue later, as the 
+DU driver doesn't support the r8a7791 yet anyway. So,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+I've taken the patch to my tree and will push it as-is, or with modifications 
+to the DU pin groups as needed if I can get access to the documentation before 
+the next merge window.
+
+-- 
+Regards,
+
+Laurent Pinchart
