@@ -1,44 +1,90 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 18 Oct 2013 14:07:11 +0100
-Subject: [RFC PATCH 0/2] Implement get_user_pages_fast for ARM
-Message-ID: <1382101634-4723-1-git-send-email-steve.capper@linaro.org>
+Date: Fri, 18 Oct 2013 14:07:12 +0100
+Subject: [RFC PATCH 1/2] thp: Introduce arch_(un)block_thp_split
+In-Reply-To: <1382101634-4723-1-git-send-email-steve.capper@linaro.org>
+References: <1382101634-4723-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1382101634-4723-2-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series implements get_user_pages_fast on ARM. Unlike other
-architectures, we do not use IPIs/disabled IRQs as a blocking
-mechanism to protect the page table walker. Instead an atomic counter
-is used to indicate how many fast gup walkers are active on an address
-space, and any code that would cause them problems (THP splitting or
-code that could free a page table page) spins on positive values of
-this counter.
+In kernel/futex.c an assumption is made in the THP tail pinning code
+that disabling the irqs is sufficient to block the THP splitting code
+from completing.
 
-This series also addresses an assumption made in kernel/futex.c that
-THP page splitting can be blocked by disabling the IRQs on a processor
-by introducing arch_block_thp_split and arch_unblock_thp_split.
+Architectures such as ARM do hardware TLB broadcasts so disabling the
+irqs will not prevent a THP split from completing.
 
-As well as fixing a problem where futexes on THP tails cause hangs on
-ARM, I expect this series to also be beneficial for direct-IO, and for
-KVM (the hva_to_pfn fast path uses __get_user_pages_fast).
+This patch introduces: arch_block_thp_split and arch_unblock_thp_split,
+and provides stock implementations that observe the original irq enable
+and disable behaviour.
 
-Any comments would be greatly appreciated.
+One can then define these macros themselves to implement architecture
+specific behaviour.
 
-Steve Capper (2):
-  thp: Introduce arch_(un)block_thp_split
-  arm: mm: implement get_user_pages_fast
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ include/linux/huge_mm.h | 16 ++++++++++++++++
+ kernel/futex.c          |  6 +++---
+ 2 files changed, 19 insertions(+), 3 deletions(-)
 
- arch/arm/include/asm/mmu.h            |   1 +
- arch/arm/include/asm/pgalloc.h        |   9 ++
- arch/arm/include/asm/pgtable-2level.h |   1 +
- arch/arm/include/asm/pgtable-3level.h |  21 +++
- arch/arm/include/asm/pgtable.h        |  18 +++
- arch/arm/include/asm/tlb.h            |   8 ++
- arch/arm/mm/Makefile                  |   2 +-
- arch/arm/mm/gup.c                     | 234 ++++++++++++++++++++++++++++++++++
- include/linux/huge_mm.h               |  16 +++
- kernel/futex.c                        |   6 +-
- 10 files changed, 312 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mm/gup.c
-
+diff --git a/include/linux/huge_mm.h b/include/linux/huge_mm.h
+index 3935428..35fb742 100644
+--- a/include/linux/huge_mm.h
++++ b/include/linux/huge_mm.h
+@@ -177,6 +177,14 @@ static inline struct page *compound_trans_head(struct page *page)
+ extern int do_huge_pmd_numa_page(struct mm_struct *mm, struct vm_area_struct *vma,
+ 				unsigned long addr, pmd_t pmd, pmd_t *pmdp);
+ 
++#ifndef arch_block_thp_split
++#define arch_block_thp_split(mm)	local_irq_disable()
++#endif
++
++#ifndef arch_unblock_thp_split
++#define arch_unblock_thp_split(mm)	local_irq_enable()
++#endif
++
+ #else /* CONFIG_TRANSPARENT_HUGEPAGE */
+ #define HPAGE_PMD_SHIFT ({ BUILD_BUG(); 0; })
+ #define HPAGE_PMD_MASK ({ BUILD_BUG(); 0; })
+@@ -227,6 +235,14 @@ static inline int do_huge_pmd_numa_page(struct mm_struct *mm, struct vm_area_str
+ 	return 0;
+ }
+ 
++#ifndef arch_block_thp_split
++#define arch_block_thp_split(mm)	do { } while (0)
++#endif
++
++#ifndef arch_unblock_thp_split
++#define arch_unblock_thp_split(mm)	do { } while (0)
++#endif
++
+ #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
+ 
+ #endif /* _LINUX_HUGE_MM_H */
+diff --git a/kernel/futex.c b/kernel/futex.c
+index c3a1a55..e016ff2 100644
+--- a/kernel/futex.c
++++ b/kernel/futex.c
+@@ -287,7 +287,7 @@ again:
+ 	if (unlikely(PageTail(page))) {
+ 		put_page(page);
+ 		/* serialize against __split_huge_page_splitting() */
+-		local_irq_disable();
++		arch_block_thp_split(mm);
+ 		if (likely(__get_user_pages_fast(address, 1, 1, &page) == 1)) {
+ 			page_head = compound_head(page);
+ 			/*
+@@ -304,9 +304,9 @@ again:
+ 				get_page(page_head);
+ 				put_page(page);
+ 			}
+-			local_irq_enable();
++			arch_unblock_thp_split(mm);
+ 		} else {
+-			local_irq_enable();
++			arch_unblock_thp_split(mm);
+ 			goto again;
+ 		}
+ 	}
 -- 
 1.8.1.4
