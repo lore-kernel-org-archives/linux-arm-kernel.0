@@ -1,27 +1,76 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 18 Oct 2013 08:46:55 +0200
-Subject: [Patch v2][ 11/37] staging: imx-drm: use of_get_display_timings.
-In-Reply-To: <1382022155-21954-12-git-send-email-denis@eukrea.com>
-References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
- <1382022155-21954-12-git-send-email-denis@eukrea.com>
-Message-ID: <20131018064655.GS30088@pengutronix.de>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Fri, 18 Oct 2013 08:56:44 +0200
+Subject: [PATCH 0/2] ARM: dts: AM4372: Add more nodes
+In-Reply-To: <5260AFB2.9010300@ti.com>
+References: <1381432494-20498-1-git-send-email-lokeshvutla@ti.com>
+ <5260AFB2.9010300@ti.com>
+Message-ID: <5260DBAC.6090107@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 05:02:09PM +0200, Denis Carikli wrote:
-> The comment on top of of_get_drm_display_mode says:
->  * This function is expensive and should only be used, if only one mode is to be
->  * read from DT. To get multiple modes start with of_get_display_timings and
->  * work with that instead.
+Hi Lokesh,
 
-This patch seems to add support for multiple displays at the parallel
-display port. How does this work? You can only connect one display at a
-time.
+On 18/10/2013 05:49, Lokesh Vutla wrote:
+> Hi Benoit,
+> On Friday 11 October 2013 12:44 AM, Lokesh Vutla wrote:
+>> This patch series add nodes for l2-cache-controller, EDMA, mailbox, mmc, sham,
+>> and updates the properties for cpsw, i2c0, matrix-keypad.
+>>
+>> These patches are applied on top of Benoit's for_3.13/dts branch
+>> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.13/dts
+> Can you take this patch series for 3.13?
 
-Sascha
+I've just applied it after a sloght change in the subject and in the SoB 
+list.
+
+     ARM: dts: AM4372: Add L2, EDMA, mailbox, MMC and SHAM nodes
+
+     Populate nodes for l2-cache-controller, EDMA, mailbox,
+     mmc, sham.
+
+     Update as well DT properties for epwmss, aes, des.
+
+     Signed-off-by: Suman Anna <s-anna@ti.com>
+     Signed-off-by: Balaji T K <balajitk@ti.com>
+     Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+     Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+     Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
+
+
+I added all the author you listed in a more formal way.
+
+Regards,
+Benoit
+
+>
+> Thanks and regards,
+> Lokesh
+>>
+>> Testing:
+>> Tested EDMA, mmc, sham, aes, des, i2c0, cpsw, matric-keypad on AM4372 EPOS EVM
+>> with the addition of following two series:
+>> -> Tero's V8 of OMAP DT clock conversion
+>>    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg96769.html
+>> -> Afzal's V5 of AM43x PRCM basic support
+>>    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg96275.html
+>>
+>> Lokesh Vutla (1):
+>>    ARM: dts: AM4372: Add more nodes
+>>
+>> Mugunthan V N (1):
+>>    ARM: dts: AM4372: Update Support for EPOS EVM
+>>
+>>   arch/arm/boot/dts/am4372.dtsi        |  210 +++++++++++++++++++++++++++++++++-
+>>   arch/arm/boot/dts/am43x-epos-evm.dts |  168 +++++++++++++++++++++++++++
+>>   include/dt-bindings/pinctrl/am43xx.h |   31 +++++
+>>   3 files changed, 408 insertions(+), 1 deletion(-)
+>>   create mode 100644 include/dt-bindings/pinctrl/am43xx.h
+>>
+>
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
