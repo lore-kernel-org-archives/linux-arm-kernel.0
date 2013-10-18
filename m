@@ -1,31 +1,51 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 18 Oct 2013 16:56:37 +0200
-Subject: [RFC 0/1] Device Tree Schema Source format proposal
-Message-ID: <9610740.2oBMxfeRkE@amdc1227>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Oct 2013 16:58:44 +0200
+Subject: [GIT PULL] at91: dt for 3.13 #1
+Message-ID: <1382108324-9080-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Arnd, Olof, Kevin,
 
-Since the ARM Kernel Summit in Edinburgh is coming by big steps and we
-need some food for thought for discussions that will be happening there,
-I am posting my work in progress on Device Tree Schema Source format.
+First AT91 DT-related pull-request for 3.13. These patches will not mess with my other
+"cleanup" pull-request sent today.
+It allows to enable sound on the at91sam9n12ek board.
 
-I know I've been supposed to actively work on this and come up with
-something working long time ago already, but due to unexpected
-circumstances (aka neverending streams of other work) I could spend way
-less time than I wanted on it.
+Thanks, best regards,
 
-How miserably I failed can be seen on an example of Benoit's and Fabien's
-attempt to solve this problem that has likely taken much less time and
-is in an already working state.
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
 
-So here I am, posting whatever I have done till now to present my ideas
-that came to my mind while working on this and possibly allow wider
-discussion on this topic.
+  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 
-A work in progress text on DTSS format will be sent in a follow-up
-message, for clarity.
+are available in the git repository at:
 
-Best regards,
-Tomasz
+  git://github.com/at91linux/linux-at91.git tags/at91-dt
+
+for you to fetch changes up to e483341ce82750a1b526b65b7178213dcf967a7a:
+
+  ARM: at91: remove pinctrl conflict between mmc and SPI for at91sam9g20ek (2013-10-18 16:50:13 +0200)
+
+----------------------------------------------------------------
+First DT series for 3.13
+- addition of sound for at91sam9n12
+- a little fix for MMC vs. SPI on at91sam9g20ek
+
+----------------------------------------------------------------
+Bo Shen (5):
+      ARM: at91: add at91sam9n12 ssc clock in look up table
+      ARM: at91: add ssc dma parameter for at91sam9n12
+      ARM: at91: enable wm8904 on at91sam9n12ek board
+      ARM: at91: enable ssc on at91sam9n12ek board
+      ARM: at91: add sound support on at91sam9n12ek board
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      ARM: at91: remove pinctrl conflict between mmc and SPI for at91sam9g20ek
+
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  1 -
+ arch/arm/boot/dts/at91sam9n12.dtsi          |  3 +++
+ arch/arm/boot/dts/at91sam9n12ek.dts         | 34 +++++++++++++++++++++++++++++
+ arch/arm/mach-at91/at91sam9n12.c            |  1 +
+ 4 files changed, 38 insertions(+), 1 deletion(-)
+
+-- 
+Nicolas Ferre
