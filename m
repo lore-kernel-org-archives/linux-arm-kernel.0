@@ -1,40 +1,107 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 18 Oct 2013 20:02:42 -0300
-Subject: [PATCH v2 15/27] mtd: nand: pxa3xx: Clear cmd buffer #3 (NDCB3) on
- command start
+Date: Fri, 18 Oct 2013 20:02:45 -0300
+Subject: [PATCH v2 18/27] mtd: nand: pxa3xx: Split prepare_command_pool() in
+ two stages
 In-Reply-To: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1382137374-21251-16-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1382137374-21251-19-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Command buffer #3 is not properly cleared and it keeps the last
-set value. Fix this by clearing when a command is setup.
+This commit splits the prepare_command_pool() function into two
+stages: prepare_start_command() / prepare_set_command().
+
+This is a preparation patch without any functionality changes,
+and is meant to allow support fir multiple page reading/writing
+operations.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 44 ++++++++++++++++++++++++------------------
+ 1 file changed, 25 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 5774ce9..be90304 100644
+index cc5bcd1..2858d10 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -611,6 +611,7 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
- 	info->use_ecc		= 0;
+@@ -612,18 +612,8 @@ static void set_command_address(struct pxa3xx_nand_info *info,
+ 	}
+ }
+ 
+-static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+-		uint16_t column, int page_addr)
++static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
+ {
+-	int addr_cycle, exec_cmd;
+-	struct pxa3xx_nand_host *host;
+-	struct mtd_info *mtd;
+-
+-	host = info->host[info->cs];
+-	mtd = host->mtd;
+-	addr_cycle = 0;
+-	exec_cmd = 1;
+-
+ 	/* reset data and oob column point to handle data */
+ 	info->buf_start		= 0;
+ 	info->buf_count		= 0;
+@@ -632,10 +622,6 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
  	info->use_spare		= 1;
  	info->retcode		= ERR_NONE;
-+	info->ndcb3		= 0;
- 	if (info->cs != 0)
- 		info->ndcb0 = NDCB0_CSEL;
- 	else
-@@ -632,7 +633,6 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 	info->ndcb3		= 0;
+-	if (info->cs != 0)
+-		info->ndcb0 = NDCB0_CSEL;
+-	else
+-		info->ndcb0 = 0;
+ 
+ 	switch (command) {
+ 	case NAND_CMD_READ0:
+@@ -647,14 +633,32 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 	case NAND_CMD_PARAM:
+ 		info->use_spare = 0;
+ 		break;
+-	case NAND_CMD_SEQIN:
+-		exec_cmd = 0;
+-		break;
  	default:
  		info->ndcb1 = 0;
  		info->ndcb2 = 0;
--		info->ndcb3 = 0;
  		break;
  	}
++}
++
++static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
++		uint16_t column, int page_addr)
++{
++	int addr_cycle, exec_cmd;
++	struct pxa3xx_nand_host *host;
++	struct mtd_info *mtd;
++
++	host = info->host[info->cs];
++	mtd = host->mtd;
++	addr_cycle = 0;
++	exec_cmd = 1;
++
++	if (info->cs != 0)
++		info->ndcb0 = NDCB0_CSEL;
++	else
++		info->ndcb0 = 0;
++
++	if (command == NAND_CMD_SEQIN)
++		exec_cmd = 0;
  
+ 	addr_cycle = NDCB0_ADDR_CYC(host->row_addr_cycles
+ 				    + host->col_addr_cycles);
+@@ -792,8 +796,10 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 		nand_writel(info, NDTR1CS0, info->ndtr1cs0);
+ 	}
+ 
++	prepare_start_command(info, command);
++
+ 	info->state = STATE_PREPARED;
+-	exec_cmd = prepare_command_pool(info, command, column, page_addr);
++	exec_cmd = prepare_set_command(info, command, column, page_addr);
+ 	if (exec_cmd) {
+ 		init_completion(&info->cmd_complete);
+ 		init_completion(&info->dev_ready);
 -- 
 1.8.1.5
