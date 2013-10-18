@@ -1,9 +1,22 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 18 Oct 2013 18:54:22 +0200
-Subject: [PATCHv3][ 1/2] ARM: dts: imx51.dtsi: Add some pinmux pins.
-Message-ID: <1382115263-7990-1-git-send-email-denis@eukrea.com>
+Date: Fri, 18 Oct 2013 18:54:23 +0200
+Subject: [PATCHv3][ 2/2] ARM: dts: Add support for the cpuimx51 board from
+ Eukrea and its baseboard.
+In-Reply-To: <1382115263-7990-1-git-send-email-denis@eukrea.com>
+References: <1382115263-7990-1-git-send-email-denis@eukrea.com>
+Message-ID: <1382115263-7990-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+The following devices/functionalities were added:
+ * Main and secondary UARTs.
+ * i2c and the pcf8563 device.
+ * Ethernet.
+ * NAND.
+ * The BP1 button.
+ * The LED.
+ * Watchdog
+ * SD.
 
 Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Pawel Moll <pawel.moll@arm.com>
@@ -16,42 +29,224 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- arch/arm/boot/dts/imx51.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ChangeLog v2->v3:
+- This patch was splitted, the part that enabled the display, the audio, and
+  the touchscreen was removed and will be submited in a new patch
+  serie(because they depend on changes touching other subsystems).
+- Added a cosmetic linebreak between and the ssi2 and the uart1 nodes.
+---
+ arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi       |   63 ++++++++++
+ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |  132 ++++++++++++++++++++
+ 2 files changed, 195 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
+ create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index f4dcff3..48fa41b 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -621,6 +621,15 @@
- 		};
- 	};
- 
-+	i2c1 {
-+		pinctrl_i2c1_1: i2c1grp-1 {
+diff --git a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
+new file mode 100644
+index 0000000..8638656
+--- /dev/null
++++ b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
+@@ -0,0 +1,63 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include "imx51.dtsi"
++
++/ {
++	model = "Eukrea CPUIMX51";
++	compatible = "eukrea,cpuimx51", "fsl,imx51";
++
++	memory {
++		reg = <0x90000000 0x10000000>; /* 256M */
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec_2>;
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1_1>;
++	status = "okay";
++
++	pcf8563 at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
++	};
++};
++
++&iomuxc {
++	tsc2007 {
++		pinctrl_tsc2007_1: tsc2007grp-1 {
 +			fsl,pins = <
-+				MX51_PAD_SD2_CMD__I2C1_SCL 0x400001ed
-+				MX51_PAD_SD2_CLK__I2C1_SDA 0x400001ed
++				MX51_PAD_GPIO_NAND__GPIO_NAND 0x1f5
++				MX51_PAD_NANDF_D8__GPIO4_0 0x1f5
++			>;
++		};
++	};
++};
++
++&nfc {
++	nand-bus-width = <8>;
++	nand-ecc-mode = "hw";
++	nand-on-flash-bbt;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+new file mode 100644
+index 0000000..64d8082
+--- /dev/null
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+@@ -0,0 +1,132 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++/dts-v1/;
++#include "imx51-eukrea-cpuimx51.dtsi"
++
++/ {
++	model = "Eukrea CPUIMX51";
++	compatible = "eukrea,mbimxsd51","eukrea,cpuimx51", "fsl,imx51";
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpiokeys_1>;
++
++		button-1 {
++			label = "BP1";
++			gpios = <&gpio3 31 1>;
++			linux,code = <256>;
++			gpio-key,wakeup;
++			linux,input-type = <1>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpioled>;
++
++		led1 {
++			label = "led1";
++			gpios = <&gpio3 30 1>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux_1>;
++	status = "okay";
++};
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1_1 &pinctrl_esdhc1_cd>;
++	fsl,cd-controller;
++	status = "okay";
++};
++
++&i2c1 {
++	tlv320aic23: codec at 1a {
++		compatible = "ti,tlv320aic23";
++		reg = <0x1a>;
++	};
++};
++
++&iomuxc {
++	backlight {
++		pinctrl_backlight_1: backlightgrp-1 {
++			fsl,pins = <
++				MX51_PAD_DI1_D1_CS__GPIO3_4 0x1f5
 +			>;
 +		};
 +	};
 +
- 	i2c2 {
- 		pinctrl_i2c2_1: i2c2grp-1 {
- 			fsl,pins = <
-@@ -801,6 +810,13 @@
- 				MX51_PAD_UART3_TXD__UART3_TXD 0x1c5
- 			>;
- 		};
-+
-+		pinctrl_uart3_rtscts_2: uart3rtscts-2 {
++	esdhc1 {
++		pinctrl_esdhc1_cd: esdhc1_cd {
 +			fsl,pins = <
-+				MX51_PAD_KEY_COL4__UART3_RTS 0x1c5
-+				MX51_PAD_KEY_COL5__UART3_CTS 0x1c5
++				MX51_PAD_GPIO1_0__SD1_CD 0x20d5
 +			>;
 +		};
- 	};
- 
- 	usbh1 {
++	};
++
++	gpio-keys {
++		pinctrl_gpiokeys_1: gpiokeysgrp-1 {
++			fsl,pins = <
++				MX51_PAD_NANDF_D9__GPIO3_31 0x1f5
++			>;
++		};
++	};
++
++	leds {
++		pinctrl_gpioled: gpioledgrp-1 {
++			fsl,pins = <
++				MX51_PAD_NANDF_D10__GPIO3_30 0x80000000
++			>;
++		};
++	};
++
++	reg_lcd_3v3 {
++		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
++			fsl,pins = <
++				MX51_PAD_CSI1_D9__GPIO3_13 0x1f5
++			>;
++		};
++	};
++};
++
++&ssi2 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3_2 &pinctrl_uart3_rtscts_2>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
 -- 
 1.7.9.5
