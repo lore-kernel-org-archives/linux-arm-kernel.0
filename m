@@ -1,101 +1,160 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 18 Oct 2013 13:54:13 +0200
-Subject: [PATCH] ARM: kirkwood: remove lagacy clk workarounds
-Message-ID: <1382097253-15624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 18 Oct 2013 13:54:53 +0200
+Subject: [RFC][PATCH v5 02/14] ARM: sched: clear SD_SHARE_POWERDOMAIN
+Message-ID: <1382097293-30245-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With legacy devices converted to DT and a proper ethernet MAC
-workaround, we can now remove the clk workarounds for legacy
-devices. While at it, also cleanup the list of includes.
+The ARM platforms take advantage of packing tasks on few cores if the latters
+can be powergated independantly. We use DT and the cpu topology descirption
+to define at which level a core can be independantly powergated to the others
+and the SD_SHARE_POWERDOMAIN will be set accordingly at MC and CPU sched_domain
+level.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+The power-gate properties should be added with the value 1 in cpu and cluster
+node when then can power gate independantly from the other.
+
+As an example of a quad cores system which can power gate each core
+independantly, we should have a DT similar to the example below
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+	       cpu-map {
+	               cluster0 {
+				power-gate = <1>;
+				core0 {
+	                               cpu = <&cpu0>;
+					power-gate = <1>;
+				};
+				core1 {
+				        cpu = <&cpu1>;
+					power-gate = <1>;
+				};
+				core2 {
+					cpu = <&cpu2>;
+					power-gate = <1>;
+				};
+				core3 {
+					cpu = <&cpu3>;
+					power-gate = <1>;
+				};
+			};
+		};
+
+	...
+
+	};
+
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
-As a follow-up patch for latest mvebu PRs, this patch is based on
- git://git.infradead.org/linux-mvebu.git tags/soc-3.13-2
+ arch/arm/include/asm/topology.h |    4 ++++
+ arch/arm/kernel/topology.c      |   50 ++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 53 insertions(+), 1 deletion(-)
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-kirkwood/board-dt.c |   42 ++----------------------------------
- 1 files changed, 3 insertions(+), 39 deletions(-)
-
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 27c1877..3f5984e 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -10,56 +10,22 @@
-  * warranty of any kind, whether express or implied.
-  */
+diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
+index 58b8b84..5102847 100644
+--- a/arch/arm/include/asm/topology.h
++++ b/arch/arm/include/asm/topology.h
+@@ -5,12 +5,16 @@
  
-+#include <linux/clk.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_net.h>
- #include <linux/of_platform.h>
- #include <linux/clk-provider.h>
- #include <linux/clocksource.h>
--#include <linux/dma-mapping.h>
--#include <linux/irqchip.h>
--#include <linux/kexec.h>
-+#include <linux/slab.h>
- #include <asm/mach/arch.h>
--#include <asm/mach/map.h>
- #include <mach/bridge-regs.h>
--#include <linux/platform_data/usb-ehci-orion.h>
--#include <plat/irq.h>
- #include <plat/common.h>
- #include "common.h"
+ #include <linux/cpumask.h>
  
--/*
-- * There are still devices that doesn't know about DT yet.  Get clock
-- * gates here and add a clock lookup alias, so that old platform
-- * devices still work.
--*/
--
--static void __init kirkwood_legacy_clk_init(void)
--{
--
--	struct device_node *np = of_find_compatible_node(
--		NULL, NULL, "marvell,kirkwood-gating-clock");
--	struct of_phandle_args clkspec;
--	struct clk *clk;
--
--	clkspec.np = np;
--	clkspec.args_count = 1;
--
--	/*
--	 * The ethernet interfaces forget the MAC address assigned by
--	 * u-boot if the clocks are turned off. Until proper DT support
--	 * is available we always enable them for now.
--	 */
--	clkspec.args[0] = CGC_BIT_GE0;
--	clk = of_clk_get_from_provider(&clkspec);
--	clk_prepare_enable(clk);
--
--	clkspec.args[0] = CGC_BIT_GE1;
--	clk = of_clk_get_from_provider(&clkspec);
--	clk_prepare_enable(clk);
--}
--
- #define MV643XX_ETH_MAC_ADDR_LOW	0x0414
- #define MV643XX_ETH_MAC_ADDR_HIGH	0x0418
++#define CPU_CORE_GATE		0x1
++#define CPU_CLUSTER_GATE	0x2
++
+ struct cputopo_arm {
+ 	int thread_id;
+ 	int core_id;
+ 	int socket_id;
+ 	cpumask_t thread_sibling;
+ 	cpumask_t core_sibling;
++	int flags;
+ };
  
-@@ -164,8 +130,6 @@ static void __init kirkwood_dt_init(void)
+ extern struct cputopo_arm cpu_topology[NR_CPUS];
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 85a8737..f38f1f9 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -24,6 +24,7 @@
  
- 	kirkwood_cpufreq_init();
- 	kirkwood_cpuidle_init();
--	/* Setup clocks for legacy devices */
--	kirkwood_legacy_clk_init();
+ #include <asm/cputype.h>
+ #include <asm/topology.h>
++#include <asm/smp_plat.h>
  
- 	kirkwood_pm_init();
- 	kirkwood_dt_eth_fixup();
+ /*
+  * cpu power scale management
+@@ -79,6 +80,51 @@ unsigned long *__cpu_capacity;
+ 
+ unsigned long middle_capacity = 1;
+ 
++static int __init get_dt_power_topology(struct device_node *topo)
++{
++	const u32 *reg;
++	int len, power = 0;
++	int flag = CPU_CORE_GATE;
++
++	for (; topo; topo = of_get_next_parent(topo)) {
++		reg = of_get_property(topo, "power-gate", &len);
++		if (reg && len == 4 && be32_to_cpup(reg))
++			power |= flag;
++		flag <<= 1;
++	}
++
++	return power;
++}
++
++#define for_each_subnode_with_property(dn, pn, prop_name) \
++	for (dn = of_find_node_with_property(pn, prop_name); dn; \
++	     dn = of_find_node_with_property(dn, prop_name))
++
++static void __init init_dt_power_topology(void)
++{
++	struct device_node *cn, *topo;
++
++	/* Get power domain topology information */
++	cn = of_find_node_by_path("/cpus/cpu-map");
++	if (!cn) {
++		pr_warn("Missing cpu-map node, bailing out\n");
++		return;
++	}
++
++	for_each_subnode_with_property(topo, cn, "cpu") {
++		struct device_node *cpu;
++
++		cpu = of_parse_phandle(topo, "cpu", 0);
++		if (cpu) {
++			u32 hwid;
++
++			of_property_read_u32(cpu, "reg", &hwid);
++			cpu_topology[get_logical_index(hwid)].flags = get_dt_power_topology(topo);
++
++		}
++	}
++}
++
+ /*
+  * Iterate all CPUs' descriptor in DT and compute the efficiency
+  * (as per table_efficiency). Also calculate a middle efficiency
+@@ -151,6 +197,8 @@ static void __init parse_dt_topology(void)
+ 		middle_capacity = ((max_capacity / 3)
+ 				>> (SCHED_POWER_SHIFT-1)) + 1;
+ 
++	/* Retrieve power topology information from DT */
++	init_dt_power_topology();
+ }
+ 
+ /*
+@@ -283,7 +331,7 @@ void __init init_cpu_topology(void)
+ 		cpu_topo->socket_id = -1;
+ 		cpumask_clear(&cpu_topo->core_sibling);
+ 		cpumask_clear(&cpu_topo->thread_sibling);
+-
++		cpu_topo->flags = 0;
+ 		set_power_scale(cpu, SCHED_POWER_SCALE);
+ 	}
+ 	smp_wmb();
 -- 
-1.7.2.5
+1.7.9.5
