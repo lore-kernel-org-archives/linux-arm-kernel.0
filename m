@@ -1,76 +1,39 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 18 Oct 2013 12:28:36 +0530
-Subject: [PATCH 0/2] ARM: dts: AM4372: Add more nodes
-In-Reply-To: <5260DBAC.6090107@baylibre.com>
-References: <1381432494-20498-1-git-send-email-lokeshvutla@ti.com>
- <5260AFB2.9010300@ti.com> <5260DBAC.6090107@baylibre.com>
-Message-ID: <5260DC1C.6010004@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 18 Oct 2013 09:02:31 +0200
+Subject: [Patch v2][ 20/37] arm/dts: imx25.dtsi: Add some pinmux pins.
+In-Reply-To: <1382022155-21954-21-git-send-email-denis@eukrea.com>
+References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
+ <1382022155-21954-21-git-send-email-denis@eukrea.com>
+Message-ID: <20131018070231.GU30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-On Friday 18 October 2013 12:26 PM, Benoit Cousson wrote:
-> Hi Lokesh,
+On Thu, Oct 17, 2013 at 05:02:18PM +0200, Denis Carikli wrote:
+> Uart1, fec, i2c1,esdhc1 and audmux were added.
 > 
-> On 18/10/2013 05:49, Lokesh Vutla wrote:
->> Hi Benoit,
->> On Friday 11 October 2013 12:44 AM, Lokesh Vutla wrote:
->>> This patch series add nodes for l2-cache-controller, EDMA, mailbox, mmc, sham,
->>> and updates the properties for cpsw, i2c0, matrix-keypad.
->>>
->>> These patches are applied on top of Benoit's for_3.13/dts branch
->>> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.13/dts
->> Can you take this patch series for 3.13?
-> 
-> I've just applied it after a sloght change in the subject and in the SoB list.
-> 
->     ARM: dts: AM4372: Add L2, EDMA, mailbox, MMC and SHAM nodes
-> 
->     Populate nodes for l2-cache-controller, EDMA, mailbox,
->     mmc, sham.
-> 
->     Update as well DT properties for epwmss, aes, des.
-> 
->     Signed-off-by: Suman Anna <s-anna@ti.com>
->     Signed-off-by: Balaji T K <balajitk@ti.com>
->     Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
->     Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->     Signed-off-by: Benoit Cousson <bcousson@baylibre.com>
-> 
-> 
-> I added all the author you listed in a more formal way.
-Thanks.
+> +				fec {
+> +					pinctrl_fec_1: fecgrp-1 {
+> +						fsl,pins = <
+> +							MX25_PAD_FEC_MDC__FEC_MDC       0x80000000
+> +							MX25_PAD_FEC_MDIO__FEC_MDIO     0x400001e0
+> +							MX25_PAD_FEC_TDATA0__FEC_TDATA0 0x80000000
+> +							MX25_PAD_FEC_TDATA1__FEC_TDATA1 0x80000000
+> +							MX25_PAD_FEC_TX_EN__FEC_TX_EN   0x80000000
+> +							MX25_PAD_FEC_RDATA0__FEC_RDATA0 0x800000c0
+> +							MX25_PAD_FEC_RDATA1__FEC_RDATA1 0x800000c0
+> +							MX25_PAD_FEC_RX_DV__FEC_RX_DV   0x800000c0
 
-Regards,
-Lokesh
-> 
-> Regards,
-> Benoit
-> 
->>
->> Thanks and regards,
->> Lokesh
->>>
->>> Testing:
->>> Tested EDMA, mmc, sham, aes, des, i2c0, cpsw, matric-keypad on AM4372 EPOS EVM
->>> with the addition of following two series:
->>> -> Tero's V8 of OMAP DT clock conversion
->>>    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg96769.html
->>> -> Afzal's V5 of AM43x PRCM basic support
->>>    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg96275.html
->>>
->>> Lokesh Vutla (1):
->>>    ARM: dts: AM4372: Add more nodes
->>>
->>> Mugunthan V N (1):
->>>    ARM: dts: AM4372: Update Support for EPOS EVM
->>>
->>>   arch/arm/boot/dts/am4372.dtsi        |  210 +++++++++++++++++++++++++++++++++-
->>>   arch/arm/boot/dts/am43x-epos-evm.dts |  168 +++++++++++++++++++++++++++
->>>   include/dt-bindings/pinctrl/am43xx.h |   31 +++++
->>>   3 files changed, 408 insertions(+), 1 deletion(-)
->>>   create mode 100644 include/dt-bindings/pinctrl/am43xx.h
->>>
->>
-> 
-> 
+The 0x8000xxxx values don't make sense:
+
+NO_PAD_CTL(1 << 31): indicate this pin does not need config.
+
+So by setting bit 31 you ask to ignore the settings, still you set other
+bits.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
