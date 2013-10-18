@@ -1,38 +1,44 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 18 Oct 2013 20:02:32 -0300
-Subject: [PATCH v2 05/27] mtd: nand: pxa3xx: Make config menu show supported
- platforms
+Date: Fri, 18 Oct 2013 20:02:35 -0300
+Subject: [PATCH v2 08/27] mtd: nand: pxa3xx: Use chip->cmdfunc instead of the
+ internal
 In-Reply-To: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1382137374-21251-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1382137374-21251-9-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we have now support for the NFCv2 controller found on
-Armada 370/XP platforms.
+Whenever possible, it's always better to use the generic chip->cmdfunc
+instead of the internal pxa3xx_nand_cmdfunc().
+In this particular case, this will allow to have multiple cmdfunc()
+implementations for different SoC variants.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index d885298..791d219 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -354,11 +354,11 @@ config MTD_NAND_ATMEL
- 	  on Atmel AT91 and AVR32 processors.
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 83ea806..1e2f4ae 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -1011,14 +1011,16 @@ static void pxa3xx_nand_free_buff(struct pxa3xx_nand_info *info)
+ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
+ {
+ 	struct mtd_info *mtd;
++	struct nand_chip *chip;
+ 	int ret;
+ 	mtd = info->host[info->cs]->mtd;
++	chip = mtd->priv;
+ 	/* use the common timing to make a try */
+ 	ret = pxa3xx_nand_config_flash(info, &builtin_flash_types[0]);
+ 	if (ret)
+ 		return ret;
  
- config MTD_NAND_PXA3xx
--	tristate "Support for NAND flash devices on PXA3xx"
-+	tristate "NAND support on PXA3xx and Armada 370/XP"
- 	depends on PXA3xx || ARCH_MMP || PLAT_ORION
- 	help
- 	  This enables the driver for the NAND flash device found on
--	  PXA3xx processors
-+	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
+-	pxa3xx_nand_cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
++	chip->cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
+ 	if (info->is_ready)
+ 		return 0;
  
- config MTD_NAND_SLC_LPC32XX
- 	tristate "NXP LPC32xx SLC Controller"
 -- 
 1.8.1.5
