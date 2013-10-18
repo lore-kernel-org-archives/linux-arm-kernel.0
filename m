@@ -1,66 +1,38 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 18 Oct 2013 16:40:27 -0600
-Subject: [GIT PULL V2] ARM: tegra: core SoC support changes for 3.13
-Message-ID: <1382136027-4937-1-git-send-email-swarren@wwwdotorg.org>
+Date: Fri, 18 Oct 2013 16:42:27 -0600
+Subject: [GIT PULL 3/6] ARM: tegra: core SoC support changes for 3.13
+In-Reply-To: <87ppr3y01l.fsf@linaro.org>
+References: <1382036881-23339-1-git-send-email-swarren@wwwdotorg.org>	<1382036881-23339-3-git-send-email-swarren@wwwdotorg.org>
+ <87ppr3y01l.fsf@linaro.org>
+Message-ID: <5261B953.5020403@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch includes:
-* SoC fuse values are used as device randomness at boot.
-* Initial support for the Tegra124 SoC is added. When coupled with an
-  appropriate clock driver, which should also be merged for 3.13, we are
-  able to boot to user-space using an initrd.
-* The powergate code gains support for Tegra114.
+On 10/17/2013 05:01 PM, Kevin Hilman wrote:
+> Stephen Warren <swarren@wwwdotorg.org> writes:
+> 
+>> This branch includes:
+>> * SoC fuse values are used as device randomness at boot.
+>> * Initial support for the Tegra124 SoC is added. When coupled with an
+>>   appropriate clock driver, which should also be merged for 3.13, we are
+>>   able to boot to user-space using an initrd.
+>> * The powergate code gains support for Tegra114.
+>>
+>> This branch is based on previous pull request tegra-for-3.13-cleanup.
+> 
+> hmm, seems to actually be based on tegra-for-3.13-cleanup~1...
 
-This branch is based on previous pull request tegra-for-3.13-cleanup.
+Oh, indeed.
 
-----------------------------------------------------------------
+...
+> git figures it out and it all comes out in the wash when merging, but
+> makes looking at the merge history slightly confusing and the
+> dependencies not obvious.  
+> 
+> Any chance you can respin this branch on top of your cleanup branch that
+> I pulled so the merge points/branches and dependencies are obvious?
 
-The following changes since commit b6bda4e0d23815cb711c16085e03cb23c6d49f21:
+I've rebased that branch and issued a v2.
 
-  ARM: tegra: fix ARCH_TEGRA_114_SOC select sort order
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.13-soc-v2
-
-for you to fetch changes up to bd6a9ddcb9f2cb19dae0509341a4cbaf40dc66f0:
-
-  ARM: tegra: Add Tegra114 powergate support
-
-----------------------------------------------------------------
-
-Joseph Lo (7):
-      ARM: tegra: add Tegra124 SoC support
-      ARM: tegra: add PMC compatible value for Tegra124
-      ARM: tegra: CPU hotplug support for Tegra124
-      ARM: tegra: make tegra_resume can work with current and later chips
-      ARM: tegra: enable CPU idle for Tegra124
-      ARM: tegra: re-calculate the LP1 data for Tegra30/114
-      ARM: tegra: add LP1 support code for Tegra124
-
-Stephen Warren (1):
-      ARM: tegra: add fuses as device randomness
-
-Thierry Reding (3):
-      ARM: tegra: Remove duplicate powergate defines
-      ARM: tegra: Constify list of CPU domains
-      ARM: tegra: Add Tegra114 powergate support
-
- arch/arm/mach-tegra/Kconfig         |    8 +++++
- arch/arm/mach-tegra/Makefile        |    5 +++
- arch/arm/mach-tegra/cpuidle.c       |    4 ++-
- arch/arm/mach-tegra/flowctrl.c      |    2 ++
- arch/arm/mach-tegra/fuse.c          |   54 ++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/fuse.h          |    1 +
- arch/arm/mach-tegra/hotplug.c       |    2 ++
- arch/arm/mach-tegra/iomap.h         |    3 ++
- arch/arm/mach-tegra/platsmp.c       |    2 ++
- arch/arm/mach-tegra/pm.c            |   12 +++++--
- arch/arm/mach-tegra/pmc.c           |    8 ++---
- arch/arm/mach-tegra/powergate.c     |   48 ++++++++++++++++++++++++--
- arch/arm/mach-tegra/reset-handler.S |   13 +++----
- arch/arm/mach-tegra/sleep-tegra30.S |   49 ++++++++++++++++++++-------
- arch/arm/mach-tegra/tegra.c         |    1 +
- include/linux/tegra-powergate.h     |    9 ++++-
- 16 files changed, 187 insertions(+), 34 deletions(-)
+On a side note, the Globalgig WiFi dongle I brought with me to Edinburgh
+is really slow, and doesn't like OpenVPN and/or UDP at all:-(
