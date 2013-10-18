@@ -1,73 +1,90 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 18 Oct 2013 13:45:45 -0400
-Subject: [PATCH] ARM: kirkwood: remove lagacy clk workarounds
-In-Reply-To: <5261735A.1000504@gmail.com>
-References: <1382097253-15624-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131018144741.GL22434@titan.lakedaemon.net>
- <20131018161743.GA29595@localhost> <52616F81.8060504@gmail.com>
- <5261735A.1000504@gmail.com>
-Message-ID: <20131018174545.GN22434@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Oct 2013 10:49:54 -0700
+Subject: [GIT PULL 1/1] omap board removal for some omap3 boards for v3.13
+ merge window
+Message-ID: <pull-1382118594-957435>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 07:43:54PM +0200, Sebastian Hesselbarth wrote:
-> On 10/18/2013 07:27 PM, Sebastian Hesselbarth wrote:
-> >On 10/18/2013 06:17 PM, Ezequiel Garcia wrote:
-> >>On Fri, Oct 18, 2013 at 10:47:41AM -0400, Jason Cooper wrote:
-> >>>On Fri, Oct 18, 2013 at 01:54:13PM +0200, Sebastian Hesselbarth wrote:
-> >>>>With legacy devices converted to DT and a proper ethernet MAC
-> >>>>workaround, we can now remove the clk workarounds for legacy
-> >>>>devices. While at it, also cleanup the list of includes.
-> >>>>
-> >>>>Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >>>>---
-> >>>>As a follow-up patch for latest mvebu PRs, this patch is based on
-> >>>>  git://git.infradead.org/linux-mvebu.git tags/soc-3.13-2
-> >>>>
-> >>>>Cc: Jason Cooper <jason@lakedaemon.net>
-> >>>>Cc: Andrew Lunn <andrew@lunn.ch>
-> >>>>Cc: Russell King <linux@arm.linux.org.uk>
-> >>>>Cc: Kevin Hilman <khilman@linaro.org>
-> >>>>Cc: linux-arm-kernel at lists.infradead.org
-> >>>>Cc: linux-kernel at vger.kernel.org
-> >>>>---
-> >>>>  arch/arm/mach-kirkwood/board-dt.c |   42
-> >>>>++----------------------------------
-> >>>>  1 files changed, 3 insertions(+), 39 deletions(-)
-> >>>
-> >>>Applied to mvebu/soc
-> >>>
-> >>
-> >>Weird: I've tried to do this clean-up myself and my usual tests with
-> >>network
-> >>built as a module failed somehow. Maybe I missed something and did
-> >>something
-> >>stupid?
-> >
-> >Ezequiel,
-> >
-> >you need commits
-> >b5d82db net: mv643xx_eth: fix missing device_node for port devices
-> >f564412 net: mv643xx_eth: fix orphaned statistics timer crash
-> >041b4dd net: mv643xx_eth: update statistics timer from timer context only
-> >
-> >from git://git.kernel.org/pub/scm/linux/kernel/git/davem/net.git master
-> >
-> >Those are the three net driver fixes and have not yet been pulled into
-> >mainline linux.
-> >
-> >Can you re-test with those three applied (or you can just merge in
-> >above master)? I am compiling right now and will report.
-> 
-> With mvebu/for-next and net/master merged in,
-> modular mvmdio and mv643xx_eth on Kirkwood Dockstar:
-> 
-> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail>
-> 
-> IOW, works. I hope you can confirm this, too.
+The following changes since commit f41509ad0d4c11d0911630440749d409ce2aa1aa:
 
-Nice!  Thanks for testing.
+  Merge branches 'omap-for-v3.13/dt' and 'omap-for-v3.13/quirk' into omap-for-v3.13/board-removal (2013-10-14 11:33:07 -0700)
 
-thx,
+are available in the git repository at:
 
-Jason.
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/board-removal-signed-take2
+
+for you to fetch changes up to 06ff74fd197aa8205443cf64b94383802602e320:
+
+  ARM: OMAP2+: remove legacy support for IGEP boards (2013-10-18 10:25:46 -0700)
+
+----------------------------------------------------------------
+Changes needed to drop legacy booting support for some
+omap3 boards.
+
+Note that that these are based on a merge of the
+following for the dependencies:
+
+- v3.12-rc5 for fixes to pinctrl mask
+- omap-for-v3.13/dt-signed to avoid pointless merge conflicts
+- omap-for-v3.13/quirk-signed for legacy pdata handling
+
+----------------------------------------------------------------
+Aaro Koskinen (2):
+      ARM: dts: add minimal DT support for Nokia N950 & N9 phones
+      ARM: OMAP2: delete board-rm680
+
+Javier Martinez Canillas (1):
+      ARM: OMAP2+: remove legacy support for IGEP boards
+
+Tony Lindgren (6):
+      ARM: dts: Shared file for omap GPMC connected smsc911x
+      ARM: dts: Add common support for omap3-evm
+      ARM: dts: Add basic support for TMDSEVM3730 (Mistral AM/DM37x EVM)
+      ARM: dts: Add basic support for zoom3
+      ARM: OMAP2+: Remove legacy booting support for omap3 EVM
+      ARM: OMAP2+: Remove legacy support for zoom platforms
+
+ MAINTAINERS                                  |   2 +-
+ arch/arm/boot/dts/Makefile                   |   4 +
+ arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi    |  52 ++
+ arch/arm/boot/dts/omap-zoom-common.dtsi      |  33 ++
+ arch/arm/boot/dts/omap3-evm-37xx.dts         | 151 ++++++
+ arch/arm/boot/dts/omap3-evm-common.dtsi      |  94 ++++
+ arch/arm/boot/dts/omap3-evm.dts              |  58 +-
+ arch/arm/boot/dts/omap3-igep0020.dts         |  45 +-
+ arch/arm/boot/dts/omap3-n9.dts               |  18 +
+ arch/arm/boot/dts/omap3-n950-n9.dtsi         | 174 ++++++
+ arch/arm/boot/dts/omap3-n950.dts             |  18 +
+ arch/arm/boot/dts/omap3-zoom3.dts            | 217 ++++++++
+ arch/arm/mach-omap2/Kconfig                  |  46 --
+ arch/arm/mach-omap2/Makefile                 |  12 -
+ arch/arm/mach-omap2/board-3630sdp.c          | 225 --------
+ arch/arm/mach-omap2/board-igep0020.c         | 683 ------------------------
+ arch/arm/mach-omap2/board-ldp.c              |   3 +-
+ arch/arm/mach-omap2/board-omap3evm.c         | 756 ---------------------------
+ arch/arm/mach-omap2/board-rm680.c            | 167 ------
+ arch/arm/mach-omap2/board-zoom-debugboard.c  | 139 -----
+ arch/arm/mach-omap2/board-zoom-display.c     |  71 ---
+ arch/arm/mach-omap2/board-zoom-peripherals.c | 360 -------------
+ arch/arm/mach-omap2/board-zoom.c             | 159 ------
+ arch/arm/mach-omap2/board-zoom.h             |  10 -
+ 24 files changed, 767 insertions(+), 2730 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi
+ create mode 100644 arch/arm/boot/dts/omap-zoom-common.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-evm-37xx.dts
+ create mode 100644 arch/arm/boot/dts/omap3-evm-common.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-n9.dts
+ create mode 100644 arch/arm/boot/dts/omap3-n950-n9.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-n950.dts
+ create mode 100644 arch/arm/boot/dts/omap3-zoom3.dts
+ delete mode 100644 arch/arm/mach-omap2/board-3630sdp.c
+ delete mode 100644 arch/arm/mach-omap2/board-igep0020.c
+ delete mode 100644 arch/arm/mach-omap2/board-omap3evm.c
+ delete mode 100644 arch/arm/mach-omap2/board-rm680.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom-debugboard.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom-display.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom-peripherals.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom.c
+ delete mode 100644 arch/arm/mach-omap2/board-zoom.h
