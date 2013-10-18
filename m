@@ -1,49 +1,64 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Fri, 18 Oct 2013 21:29:16 +0530
-Subject: [PATCH 4/6] pinctrl: single: Add support for wake-up interrupts
-In-Reply-To: <20131018153541.GJ15154@atomide.com>
-References: <20131010160018.GA29913@atomide.com>
- <CACRpkdaG-PQA39XSjKUgM9TyeD7srgm_8s+NazrDKJ0gmNLcwg@mail.gmail.com>
- <20131010162015.GC29913@atomide.com>
- <CACRpkdYF83ghUf60Wmrti53UJ1bWV30GW_P9GjWnsOcZHbsv+Q@mail.gmail.com>
- <5257BD3E.5000707@ti.com>
- <CACRpkdYJNaiAAHhYatd6g5_wVt0QEUxOvsk6nQn9o=_i5zfWrA@mail.gmail.com>
- <20131011154352.GO29913@atomide.com>
- <CACRpkdZhbadd5d4P+2B0_DktqK4CHzZPVJC8kPHZYUnp8TaxsA@mail.gmail.com>
- <20131011160146.GR29913@atomide.com> <5260E606.2030903@ti.com>
- <20131018153541.GJ15154@atomide.com>
-Message-ID: <52615AD4.7040306@ti.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Fri, 18 Oct 2013 17:59:56 +0200
+Subject: [PATCH] ARM: dts: omap3-beagle: Adapt USB OTG to generic PHY
+ framework
+In-Reply-To: <526122C4.4090702@ti.com>
+References: <1381142810-14541-1-git-send-email-rogerq@ti.com>
+ <526122C4.4090702@ti.com>
+Message-ID: <52615AFC.5070203@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 October 2013 09:05 PM, Tony Lindgren wrote:
-> * Balaji T K <balajitk@ti.com> [131018 00:41]:
+Hi Roger,
+
+On 18/10/2013 14:00, Roger Quadros wrote:
+> Hi Benoit,
+>
+> Could you please include this one for 3.13?
+> Without this OTG port will be broken for beagle. Thanks.
+>
+
+I've just applied it.
+
+Thanks,
+Benoit
+
+> cheers,
+> -roger
+>
+> On 10/07/2013 01:46 PM, Roger Quadros wrote:
+>> The generic PHY framewrok expects different properties than the
+>> old USB PHY framework. Supply those properties.
 >>
->> Any conclusion on using regmap for omap control module non-mux registers ?
+>> Fixes USB OTG port on beagle after the Generic PHY framework was
+>> merged in greg/usb-next. [1]
+>>
+>> [1] - https://lkml.org/lkml/2013/9/27/581
+>>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>   arch/arm/boot/dts/omap3-beagle.dts |    2 ++
+>>   1 files changed, 2 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+>> index 7669c16..fa532aa 100644
+>> --- a/arch/arm/boot/dts/omap3-beagle.dts
+>> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+>> @@ -173,6 +173,8 @@
+>>   &usb_otg_hs {
+>>   	interface-type = <0>;
+>>   	usb-phy = <&usb2_phy>;
+>> +	phys = <&usb2_phy>;
+>> +	phy-names = "usb2-phy";
+>>   	mode = <3>;
+>>   	power = <50>;
+>>   };
+>>
 >
-> I don't think anybody has even started looking into a SCM driver
-> yet considering there are tons of other issues to sort out.
->
-> If you're thinking about implementing the MMC PBIAS driver, I would
-> just implement it as a standalone driver. It seems that the PBIAS
-> interface to the MMC driver can be just regulator framework.
->
-Hi Tony,
-
-I am testing pbias regulator, Just thinking whether it should be
-using regmap api or direct readl/writel
 
 
-> Then when we have the SCM driver available, this driver can be
-> updated to coordinate things with the core SCM driver.
-
-Do you see regmap getting used for the SCM driver ?
-
-Thanks and Regards,
-Balaji T K
-
->
-> Regards,
->
-> Tony
->
+-- 
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
