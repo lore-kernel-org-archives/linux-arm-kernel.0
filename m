@@ -1,51 +1,46 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Fri, 18 Oct 2013 15:36:38 +0300
-Subject: .align may cause data to be interpreted as instructions
-In-Reply-To: <1382094190.3394.13.camel@linaro1.home>
-References: <20131017125533.GD2442@localhost.localdomain>
- <1382094190.3394.13.camel@linaro1.home>
-Message-ID: <52612B56.6070302@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 18 Oct 2013 13:46:59 +0100
+Subject: [PATCH 4/5 v2] ARM: ux500: fix I2C4 clock bit
+In-Reply-To: <1382096630-23640-1-git-send-email-linus.walleij@linaro.org>
+References: <1382096630-23640-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20131018124659.GA19112@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2013 02:03 PM, Jon Medhurst (Tixy) wrote:
-> On Thu, 2013-10-17 at 13:55 +0100, Dave Martin wrote:
->> On Thu, Oct 17, 2013 at 01:17:23PM +0100, Jon Medhurst (Tixy) wrote:
->>> I'll send a patch proposing that fix after I've worked out how to test
->>> it on a big-endian kernel. Or if someone else sends a patch for that
->>> with a good commit message that explains what's going on I'll happily
->>> ack that.
->>
->> Disassemble-testing may be enough -- but I advise to dump the relevant
->> code section with objdump -s as well as reading the code disassembly.
->> The hex dump does not lie, whereas the disassembler does sometimes get
->> confused in cases like this.
->>
->> Building and disassembling in BE8 and LE configurations will exercise
->> the two main cases (linker swabbing versus no swabbing) -- comparing
->> the dump of vmlinux with the dump of the .o file shows what the linker
->> is doing.
-> 
-> Thanks, that's the clue I was missing. I was looking at objdumps of .o
-> files and wasn't seeing any byte changes caused by this bug, just the
-> disassembler treating data as code. Doing a dump of the final linked
-> vmlinux I now see that exactly because the data is being treated as
-> code, the linking is swapping the byte order of the data, (because ARM
-> instructions are always little-endian and need to be fixed from their
-> big-endian representation in the .o file?).
-> 
-> In another branch of this thread, Taras said he had patches that were
-> tested, so I'll wait for those rather than doing one myself. Taras
-> should get the main credit for this investigation anyway :-)
-> 
+On Fri, 18 Oct 2013, Linus Walleij wrote:
 
-I've just sent patches to Ben.
+> The PCLK for I2C4 is controlled by bit 10 in the PCKEN registers
+> while the KCLK is controlled by bit 9 on the KCKEN, it's
+> one of these odd assymetric things. Correct the PCLK bit to 10.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Actually do what the commit says and update the PCLK to bit
+>   10 instead of screwing with the KCLK. The KCLK was right all the time.
+> ---
+>  arch/arm/boot/dts/ste-dbx5x0.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+> index 705bd0d..7da99fe 100644
+> --- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
+> +++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+> @@ -694,7 +694,7 @@
+>  
+>  			clock-frequency = <400000>;
+>  
+> -			clocks = <&prcc_kclk 1 9>, <&prcc_pclk 1 9>;
+> +			clocks = <&prcc_kclk 1 9>, <&prcc_pclk 1 10>;
+>  			clock-names = "i2cclk", "apb_pclk";
 
-I was looking into gas code and found an opposite bug:
-If NOP-padding is used to align data it can be treated as data
-and saved in BE format.
-So we definitely have to explicitly specify fill value for data
-alignment in code section.
+Ah, much better:
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
-Taras Kondratiuk
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
