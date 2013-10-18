@@ -1,109 +1,167 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Oct 2013 08:24:50 -0700
-Subject: [GIT PULL 1/2] omap board removal for some omap3 boards for
- v3.13 merge window
-In-Reply-To: <87hacews6o.fsf@linaro.org>
-References: <526041db.41abe00a.33b7.00a1SMTPIN_ADDED_BROKEN@mx.google.com>
- <87hacews6o.fsf@linaro.org>
-Message-ID: <20131018152450.GI15154@atomide.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Fri, 18 Oct 2013 23:19:56 +0800
+Subject: [PATCH v5 2/7] arm64: introduce interfaces to hotpatch kernel and
+ module code
+In-Reply-To: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+Message-ID: <1382109602-27432-3-git-send-email-liuj97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [131018 07:49]:
-> Hi Tony,
-> 
-> Tony Lindgren <tony@atomide.com> writes:
-> 
-> > The following changes since commit f41509ad0d4c11d0911630440749d409ce2aa1aa:
-> >
-> >   Merge branches 'omap-for-v3.13/dt' and 'omap-for-v3.13/quirk' into omap-for-v3.13/board-removal (2013-10-14 11:33:07 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/board-removal-signed
-> >
-> > for you to fetch changes up to f0c09b7c3b4e6b2fe501b3e888797b470de8320c:
-> >
-> >   ARM: OMAP2+: Remove legacy support for zoom platforms (2013-10-15 17:38:21 -0700)
-> >
-> > ----------------------------------------------------------------
-> > Changes needed to drop legacy booting support for some
-> > omap3 boards.
-> >
-> > Note that that these are based on a merge of the
-> > following for the dependencies:
-> >
-> > - v3.12-rc5 for fixes to pinctrl mask
-> > - omap-for-v3.13/dt-signed to avoid pointless merge conflicts
-> > - omap-for-v3.13/quirk-signed for legacy pdata handling
-> >
-> > ----------------------------------------------------------------
-> > Aaro Koskinen (2):
-> >       ARM: dts: add minimal DT support for Nokia N950 & N9 phones
-> >       ARM: OMAP2: delete board-rm680
-> >
-> > Tony Lindgren (6):
-> >       ARM: dts: Shared file for omap GPMC connected smsc911x
-> >       ARM: dts: Add common support for omap3-evm
-> >       ARM: dts: Add basic support for TMDSEVM3730 (Mistral AM/DM37x EVM)
-> >       ARM: dts: Add basic support for zoom3
-> 
-> This patch introduces a build failure when compiling the DTBs:
-> 
->   [...]
->   DTC     arch/arm/boot/dts/omap3-zoom3.dtb
-> ERROR (phandle_references): Reference to non-existent node or label "wl12xx_gpio"
+From: Jiang Liu <jiang.liu@huawei.com>
 
-Oops sorry, looks like the common support for omap3-evm has a
-pinctrl entry that should be in the omap3-evm-37xx only. I guess
-I did not run make dtbs after adding the omap3-evm-37xx parts.
-The patch below fixes it for me.
+Introduce three interfaces to patch kernel and module code:
+aarch64_insn_patch_text_nosync():
+	patch code without synchronization, it's caller's responsibility
+	to synchronize all CPUs if needed.
+aarch64_insn_patch_text_sync():
+	patch code and always synchronize with stop_machine()
+aarch64_insn_patch_text():
+	patch code and synchronize with stop_machine() if needed
 
-Do you want a new pull request or just the fix below?
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Cc: Jiang Liu <liuj97@gmail.com>
+---
+ arch/arm64/include/asm/insn.h | 19 ++++++++-
+ arch/arm64/kernel/insn.c      | 91 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 109 insertions(+), 1 deletion(-)
 
-Regards,
-
-Tony
-
-8< -----------------------------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Fri, 18 Oct 2013 08:16:25 -0700
-Subject: [PATCH] ARM: dts: Fix build error for omap3-evm after adding common file
-
-Commit c4856107 ((ARM: dts: Add basic support for TMDSEVM3730
-(Mistral AM/DM37x EVM)) added a pinctrl entry to the common file
-for evm that should be only in the omap3-evm-37xx. This causes:
-
-ERROR (phandle_references): Reference to non-existent node or label "wl12xx_gpio"
-
-Fix it by moving the entry to omap3-evm-37xx.
-
-Reported-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/boot/dts/omap3-evm-37xx.dts
-+++ b/arch/arm/boot/dts/omap3-evm-37xx.dts
-@@ -19,6 +19,11 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 7499490..7a69491 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -71,8 +71,25 @@ enum aarch64_insn_hint_op {
+ 
+ bool aarch64_insn_is_nop(u32 insn);
+ 
+-enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
++/*
++ * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
++ * little-endian.
++ */
++static __always_inline u32 aarch64_insn_read(void *addr)
++{
++	return le32_to_cpu(*(u32 *)addr);
++}
+ 
++static __always_inline void aarch64_insn_write(void *addr, u32 insn)
++{
++	*(u32 *)addr = cpu_to_le32(insn);
++}
 +
-+	wl12xx_vmmc: wl12xx_vmmc {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wl12xx_gpio>;
++enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+ 
++int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
++int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
++int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
++
+ #endif	/* __ASM_INSN_H */
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index f5b779f..3879db4 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -16,6 +16,9 @@
+  */
+ #include <linux/compiler.h>
+ #include <linux/kernel.h>
++#include <linux/smp.h>
++#include <linux/stop_machine.h>
++#include <asm/cacheflush.h>
+ #include <asm/insn.h>
+ 
+ static int aarch64_insn_encoding_class[] = {
+@@ -88,3 +91,91 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+ 	return __aarch64_insn_hotpatch_safe(old_insn) &&
+ 	       __aarch64_insn_hotpatch_safe(new_insn);
+ }
++
++int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
++{
++	u32 *tp = addr;
++
++	/* A64 instructions must be word aligned */
++	if ((uintptr_t)tp & 0x3)
++		return -EINVAL;
++
++	aarch64_insn_write(tp, insn);
++	flush_icache_range((uintptr_t)tp, (uintptr_t)tp + sizeof(u32));
++
++	return 0;
++}
++
++struct aarch64_insn_patch {
++	void	**text_addrs;
++	u32	*new_insns;
++	int	insn_cnt;
++};
++
++static DEFINE_MUTEX(text_patch_lock);
++static atomic_t text_patch_id;
++
++static int __kprobes aarch64_insn_patch_text_cb(void *arg)
++{
++	int i, ret = 0;
++	struct aarch64_insn_patch *pp = arg;
++
++	if (atomic_read(&text_patch_id) == smp_processor_id()) {
++		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
++			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
++							     pp->new_insns[i]);
++		/* Let other CPU continue */
++		atomic_set(&text_patch_id, -1);
++	} else {
++		while (atomic_read(&text_patch_id) != -1)
++			cpu_relax();
++		isb();
++	}
++
++	return ret;
++}
++
++int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
++{
++	int ret;
++	struct aarch64_insn_patch patch = {
++		.text_addrs = addrs,
++		.new_insns = insns,
++		.insn_cnt = cnt,
 +	};
- };
- 
- &omap3_pmx_core {
---- a/arch/arm/boot/dts/omap3-evm-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-evm-common.dtsi
-@@ -21,8 +21,6 @@
- 	};
- 
- 	wl12xx_vmmc: wl12xx_vmmc {
--		pinctrl-names = "default";
--		pinctrl-0 = <&wl12xx_gpio>;
- 		compatible = "regulator-fixed";
- 		regulator-name = "vwl1271";
- 		regulator-min-microvolt = <1800000>;
++
++	if (cnt <= 0)
++		return -EINVAL;
++
++	mutex_lock(&text_patch_lock);
++	atomic_set(&text_patch_id, smp_processor_id());
++	ret = stop_machine(aarch64_insn_patch_text_cb, &patch, cpu_online_mask);
++	mutex_unlock(&text_patch_lock);
++
++	return ret;
++}
++
++int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
++{
++	int ret;
++	bool safe = false;
++
++	if (cnt == 1)
++		safe = aarch64_insn_hotpatch_safe(aarch64_insn_read(addrs[0]),
++						  insns[0]);
++
++	if (safe) {
++		/*
++		 * ARMv8 architecture doesn't guarantee all CPUs see the new
++		 * instruction after returning from function
++		 * aarch64_insn_patch_text_nosync(). So send a IPI to all other
++		 * CPUs to achieve instruction synchronization.
++		 */
++		ret = aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
++		kick_all_cpus_sync();
++	} else {
++		ret = aarch64_insn_patch_text_sync(addrs, insns, cnt);
++	}
++
++	return ret;
++}
+-- 
+1.8.1.2
