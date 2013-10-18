@@ -1,96 +1,48 @@
-From: csmanjuvijay@gmail.com (Majunath Goudar)
-Date: Fri, 18 Oct 2013 16:36:15 +0530
-Subject: [PATCH V3 5/6] USB: OHCI: Properly handle ohci-exynos suspend
-In-Reply-To: <1382094376-31016-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
- <1382094376-31016-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1382094376-31016-6-git-send-email-csmanjuvijay@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 18 Oct 2013 12:06:50 +0100
+Subject: [PATCH 2/5] clk: ux500: fix erroneous bit assignment
+In-Reply-To: <1382087097-31627-1-git-send-email-linus.walleij@linaro.org>
+References: <1382087097-31627-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20131018110650.GX19112@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-exynos glue was not
-properly handled as it was not suspending generic part
-of ohci controller. Alan Stern suggested, properly handle
-ohci-exynos suspend scenario.
+On Fri, 18 Oct 2013, Linus Walleij wrote:
 
-Calling explicitly the ohci_suspend() routine in
-exynos_ohci_suspend() will ensure proper handling of suspend
-scenario.
+> Due to a typo or similar, the peripheral group 2 clock 11
+> gate was set to bit 1 instead of bit 11. We need to fix this
+> to be able to set the correct enable bit in the device tree:
+> when trying to correct the bit assignment in the device tree,
+> the system would hang.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Mike: seeking an ACK for this as it needs to be taken into
+> ARM SoC with the rest of the fixes so as not to cause
+> bisection problems between the trees.
+> ---
+>  drivers/clk/ux500/u8500_of_clk.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/ux500/u8500_of_clk.c b/drivers/clk/ux500/u8500_of_clk.c
+> index b768b50..cdeff29 100644
+> --- a/drivers/clk/ux500/u8500_of_clk.c
+> +++ b/drivers/clk/ux500/u8500_of_clk.c
+> @@ -339,7 +339,7 @@ void u8500_of_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+>  
+>  	clk = clk_reg_prcc_pclk("p2_pclk11", "per2clk", clkrst2_base,
+>  				BIT(11), 0);
+> -	PRCC_PCLK_STORE(clk, 2, 1);
+> +	PRCC_PCLK_STORE(clk, 2, 11);
 
-Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-usb at vger.kernel.org
----
-V2->V3:
-      -No changes.
-      As a build failure on "ep93xx proper suspend patch"
-      and Linaro id bounced. Rewrote this patch on top of latest
-      Greg usb-next branch. This patch not gives any build error.
-      Patch is required for ohci-exynos proper suspending as Alan
-      mentioned.
+Ah, you found it already. Nice.
 
-      Initially when I wrote this patch I was working in Linaro,
-      now I am not part of Linaro that is why Linaro id is bouncing.
-      Sending this patch from personal mail id.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-V1->V2:
-      -No changes.
-       Due to the build failure on ep93xx reverted this patch.
-       This patch is needed as Alan Stern suggestion.
-
- drivers/usb/host/ohci-exynos.c |   22 ++++++----------------
- 1 file changed, 6 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-index a87baed..4b5c8bd 100644
---- a/drivers/usb/host/ohci-exynos.c
-+++ b/drivers/usb/host/ohci-exynos.c
-@@ -192,23 +192,14 @@ static int exynos_ohci_suspend(struct device *dev)
- 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
- 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
- 	struct platform_device *pdev = to_platform_device(dev);
-+	bool do_wakeup = device_may_wakeup(dev);
- 	unsigned long flags;
--	int rc = 0;
-+	int rc = ohci_suspend(hcd, do_wakeup);
- 
--	/*
--	 * Root hub was already suspended. Disable irq emission and
--	 * mark HW unaccessible, bail out if RH has been resumed. Use
--	 * the spinlock to properly synchronize with possible pending
--	 * RH suspend or resume activity.
--	 */
--	spin_lock_irqsave(&ohci->lock, flags);
--	if (ohci->rh_state != OHCI_RH_SUSPENDED &&
--			ohci->rh_state != OHCI_RH_HALTED) {
--		rc = -EINVAL;
--		goto fail;
--	}
-+	if (rc)
-+		return rc;
- 
--	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-+	spin_lock_irqsave(&ohci->lock, flags);
- 
- 	if (exynos_ohci->otg)
- 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
-@@ -217,10 +208,9 @@ static int exynos_ohci_suspend(struct device *dev)
- 
- 	clk_disable_unprepare(exynos_ohci->clk);
- 
--fail:
- 	spin_unlock_irqrestore(&ohci->lock, flags);
- 
--	return rc;
-+	return 0;
- }
- 
- static int exynos_ohci_resume(struct device *dev)
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
