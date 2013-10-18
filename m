@@ -1,107 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Oct 2013 16:09:28 +0200
-Subject: [GIT PULL] at91: cleanup and preparation for the move to common clk #1
-Message-ID: <1382105368-415-1-git-send-email-nicolas.ferre@atmel.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Fri, 18 Oct 2013 17:12:02 +0300
+Subject: Build error for nommu if CONFIG_DEBUG_ATOMIC_SLEEP is selected
+In-Reply-To: <1382088475.16935.4.camel@phoenix>
+References: <1382088475.16935.4.camel@phoenix>
+Message-ID: <20131018141202.GA24660@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Fri, Oct 18, 2013 at 05:27:55PM +0800, Axel Lin wrote:
+> Hi Michael,
+> 
+> I got below build error for nommu if CONFIG_DEBUG_ATOMIC_SLEEP is selected.
+> Also got the same build error if CONFIG_PROVE_LOCKING is selected.
+> 
+> Seems this issue is introduced by commit 662bbcb2747c2
+> "mm, sched: Allow uaccess in atomic with pagefault_disable()".
+> 
+> arch/arm/kernel/built-in.o: In function `arch_ptrace':
+> arch/arm/kernel/ptrace.c:852: undefined reference to `might_fault'
+> arch/arm/kernel/built-in.o: In function `restore_sigframe':
+> arch/arm/kernel/signal.c:173: undefined reference to `might_fault'
+> arch/arm/kernel/signal.c:174: undefined reference to `might_fault'
+> arch/arm/kernel/signal.c:175: undefined reference to `might_fault'
+> arch/arm/kernel/signal.c:176: undefined reference to `might_fault'
+> arch/arm/kernel/built-in.o:arch/arm/kernel/signal.c:177: more undefined references to `might_fault' follow
+> make: *** [vmlinux] Error 1
+> 
+> Regards,
+> Axel
 
-This is the first AT91 pull-request for 3.13. I delayed the inclusion of
-material for AT91 as I wanted to build this "cleanup" series with the patches
-for moving AT91 to common clock framerowk. Now that the (big) series is nearly
-finished, I can send you the first patches that are targetted at preparing the
-landing...
-
-I plan to build another pull-request for the whole move to common clk framework
-early next week, if I manage to get the appropiate tags from Mike and the DT
-maintainers.
-
-The work that is beginning here is a big step toward AT91 integratin the
-multi-arch movement and removal of a bunch of code that bloats the mach-at91
-directory.
-
-Thanks, best regards,
-
-The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
-
-  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-cleanup
-
-for you to fetch changes up to 70e389cc7fedc4c279ef28e970658a39adc7dec7:
-
-  MAINTAINERS: Add patterns for DTS files for AT91 (2013-10-16 16:22:56 +0200)
-
-----------------------------------------------------------------
-First cleanup series for 3.13
-- a little non-urgent fix
-- addition of DT files to MAINTAINERS
-- more important, the splitting of .dtsi files
-  that allows to precisely choose the peripherals
-  that are present for a particular SoC.
-  It is useful for upcoming move to common cloks.
-
-----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (1):
-      ARM: at91: cam60: fix incorrect placement of __initdata tag
-
-Boris BREZILLON (2):
-      ARM: at91/dt: split sam9x5 peripheral definitions
-      ARM: at91/dt: split sama5d3 peripheral definitions
-
-Mark Brown (1):
-      MAINTAINERS: Add patterns for DTS files for AT91
-
-Nicolas Ferre (1):
-      ARM: at91: remove init_machine() as default is suitable
-
- MAINTAINERS                              |   4 +
- arch/arm/boot/dts/at91sam9g25.dtsi       |   2 +
- arch/arm/boot/dts/at91sam9g35.dtsi       |   1 +
- arch/arm/boot/dts/at91sam9x25.dtsi       |  24 +---
- arch/arm/boot/dts/at91sam9x35.dtsi       |   1 +
- arch/arm/boot/dts/at91sam9x5.dtsi        |  67 ----------
- arch/arm/boot/dts/at91sam9x5_macb0.dtsi  |  56 +++++++++
- arch/arm/boot/dts/at91sam9x5_macb1.dtsi  |  44 +++++++
- arch/arm/boot/dts/at91sam9x5_usart3.dtsi |  51 ++++++++
- arch/arm/boot/dts/sama5d3.dtsi           | 203 -------------------------------
- arch/arm/boot/dts/sama5d31.dtsi          |  16 +++
- arch/arm/boot/dts/sama5d31ek.dts         |   3 +-
- arch/arm/boot/dts/sama5d33.dtsi          |  14 +++
- arch/arm/boot/dts/sama5d33ek.dts         |   3 +-
- arch/arm/boot/dts/sama5d34.dtsi          |  16 +++
- arch/arm/boot/dts/sama5d34ek.dts         |   3 +-
- arch/arm/boot/dts/sama5d35.dtsi          |  18 +++
- arch/arm/boot/dts/sama5d35ek.dts         |   3 +-
- arch/arm/boot/dts/sama5d3_can.dtsi       |  54 ++++++++
- arch/arm/boot/dts/sama5d3_emac.dtsi      |  44 +++++++
- arch/arm/boot/dts/sama5d3_gmac.dtsi      |  77 ++++++++++++
- arch/arm/boot/dts/sama5d3_lcd.dtsi       |  55 +++++++++
- arch/arm/boot/dts/sama5d3_mci2.dtsi      |  47 +++++++
- arch/arm/boot/dts/sama5d3_tcb1.dtsi      |  27 ++++
- arch/arm/boot/dts/sama5d3_uart.dtsi      |  53 ++++++++
- arch/arm/boot/dts/sama5d3xcm.dtsi        |   1 -
- arch/arm/mach-at91/board-cam60.c         |   2 +-
- arch/arm/mach-at91/board-dt-rm9200.c     |   7 --
- arch/arm/mach-at91/board-dt-sam9.c       |   7 --
- 29 files changed, 592 insertions(+), 311 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9x5_macb0.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x5_macb1.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x5_usart3.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d31.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d33.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d34.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d35.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_can.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_emac.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_gmac.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_lcd.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_mci2.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_tcb1.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_uart.dtsi
-
--- 
-Nicolas Ferre
+Can you send/upload your full .config please?
