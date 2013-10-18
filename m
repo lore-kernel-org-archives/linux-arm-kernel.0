@@ -1,64 +1,59 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 18 Oct 2013 07:53:22 -0700
-Subject: [GIT PULL 2/2] omap changes for am43xx hwmod for v3.13 merge
- window
-In-Reply-To: <526041df.4740e50a.3954.5084SMTPIN_ADDED_MISSING@mx.google.com>
- (Tony Lindgren's message of "Thu, 17 Oct 2013 13:00:21 -0700")
-References: <526041df.4740e50a.3954.5084SMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <87d2n2wrz1.fsf@linaro.org>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Fri, 18 Oct 2013 16:54:36 +0200
+Subject: [PATCH 0/2] ARM64: perf: add support for the perf registers and dwarf
+ unwinding
+Message-ID: <1382108078-8807-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+From: Jean Pihet <jean.pihet@newoldbits.com>
 
-> The following changes since commit 254f57a92987b6cde6004f58d6b847813dfb9e0e:
->
->   ARM: OMAP5: hwmod: add missing ocp2scp hwmod data (2013-10-11 15:37:05 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/am43xx-hwmod-signed
->
-> for you to fetch changes up to 811e7c87340b75dce5c488d9496075b00853942b:
->
->   Merge tag 'for-v3.13/am43xx-support' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.13/hwmod (2013-10-17 10:37:27 -0700)
->
-> ----------------------------------------------------------------
->
-> Changes needed for am43xx for the hwmod data.
->
-> This will be the last new set of hwmod data for any SoC
-> as future SoCs will use a driver and device tree based
-> approach. But before that can be dealt with, we need to
-> first sort out the pending driver/clk issues.
->
-> Queued by Paul Walmsley <paul@pwsan.com>:
->
-> Add hwmod and PRCM data for the TI AM43xx family of SoCs.
->
-> Under normal circumstances, these patches would not be merged.
-> The hwmod and PRCM data should be moved out either to DT data or
-> to drivers/.  Also, the current implementation trades off lines
-> of diff by dynamically rewriting static data at runtime, which is
-> a bad practice - it causes future maintenance headaches.
-> However, after speaking with my upstream, it sounds like it's
-> better to merge these patches in their current state, due to long
-> term considerations.
->
-> Basic test logs are here:
->
-> http://www.pwsan.com/omap/testlogs/am43xx_support_v3.13/20131015213706/
->
-> Due to the lack of an AM43xx board and any available public
-> documentation, it's impossible for me to review or test that
-> platform in any meaningful way.  But at least the tests above
-> verify that the patches don't affect existing platforms -
-> particularly AM33xx.
->
-> ----------------------------------------------------------------
+This patch implements the functions required for the perf registers API,
+allowing the perf tool to interface kernel register dumps with libunwind
+in order to provide userspace backtracing.
+Only the general purpose user space registers are exported, i.e.:
+ PERF_REG_ARM_X0,
+ ...
+ PERF_REG_ARM_X28,
+ PERF_REG_ARM_FP,
+ PERF_REG_ARM_LR,
+ PERF_REG_ARM_SP,
+ PERF_REG_ARM_PC
+and not the PERF_REG_ARM_V* registers.
 
-Pulled into next/soc.
+Dependencies:
+ . if present, libunwind >= 1.1 is needed to prevent a segfault when
+   parsing the dwarf info,
+ . libunwind needs to be configured with --enable-debug-frame. Note:
+   --enable-debug-frame is automatically selected on ARM, NOT on ARM64.
 
-Thanks,
+The generated perf binary has been tested on ARMv8 (using the
+foundation model simulator) and x86_64, using the following commands:
+ perf record -g [fp,dwarf] -- <binary>
+ perf report --sort symbol --call-graph --stdio
 
-Kevin
+
+Jean Pihet (2):
+  ARM64: perf: add support for perf registers API
+  ARM64: perf: wire up perf_regs and unwind support
+
+ arch/arm64/Kconfig                        |  2 +
+ arch/arm64/include/uapi/asm/Kbuild        |  1 +
+ arch/arm64/include/uapi/asm/perf_regs.h   | 40 ++++++++++++++
+ arch/arm64/kernel/Makefile                |  1 +
+ arch/arm64/kernel/perf_regs.c             | 29 ++++++++++
+ tools/perf/arch/arm64/Makefile            |  7 +++
+ tools/perf/arch/arm64/include/perf_regs.h | 88 +++++++++++++++++++++++++++++++
+ tools/perf/arch/arm64/util/dwarf-regs.c   | 81 ++++++++++++++++++++++++++++
+ tools/perf/arch/arm64/util/unwind.c       | 82 ++++++++++++++++++++++++++++
+ tools/perf/config/Makefile                |  6 +++
+ 10 files changed, 337 insertions(+)
+ create mode 100644 arch/arm64/include/uapi/asm/perf_regs.h
+ create mode 100644 arch/arm64/kernel/perf_regs.c
+ create mode 100644 tools/perf/arch/arm64/Makefile
+ create mode 100644 tools/perf/arch/arm64/include/perf_regs.h
+ create mode 100644 tools/perf/arch/arm64/util/dwarf-regs.c
+ create mode 100644 tools/perf/arch/arm64/util/unwind.c
+
+-- 
+1.7.11.7
