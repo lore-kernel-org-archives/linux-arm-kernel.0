@@ -1,70 +1,46 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 18 Oct 2013 19:41:19 +0800
-Subject: [PATCH v2 5/8] mmc: sdhci-esdhc-imx: add delay line setting
- support
-In-Reply-To: <20131018115754.GF6043@S2101-09.ap.freescale.net>
-References: <1382093661-4074-1-git-send-email-b29396@freescale.com>
- <1382093661-4074-6-git-send-email-b29396@freescale.com>
- <20131018114233.GD6043@S2101-09.ap.freescale.net>
- <20131018113046.GE22289@shlinux2.ap.freescale.net>
- <20131018115754.GF6043@S2101-09.ap.freescale.net>
-Message-ID: <20131018114119.GF22289@shlinux2.ap.freescale.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 18 Oct 2013 15:00:04 +0300
+Subject: [PATCH] ARM: dts: omap3-beagle: Adapt USB OTG to generic PHY
+ framework
+In-Reply-To: <1381142810-14541-1-git-send-email-rogerq@ti.com>
+References: <1381142810-14541-1-git-send-email-rogerq@ti.com>
+Message-ID: <526122C4.4090702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 07:57:56PM +0800, Shawn Guo wrote:
-> On Fri, Oct 18, 2013 at 07:30:47PM +0800, Dong Aisheng wrote:
-> > On Fri, Oct 18, 2013 at 07:42:35PM +0800, Shawn Guo wrote:
-> > > On Fri, Oct 18, 2013 at 06:54:18PM +0800, Dong Aisheng wrote:
-> > > > The DLL(Delay Line) is newly added to assist in sampling read data.
-> > > > The DLL provides the ability to programmatically select a quantized
-> > > > delay (in fractions of the clock period) regardless of on-chip variations
-> > > > such as process, voltage and temperature (PVT).
-> > > > 
-> > > > This patch adds a user interface to set slave delay line via device tree.
-> > > > It's usually used in high speed mode like mmc DDR mode when the signal
-> > > > quality is not good caused by board design, e.g. the signal path is too long.
-> > > > User can manual set delay line to find a suitable data sampling window
-> > > > for card to work properly.
-> > > > 
-> > > > Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> > > > ---
-> > > >  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    5 +++++
-> > > >  drivers/mmc/host/sdhci-esdhc-imx.c                 |   18 ++++++++++++++++++
-> > > >  include/linux/platform_data/mmc-esdhc-imx.h        |    1 +
-> > > >  3 files changed, 24 insertions(+), 0 deletions(-)
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> > > > index 1dd6225..78a45c5 100644
-> > > > --- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> > > > +++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> > > > @@ -12,6 +12,11 @@ Required properties:
-> > > >  Optional properties:
-> > > >  - fsl,cd-controller : Indicate to use controller internal card detection
-> > > >  - fsl,wp-controller : Indicate to use controller internal write protection
-> > > > +- fsl,delay-line : Specify the number of delay cells for override mode.
-> > > > +  This is used to set the clock delay for DLL(Delay Line) on override mode
-> > > > +  to select a proper data sampling window in case the clock quality is not good
-> > > > +  due to signal path is too long on the board.
-> > > > +  please refer to DLL chapter in RM for details.
-> > > 
-> > > It might be better to reword it like:
-> > > 
-> > > Please refer to eSDHC/uSDHC DLL_CTRL register bit field
-> > > DLL_CTRL_SLV_OVERRIDE_VAL in Reference Manual for details.
-> > > 
-> > 
-> > There is a DLL (Delay Line) chapter in the reference manual which
-> > has more detailed descriptions on the delay line including override mode.
-> > So i think it may be better to point user to the DLL chapter for understanding,
-> > then naturally user will refer to register for bit defines later too.
-> > Does it make sense?
-> 
-> Okay.  But "eSDHC/uSDHC chapter, DLL (Delay Line) section" please.
-> 
+Hi Benoit,
 
-Okay, i'm fine with it.
+Could you please include this one for 3.13?
+Without this OTG port will be broken for beagle. Thanks.
 
-Regards
-Dong Aisheng
-> Shawn
+cheers,
+-roger
+
+On 10/07/2013 01:46 PM, Roger Quadros wrote:
+> The generic PHY framewrok expects different properties than the
+> old USB PHY framework. Supply those properties.
+> 
+> Fixes USB OTG port on beagle after the Generic PHY framework was
+> merged in greg/usb-next. [1]
+> 
+> [1] - https://lkml.org/lkml/2013/9/27/581
+> 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  arch/arm/boot/dts/omap3-beagle.dts |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+> index 7669c16..fa532aa 100644
+> --- a/arch/arm/boot/dts/omap3-beagle.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -173,6 +173,8 @@
+>  &usb_otg_hs {
+>  	interface-type = <0>;
+>  	usb-phy = <&usb2_phy>;
+> +	phys = <&usb2_phy>;
+> +	phy-names = "usb2-phy";
+>  	mode = <3>;
+>  	power = <50>;
+>  };
+> 
