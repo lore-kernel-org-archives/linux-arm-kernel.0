@@ -1,90 +1,60 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 18 Oct 2013 10:56:45 -0700
-Subject: [PATCH v2 3/4] ARM: dts: MSM8974: Add MMIO architected timer node
+Date: Fri, 18 Oct 2013 10:56:43 -0700
+Subject: [PATCH v2 1/4] ARM: msm: Simplify ARCH_MSM_DT config
 In-Reply-To: <1382119006-22231-1-git-send-email-sboyd@codeaurora.org>
 References: <1382034310-31147-1-git-send-email-rvaswani@codeaurora.org>
  <1382119006-22231-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1382119006-22231-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1382119006-22231-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the mmio architected timer node.
+This doesn't need to be a def_bool y. Instead we can have every
+DT supported platform select ARCH_MSM_DT and we achieve the same
+thing with less chance of conflicts.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8974.dtsi | 59 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ arch/arm/mach-msm/Kconfig | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index df18637..6ac9496 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -30,6 +30,65 @@
- 			clock-frequency = <19200000>;
- 		};
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 5e5782d..702553b 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -44,6 +44,7 @@ endchoice
  
-+		timer at f9020000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			compatible = "arm,armv7-timer-mem";
-+			reg = <0xf9020000 0x1000>;
-+			clock-frequency = <19200000>;
-+
-+			frame at f9021000 {
-+				frame-number = <0>;
-+				interrupts = <0 8 0x4>,
-+					     <0 7 0x4>;
-+				reg = <0xf9021000 0x1000>,
-+				      <0xf9022000 0x1000>;
-+			};
-+
-+			frame at f9023000 {
-+				frame-number = <1>;
-+				interrupts = <0 9 0x4>;
-+				reg = <0xf9023000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9024000 {
-+				frame-number = <2>;
-+				interrupts = <0 10 0x4>;
-+				reg = <0xf9024000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9025000 {
-+				frame-number = <3>;
-+				interrupts = <0 11 0x4>;
-+				reg = <0xf9025000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9026000 {
-+				frame-number = <4>;
-+				interrupts = <0 12 0x4>;
-+				reg = <0xf9026000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9027000 {
-+				frame-number = <5>;
-+				interrupts = <0 13 0x4>;
-+				reg = <0xf9027000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at f9028000 {
-+				frame-number = <6>;
-+				interrupts = <0 14 0x4>;
-+				reg = <0xf9028000 0x1000>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		restart at fc4ab000 {
- 			compatible = "qcom,pshold";
- 			reg = <0xfc4ab000 0x4>;
+ config ARCH_MSM8X60
+ 	bool "MSM8X60"
++	select ARCH_MSM_DT
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select GPIO_MSM_V2
+@@ -52,6 +53,7 @@ config ARCH_MSM8X60
+ 
+ config ARCH_MSM8960
+ 	bool "MSM8960"
++	select ARCH_MSM_DT
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select HAVE_SMP
+@@ -60,6 +62,7 @@ config ARCH_MSM8960
+ 
+ config ARCH_MSM8974
+ 	bool "MSM8974"
++	select ARCH_MSM_DT
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select HAVE_ARM_ARCH_TIMER
+@@ -68,8 +71,7 @@ config ARCH_MSM8974
+ 	select USE_OF
+ 
+ config ARCH_MSM_DT
+-	def_bool y
+-	depends on (ARCH_MSM8X60 || ARCH_MSM8960 || ARCH_MSM8974)
++	bool
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
