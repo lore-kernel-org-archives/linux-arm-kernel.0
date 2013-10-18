@@ -1,47 +1,96 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 18 Oct 2013 11:01:00 +0530
-Subject: [PATCH] phy: exynos-mipi-video: Fix phy_power_off() callback
-In-Reply-To: <1381943025-1036-1-git-send-email-s.nawrocki@samsung.com>
-References: <1381940896-9355-1-git-send-email-kishon@ti.com>
- <1381943025-1036-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <5260C794.7040605@ti.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 17 Oct 2013 22:32:51 -0700
+Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
+In-Reply-To: <1379319655-20210-4-git-send-email-xobs@kosagi.com>
+References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
+ <1379319655-20210-4-git-send-email-xobs@kosagi.com>
+Message-ID: <CAJ+vNU36neHP77dVnqSP=+oMxaU=-6PxWQ8Afni-tTRjNTkM_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-On Wednesday 16 October 2013 10:33 PM, Sylwester Nawrocki wrote:
-> Fix argument passed to the register setup helper function so
-> the phy is actually disabled. Now due to cut&paste error 1 is
-> passed to both phy_power_on() and phy_power_off().
-
-Can you take this patch?
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
-> Reported by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+On Mon, Sep 16, 2013 at 1:20 AM, Sean Cross <xobs@kosagi.com> wrote:
+> Add support for the PCIe port present on the i.MX6 family of controllers.
+> These use the Synopsis Designware core tied to their own PHY.
+>
+> Signed-off-by: Sean Cross <xobs@kosagi.com>
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 > ---
-> 
-> This fixes a cut&paste typo which snicked in while doing very last
-> adaptation to latest version of the phy framework.
-> 
-> Thanks,
-> Sylwester
-> ---
->  drivers/phy/phy-exynos-mipi-video.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
-> index b73b86a..0c5efab 100644
-> --- a/drivers/phy/phy-exynos-mipi-video.c
-> +++ b/drivers/phy/phy-exynos-mipi-video.c
-> @@ -93,7 +93,7 @@ static int exynos_mipi_video_phy_power_off(struct phy *phy)
->  	struct video_phy_desc *phy_desc = phy_get_drvdata(phy);
->  	struct exynos_mipi_video_phy *state = to_mipi_video_phy(phy_desc);
->  
-> -	return __set_phy_state(state, phy_desc->index, 1);
-> +	return __set_phy_state(state, phy_desc->index, 0);
->  }
->  
->  static struct phy *exynos_mipi_video_phy_xlate(struct device *dev,
-> 
+>  .../devicetree/bindings/pci/designware-pcie.txt    |    7 +-
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index ccd55c2..125202e 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -116,6 +116,22 @@
+>                         arm,data-latency = <4 2 3>;
+>                 };
+>
+> +               pcie: pcie at 0x01000000 {
+> +                       compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
+> +                       reg = <0x01ffc000 0x4000>; /* DBI */
+> +                       #address-cells = <3>;
+> +                       #size-cells = <2>;
+> +                       device_type = "pci";
+> +                       ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000 /* configuration space */
+> +                                 0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
+> +                                 0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+> +                       num-lanes = <1>;
+> +                       interrupts = <0 123 0x04>;
+> +                       clocks = <&clks 189>, <&clks 187>, <&clks 205>, <&clks 144>;
+> +                       clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
+> +                       status = "disabled";
+> +               };
+> +
+
+Sean,
+
+The devicetree portion above is now here
+https://gitorious.org/thierryreding/linux-next/commit/3a57291fa4ca7f7647d826f5b47082ef306d839f
+(which I'm told gets pulled into linux-next) and I wanted to see if
+you or any of the other IMX/PCI gurus here can answer a question about
+region mapping.
+
+The above ranges look to me to allocate 15MB for mem resources, 64K
+for io resources, and 256K for cfg space.
+
+Table 2.1 of the IMX6DQRM.pdf
+(http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf)
+shows:
+  01FF_C000 01FF_FFFF 16 KB PCIe registers
+  0100_0000 01FF_BFFF 16368 KB PCIe
+
+The driver in the fsl 3.0.35_4.1.0 BSP maps the following (see
+http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/arch/arm/mach-mx6/pcie.c?h=imx_3.0.35_4.1.0#n331):
+
+0x0100_0000 --- 0x01DF_FFFF 14MB IORESOURCE_MEM
+0x01E0_0000 --- 0x01EF_FFFF 1MB IORESOURCE_IO
+0x01F0_0000 --- 0x01FF_FFFF 1MB Cfg + MSI + Registers
+
+and, in a discussion on the IMX Community forum
+(https://community.freescale.com/message/334959#334959) points out
+that you have more flexibility if you map the MEM resource first
+because of its more limited alignment.  So, if you were going to stick
+with the fsl mapping I would think we would want something like this
+in the dt node:
+
+ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000 /* 512K
+configuration space */
+               0x81000000 0 0          0x01e00000 0 0x00100000 /* 1MB
+downstream I/O */
+               0x82000000 0 0x01000000 0x01000000 0 0x00e00000>; /*
+14MB non-prefetchable memory */
+
+Can these regions be moved around however you want depending on what
+kind of mem vs io resource configurations you desire?  How about the
+cfg space - is 512K really needed?
+
+Are we sure the committed values to linux-next 'wrong' in any way?  I
+still am seeing bus-hangs with devices behind a bridge that use
+io-space resources and am trying to figure out where the issue is.  I
+don't get these bus-hangs when using the fsl driver which is
+structured very different so its been difficult for me to determine
+the difference.  The mappings and the way iATU mappings are done are
+very different.
+
+Thanks,
+
+Tim
