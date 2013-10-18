@@ -1,44 +1,76 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 18 Oct 2013 20:02:35 -0300
-Subject: [PATCH v2 08/27] mtd: nand: pxa3xx: Use chip->cmdfunc instead of the
- internal
+Date: Fri, 18 Oct 2013 20:02:43 -0300
+Subject: [PATCH v2 16/27] mtd: nand: pxa3xx: Add helper function to set page
+ address
 In-Reply-To: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1382137374-21251-9-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1382137374-21251-17-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever possible, it's always better to use the generic chip->cmdfunc
-instead of the internal pxa3xx_nand_cmdfunc().
-In this particular case, this will allow to have multiple cmdfunc()
-implementations for different SoC variants.
+Let's simplify the code by first introducing a helper function
+to set the page address, as done by the READ0, READOOB and SEQIN
+commands.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 36 +++++++++++++++++++++---------------
+ 1 file changed, 21 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 83ea806..1e2f4ae 100644
+index be90304..e9d0dde 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1011,14 +1011,16 @@ static void pxa3xx_nand_free_buff(struct pxa3xx_nand_info *info)
- static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
- {
- 	struct mtd_info *mtd;
-+	struct nand_chip *chip;
- 	int ret;
- 	mtd = info->host[info->cs]->mtd;
-+	chip = mtd->priv;
- 	/* use the common timing to make a try */
- 	ret = pxa3xx_nand_config_flash(info, &builtin_flash_types[0]);
- 	if (ret)
- 		return ret;
+@@ -592,6 +592,26 @@ static inline int is_buf_blank(uint8_t *buf, size_t len)
+ 	return 1;
+ }
  
--	pxa3xx_nand_cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
-+	chip->cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
- 	if (info->is_ready)
- 		return 0;
++static void set_command_address(struct pxa3xx_nand_info *info,
++		unsigned int page_size, uint16_t column, int page_addr)
++{
++	/* small page addr setting */
++	if (page_size < PAGE_CHUNK_SIZE) {
++		info->ndcb1 = ((page_addr & 0xFFFFFF) << 8)
++				| (column & 0xFF);
++
++		info->ndcb2 = 0;
++	} else {
++		info->ndcb1 = ((page_addr & 0xFFFF) << 16)
++				| (column & 0xFFFF);
++
++		if (page_addr & 0xFF0000)
++			info->ndcb2 = (page_addr & 0xFF0000) >> 16;
++		else
++			info->ndcb2 = 0;
++	}
++}
++
+ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 		uint16_t column, int page_addr)
+ {
+@@ -655,22 +675,8 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 			info->ndcb0 |= NDCB0_DBC | (NAND_CMD_READSTART << 8);
+ 
+ 	case NAND_CMD_SEQIN:
+-		/* small page addr setting */
+-		if (unlikely(mtd->writesize < PAGE_CHUNK_SIZE)) {
+-			info->ndcb1 = ((page_addr & 0xFFFFFF) << 8)
+-					| (column & 0xFF);
+-
+-			info->ndcb2 = 0;
+-		} else {
+-			info->ndcb1 = ((page_addr & 0xFFFF) << 16)
+-					| (column & 0xFFFF);
+-
+-			if (page_addr & 0xFF0000)
+-				info->ndcb2 = (page_addr & 0xFF0000) >> 16;
+-			else
+-				info->ndcb2 = 0;
+-		}
+ 
++		set_command_address(info, mtd->writesize, column, page_addr);
+ 		info->buf_count = mtd->writesize + mtd->oobsize;
+ 		memset(info->data_buff, 0xFF, info->buf_count);
  
 -- 
 1.8.1.5
