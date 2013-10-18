@@ -1,109 +1,64 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Fri, 18 Oct 2013 20:21:27 +0530
-Subject: [PATCH v2 1/1] ARM: OMAP2+: DRA7: hwmod: Add hwmod data for MDIO and
- CPSW
-Message-ID: <1382107887-11728-1-git-send-email-mugunthanvnm@ti.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 18 Oct 2013 07:53:22 -0700
+Subject: [GIT PULL 2/2] omap changes for am43xx hwmod for v3.13 merge
+ window
+In-Reply-To: <526041df.4740e50a.3954.5084SMTPIN_ADDED_MISSING@mx.google.com>
+ (Tony Lindgren's message of "Thu, 17 Oct 2013 13:00:21 -0700")
+References: <526041df.4740e50a.3954.5084SMTPIN_ADDED_MISSING@mx.google.com>
+Message-ID: <87d2n2wrz1.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding hwmod data for CPSW and MDIO which is present in DRA7xx SoC
+Tony Lindgren <tony@atomide.com> writes:
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
-Changes from initial version:
-* changed the subject with proper text
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 64 +++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+> The following changes since commit 254f57a92987b6cde6004f58d6b847813dfb9e0e:
+>
+>   ARM: OMAP5: hwmod: add missing ocp2scp hwmod data (2013-10-11 15:37:05 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/am43xx-hwmod-signed
+>
+> for you to fetch changes up to 811e7c87340b75dce5c488d9496075b00853942b:
+>
+>   Merge tag 'for-v3.13/am43xx-support' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.13/hwmod (2013-10-17 10:37:27 -0700)
+>
+> ----------------------------------------------------------------
+>
+> Changes needed for am43xx for the hwmod data.
+>
+> This will be the last new set of hwmod data for any SoC
+> as future SoCs will use a driver and device tree based
+> approach. But before that can be dealt with, we need to
+> first sort out the pending driver/clk issues.
+>
+> Queued by Paul Walmsley <paul@pwsan.com>:
+>
+> Add hwmod and PRCM data for the TI AM43xx family of SoCs.
+>
+> Under normal circumstances, these patches would not be merged.
+> The hwmod and PRCM data should be moved out either to DT data or
+> to drivers/.  Also, the current implementation trades off lines
+> of diff by dynamically rewriting static data at runtime, which is
+> a bad practice - it causes future maintenance headaches.
+> However, after speaking with my upstream, it sounds like it's
+> better to merge these patches in their current state, due to long
+> term considerations.
+>
+> Basic test logs are here:
+>
+> http://www.pwsan.com/omap/testlogs/am43xx_support_v3.13/20131015213706/
+>
+> Due to the lack of an AM43xx board and any available public
+> documentation, it's impossible for me to review or test that
+> platform in any meaningful way.  But at least the tests above
+> verify that the patches don't affect existing platforms -
+> particularly AM33xx.
+>
+> ----------------------------------------------------------------
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index db32d53..9a8191b 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -273,6 +273,55 @@ static struct omap_hwmod dra7xx_ctrl_module_wkup_hwmod = {
- };
- 
- /*
-+ * 'gmac' class
-+ * cpsw/gmac sub system
-+ */
-+static struct omap_hwmod_class_sysconfig dra7xx_gmac_sysc = {
-+	.rev_offs	= 0x0,
-+	.sysc_offs	= 0x8,
-+	.syss_offs	= 0x4,
-+	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
-+			   SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | MSTANDBY_FORCE |
-+			   MSTANDBY_NO),
-+	.sysc_fields	= &omap_hwmod_sysc_type3,
-+};
-+
-+static struct omap_hwmod_class dra7xx_gmac_hwmod_class = {
-+	.name		= "gmac",
-+	.sysc		= &dra7xx_gmac_sysc,
-+};
-+
-+static struct omap_hwmod dra7xx_gmac_hwmod = {
-+	.name		= "gmac",
-+	.class		= &dra7xx_gmac_hwmod_class,
-+	.clkdm_name	= "gmac_clkdm",
-+	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
-+	.main_clk	= "dpll_gmac_ck",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs	= DRA7XX_CM_GMAC_GMAC_CLKCTRL_OFFSET,
-+			.context_offs	= DRA7XX_RM_GMAC_GMAC_CONTEXT_OFFSET,
-+			.modulemode	= MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-+ * 'mdio' class
-+ */
-+static struct omap_hwmod_class dra7xx_mdio_hwmod_class = {
-+	.name		= "davinci_mdio",
-+};
-+
-+static struct omap_hwmod dra7xx_mdio_hwmod = {
-+	.name		= "davinci_mdio",
-+	.class		= &dra7xx_mdio_hwmod_class,
-+	.clkdm_name	= "gmac_clkdm",
-+	.main_clk	= "dpll_gmac_ck",
-+};
-+
-+/*
-  * 'dcan' class
-  *
-  */
-@@ -2000,6 +2049,19 @@ static struct omap_hwmod_ocp_if dra7xx_l4_wkup__ctrl_module_wkup = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__cpgmac0 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_gmac_hwmod,
-+	.clk		= "dpll_gmac_ck",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+static struct omap_hwmod_ocp_if dra7xx_gmac__mdio = {
-+	.master		= &dra7xx_gmac_hwmod,
-+	.slave		= &dra7xx_mdio_hwmod,
-+	.user		= OCP_USER_MPU,
-+};
-+
- /* l4_wkup -> dcan1 */
- static struct omap_hwmod_ocp_if dra7xx_l4_wkup__dcan1 = {
- 	.master		= &dra7xx_l4_wkup_hwmod,
-@@ -2653,6 +2715,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_wkup__ctrl_module_wkup,
- 	&dra7xx_l4_wkup__dcan1,
- 	&dra7xx_l4_per2__dcan2,
-+	&dra7xx_l4_per2__cpgmac0,
-+	&dra7xx_gmac__mdio,
- 	&dra7xx_l4_cfg__dma_system,
- 	&dra7xx_l3_main_1__dss,
- 	&dra7xx_l3_main_1__dispc,
--- 
-1.8.4.1.516.g1d25dd4
+Pulled into next/soc.
+
+Thanks,
+
+Kevin
