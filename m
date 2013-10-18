@@ -1,39 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 18 Oct 2013 18:28:14 +0100
-Subject: [PATCHv1 5/8] ASoC: sgtl5000: Revise the bugs about the sgt15000
- codec.
-In-Reply-To: <1382000477-17304-6-git-send-email-Li.Xiubo@freescale.com>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-6-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20131018172814.GT2443@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Oct 2013 19:26:15 +0200
+Subject: [GIT PULL] Allwinner sunXi fixes for 3.13
+Message-ID: <20131018172615.GA14943@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 05:01:14PM +0800, Xiubo Li wrote:
+Hi Kevin, Olof,
 
-> @@ -883,14 +883,19 @@ static int ldo_regulator_register(struct snd_soc_codec *codec,
->  				struct regulator_init_data *init_data,
->  				int voltage)
->  {
-> +#ifdef CONFIG_SND_SOC_FSL_SGTL5000
-> +	return 0;
-> +#else
->  	dev_err(codec->dev, "this setup needs regulator support in the kernel\n");
->  	return -EINVAL;
-> +#endif
->  }
+Please pull this minor fix for the 3.13 merge window.
 
-If these systems don't actually need the internal regulator then should
-they not be trying to enable it?  Alternatively if it's OK to ignore
-this then why is this conditional in the board?
+Thanks,
+Maxime
 
-If this is something that it's safe to ignore then it should either be
-ignored all the time or should be controlled by platform data not by a
-compile time #define.
+The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+
+  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+
+are available in the git repository at:
+
+  https://github.com/mripard/linux.git tags/sunxi-fixes-for-3.13
+
+for you to fetch changes up to 439d9f58017af96f0375d9443ff957c19056d6ec:
+
+  ARM: sun6i: Fix the APB2 clock gates register size (2013-10-05 15:36:10 +0200)
+
+----------------------------------------------------------------
+Allwinner sunXi SoCs minor fixes for 3.13
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: sun6i: Fix the APB2 clock gates register size
+
+ arch/arm/boot/dts/sun6i-a31.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131018/c86b899c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131018/ccdbb1a6/attachment.sig>
