@@ -1,73 +1,28 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Fri, 18 Oct 2013 23:08:49 +0800
-Subject: [PATCH v4 2/7] arm64: introduce interfaces to hotpatch kernel
- and module code
-In-Reply-To: <1382103862.3394.46.camel@linaro1.home>
-References: <1381990781-27814-1-git-send-email-liuj97@gmail.com>	
- <1381990781-27814-3-git-send-email-liuj97@gmail.com>	
- <20131017113826.GJ18765@mudshark.cambridge.arm.com>	
- <1382023441.19506.66.camel@linaro1.home>	
- <20131018085638.GA2858@mudshark.cambridge.arm.com>
- <1382103862.3394.46.camel@linaro1.home>
-Message-ID: <52614F01.8050209@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 18 Oct 2013 08:14:36 -0700
+Subject: [BUILD BROKEN] Current Linus' master and -next don't build for
+ imx_v6_v7_defconfig
+In-Reply-To: <Pine.LNX.4.64.1310181632160.9158@axis700.grange>
+References: <Pine.LNX.4.64.1310181632160.9158@axis700.grange>
+Message-ID: <CAGa+x86+qfWBou2jkEjz10ix95m89cxnyyFOPwryF27YezeoPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2013 09:44 PM, Jon Medhurst (Tixy) wrote:
-> On Fri, 2013-10-18 at 09:56 +0100, Will Deacon wrote:
->> Hi Tixy,
->>
->> On Thu, Oct 17, 2013 at 04:24:01PM +0100, Jon Medhurst (Tixy) wrote:
->>> On Thu, 2013-10-17 at 12:38 +0100, Will Deacon wrote:
->>>> On Thu, Oct 17, 2013 at 07:19:35AM +0100, Jiang Liu wrote:
->>>>> +	/*
->>>>> +	 * Execute __aarch64_insn_patch_text() on every online CPU,
->>>>> +	 * which ensure serialization among all online CPUs.
->>>>> +	 */
->>>>> +	return stop_machine(aarch64_insn_patch_text_cb, &patch, NULL);
->>>>> +}
->>>>
->>>> Whoa, whoa, whoa! The comment here is wrong -- we only run the patching on
->>>> *one* CPU, which is the right thing to do. However, the arch/arm/ call to
->>>> stop_machine in kprobes does actually run the patching code on *all* the
->>>> online cores (including the cache flushing!). I think this is to work around
->>>> cores without hardware cache maintenance broadcasting, but that could easily
->>>> be called out specially (like we do in patch.c) and the flushing could be
->>>> separated from the patching too.
->>> [...]
->>>
->>> For code modifications done in 32bit ARM kprobes (and ftrace) I'm not
->>> sure we ever actually resolved the possible cache flushing issues. If
->>> there was specific reasons for flushing on all cores I can't remember
->>> them, sorry. I have a suspicion that doing so was a case of sticking
->>> with what the code was already doing, and flushing on all cores seemed
->>> safest to guard against problems we hadn't thought about.
->>
->> [...]
->>
->>> Sorry, I don't think I've added much light on things here have I?
->>
->> I think you missed the bit I was confused about :) Flushing the cache on
->> each core is necessary if cache_ops_need_broadcast, so I can understand why
->> you'd have code to do that. The bit I don't understand is that you actually
->> patch the instruction on each core too!
-> 
-> This is only happens when removing a kprobe with __arch_disarm_kprobe().
-> We can't just use the intelligent patch_text() function there because we
-> want to always force stop machine to be used as this prevents the case
-> where a CPU a hits the probe, starts executing it's handler then another
-> CPU whips away the probe from under it.
-> 
-> That explains why we use stop_machine, but not why all CPU's must modify
-> the instruction. I think it's a case of just that it's simpler to do
-> that unconditionally rather than add extra code for the
-> cache_ops_need_broadcast() case. I mean, stop_machine() is a sledge
-> hammer, which stalls the whole system until the next scheduler tick, and
-> then gets every CPU to busy wait, so there's not much incentive to try
-> and optimise the code to avoid a memory write + cacheline flush on each
-> core.
-> 
-> This reminds me, I'm sure I heard rumours quite some time ago that Paul
-> McKenney was thinking of trying to do away with stop_machine...?
-> 
-I remember McKenney has tried that, don't know about the progress now.
+On Fri, Oct 18, 2013 at 7:59 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+
+> On current Linus' tree as of 04919af as well as -next since 16.10, IIRC,
+> compilation is broken for i.MX3*, including the default
+> imx_v6_v7_defconfig. The toolchain used is
+>
+> arm-none-linux-gnueabi-gcc (Sourcery CodeBench Lite 2012.09-64) 4.7.2
+
+Just for another data point, I'm not seeing this in my builds
+(arm-linux-gnueabi-gcc (Ubuntu/Linaro 4.7.2-1ubuntu1) 4.7.2) and we're
+not seeing this in Olof's autobuilds either for latest mainline[1] or
+latest next-thierry[2].  I belive Olof is using vanilla gcc 4.8.1.
+
+Kevin
+
+[1] http://lists.linaro.org/pipermail/kernel-build-reports/2013-October/000721.html
+[2] http://lists.linaro.org/pipermail/kernel-build-reports/2013-October/000718.html
