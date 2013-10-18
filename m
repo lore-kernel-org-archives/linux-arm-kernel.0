@@ -1,31 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 18 Oct 2013 23:40:36 +0800
-Subject: [PATCH] ARM: imx: imx6sl iomuxc syscon is compatible to imx6q
-Message-ID: <1382110836-10534-1-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Oct 2013 16:42:46 +0100
+Subject: [PATCH v8 08/19] arm/xen: get_dma_ops: return xen_dma_ops if
+ we are running as xen_initial_domain
+In-Reply-To: <alpine.DEB.2.02.1310181319300.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-8-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1310181319300.26077@kaball.uk.xensource.com>
+Message-ID: <20131018154246.GB25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx6sl iomuxc syscon is compatible to imx6q, so let's add
-compatible string 'fsl,imx6q-iomuxc-gpr' for imx6sl iomuxc syscon node.
+On Fri, Oct 18, 2013 at 01:22:18PM +0100, Stefano Stabellini wrote:
+> Russell,
+> are you OK with this patch?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx6sl.dtsi |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Only concern is why the change is soo large.
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 0a2d614..6eabfa1 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -533,7 +533,8 @@
- 			};
- 
- 			gpr: iomuxc-gpr at 020e0000 {
--				compatible = "fsl,imx6sl-iomuxc-gpr", "syscon";
-+				compatible = "fsl,imx6sl-iomuxc-gpr",
-+					     "fsl,imx6q-iomuxc-gpr", "syscon";
- 				reg = <0x020e0000 0x38>;
- 			};
- 
--- 
-1.7.9.5
+> > -static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> > +static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+> >  {
+> >  	if (dev && dev->archdata.dma_ops)
+> >  		return dev->archdata.dma_ops;
+> >  	return &arm_dma_ops;
+> >  }
+> >  
+> > +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> > +{
+> > +	if (xen_initial_domain())
+> > +		return xen_dma_ops;
+> > +	else
+> > +		return __generic_dma_ops(dev);
+> > +}
+> > +
+
+What's wrong with:
+
+ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+ {
++	if (xen_initial_domain())
++		return xen_dma_ops;
+ 	if (dev && dev->archdata.dma_ops)
+ 		return dev->archdata.dma_ops;
+ 	return &arm_dma_ops;
+ }
