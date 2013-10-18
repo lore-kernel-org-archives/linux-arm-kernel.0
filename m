@@ -1,36 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 18 Oct 2013 13:43:50 +0200
-Subject: [PATCH 4/5 v2] ARM: ux500: fix I2C4 clock bit
-Message-ID: <1382096630-23640-1-git-send-email-linus.walleij@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 18 Oct 2013 19:46:01 +0800
+Subject: [PATCH v2 0/8] mmc: sdhci-esdhc-imx: add std tuning for mx6sl
+ and DDR mode support
+In-Reply-To: <1382093661-4074-1-git-send-email-b29396@freescale.com>
+References: <1382093661-4074-1-git-send-email-b29396@freescale.com>
+Message-ID: <20131018114553.GE6043@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCLK for I2C4 is controlled by bit 10 in the PCKEN registers
-while the KCLK is controlled by bit 9 on the KCKEN, it's
-one of these odd assymetric things. Correct the PCLK bit to 10.
+On Fri, Oct 18, 2013 at 06:54:13PM +0800, Dong Aisheng wrote:
+> ChangeLog:
+> v1->v2:
+>  - Only a few minor changes on patch 1 and 5 based on comments from Shawn
+>    while other patches have no change.
+>  - rebase on Shawn's patch series
+>    [PATCH v2 0/4] mmc: sdhci-esdhc-imx: eliminate enum imx_esdhc_type
+> 
+> Dong Aisheng (8):
+>   mmc: sdhci-esdhc-imx: add std tuning support for mx6sl
+>   mmc: sdhci-esdhc-imx: fix reading cap_1 register value for mx6sl
+>   mmc: sdhci: report error once the maximum tuning loops exhausted or
+>     timeout
+>   mmc: sdhci-esdhc-imx: add DDR mode support for mx6
+>   mmc: sdhci-esdhc-imx: add delay line setting support
+>   mmc: sdhci-esdhc-imx: enable SDR50 tuning for imx6q/dl
+>   mmc: sdhci-esdhc-imx: add preset value quirk for mx6
+>   mmc: sdhci: remove unneeded call when have preset value quirk
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Actually do what the commit says and update the PCLK to bit
-  10 instead of screwing with the KCLK. The KCLK was right all the time.
----
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Other than 2 small comments I gave on patch #1 and #5, for the series:
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index 705bd0d..7da99fe 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -694,7 +694,7 @@
- 
- 			clock-frequency = <400000>;
- 
--			clocks = <&prcc_kclk 1 9>, <&prcc_pclk 1 9>;
-+			clocks = <&prcc_kclk 1 9>, <&prcc_pclk 1 10>;
- 			clock-names = "i2cclk", "apb_pclk";
- 		};
- 
--- 
-1.8.3.1
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
