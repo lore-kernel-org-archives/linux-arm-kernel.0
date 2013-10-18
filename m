@@ -1,33 +1,65 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 18 Oct 2013 18:54:16 +0800
-Subject: [PATCH v2 3/8] mmc: sdhci: report error once the maximum tuning loops
- exhausted or timeout
-In-Reply-To: <1382093661-4074-1-git-send-email-b29396@freescale.com>
-References: <1382093661-4074-1-git-send-email-b29396@freescale.com>
-Message-ID: <1382093661-4074-4-git-send-email-b29396@freescale.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 18 Oct 2013 13:27:06 +0200
+Subject: [GIT PULL] ARM: mvebu: soc changes for v3.13 (round 2)
+In-Reply-To: <87ob6nzghi.fsf@linaro.org>
+References: <20131017135409.GG22434@titan.lakedaemon.net>
+ <87ob6nzghi.fsf@linaro.org>
+Message-ID: <52611B0A.5040303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original code missed to report an error when the maximum tuning loops exhausted
-or timeout, it will cause the upper layer to wrongly think the tuning process
-is passed.
+On 10/18/2013 12:20 AM, Kevin Hilman wrote:
+> Jason Cooper <jason@lakedaemon.net> writes:
+>
+>> Guys,
+>>
+>> The only thing exciting here is the workaround for the mv643xx_eth bug.
+>> Whenever you shut off it's clock (and folks have good reason to do
+>> this), it loses it's mac address.  In the happy, ideal boot-from-DT
+>> world, this isn't a problem, since the bootloader will set
+>> local-mac-address in the DT.  However, we aren't in that world (yet).
+>>
+>> We've been tossing around different solutions to the problem over the
+>> past year or so, and this one seems a) the least painful, and b) most in
+>> line with what the future will hold.  eg, the driver (on reload or
+>> resume) will need to read the mac address from the DT, regardless of how
+>> the mac address got there.
+>>
+>> thx,
+>>
+>> Jason.
+>>
+>> The following changes since commit e1cb367de27ca5c186b0f120c3c10a4a0e8edd2e:
+>>
+>>    ARM: kirkwood: Add standby support (2013-10-08 15:41:52 +0000)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.infradead.org/linux-mvebu.git tags/soc-3.13-2
+>>
+>> for you to fetch changes up to d7f5baeedbdb48d4f5bb2b4f6f56f32b7f2f7aff:
+>>
+>>    Documentation: arm/Marvell: clarify Armada SoCs that match 78xx0 pattern (2013-10-08 17:27:59 +0000)
+>>
+>> ----------------------------------------------------------------
+>> mvebu soc changes for v3.13 (round 2)
+>>
+>>   - kirkwood
+>>      - remove mbus init, pcie clk init
+>>      - retain MAC addr for DT ethernet (work around broken IP)
+>>      - docs: clarify Armada SoCs
+>
+> Pulled into next/soc.
+>
+> This had a minor conflict in board-dt.c with Sebastian's clk-of-init
+> branch that's part of next/cleanup.  Please double check my conflict
+> resolution (currently in our to-build branch, not yet pushed to for-next)
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
- drivers/mmc/host/sdhci.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Resolution looks sane to me.
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 66bce7a..cbde17d 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1989,6 +1989,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 	if (!tuning_loop_counter || !timeout) {
- 		ctrl &= ~SDHCI_CTRL_TUNED_CLK;
- 		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
-+		err = -EIO;
- 	} else {
- 		if (!(ctrl & SDHCI_CTRL_TUNED_CLK)) {
- 			pr_info(DRIVER_NAME ": Tuning procedure"
--- 
-1.7.2.rc3
+While looking at it, I realized that we forgot to remove now obsolete
+kirkwood_legacy_clk_init. I shove a patch to Jason soon, if it makes
+it into v3.13 great, if not, it will not break anything and can wait
+for v3.14.
+
+Sebastian
