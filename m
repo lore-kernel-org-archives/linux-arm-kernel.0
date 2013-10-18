@@ -1,29 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 Oct 2013 12:07:23 +0100
-Subject: [PATCH 3/5] ARM: ux500: fix clock for GPIO blocks 6 and 7
-In-Reply-To: <20131018110557.GW19112@lee--X1>
-References: <1382087112-31665-1-git-send-email-linus.walleij@linaro.org>
- <20131018110557.GW19112@lee--X1>
-Message-ID: <20131018110723.GY19112@lee--X1>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Fri, 18 Oct 2013 16:37:45 +0530
+Subject: [PATCH v3 0/4] : AArch64: KGDB support
+Message-ID: <1382094469-7971-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Oct 2013, Lee Jones wrote:
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-> On Fri, 18 Oct 2013, Linus Walleij wrote:
-> 
-> > The clock assignment in the device tree for GPIO blocks 6
-> > and 7 was incorrect, indicating this was managed by bit 1 on
-> > PRCC 2 while it was in fact bit 11 on PRCC 2.
-> 
-> Nice catch.
-> 
-> It's also wrong in the driver:
+Based on the step-handler and break-handler hooks patch from
+Sandeepa (Patch 1), KGDB debugging support is added for EL1
+debug in AArch64 mode. Any updates that come for Patch 1 from
+Sandeepa will be rebased in next version
 
-Sorry, forgot this: Acked-by: Lee Jones <lee.jones@linaro.org>
+With second patch,register layout is updated to be inline with GDB tool.
+Basic GDB connection, break point set/clear and info commands
+are supported except step/next debugging
+
+With third patch, step/next debugging support is added, where in
+pc is updated to point to the instruction to be stepped and
+stopped.
+
+with fourth patch, the compile time breakpoint instruction
+reordering is fixed by making kgbd_breakpoint() as noinline
+
+v3:
+ - Rebased to v4 version of Sandeepa Prabhu's patch (patch 1)
+ - Made dynamic break point instruction encoding generic
+ - Made ESR value encoding generic for dynamic and compile break point
+ - Used memcpy and memset to copy register contents to gdb buffer
+ - Fixed reordering of break point instruction by compiler with
+   patch 3
+ - Rebased against AAach64 upstream kernel
+
+v2:
+ - Moved break instruction encoding to debug-monitors.h file
+ - Fixed endianess of compile break instruction encoding
+ - Updated I/O buffer sizes
+ - Updated register buffer size
+ - Remove changes to debug_exception handler in entry.S for
+ - ELR update and step debugging with update pc instead of ELR
+ - Rebased against AArch64 upstream kernel
+
+v1:
+ - Initial patch-set
+
+Tested with Aarch64 GDB tool chain on simulator
+
+Sandeepa Prabhu (1):
+  arm64: support single-step and breakpoint handler hooks
+
+Vijaya Kumar K (3):
+  AArch64: KGDB: Add Basic KGDB support
+  AArch64: KGDB: Add step debugging support
+  KGDB: make kgdb_breakpoint() as noinline
+
+ arch/arm64/include/asm/debug-monitors.h |   67 +++++++
+ arch/arm64/include/asm/kgdb.h           |   86 ++++++++
+ arch/arm64/kernel/Makefile              |    1 +
+ arch/arm64/kernel/debug-monitors.c      |   86 +++++++-
+ arch/arm64/kernel/entry.S               |    2 +
+ arch/arm64/kernel/kgdb.c                |  325 +++++++++++++++++++++++++++++++
+ kernel/debug/debug_core.c               |    2 +-
+ 7 files changed, 567 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kgdb.h
+ create mode 100644 arch/arm64/kernel/kgdb.c
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
