@@ -1,34 +1,57 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 18 Oct 2013 10:47:41 -0400
-Subject: [PATCH] ARM: kirkwood: remove lagacy clk workarounds
-In-Reply-To: <1382097253-15624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1382097253-15624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131018144741.GL22434@titan.lakedaemon.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 18 Oct 2013 07:48:47 -0700
+Subject: [GIT PULL 1/2] omap board removal for some omap3 boards for v3.13
+ merge window
+In-Reply-To: <526041db.41abe00a.33b7.00a1SMTPIN_ADDED_BROKEN@mx.google.com>
+ (Tony Lindgren's message of "Thu, 17 Oct 2013 13:00:21 -0700")
+References: <526041db.41abe00a.33b7.00a1SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <87hacews6o.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 01:54:13PM +0200, Sebastian Hesselbarth wrote:
-> With legacy devices converted to DT and a proper ethernet MAC
-> workaround, we can now remove the clk workarounds for legacy
-> devices. While at it, also cleanup the list of includes.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> As a follow-up patch for latest mvebu PRs, this patch is based on
->  git://git.infradead.org/linux-mvebu.git tags/soc-3.13-2
-> 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-kirkwood/board-dt.c |   42 ++----------------------------------
->  1 files changed, 3 insertions(+), 39 deletions(-)
+Hi Tony,
 
-Applied to mvebu/soc
+Tony Lindgren <tony@atomide.com> writes:
 
-thx,
+> The following changes since commit f41509ad0d4c11d0911630440749d409ce2aa1aa:
+>
+>   Merge branches 'omap-for-v3.13/dt' and 'omap-for-v3.13/quirk' into omap-for-v3.13/board-removal (2013-10-14 11:33:07 -0700)
+>
+> are available in the git repository at:
+>
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/board-removal-signed
+>
+> for you to fetch changes up to f0c09b7c3b4e6b2fe501b3e888797b470de8320c:
+>
+>   ARM: OMAP2+: Remove legacy support for zoom platforms (2013-10-15 17:38:21 -0700)
+>
+> ----------------------------------------------------------------
+> Changes needed to drop legacy booting support for some
+> omap3 boards.
+>
+> Note that that these are based on a merge of the
+> following for the dependencies:
+>
+> - v3.12-rc5 for fixes to pinctrl mask
+> - omap-for-v3.13/dt-signed to avoid pointless merge conflicts
+> - omap-for-v3.13/quirk-signed for legacy pdata handling
+>
+> ----------------------------------------------------------------
+> Aaro Koskinen (2):
+>       ARM: dts: add minimal DT support for Nokia N950 & N9 phones
+>       ARM: OMAP2: delete board-rm680
+>
+> Tony Lindgren (6):
+>       ARM: dts: Shared file for omap GPMC connected smsc911x
+>       ARM: dts: Add common support for omap3-evm
+>       ARM: dts: Add basic support for TMDSEVM3730 (Mistral AM/DM37x EVM)
+>       ARM: dts: Add basic support for zoom3
 
-Jason.
+This patch introduces a build failure when compiling the DTBs:
+
+  [...]
+  DTC     arch/arm/boot/dts/omap3-zoom3.dtb
+ERROR (phandle_references): Reference to non-existent node or label "wl12xx_gpio"
+
+Kevin
