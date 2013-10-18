@@ -1,9 +1,9 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 18 Oct 2013 17:16:58 +0200
-Subject: [PATCHv3][ 07/11] ARM: dts: i.MX25: Add ssi clocks and DMA events.
+Date: Fri, 18 Oct 2013 17:16:59 +0200
+Subject: [PATCHv3][ 08/11] ARM: dts: i.MX25: Add sdma script path.
 In-Reply-To: <1382109422-24454-1-git-send-email-denis@eukrea.com>
 References: <1382109422-24454-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382109422-24454-7-git-send-email-denis@eukrea.com>
+Message-ID: <1382109422-24454-8-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,45 +18,20 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- arch/arm/boot/dts/imx25.dtsi |   12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx25.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index 6ac4c98..cce0669 100644
+index cce0669..7c0a019 100644
 --- a/arch/arm/boot/dts/imx25.dtsi
 +++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -339,6 +339,11 @@
- 				compatible = "fsl,imx25-ssi", "fsl,imx21-ssi";
- 				reg = <0x50014000 0x4000>;
- 				interrupts = <11>;
-+				clocks = <&clks 118>;
-+				clock-names = "ipg";
-+				dmas = <&sdma 24 1 0>,
-+				       <&sdma 25 1 0>;
-+				dma-names = "rx", "tx";
- 				status = "disabled";
+@@ -556,6 +556,7 @@
+ 				clock-names = "ipg", "ahb";
+ 				#dma-cells = <3>;
+ 				interrupts = <34>;
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx25.bin";
  			};
  
-@@ -369,6 +374,11 @@
- 				compatible = "fsl,imx25-ssi", "fsl,imx21-ssi";
- 				reg = <0x50034000 0x4000>;
- 				interrupts = <12>;
-+				clocks = <&clks 117>;
-+				clock-names = "ipg";
-+				dmas = <&sdma 28 1 0>,
-+				       <&sdma 29 1 0>;
-+				dma-names = "rx", "tx";
- 				status = "disabled";
- 			};
- 
-@@ -539,7 +549,7 @@
- 				#interrupt-cells = <2>;
- 			};
- 
--			sdma at 53fd4000 {
-+			sdma: sdma at 53fd4000 {
- 				compatible = "fsl,imx25-sdma", "fsl,imx35-sdma";
- 				reg = <0x53fd4000 0x4000>;
- 				clocks = <&clks 112>, <&clks 68>;
+ 			wdog at 53fdc000 {
 -- 
 1.7.9.5
