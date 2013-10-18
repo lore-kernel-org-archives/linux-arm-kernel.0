@@ -1,94 +1,49 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 18 Oct 2013 13:23:59 +0100
-Subject: [PATCH v8 16/19] arm,arm64: do not always merge biovec if we
- are running on Xen
-In-Reply-To: <1382031814-8782-16-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
- <1382031814-8782-16-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <alpine.DEB.2.02.1310181322301.26077@kaball.uk.xensource.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 18 Oct 2013 15:27:46 +0300
+Subject: [PATCH v4 06/15] clk: tegra: move fields to tegra_clk_pll_params
+In-Reply-To: <CAL1qeaH+DVdjB-jJMhqKWbFG7TtTAgOuSk3esRh_HPT4YfwPdA@mail.gmail.com>
+References: <1382013526-12800-1-git-send-email-pdeschrijver@nvidia.com>
+ <1382013526-12800-7-git-send-email-pdeschrijver@nvidia.com>
+ <CAL1qeaH+DVdjB-jJMhqKWbFG7TtTAgOuSk3esRh_HPT4YfwPdA@mail.gmail.com>
+Message-ID: <20131018122746.GB25591@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, Catalin,
-are you OK with this patch?
+On Fri, Oct 18, 2013 at 12:59:30AM +0200, Andrew Bresticker wrote:
+> Hi Peter,
+> 
+> > @@ -1682,17 +1664,15 @@ struct clk *tegra_clk_register_pllc(const char *name, const char *parent_name,
+> >  struct clk *tegra_clk_register_plle_tegra114(const char *name,
+> >                                 const char *parent_name,
+> >                                 void __iomem *clk_base, unsigned long flags,
+> > -                               unsigned long fixed_rate,
+> >                                 struct tegra_clk_pll_params *pll_params,
+> > -                               struct tegra_clk_pll_freq_table *freq_table,
+> >                                 spinlock_t *lock)
+> >  {
+> >         struct tegra_clk_pll *pll;
+> >         struct clk *clk;
+> >         u32 val, val_aux;
+> >
+> > -       pll = _tegra_init_pll(clk_base, NULL, fixed_rate, pll_params,
+> > -                             TEGRA_PLL_HAS_LOCK_ENABLE, freq_table, lock);
+> > +       pll_params->flags = TEGRA_PLL_HAS_LOCK_ENABLE;
+> 
+> Why are we just overwriting the flags?  We pass in flags here:
+> 
+> > @@ -661,6 +685,9 @@ static struct tegra_clk_pll_params pll_e_params = {
+> >         .lock_enable_bit_idx = PLLE_MISC_LOCK_ENABLE,
+> >         .lock_delay = 300,
+> >         .div_nmp = &plle_nmp,
+> > +       .freq_table = pll_e_freq_table,
+> > +       .flags = TEGRA_PLL_FIXED,
+> 
+> TEGRA_PLL_FIXED doesn't actually make a difference in the
+> plle_tegra114 case, but it would be nice to be correct about setting
+> it.
 
-It shouldn't have any impact when running on native, only on Xen.
+Yeah indeed.
 
+Cheers,
 
-On Thu, 17 Oct 2013, Stefano Stabellini wrote:
-> This is similar to what it is done on X86: biovecs are prevented from merging
-> otherwise every dma requests would be forced to bounce on the swiotlb buffer.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> 
-> 
-> Changes in v7:
-> - remove the extra autotranslate check in biomerge.c.
-> ---
->  arch/arm/include/asm/io.h   |    8 ++++++++
->  arch/arm64/include/asm/io.h |    9 +++++++++
->  2 files changed, 17 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index d070741..c45effc 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -24,9 +24,11 @@
->  #ifdef __KERNEL__
->  
->  #include <linux/types.h>
-> +#include <linux/blk_types.h>
->  #include <asm/byteorder.h>
->  #include <asm/memory.h>
->  #include <asm-generic/pci_iomap.h>
-> +#include <xen/xen.h>
->  
->  /*
->   * ISA I/O bus memory addresses are 1:1 with the physical address.
-> @@ -372,6 +374,12 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
->  #define BIOVEC_MERGEABLE(vec1, vec2)	\
->  	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
->  
-> +extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
-> +				      const struct bio_vec *vec2);
-> +#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
-> +	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
-> +	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
-> +
->  #ifdef CONFIG_MMU
->  #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
->  extern int valid_phys_addr_range(phys_addr_t addr, size_t size);
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index 1d12f89..c163287b 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -22,11 +22,14 @@
->  #ifdef __KERNEL__
->  
->  #include <linux/types.h>
-> +#include <linux/blk_types.h>
->  
->  #include <asm/byteorder.h>
->  #include <asm/barrier.h>
->  #include <asm/pgtable.h>
->  
-> +#include <xen/xen.h>
-> +
->  /*
->   * Generic IO read/write.  These perform native-endian accesses.
->   */
-> @@ -263,5 +266,11 @@ extern int devmem_is_allowed(unsigned long pfn);
->   */
->  #define xlate_dev_kmem_ptr(p)	p
->  
-> +extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
-> +				      const struct bio_vec *vec2);
-> +#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
-> +	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
-> +	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
-> +
->  #endif	/* __KERNEL__ */
->  #endif	/* __ASM_IO_H */
-> -- 
-> 1.7.2.5
-> 
+Peter.
