@@ -1,71 +1,82 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 18 Oct 2013 21:26:51 +0200
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Fri, 18 Oct 2013 21:30:58 +0200
 Subject: [PATCH] USB: ehci-atmel: add usb_clk for transition to CCF
-Message-ID: <1382124411-29023-1-git-send-email-b.brezillon@overkiz.com>
+In-Reply-To: <1382124411-29023-1-git-send-email-b.brezillon@overkiz.com>
+References: <1382124411-29023-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <52618C72.3060506@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AT91 PMC (Power Management Controller) provides a USB clock used by
-the different USB controllers (ehci, ohci and udc).
-The atmel-ehci driver must configure the usb clock rate to 48Mhz in order
-to get a fully functionnal USB host controller.
-This configuration was formely done in mach-at91/clock.c, but will be
-bypassed when moving to common clk framework.
+Hello Nicolas,
 
-This patch adds support for usb clock retrieval and configuration only if
-CCF is enabled (CONFIG_COMMON_CLK).
+This patch should fix the bug you were seeing with USB device 
+enumaration after moving to CCF.
+Tell me if this solves the issue (it worked for me).
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/usb/host/ehci-atmel.c |   16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+Best Regards,
 
-diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-index 3b645ff..f417526 100644
---- a/drivers/usb/host/ehci-atmel.c
-+++ b/drivers/usb/host/ehci-atmel.c
-@@ -30,13 +30,17 @@ static const char hcd_name[] = "ehci-atmel";
- static struct hc_driver __read_mostly ehci_atmel_hc_driver;
- 
- /* interface and function clocks */
--static struct clk *iclk, *fclk;
-+static struct clk *iclk, *fclk, *uclk;
- static int clocked;
- 
- /*-------------------------------------------------------------------------*/
- 
- static void atmel_start_clock(void)
- {
-+	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-+		clk_set_rate(uclk, 48000000);
-+		clk_prepare_enable(uclk);
-+	}
- 	clk_prepare_enable(iclk);
- 	clk_prepare_enable(fclk);
- 	clocked = 1;
-@@ -46,6 +50,8 @@ static void atmel_stop_clock(void)
- {
- 	clk_disable_unprepare(fclk);
- 	clk_disable_unprepare(iclk);
-+	if (IS_ENABLED(CONFIG_COMMON_CLK))
-+		clk_disable_unprepare(uclk);
- 	clocked = 0;
- }
- 
-@@ -130,6 +136,14 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
- 		retval = -ENOENT;
- 		goto fail_request_resource;
- 	}
-+	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
-+		uclk = devm_clk_get(&pdev->dev, "usb_clk");
-+		if (IS_ERR(uclk)) {
-+			dev_err(&pdev->dev, "failed to get uclk\n");
-+			retval = PTR_ERR(uclk);
-+			goto fail_request_resource;
-+		}
-+	}
- 
- 	ehci = hcd_to_ehci(hcd);
- 	/* registers start at offset 0x0 */
--- 
-1.7.9.5
+Boris
+
+On 18/10/2013 21:26, Boris BREZILLON wrote:
+> The AT91 PMC (Power Management Controller) provides a USB clock used by
+> the different USB controllers (ehci, ohci and udc).
+> The atmel-ehci driver must configure the usb clock rate to 48Mhz in order
+> to get a fully functionnal USB host controller.
+> This configuration was formely done in mach-at91/clock.c, but will be
+> bypassed when moving to common clk framework.
+>
+> This patch adds support for usb clock retrieval and configuration only if
+> CCF is enabled (CONFIG_COMMON_CLK).
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> ---
+>   drivers/usb/host/ehci-atmel.c |   16 +++++++++++++++-
+>   1 file changed, 15 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+> index 3b645ff..f417526 100644
+> --- a/drivers/usb/host/ehci-atmel.c
+> +++ b/drivers/usb/host/ehci-atmel.c
+> @@ -30,13 +30,17 @@ static const char hcd_name[] = "ehci-atmel";
+>   static struct hc_driver __read_mostly ehci_atmel_hc_driver;
+>   
+>   /* interface and function clocks */
+> -static struct clk *iclk, *fclk;
+> +static struct clk *iclk, *fclk, *uclk;
+>   static int clocked;
+>   
+>   /*-------------------------------------------------------------------------*/
+>   
+>   static void atmel_start_clock(void)
+>   {
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> +		clk_set_rate(uclk, 48000000);
+> +		clk_prepare_enable(uclk);
+> +	}
+>   	clk_prepare_enable(iclk);
+>   	clk_prepare_enable(fclk);
+>   	clocked = 1;
+> @@ -46,6 +50,8 @@ static void atmel_stop_clock(void)
+>   {
+>   	clk_disable_unprepare(fclk);
+>   	clk_disable_unprepare(iclk);
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK))
+> +		clk_disable_unprepare(uclk);
+>   	clocked = 0;
+>   }
+>   
+> @@ -130,6 +136,14 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+>   		retval = -ENOENT;
+>   		goto fail_request_resource;
+>   	}
+> +	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+> +		uclk = devm_clk_get(&pdev->dev, "usb_clk");
+> +		if (IS_ERR(uclk)) {
+> +			dev_err(&pdev->dev, "failed to get uclk\n");
+> +			retval = PTR_ERR(uclk);
+> +			goto fail_request_resource;
+> +		}
+> +	}
+>   
+>   	ehci = hcd_to_ehci(hcd);
+>   	/* registers start at offset 0x0 */
