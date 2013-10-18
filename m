@@ -1,33 +1,31 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 18 Oct 2013 17:38:12 +0200
-Subject: [PATCH] ASoC: kirkwood: add S/PDIF support
-In-Reply-To: <20131018124832.GK2443@sirena.org.uk>
-References: <20130924124122.64834b2a@armhf>
- <20131018003439.GG2443@sirena.org.uk>
- <20131018103019.GW25034@n2100.arm.linux.org.uk>
- <20131018124832.GK2443@sirena.org.uk>
-Message-ID: <20131018173812.74a23b52@armhf>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 18 Oct 2013 23:40:36 +0800
+Subject: [PATCH] ARM: imx: imx6sl iomuxc syscon is compatible to imx6q
+Message-ID: <1382110836-10534-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Oct 2013 13:48:32 +0100
-Mark Brown <broonie@kernel.org> wrote:
+The imx6sl iomuxc syscon is compatible to imx6q, so let's add
+compatible string 'fsl,imx6q-iomuxc-gpr' for imx6sl iomuxc syscon node.
 
-> > "widgets that manage the enable of the S/PDIF and I2S interfaces between
-> > the FE and BE DAIs" is exactly what I did and you told me that was wrong.
-> > Make up your fscking mind.  
-> 
-> No, this is not the case.  The major problem with your last set of
-> patches was that they did not create any back end DAIs, instead they
-> created purely DAPM routes from the single traditional DAI out to
-> widgets in the CODEC.  What I'm asking Jean-Francois to do above is
-> create and use back end DAIs.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx6sl.dtsi |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Mark,
-
-I think I understood what you mean. I am testing my system with this
-new approach and I will submit a new patch as soon as it works.
-
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 0a2d614..6eabfa1 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -533,7 +533,8 @@
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
+-				compatible = "fsl,imx6sl-iomuxc-gpr", "syscon";
++				compatible = "fsl,imx6sl-iomuxc-gpr",
++					     "fsl,imx6q-iomuxc-gpr", "syscon";
+ 				reg = <0x020e0000 0x38>;
+ 			};
+ 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.7.9.5
