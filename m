@@ -1,17 +1,16 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Oct 2013 19:17:36 +0200
-Subject: [GIT PULL] Allwinner sunXi defconfig changes for 3.13
-Message-ID: <20131018171736.GA14559@lukather>
+Date: Fri, 18 Oct 2013 19:22:20 +0200
+Subject: [GIT PULL] Allwinner sunXi DT changes for 3.13
+Message-ID: <20131018172220.GA14740@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Kevin,
+Hi Kevin, Olof,
 
-Please pull the following changes for the 3.13 merge window.
+Please pull the following DT changes for the 3.13 merge window.
 
-Thanks!
+Thanks,
 Maxime
-
 
 The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
@@ -19,24 +18,40 @@ The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
 
 are available in the git repository at:
 
-  https://github.com/mripard/linux.git tags/sunxi-defconfig-for-3.13
+  https://github.com/mripard/linux.git tags/sunxi-dt-for-3.13
 
-for you to fetch changes up to 2ce4ec7a076203f39016553b6c51248f9c721071:
+for you to fetch changes up to 01ed6632a554dfdf4a9fc3c593ce4ff7255ed161:
 
-  ARM: sunxi: Add a defconfig for the Allwinner SoCs (2013-10-08 11:39:44 +0200)
-
-----------------------------------------------------------------
-Allwinner sunXi defconfig changes for 3.13
-
-This pull request only see the introduction of a sunxi_defconfig.
+  ARM: sunxi: dts: Add support for the cubieboard3, the CubieTruck (2013-10-08 11:35:19 +0200)
 
 ----------------------------------------------------------------
-Maxime Ripard (1):
-      ARM: sunxi: Add a defconfig for the Allwinner SoCs
+Allwinner sunXi SoCs device tree changes for 3.13
 
- arch/arm/configs/sunxi_defconfig | 61 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
- create mode 100644 arch/arm/configs/sunxi_defconfig
+This DT series sees the introduction of the cubietruck DT, plus the addition of
+the i2c controller for the A20 based boards, and of the Security ID found in
+all the Allwinner SoCs but the A31.
+
+----------------------------------------------------------------
+Maxime Ripard (4):
+      ARM: sun7i: Enable the I2C controllers
+      ARM: sun7i: Add the pin muxing options for the I2C controllers
+      ARM: sun7i: cubieboard2: Enable the I2C controllers
+      ARM: sun7i: olinuxino-micro: Enable the I2C controllers
+
+Oliver Schinagl (2):
+      ARM: sunxi: dt: Add sunxi-sid to dts for sun4i, sun5i and sun7i
+      ARM: sunxi: dts: Add support for the cubieboard3, the CubieTruck
+
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/sun4i-a10.dtsi                |  5 ++
+ arch/arm/boot/dts/sun5i-a10s.dtsi               |  5 ++
+ arch/arm/boot/dts/sun5i-a13.dtsi                |  5 ++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 12 +++++
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 63 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 18 +++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi                | 71 +++++++++++++++++++++++++
+ 8 files changed, 180 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-cubietruck.dts
 
 -- 
 Maxime Ripard, Free Electrons
@@ -48,4 +63,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131018/2da704e3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131018/cc2a7f01/attachment-0001.sig>
