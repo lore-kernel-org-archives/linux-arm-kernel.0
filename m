@@ -1,36 +1,41 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Oct 2013 18:19:02 +0100
-Subject: [PATCH 0/4] ARM: KVM: allow VMs with more than 4 CPUs
-Message-ID: <1382116746-8757-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 18 Oct 2013 18:19:06 +0100
+Subject: [PATCH 4/4] ARM: KVM: drop limitation to 4 CPU VMs
+In-Reply-To: <1382116746-8757-1-git-send-email-marc.zyngier@arm.com>
+References: <1382116746-8757-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1382116746-8757-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, KVM/ARM is limited to 4 A7 or A15 per VM. This is due to
-the fact that KVM doesn't know about clusters, and puts all CPUs at
-affinity level 0.
+Now that the KVM/arm code knows about affinity, remove the hard
+limit of 4 vcpus per VM.
 
-This patch series removes this limitation by allowing additionnal CPUs
-to be part of a separate cluster (affinity level 1).
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/reset.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-This also requires a patch to kvmtool so the generated DT matches the
-expectations of the guest (posted separately).
-
-Tested on TC2 and arm64 model.
-
-Patches based on Christoffer's next tree as of today.
-
-Marc Zyngier (4):
-  arm/arm64: KVM: PSCI: use MPIDR to identify a target CPU
-  ARM: KVM: Fix MPIDR computing to support virtual clusters
-  ARM: KVM: fix L2CTLR to be per-cluster
-  ARM: KVM: drop limitation to 4 CPU VMs
-
- arch/arm/include/asm/kvm_emulate.h   |  5 +++++
- arch/arm/kvm/coproc.c                | 14 ++++++++++----
- arch/arm/kvm/psci.c                  | 17 +++++++++++++----
- arch/arm/kvm/reset.c                 |  4 ----
- arch/arm64/include/asm/kvm_emulate.h |  5 +++++
- 5 files changed, 33 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+index d9bbd83..2c5add0 100644
+--- a/arch/arm/kvm/reset.c
++++ b/arch/arm/kvm/reset.c
+@@ -33,8 +33,6 @@
+  * Cortex-A15 and Cortex-A7 Reset Values
+  */
+ 
+-static const int cortexa_max_cpu_idx = 3;
+-
+ static struct kvm_regs cortexa_regs_reset = {
+ 	.usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+ };
+@@ -64,8 +62,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	switch (vcpu->arch.target) {
+ 	case KVM_ARM_TARGET_CORTEX_A7:
+ 	case KVM_ARM_TARGET_CORTEX_A15:
+-		if (vcpu->vcpu_id > cortexa_max_cpu_idx)
+-			return -EINVAL;
+ 		cpu_reset = &cortexa_regs_reset;
+ 		vcpu->arch.midr = read_cpuid_id();
+ 		cpu_vtimer_irq = &cortexa_vtimer_irq;
 -- 
 1.8.2.3
