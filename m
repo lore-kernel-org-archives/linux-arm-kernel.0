@@ -1,221 +1,109 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Fri, 18 Oct 2013 23:19:55 +0800
-Subject: [PATCH v5 1/7] arm64: introduce basic aarch64 instruction decoding
- helpers
-In-Reply-To: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
-References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
-Message-ID: <1382109602-27432-2-git-send-email-liuj97@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Oct 2013 08:24:50 -0700
+Subject: [GIT PULL 1/2] omap board removal for some omap3 boards for
+ v3.13 merge window
+In-Reply-To: <87hacews6o.fsf@linaro.org>
+References: <526041db.41abe00a.33b7.00a1SMTPIN_ADDED_BROKEN@mx.google.com>
+ <87hacews6o.fsf@linaro.org>
+Message-ID: <20131018152450.GI15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiang Liu <jiang.liu@huawei.com>
+* Kevin Hilman <khilman@linaro.org> [131018 07:49]:
+> Hi Tony,
+> 
+> Tony Lindgren <tony@atomide.com> writes:
+> 
+> > The following changes since commit f41509ad0d4c11d0911630440749d409ce2aa1aa:
+> >
+> >   Merge branches 'omap-for-v3.13/dt' and 'omap-for-v3.13/quirk' into omap-for-v3.13/board-removal (2013-10-14 11:33:07 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/board-removal-signed
+> >
+> > for you to fetch changes up to f0c09b7c3b4e6b2fe501b3e888797b470de8320c:
+> >
+> >   ARM: OMAP2+: Remove legacy support for zoom platforms (2013-10-15 17:38:21 -0700)
+> >
+> > ----------------------------------------------------------------
+> > Changes needed to drop legacy booting support for some
+> > omap3 boards.
+> >
+> > Note that that these are based on a merge of the
+> > following for the dependencies:
+> >
+> > - v3.12-rc5 for fixes to pinctrl mask
+> > - omap-for-v3.13/dt-signed to avoid pointless merge conflicts
+> > - omap-for-v3.13/quirk-signed for legacy pdata handling
+> >
+> > ----------------------------------------------------------------
+> > Aaro Koskinen (2):
+> >       ARM: dts: add minimal DT support for Nokia N950 & N9 phones
+> >       ARM: OMAP2: delete board-rm680
+> >
+> > Tony Lindgren (6):
+> >       ARM: dts: Shared file for omap GPMC connected smsc911x
+> >       ARM: dts: Add common support for omap3-evm
+> >       ARM: dts: Add basic support for TMDSEVM3730 (Mistral AM/DM37x EVM)
+> >       ARM: dts: Add basic support for zoom3
+> 
+> This patch introduces a build failure when compiling the DTBs:
+> 
+>   [...]
+>   DTC     arch/arm/boot/dts/omap3-zoom3.dtb
+> ERROR (phandle_references): Reference to non-existent node or label "wl12xx_gpio"
 
-Introduce basic aarch64 instruction decoding helper
-aarch64_get_insn_class() and aarch64_insn_hotpatch_safe().
+Oops sorry, looks like the common support for omap3-evm has a
+pinctrl entry that should be in the omap3-evm-37xx only. I guess
+I did not run make dtbs after adding the omap3-evm-37xx parts.
+The patch below fixes it for me.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Jiang Liu <liuj97@gmail.com>
----
- arch/arm64/include/asm/insn.h | 78 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/Makefile    |  2 +-
- arch/arm64/kernel/insn.c      | 90 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 169 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/insn.h
- create mode 100644 arch/arm64/kernel/insn.c
+Do you want a new pull request or just the fix below?
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-new file mode 100644
-index 0000000..7499490
---- /dev/null
-+++ b/arch/arm64/include/asm/insn.h
-@@ -0,0 +1,78 @@
-+/*
-+ * Copyright (C) 2013 Huawei Ltd.
-+ * Author: Jiang Liu <jiang.liu@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef	__ASM_INSN_H
-+#define	__ASM_INSN_H
-+#include <linux/types.h>
+Regards,
+
+Tony
+
+8< -----------------------------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Fri, 18 Oct 2013 08:16:25 -0700
+Subject: [PATCH] ARM: dts: Fix build error for omap3-evm after adding common file
+
+Commit c4856107 ((ARM: dts: Add basic support for TMDSEVM3730
+(Mistral AM/DM37x EVM)) added a pinctrl entry to the common file
+for evm that should be only in the omap3-evm-37xx. This causes:
+
+ERROR (phandle_references): Reference to non-existent node or label "wl12xx_gpio"
+
+Fix it by moving the entry to omap3-evm-37xx.
+
+Reported-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/boot/dts/omap3-evm-37xx.dts
++++ b/arch/arm/boot/dts/omap3-evm-37xx.dts
+@@ -19,6 +19,11 @@
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
 +
-+/*
-+ * ARM Architecture Reference Manual ARMv8, Section C3.1
-+ * AArch64 main encoding table
-+ *  Bit position
-+ *   28 27 26 25	Encoding Group
-+ *   0  0  -  -		Unallocated
-+ *   1  0  0  -		Data processing, immediate
-+ *   1  0  1  -		Branch, exception generation and system instructions
-+ *   -  1  -  0		Loads and stores
-+ *   -  1  0  1		Data processing - register
-+ *   0  1  1  1		Data processing - SIMD and floating point
-+ *   1  1  1  1		Data processing - SIMD and floating point
-+ * "-" means "don't care"
-+ */
-+enum aarch64_insn_encoding_class {
-+	AARCH64_INSN_CLS_UNKNOWN,	/* UNALLOCATED */
-+	AARCH64_INSN_CLS_DP_IMM,	/* Data processing - immediate */
-+	AARCH64_INSN_CLS_DP_REG,	/* Data processing - register */
-+	AARCH64_INSN_CLS_DP_FPSIMD,	/* Data processing - SIMD and FP */
-+	AARCH64_INSN_CLS_LDST,		/* Loads and stores */
-+	AARCH64_INSN_CLS_BR_SYS,	/* Branch, exception generation and
-+					 * system instructions */
-+};
-+
-+#define	__AARCH64_INSN_FUNCS(abbr, mask, val)	\
-+static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
-+{ return (code & (mask)) == (val); }	\
-+static __always_inline u32 aarch64_insn_get_##abbr##_mask(void) \
-+{ return (mask); } \
-+static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
-+{ return (val); }
-+
-+__AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
-+__AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
-+__AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
-+__AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
-+__AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
-+__AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
-+__AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
-+
-+#undef	__AARCH64_INSN_FUNCS
-+
-+enum aarch64_insn_hint_op {
-+	AARCH64_INSN_HINT_NOP	= 0x0 << 5,
-+	AARCH64_INSN_HINT_YIELD	= 0x1 << 5,
-+	AARCH64_INSN_HINT_WFE	= 0x2 << 5,
-+	AARCH64_INSN_HINT_WFI	= 0x3 << 5,
-+	AARCH64_INSN_HINT_SEV	= 0x4 << 5,
-+	AARCH64_INSN_HINT_SEVL	= 0x5 << 5,
-+};
-+
-+bool aarch64_insn_is_nop(u32 insn);
-+
-+enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
-+
-+bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
-+
-+#endif	/* __ASM_INSN_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7b4b564..9af6cb3 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -9,7 +9,7 @@ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
- 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
--			   hyp-stub.o psci.o
-+			   hyp-stub.o psci.o insn.o
++	wl12xx_vmmc: wl12xx_vmmc {
++		pinctrl-names = "default";
++		pinctrl-0 = <&wl12xx_gpio>;
++	};
+ };
  
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-new file mode 100644
-index 0000000..f5b779f
---- /dev/null
-+++ b/arch/arm64/kernel/insn.c
-@@ -0,0 +1,90 @@
-+/*
-+ * Copyright (C) 2013 Huawei Ltd.
-+ * Author: Jiang Liu <jiang.liu@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/compiler.h>
-+#include <linux/kernel.h>
-+#include <asm/insn.h>
-+
-+static int aarch64_insn_encoding_class[] = {
-+	AARCH64_INSN_CLS_UNKNOWN,
-+	AARCH64_INSN_CLS_UNKNOWN,
-+	AARCH64_INSN_CLS_UNKNOWN,
-+	AARCH64_INSN_CLS_UNKNOWN,
-+	AARCH64_INSN_CLS_LDST,
-+	AARCH64_INSN_CLS_DP_REG,
-+	AARCH64_INSN_CLS_LDST,
-+	AARCH64_INSN_CLS_DP_FPSIMD,
-+	AARCH64_INSN_CLS_DP_IMM,
-+	AARCH64_INSN_CLS_DP_IMM,
-+	AARCH64_INSN_CLS_BR_SYS,
-+	AARCH64_INSN_CLS_BR_SYS,
-+	AARCH64_INSN_CLS_LDST,
-+	AARCH64_INSN_CLS_DP_REG,
-+	AARCH64_INSN_CLS_LDST,
-+	AARCH64_INSN_CLS_DP_FPSIMD,
-+};
-+
-+enum aarch64_insn_encoding_class __kprobes aarch64_get_insn_class(u32 insn)
-+{
-+	return aarch64_insn_encoding_class[(insn >> 25) & 0xf];
-+}
-+
-+/* NOP is an alias of HINT */
-+bool aarch64_insn_is_nop(u32 insn)
-+{
-+	if (!aarch64_insn_is_hint(insn))
-+		return false;
-+
-+	switch (insn & 0xFE0) {
-+	case AARCH64_INSN_HINT_YIELD:
-+	case AARCH64_INSN_HINT_WFE:
-+	case AARCH64_INSN_HINT_WFI:
-+	case AARCH64_INSN_HINT_SEV:
-+	case AARCH64_INSN_HINT_SEVL:
-+		return false;
-+	default:
-+		return true;
-+	}
-+}
-+
-+static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
-+{
-+	if (aarch64_get_insn_class(insn) != AARCH64_INSN_CLS_BR_SYS)
-+		return false;
-+
-+	return	aarch64_insn_is_b(insn) ||
-+		aarch64_insn_is_bl(insn) ||
-+		aarch64_insn_is_svc(insn) ||
-+		aarch64_insn_is_hvc(insn) ||
-+		aarch64_insn_is_smc(insn) ||
-+		aarch64_insn_is_brk(insn) ||
-+		aarch64_insn_is_nop(insn);
-+}
-+
-+/*
-+ * ARMv8-A Section B2.6.5:
-+ * Concurrent modification and execution of instructions can lead to the
-+ * resulting instruction performing any behavior that can be achieved by
-+ * executing any sequence of instructions that can be executed from the
-+ * same Exception level, except where the instruction before modification
-+ * and the instruction after modification is a B, BL, NOP, BKPT, SVC, HVC,
-+ * or SMC instruction.
-+ */
-+bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
-+{
-+	return __aarch64_insn_hotpatch_safe(old_insn) &&
-+	       __aarch64_insn_hotpatch_safe(new_insn);
-+}
--- 
-1.8.1.2
+ &omap3_pmx_core {
+--- a/arch/arm/boot/dts/omap3-evm-common.dtsi
++++ b/arch/arm/boot/dts/omap3-evm-common.dtsi
+@@ -21,8 +21,6 @@
+ 	};
+ 
+ 	wl12xx_vmmc: wl12xx_vmmc {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&wl12xx_gpio>;
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vwl1271";
+ 		regulator-min-microvolt = <1800000>;
