@@ -1,96 +1,231 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 17 Oct 2013 22:32:51 -0700
-Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
-In-Reply-To: <1379319655-20210-4-git-send-email-xobs@kosagi.com>
-References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
- <1379319655-20210-4-git-send-email-xobs@kosagi.com>
-Message-ID: <CAJ+vNU36neHP77dVnqSP=+oMxaU=-6PxWQ8Afni-tTRjNTkM_A@mail.gmail.com>
+From: jackey.shen.bo@gmail.com (Jackey Shen)
+Date: Fri, 18 Oct 2013 14:04:01 +0800
+Subject: eMMC 4.51
+In-Reply-To: <CACUGKYPn-qL2_z83wK0EYtDexmyYQX6YVPwHTp5C4_d2M9BH4w@mail.gmail.com>
+References: <CACUGKYPDQJPvtXj3NBm8=eYCioWmq=pRVSORNYNZjD13N5ceeg@mail.gmail.com>
+ <CA+6rjLzLhA-zzTqWuzFCMXa1v9CgS-O+Rrnqsfpw9=UY_1vuMA@mail.gmail.com>
+ <CACUGKYPn-qL2_z83wK0EYtDexmyYQX6YVPwHTp5C4_d2M9BH4w@mail.gmail.com>
+Message-ID: <CA+6rjLzaLZ=R_iEjgu4wB57j1pFraHpAjrg24Er2=SVefVGt7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 16, 2013 at 1:20 AM, Sean Cross <xobs@kosagi.com> wrote:
-> Add support for the PCIe port present on the i.MX6 family of controllers.
-> These use the Synopsis Designware core tied to their own PHY.
->
-> Signed-off-by: Sean Cross <xobs@kosagi.com>
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  .../devicetree/bindings/pci/designware-pcie.txt    |    7 +-
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index ccd55c2..125202e 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -116,6 +116,22 @@
->                         arm,data-latency = <4 2 3>;
->                 };
->
-> +               pcie: pcie at 0x01000000 {
-> +                       compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
-> +                       reg = <0x01ffc000 0x4000>; /* DBI */
-> +                       #address-cells = <3>;
-> +                       #size-cells = <2>;
-> +                       device_type = "pci";
-> +                       ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000 /* configuration space */
-> +                                 0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
-> +                                 0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
-> +                       num-lanes = <1>;
-> +                       interrupts = <0 123 0x04>;
-> +                       clocks = <&clks 189>, <&clks 187>, <&clks 205>, <&clks 144>;
-> +                       clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
-> +                       status = "disabled";
-> +               };
-> +
+Hi John,
 
-Sean,
-
-The devicetree portion above is now here
-https://gitorious.org/thierryreding/linux-next/commit/3a57291fa4ca7f7647d826f5b47082ef306d839f
-(which I'm told gets pulled into linux-next) and I wanted to see if
-you or any of the other IMX/PCI gurus here can answer a question about
-region mapping.
-
-The above ranges look to me to allocate 15MB for mem resources, 64K
-for io resources, and 256K for cfg space.
-
-Table 2.1 of the IMX6DQRM.pdf
-(http://cache.freescale.com/files/32bit/doc/ref_manual/IMX6DQRM.pdf)
-shows:
-  01FF_C000 01FF_FFFF 16 KB PCIe registers
-  0100_0000 01FF_BFFF 16368 KB PCIe
-
-The driver in the fsl 3.0.35_4.1.0 BSP maps the following (see
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/arch/arm/mach-mx6/pcie.c?h=imx_3.0.35_4.1.0#n331):
-
-0x0100_0000 --- 0x01DF_FFFF 14MB IORESOURCE_MEM
-0x01E0_0000 --- 0x01EF_FFFF 1MB IORESOURCE_IO
-0x01F0_0000 --- 0x01FF_FFFF 1MB Cfg + MSI + Registers
-
-and, in a discussion on the IMX Community forum
-(https://community.freescale.com/message/334959#334959) points out
-that you have more flexibility if you map the MEM resource first
-because of its more limited alignment.  So, if you were going to stick
-with the fsl mapping I would think we would want something like this
-in the dt node:
-
-ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000 /* 512K
-configuration space */
-               0x81000000 0 0          0x01e00000 0 0x00100000 /* 1MB
-downstream I/O */
-               0x82000000 0 0x01000000 0x01000000 0 0x00e00000>; /*
-14MB non-prefetchable memory */
-
-Can these regions be moved around however you want depending on what
-kind of mem vs io resource configurations you desire?  How about the
-cfg space - is 512K really needed?
-
-Are we sure the committed values to linux-next 'wrong' in any way?  I
-still am seeing bus-hangs with devices behind a bridge that use
-io-space resources and am trying to figure out where the issue is.  I
-don't get these bus-hangs when using the fsl driver which is
-structured very different so its been difficult for me to determine
-the difference.  The mappings and the way iATU mappings are done are
-very different.
+Does your SD host controller support 3.0 card? As I know, Marvel
+SDIO8797 can work at UHS-I SDR104. Did you test it?
 
 Thanks,
+Jackey
 
-Tim
+On Thu, Oct 10, 2013 at 2:00 AM, John Tobias <john.tobias.ph@gmail.com> wrote:
+> Hi Jackey,
+>
+> The Marvel SD8797 work fine but there are some cases that the firmware
+> failed to load during the system boot up. Although, we managed it by
+> power cycling the power source of the Marvel chip so that the kernel
+> will able to detect and reinitialize again.
+>
+> The module was running in high speed, 4bit bus width.
+>
+> Here are some info:
+>
+> # iperf -c 192.168.x.x -t 60 -i 10
+> ------------------------------------------------------------
+> Client connecting to 192.168.x.x, TCP port 5001
+> TCP window size: 20.7 KByte (default)
+> ------------------------------------------------------------
+> [  3] local 192.168.x.x port 52071 connected with 192.168.x.x port 5001
+> [ ID] Interval       Transfer     Bandwidth
+> [  3]  0.0-10.0 sec  48.0 MBytes  40.3 Mbits/sec
+> [  3] 10.0-20.0 sec  53.4 MBytes  44.8 Mbits/sec
+> [  3] 20.0-30.0 sec  53.8 MBytes  45.1 Mbits/sec
+> [  3] 30.0-40.0 sec  56.4 MBytes  47.3 Mbits/sec
+> [  3] 40.0-50.0 sec  54.2 MBytes  45.5 Mbits/sec
+> [  3] 50.0-60.0 sec  53.5 MBytes  44.9 Mbits/sec
+> [  3]  0.0-60.0 sec   319 MBytes  44.6 Mbits/sec
+>
+> # iwconfig mlan0
+> mlan0     IEEE 802.11abgn  ESSID:"Pxx-xxx"
+>           Mode:Managed  Frequency:2.437 GHz  Access Point:
+> BC:Dx:xx:xx:xx:xx
+>           Bit Rate=135 Mb/s
+>           Retry  long limit:7   RTS thr:off   Fragment thr:off
+>           Encryption key:off
+>           Power Management:on
+>           Link Quality=70/70  Signal level=-28 dBm
+>           Rx invalid nwid:0  Rx invalid crypt:0  Rx invalid frag:0
+>           Tx excessive retries:0  Invalid misc:0   Missed beacon:0
+>
+> Regards,
+>
+> john
+>
+>
+>
+> On Wed, Oct 9, 2013 at 12:23 AM, Jackey Shen <jackey.shen.bo@gmail.com>
+> wrote:
+>> Hi John,
+>>
+>> Does wifi module (Marvel SD8797) work fine on your board? What speed does
+>> it
+>> run at? SDR104?
+>>
+>> Thanks,
+>> Jackey
+>>
+>> On Wed, Oct 9, 2013 at 10:00 AM, John Tobias <john.tobias.ph@gmail.com>
+>> wrote:
+>>>
+>>> Hello,
+>>>
+>>> I am using git://gitorious.org/thierryreding/linux-next.git to boot my
+>>> custom board based on iMX6 sololite. My board has SanDisk iNAND 4.51
+>>> I/F and wifi module (Marvel SD8797). The latest update of
+>>> sdhci-esdhc-imx.c supports DDR50/SDR50/SDR104 and I would like to use
+>>> it for my device.
+>>>
+>>> In my .dts file, I have the following settings:
+>>>
+>>> /* WIFI module */
+>>> &usdhc2 {
+>>> pinctrl-names = "default", "state_100mhz", "state_200mhz";
+>>> pinctrl-0 = <&pinctrl_usdhc2_2_default>;
+>>> pinctrl-1 = <&pinctrl_usdhc2_3_100mhz>;
+>>> pinctrl-2 = <&pinctrl_usdhc2_4_200mhz>;
+>>> bus-width = <4>;
+>>> status = "okay";
+>>> };
+>>>
+>>> /* eMMC module  */
+>>> &usdhc4 {
+>>> pinctrl-names = "default", "state_100mhz", "state_200mhz";
+>>> pinctrl-0 = <&pinctrl_usdhc4_2_default>;
+>>> pinctrl-1 = <&pinctrl_usdhc4_3_100mhz>;
+>>> pinctrl-2 = <&pinctrl_usdhc4_4_200mhz>;
+>>> bus-width = <8>;
+>>> status = "okay";
+>>> compatible = "fsl,imx6sl-usdhc", "fsl,imx6q-usdhc";
+>>> reg = <0x0219c000 0x4000>;
+>>> };
+>>>
+>>> Then, in my .dtsi file:
+>>>
+>>> usdhc2 {
+>>> /*WIFI pinmux */
+>>> pinctrl_usdhc2_2_default: default {
+>>> fsl,pins = <
+>>> EVT1_PAD_SD2_CMD__SD2_CMD     0x17039
+>>> EVT1_PAD_SD2_CLK__SD2_CLK     0x17039
+>>> EVT1_PAD_SD2_DATA0__SD2_DATA0 0x17039
+>>> EVT1_PAD_SD2_DATA1__SD2_DATA1 0x17039
+>>> EVT1_PAD_SD2_DATA2__SD2_DATA2 0x17039
+>>> EVT1_PAD_SD2_DATA3__SD2_DATA3 0x17039
+>>> >;
+>>> };
+>>>
+>>> pinctrl_usdhc2_3_100mhz: state_100mhz { /* 100Mhz */
+>>> fsl,pins = <
+>>> EVT1_PAD_SD2_CMD__SD2_CMD 0x170B9
+>>> EVT1_PAD_SD2_CLK__SD2_CLK 0x100B9
+>>> EVT1_PAD_SD2_DATA0__SD2_DATA0 0x170B9
+>>> EVT1_PAD_SD2_DATA1__SD2_DATA1 0x170B9
+>>> EVT1_PAD_SD2_DATA2__SD2_DATA2 0x170B9
+>>> EVT1_PAD_SD2_DATA3__SD2_DATA3 0x170B9
+>>> >;
+>>> };
+>>>
+>>> pinctrl_usdhc2_4_200mhz: state_200mhz { /* 200Mhz */
+>>> fsl,pins = <
+>>> EVT1_PAD_SD2_CMD__SD2_CMD 0x170F9
+>>> EVT1_PAD_SD2_CLK__SD2_CLK 0x100F9
+>>> EVT1_PAD_SD2_DATA0__SD2_DATA0 0x170F9
+>>> EVT1_PAD_SD2_DATA1__SD2_DATA1 0x170F9
+>>> EVT1_PAD_SD2_DATA2__SD2_DATA2 0x170F9
+>>> EVT1_PAD_SD2_DATA3__SD2_DATA3 0x170F9
+>>> >;
+>>> };
+>>> };
+>>>
+>>> usdhc4 {
+>>> /* eMMC pinmux */
+>>> pinctrl_usdhc4_2_default: default {
+>>> fsl,pins = <
+>>> EVT1_PAD_EPDC_BDR1__SD4_CMD       0x17039
+>>> EVT1_PAD_EPDC_BDR0__SD4_CLK       0x10039
+>>> EVT1_PAD_EPDC_PWR_COM__SD4_DATA0  0x17039
+>>> EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1  0x17039
+>>> EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x17039
+>>> EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x17039
+>>> EVT1_PAD_FEC_MDC__SD4_DATA4 0x17039
+>>> EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x17039
+>>> EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x17039
+>>> EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x17039
+>>> >;
+>>> };
+>>>
+>>> pinctrl_usdhc4_3_100mhz: state_100mhz { /* 100Mhz */
+>>> fsl,pins = <
+>>> EVT1_PAD_EPDC_BDR1__SD4_CMD 0x170B9
+>>> EVT1_PAD_EPDC_BDR0__SD4_CLK   0x100B9
+>>> EVT1_PAD_EPDC_PWR_COM__SD4_DATA0 0x170B9
+>>> EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1 0x170B9
+>>> EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x170B9
+>>> EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x170B9
+>>> EVT1_PAD_FEC_MDC__SD4_DATA4 0x170B9
+>>> EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x170B9
+>>> EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x170B9
+>>> EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x170B9
+>>> >;
+>>> };
+>>>
+>>> pinctrl_usdhc4_4_200mhz: state_200mhz { /* 200Mhz */
+>>> fsl,pins = <
+>>> EVT1_PAD_EPDC_BDR1__SD4_CMD 0x170F9
+>>> EVT1_PAD_EPDC_BDR0__SD4_CLK   0x100F9
+>>> EVT1_PAD_EPDC_PWR_COM__SD4_DATA0 0x170F9
+>>> EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1 0x170F9
+>>> EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x170F9
+>>> EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x170F9
+>>> EVT1_PAD_FEC_MDC__SD4_DATA4 0x170F9
+>>> EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x170F9
+>>> EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x170F9
+>>> EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x170F9
+>>> >;
+>>> };
+>>> };
+>>>
+>>>
+>>> 1. After using the said pinmux settings, the sdhci-esdh-imx controller
+>>> wasn't able to configure it correctly due the the group name for the
+>>> two port were the same (default, state_100mhz, state_200mhz).
+>>>
+>>> 2. Then, I temporarily disabled usdhc4 to test if the driver able to
+>>> enable the SDR50 for my wifi. Then, I was getting the following
+>>> errors:
+>>>
+>>> [    1.655024] mmc0: error -110 whilst initialising SDIO card
+>>> [    3.746340] mmc0: error -110 whilst initialising SDIO card
+>>> [    3.818624] mmc0: host doesn't support card's voltages
+>>> [    3.823783] mmc0: error -22 whilst initialising SDIO card
+>>> [    3.901670] mmc0: host doesn't support card's voltages
+>>> [    3.906862] mmc0: error -22 whilst initialising SDIO card
+>>> [   34.307777] mmc0: host doesn't support card's voltages
+>>> [   34.312980] mmc0: error -22 whilst initialising SDIO card
+>>>
+>>> 3. Then, I tried the eMMC to see if the driver able to enable the
+>>> DDR50. After booting it, the kernel detect the eMMC only in hight
+>>> speed mode.
+>>>
+>>>
+>>> I would like to know if anyone here can help me to figure out how to
+>>> enable the DDR50 for my eMMC and SDR50 for my wifi as well.
+>>>
+>>> Regards,
+>>>
+>>> john
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
