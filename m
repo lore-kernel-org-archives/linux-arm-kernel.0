@@ -1,109 +1,66 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 18 Oct 2013 14:56:00 -0700
-Subject: [PATCH v3 1/3] mmc: core: Support the optional init_card() callback
- for MMC and SD
-In-Reply-To: <1382133362-31747-1-git-send-email-dianders@chromium.org>
-References: <1382126905-14654-1-git-send-email-dianders@chromium.org>
- <1382133362-31747-1-git-send-email-dianders@chromium.org>
-Message-ID: <1382133362-31747-2-git-send-email-dianders@chromium.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 18 Oct 2013 16:40:27 -0600
+Subject: [GIT PULL V2] ARM: tegra: core SoC support changes for 3.13
+Message-ID: <1382136027-4937-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In (3fcb027 ARM: MXC: mxcmmc: work around a bug in the SDHC busy line
-handling) the optional init_card() callback was added.  According to
-the original change it was "for now only called from
-mmc_sdio_init_card()".
+This branch includes:
+* SoC fuse values are used as device randomness at boot.
+* Initial support for the Tegra124 SoC is added. When coupled with an
+  appropriate clock driver, which should also be merged for 3.13, we are
+  able to boot to user-space using an initrd.
+* The powergate code gains support for Tegra114.
 
-This callback really ought to be called from the SD and MMC init
-functions as well.  One current user of this callback
-(mxcmci_init_card) will not work as expected if you insert an SDIO
-card, then eject it and put a normal SD card in.  Specifically the
-normal SD card will not get to run with 4-bit data.
+This branch is based on previous pull request tegra-for-3.13-cleanup.
 
-I'd like to use the init_card() callback to handle a similar quirk on
-dw_mmc when using SDIO Interrupts (the "low power" feature of the card
-needs to be disabled), so that will add a second user of the function.
+----------------------------------------------------------------
 
-As part of this change fixup the one place that relied on the callback
-only happening for SDIO cards.
+The following changes since commit b6bda4e0d23815cb711c16085e03cb23c6d49f21:
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Reviewed-by: Grant Grundler <grundler@chromium.org>
----
-Changes in v3:
-- Add fixup to pandora_wl1251_init_card().
+  ARM: tegra: fix ARCH_TEGRA_114_SOC select sort order
 
-Changes in v2:
-- New for this version.
+are available in the git repository at:
 
- arch/arm/mach-omap2/board-omap3pandora.c | 14 ++++++++------
- drivers/mmc/core/mmc.c                   |  6 ++++++
- drivers/mmc/core/sd.c                    |  7 ++++++-
- 3 files changed, 20 insertions(+), 7 deletions(-)
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.13-soc-v2
 
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index de1bc6b..6404595 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -254,12 +254,14 @@ static void pandora_wl1251_init_card(struct mmc_card *card)
- 	 * We have TI wl1251 attached to MMC3. Pass this information to
- 	 * SDIO core because it can't be probed by normal methods.
- 	 */
--	card->quirks |= MMC_QUIRK_NONSTD_SDIO;
--	card->cccr.wide_bus = 1;
--	card->cis.vendor = 0x104c;
--	card->cis.device = 0x9066;
--	card->cis.blksize = 512;
--	card->cis.max_dtr = 20000000;
-+	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
-+		card->quirks |= MMC_QUIRK_NONSTD_SDIO;
-+		card->cccr.wide_bus = 1;
-+		card->cis.vendor = 0x104c;
-+		card->cis.device = 0x9066;
-+		card->cis.blksize = 512;
-+		card->cis.max_dtr = 20000000;
-+	}
- }
- 
- static struct omap2_hsmmc_info omap3pandora_mmc[] = {
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index 6d02012..7ad75c0 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -940,6 +940,12 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
- 	}
- 
- 	/*
-+	 * Call the optional HC's init_card function to handle quirks.
-+	 */
-+	if (host->ops->init_card)
-+		host->ops->init_card(host, card);
-+
-+	/*
- 	 * For native busses:  set card RCA and quit open drain mode.
- 	 */
- 	if (!mmc_host_is_spi(host)) {
-diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-index 5e8823d..59e2318 100644
---- a/drivers/mmc/core/sd.c
-+++ b/drivers/mmc/core/sd.c
-@@ -940,6 +940,12 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
- 	}
- 
- 	/*
-+	 * Call the optional HC's init_card function to handle quirks.
-+	 */
-+	if (host->ops->init_card)
-+		host->ops->init_card(host, card);
-+
-+	/*
- 	 * For native busses:  get card RCA and quit open drain mode.
- 	 */
- 	if (!mmc_host_is_spi(host)) {
-@@ -1286,4 +1292,3 @@ err:
- 
- 	return err;
- }
--
--- 
-1.8.4
+for you to fetch changes up to bd6a9ddcb9f2cb19dae0509341a4cbaf40dc66f0:
+
+  ARM: tegra: Add Tegra114 powergate support
+
+----------------------------------------------------------------
+
+Joseph Lo (7):
+      ARM: tegra: add Tegra124 SoC support
+      ARM: tegra: add PMC compatible value for Tegra124
+      ARM: tegra: CPU hotplug support for Tegra124
+      ARM: tegra: make tegra_resume can work with current and later chips
+      ARM: tegra: enable CPU idle for Tegra124
+      ARM: tegra: re-calculate the LP1 data for Tegra30/114
+      ARM: tegra: add LP1 support code for Tegra124
+
+Stephen Warren (1):
+      ARM: tegra: add fuses as device randomness
+
+Thierry Reding (3):
+      ARM: tegra: Remove duplicate powergate defines
+      ARM: tegra: Constify list of CPU domains
+      ARM: tegra: Add Tegra114 powergate support
+
+ arch/arm/mach-tegra/Kconfig         |    8 +++++
+ arch/arm/mach-tegra/Makefile        |    5 +++
+ arch/arm/mach-tegra/cpuidle.c       |    4 ++-
+ arch/arm/mach-tegra/flowctrl.c      |    2 ++
+ arch/arm/mach-tegra/fuse.c          |   54 ++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/fuse.h          |    1 +
+ arch/arm/mach-tegra/hotplug.c       |    2 ++
+ arch/arm/mach-tegra/iomap.h         |    3 ++
+ arch/arm/mach-tegra/platsmp.c       |    2 ++
+ arch/arm/mach-tegra/pm.c            |   12 +++++--
+ arch/arm/mach-tegra/pmc.c           |    8 ++---
+ arch/arm/mach-tegra/powergate.c     |   48 ++++++++++++++++++++++++--
+ arch/arm/mach-tegra/reset-handler.S |   13 +++----
+ arch/arm/mach-tegra/sleep-tegra30.S |   49 ++++++++++++++++++++-------
+ arch/arm/mach-tegra/tegra.c         |    1 +
+ include/linux/tegra-powergate.h     |    9 ++++-
+ 16 files changed, 187 insertions(+), 34 deletions(-)
