@@ -1,36 +1,57 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 18 Oct 2013 20:34:52 +0200
-Subject: [PATCH RESEND] ASoC: kirkwood: prefer external clock over internal
- clock
-Message-ID: <20131018203452.177f8693@armhf>
+Date: Fri, 18 Oct 2013 20:35:55 +0200
+Subject: [PATCH v3 2/2] ASoC: kirkwood: fix loss of external clock at probe
+ time
+Message-ID: <20131018203555.4d974251@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When there is an external clock, always use this one.
-This prevents the two Dove audio devices to use the same DCO clock
-at different rates.
+At probe time, when the clock driver is not yet initialized, the
+external clock of the kirkwood sound device will not be usable.
+
+This patch fixes this problem defering the device probe.
+
+It also removes the test about same internal and external clocks which
+can never occur.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
-This patch was initialy proposed by Russell, but with an erroneous
-'else if'.
+v3: remove the test of same internal and external clocks
+
+The associated patch:
+[PATCH v3 1/2] ASoC: kirkwood: clk: probe defer when clock not yet ready
+is unchanged and not resent
 ---
- sound/soc/kirkwood/kirkwood-i2s.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/kirkwood/kirkwood-i2s.c | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
 
 diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-index 0f3d73d..8ac89f5 100644
+index 8ac89f5..2bbbab5 100644
 --- a/sound/soc/kirkwood/kirkwood-i2s.c
 +++ b/sound/soc/kirkwood/kirkwood-i2s.c
-@@ -103,7 +103,7 @@ static void kirkwood_set_rate(struct snd_soc_dai *dai,
- {
- 	uint32_t clks_ctrl;
+@@ -496,15 +496,13 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
+ 		return err;
  
--	if (rate == 44100 || rate == 48000 || rate == 96000) {
+ 	priv->extclk = devm_clk_get(&pdev->dev, "extclk");
+-	if (!IS_ERR(priv->extclk)) {
+-		if (priv->extclk == priv->clk) {
+-			devm_clk_put(&pdev->dev, priv->extclk);
+-			priv->extclk = ERR_PTR(-EINVAL);
+-		} else {
+-			dev_info(&pdev->dev, "found external clock\n");
+-			clk_prepare_enable(priv->extclk);
+-			soc_dai = &kirkwood_i2s_dai_extclk;
+-		}
 +	if (IS_ERR(priv->extclk)) {
- 		/* use internal dco for the supported rates
- 		 * defined in kirkwood_i2s_dai */
- 		dev_dbg(dai->dev, "%s: dco set rate = %lu\n",
++		if (PTR_ERR(priv->extclk) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++	} else {
++		dev_info(&pdev->dev, "found external clock\n");
++		clk_prepare_enable(priv->extclk);
++		soc_dai = kirkwood_i2s_dai_extclk;
+ 	}
+ 
+ 	/* Some sensible defaults - this reflects the powerup values */
 
 
 -- 
