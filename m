@@ -1,52 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 18 Oct 2013 21:12:59 +0200
-Subject: [PATCH v3 2/2] ASoC: kirkwood: fix loss of external clock at
- probe time
-In-Reply-To: <20131018203555.4d974251@armhf>
-References: <20131018203555.4d974251@armhf>
-Message-ID: <20131018191259.GF10079@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 18 Oct 2013 21:23:45 +0200
+Subject: [GIT PULL] ux500 devicetree patches, take 3
+Message-ID: <CACRpkdYyazH9KevkA=qTho3okdKnKWcq_uMwRroa6=svacfJAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi ARM SoC folks,
 
-On Fri, Oct 18, 2013 at 08:35:55PM +0200, Jean-Francois Moine wrote:
-> diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-> index 8ac89f5..2bbbab5 100644
-> --- a/sound/soc/kirkwood/kirkwood-i2s.c
-> +++ b/sound/soc/kirkwood/kirkwood-i2s.c
-> @@ -496,15 +496,13 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->  		return err;
->  
->  	priv->extclk = devm_clk_get(&pdev->dev, "extclk");
-> -	if (!IS_ERR(priv->extclk)) {
-> -		if (priv->extclk == priv->clk) {
-> -			devm_clk_put(&pdev->dev, priv->extclk);
-> -			priv->extclk = ERR_PTR(-EINVAL);
-> -		} else {
-> -			dev_info(&pdev->dev, "found external clock\n");
-> -			clk_prepare_enable(priv->extclk);
-> -			soc_dai = &kirkwood_i2s_dai_extclk;
-> -		}
-> +	if (IS_ERR(priv->extclk)) {
-> +		if (PTR_ERR(priv->extclk) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-Maybe the better logic here is:
-		if (!PTR_ERR(priv->extclk) == -ENOENT)
-			return PTR_ERR(priv->extclk);
+this is yet another pull request for ux500 device tree stuff. It should
+go on top of the second pull request, I tested to pull it on top of
+ux500/dt2 in the ARM SoC tree and it worked just fine.
 
-?
+These are fixes and additions found during testing of the switch to
+full device tree on ux500. The clock fixes will go into the -rc:s if
+you don't take this in as a whole.
 
-> +	} else {
-> +		dev_info(&pdev->dev, "found external clock\n");
-> +		clk_prepare_enable(priv->extclk);
-> +		soc_dai = kirkwood_i2s_dai_extclk;
-Another todo (that is already in the patched code) is that you should
-check the return value of clk_prepare_enable.
+There is one oneline patch to the clock driver that I have not had
+an ACK from Mike on, but Lee checked it and I certainly don't
+think Mike has anything against it. The last patch adds the SSP
+and SPI devices that were strangely absent from the platform
+after the conversion.
 
-Best regards
-Uwe
+So: please pull this into ARM SoC as ux500/dt3 or something.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Yours,
+Linus Walleij
+
+
+The following changes since commit 741a6c4c59cfa1266bc75aca9f66bdc6e421b0d5:
+
+  ARM: ux500: move BU21013 touchpad GPIOs into top-level DTS
+(2013-10-03 10:29:24 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-dt-for-v3.13-3
+
+for you to fetch changes up to 6e1484c2761e56bb98ec95ccdd1d98d2f67852ae:
+
+  ARM: ux500: register all SSP and SPI blocks (2013-10-18 14:55:44 +0200)
+
+----------------------------------------------------------------
+Five incremental device tree patches around the clock handling,
+and adding SSP/SPI devices to the device tree.
+
+----------------------------------------------------------------
+Linus Walleij (5):
+      ARM: ux500: fix clock for GPIO block 8
+      clk: ux500: fix erroneous bit assignment
+      ARM: ux500: fix clock for GPIO blocks 6 and 7
+      ARM: ux500: fix I2C4 clock bit
+      ARM: ux500: register all SSP and SPI blocks
+
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 83 ++++++++++++++++++++++++++++++++++++---
+ drivers/clk/ux500/u8500_of_clk.c  |  2 +-
+ 2 files changed, 79 insertions(+), 6 deletions(-)
