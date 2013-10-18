@@ -1,118 +1,44 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Fri, 18 Oct 2013 21:59:14 +0800
-Subject: [RFC PATCH] of/base: add helper of_property_read_u32_array_index
-In-Reply-To: <1382103943-17812-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1382103943-17812-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <52613EB2.7080206@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 18 Oct 2013 07:05:23 -0700
+Subject: [GIT PULL] Rockchip boards for 3.13
+In-Reply-To: <201310172138.01672.heiko@sntech.de> ("Heiko =?utf-8?Q?St?=
+ =?utf-8?Q?=C3=BCbner=22's?= message
+ of "Thu, 17 Oct 2013 21:38:01 +0200")
+References: <201310172138.01672.heiko@sntech.de>
+Message-ID: <87txgewu70.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Heiko St?bner <heiko@sntech.de> writes:
 
-Here is one question, is there any existing API could get nth array from 
-arrays table?
+> The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+>
+>   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.13-rockchip-boards
+>
+> for you to fetch changes up to 0311caed3aa7395fe216dce16222d70a1793554f:
+>
+>   MAINTAINERS: Add maintainers entry for Rockchip SoCs (2013-10-14 23:19:58 +0200)
+>
+> ----------------------------------------------------------------
+> Support for the RK3188 SoC, basic RK3188 based Radxa Rock board
+> and RK3066a based BQ Curie2 tablet.
+>
+> ----------------------------------------------------------------
 
-For example:
-		tune-table =
-                         <26000000 1 1 3 3 13000000>,
-                         <360000000 6 3 3 1 50000000>,
-                         <0 0 0 0 0 0>,
-                         <0 0 0 0 0 0>,
-                         <26000000 1 1 3 3 13000000>,
-                         <360000000 6 3 3 1 50000000>,
-                         <0 0 0 0 0 0>,
-                         <720000000 6 4 8 4 100000000>;
+This series appears to only have been posted 2 days ago so it seems a
+little quick for the pull request.  That being said, there's nothing
+earth shattering going on here, and it seems like the pinctrl dependency
+changes you mentioned in PATCH 4/5 have been applied by Linus, so....
 
-Can we get nth array with index?
-Like:
-u32 table[6];
-ret = of_property_read_u32_array_index(np, "tune-table",
-                                         table, 6, index);
+Since it didn't look like this was already in -next, I broke it up
+slightly, putting the MAINTAINERS change into fixes (since we have a
+handful of other MAINTAINERS changes there already) and then pulled the
+reset into next/boards.
 
 Thanks
 
-On 10/18/2013 09:45 PM, Zhangfei Gao wrote:
-> of_property_read_u32_array_index is added for read nth array values from u32 arrays
->
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> ---
->   drivers/of/base.c  |   35 +++++++++++++++++++++++++++++++++++
->   include/linux/of.h |   12 ++++++++++++
->   2 files changed, 47 insertions(+)
->
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 865d3f6..5c5f877 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -1002,6 +1002,41 @@ int of_property_read_u32_array(const struct device_node *np,
->   EXPORT_SYMBOL_GPL(of_property_read_u32_array);
->
->   /**
-> + * of_property_read_u32_array_index - Find and read an array of 32 bit integers
-> + * pointed by index from a property.
-> + *
-> + * @np:		device node from which the property value is to be read.
-> + * @propname:	name of the property to be searched.
-> + * @out_values:	pointer to return value, modified only if return value is 0.
-> + * @sz:		number of array elements to read
-> + * @index:	index of the u32 array in the list of values
-> + *
-> + * Search for a property in a device node and read nth 32-bit value(s) from
-> + * it. Returns 0 on success, -EINVAL if the property does not exist,
-> + * -ENODATA if property does not have a value, and -EOVERFLOW if the
-> + * property data isn't large enough.
-> + *
-> + * The out_values is modified only if a valid u32 value can be decoded.
-> + */
-> +int of_property_read_u32_array_index(const struct device_node *np,
-> +			       const char *propname, u32 *out_values,
-> +			       size_t sz, u32 index)
-> +{
-> +	const __be32 *val = of_find_property_value_of_size(np, propname,
-> +				(index + 1) * (sz * sizeof(*out_values)));
-> +
-> +	if (IS_ERR(val))
-> +		return PTR_ERR(val);
-> +
-> +	while (index--)
-> +		val += sz;
-> +	while (sz--)
-> +		*out_values++ = be32_to_cpup(val++);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_property_read_u32_array_index);
-> +
-> +/**
->    * of_property_read_u64 - Find and read a 64 bit integer from a property
->    * @np:		device node from which the property value is to be read.
->    * @propname:	name of the property to be searched.
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index f95aee3..7103983 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -246,6 +246,10 @@ extern int of_property_read_u32_array(const struct device_node *np,
->   				      const char *propname,
->   				      u32 *out_values,
->   				      size_t sz);
-> +extern int of_property_read_u32_array_index(const struct device_node *np,
-> +				      const char *propname,
-> +				      u32 *out_values,
-> +				      size_t sz, u32 index);
->   extern int of_property_read_u64(const struct device_node *np,
->   				const char *propname, u64 *out_value);
->
-> @@ -427,6 +431,14 @@ static inline int of_property_read_u32_array(const struct device_node *np,
->   	return -ENOSYS;
->   }
->
-> +static inline int of_property_read_u32_array_index(const struct device_node *np,
-> +				      const char *propname,
-> +				      u32 *out_values,
-> +				      size_t sz, u32 index)
-> +{
-> +	return -ENOSYS;
-> +}
-> +
->   static inline int of_property_read_string(struct device_node *np,
->   					  const char *propname,
->   					  const char **out_string)
->
+Kevin
