@@ -1,38 +1,49 @@
 From: vkale@apm.com (Vinayak Kale)
-Date: Fri, 18 Oct 2013 15:36:29 +0530
+Date: Fri, 18 Oct 2013 15:39:08 +0530
 Subject: [PATCH] genirq: error reporting for non-percpu interrupt in
  request_percpu_irq()
-Message-ID: <1382090789-18177-1-git-send-email-vkale@apm.com>
+In-Reply-To: <1382090789-18177-1-git-send-email-vkale@apm.com>
+References: <1382090789-18177-1-git-send-email-vkale@apm.com>
+Message-ID: <CAPrCYke1_RjUgH79vZW99pwdExo4BspCaVi7zL-8hapKb0=gwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return a separate error code when a non-percpu interrupt is passed to
-request_percpu_irq().
+Need for this patch is discussed in mail-thread [1].
 
-Suggested-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Vinayak Kale <vkale@apm.com>
----
- kernel/irq/manage.c |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204414.html
 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 514bcfd..c2713ae 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -1671,10 +1671,12 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
- 		return -EINVAL;
- 
- 	desc = irq_to_desc(irq);
--	if (!desc || !irq_settings_can_request(desc) ||
--	    !irq_settings_is_per_cpu_devid(desc))
-+	if (!desc || !irq_settings_can_request(desc))
- 		return -EINVAL;
- 
-+	if (!irq_settings_is_per_cpu_devid(desc))
-+		return -EPERM;
-+
- 	action = kzalloc(sizeof(struct irqaction), GFP_KERNEL);
- 	if (!action)
- 		return -ENOMEM;
--- 
-1.7.9.5
+Thanks
+-Vinayak
+
+On Fri, Oct 18, 2013 at 3:36 PM, Vinayak Kale <vkale@apm.com> wrote:
+> Return a separate error code when a non-percpu interrupt is passed to
+> request_percpu_irq().
+>
+> Suggested-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> ---
+>  kernel/irq/manage.c |    6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+> index 514bcfd..c2713ae 100644
+> --- a/kernel/irq/manage.c
+> +++ b/kernel/irq/manage.c
+> @@ -1671,10 +1671,12 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+>                 return -EINVAL;
+>
+>         desc = irq_to_desc(irq);
+> -       if (!desc || !irq_settings_can_request(desc) ||
+> -           !irq_settings_is_per_cpu_devid(desc))
+> +       if (!desc || !irq_settings_can_request(desc))
+>                 return -EINVAL;
+>
+> +       if (!irq_settings_is_per_cpu_devid(desc))
+> +               return -EPERM;
+> +
+>         action = kzalloc(sizeof(struct irqaction), GFP_KERNEL);
+>         if (!action)
+>                 return -ENOMEM;
+> --
+> 1.7.9.5
+>
