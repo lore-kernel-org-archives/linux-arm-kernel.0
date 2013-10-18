@@ -1,300 +1,126 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Fri, 18 Oct 2013 17:57:17 +0200
-Subject: [PATCH v3] ARM: dts: add minimal DT support for Nokia N950 &
- N9 phones
-In-Reply-To: <20131016003536.GA15154@atomide.com>
-References: <1381869369-14626-1-git-send-email-aaro.koskinen@iki.fi>
- <20131016003536.GA15154@atomide.com>
-Message-ID: <52615A5D.7030002@baylibre.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 18 Oct 2013 16:56:47 +0100
+Subject: [PATCH v8 01/19] arm: make SWIOTLB available
+In-Reply-To: <1382031814-8782-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.DEB.2.02.1310181652310.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/10/2013 02:35, Tony Lindgren wrote:
-> * Aaro Koskinen <aaro.koskinen@iki.fi> [131015 13:36]:
->> Add minimal DT support for Nokia N950 & N9 phones. The same functionality
->> that is provided by the current board file should work: serial console,
->> USB, OneNAND and MMC.
->>
->> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
->> Acked-by: Tony Lindgren <tony@atomide.com>
->
-> Oh this is not yet merged, I'll pick this one into the
-> omap-for-v3.13/board-removal as the board removal patch is
-> already there.
+Russell,
+this is the last ARM patch of the series that needs review.
 
-Just to be sure. Does that mean that you'll take care of that one, and 
-thus I do not have to queue it?
+It is just adding three new static inlines needed by SWIOTLB and
+IOMMU_HELPER.
 
-Thanks,
-Benoit
+If you are OK with the patch I am going to add the lot to linux-next via
+the Xen tree.
 
-> Regards,
->
-> Tony
->
->> ---
->>
->> 	v3: Added Tony's ACK & properties for generic USB PHY framework.
->>
->> 	Previous version: http://marc.info/?t=138005105700010&r=1&w=2
->>
->>   arch/arm/boot/dts/Makefile           |   2 +
->>   arch/arm/boot/dts/omap3-n9.dts       |  18 ++++
->>   arch/arm/boot/dts/omap3-n950-n9.dtsi | 174 +++++++++++++++++++++++++++++++++++
->>   arch/arm/boot/dts/omap3-n950.dts     |  18 ++++
->>   4 files changed, 212 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/omap3-n9.dts
->>   create mode 100644 arch/arm/boot/dts/omap3-n950-n9.dtsi
->>   create mode 100644 arch/arm/boot/dts/omap3-n950.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 9df7d2c..62d0f4d 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -177,6 +177,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->>   	omap3-gta04.dtb \
->>   	omap3-igep0020.dtb \
->>   	omap3-igep0030.dtb \
->> +	omap3-n9.dtb \
->> +	omap3-n950.dtb \
->>   	omap4-panda.dtb \
->>   	omap4-panda-a4.dtb \
->>   	omap4-panda-es.dtb \
->> diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
->> new file mode 100644
->> index 0000000..39828ce
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap3-n9.dts
->> @@ -0,0 +1,18 @@
->> +/*
->> + * omap3-n9.dts - Device Tree file for Nokia N9
->> + *
->> + * Written by: Aaro Koskinen <aaro.koskinen@iki.fi>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "omap3-n950-n9.dtsi"
->> +
->> +/ {
->> +	model = "Nokia N9";
->> +	compatible = "nokia,omap3-n9", "ti,omap3";
->> +};
->> diff --git a/arch/arm/boot/dts/omap3-n950-n9.dtsi b/arch/arm/boot/dts/omap3-n950-n9.dtsi
->> new file mode 100644
->> index 0000000..94eb77d
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap3-n950-n9.dtsi
->> @@ -0,0 +1,174 @@
->> +/*
->> + * omap3-n950-n9.dtsi - Device Tree file for Nokia N950 & N9 (common stuff)
->> + *
->> + * Written by: Aaro Koskinen <aaro.koskinen@iki.fi>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include "omap36xx.dtsi"
->> +
->> +/ {
->> +	cpus {
->> +		cpu at 0 {
->> +			cpu0-supply = <&vcc>;
->> +		};
->> +	};
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x80000000 0x40000000>; /* 1 GB */
->> +	};
->> +
->> +	vemmc: fixedregulator at 0 {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "VEMMC";
->> +		regulator-min-microvolt = <2900000>;
->> +		regulator-max-microvolt = <2900000>;
->> +		gpio = <&gpio5 29 0>; /* gpio line 157 */
->> +		startup-delay-us = <150>;
->> +		enable-active-high;
->> +	};
->> +};
->> +
->> +&omap3_pmx_core {
->> +	mmc2_pins: pinmux_mmc2_pins {
->> +		pinctrl-single,pins = <
->> +			0x128 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_clk */
->> +			0x12a (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_cmd */
->> +			0x12c (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat0 */
->> +			0x12e (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat1 */
->> +			0x130 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat2 */
->> +			0x132 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc2_dat3 */
->> +		>;
->> +	};
->> +};
->> +
->> +&i2c1 {
->> +	clock-frequency = <2900000>;
->> +
->> +	twl: twl at 48 {
->> +		reg = <0x48>;
->> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
->> +		interrupt-parent = <&intc>;
->> +	};
->> +};
->> +
->> +/include/ "twl4030.dtsi"
->> +
->> +&twl {
->> +	compatible = "ti,twl5031";
->> +};
->> +
->> +&twl_gpio {
->> +	ti,pullups	= <0x000001>; /* BIT(0) */
->> +	ti,pulldowns	= <0x008106>; /* BIT(1) | BIT(2) | BIT(8) | BIT(15) */
->> +};
->> +
->> +&i2c2 {
->> +	clock-frequency = <400000>;
->> +};
->> +
->> +&i2c3 {
->> +	clock-frequency = <400000>;
->> +};
->> +
->> +&mmc1 {
->> +	status = "disabled";
->> +};
->> +
->> +&mmc2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc2_pins>;
->> +	vmmc-supply = <&vemmc>;
->> +	bus-width = <4>;
->> +	ti,non-removable;
->> +};
->> +
->> +&mmc3 {
->> +	status = "disabled";
->> +};
->> +
->> +&usb_otg_hs {
->> +	interface-type = <0>;
->> +	usb-phy = <&usb2_phy>;
->> +	phys = <&usb2_phy>;
->> +	phy-names = "usb2-phy";
->> +	mode = <3>;
->> +	power = <50>;
->> +};
->> +
->> +&gpmc {
->> +	ranges = <0 0 0x04000000 0x20000000>;
->> +
->> +	onenand at 0,0 {
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +		reg = <0 0 0x20000000>;
->> +
->> +		gpmc,sync-read;
->> +		gpmc,sync-write;
->> +		gpmc,burst-length = <16>;
->> +		gpmc,burst-read;
->> +		gpmc,burst-wrap;
->> +		gpmc,burst-write;
->> +		gpmc,device-width = <2>;
->> +		gpmc,mux-add-data = <2>;
->> +		gpmc,cs-on-ns = <0>;
->> +		gpmc,cs-rd-off-ns = <87>;
->> +		gpmc,cs-wr-off-ns = <87>;
->> +		gpmc,adv-on-ns = <0>;
->> +		gpmc,adv-rd-off-ns = <10>;
->> +		gpmc,adv-wr-off-ns = <10>;
->> +		gpmc,oe-on-ns = <15>;
->> +		gpmc,oe-off-ns = <87>;
->> +		gpmc,we-on-ns = <0>;
->> +		gpmc,we-off-ns = <87>;
->> +		gpmc,rd-cycle-ns = <112>;
->> +		gpmc,wr-cycle-ns = <112>;
->> +		gpmc,access-ns = <81>;
->> +		gpmc,page-burst-access-ns = <15>;
->> +		gpmc,bus-turnaround-ns = <0>;
->> +		gpmc,cycle2cycle-delay-ns = <0>;
->> +		gpmc,wait-monitoring-ns = <0>;
->> +		gpmc,clk-activation-ns = <5>;
->> +		gpmc,wr-data-mux-bus-ns = <30>;
->> +		gpmc,wr-access-ns = <81>;
->> +		gpmc,sync-clk-ps = <15000>;
->> +
->> +		/*
->> +		 * MTD partition table corresponding to Nokia's MeeGo 1.2
->> +		 * Harmattan release.
->> +		 */
->> +		partition at 0 {
->> +			label = "bootloader";
->> +			reg = <0x00000000 0x00100000>;
->> +		};
->> +		partition at 1 {
->> +			label = "config";
->> +			reg = <0x00100000 0x002c0000>;
->> +		};
->> +		partition at 2 {
->> +			label = "kernel";
->> +			reg = <0x003c0000 0x01000000>;
->> +		};
->> +		partition at 3 {
->> +			label = "log";
->> +			reg = <0x013c0000 0x00200000>;
->> +		};
->> +		partition at 4 {
->> +			label = "var";
->> +			reg = <0x015c0000 0x1ca40000>;
->> +		};
->> +		partition at 5 {
->> +			label = "moslo";
->> +			reg = <0x1e000000 0x02000000>;
->> +		};
->> +		partition at 6 {
->> +			label = "omap2-onenand";
->> +			reg = <0x00000000 0x20000000>;
->> +		};
->> +	};
->> +};
->> diff --git a/arch/arm/boot/dts/omap3-n950.dts b/arch/arm/boot/dts/omap3-n950.dts
->> new file mode 100644
->> index 0000000..b076a52
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap3-n950.dts
->> @@ -0,0 +1,18 @@
->> +/*
->> + * omap3-n950.dts - Device Tree file for Nokia N950
->> + *
->> + * Written by: Aaro Koskinen <aaro.koskinen@iki.fi>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "omap3-n950-n9.dtsi"
->> +
->> +/ {
->> +	model = "Nokia N950";
->> +	compatible = "nokia,omap3-n950", "ti,omap3";
->> +};
->> --
->> 1.8.4.rc3
->>
-
-
--- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+On Thu, 17 Oct 2013, Stefano Stabellini wrote:
+> IOMMU_HELPER is needed because SWIOTLB calls iommu_is_span_boundary,
+> provided by lib/iommu_helper.c.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> CC: will.deacon at arm.com
+> CC: linux at arm.linux.org.uk
+> 
+> 
+> Changes in v8:
+> - use __phys_to_pfn and __pfn_to_phys.
+> 
+> Changes in v7:
+> - dma_mark_clean: empty implementation;
+> - in dma_capable use coherent_dma_mask if dma_mask hasn't been
+>   allocated.
+> 
+> Changes in v6:
+> - check for dev->dma_mask being NULL in dma_capable.
+> 
+> Changes in v5:
+> - implement dma_mark_clean using dmac_flush_range.
+> 
+> Changes in v3:
+> - dma_capable: do not treat dma_mask as a limit;
+> - remove SWIOTLB dependency on NEED_SG_DMA_LENGTH.
+> ---
+>  arch/arm/Kconfig                   |    6 +++++
+>  arch/arm/include/asm/dma-mapping.h |   37 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 43 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index ba412e0..c0bfb33 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1832,6 +1832,12 @@ config CC_STACKPROTECTOR
+>  	  neutralized via a kernel panic.
+>  	  This feature requires gcc version 4.2 or above.
+>  
+> +config SWIOTLB
+> +	def_bool y
+> +
+> +config IOMMU_HELPER
+> +	def_bool SWIOTLB
+> +
+>  config XEN_DOM0
+>  	def_bool y
+>  	depends on XEN
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 5b579b9..01b5a3d 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -10,6 +10,7 @@
+>  
+>  #include <asm-generic/dma-coherent.h>
+>  #include <asm/memory.h>
+> +#include <asm/cacheflush.h>
+>  
+>  #define DMA_ERROR_CODE	(~0)
+>  extern struct dma_map_ops arm_dma_ops;
+> @@ -86,6 +87,42 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>  }
+>  #endif
+>  
+> +static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+> +{
+> +	unsigned int offset = paddr & ~PAGE_MASK;
+> +	return pfn_to_dma(dev, __phys_to_pfn(paddr)) + offset;
+> +}
+> +
+> +static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+> +{
+> +	unsigned int offset = dev_addr & ~PAGE_MASK;
+> +	return __pfn_to_phys(dma_to_pfn(dev, dev_addr)) + offset;
+> +}
+> +
+> +static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+> +{
+> +	u64 limit, mask;
+> +	
+> +	if (dev->dma_mask)
+> +		mask = *dev->dma_mask;
+> +	else 
+> +		mask = dev->coherent_dma_mask;
+> +
+> +	if (mask == 0)
+> +		return 0;
+> +
+> +	limit = (mask + 1) & ~mask;
+> +	if (limit && size > limit)
+> +		return 0;
+> +
+> +	if ((addr | (addr + size - 1)) & ~mask)
+> +		return 0;
+> +
+> +	return 1;
+> +}
+> +
+> +static inline void dma_mark_clean(void *addr, size_t size) { }
+> +
+>  /*
+>   * DMA errors are defined by all-bits-set in the DMA address.
+>   */
+> -- 
+> 1.7.2.5
+> 
