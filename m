@@ -1,61 +1,191 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 18 Oct 2013 19:09:42 +0200
-Subject: [PATCH v2] ARM: head-common.S: relocate atags area if necessary
-In-Reply-To: <20131018162956.GE25034@n2100.arm.linux.org.uk>
-References: <1382112776-20300-1-git-send-email-zonque@gmail.com>
- <20131018162956.GE25034@n2100.arm.linux.org.uk>
-Message-ID: <52616B56.10407@gmail.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Fri, 18 Oct 2013 19:10:50 +0200
+Subject: [PATCHv3] video: backlight: gpio-backlight: Add DT support.
+Message-ID: <1382116250-8808-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v2->v3:
+- The dev_err are not split between multiples lines anymore, in order to
+  improve grepping. Thanks to Lothar Wa?mann for the advise.
+---
+ .../bindings/video/backlight/gpio-backlight.txt    |   18 +++++
+ drivers/video/backlight/gpio_backlight.c           |   72 ++++++++++++++++++--
+ 2 files changed, 83 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
 
-thanks for having a look.
-
-On 10/18/2013 06:29 PM, Russell King - ARM Linux wrote:
-> On Fri, Oct 18, 2013 at 06:12:56PM +0200, Daniel Mack wrote:
->> If the supplied atags/dtb pointer is located at memory inside the bss
->> section, it will be erased by __mmap_switched. The problem is that the
->> code that sets up the pointer can't know about a safe value unless it
->> examines the kernel's symbol tables, so we should care about that case
->> and relocate the area if necessary.
->>
->> This patch does that from inside __vet_atags. In order to determine the
->> size of the section in dtb cases, it reads the next word after the dtb
->> binary magic, and also has to convert that value from big to CPU
->> endianess. For the atags case, a total size of up to 4k is assumed for
->> now.
-> 
-> I'm not convinced that this is a good solution.  If this oerlaps the
-> BSS region, it could well end up being overlapped by something else
-> more serious, like the data segment
-
-My v1 had a cover letter, don't know if you've seen it. In that, I
-describe that the setup I see that faulty condition is caused by kexec,
-which currently assumes that the decompressed kernel size is max. 4
-times bigger than the zImage it executes. While that is naive, it seems
-to be an assumption that reflects reality in my tests.
-
-Correct me if I'm wrong, but AFAIK the .bss section is the only thing
-that can grow to arbitrary size at runtime without accounting to the
-compressed image size; so in order to fix kernels executed by kexec that
-way, my fixup seems reasonable, doesn't it?
-
-> - at which point doing the fixup
-> here means we've already lost.
-
-The question is whether it does any harm to at least try to fix up
-things in that situation.
-
-> We already give the decompressor the size of the kernel's BSS and take
-> action if we believe that the kernel's BSS will overlap the DTB/ATAGs
-> there.
-
-Only for CONFIG_ARM_ATAG_DTB_COMPAT (which is unset in my config),
-right? I've read through the sources relevant for my system (AM33xx),
-and couldn't find any other place where my case is covered. The
-relocation I propose does fix it, though.
-
-
-Thanks,
-Daniel
+diff --git a/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+new file mode 100644
+index 0000000..362dd40
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+@@ -0,0 +1,18 @@
++gpio-backlight bindings
++
++Required properties:
++  - compatible: "gpio-backlight"
++  - gpios: describes the gpio that is used for enabling/disabling the backlight
++     (see GPIO binding[0] for more details).
++  - default-brightness-level: the default brightness level (can be 0(off) or
++      1(on) since GPIOs only support theses levels).
++
++[0]: Documentation/devicetree/bindings/gpio/gpio.txt
++
++Example:
++
++	backlight {
++		compatible = "gpio-backlight";
++		gpios = <&gpio3 4 0>;
++		default-brightness-level = <1>;
++	};
+diff --git a/drivers/video/backlight/gpio_backlight.c b/drivers/video/backlight/gpio_backlight.c
+index 81fb127..3bf38a0 100644
+--- a/drivers/video/backlight/gpio_backlight.c
++++ b/drivers/video/backlight/gpio_backlight.c
+@@ -13,6 +13,8 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
+ #include <linux/platform_data/gpio_backlight.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+@@ -23,6 +25,7 @@ struct gpio_backlight {
+ 
+ 	int gpio;
+ 	int active;
++	int def_value;
+ };
+ 
+ static int gpio_backlight_update_status(struct backlight_device *bl)
+@@ -60,6 +63,42 @@ static const struct backlight_ops gpio_backlight_ops = {
+ 	.check_fb	= gpio_backlight_check_fb,
+ };
+ 
++static int gpio_backlight_probe_dt(struct platform_device *pdev,
++				   struct gpio_backlight *gbl)
++{
++	struct device_node *np = pdev->dev.of_node;
++	enum of_gpio_flags gpio_flags;
++	int ret;
++
++	gbl->fbdev = NULL;
++	gbl->gpio = of_get_gpio_flags(np, 0, &gpio_flags);
++
++	gbl->active = (gpio_flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1;
++
++	if (gbl->gpio == -EPROBE_DEFER) {
++		return ERR_PTR(-EPROBE_DEFER);
++	} else if (gbl->gpio < 0) {
++		dev_err(&pdev->dev, "Error: gpios is a required parameter.\n");
++		return gbl->gpio;
++	}
++
++	ret = of_property_read_u32(np, "default-brightness-level",
++				   &gbl->def_value);
++	if (ret < 0) {
++		dev_err(&pdev->dev,
++			"Error: default-brightness-level is a required parameter.\n");
++		return ret;
++	}
++
++	if (gbl->def_value < 0 || gbl->def_value > 1) {
++		dev_err(&pdev->dev,
++			"Error: Invalid default-brightness-level value. Its value can be either 0(off) or 1(on).\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int gpio_backlight_probe(struct platform_device *pdev)
+ {
+ 	struct gpio_backlight_platform_data *pdata =
+@@ -67,10 +106,12 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 	struct backlight_properties props;
+ 	struct backlight_device *bl;
+ 	struct gpio_backlight *gbl;
++	struct device_node *np = pdev->dev.of_node;
+ 	int ret;
+ 
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "failed to find platform data\n");
++	if (!pdata && !np) {
++		dev_err(&pdev->dev,
++			"failed to find platform data or device tree node.\n");
+ 		return -ENODEV;
+ 	}
+ 
+@@ -79,14 +120,21 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	gbl->dev = &pdev->dev;
+-	gbl->fbdev = pdata->fbdev;
+-	gbl->gpio = pdata->gpio;
+-	gbl->active = pdata->active_low ? 0 : 1;
++
++	if (np) {
++		ret = gpio_backlight_probe_dt(pdev, gbl);
++		if (ret)
++			return ret;
++	} else {
++		gbl->fbdev = pdata->fbdev;
++		gbl->gpio = pdata->gpio;
++		gbl->active = pdata->active_low ? 0 : 1;
++	}
+ 
+ 	ret = devm_gpio_request_one(gbl->dev, gbl->gpio, GPIOF_DIR_OUT |
+ 				    (gbl->active ? GPIOF_INIT_LOW
+ 						 : GPIOF_INIT_HIGH),
+-				    pdata->name);
++				    pdata ? pdata->name : "backlight");
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "unable to request GPIO\n");
+ 		return ret;
+@@ -103,17 +151,27 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 		return PTR_ERR(bl);
+ 	}
+ 
+-	bl->props.brightness = pdata->def_value;
++	if (np)
++		bl->props.brightness = gbl->def_value;
++	else
++		bl->props.brightness = pdata->def_value;
++
+ 	backlight_update_status(bl);
+ 
+ 	platform_set_drvdata(pdev, bl);
+ 	return 0;
+ }
+ 
++static struct of_device_id gpio_backlight_of_match[] = {
++	{ .compatible = "gpio-backlight" },
++	{ /* sentinel */ }
++};
++
+ static struct platform_driver gpio_backlight_driver = {
+ 	.driver		= {
+ 		.name		= "gpio-backlight",
+ 		.owner		= THIS_MODULE,
++		.of_match_table = of_match_ptr(gpio_backlight_of_match),
+ 	},
+ 	.probe		= gpio_backlight_probe,
+ };
+-- 
+1.7.9.5
