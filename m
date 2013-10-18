@@ -1,57 +1,109 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 18 Oct 2013 07:48:47 -0700
-Subject: [GIT PULL 1/2] omap board removal for some omap3 boards for v3.13
- merge window
-In-Reply-To: <526041db.41abe00a.33b7.00a1SMTPIN_ADDED_BROKEN@mx.google.com>
- (Tony Lindgren's message of "Thu, 17 Oct 2013 13:00:21 -0700")
-References: <526041db.41abe00a.33b7.00a1SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <87hacews6o.fsf@linaro.org>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Fri, 18 Oct 2013 20:21:27 +0530
+Subject: [PATCH v2 1/1] ARM: OMAP2+: DRA7: hwmod: Add hwmod data for MDIO and
+ CPSW
+Message-ID: <1382107887-11728-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Adding hwmod data for CPSW and MDIO which is present in DRA7xx SoC
 
-Tony Lindgren <tony@atomide.com> writes:
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
+Changes from initial version:
+* changed the subject with proper text
+---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 64 +++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-> The following changes since commit f41509ad0d4c11d0911630440749d409ce2aa1aa:
->
->   Merge branches 'omap-for-v3.13/dt' and 'omap-for-v3.13/quirk' into omap-for-v3.13/board-removal (2013-10-14 11:33:07 -0700)
->
-> are available in the git repository at:
->
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/board-removal-signed
->
-> for you to fetch changes up to f0c09b7c3b4e6b2fe501b3e888797b470de8320c:
->
->   ARM: OMAP2+: Remove legacy support for zoom platforms (2013-10-15 17:38:21 -0700)
->
-> ----------------------------------------------------------------
-> Changes needed to drop legacy booting support for some
-> omap3 boards.
->
-> Note that that these are based on a merge of the
-> following for the dependencies:
->
-> - v3.12-rc5 for fixes to pinctrl mask
-> - omap-for-v3.13/dt-signed to avoid pointless merge conflicts
-> - omap-for-v3.13/quirk-signed for legacy pdata handling
->
-> ----------------------------------------------------------------
-> Aaro Koskinen (2):
->       ARM: dts: add minimal DT support for Nokia N950 & N9 phones
->       ARM: OMAP2: delete board-rm680
->
-> Tony Lindgren (6):
->       ARM: dts: Shared file for omap GPMC connected smsc911x
->       ARM: dts: Add common support for omap3-evm
->       ARM: dts: Add basic support for TMDSEVM3730 (Mistral AM/DM37x EVM)
->       ARM: dts: Add basic support for zoom3
-
-This patch introduces a build failure when compiling the DTBs:
-
-  [...]
-  DTC     arch/arm/boot/dts/omap3-zoom3.dtb
-ERROR (phandle_references): Reference to non-existent node or label "wl12xx_gpio"
-
-Kevin
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index db32d53..9a8191b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -273,6 +273,55 @@ static struct omap_hwmod dra7xx_ctrl_module_wkup_hwmod = {
+ };
+ 
+ /*
++ * 'gmac' class
++ * cpsw/gmac sub system
++ */
++static struct omap_hwmod_class_sysconfig dra7xx_gmac_sysc = {
++	.rev_offs	= 0x0,
++	.sysc_offs	= 0x8,
++	.syss_offs	= 0x4,
++	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
++			   SYSS_HAS_RESET_STATUS),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | MSTANDBY_FORCE |
++			   MSTANDBY_NO),
++	.sysc_fields	= &omap_hwmod_sysc_type3,
++};
++
++static struct omap_hwmod_class dra7xx_gmac_hwmod_class = {
++	.name		= "gmac",
++	.sysc		= &dra7xx_gmac_sysc,
++};
++
++static struct omap_hwmod dra7xx_gmac_hwmod = {
++	.name		= "gmac",
++	.class		= &dra7xx_gmac_hwmod_class,
++	.clkdm_name	= "gmac_clkdm",
++	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
++	.main_clk	= "dpll_gmac_ck",
++	.prcm		= {
++		.omap4	= {
++			.clkctrl_offs	= DRA7XX_CM_GMAC_GMAC_CLKCTRL_OFFSET,
++			.context_offs	= DRA7XX_RM_GMAC_GMAC_CONTEXT_OFFSET,
++			.modulemode	= MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++/*
++ * 'mdio' class
++ */
++static struct omap_hwmod_class dra7xx_mdio_hwmod_class = {
++	.name		= "davinci_mdio",
++};
++
++static struct omap_hwmod dra7xx_mdio_hwmod = {
++	.name		= "davinci_mdio",
++	.class		= &dra7xx_mdio_hwmod_class,
++	.clkdm_name	= "gmac_clkdm",
++	.main_clk	= "dpll_gmac_ck",
++};
++
++/*
+  * 'dcan' class
+  *
+  */
+@@ -2000,6 +2049,19 @@ static struct omap_hwmod_ocp_if dra7xx_l4_wkup__ctrl_module_wkup = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++static struct omap_hwmod_ocp_if dra7xx_l4_per2__cpgmac0 = {
++	.master		= &dra7xx_l4_per2_hwmod,
++	.slave		= &dra7xx_gmac_hwmod,
++	.clk		= "dpll_gmac_ck",
++	.user		= OCP_USER_MPU,
++};
++
++static struct omap_hwmod_ocp_if dra7xx_gmac__mdio = {
++	.master		= &dra7xx_gmac_hwmod,
++	.slave		= &dra7xx_mdio_hwmod,
++	.user		= OCP_USER_MPU,
++};
++
+ /* l4_wkup -> dcan1 */
+ static struct omap_hwmod_ocp_if dra7xx_l4_wkup__dcan1 = {
+ 	.master		= &dra7xx_l4_wkup_hwmod,
+@@ -2653,6 +2715,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_wkup__ctrl_module_wkup,
+ 	&dra7xx_l4_wkup__dcan1,
+ 	&dra7xx_l4_per2__dcan2,
++	&dra7xx_l4_per2__cpgmac0,
++	&dra7xx_gmac__mdio,
+ 	&dra7xx_l4_cfg__dma_system,
+ 	&dra7xx_l3_main_1__dss,
+ 	&dra7xx_l3_main_1__dispc,
+-- 
+1.8.4.1.516.g1d25dd4
