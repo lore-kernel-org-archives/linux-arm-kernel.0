@@ -1,45 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sat, 19 Oct 2013 18:09:54 +0100
-Subject: [PULL REQ] Big Endian initial patch series
-In-Reply-To: <20131018205405.GA28835@codethink.co.uk>
-References: <20131018205405.GA28835@codethink.co.uk>
-Message-ID: <20131019170954.GC25076@mudshark.cambridge.arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 19 Oct 2013 17:11:04 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: CM/SCM: clean up direct register accesses
+Message-ID: <alpine.DEB.2.02.1310191709220.11676@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-A few nits here...
+Hi Tony,
 
-Firstly, I'd suggest using [GIT PULL] instead of [PULL REQ] in the subject.
-Many people filter on the first, so you might get missed with the latter.
+The following changes since commit d0e639c9e06d44e713170031fe05fb60ebe680af:
 
-On Fri, Oct 18, 2013 at 09:54:05PM +0100, Ben Dooks wrote:
-> This series has been well tested and it would be great to get this
-> merged now. So here is the pull request:
-> 
-> The following changes since commit 8b5ede69d24db939f52b47effff2f6fe1e83e08b:
-> 
->   powerpc/irq: Don't switch to irq stack from softirq stack (2013-10-07 14:19:39 -0700)
+  Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
 
-Secondly, I'd suggest basing against a specific tag in mainline if possible,
-rather than a random commit. I think -rc3 matches rmk's current
-devel-stable branch.
+are available in the git repository at:
 
-> are available in the git repository at:
-> 
->   ssh://git at git.baserock.org/delta/linux baserock/bjdooks/312-rc4/be/core-v2
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13/cm-scm-cleanup-a
 
-This is an ssh URL, so it can't be pulled without some form of
-authentication! Use git:// instead for pull requests.
+for you to fetch changes up to 49e03402327ab69a26f604398982ef14123900a2:
 
-It's also good form to put your pull requests on separate branches from what
-you have been using for development, to make it clear that it is stable.
-Another method is to use a signed tag (although this seems more common with
-arm-soc than others).
+  ARM: OMAP3: control: add API for setting IVA bootmode (2013-10-19 10:11:52 -0600)
 
-Do you think you could send another pull request please?
+- ----------------------------------------------------------------
+Move some of the OMAP2+ CM and System Control Module direct
+register accesses into CM- and System Control
+Module-specific "drivers" underneath arch/arm/mach-omap2/.  This
+is a prerequisite for moving this code out of arch/arm/mach-omap2/ into
+drivers/.
 
-Cheers,
+Basic test logs are available here:
 
-Will
+http://www.pwsan.com/omap/testlogs/cm_scm_cleanup_a_v3.13/20131019101809/
+
+- ----------------------------------------------------------------
+Tero Kristo (5):
+      ARM: OMAP2: CM/PM: remove direct register accesses outside CM code
+      ARM: OMAP3: clock: add API to enable/disable autoidle for a single clock
+      ARM: OMAP3: McBSP: do not access CM register directly
+      ARM: OMAP3: CM/control: move CM scratchpad save to CM driver
+      ARM: OMAP3: control: add API for setting IVA bootmode
+
+ arch/arm/mach-omap2/clkt2xxx_apll.c          |  4 +-
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c      | 11 ++---
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c | 24 +++-------
+ arch/arm/mach-omap2/clock.c                  | 38 ++++++++++++++++
+ arch/arm/mach-omap2/clock.h                  |  2 +
+ arch/arm/mach-omap2/cm2xxx.c                 | 67 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/cm2xxx.h                 |  8 ++++
+ arch/arm/mach-omap2/cm3xxx.c                 | 22 +++++++++
+ arch/arm/mach-omap2/cm3xxx.h                 |  1 +
+ arch/arm/mach-omap2/control.c                | 54 +++++++---------------
+ arch/arm/mach-omap2/control.h                |  1 +
+ arch/arm/mach-omap2/mcbsp.c                  | 16 +++----
+ arch/arm/mach-omap2/pm24xx.c                 | 24 +---------
+ arch/arm/mach-omap2/pm34xx.c                 |  3 +-
+ 14 files changed, 177 insertions(+), 98 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.15 (GNU/Linux)
+
+iQIcBAEBAgAGBQJSYrwzAAoJEMePsQ0LvSpLAZoP/AkIs74RMF42SmWCfmhPHyz9
+PiUI6AFchOHLoRPf06vZcVylFPH3Tyb6GvNrB+tlmdJ8K7hsJjHJW4JMsnL6jZlN
+53Yhe9Ij/7Ydnat8D21dVFj+NX7Sks/qoqwMPDIa9BcLTvGZ9ruOpAWZQcK8qdRz
+BaWM8uQeQXt0/Asgy+qJW2Rn9YwyGLaDQBOduSsidC6Jl5mk4rrRr1wBHkmjAfvn
+g41/7ehbzt6BUFMn0hWy2x47bWv+LH5oJlrKr8X7Ocu7bgZC8H6dcAgMho6fdTe8
+fIJAuCHs7X+tAYXtVoMBzm3bRIrr59x25PULVzzEkzj1B8q7e0y6AdB87aPIo4Yg
+ebREEq5S+iWdniWvGNCqK5pKXeeAIPjWLVaGbDsFx1POq5JsvBNtlt1zCCGU73/S
+wK9J15POnrHjeyDQZha2w+sdAxT8kj/EbTXakehPLkX1hW/vc7PZIbd4X6ws/Dsk
+nPTuoI0IYARJK1T6vRJKfqyilAOFVjvjMB1yngTHMuN/wxUeJtjdiP/KnWv2EDGv
+a2IKRf1dJpA9x6naLOeV3aSYsiB7KE+fvcLNuFsiyU6Kv9NVfNS9w86mr/AVfUAX
+TsNTPVfkiAuqmCFRFkVHq7wyL8edx8dMeJewUlb5sxx/0awabHASpPz5x7OPnOaw
+Yf1XC+AecmxJoAuLO/nG
+=xSrk
+-----END PGP SIGNATURE-----
