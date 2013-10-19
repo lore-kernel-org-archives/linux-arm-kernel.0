@@ -1,134 +1,82 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 19 Oct 2013 07:07:15 +0200
-Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D40FB22@039-SN2MPN1-011.039d.mgd.msft.net>
-References: <1381853200-5534-1-git-send-email-marex@denx.de>
- <201310171934.34021.marex@denx.de>
- <0E83723C55F66F43A6041464FE31119D40FB22@039-SN2MPN1-011.039d.mgd.msft.net>
-Message-ID: <201310190707.15783.marex@denx.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 18 Oct 2013 22:52:46 -0700
+Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
+In-Reply-To: <20131018225702.GA13090@kroah.com> (Greg KH's message of "Fri, 18
+ Oct 2013 15:57:02 -0700")
+References: <1381296747.2040.17.camel@joe-AO722>
+ <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
+ <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
+ <CAGa+x86aS+C8iEb1P4ZYxPBix=Anjh4JZoAof=R-i9fGw=bq6w@mail.gmail.com>
+ <20131018225702.GA13090@kroah.com>
+Message-ID: <8761stu7rl.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Greg KH <gregkh@linuxfoundation.org> writes:
 
-> Hi Merak:
-> Thanks for your great help on the imx6 pcie switch support on the latest
-> kernel fristly.
+> On Fri, Oct 18, 2013 at 10:04:11AM -0700, Kevin Hilman wrote:
+>> > A handful of boot panics on ARM platforms were bisected to point at
+>> > the version of this commit that's in linux-next (commit
+>> > 64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
+>> > makes things happy again.
+>> >
+>> > Upon further digging, it seems that users of devres_alloc() are
+>> > relying on the previous behavior of having the memory zero'd which is
+>> > no longer the case after $SUBJECT patch.  The change below on top of
+>> > -next makes these ARM boards happy again.
+>> 
+>> Oops, it should've fixed __devres_alloc() also.  Updated patch below.
+>
+> Can you send this in a format that I can apply it in?  It was whitespace
+> damaged.
 
-Let's get this PCIe thing working well :)
+hmm, sorry about that.  This one should work, though I wonder if Andrew
+should pick this up since I think the patch that causes the breakage
+came through his tree.
 
-[...]
+Kevin
 
-> > > > > Since you are forcing RC to work in GEN1, so you will not be able
-> > > > > to connect any device at GEN2 now.
-> > > > 
-> > > > I'd rather prefer to know WHY if the RC is operating in Gen2 mode by
-> > > > default, I cannot see the PCIe switch (Pericom PI7C9X2G303)
-> > > > connected to it. I was unable to figure this out. Tim pointed out
-> > > > this thread [1] , so it might be related in some way.
-> > > > 
-> > > > [1] https://community.freescale.com/message/316162#316162
-> > > > 
-> > > > I tried switching the PCIe RC to Gen2 operation right after LinkUp
-> > > > by writing this register with 0x2 again and re-issuing the LinkUp
-> > > > check, which passed and the status register reported Gen2 operation,
-> > > > but then the PCIe Intel NIC connected to the downstream port of the
-> > > > Pericom switch still reported Gen1 operation for some reason.
-> > >  
-> > >  [Richard] Is your Inetl NIC GEN1 EP device?
-> > 
-> > Yes, the i210 is PCIe v2.1 (2.5GT/s) x1 device.
-> > 
-> > > > > Yes, There are some buggy PCIe devices which works with GEN1 only
-> > > > > host.
-> > > > 
-> > > > The pericom one is Gen2 according to it's datasheet.
-> > > 
-> > > [Richard] Yes, it is. Pericom's PI7C9X2G303EL is GEN2 PCIe switch.
-> > > It had been verified on FSL's 3.0.35 releases.
-> > 
-> > Verified how? What does it mean?
-> > 
-> > Note that when I followed [1] in this manner:
-> > 
-> > 1) Force GEN1 mode
-> > 2) Wait for PHY link up
-> > 3) Allow GEN2 mode
-> > 4) Start GEN2 speed change
-> > 5) Wait for PHY link up
-> > 
-> > my devices were detected and the link between pericom and mx6 was
-> > operating in gen2 mode. Thus I suspect we might need to start the port
-> > in Gen1 mode and switch to Gen2 only after link is up. Does that make
-> > sense?
-> > 
-> > https://community.freescale.com/thread/304284
-> 
-> [Richard] Yes, it make sense regarding to the
-> https://community.freescale.com/thread/304284.
-> 
-> The verification I said above means that the Pericom's PI7C9X2G303EL PCIe
-> GEN2 switch can work well on 3.0.35 kernel in GEN2 mode(without GEN1
-> force), and hand been tested by kinds of PCIe EP device(GEN1: Intel e1000e
-> network card, GEN2 xHCI USB3.0 PCIe x1 card).
+---------------8<----------------------------------------------------
+>From a1962ed4a999fb630a48f75a5ecaf84401d5dbfc Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@linaro.org>
+Date: Fri, 18 Oct 2013 09:41:39 -0700
+Subject: [PATCH] devres: restore zeroing behavior of devres_alloc()
 
-Oh, thanks for verifying this!
+commit 64c862a8 (devres: add kernel standard devm_k.alloc functions) changed
+the default behavior of alloc_dr() to no longer zero the allocated memory.  However,
+only the devm.k.alloc() function were modified to pass in __GFP_ZERO which leaves
+any users of devres_alloc() or __devres_alloc() with potentially wrong assumptions
+about memory being zero'd upon allocation.
 
-> Regarding to your comments why FORCE GEN1 mode in RC " Force Gen1
-> operation. In case the IP block is in Gen2 operation mode, it does not
-> detect the PCIe switch at all.", does the gen2 link can be set-up without
-> force gen1 mode?
+To fix, add __GFP_ZERO to devres_alloc() calls to preserve previous
+behavior of zero'ing memory upon allocation.
 
-What I did in the end for testing purpose was I followed the thread at FSL 
-community in the link above, forced the link into Gen1 mode , then waited for 
-link up, then started directed gen2 switch and waited for linkup again. This 
-worked and the PCIe indicated the link is in Gen2 mode.
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/base/devres.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Interestingly enough, I also implemented PCIe driver for MX6 for U-Boot (will 
-submit it shortly to U-Boot ML) and use it with the Intel i210 ethernet NIC now. 
-When I use the PCIe in U-Boot, I don't need the Force-Gen1 thing above. I 
-suspect though, that the Gen1 setting is preserved from U-Boot, where I have 
-this as well.
-
-> About the errata mentioned in
-> https://community.freescale.com/thread/304284, the errata-SW-workaround of
-> initialization is contained in previous Sean Cross' codes, like this. /*
->          * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
->          * Wait 2ms (LTSSM timeout is 24ms, PHY lock is ~5us in gen2).
->          * If (MAC/LTSSM.state == Recovery.RcvrLock)
->          * && (PHY/rx_valid==0) then pulse PHY/rx_reset. Transition
->          * to gen2 is stuck
->          */
-
-Is this not handling only the PHY part ? Honestly, I'm quite lost in the flurry 
-of different opinions on the MX6 PCIe. Maybe you as a FSL guy could scrounge 
-some internal knowledge ?
-
-> > > > > So better solution should be to initialize RC by default at GEN2
-> > > > > or highest speed. Further, a parameter say gen_only can be passed
-> > > > > from DT to force GEN1 only mode.
-> > > > > 
-> > > > > What do you say?
-> > > > 
-> > > > I say I'd like to know the root cause of this problem. This Gen2 fix
-> > > > was pulled from one of the myriad variants of the FSL PCIe driver,
-> > > > so apparently this issue happens to other people as well. But why
-> > > > and how to properly fix this so the whole PCIe bus does operate in
-> > > > Gen2 mode, I cannot tell :-(
-> > > 
-> > > [Richard] GEN2 mode had been verified in FSL 3.0.35 kernel releases
-> > > before. I don't know why it can't work in GEN2 mode in the latest
-> > > kernel. BTW, Based on for-next branch of shawn's git reops and applied
-> > > Merak's patch-set, my PI7C9X2G303EL with intel e1000e network card
-> > > plugged can't be detected at all. :(.
-> > 
-> > I think we're still fighting some issue with resource mappings here. We
-> > also agreed with Tim that my patches are incomplete. I will send out a
-> > new version ASAP.
-> 
-> [Richard] What's I said above is just curious that I encounter different
-> phenomena at my side With the almost same codes.
-
-I talked to Tim about the mappings some more. It seems if the IOspace is 
-disabled, everything works without hangs. If the IOspace is not disabled on the 
-ethernet NICs, we get a hang.
+diff --git a/drivers/base/devres.c b/drivers/base/devres.c
+index 37e67a2..545c4de 100644
+--- a/drivers/base/devres.c
++++ b/drivers/base/devres.c
+@@ -111,7 +111,7 @@ void * __devres_alloc(dr_release_t release, size_t size, gfp_t gfp,
+ {
+ 	struct devres *dr;
+ 
+-	dr = alloc_dr(release, size, gfp);
++	dr = alloc_dr(release, size, gfp | __GFP_ZERO);
+ 	if (unlikely(!dr))
+ 		return NULL;
+ 	set_node_dbginfo(&dr->node, name, size);
+@@ -136,7 +136,7 @@ void * devres_alloc(dr_release_t release, size_t size, gfp_t gfp)
+ {
+ 	struct devres *dr;
+ 
+-	dr = alloc_dr(release, size, gfp);
++	dr = alloc_dr(release, size, gfp | __GFP_ZERO);
+ 	if (unlikely(!dr))
+ 		return NULL;
+ 	return dr->data;
+-- 
+1.8.3
