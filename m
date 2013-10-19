@@ -1,36 +1,25 @@
 From: oleg@redhat.com (Oleg Nesterov)
-Date: Sat, 19 Oct 2013 18:50:51 +0200
-Subject: [PATCH v2 05/13] uprobes: add arch write opcode hook
-In-Reply-To: <1381871068-27660-6-git-send-email-dave.long@linaro.org>
+Date: Sat, 19 Oct 2013 19:02:14 +0200
+Subject: [PATCH v2 02/13] uprobes: allow ignoring of probe hits
+In-Reply-To: <1381871068-27660-3-git-send-email-dave.long@linaro.org>
 References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-6-git-send-email-dave.long@linaro.org>
-Message-ID: <20131019165051.GC7837@redhat.com>
+ <1381871068-27660-3-git-send-email-dave.long@linaro.org>
+Message-ID: <20131019170214.GA8324@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/15, David Long wrote:
 >
-> Allow arches to write the opcode with a custom function.  ARM needs to
-> customize the swbp instruction depending on the condition code of the
-> instruction it replaces.
+> @@ -1732,9 +1732,6 @@ static void handle_swbp(struct pt_regs *regs)
+>  		return;
+>  	}
+>  
+> -	/* change it in advance for ->handler() and restart */
+> -	instruction_pointer_set(regs, bp_vaddr);
+> -
 
-Well, we already have "__weak set_swbp(auprobe, ...)", can't arm use it?
+Well, this looks obviously wrong. This SET_IP() has the comment ;)
 
-If not,
-
-> +void __weak arch_uprobe_write_opcode(struct arch_uprobe *auprobe, void *vaddr,
-> +				     uprobe_opcode_t opcode)
-> +{
-> +	memcpy(vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
-> +}
-> ...
-> -	copy_to_page(new_page, vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
-> +	vaddr_new = kmap_atomic(new_page);
-> +	arch_uprobe_write_opcode(auprobe, vaddr_new + (vaddr & ~PAGE_MASK),
-> +				 opcode);
-> +	kunmap_atomic(vaddr_new);
-
-Again, if you need to add the new __weak helper, I think it should simply
-do copy_to_page().
+Note also that with this breaks __skip_sstep() on x86.
 
 Oleg.
