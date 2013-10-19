@@ -1,82 +1,145 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 18 Oct 2013 22:52:46 -0700
-Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
-In-Reply-To: <20131018225702.GA13090@kroah.com> (Greg KH's message of "Fri, 18
- Oct 2013 15:57:02 -0700")
-References: <1381296747.2040.17.camel@joe-AO722>
- <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
- <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
- <CAGa+x86aS+C8iEb1P4ZYxPBix=Anjh4JZoAof=R-i9fGw=bq6w@mail.gmail.com>
- <20131018225702.GA13090@kroah.com>
-Message-ID: <8761stu7rl.fsf@linaro.org>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sat, 19 Oct 2013 08:35:35 +0200
+Subject: [PATCH v2 00/27] Armada 370/XP NAND support
+In-Reply-To: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131019063535.GC20157@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg KH <gregkh@linuxfoundation.org> writes:
+Hi Ezequiel,
 
-> On Fri, Oct 18, 2013 at 10:04:11AM -0700, Kevin Hilman wrote:
->> > A handful of boot panics on ARM platforms were bisected to point at
->> > the version of this commit that's in linux-next (commit
->> > 64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
->> > makes things happy again.
->> >
->> > Upon further digging, it seems that users of devres_alloc() are
->> > relying on the previous behavior of having the memory zero'd which is
->> > no longer the case after $SUBJECT patch.  The change below on top of
->> > -next makes these ARM boards happy again.
->> 
->> Oops, it should've fixed __devres_alloc() also.  Updated patch below.
->
-> Can you send this in a format that I can apply it in?  It was whitespace
-> damaged.
+On Fri, Oct 18, 2013 at 08:02:27PM -0300, Ezequiel Garcia wrote:
+> Hi guys,
+> 
+> This is the v2 of the work implementing NAND support in Armada 370/XP SoCs.
+> This series is probably not yet complete (see below), but I feel like
+> we're really closer now :-)
+> 
+> As in the previous version and given I don't have any public datasheet
+> to show, I'll try to write some of the most relevant parts of the controller.
+> 
+> * NFCv2 controller background
+> 
+> The controller has a 2176 bytes FIFO buffer. Therefore, in order to support
+> larger pages, I/O operations on 4 KiB and 8 KiB pages is done with a set of
+> chunked transfers.
+> 
+> For instance, if we choose a 2048 data chunk and set "BCH" ECC (see below)
+> we'll have this layout in the pages:
+> 
+>   ------------------------------------------------------------------------------
+>   | 2048B data | 32B spare | 30B ECC || 2048B data | 32B spare | 30B ECC | ... |
+>   ------------------------------------------------------------------------------
+> 
+> The driver reads the data and spare portions independently and builds an internal
+> buffer with this layout (in the 4 KiB page case):
+> 
+>   ------------------------------------------
+>   |     4096B data     |     64B spare     |
+>   ------------------------------------------
+> 
+> Also, for the READOOB command the driver disables the ECC and reads a 'spare + ECC'
+> OOB, one per chunk read.
+> 
+>   -------------------------------------------------------------------
+>   |     4096B data     |  32B spare | 30B ECC | 32B spare | 30B ECC |
+>   -------------------------------------------------------------------
+> 
+> So, in order to achieve reading (for instance), we issue several READ0 commands
+> (with some additional controller-specific magic) and read two chunks of 2080B
+> (2048 data + 32 spare) each.
+> The driver accomodates this data to expose the NAND core a contiguous buffer
+> (4096 data + spare) or (4096 + spare + ECC + spare + ECC).
+> 
+> * ECC
+> 
+> The controller has built-in hardware ECC capabilities. In addition it is
+> configurable between two modes: 1) Hamming, 2) BCH.
+> 
+> Note that the actual BCH mode: BCH-4 or BCH-8 will depend on the way
+> the controller is configured to transfer the data.
+> 
+> In the BCH mode the ECC code will be calculated for each transfered chunk
+> and expected to be located (when reading/programming) right after the spare
+> bytes as the figure above shows.
+> 
+> So, repeating the above scheme, a 2048B data chunk will be followed by 32B
+> spare, and then the ECC controller will read/write the ECC code (30B in
+> this case):
+> 
+>   ------------------------------------
+>   | 2048B data | 32B spare | 30B ECC |
+>   ------------------------------------
+> 
+> If the ECC mode is 'BCH' then the ECC is *always* 30 bytes long.
+> If the ECC mode is 'Hamming' the ECC is 6 bytes long, for each 512B block.
+> So in Hamming mode, a 2048B page will have a 24B ECC.
+> 
+> Despite all of the above, the controller requires the driver to only read or
+> write in multiples of 8-bytes, because the data buffer is 64-bits.
+> 
+> * Changes from v1
+> 
+> Aside from several changes based in Brian's feedback, the main changes
+> from v1 are:
+> 
+>   * The controller's clock source is now fully modeled, see patche 1 to 4.
+>     Of course, none of those patches should be taken through the mtd
+>     subsystem, but I'm adding them here for completeness.
+> 
+>   * The chip's cmdfunc() is now independently implemented in each SoC variant.
+>     The rationale behind this decision is that 'chunked' I/O is the only tested
+>     mode on the Armada370 variant, while the old 'vanilla' I/O is the only
+>     tested mode on the PXA variant.
+> 
+>     So it's safer to have an implementation for each variant.
+> 
+>   * Added support for BCH-8, in other words: 8-bits of correction in a 512-byte
+>     region. This is obtained by using a data chunk size of 1024B, thus doubling
+>     the ECC BCH strength, as per this ECC engine mechanism.
+> 
+>   * The ECC layout in use, which must be set according to the page size and
+>     desired ECC strength is now strictly chosen to match only the tested
+>     combinations.
+> 
+> * Pending stuff
+> 
+>   1. Factory bad blocks handling
+> 
+>   Currently, there's no factory bad block initial scan (when the bad block
+>   table is missing). The ECC BCH requires to layout the device's pages in
+>   a splitted "data + OOB + data + OOB" way. This layout being different from
+>   the factory layout. In other words,
+> 
+>   Factory view:
+> 
+>   -----------------------------------------------
+>   |                    Data           |x  OOB   |
+>   -----------------------------------------------
+> 
+>   Driver's view:
+> 
+>   -----------------------------------------------
+>   |      Data      | OOB |      Data   x  | OOB |
+>   -----------------------------------------------
+> 
+>   It can be seen from the above, that the factory bad block marker must be
+>   searched within the 'data' region, and not in the usual OOB region.
+> 
+>   This seems to be similar to the gpmi-nand driver, yet I really find its
+>   'bad block swapping' solution odd, so I'm trying to find something
+>   cleaner.
+> 
+>   2. ECC modeling
+> 
+>   Although I've exposed some ECC information in the ECC layout, I'm still
+>   not sure why is this needed, or if it's needed at all.
+> 
 
-hmm, sorry about that.  This one should work, though I wonder if Andrew
-should pick this up since I think the patch that causes the breakage
-came through his tree.
+I strongly believe that all the information above is very valuable and
+that it's a shame to lose it in a cover message. It would definitely
+make sense to have this in a doc file.
 
-Kevin
-
----------------8<----------------------------------------------------
->From a1962ed4a999fb630a48f75a5ecaf84401d5dbfc Mon Sep 17 00:00:00 2001
-From: Kevin Hilman <khilman@linaro.org>
-Date: Fri, 18 Oct 2013 09:41:39 -0700
-Subject: [PATCH] devres: restore zeroing behavior of devres_alloc()
-
-commit 64c862a8 (devres: add kernel standard devm_k.alloc functions) changed
-the default behavior of alloc_dr() to no longer zero the allocated memory.  However,
-only the devm.k.alloc() function were modified to pass in __GFP_ZERO which leaves
-any users of devres_alloc() or __devres_alloc() with potentially wrong assumptions
-about memory being zero'd upon allocation.
-
-To fix, add __GFP_ZERO to devres_alloc() calls to preserve previous
-behavior of zero'ing memory upon allocation.
-
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
- drivers/base/devres.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/base/devres.c b/drivers/base/devres.c
-index 37e67a2..545c4de 100644
---- a/drivers/base/devres.c
-+++ b/drivers/base/devres.c
-@@ -111,7 +111,7 @@ void * __devres_alloc(dr_release_t release, size_t size, gfp_t gfp,
- {
- 	struct devres *dr;
- 
--	dr = alloc_dr(release, size, gfp);
-+	dr = alloc_dr(release, size, gfp | __GFP_ZERO);
- 	if (unlikely(!dr))
- 		return NULL;
- 	set_node_dbginfo(&dr->node, name, size);
-@@ -136,7 +136,7 @@ void * devres_alloc(dr_release_t release, size_t size, gfp_t gfp)
- {
- 	struct devres *dr;
- 
--	dr = alloc_dr(release, size, gfp);
-+	dr = alloc_dr(release, size, gfp | __GFP_ZERO);
- 	if (unlikely(!dr))
- 		return NULL;
- 	return dr->data;
--- 
-1.8.3
+Best regards,
+Willy
