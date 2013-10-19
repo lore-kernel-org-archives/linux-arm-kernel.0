@@ -1,114 +1,32 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 19 Oct 2013 12:45:55 +0200
-Subject: [PATCH 02/11] video: imxfb: Introduce regulator support.
-In-Reply-To: <1382108672-23269-2-git-send-email-denis@eukrea.com>
-References: <1382108672-23269-1-git-send-email-denis@eukrea.com>
- <1382108672-23269-2-git-send-email-denis@eukrea.com>
-Message-ID: <20131019104555.GI18477@ns203013.ovh.net>
+Date: Sat, 19 Oct 2013 12:57:46 +0200
+Subject: [Patch v2][ 10/37] video: imxfb: Also add pwmr for the device
+ tree.
+In-Reply-To: <1382022155-21954-11-git-send-email-denis@eukrea.com>
+References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
+ <1382022155-21954-11-git-send-email-denis@eukrea.com>
+Message-ID: <20131019105746.GL18477@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:04 Fri 18 Oct     , Denis Carikli wrote:
-> This commit is based on the following commit by Fabio Estevam:
->   4344429 video: mxsfb: Introduce regulator support
+On 17:02 Thu 17 Oct     , Denis Carikli wrote:
+> pwmr has to be set to get the imxfb backlight work,
+> though pwmr was only configurable trough the platform data.
 > 
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
 > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
 > Cc: linux-fbdev at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
 > Cc: Eric B?nard <eric@eukrea.com>
 > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  drivers/video/imxfb.c |   27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index 44ee678..4dd7678 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -28,6 +28,7 @@
->  #include <linux/cpufreq.h>
->  #include <linux/clk.h>
->  #include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/io.h>
->  #include <linux/math64.h>
-> @@ -145,6 +146,7 @@ struct imxfb_info {
->  	struct clk		*clk_ipg;
->  	struct clk		*clk_ahb;
->  	struct clk		*clk_per;
-> +	struct regulator	*reg_lcd;
->  	enum imxfb_type		devtype;
->  	bool			enabled;
->  
-> @@ -563,12 +565,23 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
->  
->  static void imxfb_enable_controller(struct imxfb_info *fbi)
->  {
-> +	int ret;
->  
->  	if (fbi->enabled)
->  		return;
->  
->  	pr_debug("Enabling LCD controller\n");
->  
-> +	if (fbi->reg_lcd) {
-> +		ret = regulator_enable(fbi->reg_lcd);
-> +		if (ret) {
-> +			dev_err(&fbi->pdev->dev,
-> +				"lcd regulator enable failed with error: %d\n",
-> +				ret);
-> +			return;
-> +		}
-> +	}
-> +
->  	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
->  
->  	/* panning offset 0 (0 pixel offset)        */
-> @@ -597,6 +610,8 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
->  
->  static void imxfb_disable_controller(struct imxfb_info *fbi)
->  {
-> +	int ret;
-> +
->  	if (!fbi->enabled)
->  		return;
->  
-> @@ -613,6 +628,14 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
->  	fbi->enabled = false;
->  
->  	writel(0, fbi->regs + LCDC_RMCR);
-> +
-> +	if (fbi->reg_lcd) {
-> +		ret = regulator_disable(fbi->reg_lcd);
-> +		if (ret)
-> +			dev_err(&fbi->pdev->dev,
-> +				"lcd regulator disable failed with error: %d\n",
-> +				ret);
-> +	}
->  }
->  
->  static int imxfb_blank(int blank, struct fb_info *info)
-> @@ -1020,6 +1043,10 @@ static int imxfb_probe(struct platform_device *pdev)
->  		goto failed_register;
->  	}
->  
-> +	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
-put a warning at list
-
-otherwise looks ok
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
 Best Regards,
 J.
-> +	if (IS_ERR(fbi->reg_lcd))
-> +		fbi->reg_lcd = NULL;
-> +
->  	imxfb_enable_controller(fbi);
->  	fbi->pdev = pdev;
->  #ifdef PWMR_BACKLIGHT_AVAILABLE
-> -- 
-> 1.7.9.5
-> 
