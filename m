@@ -1,120 +1,150 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 19 Oct 2013 14:37:39 +0200
-Subject: [PATCH 2/4] mvebu: Dove: Instantiate cpufreq driver.
-In-Reply-To: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
-References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1382186261-14482-3-git-send-email-andrew@lunn.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 19 Oct 2013 10:25:49 -0400
+Subject: [PATCH v2 00/27] Armada 370/XP NAND support
+In-Reply-To: <20131019063535.GC20157@1wt.eu>
+References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131019063535.GC20157@1wt.eu>
+Message-ID: <20131019142549.GO22434@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a platform driver definition to instantiate the dove cpufreq
-driver. Also indicate the ARCH has cpufreq support, so allowing the
-cpufreq framework to be enabled.
+On Sat, Oct 19, 2013 at 08:35:35AM +0200, Willy Tarreau wrote:
+> Hi Ezequiel,
+> 
+> On Fri, Oct 18, 2013 at 08:02:27PM -0300, Ezequiel Garcia wrote:
+> > Hi guys,
+> > 
+> > This is the v2 of the work implementing NAND support in Armada 370/XP SoCs.
+> > This series is probably not yet complete (see below), but I feel like
+> > we're really closer now :-)
+> > 
+> > As in the previous version and given I don't have any public datasheet
+> > to show, I'll try to write some of the most relevant parts of the controller.
+> > 
+> > * NFCv2 controller background
+> > 
+> > The controller has a 2176 bytes FIFO buffer. Therefore, in order to support
+> > larger pages, I/O operations on 4 KiB and 8 KiB pages is done with a set of
+> > chunked transfers.
+> > 
+> > For instance, if we choose a 2048 data chunk and set "BCH" ECC (see below)
+> > we'll have this layout in the pages:
+> > 
+> >   ------------------------------------------------------------------------------
+> >   | 2048B data | 32B spare | 30B ECC || 2048B data | 32B spare | 30B ECC | ... |
+> >   ------------------------------------------------------------------------------
+> > 
+> > The driver reads the data and spare portions independently and builds an internal
+> > buffer with this layout (in the 4 KiB page case):
+> > 
+> >   ------------------------------------------
+> >   |     4096B data     |     64B spare     |
+> >   ------------------------------------------
+> > 
+> > Also, for the READOOB command the driver disables the ECC and reads a 'spare + ECC'
+> > OOB, one per chunk read.
+> > 
+> >   -------------------------------------------------------------------
+> >   |     4096B data     |  32B spare | 30B ECC | 32B spare | 30B ECC |
+> >   -------------------------------------------------------------------
+> > 
+> > So, in order to achieve reading (for instance), we issue several READ0 commands
+> > (with some additional controller-specific magic) and read two chunks of 2080B
+> > (2048 data + 32 spare) each.
+> > The driver accomodates this data to expose the NAND core a contiguous buffer
+> > (4096 data + spare) or (4096 + spare + ECC + spare + ECC).
+> > 
+> > * ECC
+> > 
+> > The controller has built-in hardware ECC capabilities. In addition it is
+> > configurable between two modes: 1) Hamming, 2) BCH.
+> > 
+> > Note that the actual BCH mode: BCH-4 or BCH-8 will depend on the way
+> > the controller is configured to transfer the data.
+> > 
+> > In the BCH mode the ECC code will be calculated for each transfered chunk
+> > and expected to be located (when reading/programming) right after the spare
+> > bytes as the figure above shows.
+> > 
+> > So, repeating the above scheme, a 2048B data chunk will be followed by 32B
+> > spare, and then the ECC controller will read/write the ECC code (30B in
+> > this case):
+> > 
+> >   ------------------------------------
+> >   | 2048B data | 32B spare | 30B ECC |
+> >   ------------------------------------
+> > 
+> > If the ECC mode is 'BCH' then the ECC is *always* 30 bytes long.
+> > If the ECC mode is 'Hamming' the ECC is 6 bytes long, for each 512B block.
+> > So in Hamming mode, a 2048B page will have a 24B ECC.
+> > 
+> > Despite all of the above, the controller requires the driver to only read or
+> > write in multiples of 8-bytes, because the data buffer is 64-bits.
+> > 
+> > * Changes from v1
+> > 
+> > Aside from several changes based in Brian's feedback, the main changes
+> > from v1 are:
+> > 
+> >   * The controller's clock source is now fully modeled, see patche 1 to 4.
+> >     Of course, none of those patches should be taken through the mtd
+> >     subsystem, but I'm adding them here for completeness.
+> > 
+> >   * The chip's cmdfunc() is now independently implemented in each SoC variant.
+> >     The rationale behind this decision is that 'chunked' I/O is the only tested
+> >     mode on the Armada370 variant, while the old 'vanilla' I/O is the only
+> >     tested mode on the PXA variant.
+> > 
+> >     So it's safer to have an implementation for each variant.
+> > 
+> >   * Added support for BCH-8, in other words: 8-bits of correction in a 512-byte
+> >     region. This is obtained by using a data chunk size of 1024B, thus doubling
+> >     the ECC BCH strength, as per this ECC engine mechanism.
+> > 
+> >   * The ECC layout in use, which must be set according to the page size and
+> >     desired ECC strength is now strictly chosen to match only the tested
+> >     combinations.
+> > 
+> > * Pending stuff
+> > 
+> >   1. Factory bad blocks handling
+> > 
+> >   Currently, there's no factory bad block initial scan (when the bad block
+> >   table is missing). The ECC BCH requires to layout the device's pages in
+> >   a splitted "data + OOB + data + OOB" way. This layout being different from
+> >   the factory layout. In other words,
+> > 
+> >   Factory view:
+> > 
+> >   -----------------------------------------------
+> >   |                    Data           |x  OOB   |
+> >   -----------------------------------------------
+> > 
+> >   Driver's view:
+> > 
+> >   -----------------------------------------------
+> >   |      Data      | OOB |      Data   x  | OOB |
+> >   -----------------------------------------------
+> > 
+> >   It can be seen from the above, that the factory bad block marker must be
+> >   searched within the 'data' region, and not in the usual OOB region.
+> > 
+> >   This seems to be similar to the gpmi-nand driver, yet I really find its
+> >   'bad block swapping' solution odd, so I'm trying to find something
+> >   cleaner.
+> > 
+> >   2. ECC modeling
+> > 
+> >   Although I've exposed some ECC information in the ECC layout, I'm still
+> >   not sure why is this needed, or if it's needed at all.
+> > 
+> 
+> I strongly believe that all the information above is very valuable and
+> that it's a shame to lose it in a cover message. It would definitely
+> make sense to have this in a doc file.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/Kconfig                       |  1 +
- arch/arm/mach-dove/board-dt.c          |  2 ++
- arch/arm/mach-dove/common.c            | 36 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-dove/common.h            |  1 +
- arch/arm/mach-dove/include/mach/dove.h |  1 +
- 5 files changed, 41 insertions(+)
+Agreed.  Great work Ezequiel!  Let's capture this in Documentation/.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1ad6fb6..7744415 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -495,6 +495,7 @@ config ARCH_IXP4XX
- 
- config ARCH_DOVE
- 	bool "Marvell Dove"
-+	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CPU_PJ4
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-index 49f72a8..98202de 100644
---- a/arch/arm/mach-dove/board-dt.c
-+++ b/arch/arm/mach-dove/board-dt.c
-@@ -70,6 +70,8 @@ static void __init dove_dt_init(void)
- 	/* Setup clocks for legacy devices */
- 	dove_legacy_clk_init();
- 
-+	dove_cpufreq_init();
-+
- 	/* Internal devices not ported to DT yet */
- 	dove_pcie_init(1, 1);
- 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index c122bcf..9e648a8 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -344,6 +344,42 @@ void __init dove_sdio1_init(void)
- 	platform_device_register(&dove_sdio1);
- }
- 
-+/*****************************************************************************
-+ * CPU Frequency
-+ ****************************************************************************/
-+static struct resource dove_cpufreq_resources[] = {
-+	[0] = {
-+		.start  = DOVE_PMU_PHYS_BASE,
-+		.end    = DOVE_PMU_PHYS_BASE + 0x7,
-+		.flags  = IORESOURCE_MEM,
-+		.name   = "cpufreq: DFS"
-+	},
-+	[1] = {
-+		.start  = DOVE_PMU_PHYS_BASE + 0x8000,
-+		.end    = DOVE_PMU_PHYS_BASE + 0x8004,
-+		.flags  = IORESOURCE_MEM,
-+		.name   = "cpufreq PMU CR"
-+	},
-+	[2] = {
-+		.start  = DOVE_PMU_PHYS_BASE + 0x0044,
-+		.end    = DOVE_PMU_PHYS_BASE + 0x0048,
-+		.flags  = IORESOURCE_MEM,
-+		.name   = "cpufreq: PMU Clk Div"
-+	},
-+};
-+
-+static struct platform_device dove_cpufreq_device = {
-+	.name		= "dove-cpufreq",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(dove_cpufreq_resources),
-+	.resource	= dove_cpufreq_resources,
-+};
-+
-+void __init dove_cpufreq_init(void)
-+{
-+	platform_device_register(&dove_cpufreq_device);
-+}
-+
- void __init dove_setup_cpu_wins(void)
- {
- 	/*
-diff --git a/arch/arm/mach-dove/common.h b/arch/arm/mach-dove/common.h
-index 1d72522..5c9a77b 100644
---- a/arch/arm/mach-dove/common.h
-+++ b/arch/arm/mach-dove/common.h
-@@ -44,6 +44,7 @@ void dove_spi1_init(void);
- void dove_i2c_init(void);
- void dove_sdio0_init(void);
- void dove_sdio1_init(void);
-+void dove_cpufreq_init(void);
- void dove_restart(enum reboot_mode, const char *);
- 
- #endif
-diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
-index 0c4b35f..48db186 100644
---- a/arch/arm/mach-dove/include/mach/dove.h
-+++ b/arch/arm/mach-dove/include/mach/dove.h
-@@ -144,6 +144,7 @@
- #define  DOVE_SD0_GPIO_SEL		(1 << 0)
- 
- /* Power Management */
-+#define DOVE_PMU_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xd0000)
- #define DOVE_PMU_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xd0000)
- #define DOVE_PMU_SIG_CTRL	(DOVE_PMU_VIRT_BASE + 0x802c)
- 
--- 
-1.8.4.rc3
+thx,
+
+Jason.
