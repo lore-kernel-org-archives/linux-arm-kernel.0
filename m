@@ -1,150 +1,264 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 19 Oct 2013 10:25:49 -0400
-Subject: [PATCH v2 00/27] Armada 370/XP NAND support
-In-Reply-To: <20131019063535.GC20157@1wt.eu>
-References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131019063535.GC20157@1wt.eu>
-Message-ID: <20131019142549.GO22434@titan.lakedaemon.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 19 Oct 2013 15:45:51 +0100
+Subject: [PATCH] arm/arm64: KVM: MMIO support for BE guest
+In-Reply-To: <1381502101-7974-1-git-send-email-marc.zyngier@arm.com>
+References: <1381502101-7974-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20131019144551.GB39411@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 19, 2013 at 08:35:35AM +0200, Willy Tarreau wrote:
-> Hi Ezequiel,
+On Fri, Oct 11, 2013 at 03:35:01PM +0100, Marc Zyngier wrote:
+> Do the necessary byteswap when host and guest have different
+> views of the universe. Actually, the only case we need to take
+> care of is when the guest is BE. All the other cases are naturally
+> handled.
 > 
-> On Fri, Oct 18, 2013 at 08:02:27PM -0300, Ezequiel Garcia wrote:
-> > Hi guys,
-> > 
-> > This is the v2 of the work implementing NAND support in Armada 370/XP SoCs.
-> > This series is probably not yet complete (see below), but I feel like
-> > we're really closer now :-)
-> > 
-> > As in the previous version and given I don't have any public datasheet
-> > to show, I'll try to write some of the most relevant parts of the controller.
-> > 
-> > * NFCv2 controller background
-> > 
-> > The controller has a 2176 bytes FIFO buffer. Therefore, in order to support
-> > larger pages, I/O operations on 4 KiB and 8 KiB pages is done with a set of
-> > chunked transfers.
-> > 
-> > For instance, if we choose a 2048 data chunk and set "BCH" ECC (see below)
-> > we'll have this layout in the pages:
-> > 
-> >   ------------------------------------------------------------------------------
-> >   | 2048B data | 32B spare | 30B ECC || 2048B data | 32B spare | 30B ECC | ... |
-> >   ------------------------------------------------------------------------------
-> > 
-> > The driver reads the data and spare portions independently and builds an internal
-> > buffer with this layout (in the 4 KiB page case):
-> > 
-> >   ------------------------------------------
-> >   |     4096B data     |     64B spare     |
-> >   ------------------------------------------
-> > 
-> > Also, for the READOOB command the driver disables the ECC and reads a 'spare + ECC'
-> > OOB, one per chunk read.
-> > 
-> >   -------------------------------------------------------------------
-> >   |     4096B data     |  32B spare | 30B ECC | 32B spare | 30B ECC |
-> >   -------------------------------------------------------------------
-> > 
-> > So, in order to achieve reading (for instance), we issue several READ0 commands
-> > (with some additional controller-specific magic) and read two chunks of 2080B
-> > (2048 data + 32 spare) each.
-> > The driver accomodates this data to expose the NAND core a contiguous buffer
-> > (4096 data + spare) or (4096 + spare + ECC + spare + ECC).
-> > 
-> > * ECC
-> > 
-> > The controller has built-in hardware ECC capabilities. In addition it is
-> > configurable between two modes: 1) Hamming, 2) BCH.
-> > 
-> > Note that the actual BCH mode: BCH-4 or BCH-8 will depend on the way
-> > the controller is configured to transfer the data.
-> > 
-> > In the BCH mode the ECC code will be calculated for each transfered chunk
-> > and expected to be located (when reading/programming) right after the spare
-> > bytes as the figure above shows.
-> > 
-> > So, repeating the above scheme, a 2048B data chunk will be followed by 32B
-> > spare, and then the ECC controller will read/write the ECC code (30B in
-> > this case):
-> > 
-> >   ------------------------------------
-> >   | 2048B data | 32B spare | 30B ECC |
-> >   ------------------------------------
-> > 
-> > If the ECC mode is 'BCH' then the ECC is *always* 30 bytes long.
-> > If the ECC mode is 'Hamming' the ECC is 6 bytes long, for each 512B block.
-> > So in Hamming mode, a 2048B page will have a 24B ECC.
-> > 
-> > Despite all of the above, the controller requires the driver to only read or
-> > write in multiples of 8-bytes, because the data buffer is 64-bits.
-> > 
-> > * Changes from v1
-> > 
-> > Aside from several changes based in Brian's feedback, the main changes
-> > from v1 are:
-> > 
-> >   * The controller's clock source is now fully modeled, see patche 1 to 4.
-> >     Of course, none of those patches should be taken through the mtd
-> >     subsystem, but I'm adding them here for completeness.
-> > 
-> >   * The chip's cmdfunc() is now independently implemented in each SoC variant.
-> >     The rationale behind this decision is that 'chunked' I/O is the only tested
-> >     mode on the Armada370 variant, while the old 'vanilla' I/O is the only
-> >     tested mode on the PXA variant.
-> > 
-> >     So it's safer to have an implementation for each variant.
-> > 
-> >   * Added support for BCH-8, in other words: 8-bits of correction in a 512-byte
-> >     region. This is obtained by using a data chunk size of 1024B, thus doubling
-> >     the ECC BCH strength, as per this ECC engine mechanism.
-> > 
-> >   * The ECC layout in use, which must be set according to the page size and
-> >     desired ECC strength is now strictly chosen to match only the tested
-> >     combinations.
-> > 
-> > * Pending stuff
-> > 
-> >   1. Factory bad blocks handling
-> > 
-> >   Currently, there's no factory bad block initial scan (when the bad block
-> >   table is missing). The ECC BCH requires to layout the device's pages in
-> >   a splitted "data + OOB + data + OOB" way. This layout being different from
-> >   the factory layout. In other words,
-> > 
-> >   Factory view:
-> > 
-> >   -----------------------------------------------
-> >   |                    Data           |x  OOB   |
-> >   -----------------------------------------------
-> > 
-> >   Driver's view:
-> > 
-> >   -----------------------------------------------
-> >   |      Data      | OOB |      Data   x  | OOB |
-> >   -----------------------------------------------
-> > 
-> >   It can be seen from the above, that the factory bad block marker must be
-> >   searched within the 'data' region, and not in the usual OOB region.
-> > 
-> >   This seems to be similar to the gpmi-nand driver, yet I really find its
-> >   'bad block swapping' solution odd, so I'm trying to find something
-> >   cleaner.
-> > 
-> >   2. ECC modeling
-> > 
-> >   Although I've exposed some ECC information in the ECC layout, I'm still
-> >   not sure why is this needed, or if it's needed at all.
-> > 
+> Also be careful about endianness when the data is being memcopy-ed
+> from/to the run buffer.
 > 
-> I strongly believe that all the information above is very valuable and
-> that it's a shame to lose it in a cover message. It would definitely
-> make sense to have this in a doc file.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_emulate.h   | 41 ++++++++++++++++++++
+>  arch/arm/kvm/mmio.c                  | 74 ++++++++++++++++++++++++++++++------
+>  arch/arm64/include/asm/kvm_emulate.h | 48 +++++++++++++++++++++++
+>  3 files changed, 152 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index a464e8d..8a6be05 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -157,4 +157,45 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
+>  	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
+>  }
+>  
+> +static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
+> +{
+> +	return !!(*vcpu_cpsr(vcpu) & PSR_E_BIT);
+> +}
+> +
+> +static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
+> +						    unsigned long data,
+> +						    unsigned int len)
+> +{
+> +	if (kvm_vcpu_is_be(vcpu)) {
+> +		switch (len) {
+> +		case 1:
+> +			return data & 0xff;
+> +		case 2:
+> +			return be16_to_cpu(data & 0xffff);
+> +		default:
+> +			return be32_to_cpu(data);
+> +		}
+> +	}
+> +
+> +	return data;		/* Leave LE untouched */
+> +}
+> +
+> +static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+> +						    unsigned long data,
+> +						    unsigned int len)
+> +{
+> +	if (kvm_vcpu_is_be(vcpu)) {
+> +		switch (len) {
+> +		case 1:
+> +			return data & 0xff;
+> +		case 2:
+> +			return cpu_to_be16(data & 0xffff);
+> +		default:
+> +			return cpu_to_be32(data);
+> +		}
+> +	}
+> +
+> +	return data;		/* Leave LE untouched */
+> +}
+> +
+>  #endif /* __ARM_KVM_EMULATE_H__ */
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 0c25d94..5f65c95 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -33,28 +33,49 @@
+>   */
+>  int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> -	unsigned long *dest;
+>  	unsigned int len;
+>  	int mask;
+>  
+>  	if (!run->mmio.is_write) {
+> -		dest = vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt);
+> -		*dest = 0;
+> +		unsigned long data = 0;
+>  
+>  		len = run->mmio.len;
+>  		if (len > sizeof(unsigned long))
+>  			return -EINVAL;
+>  
+> -		memcpy(dest, run->mmio.data, len);
+> -
+> -		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
+> -				*((u64 *)run->mmio.data));
+> +		switch (run->mmio.len) {
+> +		case 1:
+> +			data = run->mmio.data[0];
+> +			break;
+> +		case 2: {
+> +			u16 hword;
+> +			memcpy(&hword, run->mmio.data, len);
+> +			data = hword;
+> +			break;
+> +		}
+> +		case 4: {
+> +			u32 word;
+> +			memcpy(&word, run->mmio.data, len);
+> +			data = word;
+> +			break;
+> +		}
+> +		case 8: {
+> +			u64 dword;
+> +			memcpy(&dword, run->mmio.data, len);
+> +			data = dword;
+> +			break;
+> +		}
+> +		}
+>  
+>  		if (vcpu->arch.mmio_decode.sign_extend &&
+>  		    len < sizeof(unsigned long)) {
+>  			mask = 1U << ((len * 8) - 1);
+> -			*dest = (*dest ^ mask) - mask;
+> +			data = (data ^ mask) - mask;
+>  		}
+> +
+> +		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
+> +			       data);
+> +		*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = vcpu_data_host_to_guest(vcpu, data, len);
 
-Agreed.  Great work Ezequiel!  Let's capture this in Documentation/.
+argh, very long line, can you reuse the "dest" variable and make it two
+lines?
 
-thx,
+>  	}
+>  
+>  	return 0;
+> @@ -105,6 +126,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		 phys_addr_t fault_ipa)
+>  {
+>  	struct kvm_exit_mmio mmio;
+> +	unsigned long data;
+>  	unsigned long rt;
+>  	int ret;
+>  
+> @@ -125,13 +147,43 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  	}
+>  
+>  	rt = vcpu->arch.mmio_decode.rt;
+> +	data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), mmio.len);
+> +
+>  	trace_kvm_mmio((mmio.is_write) ? KVM_TRACE_MMIO_WRITE :
+>  					 KVM_TRACE_MMIO_READ_UNSATISFIED,
+>  			mmio.len, fault_ipa,
+> -			(mmio.is_write) ? *vcpu_reg(vcpu, rt) : 0);
+> +			(mmio.is_write) ? data : 0);
+> +
+> +	if (mmio.is_write) {
+> +		void *datap = NULL;
+> +		union {
+> +			u8	byte;
+> +			u16	hword;
+> +			u32	word;
+> +			u64	dword;
+> +		} tmp;
+> +
+> +		switch (mmio.len) {
+> +		case 1:
+> +			tmp.byte	= data;
+> +			datap		= &tmp.byte;
+> +			break;
+> +		case 2:
+> +			tmp.hword	= data;
+> +			datap		= &tmp.hword;
+> +			break;
+> +		case 4:
+> +			tmp.word	= data;
+> +			datap		= &tmp.word;
+> +			break;
+> +		case 8:
+> +			tmp.dword	= data;
+> +			datap		= &tmp.dword;
+> +			break;
+> +		}
+>  
 
-Jason.
+can we factor this out to a separate function like mmio_write_data_fill
+or something?
+
+> -	if (mmio.is_write)
+> -		memcpy(mmio.data, vcpu_reg(vcpu, rt), mmio.len);
+> +		memcpy(mmio.data, datap, mmio.len);
+> +	}
+>  
+>  	if (vgic_handle_mmio(vcpu, run, &mmio))
+>  		return 1;
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index eec0738..3a7d058 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -177,4 +177,52 @@ static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
+>  	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
+>  }
+>  
+> +static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
+> +{
+> +	if (vcpu_mode_is_32bit(vcpu))
+> +		return !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_E_BIT);
+> +
+> +	return !!(vcpu_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
+> +}
+> +
+> +static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
+> +						    unsigned long data,
+> +						    unsigned int len)
+> +{
+> +	if (kvm_vcpu_is_be(vcpu)) {
+> +		switch (len) {
+> +		case 1:
+> +			return data & 0xff;
+> +		case 2:
+> +			return be16_to_cpu(data & 0xffff);
+> +		case 4:
+> +			return be32_to_cpu(data & ((1UL << 32) - 1));
+> +		default:
+> +			return be64_to_cpu(data);
+> +		}
+> +	}
+> +
+> +	return data;		/* Leave LE untouched */
+> +}
+> +
+> +static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+> +						    unsigned long data,
+> +						    unsigned int len)
+> +{
+> +	if (kvm_vcpu_is_be(vcpu)) {
+> +		switch (len) {
+> +		case 1:
+> +			return data & 0xff;
+> +		case 2:
+> +			return cpu_to_be16(data & 0xffff);
+> +		case 4:
+> +			return cpu_to_be32(data & ((1UL << 32) - 1));
+> +		default:
+> +			return cpu_to_be64(data);
+> +		}
+> +	}
+> +
+> +	return data;		/* Leave LE untouched */
+> +}
+> +
+>  #endif /* __ARM64_KVM_EMULATE_H__ */
+> -- 
+> 1.8.2.3
+> 
+> 
+
+Otherwise it looks pretty good,
+-Christoffer
