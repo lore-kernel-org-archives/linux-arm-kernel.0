@@ -1,264 +1,130 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 19 Oct 2013 15:45:51 +0100
-Subject: [PATCH] arm/arm64: KVM: MMIO support for BE guest
-In-Reply-To: <1381502101-7974-1-git-send-email-marc.zyngier@arm.com>
-References: <1381502101-7974-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20131019144551.GB39411@lvm>
+Date: Sat, 19 Oct 2013 15:45:34 +0100
+Subject: [RFC PATCH] arm64: KVM: honor cacheability attributes on S2 page
+ fault
+In-Reply-To: <20131017111601.GK23462@arm.com>
+References: <CAAhSdy1Sm2N68ZB5r9BmansGYnUgFO0ZFdUL=XB7RhJ258AAFA@mail.gmail.com>
+ <20131011143721.GD15803@arm.com>
+ <CAAhSdy1RS58HxDD2sKC5NP=vZ-fn=Zc4qEYZoFHR2usGqiQMFA@mail.gmail.com>
+ <5258125E.4040709@arm.com>
+ <CAAhSdy2nfnDuAZW6XWz0Xc4ehcU9YcHKLv7WVSCgk3+b8AD7Hw@mail.gmail.com>
+ <20131011154401.GE15803@arm.com>
+ <CAAhSdy3u2KUwdSWniDq=vCfXi6u44FhjKUA96RZPjCMiDaDA5A@mail.gmail.com>
+ <20131015143848.GA1591@arm.com>
+ <CAAhSdy3X1y6Lgni47NQu0ozUbTv3902RaMyBGyjD7OZ9p1=iJw@mail.gmail.com>
+ <20131017111601.GK23462@arm.com>
+Message-ID: <20131019144534.GA39411@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 11, 2013 at 03:35:01PM +0100, Marc Zyngier wrote:
-> Do the necessary byteswap when host and guest have different
-> views of the universe. Actually, the only case we need to take
-> care of is when the guest is BE. All the other cases are naturally
-> handled.
+On Thu, Oct 17, 2013 at 12:16:02PM +0100, Catalin Marinas wrote:
+> On Thu, Oct 17, 2013 at 05:19:01AM +0100, Anup Patel wrote:
+> > On Tue, Oct 15, 2013 at 8:08 PM, Catalin Marinas
+> > <catalin.marinas@arm.com> wrote:
+> > > So, the proposal:
+> > >
+> > > 1. Clean+invalidate D-cache for pages mapped into the stage 2 for the
+> > >    first time (if the access is non-cacheable). Covered by this patch.
+> > > 2. Track guest's use of the MMU registers (SCTLR etc.) and detect when
+> > >    the stage 1 is enabled. When stage 1 is enabled, clean+invalidate the
+> > >    D-cache again for the all pages already mapped in stage 2 (in case we
+> > >    had speculative loads).
+> > 
+> > I agree on both point1 & poin2.
+> > 
+> > The point2 is for avoiding speculative cache loads for Host-side mappings
+> > of the Guest RAM. Right?
 > 
-> Also be careful about endianness when the data is being memcopy-ed
-> from/to the run buffer.
+> Yes.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/kvm_emulate.h   | 41 ++++++++++++++++++++
->  arch/arm/kvm/mmio.c                  | 74 ++++++++++++++++++++++++++++++------
->  arch/arm64/include/asm/kvm_emulate.h | 48 +++++++++++++++++++++++
->  3 files changed, 152 insertions(+), 11 deletions(-)
+
+I'm having a hard time imagining a scenario where (2) is needed, can you
+give me a concrete example of a situation that we're addressing here?
+
+> > > The above allow the guest OS to run the boot code with MMU disabled and
+> > > then enable the MMU. If the guest needs to disable the MMU or caches
+> > > after boot, we either ask the guest for a Hyp call or we extend point 2
+> > > above to detect disabling (though that's not very efficient). Guest
+> > > power management via PSCI already implies Hyp calls, it's more for kexec
+> > > where you have a soft reset.
+
+Why would we need to do anything if the guest disables the MMU?  Isn't it
+completely the responsibility of the guest to flush whatever it needs in
+physical memory before doing ?
+
+> > 
+> > Yes, Guest disabling MMU after boot could be problematic.
+> > 
+> > The Hyp call (or PSCI call) approach can certainly be efficient but we need
+> > to change Guest OS for this. On the other hand, extending point2 (though
+> > inefficient) could save us the pain of changing Guest OS.
+> > 
+> > Can we come-up with a way of avoiding Hyp call (or PSCI call) here ?
 > 
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index a464e8d..8a6be05 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -157,4 +157,45 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
->  	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
->  }
->  
-> +static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
-> +{
-> +	return !!(*vcpu_cpsr(vcpu) & PSR_E_BIT);
-> +}
-> +
-> +static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
-> +						    unsigned long data,
-> +						    unsigned int len)
-> +{
-> +	if (kvm_vcpu_is_be(vcpu)) {
-> +		switch (len) {
-> +		case 1:
-> +			return data & 0xff;
-> +		case 2:
-> +			return be16_to_cpu(data & 0xffff);
-> +		default:
-> +			return be32_to_cpu(data);
-> +		}
-> +	}
-> +
-> +	return data;		/* Leave LE untouched */
-> +}
-> +
-> +static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-> +						    unsigned long data,
-> +						    unsigned int len)
-> +{
-> +	if (kvm_vcpu_is_be(vcpu)) {
-> +		switch (len) {
-> +		case 1:
-> +			return data & 0xff;
-> +		case 2:
-> +			return cpu_to_be16(data & 0xffff);
-> +		default:
-> +			return cpu_to_be32(data);
-> +		}
-> +	}
-> +
-> +	return data;		/* Leave LE untouched */
-> +}
-> +
->  #endif /* __ARM_KVM_EMULATE_H__ */
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index 0c25d94..5f65c95 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -33,28 +33,49 @@
->   */
->  int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
-> -	unsigned long *dest;
->  	unsigned int len;
->  	int mask;
->  
->  	if (!run->mmio.is_write) {
-> -		dest = vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt);
-> -		*dest = 0;
-> +		unsigned long data = 0;
->  
->  		len = run->mmio.len;
->  		if (len > sizeof(unsigned long))
->  			return -EINVAL;
->  
-> -		memcpy(dest, run->mmio.data, len);
-> -
-> -		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
-> -				*((u64 *)run->mmio.data));
-> +		switch (run->mmio.len) {
-> +		case 1:
-> +			data = run->mmio.data[0];
-> +			break;
-> +		case 2: {
-> +			u16 hword;
-> +			memcpy(&hword, run->mmio.data, len);
-> +			data = hword;
-> +			break;
-> +		}
-> +		case 4: {
-> +			u32 word;
-> +			memcpy(&word, run->mmio.data, len);
-> +			data = word;
-> +			break;
-> +		}
-> +		case 8: {
-> +			u64 dword;
-> +			memcpy(&dword, run->mmio.data, len);
-> +			data = dword;
-> +			break;
-> +		}
-> +		}
->  
->  		if (vcpu->arch.mmio_decode.sign_extend &&
->  		    len < sizeof(unsigned long)) {
->  			mask = 1U << ((len * 8) - 1);
-> -			*dest = (*dest ^ mask) - mask;
-> +			data = (data ^ mask) - mask;
->  		}
-> +
-> +		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
-> +			       data);
-> +		*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = vcpu_data_host_to_guest(vcpu, data, len);
+> It could probably be done more efficiently by decoding the MMU register
+> access fault at the EL2 level and emulating it there to avoid a switch
+> to host Linux. But that's not a trivial task and I can't tell about the
+> performance impact.
 
-argh, very long line, can you reuse the "dest" variable and make it two
-lines?
+That would be trapping to Hyp mode on every context switch for example,
+multiple times probably, and that sounds horrible.  Yes, this should be
+isolated to EL2, but even then this will add overhead.
 
->  	}
->  
->  	return 0;
-> @@ -105,6 +126,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		 phys_addr_t fault_ipa)
->  {
->  	struct kvm_exit_mmio mmio;
-> +	unsigned long data;
->  	unsigned long rt;
->  	int ret;
->  
-> @@ -125,13 +147,43 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	}
->  
->  	rt = vcpu->arch.mmio_decode.rt;
-> +	data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), mmio.len);
-> +
->  	trace_kvm_mmio((mmio.is_write) ? KVM_TRACE_MMIO_WRITE :
->  					 KVM_TRACE_MMIO_READ_UNSATISFIED,
->  			mmio.len, fault_ipa,
-> -			(mmio.is_write) ? *vcpu_reg(vcpu, rt) : 0);
-> +			(mmio.is_write) ? data : 0);
-> +
-> +	if (mmio.is_write) {
-> +		void *datap = NULL;
-> +		union {
-> +			u8	byte;
-> +			u16	hword;
-> +			u32	word;
-> +			u64	dword;
-> +		} tmp;
-> +
-> +		switch (mmio.len) {
-> +		case 1:
-> +			tmp.byte	= data;
-> +			datap		= &tmp.byte;
-> +			break;
-> +		case 2:
-> +			tmp.hword	= data;
-> +			datap		= &tmp.hword;
-> +			break;
-> +		case 4:
-> +			tmp.word	= data;
-> +			datap		= &tmp.word;
-> +			break;
-> +		case 8:
-> +			tmp.dword	= data;
-> +			datap		= &tmp.dword;
-> +			break;
-> +		}
->  
+We could measure this though, but it sounds like something that will
+hurt the system significantly overall in both performance and complexity
+to solve and extremely rare situation.
 
-can we factor this out to a separate function like mmio_write_data_fill
-or something?
+A Hyp call sounds equally icky and quite different from PSCI imho, since
+PSCI is used on native systems and support by a "standard", so we're not
+doing paravirtualization there.
 
-> -	if (mmio.is_write)
-> -		memcpy(mmio.data, vcpu_reg(vcpu, rt), mmio.len);
-> +		memcpy(mmio.data, datap, mmio.len);
-> +	}
->  
->  	if (vgic_handle_mmio(vcpu, run, &mmio))
->  		return 1;
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index eec0738..3a7d058 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -177,4 +177,52 @@ static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
->  	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
->  }
->  
-> +static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
-> +{
-> +	if (vcpu_mode_is_32bit(vcpu))
-> +		return !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_E_BIT);
-> +
-> +	return !!(vcpu_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
-> +}
-> +
-> +static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
-> +						    unsigned long data,
-> +						    unsigned int len)
-> +{
-> +	if (kvm_vcpu_is_be(vcpu)) {
-> +		switch (len) {
-> +		case 1:
-> +			return data & 0xff;
-> +		case 2:
-> +			return be16_to_cpu(data & 0xffff);
-> +		case 4:
-> +			return be32_to_cpu(data & ((1UL << 32) - 1));
-> +		default:
-> +			return be64_to_cpu(data);
-> +		}
-> +	}
-> +
-> +	return data;		/* Leave LE untouched */
-> +}
-> +
-> +static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-> +						    unsigned long data,
-> +						    unsigned int len)
-> +{
-> +	if (kvm_vcpu_is_be(vcpu)) {
-> +		switch (len) {
-> +		case 1:
-> +			return data & 0xff;
-> +		case 2:
-> +			return cpu_to_be16(data & 0xffff);
-> +		case 4:
-> +			return cpu_to_be32(data & ((1UL << 32) - 1));
-> +		default:
-> +			return cpu_to_be64(data);
-> +		}
-> +	}
-> +
-> +	return data;		/* Leave LE untouched */
-> +}
-> +
->  #endif /* __ARM64_KVM_EMULATE_H__ */
+> 
+> We still have an issue here since normally the guest disables the caches
+> and flushes them by set/way (usually on the last standing CPU, the
+> others being parked via PSCI). Such guest set/way operation isn't safe
+> when physical CPUs are up, even if you trap it in Hyp (unless you do it
+> via other complications like stop_machine() but even that may not be
+> entirely race-free and it opens the way for DoS attacks). The safest
+> here would be to do the cache maintenance by VA for all the guest
+> address space (probably fine if you do it in a preemptible way).
+> 
+
+This should be handled properly already (see access_dcsw in
+arch/arm/kvm/coproc.c) or am I missing something?
+
+With respect to DoS this would eventually be managed by the host
+scheduler which would detect that these processes are spending too much
+time on the cpu (doing cache flushes or other things) and reschedules
+another process, so I don't quite see the DoS happening.
+
+Sounds like I'm missing some subtle aspect of the architecture here, but
+let's see if we can't make KVM resiliant enough.
+
+> > > This only needs to be done for the primary CPU (or until the first CPU
+> > > enabled the MMU). Once a CPU enabled its MMU, the others will have
+> > > to cope with speculative loads into the cache anyway (if secondary VCPU
+> > > are started by a PSCI HVC call, we can probably ignore the trapping of
+> > > MMU register access anyway).
+> > 
+> > Also, this would be a nice way of reducing Clean-invalidate D-cache upon
+> > non-cacheable accesses for SMP Guest (i.e. An enhancement to this patch).
+> 
+> I think this should be fine, just do the clean&invalidate when the MMU
+> is off on all the VCPUs. Once one of them enabled the MMU, fall back to
+> the faster implementation. The same for the trapping above (unless we
+> later want to deal with MMU being turned off).
+> 
+> > > Note that we don't cover the I-cache. On ARMv8 you can get speculative
+> > > loads into the I-cache even if it is disabled, so it needs to be
+> > > invalidated explicitly before the MMU or the I-cache is enabled.
+> > 
+> > I think it should be responsibility of Guest OS to invalidate I-cache before
+> > enabling MMU or I-cache enable. Right?
+> 
+> Yes.
+> 
 > -- 
-> 1.8.2.3
-> 
-> 
+> Catalin
 
-Otherwise it looks pretty good,
--Christoffer
+-- 
+Christoffer
