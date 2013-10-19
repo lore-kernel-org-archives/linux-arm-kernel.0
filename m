@@ -1,67 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 19 Oct 2013 16:05:56 +0100
-Subject: [PATCH RFC 1/2] ARM: imx6qdl: provide pinctrl configurations
- for DAT3 pull-down
-In-Reply-To: <20131008090015.GC25034@n2100.arm.linux.org.uk>
-References: <20131005112147.GX12758@n2100.arm.linux.org.uk>
- <E1VSPw9-0004Ug-BF@rmk-PC.arm.linux.org.uk>
- <20131007055340.GB3739@S2101-09.ap.freescale.net>
- <20131007180357.GS12758@n2100.arm.linux.org.uk>
- <20131008015426.GA7480@S2101-09.ap.freescale.net>
- <52537378.1020904@wwwdotorg.org>
- <20131008034048.GB7480@S2101-09.ap.freescale.net>
- <20131008090015.GC25034@n2100.arm.linux.org.uk>
-Message-ID: <20131019150556.GI25034@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 19 Oct 2013 11:15:48 -0400 (EDT)
+Subject: [PATCH v2] ARM: head-common.S: relocate atags area if necessary
+In-Reply-To: <20131018175414.GF25034@n2100.arm.linux.org.uk>
+References: <1382112776-20300-1-git-send-email-zonque@gmail.com>
+ <20131018162956.GE25034@n2100.arm.linux.org.uk> <52616B56.10407@gmail.com>
+ <20131018175414.GF25034@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1310191059290.1951@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 08, 2013 at 10:00:15AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 08, 2013 at 11:40:51AM +0800, Shawn Guo wrote:
-> > On Mon, Oct 07, 2013 at 08:52:40PM -0600, Stephen Warren wrote:
-> > > >>> &usdhc1 {
-> > > >>> 	pinctrl-names = "default";
-> > > >>> 	pinctrl-0 = <&pinctrl_usdhc1_1 &pinctrl_usdhc1_1_dat3cd>;
-> > > >>> 	...
-> > > >>> 	status = "okay";
-> > > >>> };
-> > > >>
-> > > >> Are you sure that this will always be the case?  This would assume that
-> > > >> the pinctrl entries are always processed sequentially.
-> > > > 
-> > > > That will always be the case per my understanding.  Otherwise, I would
-> > > > be so surprised.  Are you seeing any case that the entries are not
-> > > > processed sequentially?
-> > > 
-> > > Given the way the Linux code currently works, I think that will
-> > > currently happen in practice. However, there's nothing in the pinctrl DT
-> > > binding documentation that guarantees (or even mentions) such semantics.
-> > 
-> > Ah, that's Russell's point, I guess.  I think it makes perfect sense to
-> > make this clear in the binding doc, as this "overwrite mechanism" can be
-> > very helpful.  I will send a patch for it.
+On Fri, 18 Oct 2013, Russell King - ARM Linux wrote:
+
+> When things were at a fixed location, they were always placed at
+> around 256 bytes into the memory, below the kernel.  I guess now people
+> are placing them at some random location elsewhere.
 > 
-> Exactly - otherwise we're just relying on implementation details.
-> There's nothing at present which mandates starting at the first entry
-> and working through sequentially to the last entry, which means another
-> implementation can choose to operate in the opposite order.  If it does,
-> what you're suggesting won't work so well.
-> 
-> However, there's another point to consider.  In cases like this, we will
-> cause a glitch on the pin.  When we process the initial set, we will set
-> the pull-up high, and then later set it low.  That may not be a problem
-> in this case, but that's not to say it won't be in every case, and that's
-> something which also needs to be considered.
+> This is becoming more a more of a pain.  We have all sorts of randomly
+> placed objects in memory now that its only a matter of time before we
+> hit something.  We keep on dreaming up these "well, let's move it"
+> solutions but does that really help?  Move it to where?  Another place
+> where we think there isn't going to be anything?  What if there is?
 
-I can't find what the result of this discussion was, but from what I
-remember, we decided that we weren't going to do this override thing,
-and instead we were going to separate out the configuration of DAT3.
+This is why I suggested adding a recommendation for placing the 
+initrd/DTB/ATAGs above the 128MB boundary from start of RAM in the ARM 
+booting document.
 
-Who's going to do that?  I'd rather not, because it means editing
-quite a number of DT files which I have no way to test, and the
-chances of messing this up are quite high.  I've already developed
-a deep seated hatred for DT in general through my involvement with
-IMX, particularly how it's very easy to make an undetected mistake
-and then spend hours debugging it.
+The zImage code does have to take into account the location of the final 
+kernel's .bss area in order to properly accommodate appended DTB to 
+zImage, otherwise the simple relocation of the decompressor (with its 
+appended DTB) out of the way of the final kernel image is not sufficient 
+to guarantee that the appended DTB won't be overwritten.
 
-Until this is resolved, I'm sticking with my own method of redefining
-the entire pinctrl set for DAT3 pull-down, which I've tested as working.
+But I think that this is the extent of what we should do.  We already 
+don't relocate the initrd if it is in the way either.  Trying to make 
+everything automagically relocate properly in all cases during very 
+early boot is very difficult, so it is best to simply not attempt it.  
+On the other hand, the loader agent, whether it is kexec or a 
+bootloader, should be aware of all the available RAM and could therefore 
+make things safe.
+
+If you have the ability to load the DTB and/or ATAG independently from 
+zImage or uncompressed Image (which is not the case for the appended 
+DTB) then it is your responsibility to load it sufficiently far away 
+from the kernel.  Same rule applies for the initrd.  Hence the "above 
+128MB from start of RAM" recommendation.
+
+
+Nicolas
