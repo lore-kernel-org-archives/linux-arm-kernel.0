@@ -1,163 +1,47 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 19 Oct 2013 13:21:59 -0300
-Subject: [PATCH v2 00/27] Armada 370/XP NAND support
-In-Reply-To: <20131019142549.GO22434@titan.lakedaemon.net>
-References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131019063535.GC20157@1wt.eu>
- <20131019142549.GO22434@titan.lakedaemon.net>
-Message-ID: <20131019162158.GA3044@localhost>
+From: leigh@solinno.co.uk (Leigh Brown)
+Date: Sat, 19 Oct 2013 17:23:53 +0100
+Subject: [PATCH RFC 3/4] net: mvmdio: slight optimisation of orion_mdio_write
+In-Reply-To: <cover.1382199042.git.leigh@solinno.co.uk>
+References: <cover.1382199042.git.leigh@solinno.co.uk>
+Message-ID: <22cebaeee77c5f2ef66811ca1012d3f0e6c61cbe.1382199042.git.leigh@solinno.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 19, 2013 at 10:25:49AM -0400, Jason Cooper wrote:
-> On Sat, Oct 19, 2013 at 08:35:35AM +0200, Willy Tarreau wrote:
-> > Hi Ezequiel,
-> > 
-> > On Fri, Oct 18, 2013 at 08:02:27PM -0300, Ezequiel Garcia wrote:
-> > > Hi guys,
-> > > 
-> > > This is the v2 of the work implementing NAND support in Armada 370/XP SoCs.
-> > > This series is probably not yet complete (see below), but I feel like
-> > > we're really closer now :-)
-> > > 
-> > > As in the previous version and given I don't have any public datasheet
-> > > to show, I'll try to write some of the most relevant parts of the controller.
-> > > 
-> > > * NFCv2 controller background
-> > > 
-> > > The controller has a 2176 bytes FIFO buffer. Therefore, in order to support
-> > > larger pages, I/O operations on 4 KiB and 8 KiB pages is done with a set of
-> > > chunked transfers.
-> > > 
-> > > For instance, if we choose a 2048 data chunk and set "BCH" ECC (see below)
-> > > we'll have this layout in the pages:
-> > > 
-> > >   ------------------------------------------------------------------------------
-> > >   | 2048B data | 32B spare | 30B ECC || 2048B data | 32B spare | 30B ECC | ... |
-> > >   ------------------------------------------------------------------------------
-> > > 
-> > > The driver reads the data and spare portions independently and builds an internal
-> > > buffer with this layout (in the 4 KiB page case):
-> > > 
-> > >   ------------------------------------------
-> > >   |     4096B data     |     64B spare     |
-> > >   ------------------------------------------
-> > > 
-> > > Also, for the READOOB command the driver disables the ECC and reads a 'spare + ECC'
-> > > OOB, one per chunk read.
-> > > 
-> > >   -------------------------------------------------------------------
-> > >   |     4096B data     |  32B spare | 30B ECC | 32B spare | 30B ECC |
-> > >   -------------------------------------------------------------------
-> > > 
-> > > So, in order to achieve reading (for instance), we issue several READ0 commands
-> > > (with some additional controller-specific magic) and read two chunks of 2080B
-> > > (2048 data + 32 spare) each.
-> > > The driver accomodates this data to expose the NAND core a contiguous buffer
-> > > (4096 data + spare) or (4096 + spare + ECC + spare + ECC).
-> > > 
-> > > * ECC
-> > > 
-> > > The controller has built-in hardware ECC capabilities. In addition it is
-> > > configurable between two modes: 1) Hamming, 2) BCH.
-> > > 
-> > > Note that the actual BCH mode: BCH-4 or BCH-8 will depend on the way
-> > > the controller is configured to transfer the data.
-> > > 
-> > > In the BCH mode the ECC code will be calculated for each transfered chunk
-> > > and expected to be located (when reading/programming) right after the spare
-> > > bytes as the figure above shows.
-> > > 
-> > > So, repeating the above scheme, a 2048B data chunk will be followed by 32B
-> > > spare, and then the ECC controller will read/write the ECC code (30B in
-> > > this case):
-> > > 
-> > >   ------------------------------------
-> > >   | 2048B data | 32B spare | 30B ECC |
-> > >   ------------------------------------
-> > > 
-> > > If the ECC mode is 'BCH' then the ECC is *always* 30 bytes long.
-> > > If the ECC mode is 'Hamming' the ECC is 6 bytes long, for each 512B block.
-> > > So in Hamming mode, a 2048B page will have a 24B ECC.
-> > > 
-> > > Despite all of the above, the controller requires the driver to only read or
-> > > write in multiples of 8-bytes, because the data buffer is 64-bits.
-> > > 
-> > > * Changes from v1
-> > > 
-> > > Aside from several changes based in Brian's feedback, the main changes
-> > > from v1 are:
-> > > 
-> > >   * The controller's clock source is now fully modeled, see patche 1 to 4.
-> > >     Of course, none of those patches should be taken through the mtd
-> > >     subsystem, but I'm adding them here for completeness.
-> > > 
-> > >   * The chip's cmdfunc() is now independently implemented in each SoC variant.
-> > >     The rationale behind this decision is that 'chunked' I/O is the only tested
-> > >     mode on the Armada370 variant, while the old 'vanilla' I/O is the only
-> > >     tested mode on the PXA variant.
-> > > 
-> > >     So it's safer to have an implementation for each variant.
-> > > 
-> > >   * Added support for BCH-8, in other words: 8-bits of correction in a 512-byte
-> > >     region. This is obtained by using a data chunk size of 1024B, thus doubling
-> > >     the ECC BCH strength, as per this ECC engine mechanism.
-> > > 
-> > >   * The ECC layout in use, which must be set according to the page size and
-> > >     desired ECC strength is now strictly chosen to match only the tested
-> > >     combinations.
-> > > 
-> > > * Pending stuff
-> > > 
-> > >   1. Factory bad blocks handling
-> > > 
-> > >   Currently, there's no factory bad block initial scan (when the bad block
-> > >   table is missing). The ECC BCH requires to layout the device's pages in
-> > >   a splitted "data + OOB + data + OOB" way. This layout being different from
-> > >   the factory layout. In other words,
-> > > 
-> > >   Factory view:
-> > > 
-> > >   -----------------------------------------------
-> > >   |                    Data           |x  OOB   |
-> > >   -----------------------------------------------
-> > > 
-> > >   Driver's view:
-> > > 
-> > >   -----------------------------------------------
-> > >   |      Data      | OOB |      Data   x  | OOB |
-> > >   -----------------------------------------------
-> > > 
-> > >   It can be seen from the above, that the factory bad block marker must be
-> > >   searched within the 'data' region, and not in the usual OOB region.
-> > > 
-> > >   This seems to be similar to the gpmi-nand driver, yet I really find its
-> > >   'bad block swapping' solution odd, so I'm trying to find something
-> > >   cleaner.
-> > > 
-> > >   2. ECC modeling
-> > > 
-> > >   Although I've exposed some ECC information in the ECC layout, I'm still
-> > >   not sure why is this needed, or if it's needed at all.
-> > > 
-> > 
-> > I strongly believe that all the information above is very valuable and
-> > that it's a shame to lose it in a cover message. It would definitely
-> > make sense to have this in a doc file.
-> 
-> Agreed.  Great work Ezequiel!  Let's capture this in Documentation/.
-> 
+Make only a single call to mutex_unlock in orion_mdio_write.
 
-Wait a second!
+Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+---
+ drivers/net/ethernet/marvell/mvmdio.c |   10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-  $ ls Documentation/mtd/ | wc -l
-  1
-
-Isn't documenting deprecated? ...
-
-Just kiddin'! I'll add this and the other cover to Documentation/
-so typos and english fixes are welcome!
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 56185fb..3992e2b 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -145,10 +145,8 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 	mutex_lock(&dev->lock);
+ 
+ 	ret = orion_mdio_wait_ready(bus);
+-	if (ret < 0) {
+-		mutex_unlock(&dev->lock);
+-		return ret;
+-	}
++	if (ret != 0)
++		goto out;
+ 
+ 	writel(((mii_id << MVMDIO_SMI_PHY_ADDR_SHIFT) |
+ 		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
+@@ -156,9 +154,9 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 		(value << MVMDIO_SMI_DATA_SHIFT)),
+ 	       dev->regs);
+ 
++out:
+ 	mutex_unlock(&dev->lock);
+-
+-	return 0;
++	return ret;
+ }
+ 
+ static int orion_mdio_reset(struct mii_bus *bus)
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.7.10.4
