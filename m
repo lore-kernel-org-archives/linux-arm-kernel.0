@@ -1,29 +1,32 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Fri, 18 Oct 2013 17:16:16 -0700
-Subject: [PATCH v5 13/15] clk: tegra: introduce common gen4 super clock
-In-Reply-To: <1382102719-5531-14-git-send-email-pdeschrijver@nvidia.com>
-References: <1382102719-5531-1-git-send-email-pdeschrijver@nvidia.com>
- <1382102719-5531-14-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <CAL1qeaEpemA5ekC2qzNfQKOkjAiWU3oYp4kwmdup1s1dOjAUNA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Oct 2013 17:26:32 -0700
+Subject: [GIT PULL] urgent omap related x86 pinctrl build fix for v3.13 merge
+ window
+Message-ID: <pull-1382142392-665487>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+The following changes since commit dc7743aa3c49fabbc6dc9edbcf7df74d776ac32e:
 
-> +#define PLL_BASE_LOCK BIT(27)
-> +#define PLL_MISC_LOCK_ENABLE 18
+  pinctrl: single: Add support for auxdata (2013-10-10 15:30:47 -0700)
 
-I don't see these used anywhere.
+are available in the git repository at:
 
-> +static const char *cclk_lp_parents[] = { "clk_m", "pll_c", "clk_32k", "pll_m",
-> +                                        "pll_p", "pll_p_out4", "unused",
-> +                                        "unused", "pll_x", "pll_x_out0" };
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/pinctrl-fix
 
-nit: insert blank line here.
+for you to fetch changes up to 1b9c0fb365cbb1154f4e7997061db972cbf58300:
 
-> +static void __init tegra_sclk_init(void __iomem *clk_base,
-> +                               struct tegra_clk *tegra_clks)
-> +{
+  pinctrl: single: Fix build when not built on ARM (2013-10-18 16:43:06 -0700)
 
-Thanks,
-Andrew
+----------------------------------------------------------------
+Looks like I managed to break the x86 build for some
+configs. Here's a fix for that on top of the pinctrl
+changes already merged with the signed tag
+omap-for-v3.13/quirk-signed.
+
+----------------------------------------------------------------
+Tony Lindgren (1):
+      pinctrl: single: Fix build when not built on ARM
+
+ drivers/pinctrl/pinctrl-single.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
