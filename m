@@ -1,37 +1,163 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 19 Oct 2013 18:19:34 +0200
-Subject: [PATCH v2] ARM: head-common.S: relocate atags area if necessary
-In-Reply-To: <20131019161314.GK25034@n2100.arm.linux.org.uk>
-References: <1382112776-20300-1-git-send-email-zonque@gmail.com>
- <20131018162956.GE25034@n2100.arm.linux.org.uk> <52616B56.10407@gmail.com>
- <20131018175414.GF25034@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1310191059290.1951@syhkavp.arg> <5262AEE8.5010505@gmail.com>
- <20131019161314.GK25034@n2100.arm.linux.org.uk>
-Message-ID: <5262B116.50807@gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 19 Oct 2013 13:21:59 -0300
+Subject: [PATCH v2 00/27] Armada 370/XP NAND support
+In-Reply-To: <20131019142549.GO22434@titan.lakedaemon.net>
+References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131019063535.GC20157@1wt.eu>
+ <20131019142549.GO22434@titan.lakedaemon.net>
+Message-ID: <20131019162158.GA3044@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2013 06:13 PM, Russell King - ARM Linux wrote:
-> On Sat, Oct 19, 2013 at 06:10:16PM +0200, Daniel Mack wrote:
->> Well, I totally see your point. However, we have machines out there that
->> won't update via kexec due to this, and fixing kexec is unfortunately
->> not an option, as updating anything would involve kexec'ing into an
->> update kernel again. So out only chance is to fix up the dtb location in
->> early boot code.
->>
->> You might say my case is special, and you're most probably right. I see
->> that trying to fix things is opening a can of worms.
->>
->> So - no worries, we'll just keep that patch around locally as it 'works
->> for me' (tm) :)
+On Sat, Oct 19, 2013 at 10:25:49AM -0400, Jason Cooper wrote:
+> On Sat, Oct 19, 2013 at 08:35:35AM +0200, Willy Tarreau wrote:
+> > Hi Ezequiel,
+> > 
+> > On Fri, Oct 18, 2013 at 08:02:27PM -0300, Ezequiel Garcia wrote:
+> > > Hi guys,
+> > > 
+> > > This is the v2 of the work implementing NAND support in Armada 370/XP SoCs.
+> > > This series is probably not yet complete (see below), but I feel like
+> > > we're really closer now :-)
+> > > 
+> > > As in the previous version and given I don't have any public datasheet
+> > > to show, I'll try to write some of the most relevant parts of the controller.
+> > > 
+> > > * NFCv2 controller background
+> > > 
+> > > The controller has a 2176 bytes FIFO buffer. Therefore, in order to support
+> > > larger pages, I/O operations on 4 KiB and 8 KiB pages is done with a set of
+> > > chunked transfers.
+> > > 
+> > > For instance, if we choose a 2048 data chunk and set "BCH" ECC (see below)
+> > > we'll have this layout in the pages:
+> > > 
+> > >   ------------------------------------------------------------------------------
+> > >   | 2048B data | 32B spare | 30B ECC || 2048B data | 32B spare | 30B ECC | ... |
+> > >   ------------------------------------------------------------------------------
+> > > 
+> > > The driver reads the data and spare portions independently and builds an internal
+> > > buffer with this layout (in the 4 KiB page case):
+> > > 
+> > >   ------------------------------------------
+> > >   |     4096B data     |     64B spare     |
+> > >   ------------------------------------------
+> > > 
+> > > Also, for the READOOB command the driver disables the ECC and reads a 'spare + ECC'
+> > > OOB, one per chunk read.
+> > > 
+> > >   -------------------------------------------------------------------
+> > >   |     4096B data     |  32B spare | 30B ECC | 32B spare | 30B ECC |
+> > >   -------------------------------------------------------------------
+> > > 
+> > > So, in order to achieve reading (for instance), we issue several READ0 commands
+> > > (with some additional controller-specific magic) and read two chunks of 2080B
+> > > (2048 data + 32 spare) each.
+> > > The driver accomodates this data to expose the NAND core a contiguous buffer
+> > > (4096 data + spare) or (4096 + spare + ECC + spare + ECC).
+> > > 
+> > > * ECC
+> > > 
+> > > The controller has built-in hardware ECC capabilities. In addition it is
+> > > configurable between two modes: 1) Hamming, 2) BCH.
+> > > 
+> > > Note that the actual BCH mode: BCH-4 or BCH-8 will depend on the way
+> > > the controller is configured to transfer the data.
+> > > 
+> > > In the BCH mode the ECC code will be calculated for each transfered chunk
+> > > and expected to be located (when reading/programming) right after the spare
+> > > bytes as the figure above shows.
+> > > 
+> > > So, repeating the above scheme, a 2048B data chunk will be followed by 32B
+> > > spare, and then the ECC controller will read/write the ECC code (30B in
+> > > this case):
+> > > 
+> > >   ------------------------------------
+> > >   | 2048B data | 32B spare | 30B ECC |
+> > >   ------------------------------------
+> > > 
+> > > If the ECC mode is 'BCH' then the ECC is *always* 30 bytes long.
+> > > If the ECC mode is 'Hamming' the ECC is 6 bytes long, for each 512B block.
+> > > So in Hamming mode, a 2048B page will have a 24B ECC.
+> > > 
+> > > Despite all of the above, the controller requires the driver to only read or
+> > > write in multiples of 8-bytes, because the data buffer is 64-bits.
+> > > 
+> > > * Changes from v1
+> > > 
+> > > Aside from several changes based in Brian's feedback, the main changes
+> > > from v1 are:
+> > > 
+> > >   * The controller's clock source is now fully modeled, see patche 1 to 4.
+> > >     Of course, none of those patches should be taken through the mtd
+> > >     subsystem, but I'm adding them here for completeness.
+> > > 
+> > >   * The chip's cmdfunc() is now independently implemented in each SoC variant.
+> > >     The rationale behind this decision is that 'chunked' I/O is the only tested
+> > >     mode on the Armada370 variant, while the old 'vanilla' I/O is the only
+> > >     tested mode on the PXA variant.
+> > > 
+> > >     So it's safer to have an implementation for each variant.
+> > > 
+> > >   * Added support for BCH-8, in other words: 8-bits of correction in a 512-byte
+> > >     region. This is obtained by using a data chunk size of 1024B, thus doubling
+> > >     the ECC BCH strength, as per this ECC engine mechanism.
+> > > 
+> > >   * The ECC layout in use, which must be set according to the page size and
+> > >     desired ECC strength is now strictly chosen to match only the tested
+> > >     combinations.
+> > > 
+> > > * Pending stuff
+> > > 
+> > >   1. Factory bad blocks handling
+> > > 
+> > >   Currently, there's no factory bad block initial scan (when the bad block
+> > >   table is missing). The ECC BCH requires to layout the device's pages in
+> > >   a splitted "data + OOB + data + OOB" way. This layout being different from
+> > >   the factory layout. In other words,
+> > > 
+> > >   Factory view:
+> > > 
+> > >   -----------------------------------------------
+> > >   |                    Data           |x  OOB   |
+> > >   -----------------------------------------------
+> > > 
+> > >   Driver's view:
+> > > 
+> > >   -----------------------------------------------
+> > >   |      Data      | OOB |      Data   x  | OOB |
+> > >   -----------------------------------------------
+> > > 
+> > >   It can be seen from the above, that the factory bad block marker must be
+> > >   searched within the 'data' region, and not in the usual OOB region.
+> > > 
+> > >   This seems to be similar to the gpmi-nand driver, yet I really find its
+> > >   'bad block swapping' solution odd, so I'm trying to find something
+> > >   cleaner.
+> > > 
+> > >   2. ECC modeling
+> > > 
+> > >   Although I've exposed some ECC information in the ECC layout, I'm still
+> > >   not sure why is this needed, or if it's needed at all.
+> > > 
+> > 
+> > I strongly believe that all the information above is very valuable and
+> > that it's a shame to lose it in a cover message. It would definitely
+> > make sense to have this in a doc file.
 > 
-> How about fixing kexec to work properly anyway, so that at a later date
-> you can drop that patch?
+> Agreed.  Great work Ezequiel!  Let's capture this in Documentation/.
+> 
 
-I'll have a look on how to properly fix this in kexec, yes.
+Wait a second!
 
-However, new images have to stay compatible to old versions to update
-from, so we'll not be able to drop the patch any time soon :(
+  $ ls Documentation/mtd/ | wc -l
+  1
 
+Isn't documenting deprecated? ...
 
-Daniel
+Just kiddin'! I'll add this and the other cover to Documentation/
+so typos and english fixes are welcome!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
