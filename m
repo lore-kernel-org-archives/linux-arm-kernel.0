@@ -1,49 +1,134 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sat, 19 Oct 2013 03:33:52 +0200
-Subject: [PATCH] PCI: imx6: fix imprecise abort handler
-In-Reply-To: <1382056042-7299-1-git-send-email-tharvey@gateworks.com>
-References: <1382056042-7299-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <201310190333.52772.marex@denx.de>
+Date: Sat, 19 Oct 2013 07:07:15 +0200
+Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
+In-Reply-To: <0E83723C55F66F43A6041464FE31119D40FB22@039-SN2MPN1-011.039d.mgd.msft.net>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+ <201310171934.34021.marex@denx.de>
+ <0E83723C55F66F43A6041464FE31119D40FB22@039-SN2MPN1-011.039d.mgd.msft.net>
+Message-ID: <201310190707.15783.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Tim Harvey,
+Hi Richard,
 
-> An imprecise abort is triggered when a port behind a switch is accessed
-> and no device is present.  At enumeration, imprecise aborts are not enabled
-> thus this ends up getting deferred until the kernel has completed init.  At
-> that point we must not adjust PC - the handler must do nothing, but a
-> handler must exist.
+> Hi Merak:
+> Thanks for your great help on the imx6 pcie switch support on the latest
+> kernel fristly.
+
+Let's get this PCIe thing working well :)
+
+[...]
+
+> > > > > Since you are forcing RC to work in GEN1, so you will not be able
+> > > > > to connect any device at GEN2 now.
+> > > > 
+> > > > I'd rather prefer to know WHY if the RC is operating in Gen2 mode by
+> > > > default, I cannot see the PCIe switch (Pericom PI7C9X2G303)
+> > > > connected to it. I was unable to figure this out. Tim pointed out
+> > > > this thread [1] , so it might be related in some way.
+> > > > 
+> > > > [1] https://community.freescale.com/message/316162#316162
+> > > > 
+> > > > I tried switching the PCIe RC to Gen2 operation right after LinkUp
+> > > > by writing this register with 0x2 again and re-issuing the LinkUp
+> > > > check, which passed and the status register reported Gen2 operation,
+> > > > but then the PCIe Intel NIC connected to the downstream port of the
+> > > > Pericom switch still reported Gen1 operation for some reason.
+> > >  
+> > >  [Richard] Is your Inetl NIC GEN1 EP device?
+> > 
+> > Yes, the i210 is PCIe v2.1 (2.5GT/s) x1 device.
+> > 
+> > > > > Yes, There are some buggy PCIe devices which works with GEN1 only
+> > > > > host.
+> > > > 
+> > > > The pericom one is Gen2 according to it's datasheet.
+> > > 
+> > > [Richard] Yes, it is. Pericom's PI7C9X2G303EL is GEN2 PCIe switch.
+> > > It had been verified on FSL's 3.0.35 releases.
+> > 
+> > Verified how? What does it mean?
+> > 
+> > Note that when I followed [1] in this manner:
+> > 
+> > 1) Force GEN1 mode
+> > 2) Wait for PHY link up
+> > 3) Allow GEN2 mode
+> > 4) Start GEN2 speed change
+> > 5) Wait for PHY link up
+> > 
+> > my devices were detected and the link between pericom and mx6 was
+> > operating in gen2 mode. Thus I suspect we might need to start the port
+> > in Gen1 mode and switch to Gen2 only after link is up. Does that make
+> > sense?
+> > 
+> > https://community.freescale.com/thread/304284
 > 
-> This fixes random crashes that occur right after freeing init.
-> This is against linux-pci/host-imx6.
+> [Richard] Yes, it make sense regarding to the
+> https://community.freescale.com/thread/304284.
 > 
-> Acked-by: Marek Vasut <marex@denx.de>
-> Tested-by: Marek Vasut <marex@denx.de>
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> The verification I said above means that the Pericom's PI7C9X2G303EL PCIe
+> GEN2 switch can work well on 3.0.35 kernel in GEN2 mode(without GEN1
+> force), and hand been tested by kinds of PCIe EP device(GEN1: Intel e1000e
+> network card, GEN2 xHCI USB3.0 PCIe x1 card).
 
-Expanding CC a bit, let's have more eyes on this.
+Oh, thanks for verifying this!
 
-> ---
->  drivers/pci/host/pci-imx6.c |    6 ------
->  1 file changed, 6 deletions(-)
+> Regarding to your comments why FORCE GEN1 mode in RC " Force Gen1
+> operation. In case the IP block is in Gen2 operation mode, it does not
+> detect the PCIe switch at all.", does the gen2 link can be set-up without
+> force gen1 mode?
+
+What I did in the end for testing purpose was I followed the thread at FSL 
+community in the link above, forced the link into Gen1 mode , then waited for 
+link up, then started directed gen2 switch and waited for linkup again. This 
+worked and the PCIe indicated the link is in Gen2 mode.
+
+Interestingly enough, I also implemented PCIe driver for MX6 for U-Boot (will 
+submit it shortly to U-Boot ML) and use it with the Intel i210 ethernet NIC now. 
+When I use the PCIe in U-Boot, I don't need the Force-Gen1 thing above. I 
+suspect though, that the Gen1 setting is preserved from U-Boot, where I have 
+this as well.
+
+> About the errata mentioned in
+> https://community.freescale.com/thread/304284, the errata-SW-workaround of
+> initialization is contained in previous Sean Cross' codes, like this. /*
+>          * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
+>          * Wait 2ms (LTSSM timeout is 24ms, PHY lock is ~5us in gen2).
+>          * If (MAC/LTSSM.state == Recovery.RcvrLock)
+>          * && (PHY/rx_valid==0) then pulse PHY/rx_reset. Transition
+>          * to gen2 is stuck
+>          */
+
+Is this not handling only the PHY part ? Honestly, I'm quite lost in the flurry 
+of different opinions on the MX6 PCIe. Maybe you as a FSL guy could scrounge 
+some internal knowledge ?
+
+> > > > > So better solution should be to initialize RC by default at GEN2
+> > > > > or highest speed. Further, a parameter say gen_only can be passed
+> > > > > from DT to force GEN1 only mode.
+> > > > > 
+> > > > > What do you say?
+> > > > 
+> > > > I say I'd like to know the root cause of this problem. This Gen2 fix
+> > > > was pulled from one of the myriad variants of the FSL PCIe driver,
+> > > > so apparently this issue happens to other people as well. But why
+> > > > and how to properly fix this so the whole PCIe bus does operate in
+> > > > Gen2 mode, I cannot tell :-(
+> > > 
+> > > [Richard] GEN2 mode had been verified in FSL 3.0.35 kernel releases
+> > > before. I don't know why it can't work in GEN2 mode in the latest
+> > > kernel. BTW, Based on for-next branch of shawn's git reops and applied
+> > > Merak's patch-set, my PI7C9X2G303EL with intel e1000e network card
+> > > plugged can't be detected at all. :(.
+> > 
+> > I think we're still fighting some issue with resource mappings here. We
+> > also agreed with Tim that my patches are incomplete. I will send out a
+> > new version ASAP.
 > 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 966bac6..90fce05 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -200,12 +200,6 @@ static int pcie_phy_write(void __iomem *dbi_base, int
-> addr, int data) static int imx6q_pcie_abort_handler(unsigned long addr,
->  		unsigned int fsr, struct pt_regs *regs)
->  {
-> -	/*
-> -	 * If it was an imprecise abort, then we need to correct the
-> -	 * return address to be _after_ the instruction.
-> -	 */
-> -	if (fsr & (1 << 10))
-> -		regs->ARM_pc += 4;
->  	return 0;
->  }
+> [Richard] What's I said above is just curious that I encounter different
+> phenomena at my side With the almost same codes.
 
-Best regards,
-Marek Vasut
+I talked to Tim about the mappings some more. It seems if the IOspace is 
+disabled, everything works without hangs. If the IOspace is not disabled on the 
+ethernet NICs, we get a hang.
