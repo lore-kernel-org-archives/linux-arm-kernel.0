@@ -1,41 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 19 Oct 2013 14:22:13 -0700
-Subject: [PATCH 2/2 v4] usb: ohci: remove ep93xx bus glue platform driver
-In-Reply-To: <201310171329.12434.hartleys@visionengravers.com>
-References: <201310171329.12434.hartleys@visionengravers.com>
-Message-ID: <20131019212213.GA5341@kroah.com>
+From: luka@openwrt.org (Luka Perkov)
+Date: Sun, 20 Oct 2013 01:09:08 +0200
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <1382186261-14482-2-git-send-email-andrew@lunn.ch>
+References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
+ <1382186261-14482-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20131019230908.GA10934@w500.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 01:29:11PM -0700, H Hartley Sweeten wrote:
-> Convert ep93xx to use the OHCI platform driver and remove the
-> ohci-ep93xx bus glue driver.
+Hi Andrew,
+
+On Sat, Oct 19, 2013 at 02:37:38PM +0200, Andrew Lunn wrote:
+> The Marvell Dove SoC can run the CPU at two frequencies. The high
+> frequencey is from a PLL, while the lower is the same as the DDR
+> clock. Add a cpufreq driver to swap between these frequences.
 > 
-> Enable CONFIG_OHCI_HCD_PLATFORM in the ep93xx_defconfig so that USB
-> is still enabled by default on the EP93xx platform.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Lennert Buytenhek <kernel@wantstofly.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  arch/arm/configs/ep93xx_defconfig |   1 +
->  arch/arm/mach-ep93xx/clock.c      |   2 +-
->  arch/arm/mach-ep93xx/core.c       |  38 +++++++-
->  drivers/usb/host/ohci-ep93xx.c    | 184 --------------------------------------
->  drivers/usb/host/ohci-hcd.c       |  18 ----
->  5 files changed, 36 insertions(+), 207 deletions(-)
->  delete mode 100644 drivers/usb/host/ohci-ep93xx.c
+>  drivers/cpufreq/Kconfig.arm    |   7 ++
+>  drivers/cpufreq/Makefile       |   1 +
+>  drivers/cpufreq/dove-cpufreq.c | 276 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 284 insertions(+)
+>  create mode 100644 drivers/cpufreq/dove-cpufreq.c
 
-This patch doesn't apply to my usb-next branch of usb.git at all, what
-happened?  Did Alan's other recent changes interfere with this?
+...
 
-Can you refresh this against my tree and resend it so that I can apply
-it?  I've applied the 1/2 patch already.
+> --- /dev/null
+> +++ b/drivers/cpufreq/dove-cpufreq.c
+> @@ -0,0 +1,276 @@
+> +/*
+> + *	dove_freq.c: cpufreq driver for the Marvell dove
+> + *
+> + *	Copyright (C) 2013 Andrew Lunn <andrew@lunn.ch>
+> + *
+> + *	This program is free software; you can redistribute it and/or
+> + *	modify it under the terms of the GNU General Public License
+> + *	as published by the Free Software Foundation; either version
+> + *	2 of the License, or (at your option) any later version.
+> + */
+> +
+> +#define DEBUG
 
-thanks,
+It seems to me that this define is not used at all...
 
-greg k-h
+Luka
