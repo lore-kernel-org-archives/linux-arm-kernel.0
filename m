@@ -1,11 +1,11 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 19 Oct 2013 17:19:46 +0000 (UTC)
+Date: Sat, 19 Oct 2013 17:30:28 +0000 (UTC)
 Subject: [PATCH 06/11] ARM: OMAP3: CM/PM: add API for forcing IVA2 clk
  enable/disable
 In-Reply-To: <1381508141-15244-7-git-send-email-t-kristo@ti.com>
 References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
  <1381508141-15244-7-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.02.1310191719060.11676@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1310191730030.12900@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,10 +16,33 @@ On Fri, 11 Oct 2013, Tero Kristo wrote:
 > thus implement an API call for this, and change the PM core to use this.
 > 
 > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  arch/arm/mach-omap2/cm3xxx.c |   10 ++++++++++
+>  arch/arm/mach-omap2/cm3xxx.h |    1 +
+>  arch/arm/mach-omap2/pm34xx.c |    7 +++----
+>  3 files changed, 14 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
+> index f13742b..55bf939 100644
+> --- a/arch/arm/mach-omap2/cm3xxx.c
+> +++ b/arch/arm/mach-omap2/cm3xxx.c
+> @@ -686,6 +686,16 @@ u32 omap3_cm_write_module_clken(s16 module, u8 regs, bool fck, u32 val)
+>  	return omap3_cm_access_module_clken(module, regs, fck, val, true);
+>  }
+>  
+> +void omap3_cm_force_iva_clk(bool enable)
+> +{
+> +	u32 val = 0;
+> +
+> +	if (enable)
+> +		val = OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK;
+> +
+> +	omap2_cm_write_mod_reg(val, OMAP3430_IVA2_MOD, CM_FCLKEN);
+> +}
+> +
 
-Seems like this type of clock forcing needs to be coordinated with the 
-clock framework.  Could you please work with Mike to get a decent 
-interface implemented for this?
+Please implement this as a generic clockdomain API that can be called for 
+any clockdomain.
 
 
 - Paul
