@@ -1,42 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 19 Oct 2013 18:49:41 +0200
-Subject: [PATCH v2 2/3] ARM: Dove: Add DT node for PMU interrupt controller.
-In-Reply-To: <1382201382-15551-1-git-send-email-andrew@lunn.ch>
-References: <1382201382-15551-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1382201382-15551-2-git-send-email-andrew@lunn.ch>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Sat, 19 Oct 2013 18:50:51 +0200
+Subject: [PATCH v2 05/13] uprobes: add arch write opcode hook
+In-Reply-To: <1381871068-27660-6-git-send-email-dave.long@linaro.org>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-6-git-send-email-dave.long@linaro.org>
+Message-ID: <20131019165051.GC7837@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instantiate the PMU interrupt controller which Dove has.
+On 10/15, David Long wrote:
+>
+> Allow arches to write the opcode with a custom function.  ARM needs to
+> customize the swbp instruction depending on the condition code of the
+> instruction it replaces.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
+Well, we already have "__weak set_swbp(auprobe, ...)", can't arm use it?
 
-Added Sebastians Tested-by.
+If not,
 
- arch/arm/boot/dts/dove.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> +void __weak arch_uprobe_write_opcode(struct arch_uprobe *auprobe, void *vaddr,
+> +				     uprobe_opcode_t opcode)
+> +{
+> +	memcpy(vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
+> +}
+> ...
+> -	copy_to_page(new_page, vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
+> +	vaddr_new = kmap_atomic(new_page);
+> +	arch_uprobe_write_opcode(auprobe, vaddr_new + (vaddr & ~PAGE_MASK),
+> +				 opcode);
+> +	kunmap_atomic(vaddr_new);
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index cc27916..52b992a 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -66,6 +66,15 @@
- 			marvell,#interrupts = <5>;
- 		};
- 
-+		pmu_intc: pmu-interrupt-ctrl at d0050 {
-+			compatible = "marvell,dove-pmu-intc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0xd0050 0x8>;
-+			interrupts = <33>;
-+			marvell,#interrupts = <7>;
-+		};
-+
- 		core_clk: core-clocks at d0214 {
- 			compatible = "marvell,dove-core-clock";
- 			reg = <0xd0214 0x4>;
--- 
-1.8.4.rc3
+Again, if you need to add the new __weak helper, I think it should simply
+do copy_to_page().
+
+Oleg.
