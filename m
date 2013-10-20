@@ -1,68 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 21 Oct 2013 07:15:39 +0900
-Subject: [GIT PULL 6/6] Samsung update for v3.13
-Message-ID: <5264560B.504@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sun, 20 Oct 2013 23:21:35 +0100
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution,
+ or is there something better?
+In-Reply-To: <20131020220839.GT2443@sirena.org.uk>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020220839.GT2443@sirena.org.uk>
+Message-ID: <5264576F.6050307@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+On 10/20/2013 11:08 PM, Mark Brown wrote:
+> On Sun, Oct 20, 2013 at 10:26:54PM +0100, Stephen Warren wrote:
+> 
+>> IIRC (and perhaps I don't; it was really slightly before my
+>> active involvement in kernel development) Linus triggered the
+>> whole ARM DT conversion in response to disliking the volume of
+>> changes, and conflicts, in board files. The idea of DT conversion
+>> being that all the board-specific details could be moved out of
+>> the kernel and into DT files, thus causing him not to have to see
+>> it.
+> 
+> A large part of this was to do with the needs of distros and their
+> users - they have a strong need to ship a device neutral kernel and
+> to have a reasonable ability to have their kernel deploy on
+> hardware unknown to them.  Allowing the device tree to be delivered
+> with the system rather than have the board configuration in the
+> kernel helps achieve that goal.
 
-   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+Yes.
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/exynos-dt
-
-for you to fetch changes up to c6ad2259c629bef992be5ee82d3e74cd1e90c440:
-
-   ARM: dts: disable PCIe for SD5v1 board (2013-10-08 06:58:01 +0900)
-
-----------------------------------------------------------------
-update device tree for exynos
-- add MIPI PHY node for exynos4
-- update regulator for origen and exynos5250-arndale
-- add support HDMI for exynos5250, exynos5420
-- disable PCIe for exynos5440-sd5v1
-
-----------------------------------------------------------------
-Andrew Bresticker (1):
-       ARM: dts: add i2c device nodes for Exynos5420
-
-Jingoo Han (1):
-       ARM: dts: disable PCIe for SD5v1 board
-
-Mark Brown (1):
-       ARM: dts: Disable Exynos5250 I2S controllers by default
-
-Rahul Sharma (4):
-       of/documentation: update with clock information for exynos hdmi 
-subsystem
-       ARM: dts: add clocks to hdmi dt node for exynos5250
-       ARM: dts: add dt nodes for hdmi subsystem for exynos5420
-       ARM: dts: enable hdmi subsystem for exynos5420 smdk board
-
-Sachin Kamat (3):
-       ARM: dts: Add fixed voltage regulator to simple bus for origen
-       ARM: dts: Add reg property to regulator nodes in exynos5250-arndale
-       ARM: dts: Add HDMI related I2C nodes for Arndale board
-
-Sean Paul (1):
-       ARM: dts: add mixer clocks to mixer node for Exynos5250
-
-Sylwester Nawrocki (1):
-       ARM: dts: Add MIPI PHY node to exynos4.dtsi
-
-  .../devicetree/bindings/video/exynos_hdmi.txt      | 14 +++-
-  .../devicetree/bindings/video/exynos_mixer.txt     |  4 ++
-  arch/arm/boot/dts/exynos4.dtsi                     | 10 +++
-  arch/arm/boot/dts/exynos4210-origen.dts            | 21 ++++--
-  arch/arm/boot/dts/exynos4412-origen.dts            | 21 ++++--
-  arch/arm/boot/dts/exynos5250-arndale.dts           | 33 ++++++++--
-  arch/arm/boot/dts/exynos5250-smdk5250.dts          |  8 ---
-  arch/arm/boot/dts/exynos5250.dtsi                  | 11 +++-
-  arch/arm/boot/dts/exynos5420-smdk5420.dts          | 26 ++++++++
-  arch/arm/boot/dts/exynos5420.dtsi                  | 75 
-++++++++++++++++++++++
-  arch/arm/boot/dts/exynos5440-sd5v1.dts             |  7 ++
-  11 files changed, 200 insertions(+), 30 deletions(-)
+I guess one thing I didn't make clear was my hope that whatever
+firmware API or VM host implementation exists would be pre-installed
+on the system so that distros never had to deal with it, or even know
+it existed. That would then transform the many different HW
+configurations into a single HW configuration as far as distros are
+concerned, since they only target running as firmware clients or VM
+guests. Essentially, we are creating a standard platform in SW, which
+perhaps is still possible, rather than in HW, which seems unlikely at
+present.
