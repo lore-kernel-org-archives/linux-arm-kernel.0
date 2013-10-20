@@ -1,43 +1,41 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 19 Oct 2013 19:57:13 -0700
-Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
-In-Reply-To: <8761stu7rl.fsf@linaro.org>
-References: <1381296747.2040.17.camel@joe-AO722>
- <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
- <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
- <CAGa+x86aS+C8iEb1P4ZYxPBix=Anjh4JZoAof=R-i9fGw=bq6w@mail.gmail.com>
- <20131018225702.GA13090@kroah.com> <8761stu7rl.fsf@linaro.org>
-Message-ID: <20131020025713.GA22344@kroah.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 20 Oct 2013 10:03:33 +0200
+Subject: [PATCH v3 2/2] ASoC: kirkwood: fix loss of external clock at
+ probe time
+In-Reply-To: <20131019102809.180dc4ff@armhf>
+References: <20131018203555.4d974251@armhf>
+ <20131018191259.GF10079@pengutronix.de>
+ <20131019102809.180dc4ff@armhf>
+Message-ID: <20131020080333.GG10079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 10:52:46PM -0700, Kevin Hilman wrote:
-> Greg KH <gregkh@linuxfoundation.org> writes:
+On Sat, Oct 19, 2013 at 10:28:09AM +0200, Jean-Francois Moine wrote:
+> On Fri, 18 Oct 2013 21:12:59 +0200
+> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 > 
-> > On Fri, Oct 18, 2013 at 10:04:11AM -0700, Kevin Hilman wrote:
-> >> > A handful of boot panics on ARM platforms were bisected to point at
-> >> > the version of this commit that's in linux-next (commit
-> >> > 64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
-> >> > makes things happy again.
-> >> >
-> >> > Upon further digging, it seems that users of devres_alloc() are
-> >> > relying on the previous behavior of having the memory zero'd which is
-> >> > no longer the case after $SUBJECT patch.  The change below on top of
-> >> > -next makes these ARM boards happy again.
-> >> 
-> >> Oops, it should've fixed __devres_alloc() also.  Updated patch below.
-> >
-> > Can you send this in a format that I can apply it in?  It was whitespace
-> > damaged.
+> > > +	if (IS_ERR(priv->extclk)) {
+> > > +		if (PTR_ERR(priv->extclk) == -EPROBE_DEFER)
+> > > +			return -EPROBE_DEFER;  
+> > Maybe the better logic here is:
+> > 		if (!PTR_ERR(priv->extclk) == -ENOENT)
+> > 			return PTR_ERR(priv->extclk);
+> > 
+> > ?
 > 
-> hmm, sorry about that.  This one should work, though I wonder if Andrew
-> should pick this up since I think the patch that causes the breakage
-> came through his tree.
+> No. This patch is associated with an other one which returns
+> -EPROBE_DEFER when the external clock is declared in the DT and when
+> the clock driver is not yet initialized. Then, the kirkwood modules
+> must be probed later.
+Yes, that's understood. My suggestion behaves as your's for the return
+values -EPROBE_DEFER and -ENOENT, so the deferred probe should work,
+too. The question is only what you want to do for other errors (don't
+know if they can happen at this stage). I'd say, on a dt parsing error
+bail out, too.
 
-No, the patch is in my tree, not Andrew's.
+Best regards
+Uwe
 
-Joe, can I get a signed-off-by for this?
-
-thanks,
-
-greg k-h
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
