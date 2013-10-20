@@ -1,45 +1,97 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 20 Oct 2013 08:22:46 -0700
-Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
-In-Reply-To: <20131020025713.GA22344@kroah.com>
-References: <1381296747.2040.17.camel@joe-AO722>
- <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
- <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
- <CAGa+x86aS+C8iEb1P4ZYxPBix=Anjh4JZoAof=R-i9fGw=bq6w@mail.gmail.com>
- <20131018225702.GA13090@kroah.com> <8761stu7rl.fsf@linaro.org>
- <20131020025713.GA22344@kroah.com>
-Message-ID: <1382282566.2041.39.camel@joe-AO722>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 20 Oct 2013 08:51:35 -0700
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <1805938.y3dym69kEh@avalon>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <5231E44C.9070800@ahsoftware.de>
+ <20130918003632.CBF48C42BC5@trevor.secretlab.ca>
+ <1805938.y3dym69kEh@avalon>
+Message-ID: <20131020155135.GW12599@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2013-10-19 at 19:57 -0700, Greg KH wrote:
-> On Fri, Oct 18, 2013 at 10:52:46PM -0700, Kevin Hilman wrote:
-> > Greg KH <gregkh@linuxfoundation.org> writes:
-> > 
-> > > On Fri, Oct 18, 2013 at 10:04:11AM -0700, Kevin Hilman wrote:
-> > >> > A handful of boot panics on ARM platforms were bisected to point at
-> > >> > the version of this commit that's in linux-next (commit
-> > >> > 64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
-> > >> > makes things happy again.
-> > >> >
-> > >> > Upon further digging, it seems that users of devres_alloc() are
-> > >> > relying on the previous behavior of having the memory zero'd which is
-> > >> > no longer the case after $SUBJECT patch.  The change below on top of
-> > >> > -next makes these ARM boards happy again.
-> > >> 
-> > >> Oops, it should've fixed __devres_alloc() also.  Updated patch below.
-> > >
-> > > Can you send this in a format that I can apply it in?  It was whitespace
-> > > damaged.
-> > 
-> > hmm, sorry about that.  This one should work, though I wonder if Andrew
-> > should pick this up since I think the patch that causes the breakage
-> > came through his tree.
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [131020 05:41]:
+> Hi Grant,
 > 
-> No, the patch is in my tree, not Andrew's.
+> On Tuesday 17 September 2013 17:36:32 Grant Likely wrote:
+> > On Thu, 12 Sep 2013 17:57:00 +0200, Alexander Holler wrote:
+> > > Am 12.09.2013 17:19, schrieb Stephen Warren:
+> > > > IRQs, DMA channels, and GPIOs are all different things. Their bindings
+> > > > are defined independently. While it's good to define new types of
+> > > > bindings consistently with other bindings, this hasn't always happened,
+> > > > so you can make zero assumptions about the IRQ bindings by reading the
+> > > > documentation for any other kind of binding.
+> > > > 
+> > > > Multiple interrupts are defined as follows:
+> > > > 	// Optional; otherwise inherited from parent/grand-parent/...
+> > > > 	interrupt-parent = <&gpio6>;
+> > > > 	// Must be in a fixed order, unless binding defines that the
+> > > > 	// optional interrupt-names property is to be used.
+> > > > 	interrupts = <1 IRQF_TRIGGER_HIGH> <2 IRQF_TRIGGER_LOW>;
+> > > > 	// Optional; binding for device defines whether it must
+> > > > 	// be present
+> > > > 	interrupt-names = "foo", "bar";
+> > > > 
+> > > > If you need multiple interrupts, each with a different parent, you need
+> > > > to use an interrupt-map property (Google it for a more complete
+> > > > explanation I guess). Unlike "interrupts", "interrupt-map" has a phandle
+> > > > in each entry, and hence each entry can refer to a different IRQ
+> > > > controller. You end up defining a dummy interrupt controller node (which
+> > > > may be the leaf node with multiple IRQ outputs, which then points at
+> > > > itself as the interrupt parent), pointing the leaf node's
+> > > > interrupt-parent at that node, and then having interrupt-map "demux" the
+> > > > N interrupt outputs to the various interrupt controllers.
+> > > 
+> > > What a mess. I assume that is the price that bindings don't have to
+> > > change.
+> > > 
+> > > Thanks for clarifying that,
+> > > 
+> > > Alexander Holler
+> > 
+> > Actually, I think it is solveable but doing so requires a new binding
+> > for interrupts. I took a shot at implementing it earlier this week and
+> > I've got working patches that I'll be posting soon. I created a new
+> > "interrupts-extended" property that uses a phandle+args type of
+> > binding like this:
+> > 
+> > intc1: intc at 1000 {
+> > 	interrupt-controller;
+> > 	#interrupt-cells = <1>;
+> > };
+> > 
+> > intc2: intc at 2000 {
+> > 	interrupt-controller;
+> > 	#interrupt-cells = <2>;
+> > };
+> > 
+> > device at 3000 {
+> > 	interrupts-extended = <&intc1 5> <&intc2 3 4> <&intc1 6>;
+> > };
+> > 
+> > 'interrupts-extended' will be proposed as a directly replacement of the
+> > 'interrupts' property and it will eliminate the need for an
+> > interrupt-map property. A node will be allowed to have one or the other,
+> > but not both.
+> > 
+> > I'll write up a proper binding document and post for review.
 > 
-> Joe, can I get a signed-off-by for this?
+> Any progress on this ? I'll need to use multiple interrupts with different 
+> parents in the near future, I can take this over if needed.
 
-If you want.
+Grant posted the interrupts-extended binding few days ago:
 
-Signed-off-by: Joe Perches <joe@perches.com>
+http://lkml.org/lkml/2013/10/15/760
+ 
+> I've also been thinking that we could possibly reuse the "interrupts" property 
+> without defining a new "interrupts-extended". When parsing the property the 
+> code would use the current DT bindings if an interrupt-parent is present, and 
+> the new DT bindings if it isn't.
+
+That could lead to mysterious failures easily as the binding
+behaves in two different ways :) Probably best to have a separate
+binding for it.
+
+Regards,
+
+Tony
