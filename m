@@ -1,46 +1,83 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 20 Oct 2013 19:50:49 +0200
-Subject: [PATCH v2 00/27] Armada 370/XP NAND support
-In-Reply-To: <20131019162158.GA3044@localhost>
-References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131019063535.GC20157@1wt.eu>
- <20131019142549.GO22434@titan.lakedaemon.net>
- <20131019162158.GA3044@localhost>
-Message-ID: <20131020195049.7e683d0f@skate>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 20 Oct 2013 20:10:41 +0200
+Subject: [REGRESSION?] sensors and fancontrol not seeing armada_thermal on
+ 3.12-rc series
+Message-ID: <87ppqzolsu.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+Hi,
 
-On Sat, 19 Oct 2013 13:21:59 -0300, Ezequiel Garcia wrote:
+With 3.12-rc series, sysfs support for thermal susbsytem (and/or hwmon
+one) was modified in such a way that sensors utility (current 3.3.4
+version with 3.3.4 version of libsensors from lm-sensors package on
+Debian unstable) does not see the temperature sensor anymore on armada
+370 platforms (not tested on others). Additionally, the changes break
+existing configurations of fancontrol utility, which prevents the 
+fan to be regulated correctly w/o recreating an /etc/fancontrol w/
+pwmconfig.
 
-> > > I strongly believe that all the information above is very valuable and
-> > > that it's a shame to lose it in a cover message. It would definitely
-> > > make sense to have this in a doc file.
-> > 
-> > Agreed.  Great work Ezequiel!  Let's capture this in Documentation/.
-> > 
-> 
-> Wait a second!
-> 
->   $ ls Documentation/mtd/ | wc -l
->   1
-> 
-> Isn't documenting deprecated? ...
-> 
-> Just kiddin'! I'll add this and the other cover to Documentation/
-> so typos and english fixes are welcome!
+Here is what I have on my Armada 370-based system on a 3.11.5:
 
-I certainly agree this documentation should be kept, but I'm wondering
-if keeping it as a comment inside the driver doesn't make more sense.
-This document is really more about specific implementation details, and
-the next person looking at the driver is not very likely to search such
-details in Documentation/, in my opinion.
+# sensors
+g762-i2c-0-3e
+Adapter: mv64xxx_i2c adapter
+fan1:        2457 RPM  (div = 1)
 
-Best regards,
+armada_thermal-virtual-0
+Adapter: Virtual device
+temp1:        +45.7?C  
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+And what I get on 3.12-rc6:
+
+# sensors
+g762-i2c-0-3e
+Adapter: mv64xxx_i2c adapter
+fan1:        1350 RPM  (div = 1)
+
+
+Monitoring what sensors does w/ strace, I started looking at the changes
+to /sys/class/hwmon/hwmon1/:
+
+On 3.11.5:
+
+# find /sys/class/hwmon/hwmon1/
+/sys/class/hwmon/hwmon1/
+/sys/class/hwmon/hwmon1/name
+/sys/class/hwmon/hwmon1/subsystem
+/sys/class/hwmon/hwmon1/uevent
+/sys/class/hwmon/hwmon1/temp1_input
+
+On 3.12-rc6:
+
+# find /sys/class/hwmon/hwmon1/
+/sys/class/hwmon/hwmon1/
+/sys/class/hwmon/hwmon1/name
+/sys/class/hwmon/hwmon1/device
+/sys/class/hwmon/hwmon1/subsystem
+/sys/class/hwmon/hwmon1/uevent
+/sys/class/hwmon/hwmon1/temp1_input
+
+# find /sys/class/hwmon/hwmon1/device/
+/sys/class/hwmon/hwmon1/device/
+/sys/class/hwmon/hwmon1/device/temp
+/sys/class/hwmon/hwmon1/device/type
+/sys/class/hwmon/hwmon1/device/hwmon1
+/sys/class/hwmon/hwmon1/device/hwmon1/name
+/sys/class/hwmon/hwmon1/device/hwmon1/device
+/sys/class/hwmon/hwmon1/device/hwmon1/subsystem
+/sys/class/hwmon/hwmon1/device/hwmon1/uevent
+/sys/class/hwmon/hwmon1/device/hwmon1/temp1_input
+/sys/class/hwmon/hwmon1/device/subsystem
+/sys/class/hwmon/hwmon1/device/policy
+/sys/class/hwmon/hwmon1/device/uevent
+/sys/class/hwmon/hwmon1/device/passive
+
+Is that expected? As for sensors, it *seems* to be bothered to find a
+device/ folder in /sys/class/hwmon/hwmon1/ w/o no name entry in it.
+
+Cheers,
+
+a+
+
+ps: I can test if this is the same on kirkwood if there is a need.
