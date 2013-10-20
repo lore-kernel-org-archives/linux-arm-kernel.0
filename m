@@ -1,46 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 21 Oct 2013 06:34:29 +0900
-Subject: [PATCH V2] ARM: EXYNOS: Move arm core power down clock to
- exynos5250 common clock
-In-Reply-To: <4953642.S7P9jyspGP@amdn883>
-References: <1381470134-29410-1-git-send-email-amit.daniel@samsung.com>
- <4953642.S7P9jyspGP@amdn883>
-Message-ID: <52644C65.3040805@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sun, 20 Oct 2013 22:35:04 +0100
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <1805938.y3dym69kEh@avalon>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <5231E44C.9070800@ahsoftware.de>
+ <20130918003632.CBF48C42BC5@trevor.secretlab.ca> <1805938.y3dym69kEh@avalon>
+Message-ID: <52644C88.5060608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/13 16:33, Tomasz Figa wrote:
-> Hi Amit,
->
-> On Friday 11 of October 2013 11:12:14 Amit Daniel Kachhap wrote:
->> Now with common clock support added for exynos5250 it is necessary to move
->> this code to exynos5250 common clock driver as clock registers should be
->> handled there. This change is tested in exynos5250 based arndale platform.
->>
->> Cc: Abhilash Kesavan<a.kesavan@samsung.com>
->> Cc: Thomas Abraham<thomas.abraham@linaro.org>
->> Acked-by: Kukjin Kim<kgene.kim@samsugn.com>
->
-> nit: Typo in samsung. Probably something that Kukjin can fix up when
-> applying, though.
->
->> Reviewed-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
->> Signed-off-by: Amit Daniel Kachhap<amit.daniel@samsung.com>
->> ---
->>
->> Changes in V2:
->> * Rebased against linux-next tree.
->> * Removed un-used macros in regs-clock.h
->>
->>   arch/arm/mach-exynos/cpuidle.c                 |   35 --------------------
->>   arch/arm/mach-exynos/include/mach/regs-clock.h |   16 ---------
->>   drivers/clk/samsung/clk-exynos5250.c           |   42 ++++++++++++++++++++++++
->>   3 files changed, 42 insertions(+), 51 deletions(-)
->
-> Otherwise
->
-> Acked-by: Tomasz Figa<t.figa@samsung.com>
->
-Mike, do you want me to pick this patch into Samsung tree?
+On 10/20/2013 01:41 PM, Laurent Pinchart wrote:
+> Hi Grant,
+> 
+> On Tuesday 17 September 2013 17:36:32 Grant Likely wrote:
+>> On Thu, 12 Sep 2013 17:57:00 +0200, Alexander Holler wrote:
+>>> Am 12.09.2013 17:19, schrieb Stephen Warren:
+>>>> IRQs, DMA channels, and GPIOs are all different things. Their bindings
+>>>> are defined independently. While it's good to define new types of
+>>>> bindings consistently with other bindings, this hasn't always happened,
+>>>> so you can make zero assumptions about the IRQ bindings by reading the
+>>>> documentation for any other kind of binding.
+>>>>
+>>>> Multiple interrupts are defined as follows:
+>>>> 	// Optional; otherwise inherited from parent/grand-parent/...
+>>>> 	interrupt-parent = <&gpio6>;
+>>>> 	// Must be in a fixed order, unless binding defines that the
+>>>> 	// optional interrupt-names property is to be used.
+>>>> 	interrupts = <1 IRQF_TRIGGER_HIGH> <2 IRQF_TRIGGER_LOW>;
+>>>> 	// Optional; binding for device defines whether it must
+>>>> 	// be present
+>>>> 	interrupt-names = "foo", "bar";
+>>>>
+>>>> If you need multiple interrupts, each with a different parent, you need
+>>>> to use an interrupt-map property...
+...
+>> Actually, I think it is solveable but doing so requires a new binding
+>> for interrupts. I took a shot at implementing it earlier this week and
+>> I've got working patches that I'll be posting soon. I created a new
+>> "interrupts-extended" property that uses a phandle+args type of
+>> binding like this:
+...
+>> device at 3000 {
+>> 	interrupts-extended = <&intc1 5> <&intc2 3 4> <&intc1 6>;
+>> };
+...
+> Any progress on this ? I'll need to use multiple interrupts with different 
+> parents in the near future, I can take this over if needed.
+> 
+> I've also been thinking that we could possibly reuse the "interrupts" property 
+> without defining a new "interrupts-extended". When parsing the property the 
+> code would use the current DT bindings if an interrupt-parent is present, and 
+> the new DT bindings if it isn't.
 
-- Kukjin
+interrupt-parents doesn't have to be present in individual nodes; it can
+be inherited from the parent. That means you'd have to convert whole
+sub-trees at once. It seems much more flexible to use a new property and
+hence make it explicit what format the data is in.
