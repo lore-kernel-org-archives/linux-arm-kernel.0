@@ -1,41 +1,43 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Sat, 19 Oct 2013 23:41:52 -0700
-Subject: Tegra baseline test results for v3.12-rc6
-Message-ID: <52637B30.7000203@nvidia.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sat, 19 Oct 2013 19:57:13 -0700
+Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
+In-Reply-To: <8761stu7rl.fsf@linaro.org>
+References: <1381296747.2040.17.camel@joe-AO722>
+ <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
+ <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
+ <CAGa+x86aS+C8iEb1P4ZYxPBix=Anjh4JZoAof=R-i9fGw=bq6w@mail.gmail.com>
+ <20131018225702.GA13090@kroah.com> <8761stu7rl.fsf@linaro.org>
+Message-ID: <20131020025713.GA22344@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 18, 2013 at 10:52:46PM -0700, Kevin Hilman wrote:
+> Greg KH <gregkh@linuxfoundation.org> writes:
+> 
+> > On Fri, Oct 18, 2013 at 10:04:11AM -0700, Kevin Hilman wrote:
+> >> > A handful of boot panics on ARM platforms were bisected to point at
+> >> > the version of this commit that's in linux-next (commit
+> >> > 64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
+> >> > makes things happy again.
+> >> >
+> >> > Upon further digging, it seems that users of devres_alloc() are
+> >> > relying on the previous behavior of having the memory zero'd which is
+> >> > no longer the case after $SUBJECT patch.  The change below on top of
+> >> > -next makes these ARM boards happy again.
+> >> 
+> >> Oops, it should've fixed __devres_alloc() also.  Updated patch below.
+> >
+> > Can you send this in a format that I can apply it in?  It was whitespace
+> > damaged.
+> 
+> hmm, sorry about that.  This one should work, though I wonder if Andrew
+> should pick this up since I think the patch that causes the breakage
+> came through his tree.
 
-Here are some basic Tegra test results for Linux v3.12-rc6.
-Logs and other details at:
+No, the patch is in my tree, not Andrew's.
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12-rc6/20131019232523/
+Joe, can I get a signed-off-by for this?
 
+thanks,
 
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc5 (61e6cfa80de5760bbe406f4e815b7739205754d2)):
-    text     data      bss    total  kernel
-    -168      +64     -768     -872  multi_v7_defconfig
-   -1781       -8     -704    -2493  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc5 (61e6cfa80de5760bbe406f4e815b7739205754d2))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-        8k      -8k        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        8k      -8k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+greg k-h
