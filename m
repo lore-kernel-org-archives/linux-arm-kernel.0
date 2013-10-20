@@ -1,42 +1,68 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 21 Oct 2013 05:27:20 +0900
-Subject: [PATCH RESEND 0/3] ARM: S3C24XX: add missing dma-devices and
- warning fix
-In-Reply-To: <20131016020516.GT2954@intel.com>
-References: <201310111059.19791.heiko@sntech.de>
- <20131013145642.GJ2954@intel.com> <201310132011.11285.heiko@sntech.de>
- <525DC274.8090808@samsung.com> <20131016020516.GT2954@intel.com>
-Message-ID: <52643CA8.2020902@samsung.com>
+Date: Mon, 21 Oct 2013 05:51:42 +0900
+Subject: [PATCH v5 0/3] ARM: S5PV210: move to common clk framework
+In-Reply-To: <1816869.ggMDlA1qNY@flatron>
+References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <1816869.ggMDlA1qNY@flatron>
+Message-ID: <5264425E.4040301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/13 11:05, Vinod Koul wrote:
-> On Wed, Oct 16, 2013 at 07:32:20AM +0900, Kukjin Kim wrote:
->> On 10/14/13 03:11, Heiko St?bner wrote:
->>> Am Sonntag, 13. Oktober 2013, 16:56:42 schrieb Vinod Koul:
->>>> On Fri, Oct 11, 2013 at 10:59:19AM +0200, Heiko St?bner wrote:
->>>>> [I messed up the linux-arm-kernel list address yesterday, so I resend it
->>>>> with a fixed address, sorry for the noise]
->>>>>
->>>>> When Olof reported the warning about the unused s3c2410_dma_resource, I
->>>>> thought the best way forward would be to simply implement the missing
->>>>> pieces and so it has users :-) .
->>>>>
->>>>> Therefore this series adds the necessary platform-devices for s3c2410,
->>>>> s3c2440 and s3c2442. This especially also includes the
->>>>> channel-constraints of those socs.
->>>>>
->>>>> As I do not have access to any of those socs these changes are of course
->>>>> compile-tested only.
->>>>
->>>> Do you want this to be applied thru dma or arm tree?
->>>
->>> hmm, the original series went into the samsung tree for 3.13, so maybe this
->>> addition should go the same way?
->>>
->> I think so, let me pick this up into Samsung tree for v3.13.
-> Okay, sounds good. Ack for dmaengine patch sent
+On 10/20/13 01:03, Tomasz Figa wrote:
+> Hi Mike, Kukjin, Rafael,
 >
-Applied with Vinod's ack, thanks.
+> On Tuesday 24 of September 2013 14:50:06 Mateusz Krawczuk wrote:
+>> This patch series is the new s5pv210 clock implementation
+>> (using common clk framework).
+>>
+>> This implementation is compatible with device tree definition and board
+>> files.
+>>
+>> This patch series is based on linux-next and has been tested on goni and
+>> aquila
+>> boards using board file.
+>>
+>> Since v4:
+>> Corrected mux flags for finpll.
+>>
+>> Since v3:
+>>
+>> Replace s5pv210_clk_register_finpll, by creating mux finpll
+>> with xusbxti and xxti as parrents.
+>>
+>>
+>> Mateusz Krawczuk (3):
+>>    clk: samsung: Add clock driver for s5pc110/s5pv210
+>>    Cpufreq: s5pv210 cpufreq fixes for CCF
+>>    ARM: s5pv210: Migrate clock handling to Common Clock Framework
+>>
+>>   .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
+>>   arch/arm/mach-s5pv210/Kconfig                      |   9 +
+>>   arch/arm/mach-s5pv210/Makefile                     |   4 +-
+>>   arch/arm/mach-s5pv210/common.c                     |  17 +
+>>   arch/arm/mach-s5pv210/common.h                     |  10 +
+>>   arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+>>   arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+>>   arch/arm/plat-samsung/Kconfig                      |   2 +-
+>>   drivers/clk/samsung/Makefile                       |   3 +
+>>   drivers/clk/samsung/clk-s5pv210.c                  | 673
+>> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c
+>>   |   6 +-
+>>   include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
+>>   12 files changed, 1019 insertions(+), 8 deletions(-)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
+>> create mode 100644 drivers/clk/samsung/clk-s5pv210.c
+>>   create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
+>
+> I believe this series is reasonable to be applied. Could we agree on
+> the tree it would go through and get all tne required acks?
+>
+> Best regards,
+> Tomasz
+
+I agree.
+
+Mike, how do you think the common clk stuff for s5pv210?
 
 - Kukjin
