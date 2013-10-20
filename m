@@ -1,59 +1,88 @@
-From: robt201108@gmail.com (robert)
-Date: Sun, 20 Oct 2013 13:08:34 +0100
-Subject: DreamPlug / GuruPlug support in 3.12-rc
-Message-ID: <5263C7C2.4000204@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 20 Oct 2013 14:41:41 +0200
+Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
+In-Reply-To: <20130918003632.CBF48C42BC5@trevor.secretlab.ca>
+References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
+ <5231E44C.9070800@ahsoftware.de>
+ <20130918003632.CBF48C42BC5@trevor.secretlab.ca>
+Message-ID: <1805938.y3dym69kEh@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have an 'older' DreamPlug, that is - effectively - a GuruPlug inside:
+Hi Grant,
 
-# cat /proc/cpuinfo
-processor       : 0
-model name      : Feroceon 88FR131 rev 1 (v5l)
-BogoMIPS        : 1191.11
-Features        : swp half thumb fastmult edsp
-CPU implementer : 0x56
-CPU architecture: 5TE
-CPU variant     : 0x2
-CPU part        : 0x131
-CPU revision    : 1
-Hardware        : Marvell GuruPlug Reference Board
-Revision        : 0000
-Serial          : 0000000000000000
+On Tuesday 17 September 2013 17:36:32 Grant Likely wrote:
+> On Thu, 12 Sep 2013 17:57:00 +0200, Alexander Holler wrote:
+> > Am 12.09.2013 17:19, schrieb Stephen Warren:
+> > > IRQs, DMA channels, and GPIOs are all different things. Their bindings
+> > > are defined independently. While it's good to define new types of
+> > > bindings consistently with other bindings, this hasn't always happened,
+> > > so you can make zero assumptions about the IRQ bindings by reading the
+> > > documentation for any other kind of binding.
+> > > 
+> > > Multiple interrupts are defined as follows:
+> > > 	// Optional; otherwise inherited from parent/grand-parent/...
+> > > 	interrupt-parent = <&gpio6>;
+> > > 	// Must be in a fixed order, unless binding defines that the
+> > > 	// optional interrupt-names property is to be used.
+> > > 	interrupts = <1 IRQF_TRIGGER_HIGH> <2 IRQF_TRIGGER_LOW>;
+> > > 	// Optional; binding for device defines whether it must
+> > > 	// be present
+> > > 	interrupt-names = "foo", "bar";
+> > > 
+> > > If you need multiple interrupts, each with a different parent, you need
+> > > to use an interrupt-map property (Google it for a more complete
+> > > explanation I guess). Unlike "interrupts", "interrupt-map" has a phandle
+> > > in each entry, and hence each entry can refer to a different IRQ
+> > > controller. You end up defining a dummy interrupt controller node (which
+> > > may be the leaf node with multiple IRQ outputs, which then points at
+> > > itself as the interrupt parent), pointing the leaf node's
+> > > interrupt-parent at that node, and then having interrupt-map "demux" the
+> > > N interrupt outputs to the various interrupt controllers.
+> > 
+> > What a mess. I assume that is the price that bindings don't have to
+> > change.
+> > 
+> > Thanks for clarifying that,
+> > 
+> > Alexander Holler
+> 
+> Actually, I think it is solveable but doing so requires a new binding
+> for interrupts. I took a shot at implementing it earlier this week and
+> I've got working patches that I'll be posting soon. I created a new
+> "interrupts-extended" property that uses a phandle+args type of
+> binding like this:
+> 
+> intc1: intc at 1000 {
+> 	interrupt-controller;
+> 	#interrupt-cells = <1>;
+> };
+> 
+> intc2: intc at 2000 {
+> 	interrupt-controller;
+> 	#interrupt-cells = <2>;
+> };
+> 
+> device at 3000 {
+> 	interrupts-extended = <&intc1 5> <&intc2 3 4> <&intc1 6>;
+> };
+> 
+> 'interrupts-extended' will be proposed as a directly replacement of the
+> 'interrupts' property and it will eliminate the need for an
+> interrupt-map property. A node will be allowed to have one or the other,
+> but not both.
+> 
+> I'll write up a proper binding document and post for review.
 
-UBoot:
-Marvell-DreamPlug
-SoC:   Kirkwood 88F6281_A0
+Any progress on this ? I'll need to use multiple interrupts with different 
+parents in the near future, I can take this over if needed.
 
-I have managed to get kernels up to 3.11.6 to compile and install OK,
-with the 'device tree' option, by selecting 'Marvel GuruPlug reference
-board' and 'Marvel GuruPlug reference board (flattened device tree)',
-but none of the available options on 3.12-rc seem to work..    I have
-tried selecting all the 'Marvell Kirkwood' options, and the 'Marvell
-SOC' options, and none of these produces a bootable kernel.
+I've also been thinking that we could possibly reuse the "interrupts" property 
+without defining a new "interrupts-extended". When parsing the property the 
+code would use the current DT bindings if an interrupt-parent is present, and 
+the new DT bindings if it isn't.
 
-As a test, I temporarily deselected 'Embedded system', and got the
-following at boot:
-Uncompressing Linux... done, booting the kernel.
-Error: unrecognized/unsupported machine ID (r1 = 0x00000a63).
-Available machine support:
-ID (hex)        NAME
-00000b44        Marvell OpenRD Ultimate Board
-00000939        Marvell OpenRD Client Board
-00000915        Marvell OpenRD Base Board
-00000691        Marvell RD-88F6192-NAS Development Board
-00000692        Marvell RD-88F6281 Reference Board
-ffffffff        Marvell Kirkwood (Flattened Device Tree)
-Please check your kernel config and/or bootloader.
+-- 
+Regards,
 
-0a63(hex) is 2659(dec), which is, in ~/arch/arm/tools/mach-types:
-guruplug        MACH_GURUPLUG        GURUPLUG        2659
-
-I appreciate that ARM support in 3.12-rc is still a work-in-progress,
-but would like to know if this support will be included soon..   I have
-- as usual - tried to find some clues online, but haven't found
-anything, so far...
-
-Thanks.
-
-Robert Gadsdon.
+Laurent Pinchart
