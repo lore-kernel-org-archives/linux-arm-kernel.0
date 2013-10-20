@@ -1,58 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sun, 20 Oct 2013 22:35:04 +0100
-Subject: [PATCH] RFC: interrupt consistency check for OF GPIO IRQs
-In-Reply-To: <1805938.y3dym69kEh@avalon>
-References: <1375101368-17645-1-git-send-email-linus.walleij@linaro.org>
- <5231E44C.9070800@ahsoftware.de>
- <20130918003632.CBF48C42BC5@trevor.secretlab.ca> <1805938.y3dym69kEh@avalon>
-Message-ID: <52644C88.5060608@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 20 Oct 2013 17:50:17 -0400
+Subject: DreamPlug / GuruPlug support in 3.12-rc
+In-Reply-To: <5264382E.9050207@gmail.com>
+References: <5263C7C2.4000204@gmail.com>
+ <20131020161747.GA15169@titan.lakedaemon.net>
+ <5264382E.9050207@gmail.com>
+Message-ID: <20131020215017.GD15169@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2013 01:41 PM, Laurent Pinchart wrote:
-> Hi Grant,
-> 
-> On Tuesday 17 September 2013 17:36:32 Grant Likely wrote:
->> On Thu, 12 Sep 2013 17:57:00 +0200, Alexander Holler wrote:
->>> Am 12.09.2013 17:19, schrieb Stephen Warren:
->>>> IRQs, DMA channels, and GPIOs are all different things. Their bindings
->>>> are defined independently. While it's good to define new types of
->>>> bindings consistently with other bindings, this hasn't always happened,
->>>> so you can make zero assumptions about the IRQ bindings by reading the
->>>> documentation for any other kind of binding.
->>>>
->>>> Multiple interrupts are defined as follows:
->>>> 	// Optional; otherwise inherited from parent/grand-parent/...
->>>> 	interrupt-parent = <&gpio6>;
->>>> 	// Must be in a fixed order, unless binding defines that the
->>>> 	// optional interrupt-names property is to be used.
->>>> 	interrupts = <1 IRQF_TRIGGER_HIGH> <2 IRQF_TRIGGER_LOW>;
->>>> 	// Optional; binding for device defines whether it must
->>>> 	// be present
->>>> 	interrupt-names = "foo", "bar";
->>>>
->>>> If you need multiple interrupts, each with a different parent, you need
->>>> to use an interrupt-map property...
-...
->> Actually, I think it is solveable but doing so requires a new binding
->> for interrupts. I took a shot at implementing it earlier this week and
->> I've got working patches that I'll be posting soon. I created a new
->> "interrupts-extended" property that uses a phandle+args type of
->> binding like this:
-...
->> device at 3000 {
->> 	interrupts-extended = <&intc1 5> <&intc2 3 4> <&intc1 6>;
->> };
-...
-> Any progress on this ? I'll need to use multiple interrupts with different 
-> parents in the near future, I can take this over if needed.
-> 
-> I've also been thinking that we could possibly reuse the "interrupts" property 
-> without defining a new "interrupts-extended". When parsing the property the 
-> code would use the current DT bindings if an interrupt-parent is present, and 
-> the new DT bindings if it isn't.
+Robert,
 
-interrupt-parents doesn't have to be present in individual nodes; it can
-be inherited from the parent. That means you'd have to convert whole
-sub-trees at once. It seems much more flexible to use a new property and
-hence make it explicit what format the data is in.
+Please don't toppost.  It makes it very frustrating for others in your
+situation trying to solve their problem by reading the archives.
+
+On Sun, Oct 20, 2013 at 09:08:14PM +0100, robert wrote:
+> On 10/20/2013 05:17 PM, Jason Cooper wrote:
+> > On Sun, Oct 20, 2013 at 01:08:34PM +0100, robert wrote:
+...
+> >> ffffffff        Marvell Kirkwood (Flattened Device Tree)
+> >> Please check your kernel config and/or bootloader.
+> > 
+> > You need to enable CONFIG_ARM_APPENDED_DTB and then append the
+> > appropriate dtb:
+
+Did you do this?  It doesn't sound like you did.  Please attach the
+console boot output.
+
+> I've been running more tests, and still no luck, so far.
+
+Can you cut-n-paste specific results?  eg configs, console output, etc?
+
+> For 3.11, I found that selecting the 'Dreamplug' options for Kirkwood
+> didn't work, and I had to select both 'Marvell GuruPlug Reference Board'
+> _and_ 'Marvell GuruPlug Reference Board (Flattened Device Tree)', and
+> then use kirkwood-guruplug-server-plus.dtb:
+
+Your bootloader is, incorrectly, identifying itself as a Guruplug.  By
+enabling 'Marvell GuruPlug Reference Board', the kernel executes that
+legacy board file's machine_init.  It most likely isn't using the
+appended dtb at all, but we can't say for certain until we see the boot
+logs.
+
+> # cat arch/arm/boot/zImage
+> arch/arm/boot/dts/kirkwood-guruplug-server-plus.dtb >
+> arch/arm/boot/zImage_w_dtb
+
+Please don't do that.  Your board needs kirkwood-dreamplug.dtb,
+otherwise it will enumerate a NAND flash that isn't there.
+
+
+thx,
+
+Jason.
