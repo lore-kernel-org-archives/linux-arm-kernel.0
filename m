@@ -1,31 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 20 Oct 2013 23:08:39 +0100
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <52644A9E.3060007@wwwdotorg.org>
-References: <52644A9E.3060007@wwwdotorg.org>
-Message-ID: <20131020220839.GT2443@sirena.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 21 Oct 2013 07:14:35 +0900
+Subject: [GIT PULL 1/6] Samsung cleanup for v3.13
+Message-ID: <526455CB.6050507@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 20, 2013 at 10:26:54PM +0100, Stephen Warren wrote:
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
 
-> IIRC (and perhaps I don't; it was really slightly before my active
-> involvement in kernel development) Linus triggered the whole ARM DT
-> conversion in response to disliking the volume of changes, and
-> conflicts, in board files. The idea of DT conversion being that all the
-> board-specific details could be moved out of the kernel and into DT
-> files, thus causing him not to have to see it.
+   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 
-A large part of this was to do with the needs of distros and their users
-- they have a strong need to ship a device neutral kernel and to have a
-reasonable ability to have their kernel deploy on hardware unknown to
-them.  Allowing the device tree to be delivered with the system rather
-than have the board configuration in the kernel helps achieve that goal.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131020/9f27877f/attachment.sig>
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-cleanup
+
+for you to fetch changes up to ae3c5d74ea0d5e2f1c32c527e5de36c7614525af:
+
+   ARM: EXYNOS: remove CONFIG_MACH_EXYNOS[4, 5]_DT config options 
+(2013-10-21 06:35:47 +0900)
+
+----------------------------------------------------------------
+Samsung Cleanup for v3.13
+- remove unnecessary config options and header inclusions
+- use CONFIG_ARCH_S3C64XX instead of PLAT_S3C64XX
+
+----------------------------------------------------------------
+Bartlomiej Zolnierkiewicz (1):
+       ARM: EXYNOS: remove CONFIG_MACH_EXYNOS[4, 5]_DT config options
+
+Jingoo Han (1):
+       ARM: EXYNOS: remove unnecessary header inclusions from exynos4/5 
+dt machine file
+
+Tomasz Figa (5):
+       ARM: S3C64XX: Move if ARCH_S3C64XX statement into mach-s3c64xx
+       gpio: samsung: Use CONFIG_ARCH_S3C64XX to check for S3C64XX support
+       s3c-camif: Use CONFIG_ARCH_S3C64XX to check for S3C64XX support
+       ASoC: samsung: Use CONFIG_ARCH_S3C64XX to check for S3C64XX support
+       ARM: S3C64XX: Kill CONFIG_PLAT_S3C64XX
+
+  arch/arm/Kconfig                       |  4 ++--
+  arch/arm/mach-exynos/Kconfig           | 38 
+++++++++--------------------------
+  arch/arm/mach-exynos/Makefile          |  4 ++--
+  arch/arm/mach-exynos/mach-exynos4-dt.c |  4 ----
+  arch/arm/mach-exynos/mach-exynos5-dt.c |  4 ----
+  arch/arm/mach-s3c64xx/Kconfig          | 13 +++---------
+  drivers/gpio/gpio-samsung.c            |  8 +++----
+  drivers/media/platform/Kconfig         |  2 +-
+  sound/soc/samsung/s3c-i2s-v2.c         |  6 +-----
+  9 files changed, 22 insertions(+), 61 deletions(-)
