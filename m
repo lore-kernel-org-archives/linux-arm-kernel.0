@@ -1,41 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 20 Oct 2013 10:03:33 +0200
-Subject: [PATCH v3 2/2] ASoC: kirkwood: fix loss of external clock at
- probe time
-In-Reply-To: <20131019102809.180dc4ff@armhf>
-References: <20131018203555.4d974251@armhf>
- <20131018191259.GF10079@pengutronix.de>
- <20131019102809.180dc4ff@armhf>
-Message-ID: <20131020080333.GG10079@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 20 Oct 2013 10:42:01 +0200
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <20131019230908.GA10934@w500.lan>
+References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
+ <1382186261-14482-2-git-send-email-andrew@lunn.ch>
+ <20131019230908.GA10934@w500.lan>
+Message-ID: <20131020084201.GA19257@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 19, 2013 at 10:28:09AM +0200, Jean-Francois Moine wrote:
-> On Fri, 18 Oct 2013 21:12:59 +0200
-> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+On Sun, Oct 20, 2013 at 01:09:08AM +0200, Luka Perkov wrote:
+> Hi Andrew,
 > 
-> > > +	if (IS_ERR(priv->extclk)) {
-> > > +		if (PTR_ERR(priv->extclk) == -EPROBE_DEFER)
-> > > +			return -EPROBE_DEFER;  
-> > Maybe the better logic here is:
-> > 		if (!PTR_ERR(priv->extclk) == -ENOENT)
-> > 			return PTR_ERR(priv->extclk);
+> On Sat, Oct 19, 2013 at 02:37:38PM +0200, Andrew Lunn wrote:
+> > The Marvell Dove SoC can run the CPU at two frequencies. The high
+> > frequencey is from a PLL, while the lower is the same as the DDR
+> > clock. Add a cpufreq driver to swap between these frequences.
 > > 
-> > ?
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > ---
+> >  drivers/cpufreq/Kconfig.arm    |   7 ++
+> >  drivers/cpufreq/Makefile       |   1 +
+> >  drivers/cpufreq/dove-cpufreq.c | 276 +++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 284 insertions(+)
+> >  create mode 100644 drivers/cpufreq/dove-cpufreq.c
 > 
-> No. This patch is associated with an other one which returns
-> -EPROBE_DEFER when the external clock is declared in the DT and when
-> the clock driver is not yet initialized. Then, the kirkwood modules
-> must be probed later.
-Yes, that's understood. My suggestion behaves as your's for the return
-values -EPROBE_DEFER and -ENOENT, so the deferred probe should work,
-too. The question is only what you want to do for other errors (don't
-know if they can happen at this stage). I'd say, on a dt parsing error
-bail out, too.
+> ...
+> 
+> > --- /dev/null
+> > +++ b/drivers/cpufreq/dove-cpufreq.c
+> > @@ -0,0 +1,276 @@
+> > +/*
+> > + *	dove_freq.c: cpufreq driver for the Marvell dove
+> > + *
+> > + *	Copyright (C) 2013 Andrew Lunn <andrew@lunn.ch>
+> > + *
+> > + *	This program is free software; you can redistribute it and/or
+> > + *	modify it under the terms of the GNU General Public License
+> > + *	as published by the Free Software Foundation; either version
+> > + *	2 of the License, or (at your option) any later version.
+> > + */
+> > +
+> > +#define DEBUG
+> 
+> It seems to me that this define is not used at all...
 
-Best regards
-Uwe
+Hi Luke
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Correct. Its left over from my debugging. I will collect more comments
+and then remove it in a v2 patchset.
+
+    Thanks
+	Andrew
