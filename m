@@ -1,40 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 20 Oct 2013 18:56:27 +0100
-Subject: [PATCH v2] ASoC: kirkwood: add S/PDIF support
-In-Reply-To: <20131020171255.GP2443@sirena.org.uk>
-References: <20131018203750.7b981d62@armhf>
- <20131020171255.GP2443@sirena.org.uk>
-Message-ID: <20131020175627.GP25034@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 20 Oct 2013 19:50:49 +0200
+Subject: [PATCH v2 00/27] Armada 370/XP NAND support
+In-Reply-To: <20131019162158.GA3044@localhost>
+References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131019063535.GC20157@1wt.eu>
+ <20131019142549.GO22434@titan.lakedaemon.net>
+ <20131019162158.GA3044@localhost>
+Message-ID: <20131020195049.7e683d0f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 20, 2013 at 06:12:55PM +0100, Mark Brown wrote:
-> On Fri, Oct 18, 2013 at 08:37:50PM +0200, Jean-Francois Moine wrote:
-> > This patch adds S/PDIF input/output for mvebu DT boards.
-> 
-> This looks basically good, thanks.  A couple of things though:
-> 
-> > +	if (dai->name[0] == 'i')
-> > +		ctl &= ~KIRKWOOD_PLAYCTL_SPDIF_EN;	/* i2s */
-> > +	else
-> > +		ctl &= ~KIRKWOOD_PLAYCTL_I2S_EN;	/* spdif */
-> > +
-> 
-> This works and isn't actively a problem but it's not really normal
-> either - the normal thing would be to use dai->id.
-> 
-> > +static struct snd_soc_dai_driver kirkwood_i2s_dai[2] = {
-> > +    {
-> > +	.name = "i2s",
-> > +	.playback = {
-> 
-> This should cause problems for the existing (non-DT) machine drivers?
-> They're using cpu_dai_name to bind the CPU DAI and you're now setting an
-> explicit name instead of letting the dev_name() be used.  The patch
-> should be updating those machine drivers too unless I'm missing
-> something.
+Dear Ezequiel Garcia,
 
-For your information, I intend to nobble you and Liam at the kernel
-summit and knock your two heads together over this.  You both have
-been dysfunctional over this driver and its about time someone banged
-some sense into you both.
+On Sat, 19 Oct 2013 13:21:59 -0300, Ezequiel Garcia wrote:
+
+> > > I strongly believe that all the information above is very valuable and
+> > > that it's a shame to lose it in a cover message. It would definitely
+> > > make sense to have this in a doc file.
+> > 
+> > Agreed.  Great work Ezequiel!  Let's capture this in Documentation/.
+> > 
+> 
+> Wait a second!
+> 
+>   $ ls Documentation/mtd/ | wc -l
+>   1
+> 
+> Isn't documenting deprecated? ...
+> 
+> Just kiddin'! I'll add this and the other cover to Documentation/
+> so typos and english fixes are welcome!
+
+I certainly agree this documentation should be kept, but I'm wondering
+if keeping it as a comment inside the driver doesn't make more sense.
+This document is really more about specific implementation details, and
+the next person looking at the driver is not very likely to search such
+details in Documentation/, in my opinion.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
