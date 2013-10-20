@@ -1,53 +1,123 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 21 Oct 2013 00:42:48 +0200
-Subject: [PATCH] ARM: s3c64xx: mini6410: Correct card detect type for
- HSMMC1
-In-Reply-To: <5264529C.1000601@samsung.com>
-References: <1380471121-9478-1-git-send-email-tomasz.figa@gmail.com>
- <1e2a01cecb91$f790c700$e6b25500$@org> <5264529C.1000601@samsung.com>
-Message-ID: <1538561.RlaZEsIrlT@thinkpad>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Oct 2013 00:11:34 +0100
+Subject: ARM topic: Is DT on ARM the solution, or is there something
+ better?
+In-Reply-To: <52644A9E.3060007@wwwdotorg.org>
+References: <52644A9E.3060007@wwwdotorg.org>
+Message-ID: <20131020231134.GR25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Sun, Oct 20, 2013 at 10:26:54PM +0100, Stephen Warren wrote:
+> The only thing we've really moved out of the kernel is the exact IDs of
+> which GPIOS, interrupts, I2C/SPI ports the devices are connected to; the
+> simple stuff not the hard stuff. The code hasn't really been simplified
+> by DT - if anything, it's more complicated since we now have to parse
+> those values from DT rather than putting them into simple data-structures.
 
-On Monday 21 of October 2013 07:01:00 Kukjin Kim wrote:
-> On 10/18/13 08:38, Kukjin Kim wrote:
-> > Tomasz Figa wrote:
-> >> Hi Kukjin,
-> > 
-> > Hi,
-> > 
-> >> On Sunday 29 of September 2013 18:12:01 Tomasz Figa wrote:
-> >>> According to board schematics, for HSMMC1 a GPIO line is used to
-> >>> detect
-> >>> card presence, while currently it is being configured for internal
-> >>> card
-> >>> detect line, which is multiplexed with card detect line of HSMMC0 and
-> >>> thus breaking it.
-> >>> 
-> >>> This patch adds proper sdhci platform data setting card detect type
-> >>> to
-> >>> external GPIO and fixing operation of HSMMC0.
-> >>> 
-> >>> Signed-off-by: Tomasz Figa<tomasz.figa@gmail.com>
-> >>> ---
-> >>> 
-> >>>   arch/arm/mach-s3c64xx/mach-mini6410.c | 10 ++++++++++
-> >>>   1 file changed, 10 insertions(+)
-> >> 
-> >> Would you mind taking this patch to your tree?
-> > 
-> > Applied, thanks.
-> > Kukjin
-> 
-> Uhm...just small concern...it's possible to support dt for mini6410 but
-> basic. I need to hold this on...
+Here's my random thoughts this evening on DT, orientated mostly on a
+problem area I've been paying attention to recently.
 
-May I ask you to explain your concern about this?
+In some ways, DT has made things much harder.  I don't know whether
+you've taken a look at DRM and the various drivers we have under there,
+it's quite a mess of unreliable code which is trying to bend the DRM
+card based model to a DT based multi-device component based description
+with lots of sub-drivers.
 
-I believe this bug fix is fine, since we still support board files for 
-s3c64xx and DT based support is experimental at the moment.
+What DRM currently expects is a certain initialisation order: the main
+drm_device structure is created by the DRM code, and then supplied to
+the DRM driver to populate all the different parts of the "DRM card".
 
-Best regards,
-Tomasz
+Once all parts of the card have been setup (the CRTCs, encoders,
+connectors, etc) then some helpers can be initialised.  Once the
+helpers have been initialised, the "dimensions" of the "DRM card"
+become rather fixed until the helper is torn down.
+
+The problem is this: if you have a multi-driver based card, there is
+no way to prevent any of those sub-drivers from being unbound from
+their drivers at any time.  module refcounts don't save you from this.
+Meanwhile, (at the moment) you can't half-tear down a "DRM card" and
+have it still in a usable state.  The internals just don't allow for
+it at present.
+
+Yes, work can be put in to solve this problem, but it's being solved
+because of a desire to bend the subsystem to the DT way of doing things.
+That may or may not be the best idea.  However, what I do know is that
+there is now great pressure to "bend stuff so that it works with DT
+at all costs".  Evidence is the Exynos driver and the imx-drm driver.
+
+Now, the flip side to this is that some DRM solutions include an I2C
+device, which is itself a separate driver, and would appear to suffer
+from this same problem.  This is handled via the drm_encoder_slave
+infrastructure.  As it currently is written (ignoring DT) it get
+around the problem by not actually using the driver model "properly".
+If it were to, it would run into this same problem.
+
+How would we sort this out pre-DT?  We'd pass a chunk of platform data
+into a driver to describe the various options: eg, whether we wanted
+HDMI output, the I2C bus details of the DDC bus, etc., which results
+in a simpler solution - though traditionally a driver specific solution.
+
+However, "driver specific solution" is bad - always has been.  What was
+missed is that the platform datas should never have been specific to
+any particular device.  They should have been class specific.  I tried
+to do that with flash_platform_data for example - some people got the
+idea, but the vast majority didn't.
+
+What is clear to me is that there is no panacea "one size fits all"
+approach to the problem of device driver bindings and turning them into
+generic drivers.  Everyone has their own pet ideas and solutions to
+this.  Some favour DT.  Others favour other solutions.
+
+At the end of the day, the question should be - what is the easiest
+solution.  In the case of DRM, it may well be that the easiest solution
+is to have a translation layer which presents a DT multi-node
+description (note the change in terminology: multi-node not multi-device)
+to DRM as platform data so that DRM can preserve its "single card"
+solution.  Or whatever other translation layer is necessary for whatever
+solution is chosen in the future.
+
+There's much much more to the DRM vs DT problem than the above.  In
+short:
+- we have several driver specific solutions to this same problem
+- on the balance of probabilities, their solutions are buggy in some
+  way, some more buggy than others.
+
+I have one DRM driver which I've recently submitted to David Airlie
+which I have *not* implemented DT support for and that is because I
+don't want to solve this same problem in another driver specific way.
+I'd rather the driver wasn't directly supportable by DT until there's
+proper work in infrastructure than to create yet another driver
+specific solution - or the DT mess is dealt with outside the main
+driver.  (I believe that has already been done by Sebastian...)
+
+Other thoughts on DT... it's a pain in the backside as it's far too
+easy to make a subtle mistake in a DT source file and have it "build"
+to a blob. You can then spend hours trying to debug why something isn't
+working, and it's very simply because you typo'd something.  A recent
+example:
+
+	pintctrl-0 = <...>;
+
+and then you start wondering why aren't I getting signals out from the
+pins you want, and you start chasing around trying to find out if its
+something that you haven't thought of, whether some setting in the
+pin settings is wrong or whatever.  You completely fail to notice the
+additional 't' for hours and hours.  Eventually, you start pasting it
+onto IRC and at that point you spot the error.
+
+You may laugh at that, but that's exactly what has happened - all
+because the DT compiler is freeform - provided the strings look okay
+to it, that's all it cares about.  Whether the description is correct
+for the device or not is outside of its concern.
+
+I'm pretty certain that I won't be the only one who has gone through
+this - and I'm probably not going to be the last.
+
+We already know that "board firmware" has a tendency to be buggy.  Well,
+the DT compiler as it stands today does nothing what so ever to help
+people make sure that what they _think_ they're typing into the DT
+file is actually correct.  All the time that we're have a tool which
+allows typos through we're going to encounter bugs like this.  Not a
+problem when DT is shipped with the kernel, but when it isn't, what
+then...
