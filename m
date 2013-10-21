@@ -1,77 +1,38 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 21 Oct 2013 14:57:26 +0530
-Subject: [RFC] Does PHY UTMI data width belong to DWC2 or PHY binding?
-In-Reply-To: <20131018141221.GH2721@beef>
-References: <20131018141221.GH2721@beef>
-Message-ID: <5264F37E.9060307@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Oct 2013 10:34:48 +0100
+Subject: imx-drm: Add HDMI support
+In-Reply-To: <20131021091259.GB9716@S2101-09.ap.freescale.net>
+References: <52602EEA.6060402@prisktech.co.nz>
+ <20131017193948.GT25034@n2100.arm.linux.org.uk>
+ <1382039535.976669051@f130.i.mail.ru>
+ <20131017203545.GV25034@n2100.arm.linux.org.uk>
+ <20131019121218.GH25034@n2100.arm.linux.org.uk>
+ <20131021091259.GB9716@S2101-09.ap.freescale.net>
+Message-ID: <20131021093448.GX25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 October 2013 07:42 PM, Matt Porter wrote:
-> This is a summary of an unresolved issue resulting from this thread:
-> http://www.spinics.net/lists/arm-kernel/msg277700.html
+On Mon, Oct 21, 2013 at 05:13:03PM +0800, Shawn Guo wrote:
+> On Sat, Oct 19, 2013 at 01:12:18PM +0100, Russell King - ARM Linux wrote:
+> > The other issue is that the set_rate() functions don't wait for the PLL
+> > to lock before returning, and don't set bypass mode.  It looks like this
+> > code relies on drivers unpreparing the clocks before calling clk_set_rate().
+> > I don't see the clk API enforcing this in any way, so I'd suggest that
+> > the set_rate() function also does the bypass -> set rate -> wait lock
+> > -> clear bypass transition too.  Maybe this should be applied to the
+> > other PLLs too.
 > 
-> The BCM281xx family of SoCs contain an OTG subsystem consisting of a
-> DWC2 HSOTG controller and an internal UTMI PHY. This is appears as
-> follows (monospace font requirement ahead):
-> 
-> +----------------+              +-----------------+
-> |                |              |                 |
-> |                |       8      |                 |
-> |      DWC2      |<------/----->|     BCM Kona    |
-> |                |     UTMI     |     UTMI PHY    |
-> |                |              |                 |
-> +----------------+              +-----------------+
-> 
-> The internal UTMI phy is connected via an 8-bit data path. There is
-> no way to autodetect whether the data path is 8-bit or 16-bit. As such,
-> it was determined that a DT property is necessary to reflect this.
-> 
-> In the original patch submitted this property was offered as an
-> additional optional dwc2 property:
-> 
-> --- a/Documentation/devicetree/bindings/staging/dwc2.txt
-> +++ b/Documentation/devicetree/bindings/staging/dwc2.txt
-> @@ -6,10 +6,14 @@ Required properties:
->  - reg : Should contain 1 register range (address and length)
->  - interrupts : Should contain 1 interrupt
-> 
-> +Optional properties:
-> +- snps,phy-utmi-width: Must contain the UTMI data width (either 8 or 16)
-> +
->  Example:
-> 
->          usb at 101c0000 {
->                  compatible = "ralink,rt3050-usb, snps,dwc2";
->                  reg = <0x101c0000 40000>;
->                  interrupts = <18>;
-> +		snps,phy-utmi-width = <8>;
->          };
-> 
-> The open question is whether this required hardware property belongs to
-> the DWC2 controller or the PHY itself.
+> Yes.  We experienced the problem when upgrading FSL kernel tree to 3.10.
+> The .set_rate() should wait for LOCK bit, but does not need to touch
+> BYPASS.
 
-I think it makes sense to keep the data width property in the dwc2 node itself.
-I mean it describes how the dwc2 IP is configured in that particular SoC (given
-that it can be either <8> or <16>).
+However, the IPU is more stable with switching to bypass while it relocks
+than not.
 
-Thanks
-Kishon
+> > Here's a diff which updates the av PLL to do this:
+> 
+> Some other PLLs needs update too.  I will cook up patches to fix these
+> problems.
 
-> 
-> If the UTMI data path width is considered to be a property of the PHY
-> then this will impact both the generic PHY framework and the PHY device
-> node (producer) binding. The binding would need to be extended to carry
-> the data path width property. In addition, the generic PHY framework
-> would need to allow for this information to be gathered in some manner
-> for use by the controller driver (PHY consumer). In the case of DWC2,
-> the driver needs to know whether to program the phy interface for 8 or
-> 16 bit UTMI communication.
-> 
-> Thanks,
-> Matt
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Yes, I only changed the set_rate on the AV codecs as I haven't tested
+that on the others.
