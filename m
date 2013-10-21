@@ -1,75 +1,77 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Oct 2013 11:27:30 +0200
-Subject: ARM topic: Is DT on ARM the solution, or is there something
- better?
-In-Reply-To: <20131021084854.GV25034@n2100.arm.linux.org.uk>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131020231134.GR25034@n2100.arm.linux.org.uk>
- <20131021083242.GB30088@pengutronix.de>
- <20131021084854.GV25034@n2100.arm.linux.org.uk>
-Message-ID: <20131021092730.GF30088@pengutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 21 Oct 2013 14:57:26 +0530
+Subject: [RFC] Does PHY UTMI data width belong to DWC2 or PHY binding?
+In-Reply-To: <20131018141221.GH2721@beef>
+References: <20131018141221.GH2721@beef>
+Message-ID: <5264F37E.9060307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 21, 2013 at 09:48:54AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 21, 2013 at 10:32:42AM +0200, Sascha Hauer wrote:
-> > On Mon, Oct 21, 2013 at 12:11:34AM +0100, Russell King - ARM Linux wrote:
-> > 
-> > In fact it was the other way round. We modeled the IPU devicetree
-> > binding after the hardware and bended the driver around it. The DRM
-> > single-card model is the limiting fator here, not the devicetree.
+On Friday 18 October 2013 07:42 PM, Matt Porter wrote:
+> This is a summary of an unresolved issue resulting from this thread:
+> http://www.spinics.net/lists/arm-kernel/msg277700.html
 > 
-> There are several points which I think you failed to understand:
+> The BCM281xx family of SoCs contain an OTG subsystem consisting of a
+> DWC2 HSOTG controller and an internal UTMI PHY. This is appears as
+> follows (monospace font requirement ahead):
 > 
-> 1. DRM vs device tree is an incompatibility.
+> +----------------+              +-----------------+
+> |                |              |                 |
+> |                |       8      |                 |
+> |      DWC2      |<------/----->|     BCM Kona    |
+> |                |     UTMI     |     UTMI PHY    |
+> |                |              |                 |
+> +----------------+              +-----------------+
+> 
+> The internal UTMI phy is connected via an 8-bit data path. There is
+> no way to autodetect whether the data path is 8-bit or 16-bit. As such,
+> it was determined that a DT property is necessary to reflect this.
+> 
+> In the original patch submitted this property was offered as an
+> additional optional dwc2 property:
+> 
+> --- a/Documentation/devicetree/bindings/staging/dwc2.txt
+> +++ b/Documentation/devicetree/bindings/staging/dwc2.txt
+> @@ -6,10 +6,14 @@ Required properties:
+>  - reg : Should contain 1 register range (address and length)
+>  - interrupts : Should contain 1 interrupt
+> 
+> +Optional properties:
+> +- snps,phy-utmi-width: Must contain the UTMI data width (either 8 or 16)
+> +
+>  Example:
+> 
+>          usb at 101c0000 {
+>                  compatible = "ralink,rt3050-usb, snps,dwc2";
+>                  reg = <0x101c0000 40000>;
+>                  interrupts = <18>;
+> +		snps,phy-utmi-width = <8>;
+>          };
+> 
+> The open question is whether this required hardware property belongs to
+> the DWC2 controller or the PHY itself.
 
-I do understand that.
+I think it makes sense to keep the data width property in the dwc2 node itself.
+I mean it describes how the dwc2 IP is configured in that particular SoC (given
+that it can be either <8> or <16>).
 
-> 2. Trying to bend DRM to DT with independent driver solutions such as
->    the abomination that is imx-drm creates its own set of problems.
-
-I also see this.
+Thanks
+Kishon
 
 > 
-> If a subsystem doesn't work well with DT, then the choices are either:
+> If the UTMI data path width is considered to be a property of the PHY
+> then this will impact both the generic PHY framework and the PHY device
+> node (producer) binding. The binding would need to be extended to carry
+> the data path width property. In addition, the generic PHY framework
+> would need to allow for this information to be gathered in some manner
+> for use by the controller driver (PHY consumer). In the case of DWC2,
+> the driver needs to know whether to program the phy interface for 8 or
+> 16 bit UTMI communication.
 > 
-> (a) don't use DT with the subsystem
-
-The underlying problem has nothing to do with DT. Multi component
-hardware does exist and won't vanish when we stop using DT.
-
-> (b) fix the subsystem
-
-I'd love to do that. Step one to this seems to be to increase the
-awareness that there's something wrong with DRM.
-
+> Thanks,
+> Matt
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> The choices do not include:
-> 
-> (c) creating an abomination that is fragile, and is trivially easy to
-> oops the kernel.
-> 
-> This comes back to the root problem I'm trying to highlight: we are not
-> trying to strive for DT forsaking everything else.  If moving to DT
-> means we give up with proper code design, then we've quite literally
-> lost the plot.
-
-The imx-drm driver has problems, but I don't see how they can be solved
-by not using DT.
-
-I think imx-drm shouldn't be used as a vehicle to show that DT is a
-failure.
-
-If you have a better vision how imx-drm can be implemented without
-getting crazy I'd love to hear about it. Please also think about the two
-IPUs the i.MX6 has, the single one on i.MX5, parallel displays, HDMI
-displays, LVDS displays, VGA encoder on i.MX53, external I2C slave
-encoders,...
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
