@@ -1,22 +1,26 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 21 Oct 2013 12:56:45 +0530
-Subject: [PATCH 3/3] dma: edma: Increase maximum SG limit to 20
-In-Reply-To: <1379977515-3794-4-git-send-email-joelf@ti.com>
-References: <1379977515-3794-1-git-send-email-joelf@ti.com>
- <1379977515-3794-4-git-send-email-joelf@ti.com>
-Message-ID: <20131021072645.GO14013@intel.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 21 Oct 2013 10:28:34 +0200
+Subject: [PATCH] ASoC: kirkwood: cleanup the external clock probe
+In-Reply-To: <20131021080657.GU25034@n2100.arm.linux.org.uk>
+References: <20131021094613.2a07bd79@armhf>
+ <20131021080657.GU25034@n2100.arm.linux.org.uk>
+Message-ID: <20131021102834.768c0887@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 23, 2013 at 06:05:15PM -0500, Joel Fernandes wrote:
-> davinci-pcm uses 16 as the no.of periods. With this, in EDMA we have to
-> allocate atleast 17 slots: 1 slot for channel, and 16 slots the periods.
+On Mon, 21 Oct 2013 09:06:57 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Mon, Oct 21, 2013 at 09:46:13AM +0200, Jean-Francois Moine wrote:
+> > This patch checks the return value of the clk_prepare_enable of the
+> > external clock and removes the test about a same internal and external
+> > clock which would quite never occur and won't work in most cases
+> > it would occur.
 > 
-> Due to this, the MAX_NR_SG limitation causes problems, set it to 20 to make
-> cyclic DMA work when davinci-pcm is converted to use DMA Engine. Also add
-> a comment clarifying this.
+> NAK.  It can occur.
 
-Applied, thanks
+In which case? And, what would be the right treatment?
 
---
-~Vinod
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
