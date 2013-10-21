@@ -1,226 +1,235 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 21 Oct 2013 23:57:46 +0200
-Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 104 board
-In-Reply-To: <87txgapcas.fsf@natisbad.org>
-References: <87txgapcas.fsf@natisbad.org>
-Message-ID: <20131021215746.GF23593@lunn.ch>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 22 Oct 2013 00:48:08 +0200
+Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
+In-Reply-To: <1382346813-8449-1-git-send-email-denis@eukrea.com>
+References: <20131019104555.GI18477@ns203013.ovh.net>
+ <1382346813-8449-1-git-send-email-denis@eukrea.com>
+Message-ID: <1671561.1xYjjYivUO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> @@ -0,0 +1,197 @@
-> +/*
-> + * Device Tree file for NETGEAR ReadyNAS 104
-> + *
-> + * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "armada-370.dtsi"
-> +
-> +/ {
-> +	model = "NETGEAR ReadyNAS 104";
-> +	compatible = "netgear,readynas-104", "marvell,armada370", "marvell,armada-370-xp";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x20000000>; /* 512 MB */
-> +	};
-> +
-> +	soc {
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-> +			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
-> +
-> +		pcie-controller {
-> +			status = "okay";
-> +
-> +			/* Connected to FL1009 USB 3.0 controller */
-> +			pcie at 1,0 {
-> +				/* Port 0, Lane 0 */
-> +				status = "okay";
-> +			};
-> +
-> +			/* Connected to Marvell 88SE9215 SATA controller */
-> +			pcie at 2,0 {
-> +				/* Port 1, Lane 0 */
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		internal-regs {
-> +			serial at 12000 {
-> +				clock-frequency = <200000000>;
-> +				status = "okay";
-> +			};
-> +
-> +			sata at a0000 {
-> +				status = "disabled";
-> +			};
+Hi Denis,
 
-It should be disabled by default, so you can skip this.
+Thanks for the patch. Please see below for a couple of small comment.
+
+On Monday 21 October 2013 11:13:33 Denis Carikli wrote:
+> Cc: Richard Purdie <rpurdie@rpsys.net>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+> ChangeLog v3->v4:
+> - The default-brightness property is now optional, it defaults to 1 if not
+> set. - def_value int becomes an u32.
+> - gbl->def_value was set to pdata->def_value in pdata mode to avoid an extra
+> check.
+> ---
+>  .../bindings/video/backlight/gpio-backlight.txt    |   20 ++++++
+>  drivers/video/backlight/gpio_backlight.c           |   69 +++++++++++++++--
+>  2 files changed, 82 insertions(+), 7 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+> b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt new
+> file mode 100644
+> index 0000000..3474d4a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+> @@ -0,0 +1,20 @@
+> +gpio-backlight bindings
+> +
+> +Required properties:
+> +  - compatible: "gpio-backlight"
+> +  - gpios: describes the gpio that is used for enabling/disabling the
+> backlight
+> +     (see GPIO binding[0] for more details).
+> +
+> +Optional properties:
+> +  - default-brightness-level: the default brightness level (can be 0(off)
+> or
+> +      1(on) since GPIOs only support theses levels).
+
+I believe you should specify what the default value is when the property isn't 
+available.
 
 > +
-> +			pinctrl {
-> +				poweroff: poweroff {
-> +					marvell,pins = "mpp60";
-> +					marvell,function = "gpio";
-> +				};
+> +[0]: Documentation/devicetree/bindings/gpio/gpio.txt
 > +
-> +				backup_key_pin: backup-key-pin {
-> +					marvell,pins = "mpp52";
-> +					marvell,function = "gpio";
-> +				};
+> +Example:
 > +
-> +				power_key_pin: power-key-pin {
-> +					marvell,pins = "mpp62";
-> +					marvell,function = "gpio";
-> +				};
+> +	backlight {
+> +		compatible = "gpio-backlight";
+> +		gpios = <&gpio3 4 0>;
+> +		default-brightness-level = <0>;
+> +	};
+> diff --git a/drivers/video/backlight/gpio_backlight.c
+> b/drivers/video/backlight/gpio_backlight.c index 81fb127..248124d 100644
+> --- a/drivers/video/backlight/gpio_backlight.c
+> +++ b/drivers/video/backlight/gpio_backlight.c
+> @@ -13,6 +13,8 @@
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/platform_data/gpio_backlight.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+> @@ -23,6 +25,7 @@ struct gpio_backlight {
+> 
+>  	int gpio;
+>  	int active;
+> +	u32 def_value;
+>  };
+> 
+>  static int gpio_backlight_update_status(struct backlight_device *bl)
+> @@ -60,6 +63,41 @@ static const struct backlight_ops gpio_backlight_ops = {
+>  	.check_fb	= gpio_backlight_check_fb,
+>  };
+> 
+> +static int gpio_backlight_probe_dt(struct platform_device *pdev,
+> +				   struct gpio_backlight *gbl)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	enum of_gpio_flags gpio_flags;
+> +	int ret;
 > +
-> +				backup_led_pin: backup-led-pin {
-> +					marvell,pins = "mpp63";
-> +					marvell,function = "gpo";
-> +				};
+> +	gbl->fbdev = NULL;
+> +	gbl->gpio = of_get_gpio_flags(np, 0, &gpio_flags);
 > +
-> +				power_led_pin: power-led-pin {
-> +					marvell,pins = "mpp64";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				reset_key_pin: reset-key-pin {
-> +					marvell,pins = "mpp65";
-> +					marvell,function = "gpio";
-> +				};
-> +			};
+> +	gbl->active = (gpio_flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1;
 
-You can also skip these. The gpio driver will put the pin into gpio
-mode when the leds/keys driver claims it. It is a case of, i didn't
-know that, put entries like this into a number of files, and people
-have been copying my mistake ever since. Thomas made an effort to
-correct this for some boards.
+I would move this line after the error check below.
 
 > +
-> +			mdio {
-> +				phy0: ethernet-phy at 0 {
-> +					reg = <0>;
-> +				};
-> +
-> +				phy1: ethernet-phy at 1 {
-> +					reg = <1>;
-> +				};
-> +			};
-> +
-> +			ethernet at 70000 {
-> +				status = "okay";
-> +				phy = <&phy0>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			ethernet at 74000 {
-> +				status = "okay";
-> +				phy = <&phy1>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			usb at 50000 {
-> +				status = "okay";
-> +			};
-> +
-> +			i2c at 11000 {
-> +				compatible = "marvell,mv64xxx-i2c";
-> +				clock-frequency = <100000>;
-> +				status = "okay";
-> +
-> +				g762: g762 at 3e {
-> +					compatible = "gmt,g762";
-> +					reg = <0x3e>;
-> +					clocks = <&g762_clk>; /* input clock */
-> +					fan_gear_mode = <0>;
-> +					fan_startv = <1>;
-> +					pwm_polarity = <0>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	clocks {
-> +	       #address-cells = <1>;
-> +	       #size-cells = <0>;
-> +
-> +	       g762_clk: fixedclk {
-> +			 compatible = "fixed-clock";
-> +			 #clock-cells = <0>;
-> +			 clock-frequency = <8192>;
-> +	       };
-> +	};
-> +
-> +	gpio_leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-0 = <&backup_led_pin &power_led_pin>;
-> +		pinctrl-names = "default";
-> +
-> +		blue_backup_led {
-> +			label = "rn104:blue:backup";
-> +			gpios = <&gpio1 31 1>;  /* GPIO 63 Active Low */
-> +			default-state = "on";
-> +		};
-> +
-> +		blue_power_led {
-> +			label = "rn104:blue:pwr";
-> +			gpios = <&gpio2 0 1>;   /* GPIO 64 Active Low */
-> +			linux,default-trigger = "heartbeat";
+> +	if (gbl->gpio == -EPROBE_DEFER) {
+> +		return ERR_PTR(-EPROBE_DEFER);
 
-Jason might not like this. He submitted a patch a few days ago
-removing all blinking LEDs.
+Any reason not to retrun -EPROBE_DEFER directly ?
 
-> +		};
-> +	};
+> +	} else if (gbl->gpio < 0) {
+> +		dev_err(&pdev->dev, "Error: gpios is a required parameter.\n");
+> +		return gbl->gpio;
+> +	}
+
+Maybe you would do something like
+
+	if (gbl->gpio < 0) {
+		if (gbl->gpio == -EPROBE_DEFER)
+			dev_err(&pdev->dev, "Error: gpios is a required parameter.\n");
+		return gbl->gpio;
+	}
+
 > +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-0 = <&backup_key_pin
-> +			     &power_key_pin
-> +			     &reset_key_pin>;
-> +		pinctrl-names = "default";
+> +	ret = of_property_read_u32(np, "default-brightness-level",
+> +				   &gbl->def_value);
+> +	if (ret < 0) {
+> +		/* The property is optional. */
+> +		gbl->def_value = 1;
+> +	}
 > +
-> +		button at 1 {
-> +			label = "Backup Button";
-> +			linux,code = <133>;     /* KEY_COPY */
-> +			gpios = <&gpio1 20 1>;
-> +		};
+> +	if (gbl->def_value > 1) {
+> +		dev_warn(&pdev->dev,
+> +			"Warning: Invalid default-brightness-level value. Its value can 
+be
+> either 0(off) or 1(on).\n");
+
+I believe a less verbose message (without the second sentence) would have 
+done, but that's up to you.
+
+> +		gbl->def_value = 1;
+> +	}
 > +
-> +		button at 2 {
-> +			label = "Power Button";
-> +			linux,code = <116>;     /* KEY_POWER */
-> +			gpios = <&gpio1 30 0>;
-> +		};
+> +	return 0;
+> +}
 > +
-> +		button at 3 {
-> +			label = "Reset Button";
-> +			linux,code = <0x198>;   /* KEY_RESTART */
-> +			gpios = <&gpio2 1 1>;
-> +		};
-> +	};
+>  static int gpio_backlight_probe(struct platform_device *pdev)
+>  {
+>  	struct gpio_backlight_platform_data *pdata =
+> @@ -67,10 +105,12 @@ static int gpio_backlight_probe(struct platform_device
+> *pdev) struct backlight_properties props;
+>  	struct backlight_device *bl;
+>  	struct gpio_backlight *gbl;
+> +	struct device_node *np = pdev->dev.of_node;
+>  	int ret;
+> 
+> -	if (!pdata) {
+> -		dev_err(&pdev->dev, "failed to find platform data\n");
+> +	if (!pdata && !np) {
+> +		dev_err(&pdev->dev,
+> +			"failed to find platform data or device tree node.\n");
+>  		return -ENODEV;
+>  	}
+> 
+> @@ -79,14 +119,22 @@ static int gpio_backlight_probe(struct platform_device
+> *pdev) return -ENOMEM;
+> 
+>  	gbl->dev = &pdev->dev;
+> -	gbl->fbdev = pdata->fbdev;
+> -	gbl->gpio = pdata->gpio;
+> -	gbl->active = pdata->active_low ? 0 : 1;
 > +
-> +	gpio_poweroff {
-> +		compatible = "gpio-poweroff";
-> +		pinctrl-0 = <&poweroff>;
-> +		pinctrl-names = "default";
-> +		gpios = <&gpio1 28 1>;
-> +	};
+> +	if (np) {
+> +		ret = gpio_backlight_probe_dt(pdev, gbl);
+> +		if (ret)
+> +			return ret;
+> +	} else {
+> +		gbl->fbdev = pdata->fbdev;
+> +		gbl->gpio = pdata->gpio;
+> +		gbl->active = pdata->active_low ? 0 : 1;
+> +		gbl->def_value = pdata->def_value;
+> +	}
+> 
+>  	ret = devm_gpio_request_one(gbl->dev, gbl->gpio, GPIOF_DIR_OUT |
+>  				    (gbl->active ? GPIOF_INIT_LOW
+> 
+>  						 : GPIOF_INIT_HIGH),
+> 
+> -				    pdata->name);
+> +				    pdata ? pdata->name : "backlight");
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "unable to request GPIO\n");
+>  		return ret;
+> @@ -103,17 +151,24 @@ static int gpio_backlight_probe(struct platform_device
+> *pdev) return PTR_ERR(bl);
+>  	}
+> 
+> -	bl->props.brightness = pdata->def_value;
+> +	bl->props.brightness = gbl->def_value;
+> +
+>  	backlight_update_status(bl);
+> 
+>  	platform_set_drvdata(pdev, bl);
+>  	return 0;
+>  }
+> 
+> +static struct of_device_id gpio_backlight_of_match[] = {
+> +	{ .compatible = "gpio-backlight" },
+> +	{ /* sentinel */ }
 > +};
-> -- 
-> 1.8.4.rc3
-> 
-> 
+> +
+>  static struct platform_driver gpio_backlight_driver = {
+>  	.driver		= {
+>  		.name		= "gpio-backlight",
+>  		.owner		= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(gpio_backlight_of_match),
+>  	},
+>  	.probe		= gpio_backlight_probe,
+>  };
+-- 
+Regards,
+
+Laurent Pinchart
