@@ -1,37 +1,44 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 21 Oct 2013 23:01:15 +0400
-Subject: [PATCH] ARM: dts: am4372: Add McASP nodes
-In-Reply-To: <1382348758-1083-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1382348758-1083-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <526579FB.10005@cogentembedded.com>
+Date: Mon, 21 Oct 2013 23:03:22 +0400
+Subject: [PATCHv4][ 09/11] ARM: dts: imx25.dtsi: Add an alias for the
+ Audio Multiplexer.
+In-Reply-To: <1382349098-11502-9-git-send-email-denis@eukrea.com>
+References: <1382349098-11502-1-git-send-email-denis@eukrea.com>
+ <1382349098-11502-9-git-send-email-denis@eukrea.com>
+Message-ID: <52657A7A.2010507@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 10/21/2013 01:45 PM, Peter Ujfalusi wrote:
+On 10/21/2013 01:51 PM, Denis Carikli wrote:
 
-> Add nodes for McASP0 and McASP1 for AM43xx.
+    I think alias is something different, defined in the "aliases" node.
+You probably mean a label.
 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 > ---
->   arch/arm/boot/dts/am4372.dtsi | 27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
+>   arch/arm/boot/dts/imx25.dtsi |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index c328d5c..defaad1 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -633,5 +633,32 @@
->   			dma-names = "tx", "rx";
->   		};
+> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> index 7c0a019..800fe7f 100644
+> --- a/arch/arm/boot/dts/imx25.dtsi
+> +++ b/arch/arm/boot/dts/imx25.dtsi
+> @@ -281,7 +281,7 @@
+>   				};
+>   			};
 >
-> +		mcasp0: mcasp at 48038000 {
-
-    According to ePAPR spec [1], "the name of a node should be somewhat 
-generic, reflecting the function of the device and not its
-precise programming model". In this case probably "sound"?
-
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+> -			audmux at 43fb0000 {
+> +			audmux: audmux at 43fb0000 {
 
 WBR, Sergei
