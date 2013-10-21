@@ -1,264 +1,87 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 21 Oct 2013 23:02:51 +0200
-Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 104 board
-Message-ID: <87txgapcas.fsf@natisbad.org>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Mon, 21 Oct 2013 14:07:14 -0700
+Subject: [RESEND PATCH v2 4/6] clocksource: kona: Add basic use of
+ external clock
+In-Reply-To: <20131017140542.GE24056@e106331-lin.cambridge.arm.com>
+References: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
+ <1381960030-1640-5-git-send-email-tim.kryger@linaro.org>
+ <20131017140542.GE24056@e106331-lin.cambridge.arm.com>
+Message-ID: <CAAYSxhoBvr2Q=ZEQX6hgBjLorgjCjeLLqB9WP2RQ1YFBejjHbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 17, 2013 at 7:05 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Oct 16, 2013 at 10:47:08PM +0100, Tim Kryger wrote:
+>> When an clock handle is specified in the device tree, enable it and use
+>> it to determine the external clock frequency.
+>
+> I'd drop handle here and just say "When a clock is specified".
+>
+> This will need a binding document update.
 
-Main hardware parts of the (Armada 370 based) NETGEAR ReadyNAS 104 are
-supported by mainline kernel (USB 3.0 rear ports, USB 2.0 front port,
-Gigabit controller and PHYs, serial port, LEDs, buttons, SATA ports,
-G762 fan controller) and referenced in provided .dts file. Some additonal
-work remains for:
+Can you be more specific about what you are looking for here?
 
- - Intersil ISL12057 I2C RTC and Alarm chip: working driver but needs
-   to be splitted for submission of RTC part first;
- - Front LCD (Winstar 1602G): driver needs to be written
- - Armada NAND controller (to access onboard 128MB of NAND): support
-   being pushed by @free-electrons people
- - 4 front SATA LEDs controlled via GPIO brought by NXP PCA9554:
-   driver is available upstream. Not referenced/tested yet.
+Shall I just say that the frequency property is now deprecated since
+it actually belongs to the external clock whose association with a
+kona timer instance might be declared in the DT using the common clock
+bindings but could also be declared through other means?
 
-but the device is usable w/o those.
+>> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+>> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>> ---
+>>  drivers/clocksource/bcm_kona_timer.c | 14 +++++++++++---
+>>  1 file changed, 11 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
+>> index 0d7d8c3..fd11f96 100644
+>> --- a/drivers/clocksource/bcm_kona_timer.c
+>> +++ b/drivers/clocksource/bcm_kona_timer.c
+>> @@ -17,6 +17,7 @@
+>>  #include <linux/jiffies.h>
+>>  #include <linux/clockchips.h>
+>>  #include <linux/types.h>
+>> +#include <linux/clk.h>
+>>
+>>  #include <linux/io.h>
+>>  #include <asm/mach/time.h>
+>> @@ -107,11 +108,18 @@ static const struct of_device_id bcm_timer_ids[] __initconst = {
+>>  static void __init kona_timers_init(struct device_node *node)
+>>  {
+>>       u32 freq;
+>> +     struct clk *external_clk;
+>>
+>> -     if (!of_property_read_u32(node, "clock-frequency", &freq))
+>> +     external_clk = of_clk_get_by_name(node, NULL);
+>
+> Is there only a single external clock input to the kona timer, or is
+> only one relevant here?
+>
+> Are there any other inputs currently not modelled (e.g. regulators)?
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
-Jason and Andrew,
+The timer block relies upon a single clock and does not use any regulators.
 
-I do not think there is any good way to share much between RN102 and
-RN104 .dts in a common .dtsi file because MPP are used in a different
-fashion on the two boards. But if you have ideas ...
+>> +
+>> +     if (!IS_ERR(external_clk)) {
+>> +             arch_timer_rate = clk_get_rate(external_clk);
+>> +             clk_prepare_enable(external_clk);
+>> +     } else if (!of_property_read_u32(node, "clock-frequency", &freq)) {
+>>               arch_timer_rate = freq;
+>> -     else
+>> -             panic("clock-frequency not set in the .dts file");
+>> +     } else {
+>> +             panic("neither clock-frequency or clocks handle in .dts file");
+>
+> Nit: it's not a handle, it's a phandle+args pair.
+>
+> Why not just "Unable to determine clock frequency"?
 
-I do intend to document the hardware parts and setup of the device as I
-did for the Duo v2 and RN102 but I wanted to get the patch submitted for
-inclusion in 3.13 first.
+Sure that sounds fine.
 
-Comments welcome,
+>
+> Do we need to panic here? Might a system have other clocks it could use
+> to continue?
 
-Cheers,
-
-a+
-
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/armada-370-netgear-rn104.dts | 197 +++++++++++++++++++++++++
- 2 files changed, 198 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-370-netgear-rn104.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 802720e..be682cb 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -108,6 +108,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
- dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-mirabox.dtb \
- 	armada-370-netgear-rn102.dtb \
-+	armada-370-netgear-rn104.dtb \
- 	armada-370-rd.dtb \
- 	armada-xp-axpwifiap.dtb \
- 	armada-xp-db.dtb \
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-new file mode 100644
-index 0000000..e3855e8
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-@@ -0,0 +1,197 @@
-+/*
-+ * Device Tree file for NETGEAR ReadyNAS 104
-+ *
-+ * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
-+
-+/dts-v1/;
-+
-+#include "armada-370.dtsi"
-+
-+/ {
-+	model = "NETGEAR ReadyNAS 104";
-+	compatible = "netgear,readynas-104", "marvell,armada370", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>; /* 512 MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			/* Connected to FL1009 USB 3.0 controller */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			/* Connected to Marvell 88SE9215 SATA controller */
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+
-+		internal-regs {
-+			serial at 12000 {
-+				clock-frequency = <200000000>;
-+				status = "okay";
-+			};
-+
-+			sata at a0000 {
-+				status = "disabled";
-+			};
-+
-+			pinctrl {
-+				poweroff: poweroff {
-+					marvell,pins = "mpp60";
-+					marvell,function = "gpio";
-+				};
-+
-+				backup_key_pin: backup-key-pin {
-+					marvell,pins = "mpp52";
-+					marvell,function = "gpio";
-+				};
-+
-+				power_key_pin: power-key-pin {
-+					marvell,pins = "mpp62";
-+					marvell,function = "gpio";
-+				};
-+
-+				backup_led_pin: backup-led-pin {
-+					marvell,pins = "mpp63";
-+					marvell,function = "gpo";
-+				};
-+
-+				power_led_pin: power-led-pin {
-+					marvell,pins = "mpp64";
-+					marvell,function = "gpio";
-+				};
-+
-+				reset_key_pin: reset-key-pin {
-+					marvell,pins = "mpp65";
-+					marvell,function = "gpio";
-+				};
-+			};
-+
-+			mdio {
-+				phy0: ethernet-phy at 0 {
-+					reg = <0>;
-+				};
-+
-+				phy1: ethernet-phy at 1 {
-+					reg = <1>;
-+				};
-+			};
-+
-+			ethernet at 70000 {
-+				status = "okay";
-+				phy = <&phy0>;
-+				phy-mode = "rgmii-id";
-+			};
-+
-+			ethernet at 74000 {
-+				status = "okay";
-+				phy = <&phy1>;
-+				phy-mode = "rgmii-id";
-+			};
-+
-+			usb at 50000 {
-+				status = "okay";
-+			};
-+
-+			i2c at 11000 {
-+				compatible = "marvell,mv64xxx-i2c";
-+				clock-frequency = <100000>;
-+				status = "okay";
-+
-+				g762: g762 at 3e {
-+					compatible = "gmt,g762";
-+					reg = <0x3e>;
-+					clocks = <&g762_clk>; /* input clock */
-+					fan_gear_mode = <0>;
-+					fan_startv = <1>;
-+					pwm_polarity = <0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	clocks {
-+	       #address-cells = <1>;
-+	       #size-cells = <0>;
-+
-+	       g762_clk: fixedclk {
-+			 compatible = "fixed-clock";
-+			 #clock-cells = <0>;
-+			 clock-frequency = <8192>;
-+	       };
-+	};
-+
-+	gpio_leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&backup_led_pin &power_led_pin>;
-+		pinctrl-names = "default";
-+
-+		blue_backup_led {
-+			label = "rn104:blue:backup";
-+			gpios = <&gpio1 31 1>;  /* GPIO 63 Active Low */
-+			default-state = "on";
-+		};
-+
-+		blue_power_led {
-+			label = "rn104:blue:pwr";
-+			gpios = <&gpio2 0 1>;   /* GPIO 64 Active Low */
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&backup_key_pin
-+			     &power_key_pin
-+			     &reset_key_pin>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "Backup Button";
-+			linux,code = <133>;     /* KEY_COPY */
-+			gpios = <&gpio1 20 1>;
-+		};
-+
-+		button at 2 {
-+			label = "Power Button";
-+			linux,code = <116>;     /* KEY_POWER */
-+			gpios = <&gpio1 30 0>;
-+		};
-+
-+		button at 3 {
-+			label = "Reset Button";
-+			linux,code = <0x198>;   /* KEY_RESTART */
-+			gpios = <&gpio2 1 1>;
-+		};
-+	};
-+
-+	gpio_poweroff {
-+		compatible = "gpio-poweroff";
-+		pinctrl-0 = <&poweroff>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio1 28 1>;
-+	};
-+};
--- 
-1.8.4.rc3
+I completely agree that this driver could be improved.  However, this
+is unrelated to the topic of this series so I will address it later in
+a separate patch.
