@@ -1,194 +1,195 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 21 Oct 2013 17:13:03 +0800
-Subject: imx-drm: Add HDMI support
-In-Reply-To: <20131019121218.GH25034@n2100.arm.linux.org.uk>
-References: <52602EEA.6060402@prisktech.co.nz>
- <20131017193948.GT25034@n2100.arm.linux.org.uk>
- <1382039535.976669051@f130.i.mail.ru>
- <20131017203545.GV25034@n2100.arm.linux.org.uk>
- <20131019121218.GH25034@n2100.arm.linux.org.uk>
-Message-ID: <20131021091259.GB9716@S2101-09.ap.freescale.net>
+From: denis@eukrea.com (Denis Carikli)
+Date: Mon, 21 Oct 2013 11:13:33 +0200
+Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
+In-Reply-To: <20131019104555.GI18477@ns203013.ovh.net>
+References: <20131019104555.GI18477@ns203013.ovh.net>
+Message-ID: <1382346813-8449-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 19, 2013 at 01:12:18PM +0100, Russell King - ARM Linux wrote:
-> Okay, more on this.
-> 
-> If I switch to using the DI clock, sourced from PLL5, and then "fix"
-> the clock tree such that I can change PLL5's rate, then I get most of
-> the display modes working.
-> 
-> However, it will occasionally not work, and when that happens I need
-> to reboot to get any kind of output working again.  I haven't delved
-> into it with the scope to find out what the HDMI clock is doing yet.
-> 
-> Having solved it, what I think is going on is as follows:
-> 
-> When one of the PLLs is prepared and then subsequently enabled, the
-> following sequence is used:
-> 
-> - Clear bypass
-> - Power up the PLL
-> - Wait for the PLL to indicate lock
-> - Enable output
-> 
-> This causes problems for me.  If I change this to:
-> 
-> - Power up the PLL
-> - Wait for PLL to indicate lock
-> - Clear bypass
-> - Enable output
-> 
-> then I don't see any problems.  My theory is that the bypass mux and/or
-> enable gate settings are synchronised with the mux output, and if the
-> mux output glitches while the PLL is gaining lock, it knocks that out
-> preventing the output from ever being enabled until the chip is hit with
-> a reset.
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v3->v4:
+- The default-brightness property is now optional, it defaults to 1 if not set.
+- def_value int becomes an u32.
+- gbl->def_value was set to pdata->def_value in pdata mode to avoid an extra
+  check.
+---
+ .../bindings/video/backlight/gpio-backlight.txt    |   20 ++++++
+ drivers/video/backlight/gpio_backlight.c           |   69 ++++++++++++++++++--
+ 2 files changed, 82 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
 
-You're right.  I just checked FSL 3.0.35 kernel and found that BYPASS
-bit is written after POWER bit.
-
-> The other issue is that the set_rate() functions don't wait for the PLL
-> to lock before returning, and don't set bypass mode.  It looks like this
-> code relies on drivers unpreparing the clocks before calling clk_set_rate().
-> I don't see the clk API enforcing this in any way, so I'd suggest that
-> the set_rate() function also does the bypass -> set rate -> wait lock
-> -> clear bypass transition too.  Maybe this should be applied to the
-> other PLLs too.
-
-Yes.  We experienced the problem when upgrading FSL kernel tree to 3.10.
-The .set_rate() should wait for LOCK bit, but does not need to touch
-BYPASS.
-
-> Here's a diff which updates the av PLL to do this:
-
-Some other PLLs needs update too.  I will cook up patches to fix these
-problems.
-
-Shawn
-
->  arch/arm/mach-imx/clk-pllv3.c |   77 ++++++++++++++++++++++++++++------------
->  1 files changed, 54 insertions(+), 23 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-> index f6640b6..11a7048 100644
-> --- a/arch/arm/mach-imx/clk-pllv3.c
-> +++ b/arch/arm/mach-imx/clk-pllv3.c
-> @@ -45,21 +45,10 @@ struct clk_pllv3 {
->  
->  #define to_clk_pllv3(_hw) container_of(_hw, struct clk_pllv3, hw)
->  
-> -static int clk_pllv3_prepare(struct clk_hw *hw)
-> +static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
->  {
-> -	struct clk_pllv3 *pll = to_clk_pllv3(hw);
-> -	unsigned long timeout;
-> -	u32 val;
-> -
-> -	val = readl_relaxed(pll->base);
-> -	val &= ~BM_PLL_BYPASS;
-> -	if (pll->powerup_set)
-> -		val |= BM_PLL_POWER;
-> -	else
-> -		val &= ~BM_PLL_POWER;
-> -	writel_relaxed(val, pll->base);
-> +	unsigned long timeout = jiffies + msecs_to_jiffies(100);
->  
-> -	timeout = jiffies + msecs_to_jiffies(10);
->  	/* Wait for PLL to lock */
->  	do {
->  		if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-> @@ -68,10 +57,31 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
->  			break;
->  	} while (1);
->  
-> -	if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-> -		return 0;
-> +	return readl_relaxed(pll->base) & BM_PLL_LOCK ? 0 : -ETIMEDOUT;
-> +}
-> +
-> +static int clk_pllv3_prepare(struct clk_hw *hw)
-> +{
-> +	struct clk_pllv3 *pll = to_clk_pllv3(hw);
-> +	u32 val, newval;
-> +	int ret;
-> +
-> +	val = readl_relaxed(pll->base);
-> +	if (pll->powerup_set)
-> +		newval = val | BM_PLL_POWER;
->  	else
-> -		return -ETIMEDOUT;
-> +		newval = val & ~BM_PLL_POWER;
-> +	writel_relaxed(newval, pll->base);
-> +
-> +	ret = clk_pllv3_wait_lock(pll);
-> +	if (ret == 0) {
-> +		newval &= ~BM_PLL_BYPASS;
-> +		writel_relaxed(newval, pll->base);
-> +	} else {
-> +		writel_relaxed(val, pll->base);
-> +	}
-> +
-> +	return ret;
->  }
->  
->  static void clk_pllv3_unprepare(struct clk_hw *hw)
-> @@ -80,6 +90,7 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
->  	u32 val;
->  
->  	val = readl_relaxed(pll->base);
-> +	pr_info("%s: 0x%08x\n", __func__, val);
->  	val |= BM_PLL_BYPASS;
->  	if (pll->powerup_set)
->  		val &= ~BM_PLL_POWER;
-> @@ -256,9 +267,10 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
->  	struct clk_pllv3 *pll = to_clk_pllv3(hw);
->  	unsigned long min_rate = parent_rate * 27;
->  	unsigned long max_rate = parent_rate * 54;
-> -	u32 val, div;
-> +	u32 val, newval, div;
->  	u32 mfn, mfd = 1000000;
->  	s64 temp64;
-> +	int ret;
->  
->  	if (rate < min_rate || rate > max_rate)
->  		return -EINVAL;
-> @@ -270,13 +282,32 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
->  	mfn = temp64;
->  
->  	val = readl_relaxed(pll->base);
-> -	val &= ~pll->div_mask;
-> -	val |= div;
-> -	writel_relaxed(val, pll->base);
-> +
-> +	/* set the PLL into bypass mode */
-> +	newval = val | BM_PLL_BYPASS;
-> +	writel_relaxed(newval, pll->base);
-> +
-> +	/* configure the new frequency */
-> +	newval &= ~pll->div_mask;
-> +	newval |= div;
-> +	writel_relaxed(newval, pll->base);
->  	writel_relaxed(mfn, pll->base + PLL_NUM_OFFSET);
-> -	writel_relaxed(mfd, pll->base + PLL_DENOM_OFFSET);
-> +	writel(mfd, pll->base + PLL_DENOM_OFFSET);
-> +
-> +	if (val & BM_PLL_POWER) {
-> +		/* PLL is powered down */
-> +		ret = 0;
-> +	} else {
-> +		ret = clk_pllv3_wait_lock(pll);
-> +		if (ret == 0) {
-> +			/* only if it locked can we switch back to the PLL */
-> +			newval &= ~BM_PLL_BYPASS;
-> +			newval |= val & BM_PLL_BYPASS;
-> +			writel(newval, pll->base);
-> +		}
-> +	}
->  
-> -	return 0;
-> +	return ret;
->  }
->  
->  static const struct clk_ops clk_pllv3_av_ops = {
-> 
+diff --git a/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+new file mode 100644
+index 0000000..3474d4a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+@@ -0,0 +1,20 @@
++gpio-backlight bindings
++
++Required properties:
++  - compatible: "gpio-backlight"
++  - gpios: describes the gpio that is used for enabling/disabling the backlight
++     (see GPIO binding[0] for more details).
++
++Optional properties:
++  - default-brightness-level: the default brightness level (can be 0(off) or
++      1(on) since GPIOs only support theses levels).
++
++[0]: Documentation/devicetree/bindings/gpio/gpio.txt
++
++Example:
++
++	backlight {
++		compatible = "gpio-backlight";
++		gpios = <&gpio3 4 0>;
++		default-brightness-level = <0>;
++	};
+diff --git a/drivers/video/backlight/gpio_backlight.c b/drivers/video/backlight/gpio_backlight.c
+index 81fb127..248124d 100644
+--- a/drivers/video/backlight/gpio_backlight.c
++++ b/drivers/video/backlight/gpio_backlight.c
+@@ -13,6 +13,8 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
+ #include <linux/platform_data/gpio_backlight.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+@@ -23,6 +25,7 @@ struct gpio_backlight {
+ 
+ 	int gpio;
+ 	int active;
++	u32 def_value;
+ };
+ 
+ static int gpio_backlight_update_status(struct backlight_device *bl)
+@@ -60,6 +63,41 @@ static const struct backlight_ops gpio_backlight_ops = {
+ 	.check_fb	= gpio_backlight_check_fb,
+ };
+ 
++static int gpio_backlight_probe_dt(struct platform_device *pdev,
++				   struct gpio_backlight *gbl)
++{
++	struct device_node *np = pdev->dev.of_node;
++	enum of_gpio_flags gpio_flags;
++	int ret;
++
++	gbl->fbdev = NULL;
++	gbl->gpio = of_get_gpio_flags(np, 0, &gpio_flags);
++
++	gbl->active = (gpio_flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1;
++
++	if (gbl->gpio == -EPROBE_DEFER) {
++		return ERR_PTR(-EPROBE_DEFER);
++	} else if (gbl->gpio < 0) {
++		dev_err(&pdev->dev, "Error: gpios is a required parameter.\n");
++		return gbl->gpio;
++	}
++
++	ret = of_property_read_u32(np, "default-brightness-level",
++				   &gbl->def_value);
++	if (ret < 0) {
++		/* The property is optional. */
++		gbl->def_value = 1;
++	}
++
++	if (gbl->def_value > 1) {
++		dev_warn(&pdev->dev,
++			"Warning: Invalid default-brightness-level value. Its value can be either 0(off) or 1(on).\n");
++		gbl->def_value = 1;
++	}
++
++	return 0;
++}
++
+ static int gpio_backlight_probe(struct platform_device *pdev)
+ {
+ 	struct gpio_backlight_platform_data *pdata =
+@@ -67,10 +105,12 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 	struct backlight_properties props;
+ 	struct backlight_device *bl;
+ 	struct gpio_backlight *gbl;
++	struct device_node *np = pdev->dev.of_node;
+ 	int ret;
+ 
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "failed to find platform data\n");
++	if (!pdata && !np) {
++		dev_err(&pdev->dev,
++			"failed to find platform data or device tree node.\n");
+ 		return -ENODEV;
+ 	}
+ 
+@@ -79,14 +119,22 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	gbl->dev = &pdev->dev;
+-	gbl->fbdev = pdata->fbdev;
+-	gbl->gpio = pdata->gpio;
+-	gbl->active = pdata->active_low ? 0 : 1;
++
++	if (np) {
++		ret = gpio_backlight_probe_dt(pdev, gbl);
++		if (ret)
++			return ret;
++	} else {
++		gbl->fbdev = pdata->fbdev;
++		gbl->gpio = pdata->gpio;
++		gbl->active = pdata->active_low ? 0 : 1;
++		gbl->def_value = pdata->def_value;
++	}
+ 
+ 	ret = devm_gpio_request_one(gbl->dev, gbl->gpio, GPIOF_DIR_OUT |
+ 				    (gbl->active ? GPIOF_INIT_LOW
+ 						 : GPIOF_INIT_HIGH),
+-				    pdata->name);
++				    pdata ? pdata->name : "backlight");
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "unable to request GPIO\n");
+ 		return ret;
+@@ -103,17 +151,24 @@ static int gpio_backlight_probe(struct platform_device *pdev)
+ 		return PTR_ERR(bl);
+ 	}
+ 
+-	bl->props.brightness = pdata->def_value;
++	bl->props.brightness = gbl->def_value;
++
+ 	backlight_update_status(bl);
+ 
+ 	platform_set_drvdata(pdev, bl);
+ 	return 0;
+ }
+ 
++static struct of_device_id gpio_backlight_of_match[] = {
++	{ .compatible = "gpio-backlight" },
++	{ /* sentinel */ }
++};
++
+ static struct platform_driver gpio_backlight_driver = {
+ 	.driver		= {
+ 		.name		= "gpio-backlight",
+ 		.owner		= THIS_MODULE,
++		.of_match_table = of_match_ptr(gpio_backlight_of_match),
+ 	},
+ 	.probe		= gpio_backlight_probe,
+ };
+-- 
+1.7.9.5
