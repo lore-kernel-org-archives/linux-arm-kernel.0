@@ -1,134 +1,111 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 21 Oct 2013 11:47:32 +0100
-Subject: [PATCH 2/4] mvebu: Dove: Instantiate cpufreq driver.
-In-Reply-To: <1382186261-14482-3-git-send-email-andrew@lunn.ch>
-References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
- <1382186261-14482-3-git-send-email-andrew@lunn.ch>
-Message-ID: <52650644.9010208@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 21 Oct 2013 12:57:51 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution,
+ or is there something	better?
+In-Reply-To: <20131021084854.GV25034@n2100.arm.linux.org.uk>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131021083242.GB30088@pengutronix.de>
+ <20131021084854.GV25034@n2100.arm.linux.org.uk>
+Message-ID: <3042469.dIZBMganma@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2013 01:37 PM, Andrew Lunn wrote:
-> Add a platform driver definition to instantiate the dove cpufreq
-> driver. Also indicate the ARCH has cpufreq support, so allowing the
-> cpufreq framework to be enabled.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->   arch/arm/Kconfig                       |  1 +
->   arch/arm/mach-dove/board-dt.c          |  2 ++
->   arch/arm/mach-dove/common.c            | 36 ++++++++++++++++++++++++++++++++++
->   arch/arm/mach-dove/common.h            |  1 +
->   arch/arm/mach-dove/include/mach/dove.h |  1 +
->   5 files changed, 41 insertions(+)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 1ad6fb6..7744415 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -495,6 +495,7 @@ config ARCH_IXP4XX
->
->   config ARCH_DOVE
->   	bool "Marvell Dove"
-> +	select ARCH_HAS_CPUFREQ
->   	select ARCH_REQUIRE_GPIOLIB
->   	select CPU_PJ4
->   	select GENERIC_CLOCKEVENTS
-> diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-> index 49f72a8..98202de 100644
-> --- a/arch/arm/mach-dove/board-dt.c
-> +++ b/arch/arm/mach-dove/board-dt.c
-> @@ -70,6 +70,8 @@ static void __init dove_dt_init(void)
->   	/* Setup clocks for legacy devices */
->   	dove_legacy_clk_init();
->
-> +	dove_cpufreq_init();
-> +
+Hi Russell,
 
-What ever the outcome of "DT: blessing or curse" discussion at ELCE will
-be, are there any plans to probe the cpufreq/cpuidle drivers directly
-from DT? Someday, we want to get rid of .machine_init.
+On Monday 21 October 2013 09:48:54 Russell King - ARM Linux wrote:
+> On Mon, Oct 21, 2013 at 10:32:42AM +0200, Sascha Hauer wrote:
+> > On Mon, Oct 21, 2013 at 12:11:34AM +0100, Russell King - ARM Linux wrote:
+> > > On Sun, Oct 20, 2013 at 10:26:54PM +0100, Stephen Warren wrote:
+> > > > The only thing we've really moved out of the kernel is the exact IDs
+> > > > of which GPIOS, interrupts, I2C/SPI ports the devices are connected
+> > > > to; the simple stuff not the hard stuff. The code hasn't really been
+> > > > simplified by DT - if anything, it's more complicated since we now
+> > > > have to parse those values from DT rather than putting them into
+> > > > simple data-structures.
+> > > 
+> > > Here's my random thoughts this evening on DT, orientated mostly on a
+> > > problem area I've been paying attention to recently.
+> > > 
+> > > In some ways, DT has made things much harder.  I don't know whether
+> > > you've taken a look at DRM and the various drivers we have under there,
+> > > it's quite a mess of unreliable code which is trying to bend the DRM
+> > > card based model to a DT based multi-device component based description
+> > > with lots of sub-drivers.
+> > > 
+> > > What DRM currently expects is a certain initialisation order: the main
+> > > drm_device structure is created by the DRM code, and then supplied to
+> > > the DRM driver to populate all the different parts of the "DRM card".
+> > > 
+> > > Once all parts of the card have been setup (the CRTCs, encoders,
+> > > connectors, etc) then some helpers can be initialised.  Once the
+> > > helpers have been initialised, the "dimensions" of the "DRM card"
+> > > become rather fixed until the helper is torn down.
+> > > 
+> > > The problem is this: if you have a multi-driver based card, there is
+> > > no way to prevent any of those sub-drivers from being unbound from
+> > > their drivers at any time.  module refcounts don't save you from this.
+> > > Meanwhile, (at the moment) you can't half-tear down a "DRM card" and
+> > > have it still in a usable state.  The internals just don't allow for
+> > > it at present.
+> > > 
+> > > Yes, work can be put in to solve this problem, but it's being solved
+> > > because of a desire to bend the subsystem to the DT way of doing things.
+> > > That may or may not be the best idea.  However, what I do know is that
+> > > there is now great pressure to "bend stuff so that it works with DT
+> > > at all costs".  Evidence is the Exynos driver and the imx-drm driver.
+> > 
+> > In fact it was the other way round. We modeled the IPU devicetree
+> > binding after the hardware and bended the driver around it. The DRM
+> > single-card model is the limiting fator here, not the devicetree.
+> 
+> There are several points which I think you failed to understand:
+> 
+> 1. DRM vs device tree is an incompatibility.
+> 2. Trying to bend DRM to DT with independent driver solutions such as
+>    the abomination that is imx-drm creates its own set of problems.
+> 
+> If a subsystem doesn't work well with DT, then the choices are either:
+> 
+> (a) don't use DT with the subsystem
+> (b) fix the subsystem
+> 
+> The choices do not include:
+> 
+> (c) creating an abomination that is fragile, and is trivially easy to
+> oops the kernel.
 
->   	/* Internal devices not ported to DT yet */
->   	dove_pcie_init(1, 1);
->
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index c122bcf..9e648a8 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -344,6 +344,42 @@ void __init dove_sdio1_init(void)
->   	platform_device_register(&dove_sdio1);
->   }
->
-> +/*****************************************************************************
-> + * CPU Frequency
-> + ****************************************************************************/
-> +static struct resource dove_cpufreq_resources[] = {
-> +	[0] = {
-> +		.start  = DOVE_PMU_PHYS_BASE,
-> +		.end    = DOVE_PMU_PHYS_BASE + 0x7,
-> +		.flags  = IORESOURCE_MEM,
-> +		.name   = "cpufreq: DFS"
-> +	},
-> +	[1] = {
-> +		.start  = DOVE_PMU_PHYS_BASE + 0x8000,
-> +		.end    = DOVE_PMU_PHYS_BASE + 0x8004,
+I would also add, in the choices I (we?) don't want
 
-BASE + 0x8004 - 1 ?
+(d) custom driver-specific solutions that will break when the next version of 
+the SoC is released.
 
-> +		.flags  = IORESOURCE_MEM,
-> +		.name   = "cpufreq PMU CR"
-> +	},
-> +	[2] = {
-> +		.start  = DOVE_PMU_PHYS_BASE + 0x0044,
-> +		.end    = DOVE_PMU_PHYS_BASE + 0x0048,
+> This comes back to the root problem I'm trying to highlight: we are not
+> trying to strive for DT forsaking everything else.  If moving to DT means we
+> give up with proper code design, then we've quite literally lost the plot.
 
-ditto.
+I started looking into DT bindings for my DRM drivers more than a year ago. It 
+started with the simple task of creating bindings for panels, but it quickly 
+became clear (to me at least) that the issue was much bigger than that. This 
+is what prompted me to work on the Common Display Framework (CDF) that you 
+might have heard about.
 
-Sebastian
+Please note that the idea behind CDF isn't DT-centric, its main goal is to 
+offer a (hopefully clean and simple) way to handle composite hardware devices 
+that are so common in the embedded world, using one driver per chip and/or IP 
+core (there's no *requirement* to split the SoC hardware support code in 
+multiple drivers in CDF, but it allows doing so when the SoC is made of 
+generic IP cores that are reused in different composite devices - a good 
+example of that is a video scaler that can be instantiated in a display 
+pipeline and a camera pipeline).
 
-> +		.flags  = IORESOURCE_MEM,
-> +		.name   = "cpufreq: PMU Clk Div"
-> +	},
-> +};
-> +
-> +static struct platform_device dove_cpufreq_device = {
-> +	.name		= "dove-cpufreq",
-> +	.id		= -1,
-> +	.num_resources	= ARRAY_SIZE(dove_cpufreq_resources),
-> +	.resource	= dove_cpufreq_resources,
-> +};
-> +
-> +void __init dove_cpufreq_init(void)
-> +{
-> +	platform_device_register(&dove_cpufreq_device);
-> +}
-> +
->   void __init dove_setup_cpu_wins(void)
->   {
->   	/*
-> diff --git a/arch/arm/mach-dove/common.h b/arch/arm/mach-dove/common.h
-> index 1d72522..5c9a77b 100644
-> --- a/arch/arm/mach-dove/common.h
-> +++ b/arch/arm/mach-dove/common.h
-> @@ -44,6 +44,7 @@ void dove_spi1_init(void);
->   void dove_i2c_init(void);
->   void dove_sdio0_init(void);
->   void dove_sdio1_init(void);
-> +void dove_cpufreq_init(void);
->   void dove_restart(enum reboot_mode, const char *);
->
->   #endif
-> diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
-> index 0c4b35f..48db186 100644
-> --- a/arch/arm/mach-dove/include/mach/dove.h
-> +++ b/arch/arm/mach-dove/include/mach/dove.h
-> @@ -144,6 +144,7 @@
->   #define  DOVE_SD0_GPIO_SEL		(1 << 0)
->
->   /* Power Management */
-> +#define DOVE_PMU_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xd0000)
->   #define DOVE_PMU_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xd0000)
->   #define DOVE_PMU_SIG_CTRL	(DOVE_PMU_VIRT_BASE + 0x802c)
->
->
+I haven't been able to spend as much time on CDF as I would have liked to so 
+far, but I haven't given up. I would be more than happy to discuss this during 
+ELC-E/KS if you would like.
+
+> Honestly, I don't see imx-drm ever moving out of drivers/staging except by
+> deletion or being rewritten.
+
+-- 
+Regards,
+
+Laurent Pinchart
