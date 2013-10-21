@@ -1,58 +1,242 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 21 Oct 2013 15:51:25 -0700
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution,
- or is there something better?
-In-Reply-To: <52658C49.80400@wwwdotorg.org>
-References: <52644A9E.3060007@wwwdotorg.org>	<20131021085420.GA21518@ulmo.nvidia.com>
- <52658C49.80400@wwwdotorg.org>
-Message-ID: <5265AFED.1040503@roeck-us.net>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Mon, 21 Oct 2013 15:58:57 -0700
+Subject: eMMC 4.51
+In-Reply-To: <CA+6rjLzaLZ=R_iEjgu4wB57j1pFraHpAjrg24Er2=SVefVGt7g@mail.gmail.com>
+References: <CACUGKYPDQJPvtXj3NBm8=eYCioWmq=pRVSORNYNZjD13N5ceeg@mail.gmail.com>
+ <CA+6rjLzLhA-zzTqWuzFCMXa1v9CgS-O+Rrnqsfpw9=UY_1vuMA@mail.gmail.com>
+ <CACUGKYPn-qL2_z83wK0EYtDexmyYQX6YVPwHTp5C4_d2M9BH4w@mail.gmail.com>
+ <CA+6rjLzaLZ=R_iEjgu4wB57j1pFraHpAjrg24Er2=SVefVGt7g@mail.gmail.com>
+Message-ID: <CACUGKYO-_j0G+P+rG3-GqdYnmx7VfQhiEqVGhyLFK2mpEsnnkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2013 01:19 PM, Stephen Warren wrote:
-> On 10/21/2013 09:54 AM, Thierry Reding wrote:
->> On Sun, Oct 20, 2013 at 10:26:54PM +0100, Stephen Warren wrote:
-> ...
->>> I wonder if DT is solving the problem at the right level of
->>> abstraction? The kernel still needs to be aware of all the
->>> nitty-gritty details of how each board is hooked up different,
->>> and have explicit code to deal the union of all the different
->>> board designs.
->>>
->>> For example, if some boards have a SW-controlled regulator for a
->>> device but others don't, the kernel still needs to have driver
->>> code to actively control that regulator, /plus/ the regulator
->>> subsystem needs to be able to substitute a dummy regulator if
->>> it's optional or simply missing from the DT.
->>>
->>> Another example: MMC drivers need to support some boards
->>> detecting SD card presence or write-protect via arbitrary GPIOs,
->>> and others via dedicated logic in the MMC controller.
->>>
->>> In general, the kernel still needs a complete driver to every
->>> last device on every strange board, and needs to support every
->>> strange way some random board hooks all the devices together.
+Hi Jackey,
+
+I have a Marvell Datasheet and it support SDR12, SDR25 and SDR50 (upto
+100MHz). SDR104 is not supported.
+
+Regards,
+
+john
+
+On Thu, Oct 17, 2013 at 11:04 PM, Jackey Shen <jackey.shen.bo@gmail.com> wrote:
+> Hi John,
+>
+> Does your SD host controller support 3.0 card? As I know, Marvel
+> SDIO8797 can work at UHS-I SDR104. Did you test it?
+>
+> Thanks,
+> Jackey
+>
+> On Thu, Oct 10, 2013 at 2:00 AM, John Tobias <john.tobias.ph@gmail.com> wrote:
+>> Hi Jackey,
 >>
->> I have some difficulty understanding what you think should've been
->> moved out of the kernel. There's only so much you can put into data
->> structures and at some point you need to start writing device
->> specific code for the peripherals that you want to drive.
->
-> My point was that (part of) the intent of adding DT support to the
-> kernel was to get rid of all the board-specific code/churn in the
-> kernel. That's not really possible, since DT is just representing the
-> data about the HW (e.g. which GPIO/IRQ numbers) and not the behaviour.
-> In order to really remove signifcant board-specific code from the
-> kernel, you need to move behaviour out of the kernel too, i.e. hide it
-> behind some kind of firmware or virtualization interface, and hence
-> have simpler drivers that don't know all the details.
->
-
-In my opinion, not being able to describe behavior (or what people refer
-to as "describe how the hardware is used") is a severe limitation of
-devicetree usage in Linux. That is not a devicetree limitation per se,
-though, it is simply a matter of choice (or, in some cases, the ability
-of those arguing for new bindings to sell those bindings as "hardware
-description").
-
-Guenter
+>> The Marvel SD8797 work fine but there are some cases that the firmware
+>> failed to load during the system boot up. Although, we managed it by
+>> power cycling the power source of the Marvel chip so that the kernel
+>> will able to detect and reinitialize again.
+>>
+>> The module was running in high speed, 4bit bus width.
+>>
+>> Here are some info:
+>>
+>> # iperf -c 192.168.x.x -t 60 -i 10
+>> ------------------------------------------------------------
+>> Client connecting to 192.168.x.x, TCP port 5001
+>> TCP window size: 20.7 KByte (default)
+>> ------------------------------------------------------------
+>> [  3] local 192.168.x.x port 52071 connected with 192.168.x.x port 5001
+>> [ ID] Interval       Transfer     Bandwidth
+>> [  3]  0.0-10.0 sec  48.0 MBytes  40.3 Mbits/sec
+>> [  3] 10.0-20.0 sec  53.4 MBytes  44.8 Mbits/sec
+>> [  3] 20.0-30.0 sec  53.8 MBytes  45.1 Mbits/sec
+>> [  3] 30.0-40.0 sec  56.4 MBytes  47.3 Mbits/sec
+>> [  3] 40.0-50.0 sec  54.2 MBytes  45.5 Mbits/sec
+>> [  3] 50.0-60.0 sec  53.5 MBytes  44.9 Mbits/sec
+>> [  3]  0.0-60.0 sec   319 MBytes  44.6 Mbits/sec
+>>
+>> # iwconfig mlan0
+>> mlan0     IEEE 802.11abgn  ESSID:"Pxx-xxx"
+>>           Mode:Managed  Frequency:2.437 GHz  Access Point:
+>> BC:Dx:xx:xx:xx:xx
+>>           Bit Rate=135 Mb/s
+>>           Retry  long limit:7   RTS thr:off   Fragment thr:off
+>>           Encryption key:off
+>>           Power Management:on
+>>           Link Quality=70/70  Signal level=-28 dBm
+>>           Rx invalid nwid:0  Rx invalid crypt:0  Rx invalid frag:0
+>>           Tx excessive retries:0  Invalid misc:0   Missed beacon:0
+>>
+>> Regards,
+>>
+>> john
+>>
+>>
+>>
+>> On Wed, Oct 9, 2013 at 12:23 AM, Jackey Shen <jackey.shen.bo@gmail.com>
+>> wrote:
+>>> Hi John,
+>>>
+>>> Does wifi module (Marvel SD8797) work fine on your board? What speed does
+>>> it
+>>> run at? SDR104?
+>>>
+>>> Thanks,
+>>> Jackey
+>>>
+>>> On Wed, Oct 9, 2013 at 10:00 AM, John Tobias <john.tobias.ph@gmail.com>
+>>> wrote:
+>>>>
+>>>> Hello,
+>>>>
+>>>> I am using git://gitorious.org/thierryreding/linux-next.git to boot my
+>>>> custom board based on iMX6 sololite. My board has SanDisk iNAND 4.51
+>>>> I/F and wifi module (Marvel SD8797). The latest update of
+>>>> sdhci-esdhc-imx.c supports DDR50/SDR50/SDR104 and I would like to use
+>>>> it for my device.
+>>>>
+>>>> In my .dts file, I have the following settings:
+>>>>
+>>>> /* WIFI module */
+>>>> &usdhc2 {
+>>>> pinctrl-names = "default", "state_100mhz", "state_200mhz";
+>>>> pinctrl-0 = <&pinctrl_usdhc2_2_default>;
+>>>> pinctrl-1 = <&pinctrl_usdhc2_3_100mhz>;
+>>>> pinctrl-2 = <&pinctrl_usdhc2_4_200mhz>;
+>>>> bus-width = <4>;
+>>>> status = "okay";
+>>>> };
+>>>>
+>>>> /* eMMC module  */
+>>>> &usdhc4 {
+>>>> pinctrl-names = "default", "state_100mhz", "state_200mhz";
+>>>> pinctrl-0 = <&pinctrl_usdhc4_2_default>;
+>>>> pinctrl-1 = <&pinctrl_usdhc4_3_100mhz>;
+>>>> pinctrl-2 = <&pinctrl_usdhc4_4_200mhz>;
+>>>> bus-width = <8>;
+>>>> status = "okay";
+>>>> compatible = "fsl,imx6sl-usdhc", "fsl,imx6q-usdhc";
+>>>> reg = <0x0219c000 0x4000>;
+>>>> };
+>>>>
+>>>> Then, in my .dtsi file:
+>>>>
+>>>> usdhc2 {
+>>>> /*WIFI pinmux */
+>>>> pinctrl_usdhc2_2_default: default {
+>>>> fsl,pins = <
+>>>> EVT1_PAD_SD2_CMD__SD2_CMD     0x17039
+>>>> EVT1_PAD_SD2_CLK__SD2_CLK     0x17039
+>>>> EVT1_PAD_SD2_DATA0__SD2_DATA0 0x17039
+>>>> EVT1_PAD_SD2_DATA1__SD2_DATA1 0x17039
+>>>> EVT1_PAD_SD2_DATA2__SD2_DATA2 0x17039
+>>>> EVT1_PAD_SD2_DATA3__SD2_DATA3 0x17039
+>>>> >;
+>>>> };
+>>>>
+>>>> pinctrl_usdhc2_3_100mhz: state_100mhz { /* 100Mhz */
+>>>> fsl,pins = <
+>>>> EVT1_PAD_SD2_CMD__SD2_CMD 0x170B9
+>>>> EVT1_PAD_SD2_CLK__SD2_CLK 0x100B9
+>>>> EVT1_PAD_SD2_DATA0__SD2_DATA0 0x170B9
+>>>> EVT1_PAD_SD2_DATA1__SD2_DATA1 0x170B9
+>>>> EVT1_PAD_SD2_DATA2__SD2_DATA2 0x170B9
+>>>> EVT1_PAD_SD2_DATA3__SD2_DATA3 0x170B9
+>>>> >;
+>>>> };
+>>>>
+>>>> pinctrl_usdhc2_4_200mhz: state_200mhz { /* 200Mhz */
+>>>> fsl,pins = <
+>>>> EVT1_PAD_SD2_CMD__SD2_CMD 0x170F9
+>>>> EVT1_PAD_SD2_CLK__SD2_CLK 0x100F9
+>>>> EVT1_PAD_SD2_DATA0__SD2_DATA0 0x170F9
+>>>> EVT1_PAD_SD2_DATA1__SD2_DATA1 0x170F9
+>>>> EVT1_PAD_SD2_DATA2__SD2_DATA2 0x170F9
+>>>> EVT1_PAD_SD2_DATA3__SD2_DATA3 0x170F9
+>>>> >;
+>>>> };
+>>>> };
+>>>>
+>>>> usdhc4 {
+>>>> /* eMMC pinmux */
+>>>> pinctrl_usdhc4_2_default: default {
+>>>> fsl,pins = <
+>>>> EVT1_PAD_EPDC_BDR1__SD4_CMD       0x17039
+>>>> EVT1_PAD_EPDC_BDR0__SD4_CLK       0x10039
+>>>> EVT1_PAD_EPDC_PWR_COM__SD4_DATA0  0x17039
+>>>> EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1  0x17039
+>>>> EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x17039
+>>>> EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x17039
+>>>> EVT1_PAD_FEC_MDC__SD4_DATA4 0x17039
+>>>> EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x17039
+>>>> EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x17039
+>>>> EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x17039
+>>>> >;
+>>>> };
+>>>>
+>>>> pinctrl_usdhc4_3_100mhz: state_100mhz { /* 100Mhz */
+>>>> fsl,pins = <
+>>>> EVT1_PAD_EPDC_BDR1__SD4_CMD 0x170B9
+>>>> EVT1_PAD_EPDC_BDR0__SD4_CLK   0x100B9
+>>>> EVT1_PAD_EPDC_PWR_COM__SD4_DATA0 0x170B9
+>>>> EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1 0x170B9
+>>>> EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x170B9
+>>>> EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x170B9
+>>>> EVT1_PAD_FEC_MDC__SD4_DATA4 0x170B9
+>>>> EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x170B9
+>>>> EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x170B9
+>>>> EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x170B9
+>>>> >;
+>>>> };
+>>>>
+>>>> pinctrl_usdhc4_4_200mhz: state_200mhz { /* 200Mhz */
+>>>> fsl,pins = <
+>>>> EVT1_PAD_EPDC_BDR1__SD4_CMD 0x170F9
+>>>> EVT1_PAD_EPDC_BDR0__SD4_CLK   0x100F9
+>>>> EVT1_PAD_EPDC_PWR_COM__SD4_DATA0 0x170F9
+>>>> EVT1_PAD_EPDC_PWR_IRQ__SD4_DATA1 0x170F9
+>>>> EVT1_PAD_EPDC_PWR_STAT__SD4_DATA2 0x170F9
+>>>> EVT1_PAD_EPDC_PWR_WAKE__SD4_DATA3 0x170F9
+>>>> EVT1_PAD_FEC_MDC__SD4_DATA4 0x170F9
+>>>> EVT1_PAD_FEC_RX_DATA0__SD4_DATA5  0x170F9
+>>>> EVT1_PAD_FEC_TX_EN__SD4_DATA6     0x170F9
+>>>> EVT1_PAD_FEC_TX_DATA1__SD4_DATA7  0x170F9
+>>>> >;
+>>>> };
+>>>> };
+>>>>
+>>>>
+>>>> 1. After using the said pinmux settings, the sdhci-esdh-imx controller
+>>>> wasn't able to configure it correctly due the the group name for the
+>>>> two port were the same (default, state_100mhz, state_200mhz).
+>>>>
+>>>> 2. Then, I temporarily disabled usdhc4 to test if the driver able to
+>>>> enable the SDR50 for my wifi. Then, I was getting the following
+>>>> errors:
+>>>>
+>>>> [    1.655024] mmc0: error -110 whilst initialising SDIO card
+>>>> [    3.746340] mmc0: error -110 whilst initialising SDIO card
+>>>> [    3.818624] mmc0: host doesn't support card's voltages
+>>>> [    3.823783] mmc0: error -22 whilst initialising SDIO card
+>>>> [    3.901670] mmc0: host doesn't support card's voltages
+>>>> [    3.906862] mmc0: error -22 whilst initialising SDIO card
+>>>> [   34.307777] mmc0: host doesn't support card's voltages
+>>>> [   34.312980] mmc0: error -22 whilst initialising SDIO card
+>>>>
+>>>> 3. Then, I tried the eMMC to see if the driver able to enable the
+>>>> DDR50. After booting it, the kernel detect the eMMC only in hight
+>>>> speed mode.
+>>>>
+>>>>
+>>>> I would like to know if anyone here can help me to figure out how to
+>>>> enable the DDR50 for my eMMC and SDR50 for my wifi as well.
+>>>>
+>>>> Regards,
+>>>>
+>>>> john
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>>
