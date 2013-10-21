@@ -1,42 +1,32 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Mon, 21 Oct 2013 13:30:32 +0100
-Subject: [PATCH] ARM: DT/kernel: fix arch_match_cpu_phys_id to avoid erroneous
- match
-Message-ID: <1382358632-32762-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 21 Oct 2013 20:36:55 +0800
+Subject: imx-drm: Add HDMI support
+In-Reply-To: <20131021093448.GX25034@n2100.arm.linux.org.uk>
+References: <52602EEA.6060402@prisktech.co.nz>
+ <20131017193948.GT25034@n2100.arm.linux.org.uk>
+ <1382039535.976669051@f130.i.mail.ru>
+ <20131017203545.GV25034@n2100.arm.linux.org.uk>
+ <20131019121218.GH25034@n2100.arm.linux.org.uk>
+ <20131021091259.GB9716@S2101-09.ap.freescale.net>
+ <20131021093448.GX25034@n2100.arm.linux.org.uk>
+Message-ID: <20131021123652.GN17165@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On Mon, Oct 21, 2013 at 10:34:48AM +0100, Russell King - ARM Linux wrote:
+> However, the IPU is more stable with switching to bypass while it relocks
+> than not.
 
-The MPIDR contains specific bitfields(MPIDR.Aff{2..0}) which uniquely
-identify a CPU, in addition to some non-identifying information and
-reserved bits. The ARM cpu binding defines the 'reg' property to only
-contain the affinity bits, and any cpu nodes with other bits set in
-their 'reg' entry are skipped.
+As far as I know, FSL kernel has always been doing relock without
+switching to bypass, and I haven't heard unstable IPU issue from their
+testing.  Do you have a case that I can set up here to see the issue?
 
-As such it is not necessary to mask the phys_id with MPIDR_HWID_BITMASK,
-and doing so could lead to matching erroneous CPU nodes in the device
-tree. This patch removes the masking of the physical identifier.
+Shawn
 
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/kernel/devtree.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index f35906b..41960fb 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -171,7 +171,7 @@ void __init arm_dt_init_cpu_maps(void)
- 
- bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
- {
--	return (phys_id & MPIDR_HWID_BITMASK) == cpu_logical_map(cpu);
-+	return phys_id == cpu_logical_map(cpu);
- }
- 
- /**
--- 
-1.8.1.2
+> > > Here's a diff which updates the av PLL to do this:
+> > 
+> > Some other PLLs needs update too.  I will cook up patches to fix these
+> > problems.
+> 
+> Yes, I only changed the set_rate on the AV codecs as I haven't tested
+> that on the others.
