@@ -1,83 +1,91 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 22 Oct 2013 00:29:04 +0800
-Subject: [PATCH 2/7] mmc: sdhci-esdhc-imx: add SDHCI_TRANSFER_MODE read
- function
-In-Reply-To: <CACUGKYPo2zWDTbmyksiwmJY8tghkYjr=dKD8pDzxugeOoojCNQ@mail.gmail.com>
-References: <1382365627-26816-1-git-send-email-b29396@freescale.com>
- <1382365627-26816-3-git-send-email-b29396@freescale.com>
- <CACUGKYPo2zWDTbmyksiwmJY8tghkYjr=dKD8pDzxugeOoojCNQ@mail.gmail.com>
-Message-ID: <CAA+hA=R8OWsMABcN66N48M+EuULqLgsbx9g+pELmcXVCMGEN2g@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 21 Oct 2013 17:38:58 +0100
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <20131021154239.GB23593@lunn.ch>
+References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
+ <1382186261-14482-2-git-send-email-andrew@lunn.ch> <52650523.80400@gmail.com>
+ <20131021154239.GB23593@lunn.ch>
+Message-ID: <526558A2.5050900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+On 10/21/2013 04:42 PM, Andrew Lunn wrote:
+>>> +	if (freqs.old != freqs.new) {
+>>> +		local_irq_disable();
+>>> +
+>>> +		/* Mask IRQ and FIQ to CPU */
+>>> +		cr = readl(priv.pmu_cr);
+>>> +		cr |= MASK_IRQ | MASK_FIQ;
+>>> +		writel(cr, priv.pmu_cr);
+>>> +
+>>> +		/* Set/Clear the CPU_SLOW_EN bit */
+>>> +		reg = readl_relaxed(priv.dfs + DFS_CR);
+>>> +		reg &= ~L2_RATIO_MASK;
+>>> +
+>>> +		switch (state) {
+>>> +		case STATE_CPU_FREQ:
+>>> +			reg |= priv.xpratio;
+>>> +			reg &= ~CPU_SLOW_EN;
+>>> +			break;
+>>> +		case STATE_DDR_FREQ:
+>>> +			reg |= (priv.dpratio | CPU_SLOW_EN);
+>>
+>> Does slow mode really (only) depend on the value written into CPUL2CR?
+>> Dove FS isn't that chatty about it and I cannot really test right now.
+>> But reading it, I think there is two CPU PLL to {L2,DDR} ratios that you
+>> can switch between by (de-)asserting CPU_SLOW_EN.
+>
+> The lack of details in the datasheet was very annoying. I spent many
+> evenings looking at a frozen up cubox. In the end i had to risk eye
+> cancer and look at the Marvell vendor code. It always sets these
+> values on each transition, and it even calculated one of the ratios
+> each time the frequency changed. I never actually tried setting them
+> once and then leaving them alone. Worth a try once i have the hardware
+> available.
 
-You need apply this patch series first which introduced esdhc_is_usdhc.
-http://permalink.gmane.org/gmane.linux.kernel.mmc/23074
+I actually just tried it and realized that both xpratio and dpratio are
+equal (=4). And I wonder that not setting l2 ratio hangs it, while not
+setting ddr ratio is fine. Anyway, without proper documentation IMHO
+your approach is as fine as it can get. We can have a closer look at
+it, when we both have time/tools/space available.
 
-Please refer to Chris tree:
-https://git.kernel.org/cgit/linux/kernel/git/cjb/mmc.git/log/?h=mmc-next
+>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>> +	priv.dfs = devm_ioremap_resource(&pdev->dev, res);
+>>> +	if (IS_ERR(priv.dfs))
+>>> +		return PTR_ERR(priv.dfs);
+>>> +
+>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>>> +	priv.pmu_cr = devm_ioremap_resource(&pdev->dev, res);
+>>> +	if (IS_ERR(priv.pmu_cr))
+>>
+>> Cleanup path for most of the resources here and below is kind of
+>> missing.
+>
+> Well, i'm using devm_ioremap_resources().  The cleanup for that should
+> happen automagically. And platform_get_resource() is just a lookup
+> function.
 
-Regards
-Dong Aisheng
+True. But e.g. on the clock errors, you do not drop node or clk. No
+clk_disable_unprepare on irq failures or if cpufreq_register_driver
+fails.
 
-On Tue, Oct 22, 2013 at 12:01 AM, John Tobias <john.tobias.ph@gmail.com> wrote:
-> Hi Dong,
+>> Also, maybe give names to the different areas and not depend
+>> on ordering?
 >
-> I compiled my kernel after applying your patch but it didn't compile
-> it correctly due to esdhc_is_usdhc function. It should be
-> is_imx6_usdhc?
->
-> Regards,
->
-> john
->
-> On Mon, Oct 21, 2013 at 7:27 AM, Dong Aisheng <b29396@freescale.com> wrote:
->> Used to read out the correct value of SDHCI_TRANSFER_MODE register
->> for upper layer.
->>
->> Signed-off-by: Dong Aisheng <b29396@freescale.com>
->> ---
->>  drivers/mmc/host/sdhci-esdhc-imx.c |   16 ++++++++++++++++
->>  1 files changed, 16 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
->> index 461a4c3..2be77e0 100644
->> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
->> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
->> @@ -385,6 +385,22 @@ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
->>                 return ret;
->>         }
->>
->> +       if (unlikely(reg == SDHCI_TRANSFER_MODE)) {
->> +               if (esdhc_is_usdhc(imx_data)) {
->> +                       u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
->> +                       ret = m & ESDHC_MIX_CTRL_SDHCI_MASK;
->> +                       /* Swap AC23 bit */
->> +                       if (m & ESDHC_MIX_CTRL_AC23EN) {
->> +                               ret &= ~ESDHC_MIX_CTRL_AC23EN;
->> +                               ret |= SDHCI_TRNS_AUTO_CMD23;
->> +                       }
->> +               } else {
->> +                       ret = readw(host->ioaddr + SDHCI_TRANSFER_MODE);
->> +               }
->> +
->> +               return ret;
->> +       }
->> +
->>         return readw(host->ioaddr + reg);
->>  }
->>
->> --
->> 1.7.2.rc3
->>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Actually, they already have names, but you probably have not go to
+> that patch yet. So swapping to platform_get_resource_byname() would be
+> simple.
+
+I did flip over the non-DT resources and now (finally) realized, that
+there is no specific DT node (You told me at least twice before).
+
+Currently, I don't see why cpufreq shouldn't get its own node as this
+adds dependency to legacy code we are trying to get rid of. But as you
+already said, let's wait for summit results on DT future.
+
+BTW, have another look at the resource names and remove the ':' (or
+add it to all).
+
+See you soon,
+
+Sebastian
