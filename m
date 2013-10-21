@@ -1,66 +1,45 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 21 Oct 2013 09:36:34 -0400
-Subject: [PATCH] arm64: allow ioremap_cache() to use existing RAM mappings
-Message-ID: <1382362594-24947-1-git-send-email-msalter@redhat.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 21 Oct 2013 15:42:49 +0200
+Subject: [PATCH 1/2] spi/s3c64xx: Do not ignore return value of
+ spi_master_resume/suspend
+Message-ID: <1382362971-16763-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers (ACPI notably) use ioremap_cache() to map an area which could
-either be outside of kernel RAM or in an already mapped reserved area of
-RAM. To avoid aliases, __ioremap() does not allow RAM to be remapped. But
-for ioremap_cache(), the existing kernel mapping may be used.
+During PM resume and suspend do not ignore the return value of
+spi_master_suspend() or spi_master_resume(). Instead pass it further.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm64/include/asm/io.h |  2 +-
- arch/arm64/mm/ioremap.c     | 15 +++++++++++++++
- 2 files changed, 16 insertions(+), 1 deletion(-)
+ drivers/spi/spi-s3c64xx.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 1d12f89..b56e5b5 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -224,6 +224,7 @@ extern void __memset_io(volatile void __iomem *, int, size_t);
-  */
- extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
- extern void __iounmap(volatile void __iomem *addr);
-+extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 512b889..59f4fd9 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1480,7 +1480,9 @@ static int s3c64xx_spi_suspend(struct device *dev)
+ 	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
  
- #define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_DIRTY)
- #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
-@@ -233,7 +234,6 @@ extern void __iounmap(volatile void __iomem *addr);
- #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
--#define ioremap_cached(addr, size)	__ioremap((addr), (size), __pgprot(PROT_NORMAL))
- #define iounmap				__iounmap
+-	spi_master_suspend(master);
++	int ret = spi_master_suspend(master);
++	if (ret)
++		return ret;
  
- #define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF)
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index 1725cd6..fb44b3d 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -79,6 +79,21 @@ void __iounmap(volatile void __iomem *io_addr)
- {
- 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
+ 	/* Disable the clock */
+ 	clk_disable_unprepare(sdd->src_clk);
+@@ -1506,9 +1508,7 @@ static int s3c64xx_spi_resume(struct device *dev)
  
-+	/* Nothing to do for normal memory. See ioremap_cache() */
-+	if (pfn_valid(__virt_to_phys(addr) >> PAGE_SHIFT))
-+		return;
-+
- 	vunmap(addr);
+ 	s3c64xx_spi_hwinit(sdd, sdd->port_id);
+ 
+-	spi_master_resume(master);
+-
+-	return 0;
++	return spi_master_resume(master);
  }
- EXPORT_SYMBOL(__iounmap);
-+
-+void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
-+{
-+	/* For normal memory we already have a cacheable mapping. */
-+	if (pfn_valid(__phys_to_pfn(phys_addr)))
-+		return (void __iomem *)__phys_to_virt(phys_addr);
-+
-+	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL),
-+				__builtin_return_address(0));
-+}
-+EXPORT_SYMBOL(ioremap_cache);
+ #endif /* CONFIG_PM_SLEEP */
+ 
 -- 
-1.8.3.1
+1.7.9.5
