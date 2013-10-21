@@ -1,53 +1,30 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 21 Oct 2013 05:10:15 -0700
-Subject: [PATCH V2] ARM: EXYNOS: Move arm core power down clock to
- exynos5250 common clock
-In-Reply-To: <52644C65.3040805@samsung.com>
-References: <1381470134-29410-1-git-send-email-amit.daniel@samsung.com>
- <4953642.S7P9jyspGP@amdn883> <52644C65.3040805@samsung.com>
-Message-ID: <20131021121015.11944.4344@quantum>
+From: robt201108@gmail.com (robert)
+Date: Mon, 21 Oct 2013 13:11:08 +0100
+Subject: DreamPlug / GuruPlug support in 3.12-rc
+In-Reply-To: <20131020215017.GD15169@titan.lakedaemon.net>
+References: <5263C7C2.4000204@gmail.com>
+ <20131020161747.GA15169@titan.lakedaemon.net> <5264382E.9050207@gmail.com>
+ <20131020215017.GD15169@titan.lakedaemon.net>
+Message-ID: <526519DC.5030500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-10-20 14:34:29)
-> On 10/11/13 16:33, Tomasz Figa wrote:
-> > Hi Amit,
-> >
-> > On Friday 11 of October 2013 11:12:14 Amit Daniel Kachhap wrote:
-> >> Now with common clock support added for exynos5250 it is necessary to move
-> >> this code to exynos5250 common clock driver as clock registers should be
-> >> handled there. This change is tested in exynos5250 based arndale platform.
-> >>
-> >> Cc: Abhilash Kesavan<a.kesavan@samsung.com>
-> >> Cc: Thomas Abraham<thomas.abraham@linaro.org>
-> >> Acked-by: Kukjin Kim<kgene.kim@samsugn.com>
-> >
-> > nit: Typo in samsung. Probably something that Kukjin can fix up when
-> > applying, though.
-> >
-> >> Reviewed-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
-> >> Signed-off-by: Amit Daniel Kachhap<amit.daniel@samsung.com>
-> >> ---
-> >>
-> >> Changes in V2:
-> >> * Rebased against linux-next tree.
-> >> * Removed un-used macros in regs-clock.h
-> >>
-> >>   arch/arm/mach-exynos/cpuidle.c                 |   35 --------------------
-> >>   arch/arm/mach-exynos/include/mach/regs-clock.h |   16 ---------
-> >>   drivers/clk/samsung/clk-exynos5250.c           |   42 ++++++++++++++++++++++++
-> >>   3 files changed, 42 insertions(+), 51 deletions(-)
-> >
-> > Otherwise
-> >
-> > Acked-by: Tomasz Figa<t.figa@samsung.com>
-> >
-> Mike, do you want me to pick this patch into Samsung tree?
+Jason,
 
-I'll take it through clk-next.
+Apologies for my ignorant 'top-posting'..
 
-Thanks,
-Mike
+My error in logic was to base my testing on a kernel config which seemed
+- to me - to 'work', but was actually _incorrect_, as you pointed out.
 
-> 
-> - Kukjin
+I decided to scrub the existing config, and start over, from # make
+kirkwood_defconfig, and then select/deselect options for the
+DreamPlug.    After a bit of trial and error, I now have a working
+3.12-rc6 system:
+
+# uname -a
+Linux rgdreamplug 3.12.0-rc6 #1 PREEMPT Mon Oct 21 12:54:19 BST 2013
+armv5tel armv5tel armv5tel GNU/Linux
+
+Many thanks for your help.
+
+Robert.
