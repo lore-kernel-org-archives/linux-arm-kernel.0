@@ -1,75 +1,97 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 21 Oct 2013 05:16:05 -0700
-Subject: [PATCH v5 0/3] ARM: S5PV210: move to common clk framework
-In-Reply-To: <5264425E.4040301@samsung.com>
-References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
- <1816869.ggMDlA1qNY@flatron> <5264425E.4040301@samsung.com>
-Message-ID: <20131021121605.11944.74007@quantum>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 21 Oct 2013 07:21:16 -0500
+Subject: [PATCH] serial: omap: Add support for optional wake-up interrupt
+In-Reply-To: <20131018225606.GT15154@atomide.com>
+References: <20131017232820.GG15154@atomide.com> <20131018161916.GF18921@gimli>
+ <20131018163740.GP15154@atomide.com>
+ <20131018164535.GQ15154@atomide.com>
+ <20131018225606.GT15154@atomide.com>
+Message-ID: <20131021122116.GL18921@gimli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-10-20 13:51:42)
-> On 10/20/13 01:03, Tomasz Figa wrote:
-> > Hi Mike, Kukjin, Rafael,
-> >
-> > On Tuesday 24 of September 2013 14:50:06 Mateusz Krawczuk wrote:
-> >> This patch series is the new s5pv210 clock implementation
-> >> (using common clk framework).
-> >>
-> >> This implementation is compatible with device tree definition and board
-> >> files.
-> >>
-> >> This patch series is based on linux-next and has been tested on goni and
-> >> aquila
-> >> boards using board file.
-> >>
-> >> Since v4:
-> >> Corrected mux flags for finpll.
-> >>
-> >> Since v3:
-> >>
-> >> Replace s5pv210_clk_register_finpll, by creating mux finpll
-> >> with xusbxti and xxti as parrents.
-> >>
-> >>
-> >> Mateusz Krawczuk (3):
-> >>    clk: samsung: Add clock driver for s5pc110/s5pv210
-> >>    Cpufreq: s5pv210 cpufreq fixes for CCF
-> >>    ARM: s5pv210: Migrate clock handling to Common Clock Framework
-> >>
-> >>   .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
-> >>   arch/arm/mach-s5pv210/Kconfig                      |   9 +
-> >>   arch/arm/mach-s5pv210/Makefile                     |   4 +-
-> >>   arch/arm/mach-s5pv210/common.c                     |  17 +
-> >>   arch/arm/mach-s5pv210/common.h                     |  10 +
-> >>   arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
-> >>   arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
-> >>   arch/arm/plat-samsung/Kconfig                      |   2 +-
-> >>   drivers/clk/samsung/Makefile                       |   3 +
-> >>   drivers/clk/samsung/clk-s5pv210.c                  | 673
-> >> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c
-> >>   |   6 +-
-> >>   include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
-> >>   12 files changed, 1019 insertions(+), 8 deletions(-)
-> >>   create mode 100644
-> >> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
-> >> create mode 100644 drivers/clk/samsung/clk-s5pv210.c
-> >>   create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
-> >
-> > I believe this series is reasonable to be applied. Could we agree on
-> > the tree it would go through and get all tne required acks?
-> >
-> > Best regards,
-> > Tomasz
+On Fri, Oct 18, 2013 at 03:56:07PM -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [131018 09:45]:
+> > * Tony Lindgren <tony@atomide.com> [131018 09:38]:
+> > > * Felipe Balbi <balbi@ti.com> [131018 09:19]:
+> > > > > @@ -786,7 +813,10 @@ static void serial_omap_shutdown(struct uart_port *port)
+> > > > >  
+> > > > >  	pm_runtime_mark_last_busy(up->dev);
+> > > > >  	pm_runtime_put_autosuspend(up->dev);
+> > > > > -	free_irq(up->port.irq, up);
+> > > > > +
+> > > > > +	for (i = 0; i < ARRAY_SIZE(up->irqs); i++)
+> > > > > +		if (up->irqs[i])
+> > > > > +			devm_free_irq(up->port.dev, up->irqs[i], up);
+> > > > 
+> > > > do you need this at all if you're using devm_* ?
+> > > 
+> > > So it seems, startup and shutdown are managed by serial_core and
+> > > that's what at least clps711x.c serial driver is doing.
+> > 
+> > And that means devm_* in this case does not really help us
+> > here..
+> > 
+> > I guess we could keep the IRQ requested from probe, but
+> > there's probably a reason why it's done in startup/shutdown.
+> > 
+> > So I'll just drop the devm_* changes for now.
 > 
-> I agree.
+> Here's an updated simplified version. I also got rid of the
+> for loops as the wake-up interrupt is optional and it made the
+> code a bit of a pain to read.
 > 
-> Mike, how do you think the common clk stuff for s5pv210?
-
-Clock code looks good to me. Which tree do you want to take it through?
-
-Regards,
-Mike
-
+> Regards,
 > 
-> - Kukjin
+> Tony
+> 
+> 
+> 8< ----------------------------------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Wed, 16 Oct 2013 10:27:28 -0700
+> Subject: [PATCH] serial: omap: Add support for optional wake-up interrupt
+> 
+> With the recent pinctrl-single changes, omaps can treat
+> wake-up events from deeper idle states as interrupts.
+> 
+> There's a separate "io chain" controller on most omaps
+> that stays enabled when the device hits off-idle and the
+> regular interrupt controller is powered off.
+> 
+> Let's add support for the optional second interrupt for
+> wake-up events. And then serial-omap can manage the
+> wake-up interrupt from it's runtime PM calls to avoid
+> spurious interrupts during runtime.
+> 
+> Note that the wake interrupt is board specific as it
+> uses the UART RX pin, and for omap3, there are six pin
+> options for UART3 RX pin.
+> 
+> Also Note that the legacy platform based booting handles
+> the wake-ups in the legacy mux driver and does not need to
+> pass the wake-up interrupt to the driver.
+> 
+> And finally, to pass the wake-up interrupt in the dts file,
+> either interrupt-map or the pending interrupts-extended
+> property needs to be passed. It's probably best to use
+> interrupts-extended when it's available.
+> 
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+looks much nicer
+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131021/8a88a95b/attachment-0001.sig>
