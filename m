@@ -1,126 +1,90 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 21 Oct 2013 15:04:05 +0100
-Subject: [RFC PATCH 5/5] arm/arm64: KVM: vgic: kill VGIC_NR_IRQS
-In-Reply-To: <1380888978-27725-6-git-send-email-marc.zyngier@arm.com>
-References: <1380888978-27725-1-git-send-email-marc.zyngier@arm.com>
- <1380888978-27725-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20131021140405.GI39411@lvm>
+From: csmanjuvijay@gmail.com (Majunath Goudar)
+Date: Mon, 21 Oct 2013 19:48:53 +0530
+Subject: [PATCH V4 3/6]  USB: OHCI: Properly handle ohci-s3c2410 suspend
+In-Reply-To: <1382365136-24472-1-git-send-email-csmanjuvijay@gmail.com>
+References: <1380708947-15966-1-git-send-email-csmanjuvijay@gmail.com>
+ <1382365136-24472-1-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1382365136-24472-4-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 04, 2013 at 01:16:18PM +0100, Marc Zyngier wrote:
-> Nuke VGIC_NR_IRQS entierly, now that the distributor instance
-> contains the number of IRQ allocated to this GIC.
-> 
-> Also add VGIC_NR_IRQS_LEGACY to preserve the current API.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/arm.c     |  2 +-
->  include/kvm/arm_vgic.h |  6 +++---
->  virt/kvm/arm/vgic.c    | 11 ++++++-----
->  3 files changed, 10 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 2f465fe..2255719 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -789,7 +789,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
->  	switch (ioctl) {
->  	case KVM_CREATE_IRQCHIP: {
->  		if (vgic_present)
-> -			return kvm_vgic_create(kvm, KVM_MAX_VCPUS, VGIC_NR_IRQS);
-> +			return kvm_vgic_create(kvm, KVM_MAX_VCPUS, VGIC_NR_IRQS_LEGACY);
->  		else
->  			return -ENXIO;
->  	}
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index a57757d..03f497d 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -26,7 +26,7 @@
->  #include <linux/types.h>
->  #include <linux/irqchip/arm-gic.h>
->  
-> -#define VGIC_NR_IRQS		256
-> +#define VGIC_NR_IRQS_LEGACY	256
->  #define VGIC_NR_SGIS		16
->  #define VGIC_NR_PPIS		16
->  #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
-> @@ -38,11 +38,11 @@
->  #error	Invalid number of CPU interfaces
->  #endif
->  
-> -#if (VGIC_NR_IRQS & 31)
-> +#if (VGIC_NR_IRQS_LEGACY & 31)
->  #error "VGIC_NR_IRQS must be a multiple of 32"
->  #endif
->  
-> -#if (VGIC_NR_IRQS > VGIC_MAX_IRQS)
-> +#if (VGIC_NR_IRQS_LEGACY > VGIC_MAX_IRQS)
->  #error "VGIC_NR_IRQS must be <= 1024"
->  #endif
->  
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index c9d706b..357fd23 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -363,7 +363,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
->  
->  	case 4:			/* TYPER */
->  		reg  = (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
-> -		reg |= (VGIC_NR_IRQS >> 5) - 1;
-> +		reg |= (vcpu->kvm->arch.vgic.nr_irqs >> 5) - 1;
->  		vgic_reg_access(mmio, &reg, word_offset,
->  				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
->  		break;
-> @@ -941,12 +941,13 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
->  static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->  {
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	int lr;
->  
->  	/* Sanitize the input... */
->  	BUG_ON(sgi_source_id & ~7);
->  	BUG_ON(sgi_source_id && irq >= VGIC_NR_SGIS);
-> -	BUG_ON(irq >= VGIC_NR_IRQS);
-> +	BUG_ON(irq >= dist->nr_irqs);
->  
->  	kvm_debug("Queue IRQ%d\n", irq);
->  
-> @@ -1153,7 +1154,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->  
->  		irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
->  
-> -		BUG_ON(irq >= VGIC_NR_IRQS);
-> +		BUG_ON(irq >= dist->nr_irqs);
->  		vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
->  	}
->  
-> @@ -1363,7 +1364,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
->  	if (vcpu->vcpu_id >= dist->nr_cpus)
->  		return -EBUSY;
->  
-> -	for (i = 0; i < VGIC_NR_IRQS; i++) {
-> +	for (i = 0; i < dist->nr_irqs; i++) {
->  		if (i < VGIC_NR_PPIS)
->  			vgic_bitmap_set_irq_val(&dist->irq_enabled,
->  						vcpu->vcpu_id, i, 1);
-> @@ -1576,7 +1577,7 @@ int kvm_vgic_init(struct kvm *kvm)
->  		goto out;
->  	}
->  
-> -	for (i = VGIC_NR_PRIVATE_IRQS; i < VGIC_NR_IRQS; i += 4)
-> +	for (i = VGIC_NR_PRIVATE_IRQS; i < kvm->arch.vgic.nr_irqs; i += 4)
->  		vgic_set_target_reg(kvm, 0, i);
->  
->  	kvm_timer_init(kvm);
-> -- 
-> 1.8.2.3
-> 
-> 
-Looks good,
+Suspend scenario in case of ohci-s3c2410 glue was not
+properly handled as it was not suspending generic part
+of ohci controller. Alan Stern suggested, properly handle
+ohci-s3c2410 suspend scenario.
 
+Calling explicitly the ohci_suspend()
+routine in ohci_hcd_s3c2410_drv_suspend() will ensure
+proper handling of suspend scenario.
+
+Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg KH <greg@kroah.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-usb at vger.kernel.org
+---
+V3->V4:
+      -No changes, only added Alan Acked-by.
+
+V2->V3:
+      -No changes.
+      As a build failure on "ep93xx proper suspend patch" and Linaro
+      id bounced. Rewrote this patch on top of latest Greg usb-next
+      branch. This patch not gives any build error. Patch is required
+      for ohci-s3c2410 proper suspending as Alan mentioned.
+
+      Initially when I wrote this patch I was working in Linaro, now
+      I am not part of Linaro that is why Linaro id is bouncing. Sending
+      this patch from personal mail id.
+
+V1->V2:
+      -No changes.
+       Due to the build failure on ep93xx reverted this patch.
+       This patch is needed as Alan Stern suggestion.
+
+ drivers/usb/host/ohci-s3c2410.c |   21 ++++-----------------
+ 1 file changed, 4 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
+index be3429e..b5bf9b7 100644
+--- a/drivers/usb/host/ohci-s3c2410.c
++++ b/drivers/usb/host/ohci-s3c2410.c
+@@ -426,28 +426,15 @@ static int ohci_hcd_s3c2410_drv_remove(struct platform_device *pdev)
+ static int ohci_hcd_s3c2410_drv_suspend(struct device *dev)
+ {
+ 	struct usb_hcd *hcd = dev_get_drvdata(dev);
+-	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	unsigned long flags;
++	bool do_wakeup = device_may_wakeup(dev);
+ 	int rc = 0;
+ 
+-	/*
+-	 * Root hub was already suspended. Disable irq emission and
+-	 * mark HW unaccessible, bail out if RH has been resumed. Use
+-	 * the spinlock to properly synchronize with possible pending
+-	 * RH suspend or resume activity.
+-	 */
+-	spin_lock_irqsave(&ohci->lock, flags);
+-	if (ohci->rh_state != OHCI_RH_SUSPENDED) {
+-		rc = -EINVAL;
+-		goto bail;
+-	}
+-
+-	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
++	rc = ohci_suspend(hcd, do_wakeup);
++	if (rc)
++		return rc;
+ 
+ 	s3c2410_stop_hc(pdev);
+-bail:
+-	spin_unlock_irqrestore(&ohci->lock, flags);
+ 
+ 	return rc;
+ }
 -- 
-Christoffer
+1.7.9.5
