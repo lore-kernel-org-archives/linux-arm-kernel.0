@@ -1,54 +1,31 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 21 Oct 2013 09:24:34 +0200
-Subject: [PATCH v3 2/2] ASoC: kirkwood: fix loss of external clock at
- probe time
-In-Reply-To: <20131020163819.GO2443@sirena.org.uk>
-References: <20131018203555.4d974251@armhf>
- <20131020163819.GO2443@sirena.org.uk>
-Message-ID: <20131021092434.02966f5e@armhf>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Mon, 21 Oct 2013 07:24:56 +0000
+Subject: [PATCHv1 8/8] Documentation: Add device tree bindings for
+ Freescale VF610 sound.
+In-Reply-To: <20131018173126.GU2443@sirena.org.uk>
+References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
+ <1382000477-17304-9-git-send-email-Li.Xiubo@freescale.com>
+ <20131018173126.GU2443@sirena.org.uk>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82866807@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 20 Oct 2013 17:38:19 +0100
-Mark Brown <broonie@kernel.org> wrote:
-
-> On Fri, Oct 18, 2013 at 08:35:55PM +0200, Jean-Francois Moine wrote:
-> > At probe time, when the clock driver is not yet initialized, the
-> > external clock of the kirkwood sound device will not be usable.  
+> > +  -- Power supplies:
+> > +     * Mic Bias
+> > +
+> > +  -- SGTL5000 pins:
+> > +     * MIC_IN
+> > +     * LINE_IN
+> > +     * HP_OUT
+> > +     * LINE_OUT
 > 
-> This doesn't apply against -next, could you please check and resend?
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/broone/sound.git topic/kirkwood
-> 
-> or the for-next branch.
+> Things that are part of the CODEC should be part of the CODEC binding and
+> this binding should reference that - this way the information doesn't
+> have to be replicated by all boards using the CODEC and if new devices
+> are supported by the CODEC driver then only that needs updating hopefully.
+>
 
-Not easy to find :)
+Yes, the "-- SGTL5000 pins:" should be in the CODEC binding.
+But, actually the CODEC binding hasn't any reference about this.
 
-> > It also removes the test about same internal and external clocks which
-> > can never occur.
-> 
-> It seems like reasonable defensiveness to have the test there in case
-> someone has a broken DT, though it'd be better to complain about the DT.
-
-The removed test run into:
-
-	clocks = <&si5351 2>, <&si5351 2>;
-	clock-names = "internal", "extclk";
-
-where it seems that the user really wanted to make a mistake.
-Then, the actual code just wants the si5351 2 to work as the internal
-clock, and that cannot be.
-
-Also, about errors, you may see that a `normal` error as:
-
-	clocks = <&si5351 2>, <&gate_clk 13>;
-	clock-names = "internal", "extclk";
-
-i.e. inversion of the internal and external clock phandle's, cannot be
-detected...
-
-So, it is better to remove the useless test.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+So I added it here, but not very sure.
