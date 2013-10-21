@@ -1,44 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Oct 2013 14:17:58 +0100
-Subject: imx-drm: Add HDMI support
-In-Reply-To: <20131021123652.GN17165@S2101-09.ap.freescale.net>
-References: <52602EEA.6060402@prisktech.co.nz>
- <20131017193948.GT25034@n2100.arm.linux.org.uk>
- <1382039535.976669051@f130.i.mail.ru>
- <20131017203545.GV25034@n2100.arm.linux.org.uk>
- <20131019121218.GH25034@n2100.arm.linux.org.uk>
- <20131021091259.GB9716@S2101-09.ap.freescale.net>
- <20131021093448.GX25034@n2100.arm.linux.org.uk>
- <20131021123652.GN17165@S2101-09.ap.freescale.net>
-Message-ID: <20131021131758.GA25034@n2100.arm.linux.org.uk>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 21 Oct 2013 09:36:34 -0400
+Subject: [PATCH] arm64: allow ioremap_cache() to use existing RAM mappings
+Message-ID: <1382362594-24947-1-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 21, 2013 at 08:36:55PM +0800, Shawn Guo wrote:
-> On Mon, Oct 21, 2013 at 10:34:48AM +0100, Russell King - ARM Linux wrote:
-> > However, the IPU is more stable with switching to bypass while it relocks
-> > than not.
-> 
-> As far as I know, FSL kernel has always been doing relock without
-> switching to bypass, and I haven't heard unstable IPU issue from their
-> testing.  Do you have a case that I can set up here to see the issue?
+Some drivers (ACPI notably) use ioremap_cache() to map an area which could
+either be outside of kernel RAM or in an already mapped reserved area of
+RAM. To avoid aliases, __ioremap() does not allow RAM to be remapped. But
+for ioremap_cache(), the existing kernel mapping may be used.
 
-export DISPLAY=:0
-while :; do
-  xrandr -s 1280x720 -r 50
-  sleep 5
-  xrandr -s 1280x720 -r 60
-  sleep 5
-done
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ arch/arm64/include/asm/io.h |  2 +-
+ arch/arm64/mm/ioremap.c     | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
-is one way.  Another way is to switch between all possible resolutions
-supported by the connected device, keeping each resolution for 30 seconds
-a time.  Normally after one or two run-throughs, the IPU will be deader
-than the parrot in Monty Python's parrot sketch, requiring a reboot to
-get it working again.
-
-As I've said previously, when it gets into this state, all the status
-registers I can find report that all FIFOs in the IPU are sitting in
-their empty state.  The TMDS clock is correct, and the frame composer
-in the HDMI block is working, but it's not producing any sync signals or
-pixel data.
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 1d12f89..b56e5b5 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -224,6 +224,7 @@ extern void __memset_io(volatile void __iomem *, int, size_t);
+  */
+ extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
+ extern void __iounmap(volatile void __iomem *addr);
++extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ 
+ #define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_DIRTY)
+ #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+@@ -233,7 +234,6 @@ extern void __iounmap(volatile void __iomem *addr);
+ #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
+-#define ioremap_cached(addr, size)	__ioremap((addr), (size), __pgprot(PROT_NORMAL))
+ #define iounmap				__iounmap
+ 
+ #define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF)
+diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+index 1725cd6..fb44b3d 100644
+--- a/arch/arm64/mm/ioremap.c
++++ b/arch/arm64/mm/ioremap.c
+@@ -79,6 +79,21 @@ void __iounmap(volatile void __iomem *io_addr)
+ {
+ 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
+ 
++	/* Nothing to do for normal memory. See ioremap_cache() */
++	if (pfn_valid(__virt_to_phys(addr) >> PAGE_SHIFT))
++		return;
++
+ 	vunmap(addr);
+ }
+ EXPORT_SYMBOL(__iounmap);
++
++void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
++{
++	/* For normal memory we already have a cacheable mapping. */
++	if (pfn_valid(__phys_to_pfn(phys_addr)))
++		return (void __iomem *)__phys_to_virt(phys_addr);
++
++	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL),
++				__builtin_return_address(0));
++}
++EXPORT_SYMBOL(ioremap_cache);
+-- 
+1.8.3.1
