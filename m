@@ -1,124 +1,70 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 21 Oct 2013 18:24:26 +0530
-Subject: [PATCH 02/11] ARM: OMAP3: clock: add API to enable/disable
- autoidle for a single clock
-In-Reply-To: <20131021122610.11944.71616@quantum>
-References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
- <1381508141-15244-3-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1310191712450.11676@utopia.booyaka.com>
- <20131021122610.11944.71616@quantum>
-Message-ID: <52652402.70906@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 21 Oct 2013 09:00:30 -0400 (EDT)
+Subject: [PATCH 5/5] ARM: vexpress/TC2: register vexpress-spc cpufreq
+ device
+In-Reply-To: <5264F1A2.8040802@arm.com>
+References: <1381931563-16785-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <1381931563-16785-6-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+ <alpine.LFD.2.03.1310181457010.1951@syhkavp.arg> <5264F1A2.8040802@arm.com>
+Message-ID: <alpine.LFD.2.03.1310210857370.1951@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 October 2013 05:56 PM, Mike Turquette wrote:
-> Quoting Paul Walmsley (2013-10-19 10:16:50)
->> On Fri, 11 Oct 2013, Tero Kristo wrote:
->>
->>> Some drivers require direct access to the autoidle functionality of the
->>> interface clocks. Added clock APIs for these, so that the drivers do not
->>> need to access CM registers directly.
->>>
->>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>
->> Thanks, queued.  Please coordinate with Mike to get 
->> allow_idle/deny_idle-type interfaces into the Common Clock Framework, so 
->> these can be replaced with standard CCF-type allow_idle() & deny_idle() 
->> functions.  That interface should include use-counting so multiple callers 
->> can use allow_idle() and deny_idle() without stomping on each other.
-> 
-> Where and when are these functions called? IIRC these are only accessed
-> at boot/init time, though I may be wrong. If they are a boot-time thing
-> then the .init callback provided in struct clk may be sufficient.
+On Mon, 21 Oct 2013, Sudeep KarkadaNagesha wrote:
 
-deny_idle() gets called early during clock init to disable all hardware
-level idling (during boot) and allow_idle() is called during late init
-(after PM init) to allow hardware idling.
+> Hi Nico,
+> 
+> On 18/10/13 19:58, Nicolas Pitre wrote:
+> > On Wed, 16 Oct 2013, Sudeep KarkadaNagesha wrote:
+> > 
+> >> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> >>
+> >> This patch adds vexpress-spc platform device to enables the vexpress
+> >> SPC cpufreq interface driver.
+> >>
+> >> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> >> Cc: Pawel Moll <Pawel.Moll@arm.com>
+> >> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> >> ---
+> >>  arch/arm/mach-vexpress/spc.c | 2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+> >> index a8b8310..4ddfbfe 100644
+> >> --- a/arch/arm/mach-vexpress/spc.c
+> >> +++ b/arch/arm/mach-vexpress/spc.c
+> >> @@ -25,6 +25,7 @@
+> >>  #include <linux/interrupt.h>
+> >>  #include <linux/io.h>
+> >>  #include <linux/opp.h>
+> >> +#include <linux/platform_device.h>
+> >>  #include <linux/slab.h>
+> >>  #include <linux/semaphore.h>
+> >>  
+> >> @@ -532,6 +533,7 @@ static int __init ve_spc_clk_init(void)
+> >>  			pr_warn("failed to initialise cpu%d opp table\n", cpu);
+> >>  	}
+> >>  
+> >> +	platform_device_register_simple("vexpress-spc-cpufreq", -1, NULL, 0);
+> >>  	return 0;
+> >>  }
+> >>  module_init(ve_spc_clk_init);
+> > 
+> > OK... this solves my concern about initcall ordering.  Please just 
+> > disregard my suggestions on patch #3.  I'd suggest folding this patch 
+> > into patch 3/5 though.
+> >
+> Thanks for the review. All the comments provided in other patches are fixed.
+> Since this would not cause any ordering issue, do you still think it needs to be
+> folded in PATCH 3/5. One concern I have with that is we will be adding device
+> first and then the driver. Either I will have to reorder patch 3 and 4 after
+> folding this patch or leave it as it is now.
 
-> 
-> Regards,
-> Mike
-> 
->>
->>
->> - Paul
->>
->>> ---
->>>  arch/arm/mach-omap2/clock.c |   38 ++++++++++++++++++++++++++++++++++++++
->>>  arch/arm/mach-omap2/clock.h |    2 ++
->>>  2 files changed, 40 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
->>> index 0c38ca9..c7c5d31 100644
->>> --- a/arch/arm/mach-omap2/clock.c
->>> +++ b/arch/arm/mach-omap2/clock.c
->>> @@ -543,6 +543,44 @@ int omap2_clk_disable_autoidle_all(void)
->>>  }
->>>  
->>>  /**
->>> + * omap2_clk_deny_idle - disable autoidle on an OMAP clock
->>> + * @clk: struct clk * to disable autoidle for
->>> + *
->>> + * Disable autoidle on an OMAP clock.
->>> + */
->>> +int omap2_clk_deny_idle(struct clk *clk)
->>> +{
->>> +     struct clk_hw_omap *c;
->>> +
->>> +     if (__clk_get_flags(clk) & CLK_IS_BASIC)
->>> +             return -EINVAL;
->>> +
->>> +     c = to_clk_hw_omap(__clk_get_hw(clk));
->>> +     if (c->ops && c->ops->deny_idle)
->>> +             c->ops->deny_idle(c);
->>> +     return 0;
->>> +}
->>> +
->>> +/**
->>> + * omap2_clk_allow_idle - enable autoidle on an OMAP clock
->>> + * @clk: struct clk * to enable autoidle for
->>> + *
->>> + * Enable autoidle on an OMAP clock.
->>> + */
->>> +int omap2_clk_allow_idle(struct clk *clk)
->>> +{
->>> +     struct clk_hw_omap *c;
->>> +
->>> +     if (__clk_get_flags(clk) & CLK_IS_BASIC)
->>> +             return -EINVAL;
->>> +
->>> +     c = to_clk_hw_omap(__clk_get_hw(clk));
->>> +     if (c->ops && c->ops->allow_idle)
->>> +             c->ops->allow_idle(c);
->>> +     return 0;
->>> +}
->>> +
->>> +/**
->>>   * omap2_clk_enable_init_clocks - prepare & enable a list of clocks
->>>   * @clk_names: ptr to an array of strings of clock names to enable
->>>   * @num_clocks: number of clock names in @clk_names
->>> diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
->>> index 7aa32cd..82916cc 100644
->>> --- a/arch/arm/mach-omap2/clock.h
->>> +++ b/arch/arm/mach-omap2/clock.h
->>> @@ -411,6 +411,8 @@ void omap2_clk_dflt_find_idlest(struct clk_hw_omap *clk,
->>>  void omap2_init_clk_hw_omap_clocks(struct clk *clk);
->>>  int omap2_clk_enable_autoidle_all(void);
->>>  int omap2_clk_disable_autoidle_all(void);
->>> +int omap2_clk_allow_idle(struct clk *clk);
->>> +int omap2_clk_deny_idle(struct clk *clk);
->>>  void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
->>>  int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
->>>  void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
->>> -- 
->>> 1.7.9.5
->>>
->>
->>
->> - Paul
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+It doesn't matter if you introduce the device before the driver.  It is 
+just that this patch on its own seemed a bit thin.
+
+In any case this is not very important and doesn't justify another post.
+
+
+
+Nicolas
