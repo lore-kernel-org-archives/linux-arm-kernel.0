@@ -1,53 +1,53 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 21 Oct 2013 14:02:28 +0200
-Subject: [PATCHv4][ 4/4] ARM: dts: cpuimx35, mbimxsd35: Add sound support.
-In-Reply-To: <1382356948-2905-1-git-send-email-denis@eukrea.com>
-References: <1382356948-2905-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382356948-2905-4-git-send-email-denis@eukrea.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 21 Oct 2013 05:10:15 -0700
+Subject: [PATCH V2] ARM: EXYNOS: Move arm core power down clock to
+ exynos5250 common clock
+In-Reply-To: <52644C65.3040805@samsung.com>
+References: <1381470134-29410-1-git-send-email-amit.daniel@samsung.com>
+ <4953642.S7P9jyspGP@amdn883> <52644C65.3040805@samsung.com>
+Message-ID: <20131021121015.11944.4344@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: alsa-devel at alsa-project.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v2->v4:
-- This patch was splitted, only the part enabling the audio was kept.
-  Part of the rest has already been submited, and the remaining parts
-  will be submited later, because they depend on changes touching other
-  subsystems.
----
- .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |    9 +++++++++
- 1 file changed, 9 insertions(+)
+Quoting Kukjin Kim (2013-10-20 14:34:29)
+> On 10/11/13 16:33, Tomasz Figa wrote:
+> > Hi Amit,
+> >
+> > On Friday 11 of October 2013 11:12:14 Amit Daniel Kachhap wrote:
+> >> Now with common clock support added for exynos5250 it is necessary to move
+> >> this code to exynos5250 common clock driver as clock registers should be
+> >> handled there. This change is tested in exynos5250 based arndale platform.
+> >>
+> >> Cc: Abhilash Kesavan<a.kesavan@samsung.com>
+> >> Cc: Thomas Abraham<thomas.abraham@linaro.org>
+> >> Acked-by: Kukjin Kim<kgene.kim@samsugn.com>
+> >
+> > nit: Typo in samsung. Probably something that Kukjin can fix up when
+> > applying, though.
+> >
+> >> Reviewed-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
+> >> Signed-off-by: Amit Daniel Kachhap<amit.daniel@samsung.com>
+> >> ---
+> >>
+> >> Changes in V2:
+> >> * Rebased against linux-next tree.
+> >> * Removed un-used macros in regs-clock.h
+> >>
+> >>   arch/arm/mach-exynos/cpuidle.c                 |   35 --------------------
+> >>   arch/arm/mach-exynos/include/mach/regs-clock.h |   16 ---------
+> >>   drivers/clk/samsung/clk-exynos5250.c           |   42 ++++++++++++++++++++++++
+> >>   3 files changed, 42 insertions(+), 51 deletions(-)
+> >
+> > Otherwise
+> >
+> > Acked-by: Tomasz Figa<t.figa@samsung.com>
+> >
+> Mike, do you want me to pick this patch into Samsung tree?
 
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-index 1378b8d..4045c5d 100644
---- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-@@ -48,6 +48,15 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	sound {
-+		compatible = "eukrea,eukrea-tlv320";
-+		model = "imx35-eukrea-tlv320aic23";
-+		ssi-controller = <&ssi1>;
-+		fsl,audio-codec = <&tlv320aic23>;
-+		mux-int-port = <1>;
-+		mux-ext-port = <4>;
-+	};
- };
- 
- &audmux {
--- 
-1.7.9.5
+I'll take it through clk-next.
+
+Thanks,
+Mike
+
+> 
+> - Kukjin
