@@ -1,35 +1,38 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 21 Oct 2013 22:27:03 +0800
-Subject: [PATCH 3/7] ARM: dts: sabresd: add usdhc4 support
+Date: Mon, 21 Oct 2013 22:27:07 +0800
+Subject: [PATCH 7/7] mmc: sdhci-esdhc-imx: add eMMC HS200 mode support
 In-Reply-To: <1382365627-26816-1-git-send-email-b29396@freescale.com>
 References: <1382365627-26816-1-git-send-email-b29396@freescale.com>
-Message-ID: <1382365627-26816-4-git-send-email-b29396@freescale.com>
+Message-ID: <1382365627-26816-8-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usdhc4 support which has an eMMC card mounted on board.
+Add support for eMMC 4.5 cards to work on hs200 mode.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 39eafc2..76762a3 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -241,3 +241,12 @@
- 	wp-gpios = <&gpio2 1 0>;
- 	status = "okay";
- };
-+
-+&usdhc4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4_1>;
-+	bus-width = <8>;
-+	non-removable;
-+	no-1-8-v;
-+	status = "okay";
-+};
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index baa27c7..d4ba277 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -825,6 +825,7 @@ static int esdhc_change_pinstate(struct sdhci_host *host,
+ 		pinctrl = imx_data->pins_100mhz;
+ 		break;
+ 	case MMC_TIMING_UHS_SDR104:
++	case MMC_TIMING_MMC_HS200:
+ 		pinctrl = imx_data->pins_200mhz;
+ 		break;
+ 	default:
+@@ -852,6 +853,7 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ 		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR50;
+ 		break;
+ 	case MMC_TIMING_UHS_SDR104:
++	case MMC_TIMING_MMC_HS200:
+ 		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR104;
+ 		break;
+ 	case MMC_TIMING_UHS_DDR50:
 -- 
 1.7.2.rc3
