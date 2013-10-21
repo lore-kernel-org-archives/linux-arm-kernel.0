@@ -1,30 +1,134 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 21 Oct 2013 11:46:04 +0100
-Subject: [PATCH v2 0/5] ARM: vexpress/TC2: cpufreq support
-In-Reply-To: <1382349534-31502-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1382349534-31502-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1382352364.3332.4.camel@hornet>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 21 Oct 2013 11:47:32 +0100
+Subject: [PATCH 2/4] mvebu: Dove: Instantiate cpufreq driver.
+In-Reply-To: <1382186261-14482-3-git-send-email-andrew@lunn.ch>
+References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
+ <1382186261-14482-3-git-send-email-andrew@lunn.ch>
+Message-ID: <52650644.9010208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-10-21 at 10:58 +0100, Sudeep KarkadaNagesha wrote:
-> Sudeep KarkadaNagesha (5):
->   cpufreq: arm-big-little: use clk_get instead of clk_get_sys
->   ARM: vexpress/TC2: add support for CPU DVFS
->   ARM: vexpress/TC2: add cpu clock support
->   cpufreq: arm_big_little: add vexpress SPC interface driver
->   ARM: vexpress/TC2: register vexpress-spc cpufreq device
-> 
->  arch/arm/mach-vexpress/Kconfig         |  12 ++
->  arch/arm/mach-vexpress/Makefile        |   3 +-
->  arch/arm/mach-vexpress/spc.c           | 366 ++++++++++++++++++++++++++++++++-
->  arch/arm/mach-vexpress/spc.h           |   2 +-
->  arch/arm/mach-vexpress/tc2_pm.c        |   7 +-
+On 10/19/2013 01:37 PM, Andrew Lunn wrote:
+> Add a platform driver definition to instantiate the dove cpufreq
+> driver. Also indicate the ARCH has cpufreq support, so allowing the
+> cpufreq framework to be enabled.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>   arch/arm/Kconfig                       |  1 +
+>   arch/arm/mach-dove/board-dt.c          |  2 ++
+>   arch/arm/mach-dove/common.c            | 36 ++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-dove/common.h            |  1 +
+>   arch/arm/mach-dove/include/mach/dove.h |  1 +
+>   5 files changed, 41 insertions(+)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1ad6fb6..7744415 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -495,6 +495,7 @@ config ARCH_IXP4XX
+>
+>   config ARCH_DOVE
+>   	bool "Marvell Dove"
+> +	select ARCH_HAS_CPUFREQ
+>   	select ARCH_REQUIRE_GPIOLIB
+>   	select CPU_PJ4
+>   	select GENERIC_CLOCKEVENTS
+> diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
+> index 49f72a8..98202de 100644
+> --- a/arch/arm/mach-dove/board-dt.c
+> +++ b/arch/arm/mach-dove/board-dt.c
+> @@ -70,6 +70,8 @@ static void __init dove_dt_init(void)
+>   	/* Setup clocks for legacy devices */
+>   	dove_legacy_clk_init();
+>
+> +	dove_cpufreq_init();
+> +
 
-For the vexpress bits and pieces:
+What ever the outcome of "DT: blessing or curse" discussion at ELCE will
+be, are there any plans to probe the cpufreq/cpuidle drivers directly
+from DT? Someday, we want to get rid of .machine_init.
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+>   	/* Internal devices not ported to DT yet */
+>   	dove_pcie_init(1, 1);
+>
+> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+> index c122bcf..9e648a8 100644
+> --- a/arch/arm/mach-dove/common.c
+> +++ b/arch/arm/mach-dove/common.c
+> @@ -344,6 +344,42 @@ void __init dove_sdio1_init(void)
+>   	platform_device_register(&dove_sdio1);
+>   }
+>
+> +/*****************************************************************************
+> + * CPU Frequency
+> + ****************************************************************************/
+> +static struct resource dove_cpufreq_resources[] = {
+> +	[0] = {
+> +		.start  = DOVE_PMU_PHYS_BASE,
+> +		.end    = DOVE_PMU_PHYS_BASE + 0x7,
+> +		.flags  = IORESOURCE_MEM,
+> +		.name   = "cpufreq: DFS"
+> +	},
+> +	[1] = {
+> +		.start  = DOVE_PMU_PHYS_BASE + 0x8000,
+> +		.end    = DOVE_PMU_PHYS_BASE + 0x8004,
 
-Thanks!
+BASE + 0x8004 - 1 ?
 
-Pawe?
+> +		.flags  = IORESOURCE_MEM,
+> +		.name   = "cpufreq PMU CR"
+> +	},
+> +	[2] = {
+> +		.start  = DOVE_PMU_PHYS_BASE + 0x0044,
+> +		.end    = DOVE_PMU_PHYS_BASE + 0x0048,
+
+ditto.
+
+Sebastian
+
+> +		.flags  = IORESOURCE_MEM,
+> +		.name   = "cpufreq: PMU Clk Div"
+> +	},
+> +};
+> +
+> +static struct platform_device dove_cpufreq_device = {
+> +	.name		= "dove-cpufreq",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(dove_cpufreq_resources),
+> +	.resource	= dove_cpufreq_resources,
+> +};
+> +
+> +void __init dove_cpufreq_init(void)
+> +{
+> +	platform_device_register(&dove_cpufreq_device);
+> +}
+> +
+>   void __init dove_setup_cpu_wins(void)
+>   {
+>   	/*
+> diff --git a/arch/arm/mach-dove/common.h b/arch/arm/mach-dove/common.h
+> index 1d72522..5c9a77b 100644
+> --- a/arch/arm/mach-dove/common.h
+> +++ b/arch/arm/mach-dove/common.h
+> @@ -44,6 +44,7 @@ void dove_spi1_init(void);
+>   void dove_i2c_init(void);
+>   void dove_sdio0_init(void);
+>   void dove_sdio1_init(void);
+> +void dove_cpufreq_init(void);
+>   void dove_restart(enum reboot_mode, const char *);
+>
+>   #endif
+> diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
+> index 0c4b35f..48db186 100644
+> --- a/arch/arm/mach-dove/include/mach/dove.h
+> +++ b/arch/arm/mach-dove/include/mach/dove.h
+> @@ -144,6 +144,7 @@
+>   #define  DOVE_SD0_GPIO_SEL		(1 << 0)
+>
+>   /* Power Management */
+> +#define DOVE_PMU_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE + 0xd0000)
+>   #define DOVE_PMU_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE + 0xd0000)
+>   #define DOVE_PMU_SIG_CTRL	(DOVE_PMU_VIRT_BASE + 0x802c)
+>
+>
