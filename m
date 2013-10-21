@@ -1,102 +1,122 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Mon, 21 Oct 2013 06:33:35 +0000
-Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
-In-Reply-To: <201310190707.15783.marex@denx.de>
-References: <1381853200-5534-1-git-send-email-marex@denx.de>
- <201310171934.34021.marex@denx.de>
- <0E83723C55F66F43A6041464FE31119D40FB22@039-SN2MPN1-011.039d.mgd.msft.net>
- <201310190707.15783.marex@denx.de>
-Message-ID: <0E83723C55F66F43A6041464FE31119D41096D@039-SN2MPN1-011.039d.mgd.msft.net>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Mon, 21 Oct 2013 06:59:10 +0000
+Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
+ Interface driver.
+In-Reply-To: <526021B0.6050206@metafoo.de>
+References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
+ <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
+ <526021B0.6050206@metafoo.de>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828667B8@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Merak:
-> Hi Richard,
-> 
-> > Hi Merak:
-> > Thanks for your great help on the imx6 pcie switch support on the
-> > latest kernel fristly.
-> 
-> Let's get this PCIe thing working well :)
-> 
-> [...]
-> 
-> 
-> > Regarding to your comments why FORCE GEN1 mode in RC " Force Gen1
-> > operation. In case the IP block is in Gen2 operation mode, it does not
-> > detect the PCIe switch at all.", does the gen2 link can be set-up
-> > without force gen1 mode?
-> 
-> What I did in the end for testing purpose was I followed the thread at FSL
-> community in the link above, forced the link into Gen1 mode , then waited for
-> link up, then started directed gen2 switch and waited for linkup again. This
-> worked and the PCIe indicated the link is in Gen2 mode.
-> 
-> Interestingly enough, I also implemented PCIe driver for MX6 for U-Boot (will
-> submit it shortly to U-Boot ML) and use it with the Intel i210 ethernet NIC
-> now.
-> When I use the PCIe in U-Boot, I don't need the Force-Gen1 thing above. I
-> suspect though, that the Gen1 setting is preserved from U-Boot, where I have
-> this as well.
-> 
-[Richard] It's great, thanks.
-> > About the errata mentioned in
-> > https://community.freescale.com/thread/304284, the
-> > errata-SW-workaround of initialization is contained in previous Sean Cross'
-> codes, like this. /*
-> >          * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
-> >          * Wait 2ms (LTSSM timeout is 24ms, PHY lock is ~5us in gen2).
-> >          * If (MAC/LTSSM.state == Recovery.RcvrLock)
-> >          * && (PHY/rx_valid==0) then pulse PHY/rx_reset. Transition
-> >          * to gen2 is stuck
-> >          */
-> 
-> Is this not handling only the PHY part ? Honestly, I'm quite lost in the
-> flurry of different opinions on the MX6 PCIe. Maybe you as a FSL guy could
-> scrounge some internal knowledge ?
-> 
-[Richard] Take it easy, maybe there is a misunderstand between you and me.
-It is handling only the PHY part.
-The errata "PCIe: Clock pointers can lose sync during clock rate changes",
- I mentioned previously is discussed in 
-(https://community.freescale.com/message/316162#316162) too.
 
-Charies Powe think that the SW workaround contained in FSL BSP is not complete for the errata.
-Because I couldn't reproduce this issue at my side, the complete version of the SW workaround
-of this errata is not included in the BSP yet.
-That's all. Thanks.
-
-> > > > > > So better solution should be to initialize RC by default at
-> > > > > > GEN2 or highest speed. Further, a parameter say gen_only can
-> > > > > > be passed from DT to force GEN1 only mode.
-> > > > > >
-> > > > > > What do you say?
-> > > > >
-> > > > > I say I'd like to know the root cause of this problem. This Gen2
-> > > > > fix was pulled from one of the myriad variants of the FSL PCIe
-> > > > > driver, so apparently this issue happens to other people as
-> > > > > well. But why and how to properly fix this so the whole PCIe bus
-> > > > > does operate in
-> > > > > Gen2 mode, I cannot tell :-(
-> > > >
-> > > > [Richard] GEN2 mode had been verified in FSL 3.0.35 kernel
-> > > > releases before. I don't know why it can't work in GEN2 mode in
-> > > > the latest kernel. BTW, Based on for-next branch of shawn's git
-> > > > reops and applied Merak's patch-set, my PI7C9X2G303EL with intel
-> > > > e1000e network card plugged can't be detected at all. :(.
-> > >
-> > > I think we're still fighting some issue with resource mappings here.
-> > > We also agreed with Tim that my patches are incomplete. I will send
-> > > out a new version ASAP.
-> >
-> > [Richard] What's I said above is just curious that I encounter
-> > different phenomena at my side With the almost same codes.
+> > +static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
+> > +		struct snd_pcm_hw_params *params,
+> > +		struct snd_soc_dai *cpu_dai)
+> > +{
+> > +	int ret;
+> > +
+> > +	ret = fsl_sai_hw_params_tr(substream, params, cpu_dai,
+> > +				FSL_FMT_TRANSMITTER);
+> > +	if (ret) {
+> > +		dev_err(cpu_dai->dev,
+> > +				"Cannot set sai transmitter hw params: %d\n",
+> > +				ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = fsl_sai_hw_params_tr(substream, params, cpu_dai,
+> > +				FSL_FMT_RECEIVER);
+> > +	if (ret) {
+> > +		dev_err(cpu_dai->dev,
+> > +				"Cannot set sai's receiver hw params: %d\n",
+> > +				ret);
+> > +		return ret;
+> > +	}
 > 
-> I talked to Tim about the mappings some more. It seems if the IOspace is
-> disabled, everything works without hangs. If the IOspace is not disabled on
-> the ethernet NICs, we get a hang.
-[Richard] Ok, I see. Thanks.
+> Shouldn't, depending on the substream direction, either transmit or
+> receiver be configured, instead of always configuring both?
+> 
+
+Yes, this can be configed separately. Please see the next version.
+
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int fsl_sai_trigger(struct snd_pcm_substream *substream, int
+> cmd,
+> > +		struct snd_soc_dai *dai)
+> > +{
+> > +	struct fsl_sai *sai = snd_soc_dai_get_drvdata(dai);
+> > +	unsigned int tcsr, rcsr;
+> > +
+> > +	tcsr = readl(sai->base + SAI_TCSR);
+> > +	rcsr = readl(sai->base + SAI_RCSR);
+> > +
+> > +	switch (cmd) {
+> > +	case SNDRV_PCM_TRIGGER_START:
+> > +	case SNDRV_PCM_TRIGGER_RESUME:
+> > +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> > +		rcsr |= SAI_CSR_TERE | SAI_CSR_FRDE;
+> > +		tcsr |= SAI_CSR_TERE | SAI_CSR_FRDE;
+> > +		writel(rcsr, sai->base + SAI_RCSR);
+> > +		udelay(10);
+> > +		writel(tcsr, sai->base + SAI_TCSR);
+> > +		break;
+> > +
+> > +	case SNDRV_PCM_TRIGGER_STOP:
+> > +	case SNDRV_PCM_TRIGGER_SUSPEND:
+> > +	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+> > +		tcsr &= ~(SAI_CSR_TERE | SAI_CSR_FRDE);
+> > +		rcsr &= ~(SAI_CSR_TERE | SAI_CSR_FRDE);
+> > +		writel(tcsr, sai->base + SAI_TCSR);
+> > +		udelay(10);
+> > +		writel(rcsr, sai->base + SAI_RCSR);
+> > +		break;
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> > +
+> 
+> Same here, shouldn't tx and rx be started independently depending on the
+> substream direction?
+> 
+
+But this couldn't, from the SAI's spec we can see that:
+------
+The SAI transmitter and receiver can be configured to operate with synchronous bit clock
+and frame sync.
+
+1), 
+If the transmitter bit clock and frame sync are to be used by both the transmitter and
+receiver:
+* The transmitter must be configured for asynchronous operation and the receiver for
+synchronous operation.
+* In synchronous mode, the receiver is enabled only when both the transmitter and
+receiver are enabled.
+* It is recommended that the transmitter is the last enabled and the first disabled.
+
+2),
+If the receiver bit clock and frame sync are to be used by both the transmitter and
+receiver:
+* The receiver must be configured for asynchronous operation and the transmitter for
+synchronous operation.
+* In synchronous mode, the transmitter is enabled only when both the receiver and
+transmitter are both enabled.
+* It is recommended that the receiver is the last enabled and the first disabled.
+------
+
+The receiver and transmitter should be both enabled at the same time if any of them is alive.
 
 
-Best Regards
-Richard.
+> > +	return 0;
+> > +}
+> > +
+> > +static struct snd_soc_dai_ops fsl_sai_pcm_dai_ops = {
+> 
+> const
+> 
+
+Please see the next version.
