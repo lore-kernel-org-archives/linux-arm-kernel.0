@@ -1,166 +1,75 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 21 Oct 2013 15:13:08 +0300
-Subject: [PATCH v2 2/7] usb: dwc3: adapt dwc3 core to use Generic PHY
- Framework
-In-Reply-To: <52651614.5040309@ti.com>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
- <1381866857-3861-3-git-send-email-kishon@ti.com> <525E9232.9050502@ti.com>
- <525E9A11.7080501@ti.com> <525EA171.9010402@ti.com> <52651614.5040309@ti.com>
-Message-ID: <52651A54.3020403@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 21 Oct 2013 05:16:05 -0700
+Subject: [PATCH v5 0/3] ARM: S5PV210: move to common clk framework
+In-Reply-To: <5264425E.4040301@samsung.com>
+References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <1816869.ggMDlA1qNY@flatron> <5264425E.4040301@samsung.com>
+Message-ID: <20131021121605.11944.74007@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2013 02:55 PM, Kishon Vijay Abraham I wrote:
-> Hi,
+Quoting Kukjin Kim (2013-10-20 13:51:42)
+> On 10/20/13 01:03, Tomasz Figa wrote:
+> > Hi Mike, Kukjin, Rafael,
+> >
+> > On Tuesday 24 of September 2013 14:50:06 Mateusz Krawczuk wrote:
+> >> This patch series is the new s5pv210 clock implementation
+> >> (using common clk framework).
+> >>
+> >> This implementation is compatible with device tree definition and board
+> >> files.
+> >>
+> >> This patch series is based on linux-next and has been tested on goni and
+> >> aquila
+> >> boards using board file.
+> >>
+> >> Since v4:
+> >> Corrected mux flags for finpll.
+> >>
+> >> Since v3:
+> >>
+> >> Replace s5pv210_clk_register_finpll, by creating mux finpll
+> >> with xusbxti and xxti as parrents.
+> >>
+> >>
+> >> Mateusz Krawczuk (3):
+> >>    clk: samsung: Add clock driver for s5pc110/s5pv210
+> >>    Cpufreq: s5pv210 cpufreq fixes for CCF
+> >>    ARM: s5pv210: Migrate clock handling to Common Clock Framework
+> >>
+> >>   .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
+> >>   arch/arm/mach-s5pv210/Kconfig                      |   9 +
+> >>   arch/arm/mach-s5pv210/Makefile                     |   4 +-
+> >>   arch/arm/mach-s5pv210/common.c                     |  17 +
+> >>   arch/arm/mach-s5pv210/common.h                     |  10 +
+> >>   arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+> >>   arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+> >>   arch/arm/plat-samsung/Kconfig                      |   2 +-
+> >>   drivers/clk/samsung/Makefile                       |   3 +
+> >>   drivers/clk/samsung/clk-s5pv210.c                  | 673
+> >> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c
+> >>   |   6 +-
+> >>   include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
+> >>   12 files changed, 1019 insertions(+), 8 deletions(-)
+> >>   create mode 100644
+> >> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
+> >> create mode 100644 drivers/clk/samsung/clk-s5pv210.c
+> >>   create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
+> >
+> > I believe this series is reasonable to be applied. Could we agree on
+> > the tree it would go through and get all tne required acks?
+> >
+> > Best regards,
+> > Tomasz
 > 
-> On Wednesday 16 October 2013 07:53 PM, Roger Quadros wrote:
->> On 10/16/2013 04:52 PM, Kishon Vijay Abraham I wrote:
->>> Hi,
->>>
->>> On Wednesday 16 October 2013 06:48 PM, Roger Quadros wrote:
->>>> Hi,
->>>>
->>>> On 10/15/2013 10:54 PM, Kishon Vijay Abraham I wrote:
->>>>> Adapted dwc3 core to use the Generic PHY Framework. So for init, exit,
->>>>> power_on and power_off the following APIs are used phy_init(), phy_exit(),
->>>>> phy_power_on() and phy_power_off().
->>>>>
->>>>> However using the old USB phy library wont be removed till the PHYs of all
->>>>> other SoC's using dwc3 core is adapted to the Generic PHY Framework.
->>>>>
->>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>> ---
->>>>>  Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++-
->>>>>  drivers/usb/dwc3/Kconfig                       |    1 +
->>>>>  drivers/usb/dwc3/core.c                        |   52 ++++++++++++++++++++++++
->>>>>  drivers/usb/dwc3/core.h                        |    7 ++++
->>>>>  drivers/usb/dwc3/platform_data.h               |    2 +
->>>>>  5 files changed, 66 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
->>>>> index e807635..471366d 100644
->>>>> --- a/Documentation/devicetree/bindings/usb/dwc3.txt
->>>>> +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
->>>>> @@ -6,11 +6,13 @@ Required properties:
->>>>>   - compatible: must be "snps,dwc3"
->>>>>   - reg : Address and length of the register set for the device
->>>>>   - interrupts: Interrupts used by the dwc3 controller.
->>>>> +
->>>>> +Optional properties:
->>>>>   - usb-phy : array of phandle for the PHY device.  The first element
->>>>>     in the array is expected to be a handle to the USB2/HS PHY and
->>>>>     the second element is expected to be a handle to the USB3/SS PHY
->>>>> -
->>>>> -Optional properties:
->>>>> + - phys: from the *Generic PHY* bindings
->>>>> + - phy-names: from the *Generic PHY* bindings
->>>>>   - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
->>>>>  
->>>>>  This is usually a subnode to DWC3 glue to which it is connected.
->>>>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
->>>>> index 8e385b4..64eed6f 100644
->>>>> --- a/drivers/usb/dwc3/Kconfig
->>>>> +++ b/drivers/usb/dwc3/Kconfig
->>>>> @@ -2,6 +2,7 @@ config USB_DWC3
->>>>>  	tristate "DesignWare USB3 DRD Core Support"
->>>>>  	depends on (USB || USB_GADGET) && HAS_DMA
->>>>>  	select USB_PHY
->>>>> +	select GENERIC_PHY
->>>>>  	select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
->>>>>  	help
->>>>>  	  Say Y or M here if your system has a Dual Role SuperSpeed
->>>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
->>>>> index cb91d70..28bfa5b 100644
->>>>> --- a/drivers/usb/dwc3/core.c
->>>>> +++ b/drivers/usb/dwc3/core.c
->>>>> @@ -82,6 +82,12 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
->>>>>  
->>>>>  	usb_phy_init(dwc->usb2_phy);
->>>>>  	usb_phy_init(dwc->usb3_phy);
->>>>> +
->>>>> +	if (dwc->usb2_generic_phy)
->>>>> +		phy_init(dwc->usb2_generic_phy);
->>>>> +	if (dwc->usb3_generic_phy)
->>>>> +		phy_init(dwc->usb3_generic_phy);
->>>>> +
->>>>
->>>> dwc3_core_soft_reset() is called from dwc3_core_init() which is called from
->>>> dwc3_probe() but before the PHYs are initialized.
->>>>
->>>> This will cause phy power_on() to be called before phy_init() which is wrong.
->>>>
->>
->> You overlooked the above?
+> I agree.
 > 
-> No. Forgot to comment back.
-> Yeah, you are right.. that should be fixed.
->>
->>>>>  	mdelay(100);
->>>>>  
->>>>>  	/* Clear USB3 PHY reset */
->>>>> @@ -343,6 +349,11 @@ static void dwc3_core_exit(struct dwc3 *dwc)
->>>>>  {
->>>>>  	usb_phy_shutdown(dwc->usb2_phy);
->>>>>  	usb_phy_shutdown(dwc->usb3_phy);
->>>>> +
->>>>> +	if (dwc->usb2_generic_phy)
->>>>> +		phy_power_off(dwc->usb2_generic_phy);
->>>>> +	if (dwc->usb3_generic_phy)
->>>>> +		phy_power_off(dwc->usb3_generic_phy);
->>>>>  }
->>>>>  
->>>>>  #define DWC3_ALIGN_MASK		(16 - 1)
->>>>> @@ -439,6 +450,26 @@ static int dwc3_probe(struct platform_device *pdev)
->>>>>  		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
->>>>>  	}
->>>>>  
->>>>> +	count = of_property_match_string(node, "phy-names", "usb2-phy");
->>>>> +	if (count >= 0 || (pdata && pdata->usb2_generic_phy)) {
->>>>> +		dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
->>>>> +		if (IS_ERR(dwc->usb2_generic_phy)) {
->>>>> +			dev_err(dev, "no usb2 phy configured yet");
->>>>> +			return PTR_ERR(dwc->usb2_generic_phy);
->>>>> +		}
->>>>> +		dwc->usb2_phy = NULL;
->>>>> +	}
->>>>> +
->>>>> +	count = of_property_match_string(node, "phy-names", "usb3-phy");
->>>>> +	if (count >= 0 || (pdata && pdata->usb3_generic_phy)) {
->>>>> +		dwc->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
->>>>> +		if (IS_ERR(dwc->usb3_generic_phy)) {
->>>>> +			dev_err(dev, "no usb3 phy configured yet");
->>>>> +			return PTR_ERR(dwc->usb3_generic_phy);
->>>>> +		}
->>>>> +		dwc->usb3_phy = NULL;
->>>>> +	}
->>>>> +
->>>>
->>>> There are a couple of issues here.
->>>> - The above code must be executed only if it node is valid.
->>>
->>> of_property_match_string will give a error value if the node is not present.
->>> *count >= 0* can take care of this.
->>
->> OK. 
->>
->>>> - We must either get both PHYs via old method or via new method and not support mix matching
->>>> them. e.g. it is possible with this code that usb2_phy is set and usb3_generic_phy is set.
->>>
->>> Why? As long as both the frameworks co-exist (and we support both in dwc3), I
->>> don't see any reason why we shouldn't allow it. We can avoid adding a few more
->>> checks by leaving it the way it is currently.
->>
->> Because it just doesn't seem elegant. Why would you want to even allow both types of PHY
->> to be used simultaneously?
-> 
-> We actually don't allow both types of PHYs to be used simultaneously.  We set
-> usb2_phy/usb3_phy to NULL, if we had got the the generic PHY.
-> If you just doesn't even want to get PHY by the second method if we have got
-> PHY by the first method, then we might need to add more *if* checks which IMO
-> don't make it any elegant either.
-> Having a clean dt data wont have both types of PHYs anyway.
+> Mike, how do you think the common clk stuff for s5pv210?
 
-OK.
+Clock code looks good to me. Which tree do you want to take it through?
 
-cheers,
--roger
+Regards,
+Mike
+
+> 
+> - Kukjin
