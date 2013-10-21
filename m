@@ -1,51 +1,38 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 21 Oct 2013 15:54:27 +0200
-Subject: [PATCHv4][ 4/4] ARM: imx_v6_v7_defconfig: Enable tsc2007 support.
-In-Reply-To: <1382363667-10341-1-git-send-email-denis@eukrea.com>
-References: <1382363667-10341-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382363667-10341-4-git-send-email-denis@eukrea.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 21 Oct 2013 09:55:03 -0400
+Subject: DreamPlug / GuruPlug support in 3.12-rc
+In-Reply-To: <526519DC.5030500@gmail.com>
+References: <5263C7C2.4000204@gmail.com>
+ <20131020161747.GA15169@titan.lakedaemon.net>
+ <5264382E.9050207@gmail.com>
+ <20131020215017.GD15169@titan.lakedaemon.net>
+ <526519DC.5030500@gmail.com>
+Message-ID: <20131021135503.GH15169@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eukrea cpuimx35 and cpuimx51 have a tsc2007 touchscreen controller,
-  so we turn it on.
+Robert,
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v2->v4:
-- This patch was splitted, only the part enabling the audio was kept.
-  Part of the rest has already been submited, and the remaining parts
-  will be submited later, because they depend on changes touching other
-  subsystems.
----
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+On Mon, Oct 21, 2013 at 01:11:08PM +0100, robert wrote:
+> My error in logic was to base my testing on a kernel config which seemed
+> - to me - to 'work', but was actually _incorrect_, as you pointed out.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index d8a52a0..23ba17d 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -130,6 +130,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_EGALAX=y
- CONFIG_TOUCHSCREEN_MC13783=y
-+CONFIG_TOUCHSCREEN_TSC2007=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MMA8450=y
- CONFIG_SERIO_SERPORT=m
--- 
-1.7.9.5
+whew!  I'm glad it was something simple and not a bug in the code.
+
+> I decided to scrub the existing config, and start over, from # make
+> kirkwood_defconfig, and then select/deselect options for the
+> DreamPlug.    After a bit of trial and error, I now have a working
+> 3.12-rc6 system:
+
+For future reference, we've been keeping the relevant _defconfig's up
+to date so that they build each new version of the kernel, and, if we're
+doing our jobs correctly, the resulting kernel should boot without
+trouble.  If it fails, please let us know.
+
+> Many thanks for your help.
+
+Anytime.
+
+thx,
+
+Jason.
