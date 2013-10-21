@@ -1,32 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 21 Oct 2013 20:36:55 +0800
-Subject: imx-drm: Add HDMI support
-In-Reply-To: <20131021093448.GX25034@n2100.arm.linux.org.uk>
-References: <52602EEA.6060402@prisktech.co.nz>
- <20131017193948.GT25034@n2100.arm.linux.org.uk>
- <1382039535.976669051@f130.i.mail.ru>
- <20131017203545.GV25034@n2100.arm.linux.org.uk>
- <20131019121218.GH25034@n2100.arm.linux.org.uk>
- <20131021091259.GB9716@S2101-09.ap.freescale.net>
- <20131021093448.GX25034@n2100.arm.linux.org.uk>
-Message-ID: <20131021123652.GN17165@S2101-09.ap.freescale.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 21 Oct 2013 05:41:00 -0700
+Subject: [GIT PULL] ux500 devicetree patches, take 3
+In-Reply-To: <CACRpkdYyazH9KevkA=qTho3okdKnKWcq_uMwRroa6=svacfJAQ@mail.gmail.com>
+References: <CACRpkdYyazH9KevkA=qTho3okdKnKWcq_uMwRroa6=svacfJAQ@mail.gmail.com>
+Message-ID: <20131021124100.11944.72532@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 21, 2013 at 10:34:48AM +0100, Russell King - ARM Linux wrote:
-> However, the IPU is more stable with switching to bypass while it relocks
-> than not.
-
-As far as I know, FSL kernel has always been doing relock without
-switching to bypass, and I haven't heard unstable IPU issue from their
-testing.  Do you have a case that I can set up here to see the issue?
-
-Shawn
-
-> > > Here's a diff which updates the av PLL to do this:
-> > 
-> > Some other PLLs needs update too.  I will cook up patches to fix these
-> > problems.
+Quoting Linus Walleij (2013-10-18 12:23:45)
+> Hi ARM SoC folks,
 > 
-> Yes, I only changed the set_rate on the AV codecs as I haven't tested
-> that on the others.
+> this is yet another pull request for ux500 device tree stuff. It should
+> go on top of the second pull request, I tested to pull it on top of
+> ux500/dt2 in the ARM SoC tree and it worked just fine.
+> 
+> These are fixes and additions found during testing of the switch to
+> full device tree on ux500. The clock fixes will go into the -rc:s if
+> you don't take this in as a whole.
+> 
+> There is one oneline patch to the clock driver that I have not had
+> an ACK from Mike on, but Lee checked it and I certainly don't
+> think Mike has anything against it. The last patch adds the SSP
+> and SPI devices that were strangely absent from the platform
+> after the conversion.
+
+If it is not too late:
+
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
+> 
+> So: please pull this into ARM SoC as ux500/dt3 or something.
+> 
+> Yours,
+> Linus Walleij
+> 
+> 
+> The following changes since commit 741a6c4c59cfa1266bc75aca9f66bdc6e421b0d5:
+> 
+>   ARM: ux500: move BU21013 touchpad GPIOs into top-level DTS
+> (2013-10-03 10:29:24 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-dt-for-v3.13-3
+> 
+> for you to fetch changes up to 6e1484c2761e56bb98ec95ccdd1d98d2f67852ae:
+> 
+>   ARM: ux500: register all SSP and SPI blocks (2013-10-18 14:55:44 +0200)
+> 
+> ----------------------------------------------------------------
+> Five incremental device tree patches around the clock handling,
+> and adding SSP/SPI devices to the device tree.
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (5):
+>       ARM: ux500: fix clock for GPIO block 8
+>       clk: ux500: fix erroneous bit assignment
+>       ARM: ux500: fix clock for GPIO blocks 6 and 7
+>       ARM: ux500: fix I2C4 clock bit
+>       ARM: ux500: register all SSP and SPI blocks
+> 
+>  arch/arm/boot/dts/ste-dbx5x0.dtsi | 83 ++++++++++++++++++++++++++++++++++++---
+>  drivers/clk/ux500/u8500_of_clk.c  |  2 +-
+>  2 files changed, 79 insertions(+), 6 deletions(-)
