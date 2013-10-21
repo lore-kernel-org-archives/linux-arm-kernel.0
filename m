@@ -1,30 +1,37 @@
-From: robt201108@gmail.com (robert)
-Date: Mon, 21 Oct 2013 13:11:08 +0100
-Subject: DreamPlug / GuruPlug support in 3.12-rc
-In-Reply-To: <20131020215017.GD15169@titan.lakedaemon.net>
-References: <5263C7C2.4000204@gmail.com>
- <20131020161747.GA15169@titan.lakedaemon.net> <5264382E.9050207@gmail.com>
- <20131020215017.GD15169@titan.lakedaemon.net>
-Message-ID: <526519DC.5030500@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 21 Oct 2013 05:11:42 -0700
+Subject: [PATCH v2 4/8] clk: samsung: s3c64xx: Add aliases for DMA clocks
+In-Reply-To: <1381950659-12703-5-git-send-email-tomasz.figa@gmail.com>
+References: <1381950659-12703-1-git-send-email-tomasz.figa@gmail.com>
+ <1381950659-12703-5-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20131021121142.11944.48412@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+Quoting Tomasz Figa (2013-10-16 12:10:55)
+> This patch adds clkdev aliases for clocks used by PL08x DMA driver.
+> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-Apologies for my ignorant 'top-posting'..
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-My error in logic was to base my testing on a kernel config which seemed
-- to me - to 'work', but was actually _incorrect_, as you pointed out.
-
-I decided to scrub the existing config, and start over, from # make
-kirkwood_defconfig, and then select/deselect options for the
-DreamPlug.    After a bit of trial and error, I now have a working
-3.12-rc6 system:
-
-# uname -a
-Linux rgdreamplug 3.12.0-rc6 #1 PREEMPT Mon Oct 21 12:54:19 BST 2013
-armv5tel armv5tel armv5tel GNU/Linux
-
-Many thanks for your help.
-
-Robert.
+> ---
+>  drivers/clk/samsung/clk-s3c64xx.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+> index 7d2c842..06cf105 100644
+> --- a/drivers/clk/samsung/clk-s3c64xx.c
+> +++ b/drivers/clk/samsung/clk-s3c64xx.c
+> @@ -332,7 +332,9 @@ static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
+>         ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "hsmmc"),
+>         ALIAS(HCLK_HSMMC0, "s3c-sdhci.0", "mmc_busclk.0"),
+>         ALIAS(HCLK_DMA1, NULL, "dma1"),
+> +       ALIAS(HCLK_DMA1, "dma-pl080s.1", "apb_pclk"),
+>         ALIAS(HCLK_DMA0, NULL, "dma0"),
+> +       ALIAS(HCLK_DMA0, "dma-pl080s.0", "apb_pclk"),
+>         ALIAS(HCLK_CAMIF, "s3c-camif", "camif"),
+>         ALIAS(HCLK_LCD, "s3c-fb", "lcd"),
+>         ALIAS(PCLK_SPI1, "s3c6410-spi.1", "spi"),
+> -- 
+> 1.8.3.2
