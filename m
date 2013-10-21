@@ -1,65 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 21 Oct 2013 22:42:42 +0200
-Subject: [PATCH] ARM: make mach-xyz/Makefile.boot optional for
- !ARCH_MULTIPLATFORM
-Message-ID: <1382388162-27185-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 21 Oct 2013 22:53:23 +0200
+Subject: [GIT PULL] fixes for integer rounding in timer core
+In-Reply-To: <20131021071240.GI10079@pengutronix.de>
+References: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
+ <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5253D9A1.1080106@pengutronix.de> <20131008153147.GR10079@pengutronix.de>
+ <20131014073436.GX10079@pengutronix.de>
+ <20131021071240.GI10079@pengutronix.de>
+Message-ID: <52659443.2050203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Makefile.boot is supposed to define zreladdr-y, params_phys-y and
-initrd_phys-y. The first one is only needed in the absence of AUTO_ZRELADDR
-and when building a zImage. The latters are only needed for bootp stuff.
-So ignore errors on including Makefile.boot and error out in the targets
-that need the corresponding settings.
+On 10/21/2013 09:12 AM, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> [added Daniel Lezcano to To:]
+>
+> On Mon, Oct 14, 2013 at 09:34:37AM +0200, Uwe Kleine-K?nig wrote:
+>> On Tue, Oct 08, 2013 at 05:31:47PM +0200, Uwe Kleine-K?nig wrote:
+>>>> What's the status of this patch?
+>>> I pinged Thomas about it already via irc, but I didn't get a response up
+>>> to now. It would be great to get that into 3.12. To make it easy for
+>>> Thomas, here is a pull request that includes the fix and converts
+>>> at91rm9200 back to clockevents_config_and_register dropping one of the
+>>> workarounds for the fixed bug.
 
-This makes it unnecessary to create dummy Makefile.boot files.
+[ ... ]
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/Makefile | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+>>> ----------------------------------------------------------------
+>>> The first patch in this pull request fixes an old integer rounding bug in the
+>>> timer core that was (and still is) worked around in a few arch's timer code.
+>>> The second patch drops such a work around now that the core is fixed.
+>> It would be nice to get that fix into 3.12, but Thomas stopped
+>> responding nearly a month ago---his last mail in this thread[1] dates back
+>> to September 20.
+> Still no sign of life from Thomas.
+>
+>> Can one of you please take it directly?
+> Daniel, would you care to take it?
 
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index 84aa2ca..44203b3 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -12,7 +12,7 @@
- #
- 
- ifneq ($(MACHINE),)
--include $(srctree)/$(MACHINE)/Makefile.boot
-+sinclude $(srctree)/$(MACHINE)/Makefile.boot
- endif
- 
- # Note: the following conditions must always be true:
-@@ -51,10 +51,19 @@ $(obj)/Image: vmlinux FORCE
- $(obj)/compressed/vmlinux: $(obj)/Image FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
- 
-+ifneq ($(CONFIG_AUTO_ZRELADDR)$(ZRELADDR),)
-+
- $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
- 	$(call if_changed,objcopy)
- 	@$(kecho) '  Kernel: $@ is ready'
- 
-+else
-+
-+$(obj)/zImage: FORCE
-+	@echo 'Either enable CONFIG_AUTO_ZRELADDR or provide zreladdr-y in Makefile.boot'
-+	@false
-+
-+endif
- endif
- 
- ifneq ($(LOADADDR),)
-@@ -81,6 +90,8 @@ $(obj)/uImage:	$(obj)/zImage FORCE
- 	@$(kecho) '  Image $@ is ready'
- 
- $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
-+	@test -n "$(PARAMS_PHYS)" || \
-+	(echo This machine does not support BOOTP; exit -1)
- 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
- 	@:
- 
+Yes, sure.
+
+   -- Daniel
+
+
 -- 
-1.8.4.rc3
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
