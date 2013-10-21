@@ -1,153 +1,293 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 21 Oct 2013 17:26:58 +0530
-Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
- indicates the presence of PHY's
-In-Reply-To: <20131017163828.GH11611@gimli>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
- <1381866857-3861-2-git-send-email-kishon@ti.com>
- <20131017163828.GH11611@gimli>
-Message-ID: <5265168A.3060309@ti.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Mon, 21 Oct 2013 14:02:25 +0200
+Subject: [PATCHv4][ 1/4] ASoC: eukrea-tlv320: Add DT support.
+Message-ID: <1382356948-2905-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Liam Girdwood <lgirdwood@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: alsa-devel at alsa-project.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Eric B?nard <eric@eukrea.com>
 
-On Thursday 17 October 2013 10:08 PM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Wed, Oct 16, 2013 at 01:24:11AM +0530, Kishon Vijay Abraham I wrote:
->> There can be systems which does not have a external usb_phy, so get
->> usb_phy only if dt data indicates the presence of PHY in the case of dt boot or
->> if platform_data indicates the presence of PHY. Also remove checking if
->> return value is -ENXIO since it's now changed to always enable usb_phy layer.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
-> I'm fine with this patch, but one comment below:
-> 
->> @@ -387,16 +388,49 @@ static int dwc3_probe(struct platform_device *pdev)
->>  	if (node) {
->>  		dwc->maximum_speed = of_usb_get_maximum_speed(node);
->>  
->> -		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
->> -		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
->> +		count = of_count_phandle_with_args(node, "usb-phy", NULL);
->> +		switch (count) {
->> +		case 2:
->> +			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
->> +				"usb-phy", 1);
->> +			if (IS_ERR(dwc->usb3_phy)) {
->> +				dev_err(dev, "usb3 phy not found\n");
->> +				return PTR_ERR(dwc->usb3_phy);
->> +			}
->> +		case 1:
->> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
->> +				"usb-phy", 0);
->> +			if (IS_ERR(dwc->usb2_phy)) {
->> +				dev_err(dev, "usb2 phy not found\n");
->> +				return PTR_ERR(dwc->usb2_phy);
->> +			}
->> +			break;
->> +		default:
->> +			dev_err(dev, "usb phy nodes not configured\n");
->> +		}
->>  
->>  		dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
->>  		dwc->dr_mode = of_usb_get_dr_mode(node);
->>  	} else if (pdata) {
->>  		dwc->maximum_speed = pdata->maximum_speed;
->>  
->> -		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
->> -		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
->> +		if (pdata->usb2_phy) {
->> +			dwc->usb2_phy = devm_usb_get_phy(dev,
->> +				USB_PHY_TYPE_USB2);
->> +			if (IS_ERR(dwc->usb2_phy)) {
->> +				dev_err(dev, "usb2 phy not found\n");
->> +				return PTR_ERR(dwc->usb2_phy);
->> +			}
->> +		}
->> +
->> +		if (pdata->usb3_phy) {
->> +			dwc->usb3_phy = devm_usb_get_phy(dev,
->> +				USB_PHY_TYPE_USB3);
->> +			if (IS_ERR(dwc->usb3_phy)) {
->> +				dev_err(dev, "usb3 phy not found\n");
->> +				return PTR_ERR(dwc->usb3_phy);
->> +			}
->> +		}
->>  
->>  		dwc->needs_fifo_resize = pdata->tx_fifo_resize;
->>  		dwc->dr_mode = pdata->dr_mode;
->> @@ -409,36 +443,6 @@ static int dwc3_probe(struct platform_device *pdev)
->>  	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
->>  		dwc->maximum_speed = USB_SPEED_SUPER;
->>  
->> -	if (IS_ERR(dwc->usb2_phy)) {
->> -		ret = PTR_ERR(dwc->usb2_phy);
->> -
->> -		/*
->> -		 * if -ENXIO is returned, it means PHY layer wasn't
->> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
->> -		 * in that case, since no PHY driver will ever probe.
->> -		 */
->> -		if (ret == -ENXIO)
->> -			return ret;
->> -
->> -		dev_err(dev, "no usb2 phy configured\n");
->> -		return -EPROBE_DEFER;
->> -	}
->> -
->> -	if (IS_ERR(dwc->usb3_phy)) {
->> -		ret = PTR_ERR(dwc->usb3_phy);
->> -
->> -		/*
->> -		 * if -ENXIO is returned, it means PHY layer wasn't
->> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
->> -		 * in that case, since no PHY driver will ever probe.
->> -		 */
->> -		if (ret == -ENXIO)
->> -			return ret;
->> -
->> -		dev_err(dev, "no usb3 phy configured\n");
->> -		return -EPROBE_DEFER;
->> -	}
-> 
-> the idea for doing the error checking here was actually to avoid
-> duplicating it in all previous cases, as you did. Please keep the error
-> checking here and you're good to go.
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v2->v4:
+- a multiline string was avoided.
+---
+ .../devicetree/bindings/sound/eukrea-tlv320.txt    |   23 ++++
+ sound/soc/fsl/Kconfig                              |    5 +-
+ sound/soc/fsl/eukrea-tlv320.c                      |  125 +++++++++++++++++---
+ 3 files changed, 133 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/eukrea-tlv320.txt
 
-Ok.
-> 
->> -
->>  	dwc->xhci_resources[0].start = res->start;
->>  	dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
->>  					DWC3_XHCI_REGS_END;
->> diff --git a/drivers/usb/dwc3/platform_data.h b/drivers/usb/dwc3/platform_data.h
->> index 7db34f0..49ffa6d 100644
->> --- a/drivers/usb/dwc3/platform_data.h
->> +++ b/drivers/usb/dwc3/platform_data.h
->> @@ -24,4 +24,6 @@ struct dwc3_platform_data {
->>  	enum usb_device_speed maximum_speed;
->>  	enum usb_dr_mode dr_mode;
->>  	bool tx_fifo_resize;
->> +	bool usb2_phy;
->> +	bool usb3_phy;
-> 
-> This would look better as a quirks flag, then we could:
-> 
-> unsigned long quirks;
-> #define DWC3_QUIRK_NO_USB3_PHY	BIT(0)
-> #define DWC3_QUIRK_NO_USB2_PHY	BIT(1)
-> 
-> ...
-> 
-> if (!test_bit(DWC3_QUIRK_NO_USB3_PHY), &dwc->quirks &&
-> 	dwc->has_usb3_phy) {
-> 	grab_usb3_phy();
-> }
-
-Ok.
-
-Thanks
-Kishon
+diff --git a/Documentation/devicetree/bindings/sound/eukrea-tlv320.txt b/Documentation/devicetree/bindings/sound/eukrea-tlv320.txt
+new file mode 100644
+index 0000000..8791037
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/eukrea-tlv320.txt
+@@ -0,0 +1,23 @@
++Audio complex for Eukrea boards with tlv320aic23 codec.
++
++Required properties:
++- compatible : "eukrea,eukrea-tlv320"
++- model : The user-visible name of this sound complex.
++- ssi-controller : The phandle of the SSI controller.
++- audio-codec : The phandle of the tlv320aic23 audio codec.
++- mux-int-port : The internal port of the i.MX audio muxer (AUDMUX).
++- mux-ext-port : The external port of the i.MX audio muxer.
++
++Note: The AUDMUX port numbering should start at 1, which is consistent with
++hardware manual.
++
++Example:
++
++	sound {
++		compatible = "eukrea,eukrea-tlv320";
++		model = "imx51-eukrea-tlv320aic23";
++		ssi-controller = <&ssi2>;
++		fsl,audio-codec = <&tlv320aic23>;
++		mux-int-port = <2>;
++		mux-ext-port = <3>;
++	};
+diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+index b7ab71f..9c3cd64 100644
+--- a/sound/soc/fsl/Kconfig
++++ b/sound/soc/fsl/Kconfig
+@@ -161,12 +161,15 @@ config SND_SOC_EUKREA_TLV320
+ 	depends on MACH_EUKREA_MBIMX27_BASEBOARD \
+ 		|| MACH_EUKREA_MBIMXSD25_BASEBOARD \
+ 		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
+-		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
++		|| MACH_EUKREA_MBIMXSD51_BASEBOARD \
++		|| OF
+ 	depends on I2C
+ 	select SND_SOC_TLV320AIC23
+ 	select SND_SOC_IMX_PCM_FIQ
+ 	select SND_SOC_IMX_AUDMUX
+ 	select SND_SOC_IMX_SSI
++	select SND_SOC_FSL_SSI
++	select SND_SOC_IMX_PCM_DMA
+ 	help
+ 	  Enable I2S based access to the TLV320AIC23B codec attached
+ 	  to the SSI interface
+diff --git a/sound/soc/fsl/eukrea-tlv320.c b/sound/soc/fsl/eukrea-tlv320.c
+index 9a4a0ca..773863d 100644
+--- a/sound/soc/fsl/eukrea-tlv320.c
++++ b/sound/soc/fsl/eukrea-tlv320.c
+@@ -17,6 +17,8 @@
+ 
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
+ #include <linux/device.h>
+ #include <linux/i2c.h>
+ #include <sound/core.h>
+@@ -26,24 +28,33 @@
+ 
+ #include "../codecs/tlv320aic23.h"
+ #include "imx-ssi.h"
++#include "fsl_ssi.h"
+ #include "imx-audmux.h"
+ 
+ #define CODEC_CLOCK 12000000
+ 
++struct eukrea_tlv320 {
++	char of;
++};
++
+ static int eukrea_tlv320_hw_params(struct snd_pcm_substream *substream,
+ 			    struct snd_pcm_hw_params *params)
+ {
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct eukrea_tlv320 *priv = snd_soc_card_get_drvdata(rtd->card);
+ 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+ 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+ 	int ret;
+ 
+-	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
+-				  SND_SOC_DAIFMT_NB_NF |
+-				  SND_SOC_DAIFMT_CBM_CFM);
+-	if (ret) {
+-		pr_err("%s: failed set cpu dai format\n", __func__);
+-		return ret;
++	/* fsl_ssi lacks the set_fmt ops. */
++	if (!priv->of) {
++		ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
++					  SND_SOC_DAIFMT_NB_NF |
++					  SND_SOC_DAIFMT_CBM_CFM);
++		if (ret) {
++			pr_err("%s: failed set cpu dai format\n", __func__);
++			return ret;
++		}
+ 	}
+ 
+ 	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S |
+@@ -60,15 +71,18 @@ static int eukrea_tlv320_hw_params(struct snd_pcm_substream *substream,
+ 		pr_err("%s: failed setting codec sysclk\n", __func__);
+ 		return ret;
+ 	}
+-	snd_soc_dai_set_tdm_slot(cpu_dai, 0xffffffc, 0xffffffc, 2, 0);
+ 
+-	ret = snd_soc_dai_set_sysclk(cpu_dai, IMX_SSP_SYS_CLK, 0,
+-				SND_SOC_CLOCK_IN);
+-	if (ret) {
+-		pr_err("can't set CPU system clock IMX_SSP_SYS_CLK\n");
+-		return ret;
+-	}
++	/* fsl_ssi lacks the set_sysclk ops */
++	if (!priv->of) {
++		snd_soc_dai_set_tdm_slot(cpu_dai, 0xffffffc, 0xffffffc, 2, 0);
+ 
++		ret = snd_soc_dai_set_sysclk(cpu_dai, IMX_SSP_SYS_CLK, 0,
++					SND_SOC_CLOCK_IN);
++		if (ret) {
++			pr_err("can't set CPU system clock IMX_SSP_SYS_CLK\n");
++			return ret;
++		}
++	}
+ 	return 0;
+ }
+ 
+@@ -80,7 +94,6 @@ static struct snd_soc_dai_link eukrea_tlv320_dai = {
+ 	.name		= "tlv320aic23",
+ 	.stream_name	= "TLV320AIC23",
+ 	.codec_dai_name	= "tlv320aic23-hifi",
+-	.platform_name	= "imx-ssi.0",
+ 	.codec_name	= "tlv320aic23-codec.0-001a",
+ 	.cpu_dai_name	= "imx-ssi.0",
+ 	.ops		= &eukrea_tlv320_snd_ops,
+@@ -97,8 +110,56 @@ static int eukrea_tlv320_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+ 	int int_port = 0, ext_port;
++	struct platform_device *ssi_pdev;
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *ssi_np;
++	struct eukrea_tlv320 *priv;
++
++	priv = devm_kzalloc(&pdev->dev,
++				sizeof(struct eukrea_tlv320), GFP_KERNEL);
++	if (priv == NULL)
++		return -ENOMEM;
++
++	if (np) {
++		ssi_np = of_parse_phandle(pdev->dev.of_node,
++					  "ssi-controller", 0);
++		ssi_pdev = of_find_device_by_node(ssi_np);
++		if (!ssi_pdev) {
++			dev_err(&pdev->dev,
++				"ssi-controller missing or invalid.\n");
++			ret = -ENODEV;
++			goto err;
++		}
++
++		ret = of_property_read_u32(np, "mux-int-port", &int_port);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"mux-int-port missing or invalid\n");
++			return ret;
++		}
++		ret = of_property_read_u32(np, "mux-ext-port", &ext_port);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"mux-ext-port missing or invalid\n");
++			return ret;
++		}
++
++		/*
++		 * The port numbering in the hardware manual starts at 1, while
++		 * the audmux API expects it starts at 0.
++		 */
++		int_port--;
++		ext_port--;
++
++		eukrea_tlv320_dai.cpu_dai_name = dev_name(&ssi_pdev->dev);
++		eukrea_tlv320_dai.platform_of_node = ssi_np;
++		priv->of = 1;
++	} else {
++		eukrea_tlv320_dai.platform_name = "imx-ssi.0";
++	}
+ 
+-	if (machine_is_eukrea_cpuimx27()) {
++	if (machine_is_eukrea_cpuimx27() ||
++	    of_find_compatible_node(NULL, NULL, "fsl,imx21-audmux")) {
+ 		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
+ 			IMX_AUDMUX_V1_PCR_SYN |
+ 			IMX_AUDMUX_V1_PCR_TFSDIR |
+@@ -115,8 +176,12 @@ static int eukrea_tlv320_probe(struct platform_device *pdev)
+ 		);
+ 	} else if (machine_is_eukrea_cpuimx25sd() ||
+ 		   machine_is_eukrea_cpuimx35sd() ||
+-		   machine_is_eukrea_cpuimx51sd()) {
+-		ext_port = machine_is_eukrea_cpuimx25sd() ? 4 : 3;
++		   machine_is_eukrea_cpuimx51sd() ||
++		   of_find_compatible_node(NULL, NULL, "fsl,imx31-audmux")) {
++		if (!np)
++			ext_port = machine_is_eukrea_cpuimx25sd() ?
++				4 : 3;
++
+ 		imx_audmux_v2_configure_port(int_port,
+ 			IMX_AUDMUX_V2_PTCR_SYN |
+ 			IMX_AUDMUX_V2_PTCR_TFSDIR |
+@@ -130,14 +195,29 @@ static int eukrea_tlv320_probe(struct platform_device *pdev)
+ 			IMX_AUDMUX_V2_PDCR_RXDSEL(int_port)
+ 		);
+ 	} else {
+-		/* return happy. We might run on a totally different machine */
+-		return 0;
++		if (np) {
++			/* The eukrea,eukrea-tlv320 driver was explicitely
++			 * requested (through the device tree).
++			 */
++			dev_err(&pdev->dev,
++				"Missing audmux DT node.\n");
++			return -ENODEV;
++		} else {
++			/* Return happy.
++			 * We might run on a totally different machine.
++			 */
++			return 0;
++		}
+ 	}
+ 
+ 	eukrea_tlv320.dev = &pdev->dev;
++	snd_soc_card_set_drvdata(&eukrea_tlv320, priv);
+ 	ret = snd_soc_register_card(&eukrea_tlv320);
++err:
+ 	if (ret)
+ 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
++	if (np)
++		of_node_put(ssi_np);
+ 
+ 	return ret;
+ }
+@@ -149,10 +229,17 @@ static int eukrea_tlv320_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id imx_tlv320_dt_ids[] = {
++	{ .compatible = "eukrea,eukrea-tlv320"},
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, imx_tlv320_dt_ids);
++
+ static struct platform_driver eukrea_tlv320_driver = {
+ 	.driver = {
+ 		.name = "eukrea_tlv320",
+ 		.owner = THIS_MODULE,
++		.of_match_table = imx_tlv320_dt_ids,
+ 	},
+ 	.probe = eukrea_tlv320_probe,
+ 	.remove = eukrea_tlv320_remove,};
+-- 
+1.7.9.5
