@@ -1,97 +1,111 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 21 Oct 2013 07:21:16 -0500
-Subject: [PATCH] serial: omap: Add support for optional wake-up interrupt
-In-Reply-To: <20131018225606.GT15154@atomide.com>
-References: <20131017232820.GG15154@atomide.com> <20131018161916.GF18921@gimli>
- <20131018163740.GP15154@atomide.com>
- <20131018164535.GQ15154@atomide.com>
- <20131018225606.GT15154@atomide.com>
-Message-ID: <20131021122116.GL18921@gimli>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 21 Oct 2013 05:26:10 -0700
+Subject: [PATCH 02/11] ARM: OMAP3: clock: add API to enable/disable
+ autoidle for a single clock
+In-Reply-To: <alpine.DEB.2.02.1310191712450.11676@utopia.booyaka.com>
+References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
+ <1381508141-15244-3-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1310191712450.11676@utopia.booyaka.com>
+Message-ID: <20131021122610.11944.71616@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 03:56:07PM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [131018 09:45]:
-> > * Tony Lindgren <tony@atomide.com> [131018 09:38]:
-> > > * Felipe Balbi <balbi@ti.com> [131018 09:19]:
-> > > > > @@ -786,7 +813,10 @@ static void serial_omap_shutdown(struct uart_port *port)
-> > > > >  
-> > > > >  	pm_runtime_mark_last_busy(up->dev);
-> > > > >  	pm_runtime_put_autosuspend(up->dev);
-> > > > > -	free_irq(up->port.irq, up);
-> > > > > +
-> > > > > +	for (i = 0; i < ARRAY_SIZE(up->irqs); i++)
-> > > > > +		if (up->irqs[i])
-> > > > > +			devm_free_irq(up->port.dev, up->irqs[i], up);
-> > > > 
-> > > > do you need this at all if you're using devm_* ?
-> > > 
-> > > So it seems, startup and shutdown are managed by serial_core and
-> > > that's what at least clps711x.c serial driver is doing.
+Quoting Paul Walmsley (2013-10-19 10:16:50)
+> On Fri, 11 Oct 2013, Tero Kristo wrote:
+> 
+> > Some drivers require direct access to the autoidle functionality of the
+> > interface clocks. Added clock APIs for these, so that the drivers do not
+> > need to access CM registers directly.
 > > 
-> > And that means devm_* in this case does not really help us
-> > here..
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> 
+> Thanks, queued.  Please coordinate with Mike to get 
+> allow_idle/deny_idle-type interfaces into the Common Clock Framework, so 
+> these can be replaced with standard CCF-type allow_idle() & deny_idle() 
+> functions.  That interface should include use-counting so multiple callers 
+> can use allow_idle() and deny_idle() without stomping on each other.
+
+Where and when are these functions called? IIRC these are only accessed
+at boot/init time, though I may be wrong. If they are a boot-time thing
+then the .init callback provided in struct clk may be sufficient.
+
+Regards,
+Mike
+
+> 
+> 
+> - Paul
+> 
+> > ---
+> >  arch/arm/mach-omap2/clock.c |   38 ++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-omap2/clock.h |    2 ++
+> >  2 files changed, 40 insertions(+)
 > > 
-> > I guess we could keep the IRQ requested from probe, but
-> > there's probably a reason why it's done in startup/shutdown.
+> > diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+> > index 0c38ca9..c7c5d31 100644
+> > --- a/arch/arm/mach-omap2/clock.c
+> > +++ b/arch/arm/mach-omap2/clock.c
+> > @@ -543,6 +543,44 @@ int omap2_clk_disable_autoidle_all(void)
+> >  }
+> >  
+> >  /**
+> > + * omap2_clk_deny_idle - disable autoidle on an OMAP clock
+> > + * @clk: struct clk * to disable autoidle for
+> > + *
+> > + * Disable autoidle on an OMAP clock.
+> > + */
+> > +int omap2_clk_deny_idle(struct clk *clk)
+> > +{
+> > +     struct clk_hw_omap *c;
+> > +
+> > +     if (__clk_get_flags(clk) & CLK_IS_BASIC)
+> > +             return -EINVAL;
+> > +
+> > +     c = to_clk_hw_omap(__clk_get_hw(clk));
+> > +     if (c->ops && c->ops->deny_idle)
+> > +             c->ops->deny_idle(c);
+> > +     return 0;
+> > +}
+> > +
+> > +/**
+> > + * omap2_clk_allow_idle - enable autoidle on an OMAP clock
+> > + * @clk: struct clk * to enable autoidle for
+> > + *
+> > + * Enable autoidle on an OMAP clock.
+> > + */
+> > +int omap2_clk_allow_idle(struct clk *clk)
+> > +{
+> > +     struct clk_hw_omap *c;
+> > +
+> > +     if (__clk_get_flags(clk) & CLK_IS_BASIC)
+> > +             return -EINVAL;
+> > +
+> > +     c = to_clk_hw_omap(__clk_get_hw(clk));
+> > +     if (c->ops && c->ops->allow_idle)
+> > +             c->ops->allow_idle(c);
+> > +     return 0;
+> > +}
+> > +
+> > +/**
+> >   * omap2_clk_enable_init_clocks - prepare & enable a list of clocks
+> >   * @clk_names: ptr to an array of strings of clock names to enable
+> >   * @num_clocks: number of clock names in @clk_names
+> > diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+> > index 7aa32cd..82916cc 100644
+> > --- a/arch/arm/mach-omap2/clock.h
+> > +++ b/arch/arm/mach-omap2/clock.h
+> > @@ -411,6 +411,8 @@ void omap2_clk_dflt_find_idlest(struct clk_hw_omap *clk,
+> >  void omap2_init_clk_hw_omap_clocks(struct clk *clk);
+> >  int omap2_clk_enable_autoidle_all(void);
+> >  int omap2_clk_disable_autoidle_all(void);
+> > +int omap2_clk_allow_idle(struct clk *clk);
+> > +int omap2_clk_deny_idle(struct clk *clk);
+> >  void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
+> >  int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
+> >  void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
+> > -- 
+> > 1.7.9.5
 > > 
-> > So I'll just drop the devm_* changes for now.
-> 
-> Here's an updated simplified version. I also got rid of the
-> for loops as the wake-up interrupt is optional and it made the
-> code a bit of a pain to read.
-> 
-> Regards,
-> 
-> Tony
 > 
 > 
-> 8< ----------------------------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 16 Oct 2013 10:27:28 -0700
-> Subject: [PATCH] serial: omap: Add support for optional wake-up interrupt
-> 
-> With the recent pinctrl-single changes, omaps can treat
-> wake-up events from deeper idle states as interrupts.
-> 
-> There's a separate "io chain" controller on most omaps
-> that stays enabled when the device hits off-idle and the
-> regular interrupt controller is powered off.
-> 
-> Let's add support for the optional second interrupt for
-> wake-up events. And then serial-omap can manage the
-> wake-up interrupt from it's runtime PM calls to avoid
-> spurious interrupts during runtime.
-> 
-> Note that the wake interrupt is board specific as it
-> uses the UART RX pin, and for omap3, there are six pin
-> options for UART3 RX pin.
-> 
-> Also Note that the legacy platform based booting handles
-> the wake-ups in the legacy mux driver and does not need to
-> pass the wake-up interrupt to the driver.
-> 
-> And finally, to pass the wake-up interrupt in the dts file,
-> either interrupt-map or the pending interrupts-extended
-> property needs to be passed. It's probably best to use
-> interrupts-extended when it's available.
-> 
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-looks much nicer
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131021/8a88a95b/attachment-0001.sig>
+> - Paul
