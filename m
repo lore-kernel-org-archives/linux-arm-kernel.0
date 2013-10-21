@@ -1,273 +1,67 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 21 Oct 2013 12:24:22 +0200
-Subject: [PATCH v4] ASoC: kirkwood: add S/PDIF support
-Message-ID: <20131021122422.4cde72c0@armhf>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Oct 2013 12:24:49 +0200
+Subject: ARM topic: Is DT on ARM the solution, or is there something
+ better?
+In-Reply-To: <20131021095757.GY25034@n2100.arm.linux.org.uk>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020231134.GR25034@n2100.arm.linux.org.uk>
+ <20131021083242.GB30088@pengutronix.de>
+ <20131021084854.GV25034@n2100.arm.linux.org.uk>
+ <20131021092730.GF30088@pengutronix.de>
+ <20131021095757.GY25034@n2100.arm.linux.org.uk>
+Message-ID: <20131021102448.GD21518@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds S/PDIF input/output for mvebu DT boards.
+On Mon, Oct 21, 2013 at 10:57:57AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 21, 2013 at 11:27:30AM +0200, Sascha Hauer wrote:
+> > If you have a better vision how imx-drm can be implemented without
+> > getting crazy I'd love to hear about it. Please also think about the two
+> > IPUs the i.MX6 has, the single one on i.MX5, parallel displays, HDMI
+> > displays, LVDS displays, VGA encoder on i.MX53, external I2C slave
+> > encoders,...
+> 
+> Well, the multi-driver solution is just too fragile: the problem
+> with it is you can never be sure when all the drivers have definitely
+> finished initialising.  This problem is made much worse should one of
+> them use deferred probing.
+> 
+> To put it another way - with a multi-driver solution, there is no
+> definite point you can say "okay, we got everything".
+> 
+> So, as long as a subsystem contains something that needs to be done
+> once everything is known (such as initialising the fb_helper), there
+> is a fundamental disconnect between a multi-driver solution and the
+> subsystem.  To put it another way, a multi-driver solution should
+> not be used.
 
-Three output DAI's are created: I2S only, S/PDIF only, both I2S and
-S/PDIF.
+Multi-driver with DRM has worked pretty well for Tegra. Essentially what
+I created was a sort of abstraction layer between DRM and the individual
+drivers so that each driver can register itself with that layer. Once it
+has been determined that all drivers have been probed, that glue layer
+can load the DRM driver and call back into the sub-drivers to register
+their respective components with DRM.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-v4: declare 3 DAI's
-v3: (Mark Brown)
-- giving a name to the DAI's impacts the Openrd and HP t5325 clients
-- test i2s or spdif from the DAI's ID instead of its name
-v2: declare 2 DAI's (Mark Brown)
----
- sound/soc/kirkwood/kirkwood-i2s.c    | 119 ++++++++++++---------
- sound/soc/kirkwood/kirkwood-openrd.c |   2 +-
- sound/soc/kirkwood/kirkwood-t5325.c  |   2 +-
- 3 file changed, 72 insertions(+), 51 deletions(-)
+That even works fairly nicely with deferred probing. Note that the code
+currently in Linus' tree has some issues, but I've reworked it since in
+linux-next and the final result isn't all that bad. I've even attempted
+to make it somewhat generic so that it could potentially be reused by
+other drivers. It's not reusable as-is, but perhaps it can be further
+improved.
 
-diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-index d0504a2..c3a5a3e 100644
---- a/sound/soc/kirkwood/kirkwood-i2s.c
-+++ b/sound/soc/kirkwood/kirkwood-i2s.c
-@@ -160,9 +160,11 @@ static int kirkwood_i2s_hw_params(struct snd_pcm_substream *substream,
- 	case SNDRV_PCM_FORMAT_S16_LE:
- 		i2s_value |= KIRKWOOD_I2S_CTL_SIZE_16;
- 		ctl_play = KIRKWOOD_PLAYCTL_SIZE_16_C |
--			   KIRKWOOD_PLAYCTL_I2S_EN;
-+			   KIRKWOOD_PLAYCTL_I2S_EN |
-+			   KIRKWOOD_PLAYCTL_SPDIF_EN;
- 		ctl_rec = KIRKWOOD_RECCTL_SIZE_16_C |
--			  KIRKWOOD_RECCTL_I2S_EN;
-+			  KIRKWOOD_RECCTL_I2S_EN |
-+			  KIRKWOOD_RECCTL_SPDIF_EN;
- 		break;
- 	/*
- 	 * doesn't work... S20_3LE != kirkwood 20bit format ?
-@@ -178,9 +180,11 @@ static int kirkwood_i2s_hw_params(struct snd_pcm_substream *substream,
- 	case SNDRV_PCM_FORMAT_S24_LE:
- 		i2s_value |= KIRKWOOD_I2S_CTL_SIZE_24;
- 		ctl_play = KIRKWOOD_PLAYCTL_SIZE_24 |
--			   KIRKWOOD_PLAYCTL_I2S_EN;
-+			   KIRKWOOD_PLAYCTL_I2S_EN |
-+			   KIRKWOOD_PLAYCTL_SPDIF_EN;
- 		ctl_rec = KIRKWOOD_RECCTL_SIZE_24 |
--			  KIRKWOOD_RECCTL_I2S_EN;
-+			  KIRKWOOD_RECCTL_I2S_EN |
-+			  KIRKWOOD_RECCTL_SPDIF_EN;
- 		break;
- 	case SNDRV_PCM_FORMAT_S32_LE:
- 		i2s_value |= KIRKWOOD_I2S_CTL_SIZE_32;
-@@ -240,6 +244,11 @@ static int kirkwood_i2s_play_trigger(struct snd_pcm_substream *substream,
- 				   ctl);
- 	}
- 
-+	if (dai->id == 0)
-+		ctl &= ~KIRKWOOD_PLAYCTL_SPDIF_EN;	/* i2s only */
-+	else if (dai->id == 1)
-+		ctl &= ~KIRKWOOD_PLAYCTL_I2S_EN;	/* spdif only */
-+
- 	switch (cmd) {
- 	case SNDRV_PCM_TRIGGER_START:
- 		/* configure */
-@@ -258,7 +267,8 @@ static int kirkwood_i2s_play_trigger(struct snd_pcm_substream *substream,
- 
- 	case SNDRV_PCM_TRIGGER_STOP:
- 		/* stop audio, disable interrupts */
--		ctl |= KIRKWOOD_PLAYCTL_PAUSE | KIRKWOOD_PLAYCTL_I2S_MUTE;
-+		ctl |= KIRKWOOD_PLAYCTL_PAUSE | KIRKWOOD_PLAYCTL_I2S_MUTE |
-+				KIRKWOOD_PLAYCTL_SPDIF_MUTE;
- 		writel(ctl, priv->io + KIRKWOOD_PLAYCTL);
- 
- 		value = readl(priv->io + KIRKWOOD_INT_MASK);
-@@ -272,13 +282,15 @@ static int kirkwood_i2s_play_trigger(struct snd_pcm_substream *substream,
- 
- 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
- 	case SNDRV_PCM_TRIGGER_SUSPEND:
--		ctl |= KIRKWOOD_PLAYCTL_PAUSE | KIRKWOOD_PLAYCTL_I2S_MUTE;
-+		ctl |= KIRKWOOD_PLAYCTL_PAUSE | KIRKWOOD_PLAYCTL_I2S_MUTE |
-+				KIRKWOOD_PLAYCTL_SPDIF_MUTE;
- 		writel(ctl, priv->io + KIRKWOOD_PLAYCTL);
- 		break;
- 
- 	case SNDRV_PCM_TRIGGER_RESUME:
- 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
--		ctl &= ~(KIRKWOOD_PLAYCTL_PAUSE | KIRKWOOD_PLAYCTL_I2S_MUTE);
-+		ctl &= ~(KIRKWOOD_PLAYCTL_PAUSE | KIRKWOOD_PLAYCTL_I2S_MUTE |
-+				KIRKWOOD_PLAYCTL_SPDIF_MUTE);
- 		writel(ctl, priv->io + KIRKWOOD_PLAYCTL);
- 		break;
- 
-@@ -301,7 +313,13 @@ static int kirkwood_i2s_rec_trigger(struct snd_pcm_substream *substream,
- 	case SNDRV_PCM_TRIGGER_START:
- 		/* configure */
- 		ctl = priv->ctl_rec;
--		value = ctl & ~KIRKWOOD_RECCTL_I2S_EN;
-+		if (dai->id == 0)
-+			ctl &= ~KIRKWOOD_RECCTL_SPDIF_EN;	/* i2s only */
-+		else if (dai->id == 1)
-+			ctl &= ~KIRKWOOD_RECCTL_I2S_EN;		/* spdif only */
-+
-+		value = ctl & ~(KIRKWOOD_RECCTL_I2S_EN |
-+				KIRKWOOD_RECCTL_SPDIF_EN);
- 		writel(value, priv->io + KIRKWOOD_RECCTL);
- 
- 		/* enable interrupts */
-@@ -361,9 +379,8 @@ static int kirkwood_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
- 	return 0;
- }
- 
--static int kirkwood_i2s_probe(struct snd_soc_dai *dai)
-+static int kirkwood_i2s_init(struct kirkwood_dma_data *priv)
- {
--	struct kirkwood_dma_data *priv = snd_soc_dai_get_drvdata(dai);
- 	unsigned long value;
- 	unsigned int reg_data;
- 
-@@ -404,45 +421,46 @@ static const struct snd_soc_dai_ops kirkwood_i2s_dai_ops = {
- 	.set_fmt        = kirkwood_i2s_set_fmt,
- };
- 
-+#define DAI_DEF(name_p, id_p, rates_p) {\
-+	.name = name_p,\
-+	.id = id_p,\
-+	.playback = {\
-+		.channels_min = 1,\
-+		.channels_max = 2,\
-+		.rates = rates_p,\
-+		.formats = KIRKWOOD_I2S_FORMATS,\
-+	},\
-+	.capture = {\
-+		.channels_min = 1,\
-+		.channels_max = 2,\
-+		.rates = rates_p,\
-+		.formats = KIRKWOOD_I2S_FORMATS,\
-+	},\
-+	.ops = &kirkwood_i2s_dai_ops,\
-+}
- 
--static struct snd_soc_dai_driver kirkwood_i2s_dai = {
--	.probe = kirkwood_i2s_probe,
--	.playback = {
--		.channels_min = 1,
--		.channels_max = 2,
--		.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
--				SNDRV_PCM_RATE_96000,
--		.formats = KIRKWOOD_I2S_FORMATS,
--	},
--	.capture = {
--		.channels_min = 1,
--		.channels_max = 2,
--		.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
--				SNDRV_PCM_RATE_96000,
--		.formats = KIRKWOOD_I2S_FORMATS,
--	},
--	.ops = &kirkwood_i2s_dai_ops,
-+static struct snd_soc_dai_driver kirkwood_i2s_dai[3] = {
-+	DAI_DEF("i2s", 0,
-+		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
-+					SNDRV_PCM_RATE_96000),
-+	DAI_DEF("spdif", 1,
-+		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
-+					SNDRV_PCM_RATE_96000),
-+	DAI_DEF("i2s/spdif", 2,
-+		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
-+					SNDRV_PCM_RATE_96000),
- };
- 
--static struct snd_soc_dai_driver kirkwood_i2s_dai_extclk = {
--	.probe = kirkwood_i2s_probe,
--	.playback = {
--		.channels_min = 1,
--		.channels_max = 2,
--		.rates = SNDRV_PCM_RATE_8000_192000 |
--			 SNDRV_PCM_RATE_CONTINUOUS |
--			 SNDRV_PCM_RATE_KNOT,
--		.formats = KIRKWOOD_I2S_FORMATS,
--	},
--	.capture = {
--		.channels_min = 1,
--		.channels_max = 2,
--		.rates = SNDRV_PCM_RATE_8000_192000 |
--			 SNDRV_PCM_RATE_CONTINUOUS |
--			 SNDRV_PCM_RATE_KNOT,
--		.formats = KIRKWOOD_I2S_FORMATS,
--	},
--	.ops = &kirkwood_i2s_dai_ops,
-+static struct snd_soc_dai_driver kirkwood_i2s_dai_extclk[3] = {
-+	DAI_DEF("i2s", 0,
-+		SNDRV_PCM_RATE_8000_192000 | SNDRV_PCM_RATE_CONTINUOUS |
-+						 SNDRV_PCM_RATE_KNOT),
-+	DAI_DEF("spdif", 1,
-+		SNDRV_PCM_RATE_8000_192000 | SNDRV_PCM_RATE_CONTINUOUS |
-+						 SNDRV_PCM_RATE_KNOT),
-+	DAI_DEF("i2s/spdif", 2,
-+		SNDRV_PCM_RATE_8000_192000 | SNDRV_PCM_RATE_CONTINUOUS |
-+						 SNDRV_PCM_RATE_KNOT),
- };
- 
- static const struct snd_soc_component_driver kirkwood_i2s_component = {
-@@ -452,7 +470,7 @@ static const struct snd_soc_component_driver kirkwood_i2s_component = {
- static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- {
- 	struct kirkwood_asoc_platform_data *data = pdev->dev.platform_data;
--	struct snd_soc_dai_driver *soc_dai = &kirkwood_i2s_dai;
-+	struct snd_soc_dai_driver *soc_dai = kirkwood_i2s_dai;
- 	struct kirkwood_dma_data *priv;
- 	struct resource *mem;
- 	struct device_node *np = pdev->dev.of_node;
-@@ -506,7 +524,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 		} else {
- 			dev_info(&pdev->dev, "found external clock\n");
- 			clk_prepare_enable(priv->extclk);
--			soc_dai = &kirkwood_i2s_dai_extclk;
-+			soc_dai = kirkwood_i2s_dai_extclk;
- 		}
- 	}
- 
-@@ -524,7 +542,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 	}
- 
- 	err = snd_soc_register_component(&pdev->dev, &kirkwood_i2s_component,
--					 soc_dai, 1);
-+					 soc_dai, 3);
- 	if (err) {
- 		dev_err(&pdev->dev, "snd_soc_register_component failed\n");
- 		goto err_component;
-@@ -535,6 +553,9 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "snd_soc_register_platform failed\n");
- 		goto err_platform;
- 	}
-+
-+	kirkwood_i2s_init(priv);
-+
- 	return 0;
-  err_platform:
- 	snd_soc_unregister_component(&pdev->dev);
-diff --git a/sound/soc/kirkwood/kirkwood-openrd.c b/sound/soc/kirkwood/kirkwood-openrd.c
-index 025be0e..65f2a5b 100644
---- a/sound/soc/kirkwood/kirkwood-openrd.c
-+++ b/sound/soc/kirkwood/kirkwood-openrd.c
-@@ -52,7 +52,7 @@ static struct snd_soc_dai_link openrd_client_dai[] = {
- {
- 	.name = "CS42L51",
- 	.stream_name = "CS42L51 HiFi",
--	.cpu_dai_name = "mvebu-audio",
-+	.cpu_dai_name = "i2s",
- 	.platform_name = "mvebu-audio",
- 	.codec_dai_name = "cs42l51-hifi",
- 	.codec_name = "cs42l51-codec.0-004a",
-diff --git a/sound/soc/kirkwood/kirkwood-t5325.c b/sound/soc/kirkwood/kirkwood-t5325.c
-index 27545b0..d213832 100644
---- a/sound/soc/kirkwood/kirkwood-t5325.c
-+++ b/sound/soc/kirkwood/kirkwood-t5325.c
-@@ -68,7 +68,7 @@ static struct snd_soc_dai_link t5325_dai[] = {
- {
- 	.name = "ALC5621",
- 	.stream_name = "ALC5621 HiFi",
--	.cpu_dai_name = "mvebu-audio",
-+	.cpu_dai_name = "i2s",
- 	.platform_name = "mvebu-audio",
- 	.codec_dai_name = "alc5621-hifi",
- 	.codec_name = "alc562x-codec.0-001a",
+I agree that hotpluggability within DRM might have made things easier,
+but it would likely also have made the core more complex. Furthermore
+there simply was no need for DRM to provide that kind of flexibility,
+simple because no driver has had that need so far. Quite a few ARM SoC
+drivers have appeared lately, and hopefully that'll provide more of an
+incentive to evolve DRM as needed, but I don't think we can hold it
+against anyone that they haven't provided us with the ideal subsystem.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131021/fa70d69c/attachment.sig>
