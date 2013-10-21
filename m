@@ -1,44 +1,28 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 21 Oct 2013 23:03:22 +0400
-Subject: [PATCHv4][ 09/11] ARM: dts: imx25.dtsi: Add an alias for the
- Audio Multiplexer.
-In-Reply-To: <1382349098-11502-9-git-send-email-denis@eukrea.com>
-References: <1382349098-11502-1-git-send-email-denis@eukrea.com>
- <1382349098-11502-9-git-send-email-denis@eukrea.com>
-Message-ID: <52657A7A.2010507@cogentembedded.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 21 Oct 2013 20:57:42 +0100
+Subject: pull request for Tegra clock rework and Tegra124 clock support
+In-Reply-To: <20131021135638.GA10943@tbergstrom-lnx.Nvidia.com>
+References: <20131021135638.GA10943@tbergstrom-lnx.Nvidia.com>
+Message-ID: <52658736.6050707@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 10/21/2013 02:56 PM, Peter De Schrijver wrote:
+> Hi Mike,
+> 
+> This pull request contains both the tegra clock rework patches
+> ([PATCH v6 00/15] Introduce common infra for tegra clocks)
+> and the patches to support Tegra124 ([PATCH v4 0/7] Tegra124 clock support)
+> 
+> The following changes since commit d031acfc0b8376209e5b429513766e7028e40e1d:
+> 
+>   clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d (2013-10-16 19:49:25 +0300)
+> 
+> are available in the git repository at:
+>   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-tegra124-0
+> 
+> Joseph Lo (2):
+>       clk: tegra124: add wait_for_reset and disable_clock for tegra_cpu_car_ops
+>       clk: tegra124: add suspend/resume function for tegra_cpu_car_ops
 
-On 10/21/2013 01:51 PM, Denis Carikli wrote:
-
-    I think alias is something different, defined in the "aliases" node.
-You probably mean a label.
-
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->   arch/arm/boot/dts/imx25.dtsi |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-
-> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> index 7c0a019..800fe7f 100644
-> --- a/arch/arm/boot/dts/imx25.dtsi
-> +++ b/arch/arm/boot/dts/imx25.dtsi
-> @@ -281,7 +281,7 @@
->   				};
->   			};
->
-> -			audmux at 43fb0000 {
-> +			audmux: audmux at 43fb0000 {
-
-WBR, Sergei
+Acked-by: Stephen Warren <swarren@nvidia.com>
