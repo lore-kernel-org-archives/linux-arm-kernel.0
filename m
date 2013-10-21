@@ -1,25 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 21 Oct 2013 15:04:53 +0800
-Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
-In-Reply-To: <5264C615.4070504@mentor.com>
-References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
- <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
- <5264A06B.2040202@mentor.com>
- <20131021045917.GH17165@S2101-09.ap.freescale.net>
- <857E9EDCA6C0904DB3357321AA9123EB62506BEA@NA-MBX-01.mgc.mentorg.com>
- <5264C615.4070504@mentor.com>
-Message-ID: <20131021070451.GI17165@S2101-09.ap.freescale.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 21 Oct 2013 09:12:40 +0200
+Subject: [GIT PULL] fixes for integer rounding in timer core
+In-Reply-To: <20131014073436.GX10079@pengutronix.de>
+References: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
+ <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5253D9A1.1080106@pengutronix.de>
+ <20131008153147.GR10079@pengutronix.de>
+ <20131014073436.GX10079@pengutronix.de>
+Message-ID: <20131021071240.GI10079@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 20, 2013 at 11:13:41PM -0700, jiada wrote:
-> I tried to checkout upstream kernel at commit: f36854c
-> even without your "ARM: imx: replace imx6q_restart() with
-> mxc_restart()" patch
-> I can reproduce system hang issue by "echo b > /proc/sysrq-trigger"
+Hello,
 
-Since the patch hasn't hit upstream tree, you meant you can reproduce
-the issue on linux-next or my for-next branch?  What's the reproducing
-rate?  I ran a few iterations but did not hit it.
+[added Daniel Lezcano to To:]
 
-Shawn
+On Mon, Oct 14, 2013 at 09:34:37AM +0200, Uwe Kleine-K?nig wrote:
+> On Tue, Oct 08, 2013 at 05:31:47PM +0200, Uwe Kleine-K?nig wrote:
+> > > What's the status of this patch?
+> > I pinged Thomas about it already via irc, but I didn't get a response up
+> > to now. It would be great to get that into 3.12. To make it easy for
+> > Thomas, here is a pull request that includes the fix and converts
+> > at91rm9200 back to clockevents_config_and_register dropping one of the
+> > workarounds for the fixed bug.
+> > 
+> > The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+> > 
+> >   Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.pengutronix.de/git/ukl/linux.git tags/timer-for-tip
+> > 
+> > for you to fetch changes up to b58c4b70121070f45eefa739ecbb58d57da1c4d9:
+> > 
+> >   ARM: at91: rm9200: switch back to clockevents_config_and_register (2013-10-08 16:58:22 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > The first patch in this pull request fixes an old integer rounding bug in the
+> > timer core that was (and still is) worked around in a few arch's timer code.
+> > The second patch drops such a work around now that the core is fixed.
+> It would be nice to get that fix into 3.12, but Thomas stopped
+> responding nearly a month ago---his last mail in this thread[1] dates back
+> to September 20.
+Still no sign of life from Thomas.
+ 
+> Can one of you please take it directly?
+Daniel, would you care to take it?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
