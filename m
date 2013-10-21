@@ -1,29 +1,47 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 21 Oct 2013 19:07:11 +0200
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131021091555.GB21518@ulmo.nvidia.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <20131021091555.GB21518@ulmo.nvidia.com>
-Message-ID: <20131021170711.GA5256@netboy>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Mon, 21 Oct 2013 17:23:49 +0000
+Subject: [PATCH 2/2 v4] usb: ohci: remove ep93xx bus glue platform driver
+In-Reply-To: <20131019212213.GA5341@kroah.com>
+References: <201310171329.12434.hartleys@visionengravers.com>
+ <20131019212213.GA5341@kroah.com>
+Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817DB953A@P3PWEX4MB008.ex4.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 21, 2013 at 11:15:56AM +0200, Thierry Reding wrote:
-> 
-> Right now, we're taking away much of that flexibility and I see progress
-> on ARM actively hindered.
+On Saturday, October 19, 2013 2:22 PM, Greg KH wrote:
+> On Thu, Oct 17, 2013 at 01:29:11PM -0700, H Hartley Sweeten wrote:
+>> Convert ep93xx to use the OHCI platform driver and remove the
+>> ohci-ep93xx bus glue driver.
+>> 
+>> Enable CONFIG_OHCI_HCD_PLATFORM in the ep93xx_defconfig so that USB
+>> is still enabled by default on the EP93xx platform.
+>> 
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+>> Cc: Ryan Mallon <rmallon@gmail.com>
+>> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> ---
+>>  arch/arm/configs/ep93xx_defconfig |   1 +
+>>  arch/arm/mach-ep93xx/clock.c      |   2 +-
+>>  arch/arm/mach-ep93xx/core.c       |  38 +++++++-
+>>  drivers/usb/host/ohci-ep93xx.c    | 184 --------------------------------------
+>>  drivers/usb/host/ohci-hcd.c       |  18 ----
+>>  5 files changed, 36 insertions(+), 207 deletions(-)
+>>  delete mode 100644 drivers/usb/host/ohci-ep93xx.c
+>
+> This patch doesn't apply to my usb-next branch of usb.git at all, what
+> happened?  Did Alan's other recent changes interfere with this?
 
-Baloney.
+With the temporary linux-next shutdown it appears that I based this on
+the mainline git tree. Sorry about that.
 
-No one is taking away your flexibility or hindering progress. It is
-really very simple. Just make an arm-dt-devel tree where you can both
-change the bindings at will and recommend to people. Once bindings
-have seen some real world testing and have had time to mature, then
-request a merge into mainline.
+> Can you refresh this against my tree and resend it so that I can apply
+> it?  I've applied the 1/2 patch already.
 
-Thanks,
-Richard
+I'll try to pull usb-next today and rebase this.
+
+Regards,
+Hartley
