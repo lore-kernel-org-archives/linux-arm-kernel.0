@@ -1,122 +1,160 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 21 Oct 2013 10:35:35 +0800
-Subject: [GIT PULL 1/2] ARM: imx: soc changes for 3.13
-Message-ID: <20131021023533.GE17165@S2101-09.ap.freescale.net>
+Date: Mon, 21 Oct 2013 11:09:52 +0800
+Subject: [GIT PULL 2/2] ARM: imx: device tree changes for 3.13
+In-Reply-To: <20131021023533.GE17165@S2101-09.ap.freescale.net>
+Message-ID: <20131021030950.GG17165@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the imx/mxs soc changes I queued for 3.13.  A couple of notes:
+The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
 
-* Since mach-mxs patch volume drops a lot, I start collecting mxs
-  patches using imx branch from this cycle.  Hope it's fine.
-
-* The change set conflicts with Sebastian's .init_time cleanup series
-  quite badly.  The pull request is based on his branch [1] to solve
-  those conflicts.
-
-Shawn
-
-[1] http://www.spinics.net/lists/arm-kernel/msg276175.html
-
-The following changes since commit 6886530bab1e059a0fc5bab9813c739413d033bf:
-
-  Merge remote-tracking branch 'shesselba/clk-of-init-v2_for-3.13' into imx/soc (2013-10-21 09:10:56 +0800)
+  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 
 are available in the git repository at:
 
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-dt-3.13
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.13
+for you to fetch changes up to 5f7adc9762a33c4aa534f575532f55804ff50609:
 
-for you to fetch changes up to 9ba64fe3eb461b95bf11436a13db0d9c79465514:
-
-  ARM: imx: enable suspend for imx6sl (2013-10-21 09:39:27 +0800)
-
-----------------------------------------------------------------
-The imx/mxs soc changes for 3.13:
-
-* Low-level debug support for Vybrid
-* Support soc bus/device for imx6
-* Suspend support for imx6dl and imx6sl
-* The imx6q clock updates for PCIe and audio PLL support
-* IOMUXC GPR update for fec support
-* Some random cleanup
-* A few defconfig updates
+  ARM: imx: imx6sl iomuxc syscon is compatible to imx6q (2013-10-18 23:27:37 +0800)
 
 ----------------------------------------------------------------
-Fabio Estevam (9):
-      ARM: imx_v6_v7_defconfig: Add SPDIF support
-      ARM: imx_v6_v7_defconfig: Add CHIPIDEA_UDC support
-      ARM: mxs_defconfig: Add CHIPIDEA_UDC support
-      ARM: mach-imx: clk-imx51-imx53: Retrieve base address and irq from dt
-      ARM: mach-imx: mm-imx5: Retrieve tzic base address from dt
-      ARM: mach-imx: mm-imx5: Retrieve iomuxc base address from dt
-      ARM: mxs_defconfig: Turn off CONFIG_DEBUG_GPIO
-      ARM: imx_v6_v7_defconfig: Enable LEDS_GPIO related options
-      ARM: imx_v6_v7_defconfig: Select CONFIG_PROVE_LOCKING
+The imx/mxs device tree changes for 3.13:
 
-Fugang Duan (2):
-      ARM: imx6sl: add imx6sl iomux-gpr field define
-      ARM: imx6sl: config iomux-gpr1 to select clock for fec
+* Use macros for mxs pinctrl settings
+* New board support: VF610 Cosmic/Cosmic+, imx6q-udoo, MSR M28CU3
+* Support DSPI device for vf610
+* Add PCIe device for imx6qdl
+* Add UHS pinctrl states for imx6sl and imx6qdl
+* Display support for APF and imx51-babbage boards
+* Enable SPI NOR and USB for imx6sl-evk board
+* Enable LVDS for imx6q-sabrelite and SPDIF for imx6qdl-wandboard
+* Misc updates on boards: TX28, imx6qdl-wandboard, imx53-qsb etc.
+* Some random updates on imx51 device tree
 
-Michael Opdenacker (1):
-      ARM: imx: remove IRQF_DISABLED
+----------------------------------------------------------------
+Alexander Shiyan (3):
+      ARM: dts: i.MX51: Separate TXD/RXD and RTS/CTS pinmux entries for UARTs
+      ARM: dts: i.MX51: Add IRAM devicetree node
+      ARM: dts: i.MX51: Add W1 devicetree node
 
-Nicolin Chen (1):
-      ARM: imx6q: Add pll4_audio_div to clock tree
+Chao Fu (2):
+      ARM: dts: vf610: Add DSPI nodes
+      ARM: dts: vf610-twr: Enable DSPI0 devices and Flash at26df081a
 
-Sean Cross (2):
-      ARM: imx: Add LVDS general-purpose clocks to i.MX6Q
-      ARM: imx6q: clock and Kconfig update for PCIe support
+Dong Aisheng (2):
+      ARM: dts: imx6qdl: add uhs pinctrl state for usdhc3
+      ARM: dts: imx6sl: add pinctrl uhs states for usdhc
 
-Shawn Guo (15):
-      ARM: imx: add low-level debug for vybrid
-      ARM: imx: add soc revision helper functions
-      ARM: imx6q: use common soc revision helpers
-      ARM: imx: add a common function to initialize revision from anatop
-      ARM: imx: use imx_init_revision_from_anatop() on imx6sl
-      ARM: imx6: report soc info via soc device
-      ARM: imx: remove stale mx53_display_revision() declaration
-      ARM: imx: replace imx6q_restart() with mxc_restart()
-      ARM: imx: do not return from imx_cpu_die() call
-      ARM: imx: reset core along with enable/disable operation
-      ARM: imx: drop extern with function prototypes in common.h
-      ARM: imx6q: move low-power code out of clock driver
-      ARM: imx6q: call WB and RBC configuration from imx6q_pm_enter()
-      ARM: imx: ensure dsm_request signal is not asserted when setting LPM
-      ARM: imx: enable suspend for imx6sl
+Fabio Estevam (17):
+      ARM: dts: imx6qdl-wandboard: Add usbotg support
+      ARM: dts: imx28-evk: Allow usb peripheral mode to work
+      ARM: dts: imx53-qsb: Allow usb peripheral mode to work
+      ARM: dts: imx6q-sabrelite: Put the nodes in alphabetical order
+      ARM: dts: imx6q-sabrelite: Add LVDS support
+      ARM: imx6qdl-wandboard: Add spdif support
+      ARM: dts: imx6sl: Add spi aliases
+      ARM: dts: imx6qdl-sabresd: SDHC ports are 8 bit-wide
+      ARM: dts: imx28-evk: Enable touchscreen support
+      ARM: dts: imx6q-udoo: Add initial board support
+      ARM: dts: imx6q-sabrelite: Add ethernet phy reset pin into hog
+      ARM: dts: imx6qdl-sabresd: Provide phy-reset-gpios
+      ARM: dts: imx6qdl-wandboard: Provide phy-reset-gpios
+      ARM: dts: imx53-qsb: SDHC3 is connected in 8-bit mode
+      ARM: dts: imx53-qsb: SDHC1 does not have cd-gpios
+      ARM: dts: imx53-qsb: Do not use GPIO1_8 as wakeup source
+      ARM: dts: imx51-babbage: Make DVI and WVGA panel functional
 
-Thierry Reding (1):
-      ARM: imx: Include linux/err.h
+Fugang Duan (1):
+      ARM: dts: add iomuxc-gpr device node for imx6sl
 
- .../devicetree/bindings/clock/imx6q-clock.txt      |    5 +
- arch/arm/Kconfig.debug                             |    8 +
- arch/arm/boot/dts/imx6sl.dtsi                      |    4 +-
- arch/arm/configs/imx_v6_v7_defconfig               |   16 +-
- arch/arm/configs/mxs_defconfig                     |    7 +-
- arch/arm/include/debug/vf.S                        |   26 +++
- arch/arm/mach-imx/Kconfig                          |    5 +-
- arch/arm/mach-imx/Makefile                         |    2 +
- arch/arm/mach-imx/anatop.c                         |   33 +++-
- arch/arm/mach-imx/clk-imx51-imx53.c                |   15 +-
- arch/arm/mach-imx/clk-imx6q.c                      |  190 ++++----------------
- arch/arm/mach-imx/clk-imx6sl.c                     |    3 +
- arch/arm/mach-imx/common.h                         |  186 ++++++++++---------
- arch/arm/mach-imx/cpu.c                            |   95 +++++++++-
- arch/arm/mach-imx/epit.c                           |    2 +-
- arch/arm/mach-imx/gpc.c                            |    4 +-
- arch/arm/mach-imx/hotplug.c                        |    4 +-
- arch/arm/mach-imx/mach-armadillo5x0.c              |    3 +-
- arch/arm/mach-imx/mach-imx6q.c                     |   77 ++------
- arch/arm/mach-imx/mach-imx6sl.c                    |   33 +++-
- arch/arm/mach-imx/mach-mx31_3ds.c                  |    2 +-
- arch/arm/mach-imx/mach-pcm037.c                    |    3 +-
- arch/arm/mach-imx/mm-imx5.c                        |   19 +-
- arch/arm/mach-imx/mx31lilly-db.c                   |    3 +-
- arch/arm/mach-imx/mxc.h                            |    6 +
- arch/arm/mach-imx/pm-imx6q.c                       |  176 +++++++++++++++++-
- arch/arm/mach-imx/src.c                            |    1 +
- arch/arm/mach-imx/system.c                         |    5 +
- arch/arm/mach-imx/time.c                           |    2 +-
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |    5 +
- 30 files changed, 593 insertions(+), 347 deletions(-)
- create mode 100644 arch/arm/include/debug/vf.S
+Gwenhael Goavec-Merou (2):
+      ARM: imx51-apf51dev: Add parallel display support
+      ARM: imx27-apf27dev: Add framebuffer support
+
+Huang Shijie (2):
+      ARM: dts: imx6sl: add a pinctrl for ECSPI1
+      ARM: dts: imx6sl-evk: enable the SPI NOR
+
+Lothar Wa?mann (5):
+      ARM: dts: mxs: add pinctrl header files
+      ARM: dts: mxs: modify mx23/mx28 dts files to use pinctrl headers
+      ARM: dts: mxs: modify mx23/mx28 dts files to use padconfig defines
+      ARM: dts: tx28: restructure and update DTS file
+      ARM: dts: mxs: convert usb0_id_pins_a to use symbolic pin defs
+
+Marek Vasut (2):
+      ARM: dts: mxs: Add muxing options for the SSP2 MMC
+      ARM: dts: mxs: Add MSR M28CU3 board
+
+Matt Porter (1):
+      ARM: dts: add initial VF610 Cosmic/Cosmic+ board support
+
+Peter Chen (1):
+      ARM: imx: mx6sl-evk: Enable USB function
+
+Rogerio Pimentel (1):
+      ARM: dts: imx6qdl-sabresd: Add backlight support for lvds
+
+Sean Cross (1):
+      ARM: dts: imx6qdl: add pcie device node
+
+Shawn Guo (3):
+      ARM: dts: imx6sl reuses imx6q sdma firmware
+      ARM: dts: imx6q: add quirky select input for USB_OTG_ID
+      ARM: imx: imx6sl iomuxc syscon is compatible to imx6q
+
+Steffen Trumtrar (1):
+      ARM: imx27: add missing #pwm-cells property
+
+ .../bindings/pinctrl/fsl,mxs-pinctrl.txt           |  859 +-------------------
+ arch/arm/boot/dts/Makefile                         |    3 +
+ arch/arm/boot/dts/imx23-evk.dts                    |   16 +-
+ arch/arm/boot/dts/imx23-olinuxino.dts              |   18 +-
+ arch/arm/boot/dts/imx23-pinfunc.h                  |  333 ++++++++
+ arch/arm/boot/dts/imx23-stmp378x_devb.dts          |   12 +-
+ arch/arm/boot/dts/imx23.dtsi                       |  221 ++---
+ arch/arm/boot/dts/imx27-apf27dev.dts               |   26 +
+ arch/arm/boot/dts/imx27.dtsi                       |    1 +
+ arch/arm/boot/dts/imx28-apf28.dts                  |    2 +-
+ arch/arm/boot/dts/imx28-apf28dev.dts               |   36 +-
+ arch/arm/boot/dts/imx28-apx4devkit.dts             |   60 +-
+ arch/arm/boot/dts/imx28-cfa10036.dts               |   26 +-
+ arch/arm/boot/dts/imx28-cfa10037.dts               |   18 +-
+ arch/arm/boot/dts/imx28-cfa10049.dts               |  156 ++--
+ arch/arm/boot/dts/imx28-cfa10055.dts               |   80 +-
+ arch/arm/boot/dts/imx28-cfa10056.dts               |   38 +-
+ arch/arm/boot/dts/imx28-cfa10057.dts               |   66 +-
+ arch/arm/boot/dts/imx28-cfa10058.dts               |   24 +-
+ arch/arm/boot/dts/imx28-evk.dts                    |   59 +-
+ arch/arm/boot/dts/imx28-m28cu3.dts                 |  266 ++++++
+ arch/arm/boot/dts/imx28-m28evk.dts                 |   28 +-
+ arch/arm/boot/dts/imx28-pinfunc.h                  |  506 ++++++++++++
+ arch/arm/boot/dts/imx28-sps1.dts                   |   14 +-
+ arch/arm/boot/dts/imx28-tx28.dts                   |  703 ++++++++++++++--
+ arch/arm/boot/dts/imx28.dtsi                       |  620 +++++++-------
+ arch/arm/boot/dts/imx51-apf51dev.dts               |   27 +
+ arch/arm/boot/dts/imx51-babbage.dts                |   37 +-
+ arch/arm/boot/dts/imx51.dtsi                       |   23 +
+ arch/arm/boot/dts/imx53-qsb.dts                    |    9 +-
+ arch/arm/boot/dts/imx6q-pinfunc.h                  |    4 +-
+ arch/arm/boot/dts/imx6q-sabrelite.dts              |  104 ++-
+ arch/arm/boot/dts/imx6q-udoo.dts                   |   39 +
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |    5 +-
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   18 +
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi           |   23 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   67 ++
+ arch/arm/boot/dts/imx6sl-evk.dts                   |   67 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |  172 +++-
+ arch/arm/boot/dts/mxs-pinfunc.h                    |   31 +
+ arch/arm/boot/dts/vf610-cosmic.dts                 |   47 ++
+ arch/arm/boot/dts/vf610-twr.dts                    |   17 +
+ arch/arm/boot/dts/vf610.dtsi                       |   12 +
+ arch/arm/mach-mxs/mach-mxs.c                       |    7 +
+ 44 files changed, 3207 insertions(+), 1693 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx23-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/imx28-m28cu3.dts
+ create mode 100644 arch/arm/boot/dts/imx28-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/imx6q-udoo.dts
+ create mode 100644 arch/arm/boot/dts/mxs-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/vf610-cosmic.dts
