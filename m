@@ -1,52 +1,264 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 21 Oct 2013 22:53:23 +0200
-Subject: [GIT PULL] fixes for integer rounding in timer core
-In-Reply-To: <20131021071240.GI10079@pengutronix.de>
-References: <alpine.DEB.2.02.1309191629040.4089@ionos.tec.linutronix.de>
- <1380052223-24139-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5253D9A1.1080106@pengutronix.de> <20131008153147.GR10079@pengutronix.de>
- <20131014073436.GX10079@pengutronix.de>
- <20131021071240.GI10079@pengutronix.de>
-Message-ID: <52659443.2050203@linaro.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 21 Oct 2013 23:02:51 +0200
+Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 104 board
+Message-ID: <87txgapcas.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2013 09:12 AM, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> [added Daniel Lezcano to To:]
->
-> On Mon, Oct 14, 2013 at 09:34:37AM +0200, Uwe Kleine-K?nig wrote:
->> On Tue, Oct 08, 2013 at 05:31:47PM +0200, Uwe Kleine-K?nig wrote:
->>>> What's the status of this patch?
->>> I pinged Thomas about it already via irc, but I didn't get a response up
->>> to now. It would be great to get that into 3.12. To make it easy for
->>> Thomas, here is a pull request that includes the fix and converts
->>> at91rm9200 back to clockevents_config_and_register dropping one of the
->>> workarounds for the fixed bug.
 
-[ ... ]
+Main hardware parts of the (Armada 370 based) NETGEAR ReadyNAS 104 are
+supported by mainline kernel (USB 3.0 rear ports, USB 2.0 front port,
+Gigabit controller and PHYs, serial port, LEDs, buttons, SATA ports,
+G762 fan controller) and referenced in provided .dts file. Some additonal
+work remains for:
 
->>> ----------------------------------------------------------------
->>> The first patch in this pull request fixes an old integer rounding bug in the
->>> timer core that was (and still is) worked around in a few arch's timer code.
->>> The second patch drops such a work around now that the core is fixed.
->> It would be nice to get that fix into 3.12, but Thomas stopped
->> responding nearly a month ago---his last mail in this thread[1] dates back
->> to September 20.
-> Still no sign of life from Thomas.
->
->> Can one of you please take it directly?
-> Daniel, would you care to take it?
+ - Intersil ISL12057 I2C RTC and Alarm chip: working driver but needs
+   to be splitted for submission of RTC part first;
+ - Front LCD (Winstar 1602G): driver needs to be written
+ - Armada NAND controller (to access onboard 128MB of NAND): support
+   being pushed by @free-electrons people
+ - 4 front SATA LEDs controlled via GPIO brought by NXP PCA9554:
+   driver is available upstream. Not referenced/tested yet.
 
-Yes, sure.
+but the device is usable w/o those.
 
-   -- Daniel
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+Jason and Andrew,
 
+I do not think there is any good way to share much between RN102 and
+RN104 .dts in a common .dtsi file because MPP are used in a different
+fashion on the two boards. But if you have ideas ...
 
+I do intend to document the hardware parts and setup of the device as I
+did for the Duo v2 and RN102 but I wanted to get the patch submitted for
+inclusion in 3.13 first.
+
+Comments welcome,
+
+Cheers,
+
+a+
+
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts | 197 +++++++++++++++++++++++++
+ 2 files changed, 198 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-370-netgear-rn104.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 802720e..be682cb 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -108,6 +108,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+ 	armada-370-mirabox.dtb \
+ 	armada-370-netgear-rn102.dtb \
++	armada-370-netgear-rn104.dtb \
+ 	armada-370-rd.dtb \
+ 	armada-xp-axpwifiap.dtb \
+ 	armada-xp-db.dtb \
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+new file mode 100644
+index 0000000..e3855e8
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+@@ -0,0 +1,197 @@
++/*
++ * Device Tree file for NETGEAR ReadyNAS 104
++ *
++ * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++
++/dts-v1/;
++
++#include "armada-370.dtsi"
++
++/ {
++	model = "NETGEAR ReadyNAS 104";
++	compatible = "netgear,readynas-104", "marvell,armada370", "marvell,armada-370-xp";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x20000000>; /* 512 MB */
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
++			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
++
++		pcie-controller {
++			status = "okay";
++
++			/* Connected to FL1009 USB 3.0 controller */
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
++				status = "okay";
++			};
++
++			/* Connected to Marvell 88SE9215 SATA controller */
++			pcie at 2,0 {
++				/* Port 1, Lane 0 */
++				status = "okay";
++			};
++		};
++
++		internal-regs {
++			serial at 12000 {
++				clock-frequency = <200000000>;
++				status = "okay";
++			};
++
++			sata at a0000 {
++				status = "disabled";
++			};
++
++			pinctrl {
++				poweroff: poweroff {
++					marvell,pins = "mpp60";
++					marvell,function = "gpio";
++				};
++
++				backup_key_pin: backup-key-pin {
++					marvell,pins = "mpp52";
++					marvell,function = "gpio";
++				};
++
++				power_key_pin: power-key-pin {
++					marvell,pins = "mpp62";
++					marvell,function = "gpio";
++				};
++
++				backup_led_pin: backup-led-pin {
++					marvell,pins = "mpp63";
++					marvell,function = "gpo";
++				};
++
++				power_led_pin: power-led-pin {
++					marvell,pins = "mpp64";
++					marvell,function = "gpio";
++				};
++
++				reset_key_pin: reset-key-pin {
++					marvell,pins = "mpp65";
++					marvell,function = "gpio";
++				};
++			};
++
++			mdio {
++				phy0: ethernet-phy at 0 {
++					reg = <0>;
++				};
++
++				phy1: ethernet-phy at 1 {
++					reg = <1>;
++				};
++			};
++
++			ethernet at 70000 {
++				status = "okay";
++				phy = <&phy0>;
++				phy-mode = "rgmii-id";
++			};
++
++			ethernet at 74000 {
++				status = "okay";
++				phy = <&phy1>;
++				phy-mode = "rgmii-id";
++			};
++
++			usb at 50000 {
++				status = "okay";
++			};
++
++			i2c at 11000 {
++				compatible = "marvell,mv64xxx-i2c";
++				clock-frequency = <100000>;
++				status = "okay";
++
++				g762: g762 at 3e {
++					compatible = "gmt,g762";
++					reg = <0x3e>;
++					clocks = <&g762_clk>; /* input clock */
++					fan_gear_mode = <0>;
++					fan_startv = <1>;
++					pwm_polarity = <0>;
++				};
++			};
++		};
++	};
++
++	clocks {
++	       #address-cells = <1>;
++	       #size-cells = <0>;
++
++	       g762_clk: fixedclk {
++			 compatible = "fixed-clock";
++			 #clock-cells = <0>;
++			 clock-frequency = <8192>;
++	       };
++	};
++
++	gpio_leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&backup_led_pin &power_led_pin>;
++		pinctrl-names = "default";
++
++		blue_backup_led {
++			label = "rn104:blue:backup";
++			gpios = <&gpio1 31 1>;  /* GPIO 63 Active Low */
++			default-state = "on";
++		};
++
++		blue_power_led {
++			label = "rn104:blue:pwr";
++			gpios = <&gpio2 0 1>;   /* GPIO 64 Active Low */
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&backup_key_pin
++			     &power_key_pin
++			     &reset_key_pin>;
++		pinctrl-names = "default";
++
++		button at 1 {
++			label = "Backup Button";
++			linux,code = <133>;     /* KEY_COPY */
++			gpios = <&gpio1 20 1>;
++		};
++
++		button at 2 {
++			label = "Power Button";
++			linux,code = <116>;     /* KEY_POWER */
++			gpios = <&gpio1 30 0>;
++		};
++
++		button at 3 {
++			label = "Reset Button";
++			linux,code = <0x198>;   /* KEY_RESTART */
++			gpios = <&gpio2 1 1>;
++		};
++	};
++
++	gpio_poweroff {
++		compatible = "gpio-poweroff";
++		pinctrl-0 = <&poweroff>;
++		pinctrl-names = "default";
++		gpios = <&gpio1 28 1>;
++	};
++};
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.4.rc3
