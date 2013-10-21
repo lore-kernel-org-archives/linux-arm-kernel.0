@@ -1,49 +1,43 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 20 Oct 2013 18:17:58 -0700 (PDT)
-Subject: [PATCH] ARM: shmobile: Add r8a7790 thermal sensor DT device
-In-Reply-To: <87y56km7up.wl%kuninori.morimoto.gx@renesas.com>
-References: <20130925231119.16473.31647.sendpatchset@w520>
- <20130925233552.GA20882@verge.net.au>
- <CANqRtoRPAMDDgPo5kBTxnEoVG7N1UwxWGBuz+ORzTPqP=+7r_A@mail.gmail.com>
- <20130926002919.GB13464@verge.net.au>
- <87y56km7up.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87vc0rbewz.wl%kuninori.morimoto.gx@renesas.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 21 Oct 2013 10:52:15 +0900
+Subject: [PATCH 1/2] ARM: EXYNOS: Use dev_err() instead of printk() for cpuidle
+ driver
+Message-ID: <003601cece00$2affeba0$80ffc2e0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Change raw printk() call to dev_err() to provide a better message
+to userspace so it can properly identify the device.
 
-Hi Simon, Magnus
-
-> > > >> Hook up the single channel thermal sensor via DT
-> > > >> on r8a7790. The information used by the platform
-> > > >> device has been verified against the data sheet.
-> > > >>
-> > > >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> > > >
-> > > > Hi Magnus,
-> > > >
-> > > > I would prefer if this was split into two patches.
-> > > > An SoC patch that updates clock-r8a7790.c.
-> > > > And a DT patch which updates r8a7790.dtsi.
-> > > 
-> > > Sure, that's fine with me. I will do that from now on.
-> > 
-> > Thanks. I'm trying to reduce dependencies/conflicts between
-> > branches. I'm not sure how well it will pan out. But that is my aim
-> > at the moment.
-> > 
-> > > I believe that common clock framework will allow us to handle all
-> > > within a single dtsi patch.
-> 
-> About thermal on H2/M2 (= Gen2),
-> I am concerned about whether Gen1/Gen2 thermal chip have a compatible,
-> since H2 datasheet v0.05 <-> v0.6 seems have different register mapping,
-> and M2 is very different from Gen1.
-> Now, I'm confirming about it
-
-Sorry, It seems my mistake.
-H2 thermal seems no problem.
-
-Best regards
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 ---
-Kuninori Morimoto
+- Based against pm-cpuidle branch
+- Tested on Exynos5440
+
+ arch/arm/mach-exynos/cpuidle.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index 1bde6ad..6616e0f 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -206,7 +206,7 @@ static int __init exynos_cpuidle_probe(struct platform_device *pdev)
+ 
+ 	ret = cpuidle_register_driver(&exynos4_idle_driver);
+ 	if (ret) {
+-		printk(KERN_ERR "CPUidle failed to register driver\n");
++		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
+ 		return ret;
+ 	}
+ 
+@@ -220,7 +220,7 @@ static int __init exynos_cpuidle_probe(struct platform_device *pdev)
+ 
+ 		ret = cpuidle_register_device(device);
+ 		if (ret) {
+-			printk(KERN_ERR "CPUidle register device failed\n");
++			dev_err(&pdev->dev, "failed to register cpuidle device\n");
+ 			return ret;
+ 		}
+ 	}
+-- 
+1.7.10.4
