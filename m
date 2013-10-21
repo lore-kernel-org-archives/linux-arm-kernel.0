@@ -1,83 +1,31 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 Oct 2013 21:19:21 +0100
-Subject: ARM topic: Is DT on ARM the solution,
+Date: Mon, 21 Oct 2013 21:24:20 +0100
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution,
  or is there something better?
-In-Reply-To: <20131021085420.GA21518@ulmo.nvidia.com>
+In-Reply-To: <20131021170711.GA5256@netboy>
 References: <52644A9E.3060007@wwwdotorg.org>
- <20131021085420.GA21518@ulmo.nvidia.com>
-Message-ID: <52658C49.80400@wwwdotorg.org>
+ <20131020220839.GT2443@sirena.org.uk> <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <20131021091555.GB21518@ulmo.nvidia.com> <20131021170711.GA5256@netboy>
+Message-ID: <52658D74.3010504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2013 09:54 AM, Thierry Reding wrote:
-> On Sun, Oct 20, 2013 at 10:26:54PM +0100, Stephen Warren wrote:
-...
->> I wonder if DT is solving the problem at the right level of
->> abstraction? The kernel still needs to be aware of all the
->> nitty-gritty details of how each board is hooked up different,
->> and have explicit code to deal the union of all the different
->> board designs.
->> 
->> For example, if some boards have a SW-controlled regulator for a
->> device but others don't, the kernel still needs to have driver
->> code to actively control that regulator, /plus/ the regulator
->> subsystem needs to be able to substitute a dummy regulator if
->> it's optional or simply missing from the DT.
->> 
->> Another example: MMC drivers need to support some boards
->> detecting SD card presence or write-protect via arbitrary GPIOs,
->> and others via dedicated logic in the MMC controller.
->> 
->> In general, the kernel still needs a complete driver to every
->> last device on every strange board, and needs to support every
->> strange way some random board hooks all the devices together.
+On 10/21/2013 06:07 PM, Richard Cochran wrote:
+> On Mon, Oct 21, 2013 at 11:15:56AM +0200, Thierry Reding wrote:
+>>
+>> Right now, we're taking away much of that flexibility and I see progress
+>> on ARM actively hindered.
 > 
-> I have some difficulty understanding what you think should've been
-> moved out of the kernel. There's only so much you can put into data
-> structures and at some point you need to start writing device
-> specific code for the peripherals that you want to drive.
-
-My point was that (part of) the intent of adding DT support to the
-kernel was to get rid of all the board-specific code/churn in the
-kernel. That's not really possible, since DT is just representing the
-data about the HW (e.g. which GPIO/IRQ numbers) and not the behaviour.
-In order to really remove signifcant board-specific code from the
-kernel, you need to move behaviour out of the kernel too, i.e. hide it
-behind some kind of firmware or virtualization interface, and hence
-have simpler drivers that don't know all the details.
-
-...
->> * Would UEFI/ACPI/similar fulfill this role?
+> Baloney.
 > 
-> If I recall correctly, the original OpenFirmware that introduced
-> the DT concept used to have something similar to UEFI/ACPI.
-> Essentially it was possible to not only pass the DT to the
-> operating system but also allow the operating system to call back
-> into the firmware to request service.
+> No one is taking away your flexibility or hindering progress. It is
+> really very simple. Just make an arm-dt-devel tree where you can both
+> change the bindings at will and recommend to people. Once bindings
+> have seen some real world testing and have had time to mature, then
+> request a merge into mainline.
 
-Yes, OpenFirmware might be another possible firmware interface. I
-don't know anything about it...
-
->> * Perhaps a standard virtualization interface could fulfil this
->> role?
-...
-> What will likely happen with such a solution is that we'll have to
-> come up with a standard interface that the guest OS expects.
-
-I think much of that is already defined for a paravirt KVM guest
-though, right?
-
-...
-> Vendor kernels that implement the host OS will effectively become
-> forks of their own since there's no incentive to upstream code
-> anymore. Linux upstream becomes a single unified architecture
-> because all interfaces are now the same. Vendors are back to
-> brewing their own.
-
-True. Many/most(?) vendors work like that for most *products* though
-already...
-
-> ...
-
-(Yes, I fully acknowledge there are many issues with
-firmware/virtualization as a platform...)
+Thierry already has working patches for LCD support, and the "request
+[for] a merge into mainline" is just "send the patch to be applied to
+mainline", which he did, and was blocked on, because of the potential
+existance of CDF if the future.
