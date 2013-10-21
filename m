@@ -1,65 +1,16 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Oct 2013 10:03:27 +0200
-Subject: [Patch v2][ 08/37] video: mx3fb: Add device tree suport.
-In-Reply-To: <20131019110459.GM18477@ns203013.ovh.net>
-References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
- <1382022155-21954-9-git-send-email-denis@eukrea.com>
- <20131019110459.GM18477@ns203013.ovh.net>
-Message-ID: <20131021080327.GA30088@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Oct 2013 09:06:57 +0100
+Subject: [PATCH] ASoC: kirkwood: cleanup the external clock probe
+In-Reply-To: <20131021094613.2a07bd79@armhf>
+References: <20131021094613.2a07bd79@armhf>
+Message-ID: <20131021080657.GU25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 19, 2013 at 01:04:59PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:02 Thu 17 Oct     , Denis Carikli wrote:
-> > diff --git a/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
-> > new file mode 100644
-> > index 0000000..ae0b343
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
-> > @@ -0,0 +1,52 @@
-> > +Freescale mx3 Framebuffer
-> > +
-> > +This framebuffer driver supports the imx31 and imx35 devices.
-> > +
-> > +Required properties:
-> > +- compatible : Must be "fsl,mx3-fb".
-> > +- reg : Should contain 1 register ranges(address and length).
-> > +- dmas : Phandle to the ipu dma node as described in
-> > +	Documentation/devicetree/bindings/dma/dma.txt
-> > +- dma-names : Must be "tx".
-> > +- clocks : Phandle to the ipu source clock.
-> > +- display: Phandle to a display node as described in
-> > +	Documentation/devicetree/bindings/video/display-timing.txt
-> > +	Additional, the display node has to define properties:
-> > +	- bits-per-pixel: lcd panel bit-depth.
-> > +
-> > +Optional properties:
-> > +- ipu-disp-format: could be "rgb666", "rgb565", or "rgb888".
-> > +  If not specified defaults to "rgb666".
-> > +
-> > +Example:
-> > +
-> > +	lcdc: mx3fb at 53fc00b4 {
-> > +		compatible = "fsl,mx3-fb";
-> > +		reg = <0x53fc00b4 0x0b>;
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_lcdc_1>;
-> > +		clocks = <&clks 55>;
-> > +		dmas = <&ipu 14>;
-> > +		dma-names = "tx";
-> > +	};
+On Mon, Oct 21, 2013 at 09:46:13AM +0200, Jean-Francois Moine wrote:
+> This patch checks the return value of the clk_prepare_enable of the
+> external clock and removes the test about a same internal and external
+> clock which would quite never occur and won't work in most cases
+> it would occur.
 
-As mentioned to the v1 patch: This should really be closer to the IPUv3
-binding. IPUv1 and IPUv3 are very similar hardwares. Having two
-different bindings for it is painful.
-
-Implementing IPUv1 as a DMA driver was the wrong decision back then, now
-exposing the IPU to dt using the DMA binding makes it worse.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+NAK.  It can occur.
