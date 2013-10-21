@@ -1,47 +1,80 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Mon, 21 Oct 2013 17:23:49 +0000
-Subject: [PATCH 2/2 v4] usb: ohci: remove ep93xx bus glue platform driver
-In-Reply-To: <20131019212213.GA5341@kroah.com>
-References: <201310171329.12434.hartleys@visionengravers.com>
- <20131019212213.GA5341@kroah.com>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817DB953A@P3PWEX4MB008.ex4.secureserver.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 21 Oct 2013 14:43:40 -0300
+Subject: Armada XP Internal registers
+In-Reply-To: <CAFJTrDtznkpwi76yyEKYvjuo+XV34ky9AOe8Qfa5wm-uHDJT6A@mail.gmail.com>
+References: <CAFJTrDtznkpwi76yyEKYvjuo+XV34ky9AOe8Qfa5wm-uHDJT6A@mail.gmail.com>
+Message-ID: <20131021174339.GA27284@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, October 19, 2013 2:22 PM, Greg KH wrote:
-> On Thu, Oct 17, 2013 at 01:29:11PM -0700, H Hartley Sweeten wrote:
->> Convert ep93xx to use the OHCI platform driver and remove the
->> ohci-ep93xx bus glue driver.
->> 
->> Enable CONFIG_OHCI_HCD_PLATFORM in the ep93xx_defconfig so that USB
->> is still enabled by default on the EP93xx platform.
->> 
->> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->> Acked-by: Alan Stern <stern@rowland.harvard.edu>
->> Cc: Ryan Mallon <rmallon@gmail.com>
->> Cc: Lennert Buytenhek <kernel@wantstofly.org>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Olof Johansson <olof@lixom.net>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> ---
->>  arch/arm/configs/ep93xx_defconfig |   1 +
->>  arch/arm/mach-ep93xx/clock.c      |   2 +-
->>  arch/arm/mach-ep93xx/core.c       |  38 +++++++-
->>  drivers/usb/host/ohci-ep93xx.c    | 184 --------------------------------------
->>  drivers/usb/host/ohci-hcd.c       |  18 ----
->>  5 files changed, 36 insertions(+), 207 deletions(-)
->>  delete mode 100644 drivers/usb/host/ohci-ep93xx.c
->
-> This patch doesn't apply to my usb-next branch of usb.git at all, what
-> happened?  Did Alan's other recent changes interfere with this?
+Matthew,
 
-With the temporary linux-next shutdown it appears that I based this on
-the mainline git tree. Sorry about that.
+On Mon, Oct 21, 2013 at 03:47:43PM +0100, Matthew Minter wrote:
+> I recently had to upgrade the boot loader on my Armada XP GP board (as
+> I could not get the sources for the old version, only the binaries for
+> the SPI flash version and needed to build a bootloader to boot from
+> NAND flash).
+> 
+> After upgrading I experienced a number of problems on both the mvebu tree and
+> Ezequiel Garcia's v2 NAND develoment tree (here
+> https://github.com/MISL-EBU-System-SW/mainline-public/tree/l2-mtd/upstream-nand-v2)
+> (which otherwise runs really well, so thanks)
+> 
+> However I do not think it is the fault of either kernel. Specifically
+> it seems the new bootloader is sticking the internal registers at
+> 0xf1000000 instead of 0xd0000000. Specifically this was causing the
+> kernel to oops and then panic when trying to init the IRQ or serial
+> uart.
+> 
+> It seems that changing the armada-xp-gp device tree to read:
+>         soc {
+>                 ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>                           MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+>                           MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
+> 
+> 
+> instead of:
+>         soc {
+>                 ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+>                           MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+>                           MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
+> 
+> causes the chip to get further in boot, however at this point I found
+> another issue. The kernel was experiencing another oops (which was
+> killing either init or the idle process) due to an error "Unhandled
+> fault: external abort on non-linefetch (0x808) at 0xf0144010"
+> 
+> I again managed to get past this by not configuring the serial port on
+> the kernel command line however this has the significant drawback that
+> I do not get any messages from the kernel or my init system over
+> serial and the terminal remains blank until a getty eventually spawns.
+> This makes other boot issues hard to debug.
+> 
+> I am not completely sure if this is a boot-loader issue, a kernel
+> issue or my own misconfiguration. However I can make the chip boot so
+> it is not too urgent, just introduces annoying limitations.
+> 
+> If anyone has any ideas on this I would be very grateful, best regards,
 
-> Can you refresh this against my tree and resend it so that I can apply
-> it?  I've applied the 1/2 patch already.
+Hm.. so if you upgraded the bootloader and the internal register address
+is now 0xf100000 then it makes sense to fix your DT accordingly.
 
-I'll try to pull usb-next today and rebase this.
+First of all, I think you're safer trying some very recent upstream
+tag, such as v3.12-rc5. At least until you can pinpoint your issue
+it will be best to use that kernel.
+
+Are you enabling CONFIG_DEBUG_LL? In that case, please note there's a
+new option that will let you move to the 'new' internal regs address.
+
+Thomas and Gregory might know better, but they might be a little
+unresponsive so please bare with me as I haven't tried the new internal
+register address yet.
+
+Anyway, please double-check that option and send me the full kernel log
+(until it hangs or panics) and the also the full config.
 
 Regards,
-Hartley
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
