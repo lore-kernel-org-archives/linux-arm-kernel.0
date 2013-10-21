@@ -1,160 +1,346 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 21 Oct 2013 11:09:52 +0800
-Subject: [GIT PULL 2/2] ARM: imx: device tree changes for 3.13
-In-Reply-To: <20131021023533.GE17165@S2101-09.ap.freescale.net>
-Message-ID: <20131021030950.GG17165@S2101-09.ap.freescale.net>
+From: jiada_wang@mentor.com (jiada)
+Date: Sun, 20 Oct 2013 20:32:59 -0700
+Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
+In-Reply-To: <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
+References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
+ <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
+Message-ID: <5264A06B.2040202@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4a10c2ac2f368583138b774ca41fac4207911983:
+Hi Shawn
 
-  Linux 3.12-rc2 (2013-09-23 15:41:09 -0700)
 
-are available in the git repository at:
+> The imx6q_restart() works fine with normal reboot but will run into problem with emergency reboot like sysrq-b.  In that case, of_iomap() gets called from interrupt context and hence triggers the BUG_ON in __get_vm_area_node().
+>
+> Actually, since commit c1e31d1 (ARM: imx: create
+> mxc_arch_reset_init_dt() for DT boot), imx6q/dl should try to use
+> mxc_restart() by calling mxc_arch_reset_init_dt() beforehand, where things like of_iomap() can be done.
+>
+> The patch updates mxc_restart() a little bit to get it work for imx6q/dl and kill imx6q_restart() completely.
+>
+> Reported-by: Nathan Lynch <nathan_lynch@mentor.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>   arch/arm/mach-imx/common.h     |    4 ++++
+>   arch/arm/mach-imx/mach-imx6q.c |   35 +++--------------------------------
+>   arch/arm/mach-imx/system.c     |    5 +++++
+>   3 files changed, 12 insertions(+), 32 deletions(-)
+>
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h index 7230cf8..9ebca9e 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -130,7 +130,11 @@ static inline void imx_smp_prepare(void) {}  static inline void imx_scu_standby_enable(void) {}  #endif  extern void imx_src_init(void);
+> +#ifdef CONFIG_HAVE_IMX_SRC
+>   extern void imx_src_prepare_restart(void);
+> +#else
+> +extern inline void imx_src_prepare_restart(void) {} #endif
+>   extern void imx_gpc_init(void);
+>   extern void imx_gpc_pre_suspend(void);
+>   extern void imx_gpc_post_resume(void);
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c index 398858b..53e70f4 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -15,7 +15,6 @@
+>   #include <linux/clkdev.h>
+>   #include <linux/clocksource.h>
+>   #include <linux/cpu.h>
+> -#include <linux/delay.h>
+>   #include <linux/export.h>
+>   #include <linux/init.h>
+>   #include <linux/io.h>
+> @@ -40,36 +39,6 @@
+>   #include "cpuidle.h"
+>   #include "hardware.h"
+>
+> -static void imx6q_restart(enum reboot_mode mode, const char *cmd) -{
+> -	struct device_node *np;
+> -	void __iomem *wdog_base;
+> -
+> -	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
+> -	wdog_base = of_iomap(np, 0);
+> -	if (!wdog_base)
+> -		goto soft;
+> -
+> -	imx_src_prepare_restart();
+> -
+> -	/* enable wdog */
+> -	writew_relaxed(1 << 2, wdog_base);
+> -	/* write twice to ensure the request will not get ignored */
+> -	writew_relaxed(1 << 2, wdog_base);
+> -
+> -	/* wait for reset to assert ... */
+> -	mdelay(500);
+> -
+> -	pr_err("Watchdog reset failed to assert reset\n");
+> -
+> -	/* delay to allow the serial port to show the message */
+> -	mdelay(50);
+> -
+> -soft:
+> -	/* we'll take a jump through zero as a poor second */
+> -	soft_restart(0);
+> -}
+> -
+>   /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */  static int ksz9021rn_phy_fixup(struct phy_device *phydev)  { @@ -166,6 +135,8 @@ static void __init imx6q_init_machine(void)  {
+>   	struct device *parent;
+>
+> +	mxc_arch_reset_init_dt();
+> +
+>   	parent = imx_soc_device_init();
+>   	if (parent == NULL)
+>   		pr_warn("failed to initialize soc device\n"); @@ -293,5 +264,5 @@ DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad/DualLite (Device Tree)")
+>   	.init_machine	= imx6q_init_machine,
+>   	.init_late      = imx6q_init_late,
+>   	.dt_compat	= imx6q_dt_compat,
+> -	.restart	= imx6q_restart,
+> +	.restart	= mxc_restart,
+>   MACHINE_END
+> diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c index 80c177c..e6edcd3 100644
+> --- a/arch/arm/mach-imx/system.c
+> +++ b/arch/arm/mach-imx/system.c
+> @@ -42,6 +42,9 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)  {
+>   	unsigned int wcr_enable;
+>
+> +	if (cpu_is_imx6q() || cpu_is_imx6dl())
+> +		imx_src_prepare_restart();
+> +
+>   	if (wdog_clk)
+>   		clk_enable(wdog_clk);
+>
+> @@ -52,6 +55,8 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
+>
+>   	/* Assert SRS signal */
+>   	__raw_writew(wcr_enable, wdog_base);
+> +	/* write twice to ensure the request will not get ignored */
+> +	__raw_writew(wcr_enable, wdog_base);
+>
+>   	/* wait for reset to assert... */
+>   	mdelay(500);
+> --
+> 1.7.9.5
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-dt-3.13
+By backporting your patch to our 3.5 kernel,
+I can confirm the original issue reported by Nathan is fixed
+but with your patch, sometimes "echo b > /proc/sysrq-trigger" may cause 
+system hang.
 
-for you to fetch changes up to 5f7adc9762a33c4aa534f575532f55804ff50609:
+The successful case:
+root at mx6q:~# echo b > /proc/sysrq-trigger
 
-  ARM: imx: imx6sl iomuxc syscon is compatible to imx6q (2013-10-18 23:27:37 +0800)
+[   23.038806] SysRq : Resetting
+[   23.042081] CPU1: stopping
+[   23.044832] Backtrace:
+[   23.047361] [<800114d4>] (dump_backtrace+0x0/0x108) from [<80396fcc>] 
+(dump_stack+0x18/0x1c)
+[   23.055839]  r6:00000000 r5:00000006 r4:00000001 r3:600f0193
+[   23.061620] [<80396fb4>] (dump_stack+0x0/0x1c) from [<80012a68>] 
+(handle_IPI+0xfc/0x170)
+[   23.069759] [<8001296c>] (handle_IPI+0x0/0x170) from [<800084e0>] 
+(gic_handle_irq+0x60/0x68)
+[   23.078236]  r7:ac0a1fa4 r6:804f8500 r5:f4000100 r4:ac0a1f70
+[   23.084022] [<80008480>] (gic_handle_irq+0x0/0x68) from [<8039e000>] 
+(__irq_svc+0x40/0x70)
+[   23.092330] Exception stack(0xac0a1f70 to 0xac0a1fb8)
+[   23.097425] 1f60:                                     00000001 
+800f0093 ac0a1fa0 00000000
+[   23.105649] 1f80: ac0a0000 803a5c4c 10c0387d 80538444 1000406a 
+412fc09a 00000000 ac0a1fc4
+[   23.113869] 1fa0: ac0a1fc8 ac0a1fb8 8000e700 8000e704 600f0013 ffffffff
+[   23.120523]  r6:ffffffff r5:600f0013 r4:8000e704 r3:8000e700
+[   23.126308] [<8000e6d8>] (default_idle+0x0/0x34) from [<8000e92c>] 
+(cpu_idle+0xa8/0xf8)
+[   23.134366] [<8000e884>] (cpu_idle+0x0/0xf8) from [<80393e14>] 
+(secondary_start_kernel+0xf8/0x118)
+[   23.143364]  r5:00000001 r4:8050b490
+[   23.147028] [<80393d1c>] (secondary_start_kernel+0x0/0x118) from 
+[<10393854>] (0x10393854)
+[   23.155332]  r5:00000015 r4:3c08c06a
+[   23.158988] CPU2: stopping
+[   23.161738] Backtrace:
+[   23.164257] [<800114d4>] (dump_backtrace+0x0/0x108) from [<80396fcc>] 
+(dump_stack+0x18/0x1c)
+[   23.172735]  r6:00000000 r5:00000006 r4:00000002 r3:60000193
+[   23.178517] [<80396fb4>] (dump_stack+0x0/0x1c) from [<80012a68>] 
+(handle_IPI+0xfc/0x170)
+[   23.186655] [<8001296c>] (handle_IPI+0x0/0x170) from [<800084e0>] 
+(gic_handle_irq+0x60/0x68)
+[   23.195132]  r7:ac0a3fa4 r6:804f8500 r5:f4000100 r4:ac0a3f70
+[   23.200915] [<80008480>] (gic_handle_irq+0x0/0x68) from [<8039e000>] 
+(__irq_svc+0x40/0x70)
+[   23.209221] Exception stack(0xac0a3f70 to 0xac0a3fb8)
+[   23.214317] 3f60:                                     00000001 
+80000093 ac0a3fa0 00000000
+[   23.222541] 3f80: ac0a2000 803a5c4c 10c0387d 80538444 1000406a 
+412fc09a 00000000 ac0a3fc4
+[   23.230763] 3fa0: ac0a3fc8 ac0a3fb8 8000e700 8000e704 60000013 ffffffff
+[   23.237417]  r6:ffffffff r5:60000013 r4:8000e704 r3:8000e700
+[   23.243199] [<8000e6d8>] (default_idle+0x0/0x34) from [<8000e92c>] 
+(cpu_idle+0xa8/0xf8)
+[   23.251253] [<8000e884>] (cpu_idle+0x0/0xf8) from [<80393e14>] 
+(secondary_start_kernel+0xf8/0x118)
+[   23.260253]  r5:00000002 r4:8050b490
+[   23.263913] [<80393d1c>] (secondary_start_kernel+0x0/0x118) from 
+[<10393854>] (0x10393854)
+[   23.272218]  r5:00000015 r4:3c08c06a
+[   23.275872] CPU3: stopping
+[   23.278622] Backtrace:
+[   23.281142] [<800114d4>] (dump_backtrace+0x0/0x108) from [<80396fcc>] 
+(dump_stack+0x18/0x1c)
+[   23.289620]  r6:00000000 r5:00000006 r4:00000003 r3:600f0193
+[   23.295400] [<80396fb4>] (dump_stack+0x0/0x1c) from [<80012a68>] 
+(handle_IPI+0xfc/0x170)
+[   23.303539] [<8001296c>] (handle_IPI+0x0/0x170) from [<800084e0>] 
+(gic_handle_irq+0x60/0x68)
+[   23.312016]  r7:ac0a9fa4 r6:804f8500 r5:f4000100 r4:ac0a9f70
+[   23.317800] [<80008480>] (gic_handle_irq+0x0/0x68) from [<8039e000>] 
+(__irq_svc+0x40/0x70)
+[   23.326106] Exception stack(0xac0a9f70 to 0xac0a9fb8)
+[   23.331201] 9f60:                                     00000001 
+800f0093 ac0a9fa0 00000000
+[   23.339425] 9f80: ac0a8000 803a5c4c 10c0387d 80538444 1000406a 
+412fc09a 00000000 ac0a9fc4
+[   23.347647] 9fa0: ac0a9fc8 ac0a9fb8 8000e700 8000e704 600f0013 ffffffff
+[   23.354301]  r6:ffffffff r5:600f0013 r4:8000e704 r3:8000e700
+[   23.360084] [<8000e6d8>] (default_idle+0x0/0x34) from [<8000e92c>] 
+(cpu_idle+0xa8/0xf8)
+[   23.368137] [<8000e884>] (cpu_idle+0x0/0xf8) from [<80393e14>] 
+(secondary_start_kernel+0xf8/0x118)
+[   23.377136]  r5:00000003 r4:8050b490
+[   23.380798] [<80393d1c>] (secondary_start_kernel+0x0/0x118) from 
+[<10393854>] (0x10393854)
+[   23.389102]  r5:00000015 r4:3c08c06a
 
-----------------------------------------------------------------
-The imx/mxs device tree changes for 3.13:
+[    0.000254]
+[    0.001733] U-Boot 2012.07-00103-g171bd0a (Sep 24 2013 - 20:19:22)
+[    0.007910]
+[    0.009441] CPU:   Freescale i.MX6Q rev1.0 at 792 MHz
+[    0.014468] Reset cause: WDOG
+[    0.017412] Board: MX6Q-Sabre Lite
+[    0.020827] Board ID: 0x0000 (#0)
+[    0.024140] DRAM:  1 GiB
+[    0.037266] MMC:   FSL_SDHC: 0, FSL_SDHC: 1
+[    0.133608] In:    serial
+[    0.136144] Out:   serial
+[    0.138755] Err:   serial
+[    0.141381] Net:   FEC
+[    0.170074] Hit any key to stop autoboot:  0
+[    0.614926] MX6QSABRELITE U-Boot >
 
-* Use macros for mxs pinctrl settings
-* New board support: VF610 Cosmic/Cosmic+, imx6q-udoo, MSR M28CU3
-* Support DSPI device for vf610
-* Add PCIe device for imx6qdl
-* Add UHS pinctrl states for imx6sl and imx6qdl
-* Display support for APF and imx51-babbage boards
-* Enable SPI NOR and USB for imx6sl-evk board
-* Enable LVDS for imx6q-sabrelite and SPDIF for imx6qdl-wandboard
-* Misc updates on boards: TX28, imx6qdl-wandboard, imx53-qsb etc.
-* Some random updates on imx51 device tree
 
-----------------------------------------------------------------
-Alexander Shiyan (3):
-      ARM: dts: i.MX51: Separate TXD/RXD and RTS/CTS pinmux entries for UARTs
-      ARM: dts: i.MX51: Add IRAM devicetree node
-      ARM: dts: i.MX51: Add W1 devicetree node
+The failure case:
+root at mx6q:~# echo b > /proc/sysrq-trigger
 
-Chao Fu (2):
-      ARM: dts: vf610: Add DSPI nodes
-      ARM: dts: vf610-twr: Enable DSPI0 devices and Flash at26df081a
+[   28.509913] SysRq : Resetting
+[   28.513187] CPU1: stopping
+[   28.515937] Backtrace:
+[   28.518466] [<800114d4>] (dump_backtrace+0x0/0x108) from [<80396fcc>] 
+(dump_stack+0x18/0x1c)
+[   28.526946]  r6:00000000 r5:00000006 r4:00000001 r3:600f0193
+[   28.532723] [<80396fb4>] (dump_stack+0x0/0x1c) from [<80012a68>] 
+(handle_IPI+0xfc/0x170)
+[   28.540860] [<8001296c>] (handle_IPI+0x0/0x170) from [<800084e0>] 
+(gic_handle_irq+0x60/0x68)
+[   28.549339]  r7:ac0a1fa4 r6:804f8500 r5:f4000100 r4:ac0a1f70
+[   28.555124] [<80008480>] (gic_handle_irq+0x0/0x68) from [<8039e000>] 
+(__irq_svc+0x40/0x70)
+[   28.563430] Exception stack(0xac0a1f70 to 0xac0a1fb8)
+[   28.568526] 1f60:                                     00000001 
+800f0093 ac0a1fa0 00000000
+[   28.576749] 1f80: ac0a0000 803a5c4c 10c0387d 80538444 1000406a 
+412fc09a 00000000 ac0a1fc4
+[   28.584970] 1fa0: ac0a1fc8 ac0a1fb8 8000e700 8000e704 600f0013 ffffffff
+[   28.591624]  r6:ffffffff r5:600f0013 r4:8000e704 r3:8000e700
+[   28.597408] [<8000e6d8>] (default_idle+0x0/0x34) from [<8000e92c>] 
+(cpu_idle+0xa8/0xf8)
+[   28.605467] [<8000e884>] (cpu_idle+0x0/0xf8) from [<80393e14>] 
+(secondary_start_kernel+0xf8/0x118)
+[   28.614466]  r5:00000001 r4:8050b490
+[   28.618129] [<80393d1c>] (secondary_start_kernel+0x0/0x118) from 
+[<10393854>] (0x10393854)
+[   28.626433]  r5:00000015 r4:3c08c06a
+[   28.630089] CPU2: stopping
+[   28.632839] Backtrace:
+[   28.635358] [<800114d4>] (dump_backtrace+0x0/0x108) from [<80396fcc>] 
+(dump_stack+0x18/0x1c)
+[   28.643836]  r6:00000000 r5:00000006 r4:00000002 r3:600f0193
+[   28.649617] [<80396fb4>] (dump_stack+0x0/0x1c) from [<80012a68>] 
+(handle_IPI+0xfc/0x170)
+[   28.657755] [<8001296c>] (handle_IPI+0x0/0x170) from [<800084e0>] 
+(gic_handle_irq+0x60/0x68)
+[   28.666233]  r7:ac0a3fa4 r6:804f8500 r5:f4000100 r4:ac0a3f70
+[   28.672017] [<80008480>] (gic_handle_irq+0x0/0x68) from [<8039e000>] 
+(__irq_svc+0x40/0x70)
+[   28.680323] Exception stack(0xac0a3f70 to 0xac0a3fb8)
+[   28.685419] 3f60:                                     00000001 
+800f0093 ac0a3fa0 00000000
+[   28.693643] 3f80: ac0a2000 803a5c4c 10c0387d 80538444 1000406a 
+412fc09a 00000000 ac0a3fc4
+[   28.701865] 3fa0: ac0a3fc8 ac0a3fb8 8000e700 8000e704 600f0013 ffffffff
+[   28.708519]  r6:ffffffff r5:600f0013 r4:8000e704 r3:8000e700
+[   28.714300] [<8000e6d8>] (default_idle+0x0/0x34) from [<8000e92c>] 
+(cpu_idle+0xa8/0xf8)
+[   28.722353] [<8000e884>] (cpu_idle+0x0/0xf8) from [<80393e14>] 
+(secondary_start_kernel+0xf8/0x118)
+[   28.731352]  r5:00000002 r4:8050b490
+[   28.735013] [<80393d1c>] (secondary_start_kernel+0x0/0x118) from 
+[<10393854>] (0x10393854)
+[   28.743318]  r5:00000015 r4:3c08c06a
+[   28.746973] CPU0: stopping
+[   28.749724] Backtrace:
+[   28.752247] [<800114d4>] (dump_backtrace+0x0/0x108) from [<80396fcc>] 
+(dump_stack+0x18/0x1c)
+[   28.760725]  r6:00000000 r5:00000006 r4:00000000 r3:600f0193
+[   28.766505] [<80396fb4>] (dump_stack+0x0/0x1c) from [<80012a68>] 
+(handle_IPI+0xfc/0x170)
+[   28.774643] [<8001296c>] (handle_IPI+0x0/0x170) from [<800084e0>] 
+(gic_handle_irq+0x60/0x68)
+[   28.783120]  r7:804f1e84 r6:804f8500 r5:f4000100 r4:804f1e50
+[   28.788903] [<80008480>] (gic_handle_irq+0x0/0x68) from [<8039e000>] 
+(__irq_svc+0x40/0x70)
+[   28.797209] Exception stack(0x804f1e50 to 0x804f1e98)
+[   28.802305] 1e40:                                     80ecb440 
+804fb3b0 804f1ea8 00000000
+[   28.810529] 1e60: ac1c3400 ac6ea8c0 80ecb440 ac1c3400 00000002 
+00000000 ac1c3400 804f1ea4
+[   28.818751] 1e80: 804f1ea8 804f1e98 8004ba38 8039d5fc 600f0013 ffffffff
+[   28.825405]  r6:ffffffff r5:600f0013 r4:8039d5fc r3:8004ba38
+[   28.831191] [<8039d5d8>] (_raw_spin_unlock_irq+0x0/0x4c) from 
+[<8004ba38>] (finish_task_switch+0x58/0x130)
+[   28.840892] [<8004b9e0>] (finish_task_switch+0x0/0x130) from 
+[<8039c700>] (__schedule+0x5a4/0x714)
+[   28.849890]  r8:804ef440 r7:ac1c3400 r6:804f0000 r5:804f8fc0 r4:804ef440
+r3:ffffffff
+[   28.857915] [<8039c15c>] (__schedule+0x0/0x714) from [<8039c9fc>] 
+(schedule+0x8c/0x90)
+[   28.865880] [<8039c970>] (schedule+0x0/0x90) from [<8039ccc4>] 
+(schedule_preempt_disabled+0x18/0x24)
+[   28.875059] [<8039ccac>] (schedule_preempt_disabled+0x0/0x24) from 
+[<8000e964>] (cpu_idle+0xe0/0xf8)
+[   28.884241] [<8000e884>] (cpu_idle+0x0/0xf8) from [<803896e4>] 
+(rest_init+0x74/0x8c)
+[   28.892024]  r5:805380c0 r4:00000002
+[   28.895693] [<80389670>] (rest_init+0x0/0x8c) from [<804c3acc>] 
+(start_kernel+0x2c8/0x320)
+[   28.903998]  r4:804f8dd8 r3:60000153
+[   28.907658] [<804c3804>] (start_kernel+0x0/0x320) from [<10008044>] 
+(0x10008044)
+[   28.915094]  r8:1000406a r7:804fc214 r6:804e6ae0 r5:804f84d8 r4:10c5387d
 
-Dong Aisheng (2):
-      ARM: dts: imx6qdl: add uhs pinctrl state for usdhc3
-      ARM: dts: imx6sl: add pinctrl uhs states for usdhc
+the difference between successful "echo b > /proc/sysrq-trigger" reboot 
+and the failure one is:
+whether CPU0 is firstly stopped or not
 
-Fabio Estevam (17):
-      ARM: dts: imx6qdl-wandboard: Add usbotg support
-      ARM: dts: imx28-evk: Allow usb peripheral mode to work
-      ARM: dts: imx53-qsb: Allow usb peripheral mode to work
-      ARM: dts: imx6q-sabrelite: Put the nodes in alphabetical order
-      ARM: dts: imx6q-sabrelite: Add LVDS support
-      ARM: imx6qdl-wandboard: Add spdif support
-      ARM: dts: imx6sl: Add spi aliases
-      ARM: dts: imx6qdl-sabresd: SDHC ports are 8 bit-wide
-      ARM: dts: imx28-evk: Enable touchscreen support
-      ARM: dts: imx6q-udoo: Add initial board support
-      ARM: dts: imx6q-sabrelite: Add ethernet phy reset pin into hog
-      ARM: dts: imx6qdl-sabresd: Provide phy-reset-gpios
-      ARM: dts: imx6qdl-wandboard: Provide phy-reset-gpios
-      ARM: dts: imx53-qsb: SDHC3 is connected in 8-bit mode
-      ARM: dts: imx53-qsb: SDHC1 does not have cd-gpios
-      ARM: dts: imx53-qsb: Do not use GPIO1_8 as wakeup source
-      ARM: dts: imx51-babbage: Make DVI and WVGA panel functional
+Do you have any idea?
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-Fugang Duan (1):
-      ARM: dts: add iomuxc-gpr device node for imx6sl
 
-Gwenhael Goavec-Merou (2):
-      ARM: imx51-apf51dev: Add parallel display support
-      ARM: imx27-apf27dev: Add framebuffer support
-
-Huang Shijie (2):
-      ARM: dts: imx6sl: add a pinctrl for ECSPI1
-      ARM: dts: imx6sl-evk: enable the SPI NOR
-
-Lothar Wa?mann (5):
-      ARM: dts: mxs: add pinctrl header files
-      ARM: dts: mxs: modify mx23/mx28 dts files to use pinctrl headers
-      ARM: dts: mxs: modify mx23/mx28 dts files to use padconfig defines
-      ARM: dts: tx28: restructure and update DTS file
-      ARM: dts: mxs: convert usb0_id_pins_a to use symbolic pin defs
-
-Marek Vasut (2):
-      ARM: dts: mxs: Add muxing options for the SSP2 MMC
-      ARM: dts: mxs: Add MSR M28CU3 board
-
-Matt Porter (1):
-      ARM: dts: add initial VF610 Cosmic/Cosmic+ board support
-
-Peter Chen (1):
-      ARM: imx: mx6sl-evk: Enable USB function
-
-Rogerio Pimentel (1):
-      ARM: dts: imx6qdl-sabresd: Add backlight support for lvds
-
-Sean Cross (1):
-      ARM: dts: imx6qdl: add pcie device node
-
-Shawn Guo (3):
-      ARM: dts: imx6sl reuses imx6q sdma firmware
-      ARM: dts: imx6q: add quirky select input for USB_OTG_ID
-      ARM: imx: imx6sl iomuxc syscon is compatible to imx6q
-
-Steffen Trumtrar (1):
-      ARM: imx27: add missing #pwm-cells property
-
- .../bindings/pinctrl/fsl,mxs-pinctrl.txt           |  859 +-------------------
- arch/arm/boot/dts/Makefile                         |    3 +
- arch/arm/boot/dts/imx23-evk.dts                    |   16 +-
- arch/arm/boot/dts/imx23-olinuxino.dts              |   18 +-
- arch/arm/boot/dts/imx23-pinfunc.h                  |  333 ++++++++
- arch/arm/boot/dts/imx23-stmp378x_devb.dts          |   12 +-
- arch/arm/boot/dts/imx23.dtsi                       |  221 ++---
- arch/arm/boot/dts/imx27-apf27dev.dts               |   26 +
- arch/arm/boot/dts/imx27.dtsi                       |    1 +
- arch/arm/boot/dts/imx28-apf28.dts                  |    2 +-
- arch/arm/boot/dts/imx28-apf28dev.dts               |   36 +-
- arch/arm/boot/dts/imx28-apx4devkit.dts             |   60 +-
- arch/arm/boot/dts/imx28-cfa10036.dts               |   26 +-
- arch/arm/boot/dts/imx28-cfa10037.dts               |   18 +-
- arch/arm/boot/dts/imx28-cfa10049.dts               |  156 ++--
- arch/arm/boot/dts/imx28-cfa10055.dts               |   80 +-
- arch/arm/boot/dts/imx28-cfa10056.dts               |   38 +-
- arch/arm/boot/dts/imx28-cfa10057.dts               |   66 +-
- arch/arm/boot/dts/imx28-cfa10058.dts               |   24 +-
- arch/arm/boot/dts/imx28-evk.dts                    |   59 +-
- arch/arm/boot/dts/imx28-m28cu3.dts                 |  266 ++++++
- arch/arm/boot/dts/imx28-m28evk.dts                 |   28 +-
- arch/arm/boot/dts/imx28-pinfunc.h                  |  506 ++++++++++++
- arch/arm/boot/dts/imx28-sps1.dts                   |   14 +-
- arch/arm/boot/dts/imx28-tx28.dts                   |  703 ++++++++++++++--
- arch/arm/boot/dts/imx28.dtsi                       |  620 +++++++-------
- arch/arm/boot/dts/imx51-apf51dev.dts               |   27 +
- arch/arm/boot/dts/imx51-babbage.dts                |   37 +-
- arch/arm/boot/dts/imx51.dtsi                       |   23 +
- arch/arm/boot/dts/imx53-qsb.dts                    |    9 +-
- arch/arm/boot/dts/imx6q-pinfunc.h                  |    4 +-
- arch/arm/boot/dts/imx6q-sabrelite.dts              |  104 ++-
- arch/arm/boot/dts/imx6q-udoo.dts                   |   39 +
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |    5 +-
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   18 +
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi           |   23 +
- arch/arm/boot/dts/imx6qdl.dtsi                     |   67 ++
- arch/arm/boot/dts/imx6sl-evk.dts                   |   67 +-
- arch/arm/boot/dts/imx6sl.dtsi                      |  172 +++-
- arch/arm/boot/dts/mxs-pinfunc.h                    |   31 +
- arch/arm/boot/dts/vf610-cosmic.dts                 |   47 ++
- arch/arm/boot/dts/vf610-twr.dts                    |   17 +
- arch/arm/boot/dts/vf610.dtsi                       |   12 +
- arch/arm/mach-mxs/mach-mxs.c                       |    7 +
- 44 files changed, 3207 insertions(+), 1693 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx23-pinfunc.h
- create mode 100644 arch/arm/boot/dts/imx28-m28cu3.dts
- create mode 100644 arch/arm/boot/dts/imx28-pinfunc.h
- create mode 100644 arch/arm/boot/dts/imx6q-udoo.dts
- create mode 100644 arch/arm/boot/dts/mxs-pinfunc.h
- create mode 100644 arch/arm/boot/dts/vf610-cosmic.dts
+Thanks,
+Jiada
