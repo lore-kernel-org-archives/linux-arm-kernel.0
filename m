@@ -1,61 +1,33 @@
-From: matthew_minter@xyratex.com (Matthew Minter)
-Date: Mon, 21 Oct 2013 15:47:43 +0100
-Subject: Armada XP Internal registers
-Message-ID: <CAFJTrDtznkpwi76yyEKYvjuo+XV34ky9AOe8Qfa5wm-uHDJT6A@mail.gmail.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Mon, 21 Oct 2013 09:49:28 -0500
+Subject: [PATCH] imx6q: fix emergency restart
+In-Reply-To: <20131020232217.GS25034@n2100.arm.linux.org.uk>
+References: <1380832337-4637-1-git-send-email-nathan_lynch@mentor.com>
+ <20131020232217.GS25034@n2100.arm.linux.org.uk>
+Message-ID: <52653EF8.8030902@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I recently had to upgrade the boot loader on my Armada XP GP board (as
-I could not get the sources for the old version, only the binaries for
-the SPI flash version and needed to build a bootloader to boot from
-NAND flash).
+On 10/20/2013 06:22 PM, Russell King - ARM Linux wrote:
+> On Thu, Oct 03, 2013 at 03:32:17PM -0500, Nathan Lynch wrote:
+>> @@ -192,8 +188,15 @@ static void __init imx6q_1588_init(void)
+>>  
+>>  static void __init imx6q_init_machine(void)
+>>  {
+>> +	struct device_node *np;
+>> +
+>>  	imx6q_enet_phy_init();
+>>  
+>> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
+>> +	if (np)
+>> +		wdog_base = of_iomap(np, 0);
+>> +	pr_info("%s: wdog_base = %p\n", __func__, wdog_base);
+> 
+> I don't know whether this has been applied yet, but please don't add
+> to the kernel messages unnecessarily; there's already enough of them
+> and unless it provides something which is useful, it doesn't deserve
+> to be at "info" level.  If you want it to report it for debugging,
+> then please use the debugging level.
 
-After upgrading I experienced a number of problems on both the mvebu tree and
-Ezequiel Garcia's v2 NAND develoment tree (here
-https://github.com/MISL-EBU-System-SW/mainline-public/tree/l2-mtd/upstream-nand-v2)
-(which otherwise runs really well, so thanks)
-
-However I do not think it is the fault of either kernel. Specifically
-it seems the new bootloader is sticking the internal registers at
-0xf1000000 instead of 0xd0000000. Specifically this was causing the
-kernel to oops and then panic when trying to init the IRQ or serial
-uart.
-
-It seems that changing the armada-xp-gp device tree to read:
-        soc {
-                ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
-                          MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-                          MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
-
-
-instead of:
-        soc {
-                ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
-                          MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-                          MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
-
-causes the chip to get further in boot, however at this point I found
-another issue. The kernel was experiencing another oops (which was
-killing either init or the idle process) due to an error "Unhandled
-fault: external abort on non-linefetch (0x808) at 0xf0144010"
-
-I again managed to get past this by not configuring the serial port on
-the kernel command line however this has the significant drawback that
-I do not get any messages from the kernel or my init system over
-serial and the terminal remains blank until a getty eventually spawns.
-This makes other boot issues hard to debug.
-
-I am not completely sure if this is a boot-loader issue, a kernel
-issue or my own misconfiguration. However I can make the chip boot so
-it is not too urgent, just introduces annoying limitations.
-
-If anyone has any ideas on this I would be very grateful, best regards,
-Matthew
-
--- 
-
-
-------------------------------
-For additional information including the registered office and the treatment of Xyratex confidential information please visit www.xyratex.com
-
-------------------------------
+Yeah, sorry, it was just debug cruft I didn't intend to include in the
+final patch.  Sloppy :(
