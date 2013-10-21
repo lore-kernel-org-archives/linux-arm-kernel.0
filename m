@@ -1,80 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 21 Oct 2013 16:40:15 -0400 (EDT)
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution,
- or is there something better?
-In-Reply-To: <52658EBC.8020800@wwwdotorg.org>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131020220839.GT2443@sirena.org.uk> <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
-Message-ID: <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Mon, 21 Oct 2013 20:41:00 +0000
+Subject: [PATCH 2/2 v4] usb: ohci: remove ep93xx bus glue platform driver
+In-Reply-To: <20131019212213.GA5341@kroah.com>
+References: <201310171329.12434.hartleys@visionengravers.com>
+ <20131019212213.GA5341@kroah.com>
+Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817DB9D93@P3PWEX4MB008.ex4.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Oct 2013, Stephen Warren wrote:
+On Saturday, October 19, 2013 2:22 PM, Greg KH wrote:
+> On Thu, Oct 17, 2013 at 01:29:11PM -0700, H Hartley Sweeten wrote:
+>> Convert ep93xx to use the OHCI platform driver and remove the
+>> ohci-ep93xx bus glue driver.
+>> 
+>> Enable CONFIG_OHCI_HCD_PLATFORM in the ep93xx_defconfig so that USB
+>> is still enabled by default on the EP93xx platform.
+>> 
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-> On 10/21/2013 02:00 AM, Nicolas Pitre wrote:
-> ...
-> > The idea of some firmware to abstract hardware differences in order to 
-> > greatly simplify kernel development and maintenance comes up with some 
-> > regularity.  In other words, you are far from being the first one to 
-> > suggest that.
-> > 
-> > However this needs some reality check.
-> > 
-> > Every hardware system has its share of complexity that the software has 
-> > to deal with.
-> > 
-> > If that complexity is not in the kernel, it has to be in the firmware.  
-> > Given we already struggles to have proper and bug free hardware support 
-> > in the kernel today, even with all the debugging aid and peer review 
-> > available from the kernel community, I really don't see how you'd manage 
-> > to make it any less complex in some firmware implementation.
-> 
-> True. Hiding all the HW details sucks in some ways.
-> 
-> So, if we have chosen not to do that, and instead have the kernel know
-> all the details of the HW, then why not simply do that? What do we get
-> from DT that we don't get from board files? The driver complexity still
-> all needs to be present in the kernel.
+[snip]
 
-Driver complexity: obviously.
+> This patch doesn't apply to my usb-next branch of usb.git at all, what
+> happened?  Did Alan's other recent changes interfere with this?
+>
+> Can you refresh this against my tree and resend it so that I can apply
+> it?  I've applied the 1/2 patch already.
 
-DT is only meant to abstract away the configuration part.
+Greg,
 
-> The only thing we can move out is some of the board-specific
-> parameterization data. That might reduce the code-size of kernel board
-> files a bit (or rather, eliminate them),
+I just refreshed this patch against usb-next and sent it as v5.
 
-That is effectively the point of DT.
-
-> but taking the big picture into
-> account, observe that we make life a lot more difficult for distros,
-> since they need to get the device tree from somewhere. Distros now are
-> forced to work out which DTB goes with which board,
-
-This is not a new problem.  Before you had to figure out which kernel 
-would go with which board.
-
-> or perhaps we need
-> to define a firmware interface to obtain the DTB and pass it to the
-> kernel.
-
-That's the bootloader's job.  Nothing magical actually: just have U-Boot 
-or whatever load the DTB from some flash area.
-
-> It'd be a lot simpler just to embed the data into the kernel.
-
-For one target, this is indeed the simplest way.
-
-> I
-> think we can still have a hack-free, churn-free, multi-platform kernel
-> without requiring DT, but by using board files.
-
-I kinda agree with you, but this is too late for that now.
-
-We have DT, and the best way forward is to fix the process which is, 
-arguably, somewhat obstructive and broken at the moment.
-
-
-Nicolas
+Thanks,
+Hartley
