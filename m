@@ -1,34 +1,65 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Mon, 21 Oct 2013 20:41:00 +0000
-Subject: [PATCH 2/2 v4] usb: ohci: remove ep93xx bus glue platform driver
-In-Reply-To: <20131019212213.GA5341@kroah.com>
-References: <201310171329.12434.hartleys@visionengravers.com>
- <20131019212213.GA5341@kroah.com>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D8817DB9D93@P3PWEX4MB008.ex4.secureserver.net>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 21 Oct 2013 22:42:42 +0200
+Subject: [PATCH] ARM: make mach-xyz/Makefile.boot optional for
+ !ARCH_MULTIPLATFORM
+Message-ID: <1382388162-27185-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, October 19, 2013 2:22 PM, Greg KH wrote:
-> On Thu, Oct 17, 2013 at 01:29:11PM -0700, H Hartley Sweeten wrote:
->> Convert ep93xx to use the OHCI platform driver and remove the
->> ohci-ep93xx bus glue driver.
->> 
->> Enable CONFIG_OHCI_HCD_PLATFORM in the ep93xx_defconfig so that USB
->> is still enabled by default on the EP93xx platform.
->> 
->> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Makefile.boot is supposed to define zreladdr-y, params_phys-y and
+initrd_phys-y. The first one is only needed in the absence of AUTO_ZRELADDR
+and when building a zImage. The latters are only needed for bootp stuff.
+So ignore errors on including Makefile.boot and error out in the targets
+that need the corresponding settings.
 
-[snip]
+This makes it unnecessary to create dummy Makefile.boot files.
 
-> This patch doesn't apply to my usb-next branch of usb.git at all, what
-> happened?  Did Alan's other recent changes interfere with this?
->
-> Can you refresh this against my tree and resend it so that I can apply
-> it?  I've applied the 1/2 patch already.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/boot/Makefile | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-Greg,
-
-I just refreshed this patch against usb-next and sent it as v5.
-
-Thanks,
-Hartley
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index 84aa2ca..44203b3 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -12,7 +12,7 @@
+ #
+ 
+ ifneq ($(MACHINE),)
+-include $(srctree)/$(MACHINE)/Makefile.boot
++sinclude $(srctree)/$(MACHINE)/Makefile.boot
+ endif
+ 
+ # Note: the following conditions must always be true:
+@@ -51,10 +51,19 @@ $(obj)/Image: vmlinux FORCE
+ $(obj)/compressed/vmlinux: $(obj)/Image FORCE
+ 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
+ 
++ifneq ($(CONFIG_AUTO_ZRELADDR)$(ZRELADDR),)
++
+ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
+ 	$(call if_changed,objcopy)
+ 	@$(kecho) '  Kernel: $@ is ready'
+ 
++else
++
++$(obj)/zImage: FORCE
++	@echo 'Either enable CONFIG_AUTO_ZRELADDR or provide zreladdr-y in Makefile.boot'
++	@false
++
++endif
+ endif
+ 
+ ifneq ($(LOADADDR),)
+@@ -81,6 +90,8 @@ $(obj)/uImage:	$(obj)/zImage FORCE
+ 	@$(kecho) '  Image $@ is ready'
+ 
+ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
++	@test -n "$(PARAMS_PHYS)" || \
++	(echo This machine does not support BOOTP; exit -1)
+ 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
+ 	@:
+ 
+-- 
+1.8.4.rc3
