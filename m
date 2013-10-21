@@ -1,37 +1,102 @@
-From: jiada_wang@mentor.com (jiada)
-Date: Sun, 20 Oct 2013 23:13:41 -0700
-Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
-In-Reply-To: <857E9EDCA6C0904DB3357321AA9123EB62506BEA@NA-MBX-01.mgc.mentorg.com>
-References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
- <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
- <5264A06B.2040202@mentor.com>
- <20131021045917.GH17165@S2101-09.ap.freescale.net>
- <857E9EDCA6C0904DB3357321AA9123EB62506BEA@NA-MBX-01.mgc.mentorg.com>
-Message-ID: <5264C615.4070504@mentor.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Mon, 21 Oct 2013 06:33:35 +0000
+Subject: [PATCH 5/6] PCI: imx6: Force Gen1 operation
+In-Reply-To: <201310190707.15783.marex@denx.de>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+ <201310171934.34021.marex@denx.de>
+ <0E83723C55F66F43A6041464FE31119D40FB22@039-SN2MPN1-011.039d.mgd.msft.net>
+ <201310190707.15783.marex@denx.de>
+Message-ID: <0E83723C55F66F43A6041464FE31119D41096D@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn
+Hi Merak:
+> Hi Richard,
+> 
+> > Hi Merak:
+> > Thanks for your great help on the imx6 pcie switch support on the
+> > latest kernel fristly.
+> 
+> Let's get this PCIe thing working well :)
+> 
+> [...]
+> 
+> 
+> > Regarding to your comments why FORCE GEN1 mode in RC " Force Gen1
+> > operation. In case the IP block is in Gen2 operation mode, it does not
+> > detect the PCIe switch at all.", does the gen2 link can be set-up
+> > without force gen1 mode?
+> 
+> What I did in the end for testing purpose was I followed the thread at FSL
+> community in the link above, forced the link into Gen1 mode , then waited for
+> link up, then started directed gen2 switch and waited for linkup again. This
+> worked and the PCIe indicated the link is in Gen2 mode.
+> 
+> Interestingly enough, I also implemented PCIe driver for MX6 for U-Boot (will
+> submit it shortly to U-Boot ML) and use it with the Intel i210 ethernet NIC
+> now.
+> When I use the PCIe in U-Boot, I don't need the Force-Gen1 thing above. I
+> suspect though, that the Gen1 setting is preserved from U-Boot, where I have
+> this as well.
+> 
+[Richard] It's great, thanks.
+> > About the errata mentioned in
+> > https://community.freescale.com/thread/304284, the
+> > errata-SW-workaround of initialization is contained in previous Sean Cross'
+> codes, like this. /*
+> >          * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
+> >          * Wait 2ms (LTSSM timeout is 24ms, PHY lock is ~5us in gen2).
+> >          * If (MAC/LTSSM.state == Recovery.RcvrLock)
+> >          * && (PHY/rx_valid==0) then pulse PHY/rx_reset. Transition
+> >          * to gen2 is stuck
+> >          */
+> 
+> Is this not handling only the PHY part ? Honestly, I'm quite lost in the
+> flurry of different opinions on the MX6 PCIe. Maybe you as a FSL guy could
+> scrounge some internal knowledge ?
+> 
+[Richard] Take it easy, maybe there is a misunderstand between you and me.
+It is handling only the PHY part.
+The errata "PCIe: Clock pointers can lose sync during clock rate changes",
+ I mentioned previously is discussed in 
+(https://community.freescale.com/message/316162#316162) too.
 
-On 10/20/2013 10:53 PM, Wang, Jiada (ESD) wrote:
-> On Sun, Oct 20, 2013 at 08:32:59PM -0700, jiada wrote:
->> the difference between successful "echo b > /proc/sysrq-trigger"
->> reboot and the failure one is:
->> whether CPU0 is firstly stopped or not
->
-> Do you have commit a985941 (kernel/sys.c: call disable_nonboot_cpus() in
-> kernel_restart()) on your 3.5 kernel.  The commit can be found on 3.5.7 kernel.
->
-> Shawn
->
-currently my kernel/sys.c is at
-f36854c: reboot: rigrate shutdown/reboot to boot cpu
-which means I have your commit: a985941
+Charies Powe think that the SW workaround contained in FSL BSP is not complete for the errata.
+Because I couldn't reproduce this issue at my side, the complete version of the SW workaround
+of this errata is not included in the BSP yet.
+That's all. Thanks.
 
-I tried to checkout upstream kernel at commit: f36854c
-even without your "ARM: imx: replace imx6q_restart() with mxc_restart()" 
-patch
-I can reproduce system hang issue by "echo b > /proc/sysrq-trigger"
+> > > > > > So better solution should be to initialize RC by default at
+> > > > > > GEN2 or highest speed. Further, a parameter say gen_only can
+> > > > > > be passed from DT to force GEN1 only mode.
+> > > > > >
+> > > > > > What do you say?
+> > > > >
+> > > > > I say I'd like to know the root cause of this problem. This Gen2
+> > > > > fix was pulled from one of the myriad variants of the FSL PCIe
+> > > > > driver, so apparently this issue happens to other people as
+> > > > > well. But why and how to properly fix this so the whole PCIe bus
+> > > > > does operate in
+> > > > > Gen2 mode, I cannot tell :-(
+> > > >
+> > > > [Richard] GEN2 mode had been verified in FSL 3.0.35 kernel
+> > > > releases before. I don't know why it can't work in GEN2 mode in
+> > > > the latest kernel. BTW, Based on for-next branch of shawn's git
+> > > > reops and applied Merak's patch-set, my PI7C9X2G303EL with intel
+> > > > e1000e network card plugged can't be detected at all. :(.
+> > >
+> > > I think we're still fighting some issue with resource mappings here.
+> > > We also agreed with Tim that my patches are incomplete. I will send
+> > > out a new version ASAP.
+> >
+> > [Richard] What's I said above is just curious that I encounter
+> > different phenomena at my side With the almost same codes.
+> 
+> I talked to Tim about the mappings some more. It seems if the IOspace is
+> disabled, everything works without hangs. If the IOspace is not disabled on
+> the ethernet NICs, we get a hang.
+[Richard] Ok, I see. Thanks.
 
-Thanks,
-Jiada
+
+Best Regards
+Richard.
