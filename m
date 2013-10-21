@@ -1,56 +1,99 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 21 Oct 2013 10:11:17 +0200
-Subject: [PATCHv1 5/8] ASoC: sgtl5000: Revise the bugs about the
- sgt15000 codec.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F82866756@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-6-git-send-email-Li.Xiubo@freescale.com>
- <20131017121721.43e1b34b@ipc1.ka-ro>
- <1DD289F6464F0949A2FCA5AA6DC23F82866756@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20131021101117.5c0c71aa@ipc1.ka-ro>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 21 Oct 2013 08:13:07 +0100
+Subject: [PATCH RFC 1/4] net: mvmdio: make orion_mdio_wait_ready consistent
+In-Reply-To: <3acbec7a5077d1375777e26cd808b787eb677fb3.1382199042.git.leigh@solinno.co.uk>
+References: <cover.1382199042.git.leigh@solinno.co.uk>
+ <3acbec7a5077d1375777e26cd808b787eb677fb3.1382199042.git.leigh@solinno.co.uk>
+Message-ID: <5264D403.1090606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/19/2013 05:23 PM, Leigh Brown wrote:
+> Amend orion_mdio_wait_ready so that the same timeout is used when
+> polling or using wait_event_timeout.  Set the timeout to 10ms.
+>
+> Generate the same log message at timeout when polling or using
+> wait_event_timeout.
+>
+> Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+> ---
+>   drivers/net/ethernet/marvell/mvmdio.c |   41 ++++++++++++++++++---------------
+>   1 file changed, 22 insertions(+), 19 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+> index e2f6626..11e6415 100644
+> --- a/drivers/net/ethernet/marvell/mvmdio.c
+> +++ b/drivers/net/ethernet/marvell/mvmdio.c
+> @@ -44,6 +44,13 @@
+>   #define  MVMDIO_ERR_INT_SMI_DONE	   0x00000010
+>   #define MVMDIO_ERR_INT_MASK		   0x0080
+>
+> +/*
+> + * Testing on a Dreamplug showed that the SMI interface took an average of
+> + * 3.2ms to respond, with a maximum time of 4.9ms.
+> + */
+> +#define MVMDIO_SMI_TIMEOUT		   10000 /* 10000us = 10ms */
+> +#define MVMDIO_SMI_POLL_INTERVAL	   10
+> +
+>   struct orion_mdio_dev {
+>   	struct mutex lock;
+>   	void __iomem *regs;
+> @@ -70,32 +77,28 @@ static int orion_mdio_wait_ready(struct mii_bus *bus)
+>   	struct orion_mdio_dev *dev = bus->priv;
+>   	int count;
+>
+> -	if (dev->err_interrupt <= 0) {
+> -		count = 0;
+> -		while (1) {
+> +	if (dev->err_interrupt <= 0)
+> +		for (count = MVMDIO_SMI_TIMEOUT / MVMDIO_SMI_POLL_INTERVAL;
+> +		     count > 0;
+> +		     --count) {
+>   			if (orion_mdio_smi_is_done(dev))
+> -				break;
+> -
+> -			if (count > 100) {
+> -				dev_err(bus->parent,
+> -					"Timeout: SMI busy for too long\n");
+> -				return -ETIMEDOUT;
+> -			}
+> +				return 0;
+>
+> -			udelay(10);
+> -			count++;
+> +			udelay(MVMDIO_SMI_POLL_INTERVAL);
 
-> > > diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
-> > > index 1f4093f..4e2e4c9 100644
-> > > --- a/sound/soc/codecs/sgtl5000.c
-> > > +++ b/sound/soc/codecs/sgtl5000.c
-> > > @@ -883,14 +883,19 @@ static int ldo_regulator_register(struct
-> > snd_soc_codec *codec,
-> > >  				struct regulator_init_data *init_data,
-> > >  				int voltage)
-> > >  {
-> > > +#ifdef CONFIG_SND_SOC_FSL_SGTL5000
-> > > +	return 0;
-> > > +#else
-> > >  	dev_err(codec->dev, "this setup needs regulator support in the
-> > kernel\n");
-> > >  	return -EINVAL;
-> > > +#endif
-> > >
-> > This looks wrong to me, as this will disable the error for unsolicited
-> > platforms in a multi arch kernel!
-> > 
-> 
-> The CONFIG_SND_SOC_FSL_SGTL5000 micro will be renamed to CONFIG_SND_SOC_FSL_SGTL5000_VF610.
-> In VF610, there has not Power Manager Module, so whether the CONFIG_REGULATOR is enable or 
-> Disabled, there will always some errors booting...
-> 
-Yes, but you are altering code that may be run on a different machine
-than VF610 in a multiarch kernel! You should have a RUNTIME check for
-the machine type if you need to do machine type specific stuff.
+Leigh,
 
+this isn't happening in interrupt context, is it? According to
+Documentation/timers/timers-howto.txt starting from 10us you
+should use usleep_range instead. I guess it isn't really critical
+but IMHO sleeping is always better than delay.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Sebastian
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+>   		}
+> -	} else {
+> -		if (!orion_mdio_smi_is_done(dev)) {
+> +	else {
+> +		if (!orion_mdio_smi_is_done(dev))
+>   			wait_event_timeout(dev->smi_busy_wait,
+>   				orion_mdio_smi_is_done(dev),
+> -				msecs_to_jiffies(100));
+> -			if (!orion_mdio_smi_is_done(dev))
+> -				return -ETIMEDOUT;
+> -		}
+> +				usecs_to_jiffies(MVMDIO_SMI_TIMEOUT));
+> +
+> +		if (orion_mdio_smi_is_done(dev))
+> +			return 0;
+>   	}
+>
+> -	return 0;
+> +	dev_err(bus->parent,
+> +		"Timeout: SMI busy for too long\n");
+> +	return -ETIMEDOUT;
+>   }
+>
+>   static int orion_mdio_read(struct mii_bus *bus, int mii_id,
+>
