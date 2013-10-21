@@ -1,50 +1,71 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Mon, 21 Oct 2013 17:44:01 +0200
-Subject: [PATCHv5][ 4/4] ARM: dts: mbimxsd35: Add sound support.
-In-Reply-To: <1382370241-9517-1-git-send-email-denis@eukrea.com>
-References: <1382370241-9517-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382370241-9517-4-git-send-email-denis@eukrea.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 21 Oct 2013 17:42:39 +0200
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <52650523.80400@gmail.com>
+References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
+ <1382186261-14482-2-git-send-email-andrew@lunn.ch>
+ <52650523.80400@gmail.com>
+Message-ID: <20131021154239.GB23593@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: alsa-devel at alsa-project.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v4->v5:
-- Improved commit message: The tlv320 chip are on the baseboards.
----
- .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |    9 +++++++++
- 1 file changed, 9 insertions(+)
+> >+	if (freqs.old != freqs.new) {
+> >+		local_irq_disable();
+> >+
+> >+		/* Mask IRQ and FIQ to CPU */
+> >+		cr = readl(priv.pmu_cr);
+> >+		cr |= MASK_IRQ | MASK_FIQ;
+> >+		writel(cr, priv.pmu_cr);
+> >+
+> >+		/* Set/Clear the CPU_SLOW_EN bit */
+> >+		reg = readl_relaxed(priv.dfs + DFS_CR);
+> >+		reg &= ~L2_RATIO_MASK;
+> >+
+> >+		switch (state) {
+> >+		case STATE_CPU_FREQ:
+> >+			reg |= priv.xpratio;
+> >+			reg &= ~CPU_SLOW_EN;
+> >+			break;
+> >+		case STATE_DDR_FREQ:
+> >+			reg |= (priv.dpratio | CPU_SLOW_EN);
+> 
+> Does slow mode really (only) depend on the value written into CPUL2CR?
+> Dove FS isn't that chatty about it and I cannot really test right now.
+> But reading it, I think there is two CPU PLL to {L2,DDR} ratios that you
+> can switch between by (de-)asserting CPU_SLOW_EN.
 
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-index 1378b8d..4045c5d 100644
---- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-@@ -48,6 +48,15 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	sound {
-+		compatible = "eukrea,eukrea-tlv320";
-+		model = "imx35-eukrea-tlv320aic23";
-+		ssi-controller = <&ssi1>;
-+		fsl,audio-codec = <&tlv320aic23>;
-+		mux-int-port = <1>;
-+		mux-ext-port = <4>;
-+	};
- };
- 
- &audmux {
--- 
-1.7.9.5
+Hi Sebastian
+
+The lack of details in the datasheet was very annoying. I spent many
+evenings looking at a frozen up cubox. In the end i had to risk eye
+cancer and look at the Marvell vendor code. It always sets these
+values on each transition, and it even calculated one of the ratios
+each time the frequency changed. I never actually tried setting them
+once and then leaving them alone. Worth a try once i have the hardware
+available.
+
+> >+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >+	priv.dfs = devm_ioremap_resource(&pdev->dev, res);
+> >+	if (IS_ERR(priv.dfs))
+> >+		return PTR_ERR(priv.dfs);
+> >+
+> >+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> >+	priv.pmu_cr = devm_ioremap_resource(&pdev->dev, res);
+> >+	if (IS_ERR(priv.pmu_cr))
+> 
+> Cleanup path for most of the resources here and below is kind of
+> missing. 
+
+Well, i'm using devm_ioremap_resources().  The cleanup for that should
+happen automagically. And platform_get_resource() is just a lookup
+function.
+
+> Also, maybe give names to the different areas and not depend
+> on ordering?
+
+Actually, they already have names, but you probably have not go to
+that patch yet. So swapping to platform_get_resource_byname() would be
+simple.
+
+Thanks
+	Andrew
