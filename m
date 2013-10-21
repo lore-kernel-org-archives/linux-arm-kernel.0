@@ -1,47 +1,68 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 21 Oct 2013 09:46:13 +0200
-Subject: [PATCH] ASoC: kirkwood: cleanup the external clock probe
-Message-ID: <20131021094613.2a07bd79@armhf>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 21 Oct 2013 12:23:19 +0530
+Subject: [PATCH 2/3] dma: edma: Add support for Cyclic DMA
+In-Reply-To: <1379977515-3794-3-git-send-email-joelf@ti.com>
+References: <1379977515-3794-1-git-send-email-joelf@ti.com>
+ <1379977515-3794-3-git-send-email-joelf@ti.com>
+Message-ID: <20131021065319.GM14013@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch checks the return value of the clk_prepare_enable of the
-external clock and removes the test about a same internal and external
-clock which would quite never occur and won't work in most cases
-it would occur.
-
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-This patch applies against broonie/sound for-next.
----
- sound/soc/kirkwood/kirkwood-i2s.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
-
-diff --git a/sound/soc/kirkwood/kirkwood-i2s.c.old b/sound/soc/kirkwood/kirkwood-i2s.c.pat2
-index d0504a2..c2433ea 100644
---- a/sound/soc/kirkwood/kirkwood-i2s.c.old
-+++ b/sound/soc/kirkwood/kirkwood-i2s.c.pat2
-@@ -500,14 +500,11 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 		if (PTR_ERR(priv->extclk) == -EPROBE_DEFER)
- 			return -EPROBE_DEFER;
- 	} else {
--		if (priv->extclk == priv->clk) {
--			devm_clk_put(&pdev->dev, priv->extclk);
--			priv->extclk = ERR_PTR(-EINVAL);
--		} else {
--			dev_info(&pdev->dev, "found external clock\n");
--			clk_prepare_enable(priv->extclk);
--			soc_dai = &kirkwood_i2s_dai_extclk;
--		}
-+		dev_info(&pdev->dev, "found external clock\n");
-+		ret = clk_prepare_enable(priv->extclk);
-+		if (err < 0)
-+			return err;
-+		soc_dai = kirkwood_i2s_dai_extclk;
- 	}
+On Mon, Sep 23, 2013 at 06:05:14PM -0500, Joel Fernandes wrote:
  
- 	/* Some sensible defaults - this reflects the powerup values */
+> @@ -449,6 +455,138 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+>  	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+>  }
+>  
+> +static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+> +	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+> +	size_t period_len, enum dma_transfer_direction direction,
+> +	unsigned long tx_flags, void *context)
+> +{
+> +	struct edma_chan *echan = to_edma_chan(chan);
+> +	struct device *dev = chan->device->dev;
+> +	struct edma_desc *edesc;
+> +	dma_addr_t src_addr, dst_addr;
+> +	enum dma_slave_buswidth dev_width;
+> +	u32 burst;
+> +	int i, ret, nr_periods;
+> +
+> +	if (unlikely(!echan || !buf_len || !period_len))
+> +		return NULL;
+> +
+> +	if (direction == DMA_DEV_TO_MEM) {
+> +		src_addr = echan->cfg.src_addr;
+> +		dst_addr = buf_addr;
+> +		dev_width = echan->cfg.src_addr_width;
+> +		burst = echan->cfg.src_maxburst;
+> +	} else if (direction == DMA_MEM_TO_DEV) {
+> +		src_addr = buf_addr;
+> +		dst_addr = echan->cfg.dst_addr;
+> +		dev_width = echan->cfg.dst_addr_width;
+> +		burst = echan->cfg.dst_maxburst;
+> +	} else {
+> +		dev_err(dev, "%s: bad direction?\n", __func__);
+> +		return NULL;
+> +	}
+> +
+> +	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
+> +		dev_err(dev, "Undefined slave buswidth\n");
+> +		return NULL;
+> +	}
+> +
+> +	if (unlikely(buf_len % period_len)) {
+> +		dev_err(dev, "Period should be multiple of Buffer length\n");
+> +		return NULL;
+> +	}
+> +
+> +	nr_periods = (buf_len / period_len) + 1;
+?
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+consider the case of buf = period_len, above makes nr_period = 2.
+
+Or buf len 100, period len 50, makes nr_period = 3
+
+Both doesnt seem right to me?
+
+--
+~Vinod
