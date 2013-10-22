@@ -1,120 +1,155 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 22 Oct 2013 14:23:31 +0800
-Subject: [Patch v2 02/10] usb: chipidea: imx: add power management support
+Date: Tue, 22 Oct 2013 14:23:30 +0800
+Subject: [Patch v2 01/10] usb: chipidea: Add power management support
 In-Reply-To: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
 References: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1382423019-26184-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <1382423019-26184-2-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add system and runtime power management support for imx gluy layer.
+This commit adds runtime and system power management support for
+chipidea core. The runtime pm support is controlled by glue
+layer, it can be enabled by flag CI_HDRC_SUPPORTS_RUNTIME_PM.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci_hdrc_imx.c |   94 ++++++++++++++++++++++++++++++++++-
- 1 files changed, 91 insertions(+), 3 deletions(-)
+ drivers/usb/chipidea/ci.h    |    2 +
+ drivers/usb/chipidea/core.c  |  119 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/usb/chipidea.h |    1 +
+ 3 files changed, 122 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 023d3cb..a1e5634 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -28,6 +28,8 @@ struct ci_hdrc_imx_data {
- 	struct platform_device *ci_pdev;
- 	struct clk *clk;
- 	struct imx_usbmisc_data *usbmisc_data;
-+	bool supports_runtime_pm;
-+	bool in_lpm;
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index 1c94fc5..6ea1892 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -173,6 +173,8 @@ struct ci_hdrc {
+ 	struct dentry			*debugfs;
+ 	bool				id_event;
+ 	bool				b_sess_valid_event;
++	bool				supports_runtime_pm;
++	bool				in_lpm;
  };
  
- /* Common functions shared by usbmisc drivers */
-@@ -82,6 +84,7 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 				  CI_HDRC_DISABLE_STREAMING,
- 	};
- 	int ret;
-+	struct device_node *np = pdev->dev.of_node;
+ static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 87546a0..a5b8f43 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -578,6 +578,10 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	hw_phymode_configure(ci);
  
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data) {
-@@ -151,8 +154,12 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 	dr_mode = ci->platdata->dr_mode;
++
++	ci->supports_runtime_pm = !!(ci->platdata->flags &
++		CI_HDRC_SUPPORTS_RUNTIME_PM);
++
+ 	/* initialize role(s) before the interrupt is requested */
+ 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
+ 		ret = ci_hdrc_host_init(ci);
+@@ -651,6 +655,13 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto stop;
  
- 	platform_set_drvdata(pdev, data);
- 
--	pm_runtime_no_callbacks(&pdev->dev);
--	pm_runtime_enable(&pdev->dev);
 +	device_set_wakeup_capable(&pdev->dev, true);
 +
-+	if (data->supports_runtime_pm) {
++	if (ci->supports_runtime_pm) {
 +		pm_runtime_set_active(&pdev->dev);
 +		pm_runtime_enable(&pdev->dev);
 +	}
- 
- 	return 0;
- 
-@@ -167,13 +174,93 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
++
+ 	ret = dbg_create_files(ci);
+ 	if (!ret)
+ 		return 0;
+@@ -668,6 +679,11 @@ static int ci_hdrc_remove(struct platform_device *pdev)
  {
- 	struct ci_hdrc_imx_data *data = platform_get_drvdata(pdev);
+ 	struct ci_hdrc *ci = platform_get_drvdata(pdev);
  
--	pm_runtime_disable(&pdev->dev);
- 	ci_hdrc_remove_device(data->ci_pdev);
-+	if (data->supports_runtime_pm) {
++	if (ci->supports_runtime_pm) {
 +		pm_runtime_get_sync(&pdev->dev);
 +		pm_runtime_disable(&pdev->dev);
 +		pm_runtime_put_noidle(&pdev->dev);
 +	}
- 	clk_disable_unprepare(data->clk);
- 
+ 	dbg_remove_files(ci);
+ 	free_irq(ci->irq, ci);
+ 	ci_role_destroy(ci);
+@@ -678,11 +694,114 @@ static int ci_hdrc_remove(struct platform_device *pdev)
  	return 0;
  }
  
 +#ifdef CONFIG_PM
-+static int imx_controller_suspend(struct device *dev)
++static int ci_controller_suspend(struct device *dev)
 +{
-+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
++	struct ci_hdrc *ci = dev_get_drvdata(dev);
 +
 +	dev_dbg(dev, "at %s\n", __func__);
 +
-+	if (data->in_lpm)
++	if (ci->in_lpm)
 +		return 0;
 +
-+	clk_disable_unprepare(data->clk);
++	disable_irq(ci->irq);
 +
-+	data->in_lpm = true;
++	if (ci->transceiver)
++		usb_phy_set_wakeup(ci->transceiver, true);
++
++	ci_hdrc_enter_lpm(ci, true);
++
++	if (ci->transceiver)
++		usb_phy_set_suspend(ci->transceiver, 1);
++
++	ci->in_lpm = true;
++
++	enable_irq(ci->irq);
 +
 +	return 0;
 +}
 +
-+static int imx_controller_resume(struct device *dev)
++static int ci_controller_resume(struct device *dev)
 +{
-+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
-+	int ret = 0;
++	struct ci_hdrc *ci = dev_get_drvdata(dev);
 +
 +	dev_dbg(dev, "at %s\n", __func__);
 +
-+	if (!data->in_lpm)
++	if (!ci->in_lpm)
 +		return 0;
 +
-+	ret = clk_prepare_enable(data->clk);
++	ci_hdrc_enter_lpm(ci, false);
++
++	if (ci->transceiver) {
++		usb_phy_set_suspend(ci->transceiver, 0);
++		usb_phy_set_wakeup(ci->transceiver, false);
++	}
++
++	ci->in_lpm = false;
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int ci_suspend(struct device *dev)
++{
++	struct ci_hdrc *ci = dev_get_drvdata(dev);
++	int ret;
++
++	ret = ci_controller_suspend(dev);
 +	if (ret)
 +		return ret;
 +
-+	data->in_lpm = false;
++	if (device_may_wakeup(dev))
++		enable_irq_wake(ci->irq);
 +
 +	return ret;
 +}
 +
-+#ifdef CONFIG_PM_SLEEP
-+static int ci_hdrc_imx_suspend(struct device *dev)
++static int ci_resume(struct device *dev)
 +{
-+	return imx_controller_suspend(dev);
-+}
-+
-+static int ci_hdrc_imx_resume(struct device *dev)
-+{
-+	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
++	struct ci_hdrc *ci = dev_get_drvdata(dev);
 +	int ret;
 +
-+	ret = imx_controller_resume(dev);
-+	if (!ret && data->supports_runtime_pm) {
++	if (device_may_wakeup(dev))
++		disable_irq_wake(ci->irq);
++
++	ret = ci_controller_resume(dev);
++	if (!ret && ci->supports_runtime_pm) {
 +		pm_runtime_disable(dev);
 +		pm_runtime_set_active(dev);
 +		pm_runtime_enable(dev);
@@ -125,33 +160,44 @@ index 023d3cb..a1e5634 100644
 +#endif /* CONFIG_PM_SLEEP */
 +
 +#ifdef CONFIG_PM_RUNTIME
-+static int ci_hdrc_imx_runtime_suspend(struct device *dev)
++static int ci_runtime_suspend(struct device *dev)
 +{
-+	return imx_controller_suspend(dev);
++	return ci_controller_suspend(dev);
 +}
 +
-+static int ci_hdrc_imx_runtime_resume(struct device *dev)
++static int ci_runtime_resume(struct device *dev)
 +{
-+	return imx_controller_resume(dev);
++	return ci_controller_resume(dev);
 +}
 +#endif /* CONFIG_PM_RUNTIME */
 +
 +#endif /* CONFIG_PM */
-+static const struct dev_pm_ops ci_hdrc_imx_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(ci_hdrc_imx_suspend, ci_hdrc_imx_resume)
-+	SET_RUNTIME_PM_OPS(ci_hdrc_imx_runtime_suspend,
-+			ci_hdrc_imx_runtime_resume, NULL)
++static const struct dev_pm_ops ci_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(ci_suspend, ci_resume)
++	SET_RUNTIME_PM_OPS(ci_runtime_suspend,
++			ci_runtime_resume, NULL)
 +};
- static const struct of_device_id ci_hdrc_imx_dt_ids[] = {
- 	{ .compatible = "fsl,imx27-usb", },
- 	{ /* sentinel */ }
-@@ -187,6 +274,7 @@ static struct platform_driver ci_hdrc_imx_driver = {
- 		.name = "imx_usb",
- 		.owner = THIS_MODULE,
- 		.of_match_table = ci_hdrc_imx_dt_ids,
-+		.pm = &ci_hdrc_imx_pm_ops,
- 	 },
++
+ static struct platform_driver ci_hdrc_driver = {
+ 	.probe	= ci_hdrc_probe,
+ 	.remove	= ci_hdrc_remove,
+ 	.driver	= {
+ 		.name	= "ci_hdrc",
++		.pm	= &ci_pm_ops,
+ 	},
  };
  
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 7d39967..667b46c 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -18,6 +18,7 @@ struct ci_hdrc_platform_data {
+ 	unsigned long	 flags;
+ #define CI_HDRC_REGS_SHARED		BIT(0)
+ #define CI_HDRC_REQUIRE_TRANSCEIVER	BIT(1)
++#define CI_HDRC_SUPPORTS_RUNTIME_PM	BIT(2)
+ #define CI_HDRC_DISABLE_STREAMING	BIT(3)
+ 	/*
+ 	 * Only set it when DCCPARAMS.DC==1 and DCCPARAMS.HC==1,
 -- 
 1.7.1
