@@ -1,40 +1,20 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Oct 2013 16:06:35 +0100
-Subject: [PATCH v2 1/2] ARM: dts: sun4i/sun7i: add RTC node
-In-Reply-To: <20131022150003.GS3041@lukather>
-References: <1381948227-6290-1-git-send-email-carlo.caione@gmail.com>
- <20131022150003.GS3041@lukather>
-Message-ID: <20131022150635.GT3041@lukather>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Oct 2013 08:11:35 -0700
+Subject: [PATCH V7 3/8] ARM: OMAP3+: use cpu0-cpufreq driver in device
+ tree supported boot
+In-Reply-To: <1381937948-27057-4-git-send-email-nm@ti.com>
+References: <1381937948-27057-1-git-send-email-nm@ti.com>
+ <1381937948-27057-4-git-send-email-nm@ti.com>
+Message-ID: <20131022151135.GN15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 04:00:03PM +0100, Maxime Ripard wrote:
-> Hi Carlo,
-> 
-> On Wed, Oct 16, 2013 at 08:30:26PM +0200, Carlo Caione wrote:
-> > Add the RTC node to DTS for Allwinner A10 and Allwinner A20.
-> > 
-> > Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
-> 
-> Queued up for 3.14.
+* Nishanth Menon <nm@ti.com> [131016 08:39]:
+> With OMAP3+ and AM33xx supported SoC having defined CPU device tree
+> entries with operating-points and clock nodes defined, we can now use
+> the SoC generic cpufreq-cpu0 driver by registering appropriate device.
 
-Oh, and btw, next time, please try to rebase on top of my sunxi-next
-branch before you send patches.
+Thanks I'm taking patches 1 - 3 from this series into
+omap-for-v3.13/board-removal-take2 because of the dependencies.
 
-These were conflicting, and even though in that case the conflict was
-trivial, it might not be next time.
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/785f7a15/attachment.sig>
+Tony
