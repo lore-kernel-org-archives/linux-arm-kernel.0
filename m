@@ -1,58 +1,62 @@
 From: sre@debian.org (Sebastian Reichel)
-Date: Tue, 22 Oct 2013 14:55:03 +0200
-Subject: [PATCH 3/4] Input: twl4030-pwrbutton: simplify driver using devm_*
+Date: Tue, 22 Oct 2013 14:55:01 +0200
+Subject: [PATCH 1/4] Input: twl4030-pwrbutton - add device tree support
 In-Reply-To: <1382446504-27837-1-git-send-email-sre@debian.org>
 References: <1382446504-27837-1-git-send-email-sre@debian.org>
-Message-ID: <1382446504-27837-4-git-send-email-sre@debian.org>
+Message-ID: <1382446504-27837-2-git-send-email-sre@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use managed irq resource to simplify the driver.
+Add device tree support for twl4030 power button driver.
 
 Signed-off-by: Sebastian Reichel <sre@debian.org>
 ---
- drivers/input/misc/twl4030-pwrbutton.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/input/misc/twl4030-pwrbutton.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/input/misc/twl4030-pwrbutton.c b/drivers/input/misc/twl4030-pwrbutton.c
-index 4e7a810..4ab9243 100644
+index b9a05fd..e450947 100644
 --- a/drivers/input/misc/twl4030-pwrbutton.c
 +++ b/drivers/input/misc/twl4030-pwrbutton.c
-@@ -70,7 +70,7 @@ static int twl4030_pwrbutton_probe(struct platform_device *pdev)
- 	pwr->phys = "twl4030_pwrbutton/input0";
- 	pwr->dev.parent = &pdev->dev;
+@@ -52,7 +52,7 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
+ 	return IRQ_HANDLED;
+ }
  
--	err = request_threaded_irq(irq, NULL, powerbutton_irq,
-+	err = devm_request_threaded_irq(&pwr->dev, irq, NULL, powerbutton_irq,
- 			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
- 			"twl4030_pwrbutton", pwr);
- 	if (err < 0) {
-@@ -81,15 +81,13 @@ static int twl4030_pwrbutton_probe(struct platform_device *pdev)
- 	err = input_register_device(pwr);
- 	if (err) {
- 		dev_err(&pdev->dev, "Can't register power button: %d\n", err);
--		goto free_irq;
-+		goto free_input_dev;
- 	}
- 
- 	platform_set_drvdata(pdev, pwr);
- 
- 	return 0;
- 
--free_irq:
--	free_irq(irq, pwr);
- free_input_dev:
- 	input_free_device(pwr);
- 	return err;
-@@ -98,9 +96,7 @@ free_input_dev:
- static int __exit twl4030_pwrbutton_remove(struct platform_device *pdev)
+-static int __init twl4030_pwrbutton_probe(struct platform_device *pdev)
++static int twl4030_pwrbutton_probe(struct platform_device *pdev)
  {
- 	struct input_dev *pwr = platform_get_drvdata(pdev);
--	int irq = platform_get_irq(pdev, 0);
- 
--	free_irq(irq, pwr);
- 	input_unregister_device(pwr);
- 
+ 	struct input_dev *pwr;
+ 	int irq = platform_get_irq(pdev, 0);
+@@ -106,16 +106,27 @@ static int __exit twl4030_pwrbutton_remove(struct platform_device *pdev)
  	return 0;
+ }
+ 
++#if IS_ENABLED(CONFIG_OF)
++static const struct of_device_id twl4030_pwrbutton_dt_match_table[] = {
++       { .compatible = "ti,twl4030-pwrbutton" },
++       {},
++};
++MODULE_DEVICE_TABLE(of, twl4030_pwrbutton_dt_match_table);
++#define twl4030_pwrbutton_dt_match of_match_ptr(twl4030_pwrbutton_dt_match_table)
++#else
++#define twl4030_pwrbutton_dt_match NULL
++#endif
++
+ static struct platform_driver twl4030_pwrbutton_driver = {
++	.probe		= twl4030_pwrbutton_probe,
+ 	.remove		= __exit_p(twl4030_pwrbutton_remove),
+ 	.driver		= {
+ 		.name	= "twl4030_pwrbutton",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = twl4030_pwrbutton_dt_match,
+ 	},
+ };
+-
+-module_platform_driver_probe(twl4030_pwrbutton_driver,
+-			twl4030_pwrbutton_probe);
++module_platform_driver(twl4030_pwrbutton_driver);
+ 
+ MODULE_ALIAS("platform:twl4030_pwrbutton");
+ MODULE_DESCRIPTION("Triton2 Power Button");
 -- 
 1.8.4.rc3
