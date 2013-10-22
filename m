@@ -1,60 +1,40 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 22 Oct 2013 13:58:41 +0800
-Subject: [Patch v2 07/14] usb: phy: add notify suspend and resume callback
+Date: Tue, 22 Oct 2013 13:58:44 +0800
+Subject: [Patch v2 10/14] usb: doc: phy-mxs: update binding for adding
+ disconnect line property
 In-Reply-To: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
 References: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1382421528-17897-8-git-send-email-peter.chen@freescale.com>
+Message-ID: <1382421528-17897-11-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They are used to notify PHY that the controller enters suspend
-or finishes resume.
+This property is used to disconnect line between USB PHY and
+USB controller.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- include/linux/usb/phy.h |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/usb/mxs-phy.txt |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index 6c0b1c5..a747960 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -116,6 +116,11 @@ struct usb_phy {
- 			enum usb_device_speed speed);
- 	int	(*notify_disconnect)(struct usb_phy *x,
- 			enum usb_device_speed speed);
-+	int	(*notify_suspend)(struct usb_phy *x,
-+			enum usb_device_speed speed);
-+	int	(*notify_resume)(struct usb_phy *x,
-+			enum usb_device_speed speed);
-+
+diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+index 5837963..356c9b6 100644
+--- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
++++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+@@ -9,6 +9,9 @@ mxs PHY verions.
+ - reg: Should contain registers location and length
+ - interrupts: Should contain phy interrupt
+ - fsl,anatop: phandle for anatop register, it is only for mx6 SoC serial
++- disconnect-line-without-vbus: needs to disconnect
++connection between USB PHY and controller, it can avoid
++unexpected wakeup interrupt when the PHY is out of power
+ 
+ Example:
+ usbphy1: usbphy at 020c9000 {
+@@ -16,4 +19,5 @@ usbphy1: usbphy at 020c9000 {
+ 	reg = <0x020c9000 0x1000>;
+ 	interrupts = <0 44 0x04>;
+ 	fsl,anatop = <&anatop>;
++	disconnect-line-without-vbus;
  };
- 
- /**
-@@ -282,6 +287,24 @@ usb_phy_notify_disconnect(struct usb_phy *x, enum usb_device_speed speed)
- 		return 0;
- }
- 
-+static inline int usb_phy_notify_suspend
-+	(struct usb_phy *x, enum usb_device_speed speed)
-+{
-+	if (x && x->notify_suspend)
-+		return x->notify_suspend(x, speed);
-+	else
-+		return 0;
-+}
-+
-+static inline int usb_phy_notify_resume
-+	(struct usb_phy *x, enum usb_device_speed speed)
-+{
-+	if (x && x->notify_resume)
-+		return x->notify_resume(x, speed);
-+	else
-+		return 0;
-+}
-+
- /* notifiers */
- static inline int
- usb_register_notifier(struct usb_phy *x, struct notifier_block *nb)
 -- 
 1.7.1
