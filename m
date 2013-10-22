@@ -1,23 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Oct 2013 10:06:04 -0700
-Subject: [PATCH 1/2] leds: lp55xx: handle enable pin in driver
-In-Reply-To: <1382446896-28436-2-git-send-email-sre@debian.org>
-References: <1382446896-28436-1-git-send-email-sre@debian.org>
- <1382446896-28436-2-git-send-email-sre@debian.org>
-Message-ID: <20131022170604.GP15154@atomide.com>
+From: lisovy@gmail.com (Rostislav Lisovy)
+Date: Tue, 22 Oct 2013 19:07:19 +0200
+Subject: [PATCH 0/4] Devicetree description for Voipac i.MX53 module
+Message-ID: <1382461643-16790-1-git-send-email-lisovy@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@debian.org> [131022 06:02]:
-> This patch moves the handling of the chip's enable pin from the board
-> code into the driver. It also updates all board-code files using the
-> driver to incorporate this change.
-> 
-> This is needed for device tree support of the enable pin.
+This patchset adds devicetree description for Voipac X53-DMM-668 module
+which uses i.MX53 CPU. More information about the module may be found at:
+http://www.voipac.com/#X53-DMM-668
+The support for the baseboard used with this module is also provided.
+More information about the baseboard: http://www.voipac.com/#X25-BSB-000
 
-This seems safe to merge along with the other LED patches, the
-changes to arch/arm/mach-omap2 should not conflict with anything.
+Working peripherals are:
+* UART0
+* Ethernet
+* Buttons (with keyboard controller)
+* Sound (headphone output)
+* SD-card
+* LEDs (through GPIOs)
 
-So for the arch/arm/mach-omap2 changes:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Rostislav Lisovy (4):
+  ARM: dts: i.MX53: Add alternate pinmux option for i2c_3
+  ARM: dts: i.MX53: Internal keyboard controller
+  ARM: dts: i.MX53: dts for Voipac x53-dmm-668 module
+  ARM: dts: i.MX53: Devicetree for Voipac Baseboard using x53-dmm-668
+    module
+
+ arch/arm/boot/dts/imx53-voipac-bsb.dts      |  135 +++++++++++++++++++
+ arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi |  195 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx53.dtsi                |   15 +++
+ 3 files changed, 345 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx53-voipac-bsb.dts
+ create mode 100644 arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+
+-- 
+1.7.10.4
