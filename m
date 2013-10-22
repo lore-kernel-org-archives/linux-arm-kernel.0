@@ -1,22 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Oct 2013 09:34:01 +0100
-Subject: [PATCH 1/2] spi/s3c64xx: Do not ignore return value of
- spi_master_resume/suspend
-In-Reply-To: <1382362971-16763-1-git-send-email-k.kozlowski@samsung.com>
-References: <1382362971-16763-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20131022083401.GB20821@sirena.org.uk>
+From: aida.mynzhasova@skitlab.ru (Aida Mynzhasova)
+Date: Tue, 22 Oct 2013 12:34:38 +0400
+Subject: [PATCH] ARM: dts: mxs: add auart2 pinmux to imx28.dtsi
+Message-ID: <1382430878-14950-1-git-send-email-aida.mynzhasova@skitlab.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 21, 2013 at 03:42:49PM +0200, Krzysztof Kozlowski wrote:
-> During PM resume and suspend do not ignore the return value of
-> spi_master_suspend() or spi_master_resume(). Instead pass it further.
+Add auart2 pins configuration on its main pads
 
-Applied both, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/599a5f5e/attachment.sig>
+Signed-off-by: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
+---
+ arch/arm/boot/dts/imx28.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 918d419..cab4c22 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -343,6 +343,19 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
+ 
++				auart2_pins_a: auart2-pins at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_AUART2_RX__AUART2_RX
++						MX28_PAD_AUART2_TX__AUART2_TX
++						MX28_PAD_AUART2_CTS__AUART2_CTS
++						MX28_PAD_AUART2_RTS__AUART2_RTS
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
+ 				auart3_pins_a: auart3 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-- 
+1.8.1.2
