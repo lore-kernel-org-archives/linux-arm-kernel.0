@@ -1,38 +1,31 @@
 From: lisovy@gmail.com (Rostislav Lisovy)
-Date: Tue, 22 Oct 2013 19:07:19 +0200
-Subject: [PATCH 0/4] Devicetree description for Voipac i.MX53 module
-Message-ID: <1382461643-16790-1-git-send-email-lisovy@gmail.com>
+Date: Tue, 22 Oct 2013 19:07:20 +0200
+Subject: [PATCH 1/4] ARM: dts: i.MX53: Add alternate pinmux option for i2c_3
+In-Reply-To: <1382461643-16790-1-git-send-email-lisovy@gmail.com>
+References: <1382461643-16790-1-git-send-email-lisovy@gmail.com>
+Message-ID: <1382461643-16790-2-git-send-email-lisovy@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds devicetree description for Voipac X53-DMM-668 module
-which uses i.MX53 CPU. More information about the module may be found at:
-http://www.voipac.com/#X53-DMM-668
-The support for the baseboard used with this module is also provided.
-More information about the baseboard: http://www.voipac.com/#X25-BSB-000
+Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
 
-Working peripherals are:
-* UART0
-* Ethernet
-* Buttons (with keyboard controller)
-* Sound (headphone output)
-* SD-card
-* LEDs (through GPIOs)
-
-
-Rostislav Lisovy (4):
-  ARM: dts: i.MX53: Add alternate pinmux option for i2c_3
-  ARM: dts: i.MX53: Internal keyboard controller
-  ARM: dts: i.MX53: dts for Voipac x53-dmm-668 module
-  ARM: dts: i.MX53: Devicetree for Voipac Baseboard using x53-dmm-668
-    module
-
- arch/arm/boot/dts/imx53-voipac-bsb.dts      |  135 +++++++++++++++++++
- arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi |  195 +++++++++++++++++++++++++++
- arch/arm/boot/dts/imx53.dtsi                |   15 +++
- 3 files changed, 345 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx53-voipac-bsb.dts
- create mode 100644 arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
-
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 4307e80..55e83d1 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -599,6 +599,13 @@
+ 							MX53_PAD_GPIO_5__I2C3_SCL 0xc0000000
+ 						>;
+ 					};
++
++					pinctrl_i2c3_2: i2c3grp-2 {
++						fsl,pins = <
++							MX53_PAD_GPIO_3__I2C3_SCL	0xc0000000
++							MX53_PAD_GPIO_6__I2C3_SDA	0xc0000000
++						>;
++					};
+ 				};
+ 
+ 				ipu_disp0 {
 -- 
 1.7.10.4
