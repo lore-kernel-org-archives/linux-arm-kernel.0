@@ -1,94 +1,87 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 22 Oct 2013 11:19:51 +0100
-Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <1382186261-14482-2-git-send-email-andrew@lunn.ch>
-References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
- <1382186261-14482-2-git-send-email-andrew@lunn.ch>
-Message-ID: <52665147.8080307@arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 22 Oct 2013 03:19:04 -0700
+Subject: pull request for Tegra clock rework and Tegra124 clock support
+In-Reply-To: <20131021135638.GA10943@tbergstrom-lnx.Nvidia.com>
+References: <20131021135638.GA10943@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20131022101904.7554.73999@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/13 13:37, Andrew Lunn wrote:
-> The Marvell Dove SoC can run the CPU at two frequencies. The high
-> frequencey is from a PLL, while the lower is the same as the DDR
-> clock. Add a cpufreq driver to swap between these frequences.
+Quoting Peter De Schrijver (2013-10-21 06:56:38)
+> Hi Mike,
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  drivers/cpufreq/Kconfig.arm    |   7 ++
->  drivers/cpufreq/Makefile       |   1 +
->  drivers/cpufreq/dove-cpufreq.c | 276 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 284 insertions(+)
->  create mode 100644 drivers/cpufreq/dove-cpufreq.c
+> This pull request contains both the tegra clock rework patches
+> ([PATCH v6 00/15] Introduce common infra for tegra clocks)
+> and the patches to support Tegra124 ([PATCH v4 0/7] Tegra124 clock support)
 > 
+> The following changes since commit d031acfc0b8376209e5b429513766e7028e40e1d:
+> 
+>   clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d (2013-10-16 19:49:25 +0300)
+> 
+> are available in the git repository at:
+>   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-tegra124-0
 
-[snip]
-
-> +static int dove_cpufreq_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np;
-> +	struct resource *res;
-> +	int err;
-> +	int irq;
-> +
-> +	priv.dev = &pdev->dev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	priv.dfs = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv.dfs))
-> +		return PTR_ERR(priv.dfs);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	priv.pmu_cr = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv.pmu_cr))
-> +		return PTR_ERR(priv.pmu_cr);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-> +	priv.pmu_clk_div = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv.pmu_clk_div))
-> +		return PTR_ERR(priv.pmu_clk_div);
-> +
-> +	np = of_find_node_by_path("/cpus/cpu at 0");
-> +	if (!np)
-> +		return -ENODEV;
-> +
-You need not search for cpu nodes. When the cpu are registered, their of_node
-gets initialised. So you can just use:
-	np = of_cpu_device_node_get(0);
-
-However I think its better to just get:
-	cpu_dev = get_cpu_device(0);
-as clk APIs can use cpu_dev
-
-> +	priv.cpu_clk = of_clk_get_by_name(np, "cpu_clk");
-
-Now this can be
-	priv.cpu_clk = devm_clk_get(cpu_dev, "cpu_clk");
-
-> +	if (IS_ERR(priv.cpu_clk)) {
-> +		dev_err(priv.dev, "Unable to get cpuclk");
-> +		return PTR_ERR(priv.cpu_clk);
-> +	}
-> +
-> +	clk_prepare_enable(priv.cpu_clk);
-> +	dove_freq_table[0].frequency = clk_get_rate(priv.cpu_clk) / 1000;
-> +
-> +	priv.ddr_clk = of_clk_get_by_name(np, "ddrclk");
-
-Similarly priv.ddr_clk = devm_clk_get(cpu_dev, "ddrclk");
-
-> +	if (IS_ERR(priv.ddr_clk)) {
-> +		dev_err(priv.dev, "Unable to get ddrclk");
-> +		err = PTR_ERR(priv.ddr_clk);
-> +		goto out_cpu;
-> +	}
-> +
-> +	clk_prepare_enable(priv.ddr_clk);
-> +	dove_freq_table[1].frequency = clk_get_rate(priv.ddr_clk) / 1000;
-> +
-> +	irq = irq_of_parse_and_map(np, 0);
-
-Here you can use cpu_dev->of_node
+Thanks for the pull request Peter. I've taken into clk-next. Next time
+can you generate a signed tag? Due to the increased volume of ccf
+patches I'm happy to start taking pull requests more regularly (after
+requisite review on the list).
 
 Regards,
-Sudeep
+Mike
+
+> 
+> Joseph Lo (2):
+>       clk: tegra124: add wait_for_reset and disable_clock for tegra_cpu_car_ops
+>       clk: tegra124: add suspend/resume function for tegra_cpu_car_ops
+> 
+> Peter De Schrijver (20):
+>       ARM: tegra30: add missing CLK IDs
+>       clk: tegra: simplify periph clock data
+>       clk: tegra: common periph_clk_enb_refcnt and clks
+>       clk: tegra: Add TEGRA_PERIPH_NO_DIV flag
+>       clk: tegra: move some PLLC and PLLXC init to clk-pll.c
+>       clk: tegra: move fields to tegra_clk_pll_params
+>       clk: tegra: add header for common tegra clock IDs
+>       clk: tegra: add common infra for DT clocks
+>       clk: tegra: add clkdev registration infra
+>       clk: tegra: move audio clk to common file
+>       clk: tegra: move periph clocks to common file
+>       clk: tegra: move PMC, fixed clocks to common files
+>       clk: tegra: introduce common gen4 super clock
+>       clk: tegra: move tegra30 to common infra
+>       clk: tegra: move tegra20 to common infra
+>       clk: tegra: Add support for PLLSS
+>       clk: tegra: Add periph regs bank X
+>       clk: tegra124: Add common clk IDs to clk-id.h
+>       clk: tegra124: Add new peripheral clocks
+>       clk: tegra124: Add support for Tegra124 clocks
+> 
+>  .../bindings/clock/nvidia,tegra124-car.txt         |   59 +
+>  drivers/clk/tegra/Makefile                         |    7 +-
+>  drivers/clk/tegra/clk-id.h                         |  233 +++
+>  drivers/clk/tegra/clk-periph-gate.c                |    8 +-
+>  drivers/clk/tegra/clk-periph.c                     |   18 +-
+>  drivers/clk/tegra/clk-pll.c                        |  356 ++++--
+>  drivers/clk/tegra/clk-tegra-audio.c                |  215 +++
+>  drivers/clk/tegra/clk-tegra-fixed.c                |  111 ++
+>  drivers/clk/tegra/clk-tegra-periph.c               |  644 ++++++++
+>  drivers/clk/tegra/clk-tegra-pmc.c                  |  131 ++
+>  drivers/clk/tegra/clk-tegra-super-gen4.c           |  149 ++
+>  drivers/clk/tegra/clk-tegra114.c                   | 1540 +++++---------------
+>  drivers/clk/tegra/clk-tegra124.c                   | 1430 ++++++++++++++++++
+>  drivers/clk/tegra/clk-tegra20.c                    |  811 ++++-------
+>  drivers/clk/tegra/clk-tegra30.c                    | 1492 ++++++-------------
+>  drivers/clk/tegra/clk.c                            |  166 +++
+>  drivers/clk/tegra/clk.h                            |  104 +-
+>  include/dt-bindings/clock/tegra124-car.h           |  340 +++++
+>  include/dt-bindings/clock/tegra30-car.h            |   10 +-
+>  19 files changed, 4940 insertions(+), 2884 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-car.txt
+>  create mode 100644 drivers/clk/tegra/clk-id.h
+>  create mode 100644 drivers/clk/tegra/clk-tegra-audio.c
+>  create mode 100644 drivers/clk/tegra/clk-tegra-fixed.c
+>  create mode 100644 drivers/clk/tegra/clk-tegra-periph.c
+>  create mode 100644 drivers/clk/tegra/clk-tegra-pmc.c
+>  create mode 100644 drivers/clk/tegra/clk-tegra-super-gen4.c
+>  create mode 100644 drivers/clk/tegra/clk-tegra124.c
+>  create mode 100644 include/dt-bindings/clock/tegra124-car.h
