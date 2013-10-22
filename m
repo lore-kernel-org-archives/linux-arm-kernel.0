@@ -1,119 +1,59 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 22 Oct 2013 17:25:50 +0200
-Subject: [PATCH RESEND v5 1/5] misc: sram: add ability to limit used sram areas
-In-Reply-To: <201310221724.21550.heiko@sntech.de>
-References: <201310221724.21550.heiko@sntech.de>
-Message-ID: <201310221725.50942.heiko@sntech.de>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Tue, 22 Oct 2013 17:26:02 +0200
+Subject: [RFCv3 7/7] ARM: dts: N900: Add SSI information
+In-Reply-To: <20131022144413.GA31867@earth.universe>
+References: <1381091235-18293-1-git-send-email-sre@debian.org>
+ <1381091235-18293-8-git-send-email-sre@debian.org>
+ <5266742D.9050604@baylibre.com> <20131022144413.GA31867@earth.universe>
+Message-ID: <5266990A.5040907@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs need parts of their sram for special purposes. So while being part
-of the peripheral, it should not be part of the genpool controlling the sram.
+Hi Sebastian,
 
-Therefore add an option available to keep arbitrary portions of the
-sram from being part of the pool. If available is not present, all
-sram is used.
+On 22/10/2013 16:44, Sebastian Reichel wrote:
+> Hi Benoit,
+>
+> On Tue, Oct 22, 2013 at 02:48:45PM +0200, Benoit Cousson wrote:
+>> Thanks to Tony, I've just realized that I missed all your patches,
+>> that for some reason ended-up in my junk folder :-(
+>
+> oh :( Can you check why they ended up in junk? I would like to
+> prevent more mails going there.
+>
+>> That being said, I cannot apply any of your DTS patches! What base
+>> branch are you using?
+>
+> Currently torvalds/master with pavel's n900 patch and some more
+> patches from me.
 
-Suggested-by: Rob Herring <robherring2@gmail.com>
-move from marking reserved space to available space
-Suggested-by: Matt Sealey <neko@bakuhatsu.net>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
----
- Documentation/devicetree/bindings/misc/sram.txt |    8 ++++
- drivers/misc/sram.c                             |   51 ++++++++++++++++++++---
- 2 files changed, 53 insertions(+), 6 deletions(-)
+Mmm, looks like I missed these patches :-)
 
-diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-index 4d0a00e..8be552f 100644
---- a/Documentation/devicetree/bindings/misc/sram.txt
-+++ b/Documentation/devicetree/bindings/misc/sram.txt
-@@ -8,9 +8,17 @@ Required properties:
- 
- - reg : SRAM iomem address range
- 
-+Optional properties:
-+
-+- available: optional list of available chunks inside the sram that the
-+  OS can use. Without available, the whole range is usable for the OS.
-+  Format is <base size>, <base size>, ...; with base being relative to the
-+  reg property base.
-+
- Example:
- 
- sram: sram at 5c000000 {
- 	compatible = "mmio-sram";
- 	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
-+	available = <0x100 0x3ff00>;
- };
-diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-index afe66571..755e640 100644
---- a/drivers/misc/sram.c
-+++ b/drivers/misc/sram.c
-@@ -42,6 +42,8 @@ static int sram_probe(struct platform_device *pdev)
- 	struct sram_dev *sram;
- 	struct resource *res;
- 	unsigned long size;
-+	const __be32 *avail_list = NULL;
-+	int avail_size = 0;
- 	int ret;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -65,12 +67,49 @@ static int sram_probe(struct platform_device *pdev)
- 	if (!sram->pool)
- 		return -ENOMEM;
- 
--	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
--				res->start, size, -1);
--	if (ret < 0) {
--		if (sram->clk)
--			clk_disable_unprepare(sram->clk);
--		return ret;
-+	if (pdev->dev.of_node) {
-+		avail_list = of_get_property(pdev->dev.of_node,
-+						"available",
-+						&avail_size);
-+		if (avail_list) {
-+			avail_size /= sizeof(*avail_list);
-+			if (!avail_size || avail_size % 2) {
-+				dev_warn(&pdev->dev, "wrong number of arguments in available property\n");
-+				avail_list = NULL;
-+			}
-+		}
-+	}
-+
-+	if (!avail_list) {
-+		ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
-+					res->start, size, -1);
-+		if (ret < 0) {
-+			if (sram->clk)
-+				clk_disable_unprepare(sram->clk);
-+			return ret;
-+		}
-+	} else {
-+		unsigned int astart;
-+		unsigned int asize;
-+		int i;
-+
-+		for (i = 0; i < avail_size; i += 2) {
-+			/* get the next available block */
-+			astart = be32_to_cpu(*avail_list++);
-+			asize = be32_to_cpu(*avail_list++);
-+
-+			dev_dbg(&pdev->dev, "found available block 0x%x-0x%x\n",
-+				 astart, astart + asize);
-+
-+			ret = gen_pool_add_virt(sram->pool,
-+					(unsigned long)virt_base + astart,
-+					res->start + astart, asize, -1);
-+			if (ret < 0) {
-+				if (sram->clk)
-+					clk_disable_unprepare(sram->clk);
-+				return ret;
-+			}
-+		}
- 	}
- 
- 	platform_set_drvdata(pdev, sram);
+>
+>> Could you repost all your pending DTS patches in one series rebased
+>> on top of my for_3.13/dts?
+>
+> Sure. DT maintainers haven't given feedback since the last patchset
+> [0]. Do you want to wait for feedback from them?
+
+OK, maybe not the SSI series that is still RFC, but I guess all the 
+others ones are fine to be merged.
+
+Could you repost the whole N900 DTS patches (beside SSI) in one series 
+rebased on top of mine?
+
+Thanks,
+Benoit
+
+>
+> [0] https://lkml.org/lkml/2013/9/23/529
+>
+> -- Sebastian
+>
+
+
 -- 
-1.7.10.4
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
