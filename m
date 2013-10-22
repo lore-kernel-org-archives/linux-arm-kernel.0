@@ -1,35 +1,45 @@
-From: matthijs@stdin.nl (Matthijs Kooijman)
-Date: Tue, 22 Oct 2013 12:48:29 +0200
-Subject: [RFC] Does PHY UTMI data width belong to DWC2 or PHY binding?
-In-Reply-To: <5264F37E.9060307@ti.com>
-References: <20131018141221.GH2721@beef>
- <5264F37E.9060307@ti.com>
-Message-ID: <20131022104829.GF15425@login.drsnuggles.stderr.nl>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 22 Oct 2013 05:45:23 -0500
+Subject: [PATCH] clk: socfpga: Remove check for "reg" property in
+ socfpga_clk_init
+In-Reply-To: <1381797274-4564-1-git-send-email-dinguyen@altera.com>
+References: <1381797274-4564-1-git-send-email-dinguyen@altera.com>
+Message-ID: <52665743.1000309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Hi Mike,
 
-On Mon, Oct 21, 2013 at 02:57:26PM +0530, Kishon Vijay Abraham I wrote:
-> I think it makes sense to keep the data width property in the dwc2 node itself.
-> I mean it describes how the dwc2 IP is configured in that particular SoC (given
-> that it can be either <8> or <16>).
-If I'm reading the RT3052 datasheet correctly (GHWCFG4 register), the IP
-can be configured for 8, 16 or 8 _and_ 16. In the latter case, the "8
-and 16 supported" would make sense as a property of dwc2 (though this
-value should be autodetectable through GHWCFG4), while the actual 8 or
-16 supported by the PHY would make sense as property of a phy.
+On 10/14/13 7:34 PM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+>
+> The function socfpga_clk_init() can support clocks that do not have a divider
+> register, but a fixed-divider that can be read from DTS. Therefore, the "reg"
+> property is not a failing condition for socfpga_clk_init().
+>
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>   drivers/clk/socfpga/clk.c |    4 +---
+>   1 file changed, 1 insertion(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
+> index 5bb848c..7f846bf 100644
+> --- a/drivers/clk/socfpga/clk.c
+> +++ b/drivers/clk/socfpga/clk.c
+> @@ -121,9 +121,7 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
+>   	int rc;
+>   	u32 fixed_div;
+>   
+> -	rc = of_property_read_u32(node, "reg", &reg);
+> -	if (WARN_ON(rc))
+> -		return NULL;
+> +	of_property_read_u32(node, "reg", &reg);
+>   
+>   	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
+>   	if (WARN_ON(!socfpga_clk))
+Was wondering if you have gotten a chance to review this patch?
 
-Note sure if this is really useful in practice as well, or if just
-setting the actual width to use on dwc2 makes more sense...
-
-Gr.
-
-Matthijs
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/c5b6deae/attachment.sig>
+Thanks,
+Dinh
