@@ -1,86 +1,78 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 22 Oct 2013 17:57:58 +0200
-Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <CAKohpok2scsSU7eFOP5LYmQar8xfOqG4-b3z4sVS6JOgnxVcpw@mail.gmail.com>
-References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
- <1382186261-14482-2-git-send-email-andrew@lunn.ch>
- <CAKohpok2scsSU7eFOP5LYmQar8xfOqG4-b3z4sVS6JOgnxVcpw@mail.gmail.com>
-Message-ID: <20131022155758.GA26694@lunn.ch>
+From: matthew_minter@xyratex.com (Matthew Minter)
+Date: Tue, 22 Oct 2013 16:56:17 +0100
+Subject: Armada XP Internal registers
+In-Reply-To: <20131022152950.40171b36@skate>
+References: <CAFJTrDtznkpwi76yyEKYvjuo+XV34ky9AOe8Qfa5wm-uHDJT6A@mail.gmail.com>
+ <20131021174339.GA27284@localhost>
+ <20131021184219.GA24520@titan.lakedaemon.net>
+ <20131022152950.40171b36@skate>
+Message-ID: <CAFJTrDtKw0ANh55Y6xQtFzGtvmZOJ-ZC6cFuKV62L0tmmhT3uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh
+Hi guys,
 
-Thanks for your comments. I will include them in the next version.
+I am preparing all the requested info and will send it to the list
+soon, unfortunately I am away from the office right now so cant sent
+it immediately (I don't have my serial logs on this computer) but will
+send all the data as soon as I can.
 
-> > +static irqreturn_t dove_cpufreq_irq(int irq, void *dev)
-> > +{
-> > +       return IRQ_HANDLED;
-> > +}
-> 
-> what is this for?
+Best regards,
+Matthew
 
-The hardware raises an interrupt when the change is complete. This
-interrupt is what brings the CPU out of the WFI. I don't know the
-interrupt code too well, but i think it is necessary for the driver to
-acknowledged it. The interrupt core code counts interrupts which
-nobody acknowledges, and after 1000 are received, it disables the
-interrupt. That would probably result in the machine locking solid,
-never coming out of the WFI. So i'm playing it safe and handling the
-interrupt.
+On 22 October 2013 14:29, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Jason, Matthew,
+>
+> On Mon, 21 Oct 2013 14:42:19 -0400, Jason Cooper wrote:
+>
+>> > Hm.. so if you upgraded the bootloader and the internal register address
+>> > is now 0xf100000 then it makes sense to fix your DT accordingly.
+>>
+>> Agreed.
+>>
+>> > Are you enabling CONFIG_DEBUG_LL? In that case, please note there's a
+>> > new option that will let you move to the 'new' internal regs address.
+>>
+>> The option is CONFIG_DEBUG_MVEBU_UART.  Since you swapped out the
+>> bootloader, you need to tell it so.  (Early printk assumes the
+>> bootloader setup the uart and just writes to it blindly.  If it's at a
+>> different address than expected, it'll crash.)
+>
+> I do confirm what Ezequiel and Jason said. The earlier U-Boot versions
+> from Marvell remapped the registers at 0xd0000000, while the more
+> recent versions remap the registers at 0xf1000000.
+>
+> In recent kernel versions (I guess since 3.10 or 3.11), we've made sure
+> that changing the DT Mbus informations was enough to switch the entire
+> kernel to use the correct internal register base address. With the
+> exception of DEBUG_LL, which can't really on the DT, so that's why we
+> have two separate Kconfig options, one for 0xd0000000 and another one
+> for 0xf1000000.
+>
+> That being said, I don't think the issue Matthew is seeing is related
+> to improper DEBUG_LL configuration. He wouldn't be getting "Unhandled
+> fault: external abort on non-linefetch (0x808) at 0xf0144010". He would
+> simply be getting *nothing* if the DEBUG_LL configuration was wrong.
+>
+> Matthew, can you tell me which U-Boot version exactly you're using, and
+> give me the diff of the changes you've made to your Device Tree, so I
+> can see if I can reproduce the problem? For what it's worth, register
+> 0x44010 is part of the PCIe registers, but I don't see right now what
+> could be the reason for the problem you're seeing.
+>
+> Best regards,
+>
+> Thomas
+> --
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 
-> > +static int dove_cpufreq_probe(struct platform_device *pdev)
-> > +{
-> > +       struct device_node *np;
-> > +       struct resource *res;
-> > +       int err;
-> > +       int irq;
-> 
-> Above two can be merged.
+-- 
 
-Well, i was told the exact opposite by the USB serial maintainer :-) 
-I will use your coding style here, and his for USB code, and try to
-keep everybody happy.
 
- 
-> > +       priv.dev = &pdev->dev;
-> > +
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +       priv.dfs = devm_ioremap_resource(&pdev->dev, res);
-> > +       if (IS_ERR(priv.dfs))
-> > +               return PTR_ERR(priv.dfs);
-> > +
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> > +       priv.pmu_cr = devm_ioremap_resource(&pdev->dev, res);
-> > +       if (IS_ERR(priv.pmu_cr))
-> > +               return PTR_ERR(priv.pmu_cr);
-> > +
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-> > +       priv.pmu_clk_div = devm_ioremap_resource(&pdev->dev, res);
-> > +       if (IS_ERR(priv.pmu_clk_div))
-> > +               return PTR_ERR(priv.pmu_clk_div);
-> > +
-> > +       np = of_find_node_by_path("/cpus/cpu at 0");
-> > +       if (!np)
-> > +               return -ENODEV;
-> > +
-> > +       priv.cpu_clk = of_clk_get_by_name(np, "cpu_clk");
-> > +       if (IS_ERR(priv.cpu_clk)) {
-> > +               dev_err(priv.dev, "Unable to get cpuclk");
-> > +               return PTR_ERR(priv.cpu_clk);
-> > +       }
-> > +
-> > +       clk_prepare_enable(priv.cpu_clk);
-> 
-> this can fail..
+------------------------------
+For additional information including the registered office and the treatment of Xyratex confidential information please visit www.xyratex.com
 
-In theory yes. In practice no. It is a fixed rate clock. prepare and
-enable are actually NOPs for this type of clock. However the API
-documentation explicitly states you need to call prepare and enable
-before you can call clk_get_rate(). But i can add error checking if
-you want.
-
-> 
-> > +       dove_freq_table[0].frequency = clk_get_rate(priv.cpu_clk) / 1000;
-
-  Andrew
+------------------------------
