@@ -1,7 +1,9 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Tue, 22 Oct 2013 18:32:38 +0200
-Subject: [PATCH 0/2] misc: atmel_pwm: fix probe dependencies
-Message-ID: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+Date: Tue, 22 Oct 2013 18:32:39 +0200
+Subject: [PATCH 1/2] misc: atmel_pwm: add deferred-probing support
+In-Reply-To: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+Message-ID: <1382459560-26596-2-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,25 +11,31 @@ Two drivers (atmel-pwm-bl and leds-atmel-pwm) currently depend on the
 atmel_pwm driver to have bound to any pwm-device before their devices
 are probed.
 
-The first patch adds deferred-probing support to the atmel_pwm driver to
-handle such dependencies. Note that the atmel-pwm-bl driver in
-linux-next supports deferred probing since commit 9d3fde86b ("backlight:
-atmel-pwm-bl: fix deferred probe from __init").
+Support deferred probing of such devices by making sure to return
+-EPROBE_DEFER from pwm_channel_alloc when no pwm-device has yet been
+bound.
 
-Although deferred probing is sufficient to deal with the dependency
-problem, relying on deferred probing for the backlight driver is not
-desirable as it may cause unnecessary delays before enabling the
-backlight at boot. The second patch fixes this by making sure
-pwm-devices are probed before any backlight devices.
+Signed-off-by: Johan Hovold <jhovold@gmail.com>
+---
+ drivers/misc/atmel_pwm.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Johan
-
-Johan Hovold (2):
-  misc: atmel_pwm: add deferred-probing support
-  misc: atmel_pwm: set initcall level to subsys
-
- drivers/misc/atmel_pwm.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/misc/atmel_pwm.c b/drivers/misc/atmel_pwm.c
+index 494d050..a6dc56e 100644
+--- a/drivers/misc/atmel_pwm.c
++++ b/drivers/misc/atmel_pwm.c
+@@ -90,8 +90,10 @@ int pwm_channel_alloc(int index, struct pwm_channel *ch)
+ 	unsigned long	flags;
+ 	int		status = 0;
+ 
+-	/* insist on PWM init, with this signal pinned out */
+-	if (!pwm || !(pwm->mask & 1 << index))
++	if (!pwm)
++		return -EPROBE_DEFER;
++
++	if (!(pwm->mask & 1 << index))
+ 		return -ENODEV;
+ 
+ 	if (index < 0 || index >= PWM_NCHAN || !ch)
 -- 
 1.8.4
