@@ -1,57 +1,41 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 22 Oct 2013 15:27:37 +0800
-Subject: [PATCH 1/1] mfd: syscon: return -ENXIO if CONFIG_MFD_SYSCON is not
- enabled
-Message-ID: <1382426857-31975-1-git-send-email-peter.chen@freescale.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 22 Oct 2013 10:46:03 +0300
+Subject: [PATCH] ARM: dts: am4372: Add McASP nodes
+In-Reply-To: <526579FB.10005@cogentembedded.com>
+References: <1382348758-1083-1-git-send-email-peter.ujfalusi@ti.com>
+ <526579FB.10005@cogentembedded.com>
+Message-ID: <52662D3B.5050204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms may not define CONFIG_MFD_SYSCON (or haven't syscon),
-it can fix build error for those platforms.
+Hi,
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- include/linux/mfd/syscon.h |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
+On 10/21/2013 10:01 PM, Sergei Shtylyov wrote:
 
-diff --git a/include/linux/mfd/syscon.h b/include/linux/mfd/syscon.h
-index b473577..60bf0fb 100644
---- a/include/linux/mfd/syscon.h
-+++ b/include/linux/mfd/syscon.h
-@@ -17,10 +17,34 @@
- 
- struct device_node;
- 
-+#if IS_ENABLED(CONFIG_MFD_SYSCON)
- extern struct regmap *syscon_node_to_regmap(struct device_node *np);
- extern struct regmap *syscon_regmap_lookup_by_compatible(const char *s);
- extern struct regmap *syscon_regmap_lookup_by_pdevname(const char *s);
- extern struct regmap *syscon_regmap_lookup_by_phandle(
- 					struct device_node *np,
- 					const char *property);
-+#else
-+static inline struct regmap *syscon_node_to_regmap(struct device_node *np)
-+{
-+	return ERR_PTR(-ENXIO);
-+}
-+
-+static inline struct regmap *syscon_regmap_lookup_by_compatible(const char *s)
-+{
-+	return ERR_PTR(-ENXIO);
-+}
-+
-+static inline struct regmap *syscon_regmap_lookup_by_pdevname(const char *s)
-+{
-+	return ERR_PTR(-ENXIO);
-+}
-+static inline struct regmap *syscon_regmap_lookup_by_phandle(
-+					struct device_node *np,
-+					const char *property)
-+{
-+	return ERR_PTR(-ENXIO);
-+}
-+#endif
-+
- #endif /* __LINUX_MFD_SYSCON_H__ */
+>> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+>> index c328d5c..defaad1 100644
+>> --- a/arch/arm/boot/dts/am4372.dtsi
+>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>> @@ -633,5 +633,32 @@
+>>               dma-names = "tx", "rx";
+>>           };
+>>
+>> +        mcasp0: mcasp at 48038000 {
+> 
+>    According to ePAPR spec [1], "the name of a node should be somewhat
+> generic, reflecting the function of the device and not its
+> precise programming model". In this case probably "sound"?
+
+We use the 'sound' node name for the sound card itself. The case with McASP is
+a bit complicated. It can operate in I2S mode (and similar protocols like RJM,
+LJM, TDM) or it can interface with S/PDIF, IEC60958-1, AES-3 codecs.
+The mode we put McASP depends on the external components, so the same McASP
+can be used in I2S mode in one board while on the other it can be S/PDIF.
+It would have been convenient if I could use 'i2s' as node name but it is not
+true for McASP (Tegra, Exynos for example have I2S, AC97, S/PDIF as separate IP).
+
+IMHO the 'mcasp' is still the best node name for this IP. McASP stands for:
+'Multichannel Audio Serial Port' and this is pretty much what McASP is.
+
 -- 
-1.7.1
+P?ter
