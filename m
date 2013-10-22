@@ -1,82 +1,47 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 22 Oct 2013 16:08:44 +0200
-Subject: [PATCH v5 0/5] ARM: rockchip: add smp functionality
-In-Reply-To: <201310221600.13562.heiko@sntech.de>
-References: <201310221600.13562.heiko@sntech.de>
-Message-ID: <201310221608.45192.heiko@sntech.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 22 Oct 2013 15:10:23 +0100
+Subject: [PATCH 0/4] ARM: KVM: allow VMs with more than 4 CPUs
+In-Reply-To: <1382116746-8757-1-git-send-email-marc.zyngier@arm.com>
+References: <1382116746-8757-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20131022141023.GB61492@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 18, 2013 at 06:19:02PM +0100, Marc Zyngier wrote:
+> Currently, KVM/ARM is limited to 4 A7 or A15 per VM. This is due to
+> the fact that KVM doesn't know about clusters, and puts all CPUs at
+> affinity level 0.
+> 
+> This patch series removes this limitation by allowing additionnal CPUs
+> to be part of a separate cluster (affinity level 1).
+> 
+> This also requires a patch to kvmtool so the generated DT matches the
+> expectations of the guest (posted separately).
+> 
+> Tested on TC2 and arm64 model.
+> 
+> Patches based on Christoffer's next tree as of today.
+> 
+> Marc Zyngier (4):
+>   arm/arm64: KVM: PSCI: use MPIDR to identify a target CPU
+>   ARM: KVM: Fix MPIDR computing to support virtual clusters
+>   ARM: KVM: fix L2CTLR to be per-cluster
+>   ARM: KVM: drop limitation to 4 CPU VMs
+> 
+>  arch/arm/include/asm/kvm_emulate.h   |  5 +++++
+>  arch/arm/kvm/coproc.c                | 14 ++++++++++----
+>  arch/arm/kvm/psci.c                  | 17 +++++++++++++----
+>  arch/arm/kvm/reset.c                 |  4 ----
+>  arch/arm64/include/asm/kvm_emulate.h |  5 +++++
+>  5 files changed, 33 insertions(+), 12 deletions(-)
+> 
+> -- 
+> 1.8.2.3
+> 
+> 
+ack on the series,
 
-gaah, there I just learned about the arm at kernel.org address and still didn't 
-remember when digging up this old recipient list - which of course resulted in 
-Kevin not being included.
+I'll apply these to my tree.
 
-Additionally I also had the old devicetree list included.
-
-So I'll do it again shortly :-)
-
-
-Sorry for the noise
-Heiko
-
-Am Dienstag, 22. Oktober 2013, 16:00:13 schrieb Heiko St?bner:
-> This series enables the use of the additional cores on Rockchip
-> Cortex-A9 SoCs.
-> 
-> To achieve this, add the scu, the needed sram and power-management-unit.
-> 
-> Tested on both a BQ Curie2 (rk3066a / dual core) and
-> on a Radxa Rock (rk3188 / quad core).
-> 
-> changes since v4:
-> - rebase on top of the recent rk3188 board support
-> - implement suggestion from Matt Sealey in moving the sram-limit from
->   marking reserved regions to marking available regions - hopefully
->   I got the usage right :-)
-> - remove __CPUINIT as suggested by Fabio Estevam
-> 
-> changes since v3:
-> - address comments from Rob Herring:
->   - split the gathering of the reserve-data into a separate loop
->   - spelling and style fixes
-> - first patch only included for reference, already part of the
->   char-misc git tree
-> 
-> changes since v2:
-> - rework the sram allocation following the suggestion from Philipp Zabel
-> 
-> changes since v1:
-> - add reserved block feature for mmio-sram, to not use two logical
->   sram nodes
-> - the sram content is kept intact while the device is running, so
->   copying the trampoline is only needed once
-> 
-> Heiko Stuebner (5):
->   misc: sram: add ability to limit used sram areas
->   ARM: rockchip: add snoop-control-unit
->   ARM: rockchip: add sram dt nodes and documentation
->   ARM: rockchip: add power-management-unit dt node
->   ARM: rockchip: add smp bringup code
-> 
->  .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
->  .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   24 +++
->  Documentation/devicetree/bindings/misc/sram.txt    |    8 +
->  arch/arm/boot/dts/rk3066a.dtsi                     |    6 +
->  arch/arm/boot/dts/rk3188.dtsi                      |    6 +
->  arch/arm/boot/dts/rk3xxx.dtsi                      |   10 +
->  arch/arm/mach-rockchip/Kconfig                     |    1 +
->  arch/arm/mach-rockchip/Makefile                    |    1 +
->  arch/arm/mach-rockchip/core.h                      |   22 +++
->  arch/arm/mach-rockchip/headsmp.S                   |   30 ++++
->  arch/arm/mach-rockchip/platsmp.c                   |  195
-> ++++++++++++++++++++ arch/arm/mach-rockchip/rockchip.c                  | 
->   2 +
->  drivers/misc/sram.c                                |   51 ++++-
->  13 files changed, 368 insertions(+), 6 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
->  create mode 100644
-> Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt create mode
-> 100644 arch/arm/mach-rockchip/core.h
->  create mode 100644 arch/arm/mach-rockchip/headsmp.S
->  create mode 100644 arch/arm/mach-rockchip/platsmp.c
+-- 
+Christoffer
