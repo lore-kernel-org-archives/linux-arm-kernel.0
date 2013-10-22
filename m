@@ -1,26 +1,23 @@
-From: dave.long@linaro.org (David Long)
-Date: Tue, 22 Oct 2013 19:56:20 -0400
-Subject: [PATCH v2 02/13] uprobes: allow ignoring of probe hits
-In-Reply-To: <1641249240.11471136.1382441151287.JavaMail.root@redhat.com>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-3-git-send-email-dave.long@linaro.org>
- <20131019170214.GA8324@redhat.com> <5265F4EB.2060803@linaro.org>
- <1641249240.11471136.1382441151287.JavaMail.root@redhat.com>
-Message-ID: <526710A4.9010705@linaro.org>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 22 Oct 2013 16:58:24 -0700
+Subject: [PATCH 00/24] treewide: Convert use of typedef ctl_table to
+ struct ctl_table
+In-Reply-To: <52670FF4.8070701@gmail.com>
+References: <cover.1382480758.git.joe@perches.com> <52670FF4.8070701@gmail.com>
+Message-ID: <1382486304.2041.103.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/13 07:25, Oleg Nesterov wrote:
-> Sorry for top-posting/formatting,
->
-> Do you mean arch_uprobe_skip_sstep() ?
->
-> Yes, this __weak is wrong, already fixed in my tree. See
-> http://marc.info/?l=linux-mips&m=138132052022388&w=2
->
+On Tue, 2013-10-22 at 16:53 -0700, David Daney wrote:
+> After all this work, why not go ahead and remove the typedef?  That way 
+> people won't add more users of this abomination.
 
-That was one I was looking at, but it seemed to me a general opportunity 
-for runtime failures in the kernel that could have been detected at link 
-time.  But that's a topic for discussion elsewhere I should think.
+Hi David.
 
--dl
+The typedef can't be removed until all the uses are gone.
+
+I've sent this before as a single large patch as well as
+individual patches.
+
+treewide:	https://lkml.org/lkml/2013/7/22/600
+RemoveTypedef:	https://lkml.org/lkml/2013/7/22/603
