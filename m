@@ -1,57 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 22 Oct 2013 18:02:13 +0200
-Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 104 board
-In-Reply-To: <20131021215746.GF23593@lunn.ch>
-References: <87txgapcas.fsf@natisbad.org>
- <20131021215746.GF23593@lunn.ch>
-Message-ID: <20131022160213.GB26694@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 22 Oct 2013 18:11:41 +0200
+Subject: Armada XP Internal registers
+In-Reply-To: <CAFJTrDtKw0ANh55Y6xQtFzGtvmZOJ-ZC6cFuKV62L0tmmhT3uA@mail.gmail.com>
+References: <CAFJTrDtznkpwi76yyEKYvjuo+XV34ky9AOe8Qfa5wm-uHDJT6A@mail.gmail.com>
+ <20131021174339.GA27284@localhost>
+ <20131021184219.GA24520@titan.lakedaemon.net>
+ <20131022152950.40171b36@skate>
+ <CAFJTrDtKw0ANh55Y6xQtFzGtvmZOJ-ZC6cFuKV62L0tmmhT3uA@mail.gmail.com>
+Message-ID: <20131022181141.3f567273@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +			pinctrl {
-> > +				poweroff: poweroff {
-> > +					marvell,pins = "mpp60";
-> > +					marvell,function = "gpio";
-> > +				};
-> > +
-> > +				backup_key_pin: backup-key-pin {
-> > +					marvell,pins = "mpp52";
-> > +					marvell,function = "gpio";
-> > +				};
-> > +
-> > +				power_key_pin: power-key-pin {
-> > +					marvell,pins = "mpp62";
-> > +					marvell,function = "gpio";
-> > +				};
-> > +
-> > +				backup_led_pin: backup-led-pin {
-> > +					marvell,pins = "mpp63";
-> > +					marvell,function = "gpo";
-> > +				};
-> > +
-> > +				power_led_pin: power-led-pin {
-> > +					marvell,pins = "mpp64";
-> > +					marvell,function = "gpio";
-> > +				};
-> > +
-> > +				reset_key_pin: reset-key-pin {
-> > +					marvell,pins = "mpp65";
-> > +					marvell,function = "gpio";
-> > +				};
-> > +			};
-> 
-> You can also skip these. The gpio driver will put the pin into gpio
-> mode when the leds/keys driver claims it. It is a case of, i didn't
-> know that, put entries like this into a number of files, and people
-> have been copying my mistake ever since. Thomas made an effort to
-> correct this for some boards.
+Dear Matthew Minter,
 
-Thomas just talked to me about this. What i said is right, but wrong.
+On Tue, 22 Oct 2013 16:56:17 +0100, Matthew Minter wrote:
 
-It is correct they are not required. The gpio driver and pinctrl will
-do the right thing without these. However, having these entries is
-good because it improves what you see in /debugfs/pinctrl. There is a
-name in the output. So please do keep these entries, and sorry for the
-noise.
+> I am preparing all the requested info and will send it to the list
+> soon, unfortunately I am away from the office right now so cant sent
+> it immediately (I don't have my serial logs on this computer) but will
+> send all the data as soon as I can.
 
-	Andrew
+Sure, no problem. Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
