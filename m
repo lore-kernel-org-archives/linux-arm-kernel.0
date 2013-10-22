@@ -1,121 +1,77 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 22 Oct 2013 14:48:45 +0200
-Subject: [RFCv3 7/7] ARM: dts: N900: Add SSI information
-In-Reply-To: <1381091235-18293-8-git-send-email-sre@debian.org>
-References: <1381091235-18293-1-git-send-email-sre@debian.org>
- <1381091235-18293-8-git-send-email-sre@debian.org>
-Message-ID: <5266742D.9050604@baylibre.com>
+From: sre@debian.org (Sebastian Reichel)
+Date: Tue, 22 Oct 2013 14:49:38 +0200
+Subject: [PATCH] ARM: dts: N900: GPIO key definitions
+Message-ID: <1382446178-27638-1-git-send-email-sre@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Add device tree node for the GPIO keys provided by the
+N900 board. This is a simple conversion of the existing
+board code.
 
-Thanks to Tony, I've just realized that I missed all your patches, that 
-for some reason ended-up in my junk folder :-(
+Signed-off-by: Sebastian Reichel <sre@debian.org>
+---
+ arch/arm/boot/dts/omap3-n900.dts | 48 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-That being said, I cannot apply any of your DTS patches! What base 
-branch are you using?
-
-Could you repost all your pending DTS patches in one series rebased on 
-top of my for_3.13/dts?
-
-Thanks,
-Benoit
-
-On 06/10/2013 22:27, Sebastian Reichel wrote:
-> Add SSI device tree data for OMAP3 and Nokia N900.
->
-> Signed-off-by: Sebastian Reichel <sre@debian.org>
-> ---
->   arch/arm/boot/dts/omap3-n900.dts | 12 ++++++++++
->   arch/arm/boot/dts/omap3.dtsi     | 47 ++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 59 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index 0582356..0fbb77e 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -186,6 +186,18 @@
->   	power = <50>;
->   };
->
-> +&ssi_port1 {
-> +	ti,ssi-cawake-gpio = <&gpio5 23 GPIO_ACTIVE_HIGH>; /* 151 */
-> +
-> +	ssi-char {
-> +		compatible = "ssi-char";
-> +	};
-> +};
-> +
-> +&ssi_port2 {
-> +	status = "disabled";
-> +};
-> +
->   &uart1 {
->   	pinctrl-names = "default";
->   	pinctrl-0 = <&uart1_pins>;
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 7d95cda..9f60b82 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -532,5 +532,52 @@
->   			num-eps = <16>;
->   			ram-bits = <12>;
->   		};
-> +
-> +		ssi: ssi-controller at 48058000 {
-> +			compatible = "ti,omap3-ssi";
-> +			ti,hwmods = "ssi";
-> +
-> +			reg = <0x48058000 0x1000>,
-> +			      <0x48059000 0x1000>;
-> +			reg-names = "sys",
-> +				    "gdd";
-> +
-> +			interrupts = <71>;
-> +			interrupt-names = "gdd_mpu";
-> +
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			ssi_port1: ssi-port at 0 {
-> +				compatible = "ti,omap3-ssi-port";
-> +
-> +				reg = <0x4805a000 0x800>,
-> +				      <0x4805a800 0x800>;
-> +				reg-names = "tx",
-> +					    "rx";
-> +
-> +				interrupt-parent = <&intc>;
-> +				interrupts = <67>,
-> +					     <68>;
-> +				interrupt-names = "mpu_irq0",
-> +						  "mpu_irq1";
-> +			};
-> +
-> +			ssi_port2: ssi-port at 1 {
-> +				compatible = "ti,omap3-ssi-port";
-> +
-> +				reg = <0x4805b000 0x800>,
-> +				      <0x4805b800 0x800>;
-> +				reg-names = "tx",
-> +					    "rx";
-> +
-> +				interrupt-parent = <&intc>;
-> +				interrupts = <69>,
-> +					     <70>;
-> +				interrupt-names = "mpu_irq0",
-> +						  "mpu_irq1";
-> +			};
-> +		};
->   	};
->   };
->
-
-
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 30ac779..2841002 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -26,6 +26,54 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
+ 
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		camera_lens_cover {
++			label = "Camera Lens Cover";
++			gpios = <&gpio4 14 GPIO_ACTIVE_LOW>; /* 110 */
++			linux,input-type = <5>; /* EV_SW */
++			linux,code = <0x09>; /* SW_CAMERA_LENS_COVER */
++			gpio-key,wakeup;
++		};
++
++		camera_focus {
++			label = "Camera Focus";
++			gpios = <&gpio3 4 GPIO_ACTIVE_LOW>; /* 68 */
++			linux,code = <0x210>; /* KEY_CAMERA_FOCUS */
++			gpio-key,wakeup;
++		};
++
++		camera_capture {
++			label = "Camera Capture";
++			gpios = <&gpio3 5 GPIO_ACTIVE_LOW>; /* 69 */
++			linux,code = <0xd4>; /* KEY_CAMERA */
++			gpio-key,wakeup;
++		};
++
++		lock_button {
++			label = "Lock Button";
++			gpios = <&gpio4 17 GPIO_ACTIVE_LOW>; /* 113 */
++			linux,code = <0x98>; /* KEY_SCREENLOCK */
++			gpio-key,wakeup;
++		};
++
++		keypad_slide {
++			label = "Keypad Slide";
++			gpios = <&gpio3 7 GPIO_ACTIVE_LOW>; /* 71 */
++			linux,input-type = <5>; /* EV_SW */
++			linux,code = <0x0a>; /* SW_KEYPAD_SLIDE */
++			gpio-key,wakeup;
++		};
++
++		proximity_sensor {
++			label = "Proximity Sensor";
++			gpios = <&gpio3 25 GPIO_ACTIVE_HIGH>; /* 89 */
++			linux,input-type = <5>; /* EV_SW */
++			linux,code = <0x0b>; /* SW_FRONT_PROXIMITY */
++		};
++	};
++
+ };
+ 
+ &omap3_pmx_core {
 -- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+1.8.4.rc3
