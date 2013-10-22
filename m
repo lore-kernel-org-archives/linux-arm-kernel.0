@@ -1,50 +1,46 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 22 Oct 2013 10:45:56 +0900
-Subject: [PATCH] arm: firmware: Check firmware is running or not
-Message-ID: <20131022014556.GA1364@july>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Tue, 22 Oct 2013 02:20:29 +0000
+Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
+ Interface driver.
+In-Reply-To: <526021B0.6050206@metafoo.de>
+References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
+ <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
+ <526021B0.6050206@metafoo.de>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82866F8C@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
 
-To support multi-platform, it needs to know it's running under secure OS or not.
-sometime it needs to access physical address by smc calls.
+> > +static int fsl_sai_probe(struct platform_device *pdev) {
+> [...]
+> > +
+> > +	sai->dma_params_rx.addr = res->start + SAI_RDR;
+> > +	sai->dma_params_rx.maxburst = 6;
+> > +	index = of_property_match_string(np, "dma-names", "rx");
+> > +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
+> > +				&dma_args);
+> > +	if (ret)
+> > +		return ret;
+> > +	sai->dma_params_rx.slave_id = dma_args.args[1];
+> > +
+> > +	sai->dma_params_tx.addr = res->start + SAI_TDR;
+> > +	sai->dma_params_tx.maxburst = 6;
+> > +	index = of_property_match_string(np, "dma-names", "tx");
+> > +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
+> > +				&dma_args);
+> > +	if (ret)
+> > +		return ret;
+> > +	sai->dma_params_tx.slave_id = dma_args.args[1];
+> 
+> The driver should not have to manually parse the dma devicetree
+> properties, this is something that should be handled by the dma engine
+> driver.
+> 
 
-e.g., 
-	if (firmware_run()) {
-		addr = physical address;
-	} else {
-		addr = virtual address;
-	}
+Yes, the dma engine interface has already parsed the slave_id while
+the dma customer requesting one dma channel.
 
-	call_firmware_ops(read_address, addr, &value);
+Though this also could be a way to pass the slave_id to dma driver, but the 
+dma driver uses the way while requesting dma channels.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
-index 27ddccb..e9d9ee5 100644
---- a/arch/arm/common/firmware.c
-+++ b/arch/arm/common/firmware.c
-@@ -16,3 +16,8 @@
- static const struct firmware_ops default_firmware_ops;
- 
- const struct firmware_ops *firmware_ops = &default_firmware_ops;
-+
-+int firmware_run(void)
-+{
-+	return firmware_ops != &default_firmware_ops;
-+}
-diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-index 1563130..efc4554 100644
---- a/arch/arm/include/asm/firmware.h
-+++ b/arch/arm/include/asm/firmware.h
-@@ -42,6 +42,9 @@ struct firmware_ops {
- /* Global pointer for current firmware_ops structure, can't be NULL. */
- extern const struct firmware_ops *firmware_ops;
- 
-+/* Check firmware is running */
-+extern int firmware_run(void);
-+
- /*
-  * call_firmware_op(op, ...)
-  *
+So I'll drop this code later.
