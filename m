@@ -1,47 +1,65 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 22 Oct 2013 15:10:23 +0100
-Subject: [PATCH 0/4] ARM: KVM: allow VMs with more than 4 CPUs
-In-Reply-To: <1382116746-8757-1-git-send-email-marc.zyngier@arm.com>
-References: <1382116746-8757-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20131022141023.GB61492@lvm>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Tue, 22 Oct 2013 16:25:47 +0200
+Subject: [PATCH] ARM: dts: am33xx, change usb ctrl module label
+In-Reply-To: <1381754961-3252-1-git-send-email-mpa@pengutronix.de>
+References: <1381754961-3252-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <52668AEB.8000201@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 06:19:02PM +0100, Marc Zyngier wrote:
-> Currently, KVM/ARM is limited to 4 A7 or A15 per VM. This is due to
-> the fact that KVM doesn't know about clusters, and puts all CPUs at
-> affinity level 0.
-> 
-> This patch series removes this limitation by allowing additionnal CPUs
-> to be part of a separate cluster (affinity level 1).
-> 
-> This also requires a patch to kvmtool so the generated DT matches the
-> expectations of the guest (posted separately).
-> 
-> Tested on TC2 and arm64 model.
-> 
-> Patches based on Christoffer's next tree as of today.
-> 
-> Marc Zyngier (4):
->   arm/arm64: KVM: PSCI: use MPIDR to identify a target CPU
->   ARM: KVM: Fix MPIDR computing to support virtual clusters
->   ARM: KVM: fix L2CTLR to be per-cluster
->   ARM: KVM: drop limitation to 4 CPU VMs
-> 
->  arch/arm/include/asm/kvm_emulate.h   |  5 +++++
->  arch/arm/kvm/coproc.c                | 14 ++++++++++----
->  arch/arm/kvm/psci.c                  | 17 +++++++++++++----
->  arch/arm/kvm/reset.c                 |  4 ----
->  arch/arm64/include/asm/kvm_emulate.h |  5 +++++
->  5 files changed, 33 insertions(+), 12 deletions(-)
-> 
-> -- 
-> 1.8.2.3
-> 
-> 
-ack on the series,
+Hi Markus,
 
-I'll apply these to my tree.
+On 14/10/2013 14:49, Markus Pargmann wrote:
+> Control module is not usb specific. This patch changes the label to
+> usb_ctrl_mod.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+
+I've just applied it.
+
+Thanks,
+Benoit
+
+> ---
+>   arch/arm/boot/dts/am33xx.dtsi | 6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index f9c5da9..14510ee 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -346,7 +346,7 @@
+>   			ti,hwmods = "usb_otg_hs";
+>   			status = "disabled";
+>
+> -			ctrl_mod: control at 44e10000 {
+> +			usb_ctrl_mod: control at 44e10000 {
+>   				compatible = "ti,am335x-usb-ctrl-module";
+>   				reg = <0x44e10620 0x10
+>   					0x44e10648 0x4>;
+> @@ -359,7 +359,7 @@
+>   				reg = <0x47401300 0x100>;
+>   				reg-names = "phy";
+>   				status = "disabled";
+> -				ti,ctrl_mod = <&ctrl_mod>;
+> +				ti,ctrl_mod = <&usb_ctrl_mod>;
+>   			};
+>
+>   			usb0: usb at 47401000 {
+> @@ -407,7 +407,7 @@
+>   				reg = <0x47401b00 0x100>;
+>   				reg-names = "phy";
+>   				status = "disabled";
+> -				ti,ctrl_mod = <&ctrl_mod>;
+> +				ti,ctrl_mod = <&usb_ctrl_mod>;
+>   			};
+>
+>   			usb1: usb at 47401800 {
+>
+
 
 -- 
-Christoffer
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
