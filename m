@@ -1,323 +1,329 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 22 Oct 2013 17:28:29 +0200
-Subject: [PATCH RESEND v5 5/5] ARM: rockchip: add smp bringup code
-In-Reply-To: <201310221724.21550.heiko@sntech.de>
-References: <201310221724.21550.heiko@sntech.de>
-Message-ID: <201310221728.29854.heiko@sntech.de>
+From: joelf@ti.com (Joel Fernandes)
+Date: Tue, 22 Oct 2013 10:30:43 -0500
+Subject: [PATCH 2/3] dma: edma: Add support for Cyclic DMA
+In-Reply-To: <20131021065319.GM14013@intel.com>
+References: <1379977515-3794-1-git-send-email-joelf@ti.com>
+ <1379977515-3794-3-git-send-email-joelf@ti.com>
+ <20131021065319.GM14013@intel.com>
+Message-ID: <52669A23.2080805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the necessary smp-operations and startup code to use
-additional cores on Rockchip SoCs.
+On 10/21/2013 01:53 AM, Vinod Koul wrote:
+> On Mon, Sep 23, 2013 at 06:05:14PM -0500, Joel Fernandes wrote:
+>  
+>> @@ -449,6 +455,138 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+>>  	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+>>  }
+>>  
+>> +static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+>> +	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+>> +	size_t period_len, enum dma_transfer_direction direction,
+>> +	unsigned long tx_flags, void *context)
+>> +{
+>> +	struct edma_chan *echan = to_edma_chan(chan);
+>> +	struct device *dev = chan->device->dev;
+>> +	struct edma_desc *edesc;
+>> +	dma_addr_t src_addr, dst_addr;
+>> +	enum dma_slave_buswidth dev_width;
+>> +	u32 burst;
+>> +	int i, ret, nr_periods;
+>> +
+>> +	if (unlikely(!echan || !buf_len || !period_len))
+>> +		return NULL;
+>> +
+>> +	if (direction == DMA_DEV_TO_MEM) {
+>> +		src_addr = echan->cfg.src_addr;
+>> +		dst_addr = buf_addr;
+>> +		dev_width = echan->cfg.src_addr_width;
+>> +		burst = echan->cfg.src_maxburst;
+>> +	} else if (direction == DMA_MEM_TO_DEV) {
+>> +		src_addr = buf_addr;
+>> +		dst_addr = echan->cfg.dst_addr;
+>> +		dev_width = echan->cfg.dst_addr_width;
+>> +		burst = echan->cfg.dst_maxburst;
+>> +	} else {
+>> +		dev_err(dev, "%s: bad direction?\n", __func__);
+>> +		return NULL;
+>> +	}
+>> +
+>> +	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
+>> +		dev_err(dev, "Undefined slave buswidth\n");
+>> +		return NULL;
+>> +	}
+>> +
+>> +	if (unlikely(buf_len % period_len)) {
+>> +		dev_err(dev, "Period should be multiple of Buffer length\n");
+>> +		return NULL;
+>> +	}
+>> +
+>> +	nr_periods = (buf_len / period_len) + 1;
+> ?
+> 
+> consider the case of buf = period_len, above makes nr_period = 2.
+> 
+> Or buf len 100, period len 50, makes nr_period = 3
+> 
+> Both doesnt seem right to me?
 
-We currently hog the power management unit in the smp code, as it is
-necessary to control the power to the cpu core and nothing else is
-currently using it, so a generic implementation can be done later.
+I guess that variable name is misleading.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+nr_periods is actually the total no.of slots needed to process the request. Its
+value is 1 greater than the total number of periods.
+
+This is because the channel uses one dedicated slot that it continuously
+refreshed (not read-only). The other slots are read-only, and are continuously
+copied into the dedicated channel's slot.
+
+Below is the updated patch where I changed the nr_periods variable name to
+nslots for clarity.
+
+---8<---
+From: Joel Fernandes <joelf@ti.com>
+Subject: [PATCH v2] dma: edma: Add support for Cyclic DMA
+
+Using the PaRAM configuration function that we split for reuse by the
+different DMA types, we implement Cyclic DMA support.
+For the cyclic case, we pass different configuration parameters to this
+function, and handle all the Cyclic-specific functionality separately.
+
+Callbacks to the DMA users are handled using vchan_cyclic_callback in
+the virt-dma layer. Linking is handled the same way as the slave SG case
+except for the last slot where we link it back to the first one in a
+cyclic fashion.
+
+For continuity, we check for cases where no.of periods is great than the
+MAX number of slots the driver can allocate for a particular descriptor
+and error out on such cases.
+
+Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/mach-rockchip/Makefile   |    1 +
- arch/arm/mach-rockchip/core.h     |   22 +++++
- arch/arm/mach-rockchip/headsmp.S  |   30 ++++++
- arch/arm/mach-rockchip/platsmp.c  |  195 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-rockchip/rockchip.c |    2 +
- 5 files changed, 252 insertions(+)
- create mode 100644 arch/arm/mach-rockchip/core.h
- create mode 100644 arch/arm/mach-rockchip/headsmp.S
- create mode 100644 arch/arm/mach-rockchip/platsmp.c
+v2 changes:
+ - changed variable name- nr_periods to nslots, to make the context more clear.
 
-diff --git a/arch/arm/mach-rockchip/Makefile b/arch/arm/mach-rockchip/Makefile
-index 1547d4f..4377a14 100644
---- a/arch/arm/mach-rockchip/Makefile
-+++ b/arch/arm/mach-rockchip/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_ARCH_ROCKCHIP) += rockchip.o
-+obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-diff --git a/arch/arm/mach-rockchip/core.h b/arch/arm/mach-rockchip/core.h
-new file mode 100644
-index 0000000..e2e7c9d
---- /dev/null
-+++ b/arch/arm/mach-rockchip/core.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (c) 2013 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+extern char rockchip_secondary_trampoline;
-+extern char rockchip_secondary_trampoline_end;
-+
-+extern unsigned long rockchip_boot_fn;
-+extern void rockchip_secondary_startup(void);
-+
-+extern struct smp_operations rockchip_smp_ops;
-diff --git a/arch/arm/mach-rockchip/headsmp.S b/arch/arm/mach-rockchip/headsmp.S
-new file mode 100644
-index 0000000..3dd72f7
---- /dev/null
-+++ b/arch/arm/mach-rockchip/headsmp.S
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (c) 2013 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+ENTRY(rockchip_secondary_startup)
-+	bl	v7_invalidate_l1
-+	b	secondary_startup
-+ENDPROC(rockchip_secondary_startup)
-+
-+ENTRY(rockchip_secondary_trampoline)
-+	ldr	pc, 1f
-+ENDPROC(rockchip_secondary_trampoline)
-+	.globl	rockchip_boot_fn
-+rockchip_boot_fn:
-+1:	.space	4
-+
-+ENTRY(rockchip_secondary_trampoline_end)
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-new file mode 100644
-index 0000000..5b3f69c
---- /dev/null
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -0,0 +1,195 @@
-+/*
-+ * Copyright (c) 2013 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/smp_scu.h>
-+#include <asm/smp_plat.h>
-+#include <asm/mach/map.h>
-+
-+#include "core.h"
-+
-+static void __iomem *scu_base_addr;
-+static void __iomem *sram_base_addr;
-+static int ncores;
-+
-+/*
-+ * temporary PMU handling
-+ */
-+
-+#define PMU_PWRDN_CON		0x08
-+#define PMU_PWRDN_ST		0x0c
-+
-+static void __iomem *pmu_base_addr;
-+
-+static inline bool pmu_power_domain_is_on(int pd)
+ drivers/dma/edma.c | 160 ++++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 152 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 9b6004f..0fef450 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -54,6 +54,7 @@
+ struct edma_desc {
+ 	struct virt_dma_desc		vdesc;
+ 	struct list_head		node;
++	int				cyclic;
+ 	int				absync;
+ 	int				pset_nr;
+ 	int				processed;
+@@ -167,8 +168,13 @@ static void edma_execute(struct edma_chan *echan)
+ 	 * then setup a link to the dummy slot, this results in all future
+ 	 * events being absorbed and that's OK because we're done
+ 	 */
+-	if (edesc->processed == edesc->pset_nr)
+-		edma_link(echan->slot[nslots-1], echan->ecc->dummy_slot);
++	if (edesc->processed == edesc->pset_nr) {
++		if (edesc->cyclic)
++			edma_link(echan->slot[nslots-1], echan->slot[1]);
++		else
++			edma_link(echan->slot[nslots-1],
++				  echan->ecc->dummy_slot);
++	}
+
+ 	edma_resume(echan->ch_num);
+
+@@ -253,6 +259,7 @@ static int edma_control(struct dma_chan *chan, enum
+dma_ctrl_cmd cmd,
+ /*
+  * A PaRAM set configuration abstraction used by other modes
+  * @chan: Channel who's PaRAM set we're configuring
++ * @pset: PaRAM set to initialize and setup.
+  * @src_addr: Source address of the DMA
+  * @dst_addr: Destination address of the DMA
+  * @burst: In units of dev_width, how much to send
+@@ -448,6 +455,138 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+ }
+
++static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
++	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
++	size_t period_len, enum dma_transfer_direction direction,
++	unsigned long tx_flags, void *context)
 +{
-+	return !(readl_relaxed(pmu_base_addr + PMU_PWRDN_ST) & BIT(pd));
-+}
++	struct edma_chan *echan = to_edma_chan(chan);
++	struct device *dev = chan->device->dev;
++	struct edma_desc *edesc;
++	dma_addr_t src_addr, dst_addr;
++	enum dma_slave_buswidth dev_width;
++	u32 burst;
++	int i, ret, nslots;
 +
-+static void pmu_set_power_domain(int pd, bool on)
-+{
-+	u32 val = readl_relaxed(pmu_base_addr + PMU_PWRDN_CON);
-+	if (on)
-+		val &= ~BIT(pd);
-+	else
-+		val |=  BIT(pd);
-+	writel(val, pmu_base_addr + PMU_PWRDN_CON);
++	if (unlikely(!echan || !buf_len || !period_len))
++		return NULL;
 +
-+	while (pmu_power_domain_is_on(pd) != on) { }
-+}
-+
-+/*
-+ * Handling of CPU cores
-+ */
-+
-+static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
-+					     struct task_struct *idle)
-+{
-+	if (!sram_base_addr || !pmu_base_addr) {
-+		pr_err("%s: sram or pmu missing for cpu boot\n", __func__);
-+		return -ENXIO;
++	if (direction == DMA_DEV_TO_MEM) {
++		src_addr = echan->cfg.src_addr;
++		dst_addr = buf_addr;
++		dev_width = echan->cfg.src_addr_width;
++		burst = echan->cfg.src_maxburst;
++	} else if (direction == DMA_MEM_TO_DEV) {
++		src_addr = buf_addr;
++		dst_addr = echan->cfg.dst_addr;
++		dev_width = echan->cfg.dst_addr_width;
++		burst = echan->cfg.dst_maxburst;
++	} else {
++		dev_err(dev, "%s: bad direction?\n", __func__);
++		return NULL;
 +	}
 +
-+	if (cpu >= ncores) {
-+		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
-+							__func__, cpu, ncores);
-+		return -ENXIO;
++	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
++		dev_err(dev, "Undefined slave buswidth\n");
++		return NULL;
 +	}
 +
-+	/* start the core */
-+	pmu_set_power_domain(0 + cpu, true);
-+
-+	return 0;
-+}
-+
-+/**
-+ * rockchip_smp_prepare_sram - populate necessary sram block
-+ * Starting cores execute the code residing at the start of the on-chip sram
-+ * after power-on. Therefore make sure, this sram region is reserved and
-+ * big enough. After this check, copy the trampoline code that directs the
-+ * core to the real startup code in ram into the sram-region.
-+ * @node: mmio-sram device node
-+ */
-+static int __init rockchip_smp_prepare_sram(struct device_node *node)
-+{
-+	unsigned int trampoline_sz = &rockchip_secondary_trampoline_end -
-+					    &rockchip_secondary_trampoline;
-+	const __be32 *avail_list = NULL;
-+	int avail_size;
-+	int astart = -1;
-+	unsigned int asize;
-+	unsigned int i;
-+
-+	avail_list = of_get_property(node, "available",
-+					&avail_size);
-+	if (!avail_list) {
-+		pr_err("%s: available property for sram missing\n",
-+		       __func__);
-+		return -ENOENT;
++	if (unlikely(buf_len % period_len)) {
++		dev_err(dev, "Period should be multiple of Buffer length\n");
++		return NULL;
 +	}
 +
-+	avail_size /= sizeof(*avail_list);
-+	if (!avail_size || avail_size % 2) {
-+		pr_err("%s: wrong number of arguments for available chunks\n",
-+		       __func__);
-+		return -EINVAL;
-+	}
-+
-+	/* Check that the area for the trampoline is not generally available */
-+	for (i = 0; i < avail_size; i += 2) {
-+		/* get the next reserved block */
-+		astart = be32_to_cpu(*avail_list++);
-+		asize = be32_to_cpu(*avail_list++);
-+
-+		if (astart + asize < trampoline_sz) {
-+			pr_err("%s: trampoline area in sram is not reserved\n",
-+			       __func__);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	sram_base_addr = of_iomap(node, 0);
-+
-+	/* set the boot function for the sram code */
-+	rockchip_boot_fn = virt_to_phys(rockchip_secondary_startup);
-+
-+	/* copy the trampoline to sram, that runs during startup of the core */
-+	memcpy(sram_base_addr, &rockchip_secondary_trampoline, trampoline_sz);
-+	flush_cache_all();
-+	outer_clean_range(0, trampoline_sz);
-+
-+	dsb_sev();
-+
-+	return 0;
-+}
-+
-+static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *node;
-+	unsigned int i;
-+
-+	node = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-+	if (!node) {
-+		pr_err("%s: missing scu\n", __func__);
-+		return;
-+	}
-+
-+	scu_base_addr = of_iomap(node, 0);
-+	if (!scu_base_addr) {
-+		pr_err("%s: could not map scu registers\n", __func__);
-+		return;
-+	}
-+
-+	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-sram");
-+	if (!node) {
-+		pr_err("%s: could not find sram dt node\n", __func__);
-+		return;
-+	}
-+
-+	if (rockchip_smp_prepare_sram(node))
-+		return;
-+
-+	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-pmu");
-+	if (!node) {
-+		pr_err("%s: could not find sram dt node\n", __func__);
-+		return;
-+	}
-+
-+	pmu_base_addr = of_iomap(node, 0);
++	nslots = (buf_len / period_len) + 1;
 +
 +	/*
-+	 * While the number of cpus is gathered from dt, also get the number
-+	 * of cores from the scu to verify this value when booting the cores.
++	 * Cyclic DMA users such as audio cannot tolerate delays introduced
++	 * by cases where the number of periods is more than the maximum
++	 * number of SGs the EDMA driver can handle at a time. For DMA types
++	 * such as Slave SGs, such delays are tolerable and synchronized,
++	 * but the synchronization is difficult to achieve with Cyclic and
++	 * cannot be guaranteed, so we error out early.
 +	 */
-+	ncores = scu_get_core_count(scu_base_addr);
++	if (nslots > MAX_NR_SG)
++		return NULL;
 +
-+	scu_enable(scu_base_addr);
++	edesc = kzalloc(sizeof(*edesc) + nslots *
++		sizeof(edesc->pset[0]), GFP_ATOMIC);
++	if (!edesc) {
++		dev_dbg(dev, "Failed to allocate a descriptor\n");
++		return NULL;
++	}
 +
-+	/* Make sure that all cores except the first are really off */
-+	for (i = 1; i < ncores; i++)
-+		pmu_set_power_domain(0 + i, false);
++	edesc->cyclic = 1;
++	edesc->pset_nr = nslots;
++
++	dev_dbg(dev, "%s: nslots=%d\n", __func__, nslots);
++	dev_dbg(dev, "%s: period_len=%d\n", __func__, period_len);
++	dev_dbg(dev, "%s: buf_len=%d\n", __func__, buf_len);
++
++	for (i = 0; i < nslots; i++) {
++		/* Allocate a PaRAM slot, if needed */
++		if (echan->slot[i] < 0) {
++			echan->slot[i] =
++				edma_alloc_slot(EDMA_CTLR(echan->ch_num),
++						EDMA_SLOT_ANY);
++			if (echan->slot[i] < 0) {
++				dev_err(dev, "Failed to allocate slot\n");
++				return NULL;
++			}
++		}
++
++		if (i == nslots - 1) {
++			memcpy(&edesc->pset[i], &edesc->pset[0],
++			       sizeof(edesc->pset[0]));
++			break;
++		}
++
++		ret = edma_config_pset(chan, &edesc->pset[i], src_addr,
++				       dst_addr, burst, dev_width, period_len,
++				       direction);
++		if (ret < 0)
++			return NULL;
++
++		if (direction == DMA_DEV_TO_MEM)
++			dst_addr += period_len;
++		else
++			src_addr += period_len;
++
++		dev_dbg(dev, "%s: Configure period %d of buf:\n", __func__, i);
++		dev_dbg(dev,
++			"\n pset[%d]:\n"
++			"  chnum\t%d\n"
++			"  slot\t%d\n"
++			"  opt\t%08x\n"
++			"  src\t%08x\n"
++			"  dst\t%08x\n"
++			"  abcnt\t%08x\n"
++			"  ccnt\t%08x\n"
++			"  bidx\t%08x\n"
++			"  cidx\t%08x\n"
++			"  lkrld\t%08x\n",
++			i, echan->ch_num, echan->slot[i],
++			edesc->pset[i].opt,
++			edesc->pset[i].src,
++			edesc->pset[i].dst,
++			edesc->pset[i].a_b_cnt,
++			edesc->pset[i].ccnt,
++			edesc->pset[i].src_dst_bidx,
++			edesc->pset[i].src_dst_cidx,
++			edesc->pset[i].link_bcntrld);
++
++		edesc->absync = ret;
++
++		/*
++		 * Enable interrupts for every period because callback
++		 * has to be called for every period.
++		 */
++		edesc->pset[i].opt |= TCINTEN;
++	}
++
++	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
 +}
 +
-+struct smp_operations rockchip_smp_ops __initdata = {
-+	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
-+	.smp_boot_secondary	= rockchip_boot_secondary,
-+};
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index 724d2d8..a0c1f19 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -24,6 +24,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include "core.h"
- 
- static void __init rockchip_timer_init(void)
+ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
  {
-@@ -46,6 +47,7 @@ static const char * const rockchip_board_dt_compat[] = {
- };
- 
- DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
-+	.smp		= smp_ops(rockchip_smp_ops),
- 	.init_machine	= rockchip_dt_init,
- 	.init_time	= rockchip_timer_init,
- 	.dt_compat	= rockchip_board_dt_compat,
+ 	struct edma_chan *echan = data;
+@@ -456,24 +595,28 @@ static void edma_callback(unsigned ch_num, u16 ch_status,
+void *data)
+ 	unsigned long flags;
+ 	struct edmacc_param p;
+
+-	/* Pause the channel */
+-	edma_pause(echan->ch_num);
++	edesc = echan->edesc;
++
++	/* Pause the channel for non-cyclic */
++	if (!edesc || (edesc && !edesc->cyclic))
++		edma_pause(echan->ch_num);
+
+ 	switch (ch_status) {
+ 	case DMA_COMPLETE:
+ 		spin_lock_irqsave(&echan->vchan.lock, flags);
+
+-		edesc = echan->edesc;
+ 		if (edesc) {
+-			if (edesc->processed == edesc->pset_nr) {
++			if (edesc->cyclic) {
++				vchan_cyclic_callback(&edesc->vdesc);
++			} else if (edesc->processed == edesc->pset_nr) {
+ 				dev_dbg(dev, "Transfer complete, stopping channel %d\n", ch_num);
+ 				edma_stop(echan->ch_num);
+ 				vchan_cookie_complete(&edesc->vdesc);
++				edma_execute(echan);
+ 			} else {
+ 				dev_dbg(dev, "Intermediate transfer complete on channel %d\n", ch_num);
++				edma_execute(echan);
+ 			}
+-
+-			edma_execute(echan);
+ 		}
+
+ 		spin_unlock_irqrestore(&echan->vchan.lock, flags);
+@@ -671,6 +814,7 @@ static void edma_dma_init(struct edma_cc *ecc, struct
+dma_device *dma,
+ 			  struct device *dev)
+ {
+ 	dma->device_prep_slave_sg = edma_prep_slave_sg;
++	dma->device_prep_dma_cyclic = edma_prep_dma_cyclic;
+ 	dma->device_alloc_chan_resources = edma_alloc_chan_resources;
+ 	dma->device_free_chan_resources = edma_free_chan_resources;
+ 	dma->device_issue_pending = edma_issue_pending;
 -- 
-1.7.10.4
+1.8.1.2
