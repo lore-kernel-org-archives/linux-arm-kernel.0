@@ -1,58 +1,52 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 22 Oct 2013 10:51:16 +0100
-Subject: [PATCH v2 0/5] ARM: vexpress/TC2: cpufreq support
-In-Reply-To: <CAKohpo=7Z7D9VsF5GHXKTUy70muNSr-q4nf8k8_qzWBzitzmvA@mail.gmail.com>
-References: <1382349534-31502-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <CAKohpo=7Z7D9VsF5GHXKTUy70muNSr-q4nf8k8_qzWBzitzmvA@mail.gmail.com>
-Message-ID: <52664A94.3040508@arm.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Tue, 22 Oct 2013 15:41:07 +0530
+Subject: [PATCH v2 6/7] ARM: dts: update hdmiphy dt node for exynos5250
+In-Reply-To: <1382436668-15813-1-git-send-email-rahul.sharma@samsung.com>
+References: <1382436668-15813-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1382436668-15813-7-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/10/13 09:22, Viresh Kumar wrote:
-> On 21 October 2013 15:28, Sudeep KarkadaNagesha
-> <Sudeep.KarkadaNagesha@arm.com> wrote:
->> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>
->> Hi,
->>
->> The SPC(Serial Power Controller) on Versatile Express V2P-CA15_A7(TC2)
->> not only controls low-power states, wake-up irqs and per-CPU jump addresses
->> but also the CPU performance operating points which is essential to provide
->> CPU DVFS. The M3 microcontroller can provide upto eight performance values,
->> one set for each cluster (CA15 or CA7). Each of this value contains the
->> frequency(kHz) and voltage(mV) at that performance level. It expects
->> these performance level to be passed through the SPC PERF_LVL registers.
->>
->> This patch series adds support to populate those OPPs, add them to the
->> cpu devices and runtime programming of these performance levels through
->> clock framework. It also adds a small interface cpufreq driver to validate
->> the OPPs and register the arm_big_little cpufreq driver.
->>
->> Changes v1->v2:
->>         - Introduced ARCH_VEXPRESS_SPC config to make dependency
->>           selection cleaner
->>         - Other minor review comments from Nico implemented
->>
->> Regards,
->> Sudeep
->>
->> Sudeep KarkadaNagesha (5):
->>   cpufreq: arm-big-little: use clk_get instead of clk_get_sys
->>   ARM: vexpress/TC2: add support for CPU DVFS
->>   ARM: vexpress/TC2: add cpu clock support
->>   cpufreq: arm_big_little: add vexpress SPC interface driver
->>   ARM: vexpress/TC2: register vexpress-spc cpufreq device
-> 
-> For All Patches:
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
+hdmiphy dt node needs a child node called 'phy-power-control'
+which represents the PMU register for power controlling the
+hdmiphy.
 
-Thanks Nico, Pawel and Viresh for the review and acks.
+hdmi driver dt node provides phy property which points to
+the hdmiphy dt node.
 
-Hi Rafael,
+Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+---
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Do you prefer a pull request for this or are you OK to pull from the mails ?
-
-Regards,
-Sudeep
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 49f18c2..99a83412 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -134,9 +134,15 @@
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-max-bus-freq = <66000>;
+ 
+-		hdmiphy at 38 {
++		hdmiphy: hdmiphy at 38 {
+ 			compatible = "samsung,exynos4212-hdmiphy";
+ 			reg = <0x38>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			phy-power-control {
++				reg = <0x10040700 0x04>;
++			};
+ 		};
+ 	};
+ 
+@@ -220,6 +226,7 @@
+ 
+ 	hdmi {
+ 		hpd-gpio = <&gpx3 7 0>;
++		phy = <&hdmiphy>;
+ 	};
+ 
+ 	codec at 11000000 {
+-- 
+1.7.10.4
