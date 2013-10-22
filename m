@@ -1,111 +1,68 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 22 Oct 2013 10:08:36 +0100
-Subject: [PATCH RESEND v2 1/8] ARM: KVM: Allow creating the VGIC after VCPUs
+Date: Tue, 22 Oct 2013 10:08:40 +0100
+Subject: [PATCH RESEND v2 5/8] KVM: arm-vgic: Make vgic mmio functions more
+ generic
 In-Reply-To: <1382432923-61267-1-git-send-email-christoffer.dall@linaro.org>
 References: <1382432923-61267-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1382432923-61267-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1382432923-61267-6-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework the VGIC initialization slightly to allow initialization of the
-vgic cpu-specific state even if the irqchip (the VGIC) hasn't been
-created by user space yet.  This is safe, because the vgic data
-structures are already allocated when the CPU is allocated if VGIC
-support is compiled into the kernel.  Further, the init process does not
-depend on any other information and the sacrifice is a slight
-performance degradation for creating VMs in the no-VGIC case.
+Rename the vgic_ranges array to vgic_dist_ranges to be more specific and
+to prepare for handling CPU interface register access as well (for
+save/restore of VGIC state).
 
-The reason is that the new device control API doesn't mandate creating
-the VGIC before creating the VCPU and it is unreasonable to require user
-space to create the VGIC before creating the VCPUs.
-
-At the same time move the irqchip_in_kernel check out of
-kvm_vcpu_first_run_init and into the init function to make the per-vcpu
-and global init functions symmetric and add comments on the exported
-functions making it a bit easier to understand the init flow by only
-looking at vgic.c.
+Pass offset from distributor or interface MMIO base to
+find_matching_range function instead of the physical address of the
+access in the VM memory map.  This allows other callers unaware of the
+VM specifics, but with generic VGIC knowledge to reuse the function.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Reviewed-by: Alexander Graf <agraf@suse.de>
 ---
- arch/arm/kvm/arm.c  |    7 ++++---
- virt/kvm/arm/vgic.c |   22 +++++++++++++++++++---
- 2 files changed, 23 insertions(+), 6 deletions(-)
+ virt/kvm/arm/vgic.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9c697db..2b1091a 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -461,6 +461,8 @@ static void update_vttbr(struct kvm *kvm)
- 
- static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- {
-+	int ret;
-+
- 	if (likely(vcpu->arch.has_run_once))
- 		return 0;
- 
-@@ -470,9 +472,8 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 	 * Initialize the VGIC before running a vcpu the first time on
- 	 * this VM.
- 	 */
--	if (irqchip_in_kernel(vcpu->kvm) &&
--	    unlikely(!vgic_initialized(vcpu->kvm))) {
--		int ret = kvm_vgic_init(vcpu->kvm);
-+	if (unlikely(!vgic_initialized(vcpu->kvm))) {
-+		ret = kvm_vgic_init(vcpu->kvm);
- 		if (ret)
- 			return ret;
- 	}
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 685fc72..5ce100f 100644
+index d9c0fc5..1148a2e 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1243,15 +1243,19 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
- 	return IRQ_HANDLED;
- }
+@@ -602,7 +602,7 @@ struct mmio_range {
+ 			    phys_addr_t offset);
+ };
  
-+/**
-+ * kvm_vgic_vcpu_init - Initialize per-vcpu VGIC state
-+ * @vcpu: pointer to the vcpu struct
-+ *
-+ * Initialize the vgic_cpu struct and vgic_dist struct fields pertaining to
-+ * this vcpu and enable the VGIC for this VCPU
-+ */
- int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+-static const struct mmio_range vgic_ranges[] = {
++static const struct mmio_range vgic_dist_ranges[] = {
+ 	{
+ 		.base		= GIC_DIST_CTRL,
+ 		.len		= 12,
+@@ -669,14 +669,13 @@ static const struct mmio_range vgic_ranges[] = {
+ static const
+ struct mmio_range *find_matching_range(const struct mmio_range *ranges,
+ 				       struct kvm_exit_mmio *mmio,
+-				       phys_addr_t base)
++				       phys_addr_t offset)
  {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	int i;
+ 	const struct mmio_range *r = ranges;
+-	phys_addr_t addr = mmio->phys_addr - base;
  
--	if (!irqchip_in_kernel(vcpu->kvm))
--		return 0;
--
- 	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
- 		return -EBUSY;
+ 	while (r->len) {
+-		if (addr >= r->base &&
+-		    (addr + mmio->len) <= (r->base + r->len))
++		if (offset >= r->base &&
++		    (offset + mmio->len) <= (r->base + r->len))
+ 			return r;
+ 		r++;
+ 	}
+@@ -713,7 +712,8 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		return true;
+ 	}
  
-@@ -1383,10 +1387,22 @@ out:
- 	return ret;
- }
- 
-+/**
-+ * kvm_vgic_init - Initialize global VGIC state before running any VCPUs
-+ * @kvm: pointer to the kvm struct
-+ *
-+ * Map the virtual CPU interface into the VM before running any VCPUs.  We
-+ * can't do this at creation time, because user space must first set the
-+ * virtual CPU interface address in the guest physical address space.  Also
-+ * initialize the ITARGETSRn regs to 0 on the emulated distributor.
-+ */
- int kvm_vgic_init(struct kvm *kvm)
- {
- 	int ret = 0, i;
- 
-+	if (!irqchip_in_kernel(kvm))
-+		return 0;
-+
- 	mutex_lock(&kvm->lock);
- 
- 	if (vgic_initialized(kvm))
+-	range = find_matching_range(vgic_ranges, mmio, base);
++	offset = mmio->phys_addr - base;
++	range = find_matching_range(vgic_dist_ranges, mmio, offset);
+ 	if (unlikely(!range || !range->handle_mmio)) {
+ 		pr_warn("Unhandled access %d %08llx %d\n",
+ 			mmio->is_write, mmio->phys_addr, mmio->len);
 -- 
 1.7.10.4
