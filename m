@@ -1,101 +1,81 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 22 Oct 2013 14:23:32 +0800
-Subject: [Patch v2 03/10] usb: chipidea: add wakeup interrupt handler
+Date: Tue, 22 Oct 2013 14:23:33 +0800
+Subject: [Patch v2 04/10] usb: chipidea: usbmisc_imx: remove the controller's
+ clock information
 In-Reply-To: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
 References: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1382423019-26184-4-git-send-email-peter.chen@freescale.com>
+Message-ID: <1382423019-26184-5-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the controller is at suspend mode, it can be waken up by
-external events (like vbus, dp/dm or id change). Once we receive
-the wakeup interrupt, we need to resume the controller first, eg
-open clocks, disable some wakeup settings, etc. After that, the
-controller can receive the normal USB interrupts.
+Currently, the usbmisc is just an API supplier for controller
+driver, the controller calls related APIs to handle different
+things among the SoCs, before calling it, the clock must
+be on. So the clock operation is useless for usbmisc, it also
+increases the difficulties to manage the clock, especially at
+runtime power management situation.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci.h   |    1 +
- drivers/usb/chipidea/core.c |   20 ++++++++++++++++++++
- drivers/usb/chipidea/otg.c  |    5 +++++
- 3 files changed, 26 insertions(+), 0 deletions(-)
+ drivers/usb/chipidea/usbmisc_imx.c |   18 ------------------
+ 1 files changed, 0 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index 6ea1892..38598b3 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -175,6 +175,7 @@ struct ci_hdrc {
- 	bool				b_sess_valid_event;
- 	bool				supports_runtime_pm;
- 	bool				in_lpm;
-+	bool				wakeup_int;
+diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+index 8a1094b..1fd9a12 100644
+--- a/drivers/usb/chipidea/usbmisc_imx.c
++++ b/drivers/usb/chipidea/usbmisc_imx.c
+@@ -11,7 +11,6 @@
+ 
+ #include <linux/module.h>
+ #include <linux/of_platform.h>
+-#include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
+@@ -40,7 +39,6 @@ struct usbmisc_ops {
+ struct imx_usbmisc {
+ 	void __iomem *base;
+ 	spinlock_t lock;
+-	struct clk *clk;
+ 	const struct usbmisc_ops *ops;
  };
  
- static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index a5b8f43..a9497eb 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -190,6 +190,13 @@ static void ci_hdrc_enter_lpm(struct ci_hdrc *ci, bool enable)
- 		 * than 1ms) to leave low power mode.
- 		 */
- 		usleep_range(1500, 2000);
-+	} else if (!enable) {
-+		/*
-+		 * At wakeup interrupt, the phcd will be cleared by hardware
-+		 * automatically, but the controller needs at least 1ms
-+		 * to reflect PHY's status.
-+		 */
-+		usleep_range(1200, 1800);
- 	}
- }
+@@ -177,7 +175,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
+ {
+ 	struct resource	*res;
+ 	struct imx_usbmisc *data;
+-	int ret;
+ 	struct of_device_id *tmp_dev;
  
-@@ -355,6 +362,13 @@ static irqreturn_t ci_irq(int irq, void *data)
- 	irqreturn_t ret = IRQ_NONE;
- 	u32 otgsc = 0;
+ 	if (usbmisc)
+@@ -194,20 +191,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
+ 	if (IS_ERR(data->base))
+ 		return PTR_ERR(data->base);
  
-+	if (ci->in_lpm) {
-+		disable_irq_nosync(irq);
-+		ci->wakeup_int = true;
-+		pm_runtime_get(ci->dev);
-+		return IRQ_HANDLED;
-+	}
-+
- 	if (ci->is_otg)
- 		otgsc = hw_read(ci, OP_OTGSC, ~0);
+-	data->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(data->clk)) {
+-		dev_err(&pdev->dev,
+-			"failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+-		return PTR_ERR(data->clk);
+-	}
+-
+-	ret = clk_prepare_enable(data->clk);
+-	if (ret) {
+-		dev_err(&pdev->dev,
+-			"clk_prepare_enable failed, err=%d\n", ret);
+-		return ret;
+-	}
+-
+ 	tmp_dev = (struct of_device_id *)
+ 		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
+ 	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
+@@ -218,7 +201,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
  
-@@ -739,6 +753,12 @@ static int ci_controller_resume(struct device *dev)
- 
- 	ci->in_lpm = false;
- 
-+	if (ci->wakeup_int) {
-+		ci->wakeup_int = false;
-+		enable_irq(ci->irq);
-+		pm_runtime_put(ci->dev);
-+	}
-+
+ static int usbmisc_imx_remove(struct platform_device *pdev)
+ {
+-	clk_disable_unprepare(usbmisc->clk);
+ 	usbmisc = NULL;
  	return 0;
  }
- 
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-index 39bd7ec..54bc7c0 100644
---- a/drivers/usb/chipidea/otg.c
-+++ b/drivers/usb/chipidea/otg.c
-@@ -78,10 +78,15 @@ static void ci_otg_work(struct work_struct *work)
- 
- 	if (ci->id_event) {
- 		ci->id_event = false;
-+		/* Keep controller active during id switch */
-+		pm_runtime_get_sync(ci->dev);
- 		ci_handle_id_switch(ci);
-+		pm_runtime_put_sync(ci->dev);
- 	} else if (ci->b_sess_valid_event) {
- 		ci->b_sess_valid_event = false;
-+		pm_runtime_get_sync(ci->dev);
- 		ci_handle_vbus_change(ci);
-+		pm_runtime_put_sync(ci->dev);
- 	} else
- 		dev_err(ci->dev, "unexpected event occurs at %s\n", __func__);
- 
 -- 
 1.7.1
