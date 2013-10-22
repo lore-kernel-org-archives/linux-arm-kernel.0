@@ -1,46 +1,33 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Tue, 22 Oct 2013 02:20:29 +0000
-Subject: [alsa-devel] [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio
- Interface driver.
-In-Reply-To: <526021B0.6050206@metafoo.de>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
- <526021B0.6050206@metafoo.de>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82866F8C@039-SN2MPN1-013.039d.mgd.msft.net>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 22 Oct 2013 10:23:43 +0800
+Subject: [PATCH] clk / clkdev: fix the comments in clk_register_clkdev
+Message-ID: <1382408623-23673-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+'dev_id' in the comments of clk_register_clkdev should
+be 'dev_fmt' here.
 
-> > +static int fsl_sai_probe(struct platform_device *pdev) {
-> [...]
-> > +
-> > +	sai->dma_params_rx.addr = res->start + SAI_RDR;
-> > +	sai->dma_params_rx.maxburst = 6;
-> > +	index = of_property_match_string(np, "dma-names", "rx");
-> > +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
-> > +				&dma_args);
-> > +	if (ret)
-> > +		return ret;
-> > +	sai->dma_params_rx.slave_id = dma_args.args[1];
-> > +
-> > +	sai->dma_params_tx.addr = res->start + SAI_TDR;
-> > +	sai->dma_params_tx.maxburst = 6;
-> > +	index = of_property_match_string(np, "dma-names", "tx");
-> > +	ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
-> > +				&dma_args);
-> > +	if (ret)
-> > +		return ret;
-> > +	sai->dma_params_tx.slave_id = dma_args.args[1];
-> 
-> The driver should not have to manually parse the dma devicetree
-> properties, this is something that should be handled by the dma engine
-> driver.
-> 
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/clk/clkdev.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Yes, the dma engine interface has already parsed the slave_id while
-the dma customer requesting one dma channel.
-
-Though this also could be a way to pass the slave_id to dma driver, but the 
-dma driver uses the way while requesting dma channels.
-
-So I'll drop this code later.
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 442a313..825b52b 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -270,9 +270,9 @@ EXPORT_SYMBOL(clkdev_drop);
+  * clk_register_clkdev - register one clock lookup for a struct clk
+  * @clk: struct clk to associate with all clk_lookups
+  * @con_id: connection ID string on device
+- * @dev_id: format string describing device name
++ * @dev_fmt: format string describing device name
+  *
+- * con_id or dev_id may be NULL as a wildcard, just as in the rest of
++ * con_id or dev_fmt may be NULL as a wildcard, just as in the rest of
+  * clkdev.
+  *
+  * To make things easier for mass registration, we detect error clks
+-- 
+1.7.9.5
