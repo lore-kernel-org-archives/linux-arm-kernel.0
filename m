@@ -1,53 +1,27 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 22 Oct 2013 23:00:33 +0200
-Subject: [PATCH v2] clocksource: Provide timekeeping for efm32 SoCs
-In-Reply-To: <20131022201001.GB27227@pengutronix.de>
-References: <1380830189-21553-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <5253ECC7.30700@linaro.org> <20131008145147.GP10079@pengutronix.de>
- <20131022201001.GB27227@pengutronix.de>
-Message-ID: <5266E771.4070906@linaro.org>
+From: anton@enomsg.org (Anton Vorontsov)
+Date: Tue, 22 Oct 2013 14:03:38 -0700
+Subject: [PATCH 2/4] power: isp1704_charger: Fix driver to work with
+ changes introduced in v3.5
+In-Reply-To: <1378630239-10006-3-git-send-email-pali.rohar@gmail.com>
+References: <1378630239-10006-1-git-send-email-pali.rohar@gmail.com>
+ <1378630239-10006-3-git-send-email-pali.rohar@gmail.com>
+Message-ID: <20131022210337.GA6148@teo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2013 10:10 PM, Uwe Kleine-K?nig wrote:
-> On Tue, Oct 08, 2013 at 04:51:47PM +0200, Uwe Kleine-K?nig wrote:
->> Hello Daniel,
->>
->> On Tue, Oct 08, 2013 at 01:30:15PM +0200, Daniel Lezcano wrote:
->>> On 10/03/2013 09:56 PM, Uwe Kleine-K?nig wrote:
->>>> An efm32 features 4 16-bit timers with a 10-bit prescaler. This driver
->>>> provides clocksource and clock event device using one timer instance
->>>> each.
->>>>
->>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>>> ---
->>>
->>> Applied to my tree for 3.13
->> Thanks
-> Where is your tree to be found? This commit isn't in
->
-> 	git://git.linaro.org/people/dlezcano/linux.git clockevents/3.13
->
-> and also it's not included in next-20131021.
+On Sun, Sep 08, 2013 at 10:50:37AM +0200, Pali Roh?r wrote:
+> * omap musb driver does not report USB_EVENT_ENUMERATED event anymore
+> * omap musb driver reporting USB_EVENT_VBUS when charger is connected
+> * read last event from phy->last_event (instead from ulpi register)
+> * do not call wall charger detection more times
+> 
+> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
 
-Thanks for the heads up.
+Applied, thanks a lot!
 
-I synced my local tree with the tree:
+(Per others' review comments I am assuming that the second isp1704 patch
+will be reworked to support device-tree, so I am not applying it.)
 
-git://git.linaro.org/people/dlezcano/linux.git
+Thanks,
 
-for the branch clockevents/3.13 and clockevents/3.12-fixes
-
-I will send a PR as soon as I can.
-
-Thanks
-   -- Daniel
-
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Anton
