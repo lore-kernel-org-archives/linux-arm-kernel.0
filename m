@@ -1,41 +1,67 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 22 Oct 2013 19:23:10 +0530
-Subject: [PATCH v2] ARM: OMAP2+: wakeupgen: AM43x adaptation
-In-Reply-To: <525922CE.6080200@ti.com>
-References: <1381302753-7045-1-git-send-email-afzal@ti.com>
- <525922CE.6080200@ti.com>
-Message-ID: <52668346.7010608@ti.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 22 Oct 2013 16:00:13 +0200
+Subject: [PATCH v5 0/5] ARM: rockchip: add smp functionality
+Message-ID: <201310221600.13562.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+This series enables the use of the additional cores on Rockchip
+Cortex-A9 SoCs.
 
-On Saturday 12 October 2013 03:52 PM, Afzal Mohammed wrote:
-> On Wednesday 09 October 2013 12:42 PM, Afzal Mohammed wrote:
+To achieve this, add the scu, the needed sram and power-management-unit.
 
->> AM43x has 224 interrupts and 7 banks, make it as maximum values. Keep
->> default values as earlier, if am43x is detected, update interrupts and
->> banks accordingly.
->>
->> Also AM43x has only one cpu, ensure that clearing bitmask at wakeupgen
->> is done only for the single existing cpu, existing code assumes that
->> there are two cpu's.
->>
->> If bitmask is cleared in wakeupgen for the nonexistent second cpu,
->> an imprecise abort happens as soon as Kernel switches to user space.
->> It was rootcaused by Sekhar Nori <nsekhar@ti.com>.
->>
->> Signed-off-by: Afzal Mohammed <afzal@ti.com>
->> ---
->>
->> v2:
->> 1. make AM43x adaptation such that changes required for new SoC addition is less
->> 2. avoid usage of am43x local variable, use soc_is_am43xx() instead
-> 
-> Seems you missed this one, please consider this for the coming merge
-> window. Without this AM43x would not boot to prompt.
+Tested on both a BQ Curie2 (rk3066a / dual core) and
+on a Radxa Rock (rk3188 / quad core).
 
-Ping
+changes since v4:
+- rebase on top of the recent rk3188 board support
+- implement suggestion from Matt Sealey in moving the sram-limit from
+  marking reserved regions to marking available regions - hopefully
+  I got the usage right :-)
+- remove __CPUINIT as suggested by Fabio Estevam
 
-Regards
-Afzal
+changes since v3:
+- address comments from Rob Herring:
+  - split the gathering of the reserve-data into a separate loop
+  - spelling and style fixes
+- first patch only included for reference, already part of the
+  char-misc git tree
+
+changes since v2:
+- rework the sram allocation following the suggestion from Philipp Zabel
+
+changes since v1:
+- add reserved block feature for mmio-sram, to not use two logical
+  sram nodes
+- the sram content is kept intact while the device is running, so
+  copying the trampoline is only needed once
+
+Heiko Stuebner (5):
+  misc: sram: add ability to limit used sram areas
+  ARM: rockchip: add snoop-control-unit
+  ARM: rockchip: add sram dt nodes and documentation
+  ARM: rockchip: add power-management-unit dt node
+  ARM: rockchip: add smp bringup code
+
+ .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
+ .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   24 +++
+ Documentation/devicetree/bindings/misc/sram.txt    |    8 +
+ arch/arm/boot/dts/rk3066a.dtsi                     |    6 +
+ arch/arm/boot/dts/rk3188.dtsi                      |    6 +
+ arch/arm/boot/dts/rk3xxx.dtsi                      |   10 +
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/core.h                      |   22 +++
+ arch/arm/mach-rockchip/headsmp.S                   |   30 ++++
+ arch/arm/mach-rockchip/platsmp.c                   |  195 ++++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |    2 +
+ drivers/misc/sram.c                                |   51 ++++-
+ 13 files changed, 368 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/core.h
+ create mode 100644 arch/arm/mach-rockchip/headsmp.S
+ create mode 100644 arch/arm/mach-rockchip/platsmp.c
+
+-- 
+1.7.10.4
