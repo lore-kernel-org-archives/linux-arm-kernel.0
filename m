@@ -1,36 +1,35 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 22 Oct 2013 14:23:39 +0800
-Subject: [Patch v2 10/10] usb: chipidea: imx: Enable CI_HDRC_IMX_EHCI_QUIRK if
- the phy has notify APIs
-In-Reply-To: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
-References: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1382423019-26184-11-git-send-email-peter.chen@freescale.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 21 Oct 2013 23:47:23 -0700
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+Message-ID: <20131022064723.GA15861@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the PHY has .notify_suspend and .notify_resume, it means this
-imx usb controller needs to add quirks for standard ehci routine.
+On Sun, Oct 20, 2013 at 09:00:08PM -0400, Nicolas Pitre wrote:
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/chipidea/ci_hdrc_imx.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+>The hardware support in the kernel, on the other hand, can be improved
+>incrementally with time.  It doesn't matter if it is not optimal at
+>first. It can be revisited, optimized, reviewed, and sometimes even
+>redesigned.  And only when it reaches maturity would be the time to use
+>the experience from the kernel development and make some firmware out of
+>it.  But what would be the point then?
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index d4775b3..4045c76 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -118,6 +118,11 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 
- 	pdata.phy = data->phy;
- 
-+	/* notify APIs are used for adding quirks at standard EHCI routine */
-+	if (pdata.phy && pdata.phy->notify_suspend
-+			&& pdata.phy->notify_resume)
-+		pdata.flags |= CI_HDRC_IMX_EHCI_QUIRK;
-+
- 	if (of_device_is_compatible(np, "fsl,imx6q-usb")) {
- 		pdata.flags |= CI_HDRC_SUPPORTS_RUNTIME_PM;
- 		data->supports_runtime_pm = true;
+One other point that is kind of overlooked, but I think is important,
+is that firmware will tend to be closed source.  The advantages we get
+to having drivers shared in the kernel would be gone, and we would end
+up with multiple implementations of essentially the same driver,
+especially with reference hardware blocks that get used in different
+platforms.
+
+David
+
 -- 
-1.7.1
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
