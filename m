@@ -1,69 +1,66 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 22 Oct 2013 17:29:06 +0800
-Subject: [Patch v2 00/14] Add power management support for MXS PHY
-In-Reply-To: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
-References: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131022092905.GC8534@shlinux1.ap.freescale.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 22 Oct 2013 11:45:16 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something	better?
+In-Reply-To: <52658918.1060708@wwwdotorg.org>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020231134.GR25034@n2100.arm.linux.org.uk>
+ <52646AF9.3050309@roeck-us.net> <52658918.1060708@wwwdotorg.org>
+Message-ID: <20131022094515.GD15640@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Mon, Oct 21, 2013 at 09:05:44PM +0100, Stephen Warren wrote:
+> On 10/21/2013 12:44 AM, Guenter Roeck wrote:
+> > On 10/20/2013 04:11 PM, Russell King - ARM Linux wrote:
+> >> On Sun, Oct 20, 2013 at 10:26:54PM +0100, Stephen Warren wrote:
+> >>> The only thing we've really moved out of the kernel is the exact IDs of
+> >>> which GPIOS, interrupts, I2C/SPI ports the devices are connected to; the
+> >>> simple stuff not the hard stuff. The code hasn't really been simplified
+> >>> by DT - if anything, it's more complicated since we now have to parse
+> >>> those values from DT rather than putting them into simple
+> >>> data-structures.
+> >>
+> >> Here's my random thoughts this evening on DT, orientated mostly on a
+> >> problem area I've been paying attention to recently.
+> >>
+> >> In some ways, DT has made things much harder.  I don't know whether
+> > 
+> > On the other side, DT has made some things much simpler.
+> > 
+> > Problem case: Chip A's interrupt pin is connected to gpio pin of chip B.
+> > Chip B's interrupt pin is connected to a gpio pin on chip C. Chip C's
+> > interrupt pin is connected to the interrupt controller. Chips B and C
+> > are multi-function FPGAs. Exact gpio pins used vary from board to board.
+> > 
+> > With DT, this relationship is easy to describe, and none of the chip
+> > drivers
+> > really needs to know what is connected to what. Without DT, it would be
+> > much more complex.
+> 
+> I thought that was very easy with board files. For every chip that gets
+> instantiated, you tell it which base IRQ ID to use. For every chip that
+> outputs a IRQ, you tell it which IRQ ID that signal is, simply by adding
+> the recipient chip's IRQ base and an offset. That seems very simple. If
+> you don't want to add the base/offset together, we could always have
+> invented some lookup table similar to what regulators had, and pinctrl
+> has now, which says for each (device name, IRQ name/number) output,
+> here's the (device name, IRQ name/number) of the associated input.
 
-I have tried this patchset as well as my chipidea runtime pm patchset
-at imx28 evk, it works ok except below two problems:
+Well, DT has certainly increased the level of dynamicity within the
+kernel. I for one consider not having to rely on a fixed IRQ or GPIO
+base per-chip a good thing. Deferred probing is a very powerful yet
+extremely simple tool that was created as part of the DT conversion
+effort. There is obviously much more that can be done, but I think
+that we have come a long way.
 
-- Without CONFIG_MFD_SYSCON causes build error, fixed by below patches
-http://marc.info/?l=linux-arm-kernel&m=138243289017143&w=2
-- Unbalanced IRQ wake disable kernel warning when system resume if
-enabled wakeup setting , it may mx28 platform problem, I will discuss
-with shawn about it.
+But as you said, that could all have been done even with board files.
 
-On Tue, Oct 22, 2013 at 01:58:34PM +0800, Peter Chen wrote:
-> Hi Felipe,
-> 
->    The serial adds power management support for MXS PHY, it includes:
-> 
->    - Add three common PHY API, .set_wakeup, .notify_suspend, notify_resume.
->    - Related above API implementation at mxs phy driver
->    - misc changes for mxs phy to support low power mode and wakeup.
-> 
-> Changes for v2:
-> 
-> - Add missing patches which introduce platform judgement code [1/14,2/14]
-> - re-order the patch sequence, like doc->dts->source file, 
-> the reviewers can know the meaning of dt properties before review source
-> - Add description of two IC problems exsiting at mxs PHY; change
-> "high speed" to "HS" and "non-high speed" to "FS/LS" [5/14]
-> - Change the dt property disconnect-line-without-vbus
-> that the separator should be "-" not the "_", meanwhile, related source
-> code has changed.
-> - Using one local variable to get the function return val to avoid long
-> condition statement. [13/14]
-> 
-> Peter Chen (14):
->   usb: doc: phy-mxs: Add more compatible strings
->   usb: phy-mxs: Add platform judgement code
->   usb: phy-mxs: Add auto clock and power setting
->   usb: doc: phy-mxs: update binding for adding anatop phandle
->   ARM: dts: imx6: add anatop phandle for usbphy
->   usb: phy-mxs: Add anatop regmap
->   usb: phy: add notify suspend and resume callback
->   usb: phy-mxs: Add implementation of nofity_suspend and notify_resume
->   usb: phy-mxs: Enable IC fixes for mx6 SoC serial
->   usb: doc: phy-mxs: update binding for adding disconnect line property
->   ARM: dts: imx6: Add disconnect-line-without-vbus property for usbphy
->   usb: phy: Add set_wakeup API
->   usb: phy-mxs: Add implementation of set_wakeup
->   usb: phy-mxs: Add system suspend/resume API
-> 
->  Documentation/devicetree/bindings/usb/mxs-phy.txt |   12 +-
->  arch/arm/boot/dts/imx6qdl.dtsi                    |    3 +
->  drivers/usb/phy/phy-mxs-usb.c                     |  328 ++++++++++++++++++++-
->  include/linux/usb/phy.h                           |   39 +++
->  4 files changed, 367 insertions(+), 15 deletions(-)
-> 
-
--- 
-
-Best Regards,
-Peter Chen
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/148594b1/attachment.sig>
