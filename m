@@ -1,41 +1,46 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 22 Oct 2013 10:46:03 +0300
-Subject: [PATCH] ARM: dts: am4372: Add McASP nodes
-In-Reply-To: <526579FB.10005@cogentembedded.com>
-References: <1382348758-1083-1-git-send-email-peter.ujfalusi@ti.com>
- <526579FB.10005@cogentembedded.com>
-Message-ID: <52662D3B.5050204@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 22 Oct 2013 13:52:13 +0530
+Subject: [PATCH v2 0/5] ARM: vexpress/TC2: cpufreq support
+In-Reply-To: <1382349534-31502-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1382349534-31502-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <CAKohpo=7Z7D9VsF5GHXKTUy70muNSr-q4nf8k8_qzWBzitzmvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 21 October 2013 15:28, Sudeep KarkadaNagesha
+<Sudeep.KarkadaNagesha@arm.com> wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+>
+> Hi,
+>
+> The SPC(Serial Power Controller) on Versatile Express V2P-CA15_A7(TC2)
+> not only controls low-power states, wake-up irqs and per-CPU jump addresses
+> but also the CPU performance operating points which is essential to provide
+> CPU DVFS. The M3 microcontroller can provide upto eight performance values,
+> one set for each cluster (CA15 or CA7). Each of this value contains the
+> frequency(kHz) and voltage(mV) at that performance level. It expects
+> these performance level to be passed through the SPC PERF_LVL registers.
+>
+> This patch series adds support to populate those OPPs, add them to the
+> cpu devices and runtime programming of these performance levels through
+> clock framework. It also adds a small interface cpufreq driver to validate
+> the OPPs and register the arm_big_little cpufreq driver.
+>
+> Changes v1->v2:
+>         - Introduced ARCH_VEXPRESS_SPC config to make dependency
+>           selection cleaner
+>         - Other minor review comments from Nico implemented
+>
+> Regards,
+> Sudeep
+>
+> Sudeep KarkadaNagesha (5):
+>   cpufreq: arm-big-little: use clk_get instead of clk_get_sys
+>   ARM: vexpress/TC2: add support for CPU DVFS
+>   ARM: vexpress/TC2: add cpu clock support
+>   cpufreq: arm_big_little: add vexpress SPC interface driver
+>   ARM: vexpress/TC2: register vexpress-spc cpufreq device
 
-On 10/21/2013 10:01 PM, Sergei Shtylyov wrote:
+For All Patches:
 
->> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
->> index c328d5c..defaad1 100644
->> --- a/arch/arm/boot/dts/am4372.dtsi
->> +++ b/arch/arm/boot/dts/am4372.dtsi
->> @@ -633,5 +633,32 @@
->>               dma-names = "tx", "rx";
->>           };
->>
->> +        mcasp0: mcasp at 48038000 {
-> 
->    According to ePAPR spec [1], "the name of a node should be somewhat
-> generic, reflecting the function of the device and not its
-> precise programming model". In this case probably "sound"?
-
-We use the 'sound' node name for the sound card itself. The case with McASP is
-a bit complicated. It can operate in I2S mode (and similar protocols like RJM,
-LJM, TDM) or it can interface with S/PDIF, IEC60958-1, AES-3 codecs.
-The mode we put McASP depends on the external components, so the same McASP
-can be used in I2S mode in one board while on the other it can be S/PDIF.
-It would have been convenient if I could use 'i2s' as node name but it is not
-true for McASP (Tegra, Exynos for example have I2S, AC97, S/PDIF as separate IP).
-
-IMHO the 'mcasp' is still the best node name for this IP. McASP stands for:
-'Multichannel Audio Serial Port' and this is pretty much what McASP is.
-
--- 
-P?ter
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
