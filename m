@@ -1,88 +1,86 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Tue, 22 Oct 2013 17:49:10 +0200
-Subject: [PATCH V7 0/8] ARM: OMAP3+: support cpufreq-cpu0 for device tree
- boot
-In-Reply-To: <1381937948-27057-1-git-send-email-nm@ti.com>
-References: <1381937948-27057-1-git-send-email-nm@ti.com>
-Message-ID: <52669E76.2010702@baylibre.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 22 Oct 2013 17:57:58 +0200
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <CAKohpok2scsSU7eFOP5LYmQar8xfOqG4-b3z4sVS6JOgnxVcpw@mail.gmail.com>
+References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
+ <1382186261-14482-2-git-send-email-andrew@lunn.ch>
+ <CAKohpok2scsSU7eFOP5LYmQar8xfOqG4-b3z4sVS6JOgnxVcpw@mail.gmail.com>
+Message-ID: <20131022155758.GA26694@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+Hi Viresh
 
-On 16/10/2013 17:39, Nishanth Menon wrote:
-> Hi,
->
-> This series enables the use of cpufreq-cpu0 generic driver for all
-> OMAP and related derivatives. Only patch#8 in the series, which
-> introduces CPU clock nodes, depends on Tero's V8 patch series for clock
-> nodes[1]
->
-> I will stop copy pasting the series complete history and point at [2].
->
-> Main changes since V6[3]:
-> - squashed patches for a minimal set
-> - i have organized the series such that 1 to 7 can immediately be merged
->    if desired:
-> 	- patches 1,2,3 can go to Tony's omap-for-v3.13/quirk [4]
-> 	- patches 4-7 can go to Benoit's for_3.13/dts [5]
+Thanks for your comments. I will include them in the next version.
 
-I've just applied them in my DTS tree.
+> > +static irqreturn_t dove_cpufreq_irq(int irq, void *dev)
+> > +{
+> > +       return IRQ_HANDLED;
+> > +}
+> 
+> what is this for?
 
-Thanks,
-Benoit
+The hardware raises an interrupt when the change is complete. This
+interrupt is what brings the CPU out of the WFI. I don't know the
+interrupt code too well, but i think it is necessary for the driver to
+acknowledged it. The interrupt core code counts interrupts which
+nobody acknowledges, and after 1000 are received, it disables the
+interrupt. That would probably result in the machine locking solid,
+never coming out of the WFI. So i'm playing it safe and handling the
+interrupt.
 
-> 	- patch 8 needs to depend on [1] and should eventually go to [5]
->
-> NOTES: obviously without clock nodes cpufreq will not function.
->
-> Test Script: http://pastebin.com/VvJPjsne
->
-> Test-log:
-> BeagleBoard-XM (OMAP36xx): http://pastebin.com/XZDNaHPf
-> PandaBoard-ES (OMAP4460): http://pastebin.com/qQCmA2ng
-> BeagleBone-Black(AM335x): http://pastebin.com/98FX4uYW
-> OMAP5uEVM (OMAP5432): http://pastebin.com/NXj3L636
-> DRA7-EVM (DRA7xx): http://pastebin.com/0kKT3TXy
->
-> J Keerthy (3):
->    ARM: dts: dra7-evm: add smps123 supply for CPU
->    ARM: dts: OMAP5: Add CPU OPP table
->    ARM: dts: DRA7: Add CPU OPP table
->
-> Nishanth Menon (5):
->    ARM: OMAP3+: do not register non-dt OPP tables for device tree boot
->    ARM: OMAP2+: add missing lateinit hook for calling pm late init
->    ARM: OMAP3+: use cpu0-cpufreq driver in device tree supported boot
->    ARM: dts: omap5-uevm: add smps123 supply for CPU
->    ARM: dts: OMAP3: add clock nodes for CPU
->
-> [1] http://marc.info/?t=138133284200006&r=1&w=2
-> [2] http://marc.info/?l=linux-arm-kernel&m=136804009618594&w=2
-> [3] http://marc.info/?l=devicetree&m=138135419203492&w=2
-> [4] https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.13/quirk
->
->   arch/arm/boot/dts/am33xx.dtsi       |    4 ++++
->   arch/arm/boot/dts/dra7-evm.dts      |    4 ++++
->   arch/arm/boot/dts/dra7.dtsi         |   13 ++++++++++++-
->   arch/arm/boot/dts/omap3.dtsi        |    5 +++++
->   arch/arm/boot/dts/omap4.dtsi        |    5 +++++
->   arch/arm/boot/dts/omap5-uevm.dts    |    4 ++++
->   arch/arm/boot/dts/omap5.dtsi        |   15 ++++++++++++++-
->   arch/arm/mach-omap2/board-generic.c |    4 ++++
->   arch/arm/mach-omap2/common.h        |    4 ++++
->   arch/arm/mach-omap2/io.c            |   20 ++++++++++++++++++++
->   arch/arm/mach-omap2/opp.c           |    4 ++++
->   arch/arm/mach-omap2/pm.c            |   12 +++++++++---
->   12 files changed, 89 insertions(+), 5 deletions(-)
->
-> Regards,
-> Nishanth Menon
->
+> > +static int dove_cpufreq_probe(struct platform_device *pdev)
+> > +{
+> > +       struct device_node *np;
+> > +       struct resource *res;
+> > +       int err;
+> > +       int irq;
+> 
+> Above two can be merged.
 
+Well, i was told the exact opposite by the USB serial maintainer :-) 
+I will use your coding style here, and his for USB code, and try to
+keep everybody happy.
 
--- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+ 
+> > +       priv.dev = &pdev->dev;
+> > +
+> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +       priv.dfs = devm_ioremap_resource(&pdev->dev, res);
+> > +       if (IS_ERR(priv.dfs))
+> > +               return PTR_ERR(priv.dfs);
+> > +
+> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > +       priv.pmu_cr = devm_ioremap_resource(&pdev->dev, res);
+> > +       if (IS_ERR(priv.pmu_cr))
+> > +               return PTR_ERR(priv.pmu_cr);
+> > +
+> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+> > +       priv.pmu_clk_div = devm_ioremap_resource(&pdev->dev, res);
+> > +       if (IS_ERR(priv.pmu_clk_div))
+> > +               return PTR_ERR(priv.pmu_clk_div);
+> > +
+> > +       np = of_find_node_by_path("/cpus/cpu at 0");
+> > +       if (!np)
+> > +               return -ENODEV;
+> > +
+> > +       priv.cpu_clk = of_clk_get_by_name(np, "cpu_clk");
+> > +       if (IS_ERR(priv.cpu_clk)) {
+> > +               dev_err(priv.dev, "Unable to get cpuclk");
+> > +               return PTR_ERR(priv.cpu_clk);
+> > +       }
+> > +
+> > +       clk_prepare_enable(priv.cpu_clk);
+> 
+> this can fail..
+
+In theory yes. In practice no. It is a fixed rate clock. prepare and
+enable are actually NOPs for this type of clock. However the API
+documentation explicitly states you need to call prepare and enable
+before you can call clk_get_rate(). But i can add error checking if
+you want.
+
+> 
+> > +       dove_freq_table[0].frequency = clk_get_rate(priv.cpu_clk) / 1000;
+
+  Andrew
