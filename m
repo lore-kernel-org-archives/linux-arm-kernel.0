@@ -1,70 +1,53 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Oct 2013 22:48:12 +0200
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <52665314.2040904@imgtec.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131021085420.GA21518@ulmo.nvidia.com>
- <52658C49.80400@wwwdotorg.org> <5265AFED.1040503@roeck-us.net>
- <52665314.2040904@imgtec.com>
-Message-ID: <20131022204811.GD8037@mithrandir>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 22 Oct 2013 23:00:33 +0200
+Subject: [PATCH v2] clocksource: Provide timekeeping for efm32 SoCs
+In-Reply-To: <20131022201001.GB27227@pengutronix.de>
+References: <1380830189-21553-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5253ECC7.30700@linaro.org> <20131008145147.GP10079@pengutronix.de>
+ <20131022201001.GB27227@pengutronix.de>
+Message-ID: <5266E771.4070906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 11:27:32AM +0100, James Hogan wrote:
-> On 21/10/13 23:51, Guenter Roeck wrote:
-> > In my opinion, not being able to describe behavior (or what people refer
-> > to as "describe how the hardware is used") is a severe limitation of
-> > devicetree usage in Linux. That is not a devicetree limitation per se,
-> > though, it is simply a matter of choice (or, in some cases, the ability
-> > of those arguing for new bindings to sell those bindings as "hardware
-> > description").
-> 
-> I agree this is a real problem, and I think it hinders upstream
-> submission, since platform data was permitted to describe behaviour as
-> well as describe the hardware, and platform data is being replaced with
-> DT which is only permitted to describe the hardware. How then should we
-> specify the behaviour to the kernel?
-> 
-> I've already mentioned specific examples of this on the "Clock DT
-> bindings" thread, and would be very interested if anybody has thoughts
-> about it:
-> http://lkml.kernel.org/r/520E1DF5.4030409 at imgtec.com
+On 10/22/2013 10:10 PM, Uwe Kleine-K?nig wrote:
+> On Tue, Oct 08, 2013 at 04:51:47PM +0200, Uwe Kleine-K?nig wrote:
+>> Hello Daniel,
+>>
+>> On Tue, Oct 08, 2013 at 01:30:15PM +0200, Daniel Lezcano wrote:
+>>> On 10/03/2013 09:56 PM, Uwe Kleine-K?nig wrote:
+>>>> An efm32 features 4 16-bit timers with a 10-bit prescaler. This driver
+>>>> provides clocksource and clock event device using one timer instance
+>>>> each.
+>>>>
+>>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>>> ---
+>>>
+>>> Applied to my tree for 3.13
+>> Thanks
+> Where is your tree to be found? This commit isn't in
+>
+> 	git://git.linaro.org/people/dlezcano/linux.git clockevents/3.13
+>
+> and also it's not included in next-20131021.
 
-I've certainly run into similar problems. To be specific, one such
-instance involved backlight devices. In a nutshell, Linux' backlight
-subsystem by default enables a backlight when it is probed (well, the
-subsystem doesn't do that, but pretty much every driver does). This
-seems to have worked very well, but when you hook up a backlight with
-something high-level such as DRM, the fact that you no longer control
-when the backlight is turned on becomes a problem. DRM knows very
-precisely when a backlight or panel should be turned on, because it's
-tightly coupled with when the display controller starts sending data to
-the display. If the backlight is turned on by default at some
-unpredictable point during the boot process, you end up with a powered
-backlight that shows you all sorts of artifacts while the display is
-being initialized.
+Thanks for the heads up.
 
-My first attempt at solving this was to add a backlight-boot-off
-property to the device tree, which would make the device driver keep the
-backlight turned off on boot by default so that the DRM driver would be
-able to turn it on only after the display was properly initialized.
+I synced my local tree with the tree:
 
-Obviously that doesn't represent the hardware but some random bit of
-software policy. The bad thing about it is that there's no other place
-to put this bit of information. I can't change the default behaviour of
-the backlight driver either because it is generic and used by many other
-boards. So what's the solution to that? Perhaps duplicate the driver
-with only the boot on default changed? Or add a new compatible value
-"pwm-backlight-disabled-on-boot"? Guess that won't be acceptable either
-because it encodes behaviour. "pwm-backlight-v2" wouldn't encode any
-behaviour...
+git://git.linaro.org/people/dlezcano/linux.git
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/c67ec51a/attachment.sig>
+for the branch clockevents/3.13 and clockevents/3.12-fixes
+
+I will send a PR as soon as I can.
+
+Thanks
+   -- Daniel
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
