@@ -1,53 +1,51 @@
-From: onestero@redhat.com (Oleg Nesterov)
-Date: Tue, 22 Oct 2013 07:25:51 -0400 (EDT)
-Subject: [PATCH v2 02/13] uprobes: allow ignoring of probe hits
-In-Reply-To: <5265F4EB.2060803@linaro.org>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-3-git-send-email-dave.long@linaro.org>
- <20131019170214.GA8324@redhat.com> <5265F4EB.2060803@linaro.org>
-Message-ID: <1641249240.11471136.1382441151287.JavaMail.root@redhat.com>
+From: sre@debian.org (Sebastian Reichel)
+Date: Tue, 22 Oct 2013 13:43:58 +0200
+Subject: [PATCH] DTS: ARM: OMAP3-N900: Add support for SD cards
+Message-ID: <1382442238-24637-1-git-send-email-sre@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for top-posting/formatting,
+Add support for external SD card slot.
 
-Do you mean arch_uprobe_skip_sstep() ?
+Signed-off-by: Sebastian Reichel <sre@debian.org>
+---
+ arch/arm/boot/dts/omap3-n900.dts | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-Yes, this __weak is wrong, already fixed in my tree. See
-http://marc.info/?l=linux-mips&m=138132052022388&w=2
-
------ Original Message -----
-From: "David Long" <dave.long@linaro.org>
-To: "Oleg Nesterov" <oleg@redhat.com>
-Cc: linux-arm-kernel at lists.infradead.org, "Rabin Vincent" <rabin@rab.in>, "Jon Medhurst (Tixy)" <tixy@linaro.org>, "Srikar Dronamraju" <srikar@linux.vnet.ibm.com>, "Ingo Molnar" <mingo@redhat.com>, linux-kernel at vger.kernel.org
-Sent: Tuesday, 22 October, 2013 5:45:47 AM
-Subject: Re: [PATCH v2 02/13] uprobes: allow ignoring of probe hits
-
-On 10/19/13 13:02, Oleg Nesterov wrote:
-> On 10/15, David Long wrote:
->>
->> @@ -1732,9 +1732,6 @@ static void handle_swbp(struct pt_regs *regs)
->>   		return;
->>   	}
->>
->> -	/* change it in advance for ->handler() and restart */
->> -	instruction_pointer_set(regs, bp_vaddr);
->> -
->
-> Well, this looks obviously wrong. This SET_IP() has the comment ;)
->
-> Note also that with this breaks __skip_sstep() on x86.
->
-> Oleg.
->
-
-Yes, and there's a missing weak stub function in there too.  It was a 
-surprise to me that declaring an external as weak means that it quietly 
-ignores the fact there is no definition for it at link time, and makes 
-it zero.  I think there may be some similar land mines elsewhere in the 
-kernel, unrelated to these changes or uprobes in general.
-
-I have an updated version to go out with the v3 patches.  It is working 
-with v3.12-rc6 on x86 and ARM, to the extent I'm able to test it.
-
--dl
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 99d0668..ab62afa 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -65,6 +65,17 @@
+ 			0x194 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c3_sda */
+ 		>;
+ 	};
++
++	mmc1_pins: pinmux_mmc1_pins {
++		pinctrl-single,pins = <
++			0x114 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk */
++			0x116 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd */
++			0x118 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat0 */
++			0x11a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat1 */
++			0x11c (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat2 */
++			0x11e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat3 */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -103,7 +114,11 @@
+ };
+ 
+ &mmc1 {
+-	status = "disabled";
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	vmmc-supply = <&vmmc1>;
++	bus-width = <4>;
++	cd-gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>; /* 160 */
+ };
+ 
+ &mmc2 {
+-- 
+1.8.4.rc3
