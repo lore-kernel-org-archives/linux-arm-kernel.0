@@ -1,196 +1,36 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 22 Oct 2013 14:23:38 +0800
-Subject: [Patch v2 09/10] usb: chipidea: host: add ehci quirk for imx
- controller
+Date: Tue, 22 Oct 2013 14:23:39 +0800
+Subject: [Patch v2 10/10] usb: chipidea: imx: Enable CI_HDRC_IMX_EHCI_QUIRK if
+ the phy has notify APIs
 In-Reply-To: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
 References: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1382423019-26184-10-git-send-email-peter.chen@freescale.com>
+Message-ID: <1382423019-26184-11-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the port goes to suspend or finishes resme, it needs to
-notify PHY, it is not a standard EHCI operation, so we add a
-quirk for it.
+If the PHY has .notify_suspend and .notify_resume, it means this
+imx usb controller needs to add quirks for standard ehci routine.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/host.c  |  129 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/usb/chipidea.h |    1 +
- 2 files changed, 130 insertions(+), 0 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_imx.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index 283b385..c1d05c4 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -34,6 +34,10 @@
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index d4775b3..4045c76 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -118,6 +118,11 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
  
- static struct hc_driver __read_mostly ci_ehci_hc_driver;
- static int (*orig_bus_suspend)(struct usb_hcd *hcd);
-+static int (*orig_bus_resume)(struct usb_hcd *hcd);
-+static int (*orig_hub_control)(struct usb_hcd *hcd,
-+				u16 typeReq, u16 wValue, u16 wIndex,
-+				char *buf, u16 wLength);
+ 	pdata.phy = data->phy;
  
- static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
- {
-@@ -75,12 +79,131 @@ static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
- 				 */
- 				udelay(125);
- 			}
-+			if (hcd->phy && test_bit(port, &ehci->bus_suspended)
-+				&& (ehci_port_speed(ehci, portsc) ==
-+					USB_PORT_STAT_HIGH_SPEED))
-+				/*
-+				 * notify the USB PHY, it is for global
-+				 * suspend case.
-+				 */
-+				usb_phy_notify_suspend(hcd->phy,
-+					USB_SPEED_HIGH);
- 		}
- 	}
- 
- 	return 0;
- }
- 
-+static int ci_imx_ehci_bus_resume(struct usb_hcd *hcd)
-+{
-+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-+	int port;
++	/* notify APIs are used for adding quirks at standard EHCI routine */
++	if (pdata.phy && pdata.phy->notify_suspend
++			&& pdata.phy->notify_resume)
++		pdata.flags |= CI_HDRC_IMX_EHCI_QUIRK;
 +
-+	int ret = orig_bus_resume(hcd);
-+
-+	if (ret)
-+		return ret;
-+
-+	port = HCS_N_PORTS(ehci->hcs_params);
-+	while (port--) {
-+		u32 __iomem *reg = &ehci->regs->port_status[port];
-+		u32 portsc = ehci_readl(ehci, reg);
-+		/*
-+		 * Notify PHY after resume signal has finished, it is
-+		 * for global suspend case.
-+		 */
-+		if (hcd->phy
-+			&& test_bit(port, &ehci->bus_suspended)
-+			&& (portsc & PORT_CONNECT)
-+			&& (ehci_port_speed(ehci, portsc) ==
-+				USB_PORT_STAT_HIGH_SPEED))
-+			/* notify the USB PHY */
-+			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
-+	}
-+
-+	return 0;
-+}
-+
-+/* The below code is based on tegra ehci driver */
-+static int ci_imx_ehci_hub_control(
-+	struct usb_hcd	*hcd,
-+	u16		typeReq,
-+	u16		wValue,
-+	u16		wIndex,
-+	char		*buf,
-+	u16		wLength
-+)
-+{
-+	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
-+	u32 __iomem	*status_reg;
-+	u32		temp;
-+	unsigned long	flags;
-+	int		retval = 0;
-+
-+	status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
-+
-+	spin_lock_irqsave(&ehci->lock, flags);
-+
-+	if (typeReq == SetPortFeature && wValue == USB_PORT_FEAT_SUSPEND) {
-+		temp = ehci_readl(ehci, status_reg);
-+		if ((temp & PORT_PE) == 0 || (temp & PORT_RESET) != 0) {
-+			retval = -EPIPE;
-+			goto done;
-+		}
-+
-+		temp &= ~(PORT_RWC_BITS | PORT_WKCONN_E);
-+		temp |= PORT_WKDISC_E | PORT_WKOC_E;
-+		ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
-+
-+		/*
-+		 * If a transaction is in progress, there may be a delay in
-+		 * suspending the port. Poll until the port is suspended.
-+		 */
-+		if (ehci_handshake(ehci, status_reg, PORT_SUSPEND,
-+						PORT_SUSPEND, 5000))
-+			ehci_err(ehci, "timeout waiting for SUSPEND\n");
-+
-+		spin_unlock_irqrestore(&ehci->lock, flags);
-+		if (ehci_port_speed(ehci, temp) ==
-+				USB_PORT_STAT_HIGH_SPEED && hcd->phy) {
-+			/* notify the USB PHY */
-+			usb_phy_notify_suspend(hcd->phy, USB_SPEED_HIGH);
-+		}
-+		spin_lock_irqsave(&ehci->lock, flags);
-+
-+		set_bit((wIndex & 0xff) - 1, &ehci->suspended_ports);
-+		goto done;
-+	}
-+
-+	/*
-+	 * After resume has finished, it needs do some post resume
-+	 * operation for some SoCs.
-+	 */
-+	else if (typeReq == ClearPortFeature &&
-+					wValue == USB_PORT_FEAT_C_SUSPEND) {
-+
-+		/* Make sure the resume has finished, it should be finished */
-+		if (ehci_handshake(ehci, status_reg, PORT_RESUME, 0, 25000))
-+			ehci_err(ehci, "timeout waiting for resume\n");
-+
-+		temp = ehci_readl(ehci, status_reg);
-+
-+		if (ehci_port_speed(ehci, temp) ==
-+				USB_PORT_STAT_HIGH_SPEED && hcd->phy) {
-+			/* notify the USB PHY */
-+			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
-+		}
-+	}
-+
-+	spin_unlock_irqrestore(&ehci->lock, flags);
-+
-+	/* Handle the hub control events here */
-+	return orig_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
-+done:
-+	spin_unlock_irqrestore(&ehci->lock, flags);
-+	return retval;
-+}
-+
- static irqreturn_t host_irq(struct ci_hdrc *ci)
- {
- 	return usb_hcd_irq(ci->irq, ci->hcd);
-@@ -182,8 +305,14 @@ int ci_hdrc_host_init(struct ci_hdrc *ci)
- 	ehci_init_driver(&ci_ehci_hc_driver, NULL);
- 
- 	orig_bus_suspend = ci_ehci_hc_driver.bus_suspend;
-+	orig_bus_resume = ci_ehci_hc_driver.bus_resume;
-+	orig_hub_control = ci_ehci_hc_driver.hub_control;
- 
- 	ci_ehci_hc_driver.bus_suspend = ci_ehci_bus_suspend;
-+	if (ci->platdata->flags & CI_HDRC_IMX_EHCI_QUIRK) {
-+		ci_ehci_hc_driver.bus_resume = ci_imx_ehci_bus_resume;
-+		ci_ehci_hc_driver.hub_control = ci_imx_ehci_hub_control;
-+	}
- 
- 	return 0;
- }
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 667b46c..8ce3daf 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -25,6 +25,7 @@ struct ci_hdrc_platform_data {
- 	 * but otg is not supported (no register otgsc).
- 	 */
- #define CI_HDRC_DUAL_ROLE_NOT_OTG	BIT(4)
-+#define CI_HDRC_IMX_EHCI_QUIRK		BIT(5)
- 	enum usb_dr_mode	dr_mode;
- #define CI_HDRC_CONTROLLER_RESET_EVENT		0
- #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
+ 	if (of_device_is_compatible(np, "fsl,imx6q-usb")) {
+ 		pdata.flags |= CI_HDRC_SUPPORTS_RUNTIME_PM;
+ 		data->supports_runtime_pm = true;
 -- 
 1.7.1
