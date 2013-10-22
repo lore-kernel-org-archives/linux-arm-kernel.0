@@ -1,40 +1,48 @@
-From: aida.mynzhasova@skitlab.ru (Aida Mynzhasova)
-Date: Tue, 22 Oct 2013 12:34:38 +0400
-Subject: [PATCH] ARM: dts: mxs: add auart2 pinmux to imx28.dtsi
-Message-ID: <1382430878-14950-1-git-send-email-aida.mynzhasova@skitlab.ru>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 22 Oct 2013 09:38:33 +0100
+Subject: [PATCH 1/1] mfd: syscon: return -ENXIO if CONFIG_MFD_SYSCON is
+ not enabled
+In-Reply-To: <1382426857-31975-1-git-send-email-peter.chen@freescale.com>
+References: <1382426857-31975-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131022083833.GC19112@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add auart2 pins configuration on its main pads
+> Some platforms may not define CONFIG_MFD_SYSCON (or haven't syscon),
+> it can fix build error for those platforms.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  include/linux/mfd/syscon.h |   24 ++++++++++++++++++++++++
+>  1 files changed, 24 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/mfd/syscon.h b/include/linux/mfd/syscon.h
+> index b473577..60bf0fb 100644
+> --- a/include/linux/mfd/syscon.h
+> +++ b/include/linux/mfd/syscon.h
+> @@ -17,10 +17,34 @@
+>  
+>  struct device_node;
+>  
+> +#if IS_ENABLED(CONFIG_MFD_SYSCON)
 
-Signed-off-by: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
----
- arch/arm/boot/dts/imx28.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+I'd prefer #ifdef.
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 918d419..cab4c22 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -343,6 +343,19 @@
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
- 				};
- 
-+				auart2_pins_a: auart2-pins at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						MX28_PAD_AUART2_RX__AUART2_RX
-+						MX28_PAD_AUART2_TX__AUART2_TX
-+						MX28_PAD_AUART2_CTS__AUART2_CTS
-+						MX28_PAD_AUART2_RTS__AUART2_RTS
-+					>;
-+					fsl,drive-strength = <MXS_DRIVE_4mA>;
-+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
-+				};
-+
- 				auart3_pins_a: auart3 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
+>  extern struct regmap *syscon_node_to_regmap(struct device_node *np);
+>  extern struct regmap *syscon_regmap_lookup_by_compatible(const char *s);
+>  extern struct regmap *syscon_regmap_lookup_by_pdevname(const char *s);
+>  extern struct regmap *syscon_regmap_lookup_by_phandle(
+>  					struct device_node *np,
+>  					const char *property);
+> +#else
+> +static inline struct regmap *syscon_node_to_regmap(struct device_node *np)
+> +{
+> +	return ERR_PTR(-ENXIO);
+
+ENOSYS?
+
 -- 
-1.8.1.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
