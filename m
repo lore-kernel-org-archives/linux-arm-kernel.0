@@ -1,188 +1,53 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 22 Oct 2013 14:10:00 -0700
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131022203546.GC8037@mithrandir>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131021085420.GA21518@ulmo.nvidia.com>
- <52658C49.80400@wwwdotorg.org> <5265AFED.1040503@roeck-us.net>
- <52665314.2040904@imgtec.com>
- <232aa6e4-19fe-4460-8101-8bf1d639ff3c@email.android.com>
- <20131022164922.GA29852@roeck-us.net>
- <20131022203546.GC8037@mithrandir>
-Message-ID: <20131022211000.GA30394@roeck-us.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Oct 2013 16:38:52 -0500
+Subject: [RFC] Does PHY UTMI data width belong to DWC2 or PHY binding?
+In-Reply-To: <20131022112520.GE29341@beef>
+References: <20131018141221.GH2721@beef> <5264F37E.9060307@ti.com>
+ <20131022104829.GF15425@login.drsnuggles.stderr.nl>
+ <20131022112520.GE29341@beef>
+Message-ID: <5266F06C.2080701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 10:35:47PM +0200, Thierry Reding wrote:
-> On Tue, Oct 22, 2013 at 09:49:22AM -0700, Guenter Roeck wrote:
-> > On Tue, Oct 22, 2013 at 05:31:25PM +0100, Jonathan Cameron wrote:
-> > > 
-> > > 
-> > > James Hogan <james.hogan@imgtec.com> wrote:
-> > > >On 21/10/13 23:51, Guenter Roeck wrote:
-> > > >> In my opinion, not being able to describe behavior (or what people
-> > > >refer
-> > > >> to as "describe how the hardware is used") is a severe limitation of
-> > > >> devicetree usage in Linux. That is not a devicetree limitation per
-> > > >se,
-> > > >> though, it is simply a matter of choice (or, in some cases, the
-> > > >ability
-> > > >> of those arguing for new bindings to sell those bindings as "hardware
-> > > >> description").
-> > > >
-> > > >I agree this is a real problem, and I think it hinders upstream
-> > > >submission, since platform data was permitted to describe behaviour as
-> > > >well as describe the hardware, and platform data is being replaced with
-> > > >DT which is only permitted to describe the hardware. How then should we
-> > > >specify the behaviour to the kernel?
-> > > >
-> > > >I've already mentioned specific examples of this on the "Clock DT
-> > > >bindings" thread, and would be very interested if anybody has thoughts
-> > > >about it:
-> > > >http://lkml.kernel.org/r/520E1DF5.4030409 at imgtec.com
-> > > 
-> > > We have run into a kind of similar issue with IIO. We are interested in describing sensors
-> > >  adcs,DACs etc and providing both userspace access and in kernel access to other drivers.
-> > > 
-> > >  Lots of sensors are used for different
-> > >  purposes on different devices. Simple example is free fall detection vs vibration
-> > >  analysis vs input for an accelerometer. User space expects data from different
-> > >  subsystems. We handle that via 'bridge' drivers.  So need a way to specify which
-> > >  bridge driver cares about which channels.
-> > > It is not always 'wiring' but it usually is dictated by the product implementation. 
-> > > Some aspects of this have been discussed but they only cover the is an ADC wired to an
-> > >  accelerometer case rather than the using the same physical hardware for on or more
-> > >  unrelated purpose.
-> > > Perhaps this case could be pushed into user space but then we just have another board
-> > >  specific bit of code...
-> > > 
-> > > Just to add that for IIO device tree mostly works pretty well.
-> > 
-> > Yes, it does, only the iio-hwmon bridge is one of those cases where we are now
-> > told that "this describes use, not the hardware itself". But how is one supposed
-> > to describe that an ADC on a board is used as voltage sensor ? Does that mean one
-> > would have to have a dedicated voltage sensor (or current sensor, for that
-> > matter) to ensure that the use case is clear ?
+On 10/22/2013 06:25 AM, Matt Porter wrote:
+> On Tue, Oct 22, 2013 at 12:48:29PM +0200, Matthijs Kooijman wrote:
+>> Hi Kishon,
+>>
+>> On Mon, Oct 21, 2013 at 02:57:26PM +0530, Kishon Vijay Abraham I wrote:
+>>> I think it makes sense to keep the data width property in the dwc2 node itself.
+>>> I mean it describes how the dwc2 IP is configured in that particular SoC (given
+>>> that it can be either <8> or <16>).
+>> If I'm reading the RT3052 datasheet correctly (GHWCFG4 register), the IP
+>> can be configured for 8, 16 or 8 _and_ 16. In the latter case, the "8
+>> and 16 supported" would make sense as a property of dwc2 (though this
+>> value should be autodetectable through GHWCFG4), while the actual 8 or
+>> 16 supported by the PHY would make sense as property of a phy.
 > 
-> I'm not sure I understand correctly, but it seems to me like this isn't
-> actually about behaviour at all. Having something like:
+> There would be no value in adding a property for an already detectable
+> value to dwc2's binding. To be honest, it's pretty much useless
+> information due to the existence of the "8 and 16" option.
 > 
-> 	adc: adc {
-> 		...
-> 	};
+>> Note sure if this is really useful in practice as well, or if just
+>> setting the actual width to use on dwc2 makes more sense...
 > 
-> 	sensor {
-> 		adc = <&adc>;
-> 	};
+> The GHWCFG4 information itself is not useful in practice, as described
+> in the original thread: https://lkml.org/lkml/2013/10/10/477
 > 
-> sounds like an appropriate description of the hardware. Well, I guess it
+> It's certainly useful in practice to have this width property in either
+> the dwc2 or the phy binding. One can make a case for either. As I
+> mentioned in the original post, if we put it in the phy binding we'll be
+> updating the generic phy binding. We'll then need an api added into the
+> generic phy framework to fetch the width of a phy.
+> 
+> Both cases are doable and trivial, we just need the canonical decision
+> from a DT maintainer as to where the property belongs. Given that they
+> are in ARM ksummit, I'm not expecting to hear anything right this
+> moment. :)
 
-One would think so.
+The host can support both, so it is not a property of the host and is a
+property of the phy. It is no different than what mode a SPI slave
+requires or whether an i2c slave supports 8 or 10-bit addressing. Those
+examples are all 1 to many rather than 1 to 1 where it doesn't really
+matter, but the same logic applies.
 
-> doesn't quite accurately describe the hardware if one considers the ADC
-> to actually be the sensor, in which case, yeah, this actually describes
-> what the ADC is used for.
-> 
-... but then there is this point of view. Thinking about it, much of
-a hardware description can be seen as "use case", at least when it comes
-to gpio pins or adc channels.
-
-> But on the other hand we do the same with other "resources". GPIOs for
-> example are rather useless if you don't associate them with specific
-> functionality. And we actually do that quite often. They are used in
-> properties such as:
-> 
-> 	foo {
-> 		...
-> 		enable-gpios = <&gpio 42 0>;
-> 		...
-> 	};
-> 
-> I don't see how that is different to the ADC/sensor example above.
-> Perhaps there's no real physical device that is the sensor, but if we
-> can't even represent simple yet essential things like that in DT, then
-> we definitely need something better.
-> 
-I don't think the issue is "can". After all, the restriction that DT shall only
-describe HW and not its use is purely arbitrary.
-
-> We do pretty much the same thing with regulators. We can have fixed
-> regulators that control a GPIO, yet there's no physical device that one
-> could associate with such regulators either.
-> 
-> > Another example is my recent attempt to add dt support to gpio based connectors.
-> > Even though a connector is as much hardware as it can get (or at least one
-> > should think so), that was rejected because it isn't generic enough and,
-> > after all, it describes the _use_ of gpio pins which apparently is already
-> > borderline. So now I have my own out of tree driver (where I can add as many
-> > bindings and as much functionality as I want and see fit, so I am not too
-> > unhappy about that).
-> 
-> That's odd. This sounds exactly like a variant of the above. Would you
-> mind posting the binding (or a usage example here)? I'd be interested to
-> understand why it would be inappropriate.
-> 
-
-Patch 4 and 5 of https://lkml.org/lkml/2013/8/30/23.
-
-The bindings I currently use are actually a bit more complex.
-Here is an example.
-
-        pic1 {
-            compatible = "jnpr,pic-connector";
-            presence-detect-gpios = <&gpio20 36 0x10013>;
-            request-button-gpios = <&gpio20 38 0x10013>;
-            power-enable-gpios = <&gpio20 42 0x0>;
-            power-status-gpios = <&gpio20 39 0x3>;
-            reset-gpios = <&gpio20 41 0x10000>;
-            power-enable-timeout = <2000>;
-            debounce-interval = <1>;
-            led-green = <&pic1_green>;
-            led-red = <&pic1_red>;
-
-            i2c-bus {
-                #address-cells = <1>;
-                #size-cells = <0>;
-
-                i2c-parent = <&pic1i2c>;
-
-                eeprom at 55 {
-                    compatible = "atmel,24c02";
-                    reg = <0x55>;
-                    ideeprom;
-                };
-            };
-        };
-
-[ Note this is preliminary, and I expect some of the bindings to change.
-  Also, I have no plan to even try to get this code upstream ;) ]
-
-> > That matches Thierry's earlier comments - one is now _forced_ to maintain
-> > out-of-tree code simply because DT bindings are either unacceptable, not generic
-> > enough, or not stable enough to be accepted into the upstream kernel.
-> > 
-> > So far I have been able to work around that, but I seriously consider dropping
-> > DT use entirely and moving back to platform data ...
-> 
-> I've actually been toying with that idea myself. Unfortunately it's very
-> difficult to do once you run on a platform that's completely moved to DT
-> because you actually have to manually search the DT in order to find any
-> references that you need.
-> 
-Yes, I know.
-
-> > not the very least because DT isn't supported on x86 and I have to deal with
-> > that situation as well (and, no, ACPI doesn't solve my problems there either).
-> 
-> Actually DT is supported very well on x86. There's at least one platform
-> in mainline that uses it (arch/x86/platform/ce4100/falconfalls.dts) and
-> I've ported a platform that I worked on in the past to use DT on x86 as
-> well.
-> 
-But presumably that was DT only, or was it a system that needs to use
-DT on top of ACPI ? If so, I would be very interested in that experience,
-especially if you had any issues to get it working.
-
-Thanks,
-Guenter
+Rob
