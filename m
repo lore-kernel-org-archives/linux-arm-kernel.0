@@ -1,62 +1,39 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Tue, 22 Oct 2013 10:54:14 -0700
-Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
-In-Reply-To: <20131010175010.17870.58060@capellas-linux>
-References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
- <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
- <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
- <20131003214246.24540.99218@capellas-linux>
- <20131003234735.19051.84583@capellas-linux>
- <20131010175010.17870.58060@capellas-linux>
-Message-ID: <20131022175414.14753.58063@capellas-linux>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 22 Oct 2013 19:21:46 +0100
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <alpine.LFD.2.03.1310221333300.1951@syhkavp.arg>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
+ <alpine.LFD.2.03.1310221333300.1951@syhkavp.arg>
+Message-ID: <CAFEAcA8QQyDyvssamsb8s8ydfHGT8V0FQE-wGYt_kRbRMv9GSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Capella (2013-10-10 10:50:10)
-> Quoting Sebastian Capella (2013-10-03 16:47:35)
-> > Quoting Sebastian Capella (2013-10-03 14:42:46)
-> > I looked into removing the const from the store function, but I'm not sure
-> > this is the right idea, so I'm going to shelf that for now.
-> > 
-> Below are the three options considered thus far.  Do
-> you have any additional suggestions or preferences?
-> 
-> 1) copy buffer, remove \n.
->   - v1 patch did this
->   - alternatively could use an array on the stack or a preallocated global
->     Pros:
->      . cleanest change
->      . could use strim() proposed by Andrew
->     Cons:
->      . adds memcpy
-> 2) make name_to_dev_t work with readonly buffer to ignore \n
->   - v2 and v3 patches do this
->     Pros:
->      . no memcpy, no big modifications to unrelated code
->     Cons:
->      . seems more appropriate to harden store functions to user input
->        than name_to_dev_t.
->      . a little complicated
-> 3) remove const from buffer and modify contents in place to remove \n
->   - remove const from sysfs_ops.store, modify dependent definitions
->   - remove const from kobj_attribute.store, modify dependent definitions
->     Pros:
->      . no memcpy
->     Cons:
->      . a lot of modifications
->      . const contract to not modify the input buffer seems the right way.
+On 22 October 2013 18:42, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> Having "stable" DT bindings is just a dream.  Experience so far is
+> showing that this is neither practical nor realistic.
+>
+> The unstructured free-for-all approach isn't good either.  Some
+> compromise between the two extremes needs to be found.
 
-Hi Andrew,
+While I entirely agree that the concept of DT bindings as stable
+ABI is a complete pipe dream, it would be nice if we could have
+some suitably restricted parts of it that are defined as stable,
+for the benefit of tools like kvmtool and QEMU which construct
+device tree blobs from scratch to describe the virtual machine
+environment. (That means roughly CPUs, RAM, virtio-mmio
+devices and a UART at least.)
 
-Do you have any feedback for me on this?
+As the person who has to maintain the device-tree-writing
+code for ARM QEMU, I'd actually trust a carefully limited
+guarantee of ABI stability for specific bindings much more
+than I do the current airy promises that everything is stable.
 
-I'm happy do make any changes you think are correct, but I'm unsure if
-you're asking me for option #3 above.  It's quite an intrusive change,
-and changes old, established code and I'd like confirmation that's what
-you'd like before proceeding down that path.
-
-I've submitted patches with both options #1 and #2 above.
-
-Thanks,
-
-Sebastian
+thanks
+-- PMM
