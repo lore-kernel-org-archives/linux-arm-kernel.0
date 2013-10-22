@@ -1,29 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Oct 2013 06:00:14 -0700
-Subject: [GIT PULL] ARM: OMAP: Some more Device Tree for 3.13
-In-Reply-To: <526652AD.8060806@baylibre.com>
-References: <526652AD.8060806@baylibre.com>
-Message-ID: <20131022130013.GI15154@atomide.com>
+From: sre@debian.org (Sebastian Reichel)
+Date: Tue, 22 Oct 2013 15:01:34 +0200
+Subject: [PATCH 0/2] Add lp5523 DT support
+Message-ID: <1382446896-28436-1-git-send-email-sre@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <bcousson@baylibre.com> [131022 03:26]:
-> Hi Tony,
-> 
-> Please pull the branch for few more OMAP Device Tree for v3.13 or later.
-> 
-> Thanks,
-> Benoit
-> 
-> 
-> The following changes since commit 6cf02dbb4b71f1c0c9acec89ae2df3b2318135f4:
-> 
->   ARM: dts: dra7-evm: Add mmc2 node for eMMC support (2013-10-11 21:15:02 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git tags/for_3.13_late/dts_signed
+Hi,
 
-Thanks pulled into omap-for-v3.13/dt and pushed out.
+This patchset adds device tree support for the enable-pin
+of the lp55xx. The second part adds support for the LP5523
+to the Nokia N900's DTS file.
 
-Tony 
+I have tested the patchset only using DT boot, since
+non-DT boot is currently broken for me.
+
+-- Sebastian
+
+Sebastian Reichel (2):
+  leds: lp55xx: handle enable pin in driver
+  DTS: ARM: OMAP3-N900: Add LP5523 support
+
+ .../devicetree/bindings/leds/leds-lp55xx.txt       |  1 +
+ arch/arm/boot/dts/omap3-n900.dts                   | 61 ++++++++++++++++++++++
+ arch/arm/mach-omap2/board-rx51-peripherals.c       | 20 +------
+ arch/arm/mach-ux500/board-mop500.c                 |  2 +
+ drivers/leds/leds-lp55xx-common.c                  | 25 ++++-----
+ include/linux/platform_data/leds-lp55xx.h          |  6 +--
+ 6 files changed, 80 insertions(+), 35 deletions(-)
+
+-- 
+1.8.4.rc3
