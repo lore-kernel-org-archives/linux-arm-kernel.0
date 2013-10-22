@@ -1,39 +1,62 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 22 Oct 2013 10:49:08 -0700
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131022171346.GE4061@obsidianresearch.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
-Message-ID: <20131022174908.GA11614@roeck-us.net>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Tue, 22 Oct 2013 10:54:14 -0700
+Subject: [PATCH v3 1/2] init/do_mounts.c: ignore final \n in name_to_dev_t
+In-Reply-To: <20131010175010.17870.58060@capellas-linux>
+References: <1380834638-24035-1-git-send-email-sebastian.capella@linaro.org>
+ <1380834638-24035-2-git-send-email-sebastian.capella@linaro.org>
+ <20131003141523.8b60ab988799af7e2b2c338b@linux-foundation.org>
+ <20131003214246.24540.99218@capellas-linux>
+ <20131003234735.19051.84583@capellas-linux>
+ <20131010175010.17870.58060@capellas-linux>
+Message-ID: <20131022175414.14753.58063@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 11:13:46AM -0600, Jason Gunthorpe wrote:
-> On Tue, Oct 22, 2013 at 11:04:26AM -0400, Matt Porter wrote:
+Quoting Sebastian Capella (2013-10-10 10:50:10)
+> Quoting Sebastian Capella (2013-10-03 16:47:35)
+> > Quoting Sebastian Capella (2013-10-03 14:42:46)
+> > I looked into removing the const from the store function, but I'm not sure
+> > this is the right idea, so I'm going to shelf that for now.
+> > 
+> Below are the three options considered thus far.  Do
+> you have any additional suggestions or preferences?
 > 
-> > DT has many benefits. It would be great to leverage them as long as it
-> > doesn't interfere with the rate of change and willingness to evolve code
-> > that's always been the strength of the kernel process. That strength is
-> > too valuable to trade away for the "DT as ABI" vision.
-> 
-> I agree with this, and have posted similar things before.
-> 
-> The question I asked last time this came up, which was left unaswered:
-> 
->  Who does this stable DT ABI vision benifit, and how much is that
->  benifit worth?
-> 
+> 1) copy buffer, remove \n.
+>   - v1 patch did this
+>   - alternatively could use an array on the stack or a preallocated global
+>     Pros:
+>      . cleanest change
+>      . could use strim() proposed by Andrew
+>     Cons:
+>      . adds memcpy
+> 2) make name_to_dev_t work with readonly buffer to ignore \n
+>   - v2 and v3 patches do this
+>     Pros:
+>      . no memcpy, no big modifications to unrelated code
+>     Cons:
+>      . seems more appropriate to harden store functions to user input
+>        than name_to_dev_t.
+>      . a little complicated
+> 3) remove const from buffer and modify contents in place to remove \n
+>   - remove const from sysfs_ops.store, modify dependent definitions
+>   - remove const from kobj_attribute.store, modify dependent definitions
+>     Pros:
+>      . no memcpy
+>     Cons:
+>      . a lot of modifications
+>      . const contract to not modify the input buffer seems the right way.
 
-You might add: Who does the DT restriction to "hardware description only"
-(ie it must not describe what the system is supposed to do with the hardware)
-benefit, and how much is that benefit (or restriction) worth ?
+Hi Andrew,
 
-Guenter
+Do you have any feedback for me on this?
+
+I'm happy do make any changes you think are correct, but I'm unsure if
+you're asking me for option #3 above.  It's quite an intrusive change,
+and changes old, established code and I'd like confirmation that's what
+you'd like before proceeding down that path.
+
+I've submitted patches with both options #1 and #2 above.
+
+Thanks,
+
+Sebastian
