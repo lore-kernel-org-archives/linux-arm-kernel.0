@@ -1,57 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Oct 2013 15:29:50 +0200
-Subject: Armada XP Internal registers
-In-Reply-To: <20131021184219.GA24520@titan.lakedaemon.net>
-References: <CAFJTrDtznkpwi76yyEKYvjuo+XV34ky9AOe8Qfa5wm-uHDJT6A@mail.gmail.com>
- <20131021174339.GA27284@localhost>
- <20131021184219.GA24520@titan.lakedaemon.net>
-Message-ID: <20131022152950.40171b36@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Oct 2013 14:36:52 +0100
+Subject: [GIT PULL] Armada DRM support
+In-Reply-To: <20131018151557.GA25034@n2100.arm.linux.org.uk>
+References: <20131006220728.GG12758@n2100.arm.linux.org.uk>
+ <20131018151557.GA25034@n2100.arm.linux.org.uk>
+Message-ID: <20131022133652.GC25034@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Matthew,
-
-On Mon, 21 Oct 2013 14:42:19 -0400, Jason Cooper wrote:
-
-> > Hm.. so if you upgraded the bootloader and the internal register address
-> > is now 0xf100000 then it makes sense to fix your DT accordingly.
+On Fri, Oct 18, 2013 at 04:15:57PM +0100, Russell King - ARM Linux wrote:
+> David,
 > 
-> Agreed.
+> Rob Clark has now reviewed this and has given his blessing for it to be
+> pulled for the coming merge window.
 > 
-> > Are you enabling CONFIG_DEBUG_LL? In that case, please note there's a
-> > new option that will let you move to the 'new' internal regs address.
+> This adds support for the Armada 510 display subsystem found on the
+> Marvell Dove devices.  This IP is re-used across several different Marvell
+> SoCs with various tweaks, and this driver has been structured to allow
+> the other IPs to re-use the bulk of this code; further work in this area
+> is expected from interested parties.
 > 
-> The option is CONFIG_DEBUG_MVEBU_UART.  Since you swapped out the
-> bootloader, you need to tell it so.  (Early printk assumes the
-> bootloader setup the uart and just writes to it blindly.  If it's at a
-> different address than expected, it'll crash.)
+> This has been extensively tested on the SolidRun Cubox platform and
+> appears to work well there.
 
-I do confirm what Ezequiel and Jason said. The earlier U-Boot versions
-from Marvell remapped the registers at 0xd0000000, while the more
-recent versions remap the registers at 0xf1000000.
+David,
 
-In recent kernel versions (I guess since 3.10 or 3.11), we've made sure
-that changing the DT Mbus informations was enough to switch the entire
-kernel to use the correct internal register base address. With the
-exception of DEBUG_LL, which can't really on the DT, so that's why we
-have two separate Kconfig options, one for 0xd0000000 and another one
-for 0xf1000000.
+The zero day tester found a problem with this building on some non-ARM.
+Please add this fix to it, which Rob Clark has acked.  It's a small patch
+to add a dependency on ARM.
 
-That being said, I don't think the issue Matthew is seeing is related
-to improper DEBUG_LL configuration. He wouldn't be getting "Unhandled
-fault: external abort on non-linefetch (0x808) at 0xf0144010". He would
-simply be getting *nothing* if the DEBUG_LL configuration was wrong.
+Thanks.
 
-Matthew, can you tell me which U-Boot version exactly you're using, and
-give me the diff of the changes you've made to your Device Tree, so I
-can see if I can reproduce the problem? For what it's worth, register
-0x44010 is part of the PCIe registers, but I don't see right now what
-could be the reason for the problem you're seeing.
+The following changes since commit 585b691e2180e1501637050290292f77f5c30c7b:
 
-Best regards,
+  DRM: Armada: add support for drm tda19988 driver (2013-10-18 16:00:33 +0100)
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+are available in the git repository at:
+  git://ftp.arm.linux.org.uk/~rmk/linux-cubox.git drm-tda998x-3.12-fixes
+
+Russell King (1):
+      DRM: Armada: depend on ARM
+
+ drivers/gpu/drm/armada/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
