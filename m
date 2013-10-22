@@ -1,53 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Oct 2013 16:38:52 -0500
-Subject: [RFC] Does PHY UTMI data width belong to DWC2 or PHY binding?
-In-Reply-To: <20131022112520.GE29341@beef>
-References: <20131018141221.GH2721@beef> <5264F37E.9060307@ti.com>
- <20131022104829.GF15425@login.drsnuggles.stderr.nl>
- <20131022112520.GE29341@beef>
-Message-ID: <5266F06C.2080701@gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 22 Oct 2013 15:39:30 -0600
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <alpine.LFD.2.03.1310221624390.1951@syhkavp.arg>
+References: <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <alpine.LFD.2.03.1310221333300.1951@syhkavp.arg>
+ <20131022201228.GB8037@mithrandir>
+ <alpine.LFD.2.03.1310221624390.1951@syhkavp.arg>
+Message-ID: <20131022213930.GA14529@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2013 06:25 AM, Matt Porter wrote:
-> On Tue, Oct 22, 2013 at 12:48:29PM +0200, Matthijs Kooijman wrote:
->> Hi Kishon,
->>
->> On Mon, Oct 21, 2013 at 02:57:26PM +0530, Kishon Vijay Abraham I wrote:
->>> I think it makes sense to keep the data width property in the dwc2 node itself.
->>> I mean it describes how the dwc2 IP is configured in that particular SoC (given
->>> that it can be either <8> or <16>).
->> If I'm reading the RT3052 datasheet correctly (GHWCFG4 register), the IP
->> can be configured for 8, 16 or 8 _and_ 16. In the latter case, the "8
->> and 16 supported" would make sense as a property of dwc2 (though this
->> value should be autodetectable through GHWCFG4), while the actual 8 or
->> 16 supported by the PHY would make sense as property of a phy.
-> 
-> There would be no value in adding a property for an already detectable
-> value to dwc2's binding. To be honest, it's pretty much useless
-> information due to the existence of the "8 and 16" option.
-> 
->> Note sure if this is really useful in practice as well, or if just
->> setting the actual width to use on dwc2 makes more sense...
-> 
-> The GHWCFG4 information itself is not useful in practice, as described
-> in the original thread: https://lkml.org/lkml/2013/10/10/477
-> 
-> It's certainly useful in practice to have this width property in either
-> the dwc2 or the phy binding. One can make a case for either. As I
-> mentioned in the original post, if we put it in the phy binding we'll be
-> updating the generic phy binding. We'll then need an api added into the
-> generic phy framework to fetch the width of a phy.
-> 
-> Both cases are doable and trivial, we just need the canonical decision
-> from a DT maintainer as to where the property belongs. Given that they
-> are in ARM ksummit, I'm not expecting to hear anything right this
-> moment. :)
+On Tue, Oct 22, 2013 at 04:41:23PM -0400, Nicolas Pitre wrote:
 
-The host can support both, so it is not a property of the host and is a
-property of the phy. It is no different than what mode a SPI slave
-requires or whether an i2c slave supports 8 or 10-bit addressing. Those
-examples are all 1 to many rather than 1 to 1 where it doesn't really
-matter, but the same logic applies.
+> I think it is best to establish any process around DT assuming no strong 
+> binding stability.  Eventually the DT binding update frequency will 
+> converge to zero while the kernel will continue to be developed.  But 
+> the DTB for a particular hardware might have to change from time to 
+> time.
 
-Rob
+This is exactly what happened on our PPC platforms, the bindings
+churned for a bit and have been stable now since 2.6.2x something.
+
+I'm hopefully seeing something similar on kirkwood. 3.7 bindings look
+nothing like 3.12 bindings, but the 3.12 bindings will run lightly
+patched 3.10 and onwards just fine, and there are no pending patches
+I've seen that would change that for 3.13..
+
+To me, it is an advantage to DT that it does converge on something
+stable, while .c code always gets light churn, no matter where it is.
+
+Jason
