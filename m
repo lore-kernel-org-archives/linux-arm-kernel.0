@@ -1,53 +1,46 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 22 Oct 2013 21:13:54 +0200
-Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 104 board
-In-Reply-To: <52668F35.9050203@free-electrons.com> (Gregory CLEMENT's message
- of "Tue, 22 Oct 2013 15:44:05 +0100")
-References: <87txgapcas.fsf@natisbad.org> <52668F35.9050203@free-electrons.com>
-Message-ID: <8738ntqft9.fsf@natisbad.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 22 Oct 2013 12:16:00 -0700
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <CAFEAcA8QQyDyvssamsb8s8ydfHGT8V0FQE-wGYt_kRbRMv9GSQ@mail.gmail.com>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <alpine.LFD.2.03.1310221333300.1951@syhkavp.arg>
+ <CAFEAcA8QQyDyvssamsb8s8ydfHGT8V0FQE-wGYt_kRbRMv9GSQ@mail.gmail.com>
+Message-ID: <20131022191600.GA28630@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On Tue, Oct 22, 2013 at 07:21:46PM +0100, Peter Maydell wrote:
+> On 22 October 2013 18:42, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > Having "stable" DT bindings is just a dream.  Experience so far is
+> > showing that this is neither practical nor realistic.
+> >
+> > The unstructured free-for-all approach isn't good either.  Some
+> > compromise between the two extremes needs to be found.
+> 
+> While I entirely agree that the concept of DT bindings as stable
+> ABI is a complete pipe dream, it would be nice if we could have
+> some suitably restricted parts of it that are defined as stable,
+> for the benefit of tools like kvmtool and QEMU which construct
+> device tree blobs from scratch to describe the virtual machine
+> environment. (That means roughly CPUs, RAM, virtio-mmio
+> devices and a UART at least.)
+> 
+> As the person who has to maintain the device-tree-writing
+> code for ARM QEMU, I'd actually trust a carefully limited
+> guarantee of ABI stability for specific bindings much more
+> than I do the current airy promises that everything is stable.
+> 
 
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
+Agreed. I like the idea of Documentation/ABI, though of course
+it would help if its contents would move from testing/ to stable/
+at some point ;-).
 
-> On 21/10/2013 22:02, Arnaud Ebalard wrote:
->> 
->> Main hardware parts of the (Armada 370 based) NETGEAR ReadyNAS 104 are
->> supported by mainline kernel (USB 3.0 rear ports, USB 2.0 front port,
->> Gigabit controller and PHYs, serial port, LEDs, buttons, SATA ports,
->> G762 fan controller) and referenced in provided .dts file. Some additonal
->> work remains for:
->> 
->>  - Intersil ISL12057 I2C RTC and Alarm chip: working driver but needs
->>    to be splitted for submission of RTC part first;
->>  - Front LCD (Winstar 1602G): driver needs to be written
->>  - Armada NAND controller (to access onboard 128MB of NAND): support
->>    being pushed by @free-electrons people
->>  - 4 front SATA LEDs controlled via GPIO brought by NXP PCA9554:
->>    driver is available upstream. Not referenced/tested yet.
->> 
->> but the device is usable w/o those.
->> 
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->> ---
->> Jason and Andrew,
->> 
->> I do not think there is any good way to share much between RN102 and
->> RN104 .dts in a common .dtsi file because MPP are used in a different
->> fashion on the two boards. But if you have ideas ...
->
-> It seems to me that you can share at least half of the nodes in a common
-> dtsi. But I prefer having two dts files, it remains easier to understand.
-> Latter if a 3rd board share the same amount of nodes, then we can
-> consider to use a dtsi.
-
-Dully noted. AFAICT, NETGEAR only has 2 Armada 370 based devices at the
-moment: the 2-bay RN102 and the 4-bay RN104. FWIW, the only other
-ARM-based NAS in their portfolio is the ReadyNAS 2120 (Dual core Armada
-XP @1.2GHz).
-
-Cheers,
-
-a+
+Guenter
