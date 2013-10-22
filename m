@@ -1,46 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 22 Oct 2013 01:14:10 +0000 (UTC)
-Subject: [PATCH 02/11] ARM: OMAP3: clock: add API to enable/disable
- autoidle for a single clock
-In-Reply-To: <alpine.DEB.2.02.1310211250370.13878@utopia.booyaka.com>
-References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
- <1381508141-15244-3-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1310191712450.11676@utopia.booyaka.com>
- <20131021122610.11944.71616@quantum>
- <alpine.DEB.2.02.1310211250370.13878@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1310220113530.6442@utopia.booyaka.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 22 Oct 2013 10:45:56 +0900
+Subject: [PATCH] arm: firmware: Check firmware is running or not
+Message-ID: <20131022014556.GA1364@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Oct 2013, Paul Walmsley wrote:
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-> On Mon, 21 Oct 2013, Mike Turquette wrote:
-> 
-> > Quoting Paul Walmsley (2013-10-19 10:16:50)
-> > > On Fri, 11 Oct 2013, Tero Kristo wrote:
-> > > 
-> > > > Some drivers require direct access to the autoidle functionality of the
-> > > > interface clocks. Added clock APIs for these, so that the drivers do not
-> > > > need to access CM registers directly.
-> > > > 
-> > > > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > > 
-> > > Thanks, queued.  Please coordinate with Mike to get 
-> > > allow_idle/deny_idle-type interfaces into the Common Clock Framework, so 
-> > > these can be replaced with standard CCF-type allow_idle() & deny_idle() 
-> > > functions.  That interface should include use-counting so multiple callers 
-> > > can use allow_idle() and deny_idle() without stomping on each other.
-> > 
-> > Where and when are these functions called? IIRC these are only accessed
-> > at boot/init time, though I may be wrong. If they are a boot-time thing
-> > then the .init callback provided in struct clk may be sufficient.
-> 
-> They are called dynamically at runtime when the McBSP goes active and 
-> inactive.  It's in the next patch in this series.  I'm fairly sure at 
-> least one other IP block needs this workaround also.
+To support multi-platform, it needs to know it's running under secure OS or not.
+sometime it needs to access physical address by smc calls.
 
-By the way, here's that patch:
+e.g., 
+	if (firmware_run()) {
+		addr = physical address;
+	} else {
+		addr = virtual address;
+	}
 
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg97004.html
+	call_firmware_ops(read_address, addr, &value);
 
-- Paul
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
+index 27ddccb..e9d9ee5 100644
+--- a/arch/arm/common/firmware.c
++++ b/arch/arm/common/firmware.c
+@@ -16,3 +16,8 @@
+ static const struct firmware_ops default_firmware_ops;
+ 
+ const struct firmware_ops *firmware_ops = &default_firmware_ops;
++
++int firmware_run(void)
++{
++	return firmware_ops != &default_firmware_ops;
++}
+diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+index 1563130..efc4554 100644
+--- a/arch/arm/include/asm/firmware.h
++++ b/arch/arm/include/asm/firmware.h
+@@ -42,6 +42,9 @@ struct firmware_ops {
+ /* Global pointer for current firmware_ops structure, can't be NULL. */
+ extern const struct firmware_ops *firmware_ops;
+ 
++/* Check firmware is running */
++extern int firmware_run(void);
++
+ /*
+  * call_firmware_op(op, ...)
+  *
