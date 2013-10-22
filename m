@@ -1,250 +1,151 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 22 Oct 2013 20:56:13 +0200
-Subject: [PATCHv1] ARM: mvebu: Add Netgear ReadyNAS 104 board
-Message-ID: <87fvrtqgmq.fsf@natisbad.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 22 Oct 2013 22:07:15 +0300
+Subject: [PATCH v2] ARM: OMAP4460: cpuidle: Extend
+ PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD on cpuidle
+In-Reply-To: <1382467484-16957-1-git-send-email-grygorii.strashko@ti.com>
+References: <1382467484-16957-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <5266CCE3.1090801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The same workaround as ff999b8a0983ee15668394ed49e38d3568fc6859
+"ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC ..."
+need to be applied not only when system is booting, but when MPUSS hits
+OSWR state through CPUIdle too. Without this WA the same issue is
+reproduced now on boards PandaES and Tablet/Blaze with SOM OMAP4460
+when CONFIG_CPU_IDLE is enabled.
+After MPUSS has enterred OSWR and waken up:
+- GIC distributor became disabled forever
+- scheduling is not performed any more
 
-Main hardware parts of the (Armada 370 based) NETGEAR ReadyNAS 104 are
-supported by mainline kernel (USB 3.0 rear ports, USB 2.0 front port,
-Gigabit controller and PHYs, serial port, LEDs, buttons, SATA ports,
-G762 fan controller) and referenced in provided .dts file. Some additonal
-work remains for:
-
- - Intersil ISL12057 I2C RTC and Alarm chip: working driver but needs
-   to be splitted for submission of RTC part first;
- - Front LCD (Winstar 1602G): driver needs to be written
- - Armada NAND controller (to access onboard 128MB of NAND): support
-   being pushed by @free-electrons people
- - 4 front SATA LEDs controlled via GPIO brought by NXP PCA9554:
-   driver is available upstream. Not referenced/tested yet.
-
-but the device is usable w/o those.
-
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+Cc: Kevin Hilman <khilman@linaro.org>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reported-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
+Changes in V2:
+- get rid of using omap4_mpuss_read_prev_context_state();
+- move call of gic_dist_enable() in omap-mpuss-lowpower.c
+- add call of gic_timer_retrigger()
 
-Changes since v0, based on comments from Andrew:
+Based on: v3.12-rc5
 
- - removed useless sata nodes w/ disabled status
- - changed power LED to default-state="keep" and backup LED to "off"
+ arch/arm/mach-omap2/common.h              |    1 +
+ arch/arm/mach-omap2/cpuidle44xx.c         |   26 +++++++++++++++++++++-----
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |    3 +++
+ arch/arm/mach-omap2/omap4-common.c        |    6 ++++++
+ 4 files changed, 31 insertions(+), 5 deletions(-)
 
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/armada-370-netgear-rn104.dts | 193 +++++++++++++++++++++++++
- 2 files changed, 194 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-370-netgear-rn104.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 802720e..be682cb 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -108,6 +108,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
- dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-mirabox.dtb \
- 	armada-370-netgear-rn102.dtb \
-+	armada-370-netgear-rn104.dtb \
- 	armada-370-rd.dtb \
- 	armada-xp-axpwifiap.dtb \
- 	armada-xp-db.dtb \
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-new file mode 100644
-index 0000000..2eb855f
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-@@ -0,0 +1,193 @@
-+/*
-+ * Device Tree file for NETGEAR ReadyNAS 104
-+ *
-+ * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 4a5684b..c9b4bc3 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -232,6 +232,7 @@ static inline void __iomem *omap4_get_scu_base(void)
+ 
+ extern void __init gic_init_irq(void);
+ extern void gic_dist_disable(void);
++extern void gic_dist_enable(void);
+ extern bool gic_dist_disabled(void);
+ extern void gic_timer_retrigger(void);
+ extern void omap_smc1(u32 fn, u32 arg);
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index 4c8982a..4c158c8 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -80,6 +80,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 			int index)
+ {
+ 	struct idle_statedata *cx = state_ptr + index;
++	u32 mpuss_can_lose_context = 0;
+ 
+ 	/*
+ 	 * CPU0 has to wait and stay ON until CPU1 is OFF state.
+@@ -104,6 +105,9 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 		}
+ 	}
+ 
++	mpuss_can_lose_context = (cx->mpu_state == PWRDM_POWER_RET) &&
++				 (cx->mpu_logic_state == PWRDM_POWER_OFF);
 +
-+/dts-v1/;
+ 	/*
+ 	 * Call idle CPU PM enter notifier chain so that
+ 	 * VFP and per CPU interrupt context is saved.
+@@ -118,9 +122,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 		 * Call idle CPU cluster PM enter notifier chain
+ 		 * to save GIC and wakeupgen context.
+ 		 */
+-		if ((cx->mpu_state == PWRDM_POWER_RET) &&
+-			(cx->mpu_logic_state == PWRDM_POWER_OFF))
+-				cpu_cluster_pm_enter();
++		if (mpuss_can_lose_context)
++			cpu_cluster_pm_enter();
+ 	}
+ 
+ 	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+@@ -128,9 +131,23 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 
+ 	/* Wakeup CPU1 only if it is not offlined */
+ 	if (dev->cpu == 0 && cpumask_test_cpu(1, cpu_online_mask)) {
 +
-+#include "armada-370.dtsi"
++		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD) &&
++		    mpuss_can_lose_context)
++			gic_dist_disable();
 +
-+/ {
-+	model = "NETGEAR ReadyNAS 104";
-+	compatible = "netgear,readynas-104", "marvell,armada370", "marvell,armada-370-xp";
+ 		clkdm_wakeup(cpu_clkdm[1]);
+ 		omap_set_pwrdm_state(cpu_pd[1], PWRDM_POWER_ON);
+ 		clkdm_allow_idle(cpu_clkdm[1]);
 +
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
++		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD) &&
++		    mpuss_can_lose_context) {
++			while (gic_dist_disabled()) {
++				udelay(1);
++				cpu_relax();
++			}
++			gic_timer_retrigger();
++		}
+ 	}
+ 
+ 	/*
+@@ -143,8 +160,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 	 * Call idle CPU cluster PM exit notifier chain
+ 	 * to restore GIC and wakeupgen context.
+ 	 */
+-	if (dev->cpu == 0 && (cx->mpu_state == PWRDM_POWER_RET) &&
+-		(cx->mpu_logic_state == PWRDM_POWER_OFF))
++	if (dev->cpu == 0 && mpuss_can_lose_context)
+ 		cpu_cluster_pm_exit();
+ 
+ fail:
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index f991016..667915d 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -271,6 +271,9 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	else
+ 		omap_pm_ops.finish_suspend(save_state);
+ 
++	if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD) && cpu)
++		gic_dist_enable();
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>; /* 512 MB */
-+	};
+ 	/*
+ 	 * Restore the CPUx power state to ON otherwise CPUx
+ 	 * power domain can transitions to programmed low power
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 5791143..3ad4a8c 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -128,6 +128,12 @@ void gic_dist_disable(void)
+ 		__raw_writel(0x0, gic_dist_base_addr + GIC_DIST_CTRL);
+ }
+ 
++void gic_dist_enable(void)
++{
++	if (gic_dist_base_addr)
++		__raw_writel(0x1, gic_dist_base_addr + GIC_DIST_CTRL);
++}
 +
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			/* Connected to FL1009 USB 3.0 controller */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			/* Connected to Marvell 88SE9215 SATA controller */
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+
-+		internal-regs {
-+			serial at 12000 {
-+				clock-frequency = <200000000>;
-+				status = "okay";
-+			};
-+
-+			pinctrl {
-+				poweroff: poweroff {
-+					marvell,pins = "mpp60";
-+					marvell,function = "gpio";
-+				};
-+
-+				backup_key_pin: backup-key-pin {
-+					marvell,pins = "mpp52";
-+					marvell,function = "gpio";
-+				};
-+
-+				power_key_pin: power-key-pin {
-+					marvell,pins = "mpp62";
-+					marvell,function = "gpio";
-+				};
-+
-+				backup_led_pin: backup-led-pin {
-+					marvell,pins = "mpp63";
-+					marvell,function = "gpo";
-+				};
-+
-+				power_led_pin: power-led-pin {
-+					marvell,pins = "mpp64";
-+					marvell,function = "gpio";
-+				};
-+
-+				reset_key_pin: reset-key-pin {
-+					marvell,pins = "mpp65";
-+					marvell,function = "gpio";
-+				};
-+			};
-+
-+			mdio {
-+				phy0: ethernet-phy at 0 {
-+					reg = <0>;
-+				};
-+
-+				phy1: ethernet-phy at 1 {
-+					reg = <1>;
-+				};
-+			};
-+
-+			ethernet at 70000 {
-+				status = "okay";
-+				phy = <&phy0>;
-+				phy-mode = "rgmii-id";
-+			};
-+
-+			ethernet at 74000 {
-+				status = "okay";
-+				phy = <&phy1>;
-+				phy-mode = "rgmii-id";
-+			};
-+
-+			usb at 50000 {
-+				status = "okay";
-+			};
-+
-+			i2c at 11000 {
-+				compatible = "marvell,mv64xxx-i2c";
-+				clock-frequency = <100000>;
-+				status = "okay";
-+
-+				g762: g762 at 3e {
-+					compatible = "gmt,g762";
-+					reg = <0x3e>;
-+					clocks = <&g762_clk>; /* input clock */
-+					fan_gear_mode = <0>;
-+					fan_startv = <1>;
-+					pwm_polarity = <0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	clocks {
-+	       #address-cells = <1>;
-+	       #size-cells = <0>;
-+
-+	       g762_clk: fixedclk {
-+			 compatible = "fixed-clock";
-+			 #clock-cells = <0>;
-+			 clock-frequency = <8192>;
-+	       };
-+	};
-+
-+	gpio_leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&backup_led_pin &power_led_pin>;
-+		pinctrl-names = "default";
-+
-+		blue_backup_led {
-+			label = "rn104:blue:backup";
-+			gpios = <&gpio1 31 0>;   /* GPIO 63 Active High */
-+			default-state = "off";
-+		};
-+
-+		blue_power_led {
-+			label = "rn104:blue:pwr";
-+			gpios = <&gpio2 0 1>;    /* GPIO 64 Active Low */
-+			linux,default-trigger = "keep";
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&backup_key_pin
-+			     &power_key_pin
-+			     &reset_key_pin>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "Backup Button";
-+			linux,code = <133>;     /* KEY_COPY */
-+			gpios = <&gpio1 20 1>;
-+		};
-+
-+		button at 2 {
-+			label = "Power Button";
-+			linux,code = <116>;     /* KEY_POWER */
-+			gpios = <&gpio1 30 0>;
-+		};
-+
-+		button at 3 {
-+			label = "Reset Button";
-+			linux,code = <0x198>;   /* KEY_RESTART */
-+			gpios = <&gpio2 1 1>;
-+		};
-+	};
-+
-+	gpio_poweroff {
-+		compatible = "gpio-poweroff";
-+		pinctrl-0 = <&poweroff>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio1 28 1>;
-+	};
-+};
+ bool gic_dist_disabled(void)
+ {
+ 	return !(__raw_readl(gic_dist_base_addr + GIC_DIST_CTRL) & 0x1);
 -- 
-1.8.4.rc3
+1.7.9.5
