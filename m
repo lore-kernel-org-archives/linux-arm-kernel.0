@@ -1,68 +1,65 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 22 Oct 2013 10:08:40 +0100
-Subject: [PATCH RESEND v2 5/8] KVM: arm-vgic: Make vgic mmio functions more
- generic
+Date: Tue, 22 Oct 2013 10:08:39 +0100
+Subject: [PATCH RESEND v2 4/8] irqchip: arm-gic: Define additional MMIO
+ offsets and masks
 In-Reply-To: <1382432923-61267-1-git-send-email-christoffer.dall@linaro.org>
 References: <1382432923-61267-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1382432923-61267-6-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1382432923-61267-5-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the vgic_ranges array to vgic_dist_ranges to be more specific and
-to prepare for handling CPU interface register access as well (for
-save/restore of VGIC state).
+Define CPU interface offsets for the GICC_ABPR, GICC_APR, and GICC_IIDR
+registers.  Define distributor registers for the GICD_SPENDSGIR and the
+GICD_CPENDSGIR.  KVM/ARM needs to know about these definitions to fully
+support save/restore of the VGIC.
 
-Pass offset from distributor or interface MMIO base to
-find_matching_range function instead of the physical address of the
-access in the VM memory map.  This allows other callers unaware of the
-VM specifics, but with generic VGIC knowledge to reuse the function.
+Also define some masks and shifts for the various GICH_VMCR fields.
 
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Reviewed-by: Alexander Graf <agraf@suse.de>
 ---
- virt/kvm/arm/vgic.c |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ include/linux/irqchip/arm-gic.h |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index d9c0fc5..1148a2e 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -602,7 +602,7 @@ struct mmio_range {
- 			    phys_addr_t offset);
- };
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 0e5d9ec..28b28fc 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -17,6 +17,9 @@
+ #define GIC_CPU_EOI			0x10
+ #define GIC_CPU_RUNNINGPRI		0x14
+ #define GIC_CPU_HIGHPRI			0x18
++#define GIC_CPU_ALIAS_BINPOINT		0x1c
++#define GIC_CPU_ACTIVEPRIO		0xd0
++#define GIC_CPU_IDENT			0xfc
  
--static const struct mmio_range vgic_ranges[] = {
-+static const struct mmio_range vgic_dist_ranges[] = {
- 	{
- 		.base		= GIC_DIST_CTRL,
- 		.len		= 12,
-@@ -669,14 +669,13 @@ static const struct mmio_range vgic_ranges[] = {
- static const
- struct mmio_range *find_matching_range(const struct mmio_range *ranges,
- 				       struct kvm_exit_mmio *mmio,
--				       phys_addr_t base)
-+				       phys_addr_t offset)
- {
- 	const struct mmio_range *r = ranges;
--	phys_addr_t addr = mmio->phys_addr - base;
+ #define GIC_DIST_CTRL			0x000
+ #define GIC_DIST_CTR			0x004
+@@ -31,6 +34,8 @@
+ #define GIC_DIST_TARGET			0x800
+ #define GIC_DIST_CONFIG			0xc00
+ #define GIC_DIST_SOFTINT		0xf00
++#define GIC_DIST_SGI_CLEAR		0xf10
++#define GIC_DIST_SGI_SET		0xf20
  
- 	while (r->len) {
--		if (addr >= r->base &&
--		    (addr + mmio->len) <= (r->base + r->len))
-+		if (offset >= r->base &&
-+		    (offset + mmio->len) <= (r->base + r->len))
- 			return r;
- 		r++;
- 	}
-@@ -713,7 +712,8 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		return true;
- 	}
+ #define GICH_HCR			0x0
+ #define GICH_VTR			0x4
+@@ -54,6 +59,15 @@
+ #define GICH_LR_ACTIVE_BIT		(1 << 29)
+ #define GICH_LR_EOI			(1 << 19)
  
--	range = find_matching_range(vgic_ranges, mmio, base);
-+	offset = mmio->phys_addr - base;
-+	range = find_matching_range(vgic_dist_ranges, mmio, offset);
- 	if (unlikely(!range || !range->handle_mmio)) {
- 		pr_warn("Unhandled access %d %08llx %d\n",
- 			mmio->is_write, mmio->phys_addr, mmio->len);
++#define GICH_VMCR_CTRL_SHIFT		0
++#define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
++#define GICH_VMCR_PRIMASK_SHIFT		27
++#define GICH_VMCR_PRIMASK_MASK		(0x1f << GICH_VMCR_PRIMASK_SHIFT)
++#define GICH_VMCR_BINPOINT_SHIFT	21
++#define GICH_VMCR_BINPOINT_MASK		(0x7 << GICH_VMCR_BINPOINT_SHIFT)
++#define GICH_VMCR_ALIAS_BINPOINT_SHIFT	18
++#define GICH_VMCR_ALIAS_BINPOINT_MASK	(0x7 << GICH_VMCR_ALIAS_BINPOINT_SHIFT)
++
+ #define GICH_MISR_EOI			(1 << 0)
+ #define GICH_MISR_U			(1 << 1)
+ 
 -- 
 1.7.10.4
