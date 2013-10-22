@@ -1,38 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Oct 2013 08:17:00 -0700
-Subject: [PATCH v2 5/6] Revert "ARM: OMAP2+: Provide alias to USB PHY
- clock"
-In-Reply-To: <5256703F.1070806@ti.com>
-References: <1381226799-29158-1-git-send-email-rogerq@ti.com>
- <1381226799-29158-6-git-send-email-rogerq@ti.com>
- <52550180.1000506@ti.com> <20131009151522.GA8313@atomide.com>
- <5256703F.1070806@ti.com>
-Message-ID: <20131022151659.GO15154@atomide.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 22 Oct 2013 17:24:21 +0200
+Subject: [PATCH RESEND v5 0/5] ARM: rockchip: add smp functionality
+Message-ID: <201310221724.21550.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [131010 02:23]:
-> On 10/09/2013 06:15 PM, Tony Lindgren wrote:
-> > * Roger Quadros <rogerq@ti.com> [131009 00:19]:
-> >> Hi Tony,
-> >>
-> >> On 10/08/2013 01:06 PM, Roger Quadros wrote:
-> >>> This reverts commit 741532c4a995be11815cb72d4d7a48f442a22fea.
-> >>>
-> >>> The proper clock reference is provided in device tree so we
-> >>> no longer need this.
-> >>
-> >> Could you please Ack this one? I think it is best if it goes through Benoit's tree.
-> > 
-> > I could queue this into my board removal series that will be
-> > based on Benoit's branch if that works for you. And this
-> > also seems to depend on the omap-for-v3.13/quirk branch
-> > that moves all the legacy pdata handling into pdata-quirks.c.
-> 
-> OK Tony. Thanks.
+This series enables the use of the additional cores on Rockchip
+Cortex-A9 SoCs.
 
-Actually, can you please update this patch against branch
-omap-for-v3.13/board-removal-take2 and check the
-omap5_uevm_legacy_init() part as well?
+To achieve this, add the scu, the needed sram and power-management-unit.
 
-Tony
+Tested on both a BQ Curie2 (rk3066a / dual core) and
+on a Radxa Rock (rk3188 / quad core).
+
+changes since v4:
+- rebase on top of the recent rk3188 board support
+- implement suggestion from Matt Sealey in moving the sram-limit from
+  marking reserved regions to marking available regions - hopefully
+  I got the usage right :-)
+- remove __CPUINIT as suggested by Fabio Estevam
+
+changes since v3:
+- address comments from Rob Herring:
+  - split the gathering of the reserve-data into a separate loop
+  - spelling and style fixes
+- first patch only included for reference, already part of the
+  char-misc git tree
+
+changes since v2:
+- rework the sram allocation following the suggestion from Philipp Zabel
+
+changes since v1:
+- add reserved block feature for mmio-sram, to not use two logical
+  sram nodes
+- the sram content is kept intact while the device is running, so
+  copying the trampoline is only needed once
+
+Heiko Stuebner (5):
+  misc: sram: add ability to limit used sram areas
+  ARM: rockchip: add snoop-control-unit
+  ARM: rockchip: add sram dt nodes and documentation
+  ARM: rockchip: add power-management-unit dt node
+  ARM: rockchip: add smp bringup code
+
+ .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 ++
+ .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   24 +++
+ Documentation/devicetree/bindings/misc/sram.txt    |    8 +
+ arch/arm/boot/dts/rk3066a.dtsi                     |    6 +
+ arch/arm/boot/dts/rk3188.dtsi                      |    6 +
+ arch/arm/boot/dts/rk3xxx.dtsi                      |   10 +
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/core.h                      |   22 +++
+ arch/arm/mach-rockchip/headsmp.S                   |   30 ++++
+ arch/arm/mach-rockchip/platsmp.c                   |  195 ++++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |    2 +
+ drivers/misc/sram.c                                |   51 ++++-
+ 13 files changed, 368 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/core.h
+ create mode 100644 arch/arm/mach-rockchip/headsmp.S
+ create mode 100644 arch/arm/mach-rockchip/platsmp.c
+
+-- 
+1.7.10.4
