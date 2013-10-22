@@ -1,37 +1,59 @@
 From: sre@debian.org (Sebastian Reichel)
-Date: Tue, 22 Oct 2013 13:02:54 +0200
-Subject: [PATCH] DTS: ARM: OMAP3-N900: Fix i2c bus speed
-Message-ID: <1382439774-16265-1-git-send-email-sre@debian.org>
+Date: Tue, 22 Oct 2013 13:05:13 +0200
+Subject: [PATCH] DTS: ARM: OMAP3-N900: Add UART support
+Message-ID: <1382439913-16534-1-git-send-email-sre@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the bus speed of i2c bus 2 and 3.
+Add UART support to Nokia N900.
 
 Signed-off-by: Sebastian Reichel <sre@debian.org>
 ---
- arch/arm/boot/dts/omap3-n900.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap3-n900.dts | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 57f5a2a..2374b9a 100644
+index 2374b9a..99d0668 100644
 --- a/arch/arm/boot/dts/omap3-n900.dts
 +++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -78,14 +78,14 @@
+@@ -31,6 +31,20 @@
+ &omap3_pmx_core {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c2_pins>;
  
--	clock-frequency = <400000>;
-+	clock-frequency = <100000>;
++	uart2_pins: pinmux_uart2_pins {
++		pinctrl-single,pins = <
++			0x14a (PIN_INPUT | MUX_MODE0)		/* uart2_rx */
++			0x148 (PIN_OUTPUT | MUX_MODE0)		/* uart2_tx */
++		>;
++	};
++
++	uart3_pins: pinmux_uart3_pins {
++		pinctrl-single,pins = <
++			0x16e (PIN_INPUT | MUX_MODE0)		/* uart3_rx */
++			0x170 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx */
++		>;
++	};
++
+ 	i2c1_pins: pinmux_i2c1_pins {
+ 		pinctrl-single,pins = <
+ 			0x18a (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl */
+@@ -125,3 +139,17 @@
+ 	mode = <2>;
+ 	power = <50>;
  };
- 
- &i2c3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c3_pins>;
- 
--	clock-frequency = <100000>;
-+	clock-frequency = <400000>;
- };
- 
- &mmc1 {
++
++&uart1 {
++	status = "disabled";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins>;
++};
 -- 
 1.8.4.rc3
