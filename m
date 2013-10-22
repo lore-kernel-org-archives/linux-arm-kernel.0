@@ -1,34 +1,29 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Tue, 22 Oct 2013 14:56:17 +0200
-Subject: [PATCH 2/2] DTS: ARM: OMAP3-N900: Add bq27200 battery monitor
-In-Reply-To: <1382446577-28270-1-git-send-email-sre@debian.org>
-References: <1382446577-28270-1-git-send-email-sre@debian.org>
-Message-ID: <1382446577-28270-2-git-send-email-sre@debian.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Oct 2013 06:00:14 -0700
+Subject: [GIT PULL] ARM: OMAP: Some more Device Tree for 3.13
+In-Reply-To: <526652AD.8060806@baylibre.com>
+References: <526652AD.8060806@baylibre.com>
+Message-ID: <20131022130013.GI15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the bq27200 battery monitor chip.
+* Benoit Cousson <bcousson@baylibre.com> [131022 03:26]:
+> Hi Tony,
+> 
+> Please pull the branch for few more OMAP Device Tree for v3.13 or later.
+> 
+> Thanks,
+> Benoit
+> 
+> 
+> The following changes since commit 6cf02dbb4b71f1c0c9acec89ae2df3b2318135f4:
+> 
+>   ARM: dts: dra7-evm: Add mmc2 node for eMMC support (2013-10-11 21:15:02 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git tags/for_3.13_late/dts_signed
 
-Signed-off-by: Sebastian Reichel <sre@debian.org>
----
- arch/arm/boot/dts/omap3-n900.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+Thanks pulled into omap-for-v3.13/dt and pushed out.
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 60cb33f..992338c 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -240,6 +240,11 @@
- 	pinctrl-0 = <&i2c2_pins>;
- 
- 	clock-frequency = <100000>;
-+
-+	bq27200: bq27200 at 55 {
-+		compatible = "ti,bq27200";
-+		reg = <0x55>;
-+	};
- };
- 
- &i2c3 {
--- 
-1.8.4.rc3
+Tony 
