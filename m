@@ -1,46 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 22 Oct 2013 12:16:00 -0700
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <CAFEAcA8QQyDyvssamsb8s8ydfHGT8V0FQE-wGYt_kRbRMv9GSQ@mail.gmail.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <alpine.LFD.2.03.1310221333300.1951@syhkavp.arg>
- <CAFEAcA8QQyDyvssamsb8s8ydfHGT8V0FQE-wGYt_kRbRMv9GSQ@mail.gmail.com>
-Message-ID: <20131022191600.GA28630@roeck-us.net>
+From: zyy@motorola.com (Yuanyuan Zhong)
+Date: Tue, 22 Oct 2013 14:35:53 -0500
+Subject: [PATCH v2] vfp: clear vfp_current_hw_state for dying cpu
+Message-ID: <1382470553-19624-1-git-send-email-zyy@motorola.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 07:21:46PM +0100, Peter Maydell wrote:
-> On 22 October 2013 18:42, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > Having "stable" DT bindings is just a dream.  Experience so far is
-> > showing that this is neither practical nor realistic.
-> >
-> > The unstructured free-for-all approach isn't good either.  Some
-> > compromise between the two extremes needs to be found.
-> 
-> While I entirely agree that the concept of DT bindings as stable
-> ABI is a complete pipe dream, it would be nice if we could have
-> some suitably restricted parts of it that are defined as stable,
-> for the benefit of tools like kvmtool and QEMU which construct
-> device tree blobs from scratch to describe the virtual machine
-> environment. (That means roughly CPUs, RAM, virtio-mmio
-> devices and a UART at least.)
-> 
-> As the person who has to maintain the device-tree-writing
-> code for ARM QEMU, I'd actually trust a carefully limited
-> guarantee of ABI stability for specific bindings much more
-> than I do the current airy promises that everything is stable.
-> 
+Previous version of the patch can be found at:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/201893.html
 
-Agreed. I like the idea of Documentation/ABI, though of course
-it would help if its contents would move from testing/ to stable/
-at some point ;-).
+The CPU_DYING notifier is called by cpu stopper task which
+does not own the context held in the VFP hardware. Calling
+vfp_force_reload() has no effect.
+Replace it with clearing vfp_current_hw_state.
 
-Guenter
+Change-Id: Icb2c726334c5b0463b8126170cac2b44cd4ac38f
+Signed-off-by: Yuanyuan Zhong <zyy@motorola.com>
+---
+ arch/arm/vfp/vfpmodule.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 52b8f40..2f37e1d 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -642,9 +642,9 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
+ static int vfp_hotplug(struct notifier_block *b, unsigned long action,
+ 	void *hcpu)
+ {
+-	if (action == CPU_DYING || action == CPU_DYING_FROZEN) {
+-		vfp_force_reload((long)hcpu, current_thread_info());
+-	} else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
++	if (action == CPU_DYING || action == CPU_DYING_FROZEN)
++		vfp_current_hw_state[(long)hcpu] = NULL;
++	else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+ 		vfp_enable(NULL);
+ 	return NOTIFY_OK;
+ }
+-- 
+1.7.9.5
