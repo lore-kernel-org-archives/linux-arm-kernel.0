@@ -1,81 +1,37 @@
 From: sre@debian.org (Sebastian Reichel)
-Date: Tue, 22 Oct 2013 13:00:26 +0200
-Subject: [PATCH] DTS: ARM: OMAP3-N900: Add pinctrl for i2c devices
-Message-ID: <1382439626-16093-1-git-send-email-sre@debian.org>
+Date: Tue, 22 Oct 2013 13:02:54 +0200
+Subject: [PATCH] DTS: ARM: OMAP3-N900: Fix i2c bus speed
+Message-ID: <1382439774-16265-1-git-send-email-sre@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pin muxing support for the Nokia N900 i2c controllers.
+Fix the bus speed of i2c bus 2 and 3.
 
 Signed-off-by: Sebastian Reichel <sre@debian.org>
 ---
- arch/arm/boot/dts/omap3-n900.dts | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/arm/boot/dts/omap3-n900.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index d64fa04..57f5a2a 100644
+index 57f5a2a..2374b9a 100644
 --- a/arch/arm/boot/dts/omap3-n900.dts
 +++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -28,7 +28,35 @@
+@@ -78,14 +78,14 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c2_pins>;
  
- };
- 
-+&omap3_pmx_core {
-+	pinctrl-names = "default";
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			0x18a (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl */
-+			0x18c (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_sda */
-+		>;
-+	};
-+
-+	i2c2_pins: pinmux_i2c2_pins {
-+		pinctrl-single,pins = <
-+			0x18e (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c2_scl */
-+			0x190 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c2_sda */
-+		>;
-+	};
-+
-+	i2c3_pins: pinmux_i2c3_pins {
-+		pinctrl-single,pins = <
-+			0x192 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c3_scl */
-+			0x194 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c3_sda */
-+		>;
-+	};
-+};
-+
- &i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+
- 	clock-frequency = <2200000>;
- 
- 	twl: twl at 48 {
-@@ -39,6 +67,7 @@
- };
- 
- #include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
- 
- &twl_gpio {
- 	ti,pullups	= <0x0>;
-@@ -46,10 +75,16 @@
- };
- 
- &i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
-+
- 	clock-frequency = <400000>;
+-	clock-frequency = <400000>;
++	clock-frequency = <100000>;
  };
  
  &i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins>;
-+
- 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c3_pins>;
+ 
+-	clock-frequency = <100000>;
++	clock-frequency = <400000>;
  };
  
+ &mmc1 {
 -- 
 1.8.4.rc3
