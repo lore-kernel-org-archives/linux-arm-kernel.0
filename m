@@ -1,32 +1,57 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Oct 2013 09:39:40 +0200
-Subject: [PATCH 3/4] drivers/pwm: don't use
- devm_pinctrl_get_select_default() in probe
-In-Reply-To: <1381681071-6021-4-git-send-email-wsa@the-dreams.de>
-References: <1381681071-6021-1-git-send-email-wsa@the-dreams.de>
- <1381681071-6021-4-git-send-email-wsa@the-dreams.de>
-Message-ID: <20131022073939.GD8681@ulmo.nvidia.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 22 Oct 2013 15:27:37 +0800
+Subject: [PATCH 1/1] mfd: syscon: return -ENXIO if CONFIG_MFD_SYSCON is not
+ enabled
+Message-ID: <1382426857-31975-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 13, 2013 at 06:17:49PM +0200, Wolfram Sang wrote:
-> Since commit ab78029 (drivers/pinctrl: grab default handles from device core),
-> we can rely on device core for setting the default pins. Compile tested only.
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org> (personally at LCE13)
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->  drivers/pwm/pwm-tiecap.c   | 6 ------
->  drivers/pwm/pwm-tiehrpwm.c | 6 ------
->  2 files changed, 12 deletions(-)
+Some platforms may not define CONFIG_MFD_SYSCON (or haven't syscon),
+it can fix build error for those platforms.
 
-Applied, thanks.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ include/linux/mfd/syscon.h |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/8d23fbef/attachment.sig>
+diff --git a/include/linux/mfd/syscon.h b/include/linux/mfd/syscon.h
+index b473577..60bf0fb 100644
+--- a/include/linux/mfd/syscon.h
++++ b/include/linux/mfd/syscon.h
+@@ -17,10 +17,34 @@
+ 
+ struct device_node;
+ 
++#if IS_ENABLED(CONFIG_MFD_SYSCON)
+ extern struct regmap *syscon_node_to_regmap(struct device_node *np);
+ extern struct regmap *syscon_regmap_lookup_by_compatible(const char *s);
+ extern struct regmap *syscon_regmap_lookup_by_pdevname(const char *s);
+ extern struct regmap *syscon_regmap_lookup_by_phandle(
+ 					struct device_node *np,
+ 					const char *property);
++#else
++static inline struct regmap *syscon_node_to_regmap(struct device_node *np)
++{
++	return ERR_PTR(-ENXIO);
++}
++
++static inline struct regmap *syscon_regmap_lookup_by_compatible(const char *s)
++{
++	return ERR_PTR(-ENXIO);
++}
++
++static inline struct regmap *syscon_regmap_lookup_by_pdevname(const char *s)
++{
++	return ERR_PTR(-ENXIO);
++}
++static inline struct regmap *syscon_regmap_lookup_by_phandle(
++					struct device_node *np,
++					const char *property)
++{
++	return ERR_PTR(-ENXIO);
++}
++#endif
++
+ #endif /* __LINUX_MFD_SYSCON_H__ */
+-- 
+1.7.1
