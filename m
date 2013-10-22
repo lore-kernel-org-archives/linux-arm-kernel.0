@@ -1,60 +1,55 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Tue, 22 Oct 2013 15:41:03 +0530
-Subject: [PATCH v2 2/7] drm/exynos: remove dummy hdmiphy clock
+Date: Tue, 22 Oct 2013 15:41:08 +0530
+Subject: [PATCH v2 7/7] ARM: dts: update hdmiphy dt node for exynos5420
 In-Reply-To: <1382436668-15813-1-git-send-email-rahul.sharma@samsung.com>
 References: <1382436668-15813-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1382436668-15813-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1382436668-15813-8-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hdmiphy is a dummy clock which actually controls the PMU bit
-to enable/disable hdmiphy (before CCF). This clock is cleaned
-from the hdmi driver.
+hdmiphy dt node needs a child node called 'phy-power-control'
+which represents the PMU register for power controlling the
+hdmiphy.
+
+hdmi driver dt node provides phy property which points to
+the hdmiphy dt node.
 
 Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_hdmi.c |    8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm/boot/dts/exynos5420.dtsi |   14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index bbb9fbf..444541d 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -84,7 +84,6 @@ struct hdmi_resources {
- 	struct clk			*sclk_hdmi;
- 	struct clk			*sclk_pixel;
- 	struct clk			*sclk_hdmiphy;
--	struct clk			*hdmiphy;
- 	struct clk			*mout_hdmi;
- 	struct regulator_bulk_data	*regul_bulk;
- 	int				regul_count;
-@@ -1442,7 +1441,6 @@ static void hdmi_poweron(struct hdmi_context *hdata)
- 	if (regulator_bulk_enable(res->regul_count, res->regul_bulk))
- 		DRM_DEBUG_KMS("failed to enable regulator bulk\n");
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index ed687ac..f7fb337 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -207,7 +207,7 @@
+ 	};
  
--	clk_prepare_enable(res->hdmiphy);
- 	clk_prepare_enable(res->hdmi);
- 	clk_prepare_enable(res->sclk_hdmi);
+ 	hdmi at 14530000 {
+-		compatible = "samsung,exynos4212-hdmi";
++		compatible = "samsung,exynos5420-hdmi";
+ 		reg = <0x14530000 0x70000>;
+ 		interrupts = <0 95 0>;
+ 		clocks = <&clock 413>, <&clock 143>, <&clock 768>,
+@@ -215,6 +215,18 @@
+ 		clock-names = "hdmi", "sclk_hdmi", "sclk_pixel",
+ 			"sclk_hdmiphy", "mout_hdmi";
+ 		status = "disabled";
++		phy = <&hdmiphy>;
++	};
++
++	hdmiphy: hdmiphy at 145D0000 {
++		compatible = "samsung,exynos5420-hdmiphy";
++		reg = <0x145D0000 0x20>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		phy-power-control {
++			reg = <0x10040700 0x04>;
++		};
+ 	};
  
-@@ -1467,7 +1465,6 @@ static void hdmi_poweroff(struct hdmi_context *hdata)
- 
- 	clk_disable_unprepare(res->sclk_hdmi);
- 	clk_disable_unprepare(res->hdmi);
--	clk_disable_unprepare(res->hdmiphy);
- 	regulator_bulk_disable(res->regul_count, res->regul_bulk);
- 
- 	mutex_lock(&hdata->hdmi_mutex);
-@@ -1560,11 +1557,6 @@ static int hdmi_resources_init(struct hdmi_context *hdata)
- 		DRM_ERROR("failed to get clock 'sclk_hdmiphy'\n");
- 		goto fail;
- 	}
--	res->hdmiphy = devm_clk_get(dev, "hdmiphy");
--	if (IS_ERR(res->hdmiphy)) {
--		DRM_ERROR("failed to get clock 'hdmiphy'\n");
--		goto fail;
--	}
- 	res->mout_hdmi = devm_clk_get(dev, "mout_hdmi");
- 	if (IS_ERR(res->mout_hdmi)) {
- 		DRM_ERROR("failed to get clock 'mout_hdmi'\n");
+ 	mixer at 14450000 {
 -- 
 1.7.10.4
