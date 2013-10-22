@@ -1,329 +1,74 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 22 Oct 2013 10:30:43 -0500
-Subject: [PATCH 2/3] dma: edma: Add support for Cyclic DMA
-In-Reply-To: <20131021065319.GM14013@intel.com>
-References: <1379977515-3794-1-git-send-email-joelf@ti.com>
- <1379977515-3794-3-git-send-email-joelf@ti.com>
- <20131021065319.GM14013@intel.com>
-Message-ID: <52669A23.2080805@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 22 Oct 2013 17:34:45 +0200
+Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
+In-Reply-To: <20131022072307.GA8681@ulmo.nvidia.com>
+References: <20131019104555.GI18477@ns203013.ovh.net>
+ <1382346813-8449-1-git-send-email-denis@eukrea.com>
+ <20131022045833.GB17512@ns203013.ovh.net>
+ <20131022072307.GA8681@ulmo.nvidia.com>
+Message-ID: <20131022153445.GD17512@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2013 01:53 AM, Vinod Koul wrote:
-> On Mon, Sep 23, 2013 at 06:05:14PM -0500, Joel Fernandes wrote:
->  
->> @@ -449,6 +455,138 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
->>  	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
->>  }
->>  
->> +static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
->> +	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
->> +	size_t period_len, enum dma_transfer_direction direction,
->> +	unsigned long tx_flags, void *context)
->> +{
->> +	struct edma_chan *echan = to_edma_chan(chan);
->> +	struct device *dev = chan->device->dev;
->> +	struct edma_desc *edesc;
->> +	dma_addr_t src_addr, dst_addr;
->> +	enum dma_slave_buswidth dev_width;
->> +	u32 burst;
->> +	int i, ret, nr_periods;
->> +
->> +	if (unlikely(!echan || !buf_len || !period_len))
->> +		return NULL;
->> +
->> +	if (direction == DMA_DEV_TO_MEM) {
->> +		src_addr = echan->cfg.src_addr;
->> +		dst_addr = buf_addr;
->> +		dev_width = echan->cfg.src_addr_width;
->> +		burst = echan->cfg.src_maxburst;
->> +	} else if (direction == DMA_MEM_TO_DEV) {
->> +		src_addr = buf_addr;
->> +		dst_addr = echan->cfg.dst_addr;
->> +		dev_width = echan->cfg.dst_addr_width;
->> +		burst = echan->cfg.dst_maxburst;
->> +	} else {
->> +		dev_err(dev, "%s: bad direction?\n", __func__);
->> +		return NULL;
->> +	}
->> +
->> +	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
->> +		dev_err(dev, "Undefined slave buswidth\n");
->> +		return NULL;
->> +	}
->> +
->> +	if (unlikely(buf_len % period_len)) {
->> +		dev_err(dev, "Period should be multiple of Buffer length\n");
->> +		return NULL;
->> +	}
->> +
->> +	nr_periods = (buf_len / period_len) + 1;
-> ?
+On 09:23 Tue 22 Oct     , Thierry Reding wrote:
+> On Tue, Oct 22, 2013 at 06:58:33AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 11:13 Mon 21 Oct     , Denis Carikli wrote:
+> > > Cc: Richard Purdie <rpurdie@rpsys.net>
+> > > Cc: Jingoo Han <jg1.han@samsung.com>
+> > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > Cc: Rob Herring <rob.herring@calxeda.com>
+> > > Cc: Pawel Moll <pawel.moll@arm.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > > Cc: devicetree at vger.kernel.org
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> > > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > > Cc: Eric B?nard <eric@eukrea.com>
+> > > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > > ---
+> > > ChangeLog v3->v4:
+> > > - The default-brightness property is now optional, it defaults to 1 if not set.
+> > by default we set OFF not ON
+> > 
+> > do not actiate driver or properti by default you can not known to consequence
+> > on the hw
 > 
-> consider the case of buf = period_len, above makes nr_period = 2.
+> Turning on a backlight by default is what pretty much every backlight
+> driver does. I personally think that's the wrong default, I even tried
+> to get some discussion started recently about how we could change this.
+> However, given that this has been the case for possibly as long as the
+> subsystem has existed, suddenly changing it might cause quite a few of
+> our users to boot the new kernel and not see their display come up. As
+> with any other ABI, this isn't something we can just change without a
+> very good migration path.
+
+I'm sorry but the blacklight descibe in DT have nothing to do with the common
+pratice that the current driver have today
+
+put on by default if wrong specially without the property define. Even put it
+on by default it wrong as the bootloader may have set it already for splash
+screen and to avoid glitch the drivers need to detect this.
+
+For me this should not even be a property but handled by the driver them
+selves in C.
+
+Best Regards,
+J.
 > 
-> Or buf len 100, period len 50, makes nr_period = 3
+> In my opinion every backlight should be hooked up to a display panel,
+> and the display panel driver should be the one responsible for turning
+> the backlight on or off. That's the only way we can guarantee that the
+> backlight is turned on at the right moment so that glitches can be
+> avoided.
 > 
-> Both doesnt seem right to me?
-
-I guess that variable name is misleading.
-
-nr_periods is actually the total no.of slots needed to process the request. Its
-value is 1 greater than the total number of periods.
-
-This is because the channel uses one dedicated slot that it continuously
-refreshed (not read-only). The other slots are read-only, and are continuously
-copied into the dedicated channel's slot.
-
-Below is the updated patch where I changed the nr_periods variable name to
-nslots for clarity.
-
----8<---
-From: Joel Fernandes <joelf@ti.com>
-Subject: [PATCH v2] dma: edma: Add support for Cyclic DMA
-
-Using the PaRAM configuration function that we split for reuse by the
-different DMA types, we implement Cyclic DMA support.
-For the cyclic case, we pass different configuration parameters to this
-function, and handle all the Cyclic-specific functionality separately.
-
-Callbacks to the DMA users are handled using vchan_cyclic_callback in
-the virt-dma layer. Linking is handled the same way as the slave SG case
-except for the last slot where we link it back to the first one in a
-cyclic fashion.
-
-For continuity, we check for cases where no.of periods is great than the
-MAX number of slots the driver can allocate for a particular descriptor
-and error out on such cases.
-
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
-v2 changes:
- - changed variable name- nr_periods to nslots, to make the context more clear.
-
- drivers/dma/edma.c | 160 ++++++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 152 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 9b6004f..0fef450 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -54,6 +54,7 @@
- struct edma_desc {
- 	struct virt_dma_desc		vdesc;
- 	struct list_head		node;
-+	int				cyclic;
- 	int				absync;
- 	int				pset_nr;
- 	int				processed;
-@@ -167,8 +168,13 @@ static void edma_execute(struct edma_chan *echan)
- 	 * then setup a link to the dummy slot, this results in all future
- 	 * events being absorbed and that's OK because we're done
- 	 */
--	if (edesc->processed == edesc->pset_nr)
--		edma_link(echan->slot[nslots-1], echan->ecc->dummy_slot);
-+	if (edesc->processed == edesc->pset_nr) {
-+		if (edesc->cyclic)
-+			edma_link(echan->slot[nslots-1], echan->slot[1]);
-+		else
-+			edma_link(echan->slot[nslots-1],
-+				  echan->ecc->dummy_slot);
-+	}
-
- 	edma_resume(echan->ch_num);
-
-@@ -253,6 +259,7 @@ static int edma_control(struct dma_chan *chan, enum
-dma_ctrl_cmd cmd,
- /*
-  * A PaRAM set configuration abstraction used by other modes
-  * @chan: Channel who's PaRAM set we're configuring
-+ * @pset: PaRAM set to initialize and setup.
-  * @src_addr: Source address of the DMA
-  * @dst_addr: Destination address of the DMA
-  * @burst: In units of dev_width, how much to send
-@@ -448,6 +455,138 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
- 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
- }
-
-+static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
-+	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
-+	size_t period_len, enum dma_transfer_direction direction,
-+	unsigned long tx_flags, void *context)
-+{
-+	struct edma_chan *echan = to_edma_chan(chan);
-+	struct device *dev = chan->device->dev;
-+	struct edma_desc *edesc;
-+	dma_addr_t src_addr, dst_addr;
-+	enum dma_slave_buswidth dev_width;
-+	u32 burst;
-+	int i, ret, nslots;
-+
-+	if (unlikely(!echan || !buf_len || !period_len))
-+		return NULL;
-+
-+	if (direction == DMA_DEV_TO_MEM) {
-+		src_addr = echan->cfg.src_addr;
-+		dst_addr = buf_addr;
-+		dev_width = echan->cfg.src_addr_width;
-+		burst = echan->cfg.src_maxburst;
-+	} else if (direction == DMA_MEM_TO_DEV) {
-+		src_addr = buf_addr;
-+		dst_addr = echan->cfg.dst_addr;
-+		dev_width = echan->cfg.dst_addr_width;
-+		burst = echan->cfg.dst_maxburst;
-+	} else {
-+		dev_err(dev, "%s: bad direction?\n", __func__);
-+		return NULL;
-+	}
-+
-+	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
-+		dev_err(dev, "Undefined slave buswidth\n");
-+		return NULL;
-+	}
-+
-+	if (unlikely(buf_len % period_len)) {
-+		dev_err(dev, "Period should be multiple of Buffer length\n");
-+		return NULL;
-+	}
-+
-+	nslots = (buf_len / period_len) + 1;
-+
-+	/*
-+	 * Cyclic DMA users such as audio cannot tolerate delays introduced
-+	 * by cases where the number of periods is more than the maximum
-+	 * number of SGs the EDMA driver can handle at a time. For DMA types
-+	 * such as Slave SGs, such delays are tolerable and synchronized,
-+	 * but the synchronization is difficult to achieve with Cyclic and
-+	 * cannot be guaranteed, so we error out early.
-+	 */
-+	if (nslots > MAX_NR_SG)
-+		return NULL;
-+
-+	edesc = kzalloc(sizeof(*edesc) + nslots *
-+		sizeof(edesc->pset[0]), GFP_ATOMIC);
-+	if (!edesc) {
-+		dev_dbg(dev, "Failed to allocate a descriptor\n");
-+		return NULL;
-+	}
-+
-+	edesc->cyclic = 1;
-+	edesc->pset_nr = nslots;
-+
-+	dev_dbg(dev, "%s: nslots=%d\n", __func__, nslots);
-+	dev_dbg(dev, "%s: period_len=%d\n", __func__, period_len);
-+	dev_dbg(dev, "%s: buf_len=%d\n", __func__, buf_len);
-+
-+	for (i = 0; i < nslots; i++) {
-+		/* Allocate a PaRAM slot, if needed */
-+		if (echan->slot[i] < 0) {
-+			echan->slot[i] =
-+				edma_alloc_slot(EDMA_CTLR(echan->ch_num),
-+						EDMA_SLOT_ANY);
-+			if (echan->slot[i] < 0) {
-+				dev_err(dev, "Failed to allocate slot\n");
-+				return NULL;
-+			}
-+		}
-+
-+		if (i == nslots - 1) {
-+			memcpy(&edesc->pset[i], &edesc->pset[0],
-+			       sizeof(edesc->pset[0]));
-+			break;
-+		}
-+
-+		ret = edma_config_pset(chan, &edesc->pset[i], src_addr,
-+				       dst_addr, burst, dev_width, period_len,
-+				       direction);
-+		if (ret < 0)
-+			return NULL;
-+
-+		if (direction == DMA_DEV_TO_MEM)
-+			dst_addr += period_len;
-+		else
-+			src_addr += period_len;
-+
-+		dev_dbg(dev, "%s: Configure period %d of buf:\n", __func__, i);
-+		dev_dbg(dev,
-+			"\n pset[%d]:\n"
-+			"  chnum\t%d\n"
-+			"  slot\t%d\n"
-+			"  opt\t%08x\n"
-+			"  src\t%08x\n"
-+			"  dst\t%08x\n"
-+			"  abcnt\t%08x\n"
-+			"  ccnt\t%08x\n"
-+			"  bidx\t%08x\n"
-+			"  cidx\t%08x\n"
-+			"  lkrld\t%08x\n",
-+			i, echan->ch_num, echan->slot[i],
-+			edesc->pset[i].opt,
-+			edesc->pset[i].src,
-+			edesc->pset[i].dst,
-+			edesc->pset[i].a_b_cnt,
-+			edesc->pset[i].ccnt,
-+			edesc->pset[i].src_dst_bidx,
-+			edesc->pset[i].src_dst_cidx,
-+			edesc->pset[i].link_bcntrld);
-+
-+		edesc->absync = ret;
-+
-+		/*
-+		 * Enable interrupts for every period because callback
-+		 * has to be called for every period.
-+		 */
-+		edesc->pset[i].opt |= TCINTEN;
-+	}
-+
-+	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
-+}
-+
- static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
- {
- 	struct edma_chan *echan = data;
-@@ -456,24 +595,28 @@ static void edma_callback(unsigned ch_num, u16 ch_status,
-void *data)
- 	unsigned long flags;
- 	struct edmacc_param p;
-
--	/* Pause the channel */
--	edma_pause(echan->ch_num);
-+	edesc = echan->edesc;
-+
-+	/* Pause the channel for non-cyclic */
-+	if (!edesc || (edesc && !edesc->cyclic))
-+		edma_pause(echan->ch_num);
-
- 	switch (ch_status) {
- 	case DMA_COMPLETE:
- 		spin_lock_irqsave(&echan->vchan.lock, flags);
-
--		edesc = echan->edesc;
- 		if (edesc) {
--			if (edesc->processed == edesc->pset_nr) {
-+			if (edesc->cyclic) {
-+				vchan_cyclic_callback(&edesc->vdesc);
-+			} else if (edesc->processed == edesc->pset_nr) {
- 				dev_dbg(dev, "Transfer complete, stopping channel %d\n", ch_num);
- 				edma_stop(echan->ch_num);
- 				vchan_cookie_complete(&edesc->vdesc);
-+				edma_execute(echan);
- 			} else {
- 				dev_dbg(dev, "Intermediate transfer complete on channel %d\n", ch_num);
-+				edma_execute(echan);
- 			}
--
--			edma_execute(echan);
- 		}
-
- 		spin_unlock_irqrestore(&echan->vchan.lock, flags);
-@@ -671,6 +814,7 @@ static void edma_dma_init(struct edma_cc *ecc, struct
-dma_device *dma,
- 			  struct device *dev)
- {
- 	dma->device_prep_slave_sg = edma_prep_slave_sg;
-+	dma->device_prep_dma_cyclic = edma_prep_dma_cyclic;
- 	dma->device_alloc_chan_resources = edma_alloc_chan_resources;
- 	dma->device_free_chan_resources = edma_free_chan_resources;
- 	dma->device_issue_pending = edma_issue_pending;
--- 
-1.8.1.2
+> One possible migration path would be to update all display panel drivers
+> to cope with an associated backlight device, but even if somebody would
+> even find the time to write the code to do that, I can imagine that we'd
+> have a hard time getting this tested since a lot of the boards that rely
+> on these backlight drivers are legacy and probably no longer very
+> actively used.
+> 
+> Thierry
