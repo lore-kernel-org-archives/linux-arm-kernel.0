@@ -1,53 +1,94 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 22 Oct 2013 18:13:10 +0800
-Subject: [PATCH v5] PWM: atmel-pwm: add PWM controller driver
-In-Reply-To: <20131008131727.GB12839@ulmo.nvidia.com>
-References: <1380532240-18650-1-git-send-email-voice.shen@atmel.com>
- <20131008131727.GB12839@ulmo.nvidia.com>
-Message-ID: <52664FB6.4000004@atmel.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Tue, 22 Oct 2013 11:19:51 +0100
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <1382186261-14482-2-git-send-email-andrew@lunn.ch>
+References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
+ <1382186261-14482-2-git-send-email-andrew@lunn.ch>
+Message-ID: <52665147.8080307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On 19/10/13 13:37, Andrew Lunn wrote:
+> The Marvell Dove SoC can run the CPU at two frequencies. The high
+> frequencey is from a PLL, while the lower is the same as the DDR
+> clock. Add a cpufreq driver to swap between these frequences.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/cpufreq/Kconfig.arm    |   7 ++
+>  drivers/cpufreq/Makefile       |   1 +
+>  drivers/cpufreq/dove-cpufreq.c | 276 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 284 insertions(+)
+>  create mode 100644 drivers/cpufreq/dove-cpufreq.c
+> 
 
-On 10/8/2013 21:17, Thierry Reding wrote:
-> On Mon, Sep 30, 2013 at 05:10:40PM +0800, Bo Shen wrote:
->> Add Atmel PWM controller driver based on PWM framework.
->>
->> This is the basic function implementation of Atmel PWM controller.
->> It can work with PWM based led and backlight.
->>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->>
->> ---
->> Changes in v5:
->>    - call clk_disable directly, if so, it won't cause more than one channel
->>      enabled, the clock can not be disabled.
->>
->> Changes in v4:
->>    - check the return value of clk_prepare()
->>    - change channel register size as constant
->>
->> Changes in v3:
->>    - change compatible string from "atmel,sama5-pwm" to "atmel,sama5d3-pwm"
->>    - Add PWM led example in binding documentation
->>    - Using micro replace hard code
->>
->> Changes in v2:
->>    - Address the comments from Thierry Reding
->>
->>   .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 +++
->>   drivers/pwm/Kconfig                                |    9 +
->>   drivers/pwm/Makefile                               |    1 +
->>   drivers/pwm/pwm-atmel.c                            |  344 ++++++++++++++++++++
->>   4 files changed, 395 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
->>   create mode 100644 drivers/pwm/pwm-atmel.c
->
-> I haven't seen an Acked-by from the device tree bindings maintainers on
-> this. I've Cc'ed them, so hopefully one of them has time to review.
+[snip]
 
-Any comments?
+> +static int dove_cpufreq_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np;
+> +	struct resource *res;
+> +	int err;
+> +	int irq;
+> +
+> +	priv.dev = &pdev->dev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv.dfs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(priv.dfs))
+> +		return PTR_ERR(priv.dfs);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	priv.pmu_cr = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(priv.pmu_cr))
+> +		return PTR_ERR(priv.pmu_cr);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+> +	priv.pmu_clk_div = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(priv.pmu_clk_div))
+> +		return PTR_ERR(priv.pmu_clk_div);
+> +
+> +	np = of_find_node_by_path("/cpus/cpu at 0");
+> +	if (!np)
+> +		return -ENODEV;
+> +
+You need not search for cpu nodes. When the cpu are registered, their of_node
+gets initialised. So you can just use:
+	np = of_cpu_device_node_get(0);
 
-Best Regards,
-Bo Shen
+However I think its better to just get:
+	cpu_dev = get_cpu_device(0);
+as clk APIs can use cpu_dev
+
+> +	priv.cpu_clk = of_clk_get_by_name(np, "cpu_clk");
+
+Now this can be
+	priv.cpu_clk = devm_clk_get(cpu_dev, "cpu_clk");
+
+> +	if (IS_ERR(priv.cpu_clk)) {
+> +		dev_err(priv.dev, "Unable to get cpuclk");
+> +		return PTR_ERR(priv.cpu_clk);
+> +	}
+> +
+> +	clk_prepare_enable(priv.cpu_clk);
+> +	dove_freq_table[0].frequency = clk_get_rate(priv.cpu_clk) / 1000;
+> +
+> +	priv.ddr_clk = of_clk_get_by_name(np, "ddrclk");
+
+Similarly priv.ddr_clk = devm_clk_get(cpu_dev, "ddrclk");
+
+> +	if (IS_ERR(priv.ddr_clk)) {
+> +		dev_err(priv.dev, "Unable to get ddrclk");
+> +		err = PTR_ERR(priv.ddr_clk);
+> +		goto out_cpu;
+> +	}
+> +
+> +	clk_prepare_enable(priv.ddr_clk);
+> +	dove_freq_table[1].frequency = clk_get_rate(priv.ddr_clk) / 1000;
+> +
+> +	irq = irq_of_parse_and_map(np, 0);
+
+Here you can use cpu_dev->of_node
+
+Regards,
+Sudeep
