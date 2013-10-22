@@ -1,45 +1,81 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 22 Oct 2013 05:45:23 -0500
-Subject: [PATCH] clk: socfpga: Remove check for "reg" property in
- socfpga_clk_init
-In-Reply-To: <1381797274-4564-1-git-send-email-dinguyen@altera.com>
-References: <1381797274-4564-1-git-send-email-dinguyen@altera.com>
-Message-ID: <52665743.1000309@gmail.com>
+From: sre@debian.org (Sebastian Reichel)
+Date: Tue, 22 Oct 2013 13:00:26 +0200
+Subject: [PATCH] DTS: ARM: OMAP3-N900: Add pinctrl for i2c devices
+Message-ID: <1382439626-16093-1-git-send-email-sre@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Add pin muxing support for the Nokia N900 i2c controllers.
 
-On 10/14/13 7:34 PM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
->
-> The function socfpga_clk_init() can support clocks that do not have a divider
-> register, but a fixed-divider that can be read from DTS. Therefore, the "reg"
-> property is not a failing condition for socfpga_clk_init().
->
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->   drivers/clk/socfpga/clk.c |    4 +---
->   1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-> index 5bb848c..7f846bf 100644
-> --- a/drivers/clk/socfpga/clk.c
-> +++ b/drivers/clk/socfpga/clk.c
-> @@ -121,9 +121,7 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
->   	int rc;
->   	u32 fixed_div;
->   
-> -	rc = of_property_read_u32(node, "reg", &reg);
-> -	if (WARN_ON(rc))
-> -		return NULL;
-> +	of_property_read_u32(node, "reg", &reg);
->   
->   	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
->   	if (WARN_ON(!socfpga_clk))
-Was wondering if you have gotten a chance to review this patch?
+Signed-off-by: Sebastian Reichel <sre@debian.org>
+---
+ arch/arm/boot/dts/omap3-n900.dts | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-Thanks,
-Dinh
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index d64fa04..57f5a2a 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -28,7 +28,35 @@
+ 
+ };
+ 
++&omap3_pmx_core {
++	pinctrl-names = "default";
++
++	i2c1_pins: pinmux_i2c1_pins {
++		pinctrl-single,pins = <
++			0x18a (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl */
++			0x18c (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_sda */
++		>;
++	};
++
++	i2c2_pins: pinmux_i2c2_pins {
++		pinctrl-single,pins = <
++			0x18e (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c2_scl */
++			0x190 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c2_sda */
++		>;
++	};
++
++	i2c3_pins: pinmux_i2c3_pins {
++		pinctrl-single,pins = <
++			0x192 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c3_scl */
++			0x194 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c3_sda */
++		>;
++	};
++};
++
+ &i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++
+ 	clock-frequency = <2200000>;
+ 
+ 	twl: twl at 48 {
+@@ -39,6 +67,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3.dtsi"
+ 
+ &twl_gpio {
+ 	ti,pullups	= <0x0>;
+@@ -46,10 +75,16 @@
+ };
+ 
+ &i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins>;
++
+ 	clock-frequency = <400000>;
+ };
+ 
+ &i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins>;
++
+ 	clock-frequency = <100000>;
+ };
+ 
+-- 
+1.8.4.rc3
