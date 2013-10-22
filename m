@@ -1,62 +1,38 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 22 Oct 2013 18:38:12 +0100
-Subject: [PATCH v2 0/5] ARM: vexpress/TC2: cpufreq support
-In-Reply-To: <52664A94.3040508@arm.com>
-References: <1382349534-31502-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <CAKohpo=7Z7D9VsF5GHXKTUy70muNSr-q4nf8k8_qzWBzitzmvA@mail.gmail.com>
- <52664A94.3040508@arm.com>
-Message-ID: <5266B804.3080407@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Oct 2013 10:37:42 -0700
+Subject: [PATCH 1/2] leds: lp55xx: handle enable pin in driver
+In-Reply-To: <CAK5ve-KWdJFuJsvQ+JS2y7bpa9j4hGdU=ceb4nAz8BKQ1M9_XA@mail.gmail.com>
+References: <1382446896-28436-1-git-send-email-sre@debian.org>
+ <1382446896-28436-2-git-send-email-sre@debian.org>
+ <20131022170604.GP15154@atomide.com>
+ <CAK5ve-KWdJFuJsvQ+JS2y7bpa9j4hGdU=ceb4nAz8BKQ1M9_XA@mail.gmail.com>
+Message-ID: <20131022173742.GQ15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(resending with correct/new Rafael's email address)
-
-On 22/10/13 10:51, Sudeep KarkadaNagesha wrote:
-> On 22/10/13 09:22, Viresh Kumar wrote:
->> On 21 October 2013 15:28, Sudeep KarkadaNagesha
->> <Sudeep.KarkadaNagesha@arm.com> wrote:
->>> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->>>
->>> Hi,
->>>
->>> The SPC(Serial Power Controller) on Versatile Express V2P-CA15_A7(TC2)
->>> not only controls low-power states, wake-up irqs and per-CPU jump addresses
->>> but also the CPU performance operating points which is essential to provide
->>> CPU DVFS. The M3 microcontroller can provide upto eight performance values,
->>> one set for each cluster (CA15 or CA7). Each of this value contains the
->>> frequency(kHz) and voltage(mV) at that performance level. It expects
->>> these performance level to be passed through the SPC PERF_LVL registers.
->>>
->>> This patch series adds support to populate those OPPs, add them to the
->>> cpu devices and runtime programming of these performance levels through
->>> clock framework. It also adds a small interface cpufreq driver to validate
->>> the OPPs and register the arm_big_little cpufreq driver.
->>>
->>> Changes v1->v2:
->>>         - Introduced ARCH_VEXPRESS_SPC config to make dependency
->>>           selection cleaner
->>>         - Other minor review comments from Nico implemented
->>>
->>> Regards,
->>> Sudeep
->>>
->>> Sudeep KarkadaNagesha (5):
->>>   cpufreq: arm-big-little: use clk_get instead of clk_get_sys
->>>   ARM: vexpress/TC2: add support for CPU DVFS
->>>   ARM: vexpress/TC2: add cpu clock support
->>>   cpufreq: arm_big_little: add vexpress SPC interface driver
->>>   ARM: vexpress/TC2: register vexpress-spc cpufreq device
->>
->> For All Patches:
->>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->>
+* Bryan Wu <cooloney@gmail.com> [131022 10:23]:
+> On Tue, Oct 22, 2013 at 10:06 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Sebastian Reichel <sre@debian.org> [131022 06:02]:
+> >> This patch moves the handling of the chip's enable pin from the board
+> >> code into the driver. It also updates all board-code files using the
+> >> driver to incorporate this change.
+> >>
+> >> This is needed for device tree support of the enable pin.
+> >
+> > This seems safe to merge along with the other LED patches, the
+> > changes to arch/arm/mach-omap2 should not conflict with anything.
+> >
+> > So for the arch/arm/mach-omap2 changes:
+> >
+> > Acked-by: Tony Lindgren <tony@atomide.com>
 > 
-Thanks Nico, Pawel and Viresh for the review and acks.
+> I'm OK for LED parts, will this patch go through omap tree? If so,
+> please add my ack.
+> 
+> Acked-by: Bryan Wu <cooloney@gmail.com>
 
-Hi Rafael,
-
-Do you prefer a pull request for this or are you OK to pull from the mails ?
+It's probably best that you take it via with the LED patches.
 
 Regards,
-Sudeep
+
+Tony
