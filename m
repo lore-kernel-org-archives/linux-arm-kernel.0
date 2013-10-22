@@ -1,41 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Oct 2013 10:19:59 +0100
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131021102448.GD21518@ulmo.nvidia.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131020231134.GR25034@n2100.arm.linux.org.uk>
- <20131021083242.GB30088@pengutronix.de>
- <20131021084854.GV25034@n2100.arm.linux.org.uk>
- <20131021092730.GF30088@pengutronix.de>
- <20131021095757.GY25034@n2100.arm.linux.org.uk>
- <20131021102448.GD21518@ulmo.nvidia.com>
-Message-ID: <20131022091959.GC20821@sirena.org.uk>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 22 Oct 2013 18:13:10 +0800
+Subject: [PATCH v5] PWM: atmel-pwm: add PWM controller driver
+In-Reply-To: <20131008131727.GB12839@ulmo.nvidia.com>
+References: <1380532240-18650-1-git-send-email-voice.shen@atmel.com>
+ <20131008131727.GB12839@ulmo.nvidia.com>
+Message-ID: <52664FB6.4000004@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 21, 2013 at 12:24:49PM +0200, Thierry Reding wrote:
+Hi All,
 
-> Multi-driver with DRM has worked pretty well for Tegra. Essentially what
-> I created was a sort of abstraction layer between DRM and the individual
-> drivers so that each driver can register itself with that layer. Once it
-> has been determined that all drivers have been probed, that glue layer
-> can load the DRM driver and call back into the sub-drivers to register
-> their respective components with DRM.
+On 10/8/2013 21:17, Thierry Reding wrote:
+> On Mon, Sep 30, 2013 at 05:10:40PM +0800, Bo Shen wrote:
+>> Add Atmel PWM controller driver based on PWM framework.
+>>
+>> This is the basic function implementation of Atmel PWM controller.
+>> It can work with PWM based led and backlight.
+>>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>>
+>> ---
+>> Changes in v5:
+>>    - call clk_disable directly, if so, it won't cause more than one channel
+>>      enabled, the clock can not be disabled.
+>>
+>> Changes in v4:
+>>    - check the return value of clk_prepare()
+>>    - change channel register size as constant
+>>
+>> Changes in v3:
+>>    - change compatible string from "atmel,sama5-pwm" to "atmel,sama5d3-pwm"
+>>    - Add PWM led example in binding documentation
+>>    - Using micro replace hard code
+>>
+>> Changes in v2:
+>>    - Address the comments from Thierry Reding
+>>
+>>   .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 +++
+>>   drivers/pwm/Kconfig                                |    9 +
+>>   drivers/pwm/Makefile                               |    1 +
+>>   drivers/pwm/pwm-atmel.c                            |  344 ++++++++++++++++++++
+>>   4 files changed, 395 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+>>   create mode 100644 drivers/pwm/pwm-atmel.c
+>
+> I haven't seen an Acked-by from the device tree bindings maintainers on
+> this. I've Cc'ed them, so hopefully one of them has time to review.
 
-This is pretty much what ASoC always did, it's been working out
-reasonably well.
+Any comments?
 
-We do still don't really handle what happens if someone tries to unbind
-one of the supporting devices while things are in use sensibly.  Since
-generally this would involve someone manually removing the driver for
-pracical purposes we're OK now but it's an issue and we probably will
-have to deal with systems that trigger this for sensible reasons at some
-point.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/ea081a26/attachment.sig>
+Best Regards,
+Bo Shen
