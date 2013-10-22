@@ -1,36 +1,98 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 22 Oct 2013 14:23:36 +0800
-Subject: [Patch v2 07/10] usb: chipidea: imx: Enable runtime pm support for
- imx6 SoC serial
+Date: Tue, 22 Oct 2013 14:23:37 +0800
+Subject: [Patch v2 08/10] usb: chipidea: host: add quirk for ehci operation
 In-Reply-To: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
 References: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1382423019-26184-8-git-send-email-peter.chen@freescale.com>
+Message-ID: <1382423019-26184-9-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, only imx6 SoC serial adds wakeup logic, so only
-enable runtime pm for imx6.
+For chipidea controller, it does not follow ehci spec strictly.
+Taking resume signal as an example, it will stop resume signal about
+20-21ms later automatically, but standard ehci spec says, the resume
+signal is controlled by software (clear portsc.PORT_RESUME).
+
+This operation causes some remote wakeup problems for high speed
+devices due to host controller does not send SOF in time since
+software can't guarantee set run/stop bit in time (run/stop bit
+was cleared at the ehci suspend routine).
+
+When software sets run/stop bit, it needs 1 SoF time to make it effect.
+If we close the PHY clock just after setting run/stop bit, it does
+not be set in practice, so a software delay is needed.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci_hdrc_imx.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/usb/chipidea/host.c |   51 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 51 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 2a14152..d4775b3 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -118,6 +118,11 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 59e6020..283b385 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -33,6 +33,53 @@
+ #include "host.h"
  
- 	pdata.phy = data->phy;
- 
-+	if (of_device_is_compatible(np, "fsl,imx6q-usb")) {
-+		pdata.flags |= CI_HDRC_SUPPORTS_RUNTIME_PM;
-+		data->supports_runtime_pm = true;
+ static struct hc_driver __read_mostly ci_ehci_hc_driver;
++static int (*orig_bus_suspend)(struct usb_hcd *hcd);
++
++static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
++{
++	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++	int port;
++	u32 tmp;
++
++	int ret = orig_bus_suspend(hcd);
++
++	if (ret)
++		return ret;
++
++	port = HCS_N_PORTS(ehci->hcs_params);
++	while (port--) {
++		u32 __iomem *reg = &ehci->regs->port_status[port];
++		u32 portsc = ehci_readl(ehci, reg);
++
++		if (portsc & PORT_CONNECT) {
++			/*
++			 * For chipidea, the resume signal will be ended
++			 * automatically, so for remote wakeup case, the
++			 * usbcmd.rs may not be set before the resume has
++			 * ended if other resume path consumes too much
++			 * time (~23ms-24ms), in that case, the SOF will not
++			 * send out within 3ms after resume ends, then the
++			 * device will enter suspend again.
++			 */
++			if (hcd->self.root_hub->do_remote_wakeup) {
++				ehci_dbg(ehci,
++					"Remote wakeup is enabled, "
++					"and device is on the port\n");
++
++				tmp = ehci_readl(ehci, &ehci->regs->command);
++				tmp |= CMD_RUN;
++				ehci_writel(ehci, tmp, &ehci->regs->command);
++				/*
++				 * It needs a short delay between set RUNSTOP
++				 * and set PHCD.
++				 */
++				udelay(125);
++			}
++		}
 +	}
 +
- 	if (!pdev->dev.dma_mask)
- 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
- 	if (!pdev->dev.coherent_dma_mask)
++	return 0;
++}
+ 
+ static irqreturn_t host_irq(struct ci_hdrc *ci)
+ {
+@@ -134,5 +181,9 @@ int ci_hdrc_host_init(struct ci_hdrc *ci)
+ 
+ 	ehci_init_driver(&ci_ehci_hc_driver, NULL);
+ 
++	orig_bus_suspend = ci_ehci_hc_driver.bus_suspend;
++
++	ci_ehci_hc_driver.bus_suspend = ci_ehci_bus_suspend;
++
+ 	return 0;
+ }
 -- 
 1.7.1
