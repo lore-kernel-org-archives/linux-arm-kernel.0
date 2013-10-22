@@ -1,209 +1,46 @@
-From: cinifr@gmail.com (cinifr)
-Date: Tue, 22 Oct 2013 08:48:34 +0800
-Subject: [Add SMP support for Allwinner A20: PATCH V5 1/3] Add smp support
- for Allwinner A20(sunxi 7i).
-In-Reply-To: <1382027827-10080-2-git-send-email-cinifr@gmail.com>
-References: <1382027827-10080-1-git-send-email-cinifr@gmail.com>
- <1382027827-10080-2-git-send-email-cinifr@gmail.com>
-Message-ID: <CAK3cCBweErZS7X1EaGsWeKt+wrX=_=rUVE+04XZRUgYRJa2JTQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 22 Oct 2013 01:14:10 +0000 (UTC)
+Subject: [PATCH 02/11] ARM: OMAP3: clock: add API to enable/disable
+ autoidle for a single clock
+In-Reply-To: <alpine.DEB.2.02.1310211250370.13878@utopia.booyaka.com>
+References: <1381508141-15244-1-git-send-email-t-kristo@ti.com>
+ <1381508141-15244-3-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1310191712450.11676@utopia.booyaka.com>
+ <20131021122610.11944.71616@quantum>
+ <alpine.DEB.2.02.1310211250370.13878@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1310220113530.6442@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI  Maxime?
- How about the new V5 patch?
-Fan
-Thanks
+On Mon, 21 Oct 2013, Paul Walmsley wrote:
 
+> On Mon, 21 Oct 2013, Mike Turquette wrote:
+> 
+> > Quoting Paul Walmsley (2013-10-19 10:16:50)
+> > > On Fri, 11 Oct 2013, Tero Kristo wrote:
+> > > 
+> > > > Some drivers require direct access to the autoidle functionality of the
+> > > > interface clocks. Added clock APIs for these, so that the drivers do not
+> > > > need to access CM registers directly.
+> > > > 
+> > > > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > > 
+> > > Thanks, queued.  Please coordinate with Mike to get 
+> > > allow_idle/deny_idle-type interfaces into the Common Clock Framework, so 
+> > > these can be replaced with standard CCF-type allow_idle() & deny_idle() 
+> > > functions.  That interface should include use-counting so multiple callers 
+> > > can use allow_idle() and deny_idle() without stomping on each other.
+> > 
+> > Where and when are these functions called? IIRC these are only accessed
+> > at boot/init time, though I may be wrong. If they are a boot-time thing
+> > then the .init callback provided in struct clk may be sufficient.
+> 
+> They are called dynamically at runtime when the McBSP goes active and 
+> inactive.  It's in the next patch in this series.  I'm fairly sure at 
+> least one other IP block needs this workaround also.
 
-On 18 October 2013 00:37, Fan Rong <cinifr@gmail.com> wrote:
-> This patch adds SMP support for the Allwinner A20 SoC. This SoC uses an IP to, among other things, handle the CPU-related configuration, like the power clamp, the boot address of the secondary CPUS, etc. We thus need to map this IP during the prepare_cpu SMP operation, before bringing up the secondary CPU in the secondary_startup operation.
->
-> Signed-off-by: Fan Rong <cinifr@gmail.com>
-> ---
->  arch/arm/mach-sunxi/Makefile  |   2 +
->  arch/arm/mach-sunxi/headsmp.S |  18 +++++++
->  arch/arm/mach-sunxi/platsmp.c | 114 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-sunxi/sunxi.c   |   3 ++
->  4 files changed, 137 insertions(+)
->  create mode 100644 arch/arm/mach-sunxi/headsmp.S
->  create mode 100644 arch/arm/mach-sunxi/platsmp.c
->  mode change 100644 => 100755 arch/arm/mach-sunxi/sunxi.c
->
-> diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-> index 93bebfc..d7f1ef4 100644
-> --- a/arch/arm/mach-sunxi/Makefile
-> +++ b/arch/arm/mach-sunxi/Makefile
-> @@ -1 +1,3 @@
->  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-> +obj-$(CONFIG_ARCH_SUNXI) += platsmp.o
-> +obj-$(CONFIG_ARCH_SUNXI) += headsmp.o
-> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> new file mode 100644
-> index 0000000..48c9d33
-> --- /dev/null
-> +++ b/arch/arm/mach-sunxi/headsmp.S
-> @@ -0,0 +1,18 @@
-> +/*
-> + * SMP support for A20
-> + *
-> + *  Copyright (C) 2013 Fan Rong <cinifr@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +
-> +.section ".text.head", "ax"
-> +ENTRY(sun7i_secondary_startup)
-> +       msr cpsr_fsxc,#0xd3
-> +       b secondary_startup
-> +ENDPROC(sun7i_secondary_startup)
-> diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
-> new file mode 100644
-> index 0000000..fa5adde
-> --- /dev/null
-> +++ b/arch/arm/mach-sunxi/platsmp.c
-> @@ -0,0 +1,114 @@
-> +/*
-> + *  linux/arch/arm/mach-sun7i/platsmp.c
-> + *
-> + *  Copyright (C) 2013 Fan Rong <cinifr@gmail.com>
-> + *  All Rights Reserved
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/init.h>
-> +#include <linux/errno.h>
-> +#include <linux/smp.h>
-> +#include <linux/io.h>
-> +#include <linux/delay.h>
-> +#include <linux/smp.h>
-> +
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +
-> +/*
-> + * CPU Configure module support
-> + * 1: Software reset for smp cpus
-> + * 2: Configure for smp cpus including boot.
-> + * 3: Three 64-bit idle counters and two 64-bit common counters
-> + * it is needed for smp cpus
-> + */
-> +void __iomem *sun7i_cc_base; /*CPU Configure Base*/
-> +extern void sun7i_secondary_startup(void);
-> +
-> +/*
-> + * CPUCFG
-> + */
-> +#define SUN7I_CPUCFG_BOOTADDR  0x01a4
-> +
-> +#define SUN7I_CPUCFG_GENCTL    0x0184
-> +#define SUN7I_CPUCFG_DBGCTL0   0x01e0
-> +#define SUN7I_CPUCFG_DBGCTL1   0x01e4
-> +
-> +#define SUN7I_CPU1_PWR_CLAMP   0x01b0
-> +#define SUN7I_CPU1_PWROFF_REG  0x01b4
-> +#define SUN7I_CPUX_RESET_CTL(x)        (0x40 + (x)*0x40)
-> +
-> +static struct of_device_id sun7i_cc_ids[] = {
-> +       { .compatible = "allwinner,sun7i-a20-cpuconfig"},
-> +       { /*sentinel*/ }
-> +};
-> +
-> +static int sun7i_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +       long paddr;
-> +       uint32_t pwr_reg;
-> +       uint32_t j = 0xff << 1;
-> +       if (!sun7i_cc_base) {
-> +               pr_debug("error map cpu configure\n");
-> +               return -ENOSYS;
-> +       }
-> +       /* Set boot addr */
-> +       paddr = virt_to_phys(sun7i_secondary_startup);
-> +       writel(paddr, sun7i_cc_base + SUN7I_CPUCFG_BOOTADDR);
-> +
-> +       /* Assert cpu core reset */
-> +       writel(0, sun7i_cc_base + SUN7I_CPUX_RESET_CTL(cpu));
-> +
-> +       /* Ensure CPU reset also invalidates L1 caches */
-> +       pwr_reg = readl(sun7i_cc_base + SUN7I_CPUCFG_GENCTL);
-> +       pwr_reg &= ~BIT(cpu);
-> +       writel(pwr_reg, sun7i_cc_base + SUN7I_CPUCFG_GENCTL);
-> +
-> +       /* DBGPWRDUP hold low */
-> +       pwr_reg = readl(sun7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +       pwr_reg &= ~BIT(cpu);
-> +       writel(pwr_reg, sun7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +
-> +       /* Ramp up power to CPU1 */
-> +       do {
-> +               writel(j, sun7i_cc_base + SUN7I_CPU1_PWR_CLAMP);
-> +               j = j >> 1;
-> +       } while (j != 0);
-> +
-> +       mdelay(10);
-> +
-> +       pwr_reg = readl(sun7i_cc_base + SUN7I_CPU1_PWROFF_REG);
-> +       pwr_reg &= ~1;
-> +       writel(pwr_reg, sun7i_cc_base + SUN7I_CPU1_PWROFF_REG);
-> +       mdelay(1);
-> +
-> +       /* Release CPU reset */
-> +       writel(3, sun7i_cc_base + SUN7I_CPUX_RESET_CTL(cpu));
-> +
-> +       /* Unlock CPU */
-> +       pwr_reg = readl(sun7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +       pwr_reg |= BIT(cpu);
-> +       writel(pwr_reg, sun7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +
-> +       return 0;
-> +}
-> +
-> +static void __init sun7i_init_cpuconfig_map(unsigned int max_cpus)
-> +{
-> +       struct device_node *np;
-> +       np = of_find_matching_node(NULL, sun7i_cc_ids);
-> +       if (WARN(!np, "unable to setup cup configure"))
-> +               return;
-> +       sun7i_cc_base = of_iomap(np, 0);
-> +       if (WARN(!sun7i_cc_base, "failed to map cup configure base address"))
-> +               return;
-> +}
-> +
-> +struct smp_operations sun7i_smp_ops __initdata = {
-> +       .smp_boot_secondary = sun7i_boot_secondary,
-> +       .smp_prepare_cpus = sun7i_init_cpuconfig_map,
-> +};
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> old mode 100644
-> new mode 100755
-> index f184f6c..545269d
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -26,6 +26,8 @@
->  #include <asm/mach/map.h>
->  #include <asm/system_misc.h>
->
-> +extern struct smp_operations sun7i_smp_ops;
-> +
->  #define SUN4I_WATCHDOG_CTRL_REG                0x00
->  #define SUN4I_WATCHDOG_CTRL_RESTART            BIT(0)
->  #define SUN4I_WATCHDOG_MODE_REG                0x04
-> @@ -155,6 +157,7 @@ static const char * const sun7i_board_dt_compat[] = {
->  };
->
->  DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
-> +       .smp    = smp_ops(sun7i_smp_ops),
->         .init_machine   = sunxi_dt_init,
->         .init_time      = sunxi_timer_init,
->         .dt_compat      = sun7i_board_dt_compat,
-> --
-> 1.8.1.2
->
+By the way, here's that patch:
+
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg97004.html
+
+- Paul
