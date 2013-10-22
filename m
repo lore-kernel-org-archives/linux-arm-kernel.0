@@ -1,43 +1,72 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Tue, 22 Oct 2013 15:41:06 +0530
-Subject: [PATCH v2 5/7] exynos/drm: fix ddc i2c device probe failure
-In-Reply-To: <1382436668-15813-1-git-send-email-rahul.sharma@samsung.com>
-References: <1382436668-15813-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1382436668-15813-6-git-send-email-rahul.sharma@samsung.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 22 Oct 2013 02:53:17 -0700
+Subject: [PATCH v2 1/4] clk: mvebu: Add Core Divider clock
+In-Reply-To: <20131017192545.GJ22434@titan.lakedaemon.net>
+References: <1380224130-11868-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1380224130-11868-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131002174332.GQ31178@titan.lakedaemon.net>
+ <20131002180944.GC2365@localhost> <20131008195933.GA2473@localhost>
+ <20131016110819.GC2518@localhost> <20131017191852.GA8832@localhost>
+ <20131017192545.GJ22434@titan.lakedaemon.net>
+Message-ID: <20131022095317.11944.60429@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos hdmi ddc is a I2C device and if we register hdmi ddc
-driver with id_table as NULL, cause failure in probing.
+Quoting Jason Cooper (2013-10-17 12:25:45)
+> On Thu, Oct 17, 2013 at 04:18:53PM -0300, Ezequiel Garcia wrote:
+> > On Wed, Oct 16, 2013 at 08:08:19AM -0300, Ezequiel Garcia wrote:
+> > > On Tue, Oct 08, 2013 at 04:59:33PM -0300, Ezequiel Garcia wrote:
+> > > > On Wed, Oct 02, 2013 at 03:09:44PM -0300, Ezequiel Garcia wrote:
+> > > > > On Wed, Oct 02, 2013 at 01:43:32PM -0400, Jason Cooper wrote:
+> > > > > > On Thu, Sep 26, 2013 at 04:35:27PM -0300, Ezequiel Garcia wrote:
+> > > > > > > This commit introduces a new group of clocks present in Armada 370/XP
+> > > > > > > SoCs (called "Core Divider" clocks) and add a provider for them.
+> > > > > > > The only clock supported for now is the NAND clock (ndclk), but the
+> > > > > > > infrastructure to add the rest is already set.
+> > > > > > > 
+> > > > > > > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > > > > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > > > > > ---
+> > > > > > >  drivers/clk/mvebu/Kconfig       |   5 +
+> > > > > > >  drivers/clk/mvebu/Makefile      |   1 +
+> > > > > > >  drivers/clk/mvebu/clk-corediv.c | 223 ++++++++++++++++++++++++++++++++++++++++
+> > > > > > >  3 files changed, 229 insertions(+)
+> > > > > > >  create mode 100644 drivers/clk/mvebu/clk-corediv.c
+> > > > > > 
+> > > > > > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > > > > > 
+> > > > > 
+> > > > > Mike: any comments on this?
+> > > > 
+> > > > ping?
+> > > > 
+> > > > I'd like to move along with the NAND driver for this controller and
+> > > > -although these are not a hard requirement- it would be nice
+> > > > to have them merged.
+> > > > 
+> > > 
+> > > Mike? Any chance you pick these soon? It's been almost three-weeks since
+> > > these patchset has been sent and I'm starting to forget the details of it ;)
+> > 
+> > Jason: It seems Mike went on 'stealth mode' so I'm wondering if you would
+> > consider taking this patchset through you (given it's for our SoCs).
+> 
+> I considered it, and it didn't sit well with me.  I don't mind taking a
+> bugfix, everyone wants to see those moved along.  However, this is an
+> entirely new driver.  Yes, it's scope of use is limited, but I'd prefer
+> to let the maintainer review the driver before agreeing to maintain it.
+> Otherwise, I'd be forcing him to maintain something he hasn't even
+> looked at.  :(
+> 
+> I know it sucks, but we're going to wait for Mike.
 
-id_table field should not be NULL for i2c_driver registeration.
+Sorry for the delay. This driver looks fine and I've taken it into
+clk-next.
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
----
- drivers/gpu/drm/exynos/exynos_ddc.c |    5 +++++
- 1 file changed, 5 insertions(+)
+Thanks!
+Mike
 
-diff --git a/drivers/gpu/drm/exynos/exynos_ddc.c b/drivers/gpu/drm/exynos/exynos_ddc.c
-index 6a8c84e..54ead55 100644
---- a/drivers/gpu/drm/exynos/exynos_ddc.c
-+++ b/drivers/gpu/drm/exynos/exynos_ddc.c
-@@ -51,12 +51,17 @@ static struct of_device_id hdmiddc_match_types[] = {
- 	}
- };
- 
-+static struct i2c_device_id ddc_idtable[] = {
-+	{ },
-+};
-+
- struct i2c_driver ddc_driver = {
- 	.driver = {
- 		.name = "exynos-hdmiddc",
- 		.owner = THIS_MODULE,
- 		.of_match_table = hdmiddc_match_types,
- 	},
-+	.id_table	= ddc_idtable,
- 	.probe		= s5p_ddc_probe,
- 	.remove		= s5p_ddc_remove,
- 	.command		= NULL,
--- 
-1.7.10.4
+> 
+> thx,
+> 
+> Jason.
