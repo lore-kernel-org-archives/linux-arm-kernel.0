@@ -1,42 +1,45 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Tue, 22 Oct 2013 16:44:14 +0200
-Subject: [RFCv3 7/7] ARM: dts: N900: Add SSI information
-In-Reply-To: <5266742D.9050604@baylibre.com>
-References: <1381091235-18293-1-git-send-email-sre@debian.org>
- <1381091235-18293-8-git-send-email-sre@debian.org>
- <5266742D.9050604@baylibre.com>
-Message-ID: <20131022144413.GA31867@earth.universe>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Oct 2013 07:55:29 -0700
+Subject: [PATCH] ARM: omap2: irq, AM33XX add missing register check
+In-Reply-To: <1381994318-10207-1-git-send-email-mpa@pengutronix.de>
+References: <1381994318-10207-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131022145529.GM15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+* Markus Pargmann <mpa@pengutronix.de> [131017 00:19]:
+> am33xx has a INTC_PENDING_IRQ3 register that is not checked for pending
+> interrupts. This patch adds AM33XX to the ifdef of SOCs that have to
+> check this register.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-On Tue, Oct 22, 2013 at 02:48:45PM +0200, Benoit Cousson wrote:
-> Thanks to Tony, I've just realized that I missed all your patches,
-> that for some reason ended-up in my junk folder :-(
+Thanks, it seems this can wait for the merge window, but I'll also add cc
+stable to it as it can save some duplicate debugging for people.
 
-oh :( Can you check why they ended up in junk? I would like to
-prevent more mails going there.
+So I'll apply this into omap-for-v3.13/fixes-not-urgent.
 
-> That being said, I cannot apply any of your DTS patches! What base
-> branch are you using?
+Regards,
 
-Currently torvalds/master with pavel's n900 patch and some more
-patches from me.
+Tony
 
-> Could you repost all your pending DTS patches in one series rebased
-> on top of my for_3.13/dts?
-
-Sure. DT maintainers haven't given feedback since the last patchset
-[0]. Do you want to wait for feedback from them?
-
-[0] https://lkml.org/lkml/2013/9/23/529
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/d075c54f/attachment.sig>
+> ---
+>  arch/arm/mach-omap2/irq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+> index 3926f37..e022a86 100644
+> --- a/arch/arm/mach-omap2/irq.c
+> +++ b/arch/arm/mach-omap2/irq.c
+> @@ -233,7 +233,7 @@ static inline void omap_intc_handle_irq(void __iomem *base_addr, struct pt_regs
+>  			goto out;
+>  
+>  		irqnr = readl_relaxed(base_addr + 0xd8);
+> -#ifdef CONFIG_SOC_TI81XX
+> +#if IS_ENABLED(CONFIG_SOC_TI81XX) || IS_ENABLED(CONFIG_SOC_AM33XX)
+>  		if (irqnr)
+>  			goto out;
+>  		irqnr = readl_relaxed(base_addr + 0xf8);
+> -- 
+> 1.8.4.rc3
+> 
