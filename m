@@ -1,40 +1,49 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Mon, 21 Oct 2013 22:35:38 -0700
-Subject: [GIT PULL] bcm soc updates for 3.13
-Message-ID: <CAEPRUYrQ94u4NzbFBOY2E5_B3aoiNLKDcbehsU+J-pVMT64YWw@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 22 Oct 2013 13:58:34 +0800
+Subject: [Patch v2 00/14] Add power management support for MXS PHY
+Message-ID: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+Hi Felipe,
 
-  Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+   The serial adds power management support for MXS PHY, it includes:
 
-are available in the git repository at:
+   - Add three common PHY API, .set_wakeup, .notify_suspend, notify_resume.
+   - Related above API implementation at mxs phy driver
+   - misc changes for mxs phy to support low power mode and wakeup.
 
-  git://github.com/broadcom/bcm11351.git tags/bcm-for-3.13-soc
+Changes for v2:
 
-for you to fetch changes up to 501b022a394992f8b673e74900976adb44b7f36d:
+- Add missing patches which introduce platform judgement code [1/14,2/14]
+- re-order the patch sequence, like doc->dts->source file, 
+the reviewers can know the meaning of dt properties before review source
+- Add description of two IC problems exsiting at mxs PHY; change
+"high speed" to "HS" and "non-high speed" to "FS/LS" [5/14]
+- Change the dt property disconnect-line-without-vbus
+that the separator should be "-" not the "_", meanwhile, related source
+code has changed.
+- Using one local variable to get the function return val to avoid long
+condition statement. [13/14]
 
-  ARM: bcm_defconfig: Run "make savedefconfig" (2013-10-16 22:44:26 -0700)
+Peter Chen (14):
+  usb: doc: phy-mxs: Add more compatible strings
+  usb: phy-mxs: Add platform judgement code
+  usb: phy-mxs: Add auto clock and power setting
+  usb: doc: phy-mxs: update binding for adding anatop phandle
+  ARM: dts: imx6: add anatop phandle for usbphy
+  usb: phy-mxs: Add anatop regmap
+  usb: phy: add notify suspend and resume callback
+  usb: phy-mxs: Add implementation of nofity_suspend and notify_resume
+  usb: phy-mxs: Enable IC fixes for mx6 SoC serial
+  usb: doc: phy-mxs: update binding for adding disconnect line property
+  ARM: dts: imx6: Add disconnect-line-without-vbus property for usbphy
+  usb: phy: Add set_wakeup API
+  usb: phy-mxs: Add implementation of set_wakeup
+  usb: phy-mxs: Add system suspend/resume API
 
-----------------------------------------------------------------
-BCM changes for 3.13/soc. A number of cleanup related changed.
-
-----------------------------------------------------------------
-Christian Daudt (3):
-      ARM: bcm281xx: more descriptive machine string
-      rename ARCH_BCM to ARCH_BCM_MOBILE (mach-bcm)
-      ARM: bcm281xx: Add ARCH Timers to config
-
-Markus Mayer (1):
-      ARM: bcm281xx: Enable GPIO driver
-
-Tim Kryger (1):
-      ARM: bcm_defconfig: Run "make savedefconfig"
-
- arch/arm/configs/bcm_defconfig      |  9 ++-------
- arch/arm/configs/multi_v7_defconfig |  1 +
- arch/arm/mach-bcm/Kconfig           | 23 ++++++++++++++++++++---
- arch/arm/mach-bcm/Makefile          |  2 +-
- arch/arm/mach-bcm/board_bcm281xx.c  |  2 +-
- 5 files changed, 25 insertions(+), 12 deletions(-)
+ Documentation/devicetree/bindings/usb/mxs-phy.txt |   12 +-
+ arch/arm/boot/dts/imx6qdl.dtsi                    |    3 +
+ drivers/usb/phy/phy-mxs-usb.c                     |  328 ++++++++++++++++++++-
+ include/linux/usb/phy.h                           |   39 +++
+ 4 files changed, 367 insertions(+), 15 deletions(-)
