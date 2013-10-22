@@ -1,63 +1,70 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Tue, 22 Oct 2013 16:42:38 -0400
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 22 Oct 2013 22:48:12 +0200
 Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
  is there something better?
-In-Reply-To: <20131022201228.GB8037@mithrandir>
+In-Reply-To: <52665314.2040904@imgtec.com>
 References: <52644A9E.3060007@wwwdotorg.org>
- <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <alpine.LFD.2.03.1310221333300.1951@syhkavp.arg>
- <20131022201228.GB8037@mithrandir>
-Message-ID: <20131022204238.GG29341@beef>
+ <20131021085420.GA21518@ulmo.nvidia.com>
+ <52658C49.80400@wwwdotorg.org> <5265AFED.1040503@roeck-us.net>
+ <52665314.2040904@imgtec.com>
+Message-ID: <20131022204811.GD8037@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 10:12:29PM +0200, Thierry Reding wrote:
-> On Tue, Oct 22, 2013 at 01:42:48PM -0400, Nicolas Pitre wrote:
-> > On Tue, 22 Oct 2013, Matt Porter wrote:
-> > 
-> > > DT has many benefits. It would be great to leverage them as long as it
-> > > doesn't interfere with the rate of change and willingness to evolve code
-> > > that's always been the strength of the kernel process. That strength is
-> > > too valuable to trade away for the "DT as ABI" vision.
-> > 
-> > Amen.  This is the best statement I've read about DT so far.
-> > 
-> > Having "stable" DT bindings is just a dream.  Experience so far is 
-> > showing that this is neither practical nor realistic.
-> > 
-> > The unstructured free-for-all approach isn't good either.  Some 
-> > compromise between the two extremes needs to be found.
+On Tue, Oct 22, 2013 at 11:27:32AM +0100, James Hogan wrote:
+> On 21/10/13 23:51, Guenter Roeck wrote:
+> > In my opinion, not being able to describe behavior (or what people refer
+> > to as "describe how the hardware is used") is a severe limitation of
+> > devicetree usage in Linux. That is not a devicetree limitation per se,
+> > though, it is simply a matter of choice (or, in some cases, the ability
+> > of those arguing for new bindings to sell those bindings as "hardware
+> > description").
 > 
-> I agree. I think we need an easy way to mark bindings as unstable. One
-> possible solution that I can think of would be to use some kind of
-> special marker within the compatible value defined by a binding that
-> would be used to qualify it as unstable. Perhaps something as simple as
-> a preceding exclamation mark (!) would do.
+> I agree this is a real problem, and I think it hinders upstream
+> submission, since platform data was permitted to describe behaviour as
+> well as describe the hardware, and platform data is being replaced with
+> DT which is only permitted to describe the hardware. How then should we
+> specify the behaviour to the kernel?
 > 
-> 	gpio {
-> 		compatible = "!foo-gpio";
-> 	};
-> 
-> The DT core code could look for that when matching device nodes to the
-> list of compatible values supported by a driver and output a big warning
-> message to make users aware of the fact that the binding may change. The
-> driver could use the same marker in the OF device ID table to make it
-> clear that it implements an experimental binding. Whenever a binding is
-> deemed stable we can simply remove the marker from both the driver and
-> the binding, as well as DTS files.
+> I've already mentioned specific examples of this on the "Clock DT
+> bindings" thread, and would be very interested if anybody has thoughts
+> about it:
+> http://lkml.kernel.org/r/520E1DF5.4030409 at imgtec.com
 
->From a technical POV this seems nice.
+I've certainly run into similar problems. To be specific, one such
+instance involved backlight devices. In a nutshell, Linux' backlight
+subsystem by default enables a backlight when it is probed (well, the
+subsystem doesn't do that, but pretty much every driver does). This
+seems to have worked very well, but when you hook up a backlight with
+something high-level such as DRM, the fact that you no longer control
+when the backlight is turned on becomes a problem. DRM knows very
+precisely when a backlight or panel should be turned on, because it's
+tightly coupled with when the display controller starts sending data to
+the display. If the backlight is turned on by default at some
+unpredictable point during the boot process, you end up with a powered
+backlight that shows you all sorts of artifacts while the display is
+being initialized.
 
-What does stable mean at this point? DTBs using the stable binding are
-forever guaranteed compatibility with newer kernels? We really need to
-define *exactly* what this implies for future support. More than likely,
-most bindings will choose to stay experimental/testing indefinitely if
-stable means a lifetime of ugly backward compatibility hacks.
+My first attempt at solving this was to add a backlight-boot-off
+property to the device tree, which would make the device driver keep the
+backlight turned off on boot by default so that the DRM driver would be
+able to turn it on only after the display was properly initialized.
 
--Matt
+Obviously that doesn't represent the hardware but some random bit of
+software policy. The bad thing about it is that there's no other place
+to put this bit of information. I can't change the default behaviour of
+the backlight driver either because it is generic and used by many other
+boards. So what's the solution to that? Perhaps duplicate the driver
+with only the boot on default changed? Or add a new compatible value
+"pwm-backlight-disabled-on-boot"? Guess that won't be acceptable either
+because it encodes behaviour. "pwm-backlight-v2" wouldn't encode any
+behaviour...
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/c67ec51a/attachment.sig>
