@@ -1,43 +1,57 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Mon, 21 Oct 2013 22:37:12 -0700
-Subject: [GIT PULL] bcm dt updates for 3.13
-Message-ID: <CAEPRUYro7a_o0EMachJY5GWJRv7By_u+0r5D9s2aKBRw++DCXw@mail.gmail.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue, 22 Oct 2013 11:20:16 +0530
+Subject: [PATCH v2] clk: exynos5420: fix cpll clock register offsets
+In-Reply-To: <CANuQgHFPB4C69C1sDFPVx6E8XjMhbqs-75R9xq1LP0=yO9C4zg@mail.gmail.com>
+References: <1380186395-28814-1-git-send-email-chander.kashyap@linaro.org>
+ <CANuQgHFPB4C69C1sDFPVx6E8XjMhbqs-75R9xq1LP0=yO9C4zg@mail.gmail.com>
+Message-ID: <CANuQgHEMsNMyjvwoZ6we8dz-X+T0XdQYyYwCHGCPk0iuH8W=8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+On 16 October 2013 11:10, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+> On 26 September 2013 14:36, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+>> Fixes cpll control and lock register offset values for Exynos5420 SoC.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>> ---
+>> Changes Since v1:
+>>         - Fixed patch subject as per Kukgin suggestion.
+>>
+>>  drivers/clk/samsung/clk-exynos5420.c |    4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+>> index 86dfc64..892aac0 100644
+>> --- a/drivers/clk/samsung/clk-exynos5420.c
+>> +++ b/drivers/clk/samsung/clk-exynos5420.c
+>> @@ -730,8 +730,8 @@ struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>>  struct __initdata samsung_pll_clock exynos5420_plls[nr_plls] = {
+>>         [apll] = PLL(pll_2550, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+>>                 APLL_CON0, NULL),
+>> -       [cpll] = PLL(pll_2550, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
+>> -               MPLL_CON0, NULL),
+>> +       [cpll] = PLL(pll_2550, fout_cpll, "fout_cpll", "fin_pll", CPLL_LOCK,
+>> +               CPLL_CON0, NULL),
+>>         [dpll] = PLL(pll_2550, fout_dpll, "fout_dpll", "fin_pll", DPLL_LOCK,
+>>                 DPLL_CON0, NULL),
+>>         [epll] = PLL(pll_2650, fout_epll, "fout_epll", "fin_pll", EPLL_LOCK,
+>> --
+>> 1.7.9.5
+>>
+>
+>
+> Mike, can you please take this patch.
 
-  Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+Can this patch be merged?
 
-are available in the git repository at:
+>
+> --
+> with warm regards,
+> Chander Kashyap
 
-  git://github.com/broadcom/bcm11351.git tags/bcm-for-3.13-dt
 
-for you to fetch changes up to 484391ac1e3c95fb3bd753d6fb0d57b845a9a428:
 
-  ARM: dts: bcm11351: Use GIC/IRQ defines for sdio interrupts
-(2013-10-02 23:01:44 -0700)
-
-----------------------------------------------------------------
-Changes for 3.13/dt
-- Add gpio+uart+sd irq configuration to bcm281xx DT
-- Miscelaneous cleanups.
-
-----------------------------------------------------------------
-Christian Daudt (1):
-      rename ARCH_BCM to ARCH_BCM_MOBILE (dt)
-
-Markus Mayer (2):
-      ARM: bcm281xx: Add device node for the GPIO controller
-      ARM: dts: bcm281xx: Add card detect GPIO
-
-Matt Porter (1):
-      ARM: dts: bcm11351: Use GIC/IRQ defines for sdio interrupts
-
-Tim Kryger (1):
-      ARM: DT: Add missing UARTs for bcm11351 (bcm281xx)
- arch/arm/boot/dts/Makefile         |  4 +--
- arch/arm/boot/dts/bcm11351-brt.dts |  1 +
- arch/arm/boot/dts/bcm11351.dtsi    | 54 +++++++++++++++++++++++++++++++++++---
- arch/arm/boot/dts/bcm28155-ap.dts  |  1 +
- 4 files changed, 54 insertions(+), 6 deletions(-)
+-- 
+with warm regards,
+Chander Kashyap
