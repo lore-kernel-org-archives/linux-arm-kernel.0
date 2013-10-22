@@ -1,65 +1,36 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Tue, 22 Oct 2013 15:08:43 -0500
-Subject: [PATCH 7/8] ARM: dts: imx: add IMX50 SoC device tree bindings
-In-Reply-To: <20131022123544.GB31304@pengutronix.de>
-References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
- <1382076260-6422-8-git-send-email-gerg@uclinux.org>
- <20131022123544.GB31304@pengutronix.de>
-Message-ID: <CAHCPf3tLovKaCWAQn13c+ifvzQH4ojcXyevYxbh018XYYK=xJA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 22 Oct 2013 22:10:01 +0200
+Subject: [PATCH v2] clocksource: Provide timekeeping for efm32 SoCs
+In-Reply-To: <20131008145147.GP10079@pengutronix.de>
+References: <1380830189-21553-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <5253ECC7.30700@linaro.org> <20131008145147.GP10079@pengutronix.de>
+Message-ID: <20131022201001.GB27227@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 7:35 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, Oct 18, 2013 at 04:04:19PM +1000, gerg at uclinux.org wrote:
->> From: Greg Ungerer <gerg@uclinux.org>
->>
->> Create device tree bindings for the Freescale IMX50 SoC. This was based on
->> the IMX53 bindings with changes made as necessary.
->>
->> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
->> ---
->> +
->> +                     iomuxc: iomuxc at 53fa8000 {
->> +                             compatible = "fsl,imx50-iomuxc";
->> +                             reg = <0x53fa8000 0x4000>;
->> +
->> +                             fec {
->> +                                     pinctrl_fec_1: fecgrp-1 {
->> +                                             fsl,pins = <
->> +                                                     MX50_PAD_SSI_RXFS__FEC_MDC      0x80
->> +                                                     MX50_PAD_SSI_RXC__FEC_MDIO      0x80
->> +                                                     MX50_PAD_DISP_D0__FEC_TX_CLK    0x80
->> +                                                     MX50_PAD_DISP_D1__FEC_RX_ERR    0x80
->> +                                                     MX50_PAD_DISP_D2__FEC_RX_DV     0x80
->> +                                                     MX50_PAD_DISP_D3__FEC_RDATA_1   0x80
->> +                                                     MX50_PAD_DISP_D4__FEC_RDATA_0   0x80
->> +                                                     MX50_PAD_DISP_D5__FEC_TX_EN     0x80
->> +                                                     MX50_PAD_DISP_D6__FEC_TDATA_1   0x80
->> +                                                     MX50_PAD_DISP_D7__FEC_TDATA_0   0x80
->> +                                             >;
->> +                                     };
->> +
->
-> Shawn recently removed the pinctrl groups here and referenced to this
-> node by doing
->
-> &iomuxc {
->         fec {
->                 ...
->         };
-> };
->
->> +                             cspi {
->> +                                     pinctrl_cspi_1: cspigrp-1 {
->> +                                             fsl,pins = <
->> +                                                     MX50_PAD_CSPI_SCLK__CSPI_SCLK   0
->
-> 0 is definitely wrong here. We have 0x80000000 for "Don't touch
-> padctrl", but otherwise this should contain some real padctrl settings.
+On Tue, Oct 08, 2013 at 04:51:47PM +0200, Uwe Kleine-K?nig wrote:
+> Hello Daniel,
+> 
+> On Tue, Oct 08, 2013 at 01:30:15PM +0200, Daniel Lezcano wrote:
+> > On 10/03/2013 09:56 PM, Uwe Kleine-K?nig wrote:
+> > >An efm32 features 4 16-bit timers with a 10-bit prescaler. This driver
+> > >provides clocksource and clock event device using one timer instance
+> > >each.
+> > >
+> > >Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > >---
+> > 
+> > Applied to my tree for 3.13
+> Thanks
+Where is your tree to be found? This commit isn't in
 
-A more pressing question is in what world did the bootloader not
-already set these pins up and if they are already set up, why are they
-loitering in the device tree?
+	git://git.linaro.org/people/dlezcano/linux.git clockevents/3.13
+
+and also it's not included in next-20131021.
+
+Best regards and thanks
+Uwe
 
 -- 
-Matt Sealey <neko@bakuhatsu.net>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
