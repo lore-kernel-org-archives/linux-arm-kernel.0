@@ -1,46 +1,28 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 22 Oct 2013 13:52:13 +0530
-Subject: [PATCH v2 0/5] ARM: vexpress/TC2: cpufreq support
-In-Reply-To: <1382349534-31502-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1382349534-31502-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <CAKohpo=7Z7D9VsF5GHXKTUy70muNSr-q4nf8k8_qzWBzitzmvA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 22 Oct 2013 13:04:12 +0530
+Subject: [PATCH] MAINTAINERS: add the new dmaengine mailing list
+Message-ID: <1382427252-26470-1-git-send-email-vinod.koul@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 October 2013 15:28, Sudeep KarkadaNagesha
-<Sudeep.KarkadaNagesha@arm.com> wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
->
-> Hi,
->
-> The SPC(Serial Power Controller) on Versatile Express V2P-CA15_A7(TC2)
-> not only controls low-power states, wake-up irqs and per-CPU jump addresses
-> but also the CPU performance operating points which is essential to provide
-> CPU DVFS. The M3 microcontroller can provide upto eight performance values,
-> one set for each cluster (CA15 or CA7). Each of this value contains the
-> frequency(kHz) and voltage(mV) at that performance level. It expects
-> these performance level to be passed through the SPC PERF_LVL registers.
->
-> This patch series adds support to populate those OPPs, add them to the
-> cpu devices and runtime programming of these performance levels through
-> clock framework. It also adds a small interface cpufreq driver to validate
-> the OPPs and register the arm_big_little cpufreq driver.
->
-> Changes v1->v2:
->         - Introduced ARCH_VEXPRESS_SPC config to make dependency
->           selection cleaner
->         - Other minor review comments from Nico implemented
->
-> Regards,
-> Sudeep
->
-> Sudeep KarkadaNagesha (5):
->   cpufreq: arm-big-little: use clk_get instead of clk_get_sys
->   ARM: vexpress/TC2: add support for CPU DVFS
->   ARM: vexpress/TC2: add cpu clock support
->   cpufreq: arm_big_little: add vexpress SPC interface driver
->   ARM: vexpress/TC2: register vexpress-spc cpufreq device
+We have a new mailing list hosted by vger for dmaengine
 
-For All Patches:
+Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+---
+ MAINTAINERS |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 8a0cbf3..3ebb49b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2718,6 +2718,7 @@ T:	git git://git.linaro.org/people/sumitsemwal/linux-dma-buf.git
+ DMA GENERIC OFFLOAD ENGINE SUBSYSTEM
+ M:	Vinod Koul <vinod.koul@intel.com>
+ M:	Dan Williams <dan.j.williams@intel.com>
++L:	dmaengine at vger.kernel.org
+ S:	Supported
+ F:	drivers/dma/
+ F:	include/linux/dma*
+-- 
+1.7.0.4
