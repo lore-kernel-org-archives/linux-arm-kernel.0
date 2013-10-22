@@ -1,45 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Oct 2013 07:55:29 -0700
-Subject: [PATCH] ARM: omap2: irq, AM33XX add missing register check
-In-Reply-To: <1381994318-10207-1-git-send-email-mpa@pengutronix.de>
-References: <1381994318-10207-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20131022145529.GM15154@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Oct 2013 15:56:54 +0100
+Subject: [PATCH 0/3] clocksource: sun4i: Fix a few minor issues
+In-Reply-To: <1381777668-32565-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1381777668-32565-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20131022145654.GR3041@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Markus Pargmann <mpa@pengutronix.de> [131017 00:19]:
-> am33xx has a INTC_PENDING_IRQ3 register that is not checked for pending
-> interrupts. This patch adds AM33XX to the ifdef of SOCs that have to
-> check this register.
+Hi Daniel,
+
+On Mon, Oct 14, 2013 at 09:07:45PM +0200, Maxime Ripard wrote:
+> Hi everyone,
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-
-Thanks, it seems this can wait for the merge window, but I'll also add cc
-stable to it as it can save some duplicate debugging for people.
-
-So I'll apply this into omap-for-v3.13/fixes-not-urgent.
-
-Regards,
-
-Tony
-
-> ---
->  arch/arm/mach-omap2/irq.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Here is a few fixes for a few mistakes found during the review of the High
+> Speed Timers patches, that also applies to the timer code we had previously.
 > 
-> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-> index 3926f37..e022a86 100644
-> --- a/arch/arm/mach-omap2/irq.c
-> +++ b/arch/arm/mach-omap2/irq.c
-> @@ -233,7 +233,7 @@ static inline void omap_intc_handle_irq(void __iomem *base_addr, struct pt_regs
->  			goto out;
->  
->  		irqnr = readl_relaxed(base_addr + 0xd8);
-> -#ifdef CONFIG_SOC_TI81XX
-> +#if IS_ENABLED(CONFIG_SOC_TI81XX) || IS_ENABLED(CONFIG_SOC_AM33XX)
->  		if (irqnr)
->  			goto out;
->  		irqnr = readl_relaxed(base_addr + 0xf8);
-> -- 
-> 1.8.4.rc3
-> 
+> It's mostly a few things here and there, so it can wait for 3.13.
+
+Ping?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/c04b8d52/attachment-0001.sig>
