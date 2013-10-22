@@ -1,254 +1,162 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 22 Oct 2013 10:08:38 +0100
-Subject: [PATCH RESEND v2 3/8] KVM: arm-vgic: Set base addr through device API
+Date: Tue, 22 Oct 2013 10:08:43 +0100
+Subject: [PATCH RESEND v2 8/8] KVM: arm-vgic: Support CPU interface reg access
 In-Reply-To: <1382432923-61267-1-git-send-email-christoffer.dall@linaro.org>
 References: <1382432923-61267-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1382432923-61267-4-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1382432923-61267-9-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support setting the distributor and cpu interface base addresses in the
-VM physical address space through the KVM_{SET,GET}_DEVICE_ATTR API
-in addition to the ARM specific API.
+Implement support for the CPU interface register access driven by MMIO
+address offsets from the CPU interface base address.  Useful for user
+space to support save/restore of the VGIC state.
 
-This has the added benefit of being able to share more code in user
-space and do things in a uniform maner.
-
-Also deprecate the older API at the same time, but backwards
-compatibility will be maintained.
+This commit adds support only for the same logic as the current VGIC
+support, and no more.  For example, the active priority registers are
+handled as RAZ/WI, just like setting priorities on the emulated
+distributor.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Reviewed-by: Alexander Graf <agraf@suse.de>
 ---
- Documentation/virtual/kvm/api.txt              |    6 +-
- Documentation/virtual/kvm/devices/arm-vgic.txt |   11 +++
- arch/arm/include/uapi/asm/kvm.h                |    9 +++
- arch/arm/kvm/arm.c                             |    2 +-
- include/kvm/arm_vgic.h                         |    2 +-
- virt/kvm/arm/vgic.c                            |   90 ++++++++++++++++++++----
- 6 files changed, 105 insertions(+), 15 deletions(-)
+ virt/kvm/arm/vgic.c |   81 ++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 73 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 858aecf..d68b6c2 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2324,7 +2324,7 @@ This ioctl returns the guest registers that are supported for the
- KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
- 
- 
--4.84 KVM_ARM_SET_DEVICE_ADDR
-+4.84 KVM_ARM_SET_DEVICE_ADDR (deprecated)
- 
- Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
- Architectures: arm, arm64
-@@ -2362,6 +2362,10 @@ must be called after calling KVM_CREATE_IRQCHIP, but before calling
- KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
- base addresses will return -EEXIST.
- 
-+Note, this IOCTL is deprecated and the more flexible SET/GET_DEVICE_ATTR API
-+should be used instead.
-+
-+
- 4.85 KVM_PPC_RTAS_DEFINE_TOKEN
- 
- Capability: KVM_CAP_PPC_RTAS
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-index 38f27f7..c9febb2 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-@@ -8,3 +8,14 @@ Only one VGIC instance may be instantiated through either this API or the
- legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
- controller, requiring emulated user-space devices to inject interrupts to the
- VGIC instead of directly to CPUs.
-+
-+Groups:
-+  KVM_DEV_ARM_VGIC_GRP_ADDR
-+  Attributes:
-+    KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
-+      Base address in the guest physical address space of the GIC distributor
-+      register mappings.
-+
-+    KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
-+      Base address in the guest physical address space of the GIC virtual cpu
-+      interface register mappings.
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 1c85102..587f1ae 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -142,6 +142,15 @@ struct kvm_arch_memory_slot {
- #define KVM_REG_ARM_VFP_FPINST		0x1009
- #define KVM_REG_ARM_VFP_FPINST2		0x100A
- 
-+/* Device Control API: ARM VGIC */
-+#define KVM_DEV_ARM_VGIC_GRP_ADDR	0
-+#define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-+#define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
-+#define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
-+#define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
-+#define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
-+#define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-+
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
- #define KVM_ARM_IRQ_TYPE_MASK		0xff
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index ab96af2..3ecee45 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -773,7 +773,7 @@ static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
- 	case KVM_ARM_DEVICE_VGIC_V2:
- 		if (!vgic_present)
- 			return -ENXIO;
--		return kvm_vgic_set_addr(kvm, type, dev_addr->addr);
-+		return kvm_vgic_addr(kvm, type, &dev_addr->addr, true);
- 	default:
- 		return -ENODEV;
- 	}
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 7e2d158..be85127 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -144,7 +144,7 @@ struct kvm_run;
- struct kvm_exit_mmio;
- 
- #ifdef CONFIG_KVM_ARM_VGIC
--int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
- int kvm_vgic_hyp_init(void);
- int kvm_vgic_init(struct kvm *kvm);
- int kvm_vgic_create(struct kvm *kvm);
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 79a8bae..d9c0fc5 100644
+index 4e8c3ab..3cfdd4d 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1479,6 +1479,12 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
- {
- 	int ret;
+@@ -71,6 +71,10 @@
+ #define VGIC_ADDR_UNDEF		(-1)
+ #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
  
-+	if (addr & ~KVM_PHYS_MASK)
-+		return -E2BIG;
++#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
++#define IMPLEMENTER_ARM		0x43b
++#define GICC_ARCH_VERSION_V2	0x2
 +
-+	if (addr & (SZ_4K - 1))
-+		return -EINVAL;
-+
- 	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
- 		return -EEXIST;
- 	if (addr + size < addr)
-@@ -1491,26 +1497,41 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
- 	return ret;
- }
+ /* Physical address of vgic virtual cpu interface */
+ static phys_addr_t vgic_vcpu_base;
  
--int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
-+/**
-+ * kvm_vgic_addr - set or get vgic VM base addresses
-+ * @kvm:   pointer to the vm struct
-+ * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
-+ * @addr:  pointer to address value
-+ * @write: if true set the address in the VM address space, if false read the
-+ *          address
-+ *
-+ * Set or get the vgic base addresses for the distributor and the virtual CPU
-+ * interface in the VM physical address space.  These addresses are properties
-+ * of the emulated core/SoC and therefore user space initially knows this
-+ * information.
-+ */
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
- {
- 	int r = 0;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
+@@ -312,7 +316,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 	u32 word_offset = offset & 3;
  
--	if (addr & ~KVM_PHYS_MASK)
--		return -E2BIG;
--
--	if (addr & (SZ_4K - 1))
--		return -EINVAL;
--
- 	mutex_lock(&kvm->lock);
- 	switch (type) {
- 	case KVM_VGIC_V2_ADDR_TYPE_DIST:
--		r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
--				       addr, KVM_VGIC_V2_DIST_SIZE);
-+		if (write) {
-+			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
-+					       *addr, KVM_VGIC_V2_DIST_SIZE);
-+		} else {
-+			*addr = vgic->vgic_dist_base;
-+		}
+ 	switch (offset & ~3) {
+-	case 0:			/* CTLR */
++	case 0:			/* GICD_CTLR */
+ 		reg = vcpu->kvm->arch.vgic.enabled;
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
+@@ -323,15 +327,15 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 		}
  		break;
- 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
--		r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
--				       addr, KVM_VGIC_V2_CPU_SIZE);
-+		if (write) {
-+			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
-+					       *addr, KVM_VGIC_V2_CPU_SIZE);
-+		} else {
-+			*addr = vgic->vgic_cpu_base;
-+		}
+ 
+-	case 4:			/* TYPER */
++	case 4:			/* GICD_TYPER */
+ 		reg  = (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
+ 		reg |= (VGIC_NR_IRQS >> 5) - 1;
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
  		break;
- 	default:
- 		r = -ENODEV;
-@@ -1522,16 +1543,61 @@ int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
  
- static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+-	case 8:			/* IIDR */
+-		reg = 0x4B00043B;
++	case 8:			/* GICD_IIDR */
++		reg = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+ 		break;
+@@ -1682,9 +1686,70 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
+ 				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
  {
-+	int r;
+-	return true;
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	u32 reg, mask = 0, shift = 0;
++	bool updated = false;
 +
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 addr;
-+		unsigned long type = (unsigned long)attr->attr;
-+
-+		if (copy_from_user(&addr, uaddr, sizeof(addr)))
-+			return -EFAULT;
-+
-+		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
-+		return (r == -ENODEV) ? -ENXIO : r;
-+	}
-+	}
-+
- 	return -ENXIO;
- }
- 
- static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	int r = ENXIO;
-+
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 addr;
-+		unsigned long type = (unsigned long)attr->attr;
-+
-+		r = kvm_vgic_addr(dev->kvm, type, &addr, false);
-+		if (r)
-+			return (r == -ENODEV) ? -ENXIO : r;
-+
-+		r = 0;
-+		if (copy_to_user(uaddr, &addr, sizeof(addr)))
-+			return -EFAULT;
-+	}
-+	}
-+
-+	return r;
- }
- 
- static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- {
-+	phys_addr_t offset;
-+
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR:
-+		switch (attr->attr) {
-+		case KVM_VGIC_V2_ADDR_TYPE_DIST:
-+		case KVM_VGIC_V2_ADDR_TYPE_CPU:
-+			return 0;
-+		}
++	switch (offset & ~0x3) {
++	case GIC_CPU_CTRL:
++		mask = GICH_VMCR_CTRL_MASK;
++		shift = GICH_VMCR_CTRL_SHIFT;
++		break;
++	case GIC_CPU_PRIMASK:
++		mask = GICH_VMCR_PRIMASK_MASK;
++		shift = GICH_VMCR_PRIMASK_SHIFT;
++		break;
++	case GIC_CPU_BINPOINT:
++		mask = GICH_VMCR_BINPOINT_MASK;
++		shift = GICH_VMCR_BINPOINT_SHIFT;
++		break;
++	case GIC_CPU_ALIAS_BINPOINT:
++		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
++		shift = GICH_VMCR_ALIAS_BINPOINT_SHIFT;
 +		break;
 +	}
- 	return -ENXIO;
++
++	if (!mmio->is_write) {
++		reg = (vgic_cpu->vgic_vmcr & mask) >> shift;
++		mmio_data_write(mmio, ~0, reg);
++	} else {
++		reg = mmio_data_read(mmio, ~0);
++		reg = (reg << shift) & mask;
++		if (reg != (vgic_cpu->vgic_vmcr & mask))
++			updated = true;
++		vgic_cpu->vgic_vmcr &= ~mask;
++		vgic_cpu->vgic_vmcr |= reg;
++	}
++	return updated;
  }
+ 
++static bool handle_mmio_abpr(struct kvm_vcpu *vcpu,
++			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
++{
++	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT);
++}
++
++static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
++				  struct kvm_exit_mmio *mmio,
++				  phys_addr_t offset)
++{
++	u32 reg;
++
++	if (mmio->is_write)
++		return false;
++
++	/* GICC_IIDR */
++	reg = (PRODUCT_ID_KVM << 20) |
++	      (GICC_ARCH_VERSION_V2 << 16) |
++	      (IMPLEMENTER_ARM << 0);
++	mmio_data_write(mmio, ~0, reg);
++	return false;
++}
++
++/*
++ * CPU Interface Register accesses - these are not accessed by the VM, but by
++ * user space for saving and restoring VGIC state.
++ */
+ static const struct mmio_range vgic_cpu_ranges[] = {
+ 	{
+ 		.base		= GIC_CPU_CTRL,
+@@ -1694,17 +1759,17 @@ static const struct mmio_range vgic_cpu_ranges[] = {
+ 	{
+ 		.base		= GIC_CPU_ALIAS_BINPOINT,
+ 		.len		= 4,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_mmio_abpr,
+ 	},
+ 	{
+ 		.base		= GIC_CPU_ACTIVEPRIO,
+ 		.len		= 16,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_CPU_IDENT,
+ 		.len		= 4,
+-		.handle_mmio	= handle_cpu_mmio_misc,
++		.handle_mmio	= handle_cpu_mmio_ident,
+ 	},
+ };
  
 -- 
 1.7.10.4
