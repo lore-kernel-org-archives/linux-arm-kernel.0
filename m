@@ -1,35 +1,47 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 22 Oct 2013 19:20:55 +0200
-Subject: [PATCH 0/3] clocksource: sun4i: Fix a few minor issues
-In-Reply-To: <20131022145654.GR3041@lukather>
-References: <1381777668-32565-1-git-send-email-maxime.ripard@free-electrons.com>
- <20131022145654.GR3041@lukather>
-Message-ID: <5266B3F7.7000308@linaro.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 22 Oct 2013 11:22:14 -0600
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131021170711.GA5256@netboy>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <20131021091555.GB21518@ulmo.nvidia.com>
+ <20131021170711.GA5256@netboy>
+Message-ID: <20131022172214.GF4061@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2013 04:56 PM, Maxime Ripard wrote:
-> Hi Daniel,
->
-> On Mon, Oct 14, 2013 at 09:07:45PM +0200, Maxime Ripard wrote:
->> Hi everyone,
->>
->> Here is a few fixes for a few mistakes found during the review of the High
->> Speed Timers patches, that also applies to the timer code we had previously.
->>
->> It's mostly a few things here and there, so it can wait for 3.13.
->
-> Ping?
+On Mon, Oct 21, 2013 at 07:07:11PM +0200, Richard Cochran wrote:
+> On Mon, Oct 21, 2013 at 11:15:56AM +0200, Thierry Reding wrote:
+> > 
+> > Right now, we're taking away much of that flexibility and I see progress
+> > on ARM actively hindered.
+> 
+> Baloney.
+> 
+> No one is taking away your flexibility or hindering progress. It is
+> really very simple. Just make an arm-dt-devel tree where you can both
+> change the bindings at will and recommend to people. Once bindings
+> have seen some real world testing and have had time to mature, then
+> request a merge into mainline.
 
-Pong. I am out of the office for the moment but I saw the patches. I 
-will take them for 3.13.
+The argument is that DT is a stable ABI we must never change it once
+it hits mainline.
 
-Thanks
-   -- Daniel
+This leads to not accepting patches into mainline until they are
+'stable'.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Whihc leads to vendors shipping code in real systems to real customers
+with those out of tree patches. (Deadlines are a bitch)
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+The vendors are now forced to treat the DT as an *UNSTABLE* ABI
+because they are shipping non-mainline DT schemas and plan to upgrade
+to mainline someday.
+
+Now the vendors no longer value DT as a stable ABI.
+
+So, why are we making argument #1? Seems pretty self defeating to me.
+
+Jason
