@@ -1,284 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 22 Oct 2013 15:44:05 +0100
-Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 104 board
-In-Reply-To: <87txgapcas.fsf@natisbad.org>
-References: <87txgapcas.fsf@natisbad.org>
-Message-ID: <52668F35.9050203@free-electrons.com>
+From: sre@debian.org (Sebastian Reichel)
+Date: Tue, 22 Oct 2013 16:44:14 +0200
+Subject: [RFCv3 7/7] ARM: dts: N900: Add SSI information
+In-Reply-To: <5266742D.9050604@baylibre.com>
+References: <1381091235-18293-1-git-send-email-sre@debian.org>
+ <1381091235-18293-8-git-send-email-sre@debian.org>
+ <5266742D.9050604@baylibre.com>
+Message-ID: <20131022144413.GA31867@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+Hi Benoit,
 
-On 21/10/2013 22:02, Arnaud Ebalard wrote:
-> 
-> Main hardware parts of the (Armada 370 based) NETGEAR ReadyNAS 104 are
-> supported by mainline kernel (USB 3.0 rear ports, USB 2.0 front port,
-> Gigabit controller and PHYs, serial port, LEDs, buttons, SATA ports,
-> G762 fan controller) and referenced in provided .dts file. Some additonal
-> work remains for:
-> 
->  - Intersil ISL12057 I2C RTC and Alarm chip: working driver but needs
->    to be splitted for submission of RTC part first;
->  - Front LCD (Winstar 1602G): driver needs to be written
->  - Armada NAND controller (to access onboard 128MB of NAND): support
->    being pushed by @free-electrons people
->  - 4 front SATA LEDs controlled via GPIO brought by NXP PCA9554:
->    driver is available upstream. Not referenced/tested yet.
-> 
-> but the device is usable w/o those.
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
-> Jason and Andrew,
-> 
-> I do not think there is any good way to share much between RN102 and
-> RN104 .dts in a common .dtsi file because MPP are used in a different
-> fashion on the two boards. But if you have ideas ...
+On Tue, Oct 22, 2013 at 02:48:45PM +0200, Benoit Cousson wrote:
+> Thanks to Tony, I've just realized that I missed all your patches,
+> that for some reason ended-up in my junk folder :-(
 
+oh :( Can you check why they ended up in junk? I would like to
+prevent more mails going there.
 
+> That being said, I cannot apply any of your DTS patches! What base
+> branch are you using?
 
-It seems to me that you can share at least half of the nodes in a common
-dtsi. But I prefer having two dts files, it remains easier to understand.
-Latter if a 3rd board share the same amount of nodes, then we can
-consider to use a dtsi.
+Currently torvalds/master with pavel's n900 patch and some more
+patches from me.
 
-Gregory
-> 
-> I do intend to document the hardware parts and setup of the device as I
-> did for the Duo v2 and RN102 but I wanted to get the patch submitted for
-> inclusion in 3.13 first.
-> 
-> Comments welcome,
-> 
-> Cheers,
-> 
-> a+
-> 
->  arch/arm/boot/dts/Makefile                     |   1 +
->  arch/arm/boot/dts/armada-370-netgear-rn104.dts | 197 +++++++++++++++++++++++++
->  2 files changed, 198 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 802720e..be682cb 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -108,6 +108,7 @@ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
->  	armada-370-mirabox.dtb \
->  	armada-370-netgear-rn102.dtb \
-> +	armada-370-netgear-rn104.dtb \
->  	armada-370-rd.dtb \
->  	armada-xp-axpwifiap.dtb \
->  	armada-xp-db.dtb \
-> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> new file mode 100644
-> index 0000000..e3855e8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> @@ -0,0 +1,197 @@
-> +/*
-> + * Device Tree file for NETGEAR ReadyNAS 104
-> + *
-> + * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "armada-370.dtsi"
-> +
-> +/ {
-> +	model = "NETGEAR ReadyNAS 104";
-> +	compatible = "netgear,readynas-104", "marvell,armada370", "marvell,armada-370-xp";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x20000000>; /* 512 MB */
-> +	};
-> +
-> +	soc {
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-> +			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
-> +
-> +		pcie-controller {
-> +			status = "okay";
-> +
-> +			/* Connected to FL1009 USB 3.0 controller */
-> +			pcie at 1,0 {
-> +				/* Port 0, Lane 0 */
-> +				status = "okay";
-> +			};
-> +
-> +			/* Connected to Marvell 88SE9215 SATA controller */
-> +			pcie at 2,0 {
-> +				/* Port 1, Lane 0 */
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		internal-regs {
-> +			serial at 12000 {
-> +				clock-frequency = <200000000>;
-> +				status = "okay";
-> +			};
-> +
-> +			sata at a0000 {
-> +				status = "disabled";
-> +			};
-> +
-> +			pinctrl {
-> +				poweroff: poweroff {
-> +					marvell,pins = "mpp60";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				backup_key_pin: backup-key-pin {
-> +					marvell,pins = "mpp52";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				power_key_pin: power-key-pin {
-> +					marvell,pins = "mpp62";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				backup_led_pin: backup-led-pin {
-> +					marvell,pins = "mpp63";
-> +					marvell,function = "gpo";
-> +				};
-> +
-> +				power_led_pin: power-led-pin {
-> +					marvell,pins = "mpp64";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				reset_key_pin: reset-key-pin {
-> +					marvell,pins = "mpp65";
-> +					marvell,function = "gpio";
-> +				};
-> +			};
-> +
-> +			mdio {
-> +				phy0: ethernet-phy at 0 {
-> +					reg = <0>;
-> +				};
-> +
-> +				phy1: ethernet-phy at 1 {
-> +					reg = <1>;
-> +				};
-> +			};
-> +
-> +			ethernet at 70000 {
-> +				status = "okay";
-> +				phy = <&phy0>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			ethernet at 74000 {
-> +				status = "okay";
-> +				phy = <&phy1>;
-> +				phy-mode = "rgmii-id";
-> +			};
-> +
-> +			usb at 50000 {
-> +				status = "okay";
-> +			};
-> +
-> +			i2c at 11000 {
-> +				compatible = "marvell,mv64xxx-i2c";
-> +				clock-frequency = <100000>;
-> +				status = "okay";
-> +
-> +				g762: g762 at 3e {
-> +					compatible = "gmt,g762";
-> +					reg = <0x3e>;
-> +					clocks = <&g762_clk>; /* input clock */
-> +					fan_gear_mode = <0>;
-> +					fan_startv = <1>;
-> +					pwm_polarity = <0>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	clocks {
-> +	       #address-cells = <1>;
-> +	       #size-cells = <0>;
-> +
-> +	       g762_clk: fixedclk {
-> +			 compatible = "fixed-clock";
-> +			 #clock-cells = <0>;
-> +			 clock-frequency = <8192>;
-> +	       };
-> +	};
-> +
-> +	gpio_leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-0 = <&backup_led_pin &power_led_pin>;
-> +		pinctrl-names = "default";
-> +
-> +		blue_backup_led {
-> +			label = "rn104:blue:backup";
-> +			gpios = <&gpio1 31 1>;  /* GPIO 63 Active Low */
-> +			default-state = "on";
-> +		};
-> +
-> +		blue_power_led {
-> +			label = "rn104:blue:pwr";
-> +			gpios = <&gpio2 0 1>;   /* GPIO 64 Active Low */
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-0 = <&backup_key_pin
-> +			     &power_key_pin
-> +			     &reset_key_pin>;
-> +		pinctrl-names = "default";
-> +
-> +		button at 1 {
-> +			label = "Backup Button";
-> +			linux,code = <133>;     /* KEY_COPY */
-> +			gpios = <&gpio1 20 1>;
-> +		};
-> +
-> +		button at 2 {
-> +			label = "Power Button";
-> +			linux,code = <116>;     /* KEY_POWER */
-> +			gpios = <&gpio1 30 0>;
-> +		};
-> +
-> +		button at 3 {
-> +			label = "Reset Button";
-> +			linux,code = <0x198>;   /* KEY_RESTART */
-> +			gpios = <&gpio2 1 1>;
-> +		};
-> +	};
-> +
-> +	gpio_poweroff {
-> +		compatible = "gpio-poweroff";
-> +		pinctrl-0 = <&poweroff>;
-> +		pinctrl-names = "default";
-> +		gpios = <&gpio1 28 1>;
-> +	};
-> +};
-> 
+> Could you repost all your pending DTS patches in one series rebased
+> on top of my for_3.13/dts?
 
+Sure. DT maintainers haven't given feedback since the last patchset
+[0]. Do you want to wait for feedback from them?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+[0] https://lkml.org/lkml/2013/9/23/529
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131022/d075c54f/attachment.sig>
