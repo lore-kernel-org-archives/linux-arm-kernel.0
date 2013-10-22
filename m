@@ -1,74 +1,88 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 22 Oct 2013 17:34:45 +0200
-Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <20131022072307.GA8681@ulmo.nvidia.com>
-References: <20131019104555.GI18477@ns203013.ovh.net>
- <1382346813-8449-1-git-send-email-denis@eukrea.com>
- <20131022045833.GB17512@ns203013.ovh.net>
- <20131022072307.GA8681@ulmo.nvidia.com>
-Message-ID: <20131022153445.GD17512@ns203013.ovh.net>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Tue, 22 Oct 2013 17:49:10 +0200
+Subject: [PATCH V7 0/8] ARM: OMAP3+: support cpufreq-cpu0 for device tree
+ boot
+In-Reply-To: <1381937948-27057-1-git-send-email-nm@ti.com>
+References: <1381937948-27057-1-git-send-email-nm@ti.com>
+Message-ID: <52669E76.2010702@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:23 Tue 22 Oct     , Thierry Reding wrote:
-> On Tue, Oct 22, 2013 at 06:58:33AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 11:13 Mon 21 Oct     , Denis Carikli wrote:
-> > > Cc: Richard Purdie <rpurdie@rpsys.net>
-> > > Cc: Jingoo Han <jg1.han@samsung.com>
-> > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > Cc: Pawel Moll <pawel.moll@arm.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > > Cc: devicetree at vger.kernel.org
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: linux-arm-kernel at lists.infradead.org
-> > > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> > > Cc: Eric B?nard <eric@eukrea.com>
-> > > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > > ---
-> > > ChangeLog v3->v4:
-> > > - The default-brightness property is now optional, it defaults to 1 if not set.
-> > by default we set OFF not ON
-> > 
-> > do not actiate driver or properti by default you can not known to consequence
-> > on the hw
-> 
-> Turning on a backlight by default is what pretty much every backlight
-> driver does. I personally think that's the wrong default, I even tried
-> to get some discussion started recently about how we could change this.
-> However, given that this has been the case for possibly as long as the
-> subsystem has existed, suddenly changing it might cause quite a few of
-> our users to boot the new kernel and not see their display come up. As
-> with any other ABI, this isn't something we can just change without a
-> very good migration path.
+Hi Nishanth,
 
-I'm sorry but the blacklight descibe in DT have nothing to do with the common
-pratice that the current driver have today
+On 16/10/2013 17:39, Nishanth Menon wrote:
+> Hi,
+>
+> This series enables the use of cpufreq-cpu0 generic driver for all
+> OMAP and related derivatives. Only patch#8 in the series, which
+> introduces CPU clock nodes, depends on Tero's V8 patch series for clock
+> nodes[1]
+>
+> I will stop copy pasting the series complete history and point at [2].
+>
+> Main changes since V6[3]:
+> - squashed patches for a minimal set
+> - i have organized the series such that 1 to 7 can immediately be merged
+>    if desired:
+> 	- patches 1,2,3 can go to Tony's omap-for-v3.13/quirk [4]
+> 	- patches 4-7 can go to Benoit's for_3.13/dts [5]
 
-put on by default if wrong specially without the property define. Even put it
-on by default it wrong as the bootloader may have set it already for splash
-screen and to avoid glitch the drivers need to detect this.
+I've just applied them in my DTS tree.
 
-For me this should not even be a property but handled by the driver them
-selves in C.
+Thanks,
+Benoit
 
-Best Regards,
-J.
-> 
-> In my opinion every backlight should be hooked up to a display panel,
-> and the display panel driver should be the one responsible for turning
-> the backlight on or off. That's the only way we can guarantee that the
-> backlight is turned on at the right moment so that glitches can be
-> avoided.
-> 
-> One possible migration path would be to update all display panel drivers
-> to cope with an associated backlight device, but even if somebody would
-> even find the time to write the code to do that, I can imagine that we'd
-> have a hard time getting this tested since a lot of the boards that rely
-> on these backlight drivers are legacy and probably no longer very
-> actively used.
-> 
-> Thierry
+> 	- patch 8 needs to depend on [1] and should eventually go to [5]
+>
+> NOTES: obviously without clock nodes cpufreq will not function.
+>
+> Test Script: http://pastebin.com/VvJPjsne
+>
+> Test-log:
+> BeagleBoard-XM (OMAP36xx): http://pastebin.com/XZDNaHPf
+> PandaBoard-ES (OMAP4460): http://pastebin.com/qQCmA2ng
+> BeagleBone-Black(AM335x): http://pastebin.com/98FX4uYW
+> OMAP5uEVM (OMAP5432): http://pastebin.com/NXj3L636
+> DRA7-EVM (DRA7xx): http://pastebin.com/0kKT3TXy
+>
+> J Keerthy (3):
+>    ARM: dts: dra7-evm: add smps123 supply for CPU
+>    ARM: dts: OMAP5: Add CPU OPP table
+>    ARM: dts: DRA7: Add CPU OPP table
+>
+> Nishanth Menon (5):
+>    ARM: OMAP3+: do not register non-dt OPP tables for device tree boot
+>    ARM: OMAP2+: add missing lateinit hook for calling pm late init
+>    ARM: OMAP3+: use cpu0-cpufreq driver in device tree supported boot
+>    ARM: dts: omap5-uevm: add smps123 supply for CPU
+>    ARM: dts: OMAP3: add clock nodes for CPU
+>
+> [1] http://marc.info/?t=138133284200006&r=1&w=2
+> [2] http://marc.info/?l=linux-arm-kernel&m=136804009618594&w=2
+> [3] http://marc.info/?l=devicetree&m=138135419203492&w=2
+> [4] https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.13/quirk
+>
+>   arch/arm/boot/dts/am33xx.dtsi       |    4 ++++
+>   arch/arm/boot/dts/dra7-evm.dts      |    4 ++++
+>   arch/arm/boot/dts/dra7.dtsi         |   13 ++++++++++++-
+>   arch/arm/boot/dts/omap3.dtsi        |    5 +++++
+>   arch/arm/boot/dts/omap4.dtsi        |    5 +++++
+>   arch/arm/boot/dts/omap5-uevm.dts    |    4 ++++
+>   arch/arm/boot/dts/omap5.dtsi        |   15 ++++++++++++++-
+>   arch/arm/mach-omap2/board-generic.c |    4 ++++
+>   arch/arm/mach-omap2/common.h        |    4 ++++
+>   arch/arm/mach-omap2/io.c            |   20 ++++++++++++++++++++
+>   arch/arm/mach-omap2/opp.c           |    4 ++++
+>   arch/arm/mach-omap2/pm.c            |   12 +++++++++---
+>   12 files changed, 89 insertions(+), 5 deletions(-)
+>
+> Regards,
+> Nishanth Menon
+>
+
+
+-- 
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
