@@ -1,49 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Oct 2013 01:19:58 -0700
-Subject: [PATCH 1/2] leds: lp55xx: handle enable pin in driver
-In-Reply-To: <CAK5ve-JhehHHAU_2tN-RVb8+u2AbUS_Yx=k+i0Ponnm9Wir+OQ@mail.gmail.com>
-References: <1382446896-28436-1-git-send-email-sre@debian.org>
- <1382446896-28436-2-git-send-email-sre@debian.org>
- <20131022170604.GP15154@atomide.com>
- <CAK5ve-KWdJFuJsvQ+JS2y7bpa9j4hGdU=ceb4nAz8BKQ1M9_XA@mail.gmail.com>
- <20131022173742.GQ15154@atomide.com>
- <CAK5ve-JhehHHAU_2tN-RVb8+u2AbUS_Yx=k+i0Ponnm9Wir+OQ@mail.gmail.com>
-Message-ID: <20131023081957.GB16686@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 23 Oct 2013 16:23:26 +0800
+Subject: [PATCH 2/4] ARM: dts: add Gateworks Ventana support
+In-Reply-To: <1382503888-3962-3-git-send-email-tharvey@gateworks.com>
+References: <1382503888-3962-1-git-send-email-tharvey@gateworks.com>
+ <1382503888-3962-3-git-send-email-tharvey@gateworks.com>
+Message-ID: <20131023082324.GO2839@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Bryan Wu <cooloney@gmail.com> [131022 10:47]:
-> On Tue, Oct 22, 2013 at 10:37 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Bryan Wu <cooloney@gmail.com> [131022 10:23]:
-> >> On Tue, Oct 22, 2013 at 10:06 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >> > * Sebastian Reichel <sre@debian.org> [131022 06:02]:
-> >> >> This patch moves the handling of the chip's enable pin from the board
-> >> >> code into the driver. It also updates all board-code files using the
-> >> >> driver to incorporate this change.
-> >> >>
-> >> >> This is needed for device tree support of the enable pin.
-> >> >
-> >> > This seems safe to merge along with the other LED patches, the
-> >> > changes to arch/arm/mach-omap2 should not conflict with anything.
-> >> >
-> >> > So for the arch/arm/mach-omap2 changes:
-> >> >
-> >> > Acked-by: Tony Lindgren <tony@atomide.com>
-> >>
-> >> I'm OK for LED parts, will this patch go through omap tree? If so,
-> >> please add my ack.
-> >>
-> >> Acked-by: Bryan Wu <cooloney@gmail.com>
-> >
-> > It's probably best that you take it via with the LED patches.
-> >
+On Tue, Oct 22, 2013 at 09:51:26PM -0700, Tim Harvey wrote:
+> The Gateworks Ventana product family consists of several baseboard designs
+> based on the Freescale i.MX6 family of processors.  Each baseboard has a
+> different set of possible features.
 > 
-> OK, I will do it. what about PATCH 2 of this patch set? Will you take
-> care of it?
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
 
-Benoit should take that one, otherwise there's a good chance of
-pointless merge conflicts with the .dts files.
+<snip>
 
-Regards,
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 3043e6c..2b7084c 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -131,10 +131,19 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx53-mba53.dtb \
+>  	imx53-qsb.dtb \
+>  	imx53-smd.dtb \
+> +	imx6dl-gw54xx.dtb \
+> +	imx6dl-gw53xx.dtb \
+> +	imx6dl-gw52xx.dtb \
+> +	imx6dl-gw51xx.dtb \
 
-Tony
+Sorted it like 51xx, 52xx, 53xx, 54xx, and applied the patch.  Thanks.
+
+Shawn
+
+>  	imx6dl-sabreauto.dtb \
+>  	imx6dl-sabresd.dtb \
+>  	imx6dl-wandboard.dtb \
+>  	imx6q-arm2.dtb \
+> +	imx6q-gw5400-a.dtb \
+> +	imx6q-gw54xx.dtb \
+> +	imx6q-gw53xx.dtb \
+> +	imx6q-gw52xx.dtb \
+> +	imx6q-gw51xx.dtb \
+>  	imx6q-phytec-pbab01.dtb \
+>  	imx6q-sabreauto.dtb \
+>  	imx6q-sabrelite.dtb \
