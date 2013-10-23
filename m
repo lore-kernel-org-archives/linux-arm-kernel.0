@@ -1,158 +1,85 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 23 Oct 2013 00:59:05 -0500
-Subject: [RFC] ARM: tty: Move HVC DCC assembly to arch/arm
-In-Reply-To: <1382120064-2459-1-git-send-email-cov@codeaurora.org>
-References: <1382120064-2459-1-git-send-email-cov@codeaurora.org>
-Message-ID: <B273A106-344F-4D36-998B-E44F889AD93F@codeaurora.org>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 23 Oct 2013 13:54:04 +0800
+Subject: [PATCH 1/7] mmc: sdhci: clear auto cmd setting bits for no
+ data cmds
+In-Reply-To: <20131023023325.GB2839@S2101-09.ap.freescale.net>
+References: <1382365627-26816-1-git-send-email-b29396@freescale.com>
+ <1382365627-26816-2-git-send-email-b29396@freescale.com>
+ <20131023023325.GB2839@S2101-09.ap.freescale.net>
+Message-ID: <20131023055402.GA14667@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 23, 2013 at 10:33:28AM +0800, Shawn Guo wrote:
+> On Mon, Oct 21, 2013 at 10:27:01PM +0800, Dong Aisheng wrote:
+> > The auto cmd settings bits should be cleared before sending new commands
+> > or we may receive command timeout error for normal commands due to wrongly
+> > pre-sent auto cmd.
+> > 
+> > e.g. we receive CMD13 timeout error due to ACMD23 is wrongly enabled
+> > by former data commands.
+> > 
+> > mmc2: new high speed DDR MMC card at address 0001
+> > mmcblk1: mmc2:0001 SEM08G 7.39 GiB
+> > mmcblk1boot0: mmc2:0001 SEM08G partition 1 2.00 MiB
+> > mmcblk1boot1: mmc2:0001 SEM08G partition 2 2.00 MiB
+> > mmcblk1rpmb: mmc2:0001 SEM08G partition 3 128 KiB
+> >  mmcblk1: p1 p2 p3 p4 < p5 p6 p7 >
+> > mmc2: Timeout waiting for hardware interrupt.
+> >  mmcblk1boot1: unknown partition table
+> > mmc2: Timeout waiting for hardware interrupt.
+> >  mmcblk1boot0: unknown partition table
+> > 
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > ---
+> >  drivers/mmc/host/sdhci.c |    5 +++++
+> >  1 files changed, 5 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> > index a21a710..f868e9b 100644
+> > --- a/drivers/mmc/host/sdhci.c
+> > +++ b/drivers/mmc/host/sdhci.c
+> > @@ -898,6 +898,11 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
+> >  	u16 mode;
+> >  	struct mmc_data *data = cmd->data;
+> >  
+> > +	/* clear Auto CMD settings for no data CMDs */
+> > +	mode = sdhci_readw(host, SDHCI_TRANSFER_MODE);
+> > +	sdhci_writew(host, mode & ~(SDHCI_TRNS_AUTO_CMD12 |
+> > +			SDHCI_TRNS_AUTO_CMD23), SDHCI_TRANSFER_MODE);
+> > +
+> 
+> IMO, it will be more readable if we move the code into the if-clause
+> of (data == NULL), something like:
+> 
+> 	if (data == NULL) {
+> 		/* clear Auto CMD settings for no data CMDs */
+> 		mode = sdhci_readw(host, SDHCI_TRANSFER_MODE);
+> 		mode &= SDHCI_TRNS_AUTO_CMD12 | SDHCI_TRNS_AUTO_CMD23;
+> 		sdhci_writew(host, mode, SDHCI_TRANSFER_MODE);
+> 	}
+> 
 
-On Oct 18, 2013, at 1:14 PM, Christopher Covington wrote:
+I'm fine with it.
+Will change to:
 
-> Put architecture-specific assembly code where it belongs,
-> allowing for support of additional architectures such as arm64 in
-> the future.
-> 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
-> arch/arm/include/asm/dcc.h | 45 +++++++++++++++++++++++++++++++++++++++++++
-> drivers/tty/hvc/hvc_dcc.c  | 48 ++--------------------------------------------
-> 2 files changed, 47 insertions(+), 46 deletions(-)
-> create mode 100644 arch/arm/include/asm/dcc.h
-> 
-> diff --git a/arch/arm/include/asm/dcc.h b/arch/arm/include/asm/dcc.h
-> new file mode 100644
-> index 0000000..306d1fc
-> --- /dev/null
-> +++ b/arch/arm/include/asm/dcc.h
-> @@ -0,0 +1,45 @@
-> +/* Copyright (c) 2010, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <asm/barrier.h>
-> +
-> +/* DCC Status Bits */
-> +#define DCC_STATUS_RX		(1 << 30)
-> +#define DCC_STATUS_TX		(1 << 29)
-> +
+if (data == NULL) {
+	/* clear Auto CMD settings for no data CMDs */
+	mode = sdhci_readw(host, SDHCI_TRANSFER_MODE);
+	mode &= ~(SDHCI_TRNS_AUTO_CMD12 | SDHCI_TRNS_AUTO_CMD23);
+	sdhci_writew(host, mode, SDHCI_TRANSFER_MODE);
+	return;
+}
 
-Why'd you move these define's here?  They don't seem to be arch specific and I don't see them used in the asm anywhere.
+Regards
+Dong Aisheng
 
-> +static inline u32 __dcc_getstatus(void)
-> +{
-> +	u32 __ret;
-> +	asm volatile("mrc p14, 0, %0, c0, c1, 0	@ read comms ctrl reg"
-> +		: "=r" (__ret) : : "cc");
-> +
-> +	return __ret;
-> +}
-> +
-> +static inline char __dcc_getchar(void)
-> +{
-> +	char __c;
-> +
-> +	asm volatile("mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
-> +		: "=r" (__c));
-> +	isb();
-> +
-> +	return __c;
-> +}
-> +
-> +static inline void __dcc_putchar(char c)
-> +{
-> +	asm volatile("mcr p14, 0, %0, c0, c5, 0	@ write a char"
-> +		: /* no output register */
-> +		: "r" (c));
-> +	isb();
-> +}
-> diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
-> index 44fbeba..e9f0191 100644
-> --- a/drivers/tty/hvc/hvc_dcc.c
-> +++ b/drivers/tty/hvc/hvc_dcc.c
-> @@ -1,4 +1,4 @@
-> -/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-> +/* Copyright (c) 2010, The Linux Foundation. All rights reserved.
->  *
->  * This program is free software; you can redistribute it and/or modify
->  * it under the terms of the GNU General Public License version 2 and
-> @@ -8,57 +8,13 @@
->  * but WITHOUT ANY WARRANTY; without even the implied warranty of
->  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->  * GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License
-> - * along with this program; if not, write to the Free Software
-> - * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-> - * 02110-1301, USA.
->  */
+> Shawn
 > 
-> -#include <linux/console.h>
-> -#include <linux/delay.h>
-> -#include <linux/err.h>
-> -#include <linux/init.h>
-> -#include <linux/moduleparam.h>
-> -#include <linux/types.h>
-> -
-> +#include <asm/dcc.h>
-> #include <asm/processor.h>
-> 
-> #include "hvc_console.h"
-> 
-> -/* DCC Status Bits */
-> -#define DCC_STATUS_RX		(1 << 30)
-> -#define DCC_STATUS_TX		(1 << 29)
-> -
-> -static inline u32 __dcc_getstatus(void)
-> -{
-> -	u32 __ret;
-> -	asm volatile("mrc p14, 0, %0, c0, c1, 0	@ read comms ctrl reg"
-> -		: "=r" (__ret) : : "cc");
-> -
-> -	return __ret;
-> -}
-> -
-> -
-> -static inline char __dcc_getchar(void)
-> -{
-> -	char __c;
-> -
-> -	asm volatile("mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
-> -		: "=r" (__c));
-> -	isb();
-> -
-> -	return __c;
-> -}
-> -
-> -static inline void __dcc_putchar(char c)
-> -{
-> -	asm volatile("mcr p14, 0, %0, c0, c5, 0	@ write a char"
-> -		: /* no output register */
-> -		: "r" (c));
-> -	isb();
-> -}
-> -
-> static int hvc_dcc_put_chars(uint32_t vt, const char *buf, int count)
-> {
-> 	int i;
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by the Linux Foundation.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> >  	if (data == NULL)
+> >  		return;
+> >  
+> > -- 
+> > 1.7.2.rc3
+> > 
+> > 
