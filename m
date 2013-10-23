@@ -1,47 +1,26 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 23 Oct 2013 11:16:06 +0200
-Subject: [PATCHv6][ 4/4] ARM: dts: mbimxsd35: Add sound support.
-In-Reply-To: <1382519766-17359-1-git-send-email-denis@eukrea.com>
-References: <1382519766-17359-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382519766-17359-4-git-send-email-denis@eukrea.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 23 Oct 2013 10:18:18 +0100
+Subject: [PATCH] arm64: allow ioremap_cache() to use existing RAM mappings
+In-Reply-To: <1382362594-24947-1-git-send-email-msalter@redhat.com>
+References: <1382362594-24947-1-git-send-email-msalter@redhat.com>
+Message-ID: <1382519898.10408.1.camel@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: alsa-devel at alsa-project.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |    9 +++++++++
- 1 file changed, 9 insertions(+)
+On Mon, 2013-10-21 at 14:36 +0100, msalter at redhat.com wrote:
+> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+> index 1725cd6..fb44b3d 100644
+> --- a/arch/arm64/mm/ioremap.c
+> +++ b/arch/arm64/mm/ioremap.c
+> @@ -79,6 +79,21 @@ void __iounmap(volatile void __iomem *io_addr)
+>  {
+>  	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
+>  
+> +	/* Nothing to do for normal memory. See ioremap_cache() */
+> +	if (pfn_valid(__virt_to_phys(addr) >> PAGE_SHIFT))
+> +		return;
 
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-index 1378b8d..4045c5d 100644
---- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
-@@ -48,6 +48,15 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-+
-+	sound {
-+		compatible = "eukrea,eukrea-tlv320";
-+		model = "imx35-eukrea-tlv320aic23";
-+		ssi-controller = <&ssi1>;
-+		fsl,audio-codec = <&tlv320aic23>;
-+		mux-int-port = <1>;
-+		mux-ext-port = <4>;
-+	};
- };
- 
- &audmux {
--- 
-1.7.9.5
+addr here can be some I/O address mapped previously, so __virt_to_phys()
+is not valid (you don't actually get the pfn by shifting).
+
+Catalin
