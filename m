@@ -1,92 +1,32 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 23 Oct 2013 10:46:09 -0400 (EDT)
-Subject: [Patch v2 09/10] usb: chipidea: host: add ehci quirk for imx
- controller
-In-Reply-To: <1382423019-26184-10-git-send-email-peter.chen@freescale.com>
-Message-ID: <Pine.LNX.4.44L0.1310231043100.1326-100000@iolanthe.rowland.org>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 23 Oct 2013 16:48:51 +0200
+Subject: [Patch v2][ 03/37] drm: Add the lacking DRM_MODE_FLAG_* for
+ matching the DISPLAY_FLAGS_*
+In-Reply-To: <20131018074631.GO13047@intel.com>
+References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
+ <1382022155-21954-4-git-send-email-denis@eukrea.com>
+ <20131018074631.GO13047@intel.com>
+Message-ID: <5267E1D3.5060803@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Oct 2013, Peter Chen wrote:
+Hi,
 
-> When the port goes to suspend or finishes resme, it needs to
-> notify PHY, it is not a standard EHCI operation, so we add a
-> quirk for it.
+On 10/18/2013 09:46 AM, Ville Syrj?l? wrote:
+>> +#define DRM_MODE_FLAG_PDATEN			(1<<22)
+>> +#define DRM_MODE_FLAG_NDATEN			(1<<23)
+>> +#define DRM_MODE_FLAG_PPIXDATEDGE		(1<<24)
+>> +#define DRM_MODE_FLAG_NPIXDATEDGE		(1<<25)
+>
+> Do we really need to make this stuff visible to userspace?
+> And there's no documentation to explain any of it.
 
-Actually, this _should_ be a standard EHCI operation.  But we have to
-figure out a way to do it that will work on all platforms.
+DRM_MODE_FLAG_PDATEN and DRM_MODE_FLAG_NDATEN were meant to represent 
+the data enable polarity.
 
-Felipe, any ideas?
+DRM_MODE_FLAG_PPIXDATEDGE and DRM_MODE_FLAG_NPIXDATEDGE were meant to 
+represent the clock polarity.
 
-Alan Stern
+What would you recommend to represent theses polarities?
 
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/host.c  |  129 ++++++++++++++++++++++++++++++++++++++++++
->  include/linux/usb/chipidea.h |    1 +
->  2 files changed, 130 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-> index 283b385..c1d05c4 100644
-> --- a/drivers/usb/chipidea/host.c
-> +++ b/drivers/usb/chipidea/host.c
-> @@ -34,6 +34,10 @@
->  
->  static struct hc_driver __read_mostly ci_ehci_hc_driver;
->  static int (*orig_bus_suspend)(struct usb_hcd *hcd);
-> +static int (*orig_bus_resume)(struct usb_hcd *hcd);
-> +static int (*orig_hub_control)(struct usb_hcd *hcd,
-> +				u16 typeReq, u16 wValue, u16 wIndex,
-> +				char *buf, u16 wLength);
->  
->  static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
->  {
-> @@ -75,12 +79,131 @@ static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
->  				 */
->  				udelay(125);
->  			}
-> +			if (hcd->phy && test_bit(port, &ehci->bus_suspended)
-> +				&& (ehci_port_speed(ehci, portsc) ==
-> +					USB_PORT_STAT_HIGH_SPEED))
-> +				/*
-> +				 * notify the USB PHY, it is for global
-> +				 * suspend case.
-> +				 */
-> +				usb_phy_notify_suspend(hcd->phy,
-> +					USB_SPEED_HIGH);
->  		}
->  	}
->  
->  	return 0;
->  }
->  
-> +static int ci_imx_ehci_bus_resume(struct usb_hcd *hcd)
-> +{
-> +	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-> +	int port;
-> +
-> +	int ret = orig_bus_resume(hcd);
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	port = HCS_N_PORTS(ehci->hcs_params);
-> +	while (port--) {
-> +		u32 __iomem *reg = &ehci->regs->port_status[port];
-> +		u32 portsc = ehci_readl(ehci, reg);
-> +		/*
-> +		 * Notify PHY after resume signal has finished, it is
-> +		 * for global suspend case.
-> +		 */
-> +		if (hcd->phy
-> +			&& test_bit(port, &ehci->bus_suspended)
-> +			&& (portsc & PORT_CONNECT)
-> +			&& (ehci_port_speed(ehci, portsc) ==
-> +				USB_PORT_STAT_HIGH_SPEED))
-> +			/* notify the USB PHY */
-> +			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
-> +	}
-> +
-> +	return 0;
-> +}
+Denis.
