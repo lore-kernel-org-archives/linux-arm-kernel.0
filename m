@@ -1,54 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 23 Oct 2013 19:31:36 +0800
-Subject: [PATCH v2] ARM: dts: mxs: add auart2 pinmux to imx28.dtsi
-In-Reply-To: <1382511537-5072-1-git-send-email-aida.mynzhasova@skitlab.ru>
-References: <1382511537-5072-1-git-send-email-aida.mynzhasova@skitlab.ru>
-Message-ID: <20131023113128.GA9489@S2101-09.ap.freescale.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Oct 2013 07:32:37 -0400
+Subject: [GIT PULL] ARM: mvebu: dt changes for v3.13 (last round)
+Message-ID: <20131023113237.GG24520@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 10:58:57AM +0400, Aida Mynzhasova wrote:
-> Add auart2 pins configuration on its main pads
-> 
-> Signed-off-by: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
+Guys,
 
-Applied, thanks.
+I've held off several patches for the next window (nothing big),
+however, MikeT just took Ezequiel's clock divider driver for v3.13.  So,
+to keep things in sync, I'd appreciate it if you could take this last
+pull request containing only the corresponding dts and binding changes
+for that driver.
 
-Shawn
+thx,
 
-> ---
->  arch/arm/boot/dts/imx28.dtsi | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 918d419..cab4c22 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -343,6 +343,19 @@
->  					fsl,pull-up = <MXS_PULL_DISABLE>;
->  				};
->  
-> +				auart2_pins_a: auart2-pins at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						MX28_PAD_AUART2_RX__AUART2_RX
-> +						MX28_PAD_AUART2_TX__AUART2_TX
-> +						MX28_PAD_AUART2_CTS__AUART2_CTS
-> +						MX28_PAD_AUART2_RTS__AUART2_RTS
-> +					>;
-> +					fsl,drive-strength = <MXS_DRIVE_4mA>;
-> +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-> +					fsl,pull-up = <MXS_PULL_DISABLE>;
-> +				};
-> +
->  				auart3_pins_a: auart3 at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <
-> -- 
-> 1.8.1.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Jason.
+
+
+The following changes since commit 1deb122c724edfd799a4d7d0b88ff14c365c9e69:
+
+  ARM: Dove: fix bad properties of the si5351 clkout2 used by Cubox audio (2013-10-09 13:22:41 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/dt-3.13-4
+
+for you to fetch changes up to f039dfb51b36a2d7e4ac25e65ffbd03e3ac77a0c:
+
+  ARM: mvebu: Add the core-divider clock to Armada 370/XP (2013-10-23 11:04:31 +0000)
+
+----------------------------------------------------------------
+mvebu dt changes for v3.13 (round 4)
+
+ - mvebu
+    - core divider clock driver dt binding and nodes
+
+----------------------------------------------------------------
+Ezequiel Garcia (3):
+      ARM: mvebu: Add Core Divider clock device-tree binding
+      ARM: mvebu: Add a 2 GHz fixed-clock Armada 370/XP
+      ARM: mvebu: Add the core-divider clock to Armada 370/XP
+
+ .../devicetree/bindings/clock/mvebu-corediv-clock.txt | 19 +++++++++++++++++++
+ arch/arm/boot/dts/armada-370-xp.dtsi                  | 17 +++++++++++++++++
+ 2 files changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
