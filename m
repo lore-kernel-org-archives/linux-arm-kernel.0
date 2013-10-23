@@ -1,122 +1,35 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 22 Oct 2013 23:58:11 -0400
-Subject: [PATCH 2/2] cpufreq: arm_big_little: reconfigure switcher behavior at
- run time
-In-Reply-To: <1382500691-634-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1382500691-634-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1382500691-634-3-git-send-email-nicolas.pitre@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 23 Oct 2013 09:59:26 +0530
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <20131022155758.GA26694@lunn.ch>
+References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
+ <1382186261-14482-2-git-send-email-andrew@lunn.ch>
+ <CAKohpok2scsSU7eFOP5LYmQar8xfOqG4-b3z4sVS6JOgnxVcpw@mail.gmail.com>
+ <20131022155758.GA26694@lunn.ch>
+Message-ID: <CAKohpo=7nw4ECXg_5e2wJQ8-+ie4Q0cuC+LpLOAePJ6AmCT2EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The b.L switcher can be turned on/off at run time.  It is therefore
-necessary to change the cpufreq driver behavior accordingly.
+On 22 October 2013 21:27, Andrew Lunn <andrew@lunn.ch> wrote:
+> The hardware raises an interrupt when the change is complete. This
+> interrupt is what brings the CPU out of the WFI. I don't know the
+> interrupt code too well, but i think it is necessary for the driver to
+> acknowledged it. The interrupt core code counts interrupts which
+> nobody acknowledges, and after 1000 are received, it disables the
+> interrupt. That would probably result in the machine locking solid,
+> never coming out of the WFI. So i'm playing it safe and handling the
+> interrupt.
 
-The driver must be unregistered/registered with the cpufreq core
-to reconfigure freq tables for the virtual or actual CPUs. This is
-accomplished via the b.L switcher notifier callback.
+Theory looks correct AFAIK.. But it would be better to give it a try
+on real hardware, hopefully you have that :)
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- drivers/cpufreq/arm_big_little.c | 54 +++++++++++++++++++++++++++++++++++++---
- 1 file changed, 51 insertions(+), 3 deletions(-)
+Also, in case this is required, it would be better to document it a bit
+over the routine..
 
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index ba73f868b6..0904f0e0e6 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -40,9 +40,12 @@
- #define MAX_CLUSTERS	2
- 
- #ifdef CONFIG_BL_SWITCHER
--#define is_bL_switching_enabled()	true
-+static bool bL_switching_enabled;
-+#define is_bL_switching_enabled()	bL_switching_enabled
-+#define set_switching_enabled(x)	(bL_switching_enabled = (x))
- #else
- #define is_bL_switching_enabled()	false
-+#define set_switching_enabled(x)	do { } while (0)
- #endif
- 
- #define ACTUAL_FREQ(cluster, freq)  ((cluster == A7_CLUSTER) ? freq << 1 : freq)
-@@ -533,6 +536,38 @@ static struct cpufreq_driver bL_cpufreq_driver = {
- 	.attr			= bL_cpufreq_attr,
- };
- 
-+static int bL_cpufreq_switcher_notifier(struct notifier_block *nfb,
-+					unsigned long action, void *_arg)
-+{
-+	pr_debug("%s: action: %ld\n", __func__, action);
-+
-+	switch (action) {
-+	case BL_NOTIFY_PRE_ENABLE:
-+	case BL_NOTIFY_PRE_DISABLE:
-+		cpufreq_unregister_driver(&bL_cpufreq_driver);
-+		break;
-+
-+	case BL_NOTIFY_POST_ENABLE:
-+		set_switching_enabled(true);
-+		cpufreq_register_driver(&bL_cpufreq_driver);
-+		break;
-+
-+	case BL_NOTIFY_POST_DISABLE:
-+		set_switching_enabled(false);
-+		cpufreq_register_driver(&bL_cpufreq_driver);
-+		break;
-+
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block bL_switcher_notifier = {
-+	.notifier_call = bL_cpufreq_switcher_notifier,
-+};
-+
- int bL_cpufreq_register(struct cpufreq_arm_bL_ops *ops)
- {
- 	int ret, i;
-@@ -550,6 +585,9 @@ int bL_cpufreq_register(struct cpufreq_arm_bL_ops *ops)
- 
- 	arm_bL_ops = ops;
- 
-+	ret = bL_switcher_get_enabled();
-+	set_switching_enabled(ret);
-+
- 	for (i = 0; i < MAX_CLUSTERS; i++)
- 		mutex_init(&cluster_lock[i]);
- 
-@@ -559,10 +597,17 @@ int bL_cpufreq_register(struct cpufreq_arm_bL_ops *ops)
- 				__func__, ops->name, ret);
- 		arm_bL_ops = NULL;
- 	} else {
--		pr_info("%s: Registered platform driver: %s\n", __func__,
--				ops->name);
-+		ret = bL_switcher_register_notifier(&bL_switcher_notifier);
-+		if (ret) {
-+			cpufreq_unregister_driver(&bL_cpufreq_driver);
-+			arm_bL_ops = NULL;
-+		} else {
-+			pr_info("%s: Registered platform driver: %s\n",
-+					__func__, ops->name);
-+		}
- 	}
- 
-+	bL_switcher_put_enabled();
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(bL_cpufreq_register);
-@@ -575,7 +620,10 @@ void bL_cpufreq_unregister(struct cpufreq_arm_bL_ops *ops)
- 		return;
- 	}
- 
-+	bL_switcher_get_enabled();
-+	bL_switcher_unregister_notifier(&bL_switcher_notifier);
- 	cpufreq_unregister_driver(&bL_cpufreq_driver);
-+	bL_switcher_put_enabled();
- 	pr_info("%s: Un-registered platform driver: %s\n", __func__,
- 			arm_bL_ops->name);
- 	arm_bL_ops = NULL;
--- 
-1.8.4.108.g55ea5f6
+> In theory yes. In practice no. It is a fixed rate clock. prepare and
+> enable are actually NOPs for this type of clock. However the API
+> documentation explicitly states you need to call prepare and enable
+> before you can call clk_get_rate(). But i can add error checking if
+> you want.
+
+Leave it then..
