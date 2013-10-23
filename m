@@ -1,55 +1,45 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 23 Oct 2013 14:45:39 -0400 (EDT)
-Subject: [Patch v2 09/10] usb: chipidea: host: add ehci quirk for imx
- controller
-In-Reply-To: <20131023180657.GI25954@gimli>
-Message-ID: <Pine.LNX.4.44L0.1310231433390.1326-100000@iolanthe.rowland.org>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Wed, 23 Oct 2013 20:46:22 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131023174458.GC5208@netboy>
+References: <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023174458.GC5208@netboy>
+Message-ID: <1382553982.31058.10.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Oct 2013, Felipe Balbi wrote:
 
-> Hi,
+On Wed, 2013-10-23 at 19:45 +0200, Richard Cochran wrote:
 > 
-> On Wed, Oct 23, 2013 at 10:46:09AM -0400, Alan Stern wrote:
-> > On Tue, 22 Oct 2013, Peter Chen wrote:
-> > 
-> > > When the port goes to suspend or finishes resme, it needs to
-> > > notify PHY, it is not a standard EHCI operation, so we add a
-> > > quirk for it.
-> > 
-> > Actually, this _should_ be a standard EHCI operation.  But we have to
-> > figure out a way to do it that will work on all platforms.
-> > 
-> > Felipe, any ideas?
-> 
-> isn't it enough to call usb_phy_set_suspend() at apropriate places ?
-> 
-> This should work on all platforms if the PHY driver is implemented
-> correctly.
+> Once I design my board, and it goes into production, the hardware is
+> fixed. It doesn't change, and neither should the description of the
+> hardware, also known as the DTB. If I have to research all of the
+> ways 
 
-On Tue, 22 Oct 2013, Peter Chen wrote:
+SOC support are never completely finished; subsystems are getting new
+features.
+ 
+It's possible to ship a product with a kernel version that does not
+handle all the chip goodies, then want to upgrade the kernel later when
+someone has written the driver for a previously unused hardware block.
 
-> +				/*
-> +				 * notify the USB PHY, it is for global
-> +				 * suspend case.
-> +				 */
-> +				usb_phy_notify_suspend(hcd->phy,
-> +					USB_SPEED_HIGH);
+the first iteration of your DTB would be incomplete, the bindings to
+describe that hardware block would not exist inside it.
 
-Hmmm.  This calls usb_phy_notify_suspend(), and later on, 
-usb_phy_notify_resume().  AFAICT, those routines don't exist.
+real life example with Marvell Kirkwood, hw crypto support was added 1
+year after initial SOC support.
 
-Instead we have usb_phy_set_suspend(), as Felipe mentioned.  It has a
-different interface, because the second argument specifies whether we
-are entering or leaving suspend, not the connection speed.
+I'm happy I can use it now on existing boards by "just" upgrading the
+kernel.
 
-Peter, you need to straighten this out.
-
-Also, there's the question of where are the appropriate places to make
-the calls?  After the root hub goes into suspend, I suppose.  But when
-is the right time during resume?
-
-And what if there is more than one port on the root hub?
-
-Alan Stern
+-- 
+Maxime
