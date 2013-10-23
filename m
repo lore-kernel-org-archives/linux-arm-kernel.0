@@ -1,48 +1,105 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Oct 2013 05:19:41 -0400
-Subject: [PATCH 2/8] ARM: imx: add clocking support code for the IMX50 SoC
-In-Reply-To: <1382076260-6422-3-git-send-email-gerg@uclinux.org>
-References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
- <1382076260-6422-3-git-send-email-gerg@uclinux.org>
-Message-ID: <20131023091941.GE24520@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 23 Oct 2013 02:24:27 -0700
+Subject: [RFC] clk: add flags to distinguish xtal clocks
+In-Reply-To: <1381919067.11885.19.camel@porter.coelho.fi>
+References: <1372971912-10877-1-git-send-email-coelho@ti.com>
+ <20130704222538.10823.2559@quantum>
+ <1372977465.21065.136.camel@cumari.coelho.fi>
+ <20130704231953.10823.94331@quantum>
+ <1373010853.21065.159.camel@cumari.coelho.fi>
+ <1375105842.20048.18.camel@cumari.coelho.fi>
+ <20131007074424.7445.52119@quantum> <20131008152743.GB13128@radagast>
+ <1381919067.11885.19.camel@porter.coelho.fi>
+Message-ID: <20131023092427.11662.41825@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
-
-On Fri, Oct 18, 2013 at 04:04:14PM +1000, gerg at uclinux.org wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
+Quoting Luca Coelho (2013-10-16 03:24:27)
+> Hi,
 > 
-> Add code to support the specific clock tree of the Freescale IMX50 SoC.
-> It can use much of the common IMX51/IMX53 clocking code.
+> Sorry for the delayed response.
 > 
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c | 79 +++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/common.h          |  3 ++
->  2 files changed, 82 insertions(+)
+> On Tue, 2013-10-08 at 10:27 -0500, Felipe Balbi wrote:
+> > Fixing Luca's address since he left TI
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 7c0dc45..ea4523a 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -363,6 +363,80 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
->  }
+> Thanks, Felipe! I wouldn't have seen this otherwise.
+> 
+> 
+> > On Mon, Oct 07, 2013 at 12:44:24AM -0700, Mike Turquette wrote:
+> > > Quoting Luciano Coelho (2013-07-29 06:50:42)
+> > > > Hi Mike,
+> > > > 
+> > > > On Fri, 2013-07-05 at 10:54 +0300, Luciano Coelho wrote:
+> > > > > On Thu, 2013-07-04 at 16:19 -0700, Mike Turquette wrote:
+> > > > > > Quoting Luciano Coelho (2013-07-04 15:37:45)
+> > > > > > > On Thu, 2013-07-04 at 15:25 -0700, Mike Turquette wrote:
+> > > > > > > > Or is it the same clock input and basically the problem is that you need
+> > > > > > > > to know what kind of waveform to expect (e.g. square versus sine)?
+> > > > > > > 
+> > > > > > > It's the same clock input in the chip's perspective.  One clock input
+> > > > > > > that can be any of the combinations I mentioned above.  Again, I'm not
+> > > > > > > familiar with clocks, so I guess the square vs. sine explanation is
+> > > > > > > plausible.  What I could see in the firmware is that it handles the
+> > > > > > > clocks differently if they're xtal or not.
+> > > > > > 
+> > > > > > OMAP has a similar thing where sys_clkin (the fast reference clock for
+> > > > > > the chip) can be 19.2, 26, 38.4, etc. This is easy to handle since only
+> > > > > > the rates matter.
+> > > > > 
+> > > > > Right, this part is easy and I already have the code for that.  What I'm
+> > > > > missing is a way to pass this XTAL flag to the chip.
+> > > > > 
+> > > > > 
+> > > > > > In your case you need some extra metadata to know what to do. I'm really
+> > > > > > not sure if CLK_IS_TYPE_XTAL is the most useful form this metadata can
+> > > > > > take. It would be best to know if the waveform is what you really need
+> > > > > > to know, or perhaps something else. For instance you might be affected
+> > > > > > by some clock signal stabilization time. Can you talk to your hardware
+> > > > > > guys and figure it out? I'd rather model the actual needs instead of
+> > > > > > just tossing a flag in there.
+> > > > > 
+> > > > > I get your point.  I have tried to investigate how this flag is used by
+> > > > > the firmware and I could see that it is used to set different "buffer
+> > > > > gains" and "delays" when waking up (I guess this means when the clock is
+> > > > > starting, so probably related to stabilization time).  They specify two
+> > > > > "modes", "boost" and "normal" and use different delay values for each.
+> > > > 
+> > > > I tried but I couldn't find any more information on how exactly this
+> > > > works.  But since this change is really simple and there seems to be
+> > > > other people who need the same information, couldn't we add it as is and
+> > > > try to figure out more specific information about the clocks later on?
+> > > > 
+> > > > Even if XTAL is not that useful if we know the other details, at least
+> > > > it wouldn't hurt to have the flag there anyway.
+> > > 
+> > > Luca,
+> > > 
+> > > By any chance did you come to a different solution for this problem? I
+> > > can take the patch, but I do not feel like we're solving the right
+> > > problem the right way.
+> 
+> Unfortunately I didn't find any better solution for this.  From the
+> WiLink firmware's point of view, there was not much information about
+> the details of stabilization time requirements and such.
+> 
 >  
-> +int __init mx50_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
-> +			unsigned long rate_ckih1, unsigned long rate_ckih2)
-> +{
-> +	int i;
-> +	unsigned long r;
-> +	struct device_node *np;
-> +
-> +	clk[pll1_sw] = imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
-> +	clk[pll2_sw] = imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
-> +	clk[pll3_sw] = imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
+> > > If not I will take it for 3.13.
+> 
+> That would be great! As I mentioned above, the XTAL/non-XTAL flag
+> wouldn't hurt, even if in most cases it may not provide the necessary
+> details for the clock code.  But at least for the WiLink hardware it is
+> very useful. ;)
 
-What about the apll and it's derivatives?
+Why is the CLK_IS_TYPE_DEFINED necessary?
 
-thx,
+Also we're adding a property to the fixed-rate binding so
+Documentation/devicetree/bindings/clock/fixed-clock.txt needs to be
+updated.
 
-Jason.
+Regards,
+Mike
+
+> 
+> --
+> Cheers,
+> Luca.
