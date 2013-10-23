@@ -1,39 +1,49 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 23 Oct 2013 14:54:45 +0800
-Subject: [Patch v2 13/14] usb: phy-mxs: Add implementation of set_wakeup
-In-Reply-To: <20131023063521.GH2839@S2101-09.ap.freescale.net>
+Date: Wed, 23 Oct 2013 15:08:25 +0800
+Subject: [Patch v2 10/14] usb: doc: phy-mxs: update binding for adding
+ disconnect line property
+In-Reply-To: <20131023063154.GG2839@S2101-09.ap.freescale.net>
 References: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
- <1382421528-17897-14-git-send-email-peter.chen@freescale.com>
- <20131023063521.GH2839@S2101-09.ap.freescale.net>
-Message-ID: <20131023065444.GG8534@shlinux1.ap.freescale.net>
+ <1382421528-17897-11-git-send-email-peter.chen@freescale.com>
+ <20131023063154.GG2839@S2101-09.ap.freescale.net>
+Message-ID: <20131023070824.GH8534@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 02:35:23PM +0800, Shawn Guo wrote:
-> >  
-> > +static void mxs_phy_disconnect_line(struct mxs_phy *mxs_phy, bool on)
-> > +{
-> > +	void __iomem *base = mxs_phy->phy.io_priv;
-> > +	bool vbus_is_on = false;
-> > +	static bool line_is_disconnected;
-> > +	unsigned int vbus_value = 0;
-> > +
-> > +	/* Only the SoCs have anatop need below operation */
-> > +	if (!mxs_phy->disconnect_line_without_vbus_is_needed)
-> > +		return;
+On Wed, Oct 23, 2013 at 02:31:56PM +0800, Shawn Guo wrote:
+> On Tue, Oct 22, 2013 at 01:58:44PM +0800, Peter Chen wrote:
+> > This property is used to disconnect line between USB PHY and
+> > USB controller.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  Documentation/devicetree/bindings/usb/mxs-phy.txt |    4 ++++
+> >  1 files changed, 4 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > index 5837963..356c9b6 100644
+> > --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > @@ -9,6 +9,9 @@ mxs PHY verions.
+> >  - reg: Should contain registers location and length
+> >  - interrupts: Should contain phy interrupt
+> >  - fsl,anatop: phandle for anatop register, it is only for mx6 SoC serial
+> > +- disconnect-line-without-vbus: needs to disconnect
+> > +connection between USB PHY and controller, it can avoid
+> > +unexpected wakeup interrupt when the PHY is out of power
 > 
-> As per the comment, shouldn't the if-clause be the following?  Or is the
-> comment incorrect?
+> If it's a mxs-phy specific property, we may need to have vendor prefix
+> 'fsl,' for it.
 > 
-> 	if (!mxs_phy->regmap_anatop)
-> 
-> Shawn
+> I see you set the property in imx6qdl.dtsi.  Is it true that we should
+> always set it for imx6q/dl?  If yes, why cannot we have the driver to
+> force it for imx6q type of phy.  If no, where do we need to set it and
+> where not?
 > 
 
-Thanks,
-
-I will change the comment to 
-	/* If the SoC doesn't need to disconnect line without vbus, quit */
+One more thing: it is a SoC feature, so I can delete it from DT, and
+using compatible string (or of_device_id.data) to judge if it is needed
+at driver, do you think so?
 
 -- 
 
