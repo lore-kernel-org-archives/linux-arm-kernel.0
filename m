@@ -1,45 +1,138 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 23 Oct 2013 14:10:20 +0200
-Subject: [PATCHv5][ 4/4] ARM: imx_v6_v7_defconfig: Enable tsc2007 support.
-In-Reply-To: <1382530220-27881-1-git-send-email-denis@eukrea.com>
-References: <1382530220-27881-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382530220-27881-4-git-send-email-denis@eukrea.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Oct 2013 05:19:03 -0700
+Subject: linux-next: manual merge of the arm-soc tree
+In-Reply-To: <1382454649-16442-4-git-send-email-treding@nvidia.com>
+References: <1382369814-7582-1-git-send-email-treding@nvidia.com>
+ <1382454649-16442-1-git-send-email-treding@nvidia.com>
+ <1382454649-16442-4-git-send-email-treding@nvidia.com>
+Message-ID: <20131023121903.GT15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eukrea cpuimx35 and cpuimx51 have a tsc2007 touchscreen controller,
-  so we turn it on.
+* Thierry Reding <thierry.reding@gmail.com> [131022 08:13]:
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> 
+> 	arch/arm/boot/dts/omap3-evm.dts
+> 
+> caused by commits 975d963 (ARM: dts: omap: update usb_otg_hs data) and
+> 465ce68 (ARM: dts: Add common support for omap3-evm).
+> 
+> I fixed it up (see below). Please verify that the resolution looks good.
+> Note that the resolution adds the phys and phy-names properties in the
+> usb_otg_hs node to complement the common omap3-evm DTSI introduced in
+> 465ce68 with the changes done in 975d963.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+Sigh there was no conflict in sight when I acked patch "ARM: dts: Add common
+support for omap3-evm", then I created the omap3-evm-common.dtsi not
+remembering about the earlier patch. So a totally self-inflicted merge
+conflict again and more proof that the dts files need to be always
+merged seprately from the drivers.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index d8a52a0..23ba17d 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -130,6 +130,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_EGALAX=y
- CONFIG_TOUCHSCREEN_MC13783=y
-+CONFIG_TOUCHSCREEN_TSC2007=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MMA8450=y
- CONFIG_SERIO_SERPORT=m
--- 
-1.7.9.5
+The merge conflict below looks correct thanks.
+
+Regards,
+
+Tony
+ 
+> diff --cc arch/arm/boot/dts/omap3-evm-common.dtsi
+> index 0000000,b549329..3007e79
+> mode 000000,100644..100644
+> --- a/arch/arm/boot/dts/omap3-evm-common.dtsi
+> +++ b/arch/arm/boot/dts/omap3-evm-common.dtsi
+> @@@ -1,0 -1,94 +1,96 @@@
+> + /*
+> +  * Common support for omap3 EVM boards
+> +  */
+> + 
+> + #include "omap-gpmc-smsc911x.dtsi"
+> + 
+> + / {
+> + 	cpus {
+> + 		cpu at 0 {
+> + 			cpu0-supply = <&vcc>;
+> + 		};
+> + 	};
+> + 
+> + 	leds {
+> + 		compatible = "gpio-leds";
+> + 		ledb {
+> + 			label = "omap3evm::ledb";
+> + 			gpios = <&twl_gpio 19 GPIO_ACTIVE_HIGH>; /* LEDB */
+> + 			linux,default-trigger = "default-on";
+> + 		};
+> + 	};
+> + 
+> + 	wl12xx_vmmc: wl12xx_vmmc {
+> + 		compatible = "regulator-fixed";
+> + 		regulator-name = "vwl1271";
+> + 		regulator-min-microvolt = <1800000>;
+> + 		regulator-max-microvolt = <1800000>;
+> + 		gpio = <&gpio5 22 0>;	/* gpio150 */
+> + 		startup-delay-us = <70000>;
+> + 		enable-active-high;
+> + 		vin-supply = <&vmmc2>;
+> + 	};
+> + };
+> + 
+> + &i2c1 {
+> + 	clock-frequency = <2600000>;
+> + 
+> + 	twl: twl at 48 {
+> + 		reg = <0x48>;
+> + 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> + 		interrupt-parent = <&intc>;
+> + 	};
+> + };
+> + 
+> + #include "twl4030.dtsi"
+> + #include "twl4030_omap3.dtsi"
+> + 
+> + &i2c2 {
+> + 	clock-frequency = <400000>;
+> + };
+> + 
+> + &i2c3 {
+> + 	clock-frequency = <400000>;
+> + 
+> + 	/*
+> + 	 * TVP5146 Video decoder-in for analog input support.
+> + 	 */
+> + 	tvp5146 at 5c {
+> + 		compatible = "ti,tvp5146m2";
+> + 		reg = <0x5c>;
+> + 	};
+> + };
+> + 
+> + &mmc1 {
+> + 	vmmc-supply = <&vmmc1>;
+> + 	vmmc_aux-supply = <&vsim>;
+> + 	bus-width = <8>;
+> + };
+> + 
+> + &mmc2 {
+> + 	vmmc-supply = <&wl12xx_vmmc>;
+> + 	non-removable;
+> + 	bus-width = <4>;
+> + 	cap-power-off-card;
+> + };
+> + 
+> + &twl_gpio {
+> + 	ti,use-leds;
+> + };
+> + 
+> + &usb_otg_hs {
+> + 	interface-type = <0>;
+> + 	usb-phy = <&usb2_phy>;
+> ++	phys = <&usb2_phy>;
+> ++	phy-names = "usb2-phy";
+> + 	mode = <3>;
+> + 	power = <50>;
+> + };
+> + 
+> + &gpmc {
+> + 	ethernet at gpmc {
+> + 		interrupt-parent = <&gpio6>;
+> + 		interrupts = <16 8>;
+> + 		reg = <5 0 0xff>;
+> + 	};
+> + };
