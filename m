@@ -1,198 +1,54 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 23 Oct 2013 14:43:48 +0200
-Subject: [PATCHv3][ 4/5] video: mx3fb: Introduce regulator support.
-In-Reply-To: <1382532229-32755-1-git-send-email-denis@eukrea.com>
-References: <1382532229-32755-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382532229-32755-4-git-send-email-denis@eukrea.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Wed, 23 Oct 2013 22:44:22 +1000
+Subject: [PATCH 2/8] ARM: imx: add clocking support code for the IMX50 SoC
+In-Reply-To: <20131023091941.GE24520@titan.lakedaemon.net>
+References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+ <1382076260-6422-3-git-send-email-gerg@uclinux.org>
+ <20131023091941.GE24520@titan.lakedaemon.net>
+Message-ID: <5267C4A6.7020805@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit is based on the following commit by Fabio Estevam:
-  4344429 video: mxsfb: Introduce regulator support
+Hi Jason,
 
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v2->v3:
-- The prints are now replaced with non line wrapped prints.
-- The regulator retrival has been adapted to the new DT bindings which looks
-  more like the IPUv3 ones.
-- The regulator_is_enabled checks were kept, because regulator_disable do not
-  do such check.
----
- drivers/video/mx3fb.c |   67 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 66 insertions(+), 1 deletion(-)
+On 23/10/13 19:19, Jason Cooper wrote:
+> Greg,
+>
+> On Fri, Oct 18, 2013 at 04:04:14PM +1000, gerg at uclinux.org wrote:
+>> From: Greg Ungerer <gerg@uclinux.org>
+>>
+>> Add code to support the specific clock tree of the Freescale IMX50 SoC.
+>> It can use much of the common IMX51/IMX53 clocking code.
+>>
+>> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+>> ---
+>>   arch/arm/mach-imx/clk-imx51-imx53.c | 79 +++++++++++++++++++++++++++++++++++++
+>>   arch/arm/mach-imx/common.h          |  3 ++
+>>   2 files changed, 82 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+>> index 7c0dc45..ea4523a 100644
+>> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+>> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+>> @@ -363,6 +363,80 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>>   	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
+>>   }
+>>
+>> +int __init mx50_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+>> +			unsigned long rate_ckih1, unsigned long rate_ckih2)
+>> +{
+>> +	int i;
+>> +	unsigned long r;
+>> +	struct device_node *np;
+>> +
+>> +	clk[pll1_sw] = imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
+>> +	clk[pll2_sw] = imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
+>> +	clk[pll3_sw] = imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
+>
+> What about the apll and it's derivatives?
 
-diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-index de5a6c8..1f2ce6d 100644
---- a/drivers/video/mx3fb.c
-+++ b/drivers/video/mx3fb.c
-@@ -27,6 +27,7 @@
- #include <linux/clk.h>
- #include <linux/mutex.h>
- #include <linux/dma/ipu-dma.h>
-+#include <linux/regulator/consumer.h>
- 
- #include <linux/platform_data/dma-imx.h>
- #include <linux/platform_data/video-mx3fb.h>
-@@ -269,6 +270,7 @@ struct mx3fb_info {
- 	struct dma_async_tx_descriptor	*txd;
- 	dma_cookie_t			cookie;
- 	struct scatterlist		sg[2];
-+	struct regulator		*reg_lcd;
- 
- 	struct fb_var_screeninfo	cur_var; /* current var info */
- };
-@@ -1005,6 +1007,7 @@ static void __blank(int blank, struct fb_info *fbi)
- 	struct mx3fb_info *mx3_fbi = fbi->par;
- 	struct mx3fb_data *mx3fb = mx3_fbi->mx3fb;
- 	int was_blank = mx3_fbi->blank;
-+	int ret;
- 
- 	mx3_fbi->blank = blank;
- 
-@@ -1023,6 +1026,15 @@ static void __blank(int blank, struct fb_info *fbi)
- 	case FB_BLANK_HSYNC_SUSPEND:
- 	case FB_BLANK_NORMAL:
- 		sdc_set_brightness(mx3fb, 0);
-+		if (mx3_fbi->reg_lcd) {
-+			if (regulator_is_enabled(mx3_fbi->reg_lcd)) {
-+				ret = regulator_disable(mx3_fbi->reg_lcd);
-+				if (ret)
-+					dev_warn(fbi->device,
-+						 "lcd regulator disable failed with error: %d\n",
-+						 ret);
-+			}
-+		}
- 		memset((char *)fbi->screen_base, 0, fbi->fix.smem_len);
- 		/* Give LCD time to update - enough for 50 and 60 Hz */
- 		msleep(25);
-@@ -1030,6 +1042,15 @@ static void __blank(int blank, struct fb_info *fbi)
- 		break;
- 	case FB_BLANK_UNBLANK:
- 		sdc_enable_channel(mx3_fbi);
-+		if (mx3_fbi->reg_lcd) {
-+			if (!regulator_is_enabled(mx3_fbi->reg_lcd)) {
-+				ret = regulator_enable(mx3_fbi->reg_lcd);
-+				if (ret)
-+					dev_warn(fbi->device,
-+						 "lcd regulator enable failed with error: %d\n",
-+						 ret);
-+			}
-+		}
- 		sdc_set_brightness(mx3fb, mx3fb->backlight_level);
- 		break;
- 	}
-@@ -1206,6 +1227,7 @@ static int mx3fb_suspend(struct platform_device *pdev, pm_message_t state)
- {
- 	struct mx3fb_data *mx3fb = platform_get_drvdata(pdev);
- 	struct mx3fb_info *mx3_fbi = mx3fb->fbi->par;
-+	int ret;
- 
- 	console_lock();
- 	fb_set_suspend(mx3fb->fbi, 1);
-@@ -1214,7 +1236,15 @@ static int mx3fb_suspend(struct platform_device *pdev, pm_message_t state)
- 	if (mx3_fbi->blank == FB_BLANK_UNBLANK) {
- 		sdc_disable_channel(mx3_fbi);
- 		sdc_set_brightness(mx3fb, 0);
--
-+		if (mx3_fbi->reg_lcd) {
-+			if (regulator_is_enabled(mx3_fbi->reg_lcd)) {
-+				ret = regulator_disable(mx3_fbi->reg_lcd);
-+				if (ret)
-+					dev_warn(&pdev->dev,
-+						 "lcd regulator disable failed with error: %d\n",
-+						 ret);
-+			}
-+		}
- 	}
- 	return 0;
- }
-@@ -1226,10 +1256,20 @@ static int mx3fb_resume(struct platform_device *pdev)
- {
- 	struct mx3fb_data *mx3fb = platform_get_drvdata(pdev);
- 	struct mx3fb_info *mx3_fbi = mx3fb->fbi->par;
-+	int ret;
- 
- 	if (mx3_fbi->blank == FB_BLANK_UNBLANK) {
- 		sdc_enable_channel(mx3_fbi);
- 		sdc_set_brightness(mx3fb, mx3fb->backlight_level);
-+		if (mx3_fbi->reg_lcd) {
-+			if (!regulator_is_enabled(mx3_fbi->reg_lcd)) {
-+				ret = regulator_enable(mx3_fbi->reg_lcd);
-+				if (ret)
-+					dev_warn(&pdev->dev,
-+						 "lcd regulator enable failed with error: %d\n",
-+						 ret);
-+			}
-+		}
- 	}
- 
- 	console_lock();
-@@ -1373,6 +1413,7 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
- 	struct mx3fb_platform_data *mx3fb_pdata = dev_get_platdata(dev);
- 	struct device_node *np = dev->of_node;
- 	const char *name;
-+	const char *regulator_name;
- 	const char *ipu_disp_format;
- 	unsigned int irq;
- 	struct fb_info *fbi;
-@@ -1395,6 +1436,9 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
- 			return -EINVAL;
- 		}
- 
-+		of_property_read_string(display_np, "regulator-name",
-+					&regulator_name);
-+
- 		of_property_read_string(display_np, "interface-pix-fmt",
- 					&ipu_disp_format);
- 		if (!ipu_disp_format) {
-@@ -1509,6 +1553,24 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
- 	if (ret < 0)
- 		goto erfb;
- 
-+	/* In dt mode,
-+	 * using devm_regulator_get would require that the proprety referencing
-+	 * the regulator phandle has to be inside the mx3fb node.
-+	 */
-+	if (np) {
-+		if (regulator_name)
-+			mx3fbi->reg_lcd = regulator_get(NULL, regulator_name);
-+	} else {
-+		mx3fbi->reg_lcd = devm_regulator_get(dev, "lcd");
-+	}
-+
-+	if (IS_ERR(mx3fbi->reg_lcd)) {
-+		dev_warn(mx3fb->dev, "Operating without regulator \"lcd\"\n");
-+		mx3fbi->reg_lcd = NULL;
-+	} else {
-+		dev_info(mx3fb->dev, "Using \"lcd\" Regulator\n");
-+	}
-+
- 	return 0;
- 
- erfb:
-@@ -1575,6 +1637,7 @@ static int mx3fb_probe(struct platform_device *pdev)
- 	dma_cap_mask_t mask;
- 	struct dma_chan *chan;
- 	struct dma_chan_request rq;
-+	struct mx3fb_info *mx3_fbi;
- 
- 	/*
- 	 * Display Interface (DI) and Synchronous Display Controller (SDC)
-@@ -1630,6 +1693,8 @@ ersdc0:
- 	dmaengine_put();
- 	iounmap(mx3fb->reg_base);
- eremap:
-+	mx3_fbi = mx3fb->fbi->par;
-+	regulator_put(mx3_fbi->reg_lcd);
- 	kfree(mx3fb);
- 	dev_err(dev, "mx3fb: failed to register fb\n");
- 	return ret;
--- 
-1.7.9.5
+The IMX50RM.pdf seems light on details on the apll. Is it any different
+to the imx51 and imx53 families?
+
+Regards
+Greg
