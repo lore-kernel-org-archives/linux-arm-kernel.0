@@ -1,47 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Oct 2013 12:25:58 +0100
-Subject: [Add SMP support for Allwinner A20: PATCH V5 0/3]
-In-Reply-To: <1382027827-10080-1-git-send-email-cinifr@gmail.com>
-References: <1382027827-10080-1-git-send-email-cinifr@gmail.com>
-Message-ID: <20131023112558.GW3041@lukather>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 23 Oct 2013 19:31:36 +0800
+Subject: [PATCH v2] ARM: dts: mxs: add auart2 pinmux to imx28.dtsi
+In-Reply-To: <1382511537-5072-1-git-send-email-aida.mynzhasova@skitlab.ru>
+References: <1382511537-5072-1-git-send-email-aida.mynzhasova@skitlab.ru>
+Message-ID: <20131023113128.GA9489@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 12:37:04AM +0800, Fan Rong wrote:
-> V1 V2:
-> The patchs add smp support for Allwinner A20. It add cpuregister node in dts for smp configure. The patchs also add a options for phy count timer to replace vir count timer as ARM arch timer clocksource.
-> V3 Changes since V2:
-> It delete platform.h and delete some code in platsmp.c that's not necessary. It delete phy count timer support because most linux kernel platform want to use vir count timer especially for kvm. SMP need arch timer as clocksource, It does use virtual counter timer and  no longer use physical counter timer, so bootloader ***must*** set CNTVOFF register for a20 before kernel booting. I have add support set CNTVOFF register for uboot, if you want to test it in a20 board, you need update your sunxi uboot from: https://groups.google.com/forum/#!topic/linux-sunxi/O0Za7H5_jQI
-> V4 Changes since V3:
-> It use smp_prepare_cpus replacing early_init as cpuconfigure map init funcation caller and use sun7i replacing sunxi7i as funcation name and variable name.
-> V5 Changes since V4:
-> Move smp from struct DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)") to struct DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family") in file sunxi.c
+On Wed, Oct 23, 2013 at 10:58:57AM +0400, Aida Mynzhasova wrote:
+> Add auart2 pins configuration on its main pads
 > 
-> *** BLURB HERE ***
+> Signed-off-by: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
 
-Seriously?
+Applied, thanks.
 
-I explained to you several times what we were expecting, with references
-to examples of what you should do, and you're still not listening?
+Shawn
 
-You just make me feel like I'm wasting my time here. If you don't want
-to make any effort, I won't either.
-
-This is my last warning. Here is what is wrong about your patchset:
-  - Wrap your commit log and cover letter to 80 chars
-  - You don't have any introduction letter
-  - The prefix is wrong, again, while you had it fixed in your v4
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/2efd4bf7/attachment.sig>
+> ---
+>  arch/arm/boot/dts/imx28.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 918d419..cab4c22 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -343,6 +343,19 @@
+>  					fsl,pull-up = <MXS_PULL_DISABLE>;
+>  				};
+>  
+> +				auart2_pins_a: auart2-pins at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						MX28_PAD_AUART2_RX__AUART2_RX
+> +						MX28_PAD_AUART2_TX__AUART2_TX
+> +						MX28_PAD_AUART2_CTS__AUART2_CTS
+> +						MX28_PAD_AUART2_RTS__AUART2_RTS
+> +					>;
+> +					fsl,drive-strength = <MXS_DRIVE_4mA>;
+> +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+> +					fsl,pull-up = <MXS_PULL_DISABLE>;
+> +				};
+> +
+>  				auart3_pins_a: auart3 at 0 {
+>  					reg = <0>;
+>  					fsl,pinmux-ids = <
+> -- 
+> 1.8.1.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
