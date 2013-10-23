@@ -1,108 +1,297 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 23 Oct 2013 17:06:19 +0200
-Subject: [RFC] of: Allow for experimental device tree bindings
-Message-ID: <1382540779-6334-1-git-send-email-treding@nvidia.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Wed, 23 Oct 2013 16:10:42 +0100
+Subject: [PATCH RESEND v2 3/8] KVM: arm-vgic: Set base addr through device
+ API
+In-Reply-To: <1382432923-61267-4-git-send-email-christoffer.dall@linaro.org>
+References: <1382432923-61267-1-git-send-email-christoffer.dall@linaro.org>
+ <1382432923-61267-4-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <58ab343921956ef9575615a7bc675bef@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Past and recent discussions have shown that there's some concensus that
-device tree bindings should be considered an ABI and therefore need to
-remain backwards-compatible once code to implement them is included in
-the final release of a Linux kernel.
+On 2013-10-22 10:08, Christoffer Dall wrote:
+> Support setting the distributor and cpu interface base addresses in 
+> the
+> VM physical address space through the KVM_{SET,GET}_DEVICE_ATTR API
+> in addition to the ARM specific API.
+>
+> This has the added benefit of being able to share more code in user
+> space and do things in a uniform maner.
 
-At the same time there is a desire to keep some manoeuvre while we're
-trying to figure things out. The fact is that many of us lack the
-experience to design good bindings from the start. At the same time
-there is a shortage of people that can review bindings and help design
-better ones.
+                                    manner?
 
-Progress and the addition of new features (and restoration of features
-that used to work before the advent of DT for that matter) are blocked
-to a large degree because of that.
+> Also deprecate the older API at the same time, but backwards
+> compatibility will be maintained.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Reviewed-by: Alexander Graf <agraf@suse.de>
+> ---
+>  Documentation/virtual/kvm/api.txt              |    6 +-
+>  Documentation/virtual/kvm/devices/arm-vgic.txt |   11 +++
+>  arch/arm/include/uapi/asm/kvm.h                |    9 +++
+>  arch/arm/kvm/arm.c                             |    2 +-
+>  include/kvm/arm_vgic.h                         |    2 +-
+>  virt/kvm/arm/vgic.c                            |   90
+> ++++++++++++++++++++----
+>  6 files changed, 105 insertions(+), 15 deletions(-)
+>
+> diff --git a/Documentation/virtual/kvm/api.txt
+> b/Documentation/virtual/kvm/api.txt
+> index 858aecf..d68b6c2 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2324,7 +2324,7 @@ This ioctl returns the guest registers that are
+> supported for the
+>  KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+>
+>
+> -4.84 KVM_ARM_SET_DEVICE_ADDR
+> +4.84 KVM_ARM_SET_DEVICE_ADDR (deprecated)
+>
+>  Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
+>  Architectures: arm, arm64
+> @@ -2362,6 +2362,10 @@ must be called after calling
+> KVM_CREATE_IRQCHIP, but before calling
+>  KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of 
+> the
+>  base addresses will return -EEXIST.
+>
+> +Note, this IOCTL is deprecated and the more flexible 
+> SET/GET_DEVICE_ATTR API
+> +should be used instead.
+> +
+> +
+>  4.85 KVM_PPC_RTAS_DEFINE_TOKEN
+>
+>  Capability: KVM_CAP_PPC_RTAS
+> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt
+> b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> index 38f27f7..c9febb2 100644
+> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> @@ -8,3 +8,14 @@ Only one VGIC instance may be instantiated through
+> either this API or the
+>  legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM
+> interrupt
+>  controller, requiring emulated user-space devices to inject
+> interrupts to the
+>  VGIC instead of directly to CPUs.
+> +
+> +Groups:
+> +  KVM_DEV_ARM_VGIC_GRP_ADDR
+> +  Attributes:
+> +    KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
+> +      Base address in the guest physical address space of the GIC
+> distributor
+> +      register mappings.
+> +
+> +    KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
+> +      Base address in the guest physical address space of the GIC
+> virtual cpu
+> +      interface register mappings.
+> diff --git a/arch/arm/include/uapi/asm/kvm.h
+> b/arch/arm/include/uapi/asm/kvm.h
+> index 1c85102..587f1ae 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -142,6 +142,15 @@ struct kvm_arch_memory_slot {
+>  #define KVM_REG_ARM_VFP_FPINST		0x1009
+>  #define KVM_REG_ARM_VFP_FPINST2		0x100A
+>
+> +/* Device Control API: ARM VGIC */
+> +#define KVM_DEV_ARM_VGIC_GRP_ADDR	0
+> +#define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
+> +#define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
+> +#define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
+> +#define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL <<
+> KVM_DEV_ARM_VGIC_CPUID_SHIFT)
+> +#define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+> +#define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL <<
+> KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+> +
+>  /* KVM_IRQ_LINE irq field index values */
+>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+>  #define KVM_ARM_IRQ_TYPE_MASK		0xff
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index ab96af2..3ecee45 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -773,7 +773,7 @@ static int kvm_vm_ioctl_set_device_addr(struct 
+> kvm *kvm,
+>  	case KVM_ARM_DEVICE_VGIC_V2:
+>  		if (!vgic_present)
+>  			return -ENXIO;
+> -		return kvm_vgic_set_addr(kvm, type, dev_addr->addr);
+> +		return kvm_vgic_addr(kvm, type, &dev_addr->addr, true);
+>  	default:
+>  		return -ENODEV;
+>  	}
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 7e2d158..be85127 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -144,7 +144,7 @@ struct kvm_run;
+>  struct kvm_exit_mmio;
+>
+>  #ifdef CONFIG_KVM_ARM_VGIC
+> -int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 
+> addr);
+> +int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr,
+> bool write);
+>  int kvm_vgic_hyp_init(void);
+>  int kvm_vgic_init(struct kvm *kvm);
+>  int kvm_vgic_create(struct kvm *kvm);
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 79a8bae..d9c0fc5 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1479,6 +1479,12 @@ static int vgic_ioaddr_assign(struct kvm *kvm,
+> phys_addr_t *ioaddr,
+>  {
+>  	int ret;
+>
+> +	if (addr & ~KVM_PHYS_MASK)
+> +		return -E2BIG;
+> +
+> +	if (addr & (SZ_4K - 1))
+> +		return -EINVAL;
+> +
+>  	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
+>  		return -EEXIST;
+>  	if (addr + size < addr)
+> @@ -1491,26 +1497,41 @@ static int vgic_ioaddr_assign(struct kvm
+> *kvm, phys_addr_t *ioaddr,
+>  	return ret;
+>  }
+>
+> -int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
+> +/**
+> + * kvm_vgic_addr - set or get vgic VM base addresses
+> + * @kvm:   pointer to the vm struct
+> + * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
+> + * @addr:  pointer to address value
+> + * @write: if true set the address in the VM address space, if false
+> read the
+> + *          address
+> + *
+> + * Set or get the vgic base addresses for the distributor and the
+> virtual CPU
+> + * interface in the VM physical address space.  These addresses are
+> properties
+> + * of the emulated core/SoC and therefore user space initially knows 
+> this
+> + * information.
+> + */
+> +int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr,
+> bool write)
+>  {
+>  	int r = 0;
+>  	struct vgic_dist *vgic = &kvm->arch.vgic;
+>
+> -	if (addr & ~KVM_PHYS_MASK)
+> -		return -E2BIG;
+> -
+> -	if (addr & (SZ_4K - 1))
+> -		return -EINVAL;
+> -
+>  	mutex_lock(&kvm->lock);
+>  	switch (type) {
+>  	case KVM_VGIC_V2_ADDR_TYPE_DIST:
+> -		r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
+> -				       addr, KVM_VGIC_V2_DIST_SIZE);
+> +		if (write) {
+> +			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
+> +					       *addr, KVM_VGIC_V2_DIST_SIZE);
+> +		} else {
+> +			*addr = vgic->vgic_dist_base;
+> +		}
+>  		break;
+>  	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+> -		r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
+> -				       addr, KVM_VGIC_V2_CPU_SIZE);
+> +		if (write) {
+> +			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
+> +					       *addr, KVM_VGIC_V2_CPU_SIZE);
+> +		} else {
+> +			*addr = vgic->vgic_cpu_base;
+> +		}
+>  		break;
+>  	default:
+>  		r = -ENODEV;
+> @@ -1522,16 +1543,61 @@ int kvm_vgic_set_addr(struct kvm *kvm,
+> unsigned long type, u64 addr)
+>
+>  static int vgic_set_attr(struct kvm_device *dev, struct
+> kvm_device_attr *attr)
+>  {
+> +	int r;
+> +
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
+> +		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+> +		u64 addr;
+> +		unsigned long type = (unsigned long)attr->attr;
+> +
+> +		if (copy_from_user(&addr, uaddr, sizeof(addr)))
+> +			return -EFAULT;
+> +
+> +		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
+> +		return (r == -ENODEV) ? -ENXIO : r;
+> +	}
+> +	}
+> +
+>  	return -ENXIO;
+>  }
+>
+>  static int vgic_get_attr(struct kvm_device *dev, struct
+> kvm_device_attr *attr)
+>  {
+> -	return -ENXIO;
+> +	int r = ENXIO;
 
-This patch attempts to restore some degree of freedom by introducing an
-easy way to mark device tree bindings as experimental as well as a way
-for users to disable the use of experimental bindings if they choose
-functionality at the cost of potential device tree incompatibilities.
+Shouldn't this be a negative number?
 
-Bindings are marked experimental by prefixing the compatible value with
-an exclamation mark (!). In order to make it clear that experimental
-bindings are undesirable in the long run, a warning will be output when
-an experimental binding is encountered.
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
+> +		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+> +		u64 addr;
+> +		unsigned long type = (unsigned long)attr->attr;
+> +
+> +		r = kvm_vgic_addr(dev->kvm, type, &addr, false);
+> +		if (r)
+> +			return (r == -ENODEV) ? -ENXIO : r;
+> +
+> +		r = 0;
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/of/Kconfig |  7 +++++++
- drivers/of/base.c  | 32 +++++++++++++++++++++++++++++++-
- 2 files changed, 38 insertions(+), 1 deletion(-)
+Isn't r already zero at this point?
 
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index 78cc760..dc482f8 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -24,6 +24,13 @@ config OF_SELFTEST
- 
- 	  If unsure, say N here, but this option is safe to enable.
- 
-+config OF_EXPERIMENTAL
-+	bool "Support experimental device tree bindings"
-+	help
-+	  This option allows experimental device tree bindings to be used.
-+	  Note that experimental bindings are subject to change, possibly
-+	  requiring the DTB to be updated.
-+
- config OF_FLATTREE
- 	bool
- 	select DTC
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index a96f850..b0b8371 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -342,6 +342,36 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
- }
- EXPORT_SYMBOL(of_get_cpu_node);
- 
-+static int of_compat_match(const char *device, const char *driver,
-+			   const struct device_node *np)
-+{
-+	const char *dev = device;
-+	const char *drv = driver;
-+
-+	if (device[0] == '!')
-+		device++;
-+
-+	if (driver[0] == '!')
-+		driver++;
-+
-+	if (of_compat_cmp(device, driver, strlen(driver)) != 0)
-+		return 0;
-+
-+	/* check if binding is experimental */
-+	if (dev != device || drv != driver) {
-+		pr_warn("of: device %s (%s) uses an experimental binding\n",
-+			np->name, np->full_name);
-+
-+		/* don't match if we don't want experimental bindings */
-+		if (!IS_ENABLED(CONFIG_OF_EXPERIMENTAL)) {
-+			pr_err("of: refusing to use binding \"%s\"\n", device);
-+			return 0;
-+		}
-+	}
-+
-+	return 1;
-+}
-+
- /** Checks if the given "compat" string matches one of the strings in
-  * the device's "compatible" property
-  */
-@@ -355,7 +385,7 @@ static int __of_device_is_compatible(const struct device_node *device,
- 	if (cp == NULL)
- 		return 0;
- 	while (cplen > 0) {
--		if (of_compat_cmp(cp, compat, strlen(compat)) == 0)
-+		if (of_compat_match(cp, compat, device))
- 			return 1;
- 		l = strlen(cp) + 1;
- 		cp += l;
+> +		if (copy_to_user(uaddr, &addr, sizeof(addr)))
+> +			return -EFAULT;
+> +	}
+> +	}
+> +
+> +	return r;
+>  }
+>
+>  static int vgic_has_attr(struct kvm_device *dev, struct
+> kvm_device_attr *attr)
+>  {
+> +	phys_addr_t offset;
+> +
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_ADDR:
+> +		switch (attr->attr) {
+> +		case KVM_VGIC_V2_ADDR_TYPE_DIST:
+> +		case KVM_VGIC_V2_ADDR_TYPE_CPU:
+> +			return 0;
+> +		}
+> +		break;
+> +	}
+>  	return -ENXIO;
+>  }
+
+Cheers,
+
+         M.
 -- 
-1.8.4
+Who you jivin' with that Cosmik Debris?
