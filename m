@@ -1,64 +1,62 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 23 Oct 2013 10:55:03 +0200
-Subject: [PATCHv5][ 3/3] ARM: imx_v6_v7_defconfig: Enable some drivers used on
- the cpuimx35.
-In-Reply-To: <1382518503-16437-1-git-send-email-denis@eukrea.com>
-References: <1382518503-16437-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382518503-16437-3-git-send-email-denis@eukrea.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 23 Oct 2013 17:04:44 +0800
+Subject: [Patch v2 02/14] usb: phy-mxs: Add platform judgement code
+In-Reply-To: <20131023064604.GE8534@shlinux1.ap.freescale.net>
+References: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
+ <1382421528-17897-3-git-send-email-peter.chen@freescale.com>
+ <20131023061322.GF2839@S2101-09.ap.freescale.net>
+ <20131023064604.GE8534@shlinux1.ap.freescale.net>
+Message-ID: <20131023090443.GR2839@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eukrea cpuimx35 has a pcf8563 RTC, an LCD gpio regulator,
-  and a gpio led.
+On Wed, Oct 23, 2013 at 02:46:04PM +0800, Peter Chen wrote:
+> How about compare compatible string directly at probe?
+> 
+> 	if (of_device_is_compatible(np, "fsl,imx6q-usbphy"))
+> 		mxs_phy->devtype = IMX6Q_USB_PHY;
+> 	else if ((of_device_is_compatible(np, "fsl,imx6sl-usbphy"))
+> 		mxs_phy->devtype = IMX6SL_USB_PHY;
+> 	else if (...)
+> 		...;
 
-We enable the respective drivers in order to be able to use theses
-  features with this configuration.
+It can work, but in general, we should avoid unnecessary device tree
+lookup.  I would suggest something like below.
 
-We also enabled the i.MX35 DT support because the cpuimx35 has now DT support.
+#define MXS_FLAGS_SUSPEND_ISSUE_1	BIT(0)
+#define MXS_FLAGS_SUSPEND_ISSUE_2	BIT(1)
+#define MXS_FLAGS_LINE_DISCONNECT	BIT(2)
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |    7 +++++++
- 1 file changed, 7 insertions(+)
+struct mxs_phy_data {
+	unsigned int flags;
+};
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 5d488c2..d8a52a0 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -28,6 +28,7 @@ CONFIG_MACH_QONG=y
- CONFIG_MACH_ARMADILLO5X0=y
- CONFIG_MACH_KZM_ARM11_01=y
- CONFIG_MACH_IMX31_DT=y
-+CONFIG_MACH_IMX35_DT=y
- CONFIG_MACH_PCM043=y
- CONFIG_MACH_MX35_3DS=y
- CONFIG_MACH_VPR200=y
-@@ -161,6 +162,7 @@ CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_DA9052=y
-+CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
-@@ -204,8 +206,13 @@ CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-+CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
- CONFIG_RTC_DRV_SNVS=y
--- 
-1.7.9.5
+struct mxs_phy {
+	...
+	mxs_phy_data *data;
+};
+
+static struct mxs_phy_data imx6sl_usbphy_data = {
+        .flags = MXS_FLAGS_LINE_DISCONNECT,
+};
+
+static struct mxs_phy_data imx6q_usbphy_data = {
+        .flags = MXS_FLAGS_SUSPEND_ISSUE_2 | MXS_FLAGS_LINE_DISCONNECT,
+};
+
+static struct mxs_phy_data imx23_usbphy_data = {
+        .flags = MXS_FLAGS_SUSPEND_ISSUE_1 | MXS_FLAGS_SUSPEND_ISSUE_2,
+};
+
+static const struct of_device_id mxs_phy_dt_ids[] = {
+       { .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_usbphy_data, },
+       { .compatible = "fsl,imx6q-usbphy", .data = &imx6q_usbphy_data, },
+       { .compatible = "fsl,imx23-usbphy", .data = &imx23_usbphy_data, },
+       { /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+
+Then you can check the flags for handling different cases.  This would
+be more flexible and future proof.
+
+Shawn
