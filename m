@@ -1,70 +1,80 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 23 Oct 2013 14:13:12 -0700
-Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
- tree bindings
-In-Reply-To: <20131023195849.GA8828@mithrandir>
-References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
- <5267FA58.9050002@wwwdotorg.org> <20131023172001.GA3379@katana>
- <20131023185909.GC7863@ulmo.nvidia.com>
- <20131023193450.GE32563@obsidianresearch.com>
- <20131023195849.GA8828@mithrandir>
-Message-ID: <CALCETrV66SUsv7pFr8+W9roy47WP3G1qbdxkuKkb8a4ExSHH0Q@mail.gmail.com>
+From: Paul.Zimmerman@synopsys.com (Paul Zimmerman)
+Date: Wed, 23 Oct 2013 21:29:22 +0000
+Subject: [RFC] Does PHY UTMI data width belong to DWC2 or PHY binding?
+In-Reply-To: <20131023144242.GI29341@beef>
+References: <20131018141221.GH2721@beef> <5264F37E.9060307@ti.com>
+ <20131022104829.GF15425@login.drsnuggles.stderr.nl>
+ <20131022112520.GE29341@beef> <5266F06C.2080701@gmail.com>
+ <20131023144242.GI29341@beef>
+Message-ID: <A2CA0424C0A6F04399FB9E1CD98E030458E1DB5B@US01WEMBX2.internal.synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 12:58 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Oct 23, 2013 at 01:34:50PM -0600, Jason Gunthorpe wrote:
->> On Wed, Oct 23, 2013 at 08:59:10PM +0200, Thierry Reding wrote:
->>
->> > > I'd say yes. Going from unstable to stable is quite a step for a binding
->> > > and that should be visible and worth a patch IMO. Also, when looking at
->> > > a DTS file or some driver code, it will avoid
->> > > confusion/misinterpretation if one can see immediately the status of a
->> > > binding.
->> >
->> > Yes, I fully agree. It might look like churn, but I think this could
->> > actually be a part of the formal process to stabilize a binding. It
->> > would be final step of that process, actually.
->>
->> I actually think this makes things worse.
->>
->> Ostensibly the purpose of stable DT is to allow the DT and kernel to
->> be separate, so you should minimize the churn in the DTs, and they
->> should trend to stable.
->
-> Well, I do think that stable DT has benefits. And quite frankly I think
-> the majority of bindings will eventually converge to some stable state
-> anyway, if only because active development stops. In an ideal world that
-> would be when a product ships.
->
-> So this proposal isn't so much about making a decision for stable or
-> experimental DT, but rather about giving users a choice. If they are
-> willing to live with the additional "burden" of updating the DTB every
-> once in a while, then they can enable the option and get additional
-> functionality. If they don't want any part of that, they can just leave
-> the option disabled and only get the parts that are stable.
->
->> Having a flag day where someone goes and churns the DT to remove a !,
->> and then changes the kernel so all old DTs with a ! won't work at all
->> makes this whole thing seem kinda contrary to the basic motivating
->> premis.
->
-> No. Matching doesn't include the ! marker. So if you remove it from DTS
-> files and/or drivers, the only thing that goes away is the warning at
-> runtime. Feature-wise there should be no difference.
->
->> Also, what happens during development? If you incompatibly change the
->> binding you should change the name, so maybe <version>!marvell,foo is
->> the way to go.
->>
->> v1 of the binding is 1!marvell,foo - version 2 is 2!marvell,foo, etc.
->>
+> From: Matt Porter [mailto:matt.porter at linaro.org]
+> Sent: Wednesday, October 23, 2013 7:43 AM
+> 
+> On Tue, Oct 22, 2013 at 04:38:52PM -0500, Rob Herring wrote:
+> > On 10/22/2013 06:25 AM, Matt Porter wrote:
+> > > On Tue, Oct 22, 2013 at 12:48:29PM +0200, Matthijs Kooijman wrote:
+> > >> Hi Kishon,
+> > >>
+> > >> On Mon, Oct 21, 2013 at 02:57:26PM +0530, Kishon Vijay Abraham I wrote:
+> > >>> I think it makes sense to keep the data width property in the dwc2 node itself.
+> > >>> I mean it describes how the dwc2 IP is configured in that particular SoC (given
+> > >>> that it can be either <8> or <16>).
+> > >> If I'm reading the RT3052 datasheet correctly (GHWCFG4 register), the IP
+> > >> can be configured for 8, 16 or 8 _and_ 16. In the latter case, the "8
+> > >> and 16 supported" would make sense as a property of dwc2 (though this
+> > >> value should be autodetectable through GHWCFG4), while the actual 8 or
+> > >> 16 supported by the PHY would make sense as property of a phy.
+> > >
+> > > There would be no value in adding a property for an already detectable
+> > > value to dwc2's binding. To be honest, it's pretty much useless
+> > > information due to the existence of the "8 and 16" option.
+> > >
+> > >> Note sure if this is really useful in practice as well, or if just
+> > >> setting the actual width to use on dwc2 makes more sense...
+> > >
+> > > The GHWCFG4 information itself is not useful in practice, as described
+> > > in the original thread: https://lkml.org/lkml/2013/10/10/477
+> > >
+> > > It's certainly useful in practice to have this width property in either
+> > > the dwc2 or the phy binding. One can make a case for either. As I
+> > > mentioned in the original post, if we put it in the phy binding we'll be
+> > > updating the generic phy binding. We'll then need an api added into the
+> > > generic phy framework to fetch the width of a phy.
+> > >
+> > > Both cases are doable and trivial, we just need the canonical decision
+> > > from a DT maintainer as to where the property belongs. Given that they
+> > > are in ARM ksummit, I'm not expecting to hear anything right this
+> > > moment. :)
+> >
+> > The host can support both, so it is not a property of the host and is a
+> > property of the phy. It is no different than what mode a SPI slave
+> > requires or whether an i2c slave supports 8 or 10-bit addressing. Those
+> > examples are all 1 to many rather than 1 to 1 where it doesn't really
+> > matter, but the same logic applies.
+> 
+> Makes good sense, thanks.
+> 
+> In this case, given the PHY ownership of width, we can completely avoid
+> any DT properties. The generic phy compliant BCM Kona phy driver can
+> report via the generic phy framework that it is 8-bit wide. There's no
+> support for this type of thing now but it's pretty trivial to add.
 
-[I'm a random bystander -- I don't really know anything about DT.]
+> I went ahead and did a quick proof-of-concept that adds a free-form
+> phy attributes struct for the generic phy. Given that generic phys can
+> be for any transmission technology this could be filled with a jumble
+> unrelated and often unpopulated attributes over time. In any case, the
+> below patch allows the phy provider to choose to specify utmi_width and
+> a controller driver that cares can use phy_get_attrs() to fetch the
+> optional phy attributes and use the utmi_width field if applicable.
 
-This sounds awfully like the -moz, -webkit, etc. CSS property
-selectors.  They are AFAICT nearly universally considered to have been
-a mistake.
+As an alternate approach, you could add a 'utmi_width' property to the
+PHY's DT node, and have the dwc2 driver scan the tree until it finds its
+PHY, and then check it for that property. That would avoid the need to
+add anything new to the PHY framework. I don't know if that would be
+considered good practice by the DT guys, though.
 
---Andy
+-- 
+Paul
