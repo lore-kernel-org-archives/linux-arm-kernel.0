@@ -1,49 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 23 Oct 2013 16:23:26 +0800
-Subject: [PATCH 2/4] ARM: dts: add Gateworks Ventana support
-In-Reply-To: <1382503888-3962-3-git-send-email-tharvey@gateworks.com>
-References: <1382503888-3962-1-git-send-email-tharvey@gateworks.com>
- <1382503888-3962-3-git-send-email-tharvey@gateworks.com>
-Message-ID: <20131023082324.GO2839@S2101-09.ap.freescale.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 23 Oct 2013 10:21:23 +0200
+Subject: [PATCHv4][ 1/4] Input: tsc2007: Add device tree support.
+In-Reply-To: <20131022223504.GA19819@core.coreip.homeip.net>
+References: <1382363667-10341-1-git-send-email-denis@eukrea.com>
+ <20131021155927.GB4255@core.coreip.homeip.net>
+ <20131022114947.30dc9c07@ipc1.ka-ro>
+ <20131022223504.GA19819@core.coreip.homeip.net>
+Message-ID: <20131023082123.GC7404@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 09:51:26PM -0700, Tim Harvey wrote:
-> The Gateworks Ventana product family consists of several baseboard designs
-> based on the Freescale i.MX6 family of processors.  Each baseboard has a
-> different set of possible features.
+On Tue, Oct 22, 2013 at 03:35:05PM -0700, Dmitry Torokhov wrote:
+> On Tue, Oct 22, 2013 at 11:49:47AM +0200, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > > On Mon, Oct 21, 2013 at 03:54:24PM +0200, Denis Carikli wrote:
+> > > >  
+> > > > +	if (ts->of)
+> > > > +		return tsc2007_get_pendown_state_dt(ts);
+> > > > +
+> > > >  	if (!ts->get_pendown_state)
+> > > >  		return true;
+> > > 
+> > > Instead of special casing "if (ts->of)" all over the place why don't you
+> > > set up the device structure as:
+> > > 
+> > > 	if (<configuring_tsc2007_form_dt>)
+> > > 		ts->get_pendown_state = tsc2007_get_pendown_state_dt;
+> > > 
+> > > and be done with it?
+> > >
+> > I also thought about that, but the existing function does not have any
+> > parameters, while the DT version of get_pendown_state() requires to get
+> > the GPIO passed to it somehow.
 > 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
+> You can always have tsc2007_get_pendown_state_platform() wrapping the
+> call. Or we just go and fix board code.
 
-<snip>
+I used to have a patch which did exactly that but never got around to
+submitting it. Essentially what it did was add a void * parameter to the
+.get_pendown_state() and .clear_penirq() callbacks, along with a new
+.callback_data field that the driver could set. At the same time there
+was some code to unify code for boards that merely use a simple GPIO as
+pendown.
 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 3043e6c..2b7084c 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -131,10 +131,19 @@ dtb-$(CONFIG_ARCH_MXC) += \
->  	imx53-mba53.dtb \
->  	imx53-qsb.dtb \
->  	imx53-smd.dtb \
-> +	imx6dl-gw54xx.dtb \
-> +	imx6dl-gw53xx.dtb \
-> +	imx6dl-gw52xx.dtb \
-> +	imx6dl-gw51xx.dtb \
+I'm attaching what I think is the latest version. I no longer have
+access to the hardware so I can't test this, but perhaps it can serve as
+an example of how this could work. Sorry this isn't in the form of a
+proper patch.
 
-Sorted it like 51xx, 52xx, 53xx, 54xx, and applied the patch.  Thanks.
-
-Shawn
-
->  	imx6dl-sabreauto.dtb \
->  	imx6dl-sabresd.dtb \
->  	imx6dl-wandboard.dtb \
->  	imx6q-arm2.dtb \
-> +	imx6q-gw5400-a.dtb \
-> +	imx6q-gw54xx.dtb \
-> +	imx6q-gw53xx.dtb \
-> +	imx6q-gw52xx.dtb \
-> +	imx6q-gw51xx.dtb \
->  	imx6q-phytec-pbab01.dtb \
->  	imx6q-sabreauto.dtb \
->  	imx6q-sabrelite.dtb \
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: tsc2007.patch
+Type: text/x-diff
+Size: 9863 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/771afff9/attachment-0001.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/771afff9/attachment-0001.sig>
