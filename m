@@ -1,66 +1,107 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 23 Oct 2013 10:21:23 +0200
-Subject: [PATCHv4][ 1/4] Input: tsc2007: Add device tree support.
-In-Reply-To: <20131022223504.GA19819@core.coreip.homeip.net>
-References: <1382363667-10341-1-git-send-email-denis@eukrea.com>
- <20131021155927.GB4255@core.coreip.homeip.net>
- <20131022114947.30dc9c07@ipc1.ka-ro>
- <20131022223504.GA19819@core.coreip.homeip.net>
-Message-ID: <20131023082123.GC7404@ulmo.nvidia.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 23 Oct 2013 10:29:27 +0200
+Subject: [PATCHv5][ 2/9] video: imxfb: Introduce regulator support.
+In-Reply-To: <1382516974-13371-1-git-send-email-denis@eukrea.com>
+References: <1382516974-13371-1-git-send-email-denis@eukrea.com>
+Message-ID: <1382516974-13371-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 03:35:05PM -0700, Dmitry Torokhov wrote:
-> On Tue, Oct 22, 2013 at 11:49:47AM +0200, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > > On Mon, Oct 21, 2013 at 03:54:24PM +0200, Denis Carikli wrote:
-> > > >  
-> > > > +	if (ts->of)
-> > > > +		return tsc2007_get_pendown_state_dt(ts);
-> > > > +
-> > > >  	if (!ts->get_pendown_state)
-> > > >  		return true;
-> > > 
-> > > Instead of special casing "if (ts->of)" all over the place why don't you
-> > > set up the device structure as:
-> > > 
-> > > 	if (<configuring_tsc2007_form_dt>)
-> > > 		ts->get_pendown_state = tsc2007_get_pendown_state_dt;
-> > > 
-> > > and be done with it?
-> > >
-> > I also thought about that, but the existing function does not have any
-> > parameters, while the DT version of get_pendown_state() requires to get
-> > the GPIO passed to it somehow.
-> 
-> You can always have tsc2007_get_pendown_state_platform() wrapping the
-> call. Or we just go and fix board code.
+This commit is based on the following commit by Fabio Estevam:
+  4344429 video: mxsfb: Introduce regulator support
 
-I used to have a patch which did exactly that but never got around to
-submitting it. Essentially what it did was add a void * parameter to the
-.get_pendown_state() and .clear_penirq() callbacks, along with a new
-.callback_data field that the driver could set. At the same time there
-was some code to unify code for boards that merely use a simple GPIO as
-pendown.
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ drivers/video/imxfb.c |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-I'm attaching what I think is the latest version. I no longer have
-access to the hardware so I can't test this, but perhaps it can serve as
-an example of how this could work. Sorry this isn't in the form of a
-proper patch.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: tsc2007.patch
-Type: text/x-diff
-Size: 9863 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/771afff9/attachment-0001.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/771afff9/attachment-0001.sig>
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 44ee678..4bf3837 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -28,6 +28,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/math64.h>
+@@ -145,6 +146,7 @@ struct imxfb_info {
+ 	struct clk		*clk_ipg;
+ 	struct clk		*clk_ahb;
+ 	struct clk		*clk_per;
++	struct regulator	*reg_lcd;
+ 	enum imxfb_type		devtype;
+ 	bool			enabled;
+ 
+@@ -563,12 +565,23 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ 
+ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
+ 
+ 	if (fbi->enabled)
+ 		return;
+ 
+ 	pr_debug("Enabling LCD controller\n");
+ 
++	if (fbi->reg_lcd) {
++		ret = regulator_enable(fbi->reg_lcd);
++		if (ret) {
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator enable failed with error: %d\n",
++				ret);
++			return;
++		}
++	}
++
+ 	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+ 
+ 	/* panning offset 0 (0 pixel offset)        */
+@@ -597,6 +610,8 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 
+ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
++
+ 	if (!fbi->enabled)
+ 		return;
+ 
+@@ -613,6 +628,14 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	fbi->enabled = false;
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
++
++	if (fbi->reg_lcd) {
++		ret = regulator_disable(fbi->reg_lcd);
++		if (ret)
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator disable failed with error: %d\n",
++				ret);
++	}
+ }
+ 
+ static int imxfb_blank(int blank, struct fb_info *info)
+@@ -1020,6 +1043,12 @@ static int imxfb_probe(struct platform_device *pdev)
+ 		goto failed_register;
+ 	}
+ 
++	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
++	if (IS_ERR(fbi->reg_lcd)) {
++		dev_info(&pdev->dev, "No lcd regulator used.\n");
++		fbi->reg_lcd = NULL;
++	}
++
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
+ #ifdef PWMR_BACKLIGHT_AVAILABLE
+-- 
+1.7.9.5
