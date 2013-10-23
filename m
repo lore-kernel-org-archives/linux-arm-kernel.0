@@ -1,54 +1,20 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Oct 2013 15:51:16 +0200
-Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <CAKohpombg7mAmgxxvUg8kz1MaFwcycR1eL0UrgELY2WdGfrAag@mail.gmail.com>
-References: <1382533461-31021-1-git-send-email-andrew@lunn.ch>
- <CAKohpombg7mAmgxxvUg8kz1MaFwcycR1eL0UrgELY2WdGfrAag@mail.gmail.com>
-Message-ID: <20131023135116.GC31126@lunn.ch>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 23 Oct 2013 10:02:11 -0400 (EDT)
+Subject: [PATCH] ARM: bL_switcher: Remove
+ cpu_hotplug_driver_{lock,unlock}()
+In-Reply-To: <1382522073-14995-1-git-send-email-tushar.behera@linaro.org>
+References: <1382522073-14995-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <alpine.LFD.2.03.1310231001180.1951@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 07:10:41PM +0530, Viresh Kumar wrote:
-> On 23 October 2013 18:34, Andrew Lunn <andrew@lunn.ch> wrote:
-> > The Marvell Dove SoC can run the CPU at two frequencies. The high
-> > frequencey is from a PLL, while the lower is the same as the DDR
-> > clock. Add a cpufreq driver to swap between these frequences.
-> >
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > ---
-> > Sort header files
-> > Comment the interrupt handler
-> 
-> Really? I don't see these two comments being incorporated..
-> Also, you would be required to update your patchset ones my
-> patches are in (And that will happen for v3.13)..
+On Wed, 23 Oct 2013, Tushar Behera wrote:
 
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/cpufreq.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/platform_device.h>
-+#include <asm/proc-fns.h>
+> Commit 6dedcca610c6 ("hotplug, powerpc, x86: Remove
+> cpu_hotplug_driver_lock())" removes the the definition of
+> cpu_hotplug_driver_{lock,unlock} APIs, thereby causing a build error.
 
-There does seem to be a convention that kernel.h and module.h come
-first, and then i have the rest in order. 
+Where is this commit to be found?
 
-+/*
-+ * Handle the interrupt raised when the frequency change is
-+ * complete.
-+ */
-+static irqreturn_t dove_cpufreq_irq(int irq, void *dev)
-+{
-+       return IRQ_HANDLED;
-+}
 
-What more would you like to see in the comment?
-
-Thanks
-     Andrew
+Nicolas
