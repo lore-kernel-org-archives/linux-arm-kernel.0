@@ -1,54 +1,27 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Wed, 23 Oct 2013 15:39:09 +0100
-Subject: [PATCH v8 14/19] ASoC: Samsung: Rename dma_ops by samsung_dma_ops
-In-Reply-To: <1382031814-8782-14-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
- <1382031814-8782-14-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <5267DF8D.70800@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Oct 2013 16:36:57 +0200
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <CAKohpokTgCz0c=PeaJHKiZEiYc0jPVq-vwkhP5pM0hh1-0QnLA@mail.gmail.com>
+References: <1382533461-31021-1-git-send-email-andrew@lunn.ch>
+ <CAKohpombg7mAmgxxvUg8kz1MaFwcycR1eL0UrgELY2WdGfrAag@mail.gmail.com>
+ <20131023135116.GC31126@lunn.ch>
+ <CAKohpokTgCz0c=PeaJHKiZEiYc0jPVq-vwkhP5pM0hh1-0QnLA@mail.gmail.com>
+Message-ID: <20131023143657.GA31536@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Add samsung sounds maintainers)
+> So, you have actually tested your code without interrupt handler?
 
-On 10/17/2013 06:43 PM, Stefano Stabellini wrote:
-> From: Julien Grall <julien.grall@linaro.org>
->
-> The commit "arm: introduce a global dma_ops pointer" introduce compilation issue
-> when CONFIG_SND_SOC_SAMSUNG is enabled.
->
-> sound/soc/samsung/dma.c:345:27: error: conflicting types for 'dma_ops'
-> /local/home/julien/works/arndale/linux/arch/arm/include/asm/dma-mapping.h:16:28:
-> note: previous declaration of 'dma_ops' was here
->
-> Signed-off-by: Julien Grall <julien.grall@linaro.org>
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->   sound/soc/samsung/dma.c |    4 ++--
->   1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-> index 21b7926..827c0d8 100644
-> --- a/sound/soc/samsung/dma.c
-> +++ b/sound/soc/samsung/dma.c
-> @@ -341,7 +341,7 @@ static int dma_mmap(struct snd_pcm_substream *substream,
->   				     runtime->dma_bytes);
->   }
->
-> -static struct snd_pcm_ops dma_ops = {
-> +static struct snd_pcm_ops samsung_dma_ops = {
->   	.open		= dma_open,
->   	.close		= dma_close,
->   	.ioctl		= snd_pcm_lib_ioctl,
-> @@ -428,7 +428,7 @@ out:
->   }
->
->   static struct snd_soc_platform_driver samsung_asoc_platform = {
-> -	.ops		= &dma_ops,
-> +	.ops		= &samsung_dma_ops,
->   	.pcm_new	= dma_new,
->   	.pcm_free	= dma_free_dma_buffers,
->   };
->
+No.
 
--- 
-Julien Grall
+> What exactly happens in that case?
+
+Take a look at request_threaded_irq(). It contains:
+
+1421         if (!handler) {
+1422                 if (!thread_fn)
+1423                         return -EINVAL;
+
+So devm_request_irq() will fail, and so the probe function will fail.
+
+   Andrew
