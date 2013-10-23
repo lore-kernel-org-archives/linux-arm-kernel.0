@@ -1,42 +1,51 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 23 Oct 2013 10:51:48 +0800
-Subject: [PATCH 5/7] mmc: sdhci-esdhc-imx: fix cpas over write issue
-In-Reply-To: <1382365627-26816-6-git-send-email-b29396@freescale.com>
-References: <1382365627-26816-1-git-send-email-b29396@freescale.com>
- <1382365627-26816-6-git-send-email-b29396@freescale.com>
-Message-ID: <20131023025146.GC2839@S2101-09.ap.freescale.net>
+Date: Wed, 23 Oct 2013 10:58:17 +0800
+Subject: [Patch v2 01/14] usb: doc: phy-mxs: Add more compatible strings
+In-Reply-To: <1382421528-17897-2-git-send-email-peter.chen@freescale.com>
+References: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
+ <1382421528-17897-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131023025814.GD2839@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 21, 2013 at 10:27:05PM +0800, Dong Aisheng wrote:
-> We should use '|=' instead '=', or it may over write
-> the original caps assigned before this line.
+On Tue, Oct 22, 2013 at 01:58:35PM +0800, Peter Chen wrote:
+> Since there are three mxs PHY versions, using three compatible
+> strings for them.
 > 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  Documentation/devicetree/bindings/usb/mxs-phy.txt |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 5fe484f..baa27c7 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -1070,7 +1070,7 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->  		break;
+> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> index 5835b27..912d4ad 100644
+> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> @@ -1,7 +1,11 @@
+>  * Freescale MXS USB Phy Device
 >  
->  	case ESDHC_CD_PERMANENT:
-> -		host->mmc->caps = MMC_CAP_NONREMOVABLE;
-> +		host->mmc->caps |= MMC_CAP_NONREMOVABLE;
+>  Required properties:
+> -- compatible: Should be "fsl,imx23-usbphy"
+> +- compatible: there are three compatiable strings to stand for three
 
-I think it will be more logical if you switch the order of this patch
-and the previous one.
+s/compatiable/compatible
+
+> +mxs PHY verions.
+
+s/verions/versions
+
+> +"fsl,imx23-usbphy": for mx23 and mx28
+> +"fsl,imx6q-usbphy": for mx6q and mx6dl
+> +"fsl,imx6sl-usbphy": for mx6sl and later mx6 soc serial
+
+s/serial/series
 
 Shawn
 
->  		break;
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain phy interrupt
 >  
->  	case ESDHC_CD_NONE:
 > -- 
-> 1.7.2.rc3
+> 1.7.1
 > 
 > 
