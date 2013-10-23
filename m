@@ -1,218 +1,51 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 23 Oct 2013 14:43:49 +0200
-Subject: [PATCHv3][ 5/5] ARM: dts: mbimxsd35 Add video and displays support.
-In-Reply-To: <1382532229-32755-1-git-send-email-denis@eukrea.com>
-References: <1382532229-32755-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382532229-32755-5-git-send-email-denis@eukrea.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Wed, 23 Oct 2013 13:46:16 +0100
+Subject: [PATCH] arm: add support for the Cortex-A12 processor
+Message-ID: <1382532376-22758-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Eric B?nard <eric@eukrea.com>
+The A12 behaves as the A7/A15 does with respect to setting the SMP bit, and
+doesn't require TLB ops broadcasting to be explicitly enabled like the A9 does.
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v2->v3:
-- The dts were adapted to the new DT bindings which looks more like the IPUv3
-  ones.
----
- .../imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts  |   61 ++++++++++++++++++++
- .../imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts  |   51 ++++++++++++++++
- .../imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts   |   51 ++++++++++++++++
- 3 files changed, 163 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
+Note that as the ACTLR cannot (usually) be written from non-secure, it is the
+responsibility of the bootloader/firmware to set this bit per core - it is
+done here in Linux as last resort in case of bad firmware.
 
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
-new file mode 100644
-index 0000000..6d186ca
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
-@@ -0,0 +1,61 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+---
+ arch/arm/mm/proc-v7.S |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3a5922d..9745288 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -164,6 +164,7 @@ __v7_cr7mp_setup:
+ 	mov	r10, #(1 << 0)			@ Cache/TLB ops broadcasting
+ 	b	1f
+ __v7_ca7mp_setup:
++__v7_ca12mp_setup:
+ __v7_ca15mp_setup:
+ 	mov	r10, #0
+ 1:
+@@ -440,6 +441,16 @@ __v7_ca7mp_proc_info:
+ 	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
+ 
+ 	/*
++	 * ARM Ltd. Cortex A12 processor.
++	 */
++	.type	__v7_ca12mp_proc_info, #object
++__v7_ca12mp_proc_info:
++	.long	0x410fc0d0
++	.long	0xff0ffff0
++	__v7_proc __v7_ca12mp_setup
++	.size	__v7_ca12mp_proc_info, . - __v7_ca12mp_proc_info
 +
-+#include "imx35-eukrea-mbimxsd35-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD35 with the CMO-QVGA Display";
-+	compatible = "eukrea,mbimxsd35-baseboard-cmo-qvga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+
-+	display at di0 {
-+		regulator-name = "lcd";
-+		interface-pix-fmt = "rgb666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcdc_1>;
-+		model = "CMO-QVGA";
-+		display-timings {
-+			qvga_timings: 320x240 {
-+				clock-frequency = <6500000>;
-+				hactive = <320>;
-+				vactive = <240>;
-+				hback-porch = <68>;
-+				hfront-porch = <20>;
-+				vback-porch = <15>;
-+				vfront-porch = <4>;
-+				hsync-len = <30>;
-+				vsync-len = <3>;
-+			};
-+		};
-+	};
-+
-+	reg_lcd_3v3: lcd-en {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
-+		regulator-name = "lcd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 4 0>;
-+		enable-active-high;
-+	};
-+};
-+
-+&lcdc {
-+	lcd-supply = <&reg_lcd_3v3>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
-new file mode 100644
-index 0000000..ccf5f48
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
-@@ -0,0 +1,51 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include "imx35-eukrea-mbimxsd35-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD35 with the DVI-SVGA Display";
-+	compatible = "eukrea,mbimxsd35-baseboard-dvi-svga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+	display at di0 {
-+		interface-pix-fmt = "rgb666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcdc_1>;
-+		model = "DVI-SVGA";
-+		display-timings {
-+			svga_timings: 800x600 {
-+				clock-frequency = <40000000>;
-+				hactive = <800>;
-+				vactive = <600>;
-+				hback-porch = <75>;
-+				hfront-porch = <75>;
-+				vback-porch = <7>;
-+				vfront-porch = <75>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
-new file mode 100644
-index 0000000..6e31684
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
-@@ -0,0 +1,51 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include "imx35-eukrea-mbimxsd35-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD35 with the DVI-VGA Display";
-+	compatible = "eukrea,mbimxsd35-baseboard-dvi-vga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+	display at di0 {
-+		interface-pix-fmt = "rgb666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcdc_1>;
-+		model = "DVI-VGA";
-+		display-timings {
-+			vga_timings: 640x480 {
-+				clock-frequency = <31250000>;
-+				hactive = <640>;
-+				vactive = <480>;
-+				hback-porch = <100>;
-+				hfront-porch = <100>;
-+				vback-porch = <7>;
-+				vfront-porch = <100>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	status = "okay";
-+};
++	/*
+ 	 * ARM Ltd. Cortex A15 processor.
+ 	 */
+ 	.type	__v7_ca15mp_proc_info, #object
 -- 
 1.7.9.5
