@@ -1,9 +1,9 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 23 Oct 2013 11:16:04 +0200
-Subject: [PATCHv6][ 2/4] ARM: dts: mbimxsd51: Add sound support.
+Date: Wed, 23 Oct 2013 11:16:05 +0200
+Subject: [PATCHv6][ 3/4] ARM: dts: mbimxsd25: Add sound support.
 In-Reply-To: <1382519766-17359-1-git-send-email-denis@eukrea.com>
 References: <1382519766-17359-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382519766-17359-2-git-send-email-denis@eukrea.com>
+Message-ID: <1382519766-17359-3-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,13 +20,13 @@ Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |    9 +++++++++
+ .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |    9 +++++++++
  1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-index 64d8082..7a485a9 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+index be24a85..9d1261d 100644
+--- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
++++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
 @@ -48,6 +48,15 @@
  			linux,default-trigger = "heartbeat";
  		};
@@ -34,11 +34,11 @@ index 64d8082..7a485a9 100644
 +
 +	sound {
 +		compatible = "eukrea,eukrea-tlv320";
-+		model = "imx51-eukrea-tlv320aic23";
-+		ssi-controller = <&ssi2>;
++		model = "imx25-eukrea-tlv320aic23";
++		ssi-controller = <&ssi1>;
 +		fsl,audio-codec = <&tlv320aic23>;
-+		mux-int-port = <2>;
-+		mux-ext-port = <3>;
++		mux-int-port = <1>;
++		mux-ext-port = <5>;
 +	};
  };
  
