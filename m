@@ -1,27 +1,18 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Oct 2013 05:14:51 -0400
-Subject: [PATCH 0/8] ARM: imx: add IMX50 SoC support
-In-Reply-To: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
-References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
-Message-ID: <20131023091451.GD24520@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Oct 2013 11:08:29 +0200
+Subject: [PATCH] pinctrl: at91: correct a few typos
+In-Reply-To: <1381932753-32081-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1381932753-32081-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <CACRpkdY0ZO4APpGM2w0vYi4zsg9nJk8j9bJYBNN=7RDOGKUJsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+On Wed, Oct 16, 2013 at 4:12 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
 
-On Fri, Oct 18, 2013 at 04:04:12PM +1000, gerg at uclinux.org wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
-> 
-> This set of patches is the code and device tree support for the Freescale
-> IMX50 SoC. This part is similar to the IMX53 SoC family, and I have resued
-> as much of its support as possible. These patches are against 3.12-rc5.
-> 
-> With these changes you can load and run on the Freescale IMX50-EVK board.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Thanks for doing this!  I was tinkering with adding this in order to
-bring up a vanilla kernel on the SanDisk Connect Wireless Media Drive.
-I'm at Edinburgh this week, so I won't be able to test until next week.
+Patch applied with Nicolas' ACK.
 
-thx,
-
-Jason.
+Yours,
+Linus Walleij
