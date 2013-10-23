@@ -1,61 +1,248 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 23 Oct 2013 09:25:53 +0200
-Subject: [PATCHv4][ 1/4] Input: tsc2007: Add device tree support.
-In-Reply-To: <20131022223504.GA19819@core.coreip.homeip.net>
-References: <1382363667-10341-1-git-send-email-denis@eukrea.com>
- <20131021155927.GB4255@core.coreip.homeip.net>
- <20131022114947.30dc9c07@ipc1.ka-ro>
- <20131022223504.GA19819@core.coreip.homeip.net>
-Message-ID: <20131023092553.6989a592@ipc1.ka-ro>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 23 Oct 2013 15:27:40 +0800
+Subject: [PATCH 3/4] ARM: dts: i.MX53: dts for Voipac x53-dmm-668 module
+In-Reply-To: <1382461643-16790-4-git-send-email-lisovy@gmail.com>
+References: <1382461643-16790-1-git-send-email-lisovy@gmail.com>
+ <1382461643-16790-4-git-send-email-lisovy@gmail.com>
+Message-ID: <20131023072738.GI2839@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 22, 2013 at 07:07:22PM +0200, Rostislav Lisovy wrote:
+> Enable UART1 and FEC
 
-> On Tue, Oct 22, 2013 at 11:49:47AM +0200, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > > On Mon, Oct 21, 2013 at 03:54:24PM +0200, Denis Carikli wrote:
-> > > >  
-> > > > +	if (ts->of)
-> > > > +		return tsc2007_get_pendown_state_dt(ts);
-> > > > +
-> > > >  	if (!ts->get_pendown_state)
-> > > >  		return true;
-> > > 
-> > > Instead of special casing "if (ts->of)" all over the place why don't you
-> > > set up the device structure as:
-> > > 
-> > > 	if (<configuring_tsc2007_form_dt>)
-> > > 		ts->get_pendown_state = tsc2007_get_pendown_state_dt;
-> > > 
-> > > and be done with it?
-> > >
-> > I also thought about that, but the existing function does not have any
-> > parameters, while the DT version of get_pendown_state() requires to get
-> > the GPIO passed to it somehow.
+You have more than these two enabled.
+
 > 
-> You can always have tsc2007_get_pendown_state_platform() wrapping the
->
-Yes, but how would you pass the GPIO number to the
-get_pendown_state_dt() function? Global variables are just ugly.
+> Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
+> 
+>  create mode 100644 arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi b/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+> new file mode 100644
+> index 0000000..04695c9
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
+> @@ -0,0 +1,195 @@
+> +/*
+> + * Copyright 2013 Rostislav Lisovy <lisovy@gmail.com>, PiKRON s.r.o.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include "imx53.dtsi"
+> +
+> +/ {
+> +	model = "Voipac i.MX53 X53-DMM-668";
+> +	compatible = "vp,imx53-dmm-668", "fsl,imx53";
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x70000000 0x20000000>;
+> +	};
+> +
+> +	memory at 1 {
+> +		device_type = "memory";
+> +		reg = <0xb0000000 0x20000000>;
+> +	};
 
-> call. Or we just go and fix board code.
->
-That's IMO a better option, but not easy to achieve without breaking
-anything. The in-kernel platforms would be easy to fix, but there may be
-external users that still use the old hook, so you can't just remove it
-or change its semantics.
+The 'num' in memory at num should match the first number in 'reg' property,
+so they should looks like:
 
+	memory at 70000000 {
+		device_type = "memory";
+		reg = <0x70000000 0x20000000>;
+	}
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+	memory at b0000000 {
+		device_type = "memory";
+		reg = <0xb0000000 0x20000000>;
+	}
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+> +		reg_3p3v: 3p3v {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +	};
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	hog {
+> +		pinctrl_hog: hoggrp {
+> +			fsl,pins = <
+> +				/* Make DA9053 regulator functional */
+> +				MX53_PAD_GPIO_16__GPIO7_11	0x80000000
+> +
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Drop these blank lines.  We generally only have blank lines between
+nodes.
+
+> +				/* FEC Power enable */
+> +				MX53_PAD_GPIO_11__GPIO4_1	0x80000000
+> +
+> +				/* FEC RST */
+> +				MX53_PAD_GPIO_12__GPIO4_2	0x80000000
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1_2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+
+Please sort these nodes alphabetically in label name, so that new node
+can find they slots easily.
+
+Shawn
+
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c1_2>;
+> +	status = "okay";
+> +
+> +	pmic: dialog at 48 {
+> +		compatible = "dlg,da9053-aa", "dlg,da9052";
+> +		reg = <0x48>;
+> +		interrupt-parent = <&gpio7>;
+> +		interrupts = <11 0x8>; /* low-level active IRQ at GPIO7_11 */
+> +
+> +		regulators {
+> +			buck1_reg: buck1 {
+> +				regulator-name = "BUCKCORE";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <1400000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			buck2_reg: buck2 {
+> +				regulator-name = "BUCKPRO";
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			buck3_reg: buck3 {
+> +				regulator-name = "BUCKMEM";
+> +				regulator-min-microvolt = <1420000>;
+> +				regulator-max-microvolt = <1580000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			buck4_reg: buck4 {
+> +				regulator-name = "BUCKPERI";
+> +				regulator-min-microvolt = <2370000>;
+> +				regulator-max-microvolt = <2630000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo1_reg: ldo1 {
+> +				regulator-name = "ldo1_1v3";
+> +				regulator-min-microvolt = <1250000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo2_reg: ldo2 {
+> +				regulator-name = "ldo2_1v3";
+> +				regulator-min-microvolt = <1250000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo3_reg: ldo3 {
+> +				regulator-name = "ldo3_3v3";
+> +				regulator-min-microvolt = <3250000>;
+> +				regulator-max-microvolt = <3350000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo4_reg: ldo4 {
+> +				regulator-name = "ldo4_2v775";
+> +				regulator-min-microvolt = <2770000>;
+> +				regulator-max-microvolt = <2780000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo5_reg: ldo5 {
+> +				regulator-name = "ldo5_3v3";
+> +				regulator-min-microvolt = <3250000>;
+> +				regulator-max-microvolt = <3350000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo6_reg: ldo6 {
+> +				regulator-name = "ldo6_1v3";
+> +				regulator-min-microvolt = <1250000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo7_reg: ldo7 {
+> +				regulator-name = "ldo7_2v75";
+> +				regulator-min-microvolt = <2700000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo8_reg: ldo8 {
+> +				regulator-name = "ldo8_1v8";
+> +				regulator-min-microvolt = <1750000>;
+> +				regulator-max-microvolt = <1850000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo9_reg: ldo9 {
+> +				regulator-name = "ldo9_1v5";
+> +				regulator-min-microvolt = <1450000>;
+> +				regulator-max-microvolt = <1550000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo10_reg: ldo10 {
+> +				regulator-name = "ldo10_1v3";
+> +				regulator-min-microvolt = <1250000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&ecspi1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> +	fsl,spi-num-chipselects = <4>;
+> +	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>, <&gpio2 16 0>, <&gpio2 17 0>;
+> +	status = "okay";
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_fec_1>;
+> +	phy-mode = "rmii";
+> +	phy-reset-gpios = <&gpio4 2 0>;
+> +	status = "okay";
+> +};
+> -- 
+> 1.7.10.4
+> 
