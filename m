@@ -1,12 +1,14 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 23 Oct 2013 10:29:26 +0200
-Subject: [PATCHv5][ 1/9] of: add vendor prefix for Eukrea Electromatique.
-Message-ID: <1382516974-13371-1-git-send-email-denis@eukrea.com>
+Date: Wed, 23 Oct 2013 10:29:28 +0200
+Subject: [PATCHv5][ 3/9] video: imxfb: Also add pwmr for the device tree.
+In-Reply-To: <1382516974-13371-1-git-send-email-denis@eukrea.com>
+References: <1382516974-13371-1-git-send-email-denis@eukrea.com>
+Message-ID: <1382516974-13371-3-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trivial patch to add Eukr?a Electromatique to the list
-of devicetree vendor prefixes.
+pwmr has to be set to get the imxfb backlight work,
+though pwmr was only configurable trough the platform data.
 
 Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Pawel Moll <pawel.moll@arm.com>
@@ -14,25 +16,45 @@ Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Stephen Warren <swarren@wwwdotorg.org>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Cc: devicetree at vger.kernel.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- 1 file changed, 1 insertion(+)
+ .../devicetree/bindings/video/fsl,imx-fb.txt       |    3 +++
+ drivers/video/imxfb.c                              |    2 ++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 2956800..a0329cf 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -25,6 +25,7 @@ denx	Denx Software Engineering
- emmicro	EM Microelectronic
- epson	Seiko Epson Corp.
- est	ESTeem Wireless Modems
-+eukrea  Eukr?a Electromatique
- fsl	Freescale Semiconductor
- GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+index 46da08d..ac457ae 100644
+--- a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
++++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+@@ -17,6 +17,9 @@ Required nodes:
+ Optional properties:
+ - fsl,dmacr: DMA Control Register value. This is optional. By default, the
+ 	register is not modified as recommended by the datasheet.
++- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
++	optional, but defining it is necessary to get the backlight working. If that
++	property is ommited, the register is zeroed.
+ - fsl,lscr1: LCDC Sharp Configuration Register value.
+ 
+ Example:
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 4bf3837..f09372d 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -833,6 +833,8 @@ static int imxfb_init_fbinfo(struct platform_device *pdev)
+ 
+ 		of_property_read_u32(np, "fsl,dmacr", &fbi->dmacr);
+ 
++		of_property_read_u32(np, "fsl,pwmr", &fbi->pwmr);
++
+ 		/* These two function pointers could be used by some specific
+ 		 * platforms. */
+ 		fbi->lcd_power = NULL;
 -- 
 1.7.9.5
