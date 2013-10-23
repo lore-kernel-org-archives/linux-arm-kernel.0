@@ -1,28 +1,49 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 23 Oct 2013 10:19:06 +0530
-Subject: [PATCH 2/2] cpufreq: arm_big_little: reconfigure switcher
- behavior at run time
-In-Reply-To: <1382500691-634-3-git-send-email-nicolas.pitre@linaro.org>
-References: <1382500691-634-1-git-send-email-nicolas.pitre@linaro.org>
- <1382500691-634-3-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <CAKohpo=-nxsqJuo7RTf8q-P5caTSuNqFWjX6ncf+GmQvL1-Q9g@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 22 Oct 2013 21:51:24 -0700
+Subject: [PATCH 0/4]: ARM: dts: Add Gateworks Ventana Support
+Message-ID: <1382503888-3962-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 October 2013 09:28, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> The b.L switcher can be turned on/off at run time.  It is therefore
-> necessary to change the cpufreq driver behavior accordingly.
->
-> The driver must be unregistered/registered with the cpufreq core
-> to reconfigure freq tables for the virtual or actual CPUs. This is
-> accomplished via the b.L switcher notifier callback.
->
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+The Gateworks Ventana product family consists of several baseboard designs
+based on the Freescale i.MX6 family of processors.
 
-Got really confused on what should I reply with,
-Ack/Tested/Reviewed/Signed-off :)
+Tim Harvey (4):
+  ARM: dts: added several new imx-pinmux groups
+  ARM: dts: add Gateworks Ventana support
+  ARM: dts: disable flexcan by default
+  imx: add PCI fixup for PEX860X on Gateworks board
 
-Because we have worked closely on these patches, maybe
-this suits best :)
+ arch/arm/boot/dts/Makefile            |    9 +
+ arch/arm/boot/dts/imx6dl-gw51xx.dts   |   19 ++
+ arch/arm/boot/dts/imx6dl-gw52xx.dts   |   19 ++
+ arch/arm/boot/dts/imx6dl-gw53xx.dts   |   19 ++
+ arch/arm/boot/dts/imx6dl-gw54xx.dts   |   19 ++
+ arch/arm/boot/dts/imx6q-gw51xx.dts    |   19 ++
+ arch/arm/boot/dts/imx6q-gw52xx.dts    |   23 ++
+ arch/arm/boot/dts/imx6q-gw53xx.dts    |   23 ++
+ arch/arm/boot/dts/imx6q-gw5400-a.dts  |  443 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-gw54xx.dts    |   23 ++
+ arch/arm/boot/dts/imx6qdl-gw51xx.dtsi |  272 ++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi |  373 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi |  429 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi |  457 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi        |   62 +++++
+ arch/arm/mach-imx/mach-imx6q.c        |   33 +++
+ 16 files changed, 2242 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-gw51xx.dts
+ create mode 100644 arch/arm/boot/dts/imx6dl-gw52xx.dts
+ create mode 100644 arch/arm/boot/dts/imx6dl-gw53xx.dts
+ create mode 100644 arch/arm/boot/dts/imx6dl-gw54xx.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-gw51xx.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-gw52xx.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-gw53xx.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-gw5400-a.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-gw54xx.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+-- 
+1.7.9.5
