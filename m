@@ -1,47 +1,39 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 23 Oct 2013 12:54:35 -0600
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131023183041.GH5208@netboy>
-References: <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023180108.GA23728@roeck-us.net>
- <20131023182502.GC32563@obsidianresearch.com>
- <20131023183041.GH5208@netboy>
-Message-ID: <20131023185435.GD32563@obsidianresearch.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 23 Oct 2013 20:56:04 +0200
+Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
+ tree bindings
+In-Reply-To: <1382547916.8522.42.camel@shinybook.infradead.org>
+References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
+ <1382544332.8522.40.camel@shinybook.infradead.org>
+ <20131023165512.GB22394@roeck-us.net>
+ <1382547916.8522.42.camel@shinybook.infradead.org>
+Message-ID: <20131023185603.GB7863@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 08:30:42PM +0200, Richard Cochran wrote:
-> On Wed, Oct 23, 2013 at 12:25:02PM -0600, Jason Gunthorpe wrote:
-
-> > On ARM the package of 'stuff' can very reasonably include dtb. Distro
-> > scripts can package modules+DTB+vmlinuz into something the bootloader
-> > can understand. (The next pain point will be to standardize that)
+On Wed, Oct 23, 2013 at 06:05:16PM +0100, David Woodhouse wrote:
+> On Wed, 2013-10-23 at 09:55 -0700, Guenter Roeck wrote:
 > > 
-> > The DTB doesn't have to be 'outside' the distro/kernel to give users a
-> > seamless upgrade experience.
+> > So to avoid tainting the kernel and clogging the kernel log I'll have
+> > to remove all the "!" from the dt sources, or not use any "!" in the
+> > dt bindings in the first place. Given that, not sure if anyone will
+> > really use this mechanism. And CONFIG_OF_EXPERIMENTAL/CONFIG_UNSTABLE_DT
+> > might have the same ultimate fate as CONFIG_EXPERIMENTAL.
 > 
-> How can a distro possibly provide me a DTB?
-> 
-> They don't know what hardware I am using. Only I know that.
+> It's not as if it's hard for you to patch out the check if you really
+> want to do that. This is about making it clear to people what they
+> should expect if they use staging code/bindings. 
 
-I'm not sure what you are asking? Treat DTBs like kernel drivers. If
-you make hardware and you want distros to run on it, you have to
-provide the DTB for that hardware to mainline+distros.
+I agree. The kernel is open source, so people are free to patch it in
+any way they want. The best we can do is to come up with a good solution
+in an upstream kernel. But there's no way we can control things beyond
+that, and we don't have to.
 
-Remember, there are two ways to view DTB:
-  a) It comes from the firmware and you have to live with whatever
-     crap the firmware does
-  b) It comes from the kernel, must match the kernel, and we don't
-     have to tolerate crap in the DTB.
-
-Both make sense, but, IMHO, minimizing the occurrence of 'a' is a
-good goal...
-
-Jason
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/d46e88e1/attachment.sig>
