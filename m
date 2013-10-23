@@ -1,68 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 23 Oct 2013 10:33:28 +0800
-Subject: [PATCH 1/7] mmc: sdhci: clear auto cmd setting bits for no data
- cmds
-In-Reply-To: <1382365627-26816-2-git-send-email-b29396@freescale.com>
-References: <1382365627-26816-1-git-send-email-b29396@freescale.com>
- <1382365627-26816-2-git-send-email-b29396@freescale.com>
-Message-ID: <20131023023325.GB2839@S2101-09.ap.freescale.net>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Wed, 23 Oct 2013 08:21:23 +0530
+Subject: [PATCH] hwmon: ntc_thermistor: Fix typo (pullup-uV -> pullup-uv)
+In-Reply-To: <1382492690-4056-1-git-send-email-cw00.choi@samsung.com>
+References: <1382492690-4056-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CAHfPSqAEY+e9wF403xrJSR5Y7=PgJ1McnKMxd6HECXFPV7ZoeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 21, 2013 at 10:27:01PM +0800, Dong Aisheng wrote:
-> The auto cmd settings bits should be cleared before sending new commands
-> or we may receive command timeout error for normal commands due to wrongly
-> pre-sent auto cmd.
-> 
-> e.g. we receive CMD13 timeout error due to ACMD23 is wrongly enabled
-> by former data commands.
-> 
-> mmc2: new high speed DDR MMC card at address 0001
-> mmcblk1: mmc2:0001 SEM08G 7.39 GiB
-> mmcblk1boot0: mmc2:0001 SEM08G partition 1 2.00 MiB
-> mmcblk1boot1: mmc2:0001 SEM08G partition 2 2.00 MiB
-> mmcblk1rpmb: mmc2:0001 SEM08G partition 3 128 KiB
->  mmcblk1: p1 p2 p3 p4 < p5 p6 p7 >
-> mmc2: Timeout waiting for hardware interrupt.
->  mmcblk1boot1: unknown partition table
-> mmc2: Timeout waiting for hardware interrupt.
->  mmcblk1boot0: unknown partition table
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+On 23 October 2013 07:14, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> This patch fix typo of property name from 'pullup-uV' to 'pullup-uv'.
+> The ntc_thermistor.c use 'pullup-uv' when parsing dt data.
+>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Thanks for the correction.
+
+Acked-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 > ---
->  drivers/mmc/host/sdhci.c |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index a21a710..f868e9b 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -898,6 +898,11 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
->  	u16 mode;
->  	struct mmc_data *data = cmd->data;
->  
-> +	/* clear Auto CMD settings for no data CMDs */
-> +	mode = sdhci_readw(host, SDHCI_TRANSFER_MODE);
-> +	sdhci_writew(host, mode & ~(SDHCI_TRNS_AUTO_CMD12 |
-> +			SDHCI_TRNS_AUTO_CMD23), SDHCI_TRANSFER_MODE);
-> +
+>  Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> index 47ada1d..5d49f2b 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> @@ -49,7 +49,7 @@ adc at 12D10000 {
+>         /* NTC thermistor is a hwmon device */
+>         ncp15wb473 at 0 {
+>                 compatible = "ntc,ncp15wb473";
+> -               pullup-uV = <1800000>;
+> +               pullup-uv = <1800000>;
+>                 pullup-ohm = <47000>;
+>                 pulldown-ohm = <0>;
+>                 io-channels = <&adc 4>;
+> --
+> 1.8.0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-IMO, it will be more readable if we move the code into the if-clause
-of (data == NULL), something like:
 
-	if (data == NULL) {
-		/* clear Auto CMD settings for no data CMDs */
-		mode = sdhci_readw(host, SDHCI_TRANSFER_MODE);
-		mode &= SDHCI_TRNS_AUTO_CMD12 | SDHCI_TRNS_AUTO_CMD23;
-		sdhci_writew(host, mode, SDHCI_TRANSFER_MODE);
-	}
 
-Shawn
-
->  	if (data == NULL)
->  		return;
->  
-> -- 
-> 1.7.2.rc3
-> 
-> 
+-- 
+Shine bright,
+(: Nav :)
