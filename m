@@ -1,59 +1,193 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Wed, 23 Oct 2013 10:47:50 -0500
-Subject: [Patch v2][ 03/37] drm: Add the lacking DRM_MODE_FLAG_* for
- matching the DISPLAY_FLAGS_*
-In-Reply-To: <1382022155-21954-4-git-send-email-denis@eukrea.com>
-References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
- <1382022155-21954-4-git-send-email-denis@eukrea.com>
-Message-ID: <CAHCPf3sgPMh5omoqafsYfto8roL+d0CQOCqHUmPn6mTAcQJRDQ@mail.gmail.com>
+From: maz@misterjones.org (Marc Zyngier)
+Date: Wed, 23 Oct 2013 17:00:43 +0100
+Subject: [PATCH RESEND v2 7/8] KVM: arm-vgic: Add
+ =?UTF-8?Q?GICD=5FSPENDSGIR=20and=20GICD=5FCPENDSGIR=20handlers?=
+In-Reply-To: <1382432923-61267-8-git-send-email-christoffer.dall@linaro.org>
+References: <1382432923-61267-1-git-send-email-christoffer.dall@linaro.org>
+ <1382432923-61267-8-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <775b0df085e5a39ab9006e20d72f1bb7@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 10:02 AM, Denis Carikli <denis@eukrea.com> wrote:
-> Without that fix, drivers using the drm_display_mode_from_videomode
->   function will not be able to get certain information because
->   some DISPLAY_FLAGS_* have no corresponding DRM_MODE_FLAG_*.
+On 2013-10-22 10:08, Christoffer Dall wrote:
+> Handle MMIO accesses to the two registers which should support both 
+> the
+> case where the VMs want to read/write either of these registers and 
+> the
+> case where user space reads/writes these registers to do save/restore 
+> of
+> the VGIC state.
 >
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: driverdev-devel at linuxdriverproject.org
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Note that the added complexity compared to simple set/clear enable
+> registers stems from the bookkeping of source cpu ids.  It may be
+> possible to change the underlying data structure to simplify the
+> complexity, but since this is not in the critical path, at all, this 
+> is
+> left as an interesting excercise to the reader.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Reviewed-by: Alexander Graf <agraf@suse.de>
+>
 > ---
->  drivers/gpu/drm/drm_modes.c |    9 +++++++++
->  include/uapi/drm/drm_mode.h |    4 ++++
->  2 files changed, 13 insertions(+)
+> Changelog[v2]:
+>  - Use struct kvm_exit_mmio accessors for ->data field.
+> ---
+>  virt/kvm/arm/vgic.c |  114
+> ++++++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 112 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-> index b073315..353aaae 100644
-> --- a/drivers/gpu/drm/drm_modes.c
-> +++ b/drivers/gpu/drm/drm_modes.c
-> @@ -537,6 +537,15 @@ int drm_display_mode_from_videomode(const struct videomode *vm,
->                 dmode->flags |= DRM_MODE_FLAG_DBLSCAN;
->         if (vm->flags & DISPLAY_FLAGS_DOUBLECLK)
->                 dmode->flags |= DRM_MODE_FLAG_DBLCLK;
-> +       if (vm->flags & DISPLAY_FLAGS_DE_LOW)
-> +               dmode->flags |= DRM_MODE_FLAG_NDATEN;
-> +       if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
-> +               dmode->flags |= DRM_MODE_FLAG_PDATEN;
-> +       if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
-> +               dmode->flags |= DRM_MODE_FLAG_PPIXDATEDGE;
-> +       if (vm->flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
-> +               dmode->flags |= DRM_MODE_FLAG_NPIXDATEDGE;
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index f2dc72a..4e8c3ab 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -589,18 +589,128 @@ static bool handle_mmio_sgi_reg(struct 
+> kvm_vcpu *vcpu,
+>  	return false;
+>  }
+>
+> +static void read_sgi_set_clear(struct kvm_vcpu *vcpu,
+> +			       struct kvm_exit_mmio *mmio,
+> +			       phys_addr_t offset)
 
-Is there any reason these aren't named after the original
-DISPLAY_FLAGS? DRM_MODE_FLAG_PIXDATA_POSEDGE is easier to get your
-head around if you know it is mapped from the DISPLAY_FLAGS_ version.
-PDATEN and PPIXDATEDGE don't exactly map to things like EDID field
-names either..
+set_clear is a bit unclear. How about reset?
 
-> +#define DRM_MODE_FLAG_PPIXDATEDGE              (1<<24)
-> +#define DRM_MODE_FLAG_NPIXDATEDGE              (1<<25)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	int i, sgi, cpu;
+> +	int min_sgi = (offset & ~0x3) * 4;
+> +	int max_sgi = min_sgi + 3;
+> +	int vcpu_id = vcpu->vcpu_id;
+> +	u32 lr, reg = 0;
+> +
+> +	/* Copy source SGIs from distributor side */
+> +	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
+> +		int shift = 8 * (sgi - min_sgi);
+> +		reg |= (u32)dist->irq_sgi_sources[vcpu_id][sgi] << shift;
+> +	}
+> +
+> +	/* Copy source SGIs already on LRs */
+> +	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
+> +		lr = vgic_cpu->vgic_lr[i];
+> +		sgi = lr & GICH_LR_VIRTUALID;
+> +		cpu = (lr & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
 
+Please wrap these  lr accesses into separate functions. There is quite 
+a bit of duplication in this patch and I wonder if we could factor 
+things a bit.
+
+At least, please isolate what is emulation related from what is 
+actually what the underlying HW provides. It will help mitigating my 
+headache in the future... ;-)
+
+> +		if (sgi >= min_sgi && sgi <= max_sgi) {
+> +			if (lr & GICH_LR_STATE)
+> +				reg |= (1 << cpu) << (8 * (sgi - min_sgi));
+> +		}
+> +	}
+> +
+> +	mmio_data_write(mmio, ~0, reg);
+> +}
+> +
+>  static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
+>  				  struct kvm_exit_mmio *mmio,
+>  				  phys_addr_t offset)
+>  {
+> -	return false;
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	int i, sgi, cpu;
+> +	int min_sgi = (offset & ~0x3) * 4;
+> +	int max_sgi = min_sgi + 3;
+> +	int vcpu_id = vcpu->vcpu_id;
+> +	u32 *lr, reg;
+> +	bool updated = false;
+> +
+> +	if (!mmio->is_write) {
+> +		read_sgi_set_clear(vcpu, mmio, offset);
+> +		return false;
+> +	}
+> +
+> +	reg = mmio_data_read(mmio, ~0);
+> +
+> +	/* Clear pending SGIs on distributor side */
+> +	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
+> +		u8 mask = reg >> (8 * (sgi - min_sgi));
+> +		if (dist->irq_sgi_sources[vcpu_id][sgi] & mask)
+> +			updated = true;
+> +		dist->irq_sgi_sources[vcpu_id][sgi] &= ~mask;
+> +	}
+> +
+> +	/* Clear SGIs already on LRs */
+> +	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
+> +		lr = &vgic_cpu->vgic_lr[i];
+> +		sgi = *lr & GICH_LR_VIRTUALID;
+> +		cpu = (*lr & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
+> +
+> +		if (sgi >= min_sgi && sgi <= max_sgi) {
+> +			if (reg & ((1 << cpu) << (8 * (sgi - min_sgi)))) {
+> +				if (*lr & GICH_LR_PENDING_BIT)
+> +					updated = true;
+> +				*lr &= GICH_LR_PENDING_BIT;
+> +			}
+> +		}
+> +	}
+> +
+> +	return updated;
+>  }
+>
+>  static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
+>  				struct kvm_exit_mmio *mmio,
+>  				phys_addr_t offset)
+>  {
+> -	return false;
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	int i, sgi, cpu;
+> +	int min_sgi = (offset & ~0x3) * 4;
+> +	int max_sgi = min_sgi + 3;
+> +	int vcpu_id = vcpu->vcpu_id;
+> +	u32 *lr, reg;
+> +	bool updated = false;
+> +
+> +	if (!mmio->is_write) {
+> +		read_sgi_set_clear(vcpu, mmio, offset);
+> +		return false;
+> +	}
+> +
+> +	reg = mmio_data_read(mmio, ~0);
+> +
+> +	/* Set pending SGIs on distributor side */
+> +	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
+> +		u8 mask = reg >> (8 * (sgi - min_sgi));
+> +		if ((dist->irq_sgi_sources[vcpu_id][sgi] & mask) != mask)
+> +			updated = true;
+> +		dist->irq_sgi_sources[vcpu_id][sgi] |= mask;
+> +	}
+> +
+> +	/* Set active SGIs already on LRs to pending and active */
+> +	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
+> +		lr = &vgic_cpu->vgic_lr[i];
+> +		sgi = *lr & GICH_LR_VIRTUALID;
+> +		cpu = (*lr & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
+> +
+> +		if (sgi >= min_sgi && sgi <= max_sgi) {
+> +			if (reg & ((1 << cpu) << (8 * (sgi - min_sgi)))) {
+> +				if (!(*lr & GICH_LR_PENDING_BIT))
+> +					updated = true;
+> +				*lr |= GICH_LR_PENDING_BIT;
+> +			}
+> +		}
+> +	}
+> +
+> +	return updated;
+>  }
+>
+>  /*
+
+Overall, I feel like I've read the same function three times. Hint, 
+hint... ;-)
+
+         M.
 -- 
-Matt Sealey <neko@bakuhatsu.net>
+Who you jivin' with that Cosmik Debris?
