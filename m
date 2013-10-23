@@ -1,58 +1,82 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 23 Oct 2013 10:41:33 +0200
-Subject: [PATCH 1/2] leds: lp55xx: handle enable pin in driver
-In-Reply-To: <20131023081957.GB16686@atomide.com>
-References: <1382446896-28436-1-git-send-email-sre@debian.org>
- <1382446896-28436-2-git-send-email-sre@debian.org>
- <20131022170604.GP15154@atomide.com>
- <CAK5ve-KWdJFuJsvQ+JS2y7bpa9j4hGdU=ceb4nAz8BKQ1M9_XA@mail.gmail.com>
- <20131022173742.GQ15154@atomide.com>
- <CAK5ve-JhehHHAU_2tN-RVb8+u2AbUS_Yx=k+i0Ponnm9Wir+OQ@mail.gmail.com>
- <20131023081957.GB16686@atomide.com>
-Message-ID: <52678BBD.4080505@baylibre.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 23 Oct 2013 16:31:50 +0800
+Subject: [PATCH] spi: spi-imx: only enable the clocks when we start to
+ transfer a message
+Message-ID: <1382517110-29913-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/10/2013 10:19, Tony Lindgren wrote:
-> * Bryan Wu <cooloney@gmail.com> [131022 10:47]:
->> On Tue, Oct 22, 2013 at 10:37 AM, Tony Lindgren <tony@atomide.com> wrote:
->>> * Bryan Wu <cooloney@gmail.com> [131022 10:23]:
->>>> On Tue, Oct 22, 2013 at 10:06 AM, Tony Lindgren <tony@atomide.com> wrote:
->>>>> * Sebastian Reichel <sre@debian.org> [131022 06:02]:
->>>>>> This patch moves the handling of the chip's enable pin from the board
->>>>>> code into the driver. It also updates all board-code files using the
->>>>>> driver to incorporate this change.
->>>>>>
->>>>>> This is needed for device tree support of the enable pin.
->>>>>
->>>>> This seems safe to merge along with the other LED patches, the
->>>>> changes to arch/arm/mach-omap2 should not conflict with anything.
->>>>>
->>>>> So for the arch/arm/mach-omap2 changes:
->>>>>
->>>>> Acked-by: Tony Lindgren <tony@atomide.com>
->>>>
->>>> I'm OK for LED parts, will this patch go through omap tree? If so,
->>>> please add my ack.
->>>>
->>>> Acked-by: Bryan Wu <cooloney@gmail.com>
->>>
->>> It's probably best that you take it via with the LED patches.
->>>
->>
->> OK, I will do it. what about PATCH 2 of this patch set? Will you take
->> care of it?
->
-> Benoit should take that one, otherwise there's a good chance of
-> pointless merge conflicts with the .dts files.
+Current code keeps the clocks enabled all the time, it wastes the power
+when there is no operaiton on the spi controller.
 
-I've just merged it.
+In order to save the power, this patch adds the two hooks:
+   spi_imx_prepare_message: enable the clocks for this message
+   spi_imx_unprepare_message: disable the clocks.
 
-Regards,
-Benoit
+This patch also disables the clocks in the end of the probe.
 
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/spi/spi-imx.c |   33 +++++++++++++++++++++++++++++++++
+ 1 files changed, 33 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index 02d9f46..b80f2f7 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -749,6 +749,35 @@ static void spi_imx_cleanup(struct spi_device *spi)
+ {
+ }
+ 
++static int
++spi_imx_prepare_message(struct spi_master *master, struct spi_message *msg)
++{
++	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
++	int ret;
++
++	ret = clk_enable(spi_imx->clk_per);
++	if (ret)
++		return ret;
++
++	ret = clk_enable(spi_imx->clk_ipg);
++	if (ret) {
++		clk_disable(spi_imx->clk_per);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int
++spi_imx_unprepare_message(struct spi_master *master, struct spi_message *msg)
++{
++	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
++
++	clk_disable(spi_imx->clk_ipg);
++	clk_disable(spi_imx->clk_per);
++	return 0;
++}
++
+ static int spi_imx_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -810,6 +839,8 @@ static int spi_imx_probe(struct platform_device *pdev)
+ 	spi_imx->bitbang.txrx_bufs = spi_imx_transfer;
+ 	spi_imx->bitbang.master->setup = spi_imx_setup;
+ 	spi_imx->bitbang.master->cleanup = spi_imx_cleanup;
++	spi_imx->bitbang.master->prepare_message = spi_imx_prepare_message;
++	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
+ 	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+ 
+ 	init_completion(&spi_imx->xfer_done);
+@@ -872,6 +903,8 @@ static int spi_imx_probe(struct platform_device *pdev)
+ 
+ 	dev_info(&pdev->dev, "probed\n");
+ 
++	clk_disable(spi_imx->clk_ipg);
++	clk_disable(spi_imx->clk_per);
+ 	return ret;
+ 
+ out_clk_put:
 -- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+1.7.2.rc3
