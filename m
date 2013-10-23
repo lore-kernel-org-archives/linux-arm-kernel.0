@@ -1,37 +1,48 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 23 Oct 2013 15:08:48 +0200
-Subject: [PATCH] ARM: nommu: Implement dummy early_paging_init()
-Message-ID: <1382533728-19495-1-git-send-email-treding@nvidia.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 23 Oct 2013 06:11:01 -0700
+Subject: [PATCH] ARM: dts: Add max77686 RTC interrupt to cros5250-common
+Message-ID: <1382533861-12688-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No-MMU configurations currenty fail to build because they are missing
-the early_paging_init() symbol.
+Without the interrupt you'll get problems if you enable
+CONFIG_RTC_DRV_MAX77686.  Setup the interrupt properly in the device
+tree.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/mm/nommu.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/cros5250-common.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 34d4ab2..5c668b7 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -296,6 +296,15 @@ void __init sanity_check_meminfo(void)
- }
- 
- /*
-+ * early_paging_init() recreates boot time page table setup, allowing machines
-+ * to switch over to a high (>4G) address space on LPAE systems
-+ */
-+void __init early_paging_init(const struct machine_desc *mdesc,
-+			      struct proc_info_list *procinfo)
-+{
-+}
+diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+index dc259e8b..9b186ac 100644
+--- a/arch/arm/boot/dts/cros5250-common.dtsi
++++ b/arch/arm/boot/dts/cros5250-common.dtsi
+@@ -27,6 +27,13 @@
+ 		i2c2_bus: i2c2-bus {
+ 			samsung,pin-pud = <0>;
+ 		};
 +
-+/*
-  * paging_init() sets up the page tables, initialises the zone memory
-  * maps, and sets up the zero page, bad page and bad page tables.
-  */
++		max77686_irq: max77686-irq {
++			samsung,pins = "gpx3-2";
++			samsung,pin-function = <0>;
++			samsung,pin-pud = <0>;
++			samsung,pin-drv = <0>;
++		};
+ 	};
+ 
+ 	i2c at 12C60000 {
+@@ -35,6 +42,11 @@
+ 
+ 		max77686 at 09 {
+ 			compatible = "maxim,max77686";
++			interrupt-parent = <&gpx3>;
++			interrupts = <2 0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&max77686_irq>;
++			wakeup-source;
+ 			reg = <0x09>;
+ 
+ 			voltage-regulators {
 -- 
 1.8.4
