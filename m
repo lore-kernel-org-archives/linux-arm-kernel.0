@@ -1,38 +1,69 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 23 Oct 2013 12:48:48 +0100
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131023100456.GE11954@ulmo.nvidia.com>
-References: <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef> <alpine.LFD.2.03.1310221333300.1951@syhkavp.arg>
- <20131022201228.GB8037@mithrandir> <20131022204238.GG29341@beef>
- <20131023100456.GE11954@ulmo.nvidia.com>
-Message-ID: <CAFEAcA9MiK3cnxnrd3bOygXMeEAu9_sO20+CMCsYKNEJEuRxOQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 23 Oct 2013 10:09:39 -0200
+Subject: [PATCH 1/3] usb: ehci: add freescale imx28 special write register
+ method
+In-Reply-To: <1382517309-6730-1-git-send-email-peter.chen@freescale.com>
+References: <1382517309-6730-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <CAOMZO5B6Hq+_p6X-+LMpaax2wT3h+xBiscYXsQ8za+_fzOuP_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 October 2013 11:04, Thierry Reding <thierry.reding@gmail.com> wrote:
-> I think there's some broad agreement about what stable bindings entail.
-> Essentially it means at no point in the future a new kernel is allowed
-> to stop working with an old binding.
+Hi Peter,
+
+On Wed, Oct 23, 2013 at 6:35 AM, Peter Chen <peter.chen@freescale.com> wrote:
+> According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+> register error issue", All USB register write operations must
+> use the ARM SWP instruction. So, we implement a special ehci_write
+> for imx28.
 >
-> It also entails that bindings can change, but only in ways that don't
-> break backwards-compatibility.
+> Discussion for it at below:
+> http://marc.info/?l=linux-usb&m=137996395529294&w=2
+>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/host/ehci.h |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+> index 2d40192..577b75d 100644
+> --- a/drivers/usb/host/ehci.h
+> +++ b/drivers/usb/host/ehci.h
+> @@ -203,6 +203,7 @@ struct ehci_hcd {                   /* one per controller */
+>         unsigned                has_synopsys_hc_bug:1; /* Synopsys HC */
+>         unsigned                frame_index_bug:1; /* MosChip (AKA NetMos) */
+>         unsigned                need_oc_pp_cycle:1; /* MPC834X port power */
+> +       unsigned                imx28_write_fix:1; /* For Freescale i.MX28 */
+>
+>         /* required for usb32 quirk */
+>         #define OHCI_CTRL_HCFS          (3 << 6)
+> @@ -680,6 +681,13 @@ static inline unsigned int ehci_readl(const struct ehci_hcd *ehci,
+>  #endif
+>  }
+>
+> +#ifdef CONFIG_SOC_IMX28
+> +static inline void imx28_ehci_writel(u32 val32, volatile u32 *addr)
+> +{
+> +       __asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
+> +}
+> +#endif
+> +
+>  static inline void ehci_writel(const struct ehci_hcd *ehci,
+>                 const unsigned int val, __u32 __iomem *regs)
+>  {
+> @@ -687,6 +695,11 @@ static inline void ehci_writel(const struct ehci_hcd *ehci,
+>         ehci_big_endian_mmio(ehci) ?
+>                 writel_be(val, regs) :
+>                 writel(val, regs);
+> +#elif defined(CONFIG_SOC_IMX28)
+> +       if (ehci->imx28_write_fix)
+> +               imx28_ehci_writel(val, regs);
+> +       else
+> +               writel(val, regs);
 
-In my opinion it should also mean that all the same functionality
-you got with the old kernel remains enabled. In other words,
-if the old kernel could drive the framebuffer because the framebuffer
-was still handled by platform data, then you can't break this when
-you introduce a new dt binding for the framebuffer; you have to
-cope with "dt blob has no node for this device because it's old".
-"The kernel boots but it doesn't find half the devices" is just as broken
-as "the kernel doesn't boot" if you're an end user trying to use the
-old device tree blob with a new kernel...
+Have you tested this on mx23?
 
-thanks
--- PMM
+What if we have a kernel built for both mx23 and mx28?
+
+Regards,
+
+Fabio Estevam
