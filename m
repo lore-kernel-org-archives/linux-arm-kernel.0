@@ -1,54 +1,218 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed, 23 Oct 2013 22:44:22 +1000
-Subject: [PATCH 2/8] ARM: imx: add clocking support code for the IMX50 SoC
-In-Reply-To: <20131023091941.GE24520@titan.lakedaemon.net>
-References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
- <1382076260-6422-3-git-send-email-gerg@uclinux.org>
- <20131023091941.GE24520@titan.lakedaemon.net>
-Message-ID: <5267C4A6.7020805@uclinux.org>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 23 Oct 2013 14:43:49 +0200
+Subject: [PATCHv3][ 5/5] ARM: dts: mbimxsd35 Add video and displays support.
+In-Reply-To: <1382532229-32755-1-git-send-email-denis@eukrea.com>
+References: <1382532229-32755-1-git-send-email-denis@eukrea.com>
+Message-ID: <1382532229-32755-5-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Eric B?nard <eric@eukrea.com>
 
-On 23/10/13 19:19, Jason Cooper wrote:
-> Greg,
->
-> On Fri, Oct 18, 2013 at 04:04:14PM +1000, gerg at uclinux.org wrote:
->> From: Greg Ungerer <gerg@uclinux.org>
->>
->> Add code to support the specific clock tree of the Freescale IMX50 SoC.
->> It can use much of the common IMX51/IMX53 clocking code.
->>
->> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
->> ---
->>   arch/arm/mach-imx/clk-imx51-imx53.c | 79 +++++++++++++++++++++++++++++++++++++
->>   arch/arm/mach-imx/common.h          |  3 ++
->>   2 files changed, 82 insertions(+)
->>
->> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
->> index 7c0dc45..ea4523a 100644
->> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
->> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
->> @@ -363,6 +363,80 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->>   	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
->>   }
->>
->> +int __init mx50_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->> +			unsigned long rate_ckih1, unsigned long rate_ckih2)
->> +{
->> +	int i;
->> +	unsigned long r;
->> +	struct device_node *np;
->> +
->> +	clk[pll1_sw] = imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
->> +	clk[pll2_sw] = imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
->> +	clk[pll3_sw] = imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
->
-> What about the apll and it's derivatives?
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v2->v3:
+- The dts were adapted to the new DT bindings which looks more like the IPUv3
+  ones.
+---
+ .../imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts  |   61 ++++++++++++++++++++
+ .../imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts  |   51 ++++++++++++++++
+ .../imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts   |   51 ++++++++++++++++
+ 3 files changed, 163 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
+ create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
+ create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
 
-The IMX50RM.pdf seems light on details on the apll. Is it any different
-to the imx51 and imx53 families?
-
-Regards
-Greg
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
+new file mode 100644
+index 0000000..6d186ca
+--- /dev/null
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
+@@ -0,0 +1,61 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include "imx35-eukrea-mbimxsd35-baseboard.dts"
++
++/ {
++	model = "Eukrea MBIMXSD35 with the CMO-QVGA Display";
++	compatible = "eukrea,mbimxsd35-baseboard-cmo-qvga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
++
++	display at di0 {
++		regulator-name = "lcd";
++		interface-pix-fmt = "rgb666";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_lcdc_1>;
++		model = "CMO-QVGA";
++		display-timings {
++			qvga_timings: 320x240 {
++				clock-frequency = <6500000>;
++				hactive = <320>;
++				vactive = <240>;
++				hback-porch = <68>;
++				hfront-porch = <20>;
++				vback-porch = <15>;
++				vfront-porch = <4>;
++				hsync-len = <30>;
++				vsync-len = <3>;
++			};
++		};
++	};
++
++	reg_lcd_3v3: lcd-en {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
++		regulator-name = "lcd";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio1 4 0>;
++		enable-active-high;
++	};
++};
++
++&lcdc {
++	lcd-supply = <&reg_lcd_3v3>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
+new file mode 100644
+index 0000000..ccf5f48
+--- /dev/null
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
+@@ -0,0 +1,51 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include "imx35-eukrea-mbimxsd35-baseboard.dts"
++
++/ {
++	model = "Eukrea MBIMXSD35 with the DVI-SVGA Display";
++	compatible = "eukrea,mbimxsd35-baseboard-dvi-svga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
++	display at di0 {
++		interface-pix-fmt = "rgb666";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_lcdc_1>;
++		model = "DVI-SVGA";
++		display-timings {
++			svga_timings: 800x600 {
++				clock-frequency = <40000000>;
++				hactive = <800>;
++				vactive = <600>;
++				hback-porch = <75>;
++				hfront-porch = <75>;
++				vback-porch = <7>;
++				vfront-porch = <75>;
++				hsync-len = <7>;
++				vsync-len = <7>;
++				hsync-active = <1>;
++				vsync-active = <1>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++		};
++	};
++};
++
++&lcdc {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
+new file mode 100644
+index 0000000..6e31684
+--- /dev/null
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
+@@ -0,0 +1,51 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include "imx35-eukrea-mbimxsd35-baseboard.dts"
++
++/ {
++	model = "Eukrea MBIMXSD35 with the DVI-VGA Display";
++	compatible = "eukrea,mbimxsd35-baseboard-dvi-vga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
++	display at di0 {
++		interface-pix-fmt = "rgb666";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_lcdc_1>;
++		model = "DVI-VGA";
++		display-timings {
++			vga_timings: 640x480 {
++				clock-frequency = <31250000>;
++				hactive = <640>;
++				vactive = <480>;
++				hback-porch = <100>;
++				hfront-porch = <100>;
++				vback-porch = <7>;
++				vfront-porch = <100>;
++				hsync-len = <7>;
++				vsync-len = <7>;
++				hsync-active = <1>;
++				vsync-active = <1>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++		};
++	};
++};
++
++&lcdc {
++	status = "okay";
++};
+-- 
+1.7.9.5
