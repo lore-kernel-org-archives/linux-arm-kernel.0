@@ -1,139 +1,62 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 23 Oct 2013 09:39:59 +0200
-Subject: [PATCH 2/10] drm/i2c: tda998x: fix some small errors
-Message-ID: <20131023093959.17b3ddd0@armhf>
+Date: Wed, 23 Oct 2013 09:40:14 +0200
+Subject: [PATCH 3/10] drm/i2c: tda998x: use HDMI constants
+Message-ID: <20131023094014.7f15d672@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes some small errors:
-- code cleanup
-- use msleep instead of mdelay
-- use mode instead of adjusted_mode
-- force page register initialization
+This patch replaces hard coded values by hdmi constants.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 41 +++++++++++++---------
- 1 file changed, 25 insertions(+), 16 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c  | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 99d483d..a896afa 100644
+index a896afa..0053a34 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -334,7 +334,7 @@ cec_write(struct tda998x_priv *priv, uint16_t addr, uint8_t val)
- 	uint8_t buf[] = {addr, val};
- 	int ret;
+@@ -18,6 +18,7 @@
  
--	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
-+	ret = i2c_master_send(client, buf, sizeof buf);
- 	if (ret < 0)
- 		dev_err(&client->dev, "Error %d writing to cec:0x%x\n", ret, addr);
- }
-@@ -371,7 +371,8 @@ set_page(struct tda998x_priv *priv, uint16_t reg)
- 		};
- 		int ret = i2c_master_send(client, buf, sizeof(buf));
- 		if (ret < 0) {
--			dev_err(&client->dev, "Error %d writing to REG_CURPAGE\n", ret);
-+			dev_err(&client->dev, "setpage %04x err %d\n",
-+					reg, ret);
- 			return ret;
- 		}
  
-@@ -448,7 +449,7 @@ reg_write(struct tda998x_priv *priv, uint16_t reg, uint8_t val)
- 	if (ret < 0)
- 		return;
+ #include <linux/module.h>
++#include <linux/hdmi.h>
  
--	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
-+	ret = i2c_master_send(client, buf, sizeof buf);
- 	if (ret < 0)
- 		dev_err(&client->dev, "Error %d writing to 0x%x\n", ret, reg);
- }
-@@ -464,7 +465,7 @@ reg_write16(struct tda998x_priv *priv, uint16_t reg, uint16_t val)
- 	if (ret < 0)
- 		return;
- 
--	ret = i2c_master_send(client, buf, ARRAY_SIZE(buf));
-+	ret = i2c_master_send(client, buf, sizeof buf);
- 	if (ret < 0)
- 		dev_err(&client->dev, "Error %d writing to 0x%x\n", ret, reg);
- }
-@@ -666,7 +667,7 @@ tda998x_configure_audio(struct tda998x_priv *priv,
- 	reg_write_range(priv, REG_CH_STAT_B(0), buf, 4);
- 
- 	tda998x_audio_mute(priv, true);
--	mdelay(20);
-+	msleep(20);
- 	tda998x_audio_mute(priv, false);
- 
- 	/* Write the audio information packet */
-@@ -937,11 +938,10 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
- 		reg_write(priv, REG_ENC_CNTRL, ENC_CNTRL_CTL_CODE(1));
- 		reg_set(priv, REG_TX33, TX33_HDMI);
- 
--		tda998x_write_avi(priv, adjusted_mode);
-+		tda998x_write_avi(priv, mode);
- 
- 		if (priv->params.audio_cfg)
--			tda998x_configure_audio(priv, adjusted_mode,
--						&priv->params);
-+			tda998x_configure_audio(priv, mode, &priv->params);
- 	}
- }
- 
-@@ -992,7 +992,7 @@ read_edid_block(struct drm_encoder *encoder, uint8_t *buf, int blk)
- 
- 	ret = reg_read_range(priv, REG_EDID_DATA_0, buf, EDID_LENGTH);
- 	if (ret != EDID_LENGTH) {
--		dev_err(encoder->dev->dev, "failed to read edid block %d: %d",
-+		dev_err(encoder->dev->dev, "failed to read edid block %d: %d\n",
- 				blk, ret);
- 		return ret;
- 	}
-@@ -1006,7 +1006,7 @@ static uint8_t *
- do_get_edid(struct drm_encoder *encoder)
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
+@@ -540,12 +541,12 @@ tda998x_write_if(struct tda998x_priv *priv, uint8_t bit, uint16_t addr,
+ static void
+ tda998x_write_aif(struct tda998x_priv *priv, struct tda998x_encoder_params *p)
  {
- 	struct tda998x_priv *priv = to_tda998x_priv(encoder);
--	int j = 0, valid_extensions = 0;
-+	int j, valid_extensions = 0;
- 	uint8_t *block, *new;
- 	bool print_bad_edid = drm_debug & DRM_UT_KMS;
+-	uint8_t buf[PB(5) + 1];
++	u8 buf[PB(HDMI_AUDIO_INFOFRAME_SIZE) + 1];
  
-@@ -1155,7 +1155,7 @@ tda998x_encoder_init(struct i2c_client *client,
- 	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1);
- 	priv->vip_cntrl_2 = VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5);
+-	buf[HB(0)] = 0x84;
++	memset(buf, 0, sizeof buf);
++	buf[HB(0)] = HDMI_INFOFRAME_TYPE_AUDIO;
+ 	buf[HB(1)] = 0x01;
+-	buf[HB(2)] = 10;
+-	buf[PB(0)] = 0;
++	buf[HB(2)] = HDMI_AUDIO_INFOFRAME_SIZE;
+ 	buf[PB(1)] = p->audio_frame[1] & 0x07; /* CC */
+ 	buf[PB(2)] = p->audio_frame[2] & 0x1c; /* SF */
+ 	buf[PB(4)] = p->audio_frame[4];
+@@ -558,12 +559,12 @@ tda998x_write_aif(struct tda998x_priv *priv, struct tda998x_encoder_params *p)
+ static void
+ tda998x_write_avi(struct tda998x_priv *priv, struct drm_display_mode *mode)
+ {
+-	uint8_t buf[PB(13) + 1];
++	u8 buf[PB(HDMI_AVI_INFOFRAME_SIZE) + 1];
  
--	priv->current_page = 0;
-+	priv->current_page = 0xff;
- 	priv->hdmi = client;
- 	priv->cec = i2c_new_dummy(client->adapter, 0x34);
- 	priv->dpms = DRM_MODE_DPMS_OFF;
-@@ -1180,12 +1180,21 @@ tda998x_encoder_init(struct i2c_client *client,
- 	priv->rev &= ~0x30; /* not-hdcp and not-scalar bit */
+ 	memset(buf, 0, sizeof(buf));
+-	buf[HB(0)] = 0x82;
++	buf[HB(0)] = HDMI_INFOFRAME_TYPE_AVI;
+ 	buf[HB(1)] = 0x02;
+-	buf[HB(2)] = 13;
++	buf[HB(2)] = HDMI_AVI_INFOFRAME_SIZE;
+ 	buf[PB(4)] = drm_match_cea_mode(mode);
  
- 	switch (priv->rev) {
--	case TDA9989N2:  dev_info(dev->dev, "found TDA9989 n2");  break;
--	case TDA19989:   dev_info(dev->dev, "found TDA19989");    break;
--	case TDA19989N2: dev_info(dev->dev, "found TDA19989 n2"); break;
--	case TDA19988:   dev_info(dev->dev, "found TDA19988");    break;
-+	case TDA9989N2:
-+		dev_info(&client->dev, "found TDA9989 n2");
-+		break;
-+	case TDA19989:
-+		dev_info(&client->dev, "found TDA19989");
-+		break;
-+	case TDA19989N2:
-+		dev_info(&client->dev, "found TDA19989 n2");
-+		break;
-+	case TDA19988:
-+		dev_info(&client->dev, "found TDA19988");
-+		break;
- 	default:
--		DBG("found unsupported device: %04x", priv->rev);
-+		dev_err(&client->dev, "found unsupported device: %04x\n",
-+			priv->rev);
- 		goto fail;
- 	}
- 
+ 	tda998x_write_if(priv, DIP_IF_FLAGS_IF2, REG_IF2_HB0, buf,
 
 -- 
 Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
