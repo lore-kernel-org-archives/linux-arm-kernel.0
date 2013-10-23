@@ -1,42 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Oct 2013 15:37:22 +0100
-Subject: [PATCH] arm64: allow ioremap_cache() to use existing RAM mappings
-In-Reply-To: <1382535972.1768.68.camel@deneb.redhat.com>
-References: <1382362594-24947-1-git-send-email-msalter@redhat.com>
- <1382519898.10408.1.camel@mbp>
- <1382535972.1768.68.camel@deneb.redhat.com>
-Message-ID: <20131023143717.GA19317@mbp>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Wed, 23 Oct 2013 15:39:09 +0100
+Subject: [PATCH v8 14/19] ASoC: Samsung: Rename dma_ops by samsung_dma_ops
+In-Reply-To: <1382031814-8782-14-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-14-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <5267DF8D.70800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 02:46:12PM +0100, Mark Salter wrote:
-> On Wed, 2013-10-23 at 10:18 +0100, Catalin Marinas wrote:
-> > On Mon, 2013-10-21 at 14:36 +0100, msalter at redhat.com wrote:
-> > > diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-> > > index 1725cd6..fb44b3d 100644
-> > > --- a/arch/arm64/mm/ioremap.c
-> > > +++ b/arch/arm64/mm/ioremap.c
-> > > @@ -79,6 +79,21 @@ void __iounmap(volatile void __iomem *io_addr)
-> > >  {
-> > >  	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
-> > >  
-> > > +	/* Nothing to do for normal memory. See ioremap_cache() */
-> > > +	if (pfn_valid(__virt_to_phys(addr) >> PAGE_SHIFT))
-> > > +		return;
-> > 
-> > addr here can be some I/O address mapped previously, so __virt_to_phys()
-> > is not valid (you don't actually get the pfn by shifting).
-> > 
-> 
-> Yeah, that's ugly. The thought was that only the kernel mapping of RAM
-> would yield a valid address from __virt_to_phys(). Anything else, like
-> a mapping of I/O space would lead to an invalid PFN. There's probably a
-> clearer way of doing that that. Other than that, is the general concept
-> of the patch reasonable?
+(Add samsung sounds maintainers)
 
-I think the concept is fine. You could change the check on
-VMALLOC_START/END or just always create a new mapping as long as it has
-the same caching attributes (PROT_NORMAL).
+On 10/17/2013 06:43 PM, Stefano Stabellini wrote:
+> From: Julien Grall <julien.grall@linaro.org>
+>
+> The commit "arm: introduce a global dma_ops pointer" introduce compilation issue
+> when CONFIG_SND_SOC_SAMSUNG is enabled.
+>
+> sound/soc/samsung/dma.c:345:27: error: conflicting types for 'dma_ops'
+> /local/home/julien/works/arndale/linux/arch/arm/include/asm/dma-mapping.h:16:28:
+> note: previous declaration of 'dma_ops' was here
+>
+> Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>   sound/soc/samsung/dma.c |    4 ++--
+>   1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+> index 21b7926..827c0d8 100644
+> --- a/sound/soc/samsung/dma.c
+> +++ b/sound/soc/samsung/dma.c
+> @@ -341,7 +341,7 @@ static int dma_mmap(struct snd_pcm_substream *substream,
+>   				     runtime->dma_bytes);
+>   }
+>
+> -static struct snd_pcm_ops dma_ops = {
+> +static struct snd_pcm_ops samsung_dma_ops = {
+>   	.open		= dma_open,
+>   	.close		= dma_close,
+>   	.ioctl		= snd_pcm_lib_ioctl,
+> @@ -428,7 +428,7 @@ out:
+>   }
+>
+>   static struct snd_soc_platform_driver samsung_asoc_platform = {
+> -	.ops		= &dma_ops,
+> +	.ops		= &samsung_dma_ops,
+>   	.pcm_new	= dma_new,
+>   	.pcm_free	= dma_free_dma_buffers,
+>   };
+>
 
 -- 
-Catalin
+Julien Grall
