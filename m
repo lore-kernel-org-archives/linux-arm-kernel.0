@@ -1,41 +1,108 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Oct 2013 16:59:15 +0200
-Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <CAKohpomedpd8XBPcdZX2vHy6b5=FMtbSVpNTG-eVLK1YPyPaMA@mail.gmail.com>
-References: <1382533461-31021-1-git-send-email-andrew@lunn.ch>
- <CAKohpombg7mAmgxxvUg8kz1MaFwcycR1eL0UrgELY2WdGfrAag@mail.gmail.com>
- <20131023135116.GC31126@lunn.ch>
- <CAKohpokTgCz0c=PeaJHKiZEiYc0jPVq-vwkhP5pM0hh1-0QnLA@mail.gmail.com>
- <20131023143657.GA31536@lunn.ch>
- <CAKohpomedpd8XBPcdZX2vHy6b5=FMtbSVpNTG-eVLK1YPyPaMA@mail.gmail.com>
-Message-ID: <20131023145915.GA31745@lunn.ch>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 23 Oct 2013 17:06:19 +0200
+Subject: [RFC] of: Allow for experimental device tree bindings
+Message-ID: <1382540779-6334-1-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 08:30:02PM +0530, Viresh Kumar wrote:
-> On 23 October 2013 20:06, Andrew Lunn <andrew@lunn.ch> wrote:
-> >> So, you have actually tested your code without interrupt handler?
-> >
-> > No.
-> 
-> It would be better if you atleast try this and confirm that this dummy
-> handler is required.
-> 
-> >> What exactly happens in that case?
-> >
-> > Take a look at request_threaded_irq(). It contains:
-> >
-> > 1421         if (!handler) {
-> > 1422                 if (!thread_fn)
-> > 1423                         return -EINVAL;
-> >
-> > So devm_request_irq() will fail, and so the probe function will fail.
-> 
-> Obviously I wanted you to remove all irq specific code and hence
-> devm_request_irq() :)
+Past and recent discussions have shown that there's some concensus that
+device tree bindings should be considered an ABI and therefore need to
+remain backwards-compatible once code to implement them is included in
+the final release of a Linux kernel.
 
-So you want to know if WFI exits without an interrupt being delivered?
-The Marvell documentation says the interrupt should be enabled, but we
-can try it with it disabled.
+At the same time there is a desire to keep some manoeuvre while we're
+trying to figure things out. The fact is that many of us lack the
+experience to design good bindings from the start. At the same time
+there is a shortage of people that can review bindings and help design
+better ones.
 
-    Andrew
+Progress and the addition of new features (and restoration of features
+that used to work before the advent of DT for that matter) are blocked
+to a large degree because of that.
+
+This patch attempts to restore some degree of freedom by introducing an
+easy way to mark device tree bindings as experimental as well as a way
+for users to disable the use of experimental bindings if they choose
+functionality at the cost of potential device tree incompatibilities.
+
+Bindings are marked experimental by prefixing the compatible value with
+an exclamation mark (!). In order to make it clear that experimental
+bindings are undesirable in the long run, a warning will be output when
+an experimental binding is encountered.
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/of/Kconfig |  7 +++++++
+ drivers/of/base.c  | 32 +++++++++++++++++++++++++++++++-
+ 2 files changed, 38 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index 78cc760..dc482f8 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -24,6 +24,13 @@ config OF_SELFTEST
+ 
+ 	  If unsure, say N here, but this option is safe to enable.
+ 
++config OF_EXPERIMENTAL
++	bool "Support experimental device tree bindings"
++	help
++	  This option allows experimental device tree bindings to be used.
++	  Note that experimental bindings are subject to change, possibly
++	  requiring the DTB to be updated.
++
+ config OF_FLATTREE
+ 	bool
+ 	select DTC
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index a96f850..b0b8371 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -342,6 +342,36 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
+ }
+ EXPORT_SYMBOL(of_get_cpu_node);
+ 
++static int of_compat_match(const char *device, const char *driver,
++			   const struct device_node *np)
++{
++	const char *dev = device;
++	const char *drv = driver;
++
++	if (device[0] == '!')
++		device++;
++
++	if (driver[0] == '!')
++		driver++;
++
++	if (of_compat_cmp(device, driver, strlen(driver)) != 0)
++		return 0;
++
++	/* check if binding is experimental */
++	if (dev != device || drv != driver) {
++		pr_warn("of: device %s (%s) uses an experimental binding\n",
++			np->name, np->full_name);
++
++		/* don't match if we don't want experimental bindings */
++		if (!IS_ENABLED(CONFIG_OF_EXPERIMENTAL)) {
++			pr_err("of: refusing to use binding \"%s\"\n", device);
++			return 0;
++		}
++	}
++
++	return 1;
++}
++
+ /** Checks if the given "compat" string matches one of the strings in
+  * the device's "compatible" property
+  */
+@@ -355,7 +385,7 @@ static int __of_device_is_compatible(const struct device_node *device,
+ 	if (cp == NULL)
+ 		return 0;
+ 	while (cplen > 0) {
+-		if (of_compat_cmp(cp, compat, strlen(compat)) == 0)
++		if (of_compat_match(cp, compat, device))
+ 			return 1;
+ 		l = strlen(cp) + 1;
+ 		cp += l;
+-- 
+1.8.4
