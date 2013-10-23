@@ -1,48 +1,38 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 23 Oct 2013 14:20:47 -0400
-Subject: [PATCH v2 05/13] uprobes: add arch write opcode hook
-In-Reply-To: <20131019165051.GC7837@redhat.com>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-6-git-send-email-dave.long@linaro.org>
- <20131019165051.GC7837@redhat.com>
-Message-ID: <5268137F.3030809@linaro.org>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 23 Oct 2013 20:23:47 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131023180240.GA32563@obsidianresearch.com>
+References: <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023174736.GD5208@netboy>
+ <20131023180240.GA32563@obsidianresearch.com>
+Message-ID: <20131023182345.GG5208@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/13 12:50, Oleg Nesterov wrote:
-> On 10/15, David Long wrote:
->>
->> Allow arches to write the opcode with a custom function.  ARM needs to
->> customize the swbp instruction depending on the condition code of the
->> instruction it replaces.
->
-> Well, we already have "__weak set_swbp(auprobe, ...)", can't arm use it?
->
-> If not,
->
->> +void __weak arch_uprobe_write_opcode(struct arch_uprobe *auprobe, void *vaddr,
->> +				     uprobe_opcode_t opcode)
->> +{
->> +	memcpy(vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
->> +}
->> ...
->> -	copy_to_page(new_page, vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
->> +	vaddr_new = kmap_atomic(new_page);
->> +	arch_uprobe_write_opcode(auprobe, vaddr_new + (vaddr & ~PAGE_MASK),
->> +				 opcode);
->> +	kunmap_atomic(vaddr_new);
->
-> Again, if you need to add the new __weak helper, I think it should simply
-> do copy_to_page().
->
-> Oleg.
->
+On Wed, Oct 23, 2013 at 12:02:40PM -0600, Jason Gunthorpe wrote:
+> On Wed, Oct 23, 2013 at 07:47:37PM +0200, Richard Cochran wrote:
+> > 
+> > The effort is no more or less than is required of every other kernel
+> > development.
+> 
+> Bollocks. User space API development is the single most difficult
+> thing to do in the kernel. It is much harder than any other change,
+> and stable ABI DT is elevated to *that* level. 
 
-Unfortunately, providing an alternative set_swbp() would mean 
-duplicating a moderate chunk of code from kernel/uprobes.c.  Adding 
-arch_uprobe_write_opcode() feels a little more like the right thing to 
-do to me.  I notice there don't seem to be any alternative set_swbp 
-functions in the (rc6) kernel tree.  I will adjust the 
-arch_uprobe_write_opcode imlementation as suggested.
+Yes, that is the kind of effort needed. It comes with the territory.
+System calls and ioctls are added all the time. Yes, they do require
+some thought and review to get them right.
 
--dl
+Creating new DT bindings also requires effort, but I don't agree with
+the idea of making a mess for the end user just to avoid this effort.
+
+Thanks,
+Richard
