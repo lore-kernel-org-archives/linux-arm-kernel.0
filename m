@@ -1,82 +1,80 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 23 Oct 2013 11:48:55 +0200
-Subject: [GIT PULL] ARM: OMAP: Some more more Device Tree for 3.13
-Message-ID: <52679B87.5020108@baylibre.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 23 Oct 2013 11:49:04 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131023080630.GA14413@netboy>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+Message-ID: <20131023094903.GD11954@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Wed, Oct 23, 2013 at 10:06:31AM +0200, Richard Cochran wrote:
+> On Tue, Oct 22, 2013 at 11:13:46AM -0600, Jason Gunthorpe wrote:
+> > The question I asked last time this came up, which was left unaswered:
+> > 
+> >  Who does this stable DT ABI vision benifit, and how much is that
+> >  benifit worth?
+> 
+> [Sigh]
+> 
+> I already answered this question more than once. I guess it doesn't
+> hurt to answer it again: It helps the users. Please, don't forget
+> about them.
 
-Please pull the branch for even more OMAP Device Tree for v3.13 or later.
+But DT ABI stability doesn't help our users if we can't get them any new
+features because we're afraid of not getting the binding perfect from
+the start.
 
-Thanks,
-Benoit
+Real world example: we currently can't settle on the DT binding for
+display panels, so while our users may not have to worry about having to
+upgrade their DTBs, they can't use their devices because we're too
+afraid of ABI stability to allow us to power up the panel. That's
+ridiculous.
 
+> If I, as an embedded developer, design my board to work with kernel
+> version N and a given DTB, then I can upgrade to any kernel version
+> M (where M > N) using the *same* DTB, and it still works.
 
-The following changes since commit 6a96867844895008558810853c7838af39dd317c:
+I get that. I even agree that a stable DTB is a good thing to strive
+for. But I also thing requiring every DTB to be stable absolutely is an
+unnecessary burden. DT on ARM isn't very mature yet and I think we could
+use some flexibility until we've figured a lot more of it out.
 
-  ARM: dts: AM33xx+: Add i2c aliases (2013-10-22 11:05:42 +0200)
+We could even add infrastructure to give people a choice. If we start
+marking unstable bindings (which arguable would be the majority of the
+bindings for the time being) and output a big warning when a device is
+matched whose driver implements an unstable binding or which refers to
+an unstable binding in the DTB, then it would discourage people from
+relying on it if they don't want to be faced with the hassle of having
+to update the DTB occasionally. But it also gives people the choice to
+consciously ignore the warning if they prefer functionality over ABI
+stability. That's nothing unheard of, we've been doing it for quite some
+time using the staging tree.
 
-are available in the git repository at:
+If a runtime warning isn't good enough, we can easily add a Kconfig
+option too. If people want to test-drive new functionality and accept
+that they might have to update the DTB even on a regular basis, they
+could activate that option and use all supported devices, even those
+with experimental bindings. Such an option could default to n, upon
+which the OF core just wouldn't match anything that carries the
+experimental marker.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git tags/for_3.13_super_late/dts_signed
+Does that sound like a good compromise?
 
-for you to fetch changes up to b306e7b819edd0515e18f5ca7e0d1cb4b0e4e58a:
-
-  ARM: dts: omap5-uevm: Remove pinmux for dmic pins (2013-10-23 11:40:47 +0200)
-
-----------------------------------------------------------------
-Add a lot of N900 nodes
-Add OPP table to OMAP5/DRA7
-Add support for Newflow NanoBone board
-
-----------------------------------------------------------------
-Eric Witcher (1):
-      ARM: dts: omap5-uevm: fix mcspi node pin descriptions
-
-J Keerthy (3):
-      ARM: dts: dra7-evm: add smps123 supply for CPU
-      ARM: dts: OMAP5: Add CPU OPP table
-      ARM: dts: DRA7: Add CPU OPP table
-
-Mark Jackson (1):
-      ARM: dts: Add support for Newflow NanoBone board
-
-Markus Pargmann (1):
-      ARM: dts: am33xx, change usb ctrl module label
-
-Nishanth Menon (1):
-      ARM: dts: omap5-uevm: add smps123 supply for CPU
-
-Peter Ujfalusi (2):
-      ARM: dts: omap5-uevm: Correct twl6040 reset GPIO pinmux
-      ARM: dts: omap5-uevm: Remove pinmux for dmic pins
-
-Sebastian Reichel (14):
-      ARM: dts: omap3-n900: Add pinctrl for i2c devices
-      ARM: dts: omap3-n900: Fix i2c bus speed
-      ARM: dts: omap3-n900: Add UART support
-      ARM: dts: omap3-n900: Add support for SD cards
-      ARM: dts: omap3-n900: GPIO key definitions
-      ARM: dts: omap3-n900: Add vibrator device
-      ARM: dts: omap3-n900: Add LP5523 support
-      ARM: dts: TWL4030: Add missing regulators
-      ARM: dts: omap3-n900: Specify regulator info
-      ARM: dts: omap3-n900: Add NAND support
-      ARM: dts: omap3-n900:: Mux RX51_LCD_RESET_GPIO in DTS
-      ARM: dts: omap3-n900: Add TLV320AIC3X support
-      ARM: dts: omap3-n900: Add LP5523 support
-      ARM: dts: TWL4030: Add power button support
-
- MAINTAINERS                       |   6 +
- arch/arm/boot/dts/Makefile        |   1 +
- arch/arm/boot/dts/am335x-nano.dts | 431 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/am33xx.dtsi     |   6 +-
- arch/arm/boot/dts/dra7-evm.dts    |   4 +
- arch/arm/boot/dts/dra7.dtsi       |   8 +-
- arch/arm/boot/dts/omap3-n900.dts  | 396 +++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/omap5-uevm.dts  |  34 ++-
- arch/arm/boot/dts/omap5.dtsi      |   9 +-
- arch/arm/boot/dts/twl4030.dtsi    |  49 ++++-
- 10 files changed, 912 insertions(+), 32 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-nano.dts
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/81451822/attachment.sig>
