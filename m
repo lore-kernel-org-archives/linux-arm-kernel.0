@@ -1,27 +1,110 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Oct 2013 16:36:57 +0200
-Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <CAKohpokTgCz0c=PeaJHKiZEiYc0jPVq-vwkhP5pM0hh1-0QnLA@mail.gmail.com>
-References: <1382533461-31021-1-git-send-email-andrew@lunn.ch>
- <CAKohpombg7mAmgxxvUg8kz1MaFwcycR1eL0UrgELY2WdGfrAag@mail.gmail.com>
- <20131023135116.GC31126@lunn.ch>
- <CAKohpokTgCz0c=PeaJHKiZEiYc0jPVq-vwkhP5pM0hh1-0QnLA@mail.gmail.com>
-Message-ID: <20131023143657.GA31536@lunn.ch>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Wed, 23 Oct 2013 10:42:42 -0400
+Subject: [RFC] Does PHY UTMI data width belong to DWC2 or PHY binding?
+In-Reply-To: <5266F06C.2080701@gmail.com>
+References: <20131018141221.GH2721@beef> <5264F37E.9060307@ti.com>
+ <20131022104829.GF15425@login.drsnuggles.stderr.nl>
+ <20131022112520.GE29341@beef> <5266F06C.2080701@gmail.com>
+Message-ID: <20131023144242.GI29341@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> So, you have actually tested your code without interrupt handler?
+On Tue, Oct 22, 2013 at 04:38:52PM -0500, Rob Herring wrote:
+> On 10/22/2013 06:25 AM, Matt Porter wrote:
+> > On Tue, Oct 22, 2013 at 12:48:29PM +0200, Matthijs Kooijman wrote:
+> >> Hi Kishon,
+> >>
+> >> On Mon, Oct 21, 2013 at 02:57:26PM +0530, Kishon Vijay Abraham I wrote:
+> >>> I think it makes sense to keep the data width property in the dwc2 node itself.
+> >>> I mean it describes how the dwc2 IP is configured in that particular SoC (given
+> >>> that it can be either <8> or <16>).
+> >> If I'm reading the RT3052 datasheet correctly (GHWCFG4 register), the IP
+> >> can be configured for 8, 16 or 8 _and_ 16. In the latter case, the "8
+> >> and 16 supported" would make sense as a property of dwc2 (though this
+> >> value should be autodetectable through GHWCFG4), while the actual 8 or
+> >> 16 supported by the PHY would make sense as property of a phy.
+> > 
+> > There would be no value in adding a property for an already detectable
+> > value to dwc2's binding. To be honest, it's pretty much useless
+> > information due to the existence of the "8 and 16" option.
+> > 
+> >> Note sure if this is really useful in practice as well, or if just
+> >> setting the actual width to use on dwc2 makes more sense...
+> > 
+> > The GHWCFG4 information itself is not useful in practice, as described
+> > in the original thread: https://lkml.org/lkml/2013/10/10/477
+> > 
+> > It's certainly useful in practice to have this width property in either
+> > the dwc2 or the phy binding. One can make a case for either. As I
+> > mentioned in the original post, if we put it in the phy binding we'll be
+> > updating the generic phy binding. We'll then need an api added into the
+> > generic phy framework to fetch the width of a phy.
+> > 
+> > Both cases are doable and trivial, we just need the canonical decision
+> > from a DT maintainer as to where the property belongs. Given that they
+> > are in ARM ksummit, I'm not expecting to hear anything right this
+> > moment. :)
+> 
+> The host can support both, so it is not a property of the host and is a
+> property of the phy. It is no different than what mode a SPI slave
+> requires or whether an i2c slave supports 8 or 10-bit addressing. Those
+> examples are all 1 to many rather than 1 to 1 where it doesn't really
+> matter, but the same logic applies.
 
-No.
+Makes good sense, thanks.
 
-> What exactly happens in that case?
+In this case, given the PHY ownership of width, we can completely avoid
+any DT properties. The generic phy compliant BCM Kona phy driver can
+report via the generic phy framework that it is 8-bit wide. There's no
+support for this type of thing now but it's pretty trivial to add.
 
-Take a look at request_threaded_irq(). It contains:
+I went ahead and did a quick proof-of-concept that adds a free-form
+phy attributes struct for the generic phy. Given that generic phys can
+be for any transmission technology this could be filled with a jumble
+unrelated and often unpopulated attributes over time. In any case, the
+below patch allows the phy provider to choose to specify utmi_width and
+a controller driver that cares can use phy_get_attrs() to fetch the
+optional phy attributes and use the utmi_width field if applicable.
 
-1421         if (!handler) {
-1422                 if (!thread_fn)
-1423                         return -EINVAL;
+Kishon: I'll start a separate thread to discuss what approach you'd like
+to see in the generic phy framework to manage this.
 
-So devm_request_irq() will fail, and so the probe function will fail.
+-Matt
 
-   Andrew
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index 6d72269..b763d7b 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -38,6 +38,14 @@ struct phy_ops {
+ };
+
+ /**
++ * struct phy_attrs - represents phy attributes
++ * @utmi_width: Data path width implemented by UTMI PHY
++ */
++struct phy_attrs {
++	int			utmi_width;
++};
++
++/**
+  * struct phy - represents the phy device
+  * @dev: phy device
+  * @id: id of the phy device
+@@ -51,6 +59,7 @@ struct phy {
+ 	struct device		dev;
+ 	int			id;
+ 	const struct phy_ops	*ops;
++	struct phy_attrs	*attrs;
+ 	struct phy_init_data	*init_data;
+ 	struct mutex		mutex;
+ 	int			init_count;
+@@ -127,6 +136,9 @@ int phy_init(struct phy *phy);
+ int phy_exit(struct phy *phy);
+ int phy_power_on(struct phy *phy);
+ int phy_power_off(struct phy *phy);
++static inline struct phy_attrs *phy_get_attrs(struct phy *phy) {
++	return phy->attrs;
++};
+ struct phy *phy_get(struct device *dev, const char *string);
+ struct phy *devm_phy_get(struct device *dev, const char *string);
+ void phy_put(struct phy *phy);
