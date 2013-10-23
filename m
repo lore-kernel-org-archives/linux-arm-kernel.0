@@ -1,41 +1,80 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 23 Oct 2013 19:30:33 +0200
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131022092410.GB15640@ulmo.nvidia.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <20131021091555.GB21518@ulmo.nvidia.com>
- <20131021170711.GA5256@netboy>
- <20131022092410.GB15640@ulmo.nvidia.com>
-Message-ID: <20131023173032.GB5208@netboy>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 23 Oct 2013 18:34:13 +0100
+Subject: [PATCH v8 18/19] swiotlb-xen: no need to do execute two
+ bus_to_phys translations in a row
+In-Reply-To: <20131023140150.GB27771@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-18-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20131023140150.GB27771@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1310231833560.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 11:24:11AM +0200, Thierry Reding wrote:
+> On Thu, Oct 17, 2013 at 06:43:33PM +0100, Stefano Stabellini wrote:
+> > xen_unmap_single calls xen_bus_to_phys, then passes dev_addr to
+> > is_xen_swiotlb_buffer that calls xen_bus_to_phys again.
 > 
-> Oh, I've been doing that for quite a while. In fact the patches that
-> gave rise to the current frustration have been in a separate tree in
-> various forms for over a year. But that's not what we want, is it?
+> It does?
+> 
+> I see it call mfn_to_local_pfn which calls pfn_to_mfn and
+> get_phys_to_machine (which I presume is going to be a slow
+> operation on ARM).
 
-I can't see anything wrong with that. Your code is not the first to
-have to wait for a long time before being finally merged. Think of
-alsa, or of the pps stuff, or wakelocks, or preempt_rt, etc, etc.
+Yeah, I am trying to reduce the number of pfn_to_mfn and mfn_to_pfn
+translations.
+That said, this patch is not needed to have a fully functional
+swiotlb-xen on arm and I would OK with postponing it.
 
-As an end user, I don't mind waiting for a feature if that means
-stability and QA. If I get impatient, still I always have the choice
-to take a development version. But I do not want to be forced to take
-unfinished work in a released kernel.
 
-> I
-> used to think that we actively wanted people to contribute code back
-> upstream, so telling everyone to keep code in their own trees isn't
-> helping anyone.
+> > xen_bus_to_phys is potentially a slow operation that might involve
+> > walking a tree.
+> > We can avoid calling xen_bus_to_phys twice by removing the
+> > is_xen_swiotlb_buffer call and doing the check directly in
+> > xen_unmap_single using the physical address.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
+> Have you tested this with a PFN that is in a foreign domain?
 
-Actually, I mean to propose that the ARM/DT people use a single
-marshaling tree, one step away in the process from mainline.
+That would be blkback. I only tested blkback on ARM, I'll test on x86
+too.
 
-Thanks,
-Richard
+
+> I am bit uncomfortable with this - I recall when developing this
+> that I had hit some odd cases of doing DMA of a page to a guest
+> and it not always working. It was the case of not detecting whether
+> the pfn was foreign or not. Sadly I can't recall the details.
+> 
+> I would think that this problem would also be present with ARM?
+> But perhaps all the new changes in the pfn_to_mfn that had lately
+> been done have fixed this?
+
+No, because on ARM the guest is autotranslate so the pfn returned by
+mfn_to_pfn is always "local".
+However thanks to the m2p_override now we should get the "local" pfn
+from mfn_to_pfn on x86 too.
+I'll test this case though.
+
+
+> > ---
+> >  drivers/xen/swiotlb-xen.c |    4 ++--
+> >  1 files changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> > index 4d50058..6d9ca61 100644
+> > --- a/drivers/xen/swiotlb-xen.c
+> > +++ b/drivers/xen/swiotlb-xen.c
+> > @@ -426,8 +426,8 @@ static void xen_unmap_single(struct device *hwdev, dma_addr_t dev_addr,
+> >  
+> >  	xen_dma_unmap_page(hwdev, paddr, size, dir, attrs);
+> >  
+> > -	/* NOTE: We use dev_addr here, not paddr! */
+> > -	if (is_xen_swiotlb_buffer(dev_addr)) {
+> > +	if (paddr >= virt_to_phys(xen_io_tlb_start) &&
+> > +		paddr < virt_to_phys(xen_io_tlb_end)) {
+> >  		swiotlb_tbl_unmap_single(hwdev, paddr, size, dir);
+> >  		return;
+> >  	}
+> > -- 
+> > 1.7.2.5
+> > 
