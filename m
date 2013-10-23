@@ -1,175 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 23 Oct 2013 15:33:59 +0800
-Subject: [PATCH 4/4] ARM: dts: i.MX53: Devicetree for Voipac Baseboard
- using x53-dmm-668 module
-In-Reply-To: <1382461643-16790-5-git-send-email-lisovy@gmail.com>
-References: <1382461643-16790-1-git-send-email-lisovy@gmail.com>
- <1382461643-16790-5-git-send-email-lisovy@gmail.com>
-Message-ID: <20131023073357.GJ2839@S2101-09.ap.freescale.net>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 23 Oct 2013 09:39:28 +0200
+Subject: [PATCH 0/10] drm/i2c: tda998x: add DT support and some extensions
+Message-ID: <20131023093928.5ea73eca@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 07:07:23PM +0200, Rostislav Lisovy wrote:
-> Supported peripherals: Audio -- headphone output, LEDs, Buttons
-> (using keyboard controller), SD-card.
-> 
-> Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
-> 
->  create mode 100644 arch/arm/boot/dts/imx53-voipac-bsb.dts
+This patch set contains various extensions to the tda998x driver.
+While these extensions may not be related, each one is based on the
+previous one.
 
-Add the dtb target into arch/arm/boot/dts/Makefile.
+The patches are:
 
-> 
-> diff --git a/arch/arm/boot/dts/imx53-voipac-bsb.dts b/arch/arm/boot/dts/imx53-voipac-bsb.dts
-> new file mode 100644
-> index 0000000..7b48462
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-voipac-bsb.dts
-> @@ -0,0 +1,135 @@
-> +/*
-> + * Copyright 2013 Rostislav Lisovy <lisovy@gmail.com>, PiKRON s.r.o.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx53-voipac-dmm-668.dtsi"
-> +
-> +/ {
-> +	sound {
-> +		compatible = "fsl,imx53-voipac-sgtl5000",
-> +			     "fsl,imx-audio-sgtl5000";
-> +		model = "imx53-voipac-sgtl5000";
-> +		ssi-controller = <&ssi2>;
-> +		audio-codec = <&sgtl5000>;
-> +		audio-routing =
-> +			"Headphone Jack", "HP_OUT";
-> +		mux-int-port = <2>;
-> +		mux-ext-port = <5>;
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pin_gpio>;
-> +
-> +		led1 {
-> +			label = "led-red";
-> +			gpios = <&gpio3 29 0>;
-> +			default-state = "off";
-> +		};
-> +
-> +		led2 {
-> +			label = "led-orange";
-> +			gpios = <&gpio2 31 0>;
-> +			default-state = "off";
-> +		};
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
-> +
-> +	hog {
-> +		pinctrl_hog: hoggrp {
-> +			fsl,pins = <
-> +				/* SD2_CD */
-> +				MX53_PAD_EIM_D25__GPIO3_25	0x80000000
-> +				/* SD2_WP */
-> +				MX53_PAD_EIM_A19__GPIO2_19 	0x80000000
-> +			>;
-> +		};
-> +
-> +		led_pin_gpio: led_gpio at 0 {
+ 1- simplify the i2c read/write
+ 2- fix some small errors
+ 3- use HDMI constants
+ 4- don't read write-only registers
+ 5- add DT support
+ 6- use irq for connexion status and EDID read
+ 7- get a better status of the connexion
+ 8- use the tda998x video format if cea mode
+ 9- fix some video errors
+10- fix some audio errors
 
-Drop the '@0' from node name, since you do not have a 'reg' property for
-the node at all.
+This patch set does not fix:
 
-> +			fsl,pins = <
-> +				MX53_PAD_EIM_D29__GPIO3_29	0x80000000
-> +				MX53_PAD_EIM_EB3__GPIO2_31	0x80000000
-> +			>;
-> +		};
-> +	};
-> +
-> +	/* Keyboard controller */
-> +	kpp {
-> +		pinctrl_kpp_1: kppgrp-1 {
-> +			fsl,pins = <
-> +				MX53_PAD_GPIO_9__KPP_COL_6	0xe8
-> +				MX53_PAD_GPIO_4__KPP_COL_7	0xe8
-> +				MX53_PAD_KEY_COL2__KPP_COL_2	0xe8
-> +				MX53_PAD_KEY_COL3__KPP_COL_3	0xe8
-> +				MX53_PAD_KEY_COL4__KPP_COL_4	0xe8
-> +
-> +				MX53_PAD_GPIO_2__KPP_ROW_6	0xe0
-> +				MX53_PAD_GPIO_5__KPP_ROW_7	0xe0
-> +				MX53_PAD_KEY_ROW2__KPP_ROW_2	0xe0
-> +				MX53_PAD_KEY_ROW3__KPP_ROW_3	0xe0
-> +				MX53_PAD_KEY_ROW4__KPP_ROW_4	0xe0
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&i2c3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c3_2>;
-> +	status = "okay";
-> +
-> +	sgtl5000: codec at 0a {
-> +		compatible = "fsl,sgtl5000";
-> +		reg = <0x0a>;
-> +		VDDA-supply = <&reg_3p3v>;
-> +		VDDIO-supply = <&reg_3p3v>;
-> +		clocks = <&clks 150>;
-> +	};
-> +};
-> +
-> +&kpp {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_kpp_1>;
-> +	linux,keymap = <
-> +			0x0203003b	/* KEY_F1 */
-> +			0x0603003c	/* KEY_F2 */
-> +			0x0207003d	/* KEY_F3 */
-> +			0x0607003e	/* KEY_F4 */
-> +			>;
-> +	keypad,num-rows = <8>;
-> +	keypad,num-columns = <8>;
-> +	status = "okay";
-> +};
-> +
-> +&ssi2 {
-> +	fsl,mode = "i2s-slave";
-> +	status = "okay";
-> +};
-> +
-> +&audmux {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_audmux_1>; /* SSI1 */
-> +	status = "okay";
-> +};
-> +
-> +&esdhc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_esdhc2_1>;
-> +	cd-gpios = <&gpio3 25 0>;
-> +	wp-gpios = <&gpio2 19 0>;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	status = "okay";
-> +};
+- the random black screen at startup time.
+  This problem seems due to a bad audio input (the image appears after
+  streaming an audio file).
 
-Sort these nodes, please.
+- the need to have the audio input port also declared in the audio
+  subsystem (I use a DTized version of the simple-card).
 
-Shawn
+- how the TDA998x audio registers must be updated when the audio
+  streaming parameters change.
 
-> -- 
-> 1.7.10.4
-> 
+- how the EDID audio capabilities act on the audio subsystem.
+
+The resulting driver has been tested on a SolidRun Cubox with my own
+Dove DRM driver.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
