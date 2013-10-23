@@ -1,47 +1,67 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Wed, 23 Oct 2013 16:12:53 -0400
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131023180507.GE5208@netboy>
-References: <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023094903.GD11954@ulmo.nvidia.com>
- <20131023171620.GA5208@netboy> <20131023172558.GK29341@beef>
- <20131023180507.GE5208@netboy>
-Message-ID: <20131023201253.GQ29341@beef>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 23 Oct 2013 22:20:12 +0200
+Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
+In-Reply-To: <5267FE81.3070201@wwwdotorg.org>
+References: <20131019104555.GI18477@ns203013.ovh.net>
+ <1382346813-8449-1-git-send-email-denis@eukrea.com>
+ <20131022045833.GB17512@ns203013.ovh.net>
+ <20131022072307.GA8681@ulmo.nvidia.com>
+ <20131022153445.GD17512@ns203013.ovh.net>
+ <20131022200141.GA8037@mithrandir> <5267FE81.3070201@wwwdotorg.org>
+Message-ID: <20131023202011.GD8828@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 08:05:08PM +0200, Richard Cochran wrote:
-> On Wed, Oct 23, 2013 at 01:25:58PM -0400, Matt Porter wrote:
+On Wed, Oct 23, 2013 at 05:51:13PM +0100, Stephen Warren wrote:
+> On 10/22/2013 09:01 PM, Thierry Reding wrote:
+> > On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe
+> > PLAGNIOL-VILLARD wrote:
+> ...
+> >> I'm sorry but the blacklight descibe in DT have nothing to do
+> >> with the common pratice that the current driver have today
 > > 
-> > No, please, no!
+> > That's not at all what I said. What I said was that the majority
+> > of backlight drivers currently default to turning the backlight on
+> > when probed. Therefore I think it would be consistent if this
+> > driver did the same.
+> > 
+> > I also said that I don't think it's a very good default, but at the
+> > same time we can't just go and change the default behaviour at will
+> > because people may rely on it.
 > 
-> On the one hand, I agree with you that the arago work is kind of scary
-> to look at, but on the other hand, it is being used in tons of beagle
-> bones and other devices. It is a success, of sorts.
+> It may well be reasonable to change the default behaviour for devices
+> instantiated from DT. If it's not possible to instantiate the device
+> from DT yet, then it's not possible for anyone to be relying on the
+> default behaviour yet, since there is none. So, perhaps the default
+> could be:
 > 
-> I know of commercial products shipping with the arago kernel (not
-> mine, of course). The chip vendors have a legitimate need to offer
-> *something* that boots on their new devices. The BSP development has
-> to be done quickly (and, more importantly, it cannot cost much
-> either).
+> * If device instantiated from a board file, default to on, for
+> backwards-compatibility.
 > 
-> There is really nothing wrong with non-mainline trees. If they serve
-> someone's needs, then they do get used.
+> * If device instantiated from DT, there is no backwards compatibility
+> to be concerned with, since this is a new feature, hence default to
+> off, since we think that's the correct thing to do.
 
-Please don't confuse what is in arago trees (or the beagleboard.org
-trees) and being aligned with what is happening upstream.
+I actually had a patch to do precisely that. However I then realized
+that people have actually been using pwm-backlight in DT for a while
+already and therefore may be relying on that behaviour as well.
 
-You are implying that there is some development happening there that is
-closely tied to submission of candidate patches upstream. Those trees
-have all been dumping grounds for patches that by and large go no where.
+It also isn't really an issue of DT vs. non-DT. The simple fact is that
+besides the backlight driver there's usually no other code that enables
+a backlight on boot. The only way to do so that I know of is using the
+DRM panel patches that I've been working on.
 
-The context of this discussion is upstream process. No where did I
-suggest that they lacked value for production.
+That said, it is true that the number of DT users of the pwm-backlight
+driver is smaller than the number of board file users, and it is much
+more likely that people are still actively using them, so if we can get
+everyone to agree on changing the default behaviour that might still be
+possible.
 
--Matt
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/e82b24c0/attachment-0001.sig>
