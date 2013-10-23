@@ -1,35 +1,28 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 23 Oct 2013 09:59:26 +0530
-Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <20131022155758.GA26694@lunn.ch>
-References: <1382186261-14482-1-git-send-email-andrew@lunn.ch>
- <1382186261-14482-2-git-send-email-andrew@lunn.ch>
- <CAKohpok2scsSU7eFOP5LYmQar8xfOqG4-b3z4sVS6JOgnxVcpw@mail.gmail.com>
- <20131022155758.GA26694@lunn.ch>
-Message-ID: <CAKohpo=7nw4ECXg_5e2wJQ8-+ie4Q0cuC+LpLOAePJ6AmCT2EQ@mail.gmail.com>
+Date: Wed, 23 Oct 2013 10:19:06 +0530
+Subject: [PATCH 2/2] cpufreq: arm_big_little: reconfigure switcher
+ behavior at run time
+In-Reply-To: <1382500691-634-3-git-send-email-nicolas.pitre@linaro.org>
+References: <1382500691-634-1-git-send-email-nicolas.pitre@linaro.org>
+ <1382500691-634-3-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <CAKohpo=-nxsqJuo7RTf8q-P5caTSuNqFWjX6ncf+GmQvL1-Q9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2013 21:27, Andrew Lunn <andrew@lunn.ch> wrote:
-> The hardware raises an interrupt when the change is complete. This
-> interrupt is what brings the CPU out of the WFI. I don't know the
-> interrupt code too well, but i think it is necessary for the driver to
-> acknowledged it. The interrupt core code counts interrupts which
-> nobody acknowledges, and after 1000 are received, it disables the
-> interrupt. That would probably result in the machine locking solid,
-> never coming out of the WFI. So i'm playing it safe and handling the
-> interrupt.
+On 23 October 2013 09:28, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> The b.L switcher can be turned on/off at run time.  It is therefore
+> necessary to change the cpufreq driver behavior accordingly.
+>
+> The driver must be unregistered/registered with the cpufreq core
+> to reconfigure freq tables for the virtual or actual CPUs. This is
+> accomplished via the b.L switcher notifier callback.
+>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Theory looks correct AFAIK.. But it would be better to give it a try
-on real hardware, hopefully you have that :)
+Got really confused on what should I reply with,
+Ack/Tested/Reviewed/Signed-off :)
 
-Also, in case this is required, it would be better to document it a bit
-over the routine..
+Because we have worked closely on these patches, maybe
+this suits best :)
 
-> In theory yes. In practice no. It is a fixed rate clock. prepare and
-> enable are actually NOPs for this type of clock. However the API
-> documentation explicitly states you need to call prepare and enable
-> before you can call clk_get_rate(). But i can add error checking if
-> you want.
-
-Leave it then..
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
