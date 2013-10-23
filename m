@@ -1,51 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 23 Oct 2013 10:58:17 +0800
-Subject: [Patch v2 01/14] usb: doc: phy-mxs: Add more compatible strings
-In-Reply-To: <1382421528-17897-2-git-send-email-peter.chen@freescale.com>
-References: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
- <1382421528-17897-2-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131023025814.GD2839@S2101-09.ap.freescale.net>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Wed, 23 Oct 2013 11:18:40 +0800
+Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
+Message-ID: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 01:58:35PM +0800, Peter Chen wrote:
-> Since there are three mxs PHY versions, using three compatible
-> strings for them.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  Documentation/devicetree/bindings/usb/mxs-phy.txt |    6 +++++-
->  1 files changed, 5 insertions(+), 1 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> index 5835b27..912d4ad 100644
-> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> @@ -1,7 +1,11 @@
->  * Freescale MXS USB Phy Device
->  
->  Required properties:
-> -- compatible: Should be "fsl,imx23-usbphy"
-> +- compatible: there are three compatiable strings to stand for three
+Address of non-module kernel symbol should always be located
+from CONFIG_PAGE_OFFSET on, so only show these legal kernel
+symbols in /proc/kallsyms.
 
-s/compatiable/compatible
+On ARM, some symbols(see below) may drop in relocatable code, so
+perf can't parse kernel symbols any more from /proc/kallsyms, this
+patch fixes the problem.
 
-> +mxs PHY verions.
+	00000000 t __vectors_start
+	00000020 A cpu_v7_suspend_size
+	00001000 t __stubs_start
+	00001004 t vector_rst
+	00001020 t vector_irq
+	000010a0 t vector_dabt
+	00001120 t vector_pabt
+	000011a0 t vector_und
+	00001220 t vector_addrexcptn
+	00001224 t vector_fiq
+	00001224 T vector_fiq_offset
 
-s/verions/versions
+The issue can be fixed in scripts/kallsyms.c too, but looks this
+approach is easier.
 
-> +"fsl,imx23-usbphy": for mx23 and mx28
-> +"fsl,imx6q-usbphy": for mx6q and mx6dl
-> +"fsl,imx6sl-usbphy": for mx6sl and later mx6 soc serial
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Rusty Russell <rusty@rustcorp.com.au>
+Cc: Chen Gang <gang.chen@asianux.com>
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+---
+ kernel/kallsyms.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-s/serial/series
-
-Shawn
-
->  - reg: Should contain registers location and length
->  - interrupts: Should contain phy interrupt
->  
-> -- 
-> 1.7.1
-> 
-> 
+diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
+index 3127ad5..184f271 100644
+--- a/kernel/kallsyms.c
++++ b/kernel/kallsyms.c
+@@ -543,7 +543,7 @@ static int s_show(struct seq_file *m, void *p)
+ 					tolower(iter->type);
+ 		seq_printf(m, "%pK %c %s\t[%s]\n", (void *)iter->value,
+ 			   type, iter->name, iter->module_name);
+-	} else
++	} else if (iter->value >= CONFIG_PAGE_OFFSET)
+ 		seq_printf(m, "%pK %c %s\n", (void *)iter->value,
+ 			   iter->type, iter->name);
+ 	return 0;
+-- 
+1.7.9.5
