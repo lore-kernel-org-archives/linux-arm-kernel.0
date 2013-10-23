@@ -1,75 +1,43 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 24 Oct 2013 00:38:59 +0200
-Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <20131023202011.GD8828@mithrandir>
-References: <20131019104555.GI18477@ns203013.ovh.net>
- <5267FE81.3070201@wwwdotorg.org> <20131023202011.GD8828@mithrandir>
-Message-ID: <2730370.0UKsY9Ox0H@avalon>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 23 Oct 2013 17:54:15 -0500
+Subject: [PATCHv5][ 1/9] of: add vendor prefix for Eukrea Electromatique.
+In-Reply-To: <1382516974-13371-1-git-send-email-denis@eukrea.com>
+References: <1382516974-13371-1-git-send-email-denis@eukrea.com>
+Message-ID: <52685397.90106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-On Wednesday 23 October 2013 22:20:12 Thierry Reding wrote:
-> On Wed, Oct 23, 2013 at 05:51:13PM +0100, Stephen Warren wrote:
-> > On 10/22/2013 09:01 PM, Thierry Reding wrote:
-> > > On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe
-> > 
-> > > PLAGNIOL-VILLARD wrote:
-> > ...
-> > 
-> > >> I'm sorry but the blacklight descibe in DT have nothing to do
-> > >> with the common pratice that the current driver have today
-> > > 
-> > > That's not at all what I said. What I said was that the majority
-> > > of backlight drivers currently default to turning the backlight on
-> > > when probed. Therefore I think it would be consistent if this
-> > > driver did the same.
-> > > 
-> > > I also said that I don't think it's a very good default, but at the
-> > > same time we can't just go and change the default behaviour at will
-> > > because people may rely on it.
-> > 
-> > It may well be reasonable to change the default behaviour for devices
-> > instantiated from DT. If it's not possible to instantiate the device
-> > from DT yet, then it's not possible for anyone to be relying on the
-> > default behaviour yet, since there is none. So, perhaps the default
-> > could be:
-> > 
-> > * If device instantiated from a board file, default to on, for
-> > backwards-compatibility.
-> > 
-> > * If device instantiated from DT, there is no backwards compatibility
-> > to be concerned with, since this is a new feature, hence default to
-> > off, since we think that's the correct thing to do.
+On 10/23/2013 03:29 AM, Denis Carikli wrote:
+> Trivial patch to add Eukr?a Electromatique to the list
+> of devicetree vendor prefixes.
 > 
-> I actually had a patch to do precisely that. However I then realized
-> that people have actually been using pwm-backlight in DT for a while
-> already and therefore may be relying on that behaviour as well.
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+> ---
+>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> It also isn't really an issue of DT vs. non-DT. The simple fact is that
-> besides the backlight driver there's usually no other code that enables
-> a backlight on boot. The only way to do so that I know of is using the
-> DRM panel patches that I've been working on.
-
-I would very much welcome a refactoring of the backlight code that would 
-remove the fbdev dependency and hook backlights to panel drivers. That's 
-something I wanted to work on myself, but that I pushed back after CDF :-)
-
-> That said, it is true that the number of DT users of the pwm-backlight
-> driver is smaller than the number of board file users, and it is much
-> more likely that people are still actively using them, so if we can get
-> everyone to agree on changing the default behaviour that might still be
-> possible.
-
--- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/8e3814bf/attachment.sig>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 2956800..a0329cf 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -25,6 +25,7 @@ denx	Denx Software Engineering
+>  emmicro	EM Microelectronic
+>  epson	Seiko Epson Corp.
+>  est	ESTeem Wireless Modems
+> +eukrea  Eukr?a Electromatique
+>  fsl	Freescale Semiconductor
+>  GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+>  gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+> 
