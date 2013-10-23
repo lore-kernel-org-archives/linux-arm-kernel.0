@@ -1,54 +1,47 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Wed, 23 Oct 2013 11:18:40 +0800
-Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
-Message-ID: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Wed, 23 Oct 2013 13:19:57 +1000
+Subject: [PATCH 2/8] ARM: imx: add clocking support code for the IMX50 SoC
+In-Reply-To: <20131022122708.GA31304@pengutronix.de>
+References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+ <1382076260-6422-3-git-send-email-gerg@uclinux.org>
+ <20131022122708.GA31304@pengutronix.de>
+Message-ID: <5267405D.4010104@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Address of non-module kernel symbol should always be located
-from CONFIG_PAGE_OFFSET on, so only show these legal kernel
-symbols in /proc/kallsyms.
+Hi Sascha,
 
-On ARM, some symbols(see below) may drop in relocatable code, so
-perf can't parse kernel symbols any more from /proc/kallsyms, this
-patch fixes the problem.
+On 22/10/13 22:27, Sascha Hauer wrote:
+> Hi Greg,
+> 
+> On Fri, Oct 18, 2013 at 04:04:14PM +1000, gerg at uclinux.org wrote:
+>> From: Greg Ungerer <gerg@uclinux.org>
+>>
+>> Add code to support the specific clock tree of the Freescale IMX50 SoC.
+>> It can use much of the common IMX51/IMX53 clocking code.
+>>
+>> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+>> ---
+>> +	clk_register_clkdev(clk[i2c3_gate], NULL, "imx21-i2c.2");
+>> +	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
+>> +	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
+>> +	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx50.0");
+>> +	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx50.0");
+>> +	clk_register_clkdev(clk[esdhc1_per_gate], "per", "sdhci-esdhc-imx50.0");
+>> +	clk_register_clkdev(clk[esdhc2_ipg_gate], "ipg", "sdhci-esdhc-imx50.1");
+>> +	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx50.1");
+>> +	clk_register_clkdev(clk[esdhc2_per_gate], "per", "sdhci-esdhc-imx50.1");
+>> +	clk_register_clkdev(clk[esdhc3_ipg_gate], "ipg", "sdhci-esdhc-imx50.2");
+>> +	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx50.2");
+>> +	clk_register_clkdev(clk[esdhc3_per_gate], "per", "sdhci-esdhc-imx50.2");
+>> +	clk_register_clkdev(clk[esdhc4_ipg_gate], "ipg", "sdhci-esdhc-imx50.3");
+>> +	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx50.3");
+>> +	clk_register_clkdev(clk[esdhc4_per_gate], "per", "sdhci-esdhc-imx50.3");
+> 
+> The above shouldn't be needed with dt-only support. On i.MX51/53 these
+> are only needed for platform based support.
 
-	00000000 t __vectors_start
-	00000020 A cpu_v7_suspend_size
-	00001000 t __stubs_start
-	00001004 t vector_rst
-	00001020 t vector_irq
-	000010a0 t vector_dabt
-	00001120 t vector_pabt
-	000011a0 t vector_und
-	00001220 t vector_addrexcptn
-	00001224 t vector_fiq
-	00001224 T vector_fiq_offset
+Ok, thanks. I'll remove them.
 
-The issue can be fixed in scripts/kallsyms.c too, but looks this
-approach is easier.
-
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Chen Gang <gang.chen@asianux.com>
-Signed-off-by: Ming Lei <tom.leiming@gmail.com>
----
- kernel/kallsyms.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
-index 3127ad5..184f271 100644
---- a/kernel/kallsyms.c
-+++ b/kernel/kallsyms.c
-@@ -543,7 +543,7 @@ static int s_show(struct seq_file *m, void *p)
- 					tolower(iter->type);
- 		seq_printf(m, "%pK %c %s\t[%s]\n", (void *)iter->value,
- 			   type, iter->name, iter->module_name);
--	} else
-+	} else if (iter->value >= CONFIG_PAGE_OFFSET)
- 		seq_printf(m, "%pK %c %s\n", (void *)iter->value,
- 			   iter->type, iter->name);
- 	return 0;
--- 
-1.7.9.5
+Regards
+Greg
