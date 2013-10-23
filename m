@@ -1,33 +1,58 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 23 Oct 2013 11:46:31 +0300
-Subject: pull request for Tegra clock rework and Tegra124 clock support
-In-Reply-To: <20131022101904.7554.73999@quantum>
-References: <20131021135638.GA10943@tbergstrom-lnx.Nvidia.com>
- <20131022101904.7554.73999@quantum>
-Message-ID: <20131023084631.GG22111@tbergstrom-lnx.Nvidia.com>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Wed, 23 Oct 2013 10:41:33 +0200
+Subject: [PATCH 1/2] leds: lp55xx: handle enable pin in driver
+In-Reply-To: <20131023081957.GB16686@atomide.com>
+References: <1382446896-28436-1-git-send-email-sre@debian.org>
+ <1382446896-28436-2-git-send-email-sre@debian.org>
+ <20131022170604.GP15154@atomide.com>
+ <CAK5ve-KWdJFuJsvQ+JS2y7bpa9j4hGdU=ceb4nAz8BKQ1M9_XA@mail.gmail.com>
+ <20131022173742.GQ15154@atomide.com>
+ <CAK5ve-JhehHHAU_2tN-RVb8+u2AbUS_Yx=k+i0Ponnm9Wir+OQ@mail.gmail.com>
+ <20131023081957.GB16686@atomide.com>
+Message-ID: <52678BBD.4080505@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 12:19:04PM +0200, Mike Turquette wrote:
-> Quoting Peter De Schrijver (2013-10-21 06:56:38)
-> > Hi Mike,
-> > 
-> > This pull request contains both the tegra clock rework patches
-> > ([PATCH v6 00/15] Introduce common infra for tegra clocks)
-> > and the patches to support Tegra124 ([PATCH v4 0/7] Tegra124 clock support)
-> > 
-> > The following changes since commit d031acfc0b8376209e5b429513766e7028e40e1d:
-> > 
-> >   clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d (2013-10-16 19:49:25 +0300)
-> > 
-> > are available in the git repository at:
-> >   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-tegra124-0
-> 
-> Thanks for the pull request Peter. I've taken into clk-next. Next time
-> can you generate a signed tag? Due to the increased volume of ccf
+On 23/10/2013 10:19, Tony Lindgren wrote:
+> * Bryan Wu <cooloney@gmail.com> [131022 10:47]:
+>> On Tue, Oct 22, 2013 at 10:37 AM, Tony Lindgren <tony@atomide.com> wrote:
+>>> * Bryan Wu <cooloney@gmail.com> [131022 10:23]:
+>>>> On Tue, Oct 22, 2013 at 10:06 AM, Tony Lindgren <tony@atomide.com> wrote:
+>>>>> * Sebastian Reichel <sre@debian.org> [131022 06:02]:
+>>>>>> This patch moves the handling of the chip's enable pin from the board
+>>>>>> code into the driver. It also updates all board-code files using the
+>>>>>> driver to incorporate this change.
+>>>>>>
+>>>>>> This is needed for device tree support of the enable pin.
+>>>>>
+>>>>> This seems safe to merge along with the other LED patches, the
+>>>>> changes to arch/arm/mach-omap2 should not conflict with anything.
+>>>>>
+>>>>> So for the arch/arm/mach-omap2 changes:
+>>>>>
+>>>>> Acked-by: Tony Lindgren <tony@atomide.com>
+>>>>
+>>>> I'm OK for LED parts, will this patch go through omap tree? If so,
+>>>> please add my ack.
+>>>>
+>>>> Acked-by: Bryan Wu <cooloney@gmail.com>
+>>>
+>>> It's probably best that you take it via with the LED patches.
+>>>
+>>
+>> OK, I will do it. what about PATCH 2 of this patch set? Will you take
+>> care of it?
+>
+> Benoit should take that one, otherwise there's a good chance of
+> pointless merge conflicts with the .dts files.
 
-Ok :) let's sign some keys next week then :)
+I've just merged it.
 
-Cheers,
+Regards,
+Benoit
 
-Peter.
+-- 
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
