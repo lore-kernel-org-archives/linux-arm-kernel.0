@@ -1,41 +1,244 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 23 Oct 2013 10:17:29 +0200
-Subject: [PATCHv3][ 2/3] arm/dts: Add support for the cpuimx35 board from
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 23 Oct 2013 10:18:16 +0200
+Subject: [PATCHv4][ 2/3] arm/dts: Add support for the cpuimx35 board from
  Eukrea and its baseboard.
-In-Reply-To: <1382112708-7424-2-git-send-email-denis@eukrea.com>
-References: <1382112708-7424-1-git-send-email-denis@eukrea.com>
- <1382112708-7424-2-git-send-email-denis@eukrea.com>
-Message-ID: <20131023081729.GP30088@pengutronix.de>
+In-Reply-To: <1382516297-12894-1-git-send-email-denis@eukrea.com>
+References: <1382516297-12894-1-git-send-email-denis@eukrea.com>
+Message-ID: <1382516297-12894-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+The following devices/functionalities were added:
+ * Main and secondary UARTs.
+ * i2c and the pcf8563 device.
+ * Ethernet.
+ * NAND.
+ * The BP1 button.
+ * The LED.
+ * Watchdog
+ * SD.
 
-You missed the most important person on Cc: Shawn Guo. He is the one who
-applies patches to i.MX.
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v3->v4:
+- removed display related nodes because their bindings have been
+  reworked.
+---
+ arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi       |   61 ++++++++++
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |  128 ++++++++++++++++++++
+ 2 files changed, 189 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+ create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
 
-On Fri, Oct 18, 2013 at 06:11:47PM +0200, Denis Carikli wrote:
-> +&ipu {
-> +	status = "okay";
-> +};
-> +
-> +&lcdc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_lcdc_1>;
-> +	ipu-disp-format = "rgb666";
-> +};
-
-Please drop the graphics nodes for now until we have the IPU bindings
-sorted out and merged.
-
-Otherwise:
-
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
-
+diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+new file mode 100644
+index 0000000..2c2d4cd
+--- /dev/null
++++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+@@ -0,0 +1,61 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include "imx35.dtsi"
++
++/ {
++	model = "Eukrea CPUIMX35";
++	compatible = "eukrea,cpuimx35", "fsl,imx35";
++
++	memory {
++		reg = <0x80000000 0x8000000>; /* 128M */
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec_1>;
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1_1>;
++	status = "okay";
++	pcf8563 at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
++	};
++};
++
++&iomuxc {
++	tsc2007 {
++		pinctrl_tsc2007_1: tsc2007grp-1 {
++			fsl,pins = <
++				MX35_PAD_ATA_DA2__GPIO3_2 0x80000000
++			>;
++		};
++	};
++};
++
++&nfc {
++	nand-bus-width = <8>;
++	nand-ecc-mode = "hw";
++	nand-on-flash-bbt;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+new file mode 100644
+index 0000000..1b5e4c9
+--- /dev/null
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+@@ -0,0 +1,128 @@
++/*
++ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++/dts-v1/;
++#include "imx35-eukrea-cpuimx35.dtsi"
++
++/ {
++	model = "Eukrea CPUIMX35";
++	compatible = "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpiokeys_1>;
++
++		bp1 {
++			label = "BP1";
++			gpios = <&gpio3 25 1>;
++			linux,code = <256>;
++			gpio-key,wakeup;
++			linux,input-type = <1>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpioled>;
++
++		led1 {
++			label = "led1";
++			gpios = <&gpio3 29 1>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux_1>;
++	status = "okay";
++};
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1_1 &pinctrl_esdhc1_cd>;
++	cd-gpios = <&gpio3 24 0>;
++	status = "okay";
++};
++
++&i2c1 {
++	tlv320aic23: codec at 1a {
++		compatible = "ti,tlv320aic23";
++		reg = <0x1a>;
++	};
++};
++
++&iomuxc {
++	esdhc1 {
++		pinctrl_esdhc1_cd: esdhc1_cd_grp-1 {
++			fsl,pins = <
++				MX35_PAD_LD18__GPIO3_24 0x80000000
++			>;
++		};
++	};
++
++	gpio_keys {
++		pinctrl_gpiokeys_1: gpiokeysgrp-1 {
++			fsl,pins = <
++				MX35_PAD_LD19__GPIO3_25 0x80000000
++			>;
++		};
++	};
++
++	leds {
++		pinctrl_gpioled: gpioledgrp-1 {
++			fsl,pins = <
++				MX35_PAD_LD23__GPIO3_29 0x80000000
++			>;
++		};
++	};
++
++	reg_lcd_3v3 {
++		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
++			fsl,pins = <
++				MX35_PAD_D3_CLS__GPIO1_4 0x80000000
++			>;
++		};
++	};
++};
++
++&ipu {
++	status = "okay";
++};
++
++&ssi1 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2_1>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
