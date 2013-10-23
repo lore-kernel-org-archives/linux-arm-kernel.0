@@ -1,34 +1,52 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Wed, 23 Oct 2013 18:05:16 +0100
-Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
- tree bindings
-In-Reply-To: <20131023165512.GB22394@roeck-us.net>
-References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
- <1382544332.8522.40.camel@shinybook.infradead.org>
- <20131023165512.GB22394@roeck-us.net>
-Message-ID: <1382547916.8522.42.camel@shinybook.infradead.org>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 23 Oct 2013 19:16:21 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131023094903.GD11954@ulmo.nvidia.com>
+References: <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023094903.GD11954@ulmo.nvidia.com>
+Message-ID: <20131023171620.GA5208@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-10-23 at 09:55 -0700, Guenter Roeck wrote:
+On Wed, Oct 23, 2013 at 11:49:04AM +0200, Thierry Reding wrote:
 > 
-> So to avoid tainting the kernel and clogging the kernel log I'll have
-> to remove all the "!" from the dt sources, or not use any "!" in the
-> dt bindings in the first place. Given that, not sure if anyone will
-> really use this mechanism. And CONFIG_OF_EXPERIMENTAL/CONFIG_UNSTABLE_DT
-> might have the same ultimate fate as CONFIG_EXPERIMENTAL.
+> If a runtime warning isn't good enough, we can easily add a Kconfig
+> option too. If people want to test-drive new functionality and accept
+> that they might have to update the DTB even on a regular basis, they
+> could activate that option and use all supported devices, even those
+> with experimental bindings. Such an option could default to n, upon
+> which the OF core just wouldn't match anything that carries the
+> experimental marker.
+> 
+> Does that sound like a good compromise?
 
-It's not as if it's hard for you to patch out the check if you really
-want to do that. This is about making it clear to people what they
-should expect if they use staging code/bindings. 
+I think having a printk warning would be pointless because if the
+majority of ARM bindings are unstable as you say, then the average
+system will emit tons of them, encouraging people to just ignore them.
 
--- 
-dwmw2
+A kconfig option to allow unstable bindings seems okay to me in
+principle, as long as progress toward getting stable bindings
+continues. However, I expect that this option would become a "sticky
+bit" that is just left on forever (remember CONFIG_EXPERIMENTAL?).
+There would be little motivation for developers to ever get bindings
+into the "stable" category.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/68b4ec33/attachment.bin>
+I still don't understand why someone (linario?) can't host an
+arm-dt-devel tree that allows the freedom to change bindings and
+features the best source for supporting the latest ARM SoCs. I don't
+buy the argument that only Linus' tree gets enough testing. If another
+tree really is the best ARM tree, then it will get plenty of attention
+and testing. Other people do this (for example, the TI arago tree),
+apparently with good success.
+
+Thanks,
+Richard
