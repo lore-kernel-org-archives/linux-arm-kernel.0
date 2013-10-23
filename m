@@ -1,41 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 23 Oct 2013 17:51:13 +0100
-Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <20131022200141.GA8037@mithrandir>
-References: <20131019104555.GI18477@ns203013.ovh.net>
- <1382346813-8449-1-git-send-email-denis@eukrea.com>
- <20131022045833.GB17512@ns203013.ovh.net>
- <20131022072307.GA8681@ulmo.nvidia.com>
- <20131022153445.GD17512@ns203013.ovh.net> <20131022200141.GA8037@mithrandir>
-Message-ID: <5267FE81.3070201@wwwdotorg.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 23 Oct 2013 09:55:12 -0700
+Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
+ tree bindings
+In-Reply-To: <1382544332.8522.40.camel@shinybook.infradead.org>
+References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
+ <1382544332.8522.40.camel@shinybook.infradead.org>
+Message-ID: <20131023165512.GB22394@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2013 09:01 PM, Thierry Reding wrote:
-> On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe
-> PLAGNIOL-VILLARD wrote:
-...
->> I'm sorry but the blacklight descibe in DT have nothing to do
->> with the common pratice that the current driver have today
+On Wed, Oct 23, 2013 at 05:05:32PM +0100, David Woodhouse wrote:
+> On Wed, 2013-10-23 at 17:06 +0200, Thierry Reding wrote:
+> > +       /* check if binding is experimental */
+> > +       if (dev != device || drv != driver) {
+> > +               pr_warn("of: device %s (%s) uses an experimental binding\n",
+> > +                       np->name, np->full_name);
+> > +
 > 
-> That's not at all what I said. What I said was that the majority
-> of backlight drivers currently default to turning the backlight on
-> when probed. Therefore I think it would be consistent if this
-> driver did the same.
+> In the discussions earlier I think we decided that this should set a
+> taint flag too. If you've built a kernel with CONFIG_OF_EXPERIMENTAL
+> (which I think we were calling CONFIG_UNSTABLE_DT) then you have no
+> expectation that it will boot tomorrow, although it might work with your
+> DTB today.
 > 
-> I also said that I don't think it's a very good default, but at the
-> same time we can't just go and change the default behaviour at will
-> because people may rely on it.
+So to avoid tainting the kernel and clogging the kernel log I'll have
+to remove all the "!" from the dt sources, or not use any "!" in the
+dt bindings in the first place. Given that, not sure if anyone will
+really use this mechanism. And CONFIG_OF_EXPERIMENTAL/CONFIG_UNSTABLE_DT
+might have the same ultimate fate as CONFIG_EXPERIMENTAL.
 
-It may well be reasonable to change the default behaviour for devices
-instantiated from DT. If it's not possible to instantiate the device
-from DT yet, then it's not possible for anyone to be relying on the
-default behaviour yet, since there is none. So, perhaps the default
-could be:
-
-* If device instantiated from a board file, default to on, for
-backwards-compatibility.
-
-* If device instantiated from DT, there is no backwards compatibility
-to be concerned with, since this is a new feature, hence default to
-off, since we think that's the correct thing to do.
+Guenter
