@@ -1,82 +1,61 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 23 Oct 2013 16:31:50 +0800
-Subject: [PATCH] spi: spi-imx: only enable the clocks when we start to
- transfer a message
-Message-ID: <1382517110-29913-1-git-send-email-b32955@freescale.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 23 Oct 2013 16:35:07 +0800
+Subject: [PATCH 1/3] usb: ehci: add freescale imx28 special write register
+ method
+Message-ID: <1382517309-6730-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current code keeps the clocks enabled all the time, it wastes the power
-when there is no operaiton on the spi controller.
+According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+register error issue", All USB register write operations must
+use the ARM SWP instruction. So, we implement a special ehci_write
+for imx28.
 
-In order to save the power, this patch adds the two hooks:
-   spi_imx_prepare_message: enable the clocks for this message
-   spi_imx_unprepare_message: disable the clocks.
+Discussion for it at below:
+http://marc.info/?l=linux-usb&m=137996395529294&w=2
 
-This patch also disables the clocks in the end of the probe.
-
-Signed-off-by: Huang Shijie <b32955@freescale.com>
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/spi/spi-imx.c |   33 +++++++++++++++++++++++++++++++++
- 1 files changed, 33 insertions(+), 0 deletions(-)
+ drivers/usb/host/ehci.h |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 02d9f46..b80f2f7 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -749,6 +749,35 @@ static void spi_imx_cleanup(struct spi_device *spi)
- {
+diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+index 2d40192..577b75d 100644
+--- a/drivers/usb/host/ehci.h
++++ b/drivers/usb/host/ehci.h
+@@ -203,6 +203,7 @@ struct ehci_hcd {			/* one per controller */
+ 	unsigned		has_synopsys_hc_bug:1; /* Synopsys HC */
+ 	unsigned		frame_index_bug:1; /* MosChip (AKA NetMos) */
+ 	unsigned		need_oc_pp_cycle:1; /* MPC834X port power */
++	unsigned		imx28_write_fix:1; /* For Freescale i.MX28 */
+ 
+ 	/* required for usb32 quirk */
+ 	#define OHCI_CTRL_HCFS          (3 << 6)
+@@ -680,6 +681,13 @@ static inline unsigned int ehci_readl(const struct ehci_hcd *ehci,
+ #endif
  }
  
-+static int
-+spi_imx_prepare_message(struct spi_master *master, struct spi_message *msg)
++#ifdef CONFIG_SOC_IMX28
++static inline void imx28_ehci_writel(u32 val32, volatile u32 *addr)
 +{
-+	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
-+	int ret;
-+
-+	ret = clk_enable(spi_imx->clk_per);
-+	if (ret)
-+		return ret;
-+
-+	ret = clk_enable(spi_imx->clk_ipg);
-+	if (ret) {
-+		clk_disable(spi_imx->clk_per);
-+		return ret;
-+	}
-+
-+	return 0;
++	__asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
 +}
++#endif
 +
-+static int
-+spi_imx_unprepare_message(struct spi_master *master, struct spi_message *msg)
-+{
-+	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
-+
-+	clk_disable(spi_imx->clk_ipg);
-+	clk_disable(spi_imx->clk_per);
-+	return 0;
-+}
-+
- static int spi_imx_probe(struct platform_device *pdev)
+ static inline void ehci_writel(const struct ehci_hcd *ehci,
+ 		const unsigned int val, __u32 __iomem *regs)
  {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -810,6 +839,8 @@ static int spi_imx_probe(struct platform_device *pdev)
- 	spi_imx->bitbang.txrx_bufs = spi_imx_transfer;
- 	spi_imx->bitbang.master->setup = spi_imx_setup;
- 	spi_imx->bitbang.master->cleanup = spi_imx_cleanup;
-+	spi_imx->bitbang.master->prepare_message = spi_imx_prepare_message;
-+	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
- 	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
- 
- 	init_completion(&spi_imx->xfer_done);
-@@ -872,6 +903,8 @@ static int spi_imx_probe(struct platform_device *pdev)
- 
- 	dev_info(&pdev->dev, "probed\n");
- 
-+	clk_disable(spi_imx->clk_ipg);
-+	clk_disable(spi_imx->clk_per);
- 	return ret;
- 
- out_clk_put:
+@@ -687,6 +695,11 @@ static inline void ehci_writel(const struct ehci_hcd *ehci,
+ 	ehci_big_endian_mmio(ehci) ?
+ 		writel_be(val, regs) :
+ 		writel(val, regs);
++#elif defined(CONFIG_SOC_IMX28)
++	if (ehci->imx28_write_fix)
++		imx28_ehci_writel(val, regs);
++	else
++		writel(val, regs);
+ #else
+ 	writel(val, regs);
+ #endif
 -- 
-1.7.2.rc3
+1.7.1
