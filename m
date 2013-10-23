@@ -1,105 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 23 Oct 2013 13:11:15 -0500
-Subject: [RFC] Does PHY UTMI data width belong to DWC2 or PHY binding?
-In-Reply-To: <20131023144242.GI29341@beef>
-References: <20131018141221.GH2721@beef> <5264F37E.9060307@ti.com>
- <20131022104829.GF15425@login.drsnuggles.stderr.nl>
- <20131022112520.GE29341@beef> <5266F06C.2080701@gmail.com>
- <20131023144242.GI29341@beef>
-Message-ID: <20131023181115.GJ25954@gimli>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 23 Oct 2013 20:13:55 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <alpine.LFD.2.03.1310231355160.1951@syhkavp.arg>
+References: <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023094903.GD11954@ulmo.nvidia.com>
+ <20131023171620.GA5208@netboy>
+ <alpine.LFD.2.03.1310231355160.1951@syhkavp.arg>
+Message-ID: <20131023181328.GF5208@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Oct 23, 2013 at 01:55:24PM -0400, Nicolas Pitre wrote:
+> On Wed, 23 Oct 2013, Richard Cochran wrote:
+> > I still don't understand why someone (linario?) can't host an
+> > arm-dt-devel tree that allows the freedom to change bindings and
+> > features the best source for supporting the latest ARM SoCs. I don't
+> > buy the argument that only Linus' tree gets enough testing. If another
+> > tree really is the best ARM tree, then it will get plenty of attention
+> > and testing.
+> 
+> So you're basically saying that we should split the development effort 
+> across multiple trees instead of encouraging people to converge on the 
+> same tree?  This is completely contrary to all the efforts we've been 
+> deploying to encourage people to submit their code upstream.
 
-On Wed, Oct 23, 2013 at 10:42:42AM -0400, Matt Porter wrote:
-> On Tue, Oct 22, 2013 at 04:38:52PM -0500, Rob Herring wrote:
-> > On 10/22/2013 06:25 AM, Matt Porter wrote:
-> > > On Tue, Oct 22, 2013 at 12:48:29PM +0200, Matthijs Kooijman wrote:
-> > >> Hi Kishon,
-> > >>
-> > >> On Mon, Oct 21, 2013 at 02:57:26PM +0530, Kishon Vijay Abraham I wrote:
-> > >>> I think it makes sense to keep the data width property in the dwc2 node itself.
-> > >>> I mean it describes how the dwc2 IP is configured in that particular SoC (given
-> > >>> that it can be either <8> or <16>).
-> > >> If I'm reading the RT3052 datasheet correctly (GHWCFG4 register), the IP
-> > >> can be configured for 8, 16 or 8 _and_ 16. In the latter case, the "8
-> > >> and 16 supported" would make sense as a property of dwc2 (though this
-> > >> value should be autodetectable through GHWCFG4), while the actual 8 or
-> > >> 16 supported by the PHY would make sense as property of a phy.
-> > > 
-> > > There would be no value in adding a property for an already detectable
-> > > value to dwc2's binding. To be honest, it's pretty much useless
-> > > information due to the existence of the "8 and 16" option.
-> > > 
-> > >> Note sure if this is really useful in practice as well, or if just
-> > >> setting the actual width to use on dwc2 makes more sense...
-> > > 
-> > > The GHWCFG4 information itself is not useful in practice, as described
-> > > in the original thread: https://lkml.org/lkml/2013/10/10/477
-> > > 
-> > > It's certainly useful in practice to have this width property in either
-> > > the dwc2 or the phy binding. One can make a case for either. As I
-> > > mentioned in the original post, if we put it in the phy binding we'll be
-> > > updating the generic phy binding. We'll then need an api added into the
-> > > generic phy framework to fetch the width of a phy.
-> > > 
-> > > Both cases are doable and trivial, we just need the canonical decision
-> > > from a DT maintainer as to where the property belongs. Given that they
-> > > are in ARM ksummit, I'm not expecting to hear anything right this
-> > > moment. :)
-> > 
-> > The host can support both, so it is not a property of the host and is a
-> > property of the phy. It is no different than what mode a SPI slave
-> > requires or whether an i2c slave supports 8 or 10-bit addressing. Those
-> > examples are all 1 to many rather than 1 to 1 where it doesn't really
-> > matter, but the same logic applies.
+No, just a single tree, please.
+ 
+> ii> As an end user, I don't mind waiting for a feature if that means
+> > stability and QA. If I get impatient, still I always have the choice
+> > to take a development version. But I do not want to be forced to take
+> > unfinished work in a released kernel.
 > 
-> Makes good sense, thanks.
-> 
-> In this case, given the PHY ownership of width, we can completely avoid
-> any DT properties. The generic phy compliant BCM Kona phy driver can
-> report via the generic phy framework that it is 8-bit wide. There's no
-> support for this type of thing now but it's pretty trivial to add.
-> 
-> I went ahead and did a quick proof-of-concept that adds a free-form
-> phy attributes struct for the generic phy. Given that generic phys can
-> be for any transmission technology this could be filled with a jumble
-> unrelated and often unpopulated attributes over time. In any case, the
-> below patch allows the phy provider to choose to specify utmi_width and
-> a controller driver that cares can use phy_get_attrs() to fetch the
-> optional phy attributes and use the utmi_width field if applicable.
-> 
-> Kishon: I'll start a separate thread to discuss what approach you'd like
-> to see in the generic phy framework to manage this.
-> 
-> -Matt
-> 
-> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> index 6d72269..b763d7b 100644
-> --- a/include/linux/phy/phy.h
-> +++ b/include/linux/phy/phy.h
-> @@ -38,6 +38,14 @@ struct phy_ops {
->  };
-> 
->  /**
-> + * struct phy_attrs - represents phy attributes
-> + * @utmi_width: Data path width implemented by UTMI PHY
-> + */
-> +struct phy_attrs {
-> +	int			utmi_width;
+> If as an end user you want full QA, you should go with a distro kernel.
 
-this is supposed to be a generic PHY layer and as such, it shouldn't
-know about USB details such as the UTMI bus. How about calling bus_width
-just to make it more generic ? Then it would work for UTMI, PIPE3, ULPI,
-SLPI (did that even fly ?) or any other PHY <-> link interconnect.
+No, no, NO! I won't ship a distro kernel because they screw things
+up (at least, in my experience). I will ship a 3.x.y stable kernel,
+though.
+ 
+> We're talking about the upstream kernel here, and given the current 
+> development and release rate we hardly can guarantee you that it'll be 
+> free of unfinished work (as long as it doesn't regress existing 
+> features).
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/8c1d37ed/attachment.sig>
+I read a quote from a Big Cheese saying how the Linux kernel is a
+stable release cycle. There are bugs, to be sure, but, in my
+experience, each release is pretty stable on x86 (but not on arm).
+
+Thanks,
+Richard
