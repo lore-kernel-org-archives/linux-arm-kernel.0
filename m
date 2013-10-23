@@ -1,99 +1,76 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 23 Oct 2013 15:42:36 +0200
-Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <20131022200141.GA8037@mithrandir>
-References: <20131019104555.GI18477@ns203013.ovh.net>
- <1382346813-8449-1-git-send-email-denis@eukrea.com>
- <20131022045833.GB17512@ns203013.ovh.net>
- <20131022072307.GA8681@ulmo.nvidia.com>
- <20131022153445.GD17512@ns203013.ovh.net>
- <20131022200141.GA8037@mithrandir>
-Message-ID: <20131023134236.GE17512@ns203013.ovh.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Oct 2013 09:42:31 -0400
+Subject: [PATCH 2/8] ARM: imx: add clocking support code for the IMX50 SoC
+In-Reply-To: <5267C4A6.7020805@uclinux.org>
+References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+ <1382076260-6422-3-git-send-email-gerg@uclinux.org>
+ <20131023091941.GE24520@titan.lakedaemon.net>
+ <5267C4A6.7020805@uclinux.org>
+Message-ID: <20131023134231.GJ24520@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:01 Tue 22 Oct     , Thierry Reding wrote:
-> On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 09:23 Tue 22 Oct     , Thierry Reding wrote:
-> > > On Tue, Oct 22, 2013 at 06:58:33AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > On 11:13 Mon 21 Oct     , Denis Carikli wrote:
-> > > > > Cc: Richard Purdie <rpurdie@rpsys.net>
-> > > > > Cc: Jingoo Han <jg1.han@samsung.com>
-> > > > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > > > Cc: Pawel Moll <pawel.moll@arm.com>
-> > > > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > > > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > > > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > > > > Cc: devicetree at vger.kernel.org
-> > > > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > > > Cc: linux-arm-kernel at lists.infradead.org
-> > > > > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > > > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> > > > > Cc: Eric B?nard <eric@eukrea.com>
-> > > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > > > > ---
-> > > > > ChangeLog v3->v4:
-> > > > > - The default-brightness property is now optional, it defaults to 1 if not set.
-> > > > by default we set OFF not ON
-> > > > 
-> > > > do not actiate driver or properti by default you can not known to consequence
-> > > > on the hw
-> > > 
-> > > Turning on a backlight by default is what pretty much every backlight
-> > > driver does. I personally think that's the wrong default, I even tried
-> > > to get some discussion started recently about how we could change this.
-> > > However, given that this has been the case for possibly as long as the
-> > > subsystem has existed, suddenly changing it might cause quite a few of
-> > > our users to boot the new kernel and not see their display come up. As
-> > > with any other ABI, this isn't something we can just change without a
-> > > very good migration path.
-> > 
-> > I'm sorry but the blacklight descibe in DT have nothing to do with the common
-> > pratice that the current driver have today
+On Wed, Oct 23, 2013 at 10:44:22PM +1000, Greg Ungerer wrote:
+> Hi Jason,
 > 
-> That's not at all what I said. What I said was that the majority of
-> backlight drivers currently default to turning the backlight on when
-> probed. Therefore I think it would be consistent if this driver did the
-> same.
-
-This is a matter of C code not DT
+> On 23/10/13 19:19, Jason Cooper wrote:
+> >Greg,
+> >
+> >On Fri, Oct 18, 2013 at 04:04:14PM +1000, gerg at uclinux.org wrote:
+> >>From: Greg Ungerer <gerg@uclinux.org>
+> >>
+> >>Add code to support the specific clock tree of the Freescale IMX50 SoC.
+> >>It can use much of the common IMX51/IMX53 clocking code.
+> >>
+> >>Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> >>---
+> >>  arch/arm/mach-imx/clk-imx51-imx53.c | 79 +++++++++++++++++++++++++++++++++++++
+> >>  arch/arm/mach-imx/common.h          |  3 ++
+> >>  2 files changed, 82 insertions(+)
+> >>
+> >>diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> >>index 7c0dc45..ea4523a 100644
+> >>--- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> >>+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> >>@@ -363,6 +363,80 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+> >>  	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
+> >>  }
+> >>
+> >>+int __init mx50_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+> >>+			unsigned long rate_ckih1, unsigned long rate_ckih2)
+> >>+{
+> >>+	int i;
+> >>+	unsigned long r;
+> >>+	struct device_node *np;
+> >>+
+> >>+	clk[pll1_sw] = imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
+> >>+	clk[pll2_sw] = imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
+> >>+	clk[pll3_sw] = imx_clk_pllv2("pll3_sw", "osc", MX53_DPLL3_BASE);
+> >
+> >What about the apll and it's derivatives?
 > 
-> I also said that I don't think it's a very good default, but at the same
-> time we can't just go and change the default behaviour at will because
-> people may rely on it.
+> The IMX50RM.pdf seems light on details on the apll. Is it any different
+> to the imx51 and imx53 families?
 
-so handle it in C not in DT
+yes, see 5.3.1.4:
 
-For me the only value a default-brightness would be with a pwn or a ragned
-value but not on 0-1 for on vs off
-> 
-> > put on by default if wrong specially without the property define. Even put it
-> > on by default it wrong as the bootloader may have set it already for splash
-> > screen and to avoid glitch the drivers need to detect this.
-> 
-> I agree that would be preferable, but I don't know of any way to detect
-> what value the bootloader set a GPIO to. The GPIO API requires that you
-> call gpio_direction_output(), and that requires a value parameter which
-> will be used as the output level of the GPIO.
+"""
+There is a fixed 480 MHz PLL that feeds eight independent Phase
+Fractional Dividers (PFDs). The PFDs allow multiple fractional clocks to
+be generated from one PLL without the trouble of relocking the PLL each
+time.
+"""
 
-For me gpio_get_value can return the value of a an output gpio but this need
-to be checked with LinusW
-> 
-> > For me this should not even be a property but handled by the driver them
-> > selves in C.
-> 
-> Agreed. There has been some discussion recently about whether devicetree
-> should be extended (or supplemented) to allow defining behaviour as well
-> (in addition to just hardware). But that's not immediately relevant here
-> at this time.
+Now, after discussing this with MikeT and a few others at the ARM
+mini-summit, I've learned that my naive assumption of a completely
+described clock tree is wrong.  We basically just describe what we need to
+get the job done. ie, the leaves and the core.
 
-yes
+So I'm sure this is fine as is if you are successfully booting it on
+your board.  My question was more focused on learning what advantage the
+apll and the pfds may provide that would make it worth describing the
+full tree.
 
-to conclued NACK on the default-brightness here
+thx,
 
-
-Best Regards,
-J.
-> 
-> Thierry
+Jason.
