@@ -1,48 +1,30 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 23 Oct 2013 20:59:10 +0200
-Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
- tree bindings
-In-Reply-To: <20131023172001.GA3379@katana>
-References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
- <5267FA58.9050002@wwwdotorg.org> <20131023172001.GA3379@katana>
-Message-ID: <20131023185909.GC7863@ulmo.nvidia.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 23 Oct 2013 14:57:26 -0400 (EDT)
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131023180507.GE5208@netboy>
+References: <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy> <20131023094903.GD11954@ulmo.nvidia.com>
+ <20131023171620.GA5208@netboy> <20131023172558.GK29341@beef>
+ <20131023180507.GE5208@netboy>
+Message-ID: <alpine.LFD.2.03.1310231454180.1951@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 06:20:02PM +0100, Wolfram Sang wrote:
-> 
-> > Do we really want to polute the drivers and DT files with a ! in the
-> > compatible values? I thought we'd considered that, but chosen having the
-> > drivers that use unstable bindings depend on a Kconfig option as an
-> > alternative, not an additional step?
-> 
-> I'd even go further and use "unstable-" as the prefix instead of "!"
-> which is way more explicit.
+On Wed, 23 Oct 2013, Richard Cochran wrote:
 
-I guess unstable- is as good as anything. I personally think that "!" is
-disturbing enough to the eye to make it abundantly clear that something
-is fishy.
+> There is really nothing wrong with non-mainline trees. If they serve
+> someone's needs, then they do get used.
 
-> > The one issue with doing this is that if a binding is thought to be
-> > unstable, but becomes stable later without any changes, we'll have to do
-> > busy-work to remove the ! in all the DT files, thus artificially
-> > introducing an incompatibility. Perhaps that's fine though?
-> 
-> I'd say yes. Going from unstable to stable is quite a step for a binding
-> and that should be visible and worth a patch IMO. Also, when looking at
-> a DTS file or some driver code, it will avoid
-> confusion/misinterpretation if one can see immediately the status of a
-> binding.
+They scatter away from the mainline tree the limited development force 
+we have.
 
-Yes, I fully agree. It might look like churn, but I think this could
-actually be a part of the formal process to stabilize a binding. It
-would be final step of that process, actually.
+Are you suggesting we should go back to vendor provided kernel tree 
+forks?  Because that's what non mainline trees are.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131023/3e27bbdc/attachment.sig>
+
+Nicolas
