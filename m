@@ -1,20 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 23 Oct 2013 10:02:11 -0400 (EDT)
-Subject: [PATCH] ARM: bL_switcher: Remove
- cpu_hotplug_driver_{lock,unlock}()
-In-Reply-To: <1382522073-14995-1-git-send-email-tushar.behera@linaro.org>
-References: <1382522073-14995-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <alpine.LFD.2.03.1310231001180.1951@syhkavp.arg>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Wed, 23 Oct 2013 10:01:50 -0400
+Subject: [PATCH v8 18/19] swiotlb-xen: no need to do execute two
+ bus_to_phys translations in a row
+In-Reply-To: <1382031814-8782-18-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-18-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20131023140150.GB27771@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Oct 2013, Tushar Behera wrote:
+On Thu, Oct 17, 2013 at 06:43:33PM +0100, Stefano Stabellini wrote:
+> xen_unmap_single calls xen_bus_to_phys, then passes dev_addr to
+> is_xen_swiotlb_buffer that calls xen_bus_to_phys again.
 
-> Commit 6dedcca610c6 ("hotplug, powerpc, x86: Remove
-> cpu_hotplug_driver_lock())" removes the the definition of
-> cpu_hotplug_driver_{lock,unlock} APIs, thereby causing a build error.
+It does?
 
-Where is this commit to be found?
+I see it call mfn_to_local_pfn which calls pfn_to_mfn and
+get_phys_to_machine (which I presume is going to be a slow
+operation on ARM).
 
+> xen_bus_to_phys is potentially a slow operation that might involve
+> walking a tree.
+> We can avoid calling xen_bus_to_phys twice by removing the
+> is_xen_swiotlb_buffer call and doing the check directly in
+> xen_unmap_single using the physical address.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Nicolas
+Have you tested this with a PFN that is in a foreign domain?
+
+I am bit uncomfortable with this - I recall when developing this
+that I had hit some odd cases of doing DMA of a page to a guest
+and it not always working. It was the case of not detecting whether
+the pfn was foreign or not. Sadly I can't recall the details.
+
+I would think that this problem would also be present with ARM?
+But perhaps all the new changes in the pfn_to_mfn that had lately
+been done have fixed this?
+
+> ---
+>  drivers/xen/swiotlb-xen.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> index 4d50058..6d9ca61 100644
+> --- a/drivers/xen/swiotlb-xen.c
+> +++ b/drivers/xen/swiotlb-xen.c
+> @@ -426,8 +426,8 @@ static void xen_unmap_single(struct device *hwdev, dma_addr_t dev_addr,
+>  
+>  	xen_dma_unmap_page(hwdev, paddr, size, dir, attrs);
+>  
+> -	/* NOTE: We use dev_addr here, not paddr! */
+> -	if (is_xen_swiotlb_buffer(dev_addr)) {
+> +	if (paddr >= virt_to_phys(xen_io_tlb_start) &&
+> +		paddr < virt_to_phys(xen_io_tlb_end)) {
+>  		swiotlb_tbl_unmap_single(hwdev, paddr, size, dir);
+>  		return;
+>  	}
+> -- 
+> 1.7.2.5
+> 
