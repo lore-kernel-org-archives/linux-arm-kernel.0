@@ -1,9 +1,9 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 23 Oct 2013 14:10:18 +0200
-Subject: [PATCHv5][ 2/4] ARM: dts: cpuimx51 Add touchscreen support.
+Date: Wed, 23 Oct 2013 14:10:19 +0200
+Subject: [PATCHv5][ 3/4] ARM: dts: cpuimx35 Add touchscreen support.
 In-Reply-To: <1382530220-27881-1-git-send-email-denis@eukrea.com>
 References: <1382530220-27881-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382530220-27881-2-git-send-email-denis@eukrea.com>
+Message-ID: <1382530220-27881-3-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,26 +21,26 @@ Cc: Lothar Wa?mann <LW@KARO-electronics.de>
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi |   11 +++++++++++
+ arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi |   11 +++++++++++
  1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-index 8638656..34ca8d3a 100644
---- a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-+++ b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-@@ -42,6 +42,17 @@
+diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+index 2c2d4cd..a22230b 100644
+--- a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
++++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+@@ -41,6 +41,17 @@
  		compatible = "nxp,pcf8563";
  		reg = <0x51>;
  	};
 +
-+	tsc2007: tsc2007 at 49 {
++	tsc2007: tsc2007 at 48 {
 +		compatible = "ti,tsc2007";
-+		reg = <0x49>;
++		reg = <0x48>;
 +		pinctrl-names = "default";
 +		pinctrl-0 = <&pinctrl_tsc2007_1>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <0x0 0x8>;
-+		gpios = <&gpio4 0 0>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <0x2 0x8>;
++		gpios = <&gpio3 2 0>;
 +		ti,x-plate-ohms = <180>;
 +	};
  };
