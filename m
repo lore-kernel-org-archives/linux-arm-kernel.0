@@ -1,73 +1,343 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 23 Oct 2013 10:07:31 -0300
-Subject: [PATCH v2 1/4] clk: mvebu: Add Core Divider clock
-In-Reply-To: <20131022095317.11944.60429@quantum>
-References: <1380224130-11868-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1380224130-11868-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131002174332.GQ31178@titan.lakedaemon.net>
- <20131002180944.GC2365@localhost> <20131008195933.GA2473@localhost>
- <20131016110819.GC2518@localhost> <20131017191852.GA8832@localhost>
- <20131017192545.GJ22434@titan.lakedaemon.net>
- <20131022095317.11944.60429@quantum>
-Message-ID: <20131023130730.GC2458@localhost>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Oct 2013 15:04:18 +0200
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+Message-ID: <1382533461-31021-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 02:53:17AM -0700, Mike Turquette wrote:
-> Quoting Jason Cooper (2013-10-17 12:25:45)
-> > On Thu, Oct 17, 2013 at 04:18:53PM -0300, Ezequiel Garcia wrote:
-> > > On Wed, Oct 16, 2013 at 08:08:19AM -0300, Ezequiel Garcia wrote:
-> > > > On Tue, Oct 08, 2013 at 04:59:33PM -0300, Ezequiel Garcia wrote:
-> > > > > On Wed, Oct 02, 2013 at 03:09:44PM -0300, Ezequiel Garcia wrote:
-> > > > > > On Wed, Oct 02, 2013 at 01:43:32PM -0400, Jason Cooper wrote:
-> > > > > > > On Thu, Sep 26, 2013 at 04:35:27PM -0300, Ezequiel Garcia wrote:
-> > > > > > > > This commit introduces a new group of clocks present in Armada 370/XP
-> > > > > > > > SoCs (called "Core Divider" clocks) and add a provider for them.
-> > > > > > > > The only clock supported for now is the NAND clock (ndclk), but the
-> > > > > > > > infrastructure to add the rest is already set.
-> > > > > > > > 
-> > > > > > > > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > > > > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > > > > > > ---
-> > > > > > > >  drivers/clk/mvebu/Kconfig       |   5 +
-> > > > > > > >  drivers/clk/mvebu/Makefile      |   1 +
-> > > > > > > >  drivers/clk/mvebu/clk-corediv.c | 223 ++++++++++++++++++++++++++++++++++++++++
-> > > > > > > >  3 files changed, 229 insertions(+)
-> > > > > > > >  create mode 100644 drivers/clk/mvebu/clk-corediv.c
-> > > > > > > 
-> > > > > > > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > > > > > > 
-> > > > > > 
-> > > > > > Mike: any comments on this?
-> > > > > 
-> > > > > ping?
-> > > > > 
-> > > > > I'd like to move along with the NAND driver for this controller and
-> > > > > -although these are not a hard requirement- it would be nice
-> > > > > to have them merged.
-> > > > > 
-> > > > 
-> > > > Mike? Any chance you pick these soon? It's been almost three-weeks since
-> > > > these patchset has been sent and I'm starting to forget the details of it ;)
-> > > 
-> > > Jason: It seems Mike went on 'stealth mode' so I'm wondering if you would
-> > > consider taking this patchset through you (given it's for our SoCs).
-> > 
-> > I considered it, and it didn't sit well with me.  I don't mind taking a
-> > bugfix, everyone wants to see those moved along.  However, this is an
-> > entirely new driver.  Yes, it's scope of use is limited, but I'd prefer
-> > to let the maintainer review the driver before agreeing to maintain it.
-> > Otherwise, I'd be forcing him to maintain something he hasn't even
-> > looked at.  :(
-> > 
-> > I know it sucks, but we're going to wait for Mike.
-> 
-> Sorry for the delay. This driver looks fine and I've taken it into
-> clk-next.
-> 
+The Marvell Dove SoC can run the CPU at two frequencies. The high
+frequencey is from a PLL, while the lower is the same as the DDR
+clock. Add a cpufreq driver to swap between these frequences.
 
-No problem, thanks Mike!
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Sort header files
+Remove unneeded header files
+Notify only on change
+Use get_cpu_device(0), devm_clk_get()
+Use platform_get_resource_byname()
+Error check clk_prepare_enable()
+Comment the interrupt handler
+---
+ drivers/cpufreq/Kconfig.arm    |   5 +
+ drivers/cpufreq/Makefile       |   1 +
+ drivers/cpufreq/dove-cpufreq.c | 279 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 285 insertions(+)
+ create mode 100644 drivers/cpufreq/dove-cpufreq.c
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 701ec95..9560384 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -8,6 +8,11 @@ config ARM_BIG_LITTLE_CPUFREQ
+ 	help
+ 	  This enables the Generic CPUfreq driver for ARM big.LITTLE platforms.
+ 
++config ARM_DOVE_CPUFREQ
++	def_bool ARCH_DOVE && OF
++	help
++	  This adds the CPUFreq driver for Marvell Dove SoCs.
++
+ config ARM_DT_BL_CPUFREQ
+ 	tristate "Generic probing via DT for ARM big LITTLE CPUfreq driver"
+ 	depends on ARM_BIG_LITTLE_CPUFREQ && OF
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index b7948bb..5956661 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -49,6 +49,7 @@ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
+ 
+ obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= davinci-cpufreq.o
+ obj-$(CONFIG_UX500_SOC_DB8500)		+= dbx500-cpufreq.o
++obj-$(CONFIG_ARM_DOVE_CPUFREQ)		+= dove-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
+diff --git a/drivers/cpufreq/dove-cpufreq.c b/drivers/cpufreq/dove-cpufreq.c
+new file mode 100644
+index 0000000..10f013c
+--- /dev/null
++++ b/drivers/cpufreq/dove-cpufreq.c
+@@ -0,0 +1,279 @@
++/*
++ *	dove_freq.c: cpufreq driver for the Marvell dove
++ *
++ *	Copyright (C) 2013 Andrew Lunn <andrew@lunn.ch>
++ *
++ *	This program is free software; you can redistribute it and/or
++ *	modify it under the terms of the GNU General Public License
++ *	as published by the Free Software Foundation; either version
++ *	2 of the License, or (at your option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/clk.h>
++#include <linux/cpu.h>
++#include <linux/cpufreq.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/platform_device.h>
++#include <asm/proc-fns.h>
++
++#define DFS_CR			0x00
++#define  DFS_EN			BIT(0)
++#define  CPU_SLOW_EN		BIT(1)
++#define  L2_RATIO_OFFS		9
++#define  L2_RATIO_MASK		(0x3F << L2_RATIO_OFFS)
++#define DFS_SR			0x04
++#define  CPU_SLOW_MODE_STTS	BIT(1)
++
++/* PMU_CR */
++#define  MASK_FIQ		BIT(28)
++#define  MASK_IRQ		BIT(24)	/* PMU_CR */
++
++/* CPU Clock Divider Control 0 Register */
++#define DPRATIO_OFFS		24
++#define DPRATIO_MASK		(0x3F << DPRATIO_OFFS)
++#define XPRATIO_OFFS		16
++#define XPRATIO_MASK		(0x3F << XPRATIO_OFFS)
++
++static struct priv
++{
++	struct clk *cpu_clk;
++	struct clk *ddr_clk;
++	struct device *dev;
++	unsigned long dpratio;
++	unsigned long xpratio;
++	void __iomem *dfs;
++	void __iomem *pmu_cr;
++	void __iomem *pmu_clk_div;
++} priv;
++
++#define STATE_CPU_FREQ 0x01
++#define STATE_DDR_FREQ 0x02
++
++/*
++ * Dove can swap the clock to the CPU between two clocks:
++ *
++ * - cpu clk
++ * - ddr clk
++ *
++ * The frequencies are set@runtime before registering this
++ * table.
++ */
++static struct cpufreq_frequency_table dove_freq_table[] = {
++	{STATE_CPU_FREQ,	0}, /* CPU uses cpuclk */
++	{STATE_DDR_FREQ,	0}, /* CPU uses ddrclk */
++	{0,			CPUFREQ_TABLE_END},
++};
++
++static unsigned int dove_cpufreq_get_cpu_frequency(unsigned int cpu)
++{
++	unsigned long reg = readl_relaxed(priv.dfs + DFS_SR);
++
++	if (reg & CPU_SLOW_MODE_STTS)
++		return dove_freq_table[1].frequency;
++	return dove_freq_table[0].frequency;
++}
++
++static void dove_cpufreq_set_cpu_state(struct cpufreq_policy *policy,
++				       unsigned int index)
++{
++	struct cpufreq_freqs freqs;
++	unsigned int state = dove_freq_table[index].driver_data;
++	unsigned long reg, cr;
++
++	freqs.old = dove_cpufreq_get_cpu_frequency(0);
++	freqs.new = dove_freq_table[index].frequency;
++
++	if (freqs.old != freqs.new) {
++		cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
++		local_irq_disable();
++
++		/* Mask IRQ and FIQ to CPU */
++		cr = readl(priv.pmu_cr);
++		cr |= MASK_IRQ | MASK_FIQ;
++		writel(cr, priv.pmu_cr);
++
++		/* Set/Clear the CPU_SLOW_EN bit */
++		reg = readl_relaxed(priv.dfs + DFS_CR);
++		reg &= ~L2_RATIO_MASK;
++
++		switch (state) {
++		case STATE_CPU_FREQ:
++			reg |= priv.xpratio;
++			reg &= ~CPU_SLOW_EN;
++			break;
++		case STATE_DDR_FREQ:
++			reg |= (priv.dpratio | CPU_SLOW_EN);
++			break;
++		}
++
++		/* Start the DFS process */
++		reg |= DFS_EN;
++
++		writel(reg, priv.dfs + DFS_CR);
++
++		/* Wait-for-Interrupt, while the hardware changes frequency */
++		cpu_do_idle();
++
++		local_irq_enable();
++		cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
++	}
++}
++
++static int dove_cpufreq_target(struct cpufreq_policy *policy,
++			    unsigned int target_freq,
++			    unsigned int relation)
++{
++	unsigned int index = 0;
++
++	if (cpufreq_frequency_table_target(policy, dove_freq_table,
++				target_freq, relation, &index))
++		return -EINVAL;
++
++	dove_cpufreq_set_cpu_state(policy, index);
++
++	return 0;
++}
++
++static int dove_cpufreq_cpu_init(struct cpufreq_policy *policy)
++{
++	return cpufreq_generic_init(policy, dove_freq_table, 5000);
++}
++
++/*
++ * Handle the interrupt raised when the frequency change is
++ * complete.
++ */
++static irqreturn_t dove_cpufreq_irq(int irq, void *dev)
++{
++	return IRQ_HANDLED;
++}
++
++static struct cpufreq_driver dove_cpufreq_driver = {
++	.get	= dove_cpufreq_get_cpu_frequency,
++	.verify	= cpufreq_generic_frequency_table_verify,
++	.target = dove_cpufreq_target,
++	.init	= dove_cpufreq_cpu_init,
++	.exit	= cpufreq_generic_exit,
++	.name	= "dove-cpufreq",
++	.attr	= cpufreq_generic_attr,
++};
++
++static int dove_cpufreq_probe(struct platform_device *pdev)
++{
++	struct device *cpu_dev;
++	struct resource *res;
++	int err, irq;
++
++	memset(&priv, 0, sizeof(priv));
++	priv.dev = &pdev->dev;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++					   "cpufreq: DFS");
++	priv.dfs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(priv.dfs))
++		return PTR_ERR(priv.dfs);
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++					   "cpufreq: PMU CR");
++	priv.pmu_cr = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(priv.pmu_cr))
++		return PTR_ERR(priv.pmu_cr);
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++					   "cpufreq: PMU Clk Div");
++	priv.pmu_clk_div = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(priv.pmu_clk_div))
++		return PTR_ERR(priv.pmu_clk_div);
++
++	cpu_dev = get_cpu_device(0);
++
++	priv.cpu_clk = devm_clk_get(cpu_dev, "cpu_clk");
++	if (IS_ERR(priv.cpu_clk)) {
++		err = PTR_ERR(priv.cpu_clk);
++		goto out;
++	}
++
++	err = clk_prepare_enable(priv.cpu_clk);
++	if (err)
++		goto out;
++
++	dove_freq_table[0].frequency = clk_get_rate(priv.cpu_clk) / 1000;
++
++	priv.ddr_clk = devm_clk_get(cpu_dev, "ddrclk");
++	if (IS_ERR(priv.ddr_clk)) {
++		err = PTR_ERR(priv.ddr_clk);
++		goto out;
++	}
++
++	err = clk_prepare_enable(priv.ddr_clk);
++	if (err)
++		goto out;
++
++	dove_freq_table[1].frequency = clk_get_rate(priv.ddr_clk) / 1000;
++
++	irq = irq_of_parse_and_map(cpu_dev->of_node, 0);
++	if (!irq) {
++		err = -ENXIO;
++		goto out;
++	}
++
++	err = devm_request_irq(&pdev->dev, irq, dove_cpufreq_irq,
++			       0, "dove-cpufreq", NULL);
++	if (err) {
++		dev_err(&pdev->dev, "cannot assign irq %d, %d\n", irq, err);
++		goto out;
++	}
++
++	/* Read the target ratio which should be the DDR ratio */
++	priv.dpratio = readl_relaxed(priv.pmu_clk_div);
++	priv.dpratio = (priv.dpratio & DPRATIO_MASK) >> DPRATIO_OFFS;
++	priv.dpratio = priv.dpratio << L2_RATIO_OFFS;
++
++	/* Save L2 ratio@reset */
++	priv.xpratio = readl(priv.pmu_clk_div);
++	priv.xpratio = (priv.xpratio & XPRATIO_MASK) >> XPRATIO_OFFS;
++	priv.xpratio = priv.xpratio << L2_RATIO_OFFS;
++
++	err = cpufreq_register_driver(&dove_cpufreq_driver);
++	if (!err)
++		return 0;
++
++	dev_err(priv.dev, "Failed to register cpufreq driver");
++
++out:
++	clk_disable_unprepare(priv.ddr_clk);
++	clk_disable_unprepare(priv.cpu_clk);
++
++	return err;
++}
++
++static int dove_cpufreq_remove(struct platform_device *pdev)
++{
++	cpufreq_unregister_driver(&dove_cpufreq_driver);
++
++	clk_disable_unprepare(priv.ddr_clk);
++	clk_disable_unprepare(priv.cpu_clk);
++
++	return 0;
++}
++
++static struct platform_driver dove_cpufreq_platform_driver = {
++	.probe = dove_cpufreq_probe,
++	.remove = dove_cpufreq_remove,
++	.driver = {
++		.name = "dove-cpufreq",
++		.owner = THIS_MODULE,
++	},
++};
++
++module_platform_driver(dove_cpufreq_platform_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch");
++MODULE_DESCRIPTION("cpufreq driver for Marvell's dove CPU");
++MODULE_ALIAS("platform:dove-cpufreq");
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.4.rc3
