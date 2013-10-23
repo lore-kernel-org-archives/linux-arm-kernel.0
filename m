@@ -1,21 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 23 Oct 2013 16:44:10 +0800
-Subject: [Patch v2 10/14] usb: doc: phy-mxs: update binding for adding
- disconnect line property
-In-Reply-To: <20131023070824.GH8534@shlinux1.ap.freescale.net>
-References: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
- <1382421528-17897-11-git-send-email-peter.chen@freescale.com>
- <20131023063154.GG2839@S2101-09.ap.freescale.net>
- <20131023070824.GH8534@shlinux1.ap.freescale.net>
-Message-ID: <20131023084408.GQ2839@S2101-09.ap.freescale.net>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 23 Oct 2013 11:46:31 +0300
+Subject: pull request for Tegra clock rework and Tegra124 clock support
+In-Reply-To: <20131022101904.7554.73999@quantum>
+References: <20131021135638.GA10943@tbergstrom-lnx.Nvidia.com>
+ <20131022101904.7554.73999@quantum>
+Message-ID: <20131023084631.GG22111@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 03:08:25PM +0800, Peter Chen wrote:
-> One more thing: it is a SoC feature, so I can delete it from DT, and
-> using compatible string (or of_device_id.data) to judge if it is needed
-> at driver, do you think so?
+On Tue, Oct 22, 2013 at 12:19:04PM +0200, Mike Turquette wrote:
+> Quoting Peter De Schrijver (2013-10-21 06:56:38)
+> > Hi Mike,
+> > 
+> > This pull request contains both the tegra clock rework patches
+> > ([PATCH v6 00/15] Introduce common infra for tegra clocks)
+> > and the patches to support Tegra124 ([PATCH v4 0/7] Tegra124 clock support)
+> > 
+> > The following changes since commit d031acfc0b8376209e5b429513766e7028e40e1d:
+> > 
+> >   clk: tegra114: Rename gr_2d/gr_3d to gr2d/gr3d (2013-10-16 19:49:25 +0300)
+> > 
+> > are available in the git repository at:
+> >   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-tegra124-0
+> 
+> Thanks for the pull request Peter. I've taken into clk-next. Next time
+> can you generate a signed tag? Due to the increased volume of ccf
 
-That's exactly my point - it's not a thing belonging to device tree.
+Ok :) let's sign some keys next week then :)
 
-Shawn
+Cheers,
+
+Peter.
