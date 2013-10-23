@@ -1,25 +1,22 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Oct 2013 10:30:06 -0400
-Subject: [PATCH 1/3] ARM: Orion: Add missing includes
-In-Reply-To: <1382537572-31472-1-git-send-email-y>
-References: <y>
- <1382537572-31472-1-git-send-email-y>
-Message-ID: <20131023143006.GK24520@titan.lakedaemon.net>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 23 Oct 2013 10:35:08 -0400 (EDT)
+Subject: [PATCH 1/3] usb: ehci: add freescale imx28 special write register
+ method
+In-Reply-To: <1382517309-6730-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <Pine.LNX.4.44L0.1310231034470.1326-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 04:12:50PM +0200, y at lunn.ch wrote:
-> From: Andrew Lunn <andrew@lunn.ch>
+On Wed, 23 Oct 2013, Peter Chen wrote:
+
+> According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+> register error issue", All USB register write operations must
+> use the ARM SWP instruction. So, we implement a special ehci_write
+> for imx28.
 > 
-> Building with C=1 generates warnings because of missing includes and
-> static keywords. Add them.
+> Discussion for it at below:
+> http://marc.info/?l=linux-usb&m=137996395529294&w=2
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-Other than this series falling into my spam folder due to source email
-address spoofing, this looks fine. :)
-
-thx,
-
-Jason.
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
