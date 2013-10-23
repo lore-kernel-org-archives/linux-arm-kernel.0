@@ -1,246 +1,70 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 23 Oct 2013 11:09:53 +0200
-Subject: [PATCHv4 2/2] ARM: dts: Add support for the cpuimx51 board from
- Eukrea and its baseboard.
-In-Reply-To: <1382519393-17055-1-git-send-email-denis@eukrea.com>
-References: <1382519393-17055-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382519393-17055-2-git-send-email-denis@eukrea.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 23 Oct 2013 16:55:46 +0800
+Subject: [Patch v2 02/14] usb: phy-mxs: Add platform judgement code
+In-Reply-To: <20131023090443.GR2839@S2101-09.ap.freescale.net>
+References: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
+ <1382421528-17897-3-git-send-email-peter.chen@freescale.com>
+ <20131023061322.GF2839@S2101-09.ap.freescale.net>
+ <20131023064604.GE8534@shlinux1.ap.freescale.net>
+ <20131023090443.GR2839@S2101-09.ap.freescale.net>
+Message-ID: <20131023085546.GI8534@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following devices/functionalities were added:
- * Main and secondary UARTs.
- * i2c and the pcf8563 device.
- * Ethernet.
- * NAND.
- * The BP1 button.
- * The LED.
- * Watchdog
- * SD.
+On Wed, Oct 23, 2013 at 05:04:44PM +0800, Shawn Guo wrote:
+> On Wed, Oct 23, 2013 at 02:46:04PM +0800, Peter Chen wrote:
+> > How about compare compatible string directly at probe?
+> > 
+> > 	if (of_device_is_compatible(np, "fsl,imx6q-usbphy"))
+> > 		mxs_phy->devtype = IMX6Q_USB_PHY;
+> > 	else if ((of_device_is_compatible(np, "fsl,imx6sl-usbphy"))
+> > 		mxs_phy->devtype = IMX6SL_USB_PHY;
+> > 	else if (...)
+> > 		...;
+> 
+> It can work, but in general, we should avoid unnecessary device tree
+> lookup.  I would suggest something like below.
+> 
+> #define MXS_FLAGS_SUSPEND_ISSUE_1	BIT(0)
+> #define MXS_FLAGS_SUSPEND_ISSUE_2	BIT(1)
+> #define MXS_FLAGS_LINE_DISCONNECT	BIT(2)
+> 
+> struct mxs_phy_data {
+> 	unsigned int flags;
+> };
+> 
+> struct mxs_phy {
+> 	...
+> 	mxs_phy_data *data;
+> };
+> 
+> static struct mxs_phy_data imx6sl_usbphy_data = {
+>         .flags = MXS_FLAGS_LINE_DISCONNECT,
+> };
+> 
+> static struct mxs_phy_data imx6q_usbphy_data = {
+>         .flags = MXS_FLAGS_SUSPEND_ISSUE_2 | MXS_FLAGS_LINE_DISCONNECT,
+> };
+> 
+> static struct mxs_phy_data imx23_usbphy_data = {
+>         .flags = MXS_FLAGS_SUSPEND_ISSUE_1 | MXS_FLAGS_SUSPEND_ISSUE_2,
+> };
+> 
+> static const struct of_device_id mxs_phy_dt_ids[] = {
+>        { .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_usbphy_data, },
+>        { .compatible = "fsl,imx6q-usbphy", .data = &imx6q_usbphy_data, },
+>        { .compatible = "fsl,imx23-usbphy", .data = &imx23_usbphy_data, },
+>        { /* sentinel */ }
+> };
+> MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+> 
+> Then you can check the flags for handling different cases.  This would
+> be more flexible and future proof.
+> 
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi       |   63 ++++++++++
- .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |  132 ++++++++++++++++++++
- 2 files changed, 195 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
- create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+Great, I will use that way at chipidea driver too.
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-new file mode 100644
-index 0000000..8638656
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-@@ -0,0 +1,63 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include "imx51.dtsi"
-+
-+/ {
-+	model = "Eukrea CPUIMX51";
-+	compatible = "eukrea,cpuimx51", "fsl,imx51";
-+
-+	memory {
-+		reg = <0x90000000 0x10000000>; /* 256M */
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec_2>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1>;
-+	status = "okay";
-+
-+	pcf8563 at 51 {
-+		compatible = "nxp,pcf8563";
-+		reg = <0x51>;
-+	};
-+};
-+
-+&iomuxc {
-+	tsc2007 {
-+		pinctrl_tsc2007_1: tsc2007grp-1 {
-+			fsl,pins = <
-+				MX51_PAD_GPIO_NAND__GPIO_NAND 0x1f5
-+				MX51_PAD_NANDF_D8__GPIO4_0 0x1f5
-+			>;
-+		};
-+	};
-+};
-+
-+&nfc {
-+	nand-bus-width = <8>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-new file mode 100644
-index 0000000..64d8082
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-@@ -0,0 +1,132 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+/dts-v1/;
-+#include "imx51-eukrea-cpuimx51.dtsi"
-+
-+/ {
-+	model = "Eukrea CPUIMX51";
-+	compatible = "eukrea,mbimxsd51","eukrea,cpuimx51", "fsl,imx51";
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpiokeys_1>;
-+
-+		button-1 {
-+			label = "BP1";
-+			gpios = <&gpio3 31 1>;
-+			linux,code = <256>;
-+			gpio-key,wakeup;
-+			linux,input-type = <1>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpioled>;
-+
-+		led1 {
-+			label = "led1";
-+			gpios = <&gpio3 30 1>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux_1>;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1_1 &pinctrl_esdhc1_cd>;
-+	fsl,cd-controller;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	tlv320aic23: codec at 1a {
-+		compatible = "ti,tlv320aic23";
-+		reg = <0x1a>;
-+	};
-+};
-+
-+&iomuxc {
-+	backlight {
-+		pinctrl_backlight_1: backlightgrp-1 {
-+			fsl,pins = <
-+				MX51_PAD_DI1_D1_CS__GPIO3_4 0x1f5
-+			>;
-+		};
-+	};
-+
-+	esdhc1 {
-+		pinctrl_esdhc1_cd: esdhc1_cd {
-+			fsl,pins = <
-+				MX51_PAD_GPIO1_0__SD1_CD 0x20d5
-+			>;
-+		};
-+	};
-+
-+	gpio-keys {
-+		pinctrl_gpiokeys_1: gpiokeysgrp-1 {
-+			fsl,pins = <
-+				MX51_PAD_NANDF_D9__GPIO3_31 0x1f5
-+			>;
-+		};
-+	};
-+
-+	leds {
-+		pinctrl_gpioled: gpioledgrp-1 {
-+			fsl,pins = <
-+				MX51_PAD_NANDF_D10__GPIO3_30 0x80000000
-+			>;
-+		};
-+	};
-+
-+	reg_lcd_3v3 {
-+		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
-+			fsl,pins = <
-+				MX51_PAD_CSI1_D9__GPIO3_13 0x1f5
-+			>;
-+		};
-+	};
-+};
-+
-+&ssi2 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3_2 &pinctrl_uart3_rtscts_2>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
 -- 
-1.7.9.5
+
+Best Regards,
+Peter Chen
