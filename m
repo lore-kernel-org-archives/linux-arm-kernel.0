@@ -1,43 +1,57 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 23 Oct 2013 11:06:18 +0200
-Subject: userspace firmware load fails with current linux-next
-Message-ID: <20131023110618.7bd07899@ipc1.ka-ro>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 23 Oct 2013 11:09:52 +0200
+Subject: [PATCHv4 1/2] ARM: dts: imx51.dtsi: Add some pinmux pins.
+Message-ID: <1382519393-17055-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ arch/arm/boot/dts/imx51.dtsi |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-with the current linux-next loading firmware from userspace fails
-because when writing to /sys/class/firmware/*/data the return code is
-always 0 (meaning to the userspace too that no data was written).
-Thus the userspace tool (mdev) keeps writing the same block of data
-over and over again.
-
-A cursory check of the latest updates to /drivers/base/firmware* didn't
-reveal anything that could be the cause of this misbehaviour.
-
-Interestingly when changing the .size member of the
-struct bin_attribute firmware_attr_data in drivers/base/firmware_class.c
-(which is now '0') to e.g. PAGE_SIZE firmware loading works again.
-
-Since .size was at '0' since the beginning of the .git universe there
-must have been a fundamental change in the guts of the kernel handling
-sysfs attribute files.
-
-Is this behavioural change intended?
-Do all sysfs attributes that are created with zero size need to be
-changed?
-Or is it an unintended side effect of some recent change?
-
-
-Lothar Wa?mann
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index f4dcff3..48fa41b 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -621,6 +621,15 @@
+ 		};
+ 	};
+ 
++	i2c1 {
++		pinctrl_i2c1_1: i2c1grp-1 {
++			fsl,pins = <
++				MX51_PAD_SD2_CMD__I2C1_SCL 0x400001ed
++				MX51_PAD_SD2_CLK__I2C1_SDA 0x400001ed
++			>;
++		};
++	};
++
+ 	i2c2 {
+ 		pinctrl_i2c2_1: i2c2grp-1 {
+ 			fsl,pins = <
+@@ -801,6 +810,13 @@
+ 				MX51_PAD_UART3_TXD__UART3_TXD 0x1c5
+ 			>;
+ 		};
++
++		pinctrl_uart3_rtscts_2: uart3rtscts-2 {
++			fsl,pins = <
++				MX51_PAD_KEY_COL4__UART3_RTS 0x1c5
++				MX51_PAD_KEY_COL5__UART3_CTS 0x1c5
++			>;
++		};
+ 	};
+ 
+ 	usbh1 {
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.9.5
