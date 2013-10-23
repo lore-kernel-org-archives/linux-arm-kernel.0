@@ -1,44 +1,82 @@
 From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 23 Oct 2013 11:38:42 +0200
-Subject: [PATCH 0/2] ARM: dts: omap5-uevm: Audio related fixes
-In-Reply-To: <1382520740-11197-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1382520740-11197-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <52679922.1050004@baylibre.com>
+Date: Wed, 23 Oct 2013 11:48:55 +0200
+Subject: [GIT PULL] ARM: OMAP: Some more more Device Tree for 3.13
+Message-ID: <52679B87.5020108@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Tony,
 
-On 23/10/2013 11:32, Peter Ujfalusi wrote:
-> Hi,
->
-> When the omap5-evm.dts file has been renamed to omap5-uevm.dts and the sEVM
-> support got deprecated in favor of uEVM (or Panda5) the content was not
-> validated.
-> The reset GPIO is different on uEVM compared to sEVM and uEVM does not have
-> support for dmic.
->
-> Regards,
-> Peter
-
-I've just applied your series, let's try to push that for 3.13.
+Please pull the branch for even more OMAP Device Tree for v3.13 or later.
 
 Thanks,
 Benoit
 
 
-> ---
-> Peter Ujfalusi (2):
->    ARM: dts: omap5-uevm: Correct twl6040 reset GPIO pinmux
->    ARM: dts: omap5-uevm: Remove pinmux for dmic pins
->
->   arch/arm/boot/dts/omap5-uevm.dts | 12 +-----------
->   1 file changed, 1 insertion(+), 11 deletions(-)
->
+The following changes since commit 6a96867844895008558810853c7838af39dd317c:
 
+  ARM: dts: AM33xx+: Add i2c aliases (2013-10-22 11:05:42 +0200)
 
--- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git tags/for_3.13_super_late/dts_signed
+
+for you to fetch changes up to b306e7b819edd0515e18f5ca7e0d1cb4b0e4e58a:
+
+  ARM: dts: omap5-uevm: Remove pinmux for dmic pins (2013-10-23 11:40:47 +0200)
+
+----------------------------------------------------------------
+Add a lot of N900 nodes
+Add OPP table to OMAP5/DRA7
+Add support for Newflow NanoBone board
+
+----------------------------------------------------------------
+Eric Witcher (1):
+      ARM: dts: omap5-uevm: fix mcspi node pin descriptions
+
+J Keerthy (3):
+      ARM: dts: dra7-evm: add smps123 supply for CPU
+      ARM: dts: OMAP5: Add CPU OPP table
+      ARM: dts: DRA7: Add CPU OPP table
+
+Mark Jackson (1):
+      ARM: dts: Add support for Newflow NanoBone board
+
+Markus Pargmann (1):
+      ARM: dts: am33xx, change usb ctrl module label
+
+Nishanth Menon (1):
+      ARM: dts: omap5-uevm: add smps123 supply for CPU
+
+Peter Ujfalusi (2):
+      ARM: dts: omap5-uevm: Correct twl6040 reset GPIO pinmux
+      ARM: dts: omap5-uevm: Remove pinmux for dmic pins
+
+Sebastian Reichel (14):
+      ARM: dts: omap3-n900: Add pinctrl for i2c devices
+      ARM: dts: omap3-n900: Fix i2c bus speed
+      ARM: dts: omap3-n900: Add UART support
+      ARM: dts: omap3-n900: Add support for SD cards
+      ARM: dts: omap3-n900: GPIO key definitions
+      ARM: dts: omap3-n900: Add vibrator device
+      ARM: dts: omap3-n900: Add LP5523 support
+      ARM: dts: TWL4030: Add missing regulators
+      ARM: dts: omap3-n900: Specify regulator info
+      ARM: dts: omap3-n900: Add NAND support
+      ARM: dts: omap3-n900:: Mux RX51_LCD_RESET_GPIO in DTS
+      ARM: dts: omap3-n900: Add TLV320AIC3X support
+      ARM: dts: omap3-n900: Add LP5523 support
+      ARM: dts: TWL4030: Add power button support
+
+ MAINTAINERS                       |   6 +
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/am335x-nano.dts | 431 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am33xx.dtsi     |   6 +-
+ arch/arm/boot/dts/dra7-evm.dts    |   4 +
+ arch/arm/boot/dts/dra7.dtsi       |   8 +-
+ arch/arm/boot/dts/omap3-n900.dts  | 396 +++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/omap5-uevm.dts  |  34 ++-
+ arch/arm/boot/dts/omap5.dtsi      |   9 +-
+ arch/arm/boot/dts/twl4030.dtsi    |  49 ++++-
+ 10 files changed, 912 insertions(+), 32 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am335x-nano.dts
