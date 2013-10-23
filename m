@@ -1,48 +1,42 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Wed, 23 Oct 2013 08:21:23 +0530
-Subject: [PATCH] hwmon: ntc_thermistor: Fix typo (pullup-uV -> pullup-uv)
-In-Reply-To: <1382492690-4056-1-git-send-email-cw00.choi@samsung.com>
-References: <1382492690-4056-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAHfPSqAEY+e9wF403xrJSR5Y7=PgJ1McnKMxd6HECXFPV7ZoeA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 23 Oct 2013 10:51:48 +0800
+Subject: [PATCH 5/7] mmc: sdhci-esdhc-imx: fix cpas over write issue
+In-Reply-To: <1382365627-26816-6-git-send-email-b29396@freescale.com>
+References: <1382365627-26816-1-git-send-email-b29396@freescale.com>
+ <1382365627-26816-6-git-send-email-b29396@freescale.com>
+Message-ID: <20131023025146.GC2839@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 October 2013 07:14, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch fix typo of property name from 'pullup-uV' to 'pullup-uv'.
-> The ntc_thermistor.c use 'pullup-uv' when parsing dt data.
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-Thanks for the correction.
-
-Acked-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+On Mon, Oct 21, 2013 at 10:27:05PM +0800, Dong Aisheng wrote:
+> We should use '|=' instead '=', or it may over write
+> the original caps assigned before this line.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 > ---
->  Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-> index 47ada1d..5d49f2b 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-> @@ -49,7 +49,7 @@ adc at 12D10000 {
->         /* NTC thermistor is a hwmon device */
->         ncp15wb473 at 0 {
->                 compatible = "ntc,ncp15wb473";
-> -               pullup-uV = <1800000>;
-> +               pullup-uv = <1800000>;
->                 pullup-ohm = <47000>;
->                 pulldown-ohm = <0>;
->                 io-channels = <&adc 4>;
-> --
-> 1.8.0
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  drivers/mmc/host/sdhci-esdhc-imx.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 5fe484f..baa27c7 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -1070,7 +1070,7 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  		break;
+>  
+>  	case ESDHC_CD_PERMANENT:
+> -		host->mmc->caps = MMC_CAP_NONREMOVABLE;
+> +		host->mmc->caps |= MMC_CAP_NONREMOVABLE;
 
+I think it will be more logical if you switch the order of this patch
+and the previous one.
 
+Shawn
 
--- 
-Shine bright,
-(: Nav :)
+>  		break;
+>  
+>  	case ESDHC_CD_NONE:
+> -- 
+> 1.7.2.rc3
+> 
+> 
