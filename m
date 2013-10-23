@@ -1,36 +1,130 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 23 Oct 2013 10:06:31 +0200
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131022171346.GE4061@obsidianresearch.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
-Message-ID: <20131023080630.GA14413@netboy>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 23 Oct 2013 16:15:41 +0800
+Subject: [PATCH 1/4] ARM: dts: added several new imx-pinmux groups
+In-Reply-To: <1382503888-3962-2-git-send-email-tharvey@gateworks.com>
+References: <1382503888-3962-1-git-send-email-tharvey@gateworks.com>
+ <1382503888-3962-2-git-send-email-tharvey@gateworks.com>
+Message-ID: <20131023081538.GN2839@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 11:13:46AM -0600, Jason Gunthorpe wrote:
-> The question I asked last time this came up, which was left unaswered:
+On Tue, Oct 22, 2013 at 09:51:25PM -0700, Tim Harvey wrote:
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+
+Applied, thanks.
+
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi |   60 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
 > 
->  Who does this stable DT ABI vision benifit, and how much is that
->  benifit worth?
-
-[Sigh]
-
-I already answered this question more than once. I guess it doesn't
-hurt to answer it again: It helps the users. Please, don't forget
-about them.
-
-If I, as an embedded developer, design my board to work with kernel
-version N and a given DTB, then I can upgrade to any kernel version
-M (where M > N) using the *same* DTB, and it still works.
-
-Thanks,
-Richard
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 59154dc..caa88f9 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -637,6 +637,14 @@
+>  							MX6QDL_PAD_DISP0_DAT19__AUD5_RXD  0x80000000
+>  						>;
+>  					};
+> +
+> +					pinctrl_audmux_4: audmux-4 {
+> +						fsl,pins = <
+> +							MX6QDL_PAD_EIM_D24__AUD5_RXFS     0x80000000
+> +							MX6QDL_PAD_EIM_D25__AUD5_RXC      0x80000000
+> +							MX6QDL_PAD_DISP0_DAT19__AUD5_RXD  0x80000000
+> +						>;
+> +					};
+>  				};
+>  
+>  				ecspi1 {
+> @@ -809,6 +817,28 @@
+>  							MX6QDL_PAD_SD4_DAT0__NAND_DQS      0x00b1
+>  						>;
+>  					};
+> +
+> +					/* No Strobe */
+> +					pinctrl_gpmi_nand_2: gpmi-nand-2 {
+> +						fsl,pins = <
+> +							MX6QDL_PAD_NANDF_CLE__NAND_CLE     0xb0b1
+> +							MX6QDL_PAD_NANDF_ALE__NAND_ALE     0xb0b1
+> +							MX6QDL_PAD_NANDF_WP_B__NAND_WP_B   0xb0b1
+> +							MX6QDL_PAD_NANDF_RB0__NAND_READY_B 0xb000
+> +							MX6QDL_PAD_NANDF_CS0__NAND_CE0_B   0xb0b1
+> +							MX6QDL_PAD_NANDF_CS1__NAND_CE1_B   0xb0b1
+> +							MX6QDL_PAD_SD4_CMD__NAND_RE_B      0xb0b1
+> +							MX6QDL_PAD_SD4_CLK__NAND_WE_B      0xb0b1
+> +							MX6QDL_PAD_NANDF_D0__NAND_DATA00   0xb0b1
+> +							MX6QDL_PAD_NANDF_D1__NAND_DATA01   0xb0b1
+> +							MX6QDL_PAD_NANDF_D2__NAND_DATA02   0xb0b1
+> +							MX6QDL_PAD_NANDF_D3__NAND_DATA03   0xb0b1
+> +							MX6QDL_PAD_NANDF_D4__NAND_DATA04   0xb0b1
+> +							MX6QDL_PAD_NANDF_D5__NAND_DATA05   0xb0b1
+> +							MX6QDL_PAD_NANDF_D6__NAND_DATA06   0xb0b1
+> +							MX6QDL_PAD_NANDF_D7__NAND_DATA07   0xb0b1
+> +						>;
+> +					};
+>  				};
+>  
+>  				hdmi_hdcp {
+> @@ -1056,6 +1086,13 @@
+>  							MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA 0x1b0b1
+>  						>;
+>  					};
+> +
+> +					pinctrl_uart1_2: uart1grp-2 {
+> +						fsl,pins = <
+> +							MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA 0x1b0b1
+> +							MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA 0x1b0b1
+> +						>;
+> +					};
+>  				};
+>  
+>  				uart2 {
+> @@ -1074,6 +1111,13 @@
+>  							MX6QDL_PAD_EIM_D29__UART2_DTE_RTS_B 0x1b0b1
+>  						>;
+>  					};
+> +
+> +					pinctrl_uart2_3: uart2grp-3 {
+> +						fsl,pins = <
+> +							MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA 0x1b0b1
+> +							MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA 0x1b0b1
+> +						>;
+> +					};
+>  				};
+>  
+>  				uart3 {
+> @@ -1094,6 +1138,13 @@
+>  							MX6QDL_PAD_EIM_EB3__UART3_RTS_B	  0x1b0b1
+>  						>;
+>  					};
+> +
+> +					pinctrl_uart3_3: uart3grp-3 {
+> +						fsl,pins = <
+> +							MX6QDL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
+> +							MX6QDL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
+> +						>;
+> +					};
+>  				};
+>  
+>  				uart4 {
+> @@ -1105,6 +1156,15 @@
+>  					};
+>  				};
+>  
+> +				uart5 {
+> +					pinctrl_uart5_1: uart5grp-1 {
+> +						fsl,pins = <
+> +							MX6QDL_PAD_KEY_COL1__UART5_TX_DATA 0x1b0b1
+> +							MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA 0x1b0b1
+> +						>;
+> +					};
+> +				};
+> +
+>  				usbotg {
+>  					pinctrl_usbotg_1: usbotggrp-1 {
+>  						fsl,pins = <
+> -- 
+> 1.7.9.5
+> 
