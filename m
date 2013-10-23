@@ -1,49 +1,72 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 23 Oct 2013 10:42:58 -0400 (EDT)
-Subject: [Patch v2 08/10] usb: chipidea: host: add quirk for ehci operation
-In-Reply-To: <1382423019-26184-9-git-send-email-peter.chen@freescale.com>
-Message-ID: <Pine.LNX.4.44L0.1310231039350.1326-100000@iolanthe.rowland.org>
+Date: Wed, 23 Oct 2013 10:46:09 -0400 (EDT)
+Subject: [Patch v2 09/10] usb: chipidea: host: add ehci quirk for imx
+ controller
+In-Reply-To: <1382423019-26184-10-git-send-email-peter.chen@freescale.com>
+Message-ID: <Pine.LNX.4.44L0.1310231043100.1326-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 22 Oct 2013, Peter Chen wrote:
 
-> For chipidea controller, it does not follow ehci spec strictly.
-> Taking resume signal as an example, it will stop resume signal about
-> 20-21ms later automatically, but standard ehci spec says, the resume
-> signal is controlled by software (clear portsc.PORT_RESUME).
-> 
-> This operation causes some remote wakeup problems for high speed
-> devices due to host controller does not send SOF in time since
-> software can't guarantee set run/stop bit in time (run/stop bit
-> was cleared at the ehci suspend routine).
-> 
-> When software sets run/stop bit, it needs 1 SoF time to make it effect.
-> If we close the PHY clock just after setting run/stop bit, it does
-> not be set in practice, so a software delay is needed.
+> When the port goes to suspend or finishes resme, it needs to
+> notify PHY, it is not a standard EHCI operation, so we add a
+> quirk for it.
+
+Actually, this _should_ be a standard EHCI operation.  But we have to
+figure out a way to do it that will work on all platforms.
+
+Felipe, any ideas?
+
+Alan Stern
+
 > 
 > Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  drivers/usb/chipidea/host.c |   51 +++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 51 insertions(+), 0 deletions(-)
+>  drivers/usb/chipidea/host.c  |  129 ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/usb/chipidea.h |    1 +
+>  2 files changed, 130 insertions(+), 0 deletions(-)
 > 
 > diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-> index 59e6020..283b385 100644
+> index 283b385..c1d05c4 100644
 > --- a/drivers/usb/chipidea/host.c
 > +++ b/drivers/usb/chipidea/host.c
-> @@ -33,6 +33,53 @@
->  #include "host.h"
+> @@ -34,6 +34,10 @@
 >  
 >  static struct hc_driver __read_mostly ci_ehci_hc_driver;
-> +static int (*orig_bus_suspend)(struct usb_hcd *hcd);
-> +
-> +static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
+>  static int (*orig_bus_suspend)(struct usb_hcd *hcd);
+> +static int (*orig_bus_resume)(struct usb_hcd *hcd);
+> +static int (*orig_hub_control)(struct usb_hcd *hcd,
+> +				u16 typeReq, u16 wValue, u16 wIndex,
+> +				char *buf, u16 wLength);
+>  
+>  static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
+>  {
+> @@ -75,12 +79,131 @@ static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
+>  				 */
+>  				udelay(125);
+>  			}
+> +			if (hcd->phy && test_bit(port, &ehci->bus_suspended)
+> +				&& (ehci_port_speed(ehci, portsc) ==
+> +					USB_PORT_STAT_HIGH_SPEED))
+> +				/*
+> +				 * notify the USB PHY, it is for global
+> +				 * suspend case.
+> +				 */
+> +				usb_phy_notify_suspend(hcd->phy,
+> +					USB_SPEED_HIGH);
+>  		}
+>  	}
+>  
+>  	return 0;
+>  }
+>  
+> +static int ci_imx_ehci_bus_resume(struct usb_hcd *hcd)
 > +{
 > +	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 > +	int port;
-> +	u32 tmp;
 > +
-> +	int ret = orig_bus_suspend(hcd);
+> +	int ret = orig_bus_resume(hcd);
 > +
 > +	if (ret)
 > +		return ret;
@@ -52,39 +75,18 @@ On Tue, 22 Oct 2013, Peter Chen wrote:
 > +	while (port--) {
 > +		u32 __iomem *reg = &ehci->regs->port_status[port];
 > +		u32 portsc = ehci_readl(ehci, reg);
-> +
-> +		if (portsc & PORT_CONNECT) {
-> +			/*
-> +			 * For chipidea, the resume signal will be ended
-> +			 * automatically, so for remote wakeup case, the
-> +			 * usbcmd.rs may not be set before the resume has
-> +			 * ended if other resume path consumes too much
-> +			 * time (~23ms-24ms), in that case, the SOF will not
-> +			 * send out within 3ms after resume ends, then the
-> +			 * device will enter suspend again.
-> +			 */
-> +			if (hcd->self.root_hub->do_remote_wakeup) {
-> +				ehci_dbg(ehci,
-> +					"Remote wakeup is enabled, "
-> +					"and device is on the port\n");
-> +
-> +				tmp = ehci_readl(ehci, &ehci->regs->command);
-> +				tmp |= CMD_RUN;
-> +				ehci_writel(ehci, tmp, &ehci->regs->command);
-> +				/*
-> +				 * It needs a short delay between set RUNSTOP
-> +				 * and set PHCD.
-> +				 */
-> +				udelay(125);
-> +			}
-> +		}
+> +		/*
+> +		 * Notify PHY after resume signal has finished, it is
+> +		 * for global suspend case.
+> +		 */
+> +		if (hcd->phy
+> +			&& test_bit(port, &ehci->bus_suspended)
+> +			&& (portsc & PORT_CONNECT)
+> +			&& (ehci_port_speed(ehci, portsc) ==
+> +				USB_PORT_STAT_HIGH_SPEED))
+> +			/* notify the USB PHY */
+> +			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
 > +	}
-
-This code is a little strange.  If there is only one port then you 
-don't need the loop.  But if there is more than one port then you don't 
-want to put the udelay inside the loop.  (If two devices are attached, 
-you don't want to delay the suspend by 250 us.)
-
-Perhaps you should add a "break;" statement following the udelay.
-
-Alan Stern
+> +
+> +	return 0;
+> +}
