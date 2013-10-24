@@ -1,99 +1,39 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 24 Oct 2013 04:33:37 -0500
-Subject: [RFC PATCH 2/6] DRIVERS: IRQCHIP: CROSSBAR: Add support for
- Crossbar IP
-In-Reply-To: <1380549564-31045-3-git-send-email-r.sricharan@ti.com>
-References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
- <1380549564-31045-3-git-send-email-r.sricharan@ti.com>
-Message-ID: <2FD881B8-1A59-418E-AF9C-EF5B9C5D0623@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Oct 2013 10:33:39 +0100
+Subject: [PATCH] ARM: dma-mapping: don't allow DMA mappings to be
+ marked executable
+In-Reply-To: <1382605463.7602.5.camel@mbp>
+References: <20131024070547.GA16735@n2100.arm.linux.org.uk>
+ <1382605463.7602.5.camel@mbp>
+Message-ID: <20131024093339.GF16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Sep 30, 2013, at 8:59 AM, Sricharan R wrote:
-
-> Some socs have a large number of interrupts requests to service
-> the needs of its many peripherals and subsystems. All of the
-> interrupt lines from the subsystems are not needed at the same
-> time, so they have to be muxed to the irq-controller appropriately.
-> In such places a interrupt controllers are preceded by an CROSSBAR
-> that provides flexibility in muxing the device requests to the controller
-> inputs.
+On Thu, Oct 24, 2013 at 10:04:23AM +0100, Catalin Marinas wrote:
+> Hi Russell,
 > 
-> This driver takes care a allocating a free irq and then configuring the
-> crossbar IP as a part of the mpu's irqchip callbacks. crossbar_init should
-> be called right before the irqchip_init, so that it is setup to handle the
-> irqchip callbacks.
+> On Thu, 2013-10-24 at 08:05 +0100, Russell King - ARM Linux wrote:
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -688,7 +688,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+> >  void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+> >  		    gfp_t gfp, struct dma_attrs *attrs)
+> >  {
+> > -	pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
+> > +	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
 > 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> ---
-> .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
-> drivers/irqchip/Kconfig                            |    8 +
-> drivers/irqchip/Makefile                           |    1 +
-> drivers/irqchip/irq-crossbar.c                     |  195 ++++++++++++++++++++
-> include/linux/irqchip/irq-crossbar.h               |   11 ++
-> 5 files changed, 242 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
-> create mode 100644 drivers/irqchip/irq-crossbar.c
-> create mode 100644 include/linux/irqchip/irq-crossbar.h
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-> new file mode 100644
-> index 0000000..cdec2cd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-> @@ -0,0 +1,27 @@
-> +Some socs have a large number of interrupts requests to service
-> +the needs of its many peripherals and subsystems. All of the
-> +interrupt lines from the subsystems are not needed at the same
-> +time, so they have to be muxed to the irq-controller appropriately.
-> +In such places a interrupt controllers are preceded by an CROSSBAR
-> +that provides flexibility in muxing the device requests to the controller
-> +inputs.
-> +
-> +Required properties:
-> +- compatible : Should be "ti,irq-crossbar"
-> +- reg: Base address and the size of the crossbar registers.
-> +- max-irqs: Total number of irqs available at the interrupt controller.
+> I think we lose the shareability attribute we add to pgprot_kernel when
+> SMP. So this creates a mismatched aliases and could have implications on
+> the barrier use (though I think we use the full system DSB in most cases
+> related to DMA). But architecturally I would feel better if we have the
+> same shareability domain.
 
-Should be 'ti,max-irqs
+We don't.
 
-> +- reg-size: Size of a individual register in bytes. Every individual
-> +	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
+#define _MOD_PROT(p, b) __pgprot(pgprot_val(p) | (b))
 
-Is this something that really needs to be encoded in the dts?
+#define PAGE_KERNEL             _MOD_PROT(pgprot_kernel, L_PTE_XN)
+#define PAGE_KERNEL_EXEC        pgprot_kernel
 
-If we keep it should be ti,reg-size
-
-> +- irqs-reserved: List of the reserved irq lines that are not muxed using
-> +		 crossbar. These interrupt lines are reserved in the soc,
-> +		 so crossbar bar driver should not consider them as free
-> +		 lines.
-> +
-
-ti,irqs-reserved
-
-> +Examples:
-> +		crossbar_mpu: @4a020000 {
-
-Did you mean for there to be a label and no node name?
-
-> +			compatible = "ti,irq-crossbar";
-> +			reg = <0x4a002a48 0x130>;
-> +			max-irqs = <160>;
-> +			reg-size = <2>;
-> +			irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
-> +		};
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+PAGE_KERNEL is used in generic code to setup kernel mappings by things
+like vmalloc() etc.
