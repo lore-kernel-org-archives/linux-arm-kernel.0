@@ -1,43 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 24 Oct 2013 15:01:20 +0800
-Subject: [PATCHv4 2/2] ARM: dts: Add support for the cpuimx51 board from
- Eukrea and its baseboard.
-In-Reply-To: <1382519393-17055-2-git-send-email-denis@eukrea.com>
-References: <1382519393-17055-1-git-send-email-denis@eukrea.com>
- <1382519393-17055-2-git-send-email-denis@eukrea.com>
-Message-ID: <20131024070116.GE11466@S2101-09.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Oct 2013 08:05:47 +0100
+Subject: [PATCH] ARM: dma-mapping: don't allow DMA mappings to be marked
+ executable
+Message-ID: <20131024070547.GA16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 11:09:53AM +0200, Denis Carikli wrote:
-> The following devices/functionalities were added:
->  * Main and secondary UARTs.
->  * i2c and the pcf8563 device.
->  * Ethernet.
->  * NAND.
->  * The BP1 button.
->  * The LED.
->  * Watchdog
->  * SD.
-> 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi       |   63 ++++++++++
->  .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  |  132 ++++++++++++++++++++
->  2 files changed, 195 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
->  create mode 100644 arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+While looking at some features which Kees talked about on Tuesday, I
+discovered that our DMA mappings were incorrectly marked executable,
+which means that they can be subject to speculative instruction
+prefetches.  This turns off executable permission for these mappings.
+I'm intending to push this for v3.12 as a fix.
 
-Applied both patches, after adding imx51-eukrea-mbimxsd51-baseboard.dtb
-target into arch/arm/boot/dts/Makefile.
+8<====
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+ARM: dma-mapping: don't allow DMA mappings to be marked executable
 
-Shawn
+DMA mapping permissions were being derived from pgprot_kernel directly
+without using PAGE_KERNEL.  This causes them to be marked with executable
+permission, which is not what we want.  Fix this.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/dma-mapping.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 7f9b179..838e871 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -688,7 +688,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 		    gfp_t gfp, struct dma_attrs *attrs)
+ {
+-	pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
++	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+ 	void *memory;
+ 
+ 	if (dma_alloc_from_coherent(dev, size, handle, &memory))
+@@ -701,7 +701,7 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+ 	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+ {
+-	pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
++	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+ 	void *memory;
+ 
+ 	if (dma_alloc_from_coherent(dev, size, handle, &memory))
+-- 
+1.7.4.4
