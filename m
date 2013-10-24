@@ -1,39 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Oct 2013 10:33:39 +0100
-Subject: [PATCH] ARM: dma-mapping: don't allow DMA mappings to be
- marked executable
-In-Reply-To: <1382605463.7602.5.camel@mbp>
-References: <20131024070547.GA16735@n2100.arm.linux.org.uk>
- <1382605463.7602.5.camel@mbp>
-Message-ID: <20131024093339.GF16735@n2100.arm.linux.org.uk>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Thu, 24 Oct 2013 10:35:59 +0100
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131024073236.GA4690@netboy>
+References: <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023180108.GA23728@roeck-us.net>
+ <20131023182502.GC32563@obsidianresearch.com>
+ <20131023183041.GH5208@netboy>
+ <1382570963.6315.48.camel@deadeye.wl.decadent.org.uk>
+ <20131024073236.GA4690@netboy>
+Message-ID: <1382607359.6315.61.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 10:04:23AM +0100, Catalin Marinas wrote:
-> Hi Russell,
+On Thu, 2013-10-24 at 09:32 +0200, Richard Cochran wrote:
+> On Thu, Oct 24, 2013 at 12:29:23AM +0100, Ben Hutchings wrote:
+> > 
+> > It starts by looking up the machine ID (in procfs, but may be overridden
+> > because some board vendors don't set it correctly).  If the machine is
+> > supported using FDT then there is an associated DTB file which will have
+> > been installed with the kernel.  The script copies/appends this to the
+> > appropriate place for the boot loader.
 > 
-> On Thu, 2013-10-24 at 08:05 +0100, Russell King - ARM Linux wrote:
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -688,7 +688,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
-> >  void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
-> >  		    gfp_t gfp, struct dma_attrs *attrs)
-> >  {
-> > -	pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
-> > +	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
-> 
-> I think we lose the shareability attribute we add to pgprot_kernel when
-> SMP. So this creates a mismatched aliases and could have implications on
-> the barrier use (though I think we use the full system DSB in most cases
-> related to DMA). But architecturally I would feel better if we have the
-> same shareability domain.
+> And if the ID is not recognized, then what?
 
-We don't.
+Then we have no idea even where to install the kernel, or what wrapper
+might be needed, so the boot loader will load it.  Lack of a DTB file is
+a small problem; it would be easy to add an option to provide one
+outside the kernel package.
 
-#define _MOD_PROT(p, b) __pgprot(pgprot_val(p) | (b))
+Ben.
 
-#define PAGE_KERNEL             _MOD_PROT(pgprot_kernel, L_PTE_XN)
-#define PAGE_KERNEL_EXEC        pgprot_kernel
-
-PAGE_KERNEL is used in generic code to setup kernel mappings by things
-like vmalloc() etc.
+-- 
+Ben Hutchings
+Teamwork is essential - it allows you to blame someone else.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/8c518504/attachment.sig>
