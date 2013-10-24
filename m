@@ -1,60 +1,53 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 24 Oct 2013 17:38:33 +0200
-Subject: [PATCH v5 7/8] ARM: dts: imx27 phycore pinctrl
-In-Reply-To: <1382629114-8628-1-git-send-email-mpa@pengutronix.de>
-References: <1382629114-8628-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1382629114-8628-8-git-send-email-mpa@pengutronix.de>
+Date: Thu, 24 Oct 2013 17:38:26 +0200
+Subject: [PATCH v5 0/8] ARM: imx27 pinctrl
+Message-ID: <1382629114-8628-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pinctrl for phycore devices.
+Hi,
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 4 ++++
- arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 4 ++++
- 2 files changed, 8 insertions(+)
+v5 contains a small new fix which moves uart1 from phycore SOM to RDK dts file.
+The uart1 pinctrl is added to RDK only.
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index ad76d88..d4e1022 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -29,11 +29,15 @@
- 
- &uart1 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_1 &pinctrl_uart1_rtscts_1>;
- 	status = "okay";
- };
- 
- &uart2 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2_1 &pinctrl_uart2_rtscts_1>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-index 648541a..1aafc0d 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-@@ -135,11 +135,15 @@
- 
- &fec {
- 	phy-reset-gpios = <&gpio3 30 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1_1>;
- 	status = "okay";
- };
- 
- &i2c2 {
- 	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2_1>;
- 	status = "okay";
- 
- 	at24 at 52 {
+this series implements a imx27 pinctrl driver. imx1/21/27 have a register
+format that is not compatible with the rest of imx series processors. The
+series adds a imx1 core driver for the different register layout.
+
+Regards,
+
+Markus
+
+
+Markus Pargmann (8):
+  pinctrl: imx1 core driver
+  pinctrl: imx27: imx27 pincontrol driver
+  ARM: dts: imx27 pin functions
+  ARM: dts: imx27 pinctrl
+  ARM: dts: imx27 phyCARD-S pinctrl
+  ARM: dts: imx27 phycore move uart1 to rdk
+  ARM: dts: imx27 phycore pinctrl
+  ARM: imx27: enable pinctrl
+
+ .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  50 ++
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts   |  10 +
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts   |   4 +
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     |   5 +
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dts     |   8 +-
+ arch/arm/boot/dts/imx27-pinfunc.h                  | 524 +++++++++++++++++
+ arch/arm/boot/dts/imx27.dtsi                       | 102 ++++
+ arch/arm/mach-imx/Kconfig                          |   2 +
+ drivers/pinctrl/Kconfig                            |  13 +
+ drivers/pinctrl/Makefile                           |   2 +
+ drivers/pinctrl/pinctrl-imx1-core.c                | 653 +++++++++++++++++++++
+ drivers/pinctrl/pinctrl-imx1.h                     |  73 +++
+ drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++
+ 13 files changed, 1919 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
+ create mode 100644 drivers/pinctrl/pinctrl-imx1-core.c
+ create mode 100644 drivers/pinctrl/pinctrl-imx1.h
+ create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+
 -- 
 1.8.4.rc3
