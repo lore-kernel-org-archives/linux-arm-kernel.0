@@ -1,34 +1,47 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 24 Oct 2013 01:45:02 -0700
-Subject: [PATCH] Simple NX lowmem mappings
-In-Reply-To: <20131024071258.GB16735@n2100.arm.linux.org.uk>
-Message-ID: <20131024084502.GT4994@outflux.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Oct 2013 09:45:59 +0100
+Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
+In-Reply-To: <87eh7bfoq9.fsf@rustcorp.com.au>
+References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
+ <87eh7bfoq9.fsf@rustcorp.com.au>
+Message-ID: <20131024084559.GD16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 24, 2013 at 11:51:18AM +1030, Rusty Russell wrote:
+> Ming Lei <tom.leiming@gmail.com> writes:
+> > Address of non-module kernel symbol should always be located
+> > from CONFIG_PAGE_OFFSET on, so only show these legal kernel
+> > symbols in /proc/kallsyms.
+> >
+> > On ARM, some symbols(see below) may drop in relocatable code, so
+> > perf can't parse kernel symbols any more from /proc/kallsyms, this
+> > patch fixes the problem.
+> >
+> > 	00000000 t __vectors_start
+> > 	00000020 A cpu_v7_suspend_size
+> > 	00001000 t __stubs_start
+> > 	00001004 t vector_rst
+> > 	00001020 t vector_irq
+> > 	000010a0 t vector_dabt
+> > 	00001120 t vector_pabt
+> > 	000011a0 t vector_und
+> > 	00001220 t vector_addrexcptn
+> > 	00001224 t vector_fiq
+> > 	00001224 T vector_fiq_offset
+> >
+> > The issue can be fixed in scripts/kallsyms.c too, but looks this
+> > approach is easier.
+> 
+> This fix looks hacky; if these symbols are not available, don't just
+> remove them from /proc/kallsyms, but don't put them in the kernel at
+> all.
 
-Thanks for starting this work!
+How do you "don't put them in the kernel at all" when they're used by
+the kernel internally as offsets?
 
-Russel said:
-> -#define MT_MEMORY      9
-> [...]
-> + MT_MEMORY,
-> + MT_MEMORY_NX,
+If you mean, just get rid of them, shall I just add these as magic
+numbers instead based on the values in this email?  Is that really a
+sane solution?
 
-Instead of these names, let's more fully describe the protections. "NX"
-doesn't say anything about RO vs RW. Instead, how about:
-
-MT_MEMORY_RWX (to replace MT_MEMORY)
-MT_MEMORY_RW  (as the new "NX" in use for this patch)
-
-for the first change? Then as we move forward, we can add:
-
-MT_MEMORY_R
-
-At which point we'll have the three states.
-
--Kees
-
--- 
-Kees Cook                                            @outflux.net
+No, we have to keep these symbols IMHO.
