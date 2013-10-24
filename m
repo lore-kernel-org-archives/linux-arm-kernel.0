@@ -1,8 +1,8 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Thu, 24 Oct 2013 13:33:59 +0200
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Thu, 24 Oct 2013 12:47:58 +0100
 Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
  is there something better?
-In-Reply-To: <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+In-Reply-To: <1382614439.6040.16.camel@sakura.staff.proxad.net>
 References: <20131020220839.GT2443@sirena.org.uk>
  <5264576F.6050307@wwwdotorg.org>
  <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
@@ -15,47 +15,55 @@ References: <20131020220839.GT2443@sirena.org.uk>
  <20131023174458.GC5208@netboy>
  <1382553982.31058.10.camel@sakura.staff.proxad.net>
  <20131024095232.27BBCC4039D@trevor.secretlab.ca>
-Message-ID: <1382614439.6040.16.camel@sakura.staff.proxad.net>
+ <1382614439.6040.16.camel@sakura.staff.proxad.net>
+Message-ID: <1382615278.8522.72.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2013-10-24 at 13:33 +0200, Maxime Bizon wrote:
+> 
+> ok then how do we solve that case:
+> 
+>  - Marvell SOC 1 is mainlined
+>  - Marvell SOC 2 is mainlined
+>  - Marvell SOC 'x' is mainlined
+>  - "PIO" hw crypto driver is written, working for all SOCs
+>  - [1 year]
+>  - SOCs bindings are marked as stable
+>  - [1 year]
+>  - someone rewrite the driver of hw crypto to use DMA, existing binding
+> is not ok because clock 'foo' or interrupt 'bar', now required, are not
+> present.
+> 
+> what is the process merge that driver ?
+> 
+> if the answer is that you need to keep PIO mode in driver so that
+> existing DTBs still works with it, then this is just plain *wrong*.
 
-On Thu, 2013-10-24 at 10:52 +0100, Grant Likely wrote:
-
-> At this point if the hardware exists then it should be described in DTB,
-> even if it is merely compatible, reg, interrupts and maybe clocks
-
-if your driver does not use them, chances are you'll get them wrong.
-
-> properties. In many cases that is all that is required. It /is/ okay to
-> amend a binding later and to use default values if the new properties
-> aren't present.
-
-how do you handle the case of a wrong property, because you only wrote
-hardware description and not the driver ?
-
-> hardware description when enabling previously unused peripherals, but it
-> is absolutely not friendly to change a binding/driver in a what that fails on
-> previously working DTB (with the caveat that if no one notices, it
-> isn't breakage).
-
-ok then how do we solve that case:
-
- - Marvell SOC 1 is mainlined
- - Marvell SOC 2 is mainlined
- - Marvell SOC 'x' is mainlined
- - "PIO" hw crypto driver is written, working for all SOCs
- - [1 year]
- - SOCs bindings are marked as stable
- - [1 year]
- - someone rewrite the driver of hw crypto to use DMA, existing binding
-is not ok because clock 'foo' or interrupt 'bar', now required, are not
+If you can automatically infer the correct clock/interrupt/etc in order
+to do DMA correctly, despite the fact that it wasn't explicitly spelled
+out in the old DT, then the property is *not* a "required" property.
+It's optional, and you have a default behaviour for when it's not
 present.
 
-what is the process merge that driver ?
+(And if you *can't* automatically infer that or otherwise get away
+without it, then you're asking for the impossible, surely?)
 
-if the answer is that you need to keep PIO mode in driver so that
-existing DTBs still works with it, then this is just plain *wrong*.
+The default behaviour in the absence of these properties may be
+horrendously complex, and it may be defined only for SOC [1..x] and not
+newer versions; it may be *mandatory* for SOC x+1. 
+
+But if you really want the new driver to do DMA on platforms even where
+this information wasn't originally provided by the DT, what option do
+you have?
 
 -- 
-Maxime
+dwmw2
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/aefaa3eb/attachment.bin>
