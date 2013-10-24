@@ -1,38 +1,45 @@
 From: leigh@solinno.co.uk (Leigh Brown)
-Date: Thu, 24 Oct 2013 19:09:34 +0100
-Subject: [PATCH RFC v2 4/4] net: mvmdio: doc: mvmdio now used by mv643xx_eth
-In-Reply-To: <cover.1382637156.git.leigh@solinno.co.uk>
-References: <cover.1382637156.git.leigh@solinno.co.uk>
-Message-ID: <3a4501026bcdf137b459ec5dc19363b8b86fc8ef.1382637156.git.leigh@solinno.co.uk>
+Date: Thu, 24 Oct 2013 19:09:30 +0100
+Subject: [PATCH RFC v2 0/4] MDIO bus timeout issues on Dreamplug 
+In-Reply-To: <cover.1382199042.git.leigh@solinno.co.uk>
+References: <cover.1382199042.git.leigh@solinno.co.uk>
+Message-ID: <cover.1382637156.git.leigh@solinno.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amend the documentation in the mvmdio driver to note the fact
-that it is now used by both the mvneta and mv643xx_eth drivers.
+Thanks to the comment from Sebastian I did some more investigation and
+discovered that almost everything about my analysis was wrong (woops).
+The patch itself wasn't too bad though.
 
-Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
----
- drivers/net/ethernet/marvell/mvmdio.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+In terms of timings, I don't believe the timeout was due to the SMI bus
+taking too long to respond because when I have repeated my testing
+(this time disabling interrupts whilst waiting), I have found that the
+maximum time that my Dreamplug takes to respond was about 95us (and
+43us on the Mirabox, which polls).  So I think the root cause of the 
+problem was that interrupt handler was interfering with the polling in 
+some way.
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 13f4614..79b6d32 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -4,11 +4,9 @@
-  * Since the MDIO interface of Marvell network interfaces is shared
-  * between all network interfaces, having a single driver allows to
-  * handle concurrent accesses properly (you may have four Ethernet
-- * ports, but they in fact share the same SMI interface to access the
-- * MDIO bus). Moreover, this MDIO interface code is similar between
-- * the mv643xx_eth driver and the mvneta driver. For now, it is only
-- * used by the mvneta driver, but it could later be used by the
-- * mv643xx_eth driver as well.
-+ * ports, but they in fact share the same SMI interface to access
-+ * the MDIO bus). This driver is currently used by the mvneta and 
-+ * mv643xx_eth drivers.
-  *
-  * Copyright (C) 2012 Marvell
-  *
+I have therefore amended the first patch to use usleep_range to sleep
+instead of busy wait as suggested by Sebastian, and set the timeout to
+1ms.  I've tested this on both the Dreamplug and Mirabox and have seen
+no timeouts at all.
+
+The second, third and fourth patches are pretty much the same as before.
+
+If I receive no comments who do I submit this to for inclusion?
+
+Regards,
+
+Leigh.
+
+Leigh Brown (4):
+  net: mvmdio: make orion_mdio_wait_ready consistent
+  net: mvmdio: orion_mdio_ready: remove manual poll
+  net: mvmdio: slight optimisation of orion_mdio_write
+  net: mvmdio: doc: mvmdio now used by mv643xx_eth
+
+ drivers/net/ethernet/marvell/mvmdio.c |  107 ++++++++++++++++-----------------
+ 1 file changed, 52 insertions(+), 55 deletions(-)
+
 -- 
 1.7.10.4
