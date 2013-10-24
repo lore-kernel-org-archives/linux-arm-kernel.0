@@ -1,37 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 24 Oct 2013 16:31:45 +0800
-Subject: [PATCHv6][ 3/7] ARM: imx{25,27} DT: Permit the selection of the
- imxfb framebuffer driver.
-In-Reply-To: <20131024102011.610e5d8b@e6520eb>
-References: <1382601665-6830-1-git-send-email-denis@eukrea.com>
- <1382601665-6830-3-git-send-email-denis@eukrea.com>
- <20131024081531.GA13614@S2101-09.ap.freescale.net>
- <20131024102011.610e5d8b@e6520eb>
-Message-ID: <20131024083143.GB13614@S2101-09.ap.freescale.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 24 Oct 2013 10:34:12 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131023182345.GG5208@netboy>
+References: <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023174736.GD5208@netboy>
+ <20131023180240.GA32563@obsidianresearch.com>
+ <20131023182345.GG5208@netboy>
+Message-ID: <20131024083411.GH9403@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 10:20:11AM +0200, Eric B?nard wrote:
-> Hi Shawn,
+On Wed, Oct 23, 2013 at 08:23:47PM +0200, Richard Cochran wrote:
+> On Wed, Oct 23, 2013 at 12:02:40PM -0600, Jason Gunthorpe wrote:
+> > On Wed, Oct 23, 2013 at 07:47:37PM +0200, Richard Cochran wrote:
+> > > 
+> > > The effort is no more or less than is required of every other kernel
+> > > development.
+> > 
+> > Bollocks. User space API development is the single most difficult
+> > thing to do in the kernel. It is much harder than any other change,
+> > and stable ABI DT is elevated to *that* level. 
 > 
-> Le Thu, 24 Oct 2013 16:15:34 +0800,
-> Shawn Guo <shawn.guo@linaro.org> a ?crit :
-> > >  config FB_IMX
-> > >  	tristate "Freescale i.MX1/21/25/27 LCD support"
-> > > -	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
-> > > +	depends on FB && HAVE_IMX_FB
-> > 
-> > Or simply have it depend on ARCH_MXC?
-> > 
-> > 	depends on FB && ARCH_MXC
-> > 
-> but not all MXC have IMX_FB : isn't that a problem ?
+> Yes, that is the kind of effort needed. It comes with the territory.
+> System calls and ioctls are added all the time. Yes, they do require
+> some thought and review to get them right.
+> 
+> Creating new DT bindings also requires effort, but I don't agree with
+> the idea of making a mess for the end user just to avoid this effort.
 
-Is it really a problem that you see this option when you configure an
-imx51 kernel?  The prompt clearly tells you do not need this option for
-an imx51 kernel.  Or will it cause any real problem even if you select
-it for an imx51 kernel, except you build in a driver which will never be
-instantiated?  I've seen drivers even start drop ARCH_* dependency to
-get a better randconfig build test coverage.
+There's another thing with DT bindings that makes them needlessly hard
+to settle on. Let's say you come up with a binding that accurately
+describes the hardware at hand and has been proven to work. Now people
+keep telling you that it might not be good enough, for whatever reason
+so eventually you decide to be bold and tell them that you're aware of
+everything that stable DT bindings imply and that there might be some
+risk of having to maintain two bindings because the first one didn't
+turn out to be perfect and yada yada.
 
-Shawn
+So you are actually prepared to take the risk of having to maintain two
+different bindings and do all the work to get a new feature supported.
+Now people tell you that you can't do that either because you might not
+be around forever and some poor sod will have to maintain it for you.
+
+What do you do then? You try to convince people that we are in a big
+mess right now and that we need to find a way out of it.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/3fe22272/attachment.sig>
