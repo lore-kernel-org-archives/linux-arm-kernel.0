@@ -1,42 +1,48 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 24 Oct 2013 13:10:22 -0000
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <1382619655.6040.52.camel@sakura.staff.proxad.net>
-References: <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023174458.GC5208@netboy>
- <1382553982.31058.10.camel@sakura.staff.proxad.net>
- <20131024095232.27BBCC4039D@trevor.secretlab.ca>
- <1382614439.6040.16.camel@sakura.staff.proxad.net>
- <1382615278.8522.72.camel@shinybook.infradead.org>
- <20131024122346.GD11296@ulmo.nvidia.com>
- <1382619655.6040.52.camel@sakura.staff.proxad.net>
-Message-ID: <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 24 Oct 2013 14:11:48 +0100
+Subject: [PATCH v8 13/19] swiotlb-xen: use xen_dma_map/unmap_page,
+ xen_dma_sync_single_for_cpu/device
+In-Reply-To: <alpine.DEB.2.02.1310241133070.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-13-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20131023140927.GD27771@phenom.dumpdata.com>
+ <alpine.DEB.2.02.1310231816180.26077@kaball.uk.xensource.com>
+ <20131023195154.GB28963@phenom.dumpdata.com>
+ <alpine.DEB.2.02.1310241133070.26077@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1310241405480.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 24 Oct 2013, Stefano Stabellini wrote:
+> On Wed, 23 Oct 2013, Konrad Rzeszutek Wilk wrote:
+> > On Wed, Oct 23, 2013 at 06:20:25PM +0100, Stefano Stabellini wrote:
+> > > On Wed, 23 Oct 2013, Konrad Rzeszutek Wilk wrote:
+> > > > On Thu, Oct 17, 2013 at 06:43:28PM +0100, Stefano Stabellini wrote:
+> > > > > Call xen_dma_map_page, xen_dma_unmap_page, xen_dma_sync_single_for_cpu,
+> > > > > xen_dma_sync_single_for_device from swiotlb-xen to ensure cpu/device
+> > > > > coherency of the pages used for DMA, including the ones belonging to the
+> > > > > swiotlb buffer.
+> > > > 
+> > > > You lost me.
+> > > > 
+> > > > Isn't it the driver's responsibility to do this?
+> > > > 
+> > > > Looking at what 'xen_dma_map_page()' does for x86 it looks to add an extra
+> > > > call - page_to_phys - and we ignore it here.
+> > > 
+> > > map_page on arm calls the right cache flushes needed to communicate with
+> > > the device. Same with unmap_page.
+> > 
+> > If this is flushing the cache then I think it makes more sense to do
+> > that without this fancy 'dma_map_page'.
+> > 
+> > Just call it 'xen_flush_dma_page' and make it a nop on all platforms
+> > except ARM.
+> 
+> I am OK with making it a nop on x86, it makes sense.
+> However I would like to keep it called xen_dma_map_page: after all it
+> corresponds exactly to the native map_page dma_op. It is part of the same
+> "contract".
 
->
-> On Thu, 2013-10-24 at 14:23 +0200, Thierry Reding wrote:
-> my point
->
-> before DT scenario for my hw crypto driver example:
-
-Note that you are not describing a normal "DT scenario" here. You are
-describing a case in which we screwed up and allowed non-invariant
-features of the hardware to be left out of the DT schema for the device in
-question - apparently because the Linux driver at the time didn't happen
-to use them yet. That was a fundamental mistake and should not have
-happened that way.
-
-So yes, after the public flogging has happened, and we're trying to work
-out how best to cope with the screwup, we don't necessarily have any
-perfect choices. The perfect choice was to do it properly in the first
-place.
-
--- 
-dwmw2
+for example we can turn xen_dma_map_page into a function that returns
+void, this way we can remove the page_to_phys on x86
