@@ -1,49 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 24 Oct 2013 23:29:33 +0100
-Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
- tree bindings
-In-Reply-To: <20131024083459.48FE3C4039D@trevor.secretlab.ca>
-References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
- <5267FA58.9050002@wwwdotorg.org> <20131023172001.GA3379@katana>
- <20131024083459.48FE3C4039D@trevor.secretlab.ca>
-Message-ID: <52699F4D.7030805@wwwdotorg.org>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 25 Oct 2013 00:47:23 +0200
+Subject: [GIT PULL] MFD patches due for v3.13
+In-Reply-To: <20131023153510.GF2620@lee--X1>
+References: <20131023153510.GF2620@lee--X1>
+Message-ID: <20131024224723.GE5714@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2013 09:34 AM, Grant Likely wrote:
-> On Wed, 23 Oct 2013 18:20:02 +0100, Wolfram Sang <wsa@the-dreams.de> wrote:
->>
->>> Do we really want to polute the drivers and DT files with a ! in the
->>> compatible values? I thought we'd considered that, but chosen having the
->>> drivers that use unstable bindings depend on a Kconfig option as an
->>> alternative, not an additional step?
->>
->> I'd even go further and use "unstable-" as the prefix instead of "!"
->> which is way more explicit.
->>
->>
->>> The one issue with doing this is that if a binding is thought to be
->>> unstable, but becomes stable later without any changes, we'll have to do
->>> busy-work to remove the ! in all the DT files, thus artificially
->>> introducing an incompatibility. Perhaps that's fine though?
->>
->> I'd say yes. Going from unstable to stable is quite a step for a binding
->> and that should be visible and worth a patch IMO. Also, when looking at
->> a DTS file or some driver code, it will avoid
->> confusion/misinterpretation if one can see immediately the status of a
->> binding.
-> 
-> No, it shouldn't. Going from unstable to stable is not a large step, rather it is coming to the point of looking around and realizing that the binding is working quite well.
-> 
-> I don't think the solution is to put this into the kernel to be checked
-> at runtime. The better solution is to put it into DTC and make it
-> complain (either warn or error; depending on build config?) about usage
-> of compatible strings that are marked in the binding documentation as
-> unstable.
+Hi Lee,
 
-I don't think that's what we talked about on Wednesday though. At a
-quick glance, this didn't make it into the meeting notes though[1], but
-is in the presentation we created for the kernel summit readout. Is
-sharing a link to that before it's presented OK?
+On Wed, Oct 23, 2013 at 04:35:10PM +0100, Lee Jones wrote:
+> The following changes since commit 61e6cfa80de5760bbe406f4e815b7739205754d2:
+> 
+>   Linux 3.12-rc5 (2013-10-13 15:41:28 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/ljones/mfd.git tags/mfd-lee-3.13-1
+> 
+> for you to fetch changes up to 6bfd1e63de34a278d67db32e3644340838308252:
+> 
+>   mfd: lpc_sch: Ignore resource conflicts when adding mfd cells (2013-10-23 16:22:40 +0100)
+> 
+> ----------------------------------------------------------------
+> mfd-lee-3.13-1
+> 
+> MFD patches due for v3.13.
+All pulled, thanks a lot.
 
-[1] http://etherpad.osuosl.org/arm-ksummit-2013-day-2
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
