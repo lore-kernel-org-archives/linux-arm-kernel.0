@@ -1,50 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 24 Oct 2013 16:35:52 +0800
-Subject: [PATCH v4 0/7] ARM: imx27 pinctrl
-In-Reply-To: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
-References: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20131024083550.GC13614@S2101-09.ap.freescale.net>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Thu, 24 Oct 2013 10:36:16 +0200
+Subject: [PATCHv6][ 3/7] ARM: imx{25,27} DT: Permit the selection of the
+ imxfb framebuffer driver.
+In-Reply-To: <20131024083143.GB13614@S2101-09.ap.freescale.net>
+References: <1382601665-6830-1-git-send-email-denis@eukrea.com>
+ <1382601665-6830-3-git-send-email-denis@eukrea.com>
+ <20131024081531.GA13614@S2101-09.ap.freescale.net>
+ <20131024102011.610e5d8b@e6520eb>
+ <20131024083143.GB13614@S2101-09.ap.freescale.net>
+Message-ID: <20131024103616.0b28b922@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+Hi Shawn,
 
-On Thu, Oct 24, 2013 at 09:53:46AM +0200, Markus Pargmann wrote:
-> Markus Pargmann (7):
->   pinctrl: imx1 core driver
->   pinctrl: imx27: imx27 pincontrol driver
+Le Thu, 24 Oct 2013 16:31:45 +0800,
+Shawn Guo <shawn.guo@linaro.org> a ?crit :
 
-Is it still possible to queue these two patches for 3.13 merge window,
-so that we get imx27 device tree machine work on 3.13-rc?
-
-Shawn
-
->   ARM: dts: imx27 pin functions
->   ARM: dts: imx27 pinctrl
->   ARM: dts: imx27 phyCARD-S pinctrl
->   ARM: dts: imx27 phycore pinctrl
->   ARM: imx27: enable pinctrl
+> On Thu, Oct 24, 2013 at 10:20:11AM +0200, Eric B?nard wrote:
+> > Hi Shawn,
+> > 
+> > Le Thu, 24 Oct 2013 16:15:34 +0800,
+> > Shawn Guo <shawn.guo@linaro.org> a ?crit :
+> > > >  config FB_IMX
+> > > >  	tristate "Freescale i.MX1/21/25/27 LCD support"
+> > > > -	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
+> > > > +	depends on FB && HAVE_IMX_FB
+> > > 
+> > > Or simply have it depend on ARCH_MXC?
+> > > 
+> > > 	depends on FB && ARCH_MXC
+> > > 
+> > but not all MXC have IMX_FB : isn't that a problem ?
 > 
->  .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  50 ++
->  arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts   |  10 +
->  arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts   |   4 +
->  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     |   2 +
->  arch/arm/boot/dts/imx27-phytec-phycore-som.dts     |   6 +
->  arch/arm/boot/dts/imx27-pinfunc.h                  | 524 +++++++++++++++++
->  arch/arm/boot/dts/imx27.dtsi                       | 102 ++++
->  arch/arm/mach-imx/Kconfig                          |   2 +
->  drivers/pinctrl/Kconfig                            |  13 +
->  drivers/pinctrl/Makefile                           |   2 +
->  drivers/pinctrl/pinctrl-imx1-core.c                | 653 +++++++++++++++++++++
->  drivers/pinctrl/pinctrl-imx1.h                     |  73 +++
->  drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++
->  13 files changed, 1918 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
->  create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
->  create mode 100644 drivers/pinctrl/pinctrl-imx1-core.c
->  create mode 100644 drivers/pinctrl/pinctrl-imx1.h
->  create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+> Is it really a problem that you see this option when you configure an
+> imx51 kernel?  The prompt clearly tells you do not need this option for
+> an imx51 kernel.  Or will it cause any real problem even if you select
+> it for an imx51 kernel, except you build in a driver which will never be
+> instantiated?  I've seen drivers even start drop ARCH_* dependency to
+> get a better randconfig build test coverage.
 > 
-> -- 
-> 1.8.4.rc3
-> 
+not really a problem for me. If the policy is not to narrow the choices
+to only the SOC which have the peripheral then we follow it and take
+your ARCH_MXC approach which is far simpler.
+
+Thanks,
+Eric
