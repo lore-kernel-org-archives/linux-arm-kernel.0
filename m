@@ -1,59 +1,75 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Thu, 24 Oct 2013 00:29:23 +0100
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131023183041.GH5208@netboy>
-References: <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023180108.GA23728@roeck-us.net>
- <20131023182502.GC32563@obsidianresearch.com>
- <20131023183041.GH5208@netboy>
-Message-ID: <1382570963.6315.48.camel@deadeye.wl.decadent.org.uk>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 24 Oct 2013 08:40:51 +0800
+Subject: [PATCH 1/3] usb: ehci: add freescale imx28 special write
+ register method
+In-Reply-To: <CAOMZO5B6Hq+_p6X-+LMpaax2wT3h+xBiscYXsQ8za+_fzOuP_A@mail.gmail.com>
+References: <1382517309-6730-1-git-send-email-peter.chen@freescale.com>
+ <CAOMZO5B6Hq+_p6X-+LMpaax2wT3h+xBiscYXsQ8za+_fzOuP_A@mail.gmail.com>
+Message-ID: <20131024004050.GA32138@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-10-23 at 20:30 +0200, Richard Cochran wrote:
-> On Wed, Oct 23, 2013 at 12:25:02PM -0600, Jason Gunthorpe wrote:
+On Wed, Oct 23, 2013 at 10:09:39AM -0200, Fabio Estevam wrote:
+> Hi Peter,
 > 
-> > What they want is one vmlinux/z, and a package of 'stuff' that they
-> > can assemble a boot image for all hardware out of.
+> On Wed, Oct 23, 2013 at 6:35 AM, Peter Chen <peter.chen@freescale.com> wrote:
+> > According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+> > register error issue", All USB register write operations must
+> > use the ARM SWP instruction. So, we implement a special ehci_write
+> > for imx28.
+> >
+> > Discussion for it at below:
+> > http://marc.info/?l=linux-usb&m=137996395529294&w=2
+> >
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/host/ehci.h |   13 +++++++++++++
+> >  1 files changed, 13 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+> > index 2d40192..577b75d 100644
+> > --- a/drivers/usb/host/ehci.h
+> > +++ b/drivers/usb/host/ehci.h
+> > @@ -203,6 +203,7 @@ struct ehci_hcd {                   /* one per controller */
+> >         unsigned                has_synopsys_hc_bug:1; /* Synopsys HC */
+> >         unsigned                frame_index_bug:1; /* MosChip (AKA NetMos) */
+> >         unsigned                need_oc_pp_cycle:1; /* MPC834X port power */
+> > +       unsigned                imx28_write_fix:1; /* For Freescale i.MX28 */
+> >
+> >         /* required for usb32 quirk */
+> >         #define OHCI_CTRL_HCFS          (3 << 6)
+> > @@ -680,6 +681,13 @@ static inline unsigned int ehci_readl(const struct ehci_hcd *ehci,
+> >  #endif
+> >  }
+> >
+> > +#ifdef CONFIG_SOC_IMX28
+> > +static inline void imx28_ehci_writel(u32 val32, volatile u32 *addr)
+> > +{
+> > +       __asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
+> > +}
+> > +#endif
+> > +
+> >  static inline void ehci_writel(const struct ehci_hcd *ehci,
+> >                 const unsigned int val, __u32 __iomem *regs)
+> >  {
+> > @@ -687,6 +695,11 @@ static inline void ehci_writel(const struct ehci_hcd *ehci,
+> >         ehci_big_endian_mmio(ehci) ?
+> >                 writel_be(val, regs) :
+> >                 writel(val, regs);
+> > +#elif defined(CONFIG_SOC_IMX28)
+> > +       if (ehci->imx28_write_fix)
+> > +               imx28_ehci_writel(val, regs);
+> > +       else
+> > +               writel(val, regs);
 > 
-> ...
+> Have you tested this on mx23?
 > 
-> > On ARM the package of 'stuff' can very reasonably include dtb. Distro
-> > scripts can package modules+DTB+vmlinuz into something the bootloader
-> > can understand. (The next pain point will be to standardize that)
-> > 
-> > The DTB doesn't have to be 'outside' the distro/kernel to give users a
-> > seamless upgrade experience.
+> What if we have a kernel built for both mx23 and mx28?
 > 
-> How can a distro possibly provide me a DTB?
-> 
-> They don't know what hardware I am using. Only I know that.
 
-This is what Debian runs when installing a kernel on most ARM systems:
-http://sources.debian.net/src/flash-kernel/3.11/functions
-
-It starts by looking up the machine ID (in procfs, but may be overridden
-because some board vendors don't set it correctly).  If the machine is
-supported using FDT then there is an associated DTB file which will have
-been installed with the kernel.  The script copies/appends this to the
-appropriate place for the boot loader.
-
-Ben.
-
+The condition ehci->imx28_write_fix will only be set
+for imx28 platform, you can refer patch 2/3 and patch 3/3.
 -- 
-Ben Hutchings
-Teamwork is essential - it allows you to blame someone else.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/158a3751/attachment-0001.sig>
+
+Best Regards,
+Peter Chen
