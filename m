@@ -1,54 +1,57 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 24 Oct 2013 10:52:32 +0100
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution,
- or is there something better?
-In-Reply-To: <1382553982.31058.10.camel@sakura.staff.proxad.net>
-References: <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com> <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com> <20131023174458.GC5208@netboy>
- <1382553982.31058.10.camel@sakura.staff.proxad.net>
-Message-ID: <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 24 Oct 2013 11:01:55 +0100
+Subject: [PATCHv6][ 1/4] ASoC: eukrea-tlv320: Add DT support.
+In-Reply-To: <1382519766-17359-1-git-send-email-denis@eukrea.com>
+References: <1382519766-17359-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131024100155.GI31415@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Oct 2013 20:46:22 +0200, Maxime Bizon <mbizon@freebox.fr> wrote:
-> 
-> On Wed, 2013-10-23 at 19:45 +0200, Richard Cochran wrote:
-> > 
-> > Once I design my board, and it goes into production, the hardware is
-> > fixed. It doesn't change, and neither should the description of the
-> > hardware, also known as the DTB. If I have to research all of the
-> > ways 
-> 
-> SOC support are never completely finished; subsystems are getting new
-> features.
->  
-> It's possible to ship a product with a kernel version that does not
-> handle all the chip goodies, then want to upgrade the kernel later when
-> someone has written the driver for a previously unused hardware block.
-> 
-> the first iteration of your DTB would be incomplete, the bindings to
-> describe that hardware block would not exist inside it.
+On Wed, Oct 23, 2013 at 11:16:03AM +0200, Denis Carikli wrote:
 
-At this point if the hardware exists then it should be described in DTB,
-even if it is merely compatible, reg, interrupts and maybe clocks
-properties. In many cases that is all that is required. It /is/ okay to
-amend a binding later and to use default values if the new properties
-aren't present.
+> +	/* fsl_ssi lacks the set_fmt ops. */
+> +	if (!priv->of) {
+> +		ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
+> +					  SND_SOC_DAIFMT_NB_NF |
+> +					  SND_SOC_DAIFMT_CBM_CFM);
+> +		if (ret) {
+> +			dev_err(cpu_dai->dev,
+> +				"Failed to set the cpu dai format\n");
+> +			return ret;
+> +		}
 
-> real life example with Marvell Kirkwood, hw crypto support was added 1
-> year after initial SOC support.
+This is unrelated to OF support, whatever version of the DAI does have
+the operation might be used on an ACPI system for example.  What would
+be better would be to check the return value for -ENOTSUPP and ignore
+that while still passing on other errors.  The same thing applies to the
+other ops that aren't supported.
 
-That said, enabling new hardware is a different problem from changing
-the binding on working hardware. It is entirely reasonable to update the
-hardware description when enabling previously unused peripherals, but it
-is absolutely not friendly to change a binding/driver in a what that fails on
-previously working DTB (with the caveat that if no one notices, it
-isn't breakage).
+>  	if (ret) {
+> -		pr_err("%s: failed set codec dai format\n", __func__);
+> +		dev_err(cpu_dai->dev,
+> +			"Failed to set the codec dai format.\n");
+>  		return ret;
 
-g.
+This is a useful cleanup but should be done in a separate patch.
+
+> +	/* fsl_ssi lacks the set_sysclk ops */
+> +	if (!priv->of) {
+> +		snd_soc_dai_set_tdm_slot(cpu_dai, 0xffffffc, 0xffffffc, 2, 0);
+
+This is nothing to do with sysclk, but that's just a minor point about
+the grouping and commenting.
+
+> @@ -80,7 +97,6 @@ static struct snd_soc_dai_link eukrea_tlv320_dai = {
+>  	.name		= "tlv320aic23",
+>  	.stream_name	= "TLV320AIC23",
+>  	.codec_dai_name	= "tlv320aic23-hifi",
+> -	.platform_name	= "imx-ssi.0",
+
+Does this not break existing users?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/d579bbfc/attachment.sig>
