@@ -1,56 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 24 Oct 2013 15:26:49 +0800
-Subject: [PATCHv5][ 11/11] ARM: imx_v4_v5_defconfig: Enable gpio
- regulator and gpio button/keyboard.
-In-Reply-To: <1382517617-14260-2-git-send-email-denis@eukrea.com>
-References: <1382517617-14260-1-git-send-email-denis@eukrea.com>
- <1382517617-14260-2-git-send-email-denis@eukrea.com>
-Message-ID: <20131024072644.GF11466@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 24 Oct 2013 09:28:11 +0200
+Subject: ARM topic: Is DT on ARM the solution, or is there something
+ better?
+In-Reply-To: <CAF6AEGtt_2sStiZCNBp9btxevWghSwLZZBdN6ir8eUpX1FXrCQ@mail.gmail.com>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020231134.GR25034@n2100.arm.linux.org.uk>
+ <20131021083242.GB30088@pengutronix.de>
+ <20131021084854.GV25034@n2100.arm.linux.org.uk>
+ <20131021092730.GF30088@pengutronix.de>
+ <CAF6AEGtt_2sStiZCNBp9btxevWghSwLZZBdN6ir8eUpX1FXrCQ@mail.gmail.com>
+Message-ID: <20131024072811.GS30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 10:40:17AM +0200, Denis Carikli wrote:
-> The eukrea mbimxsd25 has a gpio regulator for enabling its
->   LCD display, it also has a gpio button.
+On Wed, Oct 23, 2013 at 09:14:17PM -0400, Rob Clark wrote:
+> On Mon, Oct 21, 2013 at 5:27 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >> If a subsystem doesn't work well with DT, then the choices are either:
+> >>
+> >> (a) don't use DT with the subsystem
+> >
+> > The underlying problem has nothing to do with DT. Multi component
+> > hardware does exist and won't vanish when we stop using DT.
+> >
+> >> (b) fix the subsystem
+> >
+> > I'd love to do that. Step one to this seems to be to increase the
+> > awareness that there's something wrong with DRM.
 > 
-> We enable the respective drivers in order to be able to use theses
->   features with this configuration.
 > 
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Note that I suspect your idea of "fixing drm" is going to break some
+> userspace assumptions about the hw (ie. userspace isn't expecting
+> crtcs/encoders/connectors to suddenly appear/disappear.  And the funny
+> thing is, on all of this hw, that isn't going to happen anyways.
 
-Applied this one, thanks.
+I was talking about all SoC DRM drivers implementing variants of the
+same glue between drm and the multidevice nature of the components.
 
-Shawn
+To make that sure: I never had the intention to implement hotplug for
+drm. Also what the imx-drm driver does is not for hotplug, but only for
+binding different components together.
 
-> ---
->  arch/arm/configs/imx_v4_v5_defconfig |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-> index e958ebe..6309ee5 100644
-> --- a/arch/arm/configs/imx_v4_v5_defconfig
-> +++ b/arch/arm/configs/imx_v4_v5_defconfig
-> @@ -91,6 +91,7 @@ CONFIG_SMSC911X=y
->  CONFIG_SMSC_PHY=y
->  # CONFIG_INPUT_MOUSEDEV is not set
->  CONFIG_INPUT_EVDEV=y
-> +CONFIG_KEYBOARD_GPIO=y
->  CONFIG_KEYBOARD_IMX=y
->  # CONFIG_INPUT_MOUSE is not set
->  CONFIG_INPUT_TOUCHSCREEN=y
-> @@ -118,6 +119,7 @@ CONFIG_IMX2_WDT=y
->  CONFIG_MFD_MC13XXX_SPI=y
->  CONFIG_REGULATOR=y
->  CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> +CONFIG_REGULATOR_GPIO=y
->  CONFIG_REGULATOR_MC13783=y
->  CONFIG_REGULATOR_MC13892=y
->  CONFIG_MEDIA_SUPPORT=y
-> -- 
-> 1.7.9.5
-> 
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
