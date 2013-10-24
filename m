@@ -1,69 +1,102 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Thu, 24 Oct 2013 11:51:18 +1030
-Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
-In-Reply-To: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
-References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <87eh7bfoq9.fsf@rustcorp.com.au>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 24 Oct 2013 09:33:26 +0800
+Subject: [Patch v2 09/10] usb: chipidea: host: add ehci quirk for imx
+ controller
+In-Reply-To: <Pine.LNX.4.44L0.1310231433390.1326-100000@iolanthe.rowland.org>
+References: <20131023180657.GI25954@gimli>
+ <Pine.LNX.4.44L0.1310231433390.1326-100000@iolanthe.rowland.org>
+Message-ID: <20131024013325.GC32138@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei <tom.leiming@gmail.com> writes:
-> Address of non-module kernel symbol should always be located
-> from CONFIG_PAGE_OFFSET on, so only show these legal kernel
-> symbols in /proc/kallsyms.
->
-> On ARM, some symbols(see below) may drop in relocatable code, so
-> perf can't parse kernel symbols any more from /proc/kallsyms, this
-> patch fixes the problem.
->
-> 	00000000 t __vectors_start
-> 	00000020 A cpu_v7_suspend_size
-> 	00001000 t __stubs_start
-> 	00001004 t vector_rst
-> 	00001020 t vector_irq
-> 	000010a0 t vector_dabt
-> 	00001120 t vector_pabt
-> 	000011a0 t vector_und
-> 	00001220 t vector_addrexcptn
-> 	00001224 t vector_fiq
-> 	00001224 T vector_fiq_offset
->
-> The issue can be fixed in scripts/kallsyms.c too, but looks this
-> approach is easier.
+On Wed, Oct 23, 2013 at 02:45:39PM -0400, Alan Stern wrote:
+> On Wed, 23 Oct 2013, Felipe Balbi wrote:
+> 
+> > Hi,
+> > 
+> > On Wed, Oct 23, 2013 at 10:46:09AM -0400, Alan Stern wrote:
+> > > On Tue, 22 Oct 2013, Peter Chen wrote:
+> > > 
+> > > > When the port goes to suspend or finishes resme, it needs to
+> > > > notify PHY, it is not a standard EHCI operation, so we add a
+> > > > quirk for it.
+> > > 
+> > > Actually, this _should_ be a standard EHCI operation.  But we have to
+> > > figure out a way to do it that will work on all platforms.
+> > > 
+> > > Felipe, any ideas?
+> > 
+> > isn't it enough to call usb_phy_set_suspend() at apropriate places ?
+> > 
+> > This should work on all platforms if the PHY driver is implemented
+> > correctly.
+> 
+> On Tue, 22 Oct 2013, Peter Chen wrote:
+> 
+> > +				/*
+> > +				 * notify the USB PHY, it is for global
+> > +				 * suspend case.
+> > +				 */
+> > +				usb_phy_notify_suspend(hcd->phy,
+> > +					USB_SPEED_HIGH);
+> 
+> Hmmm.  This calls usb_phy_notify_suspend(), and later on, 
+> usb_phy_notify_resume().  AFAICT, those routines don't exist.
+> 
 
-This fix looks hacky; if these symbols are not available, don't just
-remove them from /proc/kallsyms, but don't put them in the kernel at
-all.
+Hi Alan and Felipe,
 
-That way, they won't interfere with other kallsyms uses (eg. backtrace).
+It is at my another patchset: "Add power management support for MXS PHY"
+http://marc.info/?l=linux-usb&m=138242248913823&w=2
+Since they are two things, one is from PHY, the other is for controller.
+I split them to two patchset.
 
-Or, better, figure out a smart way of excluding them by knowing why
-these symbol addresses are wrong.
+For these two notifications, please see:
+[Patch v2 07/14] usb: phy: add notify suspend and resume callback
+http://marc.info/?l=linux-usb&m=138242252713848&w=2
 
-Thanks,
-Rusty.
+[Patch v2 08/14] usb: phy-mxs: Add implementation of
+nofity_suspend and notify_resume
+http://marc.info/?l=linux-usb&m=138242253313856&w=2
 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Rusty Russell <rusty@rustcorp.com.au>
-> Cc: Chen Gang <gang.chen@asianux.com>
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
->  kernel/kallsyms.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
-> index 3127ad5..184f271 100644
-> --- a/kernel/kallsyms.c
-> +++ b/kernel/kallsyms.c
-> @@ -543,7 +543,7 @@ static int s_show(struct seq_file *m, void *p)
->  					tolower(iter->type);
->  		seq_printf(m, "%pK %c %s\t[%s]\n", (void *)iter->value,
->  			   type, iter->name, iter->module_name);
-> -	} else
-> +	} else if (iter->value >= CONFIG_PAGE_OFFSET)
->  		seq_printf(m, "%pK %c %s\n", (void *)iter->value,
->  			   iter->type, iter->name);
->  	return 0;
-> -- 
-> 1.7.9.5
+> Instead we have usb_phy_set_suspend(), as Felipe mentioned.  It has a
+> different interface, because the second argument specifies whether we
+> are entering or leaving suspend, not the connection speed.
+> 
+> Peter, you need to straighten this out.
+
+.set_suspend is different with .notify_suspend.
+
+.set_suspend is called when the PHY enters suspend.
+.notify_suspend is called when port enters suspends (setting portsc.suspendM,
+and stop sending SOF).
+
+After calling .notify_suspend, the PHY may still need to access,
+eg, set PHY wakeup setting, etc.
+
+The .notify_suspend is in ehci operation, .set_suspend can be at
+controller driver, since when to put the PHY enters suspend may
+platform specific.
+
+> 
+> Also, there's the question of where are the appropriate places to make
+> the calls?  After the root hub goes into suspend, I suppose.  But when
+> is the right time during resume?
+> 
+
+If we can take it as standard EHCI operation, we need to put it at below
+places:
+	
+For .notify_suspend, we need to put it after set portsc.suspendM.
+- For selective suspend, at ehci_hub_control
+- For global suspend, at ehci_bus_suspend
+
+For .notify_resume, we need to put it after clear portsc.fpr,
+it is similar for .notify_suspend
+- For selective suspend, at ehci_hub_control
+- For global suspend, at ehci_bus_resume
+
+-- 
+
+Best Regards,
+Peter Chen
