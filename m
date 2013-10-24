@@ -1,35 +1,27 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 24 Oct 2013 16:45:50 -0000
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <alpine.LFD.2.03.1310241143240.1951@syhkavp.arg>
-References: <20131023174458.GC5208@netboy>
- <1382553982.31058.10.camel@sakura.staff.proxad.net>
- <20131024095232.27BBCC4039D@trevor.secretlab.ca>
- <1382614439.6040.16.camel@sakura.staff.proxad.net>
- <1382615278.8522.72.camel@shinybook.infradead.org>
- <20131024122346.GD11296@ulmo.nvidia.com>
- <1382619655.6040.52.camel@sakura.staff.proxad.net>
- <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
- <1382621431.6040.66.camel@sakura.staff.proxad.net>
- <af289ef3cc80be8de26274ba1f598d54.squirrel@twosheds.infradead.org>
- <20131024141955.GB25061@ulmo.nvidia.com>
- <465e75de15f7d79c3b57a3b88024e739.squirrel@twosheds.infradead.org>
- <alpine.LFD.2.03.1310241143240.1951@syhkavp.arg>
-Message-ID: <93d9a5ce228d03c4a183b06b00bd0442.squirrel@twosheds.infradead.org>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Thu, 24 Oct 2013 17:45:38 +0100
+Subject: [PATCH v3 0/3] MCPM/TC2 support for CPU powerdown synchronisation
+In-Reply-To: <CALicx6uAPM8x_BcqUWtrSAMPOmc=EGMiwMKFtxL=7sUMo7BmqA@mail.gmail.com>
+References: <CALicx6v86NMp53+zbE=A3ang-ftGE3KiUojkRZO4ss6Pmks1ow@mail.gmail.com>	<CALicx6tUgu=OnrBo1NaUHQz=hd7zHrXNbDmUGKPj6EnnXRQWTw@mail.gmail.com>
+ <CALicx6uAPM8x_BcqUWtrSAMPOmc=EGMiwMKFtxL=7sUMo7BmqA@mail.gmail.com>
+Message-ID: <52694EB2.1060701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 24/10/13 13:49, Vijay Kilari wrote:
+> Sorry. Below is the right DCC configuration for SCC 700
+> SCC: 0x700 0x0032F003           ;CFGRW48 - [25:24]Boot CPU [28]Boot
+> 
+> On Thu, Oct 24, 2013 at 6:18 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
+>> Hi Dave Martin,
+>>
+>>    With the below configuration, I tried to check cpu hotplug as this
+>> is prerequisite for kexec.
+>> I see cpu hotplug fails. hot-unplug is OK but hot plug-in fails.
+>>
+It works fine for me on v3.12-rc6.
+Do you see any error message ?
+(check demsg if loglevel is changed by some scripts in FS)
 
-> So it is time IMHO that the description of how things *shall* work be
-> itself revised.
-
-It *is* being revised, with an explicit explicit understanding that things
-will have to change and a defined process for how to cope with that.
-
-That was discussed yesterday and we will be finishing the write-up to be
-presented at the Kernel Summit tomorrow.
-
-
--- 
-dwmw2
+Regards,
+Sudeep
