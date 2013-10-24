@@ -1,71 +1,73 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 24 Oct 2013 10:50:38 +0200
-Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
- tree bindings
-In-Reply-To: <20131024083459.48FE3C4039D@trevor.secretlab.ca>
-References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
- <5267FA58.9050002@wwwdotorg.org> <20131023172001.GA3379@katana>
- <20131024083459.48FE3C4039D@trevor.secretlab.ca>
-Message-ID: <20131024085037.GA10650@ulmo.nvidia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 24 Oct 2013 10:52:47 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131024081733.GG9403@ulmo.nvidia.com>
+References: <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023180108.GA23728@roeck-us.net>
+ <20131023182502.GC32563@obsidianresearch.com>
+ <20131023183041.GH5208@netboy>
+ <20131023185435.GD32563@obsidianresearch.com>
+ <20131024080624.GV30088@pengutronix.de>
+ <20131024081733.GG9403@ulmo.nvidia.com>
+Message-ID: <20131024085247.GW30088@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 09:34:59AM +0100, Grant Likely wrote:
-> On Wed, 23 Oct 2013 18:20:02 +0100, Wolfram Sang <wsa@the-dreams.de> wrote:
+On Thu, Oct 24, 2013 at 10:17:33AM +0200, Thierry Reding wrote:
+> On Thu, Oct 24, 2013 at 10:06:24AM +0200, Sascha Hauer wrote:
+> > On Wed, Oct 23, 2013 at 12:54:35PM -0600, Jason Gunthorpe wrote:
+> > > On Wed, Oct 23, 2013 at 08:30:42PM +0200, Richard Cochran wrote:
+> > > > On Wed, Oct 23, 2013 at 12:25:02PM -0600, Jason Gunthorpe wrote:
+> > > 
+> > > > > On ARM the package of 'stuff' can very reasonably include dtb. Distro
+> > > > > scripts can package modules+DTB+vmlinuz into something the bootloader
+> > > > > can understand. (The next pain point will be to standardize that)
+> > > > > 
+> > > > > The DTB doesn't have to be 'outside' the distro/kernel to give users a
+> > > > > seamless upgrade experience.
+> > > > 
+> > > > How can a distro possibly provide me a DTB?
+> > > > 
+> > > > They don't know what hardware I am using. Only I know that.
+> > > 
+> > > I'm not sure what you are asking? Treat DTBs like kernel drivers. If
+> > > you make hardware and you want distros to run on it, you have to
+> > > provide the DTB for that hardware to mainline+distros.
+> > > 
+> > > Remember, there are two ways to view DTB:
+> > >   a) It comes from the firmware and you have to live with whatever
+> > >      crap the firmware does
+> > >   b) It comes from the kernel, must match the kernel, and we don't
+> > >      have to tolerate crap in the DTB.
 > > 
-> > > Do we really want to polute the drivers and DT files with a ! in the
-> > > compatible values? I thought we'd considered that, but chosen having the
-> > > drivers that use unstable bindings depend on a Kconfig option as an
-> > > alternative, not an additional step?
-> > 
-> > I'd even go further and use "unstable-" as the prefix instead of "!"
-> > which is way more explicit.
-> > 
-> > 
-> > > The one issue with doing this is that if a binding is thought to be
-> > > unstable, but becomes stable later without any changes, we'll have to do
-> > > busy-work to remove the ! in all the DT files, thus artificially
-> > > introducing an incompatibility. Perhaps that's fine though?
-> > 
-> > I'd say yes. Going from unstable to stable is quite a step for a binding
-> > and that should be visible and worth a patch IMO. Also, when looking at
-> > a DTS file or some driver code, it will avoid
-> > confusion/misinterpretation if one can see immediately the status of a
-> > binding.
+> > c) It comes from the firmware and is at least good enough to bring up a
+> >    kernel to install a better devicetree.
 > 
-> No, it shouldn't. Going from unstable to stable is not a large step,
-> rather it is coming to the point of looking around and realizing that
-> the binding is working quite well.
+> That's an interesting new view. And I think that makes a lot of sense
+> because it matches the product cycle pretty well. Typically I wouldn't
+> expect an upstream kernel to be fully featured when first shipped in a
+> product, for all the known reasons, but it should be possible to come
+> up with stable bindings good enough to perhaps boot to a command-line
+> prompt and have some way of accessing other files (network, block
+> device, ...).
+> 
+> Then again you could argue that the bootloader should be able to update
+> itself (and the DTB while at it).
 
-Yes, the difference between the unstable binding before it is declared
-stable and the stable one shouldn't be big. In fact it should be no
-different at all.
+barebox/u-boot usually can do this, but I think distributions can
+provide a much better and more consistent user interface. Also it offers
+a distribution to provide a way to update the devicetree. Otherwise
+the distributions can only say: See your boards documentation how to update
+the devicetree.
 
-However the decision is still a conscious one. And it is a big step,
-because when you declare it stable you assert that it will never change
-in an incompatible way.
+Sascha
 
-> I don't think the solution is to put this into the kernel to be checked
-> at runtime. The better solution is to put it into DTC and make it
-> complain (either warn or error; depending on build config?) about usage
-> of compatible strings that are marked in the binding documentation as
-> unstable.
-
-Perhaps. Doing it in the kernel seemed easier. Furthermore not every
-user might generate their own DTB and whoever generates the DTB may not
-make the same choice as every user might have made. Granted, that might
-be a little far fetched.
-
-I personally don't mind where exactly it is checked for, as long as we
-can settle on something. What I'm primarily concerned about is that the
-current situation hinders progress and early adoption, which I consider
-both essential for upstream Linux development.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/b8ae85e3/attachment.sig>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
