@@ -1,143 +1,105 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 24 Oct 2013 09:53:50 +0200
-Subject: [PATCH v4 4/7] ARM: dts: imx27 pinctrl
-In-Reply-To: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
-References: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1382601233-24253-5-git-send-email-mpa@pengutronix.de>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu, 24 Oct 2013 10:00:59 +0200
+Subject: [PATCHv6][ 1/7] video: imxfb: Introduce regulator support.
+Message-ID: <1382601665-6830-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pinctrl driver node and pin group definitions for other driver nodes.
+This commit is based on the following commit by Fabio Estevam:
+  4344429 video: mxsfb: Introduce regulator support
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- arch/arm/boot/dts/imx27.dtsi | 102 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 102 insertions(+)
+ drivers/video/imxfb.c |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index b7a1c6d..641a63d 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -10,6 +10,7 @@
-  */
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 44ee678..4bf3837 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -28,6 +28,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/math64.h>
+@@ -145,6 +146,7 @@ struct imxfb_info {
+ 	struct clk		*clk_ipg;
+ 	struct clk		*clk_ahb;
+ 	struct clk		*clk_per;
++	struct regulator	*reg_lcd;
+ 	enum imxfb_type		devtype;
+ 	bool			enabled;
  
- #include "skeleton.dtsi"
-+#include "imx27-pinfunc.h"
+@@ -563,12 +565,23 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
  
- / {
- 	aliases {
-@@ -235,6 +236,12 @@
- 				status = "disabled";
- 			};
+ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
  
-+			iomuxc: iomuxc at 10015000 {
-+				compatible = "fsl,imx27-iomuxc";
-+				reg = <0x10015000 0x600>;
+ 	if (fbi->enabled)
+ 		return;
+ 
+ 	pr_debug("Enabling LCD controller\n");
+ 
++	if (fbi->reg_lcd) {
++		ret = regulator_enable(fbi->reg_lcd);
++		if (ret) {
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator enable failed with error: %d\n",
++				ret);
++			return;
++		}
++	}
 +
-+			};
+ 	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+ 
+ 	/* panning offset 0 (0 pixel offset)        */
+@@ -597,6 +610,8 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 
+ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
 +
- 			gpio1: gpio at 10015000 {
- 				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
- 				reg = <0x10015000 0x100>;
-@@ -467,3 +474,98 @@
- 		};
- 	};
- };
+ 	if (!fbi->enabled)
+ 		return;
+ 
+@@ -613,6 +628,14 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	fbi->enabled = false;
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
 +
-+&iomuxc {
-+	fec {
-+		pinctrl_fec1_1: fec1-1 {
-+			fsl,pins = <
-+				MX27_PAD_SD3_CMD__FEC_TXD0 0x0
-+				MX27_PAD_SD3_CLK__FEC_TXD1 0x0
-+				MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
-+				MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
-+				MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
-+				MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
-+				MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
-+				MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
-+				MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
-+				MX27_PAD_ATA_DATA7__FEC_MDC 0x0
-+				MX27_PAD_ATA_DATA8__FEC_CRS 0x0
-+				MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
-+				MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
-+				MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
-+				MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
-+				MX27_PAD_ATA_DATA13__FEC_COL 0x0
-+				MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
-+				MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
-+			>;
-+		};
-+	};
++	if (fbi->reg_lcd) {
++		ret = regulator_disable(fbi->reg_lcd);
++		if (ret)
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator disable failed with error: %d\n",
++				ret);
++	}
+ }
+ 
+ static int imxfb_blank(int blank, struct fb_info *info)
+@@ -1020,6 +1043,12 @@ static int imxfb_probe(struct platform_device *pdev)
+ 		goto failed_register;
+ 	}
+ 
++	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
++	if (IS_ERR(fbi->reg_lcd)) {
++		dev_info(&pdev->dev, "No lcd regulator used.\n");
++		fbi->reg_lcd = NULL;
++	}
 +
-+	i2c {
-+		pinctrl_i2c1_1: i2c1-1 {
-+			fsl,pins = <
-+				MX27_PAD_I2C_DATA__I2C_DATA 0x0
-+				MX27_PAD_I2C_CLK__I2C_CLK 0x0
-+			>;
-+		};
-+
-+		pinctrl_i2c2_1: i2c2-1 {
-+			fsl,pins = <
-+				MX27_PAD_I2C2_SDA__I2C2_SDA 0x0
-+				MX27_PAD_I2C2_SCL__I2C2_SCL 0x0
-+			>;
-+		};
-+	};
-+
-+	owire {
-+		pinctrl_owire1_1: owire1-1 {
-+			fsl,pins = <
-+				MX27_PAD_RTCK__OWIRE 0x0
-+			>;
-+		};
-+	};
-+
-+	uart {
-+		pinctrl_uart1_1: uart1-1 {
-+			fsl,pins = <
-+				MX27_PAD_UART1_TXD__UART1_TXD 0x0
-+				MX27_PAD_UART1_RXD__UART1_RXD 0x0
-+			>;
-+		};
-+
-+		pinctrl_uart1_rtscts_1: uart1-rtscts-1 {
-+			fsl,pins = <
-+				MX27_PAD_UART1_CTS__UART1_CTS 0x0
-+				MX27_PAD_UART1_RTS__UART1_RTS 0x0
-+			>;
-+		};
-+
-+		pinctrl_uart2_1: uart2-1 {
-+			fsl,pins = <
-+				MX27_PAD_UART2_TXD__UART2_TXD 0x0
-+				MX27_PAD_UART2_RXD__UART2_RXD 0x0
-+			>;
-+		};
-+
-+		pinctrl_uart2_rtscts_1: uart2-rtscts-1 {
-+			fsl,pins = <
-+				MX27_PAD_UART2_CTS__UART2_CTS 0x0
-+				MX27_PAD_UART2_RTS__UART2_RTS 0x0
-+			>;
-+		};
-+
-+		pinctrl_uart3_1: uart3-1 {
-+			fsl,pins = <
-+				MX27_PAD_UART3_TXD__UART3_TXD 0x0
-+				MX27_PAD_UART3_RXD__UART3_RXD 0x0
-+			>;
-+		};
-+
-+		pinctrl_uart3_rtscts_1: uart3-rtscts-1 {
-+			fsl,pins = <
-+				MX27_PAD_UART3_CTS__UART3_CTS 0x0
-+				MX27_PAD_UART3_RTS__UART3_RTS 0x0
-+			>;
-+		};
-+	};
-+};
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
+ #ifdef PWMR_BACKLIGHT_AVAILABLE
 -- 
-1.8.4.rc3
+1.7.9.5
