@@ -1,50 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Oct 2013 16:46:22 +0100
-Subject: [PATCH 11/14] arm64: big-endian: set correct endianess on
- kernel entry
-In-Reply-To: <1381499540-28794-12-git-send-email-matthew.leach@arm.com>
-References: <1381499540-28794-1-git-send-email-matthew.leach@arm.com>
- <1381499540-28794-12-git-send-email-matthew.leach@arm.com>
-Message-ID: <1382629582.7602.42.camel@mbp>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Oct 2013 16:49:56 +0100
+Subject: ARM: add support to dump the kernel page tables
+In-Reply-To: <20131024125530.GA27357@linaro.org>
+References: <20131024071600.GC16735@n2100.arm.linux.org.uk>
+ <20131024105143.GA24288@linaro.org>
+ <20131024122306.GK16735@n2100.arm.linux.org.uk>
+ <20131024125530.GA27357@linaro.org>
+Message-ID: <20131024154956.GN16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-10-11 at 14:52 +0100, Matthew Leach wrote:
-> The endianness of memory accesses at EL2 and EL1 are configured by
-> SCTLR_EL2.EE and SCTLR_EL1.EE respectively. When the kernel is booted,
-> the state of SCTLR_EL{2,1}.EE is unknown, and thus the kernel must
-> ensure that they are set before performing any memory accesses.
+On Thu, Oct 24, 2013 at 01:55:31PM +0100, Steve Capper wrote:
+> On Thu, Oct 24, 2013 at 01:23:06PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Oct 24, 2013 at 11:51:44AM +0100, Steve Capper wrote:
+> > > Hi Russell,
+> > > I've given this a quick go on an Arndale with LPAE, and have a few
+> > > suggestions below.
+> > 
+> > Thanks.
+> > 
+> > > > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> > > > index 5689c18..d7682cd 100644
+> > > > --- a/arch/arm/include/asm/pgtable-3level.h
+> > > > +++ b/arch/arm/include/asm/pgtable-3level.h
+> > > > @@ -140,6 +140,7 @@
+> > > >  						 PMD_TYPE_TABLE)
+> > > >  #define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
+> > > >  						 PMD_TYPE_SECT)
+> > > > +#define pmd_large(pmd)		pmd_sect(pmd)
+> > > 
+> > > Could we please instead do something like:
+> > > #define pmd_large(pmd)         (pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+> > > 
+> > > This matches the logic used in the huge pages patches (it picks up the
+> > > PROT_NONE case) that would be missed above.
+> > 
+> > Is this used in the generic parts of the kernel?  Can you please point
+> > out where?
+> > 
 > 
-> This patch ensures that SCTLR_EL{2,1} are configured appropriately at
-> boot for kernels of either endianness.
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
-> ---
->  arch/arm64/kernel/head.S |   17 ++++++++++++++---
->  arch/arm64/mm/proc.S     |    4 ++--
->  2 files changed, 16 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index b3fcdf4..cd0ecb1 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -159,12 +159,22 @@ ENTRY(el2_setup)
->  	mrs	x0, CurrentEL
->  	cmp	x0, #PSR_MODE_EL2t
->  	ccmp	x0, #PSR_MODE_EL2h, #0x4, ne
-> -	b.eq	1f
-> +	b.ne	1f
-> +	mrs	x0, sctlr_el2
-> +CPU_BE(	orr	x0, x0, #(1 << 25)	)	// Set the EE bit for EL2
-> +CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
-> +	msr	sctlr_el2, x0
-> +	b	2f
-> +1:	mrs	x0, sctlr_el1
-> +CPU_BE(	orr	x0, x0, #(2 << 24)	)	// Set the EE and E0E bits for EL1
-> +CPU_LE(	bic	x0, x0, #(2 << 24)	)	// Clear the EE and E0E bits for EL1
+> Apologies I was a little vague. I don't think there are any PROT_NONE
+> protected kernel huge pages, I am worried that pmd_huge may be used by
+> other code (and then run into problems with PROT_NONE).
 
-Shouldn't this be (3 << 24)?
-
--- 
-Catalin
+Well, the obvious question is: why would you want pmd_large() to return
+false if there is a section entry in place?
