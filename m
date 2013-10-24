@@ -1,60 +1,73 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 24 Oct 2013 12:22:18 -0000
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <1382616801.6040.26.camel@sakura.staff.proxad.net>
-References: <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023174458.GC5208@netboy>
- <1382553982.31058.10.camel@sakura.staff.proxad.net>
- <20131024095232.27BBCC4039D@trevor.secretlab.ca>
- <1382614439.6040.16.camel@sakura.staff.proxad.net>
- <1382615278.8522.72.camel@shinybook.infradead.org>
- <1382616801.6040.26.camel@sakura.staff.proxad.net>
-Message-ID: <f20013b8c402dacccd865d143e14a3ee.squirrel@twosheds.infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Oct 2013 13:23:06 +0100
+Subject: ARM: add support to dump the kernel page tables
+In-Reply-To: <20131024105143.GA24288@linaro.org>
+References: <20131024071600.GC16735@n2100.arm.linux.org.uk>
+ <20131024105143.GA24288@linaro.org>
+Message-ID: <20131024122306.GK16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 24, 2013 at 11:51:44AM +0100, Steve Capper wrote:
+> Hi Russell,
+> I've given this a quick go on an Arndale with LPAE, and have a few
+> suggestions below.
 
->
-> On Thu, 2013-10-24 at 12:47 +0100, David Woodhouse wrote:
->
->> If you can automatically infer the correct clock/interrupt/etc in order
->> to do DMA correctly, despite the fact that it wasn't explicitly spelled
->> out in the old DT, then the property is *not* a "required" property.
->> It's optional, and you have a default behaviour for when it's not
->> present.
->
-> so inside the new version of driver-hwcrypto.c:
->
-> if (irq_of_parse_and_map(...) == NO_IRQ) {
-> 	switch (get_soc_model()) {
-> 		case SOC1:
-> 			irq = 51;
-> 			break;
->
-> 		case SOC2:
-> 			irq = 62;
-> 			break;
->
-> 		[...]
-> 	}
-> }
+Thanks.
 
+> > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> > index 5689c18..d7682cd 100644
+> > --- a/arch/arm/include/asm/pgtable-3level.h
+> > +++ b/arch/arm/include/asm/pgtable-3level.h
+> > @@ -140,6 +140,7 @@
+> >  						 PMD_TYPE_TABLE)
+> >  #define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
+> >  						 PMD_TYPE_SECT)
+> > +#define pmd_large(pmd)		pmd_sect(pmd)
+> 
+> Could we please instead do something like:
+> #define pmd_large(pmd)         (pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+> 
+> This matches the logic used in the huge pages patches (it picks up the
+> PROT_NONE case) that would be missed above.
 
-If you are correct to insist that DMA needs yo be supported in the new
-driver *even* with old firmware, then yes, maybe.
+Is this used in the generic parts of the kernel?  Can you please point
+out where?
 
-The alternative is a quirk to "fix" the DT up on the affected boards and
-not actually doing the special cases in the driver itself. But that can be
-seen as an implementation detail.
+> The logic here needs adjusting for LPAE. Without LPAE,
+> USER_PGTABLES_CEILING is equal to zero and i at 0.
+> 
+> With LPAE enabled, USER_PGTABLES_CEILING / PGDIR_SIZE == 2 for me, but
+> pgd refers to the first pgd (not the third). Thus we walk the pgds we
+> don't want to walk and get empty output.
+> 
+> The following worked for me:
+>   static void walk_pgd(struct seq_file *m)
+>   {
+>           pgd_t *pgd = swapper_pg_dir;
+>           struct pg_state st;
+>           unsigned long addr;
+>           unsigned i, pgdoff = USER_PGTABLES_CEILING / PGDIR_SIZE;
+> 
+>           memset(&st, 0, sizeof(st));
+>           st.seq = m;
+>           st.marker = address_markers;
+> 
+>           pgd += pgdoff;
+> 
+>           for (i = pgdoff; i < PTRS_PER_PGD; i++, pgd++) {
+>                   addr = i * PGDIR_SIZE;
+>                   if (!pgd_none(*pgd)) {
+>                           walk_pud(&st, pgd, addr);
+>                   } else {
+>                           note_page(&st, addr, 1, pgd_val(*pgd));
+>                   }
+>           }
+> 
+>           note_page(&st, 0, 0, 0);
+>   }
+> 
+> But pgdoff is a terrible variable name :-).
 
--- 
-dwmw2
+Nevertheless, I've taken that change. :)  Just tested on non-LPAE and it
+still works, thanks.
