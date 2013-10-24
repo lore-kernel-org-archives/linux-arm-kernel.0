@@ -1,55 +1,100 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 24 Oct 2013 11:32:26 +0100
-Subject: [PATCH v8 18/19] swiotlb-xen: no need to do execute two
- bus_to_phys translations in a row
-In-Reply-To: <20131023195335.GC28963@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
- <1382031814-8782-18-git-send-email-stefano.stabellini@eu.citrix.com>
- <20131023140150.GB27771@phenom.dumpdata.com>
- <alpine.DEB.2.02.1310231833560.26077@kaball.uk.xensource.com>
- <20131023195335.GC28963@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1310241129230.26077@kaball.uk.xensource.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 24 Oct 2013 16:13:17 +0530
+Subject: [RFC PATCH 2/6] DRIVERS: IRQCHIP: CROSSBAR: Add support for
+ Crossbar IP
+In-Reply-To: <2FD881B8-1A59-418E-AF9C-EF5B9C5D0623@codeaurora.org>
+References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
+ <1380549564-31045-3-git-send-email-r.sricharan@ti.com>
+ <2FD881B8-1A59-418E-AF9C-EF5B9C5D0623@codeaurora.org>
+Message-ID: <5268F9C5.3090106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Oct 2013, Konrad Rzeszutek Wilk wrote:
-> On Wed, Oct 23, 2013 at 06:34:13PM +0100, Stefano Stabellini wrote:
-> > > On Thu, Oct 17, 2013 at 06:43:33PM +0100, Stefano Stabellini wrote:
-> > > > xen_unmap_single calls xen_bus_to_phys, then passes dev_addr to
-> > > > is_xen_swiotlb_buffer that calls xen_bus_to_phys again.
-> > > 
-> > > It does?
-> > > 
-> > > I see it call mfn_to_local_pfn which calls pfn_to_mfn and
-> > > get_phys_to_machine (which I presume is going to be a slow
-> > > operation on ARM).
-> > 
-> > Yeah, I am trying to reduce the number of pfn_to_mfn and mfn_to_pfn
-> > translations.
-> > That said, this patch is not needed to have a fully functional
-> > swiotlb-xen on arm and I would OK with postponing it.
-> 
-> OK, lets do that as it requires some hard thinking.
+Hi Kumar,
 
-OK.
+On Thursday 24 October 2013 03:03 PM, Kumar Gala wrote:
+> On Sep 30, 2013, at 8:59 AM, Sricharan R wrote:
+>
+>> Some socs have a large number of interrupts requests to service
+>> the needs of its many peripherals and subsystems. All of the
+>> interrupt lines from the subsystems are not needed at the same
+>> time, so they have to be muxed to the irq-controller appropriately.
+>> In such places a interrupt controllers are preceded by an CROSSBAR
+>> that provides flexibility in muxing the device requests to the controller
+>> inputs.
+>>
+>> This driver takes care a allocating a free irq and then configuring the
+>> crossbar IP as a part of the mpu's irqchip callbacks. crossbar_init should
+>> be called right before the irqchip_init, so that it is setup to handle the
+>> irqchip callbacks.
+>>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Rob Herring <rob.herring@calxeda.com>
+>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>> ---
+>> .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
+>> drivers/irqchip/Kconfig                            |    8 +
+>> drivers/irqchip/Makefile                           |    1 +
+>> drivers/irqchip/irq-crossbar.c                     |  195 ++++++++++++++++++++
+>> include/linux/irqchip/irq-crossbar.h               |   11 ++
+>> 5 files changed, 242 insertions(+)
+>> create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>> create mode 100644 drivers/irqchip/irq-crossbar.c
+>> create mode 100644 include/linux/irqchip/irq-crossbar.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>> new file mode 100644
+>> index 0000000..cdec2cd
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>> @@ -0,0 +1,27 @@
+>> +Some socs have a large number of interrupts requests to service
+>> +the needs of its many peripherals and subsystems. All of the
+>> +interrupt lines from the subsystems are not needed at the same
+>> +time, so they have to be muxed to the irq-controller appropriately.
+>> +In such places a interrupt controllers are preceded by an CROSSBAR
+>> +that provides flexibility in muxing the device requests to the controller
+>> +inputs.
+>> +
+>> +Required properties:
+>> +- compatible : Should be "ti,irq-crossbar"
+>> +- reg: Base address and the size of the crossbar registers.
+>> +- max-irqs: Total number of irqs available at the interrupt controller.
+> Should be 'ti,max-irqs
+ Ok, will correct.
+>> +- reg-size: Size of a individual register in bytes. Every individual
+>> +	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
+> Is this something that really needs to be encoded in the dts?
+>
+> If we keep it should be ti,reg-size
+Currently, this is the only IP with a fixed register-size.
+ So this can be in the driver also. I thought keeping it
+DT will avoid any hard-coding in driver.
+>> +- irqs-reserved: List of the reserved irq lines that are not muxed using
+>> +		 crossbar. These interrupt lines are reserved in the soc,
+>> +		 so crossbar bar driver should not consider them as free
+>> +		 lines.
+>> +
+> ti,irqs-reserved
+Ok, will correct
+>> +Examples:
+>> +		crossbar_mpu: @4a020000 {
+> Did you mean for there to be a label and no node name?
+>
+ ya, name is missing. Will add.
+>> +			compatible = "ti,irq-crossbar";
+>> +			reg = <0x4a002a48 0x130>;
+>> +			max-irqs = <160>;
+>> +			reg-size = <2>;
+>> +			irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
+>> +		};
 
-
-> > > I am bit uncomfortable with this - I recall when developing this
-> > > that I had hit some odd cases of doing DMA of a page to a guest
-> > > and it not always working. It was the case of not detecting whether
-> > > the pfn was foreign or not. Sadly I can't recall the details.
-> > > 
-> > > I would think that this problem would also be present with ARM?
-> > > But perhaps all the new changes in the pfn_to_mfn that had lately
-> > > been done have fixed this?
-> > 
-> > No, because on ARM the guest is autotranslate so the pfn returned by
-> > mfn_to_pfn is always "local".
-> > However thanks to the m2p_override now we should get the "local" pfn
-> > from mfn_to_pfn on x86 too.
-> > I'll test this case though.
-> 
-> Right, so maybe the pfn_to_mfn_local test is useless nowadays?
-
-Yes, I think so. This might be better handled by removing
-mfn_to_local_pfn altogether.
+Regards,
+ Sricharan
