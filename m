@@ -1,58 +1,53 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 24 Oct 2013 09:47:24 -0700
-Subject: [OpenWrt-Devel] [PATCH] RFT: ARM: gemini: convert to
- GENERIC_CLOCKEVENTS
-In-Reply-To: <CACRpkdb6pC-7vWdAHkV3RK6mN8GXTiRQcQBPojk_kgm9JREJAQ@mail.gmail.com>
-References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbymhLhHObL+fdWCHKbNG_LtudvhXbdxC0NCJApUBjT9w@mail.gmail.com>
- <CACRpkdb6pC-7vWdAHkV3RK6mN8GXTiRQcQBPojk_kgm9JREJAQ@mail.gmail.com>
-Message-ID: <CAGVrzcbyODYSVBAbOSr_sT2LAp7pO9pb+C8GnrOs61ni67GQsQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 24 Oct 2013 10:06:15 -0700
+Subject: [PATCH 3/7] video: exynos_mipi_dsim: Use the generic PHY driver
+In-Reply-To: <CAK9yfHxaLsdFGXiCxvs+HpMSuY6xWd=CGPv-YfSkJqWSxE+f-w@mail.gmail.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <1381940896-9355-4-git-send-email-kishon@ti.com>
+ <CAOesGMhwotSY-1WQmt+wtsrsH2m30VE=j-MwyhpYU3mt_PSPPw@mail.gmail.com>
+ <CAK9yfHxaLsdFGXiCxvs+HpMSuY6xWd=CGPv-YfSkJqWSxE+f-w@mail.gmail.com>
+Message-ID: <CAOesGMgbGvZB--uaJ2EowPFDYqGZb3iG9SZs9d0UVcJQLAZW3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
-
-2013/10/24 Linus Walleij <linus.walleij@linaro.org>:
-> Adding openwrt-devel to this thread to get some traction...
-
-I won't have my gemini device available for the next 6-8 weeks, so
-just go ahead and merge this, if it breaks, there is still time to
-figure out how to unbreak later. It cannot possibly be worse since few
-people have it and actually seem to use it. Does that work for you?
-
+On Thu, Oct 24, 2013 at 8:42 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> Hi Olof,
 >
-> On Thu, Oct 24, 2013 at 12:06 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
->> On Tue, Oct 1, 2013 at 12:57 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On 24 October 2013 20:00, Olof Johansson <olof@lixom.net> wrote:
+>> Hi Kishon,
 >>
->>> This converts the gemini machine to use generic clockevents
->>> by rewriting the timer driver.
+>> On Wed, Oct 16, 2013 at 9:28 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+>>> index 32e5406..00b3a52 100644
+>>> --- a/drivers/video/exynos/exynos_mipi_dsi.c
+>>> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
+>>> @@ -156,8 +157,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
+>>>                 exynos_mipi_regulator_enable(dsim);
 >>>
->>> Cc: arm at kernel.org
->>> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
->>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>> ---
->>> This is flagged as Request for Testing (RFT) as I have no Gemini
->>> platform. If I do not get help with testing this, the next step
->>> will be a patch series to delete the platform.
+>>>                 /* enable MIPI-DSI PHY. */
+>>> -               if (dsim->pd->phy_enable)
+>>> -                       dsim->pd->phy_enable(pdev, true);
+>>> +               phy_power_on(dsim->phy);
+>>>
+>>>                 clk_enable(dsim->clock);
+>>>
 >>
->> OK nobody is able to test this it seems, but it is a vital refactoring.
+>> This introduces the below with exynos_defconfig:
 >>
->> Should we just apply this and see what happens?
+>> ../../drivers/video/exynos/exynos_mipi_dsi.c: In function
+>> 'exynos_mipi_dsi_blank_mode':
+>> ../../drivers/video/exynos/exynos_mipi_dsi.c:144:26: warning: unused
+>> variable 'pdev' [-Wunused-variable]
+>>   struct platform_device *pdev = to_platform_device(dsim->dev);
 >>
->> Or should I just send a deletion patch right away?
->>
->> I would lean toward just applying it and see if the OpenWRT
->> people will notice and/or complain.
->>
->> What does the ARM SoC people say?
->>
->> Yours,
->> Linus Walleij
-> _______________________________________________
-> openwrt-devel mailing list
-> openwrt-devel at lists.openwrt.org
-> https://lists.openwrt.org/cgi-bin/mailman/listinfo/openwrt-devel
+>
+> I have already submitted a patch to fix this [1]
+>
+> [1] http://marc.info/?l=linux-fbdev&m=138233359617936&w=2
 
--- 
-Florian
+Ah, I'm not subscribed to the fbdev list. Next time it might be a good
+idea to cc the same lists as the original patch. But thanks for fixing
+it!
+
+
+-Olof
