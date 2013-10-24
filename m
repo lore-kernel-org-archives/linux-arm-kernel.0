@@ -1,35 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Oct 2013 12:06:23 +0200
-Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
-In-Reply-To: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
-References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdbymhLhHObL+fdWCHKbNG_LtudvhXbdxC0NCJApUBjT9w@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 24 Oct 2013 11:13:06 +0100
+Subject: [PATCHv7][ 2/6] video: imxfb: Also add pwmr for the device tree.
+In-Reply-To: <1382605103-9595-2-git-send-email-denis@eukrea.com>
+References: <1382605103-9595-1-git-send-email-denis@eukrea.com>
+ <1382605103-9595-2-git-send-email-denis@eukrea.com>
+Message-ID: <20131024101306.C8882C4039D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 1, 2013 at 12:57 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Thu, 24 Oct 2013 10:58:19 +0200, Denis Carikli <denis@eukrea.com> wrote:
+> pwmr has to be set to get the imxfb backlight work,
+> though pwmr was only configurable trough the platform data.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Eric B??nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-> This converts the gemini machine to use generic clockevents
-> by rewriting the timer driver.
->
-> Cc: arm at kernel.org
-> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+For binding:
+Acked-by: Grant Likely <grant.likely@linaro.org>
+
 > ---
-> This is flagged as Request for Testing (RFT) as I have no Gemini
-> platform. If I do not get help with testing this, the next step
-> will be a patch series to delete the platform.
-
-OK nobody is able to test this it seems, but it is a vital refactoring.
-
-Should we just apply this and see what happens?
-
-Or should I just send a deletion patch right away?
-
-I would lean toward just applying it and see if the OpenWRT
-people will notice and/or complain.
-
-What does the ARM SoC people say?
-
-Yours,
-Linus Walleij
+>  .../devicetree/bindings/video/fsl,imx-fb.txt       |    3 +++
+>  drivers/video/imxfb.c                              |    2 ++
+>  2 files changed, 5 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> index 46da08d..ac457ae 100644
+> --- a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> @@ -17,6 +17,9 @@ Required nodes:
+>  Optional properties:
+>  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
+>  	register is not modified as recommended by the datasheet.
+> +- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
+> +	optional, but defining it is necessary to get the backlight working. If that
+> +	property is ommited, the register is zeroed.
+>  - fsl,lscr1: LCDC Sharp Configuration Register value.
+>  
+>  Example:
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index 4bf3837..f09372d 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -833,6 +833,8 @@ static int imxfb_init_fbinfo(struct platform_device *pdev)
+>  
+>  		of_property_read_u32(np, "fsl,dmacr", &fbi->dmacr);
+>  
+> +		of_property_read_u32(np, "fsl,pwmr", &fbi->pwmr);
+> +
+>  		/* These two function pointers could be used by some specific
+>  		 * platforms. */
+>  		fbi->lcd_power = NULL;
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
