@@ -1,39 +1,54 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Thu, 24 Oct 2013 15:30:31 +0200
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
-References: <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef> <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023174458.GC5208@netboy>
- <1382553982.31058.10.camel@sakura.staff.proxad.net>
- <20131024095232.27BBCC4039D@trevor.secretlab.ca>
- <1382614439.6040.16.camel@sakura.staff.proxad.net>
- <1382615278.8522.72.camel@shinybook.infradead.org>
- <20131024122346.GD11296@ulmo.nvidia.com>
- <1382619655.6040.52.camel@sakura.staff.proxad.net>
- <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
-Message-ID: <1382621431.6040.66.camel@sakura.staff.proxad.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 24 Oct 2013 16:31:43 +0300
+Subject: [PATCH 1/3] ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
+In-Reply-To: <20131024132835.GX15154@atomide.com>
+References: <1381324359-28825-1-git-send-email-tomi.valkeinen@ti.com>
+ <5268D44D.5010205@ti.com> <52691F41.1030900@ti.com>
+ <20131024132835.GX15154@atomide.com>
+Message-ID: <5269213F.8020801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/24/2013 04:28 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [131024 06:23]:
+>> On 10/24/2013 11:03 AM, Tomi Valkeinen wrote:
+>>> Hi Tony, Tero,
+>>>
+>>> On 09/10/13 16:12, Tomi Valkeinen wrote:
+>>>> Set CLK_SET_RATE_PARENT flag for dss_dss_clk so that the DSS's fclk can
+>>>> be configured without the need to get the parent of the fclk.
+>>>>
+>>>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+>>>> ---
+>>>>   arch/arm/mach-omap2/cclock44xx_data.c | 3 ++-
+>>>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+>>>> index b237950..ec0dc0b 100644
+>>>> --- a/arch/arm/mach-omap2/cclock44xx_data.c
+>>>> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
+>>>> @@ -830,7 +830,8 @@ DEFINE_CLK_GATE(dss_tv_clk, "extalt_clkin_ck", &extalt_clkin_ck, 0x0,
+>>>>   		OMAP4430_CM_DSS_DSS_CLKCTRL,
+>>>>   		OMAP4430_OPTFCLKEN_TV_CLK_SHIFT, 0x0, NULL);
+>>>>
+>>>> -DEFINE_CLK_GATE(dss_dss_clk, "dpll_per_m5x2_ck", &dpll_per_m5x2_ck, 0x0,
+>>>> +DEFINE_CLK_GATE(dss_dss_clk, "dpll_per_m5x2_ck", &dpll_per_m5x2_ck,
+>>>> +		CLK_SET_RATE_PARENT,
+>>>>   		OMAP4430_CM_DSS_DSS_CLKCTRL, OMAP4430_OPTFCLKEN_DSSCLK_SHIFT,
+>>>>   		0x0, NULL);
+>>>
+>>> I was discussing with Tero about these three patches, and he was ok with
+>>> them being merged.
+>>>
+>>> Tony, it'd be great to have these for 3.13, so that I can start cleaning
+>>> up the DSS driver's fclk management.
+>>
+>> Yea, am ok with these, I can incorporate the changes to my DT clk series.
+>
+> OK. If you have fixes that should go in earlier, please put those into
+> a separate branch.
 
-On Thu, 2013-10-24 at 13:10 +0000, David Woodhouse wrote:
+This is for Paul I guess, I meant I will do the changes needed for the 
+DT series to get same fixes there.
 
-> Note that you are not describing a normal "DT scenario" here. You are
-> describing a case in which we screwed up
-
-AKA "real world"
-
-> So yes, after the public flogging has happened, and we're trying to
-> work out how best to cope with the screwup, we don't necessarily have
-> any perfect choices. The perfect choice was to do it properly in the
-> first place.
-
-or avoid shooting ourselves in the foot in the first place, and keep
-these unmodifiable stuff in kernel :)
-
--- 
-Maxime
+-Tero
