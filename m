@@ -1,176 +1,61 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 24 Oct 2013 19:55:45 -0500
-Subject: [PATCH 3/3] ARM: dts: i.MX53: Devicetree for Voipac Baseboard
- using x53-dmm-668 module
-In-Reply-To: <1382651769-21238-4-git-send-email-lisovy@gmail.com>
-References: <1382651769-21238-1-git-send-email-lisovy@gmail.com>
- <1382651769-21238-4-git-send-email-lisovy@gmail.com>
-Message-ID: <1382662545.8819.0.camel@linux-builds1>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Fri, 25 Oct 2013 09:38:19 +1030
+Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
+In-Reply-To: <20131024084559.GD16735@n2100.arm.linux.org.uk>
+References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
+ <87eh7bfoq9.fsf@rustcorp.com.au>
+ <20131024084559.GD16735@n2100.arm.linux.org.uk>
+Message-ID: <87mwlyclng.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-10-24 at 23:56 +0200, Rostislav Lisovy wrote:
-> Supported peripherals: Audio -- headphone output, LEDs, Buttons
-> (using keyboard controller), SD-card.
-> 
-> Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
-> 
->  create mode 100644 arch/arm/boot/dts/imx53-voipac-bsb.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 802720e..5571af6 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -133,6 +133,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->  	imx53-mba53.dtb \
->  	imx53-qsb.dtb \
->  	imx53-smd.dtb \
-> +	imx53-voipac-bsb.dts \
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> On Thu, Oct 24, 2013 at 11:51:18AM +1030, Rusty Russell wrote:
+>> Ming Lei <tom.leiming@gmail.com> writes:
+>> > Address of non-module kernel symbol should always be located
+>> > from CONFIG_PAGE_OFFSET on, so only show these legal kernel
+>> > symbols in /proc/kallsyms.
+>> >
+>> > On ARM, some symbols(see below) may drop in relocatable code, so
+>> > perf can't parse kernel symbols any more from /proc/kallsyms, this
+>> > patch fixes the problem.
+>> >
+>> > 	00000000 t __vectors_start
+>> > 	00000020 A cpu_v7_suspend_size
+>> > 	00001000 t __stubs_start
+>> > 	00001004 t vector_rst
+>> > 	00001020 t vector_irq
+>> > 	000010a0 t vector_dabt
+>> > 	00001120 t vector_pabt
+>> > 	000011a0 t vector_und
+>> > 	00001220 t vector_addrexcptn
+>> > 	00001224 t vector_fiq
+>> > 	00001224 T vector_fiq_offset
+>> >
+>> > The issue can be fixed in scripts/kallsyms.c too, but looks this
+>> > approach is easier.
+>> 
+>> This fix looks hacky; if these symbols are not available, don't just
+>> remove them from /proc/kallsyms, but don't put them in the kernel at
+>> all.
+>
+> How do you "don't put them in the kernel at all" when they're used by
+> the kernel internally as offsets?
 
-I think this should be imx32-voipac-bsb.dtb.
+Sorry, I was imprecise.  I was referring to the kernel's kallsyms
+tables produced by scripts/kallsyms.c.  This patch left them in the
+the kallsyms tables and filtered them out from /proc/kallsyms.
 
-Dinh
->  	imx6dl-sabreauto.dtb \
->  	imx6dl-sabresd.dtb \
->  	imx6dl-wandboard.dtb \
-> diff --git a/arch/arm/boot/dts/imx53-voipac-bsb.dts b/arch/arm/boot/dts/imx53-voipac-bsb.dts
-> new file mode 100644
-> index 0000000..5c88c0e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-voipac-bsb.dts
-> @@ -0,0 +1,135 @@
-> +/*
-> + * Copyright 2013 Rostislav Lisovy <lisovy@gmail.com>, PiKRON s.r.o.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx53-voipac-dmm-668.dtsi"
-> +
-> +/ {
-> +	sound {
-> +		compatible = "fsl,imx53-voipac-sgtl5000",
-> +			     "fsl,imx-audio-sgtl5000";
-> +		model = "imx53-voipac-sgtl5000";
-> +		ssi-controller = <&ssi2>;
-> +		audio-codec = <&sgtl5000>;
-> +		audio-routing =
-> +			"Headphone Jack", "HP_OUT";
-> +		mux-int-port = <2>;
-> +		mux-ext-port = <5>;
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pin_gpio>;
-> +
-> +		led1 {
-> +			label = "led-red";
-> +			gpios = <&gpio3 29 0>;
-> +			default-state = "off";
-> +		};
-> +
-> +		led2 {
-> +			label = "led-orange";
-> +			gpios = <&gpio2 31 0>;
-> +			default-state = "off";
-> +		};
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
-> +
-> +	hog {
-> +		pinctrl_hog: hoggrp {
-> +			fsl,pins = <
-> +				/* SD2_CD */
-> +				MX53_PAD_EIM_D25__GPIO3_25	0x80000000
-> +				/* SD2_WP */
-> +				MX53_PAD_EIM_A19__GPIO2_19 	0x80000000
-> +			>;
-> +		};
-> +
-> +		led_pin_gpio: led_gpio {
-> +			fsl,pins = <
-> +				MX53_PAD_EIM_D29__GPIO3_29	0x80000000
-> +				MX53_PAD_EIM_EB3__GPIO2_31	0x80000000
-> +			>;
-> +		};
-> +	};
-> +
-> +	/* Keyboard controller */
-> +	kpp {
-> +		pinctrl_kpp_1: kppgrp-1 {
-> +			fsl,pins = <
-> +				MX53_PAD_GPIO_9__KPP_COL_6	0xe8
-> +				MX53_PAD_GPIO_4__KPP_COL_7	0xe8
-> +				MX53_PAD_KEY_COL2__KPP_COL_2	0xe8
-> +				MX53_PAD_KEY_COL3__KPP_COL_3	0xe8
-> +				MX53_PAD_KEY_COL4__KPP_COL_4	0xe8
-> +
-> +				MX53_PAD_GPIO_2__KPP_ROW_6	0xe0
-> +				MX53_PAD_GPIO_5__KPP_ROW_7	0xe0
-> +				MX53_PAD_KEY_ROW2__KPP_ROW_2	0xe0
-> +				MX53_PAD_KEY_ROW3__KPP_ROW_3	0xe0
-> +				MX53_PAD_KEY_ROW4__KPP_ROW_4	0xe0
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&audmux {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_audmux_1>; /* SSI1 */
-> +	status = "okay";
-> +};
-> +
-> +&esdhc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_esdhc2_1>;
-> +	cd-gpios = <&gpio3 25 0>;
-> +	wp-gpios = <&gpio2 19 0>;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c3_2>;
-> +	status = "okay";
-> +
-> +	sgtl5000: codec at 0a {
-> +		compatible = "fsl,sgtl5000";
-> +		reg = <0x0a>;
-> +		VDDA-supply = <&reg_3p3v>;
-> +		VDDIO-supply = <&reg_3p3v>;
-> +		clocks = <&clks 150>;
-> +	};
-> +};
-> +
-> +&kpp {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_kpp_1>;
-> +	linux,keymap = <
-> +			0x0203003b	/* KEY_F1 */
-> +			0x0603003c	/* KEY_F2 */
-> +			0x0207003d	/* KEY_F3 */
-> +			0x0607003e	/* KEY_F4 */
-> +			>;
-> +	keypad,num-rows = <8>;
-> +	keypad,num-columns = <1>;
-> +	status = "okay";
-> +};
-> +
-> +&ssi2 {
-> +	fsl,mode = "i2s-slave";
-> +	status = "okay";
-> +};
+It's weird that cpu_v7_suspend_size appeared above, since kallsyms
+should filter out 'A' symbols already.
+
+> If you mean, just get rid of them, shall I just add these as magic
+> numbers instead based on the values in this email?  Is that really a
+> sane solution?
+>
+> No, we have to keep these symbols IMHO.
+
+Can you make them absolute symbols?  That should Just Work for kallsyms.
+
+Cheers,
+Rusty.
