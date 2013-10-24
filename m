@@ -1,41 +1,99 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 24 Oct 2013 11:27:52 +0200
-Subject: [PATCH v4 6/7] ARM: dts: imx27 phycore pinctrl
-In-Reply-To: <1382603424.519504719@f304.i.mail.ru>
-References: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
- <1382601233-24253-7-git-send-email-mpa@pengutronix.de>
- <1382603424.519504719@f304.i.mail.ru>
-Message-ID: <20131024092752.GB27073@pengutronix.de>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 24 Oct 2013 04:33:37 -0500
+Subject: [RFC PATCH 2/6] DRIVERS: IRQCHIP: CROSSBAR: Add support for
+ Crossbar IP
+In-Reply-To: <1380549564-31045-3-git-send-email-r.sricharan@ti.com>
+References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
+ <1380549564-31045-3-git-send-email-r.sricharan@ti.com>
+Message-ID: <2FD881B8-1A59-418E-AF9C-EF5B9C5D0623@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 12:30:24PM +0400, Alexander Shiyan wrote:
-> > Enable pinctrl for phycore devices.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ...
-> > diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-> > index 4ec402c..3dbdb5e 100644
-> > --- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-> > +++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-> ...
-> >  &uart1 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_uart1_1 &pinctrl_uart1_rtscts_1>;
-> >  	status = "okay";
-> >  };
+
+On Sep 30, 2013, at 8:59 AM, Sricharan R wrote:
+
+> Some socs have a large number of interrupts requests to service
+> the needs of its many peripherals and subsystems. All of the
+> interrupt lines from the subsystems are not needed at the same
+> time, so they have to be muxed to the irq-controller appropriately.
+> In such places a interrupt controllers are preceded by an CROSSBAR
+> that provides flexibility in muxing the device requests to the controller
+> inputs.
 > 
-> No. Please put RTS & CTS pins into RDK. There are no hardware dependencies for SOM.
+> This driver takes care a allocating a free irq and then configuring the
+> crossbar IP as a part of the mpu's irqchip callbacks. crossbar_init should
+> be called right before the irqchip_init, so that it is setup to handle the
+> irqchip callbacks.
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+> .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
+> drivers/irqchip/Kconfig                            |    8 +
+> drivers/irqchip/Makefile                           |    1 +
+> drivers/irqchip/irq-crossbar.c                     |  195 ++++++++++++++++++++
+> include/linux/irqchip/irq-crossbar.h               |   11 ++
+> 5 files changed, 242 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+> create mode 100644 drivers/irqchip/irq-crossbar.c
+> create mode 100644 include/linux/irqchip/irq-crossbar.h
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+> new file mode 100644
+> index 0000000..cdec2cd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+> @@ -0,0 +1,27 @@
+> +Some socs have a large number of interrupts requests to service
+> +the needs of its many peripherals and subsystems. All of the
+> +interrupt lines from the subsystems are not needed at the same
+> +time, so they have to be muxed to the irq-controller appropriately.
+> +In such places a interrupt controllers are preceded by an CROSSBAR
+> +that provides flexibility in muxing the device requests to the controller
+> +inputs.
+> +
+> +Required properties:
+> +- compatible : Should be "ti,irq-crossbar"
+> +- reg: Base address and the size of the crossbar registers.
+> +- max-irqs: Total number of irqs available at the interrupt controller.
 
-Okay, I will move both uarts into rdk.
+Should be 'ti,max-irqs
 
-Thanks,
+> +- reg-size: Size of a individual register in bytes. Every individual
+> +	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
 
-Markus
+Is this something that really needs to be encoded in the dts?
+
+If we keep it should be ti,reg-size
+
+> +- irqs-reserved: List of the reserved irq lines that are not muxed using
+> +		 crossbar. These interrupt lines are reserved in the soc,
+> +		 so crossbar bar driver should not consider them as free
+> +		 lines.
+> +
+
+ti,irqs-reserved
+
+> +Examples:
+> +		crossbar_mpu: @4a020000 {
+
+Did you mean for there to be a label and no node name?
+
+> +			compatible = "ti,irq-crossbar";
+> +			reg = <0x4a002a48 0x130>;
+> +			max-irqs = <160>;
+> +			reg-size = <2>;
+> +			irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
+> +		};
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
