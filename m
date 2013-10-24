@@ -1,132 +1,77 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 24 Oct 2013 20:11:40 +0800
-Subject: [Patch v2 09/10] usb: chipidea: host: add ehci quirk for imx
- controller
-In-Reply-To: <20131024120411.GA31897@gimli>
-References: <20131023180657.GI25954@gimli>
- <Pine.LNX.4.44L0.1310231433390.1326-100000@iolanthe.rowland.org>
- <20131024013325.GC32138@shlinux1.ap.freescale.net>
- <20131024120411.GA31897@gimli>
-Message-ID: <20131024121140.GA31284@shlinux1.ap.freescale.net>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Thu, 24 Oct 2013 12:29:29 -0000
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131024122346.GD11296@ulmo.nvidia.com>
+References: <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023174458.GC5208@netboy>
+ <1382553982.31058.10.camel@sakura.staff.proxad.net>
+ <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+ <1382614439.6040.16.camel@sakura.staff.proxad.net>
+ <1382615278.8522.72.camel@shinybook.infradead.org>
+ <20131024122346.GD11296@ulmo.nvidia.com>
+Message-ID: <c033417ee30881c2157c85d0853829af.squirrel@twosheds.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 07:04:11AM -0500, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Oct 24, 2013 at 09:33:26AM +0800, Peter Chen wrote:
-> > On Wed, Oct 23, 2013 at 02:45:39PM -0400, Alan Stern wrote:
-> > > On Wed, 23 Oct 2013, Felipe Balbi wrote:
-> > > 
-> > > > Hi,
-> > > > 
-> > > > On Wed, Oct 23, 2013 at 10:46:09AM -0400, Alan Stern wrote:
-> > > > > On Tue, 22 Oct 2013, Peter Chen wrote:
-> > > > > 
-> > > > > > When the port goes to suspend or finishes resme, it needs to
-> > > > > > notify PHY, it is not a standard EHCI operation, so we add a
-> > > > > > quirk for it.
-> > > > > 
-> > > > > Actually, this _should_ be a standard EHCI operation.  But we have to
-> > > > > figure out a way to do it that will work on all platforms.
-> > > > > 
-> > > > > Felipe, any ideas?
-> > > > 
-> > > > isn't it enough to call usb_phy_set_suspend() at apropriate places ?
-> > > > 
-> > > > This should work on all platforms if the PHY driver is implemented
-> > > > correctly.
-> > > 
-> > > On Tue, 22 Oct 2013, Peter Chen wrote:
-> > > 
-> > > > +				/*
-> > > > +				 * notify the USB PHY, it is for global
-> > > > +				 * suspend case.
-> > > > +				 */
-> > > > +				usb_phy_notify_suspend(hcd->phy,
-> > > > +					USB_SPEED_HIGH);
-> > > 
-> > > Hmmm.  This calls usb_phy_notify_suspend(), and later on, 
-> > > usb_phy_notify_resume().  AFAICT, those routines don't exist.
-> > > 
-> > 
-> > Hi Alan and Felipe,
-> > 
-> > It is at my another patchset: "Add power management support for MXS PHY"
-> > http://marc.info/?l=linux-usb&m=138242248913823&w=2
-> > Since they are two things, one is from PHY, the other is for controller.
-> > I split them to two patchset.
-> > 
-> > For these two notifications, please see:
-> > [Patch v2 07/14] usb: phy: add notify suspend and resume callback
-> > http://marc.info/?l=linux-usb&m=138242252713848&w=2
-> > 
-> > [Patch v2 08/14] usb: phy-mxs: Add implementation of
-> > nofity_suspend and notify_resume
-> > http://marc.info/?l=linux-usb&m=138242253313856&w=2
-> > 
-> > > Instead we have usb_phy_set_suspend(), as Felipe mentioned.  It has a
-> > > different interface, because the second argument specifies whether we
-> > > are entering or leaving suspend, not the connection speed.
-> > > 
-> > > Peter, you need to straighten this out.
-> > 
-> > .set_suspend is different with .notify_suspend.
-> > 
-> > .set_suspend is called when the PHY enters suspend.
-> > .notify_suspend is called when port enters suspends (setting portsc.suspendM,
-> > and stop sending SOF).
-> > 
-> > After calling .notify_suspend, the PHY may still need to access,
-> > eg, set PHY wakeup setting, etc.
-> 
-> right, this just means we need usage counters for the PHY layer. So that
-> usb_phy_set_suspend() only decreaments a counter and will only suspend
-> the PHY when said counter reaches zero.
-> 
-> Also, why can't you *always* setup wakeup events for the PHY ? Everytime
-> you're about to suspend the PHY, enable its wakeup events.
 
-Most of cases, the user doesn't want USB wakeup event. At these cases,
-if the PHY's wakeup is set, when external signal changes (id/vbus/dpdm),
-the PHY will be woken up and more power consumption will be.
+> On Thu, Oct 24, 2013 at 12:47:58PM +0100, David Woodhouse wrote:
+>> On Thu, 2013-10-24 at 13:33 +0200, Maxime Bizon wrote:
+>> >
+>> > ok then how do we solve that case:
+>> >
+>> >  - Marvell SOC 1 is mainlined
+>> >  - Marvell SOC 2 is mainlined
+>> >  - Marvell SOC 'x' is mainlined
+>> >  - "PIO" hw crypto driver is written, working for all SOCs
+>> >  - [1 year]
+>> >  - SOCs bindings are marked as stable
+>> >  - [1 year]
+>> >  - someone rewrite the driver of hw crypto to use DMA, existing
+>> binding
+>> > is not ok because clock 'foo' or interrupt 'bar', now required, are
+>> not
+>> > present.
+>> >
+>> > what is the process merge that driver ?
+>> >
+>> > if the answer is that you need to keep PIO mode in driver so that
+>> > existing DTBs still works with it, then this is just plain *wrong*.
+>>
+>> If you can automatically infer the correct clock/interrupt/etc in order
+>> to do DMA correctly, despite the fact that it wasn't explicitly spelled
+>> out in the old DT, then the property is *not* a "required" property.
+>> It's optional, and you have a default behaviour for when it's not
+>> present.
+>>
+>> (And if you *can't* automatically infer that or otherwise get away
+>> without it, then you're asking for the impossible, surely?)
+>>
+>> The default behaviour in the absence of these properties may be
+>> horrendously complex, and it may be defined only for SOC [1..x] and not
+>> newer versions; it may be *mandatory* for SOC x+1.
+>>
+>> But if you really want the new driver to do DMA on platforms even where
+>> this information wasn't originally provided by the DT, what option do
+>> you have?
+>
+> To me it sounds more like the sensible default would be to continue to
+> run with PIO support if the optional properties needed for DMA support
+> are not present.
+>
+> Determining default values for the properties pretty much defeats the
+> purpose of putting them in the DT in the first place, doesn't it?
 
-> 
-> > The .notify_suspend is in ehci operation, .set_suspend can be at
-> > controller driver, since when to put the PHY enters suspend may
-> > platform specific.
-> 
-> not really, what's platform specific is *HOW* to suspend the PHY.
-> *WHERE* to tell it to suspend is really more of a policy decision.
-> 
+Right. All that was implicit when I said "If you are correct to insist
+that DMA has to be supported..."
 
-How to suspend the PHY is indeed platform specific, but sometimes,
-the whole suspend PHY operation may not only include PHY register, but also
-needs controller register, Eg, for chipidea controller, if we have not used
-chipidea PHY, we need to control both controller register (portsc.phcd)
-and PHY's register (Different register mapping), so it is hard
-to include two operations at usb_phy_set_suspend, we have to put them
-at controller's suspend.
-
-> > > Also, there's the question of where are the appropriate places to make
-> > > the calls?  After the root hub goes into suspend, I suppose.  But when
-> > > is the right time during resume?
-> > > 
-> > 
-> > If we can take it as standard EHCI operation, we need to put it at below
-> > places:
-> > 	
-> > For .notify_suspend, we need to put it after set portsc.suspendM.
-> 
-> why do you need this notification for suspendM ? PHY should
-> automatically enter a lower power state automatically when suspendM
-> signal is asserted.
-> 
-
-For some PHYs, it may correct. For chipidea controller, it needs to set
-portsc.phcd to let the PHY enter suspend. The software needs to control it.
+It doesn't entirely defeat the purpose. It may have been easy to infer the
+answers for the first incarnations of the hardware, but later it gets more
+complex and needs to be spelled out.
 
 -- 
-
-Best Regards,
-Peter Chen
+dwmw2
