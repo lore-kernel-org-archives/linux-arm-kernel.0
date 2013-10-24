@@ -1,147 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 24 Oct 2013 23:29:28 +0800
-Subject: [PATCH 8/8] ARM: dts: imx: add device tree support for Freescale
- imx50evk board
-In-Reply-To: <1382076260-6422-9-git-send-email-gerg@uclinux.org>
-References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
- <1382076260-6422-9-git-send-email-gerg@uclinux.org>
-Message-ID: <20131024152925.GF14529@S2101-09.ap.freescale.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 24 Oct 2013 10:31:29 -0500
+Subject: [PATCH] drivers: video: exynos: Fix compiler Warning
+In-Reply-To: <1382628454-11951-1-git-send-email-kishon@ti.com>
+References: <CAOesGMhwotSY-1WQmt+wtsrsH2m30VE=j-MwyhpYU3mt_PSPPw@mail.gmail.com>
+ <1382628454-11951-1-git-send-email-kishon@ti.com>
+Message-ID: <20131024153129.GH2834@gimli>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 04:04:20PM +1000, gerg at uclinux.org wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
+On Thu, Oct 24, 2013 at 08:57:34PM +0530, Kishon Vijay Abraham I wrote:
+> Fixed the following compilation warning:
+> ../../drivers/video/exynos/exynos_mipi_dsi.c: In function
+> 'exynos_mipi_dsi_blank_mode':
+> ../../drivers/video/exynos/exynos_mipi_dsi.c:144:26: warning: unused
+> variable 'pdev' [-Wunused-variable]
+>   struct platform_device *pdev = to_platform_device(dsim->dev);
 > 
-> Add device tree support for the Freescale IMX50EVk board based around the
-> IMX50 SoC. Supports UART, SPI flash, FEC ethernet and USB on this board.
-> 
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> ---
->  arch/arm/boot/dts/Makefile      |  1 +
->  arch/arm/boot/dts/imx50-evk.dts | 89 +++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 90 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx50-evk.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index e95af3f..4dd442c 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -122,6 +122,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->  	imx27-phytec-phycard-s-som.dtb \
->  	imx27-phytec-phycard-s-rdk.dtb \
->  	imx31-bug.dtb \
-> +	imx50-evk.dtb \
->  	imx51-apf51.dtb \
->  	imx51-apf51dev.dtb \
->  	imx51-babbage.dtb \
-> diff --git a/arch/arm/boot/dts/imx50-evk.dts b/arch/arm/boot/dts/imx50-evk.dts
-> new file mode 100644
-> index 0000000..74b260d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx50-evk.dts
-> @@ -0,0 +1,89 @@
-> +/*
-> + * Copyright 2013 Greg Ungerer <gerg@uclinux.org>
-> + * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx50.dtsi"
-> +
-> +/ {
-> +	model = "Freescale i.MX50 Evaluation Kit";
-> +	compatible = "fsl,imx50-evk", "fsl,imx50";
-> +
-> +	memory {
-> +		reg = <0x70000000 0x80000000>;
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +};
+> Reported-by: Olof Johansson <olof@lixom.net>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-There is nothing meaningful in there, so it can be dropped for now.
+pretty obvious patch:
 
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1_1>;
-> +	status = "okay";
-> +};
-> +
-> +&cspi {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_cspi_1>;
-> +	fsl,spi-num-chipselects = <2>;
-> +	cs-gpios = <&gpio4 11 0>, <&gpio4 13 0>;
-> +	status = "okay";
-> +
-> +	flash: m25p32 at 1 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "m25p32", "m25p80";
-> +		spi-max-frequency = <25000000>;
-> +		reg = <1>;
-> +
-> +		partition at 0 {
-> +			label = "bootloader";
-> +			reg = <0x0 0x100000>;
-> +			read-only;
-> +		};
-> +
-> +		partition at 100000 {
-> +			label = "kernel";
-> +			reg = <0x100000 0x300000>;
-> +		};
-> +	};
-> +};
-> +
-> +&usbotg {
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +};
-> +
-> +&usbh2 {
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +};
-> +
-> +&usbh3 {
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_fec_1>;
-> +	phy-mode = "rmii";
-> +	phy-reset-gpios = <&gpio4 12 0>;
-> +	status = "okay";
-> +};
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Please sort these nodes alphabetically in label name.
-
-Shawn
-
-> -- 
-> 1.8.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/7d86c480/attachment.sig>
