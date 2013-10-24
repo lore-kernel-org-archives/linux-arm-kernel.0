@@ -1,45 +1,48 @@
 From: leigh@solinno.co.uk (Leigh Brown)
-Date: Thu, 24 Oct 2013 19:09:30 +0100
-Subject: [PATCH RFC v2 0/4] MDIO bus timeout issues on Dreamplug 
-In-Reply-To: <cover.1382199042.git.leigh@solinno.co.uk>
-References: <cover.1382199042.git.leigh@solinno.co.uk>
-Message-ID: <cover.1382637156.git.leigh@solinno.co.uk>
+Date: Thu, 24 Oct 2013 19:09:33 +0100
+Subject: [PATCH RFC v2 3/4] net: mvmdio: slight optimisation of
+ orion_mdio_write
+In-Reply-To: <cover.1382637156.git.leigh@solinno.co.uk>
+References: <cover.1382637156.git.leigh@solinno.co.uk>
+Message-ID: <6d044f3760cd506a325d5aab1199131ade96d632.1382637156.git.leigh@solinno.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks to the comment from Sebastian I did some more investigation and
-discovered that almost everything about my analysis was wrong (woops).
-The patch itself wasn't too bad though.
+Make only a single call to mutex_unlock in orion_mdio_write.
 
-In terms of timings, I don't believe the timeout was due to the SMI bus
-taking too long to respond because when I have repeated my testing
-(this time disabling interrupts whilst waiting), I have found that the
-maximum time that my Dreamplug takes to respond was about 95us (and
-43us on the Mirabox, which polls).  So I think the root cause of the 
-problem was that interrupt handler was interfering with the polling in 
-some way.
+Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+---
+ drivers/net/ethernet/marvell/mvmdio.c |   10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-I have therefore amended the first patch to use usleep_range to sleep
-instead of busy wait as suggested by Sebastian, and set the timeout to
-1ms.  I've tested this on both the Dreamplug and Mirabox and have seen
-no timeouts at all.
-
-The second, third and fourth patches are pretty much the same as before.
-
-If I receive no comments who do I submit this to for inclusion?
-
-Regards,
-
-Leigh.
-
-Leigh Brown (4):
-  net: mvmdio: make orion_mdio_wait_ready consistent
-  net: mvmdio: orion_mdio_ready: remove manual poll
-  net: mvmdio: slight optimisation of orion_mdio_write
-  net: mvmdio: doc: mvmdio now used by mv643xx_eth
-
- drivers/net/ethernet/marvell/mvmdio.c |  107 ++++++++++++++++-----------------
- 1 file changed, 52 insertions(+), 55 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index f053475..13f4614 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -151,10 +151,8 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 	mutex_lock(&dev->lock);
+ 
+ 	ret = orion_mdio_wait_ready(bus);
+-	if (ret < 0) {
+-		mutex_unlock(&dev->lock);
+-		return ret;
+-	}
++	if (ret != 0)
++		goto out;
+ 
+ 	writel(((mii_id << MVMDIO_SMI_PHY_ADDR_SHIFT) |
+ 		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
+@@ -162,9 +160,9 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 		(value << MVMDIO_SMI_DATA_SHIFT)),
+ 	       dev->regs);
+ 
++out:
+ 	mutex_unlock(&dev->lock);
+-
+-	return 0;
++	return ret;
+ }
+ 
+ static int orion_mdio_reset(struct mii_bus *bus)
 -- 
 1.7.10.4
