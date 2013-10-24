@@ -1,42 +1,50 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 24 Oct 2013 09:34:59 +0100
-Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
- tree bindings
-In-Reply-To: <20131023172001.GA3379@katana>
-References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
- <5267FA58.9050002@wwwdotorg.org> <20131023172001.GA3379@katana>
-Message-ID: <20131024083459.48FE3C4039D@trevor.secretlab.ca>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 24 Oct 2013 16:35:52 +0800
+Subject: [PATCH v4 0/7] ARM: imx27 pinctrl
+In-Reply-To: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
+References: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131024083550.GC13614@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Oct 2013 18:20:02 +0100, Wolfram Sang <wsa@the-dreams.de> wrote:
-> 
-> > Do we really want to polute the drivers and DT files with a ! in the
-> > compatible values? I thought we'd considered that, but chosen having the
-> > drivers that use unstable bindings depend on a Kconfig option as an
-> > alternative, not an additional step?
-> 
-> I'd even go further and use "unstable-" as the prefix instead of "!"
-> which is way more explicit.
-> 
-> 
-> > The one issue with doing this is that if a binding is thought to be
-> > unstable, but becomes stable later without any changes, we'll have to do
-> > busy-work to remove the ! in all the DT files, thus artificially
-> > introducing an incompatibility. Perhaps that's fine though?
-> 
-> I'd say yes. Going from unstable to stable is quite a step for a binding
-> and that should be visible and worth a patch IMO. Also, when looking at
-> a DTS file or some driver code, it will avoid
-> confusion/misinterpretation if one can see immediately the status of a
-> binding.
+Linus,
 
-No, it shouldn't. Going from unstable to stable is not a large step, rather it is coming to the point of looking around and realizing that the binding is working quite well.
+On Thu, Oct 24, 2013 at 09:53:46AM +0200, Markus Pargmann wrote:
+> Markus Pargmann (7):
+>   pinctrl: imx1 core driver
+>   pinctrl: imx27: imx27 pincontrol driver
 
-I don't think the solution is to put this into the kernel to be checked
-at runtime. The better solution is to put it into DTC and make it
-complain (either warn or error; depending on build config?) about usage
-of compatible strings that are marked in the binding documentation as
-unstable.
+Is it still possible to queue these two patches for 3.13 merge window,
+so that we get imx27 device tree machine work on 3.13-rc?
 
-g.
+Shawn
+
+>   ARM: dts: imx27 pin functions
+>   ARM: dts: imx27 pinctrl
+>   ARM: dts: imx27 phyCARD-S pinctrl
+>   ARM: dts: imx27 phycore pinctrl
+>   ARM: imx27: enable pinctrl
+> 
+>  .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  50 ++
+>  arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts   |  10 +
+>  arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts   |   4 +
+>  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     |   2 +
+>  arch/arm/boot/dts/imx27-phytec-phycore-som.dts     |   6 +
+>  arch/arm/boot/dts/imx27-pinfunc.h                  | 524 +++++++++++++++++
+>  arch/arm/boot/dts/imx27.dtsi                       | 102 ++++
+>  arch/arm/mach-imx/Kconfig                          |   2 +
+>  drivers/pinctrl/Kconfig                            |  13 +
+>  drivers/pinctrl/Makefile                           |   2 +
+>  drivers/pinctrl/pinctrl-imx1-core.c                | 653 +++++++++++++++++++++
+>  drivers/pinctrl/pinctrl-imx1.h                     |  73 +++
+>  drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++
+>  13 files changed, 1918 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+>  create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
+>  create mode 100644 drivers/pinctrl/pinctrl-imx1-core.c
+>  create mode 100644 drivers/pinctrl/pinctrl-imx1.h
+>  create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+> 
+> -- 
+> 1.8.4.rc3
+> 
