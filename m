@@ -1,43 +1,97 @@
-From: mbizon@freebox.fr (Maxime Bizon)
-Date: Thu, 24 Oct 2013 16:33:39 +0200
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131024141955.GB25061@ulmo.nvidia.com>
-References: <20131023174458.GC5208@netboy>
- <1382553982.31058.10.camel@sakura.staff.proxad.net>
- <20131024095232.27BBCC4039D@trevor.secretlab.ca>
- <1382614439.6040.16.camel@sakura.staff.proxad.net>
- <1382615278.8522.72.camel@shinybook.infradead.org>
- <20131024122346.GD11296@ulmo.nvidia.com>
- <1382619655.6040.52.camel@sakura.staff.proxad.net>
- <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
- <1382621431.6040.66.camel@sakura.staff.proxad.net>
- <af289ef3cc80be8de26274ba1f598d54.squirrel@twosheds.infradead.org>
- <20131024141955.GB25061@ulmo.nvidia.com>
-Message-ID: <1382625219.6040.96.camel@sakura.staff.proxad.net>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 24 Oct 2013 15:34:14 +0100
+Subject: [RFC PATCH] ARM: kexec: Assemble relocate code in ARM mode
+In-Reply-To: <52618C25.6040705@linaro.org>
+References: <20131015152422.GC2312@localhost.localdomain>
+ <52618C25.6040705@linaro.org>
+Message-ID: <20131024143408.GA29413@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 18, 2013 at 10:29:41PM +0300, Taras Kondratiuk wrote:
+> On 10/15/2013 06:24 PM, Dave Martin wrote:
+> > On Thu, Oct 10, 2013 at 11:36:08PM +0300, Taras Kondratiuk wrote:
+> >> I think it won't help, because here is no direct jump to this label.
+> >> This code gets copied to a new page and jump is done to the beginning
+> >> of that page.
+> > 
+> > Ah, right.
+> > 
+> > I think that the fncpy() function should work.  This is for the precise
+> > purpsoe of copying a function body from one place to another, while
+> > reatining the Thumb bit.
+> > 
+> > I have to disappear early to today, but I'll try and follow up.
+> > 
+> > Currently, I have the following, but I've not been able to test it yet.
+> > If you'd like to give it a try, that would be much appreciated.
+> 
+> I've tried the patch on ARM ISA and looks like the code does what
 
-On Thu, 2013-10-24 at 16:19 +0200, Thierry Reding wrote:
+Thanks for giving it a try.
 
-> We treated DT the same way we had treated platform data before, which
-> has inevitable lead to the current mess, which is only slightly better
-> than what we used to have. 
+> it should, but the reloaded kernel crashes somewhere at early stages.
+> Without this patch it boots fine on ARM. Next week I will try to look
+> what is going on.
 
-Side question, in your point of view, how is that better ?
+Hmmm, that's a bit strange.  You're saying that the new kernel gets
+loaded and started OK, but crashes during boot?
 
-current DT tools are not able to validate a file wrt its schema, so for
-now we just moved platdata to DTS files and lost compiler type checking
-in between.
+If relocate_new_kernel() was failing, I would not expect the new
+kernel to boot at all, unless part of the kernel doesn't get relocated,
+or something like that.
 
-I respectfully understand people fighting for *stable* DT because I see
-the benefits behind this, even if IMO they absolutely do not outweigh
-the pain.
+> > 
+> > From 94925667e650202e1baf74e1ff223671d316401d Mon Sep 17 00:00:00 2001
+> > From: Dave Martin <Dave.Martin@arm.com>
+> > Date: Tue, 15 Oct 2013 11:48:46 +0100
+> > Subject: [PATCH] ARM: kexec: Use the right ISA for relocate_new_kernel
+> > 
+> > Copying a function with memcpy() and then trying to execute the
+> > result isn't portable to Thumb.
+> > 
+> > This patch modifies the kexec soft restart code to copy its
+> > assembler trampoline relocate_new_kernel() using fncpy() instead,
+> > so that relocate_new_kernel can be in the same ISA as the rest of
+> > the kernel without problems.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm/kernel/machine_kexec.c   |   20 +++++++++-----------
+> >  arch/arm/kernel/relocate_kernel.S |    7 ++++---
+> >  2 files changed, 13 insertions(+), 14 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+> > index 57221e3..ce135b3 100644
+> > --- a/arch/arm/kernel/machine_kexec.c
+> > +++ b/arch/arm/kernel/machine_kexec.c
+> > @@ -11,6 +11,7 @@
+> >  #include <linux/memblock.h>
+> >  #include <asm/pgtable.h>
+> >  #include <linux/of_fdt.h>
+> > +#include <asm/fncpy.h>
+> >  #include <asm/pgalloc.h>
+> >  #include <asm/mmu_context.h>
+> >  #include <asm/cacheflush.h>
+> > @@ -18,7 +19,7 @@
+> >  #include <asm/smp_plat.h>
+> >  #include <asm/system_misc.h>
+> >  
+> > -extern const unsigned char relocate_new_kernel[];
+> > +extern char relocate_new_kernel;
+> 
+> Shouldn't it be a function pointer?
+> extern void relocate_new_kernel(void);
 
-But I fail to see any benefits of "forever unstable" DT, if you have to
-tie the kernel tree with a DTB file, the description could have been
-left in C code.
+Actually, it could be.
 
--- 
-Maxime
+I was forgetting that fncpy was implemented as a macro, allowing
+it to be more forgiving about argument types.
+
+Casting a function pointer type to a non-function pointer type is
+illegal in C, but fncpy dodges that problem by hiding the cast
+inside an asm so that the compiler can't try to do clever optimisations
+that might break things.
+
+Cheers
+---Dave
