@@ -1,32 +1,34 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 24 Oct 2013 03:41:35 -0500
-Subject: [GIT PULL] clk: socfpga: Clock fix for 3.13
-Message-ID: <1382604095-3097-1-git-send-email-dinguyen@altera.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 24 Oct 2013 01:45:02 -0700
+Subject: [PATCH] Simple NX lowmem mappings
+In-Reply-To: <20131024071258.GB16735@n2100.arm.linux.org.uk>
+Message-ID: <20131024084502.GT4994@outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+Hi,
 
-  Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+Thanks for starting this work!
 
-are available in the git repository at:
+Russel said:
+> -#define MT_MEMORY      9
+> [...]
+> + MT_MEMORY,
+> + MT_MEMORY_NX,
 
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.13
+Instead of these names, let's more fully describe the protections. "NX"
+doesn't say anything about RO vs RW. Instead, how about:
 
-for you to fetch changes up to f592c5da6869133de941e44ef2ed4ede7f6b2791:
+MT_MEMORY_RWX (to replace MT_MEMORY)
+MT_MEMORY_RW  (as the new "NX" in use for this patch)
 
-  clk: socfpga: Remove check for "reg" property in socfpga_clk_init (2013-10-24 03:18:30 -0500)
+for the first change? Then as we move forward, we can add:
 
-----------------------------------------------------------------
-Clock fix for SOCFPGA
+MT_MEMORY_R
 
-Remove check for "reg" property in socfpga_clk_init() function
-This allows for clk property to be assigned for the arm_twd timer, which
-will lead to removing socfpga_init_clocks().
+At which point we'll have the three states.
 
-----------------------------------------------------------------
-Dinh Nguyen (1):
-      clk: socfpga: Remove check for "reg" property in socfpga_clk_init
+-Kees
 
- drivers/clk/socfpga/clk.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+-- 
+Kees Cook                                            @outflux.net
