@@ -1,40 +1,34 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 24 Oct 2013 17:55:18 +0200
-Subject: [PATCH] ASoC: kirkwood: Fix compile error due to patch 'add S/PDIF
- support'
-Message-ID: <20131024175518.49b80343@armhf>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Oct 2013 16:52:20 +0100
+Subject: [PATCH] clk: sunxi: fix memory leaks
+In-Reply-To: <1382617513-9259-1-git-send-email-valentin.ilie@gmail.com>
+References: <1382617513-9259-1-git-send-email-valentin.ilie@gmail.com>
+Message-ID: <20131024155220.GA2768@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the compilation error of kirkwood-i2s.c introduced
-by the commit 75b9b65ee5a80e99e 'ASoC: kirkwood: add S/PDIF support'.
+Hi,
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
+On Thu, Oct 24, 2013 at 03:25:13PM +0300, Valentin Ilie wrote:
+> When the if condition is true, "fixed" and "gate" should be free'd before return.
+> 
+> Signed-off-by: Valentin Ilie <valentin.ilie@gmail.com>
 
-Mark, sorry for this error.
-This patch applies on your repository broonie/sound.git/ topic/kirkwood.
-I may give you an other patch to apply with the commit removed.
+A patch has already been submitted for this.
 
----
- sound/soc/kirkwood/kirkwood-i2s.c     | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+https://lkml.org/lkml/2013/10/18/524
 
-diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-index 9ec38d1..d34d917 100644
---- a/sound/soc/kirkwood/kirkwood-i2s.c
-+++ b/sound/soc/kirkwood/kirkwood-i2s.c
-@@ -568,7 +568,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 		} else {
- 			dev_info(&pdev->dev, "found external clock\n");
- 			clk_prepare_enable(priv->extclk);
--			soc_dai = &kirkwood_i2s_dai_extclk;
-+			soc_dai = kirkwood_i2s_dai_extclk;
- 		}
- 	}
- 
-
+Thanks anyway!
+Maxime
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/f86e9e0d/attachment.sig>
