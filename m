@@ -1,21 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 24 Oct 2013 15:13:28 +0000 (UTC)
-Subject: [PATCH 2/3] ARM: OMAP3: use CLK_SET_RATE_PARENT for dss clocks
-In-Reply-To: <1381324359-28825-2-git-send-email-tomi.valkeinen@ti.com>
-References: <1381324359-28825-1-git-send-email-tomi.valkeinen@ti.com>
- <1381324359-28825-2-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <alpine.DEB.2.02.1310241513180.6544@utopia.booyaka.com>
+From: t.stanislaws@samsung.com (Tomasz Stanislawski)
+Date: Thu, 24 Oct 2013 17:13:55 +0200
+Subject: [PATCH 5/7] phy: Add driver for Exynos DP PHY
+In-Reply-To: <1381940896-9355-6-git-send-email-kishon@ti.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <1381940896-9355-6-git-send-email-kishon@ti.com>
+Message-ID: <52693933.8040809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Oct 2013, Tomi Valkeinen wrote:
+Hi Kishon,
+Recently, I posted 'simple-phy' driver.
+It is a part of patchset for HDMI enabling on Exynos4 using Device Tree.
 
-> Set CLK_SET_RATE_PARENT flag for dss1_alwon_fck_3430es2,
-> dss1_alwon_fck_3430es1 and dpll4_m4x2_ck so that the DSS's fclk can be
-> configured without the need to get the parent's parent of the fclk.
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg23655.html
+
+The simple-phy was dedicated for single register PHYs like HDMI or DP.
+Using such a generic phy may help to avoid code duplication.
+
+Regards,
+Tomasz Stanislawski
+
+
+On 10/16/2013 06:28 PM, Kishon Vijay Abraham I wrote:
+> From: Jingoo Han <jg1.han@samsung.com>
 > 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-
-Thanks, queued.
-
-- Paul
+> Add a PHY provider driver for the Samsung Exynos SoC Display Port PHY.
+> 
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  .../devicetree/bindings/phy/samsung-phy.txt        |    8 ++
+>  drivers/phy/Kconfig                                |    7 ++
+>  drivers/phy/Makefile                               |    1 +
+>  drivers/phy/phy-exynos-dp-video.c                  |  111 ++++++++++++++++++++
+>  4 files changed, 127 insertions(+)
+>  create mode 100644 drivers/phy/phy-exynos-dp-video.c
+> 
