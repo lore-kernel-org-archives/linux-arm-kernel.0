@@ -1,43 +1,50 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 24 Oct 2013 17:00:16 +0200
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131024083411.GH9403@ulmo.nvidia.com>
-References: <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023174736.GD5208@netboy>
- <20131023180240.GA32563@obsidianresearch.com>
- <20131023182345.GG5208@netboy>
- <20131024083411.GH9403@ulmo.nvidia.com>
-Message-ID: <20131024150016.GB4096@netboy>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 24 Oct 2013 23:00:54 +0800
+Subject: [PATCH 0/8] ARM: imx: add IMX50 SoC support
+In-Reply-To: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+Message-ID: <20131024150050.GA14529@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 10:34:12AM +0200, Thierry Reding wrote:
+Hi Greg,
+
+On Fri, Oct 18, 2013 at 04:04:12PM +1000, gerg at uclinux.org wrote:
+> From: Greg Ungerer <gerg@uclinux.org>
 > 
-> There's another thing with DT bindings that makes them needlessly hard
-> to settle on. Let's say you come up with a binding that accurately
-> describes the hardware at hand and has been proven to work. Now people
-> keep telling you that it might not be good enough, for whatever reason
-> so eventually you decide to be bold and tell them that you're aware of
-> everything that stable DT bindings imply and that there might be some
-> risk of having to maintain two bindings because the first one didn't
-> turn out to be perfect and yada yada.
+> This set of patches is the code and device tree support for the Freescale
+> IMX50 SoC. This part is similar to the IMX53 SoC family, and I have resued
+> as much of its support as possible. These patches are against 3.12-rc5.
 
-You make a good point here. In my own limited experiences with DT
-kernel development, a big debate always emerged about exactly how
-these bindings should be called. Not being a real DT expert myself, I
-really couldn't understand what the point was, but I just implemented
-what the DT people wanted (or just dropped the submission altogether,
-in one case).
+Nice patches.  Can you please base it on branch below with your next
+posting, so that I can apply them more easily?
 
-I think the frustration that you have experienced is simply a result
-of the attitude on the DT list. Maybe the real issue is attitude
-and personalities, and not the hurdle of stable bindings.
+  git://git.linaro.org/people/shawnguo/linux-2.6.git for-next
 
-Thanks,
-Richard
+Shawn
+
+> With these changes you can load and run on the Freescale IMX50-EVK board.
+> 
+> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> ---
+>  arch/arm/Kconfig.debug              |    9 
+>  arch/arm/boot/dts/Makefile          |    1 
+>  arch/arm/boot/dts/imx50-evk.dts     |   89 +++
+>  arch/arm/boot/dts/imx50-pinfunc.h   |  923 ++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx50.dtsi        |  659 +++++++++++++++++++++++++
+>  arch/arm/include/debug/imx-uart.h   |   10 
+>  arch/arm/mach-imx/Kconfig           |    9 
+>  arch/arm/mach-imx/Makefile          |    1 
+>  arch/arm/mach-imx/clk-imx51-imx53.c |   79 +++
+>  arch/arm/mach-imx/common.h          |    3 
+>  arch/arm/mach-imx/mach-imx50.c      |   52 ++
+>  drivers/pinctrl/Kconfig             |    8 
+>  drivers/pinctrl/Makefile            |    1 
+>  drivers/pinctrl/pinctrl-imx50.c     |  426 ++++++++++++++++
+>  14 files changed, 2270 insertions(+)
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
