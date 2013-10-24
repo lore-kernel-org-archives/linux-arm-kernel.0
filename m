@@ -1,172 +1,37 @@
-From: lisovy@gmail.com (Rostislav Lisovy)
-Date: Thu, 24 Oct 2013 21:07:14 +0200
-Subject: [PATCH 2/2] ARM: dts: i.MX53: Devicetree for Voipac Baseboard using
- x53-dmm-668 module
-In-Reply-To: <1382641634-18187-1-git-send-email-lisovy@gmail.com>
-References: <1382641634-18187-1-git-send-email-lisovy@gmail.com>
-Message-ID: <1382641634-18187-3-git-send-email-lisovy@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 24 Oct 2013 12:10:33 -0700
+Subject: [PATCH 4/8] input: Remove OOM message after input_allocate_device
+In-Reply-To: <1382640339.22433.73.camel@joe-AO722>
+References: <cover.1382555436.git.joe@perches.com>
+ <cc5e6a317bc9ef33cfdfae3ed9d3a47b5319a47b.1382555436.git.joe@perches.com>
+ <20131024183707.GA5281@core.coreip.homeip.net>
+ <1382640339.22433.73.camel@joe-AO722>
+Message-ID: <20131024191032.GA5553@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supported peripherals: Audio -- headphone output, LEDs, Buttons
-(using keyboard controller), SD-card.
+On Thu, Oct 24, 2013 at 11:45:39AM -0700, Joe Perches wrote:
+> On Thu, 2013-10-24 at 11:37 -0700, Dmitry Torokhov wrote:
+> > Hi Joe,
+> > 
+> > On Wed, Oct 23, 2013 at 12:14:50PM -0700, Joe Perches wrote:
+> > > Emitting an OOM message isn't necessary after input_allocate_device
+> > > as there's a generic OOM and a dump_stack already done.
+> > 
+> > No, please don't. The kzalloc may get changed in the future to not dump
+> > stack (that was added originally because not everyone was handling OOM
+> > properly, right?), input core might get changed to use something else
+> > than kzalloc, etc, etc.
+> > 
+> > The majority of errors use dev_err so we also get idea what device
+> > failed (if there are several), and more.
+> 
+> I think that's not valuable as input_allocate_device already has
+> dozens of locations that don't emit a specific OOM and centralizing
+> the location for any generic message would work anyway.
 
-Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
+Not having diagnostic messages in some of the drivers is hardly a
+justification to remove them from everywhere else.
 
- create mode 100644 arch/arm/boot/dts/imx53-voipac-bsb.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 802720e..5571af6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -133,6 +133,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx53-mba53.dtb \
- 	imx53-qsb.dtb \
- 	imx53-smd.dtb \
-+	imx53-voipac-bsb.dts \
- 	imx6dl-sabreauto.dtb \
- 	imx6dl-sabresd.dtb \
- 	imx6dl-wandboard.dtb \
-diff --git a/arch/arm/boot/dts/imx53-voipac-bsb.dts b/arch/arm/boot/dts/imx53-voipac-bsb.dts
-new file mode 100644
-index 0000000..5c88c0e
---- /dev/null
-+++ b/arch/arm/boot/dts/imx53-voipac-bsb.dts
-@@ -0,0 +1,135 @@
-+/*
-+ * Copyright 2013 Rostislav Lisovy <lisovy@gmail.com>, PiKRON s.r.o.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx53-voipac-dmm-668.dtsi"
-+
-+/ {
-+	sound {
-+		compatible = "fsl,imx53-voipac-sgtl5000",
-+			     "fsl,imx-audio-sgtl5000";
-+		model = "imx53-voipac-sgtl5000";
-+		ssi-controller = <&ssi2>;
-+		audio-codec = <&sgtl5000>;
-+		audio-routing =
-+			"Headphone Jack", "HP_OUT";
-+		mux-int-port = <2>;
-+		mux-ext-port = <5>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pin_gpio>;
-+
-+		led1 {
-+			label = "led-red";
-+			gpios = <&gpio3 29 0>;
-+			default-state = "off";
-+		};
-+
-+		led2 {
-+			label = "led-orange";
-+			gpios = <&gpio2 31 0>;
-+			default-state = "off";
-+		};
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	hog {
-+		pinctrl_hog: hoggrp {
-+			fsl,pins = <
-+				/* SD2_CD */
-+				MX53_PAD_EIM_D25__GPIO3_25	0x80000000
-+				/* SD2_WP */
-+				MX53_PAD_EIM_A19__GPIO2_19 	0x80000000
-+			>;
-+		};
-+
-+		led_pin_gpio: led_gpio {
-+			fsl,pins = <
-+				MX53_PAD_EIM_D29__GPIO3_29	0x80000000
-+				MX53_PAD_EIM_EB3__GPIO2_31	0x80000000
-+			>;
-+		};
-+	};
-+
-+	/* Keyboard controller */
-+	kpp {
-+		pinctrl_kpp_1: kppgrp-1 {
-+			fsl,pins = <
-+				MX53_PAD_GPIO_9__KPP_COL_6	0xe8
-+				MX53_PAD_GPIO_4__KPP_COL_7	0xe8
-+				MX53_PAD_KEY_COL2__KPP_COL_2	0xe8
-+				MX53_PAD_KEY_COL3__KPP_COL_3	0xe8
-+				MX53_PAD_KEY_COL4__KPP_COL_4	0xe8
-+
-+				MX53_PAD_GPIO_2__KPP_ROW_6	0xe0
-+				MX53_PAD_GPIO_5__KPP_ROW_7	0xe0
-+				MX53_PAD_KEY_ROW2__KPP_ROW_2	0xe0
-+				MX53_PAD_KEY_ROW3__KPP_ROW_3	0xe0
-+				MX53_PAD_KEY_ROW4__KPP_ROW_4	0xe0
-+			>;
-+		};
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux_1>; /* SSI1 */
-+	status = "okay";
-+};
-+
-+&esdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc2_1>;
-+	cd-gpios = <&gpio3 25 0>;
-+	wp-gpios = <&gpio2 19 0>;
-+	vmmc-supply = <&reg_3p3v>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3_2>;
-+	status = "okay";
-+
-+	sgtl5000: codec at 0a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+		clocks = <&clks 150>;
-+	};
-+};
-+
-+&kpp {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_kpp_1>;
-+	linux,keymap = <
-+			0x0203003b	/* KEY_F1 */
-+			0x0603003c	/* KEY_F2 */
-+			0x0207003d	/* KEY_F3 */
-+			0x0607003e	/* KEY_F4 */
-+			>;
-+	keypad,num-rows = <8>;
-+	keypad,num-columns = <1>;
-+	status = "okay";
-+};
-+
-+&ssi2 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
 -- 
-1.7.10.4
+Dmitry
