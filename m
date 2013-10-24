@@ -1,86 +1,47 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 24 Oct 2013 13:50:29 +0800
-Subject: [Patch v2 08/10] usb: chipidea: host: add quirk for ehci operation
-In-Reply-To: <20131024075103.2e2702ec@ipc1.ka-ro>
-References: <1382423019-26184-1-git-send-email-peter.chen@freescale.com>
- <1382423019-26184-9-git-send-email-peter.chen@freescale.com>
- <20131024075103.2e2702ec@ipc1.ka-ro>
-Message-ID: <20131024055028.GA2760@shlinux1.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 24 Oct 2013 14:29:14 +0800
+Subject: [PATCHv5][ 1/9] of: add vendor prefix for Eukrea Electromatique.
+In-Reply-To: <1382516974-13371-1-git-send-email-denis@eukrea.com>
+References: <1382516974-13371-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131024062910.GA11466@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 07:51:03AM +0200, Lothar Wa?mann wrote:
-> Hi,
+On Wed, Oct 23, 2013 at 10:29:26AM +0200, Denis Carikli wrote:
+> Trivial patch to add Eukr?a Electromatique to the list
+> of devicetree vendor prefixes.
 > 
-> Peter Chen wrote:
-> > For chipidea controller, it does not follow ehci spec strictly.
-> > Taking resume signal as an example, it will stop resume signal about
-> > 20-21ms later automatically, but standard ehci spec says, the resume
-> > signal is controlled by software (clear portsc.PORT_RESUME).
-> > 
-> > This operation causes some remote wakeup problems for high speed
-> > devices due to host controller does not send SOF in time since
-> > software can't guarantee set run/stop bit in time (run/stop bit
-> > was cleared at the ehci suspend routine).
-> > 
-> > When software sets run/stop bit, it needs 1 SoF time to make it effect.
-> > If we close the PHY clock just after setting run/stop bit, it does
-> > not be set in practice, so a software delay is needed.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/chipidea/host.c |   51 +++++++++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 51 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-> > index 59e6020..283b385 100644
-> > --- a/drivers/usb/chipidea/host.c
-> > +++ b/drivers/usb/chipidea/host.c
-> > @@ -33,6 +33,53 @@
-> >  #include "host.h"
-> >  
-> >  static struct hc_driver __read_mostly ci_ehci_hc_driver;
-> > +static int (*orig_bus_suspend)(struct usb_hcd *hcd);
-> > +
-> > +static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
-> > +{
-> > +	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-> > +	int port;
-> > +	u32 tmp;
-> > +
-> > +	int ret = orig_bus_suspend(hcd);
-> > +
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	port = HCS_N_PORTS(ehci->hcs_params);
-> > +	while (port--) {
-> > +		u32 __iomem *reg = &ehci->regs->port_status[port];
-> > +		u32 portsc = ehci_readl(ehci, reg);
-> > +
-> > +		if (portsc & PORT_CONNECT) {
-> > +			/*
-> > +			 * For chipidea, the resume signal will be ended
-> > +			 * automatically, so for remote wakeup case, the
-> > +			 * usbcmd.rs may not be set before the resume has
-> > +			 * ended if other resume path consumes too much
-> > +			 * time (~23ms-24ms), in that case, the SOF will not
-> > +			 * send out within 3ms after resume ends, then the
-> > +			 * device will enter suspend again.
-> > +			 */
-> > +			if (hcd->self.root_hub->do_remote_wakeup) {
-> > +				ehci_dbg(ehci,
-> > +					"Remote wakeup is enabled, "
-> > +					"and device is on the port\n");
-> >
-> Please don't line wrap message texts, since it makes it harder to grep
-> the kernel source for messages found in a logfile.
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+
+Applied, thanks.
+
+Shawn
+
+> ---
+>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+>  1 file changed, 1 insertion(+)
 > 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 2956800..a0329cf 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -25,6 +25,7 @@ denx	Denx Software Engineering
+>  emmicro	EM Microelectronic
+>  epson	Seiko Epson Corp.
+>  est	ESTeem Wireless Modems
+> +eukrea  Eukr?a Electromatique
+>  fsl	Freescale Semiconductor
+>  GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+>  gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+> -- 
+> 1.7.9.5
 > 
-
-Thanks, will change.
-
--- 
-
-Best Regards,
-Peter Chen
