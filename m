@@ -1,102 +1,72 @@
-From: leigh@solinno.co.uk (Leigh Brown)
-Date: Thu, 24 Oct 2013 19:09:31 +0100
-Subject: [PATCH RFC v2 1/4] net: mvmdio: make orion_mdio_wait_ready consistent
-In-Reply-To: <cover.1382637156.git.leigh@solinno.co.uk>
-References: <cover.1382637156.git.leigh@solinno.co.uk>
-Message-ID: <4955b6b331459b7b9c54350b8f0b254065d013c3.1382637156.git.leigh@solinno.co.uk>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 24 Oct 2013 18:10:40 +0000
+Subject: [PATCH 0/2] ARM: OMAP: dmtimers improvements.
+In-Reply-To: <20131024065536.16889.49902.stgit@notabene.brown>
+References: <20131024065536.16889.49902.stgit@notabene.brown>
+Message-ID: <448912EABC71F84BBCADFD3C67C4BE5291DD30@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amend orion_mdio_wait_ready so that the same timeout is used when
-polling or using wait_event_timeout.  Set the timeout to 1ms.
+Sorry for top posting .... Probably we should move the dmtimer to drivers/misc or create drivers/timer/
+This has been pending for quite some time now....
 
-Replace udelay with usleep_range to avoid a busy loop, and set the
-polling interval range as 45us to 55us, so that the first sleep
-will be enough in almost all cases.
+Tony, what you say ?
+________________________________________
+From: linux-arm-kernel [linux-arm-kernel-bounces at lists.infradead.org] on behalf of NeilBrown [neilb at suse.de]
+Sent: Thursday, October 24, 2013 2:57 AM
+To: Tony Lindgren; Russell King
+Cc: Belisko Marek; linux-omap at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Dr. H. Nikolaus Schaller
+Subject: [PATCH 0/2] ARM: OMAP: dmtimers improvements.
 
-Generate the same log message at timeout when polling or using
-wait_event_timeout.
+I would like to use omap dmtimer for a PWM driver (for the backlight
+on my display).
+But there are two difficulties.
 
-Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+Unfortunately Jon Hunter (who has helped me with dmtimers before)
+seems to have disappeared.  So I guess I get to do it myself :-)
+
+Following two patches make dmtimers more usable.
+
+1/ allow the counter to be set even when the timer isn't counting.
+2/ move the include file to a more useful location
+
+Any help you can provide in getting these fixes upstream would be appreciated.
+
+Thanks,
+NeilBrown
+
 ---
- drivers/net/ethernet/marvell/mvmdio.c |   51 +++++++++++++++++++--------------
- 1 file changed, 30 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index e2f6626..6ed6f00 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -44,6 +44,15 @@
- #define  MVMDIO_ERR_INT_SMI_DONE	   0x00000010
- #define MVMDIO_ERR_INT_MASK		   0x0080
- 
-+/* 
-+ * SMI Timeout measurements:
-+ * - Kirkwood 88F6281 (Globalscale Dreamplug): 45us to 95us (Interrupt)
-+ * - Armada 370       (Globalscale Mirabox):   41us to 43us (Polled)
-+ */
-+#define MVMDIO_SMI_TIMEOUT		   1000 /* 1000us = 1ms */
-+#define MVMDIO_SMI_POLL_INTERVAL_MIN	   45
-+#define MVMDIO_SMI_POLL_INTERVAL_MAX	   55
-+
- struct orion_mdio_dev {
- 	struct mutex lock;
- 	void __iomem *regs;
-@@ -68,34 +77,34 @@ static int orion_mdio_smi_is_done(struct orion_mdio_dev *dev)
- static int orion_mdio_wait_ready(struct mii_bus *bus)
- {
- 	struct orion_mdio_dev *dev = bus->priv;
--	int count;
-+	unsigned long timeout = usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
-+	unsigned long end = jiffies + timeout;
-+	int timedout = 0;
- 
--	if (dev->err_interrupt <= 0) {
--		count = 0;
--		while (1) {
--			if (orion_mdio_smi_is_done(dev))
-+	while (1) {
-+	        if (orion_mdio_smi_is_done(dev))
-+			return 0;
-+	        else
-+			if (timedout)
- 				break;
- 
--			if (count > 100) {
--				dev_err(bus->parent,
--					"Timeout: SMI busy for too long\n");
--				return -ETIMEDOUT;
--			}
-+	        if (dev->err_interrupt <= 0) {
-+			usleep_range(MVMDIO_SMI_POLL_INTERVAL_MIN,
-+				     MVMDIO_SMI_POLL_INTERVAL_MAX);
- 
--			udelay(10);
--			count++;
--		}
--	} else {
--		if (!orion_mdio_smi_is_done(dev)) {
-+			if (time_is_before_jiffies(end))
-+				++timedout;
-+	        } else {
- 			wait_event_timeout(dev->smi_busy_wait,
--				orion_mdio_smi_is_done(dev),
--				msecs_to_jiffies(100));
--			if (!orion_mdio_smi_is_done(dev))
--				return -ETIMEDOUT;
--		}
-+				           orion_mdio_smi_is_done(dev),
-+				           timeout);
-+
-+			++timedout;
-+	        }
- 	}
- 
--	return 0;
-+	dev_err(bus->parent, "Timeout: SMI busy for too long\n");
-+	return  -ETIMEDOUT;
- }
- 
- static int orion_mdio_read(struct mii_bus *bus, int mii_id,
--- 
-1.7.10.4
+NeilBrown (2):
+      ARM: OMAP2+: dmtimer: allow counter to be set at any time.
+      ARM: OMAP: move dmtimer.h from plat-omap/include/plat to include/linux
+
+
+ arch/arm/mach-omap1/pm.c                           |    2
+ arch/arm/mach-omap1/timer.c                        |    2
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    2
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    2
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    2
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    2
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |    2
+ arch/arm/mach-omap2/timer.c                        |    2
+ arch/arm/plat-omap/dmtimer.c                       |   11 -
+ arch/arm/plat-omap/include/plat/dmtimer.h          |  415 --------------------
+ drivers/media/rc/ir-rx51.c                         |    2
+ drivers/pwm/pwm-omap.c                             |    2
+ drivers/staging/tidspbridge/core/dsp-clock.c       |    2
+ include/linux/omap-dmtimer.h                       |  415 ++++++++++++++++++++
+ 16 files changed, 434 insertions(+), 433 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/include/plat/dmtimer.h
+ create mode 100644 include/linux/omap-dmtimer.h
+
+--
+Signature
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
