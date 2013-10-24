@@ -1,40 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Oct 2013 16:30:25 +0200
-Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
-In-Reply-To: <CACRpkdbymhLhHObL+fdWCHKbNG_LtudvhXbdxC0NCJApUBjT9w@mail.gmail.com>
-References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbymhLhHObL+fdWCHKbNG_LtudvhXbdxC0NCJApUBjT9w@mail.gmail.com>
-Message-ID: <CACRpkdb6pC-7vWdAHkV3RK6mN8GXTiRQcQBPojk_kgm9JREJAQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 24 Oct 2013 07:30:28 -0700
+Subject: [PATCH 3/7] video: exynos_mipi_dsim: Use the generic PHY driver
+In-Reply-To: <1381940896-9355-4-git-send-email-kishon@ti.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <1381940896-9355-4-git-send-email-kishon@ti.com>
+Message-ID: <CAOesGMhwotSY-1WQmt+wtsrsH2m30VE=j-MwyhpYU3mt_PSPPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding openwrt-devel to this thread to get some traction...
+Hi Kishon,
 
-On Thu, Oct 24, 2013 at 12:06 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Tue, Oct 1, 2013 at 12:57 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Wed, Oct 16, 2013 at 9:28 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+> index 32e5406..00b3a52 100644
+> --- a/drivers/video/exynos/exynos_mipi_dsi.c
+> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
+> @@ -156,8 +157,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
+>                 exynos_mipi_regulator_enable(dsim);
 >
->> This converts the gemini machine to use generic clockevents
->> by rewriting the timer driver.
->>
->> Cc: arm at kernel.org
->> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> This is flagged as Request for Testing (RFT) as I have no Gemini
->> platform. If I do not get help with testing this, the next step
->> will be a patch series to delete the platform.
+>                 /* enable MIPI-DSI PHY. */
+> -               if (dsim->pd->phy_enable)
+> -                       dsim->pd->phy_enable(pdev, true);
+> +               phy_power_on(dsim->phy);
 >
-> OK nobody is able to test this it seems, but it is a vital refactoring.
+>                 clk_enable(dsim->clock);
 >
-> Should we just apply this and see what happens?
->
-> Or should I just send a deletion patch right away?
->
-> I would lean toward just applying it and see if the OpenWRT
-> people will notice and/or complain.
->
-> What does the ARM SoC people say?
->
-> Yours,
-> Linus Walleij
+
+This introduces the below with exynos_defconfig:
+
+../../drivers/video/exynos/exynos_mipi_dsi.c: In function
+'exynos_mipi_dsi_blank_mode':
+../../drivers/video/exynos/exynos_mipi_dsi.c:144:26: warning: unused
+variable 'pdev' [-Wunused-variable]
+  struct platform_device *pdev = to_platform_device(dsim->dev);
+
+
+-Olof
