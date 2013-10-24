@@ -1,61 +1,144 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Thu, 24 Oct 2013 15:46:06 -0400
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131024150016.GB4096@netboy>
-References: <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023174736.GD5208@netboy>
- <20131023180240.GA32563@obsidianresearch.com>
- <20131023182345.GG5208@netboy>
- <20131024083411.GH9403@ulmo.nvidia.com>
- <20131024150016.GB4096@netboy>
-Message-ID: <20131024194606.GX29341@beef>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Thu, 24 Oct 2013 14:46:58 -0500
+Subject: [PATCH v5 2/8] pinctrl: imx27: imx27 pincontrol driver
+In-Reply-To: <1382629114-8628-3-git-send-email-mpa@pengutronix.de>
+References: <1382629114-8628-1-git-send-email-mpa@pengutronix.de>
+ <1382629114-8628-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <CAHCPf3t0A2_9Etz7ojRSYxaedg+fuAJky+HosuxEeAsJOJccWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 05:00:16PM +0200, Richard Cochran wrote:
-> On Thu, Oct 24, 2013 at 10:34:12AM +0200, Thierry Reding wrote:
-> > 
-> > There's another thing with DT bindings that makes them needlessly hard
-> > to settle on. Let's say you come up with a binding that accurately
-> > describes the hardware at hand and has been proven to work. Now people
-> > keep telling you that it might not be good enough, for whatever reason
-> > so eventually you decide to be bold and tell them that you're aware of
-> > everything that stable DT bindings imply and that there might be some
-> > risk of having to maintain two bindings because the first one didn't
-> > turn out to be perfect and yada yada.
-> 
-> You make a good point here. In my own limited experiences with DT
-> kernel development, a big debate always emerged about exactly how
-> these bindings should be called. Not being a real DT expert myself, I
-> really couldn't understand what the point was, but I just implemented
-> what the DT people wanted (or just dropped the submission altogether,
-> in one case).
-> 
-> I think the frustration that you have experienced is simply a result
-> of the attitude on the DT list. Maybe the real issue is attitude
-> and personalities, and not the hurdle of stable bindings.
+On Thu, Oct 24, 2013 at 10:38 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> imx27 pincontrol driver using the imx1 core driver. The DT bindings are
+> similar to other imx pincontrol drivers.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  50 +++
+>  drivers/pinctrl/Kconfig                            |   8 +
+>  drivers/pinctrl/Makefile                           |   1 +
+>  drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++++++++
+>  4 files changed, 536 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+>  create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+> new file mode 100644
+> index 0000000..6619968
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+> @@ -0,0 +1,50 @@
+> +* Freescale IMX27 IOMUX Controller
+> +
+> +Required properties:
+> +- compatible: "fsl,imx27-iomuxc"
+> +
+> +The iomuxc driver node should define subnodes containing of pinctrl configuration subnodes.
+> +
+> +Required properties for pin configuration node:
+> +- fsl,pins: three integers array, represents a group of pins mux and config
+> +  setting. The format is fsl,pins = <PIN MUX_ID CONFIG>. PIN and MUX_ID are
+> +  defined as macros in arch/arm/boot/dts/imx27-pinfunc.h. CONFIG can be 0 or
 
-Well, you both hit on something here. There's no possible self-policing
-of what is submitted as bindings.
+Can we get away from this concept that a binding is predicated on the
+fact that they're preprocessed? You're getting it half right.. as
+below.
 
-There's really no canonical documentation on best practices. Most
-bindings are inconsistent in format and deprecated in style of
-content.
+Binding descriptions must NOT rely on preprocessing helpers, for the
+following reasons
 
-I'm not talking about referring back to ePAPR or the explanation of
-compatible string best practices on devicetree.org. I'm talking about
-all the decisions made in random threads. The "standards" and "best
-practices" have not been documented like our kernel patch submission
-process and best practices. As a result, people our generating
-additional traffic with every new binding submission. Stephen had
-a nice list of best practices but it's difficult to tell if that is
-agreed on by *all* the DT maintainers or his personal preference. At
-some point we need to agree on documentation for best practices acked
-by the entire maintainer team.
+* Device trees could be generated by methods other than preprocessed source
+* Device trees could be generated by Linux builds and passed to other
+operating systems (therefore they need to know the definition in
+reality).
 
--Matt
+Please provide and describe the RAW data format of the property and
+then somewhere afterwards mention that as a convenience there are
+preprocessor macros which make life easier. You can also mention the
+include name, but the path (arch/arm/boot/dts) may not be fixed. This
+may not even be Linux. They may be split elsewhere in a separate tree
+that has no OS and therefore a different layout. Bindings should be OS
+agnostic - certainly source code location agnostic - where possible.
+
+> +  PIN is a integer between 0 and 0xbf
+
+Correct.
+
+>                                                                imx27 has 6 ports with 32 configurable
+> +  configurable pins each. PIN is PORT * 32 + PORT_PIN, PORT_PIN is the pin
+> +  number on the specific port (between 0 and 31).
+
+Correct.
+
+> +  MUX_ID is
+> +  function + (direction << 2) + (gpio_oconf << 4) + (gpio_iconfa << 8) + (gpio_iconfb << 10)
+> +  function:      0 - Primary function
+> +                 1 - Alternate function
+> +                 2 - GPIO
+> +  direction:     0 - Input
+> +                 1 - Output
+> +  gpio_oconf:    0 - A_IN
+> +                 1 - B_IN
+> +                 2 - C_IN
+> +                 3 - Data Register
+> +  gpio_iconfa/b: 0 - GPIO_IN
+> +                 1 - Interrupt Status Register
+> +                 2 - 0
+> +                 3 - 1
+
+Correct, but I don't like mixing register values for multiple
+registers in a single field. I guess you'd waste a ton of space any
+other way, so acceptable.
+
+If they're the bits for a single register (could be, but I don't have
+access to an i.MX27 manual right now) then just describe it as the
+content of the register as defined in a location in the manual, you
+won't need to re-describe what is already in the manual.
+
+> +Example:
+> +
+> +iomuxc: iomuxc at 10015000 {
+> +       compatible = "fsl,imx27-iomuxc";
+> +       reg = <0x10015000 0x600>;
+> +
+> +       uart {
+> +               pinctrl_uart1: uart-1 {
+> +                       fsl,pins = <
+> +                               MX27_PAD_UART1_TXD__UART1_TXD 0x0
+
+Incorrect.
+
+Your example should show the raw output. Try compiling this and then
+performing the following:
+
+scripts/dtc/dtc -I dtb -O dts imx27-my-platform.dtb
+
+The place where pinctrl_uart1 is in that output is your example. Lots
+of awful, unreadable numbers.
+
+However you may provide a second example explaining the convenience of
+using the preprocessor macros exactly as above, perhaps with the
+location of the preprocessor macros include.
+
+> +                               MX27_PAD_UART1_RXD__UART1_RXD 0x0
+
+One question; are these definitions the one in the manual (for the
+names etc, in the huge enums later, especially?) or stripped from
+existing source code?
+
+Bindings - and their preprocessor helper macros - should follow the
+latest manual if they can. There are many odd differences in i.MX6
+pinctrl, but for instance if the manual describes it as SD_DAT3 with
+function SD_DATA3 then it should be SD_DAT3__SD_DATA3 rather than
+SD_DAT3__SD_DAT3 (even if the SD Association spec says DAT3, since you
+are describing an i.MX27 mux, not the SD physical layer :). That way
+the preprocessor definitions can be searched for in the manual with
+some mangling, and searched for in the headers by pasting out the
+function name or the original pin name. If they differ, then someone
+has to resolve the differences with their brain which is more work for
+the reader.
+
+Thanks,
+Matt Sealey <neko@bakuhatsu.net>
