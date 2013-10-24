@@ -1,47 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Oct 2013 16:49:56 +0100
-Subject: ARM: add support to dump the kernel page tables
-In-Reply-To: <20131024125530.GA27357@linaro.org>
-References: <20131024071600.GC16735@n2100.arm.linux.org.uk>
- <20131024105143.GA24288@linaro.org>
- <20131024122306.GK16735@n2100.arm.linux.org.uk>
- <20131024125530.GA27357@linaro.org>
-Message-ID: <20131024154956.GN16735@n2100.arm.linux.org.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 24 Oct 2013 17:55:18 +0200
+Subject: [PATCH] ASoC: kirkwood: Fix compile error due to patch 'add S/PDIF
+ support'
+Message-ID: <20131024175518.49b80343@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 01:55:31PM +0100, Steve Capper wrote:
-> On Thu, Oct 24, 2013 at 01:23:06PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Oct 24, 2013 at 11:51:44AM +0100, Steve Capper wrote:
-> > > Hi Russell,
-> > > I've given this a quick go on an Arndale with LPAE, and have a few
-> > > suggestions below.
-> > 
-> > Thanks.
-> > 
-> > > > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-> > > > index 5689c18..d7682cd 100644
-> > > > --- a/arch/arm/include/asm/pgtable-3level.h
-> > > > +++ b/arch/arm/include/asm/pgtable-3level.h
-> > > > @@ -140,6 +140,7 @@
-> > > >  						 PMD_TYPE_TABLE)
-> > > >  #define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-> > > >  						 PMD_TYPE_SECT)
-> > > > +#define pmd_large(pmd)		pmd_sect(pmd)
-> > > 
-> > > Could we please instead do something like:
-> > > #define pmd_large(pmd)         (pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
-> > > 
-> > > This matches the logic used in the huge pages patches (it picks up the
-> > > PROT_NONE case) that would be missed above.
-> > 
-> > Is this used in the generic parts of the kernel?  Can you please point
-> > out where?
-> > 
-> 
-> Apologies I was a little vague. I don't think there are any PROT_NONE
-> protected kernel huge pages, I am worried that pmd_huge may be used by
-> other code (and then run into problems with PROT_NONE).
+This patch fixes the compilation error of kirkwood-i2s.c introduced
+by the commit 75b9b65ee5a80e99e 'ASoC: kirkwood: add S/PDIF support'.
 
-Well, the obvious question is: why would you want pmd_large() to return
-false if there is a section entry in place?
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+
+Mark, sorry for this error.
+This patch applies on your repository broonie/sound.git/ topic/kirkwood.
+I may give you an other patch to apply with the commit removed.
+
+---
+ sound/soc/kirkwood/kirkwood-i2s.c     | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
+index 9ec38d1..d34d917 100644
+--- a/sound/soc/kirkwood/kirkwood-i2s.c
++++ b/sound/soc/kirkwood/kirkwood-i2s.c
+@@ -568,7 +568,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
+ 		} else {
+ 			dev_info(&pdev->dev, "found external clock\n");
+ 			clk_prepare_enable(priv->extclk);
+-			soc_dai = &kirkwood_i2s_dai_extclk;
++			soc_dai = kirkwood_i2s_dai_extclk;
+ 		}
+ 	}
+ 
+
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
