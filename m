@@ -1,28 +1,33 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Thu, 24 Oct 2013 10:20:11 +0200
-Subject: [PATCHv6][ 3/7] ARM: imx{25,27} DT: Permit the selection of the
- imxfb framebuffer driver.
-In-Reply-To: <20131024081531.GA13614@S2101-09.ap.freescale.net>
-References: <1382601665-6830-1-git-send-email-denis@eukrea.com>
- <1382601665-6830-3-git-send-email-denis@eukrea.com>
- <20131024081531.GA13614@S2101-09.ap.freescale.net>
-Message-ID: <20131024102011.610e5d8b@e6520eb>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 24 Oct 2013 08:27:39 -0000
+Subject: [RFCv3 0/7] OMAP SSI driver
+In-Reply-To: <20131010200236.GA6603@earth.universe>
+References: <1381091235-18293-1-git-send-email-sre@debian.org>
+ <20131008172815.GA8313@atomide.com>
+ <20131010172128.GF28657@earth.universe>
+ <20131010182801.GB29989@blackmetal.musicnaut.iki.fi>
+ <20131010200236.GA6603@earth.universe>
+Message-ID: <19700101000313.GA1434@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi!
 
-Le Thu, 24 Oct 2013 16:15:34 +0800,
-Shawn Guo <shawn.guo@linaro.org> a ?crit :
-> >  config FB_IMX
-> >  	tristate "Freescale i.MX1/21/25/27 LCD support"
-> > -	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
-> > +	depends on FB && HAVE_IMX_FB
+> 3. cmt_speech
 > 
-> Or simply have it depend on ARCH_MXC?
+>  This is an hsi client driver, which takes care of interchanging
+>  speech data with the modem. This one is needed for calling. I
+>  will have a look at it once the basic stuff is working.
 > 
-> 	depends on FB && ARCH_MXC
-> 
-but not all MXC have IMX_FB : isn't that a problem ?
+> P.S.: You can get a mainline kernel status matrix for the Nokia
+>       N900 on this page: http://elinux.org/N900
 
-Eric
+Thanks a lot for the page. I did not realize how well is N900 supported in
+latest mainline...
+
+What do you use as userland? Is there specific userland 3.13 is expected
+to work with?
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
