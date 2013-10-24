@@ -1,51 +1,113 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Oct 2013 06:28:35 -0700
-Subject: [PATCH 1/3] ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
-In-Reply-To: <52691F41.1030900@ti.com>
-References: <1381324359-28825-1-git-send-email-tomi.valkeinen@ti.com>
- <5268D44D.5010205@ti.com> <52691F41.1030900@ti.com>
-Message-ID: <20131024132835.GX15154@atomide.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 24 Oct 2013 06:00:02 -0500
+Subject: [RFC PATCH 2/6] DRIVERS: IRQCHIP: CROSSBAR: Add support for
+ Crossbar IP
+In-Reply-To: <5268F9C5.3090106@ti.com>
+References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
+ <1380549564-31045-3-git-send-email-r.sricharan@ti.com>
+ <2FD881B8-1A59-418E-AF9C-EF5B9C5D0623@codeaurora.org>
+ <5268F9C5.3090106@ti.com>
+Message-ID: <202C69F5-3DEB-4735-9CE3-13B38126BD68@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [131024 06:23]:
-> On 10/24/2013 11:03 AM, Tomi Valkeinen wrote:
-> >Hi Tony, Tero,
-> >
-> >On 09/10/13 16:12, Tomi Valkeinen wrote:
-> >>Set CLK_SET_RATE_PARENT flag for dss_dss_clk so that the DSS's fclk can
-> >>be configured without the need to get the parent of the fclk.
-> >>
-> >>Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> >>---
-> >>  arch/arm/mach-omap2/cclock44xx_data.c | 3 ++-
-> >>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >>
-> >>diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-> >>index b237950..ec0dc0b 100644
-> >>--- a/arch/arm/mach-omap2/cclock44xx_data.c
-> >>+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-> >>@@ -830,7 +830,8 @@ DEFINE_CLK_GATE(dss_tv_clk, "extalt_clkin_ck", &extalt_clkin_ck, 0x0,
-> >>  		OMAP4430_CM_DSS_DSS_CLKCTRL,
-> >>  		OMAP4430_OPTFCLKEN_TV_CLK_SHIFT, 0x0, NULL);
-> >>
-> >>-DEFINE_CLK_GATE(dss_dss_clk, "dpll_per_m5x2_ck", &dpll_per_m5x2_ck, 0x0,
-> >>+DEFINE_CLK_GATE(dss_dss_clk, "dpll_per_m5x2_ck", &dpll_per_m5x2_ck,
-> >>+		CLK_SET_RATE_PARENT,
-> >>  		OMAP4430_CM_DSS_DSS_CLKCTRL, OMAP4430_OPTFCLKEN_DSSCLK_SHIFT,
-> >>  		0x0, NULL);
-> >
-> >I was discussing with Tero about these three patches, and he was ok with
-> >them being merged.
-> >
-> >Tony, it'd be great to have these for 3.13, so that I can start cleaning
-> >up the DSS driver's fclk management.
+
+On Oct 24, 2013, at 5:43 AM, Sricharan R wrote:
+
+> Hi Kumar,
 > 
-> Yea, am ok with these, I can incorporate the changes to my DT clk series.
+> On Thursday 24 October 2013 03:03 PM, Kumar Gala wrote:
+>> On Sep 30, 2013, at 8:59 AM, Sricharan R wrote:
+>> 
+>>> Some socs have a large number of interrupts requests to service
+>>> the needs of its many peripherals and subsystems. All of the
+>>> interrupt lines from the subsystems are not needed at the same
+>>> time, so they have to be muxed to the irq-controller appropriately.
+>>> In such places a interrupt controllers are preceded by an CROSSBAR
+>>> that provides flexibility in muxing the device requests to the controller
+>>> inputs.
+>>> 
+>>> This driver takes care a allocating a free irq and then configuring the
+>>> crossbar IP as a part of the mpu's irqchip callbacks. crossbar_init should
+>>> be called right before the irqchip_init, so that it is setup to handle the
+>>> irqchip callbacks.
+>>> 
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> Cc: Rajendra Nayak <rnayak@ti.com>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>>> ---
+>>> .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
+>>> drivers/irqchip/Kconfig                            |    8 +
+>>> drivers/irqchip/Makefile                           |    1 +
+>>> drivers/irqchip/irq-crossbar.c                     |  195 ++++++++++++++++++++
+>>> include/linux/irqchip/irq-crossbar.h               |   11 ++
+>>> 5 files changed, 242 insertions(+)
+>>> create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>>> create mode 100644 drivers/irqchip/irq-crossbar.c
+>>> create mode 100644 include/linux/irqchip/irq-crossbar.h
+>>> 
+>>> diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>>> new file mode 100644
+>>> index 0000000..cdec2cd
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
+>>> @@ -0,0 +1,27 @@
+>>> +Some socs have a large number of interrupts requests to service
+>>> +the needs of its many peripherals and subsystems. All of the
+>>> +interrupt lines from the subsystems are not needed at the same
+>>> +time, so they have to be muxed to the irq-controller appropriately.
+>>> +In such places a interrupt controllers are preceded by an CROSSBAR
+>>> +that provides flexibility in muxing the device requests to the controller
+>>> +inputs.
+>>> +
+>>> +Required properties:
+>>> +- compatible : Should be "ti,irq-crossbar"
+>>> +- reg: Base address and the size of the crossbar registers.
+>>> +- max-irqs: Total number of irqs available at the interrupt controller.
+>> Should be 'ti,max-irqs
+> Ok, will correct.
+>>> +- reg-size: Size of a individual register in bytes. Every individual
+>>> +	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
+>> Is this something that really needs to be encoded in the dts?
+>> 
+>> If we keep it should be ti,reg-size
+> Currently, this is the only IP with a fixed register-size.
+> So this can be in the driver also. I thought keeping it
+> DT will avoid any hard-coding in driver.
 
-OK. If you have fixes that should go in earlier, please put those into
-a separate branch.
+I'd go with less in the DT at this point, if in the future you need this you can always add it later.
 
-Regards,
+>>> +- irqs-reserved: List of the reserved irq lines that are not muxed using
+>>> +		 crossbar. These interrupt lines are reserved in the soc,
+>>> +		 so crossbar bar driver should not consider them as free
+>>> +		 lines.
+>>> +
+>> ti,irqs-reserved
+> Ok, will correct
+>>> +Examples:
+>>> +		crossbar_mpu: @4a020000 {
+>> Did you mean for there to be a label and no node name?
+>> 
+> ya, name is missing. Will add.
+>>> +			compatible = "ti,irq-crossbar";
+>>> +			reg = <0x4a002a48 0x130>;
+>>> +			max-irqs = <160>;
+>>> +			reg-size = <2>;
+>>> +			irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
+>>> +		};
+> 
+> Regards,
+> Sricharan
 
-Tony
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
