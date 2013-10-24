@@ -1,45 +1,32 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 24 Oct 2013 10:38:53 +0200
-Subject: [PATCHv6][ 4/4] ARM: imx_v6_v7_defconfig: Enable tsc2007 support.
-In-Reply-To: <1382603933-8539-1-git-send-email-denis@eukrea.com>
-References: <1382603933-8539-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382603933-8539-4-git-send-email-denis@eukrea.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Thu, 24 Oct 2013 03:41:35 -0500
+Subject: [GIT PULL] clk: socfpga: Clock fix for 3.13
+Message-ID: <1382604095-3097-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eukrea cpuimx35 and cpuimx51 have a tsc2007 touchscreen controller,
-  so we turn it on.
+The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+  Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index d8a52a0..23ba17d 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -130,6 +130,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_EGALAX=y
- CONFIG_TOUCHSCREEN_MC13783=y
-+CONFIG_TOUCHSCREEN_TSC2007=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MMA8450=y
- CONFIG_SERIO_SERPORT=m
--- 
-1.7.9.5
+are available in the git repository at:
+
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.13
+
+for you to fetch changes up to f592c5da6869133de941e44ef2ed4ede7f6b2791:
+
+  clk: socfpga: Remove check for "reg" property in socfpga_clk_init (2013-10-24 03:18:30 -0500)
+
+----------------------------------------------------------------
+Clock fix for SOCFPGA
+
+Remove check for "reg" property in socfpga_clk_init() function
+This allows for clk property to be assigned for the arm_twd timer, which
+will lead to removing socfpga_init_clocks().
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      clk: socfpga: Remove check for "reg" property in socfpga_clk_init
+
+ drivers/clk/socfpga/clk.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
