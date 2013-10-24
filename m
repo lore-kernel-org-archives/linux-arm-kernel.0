@@ -1,83 +1,49 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 24 Oct 2013 17:38:31 +0200
-Subject: [PATCH v5 5/8] ARM: dts: imx27 phyCARD-S pinctrl
-In-Reply-To: <1382629114-8628-1-git-send-email-mpa@pengutronix.de>
-References: <1382629114-8628-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1382629114-8628-6-git-send-email-mpa@pengutronix.de>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 24 Oct 2013 21:12:09 +0530
+Subject: [PATCH 3/7] video: exynos_mipi_dsim: Use the generic PHY driver
+In-Reply-To: <CAOesGMhwotSY-1WQmt+wtsrsH2m30VE=j-MwyhpYU3mt_PSPPw@mail.gmail.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <1381940896-9355-4-git-send-email-kishon@ti.com>
+ <CAOesGMhwotSY-1WQmt+wtsrsH2m30VE=j-MwyhpYU3mt_PSPPw@mail.gmail.com>
+Message-ID: <CAK9yfHxaLsdFGXiCxvs+HpMSuY6xWd=CGPv-YfSkJqWSxE+f-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pinctrl for phyCARD-S devices.
+Hi Olof,
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts | 10 ++++++++++
- arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts |  4 ++++
- 2 files changed, 14 insertions(+)
+On 24 October 2013 20:00, Olof Johansson <olof@lixom.net> wrote:
+> Hi Kishon,
+>
+> On Wed, Oct 16, 2013 at 9:28 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+>> index 32e5406..00b3a52 100644
+>> --- a/drivers/video/exynos/exynos_mipi_dsi.c
+>> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
+>> @@ -156,8 +157,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
+>>                 exynos_mipi_regulator_enable(dsim);
+>>
+>>                 /* enable MIPI-DSI PHY. */
+>> -               if (dsim->pd->phy_enable)
+>> -                       dsim->pd->phy_enable(pdev, true);
+>> +               phy_power_on(dsim->phy);
+>>
+>>                 clk_enable(dsim->clock);
+>>
+>
+> This introduces the below with exynos_defconfig:
+>
+> ../../drivers/video/exynos/exynos_mipi_dsi.c: In function
+> 'exynos_mipi_dsi_blank_mode':
+> ../../drivers/video/exynos/exynos_mipi_dsi.c:144:26: warning: unused
+> variable 'pdev' [-Wunused-variable]
+>   struct platform_device *pdev = to_platform_device(dsim->dev);
+>
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-index 5a31c77..505e688 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-@@ -54,6 +54,8 @@
- };
- 
- &i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1>;
- 	status = "okay";
- 
- 	rtc at 51 {
-@@ -69,6 +71,8 @@
- };
- 
- &owire {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_owire1_1>;
- 	status = "okay";
- };
- 
-@@ -79,15 +83,21 @@
- 
- &uart1 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_1 &pinctrl_uart1_rtscts_1>;
- 	status = "okay";
- };
- 
- &uart2 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2_1 &pinctrl_uart2_rtscts_1>;
- 	status = "okay";
- };
- 
- &uart3 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3_1 &pinctrl_uart3_rtscts_1>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-index c8d57d1..0cee738 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-@@ -30,10 +30,14 @@
- };
- 
- &fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1_1>;
- 	status = "okay";
- };
- 
- &i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2_1>;
- 	status = "okay";
- 
- 	at24 at 52 {
+I have already submitted a patch to fix this [1]
+
+[1] http://marc.info/?l=linux-fbdev&m=138233359617936&w=2
+
+
 -- 
-1.8.4.rc3
+With warm regards,
+Sachin
