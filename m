@@ -1,53 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 24 Oct 2013 10:06:15 -0700
-Subject: [PATCH 3/7] video: exynos_mipi_dsim: Use the generic PHY driver
-In-Reply-To: <CAK9yfHxaLsdFGXiCxvs+HpMSuY6xWd=CGPv-YfSkJqWSxE+f-w@mail.gmail.com>
-References: <1381940896-9355-1-git-send-email-kishon@ti.com>
- <1381940896-9355-4-git-send-email-kishon@ti.com>
- <CAOesGMhwotSY-1WQmt+wtsrsH2m30VE=j-MwyhpYU3mt_PSPPw@mail.gmail.com>
- <CAK9yfHxaLsdFGXiCxvs+HpMSuY6xWd=CGPv-YfSkJqWSxE+f-w@mail.gmail.com>
-Message-ID: <CAOesGMgbGvZB--uaJ2EowPFDYqGZb3iG9SZs9d0UVcJQLAZW3g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 24 Oct 2013 13:08:37 -0400 (EDT)
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <93d9a5ce228d03c4a183b06b00bd0442.squirrel@twosheds.infradead.org>
+References: <20131023174458.GC5208@netboy>
+ <1382553982.31058.10.camel@sakura.staff.proxad.net>
+ <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+ <1382614439.6040.16.camel@sakura.staff.proxad.net>
+ <1382615278.8522.72.camel@shinybook.infradead.org>
+ <20131024122346.GD11296@ulmo.nvidia.com>
+ <1382619655.6040.52.camel@sakura.staff.proxad.net>
+ <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
+ <1382621431.6040.66.camel@sakura.staff.proxad.net>
+ <af289ef3cc80be8de26274ba1f598d54.squirrel@twosheds.infradead.org>
+ <20131024141955.GB25061@ulmo.nvidia.com>
+ <465e75de15f7d79c3b57a3b88024e739.squirrel@twosheds.infradead.org>
+ <alpine.LFD.2.03.1310241143240.1951@syhkavp.arg>
+ <93d9a5ce228d03c4a183b06b00bd0442.squirrel@twosheds.infradead.org>
+Message-ID: <alpine.LFD.2.03.1310241300590.1951@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 8:42 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> Hi Olof,
->
-> On 24 October 2013 20:00, Olof Johansson <olof@lixom.net> wrote:
->> Hi Kishon,
->>
->> On Wed, Oct 16, 2013 at 9:28 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
->>> index 32e5406..00b3a52 100644
->>> --- a/drivers/video/exynos/exynos_mipi_dsi.c
->>> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
->>> @@ -156,8 +157,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
->>>                 exynos_mipi_regulator_enable(dsim);
->>>
->>>                 /* enable MIPI-DSI PHY. */
->>> -               if (dsim->pd->phy_enable)
->>> -                       dsim->pd->phy_enable(pdev, true);
->>> +               phy_power_on(dsim->phy);
->>>
->>>                 clk_enable(dsim->clock);
->>>
->>
->> This introduces the below with exynos_defconfig:
->>
->> ../../drivers/video/exynos/exynos_mipi_dsi.c: In function
->> 'exynos_mipi_dsi_blank_mode':
->> ../../drivers/video/exynos/exynos_mipi_dsi.c:144:26: warning: unused
->> variable 'pdev' [-Wunused-variable]
->>   struct platform_device *pdev = to_platform_device(dsim->dev);
->>
->
-> I have already submitted a patch to fix this [1]
->
-> [1] http://marc.info/?l=linux-fbdev&m=138233359617936&w=2
+On Thu, 24 Oct 2013, David Woodhouse wrote:
 
-Ah, I'm not subscribed to the fbdev list. Next time it might be a good
-idea to cc the same lists as the original patch. But thanks for fixing
-it!
+> 
+> > So it is time IMHO that the description of how things *shall* work be
+> > itself revised.
+> 
+> It *is* being revised, with an explicit explicit understanding that things
+> will have to change and a defined process for how to cope with that.
+
+Good.
+
+Your previous emails seemed to imply that the lack of binding stability 
+enforcement was the problem.
+
+And you said: "our defined processes for coping are based on the 
+assumption that it (mistakes) should be rare". I think this statement is 
+wrong.  So if this is what's being revised then fine.
 
 
--Olof
+
+Nicolas
