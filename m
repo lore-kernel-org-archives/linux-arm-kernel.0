@@ -1,50 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 24 Oct 2013 23:00:54 +0800
-Subject: [PATCH 0/8] ARM: imx: add IMX50 SoC support
-In-Reply-To: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
-References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
-Message-ID: <20131024150050.GA14529@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Oct 2013 17:04:34 +0200
+Subject: [PATCH] ARM: sa1100: fix simpad compilation warning
+Message-ID: <1382627074-23228-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+When removing the complex GPIO interface from the SA1100 machines,
+we also removed the implicit #includes for a few header files
+that was included by <linux/gpio.h> thru <mach/gpio.h>, causing
+a compile warning on the simpad boardfile, as <asm/irq.h> was no
+longer #included, as follows:
 
-On Fri, Oct 18, 2013 at 04:04:12PM +1000, gerg at uclinux.org wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
-> 
-> This set of patches is the code and device tree support for the Freescale
-> IMX50 SoC. This part is similar to the IMX53 SoC family, and I have resued
-> as much of its support as possible. These patches are against 3.12-rc5.
+./../arch/arm/include/asm/irq.h:9:0: warning: "NR_IRQS" redefined
+[enabled by default]
+ #define NR_IRQS NR_IRQS_LEGACY
+ ^
+In file included from ../../arch/arm/mach-sa1100/simpad.c:29:0:
+../../arch/arm/mach-sa1100/include/mach/irqs.h:87:0: note: this is the
+location of the previous definition
+ #define NR_IRQS (IRQ_BOARD_START + NR_IRQS_LOCOMO)
 
-Nice patches.  Can you please base it on branch below with your next
-posting, so that I can apply them more easily?
+This resolves the problem by explicitly including <asm/irq.h>
+into the simpad boardfile.
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git for-next
+Reported-by: Olof Johansson <olof@lixom.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Alexandre Courbot <acourbot@nvidia.com>
+Cc: Kristoffer Ericson <kristoffer.ericson@gmail.com>
+Cc: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-sa1100/simpad.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Shawn
-
-> With these changes you can load and run on the Freescale IMX50-EVK board.
-> 
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> ---
->  arch/arm/Kconfig.debug              |    9 
->  arch/arm/boot/dts/Makefile          |    1 
->  arch/arm/boot/dts/imx50-evk.dts     |   89 +++
->  arch/arm/boot/dts/imx50-pinfunc.h   |  923 ++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx50.dtsi        |  659 +++++++++++++++++++++++++
->  arch/arm/include/debug/imx-uart.h   |   10 
->  arch/arm/mach-imx/Kconfig           |    9 
->  arch/arm/mach-imx/Makefile          |    1 
->  arch/arm/mach-imx/clk-imx51-imx53.c |   79 +++
->  arch/arm/mach-imx/common.h          |    3 
->  arch/arm/mach-imx/mach-imx50.c      |   52 ++
->  drivers/pinctrl/Kconfig             |    8 
->  drivers/pinctrl/Makefile            |    1 
->  drivers/pinctrl/pinctrl-imx50.c     |  426 ++++++++++++++++
->  14 files changed, 2270 insertions(+)
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index bcbc94540e45..41e476e571d7 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -19,6 +19,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <asm/setup.h>
++#include <asm/irq.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+-- 
+1.8.3.1
