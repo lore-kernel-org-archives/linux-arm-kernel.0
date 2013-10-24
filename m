@@ -1,172 +1,60 @@
-From: lisovy@gmail.com (Rostislav Lisovy)
-Date: Thu, 24 Oct 2013 23:56:09 +0200
-Subject: [PATCH 3/3] ARM: dts: i.MX53: Devicetree for Voipac Baseboard using
- x53-dmm-668 module
-In-Reply-To: <1382651769-21238-1-git-send-email-lisovy@gmail.com>
-References: <1382651769-21238-1-git-send-email-lisovy@gmail.com>
-Message-ID: <1382651769-21238-4-git-send-email-lisovy@gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Thu, 24 Oct 2013 23:57:16 +0200
+Subject: [PATCH 3/7] video: exynos_mipi_dsim: Use the generic PHY driver
+In-Reply-To: <52694354.6030603@ti.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <1381940896-9355-4-git-send-email-kishon@ti.com>
+ <CAOesGMhwotSY-1WQmt+wtsrsH2m30VE=j-MwyhpYU3mt_PSPPw@mail.gmail.com>
+ <CAK9yfHxaLsdFGXiCxvs+HpMSuY6xWd=CGPv-YfSkJqWSxE+f-w@mail.gmail.com>
+ <52694354.6030603@ti.com>
+Message-ID: <526997BC.8070602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supported peripherals: Audio -- headphone output, LEDs, Buttons
-(using keyboard controller), SD-card.
+On 10/24/2013 05:57 PM, Kishon Vijay Abraham I wrote:
+> On Thursday 24 October 2013 09:12 PM, Sachin Kamat wrote:
+>> On 24 October 2013 20:00, Olof Johansson<olof@lixom.net>  wrote:
+>>> On Wed, Oct 16, 2013 at 9:28 AM, Kishon Vijay Abraham I<kishon@ti.com>  wrote:
+>>>> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+>>>> index 32e5406..00b3a52 100644
+>>>> --- a/drivers/video/exynos/exynos_mipi_dsi.c
+>>>> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
+>>>> @@ -156,8 +157,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
+>>>>                  exynos_mipi_regulator_enable(dsim);
+>>>>
+>>>>                  /* enable MIPI-DSI PHY. */
+>>>> -               if (dsim->pd->phy_enable)
+>>>> -                       dsim->pd->phy_enable(pdev, true);
+>>>> +               phy_power_on(dsim->phy);
+>>>>
+>>>>                  clk_enable(dsim->clock);
+>>>>
+>>>
+>>> This introduces the below with exynos_defconfig:
+>>>
+>>> ../../drivers/video/exynos/exynos_mipi_dsi.c: In function
+>>> 'exynos_mipi_dsi_blank_mode':
+>>> ../../drivers/video/exynos/exynos_mipi_dsi.c:144:26: warning: unused
+>>> variable 'pdev' [-Wunused-variable]
+>>>    struct platform_device *pdev = to_platform_device(dsim->dev);
 
-Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
+Sorry about missing that, I only noticed this warning recently and didn't
+get around to submit a patch.
 
- create mode 100644 arch/arm/boot/dts/imx53-voipac-bsb.dts
+>> I have already submitted a patch to fix this [1]
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 802720e..5571af6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -133,6 +133,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx53-mba53.dtb \
- 	imx53-qsb.dtb \
- 	imx53-smd.dtb \
-+	imx53-voipac-bsb.dts \
- 	imx6dl-sabreauto.dtb \
- 	imx6dl-sabresd.dtb \
- 	imx6dl-wandboard.dtb \
-diff --git a/arch/arm/boot/dts/imx53-voipac-bsb.dts b/arch/arm/boot/dts/imx53-voipac-bsb.dts
-new file mode 100644
-index 0000000..5c88c0e
---- /dev/null
-+++ b/arch/arm/boot/dts/imx53-voipac-bsb.dts
-@@ -0,0 +1,135 @@
-+/*
-+ * Copyright 2013 Rostislav Lisovy <lisovy@gmail.com>, PiKRON s.r.o.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx53-voipac-dmm-668.dtsi"
-+
-+/ {
-+	sound {
-+		compatible = "fsl,imx53-voipac-sgtl5000",
-+			     "fsl,imx-audio-sgtl5000";
-+		model = "imx53-voipac-sgtl5000";
-+		ssi-controller = <&ssi2>;
-+		audio-codec = <&sgtl5000>;
-+		audio-routing =
-+			"Headphone Jack", "HP_OUT";
-+		mux-int-port = <2>;
-+		mux-ext-port = <5>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pin_gpio>;
-+
-+		led1 {
-+			label = "led-red";
-+			gpios = <&gpio3 29 0>;
-+			default-state = "off";
-+		};
-+
-+		led2 {
-+			label = "led-orange";
-+			gpios = <&gpio2 31 0>;
-+			default-state = "off";
-+		};
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	hog {
-+		pinctrl_hog: hoggrp {
-+			fsl,pins = <
-+				/* SD2_CD */
-+				MX53_PAD_EIM_D25__GPIO3_25	0x80000000
-+				/* SD2_WP */
-+				MX53_PAD_EIM_A19__GPIO2_19 	0x80000000
-+			>;
-+		};
-+
-+		led_pin_gpio: led_gpio {
-+			fsl,pins = <
-+				MX53_PAD_EIM_D29__GPIO3_29	0x80000000
-+				MX53_PAD_EIM_EB3__GPIO2_31	0x80000000
-+			>;
-+		};
-+	};
-+
-+	/* Keyboard controller */
-+	kpp {
-+		pinctrl_kpp_1: kppgrp-1 {
-+			fsl,pins = <
-+				MX53_PAD_GPIO_9__KPP_COL_6	0xe8
-+				MX53_PAD_GPIO_4__KPP_COL_7	0xe8
-+				MX53_PAD_KEY_COL2__KPP_COL_2	0xe8
-+				MX53_PAD_KEY_COL3__KPP_COL_3	0xe8
-+				MX53_PAD_KEY_COL4__KPP_COL_4	0xe8
-+
-+				MX53_PAD_GPIO_2__KPP_ROW_6	0xe0
-+				MX53_PAD_GPIO_5__KPP_ROW_7	0xe0
-+				MX53_PAD_KEY_ROW2__KPP_ROW_2	0xe0
-+				MX53_PAD_KEY_ROW3__KPP_ROW_3	0xe0
-+				MX53_PAD_KEY_ROW4__KPP_ROW_4	0xe0
-+			>;
-+		};
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux_1>; /* SSI1 */
-+	status = "okay";
-+};
-+
-+&esdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc2_1>;
-+	cd-gpios = <&gpio3 25 0>;
-+	wp-gpios = <&gpio2 19 0>;
-+	vmmc-supply = <&reg_3p3v>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3_2>;
-+	status = "okay";
-+
-+	sgtl5000: codec at 0a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+		clocks = <&clks 150>;
-+	};
-+};
-+
-+&kpp {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_kpp_1>;
-+	linux,keymap = <
-+			0x0203003b	/* KEY_F1 */
-+			0x0603003c	/* KEY_F2 */
-+			0x0207003d	/* KEY_F3 */
-+			0x0607003e	/* KEY_F4 */
-+			>;
-+	keypad,num-rows = <8>;
-+	keypad,num-columns = <1>;
-+	status = "okay";
-+};
-+
-+&ssi2 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
--- 
-1.7.10.4
+Thanks a lot guys for fixing this.
+
+>> [1] http://marc.info/?l=linux-fbdev&m=138233359617936&w=2
+>
+> Sorry, missed that :-(
+
+This MIPI DSIM driver is affectively a dead code in the mainline now, once
+Exynos become a dt-only platform. I guess it can be deleted for 3.14, once
+S5P gets converted to the device tree. The new driver using CDF is basically
+a complete rewrite. Or device tree support should be added to that driver,
+but I believe it doesn't make sense without CDF.
+
+--
+Regards,
+Sylwester
