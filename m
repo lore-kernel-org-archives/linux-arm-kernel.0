@@ -1,106 +1,47 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 24 Oct 2013 13:31:11 -0400 (EDT)
-Subject: [PATCH] Simple NX lowmem mappings
-In-Reply-To: <20131024071258.GB16735@n2100.arm.linux.org.uk>
-References: <20131024071258.GB16735@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1310241315290.1951@syhkavp.arg>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 24 Oct 2013 11:32:38 -0600
+Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
+ tree bindings
+In-Reply-To: <20131024080418.GE9403@ulmo.nvidia.com>
+References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
+ <5267FA58.9050002@wwwdotorg.org> <20131023172001.GA3379@katana>
+ <20131023185909.GC7863@ulmo.nvidia.com>
+ <20131023193450.GE32563@obsidianresearch.com>
+ <20131023195849.GA8828@mithrandir>
+ <20131023210849.GB2912@obsidianresearch.com>
+ <20131024080418.GE9403@ulmo.nvidia.com>
+Message-ID: <20131024173238.GA23910@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Oct 2013, Russell King - ARM Linux wrote:
+On Thu, Oct 24, 2013 at 10:04:19AM +0200, Thierry Reding wrote:
 
-> This patch has similar functionality to Laura's patch set earlier this
-> month, except I've just done the basic change - we don't increase the
-> size of the kernel for this, so there should be no kernel size related
-> problems with this.  We mark sections which do not overlap any kernel
-> text as non-executable.  
+> > The rule for experimental bindings should be that incompatible changes
+> > to the binding must bump the version number at the same time, clearly
+> > signalling to everyone using that binding that they need to take some
+> > action.
 > 
-> 8<====
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> ARM: Implement basic NX support for kernel lowmem mappings
-> 
-> Add basic NX support for kernel lowmem mappings.  We mark any section
-> which does not overlap kernel text as non-executable, preventing it
-> from being used to write code and then execute directly from there.
-> 
-> This does not change the alignment of the sections, so the kernel
-> image doesn't grow significantly via this change, so we can do this
-> without needing a config option.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> I disagree. I think that we should apply the same rule to DT bindings
+> (at least experimental ones) that we apply to code within the Linux
+> kernel. If you change an experimental binding in an incompatible way
+> then it should be your responsibility to update all users of it so that
+> they don't break.
 
-[...]
+Absolutely, but these things are going to get out of the kernel tree
+and people are going to be using them in broad contexts (eg flashing
+them into firmware) - especially if we imagine the stablization window
+is multiple kernel releases.
 
-> @@ -1294,6 +1309,8 @@ static void __init kmap_init(void)
->  static void __init map_lowmem(void)
->  {
->  	struct memblock_region *reg;
-> +	unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
-> +	unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+Clearly designating which revision is supported lets people know what
+is going on, very explicitly.
 
-Maybe a worthwhile config option could allow for the above to be rounded 
-to PAGE_SIZE instead.  That would require a second level page table for 
-the kernel text edges with increased TLB pressure but also with tighter 
-protection.  That would also allow removing executability of __init 
-memory after it is discarded.
+Also, it lets people that might have the need to support multiple
+versions in their out-of-tree DT by having repeated nodes.
 
->  	/* Map all the lowmem memory banks. */
->  	for_each_memblock(memory, reg) {
-> @@ -1306,12 +1323,40 @@ static void __init map_lowmem(void)
->  		if (start >= end)
->  			break;
->  
-> -		map.pfn = __phys_to_pfn(start);
-> -		map.virtual = __phys_to_virt(start);
-> -		map.length = end - start;
-> -		map.type = MT_MEMORY;
-> +		if (end < kernel_x_start || start >= kernel_x_end) {
+I just think it is good practice to get people into the habit that the
+compatible string indicates a single exact schema, and if you change
+the schema you have to change the compatible string.
 
-Isn't it supposed to be "end <= kernel_x_start" ?
+Always.
 
-> +			map.pfn = __phys_to_pfn(start);
-> +			map.virtual = __phys_to_virt(start);
-> +			map.length = end - start;
-> +			map.type = MT_MEMORY;
-
-Isn't it supposed to be MT_MEMORY_NX here?
-
-> -		create_mapping(&map);
-> +			create_mapping(&map);
-> +		} else {
-> +			/* This better cover the entire kernel */
-> +			if (start < kernel_x_start) {
-> +				map.pfn = __phys_to_pfn(start);
-> +				map.virtual = __phys_to_virt(start);
-> +				map.length = kernel_x_start - start;
-> +				map.type = MT_MEMORY_NX;
-> +
-> +				create_mapping(&map);
-> +			}
-> +
-> +			map.pfn = __phys_to_pfn(kernel_x_start);
-> +			map.virtual = __phys_to_virt(kernel_x_start);
-> +			map.length = kernel_x_end - kernel_x_start;
-> +			map.type = MT_MEMORY;
-> +
-> +			create_mapping(&map);
-> +
-> +			if (kernel_x_end < end) {
-> +				map.pfn = __phys_to_pfn(kernel_x_end);
-> +				map.virtual = __phys_to_virt(kernel_x_end);
-> +				map.length = end - kernel_x_end;
-> +				map.type = MT_MEMORY_NX;
-> +
-> +				create_mapping(&map);
-> +			}
-> +		}
->  	}
->  }
->  
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Jason
