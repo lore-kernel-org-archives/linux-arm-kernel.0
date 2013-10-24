@@ -1,9 +1,9 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 24 Oct 2013 14:13:51 +0200
-Subject: [PATCHv7][ 4/5] ARM: dts: mbimxsd25: Add sound support.
+Date: Thu, 24 Oct 2013 14:13:52 +0200
+Subject: [PATCHv7][ 5/5] ARM: dts: mbimxsd35: Add sound support.
 In-Reply-To: <1382616832-23593-1-git-send-email-denis@eukrea.com>
 References: <1382616832-23593-1-git-send-email-denis@eukrea.com>
-Message-ID: <1382616832-23593-4-git-send-email-denis@eukrea.com>
+Message-ID: <1382616832-23593-5-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,13 +20,13 @@ Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |    9 +++++++++
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |    9 +++++++++
  1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-index be24a85..9d1261d 100644
---- a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
+index 1378b8d..4045c5d 100644
+--- a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
++++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts
 @@ -48,6 +48,15 @@
  			linux,default-trigger = "heartbeat";
  		};
@@ -34,11 +34,11 @@ index be24a85..9d1261d 100644
 +
 +	sound {
 +		compatible = "eukrea,eukrea-tlv320";
-+		model = "imx25-eukrea-tlv320aic23";
++		model = "imx35-eukrea-tlv320aic23";
 +		ssi-controller = <&ssi1>;
 +		fsl,audio-codec = <&tlv320aic23>;
 +		mux-int-port = <1>;
-+		mux-ext-port = <5>;
++		mux-ext-port = <4>;
 +	};
  };
  
