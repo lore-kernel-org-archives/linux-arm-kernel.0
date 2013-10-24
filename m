@@ -1,37 +1,66 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 24 Oct 2013 08:18:53 -0700
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131023210715.GF8828@mithrandir>
-References: <52658C49.80400@wwwdotorg.org> <5265AFED.1040503@roeck-us.net>
- <52665314.2040904@imgtec.com>
- <232aa6e4-19fe-4460-8101-8bf1d639ff3c@email.android.com>
- <20131022164922.GA29852@roeck-us.net>
- <20131022203546.GC8037@mithrandir>
- <20131022211000.GA30394@roeck-us.net>
- <20131023075758.GA7404@ulmo.nvidia.com>
- <20131023160131.GA20675@roeck-us.net>
- <20131023210715.GF8828@mithrandir>
-Message-ID: <20131024151853.GB25355@roeck-us.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 24 Oct 2013 23:26:09 +0800
+Subject: [PATCH 7/8] ARM: dts: imx: add IMX50 SoC device tree bindings
+In-Reply-To: <1382076260-6422-8-git-send-email-gerg@uclinux.org>
+References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+ <1382076260-6422-8-git-send-email-gerg@uclinux.org>
+Message-ID: <20131024152606.GE14529@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 11:07:16PM +0200, Thierry Reding wrote:
-[ ... ]
-> > 
-> > Was this just a matter of enabling OF on this platform, or do you have an
-> > out-of-tree set of patches ? If the latter, is it available somewhere
-> > to look at (including the complete devicetree from your above example) ?
+On Fri, Oct 18, 2013 at 04:04:19PM +1000, gerg at uclinux.org wrote:
+> From: Greg Ungerer <gerg@uclinux.org>
 > 
-> It was mostly a matter of enabling OF and writing the device tree. Most
-> of the generic kernel code changes I even got merged, but there were a
-> few patches that I never got around to merge. Some weren't anywhere
-> close to a mergeable state either.
-> 
-> I no longer work for the company and don't have access to the patches.
-> But I can ping a few people and see if I can dig up something for you.
-> 
-That would be great.
+> Create device tree bindings for the Freescale IMX50 SoC. This was based on
 
-Thanks,
-Guenter
+I think it's a device tree source rather than bindings.
+
+> the IMX53 bindings with changes made as necessary.
+> 
+> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> ---
+>  arch/arm/boot/dts/imx50.dtsi | 659 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 659 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx50.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+> new file mode 100644
+> index 0000000..c4de7ac
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx50.dtsi
+> @@ -0,0 +1,659 @@
+> +/*
+> + * Copyright 2013 Greg Ungerer <gerg@uclinux.org>
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include "skeleton.dtsi"
+> +#include "imx50-pinfunc.h"
+> +
+> +/ {
+> +	aliases {
+> +		serial0 = &uart1;
+> +		serial1 = &uart2;
+> +		serial2 = &uart3;
+> +		serial3 = &uart4;
+> +		serial4 = &uart5;
+> +		gpio0 = &gpio1;
+> +		gpio1 = &gpio2;
+> +		gpio2 = &gpio3;
+> +		gpio3 = &gpio4;
+> +		gpio4 = &gpio5;
+> +		gpio5 = &gpio6;
+
+Please sort these aliases alphabetically.
+
+Shawn
+
+> +	};
