@@ -1,121 +1,54 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 24 Oct 2013 10:51:43 +0530
-Subject: [RFC] Does PHY UTMI data width belong to DWC2 or PHY binding?
-In-Reply-To: <20131023144242.GI29341@beef>
-References: <20131018141221.GH2721@beef> <5264F37E.9060307@ti.com>
- <20131022104829.GF15425@login.drsnuggles.stderr.nl>
- <20131022112520.GE29341@beef> <5266F06C.2080701@gmail.com>
- <20131023144242.GI29341@beef>
-Message-ID: <5268AE67.8060902@ti.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 24 Oct 2013 13:42:14 +0800
+Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
+In-Reply-To: <87eh7bfoq9.fsf@rustcorp.com.au>
+References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
+ <87eh7bfoq9.fsf@rustcorp.com.au>
+Message-ID: <CACVXFVOA+VOWcbaiG=RSR+WVRK70UcX3cnucO-W0GtPezHzA0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wednesday 23 October 2013 08:12 PM, Matt Porter wrote:
-> On Tue, Oct 22, 2013 at 04:38:52PM -0500, Rob Herring wrote:
->> On 10/22/2013 06:25 AM, Matt Porter wrote:
->>> On Tue, Oct 22, 2013 at 12:48:29PM +0200, Matthijs Kooijman wrote:
->>>> Hi Kishon,
->>>>
->>>> On Mon, Oct 21, 2013 at 02:57:26PM +0530, Kishon Vijay Abraham I wrote:
->>>>> I think it makes sense to keep the data width property in the dwc2 node itself.
->>>>> I mean it describes how the dwc2 IP is configured in that particular SoC (given
->>>>> that it can be either <8> or <16>).
->>>> If I'm reading the RT3052 datasheet correctly (GHWCFG4 register), the IP
->>>> can be configured for 8, 16 or 8 _and_ 16. In the latter case, the "8
->>>> and 16 supported" would make sense as a property of dwc2 (though this
->>>> value should be autodetectable through GHWCFG4), while the actual 8 or
->>>> 16 supported by the PHY would make sense as property of a phy.
->>>
->>> There would be no value in adding a property for an already detectable
->>> value to dwc2's binding. To be honest, it's pretty much useless
->>> information due to the existence of the "8 and 16" option.
->>>
->>>> Note sure if this is really useful in practice as well, or if just
->>>> setting the actual width to use on dwc2 makes more sense...
->>>
->>> The GHWCFG4 information itself is not useful in practice, as described
->>> in the original thread: https://lkml.org/lkml/2013/10/10/477
->>>
->>> It's certainly useful in practice to have this width property in either
->>> the dwc2 or the phy binding. One can make a case for either. As I
->>> mentioned in the original post, if we put it in the phy binding we'll be
->>> updating the generic phy binding. We'll then need an api added into the
->>> generic phy framework to fetch the width of a phy.
->>>
->>> Both cases are doable and trivial, we just need the canonical decision
->>> from a DT maintainer as to where the property belongs. Given that they
->>> are in ARM ksummit, I'm not expecting to hear anything right this
->>> moment. :)
+On Thu, Oct 24, 2013 at 9:21 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> Ming Lei <tom.leiming@gmail.com> writes:
+>> Address of non-module kernel symbol should always be located
+>> from CONFIG_PAGE_OFFSET on, so only show these legal kernel
+>> symbols in /proc/kallsyms.
 >>
->> The host can support both, so it is not a property of the host and is a
->> property of the phy. It is no different than what mode a SPI slave
->> requires or whether an i2c slave supports 8 or 10-bit addressing. Those
->> examples are all 1 to many rather than 1 to 1 where it doesn't really
->> matter, but the same logic applies.
-> 
-> Makes good sense, thanks.
-> 
-> In this case, given the PHY ownership of width, we can completely avoid
-> any DT properties. The generic phy compliant BCM Kona phy driver can
-> report via the generic phy framework that it is 8-bit wide. There's no
-> support for this type of thing now but it's pretty trivial to add.
-> 
-> I went ahead and did a quick proof-of-concept that adds a free-form
-> phy attributes struct for the generic phy. Given that generic phys can
-> be for any transmission technology this could be filled with a jumble
-> unrelated and often unpopulated attributes over time. In any case, the
-> below patch allows the phy provider to choose to specify utmi_width and
-> a controller driver that cares can use phy_get_attrs() to fetch the
-> optional phy attributes and use the utmi_width field if applicable.
-> 
-> Kishon: I'll start a separate thread to discuss what approach you'd like
-> to see in the generic phy framework to manage this.
-> 
-> -Matt
-> 
-> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> index 6d72269..b763d7b 100644
-> --- a/include/linux/phy/phy.h
-> +++ b/include/linux/phy/phy.h
-> @@ -38,6 +38,14 @@ struct phy_ops {
->  };
-> 
->  /**
-> + * struct phy_attrs - represents phy attributes
-> + * @utmi_width: Data path width implemented by UTMI PHY
-> + */
-> +struct phy_attrs {
-> +	int			utmi_width;
-> +};
-> +
-> +/**
->   * struct phy - represents the phy device
->   * @dev: phy device
->   * @id: id of the phy device
-> @@ -51,6 +59,7 @@ struct phy {
->  	struct device		dev;
->  	int			id;
->  	const struct phy_ops	*ops;
-> +	struct phy_attrs	*attrs;
->  	struct phy_init_data	*init_data;
->  	struct mutex		mutex;
->  	int			init_count;
-> @@ -127,6 +136,9 @@ int phy_init(struct phy *phy);
->  int phy_exit(struct phy *phy);
->  int phy_power_on(struct phy *phy);
->  int phy_power_off(struct phy *phy);
-> +static inline struct phy_attrs *phy_get_attrs(struct phy *phy) {
-> +	return phy->attrs;
-> +};
+>> On ARM, some symbols(see below) may drop in relocatable code, so
+>> perf can't parse kernel symbols any more from /proc/kallsyms, this
+>> patch fixes the problem.
+>>
+>>       00000000 t __vectors_start
+>>       00000020 A cpu_v7_suspend_size
+>>       00001000 t __stubs_start
+>>       00001004 t vector_rst
+>>       00001020 t vector_irq
+>>       000010a0 t vector_dabt
+>>       00001120 t vector_pabt
+>>       000011a0 t vector_und
+>>       00001220 t vector_addrexcptn
+>>       00001224 t vector_fiq
+>>       00001224 T vector_fiq_offset
+>>
+>> The issue can be fixed in scripts/kallsyms.c too, but looks this
+>> approach is easier.
+>
+> This fix looks hacky; if these symbols are not available, don't just
+> remove them from /proc/kallsyms, but don't put them in the kernel at
+> all.
+>
+> That way, they won't interfere with other kallsyms uses (eg. backtrace).
 
-I'd prefer to have phy_set_bus_width and phy_get_bus_width instead.
+Yes, I agree.
 
-Thanks
-Kishon
+> Or, better, figure out a smart way of excluding them by knowing why
+> these symbol addresses are wrong.
 
->  struct phy *phy_get(struct device *dev, const char *string);
->  struct phy *devm_phy_get(struct device *dev, const char *string);
->  void phy_put(struct phy *phy);
-> 
+Actually the problem is caused by commit b9b32bf70f2(ARM: use linker
+magic for vectors and vector stubs), maybe Russell can figure out a smart
+way to exclude these symbols.
+
+
+Thanks,
+-- 
+Ming Lei
