@@ -1,76 +1,69 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 24 Oct 2013 10:54:17 -0400
-Subject: [PATCH v2] arm64: allow ioremap_cache() to use existing RAM mappings
-In-Reply-To: <20131023143717.GA19317@mbp>
-References: <1382362594-24947-1-git-send-email-msalter@redhat.com>
- <1382519898.10408.1.camel@mbp> <1382535972.1768.68.camel@deneb.redhat.com>
- <20131023143717.GA19317@mbp>
-Message-ID: <1382626457.1768.80.camel@deneb.redhat.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 24 Oct 2013 16:57:16 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <1382625219.6040.96.camel@sakura.staff.proxad.net>
+References: <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+ <1382614439.6040.16.camel@sakura.staff.proxad.net>
+ <1382615278.8522.72.camel@shinybook.infradead.org>
+ <20131024122346.GD11296@ulmo.nvidia.com>
+ <1382619655.6040.52.camel@sakura.staff.proxad.net>
+ <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
+ <1382621431.6040.66.camel@sakura.staff.proxad.net>
+ <af289ef3cc80be8de26274ba1f598d54.squirrel@twosheds.infradead.org>
+ <20131024141955.GB25061@ulmo.nvidia.com>
+ <1382625219.6040.96.camel@sakura.staff.proxad.net>
+Message-ID: <20131024145715.GC9044@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers (ACPI notably) use ioremap_cache() to map an area which could
-either be outside of kernel RAM or in an already mapped reserved area of
-RAM. To avoid aliases with different caching attributes, ioremap() does
-not allow RAM to be remapped. But for ioremap_cache(), the existing kernel
-mapping may be used.
+On Thu, Oct 24, 2013 at 04:33:39PM +0200, Maxime Bizon wrote:
+> 
+> On Thu, 2013-10-24 at 16:19 +0200, Thierry Reding wrote:
+> 
+> > We treated DT the same way we had treated platform data before, which
+> > has inevitable lead to the current mess, which is only slightly better
+> > than what we used to have. 
+> 
+> Side question, in your point of view, how is that better ?
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/arm64/include/asm/io.h |  2 +-
- arch/arm64/mm/ioremap.c     | 20 ++++++++++++++++++--
- 2 files changed, 19 insertions(+), 3 deletions(-)
+The representation of the data may not be all that much better. But as a
+side-effect of the whole DT shebang we've made improvements in many
+other areas as well. Granted, we could've done that without DT too, but
+DT was a pretty good motivator.
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 1d12f89..b56e5b5 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -224,6 +224,7 @@ extern void __memset_io(volatile void __iomem *, int, size_t);
-  */
- extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
- extern void __iounmap(volatile void __iomem *addr);
-+extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- 
- #define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_DIRTY)
- #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
-@@ -233,7 +234,6 @@ extern void __iounmap(volatile void __iomem *addr);
- #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
--#define ioremap_cached(addr, size)	__ioremap((addr), (size), __pgprot(PROT_NORMAL))
- #define iounmap				__iounmap
- 
- #define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF)
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index 1725cd6..2bb1d58 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -77,8 +77,24 @@ EXPORT_SYMBOL(__ioremap);
- 
- void __iounmap(volatile void __iomem *io_addr)
- {
--	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
-+	unsigned long addr = (unsigned long)io_addr & PAGE_MASK;
- 
--	vunmap(addr);
-+	/*
-+	 * We could get an address outside vmalloc range in case
-+	 * of ioremap_cache() reusing a RAM mapping.
-+	 */
-+	if (VMALLOC_START <= addr && addr < VMALLOC_END)
-+		vunmap((void *)addr);
- }
- EXPORT_SYMBOL(__iounmap);
-+
-+void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
-+{
-+	/* For normal memory we already have a cacheable mapping. */
-+	if (pfn_valid(__phys_to_pfn(phys_addr)))
-+		return (void __iomem *)__phys_to_virt(phys_addr);
-+
-+	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL),
-+				__builtin_return_address(0));
-+}
-+EXPORT_SYMBOL(ioremap_cache);
--- 
-1.8.3.1
+I also think that during the conversion of platform data to DT we've
+made attempts to make the representation more generic and introduce
+common or standard properties. So on the whole I think we have managed
+to unify many things, which I think is a good thing.
+
+> current DT tools are not able to validate a file wrt its schema, so for
+> now we just moved platdata to DTS files and lost compiler type checking
+> in between.
+
+There's been talk about fixing that. I guess it might have been better
+if we had had such a tool two years ago, but I certainly hadn't thought
+about it before, so who am I to blame anyone else for not writing it.
+
+> I respectfully understand people fighting for *stable* DT because I see
+> the benefits behind this, even if IMO they absolutely do not outweigh
+> the pain.
+> 
+> But I fail to see any benefits of "forever unstable" DT, if you have to
+> tie the kernel tree with a DTB file, the description could have been
+> left in C code.
+
+Well the longterm goal certainly is to separate both, and keeping both
+in lockstep was a means of easing the initial conversion. There's
+certainly a lot of pain, but I also think that whatever we had before
+just didn't work out so well. If it had all been sunshine and lollipops
+then there wouldn't have been a need to change anything, right?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/2486e105/attachment-0001.sig>
