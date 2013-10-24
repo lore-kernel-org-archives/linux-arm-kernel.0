@@ -1,57 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 24 Oct 2013 16:01:08 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: clock fixes for v3.13
-Message-ID: <alpine.DEB.2.02.1310241550050.10391@utopia.booyaka.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Thu, 24 Oct 2013 18:14:19 +0200
+Subject: [PATCH 2/2] ARM64: perf: wire up perf_regs and unwind support
+In-Reply-To: <20131024145025.GA1493@krava.redhat.com>
+References: <1382108078-8807-1-git-send-email-jean.pihet@linaro.org>
+ <1382108078-8807-3-git-send-email-jean.pihet@linaro.org>
+ <20131024145025.GA1493@krava.redhat.com>
+Message-ID: <CAFrcx1=VjRbdTet2_k=w36YSgk3x+cCoNwZ1QYFpNqCymoVa0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Hi Jiri, Will,
 
-Hi Tony,
+On 24 October 2013 16:50, Jiri Olsa <jolsa@redhat.com> wrote:
+> On Fri, Oct 18, 2013 at 04:54:38PM +0200, Jean Pihet wrote:
+>
+> SNIP
+>
+>> +     return -EINVAL;
+>> +}
+>> diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
+>> index 75b93d7..15a69a5 100644
+>> --- a/tools/perf/config/Makefile
+>> +++ b/tools/perf/config/Makefile
+>> @@ -29,11 +29,17 @@ ifeq ($(ARCH),x86_64)
+>>    NO_PERF_REGS := 0
+>>    LIBUNWIND_LIBS = -lunwind -lunwind-x86_64
+>>  endif
+>> +
+>>  ifeq ($(ARCH),arm)
+>>    NO_PERF_REGS := 0
+>>    LIBUNWIND_LIBS = -lunwind -lunwind-arm
+>>  endif
+>
+> I dont see above 'ifeq' in acme's or in tip tree, so hunk
+> below fails to apply.. what tree was this based on?
+I am using 3.12-rc4. Let me rebase on the latest mainline.
 
-The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+Will, what do you think? I will post a rebased version asap.
 
-  Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
+> otherwise the change looks good to me
+Great, thanks for reviewing!
 
-are available in the git repository at:
+>
+> jirka
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.13/clock-fixes-a
-
-for you to fetch changes up to 4ff7e3b65c8e1d8062365296b738fd262cfc2e9c:
-
-  ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers (2013-10-24 09:07:23 -0600)
-
-- ----------------------------------------------------------------
-Several OMAP2+ DSS-related clock fixes for v3.13 from Tomi Valkeinen.
-
-Basic test logs at:
-
-   http://www.pwsan.com/omap/testlogs/clock_fixes_v3.13/20131024090906/
-
-- ----------------------------------------------------------------
-Tomi Valkeinen (3):
-      ARM: OMAP4: use CLK_SET_RATE_PARENT for dss_dss_clk
-      ARM: OMAP3: use CLK_SET_RATE_PARENT for dss clocks
-      ARM: OMAP3: fix dpll4_m3_ck and dpll4_m4_ck dividers
-
- arch/arm/mach-omap2/cclock3xxx_data.c | 58 +++++++++++++++++++++++++++++------
- arch/arm/mach-omap2/cclock44xx_data.c |  3 +-
- 2 files changed, 51 insertions(+), 10 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.15 (GNU/Linux)
-
-iQIcBAEBAgAGBQJSaUMYAAoJEMePsQ0LvSpLwYYP/0CEQ8jzT3iFTk2+9xqHqsgo
-JVL1MDf2RfPMAvjgGoCLt1aE/8MJhLiiwjwzHwuamPBZpcyk1Rb4KJulZp7BRIOs
-JwBT2+QR8/wZf7xKijSPB7IMRedqyDxuXXB2BPYtzpu4vvo5A3AlFUjJnunofzfX
-rdnexlw15PlYTbYSc/FkFkK0C8gW248auFBMOovBdTYWKVewH+bZWXa8kAWSvGMw
-7RZ25XaKYqggFze63A273r5r2nINZVsuQFuN30ywaZEgPg3tKDXs3OwKEzTPbB1C
-BLiMEJwZ8frfCmzX+kWbF9YVZYxxUylGiZ9ZI8TUh0GISWK4iMT+6/J6csnAkDvn
-VGu7xUoAdBQsW8pryGd8zkIsJQoqAE7nFyg1Idn5qwH0fAXtfYcCxxNjlT4DTX6Y
-2Txuk3+fb1IhQUp5E8TXIrK7mgt18XIVvpO4gYEYCAHt5LmVQ5P1AA7c6Qx7CeG/
-s2RvUjMK/A5fY1tUGHHUiuvUB3YMFCFTD+mafYPW4bLy1No5pi7iKPMpnia1lbve
-EaJslxNcKEX858MJ9SSVF/BNPOuGX5fIPgH2BKrHDUHdz9E79yYZ+UrX2uxAKFqw
-Tcwy33Nm1BM0DaLxBo1IXUBJ8UQEBORXL16oWQubaraGHZKzCMPIhInnG43pDzCI
-Yle5LLZSqcJA5yOUb1zQ
-=h7H7
------END PGP SIGNATURE-----
+Jean
