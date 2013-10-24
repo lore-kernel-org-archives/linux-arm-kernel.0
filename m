@@ -1,53 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 24 Oct 2013 23:17:11 +0800
-Subject: [PATCH 5/8] ARM: imx: allow configuration of the IMX50 SoC
-In-Reply-To: <1382076260-6422-6-git-send-email-gerg@uclinux.org>
-References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
- <1382076260-6422-6-git-send-email-gerg@uclinux.org>
-Message-ID: <20131024151708.GD14529@S2101-09.ap.freescale.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 24 Oct 2013 08:18:53 -0700
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131023210715.GF8828@mithrandir>
+References: <52658C49.80400@wwwdotorg.org> <5265AFED.1040503@roeck-us.net>
+ <52665314.2040904@imgtec.com>
+ <232aa6e4-19fe-4460-8101-8bf1d639ff3c@email.android.com>
+ <20131022164922.GA29852@roeck-us.net>
+ <20131022203546.GC8037@mithrandir>
+ <20131022211000.GA30394@roeck-us.net>
+ <20131023075758.GA7404@ulmo.nvidia.com>
+ <20131023160131.GA20675@roeck-us.net>
+ <20131023210715.GF8828@mithrandir>
+Message-ID: <20131024151853.GB25355@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 04:04:17PM +1000, gerg at uclinux.org wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
+On Wed, Oct 23, 2013 at 11:07:16PM +0200, Thierry Reding wrote:
+[ ... ]
+> > 
+> > Was this just a matter of enabling OF on this platform, or do you have an
+> > out-of-tree set of patches ? If the latter, is it available somewhere
+> > to look at (including the complete devicetree from your above example) ?
 > 
-> Allow the Freescale IMX50 SoC support code to be configured on.
+> It was mostly a matter of enabling OF and writing the device tree. Most
+> of the generic kernel code changes I even got merged, but there were a
+> few patches that I never got around to merge. Some weren't anywhere
+> close to a mergeable state either.
 > 
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> ---
->  arch/arm/mach-imx/Kconfig | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> I no longer work for the company and don't have access to the patches.
+> But I can ping a few people and see if I can dig up something for you.
 > 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 29a8af6..8497b26 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -772,6 +772,15 @@ endchoice
->  
->  comment "Device tree only"
->  
-> +config	SOC_IMX50
-> +	bool "i.MX50 support"
-> +	select HAVE_IMX_SRC
-> +	select IMX_HAVE_PLATFORM_IMX2_WDT
+That would be great.
 
-Do you really need to select IMX_HAVE_PLATFORM_IMX2_WDT?
-
-Shawn
-
-> +	select SOC_IMX5
-> +
-> +	help
-> +	  This enables support for Freescale i.MX50 processor.
-> +
->  config	SOC_IMX53
->  	bool "i.MX53 support"
->  	select HAVE_IMX_SRC
-> -- 
-> 1.8.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Guenter
