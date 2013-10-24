@@ -1,117 +1,52 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 24 Oct 2013 07:04:11 -0500
-Subject: [Patch v2 09/10] usb: chipidea: host: add ehci quirk for imx
- controller
-In-Reply-To: <20131024013325.GC32138@shlinux1.ap.freescale.net>
-References: <20131023180657.GI25954@gimli>
- <Pine.LNX.4.44L0.1310231433390.1326-100000@iolanthe.rowland.org>
- <20131024013325.GC32138@shlinux1.ap.freescale.net>
-Message-ID: <20131024120411.GA31897@gimli>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Thu, 24 Oct 2013 14:13:21 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <1382615278.8522.72.camel@shinybook.infradead.org>
+References: <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023174458.GC5208@netboy>
+ <1382553982.31058.10.camel@sakura.staff.proxad.net>
+ <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+ <1382614439.6040.16.camel@sakura.staff.proxad.net>
+ <1382615278.8522.72.camel@shinybook.infradead.org>
+Message-ID: <1382616801.6040.26.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Thu, Oct 24, 2013 at 09:33:26AM +0800, Peter Chen wrote:
-> On Wed, Oct 23, 2013 at 02:45:39PM -0400, Alan Stern wrote:
-> > On Wed, 23 Oct 2013, Felipe Balbi wrote:
-> > 
-> > > Hi,
-> > > 
-> > > On Wed, Oct 23, 2013 at 10:46:09AM -0400, Alan Stern wrote:
-> > > > On Tue, 22 Oct 2013, Peter Chen wrote:
-> > > > 
-> > > > > When the port goes to suspend or finishes resme, it needs to
-> > > > > notify PHY, it is not a standard EHCI operation, so we add a
-> > > > > quirk for it.
-> > > > 
-> > > > Actually, this _should_ be a standard EHCI operation.  But we have to
-> > > > figure out a way to do it that will work on all platforms.
-> > > > 
-> > > > Felipe, any ideas?
-> > > 
-> > > isn't it enough to call usb_phy_set_suspend() at apropriate places ?
-> > > 
-> > > This should work on all platforms if the PHY driver is implemented
-> > > correctly.
-> > 
-> > On Tue, 22 Oct 2013, Peter Chen wrote:
-> > 
-> > > +				/*
-> > > +				 * notify the USB PHY, it is for global
-> > > +				 * suspend case.
-> > > +				 */
-> > > +				usb_phy_notify_suspend(hcd->phy,
-> > > +					USB_SPEED_HIGH);
-> > 
-> > Hmmm.  This calls usb_phy_notify_suspend(), and later on, 
-> > usb_phy_notify_resume().  AFAICT, those routines don't exist.
-> > 
-> 
-> Hi Alan and Felipe,
-> 
-> It is at my another patchset: "Add power management support for MXS PHY"
-> http://marc.info/?l=linux-usb&m=138242248913823&w=2
-> Since they are two things, one is from PHY, the other is for controller.
-> I split them to two patchset.
-> 
-> For these two notifications, please see:
-> [Patch v2 07/14] usb: phy: add notify suspend and resume callback
-> http://marc.info/?l=linux-usb&m=138242252713848&w=2
-> 
-> [Patch v2 08/14] usb: phy-mxs: Add implementation of
-> nofity_suspend and notify_resume
-> http://marc.info/?l=linux-usb&m=138242253313856&w=2
-> 
-> > Instead we have usb_phy_set_suspend(), as Felipe mentioned.  It has a
-> > different interface, because the second argument specifies whether we
-> > are entering or leaving suspend, not the connection speed.
-> > 
-> > Peter, you need to straighten this out.
-> 
-> .set_suspend is different with .notify_suspend.
-> 
-> .set_suspend is called when the PHY enters suspend.
-> .notify_suspend is called when port enters suspends (setting portsc.suspendM,
-> and stop sending SOF).
-> 
-> After calling .notify_suspend, the PHY may still need to access,
-> eg, set PHY wakeup setting, etc.
+On Thu, 2013-10-24 at 12:47 +0100, David Woodhouse wrote:
 
-right, this just means we need usage counters for the PHY layer. So that
-usb_phy_set_suspend() only decreaments a counter and will only suspend
-the PHY when said counter reaches zero.
+> If you can automatically infer the correct clock/interrupt/etc in order
+> to do DMA correctly, despite the fact that it wasn't explicitly spelled
+> out in the old DT, then the property is *not* a "required" property.
+> It's optional, and you have a default behaviour for when it's not
+> present.
 
-Also, why can't you *always* setup wakeup events for the PHY ? Everytime
-you're about to suspend the PHY, enable its wakeup events.
+so inside the new version of driver-hwcrypto.c:
 
-> The .notify_suspend is in ehci operation, .set_suspend can be at
-> controller driver, since when to put the PHY enters suspend may
-> platform specific.
+if (irq_of_parse_and_map(...) == NO_IRQ) {
+	switch (get_soc_model()) {
+		case SOC1:
+			irq = 51;
+			break;
 
-not really, what's platform specific is *HOW* to suspend the PHY.
-*WHERE* to tell it to suspend is really more of a policy decision.
+		case SOC2:
+			irq = 62;
+			break;
 
-> > Also, there's the question of where are the appropriate places to make
-> > the calls?  After the root hub goes into suspend, I suppose.  But when
-> > is the right time during resume?
-> > 
-> 
-> If we can take it as standard EHCI operation, we need to put it at below
-> places:
-> 	
-> For .notify_suspend, we need to put it after set portsc.suspendM.
+		[...]
+	}
+}
 
-why do you need this notification for suspendM ? PHY should
-automatically enter a lower power state automatically when suspendM
-signal is asserted.
+?
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/182e5a77/attachment-0001.sig>
+Maxime
