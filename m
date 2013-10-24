@@ -1,51 +1,43 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 24 Oct 2013 16:58:56 +0200
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 24 Oct 2013 17:00:16 +0200
 Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
  is there something better?
-In-Reply-To: <818aaae744e58e37c6641d41912d0ba2.squirrel@twosheds.infradead.org>
-References: <20131024095232.27BBCC4039D@trevor.secretlab.ca>
- <1382614439.6040.16.camel@sakura.staff.proxad.net>
- <1382615278.8522.72.camel@shinybook.infradead.org>
- <20131024122346.GD11296@ulmo.nvidia.com>
- <1382619655.6040.52.camel@sakura.staff.proxad.net>
- <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
- <20131024141241.GA25061@ulmo.nvidia.com>
- <99db70b50b3ddcf20d940d5855c657e0.squirrel@twosheds.infradead.org>
- <20131024142347.GD25061@ulmo.nvidia.com>
- <818aaae744e58e37c6641d41912d0ba2.squirrel@twosheds.infradead.org>
-Message-ID: <20131024145855.GD9044@ulmo.nvidia.com>
+In-Reply-To: <20131024083411.GH9403@ulmo.nvidia.com>
+References: <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023174736.GD5208@netboy>
+ <20131023180240.GA32563@obsidianresearch.com>
+ <20131023182345.GG5208@netboy>
+ <20131024083411.GH9403@ulmo.nvidia.com>
+Message-ID: <20131024150016.GB4096@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 02:38:16PM -0000, David Woodhouse wrote:
+On Thu, Oct 24, 2013 at 10:34:12AM +0200, Thierry Reding wrote:
 > 
-> > On Thu, Oct 24, 2013 at 02:22:06PM -0000, David Woodhouse wrote:
-> >>
-> >> > Experimental bindings could be a suitable temporary measure, but
-> >> perhaps
-> >> > other, better solutions exist.
-> >>
-> >> Yes, unstable bindings are part of the currently-documented plan. You
-> >> are
-> >> not expected to need it as a matter of course, but that facility will
-> >> exist.
-> >
-> > Can you point me to the documented plan? I must have missed it.
-> 
-> It's not quite out there yet.
-> 
-> It was thrashed out in the ARM summit yesterday, and Grant and I will be
-> polishing the draft tonight before presenting it to the Kernel Summit
-> tomorrow.
+> There's another thing with DT bindings that makes them needlessly hard
+> to settle on. Let's say you come up with a binding that accurately
+> describes the hardware at hand and has been proven to work. Now people
+> keep telling you that it might not be good enough, for whatever reason
+> so eventually you decide to be bold and tell them that you're aware of
+> everything that stable DT bindings imply and that there might be some
+> risk of having to maintain two bindings because the first one didn't
+> turn out to be perfect and yada yada.
 
-Okay, that's great. Please let me know if there's anything I can do to
-help push this forward.
+You make a good point here. In my own limited experiences with DT
+kernel development, a big debate always emerged about exactly how
+these bindings should be called. Not being a real DT expert myself, I
+really couldn't understand what the point was, but I just implemented
+what the DT people wanted (or just dropped the submission altogether,
+in one case).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/29d8814f/attachment.sig>
+I think the frustration that you have experienced is simply a result
+of the attitude on the DT list. Maybe the real issue is attitude
+and personalities, and not the hurdle of stable bindings.
+
+Thanks,
+Richard
