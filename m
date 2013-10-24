@@ -1,73 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Oct 2013 13:23:06 +0100
-Subject: ARM: add support to dump the kernel page tables
-In-Reply-To: <20131024105143.GA24288@linaro.org>
-References: <20131024071600.GC16735@n2100.arm.linux.org.uk>
- <20131024105143.GA24288@linaro.org>
-Message-ID: <20131024122306.GK16735@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 24 Oct 2013 13:23:29 +0100
+Subject: [PATCHv7][ 1/5] ASoC: eukrea-tlv320: Use dev_err instead of
+ pr_err.
+In-Reply-To: <1382616832-23593-1-git-send-email-denis@eukrea.com>
+References: <1382616832-23593-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131024122329.GE18506@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 11:51:44AM +0100, Steve Capper wrote:
-> Hi Russell,
-> I've given this a quick go on an Arndale with LPAE, and have a few
-> suggestions below.
+On Thu, Oct 24, 2013 at 02:13:48PM +0200, Denis Carikli wrote:
 
-Thanks.
+> It also contains a minor style cleanup.
 
-> > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-> > index 5689c18..d7682cd 100644
-> > --- a/arch/arm/include/asm/pgtable-3level.h
-> > +++ b/arch/arm/include/asm/pgtable-3level.h
-> > @@ -140,6 +140,7 @@
-> >  						 PMD_TYPE_TABLE)
-> >  #define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-> >  						 PMD_TYPE_SECT)
-> > +#define pmd_large(pmd)		pmd_sect(pmd)
-> 
-> Could we please instead do something like:
-> #define pmd_large(pmd)         (pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
-> 
-> This matches the logic used in the huge pages patches (it picks up the
-> PROT_NONE case) that would be missed above.
-
-Is this used in the generic parts of the kernel?  Can you please point
-out where?
-
-> The logic here needs adjusting for LPAE. Without LPAE,
-> USER_PGTABLES_CEILING is equal to zero and i at 0.
-> 
-> With LPAE enabled, USER_PGTABLES_CEILING / PGDIR_SIZE == 2 for me, but
-> pgd refers to the first pgd (not the third). Thus we walk the pgds we
-> don't want to walk and get empty output.
-> 
-> The following worked for me:
->   static void walk_pgd(struct seq_file *m)
->   {
->           pgd_t *pgd = swapper_pg_dir;
->           struct pg_state st;
->           unsigned long addr;
->           unsigned i, pgdoff = USER_PGTABLES_CEILING / PGDIR_SIZE;
-> 
->           memset(&st, 0, sizeof(st));
->           st.seq = m;
->           st.marker = address_markers;
-> 
->           pgd += pgdoff;
-> 
->           for (i = pgdoff; i < PTRS_PER_PGD; i++, pgd++) {
->                   addr = i * PGDIR_SIZE;
->                   if (!pgd_none(*pgd)) {
->                           walk_pud(&st, pgd, addr);
->                   } else {
->                           note_page(&st, addr, 1, pgd_val(*pgd));
->                   }
->           }
-> 
->           note_page(&st, 0, 0, 0);
->   }
-> 
-> But pgdoff is a terrible variable name :-).
-
-Nevertheless, I've taken that change. :)  Just tested on non-LPAE and it
-still works, thanks.
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/b942fd17/attachment.sig>
