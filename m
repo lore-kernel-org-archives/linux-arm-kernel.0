@@ -1,35 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 24 Oct 2013 10:31:29 -0500
-Subject: [PATCH] drivers: video: exynos: Fix compiler Warning
-In-Reply-To: <1382628454-11951-1-git-send-email-kishon@ti.com>
-References: <CAOesGMhwotSY-1WQmt+wtsrsH2m30VE=j-MwyhpYU3mt_PSPPw@mail.gmail.com>
- <1382628454-11951-1-git-send-email-kishon@ti.com>
-Message-ID: <20131024153129.GH2834@gimli>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 24 Oct 2013 11:37:05 -0400 (EDT)
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131024143251.GA4096@netboy>
+References: <1382553982.31058.10.camel@sakura.staff.proxad.net>
+ <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+ <1382614439.6040.16.camel@sakura.staff.proxad.net>
+ <1382615278.8522.72.camel@shinybook.infradead.org>
+ <20131024122346.GD11296@ulmo.nvidia.com>
+ <1382619655.6040.52.camel@sakura.staff.proxad.net>
+ <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
+ <1382621431.6040.66.camel@sakura.staff.proxad.net>
+ <af289ef3cc80be8de26274ba1f598d54.squirrel@twosheds.infradead.org>
+ <20131024141955.GB25061@ulmo.nvidia.com> <20131024143251.GA4096@netboy>
+Message-ID: <alpine.LFD.2.03.1310241134260.1951@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 08:57:34PM +0530, Kishon Vijay Abraham I wrote:
-> Fixed the following compilation warning:
-> ../../drivers/video/exynos/exynos_mipi_dsi.c: In function
-> 'exynos_mipi_dsi_blank_mode':
-> ../../drivers/video/exynos/exynos_mipi_dsi.c:144:26: warning: unused
-> variable 'pdev' [-Wunused-variable]
->   struct platform_device *pdev = to_platform_device(dsim->dev);
+On Thu, 24 Oct 2013, Richard Cochran wrote:
+
+> On Thu, Oct 24, 2013 at 04:19:56PM +0200, Thierry Reding wrote:
+> > 
+> > While I agree that many of these screwups shouldn't have happened in the
+> > first place, it's nothing that we were prepared for two years ago. At
+> > some point everyone agreed that DT was the way forward, so DT is what we
+> > did. Nobody said anything about stable ABI back then, so nobody cared.
 > 
-> Reported-by: Olof Johansson <olof@lixom.net>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> The idea of a device tree has not changed. I guess the arm crowd
+> jumped on the DT bandwagon with no clue what it was about.
 
-pretty obvious patch:
+No no no.  The ARM crowd _resisted_ the introduction of DT but the 
+PowerPC refugees convinced us this was a good idea and that it would 
+solve most of our problems.
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+DT did solve some problems indeed.  But it brought new ones with it.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/7d86c480/attachment.sig>
+
+Nicolas
