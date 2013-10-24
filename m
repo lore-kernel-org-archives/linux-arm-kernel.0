@@ -1,91 +1,53 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 24 Oct 2013 17:17:37 +0200
-Subject: [PATCHv7][ 1/4] Input: tsc2007: Add device tree support.
-In-Reply-To: <1382618536-25320-1-git-send-email-denis@eukrea.com>
-References: <1382618536-25320-1-git-send-email-denis@eukrea.com>
-Message-ID: <20131024151736.GE9044@ulmo.nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 24 Oct 2013 23:17:11 +0800
+Subject: [PATCH 5/8] ARM: imx: allow configuration of the IMX50 SoC
+In-Reply-To: <1382076260-6422-6-git-send-email-gerg@uclinux.org>
+References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+ <1382076260-6422-6-git-send-email-gerg@uclinux.org>
+Message-ID: <20131024151708.GD14529@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 02:42:13PM +0200, Denis Carikli wrote:
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: linux-input at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v6->v7:
-> - One small whitespace cleanup.
-> - The properties specific to that driver are now prefixed with "ti,".
-> - The ti,fuzzy property has now better documentation.
-> ---
->  .../bindings/input/touchscreen/tsc2007.txt         |   45 +++++
->  drivers/input/touchscreen/tsc2007.c                |  194 +++++++++++++++-----
->  2 files changed, 198 insertions(+), 41 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+On Fri, Oct 18, 2013 at 04:04:17PM +1000, gerg at uclinux.org wrote:
+> From: Greg Ungerer <gerg@uclinux.org>
 > 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
-> new file mode 100644
-> index 0000000..516b63b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
-> @@ -0,0 +1,45 @@
-> +* Texas Instruments tsc2007 touchscreen controller
+> Allow the Freescale IMX50 SoC support code to be configured on.
+> 
+> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> ---
+>  arch/arm/mach-imx/Kconfig | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 29a8af6..8497b26 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -772,6 +772,15 @@ endchoice
+>  
+>  comment "Device tree only"
+>  
+> +config	SOC_IMX50
+> +	bool "i.MX50 support"
+> +	select HAVE_IMX_SRC
+> +	select IMX_HAVE_PLATFORM_IMX2_WDT
+
+Do you really need to select IMX_HAVE_PLATFORM_IMX2_WDT?
+
+Shawn
+
+> +	select SOC_IMX5
 > +
-> +Required properties:
-> +- compatible: must be "ti,tsc2007".
-> +- reg: I2C address of the chip.
-> +- ti,x-plate-ohms: X-plate resistance in ohms.
+> +	help
+> +	  This enables support for Freescale i.MX50 processor.
 > +
-> +Optional properties:
-> +- gpios: the interrupt gpio the chip is connected to (trough the penirq pin)
-> +  (see GPIO binding[2] for more details).
-> +- interrupt-parent: the phandle for the gpio controller
-> +  (see interrupt binding[1]).
-> +- interrupts: (gpio) interrupt to which the chip is connected
-> +  (see interrupt binding[1]).
-> +- pinctrl-0: Should specify pin control groups used for the gpio
-> +  (see pinctrl bindings[0]).
-> +- pinctrl-names: Should contain only one value - "default"
-> +  (see pinctrl bindings[0]).
-
-Also I haven't seen a response as to why this can't be handled by the
-GPIO driver. Adding Linus Walleij, perhaps he knows a more definitive
-answer.
-
-Linus, the issue here is that the pinctrl properties for this chip are
-supposed to pinmux the pendown GPIO for this chip. I was under the
-impression that this should be handled by the GPIO controller itself, so
-that when gpio_request() was called on a pin it would be the GPIO
-controller driver's responsibility to pinmux it appropriately.
-
-> +- ti,max-rt: maximum pressure.
-> +- ti,fuzzy: specifies the absolute input fuzz value.
-> +  If set, it will permit noise in the data up to +- the value given to the fuzz
-> +  parameter, that is used to filter noise from the event stream.
-
-Any reason why these can't be specified per axis? From my experience
-with this chip it can make sense to use different values for the
-different axes. Well, perhaps X and Y axes can share one fuzz factor,
-but the Z axis is sometimes different.
-
-You also modify the driver to ignore the X and Z axes fuzz factor even
-for platform data where specifying all three separately was explicitly
-allowed. Have you verified that this doesn't cause any regressions?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/80df19dc/attachment.sig>
+>  config	SOC_IMX53
+>  	bool "i.MX53 support"
+>  	select HAVE_IMX_SRC
+> -- 
+> 1.8.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
