@@ -1,115 +1,31 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 24 Oct 2013 09:46:16 +0200
-Subject: [PATCHv5][ 1/4] Input: tsc2007: Add device tree support.
-In-Reply-To: <20131024085150.11a81974@ipc1.ka-ro>
-References: <1382530220-27881-1-git-send-email-denis@eukrea.com>
- <52684B33.6040109@gmail.com> <20131024085150.11a81974@ipc1.ka-ro>
-Message-ID: <20131024074615.GC9403@ulmo.nvidia.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 24 Oct 2013 09:53:53 +0200
+Subject: [PATCH v4 7/7] ARM: imx27: enable pinctrl
+In-Reply-To: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
+References: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1382601233-24253-8-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 08:51:50AM +0200, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Rob Herring wrote:
-> > On 10/23/2013 07:10 AM, Denis Carikli wrote:
-> [...]
-> > > diff --git
-> a/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
-> b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
-> > > new file mode 100644
-> > > index 0000000..fadd3f6
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
-> > > @@ -0,0 +1,44 @@
-> > > +* Texas Instruments tsc2007 touchscreen controller
-> > > +
-> > > +Required properties:
-> > > +- compatible: must be "ti,tsc2007".
-> > > +- reg: I2C address of the chip.
-> > > +- pinctrl-0: Should specify pin control groups used for this controller
-> > > +  (see pinctrl bindings[0]).
-> > > +- pinctrl-names: Should contain only one value - "default"
-> > > +  (see pinctrl bindings[0]).
-> > 
-> > I'm confused why an i2c slave needs pinctl binding?
-> > 
-> for the pendetect GPIO.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Shouldn't that be done transparently to users of the GPIO API? I was
-under the impression that gpio_request() would set everything up (or
-return an error if unable to do so) so that the GPIO can be used,
-including any required pinmuxing.
-
-> [...]
-> > > diff --git a/drivers/input/touchscreen/tsc2007.c b/drivers/input/touchscreen/tsc2007.c
-> > > index 0b67ba4..0625fe1 100644
-> > > --- a/drivers/input/touchscreen/tsc2007.c
-> > > +++ b/drivers/input/touchscreen/tsc2007.c
-> > > @@ -26,6 +26,9 @@
-> > >  #include <linux/interrupt.h>
-> > >  #include <linux/i2c.h>
-> > >  #include <linux/i2c/tsc2007.h>
-> > > +#include <linux/of_device.h>
-> > > +#include <linux/of.h>
-> > > +#include <linux/of_gpio.h>
-> > >  
-> > >  #define TSC2007_MEASURE_TEMP0		(0x0 << 4)
-> > >  #define TSC2007_MEASURE_AUX		(0x2 << 4)
-> > > @@ -74,7 +77,10 @@ struct tsc2007 {
-> > >  	u16			max_rt;
-> > >  	unsigned long		poll_delay;
-> > >  	unsigned long		poll_period;
-> > > +	int			fuzzy;
-> > > +	char			of;
-> > >  
-> > > +	unsigned		gpio;
-> > >  	int			irq;
-> > >  
-> > >  	wait_queue_head_t	wait;
-> [...]
-> > > @@ -273,34 +295,65 @@ static void tsc2007_close(struct input_dev *input_dev)
-> > >  	tsc2007_stop(ts);
-> > >  }
-> > >  
-> > > -static int tsc2007_probe(struct i2c_client *client,
-> > > -				   const struct i2c_device_id *id)
-> > > +#ifdef CONFIG_OF
-> > > +static int tsc2007_probe_dt(struct i2c_client *client, struct tsc2007 *ts,
-> > > +			    struct device_node *np)
-> > >  {
-> > > -	struct tsc2007 *ts;
-> > > -	struct tsc2007_platform_data *pdata = client->dev.platform_data;
-> > > -	struct input_dev *input_dev;
-> > > -	int err;
-> > > -
-> > > -	if (!pdata) {
-> > > -		dev_err(&client->dev, "platform data is required!\n");
-> > > +	int err = 0;
-> > > +	u32 val32;
-> > > +	u64 val64;
-> > > +
-> > > +	if (!of_property_read_u32(np, "max-rt", &val32))
-> > > +		ts->max_rt = val32;
-> > > +	else
-> > > +		ts->max_rt = MAX_12BIT;
-> > 
-> > These functions don't overwrite the value if the property isn't present.
-> > So you can set the values to the defaults and just pass the variable
-> > (i.e. ts->max_rt) to of_property_read_u32 directly.
-> > 
-> Not quite. Since max_rt is an u16 you can't pass it to
-> of_property_read_u32(). And using of_property_read_u16() requires the
-> abominable DT notation: "/bits/ 16 <value>;"
-
-In that case perhaps you need to check that whatever u32 value you read
-from DT is actually in the expected range before assigning to u16?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/b4fd58a4/attachment-0001.sig>
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 29a8af6..58726d5 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -121,6 +121,8 @@ config SOC_IMX27
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MACH_MX27
+ 	select MXC_AVIC
++	select PINCTRL
++	select PINCTRL_IMX27
+ 
+ config SOC_IMX31
+ 	bool
+-- 
+1.8.4.rc3
