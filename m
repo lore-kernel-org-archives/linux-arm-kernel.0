@@ -1,72 +1,78 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 24 Oct 2013 18:10:40 +0000
-Subject: [PATCH 0/2] ARM: OMAP: dmtimers improvements.
-In-Reply-To: <20131024065536.16889.49902.stgit@notabene.brown>
-References: <20131024065536.16889.49902.stgit@notabene.brown>
-Message-ID: <448912EABC71F84BBCADFD3C67C4BE5291DD30@DBDE04.ent.ti.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 24 Oct 2013 14:15:48 -0400
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <93d9a5ce228d03c4a183b06b00bd0442.squirrel@twosheds.infradead.org>
+References: <20131023174458.GC5208@netboy>
+ <1382553982.31058.10.camel@sakura.staff.proxad.net>
+ <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+ <1382614439.6040.16.camel@sakura.staff.proxad.net>
+ <1382615278.8522.72.camel@shinybook.infradead.org>
+ <20131024122346.GD11296@ulmo.nvidia.com>
+ <1382619655.6040.52.camel@sakura.staff.proxad.net>
+ <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
+ <1382621431.6040.66.camel@sakura.staff.proxad.net>
+ <af289ef3cc80be8de26274ba1f598d54.squirrel@twosheds.infradead.org>
+ <20131024141955.GB25061@ulmo.nvidia.com>
+ <465e75de15f7d79c3b57a3b88024e739.squirrel@twosheds.infradead.org>
+ <alpine.LFD.2.03.1310241143240.1951@syhkavp.arg>
+ <93d9a5ce228d03c4a183b06b00bd0442.squirrel@twosheds.infradead.org>
+Message-ID: <CAKON4OwwY9vi65kErcKasndcvxN_ndbk=Jq9ka2n6jNHaibtOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for top posting .... Probably we should move the dmtimer to drivers/misc or create drivers/timer/
-This has been pending for quite some time now....
+On Thu, Oct 24, 2013 at 12:45 PM, David Woodhouse <dwmw2@infradead.org> wrote:
+>
+>> So it is time IMHO that the description of how things *shall* work be
+>> itself revised.
+>
+> It *is* being revised, with an explicit explicit understanding that things
+> will have to change and a defined process for how to cope with that.
+>
+> That was discussed yesterday and we will be finishing the write-up to be
+> presented at the Kernel Summit tomorrow.
 
-Tony, what you say ?
-________________________________________
-From: linux-arm-kernel [linux-arm-kernel-bounces at lists.infradead.org] on behalf of NeilBrown [neilb at suse.de]
-Sent: Thursday, October 24, 2013 2:57 AM
-To: Tony Lindgren; Russell King
-Cc: Belisko Marek; linux-omap at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Dr. H. Nikolaus Schaller
-Subject: [PATCH 0/2] ARM: OMAP: dmtimers improvements.
+Did the concept of vertical and horizontal schemas make it in?
 
-I would like to use omap dmtimer for a PWM driver (for the backlight
-on my display).
-But there are two difficulties.
+Horizontal schema - generic class descriptions for subsystems (spi,
+alsa, uart, usb, etc). All specific DTS instantiations of the
+subsystem would have to validate against the subsystem schema. And
+conversely this schema would contain all of the weird chip specific
+attributes that can't be handled generically.  These schemas serve two
+purposes - they provide a generic skeleton for someone implementing a
+new instance of the subsystem to start from and they allow the
+subsystem maintainer to control the proliferation of similarly named
+attributes (nscs, numcs, cs, ti,cs, chipsel, etc all describing the
+same thing - the number of chip selects).  These schemas would be
+highly documented and discussed on device-tree list.
 
-Unfortunately Jon Hunter (who has helped me with dmtimers before)
-seems to have disappeared.  So I guess I get to do it myself :-)
+The subsystem schemas would be included by higher level generic schema
+files. So starting at the root of this tree all DTS files in the
+kernel should validate against the tree. Anything that doesn't
+validate should produce a warning or error. Can't get your DTS
+mainlined until it can be validated without errors.
 
-Following two patches make dmtimers more usable.
-
-1/ allow the counter to be set even when the timer isn't counting.
-2/ move the include file to a more useful location
-
-Any help you can provide in getting these fixes upstream would be appreciated.
-
-Thanks,
-NeilBrown
-
----
-
-NeilBrown (2):
-      ARM: OMAP2+: dmtimer: allow counter to be set at any time.
-      ARM: OMAP: move dmtimer.h from plat-omap/include/plat to include/linux
-
-
- arch/arm/mach-omap1/pm.c                           |    2
- arch/arm/mach-omap1/timer.c                        |    2
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    2
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    2
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    2
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    2
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |    2
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |    2
- arch/arm/mach-omap2/timer.c                        |    2
- arch/arm/plat-omap/dmtimer.c                       |   11 -
- arch/arm/plat-omap/include/plat/dmtimer.h          |  415 --------------------
- drivers/media/rc/ir-rx51.c                         |    2
- drivers/pwm/pwm-omap.c                             |    2
- drivers/staging/tidspbridge/core/dsp-clock.c       |    2
- include/linux/omap-dmtimer.h                       |  415 ++++++++++++++++++++
- 16 files changed, 434 insertions(+), 433 deletions(-)
- delete mode 100644 arch/arm/plat-omap/include/plat/dmtimer.h
- create mode 100644 include/linux/omap-dmtimer.h
-
---
-Signature
+Vertical schema - the main goal of these schemas is error checking.
+For example there may be an iMX6 or OMAP schema. These schemas would
+check the device trees validated against them for as many errors as
+possible. Like attribute names that are from the wrong chip or invalid
+gpio or interrupt numbers, etc. These would be maintained by the SOC
+vendors and not subject to intense review on the device-tree list.
 
 
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+> --
+> dwmw2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
