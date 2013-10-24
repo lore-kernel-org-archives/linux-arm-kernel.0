@@ -1,104 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 24 Oct 2013 06:11:59 -0500
-Subject: [PATCH 4/8] ARM: imx: add support code for IMX50 based machines
-In-Reply-To: <1382076260-6422-5-git-send-email-gerg@uclinux.org>
-References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
- <1382076260-6422-5-git-send-email-gerg@uclinux.org>
-Message-ID: <CAL_JsqJhM=K+vovDALQnjUSXBcuzHev1CUpxEnNqCYfOfGVsWQ@mail.gmail.com>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Thu, 24 Oct 2013 13:33:59 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+References: <20131020220839.GT2443@sirena.org.uk>
+ <5264576F.6050307@wwwdotorg.org>
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
+ <52658EBC.8020800@wwwdotorg.org>
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023174458.GC5208@netboy>
+ <1382553982.31058.10.camel@sakura.staff.proxad.net>
+ <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+Message-ID: <1382614439.6040.16.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 1:04 AM,  <gerg@uclinux.org> wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
->
-> Add machine support code for the Freescale IMX50 SoC.
->
-> It is very similar to the Freescale IMX53, it contains many of the same
-> periperhal hardware modules, at the same address offsets as the IMX53.
-> (Notable exceptions are that the IMX50 contains no CAN bus hardware, less
-> GPIO, no VPU, it does contain an Electrophoretic display controller though).
->
-> So this support code just uses the IMX53 definitions as they are today.
-> We can add the extra IMX50 definitions in the future when required.
->
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> ---
->  arch/arm/mach-imx/Makefile     |  1 +
->  arch/arm/mach-imx/mach-imx50.c | 52 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 53 insertions(+)
->  create mode 100644 arch/arm/mach-imx/mach-imx50.c
->
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index 5383c58..9d94f47 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -110,6 +110,7 @@ obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
->  obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
->
->  obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
-> +obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
->  obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
->
->  obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
-> diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
-> new file mode 100644
-> index 0000000..4ac1b91
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/mach-imx50.c
-> @@ -0,0 +1,52 @@
-> +/*
-> + * Copyright 2013 Greg Ungerer <gerg@uclinux.org>
-> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + * Copyright 2011 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
-> +
-> +#include "common.h"
-> +#include "mx53.h"
-> +
-> +static void __init imx50_dt_init(void)
-> +{
-> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
-> +
-> +static const char *imx50_dt_board_compat[] __initdata = {
-> +       "fsl,imx50",
-> +       NULL
-> +};
-> +
-> +static void __init imx50_timer_init(void)
-> +{
-> +       mx50_clocks_init_dt();
-> +}
-> +
-> +DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
-> +       .map_io         = mx53_map_io,
-> +       .init_early     = imx53_init_early,
-> +       .init_irq       = mx53_init_irq,
-> +       .handle_irq     = imx53_handle_irq,
-> +       .init_time      = imx50_timer_init,
-> +       .init_machine   = imx50_dt_init,
-> +       .init_late      = imx53_init_late,
-> +       .dt_compat      = imx50_dt_board_compat,
-> +       .restart        = mxc_restart,
-> +MACHINE_END
 
-This seems like a lot of duplication. It seems like mx53 and mx50
-could be combined into a single machine_desc. init_time should not be
-needed in 3.13.
+On Thu, 2013-10-24 at 10:52 +0100, Grant Likely wrote:
+
+> At this point if the hardware exists then it should be described in DTB,
+> even if it is merely compatible, reg, interrupts and maybe clocks
+
+if your driver does not use them, chances are you'll get them wrong.
+
+> properties. In many cases that is all that is required. It /is/ okay to
+> amend a binding later and to use default values if the new properties
+> aren't present.
+
+how do you handle the case of a wrong property, because you only wrote
+hardware description and not the driver ?
+
+> hardware description when enabling previously unused peripherals, but it
+> is absolutely not friendly to change a binding/driver in a what that fails on
+> previously working DTB (with the caveat that if no one notices, it
+> isn't breakage).
+
+ok then how do we solve that case:
+
+ - Marvell SOC 1 is mainlined
+ - Marvell SOC 2 is mainlined
+ - Marvell SOC 'x' is mainlined
+ - "PIO" hw crypto driver is written, working for all SOCs
+ - [1 year]
+ - SOCs bindings are marked as stable
+ - [1 year]
+ - someone rewrite the driver of hw crypto to use DMA, existing binding
+is not ok because clock 'foo' or interrupt 'bar', now required, are not
+present.
+
+what is the process merge that driver ?
+
+if the answer is that you need to keep PIO mode in driver so that
+existing DTBs still works with it, then this is just plain *wrong*.
+
+-- 
+Maxime
