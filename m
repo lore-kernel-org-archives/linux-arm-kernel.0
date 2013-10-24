@@ -1,57 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 24 Oct 2013 11:01:55 +0100
-Subject: [PATCHv6][ 1/4] ASoC: eukrea-tlv320: Add DT support.
-In-Reply-To: <1382519766-17359-1-git-send-email-denis@eukrea.com>
-References: <1382519766-17359-1-git-send-email-denis@eukrea.com>
-Message-ID: <20131024100155.GI31415@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Oct 2013 12:06:23 +0200
+Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
+In-Reply-To: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
+References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdbymhLhHObL+fdWCHKbNG_LtudvhXbdxC0NCJApUBjT9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 11:16:03AM +0200, Denis Carikli wrote:
+On Tue, Oct 1, 2013 at 12:57 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> +	/* fsl_ssi lacks the set_fmt ops. */
-> +	if (!priv->of) {
-> +		ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
-> +					  SND_SOC_DAIFMT_NB_NF |
-> +					  SND_SOC_DAIFMT_CBM_CFM);
-> +		if (ret) {
-> +			dev_err(cpu_dai->dev,
-> +				"Failed to set the cpu dai format\n");
-> +			return ret;
-> +		}
+> This converts the gemini machine to use generic clockevents
+> by rewriting the timer driver.
+>
+> Cc: arm at kernel.org
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> This is flagged as Request for Testing (RFT) as I have no Gemini
+> platform. If I do not get help with testing this, the next step
+> will be a patch series to delete the platform.
 
-This is unrelated to OF support, whatever version of the DAI does have
-the operation might be used on an ACPI system for example.  What would
-be better would be to check the return value for -ENOTSUPP and ignore
-that while still passing on other errors.  The same thing applies to the
-other ops that aren't supported.
+OK nobody is able to test this it seems, but it is a vital refactoring.
 
->  	if (ret) {
-> -		pr_err("%s: failed set codec dai format\n", __func__);
-> +		dev_err(cpu_dai->dev,
-> +			"Failed to set the codec dai format.\n");
->  		return ret;
+Should we just apply this and see what happens?
 
-This is a useful cleanup but should be done in a separate patch.
+Or should I just send a deletion patch right away?
 
-> +	/* fsl_ssi lacks the set_sysclk ops */
-> +	if (!priv->of) {
-> +		snd_soc_dai_set_tdm_slot(cpu_dai, 0xffffffc, 0xffffffc, 2, 0);
+I would lean toward just applying it and see if the OpenWRT
+people will notice and/or complain.
 
-This is nothing to do with sysclk, but that's just a minor point about
-the grouping and commenting.
+What does the ARM SoC people say?
 
-> @@ -80,7 +97,6 @@ static struct snd_soc_dai_link eukrea_tlv320_dai = {
->  	.name		= "tlv320aic23",
->  	.stream_name	= "TLV320AIC23",
->  	.codec_dai_name	= "tlv320aic23-hifi",
-> -	.platform_name	= "imx-ssi.0",
-
-Does this not break existing users?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/d579bbfc/attachment.sig>
+Yours,
+Linus Walleij
