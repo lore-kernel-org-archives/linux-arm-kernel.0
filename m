@@ -1,52 +1,66 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Oct 2013 17:25:21 -0400
-Subject: [PATCH RFC v2 0/4] MDIO bus timeout issues on Dreamplug
-In-Reply-To: <cover.1382637156.git.leigh@solinno.co.uk>
-References: <cover.1382199042.git.leigh@solinno.co.uk>
- <cover.1382637156.git.leigh@solinno.co.uk>
-Message-ID: <20131024212521.GM24520@titan.lakedaemon.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 24 Oct 2013 23:28:29 +0200 (CEST)
+Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
+ status
+In-Reply-To: <20131017134846.GG14013@intel.com>
+References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
+ <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
+ <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
+ <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
+ <20131017020745.GA14013@intel.com> <20131017142755.GA4477@breakpoint.cc>
+ <20131017134846.GG14013@intel.com>
+Message-ID: <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Leigh,
+Hi Vinod
 
-Thanks for getting the bottom of this!
+On Thu, 17 Oct 2013, Vinod Koul wrote:
 
-On Thu, Oct 24, 2013 at 07:09:30PM +0100, Leigh Brown wrote:
-> Thanks to the comment from Sebastian I did some more investigation and
-> discovered that almost everything about my analysis was wrong (woops).
-> The patch itself wasn't too bad though.
-> 
-> In terms of timings, I don't believe the timeout was due to the SMI bus
-> taking too long to respond because when I have repeated my testing
-> (this time disabling interrupts whilst waiting), I have found that the
-> maximum time that my Dreamplug takes to respond was about 95us (and
-> 43us on the Mirabox, which polls).  So I think the root cause of the 
-> problem was that interrupt handler was interfering with the polling in 
-> some way.
-> 
-> I have therefore amended the first patch to use usleep_range to sleep
-> instead of busy wait as suggested by Sebastian, and set the timeout to
-> 1ms.  I've tested this on both the Dreamplug and Mirabox and have seen
-> no timeouts at all.
-> 
-> The second, third and fourth patches are pretty much the same as before.
+> On Thu, Oct 17, 2013 at 04:27:55PM +0200, Sebastian Andrzej Siewior wrote:
+> > On Thu, Oct 17, 2013 at 07:37:45AM +0530, Vinod Koul wrote:
+> > > index 0bc7275..683c380 100644
+> > > --- a/include/linux/dmaengine.h
+> > > +++ b/include/linux/dmaengine.h
+> > > @@ -45,16 +45,17 @@ static inline int dma_submit_error(dma_cookie_t cookie)
+> > >  
+> > >  /**
+> > >   * enum dma_status - DMA transaction status
+> > > - * @DMA_SUCCESS: transaction completed successfully
+> > > + * @DMA_COMPLETE: transaction completed
+> > >   * @DMA_IN_PROGRESS: transaction not yet processed
+> > >   * @DMA_PAUSED: transaction is paused
+> > >   * @DMA_ERROR: transaction failed
+> > >   */
+> > >  enum dma_status {
+> > > -	DMA_SUCCESS,
+> > > +	DMA_COMPLETE,
+> > >  	DMA_IN_PROGRESS,
+> > >  	DMA_PAUSED,
+> > >  	DMA_ERROR,
+> > > +	DMA_SUCCESS,
+> > >  };
+> > 
+> > There are some drivers which compare against == or != DMA_SUCCESS. Shouldn't this
+> > become
+> >   enum dma_status {
+> >  -	DMA_SUCCESS,
+> >  +	DMA_COMPLETE = 0, DMA_SUCCESS = 0,
+> >   	DMA_IN_PROGRESS,
+> >   	DMA_PAUSED,
+> >   	DMA_ERROR,
+> >   };
+> > 
+> > so nothing breaks during the transition?
+> Yes i missed it in first place update the patch to fix that
 
+Are you planning to post a fixed version of this patch or you just fix it 
+internally? Would be good to have it posted to be able to ack it and other 
+relevant patches.
 
-> 
-> If I receive no comments who do I submit this to for inclusion?
-
-You can can use scripts/get_maintainer.pl for this.  In this case, it
-spits out:
-
-"David S. Miller" <davem@davemloft.net> (commit_signer:63/70=90%)
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> (commit_signer:15/70=21%)
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> (commit_signer:10/70=14%)
-Florian Fainelli <florian@openwrt.org> (commit_signer:8/70=11%)
-Stephen Hemminger <stephen@networkplumber.org> (commit_signer:6/70=9%)
-netdev at vger.kernel.org (open list:NETWORKING DRIVERS)
-linux-kernel at vger.kernel.org (open list)
-
-thx,
-
-Jason.
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
