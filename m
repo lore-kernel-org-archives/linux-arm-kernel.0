@@ -1,47 +1,66 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Thu, 24 Oct 2013 18:14:19 +0200
-Subject: [PATCH 2/2] ARM64: perf: wire up perf_regs and unwind support
-In-Reply-To: <20131024145025.GA1493@krava.redhat.com>
-References: <1382108078-8807-1-git-send-email-jean.pihet@linaro.org>
- <1382108078-8807-3-git-send-email-jean.pihet@linaro.org>
- <20131024145025.GA1493@krava.redhat.com>
-Message-ID: <CAFrcx1=VjRbdTet2_k=w36YSgk3x+cCoNwZ1QYFpNqCymoVa0w@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 24 Oct 2013 17:25:43 +0100
+Subject: ARM: add support to dump the kernel page tables
+In-Reply-To: <20131024154956.GN16735@n2100.arm.linux.org.uk>
+References: <20131024071600.GC16735@n2100.arm.linux.org.uk>
+ <20131024105143.GA24288@linaro.org>
+ <20131024122306.GK16735@n2100.arm.linux.org.uk>
+ <20131024125530.GA27357@linaro.org>
+ <20131024154956.GN16735@n2100.arm.linux.org.uk>
+Message-ID: <20131024162542.GA32124@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiri, Will,
+On Thu, Oct 24, 2013 at 04:49:56PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Oct 24, 2013 at 01:55:31PM +0100, Steve Capper wrote:
+> > On Thu, Oct 24, 2013 at 01:23:06PM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Oct 24, 2013 at 11:51:44AM +0100, Steve Capper wrote:
+> > > > Hi Russell,
+> > > > I've given this a quick go on an Arndale with LPAE, and have a few
+> > > > suggestions below.
+> > > 
+> > > Thanks.
+> > > 
+> > > > > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> > > > > index 5689c18..d7682cd 100644
+> > > > > --- a/arch/arm/include/asm/pgtable-3level.h
+> > > > > +++ b/arch/arm/include/asm/pgtable-3level.h
+> > > > > @@ -140,6 +140,7 @@
+> > > > >  						 PMD_TYPE_TABLE)
+> > > > >  #define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
+> > > > >  						 PMD_TYPE_SECT)
+> > > > > +#define pmd_large(pmd)		pmd_sect(pmd)
+> > > > 
+> > > > Could we please instead do something like:
+> > > > #define pmd_large(pmd)         (pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+> > > > 
+> > > > This matches the logic used in the huge pages patches (it picks up the
+> > > > PROT_NONE case) that would be missed above.
+> > > 
+> > > Is this used in the generic parts of the kernel?  Can you please point
+> > > out where?
+> > > 
+> > 
+> > Apologies I was a little vague. I don't think there are any PROT_NONE
+> > protected kernel huge pages, I am worried that pmd_huge may be used by
+> > other code (and then run into problems with PROT_NONE).
+> 
+[I erroneously referred to pmd_huge here, I meant pmd_large sorry].
 
-On 24 October 2013 16:50, Jiri Olsa <jolsa@redhat.com> wrote:
-> On Fri, Oct 18, 2013 at 04:54:38PM +0200, Jean Pihet wrote:
->
-> SNIP
->
->> +     return -EINVAL;
->> +}
->> diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
->> index 75b93d7..15a69a5 100644
->> --- a/tools/perf/config/Makefile
->> +++ b/tools/perf/config/Makefile
->> @@ -29,11 +29,17 @@ ifeq ($(ARCH),x86_64)
->>    NO_PERF_REGS := 0
->>    LIBUNWIND_LIBS = -lunwind -lunwind-x86_64
->>  endif
->> +
->>  ifeq ($(ARCH),arm)
->>    NO_PERF_REGS := 0
->>    LIBUNWIND_LIBS = -lunwind -lunwind-arm
->>  endif
->
-> I dont see above 'ifeq' in acme's or in tip tree, so hunk
-> below fails to apply.. what tree was this based on?
-I am using 3.12-rc4. Let me rebase on the latest mainline.
+> Well, the obvious question is: why would you want pmd_large() to return
+> false if there is a section entry in place?
 
-Will, what do you think? I will post a rebased version asap.
+Hi,
+for LPAE:
+I want pmd_large to return true for all non-zero pmds that have bit #1
+clear.
+ 
+Clearing bit #0 of a pmd produces a faulting entry, and this is how
+PROT_NONE protection is enforced by huge pages.
 
-> otherwise the change looks good to me
-Great, thanks for reviewing!
+pmd_sect will return false for non-zero pmds that have both bit #0 and
+bit #1 clear, thus will return false for some huge pages.
 
->
-> jirka
-
-Jean
+Cheers,
+-- 
+Steve
