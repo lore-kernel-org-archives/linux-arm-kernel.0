@@ -1,41 +1,105 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 24 Oct 2013 10:57:04 +0200 (CEST)
-Subject: [RFC PATCH 0/6] DRIVERS: IRQCHIP: Add support for crossbar IP
-In-Reply-To: <524AD290.207@gmail.com>
-References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
- <52499441.1030403@gmail.com> <524AAE69.8060703@ti.com>
- <524AD290.207@gmail.com>
-Message-ID: <alpine.DEB.2.02.1310241045120.4983@ionos.tec.linutronix.de>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu, 24 Oct 2013 10:58:18 +0200
+Subject: [PATCHv7][ 1/6] video: imxfb: Introduce regulator support.
+Message-ID: <1382605103-9595-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Oct 2013, Rob Herring wrote:
-> On 10/01/2013 06:13 AM, Sricharan R wrote:
-> 
-> Is there an actual usecase on a single h/w design that you run out of
-> interrupts and it is a user decision which interrupts to use?
+This commit is based on the following commit by Fabio Estevam:
+  4344429 video: mxsfb: Introduce regulator support
 
-I don't think that matters. What matters is that you have a single DT
-entry which tells the driver which crossbar irq to use for that
-particular device. And that is the only information which is relevant
-because the IP block is connected to a crossbar input and not to a GIC
-line. The crossbar provides the mapping and this is really best done
-at runtime w/o having hardcoded information in the DT or at some other
-place.
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ drivers/video/imxfb.c |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 44ee678..4bf3837 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -28,6 +28,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/math64.h>
+@@ -145,6 +146,7 @@ struct imxfb_info {
+ 	struct clk		*clk_ipg;
+ 	struct clk		*clk_ahb;
+ 	struct clk		*clk_per;
++	struct regulator	*reg_lcd;
+ 	enum imxfb_type		devtype;
+ 	bool			enabled;
  
-> You could fill in the interrupt-map at run-time. It would have to be
-> early (bootloader or early kernel init) and can't be at request_irq time.
-
-How is that supposed to work when you have no idea at early boot time
-which particular IP blocks are going to be used later on?
-
-> >   http://www.spinics.net/lists/linux-omap/msg97085.html
-> 
-> This has nothing to do with the GIC, so it does not belong there.
-
-Errm. crossbar is a mapping device which happens to sit between the
-GIC and the IP blocks. So how is this NOT related to GIC ?
-
-Thanks,
-
-	tglx
+@@ -563,12 +565,23 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ 
+ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
+ 
+ 	if (fbi->enabled)
+ 		return;
+ 
+ 	pr_debug("Enabling LCD controller\n");
+ 
++	if (fbi->reg_lcd) {
++		ret = regulator_enable(fbi->reg_lcd);
++		if (ret) {
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator enable failed with error: %d\n",
++				ret);
++			return;
++		}
++	}
++
+ 	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+ 
+ 	/* panning offset 0 (0 pixel offset)        */
+@@ -597,6 +610,8 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 
+ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
++
+ 	if (!fbi->enabled)
+ 		return;
+ 
+@@ -613,6 +628,14 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	fbi->enabled = false;
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
++
++	if (fbi->reg_lcd) {
++		ret = regulator_disable(fbi->reg_lcd);
++		if (ret)
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator disable failed with error: %d\n",
++				ret);
++	}
+ }
+ 
+ static int imxfb_blank(int blank, struct fb_info *info)
+@@ -1020,6 +1043,12 @@ static int imxfb_probe(struct platform_device *pdev)
+ 		goto failed_register;
+ 	}
+ 
++	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
++	if (IS_ERR(fbi->reg_lcd)) {
++		dev_info(&pdev->dev, "No lcd regulator used.\n");
++		fbi->reg_lcd = NULL;
++	}
++
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
+ #ifdef PWMR_BACKLIGHT_AVAILABLE
+-- 
+1.7.9.5
