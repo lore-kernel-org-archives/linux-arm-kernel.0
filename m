@@ -1,49 +1,47 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 24 Oct 2013 14:05:58 -0000
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <1382621431.6040.66.camel@sakura.staff.proxad.net>
-References: <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023174458.GC5208@netboy>
- <1382553982.31058.10.camel@sakura.staff.proxad.net>
- <20131024095232.27BBCC4039D@trevor.secretlab.ca>
- <1382614439.6040.16.camel@sakura.staff.proxad.net>
- <1382615278.8522.72.camel@shinybook.infradead.org>
- <20131024122346.GD11296@ulmo.nvidia.com>
- <1382619655.6040.52.camel@sakura.staff.proxad.net>
- <516bfc7f9366ff3ef9187c36dd160888.squirrel@twosheds.infradead.org>
- <1382621431.6040.66.camel@sakura.staff.proxad.net>
-Message-ID: <af289ef3cc80be8de26274ba1f598d54.squirrel@twosheds.infradead.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 24 Oct 2013 07:09:57 -0700
+Subject: [PATCH v2] ARM: sa1100: remove complex GPIO interface
+In-Reply-To: <1380025478-24831-1-git-send-email-linus.walleij@linaro.org>
+References: <1380025478-24831-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAOesGMh01481i5tAotP6hbKHU+sOg7Ld_VhHXq3f1ZX1w8O9ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
+On Tue, Sep 24, 2013 at 5:24 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> The SA1100 was implementing its own variants of gpio_get_value()
+> and gpio_set_value() and only selectively falling back to
+> gpiolib for extended (EGPIO) handling. However the driver in
+> gpio/gpio-sa1100.c already handles the same functionality for
+> these lines, yet remain unused.
 >
-> On Thu, 2013-10-24 at 13:10 +0000, David Woodhouse wrote:
+> The only upside would be things like a timing-critical hotpath
+> on bit-banged GPIO, but that kind of things does not seem to
+> happen on these GPIOs, so it is not worth having the extra
+> complexity.
 >
->> Note that you are not describing a normal "DT scenario" here. You are
->> describing a case in which we screwed up
+> Tested with some buttons on the Compaq iPAQ H3630.
 >
-> AKA "real world"
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Kristoffer Ericson <kristoffer.ericson@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - #include <linux/io.h> instead of <asm/io.h>.
 
-No. Absolutely not. That was a screwup, and it needs to be *rare*. The
-excuses you present for it are crappy and uunacceptable.
 
->> So yes, after the public flogging has happened, and we're trying to
->> work out how best to cope with the screwup, we don't necessarily have
->> any perfect choices. The perfect choice was to do it properly in the
->> first place.
->
-> or avoid shooting ourselves in the foot in the first place, and keep
-> these unmodifiable stuff in kernel :)
+Looks like this hit -next and it produces the following with simpad_defconfig:
 
-No. That doesn't scale. It doesn't work. We can cope with special-cases
-for the rare screw-up, but that's a *long* way from always special-casing
-*everything* as we used to.
+../../arch/arm/include/asm/irq.h:9:0: warning: "NR_IRQS" redefined
+[enabled by default]
+ #define NR_IRQS NR_IRQS_LEGACY
+ ^
+In file included from ../../arch/arm/mach-sa1100/simpad.c:29:0:
+../../arch/arm/mach-sa1100/include/mach/irqs.h:87:0: note: this is the
+location of the previous definition
+ #define NR_IRQS (IRQ_BOARD_START + NR_IRQS_LOCOMO)
 
--- 
-dwmw2
+
+http://arm-soc.lixom.net/buildlogs/next-thierry/next-20131023/buildall.arm.simpad_defconfig.log.passed
+
+
+-Olof
