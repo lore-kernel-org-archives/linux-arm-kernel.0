@@ -1,66 +1,44 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 24 Oct 2013 23:28:29 +0200 (CEST)
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <20131017134846.GG14013@intel.com>
-References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
- <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
- <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
- <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
- <20131017020745.GA14013@intel.com> <20131017142755.GA4477@breakpoint.cc>
- <20131017134846.GG14013@intel.com>
-Message-ID: <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Oct 2013 22:31:38 +0100
+Subject: ARM: add support to dump the kernel page tables
+In-Reply-To: <20131024162542.GA32124@linaro.org>
+References: <20131024071600.GC16735@n2100.arm.linux.org.uk>
+ <20131024105143.GA24288@linaro.org>
+ <20131024122306.GK16735@n2100.arm.linux.org.uk>
+ <20131024125530.GA27357@linaro.org>
+ <20131024154956.GN16735@n2100.arm.linux.org.uk>
+ <20131024162542.GA32124@linaro.org>
+Message-ID: <20131024213138.GP16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod
+On Thu, Oct 24, 2013 at 05:25:43PM +0100, Steve Capper wrote:
+> Hi,
+> for LPAE:
+> I want pmd_large to return true for all non-zero pmds that have bit #1
+> clear.
+>  
+> Clearing bit #0 of a pmd produces a faulting entry, and this is how
+> PROT_NONE protection is enforced by huge pages.
+> 
+> pmd_sect will return false for non-zero pmds that have both bit #0 and
+> bit #1 clear, thus will return false for some huge pages.
 
-On Thu, 17 Oct 2013, Vinod Koul wrote:
+Well, consider that we want to move this code out of arch/arm and into
+generic code - when that happens architectures should just have to
+provide some data (the data to interpret the bitfields and memory
+sections) to this code.
 
-> On Thu, Oct 17, 2013 at 04:27:55PM +0200, Sebastian Andrzej Siewior wrote:
-> > On Thu, Oct 17, 2013 at 07:37:45AM +0530, Vinod Koul wrote:
-> > > index 0bc7275..683c380 100644
-> > > --- a/include/linux/dmaengine.h
-> > > +++ b/include/linux/dmaengine.h
-> > > @@ -45,16 +45,17 @@ static inline int dma_submit_error(dma_cookie_t cookie)
-> > >  
-> > >  /**
-> > >   * enum dma_status - DMA transaction status
-> > > - * @DMA_SUCCESS: transaction completed successfully
-> > > + * @DMA_COMPLETE: transaction completed
-> > >   * @DMA_IN_PROGRESS: transaction not yet processed
-> > >   * @DMA_PAUSED: transaction is paused
-> > >   * @DMA_ERROR: transaction failed
-> > >   */
-> > >  enum dma_status {
-> > > -	DMA_SUCCESS,
-> > > +	DMA_COMPLETE,
-> > >  	DMA_IN_PROGRESS,
-> > >  	DMA_PAUSED,
-> > >  	DMA_ERROR,
-> > > +	DMA_SUCCESS,
-> > >  };
-> > 
-> > There are some drivers which compare against == or != DMA_SUCCESS. Shouldn't this
-> > become
-> >   enum dma_status {
-> >  -	DMA_SUCCESS,
-> >  +	DMA_COMPLETE = 0, DMA_SUCCESS = 0,
-> >   	DMA_IN_PROGRESS,
-> >   	DMA_PAUSED,
-> >   	DMA_ERROR,
-> >   };
-> > 
-> > so nothing breaks during the transition?
-> Yes i missed it in first place update the patch to fix that
+Therefore, we need pmd_large() to have the same semantics across all
+architectures, and we can't use ARMs pmd_sect() - ARMs sections have
+no meaning on other architectures, and the established macro which
+should return true for large pages is pmd_large().
 
-Are you planning to post a fixed version of this patch or you just fix it 
-internally? Would be good to have it posted to be able to ack it and other 
-relevant patches.
+If there's the possibility for pmd_none(pmd) && pmd_large(pmd) to
+return true, but the entry contains something which is not a section
+descriptor, and ARM will be incompatible with other stuff and it will
+stand in the way of moving this to generic code.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Really, I don't think ARM can be different with its definition of
+pmd_large() even though generic code does not yet make use of this
+macro.
