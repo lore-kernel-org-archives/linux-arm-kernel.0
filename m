@@ -1,135 +1,38 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 24 Oct 2013 14:39:36 -0400
-Subject: [RFC] of: Allow for experimental device tree bindings
-In-Reply-To: <1382540779-6334-1-git-send-email-treding@nvidia.com>
-References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
-Message-ID: <CAKON4Oz_Z0-ac_1k_0wis_nMNc+PNh5iYWyk-sQdaV=DfrfS7Q@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 24 Oct 2013 11:43:38 -0700
+Subject: [PATCH 4/8] input: Remove OOM message after input_allocate_device
+In-Reply-To: <20131024182611.GA3512@pengutronix.de>
+References: <cover.1382555436.git.joe@perches.com>
+ <cc5e6a317bc9ef33cfdfae3ed9d3a47b5319a47b.1382555436.git.joe@perches.com>
+ <20131024182611.GA3512@pengutronix.de>
+Message-ID: <1382640218.22433.71.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 11:06 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> Past and recent discussions have shown that there's some concensus that
-> device tree bindings should be considered an ABI and therefore need to
-> remain backwards-compatible once code to implement them is included in
-> the final release of a Linux kernel.
+On Thu, 2013-10-24 at 20:26 +0200, Uwe Kleine-K?nig wrote:
+> Hello Joe,
+> 
+> On Wed, Oct 23, 2013 at 12:14:50PM -0700, Joe Perches wrote:
+> > Emitting an OOM message isn't necessary after input_allocate_device
+> > as there's a generic OOM and a dump_stack already done.
+> > 
+> > [...]
+> > Signed-off-by: Joe Perches <joe@perches.com>
+> > diff --git a/drivers/input/joystick/as5011.c b/drivers/input/joystick/as5011.c
+> > index 005d852..3b9c709 100644
+> > --- a/drivers/input/joystick/as5011.c
+> > +++ b/drivers/input/joystick/as5011.c
+> > @@ -254,8 +254,6 @@ static int as5011_probe(struct i2c_client *client,
+> >  	as5011 = kmalloc(sizeof(struct as5011_device), GFP_KERNEL);
+> >  	input_dev = input_allocate_device();
+> >  	if (!as5011 || !input_dev) {
+> > -		dev_err(&client->dev,
+> > -			"Can't allocate memory for device structure\n");
+> Don't know if that can happen, but if as5011 is NULL but input_dev isn't
+> the message would still be sensible, wouldn't it? There are several more
+> that suffer the same "problem".
 
-Doing it this way clutters up the DTS source files.
+Any k.alloc without __GFP_NOWARN does a generic OOM message
+and a dump_stack() so there could already be 2 messages anyway.
 
-Schemas are a way to do this without clutter. There should be a master
-schema that would validate all accepted device tree bindings.   So
-experimental bindings naturally drop right of of this - they'll
-generate errors when validated against the master schema.  When the
-binding is finally sorted out it gets added to the master schema and
-the validation errors go away.
-
-
->
-> At the same time there is a desire to keep some manoeuvre while we're
-> trying to figure things out. The fact is that many of us lack the
-> experience to design good bindings from the start. At the same time
-> there is a shortage of people that can review bindings and help design
-> better ones.
->
-> Progress and the addition of new features (and restoration of features
-> that used to work before the advent of DT for that matter) are blocked
-> to a large degree because of that.
->
-> This patch attempts to restore some degree of freedom by introducing an
-> easy way to mark device tree bindings as experimental as well as a way
-> for users to disable the use of experimental bindings if they choose
-> functionality at the cost of potential device tree incompatibilities.
->
-> Bindings are marked experimental by prefixing the compatible value with
-> an exclamation mark (!). In order to make it clear that experimental
-> bindings are undesirable in the long run, a warning will be output when
-> an experimental binding is encountered.
->
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  drivers/of/Kconfig |  7 +++++++
->  drivers/of/base.c  | 32 +++++++++++++++++++++++++++++++-
->  2 files changed, 38 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index 78cc760..dc482f8 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -24,6 +24,13 @@ config OF_SELFTEST
->
->           If unsure, say N here, but this option is safe to enable.
->
-> +config OF_EXPERIMENTAL
-> +       bool "Support experimental device tree bindings"
-> +       help
-> +         This option allows experimental device tree bindings to be used.
-> +         Note that experimental bindings are subject to change, possibly
-> +         requiring the DTB to be updated.
-> +
->  config OF_FLATTREE
->         bool
->         select DTC
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index a96f850..b0b8371 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -342,6 +342,36 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
->  }
->  EXPORT_SYMBOL(of_get_cpu_node);
->
-> +static int of_compat_match(const char *device, const char *driver,
-> +                          const struct device_node *np)
-> +{
-> +       const char *dev = device;
-> +       const char *drv = driver;
-> +
-> +       if (device[0] == '!')
-> +               device++;
-> +
-> +       if (driver[0] == '!')
-> +               driver++;
-> +
-> +       if (of_compat_cmp(device, driver, strlen(driver)) != 0)
-> +               return 0;
-> +
-> +       /* check if binding is experimental */
-> +       if (dev != device || drv != driver) {
-> +               pr_warn("of: device %s (%s) uses an experimental binding\n",
-> +                       np->name, np->full_name);
-> +
-> +               /* don't match if we don't want experimental bindings */
-> +               if (!IS_ENABLED(CONFIG_OF_EXPERIMENTAL)) {
-> +                       pr_err("of: refusing to use binding \"%s\"\n", device);
-> +                       return 0;
-> +               }
-> +       }
-> +
-> +       return 1;
-> +}
-> +
->  /** Checks if the given "compat" string matches one of the strings in
->   * the device's "compatible" property
->   */
-> @@ -355,7 +385,7 @@ static int __of_device_is_compatible(const struct device_node *device,
->         if (cp == NULL)
->                 return 0;
->         while (cplen > 0) {
-> -               if (of_compat_cmp(cp, compat, strlen(compat)) == 0)
-> +               if (of_compat_match(cp, compat, device))
->                         return 1;
->                 l = strlen(cp) + 1;
->                 cp += l;
-> --
-> 1.8.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+cheers, Joe
