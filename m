@@ -1,47 +1,68 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Thu, 24 Oct 2013 10:35:59 +0100
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <20131024073236.GA4690@netboy>
-References: <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023180108.GA23728@roeck-us.net>
- <20131023182502.GC32563@obsidianresearch.com>
- <20131023183041.GH5208@netboy>
- <1382570963.6315.48.camel@deadeye.wl.decadent.org.uk>
- <20131024073236.GA4690@netboy>
-Message-ID: <1382607359.6315.61.camel@deadeye.wl.decadent.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 24 Oct 2013 04:38:23 -0500
+Subject: [RFC PATCH 1/6] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
+ routable irqs
+In-Reply-To: <1380549564-31045-2-git-send-email-r.sricharan@ti.com>
+References: <1380549564-31045-1-git-send-email-r.sricharan@ti.com>
+ <1380549564-31045-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <D170CC15-C746-412F-A683-E8A73EFB8133@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-10-24 at 09:32 +0200, Richard Cochran wrote:
-> On Thu, Oct 24, 2013 at 12:29:23AM +0100, Ben Hutchings wrote:
-> > 
-> > It starts by looking up the machine ID (in procfs, but may be overridden
-> > because some board vendors don't set it correctly).  If the machine is
-> > supported using FDT then there is an associated DTB file which will have
-> > been installed with the kernel.  The script copies/appends this to the
-> > appropriate place for the boot loader.
+
+On Sep 30, 2013, at 8:59 AM, Sricharan R wrote:
+
+> In some socs the gic can be preceded by a crossbar IP which
+> routes the peripheral interrupts to the gic inputs. The peripheral
+> interrupts are associated with a fixed crossbar input line and the
+> crossbar routes that to one of the free gic input line.
 > 
-> And if the ID is not recognized, then what?
+> The DT entries for peripherals provides the fixed crossbar input line
+> as its interrupt number and the mapping code should associate this with
+> a free gic input line. This patch adds the support inside the gic irqchip
+> to handle such routable irqs. The routable irqs are registered in a linear
+> domain. The registered routable domain's callback should be implemented
+> to get a free irq and to configure the IP to route it.
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+> Documentation/devicetree/bindings/arm/gic.txt |    5 +++
+> arch/arm/boot/dts/dra7.dtsi                   |    1 +
+> drivers/irqchip/irq-gic.c                     |   57 +++++++++++++++++++++----
+> include/linux/irqchip/arm-gic.h               |    8 +++-
+> 4 files changed, 61 insertions(+), 10 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> index 3dfb0c0..2d8c680 100644
+> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -49,6 +49,11 @@ Optional
+>   regions, used when the GIC doesn't have banked registers. The offset is
+>   cpu-offset * cpu-nr.
+> 
+> +- routable-irqs	: Total number of gic irq inputs which are not directly
+> +		  connected from the peripherals, but are routed dynamically
+> +		  by a crossbar/multiplexer preceding the GIC. The GIC irq
+> +		  input line is assigned dynamically when the corresponding
+> +		  peripheral's crossbar line is mapped.
 
-Then we have no idea even where to install the kernel, or what wrapper
-might be needed, so the boot loader will load it.  Lack of a DTB file is
-a small problem; it would be easy to add an option to provide one
-outside the kernel package.
+arm,routable-irqs
 
-Ben.
+> Example:
+> 
+> 	intc: interrupt-controller at fff11000 {
+
+- k
 
 -- 
-Ben Hutchings
-Teamwork is essential - it allows you to blame someone else.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131024/8c518504/attachment.sig>
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
