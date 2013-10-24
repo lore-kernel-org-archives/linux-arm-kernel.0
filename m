@@ -1,49 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 24 Oct 2013 09:28:11 +0200
-Subject: ARM topic: Is DT on ARM the solution, or is there something
- better?
-In-Reply-To: <CAF6AEGtt_2sStiZCNBp9btxevWghSwLZZBdN6ir8eUpX1FXrCQ@mail.gmail.com>
-References: <52644A9E.3060007@wwwdotorg.org>
- <20131020231134.GR25034@n2100.arm.linux.org.uk>
- <20131021083242.GB30088@pengutronix.de>
- <20131021084854.GV25034@n2100.arm.linux.org.uk>
- <20131021092730.GF30088@pengutronix.de>
- <CAF6AEGtt_2sStiZCNBp9btxevWghSwLZZBdN6ir8eUpX1FXrCQ@mail.gmail.com>
-Message-ID: <20131024072811.GS30088@pengutronix.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 24 Oct 2013 09:32:37 +0200
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
+ is there something better?
+In-Reply-To: <1382570963.6315.48.camel@deadeye.wl.decadent.org.uk>
+References: <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
+ <20131022093923.GC15640@ulmo.nvidia.com>
+ <20131022150426.GF29341@beef>
+ <20131022171346.GE4061@obsidianresearch.com>
+ <20131023080630.GA14413@netboy>
+ <20131023172955.GA17145@obsidianresearch.com>
+ <20131023180108.GA23728@roeck-us.net>
+ <20131023182502.GC32563@obsidianresearch.com>
+ <20131023183041.GH5208@netboy>
+ <1382570963.6315.48.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <20131024073236.GA4690@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 09:14:17PM -0400, Rob Clark wrote:
-> On Mon, Oct 21, 2013 at 5:27 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> If a subsystem doesn't work well with DT, then the choices are either:
-> >>
-> >> (a) don't use DT with the subsystem
-> >
-> > The underlying problem has nothing to do with DT. Multi component
-> > hardware does exist and won't vanish when we stop using DT.
-> >
-> >> (b) fix the subsystem
-> >
-> > I'd love to do that. Step one to this seems to be to increase the
-> > awareness that there's something wrong with DRM.
+On Thu, Oct 24, 2013 at 12:29:23AM +0100, Ben Hutchings wrote:
 > 
-> 
-> Note that I suspect your idea of "fixing drm" is going to break some
-> userspace assumptions about the hw (ie. userspace isn't expecting
-> crtcs/encoders/connectors to suddenly appear/disappear.  And the funny
-> thing is, on all of this hw, that isn't going to happen anyways.
+> It starts by looking up the machine ID (in procfs, but may be overridden
+> because some board vendors don't set it correctly).  If the machine is
+> supported using FDT then there is an associated DTB file which will have
+> been installed with the kernel.  The script copies/appends this to the
+> appropriate place for the boot loader.
 
-I was talking about all SoC DRM drivers implementing variants of the
-same glue between drm and the multidevice nature of the components.
+And if the ID is not recognized, then what?
 
-To make that sure: I never had the intention to implement hotplug for
-drm. Also what the imx-drm driver does is not for hotplug, but only for
-binding different components together.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Richard
