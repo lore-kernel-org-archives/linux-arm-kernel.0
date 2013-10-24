@@ -1,418 +1,606 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 24 Oct 2013 11:16:24 +0100
-Subject: [PATCHv6][ 1/4] Input: tsc2007: Add device tree support.
-In-Reply-To: <1382603933-8539-1-git-send-email-denis@eukrea.com>
-References: <1382603933-8539-1-git-send-email-denis@eukrea.com>
-Message-ID: <20131024101624.9008BC4039D@trevor.secretlab.ca>
+Date: Thu, 24 Oct 2013 11:19:08 +0100
+Subject: [PATCH v4 2/7] pinctrl: imx27: imx27 pincontrol driver
+In-Reply-To: <1382601233-24253-3-git-send-email-mpa@pengutronix.de>
+References: <1382601233-24253-1-git-send-email-mpa@pengutronix.de>
+ <1382601233-24253-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <20131024101908.90B4DC4039D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Oct 2013 10:38:50 +0200, Denis Carikli <denis@eukrea.com> wrote:
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: linux-input at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Lothar Wa??mann <LW@KARO-electronics.de>
-> Cc: Eric B??nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v5->v6:
-> - Fixed a code style issue.
-> - Improved the documentation to set some gpio related properties as optional.
-> - The properties related to the gpios are also explained better.
-> ---
->  .../bindings/input/touchscreen/tsc2007.txt         |   44 +++++
->  drivers/input/touchscreen/tsc2007.c                |  194 +++++++++++++++-----
->  2 files changed, 197 insertions(+), 41 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+On Thu, 24 Oct 2013 09:53:48 +0200, Markus Pargmann <mpa@pengutronix.de> wrote:
+> imx27 pincontrol driver using the imx1 core driver. The DT bindings are
+> similar to other imx pincontrol drivers.
 > 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
-> new file mode 100644
-> index 0000000..46fc677
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
-> @@ -0,0 +1,44 @@
-> +* Texas Instruments tsc2007 touchscreen controller
-> +
-> +Required properties:
-> +- compatible: must be "ti,tsc2007".
-> +- reg: I2C address of the chip.
-> +- ti,x-plate-ohms: X-plate resistance in ohms.
-> +
-> +Optional properties:
-> +- gpios: the interrupt gpio the chip is connected to (trough the penirq pin)
-> +  (see GPIO binding[2] for more details).
-> +- interrupt-parent: the phandle for the gpio controller
-> +  (see interrupt binding[1]).
-> +- interrupts: (gpio) interrupt to which the chip is connected
-> +  (see interrupt binding[1]).
-> +- pinctrl-0: Should specify pin control groups used for the gpio
-> +  (see pinctrl bindings[0]).
-> +- pinctrl-names: Should contain only one value - "default"
-> +  (see pinctrl bindings[0]).
-> +- max-rt: maximum pressure.
-> +- fuzzy: specifies the fuzz value that is used to filter noise from the event
-> +  stream.
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-I don't actually understand what this means, can you clarify in the
-document?
-
-> +- poll-period: how much time to wait(in millisecond) before reading again the
-> +  values from the tsc2007.
-
-max-rt, fuzzy, and poll-period should probably be prefixed with "ti,".
-
-Otherwise the binding looks good to me.
+Binding looks okay to me.
 
 g.
 
-
+> ---
+>  .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  50 +++
+>  drivers/pinctrl/Kconfig                            |   8 +
+>  drivers/pinctrl/Makefile                           |   1 +
+>  drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++++++++
+>  4 files changed, 536 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+>  create mode 100644 drivers/pinctrl/pinctrl-imx27.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+> new file mode 100644
+> index 0000000..6619968
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+> @@ -0,0 +1,50 @@
+> +* Freescale IMX27 IOMUX Controller
 > +
-> +[0]: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> +[1]: Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-> +[2]: Documentation/devicetree/bindings/gpio/gpio.txt
+> +Required properties:
+> +- compatible: "fsl,imx27-iomuxc"
+> +
+> +The iomuxc driver node should define subnodes containing of pinctrl configuration subnodes.
+> +
+> +Required properties for pin configuration node:
+> +- fsl,pins: three integers array, represents a group of pins mux and config
+> +  setting. The format is fsl,pins = <PIN MUX_ID CONFIG>. PIN and MUX_ID are
+> +  defined as macros in arch/arm/boot/dts/imx27-pinfunc.h. CONFIG can be 0 or
+> +  1, meaning Pullup disable/enable.
+> +  PIN is a integer between 0 and 0xbf. imx27 has 6 ports with 32 configurable
+> +  configurable pins each. PIN is PORT * 32 + PORT_PIN, PORT_PIN is the pin
+> +  number on the specific port (between 0 and 31).
+> +  MUX_ID is
+> +  function + (direction << 2) + (gpio_oconf << 4) + (gpio_iconfa << 8) + (gpio_iconfb << 10)
+> +  function:      0 - Primary function
+> +                 1 - Alternate function
+> +                 2 - GPIO
+> +  direction:     0 - Input
+> +                 1 - Output
+> +  gpio_oconf:    0 - A_IN
+> +                 1 - B_IN
+> +                 2 - C_IN
+> +                 3 - Data Register
+> +  gpio_iconfa/b: 0 - GPIO_IN
+> +                 1 - Interrupt Status Register
+> +                 2 - 0
+> +                 3 - 1
 > +
 > +Example:
-> +	&i2c1 {
-> +		/* ... */
-> +		tsc2007 at 49 {
-> +			compatible = "ti,tsc2007";
-> +			reg = <0x49>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_tsc2007_1>;
-> +			interrupt-parent = <&gpio4>;
-> +			interrupts = <0x0 0x8>;
-> +			gpios = <&gpio4 0 0>;
-> +			ti,x-plate-ohms = <180>;
+> +
+> +iomuxc: iomuxc at 10015000 {
+> +	compatible = "fsl,imx27-iomuxc";
+> +	reg = <0x10015000 0x600>;
+> +
+> +	uart {
+> +		pinctrl_uart1: uart-1 {
+> +			fsl,pins = <
+> +				MX27_PAD_UART1_TXD__UART1_TXD 0x0
+> +				MX27_PAD_UART1_RXD__UART1_RXD 0x0
+> +				MX27_PAD_UART1_CTS__UART1_CTS 0x0
+> +				MX27_PAD_UART1_RTS__UART1_RTS 0x0
+> +			>;
 > +		};
 > +
-> +		/* ... */
+> +		...
 > +	};
-> diff --git a/drivers/input/touchscreen/tsc2007.c b/drivers/input/touchscreen/tsc2007.c
-> index 0b67ba4..6b1d7a9 100644
-> --- a/drivers/input/touchscreen/tsc2007.c
-> +++ b/drivers/input/touchscreen/tsc2007.c
-> @@ -26,6 +26,9 @@
->  #include <linux/interrupt.h>
->  #include <linux/i2c.h>
->  #include <linux/i2c/tsc2007.h>
-> +#include <linux/of_device.h>
+> +};
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> index 8a02aa0..4c3e5d2 100644
+> --- a/drivers/pinctrl/Kconfig
+> +++ b/drivers/pinctrl/Kconfig
+> @@ -85,6 +85,14 @@ config PINCTRL_IMX1_CORE
+>  	select PINMUX
+>  	select PINCONF
+>  
+> +config PINCTRL_IMX27
+> +	bool "IMX27 pinctrl driver"
+> +	depends on OF
+> +	depends on SOC_IMX27
+> +	select PINCTRL_IMX1_CORE
+> +	help
+> +	  Say Y here to enable the imx27 pinctrl driver
+> +
+>  config PINCTRL_IMX35
+>  	bool "IMX35 pinctrl driver"
+>  	depends on OF
+> diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+> index d7caf08..5d23b71 100644
+> --- a/drivers/pinctrl/Makefile
+> +++ b/drivers/pinctrl/Makefile
+> @@ -19,6 +19,7 @@ obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
+>  obj-$(CONFIG_PINCTRL_BAYTRAIL)	+= pinctrl-baytrail.o
+>  obj-$(CONFIG_PINCTRL_IMX)	+= pinctrl-imx.o
+>  obj-$(CONFIG_PINCTRL_IMX1_CORE)	+= pinctrl-imx1-core.o
+> +obj-$(CONFIG_PINCTRL_IMX27)	+= pinctrl-imx27.o
+>  obj-$(CONFIG_PINCTRL_IMX35)	+= pinctrl-imx35.o
+>  obj-$(CONFIG_PINCTRL_IMX51)	+= pinctrl-imx51.o
+>  obj-$(CONFIG_PINCTRL_IMX53)	+= pinctrl-imx53.o
+> diff --git a/drivers/pinctrl/pinctrl-imx27.c b/drivers/pinctrl/pinctrl-imx27.c
+> new file mode 100644
+> index 0000000..417c992
+> --- /dev/null
+> +++ b/drivers/pinctrl/pinctrl-imx27.c
+> @@ -0,0 +1,477 @@
+> +/*
+> + * imx27 pinctrl driver based on imx pinmux core
+> + *
+> + * Copyright (C) 2013 Pengutronix
+> + *
+> + * Author: Markus Pargmann <mpa@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
 > +#include <linux/of.h>
-> +#include <linux/of_gpio.h>
->  
->  #define TSC2007_MEASURE_TEMP0		(0x0 << 4)
->  #define TSC2007_MEASURE_AUX		(0x2 << 4)
-> @@ -74,7 +77,10 @@ struct tsc2007 {
->  	u16			max_rt;
->  	unsigned long		poll_delay;
->  	unsigned long		poll_period;
-> +	int			fuzzy;
-> +	char			of;
->  
-> +	unsigned		gpio;
->  	int			irq;
->  
->  	wait_queue_head_t	wait;
-> @@ -84,6 +90,11 @@ struct tsc2007 {
->  	void			(*clear_penirq)(void);
->  };
->  
-> +static int tsc2007_get_pendown_state_dt(struct tsc2007 *ts)
-> +{
-> +	return !gpio_get_value(ts->gpio);
-> +}
+> +#include <linux/of_device.h>
+> +#include <linux/pinctrl/pinctrl.h>
 > +
->  static inline int tsc2007_xfer(struct tsc2007 *tsc, u8 cmd)
->  {
->  	s32 data;
-> @@ -142,6 +153,14 @@ static u32 tsc2007_calculate_pressure(struct tsc2007 *tsc, struct ts_event *tc)
->  	return rt;
->  }
->  
-> +static bool tsc2007_is_pen_down_valid(struct tsc2007 *ts)
-> +{
-> +	if (ts->of)
-> +		return gpio_is_valid(ts->gpio);
-> +	else
-> +		return ts->get_pendown_state ? true : false;
-> +}
+> +#include "pinctrl-imx1.h"
 > +
->  static bool tsc2007_is_pen_down(struct tsc2007 *ts)
->  {
->  	/*
-> @@ -158,10 +177,13 @@ static bool tsc2007_is_pen_down(struct tsc2007 *ts)
->  	 * to fall back on the pressure reading.
->  	 */
->  
-> -	if (!ts->get_pendown_state)
-> +	if (!tsc2007_is_pen_down_valid(ts))
->  		return true;
->  
-> -	return ts->get_pendown_state();
-> +	if (ts->of)
-> +		return tsc2007_get_pendown_state_dt(ts);
-> +	else
-> +		return ts->get_pendown_state();
->  }
->  
->  static irqreturn_t tsc2007_soft_irq(int irq, void *handle)
-> @@ -178,7 +200,7 @@ static irqreturn_t tsc2007_soft_irq(int irq, void *handle)
->  
->  		rt = tsc2007_calculate_pressure(ts, &tc);
->  
-> -		if (rt == 0 && !ts->get_pendown_state) {
-> +		if (!rt && !tsc2007_is_pen_down_valid(ts)) {
->  			/*
->  			 * If pressure reported is 0 and we don't have
->  			 * callback to check pendown state, we have to
-> @@ -228,7 +250,7 @@ static irqreturn_t tsc2007_hard_irq(int irq, void *handle)
->  {
->  	struct tsc2007 *ts = handle;
->  
-> -	if (!ts->get_pendown_state || likely(ts->get_pendown_state()))
-> +	if (tsc2007_is_pen_down(ts))
->  		return IRQ_WAKE_THREAD;
->  
->  	if (ts->clear_penirq)
-> @@ -273,34 +295,65 @@ static void tsc2007_close(struct input_dev *input_dev)
->  	tsc2007_stop(ts);
->  }
->  
-> -static int tsc2007_probe(struct i2c_client *client,
-> -				   const struct i2c_device_id *id)
-> +#ifdef CONFIG_OF
-> +static int tsc2007_probe_dt(struct i2c_client *client, struct tsc2007 *ts,
-> +			    struct device_node *np)
->  {
-> -	struct tsc2007 *ts;
-> -	struct tsc2007_platform_data *pdata = client->dev.platform_data;
-> -	struct input_dev *input_dev;
-> -	int err;
-> -
-> -	if (!pdata) {
-> -		dev_err(&client->dev, "platform data is required!\n");
-> +	int err = 0;
-> +	u32 val32;
-> +	u64 val64;
+> +#define PAD_ID(port, pin) (port*32 + pin)
+> +#define PA 0
+> +#define PB 1
+> +#define PC 2
+> +#define PD 3
+> +#define PE 4
+> +#define PF 5
 > +
-> +	if (!of_property_read_u32(np, "max-rt", &val32))
-> +		ts->max_rt = val32;
-> +	else
-> +		ts->max_rt = MAX_12BIT;
+> +enum imx27_pads {
+> +	MX27_PAD_USBH2_CLK = PAD_ID(PA, 0),
+> +	MX27_PAD_USBH2_DIR = PAD_ID(PA, 1),
+> +	MX27_PAD_USBH2_DATA7 = PAD_ID(PA, 2),
+> +	MX27_PAD_USBH2_NXT = PAD_ID(PA, 3),
+> +	MX27_PAD_USBH2_STP = PAD_ID(PA, 4),
+> +	MX27_PAD_LSCLK = PAD_ID(PA, 5),
+> +	MX27_PAD_LD0 = PAD_ID(PA, 6),
+> +	MX27_PAD_LD1 = PAD_ID(PA, 7),
+> +	MX27_PAD_LD2 = PAD_ID(PA, 8),
+> +	MX27_PAD_LD3 = PAD_ID(PA, 9),
+> +	MX27_PAD_LD4 = PAD_ID(PA, 10),
+> +	MX27_PAD_LD5 = PAD_ID(PA, 11),
+> +	MX27_PAD_LD6 = PAD_ID(PA, 12),
+> +	MX27_PAD_LD7 = PAD_ID(PA, 13),
+> +	MX27_PAD_LD8 = PAD_ID(PA, 14),
+> +	MX27_PAD_LD9 = PAD_ID(PA, 15),
+> +	MX27_PAD_LD10 = PAD_ID(PA, 16),
+> +	MX27_PAD_LD11 = PAD_ID(PA, 17),
+> +	MX27_PAD_LD12 = PAD_ID(PA, 18),
+> +	MX27_PAD_LD13 = PAD_ID(PA, 19),
+> +	MX27_PAD_LD14 = PAD_ID(PA, 20),
+> +	MX27_PAD_LD15 = PAD_ID(PA, 21),
+> +	MX27_PAD_LD16 = PAD_ID(PA, 22),
+> +	MX27_PAD_LD17 = PAD_ID(PA, 23),
+> +	MX27_PAD_REV = PAD_ID(PA, 24),
+> +	MX27_PAD_CLS = PAD_ID(PA, 25),
+> +	MX27_PAD_PS = PAD_ID(PA, 26),
+> +	MX27_PAD_SPL_SPR = PAD_ID(PA, 27),
+> +	MX27_PAD_HSYNC = PAD_ID(PA, 28),
+> +	MX27_PAD_VSYNC = PAD_ID(PA, 29),
+> +	MX27_PAD_CONTRAST = PAD_ID(PA, 30),
+> +	MX27_PAD_OE_ACD = PAD_ID(PA, 31),
 > +
-> +	if (!of_property_read_u32(np, "fuzzy", &val32))
-> +		ts->fuzzy = val32;
+> +	MX27_PAD_UNUSED0 = PAD_ID(PB, 0),
+> +	MX27_PAD_UNUSED1 = PAD_ID(PB, 1),
+> +	MX27_PAD_UNUSED2 = PAD_ID(PB, 2),
+> +	MX27_PAD_UNUSED3 = PAD_ID(PB, 3),
+> +	MX27_PAD_SD2_D0 = PAD_ID(PB, 4),
+> +	MX27_PAD_SD2_D1 = PAD_ID(PB, 5),
+> +	MX27_PAD_SD2_D2 = PAD_ID(PB, 6),
+> +	MX27_PAD_SD2_D3 = PAD_ID(PB, 7),
+> +	MX27_PAD_SD2_CMD = PAD_ID(PB, 8),
+> +	MX27_PAD_SD2_CLK = PAD_ID(PB, 9),
+> +	MX27_PAD_CSI_D0 = PAD_ID(PB, 10),
+> +	MX27_PAD_CSI_D1 = PAD_ID(PB, 11),
+> +	MX27_PAD_CSI_D2 = PAD_ID(PB, 12),
+> +	MX27_PAD_CSI_D3 = PAD_ID(PB, 13),
+> +	MX27_PAD_CSI_D4 = PAD_ID(PB, 14),
+> +	MX27_PAD_CSI_MCLK = PAD_ID(PB, 15),
+> +	MX27_PAD_CSI_PIXCLK = PAD_ID(PB, 16),
+> +	MX27_PAD_CSI_D5 = PAD_ID(PB, 17),
+> +	MX27_PAD_CSI_D6 = PAD_ID(PB, 18),
+> +	MX27_PAD_CSI_D7 = PAD_ID(PB, 19),
+> +	MX27_PAD_CSI_VSYNC = PAD_ID(PB, 20),
+> +	MX27_PAD_CSI_HSYNC = PAD_ID(PB, 21),
+> +	MX27_PAD_USBH1_SUSP = PAD_ID(PB, 22),
+> +	MX27_PAD_USB_PWR = PAD_ID(PB, 23),
+> +	MX27_PAD_USB_OC_B = PAD_ID(PB, 24),
+> +	MX27_PAD_USBH1_RCV = PAD_ID(PB, 25),
+> +	MX27_PAD_USBH1_FS = PAD_ID(PB, 26),
+> +	MX27_PAD_USBH1_OE_B = PAD_ID(PB, 27),
+> +	MX27_PAD_USBH1_TXDM = PAD_ID(PB, 28),
+> +	MX27_PAD_USBH1_TXDP = PAD_ID(PB, 29),
+> +	MX27_PAD_USBH1_RXDM = PAD_ID(PB, 30),
+> +	MX27_PAD_USBH1_RXDP = PAD_ID(PB, 31),
 > +
-> +	if (!of_property_read_u64(np, "poll-period", &val64))
-> +		ts->poll_period = val64;
-> +	else
-> +		ts->poll_period = 1;
+> +	MX27_PAD_UNUSED4 = PAD_ID(PC, 0),
+> +	MX27_PAD_UNUSED5 = PAD_ID(PC, 1),
+> +	MX27_PAD_UNUSED6 = PAD_ID(PC, 2),
+> +	MX27_PAD_UNUSED7 = PAD_ID(PC, 3),
+> +	MX27_PAD_UNUSED8 = PAD_ID(PC, 4),
+> +	MX27_PAD_I2C2_SDA = PAD_ID(PC, 5),
+> +	MX27_PAD_I2C2_SCL = PAD_ID(PC, 6),
+> +	MX27_PAD_USBOTG_DATA5 = PAD_ID(PC, 7),
+> +	MX27_PAD_USBOTG_DATA6 = PAD_ID(PC, 8),
+> +	MX27_PAD_USBOTG_DATA0 = PAD_ID(PC, 9),
+> +	MX27_PAD_USBOTG_DATA2 = PAD_ID(PC, 10),
+> +	MX27_PAD_USBOTG_DATA1 = PAD_ID(PC, 11),
+> +	MX27_PAD_USBOTG_DATA4 = PAD_ID(PC, 12),
+> +	MX27_PAD_USBOTG_DATA3 = PAD_ID(PC, 13),
+> +	MX27_PAD_TOUT = PAD_ID(PC, 14),
+> +	MX27_PAD_TIN = PAD_ID(PC, 15),
+> +	MX27_PAD_SSI4_FS = PAD_ID(PC, 16),
+> +	MX27_PAD_SSI4_RXDAT = PAD_ID(PC, 17),
+> +	MX27_PAD_SSI4_TXDAT = PAD_ID(PC, 18),
+> +	MX27_PAD_SSI4_CLK = PAD_ID(PC, 19),
+> +	MX27_PAD_SSI1_FS = PAD_ID(PC, 20),
+> +	MX27_PAD_SSI1_RXDAT = PAD_ID(PC, 21),
+> +	MX27_PAD_SSI1_TXDAT = PAD_ID(PC, 22),
+> +	MX27_PAD_SSI1_CLK = PAD_ID(PC, 23),
+> +	MX27_PAD_SSI2_FS = PAD_ID(PC, 24),
+> +	MX27_PAD_SSI2_RXDAT = PAD_ID(PC, 25),
+> +	MX27_PAD_SSI2_TXDAT = PAD_ID(PC, 26),
+> +	MX27_PAD_SSI2_CLK = PAD_ID(PC, 27),
+> +	MX27_PAD_SSI3_FS = PAD_ID(PC, 28),
+> +	MX27_PAD_SSI3_RXDAT = PAD_ID(PC, 29),
+> +	MX27_PAD_SSI3_TXDAT = PAD_ID(PC, 30),
+> +	MX27_PAD_SSI3_CLK = PAD_ID(PC, 31),
 > +
-> +	if (!of_property_read_u32(np, "ti,x-plate-ohms", &val32)) {
-> +		ts->x_plate_ohms = val32;
-> +	} else {
-> +		dev_err(&client->dev,
-> +			"Error: lacking ti,x-plate-ohms devicetree property. (err %d).",
-> +			err);
->  		return -EINVAL;
->  	}
->  
-> -	if (!i2c_check_functionality(client->adapter,
-> -				     I2C_FUNC_SMBUS_READ_WORD_DATA))
-> -		return -EIO;
-> +	ts->gpio = of_get_gpio(np, 0);
-> +	if (!gpio_is_valid(ts->gpio))
-> +		dev_err(&client->dev,
-> +			"GPIO not found (of_get_gpio returned %d)\n",
-> +			ts->gpio);
->  
-> -	ts = kzalloc(sizeof(struct tsc2007), GFP_KERNEL);
-> -	input_dev = input_allocate_device();
-> -	if (!ts || !input_dev) {
-> -		err = -ENOMEM;
-> -		goto err_free_mem;
-> -	}
-> +	/* Used to detect if it is probed trough the device tree,
-> +	 * in order to be able to use that information in the IRQ handler.
-> +	 */
-> +	ts->of = 1;
->  
-> -	ts->client = client;
-> -	ts->irq = client->irq;
-> -	ts->input = input_dev;
-> -	init_waitqueue_head(&ts->wait);
-> +	return 0;
-> +}
-> +#else
-> +static int tsc2007_probe_dt(struct i2c_client *client, struct tsc2007 *ts,
-> +			    struct device_node *np)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
+> +	MX27_PAD_SD3_CMD = PAD_ID(PD, 0),
+> +	MX27_PAD_SD3_CLK = PAD_ID(PD, 1),
+> +	MX27_PAD_ATA_DATA0 = PAD_ID(PD, 2),
+> +	MX27_PAD_ATA_DATA1 = PAD_ID(PD, 3),
+> +	MX27_PAD_ATA_DATA2 = PAD_ID(PD, 4),
+> +	MX27_PAD_ATA_DATA3 = PAD_ID(PD, 5),
+> +	MX27_PAD_ATA_DATA4 = PAD_ID(PD, 6),
+> +	MX27_PAD_ATA_DATA5 = PAD_ID(PD, 7),
+> +	MX27_PAD_ATA_DATA6 = PAD_ID(PD, 8),
+> +	MX27_PAD_ATA_DATA7 = PAD_ID(PD, 9),
+> +	MX27_PAD_ATA_DATA8 = PAD_ID(PD, 10),
+> +	MX27_PAD_ATA_DATA9 = PAD_ID(PD, 11),
+> +	MX27_PAD_ATA_DATA10 = PAD_ID(PD, 12),
+> +	MX27_PAD_ATA_DATA11 = PAD_ID(PD, 13),
+> +	MX27_PAD_ATA_DATA12 = PAD_ID(PD, 14),
+> +	MX27_PAD_ATA_DATA13 = PAD_ID(PD, 15),
+> +	MX27_PAD_ATA_DATA14 = PAD_ID(PD, 16),
+> +	MX27_PAD_I2C_DATA = PAD_ID(PD, 17),
+> +	MX27_PAD_I2C_CLK = PAD_ID(PD, 18),
+> +	MX27_PAD_CSPI2_SS2 = PAD_ID(PD, 19),
+> +	MX27_PAD_CSPI2_SS1 = PAD_ID(PD, 20),
+> +	MX27_PAD_CSPI2_SS0 = PAD_ID(PD, 21),
+> +	MX27_PAD_CSPI2_SCLK = PAD_ID(PD, 22),
+> +	MX27_PAD_CSPI2_MISO = PAD_ID(PD, 23),
+> +	MX27_PAD_CSPI2_MOSI = PAD_ID(PD, 24),
+> +	MX27_PAD_CSPI1_RDY = PAD_ID(PD, 25),
+> +	MX27_PAD_CSPI1_SS2 = PAD_ID(PD, 26),
+> +	MX27_PAD_CSPI1_SS1 = PAD_ID(PD, 27),
+> +	MX27_PAD_CSPI1_SS0 = PAD_ID(PD, 28),
+> +	MX27_PAD_CSPI1_SCLK = PAD_ID(PD, 29),
+> +	MX27_PAD_CSPI1_MISO = PAD_ID(PD, 30),
+> +	MX27_PAD_CSPI1_MOSI = PAD_ID(PD, 31),
 > +
-> +static int tsc2007_probe_pdev(struct i2c_client *client, struct tsc2007 *ts,
-> +			      struct tsc2007_platform_data *pdata,
-> +			      const struct i2c_device_id *id)
-> +{
-> +	if (!pdata) {
-> +		dev_err(&client->dev, "platform data is required!\n");
-> +		return -EINVAL;
-> +	}
->  
->  	ts->model             = pdata->model;
->  	ts->x_plate_ohms      = pdata->x_plate_ohms;
-> @@ -309,13 +362,57 @@ static int tsc2007_probe(struct i2c_client *client,
->  	ts->poll_period       = pdata->poll_period ? : 1;
->  	ts->get_pendown_state = pdata->get_pendown_state;
->  	ts->clear_penirq      = pdata->clear_penirq;
-> +	ts->fuzzy             = pdata->fuzzy;
->  
->  	if (pdata->x_plate_ohms == 0) {
->  		dev_err(&client->dev, "x_plate_ohms is not set up in platform data");
-> -		err = -EINVAL;
-> -		goto err_free_mem;
-> +		return -EINVAL;
->  	}
->  
-> +	/* Used to detect if it is probed trough the device tree,
-> +	 * in order to be able to use that information in the IRQ handler.
-> +	 */
-> +	ts->of = 0;
+> +	MX27_PAD_USBOTG_NXT = PAD_ID(PE, 0),
+> +	MX27_PAD_USBOTG_STP = PAD_ID(PE, 1),
+> +	MX27_PAD_USBOTG_DIR = PAD_ID(PE, 2),
+> +	MX27_PAD_UART2_CTS = PAD_ID(PE, 3),
+> +	MX27_PAD_UART2_RTS = PAD_ID(PE, 4),
+> +	MX27_PAD_PWMO = PAD_ID(PE, 5),
+> +	MX27_PAD_UART2_TXD = PAD_ID(PE, 6),
+> +	MX27_PAD_UART2_RXD = PAD_ID(PE, 7),
+> +	MX27_PAD_UART3_TXD = PAD_ID(PE, 8),
+> +	MX27_PAD_UART3_RXD = PAD_ID(PE, 9),
+> +	MX27_PAD_UART3_CTS = PAD_ID(PE, 10),
+> +	MX27_PAD_UART3_RTS = PAD_ID(PE, 11),
+> +	MX27_PAD_UART1_TXD = PAD_ID(PE, 12),
+> +	MX27_PAD_UART1_RXD = PAD_ID(PE, 13),
+> +	MX27_PAD_UART1_CTS = PAD_ID(PE, 14),
+> +	MX27_PAD_UART1_RTS = PAD_ID(PE, 15),
+> +	MX27_PAD_RTCK = PAD_ID(PE, 16),
+> +	MX27_PAD_RESET_OUT_B = PAD_ID(PE, 17),
+> +	MX27_PAD_SD1_D0 = PAD_ID(PE, 18),
+> +	MX27_PAD_SD1_D1 = PAD_ID(PE, 19),
+> +	MX27_PAD_SD1_D2 = PAD_ID(PE, 20),
+> +	MX27_PAD_SD1_D3 = PAD_ID(PE, 21),
+> +	MX27_PAD_SD1_CMD = PAD_ID(PE, 22),
+> +	MX27_PAD_SD1_CLK = PAD_ID(PE, 23),
+> +	MX27_PAD_USBOTG_CLK = PAD_ID(PE, 24),
+> +	MX27_PAD_USBOTG_DATA7 = PAD_ID(PE, 25),
+> +	MX27_PAD_UNUSED9 = PAD_ID(PE, 26),
+> +	MX27_PAD_UNUSED10 = PAD_ID(PE, 27),
+> +	MX27_PAD_UNUSED11 = PAD_ID(PE, 28),
+> +	MX27_PAD_UNUSED12 = PAD_ID(PE, 29),
+> +	MX27_PAD_UNUSED13 = PAD_ID(PE, 30),
+> +	MX27_PAD_UNUSED14 = PAD_ID(PE, 31),
 > +
-> +	return 0;
-> +}
+> +	MX27_PAD_NFRB = PAD_ID(PF, 0),
+> +	MX27_PAD_NFCLE = PAD_ID(PF, 1),
+> +	MX27_PAD_NFWP_B = PAD_ID(PF, 2),
+> +	MX27_PAD_NFCE_B = PAD_ID(PF, 3),
+> +	MX27_PAD_NFALE = PAD_ID(PF, 4),
+> +	MX27_PAD_NFRE_B = PAD_ID(PF, 5),
+> +	MX27_PAD_NFWE_B = PAD_ID(PF, 6),
+> +	MX27_PAD_PC_POE = PAD_ID(PF, 7),
+> +	MX27_PAD_PC_RW_B = PAD_ID(PF, 8),
+> +	MX27_PAD_IOIS16 = PAD_ID(PF, 9),
+> +	MX27_PAD_PC_RST = PAD_ID(PF, 10),
+> +	MX27_PAD_PC_BVD2 = PAD_ID(PF, 11),
+> +	MX27_PAD_PC_BVD1 = PAD_ID(PF, 12),
+> +	MX27_PAD_PC_VS2 = PAD_ID(PF, 13),
+> +	MX27_PAD_PC_VS1 = PAD_ID(PF, 14),
+> +	MX27_PAD_CLKO = PAD_ID(PF, 15),
+> +	MX27_PAD_PC_PWRON = PAD_ID(PF, 16),
+> +	MX27_PAD_PC_READY = PAD_ID(PF, 17),
+> +	MX27_PAD_PC_WAIT_B = PAD_ID(PF, 18),
+> +	MX27_PAD_PC_CD2_B = PAD_ID(PF, 19),
+> +	MX27_PAD_PC_CD1_B = PAD_ID(PF, 20),
+> +	MX27_PAD_CS4_B = PAD_ID(PF, 21),
+> +	MX27_PAD_CS5_B = PAD_ID(PF, 22),
+> +	MX27_PAD_ATA_DATA15 = PAD_ID(PF, 23),
+> +	MX27_PAD_UNUSED15 = PAD_ID(PF, 24),
+> +	MX27_PAD_UNUSED16 = PAD_ID(PF, 25),
+> +	MX27_PAD_UNUSED17 = PAD_ID(PF, 26),
+> +	MX27_PAD_UNUSED18 = PAD_ID(PF, 27),
+> +	MX27_PAD_UNUSED19 = PAD_ID(PF, 28),
+> +	MX27_PAD_UNUSED20 = PAD_ID(PF, 29),
+> +	MX27_PAD_UNUSED21 = PAD_ID(PF, 30),
+> +	MX27_PAD_UNUSED22 = PAD_ID(PF, 31),
+> +};
 > +
-> +static int tsc2007_probe(struct i2c_client *client,
-> +			 const struct i2c_device_id *id)
-> +{
-> +	struct device_node *np = client->dev.of_node;
-> +	struct tsc2007_platform_data *pdata = client->dev.platform_data;
-> +	struct tsc2007 *ts;
-> +	struct input_dev *input_dev;
-> +	int err = 0;
+> +/* Pad names for the pinmux subsystem */
+> +static const struct pinctrl_pin_desc imx27_pinctrl_pads[] = {
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH2_CLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH2_DIR),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH2_DATA7),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH2_NXT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH2_STP),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LSCLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD0),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD3),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD4),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD5),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD6),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD7),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD8),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD9),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD10),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD11),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD12),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD13),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD14),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD15),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD16),
+> +	IMX_PINCTRL_PIN(MX27_PAD_LD17),
+> +	IMX_PINCTRL_PIN(MX27_PAD_REV),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CLS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SPL_SPR),
+> +	IMX_PINCTRL_PIN(MX27_PAD_HSYNC),
+> +	IMX_PINCTRL_PIN(MX27_PAD_VSYNC),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CONTRAST),
+> +	IMX_PINCTRL_PIN(MX27_PAD_OE_ACD),
 > +
-> +	ts = devm_kzalloc(&client->dev, sizeof(struct tsc2007), GFP_KERNEL);
-> +	if (!ts)
-> +		return -ENOMEM;
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED0),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED3),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD2_D0),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD2_D1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD2_D2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD2_D3),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD2_CMD),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD2_CLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_D0),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_D1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_D2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_D3),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_D4),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_MCLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_PIXCLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_D5),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_D6),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_D7),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_VSYNC),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSI_HSYNC),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH1_SUSP),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USB_PWR),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USB_OC_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH1_RCV),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH1_FS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH1_OE_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH1_TXDM),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH1_TXDP),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH1_RXDM),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBH1_RXDP),
 > +
-> +	if (np)
-> +		err = tsc2007_probe_dt(client, ts, np);
-> +	else
-> +		err = tsc2007_probe_pdev(client, ts, pdata, id);
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED4),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED5),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED6),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED7),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED8),
+> +	IMX_PINCTRL_PIN(MX27_PAD_I2C2_SDA),
+> +	IMX_PINCTRL_PIN(MX27_PAD_I2C2_SCL),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA5),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA6),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA0),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA4),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA3),
+> +	IMX_PINCTRL_PIN(MX27_PAD_TOUT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_TIN),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI4_FS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI4_RXDAT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI4_TXDAT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI4_CLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI1_FS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI1_RXDAT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI1_TXDAT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI1_CLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI2_FS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI2_RXDAT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI2_TXDAT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI2_CLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI3_FS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI3_RXDAT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI3_TXDAT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SSI3_CLK),
 > +
-> +	if (err)
-> +		return err;
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD3_CMD),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD3_CLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA0),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA3),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA4),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA5),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA6),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA7),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA8),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA9),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA10),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA11),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA12),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA13),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA14),
+> +	IMX_PINCTRL_PIN(MX27_PAD_I2C_DATA),
+> +	IMX_PINCTRL_PIN(MX27_PAD_I2C_CLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SS2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SS1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SS0),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SCLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_MISO),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_MOSI),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_RDY),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SS2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SS1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SS0),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SCLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_MISO),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_MOSI),
 > +
-> +	if (!i2c_check_functionality(client->adapter,
-> +				     I2C_FUNC_SMBUS_READ_WORD_DATA))
-> +		return -EIO;
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_NXT),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_STP),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DIR),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART2_CTS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART2_RTS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PWMO),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART2_TXD),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART2_RXD),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART3_TXD),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART3_RXD),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART3_CTS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART3_RTS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART1_TXD),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART1_RXD),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART1_CTS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UART1_RTS),
+> +	IMX_PINCTRL_PIN(MX27_PAD_RTCK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_RESET_OUT_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD1_D0),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD1_D1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD1_D2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD1_D3),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD1_CMD),
+> +	IMX_PINCTRL_PIN(MX27_PAD_SD1_CLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_CLK),
+> +	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA7),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED9),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED10),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED11),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED12),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED13),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED14),
 > +
-> +	input_dev = input_allocate_device();
-> +	if (!input_dev) {
-> +		err = -ENOMEM;
-> +		goto err_free_input;
-> +	};
+> +	IMX_PINCTRL_PIN(MX27_PAD_NFRB),
+> +	IMX_PINCTRL_PIN(MX27_PAD_NFCLE),
+> +	IMX_PINCTRL_PIN(MX27_PAD_NFWP_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_NFCE_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_NFALE),
+> +	IMX_PINCTRL_PIN(MX27_PAD_NFRE_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_NFWE_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_POE),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_RW_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_IOIS16),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_RST),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_BVD2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_BVD1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_VS2),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_VS1),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CLKO),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_PWRON),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_READY),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_WAIT_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_CD2_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_PC_CD1_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CS4_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_CS5_B),
+> +	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA15),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED15),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED16),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED17),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED18),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED19),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED20),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED21),
+> +	IMX_PINCTRL_PIN(MX27_PAD_UNUSED22),
+> +};
 > +
-> +	ts->client = client;
-> +	ts->irq = client->irq;
-> +	ts->input = input_dev;
-> +	init_waitqueue_head(&ts->wait);
+> +static struct imx1_pinctrl_soc_info imx27_pinctrl_info = {
+> +	.pins = imx27_pinctrl_pads,
+> +	.npins = ARRAY_SIZE(imx27_pinctrl_pads),
+> +};
 > +
->  	snprintf(ts->phys, sizeof(ts->phys),
->  		 "%s/input0", dev_name(&client->dev));
->  
-> @@ -331,19 +428,21 @@ static int tsc2007_probe(struct i2c_client *client,
->  	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
->  	input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
->  
-> -	input_set_abs_params(input_dev, ABS_X, 0, MAX_12BIT, pdata->fuzzx, 0);
-> -	input_set_abs_params(input_dev, ABS_Y, 0, MAX_12BIT, pdata->fuzzy, 0);
-> +	input_set_abs_params(input_dev, ABS_X, 0, MAX_12BIT, ts->fuzzy, 0);
-> +	input_set_abs_params(input_dev, ABS_Y, 0, MAX_12BIT, ts->fuzzy, 0);
->  	input_set_abs_params(input_dev, ABS_PRESSURE, 0, MAX_12BIT,
-> -			pdata->fuzzz, 0);
-> +			     ts->fuzzy, 0);
->  
-> -	if (pdata->init_platform_hw)
-> -		pdata->init_platform_hw();
-> +	if (!np) {
-> +		if (pdata->init_platform_hw)
-> +			pdata->init_platform_hw();
-> +	}
->  
->  	err = request_threaded_irq(ts->irq, tsc2007_hard_irq, tsc2007_soft_irq,
->  				   IRQF_ONESHOT, client->dev.driver->name, ts);
->  	if (err < 0) {
->  		dev_err(&client->dev, "irq %d busy?\n", ts->irq);
-> -		goto err_free_mem;
-> +		goto err_free_input;
->  	}
->  
->  	tsc2007_stop(ts);
-> @@ -358,23 +457,27 @@ static int tsc2007_probe(struct i2c_client *client,
->  
->   err_free_irq:
->  	free_irq(ts->irq, ts);
-> -	if (pdata->exit_platform_hw)
-> -		pdata->exit_platform_hw();
-> - err_free_mem:
-> +	if (!np) {
-> +		if (pdata->exit_platform_hw)
-> +			pdata->exit_platform_hw();
-> +	}
-> + err_free_input:
->  	input_free_device(input_dev);
-> -	kfree(ts);
->  	return err;
->  }
->  
->  static int tsc2007_remove(struct i2c_client *client)
->  {
-> +	struct device_node *np = client->dev.of_node;
->  	struct tsc2007	*ts = i2c_get_clientdata(client);
->  	struct tsc2007_platform_data *pdata = client->dev.platform_data;
->  
->  	free_irq(ts->irq, ts);
->  
-> -	if (pdata->exit_platform_hw)
-> -		pdata->exit_platform_hw();
-> +	if (!np) {
-> +		if (pdata->exit_platform_hw)
-> +			pdata->exit_platform_hw();
-> +	}
->  
->  	input_unregister_device(ts->input);
->  	kfree(ts);
-> @@ -389,10 +492,19 @@ static const struct i2c_device_id tsc2007_idtable[] = {
->  
->  MODULE_DEVICE_TABLE(i2c, tsc2007_idtable);
->  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id tsc2007_of_match[] = {
-> +	{ .compatible = "ti,tsc2007" },
+> +static struct of_device_id imx27_pinctrl_of_match[] = {
+> +	{ .compatible = "fsl,imx27-iomuxc", },
 > +	{ /* sentinel */ }
 > +};
-> +MODULE_DEVICE_TABLE(of, tsc2007_of_match);
-> +#endif
 > +
->  static struct i2c_driver tsc2007_driver = {
->  	.driver = {
->  		.owner	= THIS_MODULE,
-> -		.name	= "tsc2007"
-> +		.name	= "tsc2007",
-> +		.of_match_table = of_match_ptr(tsc2007_of_match),
->  	},
->  	.id_table	= tsc2007_idtable,
->  	.probe		= tsc2007_probe,
+> +struct imx27_pinctrl_private {
+> +	int num_gpio_childs;
+> +	struct platform_device **gpio_dev;
+> +	struct mxc_gpio_platform_data *gpio_pdata;
+> +};
+> +
+> +static int imx27_pinctrl_probe(struct platform_device *pdev)
+> +{
+> +	return imx1_pinctrl_core_probe(pdev, &imx27_pinctrl_info);
+> +}
+> +
+> +static struct platform_driver imx27_pinctrl_driver = {
+> +	.driver = {
+> +		.name = "imx27-pinctrl",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(imx27_pinctrl_of_match),
+> +	},
+> +	.probe = imx27_pinctrl_probe,
+> +	.remove = imx1_pinctrl_core_remove,
+> +};
+> +
+> +static int __init imx27_pinctrl_init(void)
+> +{
+> +	return platform_driver_register(&imx27_pinctrl_driver);
+> +}
+> +arch_initcall(imx27_pinctrl_init);
+> +
+> +static void __exit imx27_pinctrl_exit(void)
+> +{
+> +	platform_driver_unregister(&imx27_pinctrl_driver);
+> +}
+> +module_exit(imx27_pinctrl_exit);
+> +MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
+> +MODULE_DESCRIPTION("Freescale IMX27 pinctrl driver");
+> +MODULE_LICENSE("GPL v2");
 > -- 
-> 1.7.9.5
+> 1.8.4.rc3
 > 
 > 
 > _______________________________________________
