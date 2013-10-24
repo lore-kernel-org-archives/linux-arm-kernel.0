@@ -1,5 +1,5 @@
 From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 24 Oct 2013 12:22:19 -0000
+Date: Thu, 24 Oct 2013 12:22:18 -0000
 Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
  is there something better?
 In-Reply-To: <1382616801.6040.26.camel@sakura.staff.proxad.net>
@@ -18,7 +18,7 @@ References: <20131020220839.GT2443@sirena.org.uk>
  <1382614439.6040.16.camel@sakura.staff.proxad.net>
  <1382615278.8522.72.camel@shinybook.infradead.org>
  <1382616801.6040.26.camel@sakura.staff.proxad.net>
-Message-ID: <3726fd81259f84ef308ba9011ae35174.squirrel@twosheds.infradead.org>
+Message-ID: <f20013b8c402dacccd865d143e14a3ee.squirrel@twosheds.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
