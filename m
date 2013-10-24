@@ -1,57 +1,51 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 24 Oct 2013 13:14:38 -0000
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <1382619952.6040.57.camel@sakura.staff.proxad.net>
-References: <20131020220839.GT2443@sirena.org.uk>
- <5264576F.6050307@wwwdotorg.org>
- <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>
- <52658EBC.8020800@wwwdotorg.org>
- <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>
- <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023174458.GC5208@netboy>
- <1382553982.31058.10.camel@sakura.staff.proxad.net>
- <20131024095232.27BBCC4039D@trevor.secretlab.ca>
- <1382614439.6040.16.camel@sakura.staff.proxad.net>
- <1382615278.8522.72.camel@shinybook.infradead.org>
- <1382616801.6040.26.camel@sakura.staff.proxad.net>
- <3726fd81259f84ef308ba9011ae35174.squirrel@twosheds.infradead.org>
- <1382619952.6040.57.camel@sakura.staff.proxad.net>
-Message-ID: <addbb1933c62983e0114eeda7ce51342.squirrel@twosheds.infradead.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 24 Oct 2013 06:19:36 -0700
+Subject: [PATCH v2] serial: omap: Add support for optional wake-up
+In-Reply-To: <20131024103300.6023FC4039D@trevor.secretlab.ca>
+References: <20131022134947.GK15154@atomide.com>
+ <20131024103300.6023FC4039D@trevor.secretlab.ca>
+Message-ID: <20131024131935.GV15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Grant Likely <grant.likely@secretlab.ca> [131024 03:33]:
+> On Tue, 22 Oct 2013 06:49:48 -0700, Tony Lindgren <tony@atomide.com> wrote:
+> > @@ -1572,11 +1603,23 @@ static int serial_omap_probe(struct platform_device *pdev)
+> >  	struct uart_omap_port	*up;
+> >  	struct resource		*mem, *irq;
+> >  	struct omap_uart_port_info *omap_up_info = dev_get_platdata(&pdev->dev);
+> > -	int ret;
+> > +	int ret, uartirq = 0, wakeirq = 0;
+> >  
+> > +	/* The optional wakeirq may be specified in the board dts file */
+> >  	if (pdev->dev.of_node) {
+> > +		uartirq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+> > +		if (!uartirq)
+> > +			return -EPROBE_DEFER;
+> > +		wakeirq = irq_of_parse_and_map(pdev->dev.of_node, 1);
+> >  		omap_up_info = of_get_uart_port_info(&pdev->dev);
+> >  		pdev->dev.platform_data = omap_up_info;
+> > +	} else {
+> > +		irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> > +		if (!irq) {
+> > +			dev_err(&pdev->dev, "no irq resource?\n");
+> > +			return -ENODEV;
+> > +		}
+> > +		uartirq = irq->start;
+> 
+> Ugh. This is such a hack. platform_get_irq() should just work for DT and
+> non-DT. There is no way around it right now, but we need to get the code
+> in place to resolve IRQs late so that drivers don't need these special
+> cases.
 
->
-> On Thu, 2013-10-24 at 12:22 +0000, David Woodhouse wrote:
->
->> If you are correct to insist that DMA needs yo be supported in the new
->> driver *even* with old firmware, then yes, maybe.
->
-> if DMA gives a performance boost for all workloads, what is the argument
-> for not always enabling it ?
+Yes it's pretty messed up. I wrote something about it in the
+"Getting rid of subsys_initcall usage?" thread at:
 
-If DMA gives a performance boost for all workloads, what bloody idiot
-defined or reviewed a DT binding that didn't include the information which
-is required to uae DMA? :)
+http://www.mail-archive.com/linux-i2c at vger.kernel.org/msg13678.html
 
+And having zero populated in the struct resource as valid IRQ is
+not nice at all.
 
->> The alternative is a quirk to "fix" the DT up on the affected boards and
->> not actually doing the special cases in the driver itself. But that can
->> be
->> seen as an implementation detail.
->
-> I don't understand why having the soc-foo.h with the internal interrupt
-> mapping in the kernel tree is a no-no, whereas it's ok to add the
-> missing part of it in the form of fixups or directly in driver code.
+Regards,
 
-It's the difference between doing it as a matter of course, and doing it
-only in the very rare "OMG we fucked up but we really *need* to fix it up
-this time" case.
-
-
--- 
-dwmw2
+Tony
