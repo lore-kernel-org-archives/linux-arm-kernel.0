@@ -1,36 +1,49 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 24 Oct 2013 23:26:19 +0100
+Date: Thu, 24 Oct 2013 23:29:33 +0100
 Subject: [Ksummit-2013-discuss] [RFC] of: Allow for experimental device
  tree bindings
-In-Reply-To: <20131023185114.GA7863@ulmo.nvidia.com>
-References: <1382540779-6334-1-git-send-email-treding@nvidia.com>	<1382544332.8522.40.camel@shinybook.infradead.org>
- <20131023185114.GA7863@ulmo.nvidia.com>
-Message-ID: <52699E8B.3000305@wwwdotorg.org>
+In-Reply-To: <20131024083459.48FE3C4039D@trevor.secretlab.ca>
+References: <1382540779-6334-1-git-send-email-treding@nvidia.com>
+ <5267FA58.9050002@wwwdotorg.org> <20131023172001.GA3379@katana>
+ <20131024083459.48FE3C4039D@trevor.secretlab.ca>
+Message-ID: <52699F4D.7030805@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2013 07:51 PM, Thierry Reding wrote:
-> On Wed, Oct 23, 2013 at 05:05:32PM +0100, David Woodhouse wrote:
->> On Wed, 2013-10-23 at 17:06 +0200, Thierry Reding wrote:
->>> +       /* check if binding is experimental */
->>> +       if (dev != device || drv != driver) {
->>> +               pr_warn("of: device %s (%s) uses an experimental binding\n",
->>> +                       np->name, np->full_name);
->>> +
+On 10/24/2013 09:34 AM, Grant Likely wrote:
+> On Wed, 23 Oct 2013 18:20:02 +0100, Wolfram Sang <wsa@the-dreams.de> wrote:
 >>
->> In the discussions earlier I think we decided that this should set a
->> taint flag too.
+>>> Do we really want to polute the drivers and DT files with a ! in the
+>>> compatible values? I thought we'd considered that, but chosen having the
+>>> drivers that use unstable bindings depend on a Kconfig option as an
+>>> alternative, not an additional step?
+>>
+>> I'd even go further and use "unstable-" as the prefix instead of "!"
+>> which is way more explicit.
+>>
+>>
+>>> The one issue with doing this is that if a binding is thought to be
+>>> unstable, but becomes stable later without any changes, we'll have to do
+>>> busy-work to remove the ! in all the DT files, thus artificially
+>>> introducing an incompatibility. Perhaps that's fine though?
+>>
+>> I'd say yes. Going from unstable to stable is quite a step for a binding
+>> and that should be visible and worth a patch IMO. Also, when looking at
+>> a DTS file or some driver code, it will avoid
+>> confusion/misinterpretation if one can see immediately the status of a
+>> binding.
 > 
-> A taint flag seems somewhat drastic. It's not like using an experimental
-> binding should have an influence on the stability of the running kernel.
-> I always thought that taint flags were supposed to flag conditions where
-> code of unknown origin or code known to be broken was being executed
-> because they may destabilize the running kernel.
+> No, it shouldn't. Going from unstable to stable is not a large step, rather it is coming to the point of looking around and realizing that the binding is working quite well.
 > 
-> The worst that should happen if you run an experimental binding is that
-> some part of the system will just not come up.
+> I don't think the solution is to put this into the kernel to be checked
+> at runtime. The better solution is to put it into DTC and make it
+> complain (either warn or error; depending on build config?) about usage
+> of compatible strings that are marked in the binding documentation as
+> unstable.
 
-IIRC, the purpose of the taint flag was to make it clear that the kernel
-or DT was not expected to function in the future, so don't be surpised
-if you upgrade it, and it stops working, without you taking explicit
-action, such as revising your DT to match the new kernel or vice-versa.
+I don't think that's what we talked about on Wednesday though. At a
+quick glance, this didn't make it into the meeting notes though[1], but
+is in the presentation we created for the kernel summit readout. Is
+sharing a link to that before it's presented OK?
+
+[1] http://etherpad.osuosl.org/arm-ksummit-2013-day-2
