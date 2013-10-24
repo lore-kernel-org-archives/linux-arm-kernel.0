@@ -1,32 +1,143 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Thu, 24 Oct 2013 17:26:44 +0200
-Subject: [PATCHv7][ 1/4] Input: tsc2007: Add device tree support.
-In-Reply-To: <20131024151736.GE9044@ulmo.nvidia.com>
-References: <1382618536-25320-1-git-send-email-denis@eukrea.com>
- <20131024151736.GE9044@ulmo.nvidia.com>
-Message-ID: <20131024172644.45816152@e6520eb>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 24 Oct 2013 17:38:30 +0200
+Subject: [PATCH v5 4/8] ARM: dts: imx27 pinctrl
+In-Reply-To: <1382629114-8628-1-git-send-email-mpa@pengutronix.de>
+References: <1382629114-8628-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1382629114-8628-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Pinctrl driver node and pin group definitions for other driver nodes.
 
-Le Thu, 24 Oct 2013 17:17:37 +0200,
-Thierry Reding <thierry.reding@gmail.com> a ?crit :
-> > +- ti,max-rt: maximum pressure.
-> > +- ti,fuzzy: specifies the absolute input fuzz value.
-> > +  If set, it will permit noise in the data up to +- the value given to the fuzz
-> > +  parameter, that is used to filter noise from the event stream.
-> 
-> Any reason why these can't be specified per axis? From my experience
-> with this chip it can make sense to use different values for the
-> different axes. Well, perhaps X and Y axes can share one fuzz factor,
-> but the Z axis is sometimes different.
-> 
-> You also modify the driver to ignore the X and Z axes fuzz factor even
-> for platform data where specifying all three separately was explicitly
-> allowed. Have you verified that this doesn't cause any regressions?
-> 
-That was not intended, that's an error, we will fix that.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/imx27.dtsi | 102 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 102 insertions(+)
 
-Thanks,
-Eric
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index b7a1c6d..641a63d 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include "skeleton.dtsi"
++#include "imx27-pinfunc.h"
+ 
+ / {
+ 	aliases {
+@@ -235,6 +236,12 @@
+ 				status = "disabled";
+ 			};
+ 
++			iomuxc: iomuxc at 10015000 {
++				compatible = "fsl,imx27-iomuxc";
++				reg = <0x10015000 0x600>;
++
++			};
++
+ 			gpio1: gpio at 10015000 {
+ 				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+ 				reg = <0x10015000 0x100>;
+@@ -467,3 +474,98 @@
+ 		};
+ 	};
+ };
++
++&iomuxc {
++	fec {
++		pinctrl_fec1_1: fec1-1 {
++			fsl,pins = <
++				MX27_PAD_SD3_CMD__FEC_TXD0 0x0
++				MX27_PAD_SD3_CLK__FEC_TXD1 0x0
++				MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
++				MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
++				MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
++				MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
++				MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
++				MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
++				MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
++				MX27_PAD_ATA_DATA7__FEC_MDC 0x0
++				MX27_PAD_ATA_DATA8__FEC_CRS 0x0
++				MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
++				MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
++				MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
++				MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
++				MX27_PAD_ATA_DATA13__FEC_COL 0x0
++				MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
++				MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
++			>;
++		};
++	};
++
++	i2c {
++		pinctrl_i2c1_1: i2c1-1 {
++			fsl,pins = <
++				MX27_PAD_I2C_DATA__I2C_DATA 0x0
++				MX27_PAD_I2C_CLK__I2C_CLK 0x0
++			>;
++		};
++
++		pinctrl_i2c2_1: i2c2-1 {
++			fsl,pins = <
++				MX27_PAD_I2C2_SDA__I2C2_SDA 0x0
++				MX27_PAD_I2C2_SCL__I2C2_SCL 0x0
++			>;
++		};
++	};
++
++	owire {
++		pinctrl_owire1_1: owire1-1 {
++			fsl,pins = <
++				MX27_PAD_RTCK__OWIRE 0x0
++			>;
++		};
++	};
++
++	uart {
++		pinctrl_uart1_1: uart1-1 {
++			fsl,pins = <
++				MX27_PAD_UART1_TXD__UART1_TXD 0x0
++				MX27_PAD_UART1_RXD__UART1_RXD 0x0
++			>;
++		};
++
++		pinctrl_uart1_rtscts_1: uart1-rtscts-1 {
++			fsl,pins = <
++				MX27_PAD_UART1_CTS__UART1_CTS 0x0
++				MX27_PAD_UART1_RTS__UART1_RTS 0x0
++			>;
++		};
++
++		pinctrl_uart2_1: uart2-1 {
++			fsl,pins = <
++				MX27_PAD_UART2_TXD__UART2_TXD 0x0
++				MX27_PAD_UART2_RXD__UART2_RXD 0x0
++			>;
++		};
++
++		pinctrl_uart2_rtscts_1: uart2-rtscts-1 {
++			fsl,pins = <
++				MX27_PAD_UART2_CTS__UART2_CTS 0x0
++				MX27_PAD_UART2_RTS__UART2_RTS 0x0
++			>;
++		};
++
++		pinctrl_uart3_1: uart3-1 {
++			fsl,pins = <
++				MX27_PAD_UART3_TXD__UART3_TXD 0x0
++				MX27_PAD_UART3_RXD__UART3_RXD 0x0
++			>;
++		};
++
++		pinctrl_uart3_rtscts_1: uart3-rtscts-1 {
++			fsl,pins = <
++				MX27_PAD_UART3_CTS__UART3_CTS 0x0
++				MX27_PAD_UART3_RTS__UART3_RTS 0x0
++			>;
++		};
++	};
++};
+-- 
+1.8.4.rc3
