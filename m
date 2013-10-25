@@ -1,41 +1,67 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 25 Oct 2013 16:46:09 +0800
-Subject: [PATCH v3 5/5] ARM: dts: imx28: changing usb compatible string
- as only "fsl,imx28-usb"
-In-Reply-To: <20131025081429.GA10442@shlinux1.ap.freescale.net>
-References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
- <1382680943-9258-5-git-send-email-peter.chen@freescale.com>
- <20131025082330.GA13790@S2101-09.ap.freescale.net>
- <20131025081429.GA10442@shlinux1.ap.freescale.net>
-Message-ID: <20131025084607.GC13790@S2101-09.ap.freescale.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 25 Oct 2013 09:52:53 +0100
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution,
+ or is there something better?
+In-Reply-To: <1382614439.6040.16.camel@sakura.staff.proxad.net>
+References: <20131020220839.GT2443@sirena.org.uk>	
+ <5264576F.6050307@wwwdotorg.org>	
+ <alpine.LFD.2.03.1310201911190.1951@syhkavp.arg>	
+ <52658EBC.8020800@wwwdotorg.org>	
+ <alpine.LFD.2.03.1310211632460.1951@syhkavp.arg>	
+ <20131022093923.GC15640@ulmo.nvidia.com> <20131022150426.GF29341@beef>	
+ <20131022171346.GE4061@obsidianresearch.com>	
+ <20131023080630.GA14413@netboy>	
+ <20131023172955.GA17145@obsidianresearch.com>	
+ <20131023174458.GC5208@netboy>	
+ <1382553982.31058.10.camel@sakura.staff.proxad.net>	
+ <20131024095232.27BBCC4039D@trevor.secretlab.ca>
+ <1382614439.6040.16.camel@sakura.staff.proxad.net>
+Message-ID: <526A3165.4020601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 25, 2013 at 04:14:30PM +0800, Peter Chen wrote:
-> > > @@ -1041,7 +1041,7 @@
-> > >  		ranges;
-> > >  
-> > >  		usb0: usb at 80080000 {
-> > > -			compatible = "fsl,imx28-usb", "fsl,imx27-usb";
-> > > +			compatible = "fsl,imx28-usb";
-> > 
-> > You shouldn't need the change as long as you put "fsl,imx28-usb" before
-> > "fsl,imx27-usb" in driver ci_hdrc_imx_dt_ids[] table.
-> > 
+On 10/24/2013 12:33 PM, Maxime Bizon wrote:
 > 
-> I know it can work without this dts change, but that driver change like
-> a workaround.
+> On Thu, 2013-10-24 at 10:52 +0100, Grant Likely wrote:
+> 
+>> At this point if the hardware exists then it should be described in DTB,
+>> even if it is merely compatible, reg, interrupts and maybe clocks
+> 
+> if your driver does not use them, chances are you'll get them wrong.
+> 
+>> properties. In many cases that is all that is required. It /is/ okay to
+>> amend a binding later and to use default values if the new properties
+>> aren't present.
+> 
+> how do you handle the case of a wrong property, because you only wrote
+> hardware description and not the driver ?
+> 
+>> hardware description when enabling previously unused peripherals, but it
+>> is absolutely not friendly to change a binding/driver in a what that fails on
+>> previously working DTB (with the caveat that if no one notices, it
+>> isn't breakage).
+> 
+> ok then how do we solve that case:
+> 
+>  - Marvell SOC 1 is mainlined
+>  - Marvell SOC 2 is mainlined
+>  - Marvell SOC 'x' is mainlined
+>  - "PIO" hw crypto driver is written, working for all SOCs
+>  - [1 year]
+>  - SOCs bindings are marked as stable
+>  - [1 year]
+>  - someone rewrite the driver of hw crypto to use DMA, existing binding
+> is not ok because clock 'foo' or interrupt 'bar', now required, are not
+> present.
+> 
+> what is the process merge that driver ?
+> 
+> if the answer is that you need to keep PIO mode in driver so that
+> existing DTBs still works with it, then this is just plain *wrong*.
 
-No, it's not a workaround.  Before of_match_device() gets improved to
-match the best one, it should just work that way.
-
-> Since the imx28-usb is not compatible with imx27-usb,
-> we'd better only keep "fsl, imx28-usb" compatible string at imx28 dtsi.
-
->From hardware point of view, the USB block on imx28 *is* inherited from
-imx27, and compatible to imx27 USB block, even though we have a little
-difference to handle in software.  The compatible string is written in
-this way at the first place exactly for the reason we can save such
-DTS change when we have some little incompatibility to handle.
-
-Shawn
+That situation describes enabling a new feature. New features aren't
+necessarily expected to work without revising the DT, e.g. adding new
+properties/entries to describe the additional clocks/DMA-channels/...
+that are required. In many cases, those additions can even be made in a
+backwards-compatible way. Compatibility means that we shouldn't break
+old functionality, not that we shouldn't augment the existing bindings.
