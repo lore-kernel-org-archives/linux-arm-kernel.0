@@ -1,132 +1,175 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 25 Oct 2013 09:35:35 +0200
-Subject: [PATCH v2 08/10] of/platform: Resolve interrupt references at
- probe time
-In-Reply-To: <20131024163749.68D01C403B6@trevor.secretlab.ca>
-References: <1379510692-32435-1-git-send-email-treding@nvidia.com>
- <1379510692-32435-9-git-send-email-treding@nvidia.com>
- <20131015232436.19F61C40099@trevor.secretlab.ca>
- <20131024163749.68D01C403B6@trevor.secretlab.ca>
-Message-ID: <20131025073534.GA19622@ulmo.nvidia.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 25 Oct 2013 04:09:55 -0400
+Subject: [PATCH V2] ARM: trace: Add tracepoint for the Inter Processor
+ Interrupt
+In-Reply-To: <526A145E.1010809@linaro.org>
+References: <1381839042-3533-1-git-send-email-daniel.lezcano@linaro.org>
+ <526A145E.1010809@linaro.org>
+Message-ID: <1382688595.6143.5.camel@pippen.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 05:37:49PM +0100, Grant Likely wrote:
-> On Wed, 16 Oct 2013 00:24:36 +0100, Grant Likely <grant.likely@linaro.org> wrote:
-> > On Wed, 18 Sep 2013 15:24:50 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > Interrupt references are currently resolved very early (when a device is
-> > > created). This has the disadvantage that it will fail in cases where the
-> > > interrupt parent hasn't been probed and no IRQ domain for it has been
-> > > registered yet. To work around that various drivers use explicit
-> > > initcall ordering to force interrupt parents to be probed before devices
-> > > that need them are created. That's error prone and doesn't always work.
-> > > If a platform device uses an interrupt line connected to a different
-> > > platform device (such as a GPIO controller), both will be created in the
-> > > same batch, and the GPIO controller won't have been probed by its driver
-> > > when the depending platform device is created. Interrupt resolution will
-> > > fail in that case.
-> > 
-> > What is the reason for all the rework on the irq parsing return values?
-> > A return value of '0' is always an error on irq parsing, regardless of
-> > architecture even if NO_IRQ is defined as -1. I may have missed it, but
-> > I don't see any checking for specific error values in the return paths
-> > of the functions.
-> > 
-> > If the specific return value isn't required (and I don't think it is),
-> > then you can simplify the whole series by getting rid of the rework
-> > patches.
+On Fri, 2013-10-25 at 08:49 +0200, Daniel Lezcano wrote:
+> On 10/15/2013 02:10 PM, Daniel Lezcano wrote:
+> > The Inter Processor Interrupt is used on ARM to tell another processor to do
+> > a specific action. This is mainly used to emulate a timer interrupt on an idle
+> > cpu, force a cpu to reschedule or run a function on another processor context.
+> >
+> > Add a tracepoint when raising an IPI and in the entry/exit handler functions.
+> >
+> > When a cpu raises an IPI, the targeted cpus is an interesting information, the
+> > cpumask conversion in hexa is added in the trace using the cpumask_scnprintf
+> > function.
+> >
+> > Tested-on Vexpress TC2 (5 processors).
+> >
+> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
-> I've not heard back about the above, but I've just had a conversation
-> with Rob about what to do here.
+> Hi All,
+> 
+> does this patch sound good for inclusion ?
 
-I thought I had sent a reply regarding this about a week ago. Perhaps it
-got lost. I'll resend.
+Ug, I never sent my email. It was half written and in my drafts folder.
 
-> The problem that I have is that it makes a specific return code need
-> to traverse several levels of function calls and have a meaning come
-> out the other end. It becomes difficult to figure out where that code
-> actually comes from when reading the code. That's more of a gut-feel
-> reaction rather than pointing out specifics though.
+I'll reply below.
 
-To be honest, I'm not all that happy with that aspect myself, but at the
-same time I didn't feel like duplicating a lot of code to get this done
-more easily. I imagine that would've caused significant pushback as
-well. It's somewhat unfortunate that we have to propagate back through
-several level, but that's just the way the code is currently written and
-I don't think we can really get the information (EPROBE_DEFER) from any
-other place but from the lowest level.
+> 
+> Thanks in advance
+> 
+>    -- Daniel
+> 
+> > diff --git a/include/trace/events/ipi.h b/include/trace/events/ipi.h
+> > new file mode 100644
+> > index 0000000..80b734b
+> > --- /dev/null
+> > +++ b/include/trace/events/ipi.h
+> > @@ -0,0 +1,104 @@
+> > +#undef TRACE_SYSTEM
+> > +#define TRACE_SYSTEM ipi
+> > +
+> > +#if !defined(_TRACE_IPI_H) || defined(TRACE_HEADER_MULTI_READ)
+> > +#define _TRACE_IPI_H
+> > +
+> > +#include <linux/tracepoint.h>
+> > +
+> > +#define ipi_name(ipinr) { IPI_##ipinr, #ipinr }
+> > +#define show_ipi_name(val)				\
+> > +	__print_symbolic(val,				\
+> > +			 ipi_name(WAKEUP),		\
+> > +			 ipi_name(TIMER),		\
+> > +			 ipi_name(RESCHEDULE),		\
+> > +			 ipi_name(CALL_FUNC),		\
+> > +			 ipi_name(CALL_FUNC_SINGLE),	\
+> > +			 ipi_name(CPU_STOP))
+> > +
+> > +DECLARE_EVENT_CLASS(ipi,
+> > +
+> > +    TP_PROTO(int ipinr),
+> > +
+> > +    TP_ARGS(ipinr),
+> > +
+> > +    TP_STRUCT__entry(
+> > +	    __field(int, ipinr)
+> > +    ),
+> > +
+> > +    TP_fast_assign(
+> > +	    __entry->ipinr = ipinr;
+> > +    ),
+> > +
+> > +    TP_printk("ipi=%d, name=%s", __entry->ipinr,
+> > +	      show_ipi_name(__entry->ipinr))
+> > +);
+> > +
+> > +/**
+> > + * ipi_handle_entry - called right before the IPI handler
+> > + * @ipinr: the IPI number
+> > + *
+> > + * The @ipinr value must be valid and the action name associated with
+> > + * the IPI value is given in the trace.
+> > + */
+> > +DEFINE_EVENT_CONDITION(ipi, ipi_handler_entry,
+> > +
+> > +    TP_PROTO(int ipinr),
+> > +
+> > +    TP_ARGS(ipinr),
+> > +
+> > +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0)
+> > +);
+> > +
+> > +/**
+> > + * ipi_handle_exit - called right after the IPI handler
+> > + * @ipinr: the IPI number
+> > + *
+> > + * The @ipinr value must be valid and the action name associated with
+> > + * the IPI value is given in the trace.
+> > + */
+> > +DEFINE_EVENT_CONDITION(ipi, ipi_handler_exit,
+> > +
+> > +    TP_PROTO(int ipinr),
+> > +
+> > +    TP_ARGS(ipinr),
+> > +
+> > +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0)
+> > +);
+> > +
+> > +/**
+> > + * ipi_raise - called when a smp cross call is made
+> > + * @ipinr: the IPI number
+> > + * @cpumask: the recipients for the IPI
+> > + *
+> > + * The @ipinr value must be valid and the action name associated with
+> > + * the IPI value is given in the trace as well as the cpumask of the
+> > + * targeted cpus.
+> > + */
+> > +TRACE_EVENT_CONDITION(ipi_raise,
+> > +
+> > +    TP_PROTO(const struct cpumask *cpumask, int ipinr),
+> > +
+> > +    TP_ARGS(cpumask, ipinr),
+> > +
+> > +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0),
+> > +
+> > +    TP_STRUCT__entry(
+> > +	    __field(int, ipinr)
+> > +	    __array(char, cpumask, NR_CPUS)
+> > +    ),
+> > +
+> > +    TP_fast_assign(
+> > +	    __entry->ipinr = ipinr;
+> > +	    cpumask_scnprintf(__entry->cpumask,
+> > +			      ARRAY_SIZE(__entry->cpumask), cpumask);
 
-> The other thing that makes me nervous how invasive the series is.
+Please do not do the scnprintf() in the TP_fast_assign(). It's heavy
+weight and this is done in the code path. Just copy the actual cpumask
+itself.
 
-Well, I guess that comes with the territory, doesn't it? Interrupts are
-used in a large number of places and they have been used in a very
-static manner so far. The end result of this patch series is that for
-most devices instantiated from the device tree interrupts end up in the
-same category as any other resources such as GPIOs, regulators or
-clocks. They become mostly dynamic.
+Now, how to do that exactly is the reason I never sent my original mail,
+because I never got around to looking how to do it, but it is possible.
+Unfortunately, I'm at Kernel Summit at the moment, and still don't have
+time to look at the best way to do it. But you can use dynamic arrays
+for the cpus_online.
 
-That in itself is a big change, so I don't think it's all that
-surprising that the required changes are invasive.
+> > +    ),
+> > +
+> > +    TP_printk("ipi=%d, cpumask=0x%s, name=%s", __entry->ipinr, __entry->cpumask,
+> > +	      show_ipi_name(__entry->ipinr))
 
-And I think if we really want to solve it properly we need to make even
-more invasive changes. For example, Grygorii pointed out that we could
-have a setup in the future where the following happens:
+Here is where you can convert the cpumask saved in the ring buffer to a
+snprintf() format. Now this may need some work too, and perhaps even a
+handler to help. I thought there was already some printk format that
+does cpumasks.
 
-	1) driver providing interrupts is probed
-	2) driver using interrupts is probed, interrupt references are
-	   resolved at probe time
-	3) both drivers are unloaded
-	4) both drivers are reloaded
+If the helpers are not there, then I can work on adding some.
 
-In that case with the current set of patches the added core code assumes
-that the interrupts have already been resolved and are still valid.
+-- Steve
 
-Possibly the easiest way to fix that would be to just zero out the
-interrupt resources on remove so that they can be re-resolved on next
-probe.
 
-But that's somewhat cumbersome and it seems to me like a better fix
-might be to go and change struct platform_device to not use a single
-array of resources, but rather a list, or perhaps an array per type of
-resource. The current platform_device structure is simple and easy, but
-it doesn't work well with all the new dynamicity that we want/need/have
-today.
-
-Obviously modifying the innards of struct platform_device will likely
-turn out to be a mammoth task of its own, but if that's what it takes
-I'm prepared to do that as well. Or at least even try.
-
-> However, even with saying all of the above, I'm not saying outright no.
-> I want to get this feature in.
-
-That's good to hear. Last time we talked about it we seemed to have an
-agreement that this needs to be done, but you not replying had me
-worried that perhaps you had changed your mind. It seems you've been
-busy trying to address other issues that maybe are even more pressing so
-I can hardly complain. =)
-
-I'm good as long as we can keep moving in the right direction.
-
-> It is obviously needed and I'll even merge the patches piecemeal as the
-> look ready (I've already merged 2). Regardless, the current series needs
-> to be reworked. It conflicts with the other IRQ rework that I've already
-> put into my tree. The best thing to do would probably be respin it
-> against my current tree and repost.
-
-Sure, that won't be a problem. I might not get to it immediately, but
-I'll get back to it.
-
-> I'll take a fresh look then.... In the mean time, anything you can do to
-> /sanely/ reduce the impact will probably help.  :-)
-
-I might be able to do that. But I'll mention that in another thread in
-the right context.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131025/e9e9304b/attachment.sig>
+> > +);
+> > +
+> > +#endif /* _TRACE_IPI_H */
+> > +
+> > +/* This part must be outside protection */
+> > +#include <trace/define_trace.h>
+> >
+> 
+> 
