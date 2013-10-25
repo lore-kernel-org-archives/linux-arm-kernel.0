@@ -1,331 +1,77 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 25 Oct 2013 20:50:40 +0100
-Subject: [PATCHv3][ 3/5] video: mx3fb: Add device tree suport.
-In-Reply-To: <1382532229-32755-3-git-send-email-denis@eukrea.com>
-References: <1382532229-32755-1-git-send-email-denis@eukrea.com>
- <1382532229-32755-3-git-send-email-denis@eukrea.com>
-Message-ID: <20131025195040.0CCC3C404DA@trevor.secretlab.ca>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Sat, 26 Oct 2013 10:11:06 +1100
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <E1VZjCU-0005RE-Vt@jdl.com>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <20131024234340.ADF70C403B6@trevor.secretlab.ca>
+ <526A83B9.30800@wwwdotorg.org> <E1VZjCU-0005RE-Vt@jdl.com>
+Message-ID: <20131025231106.GC17659@voom.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Oct 2013 14:43:47 +0200, Denis Carikli <denis@eukrea.com> wrote:
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Eric B??nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v2->v3:
-> - The device tree bindings were reworked in order to make it look more like the
->   IPUv3 bindings.
-> - The interface_pix_fmt property now looks like the IPUv3 one.
-> ---
->  .../devicetree/bindings/video/fsl,mx3-fb.txt       |   35 ++++++
->  drivers/video/Kconfig                              |    2 +
->  drivers/video/mx3fb.c                              |  125 +++++++++++++++++---
->  3 files changed, 147 insertions(+), 15 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
+On Fri, Oct 25, 2013 at 10:21:22AM -0500, Jon Loeliger wrote:
+> > On 10/25/2013 12:43 AM, Grant Likely wrote:
+> > > On Thu, 24 Oct 2013 22:51:28 +0100, Stephen Warren <swarren@wwwdotorg.org> 
+> > wrote:
+> > >> From: Stephen Warren <swarren@nvidia.com>
+> > >>
+> > >> This is a very quick proof-of-concept re: how a DT schema checker might
+> > >> look if written in C, and integrated into dtc.
+> > > 
+> > > Thanks for looking at this.
+> > > 
+> > > Very interesting. Certainly an expedient way to start checking schemas,
+> > > and for certain bindings it may be the best approach. The downside is it
+> > > forces a recompilation of DTC to bring in new bindings and it isn't a
+> > > great meduim for mixing schema with documentation in the bindings.
+> > 
+> > This approach would certainly require recompiling something. I threw the
+> > code into dtc simply because it was the easiest container for the
+> > demonstration. It could be a separate DT validation utility if we
+> > wanted, although we'd need to split the DT parser from dtc into a
+> > library to avoid code duplication. The resultant utility could be part
+> > of the repo containing the DTs, so it didn't end up as a separate
+> > package to manage.
+> > 
+> > I think the additional documentation could be added as comments in the
+> > validation functions, just like IIRC it was to be represented as
+> > comments even in the .dts-based schema proposals.
 > 
-> diff --git a/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
-> new file mode 100644
-> index 0000000..0b31374
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
-> @@ -0,0 +1,35 @@
-> +Freescale MX3 fb
-> +================
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,mx3fb". compatible chips include the imx31 and the
-> +  imx35.
-> +- reg: should be register base and length as documented in the datasheet.
-> +- clocks: Handle to the ipu_gate clock.
-> +
-> +Example:
-> +
-> +lcdc: mx3fb at 53fc00b4 {
-> +	compatible = "fsl,mx3-fb";
-> +	reg = <0x53fc00b4 0x0b>;
-> +	clocks = <&clks 55>;
-> +};
-
-This (and some of the other bindings) are trivial, and they are all
-associated with a single SoC. I think it would be better to collect all
-the mx3 bindings into a single file rather than distributing them all
-over the bindings tree.
-
-I started thinking about this after some of the DT conversations in
-Edinburgh this week. Unless there is a high likelyhood of components
-being used separately, I think it is far more useful to collect all the
-bindings for an SoC into a single file. It will certainly reduce a lot
-of the boilerplate that we've been collecting in bindings documentation
-files.
-
-A long time ago I took that approach for the mpc5200 documentation[1].
-Take a look at that organization and let me know what you think.
-
-[1] Documentation/devicetree/bindings/powerpc/fsl/mpc5200.txt
-
-g.
-
-> +
-> +Display support
-> +===============
-> +Required properties:
-> +- model : The user-visible name of the display.
-> +
-> +Optional properties:
-> +- interface_pix_fmt: How this display is connected to the
-> +  crtc. Currently supported types: "rgb24", "rgb565", "rgb666"
-> +
-> +It can also have an optional timing subnode as described in
-> +  Documentation/devicetree/bindings/video/display-timing.txt.
-> +
-> +Example:
-> +
-> +display at di0 {
-> +	    interface-pix-fmt = "rgb666";
-> +	    model = "CMO-QVGA";
-> +};
-> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> index 14317b7..2a638df 100644
-> --- a/drivers/video/Kconfig
-> +++ b/drivers/video/Kconfig
-> @@ -2359,6 +2359,8 @@ config FB_MX3
->  	select FB_CFB_FILLRECT
->  	select FB_CFB_COPYAREA
->  	select FB_CFB_IMAGEBLIT
-> +	select VIDEOMODE_HELPERS
-> +	select FB_MODE_HELPERS
->  	default y
->  	help
->  	  This is a framebuffer device for the i.MX31 LCD Controller. So
-> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-> index 804f874..de5a6c8 100644
-> --- a/drivers/video/mx3fb.c
-> +++ b/drivers/video/mx3fb.c
-> @@ -31,6 +31,8 @@
->  #include <linux/platform_data/dma-imx.h>
->  #include <linux/platform_data/video-mx3fb.h>
->  
-> +#include <video/of_display_timing.h>
-> +
->  #include <asm/io.h>
->  #include <asm/uaccess.h>
->  
-> @@ -757,11 +759,13 @@ static int __set_par(struct fb_info *fbi, bool lock)
->  			sig_cfg.Hsync_pol = true;
->  		if (fbi->var.sync & FB_SYNC_VERT_HIGH_ACT)
->  			sig_cfg.Vsync_pol = true;
-> -		if (fbi->var.sync & FB_SYNC_CLK_INVERT)
-> +		if ((fbi->var.sync & FB_SYNC_CLK_INVERT) ||
-> +		    (fbi->var.sync & FB_SYNC_PIXDAT_HIGH_ACT))
->  			sig_cfg.clk_pol = true;
->  		if (fbi->var.sync & FB_SYNC_DATA_INVERT)
->  			sig_cfg.data_pol = true;
-> -		if (fbi->var.sync & FB_SYNC_OE_ACT_HIGH)
-> +		if ((fbi->var.sync & FB_SYNC_OE_ACT_HIGH) ||
-> +		    (fbi->var.sync & FB_SYNC_DE_HIGH_ACT))
->  			sig_cfg.enable_pol = true;
->  		if (fbi->var.sync & FB_SYNC_CLK_IDLE_EN)
->  			sig_cfg.clkidle_en = true;
-> @@ -1351,21 +1355,75 @@ static struct fb_info *mx3fb_init_fbinfo(struct device *dev, struct fb_ops *ops)
->  	return fbi;
->  }
->  
-> +static int match_dt_disp_data(const char *property)
-> +{
-> +	if (!strcmp("rgb666", property))
-> +		return IPU_DISP_DATA_MAPPING_RGB666;
-> +	else if (!strcmp("rgb565", property))
-> +		return IPU_DISP_DATA_MAPPING_RGB565;
-> +	else if (!strcmp("rgb24", property))
-> +		return IPU_DISP_DATA_MAPPING_RGB888;
-> +	else
-> +		return -EINVAL;
-> +}
-> +
->  static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
->  {
->  	struct device *dev = mx3fb->dev;
->  	struct mx3fb_platform_data *mx3fb_pdata = dev_get_platdata(dev);
-> -	const char *name = mx3fb_pdata->name;
-> +	struct device_node *np = dev->of_node;
-> +	const char *name;
-> +	const char *ipu_disp_format;
->  	unsigned int irq;
->  	struct fb_info *fbi;
->  	struct mx3fb_info *mx3fbi;
->  	const struct fb_videomode *mode;
->  	int ret, num_modes;
-> +	struct fb_videomode of_mode;
-> +	struct device_node *display_np, *root_np;
-> +
-> +	if (np) {
-> +		root_np = of_find_node_by_path("/");
-> +		if (!root_np) {
-> +			dev_err(dev, "Can't get the \"/\" node.\n");
-> +			return -EINVAL;
-> +		}
-> +
-> +		display_np = of_find_node_by_name(root_np, "display");
-> +		if (!display_np) {
-> +			dev_err(dev, "Can't get the display device node.\n");
-> +			return -EINVAL;
-> +		}
-
-Finding a node by name is bad practice. Is is possible to find the node
-via compatible?
-
-> +
-> +		of_property_read_string(display_np, "interface-pix-fmt",
-> +					&ipu_disp_format);
-> +		if (!ipu_disp_format) {
-> +			mx3fb->disp_data_fmt = IPU_DISP_DATA_MAPPING_RGB666;
-> +			dev_warn(dev,
-> +				"ipu display data mapping was not defined, using the default rgb666.\n");
-> +		} else {
-> +			mx3fb->disp_data_fmt =
-> +				match_dt_disp_data(ipu_disp_format);
-> +		}
-> +
-> +		if (mx3fb->disp_data_fmt == -EINVAL) {
-> +			dev_err(dev, "Illegal display data format \"%s\"\n",
-> +				ipu_disp_format);
-> +			return -EINVAL;
-> +		}
->  
-> -	if (mx3fb_pdata->disp_data_fmt >= ARRAY_SIZE(di_mappings)) {
-> -		dev_err(dev, "Illegal display data format %d\n",
-> +		of_property_read_string(display_np, "model", &name);
-> +		if (ret) {
-> +			dev_err(dev, "Missing display model name\n");
-> +			return -EINVAL;
-> +		}
-> +	} else {
-> +		name = mx3fb_pdata->name;
-> +		if (mx3fb_pdata->disp_data_fmt >= ARRAY_SIZE(di_mappings)) {
-> +			dev_err(dev, "Illegal display data format %d\n",
->  				mx3fb_pdata->disp_data_fmt);
-> -		return -EINVAL;
-> +			return -EINVAL;
-> +		}
->  	}
->  
->  	ichan->client = mx3fb;
-> @@ -1386,12 +1444,24 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
->  		goto emode;
->  	}
->  
-> -	if (mx3fb_pdata->mode && mx3fb_pdata->num_modes) {
-> -		mode = mx3fb_pdata->mode;
-> -		num_modes = mx3fb_pdata->num_modes;
-> +	if (np) {
-> +		ret = of_get_fb_videomode(display_np, &of_mode,
-> +					  OF_USE_NATIVE_MODE);
-> +		if (!ret) {
-> +			mode = &of_mode;
-> +			num_modes = 1;
-> +		} else {
-> +			mode = mx3fb_modedb;
-> +			num_modes = ARRAY_SIZE(mx3fb_modedb);
-> +		}
->  	} else {
-> -		mode = mx3fb_modedb;
-> -		num_modes = ARRAY_SIZE(mx3fb_modedb);
-> +		if (mx3fb_pdata->mode || !mx3fb_pdata->num_modes) {
-> +			mode = mx3fb_pdata->mode;
-> +			num_modes = mx3fb_pdata->num_modes;
-> +		} else {
-> +			mode = mx3fb_modedb;
-> +			num_modes = ARRAY_SIZE(mx3fb_modedb);
-> +		}
->  	}
->  
->  	if (!fb_find_mode(&fbi->var, fbi, fb_mode, mode,
-> @@ -1421,7 +1491,8 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
->  	mx3fbi->mx3fb		= mx3fb;
->  	mx3fbi->blank		= FB_BLANK_NORMAL;
->  
-> -	mx3fb->disp_data_fmt	= mx3fb_pdata->disp_data_fmt;
-> +	if (!np)
-> +		mx3fb->disp_data_fmt = mx3fb_pdata->disp_data_fmt;
->  
->  	init_completion(&mx3fbi->flip_cmpl);
->  	disable_irq(ichan->eof_irq);
-> @@ -1449,13 +1520,26 @@ emode:
->  	return ret;
->  }
->  
-> +static int imx_dma_is_dt_ipu(struct dma_chan *chan)
-> +{
-> +	/* Example: 53fc0000.ipu */
-> +	if (chan && chan->device && chan->device->dev) {
-> +		char *name = dev_name(chan->device->dev);
-> +		name = strchr(name, '.');
-> +		if (name)
-> +			return !strcmp(name, ".ipu");
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static bool chan_filter(struct dma_chan *chan, void *arg)
->  {
->  	struct dma_chan_request *rq = arg;
->  	struct device *dev;
->  	struct mx3fb_platform_data *mx3fb_pdata;
->  
-> -	if (!imx_dma_is_ipu(chan))
-> +	if (!imx_dma_is_ipu(chan) && !imx_dma_is_dt_ipu(chan))
->  		return false;
->  
->  	if (!rq)
-> @@ -1464,8 +1548,12 @@ static bool chan_filter(struct dma_chan *chan, void *arg)
->  	dev = rq->mx3fb->dev;
->  	mx3fb_pdata = dev_get_platdata(dev);
->  
-> -	return rq->id == chan->chan_id &&
-> -		mx3fb_pdata->dma_dev == chan->device->dev;
-> +	/* When using the devicetree, mx3fb_pdata is NULL */
-> +	if (imx_dma_is_dt_ipu(chan))
-> +		return rq->id == chan->chan_id;
-> +	else
-> +		return rq->id == chan->chan_id &&
-> +			mx3fb_pdata->dma_dev == chan->device->dev;
->  }
->  
->  static void release_fbi(struct fb_info *fbi)
-> @@ -1565,9 +1653,16 @@ static int mx3fb_remove(struct platform_device *dev)
->  	return 0;
->  }
->  
-> +static struct of_device_id mx3fb_of_dev_id[] = {
-> +	{ .compatible = "fsl,mx3-fb", },
-> +	{ /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, mx3fb_of_dev_id);
-> +
->  static struct platform_driver mx3fb_driver = {
->  	.driver = {
->  		.name = MX3FB_NAME,
-> +		.of_match_table = mx3fb_of_dev_id,
->  		.owner = THIS_MODULE,
->  	},
->  	.probe = mx3fb_probe,
-> -- 
-> 1.7.9.5
+> DTers,
 > 
+> I think the additional benefit of starting with a direct C
+> implementation is that it causes us to begin to actually
+> codify the schema requirements.  Sure, it may not be ideal
+> at first, but over time it may reveal consistent patterns
+> that can be extracted.  And it may reveal what a real schema
+> might look like and how it might be expressed better.  Which
+> is to say that perhaps we are letting "perfect" get in the
+> way of "good enough to start"?
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> In the meantime, someone has shown us the code and we can
+> get started.  It's a Small Matter of Refactoring later. :-)
+
+Yes!  This!
+
+Think of this prototype as a mechanism for collating and applying a
+bunch of schemas to the tree.  At the moment the schemas are all hard
+coded in C, but it can be extended to load some or all of them
+dynamically from a description / template / whatever.
+
+That also gives us the flexibility to start out with a simple but
+limited schema language which handles common cases, while leaving the
+complex cases in C, at least until we understand the requirements well
+enough to extend the schema language.
+
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131026/014a9126/attachment.sig>
