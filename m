@@ -1,37 +1,74 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 25 Oct 2013 16:20:10 +1030
-Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
-In-Reply-To: <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
-References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
- <87eh7bfoq9.fsf@rustcorp.com.au>
- <20131024084559.GD16735@n2100.arm.linux.org.uk>
- <87mwlyclng.fsf@rustcorp.com.au>
- <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
-Message-ID: <87y55h7vcd.fsf@rustcorp.com.au>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 25 Oct 2013 07:56:39 +0200
+Subject: [PATCHv7][ 1/4] Input: tsc2007: Add device tree support.
+In-Reply-To: <20131024164746.3CB36C403B6@trevor.secretlab.ca>
+References: <1382618536-25320-1-git-send-email-denis@eukrea.com>
+ <20131024164746.3CB36C403B6@trevor.secretlab.ca>
+Message-ID: <20131025075639.75f45fb0@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei <tom.leiming@gmail.com> writes:
-> On Fri, Oct 25, 2013 at 7:08 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
->>
->> Sorry, I was imprecise.  I was referring to the kernel's kallsyms
->> tables produced by scripts/kallsyms.c.  This patch left them in the
->> the kallsyms tables and filtered them out from /proc/kallsyms.
->
-> Yes, but it isn't easy to do it by script/kallsyms.c , and IMO, it should
-> be correct to hide them for user space but keep them in kallsyms table.
+Hi,
 
-So they'll appear in backtraces?  And turn up randomly for other symbol
-dereferences?
+Grant Likely wrote:
+> On Thu, 24 Oct 2013 14:42:13 +0200, Denis Carikli <denis@eukrea.com> wrote:
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > Cc: linux-input at vger.kernel.org
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: Lothar Wa??mann <LW@KARO-electronics.de>
+> > Cc: Eric B??nard <eric@eukrea.com>
+> > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > ---
+> > ChangeLog v6->v7:
+> > - One small whitespace cleanup.
+> > - The properties specific to that driver are now prefixed with "ti,".
+> > - The ti,fuzzy property has now better documentation.
+> > ---
+> >  .../bindings/input/touchscreen/tsc2007.txt         |   45 +++++
+> >  drivers/input/touchscreen/tsc2007.c                |  194 +++++++++++++++-----
+> >  2 files changed, 198 insertions(+), 41 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+> > new file mode 100644
+> > index 0000000..516b63b
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+> > @@ -0,0 +1,45 @@
+> > +* Texas Instruments tsc2007 touchscreen controller
+> > +
+> > +Required properties:
+> > +- compatible: must be "ti,tsc2007".
+> > +- reg: I2C address of the chip.
+> > +- ti,x-plate-ohms: X-plate resistance in ohms.
+> > +
+> > +Optional properties:
+> > +- gpios: the interrupt gpio the chip is connected to (trough the penirq pin)
+> > +  (see GPIO binding[2] for more details).
+> 
+> Hmmm, why is this needed? Is the line used for anything other than
+> finding the irq number? If it is just an interrupt then an interrupts
+> property is all that should be specified.
+> 
+It's also the pendown detect GPIO. It asserts an interrupt when first
+activated and is then polled in the driver until it goes inactive again.
 
-I don't think you really want this!
 
->> It's weird that cpu_v7_suspend_size appeared above, since kallsyms
->> should filter out 'A' symbols already.
->
-> Sorry, the 'A' symbol is a mistake, but the others do exist in /proc/kallsyms.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-Ah, OK.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Cheers,
-Rusty.
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
