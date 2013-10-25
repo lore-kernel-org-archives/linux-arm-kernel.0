@@ -1,25 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 25 Oct 2013 10:26:30 +0100
-Subject: [PATCH] ASoC: Samsung: I2S: fix return value check in
- i2s_alloc_dai()
-In-Reply-To: <CAPgLHd8nzO9Q1fF1KsuJna_JVJDd+cimBC3ipd3nTP9Sz=fE9g@mail.gmail.com>
-References: <CAPgLHd8nzO9Q1fF1KsuJna_JVJDd+cimBC3ipd3nTP9Sz=fE9g@mail.gmail.com>
-Message-ID: <20131025092630.GQ18506@sirena.org.uk>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Fri, 25 Oct 2013 17:31:51 +0800
+Subject: [PATCH] ARM: OMAP2+: smsc911x: fix return value check in
+ gpmc_smsc911x_init()
+Message-ID: <CAPgLHd9V0=GHGYgfuL7cCkzmZT7HVzuNg0iwwsOcipbnJ90bVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 25, 2013 at 05:06:24PM +0800, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function platform_device_alloc() returns NULL
-> pointer not ERR_PTR(). The IS_ERR() test in the return value check
-> should be replaced with NULL test.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131025/56021175/attachment.sig>
+In case of error, the function platform_device_register_resndata()
+returns ERR_PTR() and never returns NULL. The NULL test in the return
+value check should be replaced with IS_ERR().
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/mach-omap2/gpmc-smsc911x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+index ef99011..2757504 100644
+--- a/arch/arm/mach-omap2/gpmc-smsc911x.c
++++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+@@ -83,7 +83,7 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *gpmc_cfg)
+ 	pdev = platform_device_register_resndata(NULL, "smsc911x", gpmc_cfg->id,
+ 		 gpmc_smsc911x_resources, ARRAY_SIZE(gpmc_smsc911x_resources),
+ 		 &gpmc_smsc911x_config, sizeof(gpmc_smsc911x_config));
+-	if (!pdev) {
++	if (IS_ERR(pdev)) {
+ 		pr_err("Unable to register platform device\n");
+ 		gpio_free(gpmc_cfg->gpio_reset);
+ 		goto free2;
