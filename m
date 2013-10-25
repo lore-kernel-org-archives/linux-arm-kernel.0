@@ -1,103 +1,134 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 25 Oct 2013 18:57:02 +0300
-Subject: [PATCHv9 08/43] clk: ti: add composite clock support
+Date: Fri, 25 Oct 2013 18:57:03 +0300
+Subject: [PATCHv9 09/43] CLK: ti: add support for ti divider-clock
 In-Reply-To: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
 References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1382716658-6964-9-git-send-email-t-kristo@ti.com>
+Message-ID: <1382716658-6964-10-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a multipurpose clock node, which contains support for multiple
-sub-clocks. Uses basic composite clock type to implement the actual
-functionality, and TI specific gate, mux and divider clocks.
+This patch adds support for TI divider clock binding, which simply uses
+the basic clock divider to provide the features needed.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- .../devicetree/bindings/clock/ti/composite.txt     |   54 +++++
- drivers/clk/ti/Makefile                            |    2 +-
- drivers/clk/ti/composite.c                         |  222 ++++++++++++++++++++
- include/linux/clk/ti.h                             |    8 +
- 4 files changed, 285 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/ti/composite.txt
- create mode 100644 drivers/clk/ti/composite.c
+ .../devicetree/bindings/clock/ti/divider.txt       |   86 +++++++
+ drivers/clk/ti/Makefile                            |    3 +-
+ drivers/clk/ti/divider.c                           |  239 ++++++++++++++++++++
+ 3 files changed, 327 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/divider.txt
+ create mode 100644 drivers/clk/ti/divider.c
 
-diff --git a/Documentation/devicetree/bindings/clock/ti/composite.txt b/Documentation/devicetree/bindings/clock/ti/composite.txt
+diff --git a/Documentation/devicetree/bindings/clock/ti/divider.txt b/Documentation/devicetree/bindings/clock/ti/divider.txt
 new file mode 100644
-index 0000000..5f43c47
+index 0000000..65e3dcd
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/ti/composite.txt
-@@ -0,0 +1,54 @@
-+Binding for TI composite clock.
++++ b/Documentation/devicetree/bindings/clock/ti/divider.txt
+@@ -0,0 +1,86 @@
++Binding for TI divider clock
 +
 +Binding status: Unstable - ABI compatibility may be broken in the future
 +
-+This binding uses the common clock binding[1]. It assumes a
-+register-mapped composite clock with multiple different sub-types;
++This binding uses the common clock binding[1].  It assumes a
++register-mapped adjustable clock rate divider that does not gate and has
++only one input clock or parent.  By default the value programmed into
++the register is one less than the actual divisor value.  E.g:
 +
-+a multiplexer clock with multiple input clock signals or parents, one
-+of which can be selected as output, this behaves exactly as [2]
++register value		actual divisor value
++0			1
++1			2
++2			3
 +
-+an adjustable clock rate divider, this behaves exactly as [3]
++This assumption may be modified by the following optional properties:
 +
-+a gating function which can be used to enable and disable the output
-+clock, this behaves exactly as [4]
++ti,index-starts-at-one - valid divisor values start at 1, not the default
++of 0.  E.g:
++register value		actual divisor value
++1			1
++2			2
++3			3
 +
-+The binding must provide a list of the component clocks that shall be
-+merged to this clock. The component clocks shall be of one of the
-+"ti,*composite*-clock" types.
++ti,index-power-of-two - valid divisor values are powers of two.  E.g:
++register value		actual divisor value
++0			1
++1			2
++2			4
 +
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+[2] Documentation/devicetree/bindings/clock/ti/mux.txt
-+[3] Documentation/devicetree/bindings/clock/ti/divider.txt
-+[4] Documentation/devicetree/bindings/clock/ti/gate.txt
++Additionally an array of valid dividers may be supplied like so:
++
++	dividers = <4>, <8>, <0>, <16>;
++
++Which will map the resulting values to a divisor table by their index:
++register value		actual divisor value
++0			4
++1			8
++2			<invalid divisor, skipped>
++3			16
++
++Any zero value in this array means the corresponding bit-value is invalid
++and must not be used.
++
++The binding must also provide the register to control the divider and
++unless the divider array is provided, min and max dividers. Optionally
++the number of bits to shift that mask, if necessary. If the shift value
++is missing it is the same as supplying a zero shift.
 +
 +Required properties:
-+- compatible : shall be: "ti,composite-clock"
-+- clocks : link phandles of component clocks
++- compatible : shall be "ti,divider-clock".
 +- #clock-cells : from common clock binding; shall be set to 0.
++- clocks : link to phandle of parent clock
++- reg : offset for register controlling adjustable divider
++
++Optional properties:
++- clock-output-names : from common clock binding.
++- ti,dividers : array of integers defining divisors
++- ti,bit-shift : number of bits to shift the divider value, defaults to 0
++- ti,min-div : min divisor for dividing the input clock rate, only
++  needed if the first divisor is offset from the default value (1)
++- ti,max-div : max divisor for dividing the input clock rate, only needed
++  if ti,dividers is not defined.
++- ti,index-starts-at-one : valid divisor programming starts at 1, not zero
++- ti,index-power-of-two : valid divisor programming must be a power of two
++- ti,autoidle-shift : bit shift of the autoidle enable bit for the clock
++- ti,invert-autoidle-bit : autoidle is enabled by setting the bit to 0
++- ti,set-rate-parent : clk_set_rate is propagated to parent
 +
 +Examples:
-+
-+usb_l4_gate_ick: usb_l4_gate_ick {
++dpll_usb_m2_ck: dpll_usb_m2_ck at 4a008190 {
 +	#clock-cells = <0>;
-+	compatible = "ti,composite-interface-clock";
-+	clocks = <&l4_ick>;
-+	ti,bit-shift = <5>;
-+	reg = <0x0a10>;
-+};
-+
-+usb_l4_div_ick: usb_l4_div_ick {
-+	#clock-cells = <0>;
-+	compatible = "ti,composite-divider-clock";
-+	clocks = <&l4_ick>;
-+	ti,bit-shift = <4>;
-+	ti,max-div = <1>;
-+	reg = <0x0a40>;
++	compatible = "ti,divider-clock";
++	clocks = <&dpll_usb_ck>;
++	ti,max-div = <127>;
++	reg = <0x190>;
 +	ti,index-starts-at-one;
 +};
 +
-+usb_l4_ick: usb_l4_ick {
++aess_fclk: aess_fclk at 4a004528 {
 +	#clock-cells = <0>;
-+	compatible = "ti,composite-clock";
-+	clocks = <&usb_l4_gate_ick>, <&usb_l4_div_ick>;
++	compatible = "ti,divider-clock";
++	clocks = <&abe_clk>;
++	ti,bit-shift = <24>;
++	reg = <0x528>;
++	ti,max-div = <2>;
 +};
 diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-index 533efb4..a4a7595 100644
+index a4a7595..640ebf9 100644
 --- a/drivers/clk/ti/Makefile
 +++ b/drivers/clk/ti/Makefile
-@@ -1,3 +1,3 @@
+@@ -1,3 +1,4 @@
  ifneq ($(CONFIG_OF),)
--obj-y					+= clk.o dpll.o autoidle.o
-+obj-y					+= clk.o dpll.o autoidle.o composite.o
+-obj-y					+= clk.o dpll.o autoidle.o composite.o
++obj-y					+= clk.o dpll.o autoidle.o divider.o \
++					   composite.o
  endif
-diff --git a/drivers/clk/ti/composite.c b/drivers/clk/ti/composite.c
+diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
 new file mode 100644
-index 0000000..9ce7e54
+index 0000000..787bc8f
 --- /dev/null
-+++ b/drivers/clk/ti/composite.c
-@@ -0,0 +1,222 @@
++++ b/drivers/clk/ti/divider.c
+@@ -0,0 +1,239 @@
 +/*
-+ * TI composite clock support
++ * TI Divider Clock
 + *
 + * Copyright (C) 2013 Texas Instruments, Inc.
 + *
@@ -115,234 +146,225 @@ index 0000000..9ce7e54
 +
 +#include <linux/clk-provider.h>
 +#include <linux/slab.h>
-+#include <linux/io.h>
++#include <linux/err.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +#include <linux/clk/ti.h>
-+#include <linux/list.h>
 +
-+#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
-+
-+static unsigned long ti_composite_recalc_rate(struct clk_hw *hw,
-+					      unsigned long parent_rate)
++static struct clk_div_table
++__init *ti_clk_get_div_table(struct device_node *node)
 +{
-+	return clk_divider_ops.recalc_rate(hw, parent_rate);
-+}
++	struct clk_div_table *table;
++	const __be32 *divspec;
++	u32 val;
++	u32 num_div;
++	u32 valid_div;
++	int i;
 +
-+static long ti_composite_round_rate(struct clk_hw *hw, unsigned long rate,
-+				    unsigned long *prate)
-+{
-+	return -EINVAL;
-+}
++	divspec = of_get_property(node, "ti,dividers", &num_div);
 +
-+static int ti_composite_set_rate(struct clk_hw *hw, unsigned long rate,
-+				 unsigned long parent_rate)
-+{
-+	return -EINVAL;
-+}
-+
-+static const struct clk_ops ti_composite_divider_ops = {
-+	.recalc_rate	= &ti_composite_recalc_rate,
-+	.round_rate	= &ti_composite_round_rate,
-+	.set_rate	= &ti_composite_set_rate,
-+};
-+
-+static const struct clk_ops ti_composite_gate_ops = {
-+	.enable		= &omap2_dflt_clk_enable,
-+	.disable	= &omap2_dflt_clk_disable,
-+	.is_enabled	= &omap2_dflt_clk_is_enabled,
-+};
-+
-+struct component_clk {
-+	int num_parents;
-+	const char **parent_names;
-+	struct device_node *node;
-+	int type;
-+	struct clk_hw *hw;
-+	struct list_head link;
-+};
-+
-+static const char * __initdata component_clk_types[] = {
-+	"mux", "gate", "divider",
-+};
-+
-+static LIST_HEAD(component_clks);
-+
-+static struct component_clk *_lookup_component(struct device_node *node, int i)
-+{
-+	int rc;
-+	struct of_phandle_args clkspec;
-+	struct component_clk *comp;
-+
-+	rc = of_parse_phandle_with_args(node, "clocks", "#clock-cells", i,
-+					&clkspec);
-+	if (rc)
++	if (!divspec)
 +		return NULL;
 +
-+	list_for_each_entry(comp, &component_clks, link) {
-+		if (comp->node == clkspec.np)
-+			return comp;
-+	}
-+	return NULL;
-+}
++	num_div /= 4;
 +
-+static inline struct clk_hw *_get_hw(struct component_clk *clk)
-+{
-+	if (clk)
-+		return clk->hw;
++	valid_div = 0;
 +
-+	return NULL;
-+}
-+
-+static int __init of_ti_composite_clk_setup(struct device_node *node,
-+					    struct regmap *regmap)
-+{
-+	int num_clks;
-+	int i;
-+	struct clk *clk;
-+	struct component_clk *comp;
-+	struct component_clk *clks[3] = { NULL };
-+	const char *name = node->name;
-+	int num_parents = 0;
-+	const char **parent_names = NULL;
-+	int ret = 0;
-+
-+	/* Number of component clocks to be put inside this clock */
-+	num_clks = of_clk_get_parent_count(node);
-+
-+	if (num_clks < 1) {
-+		pr_err("%s: ti composite clk %s must have component(s)\n",
-+		       __func__, name);
-+		return -EINVAL;
++	/* Determine required size for divider table */
++	for (i = 0; i < num_div; i++) {
++		of_property_read_u32_index(node, "ti,dividers", i, &val);
++		if (val)
++			valid_div++;
 +	}
 +
-+	/* Check for presence of each component clock */
-+	for (i = 0; i < num_clks; i++) {
-+		comp = _lookup_component(node, i);
-+		if (!comp)
-+			return -EAGAIN;
-+		if (clks[comp->type] != NULL) {
-+			pr_err("%s: duplicate component types for %s (%s)!\n",
-+			       __func__, name, component_clk_types[comp->type]);
++	if (!valid_div) {
++		pr_err("%s: no valid dividers for %s table\n", __func__,
++		       node->name);
++		return ERR_PTR(-EINVAL);
++	}
++
++	table = kzalloc(sizeof(*table) * (valid_div + 1), GFP_KERNEL);
++
++	if (!table) {
++		pr_err("%s: unable to allocate memory for %s table\n", __func__,
++		       node->name);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	valid_div = 0;
++
++	for (i = 0; i < num_div; i++) {
++		of_property_read_u32_index(node, "ti,dividers", i, &val);
++		if (val) {
++			table[valid_div].div = val;
++			table[valid_div].val = i;
++			valid_div++;
++		}
++	}
++
++	return table;
++}
++
++static int _get_divider_width(struct device_node *node,
++			      const struct clk_div_table *table,
++			      u8 flags)
++{
++	u32 min_div;
++	u32 max_div;
++	u32 val = 0;
++	u32 div;
++
++	if (!table) {
++		/* Clk divider table not provided, determine min/max divs */
++		if (of_property_read_u32(node, "ti,min-div", &min_div)) {
++			pr_debug("%s: no min-div for %s, default=1\n",
++				 __func__, node->name);
++			min_div = 1;
++		}
++
++		if (of_property_read_u32(node, "ti,max-div", &max_div)) {
++			pr_err("%s: no max-div for %s!\n", __func__,
++			       node->name);
 +			return -EINVAL;
 +		}
-+		clks[comp->type] = comp;
-+	}
 +
-+	/* All components exists, proceed with registration */
-+	for (i = 0; i < 3; i++) {
-+		if (!clks[i])
-+			continue;
-+		if (clks[i]->num_parents) {
-+			num_parents = clks[i]->num_parents;
-+			parent_names = clks[i]->parent_names;
++		/* Determine bit width for the field */
++		if (flags & CLK_DIVIDER_ONE_BASED)
++			val = 1;
++
++		div = min_div;
++
++		while (div < max_div) {
++			if (flags & CLK_DIVIDER_POWER_OF_TWO)
++				div <<= 1;
++			else
++				div++;
++			val++;
++		}
++	} else {
++		div = 0;
++
++		while (table[div].div) {
++			val = table[div].val;
++			div++;
 +		}
 +	}
 +
-+	/* Enforce mux parents if exists */
-+	comp = clks[CLK_COMPONENT_TYPE_MUX];
-+	if (comp) {
-+		num_parents = comp->num_parents;
-+		parent_names = comp->parent_names;
-+	}
++	return fls(val);
++}
 +
-+	if (!num_parents) {
-+		pr_err("%s: no parents found for %s!\n", __func__,
-+		       name);
++/**
++ * of_ti_divider_clk_setup() - Setup function for simple div rate clock
++ */
++static int __init of_ti_divider_clk_setup(struct device_node *node,
++					  struct regmap *regmap)
++{
++	struct clk *clk;
++	const char *clk_name = node->name;
++	void __iomem *reg;
++	const char *parent_name;
++	u8 clk_divider_flags = 0;
++	u8 width = 0;
++	u8 shift = 0;
++	struct clk_div_table *table = NULL;
++	u32 val = 0;
++	u32 flags = 0;
++	int ret = 0;
++
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	if (of_property_read_u32(node, "reg", &val)) {
++		pr_err("%s: %s must have reg\n", __func__, clk_name);
 +		return -EINVAL;
 +	}
 +
-+	clk = clk_register_composite(NULL, name, parent_names, num_parents,
-+				     _get_hw(clks[CLK_COMPONENT_TYPE_MUX]),
-+				     &clk_mux_ops,
-+				     _get_hw(clks[CLK_COMPONENT_TYPE_DIVIDER]),
-+				     &ti_composite_divider_ops,
-+				     _get_hw(clks[CLK_COMPONENT_TYPE_GATE]),
-+				     &ti_composite_gate_ops, 0);
++	reg = (void *)val;
++
++	if (!of_property_read_u32(node, "ti,bit-shift", &val))
++		shift = val;
++
++	if (of_property_read_bool(node, "ti,index-starts-at-one"))
++		clk_divider_flags |= CLK_DIVIDER_ONE_BASED;
++
++	if (of_property_read_bool(node, "ti,index-power-of-two"))
++		clk_divider_flags |= CLK_DIVIDER_POWER_OF_TWO;
++
++	if (of_property_read_bool(node, "ti,set-rate-parent"))
++		flags |= CLK_SET_RATE_PARENT;
++
++	table = ti_clk_get_div_table(node);
++
++	if (IS_ERR(table))
++		return PTR_ERR(table);
++
++	ret = _get_divider_width(node, table, clk_divider_flags);
++	if (ret < 0)
++		goto cleanup;
++
++	width = ret;
++
++	clk = clk_register_divider_table_regmap(NULL, clk_name, parent_name,
++						flags, reg, regmap, shift,
++						width, clk_divider_flags, table,
++						NULL);
 +
 +	if (!IS_ERR(clk)) {
 +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+		goto cleanup;
++		ret = of_ti_autoidle_setup(node, regmap);
++	} else {
++		ret = PTR_ERR(clk);
 +	}
 +
-+	ret = PTR_ERR(clk);
++	if (!ret)
++		return 0;
 +cleanup:
-+	/* Free component clock list entries */
-+	for (i = 0; i < 3; i++) {
-+		if (!clks[i])
-+			continue;
-+		list_del(&clks[i]->link);
-+		kfree(clks[i]);
-+	}
-+
++	kfree(table);
 +	return ret;
 +}
-+CLK_OF_DECLARE(ti_composite_clock, "ti,composite-clock",
-+	       of_ti_composite_clk_setup);
++CLK_OF_DECLARE(divider_clk, "ti,divider-clock", of_ti_divider_clk_setup);
 +
-+int __init ti_clk_add_component(struct device_node *node, struct clk_hw *hw,
-+				int type)
++static int __init of_ti_composite_divider_clk_setup(struct device_node *node,
++						     struct regmap *regmap)
 +{
-+	int num_parents;
-+	const char **parent_names;
-+	struct component_clk *clk;
-+	int i;
++	struct clk_divider *div;
++	u32 val;
++	int ret;
 +
-+	num_parents = of_clk_get_parent_count(node);
-+
-+	if (num_parents < 1) {
-+		pr_err("%s: component-clock %s must have parent(s)\n", __func__,
-+		       node->name);
-+		return -EINVAL;
-+	}
-+
-+	parent_names = kzalloc((sizeof(char *) * num_parents), GFP_KERNEL);
-+	if (!parent_names)
++	div = kzalloc(sizeof(*div), GFP_KERNEL);
++	if (!div)
 +		return -ENOMEM;
 +
-+	for (i = 0; i < num_parents; i++)
-+		parent_names[i] = of_clk_get_parent_name(node, i);
++	of_property_read_u32(node, "reg", &val);
++	div->reg = (void *)val;
++	div->regmap = regmap;
 +
-+	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-+	if (!clk) {
-+		kfree(parent_names);
-+		return -ENOMEM;
++	div->table = ti_clk_get_div_table(node);
++
++	if (of_property_read_bool(node, "ti,index-starts-at-one"))
++		div->flags |= CLK_DIVIDER_ONE_BASED;
++
++	ret = _get_divider_width(node, div->table, div->flags);
++	if (ret < 0)
++		goto cleanup;
++
++	div->width = ret;
++
++	if (of_property_read_u32(node, "ti,bit-shift", &val)) {
++		pr_debug("%s: missing bit-shift property for %s, default=0\n",
++			 __func__, node->name);
++		val = 0;
 +	}
++	div->shift = val;
 +
-+	clk->num_parents = num_parents;
-+	clk->parent_names = parent_names;
-+	clk->hw = hw;
-+	clk->node = node;
-+	clk->type = type;
-+	list_add(&clk->link, &component_clks);
++	ret = ti_clk_add_component(node, &div->hw, CLK_COMPONENT_TYPE_DIVIDER);
++	if (!ret)
++		return 0;
 +
-+	return 0;
++cleanup:
++	kfree(div);
++	return ret;
 +}
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index e45005c..96c9725 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -137,6 +137,13 @@ struct clk_hw_omap {
- /* DPLL Type and DCO Selection Flags */
- #define DPLL_J_TYPE		0x1
- 
-+/* Composite clock component types */
-+enum {
-+	CLK_COMPONENT_TYPE_MUX = 0,
-+	CLK_COMPONENT_TYPE_GATE,
-+	CLK_COMPONENT_TYPE_DIVIDER
-+};
-+
- /**
-  * struct ti_dt_clk - OMAP DT clock alias declarations
-  * @lk: clock lookup definition
-@@ -179,6 +186,7 @@ int omap3_dpll4_set_rate(struct clk_hw *clk, unsigned long rate,
- void ti_dt_clocks_register(struct ti_dt_clk *oclks);
- void ti_dt_clk_init_provider(struct device_node *np, struct regmap *regmap);
- int of_ti_autoidle_setup(struct device_node *node, struct regmap *regmap);
-+int ti_clk_add_component(struct device_node *node, struct clk_hw *hw, int type);
- 
- #ifdef CONFIG_OF
- void of_ti_clk_allow_autoidle_all(void);
++CLK_OF_DECLARE(ti_composite_divider_clk, "ti,composite-divider-clock",
++	       of_ti_composite_divider_clk_setup);
 -- 
 1.7.9.5
