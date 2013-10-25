@@ -1,211 +1,167 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 25 Oct 2013 21:10:06 +0100
-Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <1382346813-8449-1-git-send-email-denis@eukrea.com>
-References: <20131019104555.GI18477@ns203013.ovh.net>
- <1382346813-8449-1-git-send-email-denis@eukrea.com>
-Message-ID: <20131025201006.2D999C405AB@trevor.secretlab.ca>
+Date: Fri, 25 Oct 2013 20:52:13 +0100
+Subject: [PATCHv5][ 1/3] DT: Add basic support for imx35-based devices.
+In-Reply-To: <1382518503-16437-1-git-send-email-denis@eukrea.com>
+References: <1382518503-16437-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131025195213.8C67AC404E8@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Oct 2013 11:13:33 +0200, Denis Carikli <denis@eukrea.com> wrote:
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+On Wed, 23 Oct 2013 10:55:01 +0200, Denis Carikli <denis@eukrea.com> wrote:
+> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> 
 > Cc: Rob Herring <rob.herring@calxeda.com>
 > Cc: Pawel Moll <pawel.moll@arm.com>
 > Cc: Mark Rutland <mark.rutland@arm.com>
 > Cc: Stephen Warren <swarren@wwwdotorg.org>
 > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 > Cc: devicetree at vger.kernel.org
+> Cc: Russell King <linux@arm.linux.org.uk>
 > Cc: Sascha Hauer <kernel@pengutronix.de>
 > Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Lothar Wa??mann <LW@KARO-electronics.de>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 > Cc: Eric B??nard <eric@eukrea.com>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
 > Signed-off-by: Denis Carikli <denis@eukrea.com>
 > ---
 > ChangeLog v3->v4:
-> - The default-brightness property is now optional, it defaults to 1 if not set.
-> - def_value int becomes an u32.
-> - gbl->def_value was set to pdata->def_value in pdata mode to avoid an extra
->   check.
+> - imx35.dtsi: removed display related nodes because their bindings have been
+>   reworked.
 > ---
->  .../bindings/video/backlight/gpio-backlight.txt    |   20 ++++++
->  drivers/video/backlight/gpio_backlight.c           |   69 ++++++++++++++++++--
->  2 files changed, 82 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+>  .../devicetree/bindings/clock/imx35-clock.txt      |  115 +++++
+>  arch/arm/boot/dts/imx35.dtsi                       |  450 ++++++++++++++++++++
+>  arch/arm/mach-imx/Kconfig                          |   11 +
+>  arch/arm/mach-imx/Makefile                         |    1 +
+>  arch/arm/mach-imx/clk-imx35.c                      |   21 +-
+>  arch/arm/mach-imx/common.h                         |    1 +
+>  arch/arm/mach-imx/imx35-dt.c                       |   48 +++
+>  7 files changed, 646 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx35-clock.txt
+>  create mode 100644 arch/arm/boot/dts/imx35.dtsi
+>  create mode 100644 arch/arm/mach-imx/imx35-dt.c
 > 
-> diff --git a/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
+> diff --git a/Documentation/devicetree/bindings/clock/imx35-clock.txt b/Documentation/devicetree/bindings/clock/imx35-clock.txt
 > new file mode 100644
-> index 0000000..3474d4a
+> index 0000000..9f9a60d
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt
-> @@ -0,0 +1,20 @@
-> +gpio-backlight bindings
+> +++ b/Documentation/devicetree/bindings/clock/imx35-clock.txt
+> @@ -0,0 +1,115 @@
+> +* Clock bindings for Freescale i.MX35
 > +
 > +Required properties:
-> +  - compatible: "gpio-backlight"
-> +  - gpios: describes the gpio that is used for enabling/disabling the backlight
-> +     (see GPIO binding[0] for more details).
+> +- compatible: Should be "fsl,imx35-ccm"
+> +- reg: Address and length of the register set
+> +- interrupts: Should contain CCM interrupt
+> +- #clock-cells: Should be <1>
 > +
-> +Optional properties:
-> +  - default-brightness-level: the default brightness level (can be 0(off) or
-> +      1(on) since GPIOs only support theses levels).
-
-Seems odd to call it brightness since it can only be on or off. Why not
-call it "default-state" or and empty bool named "default-on"?
-
-Otherwise looks okay to me.
-
-g.
-
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.  The following is a full list of i.MX35
+> +clocks and IDs.
 > +
-> +[0]: Documentation/devicetree/bindings/gpio/gpio.txt
+> +	Clock			ID
+> +	---------------------------
+> +	ckih			0
+> +	mpll			1
+> +	ppll			2
+> +	mpll_075		3
+> +	arm			4
+> +	hsp			5
+> +	hsp_div			6
+> +	hsp_sel			7
+> +	ahb			8
+> +	ipg			9
+> +	arm_per_div		10
+> +	ahb_per_div		11
+> +	ipg_per			12
+> +	uart_sel		13
+> +	uart_div		14
+> +	esdhc_sel		15
+> +	esdhc1_div		16
+> +	esdhc2_div		17
+> +	esdhc3_div		18
+> +	spdif_sel		19
+> +	spdif_div_pre		20
+> +	spdif_div_post		21
+> +	ssi_sel			22
+> +	ssi1_div_pre		23
+> +	ssi1_div_post		24
+> +	ssi2_div_pre		25
+> +	ssi2_div_post		26
+> +	usb_sel			27
+> +	usb_div			28
+> +	nfc_div			29
+> +	asrc_gate		30
+> +	pata_gate		31
+> +	audmux_gate		32
+> +	can1_gate		33
+> +	can2_gate		34
+> +	cspi1_gate		35
+> +	cspi2_gate		36
+> +	ect_gate		37
+> +	edio_gate		38
+> +	emi_gate		39
+> +	epit1_gate		40
+> +	epit2_gate		41
+> +	esai_gate		42
+> +	esdhc1_gate		43
+> +	esdhc2_gate		44
+> +	esdhc3_gate		45
+> +	fec_gate		46
+> +	gpio1_gate		47
+> +	gpio2_gate		48
+> +	gpio3_gate		49
+> +	gpt_gate		50
+> +	i2c1_gate		51
+> +	i2c2_gate		52
+> +	i2c3_gate		53
+> +	iomuxc_gate		54
+> +	ipu_gate		55
+> +	kpp_gate		56
+> +	mlb_gate		57
+> +	mshc_gate		58
+> +	owire_gate		59
+> +	pwm_gate		60
+> +	rngc_gate		61
+> +	rtc_gate		62
+> +	rtic_gate		63
+> +	scc_gate		64
+> +	sdma_gate		65
+> +	spba_gate		66
+> +	spdif_gate		67
+> +	ssi1_gate		68
+> +	ssi2_gate		69
+> +	uart1_gate		70
+> +	uart2_gate		71
+> +	uart3_gate		72
+> +	usbotg_gate		73
+> +	wdog_gate		74
+> +	max_gate		75
+> +	admux_gate		76
+> +	csi_gate		77
+> +	csi_div			78
+> +	csi_sel			79
+> +	iim_gate		80
+> +	gpu2d_gate		81
+> +	clk_max			82
 > +
-> +Example:
+> +Examples:
 > +
-> +	backlight {
-> +		compatible = "gpio-backlight";
-> +		gpios = <&gpio3 4 0>;
-> +		default-brightness-level = <0>;
-> +	};
-> diff --git a/drivers/video/backlight/gpio_backlight.c b/drivers/video/backlight/gpio_backlight.c
-> index 81fb127..248124d 100644
-> --- a/drivers/video/backlight/gpio_backlight.c
-> +++ b/drivers/video/backlight/gpio_backlight.c
-> @@ -13,6 +13,8 @@
->  #include <linux/init.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/platform_data/gpio_backlight.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
-> @@ -23,6 +25,7 @@ struct gpio_backlight {
->  
->  	int gpio;
->  	int active;
-> +	u32 def_value;
->  };
->  
->  static int gpio_backlight_update_status(struct backlight_device *bl)
-> @@ -60,6 +63,41 @@ static const struct backlight_ops gpio_backlight_ops = {
->  	.check_fb	= gpio_backlight_check_fb,
->  };
->  
-> +static int gpio_backlight_probe_dt(struct platform_device *pdev,
-> +				   struct gpio_backlight *gbl)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	enum of_gpio_flags gpio_flags;
-> +	int ret;
-> +
-> +	gbl->fbdev = NULL;
-> +	gbl->gpio = of_get_gpio_flags(np, 0, &gpio_flags);
-> +
-> +	gbl->active = (gpio_flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1;
-> +
-> +	if (gbl->gpio == -EPROBE_DEFER) {
-> +		return ERR_PTR(-EPROBE_DEFER);
-> +	} else if (gbl->gpio < 0) {
-> +		dev_err(&pdev->dev, "Error: gpios is a required parameter.\n");
-> +		return gbl->gpio;
-> +	}
-> +
-> +	ret = of_property_read_u32(np, "default-brightness-level",
-> +				   &gbl->def_value);
-> +	if (ret < 0) {
-> +		/* The property is optional. */
-> +		gbl->def_value = 1;
-> +	}
-> +
-> +	if (gbl->def_value > 1) {
-> +		dev_warn(&pdev->dev,
-> +			"Warning: Invalid default-brightness-level value. Its value can be either 0(off) or 1(on).\n");
-> +		gbl->def_value = 1;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int gpio_backlight_probe(struct platform_device *pdev)
->  {
->  	struct gpio_backlight_platform_data *pdata =
-> @@ -67,10 +105,12 @@ static int gpio_backlight_probe(struct platform_device *pdev)
->  	struct backlight_properties props;
->  	struct backlight_device *bl;
->  	struct gpio_backlight *gbl;
-> +	struct device_node *np = pdev->dev.of_node;
->  	int ret;
->  
-> -	if (!pdata) {
-> -		dev_err(&pdev->dev, "failed to find platform data\n");
-> +	if (!pdata && !np) {
-> +		dev_err(&pdev->dev,
-> +			"failed to find platform data or device tree node.\n");
->  		return -ENODEV;
->  	}
->  
-> @@ -79,14 +119,22 @@ static int gpio_backlight_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	gbl->dev = &pdev->dev;
-> -	gbl->fbdev = pdata->fbdev;
-> -	gbl->gpio = pdata->gpio;
-> -	gbl->active = pdata->active_low ? 0 : 1;
-> +
-> +	if (np) {
-> +		ret = gpio_backlight_probe_dt(pdev, gbl);
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		gbl->fbdev = pdata->fbdev;
-> +		gbl->gpio = pdata->gpio;
-> +		gbl->active = pdata->active_low ? 0 : 1;
-> +		gbl->def_value = pdata->def_value;
-> +	}
->  
->  	ret = devm_gpio_request_one(gbl->dev, gbl->gpio, GPIOF_DIR_OUT |
->  				    (gbl->active ? GPIOF_INIT_LOW
->  						 : GPIOF_INIT_HIGH),
-> -				    pdata->name);
-> +				    pdata ? pdata->name : "backlight");
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "unable to request GPIO\n");
->  		return ret;
-> @@ -103,17 +151,24 @@ static int gpio_backlight_probe(struct platform_device *pdev)
->  		return PTR_ERR(bl);
->  	}
->  
-> -	bl->props.brightness = pdata->def_value;
-> +	bl->props.brightness = gbl->def_value;
-> +
->  	backlight_update_status(bl);
->  
->  	platform_set_drvdata(pdev, bl);
->  	return 0;
->  }
->  
-> +static struct of_device_id gpio_backlight_of_match[] = {
-> +	{ .compatible = "gpio-backlight" },
-> +	{ /* sentinel */ }
+> +clks: ccm at 53f80000 {
+> +	compatible = "fsl,imx35-ccm";
+> +	reg = <0x53f80000 0x4000>;
+> +	interrupts = <31>;
+> +	#clock-cells = <1>;
 > +};
 > +
->  static struct platform_driver gpio_backlight_driver = {
->  	.driver		= {
->  		.name		= "gpio-backlight",
->  		.owner		= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(gpio_backlight_of_match),
->  	},
->  	.probe		= gpio_backlight_probe,
->  };
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +esdhc1: esdhc at 53fb4000 {
+> +	compatible = "fsl,imx35-esdhc";
+> +	reg = <0x53fb4000 0x4000>;
+> +	interrupts = <7>;
+> +	clocks = <&clks 9>, <&clks 8>, <&clks 43>;
+> +	clock-names = "ipg", "ahb", "per";
+> +	status = "disabled";
+> +};
+
+Looks like an entirely reasonable binding to me.
+
+g.
