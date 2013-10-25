@@ -1,35 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 25 Oct 2013 09:27:28 +0800
-Subject: [PATCH 3/4] ARM: dts: i.MX53: dts for Voipac x53-dmm-668 module
-In-Reply-To: <1382644733.19373.2.camel@lolumad>
-References: <1382461643-16790-1-git-send-email-lisovy@gmail.com>
- <1382461643-16790-4-git-send-email-lisovy@gmail.com>
- <20131023072738.GI2839@S2101-09.ap.freescale.net>
- <1382641926.16515.2.camel@lolumad>
- <CAHCPf3vB+HYkFoBYcbVM6Ecp+8BSApG2JZi1PRwc7ag6ygszOw@mail.gmail.com>
- <1382644733.19373.2.camel@lolumad>
-Message-ID: <20131025012725.GG14529@S2101-09.ap.freescale.net>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 25 Oct 2013 09:29:30 +0800
+Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
+In-Reply-To: <87mwlyclng.fsf@rustcorp.com.au>
+References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
+ <87eh7bfoq9.fsf@rustcorp.com.au>
+ <20131024084559.GD16735@n2100.arm.linux.org.uk>
+ <87mwlyclng.fsf@rustcorp.com.au>
+Message-ID: <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 09:58:53PM +0200, Rostislav Lisovy wrote:
-> I saw that most of the vendor prefixes are somehow shortened (e.g.
-> Freescale -- fsl, etc.).
+On Fri, Oct 25, 2013 at 7:08 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>
+> Sorry, I was imprecise.  I was referring to the kernel's kallsyms
+> tables produced by scripts/kallsyms.c.  This patch left them in the
+> the kallsyms tables and filtered them out from /proc/kallsyms.
 
-The 'fsl' is the stock symbol of Freescale.  If that's not the case for
-voipac, I think 'voipac' is more appropriate.
+Yes, but it isn't easy to do it by script/kallsyms.c , and IMO, it should
+be correct to hide them for user space but keep them in kallsyms table.
 
-Shawn
+>
+> It's weird that cpu_v7_suspend_size appeared above, since kallsyms
+> should filter out 'A' symbols already.
 
-> On Thu, 2013-10-24 at 14:49 -0500, Matt Sealey wrote: 
-> > On Thu, Oct 24, 2013 at 2:12 PM, Rostislav Lisovy <lisovy@gmail.com> wrote:
-> > > Dear Shawn;
-> > > Thank you for your comments.
-> > > Should I also add Voipac to
-> > > Documentation/devicetree/bindings/vendor-prefixes.txt?
-> > 
-> > I would agree with that, but why is your chosen prefix "vp" instead of
-> > "voipac" anyway?
-> > 
-> 
-> 
+Sorry, the 'A' symbol is a mistake, but the others do exist in /proc/kallsyms.
+
+
+Thanks,
+-- 
+Ming Lei
