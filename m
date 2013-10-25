@@ -1,60 +1,90 @@
-From: rob.herring@calxeda.com (Rob Herring)
-Date: Fri, 25 Oct 2013 12:38:15 -0500
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <E1VZjCU-0005RE-Vt@jdl.com>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <20131024234340.ADF70C403B6@trevor.secretlab.ca>
- <526A83B9.30800@wwwdotorg.org> <E1VZjCU-0005RE-Vt@jdl.com>
-Message-ID: <526AAC87.5070400@calxeda.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 25 Oct 2013 21:13:35 +0200
+Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: convert to platform driver
+In-Reply-To: <6431720.IUjkN7MGOG@thinkpad>
+References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
+ <6431720.IUjkN7MGOG@thinkpad>
+Message-ID: <526AC2DF.2020904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2013 10:21 AM, Jon Loeliger wrote:
->> On 10/25/2013 12:43 AM, Grant Likely wrote:
->>> On Thu, 24 Oct 2013 22:51:28 +0100, Stephen Warren <swarren@wwwdotorg.org> 
->> wrote:
->>>> From: Stephen Warren <swarren@nvidia.com>
->>>>
->>>> This is a very quick proof-of-concept re: how a DT schema checker might
->>>> look if written in C, and integrated into dtc.
->>>
->>> Thanks for looking at this.
->>>
->>> Very interesting. Certainly an expedient way to start checking schemas,
->>> and for certain bindings it may be the best approach. The downside is it
->>> forces a recompilation of DTC to bring in new bindings and it isn't a
->>> great meduim for mixing schema with documentation in the bindings.
+On 10/25/2013 12:39 PM, Tomasz Figa wrote:
+> Hi Daniel,
+>
+> [Sending again, without HTML part. Sorry for the noise.]
+>
+> On Friday 25 of October 2013 09:11:13 Daniel Lezcano wrote:
+>> The driver is tied with the pm low level code making difficult to split
+>> the driver into a more arch independent code. The platform driver allows
+>> to move the standby callback into the platform data field and use a
+>> simple driver with no more dependency on the low level code.
 >>
->> This approach would certainly require recompiling something. I threw the
->> code into dtc simply because it was the easiest container for the
->> demonstration. It could be a separate DT validation utility if we
->> wanted, although we'd need to split the DT parser from dtc into a
->> library to avoid code duplication. The resultant utility could be part
->> of the repo containing the DTs, so it didn't end up as a separate
->> package to manage.
+>> The standby callback has a portion of code to set the standby method and
+>> the effective cpu_do_idle switching the cpu to the right mode. As this
+>> code is redundant in the cpu suspend code, it has been factored out when
+>> implementing the standby methdod.
 >>
->> I think the additional documentation could be added as comments in the
->> validation functions, just like IIRC it was to be represented as
->> comments even in the .dts-based schema proposals.
-> 
-> DTers,
-> 
-> I think the additional benefit of starting with a direct C
-> implementation is that it causes us to begin to actually
-> codify the schema requirements.  Sure, it may not be ideal
-> at first, but over time it may reveal consistent patterns
-> that can be extracted.  And it may reveal what a real schema
-> might look like and how it might be expressed better.  Which
-> is to say that perhaps we are letting "perfect" get in the
-> way of "good enough to start"?
-> 
-> In the meantime, someone has shown us the code and we can
-> get started.  It's a Small Matter of Refactoring later. :-)
+>> By this way, the driver is ready to be moved out to the drivers/cpuidle.
+>
+> The idea itself is quite good, but unfortunately I have to NAK this. Please
+> see details in comments below.
+>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>   arch/arm/mach-s3c64xx/cpuidle.c |   38
+>> ++++++++++++++++---------------------- arch/arm/mach-s3c64xx/pm.c      |
+>>    33 ++++++++++++++++++++++++++------- 2 files changed, 42
+>> insertions(+), 29 deletions(-)
 
-I have not really looked at whether this would make sense or be low
-effort, but what if Grant's run-time checker was converted to run at
-kernel compile time. That would fall into the get something working
-sooner rather than later, but doesn't solve the documentation problem
-either.
+[ ... ]
 
-Rob
+>> -
+>> -	tmp = __raw_readl(S3C64XX_PWR_CFG);
+>> -	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
+>> -	tmp |= S3C64XX_PWRCFG_CFG_WFI_SLEEP;
+>
+> Finally note the S3C64XX_PWRCFG_CFG_WFI_SLEEP flag here again.
+
+Ouch ! I missed it. Thanks for spotting the problem.
+
+> I believe it should be visible now what's wrong with this patch. To make
+> sure it is, let me explain how the system controller of S3C64xx handles WFI
+> requests.
+>
+> When the CPU issues WFI request to the syscon, it takes an action depending
+> on how it is configured. A bit field is there in one of syscon registers
+> (S3C64XX_PWR_CFG) that selects what action to perform in case of WFI
+> request.
+>
+> You can program the syscon to ignore the request, enter IDLE mode, enter
+> STOP mode or enter SLEEP mode. As the names suggest, for cpuidle, it needs
+> to be programmed for IDLE mode and for system-wide sleep it needs to be set
+> to SLEEP mode. STOP mode is not very useful as it has mostly the same
+> effect that can be achieved by performing fine-grained clock and power
+> gating of peripherals manually, so it is unused by Linux.
+
+Yes, this is what I assumed but I missed the CFG_WFI_SLEEP flag, my eyes 
+read CFG_WFI_IDLE.
+
+> Now, my take on the issue you are trying to solve would be a bit different.
+> Since the S3C64xx does not have any interesting cpuidle modes, just a
+> normal, clock-gated WFI mode, it does not need to have a cpuidle driver at
+> all. All that is needed is simply setting up the S3C64XX_PWRCFG_CFG_WFI
+> field to S3C64XX_PWRCFG_CFG_WFI_IDLE early at boot-up, then set it to
+> S3C64XX_PWRCFG_CFG_WFI_SLEEP just before entering the sleep mode and
+> restore it back to S3C64XX_PWRCFG_CFG_WFI_IDLE after waking up.
+
+So you are suggesting to remove the cpuidle driver ?
+
+Won't it be worth to add a new WFI_SLEEP state to the cpuidle driver ?
+
+Thanks for the review.
+
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
