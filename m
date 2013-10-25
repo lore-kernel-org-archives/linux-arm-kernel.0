@@ -1,116 +1,53 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 25 Oct 2013 13:07:18 +0200
-Subject: [PATCHv7][ 1/6] video: imxfb: Introduce regulator support.
-In-Reply-To: <1382605103-9595-1-git-send-email-denis@eukrea.com>
-References: <1382605103-9595-1-git-send-email-denis@eukrea.com>
-Message-ID: <20131025110718.GP18477@ns203013.ovh.net>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 25 Oct 2013 11:51:53 +0100
+Subject: [PATCH v9 18/18] swiotlb-xen: static inline xen_phys_to_bus,
+ xen_bus_to_phys, xen_virt_to_bus and range_straddles_page_boundary
+In-Reply-To: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
+Message-ID: <1382698313-13161-18-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:58 Thu 24 Oct     , Denis Carikli wrote:
-> This commit is based on the following commit by Fabio Estevam:
->   4344429 video: mxsfb: Introduce regulator support
+This functions are small and called frequently. Static inline them.
 
-I've too many patch version in my mailbox specially without any description
-about what is updated between version can explain this.
-> 
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
->  drivers/video/imxfb.c |   29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index 44ee678..4bf3837 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -28,6 +28,7 @@
->  #include <linux/cpufreq.h>
->  #include <linux/clk.h>
->  #include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/io.h>
->  #include <linux/math64.h>
-> @@ -145,6 +146,7 @@ struct imxfb_info {
->  	struct clk		*clk_ipg;
->  	struct clk		*clk_ahb;
->  	struct clk		*clk_per;
-> +	struct regulator	*reg_lcd;
->  	enum imxfb_type		devtype;
->  	bool			enabled;
->  
-> @@ -563,12 +565,23 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
->  
->  static void imxfb_enable_controller(struct imxfb_info *fbi)
->  {
-> +	int ret;
->  
->  	if (fbi->enabled)
->  		return;
->  
->  	pr_debug("Enabling LCD controller\n");
->  
-> +	if (fbi->reg_lcd) {
-> +		ret = regulator_enable(fbi->reg_lcd);
-> +		if (ret) {
-> +			dev_err(&fbi->pdev->dev,
-> +				"lcd regulator enable failed with error: %d\n",
-> +				ret);
-> +			return;
-> +		}
-> +	}
-> +
->  	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
->  
->  	/* panning offset 0 (0 pixel offset)        */
-> @@ -597,6 +610,8 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
->  
->  static void imxfb_disable_controller(struct imxfb_info *fbi)
->  {
-> +	int ret;
-> +
->  	if (!fbi->enabled)
->  		return;
->  
-> @@ -613,6 +628,14 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
->  	fbi->enabled = false;
->  
->  	writel(0, fbi->regs + LCDC_RMCR);
-> +
-> +	if (fbi->reg_lcd) {
-> +		ret = regulator_disable(fbi->reg_lcd);
-> +		if (ret)
-> +			dev_err(&fbi->pdev->dev,
-> +				"lcd regulator disable failed with error: %d\n",
-> +				ret);
-> +	}
->  }
->  
->  static int imxfb_blank(int blank, struct fb_info *info)
-> @@ -1020,6 +1043,12 @@ static int imxfb_probe(struct platform_device *pdev)
->  		goto failed_register;
->  	}
->  
-> +	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
-> +	if (IS_ERR(fbi->reg_lcd)) {
-> +		dev_info(&pdev->dev, "No lcd regulator used.\n");
-> +		fbi->reg_lcd = NULL;
-> +	}
-> +
->  	imxfb_enable_controller(fbi);
->  	fbi->pdev = pdev;
->  #ifdef PWMR_BACKLIGHT_AVAILABLE
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ drivers/xen/swiotlb-xen.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index 4d50058..100962d 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -72,17 +72,17 @@ static unsigned long xen_io_tlb_nslabs;
+ 
+ static u64 start_dma_addr;
+ 
+-static dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
++static inline dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
+ {
+ 	return phys_to_machine(XPADDR(paddr)).maddr;
+ }
+ 
+-static phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
++static inline phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
+ {
+ 	return machine_to_phys(XMADDR(baddr)).paddr;
+ }
+ 
+-static dma_addr_t xen_virt_to_bus(void *address)
++static inline dma_addr_t xen_virt_to_bus(void *address)
+ {
+ 	return xen_phys_to_bus(virt_to_phys(address));
+ }
+@@ -105,7 +105,7 @@ static int check_pages_physically_contiguous(unsigned long pfn,
+ 	return 1;
+ }
+ 
+-static int range_straddles_page_boundary(phys_addr_t p, size_t size)
++static inline int range_straddles_page_boundary(phys_addr_t p, size_t size)
+ {
+ 	unsigned long pfn = PFN_DOWN(p);
+ 	unsigned int offset = p & ~PAGE_MASK;
+-- 
+1.7.2.5
