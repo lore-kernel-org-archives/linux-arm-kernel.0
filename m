@@ -1,36 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 Oct 2013 05:50:41 -0700
-Subject: ARM subplatform maintainer mailing list
-Message-ID: <CAOesGMhc-jPAz5qR-=k=BUicascwjosqx4jYapM4CKKim-Lb7A@mail.gmail.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Fri, 25 Oct 2013 22:53:37 +1000
+Subject: [PATCH 0/8] ARM: imx: add IMX50 SoC support
+In-Reply-To: <20131024150050.GA14529@S2101-09.ap.freescale.net>
+References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+ <20131024150050.GA14529@S2101-09.ap.freescale.net>
+Message-ID: <526A69D1.80506@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One topic that came up during the ARM mini-summit is that it's hard
-for the platform maintainers to notice when we (the arm-soc
-maintainers) send out information that might be relevant for them to
-see.
+Hi Shawn
 
-In some cases, they should probably try to find and read the email we
-send. :-) But it's also useful to have a forum to reach only the
-submaintainers or key contributors in one go without it drowning in
-patch postings. For a while we did it manually with To/Cc headers, but
-there are too many to keep track of that way.
+On 25/10/13 01:00, Shawn Guo wrote:
+> Hi Greg,
+>
+> On Fri, Oct 18, 2013 at 04:04:12PM +1000, gerg at uclinux.org wrote:
+>> From: Greg Ungerer <gerg@uclinux.org>
+>>
+>> This set of patches is the code and device tree support for the Freescale
+>> IMX50 SoC. This part is similar to the IMX53 SoC family, and I have resued
+>> as much of its support as possible. These patches are against 3.12-rc5.
+>
+> Nice patches.  Can you please base it on branch below with your next
+> posting, so that I can apply them more easily?
+>
+>    git://git.linaro.org/people/shawnguo/linux-2.6.git for-next
 
-So, I asked David Woodhouse to create a list on Infradead for this.
-It's open for anyone to subscribe, and it's at:
+Sure thing. I'll roll in all your suggestions, and send out a v2 in
+the next few days. Thanks for the review.
 
-http://lists.infradead.org/mailman/listinfo/arm-platform-maintainers
-
-House rules are simple:
-
-* This is not for code, not for patches, etc
-* This is for coordinating work:
- - No more pull requests until the merge window (besides fixes)? This
-is where will announce it.
- - Tree-wide ARM platform issues? Maybe this is where we'll send it as
-cc, but discuss on LAKML.
- - Announcement of an upcoming ARM mini-summit? here too.
- - ... But no patches, no code, and really no code discussions.
+Regards
+Greg
 
 
--Olof
+
+> Shawn
+>
+>> With these changes you can load and run on the Freescale IMX50-EVK board.
+>>
+>> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+>> ---
+>>   arch/arm/Kconfig.debug              |    9
+>>   arch/arm/boot/dts/Makefile          |    1
+>>   arch/arm/boot/dts/imx50-evk.dts     |   89 +++
+>>   arch/arm/boot/dts/imx50-pinfunc.h   |  923 ++++++++++++++++++++++++++++++++++++
+>>   arch/arm/boot/dts/imx50.dtsi        |  659 +++++++++++++++++++++++++
+>>   arch/arm/include/debug/imx-uart.h   |   10
+>>   arch/arm/mach-imx/Kconfig           |    9
+>>   arch/arm/mach-imx/Makefile          |    1
+>>   arch/arm/mach-imx/clk-imx51-imx53.c |   79 +++
+>>   arch/arm/mach-imx/common.h          |    3
+>>   arch/arm/mach-imx/mach-imx50.c      |   52 ++
+>>   drivers/pinctrl/Kconfig             |    8
+>>   drivers/pinctrl/Makefile            |    1
+>>   drivers/pinctrl/pinctrl-imx50.c     |  426 ++++++++++++++++
+>>   14 files changed, 2270 insertions(+)
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
