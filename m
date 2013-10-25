@@ -1,31 +1,60 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Fri, 25 Oct 2013 09:29:30 +0800
-Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
-In-Reply-To: <87mwlyclng.fsf@rustcorp.com.au>
-References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
- <87eh7bfoq9.fsf@rustcorp.com.au>
- <20131024084559.GD16735@n2100.arm.linux.org.uk>
- <87mwlyclng.fsf@rustcorp.com.au>
-Message-ID: <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 25 Oct 2013 09:46:56 +0800
+Subject: [PATCHv7][ 3/6] ARM: imx{25,27} DT: Permit the selection of the
+ imxfb framebuffer driver.
+In-Reply-To: <1382605103-9595-3-git-send-email-denis@eukrea.com>
+References: <1382605103-9595-1-git-send-email-denis@eukrea.com>
+ <1382605103-9595-3-git-send-email-denis@eukrea.com>
+Message-ID: <20131025014652.GH14529@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 25, 2013 at 7:08 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
->
-> Sorry, I was imprecise.  I was referring to the kernel's kallsyms
-> tables produced by scripts/kallsyms.c.  This patch left them in the
-> the kallsyms tables and filtered them out from /proc/kallsyms.
+On Thu, Oct 24, 2013 at 10:58:20AM +0200, Denis Carikli wrote:
+> Without that patch, a user can't select the imxfb driver when the i.MX25 and/or
+>   the i.MX27 device tree board are selected and that no boards that selects
+>   IMX_HAVE_PLATFORM_IMX_FB are compiled in.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Eric B?nard <eric@eukrea.com>
+> 
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 
-Yes, but it isn't easy to do it by script/kallsyms.c , and IMO, it should
-be correct to hide them for user space but keep them in kallsyms table.
+This is a patch that should go through FB tree, so FB maintainer should
+be copied, and patch subject should look like "video: ...".  Other than
+that,
 
->
-> It's weird that cpu_v7_suspend_size appeared above, since kallsyms
-> should filter out 'A' symbols already.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Sorry, the 'A' symbol is a mistake, but the others do exist in /proc/kallsyms.
+Shawn
 
-
-Thanks,
--- 
-Ming Lei
+> ---
+> - Rework the patch to make imxfb more broadly selectable
+>   (usefull for randconfig).
+> ---
+>  drivers/video/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 14317b7..a9f2659 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -363,7 +363,7 @@ config FB_SA1100
+>  
+>  config FB_IMX
+>  	tristate "Freescale i.MX1/21/25/27 LCD support"
+> -	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
+> +	depends on FB && ARCH_MXC
+>  	select FB_CFB_FILLRECT
+>  	select FB_CFB_COPYAREA
+>  	select FB_CFB_IMAGEBLIT
+> -- 
+> 1.7.9.5
+> 
