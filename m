@@ -1,65 +1,132 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 25 Oct 2013 09:11:14 +0200
-Subject: [PATCH 2/2] ARM: s3c64xx: cpuidle: move driver to drivers/cpuidle
-In-Reply-To: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1382685074-16502-2-git-send-email-daniel.lezcano@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 25 Oct 2013 09:35:35 +0200
+Subject: [PATCH v2 08/10] of/platform: Resolve interrupt references at
+ probe time
+In-Reply-To: <20131024163749.68D01C403B6@trevor.secretlab.ca>
+References: <1379510692-32435-1-git-send-email-treding@nvidia.com>
+ <1379510692-32435-9-git-send-email-treding@nvidia.com>
+ <20131015232436.19F61C40099@trevor.secretlab.ca>
+ <20131024163749.68D01C403B6@trevor.secretlab.ca>
+Message-ID: <20131025073534.GA19622@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no more dependency with the arch dependant code, thanks to the platform
-driver conversion.
+On Thu, Oct 24, 2013 at 05:37:49PM +0100, Grant Likely wrote:
+> On Wed, 16 Oct 2013 00:24:36 +0100, Grant Likely <grant.likely@linaro.org> wrote:
+> > On Wed, 18 Sep 2013 15:24:50 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > Interrupt references are currently resolved very early (when a device is
+> > > created). This has the disadvantage that it will fail in cases where the
+> > > interrupt parent hasn't been probed and no IRQ domain for it has been
+> > > registered yet. To work around that various drivers use explicit
+> > > initcall ordering to force interrupt parents to be probed before devices
+> > > that need them are created. That's error prone and doesn't always work.
+> > > If a platform device uses an interrupt line connected to a different
+> > > platform device (such as a GPIO controller), both will be created in the
+> > > same batch, and the GPIO controller won't have been probed by its driver
+> > > when the depending platform device is created. Interrupt resolution will
+> > > fail in that case.
+> > 
+> > What is the reason for all the rework on the irq parsing return values?
+> > A return value of '0' is always an error on irq parsing, regardless of
+> > architecture even if NO_IRQ is defined as -1. I may have missed it, but
+> > I don't see any checking for specific error values in the return paths
+> > of the functions.
+> > 
+> > If the specific return value isn't required (and I don't think it is),
+> > then you can simplify the whole series by getting rid of the rework
+> > patches.
+> 
+> I've not heard back about the above, but I've just had a conversation
+> with Rob about what to do here.
 
-Move the driver to the drivers/cpuidle like the other drivers.
+I thought I had sent a reply regarding this about a week ago. Perhaps it
+got lost. I'll resend.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-s3c64xx/Makefile                     |    1 -
- drivers/cpuidle/Kconfig.arm                        |    7 +++++++
- drivers/cpuidle/Makefile                           |    1 +
- .../cpuidle.c => drivers/cpuidle/cpuidle-s3c64xx.c |    0
- 4 files changed, 8 insertions(+), 1 deletion(-)
- rename arch/arm/mach-s3c64xx/cpuidle.c => drivers/cpuidle/cpuidle-s3c64xx.c (100%)
+> The problem that I have is that it makes a specific return code need
+> to traverse several levels of function calls and have a meaning come
+> out the other end. It becomes difficult to figure out where that code
+> actually comes from when reading the code. That's more of a gut-feel
+> reaction rather than pointing out specifics though.
 
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index 31d0c91..e7a3ee7 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -22,7 +22,6 @@ obj-$(CONFIG_CPU_S3C6410)	+= s3c6410.o
- # PM
- 
- obj-$(CONFIG_PM)		+= pm.o irq-pm.o sleep.o
--obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- 
- # DMA support
- 
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index f23bd75..5b2f84d 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -44,3 +44,10 @@ config ARM_AT91_CPUIDLE
- 	depends on ARCH_AT91
- 	help
- 	  Select this to enable cpuidle for AT91 processors
-+
-+config ARM_S3C64XX_CPUIDLE
-+	bool "Cpu Idle Driver for the s3c64xx processors"
-+	default y
-+	depends on ARCH_S3C64XX
-+	help
-+	  Select this to enable cpuidle for s3c64xx processors
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 527be28..2768020 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -13,3 +13,4 @@ obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
- obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
- obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
-+obj-$(CONFIG_ARM_S3C64XX_CPUIDLE)	+= cpuidle-s3c64xx.o
-diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/drivers/cpuidle/cpuidle-s3c64xx.c
-similarity index 100%
-rename from arch/arm/mach-s3c64xx/cpuidle.c
-rename to drivers/cpuidle/cpuidle-s3c64xx.c
--- 
-1.7.9.5
+To be honest, I'm not all that happy with that aspect myself, but at the
+same time I didn't feel like duplicating a lot of code to get this done
+more easily. I imagine that would've caused significant pushback as
+well. It's somewhat unfortunate that we have to propagate back through
+several level, but that's just the way the code is currently written and
+I don't think we can really get the information (EPROBE_DEFER) from any
+other place but from the lowest level.
+
+> The other thing that makes me nervous how invasive the series is.
+
+Well, I guess that comes with the territory, doesn't it? Interrupts are
+used in a large number of places and they have been used in a very
+static manner so far. The end result of this patch series is that for
+most devices instantiated from the device tree interrupts end up in the
+same category as any other resources such as GPIOs, regulators or
+clocks. They become mostly dynamic.
+
+That in itself is a big change, so I don't think it's all that
+surprising that the required changes are invasive.
+
+And I think if we really want to solve it properly we need to make even
+more invasive changes. For example, Grygorii pointed out that we could
+have a setup in the future where the following happens:
+
+	1) driver providing interrupts is probed
+	2) driver using interrupts is probed, interrupt references are
+	   resolved at probe time
+	3) both drivers are unloaded
+	4) both drivers are reloaded
+
+In that case with the current set of patches the added core code assumes
+that the interrupts have already been resolved and are still valid.
+
+Possibly the easiest way to fix that would be to just zero out the
+interrupt resources on remove so that they can be re-resolved on next
+probe.
+
+But that's somewhat cumbersome and it seems to me like a better fix
+might be to go and change struct platform_device to not use a single
+array of resources, but rather a list, or perhaps an array per type of
+resource. The current platform_device structure is simple and easy, but
+it doesn't work well with all the new dynamicity that we want/need/have
+today.
+
+Obviously modifying the innards of struct platform_device will likely
+turn out to be a mammoth task of its own, but if that's what it takes
+I'm prepared to do that as well. Or at least even try.
+
+> However, even with saying all of the above, I'm not saying outright no.
+> I want to get this feature in.
+
+That's good to hear. Last time we talked about it we seemed to have an
+agreement that this needs to be done, but you not replying had me
+worried that perhaps you had changed your mind. It seems you've been
+busy trying to address other issues that maybe are even more pressing so
+I can hardly complain. =)
+
+I'm good as long as we can keep moving in the right direction.
+
+> It is obviously needed and I'll even merge the patches piecemeal as the
+> look ready (I've already merged 2). Regardless, the current series needs
+> to be reworked. It conflicts with the other IRQ rework that I've already
+> put into my tree. The best thing to do would probably be respin it
+> against my current tree and repost.
+
+Sure, that won't be a problem. I might not get to it immediately, but
+I'll get back to it.
+
+> I'll take a fresh look then.... In the mean time, anything you can do to
+> /sanely/ reduce the impact will probably help.  :-)
+
+I might be able to do that. But I'll mention that in another thread in
+the right context.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131025/e9e9304b/attachment.sig>
