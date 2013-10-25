@@ -1,239 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Oct 2013 11:25:01 +0100
-Subject: [Add SMP support for Allwinner A20: PATCH V5 1/3] Add smp
- support for Allwinner A20(sunxi 7i).
-In-Reply-To: <1382027827-10080-2-git-send-email-cinifr@gmail.com>
-References: <1382027827-10080-1-git-send-email-cinifr@gmail.com>
- <1382027827-10080-2-git-send-email-cinifr@gmail.com>
-Message-ID: <20131025102501.GD2768@lukather>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 25 Oct 2013 13:25:12 +0300
+Subject: [PATCH 3/3] ARM: OMAP2: omap4-sdp: remove unneeded gpios from
+ dss-common
+In-Reply-To: <526A4585.30403@ti.com>
+References: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
+ <1382695658-18757-3-git-send-email-tomi.valkeinen@ti.com>
+ <526A4585.30403@ti.com>
+Message-ID: <526A4708.7010309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 12:37:05AM +0800, Fan Rong wrote:
-> This patch adds SMP support for the Allwinner A20 SoC. This SoC uses
-> an IP to, among other things, handle the CPU-related configuration,
-> like the power clamp, the boot address of the secondary CPUS, etc. We
-> thus need to map this IP during the prepare_cpu SMP operation, before
-> bringing up the secondary CPU in the secondary_startup operation.
+On 25/10/13 13:18, Nishanth Menon wrote:
 
-Please wrap this to 80 chars, and use sun7i in your commit title.
+>>  void __init omap_4430sdp_display_init_of(void)
+>>  {
+>> -	int r;
+>> -
+>> -	r = gpio_request_one(DISPLAY_SEL_GPIO, GPIOF_OUT_INIT_HIGH,
+>> -			"display_sel");
+>> -	if (r)
+>> -		pr_err("%s: Could not get display_sel GPIO\n", __func__);
+>> -
+>> -	r = gpio_request_one(DLP_POWER_ON_GPIO, GPIOF_OUT_INIT_LOW,
+>> -		"DLP POWER ON");
+>> -	if (r)
+>> -		pr_err("%s: Could not get DLP POWER ON GPIO\n", __func__);
+>> -
+>>  	omap_display_init(&sdp4430_dss_data);
+>>  
+>>  	platform_device_register(&sdp4430_lcd_device);
+>>
+> would you not be depending on the weak IO pull done using mux to drive
+> these GPIO pins since the GPIO is not requested and held?
 
-> 
-> Signed-off-by: Fan Rong <cinifr@gmail.com>
-> ---
->  arch/arm/mach-sunxi/Makefile  |   2 +
->  arch/arm/mach-sunxi/headsmp.S |  18 +++++++
->  arch/arm/mach-sunxi/platsmp.c | 114 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-sunxi/sunxi.c   |   3 ++
->  4 files changed, 137 insertions(+)
->  create mode 100644 arch/arm/mach-sunxi/headsmp.S
->  create mode 100644 arch/arm/mach-sunxi/platsmp.c
->  mode change 100644 => 100755 arch/arm/mach-sunxi/sunxi.c
-> 
-> diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-> index 93bebfc..d7f1ef4 100644
-> --- a/arch/arm/mach-sunxi/Makefile
-> +++ b/arch/arm/mach-sunxi/Makefile
-> @@ -1 +1,3 @@
->  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-> +obj-$(CONFIG_ARCH_SUNXI) += platsmp.o
-> +obj-$(CONFIG_ARCH_SUNXI) += headsmp.o
-> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> new file mode 100644
-> index 0000000..48c9d33
-> --- /dev/null
-> +++ b/arch/arm/mach-sunxi/headsmp.S
-> @@ -0,0 +1,18 @@
-> +/*
-> + * SMP support for A20
-> + *
-> + *  Copyright (C) 2013 Fan Rong <cinifr@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +
-> +.section ".text.head", "ax"
-> +ENTRY(sun7i_secondary_startup)
-> +	msr cpsr_fsxc,#0xd3
-> +	b secondary_startup
-> +ENDPROC(sun7i_secondary_startup)
-> diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
-> new file mode 100644
-> index 0000000..fa5adde
-> --- /dev/null
-> +++ b/arch/arm/mach-sunxi/platsmp.c
-> @@ -0,0 +1,114 @@
-> +/*
-> + *  linux/arch/arm/mach-sun7i/platsmp.c
-> + *
-> + *  Copyright (C) 2013 Fan Rong <cinifr@gmail.com>
-> + *  All Rights Reserved
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/init.h>
-> +#include <linux/errno.h>
-> +#include <linux/smp.h>
-> +#include <linux/io.h>
-> +#include <linux/delay.h>
-> +#include <linux/smp.h>
-> +
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +
-> +/*
-> + * CPU Configure module support
-> + * 1: Software reset for smp cpus
-> + * 2: Configure for smp cpus including boot.
-> + * 3: Three 64-bit idle counters and two 64-bit common counters
-> + * it is needed for smp cpus
-> + */
-> +void __iomem *sun7i_cc_base; /*CPU Configure Base*/
-> +extern void sun7i_secondary_startup(void);
-> +
-> +/*
-> + * CPUCFG
-> + */
-> +#define SUN7I_CPUCFG_BOOTADDR	0x01a4
-> +
-> +#define SUN7I_CPUCFG_GENCTL	0x0184
-> +#define SUN7I_CPUCFG_DBGCTL0	0x01e0
-> +#define SUN7I_CPUCFG_DBGCTL1	0x01e4
-> +
-> +#define SUN7I_CPU1_PWR_CLAMP	0x01b0
-> +#define SUN7I_CPU1_PWROFF_REG	0x01b4
-> +#define SUN7I_CPUX_RESET_CTL(x)	(0x40 + (x)*0x40)
-> +
-> +static struct of_device_id sun7i_cc_ids[] = {
-> +	{ .compatible = "allwinner,sun7i-a20-cpuconfig"},
-> +	{ /*sentinel*/ }
-> +};
-> +
-> +static int sun7i_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	long paddr;
-> +	uint32_t pwr_reg;
-> +	uint32_t j = 0xff << 1;
-> +	if (!sun7i_cc_base) {
-> +		pr_debug("error map cpu configure\n");
-> +		return -ENOSYS;
-> +	}
-> +	/* Set boot addr */
-> +	paddr = virt_to_phys(sun7i_secondary_startup);
-> +	writel(paddr, sun7i_cc_base + SUN7I_CPUCFG_BOOTADDR);
-> +
-> +	/* Assert cpu core reset */
-> +	writel(0, sun7i_cc_base + SUN7I_CPUX_RESET_CTL(cpu));
-> +
-> +	/* Ensure CPU reset also invalidates L1 caches */
-> +	pwr_reg = readl(sun7i_cc_base + SUN7I_CPUCFG_GENCTL);
-> +	pwr_reg &= ~BIT(cpu);
-> +	writel(pwr_reg, sun7i_cc_base + SUN7I_CPUCFG_GENCTL);
-> +
-> +	/* DBGPWRDUP hold low */
-> +	pwr_reg = readl(sun7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +	pwr_reg &= ~BIT(cpu);
-> +	writel(pwr_reg, sun7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +
-> +	/* Ramp up power to CPU1 */
-> +	do {
-> +		writel(j, sun7i_cc_base + SUN7I_CPU1_PWR_CLAMP);
-> +		j = j >> 1;
-> +	} while (j != 0);
+Yes. Is that not enough?
 
-In your first version, you were starting by writing 0xff, while here the
-first iteration of the loop writes (0xff << 1), is that intentionnal ?
+> Could we not use Documentation/devicetree/bindings/gpio/gpio.txt
+> binding to map to the right GPIO and drive it using the GPIO module?
 
-Maybe you could move the j variable affectation just before the loop so
-that we can more easily spot such mistakes.
+Hmm, what do you mean?
 
-> +
-> +	mdelay(10);
-> +
-> +	pwr_reg = readl(sun7i_cc_base + SUN7I_CPU1_PWROFF_REG);
-> +	pwr_reg &= ~1;
-> +	writel(pwr_reg, sun7i_cc_base + SUN7I_CPU1_PWROFF_REG);
-> +	mdelay(1);
-> +
-> +	/* Release CPU reset */
-> +	writel(3, sun7i_cc_base + SUN7I_CPUX_RESET_CTL(cpu));
-> +
-> +	/* Unlock CPU */
-> +	pwr_reg = readl(sun7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +	pwr_reg |= BIT(cpu);
-> +	writel(pwr_reg, sun7i_cc_base + SUN7I_CPUCFG_DBGCTL1);
-> +
-> +	return 0;
-> +}
-> +
-> +static void __init sun7i_init_cpuconfig_map(unsigned int max_cpus)
-> +{
-> +	struct device_node *np;
+I do mux the pins to gpios, but there's nothing in the kernel that would
+use those gpios. That's why we had the hack above, but I'd love to get
+rid of it.
 
-Add a new line here.
+Can I set the pins to GPIO mode, and set the GPIO to high/low in the .dts?
 
-> +	np = of_find_matching_node(NULL, sun7i_cc_ids);
-> +	if (WARN(!np, "unable to setup cup configure"))
-                                       ^ cpu
-> +		return;
+If things were perfect, we probably would have a driver for the "switch"
+part. I have no idea what kind of driver that would be, though, so at
+the moment we've just gone with the use-LCD2-by-default route.
 
-Add a new line here.
+ Tomi
 
-> +	sun7i_cc_base = of_iomap(np, 0);
-> +	if (WARN(!sun7i_cc_base, "failed to map cup configure base address"))
-                                                ^ cpu
-> +		return;
 
-I think I would panic here instead of issuing a warning.
-
-> +}
-> +
-> +struct smp_operations sun7i_smp_ops __initdata = {
-> +	.smp_boot_secondary = sun7i_boot_secondary,
-> +	.smp_prepare_cpus = sun7i_init_cpuconfig_map,
-> +};
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> old mode 100644
-> new mode 100755
-> index f184f6c..545269d
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -26,6 +26,8 @@
->  #include <asm/mach/map.h>
->  #include <asm/system_misc.h>
->  
-> +extern struct smp_operations sun7i_smp_ops;
-> +
->  #define SUN4I_WATCHDOG_CTRL_REG		0x00
->  #define SUN4I_WATCHDOG_CTRL_RESTART		BIT(0)
->  #define SUN4I_WATCHDOG_MODE_REG		0x04
-> @@ -155,6 +157,7 @@ static const char * const sun7i_board_dt_compat[] = {
->  };
->  
->  DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
-> +	.smp	= smp_ops(sun7i_smp_ops),
-
-Please align it with the other affectations.
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131025/2df2cb5a/attachment.sig>
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131025/b14d1d18/attachment.sig>
