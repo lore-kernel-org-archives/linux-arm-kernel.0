@@ -1,69 +1,131 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 25 Oct 2013 21:12:11 +0100
-Subject: [PATCHv5 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM.
-In-Reply-To: <1380521611-2764-5-git-send-email-Li.Xiubo@freescale.com>
-References: <1380521611-2764-1-git-send-email-Li.Xiubo@freescale.com>
- <1380521611-2764-5-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20131025201211.7936EC405D3@trevor.secretlab.ca>
+Date: Fri, 25 Oct 2013 20:55:11 +0100
+Subject: [PATCH RESEND v5 1/5] misc: sram: add ability to limit used sram
+ areas
+In-Reply-To: <201310221725.50942.heiko@sntech.de>
+References: <201310221724.21550.heiko@sntech.de>
+ <201310221725.50942.heiko@sntech.de>
+Message-ID: <20131025195511.D0C82C404EA@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Sep 2013 14:13:31 +0800, Xiubo Li <Li.Xiubo@freescale.com> wrote:
-> This adds the Document for Freescale FTM PWM driver under
-> Documentation/devicetree/bindings/pwm/.
+On Tue, 22 Oct 2013 17:25:50 +0200, Heiko St??bner <heiko@sntech.de> wrote:
+> Some SoCs need parts of their sram for special purposes. So while being part
+> of the peripheral, it should not be part of the genpool controlling the sram.
 > 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> Therefore add an option available to keep arbitrary portions of the
+> sram from being part of the pool. If available is not present, all
+> sram is used.
+> 
+> Suggested-by: Rob Herring <robherring2@gmail.com>
+> move from marking reserved space to available space
+> Suggested-by: Matt Sealey <neko@bakuhatsu.net>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
 > ---
->  .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+>  Documentation/devicetree/bindings/misc/sram.txt |    8 ++++
+>  drivers/misc/sram.c                             |   51 ++++++++++++++++++++---
+>  2 files changed, 53 insertions(+), 6 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> new file mode 100644
-> index 0000000..2c6969a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> @@ -0,0 +1,33 @@
-> +Freescale FTM PWM controller
+> diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
+> index 4d0a00e..8be552f 100644
+> --- a/Documentation/devicetree/bindings/misc/sram.txt
+> +++ b/Documentation/devicetree/bindings/misc/sram.txt
+> @@ -8,9 +8,17 @@ Required properties:
+>  
+>  - reg : SRAM iomem address range
+>  
+> +Optional properties:
 > +
-> +Required properties:
-> +- compatible: Should be "fsl,vf610-ftm-pwm"
-> +- reg: Physical base address and length of the controller's registers
-> +- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-> +  the cells format.
-> +- clock-names : Includes the following module clock source entries:
-> +    "ftm0" (system clock),
-> +    "ftm0_fix_sel" (fixed frequency clock),
-> +    "ftm0_ext_sel" (external clock)
-> +- clocks : Must contain a clock specifier for each entry in clock-names.
-> +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
-> +  entries in clock-names.
-> +- pinctrl-names: must contain a "default" entry.
-> +- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-> +  See ../pinctrl/pinctrl-bindings.txt for details of the property values.
+> +- available: optional list of available chunks inside the sram that the
+> +  OS can use. Without available, the whole range is usable for the OS.
+> +  Format is <base size>, <base size>, ...; with base being relative to the
+> +  reg property base.
 
-Looks okay to me.
+I think it would make more sense to specify reserved regions of the
+memory instead of the valid ranges. Carving out reserved regions is
+closer to the patterns for reserved memory that we'll be using
+elsewhere.
 
 g.
 
 > +
+>  Example:
+>  
+>  sram: sram at 5c000000 {
+>  	compatible = "mmio-sram";
+>  	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
+> +	available = <0x100 0x3ff00>;
+>  };
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+> index afe66571..755e640 100644
+> --- a/drivers/misc/sram.c
+> +++ b/drivers/misc/sram.c
+> @@ -42,6 +42,8 @@ static int sram_probe(struct platform_device *pdev)
+>  	struct sram_dev *sram;
+>  	struct resource *res;
+>  	unsigned long size;
+> +	const __be32 *avail_list = NULL;
+> +	int avail_size = 0;
+>  	int ret;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -65,12 +67,49 @@ static int sram_probe(struct platform_device *pdev)
+>  	if (!sram->pool)
+>  		return -ENOMEM;
+>  
+> -	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
+> -				res->start, size, -1);
+> -	if (ret < 0) {
+> -		if (sram->clk)
+> -			clk_disable_unprepare(sram->clk);
+> -		return ret;
+> +	if (pdev->dev.of_node) {
+> +		avail_list = of_get_property(pdev->dev.of_node,
+> +						"available",
+> +						&avail_size);
+> +		if (avail_list) {
+> +			avail_size /= sizeof(*avail_list);
+> +			if (!avail_size || avail_size % 2) {
+> +				dev_warn(&pdev->dev, "wrong number of arguments in available property\n");
+> +				avail_list = NULL;
+> +			}
+> +		}
+> +	}
 > +
-> +Example:
+> +	if (!avail_list) {
+> +		ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
+> +					res->start, size, -1);
+> +		if (ret < 0) {
+> +			if (sram->clk)
+> +				clk_disable_unprepare(sram->clk);
+> +			return ret;
+> +		}
+> +	} else {
+> +		unsigned int astart;
+> +		unsigned int asize;
+> +		int i;
 > +
-> +pwm0: pwm at 40038000 {
-> +		compatible = "fsl,vf610-ftm-pwm";
-> +		reg = <0x40038000 0x1000>;
-> +		#pwm-cells = <3>;
-> +		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-> +		clocks = <&clks VF610_CLK_FTM0>,
-> +			<&clks VF610_CLK_FTM0_FIX_SEL>,
-> +			<&clks VF610_CLK_FTM0_EXT_SEL>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_pwm0_1>;
-> +		fsl,pwm-counter-clk = "ftm0_ext_sel";
-> +};
+> +		for (i = 0; i < avail_size; i += 2) {
+> +			/* get the next available block */
+> +			astart = be32_to_cpu(*avail_list++);
+> +			asize = be32_to_cpu(*avail_list++);
+> +
+> +			dev_dbg(&pdev->dev, "found available block 0x%x-0x%x\n",
+> +				 astart, astart + asize);
+> +
+> +			ret = gen_pool_add_virt(sram->pool,
+> +					(unsigned long)virt_base + astart,
+> +					res->start + astart, asize, -1);
+> +			if (ret < 0) {
+> +				if (sram->clk)
+> +					clk_disable_unprepare(sram->clk);
+> +				return ret;
+> +			}
+> +		}
+>  	}
+>  
+>  	platform_set_drvdata(pdev, sram);
 > -- 
-> 1.8.0
-> 
+> 1.7.10.4
 > 
