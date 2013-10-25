@@ -1,34 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 Oct 2013 14:08:40 +0100
-Subject: [RFC 2/3] arm: mm: Define set_memory_* functions for ARM
-In-Reply-To: <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
-References: <1371057810-3189-1-git-send-email-lauraa@codeaurora.org>
- <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20131025130839.GA9999@mudshark.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 25 Oct 2013 14:07:42 +0100
+Subject: [PATCH v2 4/5] ARM: sun5i: a13: Add support for the High Speed Timers
+In-Reply-To: <1382706463-3892-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1382706463-3892-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1382706463-3892-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+The Allwinner A13 has support for two high speed timers. Now that we
+have a driver to support it, we can enable them in the device tree.
 
-On Wed, Jun 12, 2013 at 06:23:29PM +0100, Laura Abbott wrote:
-> Other architectures define various set_memory functions to allow
-> attributes to be changed (e.g. set_memory_x, set_memory_rw, etc.)
-> Currently, these functions are missing on ARM. Define these in an
-> appropriate manner for ARM.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Tested-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ arch/arm/boot/dts/sun5i-a13.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-[...]
-
-> +int set_memory_ro(unsigned long addr, int numpages)
-> +{
-> +	unsigned long start = addr;
-> +	unsigned long size = PAGE_SIZE*numpages;
-> +	unsigned end = start + size;
-> +
-> +	apply_to_page_range(&init_mm, start, size, pte_set_ro, NULL);
-> +	dsb();
-> +	flush_tlb_kernel_range(start, end);
-
-The TLB_WB flag gives you the dsb, so you don't need to code it explicitly
-here (same comment for the other occurrences in this patch).
-
-Will
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index ce8ef2a..1ccd75d 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -273,5 +273,12 @@
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+ 		};
++
++		timer at 01c60000 {
++			compatible = "allwinner,sun5i-a13-hstimer";
++			reg = <0x01c60000 0x1000>;
++			interrupts = <82>, <83>;
++			clocks = <&ahb_gates 28>;
++		};
+ 	};
+ };
+-- 
+1.8.4
