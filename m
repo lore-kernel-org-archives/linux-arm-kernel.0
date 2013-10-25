@@ -1,36 +1,61 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 25 Oct 2013 14:02:22 +0800
-Subject: [PATCH v3 4/5] usb: doc: chipidea: imx: add compatiable string for
- imx28 SoC
-In-Reply-To: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
-References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1382680943-9258-4-git-send-email-peter.chen@freescale.com>
+Date: Fri, 25 Oct 2013 14:02:19 +0800
+Subject: [PATCH v3 1/5] usb: ehci: add freescale imx28 special write register
+ method
+Message-ID: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to imx28 usb has special write requirement compared to other imx SoCs.
+According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+register error issue", All USB register write operations must
+use the ARM SWP instruction. So, we implement a special ehci_write
+for imx28.
+
+Discussion for it at below:
+http://marc.info/?l=linux-usb&m=137996395529294&w=2
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
-Changes for v3:
-- 4/5, 5/5 are added
+ drivers/usb/host/ehci.h |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-index b4b5b79..a502d41 100644
---- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-+++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-@@ -1,7 +1,8 @@
- * Freescale i.MX ci13xxx usb controllers
+diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+index e8f41c5..535aa8b 100644
+--- a/drivers/usb/host/ehci.h
++++ b/drivers/usb/host/ehci.h
+@@ -225,6 +225,7 @@ struct ehci_hcd {			/* one per controller */
+ 	unsigned		has_synopsys_hc_bug:1; /* Synopsys HC */
+ 	unsigned		frame_index_bug:1; /* MosChip (AKA NetMos) */
+ 	unsigned		need_oc_pp_cycle:1; /* MPC834X port power */
++	unsigned		imx28_write_fix:1; /* For Freescale i.MX28 */
  
- Required properties:
--- compatible: Should be "fsl,imx27-usb"
-+- compatible: "fsl,imx28-usb" for imx28 SoC, "fsl,imx27-usb" for
-+non-imx28 SoC.
- - reg: Should contain registers location and length
- - interrupts: Should contain controller interrupt
+ 	/* required for usb32 quirk */
+ 	#define OHCI_CTRL_HCFS          (3 << 6)
+@@ -728,6 +729,13 @@ static inline unsigned int ehci_readl(const struct ehci_hcd *ehci,
+ #endif
+ }
  
++#ifdef CONFIG_SOC_IMX28
++static inline void imx28_ehci_writel(u32 val32, volatile u32 *addr)
++{
++	__asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
++}
++#endif
++
+ static inline void ehci_writel(const struct ehci_hcd *ehci,
+ 		const unsigned int val, __u32 __iomem *regs)
+ {
+@@ -735,6 +743,11 @@ static inline void ehci_writel(const struct ehci_hcd *ehci,
+ 	ehci_big_endian_mmio(ehci) ?
+ 		writel_be(val, regs) :
+ 		writel(val, regs);
++#elif defined(CONFIG_SOC_IMX28)
++	if (ehci->imx28_write_fix)
++		imx28_ehci_writel(val, regs);
++	else
++		writel(val, regs);
+ #else
+ 	writel(val, regs);
+ #endif
 -- 
 1.7.1
