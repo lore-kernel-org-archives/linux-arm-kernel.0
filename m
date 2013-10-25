@@ -1,65 +1,61 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 25 Oct 2013 13:07:37 +0300
-Subject: [PATCH 2/3] ARM: dts: omap4-sdp: add LCD pinmuxing
+Date: Fri, 25 Oct 2013 13:07:38 +0300
+Subject: [PATCH 3/3] ARM: OMAP2: omap4-sdp: remove unneeded gpios from
+ dss-common
 In-Reply-To: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1382695658-18757-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1382695658-18757-3-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmuxing for the LCD panels.
-
-Both panels have a reset GPIO, but the second one has some extra
-complexity: some boards have a PicoDLP projector, which shares resources
-with the LCD2. We don't currently support switching between the PicoDL
-and the LCD2, so we use pin pull-ups and pull-downs to select the LCD2.
-
-GPIO40 is pulled down, which disables the PicoDLP power. GPIO59 is
-pulled up, which selects the LCD2.
+DISPLAY_SEL_GPIO and DLP_POWER_ON_GPIO are now handled in the .dts file,
+so we can remove them from dss-common.c.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/omap4-sdp.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/mach-omap2/dss-common.c | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 7951b4e..ed14a7a 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -166,6 +166,8 @@
- 			&mcbsp2_pins
- 			&dss_hdmi_pins
- 			&tpd12s015_pins
-+			&lcd1_pins
-+			&lcd2_pins
- 	>;
+diff --git a/arch/arm/mach-omap2/dss-common.c b/arch/arm/mach-omap2/dss-common.c
+index bf89eff..cc70cf9 100644
+--- a/arch/arm/mach-omap2/dss-common.c
++++ b/arch/arm/mach-omap2/dss-common.c
+@@ -113,9 +113,6 @@ void __init omap4_panda_display_init_of(void)
  
- 	uart2_pins: pinmux_uart2_pins {
-@@ -268,6 +270,25 @@
- 		>;
- 	};
+ /* OMAP4 Blaze display data */
  
-+	lcd1_pins: pinmux_lcd1_pins {
-+		pinctrl-single,pins = <
-+			0x52 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* gpio_102 */
-+		>;
-+	};
-+
-+	/*
-+	 * GPIO 59 is used to switch between LCD2 and PicoDLP. We don't support
-+	 * the switching, so set the pin to PULLUP which enables the LCD2.
-+	 * GPIO 40 enables power to PicoDLP. Use PULLDOWN to disable power.
-+	 */
-+	lcd2_pins: pinmux_lcd2_pins {
-+		pinctrl-single,pins = <
-+			0x20 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* gpio_40 */
-+			0x46 (PIN_OUTPUT_PULLUP | MUX_MODE3)	/* gpio_59 */
-+			0x56 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* gpio_104 */
-+		>;
-+	};
-+
- 	i2c1_pins: pinmux_i2c1_pins {
- 		pinctrl-single,pins = <
- 			0xe2 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl */
+-#define DISPLAY_SEL_GPIO	59	/* LCD2/PicoDLP switch */
+-#define DLP_POWER_ON_GPIO	40
+-
+ static struct panel_dsicm_platform_data dsi1_panel = {
+ 	.name		= "lcd",
+ 	.source		= "dsi.0",
+@@ -185,26 +182,8 @@ static struct omap_dss_board_info sdp4430_dss_data = {
+ 	.default_display_name = "lcd",
+ };
+ 
+-/*
+- * we select LCD2 by default (instead of Pico DLP) by setting DISPLAY_SEL_GPIO.
+- * Setting DLP_POWER_ON gpio enables the VDLP_2V5 VDLP_1V8 and VDLP_1V0 rails
+- * used by picodlp on the 4430sdp platform. Keep this gpio disabled as LCD2 is
+- * selected by default
+- */
+ void __init omap_4430sdp_display_init_of(void)
+ {
+-	int r;
+-
+-	r = gpio_request_one(DISPLAY_SEL_GPIO, GPIOF_OUT_INIT_HIGH,
+-			"display_sel");
+-	if (r)
+-		pr_err("%s: Could not get display_sel GPIO\n", __func__);
+-
+-	r = gpio_request_one(DLP_POWER_ON_GPIO, GPIOF_OUT_INIT_LOW,
+-		"DLP POWER ON");
+-	if (r)
+-		pr_err("%s: Could not get DLP POWER ON GPIO\n", __func__);
+-
+ 	omap_display_init(&sdp4430_dss_data);
+ 
+ 	platform_device_register(&sdp4430_lcd_device);
 -- 
 1.8.1.2
