@@ -1,52 +1,103 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 25 Oct 2013 16:46:42 -0400
-Subject: [PATCH v8 13/19] swiotlb-xen: use xen_dma_map/unmap_page,
- xen_dma_sync_single_for_cpu/device
-In-Reply-To: <alpine.DEB.2.02.1310241405480.26077@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
- <1382031814-8782-13-git-send-email-stefano.stabellini@eu.citrix.com>
- <20131023140927.GD27771@phenom.dumpdata.com>
- <alpine.DEB.2.02.1310231816180.26077@kaball.uk.xensource.com>
- <20131023195154.GB28963@phenom.dumpdata.com>
- <alpine.DEB.2.02.1310241133070.26077@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1310241405480.26077@kaball.uk.xensource.com>
-Message-ID: <20131025204642.GB7543@phenom.dumpdata.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 25 Oct 2013 22:52:27 +0200
+Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: convert to platform driver
+In-Reply-To: <526AC2DF.2020904@linaro.org>
+References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
+ <6431720.IUjkN7MGOG@thinkpad> <526AC2DF.2020904@linaro.org>
+Message-ID: <1953577.TBW5ixuUM5@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 02:11:48PM +0100, Stefano Stabellini wrote:
-> On Thu, 24 Oct 2013, Stefano Stabellini wrote:
-> > On Wed, 23 Oct 2013, Konrad Rzeszutek Wilk wrote:
-> > > On Wed, Oct 23, 2013 at 06:20:25PM +0100, Stefano Stabellini wrote:
-> > > > On Wed, 23 Oct 2013, Konrad Rzeszutek Wilk wrote:
-> > > > > On Thu, Oct 17, 2013 at 06:43:28PM +0100, Stefano Stabellini wrote:
-> > > > > > Call xen_dma_map_page, xen_dma_unmap_page, xen_dma_sync_single_for_cpu,
-> > > > > > xen_dma_sync_single_for_device from swiotlb-xen to ensure cpu/device
-> > > > > > coherency of the pages used for DMA, including the ones belonging to the
-> > > > > > swiotlb buffer.
-> > > > > 
-> > > > > You lost me.
-> > > > > 
-> > > > > Isn't it the driver's responsibility to do this?
-> > > > > 
-> > > > > Looking at what 'xen_dma_map_page()' does for x86 it looks to add an extra
-> > > > > call - page_to_phys - and we ignore it here.
-> > > > 
-> > > > map_page on arm calls the right cache flushes needed to communicate with
-> > > > the device. Same with unmap_page.
-> > > 
-> > > If this is flushing the cache then I think it makes more sense to do
-> > > that without this fancy 'dma_map_page'.
-> > > 
-> > > Just call it 'xen_flush_dma_page' and make it a nop on all platforms
-> > > except ARM.
+On Friday 25 of October 2013 21:13:35 Daniel Lezcano wrote:
+> On 10/25/2013 12:39 PM, Tomasz Figa wrote:
+> > Hi Daniel,
 > > 
-> > I am OK with making it a nop on x86, it makes sense.
-> > However I would like to keep it called xen_dma_map_page: after all it
-> > corresponds exactly to the native map_page dma_op. It is part of the same
-> > "contract".
+> > [Sending again, without HTML part. Sorry for the noise.]
+> > 
+> > On Friday 25 of October 2013 09:11:13 Daniel Lezcano wrote:
+> >> The driver is tied with the pm low level code making difficult to
+> >> split
+> >> the driver into a more arch independent code. The platform driver
+> >> allows
+> >> to move the standby callback into the platform data field and use a
+> >> simple driver with no more dependency on the low level code.
+> >> 
+> >> The standby callback has a portion of code to set the standby method
+> >> and
+> >> the effective cpu_do_idle switching the cpu to the right mode. As this
+> >> code is redundant in the cpu suspend code, it has been factored out
+> >> when
+> >> implementing the standby methdod.
+> >> 
+> >> By this way, the driver is ready to be moved out to the
+> >> drivers/cpuidle.
+> > 
+> > The idea itself is quite good, but unfortunately I have to NAK this.
+> > Please see details in comments below.
+> > 
+> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >> ---
+> >> 
+> >>   arch/arm/mach-s3c64xx/cpuidle.c |   38
+> >> 
+> >> ++++++++++++++++---------------------- arch/arm/mach-s3c64xx/pm.c     
+> >> |
+> >> 
+> >>    33 ++++++++++++++++++++++++++------- 2 files changed, 42
+> >> 
+> >> insertions(+), 29 deletions(-)
 > 
-> for example we can turn xen_dma_map_page into a function that returns
-> void, this way we can remove the page_to_phys on x86
+> [ ... ]
+> 
+> >> -
+> >> -	tmp = __raw_readl(S3C64XX_PWR_CFG);
+> >> -	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
+> >> -	tmp |= S3C64XX_PWRCFG_CFG_WFI_SLEEP;
+> > 
+> > Finally note the S3C64XX_PWRCFG_CFG_WFI_SLEEP flag here again.
+> 
+> Ouch ! I missed it. Thanks for spotting the problem.
+> 
+> > I believe it should be visible now what's wrong with this patch. To
+> > make
+> > sure it is, let me explain how the system controller of S3C64xx handles
+> > WFI requests.
+> > 
+> > When the CPU issues WFI request to the syscon, it takes an action
+> > depending on how it is configured. A bit field is there in one of
+> > syscon registers (S3C64XX_PWR_CFG) that selects what action to perform
+> > in case of WFI request.
+> > 
+> > You can program the syscon to ignore the request, enter IDLE mode,
+> > enter
+> > STOP mode or enter SLEEP mode. As the names suggest, for cpuidle, it
+> > needs to be programmed for IDLE mode and for system-wide sleep it
+> > needs to be set to SLEEP mode. STOP mode is not very useful as it has
+> > mostly the same effect that can be achieved by performing fine-grained
+> > clock and power gating of peripherals manually, so it is unused by
+> > Linux.
+> 
+> Yes, this is what I assumed but I missed the CFG_WFI_SLEEP flag, my eyes
+> read CFG_WFI_IDLE.
+> 
+> > Now, my take on the issue you are trying to solve would be a bit
+> > different. Since the S3C64xx does not have any interesting cpuidle
+> > modes, just a normal, clock-gated WFI mode, it does not need to have a
+> > cpuidle driver at all. All that is needed is simply setting up the
+> > S3C64XX_PWRCFG_CFG_WFI field to S3C64XX_PWRCFG_CFG_WFI_IDLE early at
+> > boot-up, then set it to S3C64XX_PWRCFG_CFG_WFI_SLEEP just before
+> > entering the sleep mode and restore it back to
+> > S3C64XX_PWRCFG_CFG_WFI_IDLE after waking up.
+> So you are suggesting to remove the cpuidle driver ?
 
-Right, the v9 patchset you posted fixes my concern.
+Exactly.
+
+> 
+> Won't it be worth to add a new WFI_SLEEP state to the cpuidle driver ?
+
+I don't think so. How a suspend-to-RAM specific thing like WFI_SLEEP could 
+be relevant to a cpuidle driver? (Unless there are some plans to 
+consolidate STR with cpuidle that I haven't heard about...)
+
+Best regards,
+Tomasz
