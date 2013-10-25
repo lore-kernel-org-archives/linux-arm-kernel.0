@@ -1,97 +1,51 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Oct 2013 14:22:45 +0100
-Subject: [PATCH v3 4/4] ARM: sun6i: Add the reset controller to the DTSI
-In-Reply-To: <1382707365-4776-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1382707365-4776-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1382707365-4776-5-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 25 Oct 2013 14:22:41 +0100
+Subject: [PATCH v3 0/4] Add support for the Allwinner A31 Reset Controllers
+Message-ID: <1382707365-4776-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 has a reset controller IP that maintains a few other IPs in
-reset, among which we can find the UARTs, high speed timers or the I2C.
-Now that we have support for them, add the reset controllers to the DTSI.
+Hi everyone,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+This patchset adds support for the reset controllers found in the Allwinner A31
+SoCs. Since these controllers are pretty simple, basically just a few MMIO
+registers, with a single bit controlling the reset state of the other devices
+it asserts in reset, the driver is quite simple as well.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index c1751a6..c7e0658 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -209,6 +209,24 @@
- 			};
- 		};
- 
-+		ahb1_rst: reset at 01c202c0 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-ahb1-reset";
-+			reg = <0x01c202c0 0xc>;
-+		};
-+
-+		apb1_rst: reset at 01c202d0 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun4i-clock-reset";
-+			reg = <0x01c202d0 0x4>;
-+		};
-+
-+		apb2_rst: reset at 01c202d8 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun4i-clock-reset";
-+			reg = <0x01c202d8 0x4>;
-+		};
-+
- 		timer at 01c20c00 {
- 			compatible = "allwinner,sun4i-timer";
- 			reg = <0x01c20c00 0xa0>;
-@@ -232,6 +250,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 16>;
-+			resets = <&apb2_rst 16>;
- 			status = "disabled";
- 		};
- 
-@@ -242,6 +261,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 17>;
-+			resets = <&apb2_rst 17>;
- 			status = "disabled";
- 		};
- 
-@@ -252,6 +272,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 18>;
-+			resets = <&apb2_rst 18>;
- 			status = "disabled";
- 		};
- 
-@@ -262,6 +283,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 19>;
-+			resets = <&apb2_rst 19>;
- 			status = "disabled";
- 		};
- 
-@@ -272,6 +294,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 20>;
-+			resets = <&apb2_rst 20>;
- 			status = "disabled";
- 		};
- 
-@@ -282,6 +305,7 @@
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clocks = <&apb2_gates 21>;
-+			resets = <&apb2_rst 21>;
- 			status = "disabled";
- 		};
- 
+However, one of the IPs asserted in reset by these controllers are the timers,
+the only thing standing out is that it requires to be registered before the
+timers are initialized.
+
+Thanks,
+Maxime
+
+Changes from v2:
+  - Changed the commit logs to be a bit more generic
+  - Fixed a stupid breakage in the Makefile
+
+Changes from v1:
+  - Don't call request_mem_region, since some of these controllers will share
+    registers with clock drivers
+  - Switched to a more generic allwinner,sun4i-clock-reset compatible, since a
+    lot of these controllers are found in other SoCs than the A31
+  - Switched to a "real" driver using the device model for all these reset
+    controllers but the one that needs to be initialised early.
+  - Fixed a typo in one of the DT bindings that was leading to a compilation
+    breakage
+
+Maxime Ripard (4):
+  reset: Add Allwinner SoCs Reset Controller Driver
+  ARM: sunxi: Select ARCH_HAS_RESET_CONTROLLER
+  ARM: sunxi: Register the A31 reset IP in init_time
+  ARM: sun6i: Add the reset controller to the DTSI
+
+ arch/arm/boot/dts/sun6i-a31.dtsi |  24 ++++++
+ arch/arm/mach-sunxi/Kconfig      |   1 +
+ arch/arm/mach-sunxi/sunxi.c      |  10 ++-
+ drivers/reset/Makefile           |   1 +
+ drivers/reset/reset-sunxi.c      | 156 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 191 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/reset/reset-sunxi.c
+
 -- 
 1.8.4
