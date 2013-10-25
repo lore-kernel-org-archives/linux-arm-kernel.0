@@ -1,77 +1,91 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Sat, 26 Oct 2013 10:11:06 +1100
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <E1VZjCU-0005RE-Vt@jdl.com>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <20131024234340.ADF70C403B6@trevor.secretlab.ca>
- <526A83B9.30800@wwwdotorg.org> <E1VZjCU-0005RE-Vt@jdl.com>
-Message-ID: <20131025231106.GC17659@voom.redhat.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 26 Oct 2013 00:20:15 +0100
+Subject: [PATCH 2/2] dmaengine: msm_bam_dma: Add device tree binding
+In-Reply-To: <1382732643-8184-3-git-send-email-agross@codeaurora.org>
+References: <1382732643-8184-1-git-send-email-agross@codeaurora.org>
+ <1382732643-8184-3-git-send-email-agross@codeaurora.org>
+Message-ID: <20131025232015.9082FC403B6@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 25, 2013 at 10:21:22AM -0500, Jon Loeliger wrote:
-> > On 10/25/2013 12:43 AM, Grant Likely wrote:
-> > > On Thu, 24 Oct 2013 22:51:28 +0100, Stephen Warren <swarren@wwwdotorg.org> 
-> > wrote:
-> > >> From: Stephen Warren <swarren@nvidia.com>
-> > >>
-> > >> This is a very quick proof-of-concept re: how a DT schema checker might
-> > >> look if written in C, and integrated into dtc.
-> > > 
-> > > Thanks for looking at this.
-> > > 
-> > > Very interesting. Certainly an expedient way to start checking schemas,
-> > > and for certain bindings it may be the best approach. The downside is it
-> > > forces a recompilation of DTC to bring in new bindings and it isn't a
-> > > great meduim for mixing schema with documentation in the bindings.
-> > 
-> > This approach would certainly require recompiling something. I threw the
-> > code into dtc simply because it was the easiest container for the
-> > demonstration. It could be a separate DT validation utility if we
-> > wanted, although we'd need to split the DT parser from dtc into a
-> > library to avoid code duplication. The resultant utility could be part
-> > of the repo containing the DTs, so it didn't end up as a separate
-> > package to manage.
-> > 
-> > I think the additional documentation could be added as comments in the
-> > validation functions, just like IIRC it was to be represented as
-> > comments even in the .dts-based schema proposals.
+On Fri, 25 Oct 2013 15:24:03 -0500, Andy Gross <agross@codeaurora.org> wrote:
+> Add device tree probe support for the MSM BAM DMA driver.
 > 
-> DTers,
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  .../devicetree/bindings/dma/msm_bam_dma.txt        |   49 ++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/msm_bam_dma.txt
 > 
-> I think the additional benefit of starting with a direct C
-> implementation is that it causes us to begin to actually
-> codify the schema requirements.  Sure, it may not be ideal
-> at first, but over time it may reveal consistent patterns
-> that can be extracted.  And it may reveal what a real schema
-> might look like and how it might be expressed better.  Which
-> is to say that perhaps we are letting "perfect" get in the
-> way of "good enough to start"?
+> diff --git a/Documentation/devicetree/bindings/dma/msm_bam_dma.txt b/Documentation/devicetree/bindings/dma/msm_bam_dma.txt
+> new file mode 100644
+> index 0000000..fe3ed8f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/msm_bam_dma.txt
+> @@ -0,0 +1,49 @@
+> +MSM BAM DMA controller
+> +
+> +Required properties:
+> +- compatible: Should be "qcom,bam"
+
+Really should be more specific than this. "qcom,bam" doesn't clarify
+what SoC this hardware is implemented on.
+
+Otherwise the binding looks fine.
+
+g.
+
+> +- reg: Address range for DMA registers
+> +- interrupts: single interrupt for this controller
+> +- #dma-cells: must be <3>
+> +- clocks: required clock
+> +- clock-names: name of clock
+> +
+> +Example:
+> +
+> +	dma0: dma at f9984000 = {
+> +		compatible = "qcom,bam";
+> +		reg = <0xf9984000 0x15000>;
+> +		interrupts = <0 94 0>;
+> +		clocks = <&bam_dma_ahb_cxc>;
+> +		clock-names = "bam_clk";
+> +		#dma-cells = <3>;
+> +	};
+> +
+> +Client:
+> +Required properties:
+> +- dmas: List of dma channel requests
+> +- dma-names: Names of aforementioned requested channels
+> +
+> +Clients must use the format described in the dma.txt file, using a four cell
+> +specifier for each channel.
+> +
+> +The four cells in order are:
+> +  1. A phandle pointing to the DMA controller
+> +  2. The channel number
+> +  3. The execution environment value for this channel.
+> +  4. Direction of the fixed unidirectional channel
+> +     0 - Memory to Device
+> +     1 - Device to Memory
+> +
+> +Example:
+> +	serial at f991e000 {
+> +		compatible = "qcom,msm-uart";
+> +		reg = <0xf991e000 0x1000>
+> +			<0xf9944000 0x19000>;
+> +		interrupts = <0 108 0>;
+> +		clocks = <&blsp1_uart2_apps_cxc>, <&blsp1_ahb_cxc>;
+> +		clock-names = "gsbi_uart_clk", "gsbi_pclk";
+> +
+> +		dmas = <&dma0 0 0 1>, <&dma0 1 0 0>;
+> +		dma-names = "rx", "tx";
+> +	};
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
-> In the meantime, someone has shown us the code and we can
-> get started.  It's a Small Matter of Refactoring later. :-)
-
-Yes!  This!
-
-Think of this prototype as a mechanism for collating and applying a
-bunch of schemas to the tree.  At the moment the schemas are all hard
-coded in C, but it can be extended to load some or all of them
-dynamically from a description / template / whatever.
-
-That also gives us the flexibility to start out with a simple but
-limited schema language which handles common cases, while leaving the
-complex cases in C, at least until we understand the requirements well
-enough to extend the schema language.
-
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131026/014a9126/attachment.sig>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
