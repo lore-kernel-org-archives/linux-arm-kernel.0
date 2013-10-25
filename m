@@ -1,75 +1,62 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 25 Oct 2013 11:16:14 +0200
-Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution, or
- is there something better?
-In-Reply-To: <526A3165.4020601@wwwdotorg.org>
-References: <20131022093923.GC15640@ulmo.nvidia.com>
- <20131022150426.GF29341@beef>
- <20131022171346.GE4061@obsidianresearch.com>
- <20131023080630.GA14413@netboy>
- <20131023172955.GA17145@obsidianresearch.com>
- <20131023174458.GC5208@netboy>
- <1382553982.31058.10.camel@sakura.staff.proxad.net>
- <20131024095232.27BBCC4039D@trevor.secretlab.ca>
- <1382614439.6040.16.camel@sakura.staff.proxad.net>
- <526A3165.4020601@wwwdotorg.org>
-Message-ID: <20131025091613.GH19622@ulmo.nvidia.com>
+Date: Fri, 25 Oct 2013 11:24:46 +0200
+Subject: ARM topic: Is DT on ARM the solution, or is there something
+ better?
+In-Reply-To: <CAF6AEGuEho9Ms7ifTE-EmBoQ-=_AXgvGcJxi5qEC0vsZ+H9C+A@mail.gmail.com>
+References: <52644A9E.3060007@wwwdotorg.org>
+ <20131020231134.GR25034@n2100.arm.linux.org.uk>
+ <20131021083242.GB30088@pengutronix.de>
+ <20131021084854.GV25034@n2100.arm.linux.org.uk>
+ <20131021092730.GF30088@pengutronix.de>
+ <CAF6AEGtt_2sStiZCNBp9btxevWghSwLZZBdN6ir8eUpX1FXrCQ@mail.gmail.com>
+ <20131024072811.GS30088@pengutronix.de>
+ <CAF6AEGuEho9Ms7ifTE-EmBoQ-=_AXgvGcJxi5qEC0vsZ+H9C+A@mail.gmail.com>
+Message-ID: <20131025092445.GI19622@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 25, 2013 at 09:52:53AM +0100, Stephen Warren wrote:
-> On 10/24/2013 12:33 PM, Maxime Bizon wrote:
-> > 
-> > On Thu, 2013-10-24 at 10:52 +0100, Grant Likely wrote:
-> > 
-> >> At this point if the hardware exists then it should be described in DTB,
-> >> even if it is merely compatible, reg, interrupts and maybe clocks
-> > 
-> > if your driver does not use them, chances are you'll get them wrong.
-> > 
-> >> properties. In many cases that is all that is required. It /is/ okay to
-> >> amend a binding later and to use default values if the new properties
-> >> aren't present.
-> > 
-> > how do you handle the case of a wrong property, because you only wrote
-> > hardware description and not the driver ?
-> > 
-> >> hardware description when enabling previously unused peripherals, but it
-> >> is absolutely not friendly to change a binding/driver in a what that fails on
-> >> previously working DTB (with the caveat that if no one notices, it
-> >> isn't breakage).
-> > 
-> > ok then how do we solve that case:
-> > 
-> >  - Marvell SOC 1 is mainlined
-> >  - Marvell SOC 2 is mainlined
-> >  - Marvell SOC 'x' is mainlined
-> >  - "PIO" hw crypto driver is written, working for all SOCs
-> >  - [1 year]
-> >  - SOCs bindings are marked as stable
-> >  - [1 year]
-> >  - someone rewrite the driver of hw crypto to use DMA, existing binding
-> > is not ok because clock 'foo' or interrupt 'bar', now required, are not
-> > present.
-> > 
-> > what is the process merge that driver ?
-> > 
-> > if the answer is that you need to keep PIO mode in driver so that
-> > existing DTBs still works with it, then this is just plain *wrong*.
+On Thu, Oct 24, 2013 at 05:21:54PM -0400, Rob Clark wrote:
+> On Thu, Oct 24, 2013 at 3:28 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Wed, Oct 23, 2013 at 09:14:17PM -0400, Rob Clark wrote:
+> >> On Mon, Oct 21, 2013 at 5:27 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >> >> If a subsystem doesn't work well with DT, then the choices are either:
+> >> >>
+> >> >> (a) don't use DT with the subsystem
+> >> >
+> >> > The underlying problem has nothing to do with DT. Multi component
+> >> > hardware does exist and won't vanish when we stop using DT.
+> >> >
+> >> >> (b) fix the subsystem
+> >> >
+> >> > I'd love to do that. Step one to this seems to be to increase the
+> >> > awareness that there's something wrong with DRM.
+> >>
+> >>
+> >> Note that I suspect your idea of "fixing drm" is going to break some
+> >> userspace assumptions about the hw (ie. userspace isn't expecting
+> >> crtcs/encoders/connectors to suddenly appear/disappear.  And the funny
+> >> thing is, on all of this hw, that isn't going to happen anyways.
+> >
+> > I was talking about all SoC DRM drivers implementing variants of the
+> > same glue between drm and the multidevice nature of the components.
+> >
+> > To make that sure: I never had the intention to implement hotplug for
+> > drm. Also what the imx-drm driver does is not for hotplug, but only for
+> > binding different components together.
 > 
-> That situation describes enabling a new feature. New features aren't
-> necessarily expected to work without revising the DT, e.g. adding new
-> properties/entries to describe the additional clocks/DMA-channels/...
-> that are required. In many cases, those additions can even be made in a
-> backwards-compatible way. Compatibility means that we shouldn't break
-> old functionality, not that we shouldn't augment the existing bindings.
+> ahh, ok.  Yeah, we do need some way to make this easier, as it is a
+> too-common pattern.  I do think we do need a way to know if something
+> is missing because it isn't there vs it hasn't been probed yet.  Ie.
+> late_initcall() is not the awesome solution.
 
-In other words, the absence of the new properties should make the driver
-fall back to a previous working mode, even if that means it might not be
-as good as it could be. Making it use the new features would require the
-DT to be updated.
-
-Doesn't that entail that new properties will intrinsically be optional?
+Yes, that's particularly easy to do with DT because you can walk the
+tree looking for status = "okay" to collect which device nodes are
+supposed to be enabled and assume that they'll show up eventually. I
+have no idea how this could be done without DT, though. Perhaps iterate
+over all platform devices and look for matching name.id pairs? Then
+again, it seems like this is primarily an issue on ARM, and eventually
+all ARM SoCs will move to DT, so perhaps this may become a non-issue.
+But it doesn't help with platforms that don't support DT yet.
 
 Thierry
 -------------- next part --------------
@@ -78,4 +65,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131025/4af9ff52/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131025/44eb4bad/attachment.sig>
