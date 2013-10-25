@@ -1,30 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Oct 2013 14:22:43 +0100
-Subject: [PATCH v3 2/4] ARM: sunxi: Select ARCH_HAS_RESET_CONTROLLER
+Date: Fri, 25 Oct 2013 14:22:44 +0100
+Subject: [PATCH v3 3/4] ARM: sunxi: Register the A31 reset IP in init_time
 In-Reply-To: <1382707365-4776-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1382707365-4776-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1382707365-4776-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1382707365-4776-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 has a reset controller, and we have to select this option to
-have access to the reset controller framework.
+The A31 has a reset IP that maintains a few other IPs in reset by
+default. Among these IPs are the UARTs, and most notably the timers. We
+thus need to register the reset driver before initializing the timers so
+that the reset timer can use the reset framework.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-sunxi/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-sunxi/sunxi.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index bce0d42..547004c 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -1,5 +1,6 @@
- config ARCH_SUNXI
- 	bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
-+	select ARCH_HAS_RESET_CONTROLLER
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_GIC
- 	select CLKSRC_MMIO
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index f184f6c..2e79736 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -142,9 +142,17 @@ static const char * const sun6i_board_dt_compat[] = {
+ 	NULL,
+ };
+ 
++extern void __init sun6i_reset_init(void);
++static void __init sun6i_timer_init(void)
++{
++	sunxi_init_clocks();
++	sun6i_reset_init();
++	clocksource_of_init();
++}
++
+ DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
+ 	.init_machine	= sunxi_dt_init,
+-	.init_time	= sunxi_timer_init,
++	.init_time	= sun6i_timer_init,
+ 	.dt_compat	= sun6i_board_dt_compat,
+ 	.restart	= sun6i_restart,
+ MACHINE_END
 -- 
 1.8.4
