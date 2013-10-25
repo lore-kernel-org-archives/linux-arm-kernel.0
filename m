@@ -1,25 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 Oct 2013 07:31:03 -0700
-Subject: [PATCH 0/2] ARM: OMAP: dmtimers improvements.
-In-Reply-To: <448912EABC71F84BBCADFD3C67C4BE5291DD30@DBDE04.ent.ti.com>
-References: <20131024065536.16889.49902.stgit@notabene.brown>
- <448912EABC71F84BBCADFD3C67C4BE5291DD30@DBDE04.ent.ti.com>
-Message-ID: <20131025143103.GZ15154@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 25 Oct 2013 15:44:09 +0100
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <20131024234340.ADF70C403B6@trevor.secretlab.ca>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <20131024234340.ADF70C403B6@trevor.secretlab.ca>
+Message-ID: <526A83B9.30800@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [131024 11:11]:
-> Sorry for top posting .... Probably we should move the dmtimer to drivers/misc or create drivers/timer/
-> This has been pending for quite some time now....
+On 10/25/2013 12:43 AM, Grant Likely wrote:
+> On Thu, 24 Oct 2013 22:51:28 +0100, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> This is a very quick proof-of-concept re: how a DT schema checker might
+>> look if written in C, and integrated into dtc.
 > 
-> Tony, what you say ?
+> Thanks for looking at this.
+> 
+> Very interesting. Certainly an expedient way to start checking schemas,
+> and for certain bindings it may be the best approach. The downside is it
+> forces a recompilation of DTC to bring in new bindings and it isn't a
+> great meduim for mixing schema with documentation in the bindings.
 
-Yes that should be done and we should cc Thomas Gleixner to
-see if he has any better ideas for some of those exported
-functions. Things that can be done with hrtimer should be done
-with hrtimer, but at least the coprocessor use of timers and
-PWM need to use timers directly.
+This approach would certainly require recompiling something. I threw the
+code into dtc simply because it was the easiest container for the
+demonstration. It could be a separate DT validation utility if we
+wanted, although we'd need to split the DT parser from dtc into a
+library to avoid code duplication. The resultant utility could be part
+of the repo containing the DTs, so it didn't end up as a separate
+package to manage.
 
-Regards,
-
-Tony
+I think the additional documentation could be added as comments in the
+validation functions, just like IIRC it was to be represented as
+comments even in the .dts-based schema proposals.
