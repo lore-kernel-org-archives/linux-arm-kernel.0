@@ -1,117 +1,112 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 26 Oct 2013 00:23:39 +0200
-Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: convert to platform driver
-In-Reply-To: <1953577.TBW5ixuUM5@thinkpad>
-References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
- <6431720.IUjkN7MGOG@thinkpad> <526AC2DF.2020904@linaro.org>
- <1953577.TBW5ixuUM5@thinkpad>
-Message-ID: <526AEF6B.2000404@linaro.org>
+Date: Sat, 26 Oct 2013 00:25:55 +0200
+Subject: [PATCH V2] ARM: trace: Add tracepoint for the Inter Processor
+ Interrupt
+In-Reply-To: <1382688595.6143.5.camel@pippen.local.home>
+References: <1381839042-3533-1-git-send-email-daniel.lezcano@linaro.org>	
+ <526A145E.1010809@linaro.org> <1382688595.6143.5.camel@pippen.local.home>
+Message-ID: <526AEFF3.3060609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2013 10:52 PM, Tomasz Figa wrote:
-> On Friday 25 of October 2013 21:13:35 Daniel Lezcano wrote:
->> On 10/25/2013 12:39 PM, Tomasz Figa wrote:
->>> Hi Daniel,
+On 10/25/2013 10:09 AM, Steven Rostedt wrote:
+> On Fri, 2013-10-25 at 08:49 +0200, Daniel Lezcano wrote:
+>> On 10/15/2013 02:10 PM, Daniel Lezcano wrote:
+>>> The Inter Processor Interrupt is used on ARM to tell another processor to do
+>>> a specific action. This is mainly used to emulate a timer interrupt on an idle
+>>> cpu, force a cpu to reschedule or run a function on another processor context.
 >>>
->>> [Sending again, without HTML part. Sorry for the noise.]
+>>> Add a tracepoint when raising an IPI and in the entry/exit handler functions.
 >>>
->>> On Friday 25 of October 2013 09:11:13 Daniel Lezcano wrote:
->>>> The driver is tied with the pm low level code making difficult to
->>>> split
->>>> the driver into a more arch independent code. The platform driver
->>>> allows
->>>> to move the standby callback into the platform data field and use a
->>>> simple driver with no more dependency on the low level code.
->>>>
->>>> The standby callback has a portion of code to set the standby method
->>>> and
->>>> the effective cpu_do_idle switching the cpu to the right mode. As this
->>>> code is redundant in the cpu suspend code, it has been factored out
->>>> when
->>>> implementing the standby methdod.
->>>>
->>>> By this way, the driver is ready to be moved out to the
->>>> drivers/cpuidle.
+>>> When a cpu raises an IPI, the targeted cpus is an interesting information, the
+>>> cpumask conversion in hexa is added in the trace using the cpumask_scnprintf
+>>> function.
 >>>
->>> The idea itself is quite good, but unfortunately I have to NAK this.
->>> Please see details in comments below.
+>>> Tested-on Vexpress TC2 (5 processors).
 >>>
->>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>> ---
->>>>
->>>>    arch/arm/mach-s3c64xx/cpuidle.c |   38
->>>>
->>>> ++++++++++++++++---------------------- arch/arm/mach-s3c64xx/pm.c
->>>> |
->>>>
->>>>     33 ++++++++++++++++++++++++++------- 2 files changed, 42
->>>>
->>>> insertions(+), 29 deletions(-)
+>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 >>
->> [ ... ]
+>> Hi All,
 >>
->>>> -
->>>> -	tmp = __raw_readl(S3C64XX_PWR_CFG);
->>>> -	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
->>>> -	tmp |= S3C64XX_PWRCFG_CFG_WFI_SLEEP;
->>>
->>> Finally note the S3C64XX_PWRCFG_CFG_WFI_SLEEP flag here again.
->>
->> Ouch ! I missed it. Thanks for spotting the problem.
->>
->>> I believe it should be visible now what's wrong with this patch. To
->>> make
->>> sure it is, let me explain how the system controller of S3C64xx handles
->>> WFI requests.
->>>
->>> When the CPU issues WFI request to the syscon, it takes an action
->>> depending on how it is configured. A bit field is there in one of
->>> syscon registers (S3C64XX_PWR_CFG) that selects what action to perform
->>> in case of WFI request.
->>>
->>> You can program the syscon to ignore the request, enter IDLE mode,
->>> enter
->>> STOP mode or enter SLEEP mode. As the names suggest, for cpuidle, it
->>> needs to be programmed for IDLE mode and for system-wide sleep it
->>> needs to be set to SLEEP mode. STOP mode is not very useful as it has
->>> mostly the same effect that can be achieved by performing fine-grained
->>> clock and power gating of peripherals manually, so it is unused by
->>> Linux.
->>
->> Yes, this is what I assumed but I missed the CFG_WFI_SLEEP flag, my eyes
->> read CFG_WFI_IDLE.
->>
->>> Now, my take on the issue you are trying to solve would be a bit
->>> different. Since the S3C64xx does not have any interesting cpuidle
->>> modes, just a normal, clock-gated WFI mode, it does not need to have a
->>> cpuidle driver at all. All that is needed is simply setting up the
->>> S3C64XX_PWRCFG_CFG_WFI field to S3C64XX_PWRCFG_CFG_WFI_IDLE early at
->>> boot-up, then set it to S3C64XX_PWRCFG_CFG_WFI_SLEEP just before
->>> entering the sleep mode and restore it back to
->>> S3C64XX_PWRCFG_CFG_WFI_IDLE after waking up.
->> So you are suggesting to remove the cpuidle driver ?
+>> does this patch sound good for inclusion ?
 >
-> Exactly.
+> Ug, I never sent my email. It was half written and in my drafts folder.
 
-I see.
+That's just typical ! I think no one can say it never happened :)
 
->> Won't it be worth to add a new WFI_SLEEP state to the cpuidle driver ?
+> I'll reply below.
 >
-> I don't think so. How a suspend-to-RAM specific thing like WFI_SLEEP could
-> be relevant to a cpuidle driver? (Unless there are some plans to
-> consolidate STR with cpuidle that I haven't heard about...)
 
-I finally found a documentation for the s3c6410x and the description of 
-the different modes. Indeed, the sleep mode is not adequate for a 
-cpuidle state. What about the 'stop' and 'deep stop' state ?
+[ ... ]
 
-What is 'STR' ?
+>>> +/**
+>>> + * ipi_raise - called when a smp cross call is made
+>>> + * @ipinr: the IPI number
+>>> + * @cpumask: the recipients for the IPI
+>>> + *
+>>> + * The @ipinr value must be valid and the action name associated with
+>>> + * the IPI value is given in the trace as well as the cpumask of the
+>>> + * targeted cpus.
+>>> + */
+>>> +TRACE_EVENT_CONDITION(ipi_raise,
+>>> +
+>>> +    TP_PROTO(const struct cpumask *cpumask, int ipinr),
+>>> +
+>>> +    TP_ARGS(cpumask, ipinr),
+>>> +
+>>> +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0),
+>>> +
+>>> +    TP_STRUCT__entry(
+>>> +	    __field(int, ipinr)
+>>> +	    __array(char, cpumask, NR_CPUS)
+>>> +    ),
+>>> +
+>>> +    TP_fast_assign(
+>>> +	    __entry->ipinr = ipinr;
+>>> +	    cpumask_scnprintf(__entry->cpumask,
+>>> +			      ARRAY_SIZE(__entry->cpumask), cpumask);
+>
+> Please do not do the scnprintf() in the TP_fast_assign(). It's heavy
+> weight and this is done in the code path. Just copy the actual cpumask
+> itself.
+
+Ok.
+
+> Now, how to do that exactly is the reason I never sent my original mail,
+> because I never got around to looking how to do it, but it is possible.
+> Unfortunately, I'm at Kernel Summit at the moment, and still don't have
+> time to look at the best way to do it. But you can use dynamic arrays
+> for the cpus_online.
+>
+>>> +    ),
+>>> +
+>>> +    TP_printk("ipi=%d, cpumask=0x%s, name=%s", __entry->ipinr, __entry->cpumask,
+>>> +	      show_ipi_name(__entry->ipinr))
+>
+> Here is where you can convert the cpumask saved in the ring buffer to a
+> snprintf() format. Now this may need some work too, and perhaps even a
+> handler to help. I thought there was already some printk format that
+> does cpumasks.
+>
+> If the helpers are not there, then I can work on adding some.
+
+I don't find any helper in the code except cpumask_scnprintf. If you 
+don't have the time, I can do the adequate changes with some advices.
 
 Thanks
    -- Daniel
 
-
+>>> +);
+>>> +
+>>> +#endif /* _TRACE_IPI_H */
+>>> +
+>>> +/* This part must be outside protection */
+>>> +#include <trace/define_trace.h>
+>>>
+>>
+>>
+>
+>
 
 
 -- 
