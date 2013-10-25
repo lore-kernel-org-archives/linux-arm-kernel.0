@@ -1,117 +1,90 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 26 Oct 2013 00:25:55 +0200
-Subject: [PATCH V2] ARM: trace: Add tracepoint for the Inter Processor
- Interrupt
-In-Reply-To: <1382688595.6143.5.camel@pippen.local.home>
-References: <1381839042-3533-1-git-send-email-daniel.lezcano@linaro.org>	
- <526A145E.1010809@linaro.org> <1382688595.6143.5.camel@pippen.local.home>
-Message-ID: <526AEFF3.3060609@linaro.org>
+From: syin@broadcom.com (Sherman Yin)
+Date: Fri, 25 Oct 2013 22:48:38 +0000
+Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <051069C10411E24D9749790C498526FA1BE0841D@SJEXCHMB12.corp.ad.broadcom.com>
+References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
+ <1380846199-12829-4-git-send-email-syin@broadcom.com>
+ <CACRpkdZah4fFuJL2Vh5JmbBCgnekg8MKqMWHzeheOx3N1Kzwng@mail.gmail.com>
+ <051069C10411E24D9749790C498526FA1BE027EA@SJEXCHMB12.corp.ad.broadcom.com>
+ <CACRpkdarPC+LxAAezT2LRiz=Y2RduUsb75YYHUgq7HqePzkD3Q@mail.gmail.com>
+ <051069C10411E24D9749790C498526FA1BE03D43@SJEXCHMB12.corp.ad.broadcom.com>
+ <051069C10411E24D9749790C498526FA1BE0841D@SJEXCHMB12.corp.ad.broadcom.com>
+Message-ID: <051069C10411E24D9749790C498526FA1BE0B7D7@SJEXCHMB12.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2013 10:09 AM, Steven Rostedt wrote:
-> On Fri, 2013-10-25 at 08:49 +0200, Daniel Lezcano wrote:
->> On 10/15/2013 02:10 PM, Daniel Lezcano wrote:
->>> The Inter Processor Interrupt is used on ARM to tell another processor to do
->>> a specific action. This is mainly used to emulate a timer interrupt on an idle
->>> cpu, force a cpu to reschedule or run a function on another processor context.
+>>>>>As well as all this stuff...
+>>>>
+>>>> OK.  Will see if I can find something suitable for "input disable" and "mode"
 >>>
->>> Add a tracepoint when raising an IPI and in the entry/exit handler functions.
+>>>Let's discuss this. What exactly does "input disable" and "mode"
+>>>mean, in electrical terms?
 >>>
->>> When a cpu raises an IPI, the targeted cpus is an interesting information, the
->>> cpumask conversion in hexa is added in the trace using the cpumask_scnprintf
->>> function.
->>>
->>> Tested-on Vexpress TC2 (5 processors).
->>>
->>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>When you come down to what actually happens it may turn out that
+>>>"input disable" is PIN_CONFIG_OUTPUT, which implicitly turns
+>>>off input does it not?
 >>
->> Hi All,
->>
->> does this patch sound good for inclusion ?
+>>I'm going to verify the details with our hardware team first, and will let you
+>>know if we think we can use one of the existing generic parameters or if we
+>>need a new one.
 >
-> Ug, I never sent my email. It was half written and in my drafts folder.
-
-That's just typical ! I think no one can say it never happened :)
-
-> I'll reply below.
+>"input disable"
+>This setting disconnects the input (DIN) to the internal logic from the pin pad.
+>However, the output (DOUT) can still drive the pad.  It seems to match
+>PIN_CONFIG_OUTPUT, but the current generic option is either "output-low" or
+>"output-high" - are these referring to a static output of 0 and 1?
 >
-
-[ ... ]
-
->>> +/**
->>> + * ipi_raise - called when a smp cross call is made
->>> + * @ipinr: the IPI number
->>> + * @cpumask: the recipients for the IPI
->>> + *
->>> + * The @ipinr value must be valid and the action name associated with
->>> + * the IPI value is given in the trace as well as the cpumask of the
->>> + * targeted cpus.
->>> + */
->>> +TRACE_EVENT_CONDITION(ipi_raise,
->>> +
->>> +    TP_PROTO(const struct cpumask *cpumask, int ipinr),
->>> +
->>> +    TP_ARGS(cpumask, ipinr),
->>> +
->>> +    TP_CONDITION(ipinr < NR_IPI && ipinr >= 0),
->>> +
->>> +    TP_STRUCT__entry(
->>> +	    __field(int, ipinr)
->>> +	    __array(char, cpumask, NR_CPUS)
->>> +    ),
->>> +
->>> +    TP_fast_assign(
->>> +	    __entry->ipinr = ipinr;
->>> +	    cpumask_scnprintf(__entry->cpumask,
->>> +			      ARRAY_SIZE(__entry->cpumask), cpumask);
+>"mode"
+>This controls several aspect of the pin (slew rate, pull up strength, etc) to meet
+>I2C specs for Standard/Fast mode vs High Speed mode.  I think the best
+>way is to map this to slew rate, which would require some explanation because
+>the meaning of slew rate differs depending on what pin function is selected:
+>- When I2C (*_SCL or *_SDA) function is selected for the pin: 0: Standard (100kbps)
+>  & Fast mode (400kbps), 1: High Speed mode (3.4Mbps)
+>- When IC_DM or IC_DP function is selected, 0: normal slew rate, 1: fast slew rate
+>- Else: 0: fast slew rate, 1: normal slew rate
 >
-> Please do not do the scnprintf() in the TP_fast_assign(). It's heavy
-> weight and this is done in the code path. Just copy the actual cpumask
-> itself.
+>Also, it seems like I have to add "slew-rate" to dt_params[] in pinconf-generic.c and
+>pinctrl-bindings.txt.
 
-Ok.
+Hi Linus,
 
-> Now, how to do that exactly is the reason I never sent my original mail,
-> because I never got around to looking how to do it, but it is possible.
-> Unfortunately, I'm at Kernel Summit at the moment, and still don't have
-> time to look at the best way to do it. But you can use dynamic arrays
-> for the cpus_online.
->
->>> +    ),
->>> +
->>> +    TP_printk("ipi=%d, cpumask=0x%s, name=%s", __entry->ipinr, __entry->cpumask,
->>> +	      show_ipi_name(__entry->ipinr))
->
-> Here is where you can convert the cpumask saved in the ring buffer to a
-> snprintf() format. Now this may need some work too, and perhaps even a
-> handler to help. I thought there was already some printk format that
-> does cpumasks.
->
-> If the helpers are not there, then I can work on adding some.
+So I will go ahead and make the change in pinconf-generic.c and pinctrl-bindings.txt
+to include parsing of the "slew-rate" property and submit it as part of my pinctrl
+changes.
 
-I don't find any helper in the code except cpumask_scnprintf. If you 
-don't have the time, I can do the adequate changes with some advices.
+Question regarding pinctrl-generic: in pinctrl-bindings.txt, this is said about the
+"function" property:
 
-Thanks
-   -- Daniel
+169- function takes a list of function names/IDs as a required argument. The
+170  specific binding for the hardware defines:
+171  - Whether the entries are integers or strings, and their meaning.
+172  - Whether only a single entry is allowed (which is applied to all entries
+173    in the pins property), or whether there may alternatively be one entry per
+174    entry in the pins property, in which case the list lengths must match, and
+175    for each list index i, the function at list index i is applied to the pin
+176    at list index i.
 
->>> +);
->>> +
->>> +#endif /* _TRACE_IPI_H */
->>> +
->>> +/* This part must be outside protection */
->>> +#include <trace/define_trace.h>
->>>
->>
->>
->
->
+(Although it looks like pinconf_generic_dt_subnode_to_map() does not support
+the "one entry per pin feature" for the "function" property yet.)
 
+In my driver, I have the "one entry per pin" support for all my properties instead
+of just the function property, like the "drive_str" property below:
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
++		grp_1 {
++			brcm,pins	= "pin1", "pin2", "pin3";
++			brcm,function	= "alt1", "alt2", "alt1";
++			brcm,drive_str	= <2 4 6>;
++			brcm,slew	= <1>;
++		};
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+I thought that would be convenient and allow users to group pins together based 
+on functionality and without the restriction that the pins must have the same 
+properties.  Do you think that's a good idea and are there plans to support that in
+the generic pinconfig?  If so, I can look into porting my implementation to
+pinconf-generic.c - but first I have to figure out how some of the properties would
+work if more than one value could be specified (eg. "bias-disable" which takes no
+values)
+
+Thanks,
+Sherman
