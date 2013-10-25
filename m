@@ -1,55 +1,36 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 25 Oct 2013 05:40:57 +0100
-Subject: [RFC PATCHv2 3/4] of: provide a binding for fixed link PHYs
-In-Reply-To: <20130918181112.56c10dde@skate>
-References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130918042923.5D845C42CF7@trevor.secretlab.ca>
- <20130918181112.56c10dde@skate>
-Message-ID: <1811694.J4B6oUpKxP@lenovo>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 25 Oct 2013 09:53:10 +0530
+Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
+ status
+In-Reply-To: <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
+References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
+ <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
+ <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
+ <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
+ <20131017020745.GA14013@intel.com>
+ <20131017142755.GA4477@breakpoint.cc>
+ <20131017134846.GG14013@intel.com>
+ <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
+Message-ID: <20131025042310.GC21230@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 18 septembre 2013, 18:11:12 Thomas Petazzoni a ?crit :
-> Dear Grant Likely,
+On Thu, Oct 24, 2013 at 11:28:29PM +0200, Guennadi Liakhovetski wrote:
+> Hi Vinod
 > 
-> On Tue, 17 Sep 2013 23:29:23 -0500, Grant Likely wrote:
-> > I understand what you're trying to do here, but it causes a troublesome
-> > leakage of implementation detail into the binding, making the whole
-> > thing look very odd. This binding tries to make a fixed link look
-> > exactly like a real PHY even to the point of including a phandle to the
-> > phy. But having a phandle to a node which is *always* a direct child of
-> > the MAC node is redundant and a rather looney. Yes, doing it that way
-> > makes it easy for of_phy_find_device() to be transparent for fixed link,
-> > but that should *not* drive bindings, especially when that makes the
-> > binding really rather weird.
-> > 
-> > Second, this new binding doesn't provide anything over and above the
-> > existing fixed-link binding. It may not be pretty, but it is
-> > estabilshed.
+> On Thu, 17 Oct 2013, Vinod Koul wrote:
+> > Yes i missed it in first place update the patch to fix that
 > 
-> Have you followed the past discussions about this patch set? Basically
-> the *only* feedback I received on RFCv1 is that the fixed-link property
-> sucks, and everybody (including the known Device Tree binding
-> maintainer Mark Rutland) suggested to not use the fixed-link mechanism.
-> See http://article.gmane.org/gmane.linux.network/276932, where Mark
-> said:
-> 
-> ""
-> I'm not sure grouping these values together is the best way of handling
-> this. It's rather opaque, and inflexible for future extension.
-> ""
-> 
-> So, please DT maintainers, tell me what you want. I honestly don't care
-> whether fixed-link or a separate node is chosen. However, I do care
-> about being dragged around between two solutions just because the
-> former DT maintainer and the new DT maintainers do not agree.
+> Are you planning to post a fixed version of this patch or you just fix it 
+> internally? Would be good to have it posted to be able to ack it and other 
+> relevant patches.
+looks like you missed it... I had posted updated patch [1] in this thread here
+and I posted 29th patch as removal one [2]
 
-Since I would like to move forward so I can one day use that binding in a 
-real-life product, I am going to go for Mark's side which happens to be how I 
-want the binding to look like.
+Both were pushed to -next after few days
 
-Do we all agree that the new binding is just way better than the old one? In 
-light of the recent unstable DT ABI discussion, we can still continue parsing 
-the old one for the sake of compatibility.
+[1]: http://marc.info/?l=linux-kernel&m=138197886521699&w=2
+[2]: http://marc.info/?l=linux-kernel&m=138197936321767&w=2
+
 -- 
-Florian
+~Vinod
