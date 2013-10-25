@@ -1,71 +1,116 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 25 Oct 2013 11:51:52 +0100
-Subject: [PATCH v9 17/18] grant-table: call set_phys_to_machine after mapping
- grant refs
-In-Reply-To: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
-Message-ID: <1382698313-13161-17-git-send-email-stefano.stabellini@eu.citrix.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 25 Oct 2013 13:07:18 +0200
+Subject: [PATCHv7][ 1/6] video: imxfb: Introduce regulator support.
+In-Reply-To: <1382605103-9595-1-git-send-email-denis@eukrea.com>
+References: <1382605103-9595-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131025110718.GP18477@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When mapping/unmapping grant refs, call
-set_phys_to_machine to update the P2M with the new mappings for
-autotranslate guests.
-This is (almost) a nop on x86.
+On 10:58 Thu 24 Oct     , Denis Carikli wrote:
+> This commit is based on the following commit by Fabio Estevam:
+>   4344429 video: mxsfb: Introduce regulator support
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-Changes in v9:
-- add in-code comments.
----
- drivers/xen/grant-table.c |   19 +++++++++++++++++--
- 1 files changed, 17 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index c4d2298..62ccf54 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -49,6 +49,7 @@
- #include <xen/grant_table.h>
- #include <xen/interface/memory.h>
- #include <xen/hvc-console.h>
-+#include <xen/swiotlb-xen.h>
- #include <asm/xen/hypercall.h>
- #include <asm/xen/interface.h>
- 
-@@ -898,8 +899,16 @@ int gnttab_map_refs(struct gnttab_map_grant_ref *map_ops,
- 			gnttab_retry_eagain_gop(GNTTABOP_map_grant_ref, map_ops + i,
- 						&map_ops[i].status, __func__);
- 
--	if (xen_feature(XENFEAT_auto_translated_physmap))
-+	/* this is basically a nop on x86 */
-+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-+		for (i = 0; i < count; i++) {
-+			if (map_ops[i].status)
-+				continue;
-+			set_phys_to_machine(map_ops[i].host_addr >> PAGE_SHIFT,
-+					map_ops[i].dev_bus_addr >> PAGE_SHIFT);
-+		}
- 		return ret;
-+	}
- 
- 	if (!in_interrupt() && paravirt_get_lazy_mode() == PARAVIRT_LAZY_NONE) {
- 		arch_enter_lazy_mmu_mode();
-@@ -942,8 +951,14 @@ int gnttab_unmap_refs(struct gnttab_unmap_grant_ref *unmap_ops,
- 	if (ret)
- 		return ret;
- 
--	if (xen_feature(XENFEAT_auto_translated_physmap))
-+	/* this is basically a nop on x86 */
-+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-+		for (i = 0; i < count; i++) {
-+			set_phys_to_machine(unmap_ops[i].host_addr >> PAGE_SHIFT,
-+					INVALID_P2M_ENTRY);
-+		}
- 		return ret;
-+	}
- 
- 	if (!in_interrupt() && paravirt_get_lazy_mode() == PARAVIRT_LAZY_NONE) {
- 		arch_enter_lazy_mmu_mode();
--- 
-1.7.2.5
+I've too many patch version in my mailbox specially without any description
+about what is updated between version can explain this.
+> 
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+>  drivers/video/imxfb.c |   29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+> 
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index 44ee678..4bf3837 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/cpufreq.h>
+>  #include <linux/clk.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/io.h>
+>  #include <linux/math64.h>
+> @@ -145,6 +146,7 @@ struct imxfb_info {
+>  	struct clk		*clk_ipg;
+>  	struct clk		*clk_ahb;
+>  	struct clk		*clk_per;
+> +	struct regulator	*reg_lcd;
+>  	enum imxfb_type		devtype;
+>  	bool			enabled;
+>  
+> @@ -563,12 +565,23 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+>  
+>  static void imxfb_enable_controller(struct imxfb_info *fbi)
+>  {
+> +	int ret;
+>  
+>  	if (fbi->enabled)
+>  		return;
+>  
+>  	pr_debug("Enabling LCD controller\n");
+>  
+> +	if (fbi->reg_lcd) {
+> +		ret = regulator_enable(fbi->reg_lcd);
+> +		if (ret) {
+> +			dev_err(&fbi->pdev->dev,
+> +				"lcd regulator enable failed with error: %d\n",
+> +				ret);
+> +			return;
+> +		}
+> +	}
+> +
+>  	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+>  
+>  	/* panning offset 0 (0 pixel offset)        */
+> @@ -597,6 +610,8 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+>  
+>  static void imxfb_disable_controller(struct imxfb_info *fbi)
+>  {
+> +	int ret;
+> +
+>  	if (!fbi->enabled)
+>  		return;
+>  
+> @@ -613,6 +628,14 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+>  	fbi->enabled = false;
+>  
+>  	writel(0, fbi->regs + LCDC_RMCR);
+> +
+> +	if (fbi->reg_lcd) {
+> +		ret = regulator_disable(fbi->reg_lcd);
+> +		if (ret)
+> +			dev_err(&fbi->pdev->dev,
+> +				"lcd regulator disable failed with error: %d\n",
+> +				ret);
+> +	}
+>  }
+>  
+>  static int imxfb_blank(int blank, struct fb_info *info)
+> @@ -1020,6 +1043,12 @@ static int imxfb_probe(struct platform_device *pdev)
+>  		goto failed_register;
+>  	}
+>  
+> +	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
+> +	if (IS_ERR(fbi->reg_lcd)) {
+> +		dev_info(&pdev->dev, "No lcd regulator used.\n");
+> +		fbi->reg_lcd = NULL;
+> +	}
+> +
+>  	imxfb_enable_controller(fbi);
+>  	fbi->pdev = pdev;
+>  #ifdef PWMR_BACKLIGHT_AVAILABLE
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
