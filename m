@@ -1,106 +1,125 @@
-From: B31939@freescale.com (Lian Minghuan-b31939)
-Date: Fri, 25 Oct 2013 13:58:06 +0800
-Subject: [PATCH 02/12][v3] pci: fsl: add structure fsl_pci
-In-Reply-To: <2B28E421-9B64-4CEC-9E00-8893502CE12F@kernel.crashing.org>
-References: <1382524894-15164-1-git-send-email-Minghuan.Lian@freescale.com>
- <1382524894-15164-2-git-send-email-Minghuan.Lian@freescale.com>
- <2B28E421-9B64-4CEC-9E00-8893502CE12F@kernel.crashing.org>
-Message-ID: <526A086E.305@freescale.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 25 Oct 2013 14:02:20 +0800
+Subject: [PATCH v3 2/5] usb: chipidea: add freescale imx28 special write
+ register method
+In-Reply-To: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
+References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1382680943-9258-2-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kumar,
+According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+register error issue", All USB register write operations must
+use the ARM SWP instruction. So, we implement special hw_write
+and hw_test_and_clear for imx28.
 
-please see my comment inline.
+Discussion for it at below:
+http://marc.info/?l=linux-usb&m=137996395529294&w=2
 
-On 10/24/2013 12:11 PM, Kumar Gala wrote:
-> On Oct 23, 2013, at 5:41 AM, Minghuan Lian wrote:
->
->> PowerPC uses structure pci_controller to describe PCI controller,
->> but ARM uses structure pci_sys_data. In order to support PowerPC
->> and ARM simultaneously, the patch adds a structure fsl_pci that
->> contains most of the members of the pci_controller and pci_sys_data.
->> Meanwhile, it defines a interface fsl_arch_sys_to_pci() which should
->> be implemented in architecture-specific PCI controller driver to
->> convert pci_controller or pci_sys_data to fsl_pci.
->>
->> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
->> ---
->> change log:
->> v1-v3:
->> Derived from http://patchwork.ozlabs.org/patch/278965/
->>
->> Based on upstream master.
->> Based on the discussion of RFC version here
->> http://patchwork.ozlabs.org/patch/274487/
->>
->> include/linux/fsl/pci-common.h | 41 +++++++++++++++++++++++++++++++++++++++++
->> 1 file changed, 41 insertions(+)
-> NAK.
->
-> We discussed this some at the ARM Summit this week and the feeling is we need to move to a common interface between the various ARCHs.
-[Minghuan] Do you mean we will use the common interface instead of 
-arch/powerpc/kernel/pci-common.c...
-and arch/arm/kernel/bios32.c?  Who will do the code movement and when 
-will the work be completed? The patches just move the common functions 
-of FSL PCI controller operation which can be re-used by PowerPC and ARM. 
-LS1 is coming, I worry about not having enough time to wait for the move 
-is completed.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+Changes for v2:
+- Rebase to latest usb-next tree
 
-> - k
->
->> diff --git a/include/linux/fsl/pci-common.h b/include/linux/fsl/pci-common.h
->> index 5e4f683..e56a040 100644
->> --- a/include/linux/fsl/pci-common.h
->> +++ b/include/linux/fsl/pci-common.h
->> @@ -102,5 +102,46 @@ struct ccsr_pci {
->>
->> };
->>
->> +/*
->> + * Structure of a PCI controller (host bridge)
->> + */
->> +struct fsl_pci {
->> +	struct list_head node;
->> +	bool is_pcie;
->> +	struct device_node *dn;
->> +	struct device *dev;
->> +
->> +	int first_busno;
->> +	int last_busno;
->> +	int self_busno;
->> +	struct resource busn;
->> +
->> +	struct pci_ops *ops;
->> +	struct ccsr_pci __iomem *regs;
->> +
->> +	u32 indirect_type;
->> +
->> +	struct resource io_resource;
->> +	resource_size_t io_base_phys;
->> +	resource_size_t pci_io_size;
->> +
->> +	struct resource mem_resources[3];
->> +	resource_size_t mem_offset[3];
->> +
->> +	int global_number;	/* PCI domain number */
->> +
->> +	resource_size_t dma_window_base_cur;
->> +	resource_size_t dma_window_size;
->> +
->> +	void *sys;
->> +};
->> +
->> +/*
->> + * Convert architecture specific pci controller structure to fsl_pci
->> + * PowerPC uses structure pci_controller and ARM uses structure pci_sys_data
->> + * to describe pci controller.
->> + */
->> +extern struct fsl_pci *fsl_arch_sys_to_pci(void *sys);
->> +
->> #endif /* __PCI_COMMON_H */
->> #endif /* __KERNEL__ */
->> -- 
->> 1.8.1.2
->>
->
+ drivers/usb/chipidea/ci.h    |   23 +++++++++++++++++++++++
+ drivers/usb/chipidea/core.c  |    2 ++
+ drivers/usb/chipidea/host.c  |    1 +
+ include/linux/usb/chipidea.h |    1 +
+ 4 files changed, 27 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index 1c94fc5..4eb61d0 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -173,6 +173,8 @@ struct ci_hdrc {
+ 	struct dentry			*debugfs;
+ 	bool				id_event;
+ 	bool				b_sess_valid_event;
++	/* imx28 needs swp instruction for writing */
++	bool				imx28_write_fix;
+ };
+ 
+ static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
+@@ -253,6 +255,13 @@ static inline u32 hw_read(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask)
+ 	return ioread32(ci->hw_bank.regmap[reg]) & mask;
+ }
+ 
++#ifdef CONFIG_SOC_IMX28
++static inline void imx28_ci_writel(u32 val32, volatile u32 *addr)
++{
++	__asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
++}
++#endif
++
+ /**
+  * hw_write: writes to a hw register
+  * @reg:  register index
+@@ -266,7 +275,14 @@ static inline void hw_write(struct ci_hdrc *ci, enum ci_hw_regs reg,
+ 		data = (ioread32(ci->hw_bank.regmap[reg]) & ~mask)
+ 			| (data & mask);
+ 
++#ifdef CONFIG_SOC_IMX28
++	if (ci->imx28_write_fix)
++		imx28_ci_writel(data, ci->hw_bank.regmap[reg]);
++	else
++		iowrite32(data, ci->hw_bank.regmap[reg]);
++#else
+ 	iowrite32(data, ci->hw_bank.regmap[reg]);
++#endif
+ }
+ 
+ /**
+@@ -281,7 +297,14 @@ static inline u32 hw_test_and_clear(struct ci_hdrc *ci, enum ci_hw_regs reg,
+ {
+ 	u32 val = ioread32(ci->hw_bank.regmap[reg]) & mask;
+ 
++#ifdef CONFIG_SOC_IMX28
++	if (ci->imx28_write_fix)
++		imx28_ci_writel(val, ci->hw_bank.regmap[reg]);
++	else
++		iowrite32(val, ci->hw_bank.regmap[reg]);
++#else
+ 	iowrite32(val, ci->hw_bank.regmap[reg]);
++#endif
+ 	return val;
+ }
+ 
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 06204b7..357a059 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -551,6 +551,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 
+ 	ci->dev = dev;
+ 	ci->platdata = dev->platform_data;
++	ci->imx28_write_fix = !!(ci->platdata->flags &
++		CI_HDRC_IMX28_WRITE_FIX);
+ 
+ 	ret = hw_device_init(ci, base);
+ 	if (ret < 0) {
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 59e6020..06fd042 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -65,6 +65,7 @@ static int host_start(struct ci_hdrc *ci)
+ 	ehci->caps = ci->hw_bank.cap;
+ 	ehci->has_hostpc = ci->hw_bank.lpm;
+ 	ehci->has_tdi_phy_lpm = ci->hw_bank.lpm;
++	ehci->imx28_write_fix = ci->imx28_write_fix;
+ 
+ 	if (ci->platdata->reg_vbus) {
+ 		ret = regulator_enable(ci->platdata->reg_vbus);
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 7d39967..708bd11 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -24,6 +24,7 @@ struct ci_hdrc_platform_data {
+ 	 * but otg is not supported (no register otgsc).
+ 	 */
+ #define CI_HDRC_DUAL_ROLE_NOT_OTG	BIT(4)
++#define CI_HDRC_IMX28_WRITE_FIX		BIT(5)
+ 	enum usb_dr_mode	dr_mode;
+ #define CI_HDRC_CONTROLLER_RESET_EVENT		0
+ #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
+-- 
+1.7.1
