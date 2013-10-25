@@ -1,159 +1,39 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 25 Oct 2013 11:51:45 +0100
-Subject: [PATCH v9 10/18] xen: introduce xen_alloc/free_coherent_pages
+Date: Fri, 25 Oct 2013 11:51:39 +0100
+Subject: [PATCH v9 04/18] xen/x86: allow __set_phys_to_machine for
+ autotranslate guests
 In-Reply-To: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
-Message-ID: <1382698313-13161-10-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1382698313-13161-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xen_swiotlb_alloc_coherent needs to allocate a coherent buffer for cpu
-and devices. On native x86 is sufficient to call __get_free_pages in
-order to get a coherent buffer, while on ARM (and potentially ARM64) we
-need to call the native dma_ops->alloc implementation.
-
-Introduce xen_alloc_coherent_pages to abstract the arch specific buffer
-allocation.
-
-Similarly introduce xen_free_coherent_pages to free a coherent buffer:
-on x86 is simply a call to free_pages while on ARM and ARM64 is
-arm_dma_ops.free.
+Allow __set_phys_to_machine to be called for autotranslate guests.
+It can be used to keep track of phys_to_machine changes, however we
+don't do anything with the information at the moment.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
-Changes in v7:
-- rename __get_dma_ops to __generic_dma_ops;
-- call __generic_dma_ops(hwdev)->alloc/free on arm64 too.
-
-Changes in v6:
-- call __get_dma_ops to get the native dma_ops pointer on arm.
 ---
- arch/arm/include/asm/xen/page-coherent.h   |   22 ++++++++++++++++++++++
- arch/arm64/include/asm/xen/page-coherent.h |   22 ++++++++++++++++++++++
- arch/ia64/include/asm/xen/page-coherent.h  |   24 ++++++++++++++++++++++++
- arch/x86/include/asm/xen/page-coherent.h   |   24 ++++++++++++++++++++++++
- 4 files changed, 92 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/xen/page-coherent.h
- create mode 100644 arch/arm64/include/asm/xen/page-coherent.h
- create mode 100644 arch/ia64/include/asm/xen/page-coherent.h
- create mode 100644 arch/x86/include/asm/xen/page-coherent.h
+ arch/x86/xen/p2m.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
-new file mode 100644
-index 0000000..c4d843c
---- /dev/null
-+++ b/arch/arm/include/asm/xen/page-coherent.h
-@@ -0,0 +1,22 @@
-+#ifndef _ASM_ARM_XEN_PAGE_COHERENT_H
-+#define _ASM_ARM_XEN_PAGE_COHERENT_H
+diff --git a/arch/x86/xen/p2m.c b/arch/x86/xen/p2m.c
+index a61c7d5..2ae8699 100644
+--- a/arch/x86/xen/p2m.c
++++ b/arch/x86/xen/p2m.c
+@@ -799,10 +799,10 @@ bool __set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+ {
+ 	unsigned topidx, mididx, idx;
+ 
+-	if (unlikely(xen_feature(XENFEAT_auto_translated_physmap))) {
+-		BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
++	/* don't track P2M changes in autotranslate guests */
++	if (unlikely(xen_feature(XENFEAT_auto_translated_physmap)))
+ 		return true;
+-	}
 +
-+#include <asm/page.h>
-+#include <linux/dma-attrs.h>
-+#include <linux/dma-mapping.h>
-+
-+static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
-+		dma_addr_t *dma_handle, gfp_t flags,
-+		struct dma_attrs *attrs)
-+{
-+	return __generic_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
-+}
-+
-+static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
-+		void *cpu_addr, dma_addr_t dma_handle,
-+		struct dma_attrs *attrs)
-+{
-+	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
-+}
-+
-+#endif /* _ASM_ARM_XEN_PAGE_COHERENT_H */
-diff --git a/arch/arm64/include/asm/xen/page-coherent.h b/arch/arm64/include/asm/xen/page-coherent.h
-new file mode 100644
-index 0000000..3b4f029
---- /dev/null
-+++ b/arch/arm64/include/asm/xen/page-coherent.h
-@@ -0,0 +1,22 @@
-+#ifndef _ASM_ARM64_XEN_PAGE_COHERENT_H
-+#define _ASM_ARM64_XEN_PAGE_COHERENT_H
-+
-+#include <asm/page.h>
-+#include <linux/dma-attrs.h>
-+#include <linux/dma-mapping.h>
-+
-+static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
-+		dma_addr_t *dma_handle, gfp_t flags,
-+		struct dma_attrs *attrs)
-+{
-+	return __generic_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
-+}
-+
-+static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
-+		void *cpu_addr, dma_addr_t dma_handle,
-+		struct dma_attrs *attrs)
-+{
-+	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
-+}
-+
-+#endif /* _ASM_ARM64_XEN_PAGE_COHERENT_H */
-diff --git a/arch/ia64/include/asm/xen/page-coherent.h b/arch/ia64/include/asm/xen/page-coherent.h
-new file mode 100644
-index 0000000..37b929c
---- /dev/null
-+++ b/arch/ia64/include/asm/xen/page-coherent.h
-@@ -0,0 +1,24 @@
-+#ifndef _ASM_IA64_XEN_PAGE_COHERENT_H
-+#define _ASM_IA64_XEN_PAGE_COHERENT_H
-+
-+#include <asm/page.h>
-+#include <linux/dma-attrs.h>
-+#include <linux/dma-mapping.h>
-+
-+static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
-+		dma_addr_t *dma_handle, gfp_t flags,
-+		struct dma_attrs *attrs)
-+{
-+	void *vstart = (void*)__get_free_pages(flags, get_order(size));
-+	*dma_handle = virt_to_phys(vstart);
-+	return vstart;
-+}
-+
-+static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
-+		void *cpu_addr, dma_addr_t dma_handle,
-+		struct dma_attrs *attrs)
-+{
-+	free_pages((unsigned long) cpu_addr, get_order(size));
-+}
-+
-+#endif /* _ASM_IA64_XEN_PAGE_COHERENT_H */
-diff --git a/arch/x86/include/asm/xen/page-coherent.h b/arch/x86/include/asm/xen/page-coherent.h
-new file mode 100644
-index 0000000..31de2e0
---- /dev/null
-+++ b/arch/x86/include/asm/xen/page-coherent.h
-@@ -0,0 +1,24 @@
-+#ifndef _ASM_X86_XEN_PAGE_COHERENT_H
-+#define _ASM_X86_XEN_PAGE_COHERENT_H
-+
-+#include <asm/page.h>
-+#include <linux/dma-attrs.h>
-+#include <linux/dma-mapping.h>
-+
-+static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
-+		dma_addr_t *dma_handle, gfp_t flags,
-+		struct dma_attrs *attrs)
-+{
-+	void *vstart = (void*)__get_free_pages(flags, get_order(size));
-+	*dma_handle = virt_to_phys(vstart);
-+	return vstart;
-+}
-+
-+static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
-+		void *cpu_addr, dma_addr_t dma_handle,
-+		struct dma_attrs *attrs)
-+{
-+	free_pages((unsigned long) cpu_addr, get_order(size));
-+}
-+
-+#endif /* _ASM_X86_XEN_PAGE_COHERENT_H */
+ 	if (unlikely(pfn >= MAX_P2M_PFN)) {
+ 		BUG_ON(mfn != INVALID_P2M_ENTRY);
+ 		return true;
 -- 
 1.7.2.5
