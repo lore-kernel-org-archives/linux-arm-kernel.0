@@ -1,94 +1,122 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 25 Oct 2013 16:31:42 -0500
-Subject: [PATCH 2/2] dmaengine: msm_bam_dma: Add device tree binding
-In-Reply-To: <1382732643-8184-3-git-send-email-agross@codeaurora.org>
-References: <1382732643-8184-1-git-send-email-agross@codeaurora.org>
- <1382732643-8184-3-git-send-email-agross@codeaurora.org>
-Message-ID: <87302369-689E-476F-8B2D-B178CE3C0D48@codeaurora.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sat, 26 Oct 2013 00:23:39 +0200
+Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: convert to platform driver
+In-Reply-To: <1953577.TBW5ixuUM5@thinkpad>
+References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
+ <6431720.IUjkN7MGOG@thinkpad> <526AC2DF.2020904@linaro.org>
+ <1953577.TBW5ixuUM5@thinkpad>
+Message-ID: <526AEF6B.2000404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/25/2013 10:52 PM, Tomasz Figa wrote:
+> On Friday 25 of October 2013 21:13:35 Daniel Lezcano wrote:
+>> On 10/25/2013 12:39 PM, Tomasz Figa wrote:
+>>> Hi Daniel,
+>>>
+>>> [Sending again, without HTML part. Sorry for the noise.]
+>>>
+>>> On Friday 25 of October 2013 09:11:13 Daniel Lezcano wrote:
+>>>> The driver is tied with the pm low level code making difficult to
+>>>> split
+>>>> the driver into a more arch independent code. The platform driver
+>>>> allows
+>>>> to move the standby callback into the platform data field and use a
+>>>> simple driver with no more dependency on the low level code.
+>>>>
+>>>> The standby callback has a portion of code to set the standby method
+>>>> and
+>>>> the effective cpu_do_idle switching the cpu to the right mode. As this
+>>>> code is redundant in the cpu suspend code, it has been factored out
+>>>> when
+>>>> implementing the standby methdod.
+>>>>
+>>>> By this way, the driver is ready to be moved out to the
+>>>> drivers/cpuidle.
+>>>
+>>> The idea itself is quite good, but unfortunately I have to NAK this.
+>>> Please see details in comments below.
+>>>
+>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>> ---
+>>>>
+>>>>    arch/arm/mach-s3c64xx/cpuidle.c |   38
+>>>>
+>>>> ++++++++++++++++---------------------- arch/arm/mach-s3c64xx/pm.c
+>>>> |
+>>>>
+>>>>     33 ++++++++++++++++++++++++++------- 2 files changed, 42
+>>>>
+>>>> insertions(+), 29 deletions(-)
+>>
+>> [ ... ]
+>>
+>>>> -
+>>>> -	tmp = __raw_readl(S3C64XX_PWR_CFG);
+>>>> -	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
+>>>> -	tmp |= S3C64XX_PWRCFG_CFG_WFI_SLEEP;
+>>>
+>>> Finally note the S3C64XX_PWRCFG_CFG_WFI_SLEEP flag here again.
+>>
+>> Ouch ! I missed it. Thanks for spotting the problem.
+>>
+>>> I believe it should be visible now what's wrong with this patch. To
+>>> make
+>>> sure it is, let me explain how the system controller of S3C64xx handles
+>>> WFI requests.
+>>>
+>>> When the CPU issues WFI request to the syscon, it takes an action
+>>> depending on how it is configured. A bit field is there in one of
+>>> syscon registers (S3C64XX_PWR_CFG) that selects what action to perform
+>>> in case of WFI request.
+>>>
+>>> You can program the syscon to ignore the request, enter IDLE mode,
+>>> enter
+>>> STOP mode or enter SLEEP mode. As the names suggest, for cpuidle, it
+>>> needs to be programmed for IDLE mode and for system-wide sleep it
+>>> needs to be set to SLEEP mode. STOP mode is not very useful as it has
+>>> mostly the same effect that can be achieved by performing fine-grained
+>>> clock and power gating of peripherals manually, so it is unused by
+>>> Linux.
+>>
+>> Yes, this is what I assumed but I missed the CFG_WFI_SLEEP flag, my eyes
+>> read CFG_WFI_IDLE.
+>>
+>>> Now, my take on the issue you are trying to solve would be a bit
+>>> different. Since the S3C64xx does not have any interesting cpuidle
+>>> modes, just a normal, clock-gated WFI mode, it does not need to have a
+>>> cpuidle driver at all. All that is needed is simply setting up the
+>>> S3C64XX_PWRCFG_CFG_WFI field to S3C64XX_PWRCFG_CFG_WFI_IDLE early at
+>>> boot-up, then set it to S3C64XX_PWRCFG_CFG_WFI_SLEEP just before
+>>> entering the sleep mode and restore it back to
+>>> S3C64XX_PWRCFG_CFG_WFI_IDLE after waking up.
+>> So you are suggesting to remove the cpuidle driver ?
+>
+> Exactly.
 
-On Oct 25, 2013, at 3:24 PM, Andy Gross wrote:
+I see.
 
-> Add device tree probe support for the MSM BAM DMA driver.
-> 
+>> Won't it be worth to add a new WFI_SLEEP state to the cpuidle driver ?
+>
+> I don't think so. How a suspend-to-RAM specific thing like WFI_SLEEP could
+> be relevant to a cpuidle driver? (Unless there are some plans to
+> consolidate STR with cpuidle that I haven't heard about...)
 
-The description here isn't correct, its the binding not probe ;).
+I finally found a documentation for the s3c6410x and the description of 
+the different modes. Indeed, the sleep mode is not adequate for a 
+cpuidle state. What about the 'stop' and 'deep stop' state ?
 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
-> .../devicetree/bindings/dma/msm_bam_dma.txt        |   49 ++++++++++++++++++++
-> 1 file changed, 49 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/dma/msm_bam_dma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/msm_bam_dma.txt b/Documentation/devicetree/bindings/dma/msm_bam_dma.txt
-> new file mode 100644
-> index 0000000..fe3ed8f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/msm_bam_dma.txt
-> @@ -0,0 +1,49 @@
-> +MSM BAM DMA controller
-> +
-> +Required properties:
-> +- compatible: Should be "qcom,bam"
-> +- reg: Address range for DMA registers
-> +- interrupts: single interrupt for this controller
-> +- #dma-cells: must be <3>
-> +- clocks: required clock
-> +- clock-names: name of clock
-> +
-> +Example:
-> +
-> +	dma0: dma at f9984000 = {
-> +		compatible = "qcom,bam";
-> +		reg = <0xf9984000 0x15000>;
-> +		interrupts = <0 94 0>;
-> +		clocks = <&bam_dma_ahb_cxc>;
-> +		clock-names = "bam_clk";
-> +		#dma-cells = <3>;
-> +	};
-> +
-> +Client:
-> +Required properties:
-> +- dmas: List of dma channel requests
-> +- dma-names: Names of aforementioned requested channels
-> +
-> +Clients must use the format described in the dma.txt file, using a four cell
-> +specifier for each channel.
-> +
-> +The four cells in order are:
-> +  1. A phandle pointing to the DMA controller
-> +  2. The channel number
-> +  3. The execution environment value for this channel.
+What is 'STR' ?
 
-This needs further explanation on what the value means.
+Thanks
+   -- Daniel
 
-> +  4. Direction of the fixed unidirectional channel
-> +     0 - Memory to Device
-> +     1 - Device to Memory
-> +
-> +Example:
-> +	serial at f991e000 {
-> +		compatible = "qcom,msm-uart";
-> +		reg = <0xf991e000 0x1000>
-> +			<0xf9944000 0x19000>;
-> +		interrupts = <0 108 0>;
-> +		clocks = <&blsp1_uart2_apps_cxc>, <&blsp1_ahb_cxc>;
-> +		clock-names = "gsbi_uart_clk", "gsbi_pclk";
-> +
-> +		dmas = <&dma0 0 0 1>, <&dma0 1 0 0>;
-> +		dma-names = "rx", "tx";
-> +	};
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
