@@ -1,31 +1,27 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 25 Oct 2013 17:06:24 +0800
-Subject: [PATCH] ASoC: Samsung: I2S: fix return value check in i2s_alloc_dai()
-Message-ID: <CAPgLHd8nzO9Q1fF1KsuJna_JVJDd+cimBC3ipd3nTP9Sz=fE9g@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 25 Oct 2013 04:10:54 -0500
+Subject: [PATCH v4 0/2] ARM: dts: Beaglebone MMC fixes
+In-Reply-To: <20131025090443.GB5474@netboy>
+References: <1379010935-25943-1-git-send-email-koen@dominion.thruhere.net>
+ <5238596F.9080806@baylibre.com> <20131025090443.GB5474@netboy>
+Message-ID: <526A359E.1000605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 10/25/2013 04:04 AM, Richard Cochran wrote:
+> On Tue, Sep 17, 2013 at 03:30:23PM +0200, Benoit Cousson wrote:
+>>
+>> I've just applied it on top of Joel's one.
+> 
+> Benoit,
+> 
+> Can you tell me where to find your git tree so that I can follow these
+> patches' progress?
+> 
 
-In case of error, the function platform_device_alloc() returns NULL
-pointer not ERR_PTR(). The IS_ERR() test in the return value check
-should be replaced with NULL test.
+https://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.13/dts
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- sound/soc/samsung/i2s.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index b302f3b..b721443 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -1073,7 +1073,7 @@ static struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
- 		dev_set_drvdata(&i2s->pdev->dev, i2s);
- 	} else {	/* Create a new platform_device for Secondary */
- 		i2s->pdev = platform_device_alloc("samsung-i2s-sec", -1);
--		if (IS_ERR(i2s->pdev))
-+		if (!i2s->pdev)
- 			return NULL;
- 
- 		i2s->pdev->dev.parent = &pdev->dev;
+-- 
+Regards,
+Nishanth Menon
