@@ -1,71 +1,48 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 25 Oct 2013 05:18:45 -0500
-Subject: [PATCH 3/3] ARM: OMAP2: omap4-sdp: remove unneeded gpios from
- dss-common
-In-Reply-To: <1382695658-18757-3-git-send-email-tomi.valkeinen@ti.com>
-References: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
- <1382695658-18757-3-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <526A4585.30403@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 25 Oct 2013 03:21:39 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.12-rc
+Message-ID: <20131025102139.GA27296@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2013 05:07 AM, Tomi Valkeinen wrote:
-> DISPLAY_SEL_GPIO and DLP_POWER_ON_GPIO are now handled in the .dts file,
-> so we can remove them from dss-common.c.
-> 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
->  arch/arm/mach-omap2/dss-common.c | 21 ---------------------
->  1 file changed, 21 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/dss-common.c b/arch/arm/mach-omap2/dss-common.c
-> index bf89eff..cc70cf9 100644
-> --- a/arch/arm/mach-omap2/dss-common.c
-> +++ b/arch/arm/mach-omap2/dss-common.c
-> @@ -113,9 +113,6 @@ void __init omap4_panda_display_init_of(void)
->  
->  /* OMAP4 Blaze display data */
->  
-> -#define DISPLAY_SEL_GPIO	59	/* LCD2/PicoDLP switch */
-> -#define DLP_POWER_ON_GPIO	40
-> -
->  static struct panel_dsicm_platform_data dsi1_panel = {
->  	.name		= "lcd",
->  	.source		= "dsi.0",
-> @@ -185,26 +182,8 @@ static struct omap_dss_board_info sdp4430_dss_data = {
->  	.default_display_name = "lcd",
->  };
->  
-> -/*
-> - * we select LCD2 by default (instead of Pico DLP) by setting DISPLAY_SEL_GPIO.
-> - * Setting DLP_POWER_ON gpio enables the VDLP_2V5 VDLP_1V8 and VDLP_1V0 rails
-> - * used by picodlp on the 4430sdp platform. Keep this gpio disabled as LCD2 is
-> - * selected by default
-> - */
->  void __init omap_4430sdp_display_init_of(void)
->  {
-> -	int r;
-> -
-> -	r = gpio_request_one(DISPLAY_SEL_GPIO, GPIOF_OUT_INIT_HIGH,
-> -			"display_sel");
-> -	if (r)
-> -		pr_err("%s: Could not get display_sel GPIO\n", __func__);
-> -
-> -	r = gpio_request_one(DLP_POWER_ON_GPIO, GPIOF_OUT_INIT_LOW,
-> -		"DLP POWER ON");
-> -	if (r)
-> -		pr_err("%s: Could not get DLP POWER ON GPIO\n", __func__);
-> -
->  	omap_display_init(&sdp4430_dss_data);
->  
->  	platform_device_register(&sdp4430_lcd_device);
-> 
-would you not be depending on the weak IO pull done using mux to drive
-these GPIO pins since the GPIO is not requested and held?
+Hi Linus,
 
-Could we not use Documentation/devicetree/bindings/gpio/gpio.txt
-binding to map to the right GPIO and drive it using the GPIO module?
+The following changes since commit 4d594dd3028ba8cdfcbd854bde3811a1ee4e36d7:
 
--- 
-Regards,
-Nishanth Menon
+  ARM: exynos: dts: Update 5250 arch timer node with clock frequency (2013-10-13 09:33:54 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 08ddbb0a899a4e7a9214bc7c063be436cabbc52a:
+
+  MAINTAINERS: Add maintainers entry for Rockchip SoCs (2013-10-18 07:01:00 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 3.12-rc
+
+There's really only one bugfix in this branch, which is a fix for timers on
+the integrator platform. Since Linus Walleij is resurrecting support for
+the platform it seems valuable to get the fix into 3.12 even though the
+regression has been around a while.
+
+The rest are a handful of maintainers updates. If you prefer to hold those
+until 3.13 then just merge the first patch on the branch which is the fix.
+
+----------------------------------------------------------------
+Heiko Stuebner (1):
+      MAINTAINERS: Add maintainers entry for Rockchip SoCs
+
+Jason Cooper (1):
+      MAINTAINERS: ARM: mvebu: add Sebastian Hesselbarth
+
+Linus Walleij (1):
+      ARM: integrator: deactivate timer0 on the Integrator/CP
+
+Stephen Warren (1):
+      MAINTAINERS: Tegra updates, and driver ownership
+
+ MAINTAINERS                        | 71 ++++++++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/integratorcp.dts |  9 +++--
+ 2 files changed, 73 insertions(+), 7 deletions(-)
