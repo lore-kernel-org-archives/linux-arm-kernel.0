@@ -1,36 +1,37 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 25 Oct 2013 09:53:10 +0530
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
-References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
- <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
- <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
- <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
- <20131017020745.GA14013@intel.com>
- <20131017142755.GA4477@breakpoint.cc>
- <20131017134846.GG14013@intel.com>
- <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
-Message-ID: <20131025042310.GC21230@intel.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Fri, 25 Oct 2013 16:20:10 +1030
+Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
+In-Reply-To: <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
+References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
+ <87eh7bfoq9.fsf@rustcorp.com.au>
+ <20131024084559.GD16735@n2100.arm.linux.org.uk>
+ <87mwlyclng.fsf@rustcorp.com.au>
+ <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
+Message-ID: <87y55h7vcd.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 11:28:29PM +0200, Guennadi Liakhovetski wrote:
-> Hi Vinod
-> 
-> On Thu, 17 Oct 2013, Vinod Koul wrote:
-> > Yes i missed it in first place update the patch to fix that
-> 
-> Are you planning to post a fixed version of this patch or you just fix it 
-> internally? Would be good to have it posted to be able to ack it and other 
-> relevant patches.
-looks like you missed it... I had posted updated patch [1] in this thread here
-and I posted 29th patch as removal one [2]
+Ming Lei <tom.leiming@gmail.com> writes:
+> On Fri, Oct 25, 2013 at 7:08 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>>
+>> Sorry, I was imprecise.  I was referring to the kernel's kallsyms
+>> tables produced by scripts/kallsyms.c.  This patch left them in the
+>> the kallsyms tables and filtered them out from /proc/kallsyms.
+>
+> Yes, but it isn't easy to do it by script/kallsyms.c , and IMO, it should
+> be correct to hide them for user space but keep them in kallsyms table.
 
-Both were pushed to -next after few days
+So they'll appear in backtraces?  And turn up randomly for other symbol
+dereferences?
 
-[1]: http://marc.info/?l=linux-kernel&m=138197886521699&w=2
-[2]: http://marc.info/?l=linux-kernel&m=138197936321767&w=2
+I don't think you really want this!
 
--- 
-~Vinod
+>> It's weird that cpu_v7_suspend_size appeared above, since kallsyms
+>> should filter out 'A' symbols already.
+>
+> Sorry, the 'A' symbol is a mistake, but the others do exist in /proc/kallsyms.
+
+Ah, OK.
+
+Cheers,
+Rusty.
