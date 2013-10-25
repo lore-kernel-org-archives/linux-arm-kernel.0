@@ -1,54 +1,63 @@
-From: jdl@jdl.com (Jon Loeliger)
-Date: Fri, 25 Oct 2013 10:21:22 -0500
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <526A83B9.30800@wwwdotorg.org>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <20131024234340.ADF70C403B6@trevor.secretlab.ca>
- <526A83B9.30800@wwwdotorg.org>
-Message-ID: <E1VZjCU-0005RE-Vt@jdl.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 Oct 2013 16:22:36 +0100
+Subject: [PATCH RFC v4 1/6] arm64: support single-step and breakpoint
+ handler hooks
+In-Reply-To: <1382008671-4515-2-git-send-email-sandeepa.prabhu@linaro.org>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-2-git-send-email-sandeepa.prabhu@linaro.org>
+Message-ID: <20131025152236.GC10673@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 10/25/2013 12:43 AM, Grant Likely wrote:
-> > On Thu, 24 Oct 2013 22:51:28 +0100, Stephen Warren <swarren@wwwdotorg.org> 
-> wrote:
-> >> From: Stephen Warren <swarren@nvidia.com>
-> >>
-> >> This is a very quick proof-of-concept re: how a DT schema checker might
-> >> look if written in C, and integrated into dtc.
-> > 
-> > Thanks for looking at this.
-> > 
-> > Very interesting. Certainly an expedient way to start checking schemas,
-> > and for certain bindings it may be the best approach. The downside is it
-> > forces a recompilation of DTC to bring in new bindings and it isn't a
-> > great meduim for mixing schema with documentation in the bindings.
+Hi Sandeepa,
+
+This is getting there, thanks for persevering with it. I still have a few
+minor comments though.
+
+On Thu, Oct 17, 2013 at 12:17:46PM +0100, Sandeepa Prabhu wrote:
+> AArch64 Single Steping and Breakpoint debug exceptions will be
+> used by multiple debug framworks like kprobes & kgdb.
 > 
-> This approach would certainly require recompiling something. I threw the
-> code into dtc simply because it was the easiest container for the
-> demonstration. It could be a separate DT validation utility if we
-> wanted, although we'd need to split the DT parser from dtc into a
-> library to avoid code duplication. The resultant utility could be part
-> of the repo containing the DTs, so it didn't end up as a separate
-> package to manage.
+> This patch implements the hooks for those frameworks to register
+> their own handlers for handling breakpoint and single step events.
 > 
-> I think the additional documentation could be added as comments in the
-> validation functions, just like IIRC it was to be represented as
-> comments even in the .dts-based schema proposals.
+> Reworked the debug exception handler in entry.S: do_dbg to route
+> software breakpoint (BRK64) exception to do_debug_exception()
+> 
+> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
+> ---
+>  arch/arm64/include/asm/debug-monitors.h | 21 ++++++++
+>  arch/arm64/kernel/debug-monitors.c      | 86 ++++++++++++++++++++++++++++++++-
+>  arch/arm64/kernel/entry.S               |  2 +
+>  3 files changed, 108 insertions(+), 1 deletion(-)
 
-DTers,
+[...]
 
-I think the additional benefit of starting with a direct C
-implementation is that it causes us to begin to actually
-codify the schema requirements.  Sure, it may not be ideal
-at first, but over time it may reveal consistent patterns
-that can be extracted.  And it may reveal what a real schema
-might look like and how it might be expressed better.  Which
-is to say that perhaps we are letting "perfect" get in the
-way of "good enough to start"?
+> @@ -215,7 +257,10 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+>  		 */
+>  		user_rewind_single_step(current);
+>  	} else {
+> -		/* TODO: route to KGDB */
+> +		/* call registered single step handlers */
 
-In the meantime, someone has shown us the code and we can
-get started.  It's a Small Matter of Refactoring later. :-)
+Don't bother with this comment (it's crystal clear from the code).
 
-Just a notion,
-jdl
+> +		if (call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
+> +			return 0;
+> +
+>  		pr_warning("Unexpected kernel single-step exception at EL1\n");
+>  		/*
+>  		 * Re-enable stepping since we know that we will be
+> @@ -227,11 +272,50 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+>  	return 0;
+>  }
+>  
+> +
+> +static LIST_HEAD(break_hook);
+> +DEFINE_RWLOCK(break_hook_lock);
+
+This guy can be a plain old spinlock. That way, the readers have less
+overhead but things still work because we only call a single hook function.
+
+Will
