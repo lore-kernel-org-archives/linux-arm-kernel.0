@@ -1,325 +1,239 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 25 Oct 2013 18:57:11 +0300
-Subject: [PATCHv9 17/43] CLK: TI: DRA7: Add APLL support
+Date: Fri, 25 Oct 2013 18:57:13 +0300
+Subject: [PATCHv9 19/43] CLK: TI: add am33xx clock init file
 In-Reply-To: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
 References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1382716658-6964-18-git-send-email-t-kristo@ti.com>
+Message-ID: <1382716658-6964-20-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: J Keerthy <j-keerthy@ti.com>
+clk-33xx.c now contains the clock init functionality for am33xx, including
+DT clock registration and adding of static clkdev entries.
 
-The patch adds support for DRA7 PCIe APLL. The APLL
-sources the optional functional clocks for PCIe module.
+This patch also moves the omap2_clk_enable_init_clocks declaration to
+the driver include, as this is needed by the am33xx clock init code.
 
-APLL stands for Analog PLL. This is different when comapred
-with DPLL meaning Digital PLL, the phase detection is done
-using an analog circuit.
-
-Signed-off-by: J Keerthy <j-keerthy@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Tested-by: Nishanth Menon <nm@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- .../devicetree/bindings/clock/ti/apll.txt          |   31 +++
- drivers/clk/ti/Makefile                            |    2 +-
- drivers/clk/ti/apll.c                              |  239 ++++++++++++++++++++
- 3 files changed, 271 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/ti/apll.txt
- create mode 100644 drivers/clk/ti/apll.c
+ arch/arm/mach-omap2/clock.h |    1 -
+ drivers/clk/ti/Makefile     |    1 +
+ drivers/clk/ti/clk-33xx.c   |  161 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk/ti.h      |    2 +
+ 4 files changed, 164 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/ti/clk-33xx.c
 
-diff --git a/Documentation/devicetree/bindings/clock/ti/apll.txt b/Documentation/devicetree/bindings/clock/ti/apll.txt
-new file mode 100644
-index 0000000..7faf5a6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/ti/apll.txt
-@@ -0,0 +1,31 @@
-+Binding for Texas Instruments APLL clock.
-+
-+Binding status: Unstable - ABI compatibility may be broken in the future
-+
-+This binding uses the common clock binding[1].  It assumes a
-+register-mapped APLL with usually two selectable input clocks
-+(reference clock and bypass clock), with analog phase locked
-+loop logic for multiplying the input clock to a desired output
-+clock. This clock also typically supports different operation
-+modes (locked, low power stop etc.) APLL mostly behaves like
-+a subtype of a DPLL [2], although a simplified one at that.
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+[2] Documentation/devicetree/bindings/clock/ti/dpll.txt
-+
-+Required properties:
-+- compatible : shall be "ti,dra7-apll-clock"
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : link phandles of parent clocks (clk-ref and clk-bypass)
-+- reg : address and length of the register set for controlling the APLL.
-+  It contains the information of registers in the following order:
-+	"control" - contains the control register base address
-+	"idlest" - contains the idlest register base address
-+
-+Examples:
-+	apll_pcie_ck: apll_pcie_ck at 4a008200 {
-+		#clock-cells = <0>;
-+		clocks = <&apll_pcie_in_clk_mux>, <&dpll_pcie_ref_ck>;
-+		reg = <0x4a00821c 0x4>, <0x4a008220 0x4>;
-+		compatible = "ti,dra7-apll-clock";
-+	};
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 2a52da2..b33f1e8 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -247,7 +247,6 @@ void omap2_clk_dflt_find_idlest(struct clk_hw_omap *clk,
+ 				void __iomem **idlest_reg,
+ 				u8 *idlest_bit, u8 *idlest_val);
+ int omap2_clk_enable_autoidle_all(void);
+-void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
+ int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
+ void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
+ 			       const char *core_ck_name,
 diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-index 935e5d2..3d71e1e 100644
+index f8ae4b5..7eb6f2b 100644
 --- a/drivers/clk/ti/Makefile
 +++ b/drivers/clk/ti/Makefile
-@@ -1,7 +1,7 @@
- ifneq ($(CONFIG_OF),)
+@@ -2,6 +2,7 @@ ifneq ($(CONFIG_OF),)
  obj-y					+= clk.o dpll.o autoidle.o divider.o \
  					   fixed-factor.o gate.o clockdomain.o \
--					   composite.o mux.o
-+					   composite.o mux.o apll.o
+ 					   composite.o mux.o apll.o
++obj-$(CONFIG_SOC_AM33XX)		+= clk-33xx.o
  obj-$(CONFIG_ARCH_OMAP4)		+= clk-44xx.o
  obj-$(CONFIG_SOC_OMAP5)			+= clk-54xx.o
- endif
-diff --git a/drivers/clk/ti/apll.c b/drivers/clk/ti/apll.c
+ obj-$(CONFIG_SOC_DRA7XX)		+= clk-7xx.o
+diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
 new file mode 100644
-index 0000000..18dbbee
+index 0000000..776ee45
 --- /dev/null
-+++ b/drivers/clk/ti/apll.c
-@@ -0,0 +1,239 @@
++++ b/drivers/clk/ti/clk-33xx.c
+@@ -0,0 +1,161 @@
 +/*
-+ * OMAP APLL clock support
++ * AM33XX Clock init
 + *
-+ * Copyright (C) 2013 Texas Instruments, Inc.
++ * Copyright (C) 2013 Texas Instruments, Inc
++ *     Tero Kristo (t-kristo at ti.com)
 + *
-+ * J Keerthy <j-keerthy@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
 + *
 + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
 + * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 + * GNU General Public License for more details.
 + */
 +
++#include <linux/kernel.h>
++#include <linux/list.h>
 +#include <linux/clk-provider.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+#include <linux/string.h>
-+#include <linux/log2.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
 +#include <linux/clk/ti.h>
-+#include <linux/delay.h>
 +
-+#define APLL_FORCE_LOCK 0x1
-+#define APLL_AUTO_IDLE	0x2
-+#define MAX_APLL_WAIT_TRIES		1000000
-+
-+static int dra7_apll_enable(struct clk_hw *hw)
-+{
-+	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-+	int r = 0, i = 0;
-+	struct dpll_data *ad;
-+	const char *clk_name;
-+	u8 state = 1;
-+	u32 v;
-+
-+	ad = clk->dpll_data;
-+	if (!ad)
-+		return -EINVAL;
-+
-+	clk_name = __clk_get_name(clk->hw.clk);
-+
-+	state <<= __ffs(ad->idlest_mask);
-+
-+	/* Check is already locked */
-+	regmap_read(clk->regmap, (u32)ad->idlest_reg, &v);
-+
-+	if ((v & ad->idlest_mask) == state)
-+		return r;
-+
-+	regmap_read(clk->regmap, (u32)ad->control_reg, &v);
-+	v &= ~ad->enable_mask;
-+	v |= APLL_FORCE_LOCK << __ffs(ad->enable_mask);
-+	regmap_write(clk->regmap, (u32)ad->control_reg, v);
-+
-+	state <<= __ffs(ad->idlest_mask);
-+
-+	while (1) {
-+		v = regmap_read(clk->regmap, (u32)ad->idlest_reg, &v);
-+		if ((v & ad->idlest_mask) == state)
-+			break;
-+		if (i > MAX_APLL_WAIT_TRIES)
-+			break;
-+		i++;
-+		udelay(1);
-+	}
-+
-+	if (i == MAX_APLL_WAIT_TRIES) {
-+		pr_warn("clock: %s failed transition to '%s'\n",
-+			clk_name, (state) ? "locked" : "bypassed");
-+	} else {
-+		pr_debug("clock: %s transition to '%s' in %d loops\n",
-+			 clk_name, (state) ? "locked" : "bypassed", i);
-+
-+		r = 0;
-+	}
-+
-+	return r;
-+}
-+
-+static void dra7_apll_disable(struct clk_hw *hw)
-+{
-+	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-+	struct dpll_data *ad;
-+	u8 state = 1;
-+	u32 v;
-+
-+	ad = clk->dpll_data;
-+
-+	state <<= __ffs(ad->idlest_mask);
-+
-+	regmap_read(clk->regmap, (u32)ad->control_reg, &v);
-+	v &= ~ad->enable_mask;
-+	v |= APLL_AUTO_IDLE << __ffs(ad->enable_mask);
-+	regmap_write(clk->regmap, (u32)ad->control_reg, v);
-+}
-+
-+static int dra7_apll_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-+	struct dpll_data *ad;
-+	u32 v;
-+
-+	ad = clk->dpll_data;
-+
-+	regmap_read(clk->regmap, (u32)ad->control_reg, &v);
-+	v &= ad->enable_mask;
-+
-+	v >>= __ffs(ad->enable_mask);
-+
-+	return v == APLL_AUTO_IDLE ? 0 : 1;
-+}
-+
-+static u8 dra7_init_apll_parent(struct clk_hw *hw)
-+{
-+	return 0;
-+}
-+
-+static const struct clk_ops apll_ck_ops = {
-+	.enable		= &dra7_apll_enable,
-+	.disable	= &dra7_apll_disable,
-+	.is_enabled	= &dra7_apll_is_enabled,
-+	.get_parent	= &dra7_init_apll_parent,
++static struct ti_dt_clk am33xx_clks[] = {
++	DT_CLK(NULL, "clk_32768_ck", "clk_32768_ck"),
++	DT_CLK(NULL, "clk_rc32k_ck", "clk_rc32k_ck"),
++	DT_CLK(NULL, "virt_19200000_ck", "virt_19200000_ck"),
++	DT_CLK(NULL, "virt_24000000_ck", "virt_24000000_ck"),
++	DT_CLK(NULL, "virt_25000000_ck", "virt_25000000_ck"),
++	DT_CLK(NULL, "virt_26000000_ck", "virt_26000000_ck"),
++	DT_CLK(NULL, "sys_clkin_ck", "sys_clkin_ck"),
++	DT_CLK(NULL, "tclkin_ck", "tclkin_ck"),
++	DT_CLK(NULL, "dpll_core_ck", "dpll_core_ck"),
++	DT_CLK(NULL, "dpll_core_x2_ck", "dpll_core_x2_ck"),
++	DT_CLK(NULL, "dpll_core_m4_ck", "dpll_core_m4_ck"),
++	DT_CLK(NULL, "dpll_core_m5_ck", "dpll_core_m5_ck"),
++	DT_CLK(NULL, "dpll_core_m6_ck", "dpll_core_m6_ck"),
++	DT_CLK(NULL, "dpll_mpu_ck", "dpll_mpu_ck"),
++	DT_CLK("cpu0", NULL, "dpll_mpu_ck"),
++	DT_CLK(NULL, "dpll_mpu_m2_ck", "dpll_mpu_m2_ck"),
++	DT_CLK(NULL, "dpll_ddr_ck", "dpll_ddr_ck"),
++	DT_CLK(NULL, "dpll_ddr_m2_ck", "dpll_ddr_m2_ck"),
++	DT_CLK(NULL, "dpll_ddr_m2_div2_ck", "dpll_ddr_m2_div2_ck"),
++	DT_CLK(NULL, "dpll_disp_ck", "dpll_disp_ck"),
++	DT_CLK(NULL, "dpll_disp_m2_ck", "dpll_disp_m2_ck"),
++	DT_CLK(NULL, "dpll_per_ck", "dpll_per_ck"),
++	DT_CLK(NULL, "dpll_per_m2_ck", "dpll_per_m2_ck"),
++	DT_CLK(NULL, "dpll_per_m2_div4_wkupdm_ck", "dpll_per_m2_div4_wkupdm_ck"),
++	DT_CLK(NULL, "dpll_per_m2_div4_ck", "dpll_per_m2_div4_ck"),
++	DT_CLK(NULL, "adc_tsc_fck", "adc_tsc_fck"),
++	DT_CLK(NULL, "cefuse_fck", "cefuse_fck"),
++	DT_CLK(NULL, "clkdiv32k_ck", "clkdiv32k_ck"),
++	DT_CLK(NULL, "clkdiv32k_ick", "clkdiv32k_ick"),
++	DT_CLK(NULL, "dcan0_fck", "dcan0_fck"),
++	DT_CLK("481cc000.d_can", NULL, "dcan0_fck"),
++	DT_CLK(NULL, "dcan1_fck", "dcan1_fck"),
++	DT_CLK("481d0000.d_can", NULL, "dcan1_fck"),
++	DT_CLK(NULL, "pruss_ocp_gclk", "pruss_ocp_gclk"),
++	DT_CLK(NULL, "mcasp0_fck", "mcasp0_fck"),
++	DT_CLK(NULL, "mcasp1_fck", "mcasp1_fck"),
++	DT_CLK(NULL, "mmu_fck", "mmu_fck"),
++	DT_CLK(NULL, "smartreflex0_fck", "smartreflex0_fck"),
++	DT_CLK(NULL, "smartreflex1_fck", "smartreflex1_fck"),
++	DT_CLK(NULL, "sha0_fck", "sha0_fck"),
++	DT_CLK(NULL, "aes0_fck", "aes0_fck"),
++	DT_CLK(NULL, "rng_fck", "rng_fck"),
++	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
++	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
++	DT_CLK(NULL, "timer3_fck", "timer3_fck"),
++	DT_CLK(NULL, "timer4_fck", "timer4_fck"),
++	DT_CLK(NULL, "timer5_fck", "timer5_fck"),
++	DT_CLK(NULL, "timer6_fck", "timer6_fck"),
++	DT_CLK(NULL, "timer7_fck", "timer7_fck"),
++	DT_CLK(NULL, "usbotg_fck", "usbotg_fck"),
++	DT_CLK(NULL, "ieee5000_fck", "ieee5000_fck"),
++	DT_CLK(NULL, "wdt1_fck", "wdt1_fck"),
++	DT_CLK(NULL, "l4_rtc_gclk", "l4_rtc_gclk"),
++	DT_CLK(NULL, "l3_gclk", "l3_gclk"),
++	DT_CLK(NULL, "dpll_core_m4_div2_ck", "dpll_core_m4_div2_ck"),
++	DT_CLK(NULL, "l4hs_gclk", "l4hs_gclk"),
++	DT_CLK(NULL, "l3s_gclk", "l3s_gclk"),
++	DT_CLK(NULL, "l4fw_gclk", "l4fw_gclk"),
++	DT_CLK(NULL, "l4ls_gclk", "l4ls_gclk"),
++	DT_CLK(NULL, "clk_24mhz", "clk_24mhz"),
++	DT_CLK(NULL, "sysclk_div_ck", "sysclk_div_ck"),
++	DT_CLK(NULL, "cpsw_125mhz_gclk", "cpsw_125mhz_gclk"),
++	DT_CLK(NULL, "cpsw_cpts_rft_clk", "cpsw_cpts_rft_clk"),
++	DT_CLK(NULL, "gpio0_dbclk_mux_ck", "gpio0_dbclk_mux_ck"),
++	DT_CLK(NULL, "gpio0_dbclk", "gpio0_dbclk"),
++	DT_CLK(NULL, "gpio1_dbclk", "gpio1_dbclk"),
++	DT_CLK(NULL, "gpio2_dbclk", "gpio2_dbclk"),
++	DT_CLK(NULL, "gpio3_dbclk", "gpio3_dbclk"),
++	DT_CLK(NULL, "lcd_gclk", "lcd_gclk"),
++	DT_CLK(NULL, "mmc_clk", "mmc_clk"),
++	DT_CLK(NULL, "gfx_fclk_clksel_ck", "gfx_fclk_clksel_ck"),
++	DT_CLK(NULL, "gfx_fck_div_ck", "gfx_fck_div_ck"),
++	DT_CLK(NULL, "sysclkout_pre_ck", "sysclkout_pre_ck"),
++	DT_CLK(NULL, "clkout2_div_ck", "clkout2_div_ck"),
++	DT_CLK(NULL, "timer_32k_ck", "clkdiv32k_ick"),
++	DT_CLK(NULL, "timer_sys_ck", "sys_clkin_ck"),
++	DT_CLK(NULL, "dbg_sysclk_ck", "dbg_sysclk_ck"),
++	DT_CLK(NULL, "dbg_clka_ck", "dbg_clka_ck"),
++	DT_CLK(NULL, "stm_pmd_clock_mux_ck", "stm_pmd_clock_mux_ck"),
++	DT_CLK(NULL, "trace_pmd_clk_mux_ck", "trace_pmd_clk_mux_ck"),
++	DT_CLK(NULL, "stm_clk_div_ck", "stm_clk_div_ck"),
++	DT_CLK(NULL, "trace_clk_div_ck", "trace_clk_div_ck"),
++	DT_CLK(NULL, "clkout2_ck", "clkout2_ck"),
++	DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
++	DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
++	DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
++	{ .node_name = NULL },
 +};
 +
-+static struct clk *omap_clk_register_apll(struct device *dev, const char *name,
-+		const char **parent_names, int num_parents, unsigned long flags,
-+		struct dpll_data *dpll_data, const char *clkdm_name,
-+		const struct clk_ops *ops, struct regmap *regmap)
++static const char *enable_init_clks[] = {
++	"dpll_ddr_m2_ck",
++	"dpll_mpu_m2_ck",
++	"l3_gclk",
++	"l4hs_gclk",
++	"l4fw_gclk",
++	"l4ls_gclk",
++	/* Required for external peripherals like, Audio codecs */
++	"clkout2_ck",
++};
++
++int __init am33xx_dt_clk_init(void)
 +{
-+	struct clk *clk;
-+	struct clk_init_data init = { NULL };
-+	struct clk_hw_omap *clk_hw;
++	struct clk *clk1, *clk2;
 +
-+	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
-+	if (!clk_hw) {
-+		pr_err("%s: could not allocate clk_hw_omap\n", __func__);
-+		return ERR_PTR(-ENOMEM);
-+	}
++	ti_dt_clocks_register(am33xx_clks);
 +
-+	clk_hw->dpll_data = dpll_data;
-+	clk_hw->hw.init = &init;
-+	clk_hw->regmap = regmap;
++	omap2_clk_disable_autoidle_all();
 +
-+	init.name = name;
-+	init.ops = ops;
-+	init.flags = flags;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
++	omap2_clk_enable_init_clocks(enable_init_clks,
++				     ARRAY_SIZE(enable_init_clks));
 +
-+	/* register the clock */
-+	clk = clk_register(dev, &clk_hw->hw);
++	/* TRM ERRATA: Timer 3 & 6 default parent (TCLKIN) may not be always
++	 *    physically present, in such a case HWMOD enabling of
++	 *    clock would be failure with default parent. And timer
++	 *    probe thinks clock is already enabled, this leads to
++	 *    crash upon accessing timer 3 & 6 registers in probe.
++	 *    Fix by setting parent of both these timers to master
++	 *    oscillator clock.
++	 */
 +
-+	return clk;
++	clk1 = clk_get_sys(NULL, "sys_clkin_ck");
++	clk2 = clk_get_sys(NULL, "timer3_fck");
++	clk_set_parent(clk2, clk1);
++
++	clk2 = clk_get_sys(NULL, "timer6_fck");
++	clk_set_parent(clk2, clk1);
++	/*
++	 * The On-Chip 32K RC Osc clock is not an accurate clock-source as per
++	 * the design/spec, so as a result, for example, timer which supposed
++	 * to get expired @60Sec, but will expire somewhere ~@40Sec, which is
++	 * not expected by any use-case, so change WDT1 clock source to PRCM
++	 * 32KHz clock.
++	 */
++	clk1 = clk_get_sys(NULL, "wdt1_fck");
++	clk2 = clk_get_sys(NULL, "clkdiv32k_ick");
++	clk_set_parent(clk1, clk2);
++
++	return 0;
 +}
-+
-+static int __init of_dra7_apll_setup(struct device_node *node,
-+				     struct regmap *regmap)
-+{
-+	const struct clk_ops *ops;
-+	struct clk *clk;
-+	const char *clk_name = node->name;
-+	int num_parents;
-+	const char **parent_names = NULL;
-+	u8 apll_flags = 0;
-+	struct dpll_data *ad;
-+	u32 idlest_mask = 0x1;
-+	u32 autoidle_mask = 0x3;
-+	int i;
-+	int ret;
-+
-+	ops = &apll_ck_ops;
-+	ad = kzalloc(sizeof(*ad), GFP_KERNEL);
-+	if (!ad) {
-+		pr_err("%s: could not allocate dpll_data\n", __func__);
-+		return -ENOMEM;
-+	}
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	num_parents = of_clk_get_parent_count(node);
-+	if (num_parents < 1) {
-+		pr_err("%s: omap dpll %s must have parent(s)\n",
-+		       __func__, node->name);
-+		ret = -EINVAL;
-+		goto cleanup;
-+	}
-+
-+	parent_names = kzalloc(sizeof(char *) * num_parents, GFP_KERNEL);
-+
-+	for (i = 0; i < num_parents; i++)
-+		parent_names[i] = of_clk_get_parent_name(node, i);
-+
-+	ad->clk_ref = of_clk_get(node, 0);
-+	ad->clk_bypass = of_clk_get(node, 1);
-+
-+	if (IS_ERR(ad->clk_ref)) {
-+		pr_debug("%s: ti,clk-ref for %s not found\n", __func__,
-+			 clk_name);
-+		ret = -EAGAIN;
-+		goto cleanup;
-+	}
-+
-+	if (IS_ERR(ad->clk_bypass)) {
-+		pr_debug("%s: ti,clk-bypass for %s not found\n", __func__,
-+			 clk_name);
-+		ret = -EAGAIN;
-+		goto cleanup;
-+	}
-+
-+	of_property_read_u32_index(node, "reg", 0, (u32 *)&ad->control_reg);
-+	of_property_read_u32_index(node, "reg", 1, (u32 *)&ad->idlest_reg);
-+
-+	ad->idlest_mask = idlest_mask;
-+	ad->enable_mask = autoidle_mask;
-+
-+	clk = omap_clk_register_apll(NULL, clk_name, parent_names,
-+				num_parents, apll_flags, ad,
-+				NULL, ops, regmap);
-+
-+	if (!IS_ERR(clk)) {
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+		return 0;
-+	}
-+
-+	return PTR_ERR(clk);
-+
-+cleanup:
-+	kfree(parent_names);
-+	kfree(ad);
-+	return ret;
-+}
-+CLK_OF_DECLARE(dra7_apll_clock, "ti,dra7-apll-clock", of_dra7_apll_setup);
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index c4a8824..de0cffc 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -212,6 +212,7 @@ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
+ int omap2_clkops_enable_clkdm(struct clk_hw *hw);
+ void omap2_clkops_disable_clkdm(struct clk_hw *hw);
+ int omap2_clk_disable_autoidle_all(void);
++void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
+ int omap3_dpll4_set_rate(struct clk_hw *clk, unsigned long rate,
+ 			 unsigned long parent_rate);
+ int omap2_dflt_clk_enable(struct clk_hw *hw);
+@@ -227,6 +228,7 @@ int ti_clk_add_component(struct device_node *node, struct clk_hw *hw, int type);
+ int omap4xxx_dt_clk_init(void);
+ int omap5xxx_dt_clk_init(void);
+ int dra7xx_dt_clk_init(void);
++int am33xx_dt_clk_init(void);
+ 
+ #ifdef CONFIG_OF
+ void of_ti_clk_allow_autoidle_all(void);
 -- 
 1.7.9.5
