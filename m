@@ -1,271 +1,326 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 25 Oct 2013 20:15:13 +0100
-Subject: [PATCHv7][ 2/5] ASoC: eukrea-tlv320: Add DT support.
-In-Reply-To: <1382616832-23593-2-git-send-email-denis@eukrea.com>
-References: <1382616832-23593-1-git-send-email-denis@eukrea.com>
- <1382616832-23593-2-git-send-email-denis@eukrea.com>
-Message-ID: <20131025191513.5345BC4042C@trevor.secretlab.ca>
+Date: Fri, 25 Oct 2013 20:50:40 +0100
+Subject: [PATCHv3][ 3/5] video: mx3fb: Add device tree suport.
+In-Reply-To: <1382532229-32755-3-git-send-email-denis@eukrea.com>
+References: <1382532229-32755-1-git-send-email-denis@eukrea.com>
+ <1382532229-32755-3-git-send-email-denis@eukrea.com>
+Message-ID: <20131025195040.0CCC3C404DA@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Oct 2013 14:13:49 +0200, Denis Carikli <denis@eukrea.com> wrote:
+On Wed, 23 Oct 2013 14:43:47 +0200, Denis Carikli <denis@eukrea.com> wrote:
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: linux-fbdev at vger.kernel.org
 > Cc: Rob Herring <rob.herring@calxeda.com>
 > Cc: Pawel Moll <pawel.moll@arm.com>
 > Cc: Mark Rutland <mark.rutland@arm.com>
 > Cc: Stephen Warren <swarren@wwwdotorg.org>
 > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 > Cc: devicetree at vger.kernel.org
-> Cc: Liam Girdwood <lgirdwood@gmail.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: alsa-devel at alsa-project.org
 > Cc: Sascha Hauer <kernel@pengutronix.de>
 > Cc: linux-arm-kernel at lists.infradead.org
 > Cc: Eric B??nard <eric@eukrea.com>
-> 
 > Signed-off-by: Denis Carikli <denis@eukrea.com>
 > ---
-> ChangeLog v6->v7:
-> - The cleanups went into another patch.
-> - The support for fsl_ssi doesn't depend on dt anymore.
-> - platform_name = "imx-ssi.0" is still set when in non-dt mode.
+> ChangeLog v2->v3:
+> - The device tree bindings were reworked in order to make it look more like the
+>   IPUv3 bindings.
+> - The interface_pix_fmt property now looks like the IPUv3 one.
 > ---
->  .../devicetree/bindings/sound/eukrea-tlv320.txt    |   23 +++++
->  sound/soc/fsl/Kconfig                              |    5 +-
->  sound/soc/fsl/eukrea-tlv320.c                      |   88 ++++++++++++++++++--
->  3 files changed, 107 insertions(+), 9 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/sound/eukrea-tlv320.txt
+>  .../devicetree/bindings/video/fsl,mx3-fb.txt       |   35 ++++++
+>  drivers/video/Kconfig                              |    2 +
+>  drivers/video/mx3fb.c                              |  125 +++++++++++++++++---
+>  3 files changed, 147 insertions(+), 15 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/eukrea-tlv320.txt b/Documentation/devicetree/bindings/sound/eukrea-tlv320.txt
+> diff --git a/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
 > new file mode 100644
-> index 0000000..8791037
+> index 0000000..0b31374
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/eukrea-tlv320.txt
-> @@ -0,0 +1,23 @@
-> +Audio complex for Eukrea boards with tlv320aic23 codec.
+> +++ b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
+> @@ -0,0 +1,35 @@
+> +Freescale MX3 fb
+> +================
 > +
 > +Required properties:
-> +- compatible : "eukrea,eukrea-tlv320"
-
-Nit: why the double "eukrea"? I have no problem if yo think that's the
-best string, it just looks odd.
-
-> +- model : The user-visible name of this sound complex.
-> +- ssi-controller : The phandle of the SSI controller.
-> +- audio-codec : The phandle of the tlv320aic23 audio codec.
-> +- mux-int-port : The internal port of the i.MX audio muxer (AUDMUX).
-> +- mux-ext-port : The external port of the i.MX audio muxer.
-> +
-> +Note: The AUDMUX port numbering should start at 1, which is consistent with
-> +hardware manual.
-
-Looks okay to me. I've not been following the sound bindings very
-closely. Are the described properties a common pattern for sound complex
-bindings?
-
+> +- compatible: Should be "fsl,mx3fb". compatible chips include the imx31 and the
+> +  imx35.
+> +- reg: should be register base and length as documented in the datasheet.
+> +- clocks: Handle to the ipu_gate clock.
 > +
 > +Example:
 > +
-> +	sound {
-> +		compatible = "eukrea,eukrea-tlv320";
-> +		model = "imx51-eukrea-tlv320aic23";
-> +		ssi-controller = <&ssi2>;
-> +		fsl,audio-codec = <&tlv320aic23>;
-> +		mux-int-port = <2>;
-> +		mux-ext-port = <3>;
-> +	};
-> diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-> index b7ab71f..9c3cd64 100644
-> --- a/sound/soc/fsl/Kconfig
-> +++ b/sound/soc/fsl/Kconfig
-> @@ -161,12 +161,15 @@ config SND_SOC_EUKREA_TLV320
->  	depends on MACH_EUKREA_MBIMX27_BASEBOARD \
->  		|| MACH_EUKREA_MBIMXSD25_BASEBOARD \
->  		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
-> -		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
-> +		|| MACH_EUKREA_MBIMXSD51_BASEBOARD \
-> +		|| OF
->  	depends on I2C
->  	select SND_SOC_TLV320AIC23
->  	select SND_SOC_IMX_PCM_FIQ
->  	select SND_SOC_IMX_AUDMUX
->  	select SND_SOC_IMX_SSI
-> +	select SND_SOC_FSL_SSI
-> +	select SND_SOC_IMX_PCM_DMA
->  	help
->  	  Enable I2S based access to the TLV320AIC23B codec attached
->  	  to the SSI interface
-> diff --git a/sound/soc/fsl/eukrea-tlv320.c b/sound/soc/fsl/eukrea-tlv320.c
-> index 5983740..ad1aac6 100644
-> --- a/sound/soc/fsl/eukrea-tlv320.c
-> +++ b/sound/soc/fsl/eukrea-tlv320.c
-> @@ -15,8 +15,11 @@
->   *
->   */
->  
-> +#include <linux/errno.h>
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
->  #include <linux/device.h>
->  #include <linux/i2c.h>
->  #include <sound/core.h>
-> @@ -26,6 +29,7 @@
->  
->  #include "../codecs/tlv320aic23.h"
->  #include "imx-ssi.h"
-> +#include "fsl_ssi.h"
->  #include "imx-audmux.h"
->  
->  #define CODEC_CLOCK 12000000
-> @@ -41,7 +45,8 @@ static int eukrea_tlv320_hw_params(struct snd_pcm_substream *substream,
->  	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
->  				  SND_SOC_DAIFMT_NB_NF |
->  				  SND_SOC_DAIFMT_CBM_CFM);
-> -	if (ret) {
-> +	/* fsl_ssi lacks the set_fmt ops. */
-> +	if (ret && ret != -ENOTSUPP) {
->  		dev_err(cpu_dai->dev,
->  			"Failed to set the cpu dai format.\n");
->  		return ret;
-> @@ -63,11 +68,13 @@ static int eukrea_tlv320_hw_params(struct snd_pcm_substream *substream,
->  			"Failed to set the codec sysclk.\n");
->  		return ret;
->  	}
+> +lcdc: mx3fb at 53fc00b4 {
+> +	compatible = "fsl,mx3-fb";
+> +	reg = <0x53fc00b4 0x0b>;
+> +	clocks = <&clks 55>;
+> +};
+
+This (and some of the other bindings) are trivial, and they are all
+associated with a single SoC. I think it would be better to collect all
+the mx3 bindings into a single file rather than distributing them all
+over the bindings tree.
+
+I started thinking about this after some of the DT conversations in
+Edinburgh this week. Unless there is a high likelyhood of components
+being used separately, I think it is far more useful to collect all the
+bindings for an SoC into a single file. It will certainly reduce a lot
+of the boilerplate that we've been collecting in bindings documentation
+files.
+
+A long time ago I took that approach for the mpc5200 documentation[1].
+Take a look at that organization and let me know what you think.
+
+[1] Documentation/devicetree/bindings/powerpc/fsl/mpc5200.txt
+
+g.
+
 > +
->  	snd_soc_dai_set_tdm_slot(cpu_dai, 0xffffffc, 0xffffffc, 2, 0);
+> +Display support
+> +===============
+> +Required properties:
+> +- model : The user-visible name of the display.
+> +
+> +Optional properties:
+> +- interface_pix_fmt: How this display is connected to the
+> +  crtc. Currently supported types: "rgb24", "rgb565", "rgb666"
+> +
+> +It can also have an optional timing subnode as described in
+> +  Documentation/devicetree/bindings/video/display-timing.txt.
+> +
+> +Example:
+> +
+> +display at di0 {
+> +	    interface-pix-fmt = "rgb666";
+> +	    model = "CMO-QVGA";
+> +};
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 14317b7..2a638df 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -2359,6 +2359,8 @@ config FB_MX3
+>  	select FB_CFB_FILLRECT
+>  	select FB_CFB_COPYAREA
+>  	select FB_CFB_IMAGEBLIT
+> +	select VIDEOMODE_HELPERS
+> +	select FB_MODE_HELPERS
+>  	default y
+>  	help
+>  	  This is a framebuffer device for the i.MX31 LCD Controller. So
+> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+> index 804f874..de5a6c8 100644
+> --- a/drivers/video/mx3fb.c
+> +++ b/drivers/video/mx3fb.c
+> @@ -31,6 +31,8 @@
+>  #include <linux/platform_data/dma-imx.h>
+>  #include <linux/platform_data/video-mx3fb.h>
 >  
->  	ret = snd_soc_dai_set_sysclk(cpu_dai, IMX_SSP_SYS_CLK, 0,
->  				SND_SOC_CLOCK_IN);
-> -	if (ret) {
-> +	/* fsl_ssi lacks the set_sysclk ops */
-> +	if (ret && ret != -EINVAL) {
->  		dev_err(cpu_dai->dev,
->  			"Can't set the IMX_SSP_SYS_CLK CPU system clock.\n");
->  		return ret;
-> @@ -84,7 +91,6 @@ static struct snd_soc_dai_link eukrea_tlv320_dai = {
->  	.name		= "tlv320aic23",
->  	.stream_name	= "TLV320AIC23",
->  	.codec_dai_name	= "tlv320aic23-hifi",
-> -	.platform_name	= "imx-ssi.0",
->  	.codec_name	= "tlv320aic23-codec.0-001a",
->  	.cpu_dai_name	= "imx-ssi.0",
->  	.ops		= &eukrea_tlv320_snd_ops,
-> @@ -101,8 +107,49 @@ static int eukrea_tlv320_probe(struct platform_device *pdev)
+> +#include <video/of_display_timing.h>
+> +
+>  #include <asm/io.h>
+>  #include <asm/uaccess.h>
+>  
+> @@ -757,11 +759,13 @@ static int __set_par(struct fb_info *fbi, bool lock)
+>  			sig_cfg.Hsync_pol = true;
+>  		if (fbi->var.sync & FB_SYNC_VERT_HIGH_ACT)
+>  			sig_cfg.Vsync_pol = true;
+> -		if (fbi->var.sync & FB_SYNC_CLK_INVERT)
+> +		if ((fbi->var.sync & FB_SYNC_CLK_INVERT) ||
+> +		    (fbi->var.sync & FB_SYNC_PIXDAT_HIGH_ACT))
+>  			sig_cfg.clk_pol = true;
+>  		if (fbi->var.sync & FB_SYNC_DATA_INVERT)
+>  			sig_cfg.data_pol = true;
+> -		if (fbi->var.sync & FB_SYNC_OE_ACT_HIGH)
+> +		if ((fbi->var.sync & FB_SYNC_OE_ACT_HIGH) ||
+> +		    (fbi->var.sync & FB_SYNC_DE_HIGH_ACT))
+>  			sig_cfg.enable_pol = true;
+>  		if (fbi->var.sync & FB_SYNC_CLK_IDLE_EN)
+>  			sig_cfg.clkidle_en = true;
+> @@ -1351,21 +1355,75 @@ static struct fb_info *mx3fb_init_fbinfo(struct device *dev, struct fb_ops *ops)
+>  	return fbi;
+>  }
+>  
+> +static int match_dt_disp_data(const char *property)
+> +{
+> +	if (!strcmp("rgb666", property))
+> +		return IPU_DISP_DATA_MAPPING_RGB666;
+> +	else if (!strcmp("rgb565", property))
+> +		return IPU_DISP_DATA_MAPPING_RGB565;
+> +	else if (!strcmp("rgb24", property))
+> +		return IPU_DISP_DATA_MAPPING_RGB888;
+> +	else
+> +		return -EINVAL;
+> +}
+> +
+>  static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
 >  {
->  	int ret;
->  	int int_port = 0, ext_port;
-> +	struct platform_device *ssi_pdev;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *ssi_np;
+>  	struct device *dev = mx3fb->dev;
+>  	struct mx3fb_platform_data *mx3fb_pdata = dev_get_platdata(dev);
+> -	const char *name = mx3fb_pdata->name;
+> +	struct device_node *np = dev->of_node;
+> +	const char *name;
+> +	const char *ipu_disp_format;
+>  	unsigned int irq;
+>  	struct fb_info *fbi;
+>  	struct mx3fb_info *mx3fbi;
+>  	const struct fb_videomode *mode;
+>  	int ret, num_modes;
+> +	struct fb_videomode of_mode;
+> +	struct device_node *display_np, *root_np;
 > +
 > +	if (np) {
-> +		ssi_np = of_parse_phandle(pdev->dev.of_node,
-> +					  "ssi-controller", 0);
-> +		ssi_pdev = of_find_device_by_node(ssi_np);
-> +		if (!ssi_pdev) {
-> +			dev_err(&pdev->dev,
-> +				"ssi-controller missing or invalid.\n");
-> +			ret = -ENODEV;
-> +			goto err;
+> +		root_np = of_find_node_by_path("/");
+> +		if (!root_np) {
+> +			dev_err(dev, "Can't get the \"/\" node.\n");
+> +			return -EINVAL;
 > +		}
 > +
-> +		ret = of_property_read_u32(np, "mux-int-port", &int_port);
-> +		if (ret) {
-> +			dev_err(&pdev->dev,
-> +				"mux-int-port missing or invalid\n");
-> +			return ret;
+> +		display_np = of_find_node_by_name(root_np, "display");
+> +		if (!display_np) {
+> +			dev_err(dev, "Can't get the display device node.\n");
+> +			return -EINVAL;
 > +		}
-> +		ret = of_property_read_u32(np, "mux-ext-port", &ext_port);
-> +		if (ret) {
-> +			dev_err(&pdev->dev,
-> +				"mux-ext-port missing or invalid\n");
-> +			return ret;
-> +		}
+
+Finding a node by name is bad practice. Is is possible to find the node
+via compatible?
+
 > +
-> +		/*
-> +		 * The port numbering in the hardware manual starts at 1, while
-> +		 * the audmux API expects it starts at 0.
-> +		 */
-> +		int_port--;
-> +		ext_port--;
-> +
-> +		eukrea_tlv320_dai.cpu_dai_name = dev_name(&ssi_pdev->dev);
-> +		eukrea_tlv320_dai.platform_of_node = ssi_np;
-> +	} else {
-> +		eukrea_tlv320_dai.platform_name = "imx-ssi.0";
-> +	}
->  
-> -	if (machine_is_eukrea_cpuimx27()) {
-> +	if (machine_is_eukrea_cpuimx27() ||
-> +	    of_find_compatible_node(NULL, NULL, "fsl,imx21-audmux")) {
->  		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
->  			IMX_AUDMUX_V1_PCR_SYN |
->  			IMX_AUDMUX_V1_PCR_TFSDIR |
-> @@ -119,8 +166,12 @@ static int eukrea_tlv320_probe(struct platform_device *pdev)
->  		);
->  	} else if (machine_is_eukrea_cpuimx25sd() ||
->  		   machine_is_eukrea_cpuimx35sd() ||
-> -		   machine_is_eukrea_cpuimx51sd()) {
-> -		ext_port = machine_is_eukrea_cpuimx25sd() ? 4 : 3;
-> +		   machine_is_eukrea_cpuimx51sd() ||
-> +		   of_find_compatible_node(NULL, NULL, "fsl,imx31-audmux")) {
-> +		if (!np)
-> +			ext_port = machine_is_eukrea_cpuimx25sd() ?
-> +				4 : 3;
-> +
->  		imx_audmux_v2_configure_port(int_port,
->  			IMX_AUDMUX_V2_PTCR_SYN |
->  			IMX_AUDMUX_V2_PTCR_TFSDIR |
-> @@ -134,14 +185,28 @@ static int eukrea_tlv320_probe(struct platform_device *pdev)
->  			IMX_AUDMUX_V2_PDCR_RXDSEL(int_port)
->  		);
->  	} else {
-> -		/* return happy. We might run on a totally different machine */
-> -		return 0;
-> +		if (np) {
-> +			/* The eukrea,eukrea-tlv320 driver was explicitely
-> +			 * requested (through the device tree).
-> +			 */
-> +			dev_err(&pdev->dev,
-> +				"Missing audmux DT node.\n");
-> +			return -ENODEV;
+> +		of_property_read_string(display_np, "interface-pix-fmt",
+> +					&ipu_disp_format);
+> +		if (!ipu_disp_format) {
+> +			mx3fb->disp_data_fmt = IPU_DISP_DATA_MAPPING_RGB666;
+> +			dev_warn(dev,
+> +				"ipu display data mapping was not defined, using the default rgb666.\n");
 > +		} else {
-> +			/* Return happy.
-> +			 * We might run on a totally different machine.
-> +			 */
-> +			return 0;
+> +			mx3fb->disp_data_fmt =
+> +				match_dt_disp_data(ipu_disp_format);
+> +		}
+> +
+> +		if (mx3fb->disp_data_fmt == -EINVAL) {
+> +			dev_err(dev, "Illegal display data format \"%s\"\n",
+> +				ipu_disp_format);
+> +			return -EINVAL;
+> +		}
+>  
+> -	if (mx3fb_pdata->disp_data_fmt >= ARRAY_SIZE(di_mappings)) {
+> -		dev_err(dev, "Illegal display data format %d\n",
+> +		of_property_read_string(display_np, "model", &name);
+> +		if (ret) {
+> +			dev_err(dev, "Missing display model name\n");
+> +			return -EINVAL;
+> +		}
+> +	} else {
+> +		name = mx3fb_pdata->name;
+> +		if (mx3fb_pdata->disp_data_fmt >= ARRAY_SIZE(di_mappings)) {
+> +			dev_err(dev, "Illegal display data format %d\n",
+>  				mx3fb_pdata->disp_data_fmt);
+> -		return -EINVAL;
+> +			return -EINVAL;
 > +		}
 >  	}
 >  
->  	eukrea_tlv320.dev = &pdev->dev;
->  	ret = snd_soc_register_card(&eukrea_tlv320);
-> +err:
->  	if (ret)
->  		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
-> +	if (np)
-> +		of_node_put(ssi_np);
+>  	ichan->client = mx3fb;
+> @@ -1386,12 +1444,24 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
+>  		goto emode;
+>  	}
 >  
+> -	if (mx3fb_pdata->mode && mx3fb_pdata->num_modes) {
+> -		mode = mx3fb_pdata->mode;
+> -		num_modes = mx3fb_pdata->num_modes;
+> +	if (np) {
+> +		ret = of_get_fb_videomode(display_np, &of_mode,
+> +					  OF_USE_NATIVE_MODE);
+> +		if (!ret) {
+> +			mode = &of_mode;
+> +			num_modes = 1;
+> +		} else {
+> +			mode = mx3fb_modedb;
+> +			num_modes = ARRAY_SIZE(mx3fb_modedb);
+> +		}
+>  	} else {
+> -		mode = mx3fb_modedb;
+> -		num_modes = ARRAY_SIZE(mx3fb_modedb);
+> +		if (mx3fb_pdata->mode || !mx3fb_pdata->num_modes) {
+> +			mode = mx3fb_pdata->mode;
+> +			num_modes = mx3fb_pdata->num_modes;
+> +		} else {
+> +			mode = mx3fb_modedb;
+> +			num_modes = ARRAY_SIZE(mx3fb_modedb);
+> +		}
+>  	}
+>  
+>  	if (!fb_find_mode(&fbi->var, fbi, fb_mode, mode,
+> @@ -1421,7 +1491,8 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
+>  	mx3fbi->mx3fb		= mx3fb;
+>  	mx3fbi->blank		= FB_BLANK_NORMAL;
+>  
+> -	mx3fb->disp_data_fmt	= mx3fb_pdata->disp_data_fmt;
+> +	if (!np)
+> +		mx3fb->disp_data_fmt = mx3fb_pdata->disp_data_fmt;
+>  
+>  	init_completion(&mx3fbi->flip_cmpl);
+>  	disable_irq(ichan->eof_irq);
+> @@ -1449,13 +1520,26 @@ emode:
 >  	return ret;
 >  }
-> @@ -153,10 +218,17 @@ static int eukrea_tlv320_remove(struct platform_device *pdev)
+>  
+> +static int imx_dma_is_dt_ipu(struct dma_chan *chan)
+> +{
+> +	/* Example: 53fc0000.ipu */
+> +	if (chan && chan->device && chan->device->dev) {
+> +		char *name = dev_name(chan->device->dev);
+> +		name = strchr(name, '.');
+> +		if (name)
+> +			return !strcmp(name, ".ipu");
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static bool chan_filter(struct dma_chan *chan, void *arg)
+>  {
+>  	struct dma_chan_request *rq = arg;
+>  	struct device *dev;
+>  	struct mx3fb_platform_data *mx3fb_pdata;
+>  
+> -	if (!imx_dma_is_ipu(chan))
+> +	if (!imx_dma_is_ipu(chan) && !imx_dma_is_dt_ipu(chan))
+>  		return false;
+>  
+>  	if (!rq)
+> @@ -1464,8 +1548,12 @@ static bool chan_filter(struct dma_chan *chan, void *arg)
+>  	dev = rq->mx3fb->dev;
+>  	mx3fb_pdata = dev_get_platdata(dev);
+>  
+> -	return rq->id == chan->chan_id &&
+> -		mx3fb_pdata->dma_dev == chan->device->dev;
+> +	/* When using the devicetree, mx3fb_pdata is NULL */
+> +	if (imx_dma_is_dt_ipu(chan))
+> +		return rq->id == chan->chan_id;
+> +	else
+> +		return rq->id == chan->chan_id &&
+> +			mx3fb_pdata->dma_dev == chan->device->dev;
+>  }
+>  
+>  static void release_fbi(struct fb_info *fbi)
+> @@ -1565,9 +1653,16 @@ static int mx3fb_remove(struct platform_device *dev)
 >  	return 0;
 >  }
 >  
-> +static const struct of_device_id imx_tlv320_dt_ids[] = {
-> +	{ .compatible = "eukrea,eukrea-tlv320"},
-> +	{ /* sentinel */ }
+> +static struct of_device_id mx3fb_of_dev_id[] = {
+> +	{ .compatible = "fsl,mx3-fb", },
+> +	{ /* sentinel */ },
 > +};
-> +MODULE_DEVICE_TABLE(of, imx_tlv320_dt_ids);
+> +MODULE_DEVICE_TABLE(of, mx3fb_of_dev_id);
 > +
->  static struct platform_driver eukrea_tlv320_driver = {
+>  static struct platform_driver mx3fb_driver = {
 >  	.driver = {
->  		.name = "eukrea_tlv320",
+>  		.name = MX3FB_NAME,
+> +		.of_match_table = mx3fb_of_dev_id,
 >  		.owner = THIS_MODULE,
-> +		.of_match_table = imx_tlv320_dt_ids,
 >  	},
->  	.probe = eukrea_tlv320_probe,
->  	.remove = eukrea_tlv320_remove,
+>  	.probe = mx3fb_probe,
 > -- 
 > 1.7.9.5
 > 
