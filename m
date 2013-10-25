@@ -1,75 +1,58 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 25 Oct 2013 15:24:03 -0500
-Subject: [PATCH 2/2] dmaengine: msm_bam_dma: Add device tree binding
-In-Reply-To: <1382732643-8184-1-git-send-email-agross@codeaurora.org>
-References: <1382732643-8184-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1382732643-8184-3-git-send-email-agross@codeaurora.org>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Fri, 25 Oct 2013 16:44:24 -0400
+Subject: [PATCH v8 13/19] swiotlb-xen: use xen_dma_map/unmap_page,
+ xen_dma_sync_single_for_cpu/device
+In-Reply-To: <alpine.DEB.2.02.1310241133070.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1310171833520.26077@kaball.uk.xensource.com>
+ <1382031814-8782-13-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20131023140927.GD27771@phenom.dumpdata.com>
+ <alpine.DEB.2.02.1310231816180.26077@kaball.uk.xensource.com>
+ <20131023195154.GB28963@phenom.dumpdata.com>
+ <alpine.DEB.2.02.1310241133070.26077@kaball.uk.xensource.com>
+Message-ID: <20131025204424.GA7543@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree probe support for the MSM BAM DMA driver.
+On Thu, Oct 24, 2013 at 11:44:50AM +0100, Stefano Stabellini wrote:
+> On Wed, 23 Oct 2013, Konrad Rzeszutek Wilk wrote:
+> > On Wed, Oct 23, 2013 at 06:20:25PM +0100, Stefano Stabellini wrote:
+> > > On Wed, 23 Oct 2013, Konrad Rzeszutek Wilk wrote:
+> > > > On Thu, Oct 17, 2013 at 06:43:28PM +0100, Stefano Stabellini wrote:
+> > > > > Call xen_dma_map_page, xen_dma_unmap_page, xen_dma_sync_single_for_cpu,
+> > > > > xen_dma_sync_single_for_device from swiotlb-xen to ensure cpu/device
+> > > > > coherency of the pages used for DMA, including the ones belonging to the
+> > > > > swiotlb buffer.
+> > > > 
+> > > > You lost me.
+> > > > 
+> > > > Isn't it the driver's responsibility to do this?
+> > > > 
+> > > > Looking at what 'xen_dma_map_page()' does for x86 it looks to add an extra
+> > > > call - page_to_phys - and we ignore it here.
+> > > 
+> > > map_page on arm calls the right cache flushes needed to communicate with
+> > > the device. Same with unmap_page.
+> > 
+> > If this is flushing the cache then I think it makes more sense to do
+> > that without this fancy 'dma_map_page'.
+> > 
+> > Just call it 'xen_flush_dma_page' and make it a nop on all platforms
+> > except ARM.
+> 
+> I am OK with making it a nop on x86, it makes sense.
+> However I would like to keep it called xen_dma_map_page: after all it
+> corresponds exactly to the native map_page dma_op. It is part of the same
+> "contract".
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- .../devicetree/bindings/dma/msm_bam_dma.txt        |   49 ++++++++++++++++++++
- 1 file changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/msm_bam_dma.txt
+OK.
+> 
+> 
+> > > On x86 they are basically nop.
+> > 
+> > It calls page_to_phys in your patch. That is hardly nop.
+> 
+> I see. It is certainly worth optimizing it out on x86.
+> Of course if one day the x86 map_page dma_op starts doing something
+> useful, we can go back to call it from xen_dma_map_page.
 
-diff --git a/Documentation/devicetree/bindings/dma/msm_bam_dma.txt b/Documentation/devicetree/bindings/dma/msm_bam_dma.txt
-new file mode 100644
-index 0000000..fe3ed8f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/msm_bam_dma.txt
-@@ -0,0 +1,49 @@
-+MSM BAM DMA controller
-+
-+Required properties:
-+- compatible: Should be "qcom,bam"
-+- reg: Address range for DMA registers
-+- interrupts: single interrupt for this controller
-+- #dma-cells: must be <3>
-+- clocks: required clock
-+- clock-names: name of clock
-+
-+Example:
-+
-+	dma0: dma at f9984000 = {
-+		compatible = "qcom,bam";
-+		reg = <0xf9984000 0x15000>;
-+		interrupts = <0 94 0>;
-+		clocks = <&bam_dma_ahb_cxc>;
-+		clock-names = "bam_clk";
-+		#dma-cells = <3>;
-+	};
-+
-+Client:
-+Required properties:
-+- dmas: List of dma channel requests
-+- dma-names: Names of aforementioned requested channels
-+
-+Clients must use the format described in the dma.txt file, using a four cell
-+specifier for each channel.
-+
-+The four cells in order are:
-+  1. A phandle pointing to the DMA controller
-+  2. The channel number
-+  3. The execution environment value for this channel.
-+  4. Direction of the fixed unidirectional channel
-+     0 - Memory to Device
-+     1 - Device to Memory
-+
-+Example:
-+	serial at f991e000 {
-+		compatible = "qcom,msm-uart";
-+		reg = <0xf991e000 0x1000>
-+			<0xf9944000 0x19000>;
-+		interrupts = <0 108 0>;
-+		clocks = <&blsp1_uart2_apps_cxc>, <&blsp1_ahb_cxc>;
-+		clock-names = "gsbi_uart_clk", "gsbi_pclk";
-+
-+		dmas = <&dma0 0 0 1>, <&dma0 1 0 0>;
-+		dma-names = "rx", "tx";
-+	};
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Sure.
