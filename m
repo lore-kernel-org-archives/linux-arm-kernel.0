@@ -1,69 +1,86 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 25 Oct 2013 13:03:27 +0200
-Subject: [PATCHv7][ 3/6] ARM: imx{25,27} DT: Permit the selection of the
- imxfb framebuffer driver.
-In-Reply-To: <20131025014652.GH14529@S2101-09.ap.freescale.net>
-References: <1382605103-9595-1-git-send-email-denis@eukrea.com>
- <1382605103-9595-3-git-send-email-denis@eukrea.com>
- <20131025014652.GH14529@S2101-09.ap.freescale.net>
-Message-ID: <20131025110327.GG17512@ns203013.ovh.net>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 25 Oct 2013 11:51:51 +0100
+Subject: [PATCH v9 16/18] arm,
+ arm64: do not always merge biovec if we are running on Xen
+In-Reply-To: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
+Message-ID: <1382698313-13161-16-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:46 Fri 25 Oct     , Shawn Guo wrote:
-> On Thu, Oct 24, 2013 at 10:58:20AM +0200, Denis Carikli wrote:
-> > Without that patch, a user can't select the imxfb driver when the i.MX25 and/or
-> >   the i.MX27 device tree board are selected and that no boards that selects
-> >   IMX_HAVE_PLATFORM_IMX_FB are compiled in.
-> > 
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Eric B?nard <eric@eukrea.com>
-> > 
-> > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> 
-> This is a patch that should go through FB tree, so FB maintainer should
-> be copied, and patch subject should look like "video: ...".  Other than
-> that,
+This is similar to what it is done on X86: biovecs are prevented from merging
+otherwise every dma requests would be forced to bounce on the swiotlb buffer.
 
-I'm in Cc but this need to be send via linux-fb ML
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-so Tomi or I can see it
 
-otherswose ti's ok for me too
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Shawn
-> 
-> > ---
-> > - Rework the patch to make imxfb more broadly selectable
-> >   (usefull for randconfig).
-> > ---
-> >  drivers/video/Kconfig |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> > index 14317b7..a9f2659 100644
-> > --- a/drivers/video/Kconfig
-> > +++ b/drivers/video/Kconfig
-> > @@ -363,7 +363,7 @@ config FB_SA1100
-> >  
-> >  config FB_IMX
-> >  	tristate "Freescale i.MX1/21/25/27 LCD support"
-> > -	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
-> > +	depends on FB && ARCH_MXC
-> >  	select FB_CFB_FILLRECT
-> >  	select FB_CFB_COPYAREA
-> >  	select FB_CFB_IMAGEBLIT
-> > -- 
-> > 1.7.9.5
-> > 
-> 
+Changes in v7:
+- remove the extra autotranslate check in biomerge.c.
+---
+ arch/arm/include/asm/io.h   |    8 ++++++++
+ arch/arm64/include/asm/io.h |    9 +++++++++
+ 2 files changed, 17 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index d070741..c45effc 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -24,9 +24,11 @@
+ #ifdef __KERNEL__
+ 
+ #include <linux/types.h>
++#include <linux/blk_types.h>
+ #include <asm/byteorder.h>
+ #include <asm/memory.h>
+ #include <asm-generic/pci_iomap.h>
++#include <xen/xen.h>
+ 
+ /*
+  * ISA I/O bus memory addresses are 1:1 with the physical address.
+@@ -372,6 +374,12 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+ #define BIOVEC_MERGEABLE(vec1, vec2)	\
+ 	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
+ 
++extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
++				      const struct bio_vec *vec2);
++#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
++	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
++	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
++
+ #ifdef CONFIG_MMU
+ #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
+ extern int valid_phys_addr_range(phys_addr_t addr, size_t size);
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 1d12f89..c163287b 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -22,11 +22,14 @@
+ #ifdef __KERNEL__
+ 
+ #include <linux/types.h>
++#include <linux/blk_types.h>
+ 
+ #include <asm/byteorder.h>
+ #include <asm/barrier.h>
+ #include <asm/pgtable.h>
+ 
++#include <xen/xen.h>
++
+ /*
+  * Generic IO read/write.  These perform native-endian accesses.
+  */
+@@ -263,5 +266,11 @@ extern int devmem_is_allowed(unsigned long pfn);
+  */
+ #define xlate_dev_kmem_ptr(p)	p
+ 
++extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
++				      const struct bio_vec *vec2);
++#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
++	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
++	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
++
+ #endif	/* __KERNEL__ */
+ #endif	/* __ASM_IO_H */
+-- 
+1.7.2.5
