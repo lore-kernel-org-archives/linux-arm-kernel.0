@@ -1,61 +1,35 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 25 Oct 2013 10:24:50 -0500
-Subject: [PATCH 3/3] ARM: OMAP2: omap4-sdp: remove unneeded gpios from
- dss-common
-In-Reply-To: <526A59F9.3010104@ti.com>
-References: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
- <1382695658-18757-3-git-send-email-tomi.valkeinen@ti.com>
- <526A4585.30403@ti.com> <526A4708.7010309@ti.com> <526A4DEA.3050505@ti.com>
- <526A528C.2020204@ti.com> <526A59F9.3010104@ti.com>
-Message-ID: <526A8D42.5090209@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 Oct 2013 16:40:52 +0100
+Subject: [PATCH v3 4/4] KGDB: make kgdb_breakpoint() as noinline
+In-Reply-To: <1382094469-7971-5-git-send-email-vijay.kilari@gmail.com>
+References: <1382094469-7971-1-git-send-email-vijay.kilari@gmail.com>
+ <1382094469-7971-5-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <20131025154051.GG10673@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2013 06:46 AM, Tomi Valkeinen wrote:
-> On 25/10/13 14:14, Nishanth Menon wrote:
+On Fri, Oct 18, 2013 at 12:07:49PM +0100, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 > 
->> lcd2_pins: pinmux_lcd2_pins {
->> +		pinctrl-single,pins = <
->> +			0x20 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* gpio_40 */
->> +			0x46 (PIN_OUTPUT_PULLUP | MUX_MODE3)	/* gpio_59 */
->> +			0x56 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* gpio_104 */
->> +		>;
->>
->> 3 pins are driven around 300uA at boot, even with display OFF -> which
->> means wasted current that could have been optimized by hooking the pin
->> to the dts node corresponding to the device and used by the driver
->> appropriately.
+> The function kgdb_breakpoint() sets up break point at
+> compile time by calling arch_kgdb_breakpoint();
+> Though this call is surrounded by wmb() barrier,
+> the compile can still re-order the break point,
+> because this scheduling barrier is not a code motion
+> barrier in gcc.
 > 
-> One more clarification question.
+> Making kgdb_breakpoint() as noinline solves this problem
+> of code reording around break point instruction and also
+> avoids problem of being called as inline function from
+> other places
 > 
-> The gpio 40 is used to enable powers for the picodlp. Shouldn't that one
-> have a pinctrl pull-down in any case? If it's left floating, and the
-> driver is not compiled in or doesn't start, the powers could get enabled
-> depending on sunspot, right?
+> More details about discussion on this can be found here
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/269732
 > 
-> And I guess the same goes for all gpios used to enable something.
-> 
-Fair question. The selection of pull up, gpio control needs to be
-balanced.
-if the peripheral in question has a regulator controlled supply, none
-of the pins would matter - driver can adequately sequence this to
-ensure there are no weird side-effects. in such a scenario, i'd have a
-default MODE3 with no pulls, sequence as follows:
-a) control gpio to required default level (disabled)
-b) control regulator
-c) set GPIO to enable.
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-if the peripheral in question is always on and controlled with just a
-enable pin, it is safer to keep the pin muxed with weak pull.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-If the enable has no real functional impact without setting another
-pin (say power_on), or if any transient glitches on the line has no
-functional impact, I might go with no pull configuration.
+I guess this goes via Jason's tree?
 
-
-It all depends on the schematics and peripherals involved w.r.t how
-you'd optimally select the configuration.
-
--- 
-Regards,
-Nishanth Menon
+Will
