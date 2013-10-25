@@ -1,10 +1,10 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 25 Oct 2013 11:51:43 +0100
-Subject: [PATCH v9 08/18] arm/xen: get_dma_ops: return xen_dma_ops if we are
+Date: Fri, 25 Oct 2013 11:51:44 +0100
+Subject: [PATCH v9 09/18] arm64/xen: get_dma_ops: return xen_dma_ops if we are
  running as xen_initial_domain
 In-Reply-To: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
-Message-ID: <1382698313-13161-8-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1382698313-13161-9-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,39 +17,39 @@ We introduce __generic_dma_ops to allow xen_dma_ops functions to call
 back to the native implementation.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 CC: will.deacon at arm.com
-CC: linux at arm.linux.org.uk
 
 Changes in v7:
 - return xen_dma_ops only if we are the initial domain;
 - rename __get_dma_ops to __generic_dma_ops.
 ---
- arch/arm/include/asm/dma-mapping.h |   13 ++++++++++++-
+ arch/arm64/include/asm/dma-mapping.h |   13 ++++++++++++-
  1 files changed, 12 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 01b5a3d..f5945d4 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -12,17 +12,28 @@
- #include <asm/memory.h>
- #include <asm/cacheflush.h>
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index 59206b1..fd0c0c0 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -23,12 +23,15 @@
+ 
+ #include <asm-generic/dma-coherent.h>
  
 +#include <xen/xen.h>
 +#include <asm/xen/hypervisor.h>
 +
- #define DMA_ERROR_CODE	(~0)
- extern struct dma_map_ops arm_dma_ops;
- extern struct dma_map_ops arm_coherent_dma_ops;
+ #define ARCH_HAS_DMA_GET_REQUIRED_MASK
+ 
+ #define DMA_ERROR_CODE	(~(dma_addr_t)0)
+ extern struct dma_map_ops *dma_ops;
  
 -static inline struct dma_map_ops *get_dma_ops(struct device *dev)
 +static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
  {
- 	if (dev && dev->archdata.dma_ops)
+ 	if (unlikely(!dev) || !dev->archdata.dma_ops)
+ 		return dma_ops;
+@@ -36,6 +39,14 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
  		return dev->archdata.dma_ops;
- 	return &arm_dma_ops;
  }
  
 +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
@@ -60,8 +60,8 @@ index 01b5a3d..f5945d4 100644
 +		return __generic_dma_ops(dev);
 +}
 +
- static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
- {
- 	BUG_ON(!dev);
+ #include <asm-generic/dma-mapping-common.h>
+ 
+ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
 -- 
 1.7.2.5
