@@ -1,131 +1,44 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 25 Oct 2013 20:55:11 +0100
-Subject: [PATCH RESEND v5 1/5] misc: sram: add ability to limit used sram
- areas
-In-Reply-To: <201310221725.50942.heiko@sntech.de>
-References: <201310221724.21550.heiko@sntech.de>
- <201310221725.50942.heiko@sntech.de>
-Message-ID: <20131025195511.D0C82C404EA@trevor.secretlab.ca>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 25 Oct 2013 20:56:34 +0100
+Subject: [PATCH 1/2] Documentation: DTS: bq27xxx are trivial i2c devices
+In-Reply-To: <1382446577-28270-1-git-send-email-sre@debian.org>
+References: <1382446577-28270-1-git-send-email-sre@debian.org>
+Message-ID: <20131025195634.EEBECC40531@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Oct 2013 17:25:50 +0200, Heiko St??bner <heiko@sntech.de> wrote:
-> Some SoCs need parts of their sram for special purposes. So while being part
-> of the peripheral, it should not be part of the genpool controlling the sram.
+On Tue, 22 Oct 2013 14:56:16 +0200, Sebastian Reichel <sre@debian.org> wrote:
+> Add all chips supported by the bq27xxx driver to the list
+> of trivial i2c devices.
 > 
-> Therefore add an option available to keep arbitrary portions of the
-> sram from being part of the pool. If available is not present, all
-> sram is used.
-> 
-> Suggested-by: Rob Herring <robherring2@gmail.com>
-> move from marking reserved space to available space
-> Suggested-by: Matt Sealey <neko@bakuhatsu.net>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+> Signed-off-by: Sebastian Reichel <sre@debian.org>
+
+Acked-by: Grant Likely <grant.likely@linaro.org>
+
 > ---
->  Documentation/devicetree/bindings/misc/sram.txt |    8 ++++
->  drivers/misc/sram.c                             |   51 ++++++++++++++++++++---
->  2 files changed, 53 insertions(+), 6 deletions(-)
+>  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-> index 4d0a00e..8be552f 100644
-> --- a/Documentation/devicetree/bindings/misc/sram.txt
-> +++ b/Documentation/devicetree/bindings/misc/sram.txt
-> @@ -8,9 +8,17 @@ Required properties:
->  
->  - reg : SRAM iomem address range
->  
-> +Optional properties:
-> +
-> +- available: optional list of available chunks inside the sram that the
-> +  OS can use. Without available, the whole range is usable for the OS.
-> +  Format is <base size>, <base size>, ...; with base being relative to the
-> +  reg property base.
-
-I think it would make more sense to specify reserved regions of the
-memory instead of the valid ranges. Carving out reserved regions is
-closer to the patterns for reserved memory that we'll be using
-elsewhere.
-
-g.
-
-> +
->  Example:
->  
->  sram: sram at 5c000000 {
->  	compatible = "mmio-sram";
->  	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
-> +	available = <0x100 0x3ff00>;
->  };
-> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-> index afe66571..755e640 100644
-> --- a/drivers/misc/sram.c
-> +++ b/drivers/misc/sram.c
-> @@ -42,6 +42,8 @@ static int sram_probe(struct platform_device *pdev)
->  	struct sram_dev *sram;
->  	struct resource *res;
->  	unsigned long size;
-> +	const __be32 *avail_list = NULL;
-> +	int avail_size = 0;
->  	int ret;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -65,12 +67,49 @@ static int sram_probe(struct platform_device *pdev)
->  	if (!sram->pool)
->  		return -ENOMEM;
->  
-> -	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
-> -				res->start, size, -1);
-> -	if (ret < 0) {
-> -		if (sram->clk)
-> -			clk_disable_unprepare(sram->clk);
-> -		return ret;
-> +	if (pdev->dev.of_node) {
-> +		avail_list = of_get_property(pdev->dev.of_node,
-> +						"available",
-> +						&avail_size);
-> +		if (avail_list) {
-> +			avail_size /= sizeof(*avail_list);
-> +			if (!avail_size || avail_size % 2) {
-> +				dev_warn(&pdev->dev, "wrong number of arguments in available property\n");
-> +				avail_list = NULL;
-> +			}
-> +		}
-> +	}
-> +
-> +	if (!avail_list) {
-> +		ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
-> +					res->start, size, -1);
-> +		if (ret < 0) {
-> +			if (sram->clk)
-> +				clk_disable_unprepare(sram->clk);
-> +			return ret;
-> +		}
-> +	} else {
-> +		unsigned int astart;
-> +		unsigned int asize;
-> +		int i;
-> +
-> +		for (i = 0; i < avail_size; i += 2) {
-> +			/* get the next available block */
-> +			astart = be32_to_cpu(*avail_list++);
-> +			asize = be32_to_cpu(*avail_list++);
-> +
-> +			dev_dbg(&pdev->dev, "found available block 0x%x-0x%x\n",
-> +				 astart, astart + asize);
-> +
-> +			ret = gen_pool_add_virt(sram->pool,
-> +					(unsigned long)virt_base + astart,
-> +					res->start + astart, asize, -1);
-> +			if (ret < 0) {
-> +				if (sram->clk)
-> +					clk_disable_unprepare(sram->clk);
-> +				return ret;
-> +			}
-> +		}
->  	}
->  
->  	platform_set_drvdata(pdev, sram);
+> diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> index ad6a738..d3a29ce 100644
+> --- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> +++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> @@ -58,6 +58,9 @@ stm,m41t00		Serial Access TIMEKEEPER
+>  stm,m41t62		Serial real-time clock (RTC) with alarm
+>  stm,m41t80		M41T80 - SERIAL ACCESS RTC WITH ALARMS
+>  taos,tsl2550		Ambient Light Sensor with SMBUS/Two Wire Serial Interface
+> -ti,tsc2003		I2C Touch-Screen Controller
+> +ti,bq27200		Battery Monitor
+> +ti,bq27500		Battery Monitor
+> +ti,bq27425		Battery Monitor
+>  ti,tmp102		Low Power Digital Temperature Sensor with SMBUS/Two Wire Serial Interface
+>  ti,tmp275		Digital Temperature Sensor
+> +ti,tsc2003		I2C Touch-Screen Controller
 > -- 
-> 1.7.10.4
+> 1.8.4.rc3
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
