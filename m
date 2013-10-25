@@ -1,56 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Oct 2013 14:07:38 +0100
-Subject: [PATCH v2 0/5] Allwinner SoCs High Speed Timer support
-Message-ID: <1382706463-3892-1-git-send-email-maxime.ripard@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 Oct 2013 14:14:41 +0100
+Subject: [PATCH 1/2] ARM64: perf: add support for perf registers API
+In-Reply-To: <1382108078-8807-2-git-send-email-jean.pihet@linaro.org>
+References: <1382108078-8807-1-git-send-email-jean.pihet@linaro.org>
+ <1382108078-8807-2-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20131025131441.GC9999@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On Fri, Oct 18, 2013 at 03:54:37PM +0100, Jean Pihet wrote:
+> From: Jean Pihet <jean.pihet@newoldbits.com>
+> 
+> This patch implements the functions required for the perf registers API,
+> allowing the perf tool to interface kernel register dumps with libunwind
+> in order to provide userspace backtracing.
+> Only the general purpose user space registers are exported, i.e.:
+>  PERF_REG_ARM_X0,
+>  ...
+>  PERF_REG_ARM_X28,
+>  PERF_REG_ARM_FP,
+>  PERF_REG_ARM_LR,
+>  PERF_REG_ARM_SP,
+>  PERF_REG_ARM_PC
+> and not the PERF_REG_ARM_V* registers.
 
-Here is a few patches adding support for the High Speed Timers running on the
-Allwinner SoCs.
+[...]
 
-These timers are 64 bits timers running at a much higher speed than the timers
-used for now on these SoCs, since they are no longer wired to the 24MHz
-oscillator, but to the AHB clock.
+> diff --git a/arch/arm64/kernel/perf_regs.c b/arch/arm64/kernel/perf_regs.c
+> new file mode 100644
+> index 0000000..bbcf63c
+> --- /dev/null
+> +++ b/arch/arm64/kernel/perf_regs.c
+> @@ -0,0 +1,29 @@
+> +#include <linux/errno.h>
+> +#include <linux/kernel.h>
+> +#include <linux/perf_event.h>
+> +#include <linux/bug.h>
+> +#include <asm/perf_regs.h>
+> +#include <asm/ptrace.h>
+> +
+> +u64 perf_reg_value(struct pt_regs *regs, int idx)
+> +{
+> +	if (WARN_ON_ONCE((u32)idx >= PERF_REG_ARM_MAX))
+> +		return 0;
+> +
+> +	return regs->regs[idx];
+> +}
+> +
+> +#define REG_RESERVED (~((1ULL << PERF_REG_ARM_MAX) - 1))
+> +
+> +int perf_reg_validate(u64 mask)
+> +{
+> +	if (!mask || mask & REG_RESERVED)
+> +		return -EINVAL;
+> +
+> +	return 0;
+> +}
+> +
+> +u64 perf_reg_abi(struct task_struct *task)
+> +{
+> +	return PERF_SAMPLE_REGS_ABI_64;
+> +}
 
-This HS timers are actually found in all the supported SoCs but the A10.
-However, the A20 and A31 come with 4 of these high speed timers, while the A10s
-and A13 only have two, hence why we introduce two different compatibles.
+You need to deal with compat (AArch32) tasks here too, which means providing
+something compatible with what we do on arch/arm/ depending on the thread
+flags.
 
-The A31 is not using these for now, as its timers are asserted in reset by a
-reset controller that first need to gain some support in the kernel first, but
-that's for another patchset.
-
-Thanks,
-Maxime
-
-Changes from v1:
-  - Reported correctly the minimum ticks we can set
-  - No longer use the HS timers as the default timers in the system
-  - Removed the IRQF_DISABLED interrupt flag
-  - Filled the irq clock_event_device field
-  - Changed the cpumask to cpu_possible_mask
-
-Maxime Ripard (5):
-  clocksource: sun4i: Increase a bit the clock event and sources rating
-  clocksource: Add Allwinner SoCs HS timers driver
-  ARM: sun5i: a10s: Add support for the High Speed Timers
-  ARM: sun5i: a13: Add support for the High Speed Timers
-  ARM: sun7i: a20: Add support for the High Speed Timers
-
- .../bindings/timer/allwinner,sun5i-a13-hstimer.txt |  22 +++
- arch/arm/boot/dts/sun5i-a10s.dtsi                  |   7 +
- arch/arm/boot/dts/sun5i-a13.dtsi                   |   7 +
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  10 ++
- arch/arm/mach-sunxi/Kconfig                        |   1 +
- drivers/clocksource/Kconfig                        |   4 +
- drivers/clocksource/Makefile                       |   1 +
- drivers/clocksource/sun4i_timer.c                  |   4 +-
- drivers/clocksource/timer-sun5i.c                  | 192 +++++++++++++++++++++
- 9 files changed, 246 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
- create mode 100644 drivers/clocksource/timer-sun5i.c
-
--- 
-1.8.4
+Will
