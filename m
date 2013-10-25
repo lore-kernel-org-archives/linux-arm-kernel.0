@@ -1,56 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 25 Oct 2013 05:59:56 -0700
-Subject: [RFC PATCH] device: Add kernel standard devm_k.alloc functions
-In-Reply-To: <1382282566.2041.39.camel@joe-AO722>
-References: <1381296747.2040.17.camel@joe-AO722>
- <20131011131138.3bc5b2acf60df3a5d79d0d24@linux-foundation.org>
- <CAGa+x864VYoGvOxoK0XnxXH9hKNq9WAZ16XHiFawZY7_2WJttw@mail.gmail.com>
- <CAGa+x86aS+C8iEb1P4ZYxPBix=Anjh4JZoAof=R-i9fGw=bq6w@mail.gmail.com>
- <20131018225702.GA13090@kroah.com> <8761stu7rl.fsf@linaro.org>
- <20131020025713.GA22344@kroah.com>
- <1382282566.2041.39.camel@joe-AO722>
-Message-ID: <CAOesGMhHPa+Wb6=bEZ1paUN4-Rw_DFc5rtZQ9miQ=Otg9p39Uw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 Oct 2013 14:08:40 +0100
+Subject: [RFC 2/3] arm: mm: Define set_memory_* functions for ARM
+In-Reply-To: <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
+References: <1371057810-3189-1-git-send-email-lauraa@codeaurora.org>
+ <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20131025130839.GA9999@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 20, 2013 at 8:22 AM, Joe Perches <joe@perches.com> wrote:
-> On Sat, 2013-10-19 at 19:57 -0700, Greg KH wrote:
->> On Fri, Oct 18, 2013 at 10:52:46PM -0700, Kevin Hilman wrote:
->> > Greg KH <gregkh@linuxfoundation.org> writes:
->> >
->> > > On Fri, Oct 18, 2013 at 10:04:11AM -0700, Kevin Hilman wrote:
->> > >> > A handful of boot panics on ARM platforms were bisected to point at
->> > >> > the version of this commit that's in linux-next (commit
->> > >> > 64c862a839a8db2c02bbaa88b923d13e1208919d).  Reverting this commit
->> > >> > makes things happy again.
->> > >> >
->> > >> > Upon further digging, it seems that users of devres_alloc() are
->> > >> > relying on the previous behavior of having the memory zero'd which is
->> > >> > no longer the case after $SUBJECT patch.  The change below on top of
->> > >> > -next makes these ARM boards happy again.
->> > >>
->> > >> Oops, it should've fixed __devres_alloc() also.  Updated patch below.
->> > >
->> > > Can you send this in a format that I can apply it in?  It was whitespace
->> > > damaged.
->> >
->> > hmm, sorry about that.  This one should work, though I wonder if Andrew
->> > should pick this up since I think the patch that causes the breakage
->> > came through his tree.
->>
->> No, the patch is in my tree, not Andrew's.
->>
->> Joe, can I get a signed-off-by for this?
->
-> If you want.
->
-> Signed-off-by: Joe Perches <joe@perches.com>
+Hi Laura,
 
-Acked-by: Olof Johansson <olof@lixom.net>
+On Wed, Jun 12, 2013 at 06:23:29PM +0100, Laura Abbott wrote:
+> Other architectures define various set_memory functions to allow
+> attributes to be changed (e.g. set_memory_x, set_memory_rw, etc.)
+> Currently, these functions are missing on ARM. Define these in an
+> appropriate manner for ARM.
 
+[...]
 
-Greg, would you mind picking this up? It's still broken in -next and I
-don't want it to mask other issues that might be introduced.
+> +int set_memory_ro(unsigned long addr, int numpages)
+> +{
+> +	unsigned long start = addr;
+> +	unsigned long size = PAGE_SIZE*numpages;
+> +	unsigned end = start + size;
+> +
+> +	apply_to_page_range(&init_mm, start, size, pte_set_ro, NULL);
+> +	dsb();
+> +	flush_tlb_kernel_range(start, end);
 
+The TLB_WB flag gives you the dsb, so you don't need to code it explicitly
+here (same comment for the other occurrences in this patch).
 
--Olof
+Will
