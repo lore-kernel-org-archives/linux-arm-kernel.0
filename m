@@ -1,17 +1,37 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 25 Oct 2013 14:13:49 +0300
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 25 Oct 2013 06:14:20 -0500
 Subject: [PATCH 3/3] ARM: OMAP2: omap4-sdp: remove unneeded gpios from
  dss-common
 In-Reply-To: <526A4DEA.3050505@ti.com>
 References: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
  <1382695658-18757-3-git-send-email-tomi.valkeinen@ti.com>
  <526A4585.30403@ti.com> <526A4708.7010309@ti.com> <526A4DEA.3050505@ti.com>
-Message-ID: <526A526D.3010108@ti.com>
+Message-ID: <526A528C.2020204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/13 13:54, Nishanth Menon wrote:
-
+On 10/25/2013 05:54 AM, Nishanth Menon wrote:
+> On 10/25/2013 05:25 AM, Tomi Valkeinen wrote:
+>> On 25/10/13 13:18, Nishanth Menon wrote:
+>>
+>>>>  void __init omap_4430sdp_display_init_of(void)
+>>>>  {
+>>>> -	int r;
+>>>> -
+>>>> -	r = gpio_request_one(DISPLAY_SEL_GPIO, GPIOF_OUT_INIT_HIGH,
+>>>> -			"display_sel");
+>>>> -	if (r)
+>>>> -		pr_err("%s: Could not get display_sel GPIO\n", __func__);
+>>>> -
+>>>> -	r = gpio_request_one(DLP_POWER_ON_GPIO, GPIOF_OUT_INIT_LOW,
+>>>> -		"DLP POWER ON");
+>>>> -	if (r)
+>>>> -		pr_err("%s: Could not get DLP POWER ON GPIO\n", __func__);
+>>>> -
+>>>>  	omap_display_init(&sdp4430_dss_data);
+>>>>  
+>>>>  	platform_device_register(&sdp4430_lcd_device);
+>>>>
 >>> would you not be depending on the weak IO pull done using mux to drive
 >>> these GPIO pins since the GPIO is not requested and held?
 >>
@@ -31,51 +51,39 @@ On 25/10/13 13:54, Nishanth Menon wrote:
 > Lower current is fine if the switch is ok with it and risk for
 > transients are reasonably safe. However, board designs generally
 > assume the stronger GPIO drive strength.
-
-Ok. Well, it definitely sounds safer to have a proper gpio pull there, then.
-
->>> Could we not use Documentation/devicetree/bindings/gpio/gpio.txt
->>> binding to map to the right GPIO and drive it using the GPIO module?
->>
->> Hmm, what do you mean?
->>
->> I do mux the pins to gpios, but there's nothing in the kernel that would
->> use those gpios. That's why we had the hack above, but I'd love to get
->> rid of it.
->>
->> Can I set the pins to GPIO mode, and set the GPIO to high/low in the .dts?
->>
->> If things were perfect, we probably would have a driver for the "switch"
->> part. I have no idea what kind of driver that would be, though, so at
->> the moment we've just gone with the use-LCD2-by-default route.
 > 
-> I meant you could, in theory provide the gpio numbers and pull
-> directions in dts and allow the init to drive them as needed.
-> 
-> Something like:
-> drivers/i2c/busses/i2c-gpio.c as a reference and use
-> of_get_named_gpio/of_get_gpio to pick themup..
 
-I'm still not quite following... What init are you referring to?
+one additional angle before I forget - this is something we do as part
+of power optimization - to identify pins which are programmed for a
+pull in non-functional scenario as it has direct impact on idle power
+numbers.
 
-The problem here is that the gpios don't really belong to anyone in the
-kernel, as we don't have a driver for the switch.
+For example patch #3 in this series
+&omap4_pmx_core {
+pinctrl-0
+...
+	&lcd2_pins
+..
+}
+&lcd2_pins
 
-Or did you mean that we'd still have the code in dss-common.c, but just
-get the gpio numbers from the .dts instead? That makes sense, although
-I'd want to get rid of that code altogether.
+lcd2_pins: pinmux_lcd2_pins {
++		pinctrl-single,pins = <
++			0x20 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* gpio_40 */
++			0x46 (PIN_OUTPUT_PULLUP | MUX_MODE3)	/* gpio_59 */
++			0x56 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* gpio_104 */
++		>;
 
-Should we have support in the gpio-controller to define default values
-for gpios? I don't think we can rely on the boot loader to set things
-correctly.
+3 pins are driven around 300uA at boot, even with display OFF -> which
+means wasted current that could have been optimized by hooking the pin
+to the dts node corresponding to the device and used by the driver
+appropriately.
 
- Tomi
+Unfortunately, folks feel simplifying the driver is traditionally a
+better alternative but with a 400 odd pins on a typical SoC of today,
+these defaults add up and end user tends to suffer with bad overall
+power numbers :(..
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131025/dfce2511/attachment.sig>
+-- 
+Regards,
+Nishanth Menon
