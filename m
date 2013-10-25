@@ -1,103 +1,282 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 25 Oct 2013 22:52:27 +0200
-Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: convert to platform driver
-In-Reply-To: <526AC2DF.2020904@linaro.org>
-References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
- <6431720.IUjkN7MGOG@thinkpad> <526AC2DF.2020904@linaro.org>
-Message-ID: <1953577.TBW5ixuUM5@thinkpad>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 25 Oct 2013 22:30:31 +0100
+Subject: [PATCH v2 1/8] irqchip: add DesignWare APB ICTL interrupt
+ controller
+In-Reply-To: <1381991853-8131-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1381235073-17134-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1381991853-8131-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <526AE2F7.3040804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 of October 2013 21:13:35 Daniel Lezcano wrote:
-> On 10/25/2013 12:39 PM, Tomasz Figa wrote:
-> > Hi Daniel,
-> > 
-> > [Sending again, without HTML part. Sorry for the noise.]
-> > 
-> > On Friday 25 of October 2013 09:11:13 Daniel Lezcano wrote:
-> >> The driver is tied with the pm low level code making difficult to
-> >> split
-> >> the driver into a more arch independent code. The platform driver
-> >> allows
-> >> to move the standby callback into the platform data field and use a
-> >> simple driver with no more dependency on the low level code.
-> >> 
-> >> The standby callback has a portion of code to set the standby method
-> >> and
-> >> the effective cpu_do_idle switching the cpu to the right mode. As this
-> >> code is redundant in the cpu suspend code, it has been factored out
-> >> when
-> >> implementing the standby methdod.
-> >> 
-> >> By this way, the driver is ready to be moved out to the
-> >> drivers/cpuidle.
-> > 
-> > The idea itself is quite good, but unfortunately I have to NAK this.
-> > Please see details in comments below.
-> > 
-> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >> ---
-> >> 
-> >>   arch/arm/mach-s3c64xx/cpuidle.c |   38
-> >> 
-> >> ++++++++++++++++---------------------- arch/arm/mach-s3c64xx/pm.c     
-> >> |
-> >> 
-> >>    33 ++++++++++++++++++++++++++------- 2 files changed, 42
-> >> 
-> >> insertions(+), 29 deletions(-)
-> 
-> [ ... ]
-> 
-> >> -
-> >> -	tmp = __raw_readl(S3C64XX_PWR_CFG);
-> >> -	tmp &= ~S3C64XX_PWRCFG_CFG_WFI_MASK;
-> >> -	tmp |= S3C64XX_PWRCFG_CFG_WFI_SLEEP;
-> > 
-> > Finally note the S3C64XX_PWRCFG_CFG_WFI_SLEEP flag here again.
-> 
-> Ouch ! I missed it. Thanks for spotting the problem.
-> 
-> > I believe it should be visible now what's wrong with this patch. To
-> > make
-> > sure it is, let me explain how the system controller of S3C64xx handles
-> > WFI requests.
-> > 
-> > When the CPU issues WFI request to the syscon, it takes an action
-> > depending on how it is configured. A bit field is there in one of
-> > syscon registers (S3C64XX_PWR_CFG) that selects what action to perform
-> > in case of WFI request.
-> > 
-> > You can program the syscon to ignore the request, enter IDLE mode,
-> > enter
-> > STOP mode or enter SLEEP mode. As the names suggest, for cpuidle, it
-> > needs to be programmed for IDLE mode and for system-wide sleep it
-> > needs to be set to SLEEP mode. STOP mode is not very useful as it has
-> > mostly the same effect that can be achieved by performing fine-grained
-> > clock and power gating of peripherals manually, so it is unused by
-> > Linux.
-> 
-> Yes, this is what I assumed but I missed the CFG_WFI_SLEEP flag, my eyes
-> read CFG_WFI_IDLE.
-> 
-> > Now, my take on the issue you are trying to solve would be a bit
-> > different. Since the S3C64xx does not have any interesting cpuidle
-> > modes, just a normal, clock-gated WFI mode, it does not need to have a
-> > cpuidle driver at all. All that is needed is simply setting up the
-> > S3C64XX_PWRCFG_CFG_WFI field to S3C64XX_PWRCFG_CFG_WFI_IDLE early at
-> > boot-up, then set it to S3C64XX_PWRCFG_CFG_WFI_SLEEP just before
-> > entering the sleep mode and restore it back to
-> > S3C64XX_PWRCFG_CFG_WFI_IDLE after waking up.
-> So you are suggesting to remove the cpuidle driver ?
+On 10/17/2013 07:37 AM, Sebastian Hesselbarth wrote:
+> This adds an irqchip driver and corresponding devicetree binding for the
+> secondary interrupt controllers based on Synopsys DesignWare IP dw_apb_ictl.
+>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Jisheng Zhang <jszhang@marvell.com>
 
-Exactly.
+Thomas (tglx),
 
-> 
-> Won't it be worth to add a new WFI_SLEEP state to the cpuidle driver ?
+can you please look at this and review it? IIRC, Olof already closed
+the arm-soc merge window for v3.13, so there is plenty of time to get
+this straight. Nevertheless, it would be great to have it in early in
+v3.13.
 
-I don't think so. How a suspend-to-RAM specific thing like WFI_SLEEP could 
-be relevant to a cpuidle driver? (Unless there are some plans to 
-consolidate STR with cpuidle that I haven't heard about...)
+Also, I prefer to have Mark look at the bindings again and maybe
+update his remarks with the latest conclusions of KS.
 
-Best regards,
-Tomasz
+Regards,
+   Sebastian
+
+> ---
+> Changelog:
+> v1->v2:
+> - reword binding docu for reg property and add FIQ decoding note
+>    (Suggested by Mark Rutland)
+> - add cleanup on error path (Reported by Jisheng Zhang)
+> RFCv1->RFCv2:
+> - added copyright reference
+>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Jisheng Zhang <jszhang@marvell.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-doc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>   .../interrupt-controller/snps,dw-apb-ictl.txt      |   32 +++++
+>   drivers/irqchip/Kconfig                            |    4 +
+>   drivers/irqchip/Makefile                           |    1 +
+>   drivers/irqchip/irq-dw-apb-ictl.c                  |  150 ++++++++++++++++++++
+>   4 files changed, 187 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+>   create mode 100644 drivers/irqchip/irq-dw-apb-ictl.c
+>
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+> new file mode 100644
+> index 0000000..4929117
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/snps,dw-apb-ictl.txt
+> @@ -0,0 +1,32 @@
+> +Synopsys DesignWare APB interrupt controller (dw_apb_ictl)
+> +
+> +Synopsys DesignWare provides interrupt controller IP for APB known as
+> +dw_apb_ictl. The IP is used as secondary interrupt controller in some SoCs with
+> +APB bus, e.g. Marvell Armada 1500.
+> +
+> +Required properties:
+> +- compatible: shall be "snps,dw-apb-ictl"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region starting with ENABLE_LOW register
+> +- interrupt-controller: identifies the node as an interrupt controller
+> +- #interrupt-cells: number of cells to encode an interrupt-specifier, shall be 1
+> +- interrupts: interrupt reference to primary interrupt controller
+> +- interrupt-parent: (optional) reference specific primary interrupt controller
+> +
+> +The interrupt sources map to the corresponding bits in the interrupt
+> +registers, i.e.
+> +- 0 maps to bit 0 of low interrupts,
+> +- 1 maps to bit 1 of low interrupts,
+> +- 32 maps to bit 0 of high interrupts,
+> +- 33 maps to bit 1 of high interrupts,
+> +- (optional) fast interrupts start at 64.
+> +
+> +Example:
+> +	aic: interrupt-controller at 3000 {
+> +		compatible = "snps,dw-apb-ictl";
+> +		reg = <0x3000 0xc00>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index 3792a1a..940638d 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -30,6 +30,10 @@ config ARM_VIC_NR
+>   	  The maximum number of VICs available in the system, for
+>   	  power management.
+>
+> +config DW_APB_ICTL
+> +	bool
+> +	select IRQ_DOMAIN
+> +
+>   config IMGPDC_IRQ
+>   	bool
+>   	select GENERIC_IRQ_CHIP
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index c60b901..6427323 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+>   obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+>   obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
+>   obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
+> +obj-$(CONFIG_DW_APB_ICTL)		+= irq-dw-apb-ictl.o
+>   obj-$(CONFIG_METAG)			+= irq-metag-ext.o
+>   obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
+>   obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
+> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
+> new file mode 100644
+> index 0000000..31e231e
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
+> @@ -0,0 +1,150 @@
+> +/*
+> + * Synopsys DW APB ICTL irqchip driver.
+> + *
+> + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> + *
+> + * based on GPL'ed 2.6 kernel sources
+> + *  (c) Marvell International Ltd.
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqchip/chained_irq.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +
+> +#include "irqchip.h"
+> +
+> +#define APB_INT_ENABLE_L	0x00
+> +#define APB_INT_ENABLE_H	0x04
+> +#define APB_INT_MASK_L		0x08
+> +#define APB_INT_MASK_H		0x0c
+> +#define APB_INT_FINALSTATUS_L	0x30
+> +#define APB_INT_FINALSTATUS_H	0x34
+> +
+> +static void dw_apb_ictl_handler(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	struct irq_chip *chip = irq_get_chip(irq);
+> +	struct irq_chip_generic *gc = irq_get_handler_data(irq);
+> +	struct irq_domain *d = gc->private;
+> +	u32 stat;
+> +	int n;
+> +
+> +	chained_irq_enter(chip, desc);
+> +
+> +	for (n = 0; n < gc->num_ct; n++) {
+> +		stat = readl_relaxed(gc->reg_base +
+> +				     APB_INT_FINALSTATUS_L + 4 * n);
+> +		while (stat) {
+> +			u32 hwirq = ffs(stat) - 1;
+> +			generic_handle_irq(irq_find_mapping(d,
+> +					    gc->irq_base + hwirq + 32 * n));
+> +			stat &= ~(1 << hwirq);
+> +		}
+> +	}
+> +
+> +	chained_irq_exit(chip, desc);
+> +}
+> +
+> +static int __init dw_apb_ictl_init(struct device_node *np,
+> +				   struct device_node *parent)
+> +{
+> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
+> +	struct resource r;
+> +	struct irq_domain *domain;
+> +	struct irq_chip_generic *gc;
+> +	void __iomem *iobase;
+> +	int ret, nrirqs, irq;
+> +	u32 reg;
+> +
+> +	/* Map the parent interrupt for the chained handler */
+> +	irq = irq_of_parse_and_map(np, 0);
+> +	if (irq <= 0) {
+> +		pr_err("%s: unable to parse irq\n", np->full_name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = of_address_to_resource(np, 0, &r);
+> +	if (ret) {
+> +		pr_err("%s: unable to get resource\n", np->full_name);
+> +		return ret;
+> +	}
+> +
+> +	if (!request_mem_region(r.start, resource_size(&r), np->full_name)) {
+> +		pr_err("%s: unable to request mem region\n", np->full_name);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	iobase = ioremap(r.start, resource_size(&r));
+> +	if (!iobase) {
+> +		pr_err("%s: unable to map resource\n", np->full_name);
+> +		ret = -ENOMEM;
+> +		goto err_release;
+> +	}
+> +
+> +	/*
+> +	 * DW IP can be configured to allow 2-64 irqs. We can determine
+> +	 * the number of irqs supported by writing into enable register
+> +	 * and look for bits not set, as corresponding flip-flops will
+> +	 * have been removed by sythesis tool.
+> +	 */
+> +
+> +	/* mask and enable all interrupts */
+> +	writel(~0, iobase + APB_INT_MASK_L);
+> +	writel(~0, iobase + APB_INT_MASK_H);
+> +	writel(~0, iobase + APB_INT_ENABLE_L);
+> +	writel(~0, iobase + APB_INT_ENABLE_H);
+> +
+> +	reg = readl(iobase + APB_INT_ENABLE_H);
+> +	if (reg)
+> +		nrirqs = 32 + fls(reg);
+> +	else
+> +		nrirqs = fls(readl(iobase + APB_INT_ENABLE_L));
+> +
+> +	domain = irq_domain_add_linear(np, nrirqs,
+> +				       &irq_generic_chip_ops, NULL);
+> +	if (!domain) {
+> +		pr_err("%s: unable to add irq domain\n", np->full_name);
+> +		ret = -ENOMEM;
+> +		goto err_unmap;
+> +	}
+> +
+> +	ret = irq_alloc_domain_generic_chips(domain, 32, (nrirqs > 32) ? 2 : 1,
+> +					     np->name, handle_level_irq, clr, 0,
+> +					     IRQ_GC_INIT_MASK_CACHE);
+> +	if (ret) {
+> +		pr_err("%s: unable to alloc irq domain gc\n", np->full_name);
+> +		goto err_unmap;
+> +	}
+> +
+> +	gc = irq_get_domain_generic_chip(domain, 0);
+> +	gc->private = domain;
+> +	gc->reg_base = iobase;
+> +
+> +	gc->chip_types[0].regs.mask = APB_INT_MASK_L;
+> +	gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
+> +	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
+> +
+> +	if (nrirqs > 32) {
+> +		gc->chip_types[1].regs.mask = APB_INT_MASK_H;
+> +		gc->chip_types[1].chip.irq_mask = irq_gc_mask_set_bit;
+> +		gc->chip_types[1].chip.irq_unmask = irq_gc_mask_clr_bit;
+> +	}
+> +
+> +	irq_set_handler_data(irq, gc);
+> +	irq_set_chained_handler(irq, dw_apb_ictl_handler);
+> +
+> +	return 0;
+> +
+> +err_unmap:
+> +	iounmap(iobase);
+> +err_release:
+> +	release_mem_region(r.start, resource_size(&r));
+> +	return ret;
+> +}
+> +IRQCHIP_DECLARE(dw_apb_ictl,
+> +		"snps,dw-apb-ictl", dw_apb_ictl_init);
+>
