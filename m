@@ -1,61 +1,35 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 25 Oct 2013 09:38:19 +1030
-Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
-In-Reply-To: <20131024084559.GD16735@n2100.arm.linux.org.uk>
-References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
- <87eh7bfoq9.fsf@rustcorp.com.au>
- <20131024084559.GD16735@n2100.arm.linux.org.uk>
-Message-ID: <87mwlyclng.fsf@rustcorp.com.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 25 Oct 2013 09:27:28 +0800
+Subject: [PATCH 3/4] ARM: dts: i.MX53: dts for Voipac x53-dmm-668 module
+In-Reply-To: <1382644733.19373.2.camel@lolumad>
+References: <1382461643-16790-1-git-send-email-lisovy@gmail.com>
+ <1382461643-16790-4-git-send-email-lisovy@gmail.com>
+ <20131023072738.GI2839@S2101-09.ap.freescale.net>
+ <1382641926.16515.2.camel@lolumad>
+ <CAHCPf3vB+HYkFoBYcbVM6Ecp+8BSApG2JZi1PRwc7ag6ygszOw@mail.gmail.com>
+ <1382644733.19373.2.camel@lolumad>
+Message-ID: <20131025012725.GG14529@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> On Thu, Oct 24, 2013 at 11:51:18AM +1030, Rusty Russell wrote:
->> Ming Lei <tom.leiming@gmail.com> writes:
->> > Address of non-module kernel symbol should always be located
->> > from CONFIG_PAGE_OFFSET on, so only show these legal kernel
->> > symbols in /proc/kallsyms.
->> >
->> > On ARM, some symbols(see below) may drop in relocatable code, so
->> > perf can't parse kernel symbols any more from /proc/kallsyms, this
->> > patch fixes the problem.
->> >
->> > 	00000000 t __vectors_start
->> > 	00000020 A cpu_v7_suspend_size
->> > 	00001000 t __stubs_start
->> > 	00001004 t vector_rst
->> > 	00001020 t vector_irq
->> > 	000010a0 t vector_dabt
->> > 	00001120 t vector_pabt
->> > 	000011a0 t vector_und
->> > 	00001220 t vector_addrexcptn
->> > 	00001224 t vector_fiq
->> > 	00001224 T vector_fiq_offset
->> >
->> > The issue can be fixed in scripts/kallsyms.c too, but looks this
->> > approach is easier.
->> 
->> This fix looks hacky; if these symbols are not available, don't just
->> remove them from /proc/kallsyms, but don't put them in the kernel at
->> all.
->
-> How do you "don't put them in the kernel at all" when they're used by
-> the kernel internally as offsets?
+On Thu, Oct 24, 2013 at 09:58:53PM +0200, Rostislav Lisovy wrote:
+> I saw that most of the vendor prefixes are somehow shortened (e.g.
+> Freescale -- fsl, etc.).
 
-Sorry, I was imprecise.  I was referring to the kernel's kallsyms
-tables produced by scripts/kallsyms.c.  This patch left them in the
-the kallsyms tables and filtered them out from /proc/kallsyms.
+The 'fsl' is the stock symbol of Freescale.  If that's not the case for
+voipac, I think 'voipac' is more appropriate.
 
-It's weird that cpu_v7_suspend_size appeared above, since kallsyms
-should filter out 'A' symbols already.
+Shawn
 
-> If you mean, just get rid of them, shall I just add these as magic
-> numbers instead based on the values in this email?  Is that really a
-> sane solution?
->
-> No, we have to keep these symbols IMHO.
-
-Can you make them absolute symbols?  That should Just Work for kallsyms.
-
-Cheers,
-Rusty.
+> On Thu, 2013-10-24 at 14:49 -0500, Matt Sealey wrote: 
+> > On Thu, Oct 24, 2013 at 2:12 PM, Rostislav Lisovy <lisovy@gmail.com> wrote:
+> > > Dear Shawn;
+> > > Thank you for your comments.
+> > > Should I also add Voipac to
+> > > Documentation/devicetree/bindings/vendor-prefixes.txt?
+> > 
+> > I would agree with that, but why is your chosen prefix "vp" instead of
+> > "voipac" anyway?
+> > 
+> 
+> 
