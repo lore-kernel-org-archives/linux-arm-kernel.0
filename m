@@ -1,53 +1,145 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 25 Oct 2013 11:51:53 +0100
-Subject: [PATCH v9 18/18] swiotlb-xen: static inline xen_phys_to_bus,
- xen_bus_to_phys, xen_virt_to_bus and range_straddles_page_boundary
+Date: Fri, 25 Oct 2013 11:51:47 +0100
+Subject: [PATCH v9 12/18] xen: introduce xen_dma_map/unmap_page and
+ xen_dma_sync_single_for_cpu/device
 In-Reply-To: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
-Message-ID: <1382698313-13161-18-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1382698313-13161-12-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This functions are small and called frequently. Static inline them.
+Introduce xen_dma_map_page, xen_dma_unmap_page,
+xen_dma_sync_single_for_cpu and xen_dma_sync_single_for_device.
+They have empty implementations on x86 and ia64 but they call the
+corresponding platform dma_ops function on arm and arm64.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- drivers/xen/swiotlb-xen.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-index 4d50058..100962d 100644
---- a/drivers/xen/swiotlb-xen.c
-+++ b/drivers/xen/swiotlb-xen.c
-@@ -72,17 +72,17 @@ static unsigned long xen_io_tlb_nslabs;
- 
- static u64 start_dma_addr;
- 
--static dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
-+static inline dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
- {
- 	return phys_to_machine(XPADDR(paddr)).maddr;
+Changes in v9:
+- xen_dma_map_page return void, avoid page_to_phys.
+---
+ arch/arm/include/asm/xen/page-coherent.h   |   28 ++++++++++++++++++++++++++++
+ arch/arm64/include/asm/xen/page-coherent.h |   25 +++++++++++++++++++++++++
+ arch/ia64/include/asm/xen/page-coherent.h  |   14 ++++++++++++++
+ arch/x86/include/asm/xen/page-coherent.h   |   14 ++++++++++++++
+ 4 files changed, 81 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
+index c4d843c..1109017 100644
+--- a/arch/arm/include/asm/xen/page-coherent.h
++++ b/arch/arm/include/asm/xen/page-coherent.h
+@@ -19,4 +19,32 @@ static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+ 	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
  }
  
--static phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
-+static inline phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
- {
- 	return machine_to_phys(XMADDR(baddr)).paddr;
++static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
++	     unsigned long offset, size_t size, enum dma_data_direction dir,
++	     struct dma_attrs *attrs)
++{
++	__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
++}
++
++static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir,
++		struct dma_attrs *attrs)
++{
++	if (__generic_dma_ops(hwdev)->unmap_page)
++		__generic_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
++}
++
++static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	if (__generic_dma_ops(hwdev)->sync_single_for_cpu)
++		__generic_dma_ops(hwdev)->sync_single_for_cpu(hwdev, handle, size, dir);
++}
++
++static inline void xen_dma_sync_single_for_device(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	if (__generic_dma_ops(hwdev)->sync_single_for_device)
++		__generic_dma_ops(hwdev)->sync_single_for_device(hwdev, handle, size, dir);
++}
+ #endif /* _ASM_ARM_XEN_PAGE_COHERENT_H */
+diff --git a/arch/arm64/include/asm/xen/page-coherent.h b/arch/arm64/include/asm/xen/page-coherent.h
+index 3b4f029..2820f1a 100644
+--- a/arch/arm64/include/asm/xen/page-coherent.h
++++ b/arch/arm64/include/asm/xen/page-coherent.h
+@@ -19,4 +19,29 @@ static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+ 	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
  }
  
--static dma_addr_t xen_virt_to_bus(void *address)
-+static inline dma_addr_t xen_virt_to_bus(void *address)
- {
- 	return xen_phys_to_bus(virt_to_phys(address));
- }
-@@ -105,7 +105,7 @@ static int check_pages_physically_contiguous(unsigned long pfn,
- 	return 1;
++static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
++	     unsigned long offset, size_t size, enum dma_data_direction dir,
++	     struct dma_attrs *attrs)
++{
++	__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
++}
++
++static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir,
++		struct dma_attrs *attrs)
++{
++	__generic_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
++}
++
++static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	__generic_dma_ops(hwdev)->sync_single_for_cpu(hwdev, handle, size, dir);
++}
++
++static inline void xen_dma_sync_single_for_device(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	__generic_dma_ops(hwdev)->sync_single_for_device(hwdev, handle, size, dir);
++}
+ #endif /* _ASM_ARM64_XEN_PAGE_COHERENT_H */
+diff --git a/arch/ia64/include/asm/xen/page-coherent.h b/arch/ia64/include/asm/xen/page-coherent.h
+index 37b929c..96e42f9 100644
+--- a/arch/ia64/include/asm/xen/page-coherent.h
++++ b/arch/ia64/include/asm/xen/page-coherent.h
+@@ -21,4 +21,18 @@ static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+ 	free_pages((unsigned long) cpu_addr, get_order(size));
  }
  
--static int range_straddles_page_boundary(phys_addr_t p, size_t size)
-+static inline int range_straddles_page_boundary(phys_addr_t p, size_t size)
- {
- 	unsigned long pfn = PFN_DOWN(p);
- 	unsigned int offset = p & ~PAGE_MASK;
++static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
++	     unsigned long offset, size_t size, enum dma_data_direction dir,
++	     struct dma_attrs *attrs) { }
++
++static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir,
++		struct dma_attrs *attrs) { }
++
++static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir) { }
++
++static inline void xen_dma_sync_single_for_device(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir) { }
++
+ #endif /* _ASM_IA64_XEN_PAGE_COHERENT_H */
+diff --git a/arch/x86/include/asm/xen/page-coherent.h b/arch/x86/include/asm/xen/page-coherent.h
+index 31de2e0..7f02fe4 100644
+--- a/arch/x86/include/asm/xen/page-coherent.h
++++ b/arch/x86/include/asm/xen/page-coherent.h
+@@ -21,4 +21,18 @@ static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+ 	free_pages((unsigned long) cpu_addr, get_order(size));
+ }
+ 
++static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
++	     unsigned long offset, size_t size, enum dma_data_direction dir,
++	     struct dma_attrs *attrs) { }
++
++static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir,
++		struct dma_attrs *attrs) { }
++
++static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir) { }
++
++static inline void xen_dma_sync_single_for_device(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir) { }
++
+ #endif /* _ASM_X86_XEN_PAGE_COHERENT_H */
 -- 
 1.7.2.5
