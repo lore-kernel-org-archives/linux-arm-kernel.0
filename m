@@ -1,44 +1,97 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Oct 2013 14:22:44 +0100
-Subject: [PATCH v3 3/4] ARM: sunxi: Register the A31 reset IP in init_time
+Date: Fri, 25 Oct 2013 14:22:45 +0100
+Subject: [PATCH v3 4/4] ARM: sun6i: Add the reset controller to the DTSI
 In-Reply-To: <1382707365-4776-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1382707365-4776-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1382707365-4776-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1382707365-4776-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 has a reset IP that maintains a few other IPs in reset by
-default. Among these IPs are the UARTs, and most notably the timers. We
-thus need to register the reset driver before initializing the timers so
-that the reset timer can use the reset framework.
+The A31 has a reset controller IP that maintains a few other IPs in
+reset, among which we can find the UARTs, high speed timers or the I2C.
+Now that we have support for them, add the reset controllers to the DTSI.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-sunxi/sunxi.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index f184f6c..2e79736 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -142,9 +142,17 @@ static const char * const sun6i_board_dt_compat[] = {
- 	NULL,
- };
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index c1751a6..c7e0658 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -209,6 +209,24 @@
+ 			};
+ 		};
  
-+extern void __init sun6i_reset_init(void);
-+static void __init sun6i_timer_init(void)
-+{
-+	sunxi_init_clocks();
-+	sun6i_reset_init();
-+	clocksource_of_init();
-+}
++		ahb1_rst: reset at 01c202c0 {
++			#reset-cells = <1>;
++			compatible = "allwinner,sun6i-a31-ahb1-reset";
++			reg = <0x01c202c0 0xc>;
++		};
 +
- DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
- 	.init_machine	= sunxi_dt_init,
--	.init_time	= sunxi_timer_init,
-+	.init_time	= sun6i_timer_init,
- 	.dt_compat	= sun6i_board_dt_compat,
- 	.restart	= sun6i_restart,
- MACHINE_END
++		apb1_rst: reset at 01c202d0 {
++			#reset-cells = <1>;
++			compatible = "allwinner,sun4i-clock-reset";
++			reg = <0x01c202d0 0x4>;
++		};
++
++		apb2_rst: reset at 01c202d8 {
++			#reset-cells = <1>;
++			compatible = "allwinner,sun4i-clock-reset";
++			reg = <0x01c202d8 0x4>;
++		};
++
+ 		timer at 01c20c00 {
+ 			compatible = "allwinner,sun4i-timer";
+ 			reg = <0x01c20c00 0xa0>;
+@@ -232,6 +250,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 16>;
++			resets = <&apb2_rst 16>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -242,6 +261,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 17>;
++			resets = <&apb2_rst 17>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -252,6 +272,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 18>;
++			resets = <&apb2_rst 18>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -262,6 +283,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 19>;
++			resets = <&apb2_rst 19>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -272,6 +294,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 20>;
++			resets = <&apb2_rst 20>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -282,6 +305,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 21>;
++			resets = <&apb2_rst 21>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.8.4
