@@ -1,43 +1,92 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 25 Oct 2013 22:28:29 +1030
-Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
-In-Reply-To: <CACVXFVPXEUX9JQ2NZvL8=J34zbw2fn202QW2SQtpKjdQ+tv=vg@mail.gmail.com>
-References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
- <87eh7bfoq9.fsf@rustcorp.com.au>
- <20131024084559.GD16735@n2100.arm.linux.org.uk>
- <87mwlyclng.fsf@rustcorp.com.au>
- <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
- <87y55h7vcd.fsf@rustcorp.com.au>
- <CACVXFVPXEUX9JQ2NZvL8=J34zbw2fn202QW2SQtpKjdQ+tv=vg@mail.gmail.com>
-Message-ID: <87sivp7eai.fsf@rustcorp.com.au>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 26 Oct 2013 02:18:54 +0200
+Subject: [PATCHv3][ 3/5] video: mx3fb: Add device tree suport.
+In-Reply-To: <20131025195040.0CCC3C404DA@trevor.secretlab.ca>
+References: <1382532229-32755-1-git-send-email-denis@eukrea.com>
+ <1382532229-32755-3-git-send-email-denis@eukrea.com>
+ <20131025195040.0CCC3C404DA@trevor.secretlab.ca>
+Message-ID: <20131026001854.GE17135@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei <tom.leiming@gmail.com> writes:
-> On Fri, Oct 25, 2013 at 1:50 PM, Rusty Russell <rusty@rustcorp.com.au> wrote:
->> Ming Lei <tom.leiming@gmail.com> writes:
->>> On Fri, Oct 25, 2013 at 7:08 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
->>>>
->>>> Sorry, I was imprecise.  I was referring to the kernel's kallsyms
->>>> tables produced by scripts/kallsyms.c.  This patch left them in the
->>>> the kallsyms tables and filtered them out from /proc/kallsyms.
->>>
->>> Yes, but it isn't easy to do it by script/kallsyms.c , and IMO, it should
->>> be correct to hide them for user space but keep them in kallsyms table.
->>
->> So they'll appear in backtraces?  And turn up randomly for other symbol
->> dereferences?
->>
->> I don't think you really want this!
->
-> Basically these symbols are only used to generate code, and in
-> kernel mode, CPU won't run into the corresponding addresses
-> because the generate code is copied to other address during booting,
-> so I understand they won't appear in backtraces.
+On Fri, Oct 25, 2013 at 08:50:40PM +0100, Grant Likely wrote:
+> On Wed, 23 Oct 2013 14:43:47 +0200, Denis Carikli <denis@eukrea.com> wrote:
+> > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Cc: linux-fbdev at vger.kernel.org
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: Eric B?nard <eric@eukrea.com>
+> > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > ---
+> > ChangeLog v2->v3:
+> > - The device tree bindings were reworked in order to make it look more like the
+> >   IPUv3 bindings.
+> > - The interface_pix_fmt property now looks like the IPUv3 one.
+> > ---
+> >  .../devicetree/bindings/video/fsl,mx3-fb.txt       |   35 ++++++
+> >  drivers/video/Kconfig                              |    2 +
+> >  drivers/video/mx3fb.c                              |  125 +++++++++++++++++---
+> >  3 files changed, 147 insertions(+), 15 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
+> > new file mode 100644
+> > index 0000000..0b31374
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
+> > @@ -0,0 +1,35 @@
+> > +Freescale MX3 fb
+> > +================
+> > +
+> > +Required properties:
+> > +- compatible: Should be "fsl,mx3fb". compatible chips include the imx31 and the
+> > +  imx35.
+> > +- reg: should be register base and length as documented in the datasheet.
+> > +- clocks: Handle to the ipu_gate clock.
+> > +
+> > +Example:
+> > +
+> > +lcdc: mx3fb at 53fc00b4 {
+> > +	compatible = "fsl,mx3-fb";
+> > +	reg = <0x53fc00b4 0x0b>;
+> > +	clocks = <&clks 55>;
+> > +};
+> 
+> This (and some of the other bindings) are trivial, and they are all
+> associated with a single SoC. I think it would be better to collect all
+> the mx3 bindings into a single file rather than distributing them all
+> over the bindings tree.
+> 
+> I started thinking about this after some of the DT conversations in
+> Edinburgh this week. Unless there is a high likelyhood of components
+> being used separately, I think it is far more useful to collect all the
+> bindings for an SoC into a single file. It will certainly reduce a lot
+> of the boilerplate that we've been collecting in bindings documentation
+> files.
+> 
+> A long time ago I took that approach for the mpc5200 documentation[1].
+> Take a look at that organization and let me know what you think.
 
-An oops occurs when something went *wrong*.  We look up all kinds of
-stuff.  Are you so sure that *none* of the callers will ever see these
-strange symbols and produce a confusing result?
+I don't think this is a good idea. When a new SoC comes out we don't
+know which components will be reused on the next SoC. This will cause a
+lot of bikeshedding when it actually is reused and then has to be moved.
 
-Cheers,
-Rusty.
+Also I would find it quite inconsistent if I had to lookup some devices
+in a SoC file and most bindings in subsystem specific files. So when
+searching for a binding I would first have to know if the hardware is
+unique to the SoC or not.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
