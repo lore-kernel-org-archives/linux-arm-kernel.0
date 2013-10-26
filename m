@@ -1,32 +1,24 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Sat, 26 Oct 2013 02:36:24 +0200
-Subject: [PATCHv9 30/43] ARM: dts: am33xx clock data
-In-Reply-To: <1382716658-6964-31-git-send-email-t-kristo@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-31-git-send-email-t-kristo@ti.com>
-Message-ID: <1382747784.6200.4.camel@polaris.local>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 26 Oct 2013 01:44:01 -0400 (EDT)
+Subject: [PATCH RFC v2 1/4] net: mvmdio: make orion_mdio_wait_ready
+ consistent
+In-Reply-To: <4955b6b331459b7b9c54350b8f0b254065d013c3.1382637156.git.leigh@solinno.co.uk>
+References: <cover.1382199042.git.leigh@solinno.co.uk>
+ <cover.1382637156.git.leigh@solinno.co.uk>
+ <4955b6b331459b7b9c54350b8f0b254065d013c3.1382637156.git.leigh@solinno.co.uk>
+Message-ID: <20131026.014401.2297094945752640834.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-10-25 at 18:57 +0300, Tero Kristo wrote:
-> +       mcasp0_fck: mcasp0_fck {
-> +               #clock-cells = <0>;
-> +               compatible = "fixed-factor-clock";
-> +               clocks = <&sys_clkin_ck>;
-> +               clock-mult = <1>;
-> +               clock-div = <1>;
-> +       };
-> +
-> +       mcasp1_fck: mcasp1_fck {
-> +               #clock-cells = <0>;
-> +               compatible = "fixed-factor-clock";
-> +               clocks = <&sys_clkin_ck>;
-> +               clock-mult = <1>;
-> +               clock-div = <1>;
-> +       };
+From: Leigh Brown <leigh@solinno.co.uk>
+Date: Thu, 24 Oct 2013 19:09:31 +0100
 
-What is you use case for these clocks with a fixed factor of 1? Wouldn't
-it be simpler to just use sys_clkin_ck from the devices?
+> +	        else
+> +			if (timedout)
+>  				break;
+>  
 
-Regards,
-Jan
+Please make this:
+
+		else if (timedout)
+			break;
