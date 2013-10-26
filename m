@@ -1,86 +1,63 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Sat, 26 Oct 2013 09:02:25 -0400
-Subject: [PATCHv5 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM.
-In-Reply-To: <20131025201211.7936EC405D3@trevor.secretlab.ca>
-References: <1380521611-2764-1-git-send-email-Li.Xiubo@freescale.com>
- <1380521611-2764-5-git-send-email-Li.Xiubo@freescale.com>
- <20131025201211.7936EC405D3@trevor.secretlab.ca>
-Message-ID: <20131026130225.GJ29341@beef>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sat, 26 Oct 2013 15:36:17 +0100
+Subject: ARM/kirkwood: v3.12-rc6: kernel BUG at mm/util.c:390!
+In-Reply-To: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
+References: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
+Message-ID: <20131026143617.GA14034@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 25, 2013 at 09:12:11PM +0100, Grant Likely wrote:
-> On Mon, 30 Sep 2013 14:13:31 +0800, Xiubo Li <Li.Xiubo@freescale.com> wrote:
-> > This adds the Document for Freescale FTM PWM driver under
-> > Documentation/devicetree/bindings/pwm/.
-> > 
-> > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> > ---
-> >  .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 33 ++++++++++++++++++++++
-> >  1 file changed, 33 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> > new file mode 100644
-> > index 0000000..2c6969a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> > @@ -0,0 +1,33 @@
-> > +Freescale FTM PWM controller
-> > +
-> > +Required properties:
-> > +- compatible: Should be "fsl,vf610-ftm-pwm"
-> > +- reg: Physical base address and length of the controller's registers
-> > +- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-> > +  the cells format.
-> > +- clock-names : Includes the following module clock source entries:
-> > +    "ftm0" (system clock),
-> > +    "ftm0_fix_sel" (fixed frequency clock),
-> > +    "ftm0_ext_sel" (external clock)
-> > +- clocks : Must contain a clock specifier for each entry in clock-names.
-> > +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
-> > +  entries in clock-names.
-> > +- pinctrl-names: must contain a "default" entry.
-> > +- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-> > +  See ../pinctrl/pinctrl-bindings.txt for details of the property values.
-> 
-> Looks okay to me.
+On Thu, Oct 24, 2013 at 09:07:30PM +0100, Aaro Koskinen wrote:
+> Hi,
 
-For consistency, shouldn't it also have:
+Hello,
 
-"See ../clock/clock-bindings.txt for details of the property values"
+[adding Catalin and Simon]
 
-where appropriate like is done under the pwm/pinctrl uses?
+> I was trying to debug kernel crashes on Marvell Kirkwood (openrd)
+> when upgrading from GCC 4.7.3 -> GCC 4.8.2. So I enabled most of the
+> kernel debug options. However, I noticed that already when compiled with
+> GCC 4.7.3 kernel crashes consistently at boot when DEBUG_VM is enabled
+> (without it there are no issues with 4.7.3). See below for the boot/crash
+> log & kernel config.
 
-IMHO, referencing parent bindings all of the time should be a documented
-best practice / requirement.
+Ok, but this doesn't seem to be related to GCC.
 
--Matt
+[...]
 
-> > +
-> > +
-> > +Example:
-> > +
-> > +pwm0: pwm at 40038000 {
-> > +		compatible = "fsl,vf610-ftm-pwm";
-> > +		reg = <0x40038000 0x1000>;
-> > +		#pwm-cells = <3>;
-> > +		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-> > +		clocks = <&clks VF610_CLK_FTM0>,
-> > +			<&clks VF610_CLK_FTM0_FIX_SEL>,
-> > +			<&clks VF610_CLK_FTM0_EXT_SEL>;
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_pwm0_1>;
-> > +		fsl,pwm-counter-clk = "ftm0_ext_sel";
-> > +};
-> > -- 
-> > 1.8.0
-> > 
-> > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> [   26.694345] ata2: link is slow to respond, please be patient (ready=0)
+> [   31.194346] ata2: SRST failed (errno=-16)
+> [   31.754426] ata2: SATA link up 3.0 Gbps (SStatus 123 SControl F300)
+> [   31.834619] ata2.00: ATA-6: eSATA-2 WD5000AAKX-00ERMA0, 15.01H15, max UDMA/133
+> [   31.899627] ata2.00: 976773168 sectors, multi 0: LBA48
+> [   31.994458] ata2.00: configured for UDMA/133
+> [   32.075306] ------------[ cut here ]------------
+> [   32.136256] kernel BUG at mm/util.c:390!
+> [   32.195446] Internal error: Oops - BUG: 0 [#1] PREEMPT ARM
+> [   32.255893] Modules linked in:
+> [   32.313109] CPU: 0 PID: 12 Comm: kworker/u2:1 Not tainted 3.12.0-rc6-openrd-los.git-1836ad9-dirty #3
+> [   32.435821] Workqueue: events_unbound async_run_entry_fn
+> [   32.498701] task: df854700 ti: df8a8000 task.ti: df8a8000
+> [   32.561662] PC is at page_mapping+0x48/0x50
+> [   32.622764] LR is at flush_kernel_dcache_page+0x14/0x98
+> [   32.685421] pc : [<c00923c4>]    lr : [<c0010dd8>]    psr: 20000093
+> [   32.685421] sp : df8a99f8  ip : df8a9a08  fp : df8a9a04
+> [   32.812754] r10: 60000093  r9 : df8a9c24  r8 : 00000024
+> [   32.874269] r7 : 00000000  r6 : c0a3cd0c  r5 : 00001000  r4 : c0e2732c
+> [   32.936395] r3 : 00000000  r2 : 00000080  r1 : 00000564  r0 : c0e2732c
+> [   32.996978] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> [   33.059012] Control: 0005317f  Table: 1a8dc000  DAC: 00000017
+> [   33.119473] Process kworker/u2:1 (pid: 12, stack limit = 0xdf8a81c0)
+
+The BUG is because page_mapping is being given a slab page...
+
+> [   36.477203] Backtrace:
+> [   36.535603] [<c009237c>] (page_mapping+0x0/0x50) from [<c0010dd8>] (flush_kernel_dcache_page+0x14/0x98)
+> [   36.661070] [<c0010dc4>] (flush_kernel_dcache_page+0x0/0x98) from [<c0172b60>] (sg_miter_stop+0xc8/0x10c)
+> [   36.792813]  r4:df8a9a64 r3:00000003
+> [   36.857524] [<c0172a98>] (sg_miter_stop+0x0/0x10c) from [<c0172f20>] (sg_miter_next+0x14/0x13c)
+
+... assumedly for scatter/gather DMA. How is your block driver allocating
+its buffers? If you're using the DMA API, I can't see how this would happen.
+
+Will
