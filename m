@@ -1,54 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 27 Oct 2013 14:25:21 +0000
-Subject: [PATCH v2 2/2] ARM: sun4i/sun7i: RTC driver
-In-Reply-To: <CAOQ7t2bkA8K6_d_Sh9Uj2-m005OWR0U4Sz8auBBWhwipnD7QNQ@mail.gmail.com>
-References: <1381948227-6290-1-git-send-email-carlo.caione@gmail.com>
- <1381948227-6290-2-git-send-email-carlo.caione@gmail.com>
- <20131022152313.GU3041@lukather>
- <CAOQ7t2bkA8K6_d_Sh9Uj2-m005OWR0U4Sz8auBBWhwipnD7QNQ@mail.gmail.com>
-Message-ID: <20131027142521.GB16856@lukather>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 27 Oct 2013 16:47:20 +0100
+Subject: [GIT PULL FOR v3.13] SH Mobile PFC patches
+Message-ID: <1863828.HbOPaS1OIe@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlo,
+Hi Linus,
 
-On Sat, Oct 26, 2013 at 11:19:49AM +0200, Carlo Caione wrote:
-> On Tue, Oct 22, 2013 at 5:23 PM, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > You never got back to us about this 500ms delay.
-> 
-> In this case this 500ms sleep is just to avoid reading the time when
-> the time (and in the worst case the date) is going to change.
-> i.e. you are reading time and date on the last second of the day.
+Here are two patches that I would like to get merged in v3.13 if possible. 
+They first one adds CAN pin groups for the r8a7778 SoC, while the second one 
+adds support for the r8a7791 SoC to the sh-pfc driver. Despite the large size 
+of the diffstat there's nothing special to mention here.
 
-Hmmm, I don't understand how that delay is solving this issue. You're
-only deferring this.
+The following changes since commit c6ce2b6bffe5740d572fdc5b5e690d5261abee51:
 
-> > How does the RTC framework behaves when you register two devices with
-> > the same string here?
-> 
-> Should be safe since rtc_device_register() uses ida_simple_get() to
-> get a new id.
+  gpio: add TB10x GPIO driver (2013-10-25 23:42:34 +0200)
 
-Ok.
+are available in the git repository at:
 
-> >
-> > Thanks!
-> 
-> v3 on its way...
+  git://linuxtv.org/pinchartl/fbdev.git pinmux/next/pfc
 
-Cool, thanks.
-You don't need to resend the DT patch btw, it's already been applied.
+for you to fetch changes up to 5088451962389924b9f05e22e6956f5c1a515d1a:
 
-Maxime
+  pinctrl: sh-pfc: r8a7791 PFC support (2013-10-27 16:40:52 +0100)
+
+----------------------------------------------------------------
+Hisashi Nakamura (1):
+      pinctrl: sh-pfc: r8a7791 PFC support
+
+Sergei Shtylyov (1):
+      sh-pfc: r8a7778: Add CAN pin groups
+
+ drivers/pinctrl/sh-pfc/Kconfig       |    5 +
+ drivers/pinctrl/sh-pfc/Makefile      |    1 +
+ drivers/pinctrl/sh-pfc/core.c        |    9 +
+ drivers/pinctrl/sh-pfc/core.h        |    1 +
+ drivers/pinctrl/sh-pfc/pfc-r8a7778.c |   55 +
+ drivers/pinctrl/sh-pfc/pfc-r8a7791.c | 4214 +++++++++++++++++++++++++++++++++
+ 6 files changed, 4285 insertions(+)
+ create mode 100644 drivers/pinctrl/sh-pfc/pfc-r8a7791.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131027/858af91e/attachment.sig>
+Regards,
+
+Laurent Pinchart
