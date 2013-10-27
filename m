@@ -1,28 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 27 Oct 2013 05:23:48 -0700
-Subject: [PATCHv2 1/3] Input: twl4030-keypad - add device tree support
-In-Reply-To: <20131027114753.GB14901@amd.pavel.ucw.cz>
-References: <1382446042-27099-1-git-send-email-sre@debian.org>
- <1382446042-27099-2-git-send-email-sre@debian.org>
- <20131027111715.GA2437@xo-6d-61-c0.localdomain>
- <20131027114026.GB14091@earth.universe>
- <20131027114753.GB14901@amd.pavel.ucw.cz>
-Message-ID: <20131027122347.GE15154@atomide.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun, 27 Oct 2013 14:50:36 +0200
+Subject: ARM/kirkwood: v3.12-rc6: kernel BUG at mm/util.c:390!
+In-Reply-To: <20131027195115.208f40f3@tom-ThinkPad-T410>
+References: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
+ <20131026143617.GA14034@mudshark.cambridge.arm.com>
+ <20131027195115.208f40f3@tom-ThinkPad-T410>
+Message-ID: <20131027125036.GJ17447@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [131027 04:48]:
+Hi,
+
+On Sun, Oct 27, 2013 at 07:51:15PM +0800, Ming Lei wrote:
+> On Sat, 26 Oct 2013 15:36:17 +0100
+> Will Deacon <will.deacon@arm.com> wrote:
 > 
-> > > > +#if IS_ENABLED(CONFIG_OF)
-> > > I'm probably missing something here, but why not #ifdef CONFIG_OF?
+> > On Thu, Oct 24, 2013 at 09:07:30PM +0100, Aaro Koskinen wrote:
 > > 
-> > I have been told for other drivers, that IS_ENABLED() is
-> > the prefered way to check for configuration these days.
+> > > [   36.477203] Backtrace:
+> > > [   36.535603] [<c009237c>] (page_mapping+0x0/0x50) from [<c0010dd8>] (flush_kernel_dcache_page+0x14/0x98)
+> > > [   36.661070] [<c0010dc4>] (flush_kernel_dcache_page+0x0/0x98) from [<c0172b60>] (sg_miter_stop+0xc8/0x10c)
+> > > [   36.792813]  r4:df8a9a64 r3:00000003
+> > > [   36.857524] [<c0172a98>] (sg_miter_stop+0x0/0x10c) from [<c0172f20>] (sg_miter_next+0x14/0x13c)
+> > 
+> > ... assumedly for scatter/gather DMA. How is your block driver allocating
+> > its buffers? If you're using the DMA API, I can't see how this would happen.
 > 
-> CONFIG_OF can not be module, using IS_ENABLED() on it is just wrong.
+> Lots of SCSI commands(inquiry, ...) pass kmalloc buffer to block layer,
+> then the sg buffer copy helpers and flush_kernel_dcache_page() may see
+> slab page.
+> 
+> That has been here from commit b1adaf65ba03( [SCSI] block: add sg buffer copy
+> helper functions).
 
-Good point. Looks like there's IS_BUILTIN that's for boolean options.
+On ARM v3.9 or older kernels do not trigger this BUG, at seems it only
+started to appear with the following commit (bisected):
 
-Regards,
+commit 1bc39742aab09248169ef9d3727c9def3528b3f3
+Author: Simon Baatz <gmbnomis@gmail.com>
+Date:   Mon Jun 10 21:10:12 2013 +0100
 
-Tony
+    ARM: 7755/1: handle user space mapped pages in flush_kernel_dcache_page
+
+A.
