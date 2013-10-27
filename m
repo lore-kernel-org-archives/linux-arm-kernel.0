@@ -1,96 +1,112 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sun, 27 Oct 2013 22:19:20 +0800
-Subject: ARM/kirkwood: v3.12-rc6: kernel BUG at mm/util.c:390!
-In-Reply-To: <20131027135344.GD16735@n2100.arm.linux.org.uk>
-References: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
- <20131026143617.GA14034@mudshark.cambridge.arm.com>
- <20131027195115.208f40f3@tom-ThinkPad-T410>
- <20131027125036.GJ17447@blackmetal.musicnaut.iki.fi>
- <CACVXFVP2B3=82m_+DfA_oAEW86c=oxQ52G+yj5ncTU1DzP26Bw@mail.gmail.com>
- <20131027135344.GD16735@n2100.arm.linux.org.uk>
-Message-ID: <CACVXFVMO4x5cW0+62V7dsmGso8HWCrNUh0_nLH3vYN0U2nk2+A@mail.gmail.com>
+From: valentin@compulab.co.il (Valentin Raevsky)
+Date: Sun, 27 Oct 2013 16:22:51 +0200
+Subject: [PATCH] ARM: dts: Add initial support for cm-fx6
+In-Reply-To: <CAKCjkJY=6mCKnxtzEgosVEYP9D3X51UAw9etr-H=j=22E=WhzA@mail.gmail.com>
+References: <1381848564-29839-1-git-send-email-valentin@compulab.co.il>
+ <CAKCjkJY=6mCKnxtzEgosVEYP9D3X51UAw9etr-H=j=22E=WhzA@mail.gmail.com>
+Message-ID: <526D21BB.3050601@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 9:53 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Oct 27, 2013 at 09:16:53PM +0800, Ming Lei wrote:
->> On Sun, Oct 27, 2013 at 8:50 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
->> >
->> > On ARM v3.9 or older kernels do not trigger this BUG, at seems it only
->> > started to appear with the following commit (bisected):
->> >
->> > commit 1bc39742aab09248169ef9d3727c9def3528b3f3
->> > Author: Simon Baatz <gmbnomis@gmail.com>
->> > Date:   Mon Jun 10 21:10:12 2013 +0100
->> >
->> >     ARM: 7755/1: handle user space mapped pages in flush_kernel_dcache_page
+On 10/17/2013 04:45 AM, Steev Klimaszewski wrote:
+> On Tue, Oct 15, 2013 at 9:49 AM, Valentin Raevsky
+> <valentin@compulab.co.il> wrote:
+>> Add initial support for cm-fx6 module.
 >>
->> The above commit only starts to implement the helper on ARM,
->> but according to Documentation/cachetlb.txt, looks caller of
->> flush_kernel_dcache_page() should make sure the passed
->> 'page' is a user space page.
+>> cm-fx6 is a module based on mx6q SoC with the following features:
+>> - Up to 4GB of DDR3
+>> - 1 LCD/DVI output port
+>> - 1 HDMI output port
+>> - 2 LVDS LCD ports
+>> - Gigabit Ethernet
+>> - Analog Audio
+>> - CAN
+>> - SATA
+>> - NAND
+>> - PCIE
+>>
+>> This patch allows to boot up the module, configures the serial console,
+>> the Ethernet adapter and the hearbeat led.
+>>
+>> Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
+>> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+>> ---
+>>   arch/arm/boot/dts/cm-fx6.dts |   51 ++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 51 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/cm-fx6.dts
+>>
+>> diff --git a/arch/arm/boot/dts/cm-fx6.dts b/arch/arm/boot/dts/cm-fx6.dts
+>> new file mode 100644
+>> index 0000000..1080215
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/cm-fx6.dts
+>> @@ -0,0 +1,51 @@
+>> +/*
+>> + * Copyright 2013 CompuLab Ltd.
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "imx6q.dtsi"
+>> +
+>> +/ {
+>> +       model = "CompuLab CM-FX6";
+>> +       compatible = "compulab,cm-fx6", "fsl,imx6q";
+>> +
+>> +       memory {
+>> +               reg = <0x10000000 0x80000000>;
+>> +       };
+>> +
+>> +       leds {
+>> +               compatible = "gpio-leds";
+>> +
+>> +               debug-led {
+>> +                       label = "Heartbeat";
+>> +                       gpios = <&gpio2 31 0>;
+>> +                       linux,default-trigger = "heartbeat";
+>> +               };
+>> +       };
+>> +};
+>> +
+>> +&gpmi {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&pinctrl_gpmi_nand_1>;
+>> +       status = "okay";
+>> +};
+>> +
+>> +&fec {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&pinctrl_enet_1>;
+>> +       phy-mode = "rgmii";
+>> +       status = "okay";
+>> +};
+>> +
+>> +&uart4 {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&pinctrl_uart4_1>;
+>> +       status = "okay";
+>> +};
+>> --
+>> 1.7.9.5
+>>
 >
-> I think your terminology is off.  flush_kernel_dcache_page() is passed a
-> struct page.  These exist for every physical RAM page in the system which
-> is under the control of the kernel.  There's no such thing as a "user
-> space page" - pages are shared from kernel space into userspace.
+> Hi Valentin,
+>
+> Completely skipped over this, as I wasn't sure what the cm-fx6 was.
+> Could we maybe mention that this is commonly referred to as the
+> Utilite?
+>
 
-It isn't my terminology, and it is from Documentation/cachetlb.txt, :-)
-But I admit it isn't good to call it as user space page.
+Utilite actually consists of two boards:
+cm-fx6 -- system on module, sb-fx6m -- base board (extension board).
+But you are right, I should have mentioned it.
+I will do it in v2.
 
-Also pages which belong to slab shouldn't be mapped to user space.
-
->
-> Secondly, flush_kernel_dcache_page() gets used on such pages whether or
-> not they're already mapped into userspace (normally they won't be if this
-> is the first read of the page.)  This function is only expected to deal
-> with kernel-side addresses of the page, ensuring that data in the page
-> is visible to the underlying memory.
->
-> The last thing to realise is that we already have a function which deals
-> with the presence of userspace mappings.  It's called flush_dcache_page().
-> If flush_kernel_dcache_page() had to make that decision, then there's no
-> point in flush_kernel_dcache_page() existing - we might as well just call
-> flush_dcache_page() directly.
->
-> So...
->
-> flush_kernel_dcache_page() is expected to take a struct page pointer.
-> This struct page pointer is part of the kernel's array of struct pages
-> which identifies every single physical page under the control of the
-> kernel.
->
-> Arguably, it should not crash if passed a page which has been allocated
-> to the slab cache; as this is not a page cache page,
-> flush_kernel_dcache_page() should merely ignore the call to it and
-> simply return on these.  So this makes total sense:
-
-I think callers of flush_kernel_dcache_page() should make sure that,
-not just arm implements the helper, so I am wondering if arch code
-needs the test.
-
->
->  arch/arm/mm/flush.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-> index 6d5ba9afb16a..eebb275a67fb 100644
-> --- a/arch/arm/mm/flush.c
-> +++ b/arch/arm/mm/flush.c
-> @@ -316,6 +316,10 @@ EXPORT_SYMBOL(flush_dcache_page);
->   */
->  void flush_kernel_dcache_page(struct page *page)
->  {
-> +       /* Ignore slab pages */
-> +       if (PageSlab(page))
-> +               return;
-> +
->         if (cache_is_vivt() || cache_is_vipt_aliasing()) {
->                 struct address_space *mapping;
->
-
-
-Thanks,
--- 
-Ming Lei
+Regards,
+Valentin.
