@@ -1,46 +1,99 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 27 Oct 2013 16:47:20 +0100
-Subject: [GIT PULL FOR v3.13] SH Mobile PFC patches
-Message-ID: <1863828.HbOPaS1OIe@avalon>
+From: sre@debian.org (Sebastian Reichel)
+Date: Sun, 27 Oct 2013 17:14:28 +0100
+Subject: [PATCH 3/4] wl1251: spi: add vio regulator support
+In-Reply-To: <1382890469-25286-1-git-send-email-sre@debian.org>
+References: <1382890469-25286-1-git-send-email-sre@debian.org>
+Message-ID: <1382890469-25286-4-git-send-email-sre@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This patch adds support for requesting the regulator powering
+the vio pin.
 
-Here are two patches that I would like to get merged in v3.13 if possible. 
-They first one adds CAN pin groups for the r8a7778 SoC, while the second one 
-adds support for the r8a7791 SoC to the sh-pfc driver. Despite the large size 
-of the diffstat there's nothing special to mention here.
+The patch also adds the regulator for the all boards using the
+wl1251 in spi mode (only the Nokia N900).
 
-The following changes since commit c6ce2b6bffe5740d572fdc5b5e690d5261abee51:
+Signed-off-by: Sebastian Reichel <sre@debian.org>
+---
+ arch/arm/mach-omap2/board-rx51-peripherals.c |  2 ++
+ drivers/net/wireless/ti/wl1251/spi.c         | 19 +++++++++++++++++--
+ drivers/net/wireless/ti/wl1251/wl1251.h      |  2 ++
+ 3 files changed, 21 insertions(+), 2 deletions(-)
 
-  gpio: add TB10x GPIO driver (2013-10-25 23:42:34 +0200)
-
-are available in the git repository at:
-
-  git://linuxtv.org/pinchartl/fbdev.git pinmux/next/pfc
-
-for you to fetch changes up to 5088451962389924b9f05e22e6956f5c1a515d1a:
-
-  pinctrl: sh-pfc: r8a7791 PFC support (2013-10-27 16:40:52 +0100)
-
-----------------------------------------------------------------
-Hisashi Nakamura (1):
-      pinctrl: sh-pfc: r8a7791 PFC support
-
-Sergei Shtylyov (1):
-      sh-pfc: r8a7778: Add CAN pin groups
-
- drivers/pinctrl/sh-pfc/Kconfig       |    5 +
- drivers/pinctrl/sh-pfc/Makefile      |    1 +
- drivers/pinctrl/sh-pfc/core.c        |    9 +
- drivers/pinctrl/sh-pfc/core.h        |    1 +
- drivers/pinctrl/sh-pfc/pfc-r8a7778.c |   55 +
- drivers/pinctrl/sh-pfc/pfc-r8a7791.c | 4214 +++++++++++++++++++++++++++++++++
- 6 files changed, 4285 insertions(+)
- create mode 100644 drivers/pinctrl/sh-pfc/pfc-r8a7791.c
-
+diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+index b9d95dd..a791fef 100644
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@ -552,6 +552,8 @@ static struct regulator_consumer_supply rx51_vio_supplies[] = {
+ 	REGULATOR_SUPPLY("vio", "2-0063"),
+ 	/* lis3lv02d */
+ 	REGULATOR_SUPPLY("Vdd_IO", "3-001d"),
++	/* wl1251 */
++	REGULATOR_SUPPLY("vio", "spi4.0"),
+ };
+ 
+ static struct regulator_consumer_supply rx51_vaux1_consumers[] = {
+diff --git a/drivers/net/wireless/ti/wl1251/spi.c b/drivers/net/wireless/ti/wl1251/spi.c
+index 9a2df9d..efea57a 100644
+--- a/drivers/net/wireless/ti/wl1251/spi.c
++++ b/drivers/net/wireless/ti/wl1251/spi.c
+@@ -27,6 +27,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/wl12xx.h>
+ #include <linux/gpio.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include "wl1251.h"
+ #include "reg.h"
+@@ -306,13 +307,26 @@ static int wl1251_spi_probe(struct spi_device *spi)
+ 
+ 	irq_set_irq_type(wl->irq, IRQ_TYPE_EDGE_RISING);
+ 
+-	ret = wl1251_init_ieee80211(wl);
++	wl->vio = devm_regulator_get(&spi->dev, "vio");
++	if (IS_ERR(wl->vio)) {
++		ret = PTR_ERR(wl->vio);
++		wl1251_error("vio regulator missing: %d", ret);
++		goto out_free;
++	}
++
++	ret = regulator_enable(wl->vio);
+ 	if (ret)
+ 		goto out_free;
+ 
++	ret = wl1251_init_ieee80211(wl);
++	if (ret)
++		goto disable_regulator;
++
+ 	return 0;
+ 
+- out_free:
++disable_regulator:
++	regulator_disable(wl->vio);
++out_free:
+ 	ieee80211_free_hw(hw);
+ 
+ 	return ret;
+@@ -324,6 +338,7 @@ static int wl1251_spi_remove(struct spi_device *spi)
+ 
+ 	free_irq(wl->irq, wl);
+ 	wl1251_free_hw(wl);
++	regulator_disable(wl->vio);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/net/wireless/ti/wl1251/wl1251.h b/drivers/net/wireless/ti/wl1251/wl1251.h
+index 5e9808c..010718b 100644
+--- a/drivers/net/wireless/ti/wl1251/wl1251.h
++++ b/drivers/net/wireless/ti/wl1251/wl1251.h
+@@ -279,6 +279,8 @@ struct wl1251 {
+ 	int irq;
+ 	bool use_eeprom;
+ 
++	struct regulator *vio;
++
+ 	spinlock_t wl_lock;
+ 
+ 	enum wl1251_state state;
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.4.rc3
