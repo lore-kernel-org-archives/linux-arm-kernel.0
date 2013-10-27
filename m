@@ -1,36 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Oct 2013 13:47:19 +0000
-Subject: ARM/kirkwood: v3.12-rc6: kernel BUG at mm/util.c:390!
-In-Reply-To: <20131027134257.GB30783@mtj.dyndns.org>
-References: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
- <20131026143617.GA14034@mudshark.cambridge.arm.com>
- <20131027195115.208f40f3@tom-ThinkPad-T410>
- <20131027125036.GJ17447@blackmetal.musicnaut.iki.fi>
- <CACVXFVP2B3=82m_+DfA_oAEW86c=oxQ52G+yj5ncTU1DzP26Bw@mail.gmail.com>
- <20131027134257.GB30783@mtj.dyndns.org>
-Message-ID: <20131027134718.GC16735@n2100.arm.linux.org.uk>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sun, 27 Oct 2013 13:50:25 +0000
+Subject: [PATCHv5 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM.
+In-Reply-To: <20131026130225.GJ29341@beef>
+References: <1380521611-2764-1-git-send-email-Li.Xiubo@freescale.com>
+ <1380521611-2764-5-git-send-email-Li.Xiubo@freescale.com>
+ <20131025201211.7936EC405D3@trevor.secretlab.ca>
+ <20131026130225.GJ29341@beef>
+Message-ID: <20131027135025.6C652C4039D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 09:42:57AM -0400, Tejun Heo wrote:
-> On Sun, Oct 27, 2013 at 09:16:53PM +0800, Ming Lei wrote:
-> > On Sun, Oct 27, 2013 at 8:50 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> > >
-> > > On ARM v3.9 or older kernels do not trigger this BUG, at seems it only
-> > > started to appear with the following commit (bisected):
-> > >
-> > > commit 1bc39742aab09248169ef9d3727c9def3528b3f3
-> > > Author: Simon Baatz <gmbnomis@gmail.com>
-> > > Date:   Mon Jun 10 21:10:12 2013 +0100
-> > >
-> > >     ARM: 7755/1: handle user space mapped pages in flush_kernel_dcache_page
+On Sat, 26 Oct 2013 09:02:25 -0400, Matt Porter <matt.porter@linaro.org> wrote:
+> On Fri, Oct 25, 2013 at 09:12:11PM +0100, Grant Likely wrote:
+> > On Mon, 30 Sep 2013 14:13:31 +0800, Xiubo Li <Li.Xiubo@freescale.com> wrote:
+> > > This adds the Document for Freescale FTM PWM driver under
+> > > Documentation/devicetree/bindings/pwm/.
+> > > 
+> > > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> > > ---
+> > >  .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 33 ++++++++++++++++++++++
+> > >  1 file changed, 33 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> > > new file mode 100644
+> > > index 0000000..2c6969a
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> > > @@ -0,0 +1,33 @@
+> > > +Freescale FTM PWM controller
+> > > +
+> > > +Required properties:
+> > > +- compatible: Should be "fsl,vf610-ftm-pwm"
+> > > +- reg: Physical base address and length of the controller's registers
+> > > +- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
+> > > +  the cells format.
+> > > +- clock-names : Includes the following module clock source entries:
+> > > +    "ftm0" (system clock),
+> > > +    "ftm0_fix_sel" (fixed frequency clock),
+> > > +    "ftm0_ext_sel" (external clock)
+> > > +- clocks : Must contain a clock specifier for each entry in clock-names.
+> > > +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
+> > > +  entries in clock-names.
+> > > +- pinctrl-names: must contain a "default" entry.
+> > > +- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
+> > > +  See ../pinctrl/pinctrl-bindings.txt for details of the property values.
 > > 
-> > The above commit only starts to implement the helper on ARM,
-> > but according to Documentation/cachetlb.txt, looks caller of
-> > flush_kernel_dcache_page() should make sure the passed
-> > 'page' is a user space page.
+> > Looks okay to me.
 > 
-> I don't think PageSlab() is the right test tho.  Wouldn't testing
-> against user_addr_max() make more sense?
+> For consistency, shouldn't it also have:
+> 
+> "See ../clock/clock-bindings.txt for details of the property values"
+> 
+> where appropriate like is done under the pwm/pinctrl uses?
+> 
+> IMHO, referencing parent bindings all of the time should be a documented
+> best practice / requirement.
 
-How does that help for a function passed a struct page pointer?
+I agree. In fact, it should be part of the requirements on schema
+tooling that we discussed last week at ksummit (email summary will be
+provided)
+
+g.
