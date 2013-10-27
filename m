@@ -1,42 +1,50 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sun, 27 Oct 2013 20:24:16 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzRdIHdsMTI1MTogbW92ZSBwb3dlciBHUElPIGhhbmRs?=
- =?UTF-8?B?aW5nIGludG8gdGhlIGRyaXZlcg==?=
-In-Reply-To: <1382890469-25286-3-git-send-email-sre@debian.org>
-References: <1382890469-25286-1-git-send-email-sre@debian.org>
- <1382890469-25286-3-git-send-email-sre@debian.org>
-Message-ID: <1382891056.102746625@f315.i.mail.ru>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 27 Oct 2013 17:25:36 +0100
+Subject: [PATCH v3 3/5] usb: chipidea: imx: set CI_HDRC_IMX28_WRITE_FIX
+ for imx28
+In-Reply-To: <1382680943-9258-3-git-send-email-peter.chen@freescale.com>
+References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
+ <1382680943-9258-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <201310271725.37175.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Move the power GPIO handling from the board code into
-> the driver. This is a dependency for device tree support.
+Dear Peter Chen,
+
+> Due to imx28 needs ARM swp instruction for writing, we set
+> CI_HDRC_IMX28_WRITE_FIX for imx28.
 > 
-> Signed-off-by: Sebastian Reichel <sre@debian.org>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  arch/arm/mach-omap2/board-omap3pandora.c     |  2 ++
->  arch/arm/mach-omap2/board-rx51-peripherals.c | 11 ++--------
->  drivers/net/wireless/ti/wl1251/sdio.c        | 21 +++++++++++++-----
->  drivers/net/wireless/ti/wl1251/spi.c         | 33 ++++++++++++++++++----------
->  drivers/net/wireless/ti/wl1251/wl1251.h      |  2 +-
->  include/linux/wl12xx.h                       |  2 +-
->  6 files changed, 43 insertions(+), 28 deletions(-)
-...
-> diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
-> index b516b4f..a9c723b 100644
-> --- a/include/linux/wl12xx.h
-> +++ b/include/linux/wl12xx.h
-> @@ -49,7 +49,7 @@ enum {
->  };
->  
->  struct wl1251_platform_data {
-> -	void (*set_power)(bool enable);
-> +	int power_gpio;
->  	/* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
->  	int irq;
->  	bool use_eeprom;
-> -- 
+>  drivers/usb/chipidea/ci_hdrc_imx.c |   32 ++++++++++++++++++++++++++------
+>  1 files changed, 26 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c
+> b/drivers/usb/chipidea/ci_hdrc_imx.c index 023d3cb..68f7f5e 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_imx.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+> @@ -23,6 +23,26 @@
+>  #include "ci.h"
+>  #include "ci_hdrc_imx.h"
+> 
+> +#define CI_HDRC_IMX_IMX28_WRITE_FIX BIT(0)
+> +
+> +struct ci_hdrc_imx_platform_flag {
+> +	unsigned int flags;
+> +};
+> +
+> +static const struct ci_hdrc_imx_platform_flag imx27_usb_data = {
+> +};
+> +
+> +static const struct ci_hdrc_imx_platform_flag imx28_usb_data = {
+> +	.flags = CI_HDRC_IMX_IMX28_WRITE_FIX,
+> +};
+> +
+> +static const struct of_device_id ci_hdrc_imx_dt_ids[] = {
+> +	{ .compatible = "fsl,imx28-usb", .data = &imx28_usb_data},
+> +	{ .compatible = "fsl,imx27-usb", .data = &imx27_usb_data},
 
-What a reason for not using regulator API here with GPIO-based regulator?
-
----
+Just a nit-pick, but the order here is wrong ;-)
+[...]
+Best regards,
+Marek Vasut
