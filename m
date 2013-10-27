@@ -1,46 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Oct 2013 10:34:52 +0000
-Subject: [RFC 0/3] Allow CONFIG_DEBUG_SET_MODULE_RONX to be used on ARM
-In-Reply-To: <20131024130346.GA31369@n2100.arm.linux.org.uk>
-References: <1371057810-3189-1-git-send-email-lauraa@codeaurora.org>
- <20131024130346.GA31369@n2100.arm.linux.org.uk>
-Message-ID: <20131027103452.GA16735@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 27 Oct 2013 12:17:15 +0100
+Subject: [PATCHv2 1/3] Input: twl4030-keypad - add device tree support
+In-Reply-To: <1382446042-27099-2-git-send-email-sre@debian.org>
+References: <1382446042-27099-1-git-send-email-sre@debian.org>
+ <1382446042-27099-2-git-send-email-sre@debian.org>
+Message-ID: <20131027111715.GA2437@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 24, 2013 at 02:03:46PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 12, 2013 at 10:23:27AM -0700, Laura Abbott wrote:
-> > Hi,
-> > 
-> > This is an RFC to allow CONFIG_DEBUG_SET_MODULE_RONX to be used on ARM. The
-> > current config description from x86 describes it best:
-> > 
-> > 	This option helps catch unintended modifications to loadable
-> > 	kernel module's text and read-only data. It also prevents execution
-> > 	of module data. Such protection may interfere with run-time code
-> > 	patching and dynamic kernel tracing - and they might also protect
-> > 	against certain classes of kernel exploits.
-> > 
-> > ARM was missing a few functions to modify the page tables so those have been
-> > added. I believe modules are always mapped with pages so changing them at map
-> > time should be acceptable. Comments/concerns are appreciated.
+Hi!
+
+> Add device tree support for twl4030 keypad driver and update the
+> Documentation with twl4030 keypad device tree binding information.
 > 
-> I've just tested this and it seems to work:
+> Tested on Nokia N900.
 
-The only remaining question is whether DEBUG_SET_MODULE_RONX should be
-by default enabled.  At the moment, the text says "if unsure, say N"
-but is that the right advice?  Shouldn't we be encouraging people to
-have this option turned on unless there's a reason not to (eg, kprobes?)
+It looks pretty good.
 
-How about adding:
+> +++ b/Documentation/devicetree/bindings/input/twl4030-keypad.txt
+> @@ -0,0 +1,31 @@
+> +* TWL4030's Keypad Controller device tree bindings
+> +
+> +TWL4030's Keypad controller is used to interface a SoC with a matrix-type
+> +keypad device. The keypad controller supports multiple row and column lines.
+> +A key can be placed at each intersection of a unique row and a unique column.
+> +The keypad controller can sense a key-press and key-release and report the
+> +event using a interrupt to the cpu.
+> +
+> +This binding is based on the matrix-keymap binding with the following
+> +changes:
+> +
+> + * keypad,num-rows and keypad,num-columns are required.
 
-	default y if !(FTRACE || KPROBES || JUMP_LABEL)
+Is "keypad," prefix neccessary here?
 
-as KPROBES and JUMP_LABEL both use the text patching, and FTRACE uses
-probe_kernel_write().  We may need to add kgdb to that later too.  Or
-maybe a dependency on the above?
+> +Optional Properties specific to linux:
+> +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
 
-One thing which comes to mind while looking at this: should
-arch/arm/kernel/patch.c be using the probe_kernel_* functions in
-mm/maccess.c?  Also, should we look at improving this code so we can
-have RONX modules and still have working ftrace/kprobes etc?
+"do not autorepeat". Plus I do not see what is Linux specifc about not
+autorepeating... Other systems will likely know about autorepeat, too.
+
+> @@ -324,6 +326,31 @@ static int twl4030_kp_program(struct twl4030_keypad *kp)
+>  	return 0;
+>  }
+>  
+> +#if IS_ENABLED(CONFIG_OF)
+
+I'm probably missing something here, but why not #ifdef CONFIG_OF?
+
+> @@ -381,7 +426,7 @@ static int twl4030_kp_probe(struct platform_device *pdev)
+>  
+>  	input_set_capability(input, EV_MSC, MSC_SCAN);
+>  	/* Enable auto repeat feature of Linux input subsystem */
+> -	if (pdata->rep)
+> +	if (!kp->no_autorepeat)
+>  		__set_bit(EV_REP, input->evbit);
+>
+
+Double negation is nasty to read. I believe code would be more
+readable if you switched logic to kp->autorepeat.
+
+Thanks,
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
