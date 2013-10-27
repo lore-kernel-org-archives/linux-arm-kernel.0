@@ -1,31 +1,40 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 27 Oct 2013 00:58:16 +0200
-Subject: Subsystem/interface for a 16x2 character LCD driver?
-In-Reply-To: <20131026221103.GD28577@1wt.eu> (Willy Tarreau's message of "Sun,
- 27 Oct 2013 00:11:03 +0200")
-References: <87iowjrblq.fsf@natisbad.org> <20131026221103.GD28577@1wt.eu>
-Message-ID: <874n83r65z.fsf@natisbad.org>
+From: cjb@laptop.org (Chris Ball)
+Date: Sat, 26 Oct 2013 22:28:19 -0400
+Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
+ (Zhangfei Gao's message of "Wed, 23 Oct 2013 21:03:16 +0800")
+References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
+ <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <87a9hvla64.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi WIlly,
+Hi Zhangfei, just small changes,
 
-Willy Tarreau <w@1wt.eu> writes:
+On Wed, Oct 23 2013, Zhangfei Gao wrote:
+> +* tune-table: should be array of clock tune mmc controller
 
->> If you have any idea where/who I can ask, do not hesitate. Additionally,
->> if someone has thoughts on what the DT interface should look like for
->> such a device, I am interested.
->
-> You should probably take a look at the "panel" driver in staging. It's
-> a driver I wrote 10-15 years ago and that someone submitted. It supports
-> most 2-line text LCD panels with various wirings (serial/parallel), and
-> relies on parport to drive them. You can probably reuse some/most of it
-> for your driver. You may also possibly add a new backend to it to access
-> GPIOs. Userland drives it by writing into /dev/lcd. I don't know if that
-> can help.
+This sounds like it should be "tuning-table", and shouldn't it also
+have a prefix?
 
-Will take a look. Thanks.
+> +			node = of_find_compatible_node(NULL, NULL,
+> +						"hisilicon,pctrl");
 
-Cheers,
+No need to use two lines here.
 
-a+
+> +		ret = of_property_read_u32_array(np,
+> +				"clken-reg", data, 2);
+
+Or here, same with the other of_property_read_u32_array() calls.
+
+> +MODULE_DESCRIPTION("K3 Specific DW-MSHC Driver Extension");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:dwmmc-k3");
+
+Can you add a MODULE_AUTHOR too?
+
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
