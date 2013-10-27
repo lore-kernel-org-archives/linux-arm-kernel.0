@@ -1,77 +1,114 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Oct 2013 13:53:44 +0000
-Subject: ARM/kirkwood: v3.12-rc6: kernel BUG at mm/util.c:390!
-In-Reply-To: <CACVXFVP2B3=82m_+DfA_oAEW86c=oxQ52G+yj5ncTU1DzP26Bw@mail.gmail.com>
-References: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
- <20131026143617.GA14034@mudshark.cambridge.arm.com>
- <20131027195115.208f40f3@tom-ThinkPad-T410>
- <20131027125036.GJ17447@blackmetal.musicnaut.iki.fi>
- <CACVXFVP2B3=82m_+DfA_oAEW86c=oxQ52G+yj5ncTU1DzP26Bw@mail.gmail.com>
-Message-ID: <20131027135344.GD16735@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 27 Oct 2013 13:56:03 +0000
+Subject: [PATCHv3][ 3/5] video: mx3fb: Add device tree suport.
+In-Reply-To: <93D2899F-E285-4794-8F32-AD55360A4A80@codeaurora.org>
+References: <1382532229-32755-1-git-send-email-denis@eukrea.com>
+ <1382532229-32755-3-git-send-email-denis@eukrea.com>
+ <20131025195040.0CCC3C404DA@trevor.secretlab.ca>
+ <20131026001854.GE17135@pengutronix.de>
+ <93D2899F-E285-4794-8F32-AD55360A4A80@codeaurora.org>
+Message-ID: <20131027135603.1589FC4039D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 09:16:53PM +0800, Ming Lei wrote:
-> On Sun, Oct 27, 2013 at 8:50 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> >
-> > On ARM v3.9 or older kernels do not trigger this BUG, at seems it only
-> > started to appear with the following commit (bisected):
-> >
-> > commit 1bc39742aab09248169ef9d3727c9def3528b3f3
-> > Author: Simon Baatz <gmbnomis@gmail.com>
-> > Date:   Mon Jun 10 21:10:12 2013 +0100
-> >
-> >     ARM: 7755/1: handle user space mapped pages in flush_kernel_dcache_page
+On Sat, 26 Oct 2013 01:43:23 -0500, Kumar Gala <galak@codeaurora.org> wrote:
 > 
-> The above commit only starts to implement the helper on ARM,
-> but according to Documentation/cachetlb.txt, looks caller of
-> flush_kernel_dcache_page() should make sure the passed
-> 'page' is a user space page.
+> On Oct 25, 2013, at 7:18 PM, Sascha Hauer wrote:
+> 
+> > On Fri, Oct 25, 2013 at 08:50:40PM +0100, Grant Likely wrote:
+> >> On Wed, 23 Oct 2013 14:43:47 +0200, Denis Carikli <denis@eukrea.com> wrote:
+> >>> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> >>> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> >>> Cc: linux-fbdev at vger.kernel.org
+> >>> Cc: Rob Herring <rob.herring@calxeda.com>
+> >>> Cc: Pawel Moll <pawel.moll@arm.com>
+> >>> Cc: Mark Rutland <mark.rutland@arm.com>
+> >>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> >>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> >>> Cc: devicetree at vger.kernel.org
+> >>> Cc: Sascha Hauer <kernel@pengutronix.de>
+> >>> Cc: linux-arm-kernel at lists.infradead.org
+> >>> Cc: Eric B??nard <eric@eukrea.com>
+> >>> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> >>> ---
+> >>> ChangeLog v2->v3:
+> >>> - The device tree bindings were reworked in order to make it look more like the
+> >>>  IPUv3 bindings.
+> >>> - The interface_pix_fmt property now looks like the IPUv3 one.
+> >>> ---
+> >>> .../devicetree/bindings/video/fsl,mx3-fb.txt       |   35 ++++++
+> >>> drivers/video/Kconfig                              |    2 +
+> >>> drivers/video/mx3fb.c                              |  125 +++++++++++++++++---
+> >>> 3 files changed, 147 insertions(+), 15 deletions(-)
+> >>> create mode 100644 Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
+> >>> 
+> >>> diff --git a/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
+> >>> new file mode 100644
+> >>> index 0000000..0b31374
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
+> >>> @@ -0,0 +1,35 @@
+> >>> +Freescale MX3 fb
+> >>> +================
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible: Should be "fsl,mx3fb". compatible chips include the imx31 and the
+> >>> +  imx35.
+> >>> +- reg: should be register base and length as documented in the datasheet.
+> >>> +- clocks: Handle to the ipu_gate clock.
+> >>> +
+> >>> +Example:
+> >>> +
+> >>> +lcdc: mx3fb at 53fc00b4 {
+> >>> +	compatible = "fsl,mx3-fb";
+> >>> +	reg = <0x53fc00b4 0x0b>;
+> >>> +	clocks = <&clks 55>;
+> >>> +};
+> >> 
+> >> This (and some of the other bindings) are trivial, and they are all
+> >> associated with a single SoC. I think it would be better to collect all
+> >> the mx3 bindings into a single file rather than distributing them all
+> >> over the bindings tree.
+> >> 
+> >> I started thinking about this after some of the DT conversations in
+> >> Edinburgh this week. Unless there is a high likelyhood of components
+> >> being used separately, I think it is far more useful to collect all the
+> >> bindings for an SoC into a single file. It will certainly reduce a lot
+> >> of the boilerplate that we've been collecting in bindings documentation
+> >> files.
+> >> 
+> >> A long time ago I took that approach for the mpc5200 documentation[1].
+> >> Take a look at that organization and let me know what you think.
+> > 
+> > I don't think this is a good idea. When a new SoC comes out we don't
+> > know which components will be reused on the next SoC. This will cause a
+> > lot of bikeshedding when it actually is reused and then has to be moved.
+> > 
+> > Also I would find it quite inconsistent if I had to lookup some devices
+> > in a SoC file and most bindings in subsystem specific files. So when
+> > searching for a binding I would first have to know if the hardware is
+> > unique to the SoC or not.
+> 
+> I agree that as new SoC come out its better to have these things split
+> out.  Also for IP that is sold by vendors like Synopsys/Designware
+> that get used on a lot of SoCs its makes it easier to ensure
+> consistency by having the binding split out for the IP and not the
+> SoC.
 
-I think your terminology is off.  flush_kernel_dcache_page() is passed a
-struct page.  These exist for every physical RAM page in the system which
-is under the control of the kernel.  There's no such thing as a "user
-space page" - pages are shared from kernel space into userspace.
+After looking at how many files we're now creating under
+Documentation/devicetree/bindings, I'm starting to think we need to go
+entirely the other way and put whole the whole family of an SoC into a
+single binding file, particularly for the SoC integration level stuff
+that isn't likely to be shared with SoCs from other vendors.
 
-Secondly, flush_kernel_dcache_page() gets used on such pages whether or
-not they're already mapped into userspace (normally they won't be if this
-is the first read of the page.)  This function is only expected to deal
-with kernel-side addresses of the page, ensuring that data in the page
-is visible to the underlying memory.
+A decision on this can be deferred as we're working on schema tools.
+Some of that may fall out when we figure out what the structure of the
+schema files should be.
 
-The last thing to realise is that we already have a function which deals
-with the presence of userspace mappings.  It's called flush_dcache_page().
-If flush_kernel_dcache_page() had to make that decision, then there's no
-point in flush_kernel_dcache_page() existing - we might as well just call
-flush_dcache_page() directly.
+> Also, by having bindings for similar devices for different SoCs kept together it becomes easier for us to see patterns across SoCs as we might come up with a more generic binding in the future.  Far more difficult if things are SoC oriented.
 
-So...
+The downside is bindings for a single SoC get distributed among a lot of
+files which makes it more difficult to follow how the SoC is put
+together and configured.
 
-flush_kernel_dcache_page() is expected to take a struct page pointer.
-This struct page pointer is part of the kernel's array of struct pages
-which identifies every single physical page under the control of the
-kernel.
-
-Arguably, it should not crash if passed a page which has been allocated
-to the slab cache; as this is not a page cache page,
-flush_kernel_dcache_page() should merely ignore the call to it and
-simply return on these.  So this makes total sense:
-
- arch/arm/mm/flush.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 6d5ba9afb16a..eebb275a67fb 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -316,6 +316,10 @@ EXPORT_SYMBOL(flush_dcache_page);
-  */
- void flush_kernel_dcache_page(struct page *page)
- {
-+	/* Ignore slab pages */
-+	if (PageSlab(page))
-+		return;
-+
- 	if (cache_is_vivt() || cache_is_vipt_aliasing()) {
- 		struct address_space *mapping;
- 
+g.
