@@ -1,120 +1,37 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Sun, 27 Oct 2013 14:26:31 +0100
-Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
-In-Reply-To: <51ECFDFD.60102@ti.com>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191751.468.89202.stgit@localhost>
- <20130520095447.GR21614@n2100.arm.linux.org.uk>
- <20130706131057.GU21614@n2100.arm.linux.org.uk>
- <20130706133627.GV21614@n2100.arm.linux.org.uk>
- <20130708093410.GT5523@atomide.com>
- <20130708142103.GX21614@n2100.arm.linux.org.uk> <51ECFDFD.60102@ti.com>
-Message-ID: <CAAwP0s2pGM6RRhkzhZ+_8BsCKP0posFrn7buTwUzLWWC5apE2A@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Sun, 27 Oct 2013 09:42:57 -0400
+Subject: ARM/kirkwood: v3.12-rc6: kernel BUG at mm/util.c:390!
+In-Reply-To: <CACVXFVP2B3=82m_+DfA_oAEW86c=oxQ52G+yj5ncTU1DzP26Bw@mail.gmail.com>
+References: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
+ <20131026143617.GA14034@mudshark.cambridge.arm.com>
+ <20131027195115.208f40f3@tom-ThinkPad-T410>
+ <20131027125036.GJ17447@blackmetal.musicnaut.iki.fi>
+ <CACVXFVP2B3=82m_+DfA_oAEW86c=oxQ52G+yj5ncTU1DzP26Bw@mail.gmail.com>
+Message-ID: <20131027134257.GB30783@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+On Sun, Oct 27, 2013 at 09:16:53PM +0800, Ming Lei wrote:
+> On Sun, Oct 27, 2013 at 8:50 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+> >
+> > On ARM v3.9 or older kernels do not trigger this BUG, at seems it only
+> > started to appear with the following commit (bisected):
+> >
+> > commit 1bc39742aab09248169ef9d3727c9def3528b3f3
+> > Author: Simon Baatz <gmbnomis@gmail.com>
+> > Date:   Mon Jun 10 21:10:12 2013 +0100
+> >
+> >     ARM: 7755/1: handle user space mapped pages in flush_kernel_dcache_page
+> 
+> The above commit only starts to implement the helper on ARM,
+> but according to Documentation/cachetlb.txt, looks caller of
+> flush_kernel_dcache_page() should make sure the passed
+> 'page' is a user space page.
 
-On Mon, Jul 22, 2013 at 11:40 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On 08/07/13 17:21, Russell King - ARM Linux wrote:
->
->> Also looks like the nonfunctional video stuff is even more nonfunctional
->> than usual:
->>
->> omapdss DSI error: can't get VDDS_DSI regulator
->> omapdss HDMI error: can't get VDDA_HDMI_DAC regulator
+I don't think PageSlab() is the right test tho.  Wouldn't testing
+against user_addr_max() make more sense?
 
-I have the same issue when trying to get VDI output working on a IGEPv2 board.
+Thanks.
 
->
-> Those should be followed by "...requests probe deferral", and the driver
-> is probed again later.
->
-
-When booting with DT the omapfb's probe is deferred several times but
-it always fails on dpi_connect() due not being able to get the
-VDDS_DSI regulator:
-
-[    3.186035] OMAPFB: omapfb_probe
-[    3.190704] omapdss DPI error: can't get VDDS_DSI regulator
-[    3.196594] omapfb omapfb: failed to connect default display
-[    3.202667] omapfb omapfb: failed to init overlay connections
-[    3.208892] OMAPFB: free_resources
-[    3.212493] OMAPFB: free all fbmem
-[    3.216735] omapfb omapfb: failed to setup omapfb
-[    3.221832] platform omapfb: Driver omapfb requests probe deferral
-[    3.231689] OMAPFB: omapfb_probe
-[    3.236175] omapdss DPI error: can't get VDDS_DSI regulator
-[    3.242248] omapfb omapfb: failed to connect default display
-[    3.248291] omapfb omapfb: failed to init overlay connections
-[    3.254394] OMAPFB: free_resources
-[    3.258026] OMAPFB: free all fbmem
-[    3.262268] omapfb omapfb: failed to setup omapfb
-[    3.267303] platform omapfb: Driver omapfb requests probe deferral
-
-My complete boot log is [1]
-
-I tracked down to dpi_init_regulator in drivers/video/omap2/dss/dpi.c
-
-static int dpi_init_regulator(void)
-{
-....
-        vdds_dsi = devm_regulator_get(&dpi.pdev->dev, "vdds_dsi");
-        if (IS_ERR(vdds_dsi)) {
-                DSSERR("can't get VDDS_DSI regulator\n");
-                return PTR_ERR(vdds_dsi);
-        }
-....
-}
-
-So I tried adding this to my DT with no luck.
-
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts
-b/arch/arm/boot/dts/omap3-igep0020.dts
-index 17a6fc1..eaae935 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -256,3 +256,8 @@
- &usbhsehci {
-        phys = <&hsusb1_phy>;
- };
-+
-+&vpll2 {
-+        supply-dev = "omapdss_dpi.0";
-+        supply = "vdds_dsi";
-+};
-
-
-Now what you said does indeed happen when booting with the legacy
-board file. omapfb fails the first time with "can't get VDDS_DSI
-regulator"
-but the driver is probed again and it succeeds.
-
-I tried to spot a difference but didn't find it...
-
-> The log
-> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=946
-> shows "taal display2: panel revision e3.83.7d" which hints that the
-> panel (and DSS) was initialized properly.
->
-> Those error prints should probably be tuned down a bit now that the
-> driver uses probe deferral.
->
->  Tomi
->
->
-
-fwiw, my wip branch is [2]:
-
-Javier Martinez Canillas (3):
-      ARM: dts: omap3-igep0020: Add pinmux setup for i2c devices
-      ARM: dts: omap3-igep0020: Add pinmuxig for DVI output
-      ARM: OMAP: dss-common: change IGEP's DVI DDC i2c bus
-
-Any hints will be highly appreciated.
-
-Thanks a lot and best regards,
-Javier
-
-[1]: http://fpaste.org/49736/79384138/raw/
-[2]: https://github.com/martinezjavier/linux/commits/igep-video-wip
+-- 
+tejun
