@@ -1,38 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 27 Oct 2013 14:27:07 +0000
+Date: Sun, 27 Oct 2013 14:25:21 +0000
 Subject: [PATCH v2 2/2] ARM: sun4i/sun7i: RTC driver
-In-Reply-To: <1381948227-6290-2-git-send-email-carlo.caione@gmail.com>
+In-Reply-To: <CAOQ7t2bkA8K6_d_Sh9Uj2-m005OWR0U4Sz8auBBWhwipnD7QNQ@mail.gmail.com>
 References: <1381948227-6290-1-git-send-email-carlo.caione@gmail.com>
  <1381948227-6290-2-git-send-email-carlo.caione@gmail.com>
-Message-ID: <20131027142707.GC16856@lukather>
+ <20131022152313.GU3041@lukather>
+ <CAOQ7t2bkA8K6_d_Sh9Uj2-m005OWR0U4Sz8auBBWhwipnD7QNQ@mail.gmail.com>
+Message-ID: <20131027142521.GB16856@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Carlo,
 
-On Wed, Oct 16, 2013 at 08:30:27PM +0200, Carlo Caione wrote:
-> This patch introduces the driver for the RTC in the Allwinner A10 and
-> A20 SoCs.
+On Sat, Oct 26, 2013 at 11:19:49AM +0200, Carlo Caione wrote:
+> On Tue, Oct 22, 2013 at 5:23 PM, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > You never got back to us about this 500ms delay.
 > 
-> Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
-> ---
-> v1->v2:
-> - Patch split in two
-> - Fix coding style
-> - New driver description
-> - Rework macros
-> - Add comments
-> - Change while in for cycles
-> ---
->  drivers/rtc/Kconfig     |   7 +
->  drivers/rtc/Makefile    |   1 +
->  drivers/rtc/rtc-sunxi.c | 487 ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 495 insertions(+)
->  create mode 100644 drivers/rtc/rtc-sunxi.c
+> In this case this 500ms sleep is just to avoid reading the time when
+> the time (and in the worst case the date) is going to change.
+> i.e. you are reading time and date on the last second of the day.
 
-Oh, and you forgot to add the DT bindings documentation in your patch.
+Hmmm, I don't understand how that delay is solving this issue. You're
+only deferring this.
 
-Thanks,
+> > How does the RTC framework behaves when you register two devices with
+> > the same string here?
+> 
+> Should be safe since rtc_device_register() uses ida_simple_get() to
+> get a new id.
+
+Ok.
+
+> >
+> > Thanks!
+> 
+> v3 on its way...
+
+Cool, thanks.
+You don't need to resend the DT patch btw, it's already been applied.
+
 Maxime
 
 -- 
@@ -45,4 +51,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131027/53b0a0ed/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131027/858af91e/attachment.sig>
