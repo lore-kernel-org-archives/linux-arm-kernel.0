@@ -1,52 +1,87 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sun, 27 Oct 2013 19:51:15 +0800
-Subject: ARM/kirkwood: v3.12-rc6: kernel BUG at mm/util.c:390!
-In-Reply-To: <20131026143617.GA14034@mudshark.cambridge.arm.com>
-References: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
- <20131026143617.GA14034@mudshark.cambridge.arm.com>
-Message-ID: <20131027195115.208f40f3@tom-ThinkPad-T410>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 27 Oct 2013 11:57:07 +0000
+Subject: [RFC 0/3] Allow CONFIG_DEBUG_SET_MODULE_RONX to be used on ARM
+In-Reply-To: <20131027103452.GA16735@n2100.arm.linux.org.uk>
+References: <1371057810-3189-1-git-send-email-lauraa@codeaurora.org>
+ <20131024130346.GA31369@n2100.arm.linux.org.uk>
+ <20131027103452.GA16735@n2100.arm.linux.org.uk>
+Message-ID: <20131027115706.GB16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Oct 2013 15:36:17 +0100
-Will Deacon <will.deacon@arm.com> wrote:
-
-> On Thu, Oct 24, 2013 at 09:07:30PM +0100, Aaro Koskinen wrote:
+On Sun, Oct 27, 2013 at 10:34:52AM +0000, Russell King - ARM Linux wrote:
+> On Thu, Oct 24, 2013 at 02:03:46PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Jun 12, 2013 at 10:23:27AM -0700, Laura Abbott wrote:
+> > > Hi,
+> > > 
+> > > This is an RFC to allow CONFIG_DEBUG_SET_MODULE_RONX to be used on ARM. The
+> > > current config description from x86 describes it best:
+> > > 
+> > > 	This option helps catch unintended modifications to loadable
+> > > 	kernel module's text and read-only data. It also prevents execution
+> > > 	of module data. Such protection may interfere with run-time code
+> > > 	patching and dynamic kernel tracing - and they might also protect
+> > > 	against certain classes of kernel exploits.
+> > > 
+> > > ARM was missing a few functions to modify the page tables so those have been
+> > > added. I believe modules are always mapped with pages so changing them at map
+> > > time should be acceptable. Comments/concerns are appreciated.
+> > 
+> > I've just tested this and it seems to work:
 > 
-> > [   36.477203] Backtrace:
-> > [   36.535603] [<c009237c>] (page_mapping+0x0/0x50) from [<c0010dd8>] (flush_kernel_dcache_page+0x14/0x98)
-> > [   36.661070] [<c0010dc4>] (flush_kernel_dcache_page+0x0/0x98) from [<c0172b60>] (sg_miter_stop+0xc8/0x10c)
-> > [   36.792813]  r4:df8a9a64 r3:00000003
-> > [   36.857524] [<c0172a98>] (sg_miter_stop+0x0/0x10c) from [<c0172f20>] (sg_miter_next+0x14/0x13c)
+> The only remaining question is whether DEBUG_SET_MODULE_RONX should be
+> by default enabled.  At the moment, the text says "if unsure, say N"
+> but is that the right advice?  Shouldn't we be encouraging people to
+> have this option turned on unless there's a reason not to (eg, kprobes?)
 > 
-> ... assumedly for scatter/gather DMA. How is your block driver allocating
-> its buffers? If you're using the DMA API, I can't see how this would happen.
+> How about adding:
+> 
+> 	default y if !(FTRACE || KPROBES || JUMP_LABEL)
+> 
+> as KPROBES and JUMP_LABEL both use the text patching, and FTRACE uses
+> probe_kernel_write().  We may need to add kgdb to that later too.  Or
+> maybe a dependency on the above?
+> 
+> One thing which comes to mind while looking at this: should
+> arch/arm/kernel/patch.c be using the probe_kernel_* functions in
+> mm/maccess.c?  Also, should we look at improving this code so we can
+> have RONX modules and still have working ftrace/kprobes etc?
 
-Lots of SCSI commands(inquiry, ...) pass kmalloc buffer to block layer,
-then the sg buffer copy helpers and flush_kernel_dcache_page() may see
-slab page.
+Further to this...
 
-That has been here from commit b1adaf65ba03( [SCSI] block: add sg buffer copy
-helper functions).
+probe_kernel_write() will return failure if it can't write without
+oopsing the kernel, so arguably this is "okay" in that it won't cause
+a kernel oops.  x86 appears to do no different here, though see below.
 
-So how about letting below patch to workaround the issue?
+The real problem case is ARMs patch_text() function which directly
+dereferences a virtual address, and so will oops against a kernel RO
+page.
 
-diff --git a/lib/scatterlist.c b/lib/scatterlist.c
-index a685c8a..eea8806 100644
---- a/lib/scatterlist.c
-+++ b/lib/scatterlist.c
-@@ -577,7 +577,7 @@ void sg_miter_stop(struct sg_mapping_iter *miter)
- 		miter->__offset += miter->consumed;
- 		miter->__remaining -= miter->consumed;
- 
--		if (miter->__flags & SG_MITER_TO_SG)
-+		if ((miter->__flags & SG_MITER_TO_SG) && !PageSlab(page))
- 			flush_kernel_dcache_page(miter->page);
- 
- 		if (miter->__flags & SG_MITER_ATOMIC) {
+x86 takes a different approach: they remap the page using a fixmap
+mapping so that they can bypass the RO permissions on text pages.  I
+don't see any reason we can't do the same, though of course it makes
+it slightly more heavy-weight to do code patching.  I think this is
+something we should do before introducing RO text of any kind on ARM,
+otherwise people will turn these options off when first presented with
+them and probably won't enable them later once such issues are fixed.
 
+That argument can be applied to ftrace using probe_kernel_write() as
+well - I think we should avoid having to turn off RO(NX) support if
+we have a kernel feature which needs to write to text as much as
+possible.
 
+A further idea is to have a separate config option which enables the
+presence of the code which bypasses the RO attribute: we don't want to
+build that into the kernel unless we have a reason for it to be there.
 
-Thanks,
--- 
-Ming Lei
+As far as merging this stuff, I know it's late in the cycle, but I think
+that the NX lowmem patches can go in during the next merge window as all
+they're doing is fixing the NX attribute setting on various mappings
+which should never have had them, and marking lowmem sections which do
+not need to be executable as such.  I see this as very low risk as we
+should have nothing poking code directly to lowmem pages and trying to
+directly execute: the bpf stuff uses module_alloc() rather than grabbing
+a lowmem allocation, and we're not (yet) marking any lowmem as read-only.
+Also the kernel page table dumping code can go in too.
+
+Expect to see those in linux-next very soon (unless someone objects?)
