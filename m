@@ -1,58 +1,82 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Sun, 27 Oct 2013 21:12:20 +0100
-Subject: [PATCH 2/4] wl1251: move power GPIO handling into the driver
-In-Reply-To: <1382891056.102746625@f315.i.mail.ru>
-References: <1382890469-25286-1-git-send-email-sre@debian.org>
- <1382890469-25286-3-git-send-email-sre@debian.org>
- <1382891056.102746625@f315.i.mail.ru>
-Message-ID: <20131027201218.GA4414@earth.universe>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 28 Oct 2013 05:23:50 +0800
+Subject: [PATCH] mmc: sdhci-sirf: enable dmabounce since SiRFprimaII MMC DMA
+ only access up to 256MB
+Message-ID: <1382909030-7499-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 08:24:16PM +0400, Alexander Shiyan wrote:
-> > Move the power GPIO handling from the board code into
-> > the driver. This is a dependency for device tree support.
-> > 
-> > Signed-off-by: Sebastian Reichel <sre@debian.org>
-> > ---
-> >  arch/arm/mach-omap2/board-omap3pandora.c     |  2 ++
-> >  arch/arm/mach-omap2/board-rx51-peripherals.c | 11 ++--------
-> >  drivers/net/wireless/ti/wl1251/sdio.c        | 21 +++++++++++++-----
-> >  drivers/net/wireless/ti/wl1251/spi.c         | 33 ++++++++++++++++++----------
-> >  drivers/net/wireless/ti/wl1251/wl1251.h      |  2 +-
-> >  include/linux/wl12xx.h                       |  2 +-
-> >  6 files changed, 43 insertions(+), 28 deletions(-)
-> ...
-> > diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
-> > index b516b4f..a9c723b 100644
-> > --- a/include/linux/wl12xx.h
-> > +++ b/include/linux/wl12xx.h
-> > @@ -49,7 +49,7 @@ enum {
-> >  };
-> >  
-> >  struct wl1251_platform_data {
-> > -	void (*set_power)(bool enable);
-> > +	int power_gpio;
-> >  	/* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
-> >  	int irq;
-> >  	bool use_eeprom;
-> > -- 
-> 
-> What a reason for not using regulator API here with GPIO-based
-> regulator?
+From: Bin Shi <Bin.Shi@csr.com>
 
-I think this pin is not used as power supply, but like an enable pin
-for low power states. Of course the regulator API could still be
-(mis?)used for this, but I think it would be the first linux device
-driver doing this.
+on SiRFprimaII, sdhci is after pci-iobg bus, the bus bridge has a hardware
+limitation. DMA operations after this bridge can not access memory address
+higher than 256MB.
 
-Note: I don't have wl1251 documentation.
+this patch enables dmabounce for SiRFprimaII to fix DMA of primaII. for other
+SiRF SoCs, there is no this problem.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131027/667702b7/attachment-0001.sig>
+Signed-off-by: Bin Shi <Bin.Shi@csr.com>
+Signed-off-by: Binghua Duan <Binghua.Duan@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/mach-prima2/Kconfig  |  1 +
+ drivers/mmc/host/sdhci-sirf.c | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
+index 6988b11..8ecb071 100644
+--- a/arch/arm/mach-prima2/Kconfig
++++ b/arch/arm/mach-prima2/Kconfig
+@@ -26,6 +26,7 @@ config ARCH_PRIMA2
+ 	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
+ 	default y
+ 	select CPU_V7
++	select DMABOUNCE
+ 	select SIRF_IRQ
+ 	select ZONE_DMA
+ 	help
+diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+index 696122c..11e270f 100644
+--- a/drivers/mmc/host/sdhci-sirf.c
++++ b/drivers/mmc/host/sdhci-sirf.c
+@@ -13,6 +13,7 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/mmc/slot-gpio.h>
++#include <linux/dma-mapping.h>
+ #include "sdhci-pltfm.h"
+ 
+ struct sdhci_sirf_priv {
+@@ -40,6 +41,16 @@ static struct sdhci_pltfm_data sdhci_sirf_pdata = {
+ 		SDHCI_QUIRK_DELAY_AFTER_POWER,
+ };
+ 
++/*
++ * The following functions are needed for DMA bouncing because SiRFprimaII SD
++ * controller can address up to 256MByte
++ */
++static int sdhci_sirf_needs_bounce(struct device *dev, dma_addr_t dma_addr,
++	size_t size)
++{
++	return (dma_addr + size) >= SZ_256M;
++}
++
+ static int sdhci_sirf_probe(struct platform_device *pdev)
+ {
+ 	struct sdhci_host *host;
+@@ -92,6 +103,13 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	if (of_machine_is_compatible("sirf,prima2")) {
++		if (pdev->dev.dma_mask)
++			*(pdev->dev.dma_mask) = SZ_256M - 1;
++		pdev->dev.coherent_dma_mask = SZ_256M - 1;
++		dmabounce_register_dev(&pdev->dev, 1024, 2048, sdhci_sirf_needs_bounce);
++	}
++
+ 	return 0;
+ 
+ err_request_cd:
+-- 
+1.8.2.3
