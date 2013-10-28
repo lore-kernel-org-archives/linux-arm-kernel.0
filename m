@@ -1,214 +1,69 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 28 Oct 2013 15:44:45 -0700
-Subject: [PATCH] ARM64: add support for kernel mode NEON in atomic context
-Message-ID: <1383000285-13427-1-git-send-email-ard.biesheuvel@linaro.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 28 Oct 2013 15:50:36 -0700
+Subject: [PATCH 1/2] mmc: arasan: Add driver for Arasan SDHCI
+In-Reply-To: <1873048.2t2L2zW4W9@flatron>
+References: <1381864085-8806-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1587218.cW45zK0ty2@flatron>
+ <b6ced7bb-e8df-4cc1-95a1-df575e37dea7@CO1EHSMHS001.ehs.local>
+ <1873048.2t2L2zW4W9@flatron>
+Message-ID: <9bba3f23-e6b8-4a9a-93ab-4f89f525a4a2@CO1EHSMHS030.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies kernel_neon_begin() and kernel_neon_end(), so
-they may be called from any context. To address the case where only
-a couple of registers are needed, kernel_neon_begin_partial(u32) is
-introduced which takes as a parameter the number of bottom 'n' NEON
-q-registers required. To mark the end of such a partial section, the
-regular kernel_neon_end() should be used.
+On Mon, Oct 28, 2013 at 11:19:13PM +0100, Tomasz Figa wrote:
+> On Monday 28 of October 2013 14:47:38 S?ren Brinkmann wrote:
+> > On Mon, Oct 28, 2013 at 10:16:49PM +0100, Tomasz Figa wrote:
+> > > Hi Soren,
+> > > 
+> > > On Tuesday 15 of October 2013 12:08:04 Soren Brinkmann wrote:
+> > > > Add a driver for Arasan's SDHCI controller core.
+> > > > 
+> > > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > > > ---
+> > > > 
+> > > >  .../devicetree/bindings/mmc/arasan,sdhci.txt       |  23 +++
+> > > >  MAINTAINERS                                        |   1 +
+> > > >  drivers/mmc/host/Kconfig                           |  12 ++
+> > > >  drivers/mmc/host/Makefile                          |   1 +
+> > > >  drivers/mmc/host/sdhci-of-arasan.c                 | 224
+> > > > 
+> > > > +++++++++++++++++++++ 5 files changed, 261 insertions(+)
+> > > > 
+> > > >  create mode 100644
+> > > > 
+> > > > Documentation/devicetree/bindings/mmc/arasan,sdhci.txt create mode
+> > > > 100644 drivers/mmc/host/sdhci-of-arasan.c
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> > > > b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt new file
+> > > > mode
+> > > > 100644
+> > > > index 000000000000..20f0fc25e270
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> > > > @@ -0,0 +1,23 @@
+> > > > +Device Tree Bindings for the Arasan SDCHI Controller
+> > > > +
+> > > > +  The bindings follow the mmc[1] and the clock bindings[2]. Only
+> > > > deviations are +  documented here.
+> > > > +
+> > > > +  [1] Documentation/devicetree/bindings/mmc/mmc.txt
+> > > > +  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > > > +
+> > > 
+> > > > +Required Properties:
+> > > According to the example below, the list of required properties lacks
+> > > interrupt-related properties.
+> > 
+> > Well, the interrupt bindings seem to differ between platforms and
+> > architecture and looking at documentation for other sdhci bindings it
+> > seemed to be okay to avoid documenting them in this place.
+> 
+> Sure, but I believe that this controller always has an interrupt signal, 
+> so at least it should be marked that interrupts need to be specified.
+Okay, I'll add these lines:
+  - interrupts: Interrupt specifier                                              
+  - interrupt-parent: Phandle for the interrupt controller that services                                 
+                      interrupts for this device.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-Instead of having arm/arm64 versions at every iteration, I propose to discuss
-this for arm64, which has a much stronger case for this feature with the Crypto
-Extensions. Once we are aligned I will implement for ARM as well.
-
- arch/arm64/include/asm/fpsimd.h       | 17 ++++++++++++++++
- arch/arm64/include/asm/fpsimdmacros.h | 37 +++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/neon.h         |  6 +++++-
- arch/arm64/kernel/entry-fpsimd.S      | 24 +++++++++++++++++++++++
- arch/arm64/kernel/fpsimd.c            | 37 +++++++++++++++++++++++------------
- 5 files changed, 108 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index c43b4ac..8657206 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -39,6 +39,19 @@ struct fpsimd_state {
- 	};
- };
- 
-+/*
-+ * Struct for stacking the bottom 'n' FP/SIMD registers.
-+ * Mainly intended for kernel use of v8 Crypto Extensions which only
-+ * needs a few registers and may need to execute in atomic context.
-+ */
-+struct fpsimd_partial_state {
-+	u32		num_regs;
-+	u32		fpsr;
-+	u32		fpcr;
-+	__uint128_t	vregs[32] __aligned(16);
-+} __aligned(16);
-+
-+
- #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
- /* Masks for extracting the FPSR and FPCR from the FPSCR */
- #define VFP_FPSCR_STAT_MASK	0xf800009f
-@@ -55,6 +68,10 @@ struct task_struct;
- extern void fpsimd_save_state(struct fpsimd_state *state);
- extern void fpsimd_load_state(struct fpsimd_state *state);
- 
-+void fpsimd_save_partial_state(struct fpsimd_partial_state *state,
-+			       u32 num_regs);
-+void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
-+
- extern void fpsimd_thread_switch(struct task_struct *next);
- extern void fpsimd_flush_thread(void);
- 
-diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index bbec599..42990a8 100644
---- a/arch/arm64/include/asm/fpsimdmacros.h
-+++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -62,3 +62,40 @@
- 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
- 	msr	fpcr, x\tmpnr
- .endm
-+
-+.altmacro
-+.macro	q2op, op, q1, q2, state
-+	\op	q\q1, q\q2, [\state, # -16 * \q1 - 16]
-+.endm
-+
-+.macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
-+	mrs	x\tmpnr1, fpsr
-+	str	w\numnr, [\state]
-+	mrs	x\tmpnr2, fpcr
-+	stp	w\tmpnr1, w\tmpnr2, [\state, #4]
-+	adr	x\tmpnr1, 0f
-+	add	\state, \state, x\numnr, lsl #4
-+	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
-+	br	x\tmpnr1
-+	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
-+		qb = \qa + 1
-+	q2op	stp, \qa, %qb, \state
-+	.endr
-+0:
-+.endm
-+
-+.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
-+	ldp	w\tmpnr1, w\tmpnr2, [\state, #4]
-+	msr	fpsr, x\tmpnr1
-+	msr	fpcr, x\tmpnr2
-+	adr	x\tmpnr1, 0f
-+	ldr	w\tmpnr2, [\state]
-+	add	\state, \state, x\tmpnr2, lsl #4
-+	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
-+	br	x\tmpnr1
-+	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
-+		qb = \qa + 1
-+	q2op	ldp, \qa, %qb, \state
-+	.endr
-+0:
-+.endm
-diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-index b0cc58a9..13ce4cc 100644
---- a/arch/arm64/include/asm/neon.h
-+++ b/arch/arm64/include/asm/neon.h
-@@ -8,7 +8,11 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/types.h>
-+
- #define cpu_has_neon()		(1)
- 
--void kernel_neon_begin(void);
-+#define kernel_neon_begin()	kernel_neon_begin_partial(32)
-+
-+void kernel_neon_begin_partial(u32 num_regs);
- void kernel_neon_end(void);
-diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
-index 6a27cd6..d358cca 100644
---- a/arch/arm64/kernel/entry-fpsimd.S
-+++ b/arch/arm64/kernel/entry-fpsimd.S
-@@ -41,3 +41,27 @@ ENTRY(fpsimd_load_state)
- 	fpsimd_restore x0, 8
- 	ret
- ENDPROC(fpsimd_load_state)
-+
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+/*
-+ * Save the bottom n FP registers.
-+ *
-+ * x0 - pointer to struct fpsimd_partial_state
-+ */
-+ENTRY(fpsimd_save_partial_state)
-+	fpsimd_save_partial x0, 1, 8, 9
-+	ret
-+ENDPROC(fpsimd_load_partial_state)
-+
-+/*
-+ * Load the bottom n FP registers.
-+ *
-+ * x0 - pointer to struct fpsimd_partial_state
-+ */
-+ENTRY(fpsimd_load_partial_state)
-+	fpsimd_restore_partial x0, 8, 9
-+	ret
-+ENDPROC(fpsimd_load_partial_state)
-+
-+#endif
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 1f2e4d5..737b337 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -86,26 +86,39 @@ void fpsimd_flush_thread(void)
- 
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-+
- /*
-  * Kernel-side NEON support functions
-  */
--void kernel_neon_begin(void)
-+void kernel_neon_begin_partial(u32 num_regs)
- {
--	/* Avoid using the NEON in interrupt context */
--	BUG_ON(in_interrupt());
--	preempt_disable();
--
--	if (current->mm)
--		fpsimd_save_state(&current->thread.fpsimd_state);
-+	BUG_ON(num_regs > 32);
-+
-+	if (in_interrupt()) {
-+		struct fpsimd_partial_state *s = this_cpu_ptr(
-+			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-+	} else {
-+		preempt_disable();
-+		if (current->mm)
-+			fpsimd_save_state(&current->thread.fpsimd_state);
-+	}
- }
--EXPORT_SYMBOL(kernel_neon_begin);
-+EXPORT_SYMBOL(kernel_neon_begin_partial);
- 
- void kernel_neon_end(void)
- {
--	if (current->mm)
--		fpsimd_load_state(&current->thread.fpsimd_state);
--
--	preempt_enable();
-+	if (in_interrupt()) {
-+		struct fpsimd_partial_state *s = this_cpu_ptr(
-+			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+		fpsimd_load_partial_state(s);
-+	} else {
-+		if (current->mm)
-+			fpsimd_load_state(&current->thread.fpsimd_state);
-+		preempt_enable();
-+	}
- }
- EXPORT_SYMBOL(kernel_neon_end);
- 
--- 
-1.8.3.2
+	S?ren
