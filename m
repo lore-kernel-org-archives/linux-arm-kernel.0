@@ -1,86 +1,41 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Mon, 28 Oct 2013 23:48:59 +0800
-Subject: [PATCH] scripts/kallsyms: filter symbols not in kernel address space
-Message-ID: <1382975339-25831-1-git-send-email-tom.leiming@gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 28 Oct 2013 15:59:34 +0000
+Subject: [PULL REQ] Big Endian initial patch series
+In-Reply-To: <20131028085328.GI16735@n2100.arm.linux.org.uk>
+References: <20131018205405.GA28835@codethink.co.uk>
+ <20131019170954.GC25076@mudshark.cambridge.arm.com>
+ <5262E2C7.7000106@codethink.co.uk>
+ <20131028004736.GG16735@n2100.arm.linux.org.uk>
+ <20131028084455.GA20218@mudshark.cambridge.arm.com>
+ <20131028085328.GI16735@n2100.arm.linux.org.uk>
+Message-ID: <526E89E6.8010202@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses CONFIG_PAGE_OFFSET to filter symbols which
-are not in kernel address space because these symbols are
-generally for generating code purpose and can't be run at
-kernel mode, so we needn't keep them in /proc/kallsyms.
+On 28/10/13 08:53, Russell King - ARM Linux wrote:
 
-For example, on ARM there are some symbols which are
-linked in relocatable code section, then perf can't parse
-symbols any more from /proc/kallsyms, and this patch fixes
-the problem.
+>> +#ifdef __ARMEB_
+>> +#define LOW_OFFSET     0x4
+>> +#define HIGH_OFFSET    0x0
+>> +#else
+>> +#define LOW_OFFSET     0x0
+>> +#define HIGH_OFFSET    0x4
+>> +#endif
+>>
+>> (spot the missing underscore).
+>
+> Yep, well spotted.
+>
+> Well, we have some time to get this all fixed, so I'm going to drop
+> Ben's tree.  I think we need to first commit a patch to fix the error
+> in Santosh's patch
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Michal Marek <mmarek@suse.cz>
-Acked-by: Rusty Russell <rusty@rustcorp.com.au>
-Signed-off-by: Ming Lei <tom.leiming@gmail.com>
----
- scripts/kallsyms.c      |   12 +++++++++++-
- scripts/link-vmlinux.sh |    2 ++
- 2 files changed, 13 insertions(+), 1 deletion(-)
+Ok, shall I look at re-basing to -rc6?
 
-diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
-index 487ac6f..9a11f9f 100644
---- a/scripts/kallsyms.c
-+++ b/scripts/kallsyms.c
-@@ -55,6 +55,7 @@ static struct sym_entry *table;
- static unsigned int table_size, table_cnt;
- static int all_symbols = 0;
- static char symbol_prefix_char = '\0';
-+static unsigned long long kernel_start_addr = 0;
- 
- int token_profit[0x10000];
- 
-@@ -65,7 +66,10 @@ unsigned char best_table_len[256];
- 
- static void usage(void)
- {
--	fprintf(stderr, "Usage: kallsyms [--all-symbols] [--symbol-prefix=<prefix char>] < in.map > out.S\n");
-+	fprintf(stderr, "Usage: kallsyms [--all-symbols] "
-+			"[--symbol-prefix=<prefix char>] "
-+			"[--page-offset=<CONFIG_PAGE_OFFSET>] "
-+			"< in.map > out.S\n");
- 	exit(1);
- }
- 
-@@ -194,6 +198,9 @@ static int symbol_valid(struct sym_entry *s)
- 	int i;
- 	int offset = 1;
- 
-+	if (s->addr < kernel_start_addr)
-+		return 0;
-+
- 	/* skip prefix char */
- 	if (symbol_prefix_char && *(s->sym + 1) == symbol_prefix_char)
- 		offset++;
-@@ -646,6 +653,9 @@ int main(int argc, char **argv)
- 				if ((*p == '"' && *(p+2) == '"') || (*p == '\'' && *(p+2) == '\''))
- 					p++;
- 				symbol_prefix_char = *p;
-+			} else if (strncmp(argv[i], "--page-offset=", 14) == 0) {
-+				const char *p = &argv[i][14];
-+				kernel_start_addr = strtoull(p, NULL, 16);
- 			} else
- 				usage();
- 		}
-diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
-index 0149949..32b10f5 100644
---- a/scripts/link-vmlinux.sh
-+++ b/scripts/link-vmlinux.sh
-@@ -82,6 +82,8 @@ kallsyms()
- 		kallsymopt="${kallsymopt} --all-symbols"
- 	fi
- 
-+	kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
-+
- 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
- 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
- 
+I have a bug report with a change to the SCU reading for the SMP
+fix-up case which could do with fixing, so I could add this and send
+another pull request (complete with description this time).
+
 -- 
-1.7.9.5
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
