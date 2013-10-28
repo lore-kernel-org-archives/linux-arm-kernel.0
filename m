@@ -1,36 +1,108 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 00:46:49 +0100
-Subject: [PATCH 01/19] serial: sh-sci: Enable the driver on all ARM platforms
-In-Reply-To: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383004027-25036-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Tue, 29 Oct 2013 00:46:48 +0100
+Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
+Message-ID: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Renesas ARM platforms are transitioning from single-platform to
-multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-and ARCH_SHMOBILE_MULTI and increase build testing coverage.
+Hello,
 
+This patch series, based on v3.12-rc7, prepares various Renesas drivers
+for migration to multiplatform kernels by enabling their compilation or
+otherwise fixing them on all ARM platforms. The patches are pretty
+straightforward and are described in their commit message.
+
+I'd like to get all these patches merged in v3.14. As they will need to go
+through their respective subsystems' trees, I would appreciate if all
+maintainers involved could notify me when they merge patches from this series
+in their tree to help me tracking the merge status. I don't plan to send pull
+requests individually for these patches, and I will repost patches
+individually if changes are requested during review.
+
+If you believe the issue should be solved in a different way (for instance by
+removing the architecture dependency completely) please reply to the cover
+letter to let other maintainers chime in.
+
+Cc: Chris Ball <cjb@laptop.org>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: dmaengine at vger.kernel.org
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: Eduardo Valentin <eduardo.valentin@ti.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Cc: Ian Molton <ian@mnementh.co.uk>
+Cc: iommu at lists.linux-foundation.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-fbdev at vger.kernel.org
+Cc: linux-i2c at vger.kernel.org
+Cc: linux-input at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-media at vger.kernel.org
+Cc: linux-mmc at vger.kernel.org
+Cc: linux-mtd at lists.infradead.org
+Cc: linux-pm at vger.kernel.org
+Cc: linux-pwm at vger.kernel.org
 Cc: linux-serial at vger.kernel.org
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/tty/serial/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Cc: linux-spi at vger.kernel.org
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Cc: netdev at vger.kernel.org
+Cc: Samuel Ortiz <samuel@sortiz.org>
+Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Zhang Rui <rui.zhang@intel.com>
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index febd45c..2976fa4 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -709,7 +709,7 @@ config SERIAL_IP22_ZILOG_CONSOLE
- 
- config SERIAL_SH_SCI
- 	tristate "SuperH SCI(F) serial port support"
--	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE)
-+	depends on HAVE_CLK && (SUPERH || ARM)
- 	select SERIAL_CORE
- 
- config SERIAL_SH_SCI_NR_UARTS
+Laurent Pinchart (19):
+  serial: sh-sci: Enable the driver on all ARM platforms
+  DMA: shdma: Enable the driver on all ARM platforms
+  i2c: sh_mobile: Enable the driver on all ARM platforms
+  input: sh_keysc: Enable the driver on all ARM platforms
+  iommu: shmobile: Enable the driver on all ARM platforms
+  i2c: rcar: Enable the driver on all ARM platforms
+  v4l: sh_vou: Enable the driver on all ARM platforms
+  mmc: sdhi: Enable the driver on all ARM platforms
+  mmc: sh_mmcif: Enable the driver on all ARM platforms
+  mtd: sh_flctl: Enable the driver on all ARM platforms
+  net: sh_eth: Set receive alignment correctly on all ARM platforms
+  irda: sh_irda: Enable the driver on all ARM platforms
+  pinctrl: sh-pfc: Enable the driver on all ARM platforms
+  pwm: pwm-renesas-tpu: Enable the driver on all ARM platforms
+  sh: intc: Enable the driver on all ARM platforms
+  spi: sh_msiof: Enable the driver on all ARM platforms
+  spi: sh_hspi: Enable the driver on all ARM platforms
+  thermal: rcar-thermal: Enable the driver on all ARM platforms
+  fbdev: sh-mobile-lcdcfb: Enable the driver on all ARM platforms
+
+ drivers/dma/sh/Kconfig                | 2 +-
+ drivers/dma/sh/shdmac.c               | 6 +++---
+ drivers/i2c/busses/Kconfig            | 4 ++--
+ drivers/input/keyboard/Kconfig        | 2 +-
+ drivers/iommu/Kconfig                 | 2 +-
+ drivers/media/platform/Kconfig        | 2 +-
+ drivers/mmc/host/Kconfig              | 4 ++--
+ drivers/mmc/host/tmio_mmc_dma.c       | 2 +-
+ drivers/mtd/nand/Kconfig              | 2 +-
+ drivers/net/ethernet/renesas/sh_eth.c | 2 +-
+ drivers/net/ethernet/renesas/sh_eth.h | 2 +-
+ drivers/net/irda/Kconfig              | 2 +-
+ drivers/pinctrl/Makefile              | 2 +-
+ drivers/pinctrl/sh-pfc/Kconfig        | 2 +-
+ drivers/pwm/Kconfig                   | 2 +-
+ drivers/sh/intc/Kconfig               | 2 +-
+ drivers/spi/Kconfig                   | 4 ++--
+ drivers/thermal/Kconfig               | 2 +-
+ drivers/tty/serial/Kconfig            | 2 +-
+ drivers/video/Kconfig                 | 6 +++---
+ 20 files changed, 27 insertions(+), 27 deletions(-)
+
 -- 
-1.8.1.5
+Regards,
+
+Laurent Pinchart
