@@ -1,91 +1,81 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 28 Oct 2013 05:57:04 -0500
-Subject: [PATCH v9 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <1382956118-12495-2-git-send-email-acourbot@nvidia.com>
-References: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
- <1382956118-12495-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <D49A3E92-54FD-4275-82F5-DBB476086B03@codeaurora.org>
+Date: Mon, 28 Oct 2013 05:59:41 -0500
+Subject: [RFC][PATCHv5 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM.
+In-Reply-To: <1382951151-31517-1-git-send-email-Li.Xiubo@freescale.com>
+References: <1382951151-31517-1-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <224C2E26-6C33-4DBB-BC06-A4BA470FDA39@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Oct 28, 2013, at 5:28 AM, Alexandre Courbot wrote:
+On Oct 28, 2013, at 4:05 AM, Xiubo Li wrote:
 
-> Trusted Foundations is a TrustZone-based secure monitor for ARM that
-> can be invoked using the same SMC-based API on all supported
-> platforms. This patch adds initial basic support for Trusted
-> Foundations using the ARM firmware API. Current features are limited
-> to the ability to boot secondary processors.
+> The RFC patch only added "See ../clock/clock-bindings.txt for details of
+> the property values."
 > 
-> Note: The API followed by Trusted Foundations does *not* follow the SMC
-> calling conventions. It has nothing to do with PSCI neither and is only
-> relevant to devices that use Trusted Foundations (like most Tegra-based
-> retail devices).
 > 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> 
+> This adds the Document for Freescale FTM PWM driver under
+> Documentation/devicetree/bindings/pwm/.
+> 
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 > ---
-> .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
-> .../devicetree/bindings/vendor-prefixes.txt        |  1 +
-> arch/arm/Kconfig                                   |  2 +
-> arch/arm/Makefile                                  |  1 +
-> arch/arm/firmware/Kconfig                          | 28 ++++++++
-> arch/arm/firmware/Makefile                         |  1 +
-> arch/arm/firmware/trusted_foundations.c            | 79 ++++++++++++++++++++++
-> arch/arm/include/asm/trusted_foundations.h         | 67 ++++++++++++++++++
-> 8 files changed, 199 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
-> create mode 100644 arch/arm/firmware/Kconfig
-> create mode 100644 arch/arm/firmware/Makefile
-> create mode 100644 arch/arm/firmware/trusted_foundations.c
-> create mode 100644 arch/arm/include/asm/trusted_foundations.h
+> .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 34 ++++++++++++++++++++++
+> 1 file changed, 34 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
 > new file mode 100644
-> index 0000000..2ec75c9
+> index 0000000..175b762
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
-> @@ -0,0 +1,20 @@
-> +Trusted Foundations
-> +-------------------
-> +
-> +Boards that use the Trusted Foundations secure monitor can signal its
-> +presence by declaring a node compatible with "tl,trusted-foundations"
-> +under the /firmware/ node
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> @@ -0,0 +1,34 @@
+> +Freescale FTM PWM controller
+
+What does FTM stand for, and can we spell out PWM at least once early on.
+
 > +
 > +Required properties:
-> +- compatible : "tl,trusted-foundations"
-> +- version-major : major version number of Trusted Foundations firmware
-> +- version-minor: minor version number of Trusted Foundations firmware
+> +- compatible: Should be "fsl,vf610-ftm-pwm"
+> +- reg: Physical base address and length of the controller's registers
+> +- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
+> +  the cells format.
+> +- clock-names : Includes the following module clock source entries:
+> +    "ftm0" (system clock),
+> +    "ftm0_fix_sel" (fixed frequency clock),
+> +    "ftm0_ext_sel" (external clock)
+> +- clocks : Must contain a clock specifier for each entry in clock-names,
+> +  See ../clock/clock-bindings.txt for details of the property values.
+> +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
+> +  entries in clock-names.
 
-vendor prefix version.
+Why do we need this, why not just have only the clock-names/clocks reference the clk that is actually used?
+
+> +- pinctrl-names: must contain a "default" entry.
+> +- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
+> +  See ../pinctrl/pinctrl-bindings.txt for details of the property values.
+
+let's drop the .. when making directory references.
 
 > +
+> +
 > +Example:
-> +	firmware {
-> +		trusted-foundations {
-> +			compatible = "tl,trusted-foundations";
-> +			version-major = <2>;
-> +			version-minor = <8>;
-> +		};
-> +	};
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 2956800..a374eaa 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -66,6 +66,7 @@ ste	ST-Ericsson
-> stericsson	ST-Ericsson
-> toumaz	Toumaz
-> ti	Texas Instruments
-> +tl	Trusted Logic
-
-Should this be Trusted Logic Mobility (tlm)?
-
-
-> toshiba	Toshiba Corporation
-> v3	V3 Semiconductor
-> via	VIA Technologies, Inc.
+> +
+> +pwm0: pwm at 40038000 {
+> +		compatible = "fsl,vf610-ftm-pwm";
+> +		reg = <0x40038000 0x1000>;
+> +		#pwm-cells = <3>;
+> +		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
+> +		clocks = <&clks VF610_CLK_FTM0>,
+> +			<&clks VF610_CLK_FTM0_FIX_SEL>,
+> +			<&clks VF610_CLK_FTM0_EXT_SEL>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_pwm0_1>;
+> +		fsl,pwm-counter-clk = "ftm0_ext_sel";
+> +};
+> -- 
+> 1.8.4
 
 - k
 
