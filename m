@@ -1,35 +1,50 @@
-From: B47053@freescale.com (Xiubo Li-B47053)
-Date: Mon, 28 Oct 2013 06:07:41 +0000
-Subject: [PATCHv1 5/8] ASoC: sgtl5000: Revise the bugs about the
- sgt15000 codec.
-In-Reply-To: <20131018172814.GT2443@sirena.org.uk>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-6-git-send-email-Li.Xiubo@freescale.com>
- <20131018172814.GT2443@sirena.org.uk>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F8286A3DC@039-SN2MPN1-013.039d.mgd.msft.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Sun, 27 Oct 2013 18:32:26 -0700
+Subject: [tip:timers/core] ARM: Kconfig: allow full nohz CPU accounting
+In-Reply-To: <20131018163740.GA21983@codeaurora.org>
+References: <tip-31c1fc8187158cb80ccd57c19e024c55af901797@git.kernel.org>
+ <20131016121416.GD12773@localhost.localdomain>
+ <20131018163740.GA21983@codeaurora.org>
+Message-ID: <526DBEAA.4030707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > @@ -883,14 +883,19 @@ static int ldo_regulator_register(struct
-> snd_soc_codec *codec,
-> >  				struct regulator_init_data *init_data,
-> >  				int voltage)
-> >  {
-> > +#ifdef CONFIG_SND_SOC_FSL_SGTL5000
-> > +	return 0;
-> > +#else
-> >  	dev_err(codec->dev, "this setup needs regulator support in the
-> kernel\n");
-> >  	return -EINVAL;
-> > +#endif
-> >  }
-> 
-> If these systems don't actually need the internal regulator then should
-> they not be trying to enable it?  
->
-Yes, I think do not trying to enable the regulator is much better.
+Hi Stephen,
 
->Alternatively if it's OK to ignore this then why is this conditional in the board?
+On 10/18/2013 09:37 AM, Stephen Boyd wrote:
+> On 10/16, Frederic Weisbecker wrote:
+>> On Thu, Oct 03, 2013 at 06:58:03AM -0700, tip-bot for Kevin Hilman wrote:
+>>> Commit-ID:  31c1fc8187158cb80ccd57c19e024c55af901797
+>>> Gitweb:     http://git.kernel.org/tip/31c1fc8187158cb80ccd57c19e024c55af901797
+>>> Author:     Kevin Hilman <khilman@linaro.org>
+>>> AuthorDate: Mon, 16 Sep 2013 15:28:22 -0700
+>>> Committer:  Frederic Weisbecker <fweisbec@gmail.com>
+>>> CommitDate: Mon, 30 Sep 2013 15:37:05 +0200
+>>>
+>>> ARM: Kconfig: allow full nohz CPU accounting
+>>>
+>>> With the 64-bit requirement removed from VIRT_CPU_ACCOUNTING_GEN,
+>>> allow ARM platforms to enable it.  Since VIRT_CPU_ACCOUNTING_GEN is a
+>>> dependency for full NO_HZ, this allows ARM platforms to enable full
+>>> NO_HZ as well.
+>>
+>> I realize that arm doesn't implement irq work raise. It hooks on the
+>> timer to execute pending irq work. You'll need to implement arch_irq_work_raise()
+>> and implement some sort of self IPI to trigger irq work. The full dynticks subsystem
+>> relies on that to work correctly. It often use that to re-evaluate and possibly restart
+>> the tick after scheduler, posix timer updates, etc...
+>>
+>> That notwithstanding that if you have no tick, tick based irq work can't
+>> work.
+>>
 > 
-The CONFIG_SND_SOC_FSL_SGTL5000 micro maybe confuse you and others.
-And it should be CONFIG_SND_SOC_FSL_SGTL5000_VF610....
+> Something like this? The only problem is that this latches on to
+> the SMP support for IPIs. If CONFIG_SMP is disabled we won't get
+> arch_irq_work_raise() but perhaps that isn't so big of a deal? Or
+> we should think about exposing IPI support to UP systems on ARM.
+
+Care to submit a proper patch for this to LAKML?  or if you prefer I can
+do it (keeping your authorship.)   We need this for proper full NOHZ
+support on ARM.  Thanks.
+
+Kevin
