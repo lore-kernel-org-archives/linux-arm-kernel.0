@@ -1,31 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 28 Oct 2013 13:01:23 -0700
-Subject: [PATCH v3 07/10] regmap: add SPMI support
-In-Reply-To: <cc2f82e353885734fe61bb8d8ec8c9f7b35e0d5a.1382985169.git.joshc@codeaurora.org>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <cc2f82e353885734fe61bb8d8ec8c9f7b35e0d5a.1382985169.git.joshc@codeaurora.org>
-Message-ID: <20131028200123.GA20439@sirena.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 28 Oct 2013 13:21:19 -0700
+Subject: [GIT PULL 1/2] ARM: imx: soc changes for 3.13
+In-Reply-To: <20131021023533.GE17165@S2101-09.ap.freescale.net>
+References: <20131021023533.GE17165@S2101-09.ap.freescale.net>
+Message-ID: <20131028202119.GA4802@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 01:12:35PM -0500, Josh Cartwright wrote:
-> Add basic support for the System Power Management Interface (SPMI) bus.
-> This is a simple implementation which only implements register accesses
-> via the Extended Register Read/Write Long commands.
+On Mon, Oct 21, 2013 at 10:35:35AM +0800, Shawn Guo wrote:
+> This is the imx/mxs soc changes I queued for 3.13.  A couple of notes:
+> 
+> * Since mach-mxs patch volume drops a lot, I start collecting mxs
+>   patches using imx branch from this cycle.  Hope it's fine.
+> 
+> * The change set conflicts with Sebastian's .init_time cleanup series
+>   quite badly.  The pull request is based on his branch [1] to solve
+>   those conflicts.
+> 
+> Shawn
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg276175.html
+> 
+> The following changes since commit 6886530bab1e059a0fc5bab9813c739413d033bf:
+> 
+>   Merge remote-tracking branch 'shesselba/clk-of-init-v2_for-3.13' into imx/soc (2013-10-21 09:10:56 +0800)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.13
+> 
+> for you to fetch changes up to 9ba64fe3eb461b95bf11436a13db0d9c79465514:
+> 
+>   ARM: imx: enable suspend for imx6sl (2013-10-21 09:39:27 +0800)
+> 
+> ----------------------------------------------------------------
+> The imx/mxs soc changes for 3.13:
+> 
+> * Low-level debug support for Vybrid
+> * Support soc bus/device for imx6
+> * Suspend support for imx6dl and imx6sl
+> * The imx6q clock updates for PCIe and audio PLL support
+> * IOMUXC GPR update for fec support
+> * Some random cleanup
+> * A few defconfig updates
 
-This looks good - I've applied it on the assumption that the underlying
-interfaces won't change and the suspicion that it'll be after the merge
-window before users get merged.  However I did provide a tag at:
+Pulled, thanks.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git tags/spmi
 
-which I'm happy to see pulled into any tree that requires it.  I can
-drop the patch for now if there would be a problem with getting it in
-during the merge window.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131028/70fffb8a/attachment.sig>
+-Olof
