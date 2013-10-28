@@ -1,58 +1,93 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Mon, 28 Oct 2013 13:22:03 -0500
-Subject: [PATCH 02/12][v3] pci: fsl: add structure fsl_pci
-In-Reply-To: <526A086E.305@freescale.com>
-References: <1382524894-15164-1-git-send-email-Minghuan.Lian@freescale.com>
- <1382524894-15164-2-git-send-email-Minghuan.Lian@freescale.com>
- <2B28E421-9B64-4CEC-9E00-8893502CE12F@kernel.crashing.org>
- <526A086E.305@freescale.com>
-Message-ID: <1382984523.3410.23.camel@snotra.buserror.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 28 Oct 2013 11:25:01 -0700
+Subject: [PATCH] ARM: Support arch_irq_work_raise() via self IPIs
+In-Reply-To: <526DBEAA.4030707@linaro.org>
+References: <526DBEAA.4030707@linaro.org>
+Message-ID: <1382984701-2371-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-10-25 at 13:58 +0800, Lian Minghuan-b31939 wrote:
-> Hi Kumar,
-> 
-> please see my comment inline.
-> 
-> On 10/24/2013 12:11 PM, Kumar Gala wrote:
-> > On Oct 23, 2013, at 5:41 AM, Minghuan Lian wrote:
-> >
-> >> PowerPC uses structure pci_controller to describe PCI controller,
-> >> but ARM uses structure pci_sys_data. In order to support PowerPC
-> >> and ARM simultaneously, the patch adds a structure fsl_pci that
-> >> contains most of the members of the pci_controller and pci_sys_data.
-> >> Meanwhile, it defines a interface fsl_arch_sys_to_pci() which should
-> >> be implemented in architecture-specific PCI controller driver to
-> >> convert pci_controller or pci_sys_data to fsl_pci.
-> >>
-> >> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> >> ---
-> >> change log:
-> >> v1-v3:
-> >> Derived from http://patchwork.ozlabs.org/patch/278965/
-> >>
-> >> Based on upstream master.
-> >> Based on the discussion of RFC version here
-> >> http://patchwork.ozlabs.org/patch/274487/
-> >>
-> >> include/linux/fsl/pci-common.h | 41 +++++++++++++++++++++++++++++++++++++++++
-> >> 1 file changed, 41 insertions(+)
-> > NAK.
-> >
-> > We discussed this some at the ARM Summit this week and the feeling is we need to move to a common interface between the various ARCHs.
-> [Minghuan] Do you mean we will use the common interface instead of 
-> arch/powerpc/kernel/pci-common.c...
-> and arch/arm/kernel/bios32.c?  Who will do the code movement and when 
-> will the work be completed? The patches just move the common functions 
-> of FSL PCI controller operation which can be re-used by PowerPC and ARM. 
-> LS1 is coming, I worry about not having enough time to wait for the move 
-> is completed.
+This will allow the scheduler tick to be restarted if we're in
+full NOHZ mode.
 
-I agree -- it can take quite a while to get from "the feeling is we need
-to move to a common interface" to actually having something we can use.
-If and when this unification is achieved, we can drop this extra layer.
-It's a better interim solution than just duplicating the entire driver
-and letting them drift apart.
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/include/asm/hardirq.h |  2 +-
+ arch/arm/kernel/smp.c          | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
 
--Scott
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 2740c2a2..3d7351c 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,7 +5,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
+-#define NR_IPI	6
++#define NR_IPI	7
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 72024ea..bf9a0d6d 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -25,6 +25,7 @@
+ #include <linux/clockchips.h>
+ #include <linux/completion.h>
+ #include <linux/cpufreq.h>
++#include <linux/irq_work.h>
+ 
+ #include <linux/atomic.h>
+ #include <asm/smp.h>
+@@ -66,6 +67,7 @@ enum ipi_msg_type {
+ 	IPI_CALL_FUNC,
+ 	IPI_CALL_FUNC_SINGLE,
+ 	IPI_CPU_STOP,
++	IPI_IRQ_WORK,
+ };
+ 
+ static DECLARE_COMPLETION(cpu_running);
+@@ -448,6 +450,13 @@ void arch_send_call_function_single_ipi(int cpu)
+ 	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
+ }
+ 
++#ifdef CONFIG_IRQ_WORK
++void arch_irq_work_raise(void)
++{
++	smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
++}
++#endif
++
+ static const char *ipi_types[NR_IPI] = {
+ #define S(x,s)	[x] = s
+ 	S(IPI_WAKEUP, "CPU wakeup interrupts"),
+@@ -456,6 +465,7 @@ static const char *ipi_types[NR_IPI] = {
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+ 	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
++	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+ };
+ 
+ void show_ipi_list(struct seq_file *p, int prec)
+@@ -565,6 +575,14 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
+ 
++#ifdef CONFIG_IRQ_WORK
++	case IPI_IRQ_WORK:
++		irq_enter();
++		irq_work_run();
++		irq_exit();
++		break;
++#endif
++
+ 	default:
+ 		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
+ 		       cpu, ipinr);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
