@@ -1,27 +1,41 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Sun, 27 Oct 2013 22:41:56 -0500
-Subject: [alsa-devel] [PATCH v2 2/6] ASoC: sirf: add I2S CPU DAI driver
-In-Reply-To: <1382913424-28626-1-git-send-email-Baohua.Song@csr.com>
-References: <1382913424-28626-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <CAOZdJXUW5u5Zh561-FHGHfW-fK20L_EeBcdBtSeanWqTfkmndQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 27 Oct 2013 21:05:52 -0700
+Subject: [PATCH 0/2] Versatile Express config update for 3.13
+In-Reply-To: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+References: <1381930594-1701-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20131028040552.GA22890@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 5:37 PM, Barry Song <21cnbao@gmail.com> wrote:
-> +       si2s->sirf_pcm_pdev = platform_device_register_simple("sirf-pcm-audio",
-> +                       0, NULL, 0);
-> +       if (IS_ERR(si2s->sirf_pcm_pdev))
-> +               return PTR_ERR(si2s->sirf_pcm_pdev);
-> +
-> +       platform_set_drvdata(pdev, si2s);
-> +
-> +       spin_lock_init(&si2s->lock);
-> +
-> +       ret = of_property_read_u32(pdev->dev.of_node,
-> +                       "sirf,i2s-dma-rx-channel", &rx_dma_ch);
-> +       if (ret < 0) {
-> +               dev_err(&pdev->dev, "Unable to USP0 rx dma channel\n");
-> +               return ret;
-> +       }
+On Wed, Oct 16, 2013 at 02:36:32PM +0100, Pawel Moll wrote:
+> Greetings,
+> 
+> This micro-series updates the Versatile Express defconfig in two stages:
+> 
+> 1. Makes the defconfig-ed kernels actually work on real boards and QEMU.
+> 2. Enables all platform-specific drivers and features.
+> 
+> The first patch definitely should go in, as it is a de-facto bug fix.
+> The second has been suggested to increase build coverage.
+> 
+> I've tried to keep the changes to minimum. The patches can be also
+> pulled as described below.
+> 
+> Cheers!
+> 
+> Pawel
+> 
+> 
+> The following changes since commit 61e6cfa80de5760bbe406f4e815b7739205754d2:
+> 
+>   Linux 3.12-rc5 (2013-10-13 15:41:28 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/pawelmoll/linux.git tags/vexpress/defconfig-for-v3.13
 
-Shouldn't you also call platform_device_unregister() before the 'return' here?
+Based on the comments on at least the first patch I'm guessing you'll want to
+respin, so I'll wait for a new pull request.
+
+
+-Olof
