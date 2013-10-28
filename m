@@ -1,9 +1,9 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 00:46:54 +0100
-Subject: [PATCH 06/19] i2c: rcar: Enable the driver on all ARM platforms
+Date: Tue, 29 Oct 2013 00:46:57 +0100
+Subject: [PATCH 09/19] mmc: sh_mmcif: Enable the driver on all ARM platforms
 In-Reply-To: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383004027-25036-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383004027-25036-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,28 +12,25 @@ multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
 driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
 and ARCH_SHMOBILE_MULTI and increase build testing coverage.
 
-Remove the explicit I2C dependency as the configuration option is
-already unavailable when I2C support is disabled.
-
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: linux-i2c at vger.kernel.org
+Cc: Chris Ball <cjb@laptop.org>
+Cc: linux-mmc at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/i2c/busses/Kconfig | 2 +-
+ drivers/mmc/host/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 6adce91..468c28a 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -768,7 +768,7 @@ config I2C_XLR
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 51957d4..1f3a0c1 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -588,7 +588,7 @@ config MMC_DW_PCI
  
- config I2C_RCAR
- 	tristate "Renesas R-Car I2C Controller"
--	depends on ARCH_SHMOBILE && I2C
-+	depends on ARM
+ config MMC_SH_MMCIF
+ 	tristate "SuperH Internal MMCIF support"
+-	depends on MMC_BLOCK && (SUPERH || ARCH_SHMOBILE)
++	depends on MMC_BLOCK && (SUPERH || ARM)
  	help
- 	  If you say yes to this option, support will be included for the
- 	  R-Car I2C controller.
+ 	  This selects the MMC Host Interface controller (MMCIF).
+ 
 -- 
 1.8.1.5
