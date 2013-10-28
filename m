@@ -1,46 +1,61 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 28 Oct 2013 16:14:10 +0800
-Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
-In-Reply-To: <CAOesGMjB6D3owftDUfmMbVNx8_EtY9-RXoGbS3Rmry4FQhSfZQ@mail.gmail.com>
-References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
- <CAOesGMjB6D3owftDUfmMbVNx8_EtY9-RXoGbS3Rmry4FQhSfZQ@mail.gmail.com>
-Message-ID: <20131028081408.GF2839@S2101-09.ap.freescale.net>
+Date: Mon, 28 Oct 2013 16:20:07 +0800
+Subject: [PATCH 1/1] ARM: dts: imx6q-arm2: enable USB OTG
+In-Reply-To: <1382940302-12931-1-git-send-email-peter.chen@freescale.com>
+References: <1382940302-12931-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131028082005.GG2839@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 10:17:19PM -0700, Olof Johansson wrote:
-> > @@ -52,6 +55,8 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
-> >
-> >         /* Assert SRS signal */
-> >         __raw_writew(wcr_enable, wdog_base);
-> > +       /* write twice to ensure the request will not get ignored */
-> > +       __raw_writew(wcr_enable, wdog_base);
-> >
-> >         /* wait for reset to assert... */
-> >         mdelay(500);
+On Mon, Oct 28, 2013 at 02:05:02PM +0800, Peter Chen wrote:
+> Enable USB OTG controller at imx6q-arm2 board
 > 
-> "will not get ignored" seems like an odd choice of words here. What's
-> the actual purpose of the double write? Does some versions of the
-> hardware ignore the first write, or is it that you need to make sure
-> that the write has reached the hardware block for some other reason?
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6q-arm2.dts |   17 +++++++++++++++++
+>  1 files changed, 17 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+> index edf1bd9..8f125b1 100644
+> --- a/arch/arm/boot/dts/imx6q-arm2.dts
+> +++ b/arch/arm/boot/dts/imx6q-arm2.dts
+> @@ -31,6 +31,15 @@
+>  			regulator-max-microvolt = <3300000>;
+>  			regulator-always-on;
+>  		};
+> +
+> +		reg_usb_otg_vbus: usb_otg_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio3 22 0>;
+> +			enable-active-high;
+> +		};
+>  	};
+>  
+>  	leds {
+> @@ -79,6 +88,14 @@
+>  	status = "okay";
+>  };
+>  
+> +&usbotg { /* USB OTG */
 
-Oh, you got it.  We're hiding an imx6q hardware defect here.  Most of
-the time, a single write will just work on imx6q, but there is a chance
-that the first write could be missed by WDOG SRC sampling logic.  I
-chose to add it unconditionally here to save a target check since
-a redundant write shouldn't be so harmful for other targets.
-
-> I came across this patch in your pull request -- I will merge the
-> branch anyway but I'd like to get the above answered and fixed up
-> later for clarification if needed.
-
-When the code was originally written in imx6q_restart(), there was no
-formal errata for this defect.  But now there is, see ERR004346 (WDOG:
-WDOG SRS bit requires to be written twice) in Chip Errata for i.MX6Q
-below.
-
-http://cache.freescale.com/files/32bit/doc/errata/IMX6DQCE.pdf?fpsp=1
-
-I will send a follow-up patch to add necessary clarification.
+The comment is not useful.  I just dropped it and applied the patch.
 
 Shawn
+
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg_1>;
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+>  &usdhc3 {
+>  	cd-gpios = <&gpio6 11 0>;
+>  	wp-gpios = <&gpio6 14 0>;
+> -- 
+> 1.7.1
+> 
+> 
