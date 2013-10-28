@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 27 Oct 2013 21:16:35 -0700
-Subject: [GIT PULL] Allwinner sunXi DT changes for 3.13
-In-Reply-To: <20131018172220.GA14740@lukather>
-References: <20131018172220.GA14740@lukather>
-Message-ID: <20131028041635.GD22890@quad.lixom.net>
+Date: Sun, 27 Oct 2013 21:17:06 -0700
+Subject: [GIT PULL] Allwinner sunXi fixes for 3.13
+In-Reply-To: <20131018172615.GA14943@lukather>
+References: <20131018172615.GA14943@lukather>
+Message-ID: <20131028041706.GE22890@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 07:22:20PM +0200, Maxime Ripard wrote:
+On Fri, Oct 18, 2013 at 07:26:15PM +0200, Maxime Ripard wrote:
 > Hi Kevin, Olof,
 > 
-> Please pull the following DT changes for the 3.13 merge window.
+> Please pull this minor fix for the 3.13 merge window.
 > 
 > Thanks,
 > Maxime
@@ -21,9 +21,9 @@ On Fri, Oct 18, 2013 at 07:22:20PM +0200, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/mripard/linux.git tags/sunxi-dt-for-3.13
+>   https://github.com/mripard/linux.git tags/sunxi-fixes-for-3.13
 
-Thanks, pulled into next/dt.
+Thanks, pulled into next/dt since there's only one patch so it fits there.
 
 
 -Olof
