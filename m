@@ -1,29 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 27 Oct 2013 21:17:06 -0700
-Subject: [GIT PULL] Allwinner sunXi fixes for 3.13
-In-Reply-To: <20131018172615.GA14943@lukather>
-References: <20131018172615.GA14943@lukather>
-Message-ID: <20131028041706.GE22890@quad.lixom.net>
+Date: Sun, 27 Oct 2013 21:21:07 -0700
+Subject: [GIT PULL] ux500 devicetree patches, take 3
+In-Reply-To: <CACRpkdYyazH9KevkA=qTho3okdKnKWcq_uMwRroa6=svacfJAQ@mail.gmail.com>
+References: <CACRpkdYyazH9KevkA=qTho3okdKnKWcq_uMwRroa6=svacfJAQ@mail.gmail.com>
+Message-ID: <20131028042107.GF22890@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 07:26:15PM +0200, Maxime Ripard wrote:
-> Hi Kevin, Olof,
+On Fri, Oct 18, 2013 at 09:23:45PM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> Please pull this minor fix for the 3.13 merge window.
+> this is yet another pull request for ux500 device tree stuff. It should
+> go on top of the second pull request, I tested to pull it on top of
+> ux500/dt2 in the ARM SoC tree and it worked just fine.
 > 
-> Thanks,
-> Maxime
+> These are fixes and additions found during testing of the switch to
+> full device tree on ux500. The clock fixes will go into the -rc:s if
+> you don't take this in as a whole.
 > 
-> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
+> There is one oneline patch to the clock driver that I have not had
+> an ACK from Mike on, but Lee checked it and I certainly don't
+> think Mike has anything against it. The last patch adds the SSP
+> and SPI devices that were strangely absent from the platform
+> after the conversion.
 > 
->   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/mripard/linux.git tags/sunxi-fixes-for-3.13
+> So: please pull this into ARM SoC as ux500/dt3 or something.
 
-Thanks, pulled into next/dt since there's only one patch so it fits there.
+Thanks, pulled into next/dt.
 
 
 -Olof
