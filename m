@@ -1,117 +1,185 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Mon, 28 Oct 2013 13:32:49 -0500
-Subject: [PATCH v3 00/10] Add support for the System Power Management
- Interface (SPMI)
-Message-ID: <cover.1382985169.git.joshc@codeaurora.org>
+Date: Mon, 28 Oct 2013 13:12:35 -0500
+Subject: [PATCH v3 07/10] regmap: add SPMI support
+In-Reply-To: <cover.1382985169.git.joshc@codeaurora.org>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+Message-ID: <cc2f82e353885734fe61bb8d8ec8c9f7b35e0d5a.1382985169.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The System Power Management Interface (SPMI) is a high-speed,
-low-latency, bi-directional, two-wire serial bus suitable for real-time
-control of voltage and frequency scaled multi-core application
-processors and its power management of auxiliary components. SPMI
-obsoletes a number of legacy, custom point-to-point interfaces and
-provides a low pin count, high-speed control bus for up to 4 Master and
-16 Slave devices.
+Add basic support for the System Power Management Interface (SPMI) bus.
+This is a simple implementation which only implements register accesses
+via the Extended Register Read/Write Long commands.
 
-SPMI is specified by the MIPI (Mobile Industry Process Interface)
-Alliance [1].
-
-This patchset is intended both to provide a core implementation of SPMI and
-also to provide a more-or-less complete example of it's use.
-  - Patch 1 provides a stubbed implementation of for_each_available_child_of_node()
-    to allow SPMI to build with !CONFIG_OF
-  - Patches 2-3 implement the SPMI core functionality.
-  - Patches 4-6 provide an implementation of an SPMI controller, the Qualcomm
-    "PMIC Arbiter", currently used on the 8x74 series SoCs.
-  - Patch 7 provides an implementation of regmap for SPMI
-  - Patches 8-9 is an implementation of a client driver for the PM8x41 PMICs paired
-    with the 800 series SoCs.
-  - Patch 10 reworks the existing pm8xxx-rtc driver to work with the PM8x41 PMIC.
-
-Changes from v2[2]:
-  - Dropped RFC.
-  - Add basic regmap support at Mark Brown's suggestion
-  - Drop debugfs interface.  Debugging SPMI accesses can happen via the regmap
-    debugfs interface if necessary.
-  - Add second address-cell in SPMI generic device tree binding, encoding the
-    address type (suggestion by Stephen Warren)
-  - Implement interrupt handling functionality within the PMIC Arbiter driver
-  - Provide basic MFD driver for the PMIC8x41 PMICs, demonstrating SPMI regmap
-    client use
-  - Adapt existing pm8xxx-rtc driver to work as a child of the PM8x41 mfd device
-
-Changes from v1[3]:
-  - Adopted patch (1/5) to #define for_each_available_node() shim
-    in the !CONFIG_OF case
-  - Moved device tree logic out of drivers/of and into spmi.c core (this
-    mirrors what SPI is doing, and what i2c will soon be doing)
-  - Move of_spmi_add_devices() call into spmi_device_add(), so drivers don't
-    have to call it explicitly
-  - Unconditionally build in debugfs code (rely on the underlying
-    CONFIG_DEBUG_FS switch to throw unused code away)
-  - Change pr_* print functions to their dev_* equivalents
-  - Fix copy_{to,from}_user error handling
-  - Renamed "board_lock" to "ctrl_idr_lock" to better describe it's purpose
-  - Rework device object lifetime management
-  - Rename PMIC arb binding document, add description of PMIC arb
-  - Add generic SPMI device tree bindings
-
-[1]: http://www.mipi.org/specifications/system-power-management-interface
-[2]: http://marc.info/?l=linux-arm-kernel&m=137721241427533&w=2
-[3]: http://thread.gmane.org/gmane.linux.ports.arm.msm/4886
-
-Josh Cartwright (7):
-  spmi: add generic SPMI controller binding documentation
-  spmi: pmic_arb: add support for interrupt handling
-  spmi: document the PMIC arbiter SPMI bindings
-  regmap: add SPMI support
-  mfd: pm8x41: add support for Qualcomm 8x41 PMICs
-  mfd: pm8x41: document device tree bindings
-  rtc: pm8xxx: add support for pm8941
-
-Kenneth Heitke (2):
-  spmi: Linux driver framework for SPMI
-  spmi: Add MSM PMIC Arbiter SPMI controller
-
-Sylwester Nawrocki (1):
-  of: Add empty for_each_available_child_of_node() macro definition
-
- Documentation/devicetree/bindings/mfd/pm8x41.txt   |  33 +
- .../bindings/spmi/qcom,spmi-pmic-arb.txt           |  42 ++
- Documentation/devicetree/bindings/spmi/spmi.txt    |  41 ++
- drivers/Kconfig                                    |   2 +
- drivers/Makefile                                   |   1 +
- drivers/base/regmap/Kconfig                        |   5 +-
- drivers/base/regmap/Makefile                       |   1 +
- drivers/base/regmap/regmap-spmi.c                  |  90 +++
- drivers/mfd/Kconfig                                |  10 +
- drivers/mfd/Makefile                               |   1 +
- drivers/mfd/pm8x41.c                               |  64 ++
- drivers/rtc/Kconfig                                |   1 -
- drivers/rtc/rtc-pm8xxx.c                           | 229 ++++---
- drivers/spmi/Kconfig                               |  24 +
- drivers/spmi/Makefile                              |   6 +
- drivers/spmi/spmi-pmic-arb.c                       | 758 +++++++++++++++++++++
- drivers/spmi/spmi.c                                | 491 +++++++++++++
- include/dt-bindings/spmi/spmi.h                    |  18 +
- include/linux/mod_devicetable.h                    |   8 +
- include/linux/of.h                                 |   3 +
- include/linux/regmap.h                             |   5 +
- include/linux/spmi.h                               | 342 ++++++++++
- 22 files changed, 2087 insertions(+), 88 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/pm8x41.txt
- create mode 100644 Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
- create mode 100644 Documentation/devicetree/bindings/spmi/spmi.txt
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+---
+ drivers/base/regmap/Kconfig       |  5 ++-
+ drivers/base/regmap/Makefile      |  1 +
+ drivers/base/regmap/regmap-spmi.c | 90 +++++++++++++++++++++++++++++++++++++++
+ include/linux/regmap.h            |  5 +++
+ 4 files changed, 100 insertions(+), 1 deletion(-)
  create mode 100644 drivers/base/regmap/regmap-spmi.c
- create mode 100644 drivers/mfd/pm8x41.c
- create mode 100644 drivers/spmi/Kconfig
- create mode 100644 drivers/spmi/Makefile
- create mode 100644 drivers/spmi/spmi-pmic-arb.c
- create mode 100644 drivers/spmi/spmi.c
- create mode 100644 include/dt-bindings/spmi/spmi.h
- create mode 100644 include/linux/spmi.h
 
+diff --git a/drivers/base/regmap/Kconfig b/drivers/base/regmap/Kconfig
+index f0d3054..4251570 100644
+--- a/drivers/base/regmap/Kconfig
++++ b/drivers/base/regmap/Kconfig
+@@ -3,7 +3,7 @@
+ # subsystems should select the appropriate symbols.
+ 
+ config REGMAP
+-	default y if (REGMAP_I2C || REGMAP_SPI || REGMAP_MMIO || REGMAP_IRQ)
++	default y if (REGMAP_I2C || REGMAP_SPI || REGMAP_SPMI || REGMAP_MMIO || REGMAP_IRQ)
+ 	select LZO_COMPRESS
+ 	select LZO_DECOMPRESS
+ 	select IRQ_DOMAIN if REGMAP_IRQ
+@@ -15,6 +15,9 @@ config REGMAP_I2C
+ config REGMAP_SPI
+ 	tristate
+ 
++config REGMAP_SPMI
++	tristate
++
+ config REGMAP_MMIO
+ 	tristate
+ 
+diff --git a/drivers/base/regmap/Makefile b/drivers/base/regmap/Makefile
+index cf12998..a7c670b 100644
+--- a/drivers/base/regmap/Makefile
++++ b/drivers/base/regmap/Makefile
+@@ -3,5 +3,6 @@ obj-$(CONFIG_REGMAP) += regcache-rbtree.o regcache-lzo.o regcache-flat.o
+ obj-$(CONFIG_DEBUG_FS) += regmap-debugfs.o
+ obj-$(CONFIG_REGMAP_I2C) += regmap-i2c.o
+ obj-$(CONFIG_REGMAP_SPI) += regmap-spi.o
++obj-$(CONFIG_REGMAP_SPMI) += regmap-spmi.o
+ obj-$(CONFIG_REGMAP_MMIO) += regmap-mmio.o
+ obj-$(CONFIG_REGMAP_IRQ) += regmap-irq.o
+diff --git a/drivers/base/regmap/regmap-spmi.c b/drivers/base/regmap/regmap-spmi.c
+new file mode 100644
+index 0000000..ac23910
+--- /dev/null
++++ b/drivers/base/regmap/regmap-spmi.c
+@@ -0,0 +1,90 @@
++/*
++ * Register map access API - SPMI support
++ *
++ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
++ *
++ * Based on regmap-i2c.c:
++ * Copyright 2011 Wolfson Microelectronics plc
++ * Author: Mark Brown <broonie@opensource.wolfsonmicro.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/regmap.h>
++#include <linux/spmi.h>
++#include <linux/module.h>
++#include <linux/init.h>
++
++static int regmap_spmi_read(void *context,
++			    const void *reg, size_t reg_size,
++			    void *val, size_t val_size)
++{
++	BUG_ON(reg_size != 2);
++	return spmi_ext_register_readl(context, *(u16 *)reg,
++				       val, val_size);
++}
++
++static int regmap_spmi_gather_write(void *context,
++				    const void *reg, size_t reg_size,
++				    const void *val, size_t val_size)
++{
++	BUG_ON(reg_size != 2);
++	return spmi_ext_register_writel(context, *(u16 *)reg, val, val_size);
++}
++
++static int regmap_spmi_write(void *context, const void *data,
++			     size_t count)
++{
++	BUG_ON(count < 2);
++	return regmap_spmi_gather_write(context, data, 2, data + 2, count - 2);
++}
++
++static struct regmap_bus regmap_spmi = {
++	.read				= regmap_spmi_read,
++	.write				= regmap_spmi_write,
++	.gather_write			= regmap_spmi_gather_write,
++	.reg_format_endian_default	= REGMAP_ENDIAN_NATIVE,
++	.val_format_endian_default	= REGMAP_ENDIAN_NATIVE,
++};
++
++/**
++ * regmap_init_spmi(): Initialize register map
++ *
++ * @sdev: Device that will be interacted with
++ * @config: Configuration for register map
++ *
++ * The return value will be an ERR_PTR() on error or a valid pointer to
++ * a struct regmap.
++ */
++struct regmap *regmap_init_spmi(struct spmi_device *sdev,
++				const struct regmap_config *config)
++{
++	return regmap_init(&sdev->dev, &regmap_spmi, sdev, config);
++}
++EXPORT_SYMBOL_GPL(regmap_init_spmi);
++
++/**
++ * devm_regmap_init_spmi(): Initialise managed register map
++ *
++ * @sdev: Device that will be interacted with
++ * @config: Configuration for register map
++ *
++ * The return value will be an ERR_PTR() on error or a valid pointer
++ * to a struct regmap.  The regmap will be automatically freed by the
++ * device management code.
++ */
++struct regmap *devm_regmap_init_spmi(struct spmi_device *sdev,
++				     const struct regmap_config *config)
++{
++	return devm_regmap_init(&sdev->dev, &regmap_spmi, sdev, config);
++}
++EXPORT_SYMBOL_GPL(devm_regmap_init_spmi);
++
++MODULE_LICENSE("GPL");
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index a10380b..3f5abc8 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -23,6 +23,7 @@ struct device;
+ struct i2c_client;
+ struct irq_domain;
+ struct spi_device;
++struct spmi_device;
+ struct regmap;
+ struct regmap_range_cfg;
+ struct regmap_field;
+@@ -318,6 +319,8 @@ struct regmap *regmap_init_i2c(struct i2c_client *i2c,
+ 			       const struct regmap_config *config);
+ struct regmap *regmap_init_spi(struct spi_device *dev,
+ 			       const struct regmap_config *config);
++struct regmap *regmap_init_spmi(struct spmi_device *dev,
++			       const struct regmap_config *config);
+ struct regmap *regmap_init_mmio_clk(struct device *dev, const char *clk_id,
+ 				    void __iomem *regs,
+ 				    const struct regmap_config *config);
+@@ -330,6 +333,8 @@ struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
+ 				    const struct regmap_config *config);
+ struct regmap *devm_regmap_init_spi(struct spi_device *dev,
+ 				    const struct regmap_config *config);
++struct regmap *devm_regmap_init_spmi(struct spmi_device *dev,
++				     const struct regmap_config *config);
+ struct regmap *devm_regmap_init_mmio_clk(struct device *dev, const char *clk_id,
+ 					 void __iomem *regs,
+ 					 const struct regmap_config *config);
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
