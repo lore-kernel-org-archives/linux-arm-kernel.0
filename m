@@ -1,113 +1,143 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 28 Oct 2013 16:58:41 +0800
-Subject: [alsa-devel] [PATCH v2 2/6] ASoC: sirf: add I2S CPU DAI driver
-In-Reply-To: <526E24EE.70402@metafoo.de>
-References: <1382913424-28626-1-git-send-email-Baohua.Song@csr.com>
- <526E08D1.4040009@metafoo.de>
- <CAGsJ_4xHHD9XqLMdepUgRL7_X5Xg3_AQ2K83pbCxiFhV8cX4zg@mail.gmail.com>
- <526E24EE.70402@metafoo.de>
-Message-ID: <CAGsJ_4wzFeDB=9GX4ZcV=cZ5Oo4GDPtVu_bQ2os8OY-UwqDxxw@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 28 Oct 2013 10:00:39 +0100
+Subject: [PATCH v6 4/8] ARM: dts: imx27 pinctrl
+In-Reply-To: <1382950843-26066-1-git-send-email-mpa@pengutronix.de>
+References: <1382950843-26066-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1382950843-26066-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/10/28 Lars-Peter Clausen <lars@metafoo.de>:
-> On 10/28/2013 09:32 AM, Barry Song wrote:
->> 2013/10/28 Lars-Peter Clausen <lars@metafoo.de>:
->>> On 10/27/2013 11:37 PM, Barry Song wrote:
->>>> +struct snd_soc_dai_ops sirfsoc_i2s_dai_ops = {
->>>
->>> static const
->>>
->>> Building your driver with sparse (`make C=2 ...`) will tell you these things.
->>>
->>>> +     .startup        = sirf_i2s_startup,
->>>> +     .shutdown       = sirf_i2s_shutdown,
->>>> +     .trigger        = sirf_i2s_trigger,
->>>> +     .hw_params      = sirf_i2s_hw_params,
->>>> +     .set_fmt        = sirf_i2s_set_dai_fmt,
->>>> +     .set_clkdiv     = sirf_i2s_set_clkdiv,
->>>> +};
->>>> +
->>> [...]
->>>> +
->>>> +static int sirf_i2s_probe(struct platform_device *pdev)
->>>> +{
->>>> +     struct sirf_i2s *si2s;
->>>> +     u32 rx_dma_ch, tx_dma_ch;
->>>> +     int ret;
->>>> +     struct resource mem_res;
->>>> +
->>>> +     si2s = devm_kzalloc(&pdev->dev, sizeof(struct sirf_i2s),
->>>> +                     GFP_KERNEL);
->>>> +     if (!si2s)
->>>> +             return -ENOMEM;
->>>> +
->>>> +     si2s->sirf_pcm_pdev = platform_device_register_simple("sirf-pcm-audio",
->>>> +                     0, NULL, 0);
->>>> +     if (IS_ERR(si2s->sirf_pcm_pdev))
->>>> +             return PTR_ERR(si2s->sirf_pcm_pdev);
->>>> +
->>>> +     platform_set_drvdata(pdev, si2s);
->>>> +
->>>> +     spin_lock_init(&si2s->lock);
->>>> +
->>>> +     ret = of_property_read_u32(pdev->dev.of_node,
->>>> +                     "sirf,i2s-dma-rx-channel", &rx_dma_ch);
->>>> +     if (ret < 0) {
->>>> +             dev_err(&pdev->dev, "Unable to USP0 rx dma channel\n");
->>>> +             return ret;
->>>> +     }
->>>> +     ret = of_property_read_u32(pdev->dev.of_node,
->>>> +                     "sirf,i2s-dma-tx-channel", &tx_dma_ch);
->>>> +     if (ret < 0) {
->>>> +             dev_err(&pdev->dev, "Unable to USP0 tx dma channel\n");
->>>> +             return ret;
->>>> +     }
->>>> +
->>>> +     dma_data[0].filter_data = (void *)tx_dma_ch;
->>>> +     dma_data[1].filter_data = (void *)rx_dma_ch;
->>>
->>> This should be using the standard DMA OF bindings. This combind with the
->>> recent changes to the generic dmaengine PCM driver, which added support for
->>> querying certain parameters (like max period length) from the dmaengine
->>> driver, will allow you to completely remove your custom PCM code. You'd
->>> basically just need to call "snd_dmaengine_pcm_register(&pdev->dev, NULL)"
->>> here in the I2S driver.
->>>
->>> This will require some changes to your dmaengine driver though. You need to
->>> implement the of_xlate callback for the generic DMA bindings and the
->>> device_slave_caps API for being able to query the capabilities from the driver.
->>
->> i am really happy to have that as for clock, gpio, pinctrl, all of
->> them we have the binding.
->> here the problem is we can't implement this in this driver as there
->> are still many drivers depending on the sirf-dma changes.
->>
->> so our point is keeping the things as is here. and we have another
->> patchset of dt binding for sirf-dma and all drivers depending sirf-dma
->> driver.
->
-> I don't think this is a good idea. Adding of_xlate support to the DMA driver
-> is a 10 line patch at most. And there is no compile time dependency between
-> the DMA driver changes and using the generic DMA bindings in this driver, so
-> this driver does not have to wait for the changes to the DMA driver to be
-> merged first.
+Pinctrl driver node and pin group definitions for other driver nodes.
 
-if we don't wait dma driver and other drivers using sirf-dma to be
-merged before merging sound, it is ok to me to have of_xlate support
-at first.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/imx27.dtsi | 102 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 102 insertions(+)
 
->
-> I'm fine with having the device_slave_caps stuff added in a later patch, but
-> adding custom DMA bindings at this point is in my opinion a no-go.
-> Especially if you consider that DT bindings are considered ABI by some people.
->
-> Btw. the DT bindings documentation for this driver seems to be missing.
-
-fine. take it into v3 then.
-
->
-> - Lars
->
-
--barry
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index b7a1c6d..641a63d 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include "skeleton.dtsi"
++#include "imx27-pinfunc.h"
+ 
+ / {
+ 	aliases {
+@@ -235,6 +236,12 @@
+ 				status = "disabled";
+ 			};
+ 
++			iomuxc: iomuxc at 10015000 {
++				compatible = "fsl,imx27-iomuxc";
++				reg = <0x10015000 0x600>;
++
++			};
++
+ 			gpio1: gpio at 10015000 {
+ 				compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+ 				reg = <0x10015000 0x100>;
+@@ -467,3 +474,98 @@
+ 		};
+ 	};
+ };
++
++&iomuxc {
++	fec {
++		pinctrl_fec1_1: fec1-1 {
++			fsl,pins = <
++				MX27_PAD_SD3_CMD__FEC_TXD0 0x0
++				MX27_PAD_SD3_CLK__FEC_TXD1 0x0
++				MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
++				MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
++				MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
++				MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
++				MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
++				MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
++				MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
++				MX27_PAD_ATA_DATA7__FEC_MDC 0x0
++				MX27_PAD_ATA_DATA8__FEC_CRS 0x0
++				MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
++				MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
++				MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
++				MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
++				MX27_PAD_ATA_DATA13__FEC_COL 0x0
++				MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
++				MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
++			>;
++		};
++	};
++
++	i2c {
++		pinctrl_i2c1_1: i2c1-1 {
++			fsl,pins = <
++				MX27_PAD_I2C_DATA__I2C_DATA 0x0
++				MX27_PAD_I2C_CLK__I2C_CLK 0x0
++			>;
++		};
++
++		pinctrl_i2c2_1: i2c2-1 {
++			fsl,pins = <
++				MX27_PAD_I2C2_SDA__I2C2_SDA 0x0
++				MX27_PAD_I2C2_SCL__I2C2_SCL 0x0
++			>;
++		};
++	};
++
++	owire {
++		pinctrl_owire1_1: owire1-1 {
++			fsl,pins = <
++				MX27_PAD_RTCK__OWIRE 0x0
++			>;
++		};
++	};
++
++	uart {
++		pinctrl_uart1_1: uart1-1 {
++			fsl,pins = <
++				MX27_PAD_UART1_TXD__UART1_TXD 0x0
++				MX27_PAD_UART1_RXD__UART1_RXD 0x0
++			>;
++		};
++
++		pinctrl_uart1_rtscts_1: uart1-rtscts-1 {
++			fsl,pins = <
++				MX27_PAD_UART1_CTS__UART1_CTS 0x0
++				MX27_PAD_UART1_RTS__UART1_RTS 0x0
++			>;
++		};
++
++		pinctrl_uart2_1: uart2-1 {
++			fsl,pins = <
++				MX27_PAD_UART2_TXD__UART2_TXD 0x0
++				MX27_PAD_UART2_RXD__UART2_RXD 0x0
++			>;
++		};
++
++		pinctrl_uart2_rtscts_1: uart2-rtscts-1 {
++			fsl,pins = <
++				MX27_PAD_UART2_CTS__UART2_CTS 0x0
++				MX27_PAD_UART2_RTS__UART2_RTS 0x0
++			>;
++		};
++
++		pinctrl_uart3_1: uart3-1 {
++			fsl,pins = <
++				MX27_PAD_UART3_TXD__UART3_TXD 0x0
++				MX27_PAD_UART3_RXD__UART3_RXD 0x0
++			>;
++		};
++
++		pinctrl_uart3_rtscts_1: uart3-rtscts-1 {
++			fsl,pins = <
++				MX27_PAD_UART3_CTS__UART3_CTS 0x0
++				MX27_PAD_UART3_RTS__UART3_RTS 0x0
++			>;
++		};
++	};
++};
+-- 
+1.8.4.rc3
