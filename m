@@ -1,83 +1,48 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Oct 2013 23:49:17 +0100
-Subject: [PATCH 00/12] Prepare various SH/R Mobile/Car drivers for CCF
- migration
-Message-ID: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Mon, 28 Oct 2013 23:49:19 +0100
+Subject: [PATCH 02/12] clocksource: sh_mtu2: Add clk_prepare/unprepare support
+In-Reply-To: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383000569-8916-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-This patch series, based on v3.12-rc7, prepares various Renesas SH-Mobile,
-R-Mobile and R-Car drivers for migration to CCF by adding clock prepare and
-unprepare support.
-
-The patches are pretty straightforward. Most of the drivers called
-clk_enable and clk_disable in sleepable context, I've thus just converted them
-to clk_prepare_enable and clk_disable_unprepare.
-
-The clocksource drivers were slightly more complex to handle as clk_enable and
-clk_disable were called in non-sleepable context. As the clocksource framework
-architecture doesn't provide any sleepable callback in which clocks could be
-prepared and unprepared, I've added clk_prepare and clk_unprepare calls in the
-probe and suspend/resume handlers (clocksources can't be removed so the remove
-handler doesn't need a clk_unprepare call).
-
-I'd like to get all these patches merged in v3.14. As they will need to go
-through their respective subsystems' trees, I would appreciate if all
-maintainers involved could notify me when they merge patches from this series
-in their tree to help me tracking the merge status. I don't plan to send pull
-requests individually for these patches, and I will repost patches
-individually if changes are requested during review.
+Prepare the clock at probe time, as there is no other appropriate place
+in the driver where we're allowed to sleep.
 
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: linux-kernel at vger.kernel.org
-Cc: Tejun Heo <tj@kernel.org>
-Cc: linux-ide at vger.kernel.org
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: linux-i2c at vger.kernel.org
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: linux-usb at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/clocksource/sh_mtu2.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-Laurent Pinchart (12):
-  clocksource: sh_cmt: Add clk_prepare/unprepare support
-  clocksource: sh_mtu2: Add clk_prepare/unprepare support
-  clocksource: sh_tmu: Add clk_prepare/unprepare support
-  sata_rcar: Convert to clk_prepare/unprepare
-  drm: shmob_drm: Convert to clk_prepare/unprepare
-  i2c: sh_mobile: Convert to clk_prepare/unprepare
-  mmc: sh_mmcif: Convert to clk_prepare/unprepare
-  mmc: sh_mobile_sdhi: Convert to clk_prepare/unprepare
-  usb: gadget: r8a66597-udc: Convert to clk_prepare/unprepare
-  usb: r8a66597-hcd: Convert to clk_prepare/unprepare
-  fbdev: shmobile-hdmi: Convert to clk_prepare/unprepare
-  fbdev: shmobile-lcdcfb: Convert to clk_prepare/unprepare
-
- drivers/ata/sata_rcar.c                   | 10 +++++-----
- drivers/clocksource/sh_cmt.c              | 20 ++++++++++++++++----
- drivers/clocksource/sh_mtu2.c             | 16 ++++++++++++++--
- drivers/clocksource/sh_tmu.c              | 20 +++++++++++++++++---
- drivers/gpu/drm/shmobile/shmob_drm_crtc.c |  4 ++--
- drivers/i2c/busses/i2c-sh_mobile.c        |  8 ++++----
- drivers/mmc/host/sh_mmcif.c               | 12 ++++++------
- drivers/mmc/host/sh_mobile_sdhi.c         |  4 ++--
- drivers/usb/gadget/r8a66597-udc.c         |  6 +++---
- drivers/usb/host/r8a66597-hcd.c           |  4 ++--
- drivers/video/sh_mobile_hdmi.c            |  6 +++---
- drivers/video/sh_mobile_lcdcfb.c          |  4 ++--
- 12 files changed, 76 insertions(+), 38 deletions(-)
-
+diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+index 4aac9ee..3cf1283 100644
+--- a/drivers/clocksource/sh_mtu2.c
++++ b/drivers/clocksource/sh_mtu2.c
+@@ -313,8 +313,20 @@ static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
+ 		goto err1;
+ 	}
+ 
+-	return sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
+-				cfg->clockevent_rating);
++	ret = clk_prepare(p->clk);
++	if (ret < 0)
++		goto err2;
++
++	ret = sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
++			       cfg->clockevent_rating);
++	if (ret < 0)
++		goto err3;
++
++	return 0;
++ err3:
++	clk_unprepare(p->clk);
++ err2:
++	clk_put(p->clk);
+  err1:
+ 	iounmap(p->mapbase);
+  err0:
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.1.5
