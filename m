@@ -1,108 +1,82 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Oct 2013 13:38:09 -0700
-Subject: [PATCH v2 1/4] rename ARCH_BCM to ARCH_BCM_MOBILE (mach-bcm)
-In-Reply-To: <1379956836-5866-2-git-send-email-bcm@fixthebug.org>
-References: <1379956836-5866-1-git-send-email-bcm@fixthebug.org>
- <1379956836-5866-2-git-send-email-bcm@fixthebug.org>
-Message-ID: <CAOesGMi59voTKvu1zA5zpv4xDiF_2OQFMOjtx2wg4S7W=MhY3g@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 28 Oct 2013 13:32:00 -0700
+Subject: [RFC v3 PATCH 3/7] ARM64: defer reloading a task's FPSIMD state
+ to userland resume
+In-Reply-To: <20131028181238.GB18563@mbp>
+References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1381666503-23726-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20131028181238.GB18563@mbp>
+Message-ID: <CAKv+Gu9J1WuA23bhOjYnTfQp+poBMwmFPQuuYKPSsO+spSPOCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Replying here but since this is a part of your pull request. There's
-still time to get this in since it's a fairly small self-contained
-change, so let's try to get it right from the get-go. See comments
-below.
-
-On Mon, Sep 23, 2013 at 10:20 AM, Christian Daudt <bcm@fixthebug.org> wrote:
-> Currently ARCH_BCM has been used for Broadcom
-> Mobile V7 based SoCs. In order to allow other Broadcom
-> SoCs to also use mach-bcm directory and files, this patch
-> renames the original ARCH_BCM to ARCH_BCM_MOBILE, and
-> uses ARCH_BCM to define any Broadcom chip residing
-> in mach-bcm directory.
+On 28 October 2013 11:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Sun, Oct 13, 2013 at 01:14:59PM +0100, Ard Biesheuvel wrote:
+>> --- a/arch/arm64/kernel/fpsimd.c
+>> +++ b/arch/arm64/kernel/fpsimd.c
+>> @@ -72,7 +72,7 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+>>  void fpsimd_thread_switch(struct task_struct *next)
+>>  {
+>>       /* check if not kernel threads */
+>> -     if (current->mm)
+>> +     if (current->mm && !test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
+>>               fpsimd_save_state(&current->thread.fpsimd_state);
 >
-> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
-> Acked-by: Olof Johansson <olof@lixom.net>
+> Why does it need test_and_set_thread_flag() here? Some comments would be
+> useful as it looks strange to check a reload flag to decide whether to
+> save a state. Or change the name to something like 'dirty'.
 >
-> Changes from v1:
->  - fix alpha ordering in dts/Makefile
->  - break into 4 patches for separate subsys
+
+Actually, it's test and clear. If the userland register file has
+already been preserved for the purpose of performing kernel mode NEON,
+it should not be saved again when the task gets scheduled out. The
+clearing could also be deferred to the time when the task gets
+scheduled in again. Or perhaps, it would be even better to always
+defer loading the userland state for the next task when that task in
+fact enters userland.
+
+>>       if (next->mm)
+>>               fpsimd_load_state(&next->thread.fpsimd_state);
 >
-> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-> index 6e49310..efb0132 100644
-> --- a/arch/arm/configs/bcm_defconfig
-> +++ b/arch/arm/configs/bcm_defconfig
-> @@ -27,6 +27,7 @@ CONFIG_MODULE_UNLOAD=y
->  CONFIG_PARTITION_ADVANCED=y
->  CONFIG_EFI_PARTITION=y
->  CONFIG_ARCH_BCM=y
-> +CONFIG_ARCH_BCM_MOBILE=y
->  CONFIG_ARM_THUMBEE=y
->  CONFIG_ARM_ERRATA_743622=y
->  CONFIG_PREEMPT=y
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 6e572c6..89a5064 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -6,6 +6,7 @@ CONFIG_ARCH_MVEBU=y
->  CONFIG_MACH_ARMADA_370=y
->  CONFIG_MACH_ARMADA_XP=y
->  CONFIG_ARCH_BCM=y
-> +CONFIG_ARCH_BCM_MOBILE=y
->  CONFIG_GPIO_PCA953X=y
->  CONFIG_ARCH_HIGHBANK=y
->  CONFIG_ARCH_KEYSTONE=y
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 69d67f7..af86cda 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -1,5 +1,17 @@
->  config ARCH_BCM
-> -       bool "Broadcom SoC" if ARCH_MULTI_V7
-> +       bool "Broadcom SoC Support"
-> +       select ARCH_MULTIPLATFORM
+> This function could be optimised a bit more to avoid saving/restoring if
+> the switch only happened between a user thread and a kernel one (and
+> back again) since the FP state may not have been dirtied. But what I had
+> in mind was per-CPU fpstate (possibly pointer or some flag) rather than
+> per-thread.
+>
 
-This should be the other way around -- all other platforms seem to
-depend on ARCH_MULTIPLATFORM instead of selecting it.
+Well, then we are entering the realm of lazy restore, imo. There were
+some patches proposed for that already, I think? But I do agree that
+at his point, there is no need to restore the userland register
+contents yet, it can be deferred to the point when the task reenters
+userland (as mentioned above).
 
-> +       help
-> +         This enables support for Broadcom ARM based SoC
-> +          chips
-> +
-> +if ARCH_BCM
-> +
-> +menu "Broadcom SoC Selection"
-> +
-> +config ARCH_BCM_MOBILE
-> +       bool "Broadcom Mobile SoC" if ARCH_MULTI_V7
-> +       default y
+>> --- a/arch/arm64/kernel/signal.c
+>> +++ b/arch/arm64/kernel/signal.c
+>> @@ -416,4 +416,6 @@ asmlinkage void do_noti fy_resume(struct pt_regs *regs,
+>>               clear_thread_flag(TIF_NOTIFY_RESUME);
+>>               tracehook_notify_resume(regs);
+>>       }
+>> +     if (test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
+>> +             fpsimd_load_state(&current->thread.fpsimd_state);
+>
+> I think this code can be preempted, it is run with IRQs enabled. And
+> there is a small window where we cleared the flag but haven't loaded the
+> state.
+>
 
-This shouldn't be default y, since it makes it less obvious in configs
-such as multi_v7_defconfig that the platform is enabled.
+If we are preempted at this point, the fpstate will be loaded in the
+normal way the next time this task runs, so I think this is harmless.
+Although I guess we may be restoring the fp state twice in that case?
 
-Also, since you have default y here, the addition of
-CONFIG_ARCH_BCM_MOBILE=y in the defconfigs doesn't actually look
-accurate, they would fall out. As a matter of fact, the patch after
-this in your branch you requested us to merge removes them again. :)
+So in summary, what I need to do is:
+- rework to use a per_cpu flag rather than a TIF;
+- preserve the userland state (if it has one) when a task gets scheduled out;
+- restore the userland state when a task enters userland;
 
->         depends on MMU
->         select ARCH_REQUIRE_GPIOLIB
->         select ARM_ERRATA_754322
-> @@ -14,7 +26,11 @@ config ARCH_BCM
->         select TICK_ONESHOT
->         select CACHE_L2X0
->         help
-> -         This enables support for system based on Broadcom SoCs.
-> +         This enables support for systems based on Broadcom mobile SoCs.
->           It currently supports the 'BCM281XX' family, which includes
->           BCM11130, BCM11140, BCM11351, BCM28145 and
->           BCM28155 variants.
-> +
-> +endmenu
-> +
-> +endif
+I will propose an updated patch after I wrap up the work on the
+in_interrupt() kernel mode NEON, as these topics are really orthogonal
+and there is no reason to keep them combined in a single series.
 
-
--Olof
+-- 
+Ard.
