@@ -1,119 +1,22 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 28 Oct 2013 13:59:12 -0700
-Subject: [PATCH v2 1/2] clk/zynq/clkc: Add 'fclk-enable' feature
-In-Reply-To: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <b9033240-ec3e-4168-ab16-5f00844d6ad2@VA3EHSMHS028.ehs.local>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 28 Oct 2013 14:03:46 -0700
+Subject: [PATCH v3] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <1382992009-19407-1-git-send-email-festevam@gmail.com>
+References: <1382992009-19407-1-git-send-email-festevam@gmail.com>
+Message-ID: <20131028210346.GA11985@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping?
+On Mon, Oct 28, 2013 at 06:26:49PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> This is based on the initial work done by Sascha Hauer and Tony Prisk.
 
-On Thu, Oct 10, 2013 at 10:10:17AM -0700, Soren Brinkmann wrote:
-> In some use cases Zynq's FPGA clocks are used as static clock
-> generators for IP in the FPGA part of the SOC for which no Linux driver
-> exists and would control those clocks. To avoid automatic
-> gating of these clocks in such cases a new property - fclk-enable - is
-> added to the clock controller's DT description to accomodate such use
-> cases. It's value is a bitmask, where a set bit results in enabling
-> the corresponding FCLK through the clkc.
-> 
-> FPGA clocks are handled following the rules below:
-> 
-> If an FCLK is not enabled by bootloaders, that FCLK will be disabled in
-> Linux. Drivers can enable and control it through the CCF as usual.
-> 
-> If an FCLK is enabled by bootloaders AND the corresponding bit in the
-> 'fclk-enable' DT property is set, that FCLK will be enabled by the clkc,
-> resulting in an off by one reference count for that clock. Ensuring it
-> will always be running.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> v2:
->  - change default value for fclk-enable to '0'
-> ---
->  Documentation/devicetree/bindings/clock/zynq-7000.txt |  4 ++++
->  drivers/clk/zynq/clkc.c                               | 18 +++++++++++++++---
->  2 files changed, 19 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/zynq-7000.txt b/Documentation/devicetree/bindings/clock/zynq-7000.txt
-> index d99af878f5d7..11fdd146ec83 100644
-> --- a/Documentation/devicetree/bindings/clock/zynq-7000.txt
-> +++ b/Documentation/devicetree/bindings/clock/zynq-7000.txt
-> @@ -22,6 +22,10 @@ Required properties:
->  Optional properties:
->   - clocks : as described in the clock bindings
->   - clock-names : as described in the clock bindings
-> + - fclk-enable : Bit mask to enable FCLKs in cases no proper CCF compatible
-> +		 driver is available. Bit [0..3] correspond to FCLK0..FCLK3. The
-> +		 corresponding FCLK will only be enabled if it is actually
-> +		 running at boot time. (default = 0xf)
->  
->  Clock inputs:
->  The following strings are optional parameters to the 'clock-names' property in
-> diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-> index 10772aa72e4e..af3bd0aec538 100644
-> --- a/drivers/clk/zynq/clkc.c
-> +++ b/drivers/clk/zynq/clkc.c
-> @@ -102,9 +102,10 @@ static const char *swdt_ext_clk_input_names[] __initdata = {"swdt_ext_clk"};
->  
->  static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
->  		const char *clk_name, void __iomem *fclk_ctrl_reg,
-> -		const char **parents)
-> +		const char **parents, int enable)
->  {
->  	struct clk *clk;
-> +	u32 enable_reg;
->  	char *mux_name;
->  	char *div0_name;
->  	char *div1_name;
-> @@ -147,6 +148,12 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
->  	clks[fclk] = clk_register_gate(NULL, clk_name,
->  			div1_name, CLK_SET_RATE_PARENT, fclk_gate_reg,
->  			0, CLK_GATE_SET_TO_DISABLE, fclk_gate_lock);
-> +	enable_reg = readl(fclk_gate_reg) & 1;
-> +	if (enable & !enable_reg) {
-> +		if (clk_prepare_enable(clks[fclk]))
-> +			pr_warn("%s: FCLK%u enable failed\n", __func__,
-> +					fclk - fclk0);
-> +	}
->  	kfree(mux_name);
->  	kfree(div0_name);
->  	kfree(div1_name);
-> @@ -213,6 +220,7 @@ static void __init zynq_clk_setup(struct device_node *np)
->  	int ret;
->  	struct clk *clk;
->  	char *clk_name;
-> +	unsigned int fclk_enable = 0;
->  	const char *clk_output_name[clk_max];
->  	const char *cpu_parents[4];
->  	const char *periph_parents[4];
-> @@ -238,6 +246,8 @@ static void __init zynq_clk_setup(struct device_node *np)
->  	periph_parents[2] = clk_output_name[armpll];
->  	periph_parents[3] = clk_output_name[ddrpll];
->  
-> +	of_property_read_u32(np, "fclk-enable", &fclk_enable);
-> +
->  	/* ps_clk */
->  	ret = of_property_read_u32(np, "ps-clk-frequency", &tmp);
->  	if (ret) {
-> @@ -340,10 +350,12 @@ static void __init zynq_clk_setup(struct device_node *np)
->  	clk_prepare_enable(clks[dci]);
->  
->  	/* Peripheral clocks */
-> -	for (i = fclk0; i <= fclk3; i++)
-> +	for (i = fclk0; i <= fclk3; i++) {
-> +		int enable = !!(fclk_enable & BIT(i - fclk0));
->  		zynq_clk_register_fclk(i, clk_output_name[i],
->  				SLCR_FPGA0_CLK_CTRL + 0x10 * (i - fclk0),
-> -				periph_parents);
-> +				periph_parents, enable);
-> +	}
->  
->  	zynq_clk_register_periph_clk(lqspi, 0, clk_output_name[lqspi], NULL,
->  			SLCR_LQSPI_CLK_CTRL, periph_parents, 0);
-> -- 
-> 1.8.4
-> 
-> 
+What is "this"?
+
+And why is new support being added to this driver instead of working to
+get it out of staging?
+
+I thought we went through this already...
+
+greg k-h
