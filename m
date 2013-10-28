@@ -1,72 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 28 Oct 2013 12:48:51 +0000
-Subject: ARM/kirkwood: v3.12-rc6: kernel BUG at mm/util.c:390!
-In-Reply-To: <20131027141817.GA13436@schnuecks.de>
-References: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
- <20131026143617.GA14034@mudshark.cambridge.arm.com>
- <20131027195115.208f40f3@tom-ThinkPad-T410>
- <20131027125036.GJ17447@blackmetal.musicnaut.iki.fi>
- <CACVXFVP2B3=82m_+DfA_oAEW86c=oxQ52G+yj5ncTU1DzP26Bw@mail.gmail.com>
- <20131027135344.GD16735@n2100.arm.linux.org.uk>
- <20131027141817.GA13436@schnuecks.de>
-Message-ID: <20131028124851.GD5354@mbp>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Mon, 28 Oct 2013 14:30:04 +0100
+Subject: [PATCH RFC] ARM: dts: imx6qdl: make pinctrl nodes board specific
+In-Reply-To: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
+References: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <526E66DC.3090003@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 02:18:17PM +0000, Simon Baatz wrote:
-> On Sun, Oct 27, 2013 at 01:53:44PM +0000, Russell King - ARM Linux wrote:
-> > On Sun, Oct 27, 2013 at 09:16:53PM +0800, Ming Lei wrote:
-> > > On Sun, Oct 27, 2013 at 8:50 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> > > >
-> > So...
-> > 
-> > flush_kernel_dcache_page() is expected to take a struct page pointer.
-> > This struct page pointer is part of the kernel's array of struct pages
-> > which identifies every single physical page under the control of the
-> > kernel.
-> > 
-> > Arguably, it should not crash if passed a page which has been allocated
-> > to the slab cache; as this is not a page cache page,
-> > flush_kernel_dcache_page() should merely ignore the call to it and
-> > simply return on these.  So this makes total sense:
-> 
-> In this respect, flush_kernel_dcache_page() is following
-> flush_dcache_page(). For example in crypto/scatterwalk.c:
-> 
-> static void scatterwalk_pagedone(struct scatter_walk *walk, int out,
->                                  unsigned int more)
-> {
->         if (out) {
->                 struct page *page;
-> 
->                 page = sg_page(walk->sg) + ((walk->offset - 1) >>
-> PAGE_SHIFT);
->                 if (!PageSlab(page))
->                         flush_dcache_page(page);
->         }
-> ... 
-> 
-> 
-> or in drivers/ata/libata-sff.c:
-> 
-> ...
->         if (!do_write && !PageSlab(page))
->                 flush_dcache_page(page);
-> ...
-> 
-> 
-> (Probably, both cases should have used
-> flush_kernel_dcache_page() in the first place). If we say that this
-> check belongs in flush_kernel_dcache_page() we should also put it
-> into flush_dcache_page(), no?
+Hi Shawn,
 
-According to cachetlb.txt, flush_dcache_page() is only called on page
-cache pages, so this excludes the PageSlab() check.
+On 25.10.2013 05:42, Shawn Guo wrote:
+> Currently, all pinctrl setting nodes are defined in <soc>.dtsi, so that
+> boards that share the same pinctrl setting do not have to define it time
+> and time again in <board>.dts.  However, along with the devices and use
+> cases being added continuously, the pinctrl setting nodes under iomuxc
+> becomes more than expected.  This bloats device tree blob for particular
+> board unnecessarily since only a small subset of those pinctrl setting
+> nodes will be used by the board.  It impacts not only the DTB file size
+> but also the run-time device tree lookup efficiency.
+>
+> The patch proposes a solution to avoid this device tree bloating problem
+> while still keeping boards share the common pinctrl setting data by
+> using DTC macro support.  It creates imx6qdl-pingrp.h and move all those
+> pinctrl setting data into there as macro definitions.  The <board>.dts
+> will instead define the pinctrl setting nodes that are necessary for the
+> board by referring to the macros in imx6qdl-pingrp.h, so that only the
+> pinctrl setting data that will be used by the board will get compiled
+> into the DTB for the board.
+>
+> With the changes, the pinctrl setting nodes becomes local to particular
+> board, and it makes no sense to continue numbering the setting for
+> given peripheral.  Thus, all the pinctrl phandler name gets updated to
+> have only peripheral name in there.
+>
+> Using imx6q-sabresd.dtb today as example, the change shrinks the file
+> from 37KiB to 26KiB.
 
-For flush_kernel_dcache_page() it says "when the kernel modifies and
-user page" and my reading is that this applies to either page cache
-or anonymous pages but not slab pages, so I would add such check to the
-caller.
+We have a similar problem, some boards need no pin mux at all (it's 
+already done by the boot loader), some boards need some pin mux. Doing 
+it the way it's done at the moment, we have ~10k dead pin mux stuff in 
+the dtb for the boards without any pin mux. As you describe above.
 
--- 
-Catalin
+While thinking about several options to solve this, we found
+
+http://permalink.gmane.org/gmane.linux.drivers.devicetree/19694
+
+Adding then something like
+
+&iomuxc {
+        status = "disabled";
+};
+
+to the dts which don't want any pin mux and then using the 
+--strip-disabled option dramatically reduces the resulting dtb size.
+
+There are several pros and cons to consider, though:
+
+Pros:
+
+* You remove additional unused parts, too. Not only the pin mux. I.e. 
+the resulting dtb should be even smaller as with only removing the pin mux.
+
+Cons:
+
+* Non mainline dtc patch
+* Not boot tested, yet. I have tried this only regarding the size of the 
+resulting dtb. I haven't tested if the resulting dtb still boots, i.e. 
+if everything essential isn't removed.
+
+Best regards
+
+Dirk
