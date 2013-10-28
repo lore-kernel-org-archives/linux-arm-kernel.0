@@ -1,40 +1,133 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Oct 2013 13:53:28 -0600
-Subject: [PATCH] ARM: remove name from machine_desc for DT platforms
-In-Reply-To: <CAL_JsqLF4WbmuW5PQUKV0nb2GS=iiXnJzO=VmP1g=AT2d7o-WQ@mail.gmail.com>
-References: <1381352107-32464-1-git-send-email-robherring2@gmail.com>
- <CAL_JsqLF4WbmuW5PQUKV0nb2GS=iiXnJzO=VmP1g=AT2d7o-WQ@mail.gmail.com>
-Message-ID: <526EC0B8.2080307@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 28 Oct 2013 12:54:01 -0700
+Subject: [PATCH v6 0/5] clk: clock deregistration support
+In-Reply-To: <525D9FC1.2040204@gmail.com>
+References: <1377874402-2944-1-git-send-email-s.nawrocki@samsung.com>
+ <52420664.2040604@gmail.com> <3160771.O1gFkR91vK@avalon>
+ <525D9FC1.2040204@gmail.com>
+Message-ID: <20131028195401.11662.11969@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2013 09:34 AM, Rob Herring wrote:
-> On Wed, Oct 9, 2013 at 3:55 PM, Rob Herring <robherring2@gmail.com> wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> As part of the effort to ultimately remove struct machine_desc, the
->> machine name is not really needed. It is only used for /proc/cpuinfo
->> "Hardware" field. Get this information from the DT instead and remove
->> the name string in the machine descriptor for DT machine descriptors. The
->> model or machine compatible property from the DT is used instead.
->>
->> This likely changes the name reported by /proc/cpuinfo. There could be
->> some userspace dependencies on the old name. Debian libdebian-installer
->> used to use this to determine kernel flavour, but now uses the DT
->> directly. It is not really a good idea for userspace to depend on this
->> anyway.
+Quoting Sylwester Nawrocki (2013-10-15 13:04:17)
+> Hi,
+> 
+> (adding linux-media mailing list at Cc)
+> 
+> On 09/25/2013 11:47 AM, Laurent Pinchart wrote:
+> > On Tuesday 24 September 2013 23:38:44 Sylwester Nawrocki wrote:
+> [...]
+> >> The only issue I found might be at the omap3isp driver, which provides
+> >> clock to its sub-drivers and takes reference on the sub-driver modules.
+> >> When sub-driver calls clk_get() all modules would get locked in memory,
+> >> due to circular reference. One solution to that could be to pass NULL
+> >> struct device pointer, as in the below patch.
+> >
+> > Doesn't that introduce race conditions ? If the sub-drivers require the clock,
+> > they want to be sure that the clock won't disappear beyond their backs. I
+> > agree that the circular dependency needs to be solved somehow, but we probably
+> > need a more generic solution. The problem will become more widespread in the
+> > future with DT-based device instantiation in both V4L2 and KMS.
+> 
+> I'm wondering whether subsystems and drivers itself should be written so
+> they deal with such dependencies they are aware of.
+> 
+> There is similar situation in the regulator API, regulator_get() simply
+> takes a reference on a module providing the regulator object.
+> 
+> Before a "more generic solution" is available, what do you think about
+> keeping obtaining a reference on a clock provider module in clk_get() and
+> doing clk_get(), clk_prepare_enable(), ..., clk_unprepare_disable(),
+> clk_put() in sub-driver whenever a clock is actively used, to avoid
+> permanent circular reference ?
 
->> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> index 0e1e2b3..b0747bb 100644
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -611,7 +611,7 @@ void __init dump_machine_table(void)
->>
->>         early_print("Available machine support:\n\nID (hex)\tNAME\n");
->>         for_each_machine_desc(p)
->> -               early_print("%08x\t%s\n", p->nr, p->name);
->> +               early_print("%08x\t%s\n", p->nr, p->name ? p->name : *p->dt_compat);
+Laurent,
 
-Does it make sense to iterate over all the entries in p->dt_compat here?
-Tegra's machine descriptor supports 4 different compatible values, and I
-think that'll only print one of them.
+Did you have any feedback on this proposal? I would like to merge these
+patches so that folks with clock driver modules can use them properly.
+We can fix up things in the core code as we figure them out.
+
+Regards,
+Mike
+
+> 
+> --
+> Thanks,
+> Sylwester
+> 
+> >> ---------8<------------------
+> >>   From ca5963041aad67e31324cb5d4d5e2cfce1706d4f Mon Sep 17 00:00:00 2001
+> >> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
+> >> Date: Thu, 19 Sep 2013 23:52:04 +0200
+> >> Subject: [PATCH] omap3isp: Pass NULL device pointer to clk_register()
+> >>
+> >> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+> >> ---
+> >>    drivers/media/platform/omap3isp/isp.c |   15 ++++++++++-----
+> >>    drivers/media/platform/omap3isp/isp.h |    1 +
+> >>    2 files changed, 11 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/drivers/media/platform/omap3isp/isp.c
+> >> b/drivers/media/platform/omap3isp/isp.c
+> >> index df3a0ec..d7f3c98 100644
+> >> --- a/drivers/media/platform/omap3isp/isp.c
+> >> +++ b/drivers/media/platform/omap3isp/isp.c
+> >> @@ -290,9 +290,11 @@ static int isp_xclk_init(struct isp_device *isp)
+> >>      struct clk_init_data init;
+> >>      unsigned int i;
+> >>
+> >> +    for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i)
+> >> +            isp->xclks[i] = ERR_PTR(-EINVAL);
+> >> +
+> >>      for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
+> >>              struct isp_xclk *xclk =&isp->xclks[i];
+> >> -            struct clk *clk;
+> >>
+> >>              xclk->isp = isp;
+> >>              xclk->id = i == 0 ? ISP_XCLK_A : ISP_XCLK_B;
+> >> @@ -306,9 +308,9 @@ static int isp_xclk_init(struct isp_device *isp)
+> >>
+> >>              xclk->hw.init =&init;
+> >>
+> >> -            clk = devm_clk_register(isp->dev,&xclk->hw);
+> >> -            if (IS_ERR(clk))
+> >> -                    return PTR_ERR(clk);
+> >> +            xclk->clk = clk_register(NULL,&xclk->hw);
+> >> +            if (IS_ERR(xclk->clk))
+> >> +                    return PTR_ERR(xclk->clk);
+> >>
+> >>              if (pdata->xclks[i].con_id == NULL&&
+> >>              pdata->xclks[i].dev_id == NULL)
+> >> @@ -320,7 +322,7 @@ static int isp_xclk_init(struct isp_device *isp)
+> >>
+> >>              xclk->lookup->con_id = pdata->xclks[i].con_id;
+> >>              xclk->lookup->dev_id = pdata->xclks[i].dev_id;
+> >> -            xclk->lookup->clk = clk;
+> >> +            xclk->lookup->clk = xclk->clk;
+> >>
+> >>              clkdev_add(xclk->lookup);
+> >>      }
+> >> @@ -335,6 +337,9 @@ static void isp_xclk_cleanup(struct isp_device *isp)
+> >>      for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
+> >>              struct isp_xclk *xclk =&isp->xclks[i];
+> >>
+> >> +            if (!IS_ERR(xclk->clk))
+> >> +                    clk_unregister(xclk->clk);
+> >> +
+> >>              if (xclk->lookup)
+> >>                      clkdev_drop(xclk->lookup);
+> >>      }
+> >> diff --git a/drivers/media/platform/omap3isp/isp.h
+> >> b/drivers/media/platform/omap3isp/isp.h
+> >> index cd3eff4..1498f2b 100644
+> >> --- a/drivers/media/platform/omap3isp/isp.h
+> >> +++ b/drivers/media/platform/omap3isp/isp.h
+> >> @@ -135,6 +135,7 @@ struct isp_xclk {
+> >>      struct isp_device *isp;
+> >>      struct clk_hw hw;
+> >>      struct clk_lookup *lookup;
+> >> +    struct clk *clk;
+> >>      enum isp_xclk_id id;
+> >>
+> >>      spinlock_t lock;        /* Protects enabled and divider */
+> >> ---------8<------------------
