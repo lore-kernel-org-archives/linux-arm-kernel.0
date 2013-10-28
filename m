@@ -1,133 +1,45 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 28 Oct 2013 12:54:01 -0700
-Subject: [PATCH v6 0/5] clk: clock deregistration support
-In-Reply-To: <525D9FC1.2040204@gmail.com>
-References: <1377874402-2944-1-git-send-email-s.nawrocki@samsung.com>
- <52420664.2040604@gmail.com> <3160771.O1gFkR91vK@avalon>
- <525D9FC1.2040204@gmail.com>
-Message-ID: <20131028195401.11662.11969@quantum>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 28 Oct 2013 14:57:04 -0500
+Subject: [PATCH 4/8] ARM: imx: add support code for IMX50 based machines
+In-Reply-To: <526E065F.60206@uclinux.org>
+References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+ <1382076260-6422-5-git-send-email-gerg@uclinux.org>
+ <CAL_JsqJhM=K+vovDALQnjUSXBcuzHev1CUpxEnNqCYfOfGVsWQ@mail.gmail.com>
+ <526E065F.60206@uclinux.org>
+Message-ID: <CAL_JsqJbWXvE9kCwAQqkvd5MzQeo5oEBKjYFx1a1XWx1k3GNUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2013-10-15 13:04:17)
-> Hi,
-> 
-> (adding linux-media mailing list at Cc)
-> 
-> On 09/25/2013 11:47 AM, Laurent Pinchart wrote:
-> > On Tuesday 24 September 2013 23:38:44 Sylwester Nawrocki wrote:
-> [...]
-> >> The only issue I found might be at the omap3isp driver, which provides
-> >> clock to its sub-drivers and takes reference on the sub-driver modules.
-> >> When sub-driver calls clk_get() all modules would get locked in memory,
-> >> due to circular reference. One solution to that could be to pass NULL
-> >> struct device pointer, as in the below patch.
-> >
-> > Doesn't that introduce race conditions ? If the sub-drivers require the clock,
-> > they want to be sure that the clock won't disappear beyond their backs. I
-> > agree that the circular dependency needs to be solved somehow, but we probably
-> > need a more generic solution. The problem will become more widespread in the
-> > future with DT-based device instantiation in both V4L2 and KMS.
-> 
-> I'm wondering whether subsystems and drivers itself should be written so
-> they deal with such dependencies they are aware of.
-> 
-> There is similar situation in the regulator API, regulator_get() simply
-> takes a reference on a module providing the regulator object.
-> 
-> Before a "more generic solution" is available, what do you think about
-> keeping obtaining a reference on a clock provider module in clk_get() and
-> doing clk_get(), clk_prepare_enable(), ..., clk_unprepare_disable(),
-> clk_put() in sub-driver whenever a clock is actively used, to avoid
-> permanent circular reference ?
+On Mon, Oct 28, 2013 at 1:38 AM, Greg Ungerer <gerg@uclinux.org> wrote:
+> Hi Rob,
+>
+> On 24/10/13 21:11, Rob Herring wrote:
+>> On Fri, Oct 18, 2013 at 1:04 AM,  <gerg@uclinux.org> wrote:
+>>> From: Greg Ungerer <gerg@uclinux.org>
+>>>
+>>> Add machine support code for the Freescale IMX50 SoC.
 
-Laurent,
 
-Did you have any feedback on this proposal? I would like to merge these
-patches so that folks with clock driver modules can use them properly.
-We can fix up things in the core code as we figure them out.
+>>> +DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
+>>> +       .map_io         = mx53_map_io,
+>>> +       .init_early     = imx53_init_early,
+>>> +       .init_irq       = mx53_init_irq,
+>>> +       .handle_irq     = imx53_handle_irq,
+>>> +       .init_time      = imx50_timer_init,
+>>> +       .init_machine   = imx50_dt_init,
+>>> +       .init_late      = imx53_init_late,
+>>> +       .dt_compat      = imx50_dt_board_compat,
+>>> +       .restart        = mxc_restart,
+>>> +MACHINE_END
+>>
+>> This seems like a lot of duplication. It seems like mx53 and mx50
+>> could be combined into a single machine_desc. init_time should not be
+>> needed in 3.13.
+>
+> Are you suggesting that "fsl,imx50" be added to the board compat list
+> in mach-imx53.c instead?
 
-Regards,
-Mike
+Yes, that would be at least part of it. I'd guess a bit more than that
+is needed.
 
-> 
-> --
-> Thanks,
-> Sylwester
-> 
-> >> ---------8<------------------
-> >>   From ca5963041aad67e31324cb5d4d5e2cfce1706d4f Mon Sep 17 00:00:00 2001
-> >> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> >> Date: Thu, 19 Sep 2013 23:52:04 +0200
-> >> Subject: [PATCH] omap3isp: Pass NULL device pointer to clk_register()
-> >>
-> >> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> >> ---
-> >>    drivers/media/platform/omap3isp/isp.c |   15 ++++++++++-----
-> >>    drivers/media/platform/omap3isp/isp.h |    1 +
-> >>    2 files changed, 11 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/drivers/media/platform/omap3isp/isp.c
-> >> b/drivers/media/platform/omap3isp/isp.c
-> >> index df3a0ec..d7f3c98 100644
-> >> --- a/drivers/media/platform/omap3isp/isp.c
-> >> +++ b/drivers/media/platform/omap3isp/isp.c
-> >> @@ -290,9 +290,11 @@ static int isp_xclk_init(struct isp_device *isp)
-> >>      struct clk_init_data init;
-> >>      unsigned int i;
-> >>
-> >> +    for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i)
-> >> +            isp->xclks[i] = ERR_PTR(-EINVAL);
-> >> +
-> >>      for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
-> >>              struct isp_xclk *xclk =&isp->xclks[i];
-> >> -            struct clk *clk;
-> >>
-> >>              xclk->isp = isp;
-> >>              xclk->id = i == 0 ? ISP_XCLK_A : ISP_XCLK_B;
-> >> @@ -306,9 +308,9 @@ static int isp_xclk_init(struct isp_device *isp)
-> >>
-> >>              xclk->hw.init =&init;
-> >>
-> >> -            clk = devm_clk_register(isp->dev,&xclk->hw);
-> >> -            if (IS_ERR(clk))
-> >> -                    return PTR_ERR(clk);
-> >> +            xclk->clk = clk_register(NULL,&xclk->hw);
-> >> +            if (IS_ERR(xclk->clk))
-> >> +                    return PTR_ERR(xclk->clk);
-> >>
-> >>              if (pdata->xclks[i].con_id == NULL&&
-> >>              pdata->xclks[i].dev_id == NULL)
-> >> @@ -320,7 +322,7 @@ static int isp_xclk_init(struct isp_device *isp)
-> >>
-> >>              xclk->lookup->con_id = pdata->xclks[i].con_id;
-> >>              xclk->lookup->dev_id = pdata->xclks[i].dev_id;
-> >> -            xclk->lookup->clk = clk;
-> >> +            xclk->lookup->clk = xclk->clk;
-> >>
-> >>              clkdev_add(xclk->lookup);
-> >>      }
-> >> @@ -335,6 +337,9 @@ static void isp_xclk_cleanup(struct isp_device *isp)
-> >>      for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
-> >>              struct isp_xclk *xclk =&isp->xclks[i];
-> >>
-> >> +            if (!IS_ERR(xclk->clk))
-> >> +                    clk_unregister(xclk->clk);
-> >> +
-> >>              if (xclk->lookup)
-> >>                      clkdev_drop(xclk->lookup);
-> >>      }
-> >> diff --git a/drivers/media/platform/omap3isp/isp.h
-> >> b/drivers/media/platform/omap3isp/isp.h
-> >> index cd3eff4..1498f2b 100644
-> >> --- a/drivers/media/platform/omap3isp/isp.h
-> >> +++ b/drivers/media/platform/omap3isp/isp.h
-> >> @@ -135,6 +135,7 @@ struct isp_xclk {
-> >>      struct isp_device *isp;
-> >>      struct clk_hw hw;
-> >>      struct clk_lookup *lookup;
-> >> +    struct clk *clk;
-> >>      enum isp_xclk_id id;
-> >>
-> >>      spinlock_t lock;        /* Protects enabled and divider */
-> >> ---------8<------------------
+Rob
