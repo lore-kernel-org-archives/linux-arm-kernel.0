@@ -1,31 +1,76 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 28 Oct 2013 12:31:04 +0100
-Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <CAKohpomedpd8XBPcdZX2vHy6b5=FMtbSVpNTG-eVLK1YPyPaMA@mail.gmail.com>
-References: <1382533461-31021-1-git-send-email-andrew@lunn.ch>
- <CAKohpombg7mAmgxxvUg8kz1MaFwcycR1eL0UrgELY2WdGfrAag@mail.gmail.com>
- <20131023135116.GC31126@lunn.ch>
- <CAKohpokTgCz0c=PeaJHKiZEiYc0jPVq-vwkhP5pM0hh1-0QnLA@mail.gmail.com>
- <20131023143657.GA31536@lunn.ch>
- <CAKohpomedpd8XBPcdZX2vHy6b5=FMtbSVpNTG-eVLK1YPyPaMA@mail.gmail.com>
-Message-ID: <20131028113104.GE27015@lunn.ch>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 28 Oct 2013 13:24:31 +0100
+Subject: [PATCH 3/7] video: exynos_mipi_dsim: Use the generic PHY driver
+In-Reply-To: <526E0038.7050805@samsung.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <526997BC.8070602@gmail.com> <526E0038.7050805@samsung.com>
+Message-ID: <23467785.uRr31aFEN8@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 08:30:02PM +0530, Viresh Kumar wrote:
-> On 23 October 2013 20:06, Andrew Lunn <andrew@lunn.ch> wrote:
-> >> So, you have actually tested your code without interrupt handler?
+Hi Donghwa,
+
+On Monday 28 of October 2013 15:12:08 Donghwa Lee wrote:
+> On Fri, OCT 25, 2013 06:57, Sylwester Nawrocki wrote:
+> > On 10/24/2013 05:57 PM, Kishon Vijay Abraham I wrote:
+> >> On Thursday 24 October 2013 09:12 PM, Sachin Kamat wrote:
+> >>> On 24 October 2013 20:00, Olof Johansson<olof@lixom.net>  wrote:
+> >>>> On Wed, Oct 16, 2013 at 9:28 AM, Kishon Vijay Abraham I<kishon@ti.com>  wrote:
+> >>>>> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+> >>>>> index 32e5406..00b3a52 100644
+> >>>>> --- a/drivers/video/exynos/exynos_mipi_dsi.c
+> >>>>> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
+> >>>>> @@ -156,8 +157,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
+> >>>>>                  exynos_mipi_regulator_enable(dsim);
+> >>>>>
+> >>>>>                  /* enable MIPI-DSI PHY. */
+> >>>>> -               if (dsim->pd->phy_enable)
+> >>>>> -                       dsim->pd->phy_enable(pdev, true);
+> >>>>> +               phy_power_on(dsim->phy);
+> >>>>>
+> >>>>>                  clk_enable(dsim->clock);
+> >>>>>
+> >>>>
+> >>>> This introduces the below with exynos_defconfig:
+> >>>>
+> >>>> ../../drivers/video/exynos/exynos_mipi_dsi.c: In function
+> >>>> 'exynos_mipi_dsi_blank_mode':
+> >>>> ../../drivers/video/exynos/exynos_mipi_dsi.c:144:26: warning: unused
+> >>>> variable 'pdev' [-Wunused-variable]
+> >>>>    struct platform_device *pdev = to_platform_device(dsim->dev);
 > >
-> > No.
+> > Sorry about missing that, I only noticed this warning recently and didn't
+> > get around to submit a patch.
+> >
+> >>> I have already submitted a patch to fix this [1]
+> >
+> > Thanks a lot guys for fixing this.
+> >
+> >>> [1] http://marc.info/?l=linux-fbdev&m=138233359617936&w=2
+> >>
+> >> Sorry, missed that :-(
+> >
+> > This MIPI DSIM driver is affectively a dead code in the mainline now, once
+> > Exynos become a dt-only platform. I guess it can be deleted for 3.14, once
+> > S5P gets converted to the device tree. The new driver using CDF is basically
+> > a complete rewrite. Or device tree support should be added to that driver,
+> > but I believe it doesn't make sense without CDF.
+> >
 > 
-> It would be better if you atleast try this and confirm that this dummy
-> handler is required.
+> MIPI DSIM driver is not a dead code. There is a steady trickle of patches.
+> It's kind of late, but, I will update it as DT based drivers as soon as possible.
+> And Why do you think that DT support of existing MIPI DSIM is something less
+> than great?
 
-Hi Viresh
+First of all, the exynos_mipi_dsim driver has currently no users in
+mainline kernel, so it is essentially dead code. In addition, on
+a platform that is the primary candidate for using it, which is Exynos,
+there is no way to use it, due to no DT support.
 
-I have tested this now. The dummy handler is required. Without it, it
-seems like the WFI exits at the next timer tick, not immediately once
-the cpufreq change has finished. I get poor numbers out of
-cpufreq-bench without the handler.
+As for the driver itself, it is not really a great example of good code.
+It contains a hacks, like calling msleep() without any clear reason and
+also many coding style issues. I'd prefer to replace it with the new
+exynos-dsi driver rewritten completely in SRPOL, when CDF is finished.
 
-	      Andrew
+Best regards,
+Tomasz
