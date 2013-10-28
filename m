@@ -1,548 +1,635 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 28 Oct 2013 10:00:38 +0100
-Subject: [PATCH v6 3/8] ARM: dts: imx27 pin functions
+Date: Mon, 28 Oct 2013 10:00:37 +0100
+Subject: [PATCH v6 2/8] pinctrl: imx27: imx27 pincontrol driver
 In-Reply-To: <1382950843-26066-1-git-send-email-mpa@pengutronix.de>
 References: <1382950843-26066-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1382950843-26066-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1382950843-26066-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+imx27 pincontrol driver using the imx1 core driver. The DT bindings are
+similar to other imx pincontrol drivers.
+
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx27-pinfunc.h | 524 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 524 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx27-pinfunc.h
+ .../bindings/pinctrl/fsl,imx27-pinctrl.txt         |  89 ++++
+ drivers/pinctrl/Kconfig                            |   8 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl-imx27.c                    | 477 +++++++++++++++++++++
+ 4 files changed, 575 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-imx27.c
 
-diff --git a/arch/arm/boot/dts/imx27-pinfunc.h b/arch/arm/boot/dts/imx27-pinfunc.h
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
 new file mode 100644
-index 0000000..32bfcc2
+index 0000000..32c81c8
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx27-pinfunc.h
-@@ -0,0 +1,524 @@
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx27-pinctrl.txt
+@@ -0,0 +1,89 @@
++* Freescale IMX27 IOMUX Controller
++
++Required properties:
++- compatible: "fsl,imx27-iomuxc"
++
++The iomuxc driver node should define subnodes containing of pinctrl configuration subnodes.
++
++Required properties for pin configuration node:
++- fsl,pins: three integers array, represents a group of pins mux and config
++  setting. The format is fsl,pins = <PIN MUX_ID CONFIG>.
++
++  PIN is an integer between 0 and 0xbf. imx27 has 6 ports with 32 configurable
++  configurable pins each. PIN is PORT * 32 + PORT_PIN, PORT_PIN is the pin
++  number on the specific port (between 0 and 31).
++
++  MUX_ID is
++    function + (direction << 2) + (gpio_oconf << 4) + (gpio_iconfa << 8) + (gpio_iconfb << 10)
++
++    function:      0 - Primary function
++                   1 - Alternate function
++                   2 - GPIO
++      Registers GIUS (GPIO In Use) and GPR (General Purpose Register)
++
++    direction:     0 - Input
++                   1 - Output
++      Register DDIR
++
++    gpio_oconf:    0 - A_IN
++                   1 - B_IN
++                   2 - C_IN
++                   3 - Data Register
++      Registers OCR1 and OCR2
++
++    gpio_iconfa/b: 0 - GPIO_IN
++                   1 - Interrupt Status Register
++                   2 - 0
++                   3 - 1
++      Registers ICONFA1, ICONFA2, ICONFB1 and ICONFB2
++
++
++  CONFIG can be 0 or 1, meaning Pullup disable/enable.
++
++
++
++
++Example:
++
++iomuxc: iomuxc@10015000 {
++	compatible = "fsl,imx27-iomuxc";
++	reg = <0x10015000 0x600>;
++
++	uart {
++		pinctrl_uart1: uart-1 {
++			fsl,pins = <
++				0x8c 0x004 0x0 /* UART1_TXD__UART1_TXD */
++				0x8d 0x000 0x0 /* UART1_RXD__UART1_RXD */
++				0x8e 0x004 0x0 /* UART1_CTS__UART1_CTS */
++				0x8f 0x000 0x0 /* UART1_RTS__UART1_RTS */
++			>;
++		};
++
++		...
++	};
++};
++
++
++For convenience there are macros defined in imx27-pinfunc.h which provide PIN
++and MUX_ID. They are structured as MX27_PAD_<Pad name>__<Signal name>. The names
++are defined in the i.MX27 reference manual.
++
++The above example using macros:
++
++iomuxc: iomuxc at 10015000 {
++	compatible = "fsl,imx27-iomuxc";
++	reg = <0x10015000 0x600>;
++
++	uart {
++		pinctrl_uart1: uart-1 {
++			fsl,pins = <
++				MX27_PAD_UART1_TXD__UART1_TXD 0x0
++				MX27_PAD_UART1_RXD__UART1_RXD 0x0
++				MX27_PAD_UART1_CTS__UART1_CTS 0x0
++				MX27_PAD_UART1_RTS__UART1_RTS 0x0
++			>;
++		};
++
++		...
++	};
++};
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 8a02aa0..4c3e5d2 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -85,6 +85,14 @@ config PINCTRL_IMX1_CORE
+ 	select PINMUX
+ 	select PINCONF
+ 
++config PINCTRL_IMX27
++	bool "IMX27 pinctrl driver"
++	depends on OF
++	depends on SOC_IMX27
++	select PINCTRL_IMX1_CORE
++	help
++	  Say Y here to enable the imx27 pinctrl driver
++
+ config PINCTRL_IMX35
+ 	bool "IMX35 pinctrl driver"
+ 	depends on OF
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index d7caf08..5d23b71 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -19,6 +19,7 @@ obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
+ obj-$(CONFIG_PINCTRL_BAYTRAIL)	+= pinctrl-baytrail.o
+ obj-$(CONFIG_PINCTRL_IMX)	+= pinctrl-imx.o
+ obj-$(CONFIG_PINCTRL_IMX1_CORE)	+= pinctrl-imx1-core.o
++obj-$(CONFIG_PINCTRL_IMX27)	+= pinctrl-imx27.o
+ obj-$(CONFIG_PINCTRL_IMX35)	+= pinctrl-imx35.o
+ obj-$(CONFIG_PINCTRL_IMX51)	+= pinctrl-imx51.o
+ obj-$(CONFIG_PINCTRL_IMX53)	+= pinctrl-imx53.o
+diff --git a/drivers/pinctrl/pinctrl-imx27.c b/drivers/pinctrl/pinctrl-imx27.c
+new file mode 100644
+index 0000000..417c992
+--- /dev/null
++++ b/drivers/pinctrl/pinctrl-imx27.c
+@@ -0,0 +1,477 @@
 +/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
++ * imx27 pinctrl driver based on imx pinmux core
++ *
++ * Copyright (C) 2013 Pengutronix
++ *
++ * Author: Markus Pargmann <mpa@pengutronix.de>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + */
 +
-+#ifndef __DTS_IMX27_PINFUNC_H
-+#define __DTS_IMX27_PINFUNC_H
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/pinctrl.h>
 +
-+/*
-+ * The pin function ID is a tuple of
-+ * <pin mux_id>
-+ * mux_id consists of
-+ * function + (direction << 2) + (gpio_oconf << 4) + (gpio_iconfa << 8) + (gpio_iconfb << 10)
-+ *
-+ * function:      0 - Primary function
-+ *                1 - Alternate function
-+ *                2 - GPIO
-+ * direction:     0 - Input
-+ *                1 - Output
-+ * gpio_oconf:    0 - A_IN
-+ *                1 - B_IN
-+ *                2 - C_IN
-+ *                3 - Data Register
-+ * gpio_iconfa/b: 0 - GPIO_IN
-+ *                1 - Interrupt Status Register
-+ *                2 - 0
-+ *                3 - 1
-+ *
-+ * 'pin' is an integer between 0 and 0xbf. imx27 has 6 ports with 32 configurable
-+ * configurable pins each. 'pin' is PORT * 32 + PORT_PIN, PORT_PIN is the pin
-+ * number on the specific port (between 0 and 31).
-+ */
++#include "pinctrl-imx1.h"
 +
-+#define MX27_PAD_USBH2_CLK__USBH2_CLK                      0x00 0x000
-+#define MX27_PAD_USBH2_CLK__GPIO1_0                        0x00 0x036
-+#define MX27_PAD_USBH2_DIR__USBH2_DIR                      0x01 0x000
-+#define MX27_PAD_USBH2_DIR__GPIO1_1                        0x01 0x036
-+#define MX27_PAD_USBH2_DATA7__USBH2_DATA7                  0x02 0x004
-+#define MX27_PAD_USBH2_DATA7__GPIO1_2                      0x02 0x036
-+#define MX27_PAD_USBH2_NXT__USBH2_NXT                      0x03 0x000
-+#define MX27_PAD_USBH2_NXT__GPIO1_3                        0x03 0x036
-+#define MX27_PAD_USBH2_STP__USBH2_STP                      0x04 0x004
-+#define MX27_PAD_USBH2_STP__GPIO1_4                        0x04 0x036
-+#define MX27_PAD_LSCLK__LSCLK                              0x05 0x004
-+#define MX27_PAD_LSCLK__GPIO1_5                            0x05 0x036
-+#define MX27_PAD_LD0__LD0                                  0x06 0x004
-+#define MX27_PAD_LD0__GPIO1_6                              0x06 0x036
-+#define MX27_PAD_LD1__LD1                                  0x07 0x004
-+#define MX27_PAD_LD1__GPIO1_7                              0x07 0x036
-+#define MX27_PAD_LD2__LD2                                  0x08 0x004
-+#define MX27_PAD_LD2__GPIO1_8                              0x08 0x036
-+#define MX27_PAD_LD3__LD3                                  0x09 0x004
-+#define MX27_PAD_LD3__GPIO1_9                              0x09 0x036
-+#define MX27_PAD_LD4__LD4                                  0x0a 0x004
-+#define MX27_PAD_LD4__GPIO1_10                             0x0a 0x036
-+#define MX27_PAD_LD5__LD5                                  0x0b 0x004
-+#define MX27_PAD_LD5__GPIO1_11                             0x0b 0x036
-+#define MX27_PAD_LD6__LD6                                  0x0c 0x004
-+#define MX27_PAD_LD6__GPIO1_12                             0x0c 0x036
-+#define MX27_PAD_LD7__LD7                                  0x0d 0x004
-+#define MX27_PAD_LD7__GPIO1_13                             0x0d 0x036
-+#define MX27_PAD_LD8__LD8                                  0x0e 0x004
-+#define MX27_PAD_LD8__GPIO1_14                             0x0e 0x036
-+#define MX27_PAD_LD9__LD9                                  0x0f 0x004
-+#define MX27_PAD_LD9__GPIO1_15                             0x0f 0x036
-+#define MX27_PAD_LD10__LD10                                0x10 0x004
-+#define MX27_PAD_LD10__GPIO1_16                            0x10 0x036
-+#define MX27_PAD_LD11__LD11                                0x11 0x004
-+#define MX27_PAD_LD11__GPIO1_17                            0x11 0x036
-+#define MX27_PAD_LD12__LD12                                0x12 0x004
-+#define MX27_PAD_LD12__GPIO1_18                            0x12 0x036
-+#define MX27_PAD_LD13__LD13                                0x13 0x004
-+#define MX27_PAD_LD13__GPIO1_19                            0x13 0x036
-+#define MX27_PAD_LD14__LD14                                0x14 0x004
-+#define MX27_PAD_LD14__GPIO1_20                            0x14 0x036
-+#define MX27_PAD_LD15__LD15                                0x15 0x004
-+#define MX27_PAD_LD15__GPIO1_21                            0x15 0x036
-+#define MX27_PAD_LD16__LD16                                0x16 0x004
-+#define MX27_PAD_LD16__GPIO1_22                            0x16 0x036
-+#define MX27_PAD_LD17__LD17                                0x17 0x004
-+#define MX27_PAD_LD17__GPIO1_23                            0x17 0x036
-+#define MX27_PAD_REV__REV                                  0x18 0x004
-+#define MX27_PAD_REV__GPIO1_24                             0x18 0x036
-+#define MX27_PAD_CLS__CLS                                  0x19 0x004
-+#define MX27_PAD_CLS__GPIO1_25                             0x19 0x036
-+#define MX27_PAD_PS__PS                                    0x1a 0x004
-+#define MX27_PAD_PS__GPIO1_26                              0x1a 0x036
-+#define MX27_PAD_SPL_SPR__SPL_SPR                          0x1b 0x004
-+#define MX27_PAD_SPL_SPR__GPIO1_27                         0x1b 0x036
-+#define MX27_PAD_HSYNC__HSYNC                              0x1c 0x004
-+#define MX27_PAD_HSYNC__GPIO1_28                           0x1c 0x036
-+#define MX27_PAD_VSYNC__VSYNC                              0x1d 0x004
-+#define MX27_PAD_VSYNC__GPIO1_29                           0x1d 0x036
-+#define MX27_PAD_CONTRAST__CONTRAST                        0x1e 0x004
-+#define MX27_PAD_CONTRAST__GPIO1_30                        0x1e 0x036
-+#define MX27_PAD_OE_ACD__OE_ACD                            0x1f 0x004
-+#define MX27_PAD_OE_ACD__GPIO1_31                          0x1f 0x036
-+#define MX27_PAD_UNUSED0__UNUSED0                          0x20 0x004
-+#define MX27_PAD_UNUSED0__GPIO2_0                          0x20 0x036
-+#define MX27_PAD_UNUSED1__UNUSED1                          0x21 0x004
-+#define MX27_PAD_UNUSED1__GPIO2_1                          0x21 0x036
-+#define MX27_PAD_UNUSED2__UNUSED2                          0x22 0x004
-+#define MX27_PAD_UNUSED2__GPIO2_2                          0x22 0x036
-+#define MX27_PAD_UNUSED3__UNUSED3                          0x23 0x004
-+#define MX27_PAD_UNUSED3__GPIO2_3                          0x23 0x036
-+#define MX27_PAD_SD2_D0__SD2_D0                            0x24 0x004
-+#define MX27_PAD_SD2_D0__MSHC_DATA0                        0x24 0x005
-+#define MX27_PAD_SD2_D0__GPIO2_4                           0x24 0x036
-+#define MX27_PAD_SD2_D1__SD2_D1                            0x25 0x004
-+#define MX27_PAD_SD2_D1__MSHC_DATA1                        0x25 0x005
-+#define MX27_PAD_SD2_D1__GPIO2_5                           0x25 0x036
-+#define MX27_PAD_SD2_D2__SD2_D2                            0x26 0x004
-+#define MX27_PAD_SD2_D2__MSHC_DATA2                        0x26 0x005
-+#define MX27_PAD_SD2_D2__GPIO2_6                           0x26 0x036
-+#define MX27_PAD_SD2_D3__SD2_D3                            0x27 0x004
-+#define MX27_PAD_SD2_D3__MSHC_DATA3                        0x27 0x005
-+#define MX27_PAD_SD2_D3__GPIO2_7                           0x27 0x036
-+#define MX27_PAD_SD2_CMD__SD2_CMD                          0x28 0x004
-+#define MX27_PAD_SD2_CMD__MSHC_BS                          0x28 0x005
-+#define MX27_PAD_SD2_CMD__GPIO2_8                          0x28 0x036
-+#define MX27_PAD_SD2_CLK__SD2_CLK                          0x29 0x004
-+#define MX27_PAD_SD2_CLK__MSHC_SCLK                        0x29 0x005
-+#define MX27_PAD_SD2_CLK__GPIO2_9                          0x29 0x036
-+#define MX27_PAD_CSI_D0__CSI_D0                            0x2a 0x000
-+#define MX27_PAD_CSI_D0__UART6_TXD                         0x2a 0x005
-+#define MX27_PAD_CSI_D0__GPIO2_10                          0x2a 0x036
-+#define MX27_PAD_CSI_D1__CSI_D1                            0x2b 0x000
-+#define MX27_PAD_CSI_D1__UART6_RXD                         0x2b 0x001
-+#define MX27_PAD_CSI_D1__GPIO2_11                          0x2b 0x036
-+#define MX27_PAD_CSI_D2__CSI_D2                            0x2c 0x000
-+#define MX27_PAD_CSI_D2__UART6_CTS                         0x2c 0x005
-+#define MX27_PAD_CSI_D2__GPIO2_12                          0x2c 0x036
-+#define MX27_PAD_CSI_D3__CSI_D3                            0x2d 0x000
-+#define MX27_PAD_CSI_D3__UART6_RTS                         0x2d 0x001
-+#define MX27_PAD_CSI_D3__GPIO2_13                          0x2d 0x036
-+#define MX27_PAD_CSI_D4__CSI_D4                            0x2e 0x000
-+#define MX27_PAD_CSI_D4__GPIO2_14                          0x2e 0x036
-+#define MX27_PAD_CSI_MCLK__CSI_MCLK                        0x2f 0x004
-+#define MX27_PAD_CSI_MCLK__GPIO2_15                        0x2f 0x036
-+#define MX27_PAD_CSI_PIXCLK__CSI_PIXCLK                    0x30 0x000
-+#define MX27_PAD_CSI_PIXCLK__GPIO2_16                      0x30 0x036
-+#define MX27_PAD_CSI_D5__CSI_D5                            0x31 0x000
-+#define MX27_PAD_CSI_D5__GPIO2_17                          0x31 0x036
-+#define MX27_PAD_CSI_D6__CSI_D6                            0x32 0x000
-+#define MX27_PAD_CSI_D6__UART5_TXD                         0x32 0x005
-+#define MX27_PAD_CSI_D6__GPIO2_18                          0x32 0x036
-+#define MX27_PAD_CSI_D7__CSI_D7                            0x33 0x000
-+#define MX27_PAD_CSI_D7__UART5_RXD                         0x33 0x001
-+#define MX27_PAD_CSI_D7__GPIO2_19                          0x33 0x036
-+#define MX27_PAD_CSI_VSYNC__CSI_VSYNC                      0x34 0x000
-+#define MX27_PAD_CSI_VSYNC__UART5_CTS                      0x34 0x005
-+#define MX27_PAD_CSI_VSYNC__GPIO2_20                       0x34 0x036
-+#define MX27_PAD_CSI_HSYNC__CSI_HSYNC                      0x35 0x000
-+#define MX27_PAD_CSI_HSYNC__UART5_RTS                      0x35 0x001
-+#define MX27_PAD_CSI_HSYNC__GPIO2_21                       0x35 0x036
-+#define MX27_PAD_USBH1_SUSP__USBH1_SUSP                    0x36 0x004
-+#define MX27_PAD_USBH1_SUSP__GPIO2_22                      0x36 0x036
-+#define MX27_PAD_USB_PWR__USB_PWR                          0x37 0x004
-+#define MX27_PAD_USB_PWR__GPIO2_23                         0x37 0x036
-+#define MX27_PAD_USB_OC_B__USB_OC_B                        0x38 0x000
-+#define MX27_PAD_USB_OC_B__GPIO2_24                        0x38 0x036
-+#define MX27_PAD_USBH1_RCV__USBH1_RCV                      0x39 0x004
-+#define MX27_PAD_USBH1_RCV__GPIO2_25                       0x39 0x036
-+#define MX27_PAD_USBH1_FS__USBH1_FS                        0x3a 0x004
-+#define MX27_PAD_USBH1_FS__UART4_RTS                       0x3a 0x001
-+#define MX27_PAD_USBH1_FS__GPIO2_26                        0x3a 0x036
-+#define MX27_PAD_USBH1_OE_B__USBH1_OE_B                    0x3b 0x004
-+#define MX27_PAD_USBH1_OE_B__GPIO2_27                      0x3b 0x036
-+#define MX27_PAD_USBH1_TXDM__USBH1_TXDM                    0x3c 0x004
-+#define MX27_PAD_USBH1_TXDM__UART4_TXD                     0x3c 0x005
-+#define MX27_PAD_USBH1_TXDM__GPIO2_28                      0x3c 0x036
-+#define MX27_PAD_USBH1_TXDP__USBH1_TXDP                    0x3d 0x004
-+#define MX27_PAD_USBH1_TXDP__UART4_CTS                     0x3d 0x005
-+#define MX27_PAD_USBH1_TXDP__GPIO2_29                      0x3d 0x036
-+#define MX27_PAD_USBH1_RXDM__USBH1_RXDM                    0x3e 0x004
-+#define MX27_PAD_USBH1_RXDM__GPIO2_30                      0x3e 0x036
-+#define MX27_PAD_USBH1_RXDP__USBH1_RXDP                    0x3f 0x004
-+#define MX27_PAD_USBH1_RXDP__UART4_RXD                     0x3f 0x001
-+#define MX27_PAD_USBH1_RXDP__GPIO2_31                      0x3f 0x036
-+#define MX27_PAD_UNUSED4__UNUSED4                          0x40 0x004
-+#define MX27_PAD_UNUSED4__GPIO3_0                          0x40 0x036
-+#define MX27_PAD_UNUSED5__UNUSED5                          0x41 0x004
-+#define MX27_PAD_UNUSED5__GPIO3_1                          0x41 0x036
-+#define MX27_PAD_UNUSED6__UNUSED6                          0x42 0x004
-+#define MX27_PAD_UNUSED6__GPIO3_2                          0x42 0x036
-+#define MX27_PAD_UNUSED7__UNUSED7                          0x43 0x004
-+#define MX27_PAD_UNUSED7__GPIO3_3                          0x43 0x036
-+#define MX27_PAD_UNUSED8__UNUSED8                          0x44 0x004
-+#define MX27_PAD_UNUSED8__GPIO3_4                          0x44 0x036
-+#define MX27_PAD_I2C2_SDA__I2C2_SDA                        0x45 0x004
-+#define MX27_PAD_I2C2_SDA__GPIO3_5                         0x45 0x036
-+#define MX27_PAD_I2C2_SCL__I2C2_SCL                        0x46 0x004
-+#define MX27_PAD_I2C2_SCL__GPIO3_6                         0x46 0x036
-+#define MX27_PAD_USBOTG_DATA5__USBOTG_DATA5                0x47 0x004
-+#define MX27_PAD_USBOTG_DATA5__GPIO3_7                     0x47 0x036
-+#define MX27_PAD_USBOTG_DATA6__USBOTG_DATA6                0x48 0x004
-+#define MX27_PAD_USBOTG_DATA6__GPIO3_8                     0x48 0x036
-+#define MX27_PAD_USBOTG_DATA0__USBOTG_DATA0                0x49 0x004
-+#define MX27_PAD_USBOTG_DATA0__GPIO3_9                     0x49 0x036
-+#define MX27_PAD_USBOTG_DATA2__USBOTG_DATA2                0x4a 0x004
-+#define MX27_PAD_USBOTG_DATA2__GPIO3_10                    0x4a 0x036
-+#define MX27_PAD_USBOTG_DATA1__USBOTG_DATA1                0x4b 0x004
-+#define MX27_PAD_USBOTG_DATA1__GPIO3_11                    0x4b 0x036
-+#define MX27_PAD_USBOTG_DATA4__USBOTG_DATA4                0x4c 0x004
-+#define MX27_PAD_USBOTG_DATA4__GPIO3_12                    0x4c 0x036
-+#define MX27_PAD_USBOTG_DATA3__USBOTG_DATA3                0x4d 0x004
-+#define MX27_PAD_USBOTG_DATA3__GPIO3_13                    0x4d 0x036
-+#define MX27_PAD_TOUT__TOUT                                0x4e 0x004
-+#define MX27_PAD_TOUT__GPIO3_14                            0x4e 0x036
-+#define MX27_PAD_TIN__TIN                                  0x4f 0x000
-+#define MX27_PAD_TIN__GPIO3_15                             0x4f 0x036
-+#define MX27_PAD_SSI4_FS__SSI4_FS                          0x50 0x004
-+#define MX27_PAD_SSI4_FS__GPIO3_16                         0x50 0x036
-+#define MX27_PAD_SSI4_RXDAT__SSI4_RXDAT                    0x51 0x004
-+#define MX27_PAD_SSI4_RXDAT__GPIO3_17                      0x51 0x036
-+#define MX27_PAD_SSI4_TXDAT__SSI4_TXDAT                    0x52 0x004
-+#define MX27_PAD_SSI4_TXDAT__GPIO3_18                      0x52 0x036
-+#define MX27_PAD_SSI4_CLK__SSI4_CLK                        0x53 0x004
-+#define MX27_PAD_SSI4_CLK__GPIO3_19                        0x53 0x036
-+#define MX27_PAD_SSI1_FS__SSI1_FS                          0x54 0x004
-+#define MX27_PAD_SSI1_FS__GPIO3_20                         0x54 0x036
-+#define MX27_PAD_SSI1_RXDAT__SSI1_RXDAT                    0x55 0x004
-+#define MX27_PAD_SSI1_RXDAT__GPIO3_21                      0x55 0x036
-+#define MX27_PAD_SSI1_TXDAT__SSI1_TXDAT                    0x56 0x004
-+#define MX27_PAD_SSI1_TXDAT__GPIO3_22                      0x56 0x036
-+#define MX27_PAD_SSI1_CLK__SSI1_CLK                        0x57 0x004
-+#define MX27_PAD_SSI1_CLK__GPIO3_23                        0x57 0x036
-+#define MX27_PAD_SSI2_FS__SSI2_FS                          0x58 0x004
-+#define MX27_PAD_SSI2_FS__GPT5_TOUT                        0x58 0x005
-+#define MX27_PAD_SSI2_FS__GPIO3_24                         0x58 0x036
-+#define MX27_PAD_SSI2_RXDAT__SSI2_RXDAT                    0x59 0x004
-+#define MX27_PAD_SSI2_RXDAT__GPTS_TIN                      0x59 0x001
-+#define MX27_PAD_SSI2_RXDAT__GPIO3_25                      0x59 0x036
-+#define MX27_PAD_SSI2_TXDAT__SSI2_TXDAT                    0x5a 0x004
-+#define MX27_PAD_SSI2_TXDAT__GPT4_TOUT                     0x5a 0x005
-+#define MX27_PAD_SSI2_TXDAT__GPIO3_26                      0x5a 0x036
-+#define MX27_PAD_SSI2_CLK__SSI2_CLK                        0x5b 0x004
-+#define MX27_PAD_SSI2_CLK__GPT4_TIN                        0x5b 0x001
-+#define MX27_PAD_SSI2_CLK__GPIO3_27                        0x5b 0x036
-+#define MX27_PAD_SSI3_FS__SSI3_FS                          0x5c 0x004
-+#define MX27_PAD_SSI3_FS__SLCDC2_D0                        0x5c 0x001
-+#define MX27_PAD_SSI3_FS__GPIO3_28                         0x5c 0x036
-+#define MX27_PAD_SSI3_RXDAT__SSI3_RXDAT                    0x5d 0x004
-+#define MX27_PAD_SSI3_RXDAT__SLCDC2_RS                     0x5d 0x001
-+#define MX27_PAD_SSI3_RXDAT__GPIO3_29                      0x5d 0x036
-+#define MX27_PAD_SSI3_TXDAT__SSI3_TXDAT                    0x5e 0x004
-+#define MX27_PAD_SSI3_TXDAT__SLCDC2_CS                     0x5e 0x001
-+#define MX27_PAD_SSI3_TXDAT__GPIO3_30                      0x5e 0x036
-+#define MX27_PAD_SSI3_CLK__SSI3_CLK                        0x5f 0x004
-+#define MX27_PAD_SSI3_CLK__SLCDC2_CLK                      0x5f 0x001
-+#define MX27_PAD_SSI3_CLK__GPIO3_31                        0x5f 0x036
-+#define MX27_PAD_SD3_CMD__SD3_CMD                          0x60 0x004
-+#define MX27_PAD_SD3_CMD__FEC_TXD0                         0x60 0x006
-+#define MX27_PAD_SD3_CMD__GPIO4_0                          0x60 0x036
-+#define MX27_PAD_SD3_CLK__SD3_CLK                          0x61 0x004
-+#define MX27_PAD_SD3_CLK__ETMTRACEPKT15                    0x61 0x005
-+#define MX27_PAD_SD3_CLK__FEC_TXD1                         0x61 0x006
-+#define MX27_PAD_SD3_CLK__GPIO4_1                          0x61 0x036
-+#define MX27_PAD_ATA_DATA0__ATA_DATA0                      0x62 0x004
-+#define MX27_PAD_ATA_DATA0__SD3_D0                         0x62 0x005
-+#define MX27_PAD_ATA_DATA0__FEC_TXD2                       0x62 0x006
-+#define MX27_PAD_ATA_DATA0__GPIO4_2                        0x62 0x036
-+#define MX27_PAD_ATA_DATA1__ATA_DATA1                      0x63 0x004
-+#define MX27_PAD_ATA_DATA1__SD3_D1                         0x63 0x005
-+#define MX27_PAD_ATA_DATA1__FEC_TXD3                       0x63 0x006
-+#define MX27_PAD_ATA_DATA1__GPIO4_3                        0x63 0x036
-+#define MX27_PAD_ATA_DATA2__ATA_DATA2                      0x64 0x004
-+#define MX27_PAD_ATA_DATA2__SD3_D2                         0x64 0x005
-+#define MX27_PAD_ATA_DATA2__FEC_RX_ER                      0x64 0x002
-+#define MX27_PAD_ATA_DATA2__GPIO4_4                        0x64 0x036
-+#define MX27_PAD_ATA_DATA3__ATA_DATA3                      0x65 0x004
-+#define MX27_PAD_ATA_DATA3__SD3_D3                         0x65 0x005
-+#define MX27_PAD_ATA_DATA3__FEC_RXD1                       0x65 0x002
-+#define MX27_PAD_ATA_DATA3__GPIO4_5                        0x65 0x036
-+#define MX27_PAD_ATA_DATA4__ATA_DATA4                      0x66 0x004
-+#define MX27_PAD_ATA_DATA4__ETMTRACEPKT14                  0x66 0x005
-+#define MX27_PAD_ATA_DATA4__FEC_RXD2                       0x66 0x002
-+#define MX27_PAD_ATA_DATA4__GPIO4_6                        0x66 0x036
-+#define MX27_PAD_ATA_DATA5__ATA_DATA5                      0x67 0x004
-+#define MX27_PAD_ATA_DATA5__ETMTRACEPKT13                  0x67 0x005
-+#define MX27_PAD_ATA_DATA5__FEC_RXD3                       0x67 0x002
-+#define MX27_PAD_ATA_DATA5__GPIO4_7                        0x67 0x036
-+#define MX27_PAD_ATA_DATA6__ATA_DATA6                      0x68 0x004
-+#define MX27_PAD_ATA_DATA6__FEC_MDIO                       0x68 0x005
-+#define MX27_PAD_ATA_DATA6__GPIO4_8                        0x68 0x036
-+#define MX27_PAD_ATA_DATA7__ATA_DATA7                      0x69 0x004
-+#define MX27_PAD_ATA_DATA7__ETMTRACEPKT12                  0x69 0x005
-+#define MX27_PAD_ATA_DATA7__FEC_MDC                        0x69 0x006
-+#define MX27_PAD_ATA_DATA7__GPIO4_9                        0x69 0x036
-+#define MX27_PAD_ATA_DATA8__ATA_DATA8                      0x6a 0x004
-+#define MX27_PAD_ATA_DATA8__ETMTRACEPKT11                  0x6a 0x005
-+#define MX27_PAD_ATA_DATA8__FEC_CRS                        0x6a 0x002
-+#define MX27_PAD_ATA_DATA8__GPIO4_10                       0x6a 0x036
-+#define MX27_PAD_ATA_DATA9__ATA_DATA9                      0x6b 0x004
-+#define MX27_PAD_ATA_DATA9__ETMTRACEPKT10                  0x6b 0x005
-+#define MX27_PAD_ATA_DATA9__FEC_TX_CLK                     0x6b 0x002
-+#define MX27_PAD_ATA_DATA9__GPIO4_11                       0x6b 0x036
-+#define MX27_PAD_ATA_DATA10__ATA_DATA10                    0x6c 0x004
-+#define MX27_PAD_ATA_DATA10__ETMTRACEPKT9                  0x6c 0x005
-+#define MX27_PAD_ATA_DATA10__FEC_RXD0                      0x6c 0x002
-+#define MX27_PAD_ATA_DATA10__GPIO4_12                      0x6c 0x036
-+#define MX27_PAD_ATA_DATA11__ATA_DATA11                    0x6d 0x004
-+#define MX27_PAD_ATA_DATA11__ETMTRACEPKT8                  0x6d 0x005
-+#define MX27_PAD_ATA_DATA11__FEC_RX_DV                     0x6d 0x002
-+#define MX27_PAD_ATA_DATA11__GPIO4_13                      0x6d 0x036
-+#define MX27_PAD_ATA_DATA12__ATA_DATA12                    0x6e 0x004
-+#define MX27_PAD_ATA_DATA12__ETMTRACEPKT7                  0x6e 0x005
-+#define MX27_PAD_ATA_DATA12__FEC_RX_CLK                    0x6e 0x002
-+#define MX27_PAD_ATA_DATA12__GPIO4_14                      0x6e 0x036
-+#define MX27_PAD_ATA_DATA13__ATA_DATA13                    0x6f 0x004
-+#define MX27_PAD_ATA_DATA13__ETMTRACEPKT6                  0x6f 0x005
-+#define MX27_PAD_ATA_DATA13__FEC_COL                       0x6f 0x002
-+#define MX27_PAD_ATA_DATA13__GPIO4_15                      0x6f 0x036
-+#define MX27_PAD_ATA_DATA14__ATA_DATA14                    0x70 0x004
-+#define MX27_PAD_ATA_DATA14__ETMTRACEPKT5                  0x70 0x005
-+#define MX27_PAD_ATA_DATA14__FEC_TX_ER                     0x70 0x006
-+#define MX27_PAD_ATA_DATA14__GPIO4_16                      0x70 0x036
-+#define MX27_PAD_I2C_DATA__I2C_DATA                        0x71 0x004
-+#define MX27_PAD_I2C_DATA__GPIO4_17                        0x71 0x036
-+#define MX27_PAD_I2C_CLK__I2C_CLK                          0x72 0x004
-+#define MX27_PAD_I2C_CLK__GPIO4_18                         0x72 0x036
-+#define MX27_PAD_CSPI2_SS2__CSPI2_SS2                      0x73 0x004
-+#define MX27_PAD_CSPI2_SS2__USBH2_DATA4                    0x73 0x005
-+#define MX27_PAD_CSPI2_SS2__GPIO4_19                       0x73 0x036
-+#define MX27_PAD_CSPI2_SS1__CSPI2_SS1                      0x74 0x004
-+#define MX27_PAD_CSPI2_SS1__USBH2_DATA3                    0x74 0x005
-+#define MX27_PAD_CSPI2_SS1__GPIO4_20                       0x74 0x036
-+#define MX27_PAD_CSPI2_SS0__CSPI2_SS0                      0x75 0x004
-+#define MX27_PAD_CSPI2_SS0__USBH2_DATA6                    0x75 0x005
-+#define MX27_PAD_CSPI2_SS0__GPIO4_21                       0x75 0x036
-+#define MX27_PAD_CSPI2_SCLK__CSPI2_SCLK                    0x76 0x004
-+#define MX27_PAD_CSPI2_SCLK__USBH2_DATA0                   0x76 0x005
-+#define MX27_PAD_CSPI2_SCLK__GPIO4_22                      0x76 0x036
-+#define MX27_PAD_CSPI2_MISO__CSPI2_MISO                    0x77 0x004
-+#define MX27_PAD_CSPI2_MISO__USBH2_DATA2                   0x77 0x005
-+#define MX27_PAD_CSPI2_MISO__GPIO4_23                      0x77 0x036
-+#define MX27_PAD_CSPI2_MOSI__CSPI2_MOSI                    0x78 0x004
-+#define MX27_PAD_CSPI2_MOSI__USBH2_DATA1                   0x78 0x005
-+#define MX27_PAD_CSPI2_MOSI__GPIO4_24                      0x78 0x036
-+#define MX27_PAD_CSPI1_RDY__CSPI1_RDY                      0x79 0x000
-+#define MX27_PAD_CSPI1_RDY__GPIO4_25                       0x79 0x036
-+#define MX27_PAD_CSPI1_SS2__CSPI1_SS2                      0x7a 0x004
-+#define MX27_PAD_CSPI1_SS2__USBH2_DATA5                    0x7a 0x005
-+#define MX27_PAD_CSPI1_SS2__GPIO4_26                       0x7a 0x036
-+#define MX27_PAD_CSPI1_SS1__CSPI1_SS1                      0x7b 0x004
-+#define MX27_PAD_CSPI1_SS1__GPIO4_27                       0x7b 0x036
-+#define MX27_PAD_CSPI1_SS0__CSPI1_SS0                      0x7c 0x004
-+#define MX27_PAD_CSPI1_SS0__GPIO4_28                       0x7c 0x036
-+#define MX27_PAD_CSPI1_SCLK__CSPI1_SCLK                    0x7d 0x004
-+#define MX27_PAD_CSPI1_SCLK__GPIO4_29                      0x7d 0x036
-+#define MX27_PAD_CSPI1_MISO__CSPI1_MISO                    0x7e 0x004
-+#define MX27_PAD_CSPI1_MISO__GPIO4_30                      0x7e 0x036
-+#define MX27_PAD_CSPI1_MOSI__CSPI1_MOSI                    0x7f 0x004
-+#define MX27_PAD_CSPI1_MOSI__GPIO4_31                      0x7f 0x036
-+#define MX27_PAD_USBOTG_NXT__USBOTG_NXT                    0x80 0x000
-+#define MX27_PAD_USBOTG_NXT__KP_COL6A                      0x80 0x005
-+#define MX27_PAD_USBOTG_NXT__GPIO5_0                       0x80 0x036
-+#define MX27_PAD_USBOTG_STP__USBOTG_STP                    0x81 0x004
-+#define MX27_PAD_USBOTG_STP__KP_ROW6A                      0x81 0x005
-+#define MX27_PAD_USBOTG_STP__GPIO5_1                       0x81 0x036
-+#define MX27_PAD_USBOTG_DIR__USBOTG_DIR                    0x82 0x000
-+#define MX27_PAD_USBOTG_DIR__KP_ROW7A                      0x82 0x005
-+#define MX27_PAD_USBOTG_DIR__GPIO5_2                       0x82 0x036
-+#define MX27_PAD_UART2_CTS__UART2_CTS                      0x83 0x004
-+#define MX27_PAD_UART2_CTS__KP_COL7                        0x83 0x005
-+#define MX27_PAD_UART2_CTS__GPIO5_3                        0x83 0x036
-+#define MX27_PAD_UART2_RTS__UART2_RTS                      0x84 0x000
-+#define MX27_PAD_UART2_RTS__KP_ROW7                        0x84 0x005
-+#define MX27_PAD_UART2_RTS__GPIO5_4                        0x84 0x036
-+#define MX27_PAD_PWMO__PWMO                                0x85 0x004
-+#define MX27_PAD_PWMO__GPIO5_5                             0x85 0x036
-+#define MX27_PAD_UART2_TXD__UART2_TXD                      0x86 0x004
-+#define MX27_PAD_UART2_TXD__KP_COL6                        0x86 0x005
-+#define MX27_PAD_UART2_TXD__GPIO5_6                        0x86 0x036
-+#define MX27_PAD_UART2_RXD__UART2_RXD                      0x87 0x000
-+#define MX27_PAD_UART2_RXD__KP_ROW6                        0x87 0x005
-+#define MX27_PAD_UART2_RXD__GPIO5_7                        0x87 0x036
-+#define MX27_PAD_UART3_TXD__UART3_TXD                      0x88 0x004
-+#define MX27_PAD_UART3_TXD__GPIO5_8                        0x88 0x036
-+#define MX27_PAD_UART3_RXD__UART3_RXD                      0x89 0x000
-+#define MX27_PAD_UART3_RXD__GPIO5_9                        0x89 0x036
-+#define MX27_PAD_UART3_CTS__UART3_CTS                      0x8a 0x004
-+#define MX27_PAD_UART3_CTS__GPIO5_10                       0x8a 0x036
-+#define MX27_PAD_UART3_RTS__UART3_RTS                      0x8b 0x000
-+#define MX27_PAD_UART3_RTS__GPIO5_11                       0x8b 0x036
-+#define MX27_PAD_UART1_TXD__UART1_TXD                      0x8c 0x004
-+#define MX27_PAD_UART1_TXD__GPIO5_12                       0x8c 0x036
-+#define MX27_PAD_UART1_RXD__UART1_RXD                      0x8d 0x000
-+#define MX27_PAD_UART1_RXD__GPIO5_13                       0x8d 0x036
-+#define MX27_PAD_UART1_CTS__UART1_CTS                      0x8e 0x004
-+#define MX27_PAD_UART1_CTS__GPIO5_14                       0x8e 0x036
-+#define MX27_PAD_UART1_RTS__UART1_RTS                      0x8f 0x000
-+#define MX27_PAD_UART1_RTS__GPIO5_15                       0x8f 0x036
-+#define MX27_PAD_RTCK__RTCK                                0x90 0x004
-+#define MX27_PAD_RTCK__OWIRE                               0x90 0x005
-+#define MX27_PAD_RTCK__GPIO5_16                            0x90 0x036
-+#define MX27_PAD_RESET_OUT_B__RESET_OUT_B                  0x91 0x004
-+#define MX27_PAD_RESET_OUT_B__GPIO5_17                     0x91 0x036
-+#define MX27_PAD_SD1_D0__SD1_D0                            0x92 0x004
-+#define MX27_PAD_SD1_D0__CSPI3_MISO                        0x92 0x001
-+#define MX27_PAD_SD1_D0__GPIO5_18                          0x92 0x036
-+#define MX27_PAD_SD1_D1__SD1_D1                            0x93 0x004
-+#define MX27_PAD_SD1_D1__GPIO5_19                          0x93 0x036
-+#define MX27_PAD_SD1_D2__SD1_D2                            0x94 0x004
-+#define MX27_PAD_SD1_D2__GPIO5_20                          0x94 0x036
-+#define MX27_PAD_SD1_D3__SD1_D3                            0x95 0x004
-+#define MX27_PAD_SD1_D3__CSPI3_SS                          0x95 0x005
-+#define MX27_PAD_SD1_D3__GPIO5_21                          0x95 0x036
-+#define MX27_PAD_SD1_CMD__SD1_CMD                          0x96 0x004
-+#define MX27_PAD_SD1_CMD__CSPI3_MOSI                       0x96 0x005
-+#define MX27_PAD_SD1_CMD__GPIO5_22                         0x96 0x036
-+#define MX27_PAD_SD1_CLK__SD1_CLK                          0x97 0x004
-+#define MX27_PAD_SD1_CLK__CSPI3_SCLK                       0x97 0x005
-+#define MX27_PAD_SD1_CLK__GPIO5_23                         0x97 0x036
-+#define MX27_PAD_USBOTG_CLK__USBOTG_CLK                    0x98 0x000
-+#define MX27_PAD_USBOTG_CLK__GPIO5_24                      0x98 0x036
-+#define MX27_PAD_USBOTG_DATA7__USBOTG_DATA7                0x99 0x004
-+#define MX27_PAD_USBOTG_DATA7__GPIO5_25                    0x99 0x036
-+#define MX27_PAD_UNUSED9__UNUSED9                          0x9a 0x004
-+#define MX27_PAD_UNUSED9__GPIO5_26                         0x9a 0x036
-+#define MX27_PAD_UNUSED10__UNUSED10                        0x9b 0x004
-+#define MX27_PAD_UNUSED10__GPIO5_27                        0x9b 0x036
-+#define MX27_PAD_UNUSED11__UNUSED11                        0x9c 0x004
-+#define MX27_PAD_UNUSED11__GPIO5_28                        0x9c 0x036
-+#define MX27_PAD_UNUSED12__UNUSED12                        0x9d 0x004
-+#define MX27_PAD_UNUSED12__GPIO5_29                        0x9d 0x036
-+#define MX27_PAD_UNUSED13__UNUSED13                        0x9e 0x004
-+#define MX27_PAD_UNUSED13__GPIO5_30                        0x9e 0x036
-+#define MX27_PAD_UNUSED14__UNUSED14                        0x9f 0x004
-+#define MX27_PAD_UNUSED14__GPIO5_31                        0x9f 0x036
-+#define MX27_PAD_NFRB__NFRB                                0xa0 0x000
-+#define MX27_PAD_NFRB__ETMTRACEPKT3                        0xa0 0x005
-+#define MX27_PAD_NFRB__GPIO6_0                             0xa0 0x036
-+#define MX27_PAD_NFCLE__NFCLE                              0xa1 0x004
-+#define MX27_PAD_NFCLE__ETMTRACEPKT0                       0xa1 0x005
-+#define MX27_PAD_NFCLE__GPIO6_1                            0xa1 0x036
-+#define MX27_PAD_NFWP_B__NFWP_B                            0xa2 0x004
-+#define MX27_PAD_NFWP_B__ETMTRACEPKT1                      0xa2 0x005
-+#define MX27_PAD_NFWP_B__GPIO6_2                           0xa2 0x036
-+#define MX27_PAD_NFCE_B__NFCE_B                            0xa3 0x004
-+#define MX27_PAD_NFCE_B__ETMTRACEPKT2                      0xa3 0x005
-+#define MX27_PAD_NFCE_B__GPIO6_3                           0xa3 0x036
-+#define MX27_PAD_NFALE__NFALE                              0xa4 0x004
-+#define MX27_PAD_NFALE__ETMPIPESTAT0                       0xa4 0x005
-+#define MX27_PAD_NFALE__GPIO6_4                            0xa4 0x036
-+#define MX27_PAD_NFRE_B__NFRE_B                            0xa5 0x004
-+#define MX27_PAD_NFRE_B__ETMPIPESTAT1                      0xa5 0x005
-+#define MX27_PAD_NFRE_B__GPIO6_5                           0xa5 0x036
-+#define MX27_PAD_NFWE_B__NFWE_B                            0xa6 0x004
-+#define MX27_PAD_NFWE_B__ETMPIPESTAT2                      0xa6 0x005
-+#define MX27_PAD_NFWE_B__GPIO6_6                           0xa6 0x036
-+#define MX27_PAD_PC_POE__PC_POE                            0xa7 0x004
-+#define MX27_PAD_PC_POE__ATA_BUFFER_EN                     0xa7 0x005
-+#define MX27_PAD_PC_POE__GPIO6_7                           0xa7 0x036
-+#define MX27_PAD_PC_RW_B__PC_RW_B                          0xa8 0x004
-+#define MX27_PAD_PC_RW_B__ATA_IORDY                        0xa8 0x001
-+#define MX27_PAD_PC_RW_B__GPIO6_8                          0xa8 0x036
-+#define MX27_PAD_IOIS16__IOIS16                            0xa9 0x000
-+#define MX27_PAD_IOIS16__ATA_INTRQ                         0xa9 0x001
-+#define MX27_PAD_IOIS16__GPIO6_9                           0xa9 0x036
-+#define MX27_PAD_PC_RST__PC_RST                            0xaa 0x004
-+#define MX27_PAD_PC_RST__ATA_RESET_B                       0xaa 0x005
-+#define MX27_PAD_PC_RST__GPIO6_10                          0xaa 0x036
-+#define MX27_PAD_PC_BVD2__PC_BVD2                          0xab 0x000
-+#define MX27_PAD_PC_BVD2__ATA_DMACK                        0xab 0x005
-+#define MX27_PAD_PC_BVD2__GPIO6_11                         0xab 0x036
-+#define MX27_PAD_PC_BVD1__PC_BVD1                          0xac 0x000
-+#define MX27_PAD_PC_BVD1__ATA_DMARQ                        0xac 0x001
-+#define MX27_PAD_PC_BVD1__GPIO6_12                         0xac 0x036
-+#define MX27_PAD_PC_VS2__PC_VS2                            0xad 0x000
-+#define MX27_PAD_PC_VS2__ATA_DA0                           0xad 0x005
-+#define MX27_PAD_PC_VS2__GPIO6_13                          0xad 0x036
-+#define MX27_PAD_PC_VS1__PC_VS1                            0xae 0x000
-+#define MX27_PAD_PC_VS1__ATA_DA1                           0xae 0x005
-+#define MX27_PAD_PC_VS1__GPIO6_14                          0xae 0x036
-+#define MX27_PAD_CLKO__CLKO                                0xaf 0x004
-+#define MX27_PAD_CLKO__GPIO6_15                            0xaf 0x036
-+#define MX27_PAD_PC_PWRON__PC_PWRON                        0xb0 0x000
-+#define MX27_PAD_PC_PWRON__ATA_DA2                         0xb0 0x005
-+#define MX27_PAD_PC_PWRON__GPIO6_16                        0xb0 0x036
-+#define MX27_PAD_PC_READY__PC_READY                        0xb1 0x000
-+#define MX27_PAD_PC_READY__ATA_CS0                         0xb1 0x005
-+#define MX27_PAD_PC_READY__GPIO6_17                        0xb1 0x036
-+#define MX27_PAD_PC_WAIT_B__PC_WAIT_B                      0xb2 0x000
-+#define MX27_PAD_PC_WAIT_B__ATA_CS1                        0xb2 0x005
-+#define MX27_PAD_PC_WAIT_B__GPIO6_18                       0xb2 0x036
-+#define MX27_PAD_PC_CD2_B__PC_CD2_B                        0xb3 0x000
-+#define MX27_PAD_PC_CD2_B__ATA_DIOW                        0xb3 0x005
-+#define MX27_PAD_PC_CD2_B__GPIO6_19                        0xb3 0x036
-+#define MX27_PAD_PC_CD1_B__PC_CD1_B                        0xb4 0x000
-+#define MX27_PAD_PC_CD1_B__ATA_DIOR                        0xb4 0x005
-+#define MX27_PAD_PC_CD1_B__GPIO6_20                        0xb4 0x036
-+#define MX27_PAD_CS4_B__CS4_B                              0xb5 0x004
-+#define MX27_PAD_CS4_B__ETMTRACESYNC                       0xb5 0x005
-+#define MX27_PAD_CS4_B__GPIO6_21                           0xb5 0x036
-+#define MX27_PAD_CS5_B__CS5_B                              0xb6 0x004
-+#define MX27_PAD_CS5_B__ETMTRACECLK                        0xb6 0x005
-+#define MX27_PAD_CS5_B__GPIO6_22                           0xb6 0x036
-+#define MX27_PAD_ATA_DATA15__ATA_DATA15                    0xb7 0x004
-+#define MX27_PAD_ATA_DATA15__ETMTRACEPKT4                  0xb7 0x005
-+#define MX27_PAD_ATA_DATA15__FEC_TX_EN                     0xb7 0x006
-+#define MX27_PAD_ATA_DATA15__GPIO6_23                      0xb7 0x036
-+#define MX27_PAD_UNUSED15__UNUSED15                        0xb8 0x004
-+#define MX27_PAD_UNUSED15__GPIO6_24                        0xb8 0x036
-+#define MX27_PAD_UNUSED16__UNUSED16                        0xb9 0x004
-+#define MX27_PAD_UNUSED16__GPIO6_25                        0xb9 0x036
-+#define MX27_PAD_UNUSED17__UNUSED17                        0xba 0x004
-+#define MX27_PAD_UNUSED17__GPIO6_26                        0xba 0x036
-+#define MX27_PAD_UNUSED18__UNUSED18                        0xbb 0x004
-+#define MX27_PAD_UNUSED18__GPIO6_27                        0xbb 0x036
-+#define MX27_PAD_UNUSED19__UNUSED19                        0xbc 0x004
-+#define MX27_PAD_UNUSED19__GPIO6_28                        0xbc 0x036
-+#define MX27_PAD_UNUSED20__UNUSED20                        0xbd 0x004
-+#define MX27_PAD_UNUSED20__GPIO6_29                        0xbd 0x036
-+#define MX27_PAD_UNUSED21__UNUSED21                        0xbe 0x004
-+#define MX27_PAD_UNUSED21__GPIO6_30                        0xbe 0x036
-+#define MX27_PAD_UNUSED22__UNUSED22                        0xbf 0x004
-+#define MX27_PAD_UNUSED22__GPIO6_31                        0xbf 0x036
++#define PAD_ID(port, pin) (port*32 + pin)
++#define PA 0
++#define PB 1
++#define PC 2
++#define PD 3
++#define PE 4
++#define PF 5
 +
-+#endif /* __DTS_IMX27_PINFUNC_H */
++enum imx27_pads {
++	MX27_PAD_USBH2_CLK = PAD_ID(PA, 0),
++	MX27_PAD_USBH2_DIR = PAD_ID(PA, 1),
++	MX27_PAD_USBH2_DATA7 = PAD_ID(PA, 2),
++	MX27_PAD_USBH2_NXT = PAD_ID(PA, 3),
++	MX27_PAD_USBH2_STP = PAD_ID(PA, 4),
++	MX27_PAD_LSCLK = PAD_ID(PA, 5),
++	MX27_PAD_LD0 = PAD_ID(PA, 6),
++	MX27_PAD_LD1 = PAD_ID(PA, 7),
++	MX27_PAD_LD2 = PAD_ID(PA, 8),
++	MX27_PAD_LD3 = PAD_ID(PA, 9),
++	MX27_PAD_LD4 = PAD_ID(PA, 10),
++	MX27_PAD_LD5 = PAD_ID(PA, 11),
++	MX27_PAD_LD6 = PAD_ID(PA, 12),
++	MX27_PAD_LD7 = PAD_ID(PA, 13),
++	MX27_PAD_LD8 = PAD_ID(PA, 14),
++	MX27_PAD_LD9 = PAD_ID(PA, 15),
++	MX27_PAD_LD10 = PAD_ID(PA, 16),
++	MX27_PAD_LD11 = PAD_ID(PA, 17),
++	MX27_PAD_LD12 = PAD_ID(PA, 18),
++	MX27_PAD_LD13 = PAD_ID(PA, 19),
++	MX27_PAD_LD14 = PAD_ID(PA, 20),
++	MX27_PAD_LD15 = PAD_ID(PA, 21),
++	MX27_PAD_LD16 = PAD_ID(PA, 22),
++	MX27_PAD_LD17 = PAD_ID(PA, 23),
++	MX27_PAD_REV = PAD_ID(PA, 24),
++	MX27_PAD_CLS = PAD_ID(PA, 25),
++	MX27_PAD_PS = PAD_ID(PA, 26),
++	MX27_PAD_SPL_SPR = PAD_ID(PA, 27),
++	MX27_PAD_HSYNC = PAD_ID(PA, 28),
++	MX27_PAD_VSYNC = PAD_ID(PA, 29),
++	MX27_PAD_CONTRAST = PAD_ID(PA, 30),
++	MX27_PAD_OE_ACD = PAD_ID(PA, 31),
++
++	MX27_PAD_UNUSED0 = PAD_ID(PB, 0),
++	MX27_PAD_UNUSED1 = PAD_ID(PB, 1),
++	MX27_PAD_UNUSED2 = PAD_ID(PB, 2),
++	MX27_PAD_UNUSED3 = PAD_ID(PB, 3),
++	MX27_PAD_SD2_D0 = PAD_ID(PB, 4),
++	MX27_PAD_SD2_D1 = PAD_ID(PB, 5),
++	MX27_PAD_SD2_D2 = PAD_ID(PB, 6),
++	MX27_PAD_SD2_D3 = PAD_ID(PB, 7),
++	MX27_PAD_SD2_CMD = PAD_ID(PB, 8),
++	MX27_PAD_SD2_CLK = PAD_ID(PB, 9),
++	MX27_PAD_CSI_D0 = PAD_ID(PB, 10),
++	MX27_PAD_CSI_D1 = PAD_ID(PB, 11),
++	MX27_PAD_CSI_D2 = PAD_ID(PB, 12),
++	MX27_PAD_CSI_D3 = PAD_ID(PB, 13),
++	MX27_PAD_CSI_D4 = PAD_ID(PB, 14),
++	MX27_PAD_CSI_MCLK = PAD_ID(PB, 15),
++	MX27_PAD_CSI_PIXCLK = PAD_ID(PB, 16),
++	MX27_PAD_CSI_D5 = PAD_ID(PB, 17),
++	MX27_PAD_CSI_D6 = PAD_ID(PB, 18),
++	MX27_PAD_CSI_D7 = PAD_ID(PB, 19),
++	MX27_PAD_CSI_VSYNC = PAD_ID(PB, 20),
++	MX27_PAD_CSI_HSYNC = PAD_ID(PB, 21),
++	MX27_PAD_USBH1_SUSP = PAD_ID(PB, 22),
++	MX27_PAD_USB_PWR = PAD_ID(PB, 23),
++	MX27_PAD_USB_OC_B = PAD_ID(PB, 24),
++	MX27_PAD_USBH1_RCV = PAD_ID(PB, 25),
++	MX27_PAD_USBH1_FS = PAD_ID(PB, 26),
++	MX27_PAD_USBH1_OE_B = PAD_ID(PB, 27),
++	MX27_PAD_USBH1_TXDM = PAD_ID(PB, 28),
++	MX27_PAD_USBH1_TXDP = PAD_ID(PB, 29),
++	MX27_PAD_USBH1_RXDM = PAD_ID(PB, 30),
++	MX27_PAD_USBH1_RXDP = PAD_ID(PB, 31),
++
++	MX27_PAD_UNUSED4 = PAD_ID(PC, 0),
++	MX27_PAD_UNUSED5 = PAD_ID(PC, 1),
++	MX27_PAD_UNUSED6 = PAD_ID(PC, 2),
++	MX27_PAD_UNUSED7 = PAD_ID(PC, 3),
++	MX27_PAD_UNUSED8 = PAD_ID(PC, 4),
++	MX27_PAD_I2C2_SDA = PAD_ID(PC, 5),
++	MX27_PAD_I2C2_SCL = PAD_ID(PC, 6),
++	MX27_PAD_USBOTG_DATA5 = PAD_ID(PC, 7),
++	MX27_PAD_USBOTG_DATA6 = PAD_ID(PC, 8),
++	MX27_PAD_USBOTG_DATA0 = PAD_ID(PC, 9),
++	MX27_PAD_USBOTG_DATA2 = PAD_ID(PC, 10),
++	MX27_PAD_USBOTG_DATA1 = PAD_ID(PC, 11),
++	MX27_PAD_USBOTG_DATA4 = PAD_ID(PC, 12),
++	MX27_PAD_USBOTG_DATA3 = PAD_ID(PC, 13),
++	MX27_PAD_TOUT = PAD_ID(PC, 14),
++	MX27_PAD_TIN = PAD_ID(PC, 15),
++	MX27_PAD_SSI4_FS = PAD_ID(PC, 16),
++	MX27_PAD_SSI4_RXDAT = PAD_ID(PC, 17),
++	MX27_PAD_SSI4_TXDAT = PAD_ID(PC, 18),
++	MX27_PAD_SSI4_CLK = PAD_ID(PC, 19),
++	MX27_PAD_SSI1_FS = PAD_ID(PC, 20),
++	MX27_PAD_SSI1_RXDAT = PAD_ID(PC, 21),
++	MX27_PAD_SSI1_TXDAT = PAD_ID(PC, 22),
++	MX27_PAD_SSI1_CLK = PAD_ID(PC, 23),
++	MX27_PAD_SSI2_FS = PAD_ID(PC, 24),
++	MX27_PAD_SSI2_RXDAT = PAD_ID(PC, 25),
++	MX27_PAD_SSI2_TXDAT = PAD_ID(PC, 26),
++	MX27_PAD_SSI2_CLK = PAD_ID(PC, 27),
++	MX27_PAD_SSI3_FS = PAD_ID(PC, 28),
++	MX27_PAD_SSI3_RXDAT = PAD_ID(PC, 29),
++	MX27_PAD_SSI3_TXDAT = PAD_ID(PC, 30),
++	MX27_PAD_SSI3_CLK = PAD_ID(PC, 31),
++
++	MX27_PAD_SD3_CMD = PAD_ID(PD, 0),
++	MX27_PAD_SD3_CLK = PAD_ID(PD, 1),
++	MX27_PAD_ATA_DATA0 = PAD_ID(PD, 2),
++	MX27_PAD_ATA_DATA1 = PAD_ID(PD, 3),
++	MX27_PAD_ATA_DATA2 = PAD_ID(PD, 4),
++	MX27_PAD_ATA_DATA3 = PAD_ID(PD, 5),
++	MX27_PAD_ATA_DATA4 = PAD_ID(PD, 6),
++	MX27_PAD_ATA_DATA5 = PAD_ID(PD, 7),
++	MX27_PAD_ATA_DATA6 = PAD_ID(PD, 8),
++	MX27_PAD_ATA_DATA7 = PAD_ID(PD, 9),
++	MX27_PAD_ATA_DATA8 = PAD_ID(PD, 10),
++	MX27_PAD_ATA_DATA9 = PAD_ID(PD, 11),
++	MX27_PAD_ATA_DATA10 = PAD_ID(PD, 12),
++	MX27_PAD_ATA_DATA11 = PAD_ID(PD, 13),
++	MX27_PAD_ATA_DATA12 = PAD_ID(PD, 14),
++	MX27_PAD_ATA_DATA13 = PAD_ID(PD, 15),
++	MX27_PAD_ATA_DATA14 = PAD_ID(PD, 16),
++	MX27_PAD_I2C_DATA = PAD_ID(PD, 17),
++	MX27_PAD_I2C_CLK = PAD_ID(PD, 18),
++	MX27_PAD_CSPI2_SS2 = PAD_ID(PD, 19),
++	MX27_PAD_CSPI2_SS1 = PAD_ID(PD, 20),
++	MX27_PAD_CSPI2_SS0 = PAD_ID(PD, 21),
++	MX27_PAD_CSPI2_SCLK = PAD_ID(PD, 22),
++	MX27_PAD_CSPI2_MISO = PAD_ID(PD, 23),
++	MX27_PAD_CSPI2_MOSI = PAD_ID(PD, 24),
++	MX27_PAD_CSPI1_RDY = PAD_ID(PD, 25),
++	MX27_PAD_CSPI1_SS2 = PAD_ID(PD, 26),
++	MX27_PAD_CSPI1_SS1 = PAD_ID(PD, 27),
++	MX27_PAD_CSPI1_SS0 = PAD_ID(PD, 28),
++	MX27_PAD_CSPI1_SCLK = PAD_ID(PD, 29),
++	MX27_PAD_CSPI1_MISO = PAD_ID(PD, 30),
++	MX27_PAD_CSPI1_MOSI = PAD_ID(PD, 31),
++
++	MX27_PAD_USBOTG_NXT = PAD_ID(PE, 0),
++	MX27_PAD_USBOTG_STP = PAD_ID(PE, 1),
++	MX27_PAD_USBOTG_DIR = PAD_ID(PE, 2),
++	MX27_PAD_UART2_CTS = PAD_ID(PE, 3),
++	MX27_PAD_UART2_RTS = PAD_ID(PE, 4),
++	MX27_PAD_PWMO = PAD_ID(PE, 5),
++	MX27_PAD_UART2_TXD = PAD_ID(PE, 6),
++	MX27_PAD_UART2_RXD = PAD_ID(PE, 7),
++	MX27_PAD_UART3_TXD = PAD_ID(PE, 8),
++	MX27_PAD_UART3_RXD = PAD_ID(PE, 9),
++	MX27_PAD_UART3_CTS = PAD_ID(PE, 10),
++	MX27_PAD_UART3_RTS = PAD_ID(PE, 11),
++	MX27_PAD_UART1_TXD = PAD_ID(PE, 12),
++	MX27_PAD_UART1_RXD = PAD_ID(PE, 13),
++	MX27_PAD_UART1_CTS = PAD_ID(PE, 14),
++	MX27_PAD_UART1_RTS = PAD_ID(PE, 15),
++	MX27_PAD_RTCK = PAD_ID(PE, 16),
++	MX27_PAD_RESET_OUT_B = PAD_ID(PE, 17),
++	MX27_PAD_SD1_D0 = PAD_ID(PE, 18),
++	MX27_PAD_SD1_D1 = PAD_ID(PE, 19),
++	MX27_PAD_SD1_D2 = PAD_ID(PE, 20),
++	MX27_PAD_SD1_D3 = PAD_ID(PE, 21),
++	MX27_PAD_SD1_CMD = PAD_ID(PE, 22),
++	MX27_PAD_SD1_CLK = PAD_ID(PE, 23),
++	MX27_PAD_USBOTG_CLK = PAD_ID(PE, 24),
++	MX27_PAD_USBOTG_DATA7 = PAD_ID(PE, 25),
++	MX27_PAD_UNUSED9 = PAD_ID(PE, 26),
++	MX27_PAD_UNUSED10 = PAD_ID(PE, 27),
++	MX27_PAD_UNUSED11 = PAD_ID(PE, 28),
++	MX27_PAD_UNUSED12 = PAD_ID(PE, 29),
++	MX27_PAD_UNUSED13 = PAD_ID(PE, 30),
++	MX27_PAD_UNUSED14 = PAD_ID(PE, 31),
++
++	MX27_PAD_NFRB = PAD_ID(PF, 0),
++	MX27_PAD_NFCLE = PAD_ID(PF, 1),
++	MX27_PAD_NFWP_B = PAD_ID(PF, 2),
++	MX27_PAD_NFCE_B = PAD_ID(PF, 3),
++	MX27_PAD_NFALE = PAD_ID(PF, 4),
++	MX27_PAD_NFRE_B = PAD_ID(PF, 5),
++	MX27_PAD_NFWE_B = PAD_ID(PF, 6),
++	MX27_PAD_PC_POE = PAD_ID(PF, 7),
++	MX27_PAD_PC_RW_B = PAD_ID(PF, 8),
++	MX27_PAD_IOIS16 = PAD_ID(PF, 9),
++	MX27_PAD_PC_RST = PAD_ID(PF, 10),
++	MX27_PAD_PC_BVD2 = PAD_ID(PF, 11),
++	MX27_PAD_PC_BVD1 = PAD_ID(PF, 12),
++	MX27_PAD_PC_VS2 = PAD_ID(PF, 13),
++	MX27_PAD_PC_VS1 = PAD_ID(PF, 14),
++	MX27_PAD_CLKO = PAD_ID(PF, 15),
++	MX27_PAD_PC_PWRON = PAD_ID(PF, 16),
++	MX27_PAD_PC_READY = PAD_ID(PF, 17),
++	MX27_PAD_PC_WAIT_B = PAD_ID(PF, 18),
++	MX27_PAD_PC_CD2_B = PAD_ID(PF, 19),
++	MX27_PAD_PC_CD1_B = PAD_ID(PF, 20),
++	MX27_PAD_CS4_B = PAD_ID(PF, 21),
++	MX27_PAD_CS5_B = PAD_ID(PF, 22),
++	MX27_PAD_ATA_DATA15 = PAD_ID(PF, 23),
++	MX27_PAD_UNUSED15 = PAD_ID(PF, 24),
++	MX27_PAD_UNUSED16 = PAD_ID(PF, 25),
++	MX27_PAD_UNUSED17 = PAD_ID(PF, 26),
++	MX27_PAD_UNUSED18 = PAD_ID(PF, 27),
++	MX27_PAD_UNUSED19 = PAD_ID(PF, 28),
++	MX27_PAD_UNUSED20 = PAD_ID(PF, 29),
++	MX27_PAD_UNUSED21 = PAD_ID(PF, 30),
++	MX27_PAD_UNUSED22 = PAD_ID(PF, 31),
++};
++
++/* Pad names for the pinmux subsystem */
++static const struct pinctrl_pin_desc imx27_pinctrl_pads[] = {
++	IMX_PINCTRL_PIN(MX27_PAD_USBH2_CLK),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH2_DIR),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH2_DATA7),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH2_NXT),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH2_STP),
++	IMX_PINCTRL_PIN(MX27_PAD_LSCLK),
++	IMX_PINCTRL_PIN(MX27_PAD_LD0),
++	IMX_PINCTRL_PIN(MX27_PAD_LD1),
++	IMX_PINCTRL_PIN(MX27_PAD_LD2),
++	IMX_PINCTRL_PIN(MX27_PAD_LD3),
++	IMX_PINCTRL_PIN(MX27_PAD_LD4),
++	IMX_PINCTRL_PIN(MX27_PAD_LD5),
++	IMX_PINCTRL_PIN(MX27_PAD_LD6),
++	IMX_PINCTRL_PIN(MX27_PAD_LD7),
++	IMX_PINCTRL_PIN(MX27_PAD_LD8),
++	IMX_PINCTRL_PIN(MX27_PAD_LD9),
++	IMX_PINCTRL_PIN(MX27_PAD_LD10),
++	IMX_PINCTRL_PIN(MX27_PAD_LD11),
++	IMX_PINCTRL_PIN(MX27_PAD_LD12),
++	IMX_PINCTRL_PIN(MX27_PAD_LD13),
++	IMX_PINCTRL_PIN(MX27_PAD_LD14),
++	IMX_PINCTRL_PIN(MX27_PAD_LD15),
++	IMX_PINCTRL_PIN(MX27_PAD_LD16),
++	IMX_PINCTRL_PIN(MX27_PAD_LD17),
++	IMX_PINCTRL_PIN(MX27_PAD_REV),
++	IMX_PINCTRL_PIN(MX27_PAD_CLS),
++	IMX_PINCTRL_PIN(MX27_PAD_PS),
++	IMX_PINCTRL_PIN(MX27_PAD_SPL_SPR),
++	IMX_PINCTRL_PIN(MX27_PAD_HSYNC),
++	IMX_PINCTRL_PIN(MX27_PAD_VSYNC),
++	IMX_PINCTRL_PIN(MX27_PAD_CONTRAST),
++	IMX_PINCTRL_PIN(MX27_PAD_OE_ACD),
++
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED0),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED1),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED2),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED3),
++	IMX_PINCTRL_PIN(MX27_PAD_SD2_D0),
++	IMX_PINCTRL_PIN(MX27_PAD_SD2_D1),
++	IMX_PINCTRL_PIN(MX27_PAD_SD2_D2),
++	IMX_PINCTRL_PIN(MX27_PAD_SD2_D3),
++	IMX_PINCTRL_PIN(MX27_PAD_SD2_CMD),
++	IMX_PINCTRL_PIN(MX27_PAD_SD2_CLK),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_D0),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_D1),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_D2),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_D3),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_D4),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_MCLK),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_PIXCLK),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_D5),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_D6),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_D7),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_VSYNC),
++	IMX_PINCTRL_PIN(MX27_PAD_CSI_HSYNC),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH1_SUSP),
++	IMX_PINCTRL_PIN(MX27_PAD_USB_PWR),
++	IMX_PINCTRL_PIN(MX27_PAD_USB_OC_B),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH1_RCV),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH1_FS),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH1_OE_B),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH1_TXDM),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH1_TXDP),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH1_RXDM),
++	IMX_PINCTRL_PIN(MX27_PAD_USBH1_RXDP),
++
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED4),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED5),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED6),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED7),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED8),
++	IMX_PINCTRL_PIN(MX27_PAD_I2C2_SDA),
++	IMX_PINCTRL_PIN(MX27_PAD_I2C2_SCL),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA5),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA6),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA0),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA2),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA1),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA4),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA3),
++	IMX_PINCTRL_PIN(MX27_PAD_TOUT),
++	IMX_PINCTRL_PIN(MX27_PAD_TIN),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI4_FS),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI4_RXDAT),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI4_TXDAT),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI4_CLK),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI1_FS),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI1_RXDAT),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI1_TXDAT),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI1_CLK),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI2_FS),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI2_RXDAT),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI2_TXDAT),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI2_CLK),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI3_FS),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI3_RXDAT),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI3_TXDAT),
++	IMX_PINCTRL_PIN(MX27_PAD_SSI3_CLK),
++
++	IMX_PINCTRL_PIN(MX27_PAD_SD3_CMD),
++	IMX_PINCTRL_PIN(MX27_PAD_SD3_CLK),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA0),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA1),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA2),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA3),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA4),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA5),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA6),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA7),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA8),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA9),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA10),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA11),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA12),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA13),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA14),
++	IMX_PINCTRL_PIN(MX27_PAD_I2C_DATA),
++	IMX_PINCTRL_PIN(MX27_PAD_I2C_CLK),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SS2),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SS1),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SS0),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_SCLK),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_MISO),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI2_MOSI),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_RDY),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SS2),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SS1),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SS0),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_SCLK),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_MISO),
++	IMX_PINCTRL_PIN(MX27_PAD_CSPI1_MOSI),
++
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_NXT),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_STP),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DIR),
++	IMX_PINCTRL_PIN(MX27_PAD_UART2_CTS),
++	IMX_PINCTRL_PIN(MX27_PAD_UART2_RTS),
++	IMX_PINCTRL_PIN(MX27_PAD_PWMO),
++	IMX_PINCTRL_PIN(MX27_PAD_UART2_TXD),
++	IMX_PINCTRL_PIN(MX27_PAD_UART2_RXD),
++	IMX_PINCTRL_PIN(MX27_PAD_UART3_TXD),
++	IMX_PINCTRL_PIN(MX27_PAD_UART3_RXD),
++	IMX_PINCTRL_PIN(MX27_PAD_UART3_CTS),
++	IMX_PINCTRL_PIN(MX27_PAD_UART3_RTS),
++	IMX_PINCTRL_PIN(MX27_PAD_UART1_TXD),
++	IMX_PINCTRL_PIN(MX27_PAD_UART1_RXD),
++	IMX_PINCTRL_PIN(MX27_PAD_UART1_CTS),
++	IMX_PINCTRL_PIN(MX27_PAD_UART1_RTS),
++	IMX_PINCTRL_PIN(MX27_PAD_RTCK),
++	IMX_PINCTRL_PIN(MX27_PAD_RESET_OUT_B),
++	IMX_PINCTRL_PIN(MX27_PAD_SD1_D0),
++	IMX_PINCTRL_PIN(MX27_PAD_SD1_D1),
++	IMX_PINCTRL_PIN(MX27_PAD_SD1_D2),
++	IMX_PINCTRL_PIN(MX27_PAD_SD1_D3),
++	IMX_PINCTRL_PIN(MX27_PAD_SD1_CMD),
++	IMX_PINCTRL_PIN(MX27_PAD_SD1_CLK),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_CLK),
++	IMX_PINCTRL_PIN(MX27_PAD_USBOTG_DATA7),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED9),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED10),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED11),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED12),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED13),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED14),
++
++	IMX_PINCTRL_PIN(MX27_PAD_NFRB),
++	IMX_PINCTRL_PIN(MX27_PAD_NFCLE),
++	IMX_PINCTRL_PIN(MX27_PAD_NFWP_B),
++	IMX_PINCTRL_PIN(MX27_PAD_NFCE_B),
++	IMX_PINCTRL_PIN(MX27_PAD_NFALE),
++	IMX_PINCTRL_PIN(MX27_PAD_NFRE_B),
++	IMX_PINCTRL_PIN(MX27_PAD_NFWE_B),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_POE),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_RW_B),
++	IMX_PINCTRL_PIN(MX27_PAD_IOIS16),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_RST),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_BVD2),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_BVD1),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_VS2),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_VS1),
++	IMX_PINCTRL_PIN(MX27_PAD_CLKO),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_PWRON),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_READY),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_WAIT_B),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_CD2_B),
++	IMX_PINCTRL_PIN(MX27_PAD_PC_CD1_B),
++	IMX_PINCTRL_PIN(MX27_PAD_CS4_B),
++	IMX_PINCTRL_PIN(MX27_PAD_CS5_B),
++	IMX_PINCTRL_PIN(MX27_PAD_ATA_DATA15),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED15),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED16),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED17),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED18),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED19),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED20),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED21),
++	IMX_PINCTRL_PIN(MX27_PAD_UNUSED22),
++};
++
++static struct imx1_pinctrl_soc_info imx27_pinctrl_info = {
++	.pins = imx27_pinctrl_pads,
++	.npins = ARRAY_SIZE(imx27_pinctrl_pads),
++};
++
++static struct of_device_id imx27_pinctrl_of_match[] = {
++	{ .compatible = "fsl,imx27-iomuxc", },
++	{ /* sentinel */ }
++};
++
++struct imx27_pinctrl_private {
++	int num_gpio_childs;
++	struct platform_device **gpio_dev;
++	struct mxc_gpio_platform_data *gpio_pdata;
++};
++
++static int imx27_pinctrl_probe(struct platform_device *pdev)
++{
++	return imx1_pinctrl_core_probe(pdev, &imx27_pinctrl_info);
++}
++
++static struct platform_driver imx27_pinctrl_driver = {
++	.driver = {
++		.name = "imx27-pinctrl",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(imx27_pinctrl_of_match),
++	},
++	.probe = imx27_pinctrl_probe,
++	.remove = imx1_pinctrl_core_remove,
++};
++
++static int __init imx27_pinctrl_init(void)
++{
++	return platform_driver_register(&imx27_pinctrl_driver);
++}
++arch_initcall(imx27_pinctrl_init);
++
++static void __exit imx27_pinctrl_exit(void)
++{
++	platform_driver_unregister(&imx27_pinctrl_driver);
++}
++module_exit(imx27_pinctrl_exit);
++MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
++MODULE_DESCRIPTION("Freescale IMX27 pinctrl driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.8.4.rc3
