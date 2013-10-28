@@ -1,41 +1,25 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 28 Oct 2013 15:59:34 +0000
-Subject: [PULL REQ] Big Endian initial patch series
-In-Reply-To: <20131028085328.GI16735@n2100.arm.linux.org.uk>
-References: <20131018205405.GA28835@codethink.co.uk>
- <20131019170954.GC25076@mudshark.cambridge.arm.com>
- <5262E2C7.7000106@codethink.co.uk>
- <20131028004736.GG16735@n2100.arm.linux.org.uk>
- <20131028084455.GA20218@mudshark.cambridge.arm.com>
- <20131028085328.GI16735@n2100.arm.linux.org.uk>
-Message-ID: <526E89E6.8010202@codethink.co.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 28 Oct 2013 09:00:15 -0700
+Subject: [RFC 1/4] ASoC: omap: rx51: Use snd_soc_register_card
+In-Reply-To: <1382909086-10493-2-git-send-email-sre@debian.org>
+References: <1382909086-10493-1-git-send-email-sre@debian.org>
+ <1382909086-10493-2-git-send-email-sre@debian.org>
+Message-ID: <20131028160015.GA13643@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/10/13 08:53, Russell King - ARM Linux wrote:
+On Sun, Oct 27, 2013 at 10:24:43PM +0100, Sebastian Reichel wrote:
+> From: Pali Roh?r <pali.rohar@gmail.com>
+> 
+> This patch converts the rx51 ASoC module to use
+> snd_soc_register_card. It also adds module alias
+> to support driver autoloading.
 
->> +#ifdef __ARMEB_
->> +#define LOW_OFFSET     0x4
->> +#define HIGH_OFFSET    0x0
->> +#else
->> +#define LOW_OFFSET     0x0
->> +#define HIGH_OFFSET    0x4
->> +#endif
->>
->> (spot the missing underscore).
->
-> Yep, well spotted.
->
-> Well, we have some time to get this all fixed, so I'm going to drop
-> Ben's tree.  I think we need to first commit a patch to fix the error
-> in Santosh's patch
-
-Ok, shall I look at re-basing to -rc6?
-
-I have a bug report with a change to the SCU reading for the SMP
-fix-up case which could do with fixing, so I could add this and send
-another pull request (complete with description this time).
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+You should really use devm_snd_soc_register_card() here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131028/9750074b/attachment.sig>
