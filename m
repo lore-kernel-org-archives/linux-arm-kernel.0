@@ -1,9 +1,9 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Oct 2013 23:49:23 +0100
-Subject: [PATCH 06/12] i2c: sh_mobile: Convert to clk_prepare/unprepare
+Date: Mon, 28 Oct 2013 23:49:24 +0100
+Subject: [PATCH 07/12] mmc: sh_mmcif: Convert to clk_prepare/unprepare
 In-Reply-To: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383000569-8916-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383000569-8916-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,51 +11,71 @@ Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
 clk_disable_unprepare() to get ready for the migration to the common
 clock framework.
 
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: linux-i2c at vger.kernel.org
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Cc: linux-mmc at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/i2c/busses/i2c-sh_mobile.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/mmc/host/sh_mmcif.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-sh_mobile.c b/drivers/i2c/busses/i2c-sh_mobile.c
-index 55110dd..1d79585 100644
---- a/drivers/i2c/busses/i2c-sh_mobile.c
-+++ b/drivers/i2c/busses/i2c-sh_mobile.c
-@@ -235,7 +235,7 @@ static void sh_mobile_i2c_init(struct sh_mobile_i2c_data *pd)
- 	int offset;
+diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+index 36629a0..37a6c57 100644
+--- a/drivers/mmc/host/sh_mmcif.c
++++ b/drivers/mmc/host/sh_mmcif.c
+@@ -964,7 +964,7 @@ static void sh_mmcif_request(struct mmc_host *mmc, struct mmc_request *mrq)
  
- 	/* Get clock rate after clock is enabled */
--	clk_enable(pd->clk);
-+	clk_prepare_enable(pd->clk);
- 	i2c_clk_khz = clk_get_rate(pd->clk) / 1000;
- 	i2c_clk_khz /= pd->clks_per_count;
- 
-@@ -270,14 +270,14 @@ static void sh_mobile_i2c_init(struct sh_mobile_i2c_data *pd)
- 		pd->icic &= ~ICIC_ICCHB8;
- 
- out:
--	clk_disable(pd->clk);
-+	clk_disable_unprepare(pd->clk);
- }
- 
- static void activate_ch(struct sh_mobile_i2c_data *pd)
+ static int sh_mmcif_clk_update(struct sh_mmcif_host *host)
  {
- 	/* Wake up device and enable clock */
- 	pm_runtime_get_sync(pd->dev);
--	clk_enable(pd->clk);
-+	clk_prepare_enable(pd->clk);
+-	int ret = clk_enable(host->hclk);
++	int ret = clk_prepare_enable(host->hclk);
  
- 	/* Enable channel and configure rx ack */
- 	iic_set_clr(pd, ICCR, ICCR_ICE, 0);
-@@ -300,7 +300,7 @@ static void deactivate_ch(struct sh_mobile_i2c_data *pd)
- 	iic_set_clr(pd, ICCR, 0, ICCR_ICE);
+ 	if (!ret) {
+ 		host->clk = clk_get_rate(host->hclk);
+@@ -1018,7 +1018,7 @@ static void sh_mmcif_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		}
+ 		if (host->power) {
+ 			pm_runtime_put_sync(&host->pd->dev);
+-			clk_disable(host->hclk);
++			clk_disable_unprepare(host->hclk);
+ 			host->power = false;
+ 			if (ios->power_mode == MMC_POWER_OFF)
+ 				sh_mmcif_set_power(host, ios);
+@@ -1466,7 +1466,7 @@ static int sh_mmcif_probe(struct platform_device *pdev)
  
- 	/* Disable clock and mark device as idle */
--	clk_disable(pd->clk);
-+	clk_disable_unprepare(pd->clk);
- 	pm_runtime_put_sync(pd->dev);
- }
+ 	mutex_init(&host->thread_lock);
  
+-	clk_disable(host->hclk);
++	clk_disable_unprepare(host->hclk);
+ 	ret = mmc_add_host(mmc);
+ 	if (ret < 0)
+ 		goto emmcaddh;
+@@ -1487,7 +1487,7 @@ ereqirq1:
+ ereqirq0:
+ 	pm_runtime_suspend(&pdev->dev);
+ eresume:
+-	clk_disable(host->hclk);
++	clk_disable_unprepare(host->hclk);
+ eclkupdate:
+ 	clk_put(host->hclk);
+ eclkget:
+@@ -1505,7 +1505,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
+ 	int irq[2];
+ 
+ 	host->dying = true;
+-	clk_enable(host->hclk);
++	clk_prepare_enable(host->hclk);
+ 	pm_runtime_get_sync(&pdev->dev);
+ 
+ 	dev_pm_qos_hide_latency_limit(&pdev->dev);
+@@ -1530,7 +1530,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
+ 	if (irq[1] >= 0)
+ 		free_irq(irq[1], host);
+ 
+-	clk_disable(host->hclk);
++	clk_disable_unprepare(host->hclk);
+ 	mmc_free_host(host->mmc);
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
 -- 
 1.8.1.5
