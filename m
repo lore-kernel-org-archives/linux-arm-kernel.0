@@ -1,102 +1,103 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 28 Oct 2013 14:42:30 +0530
-Subject: [PULL REQ] Big Endian initial patch series
-In-Reply-To: <20131028085328.GI16735@n2100.arm.linux.org.uk>
-References: <20131018205405.GA28835@codethink.co.uk>
- <20131019170954.GC25076@mudshark.cambridge.arm.com>
- <5262E2C7.7000106@codethink.co.uk>
- <20131028004736.GG16735@n2100.arm.linux.org.uk>
- <20131028084455.GA20218@mudshark.cambridge.arm.com>
- <20131028085328.GI16735@n2100.arm.linux.org.uk>
-Message-ID: <526E2A7E.50108@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 28 Oct 2013 17:22:53 +0800
+Subject: [PATCH] ARM: imx: remove imx_src_prepare_restart() call
+Message-ID: <1382952173-28192-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Monday 28 October 2013 02:23 PM, Russell King - ARM Linux wrote:
-> On Mon, Oct 28, 2013 at 08:44:55AM +0000, Will Deacon wrote:
->> Hi Russell,
->>
->> On Mon, Oct 28, 2013 at 12:47:36AM +0000, Russell King - ARM Linux wrote:
->>> On Sat, Oct 19, 2013 at 08:51:35PM +0100, Ben Dooks wrote:
->>>> On 19/10/13 18:09, Will Deacon wrote:
->>>>> Do you think you could send another pull request please?
->>>> Ok, sorted.
->>> Pulled, but there was a conflict.  Please check this resolution (it's
->>> copy'n'pasted).  I'll probably be in linux-next tomorrow in any case,
->>> but any mistake here can be fixed.
->> This doesn't look quite right to me, but unfortunately I'm going be spending
->> most (all?) of today trying to catch a flight out of the UK. Hopefully Dave
->> or Ben can investigate further, but comments below.
->>
->>> diff --cc arch/arm/kernel/head.S
->>> index 54547947a4e9,a047acfa6b6d..000000000000
->>> --- a/arch/arm/kernel/head.S
->>> +++ b/arch/arm/kernel/head.S
->>> @@@ -602,28 -586,26 +606,39 @@@ __fixup_a_pv_table
->>>         b       2f
->>>   1:    add     r7, r3
->>>         ldrh    ip, [r7, #2]
->>> + ARM_BE8(rev16 ip, ip)
->>>  -      and     ip, 0x8f00
->>>  -      orr     ip, r6  @ mask in offset bits 31-24
->>>  +      tst     ip, #0x4000
->>>  +      and     ip, #0x8f00
->>>  +      orrne   ip, r6  @ mask in offset bits 31-24
->>>  +      orreq   ip, r0  @ mask in offset bits 7-0
->>> + ARM_BE8(rev16 ip, ip)
->>>         strh    ip, [r7, #2]
->>>  +      ldrheq  ip, [r7]
->>>  +      biceq   ip, #0x20
->>>  +      orreq   ip, ip, r0, lsr #16
->>>  +      strheq  ip, [r7]
->> There are new halfword accesses here without any conditional revs.
-> Yes, I missed this one.
->
->>> + #ifdef CONFIG_CPU_ENDIAN_BE8
->>> +       @ in BE8, we load data in BE, but instructions still in LE
->>> +       bic     ip, ip, #0xff000000
->>>  -      orr     ip, ip, r6, lsl#24
->>> ++      tst     ip, #0x000f0000 @ check the rotation field
->> Since that orr with shift has been removed, I think the masks for the BE
->> case are now incorrect...
->>
->>> ++      orrne   ip, ip, r6, lsl #24 @ mask in offset bits 31-24
->>> ++      biceq   ip, ip, #0x00004000 @ clear bit 22
->>> ++      orreq   ip, ip, r0, lsl #24 @ mask in offset bits 7-0
-> Actually, look closer.  It became the orrne here.
->
->>> + #else
->>>         bic     ip, ip, #0x000000ff
->>>  -      orr     ip, ip, r6      @ mask in offset bits 31-24
->>>  +      tst     ip, #0xf00      @ check the rotation field
->>>  +      orrne   ip, ip, r6      @ mask in offset bits 31-24
->>>  +      biceq   ip, ip, #0x400000       @ clear bit 22
->> ...which seems to be confirmed by the updated LE code (everything is off
->> by a byte).
-> The LE code was left unaltered from Santosh's patch, so that should be
-> correct.  I just did an endian conversion to the BE case.
->
->> Somebody should probably sit down with the conflicting patch and port the BE
->> changes over. I think the relevant patch is "ARM: mm: Correct virt_to_phys
->> patching for 64 bit physical addresses". In fact, looking at *that* patch,
->> it's *also* broken for BE! It adds the following to head.S:
->>
->> +#ifdef __ARMEB_
->> +#define LOW_OFFSET     0x4
->> +#define HIGH_OFFSET    0x0
->> +#else
->> +#define LOW_OFFSET     0x0
->> +#define HIGH_OFFSET    0x4
->> +#endif
->>
->> (spot the missing underscore).
-> Yep, well spotted.
->
-> Well, we have some time to get this all fixed, so I'm going to drop
-> Ben's tree.  I think we need to first commit a patch to fix the error
-> in Santosh's patch.
-Sorry, I will send a patch fix this missing underscore bug.
+There is ~10% possibility that the following emergency restart command
+fails to reboot imx6q.
 
-Regards,
- Sricharan
+$ echo b > /proc/sysrq-trigger
+
+The IMX restart routine mxc_restart() assumes that it will always run on
+primary core, and will call imx_src_prepare_restart() to disable
+secondary cores in order to get them come to online in the following
+boot.  However, the assumption is only true for normal kernel_restart()
+case where migrate_to_reboot_cpu() will be called to migrate to primary
+core, but not necessarily true for emergency_restart() case.  So when
+emergency_restart() calls into mxc_restart() on any secondary core,
+system will hang immediately once imx_src_prepare_restart() is called
+to disabled secondary cores.  Since emergency_restart() is defined as a
+function that is safe to call in interrupt context, we cannot just call
+migrate_to_reboot_cpu() to fix the issue.
+
+Fortunately, we just found that the issue can be fixed at imx6q platform
+level.  We used to call imx_src_prepare_restart() to disable all
+secondary cores before resetting hardware.  Otherwise, the secondary
+will fail come to online in the reboot.  However, we recently found that
+after commit 6050d18 (ARM: imx: reset core along with enable/disable
+operation) comes to play, we do not need to reset the secondary cores
+any more.  That said, mxc_restart() now can run on any core to reboot
+the system, as long as we remove the imx_src_prepare_restart() call from
+mxc_restart().
+
+So let's simply remove imx_src_prepare_restart() call to fix the above
+emergency restart failure.
+
+Reported-by: Jiada Wang <jiada_wang@mentor.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/common.h |    5 -----
+ arch/arm/mach-imx/src.c    |   15 ---------------
+ arch/arm/mach-imx/system.c |    3 ---
+ 3 files changed, 23 deletions(-)
+
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 7cbe22d..24a7899 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -127,11 +127,6 @@ static inline void imx_smp_prepare(void) {}
+ static inline void imx_scu_standby_enable(void) {}
+ #endif
+ void imx_src_init(void);
+-#ifdef CONFIG_HAVE_IMX_SRC
+-void imx_src_prepare_restart(void);
+-#else
+-static inline void imx_src_prepare_restart(void) {}
+-#endif
+ void imx_gpc_init(void);
+ void imx_gpc_pre_suspend(void);
+ void imx_gpc_post_resume(void);
+diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+index 4754373..45f7f4e 100644
+--- a/arch/arm/mach-imx/src.c
++++ b/arch/arm/mach-imx/src.c
+@@ -115,21 +115,6 @@ void imx_set_cpu_arg(int cpu, u32 arg)
+ 	writel_relaxed(arg, src_base + SRC_GPR1 + cpu * 8 + 4);
+ }
+ 
+-void imx_src_prepare_restart(void)
+-{
+-	u32 val;
+-
+-	/* clear enable bits of secondary cores */
+-	spin_lock(&scr_lock);
+-	val = readl_relaxed(src_base + SRC_SCR);
+-	val &= ~(0x7 << BP_SRC_SCR_CORE1_ENABLE);
+-	writel_relaxed(val, src_base + SRC_SCR);
+-	spin_unlock(&scr_lock);
+-
+-	/* clear persistent entry register of primary core */
+-	writel_relaxed(0, src_base + SRC_GPR1);
+-}
+-
+ void __init imx_src_init(void)
+ {
+ 	struct device_node *np;
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index e6edcd3..826b72b 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -42,9 +42,6 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
+ {
+ 	unsigned int wcr_enable;
+ 
+-	if (cpu_is_imx6q() || cpu_is_imx6dl())
+-		imx_src_prepare_restart();
+-
+ 	if (wdog_clk)
+ 		clk_enable(wdog_clk);
+ 
+-- 
+1.7.9.5
