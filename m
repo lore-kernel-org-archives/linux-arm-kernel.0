@@ -1,51 +1,138 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 28 Oct 2013 14:05:02 +0800
-Subject: [PATCH 1/1] ARM: dts: imx6q-arm2: enable USB OTG
-Message-ID: <1382940302-12931-1-git-send-email-peter.chen@freescale.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 28 Oct 2013 01:29:03 -0500
+Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
+ <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <0D287D95-C302-4A59-98AC-C654F5AC97B4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB OTG controller at imx6q-arm2 board
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/boot/dts/imx6q-arm2.dts |   17 +++++++++++++++++
- 1 files changed, 17 insertions(+), 0 deletions(-)
+On Oct 23, 2013, at 8:03 AM, Zhangfei Gao wrote:
 
-diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
-index edf1bd9..8f125b1 100644
---- a/arch/arm/boot/dts/imx6q-arm2.dts
-+++ b/arch/arm/boot/dts/imx6q-arm2.dts
-@@ -31,6 +31,15 @@
- 			regulator-max-microvolt = <3300000>;
- 			regulator-always-on;
- 		};
-+
-+		reg_usb_otg_vbus: usb_otg_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio3 22 0>;
-+			enable-active-high;
-+		};
- 	};
- 
- 	leds {
-@@ -79,6 +88,14 @@
- 	status = "okay";
- };
- 
-+&usbotg { /* USB OTG */
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg_1>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
- &usdhc3 {
- 	cd-gpios = <&gpio6 11 0>;
- 	wp-gpios = <&gpio6 14 0>;
+> update: fix typo
+> 
+> Add dw_mmc-k3.c for k3v2, support sd/emmc
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Tested-by: Zhigang Wang <brooke.wangzhigang@huawei.com>
+> ---
+> .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   77 +++++
+> drivers/mmc/host/Kconfig                           |   10 +
+> drivers/mmc/host/Makefile                          |    1 +
+> drivers/mmc/host/dw_mmc-k3.c                       |  297 ++++++++++++++++++++
+> 4 files changed, 385 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+> create mode 100644 drivers/mmc/host/dw_mmc-k3.c
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+> new file mode 100644
+> index 0000000..0de8c27
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+> @@ -0,0 +1,77 @@
+> +* Hisilicon specific extensions to the Synopsys Designware Mobile
+> +  Storage Host Controller
+> +
+> +Read synopsis-dw-mshc.txt for more details
+> +The Synopsys designware mobile storage host controller is used to interface
+> +a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
+> +differences between the core Synopsys dw mshc controller properties described
+> +by synopsis-dw-mshc.txt and the properties used by the Hisilicon specific
+> +extensions to the Synopsys Designware Mobile Storage Host Controller.
+> +
+> +Required Properties:
+> +
+> +* compatible: should be
+> +	- "hisilicon,hi4511-dw-mshc": for controllers with hi4511
+> +	  specific extentions.
+> +* vmmc-supply: should be vmmc used in dwmmc
+> +* fifo-depth: should be provided if register can not provide correct value
+> +* clken-reg: should be clock enable register and offset
+> +* drv-sel-reg: should be driver delay select register, offset and bits
+> +* sam-sel-reg: should be sample delay select register, offset and bits
+> +* div-reg: should be divider register, offset and bits
+> +* tune-table: should be array of clock tune mmc controller
+> +
+
+1. These should have vendor prefixes
+2. why do we need the *-reg properties
+3. for the *-reg properties its not clear what bits means?
+4. tune-table is not well described, what does 'clock tune' mean, why an array?
+
+
+> +Example:
+> +
+> +  The MSHC controller node can be split into two portions, SoC specific and
+> +  board specific portions as listed below.
+> +
+
+Does dtc merge this all into a single node?  Would probably be good to have comments
+in the example stating both that the merge into one node, and which is board and which
+is soc.
+
+> +	dwmmc_0: dwmmc0 at fcd03000 {
+> +		compatible = "hisilicon,hi4511-dw-mshc";
+> +		reg = <0xfcd03000 0x1000>;
+> +		interrupts = <0 16 4>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		clocks = <&clk_sd>, <&clk_ddrc_per>;
+> +		clock-names = "ciu", "biu";
+> +		clken-reg = <0x1f8 0>;
+> +		drv-sel-reg = <0x1f8 4 4>;
+> +		sam-sel-reg = <0x1f8 8 4>;
+> +		div-reg = <0x1f8 1 3>;
+> +		tune-table =
+> +		<180000000 6 6 13 13 25000000>,
+> +		<0 0 0 0 0 0>,
+> +		<360000000 6 4 2 0 50000000>,
+> +		<180000000 6 4 13 13 25000000>,
+> +		<360000000 6 4 2 0 50000000>,
+> +		<720000000 6 1 9 4 100000000>,
+> +		<0 0 0 0 0 0>,
+> +		<360000000 7 1 3 0 50000000>;
+> +	};
+> +	dwmmc0 at fcd03000 {
+> +		num-slots = <1>;
+> +		vmmc-supply = <&ldo12>;
+> +		fifo-depth = <0x100>;
+> +		supports-highspeed;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
+> +		slot at 0 {
+> +			reg = <0>;
+> +			bus-width = <4>;
+> +			disable-wp;
+> +			cd-gpios = <&gpio10 3 0>;
+> +		};
+> +	};
+> +
+> +PCTRL:
+> +
+
+should have a description
+
+> +Required Properties:
+> +* compatible: should be
+> +	- "hisilicon,pctrl": Peripheral control
+> +
+
+Reg is not described as a required property.
+
+> +Example:
+> +
+> +	pctrl: pctrl at fca09000 {
+> +		compatible = "hisilicon,pctrl";
+> +		reg = <0xfca09000 0x1000>;
+> +	};
+
+This should be in its own binding document, and not part of the mmc binding
+
+- k
+> 
+
 -- 
-1.7.1
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
