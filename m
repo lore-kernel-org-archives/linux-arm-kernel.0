@@ -1,36 +1,51 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 28 Oct 2013 14:01:16 +0800
-Subject: [PATCH 1/1] pinctrl: imx: fix using pin->input_val wrongly
-Message-ID: <1382940076-11898-1-git-send-email-peter.chen@freescale.com>
+Date: Mon, 28 Oct 2013 14:05:02 +0800
+Subject: [PATCH 1/1] ARM: dts: imx6q-arm2: enable USB OTG
+Message-ID: <1382940302-12931-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit: "pinctrl: imx: Use struct type for pins" relaced
-pin->input_reg by pin->input_val wrongly, fix it at this commit.
+Enable USB OTG controller at imx6q-arm2 board
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/pinctrl/pinctrl-imx.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx6q-arm2.dts |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index d78dd81..4779b8e 100644
---- a/drivers/pinctrl/pinctrl-imx.c
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -245,11 +245,11 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
- 			 * The input_reg[i] here is actually some IOMUXC general
- 			 * purpose register, not regular select input register.
- 			 */
--			val = readl(ipctl->base + pin->input_val);
-+			val = readl(ipctl->base + pin->input_reg);
- 			val &= ~mask;
- 			val |= select << shift;
--			writel(val, ipctl->base + pin->input_val);
--		} else if (pin->input_val) {
-+			writel(val, ipctl->base + pin->input_reg);
-+		} else if (pin->input_reg) {
- 			/*
- 			 * Regular select input register can never be at offset
- 			 * 0, and we only print register value for regular case.
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index edf1bd9..8f125b1 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -31,6 +31,15 @@
+ 			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
++
++		reg_usb_otg_vbus: usb_otg_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 22 0>;
++			enable-active-high;
++		};
+ 	};
+ 
+ 	leds {
+@@ -79,6 +88,14 @@
+ 	status = "okay";
+ };
+ 
++&usbotg { /* USB OTG */
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg_1>;
++	disable-over-current;
++	status = "okay";
++};
++
+ &usdhc3 {
+ 	cd-gpios = <&gpio6 11 0>;
+ 	wp-gpios = <&gpio6 14 0>;
 -- 
 1.7.1
