@@ -1,54 +1,83 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Oct 2013 23:49:26 +0100
-Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
- clk_prepare/unprepare
-In-Reply-To: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383000569-8916-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Mon, 28 Oct 2013 23:49:17 +0100
+Subject: [PATCH 00/12] Prepare various SH/R Mobile/Car drivers for CCF
+ migration
+Message-ID: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
-clk_disable_unprepare() to get ready for the migration to the common
-clock framework.
+Hello,
 
+This patch series, based on v3.12-rc7, prepares various Renesas SH-Mobile,
+R-Mobile and R-Car drivers for migration to CCF by adding clock prepare and
+unprepare support.
+
+The patches are pretty straightforward. Most of the drivers called
+clk_enable and clk_disable in sleepable context, I've thus just converted them
+to clk_prepare_enable and clk_disable_unprepare.
+
+The clocksource drivers were slightly more complex to handle as clk_enable and
+clk_disable were called in non-sleepable context. As the clocksource framework
+architecture doesn't provide any sleepable callback in which clocks could be
+prepared and unprepared, I've added clk_prepare and clk_unprepare calls in the
+probe and suspend/resume handlers (clocksources can't be removed so the remove
+handler doesn't need a clk_unprepare call).
+
+I'd like to get all these patches merged in v3.14. As they will need to go
+through their respective subsystems' trees, I would appreciate if all
+maintainers involved could notify me when they merge patches from this series
+in their tree to help me tracking the merge status. I don't plan to send pull
+requests individually for these patches, and I will repost patches
+individually if changes are requested during review.
+
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-kernel at vger.kernel.org
+Cc: Tejun Heo <tj@kernel.org>
+Cc: linux-ide at vger.kernel.org
+Cc: David Airlie <airlied@linux.ie>
+Cc: dri-devel at lists.freedesktop.org
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: linux-i2c at vger.kernel.org
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Cc: linux-mmc at vger.kernel.org
 Cc: Felipe Balbi <balbi@ti.com>
 Cc: linux-usb at vger.kernel.org
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/usb/gadget/r8a66597-udc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
 
-diff --git a/drivers/usb/gadget/r8a66597-udc.c b/drivers/usb/gadget/r8a66597-udc.c
-index 68be48d..4728751 100644
---- a/drivers/usb/gadget/r8a66597-udc.c
-+++ b/drivers/usb/gadget/r8a66597-udc.c
-@@ -1833,7 +1833,7 @@ static int __exit r8a66597_remove(struct platform_device *pdev)
- 	r8a66597_free_request(&r8a66597->ep[0].ep, r8a66597->ep0_req);
- 
- 	if (r8a66597->pdata->on_chip) {
--		clk_disable(r8a66597->clk);
-+		clk_disable_unprepare(r8a66597->clk);
- 		clk_put(r8a66597->clk);
- 	}
- 
-@@ -1931,7 +1931,7 @@ static int __init r8a66597_probe(struct platform_device *pdev)
- 			ret = PTR_ERR(r8a66597->clk);
- 			goto clean_up;
- 		}
--		clk_enable(r8a66597->clk);
-+		clk_prepare_enable(r8a66597->clk);
- 	}
- 
- 	if (r8a66597->pdata->sudmac) {
-@@ -1996,7 +1996,7 @@ clean_up3:
- 	free_irq(irq, r8a66597);
- clean_up2:
- 	if (r8a66597->pdata->on_chip) {
--		clk_disable(r8a66597->clk);
-+		clk_disable_unprepare(r8a66597->clk);
- 		clk_put(r8a66597->clk);
- 	}
- clean_up:
+Laurent Pinchart (12):
+  clocksource: sh_cmt: Add clk_prepare/unprepare support
+  clocksource: sh_mtu2: Add clk_prepare/unprepare support
+  clocksource: sh_tmu: Add clk_prepare/unprepare support
+  sata_rcar: Convert to clk_prepare/unprepare
+  drm: shmob_drm: Convert to clk_prepare/unprepare
+  i2c: sh_mobile: Convert to clk_prepare/unprepare
+  mmc: sh_mmcif: Convert to clk_prepare/unprepare
+  mmc: sh_mobile_sdhi: Convert to clk_prepare/unprepare
+  usb: gadget: r8a66597-udc: Convert to clk_prepare/unprepare
+  usb: r8a66597-hcd: Convert to clk_prepare/unprepare
+  fbdev: shmobile-hdmi: Convert to clk_prepare/unprepare
+  fbdev: shmobile-lcdcfb: Convert to clk_prepare/unprepare
+
+ drivers/ata/sata_rcar.c                   | 10 +++++-----
+ drivers/clocksource/sh_cmt.c              | 20 ++++++++++++++++----
+ drivers/clocksource/sh_mtu2.c             | 16 ++++++++++++++--
+ drivers/clocksource/sh_tmu.c              | 20 +++++++++++++++++---
+ drivers/gpu/drm/shmobile/shmob_drm_crtc.c |  4 ++--
+ drivers/i2c/busses/i2c-sh_mobile.c        |  8 ++++----
+ drivers/mmc/host/sh_mmcif.c               | 12 ++++++------
+ drivers/mmc/host/sh_mobile_sdhi.c         |  4 ++--
+ drivers/usb/gadget/r8a66597-udc.c         |  6 +++---
+ drivers/usb/host/r8a66597-hcd.c           |  4 ++--
+ drivers/video/sh_mobile_hdmi.c            |  6 +++---
+ drivers/video/sh_mobile_lcdcfb.c          |  4 ++--
+ 12 files changed, 76 insertions(+), 38 deletions(-)
+
 -- 
-1.8.1.5
+Regards,
+
+Laurent Pinchart
