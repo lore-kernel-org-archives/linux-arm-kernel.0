@@ -1,72 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Oct 2013 14:56:49 -0700
-Subject: [PATCH v9 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <D49A3E92-54FD-4275-82F5-DBB476086B03@codeaurora.org>
-References: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
- <1382956118-12495-2-git-send-email-acourbot@nvidia.com>
- <D49A3E92-54FD-4275-82F5-DBB476086B03@codeaurora.org>
-Message-ID: <20131028215649.GB10833@quad.lixom.net>
+Date: Mon, 28 Oct 2013 15:07:41 -0700
+Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
+In-Reply-To: <CACRpkdYANuqDo2V2WfvdN6KNnAb9adU-jdh96ra7RRo2Lvg9xA@mail.gmail.com>
+References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbymhLhHObL+fdWCHKbNG_LtudvhXbdxC0NCJApUBjT9w@mail.gmail.com>
+ <201310250006.28668.arnd@arndb.de>
+ <CACRpkdYANuqDo2V2WfvdN6KNnAb9adU-jdh96ra7RRo2Lvg9xA@mail.gmail.com>
+Message-ID: <20131028220741.GA11660@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 05:57:04AM -0500, Kumar Gala wrote:
+On Fri, Oct 25, 2013 at 03:53:17PM +0200, Linus Walleij wrote:
+> On Fri, Oct 25, 2013 at 12:06 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 24 October 2013, Linus Walleij wrote:
+> >
+> >> I would lean toward just applying it and see if the OpenWRT
+> >> people will notice and/or complain.
+> >>
+> >> What does the ARM SoC people say?
+> >
+> > I'd prefer applying it as-is.
 > 
-> On Oct 28, 2013, at 5:28 AM, Alexandre Courbot wrote:
-> 
-> > Trusted Foundations is a TrustZone-based secure monitor for ARM that
-> > can be invoked using the same SMC-based API on all supported
-> > platforms. This patch adds initial basic support for Trusted
-> > Foundations using the ARM firmware API. Current features are limited
-> > to the ability to boot secondary processors.
-> > 
-> > Note: The API followed by Trusted Foundations does *not* follow the SMC
-> > calling conventions. It has nothing to do with PSCI neither and is only
-> > relevant to devices that use Trusted Foundations (like most Tegra-based
-> > retail devices).
-> > 
-> > Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> > ---
-> > .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
-> > .../devicetree/bindings/vendor-prefixes.txt        |  1 +
-> > arch/arm/Kconfig                                   |  2 +
-> > arch/arm/Makefile                                  |  1 +
-> > arch/arm/firmware/Kconfig                          | 28 ++++++++
-> > arch/arm/firmware/Makefile                         |  1 +
-> > arch/arm/firmware/trusted_foundations.c            | 79 ++++++++++++++++++++++
-> > arch/arm/include/asm/trusted_foundations.h         | 67 ++++++++++++++++++
-> > 8 files changed, 199 insertions(+)
-> > create mode 100644 Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
-> > create mode 100644 arch/arm/firmware/Kconfig
-> > create mode 100644 arch/arm/firmware/Makefile
-> > create mode 100644 arch/arm/firmware/trusted_foundations.c
-> > create mode 100644 arch/arm/include/asm/trusted_foundations.h
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
-> > new file mode 100644
-> > index 0000000..2ec75c9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
-> > @@ -0,0 +1,20 @@
-> > +Trusted Foundations
-> > +-------------------
-> > +
-> > +Boards that use the Trusted Foundations secure monitor can signal its
-> > +presence by declaring a node compatible with "tl,trusted-foundations"
-> > +under the /firmware/ node
-> > +
-> > +Required properties:
-> > +- compatible : "tl,trusted-foundations"
-> > +- version-major : major version number of Trusted Foundations firmware
-> > +- version-minor: minor version number of Trusted Foundations firmware
-> 
-> vendor prefix version.
+> OK Olof/Kevin: can either of you strip "RFT" from $SUBJECT
+> and apply this patch to the ARM SoC tree?
 
-Are you saying he should use tl,version-major tl,version-minor? For bindings
-that are already vendor-specific we haven't (on ARM) asked for vendor prefix on
-properties. It doesn't mean that we should keep going down that route though,
-so I'm just asking for clarification for my own edification. :)
+Done, applied to next/cleanup.
 
 
 -Olof
