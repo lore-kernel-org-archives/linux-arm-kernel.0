@@ -1,64 +1,110 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 28 Oct 2013 23:19:13 +0100
-Subject: [PATCH 1/2] mmc: arasan: Add driver for Arasan SDHCI
-In-Reply-To: <b6ced7bb-e8df-4cc1-95a1-df575e37dea7@CO1EHSMHS001.ehs.local>
-References: <1381864085-8806-1-git-send-email-soren.brinkmann@xilinx.com>
- <1587218.cW45zK0ty2@flatron>
- <b6ced7bb-e8df-4cc1-95a1-df575e37dea7@CO1EHSMHS001.ehs.local>
-Message-ID: <1873048.2t2L2zW4W9@flatron>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 28 Oct 2013 22:29:52 +0000
+Subject: [RFC v3 PATCH 3/7] ARM64: defer reloading a task's FPSIMD state
+ to userland resume
+In-Reply-To: <CAKv+Gu9J1WuA23bhOjYnTfQp+poBMwmFPQuuYKPSsO+spSPOCQ@mail.gmail.com>
+References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1381666503-23726-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20131028181238.GB18563@mbp>
+ <CAKv+Gu9J1WuA23bhOjYnTfQp+poBMwmFPQuuYKPSsO+spSPOCQ@mail.gmail.com>
+Message-ID: <75E40F24-4A8F-4D46-89F8-C546F6F200EC@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 of October 2013 14:47:38 S?ren Brinkmann wrote:
-> On Mon, Oct 28, 2013 at 10:16:49PM +0100, Tomasz Figa wrote:
-> > Hi Soren,
-> > 
-> > On Tuesday 15 of October 2013 12:08:04 Soren Brinkmann wrote:
-> > > Add a driver for Arasan's SDHCI controller core.
-> > > 
-> > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > > ---
-> > > 
-> > >  .../devicetree/bindings/mmc/arasan,sdhci.txt       |  23 +++
-> > >  MAINTAINERS                                        |   1 +
-> > >  drivers/mmc/host/Kconfig                           |  12 ++
-> > >  drivers/mmc/host/Makefile                          |   1 +
-> > >  drivers/mmc/host/sdhci-of-arasan.c                 | 224
-> > > 
-> > > +++++++++++++++++++++ 5 files changed, 261 insertions(+)
-> > > 
-> > >  create mode 100644
-> > > 
-> > > Documentation/devicetree/bindings/mmc/arasan,sdhci.txt create mode
-> > > 100644 drivers/mmc/host/sdhci-of-arasan.c
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> > > b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt new file
-> > > mode
-> > > 100644
-> > > index 000000000000..20f0fc25e270
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> > > @@ -0,0 +1,23 @@
-> > > +Device Tree Bindings for the Arasan SDCHI Controller
-> > > +
-> > > +  The bindings follow the mmc[1] and the clock bindings[2]. Only
-> > > deviations are +  documented here.
-> > > +
-> > > +  [1] Documentation/devicetree/bindings/mmc/mmc.txt
-> > > +  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > > +
-> > 
-> > > +Required Properties:
-> > According to the example below, the list of required properties lacks
-> > interrupt-related properties.
+On 28 Oct 2013, at 20:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 28 October 2013 11:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Sun, Oct 13, 2013 at 01:14:59PM +0100, Ard Biesheuvel wrote:
+>>> --- a/arch/arm64/kernel/fpsimd.c
+>>> +++ b/arch/arm64/kernel/fpsimd.c
+>>> @@ -72,7 +72,7 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+>>> void fpsimd_thread_switch(struct task_struct *next)
+>>> {
+>>>      /* check if not kernel threads */
+>>> -     if (current->mm)
+>>> +     if (current->mm && !test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
+>>>              fpsimd_save_state(&current->thread.fpsimd_state);
+>> 
+>> Why does it need test_and_set_thread_flag() here? Some comments would be
+>> useful as it looks strange to check a reload flag to decide whether to
+>> save a state. Or change the name to something like 'dirty'.
 > 
-> Well, the interrupt bindings seem to differ between platforms and
-> architecture and looking at documentation for other sdhci bindings it
-> seemed to be okay to avoid documenting them in this place.
+> Actually, it's test and clear.
 
-Sure, but I believe that this controller always has an interrupt signal, 
-so at least it should be marked that interrupts need to be specified.
+Yes, just a typo.
 
-Best regards,
-Tomasz
+> If the userland register file has
+> already been preserved for the purpose of performing kernel mode NEON,
+> it should not be saved again when the task gets scheduled out. The
+> clearing could also be deferred to the time when the task gets
+> scheduled in again.
+
+The above should be turned into a comment in the code.
+
+> Or perhaps, it would be even better to always
+> defer loading the userland state for the next task when that task in
+> fact enters userland.
+
+It needs some more thinking, its usually cleaner in the context
+switching code.
+
+>>>      if (next->mm)
+>>>              fpsimd_load_state(&next->thread.fpsimd_state);
+>> 
+>> This function could be optimised a bit more to avoid saving/restoring if
+>> the switch only happened between a user thread and a kernel one (and
+>> back again) since the FP state may not have been dirtied. But what I had
+>> in mind was per-CPU fpstate (possibly pointer or some flag) rather than
+>> per-thread.
+> 
+> Well, then we are entering the realm of lazy restore, imo. There were
+> some patches proposed for that already, I think? But I do agree that
+> at his point, there is no need to restore the userland register
+> contents yet, it can be deferred to the point when the task reenters
+> userland (as mentioned above).
+
+Not entirely lazy.  What I dont want to see (without proper benchmarks)
+is disabling the FP at context switch and restoring the registers lazily
+via the fault mechanism.  What Im proposing above is not lazy, just an
+optimisation for a clear case where the FP is not used in a kernel
+thread.
+
+>>> --- a/arch/arm64/kernel/signal.c
+>>> +++ b/arch/arm64/kernel/signal.c
+>>> @@ -416,4 +416,6 @@ asmlinkage void do_noti fy_resume(struct pt_regs *regs,
+>>>              clear_thread_flag(TIF_NOTIFY_RESUME);
+>>>              tracehook_notify_resume(regs);
+>>>      }
+>>> +     if (test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
+>>> +             fpsimd_load_state(&current->thread.fpsimd_state);
+>> 
+>> I think this code can be preempted, it is run with IRQs enabled. And
+>> there is a small window where we cleared the flag but haven't loaded the
+>> state.
+> 
+> If we are preempted at this point, the fpstate will be loaded in the
+> normal way the next time this task runs, so I think this is harmless.
+> Although I guess we may be restoring the fp state twice in that case?
+
+Lets say task A does an svc and gets into kernel mode followed by
+kernel_neon_begin/end().  Before returning to user, the kernel runs the
+above test_and_clear_thread_flag().  Immediately after, an interrupt
+happens the task A is preempted.  The fpsimd_thread_switch() function
+finds that TIF_RELOAD_FPSTATE is cleared and save the current FP state.
+But the FP regs contain whatever the kernel neon code did, so you
+corrupt the existing data.
+
+> So in summary, what I need to do is:
+> - rework to use a per_cpu flag rather than a TIF;
+> - preserve the userland state (if it has one) when a task gets scheduled out;
+> - restore the userland state when a task enters userland;
+
+Happy to discuss the algorithm before you code it (unless you prefer to
+write the code quickly).
+
+> I will propose an updated patch after I wrap up the work on the
+> in_interrupt() kernel mode NEON, as these topics are really orthogonal
+> and there is no reason to keep them combined in a single series.
+
+Sounds fine.
+
+Catalin
