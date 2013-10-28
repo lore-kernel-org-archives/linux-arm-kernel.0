@@ -1,25 +1,26 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 28 Oct 2013 09:00:15 -0700
-Subject: [RFC 1/4] ASoC: omap: rx51: Use snd_soc_register_card
-In-Reply-To: <1382909086-10493-2-git-send-email-sre@debian.org>
-References: <1382909086-10493-1-git-send-email-sre@debian.org>
- <1382909086-10493-2-git-send-email-sre@debian.org>
-Message-ID: <20131028160015.GA13643@sirena.org.uk>
+Date: Mon, 28 Oct 2013 09:11:48 -0700
+Subject: [PATCH v2 1/6] ASoC: sirf: add sirf platform driver which
+ provides DMA
+In-Reply-To: <1382912628-13796-1-git-send-email-Baohua.Song@csr.com>
+References: <1382912628-13796-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20131028161148.GC13643@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 10:24:43PM +0100, Sebastian Reichel wrote:
-> From: Pali Roh?r <pali.rohar@gmail.com>
-> 
-> This patch converts the rx51 ASoC module to use
-> snd_soc_register_card. It also adds module alias
-> to support driver autoloading.
+On Mon, Oct 28, 2013 at 06:23:48AM +0800, Barry Song wrote:
 
-You should really use devm_snd_soc_register_card() here.
+> +static struct snd_pcm_hardware sirf_pcm_hardware = {
+> +	.info                   = (SNDRV_PCM_INFO_MMAP
+> +			| SNDRV_PCM_INFO_MMAP_VALID
+
+Can you please try the recently added support for automatically
+discovering the configuration from the dmaengine driver rather than hard
+coding things?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131028/9750074b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131028/acf1d29c/attachment.sig>
