@@ -1,29 +1,100 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 28 Oct 2013 08:52:43 +0100
-Subject: [PATCH v3 3/5] usb: chipidea: imx: set CI_HDRC_IMX28_WRITE_FIX
- for imx28
-In-Reply-To: <20131028020311.GB2839@S2101-09.ap.freescale.net>
-References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
- <201310271725.37175.marex@denx.de>
- <20131028020311.GB2839@S2101-09.ap.freescale.net>
-Message-ID: <201310280852.43881.marex@denx.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 28 Oct 2013 09:48:46 +0100
+Subject: [alsa-devel] [PATCH v2 2/6] ASoC: sirf: add I2S CPU DAI driver
+In-Reply-To: <CAGsJ_4xHHD9XqLMdepUgRL7_X5Xg3_AQ2K83pbCxiFhV8cX4zg@mail.gmail.com>
+References: <1382913424-28626-1-git-send-email-Baohua.Song@csr.com>
+ <526E08D1.4040009@metafoo.de>
+ <CAGsJ_4xHHD9XqLMdepUgRL7_X5Xg3_AQ2K83pbCxiFhV8cX4zg@mail.gmail.com>
+Message-ID: <526E24EE.70402@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-> On Sun, Oct 27, 2013 at 05:25:36PM +0100, Marek Vasut wrote:
-> > > +static const struct of_device_id ci_hdrc_imx_dt_ids[] = {
-> > > +	{ .compatible = "fsl,imx28-usb", .data = &imx28_usb_data},
-> > > +	{ .compatible = "fsl,imx27-usb", .data = &imx27_usb_data},
-> > 
-> > Just a nit-pick, but the order here is wrong ;-)
+On 10/28/2013 09:32 AM, Barry Song wrote:
+> 2013/10/28 Lars-Peter Clausen <lars@metafoo.de>:
+>> On 10/27/2013 11:37 PM, Barry Song wrote:
+>>> +struct snd_soc_dai_ops sirfsoc_i2s_dai_ops = {
+>>
+>> static const
+>>
+>> Building your driver with sparse (`make C=2 ...`) will tell you these things.
+>>
+>>> +     .startup        = sirf_i2s_startup,
+>>> +     .shutdown       = sirf_i2s_shutdown,
+>>> +     .trigger        = sirf_i2s_trigger,
+>>> +     .hw_params      = sirf_i2s_hw_params,
+>>> +     .set_fmt        = sirf_i2s_set_dai_fmt,
+>>> +     .set_clkdiv     = sirf_i2s_set_clkdiv,
+>>> +};
+>>> +
+>> [...]
+>>> +
+>>> +static int sirf_i2s_probe(struct platform_device *pdev)
+>>> +{
+>>> +     struct sirf_i2s *si2s;
+>>> +     u32 rx_dma_ch, tx_dma_ch;
+>>> +     int ret;
+>>> +     struct resource mem_res;
+>>> +
+>>> +     si2s = devm_kzalloc(&pdev->dev, sizeof(struct sirf_i2s),
+>>> +                     GFP_KERNEL);
+>>> +     if (!si2s)
+>>> +             return -ENOMEM;
+>>> +
+>>> +     si2s->sirf_pcm_pdev = platform_device_register_simple("sirf-pcm-audio",
+>>> +                     0, NULL, 0);
+>>> +     if (IS_ERR(si2s->sirf_pcm_pdev))
+>>> +             return PTR_ERR(si2s->sirf_pcm_pdev);
+>>> +
+>>> +     platform_set_drvdata(pdev, si2s);
+>>> +
+>>> +     spin_lock_init(&si2s->lock);
+>>> +
+>>> +     ret = of_property_read_u32(pdev->dev.of_node,
+>>> +                     "sirf,i2s-dma-rx-channel", &rx_dma_ch);
+>>> +     if (ret < 0) {
+>>> +             dev_err(&pdev->dev, "Unable to USP0 rx dma channel\n");
+>>> +             return ret;
+>>> +     }
+>>> +     ret = of_property_read_u32(pdev->dev.of_node,
+>>> +                     "sirf,i2s-dma-tx-channel", &tx_dma_ch);
+>>> +     if (ret < 0) {
+>>> +             dev_err(&pdev->dev, "Unable to USP0 tx dma channel\n");
+>>> +             return ret;
+>>> +     }
+>>> +
+>>> +     dma_data[0].filter_data = (void *)tx_dma_ch;
+>>> +     dma_data[1].filter_data = (void *)rx_dma_ch;
+>>
+>> This should be using the standard DMA OF bindings. This combind with the
+>> recent changes to the generic dmaengine PCM driver, which added support for
+>> querying certain parameters (like max period length) from the dmaengine
+>> driver, will allow you to completely remove your custom PCM code. You'd
+>> basically just need to call "snd_dmaengine_pcm_register(&pdev->dev, NULL)"
+>> here in the I2S driver.
+>>
+>> This will require some changes to your dmaengine driver though. You need to
+>> implement the of_xlate callback for the generic DMA bindings and the
+>> device_slave_caps API for being able to query the capabilities from the driver.
 > 
-> Oh, no.  Before of_match_device() gets improved to find the best match,
-> we have to sort the table from the most specific entry to the most
-> generic one.
+> i am really happy to have that as for clock, gpio, pinctrl, all of
+> them we have the binding.
+> here the problem is we can't implement this in this driver as there
+> are still many drivers depending on the sirf-dma changes.
+> 
+> so our point is keeping the things as is here. and we have another
+> patchset of dt binding for sirf-dma and all drivers depending sirf-dma
+> driver.
 
-Oh, thanks for explaining!
+I don't think this is a good idea. Adding of_xlate support to the DMA driver
+is a 10 line patch at most. And there is no compile time dependency between
+the DMA driver changes and using the generic DMA bindings in this driver, so
+this driver does not have to wait for the changes to the DMA driver to be
+merged first.
 
-Best regards,
-Marek Vasut
+I'm fine with having the device_slave_caps stuff added in a later patch, but
+adding custom DMA bindings at this point is in my opinion a no-go.
+Especially if you consider that DT bindings are considered ABI by some people.
+
+Btw. the DT bindings documentation for this driver seems to be missing.
+
+- Lars
