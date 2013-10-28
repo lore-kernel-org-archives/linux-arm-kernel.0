@@ -1,9 +1,9 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Oct 2013 23:49:22 +0100
-Subject: [PATCH 05/12] drm: shmob_drm: Convert to clk_prepare/unprepare
+Date: Mon, 28 Oct 2013 23:49:28 +0100
+Subject: [PATCH 11/12] fbdev: shmobile-hdmi: Convert to clk_prepare/unprepare
 In-Reply-To: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383000569-8916-6-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383000569-8916-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,34 +11,44 @@ Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
 clk_disable_unprepare() to get ready for the migration to the common
 clock framework.
 
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/gpu/drm/shmobile/shmob_drm_crtc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/video/sh_mobile_hdmi.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/shmobile/shmob_drm_crtc.c b/drivers/gpu/drm/shmobile/shmob_drm_crtc.c
-index 54bad98..562f9a4 100644
---- a/drivers/gpu/drm/shmobile/shmob_drm_crtc.c
-+++ b/drivers/gpu/drm/shmobile/shmob_drm_crtc.c
-@@ -40,7 +40,7 @@
- static void shmob_drm_clk_on(struct shmob_drm_device *sdev)
- {
- 	if (sdev->clock)
--		clk_enable(sdev->clock);
-+		clk_prepare_enable(sdev->clock);
- #if 0
- 	if (sdev->meram_dev && sdev->meram_dev->pdev)
- 		pm_runtime_get_sync(&sdev->meram_dev->pdev->dev);
-@@ -54,7 +54,7 @@ static void shmob_drm_clk_off(struct shmob_drm_device *sdev)
- 		pm_runtime_put_sync(&sdev->meram_dev->pdev->dev);
- #endif
- 	if (sdev->clock)
--		clk_disable(sdev->clock);
-+		clk_disable_unprepare(sdev->clock);
- }
+diff --git a/drivers/video/sh_mobile_hdmi.c b/drivers/video/sh_mobile_hdmi.c
+index bfe4728..190145e 100644
+--- a/drivers/video/sh_mobile_hdmi.c
++++ b/drivers/video/sh_mobile_hdmi.c
+@@ -1326,7 +1326,7 @@ static int __init sh_hdmi_probe(struct platform_device *pdev)
+ 		goto erate;
+ 	}
  
- /* -----------------------------------------------------------------------------
+-	ret = clk_enable(hdmi->hdmi_clk);
++	ret = clk_prepare_enable(hdmi->hdmi_clk);
+ 	if (ret < 0) {
+ 		dev_err(hdmi->dev, "Cannot enable clock: %d\n", ret);
+ 		goto erate;
+@@ -1404,7 +1404,7 @@ emap_htop1:
+ emap:
+ 	release_mem_region(res->start, resource_size(res));
+ ereqreg:
+-	clk_disable(hdmi->hdmi_clk);
++	clk_disable_unprepare(hdmi->hdmi_clk);
+ erate:
+ 	clk_put(hdmi->hdmi_clk);
+ egetclk:
+@@ -1427,7 +1427,7 @@ static int __exit sh_hdmi_remove(struct platform_device *pdev)
+ 	cancel_delayed_work_sync(&hdmi->edid_work);
+ 	pm_runtime_put(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+-	clk_disable(hdmi->hdmi_clk);
++	clk_disable_unprepare(hdmi->hdmi_clk);
+ 	clk_put(hdmi->hdmi_clk);
+ 	if (hdmi->htop1)
+ 		iounmap(hdmi->htop1);
 -- 
 1.8.1.5
