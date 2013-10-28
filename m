@@ -1,52 +1,27 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 28 Oct 2013 14:47:38 -0700
-Subject: [PATCH 1/2] mmc: arasan: Add driver for Arasan SDHCI
-In-Reply-To: <1587218.cW45zK0ty2@flatron>
-References: <1381864085-8806-1-git-send-email-soren.brinkmann@xilinx.com>
- <1587218.cW45zK0ty2@flatron>
-Message-ID: <b6ced7bb-e8df-4cc1-95a1-df575e37dea7@CO1EHSMHS001.ehs.local>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 28 Oct 2013 14:40:04 -0700
+Subject: [GIT PULL 2/4] omap late clock and system control module cleanup
+ for v3.13 merge window
+In-Reply-To: <5267df04.8970e00a.02db.ffffd631SMTPIN_ADDED_MISSING@mx.google.com>
+References: <pull-1382539003-174282>
+ <5267df04.8970e00a.02db.ffffd631SMTPIN_ADDED_MISSING@mx.google.com>
+Message-ID: <20131028214004.GF4802@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 10:16:49PM +0100, Tomasz Figa wrote:
-> Hi Soren,
+On Wed, Oct 23, 2013 at 07:36:42AM -0700, Tony Lindgren wrote:
+> The following changes since commit d0e639c9e06d44e713170031fe05fb60ebe680af:
 > 
-> On Tuesday 15 of October 2013 12:08:04 Soren Brinkmann wrote:
-> > Add a driver for Arasan's SDHCI controller core.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >  .../devicetree/bindings/mmc/arasan,sdhci.txt       |  23 +++
-> >  MAINTAINERS                                        |   1 +
-> >  drivers/mmc/host/Kconfig                           |  12 ++
-> >  drivers/mmc/host/Makefile                          |   1 +
-> >  drivers/mmc/host/sdhci-of-arasan.c                 | 224
-> > +++++++++++++++++++++ 5 files changed, 261 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/mmc/arasan,sdhci.txt create mode
-> > 100644 drivers/mmc/host/sdhci-of-arasan.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> > b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt new file mode
-> > 100644
-> > index 000000000000..20f0fc25e270
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> > @@ -0,0 +1,23 @@
-> > +Device Tree Bindings for the Arasan SDCHI Controller
-> > +
-> > +  The bindings follow the mmc[1] and the clock bindings[2]. Only
-> > deviations are +  documented here.
-> > +
-> > +  [1] Documentation/devicetree/bindings/mmc/mmc.txt
-> > +  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +
-> > +Required Properties:
+>   Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
 > 
-> According to the example below, the list of required properties lacks 
-> interrupt-related properties.
-Well, the interrupt bindings seem to differ between platforms and
-architecture and looking at documentation for other sdhci bindings it
-seemed to be okay to avoid documenting them in this place.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/cm-scm-cleanup-signed
+> 
+> for you to fetch changes up to 54b89756a14aa1043507ce0811b4b6c02c5dddcc:
+> 
+>   Merge tag 'for-v3.13/cm-scm-cleanup-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.13/cm-scm-cleanup (2013-10-20 08:55:19 -0700)
 
-	S?ren
+Pulled, thanks.
+
+-Olof
