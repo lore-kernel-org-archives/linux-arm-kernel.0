@@ -1,84 +1,78 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 28 Oct 2013 05:59:41 -0500
-Subject: [RFC][PATCHv5 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM.
-In-Reply-To: <1382951151-31517-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1382951151-31517-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <224C2E26-6C33-4DBB-BC06-A4BA470FDA39@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 28 Oct 2013 12:04:43 +0100
+Subject: [PATCH v8 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <525D7969.5060908@nvidia.com>
+References: <1381527938-22840-1-git-send-email-acourbot@nvidia.com>
+ <1381527938-22840-2-git-send-email-acourbot@nvidia.com>
+ <20131015110725.GZ25034@n2100.arm.linux.org.uk>
+ <525D7969.5060908@nvidia.com>
+Message-ID: <CA+Ln22FdkcxOfq-yxVVQ7vTLWC3TYRBbAOZ=e3WmpSKkgk_DRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On Oct 28, 2013, at 4:05 AM, Xiubo Li wrote:
+2013/10/15 Alex Courbot <acourbot@nvidia.com>:
+> On 10/15/2013 04:07 AM, Russell King - ARM Linux wrote:
+>>
+>> On Fri, Oct 11, 2013 at 02:45:34PM -0700, Alexandre Courbot wrote:
+>>>
+>>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+>>> can be invoked using the same SMC-based API on all supported
+>>> platforms. This patch adds initial basic support for Trusted
+>>> Foundations using the ARM firmware API. Current features are limited
+>>> to the ability to boot secondary processors.
+>>>
+>>> Note: The API followed by Trusted Foundations does *not* follow the SMC
+>>> calling conventions. It has nothing to do with PSCI neither and is only
+>>> relevant to devices that use Trusted Foundations (like most Tegra-based
+>>> retail devices).
+>>>
+>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>>> ---
+>>>   .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
+>>>   .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>>>   arch/arm/Kconfig                                   |  2 +
+>>>   arch/arm/Makefile                                  |  1 +
+>>>   arch/arm/firmware/Kconfig                          | 28 ++++++++
+>>>   arch/arm/firmware/Makefile                         |  1 +
+>>>   arch/arm/firmware/trusted_foundations.c            | 79
+>>> ++++++++++++++++++++++
+>>>   arch/arm/include/asm/trusted_foundations.h         | 68
+>>> +++++++++++++++++++
+>>>   8 files changed, 200 insertions(+)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundations.txt
+>>>   create mode 100644 arch/arm/firmware/Kconfig
+>>>   create mode 100644 arch/arm/firmware/Makefile
+>>>   create mode 100644 arch/arm/firmware/trusted_foundations.c
+>>>   create mode 100644 arch/arm/include/asm/trusted_foundations.h
+>>
+>>
+>> Is having this under arch/arm appropriate?  What happens if the API
+>> gets re-used on ARM64 for example?  Would drivers/firmware be a better
+>> cross-arch location for this?
+>
+>
+> The reason why this has been put into arch/arm is that the firmware_ops
+> feature this patch depends also resides there
+> (arch/arm/include/asm/firmware.h).
+>
+> On the other hand it might also make sense to move firmware_ops out of ARM
+> since I don't see anything ARM-specific with it. Tomasz, could we have your
+> thoughts on this?
 
-> The RFC patch only added "See ../clock/clock-bindings.txt for details of
-> the property values."
-> 
-> 
-> 
-> This adds the Document for Freescale FTM PWM driver under
-> Documentation/devicetree/bindings/pwm/.
-> 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
-> .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 34 ++++++++++++++++++++++
-> 1 file changed, 34 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> new file mode 100644
-> index 0000000..175b762
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-> @@ -0,0 +1,34 @@
-> +Freescale FTM PWM controller
+I don't see anything wrong in moving this out of arch/arm, feel free
+to do so.
 
-What does FTM stand for, and can we spell out PWM at least once early on.
+However I guess that some (or all) of the names will have to
+be put into a more separate namespace, as the term "firmware" is a bit
+too generic IMHO. Possibly something like platform_firmware could be
+better.
 
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,vf610-ftm-pwm"
-> +- reg: Physical base address and length of the controller's registers
-> +- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-> +  the cells format.
-> +- clock-names : Includes the following module clock source entries:
-> +    "ftm0" (system clock),
-> +    "ftm0_fix_sel" (fixed frequency clock),
-> +    "ftm0_ext_sel" (external clock)
-> +- clocks : Must contain a clock specifier for each entry in clock-names,
-> +  See ../clock/clock-bindings.txt for details of the property values.
-> +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be one of the
-> +  entries in clock-names.
+What do you think?
 
-Why do we need this, why not just have only the clock-names/clocks reference the clk that is actually used?
-
-> +- pinctrl-names: must contain a "default" entry.
-> +- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-> +  See ../pinctrl/pinctrl-bindings.txt for details of the property values.
-
-let's drop the .. when making directory references.
-
-> +
-> +
-> +Example:
-> +
-> +pwm0: pwm at 40038000 {
-> +		compatible = "fsl,vf610-ftm-pwm";
-> +		reg = <0x40038000 0x1000>;
-> +		#pwm-cells = <3>;
-> +		clock-names = "ftm0", "ftm0_fix_sel", "ftm0_ext_sel";
-> +		clocks = <&clks VF610_CLK_FTM0>,
-> +			<&clks VF610_CLK_FTM0_FIX_SEL>,
-> +			<&clks VF610_CLK_FTM0_EXT_SEL>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_pwm0_1>;
-> +		fsl,pwm-counter-clk = "ftm0_ext_sel";
-> +};
-> -- 
-> 1.8.4
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Best regards,
+Tomasz
