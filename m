@@ -1,33 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 28 Oct 2013 14:09:43 -0400
-Subject: [GIT PULL] ARM: mvebu: dt changes for v3.13 (last round)
-In-Reply-To: <CAOesGMgCBALA-1J2WyhPycpxDdf=MtGzzpV_BN0e8Pw8O4X+fw@mail.gmail.com>
-References: <20131023113237.GG24520@titan.lakedaemon.net>
- <20131028173542.GA26663@titan.lakedaemon.net>
- <CAOesGMgk9kuP-E6bkEKFbciDyzxz4L2iw3YiYU=btb6TrY95dA@mail.gmail.com>
- <20131028174436.GB26663@titan.lakedaemon.net>
- <CAOesGMgCBALA-1J2WyhPycpxDdf=MtGzzpV_BN0e8Pw8O4X+fw@mail.gmail.com>
-Message-ID: <20131028180943.GD26663@titan.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 28 Oct 2013 18:12:40 +0000
+Subject: [RFC v3 PATCH 3/7] ARM64: defer reloading a task's FPSIMD state
+ to userland resume
+In-Reply-To: <1381666503-23726-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1381666503-23726-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20131028181238.GB18563@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 11:00:26AM -0700, Olof Johansson wrote:
-> On Mon, Oct 28, 2013 at 10:44 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-...
-> > btw - you _can_ get two liters of scotch through customs.  But they don't
-> > sell Springbank in the duty-free shops at the airport.  So I wept softly
-> > to myself most of the flight home.
-> 
-> Heh. Springbank is available in the US though, at least at more
-> well-stocked stores.
+On Sun, Oct 13, 2013 at 01:14:59PM +0100, Ard Biesheuvel wrote:
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -72,7 +72,7 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+>  void fpsimd_thread_switch(struct task_struct *next)
+>  {
+>  	/* check if not kernel threads */
+> -	if (current->mm)
+> +	if (current->mm && !test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
+>  		fpsimd_save_state(&current->thread.fpsimd_state);
 
-Maybe on the West Coast, I've yet to find it anywhere on the East Coast.
-I'll have to poke around again.  Maybe they've changed.  After all, we
-can get Fat Tire in most places now.
+Why does it need test_and_set_thread_flag() here? Some comments would be
+useful as it looks strange to check a reload flag to decide whether to
+save a state. Or change the name to something like 'dirty'.
 
-If we can get Philz Coffee and Springbank over here, we can almost
-qualify for civilized.
+>  	if (next->mm)
+>  		fpsimd_load_state(&next->thread.fpsimd_state);
 
-thx,
+This function could be optimised a bit more to avoid saving/restoring if
+the switch only happened between a user thread and a kernel one (and
+back again) since the FP state may not have been dirtied. But what I had
+in mind was per-CPU fpstate (possibly pointer or some flag) rather than
+per-thread.
 
-Jason.
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -416,4 +416,6 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+>  		clear_thread_flag(TIF_NOTIFY_RESUME);
+>  		tracehook_notify_resume(regs);
+>  	}
+> +	if (test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
+> +		fpsimd_load_state(&current->thread.fpsimd_state);
+
+I think this code can be preempted, it is run with IRQs enabled. And
+there is a small window where we cleared the flag but haven't loaded the
+state.
+
+-- 
+Catalin
