@@ -1,30 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Oct 2013 15:07:41 -0700
-Subject: [PATCH] RFT: ARM: gemini: convert to GENERIC_CLOCKEVENTS
-In-Reply-To: <CACRpkdYANuqDo2V2WfvdN6KNnAb9adU-jdh96ra7RRo2Lvg9xA@mail.gmail.com>
-References: <1380625040-25912-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbymhLhHObL+fdWCHKbNG_LtudvhXbdxC0NCJApUBjT9w@mail.gmail.com>
- <201310250006.28668.arnd@arndb.de>
- <CACRpkdYANuqDo2V2WfvdN6KNnAb9adU-jdh96ra7RRo2Lvg9xA@mail.gmail.com>
-Message-ID: <20131028220741.GA11660@quad.lixom.net>
+Date: Mon, 28 Oct 2013 15:09:23 -0700
+Subject: Heads up: Mostly done with 3.13 arm-soc merges now
+Message-ID: <CAOesGMhRDOdEjEQz+-0_ecuDSqMi+dn6LSU=UJZtGLriyFbBtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 25, 2013 at 03:53:17PM +0200, Linus Walleij wrote:
-> On Fri, Oct 25, 2013 at 12:06 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 24 October 2013, Linus Walleij wrote:
-> >
-> >> I would lean toward just applying it and see if the OpenWRT
-> >> people will notice and/or complain.
-> >>
-> >> What does the ARM SoC people say?
-> >
-> > I'd prefer applying it as-is.
-> 
-> OK Olof/Kevin: can either of you strip "RFT" from $SUBJECT
-> and apply this patch to the ARM SoC tree?
+Hi,
 
-Done, applied to next/cleanup.
+Since -rc7 is behind us, and the final 3.12 might be just a few days
+away, it's high time to start pulling the brakes on new pull requests.
+
+I've swept through and done the backlog that's pending. I have only a
+few ones still in mind to apply -- I've asked for some quick respins
+today for a couple of small branches and one to remove the platform
+name from DT_MACHINE entries from Rob Herring.
+
+So, if you think you've got a pull request that we've missed, speak up
+as soon as possible and we'll take a look at it.
+
+As usual we might take smaller incremental changes for critical stuff
+still, but we shouldn't be seeing any new major pull requests until
+after the merge window (or if we do, we might choose to queue them for
+3.14 instead).
 
 
 -Olof
