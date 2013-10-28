@@ -1,20 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Oct 2013 21:19:45 +0000
-Subject: [PATCH v3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <1382992009-19407-1-git-send-email-festevam@gmail.com>
-References: <1382992009-19407-1-git-send-email-festevam@gmail.com>
-Message-ID: <20131028211945.GJ16735@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 28 Oct 2013 14:19:57 -0700
+Subject: [GIT PULL 1/4] omap late not urgent fixes part 2 for v3.13 merge
+ window
+In-Reply-To: <5267df03.a26a440a.5b86.30a5SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <5267df03.a26a440a.5b86.30a5SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20131028211957.GE4802@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 06:26:49PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Oct 23, 2013 at 07:36:42AM -0700, Tony Lindgren wrote:
+> The following changes since commit 8ff875e7f93e900e7a7e78f1c9c05a22b33c27cf:
 > 
-> This is based on the initial work done by Sascha Hauer and Tony Prisk.
+>   ARM: mach-omap1: Fix omap1510_fpga_init_irq() implicit declarations. (2013-10-08 11:04:22 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/fixes-not-urgent-part2
 
-It looks like you've also taken some of the suggestions I've made too -
-like the voltage drive and symbol transmit control settings.
 
-It would be nice to identify the changes a bit better so that those of
-us who are testing your drivers (and have patches on top of them to make
-things work) know what's changed.
+Pulled, thanks.
+
+
+-Olof
