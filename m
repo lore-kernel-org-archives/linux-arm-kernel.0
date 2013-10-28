@@ -1,54 +1,88 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Tue, 29 Oct 2013 00:26:26 +0100
-Subject: [PATCH 2/4] wl1251: move power GPIO handling into the driver
-In-Reply-To: <20131028192354.GA18208@sirena.org.uk>
-References: <1382890469-25286-1-git-send-email-sre@debian.org>
- <1382890469-25286-3-git-send-email-sre@debian.org>
- <1382891056.102746625@f315.i.mail.ru>
- <20131027201218.GA4414@earth.universe>
- <CANOLnONKcC1i19ypb4rh2Rff3WsVhhuUhNvZvYwDV2-ZNtjVxQ@mail.gmail.com>
- <20131028192354.GA18208@sirena.org.uk>
-Message-ID: <20131028232624.GA950@earth.universe>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 29 Oct 2013 00:31:36 +0100
+Subject: [PATCH v9 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <20131028215649.GB10833@quad.lixom.net>
+References: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
+ <D49A3E92-54FD-4275-82F5-DBB476086B03@codeaurora.org>
+ <20131028215649.GB10833@quad.lixom.net>
+Message-ID: <2702565.PHk13m6fVo@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Oct 28, 2013 at 12:23:54PM -0700, Mark Brown wrote:
-> On Mon, Oct 28, 2013 at 07:29:52PM +0200, Grazvydas Ignotas wrote:
+On Monday 28 of October 2013 14:56:49 Olof Johansson wrote:
+> On Mon, Oct 28, 2013 at 05:57:04AM -0500, Kumar Gala wrote:
+> > On Oct 28, 2013, at 5:28 AM, Alexandre Courbot wrote:
+> > > Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> > > can be invoked using the same SMC-based API on all supported
+> > > platforms. This patch adds initial basic support for Trusted
+> > > Foundations using the ARM firmware API. Current features are limited
+> > > to the ability to boot secondary processors.
+> > > 
+> > > Note: The API followed by Trusted Foundations does *not* follow the
+> > > SMC
+> > > calling conventions. It has nothing to do with PSCI neither and is
+> > > only
+> > > relevant to devices that use Trusted Foundations (like most
+> > > Tegra-based
+> > > retail devices).
+> > > 
+> > > Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> > > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> > > Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> > > ---
+> > > .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
+> > > .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+> > > arch/arm/Kconfig                                   |  2 +
+> > > arch/arm/Makefile                                  |  1 +
+> > > arch/arm/firmware/Kconfig                          | 28 ++++++++
+> > > arch/arm/firmware/Makefile                         |  1 +
+> > > arch/arm/firmware/trusted_foundations.c            | 79
+> > > ++++++++++++++++++++++ arch/arm/include/asm/trusted_foundations.h  
+> > >       | 67 ++++++++++++++++++ 8 files changed, 199 insertions(+)
+> > > create mode 100644
+> > > Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundatio
+> > > ns.txt create mode 100644 arch/arm/firmware/Kconfig
+> > > create mode 100644 arch/arm/firmware/Makefile
+> > > create mode 100644 arch/arm/firmware/trusted_foundations.c
+> > > create mode 100644 arch/arm/include/asm/trusted_foundations.h
+> > > 
+> > > diff --git
+> > > a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+> > > ions.txt
+> > > b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+> > > ions.txt new file mode 100644
+> > > index 0000000..2ec75c9
+> > > --- /dev/null
+> > > +++
+> > > b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+> > > ions.txt @@ -0,0 +1,20 @@
+> > > +Trusted Foundations
+> > > +-------------------
+> > > +
+> > > +Boards that use the Trusted Foundations secure monitor can signal
+> > > its
+> > > +presence by declaring a node compatible with
+> > > "tl,trusted-foundations"
+> > > +under the /firmware/ node
+> > > +
+> > > +Required properties:
+> > > +- compatible : "tl,trusted-foundations"
+> > > +- version-major : major version number of Trusted Foundations
+> > > firmware
+> > > +- version-minor: minor version number of Trusted Foundations
+> > > firmware
+> > 
+> > vendor prefix version.
 > 
-> > When wl12xx family of chips is connected through SDIO, we already have
-> > that pin set up as a regulator controlled with the help of mmc
-> > subsystem. When time comes to communicate with the chip, mmc subsystem
-> > sees this as yet another SD card and looks for associated regulator
-> > for it, and the board file has that set up as a fixed regulator
-> > controlling that pin (see pandora_vmmc3 in
-> > arch/arm/mach-omap2/board-omap3pandora.c). To prevent poweroff after
-> > first SDIO communications are over, pm_runtime calls are used in
-> > drivers/net/wireless/ti/wl1251/sdio.c .
-> 
-> Is this actually controlling VMMC though, or is it some other control?
-> If it's not controlling VMMC then it shouldn't say that it is.
-> 
-> > I don't know if something similar can be done done in SPI case, but
-> > I'm sure this is not the first your-so-called regulator misuse.
-> 
-> It's not the first but that doesn't make controlling something other
-> than a regulator through the regulator API any less broken.
+> Are you saying he should use tl,version-major tl,version-minor? For
+> bindings that are already vendor-specific we haven't (on ARM) asked for
+> vendor prefix on properties. It doesn't mean that we should keep going
+> down that route though, so I'm just asking for clarification for my own
+> edification. :)
 
-I gave it a second try to find out details for this pin:
+This is a good question. We should decide what the right thing (TM) is and 
+write it down. I, on the contrary, was convinced that it's the way Kumar 
+says.
 
-1. The pin is named PMEN in the Nokia N900 schematics
-2. PMEN is described as "Power management enable - system shutdown"
-   in a crippled datasheet of the wl1253, which I found in the internet.
-
-I don't think this is supposed to be handled by the regulator API.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/4efecc05/attachment.sig>
+Best regards,
+Tomasz
