@@ -1,39 +1,66 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Oct 2013 10:16:38 -0700
-Subject: [PATCH] ARM: sunxi: remove .init_time hooks
-Message-ID: <1382980598-2912-1-git-send-email-olof@lixom.net>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Mon, 28 Oct 2013 19:29:52 +0200
+Subject: [PATCH 2/4] wl1251: move power GPIO handling into the driver
+In-Reply-To: <20131027201218.GA4414@earth.universe>
+References: <1382890469-25286-1-git-send-email-sre@debian.org>
+ <1382890469-25286-3-git-send-email-sre@debian.org>
+ <1382891056.102746625@f315.i.mail.ru>
+ <20131027201218.GA4414@earth.universe>
+Message-ID: <CANOLnONKcC1i19ypb4rh2Rff3WsVhhuUhNvZvYwDV2-ZNtjVxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The machine entries were split up, but the cleanup to remove .init_time
-removed the function that the new/split entries refer to. Remove them
-since they are no longer needed.
+On Sun, Oct 27, 2013 at 10:12 PM, Sebastian Reichel <sre@debian.org> wrote:
+> On Sun, Oct 27, 2013 at 08:24:16PM +0400, Alexander Shiyan wrote:
+>> > Move the power GPIO handling from the board code into
+>> > the driver. This is a dependency for device tree support.
+>> >
+>> > Signed-off-by: Sebastian Reichel <sre@debian.org>
+>> > ---
+>> >  arch/arm/mach-omap2/board-omap3pandora.c     |  2 ++
+>> >  arch/arm/mach-omap2/board-rx51-peripherals.c | 11 ++--------
+>> >  drivers/net/wireless/ti/wl1251/sdio.c        | 21 +++++++++++++-----
+>> >  drivers/net/wireless/ti/wl1251/spi.c         | 33 ++++++++++++++++++----------
+>> >  drivers/net/wireless/ti/wl1251/wl1251.h      |  2 +-
+>> >  include/linux/wl12xx.h                       |  2 +-
+>> >  6 files changed, 43 insertions(+), 28 deletions(-)
+>> ...
+>> > diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
+>> > index b516b4f..a9c723b 100644
+>> > --- a/include/linux/wl12xx.h
+>> > +++ b/include/linux/wl12xx.h
+>> > @@ -49,7 +49,7 @@ enum {
+>> >  };
+>> >
+>> >  struct wl1251_platform_data {
+>> > -   void (*set_power)(bool enable);
+>> > +   int power_gpio;
+>> >     /* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
+>> >     int irq;
+>> >     bool use_eeprom;
+>> > --
+>>
+>> What a reason for not using regulator API here with GPIO-based
+>> regulator?
+>
+> I think this pin is not used as power supply, but like an enable pin
+> for low power states. Of course the regulator API could still be
+> (mis?)used for this, but I think it would be the first linux device
+> driver doing this.
+>
+> Note: I don't have wl1251 documentation.
 
-Cc: Maxime Ripard <mripard@free-electrons.com>
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-sunxi/sunxi.c | 2 --
- 1 file changed, 2 deletions(-)
+When wl12xx family of chips is connected through SDIO, we already have
+that pin set up as a regulator controlled with the help of mmc
+subsystem. When time comes to communicate with the chip, mmc subsystem
+sees this as yet another SD card and looks for associated regulator
+for it, and the board file has that set up as a fixed regulator
+controlling that pin (see pandora_vmmc3 in
+arch/arm/mach-omap2/board-omap3pandora.c). To prevent poweroff after
+first SDIO communications are over, pm_runtime calls are used in
+drivers/net/wireless/ti/wl1251/sdio.c .
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index ffac2f53fede..61d3a387f01c 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -134,7 +134,6 @@ static const char * const sun6i_board_dt_compat[] = {
- 
- DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
- 	.init_machine	= sunxi_dt_init,
--	.init_time	= sunxi_timer_init,
- 	.dt_compat	= sun6i_board_dt_compat,
- 	.restart	= sun6i_restart,
- MACHINE_END
-@@ -146,7 +145,6 @@ static const char * const sun7i_board_dt_compat[] = {
- 
- DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
- 	.init_machine	= sunxi_dt_init,
--	.init_time	= sunxi_timer_init,
- 	.dt_compat	= sun7i_board_dt_compat,
- 	.restart	= sun4i_restart,
- MACHINE_END
--- 
-1.8.4.1.601.g02b3b1d
+I don't know if something similar can be done done in SPI case, but
+I'm sure this is not the first your-so-called regulator misuse.
+
+Gra?vydas
