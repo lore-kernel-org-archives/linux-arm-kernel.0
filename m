@@ -1,66 +1,60 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Mon, 28 Oct 2013 19:29:52 +0200
-Subject: [PATCH 2/4] wl1251: move power GPIO handling into the driver
-In-Reply-To: <20131027201218.GA4414@earth.universe>
-References: <1382890469-25286-1-git-send-email-sre@debian.org>
- <1382890469-25286-3-git-send-email-sre@debian.org>
- <1382891056.102746625@f315.i.mail.ru>
- <20131027201218.GA4414@earth.universe>
-Message-ID: <CANOLnONKcC1i19ypb4rh2Rff3WsVhhuUhNvZvYwDV2-ZNtjVxQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 28 Oct 2013 13:35:42 -0400
+Subject: [GIT PULL] ARM: mvebu: dt changes for v3.13 (last round)
+In-Reply-To: <20131023113237.GG24520@titan.lakedaemon.net>
+References: <20131023113237.GG24520@titan.lakedaemon.net>
+Message-ID: <20131028173542.GA26663@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 10:12 PM, Sebastian Reichel <sre@debian.org> wrote:
-> On Sun, Oct 27, 2013 at 08:24:16PM +0400, Alexander Shiyan wrote:
->> > Move the power GPIO handling from the board code into
->> > the driver. This is a dependency for device tree support.
->> >
->> > Signed-off-by: Sebastian Reichel <sre@debian.org>
->> > ---
->> >  arch/arm/mach-omap2/board-omap3pandora.c     |  2 ++
->> >  arch/arm/mach-omap2/board-rx51-peripherals.c | 11 ++--------
->> >  drivers/net/wireless/ti/wl1251/sdio.c        | 21 +++++++++++++-----
->> >  drivers/net/wireless/ti/wl1251/spi.c         | 33 ++++++++++++++++++----------
->> >  drivers/net/wireless/ti/wl1251/wl1251.h      |  2 +-
->> >  include/linux/wl12xx.h                       |  2 +-
->> >  6 files changed, 43 insertions(+), 28 deletions(-)
->> ...
->> > diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
->> > index b516b4f..a9c723b 100644
->> > --- a/include/linux/wl12xx.h
->> > +++ b/include/linux/wl12xx.h
->> > @@ -49,7 +49,7 @@ enum {
->> >  };
->> >
->> >  struct wl1251_platform_data {
->> > -   void (*set_power)(bool enable);
->> > +   int power_gpio;
->> >     /* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
->> >     int irq;
->> >     bool use_eeprom;
->> > --
->>
->> What a reason for not using regulator API here with GPIO-based
->> regulator?
->
-> I think this pin is not used as power supply, but like an enable pin
-> for low power states. Of course the regulator API could still be
-> (mis?)used for this, but I think it would be the first linux device
-> driver doing this.
->
-> Note: I don't have wl1251 documentation.
+Olof,
 
-When wl12xx family of chips is connected through SDIO, we already have
-that pin set up as a regulator controlled with the help of mmc
-subsystem. When time comes to communicate with the chip, mmc subsystem
-sees this as yet another SD card and looks for associated regulator
-for it, and the board file has that set up as a fixed regulator
-controlling that pin (see pandora_vmmc3 in
-arch/arm/mach-omap2/board-omap3pandora.c). To prevent poweroff after
-first SDIO communications are over, pm_runtime calls are used in
-drivers/net/wireless/ti/wl1251/sdio.c .
+On Wed, Oct 23, 2013 at 07:32:37AM -0400, Jason Cooper wrote:
+> Guys,
+> 
+> I've held off several patches for the next window (nothing big),
+> however, MikeT just took Ezequiel's clock divider driver for v3.13.  So,
+> to keep things in sync, I'd appreciate it if you could take this last
+> pull request containing only the corresponding dts and binding changes
+> for that driver.
 
-I don't know if something similar can be done done in SPI case, but
-I'm sure this is not the first your-so-called regulator misuse.
+I saw you handled a round of pull requests for v3.13 yesterday, did you
+miss this one?
 
-Gra?vydas
+thx,
+
+Jason.
+
+> The following changes since commit 1deb122c724edfd799a4d7d0b88ff14c365c9e69:
+> 
+>   ARM: Dove: fix bad properties of the si5351 clkout2 used by Cubox audio (2013-10-09 13:22:41 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/dt-3.13-4
+> 
+> for you to fetch changes up to f039dfb51b36a2d7e4ac25e65ffbd03e3ac77a0c:
+> 
+>   ARM: mvebu: Add the core-divider clock to Armada 370/XP (2013-10-23 11:04:31 +0000)
+> 
+> ----------------------------------------------------------------
+> mvebu dt changes for v3.13 (round 4)
+> 
+>  - mvebu
+>     - core divider clock driver dt binding and nodes
+> 
+> ----------------------------------------------------------------
+> Ezequiel Garcia (3):
+>       ARM: mvebu: Add Core Divider clock device-tree binding
+>       ARM: mvebu: Add a 2 GHz fixed-clock Armada 370/XP
+>       ARM: mvebu: Add the core-divider clock to Armada 370/XP
+> 
+>  .../devicetree/bindings/clock/mvebu-corediv-clock.txt | 19 +++++++++++++++++++
+>  arch/arm/boot/dts/armada-370-xp.dtsi                  | 17 +++++++++++++++++
+>  2 files changed, 36 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
