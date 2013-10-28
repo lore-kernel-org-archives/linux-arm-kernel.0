@@ -1,33 +1,97 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Mon, 28 Oct 2013 19:28:38 +0900
-Subject: [PATCH v9 5/5] ARM: tegra: support Trusted Foundations by default
-In-Reply-To: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
-References: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1382956118-12495-6-git-send-email-acourbot@nvidia.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Mon, 28 Oct 2013 11:36:28 +0100
+Subject: [PATCH v3 2/5] usb: chipidea: add freescale imx28 special write
+ register method
+In-Reply-To: <1382680943-9258-2-git-send-email-peter.chen@freescale.com>
+References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
+ <1382680943-9258-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <526E3E2C.3030706@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for Trusted Foundations is light and allows the kernel to run on
-a wider range of devices, so enable it by default.
+Dear Peter,
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/configs/tegra_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+On 10/25/2013 08:02 AM, Peter Chen wrote:
+> According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+> register error issue", All USB register write operations must
+> use the ARM SWP instruction. So, we implement special hw_write
+> and hw_test_and_clear for imx28.
+>
+> Discussion for it at below:
+> http://marc.info/?l=linux-usb&m=137996395529294&w=2
+>
+> Signed-off-by: Peter Chen <peter.chen-KZfg59tc24xl57MIdRCFDg@public.gmane.org>
+> ---
+> Changes for v2:
+> - Rebase to latest usb-next tree
+>
+>   drivers/usb/chipidea/ci.h    |   23 +++++++++++++++++++++++
+>   drivers/usb/chipidea/core.c  |    2 ++
+>   drivers/usb/chipidea/host.c  |    1 +
+>   include/linux/usb/chipidea.h |    1 +
+>   4 files changed, 27 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+> index 1c94fc5..4eb61d0 100644
+> --- a/drivers/usb/chipidea/ci.h
+> +++ b/drivers/usb/chipidea/ci.h
+> @@ -173,6 +173,8 @@ struct ci_hdrc {
+>   	struct dentry			*debugfs;
+>   	bool				id_event;
+>   	bool				b_sess_valid_event;
+> +	/* imx28 needs swp instruction for writing */
+> +	bool				imx28_write_fix;
+>   };
+>
+>   static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
+> @@ -253,6 +255,13 @@ static inline u32 hw_read(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask)
+>   	return ioread32(ci->hw_bank.regmap[reg]) & mask;
+>   }
+>
+> +#ifdef CONFIG_SOC_IMX28
+> +static inline void imx28_ci_writel(u32 val32, volatile u32 *addr)
+> +{
+> +	__asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
+> +}
+> +#endif
+> +
+>   /**
+>    * hw_write: writes to a hw register
+>    * @reg:  register index
+> @@ -266,7 +275,14 @@ static inline void hw_write(struct ci_hdrc *ci, enum ci_hw_regs reg,
+>   		data = (ioread32(ci->hw_bank.regmap[reg]) & ~mask)
+>   			| (data & mask);
+>
+> +#ifdef CONFIG_SOC_IMX28
+> +	if (ci->imx28_write_fix)
+> +		imx28_ci_writel(data, ci->hw_bank.regmap[reg]);
+> +	else
+> +		iowrite32(data, ci->hw_bank.regmap[reg]);
+> +#else
+>   	iowrite32(data, ci->hw_bank.regmap[reg]);
+> +#endif
+>   }
+>
+>   /**
+> @@ -281,7 +297,14 @@ static inline u32 hw_test_and_clear(struct ci_hdrc *ci, enum ci_hw_regs reg,
+>   {
+>   	u32 val = ioread32(ci->hw_bank.regmap[reg]) & mask;
+>
+> +#ifdef CONFIG_SOC_IMX28
+> +	if (ci->imx28_write_fix)
+> +		imx28_ci_writel(val, ci->hw_bank.regmap[reg]);
+> +	else
+> +		iowrite32(val, ci->hw_bank.regmap[reg]);
+> +#else
+>   	iowrite32(val, ci->hw_bank.regmap[reg]);
+> +#endif
+>   	return val;
+>   }
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index ea042e8..dddb97b 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -32,6 +32,7 @@ CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_TEGRA=y
- CONFIG_PCIEPORTBUS=y
-+CONFIG_TRUSTED_FOUNDATIONS=y
- CONFIG_SMP=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
+Can't we remove the #ifdefs CONFIG_SOC_IMX28 all around?
+The check is done on the new flag ci->imx28_write_fix which exists for all platforms, 
+isn't it?.
+
+Best regards,
 -- 
-1.8.4.1
+H?ctor Palacios
