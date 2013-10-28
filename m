@@ -1,110 +1,96 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 28 Oct 2013 22:29:52 +0000
-Subject: [RFC v3 PATCH 3/7] ARM64: defer reloading a task's FPSIMD state
- to userland resume
-In-Reply-To: <CAKv+Gu9J1WuA23bhOjYnTfQp+poBMwmFPQuuYKPSsO+spSPOCQ@mail.gmail.com>
-References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
- <1381666503-23726-4-git-send-email-ard.biesheuvel@linaro.org>
- <20131028181238.GB18563@mbp>
- <CAKv+Gu9J1WuA23bhOjYnTfQp+poBMwmFPQuuYKPSsO+spSPOCQ@mail.gmail.com>
-Message-ID: <75E40F24-4A8F-4D46-89F8-C546F6F200EC@arm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 28 Oct 2013 23:38:36 +0100
+Subject: [PATCH 4/4] wl1251: spi: add device tree support
+In-Reply-To: <FF34C626-4A49-43B1-B0AD-DC6146ABBB11@codeaurora.org>
+References: <1382890469-25286-1-git-send-email-sre@debian.org>
+ <1382890469-25286-5-git-send-email-sre@debian.org>
+ <FF34C626-4A49-43B1-B0AD-DC6146ABBB11@codeaurora.org>
+Message-ID: <4893578.SBstXOAcJY@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 Oct 2013, at 20:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 28 October 2013 11:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Sun, Oct 13, 2013 at 01:14:59PM +0100, Ard Biesheuvel wrote:
->>> --- a/arch/arm64/kernel/fpsimd.c
->>> +++ b/arch/arm64/kernel/fpsimd.c
->>> @@ -72,7 +72,7 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
->>> void fpsimd_thread_switch(struct task_struct *next)
->>> {
->>>      /* check if not kernel threads */
->>> -     if (current->mm)
->>> +     if (current->mm && !test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
->>>              fpsimd_save_state(&current->thread.fpsimd_state);
->> 
->> Why does it need test_and_set_thread_flag() here? Some comments would be
->> useful as it looks strange to check a reload flag to decide whether to
->> save a state. Or change the name to something like 'dirty'.
+On Monday 28 of October 2013 01:37:34 Kumar Gala wrote:
+> On Oct 27, 2013, at 11:14 AM, Sebastian Reichel wrote:
+> > Add device tree support for the spi variant of wl1251
+> > and document the binding.
+> > 
+> > Signed-off-by: Sebastian Reichel <sre@debian.org>
+> > ---
+> > .../devicetree/bindings/net/wireless/ti,wl1251.txt | 36
+> > ++++++++++++++++++++++ drivers/net/wireless/ti/wl1251/spi.c          
+> >     | 23 ++++++++++---- 2 files changed, 53 insertions(+), 6
+> > deletions(-)
+> > create mode 100644
+> > Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt
+> > 
+> > diff --git
+> > a/Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt
+> > b/Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt new
+> > file mode 100644
+> > index 0000000..5f8a154
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt
+> > @@ -0,0 +1,36 @@
+> > +* Texas Instruments wl1251 controller
+> > +
+> > +The wl1251 chip can be connected via SPI or via SDIO. The linux
+> > +kernel currently only supports device tree for the SPI variant.
+> > +
 > 
-> Actually, it's test and clear.
-
-Yes, just a typo.
-
-> If the userland register file has
-> already been preserved for the purpose of performing kernel mode NEON,
-> it should not be saved again when the task gets scheduled out. The
-> clearing could also be deferred to the time when the task gets
-> scheduled in again.
-
-The above should be turned into a comment in the code.
-
-> Or perhaps, it would be even better to always
-> defer loading the userland state for the next task when that task in
-> fact enters userland.
-
-It needs some more thinking, its usually cleaner in the context
-switching code.
-
->>>      if (next->mm)
->>>              fpsimd_load_state(&next->thread.fpsimd_state);
->> 
->> This function could be optimised a bit more to avoid saving/restoring if
->> the switch only happened between a user thread and a kernel one (and
->> back again) since the FP state may not have been dirtied. But what I had
->> in mind was per-CPU fpstate (possibly pointer or some flag) rather than
->> per-thread.
+> From the binding I have no idea what this chip actually does, also we
+> don't normally reference linux kernel support in bindings specs (so
+> please remove it).
 > 
-> Well, then we are entering the realm of lazy restore, imo. There were
-> some patches proposed for that already, I think? But I do agree that
-> at his point, there is no need to restore the userland register
-> contents yet, it can be deferred to the point when the task reenters
-> userland (as mentioned above).
+> However, what would expect the SDIO binding to look like?  Or more
+> specifically, how would you distinguish the SPI vs SDIO
+> binding/connection?  I'm wondering if the compatible should be
+> something like "ti,wl1251-spi" and than the sdio can be
+> "ti,wl1251-sdio"
 
-Not entirely lazy.  What I dont want to see (without proper benchmarks)
-is disabling the FP at context switch and restoring the registers lazily
-via the fault mechanism.  What Im proposing above is not lazy, just an
-optimisation for a clear case where the FP is not used in a kernel
-thread.
+Well, you can easily distinguish an SDIO device from an SPI device by its 
+parent node, but...
 
->>> --- a/arch/arm64/kernel/signal.c
->>> +++ b/arch/arm64/kernel/signal.c
->>> @@ -416,4 +416,6 @@ asmlinkage void do_noti fy_resume(struct pt_regs *regs,
->>>              clear_thread_flag(TIF_NOTIFY_RESUME);
->>>              tracehook_notify_resume(regs);
->>>      }
->>> +     if (test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
->>> +             fpsimd_load_state(&current->thread.fpsimd_state);
->> 
->> I think this code can be preempted, it is run with IRQs enabled. And
->> there is a small window where we cleared the flag but haven't loaded the
->> state.
+The binding for SDIO might require different set of properties (other than 
+ones inherited from generic SDIO or SPI bindings) than one for SPI. So 
+probably different compatible values might be justified.
+
+Did we already have such case before? (maybe some I2C + SPI devices?)
+
+> > +Required properties:
+> > +- compatible : Should be "ti,wl1251"
 > 
-> If we are preempted at this point, the fpstate will be loaded in the
-> normal way the next time this task runs, so I think this is harmless.
-> Although I guess we may be restoring the fp state twice in that case?
+> reg is not listed as a required prop.
 
-Lets say task A does an svc and gets into kernel mode followed by
-kernel_neon_begin/end().  Before returning to user, the kernel runs the
-above test_and_clear_thread_flag().  Immediately after, an interrupt
-happens the task A is preempted.  The fpsimd_thread_switch() function
-finds that TIF_RELOAD_FPSTATE is cleared and save the current FP state.
-But the FP regs contain whatever the kernel neon code did, so you
-corrupt the existing data.
+It is implied by SPI bindings, but it might be a good idea to have this 
+stated here as well.
 
-> So in summary, what I need to do is:
-> - rework to use a per_cpu flag rather than a TIF;
-> - preserve the userland state (if it has one) when a task gets scheduled out;
-> - restore the userland state when a task enters userland;
+> 
+> > +- interrupts : Should contain interrupt line
+> > +- interrupt-parent : Should be the phandle for the interrupt
+> > +  controller that services interrupts for this device
+> > +- vio-supply : phandle to regulator providing VIO
+> > +- power-gpio : GPIO connected to chip's PMEN pin
+> 
+> should be vendor prefixed: ti,power-gpio
 
-Happy to discuss the algorithm before you code it (unless you prefer to
-write the code quickly).
+Hmm, out of curiosity, is it a rule for this kind of properties? I can see 
+both cases with and without prefixes when grepping for "-gpios" in 
+Documentation/devicetree/bindings. We should really have such things 
+written down somewhere.
 
-> I will propose an updated patch after I wrap up the work on the
-> in_interrupt() kernel mode NEON, as these topics are really orthogonal
-> and there is no reason to keep them combined in a single series.
+> 
+> > +- For additional required properties on SPI, please consult
+> > +  Documentation/devicetree/bindings/spi/spi-bus.txt
+> > +
+> > +Optional properties:
+> > +- ti,use-eeprom : If found, configuration will be loaded from eeprom.
+> 
+> can you be a bit more specific on what cfg will be loaded.  Also, is
+> this property a boolean, if so how do I know which eeprom the cfg is
+> loaded from (is it one that is directly connected to the wl1251?
 
-Sounds fine.
+Maybe one from ti,has-eeprom or ti,config-eeprom would be better name for 
+this property?
 
-Catalin
+Best regards,
+Tomasz
