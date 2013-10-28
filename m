@@ -1,88 +1,54 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Mon, 28 Oct 2013 20:49:14 +0100
-Subject: [PATCH v2 05/13] uprobes: add arch write opcode hook
-In-Reply-To: <5268137F.3030809@linaro.org>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-6-git-send-email-dave.long@linaro.org>
- <20131019165051.GC7837@redhat.com> <5268137F.3030809@linaro.org>
-Message-ID: <20131028194914.GA15103@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 28 Oct 2013 12:49:36 -0700
+Subject: [RFC 3/4] ASoC: Allow Aux Codecs to be specified using DT
+In-Reply-To: <20131028175341.GA28136@earth.universe>
+References: <1382909086-10493-1-git-send-email-sre@debian.org>
+ <1382909086-10493-4-git-send-email-sre@debian.org>
+ <20131028163721.GJ13643@sirena.org.uk>
+ <20131028175341.GA28136@earth.universe>
+Message-ID: <20131028194936.GC18208@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23, David Long wrote:
->
-> On 10/19/13 12:50, Oleg Nesterov wrote:
->> On 10/15, David Long wrote:
->>>
->>> Allow arches to write the opcode with a custom function.  ARM needs to
->>> customize the swbp instruction depending on the condition code of the
->>> instruction it replaces.
->>
->> Well, we already have "__weak set_swbp(auprobe, ...)", can't arm use it?
->>
->> If not,
->>
->>> +void __weak arch_uprobe_write_opcode(struct arch_uprobe *auprobe, void *vaddr,
->>> +				     uprobe_opcode_t opcode)
->>> +{
->>> +	memcpy(vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
->>> +}
->>> ...
->>> -	copy_to_page(new_page, vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
->>> +	vaddr_new = kmap_atomic(new_page);
->>> +	arch_uprobe_write_opcode(auprobe, vaddr_new + (vaddr & ~PAGE_MASK),
->>> +				 opcode);
->>> +	kunmap_atomic(vaddr_new);
->>
->> Again, if you need to add the new __weak helper, I think it should simply
->> do copy_to_page().
->>
->> Oleg.
->>
->
-> Unfortunately, providing an alternative set_swbp() would mean
-> duplicating a moderate chunk of code from kernel/uprobes.c.
+On Mon, Oct 28, 2013 at 06:53:42PM +0100, Sebastian Reichel wrote:
+> On Mon, Oct 28, 2013 at 09:37:21AM -0700, Mark Brown wrote:
 
-Yes, yes, sorry for confusion. What I actually tried to suggest is
-something like the trivial patch below.
+> > This doesn't apply against current git, please check and resend.
 
-Then arm can do:
+> Can you give me a git url to rebase against? I used current git
+> master from torvalds.
 
-	uprobe_opcode_t arch_uprobe_swbp_insn(struct arch_uprobe *auprobe)
-	{
-		return __opcode_to_mem_arm(auprobe->bpinsn);
-	}
+>From MAINTAINERS:
 
-No?
+SOUND - SOC LAYER / DYNAMIC AUDIO POWER MANAGEMENT (ASoC)
+M:      Liam Girdwood <lgirdwood@gmail.com>
+M:      Mark Brown <broonie@kernel.org>
+T:      git git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git
+L:      alsa-devel at alsa-project.org (moderated for non-subscribers)
+W:      http://alsa-project.org/main/index.php/ASoC
+S:      Supported
+F:      Documentation/sound/alsa/soc/
+F:      sound/soc/
+F:      include/sound/soc*
 
-> I notice there don't seem to be any alternative set_swbp functions
-> in the (rc6) kernel tree
+> > Please also consider your CC list more carefully, there's an awful lot
+> > of people on this...
 
-Yes... I think we should simply make it "static". And set_orig_insn()
-too.
+> I added exactly those recipients, that were returned by
+> ./scripts/get_maintainer.pl for the patchset.
 
-Oleg.
+> The list of involved people is quite long, because the patchset
+> touches devicetree, documentation, boardcode, asoc and the specific
+> driver.
 
---- x/kernel/events/uprobes.c
-+++ x/kernel/events/uprobes.c
-@@ -304,6 +304,11 @@ put_old:
- 	return ret;
- }
- 
-+uprobe_opcode_t __weak arch_uprobe_swbp_insn(struct arch_uprobe *auprobe)
-+{
-+	return UPROBE_SWBP_INSN;
-+}
-+
- /**
-  * set_swbp - store breakpoint at a given address.
-  * @auprobe: arch specific probepoint information.
-@@ -315,7 +320,7 @@ put_old:
-  */
- int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
- {
--	return write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
-+	return write_opcode(mm, vaddr, arch_uprobe_swbp_insn(auprobe));
- }
- 
- /**
+You shouldn't be using the output of get_maintainers directly, you
+should understand why everyone it's including is in the list and if they
+really should be.  This is especially important if you are sending a
+series that covers many subsystems, or nested subsystems.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131028/78280c9a/attachment.sig>
