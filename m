@@ -1,9 +1,9 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Oct 2013 23:49:27 +0100
-Subject: [PATCH 10/12] usb: r8a66597-hcd: Convert to clk_prepare/unprepare
+Date: Mon, 28 Oct 2013 23:49:25 +0100
+Subject: [PATCH 08/12] mmc: sh_mobile_sdhi: Convert to clk_prepare/unprepare
 In-Reply-To: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383000569-8916-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383000569-8916-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,35 +11,35 @@ Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
 clk_disable_unprepare() to get ready for the migration to the common
 clock framework.
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Cc: linux-usb at vger.kernel.org
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Cc: linux-mmc at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/usb/host/r8a66597-hcd.c | 4 ++--
+ drivers/mmc/host/sh_mobile_sdhi.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/r8a66597-hcd.c b/drivers/usb/host/r8a66597-hcd.c
-index 2ad004a..a2fdd85 100644
---- a/drivers/usb/host/r8a66597-hcd.c
-+++ b/drivers/usb/host/r8a66597-hcd.c
-@@ -95,7 +95,7 @@ static int r8a66597_clock_enable(struct r8a66597 *r8a66597)
- 	int i = 0;
+diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
+index f344659..ed1718a 100644
+--- a/drivers/mmc/host/sh_mobile_sdhi.c
++++ b/drivers/mmc/host/sh_mobile_sdhi.c
+@@ -54,7 +54,7 @@ static int sh_mobile_sdhi_clk_enable(struct platform_device *pdev, unsigned int
+ 	struct mmc_host *mmc = platform_get_drvdata(pdev);
+ 	struct tmio_mmc_host *host = mmc_priv(mmc);
+ 	struct sh_mobile_sdhi *priv = container_of(host->pdata, struct sh_mobile_sdhi, mmc_data);
+-	int ret = clk_enable(priv->clk);
++	int ret = clk_prepare_enable(priv->clk);
+ 	if (ret < 0)
+ 		return ret;
  
- 	if (r8a66597->pdata->on_chip) {
--		clk_enable(r8a66597->clk);
-+		clk_prepare_enable(r8a66597->clk);
- 		do {
- 			r8a66597_write(r8a66597, SCKE, SYSCFG0);
- 			tmp = r8a66597_read(r8a66597, SYSCFG0);
-@@ -139,7 +139,7 @@ static void r8a66597_clock_disable(struct r8a66597 *r8a66597)
- 	udelay(1);
+@@ -67,7 +67,7 @@ static void sh_mobile_sdhi_clk_disable(struct platform_device *pdev)
+ 	struct mmc_host *mmc = platform_get_drvdata(pdev);
+ 	struct tmio_mmc_host *host = mmc_priv(mmc);
+ 	struct sh_mobile_sdhi *priv = container_of(host->pdata, struct sh_mobile_sdhi, mmc_data);
+-	clk_disable(priv->clk);
++	clk_disable_unprepare(priv->clk);
+ }
  
- 	if (r8a66597->pdata->on_chip) {
--		clk_disable(r8a66597->clk);
-+		clk_disable_unprepare(r8a66597->clk);
- 	} else {
- 		r8a66597_bclr(r8a66597, PLLC, SYSCFG0);
- 		r8a66597_bclr(r8a66597, XCKE, SYSCFG0);
+ static int sh_mobile_sdhi_wait_idle(struct tmio_mmc_host *host)
 -- 
 1.8.1.5
