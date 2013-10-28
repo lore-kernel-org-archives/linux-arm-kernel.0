@@ -1,50 +1,80 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sun, 27 Oct 2013 21:51:48 -0300
-Subject: [PATCH 3/3] omap2: gpmc: Move legacy GPMC width setting
+Date: Sun, 27 Oct 2013 21:51:46 -0300
+Subject: [PATCH 1/3] omap2: gpmc: Move initialization outside the gpmc_t
+ condition
 In-Reply-To: <1382921508-5104-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1382921508-5104-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1382921508-5104-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1382921508-5104-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the introduction of gpmc_set_legacy(), move the GPMC width setting
-to be done inside it. Currently, in the DT probed case, this is (wrongly)
-done twice: first at gpmc_read_settings_dt(), and then based in the
-NAND width setting.
-Fix this and use only the value obtained from the DT.
+This commit moves a bunch of initialization previously enclosed
+under a 'if (gpmc_t)' check, to be outside such condition.
+
+These initializations are not related to gpmc_t (timings) in any way
+so it's nonsense to enclose them under such check.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/mach-omap2/gpmc-nand.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/gpmc-nand.c | 40 ++++++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-index 9dd40e7..174caec 100644
+index 662c7fd..d66b856 100644
 --- a/arch/arm/mach-omap2/gpmc-nand.c
 +++ b/arch/arm/mach-omap2/gpmc-nand.c
-@@ -74,6 +74,11 @@ static void gpmc_set_legacy(struct omap_nand_platform_data *gpmc_nand_data,
- 		s->wait_on_read = true;
- 		s->wait_on_write = true;
- 	}
-+
+@@ -98,32 +98,32 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+ 			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
+ 			return err;
+ 		}
++	}
+ 
+-		if (gpmc_nand_data->of_node) {
+-			gpmc_read_settings_dt(gpmc_nand_data->of_node, &s);
+-		} else {
+-			/* Enable RD PIN Monitoring Reg */
+-			if (gpmc_nand_data->dev_ready) {
+-				s.wait_on_read = true;
+-				s.wait_on_write = true;
+-			}
++	if (gpmc_nand_data->of_node) {
++		gpmc_read_settings_dt(gpmc_nand_data->of_node, &s);
++	} else {
++		/* Enable RD PIN Monitoring Reg */
++		if (gpmc_nand_data->dev_ready) {
++			s.wait_on_read = true;
++			s.wait_on_write = true;
+ 		}
++	}
+ 
+-		s.device_nand = true;
++	s.device_nand = true;
+ 
+-		if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
+-			s.device_width = GPMC_DEVWIDTH_16BIT;
+-		else
+-			s.device_width = GPMC_DEVWIDTH_8BIT;
 +	if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
-+		s->device_width = GPMC_DEVWIDTH_16BIT;
++		s.device_width = GPMC_DEVWIDTH_16BIT;
 +	else
-+		s->device_width = GPMC_DEVWIDTH_8BIT;
- }
++		s.device_width = GPMC_DEVWIDTH_8BIT;
  
- int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
-@@ -118,11 +123,6 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+-		err = gpmc_cs_program_settings(gpmc_nand_data->cs, &s);
+-		if (err < 0)
+-			goto out_free_cs;
++	err = gpmc_cs_program_settings(gpmc_nand_data->cs, &s);
++	if (err < 0)
++		goto out_free_cs;
  
- 	s.device_nand = true;
+-		err = gpmc_configure(GPMC_CONFIG_WP, 0);
+-		if (err < 0)
+-			goto out_free_cs;
+-	}
++	err = gpmc_configure(GPMC_CONFIG_WP, 0);
++	if (err < 0)
++		goto out_free_cs;
  
--	if (gpmc_nand_data->devsize == NAND_BUSWIDTH_16)
--		s.device_width = GPMC_DEVWIDTH_16BIT;
--	else
--		s.device_width = GPMC_DEVWIDTH_8BIT;
--
- 	err = gpmc_cs_program_settings(gpmc_nand_data->cs, &s);
- 	if (err < 0)
- 		goto out_free_cs;
+ 	gpmc_update_nand_reg(&gpmc_nand_data->reg, gpmc_nand_data->cs);
+ 
 -- 
 1.8.1.5
