@@ -1,56 +1,36 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Mon, 28 Oct 2013 21:17:37 +1100
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <526A83B9.30800@wwwdotorg.org>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <20131024234340.ADF70C403B6@trevor.secretlab.ca>
- <526A83B9.30800@wwwdotorg.org>
-Message-ID: <20131028101737.GC15114@voom.fritz.box>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 28 Oct 2013 16:15:21 +0530
+Subject: [PATCH] ARM: head: Fix the missing underscore in __ARMEB__ macro usage
+Message-ID: <1382957121-10435-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 25, 2013 at 03:44:09PM +0100, Stephen Warren wrote:
-> On 10/25/2013 12:43 AM, Grant Likely wrote:
-> > On Thu, 24 Oct 2013 22:51:28 +0100, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> >> From: Stephen Warren <swarren@nvidia.com>
-> >>
-> >> This is a very quick proof-of-concept re: how a DT schema checker might
-> >> look if written in C, and integrated into dtc.
-> > 
-> > Thanks for looking at this.
-> > 
-> > Very interesting. Certainly an expedient way to start checking schemas,
-> > and for certain bindings it may be the best approach. The downside is it
-> > forces a recompilation of DTC to bring in new bindings and it isn't a
-> > great meduim for mixing schema with documentation in the bindings.
-> 
-> This approach would certainly require recompiling something. I threw the
-> code into dtc simply because it was the easiest container for the
-> demonstration. It could be a separate DT validation utility if we
-> wanted, although we'd need to split the DT parser from dtc into a
-> library to avoid code duplication. The resultant utility could be part
-> of the repo containing the DTs, so it didn't end up as a separate
-> package to manage.
-> 
-> I think the additional documentation could be added as comments in the
-> validation functions, just like IIRC it was to be represented as
-> comments even in the .dts-based schema proposals.
+Commit 'f52bb722547f43caeaecbcc62db9f3c3b80ead9b'
+Author: Sricharan R <r.sricharan@ti.com>
+    ARM: mm: Correct virt_to_phys patching for 64 bit physical addresses
 
-Fwiw, I've been starting to do some hacking on the checks code, with a
-view to making it accomodate the schema stuff better.  Branch
-'checking' on the kernel.org tree.  In a state of flux, so expect
-rebases.
+introduced a __ARMEB__ macro usage in a new place, but missed the second
+underscore. So correcting it here.
 
+Cc: Russell King <linux@arm.linux.org.uk>
 
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+---
+ arch/arm/kernel/head.S |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 0f6c6d1..0fdd318f 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -555,7 +555,7 @@ ENTRY(fixup_smp)
+ 	ldmfd	sp!, {r4 - r6, pc}
+ ENDPROC(fixup_smp)
+ 
+-#ifdef __ARMEB_
++#ifdef __ARMEB__
+ #define LOW_OFFSET	0x4
+ #define HIGH_OFFSET	0x0
+ #else
 -- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131028/480ff28f/attachment-0001.sig>
+1.7.9.5
