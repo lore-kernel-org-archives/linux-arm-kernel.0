@@ -1,40 +1,86 @@
 From: tom.leiming@gmail.com (Ming Lei)
-Date: Mon, 28 Oct 2013 23:45:06 +0800
-Subject: ARM/kirkwood: v3.12-rc6: kernel BUG at mm/util.c:390!
-In-Reply-To: <20131028141310.GA4970@schnuecks.de>
-References: <20131024200730.GB17447@blackmetal.musicnaut.iki.fi>
- <20131026143617.GA14034@mudshark.cambridge.arm.com>
- <20131027195115.208f40f3@tom-ThinkPad-T410>
- <20131028141310.GA4970@schnuecks.de>
-Message-ID: <CACVXFVMA61Wi6jZs_kf329fCj2oMXgbg9x0EhP5OpEEgPVw4kw@mail.gmail.com>
+Date: Mon, 28 Oct 2013 23:48:59 +0800
+Subject: [PATCH] scripts/kallsyms: filter symbols not in kernel address space
+Message-ID: <1382975339-25831-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 10:13 PM, Simon Baatz <gmbnomis@gmail.com> wrote:
-> On Sun, Oct 27, 2013 at 07:51:15PM +0800, Ming Lei wrote:
->> diff --git a/lib/scatterlist.c b/lib/scatterlist.c
->> index a685c8a..eea8806 100644
->> --- a/lib/scatterlist.c
->> +++ b/lib/scatterlist.c
->> @@ -577,7 +577,7 @@ void sg_miter_stop(struct sg_mapping_iter *miter)
->>               miter->__offset += miter->consumed;
->>               miter->__remaining -= miter->consumed;
->>
->> -             if (miter->__flags & SG_MITER_TO_SG)
->> +             if ((miter->__flags & SG_MITER_TO_SG) && !PageSlab(page))
->
-> This is what I was going to propose, but I would have used
-> !PageSlab(miter->page) ;-)
+This patch uses CONFIG_PAGE_OFFSET to filter symbols which
+are not in kernel address space because these symbols are
+generally for generating code purpose and can't be run at
+kernel mode, so we needn't keep them in /proc/kallsyms.
 
-OK, I will send a formal one later, thank you for pointing out the above, :-)
+For example, on ARM there are some symbols which are
+linked in relocatable code section, then perf can't parse
+symbols any more from /proc/kallsyms, and this patch fixes
+the problem.
 
->
->>                       flush_kernel_dcache_page(miter->page);
->
-> With this, a kernel with DEBUG_VM now boots on Kirkwood.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Michal Marek <mmarek@suse.cz>
+Acked-by: Rusty Russell <rusty@rustcorp.com.au>
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+---
+ scripts/kallsyms.c      |   12 +++++++++++-
+ scripts/link-vmlinux.sh |    2 ++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-
-
-Thanks,
+diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+index 487ac6f..9a11f9f 100644
+--- a/scripts/kallsyms.c
++++ b/scripts/kallsyms.c
+@@ -55,6 +55,7 @@ static struct sym_entry *table;
+ static unsigned int table_size, table_cnt;
+ static int all_symbols = 0;
+ static char symbol_prefix_char = '\0';
++static unsigned long long kernel_start_addr = 0;
+ 
+ int token_profit[0x10000];
+ 
+@@ -65,7 +66,10 @@ unsigned char best_table_len[256];
+ 
+ static void usage(void)
+ {
+-	fprintf(stderr, "Usage: kallsyms [--all-symbols] [--symbol-prefix=<prefix char>] < in.map > out.S\n");
++	fprintf(stderr, "Usage: kallsyms [--all-symbols] "
++			"[--symbol-prefix=<prefix char>] "
++			"[--page-offset=<CONFIG_PAGE_OFFSET>] "
++			"< in.map > out.S\n");
+ 	exit(1);
+ }
+ 
+@@ -194,6 +198,9 @@ static int symbol_valid(struct sym_entry *s)
+ 	int i;
+ 	int offset = 1;
+ 
++	if (s->addr < kernel_start_addr)
++		return 0;
++
+ 	/* skip prefix char */
+ 	if (symbol_prefix_char && *(s->sym + 1) == symbol_prefix_char)
+ 		offset++;
+@@ -646,6 +653,9 @@ int main(int argc, char **argv)
+ 				if ((*p == '"' && *(p+2) == '"') || (*p == '\'' && *(p+2) == '\''))
+ 					p++;
+ 				symbol_prefix_char = *p;
++			} else if (strncmp(argv[i], "--page-offset=", 14) == 0) {
++				const char *p = &argv[i][14];
++				kernel_start_addr = strtoull(p, NULL, 16);
+ 			} else
+ 				usage();
+ 		}
+diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
+index 0149949..32b10f5 100644
+--- a/scripts/link-vmlinux.sh
++++ b/scripts/link-vmlinux.sh
+@@ -82,6 +82,8 @@ kallsyms()
+ 		kallsymopt="${kallsymopt} --all-symbols"
+ 	fi
+ 
++	kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
++
+ 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
+ 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
+ 
 -- 
-Ming Lei
+1.7.9.5
