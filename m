@@ -1,68 +1,69 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 28 Oct 2013 15:25:54 +0100
-Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
-In-Reply-To: <526E6765.3030403@ti.com>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191751.468.89202.stgit@localhost>
- <20130520095447.GR21614@n2100.arm.linux.org.uk>
- <20130706131057.GU21614@n2100.arm.linux.org.uk>
- <20130706133627.GV21614@n2100.arm.linux.org.uk>
- <20130708093410.GT5523@atomide.com>
- <20130708142103.GX21614@n2100.arm.linux.org.uk>
- <51ECFDFD.60102@ti.com>
- <CAAwP0s2pGM6RRhkzhZ+_8BsCKP0posFrn7buTwUzLWWC5apE2A@mail.gmail.com>
- <526E6765.3030403@ti.com>
-Message-ID: <CABxcv==91JA9Fb_LUBX57YCgwYwgx6FMGdw39==1tGtDPtUKYA@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 28 Oct 2013 15:31:47 +0100
+Subject: [PATCH v2 00/12] clk/exynos convert clock IDs to macros
+In-Reply-To: <525274FA.5020701@samsung.com>
+References: <1378462361-13680-1-git-send-email-a.hajda@samsung.com>
+ <8412301.YP2zzplWoe@amdc1227>
+ <070001ceafa5$d4d81a40$7e884ec0$%kim@samsung.com>
+ <523716C9.3000204@samsung.com> <20130916193709.27384.86101@quantum>
+ <06c101cebdc5$75a83d10$60f8b730$%kim@samsung.com>
+ <20131002010953.9338.23436@quantum>
+ <0d8901cec170$f7230b50$e56921f0$%kim@samsung.com>
+ <20131006202709.32214.75572@quantum> <525274FA.5020701@samsung.com>
+Message-ID: <526E7553.8030607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 2:32 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On 27/10/13 15:26, Javier Martinez Canillas wrote:
->
->> When booting with DT the omapfb's probe is deferred several times but
->> it always fails on dpi_connect() due not being able to get the
->> VDDS_DSI regulator:
->
-> The problem with DT boot is that the VDDS_DSI is not linked to the DPI
-> device. For omap4, we have a few hacks to go around this (see dsi.c,
-> dsi_regulator_init()).
->
+Ping
 
-I see, I'll add a dpi_regulator_init() to
-drivers/video/omap2/dss/dpi.c to workaround this.
+Regards
+Andrzej
 
->> So I tried adding this to my DT with no luck.
+On 10/07/2013 10:46 AM, Andrzej Hajda wrote:
+> On 10/06/2013 10:27 PM, Mike Turquette wrote:
+>> Quoting Kukjin Kim (2013-10-04 19:16:56)
+>>> Mike Turquette wrote:
+>>>> Quoting Kukjin Kim (2013-09-30 03:11:41)
+>>>>> Mike Turquette wrote:
+>>>>>> Quoting Sylwester Nawrocki (2013-09-16 07:33:45)
+>>>>>>> On 09/12/2013 12:50 PM, Kukjin Kim wrote:
+>>>>>>>> Well...I'm not sure changing to use macro is better or not at this
+>>>>>> moment...
+>>>>>>> I think it is. ;) It's really less error prone to have symbolic
+>>>> names
+>>>>>> instead
+>>>>>>> of the plain numbers. The clock ids are defined in one place and it
+>>>> is
+>>>>>> more
+>>>>>>> clear what a clock is by looking at symbolic name. It's especially
+>>>>>> annoying
+>>>>>>> to use plain numbers where are are many clock in a single node, like
+>>>> 10
+>>>>>> or
+>>>>>>> more. What are you main concerns with this ?
+>>>>>> I think having the symbolic names is a win for readability.
+>>>>>>
+>>>>> Hmm...since Mike who is a maintainer for ccf agrees with Sylwester's
+>>>> opinion, so I agree. Actually, I had no strong objection on this but still
+>>>> I'm not sure using macro is really better because sometimes the name
+>>>> doesn't give readability really I think though.
+>>>>> Mike, can you give me your ack on clk stuff?
+>>>> Yes, but I was thinking to take this change through the clk tree. The
+>>>> new branch based on -rc3 will be published tonight.
+>>>>
+>>>> Let me know if it causes problems for you for me to take it.
+>>>>
+>>> Uhm, I think dt changes can make ugly conflicts because of spread dt changing?
+>> Sure, go ahead and take the patches then.
 >>
->> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts
->> b/arch/arm/boot/dts/omap3-igep0020.dts
->> index 17a6fc1..eaae935 100644
->> --- a/arch/arm/boot/dts/omap3-igep0020.dts
->> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
->> @@ -256,3 +256,8 @@
->>  &usbhsehci {
->>         phys = <&hsusb1_phy>;
->>  };
->> +
->> +&vpll2 {
->> +        supply-dev = "omapdss_dpi.0";
->> +        supply = "vdds_dsi";
->> +};
->
-> I didn't see "supply-dev" defined in dt bindings documentation, is that
-> supposed to work? If it should work, then the problem could be solved
-> with the above. Otherwise I guess we must add more hacks to omapdss
-> driver, to all places where it uses regulator_get...
->
-
-Yes I didn't find on the DT binding documentation either but saw it
-before on a DTS someone shared on linux-omap so I thought it was just
-a matter of outdated documentation. But I guess it was the other way
-around, that DTS was for a vendor kernel which added that supply-dev
-property.
-
->  Tomi
->
->
-
-Thanks a lot for your help!
-Javier
+>> Acked-by: Mike Turquette <mturquette@linaro.org>
+>>
+>> Regards,
+>> Mike
+> 
+> I can create patchset based on different git branch if neccessary.
+> 
+> Regards
+> Andrzej
+>>> - Kukjin
+> 
