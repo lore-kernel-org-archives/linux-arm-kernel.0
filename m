@@ -1,38 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Oct 2013 10:16:53 -0700
-Subject: [GIT PULL] Allwinner sunXi core additions for 3.13
-In-Reply-To: <20131028041607.GB22890@quad.lixom.net>
-References: <20131018171456.GA14419@lukather>
- <20131028041607.GB22890@quad.lixom.net>
-Message-ID: <CAOesGMgXGc-Fd13_aJ2LBE_Kyx=k7nqfsgFWGJfw47rpEBfaaQ@mail.gmail.com>
+Date: Mon, 28 Oct 2013 10:16:38 -0700
+Subject: [PATCH] ARM: sunxi: remove .init_time hooks
+Message-ID: <1382980598-2912-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 9:16 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Oct 18, 2013 at 07:14:56PM +0200, Maxime Ripard wrote:
->> Kevin, Olof,
->>
->> Please pull the following changes for the 3.13 merge window.
->>
->> Thanks!
->> Maxime
->>
->> The following changes since commit 272b98c6455f00884f0350f775c5342358ebb73f:
->>
->>   Linux 3.12-rc1 (2013-09-16 16:17:51 -0400)
->>
->> are available in the git repository at:
->>
->>   https://github.com/mripard/linux.git tags/sunxi-core-for-3.13
->
-> Thanks, pulled into next/soc.
+The machine entries were split up, but the cleanup to remove .init_time
+removed the function that the new/split entries refer to. Remove them
+since they are no longer needed.
 
-This caused conflicts (and build breaks) due to the .init_time removal
-and thus the removal of sunxi_timer_init().
+Cc: Maxime Ripard <mripard@free-electrons.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-sunxi/sunxi.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-I've merged in the removal branch as a prereq and added a fixup patch
-on top (see separate patch email). No action needed from you on this,
-just cc:ing you the patch so you see it.
-
-
--Olof
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index ffac2f53fede..61d3a387f01c 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -134,7 +134,6 @@ static const char * const sun6i_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
+ 	.init_machine	= sunxi_dt_init,
+-	.init_time	= sunxi_timer_init,
+ 	.dt_compat	= sun6i_board_dt_compat,
+ 	.restart	= sun6i_restart,
+ MACHINE_END
+@@ -146,7 +145,6 @@ static const char * const sun7i_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
+ 	.init_machine	= sunxi_dt_init,
+-	.init_time	= sunxi_timer_init,
+ 	.dt_compat	= sun7i_board_dt_compat,
+ 	.restart	= sun4i_restart,
+ MACHINE_END
+-- 
+1.8.4.1.601.g02b3b1d
