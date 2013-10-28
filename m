@@ -1,41 +1,214 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 28 Oct 2013 15:40:06 -0700
-Subject: Tegra baseline test results for v3.12-rc7
-Message-ID: <526EE7C6.60208@nvidia.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 28 Oct 2013 15:44:45 -0700
+Subject: [PATCH] ARM64: add support for kernel mode NEON in atomic context
+Message-ID: <1383000285-13427-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.12-rc7.
-Logs and other details at:
+This patch modifies kernel_neon_begin() and kernel_neon_end(), so
+they may be called from any context. To address the case where only
+a couple of registers are needed, kernel_neon_begin_partial(u32) is
+introduced which takes as a parameter the number of bottom 'n' NEON
+q-registers required. To mark the end of such a partial section, the
+regular kernel_neon_end() should be used.
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12-rc7/20131027163109/
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+Instead of having arm/arm64 versions at every iteration, I propose to discuss
+this for arm64, which has a much stronger case for this feature with the Crypto
+Extensions. Once we are aligned I will implement for ARM as well.
 
+ arch/arm64/include/asm/fpsimd.h       | 17 ++++++++++++++++
+ arch/arm64/include/asm/fpsimdmacros.h | 37 +++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/neon.h         |  6 +++++-
+ arch/arm64/kernel/entry-fpsimd.S      | 24 +++++++++++++++++++++++
+ arch/arm64/kernel/fpsimd.c            | 37 +++++++++++++++++++++++------------
+ 5 files changed, 108 insertions(+), 13 deletions(-)
 
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc6 (31d141e3a666269a3b6fcccddb0351caf7454240)):
-    text     data      bss    total  kernel
-  +89324   -10192    +1184   +80316  multi_v7_defconfig
-   +1380      +64        0    +1444  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc6 (31d141e3a666269a3b6fcccddb0351caf7454240))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-      -60k      60k        .       4k tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-       12k     -12k        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-      -72k      72k        .       4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index c43b4ac..8657206 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -39,6 +39,19 @@ struct fpsimd_state {
+ 	};
+ };
+ 
++/*
++ * Struct for stacking the bottom 'n' FP/SIMD registers.
++ * Mainly intended for kernel use of v8 Crypto Extensions which only
++ * needs a few registers and may need to execute in atomic context.
++ */
++struct fpsimd_partial_state {
++	u32		num_regs;
++	u32		fpsr;
++	u32		fpcr;
++	__uint128_t	vregs[32] __aligned(16);
++} __aligned(16);
++
++
+ #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
+ /* Masks for extracting the FPSR and FPCR from the FPSCR */
+ #define VFP_FPSCR_STAT_MASK	0xf800009f
+@@ -55,6 +68,10 @@ struct task_struct;
+ extern void fpsimd_save_state(struct fpsimd_state *state);
+ extern void fpsimd_load_state(struct fpsimd_state *state);
+ 
++void fpsimd_save_partial_state(struct fpsimd_partial_state *state,
++			       u32 num_regs);
++void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
++
+ extern void fpsimd_thread_switch(struct task_struct *next);
+ extern void fpsimd_flush_thread(void);
+ 
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index bbec599..42990a8 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -62,3 +62,40 @@
+ 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
+ 	msr	fpcr, x\tmpnr
+ .endm
++
++.altmacro
++.macro	q2op, op, q1, q2, state
++	\op	q\q1, q\q2, [\state, # -16 * \q1 - 16]
++.endm
++
++.macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
++	mrs	x\tmpnr1, fpsr
++	str	w\numnr, [\state]
++	mrs	x\tmpnr2, fpcr
++	stp	w\tmpnr1, w\tmpnr2, [\state, #4]
++	adr	x\tmpnr1, 0f
++	add	\state, \state, x\numnr, lsl #4
++	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
++	br	x\tmpnr1
++	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
++		qb = \qa + 1
++	q2op	stp, \qa, %qb, \state
++	.endr
++0:
++.endm
++
++.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
++	ldp	w\tmpnr1, w\tmpnr2, [\state, #4]
++	msr	fpsr, x\tmpnr1
++	msr	fpcr, x\tmpnr2
++	adr	x\tmpnr1, 0f
++	ldr	w\tmpnr2, [\state]
++	add	\state, \state, x\tmpnr2, lsl #4
++	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
++	br	x\tmpnr1
++	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
++		qb = \qa + 1
++	q2op	ldp, \qa, %qb, \state
++	.endr
++0:
++.endm
+diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+index b0cc58a9..13ce4cc 100644
+--- a/arch/arm64/include/asm/neon.h
++++ b/arch/arm64/include/asm/neon.h
+@@ -8,7 +8,11 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/types.h>
++
+ #define cpu_has_neon()		(1)
+ 
+-void kernel_neon_begin(void);
++#define kernel_neon_begin()	kernel_neon_begin_partial(32)
++
++void kernel_neon_begin_partial(u32 num_regs);
+ void kernel_neon_end(void);
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
+index 6a27cd6..d358cca 100644
+--- a/arch/arm64/kernel/entry-fpsimd.S
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -41,3 +41,27 @@ ENTRY(fpsimd_load_state)
+ 	fpsimd_restore x0, 8
+ 	ret
+ ENDPROC(fpsimd_load_state)
++
++#ifdef CONFIG_KERNEL_MODE_NEON
++
++/*
++ * Save the bottom n FP registers.
++ *
++ * x0 - pointer to struct fpsimd_partial_state
++ */
++ENTRY(fpsimd_save_partial_state)
++	fpsimd_save_partial x0, 1, 8, 9
++	ret
++ENDPROC(fpsimd_load_partial_state)
++
++/*
++ * Load the bottom n FP registers.
++ *
++ * x0 - pointer to struct fpsimd_partial_state
++ */
++ENTRY(fpsimd_load_partial_state)
++	fpsimd_restore_partial x0, 8, 9
++	ret
++ENDPROC(fpsimd_load_partial_state)
++
++#endif
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 1f2e4d5..737b337 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -86,26 +86,39 @@ void fpsimd_flush_thread(void)
+ 
+ #ifdef CONFIG_KERNEL_MODE_NEON
+ 
++static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
++static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
++
+ /*
+  * Kernel-side NEON support functions
+  */
+-void kernel_neon_begin(void)
++void kernel_neon_begin_partial(u32 num_regs)
+ {
+-	/* Avoid using the NEON in interrupt context */
+-	BUG_ON(in_interrupt());
+-	preempt_disable();
+-
+-	if (current->mm)
+-		fpsimd_save_state(&current->thread.fpsimd_state);
++	BUG_ON(num_regs > 32);
++
++	if (in_interrupt()) {
++		struct fpsimd_partial_state *s = this_cpu_ptr(
++			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
++		fpsimd_save_partial_state(s, roundup(num_regs, 2));
++	} else {
++		preempt_disable();
++		if (current->mm)
++			fpsimd_save_state(&current->thread.fpsimd_state);
++	}
+ }
+-EXPORT_SYMBOL(kernel_neon_begin);
++EXPORT_SYMBOL(kernel_neon_begin_partial);
+ 
+ void kernel_neon_end(void)
+ {
+-	if (current->mm)
+-		fpsimd_load_state(&current->thread.fpsimd_state);
+-
+-	preempt_enable();
++	if (in_interrupt()) {
++		struct fpsimd_partial_state *s = this_cpu_ptr(
++			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
++		fpsimd_load_partial_state(s);
++	} else {
++		if (current->mm)
++			fpsimd_load_state(&current->thread.fpsimd_state);
++		preempt_enable();
++	}
+ }
+ EXPORT_SYMBOL(kernel_neon_end);
+ 
+-- 
+1.8.3.2
