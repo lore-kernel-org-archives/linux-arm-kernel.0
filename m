@@ -1,45 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 28 Oct 2013 14:57:04 -0500
-Subject: [PATCH 4/8] ARM: imx: add support code for IMX50 based machines
-In-Reply-To: <526E065F.60206@uclinux.org>
-References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
- <1382076260-6422-5-git-send-email-gerg@uclinux.org>
- <CAL_JsqJhM=K+vovDALQnjUSXBcuzHev1CUpxEnNqCYfOfGVsWQ@mail.gmail.com>
- <526E065F.60206@uclinux.org>
-Message-ID: <CAL_JsqJbWXvE9kCwAQqkvd5MzQeo5oEBKjYFx1a1XWx1k3GNUQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 28 Oct 2013 13:01:23 -0700
+Subject: [PATCH v3 07/10] regmap: add SPMI support
+In-Reply-To: <cc2f82e353885734fe61bb8d8ec8c9f7b35e0d5a.1382985169.git.joshc@codeaurora.org>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <cc2f82e353885734fe61bb8d8ec8c9f7b35e0d5a.1382985169.git.joshc@codeaurora.org>
+Message-ID: <20131028200123.GA20439@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 1:38 AM, Greg Ungerer <gerg@uclinux.org> wrote:
-> Hi Rob,
->
-> On 24/10/13 21:11, Rob Herring wrote:
->> On Fri, Oct 18, 2013 at 1:04 AM,  <gerg@uclinux.org> wrote:
->>> From: Greg Ungerer <gerg@uclinux.org>
->>>
->>> Add machine support code for the Freescale IMX50 SoC.
+On Mon, Oct 28, 2013 at 01:12:35PM -0500, Josh Cartwright wrote:
+> Add basic support for the System Power Management Interface (SPMI) bus.
+> This is a simple implementation which only implements register accesses
+> via the Extended Register Read/Write Long commands.
 
+This looks good - I've applied it on the assumption that the underlying
+interfaces won't change and the suspicion that it'll be after the merge
+window before users get merged.  However I did provide a tag at:
 
->>> +DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
->>> +       .map_io         = mx53_map_io,
->>> +       .init_early     = imx53_init_early,
->>> +       .init_irq       = mx53_init_irq,
->>> +       .handle_irq     = imx53_handle_irq,
->>> +       .init_time      = imx50_timer_init,
->>> +       .init_machine   = imx50_dt_init,
->>> +       .init_late      = imx53_init_late,
->>> +       .dt_compat      = imx50_dt_board_compat,
->>> +       .restart        = mxc_restart,
->>> +MACHINE_END
->>
->> This seems like a lot of duplication. It seems like mx53 and mx50
->> could be combined into a single machine_desc. init_time should not be
->> needed in 3.13.
->
-> Are you suggesting that "fsl,imx50" be added to the board compat list
-> in mach-imx53.c instead?
+  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git tags/spmi
 
-Yes, that would be at least part of it. I'd guess a bit more than that
-is needed.
-
-Rob
+which I'm happy to see pulled into any tree that requires it.  I can
+drop the patch for now if there would be a problem with getting it in
+during the merge window.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131028/70fffb8a/attachment.sig>
