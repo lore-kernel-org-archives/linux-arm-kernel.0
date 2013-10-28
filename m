@@ -1,59 +1,39 @@
 From: joshc@codeaurora.org (Josh Cartwright)
 Date: Mon, 28 Oct 2013 13:12:35 -0500
-Subject: [PATCH v3 09/10] mfd: pm8x41: document device tree bindings
+Subject: [PATCH v3 01/10] of: Add empty for_each_available_child_of_node()
+ macro definition
 In-Reply-To: <cover.1382985169.git.joshc@codeaurora.org>
 References: <cover.1382985169.git.joshc@codeaurora.org>
-Message-ID: <88997d3863f72f8553fcaf66cf67fbf3289df04f.1382985169.git.joshc@codeaurora.org>
+Message-ID: <3518ab21e436f5c1a7bdd900a796bb05f9162bbf.1382985169.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the bindings used to describe the Qualcomm 8x41 PMICs.
+From: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+Add this empty macro definition so users can be compiled without
+excluding this macro call with preprocessor directives when CONFIG_OF
+is disabled.
+
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- Documentation/devicetree/bindings/mfd/pm8x41.txt | 33 ++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/pm8x41.txt
+ include/linux/of.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/pm8x41.txt b/Documentation/devicetree/bindings/mfd/pm8x41.txt
-new file mode 100644
-index 0000000..6afd4ce
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/pm8x41.txt
-@@ -0,0 +1,33 @@
-+Qualcomm PM8841 and PM8941 PMIC multi-function devices
+diff --git a/include/linux/of.h b/include/linux/of.h
+index f95aee3..908584e 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -364,6 +364,9 @@ static inline bool of_have_populated_dt(void)
+ #define for_each_child_of_node(parent, child) \
+ 	while (0)
+ 
++#define for_each_available_child_of_node(parent, child) \
++	while (0)
 +
-+The PM8x41 PMICs are used with the Qualcomm Snapdragon 800 series SoCs, and are
-+interfaced to the chip via the SPMI (System Power Management Interface) bus.
-+Support for  multiple independent functions are implemented by splitting the
-+16-bit SPMI slave address space into 256 smaller fixed-size regions, 256 bytes
-+each.  A function can consume one or more of these fixed-size register regions.
-+
-+Required properties:
-+- compatible: Must be one of:
-+     "qcom,pm8841"
-+     "qcom,pm8941"
-+- reg: Specifies the SPMI USID slave address for this device
-+- #address-cells = <1>
-+- #size-cells = <0>
-+
-+Each child node represents a function of the PM8x41.  Each child 'reg' entry
-+describes an offset within the USID slave address where the region starts.
-+
-+Example:
-+
-+pm8941 at 0 {
-+	compatible = "qcom,pm8941";
-+	reg = <0x0>;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	rtc {
-+		compatible = "qcom,pm8941-rtc";
-+		reg = <0x6000 0x6100>;
-+	};
-+}
+ static inline struct device_node *of_get_child_by_name(
+ 					const struct device_node *node,
+ 					const char *name)
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
