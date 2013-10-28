@@ -1,9 +1,9 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 00:46:58 +0100
-Subject: [PATCH 10/19] mtd: sh_flctl: Enable the driver on all ARM platforms
+Date: Tue, 29 Oct 2013 00:47:00 +0100
+Subject: [PATCH 12/19] irda: sh_irda: Enable the driver on all ARM platforms
 In-Reply-To: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383004027-25036-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383004027-25036-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,25 +12,25 @@ multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
 driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
 and ARCH_SHMOBILE_MULTI and increase build testing coverage.
 
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: linux-mtd at lists.infradead.org
+Cc: Samuel Ortiz <samuel@sortiz.org>
+Cc: netdev at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/mtd/nand/Kconfig | 2 +-
+ drivers/net/irda/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index d885298..f491f5b 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -486,7 +486,7 @@ config MTD_NAND_MXC
+diff --git a/drivers/net/irda/Kconfig b/drivers/net/irda/Kconfig
+index 2a30193..54b4101 100644
+--- a/drivers/net/irda/Kconfig
++++ b/drivers/net/irda/Kconfig
+@@ -403,7 +403,7 @@ config MCS_FIR
  
- config MTD_NAND_SH_FLCTL
- 	tristate "Support for NAND on Renesas SuperH FLCTL"
--	depends on SUPERH || ARCH_SHMOBILE
-+	depends on SUPERH || ARM
+ config SH_IRDA
+ 	tristate "SuperH IrDA driver"
+-	depends on IRDA && ARCH_SHMOBILE
++	depends on IRDA && ARM
  	help
- 	  Several Renesas SuperH CPU has FLCTL. This option enables support
- 	  for NAND Flash using FLCTL.
+ 	  Say Y here if your want to enable SuperH IrDA devices.
+ 
 -- 
 1.8.1.5
