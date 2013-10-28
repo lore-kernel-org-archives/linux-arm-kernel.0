@@ -1,58 +1,76 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 28 Oct 2013 15:32:21 +0200
-Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
-In-Reply-To: <CAAwP0s2pGM6RRhkzhZ+_8BsCKP0posFrn7buTwUzLWWC5apE2A@mail.gmail.com>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191751.468.89202.stgit@localhost>
- <20130520095447.GR21614@n2100.arm.linux.org.uk>
- <20130706131057.GU21614@n2100.arm.linux.org.uk>
- <20130706133627.GV21614@n2100.arm.linux.org.uk>
- <20130708093410.GT5523@atomide.com>
- <20130708142103.GX21614@n2100.arm.linux.org.uk> <51ECFDFD.60102@ti.com>
- <CAAwP0s2pGM6RRhkzhZ+_8BsCKP0posFrn7buTwUzLWWC5apE2A@mail.gmail.com>
-Message-ID: <526E6765.3030403@ti.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 28 Oct 2013 22:40:29 +0900
+Subject: [PATCH v2 0/7] drm/exynos: move hdmiphy related code to hdmiphy
+ driver
+In-Reply-To: <1382436668-15813-1-git-send-email-rahul.sharma@samsung.com>
+References: <1382436668-15813-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CAAQKjZOnZi_=V6ZL_SmamiG_Gbo7TxsRUv5VtSvJGpqkyvH_ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/10/13 15:26, Javier Martinez Canillas wrote:
+Hi Rahul,
 
-> When booting with DT the omapfb's probe is deferred several times but
-> it always fails on dpi_connect() due not being able to get the
-> VDDS_DSI regulator:
+I have merged the re-factoring patch set from Sean Paul to
+exynos-drm-next except eDP related patch set that these need more
+reviews. Can you re-base at top of exynos-drm-next?
 
-The problem with DT boot is that the VDDS_DSI is not linked to the DPI
-device. For omap4, we have a few hacks to go around this (see dsi.c,
-dsi_regulator_init()).
+Thanks,
+Inki Dae
 
-> So I tried adding this to my DT with no luck.
-> 
-> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts
-> b/arch/arm/boot/dts/omap3-igep0020.dts
-> index 17a6fc1..eaae935 100644
-> --- a/arch/arm/boot/dts/omap3-igep0020.dts
-> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
-> @@ -256,3 +256,8 @@
->  &usbhsehci {
->         phys = <&hsusb1_phy>;
->  };
-> +
-> +&vpll2 {
-> +        supply-dev = "omapdss_dpi.0";
-> +        supply = "vdds_dsi";
-> +};
-
-I didn't see "supply-dev" defined in dt bindings documentation, is that
-supposed to work? If it should work, then the problem could be solved
-with the above. Otherwise I guess we must add more hacks to omapdss
-driver, to all places where it uses regulator_get...
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131028/a76b34f1/attachment.sig>
+2013/10/22 Rahul Sharma <rahul.sharma@samsung.com>:
+> Currently, exynos hdmiphy operations and configs are kept
+> inside the hdmi driver. Hdmiphy related code is very tightly
+> coupled with hdmi IP driver. With these patches, hdmiphy
+> related stuff is moved to hdmiphy i2c driver for exynos4 and
+> exynos5250 socs. hdmi driver, being the phy controller, calls
+> exynos hdmiphy interfaces.
+>
+> This series also removes hdmiphy dummy clock for hdmiphy
+> and replace it with Phy PMU Control from the hdmiphy driver.
+>
+> At the end, support for exynos5420 hdmiphy is added to the
+> hdmiphy platform driver.
+>
+> Drm related paches are based on exynos-drm-next branch at
+> git://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git
+>
+> Arch related paches are based on for-next branch at
+> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git
+>
+> Rahul Sharma (7):
+>   drm/exynos: move hdmiphy code to hdmiphy i2c driver
+>   drm/exynos: remove dummy hdmiphy clock
+>   drm/exynos: add hdmiphy platform driver for exynos5420
+>   drm/exynos: add hdmiphy pmu bit control in hdmiphy drivers
+>   exynos/drm: fix ddc i2c device probe failure
+>   ARM: dts: update hdmiphy dt node for exynos5250
+>   ARM: dts: update hdmiphy dt node for exynos5420
+>
+>  .../devicetree/bindings/video/exynos_hdmi.txt      |    2 +
+>  .../devicetree/bindings/video/exynos_hdmiphy.txt   |    8 +-
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    9 +-
+>  arch/arm/boot/dts/exynos5420.dtsi                  |   14 +-
+>  drivers/gpu/drm/exynos/Makefile                    |    3 +-
+>  drivers/gpu/drm/exynos/exynos_ddc.c                |    5 +
+>  drivers/gpu/drm/exynos/exynos_hdmi.c               |  407 +++++-----------
+>  drivers/gpu/drm/exynos/exynos_hdmiphy.c            |   65 ---
+>  drivers/gpu/drm/exynos/exynos_hdmiphy.h            |   46 ++
+>  drivers/gpu/drm/exynos/exynos_hdmiphy_i2c.c        |  484 ++++++++++++++++++++
+>  drivers/gpu/drm/exynos/exynos_hdmiphy_platform.c   |  418 +++++++++++++++++
+>  drivers/gpu/drm/exynos/exynos_hdmiphy_priv.h       |   36 ++
+>  drivers/gpu/drm/exynos/regs-hdmiphy.h              |   37 ++
+>  13 files changed, 1174 insertions(+), 360 deletions(-)
+>  delete mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy.c
+>  create mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy.h
+>  create mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy_i2c.c
+>  create mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy_platform.c
+>  create mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy_priv.h
+>  create mode 100644 drivers/gpu/drm/exynos/regs-hdmiphy.h
+>
+> --
+> 1.7.10.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
