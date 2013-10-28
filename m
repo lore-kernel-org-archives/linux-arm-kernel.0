@@ -1,66 +1,128 @@
 From: joshc@codeaurora.org (Josh Cartwright)
 Date: Mon, 28 Oct 2013 13:12:35 -0500
-Subject: [PATCH v3 06/10] spmi: document the PMIC arbiter SPMI bindings
+Subject: [PATCH v3 08/10] mfd: pm8x41: add support for Qualcomm 8x41 PMICs
 In-Reply-To: <cover.1382985169.git.joshc@codeaurora.org>
 References: <cover.1382985169.git.joshc@codeaurora.org>
-Message-ID: <043d714725f8b6df1873047164d2d0e78778138b.1382985169.git.joshc@codeaurora.org>
+Message-ID: <5a49bffc44c5f5bffe222560e489a712321ce971.1382985169.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Qualcomm 8941 and 8841 PMICs are components used with the Snapdragon
+800 series SoC family.  This driver exists largely as a glue mfd component,
+it exists to be an owner of an SPMI regmap for children devices
+described in device tree.
+
 Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 ---
- .../bindings/spmi/qcom,spmi-pmic-arb.txt           | 42 ++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+ drivers/mfd/Kconfig  | 10 ++++++++
+ drivers/mfd/Makefile |  1 +
+ drivers/mfd/pm8x41.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 75 insertions(+)
+ create mode 100644 drivers/mfd/pm8x41.c
 
-diff --git a/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 914c3d1..0a288cb 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -476,6 +476,16 @@ config MFD_PM8XXX_IRQ
+ 	  This is required to use certain other PM 8xxx features, such as GPIO
+ 	  and MPP.
+ 
++config MFD_PM8X41
++	bool "Qualcomm PM8X41 PMIC"
++	depends on ARCH_MSM
++	select REGMAP_SPMI
++	help
++	  This enables basic support for the Qualcomm 8941 and 8841 PMICs.  These
++	  PMICs are currently used with the Snapdragon 800 series of SoCs.  Note, that
++	  this will only be useful paired with descriptions of the independent functions
++	  as children nodes in the device tree.
++
+ config MFD_RDC321X
+ 	tristate "RDC R-321x southbridge"
+ 	select MFD_CORE
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 15b905c..ee4d338 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -149,6 +149,7 @@ obj-$(CONFIG_MFD_CS5535)	+= cs5535-mfd.o
+ obj-$(CONFIG_MFD_OMAP_USB_HOST)	+= omap-usb-host.o omap-usb-tll.o
+ obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
+ obj-$(CONFIG_MFD_PM8XXX_IRQ) 	+= pm8xxx-irq.o
++obj-$(CONFIG_MFD_PM8X41)	+= pm8x41.o
+ obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+ obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
+ obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
+diff --git a/drivers/mfd/pm8x41.c b/drivers/mfd/pm8x41.c
 new file mode 100644
-index 0000000..68949aa
+index 0000000..0a57221
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
-@@ -0,0 +1,42 @@
-+Qualcomm SPMI Controller (PMIC Arbiter)
++++ b/drivers/mfd/pm8x41.c
+@@ -0,0 +1,64 @@
++/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/spmi.h>
++#include <linux/regmap.h>
++#include <linux/of_platform.h>
 +
-+The SPMI PMIC Arbiter is found on the Snapdragon 800 Series.  It is an SPMI
-+controller with wrapping arbitration logic to allow for multiple on-chip
-+devices to control a single SPMI master.
++static const struct regmap_config pm8x41_regmap_config = {
++	.reg_bits	= 16,
++	.val_bits	= 8,
++	.max_register	= 0xFFFF,
++};
 +
-+The PMIC Arbiter can also act as an interrupt controller, providing interrupts
-+to slave devices.
++static int pm8x41_remove_child(struct device *dev, void *unused)
++{
++	platform_device_unregister(to_platform_device(dev));
++	return 0;
++}
 +
-+See spmi.txt for the generic SPMI controller binding requirements for child
-+nodes.
++static int pm8x41_remove(struct spmi_device *sdev)
++{
++	device_for_each_child(&sdev->dev, NULL, pm8x41_remove_child);
++	return 0;
++}
 +
-+Required properties:
-+- compatible : should be "qcom,spmi-pmic-arb".
-+- reg-names  : should be "core", "intr", "cnfg"
-+- reg : offset and length of the PMIC Arbiter Core register map.
-+- reg : offset and length of the PMIC Arbiter Interrupt controller register map.
-+- reg : offset and length of the PMIC Arbiter Configuration register map.
-+- #address-cells : must be set to 1
-+- #size-cells : must be set to 0
-+- interrupt-controller : indicates the PMIC arbiter is an interrupt controller
-+- #interrupt-cells = <4>:  interrupts are specified as a 4-tuple:
-+    cell 1: slave ID for the requested interrupt (0-15)
-+    cell 2: peripheral ID for requested interrupt (0-255)
-+    cell 3: the requested peripheral interrupt (0-7)
-+    cell 4: interrupt flags indicating level-sense information, as defined in
-+            dt-bindings/interrupt-controller/irq.h
++static int pm8x41_probe(struct spmi_device *sdev)
++{
++	struct regmap *regmap;
 +
-+Example:
++	regmap = devm_regmap_init_spmi(sdev, &pm8x41_regmap_config);
++	if (IS_ERR(regmap)) {
++		dev_dbg(&sdev->dev, "regmap creation failed.\n");
++		return PTR_ERR(regmap);
++	}
 +
-+	qcom,spmi at fc4c0000 {
-+		compatible = "qcom,spmi-pmic-arb";
-+		reg-names = "core", "intr", "cnfg";
-+		reg = <0xfc4cf000 0x1000>,
-+		      <0Xfc4cb000 0x1000>,
-+		      <0Xfc4ca000 0x1000>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	return of_platform_populate(sdev->dev.of_node, NULL, NULL, &sdev->dev);
++}
 +
-+		interrupt-controller;
-+		#interrupt-cells = <4>;
-+	};
++static struct of_device_id pm8x41_id_table[] = {
++	{ "qcom,pm8841", },
++	{ "qcom,pm8941", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, pm8x41_id_table);
++
++static struct spmi_driver pm8x41_driver = {
++	.probe	= pm8x41_probe,
++	.remove	= pm8x41_remove,
++	.driver	= {
++		.name		= "qpnp,pm8x41",
++		.of_match_table	= pm8x41_id_table,
++	},
++};
++module_spmi_driver(pm8x41_driver);
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
