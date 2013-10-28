@@ -1,73 +1,58 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 28 Oct 2013 14:30:04 +0100
-Subject: [PATCH RFC] ARM: dts: imx6qdl: make pinctrl nodes board specific
-In-Reply-To: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
-References: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <526E66DC.3090003@de.bosch.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 28 Oct 2013 15:32:21 +0200
+Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
+In-Reply-To: <CAAwP0s2pGM6RRhkzhZ+_8BsCKP0posFrn7buTwUzLWWC5apE2A@mail.gmail.com>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191751.468.89202.stgit@localhost>
+ <20130520095447.GR21614@n2100.arm.linux.org.uk>
+ <20130706131057.GU21614@n2100.arm.linux.org.uk>
+ <20130706133627.GV21614@n2100.arm.linux.org.uk>
+ <20130708093410.GT5523@atomide.com>
+ <20130708142103.GX21614@n2100.arm.linux.org.uk> <51ECFDFD.60102@ti.com>
+ <CAAwP0s2pGM6RRhkzhZ+_8BsCKP0posFrn7buTwUzLWWC5apE2A@mail.gmail.com>
+Message-ID: <526E6765.3030403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 27/10/13 15:26, Javier Martinez Canillas wrote:
 
-On 25.10.2013 05:42, Shawn Guo wrote:
-> Currently, all pinctrl setting nodes are defined in <soc>.dtsi, so that
-> boards that share the same pinctrl setting do not have to define it time
-> and time again in <board>.dts.  However, along with the devices and use
-> cases being added continuously, the pinctrl setting nodes under iomuxc
-> becomes more than expected.  This bloats device tree blob for particular
-> board unnecessarily since only a small subset of those pinctrl setting
-> nodes will be used by the board.  It impacts not only the DTB file size
-> but also the run-time device tree lookup efficiency.
->
-> The patch proposes a solution to avoid this device tree bloating problem
-> while still keeping boards share the common pinctrl setting data by
-> using DTC macro support.  It creates imx6qdl-pingrp.h and move all those
-> pinctrl setting data into there as macro definitions.  The <board>.dts
-> will instead define the pinctrl setting nodes that are necessary for the
-> board by referring to the macros in imx6qdl-pingrp.h, so that only the
-> pinctrl setting data that will be used by the board will get compiled
-> into the DTB for the board.
->
-> With the changes, the pinctrl setting nodes becomes local to particular
-> board, and it makes no sense to continue numbering the setting for
-> given peripheral.  Thus, all the pinctrl phandler name gets updated to
-> have only peripheral name in there.
->
-> Using imx6q-sabresd.dtb today as example, the change shrinks the file
-> from 37KiB to 26KiB.
+> When booting with DT the omapfb's probe is deferred several times but
+> it always fails on dpi_connect() due not being able to get the
+> VDDS_DSI regulator:
 
-We have a similar problem, some boards need no pin mux at all (it's 
-already done by the boot loader), some boards need some pin mux. Doing 
-it the way it's done at the moment, we have ~10k dead pin mux stuff in 
-the dtb for the boards without any pin mux. As you describe above.
+The problem with DT boot is that the VDDS_DSI is not linked to the DPI
+device. For omap4, we have a few hacks to go around this (see dsi.c,
+dsi_regulator_init()).
 
-While thinking about several options to solve this, we found
+> So I tried adding this to my DT with no luck.
+> 
+> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts
+> b/arch/arm/boot/dts/omap3-igep0020.dts
+> index 17a6fc1..eaae935 100644
+> --- a/arch/arm/boot/dts/omap3-igep0020.dts
+> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
+> @@ -256,3 +256,8 @@
+>  &usbhsehci {
+>         phys = <&hsusb1_phy>;
+>  };
+> +
+> +&vpll2 {
+> +        supply-dev = "omapdss_dpi.0";
+> +        supply = "vdds_dsi";
+> +};
 
-http://permalink.gmane.org/gmane.linux.drivers.devicetree/19694
+I didn't see "supply-dev" defined in dt bindings documentation, is that
+supposed to work? If it should work, then the problem could be solved
+with the above. Otherwise I guess we must add more hacks to omapdss
+driver, to all places where it uses regulator_get...
 
-Adding then something like
+ Tomi
 
-&iomuxc {
-        status = "disabled";
-};
 
-to the dts which don't want any pin mux and then using the 
---strip-disabled option dramatically reduces the resulting dtb size.
-
-There are several pros and cons to consider, though:
-
-Pros:
-
-* You remove additional unused parts, too. Not only the pin mux. I.e. 
-the resulting dtb should be even smaller as with only removing the pin mux.
-
-Cons:
-
-* Non mainline dtc patch
-* Not boot tested, yet. I have tried this only regarding the size of the 
-resulting dtb. I haven't tested if the resulting dtb still boots, i.e. 
-if everything essential isn't removed.
-
-Best regards
-
-Dirk
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131028/a76b34f1/attachment.sig>
