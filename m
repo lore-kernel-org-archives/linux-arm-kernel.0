@@ -1,9 +1,10 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Oct 2013 23:49:29 +0100
-Subject: [PATCH 12/12] fbdev: shmobile-lcdcfb: Convert to clk_prepare/unprepare
+Date: Mon, 28 Oct 2013 23:49:26 +0100
+Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
+ clk_prepare/unprepare
 In-Reply-To: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383000569-8916-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383000569-8916-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,35 +12,43 @@ Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
 clk_disable_unprepare() to get ready for the migration to the common
 clock framework.
 
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: linux-usb at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/video/sh_mobile_lcdcfb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/usb/gadget/r8a66597-udc.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/video/sh_mobile_lcdcfb.c b/drivers/video/sh_mobile_lcdcfb.c
-index 0264704..eaeae0f 100644
---- a/drivers/video/sh_mobile_lcdcfb.c
-+++ b/drivers/video/sh_mobile_lcdcfb.c
-@@ -344,7 +344,7 @@ static void sh_mobile_lcdc_clk_on(struct sh_mobile_lcdc_priv *priv)
- {
- 	if (atomic_inc_and_test(&priv->hw_usecnt)) {
- 		if (priv->dot_clk)
--			clk_enable(priv->dot_clk);
-+			clk_prepare_enable(priv->dot_clk);
- 		pm_runtime_get_sync(priv->dev);
- 		if (priv->meram_dev && priv->meram_dev->pdev)
- 			pm_runtime_get_sync(&priv->meram_dev->pdev->dev);
-@@ -358,7 +358,7 @@ static void sh_mobile_lcdc_clk_off(struct sh_mobile_lcdc_priv *priv)
- 			pm_runtime_put_sync(&priv->meram_dev->pdev->dev);
- 		pm_runtime_put(priv->dev);
- 		if (priv->dot_clk)
--			clk_disable(priv->dot_clk);
-+			clk_disable_unprepare(priv->dot_clk);
- 	}
- }
+diff --git a/drivers/usb/gadget/r8a66597-udc.c b/drivers/usb/gadget/r8a66597-udc.c
+index 68be48d..4728751 100644
+--- a/drivers/usb/gadget/r8a66597-udc.c
++++ b/drivers/usb/gadget/r8a66597-udc.c
+@@ -1833,7 +1833,7 @@ static int __exit r8a66597_remove(struct platform_device *pdev)
+ 	r8a66597_free_request(&r8a66597->ep[0].ep, r8a66597->ep0_req);
  
+ 	if (r8a66597->pdata->on_chip) {
+-		clk_disable(r8a66597->clk);
++		clk_disable_unprepare(r8a66597->clk);
+ 		clk_put(r8a66597->clk);
+ 	}
+ 
+@@ -1931,7 +1931,7 @@ static int __init r8a66597_probe(struct platform_device *pdev)
+ 			ret = PTR_ERR(r8a66597->clk);
+ 			goto clean_up;
+ 		}
+-		clk_enable(r8a66597->clk);
++		clk_prepare_enable(r8a66597->clk);
+ 	}
+ 
+ 	if (r8a66597->pdata->sudmac) {
+@@ -1996,7 +1996,7 @@ clean_up3:
+ 	free_irq(irq, r8a66597);
+ clean_up2:
+ 	if (r8a66597->pdata->on_chip) {
+-		clk_disable(r8a66597->clk);
++		clk_disable_unprepare(r8a66597->clk);
+ 		clk_put(r8a66597->clk);
+ 	}
+ clean_up:
 -- 
 1.8.1.5
