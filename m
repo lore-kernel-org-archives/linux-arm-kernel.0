@@ -1,71 +1,81 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Oct 2013 23:49:21 +0100
-Subject: [PATCH 04/12] sata_rcar: Convert to clk_prepare/unprepare
+Date: Mon, 28 Oct 2013 23:49:18 +0100
+Subject: [PATCH 01/12] clocksource: sh_cmt: Add clk_prepare/unprepare support
 In-Reply-To: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383000569-8916-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383000569-8916-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
-clk_disable_unprepare() to get ready for the migration to the common
-clock framework.
+Prepare the clock at probe time, as there is no other appropriate place
+in the driver where we're allowed to sleep.
 
-Cc: Tejun Heo <tj@kernel.org>
-Cc: linux-ide at vger.kernel.org
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/ata/sata_rcar.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/ata/sata_rcar.c b/drivers/ata/sata_rcar.c
-index c2d95e9..1dae9a9 100644
---- a/drivers/ata/sata_rcar.c
-+++ b/drivers/ata/sata_rcar.c
-@@ -792,7 +792,7 @@ static int sata_rcar_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "failed to get access to sata clock\n");
- 		return PTR_ERR(priv->clk);
- 	}
--	clk_enable(priv->clk);
-+	clk_prepare_enable(priv->clk);
+diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+index 0965e98..940341a 100644
+--- a/drivers/clocksource/sh_cmt.c
++++ b/drivers/clocksource/sh_cmt.c
+@@ -634,12 +634,18 @@ static int sh_cmt_clock_event_next(unsigned long delta,
  
- 	host = ata_host_alloc(&pdev->dev, 1);
- 	if (!host) {
-@@ -822,7 +822,7 @@ static int sata_rcar_probe(struct platform_device *pdev)
- 		return 0;
- 
- cleanup:
--	clk_disable(priv->clk);
-+	clk_disable_unprepare(priv->clk);
- 
- 	return ret;
+ static void sh_cmt_clock_event_suspend(struct clock_event_device *ced)
+ {
+-	pm_genpd_syscore_poweroff(&ced_to_sh_cmt(ced)->pdev->dev);
++	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
++
++	pm_genpd_syscore_poweroff(&p->pdev->dev);
++	clk_unprepare(p->clk);
  }
-@@ -841,7 +841,7 @@ static int sata_rcar_remove(struct platform_device *pdev)
- 	iowrite32(0, base + SATAINTSTAT_REG);
- 	iowrite32(0x7ff, base + SATAINTMASK_REG);
  
--	clk_disable(priv->clk);
-+	clk_disable_unprepare(priv->clk);
+ static void sh_cmt_clock_event_resume(struct clock_event_device *ced)
+ {
+-	pm_genpd_syscore_poweron(&ced_to_sh_cmt(ced)->pdev->dev);
++	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
++
++	clk_prepare(p->clk);
++	pm_genpd_syscore_poweron(&p->pdev->dev);
+ }
+ 
+ static void sh_cmt_register_clockevent(struct sh_cmt_priv *p,
+@@ -737,6 +743,10 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 		goto err2;
+ 	}
+ 
++	ret = clk_prepare(p->clk);
++	if (ret < 0)
++		goto err3;
++
+ 	if (res2 && (resource_size(res2) == 4)) {
+ 		/* assume both CMSTR and CMCSR to be 32-bit */
+ 		p->read_control = sh_cmt_read32;
+@@ -773,19 +783,21 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+ 			      cfg->clocksource_rating);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "registration failed\n");
+-		goto err3;
++		goto err4;
+ 	}
+ 	p->cs_enabled = false;
+ 
+ 	ret = setup_irq(irq, &p->irqaction);
+ 	if (ret) {
+ 		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
+-		goto err3;
++		goto err4;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, p);
  
  	return 0;
- }
-@@ -861,7 +861,7 @@ static int sata_rcar_suspend(struct device *dev)
- 		/* mask */
- 		iowrite32(0x7ff, base + SATAINTMASK_REG);
- 
--		clk_disable(priv->clk);
-+		clk_disable_unprepare(priv->clk);
- 	}
- 
- 	return ret;
-@@ -873,7 +873,7 @@ static int sata_rcar_resume(struct device *dev)
- 	struct sata_rcar_priv *priv = host->private_data;
- 	void __iomem *base = priv->base;
- 
--	clk_enable(priv->clk);
-+	clk_prepare_enable(priv->clk);
- 
- 	/* ack and mask */
- 	iowrite32(0, base + SATAINTSTAT_REG);
++err4:
++	clk_unprepare(p->clk);
+ err3:
+ 	clk_put(p->clk);
+ err2:
 -- 
 1.8.1.5
