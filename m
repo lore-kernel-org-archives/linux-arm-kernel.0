@@ -1,40 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 28 Oct 2013 10:52:00 +0800
-Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
-In-Reply-To: <526DCED3.2070704@mentor.com>
-References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
- <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
- <5264A06B.2040202@mentor.com>
- <20131021045917.GH17165@S2101-09.ap.freescale.net>
- <857E9EDCA6C0904DB3357321AA9123EB62506BEA@NA-MBX-01.mgc.mentorg.com>
- <5264C615.4070504@mentor.com>
- <20131021070451.GI17165@S2101-09.ap.freescale.net>
- <526DCED3.2070704@mentor.com>
-Message-ID: <20131028025159.GD2839@S2101-09.ap.freescale.net>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Mon, 28 Oct 2013 13:44:30 +1030
+Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
+In-Reply-To: <CACVXFVN7PiU1dorkeamtC9-Wg_TVQE8xFiJtad-C8q4_=Rc1Ow@mail.gmail.com>
+References: <1382498320-26594-1-git-send-email-tom.leiming@gmail.com>
+ <87eh7bfoq9.fsf@rustcorp.com.au>
+ <20131024084559.GD16735@n2100.arm.linux.org.uk>
+ <87mwlyclng.fsf@rustcorp.com.au>
+ <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
+ <87y55h7vcd.fsf@rustcorp.com.au>
+ <CACVXFVPXEUX9JQ2NZvL8=J34zbw2fn202QW2SQtpKjdQ+tv=vg@mail.gmail.com>
+ <87sivp7eai.fsf@rustcorp.com.au>
+ <CACVXFVN7PiU1dorkeamtC9-Wg_TVQE8xFiJtad-C8q4_=Rc1Ow@mail.gmail.com>
+Message-ID: <874n82gk89.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 07:41:23PM -0700, jiada wrote:
-> Hi Shawn
-> 
-> On 10/21/2013 12:04 AM, Shawn Guo wrote:
-> >On Sun, Oct 20, 2013 at 11:13:41PM -0700, jiada wrote:
-> >>I tried to checkout upstream kernel at commit: f36854c
-> >>even without your "ARM: imx: replace imx6q_restart() with
-> >>mxc_restart()" patch
-> >>I can reproduce system hang issue by "echo b > /proc/sysrq-trigger"
-> >
-> >Since the patch hasn't hit upstream tree, you meant you can reproduce
-> >the issue on linux-next or my for-next branch?  What's the reproducing
-> >rate?  I ran a few iterations but did not hit it.
-> >
-> >Shawn
-> >
-> 
-> as per discussion locally, when do you think you will post the fix patch
-> for the system hang I observed?
-> I would like to test for your patch, and then pull it to my kernel.
+Ming Lei <tom.leiming@gmail.com> writes:
+> On Fri, Oct 25, 2013 at 7:58 PM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>>>
+>>> Basically these symbols are only used to generate code, and in
+>>> kernel mode, CPU won't run into the corresponding addresses
+>>> because the generate code is copied to other address during booting,
+>>> so I understand they won't appear in backtraces.
+>>
+>> An oops occurs when something went *wrong*.  We look up all kinds of
+>> stuff.  Are you so sure that *none* of the callers will ever see these
+>> strange symbols and produce a confusing result?
+>
+> Suppose that might happen, kernel should be smart enough to know
+> that the address is not inside kernel address space and won't produce
+> confusing result, right?
 
-I will do it today.
+I don't know...  It would be your job, as the person making the change,
+to find all the users of kallsyms and prove that.
 
-Shawn
+This is why it is easier not to include incorrect values in the kernel's
+kallsyms in the first place.
+
+Hope that helps,
+Rusty.
