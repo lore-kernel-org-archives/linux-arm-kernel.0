@@ -1,27 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Oct 2013 14:40:04 -0700
-Subject: [GIT PULL 2/4] omap late clock and system control module cleanup
- for v3.13 merge window
-In-Reply-To: <5267df04.8970e00a.02db.ffffd631SMTPIN_ADDED_MISSING@mx.google.com>
+Date: Mon, 28 Oct 2013 14:49:38 -0700
+Subject: [GIT PULL 4/4] omap late device tree changes for v3.13 merge
+ window
+In-Reply-To: <5267df07.41abe00a.6620.ffffb906SMTPIN_ADDED_MISSING@mx.google.com>
 References: <pull-1382539003-174282>
- <5267df04.8970e00a.02db.ffffd631SMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <20131028214004.GF4802@quad.lixom.net>
+ <5267df07.41abe00a.6620.ffffb906SMTPIN_ADDED_MISSING@mx.google.com>
+Message-ID: <20131028214938.GH4802@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 07:36:42AM -0700, Tony Lindgren wrote:
-> The following changes since commit d0e639c9e06d44e713170031fe05fb60ebe680af:
+On Wed, Oct 23, 2013 at 07:36:43AM -0700, Tony Lindgren wrote:
+> The following changes since commit c49f4984fd45be36502e903e7a5a6a4faff42931:
 > 
->   Linux 3.12-rc4 (2013-10-06 14:00:20 -0700)
+>   Merge tag 'for_3.13/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.13/dt (2013-10-11 15:40:07 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/cm-scm-cleanup-signed
 > 
-> for you to fetch changes up to 54b89756a14aa1043507ce0811b4b6c02c5dddcc:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/dt-late
 > 
->   Merge tag 'for-v3.13/cm-scm-cleanup-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.13/cm-scm-cleanup (2013-10-20 08:55:19 -0700)
+> for you to fetch changes up to b4887e16375be312cf64642ac1d826186cb836bf:
+> 
+>   Merge tag 'for_3.13_super_late/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.13/dt (2013-10-23 03:12:45 -0700)
+> 
 
-Pulled, thanks.
+
+Pulled into next/dt.
+
+By the way, I don't think it'll scale very well if we add MAINTAINERS entries
+for all board port dts files, but I also don't know of a good way to make sure
+that the people who care about those dts files get notified on patches
+otherwise.
+
 
 -Olof
