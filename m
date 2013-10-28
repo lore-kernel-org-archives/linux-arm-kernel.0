@@ -1,56 +1,50 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 00:47:07 +0100
-Subject: [PATCH 19/19] fbdev: sh-mobile-lcdcfb: Enable the driver on all ARM
- platforms
-In-Reply-To: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383004027-25036-20-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 28 Oct 2013 18:58:22 -0500
+Subject: [PATCH] ARM: remove name from machine_desc for DT platforms
+In-Reply-To: <526EC0B8.2080307@wwwdotorg.org>
+References: <1381352107-32464-1-git-send-email-robherring2@gmail.com>
+ <CAL_JsqLF4WbmuW5PQUKV0nb2GS=iiXnJzO=VmP1g=AT2d7o-WQ@mail.gmail.com>
+ <526EC0B8.2080307@wwwdotorg.org>
+Message-ID: <526EFA1E.5050008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Renesas ARM platforms are transitioning from single-platform to
-multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-and ARCH_SHMOBILE_MULTI and increase build testing coverage.
+On 10/28/2013 02:53 PM, Stephen Warren wrote:
+> On 10/26/2013 09:34 AM, Rob Herring wrote:
+>> On Wed, Oct 9, 2013 at 3:55 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> As part of the effort to ultimately remove struct machine_desc, the
+>>> machine name is not really needed. It is only used for /proc/cpuinfo
+>>> "Hardware" field. Get this information from the DT instead and remove
+>>> the name string in the machine descriptor for DT machine descriptors. The
+>>> model or machine compatible property from the DT is used instead.
+>>>
+>>> This likely changes the name reported by /proc/cpuinfo. There could be
+>>> some userspace dependencies on the old name. Debian libdebian-installer
+>>> used to use this to determine kernel flavour, but now uses the DT
+>>> directly. It is not really a good idea for userspace to depend on this
+>>> anyway.
+> 
+>>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>>> index 0e1e2b3..b0747bb 100644
+>>> --- a/arch/arm/kernel/setup.c
+>>> +++ b/arch/arm/kernel/setup.c
+>>> @@ -611,7 +611,7 @@ void __init dump_machine_table(void)
+>>>
+>>>         early_print("Available machine support:\n\nID (hex)\tNAME\n");
+>>>         for_each_machine_desc(p)
+>>> -               early_print("%08x\t%s\n", p->nr, p->name);
+>>> +               early_print("%08x\t%s\n", p->nr, p->name ? p->name : *p->dt_compat);
+> 
+> Does it make sense to iterate over all the entries in p->dt_compat here?
+> Tegra's machine descriptor supports 4 different compatible values, and I
+> think that'll only print one of them.
 
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/video/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+This is simply showing which machines are built into the kernel. With
+only the first string, you can figure out the other strings. It is not
+much of a different lookup than before. Considering you need DEBUG_LL
+enabled to see any of this to begin with, I don't think that's too much
+of a hurdle.
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 84b685f..681858e 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -10,7 +10,7 @@ config HAVE_FB_ATMEL
- 
- config SH_MIPI_DSI
- 	tristate
--	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
-+	depends on (SUPERH || ARM) && HAVE_CLK
- 
- config SH_LCD_MIPI_DSI
- 	bool
-@@ -1995,7 +1995,7 @@ config FB_W100
- 
- config FB_SH_MOBILE_LCDC
- 	tristate "SuperH Mobile LCDC framebuffer support"
--	depends on FB && (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
-+	depends on FB && (SUPERH || ARM) && HAVE_CLK
- 	select FB_SYS_FILLRECT
- 	select FB_SYS_COPYAREA
- 	select FB_SYS_IMAGEBLIT
-@@ -2482,7 +2482,7 @@ endif
- 
- config FB_SH_MOBILE_MERAM
- 	tristate "SuperH Mobile MERAM read ahead support"
--	depends on (SUPERH || ARCH_SHMOBILE)
-+	depends on (SUPERH || ARM)
- 	select GENERIC_ALLOCATOR
- 	---help---
- 	  Enable MERAM support for the SuperH controller.
--- 
-1.8.1.5
+Rob
