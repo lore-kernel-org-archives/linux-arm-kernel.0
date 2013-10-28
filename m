@@ -1,86 +1,88 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 28 Oct 2013 14:30:45 -0500
-Subject: [PATCH 4/4] wl1251: spi: add device tree support
-In-Reply-To: <CANOLnOP=antQDwQLxWhuB8+-kZh9x-JJXrXmOz3FH67fM2Lang@mail.gmail.com>
-References: <1382890469-25286-1-git-send-email-sre@debian.org>
- <1382890469-25286-5-git-send-email-sre@debian.org>
- <FF34C626-4A49-43B1-B0AD-DC6146ABBB11@codeaurora.org>
- <CANOLnOP=antQDwQLxWhuB8+-kZh9x-JJXrXmOz3FH67fM2Lang@mail.gmail.com>
-Message-ID: <3381D0FB-2AAD-446D-8650-E4BE5F22A2E3@codeaurora.org>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Mon, 28 Oct 2013 20:49:14 +0100
+Subject: [PATCH v2 05/13] uprobes: add arch write opcode hook
+In-Reply-To: <5268137F.3030809@linaro.org>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-6-git-send-email-dave.long@linaro.org>
+ <20131019165051.GC7837@redhat.com> <5268137F.3030809@linaro.org>
+Message-ID: <20131028194914.GA15103@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/23, David Long wrote:
+>
+> On 10/19/13 12:50, Oleg Nesterov wrote:
+>> On 10/15, David Long wrote:
+>>>
+>>> Allow arches to write the opcode with a custom function.  ARM needs to
+>>> customize the swbp instruction depending on the condition code of the
+>>> instruction it replaces.
+>>
+>> Well, we already have "__weak set_swbp(auprobe, ...)", can't arm use it?
+>>
+>> If not,
+>>
+>>> +void __weak arch_uprobe_write_opcode(struct arch_uprobe *auprobe, void *vaddr,
+>>> +				     uprobe_opcode_t opcode)
+>>> +{
+>>> +	memcpy(vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
+>>> +}
+>>> ...
+>>> -	copy_to_page(new_page, vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
+>>> +	vaddr_new = kmap_atomic(new_page);
+>>> +	arch_uprobe_write_opcode(auprobe, vaddr_new + (vaddr & ~PAGE_MASK),
+>>> +				 opcode);
+>>> +	kunmap_atomic(vaddr_new);
+>>
+>> Again, if you need to add the new __weak helper, I think it should simply
+>> do copy_to_page().
+>>
+>> Oleg.
+>>
+>
+> Unfortunately, providing an alternative set_swbp() would mean
+> duplicating a moderate chunk of code from kernel/uprobes.c.
 
-On Oct 28, 2013, at 12:15 PM, Grazvydas Ignotas wrote:
+Yes, yes, sorry for confusion. What I actually tried to suggest is
+something like the trivial patch below.
 
-> On Mon, Oct 28, 2013 at 8:37 AM, Kumar Gala <galak@codeaurora.org> wrote:
->> On Oct 27, 2013, at 11:14 AM, Sebastian Reichel wrote:
->>> +++ b/Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt
->>> @@ -0,0 +1,36 @@
->>> +* Texas Instruments wl1251 controller
->>> +
->>> +The wl1251 chip can be connected via SPI or via SDIO. The linux
->>> +kernel currently only supports device tree for the SPI variant.
->>> +
->> 
->> From the binding I have no idea what this chip actually does, also we don't normally reference linux kernel support in bindings specs (so please remove it).
->> 
->> However, what would expect the SDIO binding to look like?  Or more specifically, how would you distinguish the SPI vs SDIO binding/connection?  I'm wondering if the compatible should be something like "ti,wl1251-spi" and than the sdio can be "ti,wl1251-sdio"
-> 
-> When connected to SDIO, it doesn't act as standard SDIO device and
-> can't be probed (standard SDIO registers missing), so information has
-> to come some other way. That used to partially come through
-> platform_data and partially through a callback from mmc subsystem (see
-> pandora_wl1251_init_card() in
-> arch/arm/mach-omap2/board-omap3pandora.c). I don't know much about DT,
-> but maybe the information that comes from SDIO registers on "normal"
-> SDIO devices should come through DT in this case too? I don't really
-> know how that should be integrated with mmc subsystem though..
+Then arm can do:
 
-Ok, my point is still valid that we can use a different compatible for the SDIO case even if its no standard SDIO vs the SPI case.
+	uprobe_opcode_t arch_uprobe_swbp_insn(struct arch_uprobe *auprobe)
+	{
+		return __opcode_to_mem_arm(auprobe->bpinsn);
+	}
 
-> 
->>> +Required properties:
->>> +- compatible : Should be "ti,wl1251"
->> 
->> reg is not listed as a required prop.
->> 
->>> +- interrupts : Should contain interrupt line
->>> +- interrupt-parent : Should be the phandle for the interrupt
->>> +  controller that services interrupts for this device
->>> +- vio-supply : phandle to regulator providing VIO
->>> +- power-gpio : GPIO connected to chip's PMEN pin
->> 
->> should be vendor prefixed: ti,power-gpio
->> 
->>> +- For additional required properties on SPI, please consult
->>> +  Documentation/devicetree/bindings/spi/spi-bus.txt
->>> +
->>> +Optional properties:
->>> +- ti,use-eeprom : If found, configuration will be loaded from eeprom.
->> 
->> can you be a bit more specific on what cfg will be loaded.  Also, is this property a boolean, if so how do I know which eeprom the cfg is loaded from (is it one that is directly connected to the wl1251?
-> 
-> wl1251 is a wifi chip that can have an optional eeprom connected to it
-> to store things like calibration stuff and MAC address, and that
-> eeprom is usually inside a single module with some additional radio
-> related chips. If the eeprom is connected (like the module on pandora
-> board has), the driver can issue command to the firmware running on
-> chip to load that data on it's startup, alternatively the driver can
-> load calibration from other storage (like it happens on N900).
+No?
 
-So sounds like a boolean.  I think just adding that its a boolean and maybe something like "configuration (calibration data, MAC addr, etc..)"
+> I notice there don't seem to be any alternative set_swbp functions
+> in the (rc6) kernel tree
 
-- k
+Yes... I think we should simply make it "static". And set_orig_insn()
+too.
 
-> 
-> 
-> Gra?vydas
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Oleg.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+--- x/kernel/events/uprobes.c
++++ x/kernel/events/uprobes.c
+@@ -304,6 +304,11 @@ put_old:
+ 	return ret;
+ }
+ 
++uprobe_opcode_t __weak arch_uprobe_swbp_insn(struct arch_uprobe *auprobe)
++{
++	return UPROBE_SWBP_INSN;
++}
++
+ /**
+  * set_swbp - store breakpoint at a given address.
+  * @auprobe: arch specific probepoint information.
+@@ -315,7 +320,7 @@ put_old:
+  */
+ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
+ {
+-	return write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
++	return write_opcode(mm, vaddr, arch_uprobe_swbp_insn(auprobe));
+ }
+ 
+ /**
