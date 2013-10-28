@@ -1,50 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 28 Oct 2013 18:12:40 +0000
-Subject: [RFC v3 PATCH 3/7] ARM64: defer reloading a task's FPSIMD state
- to userland resume
-In-Reply-To: <1381666503-23726-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1381666503-23726-1-git-send-email-ard.biesheuvel@linaro.org>
- <1381666503-23726-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20131028181238.GB18563@mbp>
+From: scottwood@freescale.com (Scott Wood)
+Date: Mon, 28 Oct 2013 13:22:03 -0500
+Subject: [PATCH 02/12][v3] pci: fsl: add structure fsl_pci
+In-Reply-To: <526A086E.305@freescale.com>
+References: <1382524894-15164-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1382524894-15164-2-git-send-email-Minghuan.Lian@freescale.com>
+ <2B28E421-9B64-4CEC-9E00-8893502CE12F@kernel.crashing.org>
+ <526A086E.305@freescale.com>
+Message-ID: <1382984523.3410.23.camel@snotra.buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 13, 2013 at 01:14:59PM +0100, Ard Biesheuvel wrote:
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -72,7 +72,7 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
->  void fpsimd_thread_switch(struct task_struct *next)
->  {
->  	/* check if not kernel threads */
-> -	if (current->mm)
-> +	if (current->mm && !test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
->  		fpsimd_save_state(&current->thread.fpsimd_state);
+On Fri, 2013-10-25 at 13:58 +0800, Lian Minghuan-b31939 wrote:
+> Hi Kumar,
+> 
+> please see my comment inline.
+> 
+> On 10/24/2013 12:11 PM, Kumar Gala wrote:
+> > On Oct 23, 2013, at 5:41 AM, Minghuan Lian wrote:
+> >
+> >> PowerPC uses structure pci_controller to describe PCI controller,
+> >> but ARM uses structure pci_sys_data. In order to support PowerPC
+> >> and ARM simultaneously, the patch adds a structure fsl_pci that
+> >> contains most of the members of the pci_controller and pci_sys_data.
+> >> Meanwhile, it defines a interface fsl_arch_sys_to_pci() which should
+> >> be implemented in architecture-specific PCI controller driver to
+> >> convert pci_controller or pci_sys_data to fsl_pci.
+> >>
+> >> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> >> ---
+> >> change log:
+> >> v1-v3:
+> >> Derived from http://patchwork.ozlabs.org/patch/278965/
+> >>
+> >> Based on upstream master.
+> >> Based on the discussion of RFC version here
+> >> http://patchwork.ozlabs.org/patch/274487/
+> >>
+> >> include/linux/fsl/pci-common.h | 41 +++++++++++++++++++++++++++++++++++++++++
+> >> 1 file changed, 41 insertions(+)
+> > NAK.
+> >
+> > We discussed this some at the ARM Summit this week and the feeling is we need to move to a common interface between the various ARCHs.
+> [Minghuan] Do you mean we will use the common interface instead of 
+> arch/powerpc/kernel/pci-common.c...
+> and arch/arm/kernel/bios32.c?  Who will do the code movement and when 
+> will the work be completed? The patches just move the common functions 
+> of FSL PCI controller operation which can be re-used by PowerPC and ARM. 
+> LS1 is coming, I worry about not having enough time to wait for the move 
+> is completed.
 
-Why does it need test_and_set_thread_flag() here? Some comments would be
-useful as it looks strange to check a reload flag to decide whether to
-save a state. Or change the name to something like 'dirty'.
+I agree -- it can take quite a while to get from "the feeling is we need
+to move to a common interface" to actually having something we can use.
+If and when this unification is achieved, we can drop this extra layer.
+It's a better interim solution than just duplicating the entire driver
+and letting them drift apart.
 
->  	if (next->mm)
->  		fpsimd_load_state(&next->thread.fpsimd_state);
-
-This function could be optimised a bit more to avoid saving/restoring if
-the switch only happened between a user thread and a kernel one (and
-back again) since the FP state may not have been dirtied. But what I had
-in mind was per-CPU fpstate (possibly pointer or some flag) rather than
-per-thread.
-
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -416,4 +416,6 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
->  		clear_thread_flag(TIF_NOTIFY_RESUME);
->  		tracehook_notify_resume(regs);
->  	}
-> +	if (test_and_clear_thread_flag(TIF_RELOAD_FPSTATE))
-> +		fpsimd_load_state(&current->thread.fpsimd_state);
-
-I think this code can be preempted, it is run with IRQs enabled. And
-there is a small window where we cleared the flag but haven't loaded the
-state.
-
--- 
-Catalin
+-Scott
