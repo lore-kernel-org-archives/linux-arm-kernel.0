@@ -1,138 +1,114 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 28 Oct 2013 01:29:03 -0500
-Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
- <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <0D287D95-C302-4A59-98AC-C654F5AC97B4@codeaurora.org>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Mon, 28 Oct 2013 16:38:23 +1000
+Subject: [PATCH 4/8] ARM: imx: add support code for IMX50 based machines
+In-Reply-To: <CAL_JsqJhM=K+vovDALQnjUSXBcuzHev1CUpxEnNqCYfOfGVsWQ@mail.gmail.com>
+References: <1382076260-6422-1-git-send-email-gerg@uclinux.org>
+ <1382076260-6422-5-git-send-email-gerg@uclinux.org>
+ <CAL_JsqJhM=K+vovDALQnjUSXBcuzHev1CUpxEnNqCYfOfGVsWQ@mail.gmail.com>
+Message-ID: <526E065F.60206@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
 
-On Oct 23, 2013, at 8:03 AM, Zhangfei Gao wrote:
-
-> update: fix typo
+On 24/10/13 21:11, Rob Herring wrote:
+> On Fri, Oct 18, 2013 at 1:04 AM,  <gerg@uclinux.org> wrote:
+>> From: Greg Ungerer <gerg@uclinux.org>
+>>
+>> Add machine support code for the Freescale IMX50 SoC.
+>>
+>> It is very similar to the Freescale IMX53, it contains many of the same
+>> periperhal hardware modules, at the same address offsets as the IMX53.
+>> (Notable exceptions are that the IMX50 contains no CAN bus hardware, less
+>> GPIO, no VPU, it does contain an Electrophoretic display controller though).
+>>
+>> So this support code just uses the IMX53 definitions as they are today.
+>> We can add the extra IMX50 definitions in the future when required.
+>>
+>> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+>> ---
+>>  arch/arm/mach-imx/Makefile     |  1 +
+>>  arch/arm/mach-imx/mach-imx50.c | 52 ++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 53 insertions(+)
+>>  create mode 100644 arch/arm/mach-imx/mach-imx50.c
+>>
+>> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+>> index 5383c58..9d94f47 100644
+>> --- a/arch/arm/mach-imx/Makefile
+>> +++ b/arch/arm/mach-imx/Makefile
+>> @@ -110,6 +110,7 @@ obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
+>>  obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
+>>
+>>  obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
+>> +obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
+>>  obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+>>
+>>  obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
+>> diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
+>> new file mode 100644
+>> index 0000000..4ac1b91
+>> --- /dev/null
+>> +++ b/arch/arm/mach-imx/mach-imx50.c
+>> @@ -0,0 +1,52 @@
+>> +/*
+>> + * Copyright 2013 Greg Ungerer <gerg@uclinux.org>
+>> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+>> + * Copyright 2011 Linaro Ltd.
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/clkdev.h>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/of_platform.h>
+>> +#include <asm/mach/arch.h>
+>> +#include <asm/mach/time.h>
+>> +
+>> +#include "common.h"
+>> +#include "mx53.h"
+>> +
+>> +static void __init imx50_dt_init(void)
+>> +{
+>> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> +}
+>> +
+>> +static const char *imx50_dt_board_compat[] __initdata = {
+>> +       "fsl,imx50",
+>> +       NULL
+>> +};
+>> +
+>> +static void __init imx50_timer_init(void)
+>> +{
+>> +       mx50_clocks_init_dt();
+>> +}
+>> +
+>> +DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
+>> +       .map_io         = mx53_map_io,
+>> +       .init_early     = imx53_init_early,
+>> +       .init_irq       = mx53_init_irq,
+>> +       .handle_irq     = imx53_handle_irq,
+>> +       .init_time      = imx50_timer_init,
+>> +       .init_machine   = imx50_dt_init,
+>> +       .init_late      = imx53_init_late,
+>> +       .dt_compat      = imx50_dt_board_compat,
+>> +       .restart        = mxc_restart,
+>> +MACHINE_END
 > 
-> Add dw_mmc-k3.c for k3v2, support sd/emmc
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Tested-by: Zhigang Wang <brooke.wangzhigang@huawei.com>
-> ---
-> .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   77 +++++
-> drivers/mmc/host/Kconfig                           |   10 +
-> drivers/mmc/host/Makefile                          |    1 +
-> drivers/mmc/host/dw_mmc-k3.c                       |  297 ++++++++++++++++++++
-> 4 files changed, 385 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-> create mode 100644 drivers/mmc/host/dw_mmc-k3.c
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-> new file mode 100644
-> index 0000000..0de8c27
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
-> @@ -0,0 +1,77 @@
-> +* Hisilicon specific extensions to the Synopsys Designware Mobile
-> +  Storage Host Controller
-> +
-> +Read synopsis-dw-mshc.txt for more details
-> +The Synopsys designware mobile storage host controller is used to interface
-> +a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
-> +differences between the core Synopsys dw mshc controller properties described
-> +by synopsis-dw-mshc.txt and the properties used by the Hisilicon specific
-> +extensions to the Synopsys Designware Mobile Storage Host Controller.
-> +
-> +Required Properties:
-> +
-> +* compatible: should be
-> +	- "hisilicon,hi4511-dw-mshc": for controllers with hi4511
-> +	  specific extentions.
-> +* vmmc-supply: should be vmmc used in dwmmc
-> +* fifo-depth: should be provided if register can not provide correct value
-> +* clken-reg: should be clock enable register and offset
-> +* drv-sel-reg: should be driver delay select register, offset and bits
-> +* sam-sel-reg: should be sample delay select register, offset and bits
-> +* div-reg: should be divider register, offset and bits
-> +* tune-table: should be array of clock tune mmc controller
-> +
+> This seems like a lot of duplication. It seems like mx53 and mx50
+> could be combined into a single machine_desc. init_time should not be
+> needed in 3.13.
 
-1. These should have vendor prefixes
-2. why do we need the *-reg properties
-3. for the *-reg properties its not clear what bits means?
-4. tune-table is not well described, what does 'clock tune' mean, why an array?
+Are you suggesting that "fsl,imx50" be added to the board compat list
+in mach-imx53.c instead?
 
-
-> +Example:
-> +
-> +  The MSHC controller node can be split into two portions, SoC specific and
-> +  board specific portions as listed below.
-> +
-
-Does dtc merge this all into a single node?  Would probably be good to have comments
-in the example stating both that the merge into one node, and which is board and which
-is soc.
-
-> +	dwmmc_0: dwmmc0 at fcd03000 {
-> +		compatible = "hisilicon,hi4511-dw-mshc";
-> +		reg = <0xfcd03000 0x1000>;
-> +		interrupts = <0 16 4>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		clocks = <&clk_sd>, <&clk_ddrc_per>;
-> +		clock-names = "ciu", "biu";
-> +		clken-reg = <0x1f8 0>;
-> +		drv-sel-reg = <0x1f8 4 4>;
-> +		sam-sel-reg = <0x1f8 8 4>;
-> +		div-reg = <0x1f8 1 3>;
-> +		tune-table =
-> +		<180000000 6 6 13 13 25000000>,
-> +		<0 0 0 0 0 0>,
-> +		<360000000 6 4 2 0 50000000>,
-> +		<180000000 6 4 13 13 25000000>,
-> +		<360000000 6 4 2 0 50000000>,
-> +		<720000000 6 1 9 4 100000000>,
-> +		<0 0 0 0 0 0>,
-> +		<360000000 7 1 3 0 50000000>;
-> +	};
-> +	dwmmc0 at fcd03000 {
-> +		num-slots = <1>;
-> +		vmmc-supply = <&ldo12>;
-> +		fifo-depth = <0x100>;
-> +		supports-highspeed;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
-> +		slot at 0 {
-> +			reg = <0>;
-> +			bus-width = <4>;
-> +			disable-wp;
-> +			cd-gpios = <&gpio10 3 0>;
-> +		};
-> +	};
-> +
-> +PCTRL:
-> +
-
-should have a description
-
-> +Required Properties:
-> +* compatible: should be
-> +	- "hisilicon,pctrl": Peripheral control
-> +
-
-Reg is not described as a required property.
-
-> +Example:
-> +
-> +	pctrl: pctrl at fca09000 {
-> +		compatible = "hisilicon,pctrl";
-> +		reg = <0xfca09000 0x1000>;
-> +	};
-
-This should be in its own binding document, and not part of the mmc binding
-
-- k
-> 
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Regards
+Greg
