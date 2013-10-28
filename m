@@ -1,159 +1,67 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Oct 2013 22:06:05 +0100
-Subject: [PATCH v6 0/5] clk: clock deregistration support
-In-Reply-To: <20131028195401.11662.11969@quantum>
-References: <1377874402-2944-1-git-send-email-s.nawrocki@samsung.com>
- <525D9FC1.2040204@gmail.com> <20131028195401.11662.11969@quantum>
-Message-ID: <1409510.03uXiCHu2F@avalon>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 28 Oct 2013 22:13:28 +0100
+Subject: [PATCH v2 1/2] clk/zynq/clkc: Add 'fclk-enable' feature
+In-Reply-To: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1592656.1ojHcSlzVh@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 October 2013 12:54:01 Mike Turquette wrote:
-> Quoting Sylwester Nawrocki (2013-10-15 13:04:17)
-> 
-> > Hi,
-> > 
-> > (adding linux-media mailing list at Cc)
-> > 
-> > On 09/25/2013 11:47 AM, Laurent Pinchart wrote:
-> > > On Tuesday 24 September 2013 23:38:44 Sylwester Nawrocki wrote:
-> > [...]
-> > 
-> > >> The only issue I found might be at the omap3isp driver, which provides
-> > >> clock to its sub-drivers and takes reference on the sub-driver modules.
-> > >> When sub-driver calls clk_get() all modules would get locked in memory,
-> > >> due to circular reference. One solution to that could be to pass NULL
-> > >> struct device pointer, as in the below patch.
-> > > 
-> > > Doesn't that introduce race conditions ? If the sub-drivers require the
-> > > clock, they want to be sure that the clock won't disappear beyond their
-> > > backs. I agree that the circular dependency needs to be solved somehow,
-> > > but we probably need a more generic solution. The problem will become
-> > > more widespread in the future with DT-based device instantiation in
-> > > both V4L2 and KMS.
-> > 
-> > I'm wondering whether subsystems and drivers itself should be written so
-> > they deal with such dependencies they are aware of.
-> > 
-> > There is similar situation in the regulator API, regulator_get() simply
-> > takes a reference on a module providing the regulator object.
-> > 
-> > Before a "more generic solution" is available, what do you think about
-> > keeping obtaining a reference on a clock provider module in clk_get() and
-> > doing clk_get(), clk_prepare_enable(), ..., clk_unprepare_disable(),
-> > clk_put() in sub-driver whenever a clock is actively used, to avoid
-> > permanent circular reference ?
-> 
-> Laurent,
-> 
-> Did you have any feedback on this proposal? I would like to merge these
-> patches so that folks with clock driver modules can use them properly.
-> We can fix up things in the core code as we figure them out.
+Hi Soren,
 
-I've just replied to Sylwester's original patch. I'm basically OK with the 
-idea as a temporary solution.
+On Thursday 10 of October 2013 10:10:17 Soren Brinkmann wrote:
+> In some use cases Zynq's FPGA clocks are used as static clock
+> generators for IP in the FPGA part of the SOC for which no Linux driver
+> exists and would control those clocks. To avoid automatic
+> gating of these clocks in such cases a new property - fclk-enable - is
+> added to the clock controller's DT description to accomodate such use
+> cases. It's value is a bitmask, where a set bit results in enabling
+> the corresponding FCLK through the clkc.
+> 
+> FPGA clocks are handled following the rules below:
+> 
+> If an FCLK is not enabled by bootloaders, that FCLK will be disabled in
+> Linux. Drivers can enable and control it through the CCF as usual.
+> 
+> If an FCLK is enabled by bootloaders AND the corresponding bit in the
+> 'fclk-enable' DT property is set, that FCLK will be enabled by the clkc,
+> resulting in an off by one reference count for that clock. Ensuring it
+> will always be running.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+> v2:
+>  - change default value for fclk-enable to '0'
+> ---
+>  Documentation/devicetree/bindings/clock/zynq-7000.txt |  4 ++++
+>  drivers/clk/zynq/clkc.c                               | 18
+> +++++++++++++++--- 2 files changed, 19 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/zynq-7000.txt
+> b/Documentation/devicetree/bindings/clock/zynq-7000.txt index
+> d99af878f5d7..11fdd146ec83 100644
+> --- a/Documentation/devicetree/bindings/clock/zynq-7000.txt
+> +++ b/Documentation/devicetree/bindings/clock/zynq-7000.txt
+> @@ -22,6 +22,10 @@ Required properties:
+>  Optional properties:
+>   - clocks : as described in the clock bindings
+>   - clock-names : as described in the clock bindings
+> + - fclk-enable : Bit mask to enable FCLKs in cases no proper CCF
 
-> > >> ---------8<------------------
-> > >> 
-> > >>   From ca5963041aad67e31324cb5d4d5e2cfce1706d4f Mon Sep 17 00:00:00
-> > >>   2001
-> > >> 
-> > >> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> > >> Date: Thu, 19 Sep 2013 23:52:04 +0200
-> > >> Subject: [PATCH] omap3isp: Pass NULL device pointer to clk_register()
-> > >> 
-> > >> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> > >> ---
-> > >> 
-> > >>    drivers/media/platform/omap3isp/isp.c |   15 ++++++++++-----
-> > >>    drivers/media/platform/omap3isp/isp.h |    1 +
-> > >>    2 files changed, 11 insertions(+), 5 deletions(-)
-> > >> 
-> > >> diff --git a/drivers/media/platform/omap3isp/isp.c
-> > >> b/drivers/media/platform/omap3isp/isp.c
-> > >> index df3a0ec..d7f3c98 100644
-> > >> --- a/drivers/media/platform/omap3isp/isp.c
-> > >> +++ b/drivers/media/platform/omap3isp/isp.c
-> > >> @@ -290,9 +290,11 @@ static int isp_xclk_init(struct isp_device *isp)
-> > >> 
-> > >>      struct clk_init_data init;
-> > >>      unsigned int i;
-> > >> 
-> > >> +    for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i)
-> > >> +            isp->xclks[i] = ERR_PTR(-EINVAL);
-> > >> +
-> > >> 
-> > >>      for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
-> > >>      
-> > >>              struct isp_xclk *xclk =&isp->xclks[i];
-> > >> 
-> > >> -            struct clk *clk;
-> > >> 
-> > >>              xclk->isp = isp;
-> > >>              xclk->id = i == 0 ? ISP_XCLK_A : ISP_XCLK_B;
-> > >> 
-> > >> @@ -306,9 +308,9 @@ static int isp_xclk_init(struct isp_device *isp)
-> > >> 
-> > >>              xclk->hw.init =&init;
-> > >> 
-> > >> -            clk = devm_clk_register(isp->dev,&xclk->hw);
-> > >> -            if (IS_ERR(clk))
-> > >> -                    return PTR_ERR(clk);
-> > >> +            xclk->clk = clk_register(NULL,&xclk->hw);
-> > >> +            if (IS_ERR(xclk->clk))
-> > >> +                    return PTR_ERR(xclk->clk);
-> > >> 
-> > >>              if (pdata->xclks[i].con_id == NULL&&
-> > >>              pdata->xclks[i].dev_id == NULL)
-> > >> 
-> > >> @@ -320,7 +322,7 @@ static int isp_xclk_init(struct isp_device *isp)
-> > >> 
-> > >>              xclk->lookup->con_id = pdata->xclks[i].con_id;
-> > >>              xclk->lookup->dev_id = pdata->xclks[i].dev_id;
-> > >> 
-> > >> -            xclk->lookup->clk = clk;
-> > >> +            xclk->lookup->clk = xclk->clk;
-> > >> 
-> > >>              clkdev_add(xclk->lookup);
-> > >>      
-> > >>      }
-> > >> 
-> > >> @@ -335,6 +337,9 @@ static void isp_xclk_cleanup(struct isp_device
-> > >> *isp)
-> > >> 
-> > >>      for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
-> > >>      
-> > >>              struct isp_xclk *xclk =&isp->xclks[i];
-> > >> 
-> > >> +            if (!IS_ERR(xclk->clk))
-> > >> +                    clk_unregister(xclk->clk);
-> > >> +
-> > >> 
-> > >>              if (xclk->lookup)
-> > >>              
-> > >>                      clkdev_drop(xclk->lookup);
-> > >>      
-> > >>      }
-> > >> 
-> > >> diff --git a/drivers/media/platform/omap3isp/isp.h
-> > >> b/drivers/media/platform/omap3isp/isp.h
-> > >> index cd3eff4..1498f2b 100644
-> > >> --- a/drivers/media/platform/omap3isp/isp.h
-> > >> +++ b/drivers/media/platform/omap3isp/isp.h
-> > >> @@ -135,6 +135,7 @@ struct isp_xclk {
-> > >> 
-> > >>      struct isp_device *isp;
-> > >>      struct clk_hw hw;
-> > >>      struct clk_lookup *lookup;
-> > >> 
-> > >> +    struct clk *clk;
-> > >> 
-> > >>      enum isp_xclk_id id;
-> > >>      
-> > >>      spinlock_t lock;        /* Protects enabled and divider */
-> > >> 
-> > >> ---------8<------------------
--- 
-Regards,
+Since it's a vendor specific property, it should include vendor prefix.
 
-Laurent Pinchart
+Also CCF is a Linux-specific implementation detail, which DT bindings
+should not be involved into. If you really need to implement this using
+this way, then at least property description should say something like 
+this:
+
+xlnx,fclk-enable : Bit mask of bits of fclk enable register that must
+be statically enabled at boot-up time.
+
+However, I wonder why you can't simply define an FPGA block using a single 
+node, which would be a consumer to all the fclk clocks you need to enable 
+and then make a driver for it that would simply enable all clocks 
+specified in clocks property.
+
+Best regards,
+Tomasz
