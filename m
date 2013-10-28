@@ -1,48 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 28 Oct 2013 23:55:25 +0100
-Subject: [PATCH] gpio: pl061: hook request if gpio-ranges avaiable
-In-Reply-To: <1382510171-5937-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1382510171-5937-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <CACRpkdabBSvPLZHXyGSrLVpjF0tsXOqoJjx=4Fvy0zgNuWXOkA@mail.gmail.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 28 Oct 2013 23:49:21 +0100
+Subject: [PATCH 04/12] sata_rcar: Convert to clk_prepare/unprepare
+In-Reply-To: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383000569-8916-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 8:36 AM, Haojian Zhuang
-<haojian.zhuang@linaro.org> wrote:
+Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
+clk_disable_unprepare() to get ready for the migration to the common
+clock framework.
 
-> gpio-ranges property could binds gpio to pinctrl. But there may be some
-> gpios without pinctrl operation. So check whether gpio-ranges property
-> exists in device node first.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: linux-ide at vger.kernel.org
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/ata/sata_rcar.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-OK...
-
-> +       /* Hook the request()/free() for pinctrl operation */
-> +       if (of_get_property(dev->of_node, "gpio-ranges", NULL)) {
-> +               chip->gc.request = pl061_gpio_request;
-> +               chip->gc.free = pl061_gpio_free;
-> +       }
-
-This is quite hard for those not using pinctrl to understand, maybe someone
-wants to use the request/free callbacks for something else in the
-future.
-
-Can't you:
-
-- Add a variable bool uses_pinctrl to struct pl061_gpio
-
-- Use the bool check:
-
-if (of_property_read_bool(np, "gpio-ranges"))
-  chip->uses_pinctrl = true;
-
-- Alter the code in pl061_gpio_request() to do like this:
-
-if (chip->uses_pinctrl)
-   pinctrl_request_gpio()
-
-And the same for pl061_gpio_free().
-
-Yours,
-Linus Walleij
+diff --git a/drivers/ata/sata_rcar.c b/drivers/ata/sata_rcar.c
+index c2d95e9..1dae9a9 100644
+--- a/drivers/ata/sata_rcar.c
++++ b/drivers/ata/sata_rcar.c
+@@ -792,7 +792,7 @@ static int sata_rcar_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "failed to get access to sata clock\n");
+ 		return PTR_ERR(priv->clk);
+ 	}
+-	clk_enable(priv->clk);
++	clk_prepare_enable(priv->clk);
+ 
+ 	host = ata_host_alloc(&pdev->dev, 1);
+ 	if (!host) {
+@@ -822,7 +822,7 @@ static int sata_rcar_probe(struct platform_device *pdev)
+ 		return 0;
+ 
+ cleanup:
+-	clk_disable(priv->clk);
++	clk_disable_unprepare(priv->clk);
+ 
+ 	return ret;
+ }
+@@ -841,7 +841,7 @@ static int sata_rcar_remove(struct platform_device *pdev)
+ 	iowrite32(0, base + SATAINTSTAT_REG);
+ 	iowrite32(0x7ff, base + SATAINTMASK_REG);
+ 
+-	clk_disable(priv->clk);
++	clk_disable_unprepare(priv->clk);
+ 
+ 	return 0;
+ }
+@@ -861,7 +861,7 @@ static int sata_rcar_suspend(struct device *dev)
+ 		/* mask */
+ 		iowrite32(0x7ff, base + SATAINTMASK_REG);
+ 
+-		clk_disable(priv->clk);
++		clk_disable_unprepare(priv->clk);
+ 	}
+ 
+ 	return ret;
+@@ -873,7 +873,7 @@ static int sata_rcar_resume(struct device *dev)
+ 	struct sata_rcar_priv *priv = host->private_data;
+ 	void __iomem *base = priv->base;
+ 
+-	clk_enable(priv->clk);
++	clk_prepare_enable(priv->clk);
+ 
+ 	/* ack and mask */
+ 	iowrite32(0, base + SATAINTSTAT_REG);
+-- 
+1.8.1.5
