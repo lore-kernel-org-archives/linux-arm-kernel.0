@@ -1,60 +1,31 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 28 Oct 2013 10:00:42 +0100
-Subject: [PATCH v6 7/8] ARM: dts: imx27 phycore pinctrl
+Date: Mon, 28 Oct 2013 10:00:43 +0100
+Subject: [PATCH v6 8/8] ARM: imx27: enable pinctrl
 In-Reply-To: <1382950843-26066-1-git-send-email-mpa@pengutronix.de>
 References: <1382950843-26066-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1382950843-26066-8-git-send-email-mpa@pengutronix.de>
+Message-ID: <1382950843-26066-9-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pinctrl for phycore devices.
-
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 4 ++++
- arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 4 ++++
- 2 files changed, 8 insertions(+)
+ arch/arm/mach-imx/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index ad76d88..d4e1022 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -29,11 +29,15 @@
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 29a8af6..58726d5 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -121,6 +121,8 @@ config SOC_IMX27
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MACH_MX27
+ 	select MXC_AVIC
++	select PINCTRL
++	select PINCTRL_IMX27
  
- &uart1 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_1 &pinctrl_uart1_rtscts_1>;
- 	status = "okay";
- };
- 
- &uart2 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2_1 &pinctrl_uart2_rtscts_1>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-index 648541a..1aafc0d 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-@@ -135,11 +135,15 @@
- 
- &fec {
- 	phy-reset-gpios = <&gpio3 30 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1_1>;
- 	status = "okay";
- };
- 
- &i2c2 {
- 	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2_1>;
- 	status = "okay";
- 
- 	at24 at 52 {
+ config SOC_IMX31
+ 	bool
 -- 
 1.8.4.rc3
