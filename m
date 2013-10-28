@@ -1,69 +1,31 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 00:46:50 +0100
-Subject: [PATCH 02/19] DMA: shdma: Enable the driver on all ARM platforms
-In-Reply-To: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383004027-25036-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 28 Oct 2013 16:47:20 -0700
+Subject: [PATCH 2/2] dma: mv_xor: Use high_base mmio where appropriate
+In-Reply-To: <1383000855-8377-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1383000855-8377-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383000855-8377-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <CAPcyv4iQVoYCXz16T3N4MbdVJV7MoKKeL0wq9t9WF1Kf3gz3Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Renesas ARM platforms are transitioning from single-platform to
-multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-and ARCH_SHMOBILE_MULTI and increase build testing coverage.
+[ adding dmaengine ]
 
-Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: dmaengine at vger.kernel.org
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/dma/sh/Kconfig  | 2 +-
- drivers/dma/sh/shdmac.c | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+On Mon, Oct 28, 2013 at 3:54 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> Despite requesting two memory resources, called 'base' and 'high_base', the
+> driver uses explicitly only the former. The latter is being used implicitly
+> by addressing at offset +0x200, which in practice accesses high_base.
+>
+> Instead of relying in such trick, let's define the registers with the
+> offset from high_base, and use high_base explicitly where appropriate.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/dma/mv_xor.c |  3 ++-
+>  drivers/dma/mv_xor.h | 25 +++++++++++++------------
+>  2 files changed, 15 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/dma/sh/Kconfig b/drivers/dma/sh/Kconfig
-index dadd9e01..4aab56d 100644
---- a/drivers/dma/sh/Kconfig
-+++ b/drivers/dma/sh/Kconfig
-@@ -4,7 +4,7 @@
- 
- config SH_DMAE_BASE
- 	bool "Renesas SuperH DMA Engine support"
--	depends on (SUPERH && SH_DMA) || (ARM && ARCH_SHMOBILE)
-+	depends on (SUPERH && SH_DMA) || ARM
- 	depends on !SH_DMA_API
- 	default y
- 	select DMA_ENGINE
-diff --git a/drivers/dma/sh/shdmac.c b/drivers/dma/sh/shdmac.c
-index 1069e88..3625078 100644
---- a/drivers/dma/sh/shdmac.c
-+++ b/drivers/dma/sh/shdmac.c
-@@ -787,7 +787,7 @@ static int sh_dmae_probe(struct platform_device *pdev)
- 	if (err)
- 		goto rst_err;
- 
--#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
-+#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARM)
- 	chanirq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 1);
- 
- 	if (!chanirq_res)
-@@ -812,7 +812,7 @@ static int sh_dmae_probe(struct platform_device *pdev)
- 
- #else
- 	chanirq_res = errirq_res;
--#endif /* CONFIG_CPU_SH4 || CONFIG_ARCH_SHMOBILE */
-+#endif /* CONFIG_CPU_SH4 || CONFIG_ARM */
- 
- 	if (chanirq_res->start == chanirq_res->end &&
- 	    !platform_get_resource(pdev, IORESOURCE_IRQ, 1)) {
-@@ -879,7 +879,7 @@ edmadevreg:
- chan_probe_err:
- 	sh_dmae_chan_remove(shdev);
- 
--#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
-+#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARM)
- eirq_err:
- #endif
- rst_err:
--- 
-1.8.1.5
+Since it's unused I'd prefer a patch that just deletes xor_high_base.
+
+--
+Dan
