@@ -1,62 +1,79 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 28 Oct 2013 16:20:08 +0800
-Subject: [Patch v2 00/14] Add power management support for MXS PHY
-In-Reply-To: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
-References: <1382421528-17897-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131028082008.GE31499@shlinux1.ap.freescale.net>
+Date: Mon, 28 Oct 2013 16:24:37 +0800
+Subject: [PATCH v3 1/5] usb: ehci: add freescale imx28 special write
+ register method
+In-Reply-To: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
+References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131028082436.GF31499@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 01:58:34PM +0800, Peter Chen wrote:
-> Hi Felipe,
+On Fri, Oct 25, 2013 at 02:02:19PM +0800, Peter Chen wrote:
+> According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+> register error issue", All USB register write operations must
+> use the ARM SWP instruction. So, we implement a special ehci_write
+> for imx28.
+> 
+> Discussion for it at below:
+> http://marc.info/?l=linux-usb&m=137996395529294&w=2
+> 
 
-Hi Felipe, would you please give any comments for this patchset?
-My another patchset chipidea's PM support also depends on this.
-Thanks.
+Hi Greg, the last two DT patches are not needed at current time.
+The first three are OK. Thanks.
 
 Peter
 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/host/ehci.h |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
 > 
->    The serial adds power management support for MXS PHY, it includes:
+> diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+> index e8f41c5..535aa8b 100644
+> --- a/drivers/usb/host/ehci.h
+> +++ b/drivers/usb/host/ehci.h
+> @@ -225,6 +225,7 @@ struct ehci_hcd {			/* one per controller */
+>  	unsigned		has_synopsys_hc_bug:1; /* Synopsys HC */
+>  	unsigned		frame_index_bug:1; /* MosChip (AKA NetMos) */
+>  	unsigned		need_oc_pp_cycle:1; /* MPC834X port power */
+> +	unsigned		imx28_write_fix:1; /* For Freescale i.MX28 */
+>  
+>  	/* required for usb32 quirk */
+>  	#define OHCI_CTRL_HCFS          (3 << 6)
+> @@ -728,6 +729,13 @@ static inline unsigned int ehci_readl(const struct ehci_hcd *ehci,
+>  #endif
+>  }
+>  
+> +#ifdef CONFIG_SOC_IMX28
+> +static inline void imx28_ehci_writel(u32 val32, volatile u32 *addr)
+> +{
+> +	__asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
+> +}
+> +#endif
+> +
+>  static inline void ehci_writel(const struct ehci_hcd *ehci,
+>  		const unsigned int val, __u32 __iomem *regs)
+>  {
+> @@ -735,6 +743,11 @@ static inline void ehci_writel(const struct ehci_hcd *ehci,
+>  	ehci_big_endian_mmio(ehci) ?
+>  		writel_be(val, regs) :
+>  		writel(val, regs);
+> +#elif defined(CONFIG_SOC_IMX28)
+> +	if (ehci->imx28_write_fix)
+> +		imx28_ehci_writel(val, regs);
+> +	else
+> +		writel(val, regs);
+>  #else
+>  	writel(val, regs);
+>  #endif
+> -- 
+> 1.7.1
 > 
->    - Add three common PHY API, .set_wakeup, .notify_suspend, notify_resume.
->    - Related above API implementation at mxs phy driver
->    - misc changes for mxs phy to support low power mode and wakeup.
 > 
-> Changes for v2:
-> 
-> - Add missing patches which introduce platform judgement code [1/14,2/14]
-> - re-order the patch sequence, like doc->dts->source file, 
-> the reviewers can know the meaning of dt properties before review source
-> - Add description of two IC problems exsiting at mxs PHY; change
-> "high speed" to "HS" and "non-high speed" to "FS/LS" [5/14]
-> - Change the dt property disconnect-line-without-vbus
-> that the separator should be "-" not the "_", meanwhile, related source
-> code has changed.
-> - Using one local variable to get the function return val to avoid long
-> condition statement. [13/14]
-> 
-> Peter Chen (14):
->   usb: doc: phy-mxs: Add more compatible strings
->   usb: phy-mxs: Add platform judgement code
->   usb: phy-mxs: Add auto clock and power setting
->   usb: doc: phy-mxs: update binding for adding anatop phandle
->   ARM: dts: imx6: add anatop phandle for usbphy
->   usb: phy-mxs: Add anatop regmap
->   usb: phy: add notify suspend and resume callback
->   usb: phy-mxs: Add implementation of nofity_suspend and notify_resume
->   usb: phy-mxs: Enable IC fixes for mx6 SoC serial
->   usb: doc: phy-mxs: update binding for adding disconnect line property
->   ARM: dts: imx6: Add disconnect-line-without-vbus property for usbphy
->   usb: phy: Add set_wakeup API
->   usb: phy-mxs: Add implementation of set_wakeup
->   usb: phy-mxs: Add system suspend/resume API
-> 
->  Documentation/devicetree/bindings/usb/mxs-phy.txt |   12 +-
->  arch/arm/boot/dts/imx6qdl.dtsi                    |    3 +
->  drivers/usb/phy/phy-mxs-usb.c                     |  328 ++++++++++++++++++++-
->  include/linux/usb/phy.h                           |   39 +++
->  4 files changed, 367 insertions(+), 15 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
 
 -- 
