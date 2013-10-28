@@ -1,81 +1,55 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Oct 2013 23:49:24 +0100
-Subject: [PATCH 07/12] mmc: sh_mmcif: Convert to clk_prepare/unprepare
+Date: Mon, 28 Oct 2013 23:49:20 +0100
+Subject: [PATCH 03/12] clocksource: sh_tmu: Add clk_prepare/unprepare support
 In-Reply-To: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383000569-8916-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
-clk_disable_unprepare() to get ready for the migration to the common
-clock framework.
+Prepare the clock at probe time, as there is no other appropriate place
+in the driver where we're allowed to sleep.
 
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Cc: linux-mmc at vger.kernel.org
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/mmc/host/sh_mmcif.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/clocksource/sh_tmu.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
-index 36629a0..37a6c57 100644
---- a/drivers/mmc/host/sh_mmcif.c
-+++ b/drivers/mmc/host/sh_mmcif.c
-@@ -964,7 +964,7 @@ static void sh_mmcif_request(struct mmc_host *mmc, struct mmc_request *mrq)
+diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+index 78b8dae..63557cd 100644
+--- a/drivers/clocksource/sh_tmu.c
++++ b/drivers/clocksource/sh_tmu.c
+@@ -472,12 +472,26 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
+ 		ret = PTR_ERR(p->clk);
+ 		goto err1;
+ 	}
++
++	ret = clk_prepare(p->clk);
++	if (ret < 0)
++		goto err2;
++
+ 	p->cs_enabled = false;
+ 	p->enable_count = 0;
  
- static int sh_mmcif_clk_update(struct sh_mmcif_host *host)
- {
--	int ret = clk_enable(host->hclk);
-+	int ret = clk_prepare_enable(host->hclk);
- 
- 	if (!ret) {
- 		host->clk = clk_get_rate(host->hclk);
-@@ -1018,7 +1018,7 @@ static void sh_mmcif_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		}
- 		if (host->power) {
- 			pm_runtime_put_sync(&host->pd->dev);
--			clk_disable(host->hclk);
-+			clk_disable_unprepare(host->hclk);
- 			host->power = false;
- 			if (ios->power_mode == MMC_POWER_OFF)
- 				sh_mmcif_set_power(host, ios);
-@@ -1466,7 +1466,7 @@ static int sh_mmcif_probe(struct platform_device *pdev)
- 
- 	mutex_init(&host->thread_lock);
- 
--	clk_disable(host->hclk);
-+	clk_disable_unprepare(host->hclk);
- 	ret = mmc_add_host(mmc);
- 	if (ret < 0)
- 		goto emmcaddh;
-@@ -1487,7 +1487,7 @@ ereqirq1:
- ereqirq0:
- 	pm_runtime_suspend(&pdev->dev);
- eresume:
--	clk_disable(host->hclk);
-+	clk_disable_unprepare(host->hclk);
- eclkupdate:
- 	clk_put(host->hclk);
- eclkget:
-@@ -1505,7 +1505,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
- 	int irq[2];
- 
- 	host->dying = true;
--	clk_enable(host->hclk);
-+	clk_prepare_enable(host->hclk);
- 	pm_runtime_get_sync(&pdev->dev);
- 
- 	dev_pm_qos_hide_latency_limit(&pdev->dev);
-@@ -1530,7 +1530,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
- 	if (irq[1] >= 0)
- 		free_irq(irq[1], host);
- 
--	clk_disable(host->hclk);
-+	clk_disable_unprepare(host->hclk);
- 	mmc_free_host(host->mmc);
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
+-	return sh_tmu_register(p, (char *)dev_name(&p->pdev->dev),
+-			       cfg->clockevent_rating,
+-			       cfg->clocksource_rating);
++	ret = sh_tmu_register(p, (char *)dev_name(&p->pdev->dev),
++			      cfg->clockevent_rating,
++			      cfg->clocksource_rating);
++	if (ret < 0)
++		goto err3;
++
++	return 0;
++
++ err3:
++	clk_unprepare(p->clk);
++ err2:
++	clk_put(p->clk);
+  err1:
+ 	iounmap(p->mapbase);
+  err0:
 -- 
 1.8.1.5
