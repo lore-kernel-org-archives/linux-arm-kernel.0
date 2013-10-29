@@ -1,65 +1,32 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 29 Oct 2013 12:16:44 -0500
-Subject: [PATCH v3 2/4] mmc: omap_hsmmc: Enable SDIO IRQ.
-In-Reply-To: <1380971830-21492-3-git-send-email-afenkart@gmail.com>
-References: <1380971830-21492-1-git-send-email-afenkart@gmail.com>
- <1380971830-21492-3-git-send-email-afenkart@gmail.com>
-Message-ID: <EA1946E5-E119-4D4D-B99F-E96878DEC049@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Oct 2013 18:20:52 +0100
+Subject: Build failure: shmobile drm driver references backlight symbols
+In-Reply-To: <20131029100413.GA8857@n2100.arm.linux.org.uk>
+References: <20131029100413.GA8857@n2100.arm.linux.org.uk>
+Message-ID: <1773467.v8Jb5caonk@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
 
-On Oct 5, 2013, at 6:17 AM, Andreas Fenkart wrote:
-
-> For now, only support SDIO interrupt if we are booted with
-> DT. This is because some platforms need special quirks. And
-> we don't want to add new legacy mux platform init code
-> callbacks any longer as we are moving to DT based booting
-> anyways.
+On Tuesday 29 October 2013 10:04:13 Russell King - ARM Linux wrote:
+> My build system picked up on this failure:
 > 
-> Broken hardware, missing the swakueup line, should fallback
-> to polling, by setting 'ti,quirk-swakup-missing' in the
-> device tree. Otherwise pending SDIO IRQ are not detected
-> while in suspend. This affects am33xx processors.
+> drivers/built-in.o: In function `shmob_drm_backlight_init':
+> fmc-chardev.c:(.text+0x9f2d0): undefined reference to
+> `backlight_device_register' drivers/built-in.o: In function
+> `shmob_drm_backlight_exit':
+> fmc-chardev.c:(.text+0x9f370): undefined reference to
+> `backlight_device_unregister'
 > 
-> Signed-off-by: Andreas Fenkart <afenkart@gmail.com>
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> index ed271fc..1136e6b 100644
-> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> @@ -20,6 +20,24 @@ ti,dual-volt: boolean, supports dual voltage cards
-> ti,non-removable: non-removable slot (like eMMC)
-> ti,needs-special-reset: Requires a special softreset sequence
-> ti,needs-special-hs-handling: HSMMC IP needs special setting for handling High Speed
-> +ti,quirk-swakup-missing: SOC missing the swakeup line, will not detect
-> +SDIO irq while in suspend. Fallback to polling. Affected chips are
-> +am335x,
-> +
-> +                            ------
-> +                            | PRCM |
-> +                             ------
-> +                              ^ |
-> +                      swakeup | | fclk
-> +                              | v
-> +      ------                -------               -----
-> +     | card | -- CIRQ -->  | hsmmc | -- IRQ -->  | CPU |
-> +      ------                -------               -----
-> +
-> +In suspend the fclk is off and the module is disfunctional. Even
-> +register reads will fail. A small logic in the host will request fclk
-> +restore, when an external event is detected. Once the clock is
-> +restored, the host detects the event normally.
-> 
-> Example:
-> 	mmc1: mmc at 0x4809c000 {
+> which is cuased by drivers/gpu/drm/shmobile/shmob_drm_backlight.c being
+> built without the backlight dependency being enabled.  It looks like
+> the backlight dependency is a hard requirement, so needs ot be added
+> to the Kconfig entry for this driver in some way.
 
-For the DT-Binding portion:
-
-Acked-by: Kumar Gala <galak@codeaurora.org>
-
-- k
+Thank you for the report. I'll send a fix.
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Regards,
+
+Laurent Pinchart
