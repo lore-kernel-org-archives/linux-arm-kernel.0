@@ -1,55 +1,158 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 29 Oct 2013 11:40:24 -0400
-Subject: [PATCHv2 3/7] ARM: imx: add support code for IMX50 based machines
-In-Reply-To: <1383023757-30711-4-git-send-email-gerg@uclinux.org>
-References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
- <1383023757-30711-4-git-send-email-gerg@uclinux.org>
-Message-ID: <20131029154024.GC26784@titan.lakedaemon.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 29 Oct 2013 08:45:19 -0700
+Subject: [PATCH] watchdog: at91sam9_wdt: various fixes
+In-Reply-To: <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
+References: <20131029075028.GF19704@spo001.leaseweb.com>
+ <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20131029154519.GB9266@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 03:15:53PM +1000, gerg at uclinux.org wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
+On Tue, Oct 29, 2013 at 11:37:33AM +0100, Boris BREZILLON wrote:
+> Fix the secs_to_ticks macro in case 0 is passed as an argument.
 > 
-> Add machine support code for the Freescale IMX50 SoC.
+> Rework the heartbeat calculation to increase the security margin of the
+> watchdog reset timer.
 > 
-> It is very similar to the Freescale IMX53, it contains many of the same
-> periperhal hardware modules, at the same address offsets as the IMX53.
-> (Notable exceptions are that the IMX50 contains no CAN bus hardware, less
-> GPIO, no VPU, it does contain an Electrophoretic display controller though).
+> Use the min_heartbeat value instead of the calculated heartbeat value for
+> the first watchdog reset.
 > 
-> So this support code just uses the IMX53 definitions as they are today.
-> We can add the extra IMX50 definitions in the future when required.
-> 
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+
+Hi Boris,
+
+can you possibly split the three changes into separate patches ?
+
+The first is a no-brainer. Gives my opinion of my code review capabilities
+a slight damper ;-).
+
+For the other two problems, it might make sense to describe
+the problems you are trying to solve.
+
+Couple of comments inline.
+
+Thanks,
+Guenter
+
+
 > ---
->  arch/arm/mach-imx/Makefile     |  1 +
->  arch/arm/mach-imx/mach-imx50.c | 46 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 47 insertions(+)
->  create mode 100644 arch/arm/mach-imx/mach-imx50.c
+>  drivers/watchdog/at91sam9_wdt.c |   35 ++++++++++++++++++++++++-----------
+>  1 file changed, 24 insertions(+), 11 deletions(-)
 > 
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index bbe1f5b..924e117 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -112,6 +112,7 @@ obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
->  obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
+> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+> index 9bd089e..f1b59f1 100644
+> --- a/drivers/watchdog/at91sam9_wdt.c
+> +++ b/drivers/watchdog/at91sam9_wdt.c
+> @@ -51,7 +51,7 @@
+>  #define ticks_to_hz_rounddown(t)	((((t) + 1) * HZ) >> 8)
+>  #define ticks_to_hz_roundup(t)		(((((t) + 1) * HZ) + 255) >> 8)
+>  #define ticks_to_secs(t)		(((t) + 1) >> 8)
+> -#define secs_to_ticks(s)		(((s) << 8) - 1)
+> +#define secs_to_ticks(s)		(s ? (((s) << 8) - 1) : 0)
 >  
->  obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
-> +obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
->  obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+	(s)
+
+>  #define WDT_MR_RESET	0x3FFF2FFF
 >  
->  obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
-> diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
-...
-> +static const char *imx50_dt_board_compat[] __initdata = {
-> +	"fsl,imx50",
-> +	NULL
-> +};
+> @@ -61,6 +61,11 @@
+>  /* Watchdog max delta/value in secs */
+>  #define WDT_COUNTER_MAX_SECS	ticks_to_secs(WDT_COUNTER_MAX_TICKS)
+>  
+> +/* Watchdog heartbeat shift used for security margin:
+> + * we'll try to rshift the heartbeat value with this value to secure
+> + * the watchdog reset. */
+> +#define WDT_HEARTBEAT_SHIFT	2
+> +
+>  /* Hardware timeout in seconds */
+>  #define WDT_HW_TIMEOUT 2
+>  
+> @@ -158,7 +163,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+>  	int err;
+>  	u32 mask = wdt->mr_mask;
+>  	unsigned long min_heartbeat = 1;
+> +	unsigned long max_heartbeat;
+>  	struct device *dev = &pdev->dev;
+> +	int shift;
+>  
+>  	tmp = wdt_read(wdt, AT91_WDT_MR);
+>  	if ((tmp & mask) != (wdt->mr & mask)) {
+> @@ -181,23 +188,27 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+>  	if (delta < value)
+>  		min_heartbeat = ticks_to_hz_roundup(value - delta);
+>  
+> -	wdt->heartbeat = ticks_to_hz_rounddown(value);
+> -	if (!wdt->heartbeat) {
+> +	max_heartbeat = ticks_to_hz_rounddown(value);
+> +	if (!max_heartbeat) {
+>  		dev_err(dev,
+>  			"heartbeat is too small for the system to handle it correctly\n");
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (wdt->heartbeat < min_heartbeat + 4) {
+> +	for (shift = WDT_HEARTBEAT_SHIFT; shift > 0; shift--) {
+> +		if ((max_heartbeat >> shift) < min_heartbeat)
+> +			continue;
+> +
+> +		wdt->heartbeat = max_heartbeat >> shift;
+> +		break;
+> +	}
+> +
+> +	if (!shift)
+>  		wdt->heartbeat = min_heartbeat;
 
-Wasn't this going to be consolidated with mach-imx53.c by adding this
-compat string to it?
+Correct me if I am wrong, but it seems to me that
 
-thx,
+	if ((max_heartbeat >> 2) >= min_heartbeat)
+		 wdt->heartbeat = max_heartbeat >> 2;
+	else if ((max_heartbeat >> 1) >= min_heartbeat)
+		wdt->heartbeat = max_heartbeat >> 1;
+	else
+		wdt->heartbeat = min_heartbeat;
 
-Jason.
+would accomplish the same and be easier to understand.
+
+However, given that, I wonder if it is really necessary to bail out above if
+max_heartbeat is 0. After all, you set heartbeat to min_heartbeat anyway
+in this case.
+
+> +
+> +	if (max_heartbeat < min_heartbeat + 4)
+>  		dev_warn(dev,
+>  			 "min heartbeat and max heartbeat might be too close for the system to handle it correctly\n");
+> -		if (wdt->heartbeat < 4)
+> -			dev_warn(dev,
+> -				 "heartbeat might be too small for the system to handle it correctly\n");
+> -	} else {
+> -		wdt->heartbeat -= 4;
+> -	}
+>  
+>  	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
+>  		err = request_irq(wdt->irq, wdt_interrupt,
+> @@ -213,7 +224,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+>  			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
+>  
+>  	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
+> -	mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
+> +	/* Use min_heartbeat the first time because the watchdog timer might
+> +	 * be running for a long time when we reach this init function. */
+
+	/*
+	 * Multi-line comment style
+	 *
+	 * Not really sure I understand what this accomplishes. What problem
+	 * are you trying to solve here ?
+	 */
+
+> +	mod_timer(&wdt->timer, jiffies + min_heartbeat);
+>  
+>  	/* Try to set timeout from device tree first */
+>  	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
