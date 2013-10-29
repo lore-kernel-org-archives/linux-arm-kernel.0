@@ -1,96 +1,116 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 29 Oct 2013 09:10:24 +0100 (CET)
-Subject: [PATCH 07/12] mmc: sh_mmcif: Convert to clk_prepare/unprepare
-In-Reply-To: <1383000569-8916-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383000569-8916-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <Pine.LNX.4.64.1310290910160.8404@axis700.grange>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 29 Oct 2013 03:12:05 -0500
+Subject: [PATCH v9 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <20131029002543.GF4763@kartoffel>
+References: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
+ <D49A3E92-54FD-4275-82F5-DBB476086B03@codeaurora.org>
+ <20131028215649.GB10833@quad.lixom.net> <2702565.PHk13m6fVo@flatron>
+ <20131029002543.GF4763@kartoffel>
+Message-ID: <0232E02C-5F41-4EC6-9011-86D67005433D@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Oct 2013, Laurent Pinchart wrote:
 
-> Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
-> clk_disable_unprepare() to get ready for the migration to the common
-> clock framework.
+On Oct 28, 2013, at 7:25 PM, Mark Rutland wrote:
+
+> On Mon, Oct 28, 2013 at 11:31:36PM +0000, Tomasz Figa wrote:
+>> On Monday 28 of October 2013 14:56:49 Olof Johansson wrote:
+>>> On Mon, Oct 28, 2013 at 05:57:04AM -0500, Kumar Gala wrote:
+>>>> On Oct 28, 2013, at 5:28 AM, Alexandre Courbot wrote:
+>>>>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+>>>>> can be invoked using the same SMC-based API on all supported
+>>>>> platforms. This patch adds initial basic support for Trusted
+>>>>> Foundations using the ARM firmware API. Current features are limited
+>>>>> to the ability to boot secondary processors.
+>>>>> 
+>>>>> Note: The API followed by Trusted Foundations does *not* follow the
+>>>>> SMC
+>>>>> calling conventions. It has nothing to do with PSCI neither and is
+>>>>> only
+>>>>> relevant to devices that use Trusted Foundations (like most
+>>>>> Tegra-based
+>>>>> retail devices).
+>>>>> 
+>>>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>>>>> ---
+>>>>> .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
+>>>>> .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>>>>> arch/arm/Kconfig                                   |  2 +
+>>>>> arch/arm/Makefile                                  |  1 +
+>>>>> arch/arm/firmware/Kconfig                          | 28 ++++++++
+>>>>> arch/arm/firmware/Makefile                         |  1 +
+>>>>> arch/arm/firmware/trusted_foundations.c            | 79
+>>>>> ++++++++++++++++++++++ arch/arm/include/asm/trusted_foundations.h  
+>>>>>      | 67 ++++++++++++++++++ 8 files changed, 199 insertions(+)
+>>>>> create mode 100644
+>>>>> Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundatio
+>>>>> ns.txt create mode 100644 arch/arm/firmware/Kconfig
+>>>>> create mode 100644 arch/arm/firmware/Makefile
+>>>>> create mode 100644 arch/arm/firmware/trusted_foundations.c
+>>>>> create mode 100644 arch/arm/include/asm/trusted_foundations.h
+>>>>> 
+>>>>> diff --git
+>>>>> a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+>>>>> ions.txt
+>>>>> b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+>>>>> ions.txt new file mode 100644
+>>>>> index 0000000..2ec75c9
+>>>>> --- /dev/null
+>>>>> +++
+>>>>> b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+>>>>> ions.txt @@ -0,0 +1,20 @@
+>>>>> +Trusted Foundations
+>>>>> +-------------------
+>>>>> +
+>>>>> +Boards that use the Trusted Foundations secure monitor can signal
+>>>>> its
+>>>>> +presence by declaring a node compatible with
+>>>>> "tl,trusted-foundations"
+>>>>> +under the /firmware/ node
+>>>>> +
+>>>>> +Required properties:
+>>>>> +- compatible : "tl,trusted-foundations"
+>>>>> +- version-major : major version number of Trusted Foundations
+>>>>> firmware
+>>>>> +- version-minor: minor version number of Trusted Foundations
+>>>>> firmware
+>>>> 
+>>>> vendor prefix version.
+>>> 
+>>> Are you saying he should use tl,version-major tl,version-minor? For
+>>> bindings that are already vendor-specific we haven't (on ARM) asked for
+>>> vendor prefix on properties. It doesn't mean that we should keep going
+>>> down that route though, so I'm just asking for clarification for my own
+>>> edification. :)
+>> 
+>> This is a good question. We should decide what the right thing (TM) is and 
+>> write it down. I, on the contrary, was convinced that it's the way Kumar 
+>> says.
 > 
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-
-Thanks
-Guennadi
-
-> ---
->  drivers/mmc/host/sh_mmcif.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+> The impression I got was that properties should be prefixed when they're
+> extremely vendor-specific and could clash with a more generic property. I'm not
+> sure that firmware will ever have a generic binding given the variation even in
+> the set of implemented functionality.
 > 
-> diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
-> index 36629a0..37a6c57 100644
-> --- a/drivers/mmc/host/sh_mmcif.c
-> +++ b/drivers/mmc/host/sh_mmcif.c
-> @@ -964,7 +964,7 @@ static void sh_mmcif_request(struct mmc_host *mmc, struct mmc_request *mrq)
->  
->  static int sh_mmcif_clk_update(struct sh_mmcif_host *host)
->  {
-> -	int ret = clk_enable(host->hclk);
-> +	int ret = clk_prepare_enable(host->hclk);
->  
->  	if (!ret) {
->  		host->clk = clk_get_rate(host->hclk);
-> @@ -1018,7 +1018,7 @@ static void sh_mmcif_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  		}
->  		if (host->power) {
->  			pm_runtime_put_sync(&host->pd->dev);
-> -			clk_disable(host->hclk);
-> +			clk_disable_unprepare(host->hclk);
->  			host->power = false;
->  			if (ios->power_mode == MMC_POWER_OFF)
->  				sh_mmcif_set_power(host, ios);
-> @@ -1466,7 +1466,7 @@ static int sh_mmcif_probe(struct platform_device *pdev)
->  
->  	mutex_init(&host->thread_lock);
->  
-> -	clk_disable(host->hclk);
-> +	clk_disable_unprepare(host->hclk);
->  	ret = mmc_add_host(mmc);
->  	if (ret < 0)
->  		goto emmcaddh;
-> @@ -1487,7 +1487,7 @@ ereqirq1:
->  ereqirq0:
->  	pm_runtime_suspend(&pdev->dev);
->  eresume:
-> -	clk_disable(host->hclk);
-> +	clk_disable_unprepare(host->hclk);
->  eclkupdate:
->  	clk_put(host->hclk);
->  eclkget:
-> @@ -1505,7 +1505,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
->  	int irq[2];
->  
->  	host->dying = true;
-> -	clk_enable(host->hclk);
-> +	clk_prepare_enable(host->hclk);
->  	pm_runtime_get_sync(&pdev->dev);
->  
->  	dev_pm_qos_hide_latency_limit(&pdev->dev);
-> @@ -1530,7 +1530,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
->  	if (irq[1] >= 0)
->  		free_irq(irq[1], host);
->  
-> -	clk_disable(host->hclk);
-> +	clk_disable_unprepare(host->hclk);
->  	mmc_free_host(host->mmc);
->  	pm_runtime_put_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
-> -- 
-> 1.8.1.5
+> I would imagine that there are many ways different firmwares might be
+> versioned, and I can't see version-major or version-minor clashing with a
+> generic property we might add later. However prefixing would not be harmful, so
+> I'm not opposed to it if others want that.
 > 
+> Another option would be to support a fallback compatible list (e.g.
+> "tl,trusted-foundations-${MAJOR}-${MINOR}", "tl,trusted-foundations"), and get
+> versioning information from there. Given that could be painful to handle I
+> don't want to force it if not required.
+> 
+> Thanks,
+> Mark.
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+I'm of the opinion that making all vendor specific properties vendor prefixed is the easiest rule of thumb and leaves no gray area to have to argue about.
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
