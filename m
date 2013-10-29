@@ -1,90 +1,106 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 10:52:49 +0100
-Subject: [PATCH 08/19] mmc: sdhi: Enable the driver on all ARM platforms
-In-Reply-To: <Pine.LNX.4.64.1310290919120.8404@axis700.grange>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383004027-25036-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <Pine.LNX.4.64.1310290919120.8404@axis700.grange>
-Message-ID: <4906973.ikaOXXr4gP@avalon>
+Date: Tue, 29 Oct 2013 10:55:05 +0100
+Subject: [PATCH 01/12] clocksource: sh_cmt: Add clk_prepare/unprepare
+ support
+In-Reply-To: <20131029055534.GB11580@verge.net.au>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131029055534.GB11580@verge.net.au>
+Message-ID: <9952506.6pWpQZf7WG@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+Hi Simon,
 
-On Tuesday 29 October 2013 10:07:29 Guennadi Liakhovetski wrote:
-> Hi Laurent
-> 
-> On Tue, 29 Oct 2013, Laurent Pinchart wrote:
-> > Renesas ARM platforms are transitioning from single-platform to
-> > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> > driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> > and ARCH_SHMOBILE_MULTI and increase build testing coverage.
+On Tuesday 29 October 2013 14:55:35 Simon Horman wrote:
+> On Mon, Oct 28, 2013 at 11:49:18PM +0100, Laurent Pinchart wrote:
+> > Prepare the clock at probe time, as there is no other appropriate place
+> > in the driver where we're allowed to sleep.
 > > 
-> > Cc: Chris Ball <cjb@laptop.org>
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > Cc: Ian Molton <ian@mnementh.co.uk>
-> > Cc: linux-mmc at vger.kernel.org
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: linux-kernel at vger.kernel.org
 > > Signed-off-by: Laurent Pinchart
 > > <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Thanks Laurent,
+> 
+> I have queued this up in the clocksources branch of my renesas tree.
+> I will send a pull request to Mike once v3.13-rc1 has hit the shelves.
+> Mike, please let me know if you would prefer something earlier than that.
+
+I thought the clocksource patches had to go through Daniel's tree. If you can 
+take them directly that's easier, so I'm fine with that. Does this imply your 
+Acked-by (for patches 01 to 03) ?
+
 > > ---
 > > 
-> >  drivers/mmc/host/Kconfig        | 2 +-
-> >  drivers/mmc/host/tmio_mmc_dma.c | 2 +-
-> >  2 files changed, 2 insertions(+), 2 deletions(-)
+> >  drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
+> >  1 file changed, 16 insertions(+), 4 deletions(-)
 > > 
-> > diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> > index 7fc5099..51957d4 100644
-> > --- a/drivers/mmc/host/Kconfig
-> > +++ b/drivers/mmc/host/Kconfig
-> > @@ -479,7 +479,7 @@ config MMC_TMIO
-> > 
-> >  config MMC_SDHI
+> > diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+> > index 0965e98..940341a 100644
+> > --- a/drivers/clocksource/sh_cmt.c
+> > +++ b/drivers/clocksource/sh_cmt.c
+> > @@ -634,12 +634,18 @@ static int sh_cmt_clock_event_next(unsigned long
+> > delta,> 
+> >  static void sh_cmt_clock_event_suspend(struct clock_event_device *ced)
+> >  {
+> > -	pm_genpd_syscore_poweroff(&ced_to_sh_cmt(ced)->pdev->dev);
+> > +	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
+> > +
+> > +	pm_genpd_syscore_poweroff(&p->pdev->dev);
+> > +	clk_unprepare(p->clk);
+> >  }
 > >  
-> >  	tristate "SH-Mobile SDHI SD/SDIO controller support"
-> > 
-> > -	depends on SUPERH || ARCH_SHMOBILE
-> > +	depends on SUPERH || ARM
-> > 
-> >  	select MMC_TMIO_CORE
-> >  	help
-> >  	
-> >  	  This provides support for the SDHI SD/SDIO controller found in
-> > 
-> > diff --git a/drivers/mmc/host/tmio_mmc_dma.c
-> > b/drivers/mmc/host/tmio_mmc_dma.c index 65edb4a..535bc35 100644
-> > --- a/drivers/mmc/host/tmio_mmc_dma.c
-> > +++ b/drivers/mmc/host/tmio_mmc_dma.c
-> > @@ -28,7 +28,7 @@ void tmio_mmc_enable_dma(struct tmio_mmc_host *host,
-> > bool enable)> 
-> >  	if (!host->chan_tx || !host->chan_rx)
-> >  	
-> >  		return;
-> > 
-> > -#if defined(CONFIG_SUPERH) || defined(CONFIG_ARCH_SHMOBILE)
-> > +#if defined(CONFIG_SUPERH) || defined(CONFIG_ARM)
-> 
-> I'm not sure about this one. In principle DMA so far is only used on SDHI
-> with TMIO. But this #if was for a theoretical case, when a TMIO MMC IP
-> inside an MFD is also used with DMA. Bus since I had no indormation about
-> whether the CTL_DMA_ENABLE register was SDHI specific or not, I put it
-> under an #if for the time being. In any case, I don't think making it
-> #ifdef CONFIG_ARM makes much sense. We can either remove the #if
-> completely, or keep it to limit the scope of this write to sh-mobile
-> arches.
-
-SUPERH || ARCH_SHMOBILE covers all the platforms this driver currently builds 
-on. Now that we're adding ARCH_SHMOBILE_MULTI the #if needs to cover that case 
-as well. I'm fine with limiting the CTL_DMA_ENABLE write to SUPERH only (which 
-would modify the driver's behaviour) or enabling it unconditionally, but I 
-don't think adding a defined(CONFIG_ARCH_SHMOBILE_MULTI) to the above #if 
-makes sense, unless there's a plan to add support for DMA for non-SH 
-(including both SUPERH and ARCH_SHMOBILE) platforms.
-
-> >  	/* Switch DMA mode on or off - SuperH specific? */
-> >  	sd_ctrl_write16(host, CTL_DMA_ENABLE, enable ? 2 : 0);
+> >  static void sh_cmt_clock_event_resume(struct clock_event_device *ced)
+> >  {
+> > -	pm_genpd_syscore_poweron(&ced_to_sh_cmt(ced)->pdev->dev);
+> > +	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
+> > +
+> > +	clk_prepare(p->clk);
+> > +	pm_genpd_syscore_poweron(&p->pdev->dev);
+> >  }
 > >  
-> >  #endif
-
+> >  static void sh_cmt_register_clockevent(struct sh_cmt_priv *p,
+> > 
+> > @@ -737,6 +743,10 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct
+> > platform_device *pdev)> 
+> >  		goto err2;
+> >  	}
+> > 
+> > +	ret = clk_prepare(p->clk);
+> > +	if (ret < 0)
+> > +		goto err3;
+> > +
+> >  	if (res2 && (resource_size(res2) == 4)) {
+> >  		/* assume both CMSTR and CMCSR to be 32-bit */
+> >  		p->read_control = sh_cmt_read32;
+> > @@ -773,19 +783,21 @@ static int sh_cmt_setup(struct sh_cmt_priv *p,
+> > struct platform_device *pdev)> 
+> >  			      cfg->clocksource_rating);
+> >  	if (ret) {
+> >  		dev_err(&p->pdev->dev, "registration failed\n");
+> > -		goto err3;
+> > +		goto err4;
+> >  	}
+> >  	p->cs_enabled = false;
+> >  	
+> >  	ret = setup_irq(irq, &p->irqaction);
+> >  	if (ret) {
+> >  		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
+> > -		goto err3;
+> > +		goto err4;
+> >  	}
+> >  	
+> >  	platform_set_drvdata(pdev, p);
+> >  	
+> >  	return 0;
+> > 
+> > +err4:
+> > +	clk_unprepare(p->clk);
+> >  err3:
+> >  	clk_put(p->clk);
+> >  err2:
 -- 
 Regards,
 
