@@ -1,50 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 28 Oct 2013 18:58:22 -0500
-Subject: [PATCH] ARM: remove name from machine_desc for DT platforms
-In-Reply-To: <526EC0B8.2080307@wwwdotorg.org>
-References: <1381352107-32464-1-git-send-email-robherring2@gmail.com>
- <CAL_JsqLF4WbmuW5PQUKV0nb2GS=iiXnJzO=VmP1g=AT2d7o-WQ@mail.gmail.com>
- <526EC0B8.2080307@wwwdotorg.org>
-Message-ID: <526EFA1E.5050008@gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 28 Oct 2013 17:15:52 -0700
+Subject: [PATCH 1/2] mmc: arasan: Add driver for Arasan SDHCI
+In-Reply-To: <526EF149.8060304@gmail.com>
+References: <1381864085-8806-1-git-send-email-soren.brinkmann@xilinx.com>
+ <526EF149.8060304@gmail.com>
+Message-ID: <ff1f2d38-4185-49f0-8b63-b3bd2b4f9a27@CO9EHSMHS024.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2013 02:53 PM, Stephen Warren wrote:
-> On 10/26/2013 09:34 AM, Rob Herring wrote:
->> On Wed, Oct 9, 2013 at 3:55 PM, Rob Herring <robherring2@gmail.com> wrote:
->>> From: Rob Herring <rob.herring@calxeda.com>
->>>
->>> As part of the effort to ultimately remove struct machine_desc, the
->>> machine name is not really needed. It is only used for /proc/cpuinfo
->>> "Hardware" field. Get this information from the DT instead and remove
->>> the name string in the machine descriptor for DT machine descriptors. The
->>> model or machine compatible property from the DT is used instead.
->>>
->>> This likely changes the name reported by /proc/cpuinfo. There could be
->>> some userspace dependencies on the old name. Debian libdebian-installer
->>> used to use this to determine kernel flavour, but now uses the DT
->>> directly. It is not really a good idea for userspace to depend on this
->>> anyway.
+On Mon, Oct 28, 2013 at 06:20:41PM -0500, Rob Herring wrote:
+> On 10/15/2013 02:08 PM, Soren Brinkmann wrote:
+> > Add a driver for Arasan's SDHCI controller core.
+> > 
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> >  .../devicetree/bindings/mmc/arasan,sdhci.txt       |  23 +++
+> >  MAINTAINERS                                        |   1 +
+> >  drivers/mmc/host/Kconfig                           |  12 ++
+> >  drivers/mmc/host/Makefile                          |   1 +
+> >  drivers/mmc/host/sdhci-of-arasan.c                 | 224 +++++++++++++++++++++
+> >  5 files changed, 261 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> >  create mode 100644 drivers/mmc/host/sdhci-of-arasan.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> > new file mode 100644
+> > index 000000000000..20f0fc25e270
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> > @@ -0,0 +1,23 @@
+> > +Device Tree Bindings for the Arasan SDCHI Controller
+> > +
+> > +  The bindings follow the mmc[1] and the clock bindings[2]. Only deviations are
+> > +  documented here.
+> > +
+> > +  [1] Documentation/devicetree/bindings/mmc/mmc.txt
+> > +  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +
+> > +Required Properties:
+> > +  - compatible: Compatibility string. Must be 'arasan,sdhci'
 > 
->>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->>> index 0e1e2b3..b0747bb 100644
->>> --- a/arch/arm/kernel/setup.c
->>> +++ b/arch/arm/kernel/setup.c
->>> @@ -611,7 +611,7 @@ void __init dump_machine_table(void)
->>>
->>>         early_print("Available machine support:\n\nID (hex)\tNAME\n");
->>>         for_each_machine_desc(p)
->>> -               early_print("%08x\t%s\n", p->nr, p->name);
->>> +               early_print("%08x\t%s\n", p->nr, p->name ? p->name : *p->dt_compat);
-> 
-> Does it make sense to iterate over all the entries in p->dt_compat here?
-> Tegra's machine descriptor supports 4 different compatible values, and I
-> think that'll only print one of them.
+> This string is a bit non-specific. Vendor IP typically has configurable
+> options, different revs of IP with fixes/differences, and the
+> possibility of integration wierdness or bugs. So it is better to be as
+> specific as possible in case the kernel needs to know exactly what
+> version of h/w this is.
+Okay. The Zynq TRM specifies the version as '8.9A_apr02nd_2010', which seems
+a little overly specific to me. How does 'arasan,sdhci-8.9a' sound to
+you?
 
-This is simply showing which machines are built into the kernel. With
-only the first string, you can figure out the other strings. It is not
-much of a different lookup than before. Considering you need DEBUG_LL
-enabled to see any of this to begin with, I don't think that's too much
-of a hurdle.
-
-Rob
+	Thanks,
+	S?ren
