@@ -1,73 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 28 Oct 2013 17:40:26 -0700
-Subject: [PATCH v3 08/10] mfd: pm8x41: add support for Qualcomm 8x41 PMICs
-In-Reply-To: <5a49bffc44c5f5bffe222560e489a712321ce971.1382985169.git.joshc@codeaurora.org>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <5a49bffc44c5f5bffe222560e489a712321ce971.1382985169.git.joshc@codeaurora.org>
-Message-ID: <526F03FA.6000307@codeaurora.org>
+From: sre@debian.org (Sebastian Reichel)
+Date: Tue, 29 Oct 2013 02:06:08 +0100
+Subject: [PATCHv2 1/3] Input: twl4030-keypad - add device tree support
+In-Reply-To: <5137C017-2515-427C-865F-B938CC24B210@codeaurora.org>
+References: <1382446042-27099-1-git-send-email-sre@debian.org>
+ <1382446042-27099-2-git-send-email-sre@debian.org>
+ <5137C017-2515-427C-865F-B938CC24B210@codeaurora.org>
+Message-ID: <20131029010608.GA5353@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/13 11:12, Josh Cartwright wrote:
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 914c3d1..0a288cb 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -476,6 +476,16 @@ config MFD_PM8XXX_IRQ
->  	  This is required to use certain other PM 8xxx features, such as GPIO
->  	  and MPP.
->  
-> +config MFD_PM8X41
-> +	bool "Qualcomm PM8X41 PMIC"
+On Mon, Oct 28, 2013 at 01:42:47AM -0500, Kumar Gala wrote:
+> > +This binding is based on the matrix-keymap binding with the following
+> > +changes:
+> 
+> Maybe be a bit more specific and say 'based on the input/matrix-keymap.txt binding'..
 
-Can this be tristate?
+OK.
 
-> +	depends on ARCH_MSM
+> > + * keypad,num-rows and keypad,num-columns are required.
+> 
+> Is linux,keymap required from matrix-keymap.txt?
 
-It would be nice if we didn't have to depend on ARCH_MSM so we get some
-more build coverage but the driver is so simple it probably doesn't matter.
+Yes, matrix-keymap.txt contains descriptions for the following:
 
-> +	select REGMAP_SPMI
-> +	help
-> +	  This enables basic support for the Qualcomm 8941 and 8841 PMICs.  These
-> +	  PMICs are currently used with the Snapdragon 800 series of SoCs.  Note, that
-> +	  this will only be useful paired with descriptions of the independent functions
-> +	  as children nodes in the device tree.
-> +
->  config MFD_RDC321X
->  	tristate "RDC R-321x southbridge"
->  	select MFD_CORE
-> diff --git a/drivers/mfd/pm8x41.c b/drivers/mfd/pm8x41.c
-> new file mode 100644
-> index 0000000..0a57221
-> --- /dev/nullalso
-> +++ b/drivers/mfd/pm8x41.c
-> @@ -0,0 +1,64 @@
-[...]
-> +
-> +static int pm8x41_probe(struct spmi_device *sdev)
-> +{
-> +	struct regmap *regmap;
-> +
-> +	regmap = devm_regmap_init_spmi(sdev, &pm8x41_regmap_config);
-> +	if (IS_ERR(regmap)) {
-> +		dev_dbg(&sdev->dev, "regmap creation failed.\n");
-> +		return PTR_ERR(regmap);
-> +	}
-> +
-> +	return of_platform_populate(sdev->dev.of_node, NULL, NULL, &sdev->dev);
-> +}
-> +
-> +static struct of_device_id pm8x41_id_table[] = {
+required:
+ - linux,keymap
+optional:
+ - keypad,num-rows
+ - keypad,num-columns
 
-const?
+> > +Optional Properties specific to linux:
+> > +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
+> 
+> Does it make sense to update the matrix-keymap.txt binding to add
+> 'linux,keypad-no-autorepeat' there?
 
-> +	{ "qcom,pm8841", },
-> +	{ "qcom,pm8941", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, pm8x41_id_table);
->
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+At least according to devicetree documentation there are
+keymap-matrix.txt based drivers, which do not support
+"linux,keypad-no-autorepeat".
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/c6090ce8/attachment-0001.sig>
