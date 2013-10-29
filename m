@@ -1,123 +1,67 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 29 Oct 2013 15:04:27 +0900
-Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
-In-Reply-To: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131029060427.GF11580@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 28 Oct 2013 23:18:35 -0700
+Subject: [PATCH 2/2] dmaengine: msm_bam_dma: Add device tree binding
+In-Reply-To: <1382732643-8184-3-git-send-email-agross@codeaurora.org>
+References: <1382732643-8184-1-git-send-email-agross@codeaurora.org>
+ <1382732643-8184-3-git-send-email-agross@codeaurora.org>
+Message-ID: <20131029061835.GE21983@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 12:46:48AM +0100, Laurent Pinchart wrote:
-> Hello,
-> 
-> This patch series, based on v3.12-rc7, prepares various Renesas drivers
-> for migration to multiplatform kernels by enabling their compilation or
-> otherwise fixing them on all ARM platforms. The patches are pretty
-> straightforward and are described in their commit message.
-> 
-> I'd like to get all these patches merged in v3.14. As they will need to go
-> through their respective subsystems' trees, I would appreciate if all
-> maintainers involved could notify me when they merge patches from this series
-> in their tree to help me tracking the merge status. I don't plan to send pull
-> requests individually for these patches, and I will repost patches
-> individually if changes are requested during review.
-> 
-> If you believe the issue should be solved in a different way (for instance by
-> removing the architecture dependency completely) please reply to the cover
-> letter to let other maintainers chime in.
+On 10/25, Andy Gross wrote:
+> diff --git a/Documentation/devicetree/bindings/dma/msm_bam_dma.txt b/Documentation/devicetree/bindings/dma/msm_bam_dma.txt
+> new file mode 100644
+> index 0000000..fe3ed8f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/msm_bam_dma.txt
+> @@ -0,0 +1,49 @@
+> +MSM BAM DMA controller
+> +
+> +Required properties:
+> +- compatible: Should be "qcom,bam"
+> +- reg: Address range for DMA registers
+> +- interrupts: single interrupt for this controller
+> +- #dma-cells: must be <3>
+> +- clocks: required clock
+> +- clock-names: name of clock
+> +
+> +Example:
+> +
+> +	dma0: dma at f9984000 = {
 
-I think this is a step in a good direction.
-However, I think it would be even better if the architecture dependency was
-removed completely.
+I imagine it's fine to say 'bam0: dma at f9984000' here. The node
+name should stay dma though. This way we know that we're talking
+about the first bam. Or if there is a more specific name for the
+bam we could use that, like system-bam or sdhci-bam.
 
-> 
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: dmaengine at vger.kernel.org
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> Cc: Ian Molton <ian@mnementh.co.uk>
-> Cc: iommu at lists.linux-foundation.org
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: linux-i2c at vger.kernel.org
-> Cc: linux-input at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-media at vger.kernel.org
-> Cc: linux-mmc at vger.kernel.org
-> Cc: linux-mtd at lists.infradead.org
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-pwm at vger.kernel.org
-> Cc: linux-serial at vger.kernel.org
-> Cc: linux-spi at vger.kernel.org
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> Cc: netdev at vger.kernel.org
-> Cc: Samuel Ortiz <samuel@sortiz.org>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> 
-> Laurent Pinchart (19):
->   serial: sh-sci: Enable the driver on all ARM platforms
->   DMA: shdma: Enable the driver on all ARM platforms
->   i2c: sh_mobile: Enable the driver on all ARM platforms
->   input: sh_keysc: Enable the driver on all ARM platforms
->   iommu: shmobile: Enable the driver on all ARM platforms
->   i2c: rcar: Enable the driver on all ARM platforms
->   v4l: sh_vou: Enable the driver on all ARM platforms
->   mmc: sdhi: Enable the driver on all ARM platforms
->   mmc: sh_mmcif: Enable the driver on all ARM platforms
->   mtd: sh_flctl: Enable the driver on all ARM platforms
->   net: sh_eth: Set receive alignment correctly on all ARM platforms
->   irda: sh_irda: Enable the driver on all ARM platforms
->   pinctrl: sh-pfc: Enable the driver on all ARM platforms
->   pwm: pwm-renesas-tpu: Enable the driver on all ARM platforms
->   sh: intc: Enable the driver on all ARM platforms
->   spi: sh_msiof: Enable the driver on all ARM platforms
->   spi: sh_hspi: Enable the driver on all ARM platforms
->   thermal: rcar-thermal: Enable the driver on all ARM platforms
->   fbdev: sh-mobile-lcdcfb: Enable the driver on all ARM platforms
-> 
->  drivers/dma/sh/Kconfig                | 2 +-
->  drivers/dma/sh/shdmac.c               | 6 +++---
->  drivers/i2c/busses/Kconfig            | 4 ++--
->  drivers/input/keyboard/Kconfig        | 2 +-
->  drivers/iommu/Kconfig                 | 2 +-
->  drivers/media/platform/Kconfig        | 2 +-
->  drivers/mmc/host/Kconfig              | 4 ++--
->  drivers/mmc/host/tmio_mmc_dma.c       | 2 +-
->  drivers/mtd/nand/Kconfig              | 2 +-
->  drivers/net/ethernet/renesas/sh_eth.c | 2 +-
->  drivers/net/ethernet/renesas/sh_eth.h | 2 +-
->  drivers/net/irda/Kconfig              | 2 +-
->  drivers/pinctrl/Makefile              | 2 +-
->  drivers/pinctrl/sh-pfc/Kconfig        | 2 +-
->  drivers/pwm/Kconfig                   | 2 +-
->  drivers/sh/intc/Kconfig               | 2 +-
->  drivers/spi/Kconfig                   | 4 ++--
->  drivers/thermal/Kconfig               | 2 +-
->  drivers/tty/serial/Kconfig            | 2 +-
->  drivers/video/Kconfig                 | 6 +++---
->  20 files changed, 27 insertions(+), 27 deletions(-)
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> +		compatible = "qcom,bam";
+> +		reg = <0xf9984000 0x15000>;
+> +		interrupts = <0 94 0>;
+> +		clocks = <&bam_dma_ahb_cxc>;
+> +		clock-names = "bam_clk";
+> +		#dma-cells = <3>;
+> +	};
+> +
+> +Client:
+> +Required properties:
+> +- dmas: List of dma channel requests
+> +- dma-names: Names of aforementioned requested channels
+> +
+> +Clients must use the format described in the dma.txt file, using a four cell
+> +specifier for each channel.
+> +
+> +The four cells in order are:
+> +  1. A phandle pointing to the DMA controller
+> +  2. The channel number
+> +  3. The execution environment value for this channel.
+> +  4. Direction of the fixed unidirectional channel
+> +     0 - Memory to Device
+> +     1 - Device to Memory
+
+Should we add "2 - Device to Device" here? Is there anything more
+that needs to be done in the binding for device to device
+transfers.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
