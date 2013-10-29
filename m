@@ -1,43 +1,45 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 10:41:57 +0100
-Subject: [PATCH 06/12] i2c: sh_mobile: Convert to clk_prepare/unprepare
-In-Reply-To: <20131029055807.GE11580@verge.net.au>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131029050224.GA2643@katana> <20131029055807.GE11580@verge.net.au>
-Message-ID: <1931500.glV2j5U5NL@avalon>
+Date: Tue, 29 Oct 2013 10:43:56 +0100
+Subject: [PATCH 03/19] i2c: sh_mobile: Enable the driver on all ARM
+ platforms
+In-Reply-To: <20131029050337.GB2643@katana>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383004027-25036-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131029050337.GB2643@katana>
+Message-ID: <2015733.JNqH7MboLG@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Wolfram,
 
-On Tuesday 29 October 2013 14:58:07 Simon Horman wrote:
-> On Tue, Oct 29, 2013 at 06:02:24AM +0100, Wolfram Sang wrote:
-> > On Mon, Oct 28, 2013 at 11:49:23PM +0100, Laurent Pinchart wrote:
-> > > Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
-> > > clk_disable_unprepare() to get ready for the migration to the common
-> > > clock framework.
-> > > 
-> > > Cc: Wolfram Sang <wsa@the-dreams.de>
-> > > Cc: linux-i2c at vger.kernel.org
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
+On Tuesday 29 October 2013 06:03:37 Wolfram Sang wrote:
+> On Tue, Oct 29, 2013 at 12:46:51AM +0100, Laurent Pinchart wrote:
+> > Renesas ARM platforms are transitioning from single-platform to
+> > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> > driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> > and ARCH_SHMOBILE_MULTI and increase build testing coverage.
 > > 
-> > Acked-by: Wolfram Sang <wsa@the-dreams.de>
+> > Cc: Wolfram Sang <wsa@the-dreams.de>
+> > Cc: linux-i2c at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> Hi Wolfram, Hi Laurent,
+> I wonder if those two Kconfig patches couldn't be squashed, but other
+> than that:
 > 
-> correct me if I am wrong, but I think the plan was
-> for Wolfram to take this patch.
+> Acked-by: Wolfram Sang <wsa@the-dreams.de>
 
-That's correct. All patches in this series will need to go through their 
-respective maintainers' git trees. It's going to be slightly painful to track 
-on my side, but that means less work on your side :-)
-
-As mentioned in the cover letter, I won't send a pull request for this series, 
-so I expect all maintainers involved to pick their share of patches from the 
-list.
+Thank you. Please feel free to squash the patches together when applying if 
+needed.
 
 -- 
 Regards,
 
 Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/3d91fcf8/attachment.sig>
