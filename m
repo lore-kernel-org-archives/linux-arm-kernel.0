@@ -1,41 +1,32 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 30 Oct 2013 00:32:01 +0530
-Subject: [Patch v4 0/2] Enable all cpus in Exynos5420
-In-Reply-To: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
-References: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CANuQgHEx+pNdaybeJ_dpQ5kWYpA44hrYj4ikW9d60a3hEZZPDA@mail.gmail.com>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Tue, 29 Oct 2013 12:03:58 -0700
+Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
+In-Reply-To: <CAOesGMgKbreaqFTGvC=_T6-i7uejfXAPNU8LmMpgDMqeEwYxZQ@mail.gmail.com>
+References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
+ <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
+ <20131029132043.GA28165@fifo99.com>
+ <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+ <20131029170817.GA13047@fifo99.com>
+ <CAOesGMgKbreaqFTGvC=_T6-i7uejfXAPNU8LmMpgDMqeEwYxZQ@mail.gmail.com>
+Message-ID: <20131029190358.GB13047@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Tue, Oct 29, 2013 at 10:39:45AM -0700, Olof Johansson wrote:
+> On Tue, Oct 29, 2013 at 10:08 AM, Daniel Walker <dwalker@fifo99.com> wrote:
+> 
+> > Personally I think splitting mach- stuff isn't very useful or
+> > interesting.. There's just no technical reason for it, for example x86
+> > and x86_64 was a win from my perspective , there's a lot more reason to
+> > keep similar things together than to split things up.
+> 
+> There are definitely valid technical reasons for it; the old and new
+> platforms share no code, and the legacy platforms are unlikely to be
+> updated to modern infrastructure anytime soon. Other platforms are
+> managed in similar manners, such as OMAP, imx/mxs, etc.
 
-On 7 October 2013 09:47, Chander Kashyap <chander.kashyap@linaro.org> wrote:
-> Exynos5420 is an octa-core SoC. This patch series enables the remaining 4 cores.
->
-> Changes in v2:
->         - Changed the cpu node @unit-address value to reg property value.
-> Changes in v3:
->         - Removed leading 0x from @unit-address value.
-> Changes in v4:
->         - Fixed typo and patch subject from "arm: dt" to "ARM: dt".
->
-> Chander Kashyap (2):
->   clocksource: mct: extend mct to support 8 local interrupts for
->     Exynos5420
->   arm: dt: Exynos5420: populate cpu node enteries to 8 cpus
->
->  arch/arm/boot/dts/exynos5420.dtsi |   37 +++++++++++++++++++++++++++++++++++--
->  drivers/clocksource/exynos_mct.c  |    4 ++++
->  2 files changed, 39 insertions(+), 2 deletions(-)
->
-> --
-> 1.7.9.5
->
+Are you speaking from a meta perspective , or you have specific example
+in msm code ?
 
-?
 
-Can you please take these patches?
-
--- 
-with warm regards,
-Chander Kashyap
+Daniel
