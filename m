@@ -1,69 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Oct 2013 13:22:55 -0700
-Subject: [PATCH 4/6] edac: Document Krait L1/L2 EDAC driver binding
-In-Reply-To: <526FF7DB.5040805@codeaurora.org>
-References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
- <1383006690-6754-5-git-send-email-sboyd@codeaurora.org>
- <90D2FDE5-C43F-4ACF-B287-4E0AD8617892@codeaurora.org>
- <526FF7DB.5040805@codeaurora.org>
-Message-ID: <CAOesGMgG2gq9GDvEm3Dj0EZz_K=2VxgR1HhqQA5OEemKubJxVA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 29 Oct 2013 13:32:17 -0700
+Subject: [PATCH v3 10/10] rtc: pm8xxx: add support for pm8941
+In-Reply-To: <5270187D.3090004@codeaurora.org>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <1392ea90487793f9cbbdfb7f8d148f45122a52c2.1382985169.git.joshc@codeaurora.org>
+ <20131029200927.GG21983@codeaurora.org>
+ <20131029201545.GA2064@kroah.com> <5270187D.3090004@codeaurora.org>
+Message-ID: <20131029203217.GA20921@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 11:00 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 10/29/13 01:21, Kumar Gala wrote:
->> On Oct 28, 2013, at 7:31 PM, Stephen Boyd wrote:
->>
->>> The Krait L1/L2 error reporting device is made up of two
->>> interrupts, one per-CPU interrupt for the L1 caches and one
->>> interrupt for the L2 cache.
->>>
->>> Cc: <devicetree@vger.kernel.org>
->>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>> ---
->>> .../devicetree/bindings/arm/qcom,krait-cache-erp.txt     | 16 ++++++++++++++++
->>> 1 file changed, 16 insertions(+)
->>> create mode 100644 Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
->>> new file mode 100644
->>> index 0000000..01fe8a8
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
->>> @@ -0,0 +1,16 @@
->>> +* Qualcomm Krait L1 / L2 cache error reporting
->>> +
->>> +Required properties:
->>> +- compatible: Should be "qcom,krait-cache-erp"
->>> +- interrupts: Should contain the L1/CPU error interrupt number and
->>> +  then the L2 cache error interrupt number
->>> +
->>> +Optional properties:
->>> +- interrupt-names: Should contain the interrupt names "l1_irq" and
->>> +  "l2_irq"
->>> +
->>> +Example:
->>> +    edac {
->>> +            compatible = "qcom,krait-cache-erp";
->>> +            interrupts = <1 9 0xf04>, <0 2 0x4>;
->>> +    };
->> Why wouldn't we have these as part of cache nodes in the dts?  (which begs the question why we don't have cache nodes?)
+On Tue, Oct 29, 2013 at 01:20:13PM -0700, Stephen Boyd wrote:
+> On 10/29/13 13:15, Greg Kroah-Hartman wrote:
+> > On Tue, Oct 29, 2013 at 01:09:27PM -0700, Stephen Boyd wrote:
+> >> On 10/28, Josh Cartwright wrote:
+> >>> diff --git a/drivers/rtc/rtc-pm8xxx.c b/drivers/rtc/rtc-pm8xxx.c
+> >>> index 03f8f75..a9044d4 100644
+> >>> --- a/drivers/rtc/rtc-pm8xxx.c
+> >>> +++ b/drivers/rtc/rtc-pm8xxx.c
+> >>> @@ -1,4 +1,5 @@
+> >>>  /* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+> >>> + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+> >>>   *
+> >> Please rewrite this as '2010-2011,2013, The Linux Foundation'
+> > Has the Linux Foundation really taken on all prior copyrights of this
+> > codebase?  CAF wasn't around in 2010 as part of the LF, so be careful
+> > here.
+> >
+> 
+> >From what I recall our lawyers told us to do this and there is some
+> precedence for this upstream as well.
+> 
+> commit e1858b2a21cd84a855945a4747fb2db41b250c22
+> Author: Richard Kuo <rkuo@codeaurora.org>
+> Date:   Wed Sep 19 16:22:02 2012 -0500
+> 
+>     Hexagon: Copyright marking changes
+>    
+>     Code Aurora Forum (CAF) is becoming a part of Linux Foundation Labs.
+>    
+>     Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
 
-In particular, naming the node edac seems like a suboptimal choice,
-since that's a very linux-specific name for the error reporting
-framework.
+Ok, fair enough, I was not aware of this.
 
-> I can certainly add cache nodes and cpu nodes and then put the
-> interrupts in those nodes. I was thinking along those same lines when I
-> ported this driver but figured it would be good to get something out
-> there. The only question I have is how am I supposed to hook that up
-> into the linux device model? Will the edac driver bind to the device
-> created for the cpus node and the cache node? I guess it will have to be
-> a driver that binds to two devices.
+sorry for the noise,
 
-Or it could bind to one device and look up the info for the other from
-the devicetree without relying on the driver core to instantiate
-devices.
-
-
--Olof
+greg k-h
