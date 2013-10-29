@@ -1,157 +1,42 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Tue, 29 Oct 2013 00:02:25 -0700
-Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <0D287D95-C302-4A59-98AC-C654F5AC97B4@codeaurora.org>
-References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
- <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
- <0D287D95-C302-4A59-98AC-C654F5AC97B4@codeaurora.org>
-Message-ID: <CAMj5Bkhd1+JJV88ec7UNz2sK7DpugfK3MAgFxTiEgFx9FawTsw@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 29 Oct 2013 08:47:48 +0100
+Subject: [PATCH v5 4/5] dma: mxs-dma: Update state after channel reset
+In-Reply-To: <1383032869-12863-1-git-send-email-mpa@pengutronix.de>
+References: <1383032869-12863-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1383032869-12863-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kumar
+After a channel reset, the channel stops running automatically. The
+state update was missing so that a channel perperation right after a
+channel reset failed.
 
-Thanks for the careful review.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/dma/mxs-dma.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-On Sun, Oct 27, 2013 at 11:29 PM, Kumar Gala <galak@codeaurora.org> wrote:
->
-> On Oct 23, 2013, at 8:03 AM, Zhangfei Gao wrote:
->
-
->> +Required Properties:
->> +
->> +* compatible: should be
->> +     - "hisilicon,hi4511-dw-mshc": for controllers with hi4511
->> +       specific extentions.
->> +* vmmc-supply: should be vmmc used in dwmmc
->> +* fifo-depth: should be provided if register can not provide correct value
->> +* clken-reg: should be clock enable register and offset
->> +* drv-sel-reg: should be driver delay select register, offset and bits
->> +* sam-sel-reg: should be sample delay select register, offset and bits
->> +* div-reg: should be divider register, offset and bits
->> +* tune-table: should be array of clock tune mmc controller
->> +
->
-> 1. These should have vendor prefixes
-However Olof and Mark once suggested not using prefix if vector is
-internally used.
-
-Example before:
-> + - #hisilicon,clkdiv-table-cells : the number of parameters after phandle in
-> +   hisilicon,clkdiv-table property.
-> + - hisilicon,clkdiv-table : list of value that are used to configure clock
-
-Olof:
-For a binding that is your own, you don't need to prefix the properties.
-Prefixes are mostly used when adding new vendor-specific attributes to a common
-binding.
-
-Mark:
-People seem to be *very* keen on adding them for all bindings for some
-reason.
-
-> 2. why do we need the *-reg properties
-> 3. for the *-reg properties its not clear what bits means?
-
-The silicon has some limitaiton to tune the clock timing according to
-working mode,
-including driver delay, sample delay, and divider.
-If not set even the host register may not read out.
-The register in PCTRL described below,
-And one register may contains sereral usage,
-for example
-mmc0: 0x1f8: bit 0 is clock en/dis, bit 1 ~ bit 3 controls div, bit
-4~7 controls drv-sel, bit 8 ~11 controls sam-sel
-mmc1: 0x1f8: bit 12 ~~
-register, offset and bits stands for 0x1f8, start bit and how many bits.
-Is this fine?
-
-
-> 4. tune-table is not well described, what does 'clock tune' mean, why an array?
-Will change to  "tuning-table"
-It is values used for computing these div, drv, sample register,
-Also contains system clock need to be set, and output clock output
-after PCTRL control.
-
->
->
->> +Example:
->> +
->> +  The MSHC controller node can be split into two portions, SoC specific and
->> +  board specific portions as listed below.
->> +
->
-> Does dtc merge this all into a single node?  Would probably be good to have comments
-> in the example stating both that the merge into one node, and which is board and which
-> is soc.
-OK, will add comments to distinguish dtsi for soc and dts for board.
-
->
->> +     dwmmc_0: dwmmc0 at fcd03000 {
->> +             compatible = "hisilicon,hi4511-dw-mshc";
->> +             reg = <0xfcd03000 0x1000>;
->> +             interrupts = <0 16 4>;
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +             clocks = <&clk_sd>, <&clk_ddrc_per>;
->> +             clock-names = "ciu", "biu";
->> +             clken-reg = <0x1f8 0>;
->> +             drv-sel-reg = <0x1f8 4 4>;
->> +             sam-sel-reg = <0x1f8 8 4>;
->> +             div-reg = <0x1f8 1 3>;
->> +             tune-table =
->> +             <180000000 6 6 13 13 25000000>,
->> +             <0 0 0 0 0 0>,
->> +             <360000000 6 4 2 0 50000000>,
->> +             <180000000 6 4 13 13 25000000>,
->> +             <360000000 6 4 2 0 50000000>,
->> +             <720000000 6 1 9 4 100000000>,
->> +             <0 0 0 0 0 0>,
->> +             <360000000 7 1 3 0 50000000>;
->> +     };
->> +     dwmmc0 at fcd03000 {
->> +             num-slots = <1>;
->> +             vmmc-supply = <&ldo12>;
->> +             fifo-depth = <0x100>;
->> +             supports-highspeed;
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&sd_pmx_pins &sd_cfg_func1 &sd_cfg_func2>;
->> +             slot at 0 {
->> +                     reg = <0>;
->> +                     bus-width = <4>;
->> +                     disable-wp;
->> +                     cd-gpios = <&gpio10 3 0>;
->> +             };
->> +     };
->> +
->> +PCTRL:
->> +
->
-> should have a description
-OK.
-
->
->> +Required Properties:
->> +* compatible: should be
->> +     - "hisilicon,pctrl": Peripheral control
->> +
->
-> Reg is not described as a required property.
-OK.
-
->
->> +Example:
->> +
->> +     pctrl: pctrl at fca09000 {
->> +             compatible = "hisilicon,pctrl";
->> +             reg = <0xfca09000 0x1000>;
->> +     };
->
-> This should be in its own binding document, and not part of the mmc binding
-bindings/arm/hisilicon/hisilicon.txt still not been merged in another
-patch, where
-we want to push such desc as well as other system binding.
-Is it OK adding this node desc twice in two files, since mmc need such node.
-or move this desc after hisilicon.txt get merged for saving conflict?
-
-Thanks
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 5302670..f48f87f 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -235,6 +235,8 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ 		writel(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
+ 			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_SET);
+ 	}
++
++	mxs_chan->status = DMA_COMPLETE;
+ }
+ 
+ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
+@@ -362,7 +364,7 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+ 			chan);
+ 		mxs_chan->status = DMA_ERROR;
+ 		mxs_dma_reset_chan(mxs_chan);
+-	} else {
++	} else if (mxs_chan->status != DMA_COMPLETE) {
+ 		if (mxs_chan->flags & MXS_DMA_SG_LOOP)
+ 			mxs_chan->status = DMA_IN_PROGRESS;
+ 		else
+-- 
+1.8.4.rc3
