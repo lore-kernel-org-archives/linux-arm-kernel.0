@@ -1,45 +1,39 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 28 Oct 2013 17:31:28 -0700
-Subject: [PATCH 4/6] edac: Document Krait L1/L2 EDAC driver binding
+Date: Mon, 28 Oct 2013 17:31:26 -0700
+Subject: [PATCH 2/6] genirq: export percpu irq functions for module usage
 In-Reply-To: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
 References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1383006690-6754-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1383006690-6754-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Krait L1/L2 error reporting device is made up of two
-interrupts, one per-CPU interrupt for the L1 caches and one
-interrupt for the L2 cache.
+In the near future we're going to use these percpu irq functions
+in the Krait CPU EDAC driver. Export them so that the EDAC driver
+can be compiled as a module.
 
-Cc: <devicetree@vger.kernel.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- .../devicetree/bindings/arm/qcom,krait-cache-erp.txt     | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
+ kernel/irq/manage.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-new file mode 100644
-index 0000000..01fe8a8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-@@ -0,0 +1,16 @@
-+* Qualcomm Krait L1 / L2 cache error reporting
-+
-+Required properties:
-+- compatible: Should be "qcom,krait-cache-erp"
-+- interrupts: Should contain the L1/CPU error interrupt number and
-+  then the L2 cache error interrupt number
-+
-+Optional properties:
-+- interrupt-names: Should contain the interrupt names "l1_irq" and
-+  "l2_irq"
-+
-+Example:
-+	edac {
-+		compatible = "qcom,krait-cache-erp";
-+		interrupts = <1 9 0xf04>, <0 2 0x4>;
-+	};
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 514bcfd..c6009d1 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1623,6 +1623,7 @@ void free_percpu_irq(unsigned int irq, void __percpu *dev_id)
+ 	kfree(__free_percpu_irq(irq, dev_id));
+ 	chip_bus_sync_unlock(desc);
+ }
++EXPORT_SYMBOL_GPL(free_percpu_irq);
+ 
+ /**
+  *	setup_percpu_irq - setup a per-cpu interrupt
+@@ -1693,3 +1694,4 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+ 
+ 	return retval;
+ }
++EXPORT_SYMBOL_GPL(request_percpu_irq);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
