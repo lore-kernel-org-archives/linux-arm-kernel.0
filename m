@@ -1,45 +1,55 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 18:05:53 +0100
-Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
-In-Reply-To: <20131029160449.GD16686@sirena.org.uk>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131029060427.GF11580@verge.net.au> <20131029160449.GD16686@sirena.org.uk>
-Message-ID: <1577821.Q7gttkPE2J@avalon>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Tue, 29 Oct 2013 10:08:17 -0700
+Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
+In-Reply-To: <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
+ <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
+ <20131029132043.GA28165@fifo99.com>
+ <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+Message-ID: <20131029170817.GA13047@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Tuesday 29 October 2013 09:04:49 Mark Brown wrote:
-> On Tue, Oct 29, 2013 at 03:04:27PM +0900, Simon Horman wrote:
-> > I think this is a step in a good direction.
-> > However, I think it would be even better if the architecture dependency
-> > was removed completely.
+On Tue, Oct 29, 2013 at 08:37:28AM -0700, Olof Johansson wrote:
+> Daniel,
 > 
-> Yes, please.
+> I would be very happy to take more code for the older Qualcomm chipset
+> to enable full functionality for them, but it's been my impression
+> that far from all that is needed to make it a useful platform is in
+> the upstream kernel, and there's been no signs of more of it showing
+> up at least in the last two years.
 
-I've kept it for two reasons.
+Some of the platform code he's removing is not compiled right now. I
+would have liked to make it compile, but I don't care that much (and
+they don't either) ..
 
-The first one is that I can't compile-test all those drivers on all 
-architectures. The spi-sh-msiof driver, for instance, uses io(read|write)(16|
-32) which are not available on all architectures. There might be other similar 
-problems that I can't catch, and I don't want to introduce build breakages in 
-the kernel.
+> So we have a bit of a stalemate here -- the current Qualcomm team
+> wants to avoid having to deal too much with the legacy platforms --
+> they are technically quite different from the current platforms and
+> the divergence makes it hard to deal with supporting it all in a
+> modern way without risking regressions. I tend to agree with them.
 
-The second reason is that, as the IP cores have never been used on anything 
-but SuperH and ARM, I don't like the idea of clobbering the config process 
-with drivers that are useless on the target architecture. Now that we have a 
-COMPILE_TEST Kconfig option, my preference would thus go to SUPERH || ARM || 
-COMPILE_TEST over no dependency at all.
+Oh what a sob story .. They can't claim to maintain msm except for the
+parts they don't like that much, thats not how it works. If you
+have a technical reason why you think hard to maintain code is
+"hard to deal with", please put that forth .
 
--- 
-Regards,
+If they want they can start submitting their patches to me, and I can
+deal with their "hard to deal with" stuff..
 
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/fb192e83/attachment.sig>
+> Just like omap split between omap1 and omap2plus, I think it's a time
+> to create a mach-qcom instead, and move the modern (v7, most likely)
+> platforms there -- enable them with device tree, modern framework
+> infrastructure, etc. That way you can keep older platforms in mach-msm
+> without risk of regressions, and they have a clean base to start on
+> with their later platforms.
+
+Personally I think splitting mach- stuff isn't very useful or
+interesting.. There's just no technical reason for it, for example x86
+and x86_64 was a win from my perspective , there's a lot more reason to
+keep similar things together than to split things up.
+
+The whole risking regressions, do you have proof of why you think that's
+happening ? The inverse seems more likely..
+
+Daniel
