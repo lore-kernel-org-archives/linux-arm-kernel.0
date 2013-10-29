@@ -1,48 +1,52 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 29 Oct 2013 13:32:17 -0700
-Subject: [PATCH v3 10/10] rtc: pm8xxx: add support for pm8941
-In-Reply-To: <5270187D.3090004@codeaurora.org>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <1392ea90487793f9cbbdfb7f8d148f45122a52c2.1382985169.git.joshc@codeaurora.org>
- <20131029200927.GG21983@codeaurora.org>
- <20131029201545.GA2064@kroah.com> <5270187D.3090004@codeaurora.org>
-Message-ID: <20131029203217.GA20921@kroah.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 30 Oct 2013 00:35:16 +0300
+Subject: [PATCH] sh-pfc: r8a7791 PFC support V2
+In-Reply-To: <1428789.AD4dgYWceb@avalon>
+References: <20131016214605.3868.54890.sendpatchset@w520>
+ <1428789.AD4dgYWceb@avalon>
+Message-ID: <52702A14.7020005@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 01:20:13PM -0700, Stephen Boyd wrote:
-> On 10/29/13 13:15, Greg Kroah-Hartman wrote:
-> > On Tue, Oct 29, 2013 at 01:09:27PM -0700, Stephen Boyd wrote:
-> >> On 10/28, Josh Cartwright wrote:
-> >>> diff --git a/drivers/rtc/rtc-pm8xxx.c b/drivers/rtc/rtc-pm8xxx.c
-> >>> index 03f8f75..a9044d4 100644
-> >>> --- a/drivers/rtc/rtc-pm8xxx.c
-> >>> +++ b/drivers/rtc/rtc-pm8xxx.c
-> >>> @@ -1,4 +1,5 @@
-> >>>  /* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
-> >>> + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
-> >>>   *
-> >> Please rewrite this as '2010-2011,2013, The Linux Foundation'
-> > Has the Linux Foundation really taken on all prior copyrights of this
-> > codebase?  CAF wasn't around in 2010 as part of the LF, so be careful
-> > here.
-> >
-> 
-> >From what I recall our lawyers told us to do this and there is some
-> precedence for this upstream as well.
-> 
-> commit e1858b2a21cd84a855945a4747fb2db41b250c22
-> Author: Richard Kuo <rkuo@codeaurora.org>
-> Date:   Wed Sep 19 16:22:02 2012 -0500
-> 
->     Hexagon: Copyright marking changes
->    
->     Code Aurora Forum (CAF) is becoming a part of Linux Foundation Labs.
->    
->     Signed-off-by: Richard Kuo <rkuo@codeaurora.org>
+Hello.
 
-Ok, fair enough, I was not aware of this.
+On 10/19/2013 12:33 AM, Laurent Pinchart wrote:
 
-sorry for the noise,
+>> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
 
-greg k-h
+>> Add PFC support for the r8a7791 SoC V2 including pin groups for
+>> on-chip devices such as MSIOF, SCIF, USB, MMC, SDHI, DU.
+
+>> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+>> Signed-off-by: Kunihito Higashiyama <kunihito.higashiyama.ur@renesas.com>
+>> Signed-off-by: Yoshikazu Fujikawa <yoshikazu.fujikawa.ue@renesas.com>
+>> Signed-off-by: Nobuyuki HIRAI <nobuyuki.hirai.xe@renesas.com>
+>> Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+>> Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+>> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+>> [damm at opensource.se: Forward ported to upstream, minor fixes]
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+[...]
+
+>> --- /dev/null
+>> +++ work/drivers/pinctrl/sh-pfc/pfc-r8a7791.c	2013-10-17
+> 06:35:00.000000000
+
+[...]
+
+> I'm still a bit unsure about the DU pin groups. Would it be possible to get
+> access to the SoC datasheet ?
+
+> In the worst case I can take the patch as-is and fix any issue later, as the
+> DU driver doesn't support the r8a7791 yet anyway. So,
+
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> I've taken the patch to my tree and will push it as-is, or with modifications
+> to the DU pin groups as needed if I can get access to the documentation before
+> the next merge window.
+
+    Looks like it got stuck in your tree? I have my Ether work run-time 
+dependent on this patch...
+
+WBR, Sergei
