@@ -1,58 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 29 Oct 2013 16:28:39 +0100
-Subject: [PATCH] [RFC] ARM: debug: only wait for an idle uart after all chars
- are sent
-Message-ID: <1383060519-14868-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Tue, 29 Oct 2013 17:31:47 +0200
+Subject: [PATCH v3 09/10] mfd: pm8x41: document device tree bindings
+In-Reply-To: <20131029150546.GE20207@joshc.qualcomm.com>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <88997d3863f72f8553fcaf66cf67fbf3289df04f.1382985169.git.joshc@codeaurora.org>
+ <1383056315.2837.22.camel@iivanov-dev.int.mm-sol.com>
+ <20131029150546.GE20207@joshc.qualcomm.com>
+Message-ID: <1383060707.2837.35.camel@iivanov-dev.int.mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of waiting after every single character that the fifo and
-shifter become empty only wait after the whole string. Without this
-optimization the fifo isn't used at all for more than a single
-character. The added benefit is that debug output speed is improved.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+Hi,
 
-I didn't do any benchmarks with this patch but noticed this optimization
-when I copied the printch/printascii code for the bootloader on efm32.
+On Tue, 2013-10-29 at 10:05 -0500, Josh Cartwright wrote: 
+> On Tue, Oct 29, 2013 at 04:18:35PM +0200, Ivan T. Ivanov wrote:
+> > On Mon, 2013-10-28 at 13:12 -0500, Josh Cartwright wrote: 
+> > > Document the bindings used to describe the Qualcomm 8x41 PMICs.
+> > > 
+> > > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> > > ---
+> > >  Documentation/devicetree/bindings/mfd/pm8x41.txt | 33 ++++++++++++++++++++++++
+> > >  1 file changed, 33 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/mfd/pm8x41.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/mfd/pm8x41.txt b/Documentation/devicetree/bindings/mfd/pm8x41.txt
+> > > new file mode 100644
+> > > index 0000000..6afd4ce
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/mfd/pm8x41.txt
+> > > @@ -0,0 +1,33 @@
+> > > +Qualcomm PM8841 and PM8941 PMIC multi-function devices
+> > > +
+> > > +The PM8x41 PMICs are used with the Qualcomm Snapdragon 800 series SoCs, and are
+> > > +interfaced to the chip via the SPMI (System Power Management Interface) bus.
+> > > +Support for  multiple independent functions are implemented by splitting the
+> > > +16-bit SPMI slave address space into 256 smaller fixed-size regions, 256 bytes
+> > > +each.  A function can consume one or more of these fixed-size register regions.
+> > > +
+> > > +Required properties:
+> > > +- compatible: Must be one of:
+> > > +     "qcom,pm8841"
+> > > +     "qcom,pm8941"
+> > > +- reg: Specifies the SPMI USID slave address for this device
+> > > +- #address-cells = <1>
+> > > +- #size-cells = <0>
+> > > +
+> > > +Each child node represents a function of the PM8x41.  Each child 'reg' entry
+> > > +describes an offset within the USID slave address where the region starts.
+> > > +
+> > > +Example:
+> > > +
+> > > +pm8941 at 0 {
+> > > +	compatible = "qcom,pm8941";
+> > > +	reg = <0x0>;
+> > > +
+> > > +	#address-cells = <1>;
+> > > +	#size-cells = <0>;
+> > > +
+> > > +	rtc {
+> > > +		compatible = "qcom,pm8941-rtc";
+> > > +		reg = <0x6000 0x6100>;
+> > 
+> > This doesn't look right. Probably #size-cells have to be <1>?
+> 
+> Some functions of the PMIC actually consume more than one fixed-size
+> region of the slave address space.  This example is showing one such
+> peripheral (consuming the region starting at 0x6000 and another at
+> 0x6100).
+> 
 
-Obviously it depends on waituart to reliably signal if there is space
-available in the fifo while without this patch debug output works fine
-if only busyuart is functional. So this breaks at least
-arch/arm/include/debug/imx.S and arch/arm/include/debug/8250.S .
+Ok. Thanks for clarification.
 
-Looking at the 8250 code I wonder if I got the semantics of waituart
-right. I thought it's about waiting until there is space available in
-the fifo but arch/arm/include/debug/8250.S suggests it's about hand
-shaking? (In that case my patch would be wrong.)
-
-Best regards
-Uwe
----
- arch/arm/kernel/debug.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index e18cb30..17156ee 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -83,7 +83,6 @@ ENTRY(printascii)
- 		b	2f
- 1:		waituart r2, r3
- 		senduart r1, r3
--		busyuart r2, r3
- 		teq	r1, #'\n'
- 		moveq	r1, #'\r'
- 		beq	1b
-@@ -91,6 +90,7 @@ ENTRY(printascii)
- 		ldrneb	r1, [r0], #1
- 		teqne	r1, #0
- 		bne	1b
-+		busyuart r2, r3
- 		mov	pc, lr
- ENDPROC(printascii)
- 
--- 
-1.8.4.rc3
+Regards,
+Ivan
