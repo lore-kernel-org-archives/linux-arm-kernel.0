@@ -1,32 +1,24 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 29 Oct 2013 11:03:12 -0500
-Subject: [PATCH v3 08/10] mfd: pm8x41: add support for Qualcomm 8x41 PMICs
-In-Reply-To: <20131029155605.GE4231@lee--X1>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <5a49bffc44c5f5bffe222560e489a712321ce971.1382985169.git.joshc@codeaurora.org>
- <20131029155605.GE4231@lee--X1>
-Message-ID: <20131029160312.GA23929@joshc.qualcomm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Oct 2013 09:04:49 -0700
+Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
+In-Reply-To: <20131029060427.GF11580@verge.net.au>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131029060427.GF11580@verge.net.au>
+Message-ID: <20131029160449.GD16686@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 08:56:05AM -0700, Lee Jones wrote:
-> On Mon, 28 Oct 2013, Josh Cartwright wrote:
-> 
-> > The Qualcomm 8941 and 8841 PMICs are components used with the Snapdragon
-> > 800 series SoC family.  This driver exists largely as a glue mfd component,
-> > it exists to be an owner of an SPMI regmap for children devices
-> > described in device tree.
-> > 
-> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> > ---
-> >  drivers/mfd/Kconfig  | 10 ++++++++
-> >  drivers/mfd/Makefile |  1 +
-> >  drivers/mfd/pm8x41.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++++
-> 
-> Can you CC me on your next submission, or it may not get applied.
+On Tue, Oct 29, 2013 at 03:04:27PM +0900, Simon Horman wrote:
 
-Certainly.  Sorry about that.
+> I think this is a step in a good direction.
+> However, I think it would be even better if the architecture dependency was
+> removed completely.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Yes, please.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/7aa427b4/attachment.sig>
