@@ -1,126 +1,69 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 10:46:18 +0100
-Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
-In-Reply-To: <Pine.LNX.4.64.1310291009121.8404@axis700.grange>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <Pine.LNX.4.64.1310291009121.8404@axis700.grange>
-Message-ID: <4271216.r5b5qx4BLA@avalon>
+From: yoshihiro.shimoda.uh@renesas.com (Shimoda, Yoshihiro)
+Date: Tue, 29 Oct 2013 18:47:19 +0900
+Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
+ clk_prepare/unprepare
+In-Reply-To: <1383000569-8916-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <526F8427.8000209@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon and Guennadi,
+Hi Laurent-san,
 
-On Tuesday 29 October 2013 10:12:17 Guennadi Liakhovetski wrote:
-> On Tue, 29 Oct 2013, Laurent Pinchart wrote:
-> > Hello,
-> > 
-> > This patch series, based on v3.12-rc7, prepares various Renesas drivers
-> > for migration to multiplatform kernels by enabling their compilation or
-> > otherwise fixing them on all ARM platforms. The patches are pretty
-> > straightforward and are described in their commit message.
-> > 
-> > I'd like to get all these patches merged in v3.14. As they will need to go
-> > through their respective subsystems' trees, I would appreciate if all
-> > maintainers involved could notify me when they merge patches from this
-> > series in their tree to help me tracking the merge status. I don't plan
-> > to send pull requests individually for these patches, and I will repost
-> > patches individually if changes are requested during review.
-> > 
-> > If you believe the issue should be solved in a different way (for instance
-> > by removing the architecture dependency completely) please reply to the
-> > cover letter to let other maintainers chime in.
+(2013/10/29 7:49), Laurent Pinchart wrote:
+> Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
+> clk_disable_unprepare() to get ready for the migration to the common
+> clock framework.
 > 
-> Exactly this was my doubt. If we let these drivers build on all ARM
-> platforms... Maybe we should just let them build everywhere? Unless there
-> are real ARM dependencies. Maybe you could try to remove the restriction
-> and try to build them all on x86?
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: linux-usb at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-My concern is that they might not build on some architectures for which I 
-don't have a cross-compiler. For instance not all architecture define ioread32 
-and iowrite32, which some drivers might rely on. What about depending on 
-SUPERH || ARM || COMPILE_TEST to start with, in order not to push compilation 
-breakages to mainline ?
+Thank you for the patch.
 
-> > Cc: Chris Ball <cjb@laptop.org>
-> > Cc: "David S. Miller" <davem@davemloft.net>
-> > Cc: David Woodhouse <dwmw2@infradead.org>
-> > Cc: dmaengine at vger.kernel.org
-> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> > Cc: Ian Molton <ian@mnementh.co.uk>
-> > Cc: iommu at lists.linux-foundation.org
-> > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> > Cc: Joerg Roedel <joro@8bytes.org>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: linux-fbdev at vger.kernel.org
-> > Cc: linux-i2c at vger.kernel.org
-> > Cc: linux-input at vger.kernel.org
-> > Cc: linux-kernel at vger.kernel.org
-> > Cc: linux-media at vger.kernel.org
-> > Cc: linux-mmc at vger.kernel.org
-> > Cc: linux-mtd at lists.infradead.org
-> > Cc: linux-pm at vger.kernel.org
-> > Cc: linux-pwm at vger.kernel.org
-> > Cc: linux-serial at vger.kernel.org
-> > Cc: linux-spi at vger.kernel.org
-> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > Cc: Mark Brown <broonie@kernel.org>
-> > Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> > Cc: netdev at vger.kernel.org
-> > Cc: Samuel Ortiz <samuel@sortiz.org>
-> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > Cc: Thierry Reding <thierry.reding@gmail.com>
-> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Cc: Wolfram Sang <wsa@the-dreams.de>
-> > Cc: Zhang Rui <rui.zhang@intel.com>
-> > 
-> > Laurent Pinchart (19):
-> >   serial: sh-sci: Enable the driver on all ARM platforms
-> >   DMA: shdma: Enable the driver on all ARM platforms
-> >   i2c: sh_mobile: Enable the driver on all ARM platforms
-> >   input: sh_keysc: Enable the driver on all ARM platforms
-> >   iommu: shmobile: Enable the driver on all ARM platforms
-> >   i2c: rcar: Enable the driver on all ARM platforms
-> >   v4l: sh_vou: Enable the driver on all ARM platforms
-> >   mmc: sdhi: Enable the driver on all ARM platforms
-> >   mmc: sh_mmcif: Enable the driver on all ARM platforms
-> >   mtd: sh_flctl: Enable the driver on all ARM platforms
-> >   net: sh_eth: Set receive alignment correctly on all ARM platforms
-> >   irda: sh_irda: Enable the driver on all ARM platforms
-> >   pinctrl: sh-pfc: Enable the driver on all ARM platforms
-> >   pwm: pwm-renesas-tpu: Enable the driver on all ARM platforms
-> >   sh: intc: Enable the driver on all ARM platforms
-> >   spi: sh_msiof: Enable the driver on all ARM platforms
-> >   spi: sh_hspi: Enable the driver on all ARM platforms
-> >   thermal: rcar-thermal: Enable the driver on all ARM platforms
-> >   fbdev: sh-mobile-lcdcfb: Enable the driver on all ARM platforms
-> >  
-> >  drivers/dma/sh/Kconfig                | 2 +-
-> >  drivers/dma/sh/shdmac.c               | 6 +++---
-> >  drivers/i2c/busses/Kconfig            | 4 ++--
-> >  drivers/input/keyboard/Kconfig        | 2 +-
-> >  drivers/iommu/Kconfig                 | 2 +-
-> >  drivers/media/platform/Kconfig        | 2 +-
-> >  drivers/mmc/host/Kconfig              | 4 ++--
-> >  drivers/mmc/host/tmio_mmc_dma.c       | 2 +-
-> >  drivers/mtd/nand/Kconfig              | 2 +-
-> >  drivers/net/ethernet/renesas/sh_eth.c | 2 +-
-> >  drivers/net/ethernet/renesas/sh_eth.h | 2 +-
-> >  drivers/net/irda/Kconfig              | 2 +-
-> >  drivers/pinctrl/Makefile              | 2 +-
-> >  drivers/pinctrl/sh-pfc/Kconfig        | 2 +-
-> >  drivers/pwm/Kconfig                   | 2 +-
-> >  drivers/sh/intc/Kconfig               | 2 +-
-> >  drivers/spi/Kconfig                   | 4 ++--
-> >  drivers/thermal/Kconfig               | 2 +-
-> >  drivers/tty/serial/Kconfig            | 2 +-
-> >  drivers/video/Kconfig                 | 6 +++---
-> >  20 files changed, 27 insertions(+), 27 deletions(-)
+Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+
+Best regards,
+Yoshihro Shimoda
+
+> ---
+>  drivers/usb/gadget/r8a66597-udc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/r8a66597-udc.c b/drivers/usb/gadget/r8a66597-udc.c
+> index 68be48d..4728751 100644
+> --- a/drivers/usb/gadget/r8a66597-udc.c
+> +++ b/drivers/usb/gadget/r8a66597-udc.c
+> @@ -1833,7 +1833,7 @@ static int __exit r8a66597_remove(struct platform_device *pdev)
+>  	r8a66597_free_request(&r8a66597->ep[0].ep, r8a66597->ep0_req);
+>  
+>  	if (r8a66597->pdata->on_chip) {
+> -		clk_disable(r8a66597->clk);
+> +		clk_disable_unprepare(r8a66597->clk);
+>  		clk_put(r8a66597->clk);
+>  	}
+>  
+> @@ -1931,7 +1931,7 @@ static int __init r8a66597_probe(struct platform_device *pdev)
+>  			ret = PTR_ERR(r8a66597->clk);
+>  			goto clean_up;
+>  		}
+> -		clk_enable(r8a66597->clk);
+> +		clk_prepare_enable(r8a66597->clk);
+>  	}
+>  
+>  	if (r8a66597->pdata->sudmac) {
+> @@ -1996,7 +1996,7 @@ clean_up3:
+>  	free_irq(irq, r8a66597);
+>  clean_up2:
+>  	if (r8a66597->pdata->on_chip) {
+> -		clk_disable(r8a66597->clk);
+> +		clk_disable_unprepare(r8a66597->clk);
+>  		clk_put(r8a66597->clk);
+>  	}
+>  clean_up:
+> 
 
 -- 
-Regards,
-
-Laurent Pinchart
+Yoshihiro Shimoda
+EC No.
