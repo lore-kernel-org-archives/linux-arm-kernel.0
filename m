@@ -1,27 +1,27 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 29 Oct 2013 14:55:58 +0900
-Subject: [PATCH 03/12] clocksource: sh_tmu: Add clk_prepare/unprepare
- support
-In-Reply-To: <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Tue, 29 Oct 2013 14:58:07 +0900
+Subject: [PATCH 06/12] i2c: sh_mobile: Convert to clk_prepare/unprepare
+In-Reply-To: <20131029050224.GA2643@katana>
 References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131029055558.GD11580@verge.net.au>
+ <1383000569-8916-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131029050224.GA2643@katana>
+Message-ID: <20131029055807.GE11580@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 11:49:20PM +0100, Laurent Pinchart wrote:
-> Prepare the clock at probe time, as there is no other appropriate place
-> in the driver where we're allowed to sleep.
+On Tue, Oct 29, 2013 at 06:02:24AM +0100, Wolfram Sang wrote:
+> On Mon, Oct 28, 2013 at 11:49:23PM +0100, Laurent Pinchart wrote:
+> > Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
+> > clk_disable_unprepare() to get ready for the migration to the common
+> > clock framework.
+> > 
+> > Cc: Wolfram Sang <wsa@the-dreams.de>
+> > Cc: linux-i2c at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/clocksource/sh_tmu.c | 20 +++++++++++++++++---
->  1 file changed, 17 insertions(+), 3 deletions(-)
+> Acked-by: Wolfram Sang <wsa@the-dreams.de>
 
-Thanks Laurent,
+Hi Wolfram, Hi Laurent,
 
-I have queued this up in the clocksources branch of my renesas tree.
-I will send a pull request to Mike once v3.13-rc1 has hit the shelves.
-Mike, please let me know if you would prefer something earlier than that.
+correct me if I am wrong, but I think the plan was
+for Wolfram to take this patch.
