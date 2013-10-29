@@ -1,158 +1,43 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 29 Oct 2013 08:45:19 -0700
-Subject: [PATCH] watchdog: at91sam9_wdt: various fixes
-In-Reply-To: <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
-References: <20131029075028.GF19704@spo001.leaseweb.com>
- <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20131029154519.GB9266@roeck-us.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 29 Oct 2013 13:45:50 -0200
+Subject: [PATCH v3] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <CAOMZO5BYXv4whoRrRD7pF5zj9DArEnbqFaZVdLgZgPC2nSDePw@mail.gmail.com>
+References: <1382992009-19407-1-git-send-email-festevam@gmail.com>
+ <20131028211945.GJ16735@n2100.arm.linux.org.uk>
+ <CAOMZO5BYXv4whoRrRD7pF5zj9DArEnbqFaZVdLgZgPC2nSDePw@mail.gmail.com>
+Message-ID: <CAOMZO5DN0KGvUBut0BqyvPTdyByWtZ=uamTpQGeENBzMOfJK3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 11:37:33AM +0100, Boris BREZILLON wrote:
-> Fix the secs_to_ticks macro in case 0 is passed as an argument.
-> 
-> Rework the heartbeat calculation to increase the security margin of the
-> watchdog reset timer.
-> 
-> Use the min_heartbeat value instead of the calculated heartbeat value for
-> the first watchdog reset.
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+On Tue, Oct 29, 2013 at 1:00 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-Hi Boris,
+> Today I was able to get access to a wandboard solo and the HDMI image
+> does look different compared to a wandboard quad board:
+>
+> - The Linux logo penguins are steady on mx6q, but on mx6solo the
+> contour lines look like they flicker.
+> - The kernel log text appears in good white colour with mx6q, but not
+> so white on mx6solo (tending to green).
+>
+> Even the U-boot HDMI splash screen is not very steady on mx6solo.
+>
+> I will try to look at these mx6 solo HDMI issues.
 
-can you possibly split the three changes into separate patches ?
+With the change below I am able to get a good HDMI quality image on
+mx6solo (and mx6quad as well):
 
-The first is a no-brainer. Gives my opinion of my code review capabilities
-a slight damper ;-).
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -238,7 +238,7 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+                sig_cfg.Vsync_pol = 1;
 
-For the other two problems, it might make sense to describe
-the problems you are trying to solve.
+        sig_cfg.enable_pol = 1;
+-       sig_cfg.clk_pol = 0;
++       sig_cfg.clk_pol = 1;
+        sig_cfg.width = mode->hdisplay;
+        sig_cfg.height = mode->vdisplay;
+        sig_cfg.pixel_fmt = out_pixel_fmt;
 
-Couple of comments inline.
+Regards,
 
-Thanks,
-Guenter
-
-
-> ---
->  drivers/watchdog/at91sam9_wdt.c |   35 ++++++++++++++++++++++++-----------
->  1 file changed, 24 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index 9bd089e..f1b59f1 100644
-> --- a/drivers/watchdog/at91sam9_wdt.c
-> +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -51,7 +51,7 @@
->  #define ticks_to_hz_rounddown(t)	((((t) + 1) * HZ) >> 8)
->  #define ticks_to_hz_roundup(t)		(((((t) + 1) * HZ) + 255) >> 8)
->  #define ticks_to_secs(t)		(((t) + 1) >> 8)
-> -#define secs_to_ticks(s)		(((s) << 8) - 1)
-> +#define secs_to_ticks(s)		(s ? (((s) << 8) - 1) : 0)
->  
-	(s)
-
->  #define WDT_MR_RESET	0x3FFF2FFF
->  
-> @@ -61,6 +61,11 @@
->  /* Watchdog max delta/value in secs */
->  #define WDT_COUNTER_MAX_SECS	ticks_to_secs(WDT_COUNTER_MAX_TICKS)
->  
-> +/* Watchdog heartbeat shift used for security margin:
-> + * we'll try to rshift the heartbeat value with this value to secure
-> + * the watchdog reset. */
-> +#define WDT_HEARTBEAT_SHIFT	2
-> +
->  /* Hardware timeout in seconds */
->  #define WDT_HW_TIMEOUT 2
->  
-> @@ -158,7 +163,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->  	int err;
->  	u32 mask = wdt->mr_mask;
->  	unsigned long min_heartbeat = 1;
-> +	unsigned long max_heartbeat;
->  	struct device *dev = &pdev->dev;
-> +	int shift;
->  
->  	tmp = wdt_read(wdt, AT91_WDT_MR);
->  	if ((tmp & mask) != (wdt->mr & mask)) {
-> @@ -181,23 +188,27 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->  	if (delta < value)
->  		min_heartbeat = ticks_to_hz_roundup(value - delta);
->  
-> -	wdt->heartbeat = ticks_to_hz_rounddown(value);
-> -	if (!wdt->heartbeat) {
-> +	max_heartbeat = ticks_to_hz_rounddown(value);
-> +	if (!max_heartbeat) {
->  		dev_err(dev,
->  			"heartbeat is too small for the system to handle it correctly\n");
->  		return -EINVAL;
->  	}
->  
-> -	if (wdt->heartbeat < min_heartbeat + 4) {
-> +	for (shift = WDT_HEARTBEAT_SHIFT; shift > 0; shift--) {
-> +		if ((max_heartbeat >> shift) < min_heartbeat)
-> +			continue;
-> +
-> +		wdt->heartbeat = max_heartbeat >> shift;
-> +		break;
-> +	}
-> +
-> +	if (!shift)
->  		wdt->heartbeat = min_heartbeat;
-
-Correct me if I am wrong, but it seems to me that
-
-	if ((max_heartbeat >> 2) >= min_heartbeat)
-		 wdt->heartbeat = max_heartbeat >> 2;
-	else if ((max_heartbeat >> 1) >= min_heartbeat)
-		wdt->heartbeat = max_heartbeat >> 1;
-	else
-		wdt->heartbeat = min_heartbeat;
-
-would accomplish the same and be easier to understand.
-
-However, given that, I wonder if it is really necessary to bail out above if
-max_heartbeat is 0. After all, you set heartbeat to min_heartbeat anyway
-in this case.
-
-> +
-> +	if (max_heartbeat < min_heartbeat + 4)
->  		dev_warn(dev,
->  			 "min heartbeat and max heartbeat might be too close for the system to handle it correctly\n");
-> -		if (wdt->heartbeat < 4)
-> -			dev_warn(dev,
-> -				 "heartbeat might be too small for the system to handle it correctly\n");
-> -	} else {
-> -		wdt->heartbeat -= 4;
-> -	}
->  
->  	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
->  		err = request_irq(wdt->irq, wdt_interrupt,
-> @@ -213,7 +224,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->  			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
->  
->  	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
-> -	mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
-> +	/* Use min_heartbeat the first time because the watchdog timer might
-> +	 * be running for a long time when we reach this init function. */
-
-	/*
-	 * Multi-line comment style
-	 *
-	 * Not really sure I understand what this accomplishes. What problem
-	 * are you trying to solve here ?
-	 */
-
-> +	mod_timer(&wdt->timer, jiffies + min_heartbeat);
->  
->  	/* Try to set timeout from device tree first */
->  	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Fabio Estevam
