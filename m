@@ -1,102 +1,45 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Tue, 29 Oct 2013 11:56:54 -0500
-Subject: [PATCHv7][ 2/5] ASoC: eukrea-tlv320: Add DT support.
-In-Reply-To: <20131026114840.GX2443@sirena.org.uk>
-References: <1382616832-23593-1-git-send-email-denis@eukrea.com>
- <1382616832-23593-2-git-send-email-denis@eukrea.com>
- <20131025191513.5345BC4042C@trevor.secretlab.ca>
- <20131026114840.GX2443@sirena.org.uk>
-Message-ID: <CAHCPf3vHWt5XJCwvGDMfX9rTPKqHU43SHORqpxLtLaDL6RGb8A@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Oct 2013 18:05:53 +0100
+Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
+In-Reply-To: <20131029160449.GD16686@sirena.org.uk>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131029060427.GF11580@verge.net.au> <20131029160449.GD16686@sirena.org.uk>
+Message-ID: <1577821.Q7gttkPE2J@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 26, 2013 at 6:48 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Oct 25, 2013 at 08:15:13PM +0100, Grant Likely wrote:
->> On Thu, 24 Oct 2013 14:13:49 +0200, Denis Carikli <denis@eukrea.com> wrote:
->
->> > +- mux-int-port : The internal port of the i.MX audio muxer (AUDMUX).
->> > +- mux-ext-port : The external port of the i.MX audio muxer.
->
->> > +Note: The AUDMUX port numbering should start at 1, which is consistent with
->> > +hardware manual.
->
->> Looks okay to me. I've not been following the sound bindings very
->> closely. Are the described properties a common pattern for sound complex
->> bindings?
->
-> They're standard for i.MX - it's a mux within the SoC.
+Hi Mark,
 
-And these bindings all suck, which is not a fault of Eukrea. There
-shouldn't be yet another duplication of the sound{} node though.
+On Tuesday 29 October 2013 09:04:49 Mark Brown wrote:
+> On Tue, Oct 29, 2013 at 03:04:27PM +0900, Simon Horman wrote:
+> > I think this is a step in a good direction.
+> > However, I think it would be even better if the architecture dependency
+> > was removed completely.
+> 
+> Yes, please.
 
-There is nothing specific to Eukrea in any of this. This is a TI audio
-codec connected via i.MX SSI and routed through the SoC fabric by one
-or another i.MX AUDMUX port.
+I've kept it for two reasons.
 
-Maybe this is a reasonable place to ask since I am holding off on
-doing any audio support for the i.MX platform I want to push a DT for,
-and I am still bashing my head over the logic in this. Why is this so
-much more complicated than it needs to be? I can see codec specific
-and Linux-specific things floating in trees. I can see redundancy in
-property naming and misplacement of properties.. this whole thing
-needs to be cleaned up because it's been done as "binding a Linux
-driver into the device tree" and this is another example of the same
-thing - taking the way ASoC is working right now and dumping platform
-data externally.
+The first one is that I can't compile-test all those drivers on all 
+architectures. The spi-sh-msiof driver, for instance, uses io(read|write)(16|
+32) which are not available on all architectures. There might be other similar 
+problems that I can't catch, and I don't want to introduce build breakages in 
+the kernel.
 
-The existing MXS and IMX SGTL5000 bindings are not SGTL5000 specific.
-The sound node references a phandle for a codec - those properties
-should be present in the codec node. In this vein, Eukrea's bindings
-should not be codec or platform specific at all. This is a TI audio
-codec being referenced in an SoC-specific audio fabric definition.
-
-The better way of thinking here is to stop being so insular with
-bindings. One binding for all these SoCs would suffice; codecs are
-codec-specific and codec properties like audio routing from mixers to
-pins should not be in the audio fabric definition. You can find the
-codec from the existing binding; you can find the controller. One
-thing it NEVER refers to is the audmux controller.. but it does
-magically specify the internal and external ports required.. and all
-the drivers (so far, sgtl5000 and wm8962) magically know what they're
-doing here.
-
-It is NOT some kind of undefined, unholy evil to reach outside of the
-node you found the compatible property of to look elsewhere - the
-fabric driver in this case has all the capability to dereference the
-codec, controller, audiomux etc. nodes it's got phandles to, and find
-the properties it needs to stuff into the handoff data for dai and
-dapm. Sure, you can have a generic driver have some codec-specific
-stuff in there where it has to be handled externally to a codec
-driver.. This just shows there should be another level in the driver
-subsystem (actually there sort of is already, isn't there?).
-
-As it stands; Neither imx-sgtl5000.c or imx-wm8962.c do anything with
-the controller or codec nodes except to stuff it into a handoff data
-structure for the rest of the subsystem to glue ASoC together.
-eukrea-tlv320.c is the same way even in this patch and imx-mc13783 is
-languishing..
-
-They are essentially line-for-line identical except a couple hacks
-here and there - things that are understandably outside of the control
-of the codec driver itself.  Some of it could even be driven down to
-lower levels of the subsystem.
-
-What we should have is something simpler and more "realistic" vs.
-hardware design, and imx-sgtl5000, imx-wm8962, imx-mc13783, and
-eukrea-tlv320 should be merged into a single fabric driver with a
-single all-encompassing and altogether simpler binding.Please don't
-continue to layer crappier parts of the Linux abstractions into the
-device tree. The device tree should present the structure and layout
-of the devices - not of the OS subsystems involved. Parsing the device
-tree at various points in the subsystems - even if you end up doing it
-3 times over - is the correct way. Not to try and consolidate and
-optimize your tree to make your drivers smaller.
-
-As it stands this could be easily changed right now with a couple
-tweaks; compatibility can be maintained with the older bindings, too.
-I'll write it up (binding def at least, I can't fix the drivers in a
-reasonable time, unfortunately) and throw it out tonight if we're all
-agreeable..
+The second reason is that, as the IP cores have never been used on anything 
+but SuperH and ARM, I don't like the idea of clobbering the config process 
+with drivers that are useless on the target architecture. Now that we have a 
+COMPILE_TEST Kconfig option, my preference would thus go to SUPERH || ARM || 
+COMPILE_TEST over no dependency at all.
 
 -- 
-Matt Sealey <neko@bakuhatsu.net>
+Regards,
+
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/fb192e83/attachment.sig>
