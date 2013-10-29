@@ -1,10 +1,10 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 23:37:53 +0100
-Subject: [PATCH v2 18/19] thermal: rcar-thermal: Enable the driver on all ARM
- platforms
+Date: Tue, 29 Oct 2013 23:37:54 +0100
+Subject: [PATCH v2 19/19] fbdev: sh-mobile-lcdcfb: Enable the driver on all
+ ARM platforms
 In-Reply-To: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383086274-11049-19-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383086274-11049-20-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,26 +14,44 @@ driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
 and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
 COMPILE_TEST.
 
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-Cc: linux-pm at vger.kernel.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/thermal/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/video/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index dbfc390..bd905ac 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -121,7 +121,7 @@ config SPEAR_THERMAL
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 84b685f..32b5c86 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -10,7 +10,7 @@ config HAVE_FB_ATMEL
  
- config RCAR_THERMAL
- 	tristate "Renesas R-Car thermal driver"
--	depends on ARCH_SHMOBILE
-+	depends on ARM || COMPILE_TEST
- 	help
- 	  Enable this to plug the R-Car thermal sensor driver into the Linux
- 	  thermal framework
+ config SH_MIPI_DSI
+ 	tristate
+-	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
++	depends on (SUPERH || ARM || COMPILE_TEST) && HAVE_CLK
+ 
+ config SH_LCD_MIPI_DSI
+ 	bool
+@@ -1995,7 +1995,7 @@ config FB_W100
+ 
+ config FB_SH_MOBILE_LCDC
+ 	tristate "SuperH Mobile LCDC framebuffer support"
+-	depends on FB && (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
++	depends on FB && (SUPERH || ARM || COMPILE_TEST) && HAVE_CLK
+ 	select FB_SYS_FILLRECT
+ 	select FB_SYS_COPYAREA
+ 	select FB_SYS_IMAGEBLIT
+@@ -2482,7 +2482,7 @@ endif
+ 
+ config FB_SH_MOBILE_MERAM
+ 	tristate "SuperH Mobile MERAM read ahead support"
+-	depends on (SUPERH || ARCH_SHMOBILE)
++	depends on (SUPERH || ARM || COMPILE_TEST)
+ 	select GENERIC_ALLOCATOR
+ 	---help---
+ 	  Enable MERAM support for the SuperH controller.
 -- 
 1.8.1.5
