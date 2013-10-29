@@ -1,54 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Oct 2013 10:32:29 +0100
-Subject: [PATCH 2/2] dma: mv_xor: Use high_base mmio where appropriate
-In-Reply-To: <20131029083407.GA2416@localhost>
-References: <1383000855-8377-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383000855-8377-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <CAPcyv4iQVoYCXz16T3N4MbdVJV7MoKKeL0wq9t9WF1Kf3gz3Bw@mail.gmail.com>
- <20131029083407.GA2416@localhost>
-Message-ID: <20131029103229.5e095a24@skate>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Oct 2013 10:41:57 +0100
+Subject: [PATCH 06/12] i2c: sh_mobile: Convert to clk_prepare/unprepare
+In-Reply-To: <20131029055807.GE11580@verge.net.au>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131029050224.GA2643@katana> <20131029055807.GE11580@verge.net.au>
+Message-ID: <1931500.glV2j5U5NL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dan, Ezequiel,
+Hi Simon,
 
-On Tue, 29 Oct 2013 05:34:08 -0300, Ezequiel Garcia wrote:
-
-> > On Mon, Oct 28, 2013 at 3:54 PM, Ezequiel Garcia
-> > <ezequiel.garcia@free-electrons.com> wrote:
-> > > Despite requesting two memory resources, called 'base' and 'high_base', the
-> > > driver uses explicitly only the former. The latter is being used implicitly
-> > > by addressing at offset +0x200, which in practice accesses high_base.
-> > >
-> > > Instead of relying in such trick, let's define the registers with the
-> > > offset from high_base, and use high_base explicitly where appropriate.
-> > >
-> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > ---
-> > >  drivers/dma/mv_xor.c |  3 ++-
-> > >  drivers/dma/mv_xor.h | 25 +++++++++++++------------
-> > >  2 files changed, 15 insertions(+), 13 deletions(-)
+On Tuesday 29 October 2013 14:58:07 Simon Horman wrote:
+> On Tue, Oct 29, 2013 at 06:02:24AM +0100, Wolfram Sang wrote:
+> > On Mon, Oct 28, 2013 at 11:49:23PM +0100, Laurent Pinchart wrote:
+> > > Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
+> > > clk_disable_unprepare() to get ready for the migration to the common
+> > > clock framework.
+> > > 
+> > > Cc: Wolfram Sang <wsa@the-dreams.de>
+> > > Cc: linux-i2c at vger.kernel.org
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
 > > 
-> > Since it's unused I'd prefer a patch that just deletes xor_high_base.
-> > 
+> > Acked-by: Wolfram Sang <wsa@the-dreams.de>
 > 
-> It's wrongly *unused*, the mmio high_base is actually being used
-> implicitly by always addressing at an offset that addresses +200.
+> Hi Wolfram, Hi Laurent,
 > 
-> Deleting high_base would actually make it worse, for that region
-> will no longer be ioremaped. Maybe the commit message is not clear
-> about it?
+> correct me if I am wrong, but I think the plan was
+> for Wolfram to take this patch.
 
-I agree with Ezequiel, and I believe his patch is appropriate. The
-registers for the XOR engines are indeed split in two areas, so it
-makes sense to have this xor_base / xor_high_base split that reflects
-the register mapping passed from the Device Tree, and use this split in
-the macros used to access the registers.
+That's correct. All patches in this series will need to go through their 
+respective maintainers' git trees. It's going to be slightly painful to track 
+on my side, but that means less work on your side :-)
 
-Best regards,
+As mentioned in the cover letter, I won't send a pull request for this series, 
+so I expect all maintainers involved to pick their share of patches from the 
+list.
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
