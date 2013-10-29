@@ -1,62 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 28 Oct 2013 18:34:55 -0700
-Subject: [PATCH 4/6] edac: Document Krait L1/L2 EDAC driver binding
-In-Reply-To: <1383006690-6754-5-git-send-email-sboyd@codeaurora.org>
-References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
- <1383006690-6754-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20131029013454.GJ4763@kartoffel>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 28 Oct 2013 18:58:40 -0700
+Subject: [PATCH] ARM: Support arch_irq_work_raise() via self IPIs
+In-Reply-To: <1382984701-2371-1-git-send-email-sboyd@codeaurora.org> (Stephen
+ Boyd's message of "Mon, 28 Oct 2013 11:25:01 -0700")
+References: <526DBEAA.4030707@linaro.org>
+ <1382984701-2371-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <878uxcq1m7.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 12:31:28AM +0000, Stephen Boyd wrote:
-> The Krait L1/L2 error reporting device is made up of two
-> interrupts, one per-CPU interrupt for the L1 caches and one
-> interrupt for the L2 cache.
-> 
-> Cc: <devicetree@vger.kernel.org>
+Stephen Boyd <sboyd@codeaurora.org> writes:
+
+> This will allow the scheduler tick to be restarted if we're in
+> full NOHZ mode.
+>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  .../devicetree/bindings/arm/qcom,krait-cache-erp.txt     | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-> new file mode 100644
-> index 0000000..01fe8a8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-> @@ -0,0 +1,16 @@
-> +* Qualcomm Krait L1 / L2 cache error reporting
-> +
-> +Required properties:
-> +- compatible: Should be "qcom,krait-cache-erp"
-> +- interrupts: Should contain the L1/CPU error interrupt number and
-> +  then the L2 cache error interrupt number
-> +
-> +Optional properties:
-> +- interrupt-names: Should contain the interrupt names "l1_irq" and
-> +  "l2_irq"
 
-As with my comment on the parsing code, I'd prefer that if interrupt-names was
-present it defined the order of interrupts. Otherwise it's redundant and of no
-value.
+Minor nit, but I'd prefer a more verbose changelog (I forget things
+quickly and like to rely on changelogs for my memory.)  Probably worth
+adding something like: "By default, irq_work is tied to the tick
+processing (update_process_times()) but in full NOHZ mode, no tick means
+no IRQ work.  In order for IRQ work to be done in full NOHZ mode, a
+self-IPI is used to process IRQ work."
 
-Otherwise, the binding looks fine to me:
+Other than the changelog nit, patch looks good, feel free to add
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
 
-> +
-> +Example:
-> +	edac {
-> +		compatible = "qcom,krait-cache-erp";
-> +		interrupts = <1 9 0xf04>, <0 2 0x4>;
-> +	};
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+If Russell is OK with this, it can go to his patch system.
+
+Kevin
