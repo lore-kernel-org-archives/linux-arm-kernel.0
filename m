@@ -1,83 +1,100 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 29 Oct 2013 18:56:42 -0500
-Subject: [PATCH 3/3] clk: shmobile: Add R8A7790 clocks support
-In-Reply-To: <1383058511-26046-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Tue, 29 Oct 2013 18:56:35 -0500
+Subject: [PATCH 1/3] clk: shmobile: Add DIV6 clock support
+In-Reply-To: <3042335.v0dpKXFPjS@avalon>
 References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383058511-26046-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <A519A094-2E76-43C7-99D8-763122413ECD@codeaurora.org>
+ <1383058511-26046-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <158C7FC6-F6DF-4F10-B04B-05522D09FC05@codeaurora.org>
+ <3042335.v0dpKXFPjS@avalon>
+Message-ID: <EAB11732-A677-4369-8852-6D2DDCC2FFE0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
+On Oct 29, 2013, at 6:54 PM, Laurent Pinchart wrote:
 
-> The R8A7790 has several clocks that are too custom to be supported in a
-> generic driver. Those clocks can be divided in two categories:
+> Hi Kumar,
 > 
-> - Fixed rate clocks with multiplier and divisor set according to boot
->  mode configuration
+> Thank you for the review.
 > 
-> - Custom divider clocks with SoC-specific divider values
+> On Tuesday 29 October 2013 18:33:00 Kumar Gala wrote:
+>> On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
+>>> DIV6 clocks are divider gate clocks controlled through a single
+>>> register. The divider is expressed on 6 bits, hence the name, and can
+>>> take values from 1/1 to 1/64.
+>>> 
+>>> Those clocks are found on Renesas ARM SoCs.
+>>> 
+>>> Signed-off-by: Laurent Pinchart
+>>> <laurent.pinchart+renesas@ideasonboard.com>
+>>> ---
+>>> .../bindings/clock/renesas,cpg-div6-clocks.txt     |  27 +++
+>>> drivers/clk/shmobile/Makefile                      |   4 +-
+>>> drivers/clk/shmobile/clk-div6.c                    | 185 +++++++++++++++++
+>>> 3 files changed, 215 insertions(+), 1 deletion(-)
+>>> create mode 100644
+>>> Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+>>> create mode 100644 drivers/clk/shmobile/clk-div6.c
+>>> 
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+>>> b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt new
+>>> file mode 100644
+>>> index 0000000..8036f3c
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+>>> @@ -0,0 +1,27 @@
+>>> +* Renesas CPG DIV6 Clock
+>>> +
+>>> +The CPG DIV6 clocks are variable factor clocks provided by the Clock
+>>> Pulse
+>>> +Generator (CPG). They clock input is divided by a configurable factor
+>>> from 1
+>>> +to 64.
+>>> +
+>>> +Required Properties:
+>>> +
+>>> +  - compatible: Must be one of the following
+>>> +    - "renesas,r8a7790-div6-clock" for R8A7790 (R-Car H2) DIV6 clocks
+>>> +    - "renesas,cpg-div6-clock" for generic DIV6 clocks
+>>> +  - reg: Base address and length of the memory resource used by the DIV6
+>>> clock
+>>> +  - clocks: Reference to the parent clock
+>>> +  - #clock-cells: Must be 0
+>>> +  - clock-output-name: The name of the clock as a free-form string
+>> 
+>> Is this suppose to be 'clock-output-names' (missing a 's')?
 > 
-> This driver supports both.
+> Yes it is, my bad. I'll fix that.
 > 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
-> .../bindings/clock/renesas,r8a7790-cpg-clocks.txt  |  26 +++
-> drivers/clk/shmobile/Makefile                      |   1 +
-> drivers/clk/shmobile/clk-r8a7790.c                 | 176 +++++++++++++++++++++
-> include/dt-bindings/clock/r8a7790-clock.h          |  10 ++
-> include/linux/clk/shmobile.h                       |  19 +++
-> 5 files changed, 232 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7790-cpg-clocks.txt
-> create mode 100644 drivers/clk/shmobile/clk-r8a7790.c
-> create mode 100644 include/linux/clk/shmobile.h
+>>> +
+>>> +
+>>> +Example
+>>> +-------
+>>> +
+>>> +	sd2_clk: sd2_clk {
+>> 
+>> example should be sd2_clk at e6150078
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/renesas,r8a7790-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,r8a7790-cpg-clocks.txt
-> new file mode 100644
-> index 0000000..d889917
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/renesas,r8a7790-cpg-clocks.txt
-> @@ -0,0 +1,26 @@
-> +* Renesas R8A7790 Clock Pulse Generator (CPG)
-> +
-> +The CPG generates core clocks for the R8A7790. It includes three PLLs and
-> +several fixed ratio dividers.
-> +
-> +Required Properties:
-> +
-> +  - compatible: Must be "renesas,r8a7790-cpg-clocks"
-> +  - reg: Base address and length of the memory resource used by the CPG
-> +  - clocks: Reference to the parent clock
-> +  - #clock-cells: Must be 1
-> +  - clock-output-names: The name of the clocks, must be "main", "pll1",
-> +    "pll3", "lb", "qspi", "sdh", "sd0", "sd1".
-> +
-> +
-> +Example
-> +-------
-> +
-> +	cpg_clocks: cpg_clocks {
+> You're absolutely right.
+> 
+>>> +		compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-
+> clock";
+>>> +		reg = <0 0xe6150078 0 4>;
+>> 
+>> curious, do you really have a second register at 0?
+> 
+> No, but the r8a7790 has #address-cells and #size-cells set to 2.
 
-cpg_clocks at e6150000
+Oh, duh.  Its been a while since I've seen a reg with cells being 2 ;)
 
-> +		compatible = "renesas,r8a7790-cpg-clocks";
-> +		reg = <0 0xe6150000 0 0x1000>;
-> +		clocks = <&extal_clk>;
-> +		#clock-cells = <1>;
-> +		clock-output-names = "main", "pll1", "pll3", "lb",
-> +				     "qspi", "sdh", "sd0", "sd1";
-> +	};
-
-Other than minor nit, ack.
-
-For the DT-Binding portion:
-
-Acked-by: Kumar Gala <galak@codeaurora.org>
+> 
+>>> +		clocks = <&pll1_div2_clk>;
+>>> +		#clock-cells = <0>;
+>>> +		clock-output-names = "sd2";
+>>> +	};
 
 - k
-
-
 
 -- 
 Employee of Qualcomm Innovation Center, Inc.
