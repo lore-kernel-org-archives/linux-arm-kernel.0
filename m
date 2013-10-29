@@ -1,58 +1,123 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 28 Oct 2013 23:00:58 -0700
-Subject: [PATCH] ARM: Support arch_irq_work_raise() via self IPIs
-In-Reply-To: <878uxcq1m7.fsf@linaro.org>
-References: <526DBEAA.4030707@linaro.org>
- <1382984701-2371-1-git-send-email-sboyd@codeaurora.org>
- <878uxcq1m7.fsf@linaro.org>
-Message-ID: <20131029060058.GD21983@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 29 Oct 2013 15:04:27 +0900
+Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
+In-Reply-To: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131029060427.GF11580@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28, Kevin Hilman wrote:
-> Stephen Boyd <sboyd@codeaurora.org> writes:
+On Tue, Oct 29, 2013 at 12:46:48AM +0100, Laurent Pinchart wrote:
+> Hello,
 > 
-> > This will allow the scheduler tick to be restarted if we're in
-> > full NOHZ mode.
-> >
-> > Cc: Kevin Hilman <khilman@linaro.org>
-> > Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> This patch series, based on v3.12-rc7, prepares various Renesas drivers
+> for migration to multiplatform kernels by enabling their compilation or
+> otherwise fixing them on all ARM platforms. The patches are pretty
+> straightforward and are described in their commit message.
 > 
-> Minor nit, but I'd prefer a more verbose changelog (I forget things
-> quickly and like to rely on changelogs for my memory.)  Probably worth
-> adding something like: "By default, irq_work is tied to the tick
-> processing (update_process_times()) but in full NOHZ mode, no tick means
-> no IRQ work.  In order for IRQ work to be done in full NOHZ mode, a
-> self-IPI is used to process IRQ work."
+> I'd like to get all these patches merged in v3.14. As they will need to go
+> through their respective subsystems' trees, I would appreciate if all
+> maintainers involved could notify me when they merge patches from this series
+> in their tree to help me tracking the merge status. I don't plan to send pull
+> requests individually for these patches, and I will repost patches
+> individually if changes are requested during review.
 > 
-> Other than the changelog nit, patch looks good, feel free to add
-> 
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> 
-> If Russell is OK with this, it can go to his patch system.
-> 
+> If you believe the issue should be solved in a different way (for instance by
+> removing the architecture dependency completely) please reply to the cover
+> letter to let other maintainers chime in.
 
-Fair enough. This is what I came up with. I'll send it off to the
-patch tracker in about 12 hours if nobody else has anymore
-comments.
+I think this is a step in a good direction.
+However, I think it would be even better if the architecture dependency was
+removed completely.
 
-----8<-----
-ARM: Support arch_irq_work_raise() via self IPIs                                
-
-By default, IRQ work is run from the tick interrupt (see
-irq_work_run() in update_process_times()). When we're in full
-NOHZ mode, restarting the tick requires the use of IRQ work and
-if the only place we run IRQ work is in the tick interrupt we
-have an unbreakable cycle. Implement arch_irq_work_raise() via
-self IPIs to break this cycle and get the tick started again.
-Note that we implement this via IPIs which are only available on
-SMP builds. This shouldn't be a problem because full NOHZ is only
-supported on SMP builds anyway.
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: dmaengine at vger.kernel.org
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> Cc: Ian Molton <ian@mnementh.co.uk>
+> Cc: iommu at lists.linux-foundation.org
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: linux-i2c at vger.kernel.org
+> Cc: linux-input at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-media at vger.kernel.org
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-mtd at lists.infradead.org
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-pwm at vger.kernel.org
+> Cc: linux-serial at vger.kernel.org
+> Cc: linux-spi at vger.kernel.org
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
+> Cc: netdev at vger.kernel.org
+> Cc: Samuel Ortiz <samuel@sortiz.org>
+> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> 
+> Laurent Pinchart (19):
+>   serial: sh-sci: Enable the driver on all ARM platforms
+>   DMA: shdma: Enable the driver on all ARM platforms
+>   i2c: sh_mobile: Enable the driver on all ARM platforms
+>   input: sh_keysc: Enable the driver on all ARM platforms
+>   iommu: shmobile: Enable the driver on all ARM platforms
+>   i2c: rcar: Enable the driver on all ARM platforms
+>   v4l: sh_vou: Enable the driver on all ARM platforms
+>   mmc: sdhi: Enable the driver on all ARM platforms
+>   mmc: sh_mmcif: Enable the driver on all ARM platforms
+>   mtd: sh_flctl: Enable the driver on all ARM platforms
+>   net: sh_eth: Set receive alignment correctly on all ARM platforms
+>   irda: sh_irda: Enable the driver on all ARM platforms
+>   pinctrl: sh-pfc: Enable the driver on all ARM platforms
+>   pwm: pwm-renesas-tpu: Enable the driver on all ARM platforms
+>   sh: intc: Enable the driver on all ARM platforms
+>   spi: sh_msiof: Enable the driver on all ARM platforms
+>   spi: sh_hspi: Enable the driver on all ARM platforms
+>   thermal: rcar-thermal: Enable the driver on all ARM platforms
+>   fbdev: sh-mobile-lcdcfb: Enable the driver on all ARM platforms
+> 
+>  drivers/dma/sh/Kconfig                | 2 +-
+>  drivers/dma/sh/shdmac.c               | 6 +++---
+>  drivers/i2c/busses/Kconfig            | 4 ++--
+>  drivers/input/keyboard/Kconfig        | 2 +-
+>  drivers/iommu/Kconfig                 | 2 +-
+>  drivers/media/platform/Kconfig        | 2 +-
+>  drivers/mmc/host/Kconfig              | 4 ++--
+>  drivers/mmc/host/tmio_mmc_dma.c       | 2 +-
+>  drivers/mtd/nand/Kconfig              | 2 +-
+>  drivers/net/ethernet/renesas/sh_eth.c | 2 +-
+>  drivers/net/ethernet/renesas/sh_eth.h | 2 +-
+>  drivers/net/irda/Kconfig              | 2 +-
+>  drivers/pinctrl/Makefile              | 2 +-
+>  drivers/pinctrl/sh-pfc/Kconfig        | 2 +-
+>  drivers/pwm/Kconfig                   | 2 +-
+>  drivers/sh/intc/Kconfig               | 2 +-
+>  drivers/spi/Kconfig                   | 4 ++--
+>  drivers/thermal/Kconfig               | 2 +-
+>  drivers/tty/serial/Kconfig            | 2 +-
+>  drivers/video/Kconfig                 | 6 +++---
+>  20 files changed, 27 insertions(+), 27 deletions(-)
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
