@@ -1,107 +1,53 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 29 Oct 2013 11:37:33 +0100
-Subject: [PATCH] watchdog: at91sam9_wdt: various fixes
-In-Reply-To: <20131029075028.GF19704@spo001.leaseweb.com>
-References: <20131029075028.GF19704@spo001.leaseweb.com>
-Message-ID: <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 29 Oct 2013 15:15:09 +0400
+Subject: [PATCH 02/12] clocksource: sh_mtu2: Add clk_prepare/unprepare
+ support
+In-Reply-To: <1383000569-8916-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <526F98BD.9000904@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the secs_to_ticks macro in case 0 is passed as an argument.
+Hello.
 
-Rework the heartbeat calculation to increase the security margin of the
-watchdog reset timer.
+On 29-10-2013 2:49, Laurent Pinchart wrote:
 
-Use the min_heartbeat value instead of the calculated heartbeat value for
-the first watchdog reset.
+> Prepare the clock at probe time, as there is no other appropriate place
+> in the driver where we're allowed to sleep.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/watchdog/at91sam9_wdt.c |   35 ++++++++++++++++++++++++-----------
- 1 file changed, 24 insertions(+), 11 deletions(-)
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>   drivers/clocksource/sh_mtu2.c | 16 ++++++++++++++--
+>   1 file changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 9bd089e..f1b59f1 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -51,7 +51,7 @@
- #define ticks_to_hz_rounddown(t)	((((t) + 1) * HZ) >> 8)
- #define ticks_to_hz_roundup(t)		(((((t) + 1) * HZ) + 255) >> 8)
- #define ticks_to_secs(t)		(((t) + 1) >> 8)
--#define secs_to_ticks(s)		(((s) << 8) - 1)
-+#define secs_to_ticks(s)		(s ? (((s) << 8) - 1) : 0)
- 
- #define WDT_MR_RESET	0x3FFF2FFF
- 
-@@ -61,6 +61,11 @@
- /* Watchdog max delta/value in secs */
- #define WDT_COUNTER_MAX_SECS	ticks_to_secs(WDT_COUNTER_MAX_TICKS)
- 
-+/* Watchdog heartbeat shift used for security margin:
-+ * we'll try to rshift the heartbeat value with this value to secure
-+ * the watchdog reset. */
-+#define WDT_HEARTBEAT_SHIFT	2
-+
- /* Hardware timeout in seconds */
- #define WDT_HW_TIMEOUT 2
- 
-@@ -158,7 +163,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 	int err;
- 	u32 mask = wdt->mr_mask;
- 	unsigned long min_heartbeat = 1;
-+	unsigned long max_heartbeat;
- 	struct device *dev = &pdev->dev;
-+	int shift;
- 
- 	tmp = wdt_read(wdt, AT91_WDT_MR);
- 	if ((tmp & mask) != (wdt->mr & mask)) {
-@@ -181,23 +188,27 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 	if (delta < value)
- 		min_heartbeat = ticks_to_hz_roundup(value - delta);
- 
--	wdt->heartbeat = ticks_to_hz_rounddown(value);
--	if (!wdt->heartbeat) {
-+	max_heartbeat = ticks_to_hz_rounddown(value);
-+	if (!max_heartbeat) {
- 		dev_err(dev,
- 			"heartbeat is too small for the system to handle it correctly\n");
- 		return -EINVAL;
- 	}
- 
--	if (wdt->heartbeat < min_heartbeat + 4) {
-+	for (shift = WDT_HEARTBEAT_SHIFT; shift > 0; shift--) {
-+		if ((max_heartbeat >> shift) < min_heartbeat)
-+			continue;
-+
-+		wdt->heartbeat = max_heartbeat >> shift;
-+		break;
-+	}
-+
-+	if (!shift)
- 		wdt->heartbeat = min_heartbeat;
-+
-+	if (max_heartbeat < min_heartbeat + 4)
- 		dev_warn(dev,
- 			 "min heartbeat and max heartbeat might be too close for the system to handle it correctly\n");
--		if (wdt->heartbeat < 4)
--			dev_warn(dev,
--				 "heartbeat might be too small for the system to handle it correctly\n");
--	} else {
--		wdt->heartbeat -= 4;
--	}
- 
- 	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
- 		err = request_irq(wdt->irq, wdt_interrupt,
-@@ -213,7 +224,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
- 
- 	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
--	mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
-+	/* Use min_heartbeat the first time because the watchdog timer might
-+	 * be running for a long time when we reach this init function. */
-+	mod_timer(&wdt->timer, jiffies + min_heartbeat);
- 
- 	/* Try to set timeout from device tree first */
- 	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
--- 
-1.7.9.5
+> diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+> index 4aac9ee..3cf1283 100644
+> --- a/drivers/clocksource/sh_mtu2.c
+> +++ b/drivers/clocksource/sh_mtu2.c
+> @@ -313,8 +313,20 @@ static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
+>   		goto err1;
+>   	}
+>
+> -	return sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
+> -				cfg->clockevent_rating);
+> +	ret = clk_prepare(p->clk);
+> +	if (ret < 0)
+> +		goto err2;
+> +
+> +	ret = sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
+> +			       cfg->clockevent_rating);
+> +	if (ret < 0)
+> +		goto err3;
+> +
+> +	return 0;
+> + err3:
+> +	clk_unprepare(p->clk);
+> + err2:
+> +	clk_put(p->clk);
+
+    This one seems to be a fix and so needs to be in a separate patch...
+
+WBR, Sergei
