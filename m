@@ -1,35 +1,62 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 29 Oct 2013 20:18:03 +0100
-Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
-In-Reply-To: <526FE2B6.8050701@codeaurora.org>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
- <526FD278.8080102@metafoo.de> <20131029155616.GG20207@joshc.qualcomm.com>
- <526FE2B6.8050701@codeaurora.org>
-Message-ID: <527009EB.3010704@metafoo.de>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 29 Oct 2013 12:15:18 -0700
+Subject: [PATCH 2/2] dma: mv_xor: Use high_base mmio where appropriate
+In-Reply-To: <20131029103229.5e095a24@skate>
+References: <1383000855-8377-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383000855-8377-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <CAPcyv4iQVoYCXz16T3N4MbdVJV7MoKKeL0wq9t9WF1Kf3gz3Bw@mail.gmail.com>
+ <20131029083407.GA2416@localhost> <20131029103229.5e095a24@skate>
+Message-ID: <CAPcyv4iRawGxPwcPhyKCHG+2orVNmPktObR7_TSXwN+6tZ=qog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2013 05:30 PM, Stephen Boyd wrote:
-> On 10/29/13 08:56, Josh Cartwright wrote:
+On Tue, Oct 29, 2013 at 2:32 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dan, Ezequiel,
+>
+> On Tue, 29 Oct 2013 05:34:08 -0300, Ezequiel Garcia wrote:
+>
+>> > On Mon, Oct 28, 2013 at 3:54 PM, Ezequiel Garcia
+>> > <ezequiel.garcia@free-electrons.com> wrote:
+>> > > Despite requesting two memory resources, called 'base' and 'high_base', the
+>> > > driver uses explicitly only the former. The latter is being used implicitly
+>> > > by addressing at offset +0x200, which in practice accesses high_base.
+>> > >
+>> > > Instead of relying in such trick, let's define the registers with the
+>> > > offset from high_base, and use high_base explicitly where appropriate.
+>> > >
+>> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>> > > ---
+>> > >  drivers/dma/mv_xor.c |  3 ++-
+>> > >  drivers/dma/mv_xor.h | 25 +++++++++++++------------
+>> > >  2 files changed, 15 insertions(+), 13 deletions(-)
+>> >
+>> > Since it's unused I'd prefer a patch that just deletes xor_high_base.
+>> >
 >>
->>>> +#define to_spmi_controller(d) container_of(d, struct spmi_controller, dev)
->>> Should be a inline function for better type safety.
->> Sounds good.  Will change the to_spmi_*() macros.
-> 
-> I was under the impression that container_of() already does type
-> checking. At least it will ensure that typeof(d) == typeof(dev) in the
-> above example which is about as good as it can get.
+>> It's wrongly *unused*, the mmio high_base is actually being used
+>> implicitly by always addressing at an offset that addresses +200.
+>>
+>> Deleting high_base would actually make it worse, for that region
+>> will no longer be ioremaped. Maybe the commit message is not clear
+>> about it?
+>
+> I agree with Ezequiel, and I believe his patch is appropriate. The
+> registers for the XOR engines are indeed split in two areas, so it
+> makes sense to have this xor_base / xor_high_base split that reflects
+> the register mapping passed from the Device Tree, and use this split in
+> the macros used to access the registers.
+>
 
-Well you'll get a warning, but the quality of the warning message is much
-better when an inline function is used.
+Ah ok, so it's a bug if an implementation ever puts the second
+resource window at a non 0x200 offset.
 
-warning: initialization from incompatible pointer type
+Ezequiel , can you resend the patch to the new
+dmaengine at vger.kernel.org list (patchwork queue) and clarify that this
+is a fix rather than a pure cleanup in the changelog?  At least
+cleanup is how I first read it.
 
-vs.
+Thanks for the clarification.
 
-warning: Passing argument 1 of to_smpi_controller() from incompatible
-pointer type. Expected struct device * got struct driver *
-
-
-- Lars
+--
+Dan
