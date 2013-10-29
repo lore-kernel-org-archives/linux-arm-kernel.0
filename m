@@ -1,43 +1,61 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 29 Oct 2013 19:00:21 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the pm tree
-Message-ID: <20131029190021.bb2dddcbd46e1ddfdfd5e441@canb.auug.org.au>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 29 Oct 2013 09:09:37 +0100 (CET)
+Subject: [PATCH 08/12] mmc: sh_mobile_sdhi: Convert to
+ clk_prepare/unprepare
+In-Reply-To: <1383000569-8916-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <Pine.LNX.4.64.1310290907520.8404@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, 28 Oct 2013, Laurent Pinchart wrote:
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-omap2/opp.c between commit e4db1c7439b3 ("PM / OPP: rename
-header to linux/pm_opp.h") from the pm tree and commit 92d51856d740
-("ARM: OMAP3+: do not register non-dt OPP tables for device tree boot")
-from the arm-soc tree.
+> Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
+> clk_disable_unprepare() to get ready for the migration to the common
+> clock framework.
+> 
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Thanks
+Guennadi
 
-diff --cc arch/arm/mach-omap2/opp.c
-index ec21e6eb03e1,82fd8c72f750..000000000000
---- a/arch/arm/mach-omap2/opp.c
-+++ b/arch/arm/mach-omap2/opp.c
-@@@ -17,7 -17,8 +17,8 @@@
-   * GNU General Public License for more details.
-   */
-  #include <linux/module.h>
-+ #include <linux/of.h>
- -#include <linux/opp.h>
- +#include <linux/pm_opp.h>
-  #include <linux/cpu.h>
-  
-  #include "omap_device.h"
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/cb107310/attachment.sig>
+> ---
+>  drivers/mmc/host/sh_mobile_sdhi.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
+> index f344659..ed1718a 100644
+> --- a/drivers/mmc/host/sh_mobile_sdhi.c
+> +++ b/drivers/mmc/host/sh_mobile_sdhi.c
+> @@ -54,7 +54,7 @@ static int sh_mobile_sdhi_clk_enable(struct platform_device *pdev, unsigned int
+>  	struct mmc_host *mmc = platform_get_drvdata(pdev);
+>  	struct tmio_mmc_host *host = mmc_priv(mmc);
+>  	struct sh_mobile_sdhi *priv = container_of(host->pdata, struct sh_mobile_sdhi, mmc_data);
+> -	int ret = clk_enable(priv->clk);
+> +	int ret = clk_prepare_enable(priv->clk);
+>  	if (ret < 0)
+>  		return ret;
+>  
+> @@ -67,7 +67,7 @@ static void sh_mobile_sdhi_clk_disable(struct platform_device *pdev)
+>  	struct mmc_host *mmc = platform_get_drvdata(pdev);
+>  	struct tmio_mmc_host *host = mmc_priv(mmc);
+>  	struct sh_mobile_sdhi *priv = container_of(host->pdata, struct sh_mobile_sdhi, mmc_data);
+> -	clk_disable(priv->clk);
+> +	clk_disable_unprepare(priv->clk);
+>  }
+>  
+>  static int sh_mobile_sdhi_wait_idle(struct tmio_mmc_host *host)
+> -- 
+> 1.8.1.5
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
