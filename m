@@ -1,46 +1,108 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Oct 2013 10:44:45 -0700
-Subject: [PATCHv7][ 2/5] ASoC: eukrea-tlv320: Add DT support.
-In-Reply-To: <CAHCPf3vHWt5XJCwvGDMfX9rTPKqHU43SHORqpxLtLaDL6RGb8A@mail.gmail.com>
-References: <1382616832-23593-1-git-send-email-denis@eukrea.com>
- <1382616832-23593-2-git-send-email-denis@eukrea.com>
- <20131025191513.5345BC4042C@trevor.secretlab.ca>
- <20131026114840.GX2443@sirena.org.uk>
- <CAHCPf3vHWt5XJCwvGDMfX9rTPKqHU43SHORqpxLtLaDL6RGb8A@mail.gmail.com>
-Message-ID: <20131029174445.GB20251@sirena.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 29 Oct 2013 10:46:55 -0700
+Subject: [PATCH v5 0/3] ARM: S5PV210: move to common clk framework
+In-Reply-To: <526FD849.9050000@samsung.com>
+References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <5264425E.4040301@samsung.com> <20131021121605.11944.74007@quantum>
+ <1823897.8rOixkM4PW@amdc1227> <526FD849.9050000@samsung.com>
+Message-ID: <CAPtuhTgQ1M7Z3PCFCPVTKT-uY+JE6cGSdbEfJrLMmbRr+C9MZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 11:56:54AM -0500, Matt Sealey wrote:
+On Tue, Oct 29, 2013 at 8:46 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 10/29/13 04:42, Tomasz Figa wrote:
+>>
+>> Hi Kukjin, Mike,
+>>
+>> On Monday 21 of October 2013 05:16:05 Mike Turquette wrote:
+>>>
+>>> Quoting Kukjin Kim (2013-10-20 13:51:42)
+>>>>
+>>>> On 10/20/13 01:03, Tomasz Figa wrote:
+>>>>>
+>>>>> Hi Mike, Kukjin, Rafael,
+>>>>>
+>>>>> On Tuesday 24 of September 2013 14:50:06 Mateusz Krawczuk wrote:
+>>>>>>
+>>>>>> This patch series is the new s5pv210 clock implementation
+>>>>>> (using common clk framework).
+>>>>>>
+>>>>>> This implementation is compatible with device tree definition and
+>>>>>> board
+>>>>>> files.
+>>>>>>
+>>>>>> This patch series is based on linux-next and has been tested on goni
+>>>>>> and
+>>>>>> aquila
+>>>>>> boards using board file.
+>>>>>>
+>>>>>> Since v4:
+>>>>>> Corrected mux flags for finpll.
+>>>>>>
+>>>>>> Since v3:
+>>>>>>
+>>>>>> Replace s5pv210_clk_register_finpll, by creating mux finpll
+>>>>>> with xusbxti and xxti as parrents.
+>>>>>>
+>>>>>>
+>>>>>> Mateusz Krawczuk (3):
+>>>>>>     clk: samsung: Add clock driver for s5pc110/s5pv210
+>>>>>>     Cpufreq: s5pv210 cpufreq fixes for CCF
+>>>>>>     ARM: s5pv210: Migrate clock handling to Common Clock Framework
+>>>>>>
+>>>>>>    .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
+>>>>>>    arch/arm/mach-s5pv210/Kconfig                      |   9 +
+>>>>>>    arch/arm/mach-s5pv210/Makefile                     |   4 +-
+>>>>>>    arch/arm/mach-s5pv210/common.c                     |  17 +
+>>>>>>    arch/arm/mach-s5pv210/common.h                     |  10 +
+>>>>>>    arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+>>>>>>    arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+>>>>>>    arch/arm/plat-samsung/Kconfig                      |   2 +-
+>>>>>>    drivers/clk/samsung/Makefile                       |   3 +
+>>>>>>    drivers/clk/samsung/clk-s5pv210.c                  | 673
+>>>>>> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c
+>>>>>>    |   6 +-
+>>>>>>    include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
+>>>>>>    12 files changed, 1019 insertions(+), 8 deletions(-)
+>>>>>>    create mode 100644
+>>>>>> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
+>>>>>> create mode 100644 drivers/clk/samsung/clk-s5pv210.c
+>>>>>>    create mode 100644
+>>>>>> include/dt-bindings/clock/samsung,s5pv210-clock.h
+>>>>>
+>>>>>
+>>>>> I believe this series is reasonable to be applied. Could we agree on
+>>>>> the tree it would go through and get all tne required acks?
+>>>>>
+>>>>> Best regards,
+>>>>> Tomasz
+>>>>
+>>>>
+>>>> I agree.
+>>>>
+>>>> Mike, how do you think the common clk stuff for s5pv210?
+>>>
+>>>
+>>> Clock code looks good to me. Which tree do you want to take it through?
+>>
+>>
+>> Seems like we just missed another kernel release. It's a bit sad that it's
+>> happening so often for Samsung patches...
+>>
+>
+> Tomasz, sorry about that, I couldn't end up the stuff before attending ARM
+> Kernel Summit, but in my opinion, this series would be merged for upcoming
+> merge window via clk tree if Mike is fine because there is no conflicts with
+> Samsung tree.
+>
+> Mike, how do you think? If you're OK, please pick this into your tree with
+> my ack.
 
-> Maybe this is a reasonable place to ask since I am holding off on
-> doing any audio support for the i.MX platform I want to push a DT for,
-> and I am still bashing my head over the logic in this. Why is this so
-> much more complicated than it needs to be? I can see codec specific
-> and Linux-specific things floating in trees. I can see redundancy in
-> property naming and misplacement of properties.. this whole thing
-> needs to be cleaned up because it's been done as "binding a Linux
-> driver into the device tree" and this is another example of the same
-> thing - taking the way ASoC is working right now and dumping platform
-> data externally.
+I'll pull this in later today with your Ack.
 
-Can you be more specific about all these points please?  It's hard to
-engage without concrete technical discussion which there is very little
-of in your rather lengthy mail.  Please also take a look at the previous
-discussions on this stuff and make sure you understand the needs of more
-advanced audio subsystems like those found in smartphones.
+Regards,
+Mike
 
-> should not be codec or platform specific at all. This is a TI audio
-> codec being referenced in an SoC-specific audio fabric definition.
-
-Please take a look at Morimoto-san's work on the generic sound card if
-you want to work on a generic card, it'd be good if some of the people
-complaining about this stuff could help him work on that as he doesn't
-seem to be getting any help or review from anyone.  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/a4a4f78d/attachment.sig>
+>
+> Thanks,
+> Kukjin
