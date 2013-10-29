@@ -1,46 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 29 Oct 2013 16:22:49 -0700
-Subject: [PATCH 2/2] misc: atmel_pwm: set initcall level to subsys
-In-Reply-To: <1382459560-26596-3-git-send-email-jhovold@gmail.com>
-References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
- <1382459560-26596-3-git-send-email-jhovold@gmail.com>
-Message-ID: <20131029232249.GA20476@kroah.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Wed, 30 Oct 2013 00:28:39 +0100
+Subject: [PATCH v7 1/5] omap3isp: Modify clocks registration to avoid
+ circular references
+In-Reply-To: <16467881.81yEf9zq68@avalon>
+References: <1383076268-8984-1-git-send-email-s.nawrocki@samsung.com>
+ <1383076268-8984-2-git-send-email-s.nawrocki@samsung.com>
+ <16467881.81yEf9zq68@avalon>
+Message-ID: <20131029232837.GB2266@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 06:32:40PM +0200, Johan Hovold wrote:
-> Even with the atmel_pwm driver and the atmel-pwm-bl backlight driver
-> supporting deferred probing, we still want to make sure that any
-> pwm-device is available when the backlight devices are probed to avoid
-> any unnecessary delays before enabling the backlight.
+Hi,
+
+On Tue, Oct 29, 2013 at 11:28:37PM +0100, Laurent Pinchart wrote:
+> On Tuesday 29 October 2013 20:51:04 Sylwester Nawrocki wrote:
+> > The clock core code is going to be modified so clk_get() takes
+> > reference on the clock provider module. Until the potential circular
+> > reference issue is properly addressed, we pass NULL as as the first
+> > argument to clk_register(), in order to disallow sub-devices taking
+> > a reference on the ISP module back trough clk_get(). This should
+> > prevent locking the modules in memory.
+> > 
+> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> Signed-off-by: Johan Hovold <jhovold@gmail.com>
-> ---
->  drivers/misc/atmel_pwm.c | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > 
-> diff --git a/drivers/misc/atmel_pwm.c b/drivers/misc/atmel_pwm.c
-> index a6dc56e..0d0f599 100644
-> --- a/drivers/misc/atmel_pwm.c
-> +++ b/drivers/misc/atmel_pwm.c
-> @@ -395,7 +395,17 @@ static struct platform_driver atmel_pwm_driver = {
->  	 */
->  };
->  
-> -module_platform_driver_probe(atmel_pwm_driver, pwm_probe);
-> +static int __init pwm_init(void)
-> +{
-> +	return platform_driver_probe(&atmel_pwm_driver, pwm_probe);
-> +}
-> +subsys_initcall(pwm_init);
+> Do you plan to push this to mainline as part of this patch series ? I don't 
+> have pending patches for the omap3isp that would conflict with this patch, so 
+> that would be fine with me.
 
-I really hate this type of patch, as it's papering over the real
-problem.  What happens when someone else moves their driver to this
-level?  Then you are back to the original problem.
+I plan to add support for DT to omap3isp + ADP1653 shortly. I have
+not yet started to work on this, but expect to send some first RFC
+patches in November.
 
-This is what deferred probing was supposed to fix.  If it doesn't, then
-something else needs to be done, or fix the deferred probing mess...
-
-Sorry, I can't take this.
-
-greg k-h
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131030/f3a370c8/attachment-0001.sig>
