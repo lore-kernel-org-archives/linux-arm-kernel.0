@@ -1,32 +1,31 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Tue, 29 Oct 2013 10:07:57 +0800
-Subject: [PATCH] clk: tegra: fix return value check in
- tegra_clk_register_pllc()
-Message-ID: <CAPgLHd-wYa3Z7J93LmC0rvRPKsrjK+8DEZR+2f+e14RN+p_fPg@mail.gmail.com>
+Date: Tue, 29 Oct 2013 10:04:11 +0800
+Subject: [PATCH] ARM: spear: fix return value check in spear_setup_of_timer()
+Message-ID: <CAPgLHd8oLgehkC-4LdRgiASnZGfk0u3ueVQw8f4J6g+3zeT5tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-In case of error, the function __clk_lookup() returns NULL pointer
-not ERR_PTR(). The IS_ERR() test in the return value check should
-be replaced with NULL test.
+In case of error, the function clk_get_sys() returns ERR_PTR()
+and never returns NULL. The NULL test in the return value check
+should be replaced with IS_ERR().
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- drivers/clk/tegra/clk-pll.c | 2 +-
+ arch/arm/mach-spear/time.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
-index 197074a..a99bef7 100644
---- a/drivers/clk/tegra/clk-pll.c
-+++ b/drivers/clk/tegra/clk-pll.c
-@@ -1507,7 +1507,7 @@ struct clk *tegra_clk_register_pllc(const char *name, const char *parent_name,
- 		return ERR_PTR(-EINVAL);
+diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
+index d449673..3263a34 100644
+--- a/arch/arm/mach-spear/time.c
++++ b/arch/arm/mach-spear/time.c
+@@ -222,7 +222,7 @@ void __init spear_setup_of_timer(void)
+ 	}
  
- 	parent = __clk_lookup(parent_name);
--	if (IS_ERR(parent)) {
-+	if (!parent) {
- 		WARN(1, "parent clk %s of %s must be registered first\n",
- 			name, parent_name);
- 		return ERR_PTR(-EINVAL);
+ 	gpt_clk = clk_get_sys("gpt0", NULL);
+-	if (!gpt_clk) {
++	if (IS_ERR(gpt_clk)) {
+ 		pr_err("%s:couldn't get clk for gpt\n", __func__);
+ 		goto err_iomap;
+ 	}
