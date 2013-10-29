@@ -1,76 +1,96 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 29 Oct 2013 18:33:00 -0500
-Subject: [PATCH 1/3] clk: shmobile: Add DIV6 clock support
-In-Reply-To: <1383058511-26046-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Tue, 29 Oct 2013 18:36:06 -0500
+Subject: [PATCH 2/3] clk: shmobile: Add MSTP clock support
+In-Reply-To: <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383058511-26046-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <158C7FC6-F6DF-4F10-B04B-05522D09FC05@codeaurora.org>
+ <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <F8268ACF-E4E8-4411-84F1-D967450BE440@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
 
-> DIV6 clocks are divider gate clocks controlled through a single
-> register. The divider is expressed on 6 bits, hence the name, and can
-> take values from 1/1 to 1/64.
+> MSTP clocks are gate clocks controlled through a register that handles
+> up to 32 clocks. The register is often sparsely populated.
 > 
 > Those clocks are found on Renesas ARM SoCs.
 > 
 > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > ---
-> .../bindings/clock/renesas,cpg-div6-clocks.txt     |  27 +++
-> drivers/clk/shmobile/Makefile                      |   4 +-
-> drivers/clk/shmobile/clk-div6.c                    | 185 +++++++++++++++++++++
-> 3 files changed, 215 insertions(+), 1 deletion(-)
-> create mode 100644 Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
-> create mode 100644 drivers/clk/shmobile/clk-div6.c
+> .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  47 +++++
+> drivers/clk/shmobile/Makefile                      |   1 +
+> drivers/clk/shmobile/clk-mstp.c                    | 229 +++++++++++++++++++++
+> include/dt-bindings/clock/r8a7790-clock.h          |  56 +++++
+> 4 files changed, 333 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> create mode 100644 drivers/clk/shmobile/clk-mstp.c
+> create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
 > new file mode 100644
-> index 0000000..8036f3c
+> index 0000000..b3a1ce0
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
-> @@ -0,0 +1,27 @@
-> +* Renesas CPG DIV6 Clock
+> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> @@ -0,0 +1,47 @@
+> +* Renesas R8A7790 MSTP Clocks
+
+can we spell out MSTP once in the heading?
+
 > +
-> +The CPG DIV6 clocks are variable factor clocks provided by the Clock Pulse
-> +Generator (CPG). They clock input is divided by a configurable factor from 1
-> +to 64.
+> +The CPG can gate SoC device clocks. The gates are organized in groups of up to
+> +32 gates.
+> +
+> +This device tree binding describes a single 32 gate clocks group per node.
+> +Clocks are referenced by user nodes by the MSTP node phandle and the clock
+> +index in the group, from 0 to 31.
 > +
 > +Required Properties:
 > +
 > +  - compatible: Must be one of the following
-> +    - "renesas,r8a7790-div6-clock" for R8A7790 (R-Car H2) DIV6 clocks
-> +    - "renesas,cpg-div6-clock" for generic DIV6 clocks
-> +  - reg: Base address and length of the memory resource used by the DIV6 clock
-> +  - clocks: Reference to the parent clock
-> +  - #clock-cells: Must be 0
-> +  - clock-output-name: The name of the clock as a free-form string
+> +    - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
+> +    - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
+> +  - reg: Base address and length of the memory resource used by the MSTP
+> +    clocks
+> +  - clocks: Reference to the parent clocks
+> +  - #clock-cells: Must be 1
+> +  - clock-output-names: The name of the clocks as free-form strings
+> +  - renesas,indices: Index of the gate clocks (0 to 31)
 
-Is this suppose to be 'clock-output-names' (missing a 's')?
+Index of the gate clock into what?
 
+> +
+> +The clocks, clock-output-names and renesas,indices properties contain one
+> +entry per gate. The MSTP groups are sparsely populated. Unimplemented gates
+
+per gate clock. (?)
+
+> +must not be declared.
 > +
 > +
 > +Example
 > +-------
 > +
-> +	sd2_clk: sd2_clk {
-
-example should be sd2_clk at e6150078
-
-> +		compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
-> +		reg = <0 0xe6150078 0 4>;
-
-curious, do you really have a second register at 0?
-
-> +		clocks = <&pll1_div2_clk>;
-> +		#clock-cells = <0>;
-> +		clock-output-names = "sd2";
+> +	#include <dt-bindings/clock/r8a7790-clock.h>
+> +
+> +	mstp3_clks: mstp3_clks {
+> +		compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+> +		reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+> +		clocks = <&cp_clk>, <&mmc1_clk>, <&sd3_clk>, <&sd2_clk>,
+> +			 <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks R8A7790_CLK_SD0>,
+> +			 <&mmc0_clk>;
+> +		#clock-cells = <1>;
+> +		clock-output-names =
+> +			"tpu0", "mmcif1", "sdhi3", "sdhi2",
+> +			 "sdhi1", "sdhi0", "mmcif0";
+> +		renesas,clock-indices = <
+> +			R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
+> +			R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
+> +			R8A7790_CLK_MMCIF0
+> +		>;
 > +	};
 
 - k
-
 
 -- 
 Employee of Qualcomm Innovation Center, Inc.
