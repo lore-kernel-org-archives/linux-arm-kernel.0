@@ -1,64 +1,142 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 28 Oct 2013 17:31:25 -0700
-Subject: [PATCH 1/6] edac: Don't try to cancel workqueue when it's never setup
+Date: Mon, 28 Oct 2013 17:31:27 -0700
+Subject: [PATCH 3/6] ARM: Add Krait L2 accessor functions
 In-Reply-To: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
 References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1383006690-6754-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1383006690-6754-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We only setup a workqueue for edac devices that use the polling
-method. We still try to cancel the workqueue if an edac_device
-uses the irq method though. This causes a warning from debug
-objects when we remove an edac device:
+Qualcomm's Krait CPUs have a handful of L2 cache controller
+registers that live behind a cp15 based indirection register.
+First you program the indirection register (l2cpselr) to point
+the L2 'window' register (l2cpdr) at what you want to read/write.
+Then you read/write the 'window' register to do what you want.
+The l2cpselr register is not banked per-cpu so we must lock
+around accesses to it to prevent other CPUs from re-pointing
+l2cpdr underneath us.
 
-WARNING: CPU: 0 PID: 56 at lib/debugobjects.c:260 debug_print_object+0x98/0xc0()
-ODEBUG: assert_init not available (active state 0) object type: timer_list hint: stub_timer+0x0/0x28
-Modules linked in: krait_edac(-)
-CPU: 0 PID: 56 Comm: rmmod Not tainted 3.12.0-rc2-00035-g15292a0 #69
-[<c02179b4>] (unwind_backtrace+0x0/0x144) from [<c0213e58>] (show_stack+0x20/0x24)
-[<c0213e58>] (show_stack+0x20/0x24) from [<c06f7fc4>] (dump_stack+0x74/0xb4)
-[<c06f7fc4>] (dump_stack+0x74/0xb4) from [<c0223c34>] (warn_slowpath_common+0x78/0x9c)
-[<c0223c34>] (warn_slowpath_common+0x78/0x9c) from [<c0223d14>] (warn_slowpath_fmt+0x40/0x48)
-[<c0223d14>] (warn_slowpath_fmt+0x40/0x48) from [<c04cf078>] (debug_print_object+0x98/0xc0)
-[<c04cf078>] (debug_print_object+0x98/0xc0) from [<c04cfb54>] (debug_object_assert_init+0xdc/0xec)
-[<c04cfb54>] (debug_object_assert_init+0xdc/0xec) from [<c02310c4>] (del_timer+0x24/0x7c)
-[<c02310c4>] (del_timer+0x24/0x7c) from [<c023fef8>] (try_to_grab_pending+0xc0/0x1b0)
-[<c023fef8>] (try_to_grab_pending+0xc0/0x1b0) from [<c0240014>] (cancel_delayed_work+0x2c/0xa0)
-[<c0240014>] (cancel_delayed_work+0x2c/0xa0) from [<c059fa14>] (edac_device_workq_teardown+0x1c/0x38)
-[<c059fa14>] (edac_device_workq_teardown+0x1c/0x38) from [<c059fae8>] (edac_device_del_device+0xb8/0xe4)
-[<c059fae8>] (edac_device_del_device+0xb8/0xe4) from [<bf000050>] (krait_edac_remove+0x50/0x70 [krait_edac])
-[<bf000050>] (krait_edac_remove+0x50/0x70 [krait_edac]) from [<c0511e34>] (platform_drv_remove+0x24/0x28)
-[<c0511e34>] (platform_drv_remove+0x24/0x28) from [<c050fffc>] (__device_release_driver+0x68/0xc0)
-[<c050fffc>] (__device_release_driver+0x68/0xc0) from [<c0510adc>] (driver_detach+0xc4/0xc8)
-[<c0510adc>] (driver_detach+0xc4/0xc8) from [<c050fd98>] (bus_remove_driver+0xac/0x114)
-[<c050fd98>] (bus_remove_driver+0xac/0x114) from [<c05111d8>] (driver_unregister+0x38/0x58)
-[<c05111d8>] (driver_unregister+0x38/0x58) from [<c0511fe8>] (platform_driver_unregister+0x1c/0x20)
-[<c0511fe8>] (platform_driver_unregister+0x1c/0x20) from [<bf0005c4>] (krait_edac_driver_exit+0x14/0x1c [krait_edac])
-[<bf0005c4>] (krait_edac_driver_exit+0x14/0x1c [krait_edac]) from [<c028b248>] (SyS_delete_module+0x178/0x2b4)
-[<c028b248>] (SyS_delete_module+0x178/0x2b4) from [<c020f760>] (ret_fast_syscall+0x0/0x48)
-
-Fix it by skipping the workqueue teardown for such devices.
-
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/edac/edac_device.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/common/Kconfig                   |  3 ++
+ arch/arm/common/Makefile                  |  1 +
+ arch/arm/common/krait-l2-accessors.c      | 52 +++++++++++++++++++++++++++++++
+ arch/arm/include/asm/krait-l2-accessors.h | 20 ++++++++++++
+ 4 files changed, 76 insertions(+)
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
 
-diff --git a/drivers/edac/edac_device.c b/drivers/edac/edac_device.c
-index 211021d..203561b 100644
---- a/drivers/edac/edac_device.c
-+++ b/drivers/edac/edac_device.c
-@@ -437,6 +437,9 @@ void edac_device_workq_teardown(struct edac_device_ctl_info *edac_dev)
- {
- 	int status;
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index c3a4e9c..9da52dc 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -9,6 +9,9 @@ config DMABOUNCE
+ 	bool
+ 	select ZONE_DMA
  
-+	if (!edac_dev->edac_check)
-+		return;
++config KRAIT_L2_ACCESSORS
++	bool
 +
- 	status = cancel_delayed_work(&edac_dev->work);
- 	if (status == 0) {
- 		/* workq instance might be running, wait for it */
+ config SHARP_LOCOMO
+ 	bool
+ 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 8c60f47..606131a 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -8,6 +8,7 @@ obj-$(CONFIG_ICST)		+= icst.o
+ obj-$(CONFIG_SA1111)		+= sa1111.o
+ obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
+ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
++obj-$(CONFIG_KRAIT_L2_ACCESSORS) += krait-l2-accessors.o
+ obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+diff --git a/arch/arm/common/krait-l2-accessors.c b/arch/arm/common/krait-l2-accessors.c
+new file mode 100644
+index 0000000..c579794
+--- /dev/null
++++ b/arch/arm/common/krait-l2-accessors.c
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/spinlock.h>
++#include <linux/export.h>
++
++#include <asm/barrier.h>
++#include <asm/krait-l2-accessors.h>
++
++static DEFINE_RAW_SPINLOCK(krait_l2_lock);
++
++void set_l2_indirect_reg(u32 addr, u32 val)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6" : : "r" (addr));
++	isb();
++	asm volatile ("mcr p15, 3, %0, c15, c0, 7" : : "r" (val));
++	isb();
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++}
++EXPORT_SYMBOL(set_l2_indirect_reg);
++
++u32 get_l2_indirect_reg(u32 addr)
++{
++	u32 val;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6" : : "r" (addr));
++	isb();
++	asm volatile ("mrc p15, 3, %0, c15, c0, 7" : "=r" (val));
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++
++	return val;
++}
++EXPORT_SYMBOL(get_l2_indirect_reg);
+diff --git a/arch/arm/include/asm/krait-l2-accessors.h b/arch/arm/include/asm/krait-l2-accessors.h
+new file mode 100644
+index 0000000..d5305c4
+--- /dev/null
++++ b/arch/arm/include/asm/krait-l2-accessors.h
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __ASMARM_KRAIT_L2_ACCESSORS_H
++#define __ASMARM_KRAIT_L2_ACCESSORS_H
++
++extern void set_l2_indirect_reg(u32 addr, u32 val);
++extern u32 get_l2_indirect_reg(u32 addr);
++
++#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
