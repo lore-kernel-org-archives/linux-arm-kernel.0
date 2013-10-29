@@ -1,67 +1,52 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 23:37:43 +0100
-Subject: [PATCH v2 08/19] mmc: sdhi: Enable the driver on all ARM platforms
+Date: Tue, 29 Oct 2013 23:37:46 +0100
+Subject: [PATCH v2 11/19] net: sh_eth: Set receive alignment correctly on all
+ ARM platforms
 In-Reply-To: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383086274-11049-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383086274-11049-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Renesas ARM platforms are transitioning from single-platform to
-multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
-COMPILE_TEST.
+multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Configure the
+receive alignement correctly on all ARM platforms to enable the driver
+on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI.
 
-Whether the CTL_DMA_ENABLE register is part of the standard TMIO
-controller or is Renesas-specific is unknown and impossible to test as
-we have no current or planned TMIO DMA users other than SUPERH and
-ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
-for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
-list would extend this to multiarch kernels, but would break the driver
-for non-shmobile platforms if the register is Renesas-specific. We can
-thus get rid of the conditional compilation completely without
-introducing any further issue, and let future non-Renesas users deal
-with the situation if it turns out to be a the problem.
-
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Cc: Ian Molton <ian@mnementh.co.uk>
-Cc: linux-mmc at vger.kernel.org
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Cc: netdev at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/mmc/host/Kconfig        | 2 +-
- drivers/mmc/host/tmio_mmc_dma.c | 4 +---
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/renesas/sh_eth.c | 2 +-
+ drivers/net/ethernet/renesas/sh_eth.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 7fc5099..d57effb 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -479,7 +479,7 @@ config MMC_TMIO
- 
- config MMC_SDHI
- 	tristate "SH-Mobile SDHI SD/SDIO controller support"
--	depends on SUPERH || ARCH_SHMOBILE
-+	depends on SUPERH || ARM || COMPILE_TEST
- 	select MMC_TMIO_CORE
- 	help
- 	  This provides support for the SDHI SD/SDIO controller found in
-diff --git a/drivers/mmc/host/tmio_mmc_dma.c b/drivers/mmc/host/tmio_mmc_dma.c
-index 65edb4a..8a4fd2d 100644
---- a/drivers/mmc/host/tmio_mmc_dma.c
-+++ b/drivers/mmc/host/tmio_mmc_dma.c
-@@ -28,10 +28,8 @@ void tmio_mmc_enable_dma(struct tmio_mmc_host *host, bool enable)
- 	if (!host->chan_tx || !host->chan_rx)
- 		return;
- 
--#if defined(CONFIG_SUPERH) || defined(CONFIG_ARCH_SHMOBILE)
--	/* Switch DMA mode on or off - SuperH specific? */
-+	/* Switch DMA mode on or off. This might be Renesas-specific. */
- 	sd_ctrl_write16(host, CTL_DMA_ENABLE, enable ? 2 : 0);
--#endif
+diff --git a/drivers/net/ethernet/renesas/sh_eth.c b/drivers/net/ethernet/renesas/sh_eth.c
+index b57c278..990fd5b 100644
+--- a/drivers/net/ethernet/renesas/sh_eth.c
++++ b/drivers/net/ethernet/renesas/sh_eth.c
+@@ -809,7 +809,7 @@ out:
+ 	return ret;
  }
  
- void tmio_mmc_abort_dma(struct tmio_mmc_host *host)
+-#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
++#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARM)
+ static void sh_eth_set_receive_align(struct sk_buff *skb)
+ {
+ 	int reserve;
+diff --git a/drivers/net/ethernet/renesas/sh_eth.h b/drivers/net/ethernet/renesas/sh_eth.h
+index a0db02c..41509f7 100644
+--- a/drivers/net/ethernet/renesas/sh_eth.h
++++ b/drivers/net/ethernet/renesas/sh_eth.h
+@@ -165,7 +165,7 @@ enum {
+ };
+ 
+ /* Driver's parameters */
+-#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
++#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARM)
+ #define SH4_SKB_RX_ALIGN	32
+ #else
+ #define SH2_SH3_SKB_RX_ALIGN	2
 -- 
 1.8.1.5
