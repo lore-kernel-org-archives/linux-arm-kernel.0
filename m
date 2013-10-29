@@ -1,54 +1,90 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 29 Oct 2013 03:21:10 -0500
-Subject: [PATCH 4/6] edac: Document Krait L1/L2 EDAC driver binding
-In-Reply-To: <1383006690-6754-5-git-send-email-sboyd@codeaurora.org>
-References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
- <1383006690-6754-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <90D2FDE5-C43F-4ACF-B287-4E0AD8617892@codeaurora.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 29 Oct 2013 09:19:24 +0100
+Subject: [RESEND PATCH 2/2] w1-gpio: Use devm_* functions
+In-Reply-To: <1383034764-22091-1-git-send-email-mpa@pengutronix.de>
+References: <1383034764-22091-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1383034764-22091-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Acked-by: Evgeniy Polyakov <zbr@ioremap.net>
+---
+ drivers/w1/masters/w1-gpio.c | 28 +++++++++-------------------
+ 1 file changed, 9 insertions(+), 19 deletions(-)
 
-On Oct 28, 2013, at 7:31 PM, Stephen Boyd wrote:
-
-> The Krait L1/L2 error reporting device is made up of two
-> interrupts, one per-CPU interrupt for the L1 caches and one
-> interrupt for the L2 cache.
-> 
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> .../devicetree/bindings/arm/qcom,krait-cache-erp.txt     | 16 ++++++++++++++++
-> 1 file changed, 16 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-> new file mode 100644
-> index 0000000..01fe8a8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-> @@ -0,0 +1,16 @@
-> +* Qualcomm Krait L1 / L2 cache error reporting
-> +
-> +Required properties:
-> +- compatible: Should be "qcom,krait-cache-erp"
-> +- interrupts: Should contain the L1/CPU error interrupt number and
-> +  then the L2 cache error interrupt number
-> +
-> +Optional properties:
-> +- interrupt-names: Should contain the interrupt names "l1_irq" and
-> +  "l2_irq"
-> +
-> +Example:
-> +	edac {
-> +		compatible = "qcom,krait-cache-erp";
-> +		interrupts = <1 9 0xf04>, <0 2 0x4>;
-> +	};
-
-Why wouldn't we have these as part of cache nodes in the dts?  (which begs the question why we don't have cache nodes?)
-
-- k
-
+diff --git a/drivers/w1/masters/w1-gpio.c b/drivers/w1/masters/w1-gpio.c
+index ae53e88..264ad1c 100644
+--- a/drivers/w1/masters/w1-gpio.c
++++ b/drivers/w1/masters/w1-gpio.c
+@@ -99,25 +99,27 @@ static int w1_gpio_probe(struct platform_device *pdev)
+ 		return -ENXIO;
+ 	}
+ 
+-	master = kzalloc(sizeof(struct w1_bus_master), GFP_KERNEL);
++	master = devm_kzalloc(&pdev->dev, sizeof(struct w1_bus_master),
++			GFP_KERNEL);
+ 	if (!master) {
+ 		dev_err(&pdev->dev, "Out of memory\n");
+ 		return -ENOMEM;
+ 	}
+ 
+-	err = gpio_request(pdata->pin, "w1");
++	err = devm_gpio_request(&pdev->dev, pdata->pin, "w1");
+ 	if (err) {
+ 		dev_err(&pdev->dev, "gpio_request (pin) failed\n");
+-		goto free_master;
++		return err;
+ 	}
+ 
+ 	if (gpio_is_valid(pdata->ext_pullup_enable_pin)) {
+-		err = gpio_request_one(pdata->ext_pullup_enable_pin,
+-				       GPIOF_INIT_LOW, "w1 pullup");
++		err = devm_gpio_request_one(&pdev->dev,
++				pdata->ext_pullup_enable_pin, GPIOF_INIT_LOW,
++				"w1 pullup");
+ 		if (err < 0) {
+ 			dev_err(&pdev->dev, "gpio_request_one "
+ 					"(ext_pullup_enable_pin) failed\n");
+-			goto free_gpio;
++			return err;
+ 		}
+ 	}
+ 
+@@ -135,7 +137,7 @@ static int w1_gpio_probe(struct platform_device *pdev)
+ 	err = w1_add_master_device(master);
+ 	if (err) {
+ 		dev_err(&pdev->dev, "w1_add_master device failed\n");
+-		goto free_gpio_ext_pu;
++		return err;
+ 	}
+ 
+ 	if (pdata->enable_external_pullup)
+@@ -147,16 +149,6 @@ static int w1_gpio_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, master);
+ 
+ 	return 0;
+-
+- free_gpio_ext_pu:
+-	if (gpio_is_valid(pdata->ext_pullup_enable_pin))
+-		gpio_free(pdata->ext_pullup_enable_pin);
+- free_gpio:
+-	gpio_free(pdata->pin);
+- free_master:
+-	kfree(master);
+-
+-	return err;
+ }
+ 
+ static int w1_gpio_remove(struct platform_device *pdev)
+@@ -171,8 +163,6 @@ static int w1_gpio_remove(struct platform_device *pdev)
+ 		gpio_set_value(pdata->ext_pullup_enable_pin, 0);
+ 
+ 	w1_remove_master_device(master);
+-	gpio_free(pdata->pin);
+-	kfree(master);
+ 
+ 	return 0;
+ }
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.8.4.rc3
