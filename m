@@ -1,32 +1,41 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Tue, 29 Oct 2013 12:03:58 -0700
-Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
-In-Reply-To: <CAOesGMgKbreaqFTGvC=_T6-i7uejfXAPNU8LmMpgDMqeEwYxZQ@mail.gmail.com>
-References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
- <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
- <20131029132043.GA28165@fifo99.com>
- <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
- <20131029170817.GA13047@fifo99.com>
- <CAOesGMgKbreaqFTGvC=_T6-i7uejfXAPNU8LmMpgDMqeEwYxZQ@mail.gmail.com>
-Message-ID: <20131029190358.GB13047@fifo99.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 29 Oct 2013 13:14:39 -0600
+Subject: [PATCH 0/6] PCI: imx6: Random fixes
+In-Reply-To: <1381853200-5534-1-git-send-email-marex@denx.de>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+Message-ID: <CAErSpo6v4nvKQ4W9BhnUsNEjzsXoCiLxeFY-K=z=bMZ4AFOyGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 10:39:45AM -0700, Olof Johansson wrote:
-> On Tue, Oct 29, 2013 at 10:08 AM, Daniel Walker <dwalker@fifo99.com> wrote:
-> 
-> > Personally I think splitting mach- stuff isn't very useful or
-> > interesting.. There's just no technical reason for it, for example x86
-> > and x86_64 was a win from my perspective , there's a lot more reason to
-> > keep similar things together than to split things up.
-> 
-> There are definitely valid technical reasons for it; the old and new
-> platforms share no code, and the legacy platforms are unlikely to be
-> updated to modern infrastructure anytime soon. Other platforms are
-> managed in similar manners, such as OMAP, imx/mxs, etc.
+On Tue, Oct 15, 2013 at 10:06 AM, Marek Vasut <marex@denx.de> wrote:
+> Set of random fixes for the PCIe driver for i.MX6 . With these fixes, my
+> setup with MX6Q -> PCIe bridge -> i210 ethernet adapter works as expected.
+>
+> NOTE: I'm sure this will start some discussion. There are quite a few patches
+>       that are more of a hacks. Shawn, I didn't ignore your remark about the
+>       clock patches, I will test it ASAP, I just want to have these fixes in
+>       the public so others can comment/test.
+>
+> Marek Vasut (6):
+>   PCI: imx6: Make reset-gpio optional
+>   PCI: imx6: Fix the clock for PCIe
+>   ARM: dts: imx6qdl: Fix the clock for PCIe
+>   PCI: imx6: Probe the PCIe in fs_initcall()
+>   PCI: imx6: Force Gen1 operation
+>   PCI: designware: Fix DT resource retrieval
+>
+>  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
+>  arch/arm/boot/dts/imx6qdl.dtsi                     |  4 +-
+>  drivers/pci/host/pci-imx6.c                        | 63 ++++++++++++++++------
+>  drivers/pci/host/pcie-designware.c                 | 17 +++---
+>  4 files changed, 55 insertions(+), 31 deletions(-)
 
-Are you speaking from a meta perspective , or you have specific example
-in msm code ?
+I'm ignoring this series for now.  I assume you'll post an updated
+series as mentioned in your Oct 17 response to "[Patch 5/6] PCI: imx6:
+Force Gen1 operation."  Please mark that series as "v2" when you post
+it.  My assumption is still that Shawn Guo will ack the
+drivers/pci/host/ pieces before I apply them [1].
 
+Bjorn
 
-Daniel
+[1] http://marc.info/?l=linux-pci&m=138030833011687&w=2
