@@ -1,85 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 Oct 2013 17:49:37 +0000
-Subject: [PATCH] Make the 32-bit ARM get_user() and put_user() work for
- 16-bit quantities
-In-Reply-To: <1383065529-20001-1-git-send-email-wcohen@redhat.com>
-References: <1383065529-20001-1-git-send-email-wcohen@redhat.com>
-Message-ID: <526FF531.9080705@arm.com>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Tue, 29 Oct 2013 12:50:43 -0500
+Subject: [PATCHv9 05/43] CLK: TI: add DT alias clock registration mechanism
+In-Reply-To: <1382716658-6964-6-git-send-email-t-kristo@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-6-git-send-email-t-kristo@ti.com>
+Message-ID: <CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi William,
+On Fri, Oct 25, 2013 at 10:56 AM, Tero Kristo <t-kristo@ti.com> wrote:
+> Some devices require their clocks to be available with a specific
+> dev-id con-id mapping. With DT, the clocks can be found by default
+> only with their name, or alternatively through the device node of
+> the consumer. With drivers, that don't support DT fully yet, add
+> mechanism to register specific clock names.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Tested-by: Nishanth Menon <nm@ti.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-On 29/10/13 16:52, William Cohen wrote:
-> The 32-bit ARM does not have instructions to perform 16-bit loads or
-> stores.  The __get_user_asm_half and __put_user_asm_half macros
-> sythesize those operations.  However, in most cases the pointers
-> passed into these macros are pointers to 16-bit types and the pointer
-> arithmetic will end up pointing at the next 16-bit quantity rather
-> than the second half (byte) of the 16-bit quantity.  The macros need
-> to explicitly typecast the pointers as pointers to 8-bit quantities to
-> make the pointer arithmetic work out properly.
+You guys are wonderful, by the way ;)
 
-So I'm a bit perplex here. Looks like nobody but __{ge,pu}t_user_err
-calls these macros directly, and the sole users cast the pointer to an
-unsigned long, for which the arithmetic ought to work properly.
+> +void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
+> +{
+> +       struct ti_dt_clk *c;
+> +       struct device_node *node;
+> +       struct clk *clk;
+> +       struct of_phandle_args clkspec;
+> +
+> +       for (c = oclks; c->node_name != NULL; c++) {
+> +               node = of_find_node_by_name(NULL, c->node_name);
+> +               clkspec.np = node;
+> +               clk = of_clk_get_from_provider(&clkspec);
+> +
+> +               if (!IS_ERR(clk)) {
+> +                       c->lk.clk = clk;
+> +                       clkdev_add(&c->lk);
+> +               } else {
+> +                       pr_warn("%s: failed to lookup clock node %s\n",
+> +                               __func__, c->node_name);
+> +               }
+> +       }
+> +}
 
-What am I missing?
+I have one question here, what makes this part of the patch
+TI-specific at all except the definition of the structure ti_dt_clk?
+Mapping DT clocks to generic clkdev legacy namings seems like it would
+be a necessary evil across *all* SoC platforms.
 
-	M.
+I would say there is a good case for this being generic and used by
+all platforms waiting for con->id/dev->id to be moved to DT-awareness,
+the structure itself is very generic within clkdev as long as the
+drivers conformed anyway (and if they didn't, none of this helps) and
+I don't think it really needs to be a TI-only thing. The next thing
+that's going to happen when another platform arrives that wants to do
+the same thing is duplication or consolidation - so it would probably
+be a good idea to make this generic to start.
 
-> Signed-off-by: William Cohen <wcohen@redhat.com>
-> ---
->  arch/arm/include/asm/uaccess.h | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-> index 7e1f760..c2d9439 100644
-> --- a/arch/arm/include/asm/uaccess.h
-> +++ b/arch/arm/include/asm/uaccess.h
-> @@ -277,16 +277,16 @@ do {									\
->  #define __get_user_asm_half(x,__gu_addr,err)			\
->  ({								\
->  	unsigned long __b1, __b2;				\
-> -	__get_user_asm_byte(__b1, __gu_addr, err);		\
-> -	__get_user_asm_byte(__b2, __gu_addr + 1, err);		\
-> +	__get_user_asm_byte(__b1, (u8 *)(__gu_addr), err);	\
-> +	__get_user_asm_byte(__b2, ((u8 *)(__gu_addr)) + 1, err);\
->  	(x) = __b1 | (__b2 << 8);				\
->  })
->  #else
->  #define __get_user_asm_half(x,__gu_addr,err)			\
->  ({								\
->  	unsigned long __b1, __b2;				\
-> -	__get_user_asm_byte(__b1, __gu_addr, err);		\
-> -	__get_user_asm_byte(__b2, __gu_addr + 1, err);		\
-> +	__get_user_asm_byte(__b1, (u8 *)(__gu_addr), err);	\
-> +	__get_user_asm_byte(__b2, ((u8 *)(__gu_addr)) + 1, err);\
->  	(x) = (__b1 << 8) | __b2;				\
->  })
->  #endif
-> @@ -358,15 +358,15 @@ do {									\
->  #define __put_user_asm_half(x,__pu_addr,err)			\
->  ({								\
->  	unsigned long __temp = (unsigned long)(x);		\
-> -	__put_user_asm_byte(__temp, __pu_addr, err);		\
-> -	__put_user_asm_byte(__temp >> 8, __pu_addr + 1, err);	\
-> +	__put_user_asm_byte(__temp, (u8 *)(__pu_addr), err);    \
-> +	__put_user_asm_byte(__temp >> 8, ((u8 *)(__pu_addr)) + 1, err);\
->  })
->  #else
->  #define __put_user_asm_half(x,__pu_addr,err)			\
->  ({								\
->  	unsigned long __temp = (unsigned long)(x);		\
-> -	__put_user_asm_byte(__temp >> 8, __pu_addr, err);	\
-> -	__put_user_asm_byte(__temp, __pu_addr + 1, err);	\
-> +	__put_user_asm_byte(__temp >> 8, (u8 *)(__pu_addr), err);\
-> +	__put_user_asm_byte(__temp, ((u8 *)(__pu_addr)) + 1, err);\
->  })
->  #endif
->  
-> 
+While there the names could be a bit more descriptive -
+dt_clk_name_lookup_map_register(), struct dt_clk_name_lookup_map,
+DT_CLK_LOOKUP_MAP() ..? The current namespace makes it look like this
+is the absolute correct thing to do under all circumstances, but in
+fact this is purely for mapping the old way to the new, better way..
+in the event a brand new platform arrives, with all new drivers (or
+only compliant drivers), none of this code should be implemented for
+it and it should be presented this way.
 
-
--- 
-Jazz is not dead. It just smells funny...
+Thanks,
+Matt Sealey <neko@bakuhatsu.net>
