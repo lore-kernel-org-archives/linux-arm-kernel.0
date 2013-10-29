@@ -1,30 +1,57 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 29 Oct 2013 17:50:01 +0530
-Subject: [PATCH 0/4] clk/power: add clock and power off driver for AS3722
-Message-ID: <1383049205-29620-1-git-send-email-ldewangan@nvidia.com>
+Date: Tue, 29 Oct 2013 17:50:02 +0530
+Subject: [PATCH 1/4] mfd: as3722: add clock driver as mfd-sub device for the
+ ams AS3722
+In-Reply-To: <1383049205-29620-1-git-send-email-ldewangan@nvidia.com>
+References: <1383049205-29620-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1383049205-29620-2-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power off and clock driver for the ams AS3722.
+Device ams AS3722 supports the one 32KHz clock output. The clock control
+support is provided through clock driver.
 
-The mfd patches are depends on mfd subtree which can be applied independtly.
-The pacthes are created such that clock driver can go in clock tree and power
-off driver in power sub tree.
+Add clock driver as mfd sub device to probe the clock driver.
 
-Laxman Dewangan (4):
-  mfd: as3722: add clock driver as mfd-sub device for the ams AS3722
-  clk: as3722: add clock driver for ams AS3722
-  mfd: AS3722: add dt node properties for system power controller
-  power: reset: as3722: add power-off driver
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ Documentation/devicetree/bindings/mfd/as3722.txt |    9 +++++++++
+ drivers/mfd/as3722.c                             |    3 +++
+ 2 files changed, 12 insertions(+), 0 deletions(-)
 
- Documentation/devicetree/bindings/mfd/as3722.txt |   18 +++
- drivers/clk/Kconfig                              |    8 +
- drivers/clk/Makefile                             |    1 +
- drivers/clk/clk-as3722.c                         |  166 ++++++++++++++++++++++
- drivers/mfd/as3722.c                             |    3 +
- drivers/power/reset/Kconfig                      |    6 +
- drivers/power/reset/Makefile                     |    1 +
- drivers/power/reset/as3722-poweroff.c            |  101 +++++++++++++
- 8 files changed, 304 insertions(+), 0 deletions(-)
- create mode 100644 drivers/clk/clk-as3722.c
- create mode 100644 drivers/power/reset/as3722-poweroff.c
+diff --git a/Documentation/devicetree/bindings/mfd/as3722.txt b/Documentation/devicetree/bindings/mfd/as3722.txt
+index fc2191e..e782f39 100644
+--- a/Documentation/devicetree/bindings/mfd/as3722.txt
++++ b/Documentation/devicetree/bindings/mfd/as3722.txt
+@@ -112,6 +112,15 @@ Following are properties of regulator subnode.
+ 		ams,enable-tracking: Enable tracking with SD1, only supported
+ 			by LDO3.
+ 
++Clock:
++======
++AS3722 supports one 32KHz clock to output from device. The clock control is
++provided through the clock driver.
++This binding uses the common clock binding ./clock-bindings.txt.
++The device node should have the optional properties to support the clock:
++#clock-cells: from common clock binding; shall be set to 1. The clock id for
++	single clock output is 0.
++
+ Example:
+ --------
+ #include <dt-bindings/mfd/as3722.h>
+diff --git a/drivers/mfd/as3722.c b/drivers/mfd/as3722.c
+index f161f2e..1d3415c 100644
+--- a/drivers/mfd/as3722.c
++++ b/drivers/mfd/as3722.c
+@@ -72,6 +72,9 @@ static struct mfd_cell as3722_devs[] = {
+ 		.resources = as3722_adc_resource,
+ 	},
+ 	{
++		.name = "as3722-clk",
++	},
++	{
+ 		.name = "as3722-power-off",
+ 	},
+ };
+-- 
+1.7.1.1
