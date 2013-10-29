@@ -1,81 +1,58 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 29 Oct 2013 14:19:59 +0100
-Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <40E3A029-C7E8-41DA-9218-3FB7ED97B707@codeaurora.org>
-References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
- <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
- <40E3A029-C7E8-41DA-9218-3FB7ED97B707@codeaurora.org>
-Message-ID: <526FB5FF.2060908@st.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Oct 2013 14:22:28 +0100
+Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
+In-Reply-To: <1383051980.29619.33.camel@sauron.fi.intel.com>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <Pine.LNX.4.64.1310291009121.8404@axis700.grange>
+ <1383051980.29619.33.camel@sauron.fi.intel.com>
+Message-ID: <1844190.ApyucSZX8W@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Artem,
 
-On 10/28/2013 08:25 PM, Kumar Gala wrote:
-> On Oct 14, 2013, at 7:46 AM, Maxime COQUELIN wrote:
->
->> This patch adds support to SSC (Synchronous Serial Controller)
->> I2C driver. This IP also supports SPI protocol, but this is not
->> the aim of this driver.
->>
->> This IP is embedded in all ST SoCs for Set-top box platorms, and
->> supports I2C Standard and Fast modes.
->>
->> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
->> ---
->> Documentation/devicetree/bindings/i2c/i2c-st.txt |   38 +
->> drivers/i2c/busses/Kconfig                       |   10 +
->> drivers/i2c/busses/Makefile                      |    1 +
->> drivers/i2c/busses/i2c-st.c                      |  867 ++++++++++++++++++++++
->> 4 files changed, 916 insertions(+)
->> create mode 100644 Documentation/devicetree/bindings/i2c/i2c-st.txt
->> create mode 100644 drivers/i2c/busses/i2c-st.c
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
->> new file mode 100644
->> index 0000000..8b2fd0b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-st.txt
->> @@ -0,0 +1,38 @@
->> +ST SSC binding, for I2C mode operation
->> +
->> +Required properties :
->> +- compatible : Must be "st,comms-i2c"
->> +- reg : Offset and length of the register set for the device
->> +- interrupts : the interrupt specifier
->> +- clock-names: Must contain "ssc".
->> +- clocks: Must contain an entry for each name in clock-names. See the common
->> +  clock bindings.
->> +- A pinctrl state named "default" must be defined, using the bindings in
->> +  ../pinctrl/pinctrl-binding.txt
->> +
->> +Optional properties :
->> +- clock-frequency : Desired I2C bus clock frequency in Hz. If not specified,
->> +  the default 100 kHz frequency will be used. As only Normal and Fast modes
->> +  are supported, possible values are 100000 and 400000.
->> +- i2c-min-scl-pulse-width-us : The minimum valid SCL pulse width that is
->> +  allowed through the deglitch circuit. In units of us.
->> +- i2c-min-sda-pulse-width-us : The minimum valid SDA pulse width that is
->> +  allowed through the deglitch circuit. In units of us.
-> i2c-min... should be vendor prefixed, st,i2c-min...
-This was already discussed in earlier revisions of the patches.
-Initially this was prefixed with "st,", but Wolfram asked to put these 
-properties as generic.
-As explained in the cover letter, there are no I2C DT binding 
-documentation for now, but it is in Wolfram's ToDo list.
-As soon as Wolfram has created the documentation, I will create a patch 
-to document
+On Tuesday 29 October 2013 15:06:20 Artem Bityutskiy wrote:
+> On Tue, 2013-10-29 at 10:12 +0100, Guennadi Liakhovetski wrote:
+> > On Tue, 29 Oct 2013, Laurent Pinchart wrote:
+> > > Hello,
+> > > 
+> > > This patch series, based on v3.12-rc7, prepares various Renesas drivers
+> > > for migration to multiplatform kernels by enabling their compilation or
+> > > otherwise fixing them on all ARM platforms. The patches are pretty
+> > > straightforward and are described in their commit message.
+> > > 
+> > > I'd like to get all these patches merged in v3.14. As they will need to
+> > > go through their respective subsystems' trees, I would appreciate if all
+> > > maintainers involved could notify me when they merge patches from this
+> > > series in their tree to help me tracking the merge status. I don't plan
+> > > to send pull requests individually for these patches, and I will repost
+> > > patches individually if changes are requested during review.
+> > > 
+> > > If you believe the issue should be solved in a different way (for
+> > > instance by removing the architecture dependency completely) please
+> > > reply to the cover letter to let other maintainers chime in.
+> > 
+> > Exactly this was my doubt. If we let these drivers build on all ARM
+> > platforms... Maybe we should just let them build everywhere? Unless there
+> > are real ARM dependencies. Maybe you could try to remove the restriction
+> > and try to build them all on x86?
+> 
+> If they have never been used on anything but ARM, why would you remove
+> ARM dependencies? Just for the sake of compile-checking?
+> 
+> Also, if ARM dependency is ever removed, all these should become 'n' by
+> default in the Kconfig, in order to make sure they do not slip into
+> defconfigs of different architectures.
 
-i2c-min-scl-pulse-width-us and i2c-min-sda-pulse-width-us there.
+The idea is that, if ARM is neither a compile-time nor runtime dependency, it 
+should not be specified in Kconfig. However, if the IP core has never been 
+used on anything but SuperH and ARM, I don't think clobbering the config 
+process with drivers that can't be used on the target architecture would be a 
+really good idea, especially now that we have a COMPILE_TEST Kconfig option. 
+My preference does goes to SUPERH || ARM || COMPILE_TEST over no dependency at 
+all.
 
+-- 
+Regards,
 
->
->> +- A pinctrl state named "sleep" could be defined, using the bindings in
->> +  ../pinctrl/pinctrl-binding.txt
-> I don't see any reference to "sleep" in pinctrl-binding.txt
-Right, I will correct that.
-
-Thanks for the review,
-Maxime
->
-> - k
->
+Laurent Pinchart
