@@ -1,99 +1,96 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 29 Oct 2013 03:09:52 -0500
-Subject: [RFC][PATCHv5 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F8286BD27@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1382951151-31517-1-git-send-email-Li.Xiubo@freescale.com>
- <224C2E26-6C33-4DBB-BC06-A4BA470FDA39@codeaurora.org>
- <1DD289F6464F0949A2FCA5AA6DC23F8286BD27@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <754E4595-A2C5-4BAD-BBA7-29091A83197B@codeaurora.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 29 Oct 2013 09:10:24 +0100 (CET)
+Subject: [PATCH 07/12] mmc: sh_mmcif: Convert to clk_prepare/unprepare
+In-Reply-To: <1383000569-8916-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <Pine.LNX.4.64.1310290910160.8404@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 28 Oct 2013, Laurent Pinchart wrote:
 
-On Oct 28, 2013, at 10:48 PM, Xiubo Li-B47053 wrote:
-
->>> This adds the Document for Freescale FTM PWM driver under
->>> Documentation/devicetree/bindings/pwm/.
->>> 
->>> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
->>> ---
->>> .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 34
->> ++++++++++++++++++++++
->>> 1 file changed, 34 insertions(+)
->>> create mode 100644
->>> Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
->>> 
->>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
->>> b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
->>> new file mode 100644
->>> index 0000000..175b762
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
->>> @@ -0,0 +1,34 @@
->>> +Freescale FTM PWM controller
->> 
->> What does FTM stand for, and can we spell out PWM at least once early on.
->> 
+> Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
+> clk_disable_unprepare() to get ready for the migration to the common
+> clock framework.
 > 
-> "FTM" is for short of "FlexTimer Module", I'll use the full name then.
-> 
->>> +
->>> +Required properties:
->>> +- compatible: Should be "fsl,vf610-ftm-pwm"
->>> +- reg: Physical base address and length of the controller's registers
->>> +- #pwm-cells: Should be 3. See pwm.txt in this directory for a
->>> +description of
->>> +  the cells format.
->>> +- clock-names : Includes the following module clock source entries:
->>> +    "ftm0" (system clock),
->>> +    "ftm0_fix_sel" (fixed frequency clock),
->>> +    "ftm0_ext_sel" (external clock)
->>> +- clocks : Must contain a clock specifier for each entry in
->>> +clock-names,
->>> +  See ../clock/clock-bindings.txt for details of the property values.
->>> +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be
->>> +one of the
->>> +  entries in clock-names.
->> 
->> Why do we need this, why not just have only the clock-names/clocks
->> reference the clk that is actually used?
->> 
-> 
-> As I have replied before, the FTM has two clock sources: the module clock and the counter clock.
-> 
-> The counter clock source is selectable depends on different board and also the hardware design:
-> +++++
-> * FTM source clock is selectable
-> * Source clock can be the system clock, the fixed frequency clock, or an external
-> clock
-> * Fixed frequency clock is an additional clock input to allow the selection of an on
-> chip clock source other than the system clock
-> * Selecting external clock connects FTM clock to a chip level input pin therefore
-> allowing to synchronize the FTM counter with an off chip clock source
-> -----
-> From the above description we can see that the external clock source can allow to synchronize the
-> FTM counter with an off chip clock source.
-> 
-> As the chip spec permits the counter clock source be selectable, so the different board maybe has different
-> implementation, if the driver do not support, this will be a bug.
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The binding specs the HW so what a driver does or doesn't support isn't relevant.  Since I assume only one of these clocks makes sense for a given system I don't see a reason the binding should not just state that a given dts will have the one the system specified rather than all 3.
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
->>> +- pinctrl-names: must contain a "default" entry.
->>> +- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
->>> +  See ../pinctrl/pinctrl-bindings.txt for details of the property
->> values.
->> 
->> let's drop the .. when making directory references.
->> 
+Thanks
+Guennadi
+
+> ---
+>  drivers/mmc/host/sh_mmcif.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 > 
-> Is absolute path " Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt " or just "pinctrl/pinctrl-bindings.txt " ?
+> diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+> index 36629a0..37a6c57 100644
+> --- a/drivers/mmc/host/sh_mmcif.c
+> +++ b/drivers/mmc/host/sh_mmcif.c
+> @@ -964,7 +964,7 @@ static void sh_mmcif_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>  
+>  static int sh_mmcif_clk_update(struct sh_mmcif_host *host)
+>  {
+> -	int ret = clk_enable(host->hclk);
+> +	int ret = clk_prepare_enable(host->hclk);
+>  
+>  	if (!ret) {
+>  		host->clk = clk_get_rate(host->hclk);
+> @@ -1018,7 +1018,7 @@ static void sh_mmcif_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  		}
+>  		if (host->power) {
+>  			pm_runtime_put_sync(&host->pd->dev);
+> -			clk_disable(host->hclk);
+> +			clk_disable_unprepare(host->hclk);
+>  			host->power = false;
+>  			if (ios->power_mode == MMC_POWER_OFF)
+>  				sh_mmcif_set_power(host, ios);
+> @@ -1466,7 +1466,7 @@ static int sh_mmcif_probe(struct platform_device *pdev)
+>  
+>  	mutex_init(&host->thread_lock);
+>  
+> -	clk_disable(host->hclk);
+> +	clk_disable_unprepare(host->hclk);
+>  	ret = mmc_add_host(mmc);
+>  	if (ret < 0)
+>  		goto emmcaddh;
+> @@ -1487,7 +1487,7 @@ ereqirq1:
+>  ereqirq0:
+>  	pm_runtime_suspend(&pdev->dev);
+>  eresume:
+> -	clk_disable(host->hclk);
+> +	clk_disable_unprepare(host->hclk);
+>  eclkupdate:
+>  	clk_put(host->hclk);
+>  eclkget:
+> @@ -1505,7 +1505,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
+>  	int irq[2];
+>  
+>  	host->dying = true;
+> -	clk_enable(host->hclk);
+> +	clk_prepare_enable(host->hclk);
+>  	pm_runtime_get_sync(&pdev->dev);
+>  
+>  	dev_pm_qos_hide_latency_limit(&pdev->dev);
+> @@ -1530,7 +1530,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
+>  	if (irq[1] >= 0)
+>  		free_irq(irq[1], host);
+>  
+> -	clk_disable(host->hclk);
+> +	clk_disable_unprepare(host->hclk);
+>  	mmc_free_host(host->mmc);
+>  	pm_runtime_put_sync(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+> -- 
+> 1.8.1.5
+> 
 
-The later.
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
