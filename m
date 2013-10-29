@@ -1,56 +1,60 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 14:22:28 +0100
-Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
-In-Reply-To: <1383051980.29619.33.camel@sauron.fi.intel.com>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <Pine.LNX.4.64.1310291009121.8404@axis700.grange>
- <1383051980.29619.33.camel@sauron.fi.intel.com>
-Message-ID: <1844190.ApyucSZX8W@avalon>
+Date: Tue, 29 Oct 2013 14:24:57 +0100
+Subject: [PATCH 02/12] clocksource: sh_mtu2: Add clk_prepare/unprepare
+ support
+In-Reply-To: <526F98BD.9000904@cogentembedded.com>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <526F98BD.9000904@cogentembedded.com>
+Message-ID: <12808622.W4bQC68mNI@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem,
+Hi Sergei,
 
-On Tuesday 29 October 2013 15:06:20 Artem Bityutskiy wrote:
-> On Tue, 2013-10-29 at 10:12 +0100, Guennadi Liakhovetski wrote:
-> > On Tue, 29 Oct 2013, Laurent Pinchart wrote:
-> > > Hello,
-> > > 
-> > > This patch series, based on v3.12-rc7, prepares various Renesas drivers
-> > > for migration to multiplatform kernels by enabling their compilation or
-> > > otherwise fixing them on all ARM platforms. The patches are pretty
-> > > straightforward and are described in their commit message.
-> > > 
-> > > I'd like to get all these patches merged in v3.14. As they will need to
-> > > go through their respective subsystems' trees, I would appreciate if all
-> > > maintainers involved could notify me when they merge patches from this
-> > > series in their tree to help me tracking the merge status. I don't plan
-> > > to send pull requests individually for these patches, and I will repost
-> > > patches individually if changes are requested during review.
-> > > 
-> > > If you believe the issue should be solved in a different way (for
-> > > instance by removing the architecture dependency completely) please
-> > > reply to the cover letter to let other maintainers chime in.
+On Tuesday 29 October 2013 15:15:09 Sergei Shtylyov wrote:
+> On 29-10-2013 2:49, Laurent Pinchart wrote:
+> > Prepare the clock at probe time, as there is no other appropriate place
+> > in the driver where we're allowed to sleep.
 > > 
-> > Exactly this was my doubt. If we let these drivers build on all ARM
-> > platforms... Maybe we should just let them build everywhere? Unless there
-> > are real ARM dependencies. Maybe you could try to remove the restriction
-> > and try to build them all on x86?
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: linux-kernel at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >   drivers/clocksource/sh_mtu2.c | 16 ++++++++++++++--
+> >   1 file changed, 14 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+> > index 4aac9ee..3cf1283 100644
+> > --- a/drivers/clocksource/sh_mtu2.c
+> > +++ b/drivers/clocksource/sh_mtu2.c
+> > @@ -313,8 +313,20 @@ static int sh_mtu2_setup(struct sh_mtu2_priv *p,
+> > struct platform_device *pdev)> 
+> >   		goto err1;
+> >   	}
+> > 
+> > -	return sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
+> > -				cfg->clockevent_rating);
+> > +	ret = clk_prepare(p->clk);
+> > +	if (ret < 0)
+> > +		goto err2;
+> > +
+> > +	ret = sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
+> > +			       cfg->clockevent_rating);
+> > +	if (ret < 0)
+> > +		goto err3;
+> > +
+> > +	return 0;
+> > + err3:
+> > +	clk_unprepare(p->clk);
+> > + err2:
+> > +	clk_put(p->clk);
 > 
-> If they have never been used on anything but ARM, why would you remove
-> ARM dependencies? Just for the sake of compile-checking?
-> 
-> Also, if ARM dependency is ever removed, all these should become 'n' by
-> default in the Kconfig, in order to make sure they do not slip into
-> defconfigs of different architectures.
+>     This one seems to be a fix and so needs to be in a separate patch...
 
-The idea is that, if ARM is neither a compile-time nor runtime dependency, it 
-should not be specified in Kconfig. However, if the IP core has never been 
-used on anything but SuperH and ARM, I don't think clobbering the config 
-process with drivers that can't be used on the target architecture would be a 
-really good idea, especially now that we have a COMPILE_TEST Kconfig option. 
-My preference does goes to SUPERH || ARM || COMPILE_TEST over no dependency at 
-all.
+I'll split the patch and repost (same for 03/12)
 
 -- 
 Regards,
