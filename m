@@ -1,28 +1,56 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 29 Oct 2013 16:32:21 +0800
-Subject: [PATCH v2 4/6] ASoC: sirf-soc-inner: add drivers for both CPU and
- Codec DAIs
-In-Reply-To: <20131028233603.GA16686@sirena.org.uk>
-References: <1383001534-20703-1-git-send-email-Baohua.Song@csr.com>
- <20131028233603.GA16686@sirena.org.uk>
-Message-ID: <CAGsJ_4xG6KaxrrrsaWJi9K3444JFT5h6sB-qV2VK8++NXuXkaQ@mail.gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 29 Oct 2013 03:33:31 -0500
+Subject: [PATCHv2 1/3] Input: twl4030-keypad - add device tree support
+In-Reply-To: <20131029010608.GA5353@earth.universe>
+References: <1382446042-27099-1-git-send-email-sre@debian.org>
+ <1382446042-27099-2-git-send-email-sre@debian.org>
+ <5137C017-2515-427C-865F-B938CC24B210@codeaurora.org>
+ <20131029010608.GA5353@earth.universe>
+Message-ID: <14DEC9DA-8C77-4F73-AF3A-6C0D20C6C1AB@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/10/29 Mark Brown <broonie@kernel.org>:
-> On Tue, Oct 29, 2013 at 07:05:34AM +0800, Barry Song wrote:
->> From: Rongjun Ying <Rongjun.Ying@csr.com>
->>
->> there is an internal codec embedded in the SiRF SoC. this is not
->
-> I've only got patch 4 - where are the other patches?
-sorry i got some network problems and made some misoperations. others
-have been in your mailboxs:
-[PATCH v2 1/6] ASoC: sirf: add sirf platform driver which provides DMA
-http://www.spinics.net/lists/arm-kernel/msg282590.html
-[PATCH v2 2/6] ASoC: sirf: add I2S CPU DAI driver
-http://www.spinics.net/lists/arm-kernel/msg282591.html
-[PATCH v2 3/6] ASoC: usp-pcm: add CPU DAI driver for PCM simulated from USP
-http://www.spinics.net/lists/arm-kernel/msg282592.html
-...
--barry
+
+On Oct 28, 2013, at 8:06 PM, Sebastian Reichel wrote:
+
+> On Mon, Oct 28, 2013 at 01:42:47AM -0500, Kumar Gala wrote:
+>>> +This binding is based on the matrix-keymap binding with the following
+>>> +changes:
+>> 
+>> Maybe be a bit more specific and say 'based on the input/matrix-keymap.txt binding'..
+> 
+> OK.
+> 
+>>> + * keypad,num-rows and keypad,num-columns are required.
+>> 
+>> Is linux,keymap required from matrix-keymap.txt?
+> 
+> Yes, matrix-keymap.txt contains descriptions for the following:
+> 
+> required:
+> - linux,keymap
+
+So you don't say that linux,keymap is required for twl4030-keypad (wasn't clear if you assumed that or not).
+
+> optional:
+> - keypad,num-rows
+> - keypad,num-columns
+> 
+>>> +Optional Properties specific to linux:
+>>> +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
+>> 
+>> Does it make sense to update the matrix-keymap.txt binding to add
+>> 'linux,keypad-no-autorepeat' there?
+> 
+> At least according to devicetree documentation there are
+> keymap-matrix.txt based drivers, which do not support
+> "linux,keypad-no-autorepeat".
+
+Which is why it could be optional in keymap-matrix.txt.  I dont know anything about keymap/keypad's just asking the question?
+
+It seems as if linux,keypad-no-autorepeat is intended to mean the same thing (if relevant to the device) across all drivers.  Is that correct?  If so it seems like moving it to be specified in a generic input binding makes sense, just not sure if keymap-matrix.txt is that place or not.
+
+- k
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
