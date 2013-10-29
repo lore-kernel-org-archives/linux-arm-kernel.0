@@ -1,31 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Oct 2013 18:53:52 +0000
-Subject: [PATCH v3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <CAOMZO5DN0KGvUBut0BqyvPTdyByWtZ=uamTpQGeENBzMOfJK3A@mail.gmail.com>
-References: <1382992009-19407-1-git-send-email-festevam@gmail.com>
- <20131028211945.GJ16735@n2100.arm.linux.org.uk>
- <CAOMZO5BYXv4whoRrRD7pF5zj9DArEnbqFaZVdLgZgPC2nSDePw@mail.gmail.com>
- <CAOMZO5DN0KGvUBut0BqyvPTdyByWtZ=uamTpQGeENBzMOfJK3A@mail.gmail.com>
-Message-ID: <20131029185352.GT16735@n2100.arm.linux.org.uk>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 30 Oct 2013 00:32:01 +0530
+Subject: [Patch v4 0/2] Enable all cpus in Exynos5420
+In-Reply-To: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
+References: <1381119431-12697-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <CANuQgHEx+pNdaybeJ_dpQ5kWYpA44hrYj4ikW9d60a3hEZZPDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 01:45:50PM -0200, Fabio Estevam wrote:
-> On Tue, Oct 29, 2013 at 1:00 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> 
-> > Today I was able to get access to a wandboard solo and the HDMI image
-> > does look different compared to a wandboard quad board:
-> >
-> > - The Linux logo penguins are steady on mx6q, but on mx6solo the
-> > contour lines look like they flicker.
-> > - The kernel log text appears in good white colour with mx6q, but not
-> > so white on mx6solo (tending to green).
-> >
-> > Even the U-boot HDMI splash screen is not very steady on mx6solo.
-> >
-> > I will try to look at these mx6 solo HDMI issues.
-> 
-> With the change below I am able to get a good HDMI quality image on
-> mx6solo (and mx6quad as well):
+Hi Kukjin,
 
-Yes, I need that too on the Carrier-1 board, as suggested by Sascha.
+On 7 October 2013 09:47, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+> Exynos5420 is an octa-core SoC. This patch series enables the remaining 4 cores.
+>
+> Changes in v2:
+>         - Changed the cpu node @unit-address value to reg property value.
+> Changes in v3:
+>         - Removed leading 0x from @unit-address value.
+> Changes in v4:
+>         - Fixed typo and patch subject from "arm: dt" to "ARM: dt".
+>
+> Chander Kashyap (2):
+>   clocksource: mct: extend mct to support 8 local interrupts for
+>     Exynos5420
+>   arm: dt: Exynos5420: populate cpu node enteries to 8 cpus
+>
+>  arch/arm/boot/dts/exynos5420.dtsi |   37 +++++++++++++++++++++++++++++++++++--
+>  drivers/clocksource/exynos_mct.c  |    4 ++++
+>  2 files changed, 39 insertions(+), 2 deletions(-)
+>
+> --
+> 1.7.9.5
+>
+
+?
+
+Can you please take these patches?
+
+-- 
+with warm regards,
+Chander Kashyap
