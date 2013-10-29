@@ -1,29 +1,53 @@
-From: B42378@freescale.com (Chen Guangyu-B42378)
-Date: Tue, 29 Oct 2013 12:53:35 +0000
-Subject: [PATCH 2/3] ASoC: fsl_ssi: Add dual fifo mode support
-In-Reply-To: <526FAD41.2000805@tabi.org>
-References: <cover.1383047327.git.b42378@freescale.com>
- <02f8867363ed3038a0a70703856e4b642fef4339.1383047327.git.b42378@freescale.com>,
- <526FAD41.2000805@tabi.org>
-Message-ID: <flq2m8se8fxm4icha4yrpcbn.1383051217235@email.android.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 29 Oct 2013 13:54:07 +0100 (CET)
+Subject: [PATCH 2/6] genirq: export percpu irq functions for module usage
+In-Reply-To: <1383006690-6754-3-git-send-email-sboyd@codeaurora.org>
+References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
+ <1383006690-6754-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <alpine.DEB.2.02.1310291353140.8257@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without dual fifo support,  handware underrun would occasionally occur and then two audio channels would physically swap. This could be easily reproduced in low bus frequency situation, while it would be better if we enable dual fifo.
+On Mon, 28 Oct 2013, Stephen Boyd wrote:
 
-Sent by Android device.
+> In the near future we're going to use these percpu irq functions
+> in the Krait CPU EDAC driver. Export them so that the EDAC driver
+> can be compiled as a module.
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Timur Tabi <timur@tabi.org> wrote:
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
 
+Please take it through the tree which will take the EDAC patches.
 
-Nicolin Chen wrote:
-> By enabling dual fifo mode, it would allow SSI enter a better performance
-> to transimit/receive data without occasional hardware underrun/overrun.
+Thanks,
 
-Have you measured any real performance gain with this patch?  I
-considered adding dual-FIFO support when I originally wrote this driver,
-but it didn't appear to have any real benefit, but it used twice as many
-DMA channels.
+	tglx
 
-I'm concerned that this is another patch that just enables a useless
-feature.
+> ---
+>  kernel/irq/manage.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+> index 514bcfd..c6009d1 100644
+> --- a/kernel/irq/manage.c
+> +++ b/kernel/irq/manage.c
+> @@ -1623,6 +1623,7 @@ void free_percpu_irq(unsigned int irq, void __percpu *dev_id)
+>  	kfree(__free_percpu_irq(irq, dev_id));
+>  	chip_bus_sync_unlock(desc);
+>  }
+> +EXPORT_SYMBOL_GPL(free_percpu_irq);
+>  
+>  /**
+>   *	setup_percpu_irq - setup a per-cpu interrupt
+> @@ -1693,3 +1694,4 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+>  
+>  	return retval;
+>  }
+> +EXPORT_SYMBOL_GPL(request_percpu_irq);
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> 
