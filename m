@@ -1,128 +1,378 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Oct 2013 09:47:55 -0700
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <Pine.LNX.4.64.1310250840350.6186@axis700.grange>
-References: <1381940926-25564-1-git-send-email-vinod.koul@intel.com>
- <1381940926-25564-2-git-send-email-vinod.koul@intel.com>
- <Pine.LNX.4.64.1310162028340.22648@axis700.grange>
- <CAPcyv4hOZHmegDiPYmeVWzOUCasQaixzCzpLHs37i7RZznhGsA@mail.gmail.com>
- <20131017020745.GA14013@intel.com>
- <20131017142755.GA4477@breakpoint.cc>
- <20131017134846.GG14013@intel.com>
- <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
- <20131025042310.GC21230@intel.com>
- <Pine.LNX.4.64.1310250813370.6186@axis700.grange>
- <20131025054321.GD21230@intel.com>
- <Pine.LNX.4.64.1310250840350.6186@axis700.grange>
-Message-ID: <CAOesGMivD_3zSL503R0OaqyGv4Rj8qJqnbM2TdmjtxR2U63ztw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 29 Oct 2013 09:52:15 -0700
+Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
+In-Reply-To: <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
+Message-ID: <526FE7BF.1060402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/28/13 11:12, Josh Cartwright wrote:
+> diff --git a/drivers/spmi/Kconfig b/drivers/spmi/Kconfig
+> new file mode 100644
+> index 0000000..a03835f
+> --- /dev/null
+> +++ b/drivers/spmi/Kconfig
+> @@ -0,0 +1,9 @@
+> +#
+> +# SPMI driver configuration
+> +#
+> +menuconfig SPMI
+> +	bool "SPMI support"
 
-On Thu, Oct 24, 2013 at 11:43 PM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> On Fri, 25 Oct 2013, Vinod Koul wrote:
->
->> On Fri, Oct 25, 2013 at 08:32:12AM +0200, Guennadi Liakhovetski wrote:
->> > Hi Vinod
->> >
->> > On Fri, 25 Oct 2013, Vinod Koul wrote:
->> >
->> > > On Thu, Oct 24, 2013 at 11:28:29PM +0200, Guennadi Liakhovetski wrote:
->> > > > Hi Vinod
->> > > >
->> > > > On Thu, 17 Oct 2013, Vinod Koul wrote:
->> > > > > Yes i missed it in first place update the patch to fix that
->> > > >
->> > > > Are you planning to post a fixed version of this patch or you just fix it
->> > > > internally? Would be good to have it posted to be able to ack it and other
->> > > > relevant patches.
->> > > looks like you missed it... I had posted updated patch [1] in this thread here
->> > > and I posted 29th patch as removal one [2]
->> >
->> > No, I didn't miss those, but as Sebastian pointed out and as I commented
->> > too, also that v2 version wasn't correct, so, a fixed v3 was needed.
->> > Consider this:
->> >
->> > In patch 1 you do:
->> >
->> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
->> > index 0bc7275..683c380 100644
->> > --- a/include/linux/dmaengine.h
->> > +++ b/include/linux/dmaengine.h
->> > @@ -45,16 +45,17 @@ static inline int dma_submit_error(dma_cookie_t cookie)
->> >
->> >  /**
->> >   * enum dma_status - DMA transaction status
->> > - * @DMA_SUCCESS: transaction completed successfully
->> > + * @DMA_COMPLETE: transaction completed
->> >   * @DMA_IN_PROGRESS: transaction not yet processed
->> >   * @DMA_PAUSED: transaction is paused
->> >   * @DMA_ERROR: transaction failed
->> >   */
->> >  enum dma_status {
->> > -   DMA_SUCCESS,
->> > +   DMA_COMPLETE,
->> >     DMA_IN_PROGRESS,
->> >     DMA_PAUSED,
->> >     DMA_ERROR,
->> > +   DMA_SUCCESS,
->> >  };
->> >
->> >  /**
->> >
->> > and then in a couple of places
->> >
->> > -                   return DMA_SUCCESS;
->> > +                   return DMA_COMPLETE;
->> >
->> > So, after that your patch dmaengine would be returning DMA_COMPLETE in
->> > case of success, i.e. 0. But all the DMAC and user drivers would still be
->> > checking for
->> >
->> >     if (status != DMA_COMPLETE) {
->> >
->> > i.e. comparing status with 4 and thus detecting false errors, until your
->> > further 28 patches fix them. That's why, as Sebastian pointed out it was
->> > important to define DMA_COMPLETE and DMA_SUCCESS with the _same_ numerical
->> > value in your patch 1.
->> Sure, I will fix this up now as suggested
->>
->>   enum dma_status {
->>  -    DMA_SUCCESS,
->>  +    DMA_COMPLETE = 0, DMA_SUCCESS = 0,
->>
->> Thanks for poiting out.
->
-> Great! In my reply to Sebastian I proposed an equivlent but slightly
-> different version:
->
->  enum dma_status {
-> -       DMA_SUCCESS,
-> +       DMA_COMPLETE,
->         DMA_IN_PROGRESS,
->         DMA_PAUSED,
->         DMA_ERROR,
->  };
->
-> + #define DMA_SUCCESS DMA_COMPLETE
->
-> but it doesn't really matter. Feel free to use whichever version you
-> prefer.
+Can we do tristate?
 
+> +	help
+> +	  SPMI (System Power Management Interface) is a two-wire
+> +	  serial interface between baseband and application processors
+> +	  and Power Management Integrated Circuits (PMIC).
+> diff --git a/drivers/spmi/spmi.c b/drivers/spmi/spmi.c
+> new file mode 100644
+> index 0000000..0780bd4
+> --- /dev/null
+> +++ b/drivers/spmi/spmi.c
+> @@ -0,0 +1,491 @@
+> +/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/errno.h>
+> +#include <linux/idr.h>
+> +#include <linux/slab.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spmi.h>
+> +#include <linux/module.h>
+> +#include <linux/pm_runtime.h>
+> +
+> +#include <dt-bindings/spmi/spmi.h>
+> +
+> +static DEFINE_MUTEX(ctrl_idr_lock);
+> +static DEFINE_IDR(ctrl_idr);
+> +
+> +static void spmi_dev_release(struct device *dev)
+> +{
+> +	struct spmi_device *sdev = to_spmi_device(dev);
+> +	kfree(sdev);
+> +}
+> +
+> +static struct device_type spmi_dev_type = {
+> +	.release	= spmi_dev_release,
 
-This patch broke some TI platforms (using edma) due to namespace
-conflicts. The error is:
+const?
 
-../../include/linux/dmaengine.h:54:2: error: expected identifier
-before numeric constant   (for DMA_COMPLETE)
+> +};
+> +
+> +static void spmi_ctrl_release(struct device *dev)
+> +{
+> +	struct spmi_controller *ctrl = to_spmi_controller(dev);
+> +	mutex_lock(&ctrl_idr_lock);
+> +	idr_remove(&ctrl_idr, ctrl->nr);
+> +	mutex_unlock(&ctrl_idr_lock);
+> +	kfree(ctrl);
+> +}
+> +
+> +static struct device_type spmi_ctrl_type = {
 
-.. it's because they define DMA_COMPLETE in include/platform_data/edma.h.
+const?
 
-The edma driver seems to overall lack prefixes and thus pollutes
-global namespaces, so it should be fixed up.
+> +	.release	= spmi_ctrl_release,
+> +};
+> +
+[...]
+> +
+> +/*
+> + * register read/write: 5-bit address, 1 byte of data
+> + * extended register read/write: 8-bit address, up to 16 bytes of data
+> + * extended register read/write long: 16-bit address, up to 8 bytes of data
+> + */
+> +
+> +int spmi_register_read(struct spmi_device *sdev, u8 addr, u8 *buf)
+> +{
+> +	/* 5-bit register address */
+> +	if (addr > 0x1F)
 
+Perhaps 0x1f should be a #define.
 
--Olof
+> +		return -EINVAL;
+> +
+> +	return spmi_read_cmd(sdev->ctrl, SPMI_CMD_READ, sdev->usid, addr, 0,
+> +			     buf);
+> +}
+> +EXPORT_SYMBOL_GPL(spmi_register_read);
+> +
+[...]
+> +struct spmi_controller *spmi_controller_alloc(struct device *parent,
+> +					      size_t size)
+> +{
+> +	struct spmi_controller *ctrl;
+> +	int id;
+> +
+> +	if (WARN_ON(!parent))
+> +		return NULL;
+> +
+> +	ctrl = kzalloc(sizeof(*ctrl) + size, GFP_KERNEL);
+> +	if (!ctrl)
+> +		return NULL;
+> +
+> +	device_initialize(&ctrl->dev);
+> +	ctrl->dev.type = &spmi_ctrl_type;
+> +	ctrl->dev.bus = &spmi_bus_type;
+> +	ctrl->dev.parent = parent;
+> +	ctrl->dev.of_node = parent->of_node;
+> +	spmi_controller_set_drvdata(ctrl, &ctrl[1]);
+> +
+> +	idr_preload(GFP_KERNEL);
+> +	mutex_lock(&ctrl_idr_lock);
+> +	id = idr_alloc(&ctrl_idr, ctrl, 0, 0, GFP_NOWAIT);
+> +	mutex_unlock(&ctrl_idr_lock);
+> +	idr_preload_end();
+
+This can just be:
+
+    mutex_lock(&ctrl_idr_lock);
+    id = idr_alloc(&ctrl_idr, ctrl, 0, 0, GFP_KERNEL);
+    mutex_unlock(&ctrl_idr_lock);
+
+> +
+> +	if (id < 0) {
+> +		dev_err(parent,
+> +			"unable to allocate SPMI controller identifier.\n");
+> +		spmi_controller_put(ctrl);
+> +		return NULL;
+> +	}
+> +
+> +	ctrl->nr = id;
+> +	dev_set_name(&ctrl->dev, "spmi-%d", id);
+> +
+> +	dev_dbg(&ctrl->dev, "allocated controller 0x%p id %d\n", ctrl, id);
+> +	return ctrl;
+> +}
+> +EXPORT_SYMBOL_GPL(spmi_controller_alloc);
+> +
+> +static int of_spmi_register_devices(struct spmi_controller *ctrl)
+> +{
+> +	struct device_node *node;
+> +	int err;
+> +
+> +	dev_dbg(&ctrl->dev, "of_spmi_register_devices\n");
+
+Could be
+
+    dev_dbg(&ctrl->dev, "%s", __func__);
+
+so that function renaming is transparent.
+
+> +
+> +	if (!ctrl->dev.of_node)
+> +		return -ENODEV;
+> +
+> +	dev_dbg(&ctrl->dev, "looping through children\n");
+> +
+> +	for_each_available_child_of_node(ctrl->dev.of_node, node) {
+> +		struct spmi_device *sdev;
+> +		u32 reg[2];
+> +
+> +		dev_dbg(&ctrl->dev, "adding child %s\n", node->full_name);
+> +
+> +		err = of_property_read_u32_array(node, "reg", reg, 2);
+> +		if (err) {
+> +			dev_err(&ctrl->dev,
+> +				"node %s does not have 'reg' property\n",
+> +				node->full_name);
+> +				continue;
+> +		}
+> +
+> +		if (reg[1] != SPMI_USID) {
+> +			dev_err(&ctrl->dev,
+> +				"node %s contains unsupported 'reg' entry\n",
+> +				node->full_name);
+> +			continue;
+> +		}
+> +
+> +		if (reg[0] > 0xF) {
+
+Perhaps call this MAX_USID?
+
+> +			dev_err(&ctrl->dev,
+> +				"invalid usid on node %s\n",
+> +				node->full_name);
+> +			continue;
+> +		}
+> +
+[...]
+> diff --git a/include/linux/spmi.h b/include/linux/spmi.h
+> new file mode 100644
+> index 0000000..29cf0c9
+> --- /dev/null
+> +++ b/include/linux/spmi.h
+> @@ -0,0 +1,342 @@
+> +/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#ifndef _LINUX_SPMI_H
+> +#define _LINUX_SPMI_H
+> +
+> +#include <linux/types.h>
+> +#include <linux/device.h>
+> +#include <linux/mod_devicetable.h>
+> +
+> +/* Maximum slave identifier */
+> +#define SPMI_MAX_SLAVE_ID		16
+> +
+> +/* SPMI Commands */
+> +#define SPMI_CMD_EXT_WRITE		0x00
+> +#define SPMI_CMD_RESET			0x10
+> +#define SPMI_CMD_SLEEP			0x11
+> +#define SPMI_CMD_SHUTDOWN		0x12
+> +#define SPMI_CMD_WAKEUP			0x13
+> +#define SPMI_CMD_AUTHENTICATE		0x14
+> +#define SPMI_CMD_MSTR_READ		0x15
+> +#define SPMI_CMD_MSTR_WRITE		0x16
+> +#define SPMI_CMD_TRANSFER_BUS_OWNERSHIP	0x1A
+> +#define SPMI_CMD_DDB_MASTER_READ	0x1B
+> +#define SPMI_CMD_DDB_SLAVE_READ		0x1C
+> +#define SPMI_CMD_EXT_READ		0x20
+> +#define SPMI_CMD_EXT_WRITEL		0x30
+> +#define SPMI_CMD_EXT_READL		0x38
+> +#define SPMI_CMD_WRITE			0x40
+> +#define SPMI_CMD_READ			0x60
+> +#define SPMI_CMD_ZERO_WRITE		0x80
+> +
+> +/**
+> + * Client/device handle (struct spmi_device):
+
+This isn't kernel-doc format.
+
+> + *  This is the client/device handle returned when a SPMI device
+> + *  is registered with a controller.
+> + *  Pointer to this structure is used by client-driver as a handle.
+> + *  @dev: Driver model representation of the device.
+> + *  @ctrl: SPMI controller managing the bus hosting this device.
+> + *  @usid: Unique Slave IDentifier.
+> + */
+> +struct spmi_device {
+> +	struct device		dev;
+> +	struct spmi_controller	*ctrl;
+> +	u8			usid;
+> +};
+> +#define to_spmi_device(d) container_of(d, struct spmi_device, dev)
+> +
+> +static inline void *spmi_device_get_drvdata(const struct spmi_device *sdev)
+> +{
+> +	return dev_get_drvdata(&sdev->dev);
+> +}
+> +
+> +static inline void spmi_device_set_drvdata(struct spmi_device *sdev, void *data)
+> +{
+> +	dev_set_drvdata(&sdev->dev, data);
+> +}
+> +
+> +/**
+> + * spmi_controller_alloc: Allocate a new SPMI controller
+
+There should be a dash here instead of colon.
+
+> + * @ctrl: associated controller
+> + *
+> + * Caller is responsible for either calling spmi_device_add() to add the
+> + * newly allocated controller, or calling spmi_device_put() to discard it.
+> + */
+> +struct spmi_device *spmi_device_alloc(struct spmi_controller *ctrl);
+> +
+> +static inline void spmi_device_put(struct spmi_device *sdev)
+> +{
+> +	if (sdev)
+> +		put_device(&sdev->dev);
+> +}
+> +
+[...]
+> +
+> +/**
+> + * spmi_controller_alloc: Allocate a new SPMI controller
+> + * @parent: parent device
+> + * @size: size of private data
+> + *
+> + * Caller is responsible for either calling spmi_controller_add() to add the
+> + * newly allocated controller, or calling spmi_controller_put() to discard it.
+> + */
+> +struct spmi_controller *spmi_controller_alloc(struct device *parent,
+> +					      size_t size);
+> +
+> +static inline void spmi_controller_put(struct spmi_controller *ctrl)
+> +{
+> +	if (ctrl)
+> +		put_device(&ctrl->dev);
+> +}
+
+This function is missing documentation.
+
+> +
+> +/**
+> + * spmi_controller_add: Controller bring-up.
+> + * @ctrl: controller to be registered.
+> + *
+> + * Register a controller previously allocated via spmi_controller_alloc() with
+> + * the SPMI core
+> + */
+> +int spmi_controller_add(struct spmi_controller *ctrl);
+[...]
+> +
+> +/**
+> + * spmi_driver_unregister - reverse effect of spmi_driver_register
+> + * @sdrv: the driver to unregister
+> + * Context: can sleep
+> + */
+> +static inline void spmi_driver_unregister(struct spmi_driver *sdrv)
+> +{
+> +	if (sdrv)
+> +		driver_unregister(&sdrv->driver);
+> +}
+> +
+> +#define module_spmi_driver(__spmi_driver) \
+> +	module_driver(__spmi_driver, spmi_driver_register, \
+> +			spmi_driver_unregister)
+> +
+> +/**
+> + * spmi_register_read() - register read
+
+This is right but then it's not consistent. These functions have ()
+after them but higher up we don't have that.
+
+Usually the prototypes aren't documented because people use tags and
+such to go to the definition of the function. I would prefer we put the
+documentation near the implementation so that 1) this file gives a high
+level overview of the API and 2) I don't have to double jump with tags
+to figure out what to pass to these functions.
+
+> + * @sdev: SPMI device
+> + * @addr: slave register address (5-bit address).
+> + * @buf: buffer to be populated with data from the Slave.
+> + *
+> + * Reads 1 byte of data from a Slave device register.
+> + */
+> +int spmi_register_read(struct spmi_device *sdev, u8 addr, u8 *buf);
+> +
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
