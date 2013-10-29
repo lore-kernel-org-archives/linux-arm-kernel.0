@@ -1,101 +1,77 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 29 Oct 2013 12:15:54 +0200
-Subject: [PATCH 1/3] ARM: dts: omap4-panda: add DPI pinmuxing
-In-Reply-To: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <526F8ADA.3030003@ti.com>
+From: sre@debian.org (Sebastian Reichel)
+Date: Tue, 29 Oct 2013 11:25:28 +0100
+Subject: [PATCHv2 1/3] Input: twl4030-keypad - add device tree support
+In-Reply-To: <14DEC9DA-8C77-4F73-AF3A-6C0D20C6C1AB@codeaurora.org>
+References: <1382446042-27099-1-git-send-email-sre@debian.org>
+ <1382446042-27099-2-git-send-email-sre@debian.org>
+ <5137C017-2515-427C-865F-B938CC24B210@codeaurora.org>
+ <20131029010608.GA5353@earth.universe>
+ <14DEC9DA-8C77-4F73-AF3A-6C0D20C6C1AB@codeaurora.org>
+Message-ID: <20131029102527.GA10530@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 25/10/13 13:07, Tomi Valkeinen wrote:
-> New u-boot versions no longer set the pinmuxing for Panda's DPI output,
-> and the muxing has to be done in the .dts file.
+On Tue, Oct 29, 2013 at 03:33:31AM -0500, Kumar Gala wrote:
+> On Oct 28, 2013, at 8:06 PM, Sebastian Reichel wrote:
+> > On Mon, Oct 28, 2013 at 01:42:47AM -0500, Kumar Gala wrote:
+> >>> +This binding is based on the matrix-keymap binding with the following
+> >>> +changes:
+> >> 
+> >> Maybe be a bit more specific and say 'based on the input/matrix-keymap.txt binding'..
+> > 
+> > OK.
+> > 
+> >>> + * keypad,num-rows and keypad,num-columns are required.
+> >> 
+> >> Is linux,keymap required from matrix-keymap.txt?
+> > 
+> > Yes, matrix-keymap.txt contains descriptions for the following:
+> > 
+> > required:
+> > - linux,keymap
 > 
-> Add pinmuxing for DPI and TFP410. Without these, the DVI output on Panda
-> does not work with recent u-boot.
+> So you don't say that linux,keymap is required for twl4030-keypad
+> (wasn't clear if you assumed that or not).
+
+It's already required by matrix-keypad, so I assumed the requirement
+is inherited by twl4030-keypad. The other matrix-keymap based
+bindings assume the same.
+
+keypad,num-rows and keypad,num-columns are only stated explicitly,
+because they are optional in matrix-keymap, but required by
+twl4030-keympad.
+
+> > optional:
+> > - keypad,num-rows
+> > - keypad,num-columns
+> > 
+> >>> +Optional Properties specific to linux:
+> >>> +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
+> >> 
+> >> Does it make sense to update the matrix-keymap.txt binding to add
+> >> 'linux,keypad-no-autorepeat' there?
+> > 
+> > At least according to devicetree documentation there are
+> > keymap-matrix.txt based drivers, which do not support
+> > "linux,keypad-no-autorepeat".
 > 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-
-The two latter patches in this series needs more work and can be
-dropped, but this one should be applied to make Panda work properly with
-new u-boots.
-
- Tomi
-
-> ---
->  arch/arm/boot/dts/omap4-panda-common.dtsi | 43 +++++++++++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
+> Which is why it could be optional in keymap-matrix.txt.  I dont
+> know anything about keymap/keypad's just asking the question?
 > 
-> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> index faa95b5..fcb8856 100644
-> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> @@ -129,6 +129,8 @@
->  			&twl6040_pins
->  			&mcpdm_pins
->  			&mcbsp1_pins
-> +			&dss_dpi_pins
-> +			&tfp410_pins
->  			&dss_hdmi_pins
->  			&tpd12s015_pins
->  			&hsusbb1_pins
-> @@ -166,6 +168,47 @@
->  		>;
->  	};
->  
-> +	dss_dpi_pins: pinmux_dss_dpi_pins {
-> +		pinctrl-single,pins = <
-> +			0x122 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data23 */
-> +			0x124 (PIN_OUTPUT | MUX_MODE5) 	/* dispc2_data22 */
-> +			0x126 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data21 */
-> +			0x128 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data20 */
-> +			0x12a (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data19 */
-> +			0x12c (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data18 */
-> +			0x12e (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data15 */
-> +			0x130 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data14 */
-> +			0x132 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data13 */
-> +			0x134 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data12 */
-> +			0x136 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data11 */
-> +
-> +			0x174 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data10 */
-> +			0x176 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data9 */
-> +			0x178 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data16 */
-> +			0x17a (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data17 */
-> +			0x17c (PIN_OUTPUT | MUX_MODE5)	/* dispc2_hsync */
-> +			0x17e (PIN_OUTPUT | MUX_MODE5)	/* dispc2_pclk */
-> +			0x180 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_vsync */
-> +			0x182 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_de */
-> +			0x184 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data8 */
-> +			0x186 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data7 */
-> +			0x188 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data6 */
-> +			0x18a (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data5 */
-> +			0x18c (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data4 */
-> +			0x18e (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data3 */
-> +
-> +			0x190 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data2 */
-> +			0x192 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data1 */
-> +			0x194 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data0 */
-> +		>;
-> +	};
-> +
-> +	tfp410_pins: pinmux_tfp410_pins {
-> +		pinctrl-single,pins = <
-> +			0x144 (PIN_OUTPUT | MUX_MODE3)	/* gpio_0 */
-> +		>;
-> +	};
-> +
->  	dss_hdmi_pins: pinmux_dss_hdmi_pins {
->  		pinctrl-single,pins = <
->  			0x5a (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
-> 
+> It seems as if linux,keypad-no-autorepeat is intended to mean the
+> same thing (if relevant to the device) across all drivers.  Is
+> that correct?  If so it seems like moving it to be specified in a
+> generic input binding makes sense, just not sure if
+> keymap-matrix.txt is that place or not.
 
+Yes, when supported it means the same. I can add it to
+keymap-matrix.txt.
 
+-- Sebastian
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/e5ad093b/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/e8b1e02f/attachment.sig>
