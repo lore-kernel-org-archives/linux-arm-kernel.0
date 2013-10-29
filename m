@@ -1,42 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 29 Oct 2013 11:17:47 -0400
-Subject: [GIT PULL] ARM: mvebu: dt changes for v3.13 (last round)
-In-Reply-To: <20131028205506.GD4802@quad.lixom.net>
-References: <20131023113237.GG24520@titan.lakedaemon.net>
- <20131028205506.GD4802@quad.lixom.net>
-Message-ID: <20131029151747.GB26784@titan.lakedaemon.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 29 Oct 2013 08:21:22 -0700
+Subject: [PATCH 1/4] mfd: as3722: add clock driver as mfd-sub device for
+ the ams AS3722
+In-Reply-To: <1383049205-29620-2-git-send-email-ldewangan@nvidia.com>
+References: <1383049205-29620-1-git-send-email-ldewangan@nvidia.com>
+ <1383049205-29620-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20131029152122.GD4231@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 01:55:06PM -0700, Olof Johansson wrote:
-> On Wed, Oct 23, 2013 at 07:32:37AM -0400, Jason Cooper wrote:
-> > Guys,
-> > 
-> > I've held off several patches for the next window (nothing big),
-> > however, MikeT just took Ezequiel's clock divider driver for v3.13.  So,
-> > to keep things in sync, I'd appreciate it if you could take this last
-> > pull request containing only the corresponding dts and binding changes
-> > for that driver.
+On Tue, 29 Oct 2013, Laxman Dewangan wrote:
+
+> Device ams AS3722 supports the one 32KHz clock output. The clock control
+> support is provided through clock driver.
 > 
-> Hi,
+> Add clock driver as mfd sub device to probe the clock driver.
 > 
-> I took this now but I think things such as clock bindings should be merged
-> through Mike's tree, since he's more familiar with how other drivers specify
-> similar bindings.
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/as3722.txt |    9 +++++++++
+>  drivers/mfd/as3722.c                             |    3 +++
 
-Agreed.  This arrangement was made before things were settled on at the
-mini-summit.  We'll do as you suggest from now on.
+You need to seperate the DT binding from the drivers/mfd changes.
 
-> > The following changes since commit 1deb122c724edfd799a4d7d0b88ff14c365c9e69:
-> > 
-> >   ARM: Dove: fix bad properties of the si5351 clkout2 used by Cubox audio (2013-10-09 13:22:41 +0000)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.infradead.org/linux-mvebu.git tags/dt-3.13-4
-> 
-> Pulled into next/dt.
+The MFD changes are fine of course.
 
-thx,
-
-Jason.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
