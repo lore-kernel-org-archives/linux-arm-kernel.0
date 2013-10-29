@@ -1,36 +1,53 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 29 Oct 2013 16:10:06 +0100
-Subject: [PATCH v6 1/8] pinctrl: imx1 core driver
-In-Reply-To: <CACRpkdZZhwYtvki-2AQFOSND4BQmOenZb6sSm2tOpQUYWwETgA@mail.gmail.com>
-References: <1382950843-26066-1-git-send-email-mpa@pengutronix.de>
- <1382950843-26066-2-git-send-email-mpa@pengutronix.de>
- <CACRpkdZZhwYtvki-2AQFOSND4BQmOenZb6sSm2tOpQUYWwETgA@mail.gmail.com>
-Message-ID: <20131029151006.GD20839@pengutronix.de>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Tue, 29 Oct 2013 10:12:38 -0500
+Subject: [PATCH v3 06/10] spmi: document the PMIC arbiter SPMI bindings
+In-Reply-To: <1383055709.2837.17.camel@iivanov-dev.int.mm-sol.com>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <043d714725f8b6df1873047164d2d0e78778138b.1382985169.git.joshc@codeaurora.org>
+ <1383055709.2837.17.camel@iivanov-dev.int.mm-sol.com>
+Message-ID: <20131029151238.GF20207@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 02:55:56PM +0100, Linus Walleij wrote:
-> On Mon, Oct 28, 2013 at 10:00 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+On Tue, Oct 29, 2013 at 04:08:29PM +0200, Ivan T. Ivanov wrote:
+> On Mon, 2013-10-28 at 13:12 -0500, Josh Cartwright wrote: 
+> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> > ---
+> >  .../bindings/spmi/qcom,spmi-pmic-arb.txt           | 42 ++++++++++++++++++++++
+> >  1 file changed, 42 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+> > new file mode 100644
+> > index 0000000..68949aa
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/spmi/qcom,spmi-pmic-arb.txt
+> > @@ -0,0 +1,42 @@
+> > +Qualcomm SPMI Controller (PMIC Arbiter)
+> > +
+> > +The SPMI PMIC Arbiter is found on the Snapdragon 800 Series.  It is an SPMI
+> > +controller with wrapping arbitration logic to allow for multiple on-chip
+> > +devices to control a single SPMI master.
+> > +
+> > +The PMIC Arbiter can also act as an interrupt controller, providing interrupts
+> > +to slave devices.
+> > +
+> > +See spmi.txt for the generic SPMI controller binding requirements for child
+> > +nodes.
+> > +
+> > +Required properties:
+> > +- compatible : should be "qcom,spmi-pmic-arb".
+> > +- reg-names  : should be "core", "intr", "cnfg"
+> > +- reg : offset and length of the PMIC Arbiter Core register map.
+> > +- reg : offset and length of the PMIC Arbiter Interrupt controller register map.
+> > +- reg : offset and length of the PMIC Arbiter Configuration register map.
+> > +- #address-cells : must be set to 1
 > 
-> > Core driver for register formats of imx1/imx21/imx27 processors.
-> >
-> > The pins of those processors are grouped into ports. Each port has 32
-> > pins. The pins mux configuration is controlled by registers with 1 or 2
-> > bit per pin, depending on the specific control register.
-> >
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Allright, as it is a new driver and I feel sorry for it being stuck in
-> DT review limbo, patch applied.
+> This doesn't seem to follow generic set of bindings for the SPMI
+> controllers. #address-cells : must be set to 2.
 
-Thanks for applying.
-
-Markus
+Indeed, good catch.  I'll fix it up.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
