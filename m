@@ -1,47 +1,54 @@
-From: leigh@solinno.co.uk (Leigh Brown)
-Date: Tue, 29 Oct 2013 09:33:33 +0000
-Subject: [PATCH v3 3/4] net: mvmdio: slight optimisation of orion_mdio_write
-In-Reply-To: <cover.1383038973.git.leigh@solinno.co.uk>
-References: <cover.1383038973.git.leigh@solinno.co.uk>
-Message-ID: <892347afda1ebf28fe888cc8b5f97497971084fa.1383038974.git.leigh@solinno.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Oct 2013 10:32:29 +0100
+Subject: [PATCH 2/2] dma: mv_xor: Use high_base mmio where appropriate
+In-Reply-To: <20131029083407.GA2416@localhost>
+References: <1383000855-8377-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383000855-8377-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <CAPcyv4iQVoYCXz16T3N4MbdVJV7MoKKeL0wq9t9WF1Kf3gz3Bw@mail.gmail.com>
+ <20131029083407.GA2416@localhost>
+Message-ID: <20131029103229.5e095a24@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make only a single call to mutex_unlock in orion_mdio_write.
+Dan, Ezequiel,
 
-Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
----
- drivers/net/ethernet/marvell/mvmdio.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+On Tue, 29 Oct 2013 05:34:08 -0300, Ezequiel Garcia wrote:
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index e3898b3..0cfa0c8 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -150,10 +150,8 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
- 	mutex_lock(&dev->lock);
- 
- 	ret = orion_mdio_wait_ready(bus);
--	if (ret < 0) {
--		mutex_unlock(&dev->lock);
--		return ret;
--	}
-+	if (ret < 0)
-+		goto out;
- 
- 	writel(((mii_id << MVMDIO_SMI_PHY_ADDR_SHIFT) |
- 		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
-@@ -161,9 +159,9 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
- 		(value << MVMDIO_SMI_DATA_SHIFT)),
- 	       dev->regs);
- 
-+out:
- 	mutex_unlock(&dev->lock);
--
--	return 0;
-+	return ret;
- }
- 
- static int orion_mdio_reset(struct mii_bus *bus)
+> > On Mon, Oct 28, 2013 at 3:54 PM, Ezequiel Garcia
+> > <ezequiel.garcia@free-electrons.com> wrote:
+> > > Despite requesting two memory resources, called 'base' and 'high_base', the
+> > > driver uses explicitly only the former. The latter is being used implicitly
+> > > by addressing at offset +0x200, which in practice accesses high_base.
+> > >
+> > > Instead of relying in such trick, let's define the registers with the
+> > > offset from high_base, and use high_base explicitly where appropriate.
+> > >
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > ---
+> > >  drivers/dma/mv_xor.c |  3 ++-
+> > >  drivers/dma/mv_xor.h | 25 +++++++++++++------------
+> > >  2 files changed, 15 insertions(+), 13 deletions(-)
+> > 
+> > Since it's unused I'd prefer a patch that just deletes xor_high_base.
+> > 
+> 
+> It's wrongly *unused*, the mmio high_base is actually being used
+> implicitly by always addressing at an offset that addresses +200.
+> 
+> Deleting high_base would actually make it worse, for that region
+> will no longer be ioremaped. Maybe the commit message is not clear
+> about it?
+
+I agree with Ezequiel, and I believe his patch is appropriate. The
+registers for the XOR engines are indeed split in two areas, so it
+makes sense to have this xor_base / xor_high_base split that reflects
+the register mapping passed from the Device Tree, and use this split in
+the macros used to access the registers.
+
+Best regards,
+
+Thomas
 -- 
-1.8.4.rc3
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
