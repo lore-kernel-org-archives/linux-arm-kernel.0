@@ -1,23 +1,78 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 29 Oct 2013 17:03:14 +0530
-Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <20131028113104.GE27015@lunn.ch>
-References: <1382533461-31021-1-git-send-email-andrew@lunn.ch>
- <CAKohpombg7mAmgxxvUg8kz1MaFwcycR1eL0UrgELY2WdGfrAag@mail.gmail.com>
- <20131023135116.GC31126@lunn.ch>
- <CAKohpokTgCz0c=PeaJHKiZEiYc0jPVq-vwkhP5pM0hh1-0QnLA@mail.gmail.com>
- <20131023143657.GA31536@lunn.ch>
- <CAKohpomedpd8XBPcdZX2vHy6b5=FMtbSVpNTG-eVLK1YPyPaMA@mail.gmail.com>
- <20131028113104.GE27015@lunn.ch>
-Message-ID: <CAKohponoxbV9P+0pWfEEi3sND7GbgHECsT=FRMCfeLcvOP9iDg@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 29 Oct 2013 12:42:02 +0100
+Subject: [PATCH v5 0/3] ARM: S5PV210: move to common clk framework
+In-Reply-To: <20131021121605.11944.74007@quantum>
+References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <5264425E.4040301@samsung.com> <20131021121605.11944.74007@quantum>
+Message-ID: <1823897.8rOixkM4PW@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 October 2013 17:01, Andrew Lunn <andrew@lunn.ch> wrote:
-> I have tested this now. The dummy handler is required. Without it, it
-> seems like the WFI exits at the next timer tick, not immediately once
-> the cpufreq change has finished. I get poor numbers out of
-> cpufreq-bench without the handler.
+Hi Kukjin, Mike,
 
-Ahh.. that helps.. You can now put exactly this stuff in the comment over
-the handler..
+On Monday 21 of October 2013 05:16:05 Mike Turquette wrote:
+> Quoting Kukjin Kim (2013-10-20 13:51:42)
+> > On 10/20/13 01:03, Tomasz Figa wrote:
+> > > Hi Mike, Kukjin, Rafael,
+> > >
+> > > On Tuesday 24 of September 2013 14:50:06 Mateusz Krawczuk wrote:
+> > >> This patch series is the new s5pv210 clock implementation
+> > >> (using common clk framework).
+> > >>
+> > >> This implementation is compatible with device tree definition and board
+> > >> files.
+> > >>
+> > >> This patch series is based on linux-next and has been tested on goni and
+> > >> aquila
+> > >> boards using board file.
+> > >>
+> > >> Since v4:
+> > >> Corrected mux flags for finpll.
+> > >>
+> > >> Since v3:
+> > >>
+> > >> Replace s5pv210_clk_register_finpll, by creating mux finpll
+> > >> with xusbxti and xxti as parrents.
+> > >>
+> > >>
+> > >> Mateusz Krawczuk (3):
+> > >>    clk: samsung: Add clock driver for s5pc110/s5pv210
+> > >>    Cpufreq: s5pv210 cpufreq fixes for CCF
+> > >>    ARM: s5pv210: Migrate clock handling to Common Clock Framework
+> > >>
+> > >>   .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
+> > >>   arch/arm/mach-s5pv210/Kconfig                      |   9 +
+> > >>   arch/arm/mach-s5pv210/Makefile                     |   4 +-
+> > >>   arch/arm/mach-s5pv210/common.c                     |  17 +
+> > >>   arch/arm/mach-s5pv210/common.h                     |  10 +
+> > >>   arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+> > >>   arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+> > >>   arch/arm/plat-samsung/Kconfig                      |   2 +-
+> > >>   drivers/clk/samsung/Makefile                       |   3 +
+> > >>   drivers/clk/samsung/clk-s5pv210.c                  | 673
+> > >> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c
+> > >>   |   6 +-
+> > >>   include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
+> > >>   12 files changed, 1019 insertions(+), 8 deletions(-)
+> > >>   create mode 100644
+> > >> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
+> > >> create mode 100644 drivers/clk/samsung/clk-s5pv210.c
+> > >>   create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
+> > >
+> > > I believe this series is reasonable to be applied. Could we agree on
+> > > the tree it would go through and get all tne required acks?
+> > >
+> > > Best regards,
+> > > Tomasz
+> > 
+> > I agree.
+> > 
+> > Mike, how do you think the common clk stuff for s5pv210?
+> 
+> Clock code looks good to me. Which tree do you want to take it through?
+
+Seems like we just missed another kernel release. It's a bit sad that it's
+happening so often for Samsung patches...
+
+Best regards,
+Tomasz
