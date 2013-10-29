@@ -1,45 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Oct 2013 23:47:26 +0000
-Subject: [PATCH v3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <CAOMZO5AX+uh0sT7FHJZBP_ufKznkuFn7jNCB__vrwpcMrqY36w@mail.gmail.com>
-References: <1382992009-19407-1-git-send-email-festevam@gmail.com>
- <20131028210346.GA11985@kroah.com>
- <CAOMZO5AX+uh0sT7FHJZBP_ufKznkuFn7jNCB__vrwpcMrqY36w@mail.gmail.com>
-Message-ID: <20131029234726.GV16735@n2100.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 30 Oct 2013 00:54:18 +0100
+Subject: [PATCH 1/3] clk: shmobile: Add DIV6 clock support
+In-Reply-To: <158C7FC6-F6DF-4F10-B04B-05522D09FC05@codeaurora.org>
+References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383058511-26046-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <158C7FC6-F6DF-4F10-B04B-05522D09FC05@codeaurora.org>
+Message-ID: <3042335.v0dpKXFPjS@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 08:01:46PM -0200, Fabio Estevam wrote:
-> Hi Greg,
+Hi Kumar,
+
+Thank you for the review.
+
+On Tuesday 29 October 2013 18:33:00 Kumar Gala wrote:
+> On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
+> > DIV6 clocks are divider gate clocks controlled through a single
+> > register. The divider is expressed on 6 bits, hence the name, and can
+> > take values from 1/1 to 1/64.
+> > 
+> > Those clocks are found on Renesas ARM SoCs.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > .../bindings/clock/renesas,cpg-div6-clocks.txt     |  27 +++
+> > drivers/clk/shmobile/Makefile                      |   4 +-
+> > drivers/clk/shmobile/clk-div6.c                    | 185 +++++++++++++++++
+> > 3 files changed, 215 insertions(+), 1 deletion(-)
+> > create mode 100644
+> > Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+> > create mode 100644 drivers/clk/shmobile/clk-div6.c
+> > 
+> > diff --git
+> > a/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+> > b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt new
+> > file mode 100644
+> > index 0000000..8036f3c
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+> > @@ -0,0 +1,27 @@
+> > +* Renesas CPG DIV6 Clock
+> > +
+> > +The CPG DIV6 clocks are variable factor clocks provided by the Clock
+> > Pulse
+> > +Generator (CPG). They clock input is divided by a configurable factor
+> > from 1
+> > +to 64.
+> > +
+> > +Required Properties:
+> > +
+> > +  - compatible: Must be one of the following
+> > +    - "renesas,r8a7790-div6-clock" for R8A7790 (R-Car H2) DIV6 clocks
+> > +    - "renesas,cpg-div6-clock" for generic DIV6 clocks
+> > +  - reg: Base address and length of the memory resource used by the DIV6
+> > clock
+> > +  - clocks: Reference to the parent clock
+> > +  - #clock-cells: Must be 0
+> > +  - clock-output-name: The name of the clock as a free-form string
 > 
-> On Mon, Oct 28, 2013 at 7:03 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > And why is new support being added to this driver instead of working to
-> > get it out of staging?
+> Is this suppose to be 'clock-output-names' (missing a 's')?
+
+Yes it is, my bad. I'll fix that.
+
+> > +
+> > +
+> > +Example
+> > +-------
+> > +
+> > +	sd2_clk: sd2_clk {
 > 
-> Philipp Zabel mentioned that he will submit the imx-drm driver out of staging:
-> http://www.spinics.net/lists/dri-devel/msg46784.html
+> example should be sd2_clk at e6150078
 
-The issues surrounding DT and DRM were given an airing last week at
-kernel summit in a session chaired by David Airlie.
+You're absolutely right.
 
-The Kernel Summit session was to discuss issues surrounding DT and DRM,
-or more specifically DT and componentised subsystems like DRM, ASoC and
-V4L2.  Grant Likely has said that he will attempt to summarise some of
-the discussion there; unfortunately I'm not aware of anyone making any
-real "minutes" of what was discussed - it wasn't a formal session.
+> > +		compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-
+clock";
+> > +		reg = <0 0xe6150078 0 4>;
+> 
+> curious, do you really have a second register at 0?
 
-I also had discussions with David Airlie and, separately, with the
-Pengutronix folk about imx-drm.
+No, but the r8a7790 has #address-cells and #size-cells set to 2.
 
-It is very clear to me that David is against imx-drm moving into
-drivers/gpu/drm - the driver requires an amount of rework in various
-places.  So I don't think it will move out of drivers/staging any
-time soon.
+> > +		clocks = <&pll1_div2_clk>;
+> > +		#clock-cells = <0>;
+> > +		clock-output-names = "sd2";
+> > +	};
 
-I have a few other bits to sort out first, but I've volunteered to try
-to resolve some of these blocking issues so that imx-drm can move
-forward and hopefully out of staging.
+-- 
+Regards,
 
-To put it another way, moving this driver out of staging is not as
-simple as moving the files; it requires real work to address the
-issues the subsystem maintainer has with this code.
+Laurent Pinchart
