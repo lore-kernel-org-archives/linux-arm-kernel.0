@@ -1,34 +1,25 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Tue, 29 Oct 2013 14:38:58 -0400
-Subject: [PATCH] Make the 32-bit ARM get_user() and put_user() work for
- 16-bit quantities
-In-Reply-To: <20131029180414.GS16735@n2100.arm.linux.org.uk>
-References: <1383065529-20001-1-git-send-email-wcohen@redhat.com>
- <20131029180414.GS16735@n2100.arm.linux.org.uk>
-Message-ID: <527000C2.5000501@redhat.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 29 Oct 2013 13:40:26 -0600
+Subject: [PATCH] clk: tegra: fix return value check in
+ tegra_clk_register_pllc()
+In-Reply-To: <CAPgLHd-wYa3Z7J93LmC0rvRPKsrjK+8DEZR+2f+e14RN+p_fPg@mail.gmail.com>
+References: <CAPgLHd-wYa3Z7J93LmC0rvRPKsrjK+8DEZR+2f+e14RN+p_fPg@mail.gmail.com>
+Message-ID: <52700F2A.1080004@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2013 02:04 PM, Russell King - ARM Linux wrote:
-> On Tue, Oct 29, 2013 at 12:52:09PM -0400, William Cohen wrote:
->> The 32-bit ARM does not have instructions to perform 16-bit loads or
->> stores.  The __get_user_asm_half and __put_user_asm_half macros
->> sythesize those operations.  However, in most cases the pointers
->> passed into these macros are pointers to 16-bit types and the pointer
->> arithmetic will end up pointing at the next 16-bit quantity rather
->> than the second half (byte) of the 16-bit quantity.  The macros need
->> to explicitly typecast the pointers as pointers to 8-bit quantities to
->> make the pointer arithmetic work out properly.
+On 10/28/2013 08:07 PM, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> NAK.
-> 
-> Nothing should be making use of these macros other than the other
-> macros in that file; these are implementation specific helper macros.
-> There, the address passed as __gu_addr and __pu_addr is an 'unsigned
-> long' quantity, so there is no concern about pointer arithmetic; they
-> do not take pointers.
-> 
+> In case of error, the function __clk_lookup() returns NULL pointer
+> not ERR_PTR(). The IS_ERR() test in the return value check should
+> be replaced with NULL test.
 
-You are correct.  systemtap had had macros that were based on the arm uaccess.h macos, but they were missing the typecasts that __get_user_err and __put_user_err.  Thanks for pointing out my error.
+>  	parent = __clk_lookup(parent_name);
+> -	if (IS_ERR(parent)) {
+> +	if (!parent) {
 
--Will
+clk_get() returns an error-value. It'd be nice if the internal clk APIs
+all did the same for consistency... Otherwise, the clock subsystem is
+essentially using both NULL and error-values as errors, which is rather
+frowned upon.
