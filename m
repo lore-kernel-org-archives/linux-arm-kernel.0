@@ -1,206 +1,154 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Tue, 29 Oct 2013 17:22:50 +0100
-Subject: [PATCH] watchdog: at91sam9_wdt: various fixes
-In-Reply-To: <20131029154519.GB9266@roeck-us.net>
-References: <20131029075028.GF19704@spo001.leaseweb.com>
- <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
- <20131029154519.GB9266@roeck-us.net>
-Message-ID: <526FE0DA.1020308@overkiz.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Tue, 29 Oct 2013 11:26:15 -0500
+Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
+In-Reply-To: <1383058923.2837.33.camel@iivanov-dev.int.mm-sol.com>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
+ <1383058923.2837.33.camel@iivanov-dev.int.mm-sol.com>
+Message-ID: <20131029162615.GH20207@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/10/2013 16:45, Guenter Roeck wrote:
-> On Tue, Oct 29, 2013 at 11:37:33AM +0100, Boris BREZILLON wrote:
->> Fix the secs_to_ticks macro in case 0 is passed as an argument.
->>
->> Rework the heartbeat calculation to increase the security margin of the
->> watchdog reset timer.
->>
->> Use the min_heartbeat value instead of the calculated heartbeat value for
->> the first watchdog reset.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> Hi Boris,
->
-> can you possibly split the three changes into separate patches ?
+On Tue, Oct 29, 2013 at 05:02:03PM +0200, Ivan T. Ivanov wrote:
+> On Mon, 2013-10-28 at 13:12 -0500, Josh Cartwright wrote: 
+> > From: Kenneth Heitke <kheitke@codeaurora.org>
+> > 
+> > System Power Management Interface (SPMI) is a specification
+> > developed by the MIPI (Mobile Industry Process Interface) Alliance
+> > optimized for the real time control of Power Management ICs (PMIC).
+> > 
+> > SPMI is a two-wire serial interface that supports up to 4 master
+> > devices and up to 16 logical slaves.
+> > 
+> > The framework supports message APIs, multiple busses (1 controller
+> > per bus) and multiple clients/slave devices per controller.
+> > 
+> > Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
+> > Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
+> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+[..]
+> > +static int spmi_drv_probe(struct device *dev)
+> > +{
+> > +	const struct spmi_driver *sdrv = to_spmi_driver(dev->driver);
+> > +	int err = 0;
+> > +
+> > +	if (sdrv->probe)
+> > +		err = sdrv->probe(to_spmi_device(dev));
+> > +
+> > +	return err;
+> > +}
+> > +
+> > +static int spmi_drv_remove(struct device *dev)
+> > +{
+> > +	const struct spmi_driver *sdrv = to_spmi_driver(dev->driver);
+> > +	int err = 0;
+> > +
+> > +	if (sdrv->remove)
+> > +		err = sdrv->remove(to_spmi_device(dev));
+> > +
+> > +	return err;
+> > +}
+> > +
+> > +static void spmi_drv_shutdown(struct device *dev)
+> > +{
+> > +	const struct spmi_driver *sdrv = to_spmi_driver(dev->driver);
+> > +
+> > +	if (sdrv->shutdown)
+> 
+> If driver for device is not loaded this will cause kernel NULL
+> pointer dereference.
 
-Sure. My first idea was to split this in 3 patches, but, as the buggy 
-at91 watchdog series was
-already applied to linux-watchdog-next, I thought it would be faster to 
-only provide one
-patch to fix all the issues at once.
+Indeed.  I'll fix this.
 
->
-> The first is a no-brainer. Gives my opinion of my code review capabilities
-> a slight damper ;-).
->
-> For the other two problems, it might make sense to describe
-> the problems you are trying to solve.
->
-> Couple of comments inline.
->
-> Thanks,
-> Guenter
->
->
->> ---
->>   drivers/watchdog/at91sam9_wdt.c |   35 ++++++++++++++++++++++++-----------
->>   1 file changed, 24 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
->> index 9bd089e..f1b59f1 100644
->> --- a/drivers/watchdog/at91sam9_wdt.c
->> +++ b/drivers/watchdog/at91sam9_wdt.c
->> @@ -51,7 +51,7 @@
->>   #define ticks_to_hz_rounddown(t)	((((t) + 1) * HZ) >> 8)
->>   #define ticks_to_hz_roundup(t)		(((((t) + 1) * HZ) + 255) >> 8)
->>   #define ticks_to_secs(t)		(((t) + 1) >> 8)
->> -#define secs_to_ticks(s)		(((s) << 8) - 1)
->> +#define secs_to_ticks(s)		(s ? (((s) << 8) - 1) : 0)
->>   
-> 	(s)
->
->>   #define WDT_MR_RESET	0x3FFF2FFF
->>   
->> @@ -61,6 +61,11 @@
->>   /* Watchdog max delta/value in secs */
->>   #define WDT_COUNTER_MAX_SECS	ticks_to_secs(WDT_COUNTER_MAX_TICKS)
->>   
->> +/* Watchdog heartbeat shift used for security margin:
->> + * we'll try to rshift the heartbeat value with this value to secure
->> + * the watchdog reset. */
->> +#define WDT_HEARTBEAT_SHIFT	2
->> +
->>   /* Hardware timeout in seconds */
->>   #define WDT_HW_TIMEOUT 2
->>   
->> @@ -158,7 +163,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->>   	int err;
->>   	u32 mask = wdt->mr_mask;
->>   	unsigned long min_heartbeat = 1;
->> +	unsigned long max_heartbeat;
->>   	struct device *dev = &pdev->dev;
->> +	int shift;
->>   
->>   	tmp = wdt_read(wdt, AT91_WDT_MR);
->>   	if ((tmp & mask) != (wdt->mr & mask)) {
->> @@ -181,23 +188,27 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->>   	if (delta < value)
->>   		min_heartbeat = ticks_to_hz_roundup(value - delta);
->>   
->> -	wdt->heartbeat = ticks_to_hz_rounddown(value);
->> -	if (!wdt->heartbeat) {
->> +	max_heartbeat = ticks_to_hz_rounddown(value);
->> +	if (!max_heartbeat) {
->>   		dev_err(dev,
->>   			"heartbeat is too small for the system to handle it correctly\n");
->>   		return -EINVAL;
->>   	}
->>   
->> -	if (wdt->heartbeat < min_heartbeat + 4) {
->> +	for (shift = WDT_HEARTBEAT_SHIFT; shift > 0; shift--) {
->> +		if ((max_heartbeat >> shift) < min_heartbeat)
->> +			continue;
->> +
->> +		wdt->heartbeat = max_heartbeat >> shift;
->> +		break;
->> +	}
->> +
->> +	if (!shift)
->>   		wdt->heartbeat = min_heartbeat;
-> Correct me if I am wrong, but it seems to me that
->
-> 	if ((max_heartbeat >> 2) >= min_heartbeat)
-> 		 wdt->heartbeat = max_heartbeat >> 2;
-> 	else if ((max_heartbeat >> 1) >= min_heartbeat)
-> 		wdt->heartbeat = max_heartbeat >> 1;
-> 	else
-> 		wdt->heartbeat = min_heartbeat;
->
-> would accomplish the same and be easier to understand.
+> > +static int of_spmi_register_devices(struct spmi_controller *ctrl)
+> > +{
+> > +	struct device_node *node;
+> > +	int err;
+> > +
+> > +	dev_dbg(&ctrl->dev, "of_spmi_register_devices\n");
+> > +
+> > +	if (!ctrl->dev.of_node)
+> > +		return -ENODEV;
+> > +
+> > +	dev_dbg(&ctrl->dev, "looping through children\n");
+> > +
+> > +	for_each_available_child_of_node(ctrl->dev.of_node, node) {
+> > +		struct spmi_device *sdev;
+> > +		u32 reg[2];
+> > +
+> > +		dev_dbg(&ctrl->dev, "adding child %s\n", node->full_name);
+> > +
+> > +		err = of_property_read_u32_array(node, "reg", reg, 2);
+> > +		if (err) {
+> > +			dev_err(&ctrl->dev,
+> > +				"node %s does not have 'reg' property\n",
+> > +				node->full_name);
+> > +			continue;
+> 
+> Shouldn't this be a fatal error?
 
-This is exactly what I'm trying to accomplish.
-I used the for loop in case we ever want to change the 
-WDT_HEARTBEAT_SHIFT value
-(which is unlikely to happen).
+Fatal in what way?  It is fatal in the sense that this particular child
+node is skipped, but other children can still be enumerated.  Are you
+suggesting that we bail completely when we hit a wrongly-described
+child?
 
-I'll move to your proposition.
+> > +		}
+> > +
+> > +		if (reg[1] != SPMI_USID) {
+> > +			dev_err(&ctrl->dev,
+> > +				"node %s contains unsupported 'reg' entry\n",
+> > +				node->full_name);
+> > +			continue;
+> > +		}
+> > +
+> > +		if (reg[0] > 0xF) {
+> > +			dev_err(&ctrl->dev,
+> > +				"invalid usid on node %s\n",
+> > +				node->full_name);
+> > +			continue;
+> > +		}
+> > +
+> > +		dev_dbg(&ctrl->dev, "read usid %02x\n", reg[0]);
+> > +
+> > +		sdev = spmi_device_alloc(ctrl);
+> > +		if (!sdev)
+> > +			continue;
+> > +
+> > +		sdev->dev.of_node = node;
+> > +		sdev->usid = (u8) reg[0];
+> > +
+> > +		err = spmi_device_add(sdev);
+> > +		if (err) {
+> > +			dev_err(&sdev->dev,
+> > +				"failure adding device. status %d\n", err);
+> > +			spmi_device_put(sdev);
+> > +			continue;
+> > +		}
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +int spmi_controller_add(struct spmi_controller *ctrl)
+> > +{
+> > +	int ret;
+> > +
+> > +	/* Can't register until after driver model init */
+> > +	if (WARN_ON(!spmi_bus_type.p))
+> > +		return -EAGAIN;
+> > +
+> > +	ret = device_add(&ctrl->dev);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	if (IS_ENABLED(CONFIG_OF))
+> > +		of_spmi_register_devices(ctrl);
+> 
+> Check for error code here?
 
->
-> However, given that, I wonder if it is really necessary to bail out above if
-> max_heartbeat is 0. After all, you set heartbeat to min_heartbeat anyway
-> in this case.
+And do what with it?  Maybe instead, I should make
+of_spmi_register_devices() return void.
 
-Yes it is necessary. The max_heartbeat is a configuration that cannot be 
-changed once configured.
-We have to inform the user that his max_heartbeat value is too small to 
-be handled correctly by the Linux kernel.
-
-If we simply use the min_heartbeat value as heartbeat and ignore the 
-wrong max_heartbeat value,
-the watchdog will reset the SoC before we can ever reset the watchdog 
-counter.
-
->
->> +
->> +	if (max_heartbeat < min_heartbeat + 4)
->>   		dev_warn(dev,
->>   			 "min heartbeat and max heartbeat might be too close for the system to handle it correctly\n");
->> -		if (wdt->heartbeat < 4)
->> -			dev_warn(dev,
->> -				 "heartbeat might be too small for the system to handle it correctly\n");
->> -	} else {
->> -		wdt->heartbeat -= 4;
->> -	}
->>   
->>   	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
->>   		err = request_irq(wdt->irq, wdt_interrupt,
->> @@ -213,7 +224,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->>   			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
->>   
->>   	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
->> -	mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
->> +	/* Use min_heartbeat the first time because the watchdog timer might
->> +	 * be running for a long time when we reach this init function. */
-> 	/*
-> 	 * Multi-line comment style
-> 	 *
-> 	 * Not really sure I understand what this accomplishes. What problem
-> 	 * are you trying to solve here ?
-> 	 */
-
-Sure, I'll change the comment style.
-
-What, I'm trying to explain, is that the watchdog might (or should) have 
-been resetted
-before loading the linux kernel. But loading the kernel takes some time 
-(uncompressing,
-low level init, ...), and if we take the heartbeat (or max_heartbeat / 4 
-in the common case) value as
-the next trigger to reset the watchdog counter, the watchdog timer might 
-have already expired.
-
-Here is an example:
-  - max_heartbeat configured to 8 seconds
-  - min_heartbeat configured to 1 second
-  => heartbeat = 2s
-  - kernel boot time (before at91 watchdog is loaded) = 6 secs
-
-If I use the heartbeat value when configuring the first expiration of 
-the timer,
-it might be too late to reset the watchdog counter.
-
-I'll try to find a proper to explain this use case :-).
-
->> +	mod_timer(&wdt->timer, jiffies + min_heartbeat);
->>   
->>   	/* Try to set timeout from device tree first */
->>   	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
->> -- 
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
