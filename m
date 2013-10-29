@@ -1,68 +1,133 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue, 29 Oct 2013 16:18:35 +0200
-Subject: [PATCH v3 09/10] mfd: pm8x41: document device tree bindings
-In-Reply-To: <88997d3863f72f8553fcaf66cf67fbf3289df04f.1382985169.git.joshc@codeaurora.org>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <88997d3863f72f8553fcaf66cf67fbf3289df04f.1382985169.git.joshc@codeaurora.org>
-Message-ID: <1383056315.2837.22.camel@iivanov-dev.int.mm-sol.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 29 Oct 2013 10:20:23 -0400
+Subject: [PATCH v9 01/18] arm: make SWIOTLB available
+In-Reply-To: <alpine.DEB.2.02.1310290441260.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
+ <1382698313-13161-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1310251206450.26077@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1310290441260.26077@kaball.uk.xensource.com>
+Message-ID: <20131029142023.GE20487@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 29, 2013 at 04:41:40AM +0000, Stefano Stabellini wrote:
+> ping?
 
-Hi Josh,
+You know you are pinging yourself, right ? :-)
 
-On Mon, 2013-10-28 at 13:12 -0500, Josh Cartwright wrote: 
-> Document the bindings used to describe the Qualcomm 8x41 PMICs.
 > 
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> ---
->  Documentation/devicetree/bindings/mfd/pm8x41.txt | 33 ++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/pm8x41.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/pm8x41.txt b/Documentation/devicetree/bindings/mfd/pm8x41.txt
-> new file mode 100644
-> index 0000000..6afd4ce
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/pm8x41.txt
-> @@ -0,0 +1,33 @@
-> +Qualcomm PM8841 and PM8941 PMIC multi-function devices
-> +
-> +The PM8x41 PMICs are used with the Qualcomm Snapdragon 800 series SoCs, and are
-> +interfaced to the chip via the SPMI (System Power Management Interface) bus.
-> +Support for  multiple independent functions are implemented by splitting the
-> +16-bit SPMI slave address space into 256 smaller fixed-size regions, 256 bytes
-> +each.  A function can consume one or more of these fixed-size register regions.
-> +
-> +Required properties:
-> +- compatible: Must be one of:
-> +     "qcom,pm8841"
-> +     "qcom,pm8941"
-> +- reg: Specifies the SPMI USID slave address for this device
-> +- #address-cells = <1>
-> +- #size-cells = <0>
-> +
-> +Each child node represents a function of the PM8x41.  Each child 'reg' entry
-> +describes an offset within the USID slave address where the region starts.
-> +
-> +Example:
-> +
-> +pm8941 at 0 {
-> +	compatible = "qcom,pm8941";
-> +	reg = <0x0>;
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	rtc {
-> +		compatible = "qcom,pm8941-rtc";
-> +		reg = <0x6000 0x6100>;
-
-This doesn't look right. Probably #size-cells have to be <1>?
-
-Regards,
-Ivan
-
-
-> +	};
-> +}
+> On Fri, 25 Oct 2013, Stefano Stabellini wrote:
+> > Russell,
+> > this is the only patch that needs an ack at the moment.
+> > As you commented on it before and I have already addressed your comments
+> > few versions ago, unless you have any complaints I am going to add it to
+> > linux-next and I am thinking of merging it during the next merge window.
+> > 
+> > On Fri, 25 Oct 2013, Stefano Stabellini wrote:
+> > > IOMMU_HELPER is needed because SWIOTLB calls iommu_is_span_boundary,
+> > > provided by lib/iommu_helper.c.
+> > > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> > > CC: will.deacon at arm.com
+> > > CC: linux at arm.linux.org.uk
+> > > 
+> > > 
+> > > Changes in v8:
+> > > - use __phys_to_pfn and __pfn_to_phys.
+> > > 
+> > > Changes in v7:
+> > > - dma_mark_clean: empty implementation;
+> > > - in dma_capable use coherent_dma_mask if dma_mask hasn't been
+> > >   allocated.
+> > > 
+> > > Changes in v6:
+> > > - check for dev->dma_mask being NULL in dma_capable.
+> > > 
+> > > Changes in v5:
+> > > - implement dma_mark_clean using dmac_flush_range.
+> > > 
+> > > Changes in v3:
+> > > - dma_capable: do not treat dma_mask as a limit;
+> > > - remove SWIOTLB dependency on NEED_SG_DMA_LENGTH.
+> > > ---
+> > >  arch/arm/Kconfig                   |    6 +++++
+> > >  arch/arm/include/asm/dma-mapping.h |   37 ++++++++++++++++++++++++++++++++++++
+> > >  2 files changed, 43 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index 1ad6fb6..b08374f 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -1872,6 +1872,12 @@ config CC_STACKPROTECTOR
+> > >  	  neutralized via a kernel panic.
+> > >  	  This feature requires gcc version 4.2 or above.
+> > >  
+> > > +config SWIOTLB
+> > > +	def_bool y
+> > > +
+> > > +config IOMMU_HELPER
+> > > +	def_bool SWIOTLB
+> > > +
+> > >  config XEN_DOM0
+> > >  	def_bool y
+> > >  	depends on XEN
+> > > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> > > index 5b579b9..01b5a3d 100644
+> > > --- a/arch/arm/include/asm/dma-mapping.h
+> > > +++ b/arch/arm/include/asm/dma-mapping.h
+> > > @@ -10,6 +10,7 @@
+> > >  
+> > >  #include <asm-generic/dma-coherent.h>
+> > >  #include <asm/memory.h>
+> > > +#include <asm/cacheflush.h>
+> > >  
+> > >  #define DMA_ERROR_CODE	(~0)
+> > >  extern struct dma_map_ops arm_dma_ops;
+> > > @@ -86,6 +87,42 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+> > >  }
+> > >  #endif
+> > >  
+> > > +static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+> > > +{
+> > > +	unsigned int offset = paddr & ~PAGE_MASK;
+> > > +	return pfn_to_dma(dev, __phys_to_pfn(paddr)) + offset;
+> > > +}
+> > > +
+> > > +static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+> > > +{
+> > > +	unsigned int offset = dev_addr & ~PAGE_MASK;
+> > > +	return __pfn_to_phys(dma_to_pfn(dev, dev_addr)) + offset;
+> > > +}
+> > > +
+> > > +static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+> > > +{
+> > > +	u64 limit, mask;
+> > > +	
+> > > +	if (dev->dma_mask)
+> > > +		mask = *dev->dma_mask;
+> > > +	else 
+> > > +		mask = dev->coherent_dma_mask;
+> > > +
+> > > +	if (mask == 0)
+> > > +		return 0;
+> > > +
+> > > +	limit = (mask + 1) & ~mask;
+> > > +	if (limit && size > limit)
+> > > +		return 0;
+> > > +
+> > > +	if ((addr | (addr + size - 1)) & ~mask)
+> > > +		return 0;
+> > > +
+> > > +	return 1;
+> > > +}
+> > > +
+> > > +static inline void dma_mark_clean(void *addr, size_t size) { }
+> > > +
+> > >  /*
+> > >   * DMA errors are defined by all-bits-set in the DMA address.
+> > >   */
+> > > -- 
+> > > 1.7.2.5
+> > > 
+> > 
