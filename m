@@ -1,31 +1,43 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 29 Oct 2013 13:08:23 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the pm tree
-In-Reply-To: <20131029190021.bb2dddcbd46e1ddfdfd5e441@canb.auug.org.au>
-References: <20131029190021.bb2dddcbd46e1ddfdfd5e441@canb.auug.org.au>
-Message-ID: <1919820.jZeQGKJQBQ@vostro.rjw.lan>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 29 Oct 2013 17:28:29 +0530
+Subject: [PATCH 01/10] clk: bcm2835: Remove duplicate inclusion of
+ clk-provider.h
+In-Reply-To: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
+References: <1379064232-10261-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <CAK9yfHxFhfk=8CigSf-8PgVNZFQ1Uq6oCmP1VAkrKyzbOu0TLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 29, 2013 07:00:21 PM Stephen Rothwell wrote:
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-omap2/opp.c between commit e4db1c7439b3 ("PM / OPP: rename
-> header to linux/pm_opp.h") from the pm tree and commit 92d51856d740
-> ("ARM: OMAP3+: do not register non-dt OPP tables for device tree boot")
-> from the arm-soc tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+Mike,
 
-The fix looks good to me, thanks for fixing this up.
+On 13 September 2013 14:53, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> clk-provider.h was included twice.
+>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+>  drivers/clk/clk-bcm2835.c |    1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
+> index 5fb4ff5..676077d 100644
+> --- a/drivers/clk/clk-bcm2835.c
+> +++ b/drivers/clk/clk-bcm2835.c
+> @@ -20,7 +20,6 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/clk/bcm2835.h>
+> -#include <linux/clk-provider.h>
+>  #include <linux/of.h>
+>
+>  static const struct of_device_id clk_match[] __initconst = {
+> --
+> 1.7.9.5
+>
 
-Rafael
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/87817414/attachment.sig>
+This series is pending since a long time. Can you please look into it?
+
+
+-- 
+With warm regards,
+Sachin
