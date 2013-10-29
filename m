@@ -1,133 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Oct 2013 14:26:26 +0000
-Subject: [PATCH v9 01/18] arm: make SWIOTLB available
-In-Reply-To: <20131029142023.GE20487@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
- <1382698313-13161-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1310251206450.26077@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1310290441260.26077@kaball.uk.xensource.com>
- <20131029142023.GE20487@phenom.dumpdata.com>
-Message-ID: <20131029142626.GQ16735@n2100.arm.linux.org.uk>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Oct 2013 15:30:45 +0100
+Subject: [PATCH v2 2/2] clocksource: sh_mtu2: Add clk_prepare/unprepare support
+In-Reply-To: <1383057045-22608-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383057045-22608-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383057045-22608-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 10:20:23AM -0400, Konrad Rzeszutek Wilk wrote:
-> On Tue, Oct 29, 2013 at 04:41:40AM +0000, Stefano Stabellini wrote:
-> > ping?
-> 
-> You know you are pinging yourself, right ? :-)
+Prepare the clock at probe time, as there is no other appropriate place
+in the driver where we're allowed to sleep.
 
-And the patch was only Cc'd.  I'm starting to read stuff which isn't
-flagged as having me in the To: line with less priority in recent times.
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/clocksource/sh_mtu2.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-> > On Fri, 25 Oct 2013, Stefano Stabellini wrote:
-> > > Russell,
-> > > this is the only patch that needs an ack at the moment.
-> > > As you commented on it before and I have already addressed your comments
-> > > few versions ago, unless you have any complaints I am going to add it to
-> > > linux-next and I am thinking of merging it during the next merge window.
-> > > 
-> > > On Fri, 25 Oct 2013, Stefano Stabellini wrote:
-> > > > IOMMU_HELPER is needed because SWIOTLB calls iommu_is_span_boundary,
-> > > > provided by lib/iommu_helper.c.
-> > > > 
-> > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > > Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> > > > CC: will.deacon at arm.com
-> > > > CC: linux at arm.linux.org.uk
-> > > > 
-> > > > 
-> > > > Changes in v8:
-> > > > - use __phys_to_pfn and __pfn_to_phys.
-> > > > 
-> > > > Changes in v7:
-> > > > - dma_mark_clean: empty implementation;
-> > > > - in dma_capable use coherent_dma_mask if dma_mask hasn't been
-> > > >   allocated.
-> > > > 
-> > > > Changes in v6:
-> > > > - check for dev->dma_mask being NULL in dma_capable.
-> > > > 
-> > > > Changes in v5:
-> > > > - implement dma_mark_clean using dmac_flush_range.
-> > > > 
-> > > > Changes in v3:
-> > > > - dma_capable: do not treat dma_mask as a limit;
-> > > > - remove SWIOTLB dependency on NEED_SG_DMA_LENGTH.
-> > > > ---
-> > > >  arch/arm/Kconfig                   |    6 +++++
-> > > >  arch/arm/include/asm/dma-mapping.h |   37 ++++++++++++++++++++++++++++++++++++
-> > > >  2 files changed, 43 insertions(+), 0 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > > index 1ad6fb6..b08374f 100644
-> > > > --- a/arch/arm/Kconfig
-> > > > +++ b/arch/arm/Kconfig
-> > > > @@ -1872,6 +1872,12 @@ config CC_STACKPROTECTOR
-> > > >  	  neutralized via a kernel panic.
-> > > >  	  This feature requires gcc version 4.2 or above.
-> > > >  
-> > > > +config SWIOTLB
-> > > > +	def_bool y
-> > > > +
-> > > > +config IOMMU_HELPER
-> > > > +	def_bool SWIOTLB
-> > > > +
-> > > >  config XEN_DOM0
-> > > >  	def_bool y
-> > > >  	depends on XEN
-> > > > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > > > index 5b579b9..01b5a3d 100644
-> > > > --- a/arch/arm/include/asm/dma-mapping.h
-> > > > +++ b/arch/arm/include/asm/dma-mapping.h
-> > > > @@ -10,6 +10,7 @@
-> > > >  
-> > > >  #include <asm-generic/dma-coherent.h>
-> > > >  #include <asm/memory.h>
-> > > > +#include <asm/cacheflush.h>
-
-Why does this need to be here?  Your'e not adding anything which
-needs it.
-
-> > > > +static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-> > > > +{
-> > > > +	unsigned int offset = paddr & ~PAGE_MASK;
-> > > > +	return pfn_to_dma(dev, __phys_to_pfn(paddr)) + offset;
-> > > > +}
-> > > > +
-> > > > +static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-> > > > +{
-> > > > +	unsigned int offset = dev_addr & ~PAGE_MASK;
-> > > > +	return __pfn_to_phys(dma_to_pfn(dev, dev_addr)) + offset;
-> > > > +}
-
-These look fine.
-
-> > > > +static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-> > > > +{
-> > > > +	u64 limit, mask;
-> > > > +	
-> > > > +	if (dev->dma_mask)
-> > > > +		mask = *dev->dma_mask;
-> > > > +	else 
-> > > > +		mask = dev->coherent_dma_mask;
-
-This looks like a hack.  Either we want to use the streaming mask or
-the coherent mask as appropriate for the caller.  That should be a choice
-the caller makes, not the implementation of this behind the callers back.
-
-> > > > +
-> > > > +	if (mask == 0)
-> > > > +		return 0;
-> > > > +
-> > > > +	limit = (mask + 1) & ~mask;
-> > > > +	if (limit && size > limit)
-> > > > +		return 0;
-> > > > +
-> > > > +	if ((addr | (addr + size - 1)) & ~mask)
-> > > > +		return 0;
-> > > > +
-> > > > +	return 1;
-> > > > +}
-
-The remainder looks fine to me.
+diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+index e6cfb32..3cf1283 100644
+--- a/drivers/clocksource/sh_mtu2.c
++++ b/drivers/clocksource/sh_mtu2.c
+@@ -313,13 +313,18 @@ static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
+ 		goto err1;
+ 	}
+ 
++	ret = clk_prepare(p->clk);
++	if (ret < 0)
++		goto err2;
++
+ 	ret = sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
+ 			       cfg->clockevent_rating);
+ 	if (ret < 0)
+-		goto err2;
++		goto err3;
+ 
+ 	return 0;
+-
++ err3:
++	clk_unprepare(p->clk);
+  err2:
+ 	clk_put(p->clk);
+  err1:
+-- 
+1.8.1.5
