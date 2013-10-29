@@ -1,42 +1,85 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 29 Oct 2013 05:34:08 -0300
-Subject: [PATCH 2/2] dma: mv_xor: Use high_base mmio where appropriate
-In-Reply-To: <CAPcyv4iQVoYCXz16T3N4MbdVJV7MoKKeL0wq9t9WF1Kf3gz3Bw@mail.gmail.com>
-References: <1383000855-8377-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383000855-8377-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <CAPcyv4iQVoYCXz16T3N4MbdVJV7MoKKeL0wq9t9WF1Kf3gz3Bw@mail.gmail.com>
-Message-ID: <20131029083407.GA2416@localhost>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Tue, 29 Oct 2013 17:38:42 +0900
+Subject: [PATCH 3/7] video: exynos_mipi_dsim: Use the generic PHY driver
+In-Reply-To: <23467785.uRr31aFEN8@amdc1227>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <526997BC.8070602@gmail.com> <526E0038.7050805@samsung.com>
+ <23467785.uRr31aFEN8@amdc1227>
+Message-ID: <526F7412.60004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 04:47:20PM -0700, Dan Williams wrote:
-> [ adding dmaengine ]
-> 
-> On Mon, Oct 28, 2013 at 3:54 PM, Ezequiel Garcia
-> <ezequiel.garcia@free-electrons.com> wrote:
-> > Despite requesting two memory resources, called 'base' and 'high_base', the
-> > driver uses explicitly only the former. The latter is being used implicitly
-> > by addressing at offset +0x200, which in practice accesses high_base.
-> >
-> > Instead of relying in such trick, let's define the registers with the
-> > offset from high_base, and use high_base explicitly where appropriate.
-> >
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  drivers/dma/mv_xor.c |  3 ++-
-> >  drivers/dma/mv_xor.h | 25 +++++++++++++------------
-> >  2 files changed, 15 insertions(+), 13 deletions(-)
-> 
-> Since it's unused I'd prefer a patch that just deletes xor_high_base.
-> 
+Hi Tomasz,
+On Tue, OCT 28, 2013 21:24, Tomasz Figa wrote:
+> Hi Donghwa,
+>
+> On Monday 28 of October 2013 15:12:08 Donghwa Lee wrote:
+>> On Fri, OCT 25, 2013 06:57, Sylwester Nawrocki wrote:
+>>> On 10/24/2013 05:57 PM, Kishon Vijay Abraham I wrote:
+>>>> On Thursday 24 October 2013 09:12 PM, Sachin Kamat wrote:
+>>>>> On 24 October 2013 20:00, Olof Johansson<olof@lixom.net>  wrote:
+>>>>>> On Wed, Oct 16, 2013 at 9:28 AM, Kishon Vijay Abraham I<kishon@ti.com>  wrote:
+>>>>>>> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+>>>>>>> index 32e5406..00b3a52 100644
+>>>>>>> --- a/drivers/video/exynos/exynos_mipi_dsi.c
+>>>>>>> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
+>>>>>>> @@ -156,8 +157,7 @@ static int exynos_mipi_dsi_blank_mode(struct mipi_dsim_device *dsim, int power)
+>>>>>>>                  exynos_mipi_regulator_enable(dsim);
+>>>>>>>
+>>>>>>>                  /* enable MIPI-DSI PHY. */
+>>>>>>> -               if (dsim->pd->phy_enable)
+>>>>>>> -                       dsim->pd->phy_enable(pdev, true);
+>>>>>>> +               phy_power_on(dsim->phy);
+>>>>>>>
+>>>>>>>                  clk_enable(dsim->clock);
+>>>>>>>
+>>>>>> This introduces the below with exynos_defconfig:
+>>>>>>
+>>>>>> ../../drivers/video/exynos/exynos_mipi_dsi.c: In function
+>>>>>> 'exynos_mipi_dsi_blank_mode':
+>>>>>> ../../drivers/video/exynos/exynos_mipi_dsi.c:144:26: warning: unused
+>>>>>> variable 'pdev' [-Wunused-variable]
+>>>>>>    struct platform_device *pdev = to_platform_device(dsim->dev);
+>>> Sorry about missing that, I only noticed this warning recently and didn't
+>>> get around to submit a patch.
+>>>
+>>>>> I have already submitted a patch to fix this [1]
+>>> Thanks a lot guys for fixing this.
+>>>
+>>>>> [1] http://marc.info/?l=linux-fbdev&m=138233359617936&w=2
+>>>> Sorry, missed that :-(
+>>> This MIPI DSIM driver is affectively a dead code in the mainline now, once
+>>> Exynos become a dt-only platform. I guess it can be deleted for 3.14, once
+>>> S5P gets converted to the device tree. The new driver using CDF is basically
+>>> a complete rewrite. Or device tree support should be added to that driver,
+>>> but I believe it doesn't make sense without CDF.
+>>>
+>> MIPI DSIM driver is not a dead code. There is a steady trickle of patches.
+>> It's kind of late, but, I will update it as DT based drivers as soon as possible.
+>> And Why do you think that DT support of existing MIPI DSIM is something less
+>> than great?
+> First of all, the exynos_mipi_dsim driver has currently no users in
+> mainline kernel, so it is essentially dead code. In addition, on
+> a platform that is the primary candidate for using it, which is Exynos,
+> there is no way to use it, due to no DT support.
+As I mentioned above, patches are submitted sometimes and I will update
+this driver as soon as possible to support DT.
+> As for the driver itself, it is not really a great example of good code.
+> It contains a hacks, like calling msleep() without any clear reason and
+> also many coding style issues. I'd prefer to replace it with the new
+> exynos-dsi driver rewritten completely in SRPOL, when CDF is finished.
 
-It's wrongly *unused*, the mmio high_base is actually being used
-implicitly by always addressing at an offset that addresses +200.
+Yes, I know this drivers had been changed about only minor issues and
+it is not really good code style. And CDF is more good and light.
+But discussion for CDF is still remaining a kind of requests. If it is merged
+into linux kernel and many users use it, existing MIPI DSI drivers will be
+replaced with the new drivers naturally, isn't it?
+Until that, I and quite a few users will update and code re-factory for
+this drivers to be more better.
 
-Deleting high_base would actually make it worse, for that region
-will no longer be ioremaped. Maybe the commit message is not clear
-about it?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+BR,
+Donghwa Lee
+> Best regards,
+> Tomasz
+>
+>
