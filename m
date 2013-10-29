@@ -1,30 +1,141 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 29 Oct 2013 08:56:05 -0700
-Subject: [PATCH v3 08/10] mfd: pm8x41: add support for Qualcomm 8x41 PMICs
-In-Reply-To: <5a49bffc44c5f5bffe222560e489a712321ce971.1382985169.git.joshc@codeaurora.org>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Tue, 29 Oct 2013 10:56:16 -0500
+Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
+In-Reply-To: <526FD278.8080102@metafoo.de>
 References: <cover.1382985169.git.joshc@codeaurora.org>
- <5a49bffc44c5f5bffe222560e489a712321ce971.1382985169.git.joshc@codeaurora.org>
-Message-ID: <20131029155605.GE4231@lee--X1>
+ <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
+ <526FD278.8080102@metafoo.de>
+Message-ID: <20131029155616.GG20207@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Oct 2013, Josh Cartwright wrote:
+Hey Lars-
 
-> The Qualcomm 8941 and 8841 PMICs are components used with the Snapdragon
-> 800 series SoC family.  This driver exists largely as a glue mfd component,
-> it exists to be an owner of an SPMI regmap for children devices
-> described in device tree.
+Thanks for the feedback.  CC'ing Ivan, since he had the same feedback
+regarding the PM callbacks.
+
+On Tue, Oct 29, 2013 at 04:21:28PM +0100, Lars-Peter Clausen wrote:
+> Couple of high-level comments on the in-kernel API.
 > 
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> ---
->  drivers/mfd/Kconfig  | 10 ++++++++
->  drivers/mfd/Makefile |  1 +
->  drivers/mfd/pm8x41.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+> On 10/28/2013 07:12 PM, Josh Cartwright wrote:
+> > +#ifdef CONFIG_PM_SLEEP
+> > +static int spmi_pm_suspend(struct device *dev)
+> > +{
+> > +	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+> > +
+> > +	if (pm)
+> > +		return pm_generic_suspend(dev);
+> 
+> pm_generic_suspend() checks both dev->driver and dev->driver->pm and returns
+> 0 if either of them is NULL, so there should be no need to wrap the function.
+> 
+> > +	else
+> > +		return 0;
+> > +}
+> > +
+> > +static int spmi_pm_resume(struct device *dev)
+> > +{
+> > +	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+> > +
+> > +	if (pm)
+> > +		return pm_generic_resume(dev);
+> 
+> Same here
 
-Can you CC me on your next submission, or it may not get applied.
+Sounds good.  I'll drop these.
+
+> > +/**
+> > + * spmi_controller_remove: Controller tear-down.
+> > + * @ctrl: controller to be removed.
+> > + *
+> > + * Controller added with the above API is torn down using this API.
+> > + */
+> > +int spmi_controller_remove(struct spmi_controller *ctrl)
+> 
+> The return type should be void. The function can't fail and nobody is going
+> to check the return value anyway.
+
+Alright.
+
+> > +{
+> > +	int dummy;
+> > +
+> > +	if (!ctrl)
+> > +		return -EINVAL;
+> > +
+> > +	dummy = device_for_each_child(&ctrl->dev, NULL,
+> > +				      spmi_ctrl_remove_device);
+> > +	device_unregister(&ctrl->dev);
+> 
+> Should be device_del(). device_unregister() will do both device_del() and
+> put_device(). But usually you'd want to do something in between like release
+> resources used by the controller.
+
+I'm not sure I understand your suggestion here.  If put_device() isn't
+called here, wouldn't we be leaking the controller?  What resources
+would I want to be releasing here that aren't released as part of the
+controller's release() function?
+
+> > +	return 0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(spmi_controller_remove);
+> > +
+> [...]
+> > +/**
+> > + * spmi_controller_alloc: Allocate a new SPMI controller
+> > + * @ctrl: associated controller
+> > + *
+> > + * Caller is responsible for either calling spmi_device_add() to add the
+> > + * newly allocated controller, or calling spmi_device_put() to discard it.
+> > + */
+> > +struct spmi_device *spmi_device_alloc(struct spmi_controller *ctrl);
+> > +
+> > +static inline void spmi_device_put(struct spmi_device *sdev)
+> 
+> For symmetry reasons it might make sense to call this spmi_device_free().
+
+Except that it doesn't necessarily free() the underlying device, so I
+find that more confusing.
+
+> > +{
+> > +	if (sdev)
+> > +		put_device(&sdev->dev);
+> > +}
+> [...]
+> > +#define to_spmi_controller(d) container_of(d, struct spmi_controller, dev)
+> 
+> Should be a inline function for better type safety.
+
+Sounds good.  Will change the to_spmi_*() macros.
+
+> [...]
+> > +static inline void spmi_controller_put(struct spmi_controller *ctrl)
+> 
+> For symmetry reasons it might make sense to call this spmi_controller_free().
+> 
+> > +{
+> > +	if (ctrl)
+> > +		put_device(&ctrl->dev);
+> > +}
+> > +
+> [....]
+> > +struct spmi_driver {
+> > +	struct device_driver driver;
+> > +	int	(*probe)(struct spmi_device *sdev);
+> > +	int	(*remove)(struct spmi_device *sdev);
+> 
+> The type of the remove function should be found. The Linux device model
+> doesn't really allow for device removal to fail.
+> 
+> > +	void	(*shutdown)(struct spmi_device *sdev);
+> > +	int	(*suspend)(struct spmi_device *sdev, pm_message_t pmesg);
+> > +	int	(*resume)(struct spmi_device *sdev);
+> 
+> The framework seems to support dev_pm_ops just fine, there should be no need
+> for legacy suspend/resume callbacks.
+
+Yep.  Will drop.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
