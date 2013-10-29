@@ -1,51 +1,127 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Oct 2013 00:55:06 +0100
-Subject: [PATCH v7 1/5] omap3isp: Modify clocks registration to avoid
- circular references
-In-Reply-To: <20131029232837.GB2266@earth.universe>
-References: <1383076268-8984-1-git-send-email-s.nawrocki@samsung.com>
- <16467881.81yEf9zq68@avalon> <20131029232837.GB2266@earth.universe>
-Message-ID: <15201376.PVPE5NrGdO@avalon>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Tue, 29 Oct 2013 16:54:47 -0700
+Subject: [PATCH v3 2/5] usb: chipidea: add freescale imx28 special write
+ register method
+In-Reply-To: <201310281147.53982.marex@denx.de>
+References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
+ <1382680943-9258-2-git-send-email-peter.chen@freescale.com>
+ <526E3E2C.3030706@digi.com> <201310281147.53982.marex@denx.de>
+Message-ID: <20131029235447.GA21367@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-
-On Wednesday 30 October 2013 00:28:39 Sebastian Reichel wrote:
-> On Tue, Oct 29, 2013 at 11:28:37PM +0100, Laurent Pinchart wrote:
-> > On Tuesday 29 October 2013 20:51:04 Sylwester Nawrocki wrote:
-> > > The clock core code is going to be modified so clk_get() takes
-> > > reference on the clock provider module. Until the potential circular
-> > > reference issue is properly addressed, we pass NULL as as the first
-> > > argument to clk_register(), in order to disallow sub-devices taking
-> > > a reference on the ISP module back trough clk_get(). This should
-> > > prevent locking the modules in memory.
-> > > 
-> > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > 
-> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > 
-> > Do you plan to push this to mainline as part of this patch series ? I
-> > don't have pending patches for the omap3isp that would conflict with this
-> > patch, so that would be fine with me.
+On Mon, Oct 28, 2013 at 11:47:53AM +0100, Marek Vasut wrote:
+> Dear Hector Palacios,
 > 
-> I plan to add support for DT to omap3isp + ADP1653 shortly. I have
-> not yet started to work on this, but expect to send some first RFC
-> patches in November.
+> > Dear Peter,
+> > 
+> > On 10/25/2013 08:02 AM, Peter Chen wrote:
+> > > According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+> > > register error issue", All USB register write operations must
+> > > use the ARM SWP instruction. So, we implement special hw_write
+> > > and hw_test_and_clear for imx28.
+> > > 
+> > > Discussion for it at below:
+> > > http://marc.info/?l=linux-usb&m=137996395529294&w=2
+> > > 
+> > > Signed-off-by: Peter Chen
+> > > <peter.chen-KZfg59tc24xl57MIdRCFDg@public.gmane.org> ---
+> > > Changes for v2:
+> > > - Rebase to latest usb-next tree
+> > > 
+> > >   drivers/usb/chipidea/ci.h    |   23 +++++++++++++++++++++++
+> > >   drivers/usb/chipidea/core.c  |    2 ++
+> > >   drivers/usb/chipidea/host.c  |    1 +
+> > >   include/linux/usb/chipidea.h |    1 +
+> > >   4 files changed, 27 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+> > > index 1c94fc5..4eb61d0 100644
+> > > --- a/drivers/usb/chipidea/ci.h
+> > > +++ b/drivers/usb/chipidea/ci.h
+> > > @@ -173,6 +173,8 @@ struct ci_hdrc {
+> > > 
+> > >   	struct dentry			*debugfs;
+> > >   	bool				id_event;
+> > >   	bool				b_sess_valid_event;
+> > > 
+> > > +	/* imx28 needs swp instruction for writing */
+> > > +	bool				imx28_write_fix;
+> > > 
+> > >   };
+> > >   
+> > >   static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
+> > > 
+> > > @@ -253,6 +255,13 @@ static inline u32 hw_read(struct ci_hdrc *ci, enum
+> > > ci_hw_regs reg, u32 mask)
+> > > 
+> > >   	return ioread32(ci->hw_bank.regmap[reg]) & mask;
+> > >   
+> > >   }
+> > > 
+> > > +#ifdef CONFIG_SOC_IMX28
+> > > +static inline void imx28_ci_writel(u32 val32, volatile u32 *addr)
+> > > +{
+> > > +	__asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
+> > > +}
+> > > +#endif
+> > > +
+> > > 
+> > >   /**
+> > >   
+> > >    * hw_write: writes to a hw register
+> > >    * @reg:  register index
+> > > 
+> > > @@ -266,7 +275,14 @@ static inline void hw_write(struct ci_hdrc *ci, enum
+> > > ci_hw_regs reg,
+> > > 
+> > >   		data = (ioread32(ci->hw_bank.regmap[reg]) & ~mask)
+> > >   		
+> > >   			| (data & mask);
+> > > 
+> > > +#ifdef CONFIG_SOC_IMX28
+> > > +	if (ci->imx28_write_fix)
+> > > +		imx28_ci_writel(data, ci->hw_bank.regmap[reg]);
+> > > +	else
+> > > +		iowrite32(data, ci->hw_bank.regmap[reg]);
+> > > +#else
+> > > 
+> > >   	iowrite32(data, ci->hw_bank.regmap[reg]);
+> > > 
+> > > +#endif
+> > > 
+> > >   }
+> > >   
+> > >   /**
+> > > 
+> > > @@ -281,7 +297,14 @@ static inline u32 hw_test_and_clear(struct ci_hdrc
+> > > *ci, enum ci_hw_regs reg,
+> > > 
+> > >   {
+> > >   
+> > >   	u32 val = ioread32(ci->hw_bank.regmap[reg]) & mask;
+> > > 
+> > > +#ifdef CONFIG_SOC_IMX28
+> > > +	if (ci->imx28_write_fix)
+> > > +		imx28_ci_writel(val, ci->hw_bank.regmap[reg]);
+> > > +	else
+> > > +		iowrite32(val, ci->hw_bank.regmap[reg]);
+> > > +#else
+> > > 
+> > >   	iowrite32(val, ci->hw_bank.regmap[reg]);
+> > > 
+> > > +#endif
+> > > 
+> > >   	return val;
+> > >   
+> > >   }
+> > 
+> > Can't we remove the #ifdefs CONFIG_SOC_IMX28 all around?
+> > The check is done on the new flag ci->imx28_write_fix which exists for all
+> > platforms, isn't it?.
+> 
+> The SWP instruction is specific to ARM, so you'd need to stub-out the 
+> imx28_ci_writel() with ifdef then.
 
-That's very nice to hear ! And thanks for the heads up, I would have started 
-working on it shortly.
-
--- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131030/789c7a56/attachment.sig>
+That's better than the mess of #ifdefs this patch adds, which isn't ok
+at all :(
