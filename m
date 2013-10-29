@@ -1,230 +1,101 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Tue, 29 Oct 2013 11:08:22 +0100
-Subject: [PATCH v2] videobuf2: Add missing lock held on vb2_fop_relase
-In-Reply-To: <CAPybu_0y1R_OTPhkVPu4P9MmY=+uQU4hffEwvc8skUomqUeJ3A@mail.gmail.com>
-References: <1382198877-27164-1-git-send-email-ricardo.ribalda@gmail.com>
- <5262CEF6.1040003@gmail.com>
- <CAPybu_0y1R_OTPhkVPu4P9MmY=+uQU4hffEwvc8skUomqUeJ3A@mail.gmail.com>
-Message-ID: <CAPybu_3ngoGuV+emsX4F5CpLYeevpNbCNHONwAY7JAxm=hLvrg@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 29 Oct 2013 12:15:54 +0200
+Subject: [PATCH 1/3] ARM: dts: omap4-panda: add DPI pinmuxing
+In-Reply-To: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1382695658-18757-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <526F8ADA.3030003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Hi Tony,
 
-Anybody has a comment here? If not I will post a patch with the
-modifications propossed by Sylwester.
+On 25/10/13 13:07, Tomi Valkeinen wrote:
+> New u-boot versions no longer set the pinmuxing for Panda's DPI output,
+> and the muxing has to be done in the .dts file.
+> 
+> Add pinmuxing for DPI and TFP410. Without these, the DVI output on Panda
+> does not work with recent u-boot.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
+The two latter patches in this series needs more work and can be
+dropped, but this one should be applied to make Panda work properly with
+new u-boots.
 
-Thanks!
+ Tomi
 
-On Sat, Oct 19, 2013 at 10:08 PM, Ricardo Ribalda Delgado
-<ricardo.ribalda@gmail.com> wrote:
-> Hello Sylwester
->
->
-> On Sat, Oct 19, 2013 at 8:27 PM, Sylwester Nawrocki
-> <sylvester.nawrocki@gmail.com> wrote:
->> On 10/19/2013 06:07 PM, Ricardo Ribalda wrote:
->> [...]
->>>
->>> ---
->>>   drivers/media/platform/exynos4-is/fimc-capture.c |  2 +-
->>>   drivers/media/platform/exynos4-is/fimc-lite.c    |  2 +-
->>>   drivers/media/usb/em28xx/em28xx-video.c          |  2 +-
->>>   drivers/media/v4l2-core/videobuf2-core.c         | 18 +++++++++++++++++-
->>>   include/media/videobuf2-core.h                   |  2 ++
->>>   5 files changed, 22 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c
->>> b/drivers/media/platform/exynos4-is/fimc-capture.c
->>> index fb27ff7..c38d247c 100644
->>> --- a/drivers/media/platform/exynos4-is/fimc-capture.c
->>> +++ b/drivers/media/platform/exynos4-is/fimc-capture.c
->>> @@ -549,7 +549,7 @@ static int fimc_capture_release(struct file *file)
->>>                 vc->streaming = false;
->>>         }
->>>
->>> -       ret = vb2_fop_release(file);
->>> +       ret = __vb2_fop_release(file, true);
->>>
->>>         if (close) {
->>>                 clear_bit(ST_CAPT_BUSY,&fimc->state);
->>>
->>> diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c
->>> b/drivers/media/platform/exynos4-is/fimc-lite.c
->>> index e5798f7..021d804 100644
->>> --- a/drivers/media/platform/exynos4-is/fimc-lite.c
->>> +++ b/drivers/media/platform/exynos4-is/fimc-lite.c
->>> @@ -546,7 +546,7 @@ static int fimc_lite_release(struct file *file)
->>>                 mutex_unlock(&entity->parent->graph_mutex);
->>>         }
->>>
->>> -       vb2_fop_release(file);
->>> +       __vb2_fop_release(file, true);
->>>         pm_runtime_put(&fimc->pdev->dev);
->>>         clear_bit(ST_FLITE_SUSPENDED,&fimc->state);
->>>
->>>
->>> diff --git a/drivers/media/usb/em28xx/em28xx-video.c
->>> b/drivers/media/usb/em28xx/em28xx-video.c
->>> index 9d10334..6a5c147 100644
->>> --- a/drivers/media/usb/em28xx/em28xx-video.c
->>> +++ b/drivers/media/usb/em28xx/em28xx-video.c
->>> @@ -1664,7 +1664,7 @@ static int em28xx_v4l2_close(struct file *filp)
->>>         em28xx_videodbg("users=%d\n", dev->users);
->>>
->>>         mutex_lock(&dev->lock);
->>> -       vb2_fop_release(filp);
->>> +       __vb2_fop_release(filp, false);
->>
->>
->> I believe no modifications are needed for this driver.
->>
->>
->>>         if (dev->users == 1) {
->>>                 /* the device is already disconnect,
->>> diff --git a/drivers/media/v4l2-core/videobuf2-core.c
->>> b/drivers/media/v4l2-core/videobuf2-core.c
->>> index 594c75e..ce309a8 100644
->>> --- a/drivers/media/v4l2-core/videobuf2-core.c
->>> +++ b/drivers/media/v4l2-core/videobuf2-core.c
->>> @@ -2619,16 +2619,32 @@ int vb2_fop_mmap(struct file *file, struct
->>> vm_area_struct *vma)
->>>   }
->>>   EXPORT_SYMBOL_GPL(vb2_fop_mmap);
->>>
->>> -int vb2_fop_release(struct file *file)
->>> +int __vb2_fop_release(struct file *file, bool lock_is_held)
->>>   {
->>>         struct video_device *vdev = video_devdata(file);
->>> +       struct mutex *lock;
->>>
->>>         if (file->private_data == vdev->queue->owner) {
->>> +               if (lock_is_held)
->>> +                       lock = NULL;
->>> +               else
->>> +                       lock = vdev->queue->lock ?
->>> +                               vdev->queue->lock : vdev->lock;
->>> +               if (lock)
->>> +                       mutex_lock(lock);
->>>                 vb2_queue_release(vdev->queue);
->>>                 vdev->queue->owner = NULL;
->>> +               if (lock)
->>> +                       mutex_unlock(lock);
->>>         }
->>>         return v4l2_fh_release(file);
->>>   }
->>> +EXPORT_SYMBOL_GPL(__vb2_fop_release);
->>> +
->>> +int vb2_fop_release(struct file *file)
->>> +{
->>> +       return __vb2_fop_release(file, false);
->>> +}
->>>   EXPORT_SYMBOL_GPL(vb2_fop_release);
->>
->>
->> It might be better to make it something like:
->>
->
-> The rationale behind my patch (and probably not properly commented) is
-> that the vb2_fop_release must be used ONLY as a file operantion
-> handler.
->
-> If the user makes its own function for relase the __vb2_fop_release
-> function must be used and the infrastructure must be notified about
-> the status of he lock (he is on his own).
->
-> I believe my approach is simpler because It has only two functions
-> (instead of 3) and the user understand the difference of the two
-> functions just by looking at the arguments. In the future we could
-> even check statically that  vb2_fop_release is not called inside a
-> driver.
->
-> Anyway, this is just a detail :), the most important part is that the
-> oops is fixed, and that all the drivers that worked keep working.
->
-> Lets wait for more comments and then lets post a new patch (with two
-> functions and better documentation, or three functions).
->
-> Thank you very much for you comments!!!
->
->> static int _vb2_fop_release(struct file *file, bool locked)
->>
->> {
->>         struct video_device *vdev = video_devdata(file);
->>         struct mutex *lock;
->>
->>         if (file->private_data == vdev->queue->owner) {
->>                 lock = vdev->queue->lock ?
->>                         vdev->queue->lock : vdev->lock;
->>
->>                 if (lock && !locked)
->>
->>                         mutex_lock(lock);
->>
->>                 vb2_queue_release(vdev->queue);
->>                 vdev->queue->owner = NULL;
->>                 if (lock && !locked)
->>                         mutex_unlock(lock);
->>         }
->>         return v4l2_fh_release(file);
->> }
->>
->> int vb2_fop_release(struct file *file)
->> {
->>         return _vb2_fop_release(file, false);
->> }
->> EXPORT_SYMBOL_GPL(vb2_fop_release);
->>
->> /*
->>  * This function should be used instead of vb2_fop_release()
->>  * if the caller already holds the video queue mutex.
->>  */
->> int __vb2_fop_release(struct file *file)
->> {
->>         return _vb2_fop_release(file, true);
->> }
->> EXPORT_SYMBOL_GPL(__vb2_fop_release);
->>
->> since __vb2_fop_release(file, false); is basically useless, it is same
->> as vb2_fop_release(file);
->>
->>
->>>   ssize_t vb2_fop_write(struct file *file, char __user *buf,
->>> diff --git a/include/media/videobuf2-core.h
->>> b/include/media/videobuf2-core.h
->>> index 6781258..cd1e4d5 100644
->>> --- a/include/media/videobuf2-core.h
->>> +++ b/include/media/videobuf2-core.h
->>> @@ -491,6 +491,8 @@ int vb2_ioctl_expbuf(struct file *file, void *priv,
->>>
->>>   int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma);
->>>   int vb2_fop_release(struct file *file);
->>> +/* must be used if the lock is held. */
->>
->>
->> Let's put any comments at the function body, not here.
->>
->>> +int __vb2_fop_release(struct file *file, bool lock_is_held);
->>
->>
->> int __vb2_fop_release(struct file *file);
->>
->>
->>>   ssize_t vb2_fop_write(struct file *file, char __user *buf,
->>>                 size_t count, loff_t *ppos);
->>>   ssize_t vb2_fop_read(struct file *file, char __user *buf,
->>
->>
->> Thanks,
->> Sylwester
->
->
->
-> --
-> Ricardo Ribalda
+> ---
+>  arch/arm/boot/dts/omap4-panda-common.dtsi | 43 +++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index faa95b5..fcb8856 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -129,6 +129,8 @@
+>  			&twl6040_pins
+>  			&mcpdm_pins
+>  			&mcbsp1_pins
+> +			&dss_dpi_pins
+> +			&tfp410_pins
+>  			&dss_hdmi_pins
+>  			&tpd12s015_pins
+>  			&hsusbb1_pins
+> @@ -166,6 +168,47 @@
+>  		>;
+>  	};
+>  
+> +	dss_dpi_pins: pinmux_dss_dpi_pins {
+> +		pinctrl-single,pins = <
+> +			0x122 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data23 */
+> +			0x124 (PIN_OUTPUT | MUX_MODE5) 	/* dispc2_data22 */
+> +			0x126 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data21 */
+> +			0x128 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data20 */
+> +			0x12a (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data19 */
+> +			0x12c (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data18 */
+> +			0x12e (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data15 */
+> +			0x130 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data14 */
+> +			0x132 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data13 */
+> +			0x134 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data12 */
+> +			0x136 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data11 */
+> +
+> +			0x174 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data10 */
+> +			0x176 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data9 */
+> +			0x178 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data16 */
+> +			0x17a (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data17 */
+> +			0x17c (PIN_OUTPUT | MUX_MODE5)	/* dispc2_hsync */
+> +			0x17e (PIN_OUTPUT | MUX_MODE5)	/* dispc2_pclk */
+> +			0x180 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_vsync */
+> +			0x182 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_de */
+> +			0x184 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data8 */
+> +			0x186 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data7 */
+> +			0x188 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data6 */
+> +			0x18a (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data5 */
+> +			0x18c (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data4 */
+> +			0x18e (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data3 */
+> +
+> +			0x190 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data2 */
+> +			0x192 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data1 */
+> +			0x194 (PIN_OUTPUT | MUX_MODE5)	/* dispc2_data0 */
+> +		>;
+> +	};
+> +
+> +	tfp410_pins: pinmux_tfp410_pins {
+> +		pinctrl-single,pins = <
+> +			0x144 (PIN_OUTPUT | MUX_MODE3)	/* gpio_0 */
+> +		>;
+> +	};
+> +
+>  	dss_hdmi_pins: pinmux_dss_hdmi_pins {
+>  		pinctrl-single,pins = <
+>  			0x5a (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
+> 
 
 
-
--- 
-Ricardo Ribalda
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/e5ad093b/attachment.sig>
