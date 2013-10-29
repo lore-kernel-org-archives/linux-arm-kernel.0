@@ -1,45 +1,64 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 29 Oct 2013 09:19:23 +0100
-Subject: [RESEND PATCH 1/2] w1-gpio: Detect of_gpio_error for first gpio
-Message-ID: <1383034764-22091-1-git-send-email-mpa@pengutronix.de>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Tue, 29 Oct 2013 09:25:48 +0100
+Subject: [PATCH] ARM: Support arch_irq_work_raise() via self IPIs
+In-Reply-To: <20131029060058.GD21983@codeaurora.org>
+References: <526DBEAA.4030707@linaro.org>
+ <1382984701-2371-1-git-send-email-sboyd@codeaurora.org>
+ <878uxcq1m7.fsf@linaro.org> <20131029060058.GD21983@codeaurora.org>
+Message-ID: <20131029082546.GA17514@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first DT gpio is necessary for this driver, but errors returned for
-of_get_gpio are ignored.
+On Mon, Oct 28, 2013 at 11:00:58PM -0700, Stephen Boyd wrote:
+> On 10/28, Kevin Hilman wrote:
+> > Stephen Boyd <sboyd@codeaurora.org> writes:
+> > 
+> > > This will allow the scheduler tick to be restarted if we're in
+> > > full NOHZ mode.
+> > >
+> > > Cc: Kevin Hilman <khilman@linaro.org>
+> > > Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> > Minor nit, but I'd prefer a more verbose changelog (I forget things
+> > quickly and like to rely on changelogs for my memory.)  Probably worth
+> > adding something like: "By default, irq_work is tied to the tick
+> > processing (update_process_times()) but in full NOHZ mode, no tick means
+> > no IRQ work.  In order for IRQ work to be done in full NOHZ mode, a
+> > self-IPI is used to process IRQ work."
+> > 
+> > Other than the changelog nit, patch looks good, feel free to add
+> > 
+> > Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> > 
+> > If Russell is OK with this, it can go to his patch system.
+> > 
+> 
+> Fair enough. This is what I came up with. I'll send it off to the
+> patch tracker in about 12 hours if nobody else has anymore
+> comments.
+> 
+> ----8<-----
+> ARM: Support arch_irq_work_raise() via self IPIs                                
+> 
+> By default, IRQ work is run from the tick interrupt (see
+> irq_work_run() in update_process_times()). When we're in full
+> NOHZ mode, restarting the tick requires the use of IRQ work and
+> if the only place we run IRQ work is in the tick interrupt we
+> have an unbreakable cycle. Implement arch_irq_work_raise() via
+> self IPIs to break this cycle and get the tick started again.
+> Note that we implement this via IPIs which are only available on
+> SMP builds. This shouldn't be a problem because full NOHZ is only
+> supported on SMP builds anyway.
 
-This patch adds a return value check for the first of_get_gpio.
+Nice description!
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Acked-by: Evgeniy Polyakov <zbr@ioremap.net>
----
- drivers/w1/masters/w1-gpio.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Thanks!
 
-diff --git a/drivers/w1/masters/w1-gpio.c b/drivers/w1/masters/w1-gpio.c
-index f54ece2..ae53e88 100644
---- a/drivers/w1/masters/w1-gpio.c
-+++ b/drivers/w1/masters/w1-gpio.c
-@@ -58,6 +58,7 @@ static int w1_gpio_probe_dt(struct platform_device *pdev)
- {
- 	struct w1_gpio_platform_data *pdata = pdev->dev.platform_data;
- 	struct device_node *np = pdev->dev.of_node;
-+	int gpio;
- 
- 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
- 	if (!pdata)
-@@ -66,7 +67,11 @@ static int w1_gpio_probe_dt(struct platform_device *pdev)
- 	if (of_get_property(np, "linux,open-drain", NULL))
- 		pdata->is_open_drain = 1;
- 
--	pdata->pin = of_get_gpio(np, 0);
-+	gpio = of_get_gpio(np, 0);
-+	if (gpio < 0)
-+		return gpio;
-+	pdata->pin = gpio;
-+
- 	pdata->ext_pullup_enable_pin = of_get_gpio(np, 1);
- 	pdev->dev.platform_data = pdata;
- 
--- 
-1.8.4.rc3
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
