@@ -1,38 +1,61 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 29 Oct 2013 20:59:20 +0100
-Subject: [PATCH v2 05/13] uprobes: add arch write opcode hook
-In-Reply-To: <20131028194914.GA15103@redhat.com>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-6-git-send-email-dave.long@linaro.org>
- <20131019165051.GC7837@redhat.com> <5268137F.3030809@linaro.org>
- <20131028194914.GA15103@redhat.com>
-Message-ID: <20131029195920.GA4538@redhat.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 30 Oct 2013 04:04:22 +0800
+Subject: [GIT PULL]ARM: sirf: dts update for 3.13
+In-Reply-To: <20131029194451.GA19870@quad.lixom.net>
+References: <CAGsJ_4z0xLZE5yfaQqVnVne8zn=D13UxmWb8P6pknPNcQ9p14A@mail.gmail.com>
+ <20131029194451.GA19870@quad.lixom.net>
+Message-ID: <CAGsJ_4zvDqM3eNwaXqx_4kBsNh9K_NMWyQVroDrHX-kE+nOLXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28, Oleg Nesterov wrote:
->
-> Yes, yes, sorry for confusion. What I actually tried to suggest is
-> something like the trivial patch below.
->
-> Then arm can do:
->
-> 	uprobe_opcode_t arch_uprobe_swbp_insn(struct arch_uprobe *auprobe)
-> 	{
-> 		return __opcode_to_mem_arm(auprobe->bpinsn);
-> 	}
->
-> No?
->
-> > I notice there don't seem to be any alternative set_swbp functions
-> > in the (rc6) kernel tree
->
-> Yes... I think we should simply make it "static". And set_orig_insn()
-> too.
+Hi Oolf,
 
-Or. arm can actually reimplement set_swbp(). This doesn't mean the
-duplication of write_opcode() code, we can simply export this helper.
 
-Either way is imho better than this patch. Unless I missed something.
+2013/10/30 Olof Johansson <olof@lixom.net>:
+> Hi Barry,
+>
+> On Wed, Oct 30, 2013 at 02:49:09AM +0800, Barry Song wrote:
+>> Hi Oolf,
+>>
+>> as discussed at "[GIT PULL]ARM: sirf: dts fixes for 3.12-rc"
+>> http://www.spinics.net/lists/arm-kernel/msg276335.html
+>>
+>> some CSR SiRFSoC dts changes are queued for 3.13 here.
+>>
+>> -barry
+>>
+>> The following changes since commit 959f58544b7f20c92d5eb43d1232c96c15c01bfb:
+>>
+>>   Linux 3.12-rc7 (2013-10-27 16:12:03 -0700)
+>
+> There's really no need to base this branch on -rc7, please go with older
+> -rc bases unless there's a good reason to pick up a newer one (such as
+> to avoid conflicts with bugfixes).
 
-Oleg.
+get it.
+
+>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+>> tags/sirf-dts-for-3.13
+>>
+>> for you to fetch changes up to 6b4e51e09de47c9d7fe3eccde339e1e61001bce3:
+>>
+>>   ARM: dts: sirf: add missed address-cells and size-cells for prima2
+>> I2C (2013-10-30 02:31:51 +0800)
+>
+> I've taken the patches from this branch and applied them to a 3.12-rc4-based
+> branch and merged them in. So they are now in next/dt, but the same commit ids
+> are not. Since there's no sirf tree in linux-next this should hopefully not
+> cause any problems.
+
+thanks!
+
+>
+> No further action needed on your part. :)
+>
+>
+> -Olof
+
+-barry
