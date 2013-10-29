@@ -1,41 +1,35 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 29 Oct 2013 13:14:39 -0600
-Subject: [PATCH 0/6] PCI: imx6: Random fixes
-In-Reply-To: <1381853200-5534-1-git-send-email-marex@denx.de>
-References: <1381853200-5534-1-git-send-email-marex@denx.de>
-Message-ID: <CAErSpo6v4nvKQ4W9BhnUsNEjzsXoCiLxeFY-K=z=bMZ4AFOyGg@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 29 Oct 2013 20:18:03 +0100
+Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
+In-Reply-To: <526FE2B6.8050701@codeaurora.org>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
+ <526FD278.8080102@metafoo.de> <20131029155616.GG20207@joshc.qualcomm.com>
+ <526FE2B6.8050701@codeaurora.org>
+Message-ID: <527009EB.3010704@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 15, 2013 at 10:06 AM, Marek Vasut <marex@denx.de> wrote:
-> Set of random fixes for the PCIe driver for i.MX6 . With these fixes, my
-> setup with MX6Q -> PCIe bridge -> i210 ethernet adapter works as expected.
->
-> NOTE: I'm sure this will start some discussion. There are quite a few patches
->       that are more of a hacks. Shawn, I didn't ignore your remark about the
->       clock patches, I will test it ASAP, I just want to have these fixes in
->       the public so others can comment/test.
->
-> Marek Vasut (6):
->   PCI: imx6: Make reset-gpio optional
->   PCI: imx6: Fix the clock for PCIe
->   ARM: dts: imx6qdl: Fix the clock for PCIe
->   PCI: imx6: Probe the PCIe in fs_initcall()
->   PCI: imx6: Force Gen1 operation
->   PCI: designware: Fix DT resource retrieval
->
->  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
->  arch/arm/boot/dts/imx6qdl.dtsi                     |  4 +-
->  drivers/pci/host/pci-imx6.c                        | 63 ++++++++++++++++------
->  drivers/pci/host/pcie-designware.c                 | 17 +++---
->  4 files changed, 55 insertions(+), 31 deletions(-)
+On 10/29/2013 05:30 PM, Stephen Boyd wrote:
+> On 10/29/13 08:56, Josh Cartwright wrote:
+>>
+>>>> +#define to_spmi_controller(d) container_of(d, struct spmi_controller, dev)
+>>> Should be a inline function for better type safety.
+>> Sounds good.  Will change the to_spmi_*() macros.
+> 
+> I was under the impression that container_of() already does type
+> checking. At least it will ensure that typeof(d) == typeof(dev) in the
+> above example which is about as good as it can get.
 
-I'm ignoring this series for now.  I assume you'll post an updated
-series as mentioned in your Oct 17 response to "[Patch 5/6] PCI: imx6:
-Force Gen1 operation."  Please mark that series as "v2" when you post
-it.  My assumption is still that Shawn Guo will ack the
-drivers/pci/host/ pieces before I apply them [1].
+Well you'll get a warning, but the quality of the warning message is much
+better when an inline function is used.
 
-Bjorn
+warning: initialization from incompatible pointer type
 
-[1] http://marc.info/?l=linux-pci&m=138030833011687&w=2
+vs.
+
+warning: Passing argument 1 of to_smpi_controller() from incompatible
+pointer type. Expected struct device * got struct driver *
+
+
+- Lars
