@@ -1,25 +1,37 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 29 Oct 2013 00:50:30 -0500
-Subject: [PATCH v3 01/10] of: Add empty for_each_available_child_of_node()
- macro definition
-In-Reply-To: <3518ab21e436f5c1a7bdd900a796bb05f9162bbf.1382985169.git.joshc@codeaurora.org>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <3518ab21e436f5c1a7bdd900a796bb05f9162bbf.1382985169.git.joshc@codeaurora.org>
-Message-ID: <CAL_Jsq+n_cAGXJaxPrRNOeb1-39EMWokCEFJ3Z3OQydJaRbijQ@mail.gmail.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 29 Oct 2013 13:50:22 +0800
+Subject: question about  Make CONFIG_STRICT_MEMORY_RWX even stricter   patch 
+Message-ID: <35FD53F367049845BC99AC72306C23D101592A7054F5@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 1:12 PM, Josh Cartwright <joshc@codeaurora.org> wrote:
-> From: Sylwester Nawrocki <s.nawrocki@samsung.com>
->
-> Add this empty macro definition so users can be compiled without
-> excluding this macro call with preprocessor directives when CONFIG_OF
-> is disabled.
->
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Hi  ,
 
-I'm assuming the rest of this is not going to make 3.13, so I've
-applied this for 3.13.
+We will cherry-pick this patch :
+http://cgit.sonyericsson.net/cgit.cgi/kernel/msm.git/commit/?id=2504e77ddedfa34dbd64e757a14e5b21a613c000
 
-Rob
+for security reason ,
+
+but I have a question about this patch ,
+this patch will make .text  section  permission become RX but not writable ,
+so  some features like  kprobe / jump_label  may can't work correct,
+these  features will change code during runtime ,
+so it will result in page fault  if it write .text section .
+
+
+Thanks 
+
+
+
+Yalin.Wang
+Software Engineer 
+OS Kernel&Graphics
+?
+Sony Mobile Communications
+Tel: +86 10 5966 9819
+Phone: 18610323092
+Address: No.16 Guangshun South Street, Chaoyang, Beijing, P.R.C.
+
+sonymobile.com
+??
+?
