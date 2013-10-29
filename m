@@ -1,32 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 29 Oct 2013 06:03:49 +0100
-Subject: [PATCH 06/19] i2c: rcar: Enable the driver on all ARM platforms
-In-Reply-To: <1383004027-25036-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383004027-25036-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131029050349.GC2643@katana>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 28 Oct 2013 22:05:49 -0700
+Subject: [PATCH 3/6] ARM: Add Krait L2 accessor functions
+In-Reply-To: <20131029013230.GI4763@kartoffel>
+References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
+ <1383006690-6754-4-git-send-email-sboyd@codeaurora.org>
+ <20131029011942.GG4763@kartoffel> <526F0DB5.8050800@codeaurora.org>
+ <20131029013230.GI4763@kartoffel>
+Message-ID: <20131029050548.GB21983@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 12:46:54AM +0100, Laurent Pinchart wrote:
-> Renesas ARM platforms are transitioning from single-platform to
-> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> and ARCH_SHMOBILE_MULTI and increase build testing coverage.
+On 10/28, Mark Rutland wrote:
+> On Tue, Oct 29, 2013 at 01:21:57AM +0000, Stephen Boyd wrote:
+> > On 10/28/13 18:19, Mark Rutland wrote:
+> > > It might be worth commmenting inline as to what register each of these is
+> > > accessing. Inevitably the commit message will become harder to find and
+> > > associate with the code over time.
+> > >
+> > > Similarly for get_l2_indirect_reg.
+> > 
+> > Do you mean with the "@" syntax in the assembly? The 80-character limit
+> > is out to get me.
 > 
-> Remove the explicit I2C dependency as the configuration option is
-> already unavailable when I2C support is disabled.
+> I probably didn't mean inline :)
 > 
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: linux-i2c at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> How about a block comment above the first asm block like:
+> 
+> /*
+>  * Select the L2 window by poking l2cpselr, then write to the window via
+>  * l2cpdr.
+>  */
+> 
 
-Acked-by: Wolfram Sang <wsa@the-dreams.de>
+Ok sure.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/cc4564bf/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
