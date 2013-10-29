@@ -1,58 +1,273 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 30 Oct 2013 02:49:09 +0800
-Subject: [GIT PULL]ARM: sirf: dts update for 3.13
-Message-ID: <CAGsJ_4z0xLZE5yfaQqVnVne8zn=D13UxmWb8P6pknPNcQ9p14A@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 Oct 2013 18:49:53 +0000
+Subject: [PATCH v2] arm/arm64: KVM: MMIO support for BE guest
+Message-ID: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oolf,
+Do the necessary byteswap when host and guest have different
+views of the universe. Actually, the only case we need to take
+care of is when the guest is BE. All the other cases are naturally
+handled.
 
-as discussed at "[GIT PULL]ARM: sirf: dts fixes for 3.12-rc"
-http://www.spinics.net/lists/arm-kernel/msg276335.html
+Also be careful about endianness when the data is being memcopy-ed
+from/to the run buffer.
 
-some CSR SiRFSoC dts changes are queued for 3.13 here.
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+>From v1:
+- Moved data insertion/extraction into specific functions
+- Bit of tidying up making the patch more readable
 
--barry
+ arch/arm/include/asm/kvm_emulate.h   | 41 +++++++++++++++++
+ arch/arm/kvm/mmio.c                  | 87 +++++++++++++++++++++++++++++++-----
+ arch/arm64/include/asm/kvm_emulate.h | 48 ++++++++++++++++++++
+ 3 files changed, 165 insertions(+), 11 deletions(-)
 
-The following changes since commit 959f58544b7f20c92d5eb43d1232c96c15c01bfb:
-
-  Linux 3.12-rc7 (2013-10-27 16:12:03 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-tags/sirf-dts-for-3.13
-
-for you to fetch changes up to 6b4e51e09de47c9d7fe3eccde339e1e61001bce3:
-
-  ARM: dts: sirf: add missed address-cells and size-cells for prima2
-I2C (2013-10-30 02:31:51 +0800)
-
-----------------------------------------------------------------
-ARM: sirf: dts update for 3.13
-
-some missed dt nodes for sirf dts for 3.13. Among them:
-  - add missed chhifbg node in prima2 and atlas6 dts
-  - add missed cell, cs and dma channel for SPI nodes
-  - add missed graphics2d iobg in atlas6 dts
-  - add missed address-cells and size-cells for prima2 I2C
-  - add missed memcontrol-monitor node in prima2 and atlas6 dts
-
-----------------------------------------------------------------
-Barry Song (2):
-      ARM: dts: sirf: add missed chhifbg node in prima2 and atlas6 dts
-      ARM: dts: sirf: add missed cell, cs and dma channel for SPI nodes
-
-Jiansong Chen (1):
-      ARM: dts: sirf: add missed graphics2d iobg in atlas6 dts
-
-Renwei Wu (1):
-      ARM: dts: sirf: add missed address-cells and size-cells for prima2 I2C
-
-Ye He (1):
-      ARM: dts: sirf: add missed memcontrol-monitor node in prima2 and
-atlas6 dts
-
- arch/arm/boot/dts/atlas6.dtsi | 33 ++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/prima2.dtsi | 30 +++++++++++++++++++++++++++++-
- 2 files changed, 61 insertions(+), 2 deletions(-)
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index a464e8d..8a6be05 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -157,4 +157,45 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
+ 	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
+ }
+ 
++static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
++{
++	return !!(*vcpu_cpsr(vcpu) & PSR_E_BIT);
++}
++
++static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
++						    unsigned long data,
++						    unsigned int len)
++{
++	if (kvm_vcpu_is_be(vcpu)) {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return be16_to_cpu(data & 0xffff);
++		default:
++			return be32_to_cpu(data);
++		}
++	}
++
++	return data;		/* Leave LE untouched */
++}
++
++static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
++						    unsigned long data,
++						    unsigned int len)
++{
++	if (kvm_vcpu_is_be(vcpu)) {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return cpu_to_be16(data & 0xffff);
++		default:
++			return cpu_to_be32(data);
++		}
++	}
++
++	return data;		/* Leave LE untouched */
++}
++
+ #endif /* __ARM_KVM_EMULATE_H__ */
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 0c25d94..54105f1b 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -23,6 +23,69 @@
+ 
+ #include "trace.h"
+ 
++static void mmio_write_data(struct kvm_exit_mmio *mmio, unsigned long data)
++{
++	void *datap = NULL;
++	union {
++		u8	byte;
++		u16	hword;
++		u32	word;
++		u64	dword;
++	} tmp;
++
++	switch (mmio->len) {
++	case 1:
++		tmp.byte	= data;
++		datap		= &tmp.byte;
++		break;
++	case 2:
++		tmp.hword	= data;
++		datap		= &tmp.hword;
++		break;
++	case 4:
++		tmp.word	= data;
++		datap		= &tmp.word;
++		break;
++	case 8:
++		tmp.dword	= data;
++		datap		= &tmp.dword;
++		break;
++	}
++
++	memcpy(mmio->data, datap, mmio->len);
++}
++
++static unsigned long mmio_read_data(struct kvm_run *run)
++{
++	unsigned long data = 0;
++	unsigned int len = run->mmio.len;
++	union {
++		u16	hword;
++		u32	word;
++		u64	dword;
++	} tmp;
++
++	switch (len) {
++	case 1:
++		data = run->mmio.data[0];
++		break;
++	case 2:
++		memcpy(&tmp.hword, run->mmio.data, len);
++		data = tmp.hword;
++		break;
++	case 4:
++		memcpy(&tmp.word, run->mmio.data, len);
++		data = tmp.word;
++		break;
++	case 8:
++		memcpy(&tmp.dword, run->mmio.data, len);
++		data = tmp.dword;
++		break;
++	}
++
++	return data;
++}
++
+ /**
+  * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
+  * @vcpu: The VCPU pointer
+@@ -33,28 +96,27 @@
+  */
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	unsigned long *dest;
++	unsigned long data;
+ 	unsigned int len;
+ 	int mask;
+ 
+ 	if (!run->mmio.is_write) {
+-		dest = vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt);
+-		*dest = 0;
+-
+ 		len = run->mmio.len;
+ 		if (len > sizeof(unsigned long))
+ 			return -EINVAL;
+ 
+-		memcpy(dest, run->mmio.data, len);
+-
+-		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
+-				*((u64 *)run->mmio.data));
++		data = mmio_read_data(run);
+ 
+ 		if (vcpu->arch.mmio_decode.sign_extend &&
+ 		    len < sizeof(unsigned long)) {
+ 			mask = 1U << ((len * 8) - 1);
+-			*dest = (*dest ^ mask) - mask;
++			data = (data ^ mask) - mask;
+ 		}
++
++		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
++			       data);
++		data = vcpu_data_host_to_guest(vcpu, data, len);
++		*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
+ 	}
+ 
+ 	return 0;
+@@ -105,6 +167,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		 phys_addr_t fault_ipa)
+ {
+ 	struct kvm_exit_mmio mmio;
++	unsigned long data;
+ 	unsigned long rt;
+ 	int ret;
+ 
+@@ -125,13 +188,15 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	}
+ 
+ 	rt = vcpu->arch.mmio_decode.rt;
++	data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), mmio.len);
++
+ 	trace_kvm_mmio((mmio.is_write) ? KVM_TRACE_MMIO_WRITE :
+ 					 KVM_TRACE_MMIO_READ_UNSATISFIED,
+ 			mmio.len, fault_ipa,
+-			(mmio.is_write) ? *vcpu_reg(vcpu, rt) : 0);
++			(mmio.is_write) ? data : 0);
+ 
+ 	if (mmio.is_write)
+-		memcpy(mmio.data, vcpu_reg(vcpu, rt), mmio.len);
++		mmio_write_data(&mmio, data);
+ 
+ 	if (vgic_handle_mmio(vcpu, run, &mmio))
+ 		return 1;
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index eec0738..3a7d058 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -177,4 +177,52 @@ static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
+ 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
+ }
+ 
++static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
++{
++	if (vcpu_mode_is_32bit(vcpu))
++		return !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_E_BIT);
++
++	return !!(vcpu_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
++}
++
++static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
++						    unsigned long data,
++						    unsigned int len)
++{
++	if (kvm_vcpu_is_be(vcpu)) {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return be16_to_cpu(data & 0xffff);
++		case 4:
++			return be32_to_cpu(data & ((1UL << 32) - 1));
++		default:
++			return be64_to_cpu(data);
++		}
++	}
++
++	return data;		/* Leave LE untouched */
++}
++
++static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
++						    unsigned long data,
++						    unsigned int len)
++{
++	if (kvm_vcpu_is_be(vcpu)) {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return cpu_to_be16(data & 0xffff);
++		case 4:
++			return cpu_to_be32(data & ((1UL << 32) - 1));
++		default:
++			return cpu_to_be64(data);
++		}
++	}
++
++	return data;		/* Leave LE untouched */
++}
++
+ #endif /* __ARM64_KVM_EMULATE_H__ */
+-- 
+1.8.2.3
