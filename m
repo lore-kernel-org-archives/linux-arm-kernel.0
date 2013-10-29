@@ -1,89 +1,86 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 29 Oct 2013 08:46:17 -0700
-Subject: [PATCH v5 0/3] ARM: S5PV210: move to common clk framework
-In-Reply-To: <1823897.8rOixkM4PW@amdc1227>
-References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
- <5264425E.4040301@samsung.com> <20131021121605.11944.74007@quantum>
- <1823897.8rOixkM4PW@amdc1227>
-Message-ID: <526FD849.9050000@samsung.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 29 Oct 2013 10:49:35 -0500
+Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
+In-Reply-To: <526FB5FF.2060908@st.com>
+References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
+ <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
+ <40E3A029-C7E8-41DA-9218-3FB7ED97B707@codeaurora.org>
+ <526FB5FF.2060908@st.com>
+Message-ID: <BA9BDFB3-122B-4BE4-BD89-2B30D5450FF6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/13 04:42, Tomasz Figa wrote:
-> Hi Kukjin, Mike,
->
-> On Monday 21 of October 2013 05:16:05 Mike Turquette wrote:
->> Quoting Kukjin Kim (2013-10-20 13:51:42)
->>> On 10/20/13 01:03, Tomasz Figa wrote:
->>>> Hi Mike, Kukjin, Rafael,
->>>>
->>>> On Tuesday 24 of September 2013 14:50:06 Mateusz Krawczuk wrote:
->>>>> This patch series is the new s5pv210 clock implementation
->>>>> (using common clk framework).
->>>>>
->>>>> This implementation is compatible with device tree definition and board
->>>>> files.
->>>>>
->>>>> This patch series is based on linux-next and has been tested on goni and
->>>>> aquila
->>>>> boards using board file.
->>>>>
->>>>> Since v4:
->>>>> Corrected mux flags for finpll.
->>>>>
->>>>> Since v3:
->>>>>
->>>>> Replace s5pv210_clk_register_finpll, by creating mux finpll
->>>>> with xusbxti and xxti as parrents.
->>>>>
->>>>>
->>>>> Mateusz Krawczuk (3):
->>>>>     clk: samsung: Add clock driver for s5pc110/s5pv210
->>>>>     Cpufreq: s5pv210 cpufreq fixes for CCF
->>>>>     ARM: s5pv210: Migrate clock handling to Common Clock Framework
->>>>>
->>>>>    .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
->>>>>    arch/arm/mach-s5pv210/Kconfig                      |   9 +
->>>>>    arch/arm/mach-s5pv210/Makefile                     |   4 +-
->>>>>    arch/arm/mach-s5pv210/common.c                     |  17 +
->>>>>    arch/arm/mach-s5pv210/common.h                     |  10 +
->>>>>    arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
->>>>>    arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
->>>>>    arch/arm/plat-samsung/Kconfig                      |   2 +-
->>>>>    drivers/clk/samsung/Makefile                       |   3 +
->>>>>    drivers/clk/samsung/clk-s5pv210.c                  | 673
->>>>> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c
->>>>>    |   6 +-
->>>>>    include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
->>>>>    12 files changed, 1019 insertions(+), 8 deletions(-)
->>>>>    create mode 100644
->>>>> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
->>>>> create mode 100644 drivers/clk/samsung/clk-s5pv210.c
->>>>>    create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
->>>>
->>>> I believe this series is reasonable to be applied. Could we agree on
->>>> the tree it would go through and get all tne required acks?
->>>>
->>>> Best regards,
->>>> Tomasz
->>>
->>> I agree.
->>>
->>> Mike, how do you think the common clk stuff for s5pv210?
->>
->> Clock code looks good to me. Which tree do you want to take it through?
->
-> Seems like we just missed another kernel release. It's a bit sad that it's
-> happening so often for Samsung patches...
->
 
-Tomasz, sorry about that, I couldn't end up the stuff before attending 
-ARM Kernel Summit, but in my opinion, this series would be merged for 
-upcoming merge window via clk tree if Mike is fine because there is no 
-conflicts with Samsung tree.
+On Oct 29, 2013, at 8:19 AM, Maxime Coquelin wrote:
 
-Mike, how do you think? If you're OK, please pick this into your tree 
-with my ack.
+> 
+> On 10/28/2013 08:25 PM, Kumar Gala wrote:
+>> On Oct 14, 2013, at 7:46 AM, Maxime COQUELIN wrote:
+>> 
+>>> This patch adds support to SSC (Synchronous Serial Controller)
+>>> I2C driver. This IP also supports SPI protocol, but this is not
+>>> the aim of this driver.
+>>> 
+>>> This IP is embedded in all ST SoCs for Set-top box platorms, and
+>>> supports I2C Standard and Fast modes.
+>>> 
+>>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>>> ---
+>>> Documentation/devicetree/bindings/i2c/i2c-st.txt |   38 +
+>>> drivers/i2c/busses/Kconfig                       |   10 +
+>>> drivers/i2c/busses/Makefile                      |    1 +
+>>> drivers/i2c/busses/i2c-st.c                      |  867 ++++++++++++++++++++++
+>>> 4 files changed, 916 insertions(+)
+>>> create mode 100644 Documentation/devicetree/bindings/i2c/i2c-st.txt
+>>> create mode 100644 drivers/i2c/busses/i2c-st.c
+>>> 
+>>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+>>> new file mode 100644
+>>> index 0000000..8b2fd0b
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+>>> @@ -0,0 +1,38 @@
+>>> +ST SSC binding, for I2C mode operation
+>>> +
+>>> +Required properties :
+>>> +- compatible : Must be "st,comms-i2c"
+>>> +- reg : Offset and length of the register set for the device
+>>> +- interrupts : the interrupt specifier
+>>> +- clock-names: Must contain "ssc".
+>>> +- clocks: Must contain an entry for each name in clock-names. See the common
+>>> +  clock bindings.
+>>> +- A pinctrl state named "default" must be defined, using the bindings in
+>>> +  ../pinctrl/pinctrl-binding.txt
+>>> +
+>>> +Optional properties :
+>>> +- clock-frequency : Desired I2C bus clock frequency in Hz. If not specified,
+>>> +  the default 100 kHz frequency will be used. As only Normal and Fast modes
+>>> +  are supported, possible values are 100000 and 400000.
+>>> +- i2c-min-scl-pulse-width-us : The minimum valid SCL pulse width that is
+>>> +  allowed through the deglitch circuit. In units of us.
+>>> +- i2c-min-sda-pulse-width-us : The minimum valid SDA pulse width that is
+>>> +  allowed through the deglitch circuit. In units of us.
+>> i2c-min... should be vendor prefixed, st,i2c-min...
+> This was already discussed in earlier revisions of the patches.
+> Initially this was prefixed with "st,", but Wolfram asked to put these properties as generic.
+> As explained in the cover letter, there are no I2C DT binding documentation for now, but it is in Wolfram's ToDo list.
+> As soon as Wolfram has created the documentation, I will create a patch to document
+> 
+> i2c-min-scl-pulse-width-us and i2c-min-sda-pulse-width-us there.
 
-Thanks,
-Kukjin
+Missed that, would be good to maybe comment about that in the commit message.. Or is there some reason to not just put them into a i2c/i2c-bus.txt right now?
+
+>>> 
+>>> +- A pinctrl state named "sleep" could be defined, using the bindings in
+>>> +  ../pinctrl/pinctrl-binding.txt
+>> I don't see any reference to "sleep" in pinctrl-binding.txt
+> Right, I will correct that.
+> 
+> Thanks for the review,
+> Maxime
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
