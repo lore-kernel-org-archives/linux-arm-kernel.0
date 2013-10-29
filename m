@@ -1,9 +1,10 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 23:37:51 +0100
-Subject: [PATCH v2 16/19] spi: sh_msiof: Enable the driver on all ARM platforms
+Date: Tue, 29 Oct 2013 23:37:53 +0100
+Subject: [PATCH v2 18/19] thermal: rcar-thermal: Enable the driver on all ARM
+ platforms
 In-Reply-To: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383086274-11049-17-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383086274-11049-19-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,25 +14,26 @@ driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
 and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
 COMPILE_TEST.
 
-Cc: Mark Brown <broonie@kernel.org>
-Cc: linux-spi at vger.kernel.org
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+Cc: linux-pm at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/spi/Kconfig | 2 +-
+ drivers/thermal/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index b9c53cc..70f5aa3 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -406,7 +406,7 @@ config SPI_SC18IS602
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index dbfc390..bd905ac 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -121,7 +121,7 @@ config SPEAR_THERMAL
  
- config SPI_SH_MSIOF
- 	tristate "SuperH MSIOF SPI controller"
--	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
-+	depends on (SUPERH || ARM || COMPILE_TEST) && HAVE_CLK
- 	select SPI_BITBANG
+ config RCAR_THERMAL
+ 	tristate "Renesas R-Car thermal driver"
+-	depends on ARCH_SHMOBILE
++	depends on ARM || COMPILE_TEST
  	help
- 	  SPI driver for SuperH and SH Mobile MSIOF blocks.
+ 	  Enable this to plug the R-Car thermal sensor driver into the Linux
+ 	  thermal framework
 -- 
 1.8.1.5
