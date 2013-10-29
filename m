@@ -1,60 +1,91 @@
-From: yoshihiro.shimoda.uh@renesas.com (Shimoda, Yoshihiro)
-Date: Tue, 29 Oct 2013 18:47:26 +0900
-Subject: [PATCH 10/12] usb: r8a66597-hcd: Convert to clk_prepare/unprepare
-In-Reply-To: <1383000569-8916-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383000569-8916-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <526F842E.1010607@renesas.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Oct 2013 10:52:49 +0100
+Subject: [PATCH 08/19] mmc: sdhi: Enable the driver on all ARM platforms
+In-Reply-To: <Pine.LNX.4.64.1310290919120.8404@axis700.grange>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383004027-25036-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <Pine.LNX.4.64.1310290919120.8404@axis700.grange>
+Message-ID: <4906973.ikaOXXr4gP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent-san,
+Hi Guennadi,
 
-(2013/10/29 7:49), Laurent Pinchart wrote:
-> Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
-> clk_disable_unprepare() to get ready for the migration to the common
-> clock framework.
+On Tuesday 29 October 2013 10:07:29 Guennadi Liakhovetski wrote:
+> Hi Laurent
 > 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> Cc: linux-usb at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
-Thank you for the patch.
-
-Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-
-Best regards,
-Yoshihro Shimoda
-
-> ---
->  drivers/usb/host/r8a66597-hcd.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> On Tue, 29 Oct 2013, Laurent Pinchart wrote:
+> > Renesas ARM platforms are transitioning from single-platform to
+> > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> > driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> > and ARCH_SHMOBILE_MULTI and increase build testing coverage.
+> > 
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > Cc: Ian Molton <ian@mnementh.co.uk>
+> > Cc: linux-mmc at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  drivers/mmc/host/Kconfig        | 2 +-
+> >  drivers/mmc/host/tmio_mmc_dma.c | 2 +-
+> >  2 files changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> > index 7fc5099..51957d4 100644
+> > --- a/drivers/mmc/host/Kconfig
+> > +++ b/drivers/mmc/host/Kconfig
+> > @@ -479,7 +479,7 @@ config MMC_TMIO
+> > 
+> >  config MMC_SDHI
+> >  
+> >  	tristate "SH-Mobile SDHI SD/SDIO controller support"
+> > 
+> > -	depends on SUPERH || ARCH_SHMOBILE
+> > +	depends on SUPERH || ARM
+> > 
+> >  	select MMC_TMIO_CORE
+> >  	help
+> >  	
+> >  	  This provides support for the SDHI SD/SDIO controller found in
+> > 
+> > diff --git a/drivers/mmc/host/tmio_mmc_dma.c
+> > b/drivers/mmc/host/tmio_mmc_dma.c index 65edb4a..535bc35 100644
+> > --- a/drivers/mmc/host/tmio_mmc_dma.c
+> > +++ b/drivers/mmc/host/tmio_mmc_dma.c
+> > @@ -28,7 +28,7 @@ void tmio_mmc_enable_dma(struct tmio_mmc_host *host,
+> > bool enable)> 
+> >  	if (!host->chan_tx || !host->chan_rx)
+> >  	
+> >  		return;
+> > 
+> > -#if defined(CONFIG_SUPERH) || defined(CONFIG_ARCH_SHMOBILE)
+> > +#if defined(CONFIG_SUPERH) || defined(CONFIG_ARM)
 > 
-> diff --git a/drivers/usb/host/r8a66597-hcd.c b/drivers/usb/host/r8a66597-hcd.c
-> index 2ad004a..a2fdd85 100644
-> --- a/drivers/usb/host/r8a66597-hcd.c
-> +++ b/drivers/usb/host/r8a66597-hcd.c
-> @@ -95,7 +95,7 @@ static int r8a66597_clock_enable(struct r8a66597 *r8a66597)
->  	int i = 0;
->  
->  	if (r8a66597->pdata->on_chip) {
-> -		clk_enable(r8a66597->clk);
-> +		clk_prepare_enable(r8a66597->clk);
->  		do {
->  			r8a66597_write(r8a66597, SCKE, SYSCFG0);
->  			tmp = r8a66597_read(r8a66597, SYSCFG0);
-> @@ -139,7 +139,7 @@ static void r8a66597_clock_disable(struct r8a66597 *r8a66597)
->  	udelay(1);
->  
->  	if (r8a66597->pdata->on_chip) {
-> -		clk_disable(r8a66597->clk);
-> +		clk_disable_unprepare(r8a66597->clk);
->  	} else {
->  		r8a66597_bclr(r8a66597, PLLC, SYSCFG0);
->  		r8a66597_bclr(r8a66597, XCKE, SYSCFG0);
-> 
+> I'm not sure about this one. In principle DMA so far is only used on SDHI
+> with TMIO. But this #if was for a theoretical case, when a TMIO MMC IP
+> inside an MFD is also used with DMA. Bus since I had no indormation about
+> whether the CTL_DMA_ENABLE register was SDHI specific or not, I put it
+> under an #if for the time being. In any case, I don't think making it
+> #ifdef CONFIG_ARM makes much sense. We can either remove the #if
+> completely, or keep it to limit the scope of this write to sh-mobile
+> arches.
+
+SUPERH || ARCH_SHMOBILE covers all the platforms this driver currently builds 
+on. Now that we're adding ARCH_SHMOBILE_MULTI the #if needs to cover that case 
+as well. I'm fine with limiting the CTL_DMA_ENABLE write to SUPERH only (which 
+would modify the driver's behaviour) or enabling it unconditionally, but I 
+don't think adding a defined(CONFIG_ARCH_SHMOBILE_MULTI) to the above #if 
+makes sense, unless there's a plan to add support for DMA for non-SH 
+(including both SUPERH and ARCH_SHMOBILE) platforms.
+
+> >  	/* Switch DMA mode on or off - SuperH specific? */
+> >  	sd_ctrl_write16(host, CTL_DMA_ENABLE, enable ? 2 : 0);
+> >  
+> >  #endif
 
 -- 
-Yoshihiro Shimoda
-EC No.
+Regards,
+
+Laurent Pinchart
