@@ -1,41 +1,103 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 29 Oct 2013 03:26:20 -0500
-Subject: [PATCH v2 1/2] clk/zynq/clkc: Add 'fclk-enable' feature
-In-Reply-To: <2028580.HhySWWnU2A@flatron>
-References: <1381425018-5653-1-git-send-email-soren.brinkmann@xilinx.com>
- <1592656.1ojHcSlzVh@flatron>
- <b7840a0d-ac49-4c2d-beaa-9f79748c70d0@CH1EHSMHS006.ehs.local>
- <2028580.HhySWWnU2A@flatron>
-Message-ID: <8864256B-F8F9-4474-9B5F-416C3BB96523@codeaurora.org>
+Date: Tue, 29 Oct 2013 03:28:39 -0500
+Subject: [PATCH 4/4] wl1251: spi: add device tree support
+In-Reply-To: <4893578.SBstXOAcJY@flatron>
+References: <1382890469-25286-1-git-send-email-sre@debian.org>
+ <1382890469-25286-5-git-send-email-sre@debian.org>
+ <FF34C626-4A49-43B1-B0AD-DC6146ABBB11@codeaurora.org>
+ <4893578.SBstXOAcJY@flatron>
+Message-ID: <11FD245D-02A1-4E29-A23A-66A1D64210DC@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Oct 28, 2013, at 5:17 PM, Tomasz Figa wrote:
+On Oct 28, 2013, at 5:38 PM, Tomasz Figa wrote:
 
->>>> diff --git a/Documentation/devicetree/bindings/clock/zynq-7000.txt
->>>> b/Documentation/devicetree/bindings/clock/zynq-7000.txt index
->>>> d99af878f5d7..11fdd146ec83 100644
->>>> --- a/Documentation/devicetree/bindings/clock/zynq-7000.txt
->>>> +++ b/Documentation/devicetree/bindings/clock/zynq-7000.txt
->>>> 
->>>> @@ -22,6 +22,10 @@ Required properties:
->>>> Optional properties:
->>>>  - clocks : as described in the clock bindings
->>>>  - clock-names : as described in the clock bindings
->>>> 
->>>> + - fclk-enable : Bit mask to enable FCLKs in cases no proper CCF
+> On Monday 28 of October 2013 01:37:34 Kumar Gala wrote:
+>> On Oct 27, 2013, at 11:14 AM, Sebastian Reichel wrote:
+>>> Add device tree support for the spi variant of wl1251
+>>> and document the binding.
 >>> 
->>> Since it's a vendor specific property, it should include vendor
->>> prefix.
+>>> Signed-off-by: Sebastian Reichel <sre@debian.org>
+>>> ---
+>>> .../devicetree/bindings/net/wireless/ti,wl1251.txt | 36
+>>> ++++++++++++++++++++++ drivers/net/wireless/ti/wl1251/spi.c          
+>>>    | 23 ++++++++++---- 2 files changed, 53 insertions(+), 6
+>>> deletions(-)
+>>> create mode 100644
+>>> Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt
+>>> 
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt
+>>> b/Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt new
+>>> file mode 100644
+>>> index 0000000..5f8a154
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt
+>>> @@ -0,0 +1,36 @@
+>>> +* Texas Instruments wl1251 controller
+>>> +
+>>> +The wl1251 chip can be connected via SPI or via SDIO. The linux
+>>> +kernel currently only supports device tree for the SPI variant.
+>>> +
 >> 
->> The whole driver is vendor specific. Should there really be another
->> prefix for that property?
+>> From the binding I have no idea what this chip actually does, also we
+>> don't normally reference linux kernel support in bindings specs (so
+>> please remove it).
+>> 
+>> However, what would expect the SDIO binding to look like?  Or more
+>> specifically, how would you distinguish the SPI vs SDIO
+>> binding/connection?  I'm wondering if the compatible should be
+>> something like "ti,wl1251-spi" and than the sdio can be
+>> "ti,wl1251-sdio"
 > 
-> Yes. If a property is introduced just for use by this particular driver 
-> then it must be prepended by a vendor prefix. That's a general rule.
+> Well, you can easily distinguish an SDIO device from an SPI device by its 
+> parent node, but...
+> 
+> The binding for SDIO might require different set of properties (other than 
+> ones inherited from generic SDIO or SPI bindings) than one for SPI. So 
+> probably different compatible values might be justified.
+> 
+> Did we already have such case before? (maybe some I2C + SPI devices?)
+> 
+>>> +Required properties:
+>>> +- compatible : Should be "ti,wl1251"
+>> 
+>> reg is not listed as a required prop.
+> 
+> It is implied by SPI bindings, but it might be a good idea to have this 
+> stated here as well.
+> 
+>> 
+>>> +- interrupts : Should contain interrupt line
+>>> +- interrupt-parent : Should be the phandle for the interrupt
+>>> +  controller that services interrupts for this device
+>>> +- vio-supply : phandle to regulator providing VIO
+>>> +- power-gpio : GPIO connected to chip's PMEN pin
+>> 
+>> should be vendor prefixed: ti,power-gpio
+> 
+> Hmm, out of curiosity, is it a rule for this kind of properties? I can see 
+> both cases with and without prefixes when grepping for "-gpios" in 
+> Documentation/devicetree/bindings. We should really have such things 
+> written down somewhere.
 
-Most all nodes are vendor specific by definition ;).
+Agreed, it should be part of the various docs we are suppose to produce for review and binding creation guidelines.
+
+>>> +- For additional required properties on SPI, please consult
+>>> +  Documentation/devicetree/bindings/spi/spi-bus.txt
+>>> +
+>>> +Optional properties:
+>>> +- ti,use-eeprom : If found, configuration will be loaded from eeprom.
+>> 
+>> can you be a bit more specific on what cfg will be loaded.  Also, is
+>> this property a boolean, if so how do I know which eeprom the cfg is
+>> loaded from (is it one that is directly connected to the wl1251?
+> 
+> Maybe one from ti,has-eeprom or ti,config-eeprom would be better name for 
+> this property?
+
+Probably, ti,wl1251-has-eeprom or something like that would be better.  However, I'm not going to get too caught up on names of properties.
 
 - k
 
