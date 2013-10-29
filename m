@@ -1,63 +1,76 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 29 Oct 2013 11:29:04 +0100
-Subject: [PATCH v2] clk: armada-370: fix tclk frequencies
-In-Reply-To: <20131023104534.11662.42256@quantum>
-References: <1380794702-6191-1-git-send-email-simon.guinot@sequanux.org>
- <20131017123159.GA22434@titan.lakedaemon.net>
- <20131023104534.11662.42256@quantum>
-Message-ID: <20131029102904.GD23849@kw.sim.vm.gnt>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 29 Oct 2013 12:35:11 +0200
+Subject: [PATCHv3][ 1/5] fbdev: Add the lacking FB_SYNC_* for matching
+ the DISPLAY_FLAGS_*
+In-Reply-To: <1382532229-32755-1-git-send-email-denis@eukrea.com>
+References: <1382532229-32755-1-git-send-email-denis@eukrea.com>
+Message-ID: <526F8F5F.6050905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 03:45:34AM -0700, Mike Turquette wrote:
-> Quoting Jason Cooper (2013-10-17 05:31:59)
-> > Mike,
-> > 
-> > I going to go ahead a take this through my tree.  I'll hold it off until
-> > my last pull request for the merge window (I'm guessing about a week).
-> > If you object, just let me know before then and I'll drop it.
-> > 
-> > 
-> > On Thu, Oct 03, 2013 at 12:05:02PM +0200, Simon Guinot wrote:
-> > > This patch fixes the tclk frequency array for the Armada-370 SoC.
-> > > This bug has been introduced by commit 6b72333d
-> > > ("clk: mvebu: add Armada 370 SoC-centric clock init").
-> > > 
-> > > A wrong tclk frequency affects the following drivers: mvsdio, mvneta,
-> > > i2c-mv64xxx and mvebu-devbus. This list may be incomplete.
-> > > 
-> > > About the mvneta Ethernet driver, note that the tclk frequency is used
-> > > to compute the Rx time coalescence. Then, this bug harms the coalescence
-> > > configuration and also degrades the networking performances with the
-> > > default values.
-> > > 
-> > > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > > Cc: Andrew Lunn <andrew@lunn.ch>
-> > > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > > Cc: Jason Cooper <jason@lakedaemon.net>
-> > > Cc: stable at vger.kernel.org
-> > > ---
-> > >  drivers/clk/mvebu/armada-370.c |    4 ++--
-> > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > Applied to mvebu/drivers for v3.13 and flagged for stable going back to
-> > v3.11.  Also added Gregory's Ack.
+On 23/10/13 15:43, Denis Carikli wrote:
+> Without that fix, drivers using the fb_videomode_from_videomode
+>   function will not be able to get certain information because
+>   some DISPLAY_FLAGS_* have no corresponding FB_SYNC_*.
 > 
-> Worked it out with Jason face to face. I've added to clk-fixes with ACKs
-> and will send out this week.
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+> ChangeLog v2->v3:
+> - Added Jean-Christophe PLAGNIOL-VILLARD's ACK.
+> ---
+>  drivers/video/fbmon.c   |    4 ++++
+>  include/uapi/linux/fb.h |    2 ++
+>  2 files changed, 6 insertions(+)
+> 
+> diff --git a/drivers/video/fbmon.c b/drivers/video/fbmon.c
+> index 6103fa6..29a9ed0 100644
+> --- a/drivers/video/fbmon.c
+> +++ b/drivers/video/fbmon.c
+> @@ -1402,6 +1402,10 @@ int fb_videomode_from_videomode(const struct videomode *vm,
+>  		fbmode->sync |= FB_SYNC_HOR_HIGH_ACT;
+>  	if (vm->flags & DISPLAY_FLAGS_VSYNC_HIGH)
+>  		fbmode->sync |= FB_SYNC_VERT_HIGH_ACT;
+> +	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
+> +		fbmode->sync |= FB_SYNC_DE_HIGH_ACT;
+> +	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
+> +		fbmode->sync |= FB_SYNC_PIXDAT_HIGH_ACT;
+>  	if (vm->flags & DISPLAY_FLAGS_INTERLACED)
+>  		fbmode->vmode |= FB_VMODE_INTERLACED;
+>  	if (vm->flags & DISPLAY_FLAGS_DOUBLESCAN)
+> diff --git a/include/uapi/linux/fb.h b/include/uapi/linux/fb.h
+> index fb795c3..30487df 100644
+> --- a/include/uapi/linux/fb.h
+> +++ b/include/uapi/linux/fb.h
+> @@ -215,6 +215,8 @@ struct fb_bitfield {
+>  					/* vtotal = 144d/288n/576i => PAL  */
+>  					/* vtotal = 121d/242n/484i => NTSC */
+>  #define FB_SYNC_ON_GREEN	32	/* sync on green */
+> +#define FB_SYNC_DE_HIGH_ACT	64	/* data enable high active */
+> +#define FB_SYNC_PIXDAT_HIGH_ACT	64	/* data enable high active */
 
-Hi Mike,
+This can't be right. You map both flags to value 64. And the comment is
+the same for both.
 
-Please, don't forget to send out :)
+ Tomi
 
-Thanks,
 
-Simon
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/d779ecb9/attachment-0001.sig>
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/6985d4b0/attachment.sig>
