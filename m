@@ -1,100 +1,162 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 16:23:13 +0100
-Subject: [PATCH 3/3] ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports
- in DT
+Date: Tue, 29 Oct 2013 16:23:12 +0100
+Subject: [PATCH 2/3] ARM: shmobile: r8a7790: Add serial ports to the device
+ tree
 In-Reply-To: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383060193-1505-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383060193-1505-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SCIF0 and SCIF1 are used as debug serial ports. Enable them and
-configure pinmuxing appropriately. We can now remove the clkdev
-registration hack for SCIF devices from the Lager reference board file.
+The platform code serial port instantiation mechanism is kept for the
+non-DT platforms only.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts            | 24 ++++++++++++++++++++----
- arch/arm/mach-shmobile/board-lager-reference.c | 18 ++----------------
- 2 files changed, 22 insertions(+), 20 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi         | 100 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7790.c |  12 ++--
+ 2 files changed, 106 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index a923ab6..9830c87 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -16,8 +16,13 @@
- 	model = "Lager";
- 	compatible = "renesas,lager", "renesas,r8a7790";
- 
-+	aliases {
-+		serial0 = &scif0;
-+		serial1 = &scif1;
-+	};
-+
- 	chosen {
--		bootargs = "console=ttySC6,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
-+		bootargs = "console=ttySC0,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 94c8373..04a4992 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -287,6 +287,106 @@
+ 		status = "disabled";
  	};
  
- 	memory at 40000000 {
-@@ -58,9 +63,6 @@
- };
++	scifa0: serial at e6c40000 {
++		compatible = "renesas,scifa-r8a7790", "renesas,scifa-generic";
++		reg = <0 0xe6c40000 0 64>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 144 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFA0>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifa1: serial at e6c50000 {
++		compatible = "renesas,scifa-r8a7790", "renesas,scifa-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6c50000 0 64>;
++		interrupts = <0 145 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFA1>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifa2: serial at e6c60000 {
++		compatible = "renesas,scifa-r8a7790", "renesas,scifa-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6c60000 0 64>;
++		interrupts = <0 151 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFA2>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifb0: serial at e6c20000 {
++		compatible = "renesas,scifb-r8a7790", "renesas,scifb-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6c20000 0 64>;
++		interrupts = <0 148 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFB0>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifb1: serial at e6c30000 {
++		compatible = "renesas,scifb-r8a7790", "renesas,scifb-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6c30000 0 64>;
++		interrupts = <0 149 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFB1>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifb2: serial at e6ce0000 {
++		compatible = "renesas,scifb-r8a7790", "renesas,scifb-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6ce0000 0 64>;
++		interrupts = <0 150 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFB2>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif0: serial at e6e60000 {
++		compatible = "renesas,scif-r8a7790", "renesas,scif-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6e60000 0 64>;
++		interrupts = <0 152 4>;
++		clocks = <&mstp7_clks R8A7790_CLK_SCIF0>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif1: serial at e6e68000 {
++		compatible = "renesas,scif-r8a7790", "renesas,scif-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6e68000 0 64>;
++		interrupts = <0 153 4>;
++		clocks = <&mstp7_clks R8A7790_CLK_SCIF1>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	hscif0: serial at e62c0000 {
++		compatible = "renesas,hscif-r8a7790", "renesas,hscif-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe62c0000 0 96>;
++		interrupts = <0 154 4>;
++		clocks = <&mstp7_clks R8A7790_CLK_HSCIF0>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	hscif1: serial at e62c8000 {
++		compatible = "renesas,hscif-r8a7790", "renesas,hscif-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe62c8000 0 96>;
++		interrupts = <0 155 4>;
++		clocks = <&mstp7_clks R8A7790_CLK_HSCIF1>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index c47bceb..8172a82 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -182,6 +182,12 @@ static const struct resource cmt00_resources[] __initconst = {
  
- &pfc {
--	pinctrl-0 = <&scif0_pins &scif1_pins>;
--	pinctrl-names = "default";
--
- 	scif0_pins: scif0 {
- 		renesas,groups = "scif0_data";
- 		renesas,function = "scif0";
-@@ -86,3 +88,17 @@
- 	non-removable;
- 	status = "okay";
- };
-+
-+&scif0 {
-+	pinctrl-0 = <&scif0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&scif1 {
-+	pinctrl-0 = <&scif1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index bc3d0d2..1f5d6e2 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -36,24 +36,10 @@ static void __init lager_init_time(void)
- static void __init lager_add_standard_devices(void)
+ void __init r8a7790_add_dt_devices(void)
  {
- 	/*
--	 * This is a really crude hack to provide clkdev support to the SCIF
--	 * and CMT devices until they get moved to DT.
-+	 * This is a really crude hack to provide clkdev support to the CMT
-+	 * CMT device until it gets moved to DT.
- 	 */
--	static const char * const scif_names[] = {
--		"scifa0", "scifa1", "scifb0", "scifb1",
--		"scifb2", "scifa2", "scif0", "scif1",
--		"hscif0", "hscif1",
--	};
- 	struct clk *clk;
--	unsigned int i;
++	r8a7790_register_cmt(00);
++}
++
++void __init r8a7790_add_standard_devices(void)
++{
++	r8a7790_add_dt_devices();
+ 	r8a7790_register_scif(SCIFA0);
+ 	r8a7790_register_scif(SCIFA1);
+ 	r8a7790_register_scif(SCIFB0);
+@@ -192,12 +198,6 @@ void __init r8a7790_add_dt_devices(void)
+ 	r8a7790_register_scif(SCIF1);
+ 	r8a7790_register_scif(HSCIF0);
+ 	r8a7790_register_scif(HSCIF1);
+-	r8a7790_register_cmt(00);
+-}
 -
--	for (i = 0; i < ARRAY_SIZE(scif_names); ++i) {
--		clk = clk_get(NULL, scif_names[i]);
--		if (clk) {
--			clk_register_clkdev(clk, NULL, "sh-sci.%u", i);
--			clk_put(clk);
--		}
--	}
- 
- 	clk = clk_get(NULL, "cmt0");
- 	if (clk) {
+-void __init r8a7790_add_standard_devices(void)
+-{
+-	r8a7790_add_dt_devices();
+ 	r8a7790_register_irqc(0);
+ 	r8a7790_register_thermal();
+ }
 -- 
 1.8.1.5
