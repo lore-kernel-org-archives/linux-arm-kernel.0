@@ -1,55 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 29 Oct 2013 13:43:53 -0400
-Subject: [PATCHv2 2/7] ARM: imx: add clocking support code for the
- IMX50 SoC
-In-Reply-To: <1383023757-30711-3-git-send-email-gerg@uclinux.org>
-References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
- <1383023757-30711-3-git-send-email-gerg@uclinux.org>
-Message-ID: <20131029174353.GD26784@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Oct 2013 10:44:45 -0700
+Subject: [PATCHv7][ 2/5] ASoC: eukrea-tlv320: Add DT support.
+In-Reply-To: <CAHCPf3vHWt5XJCwvGDMfX9rTPKqHU43SHORqpxLtLaDL6RGb8A@mail.gmail.com>
+References: <1382616832-23593-1-git-send-email-denis@eukrea.com>
+ <1382616832-23593-2-git-send-email-denis@eukrea.com>
+ <20131025191513.5345BC4042C@trevor.secretlab.ca>
+ <20131026114840.GX2443@sirena.org.uk>
+ <CAHCPf3vHWt5XJCwvGDMfX9rTPKqHU43SHORqpxLtLaDL6RGb8A@mail.gmail.com>
+Message-ID: <20131029174445.GB20251@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+On Tue, Oct 29, 2013 at 11:56:54AM -0500, Matt Sealey wrote:
 
-I've applied these against v3.12-rc7 and found a few small things,
-below.
+> Maybe this is a reasonable place to ask since I am holding off on
+> doing any audio support for the i.MX platform I want to push a DT for,
+> and I am still bashing my head over the logic in this. Why is this so
+> much more complicated than it needs to be? I can see codec specific
+> and Linux-specific things floating in trees. I can see redundancy in
+> property naming and misplacement of properties.. this whole thing
+> needs to be cleaned up because it's been done as "binding a Linux
+> driver into the device tree" and this is another example of the same
+> thing - taking the way ASoC is working right now and dumping platform
+> data externally.
 
-On Tue, Oct 29, 2013 at 03:15:52PM +1000, gerg at uclinux.org wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
-> 
-> Add code to support the specific clock tree of the Freescale IMX50 SoC.
-> It can use much of the common IMX51/IMX53 clocking code.
-> 
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c | 58 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index ce37af2..219c65e 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -365,6 +365,64 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
->  }
->  
-> +static void __init mx50_clocks_init(struct device_node *np)
-> +{
-...
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx50-gpt");
-> +	base = of_iomap(np, 0);
+Can you be more specific about all these points please?  It's hard to
+engage without concrete technical discussion which there is very little
+of in your rather lengthy mail.  Please also take a look at the previous
+discussions on this stuff and make sure you understand the needs of more
+advanced audio subsystems like those found in smartphones.
 
-This requires linux/of_address.h
+> should not be codec or platform specific at all. This is a TI audio
+> codec being referenced in an SoC-specific audio fabric definition.
 
-> +	WARN_ON(!base);
-> +	irq = irq_of_parse_and_map(np, 0);
-
-and this requires linux/of_irq.h
-
-I would also add a comment somewhere it will be seen when moving this
-code to drivers/clk that the file be renamed something like clk-imx5x.c.
-No need to churn it now, though.
-
-thx,
-
-Jason.
+Please take a look at Morimoto-san's work on the generic sound card if
+you want to work on a generic card, it'd be good if some of the people
+complaining about this stuff could help him work on that as he doesn't
+seem to be getting any help or review from anyone.  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/a4a4f78d/attachment.sig>
