@@ -1,24 +1,102 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Oct 2013 10:31:14 +0100
-Subject: [PATCH 1/2] dma: mv_xor: Remove unneeded NULL address check
-In-Reply-To: <1383000855-8377-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1383000855-8377-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131029103114.45355c97@skate>
+From: leigh@solinno.co.uk (Leigh Brown)
+Date: Tue, 29 Oct 2013 09:33:31 +0000
+Subject: [PATCH v3 1/4] net: mvmdio: make orion_mdio_wait_ready consistent
+In-Reply-To: <cover.1383038973.git.leigh@solinno.co.uk>
+References: <cover.1383038973.git.leigh@solinno.co.uk>
+Message-ID: <c47088ae4c066fea9b012db513baffb0294011a9.1383038973.git.leigh@solinno.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+Amend orion_mdio_wait_ready so that the same timeout is used when
+polling or using wait_event_timeout.  Set the timeout to 1ms.
 
-On Mon, 28 Oct 2013 19:54:14 -0300, Ezequiel Garcia wrote:
-> This mmio address is checked at probe-time, which makes this test
-> redundant. Let's just remove it.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Replace udelay with usleep_range to avoid a busy loop, and set the
+polling interval range as 45us to 55us, so that the first sleep
+will be enough in almost all cases.
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Generate the same log message at timeout when polling or using
+wait_event_timeout.
 
-Thomas
+Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+---
+ drivers/net/ethernet/marvell/mvmdio.c | 52 ++++++++++++++++++++---------------
+ 1 file changed, 30 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index e2f6626..971a4c1 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -44,6 +44,15 @@
+ #define  MVMDIO_ERR_INT_SMI_DONE	   0x00000010
+ #define MVMDIO_ERR_INT_MASK		   0x0080
+ 
++/*
++ * SMI Timeout measurements:
++ * - Kirkwood 88F6281 (Globalscale Dreamplug): 45us to 95us (Interrupt)
++ * - Armada 370       (Globalscale Mirabox):   41us to 43us (Polled)
++ */
++#define MVMDIO_SMI_TIMEOUT		   1000 /* 1000us = 1ms */
++#define MVMDIO_SMI_POLL_INTERVAL_MIN	   45
++#define MVMDIO_SMI_POLL_INTERVAL_MAX	   55
++
+ struct orion_mdio_dev {
+ 	struct mutex lock;
+ 	void __iomem *regs;
+@@ -68,34 +77,33 @@ static int orion_mdio_smi_is_done(struct orion_mdio_dev *dev)
+ static int orion_mdio_wait_ready(struct mii_bus *bus)
+ {
+ 	struct orion_mdio_dev *dev = bus->priv;
+-	int count;
++	unsigned long timeout = usecs_to_jiffies(MVMDIO_SMI_TIMEOUT);
++	unsigned long end = jiffies + timeout;
++	int timedout = 0;
+ 
+-	if (dev->err_interrupt <= 0) {
+-		count = 0;
+-		while (1) {
+-			if (orion_mdio_smi_is_done(dev))
+-				break;
++	while (1) {
++	        if (orion_mdio_smi_is_done(dev))
++			return 0;
++	        else if (timedout)
++			break;
+ 
+-			if (count > 100) {
+-				dev_err(bus->parent,
+-					"Timeout: SMI busy for too long\n");
+-				return -ETIMEDOUT;
+-			}
++	        if (dev->err_interrupt <= 0) {
++			usleep_range(MVMDIO_SMI_POLL_INTERVAL_MIN,
++				     MVMDIO_SMI_POLL_INTERVAL_MAX);
+ 
+-			udelay(10);
+-			count++;
+-		}
+-	} else {
+-		if (!orion_mdio_smi_is_done(dev)) {
++			if (time_is_before_jiffies(end))
++				++timedout;
++	        } else {
+ 			wait_event_timeout(dev->smi_busy_wait,
+-				orion_mdio_smi_is_done(dev),
+-				msecs_to_jiffies(100));
+-			if (!orion_mdio_smi_is_done(dev))
+-				return -ETIMEDOUT;
+-		}
++				           orion_mdio_smi_is_done(dev),
++				           timeout);
++
++			++timedout;
++	        }
+ 	}
+ 
+-	return 0;
++	dev_err(bus->parent, "Timeout: SMI busy for too long\n");
++	return  -ETIMEDOUT;
+ }
+ 
+ static int orion_mdio_read(struct mii_bus *bus, int mii_id,
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.4.rc3
