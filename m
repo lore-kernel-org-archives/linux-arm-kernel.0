@@ -1,27 +1,58 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 29 Oct 2013 14:58:07 +0900
-Subject: [PATCH 06/12] i2c: sh_mobile: Convert to clk_prepare/unprepare
-In-Reply-To: <20131029050224.GA2643@katana>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383000569-8916-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131029050224.GA2643@katana>
-Message-ID: <20131029055807.GE11580@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 28 Oct 2013 23:00:58 -0700
+Subject: [PATCH] ARM: Support arch_irq_work_raise() via self IPIs
+In-Reply-To: <878uxcq1m7.fsf@linaro.org>
+References: <526DBEAA.4030707@linaro.org>
+ <1382984701-2371-1-git-send-email-sboyd@codeaurora.org>
+ <878uxcq1m7.fsf@linaro.org>
+Message-ID: <20131029060058.GD21983@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 06:02:24AM +0100, Wolfram Sang wrote:
-> On Mon, Oct 28, 2013 at 11:49:23PM +0100, Laurent Pinchart wrote:
-> > Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
-> > clk_disable_unprepare() to get ready for the migration to the common
-> > clock framework.
-> > 
-> > Cc: Wolfram Sang <wsa@the-dreams.de>
-> > Cc: linux-i2c at vger.kernel.org
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On 10/28, Kevin Hilman wrote:
+> Stephen Boyd <sboyd@codeaurora.org> writes:
 > 
-> Acked-by: Wolfram Sang <wsa@the-dreams.de>
+> > This will allow the scheduler tick to be restarted if we're in
+> > full NOHZ mode.
+> >
+> > Cc: Kevin Hilman <khilman@linaro.org>
+> > Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> Minor nit, but I'd prefer a more verbose changelog (I forget things
+> quickly and like to rely on changelogs for my memory.)  Probably worth
+> adding something like: "By default, irq_work is tied to the tick
+> processing (update_process_times()) but in full NOHZ mode, no tick means
+> no IRQ work.  In order for IRQ work to be done in full NOHZ mode, a
+> self-IPI is used to process IRQ work."
+> 
+> Other than the changelog nit, patch looks good, feel free to add
+> 
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> 
+> If Russell is OK with this, it can go to his patch system.
+> 
 
-Hi Wolfram, Hi Laurent,
+Fair enough. This is what I came up with. I'll send it off to the
+patch tracker in about 12 hours if nobody else has anymore
+comments.
 
-correct me if I am wrong, but I think the plan was
-for Wolfram to take this patch.
+----8<-----
+ARM: Support arch_irq_work_raise() via self IPIs                                
+
+By default, IRQ work is run from the tick interrupt (see
+irq_work_run() in update_process_times()). When we're in full
+NOHZ mode, restarting the tick requires the use of IRQ work and
+if the only place we run IRQ work is in the tick interrupt we
+have an unbreakable cycle. Implement arch_irq_work_raise() via
+self IPIs to break this cycle and get the tick started again.
+Note that we implement this via IPIs which are only available on
+SMP builds. This shouldn't be a problem because full NOHZ is only
+supported on SMP builds anyway.
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
