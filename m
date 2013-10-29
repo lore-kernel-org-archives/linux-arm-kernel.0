@@ -1,37 +1,51 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 23:37:47 +0100
-Subject: [PATCH v2 12/19] irda: sh_irda: Enable the driver on all ARM platforms
+Date: Tue, 29 Oct 2013 23:37:48 +0100
+Subject: [PATCH v2 13/19] pinctrl: sh-pfc: Enable the driver on all ARM
+ platforms
 In-Reply-To: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383086274-11049-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383086274-11049-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Renesas ARM platforms are transitioning from single-platform to
 multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
 driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
-COMPILE_TEST.
+and ARCH_SHMOBILE_MULTI and increase build testing coverage.
 
-Cc: Samuel Ortiz <samuel@sortiz.org>
-Cc: netdev at vger.kernel.org
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/net/irda/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/Makefile       | 2 +-
+ drivers/pinctrl/sh-pfc/Kconfig | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/irda/Kconfig b/drivers/net/irda/Kconfig
-index 2a30193..e04b907 100644
---- a/drivers/net/irda/Kconfig
-+++ b/drivers/net/irda/Kconfig
-@@ -403,7 +403,7 @@ config MCS_FIR
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 496d9bf..bef5a9f 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -56,7 +56,7 @@ obj-$(CONFIG_PINCTRL_ST) 	+= pinctrl-st.o
+ obj-$(CONFIG_PINCTRL_VF610)	+= pinctrl-vf610.o
  
- config SH_IRDA
- 	tristate "SuperH IrDA driver"
--	depends on IRDA && ARCH_SHMOBILE
-+	depends on IRDA && (ARM || COMPILE_TEST)
- 	help
- 	  Say Y here if your want to enable SuperH IrDA devices.
+ obj-$(CONFIG_PLAT_ORION)        += mvebu/
+-obj-$(CONFIG_ARCH_SHMOBILE)	+= sh-pfc/
++obj-$(CONFIG_ARM)		+= sh-pfc/
+ obj-$(CONFIG_SUPERH)		+= sh-pfc/
+ obj-$(CONFIG_PLAT_SPEAR)	+= spear/
+ obj-$(CONFIG_ARCH_VT8500)	+= vt8500/
+diff --git a/drivers/pinctrl/sh-pfc/Kconfig b/drivers/pinctrl/sh-pfc/Kconfig
+index 636a882..1d6182e 100644
+--- a/drivers/pinctrl/sh-pfc/Kconfig
++++ b/drivers/pinctrl/sh-pfc/Kconfig
+@@ -2,7 +2,7 @@
+ # Renesas SH and SH Mobile PINCTRL drivers
+ #
  
+-if ARCH_SHMOBILE || SUPERH
++if ARM || SUPERH
+ 
+ config PINCTRL_SH_PFC
+ 	select GPIO_SH_PFC if ARCH_REQUIRE_GPIOLIB
 -- 
 1.8.1.5
