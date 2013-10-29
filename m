@@ -1,33 +1,39 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Tue, 29 Oct 2013 21:45:00 +0530
-Subject: [PATCH] genirq: error reporting for non-percpu interrupt in
- request_percpu_irq()
-In-Reply-To: <alpine.DEB.2.02.1310291358150.8257@ionos.tec.linutronix.de>
-References: <1382090789-18177-1-git-send-email-vkale@apm.com>
- <CAPrCYke1_RjUgH79vZW99pwdExo4BspCaVi7zL-8hapKb0=gwQ@mail.gmail.com>
- <alpine.DEB.2.02.1310291358150.8257@ionos.tec.linutronix.de>
-Message-ID: <CAPrCYkdtUjQAC58uhhFQpCXpA=BVQRA=_kcM+WeOht5uk9hfHQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 29 Oct 2013 11:19:00 -0500
+Subject: [PATCHv9 00/43] ARM: TI SoC clock DT conversion
+In-Reply-To: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+Message-ID: <526FDFF4.9030806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 10/25/2013 10:56 AM, Tero Kristo wrote:
+<snip>
+> Testing done:
+> - omap3-beagle: boot + suspend/resume (ret + off)
+> - omap4-panda-es: boot + suspend/resume
+> - omap5-uevm: boot
+> - dra7-evm: boot
+> - am335x-bone: boot
+> 
+> Test branches available:
+> 
+> tree: https://github.com/t-kristo/linux-pm.git
 
-On Tue, Oct 29, 2013 at 6:29 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Fri, 18 Oct 2013, Vinayak Kale wrote:
->
->> Need for this patch is discussed in mail-thread [1].
->>
->> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204414.html
->>
->
-> I can't see anything which makes use of the separate error code in
-> that patch.
+<snip>
+> Fully functioning test branch: 3.12-rc6-dt-clks-v9
+> 
+^^ I tested this branch (boot testing):
+Beagle-XM: http://pastebin.com/50A1qtFq (crashes + clkdm issues, dpll5
+failed to transition)
+Panda-ES: http://pastebin.com/dWMp7D1z (bandgap_fclk not found)
+OMAP5-UEVM: http://pastebin.com/pHEx6Yzg (omap-gpmc 50000000.gpmc:
+error: clk_get)
+DRA7-EVM: http://pastebin.com/uYNQ6Sss
+BeagleBone-Black: http://pastebin.com/biGXS2vi
+AM335x-evm: http://pastebin.com/K7qwJpCb
 
-It was suggested by Will in response to above mentioned patch.
-Will's response can be found here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204491.html
 
-Sorry for wrong link.
-
-Thanks
--Vinayak
+-- 
+Regards,
+Nishanth Menon
