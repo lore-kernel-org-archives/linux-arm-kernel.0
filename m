@@ -1,53 +1,81 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 28 Oct 2013 17:15:52 -0700
-Subject: [PATCH 1/2] mmc: arasan: Add driver for Arasan SDHCI
-In-Reply-To: <526EF149.8060304@gmail.com>
-References: <1381864085-8806-1-git-send-email-soren.brinkmann@xilinx.com>
- <526EF149.8060304@gmail.com>
-Message-ID: <ff1f2d38-4185-49f0-8b63-b3bd2b4f9a27@CO9EHSMHS024.ehs.local>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Oct 2013 00:18:59 +0000
+Subject: [PATCH v9 3/5] ARM: tegra: split setting of CPU reset handler
+In-Reply-To: <1382956118-12495-4-git-send-email-acourbot@nvidia.com>
+References: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
+ <1382956118-12495-4-git-send-email-acourbot@nvidia.com>
+Message-ID: <20131029001858.GE4763@kartoffel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 06:20:41PM -0500, Rob Herring wrote:
-> On 10/15/2013 02:08 PM, Soren Brinkmann wrote:
-> > Add a driver for Arasan's SDHCI controller core.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >  .../devicetree/bindings/mmc/arasan,sdhci.txt       |  23 +++
-> >  MAINTAINERS                                        |   1 +
-> >  drivers/mmc/host/Kconfig                           |  12 ++
-> >  drivers/mmc/host/Makefile                          |   1 +
-> >  drivers/mmc/host/sdhci-of-arasan.c                 | 224 +++++++++++++++++++++
-> >  5 files changed, 261 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> >  create mode 100644 drivers/mmc/host/sdhci-of-arasan.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> > new file mode 100644
-> > index 000000000000..20f0fc25e270
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> > @@ -0,0 +1,23 @@
-> > +Device Tree Bindings for the Arasan SDCHI Controller
-> > +
-> > +  The bindings follow the mmc[1] and the clock bindings[2]. Only deviations are
-> > +  documented here.
-> > +
-> > +  [1] Documentation/devicetree/bindings/mmc/mmc.txt
-> > +  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +
-> > +Required Properties:
-> > +  - compatible: Compatibility string. Must be 'arasan,sdhci'
+On Mon, Oct 28, 2013 at 10:28:36AM +0000, Alexandre Courbot wrote:
+> Not all Tegra devices can set the CPU reset handler in the same way.
+> In particular, devices using a TrustZone secure monitor cannot set the
+> reset handler directly and need to do it through a firmware operation.
 > 
-> This string is a bit non-specific. Vendor IP typically has configurable
-> options, different revs of IP with fixes/differences, and the
-> possibility of integration wierdness or bugs. So it is better to be as
-> specific as possible in case the kernel needs to know exactly what
-> version of h/w this is.
-Okay. The Zynq TRM specifies the version as '8.9A_apr02nd_2010', which seems
-a little overly specific to me. How does 'arasan,sdhci-8.9a' sound to
-you?
+> This patch separates the act of setting the reset handler from its
+> preparation, so the former can be implemented in a different way.
+> 
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/reset.c | 27 +++++++++++++++++----------
+>  1 file changed, 17 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+> index fd0bbf8..e282395 100644
+> --- a/arch/arm/mach-tegra/reset.c
+> +++ b/arch/arm/mach-tegra/reset.c
+> @@ -33,26 +33,18 @@
+>  
+>  static bool is_enabled;
+>  
+> -static void __init tegra_cpu_reset_handler_enable(void)
+> +static void __init tegra_cpu_reset_handler_set(const u32 reset_address)
+>  {
+> -	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
+>  	void __iomem *evp_cpu_reset =
+>  		IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x100);
+>  	void __iomem *sb_ctrl = IO_ADDRESS(TEGRA_SB_BASE);
+>  	u32 reg;
+>  
+> -	BUG_ON(is_enabled);
+> -	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
+> -
+> -	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
+> -			tegra_cpu_reset_handler_size);
+> -
+>  	/*
+>  	 * NOTE: This must be the one and only write to the EVP CPU reset
+>  	 *       vector in the entire system.
+>  	 */
+> -	writel(TEGRA_IRAM_RESET_BASE + tegra_cpu_reset_handler_offset,
+> -			evp_cpu_reset);
+> +	writel(reset_address, evp_cpu_reset);
+>  	wmb();
+>  	reg = readl(evp_cpu_reset);
+>  
+> @@ -66,6 +58,21 @@ static void __init tegra_cpu_reset_handler_enable(void)
+>  		writel(reg, sb_ctrl);
+>  		wmb();
+>  	}
+> +}
+> +
+> +static void __init tegra_cpu_reset_handler_enable(void)
+> +{
+> +	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
+> +	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
+> +						tegra_cpu_reset_handler_offset;
+> +
+> +	BUG_ON(is_enabled);
+> +	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
+> +
+> +	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
+> +			tegra_cpu_reset_handler_size);
 
-	Thanks,
-	S?ren
+A memcpy to iomem seems suspect. Should this be memcpy_toio, or is the __iomem
+annotation misleading?
+
+Thanks,
+Mark.
