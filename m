@@ -1,65 +1,76 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 29 Oct 2013 18:28:55 -0500
-Subject: [RESEND PATCH V2 1/2] ARM: dts: AM33xx: Add RNG node
-In-Reply-To: <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
-References: <1377780731-3648-1-git-send-email-lokeshvutla@ti.com>
- <1377780731-3648-2-git-send-email-lokeshvutla@ti.com>
-Message-ID: <095F5C3C-4A82-4905-809B-5AD14E18E0CE@codeaurora.org>
+Date: Tue, 29 Oct 2013 18:33:00 -0500
+Subject: [PATCH 1/3] clk: shmobile: Add DIV6 clock support
+In-Reply-To: <1383058511-26046-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383058511-26046-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <158C7FC6-F6DF-4F10-B04B-05522D09FC05@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Aug 29, 2013, at 7:52 AM, Lokesh Vutla wrote:
+On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
 
-> Add the AM33xx RNG module's device tree data.
-> Also add Documentation file describing the data
-> for the RNG module.
+> DIV6 clocks are divider gate clocks controlled through a single
+> register. The divider is expressed on 6 bits, hence the name, and can
+> take values from 1/1 to 1/64.
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Those clocks are found on Renesas ARM SoCs.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > ---
-> Changes since V1:
-> - Drop "status=disabled" entry in dt node, Since
->  RNG is present on all AM33xx platforms.
+> .../bindings/clock/renesas,cpg-div6-clocks.txt     |  27 +++
+> drivers/clk/shmobile/Makefile                      |   4 +-
+> drivers/clk/shmobile/clk-div6.c                    | 185 +++++++++++++++++++++
+> 3 files changed, 215 insertions(+), 1 deletion(-)
+> create mode 100644 Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+> create mode 100644 drivers/clk/shmobile/clk-div6.c
 > 
-> .../devicetree/bindings/hwrng/omap_rng.txt         |   22 ++++++++++++++++++++
-> arch/arm/boot/dts/am33xx.dtsi                      |    7 +++++++
-> 2 files changed, 29 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/hwrng/omap_rng.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/hwrng/omap_rng.txt b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
+> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
 > new file mode 100644
-> index 0000000..6a62acd
+> index 0000000..8036f3c
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwrng/omap_rng.txt
-> @@ -0,0 +1,22 @@
-> +OMAP SoC HWRNG Module
+> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+> @@ -0,0 +1,27 @@
+> +* Renesas CPG DIV6 Clock
 > +
-> +Required properties:
+> +The CPG DIV6 clocks are variable factor clocks provided by the Clock Pulse
+> +Generator (CPG). They clock input is divided by a configurable factor from 1
+> +to 64.
 > +
-> +- compatible : Should contain entries for this and backward compatible
-> +  RNG versions:
-> +  - "ti,omap2-rng" for OMAP2.
-> +  - "ti,omap4-rng" for OMAP4, OMAP5 and AM33XX.
-> +  Note that these two versions are incompatible.
-> +- ti,hwmods: Name of the hwmod associated with the RNG module
-> +- reg : Offset and length of the register set for the module
-> +- interrupts : the interrupt number for the RNG module.
-> +		Only used for "ti,omap4-rng".
+> +Required Properties:
 > +
-> +Example:
-> +/* AM335x */
-> +rng: rng at 48310000 {
-> +	compatible = "ti,omap4-rng";
-> +	ti,hwmods = "rng";
-> +	reg = <0x48310000 0x2000>;
-> +	interrupts = <111>;
-> +};
+> +  - compatible: Must be one of the following
+> +    - "renesas,r8a7790-div6-clock" for R8A7790 (R-Car H2) DIV6 clocks
+> +    - "renesas,cpg-div6-clock" for generic DIV6 clocks
+> +  - reg: Base address and length of the memory resource used by the DIV6 clock
+> +  - clocks: Reference to the parent clock
+> +  - #clock-cells: Must be 0
+> +  - clock-output-name: The name of the clock as a free-form string
 
-For the DT-Binding portion:
+Is this suppose to be 'clock-output-names' (missing a 's')?
 
-Acked-by: Kumar Gala <galak@codeaurora.org>
+> +
+> +
+> +Example
+> +-------
+> +
+> +	sd2_clk: sd2_clk {
+
+example should be sd2_clk at e6150078
+
+> +		compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
+> +		reg = <0 0xe6150078 0 4>;
+
+curious, do you really have a second register at 0?
+
+> +		clocks = <&pll1_div2_clk>;
+> +		#clock-cells = <0>;
+> +		clock-output-names = "sd2";
+> +	};
 
 - k
+
 
 -- 
 Employee of Qualcomm Innovation Center, Inc.
