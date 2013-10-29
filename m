@@ -1,137 +1,269 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 29 Oct 2013 12:22:29 -0500
-Subject: [PATCH v3 2/4] mmc: omap_hsmmc: Enable SDIO IRQ.
-In-Reply-To: <CALtMJECWCqBy4UCtuSZ7WtXaizjmgdaxW7pn5uL0ymuXPn=61A@mail.gmail.com>
-References: <1380971830-21492-1-git-send-email-afenkart@gmail.com>
- <1380971830-21492-3-git-send-email-afenkart@gmail.com>
- <20131008161131.GD13128@radagast>
- <CALtMJECWCqBy4UCtuSZ7WtXaizjmgdaxW7pn5uL0ymuXPn=61A@mail.gmail.com>
-Message-ID: <20131029172229.GA12193@gimli>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Tue, 29 Oct 2013 18:22:47 +0100
+Subject: [PATCH] watchdog: at91sam9_wdt: various fixes
+In-Reply-To: <20131029164323.GF9266@roeck-us.net>
+References: <20131029075028.GF19704@spo001.leaseweb.com>
+ <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
+ <20131029154519.GB9266@roeck-us.net> <526FE0DA.1020308@overkiz.com>
+ <20131029164323.GF9266@roeck-us.net>
+Message-ID: <526FEEE7.7030708@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 29/10/2013 17:43, Guenter Roeck wrote:
+> On Tue, Oct 29, 2013 at 05:22:50PM +0100, boris brezillon wrote:
+>> On 29/10/2013 16:45, Guenter Roeck wrote:
+>>> On Tue, Oct 29, 2013 at 11:37:33AM +0100, Boris BREZILLON wrote:
+>>>> Fix the secs_to_ticks macro in case 0 is passed as an argument.
+>>>>
+>>>> Rework the heartbeat calculation to increase the security margin of the
+>>>> watchdog reset timer.
+>>>>
+>>>> Use the min_heartbeat value instead of the calculated heartbeat value for
+>>>> the first watchdog reset.
+>>>>
+>>>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>>> Hi Boris,
+>>>
+>>> can you possibly split the three changes into separate patches ?
+>> Sure. My first idea was to split this in 3 patches, but, as the
+>> buggy at91 watchdog series was
+>> already applied to linux-watchdog-next, I thought it would be faster
+>> to only provide one
+>> patch to fix all the issues at once.
+>>
+>>> The first is a no-brainer. Gives my opinion of my code review capabilities
+>>> a slight damper ;-).
+>>>
+>>> For the other two problems, it might make sense to describe
+>>> the problems you are trying to solve.
+>>>
+>>> Couple of comments inline.
+>>>
+>>> Thanks,
+>>> Guenter
+>>>
+>>>
+>>>> ---
+>>>>   drivers/watchdog/at91sam9_wdt.c |   35 ++++++++++++++++++++++++-----------
+>>>>   1 file changed, 24 insertions(+), 11 deletions(-)
+>>>>
+>>>> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+>>>> index 9bd089e..f1b59f1 100644
+>>>> --- a/drivers/watchdog/at91sam9_wdt.c
+>>>> +++ b/drivers/watchdog/at91sam9_wdt.c
+>>>> @@ -51,7 +51,7 @@
+>>>>   #define ticks_to_hz_rounddown(t)	((((t) + 1) * HZ) >> 8)
+>>>>   #define ticks_to_hz_roundup(t)		(((((t) + 1) * HZ) + 255) >> 8)
+>>>>   #define ticks_to_secs(t)		(((t) + 1) >> 8)
+>>>> -#define secs_to_ticks(s)		(((s) << 8) - 1)
+>>>> +#define secs_to_ticks(s)		(s ? (((s) << 8) - 1) : 0)
+>>> 	(s)
+>>>
+>>>>   #define WDT_MR_RESET	0x3FFF2FFF
+>>>> @@ -61,6 +61,11 @@
+>>>>   /* Watchdog max delta/value in secs */
+>>>>   #define WDT_COUNTER_MAX_SECS	ticks_to_secs(WDT_COUNTER_MAX_TICKS)
+>>>> +/* Watchdog heartbeat shift used for security margin:
+>>>> + * we'll try to rshift the heartbeat value with this value to secure
+>>>> + * the watchdog reset. */
+>>>> +#define WDT_HEARTBEAT_SHIFT	2
+>>>> +
+>>>>   /* Hardware timeout in seconds */
+>>>>   #define WDT_HW_TIMEOUT 2
+>>>> @@ -158,7 +163,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+>>>>   	int err;
+>>>>   	u32 mask = wdt->mr_mask;
+>>>>   	unsigned long min_heartbeat = 1;
+>>>> +	unsigned long max_heartbeat;
+>>>>   	struct device *dev = &pdev->dev;
+>>>> +	int shift;
+>>>>   	tmp = wdt_read(wdt, AT91_WDT_MR);
+>>>>   	if ((tmp & mask) != (wdt->mr & mask)) {
+>>>> @@ -181,23 +188,27 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+>>>>   	if (delta < value)
+>>>>   		min_heartbeat = ticks_to_hz_roundup(value - delta);
+>>>> -	wdt->heartbeat = ticks_to_hz_rounddown(value);
+>>>> -	if (!wdt->heartbeat) {
+>>>> +	max_heartbeat = ticks_to_hz_rounddown(value);
+>>>> +	if (!max_heartbeat) {
+>>>>   		dev_err(dev,
+>>>>   			"heartbeat is too small for the system to handle it correctly\n");
+>>>>   		return -EINVAL;
+>>>>   	}
+>>>> -	if (wdt->heartbeat < min_heartbeat + 4) {
+>>>> +	for (shift = WDT_HEARTBEAT_SHIFT; shift > 0; shift--) {
+>>>> +		if ((max_heartbeat >> shift) < min_heartbeat)
+>>>> +			continue;
+>>>> +
+>>>> +		wdt->heartbeat = max_heartbeat >> shift;
+>>>> +		break;
+>>>> +	}
+>>>> +
+>>>> +	if (!shift)
+>>>>   		wdt->heartbeat = min_heartbeat;
+>>> Correct me if I am wrong, but it seems to me that
+>>>
+>>> 	if ((max_heartbeat >> 2) >= min_heartbeat)
+>>> 		 wdt->heartbeat = max_heartbeat >> 2;
+>>> 	else if ((max_heartbeat >> 1) >= min_heartbeat)
+>>> 		wdt->heartbeat = max_heartbeat >> 1;
+>>> 	else
+>>> 		wdt->heartbeat = min_heartbeat;
+>>>
+>>> would accomplish the same and be easier to understand.
+>> This is exactly what I'm trying to accomplish.
+>> I used the for loop in case we ever want to change the
+>> WDT_HEARTBEAT_SHIFT value
+>> (which is unlikely to happen).
+>>
+>> I'll move to your proposition.
+>>
+>>> However, given that, I wonder if it is really necessary to bail out above if
+>>> max_heartbeat is 0. After all, you set heartbeat to min_heartbeat anyway
+>>> in this case.
+>> Yes it is necessary. The max_heartbeat is a configuration that
+>> cannot be changed once configured.
+>> We have to inform the user that his max_heartbeat value is too small
+>> to be handled correctly by the Linux kernel.
+>>
+>> If we simply use the min_heartbeat value as heartbeat and ignore the
+>> wrong max_heartbeat value,
+>> the watchdog will reset the SoC before we can ever reset the
+>> watchdog counter.
+>>
+>>>> +
+>>>> +	if (max_heartbeat < min_heartbeat + 4)
+>>>>   		dev_warn(dev,
+>>>>   			 "min heartbeat and max heartbeat might be too close for the system to handle it correctly\n");
+>>>> -		if (wdt->heartbeat < 4)
+>>>> -			dev_warn(dev,
+>>>> -				 "heartbeat might be too small for the system to handle it correctly\n");
+>>>> -	} else {
+>>>> -		wdt->heartbeat -= 4;
+>>>> -	}
+>>>>   	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
+>>>>   		err = request_irq(wdt->irq, wdt_interrupt,
+>>>> @@ -213,7 +224,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+>>>>   			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
+>>>>   	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
+>>>> -	mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
+>>>> +	/* Use min_heartbeat the first time because the watchdog timer might
+>>>> +	 * be running for a long time when we reach this init function. */
+>>> 	/*
+>>> 	 * Multi-line comment style
+>>> 	 *
+>>> 	 * Not really sure I understand what this accomplishes. What problem
+>>> 	 * are you trying to solve here ?
+>>> 	 */
+>> Sure, I'll change the comment style.
+>>
+>> What, I'm trying to explain, is that the watchdog might (or should)
+>> have been resetted
+>> before loading the linux kernel. But loading the kernel takes some
+>> time (uncompressing,
+>> low level init, ...), and if we take the heartbeat (or max_heartbeat
+>> / 4 in the common case) value as
+>> the next trigger to reset the watchdog counter, the watchdog timer
+>> might have already expired.
+>>
+> But increasing anything in the watchdog driver itself won't help you there.
+> You can not execute any kernel code before that kernel code is running.
 
-On Tue, Oct 29, 2013 at 04:06:58PM +0100, Andreas Fenkart wrote:
-> >> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> >> index 94d6dc8..53beac4 100644
-> >> --- a/drivers/mmc/host/omap_hsmmc.c
-> >> +++ b/drivers/mmc/host/omap_hsmmc.c
-> >> @@ -130,6 +130,7 @@ static void apply_clk_hack(struct device *dev)
-> >>  #define TC_EN                        (1 << 1)
-> >>  #define BWR_EN                       (1 << 4)
-> >>  #define BRR_EN                       (1 << 5)
-> >> +#define CIRQ_EN                      (1 << 8)
-> >>  #define ERR_EN                       (1 << 15)
-> >>  #define CTO_EN                       (1 << 16)
-> >>  #define CCRC_EN                      (1 << 17)
-> >> @@ -210,6 +211,10 @@ struct omap_hsmmc_host {
-> >>       int                     reqs_blocked;
-> >>       int                     use_reg;
-> >>       int                     req_in_progress;
-> >> +     int                     flags;
-> >> +#define HSMMC_RUNTIME_SUSPENDED      (1 << 0)        /* Runtime suspended */
-> >> +#define HSMMC_SDIO_IRQ_ENABLED       (1 << 1)        /* SDIO irq enabled */
-> >> +
-> >>       struct omap_hsmmc_next  next_data;
-> >>       struct  omap_mmc_platform_data  *pdata;
-> >>  };
-> >> @@ -490,27 +495,40 @@ static void omap_hsmmc_stop_clock(struct omap_hsmmc_host *host)
-> >>  static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
-> >>                                 struct mmc_command *cmd)
-> >>  {
-> >> -     unsigned int irq_mask;
-> >> +     u32 irq_mask = INT_EN_MASK;
-> >> +     unsigned long flags;
-> >>
-> >>       if (host->use_dma)
-> >> -             irq_mask = INT_EN_MASK & ~(BRR_EN | BWR_EN);
-> >> -     else
-> >> -             irq_mask = INT_EN_MASK;
-> >> +             irq_mask &= ~(BRR_EN | BWR_EN);
-> >
-> > is this a bugfix ? should it be sent as a separate patch ?
-> 
-> maybe the u32, but otherwise it's just shorter... shall I drop it.
+Of course, but you can at least try to minimize the time between the 
+watchdog driver init
+and the first wathdog counter reset.
 
-no, now I saw what you did ;-)
+>> Here is an example:
+>>   - max_heartbeat configured to 8 seconds
+>>   - min_heartbeat configured to 1 second
+>>   => heartbeat = 2s
+>>   - kernel boot time (before at91 watchdog is loaded) = 6 secs
+>>
+> Guess that is where I got lost. Do you mean the time from loading the driver
+> to starting the watchdog application ? Because the init function is only
+> executed after the driver is loaded, so nothing will help you if it takes
+> too long for the driver to load.
 
-> >>
-> >>       /* Disable timeout for erases */
-> >>       if (cmd->opcode == MMC_ERASE)
-> >>               irq_mask &= ~DTO_EN;
-> >>
-> >> +     spin_lock_irqsave(&host->irq_lock, flags);
-> >
-> > why do you need this new locking here ? register acesses are atomic,
-> > right ? If you really do need the locking, should it be a separate patch
-> > as well ?
-> 
-> because host->flags can be accessed from irq context as well
+I think there is another bug here: the driver should not be compiled as 
+a module.
 
-fair point :-)
+Here is why:
 
-> >>  static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
-> >>  {
-> >> -     OMAP_HSMMC_WRITE(host->base, ISE, 0);
-> >> -     OMAP_HSMMC_WRITE(host->base, IE, 0);
-> >> +     u32 irq_mask = 0;
-> >> +     unsigned long flags;
-> >> +
-> >> +     spin_lock_irqsave(&host->irq_lock, flags);
-> >> +     /* no transfer running, need to signal cirq if */
-> >
-> > if... ?
-> >
-> >> +     if (host->flags & HSMMC_SDIO_IRQ_ENABLED)
-> >> +             irq_mask |= CIRQ_EN;
-> >> +     OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
-> >
-> > the whole fiddling with STAT and ISE registers look very bogus to me
-> > (even on current state before this patch). We shouldn't be clearing
-> > pending IRQ events here, right ? We could miss IRQs due to that.
-> 
-> sdio_claim_host excludes multiple users and  typical users are using synchronous
-> communication, issue a transfer, wait till it's done, then release the host.
-> Hence when we come here, the content of ISE/STAT is a leftover from
-> the previous transfer.
-> Probably the intent here is to reset the registers in defined state,
-> maybe it wasn't needed
-> but it doesn't hurt either.
-> 
-> It's conservative... I don't like to change it, along the side of my
-> sdio irq patches.
-> If I did lots of such changes, surely I would create a regression.
-> 
-> On the other side If I was up to optimize the driver, then I would do this.
+At POR the at91 SoC configure its watchdog with these default values:
+  - enabled
+  - min heartbeat = 0 ticks
+  - max heartbeat = 0xfff ticks <=> 16 secs
+  - some reset options
+After a POR the watchdog can only be reconfigured once (and only once).
+This configuration oftenly takes place in the the bootstrap (or bootloader),
+but can eventually be done by the Linux kernel.
 
-sure, that was an unrelated comment, just exposing some possible problem
-with that approach :-)
+If the watchdog is kept enabled by the bootstrap (or bootloader), this means
+the linux kernel will have to reset the watchdog counter as soon as 
+possible to avoid
+a possible watchdog reset.
 
-> >> @@ -1067,8 +1085,12 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
-> >>       int status;
-> >>
-> >>       status = OMAP_HSMMC_READ(host->base, STAT);
-> >> -     while (status & INT_EN_MASK && host->req_in_progress) {
-> >> -             omap_hsmmc_do_irq(host, status);
-> >> +     while (status & (INT_EN_MASK | CIRQ_EN)) {
-> >
-> > why don't enable CIRQ_EN in INT_EN_MASK directly ?
-> 
-> INT_EN_MASK is also used when bootstrapping the card in
-> send_init_stream, but there
-> you don't want to enable sdio irqs. So I would have to mask it there,
-> so this is the smaller
-> change.
+=> If we authorize the at91 sam9 watchdog to be compiled as a module, 
+we're not sure
+the module will be loaded soon enough to be able to reset the watchdog 
+counter.
 
-true, fair enough.
+>
+> You really have two times to deal with:
+> - Time from ROMMON handoff to loading the driver
+>    Nothing you can do there. If the watchdog fires before the driver is loaded,
+>    you are lost. Only way t handle this situation is to increase the timeout
+>    in the ROMMON.
+> - Time from loading driver to watchdog device open. This is really the time
+>    you are increasing with your change.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/609ec52b/attachment-0001.sig>
+This is where it gets a bit tricky.
+
+The heartbeat I'm talking about is not the "user space" heartbeat
+(struct watchdog_device timeout field), it's the "hardware watchdog 
+counter reset"
+heartbeat (struct at91wdt heartbeat field).
+
+Actually the at91 sam9 wdt driver does not provide a direct access to 
+the watchdog reset
+counter functionnality.
+Instead, it periodically reset the watchdog counter (based on the timing 
+config retrieved from
+the hw registers), and eventually, if the user open a the watchdog dev 
+file and fails to reset
+the watchdog (using the user space API), the drivers stops resetting the 
+hw counter, which leads
+to a watchdog reset.
+
+I hope I'm clear enough, cause it's quite complicated to explain.
+
+Best Regards,
+
+Boris
+
+> Thanks,
+> Guenter
+>
+>> If I use the heartbeat value when configuring the first expiration
+>> of the timer,
+>> it might be too late to reset the watchdog counter.
+>>
+>> I'll try to find a proper to explain this use case :-).
+>>
+>>>> +	mod_timer(&wdt->timer, jiffies + min_heartbeat);
+>>>>   	/* Try to set timeout from device tree first */
+>>>>   	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
+>>>> -- 
+>>>> 1.7.9.5
+>>>>
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
