@@ -1,38 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 29 Oct 2013 23:56:11 +0300
-Subject: [PATCH 1/2] ARM: shmobile: bockw: enable HPB-DMAC in defconfig
-In-Reply-To: <525864D7.8050403@cogentembedded.com>
-References: <201309290011.28982.sergei.shtylyov@cogentembedded.com>
- <20130930005033.GC30501@verge.net.au> <52559ACA.4050509@cogentembedded.com>
- <20131009235918.GA26091@verge.net.au> <52571745.6080307@cogentembedded.com>
- <20131011022302.GC32056@verge.net.au> <525864D7.8050403@cogentembedded.com>
-Message-ID: <527020EB.5090203@cogentembedded.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 29 Oct 2013 20:59:20 +0100
+Subject: [PATCH v2 05/13] uprobes: add arch write opcode hook
+In-Reply-To: <20131028194914.GA15103@redhat.com>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-6-git-send-email-dave.long@linaro.org>
+ <20131019165051.GC7837@redhat.com> <5268137F.3030809@linaro.org>
+ <20131028194914.GA15103@redhat.com>
+Message-ID: <20131029195920.GA4538@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 10/28, Oleg Nesterov wrote:
+>
+> Yes, yes, sorry for confusion. What I actually tried to suggest is
+> something like the trivial patch below.
+>
+> Then arm can do:
+>
+> 	uprobe_opcode_t arch_uprobe_swbp_insn(struct arch_uprobe *auprobe)
+> 	{
+> 		return __opcode_to_mem_arm(auprobe->bpinsn);
+> 	}
+>
+> No?
+>
+> > I notice there don't seem to be any alternative set_swbp functions
+> > in the (rc6) kernel tree
+>
+> Yes... I think we should simply make it "static". And set_orig_insn()
+> too.
 
-On 10/12/2013 12:51 AM, Sergei Shtylyov wrote:
+Or. arm can actually reimplement set_swbp(). This doesn't mean the
+duplication of write_opcode() code, we can simply export this helper.
 
->>>>>>> Enable HPB-DMAC driver in 'bockw_defconfig'.
+Either way is imho better than this patch. Unless I missed something.
 
->>>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->>>>>> Thanks, I will queue this up for v3.13.
-
->>>>>     As I understand you're waiting for lazy Vinod to merge the driver
->>>>> fixes? :-)
-
->>>> I am holding off on sending a pull request for these defconfig updates
->>>> until Vinod takes the fixes. Could you ping him about them?
-
->>>     Already done yesterday.
-
->> Thanks
-
->     Vinod has taken them today.
-
-    Simon, I still don't see these 2 defconfig patches queued and it seems too 
-late for 3.13 now... :-(
-
-WBR, Sergei
+Oleg.
