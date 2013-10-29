@@ -1,53 +1,72 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 29 Oct 2013 13:54:07 +0100 (CET)
-Subject: [PATCH 2/6] genirq: export percpu irq functions for module usage
-In-Reply-To: <1383006690-6754-3-git-send-email-sboyd@codeaurora.org>
-References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
- <1383006690-6754-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <alpine.DEB.2.02.1310291353140.8257@ionos.tec.linutronix.de>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Tue, 29 Oct 2013 13:57:37 +0100
+Subject: [PATCH] lib/scatterlist.c: don't flush_kernel_dcache_page on
+ slab page
+In-Reply-To: <1382977205-26268-1-git-send-email-ming.lei@canonical.com>
+References: <1382977205-26268-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <20131029125737.GA3643@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Oct 2013, Stephen Boyd wrote:
-
-> In the near future we're going to use these percpu irq functions
-> in the Krait CPU EDAC driver. Export them so that the EDAC driver
-> can be compiled as a module.
+On Tue, Oct 29, 2013 at 12:20:05AM +0800, Ming Lei wrote:
+> Commit b1adaf65ba03([SCSI] block: add sg buffer copy helper functions)
+> introduces two sg buffer copy helpers, and calls flush_kernel_dcache_page()
+> on pages in SG list after these pages are written to.
 > 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-
-Please take it through the tree which will take the EDAC patches.
-
-Thanks,
-
-	tglx
-
+> Unfortunately, the commit may introduce a potential bug:
+> 
+> 	- Before sending some SCSI commands, kmalloc() buffer may be
+> 	passed to block layper, so flush_kernel_dcache_page() can
+> 	see a slab page finally
+> 
+> 	- According to cachetlb.txt, flush_kernel_dcache_page() is
+> 	only called on "a user page", which surely can't be a slab page.
+> 
+> 	- ARCH's implementation of flush_kernel_dcache_page() may
+> 	use page mapping information to do optimization so page_mapping()
+> 	will see the slab page, then VM_BUG_ON() is triggered.
+> 
+> Aaro Koskinen reported the bug on ARM/kirkwood when DEBUG_VM is enabled,
+> and this patch fixes the bug by adding test of '!PageSlab(miter->page)'
+> before calling flush_kernel_dcache_page().
+> 
+> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Simon Baatz <gmbnomis@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: "James E.J. Bottomley" <JBottomley@parallels.com>
+> Cc: Jens Axboe <axboe@kernel.dk>
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
 > ---
->  kernel/irq/manage.c | 2 ++
->  1 file changed, 2 insertions(+)
+>  lib/scatterlist.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-> index 514bcfd..c6009d1 100644
-> --- a/kernel/irq/manage.c
-> +++ b/kernel/irq/manage.c
-> @@ -1623,6 +1623,7 @@ void free_percpu_irq(unsigned int irq, void __percpu *dev_id)
->  	kfree(__free_percpu_irq(irq, dev_id));
->  	chip_bus_sync_unlock(desc);
->  }
-> +EXPORT_SYMBOL_GPL(free_percpu_irq);
+> diff --git a/lib/scatterlist.c b/lib/scatterlist.c
+> index a685c8a..d16fa29 100644
+> --- a/lib/scatterlist.c
+> +++ b/lib/scatterlist.c
+> @@ -577,7 +577,8 @@ void sg_miter_stop(struct sg_mapping_iter *miter)
+>  		miter->__offset += miter->consumed;
+>  		miter->__remaining -= miter->consumed;
 >  
->  /**
->   *	setup_percpu_irq - setup a per-cpu interrupt
-> @@ -1693,3 +1694,4 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+> -		if (miter->__flags & SG_MITER_TO_SG)
+> +		if ((miter->__flags & SG_MITER_TO_SG) &&
+> +		    !PageSlab(miter->page))
+>  			flush_kernel_dcache_page(miter->page);
 >  
->  	return retval;
->  }
-> +EXPORT_SYMBOL_GPL(request_percpu_irq);
+>  		if (miter->__flags & SG_MITER_ATOMIC) {
 > -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> 1.7.9.5
 > 
-> 
+
+Tested-by: Simon Baatz <gmbnomis@gmail.com>
+
+on top of 3.12-rc7 on Kirkwood with DEBUG_VM enabled.
+
+- Simon
