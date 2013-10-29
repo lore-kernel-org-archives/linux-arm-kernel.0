@@ -1,32 +1,34 @@
-From: b42378@freescale.com (Nicolin Chen)
-Date: Tue, 29 Oct 2013 12:02:10 +0800
-Subject: [PATCHv1 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F8286BDB5@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1382000477-17304-1-git-send-email-Li.Xiubo@freescale.com>
- <1382000477-17304-2-git-send-email-Li.Xiubo@freescale.com>
- <20131024110543.GA18506@sirena.org.uk>
- <1DD289F6464F0949A2FCA5AA6DC23F8286BDB5@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20131029040209.GC8812@MrMyself>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Oct 2013 04:32:41 +0000
+Subject: [PATCH v2] ARM: SMMU: add devices attached to the SMMU to an
+ IOMMU group
+In-Reply-To: <1382978662.4097.35.camel@ul30vt.home>
+References: <1382108910-18049-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1382978662.4097.35.camel@ul30vt.home>
+Message-ID: <20131029043240.GE22291@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 12:00:57PM +0800, Xiubo Li-B47053 wrote:
-> > There's a patch in -next that lets the generic dmaengine code figure out
-> > some settings from the dmacontroller rather than requiring the driver to
-> > explicitly provide configuration - it's "ASoC: dmaengine-pcm: Provide
-> > default config".  Please update your driver to use this, or let's work
-> > out what it doesn't do any try to fix it.
+On Mon, Oct 28, 2013 at 04:44:22PM +0000, Alex Williamson wrote:
+> On Fri, 2013-10-18 at 17:08 +0200, Antonios Motakis wrote:
+> > IOMMU groups are expected by certain users of the IOMMU API,
+> > e.g. VFIO. Add new devices found by the SMMU driver to an IOMMU
+> > group to satisfy those users.
 > > 
+> > Changes from v1:
+> >  * Added check that dev->archdata.iommu has not been set already by an IOMMU
+> >    driver. This way we can also skip checking for an existing IOMMU group.
+> > 
+> > Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
 > 
-> I couldn't find the patch in the next and other trees.
-> Does this patch has been submitted to the -next tree ?
-> Or could you tell me how to find the patch please?
->
+> 
+> Looks ok to me.
+> 
+> Acked-by: Alex Williamson <alex.williamson@redhat.com>
 
-Are you using broonie's repository?
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git
+Yup, looks fine to me too. I'm travelling until next week, so I'll start
+picking things up then.
 
-If you searched the title in for-next branch, you should have found it.
+Cheers,
 
-Best regards,
-Nicolin Chen
+Will
