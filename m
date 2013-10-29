@@ -1,72 +1,30 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 29 Oct 2013 16:12:49 +0400
-Subject: [PATCH 08/19] mmc: sdhi: Enable the driver on all ARM platforms
-In-Reply-To: <4906973.ikaOXXr4gP@avalon>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383004027-25036-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <Pine.LNX.4.64.1310290919120.8404@axis700.grange> <4906973.ikaOXXr4gP@avalon>
-Message-ID: <526FA641.9090300@cogentembedded.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 29 Oct 2013 17:50:01 +0530
+Subject: [PATCH 0/4] clk/power: add clock and power off driver for AS3722
+Message-ID: <1383049205-29620-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Add power off and clock driver for the ams AS3722.
 
-On 29-10-2013 13:52, Laurent Pinchart wrote:
+The mfd patches are depends on mfd subtree which can be applied independtly.
+The pacthes are created such that clock driver can go in clock tree and power
+off driver in power sub tree.
 
->>> Renesas ARM platforms are transitioning from single-platform to
->>> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
->>> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
->>> and ARCH_SHMOBILE_MULTI and increase build testing coverage.
+Laxman Dewangan (4):
+  mfd: as3722: add clock driver as mfd-sub device for the ams AS3722
+  clk: as3722: add clock driver for ams AS3722
+  mfd: AS3722: add dt node properties for system power controller
+  power: reset: as3722: add power-off driver
 
->>> Cc: Chris Ball <cjb@laptop.org>
->>> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->>> Cc: Ian Molton <ian@mnementh.co.uk>
->>> Cc: linux-mmc at vger.kernel.org
->>> Signed-off-by: Laurent Pinchart
->>> <laurent.pinchart+renesas@ideasonboard.com>
-[...]
-
->>> diff --git a/drivers/mmc/host/tmio_mmc_dma.c
->>> b/drivers/mmc/host/tmio_mmc_dma.c index 65edb4a..535bc35 100644
->>> --- a/drivers/mmc/host/tmio_mmc_dma.c
->>> +++ b/drivers/mmc/host/tmio_mmc_dma.c
->>> @@ -28,7 +28,7 @@ void tmio_mmc_enable_dma(struct tmio_mmc_host *host,
->>> bool enable)>
->>>   	if (!host->chan_tx || !host->chan_rx)
->>>   	
->>>   		return;
->>>
->>> -#if defined(CONFIG_SUPERH) || defined(CONFIG_ARCH_SHMOBILE)
->>> +#if defined(CONFIG_SUPERH) || defined(CONFIG_ARM)
-
->> I'm not sure about this one. In principle DMA so far is only used on SDHI
->> with TMIO. But this #if was for a theoretical case, when a TMIO MMC IP
->> inside an MFD is also used with DMA. Bus since I had no indormation about
->> whether the CTL_DMA_ENABLE register was SDHI specific or not, I put it
->> under an #if for the time being. In any case, I don't think making it
->> #ifdef CONFIG_ARM makes much sense. We can either remove the #if
->> completely, or keep it to limit the scope of this write to sh-mobile
->> arches.
-
-> SUPERH || ARCH_SHMOBILE covers all the platforms this driver currently builds
-> on. Now that we're adding ARCH_SHMOBILE_MULTI the #if needs to cover that case
-> as well. I'm fine with limiting the CTL_DMA_ENABLE write to SUPERH only (which
-> would modify the driver's behaviour)
-
-    I'm afraid that would break the driver's ability to work in DMA mode on 
-SH-Mobile SoCs.
-
-> or enabling it unconditionally, but I
-> don't think adding a defined(CONFIG_ARCH_SHMOBILE_MULTI) to the above #if
-> makes sense, unless there's a plan to add support for DMA for non-SH
-> (including both SUPERH and ARCH_SHMOBILE) platforms.
-
-    Not only the plan -- I have already posted the patches to do it for 
-R8A777x, and Simon has queued them for 3.13.
-
->>>   	/* Switch DMA mode on or off - SuperH specific? */
->>>   	sd_ctrl_write16(host, CTL_DMA_ENABLE, enable ? 2 : 0);
->>>
->>>   #endif
-
-WBR, Sergei
+ Documentation/devicetree/bindings/mfd/as3722.txt |   18 +++
+ drivers/clk/Kconfig                              |    8 +
+ drivers/clk/Makefile                             |    1 +
+ drivers/clk/clk-as3722.c                         |  166 ++++++++++++++++++++++
+ drivers/mfd/as3722.c                             |    3 +
+ drivers/power/reset/Kconfig                      |    6 +
+ drivers/power/reset/Makefile                     |    1 +
+ drivers/power/reset/as3722-poweroff.c            |  101 +++++++++++++
+ 8 files changed, 304 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/clk-as3722.c
+ create mode 100644 drivers/power/reset/as3722-poweroff.c
