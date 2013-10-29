@@ -1,29 +1,47 @@
 From: leigh@solinno.co.uk (Leigh Brown)
-Date: Tue, 29 Oct 2013 09:33:30 +0000
-Subject: [PATCH v3 0/4] Fix MDIO bus timeout issues on Dreamplug
-In-Reply-To: <cover.1382637156.git.leigh@solinno.co.uk>
-References: <cover.1382637156.git.leigh@solinno.co.uk>
-Message-ID: <cover.1383038973.git.leigh@solinno.co.uk>
+Date: Tue, 29 Oct 2013 09:33:33 +0000
+Subject: [PATCH v3 3/4] net: mvmdio: slight optimisation of orion_mdio_write
+In-Reply-To: <cover.1383038973.git.leigh@solinno.co.uk>
+References: <cover.1383038973.git.leigh@solinno.co.uk>
+Message-ID: <892347afda1ebf28fe888cc8b5f97497971084fa.1383038974.git.leigh@solinno.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think I have addressed all comments.
+Make only a single call to mutex_unlock in orion_mdio_write.
 
-Changes since v2:
- - Fix coding style in ordio_mdio_wait_ready, as identified by David
- - Remove un-needed operator change in orion_mdio_write, as identified by David
+Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+---
+ drivers/net/ethernet/marvell/mvmdio.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-This patchset fixes an issue with the Dreamplug MDIO bus timeout since the
-mv643xx_eth driver was converted to use the mvmdio driver to access the bus.
-
-Leigh Brown (4):
-  net: mvmdio: make orion_mdio_wait_ready consistent
-  net: mvmdio: orion_mdio_ready: remove manual poll
-  net: mvmdio: slight optimisation of orion_mdio_write
-  net: mvmdio: doc: mvmdio now used by mv643xx_eth
-
- drivers/net/ethernet/marvell/mvmdio.c | 110 ++++++++++++++++------------------
- 1 file changed, 53 insertions(+), 57 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index e3898b3..0cfa0c8 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -150,10 +150,8 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 	mutex_lock(&dev->lock);
+ 
+ 	ret = orion_mdio_wait_ready(bus);
+-	if (ret < 0) {
+-		mutex_unlock(&dev->lock);
+-		return ret;
+-	}
++	if (ret < 0)
++		goto out;
+ 
+ 	writel(((mii_id << MVMDIO_SMI_PHY_ADDR_SHIFT) |
+ 		(regnum << MVMDIO_SMI_PHY_REG_SHIFT)  |
+@@ -161,9 +159,9 @@ static int orion_mdio_write(struct mii_bus *bus, int mii_id,
+ 		(value << MVMDIO_SMI_DATA_SHIFT)),
+ 	       dev->regs);
+ 
++out:
+ 	mutex_unlock(&dev->lock);
+-
+-	return 0;
++	return ret;
+ }
+ 
+ static int orion_mdio_reset(struct mii_bus *bus)
 -- 
 1.8.4.rc3
