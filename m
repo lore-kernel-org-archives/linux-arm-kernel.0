@@ -1,82 +1,117 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 19:30:05 +0100
-Subject: [PATCH 3/3] ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial
- ports in DT
-In-Reply-To: <526FF9DE.9090909@cogentembedded.com>
-References: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383060193-1505-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <526FF9DE.9090909@cogentembedded.com>
-Message-ID: <106392683.JP0nTO1Rqa@avalon>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Tue, 29 Oct 2013 14:39:37 -0400
+Subject: [PATCH v9 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <0232E02C-5F41-4EC6-9011-86D67005433D@codeaurora.org>
+References: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
+ <D49A3E92-54FD-4275-82F5-DBB476086B03@codeaurora.org>
+ <20131028215649.GB10833@quad.lixom.net>
+ <2702565.PHk13m6fVo@flatron> <20131029002543.GF4763@kartoffel>
+ <0232E02C-5F41-4EC6-9011-86D67005433D@codeaurora.org>
+Message-ID: <20131029183937.GC17573@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Tuesday 29 October 2013 22:09:34 Sergei Shtylyov wrote:
-> On 29-10-2013 19:23, Laurent Pinchart wrote:
-> > SCIF0 and SCIF1 are used as debug serial ports. Enable them and
-> > configure pinmuxing appropriately. We can now remove the clkdev
-> > registration hack for SCIF devices from the Lager reference board file.
-> > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > 
-> >   arch/arm/boot/dts/r8a7790-lager.dts            | 24 ++++++++++++++++----
-> >   arch/arm/mach-shmobile/board-lager-reference.c | 18 ++----------------
-> >   2 files changed, 22 insertions(+), 20 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts
-> > b/arch/arm/boot/dts/r8a7790-lager.dts index a923ab6..9830c87 100644
-> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> > @@ -16,8 +16,13 @@
-> >   	model = "Lager";
-> >   	compatible = "renesas,lager", "renesas,r8a7790";
-> > 
-> > +	aliases {
-> > +		serial0 = &scif0;
-> > +		serial1 = &scif1;
-> > +	};
-> > +
-> >   	chosen {
-> > -		bootargs = "console=ttySC6,115200 ignore_loglevel rw
-> > root=/dev/nfs ip=dhcp";
-> > +		bootargs = "console=ttySC0,115200 ignore_loglevel rw
-> > root=/dev/nfs ip=dhcp";
->
-> Hm... is the rename a by-product of the SCIF device tree enablement?
-
-I suppose we could keep the same serial port name using serial6 and serial7 in 
-the aliases. However, moving to DT will get rid of all other serial ports, so 
-we would be left with ttySC6 and ttySC7, without ttySC0 to ttySC5. I'm not 
-sure if I like that.
-
-(CC'ing Simon and Magnus to get their opinion on the subject)
-
-> [...]
+On Tue, Oct 29, 2013 at 03:12:05AM -0500, Kumar Gala wrote:
 > 
-> > diff --git a/arch/arm/mach-shmobile/board-lager-reference.c
-> > b/arch/arm/mach-shmobile/board-lager-reference.c index bc3d0d2..1f5d6e2
-> > 100644
-> > --- a/arch/arm/mach-shmobile/board-lager-reference.c
-> > +++ b/arch/arm/mach-shmobile/board-lager-reference.c
-> > @@ -36,24 +36,10 @@ static void __init lager_init_time(void)
-> > 
-> >   static void __init lager_add_standard_devices(void)
-> >   {
-> >   	/*
-> > -	 * This is a really crude hack to provide clkdev support to the SCIF
-> > -	 * and CMT devices until they get moved to DT.
-> > +	 * This is a really crude hack to provide clkdev support to the CMT
-> > +	 * CMT device until it gets moved to DT.
+> On Oct 28, 2013, at 7:25 PM, Mark Rutland wrote:
 > 
-> Minor nit: "CMT" repeated twice.
+> > On Mon, Oct 28, 2013 at 11:31:36PM +0000, Tomasz Figa wrote:
+> >> On Monday 28 of October 2013 14:56:49 Olof Johansson wrote:
+> >>> On Mon, Oct 28, 2013 at 05:57:04AM -0500, Kumar Gala wrote:
+> >>>> On Oct 28, 2013, at 5:28 AM, Alexandre Courbot wrote:
+> >>>>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+> >>>>> can be invoked using the same SMC-based API on all supported
+> >>>>> platforms. This patch adds initial basic support for Trusted
+> >>>>> Foundations using the ARM firmware API. Current features are limited
+> >>>>> to the ability to boot secondary processors.
+> >>>>> 
+> >>>>> Note: The API followed by Trusted Foundations does *not* follow the
+> >>>>> SMC
+> >>>>> calling conventions. It has nothing to do with PSCI neither and is
+> >>>>> only
+> >>>>> relevant to devices that use Trusted Foundations (like most
+> >>>>> Tegra-based
+> >>>>> retail devices).
+> >>>>> 
+> >>>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> >>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> >>>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> >>>>> ---
+> >>>>> .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
+> >>>>> .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+> >>>>> arch/arm/Kconfig                                   |  2 +
+> >>>>> arch/arm/Makefile                                  |  1 +
+> >>>>> arch/arm/firmware/Kconfig                          | 28 ++++++++
+> >>>>> arch/arm/firmware/Makefile                         |  1 +
+> >>>>> arch/arm/firmware/trusted_foundations.c            | 79
+> >>>>> ++++++++++++++++++++++ arch/arm/include/asm/trusted_foundations.h  
+> >>>>>      | 67 ++++++++++++++++++ 8 files changed, 199 insertions(+)
+> >>>>> create mode 100644
+> >>>>> Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundatio
+> >>>>> ns.txt create mode 100644 arch/arm/firmware/Kconfig
+> >>>>> create mode 100644 arch/arm/firmware/Makefile
+> >>>>> create mode 100644 arch/arm/firmware/trusted_foundations.c
+> >>>>> create mode 100644 arch/arm/include/asm/trusted_foundations.h
+> >>>>> 
+> >>>>> diff --git
+> >>>>> a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+> >>>>> ions.txt
+> >>>>> b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+> >>>>> ions.txt new file mode 100644
+> >>>>> index 0000000..2ec75c9
+> >>>>> --- /dev/null
+> >>>>> +++
+> >>>>> b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+> >>>>> ions.txt @@ -0,0 +1,20 @@
+> >>>>> +Trusted Foundations
+> >>>>> +-------------------
+> >>>>> +
+> >>>>> +Boards that use the Trusted Foundations secure monitor can signal
+> >>>>> its
+> >>>>> +presence by declaring a node compatible with
+> >>>>> "tl,trusted-foundations"
+> >>>>> +under the /firmware/ node
+> >>>>> +
+> >>>>> +Required properties:
+> >>>>> +- compatible : "tl,trusted-foundations"
+> >>>>> +- version-major : major version number of Trusted Foundations
+> >>>>> firmware
+> >>>>> +- version-minor: minor version number of Trusted Foundations
+> >>>>> firmware
+> >>>> 
+> >>>> vendor prefix version.
+> >>> 
+> >>> Are you saying he should use tl,version-major tl,version-minor? For
+> >>> bindings that are already vendor-specific we haven't (on ARM) asked for
+> >>> vendor prefix on properties. It doesn't mean that we should keep going
+> >>> down that route though, so I'm just asking for clarification for my own
+> >>> edification. :)
+> >> 
+> >> This is a good question. We should decide what the right thing (TM) is and 
+> >> write it down. I, on the contrary, was convinced that it's the way Kumar 
+> >> says.
+> > 
+> > The impression I got was that properties should be prefixed when they're
+> > extremely vendor-specific and could clash with a more generic property. I'm not
+> > sure that firmware will ever have a generic binding given the variation even in
+> > the set of implemented functionality.
+> > 
+> > I would imagine that there are many ways different firmwares might be
+> > versioned, and I can't see version-major or version-minor clashing with a
+> > generic property we might add later. However prefixing would not be harmful, so
+> > I'm not opposed to it if others want that.
+> > 
+> > Another option would be to support a fallback compatible list (e.g.
+> > "tl,trusted-foundations-${MAJOR}-${MINOR}", "tl,trusted-foundations"), and get
+> > versioning information from there. Given that could be painful to handle I
+> > don't want to force it if not required.
+> > 
+> > Thanks,
+> > Mark.
+> 
+> I'm of the opinion that making all vendor specific properties vendor prefixed is the easiest rule of thumb and leaves no gray area to have to argue about.
 
-I'll fix that. If no other change is required I won't repost the patch before 
-sending the pull request.
+That would really help all of us to self-police our submissions and
+reduce the burden on the DT maintainer team.
 
--- 
-Regards,
-
-Laurent Pinchart
+-Matt
