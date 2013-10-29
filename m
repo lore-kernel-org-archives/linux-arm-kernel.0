@@ -1,78 +1,43 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 29 Oct 2013 12:42:02 +0100
-Subject: [PATCH v5 0/3] ARM: S5PV210: move to common clk framework
-In-Reply-To: <20131021121605.11944.74007@quantum>
-References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
- <5264425E.4040301@samsung.com> <20131021121605.11944.74007@quantum>
-Message-ID: <1823897.8rOixkM4PW@amdc1227>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Oct 2013 11:37:56 +0000
+Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
+In-Reply-To: <20131029095332.5d926e8b@ipc1.ka-ro>
+References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
+ <CAOesGMjB6D3owftDUfmMbVNx8_EtY9-RXoGbS3Rmry4FQhSfZQ@mail.gmail.com>
+ <20131028081408.GF2839@S2101-09.ap.freescale.net>
+ <CAOesGMijji0JBJqne_j8kPedYFF82U7fh7KS92PV1hJztJXE6w@mail.gmail.com>
+ <20131029020603.GH2839@S2101-09.ap.freescale.net>
+ <20131029095332.5d926e8b@ipc1.ka-ro>
+Message-ID: <20131029113756.GP16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin, Mike,
-
-On Monday 21 of October 2013 05:16:05 Mike Turquette wrote:
-> Quoting Kukjin Kim (2013-10-20 13:51:42)
-> > On 10/20/13 01:03, Tomasz Figa wrote:
-> > > Hi Mike, Kukjin, Rafael,
-> > >
-> > > On Tuesday 24 of September 2013 14:50:06 Mateusz Krawczuk wrote:
-> > >> This patch series is the new s5pv210 clock implementation
-> > >> (using common clk framework).
-> > >>
-> > >> This implementation is compatible with device tree definition and board
-> > >> files.
-> > >>
-> > >> This patch series is based on linux-next and has been tested on goni and
-> > >> aquila
-> > >> boards using board file.
-> > >>
-> > >> Since v4:
-> > >> Corrected mux flags for finpll.
-> > >>
-> > >> Since v3:
-> > >>
-> > >> Replace s5pv210_clk_register_finpll, by creating mux finpll
-> > >> with xusbxti and xxti as parrents.
-> > >>
-> > >>
-> > >> Mateusz Krawczuk (3):
-> > >>    clk: samsung: Add clock driver for s5pc110/s5pv210
-> > >>    Cpufreq: s5pv210 cpufreq fixes for CCF
-> > >>    ARM: s5pv210: Migrate clock handling to Common Clock Framework
-> > >>
-> > >>   .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
-> > >>   arch/arm/mach-s5pv210/Kconfig                      |   9 +
-> > >>   arch/arm/mach-s5pv210/Makefile                     |   4 +-
-> > >>   arch/arm/mach-s5pv210/common.c                     |  17 +
-> > >>   arch/arm/mach-s5pv210/common.h                     |  10 +
-> > >>   arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
-> > >>   arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
-> > >>   arch/arm/plat-samsung/Kconfig                      |   2 +-
-> > >>   drivers/clk/samsung/Makefile                       |   3 +
-> > >>   drivers/clk/samsung/clk-s5pv210.c                  | 673
-> > >> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c
-> > >>   |   6 +-
-> > >>   include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
-> > >>   12 files changed, 1019 insertions(+), 8 deletions(-)
-> > >>   create mode 100644
-> > >> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
-> > >> create mode 100644 drivers/clk/samsung/clk-s5pv210.c
-> > >>   create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
-> > >
-> > > I believe this series is reasonable to be applied. Could we agree on
-> > > the tree it would go through and get all tne required acks?
-> > >
-> > > Best regards,
-> > > Tomasz
-> > 
-> > I agree.
-> > 
-> > Mike, how do you think the common clk stuff for s5pv210?
+On Tue, Oct 29, 2013 at 09:53:32AM +0100, Lothar Wa?mann wrote:
+> Hi,
 > 
-> Clock code looks good to me. Which tree do you want to take it through?
+> Shawn Guo wrote:
+> > On Mon, Oct 28, 2013 at 10:46:02AM -0700, Olof Johansson wrote:
+> > > By the way, the errata document says that you must write it twice
+> > > within one 32kHz clock period. You might want to write it three times
+> > > just in case two of them happen to straddle that period by pure bad
+> > > luck. I'm guessing it's rare enough that you haven't been able to
+> > > reproduce it though.
+> > 
+> > With CPU running at hundred MHz, two writes in the row should not
+> > straddle one 32kHz clock period - 31.25 us.
+> > 
+> But they still may end up in adjacent periods of the 32MHz
+> clock. If both writes have to happen within the same period of the
+> clock, the third write may be necessary to guarantee this.
 
-Seems like we just missed another kernel release. It's a bit sad that it's
-happening so often for Samsung patches...
+Yes, that is correct to the description given.  It's also rather vague
+in that it doesn't describe the mechanism for the bug, so we can't say
+for certain whether two or three writes are sufficient.
 
-Best regards,
-Tomasz
+If the problem is to do with a write too close to the 32kHz clock edge,
+then two writes should solve it (if the first is too close, the second
+one will likely be afterwards).  If the problem is something else, then
+three writes would be sensible.
+
+As we don't have this information, I'd suggest using three just to be
+sure as Lothar suggests.
