@@ -1,103 +1,112 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 23:23:15 +0100
-Subject: [PATCH 08/19] mmc: sdhi: Enable the driver on all ARM platforms
-In-Reply-To: <52701EE8.4040302@cogentembedded.com>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <172884142.S8DiPq9kQF@avalon> <52701EE8.4040302@cogentembedded.com>
-Message-ID: <2104528.1psQi38nVt@avalon>
+Date: Tue, 29 Oct 2013 23:28:37 +0100
+Subject: [PATCH v7 1/5] omap3isp: Modify clocks registration to avoid
+ circular references
+In-Reply-To: <1383076268-8984-2-git-send-email-s.nawrocki@samsung.com>
+References: <1383076268-8984-1-git-send-email-s.nawrocki@samsung.com>
+ <1383076268-8984-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <16467881.81yEf9zq68@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Sylwester,
 
-On Tuesday 29 October 2013 23:47:36 Sergei Shtylyov wrote:
-> On 10/29/2013 04:15 PM, Laurent Pinchart wrote:
-> >>>>> Renesas ARM platforms are transitioning from single-platform to
-> >>>>> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> >>>>> driver available on all ARM platforms to enable it on both
-> >>>>> ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI and increase build testing
-> >>>>> coverage.
-> >>>>> 
-> >>>>> Cc: Chris Ball <cjb@laptop.org>
-> >>>>> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> >>>>> Cc: Ian Molton <ian@mnementh.co.uk>
-> >>>>> Cc: linux-mmc at vger.kernel.org
-> >>>>> Signed-off-by: Laurent Pinchart
-> >>>>> <laurent.pinchart+renesas@ideasonboard.com>
-> >> 
-> >> [...]
-> >> 
-> >>>>> diff --git a/drivers/mmc/host/tmio_mmc_dma.c
-> >>>>> b/drivers/mmc/host/tmio_mmc_dma.c index 65edb4a..535bc35 100644
-> >>>>> --- a/drivers/mmc/host/tmio_mmc_dma.c
-> >>>>> +++ b/drivers/mmc/host/tmio_mmc_dma.c
-> >>>>> @@ -28,7 +28,7 @@ void tmio_mmc_enable_dma(struct tmio_mmc_host *host,
-> >>>>> bool enable)>
-> >>>>> 
-> >>>>>    	if (!host->chan_tx || !host->chan_rx)
-> >>>>>    	
-> >>>>>    		return;
-> >>>>> 
-> >>>>> -#if defined(CONFIG_SUPERH) || defined(CONFIG_ARCH_SHMOBILE)
-> >>>>> +#if defined(CONFIG_SUPERH) || defined(CONFIG_ARM)
-> >>>> 
-> >>>> I'm not sure about this one. In principle DMA so far is only used on
-> >>>> SDHI with TMIO. But this #if was for a theoretical case, when a TMIO
-> >>>> MMC IP inside an MFD is also used with DMA. Bus since I had no
-> >>>> indormation about whether the CTL_DMA_ENABLE register was SDHI specific
-> >>>> or not, I put it under an #if for the time being. In any case, I don't
-> >>>> think making it #ifdef CONFIG_ARM makes much sense. We can either
-> >>>> remove the #if completely, or keep it to limit the scope of this write
-> >>>> to sh-mobile arches.
-> >>> 
-> >>> SUPERH || ARCH_SHMOBILE covers all the platforms this driver currently
-> >>> builds on. Now that we're adding ARCH_SHMOBILE_MULTI the #if needs to
-> >>> cover that case as well. I'm fine with limiting the CTL_DMA_ENABLE write
-> >>> to SUPERH only (which would modify the driver's behaviour)
-> >> 
-> >> I'm afraid that would break the driver's ability to work in DMA mode on
-> >> SH-Mobile SoCs.
-> > 
-> > So can you confirm that writing the CTL_DMA_ENABLE register is required on
-> > all Renesas ARM SoCs (including SH-Mobile, R-Mobile and R-Car) ?
+Thank you for the patch.
+
+On Tuesday 29 October 2013 20:51:04 Sylwester Nawrocki wrote:
+> The clock core code is going to be modified so clk_get() takes
+> reference on the clock provider module. Until the potential circular
+> reference issue is properly addressed, we pass NULL as as the first
+> argument to clk_register(), in order to disallow sub-devices taking
+> a reference on the ISP module back trough clk_get(). This should
+> prevent locking the modules in memory.
 > 
-> I can't actually say anything about all SH-Mobile and R-Mobile SoCs, only
-> about the R-Car SoCs: though the datasheets don't contain the SDHI register
-> info, from my experience the register exists on R8A777x (I had to fix up the
-> broken PIO fallback in the SDHI driver).
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-OK.
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-> >>> or enabling it unconditionally, but I don't think adding a
-> >>> defined(CONFIG_ARCH_SHMOBILE_MULTI) to the above #if makes sense, unless
-> >>> there's a plan to add support for DMA for non-SH (including both SUPERH
-> >>> and ARCH_SHMOBILE) platforms.
-> >> 
-> >> Not only the plan -- I have already posted the patches to do it for
-> >> R8A777x, and Simon has queued them for 3.13.
-> > 
-> > Could you please point me to those patches ?
+Do you plan to push this to mainline as part of this patch series ? I don't 
+have pending patches for the omap3isp that would conflict with this patch, so 
+that would be fine with me.
+
+> ---
+> This patch has been "compile tested" only.
 > 
-> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?h=nex
-> t&id=1eb6b5a0e55bfcfb0852b7d0f9442841ff807345
-> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?h=ne
-> xt&id=a43e5bd76a4a3df58167d85e8020a1c9e566ad75
-> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?h=ne
-> xt&id=5d6aa3435275a5308684f90c17424b055ef7f572
-> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?h=ne
-> xt&id=e6a8b11b82fdeaa78dad52552f945b772ee1a5c9
-
-But that's still an ARCH_SHMOBILE platform. Guennadi's point, if I understood 
-it correctly, was that whether the CTL_DMA_ENABLE register is part of the 
-standard TMIO controller, or is Renesas-specific, is unknown. As we have no 
-current or planned TMIO DMA users other than SUPERH and ARCH_SHMOBILE this is 
-impossible to test. That is why the code is conditionally compiled.
-
-We could either get rid of the #if completely and always write to the 
-register, or add ARCH_SHMOBILE_MULTI to the condition. I now agree that adding 
-ARM as a dependency makes no sense. Given that this will break on 
-multiplatform kernels anyway, I'm enclined to write to the CTL_DMA_ENABLE 
-register unconditionally. I'll update the patch accordingly.
+> ---
+>  drivers/media/platform/omap3isp/isp.c |   22 ++++++++++++++++------
+>  drivers/media/platform/omap3isp/isp.h |    1 +
+>  2 files changed, 17 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/media/platform/omap3isp/isp.c
+> b/drivers/media/platform/omap3isp/isp.c index df3a0ec..286027a 100644
+> --- a/drivers/media/platform/omap3isp/isp.c
+> +++ b/drivers/media/platform/omap3isp/isp.c
+> @@ -290,9 +290,11 @@ static int isp_xclk_init(struct isp_device *isp)
+>  	struct clk_init_data init;
+>  	unsigned int i;
+> 
+> +	for (i = 0; i < ARRAY_SIZE(isp->xclks); ++i)
+> +		isp->xclks[i].clk = ERR_PTR(-EINVAL);
+> +
+>  	for (i = 0; i < ARRAY_SIZE(isp->xclks); ++i) {
+>  		struct isp_xclk *xclk = &isp->xclks[i];
+> -		struct clk *clk;
+> 
+>  		xclk->isp = isp;
+>  		xclk->id = i == 0 ? ISP_XCLK_A : ISP_XCLK_B;
+> @@ -305,10 +307,15 @@ static int isp_xclk_init(struct isp_device *isp)
+>  		init.num_parents = 1;
+> 
+>  		xclk->hw.init = &init;
+> -
+> -		clk = devm_clk_register(isp->dev, &xclk->hw);
+> -		if (IS_ERR(clk))
+> -			return PTR_ERR(clk);
+> +		/*
+> +		 * The first argument is NULL in order to avoid circular
+> +		 * reference, as this driver takes reference on the
+> +		 * sensor subdevice modules and the sensors would take
+> +		 * reference on this module through clk_get().
+> +		 */
+> +		xclk->clk = clk_register(NULL, &xclk->hw);
+> +		if (IS_ERR(xclk->clk))
+> +			return PTR_ERR(xclk->clk);
+> 
+>  		if (pdata->xclks[i].con_id == NULL &&
+>  		    pdata->xclks[i].dev_id == NULL)
+> @@ -320,7 +327,7 @@ static int isp_xclk_init(struct isp_device *isp)
+> 
+>  		xclk->lookup->con_id = pdata->xclks[i].con_id;
+>  		xclk->lookup->dev_id = pdata->xclks[i].dev_id;
+> -		xclk->lookup->clk = clk;
+> +		xclk->lookup->clk = xclk->clk;
+> 
+>  		clkdev_add(xclk->lookup);
+>  	}
+> @@ -335,6 +342,9 @@ static void isp_xclk_cleanup(struct isp_device *isp)
+>  	for (i = 0; i < ARRAY_SIZE(isp->xclks); ++i) {
+>  		struct isp_xclk *xclk = &isp->xclks[i];
+> 
+> +		if (!IS_ERR(xclk->clk))
+> +			clk_unregister(xclk->clk);
+> +
+>  		if (xclk->lookup)
+>  			clkdev_drop(xclk->lookup);
+>  	}
+> diff --git a/drivers/media/platform/omap3isp/isp.h
+> b/drivers/media/platform/omap3isp/isp.h index cd3eff4..1498f2b 100644
+> --- a/drivers/media/platform/omap3isp/isp.h
+> +++ b/drivers/media/platform/omap3isp/isp.h
+> @@ -135,6 +135,7 @@ struct isp_xclk {
+>  	struct isp_device *isp;
+>  	struct clk_hw hw;
+>  	struct clk_lookup *lookup;
+> +	struct clk *clk;
+>  	enum isp_xclk_id id;
+> 
+>  	spinlock_t lock;	/* Protects enabled and divider */
 
 -- 
 Regards,
