@@ -1,49 +1,56 @@
-From: sre@debian.org (Sebastian Reichel)
-Date: Tue, 29 Oct 2013 02:06:08 +0100
-Subject: [PATCHv2 1/3] Input: twl4030-keypad - add device tree support
-In-Reply-To: <5137C017-2515-427C-865F-B938CC24B210@codeaurora.org>
-References: <1382446042-27099-1-git-send-email-sre@debian.org>
- <1382446042-27099-2-git-send-email-sre@debian.org>
- <5137C017-2515-427C-865F-B938CC24B210@codeaurora.org>
-Message-ID: <20131029010608.GA5353@earth.universe>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 28 Oct 2013 18:19:43 -0700
+Subject: [PATCH 3/6] ARM: Add Krait L2 accessor functions
+In-Reply-To: <1383006690-6754-4-git-send-email-sboyd@codeaurora.org>
+References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
+ <1383006690-6754-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20131029011942.GG4763@kartoffel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 01:42:47AM -0500, Kumar Gala wrote:
-> > +This binding is based on the matrix-keymap binding with the following
-> > +changes:
+On Tue, Oct 29, 2013 at 12:31:27AM +0000, Stephen Boyd wrote:
+> Qualcomm's Krait CPUs have a handful of L2 cache controller
+> registers that live behind a cp15 based indirection register.
+> First you program the indirection register (l2cpselr) to point
+> the L2 'window' register (l2cpdr) at what you want to read/write.
+> Then you read/write the 'window' register to do what you want.
+> The l2cpselr register is not banked per-cpu so we must lock
+> around accesses to it to prevent other CPUs from re-pointing
+> l2cpdr underneath us.
 > 
-> Maybe be a bit more specific and say 'based on the input/matrix-keymap.txt binding'..
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/common/Kconfig                   |  3 ++
+>  arch/arm/common/Makefile                  |  1 +
+>  arch/arm/common/krait-l2-accessors.c      | 52 +++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/krait-l2-accessors.h | 20 ++++++++++++
+>  4 files changed, 76 insertions(+)
+>  create mode 100644 arch/arm/common/krait-l2-accessors.c
+>  create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
 
-OK.
+[...]
 
-> > + * keypad,num-rows and keypad,num-columns are required.
-> 
-> Is linux,keymap required from matrix-keymap.txt?
+> +void set_l2_indirect_reg(u32 addr, u32 val)
+> +{
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&krait_l2_lock, flags);
+> +
+> +	asm volatile ("mcr p15, 3, %0, c15, c0, 6" : : "r" (addr));
+> +	isb();
+> +	asm volatile ("mcr p15, 3, %0, c15, c0, 7" : : "r" (val));
+> +	isb();
+> +
+> +	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
+> +}
+> +EXPORT_SYMBOL(set_l2_indirect_reg);
 
-Yes, matrix-keymap.txt contains descriptions for the following:
+It might be worth commmenting inline as to what register each of these is
+accessing. Inevitably the commit message will become harder to find and
+associate with the code over time.
 
-required:
- - linux,keymap
-optional:
- - keypad,num-rows
- - keypad,num-columns
+Similarly for get_l2_indirect_reg.
 
-> > +Optional Properties specific to linux:
-> > +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
-> 
-> Does it make sense to update the matrix-keymap.txt binding to add
-> 'linux,keypad-no-autorepeat' there?
-
-At least according to devicetree documentation there are
-keymap-matrix.txt based drivers, which do not support
-"linux,keypad-no-autorepeat".
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/c6090ce8/attachment-0001.sig>
+Thanks,
+Mark.
