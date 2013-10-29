@@ -1,43 +1,89 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 29 Oct 2013 13:45:50 -0200
-Subject: [PATCH v3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <CAOMZO5BYXv4whoRrRD7pF5zj9DArEnbqFaZVdLgZgPC2nSDePw@mail.gmail.com>
-References: <1382992009-19407-1-git-send-email-festevam@gmail.com>
- <20131028211945.GJ16735@n2100.arm.linux.org.uk>
- <CAOMZO5BYXv4whoRrRD7pF5zj9DArEnbqFaZVdLgZgPC2nSDePw@mail.gmail.com>
-Message-ID: <CAOMZO5DN0KGvUBut0BqyvPTdyByWtZ=uamTpQGeENBzMOfJK3A@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 29 Oct 2013 08:46:17 -0700
+Subject: [PATCH v5 0/3] ARM: S5PV210: move to common clk framework
+In-Reply-To: <1823897.8rOixkM4PW@amdc1227>
+References: <1380027009-2239-1-git-send-email-m.krawczuk@partner.samsung.com>
+ <5264425E.4040301@samsung.com> <20131021121605.11944.74007@quantum>
+ <1823897.8rOixkM4PW@amdc1227>
+Message-ID: <526FD849.9050000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 1:00 PM, Fabio Estevam <festevam@gmail.com> wrote:
-
-> Today I was able to get access to a wandboard solo and the HDMI image
-> does look different compared to a wandboard quad board:
+On 10/29/13 04:42, Tomasz Figa wrote:
+> Hi Kukjin, Mike,
 >
-> - The Linux logo penguins are steady on mx6q, but on mx6solo the
-> contour lines look like they flicker.
-> - The kernel log text appears in good white colour with mx6q, but not
-> so white on mx6solo (tending to green).
+> On Monday 21 of October 2013 05:16:05 Mike Turquette wrote:
+>> Quoting Kukjin Kim (2013-10-20 13:51:42)
+>>> On 10/20/13 01:03, Tomasz Figa wrote:
+>>>> Hi Mike, Kukjin, Rafael,
+>>>>
+>>>> On Tuesday 24 of September 2013 14:50:06 Mateusz Krawczuk wrote:
+>>>>> This patch series is the new s5pv210 clock implementation
+>>>>> (using common clk framework).
+>>>>>
+>>>>> This implementation is compatible with device tree definition and board
+>>>>> files.
+>>>>>
+>>>>> This patch series is based on linux-next and has been tested on goni and
+>>>>> aquila
+>>>>> boards using board file.
+>>>>>
+>>>>> Since v4:
+>>>>> Corrected mux flags for finpll.
+>>>>>
+>>>>> Since v3:
+>>>>>
+>>>>> Replace s5pv210_clk_register_finpll, by creating mux finpll
+>>>>> with xusbxti and xxti as parrents.
+>>>>>
+>>>>>
+>>>>> Mateusz Krawczuk (3):
+>>>>>     clk: samsung: Add clock driver for s5pc110/s5pv210
+>>>>>     Cpufreq: s5pv210 cpufreq fixes for CCF
+>>>>>     ARM: s5pv210: Migrate clock handling to Common Clock Framework
+>>>>>
+>>>>>    .../bindings/clock/samsung,s5pv210-clock.txt       |  75 +++
+>>>>>    arch/arm/mach-s5pv210/Kconfig                      |   9 +
+>>>>>    arch/arm/mach-s5pv210/Makefile                     |   4 +-
+>>>>>    arch/arm/mach-s5pv210/common.c                     |  17 +
+>>>>>    arch/arm/mach-s5pv210/common.h                     |  10 +
+>>>>>    arch/arm/mach-s5pv210/mach-goni.c                  |   2 +-
+>>>>>    arch/arm/mach-s5pv210/mach-smdkv210.c              |   2 +-
+>>>>>    arch/arm/plat-samsung/Kconfig                      |   2 +-
+>>>>>    drivers/clk/samsung/Makefile                       |   3 +
+>>>>>    drivers/clk/samsung/clk-s5pv210.c                  | 673
+>>>>> +++++++++++++++++++++ drivers/cpufreq/s5pv210-cpufreq.c
+>>>>>    |   6 +-
+>>>>>    include/dt-bindings/clock/samsung,s5pv210-clock.h  | 224 +++++++
+>>>>>    12 files changed, 1019 insertions(+), 8 deletions(-)
+>>>>>    create mode 100644
+>>>>> Documentation/devicetree/bindings/clock/samsung,s5pv210-clock.txt
+>>>>> create mode 100644 drivers/clk/samsung/clk-s5pv210.c
+>>>>>    create mode 100644 include/dt-bindings/clock/samsung,s5pv210-clock.h
+>>>>
+>>>> I believe this series is reasonable to be applied. Could we agree on
+>>>> the tree it would go through and get all tne required acks?
+>>>>
+>>>> Best regards,
+>>>> Tomasz
+>>>
+>>> I agree.
+>>>
+>>> Mike, how do you think the common clk stuff for s5pv210?
+>>
+>> Clock code looks good to me. Which tree do you want to take it through?
 >
-> Even the U-boot HDMI splash screen is not very steady on mx6solo.
+> Seems like we just missed another kernel release. It's a bit sad that it's
+> happening so often for Samsung patches...
 >
-> I will try to look at these mx6 solo HDMI issues.
 
-With the change below I am able to get a good HDMI quality image on
-mx6solo (and mx6quad as well):
+Tomasz, sorry about that, I couldn't end up the stuff before attending 
+ARM Kernel Summit, but in my opinion, this series would be merged for 
+upcoming merge window via clk tree if Mike is fine because there is no 
+conflicts with Samsung tree.
 
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -238,7 +238,7 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
-                sig_cfg.Vsync_pol = 1;
+Mike, how do you think? If you're OK, please pick this into your tree 
+with my ack.
 
-        sig_cfg.enable_pol = 1;
--       sig_cfg.clk_pol = 0;
-+       sig_cfg.clk_pol = 1;
-        sig_cfg.width = mode->hdisplay;
-        sig_cfg.height = mode->vdisplay;
-        sig_cfg.pixel_fmt = out_pixel_fmt;
-
-Regards,
-
-Fabio Estevam
+Thanks,
+Kukjin
