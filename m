@@ -1,128 +1,96 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 29 Oct 2013 16:21:28 +0100
-Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
-In-Reply-To: <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
-Message-ID: <526FD278.8080102@metafoo.de>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Oct 2013 16:23:11 +0100
+Subject: [PATCH 1/3] ARM: shmobile: r8a7790: Add early debugging support
+In-Reply-To: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383060193-1505-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Couple of high-level comments on the in-kernel API.
+Add serial port debug macros for the SCIF0 serial port on R8A7790.
+Support for other serial ports can easily be added if needed.
 
-On 10/28/2013 07:12 PM, Josh Cartwright wrote:
-> +#ifdef CONFIG_PM_SLEEP
-> +static int spmi_pm_suspend(struct device *dev)
-> +{
-> +	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-> +
-> +	if (pm)
-> +		return pm_generic_suspend(dev);
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ arch/arm/Kconfig.debug           |  8 ++++++++
+ arch/arm/include/debug/r8a7790.S | 43 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 51 insertions(+)
+ create mode 100644 arch/arm/include/debug/r8a7790.S
 
-pm_generic_suspend() checks both dev->driver and dev->driver->pm and returns
-0 if either of them is NULL, so there should be no need to wrap the function.
-
-> +	else
-> +		return 0;
-> +}
-> +
-> +static int spmi_pm_resume(struct device *dev)
-> +{
-> +	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-> +
-> +	if (pm)
-> +		return pm_generic_resume(dev);
-
-Same here
-
-> +	else
-> +		return 0;
-> +}
-> +#else
-> +#define spmi_pm_suspend		NULL
-> +#define spmi_pm_resume		NULL
-> +#endif
-[...]
-> +/**
-> + * spmi_controller_remove: Controller tear-down.
-> + * @ctrl: controller to be removed.
-> + *
-> + * Controller added with the above API is torn down using this API.
-> + */
-> +int spmi_controller_remove(struct spmi_controller *ctrl)
-
-The return type should be void. The function can't fail and nobody is going
-to check the return value anyway.
-
-> +{
-> +	int dummy;
-> +
-> +	if (!ctrl)
-> +		return -EINVAL;
-> +
-> +	dummy = device_for_each_child(&ctrl->dev, NULL,
-> +				      spmi_ctrl_remove_device);
-> +	device_unregister(&ctrl->dev);
-
-Should be device_del(). device_unregister() will do both device_del() and
-put_device(). But usually you'd want to do something in between like release
-resources used by the controller.
-
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(spmi_controller_remove);
-> +
-[...]
-> +/**
-> + * spmi_controller_alloc: Allocate a new SPMI controller
-> + * @ctrl: associated controller
-> + *
-> + * Caller is responsible for either calling spmi_device_add() to add the
-> + * newly allocated controller, or calling spmi_device_put() to discard it.
-> + */
-> +struct spmi_device *spmi_device_alloc(struct spmi_controller *ctrl);
-> +
-> +static inline void spmi_device_put(struct spmi_device *sdev)
-
-For symmetry reasons it might make sense to call this spmi_device_free().
-
-> +{
-> +	if (sdev)
-> +		put_device(&sdev->dev);
-> +}
-[...]
-> +#define to_spmi_controller(d) container_of(d, struct spmi_controller, dev)
-
-Should be a inline function for better type safety.
-
-[...]
-> +static inline void spmi_controller_put(struct spmi_controller *ctrl)
-
-For symmetry reasons it might make sense to call this spmi_controller_free().
-
-> +{
-> +	if (ctrl)
-> +		put_device(&ctrl->dev);
-> +}
-> +
-[....]
-> +struct spmi_driver {
-> +	struct device_driver driver;
-> +	int	(*probe)(struct spmi_device *sdev);
-> +	int	(*remove)(struct spmi_device *sdev);
-
-The type of the remove function should be found. The Linux device model
-doesn't really allow for device removal to fail.
-
-> +	void	(*shutdown)(struct spmi_device *sdev);
-> +	int	(*suspend)(struct spmi_device *sdev, pm_message_t pmesg);
-> +	int	(*resume)(struct spmi_device *sdev);
-
-The framework seems to support dev_pm_ops just fine, there should be no need
-for legacy suspend/resume callbacks.
-
-> +};
-> +#define to_spmi_driver(d) container_of(d, struct spmi_driver, driver)
-
-Inline function here as well
-[...]
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 9762c84..f1b765a 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -493,6 +493,13 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on PXA UART1.
+ 
++	config DEBUG_R8A7790
++		bool "Kernel low-level debugging messages via SCIF0 on R8A7790 SoCs"
++		depends on ARCH_R8A7790
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Renesas R8A7790 based platforms.
++
+ 	config DEBUG_REALVIEW_STD_PORT
+ 		bool "RealView Default UART"
+ 		depends on ARCH_REALVIEW
+@@ -901,6 +908,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_MSM8660_UART || \
+ 				 DEBUG_MSM8960_UART
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
++	default "debug/r8a7790.S" if DEBUG_R8A7790
+ 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+ 	default "debug/sti.S" if DEBUG_STI_UART
+ 	default "debug/tegra.S" if DEBUG_TEGRA_UART
+diff --git a/arch/arm/include/debug/r8a7790.S b/arch/arm/include/debug/r8a7790.S
+new file mode 100644
+index 0000000..4f1feb8
+--- /dev/null
++++ b/arch/arm/include/debug/r8a7790.S
+@@ -0,0 +1,43 @@
++/*
++ * Renesas R8A7790 debugging macro include header
++ *
++ * Copyright (C) 2012-2013 Renesas Electronics Corporation
++ * Copyright (C) 1994-1999 Russell King
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#define FTDR	0x0c
++#define FSR	0x10
++
++#define TDFE	(1 << 5)
++#define TEND	(1 << 6)
++
++#define SCIF_PHYS	0xe6e60000
++#define SCIF_VIRT	0xffe60000
++
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =SCIF_PHYS
++	ldr	\rv, =SCIF_VIRT
++	.endm
++
++	.macro	waituart, rd, rx
++1001:	ldrh	\rd, [\rx, #FSR]
++	tst	\rd, #TDFE
++	beq	1001b
++	.endm
++
++	.macro	senduart, rd, rx
++	strb	\rd, [\rx, #FTDR]
++	ldrh	\rd, [\rx, #FSR]
++	bic	\rd, \rd, #TEND
++	strh	\rd, [\rx, #FSR]
++	.endm
++
++	.macro	busyuart, rd, rx
++1001:	ldrh	\rd, [\rx, #FSR]
++	tst	\rd, #TEND
++	beq	1001b
++	.endm
+-- 
+1.8.1.5
