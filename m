@@ -1,27 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 29 Oct 2013 16:13:02 -0700
-Subject: [GIT PULL] omap dt fixes for v3.13 merge window
-In-Reply-To: <52704038.857c420a.6ab0.15e1SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <52704038.857c420a.6ab0.15e1SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <CAOesGMha7qW_4gnEEDktSpMjdd-r_T4OdeXYh1MnOYu4KW1mow@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 29 Oct 2013 16:22:49 -0700
+Subject: [PATCH 2/2] misc: atmel_pwm: set initcall level to subsys
+In-Reply-To: <1382459560-26596-3-git-send-email-jhovold@gmail.com>
+References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+ <1382459560-26596-3-git-send-email-jhovold@gmail.com>
+Message-ID: <20131029232249.GA20476@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 4:09 PM, Tony Lindgren <tony@atomide.com> wrote:
-> The following changes since commit b4887e16375be312cf64642ac1d826186cb836bf:
->
->   Merge tag 'for_3.13_super_late/dts_signed' of git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt into omap-for-v3.13/dt (2013-10-23 03:12:45 -0700)
->
-> are available in the git repository at:
->
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.13/dt-fixes-for-merge-window
->
-> for you to fetch changes up to 0352bd1f04b706904b26d13f6d8792e7ff6b7eb6:
->
->   ARM: dts: omap4-panda: add DPI pinmuxing (2013-10-29 14:24:34 -0700)
+On Tue, Oct 22, 2013 at 06:32:40PM +0200, Johan Hovold wrote:
+> Even with the atmel_pwm driver and the atmel-pwm-bl backlight driver
+> supporting deferred probing, we still want to make sure that any
+> pwm-device is available when the backlight devices are probed to avoid
+> any unnecessary delays before enabling the backlight.
+> 
+> Signed-off-by: Johan Hovold <jhovold@gmail.com>
+> ---
+>  drivers/misc/atmel_pwm.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/misc/atmel_pwm.c b/drivers/misc/atmel_pwm.c
+> index a6dc56e..0d0f599 100644
+> --- a/drivers/misc/atmel_pwm.c
+> +++ b/drivers/misc/atmel_pwm.c
+> @@ -395,7 +395,17 @@ static struct platform_driver atmel_pwm_driver = {
+>  	 */
+>  };
+>  
+> -module_platform_driver_probe(atmel_pwm_driver, pwm_probe);
+> +static int __init pwm_init(void)
+> +{
+> +	return platform_driver_probe(&atmel_pwm_driver, pwm_probe);
+> +}
+> +subsys_initcall(pwm_init);
 
-Pulled, thanks.
+I really hate this type of patch, as it's papering over the real
+problem.  What happens when someone else moves their driver to this
+level?  Then you are back to the original problem.
 
+This is what deferred probing was supposed to fix.  If it doesn't, then
+something else needs to be done, or fix the deferred probing mess...
 
--Olof
+Sorry, I can't take this.
+
+greg k-h
