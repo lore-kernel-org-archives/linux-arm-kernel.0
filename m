@@ -1,57 +1,23 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 23:37:54 +0100
-Subject: [PATCH v2 19/19] fbdev: sh-mobile-lcdcfb: Enable the driver on all
- ARM platforms
-In-Reply-To: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383086274-11049-20-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 29 Oct 2013 18:54:50 -0400 (EDT)
+Subject: [PATCH v3 0/4] Fix MDIO bus timeout issues on Dreamplug
+In-Reply-To: <cover.1383038973.git.leigh@solinno.co.uk>
+References: <cover.1382637156.git.leigh@solinno.co.uk>
+ <cover.1383038973.git.leigh@solinno.co.uk>
+Message-ID: <20131029.185450.1734537211071455991.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Renesas ARM platforms are transitioning from single-platform to
-multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
-COMPILE_TEST.
+From: Leigh Brown <leigh@solinno.co.uk>
+Date: Tue, 29 Oct 2013 09:33:30 +0000
 
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/video/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+> I think I have addressed all comments.
+> 
+> Changes since v2:
+>  - Fix coding style in ordio_mdio_wait_ready, as identified by David
+>  - Remove un-needed operator change in orion_mdio_write, as identified by David
+> 
+> This patchset fixes an issue with the Dreamplug MDIO bus timeout since the
+> mv643xx_eth driver was converted to use the mvmdio driver to access the bus.
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 84b685f..32b5c86 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -10,7 +10,7 @@ config HAVE_FB_ATMEL
- 
- config SH_MIPI_DSI
- 	tristate
--	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
-+	depends on (SUPERH || ARM || COMPILE_TEST) && HAVE_CLK
- 
- config SH_LCD_MIPI_DSI
- 	bool
-@@ -1995,7 +1995,7 @@ config FB_W100
- 
- config FB_SH_MOBILE_LCDC
- 	tristate "SuperH Mobile LCDC framebuffer support"
--	depends on FB && (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
-+	depends on FB && (SUPERH || ARM || COMPILE_TEST) && HAVE_CLK
- 	select FB_SYS_FILLRECT
- 	select FB_SYS_COPYAREA
- 	select FB_SYS_IMAGEBLIT
-@@ -2482,7 +2482,7 @@ endif
- 
- config FB_SH_MOBILE_MERAM
- 	tristate "SuperH Mobile MERAM read ahead support"
--	depends on (SUPERH || ARCH_SHMOBILE)
-+	depends on (SUPERH || ARM || COMPILE_TEST)
- 	select GENERIC_ALLOCATOR
- 	---help---
- 	  Enable MERAM support for the SuperH controller.
--- 
-1.8.1.5
+Series applied to net-next, thanks.
