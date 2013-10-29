@@ -1,97 +1,81 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 29 Oct 2013 18:36:06 -0500
-Subject: [PATCH 2/3] clk: shmobile: Add MSTP clock support
-In-Reply-To: <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <F8268ACF-E4E8-4411-84F1-D967450BE440@codeaurora.org>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Wed, 30 Oct 2013 00:38:06 +0100
+Subject: [PATCH v6 0/5] clk: clock deregistration support
+In-Reply-To: <13429728.zDYQ5qS5ur@avalon>
+References: <1377874402-2944-1-git-send-email-s.nawrocki@samsung.com>
+ <52420664.2040604@gmail.com> <13429728.zDYQ5qS5ur@avalon>
+Message-ID: <527046DE.6050009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laurent,
 
-On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
+On 10/28/2013 10:05 PM, Laurent Pinchart wrote:
+> On Tuesday 24 September 2013 23:38:44 Sylwester Nawrocki wrote:
+>> On 08/30/2013 04:53 PM, Sylwester Nawrocki wrote:
+>>> This patch series implements clock deregistration in the common clock
+>>> framework. Comparing to v5 it only includes further corrections of NULL
+>>> clock handling.
+[...]
+>> ---------8<------------------
+>>   From ca5963041aad67e31324cb5d4d5e2cfce1706d4f Mon Sep 17 00:00:00 2001
+>> From: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>> Date: Thu, 19 Sep 2013 23:52:04 +0200
+>> Subject: [PATCH] omap3isp: Pass NULL device pointer to clk_register()
+>>
+>> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>> ---
+>>    drivers/media/platform/omap3isp/isp.c |   15 ++++++++++-----
+>>    drivers/media/platform/omap3isp/isp.h |    1 +
+>>    2 files changed, 11 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/omap3isp/isp.c
+>> b/drivers/media/platform/omap3isp/isp.c
+>> index df3a0ec..d7f3c98 100644
+>> --- a/drivers/media/platform/omap3isp/isp.c
+>> +++ b/drivers/media/platform/omap3isp/isp.c
+>> @@ -290,9 +290,11 @@ static int isp_xclk_init(struct isp_device *isp)
+>>    	struct clk_init_data init;
+>>    	unsigned int i;
+>>
+>> +	for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i)
+>> +		isp->xclks[i] = ERR_PTR(-EINVAL);
+>
+> I don't think you've compile-tested this :-)
 
-> MSTP clocks are gate clocks controlled through a register that handles
-> up to 32 clocks. The register is often sparsely populated.
-> 
-> Those clocks are found on Renesas ARM SoCs.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
-> .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  47 +++++
-> drivers/clk/shmobile/Makefile                      |   1 +
-> drivers/clk/shmobile/clk-mstp.c                    | 229 +++++++++++++++++++++
-> include/dt-bindings/clock/r8a7790-clock.h          |  56 +++++
-> 4 files changed, 333 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> create mode 100644 drivers/clk/shmobile/clk-mstp.c
-> create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> new file mode 100644
-> index 0000000..b3a1ce0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> @@ -0,0 +1,47 @@
-> +* Renesas R8A7790 MSTP Clocks
+Thank you for the comments. Yeah, I messed up this, I thought this part
+got recompiled but it didn't. I've fixed this in the recently posted
+patch.
 
-can we spell out MSTP once in the heading?
+>> +
+>>    	for (i = 0; i<  ARRAY_SIZE(isp->xclks); ++i) {
+>>    		struct isp_xclk *xclk =&isp->xclks[i];
+>> -		struct clk *clk;
+>>
+>>    		xclk->isp = isp;
+>>    		xclk->id = i == 0 ? ISP_XCLK_A : ISP_XCLK_B;
+>> @@ -306,9 +308,9 @@ static int isp_xclk_init(struct isp_device *isp)
+>>
+>>    		xclk->hw.init =&init;
+>>
+>> -		clk = devm_clk_register(isp->dev,&xclk->hw);
+>> -		if (IS_ERR(clk))
+>> -			return PTR_ERR(clk);
+>> +		xclk->clk = clk_register(NULL,&xclk->hw);
+>> +		if (IS_ERR(xclk->clk))
+>> +			return PTR_ERR(xclk->clk);
+>
+> This doesn't introduce any regression in the sense that it will trade a
+> problem for another one, so I'm fine with it in the short. Could you add a
+> small comment above the clk_register() call to explain why the first argument
+> is NULL ?
 
-> +
-> +The CPG can gate SoC device clocks. The gates are organized in groups of up to
-> +32 gates.
-> +
-> +This device tree binding describes a single 32 gate clocks group per node.
-> +Clocks are referenced by user nodes by the MSTP node phandle and the clock
-> +index in the group, from 0 to 31.
-> +
-> +Required Properties:
-> +
-> +  - compatible: Must be one of the following
-> +    - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
-> +    - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
-> +  - reg: Base address and length of the memory resource used by the MSTP
-> +    clocks
-> +  - clocks: Reference to the parent clocks
-> +  - #clock-cells: Must be 1
-> +  - clock-output-names: The name of the clocks as free-form strings
-> +  - renesas,indices: Index of the gate clocks (0 to 31)
+I'm not entirely happy about doing something like that. Nevertheless I 
+didn't
+hear so far any better proposals and I guess it could be treated as a short
+term modification while we're working on proper handling of those circular
+references.
 
-Index of the gate clock into what?
-
-> +
-> +The clocks, clock-output-names and renesas,indices properties contain one
-> +entry per gate. The MSTP groups are sparsely populated. Unimplemented gates
-
-per gate clock. (?)
-
-> +must not be declared.
-> +
-> +
-> +Example
-> +-------
-> +
-> +	#include <dt-bindings/clock/r8a7790-clock.h>
-> +
-> +	mstp3_clks: mstp3_clks {
-> +		compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
-> +		reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
-> +		clocks = <&cp_clk>, <&mmc1_clk>, <&sd3_clk>, <&sd2_clk>,
-> +			 <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks R8A7790_CLK_SD0>,
-> +			 <&mmc0_clk>;
-> +		#clock-cells = <1>;
-> +		clock-output-names =
-> +			"tpu0", "mmcif1", "sdhi3", "sdhi2",
-> +			 "sdhi1", "sdhi0", "mmcif0";
-> +		renesas,clock-indices = <
-> +			R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
-> +			R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
-> +			R8A7790_CLK_MMCIF0
-> +		>;
-> +	};
-
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+--
+Thanks,
+Sylwester
