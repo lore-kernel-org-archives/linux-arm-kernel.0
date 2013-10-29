@@ -1,58 +1,44 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 29 Oct 2013 08:47:46 +0100
-Subject: [PATCH v5 2/5] dma: mxs-dma: Report correct residue for cyclic DMA
-In-Reply-To: <1383032869-12863-1-git-send-email-mpa@pengutronix.de>
-References: <1383032869-12863-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1383032869-12863-3-git-send-email-mpa@pengutronix.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 29 Oct 2013 18:57:14 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the  tree
+Message-ID: <20131029185714.f6a1eef0e6700b989bbdf5dc@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the channel's buffer address register to calculate correct residue
-value for tx_status.
+Hi all,
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/dma/mxs-dma.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/Kconfig between commit 85649711a895 ("ARM: gemini: delete
+<mach/gpio.h>") from the gpio tree and commit f3372c01816e ("ARM: gemini:
+convert to GENERIC_CLOCKEVENTS") from the arm-soc tree.
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 1d1b6e9..083e7f1 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -58,6 +58,8 @@
- 	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x050 : 0x110) + (n) * 0x70)
- #define HW_APBHX_CHn_SEMA(d, n) \
- 	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x080 : 0x140) + (n) * 0x70)
-+#define HW_APBHX_CHn_BAR(d, n) \
-+	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x070 : 0x130) + (n) * 0x70)
- 
- /*
-  * ccw bits definitions
-@@ -623,8 +625,24 @@ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
- 			dma_cookie_t cookie, struct dma_tx_state *txstate)
- {
- 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-+	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-+	u32 residue = 0;
-+
-+	if (mxs_chan->status == DMA_IN_PROGRESS &&
-+			mxs_chan->flags & MXS_DMA_SG_LOOP) {
-+		struct mxs_dma_ccw *last_ccw;
-+		u32 bar;
-+
-+		last_ccw = &mxs_chan->ccw[mxs_chan->desc_count - 1];
-+		residue = last_ccw->xfer_bytes + last_ccw->bufaddr;
-+
-+		bar = readl(mxs_dma->base +
-+				HW_APBHX_CHn_BAR(mxs_dma, chan->chan_id));
-+		residue -= bar;
-+	}
- 
--	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie, 0);
-+	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie,
-+			residue);
- 
- 	return mxs_chan->status;
- }
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
 -- 
-1.8.4.rc3
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/Kconfig
+index 55be62c92b60,04163fece49f..000000000000
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@@ -391,8 -385,10 +390,9 @@@ config ARCH_CLPS711
+  config ARCH_GEMINI
+  	bool "Cortina Systems Gemini"
+  	select ARCH_REQUIRE_GPIOLIB
+- 	select ARCH_USES_GETTIMEOFFSET
++ 	select CLKSRC_MMIO
+  	select CPU_FA526
++ 	select GENERIC_CLOCKEVENTS
+ -	select NEED_MACH_GPIO_H
+  	help
+  	  Support for the Cortina Systems Gemini family SoCs
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/3b98d760/attachment.sig>
