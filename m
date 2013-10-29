@@ -1,93 +1,51 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Oct 2013 00:54:18 +0100
-Subject: [PATCH 1/3] clk: shmobile: Add DIV6 clock support
-In-Reply-To: <158C7FC6-F6DF-4F10-B04B-05522D09FC05@codeaurora.org>
-References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383058511-26046-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <158C7FC6-F6DF-4F10-B04B-05522D09FC05@codeaurora.org>
-Message-ID: <3042335.v0dpKXFPjS@avalon>
+Date: Wed, 30 Oct 2013 00:55:06 +0100
+Subject: [PATCH v7 1/5] omap3isp: Modify clocks registration to avoid
+ circular references
+In-Reply-To: <20131029232837.GB2266@earth.universe>
+References: <1383076268-8984-1-git-send-email-s.nawrocki@samsung.com>
+ <16467881.81yEf9zq68@avalon> <20131029232837.GB2266@earth.universe>
+Message-ID: <15201376.PVPE5NrGdO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kumar,
+Hi Sebastian,
 
-Thank you for the review.
-
-On Tuesday 29 October 2013 18:33:00 Kumar Gala wrote:
-> On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
-> > DIV6 clocks are divider gate clocks controlled through a single
-> > register. The divider is expressed on 6 bits, hence the name, and can
-> > take values from 1/1 to 1/64.
+On Wednesday 30 October 2013 00:28:39 Sebastian Reichel wrote:
+> On Tue, Oct 29, 2013 at 11:28:37PM +0100, Laurent Pinchart wrote:
+> > On Tuesday 29 October 2013 20:51:04 Sylwester Nawrocki wrote:
+> > > The clock core code is going to be modified so clk_get() takes
+> > > reference on the clock provider module. Until the potential circular
+> > > reference issue is properly addressed, we pass NULL as as the first
+> > > argument to clk_register(), in order to disallow sub-devices taking
+> > > a reference on the ISP module back trough clk_get(). This should
+> > > prevent locking the modules in memory.
+> > > 
+> > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > > 
-> > Those clocks are found on Renesas ARM SoCs.
+> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > .../bindings/clock/renesas,cpg-div6-clocks.txt     |  27 +++
-> > drivers/clk/shmobile/Makefile                      |   4 +-
-> > drivers/clk/shmobile/clk-div6.c                    | 185 +++++++++++++++++
-> > 3 files changed, 215 insertions(+), 1 deletion(-)
-> > create mode 100644
-> > Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
-> > create mode 100644 drivers/clk/shmobile/clk-div6.c
-> > 
-> > diff --git
-> > a/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
-> > b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt new
-> > file mode 100644
-> > index 0000000..8036f3c
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
-> > @@ -0,0 +1,27 @@
-> > +* Renesas CPG DIV6 Clock
-> > +
-> > +The CPG DIV6 clocks are variable factor clocks provided by the Clock
-> > Pulse
-> > +Generator (CPG). They clock input is divided by a configurable factor
-> > from 1
-> > +to 64.
-> > +
-> > +Required Properties:
-> > +
-> > +  - compatible: Must be one of the following
-> > +    - "renesas,r8a7790-div6-clock" for R8A7790 (R-Car H2) DIV6 clocks
-> > +    - "renesas,cpg-div6-clock" for generic DIV6 clocks
-> > +  - reg: Base address and length of the memory resource used by the DIV6
-> > clock
-> > +  - clocks: Reference to the parent clock
-> > +  - #clock-cells: Must be 0
-> > +  - clock-output-name: The name of the clock as a free-form string
+> > Do you plan to push this to mainline as part of this patch series ? I
+> > don't have pending patches for the omap3isp that would conflict with this
+> > patch, so that would be fine with me.
 > 
-> Is this suppose to be 'clock-output-names' (missing a 's')?
+> I plan to add support for DT to omap3isp + ADP1653 shortly. I have
+> not yet started to work on this, but expect to send some first RFC
+> patches in November.
 
-Yes it is, my bad. I'll fix that.
-
-> > +
-> > +
-> > +Example
-> > +-------
-> > +
-> > +	sd2_clk: sd2_clk {
-> 
-> example should be sd2_clk at e6150078
-
-You're absolutely right.
-
-> > +		compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-
-clock";
-> > +		reg = <0 0xe6150078 0 4>;
-> 
-> curious, do you really have a second register at 0?
-
-No, but the r8a7790 has #address-cells and #size-cells set to 2.
-
-> > +		clocks = <&pll1_div2_clk>;
-> > +		#clock-cells = <0>;
-> > +		clock-output-names = "sd2";
-> > +	};
+That's very nice to hear ! And thanks for the heads up, I would have started 
+working on it shortly.
 
 -- 
 Regards,
 
 Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131030/789c7a56/attachment.sig>
