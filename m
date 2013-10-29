@@ -1,45 +1,105 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 29 Oct 2013 16:20:36 -0600
-Subject: [PATCH] PCI: imx6: increase link startup
-In-Reply-To: <1382505138-23286-1-git-send-email-tharvey@gateworks.com>
-References: <1382505138-23286-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20131029222036.GB15159@google.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Oct 2013 23:23:15 +0100
+Subject: [PATCH 08/19] mmc: sdhi: Enable the driver on all ARM platforms
+In-Reply-To: <52701EE8.4040302@cogentembedded.com>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <172884142.S8DiPq9kQF@avalon> <52701EE8.4040302@cogentembedded.com>
+Message-ID: <2104528.1psQi38nVt@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 10:12:18PM -0700, Tim Harvey wrote:
-> An increase link startup delay is required when certain PCI switches are
-> attached to the root complex.  This was tested with a Pericom switch
-> and a PLX switch.
-> 
-> From: Marek Vasut <marex@denx.de>
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Acked-by: Tim Harvey <tharvey@gateworks.com>
+Hi Sergei,
 
-I applied this with Shawn's ack to my pci/host-imx6 branch for v3.13,
-thanks!
-
-I assume the intent was that this patch was written by Marek, per the
-"From:" line you added above, so I fixed that in the patch so Marek
-appears as the author.  Let me know if this is incorrect.
-
-> ---
->  drivers/pci/host/pci-imx6.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Tuesday 29 October 2013 23:47:36 Sergei Shtylyov wrote:
+> On 10/29/2013 04:15 PM, Laurent Pinchart wrote:
+> >>>>> Renesas ARM platforms are transitioning from single-platform to
+> >>>>> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> >>>>> driver available on all ARM platforms to enable it on both
+> >>>>> ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI and increase build testing
+> >>>>> coverage.
+> >>>>> 
+> >>>>> Cc: Chris Ball <cjb@laptop.org>
+> >>>>> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> >>>>> Cc: Ian Molton <ian@mnementh.co.uk>
+> >>>>> Cc: linux-mmc at vger.kernel.org
+> >>>>> Signed-off-by: Laurent Pinchart
+> >>>>> <laurent.pinchart+renesas@ideasonboard.com>
+> >> 
+> >> [...]
+> >> 
+> >>>>> diff --git a/drivers/mmc/host/tmio_mmc_dma.c
+> >>>>> b/drivers/mmc/host/tmio_mmc_dma.c index 65edb4a..535bc35 100644
+> >>>>> --- a/drivers/mmc/host/tmio_mmc_dma.c
+> >>>>> +++ b/drivers/mmc/host/tmio_mmc_dma.c
+> >>>>> @@ -28,7 +28,7 @@ void tmio_mmc_enable_dma(struct tmio_mmc_host *host,
+> >>>>> bool enable)>
+> >>>>> 
+> >>>>>    	if (!host->chan_tx || !host->chan_rx)
+> >>>>>    	
+> >>>>>    		return;
+> >>>>> 
+> >>>>> -#if defined(CONFIG_SUPERH) || defined(CONFIG_ARCH_SHMOBILE)
+> >>>>> +#if defined(CONFIG_SUPERH) || defined(CONFIG_ARM)
+> >>>> 
+> >>>> I'm not sure about this one. In principle DMA so far is only used on
+> >>>> SDHI with TMIO. But this #if was for a theoretical case, when a TMIO
+> >>>> MMC IP inside an MFD is also used with DMA. Bus since I had no
+> >>>> indormation about whether the CTL_DMA_ENABLE register was SDHI specific
+> >>>> or not, I put it under an #if for the time being. In any case, I don't
+> >>>> think making it #ifdef CONFIG_ARM makes much sense. We can either
+> >>>> remove the #if completely, or keep it to limit the scope of this write
+> >>>> to sh-mobile arches.
+> >>> 
+> >>> SUPERH || ARCH_SHMOBILE covers all the platforms this driver currently
+> >>> builds on. Now that we're adding ARCH_SHMOBILE_MULTI the #if needs to
+> >>> cover that case as well. I'm fine with limiting the CTL_DMA_ENABLE write
+> >>> to SUPERH only (which would modify the driver's behaviour)
+> >> 
+> >> I'm afraid that would break the driver's ability to work in DMA mode on
+> >> SH-Mobile SoCs.
+> > 
+> > So can you confirm that writing the CTL_DMA_ENABLE register is required on
+> > all Renesas ARM SoCs (including SH-Mobile, R-Mobile and R-Car) ?
 > 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 90fce05..34c571a 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -318,7 +318,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
->  	while (!dw_pcie_link_up(pp)) {
->  		usleep_range(100, 1000);
->  		count++;
-> -		if (count >= 10) {
-> +		if (count >= 200) {
->  			dev_err(pp->dev, "phy link never came up\n");
->  			dev_dbg(pp->dev,
->  				"DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
-> -- 
-> 1.7.9.5
+> I can't actually say anything about all SH-Mobile and R-Mobile SoCs, only
+> about the R-Car SoCs: though the datasheets don't contain the SDHI register
+> info, from my experience the register exists on R8A777x (I had to fix up the
+> broken PIO fallback in the SDHI driver).
+
+OK.
+
+> >>> or enabling it unconditionally, but I don't think adding a
+> >>> defined(CONFIG_ARCH_SHMOBILE_MULTI) to the above #if makes sense, unless
+> >>> there's a plan to add support for DMA for non-SH (including both SUPERH
+> >>> and ARCH_SHMOBILE) platforms.
+> >> 
+> >> Not only the plan -- I have already posted the patches to do it for
+> >> R8A777x, and Simon has queued them for 3.13.
+> > 
+> > Could you please point me to those patches ?
 > 
+> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?h=nex
+> t&id=1eb6b5a0e55bfcfb0852b7d0f9442841ff807345
+> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?h=ne
+> xt&id=a43e5bd76a4a3df58167d85e8020a1c9e566ad75
+> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?h=ne
+> xt&id=5d6aa3435275a5308684f90c17424b055ef7f572
+> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?h=ne
+> xt&id=e6a8b11b82fdeaa78dad52552f945b772ee1a5c9
+
+But that's still an ARCH_SHMOBILE platform. Guennadi's point, if I understood 
+it correctly, was that whether the CTL_DMA_ENABLE register is part of the 
+standard TMIO controller, or is Renesas-specific, is unknown. As we have no 
+current or planned TMIO DMA users other than SUPERH and ARCH_SHMOBILE this is 
+impossible to test. That is why the code is conditionally compiled.
+
+We could either get rid of the #if completely and always write to the 
+register, or add ARCH_SHMOBILE_MULTI to the condition. I now agree that adding 
+ARM as a dependency makes no sense. Given that this will break on 
+multiplatform kernels anyway, I'm enclined to write to the CTL_DMA_ENABLE 
+register unconditionally. I'll update the patch accordingly.
+
+-- 
+Regards,
+
+Laurent Pinchart
