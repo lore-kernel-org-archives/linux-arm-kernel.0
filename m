@@ -1,9 +1,10 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 23:37:50 +0100
-Subject: [PATCH v2 15/19] sh: intc: Enable the driver on all ARM platforms
+Date: Tue, 29 Oct 2013 23:37:49 +0100
+Subject: [PATCH v2 14/19] pwm: pwm-renesas-tpu: Enable the driver on all ARM
+ platforms
 In-Reply-To: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383086274-11049-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383086274-11049-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,24 +14,25 @@ driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
 and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
 COMPILE_TEST.
 
-Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: linux-pwm at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/sh/intc/Kconfig | 2 +-
+ drivers/pwm/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/sh/intc/Kconfig b/drivers/sh/intc/Kconfig
-index a305731..51e106f 100644
---- a/drivers/sh/intc/Kconfig
-+++ b/drivers/sh/intc/Kconfig
-@@ -6,7 +6,7 @@ comment "Interrupt controller options"
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 75840b5..56a4f2f 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -130,7 +130,7 @@ config PWM_PXA
  
- config INTC_USERIMASK
- 	bool "Userspace interrupt masking support"
--	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A)
-+	depends on ARM || (SUPERH && CPU_SH4A) || COMPILE_TEST
+ config PWM_RENESAS_TPU
+ 	tristate "Renesas TPU PWM support"
+-	depends on ARCH_SHMOBILE
++	depends on ARM || COMPILE_TEST
  	help
- 	  This enables support for hardware-assisted userspace hardirq
- 	  masking.
+ 	  This driver exposes the Timer Pulse Unit (TPU) PWM controller found
+ 	  in Renesas chips through the PWM API.
 -- 
 1.8.1.5
