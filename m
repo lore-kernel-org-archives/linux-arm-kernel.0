@@ -1,52 +1,46 @@
 From: gerg@uclinux.org (gerg at uclinux.org)
-Date: Tue, 29 Oct 2013 15:15:53 +1000
-Subject: [PATCHv2 3/7] ARM: imx: add support code for IMX50 based machines
+Date: Tue, 29 Oct 2013 15:15:57 +1000
+Subject: [PATCHv2 7/7] ARM: dts: imx: add device tree support for Freescale
+ imx50evk board
 In-Reply-To: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
 References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
-Message-ID: <1383023757-30711-4-git-send-email-gerg@uclinux.org>
+Message-ID: <1383023757-30711-8-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Greg Ungerer <gerg@uclinux.org>
 
-Add machine support code for the Freescale IMX50 SoC.
-
-It is very similar to the Freescale IMX53, it contains many of the same
-periperhal hardware modules, at the same address offsets as the IMX53.
-(Notable exceptions are that the IMX50 contains no CAN bus hardware, less
-GPIO, no VPU, it does contain an Electrophoretic display controller though).
-
-So this support code just uses the IMX53 definitions as they are today.
-We can add the extra IMX50 definitions in the future when required.
+Add device tree support for the Freescale IMX50EVk board based around the
+IMX50 SoC. Supports UART, SPI flash, FEC ethernet and USB on this board.
 
 Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 ---
- arch/arm/mach-imx/Makefile     |  1 +
- arch/arm/mach-imx/mach-imx50.c | 46 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
- create mode 100644 arch/arm/mach-imx/mach-imx50.c
+ arch/arm/boot/dts/Makefile      |  1 +
+ arch/arm/boot/dts/imx50-evk.dts | 85 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx50-evk.dts
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index bbe1f5b..924e117 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -112,6 +112,7 @@ obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
- obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
- 
- obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
-+obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
- obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
- 
- obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
-diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 20be616..96c3e37 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -122,6 +122,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx27-phytec-phycard-s-som.dtb \
+ 	imx27-phytec-phycard-s-rdk.dtb \
+ 	imx31-bug.dtb \
++	imx50-evk.dtb \
+ 	imx51-apf51.dtb \
+ 	imx51-apf51dev.dtb \
+ 	imx51-babbage.dtb \
+diff --git a/arch/arm/boot/dts/imx50-evk.dts b/arch/arm/boot/dts/imx50-evk.dts
 new file mode 100644
-index 0000000..2e1fe94
+index 0000000..60d9baf
 --- /dev/null
-+++ b/arch/arm/mach-imx/mach-imx50.c
-@@ -0,0 +1,46 @@
++++ b/arch/arm/boot/dts/imx50-evk.dts
+@@ -0,0 +1,85 @@
 +/*
 + * Copyright 2013 Greg Ungerer <gerg@uclinux.org>
-+ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2011 Freescale Semiconductor, Inc.
 + * Copyright 2011 Linaro Ltd.
 + *
 + * The code contained herein is licensed under the GNU General Public
@@ -57,38 +51,77 @@ index 0000000..2e1fe94
 + * http://www.gnu.org/copyleft/gpl.html
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
++/dts-v1/;
++#include "imx50.dtsi"
 +
-+#include "common.h"
-+#include "mx53.h"
++/ {
++	model = "Freescale i.MX50 Evaluation Kit";
++	compatible = "fsl,imx50-evk", "fsl,imx50";
 +
-+static void __init imx50_dt_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char *imx50_dt_board_compat[] __initdata = {
-+	"fsl,imx50",
-+	NULL
++	memory {
++		reg = <0x70000000 0x80000000>;
++	};
 +};
 +
-+DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
-+	.map_io		= mx53_map_io,
-+	.init_early	= imx53_init_early,
-+	.init_irq	= mx53_init_irq,
-+	.handle_irq	= imx53_handle_irq,
-+	.init_machine	= imx50_dt_init,
-+	.init_late	= imx53_init_late,
-+	.dt_compat	= imx50_dt_board_compat,
-+	.restart	= mxc_restart,
-+MACHINE_END
++&cspi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_cspi_1>;
++	fsl,spi-num-chipselects = <2>;
++	cs-gpios = <&gpio4 11 0>, <&gpio4 13 0>;
++	status = "okay";
++
++	flash: m25p32 at 1 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "m25p32", "m25p80";
++		spi-max-frequency = <25000000>;
++		reg = <1>;
++
++		partition at 0 {
++			label = "bootloader";
++			reg = <0x0 0x100000>;
++			read-only;
++		};
++
++		partition at 100000 {
++			label = "kernel";
++			reg = <0x100000 0x300000>;
++		};
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec_1>;
++	phy-mode = "rmii";
++	phy-reset-gpios = <&gpio4 12 0>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	status = "okay";
++};
++
++&usbh1 {
++	pinctrl-names = "default";
++	status = "okay";
++};
++
++&usbh2 {
++	pinctrl-names = "default";
++	status = "okay";
++};
++
++&usbh3 {
++	pinctrl-names = "default";
++	status = "okay";
++};
++
++&usbotg {
++	pinctrl-names = "default";
++	status = "okay";
++};
 -- 
 1.8.1.4
