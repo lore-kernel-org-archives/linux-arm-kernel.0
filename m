@@ -1,77 +1,55 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 29 Oct 2013 16:40:06 +0100
-Subject: [PATCH v2 03/13] uprobes: allow arch access to xol slot
-In-Reply-To: <52671265.2020107@linaro.org>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-4-git-send-email-dave.long@linaro.org>
- <20131019163627.GA7837@redhat.com> <52671265.2020107@linaro.org>
-Message-ID: <20131029154006.GA22344@redhat.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 29 Oct 2013 11:40:24 -0400
+Subject: [PATCHv2 3/7] ARM: imx: add support code for IMX50 based machines
+In-Reply-To: <1383023757-30711-4-git-send-email-gerg@uclinux.org>
+References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
+ <1383023757-30711-4-git-send-email-gerg@uclinux.org>
+Message-ID: <20131029154024.GC26784@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22, David Long wrote:
->
-> On 10/19/13 12:36, Oleg Nesterov wrote:
->>
->> How about
->>
->> 	void __weak arch_uprobe_xol_copy(...)
->> 	{
->> 		copy_to_page(...);
->> 	}
->>
->> then just
->>
->> 	- copy_to_page(...);
->> 	+ arch_uprobe_xol_copy(...);
->>
->> ?
->>
->
-> I was trying to avoid duplicating the VM calls in the
-> architecture-specific implementations,
+On Tue, Oct 29, 2013 at 03:15:53PM +1000, gerg at uclinux.org wrote:
+> From: Greg Ungerer <gerg@uclinux.org>
+> 
+> Add machine support code for the Freescale IMX50 SoC.
+> 
+> It is very similar to the Freescale IMX53, it contains many of the same
+> periperhal hardware modules, at the same address offsets as the IMX53.
+> (Notable exceptions are that the IMX50 contains no CAN bus hardware, less
+> GPIO, no VPU, it does contain an Electrophoretic display controller though).
+> 
+> So this support code just uses the IMX53 definitions as they are today.
+> We can add the extra IMX50 definitions in the future when required.
+> 
+> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> ---
+>  arch/arm/mach-imx/Makefile     |  1 +
+>  arch/arm/mach-imx/mach-imx50.c | 46 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 47 insertions(+)
+>  create mode 100644 arch/arm/mach-imx/mach-imx50.c
+> 
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index bbe1f5b..924e117 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -112,6 +112,7 @@ obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
+>  obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
+>  
+>  obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
+> +obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
+>  obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+>  
+>  obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
+> diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
+...
+> +static const char *imx50_dt_board_compat[] __initdata = {
+> +	"fsl,imx50",
+> +	NULL
+> +};
 
-Yes, I understand... But this uglifies the generic code.
+Wasn't this going to be consolidated with mach-imx53.c by adding this
+compat string to it?
 
-> but maybe that is the cleaner way
-> to do it after all.  I've made changes as suggested above.
+thx,
 
-Thanks. and this uglifies arm code I guess ;)
-
-
-David. Perhaps we can avoid the new hook altogether? What if we do
-the simple change below (it ignores powerpc) ?
-
-Then arm can add "unsigned long ixol[2]" into its arch_uprobe, and
-arch_uprobe_analyze_insn() can initialize this member correctly.
-
-What do you think?
-
-Oleg.
-
---- x/arch/x86/include/asm/uprobes.h
-+++ x/arch/x86/include/asm/uprobes.h
-@@ -35,7 +35,10 @@ typedef u8 uprobe_opcode_t;
- 
- struct arch_uprobe {
- 	u16				fixups;
--	u8				insn[MAX_UINSN_BYTES];
-+	union {
-+		u8			insn[MAX_UINSN_BYTES];
-+		u8			ixol[MAX_UINSN_BYTES];
-+	}
- #ifdef CONFIG_X86_64
- 	unsigned long			rip_rela_target_address;
- #endif
---- x/kernel/events/uprobes.c
-+++ x/kernel/events/uprobes.c
-@@ -1264,7 +1264,8 @@ static unsigned long xol_get_insn_slot(s
- 		return 0;
- 
- 	/* Initialize the slot */
--	copy_to_page(area->page, xol_vaddr, uprobe->arch.insn, MAX_UINSN_BYTES);
-+	copy_to_page(area->page, xol_vaddr,
-+			uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
- 	/*
- 	 * We probably need flush_icache_user_range() but it needs vma.
- 	 * This should work on supported architectures too.
+Jason.
