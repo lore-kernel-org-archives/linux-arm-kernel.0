@@ -1,84 +1,90 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Tue, 29 Oct 2013 09:06:20 +0530
-Subject: [PATCH v2 0/7] drm/exynos: move hdmiphy related code to hdmiphy
- driver
-In-Reply-To: <CAAQKjZOnZi_=V6ZL_SmamiG_Gbo7TxsRUv5VtSvJGpqkyvH_ug@mail.gmail.com>
-References: <1382436668-15813-1-git-send-email-rahul.sharma@samsung.com>
- <CAAQKjZOnZi_=V6ZL_SmamiG_Gbo7TxsRUv5VtSvJGpqkyvH_ug@mail.gmail.com>
-Message-ID: <CAPdUM4MhTvdz8nH20j6DxqwN_yYac3pvfwgDn21gjrxR+sCZHg@mail.gmail.com>
+From: B47053@freescale.com (Xiubo Li-B47053)
+Date: Tue, 29 Oct 2013 03:48:47 +0000
+Subject: [RFC][PATCHv5 4/4] Documentation: Add device tree bindings for
+ Freescale FTM PWM.
+In-Reply-To: <224C2E26-6C33-4DBB-BC06-A4BA470FDA39@codeaurora.org>
+References: <1382951151-31517-1-git-send-email-Li.Xiubo@freescale.com>
+ <224C2E26-6C33-4DBB-BC06-A4BA470FDA39@codeaurora.org>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F8286BD27@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 October 2013 19:10, Inki Dae <inki.dae@samsung.com> wrote:
-> Hi Rahul,
->
-> I have merged the re-factoring patch set from Sean Paul to
-> exynos-drm-next except eDP related patch set that these need more
-> reviews. Can you re-base at top of exynos-drm-next?
->
+> > This adds the Document for Freescale FTM PWM driver under
+> > Documentation/devicetree/bindings/pwm/.
+> >
+> > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> > ---
+> > .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 34
+> ++++++++++++++++++++++
+> > 1 file changed, 34 insertions(+)
+> > create mode 100644
+> > Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> > b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> > new file mode 100644
+> > index 0000000..175b762
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+> > @@ -0,0 +1,34 @@
+> > +Freescale FTM PWM controller
+> 
+> What does FTM stand for, and can we spell out PWM at least once early on.
+> 
 
-Ok. I will rebase and post it again.
+"FTM" is for short of "FlexTimer Module", I'll use the full name then.
 
-regards,
-Rahul Sharma.
+> > +
+> > +Required properties:
+> > +- compatible: Should be "fsl,vf610-ftm-pwm"
+> > +- reg: Physical base address and length of the controller's registers
+> > +- #pwm-cells: Should be 3. See pwm.txt in this directory for a
+> > +description of
+> > +  the cells format.
+> > +- clock-names : Includes the following module clock source entries:
+> > +    "ftm0" (system clock),
+> > +    "ftm0_fix_sel" (fixed frequency clock),
+> > +    "ftm0_ext_sel" (external clock)
+> > +- clocks : Must contain a clock specifier for each entry in
+> > +clock-names,
+> > +  See ../clock/clock-bindings.txt for details of the property values.
+> > +- fsl,pwm-counter-clk: The FTM PWM counter clock source, should be
+> > +one of the
+> > +  entries in clock-names.
+> 
+> Why do we need this, why not just have only the clock-names/clocks
+> reference the clk that is actually used?
+> 
 
-> Thanks,
-> Inki Dae
->
-> 2013/10/22 Rahul Sharma <rahul.sharma@samsung.com>:
->> Currently, exynos hdmiphy operations and configs are kept
->> inside the hdmi driver. Hdmiphy related code is very tightly
->> coupled with hdmi IP driver. With these patches, hdmiphy
->> related stuff is moved to hdmiphy i2c driver for exynos4 and
->> exynos5250 socs. hdmi driver, being the phy controller, calls
->> exynos hdmiphy interfaces.
->>
->> This series also removes hdmiphy dummy clock for hdmiphy
->> and replace it with Phy PMU Control from the hdmiphy driver.
->>
->> At the end, support for exynos5420 hdmiphy is added to the
->> hdmiphy platform driver.
->>
->> Drm related paches are based on exynos-drm-next branch at
->> git://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git
->>
->> Arch related paches are based on for-next branch at
->> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git
->>
->> Rahul Sharma (7):
->>   drm/exynos: move hdmiphy code to hdmiphy i2c driver
->>   drm/exynos: remove dummy hdmiphy clock
->>   drm/exynos: add hdmiphy platform driver for exynos5420
->>   drm/exynos: add hdmiphy pmu bit control in hdmiphy drivers
->>   exynos/drm: fix ddc i2c device probe failure
->>   ARM: dts: update hdmiphy dt node for exynos5250
->>   ARM: dts: update hdmiphy dt node for exynos5420
->>
->>  .../devicetree/bindings/video/exynos_hdmi.txt      |    2 +
->>  .../devicetree/bindings/video/exynos_hdmiphy.txt   |    8 +-
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    9 +-
->>  arch/arm/boot/dts/exynos5420.dtsi                  |   14 +-
->>  drivers/gpu/drm/exynos/Makefile                    |    3 +-
->>  drivers/gpu/drm/exynos/exynos_ddc.c                |    5 +
->>  drivers/gpu/drm/exynos/exynos_hdmi.c               |  407 +++++-----------
->>  drivers/gpu/drm/exynos/exynos_hdmiphy.c            |   65 ---
->>  drivers/gpu/drm/exynos/exynos_hdmiphy.h            |   46 ++
->>  drivers/gpu/drm/exynos/exynos_hdmiphy_i2c.c        |  484 ++++++++++++++++++++
->>  drivers/gpu/drm/exynos/exynos_hdmiphy_platform.c   |  418 +++++++++++++++++
->>  drivers/gpu/drm/exynos/exynos_hdmiphy_priv.h       |   36 ++
->>  drivers/gpu/drm/exynos/regs-hdmiphy.h              |   37 ++
->>  13 files changed, 1174 insertions(+), 360 deletions(-)
->>  delete mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy.c
->>  create mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy.h
->>  create mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy_i2c.c
->>  create mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy_platform.c
->>  create mode 100644 drivers/gpu/drm/exynos/exynos_hdmiphy_priv.h
->>  create mode 100644 drivers/gpu/drm/exynos/regs-hdmiphy.h
->>
->> --
->> 1.7.10.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+As I have replied before, the FTM has two clock sources: the module clock and the counter clock.
+
+The counter clock source is selectable depends on different board and also the hardware design:
++++++
+* FTM source clock is selectable
+* Source clock can be the system clock, the fixed frequency clock, or an external
+clock
+* Fixed frequency clock is an additional clock input to allow the selection of an on
+chip clock source other than the system clock
+* Selecting external clock connects FTM clock to a chip level input pin therefore
+allowing to synchronize the FTM counter with an off chip clock source
+-----
+>From the above description we can see that the external clock source can allow to synchronize the
+FTM counter with an off chip clock source.
+
+As the chip spec permits the counter clock source be selectable, so the different board maybe has different
+implementation, if the driver do not support, this will be a bug.
+
+
+> > +- pinctrl-names: must contain a "default" entry.
+> > +- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
+> > +  See ../pinctrl/pinctrl-bindings.txt for details of the property
+> values.
+> 
+> let's drop the .. when making directory references.
+> 
+
+Is absolute path " Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt " or just "pinctrl/pinctrl-bindings.txt " ?
+
+
+--
+Xiubo 
