@@ -1,43 +1,176 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Oct 2013 10:58:34 -0700
-Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
-In-Reply-To: <1422562.0L87CDt5Gd@avalon>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1577821.Q7gttkPE2J@avalon> <20131029172331.GA20251@sirena.org.uk>
- <1422562.0L87CDt5Gd@avalon>
-Message-ID: <20131029175834.GD20251@sirena.org.uk>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Tue, 29 Oct 2013 20:00:23 +0200
+Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
+In-Reply-To: <20131029162615.GH20207@joshc.qualcomm.com>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
+ <1383058923.2837.33.camel@iivanov-dev.int.mm-sol.com>
+ <20131029162615.GH20207@joshc.qualcomm.com>
+Message-ID: <1383069623.14905.7.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 06:29:59PM +0100, Laurent Pinchart wrote:
-> On Tuesday 29 October 2013 10:23:31 Mark Brown wrote:
-> > On Tue, Oct 29, 2013 at 06:05:53PM +0100, Laurent Pinchart wrote:
-> > > The first one is that I can't compile-test all those drivers on all
-> > > architectures. The spi-sh-msiof driver, for instance, uses
-> > > io(read|write)(16|
 
-> > Which architectures are these and is there not a symbol we can depend on
-> > for them?
+Hi,
 
-> arch/cris for instance. We can use readl/writel instead (maybe it would be 
-> time to rationalize and document the I/O accessors across all architectures, 
-> but that's another topic).
+On Tue, 2013-10-29 at 11:26 -0500, Josh Cartwright wrote:
+> On Tue, Oct 29, 2013 at 05:02:03PM +0200, Ivan T. Ivanov wrote:
+> > On Mon, 2013-10-28 at 13:12 -0500, Josh Cartwright wrote: 
+> > > From: Kenneth Heitke <kheitke@codeaurora.org>
+> > > 
+> > > System Power Management Interface (SPMI) is a specification
+> > > developed by the MIPI (Mobile Industry Process Interface) Alliance
+> > > optimized for the real time control of Power Management ICs (PMIC).
+> > > 
+> > > SPMI is a two-wire serial interface that supports up to 4 master
+> > > devices and up to 16 logical slaves.
+> > > 
+> > > The framework supports message APIs, multiple busses (1 controller
+> > > per bus) and multiple clients/slave devices per controller.
+> > > 
+> > > Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
+> > > Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
+> > > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> [..]
+> > > +static int spmi_drv_probe(struct device *dev)
+> > > +{
+> > > +	const struct spmi_driver *sdrv = to_spmi_driver(dev->driver);
+> > > +	int err = 0;
+> > > +
+> > > +	if (sdrv->probe)
+> > > +		err = sdrv->probe(to_spmi_device(dev));
+> > > +
+> > > +	return err;
+> > > +}
+> > > +
+> > > +static int spmi_drv_remove(struct device *dev)
+> > > +{
+> > > +	const struct spmi_driver *sdrv = to_spmi_driver(dev->driver);
+> > > +	int err = 0;
+> > > +
+> > > +	if (sdrv->remove)
+> > > +		err = sdrv->remove(to_spmi_device(dev));
+> > > +
+> > > +	return err;
+> > > +}
+> > > +
+> > > +static void spmi_drv_shutdown(struct device *dev)
+> > > +{
+> > > +	const struct spmi_driver *sdrv = to_spmi_driver(dev->driver);
+> > > +
+> > > +	if (sdrv->shutdown)
+> > 
+> > If driver for device is not loaded this will cause kernel NULL
+> > pointer dereference.
+> 
+> Indeed.  I'll fix this.
+> 
+> > > +static int of_spmi_register_devices(struct spmi_controller *ctrl)
+> > > +{
+> > > +	struct device_node *node;
+> > > +	int err;
+> > > +
+> > > +	dev_dbg(&ctrl->dev, "of_spmi_register_devices\n");
+> > > +
+> > > +	if (!ctrl->dev.of_node)
+> > > +		return -ENODEV;
+> > > +
+> > > +	dev_dbg(&ctrl->dev, "looping through children\n");
+> > > +
+> > > +	for_each_available_child_of_node(ctrl->dev.of_node, node) {
+> > > +		struct spmi_device *sdev;
+> > > +		u32 reg[2];
+> > > +
+> > > +		dev_dbg(&ctrl->dev, "adding child %s\n", node->full_name);
+> > > +
+> > > +		err = of_property_read_u32_array(node, "reg", reg, 2);
+> > > +		if (err) {
+> > > +			dev_err(&ctrl->dev,
+> > > +				"node %s does not have 'reg' property\n",
+> > > +				node->full_name);
+> > > +			continue;
+> > 
+> > Shouldn't this be a fatal error?
+> 
+> Fatal in what way?  It is fatal in the sense that this particular child
+> node is skipped, but other children can still be enumerated. 
 
-It'd certainly be sensible, or adding a config option to depend on if
-you rely on these functions.
+Oh, I have missed this.
 
-> My point is that there might be other issues that I won't be able to easily 
-> catch. This would break compilation for everybody for no reason, as the 
-> drivers are useless on non-SuperH, non-ARM platforms. That's why I believe 
-> COMPILE_TEST would be a better option as a first step.
+>  Are you
+> suggesting that we bail completely when we hit a wrongly-described
+> child?
 
-Yes, it would - please do that.  Note that it won't stop anyone running
-into build issues on other architectures though, it's just about
-stopping Kconfig noise.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131029/f7cb98ae/attachment.sig>
+Please ignore my comment.
+
+> 
+> > > +		}
+> > > +
+> > > +		if (reg[1] != SPMI_USID) {
+> > > +			dev_err(&ctrl->dev,
+> > > +				"node %s contains unsupported 'reg' entry\n",
+> > > +				node->full_name);
+> > > +			continue;
+> > > +		}
+> > > +
+> > > +		if (reg[0] > 0xF) {
+> > > +			dev_err(&ctrl->dev,
+> > > +				"invalid usid on node %s\n",
+> > > +				node->full_name);
+> > > +			continue;
+> > > +		}
+> > > +
+> > > +		dev_dbg(&ctrl->dev, "read usid %02x\n", reg[0]);
+> > > +
+> > > +		sdev = spmi_device_alloc(ctrl);
+> > > +		if (!sdev)
+> > > +			continue;
+> > > +
+> > > +		sdev->dev.of_node = node;
+> > > +		sdev->usid = (u8) reg[0];
+> > > +
+> > > +		err = spmi_device_add(sdev);
+> > > +		if (err) {
+> > > +			dev_err(&sdev->dev,
+> > > +				"failure adding device. status %d\n", err);
+> > > +			spmi_device_put(sdev);
+> > > +			continue;
+
+There is no need from this 'continue' here.
+
+> > > +		}
+> > > +	}
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +int spmi_controller_add(struct spmi_controller *ctrl)
+> > > +{
+> > > +	int ret;
+> > > +
+> > > +	/* Can't register until after driver model init */
+> > > +	if (WARN_ON(!spmi_bus_type.p))
+> > > +		return -EAGAIN;
+> > > +
+> > > +	ret = device_add(&ctrl->dev);
+> > > +	if (ret)
+> > > +		return ret;
+> > > +
+> > > +	if (IS_ENABLED(CONFIG_OF))
+> > > +		of_spmi_register_devices(ctrl);
+> > 
+> > Check for error code here?
+> 
+> And do what with it? 
+
+This was related to my previous comment, which is not valid.
+
+>  Maybe instead, I should make
+> of_spmi_register_devices() return void.
+
+Sound reasonable to me and will be the same as i2c bus.
+
+Regards,
+Ivan
+
+> 
