@@ -1,10 +1,9 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Oct 2013 23:37:40 +0100
-Subject: [PATCH v2 05/19] iommu: shmobile: Enable the driver on all ARM
- platforms
+Date: Tue, 29 Oct 2013 23:37:41 +0100
+Subject: [PATCH v2 06/19] i2c: rcar: Enable the driver on all ARM platforms
 In-Reply-To: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383086274-11049-6-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383086274-11049-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,25 +13,29 @@ driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
 and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
 COMPILE_TEST.
 
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: iommu at lists.linux-foundation.org
+Remove the explicit I2C dependency as the configuration option is
+already unavailable when I2C support is disabled.
+
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: linux-i2c at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- drivers/iommu/Kconfig | 2 +-
+ drivers/i2c/busses/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index c880eba..9fd51e5 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -206,7 +206,7 @@ config SHMOBILE_IPMMU_TLB
- config SHMOBILE_IOMMU
- 	bool "IOMMU for Renesas IPMMU/IPMMUI"
- 	default n
--	depends on (ARM && ARCH_SHMOBILE)
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index c50f092..7c4bb071 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -768,7 +768,7 @@ config I2C_XLR
+ 
+ config I2C_RCAR
+ 	tristate "Renesas R-Car I2C Controller"
+-	depends on ARCH_SHMOBILE && I2C
 +	depends on ARM || COMPILE_TEST
- 	select IOMMU_API
- 	select ARM_DMA_USE_IOMMU
- 	select SHMOBILE_IPMMU
+ 	help
+ 	  If you say yes to this option, support will be included for the
+ 	  R-Car I2C controller.
 -- 
 1.8.1.5
