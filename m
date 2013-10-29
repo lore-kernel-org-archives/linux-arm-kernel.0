@@ -1,110 +1,72 @@
-From: valentin@compulab.co.il (Valentin Raevsky)
-Date: Tue, 29 Oct 2013 14:11:43 +0200
-Subject: [PATCH] ARM: dts: Add initial support for cm-fx6.
-Message-ID: <1383048703-2101-1-git-send-email-valentin@compulab.co.il>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 29 Oct 2013 16:12:49 +0400
+Subject: [PATCH 08/19] mmc: sdhi: Enable the driver on all ARM platforms
+In-Reply-To: <4906973.ikaOXXr4gP@avalon>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383004027-25036-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <Pine.LNX.4.64.1310290919120.8404@axis700.grange> <4906973.ikaOXXr4gP@avalon>
+Message-ID: <526FA641.9090300@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial support for cm-fx6 module.
+Hello.
 
-cm-fx6 is a module based on mx6q SoC with the following features:
-- Up to 4GB of DDR3
-- 1 LCD/DVI output port
-- 1 HDMI output port
-- 2 LVDS LCD ports
-- Gigabit Ethernet
-- Analog Audio
-- CAN
-- SATA
-- NAND
-- PCIE
+On 29-10-2013 13:52, Laurent Pinchart wrote:
 
-This patch allows to boot up the module, configures the serial console,
-the Ethernet adapter and the heartbeat led.
+>>> Renesas ARM platforms are transitioning from single-platform to
+>>> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+>>> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+>>> and ARCH_SHMOBILE_MULTI and increase build testing coverage.
 
-cm-fx6 is embedded inside the Utilite computer.
+>>> Cc: Chris Ball <cjb@laptop.org>
+>>> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>>> Cc: Ian Molton <ian@mnementh.co.uk>
+>>> Cc: linux-mmc at vger.kernel.org
+>>> Signed-off-by: Laurent Pinchart
+>>> <laurent.pinchart+renesas@ideasonboard.com>
+[...]
 
-Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
+>>> diff --git a/drivers/mmc/host/tmio_mmc_dma.c
+>>> b/drivers/mmc/host/tmio_mmc_dma.c index 65edb4a..535bc35 100644
+>>> --- a/drivers/mmc/host/tmio_mmc_dma.c
+>>> +++ b/drivers/mmc/host/tmio_mmc_dma.c
+>>> @@ -28,7 +28,7 @@ void tmio_mmc_enable_dma(struct tmio_mmc_host *host,
+>>> bool enable)>
+>>>   	if (!host->chan_tx || !host->chan_rx)
+>>>   	
+>>>   		return;
+>>>
+>>> -#if defined(CONFIG_SUPERH) || defined(CONFIG_ARCH_SHMOBILE)
+>>> +#if defined(CONFIG_SUPERH) || defined(CONFIG_ARM)
 
-Shawn, can this still be applied for 3.13 ?
+>> I'm not sure about this one. In principle DMA so far is only used on SDHI
+>> with TMIO. But this #if was for a theoretical case, when a TMIO MMC IP
+>> inside an MFD is also used with DMA. Bus since I had no indormation about
+>> whether the CTL_DMA_ENABLE register was SDHI specific or not, I put it
+>> under an #if for the time being. In any case, I don't think making it
+>> #ifdef CONFIG_ARM makes much sense. We can either remove the #if
+>> completely, or keep it to limit the scope of this write to sh-mobile
+>> arches.
 
- arch/arm/boot/dts/Makefile         |    1 +
- arch/arm/boot/dts/imx6q-cm-fx6.dts |   53 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-cm-fx6.dts
+> SUPERH || ARCH_SHMOBILE covers all the platforms this driver currently builds
+> on. Now that we're adding ARCH_SHMOBILE_MULTI the #if needs to cover that case
+> as well. I'm fine with limiting the CTL_DMA_ENABLE write to SUPERH only (which
+> would modify the driver's behaviour)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 641b3c9..87ca7ca 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -131,6 +131,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6q-sabrelite.dtb \
- 	imx6q-sabresd.dtb \
- 	imx6q-sbc6x.dtb \
-+	imx6q-cm-fx6.dtb \
- 	imx6sl-evk.dtb \
- 	vf610-twr.dtb
- dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-new file mode 100644
-index 0000000..2419751
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright 2013 CompuLab Ltd.
-+ *
-+ * Author: Valentin Raevsky <valentin@compulab.co.il>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+
-+/ {
-+	model = "CompuLab CM-FX6";
-+	compatible = "compulab,cm-fx6", "fsl,imx6q";
-+
-+	memory {
-+		reg = <0x10000000 0x80000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		heartbeat-led {
-+			label = "Heartbeat";
-+			gpios = <&gpio2 31 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet_1>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand_1>;
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4_1>;
-+	status = "okay";
-+};
--- 
-1.7.9.5
+    I'm afraid that would break the driver's ability to work in DMA mode on 
+SH-Mobile SoCs.
+
+> or enabling it unconditionally, but I
+> don't think adding a defined(CONFIG_ARCH_SHMOBILE_MULTI) to the above #if
+> makes sense, unless there's a plan to add support for DMA for non-SH
+> (including both SUPERH and ARCH_SHMOBILE) platforms.
+
+    Not only the plan -- I have already posted the patches to do it for 
+R8A777x, and Simon has queued them for 3.13.
+
+>>>   	/* Switch DMA mode on or off - SuperH specific? */
+>>>   	sd_ctrl_write16(host, CTL_DMA_ENABLE, enable ? 2 : 0);
+>>>
+>>>   #endif
+
+WBR, Sergei
