@@ -1,58 +1,23 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 29 Oct 2013 15:17:01 +0400
-Subject: [PATCH 03/12] clocksource: sh_tmu: Add clk_prepare/unprepare
- support
-In-Reply-To: <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <526F992D.2000309@cogentembedded.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 29 Oct 2013 17:03:14 +0530
+Subject: [PATCH 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
+In-Reply-To: <20131028113104.GE27015@lunn.ch>
+References: <1382533461-31021-1-git-send-email-andrew@lunn.ch>
+ <CAKohpombg7mAmgxxvUg8kz1MaFwcycR1eL0UrgELY2WdGfrAag@mail.gmail.com>
+ <20131023135116.GC31126@lunn.ch>
+ <CAKohpokTgCz0c=PeaJHKiZEiYc0jPVq-vwkhP5pM0hh1-0QnLA@mail.gmail.com>
+ <20131023143657.GA31536@lunn.ch>
+ <CAKohpomedpd8XBPcdZX2vHy6b5=FMtbSVpNTG-eVLK1YPyPaMA@mail.gmail.com>
+ <20131028113104.GE27015@lunn.ch>
+Message-ID: <CAKohponoxbV9P+0pWfEEi3sND7GbgHECsT=FRMCfeLcvOP9iDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29-10-2013 2:49, Laurent Pinchart wrote:
+On 28 October 2013 17:01, Andrew Lunn <andrew@lunn.ch> wrote:
+> I have tested this now. The dummy handler is required. Without it, it
+> seems like the WFI exits at the next timer tick, not immediately once
+> the cpufreq change has finished. I get poor numbers out of
+> cpufreq-bench without the handler.
 
-> Prepare the clock at probe time, as there is no other appropriate place
-> in the driver where we're allowed to sleep.
-
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->   drivers/clocksource/sh_tmu.c | 20 +++++++++++++++++---
->   1 file changed, 17 insertions(+), 3 deletions(-)
-
-> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-> index 78b8dae..63557cd 100644
-> --- a/drivers/clocksource/sh_tmu.c
-> +++ b/drivers/clocksource/sh_tmu.c
-> @@ -472,12 +472,26 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
->   		ret = PTR_ERR(p->clk);
->   		goto err1;
->   	}
-> +
-> +	ret = clk_prepare(p->clk);
-> +	if (ret < 0)
-> +		goto err2;
-> +
->   	p->cs_enabled = false;
->   	p->enable_count = 0;
->
-> -	return sh_tmu_register(p, (char *)dev_name(&p->pdev->dev),
-> -			       cfg->clockevent_rating,
-> -			       cfg->clocksource_rating);
-> +	ret = sh_tmu_register(p, (char *)dev_name(&p->pdev->dev),
-> +			      cfg->clockevent_rating,
-> +			      cfg->clocksource_rating);
-> +	if (ret < 0)
-> +		goto err3;
-> +
-> +	return 0;
-> +
-> + err3:
-> +	clk_unprepare(p->clk);
-> + err2:
-> +	clk_put(p->clk);
-
-    This one seems to be a fix, and should be done separately.
-
-WBR, Sergei
+Ahh.. that helps.. You can now put exactly this stuff in the comment over
+the handler..
