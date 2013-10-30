@@ -1,60 +1,88 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 29 Oct 2013 21:05:09 -0700
-Subject: [PULL REQ] Big Endian initial patch series
-In-Reply-To: <526E89E6.8010202@codethink.co.uk>
-References: <20131018205405.GA28835@codethink.co.uk>
- <20131019170954.GC25076@mudshark.cambridge.arm.com>
- <5262E2C7.7000106@codethink.co.uk>
- <20131028004736.GG16735@n2100.arm.linux.org.uk>
- <20131028084455.GA20218@mudshark.cambridge.arm.com>
- <20131028085328.GI16735@n2100.arm.linux.org.uk>
- <526E89E6.8010202@codethink.co.uk>
-Message-ID: <CAA3XUr0yr0Vh_rpM7bKJGBkOpWhOarUs=pRAx40mwqRp2V=mfg@mail.gmail.com>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Wed, 30 Oct 2013 12:48:48 +0800
+Subject: [PATCH 1/3] dma: imx-sdma: Add ssi dual fifo script support
+In-Reply-To: <20131029135142.GT30088@pengutronix.de>
+References: <cover.1383047327.git.b42378@freescale.com>
+ <9ed025d4e98f716ba80b27acaaa98f43ad3bd75a.1383047327.git.b42378@freescale.com>
+ <20131029135142.GT30088@pengutronix.de>
+Message-ID: <20131030044848.GE9605@MrMyself>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 October 2013 08:59, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 28/10/13 08:53, Russell King - ARM Linux wrote:
->
->>> +#ifdef __ARMEB_
->>> +#define LOW_OFFSET     0x4
->>> +#define HIGH_OFFSET    0x0
->>> +#else
->>> +#define LOW_OFFSET     0x0
->>> +#define HIGH_OFFSET    0x4
->>> +#endif
->>>
->>> (spot the missing underscore).
->>
->>
->> Yep, well spotted.
->>
->> Well, we have some time to get this all fixed, so I'm going to drop
->> Ben's tree.  I think we need to first commit a patch to fix the error
->> in Santosh's patch
->
->
-> Ok, shall I look at re-basing to -rc6?
+Hi Sascha,
 
-I just fetched rmk/for-next as of 10/29/2013 8pm PST. I see that big
-endian patch series is in. I believe conflict resolution 580dac83 in head.S
-is correct. I've added typo and .align fix as in [1] to head.S and
-tested BE image on TC2 in both ARM and THUMB2 modes - both boot
-and look fine to me.
+On Tue, Oct 29, 2013 at 02:51:43PM +0100, Sascha Hauer wrote:
+> Look at drivers/dma/imx-sdma.c:
+> 
+> > /**
+> >  * struct sdma_firmware_header - Layout of the firmware image
+> >  *
+> >  * @magic		"SDMA"
+> >  * @version_major	increased whenever layout of struct
+> >  * sdma_script_start_addrs
+> >  *			changes.
+> 
+> Can you image why this firmware has a version field? Right, it's because
+> it encodes the layout of struct sdma_script_start_addrs.
+> 
+> As the comment clearly states you have to *increase this field* when you
+> add scripts.
+> 
+> Obviously you missed that, as the firmware on lkml posted recently
+> shows:
+> 
+> > 00000000: 414d4453 00000001 00000001 0000001c SDMA............
+>                      ^^^^^^^^
+>                      Still '1'
+> 
+> > 00000010: 00000026 000000b4 0000067a 00000282 &.......z.......
+> > 00000020: ffffffff 00000000 ffffffff ffffffff ................
+> > 00000030: ffffffff ffffffff ffffffff ffffffff ................
+> > 00000040: ffffffff ffffffff 00001a6a ffffffff ........j.......
+> > 00000050: 000002eb 000018bb ffffffff 00000408 ................
+> > 00000060: ffffffff 000003c0 ffffffff ffffffff ................
+> > 00000070: ffffffff 000002ab ffffffff 0000037b ............{...
+> > 00000080: ffffffff ffffffff 0000044c 0000046e ........L...n...
+> > 00000090: ffffffff 00001800 ffffffff ffffffff ................
+> > 000000a0: 00000000 00001800 00001862 00001a16 ........b.......
+>                               ^^^^^^^^^^^^^^^^^
+>                               new script addresses introduced
+> 
+> 
+> > -#define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	34
+> > +#define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	37
+> 
+> And no, this is not a bug. It's your firmware header that is buggy.
+> 
 
-> I have a bug report with a change to the SCU reading for the SMP
-> fix-up case which could do with fixing, so I could add this and send
-> another pull request (complete with description this time).
->
+I wasn't aware that the problem is far more complicated than I thought.
+And thank you for telling me all this.
 
-IMHO it would be great if we fix SCU BE A9 SMP issue separately
-later, and keep BE changes that are already in rmk/for-next.
+> What you need is:
+> 
+> #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V2      37
+> 
+> You (you as a company, not you as a person) knew that it was me who
+> created this firmware format. So it was absolutely unnecessary to create
+> an incompatible firmware instead of dropping me a short note.
+> 
+> Please add a version check to the driver as necessary and provide a proper
+> firmware.
+> 
 
-Thanks,
-Victor
+Just currently it's not easy for me to create a new proper firmware,
+and I's been told that besides this version number, it also lacks a
+decent license info. So may I just refine this patch as you suggested
+to add a version check and add those new scripts first?
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/thread.html#207597
+Thank you,
+Nicolin Chen
 
-> --
-> Ben Dooks                               http://www.codethink.co.uk/
-> Senior Engineer                         Codethink - Providing Genius
+> Sascha
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
