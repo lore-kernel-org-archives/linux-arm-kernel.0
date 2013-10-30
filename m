@@ -1,51 +1,40 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 30 Oct 2013 23:12:47 +0100
-Subject: [PATCH 1/2] ARM: EXYNOS: Use dev_err() instead of printk() for
- cpuidle driver
-In-Reply-To: <003601cece00$2affeba0$80ffc2e0$%han@samsung.com>
-References: <003601cece00$2affeba0$80ffc2e0$%han@samsung.com>
-Message-ID: <6595279.ZNOtcCAkvT@vostro.rjw.lan>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 30 Oct 2013 17:02:35 -0500
+Subject: [PATCH v2 4/6] edac: Document Krait L1/L2 EDAC driver binding
+In-Reply-To: <52718118.1020009@codeaurora.org>
+References: <1383164736-1849-1-git-send-email-sboyd@codeaurora.org>
+ <1383164736-1849-5-git-send-email-sboyd@codeaurora.org>
+ <872F86E8-85CE-472B-9546-CDCC96F6F08B@codeaurora.org>
+ <52717EA5.6030208@codeaurora.org>
+ <F38814D8-723E-4A41-839D-DEE351738017@codeaurora.org>
+ <52718118.1020009@codeaurora.org>
+Message-ID: <D081E03B-01D6-497F-B8D0-E994219C8282@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 21, 2013 10:52:15 AM Jingoo Han wrote:
-> Change raw printk() call to dev_err() to provide a better message
-> to userspace so it can properly identify the device.
-> 
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 
-Both [1-2/2] queued up for 3.13, thanks!
+On Oct 30, 2013, at 4:58 PM, Stephen Boyd wrote:
 
-> ---
-> - Based against pm-cpuidle branch
-> - Tested on Exynos5440
+> On 10/30/13 14:56, Kumar Gala wrote:
+>> On Oct 30, 2013, at 4:48 PM, Stephen Boyd wrote:
+>> 
+>>> On 10/30/13 14:45, Kumar Gala wrote:
+>>>> On Oct 30, 2013, at 3:25 PM, Stephen Boyd wrote:
+>>>>> +l2-cache node containing the following properties:
+>>>> Is the L1 interrupt not per core L1 cache (even if they are OR together at PIC)?
+>>> Yes it is per CPU. That is what the 0xf part of the cpus interrupts
+>>> property is showing.
+>> Than why not have it in each cpu node?
 > 
->  arch/arm/mach-exynos/cpuidle.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> index 1bde6ad..6616e0f 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -206,7 +206,7 @@ static int __init exynos_cpuidle_probe(struct platform_device *pdev)
->  
->  	ret = cpuidle_register_driver(&exynos4_idle_driver);
->  	if (ret) {
-> -		printk(KERN_ERR "CPUidle failed to register driver\n");
-> +		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
->  		return ret;
->  	}
->  
-> @@ -220,7 +220,7 @@ static int __init exynos_cpuidle_probe(struct platform_device *pdev)
->  
->  		ret = cpuidle_register_device(device);
->  		if (ret) {
-> -			printk(KERN_ERR "CPUidle register device failed\n");
-> +			dev_err(&pdev->dev, "failed to register cpuidle device\n");
->  			return ret;
->  		}
->  	}
-> 
+> Because that duplicates things unnecessarily? The cpus node can hold
+> things that are common to all CPUs to avoid duplication. If it was a
+> different PPI for each CPU then I would agree that we need to put it in
+> each cpu node.
+
+Ok, I'll accept that as the binding is specific to Krait (and I assume all SoCs w/Krait wire this up to a common interrupt)
+
+- k
+
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
