@@ -1,32 +1,33 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Wed, 30 Oct 2013 13:23:21 +0800
-Subject: [PATCH] ARM: OMAP3: Beagle: fix return value check in
- beagle_opp_init()
-Message-ID: <CAPgLHd_DZkrzaSa9cdYYUBL=p18s=P=5RFyTJTT+toFgTqNZGQ@mail.gmail.com>
+Date: Wed, 30 Oct 2013 13:25:32 +0800
+Subject: [PATCH -next] arm64: use for_each_node_by_type() macro
+Message-ID: <CAPgLHd_aQROa0-vycghYz9A9Jx4MbC131C819xPHZg_hrTQC7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-In case of error, the function get_cpu_device() returns NULL pointer
-not ERR_PTR(). The IS_ERR() test in the return value check should be
-replaced with NULL test.
+Use for_each_node_by_type() macro instead of open coding it.
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- arch/arm/mach-omap2/board-omap3beagle.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/cpu_ops.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index a516c1b..d6ed819 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -510,7 +510,7 @@ static int __init beagle_opp_init(void)
- 		mpu_dev = get_cpu_device(0);
- 		iva_dev = omap_device_get_by_hwmod_name("iva");
+diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+index aa0c9e7..37a4977 100644
+--- a/arch/arm64/kernel/cpu_ops.c
++++ b/arch/arm64/kernel/cpu_ops.c
+@@ -78,10 +78,10 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
  
--		if (IS_ERR(mpu_dev) || IS_ERR(iva_dev)) {
-+		if (!mpu_dev || IS_ERR(iva_dev)) {
- 			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
- 				__func__, mpu_dev, iva_dev);
- 			return -ENODEV;
+ void __init cpu_read_bootcpu_ops(void)
+ {
+-	struct device_node *dn = NULL;
++	struct device_node *dn;
+ 	u64 mpidr = cpu_logical_map(0);
+ 
+-	while ((dn = of_find_node_by_type(dn, "cpu"))) {
++	for_each_node_by_type(dn,  "cpu") {
+ 		u64 hwid;
+ 		const __be32 *prop;
+ 
