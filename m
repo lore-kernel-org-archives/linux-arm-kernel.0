@@ -1,28 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Oct 2013 15:25:54 +0000
-Subject: [GIT PULL] prefetch support for 3.13
-In-Reply-To: <527124B3.9090305@nvidia.com>
-References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
- <527124B3.9090305@nvidia.com>
-Message-ID: <20131030152553.GD16735@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 30 Oct 2013 16:30:31 +0100 (CET)
+Subject: [PATCH V2 2/7] DRIVERS: IRQCHIP: CROSSBAR: Add support for
+ Crossbar IP
+In-Reply-To: <1383145040-15852-3-git-send-email-r.sricharan@ti.com>
+References: <1383145040-15852-1-git-send-email-r.sricharan@ti.com>
+ <1383145040-15852-3-git-send-email-r.sricharan@ti.com>
+Message-ID: <alpine.DEB.2.02.1310301615430.24686@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 08:24:35AM -0700, Paul Walmsley wrote:
-> Hi Will et al.,
->
-> On 10/09/2013 10:13 AM, Will Deacon wrote:
->> Hi Russell,
->>
->> Please pull the following patches for 3.13. They add support for the pldw
->> instruction (prefetch with intent to modify) in ARMv7 SMP cores, which is
->> then used to gain a measurable performance boost for particular atomic
->> sequences.
->
-> Looks like the pldw changes require binutils >= 2.21.  Might be worth  
-> considering a patch to update Documentation/Changes?
+On Wed, 30 Oct 2013, Sricharan R wrote:
+> +static inline const u32 allocate_free_irq(int cb_no)
 
-Not really - because that says "for all architectures the minimum
-requirement is now 2.21 or later" and that's certainly not the case.
+I understand the "static inline" part, but "const u32" is more than
+fishy. What's wrong with "static inline int" ?
 
-It's only ARMv7 which requires this.
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < cb->int_max; i++) {
+> +		if (cb->irq_map[i] == IRQ_FREE) {
+> +			cb->irq_map[i] = cb_no;
+> +			return i;
+> +		}
+> +	}
+> +
+> +	return -ENODEV;
+> +}
+
+> +static int crossbar_domain_xlate(struct irq_domain *d,
+> +				 struct device_node *controller,
+> +				 const u32 *intspec, unsigned int intsize,
+> +				 unsigned long *out_hwirq,
+> +				 unsigned int *out_type)
+> +{
+> +	unsigned long ret = 0;
+
+Why do you need to initialize ret when you assign a value to it in the
+next line?
+
+Thanks,
+
+	tglx
