@@ -1,59 +1,55 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 31 Oct 2013 04:01:13 +0530
-Subject: [PATCH v2 0/2] cpufreq support for the big.LITTLE switcher
-In-Reply-To: <7822477.lBueQHUY4E@vostro.rjw.lan>
-References: <1383162281-24204-1-git-send-email-nicolas.pitre@linaro.org>
- <7822477.lBueQHUY4E@vostro.rjw.lan>
-Message-ID: <CAKohpom-Oo81U_J5sC8qG7uzjW=yRJLvAPDpNyV6Sst7uw=hag@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 30 Oct 2013 23:36:36 +0100
+Subject: [PATCH v2 6/6] mmc: core: mmc DDR mode should not depend on
+ UHS_DDR50
+In-Reply-To: <1383142193-24950-7-git-send-email-b29396@freescale.com>
+References: <1383142193-24950-1-git-send-email-b29396@freescale.com>
+ <1383142193-24950-7-git-send-email-b29396@freescale.com>
+Message-ID: <CAPDyKFpu-HEZ_YRX-2-g1vqww3v9-NObrBvg6pYnKbtn7ZyN8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2013 03:22, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> Queued up for 3.13, thanks!
+On 30 October 2013 15:09, Dong Aisheng <b29396@freescale.com> wrote:
+> The MMC_CAP_UHS_DDR50 must work on 1.8v.
+> However, the eMMC DDR mode can work on either 1.8v or 3.3v and
+> should not depend on UHS_DDR50.
+> So get rid of this limitation to let controller without 1.8v
+> signal voltage support can also work for eMMC DDR mode if it claims.
+>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 
-Hmm.. thanks for applying this but there was a minor bug here which
-is fixed by below commit.. You don't really need to merge this with
-the original commit and so can go as a separate commit..
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Attached for applying.. Tested by Nico.
-
---------x------------------x-------------
-
-Author: Viresh Kumar <viresh.kumar@linaro.org>
-Date:   Thu Oct 31 03:45:42 2013 +0530
-
-    cpufreq: arm_big_little: Call routine instead of passing its address
-
-    In bL_cpufreq_init() we need to fill per-cpu cpu_last_req_freq
-with the current
-    frequency of cpu. Instead of calling the function we passed its
-address to this
-    routine by mistake earlier. Lets fix it by calling the routine instead.
-
-    Tested-by: Nicolas Pitre <nico@linaro.org>
-    Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/arm_big_little.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index 2b2a44a..ee66449 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -461,7 +461,8 @@ static int bL_cpufreq_init(struct cpufreq_policy *policy)
-                policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-
-        if (is_bL_switching_enabled())
--               per_cpu(cpu_last_req_freq, policy->cpu) = clk_get_cpu_rate;
-+               per_cpu(cpu_last_req_freq, policy->cpu) =
-+                       clk_get_cpu_rate(policy->cpu);
-
-        dev_info(cpu_dev, "%s: CPU %d initialized\n", __func__, policy->cpu);
-        return 0;
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-cpufreq-arm_big_little-Call-routine-instead-of-passi.patch
-Type: text/x-patch
-Size: 1377 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131031/ce1660dd/attachment.bin>
+> ---
+>  drivers/mmc/core/mmc.c |    8 ++------
+>  1 files changed, 2 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index f631f5a..98e9eb0 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1119,14 +1119,10 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>          */
+>         if (mmc_card_highspeed(card)) {
+>                 if ((card->ext_csd.card_type & EXT_CSD_CARD_TYPE_DDR_1_8V)
+> -                       && ((host->caps & (MMC_CAP_1_8V_DDR |
+> -                            MMC_CAP_UHS_DDR50))
+> -                               == (MMC_CAP_1_8V_DDR | MMC_CAP_UHS_DDR50)))
+> +                       && (host->caps & MMC_CAP_1_8V_DDR))
+>                                 ddr = MMC_1_8V_DDR_MODE;
+>                 else if ((card->ext_csd.card_type & EXT_CSD_CARD_TYPE_DDR_1_2V)
+> -                       && ((host->caps & (MMC_CAP_1_2V_DDR |
+> -                            MMC_CAP_UHS_DDR50))
+> -                               == (MMC_CAP_1_2V_DDR | MMC_CAP_UHS_DDR50)))
+> +                       && (host->caps & MMC_CAP_1_2V_DDR))
+>                                 ddr = MMC_1_2V_DDR_MODE;
+>         }
+>
+> --
+> 1.7.2.rc3
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
