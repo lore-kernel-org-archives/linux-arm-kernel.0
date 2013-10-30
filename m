@@ -1,105 +1,42 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 30 Oct 2013 15:55:02 +0100
-Subject: [PATCH] PCI: imx6: fix imprecise abort handler
-In-Reply-To: <CAErSpo5NHXXZPm5wj05DSD94KkzEUkefceHPC_Zup+-APUYdKQ@mail.gmail.com>
-References: <1382056042-7299-1-git-send-email-tharvey@gateworks.com>
- <CAHM4w1nyXCuTya+TR7Rxiw0ojmwZHwz9iUmz=cG8z_8h2wKhSw@mail.gmail.com>
- <CAErSpo5NHXXZPm5wj05DSD94KkzEUkefceHPC_Zup+-APUYdKQ@mail.gmail.com>
-Message-ID: <201310301555.02807.marex@denx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 30 Oct 2013 09:32:42 -0600
+Subject: [GIT PULL] prefetch support for 3.13
+In-Reply-To: <20131030152553.GD16735@n2100.arm.linux.org.uk>
+References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
+ <527124B3.9090305@nvidia.com> <20131030152553.GD16735@n2100.arm.linux.org.uk>
+Message-ID: <5271269A.9080609@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
-
-> On Mon, Oct 21, 2013 at 2:16 AM, Pratyush Anand
+On 10/30/2013 09:25 AM, Russell King - ARM Linux wrote:
+> On Wed, Oct 30, 2013 at 08:24:35AM -0700, Paul Walmsley wrote:
+>> Hi Will et al.,
+>>
+>> On 10/09/2013 10:13 AM, Will Deacon wrote:
+>>> Hi Russell,
+>>>
+>>> Please pull the following patches for 3.13. They add support for the pldw
+>>> instruction (prefetch with intent to modify) in ARMv7 SMP cores, which is
+>>> then used to gain a measurable performance boost for particular atomic
+>>> sequences.
+>>
+>> Looks like the pldw changes require binutils >= 2.21.  Might be worth  
+>> considering a patch to update Documentation/Changes?
 > 
-> <pratyush.anand@gmail.com> wrote:
-> > Hi,
-> > 
-> > On Sat, Oct 19, 2013 at 7:03 AM, Marek Vasut <marex@denx.de> wrote:
-> >> Dear Tim Harvey,
-> >> 
-> >> > An imprecise abort is triggered when a port behind a switch is
-> >> > accessed and no device is present.  At enumeration, imprecise aborts
-> >> > are not enabled
-> > 
-> > I do not know the complete history. But I do not understand, why
-> > imprecise aborts are not enabled during kernel enumeration.
-> > What happens when PCIe switch is already connected before boot?
-> > pci_common_init will try to read vendor/product ID for a non-existing
-> > function during kernel enumeration itself, which should result in
-> > imprecise external abort. In fact, I had observed with my system that if
-> > a switch is connected to PCIe RC, then abort occurs during kernel
-> > initialization itself. So a proper handling was needed. We called
-> > hook_fault_code from
-> > a subsys_init pcie_init (or similar) function, which insured that abort
-> > handler is called whenever, software tries to read vendor/product id of
-> > a non-existing function
-> > 
-> >> > thus this ends up getting deferred until the kernel has completed
-> >> > init. At
-> >> > that point we must not adjust PC - the handler must do nothing, but a
-> >> > handler must exist.
-> >> > 
-> >> > This fixes random crashes that occur right after freeing init.
-> >> > This is against linux-pci/host-imx6.
-> >> > 
-> >> > Acked-by: Marek Vasut <marex@denx.de>
-> >> > Tested-by: Marek Vasut <marex@denx.de>
-> >> > Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> >> 
-> >> Expanding CC a bit, let's have more eyes on this.
-> >> 
-> >> > ---
-> >> > 
-> >> >  drivers/pci/host/pci-imx6.c |    6 ------
-> >> >  1 file changed, 6 deletions(-)
-> >> > 
-> >> > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> >> > index 966bac6..90fce05 100644
-> >> > --- a/drivers/pci/host/pci-imx6.c
-> >> > +++ b/drivers/pci/host/pci-imx6.c
-> >> > @@ -200,12 +200,6 @@ static int pcie_phy_write(void __iomem *dbi_base,
-> >> > int
-> >> > addr, int data) static int imx6q_pcie_abort_handler(unsigned long
-> >> > addr,
-> >> > 
-> >> >               unsigned int fsr, struct pt_regs *regs)
-> >> >  
-> >> >  {
-> >> > 
-> >> > -     /*
-> >> > -      * If it was an imprecise abort, then we need to correct the
-> >> > -      * return address to be _after_ the instruction.
-> >> > -      */
-> >> > -     if (fsr & (1 << 10))
-> >> > -             regs->ARM_pc += 4;
-> > 
-> > Just for knowledge, is there any case other than read of IDs which might
-> > cause imprecise abort? If not, then this handler can be modified a bit to
-> > insure
-> > that it does not handle any unintended imprecise abort.
-> > 
-> > Regards
-> > Pratyush
-> > 
-> >> >       return 0;
-> >> >  
-> >> >  }
-> 
-> I'm sort of dubious about imx6q_pcie_abort_handler() to begin with --
-> it seems like it assumes that imprecise aborts are either enabled or
-> disabled.  Isn't there some way it can *check* whether that's the
-> case, so it won't break if those aborts are enabled at a different
-> point in the future?
+> Not really - because that says "for all architectures the minimum
+> requirement is now 2.21 or later" and that's certainly not the case.
 
-The best way here would be to find a way to prevent the DWC controller from 
-generating data abort on missing device _at_all_ and just make the read from 
-that portion of config space be 0xffffffff or zeroes . I didn't find any 
-configuration bit that would be able to do it though :( Richard, can you maybe 
-check with FSL if such an option exists on the controller?
+By "that", do you mean the text Paul wrote? I don't think he was
+suggesting that as a patch.
 
-> For now, I'll apply this to my pci/host-imx6 branch for v3.13, but let
-> me know if you want to tweak it somehow.
-> 
-> Bjorn
+> It's only ARMv7 which requires this.
+
+Wouldn't it make sense to document this still? Can't we just put a list
+of minimum requirements into Documentation/Changes based on architecure,
+e.g.:
+
+o  binutils               2.21                    # ld -v (ARMv7)
+o  binutils               2.12                    # ld -v (other)
+
+At the very least, the current documentation is wrong, because there are
+clearly cases where binutils-2.12 isn't sufficient.
