@@ -1,35 +1,50 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Tue, 29 Oct 2013 23:30:02 -0700
-Subject: [PATCH v3] ARM: bcm: Add DEBUG_LL console support
-In-Reply-To: <CAEPRUYqnc0C_fEG97sFVs6uAtPyZCzXuJ09Hsb3unjAZtc5shA@mail.gmail.com>
-References: <1380987809-4886-1-git-send-email-bcm@fixthebug.org>
- <CAEPRUYqnc0C_fEG97sFVs6uAtPyZCzXuJ09Hsb3unjAZtc5shA@mail.gmail.com>
-Message-ID: <CAEPRUYqV-9P6spmxGsqOS6JGbZW79L7m4SO66Jbkyq4Kam=bRQ@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Wed, 30 Oct 2013 14:23:20 +0800
+Subject: [RFCv2][PATCHv5 0/4] Add Freescale FTM PWM driver.
+Message-ID: <1383114204-17264-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 11:12 PM, Christian Daudt <bcm@fixthebug.org> wrote:
-> On Sat, Oct 5, 2013 at 8:43 AM, Christian Daudt <bcm@fixthebug.org> wrote:
->> This patch adds low level debug uart support to Broadcom
->>  mobile based SOCs.
->>
->> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
->>
->> Changes from V2:
->>  - Changed to follow hex ordering on entries
->>  - Dropped defconfig changes
->>
->> Changes from V1:
->>  - Switched to use the common 8250 debug introduced in 3.12-rc1
->>
->
-> Hi Russell,
->  Does V3 look ok ?
->
->  Thanks,
->    csd
-Hi,
- Can anyone provide an ack on this mod ?
+Hello,
 
- Thanks,
-   csd
+This patch series is the Freescale FTM PWM implementation. And there are 8 channels most supported by the FTM PWM. This implementation is only compatible with device tree definition.
+
+This patch series is based on linux-next and has been tested on Vybrid VF610 Tower board using device tree.
+
+
+
+Changes in RFCv2 of PATVHv5:
+- Remove "fsl,pwm-counter-clk"(all the four patches are modified).
+
+Changes in v5:
+- Remove active/idle pinctrl stuff.
+
+Changes in v4:
+- Check for the result and return an error for devm_kzalloc().
+- Move pinmux setting from the SoC file to the board specific file.
+- Revise the written mistake of 'ret |= FTMSC_CLKEXT;' --> 'reg |= FTMSC_CLKEXT;'.
+
+
+Changes in v3:
+- Remove "availabe" field.
+- Remove "fsl,pwm-avaliable-chs" property.
+- ...
+
+Changes in v2:
+- Remove PWM CPWM/EPWM feature and sysfs.
+- Remove some redundant code.
+- Revise some code for more readable.
+- Remove "fsl,pwm-clk-ps", "fsl,pwm-number", "fsl,pwm-channels",etc.
+- Add "fsl,pwm-avaliable-chs", "fsl,pwm-counter-clk", etc.
+- Support 8 channels default in dtsi file.
+- Add counter clock source selection.
+- Rename some function name, macro name, etc.
+- Use PWM's and OF's existing function interfaces.
+- Split clk_unprepare_enable to clk_unprepare and clk_enable,etc.
+- ...
+
+Added in v1:
+- Add Freescale FTM PWM driver support.
+- Add Freescale FTM PWM node for VF610.
+- Enable Enables FTM PWM device for Vybrid VF610 TOWER.
+- Add device tree bindings for Freescale.
