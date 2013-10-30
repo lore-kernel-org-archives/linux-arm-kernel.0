@@ -1,74 +1,44 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 30 Oct 2013 15:50:24 -0700
-Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: convert to platform driver
-In-Reply-To: <1807659.lxGmRkUGnf@flatron>
-References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
- <526AEF6B.2000404@linaro.org> <52717D97.8090905@linaro.org>
- <1807659.lxGmRkUGnf@flatron>
-Message-ID: <52718D30.8010509@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 30 Oct 2013 16:08:27 -0700
+Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
+In-Reply-To: <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+ (Olof Johansson's message of "Tue, 29 Oct 2013 08:37:28 -0700")
+References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
+ <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
+ <20131029132043.GA28165@fifo99.com>
+ <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+Message-ID: <87ob66nyqc.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2013 03:40 PM, Tomasz Figa wrote:
-> Hi Daniel,
->
-> On Wednesday 30 of October 2013 14:43:51 Daniel Lezcano wrote:
->> On 10/25/2013 03:23 PM, Daniel Lezcano wrote:
->>
->> [ ... ]
->>
->>>>> Won't it be worth to add a new WFI_SLEEP state to the cpuidle driver
->>>>> ?
->>>>
->>>> I don't think so. How a suspend-to-RAM specific thing like WFI_SLEEP
->>>> could
->>>> be relevant to a cpuidle driver? (Unless there are some plans to
->>>> consolidate STR with cpuidle that I haven't heard about...)
->>>
->>> I finally found a documentation for the s3c6410x and the description
->>> of
->>> the different modes. Indeed, the sleep mode is not adequate for a
->>> cpuidle state. What about the 'stop' and 'deep stop' state ?
->>
->> Hi Thomas,
->>
->> just a reminder about the question above, so I can go ahead: fix what
->> you pointed out or remove the driver directly.
->>
->> You mentionned in the previous email the STOP is not usful because it
->> can be controlled by manually outside of the cpuidle driver. But I see
->> in the documentation, the stop states power gates the cpu and deep-stop
->> stops the regulator.
->
-> STOP clock-gates the CPU and DEEP-STOP power-gates it by stopping the
-> regulator.
->
-> There are some interesting aspects of those modes, like memory self-
-> refresh, PLL power-off and system-wide down clocking, but I believe they
-> are too tricky to handle (coupling with device PM, stopped timers) and
-> with too little possible power saving to justify the effort of adding
-> support for them.
->
-> In the end, I haven't seen support for them implemented even in strange
-> vendor kernels used even on production devices, like Android phones.
->
->>
->> If these states have to been added later, still it worth to remove the
->> driver ?
->
-> I don't think that anybody is even going to add support for them and by
-> anybody I should probably mean myself, since I'm currently the only person
-> actively adding new code for this platform, as a part of my hobby.
+Olof Johansson <olof@lixom.net> writes:
 
-Ok, I will kill the driver then.
+> I would be very happy to take more code for the older Qualcomm chipset
+> to enable full functionality for them, but it's been my impression
+> that far from all that is needed to make it a useful platform is in
+> the upstream kernel, and there's been no signs of more of it showing
+> up at least in the last two years.
+>
+> So we have a bit of a stalemate here -- the current Qualcomm team
+> wants to avoid having to deal too much with the legacy platforms --
+> they are technically quite different from the current platforms and
+> the divergence makes it hard to deal with supporting it all in a
+> modern way without risking regressions. I tend to agree with them.
 
-Thanks
-   -- Daniel
+As do I.
 
+> Just like omap split between omap1 and omap2plus, I think it's a time
+> to create a mach-qcom instead, and move the modern (v7, most likely)
+> platforms there -- enable them with device tree, modern framework
+> infrastructure, etc. That way you can keep older platforms in mach-msm
+> without risk of regressions, and they have a clean base to start on
+> with their later platforms.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+I think this split approach is a good compromise.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+If the maintainers of the current older platforms wish to bring them up
+to modern frameworks, we can consider combining again.  If not, they the
+older platforms will take the same path as the rest of the older
+platforms that slowly fade away.
+
+Kevin
