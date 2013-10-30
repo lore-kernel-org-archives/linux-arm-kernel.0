@@ -1,47 +1,58 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Oct 2013 12:40:12 +0100
-Subject: [PATCH v3] iommu: shmobile: Enable the driver on all ARM platforms
-In-Reply-To: <20131030112625.GZ16735@n2100.arm.linux.org.uk>
-References: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131030112625.GZ16735@n2100.arm.linux.org.uk>
-Message-ID: <1652955.Gs3XDiEUHO@avalon>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 30 Oct 2013 11:40:50 +0000
+Subject: [PATCH] ARM64: DT: define ARM64 specific arch_match_cpu_phys_id
+In-Reply-To: <1382358582-32726-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1382358582-32726-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <5270F042.6060600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Catalin,
 
-[CC'ing Mark Brown]
-
-On Wednesday 30 October 2013 11:26:25 Russell King - ARM Linux wrote:
-> On Wed, Oct 30, 2013 at 12:20:43PM +0100, Laurent Pinchart wrote:
-> > Renesas ARM platforms are transitioning from single-platform to
-> > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> > driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> > and ARCH_SHMOBILE_MULTI and increase build testing coverage.
-> > 
-> > Don't enable COMPILE_TEST support as the driver doesn't compile on
-> > non-ARM platforms due to usage of the ARM DMA IOMMU API.
+On 21/10/13 13:29, Sudeep KarkadaNagesha wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 > 
-> For similar reasons as x86, can we please think about using:
+> OF/DT core library provides architecture specific hook to match the
+> logical cpu index with the corresponding physical identifier.
 > 
-> 	depends on ARM
-> 	depends on ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI || COMPILE_TEST
+> On ARM64, the MPIDR_EL1 contains specific bitfields(MPIDR_EL1.Aff{3..0})
+> which uniquely identify a CPU, in addition to some non-identifying
+> information and reserved bits. The ARM cpu binding defines the 'reg'
+> property to only contain the affinity bits, and any cpu nodes with other
+> bits set in their 'reg' entry are skipped.
 > 
-> This way we don't end up polluting the configuration for non-shmobile
-> platforms.  Same goes for other ARM stuff... the number of options is
-> getting rather large and we need to think about keeping that in check
-> where its easily possible to do so.
+> This patch overrides the weak definition of arch_match_cpu_phys_id
+> with ARM64 specific version using MPIDR_EL1.Aff{3..0} as cpu physical
+> identifiers.
+> 
 
-I've been asked to move from depends ARM to no dependency at all, and have 
-thus settled for ARM || COMPILE_TEST in most cases, and just ARM where the 
-driver couldn't be compiled on other platforms.
+Can you take this trivial patch for v3.13 ?
 
-I'm fine with your proposed option. As I don't want to respin the series 
-dozens of time let's first agree on the course of action, I will then repost 
-the patches. Mark, you've pushed towards as few platform dependencies as 
-possible, what's your opinion on this ?
-
--- 
 Regards,
+Sudeep
 
-Laurent Pinchart
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/setup.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 055cfb8..ff629f9 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -97,6 +97,11 @@ void __init early_print(const char *str, ...)
+>  	printk("%s", buf);
+>  }
+>  
+> +bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
+> +{
+> +	return phys_id == cpu_logical_map(cpu);
+> +}
+> +
+>  static void __init setup_processor(void)
+>  {
+>  	struct cpu_info *cpu_info;
+> 
