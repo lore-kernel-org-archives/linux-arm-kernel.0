@@ -1,149 +1,147 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Oct 2013 01:13:40 +0100
-Subject: [PATCH 01/12] clocksource: sh_cmt: Add clk_prepare/unprepare
- support
-In-Reply-To: <20131030001018.GF21262@verge.net.au>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <9952506.6pWpQZf7WG@avalon> <20131030001018.GF21262@verge.net.au>
-Message-ID: <1577850.BRVoxx5piP@avalon>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 29 Oct 2013 19:19:35 -0500
+Subject: [PATCH 2/3] clk: shmobile: Add MSTP clock support
+In-Reply-To: <1481817.doGcO1nQB0@avalon>
+References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <F8268ACF-E4E8-4411-84F1-D967450BE440@codeaurora.org>
+ <1481817.doGcO1nQB0@avalon>
+Message-ID: <5E542DCC-EA79-4A9E-BC60-B8E1B964F16D@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
 
-On Wednesday 30 October 2013 09:10:19 Simon Horman wrote:
-> On Tue, Oct 29, 2013 at 10:55:05AM +0100, Laurent Pinchart wrote:
-> > On Tuesday 29 October 2013 14:55:35 Simon Horman wrote:
-> > > On Mon, Oct 28, 2013 at 11:49:18PM +0100, Laurent Pinchart wrote:
-> > > > Prepare the clock at probe time, as there is no other appropriate
-> > > > place in the driver where we're allowed to sleep.
-> > > > 
-> > > > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > > > Cc: linux-kernel at vger.kernel.org
-> > > > Signed-off-by: Laurent Pinchart
-> > > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > 
-> > > Thanks Laurent,
-> > > 
-> > > I have queued this up in the clocksources branch of my renesas tree.
-> > > I will send a pull request to Mike once v3.13-rc1 has hit the shelves.
-> > > Mike, please let me know if you would prefer something earlier than
-> > > that.
-> > 
-> > I thought the clocksource patches had to go through Daniel's tree. If you
-> > can take them directly that's easier, so I'm fine with that. Does this
-> > imply your Acked-by (for patches 01 to 03) ?
-> 
-> Sorry, my mistake. The do go through Daniel. As a convenience
-> I have been picking up Renesas clocksource patches and passing
-> them on to Daniel. I'm happy to keep doing this. And I'm happy to
-> go the next step and add some entries to MAINTAINERS if that is
-> useful to others.
-> 
-> As I mentioned above I have queued these up (though not yet pushed them
-> as I got bogged down yesterday afternoon). But if you would
-> prefer Daniel to take them directly then please use the following:
-> 
-> Patches 01 - 03:
-> 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+On Oct 29, 2013, at 7:06 PM, Laurent Pinchart wrote:
 
-I'm certainly fine with you picking the patches up, that would be helpful. 
-Could I ask you to pick v2 up instead though ? :-)
+> Hi Kumar,
+> 
+> Thank you for the review.
+> 
+> On Tuesday 29 October 2013 18:36:06 Kumar Gala wrote:
+>> On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
+>>> MSTP clocks are gate clocks controlled through a register that handles
+>>> up to 32 clocks. The register is often sparsely populated.
+>>> 
+>>> Those clocks are found on Renesas ARM SoCs.
+>>> 
+>>> Signed-off-by: Laurent Pinchart
+>>> <laurent.pinchart+renesas@ideasonboard.com>
+>>> ---
+>>> .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  47 +++++
+>>> drivers/clk/shmobile/Makefile                      |   1 +
+>>> drivers/clk/shmobile/clk-mstp.c                    | 229 +++++++++++++++++
+>>> include/dt-bindings/clock/r8a7790-clock.h          |  56 +++++
+>>> 4 files changed, 333 insertions(+)
+>>> create mode 100644
+>>> Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+>>> create mode 100644 drivers/clk/shmobile/clk-mstp.c
+>>> create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
+>>> 
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+>>> b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt new
+>>> file mode 100644
+>>> index 0000000..b3a1ce0
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+>>> @@ -0,0 +1,47 @@
+>>> +* Renesas R8A7790 MSTP Clocks
+>> 
+>> can we spell out MSTP once in the heading?
+> 
+> Sure thing. It stands for Module Stop.
+> 
+>>> +
+>>> +The CPG can gate SoC device clocks. The gates are organized in groups of
+>>> up to
+>>> +32 gates.
+>>> +
+>>> +This device tree binding describes a single 32 gate clocks group per
+>>> node.
+>>> +Clocks are referenced by user nodes by the MSTP node phandle and the
+>>> clock
+>>> +index in the group, from 0 to 31.
+>>> +
+>>> +Required Properties:
+>>> +
+>>> +  - compatible: Must be one of the following
+>>> +    - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate
+>>> clocks
+>>> +    - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
+>>> +  - reg: Base address and length of the memory resource used by the MSTP
+>>> +    clocks
+>>> +  - clocks: Reference to the parent clocks
+>>> +  - #clock-cells: Must be 1
+>>> +  - clock-output-names: The name of the clocks as free-form strings
+>>> +  - renesas,indices: Index of the gate clocks (0 to 31)
+>> 
+>> Index of the gate clock into what?
+> 
+> Into the 32 gates clock group. Groups have 32 entries with a 32-bit register 
+> that controls 32 gate clocks. The groups (and thus registers) are sparsly 
+> populated, this property lists the indices for the register bits corresponding 
+> to the clocks.
+> 
+> Would
+> 
+>  - renesas,indices: Indices of the gate clocks into the group (0 to 31)
+> 
+> be explicit enough ?
 
-> > > > ---
-> > > > 
-> > > >  drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
-> > > >  1 file changed, 16 insertions(+), 4 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/clocksource/sh_cmt.c
-> > > > b/drivers/clocksource/sh_cmt.c
-> > > > index 0965e98..940341a 100644
-> > > > --- a/drivers/clocksource/sh_cmt.c
-> > > > +++ b/drivers/clocksource/sh_cmt.c
-> > > > @@ -634,12 +634,18 @@ static int sh_cmt_clock_event_next(unsigned long
-> > > > delta,>
-> > > > 
-> > > >  static void sh_cmt_clock_event_suspend(struct clock_event_device
-> > > >  *ced)
-> > > >  {
-> > > > 
-> > > > -	pm_genpd_syscore_poweroff(&ced_to_sh_cmt(ced)->pdev->dev);
-> > > > +	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
-> > > > +
-> > > > +	pm_genpd_syscore_poweroff(&p->pdev->dev);
-> > > > +	clk_unprepare(p->clk);
-> > > > 
-> > > >  }
-> > > >  
-> > > >  static void sh_cmt_clock_event_resume(struct clock_event_device *ced)
-> > > >  {
-> > > > 
-> > > > -	pm_genpd_syscore_poweron(&ced_to_sh_cmt(ced)->pdev->dev);
-> > > > +	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
-> > > > +
-> > > > +	clk_prepare(p->clk);
-> > > > +	pm_genpd_syscore_poweron(&p->pdev->dev);
-> > > > 
-> > > >  }
-> > > >  
-> > > >  static void sh_cmt_register_clockevent(struct sh_cmt_priv *p,
-> > > > 
-> > > > @@ -737,6 +743,10 @@ static int sh_cmt_setup(struct sh_cmt_priv *p,
-> > > > struct
-> > > > platform_device *pdev)>
-> > > > 
-> > > >  		goto err2;
-> > > >  	
-> > > >  	}
-> > > > 
-> > > > +	ret = clk_prepare(p->clk);
-> > > > +	if (ret < 0)
-> > > > +		goto err3;
-> > > > +
-> > > > 
-> > > >  	if (res2 && (resource_size(res2) == 4)) {
-> > > >  	
-> > > >  		/* assume both CMSTR and CMCSR to be 32-bit */
-> > > >  		p->read_control = sh_cmt_read32;
-> > > > 
-> > > > @@ -773,19 +783,21 @@ static int sh_cmt_setup(struct sh_cmt_priv *p,
-> > > > struct platform_device *pdev)>
-> > > > 
-> > > >  			      cfg->clocksource_rating);
-> > > >  	
-> > > >  	if (ret) {
-> > > >  	
-> > > >  		dev_err(&p->pdev->dev, "registration failed\n");
-> > > > 
-> > > > -		goto err3;
-> > > > +		goto err4;
-> > > > 
-> > > >  	}
-> > > >  	p->cs_enabled = false;
-> > > >  	
-> > > >  	ret = setup_irq(irq, &p->irqaction);
-> > > >  	if (ret) {
-> > > >  	
-> > > >  		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
-> > > > 
-> > > > -		goto err3;
-> > > > +		goto err4;
-> > > > 
-> > > >  	}
-> > > >  	
-> > > >  	platform_set_drvdata(pdev, p);
-> > > >  	
-> > > >  	return 0;
-> > > > 
-> > > > +err4:
-> > > > +	clk_unprepare(p->clk);
-> > > > 
-> > > >  err3:
-> > > >  	clk_put(p->clk);
-> > > >  
-> > > >  err2:
+I'm still confused.  As I look at the code, I'm not quite clear how renesas,indices relates to a register or register bits.
+
+> 
+>>> +
+>>> +The clocks, clock-output-names and renesas,indices properties contain one
+>>> +entry per gate. The MSTP groups are sparsely populated. Unimplemented
+>>> gates
+>> per gate clock. (?)
+> 
+> I'll change that.
+> 
+>>> +must not be declared.
+>>> +
+>>> +
+>>> +Example
+>>> +-------
+>>> +
+>>> +	#include <dt-bindings/clock/r8a7790-clock.h>
+>>> +
+>>> +	mstp3_clks: mstp3_clks {
+> 
+> mstp3_clks at e615013c I suppose.
+
+yes, missed that
+`
+> 
+>>> +		compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-
+> clocks";
+>>> +		reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+>>> +		clocks = <&cp_clk>, <&mmc1_clk>, <&sd3_clk>, <&sd2_clk>,
+>>> +			 <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks 
+> R8A7790_CLK_SD0>,
+>>> +			 <&mmc0_clk>;
+>>> +		#clock-cells = <1>;
+>>> +		clock-output-names =
+>>> +			"tpu0", "mmcif1", "sdhi3", "sdhi2",
+>>> +			 "sdhi1", "sdhi0", "mmcif0";
+>>> +		renesas,clock-indices = <
+>>> +			R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
+>>> +			R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
+>>> +			R8A7790_CLK_MMCIF0
+>>> +		>;
+>>> +	};
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-Regards,
-
-Laurent Pinchart
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
