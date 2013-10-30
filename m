@@ -1,32 +1,27 @@
-From: jiada_wang@mentor.com (jiada_wang at mentor.com)
-Date: Wed, 30 Oct 2013 04:25:51 -0700
-Subject: [PATCH] ARM: i.MX6q: fix the wrong parent of can_root clock
-Message-ID: <1383132351-32112-1-git-send-email-jiada_wang@mentor.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Oct 2013 11:26:25 +0000
+Subject: [PATCH v3] iommu: shmobile: Enable the driver on all ARM platforms
+In-Reply-To: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131030112625.GZ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiada Wang <jiada_wang@mentor.com>
+On Wed, Oct 30, 2013 at 12:20:43PM +0100, Laurent Pinchart wrote:
+> Renesas ARM platforms are transitioning from single-platform to
+> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> and ARCH_SHMOBILE_MULTI and increase build testing coverage.
+> 
+> Don't enable COMPILE_TEST support as the driver doesn't compile on
+> non-ARM platforms due to usage of the ARM DMA IOMMU API.
 
-instead of pll3_usb_otg the parent of can_root clock
-should be pll3_60m.
+For similar reasons as x86, can we please think about using:
 
-Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
----
- arch/arm/mach-imx/clk-imx6q.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+	depends on ARM
+	depends on ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI || COMPILE_TEST
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 9181a24..ef85ac4 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -428,7 +428,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[asrc_podf]        = imx_clk_divider("asrc_podf",        "asrc_pred",         base + 0x30, 9,  3);
- 	clk[spdif_pred]       = imx_clk_divider("spdif_pred",       "spdif_sel",         base + 0x30, 25, 3);
- 	clk[spdif_podf]       = imx_clk_divider("spdif_podf",       "spdif_pred",        base + 0x30, 22, 3);
--	clk[can_root]         = imx_clk_divider("can_root",         "pll3_usb_otg",      base + 0x20, 2,  6);
-+	clk[can_root]         = imx_clk_divider("can_root",         "pll3_60m",          base + 0x20, 2,  6);
- 	clk[ecspi_root]       = imx_clk_divider("ecspi_root",       "pll3_60m",          base + 0x38, 19, 6);
- 	clk[gpu2d_core_podf]  = imx_clk_divider("gpu2d_core_podf",  "gpu2d_core_sel",    base + 0x18, 23, 3);
- 	clk[gpu3d_core_podf]  = imx_clk_divider("gpu3d_core_podf",  "gpu3d_core_sel",    base + 0x18, 26, 3);
--- 
-1.7.9.5
+This way we don't end up polluting the configuration for non-shmobile
+platforms.  Same goes for other ARM stuff... the number of options is
+getting rather large and we need to think about keeping that in check
+where its easily possible to do so.
