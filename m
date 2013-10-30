@@ -1,14 +1,14 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 30 Oct 2013 18:04:04 +0100
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 30 Oct 2013 18:09:11 +0100
 Subject: [PATCH 1/2] ARM: kirkwood: add support for OpenBlocks A7 platform
 In-Reply-To: <1383152110-19577-2-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1383152110-19577-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <1383152110-19577-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20131030170404.GE7655@lunn.ch>
+Message-ID: <52713D37.9090803@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 05:55:09PM +0100, Thomas Petazzoni wrote:
+On 30/10/2013 17:55, Thomas Petazzoni wrote:
 > The OpenBlocks A7 board is designed and sold by PlatHome, and based on
 > a Kirkwood 6283 Marvell SoC. It is quite similar to the OpenBlocks A6
 > already supported in the kernel, with the following main differences:
@@ -26,6 +26,9 @@ On Wed, Oct 30, 2013 at 05:55:09PM +0100, Thomas Petazzoni wrote:
 >  - Slightly different GPIOs for some functions.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
 > ---
 >  arch/arm/boot/dts/Makefile                   |   3 +-
 >  arch/arm/boot/dts/kirkwood-openblocks_a7.dts | 223 +++++++++++++++++++++++++++
@@ -43,18 +46,6 @@ On Wed, Oct 30, 2013 at 05:55:09PM +0100, Thomas Petazzoni wrote:
 > -	kirkwood-openblocks_a6.dtb
 > +	kirkwood-openblocks_a6.dtb \
 > +	kirkwood-openblocks_a7.dtb
-
-Hi Thomas
-
-Could you fix the ordering here? It is wrong to start with that the a6
-is at the end. Could you move it, and add your new one, after nsa31a.
-
-Apart from that, it looks good.
-
-Thanks
-	Andrew
-
-
 >  dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
 >  dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
 >  	msm8960-cdp.dtb
@@ -287,6 +278,11 @@ Thanks
 > +		phy-handle = <&ethphy1>;
 > +	};
 > +};
-> -- 
-> 1.8.1.2
 > 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
