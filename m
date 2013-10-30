@@ -1,105 +1,88 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 30 Oct 2013 01:17:14 +0000
-Subject: [PATCH v9 01/18] arm: make SWIOTLB available
-In-Reply-To: <20131029180105.GR16735@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
- <1382698313-13161-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1310251206450.26077@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1310290441260.26077@kaball.uk.xensource.com>
- <20131029142023.GE20487@phenom.dumpdata.com>
- <20131029142626.GQ16735@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1310291716120.26077@kaball.uk.xensource.com>
- <20131029180105.GR16735@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1310300112520.26077@kaball.uk.xensource.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Wed, 30 Oct 2013 12:02:02 +1000
+Subject: [PATCHv2 0/7] ARM: imx: add IMX50 SoC support
+In-Reply-To: <20131029192037.GE26784@titan.lakedaemon.net>
+References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
+ <20131029192037.GE26784@titan.lakedaemon.net>
+Message-ID: <5270689A.10503@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Oct 2013, Russell King - ARM Linux wrote:
-> So... what I'm saying is please fix xgmac to use the DMA API properly
-> rather than working around such problems. :)
- 
-OK.
-Would the appended patch fix your concerns?
+Hi Jason,
 
----
+On 30/10/13 05:20, Jason Cooper wrote:
+> Greg,
+> 
+> On Tue, Oct 29, 2013 at 03:15:50PM +1000, gerg at uclinux.org wrote:
+>> From: Greg Ungerer <gerg@uclinux.org>
+>>
+>> This set of patches is the code and device tree support for the Freescale
+>> IMX50 SoC. This part is similar to the IMX53 SoC family, and I have resued
+>> as much of its support as possible. These patches are against Shawn Guo's
+>> linux-2.6.git for-next branch.
+>>
+>> This loads and runs on the Freescale IMX50-EVK board.
+> 
+> Hmmm... here's how far it gets:
 
-arm: make SWIOTLB available
+The v2 patches are on top of Shawn's for-next branch. Thus the changes you
+had to make, and why this doesn't work for you on top on 3.12-rc7. (The
+timer setup is different).
 
-IOMMU_HELPER is needed because SWIOTLB calls iommu_is_span_boundary,
-provided by lib/iommu_helper.c.
+Regards
+Greg
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 
-Changes in v9:
-- remove uneeded include asm/cacheflush.h;
-- just return 0 if !dev->dma_mask in dma_capable.
-
----
- arch/arm/Kconfig                   |    6 ++++++
- arch/arm/include/asm/dma-mapping.h |   33 +++++++++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1ad6fb6..b08374f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1872,6 +1872,12 @@ config CC_STACKPROTECTOR
- 	  neutralized via a kernel panic.
- 	  This feature requires gcc version 4.2 or above.
- 
-+config SWIOTLB
-+	def_bool y
-+
-+config IOMMU_HELPER
-+	def_bool SWIOTLB
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 5b579b9..1ad2c17 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -86,6 +86,39 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- }
- #endif
- 
-+static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-+{
-+	unsigned int offset = paddr & ~PAGE_MASK;
-+	return pfn_to_dma(dev, __phys_to_pfn(paddr)) + offset;
-+}
-+
-+static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-+{
-+	unsigned int offset = dev_addr & ~PAGE_MASK;
-+	return __pfn_to_phys(dma_to_pfn(dev, dev_addr)) + offset;
-+}
-+
-+static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-+{
-+	u64 limit, mask;
-+
-+	if (!dev->dma_mask)
-+		return 0;
-+
-+	mask = *dev->dma_mask;
-+
-+	limit = (mask + 1) & ~mask;
-+	if (limit && size > limit)
-+		return 0;
-+
-+	if ((addr | (addr + size - 1)) & ~mask)
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static inline void dma_mark_clean(void *addr, size_t size) { }
-+
- /*
-  * DMA errors are defined by all-bits-set in the DMA address.
-  */
--- 
-1.7.2.5
+> Starting kernel ...
+> 
+> Uncompressing Linux... done, booting the kernel.
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Linux version 3.12.0-rc7+ (jason at triton) (gcc version 4.6.3 (Gentoo 4.6.3 p1.6, pie-0.5.2) ) #215 SMP Tue Oct 29 19:12:05 GMT 2013
+> [    0.000000] CPU: ARMv7 Processor [412fc085] revision 5 (ARMv7), cr=10c53c7d
+> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+> [    0.000000] Machine: Freescale i.MX50 (Device Tree Support), model: SanDisk Connect Wireless Media Drive
+> [    0.000000] debug: ignoring loglevel setting.
+> [    0.000000] bootconsole [earlycon0] enabled
+> [    0.000000] Memory policy: ECC disabled, Data cache writeback
+> [    0.000000] On node 0 totalpages: 32768
+> [    0.000000] free_area_init_node: node 0, pgdat 808cc480, node_mem_map 80929000
+> [    0.000000]   Normal zone: 256 pages used for memmap
+> [    0.000000]   Normal zone: 0 pages reserved
+> [    0.000000]   Normal zone: 32768 pages, LIFO batch:7
+> [    0.000000] CPU: All CPU(s) started in SVC mode.
+> [    0.000000] PERCPU: Embedded 7 pages/cpu @80a33000 s7488 r8192 d12992 u32768
+> [    0.000000] pcpu-alloc: s7488 r8192 d12992 u32768 alloc=8*4096
+> [    0.000000] pcpu-alloc: [0] 0 
+> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on. Total pages: 32512
+> [    0.000000] Kernel command line: debug ignore_loglevel earlyprintk console=ttymxc0,115200 init=/bin/sh root=/dev/ram0
+> [    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+> [    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
+> [    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+> [    0.000000] Memory: 120476K/131072K available (5555K kernel code, 259K rwdata, 1568K rodata, 1595K init, 364K bss, 10596K reserved)
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> [    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+> [    0.000000]     vmalloc : 0x88800000 - 0xff000000   (1896 MB)
+> [    0.000000]     lowmem  : 0x80000000 - 0x88000000   ( 128 MB)
+> [    0.000000]     modules : 0x7f000000 - 0x80000000   (  16 MB)
+> [    0.000000]       .text : 0x80008000 - 0x806fcef4   (7124 kB)
+> [    0.000000]       .init : 0x806fd000 - 0x8088bd40   (1596 kB)
+> [    0.000000]       .data : 0x8088c000 - 0x808ccce0   ( 260 kB)
+> [    0.000000]        .bss : 0x808ccce8 - 0x80928030   ( 365 kB)
+> [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+> [    0.000000] Hierarchical RCU implementation.
+> [    0.000000]  RCU restricting CPUs from NR_CPUS=4 to nr_cpu_ids=1.
+> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> [    0.000000] TrustZone Interrupt Controller (TZIC) initialized
+> [    0.000000] sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 4294967286ms
+> [    0.000000] Console: colour dummy device 80x30
+> [    0.000000] Calibrating delay loop... 
+> 
+> and, nothing...  I'll take a closer look later.
+> 
+> btw - this is with the two includes added into the clock patch.
+> 
+> thx,
+> 
+> Jason.
+> 
