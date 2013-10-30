@@ -1,32 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Oct 2013 14:30:23 +0100
-Subject: [PATCH 4/4] ARM: msm: Remove 8x50 support
-In-Reply-To: <20131029211901.GB16284@fifo99.com>
-References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
- <1382993006-27359-5-git-send-email-davidb@codeaurora.org>
- <20131029211901.GB16284@fifo99.com>
-Message-ID: <201310301430.24115.arnd@arndb.de>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Wed, 30 Oct 2013 13:47:16 +0000
+Subject: [PATCH] ARM64: simplify cpu_read_bootcpu_ops using OF/DT helper
+Message-ID: <1383140836-11998-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 October 2013, Daniel Walker wrote:
-> Isn't this the Nexus one platform ? Same as the last one , why don't you
-> just update it to use the device tree? This doesn't seem like it would
-> be all that difficult. 
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Please don't top-post.
+Once the cpu_logical_map for any logical cpu is populated with the
+corresponding physical identifier(i.e. mpidr), it's device node can
+be retrieved using the DT helper 'of_get_cpu_node'. Currently the
+device tree parsing code to get boot cpu node is duplicated in
+'cpu_read_bootcpu_ops'.
 
-> On Mon, Oct 28, 2013 at 01:43:26PM -0700, David Brown wrote:
-> > 
-> > This code has not been converted to device tree, and is hindering
-> > support for the multi-platform kernel on ARM.  If someone wishes to
-> > continue support for this target, patches that provide devicetree and
-> > multi-platform support can start by re-adding these files.
+This patch replaces the code parsing the device tree for the boot
+cpu with of_get_cpu_node.
 
-    ^ Here is your answer.
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/kernel/cpu_ops.c | 22 +++++-----------------
+ 1 file changed, 5 insertions(+), 17 deletions(-)
 
-
-While I'd definitely love to see support for the Nexus One upstream,
-it is evident that nobody has been working on this for a long time.
-
-	Arnd
+diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+index aa0c9e7..4fbe440 100644
+--- a/arch/arm64/kernel/cpu_ops.c
++++ b/arch/arm64/kernel/cpu_ops.c
+@@ -78,22 +78,10 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
+ 
+ void __init cpu_read_bootcpu_ops(void)
+ {
+-	struct device_node *dn = NULL;
+-	u64 mpidr = cpu_logical_map(0);
+-
+-	while ((dn = of_find_node_by_type(dn, "cpu"))) {
+-		u64 hwid;
+-		const __be32 *prop;
+-
+-		prop = of_get_property(dn, "reg", NULL);
+-		if (!prop)
+-			continue;
+-
+-		hwid = of_read_number(prop, of_n_addr_cells(dn));
+-		if (hwid == mpidr) {
+-			cpu_read_ops(dn, 0);
+-			of_node_put(dn);
+-			return;
+-		}
++	struct device_node *dn = of_get_cpu_node(0, NULL);
++	if (!dn) {
++		pr_err("failed to find device node for boot cpu\n");
++		return;
+ 	}
++	cpu_read_ops(dn, 0);
+ }
+-- 
+1.8.1.2
