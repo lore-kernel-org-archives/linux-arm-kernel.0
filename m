@@ -1,56 +1,27 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 30 Oct 2013 10:23:15 +0200
-Subject: [PATCHv9 00/43] ARM: TI SoC clock DT conversion
-In-Reply-To: <526FDFF4.9030806@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <526FDFF4.9030806@ti.com>
-Message-ID: <5270C1F3.6000409@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Oct 2013 08:28:22 +0000
+Subject: [PATCH v2] arm/arm64: KVM: MMIO support for BE guest
+In-Reply-To: <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
+References: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
+Message-ID: <b7620ddbce4278713635321bd9a708f4@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2013 06:19 PM, Nishanth Menon wrote:
-> On 10/25/2013 10:56 AM, Tero Kristo wrote:
-> <snip>
->> Testing done:
->> - omap3-beagle: boot + suspend/resume (ret + off)
->> - omap4-panda-es: boot + suspend/resume
->> - omap5-uevm: boot
->> - dra7-evm: boot
->> - am335x-bone: boot
->>
->> Test branches available:
->>
->> tree: https://github.com/t-kristo/linux-pm.git
+On 2013-10-30 01:10, Anup Patel wrote:
+> On Wed, Oct 30, 2013 at 12:19 AM, Marc Zyngier <marc.zyngier@arm.com> 
+> wrote:
+>> Do the necessary byteswap when host and guest have different
+>> views of the universe. Actually, the only case we need to take
+>> care of is when the guest is BE. All the other cases are naturally
+>> handled.
 >
-> <snip>
->> Fully functioning test branch: 3.12-rc6-dt-clks-v9
->>
-> ^^ I tested this branch (boot testing):
-> Beagle-XM: http://pastebin.com/50A1qtFq (crashes + clkdm issues, dpll5
-> failed to transition)
+> You might want to handle the case where we have LE guest on BE host
+> because for ARM64 kernel we might have lot of people interested in
+> running host kernel in BE mode with KVM enabled.
 
-I just sent you a private email with a patch to try out, should fix the 
-boot crash at least hopefully. Basically I forgot to convert one part of 
-the kernel to the new regmap stuff for omap36xx.
+What makes you think it is not handled already?
 
-clkdm issues are caused by wrong data in omap_hwmod_3xxx_data.c, USB 
-nodes are listing l3_init_clkdm for them, but this only exists on 
-omap4+. Seems like some copy paste bug introduced by someone.
-
-dpll5 part I am not too sure, can you check if the same happens with 
-non-dt boot?
-
-> Panda-ES: http://pastebin.com/dWMp7D1z (bandgap_fclk not found)
-> OMAP5-UEVM: http://pastebin.com/pHEx6Yzg (omap-gpmc 50000000.gpmc:
-> error: clk_get)
-
-Again, I don't think this is related to this series, but rather to 
-missing/wrong hwmod data.
-
--Tero
-
-> DRA7-EVM: http://pastebin.com/uYNQ6Sss
-> BeagleBone-Black: http://pastebin.com/biGXS2vi
-> AM335x-evm: http://pastebin.com/K7qwJpCb
->
->
+         M.
+-- 
+Fast, cheap, reliable. Pick two.
