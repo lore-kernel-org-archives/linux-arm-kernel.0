@@ -1,55 +1,54 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Wed, 30 Oct 2013 14:22:35 +0000
-Subject: [PATCH -next v2] arm64: use for_each_node_by_type() macro
-In-Reply-To: <20131030121610.GJ3975@mbp>
-References: <CAPgLHd_aQROa0-vycghYz9A9Jx4MbC131C819xPHZg_hrTQC7w@mail.gmail.com>
- <52709A9E.8060800@gmail.com>
- <CAPgLHd_r3_svSfrraO-oHyZbXg0O9brsjheO6ds9jL9rYbOfmA@mail.gmail.com>
- <5270F238.6010602@arm.com> <20131030121610.GJ3975@mbp>
-Message-ID: <5271162B.9070804@arm.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 30 Oct 2013 22:09:48 +0800
+Subject: [PATCH v2 1/6] mmc: sdhci: clear auto cmd setting bits for no data
+ cmds
+In-Reply-To: <1383142193-24950-1-git-send-email-b29396@freescale.com>
+References: <1383142193-24950-1-git-send-email-b29396@freescale.com>
+Message-ID: <1383142193-24950-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/10/13 12:16, Catalin Marinas wrote:
-> On Wed, Oct 30, 2013 at 11:49:12AM +0000, Sudeep KarkadaNagesha wrote:
->> On 30/10/13 05:54, Wei Yongjun wrote:
->>> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->>>
->>> Use for_each_node_by_type() macro instead of open coding it.
->>>
->>> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->>> ---
->>> v1 -> v2: remove extra space
->>> ---
->>>  arch/arm64/kernel/cpu_ops.c | 4 ++--
->>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
->>> index aa0c9e7..37a4977 100644
->>> --- a/arch/arm64/kernel/cpu_ops.c
->>> +++ b/arch/arm64/kernel/cpu_ops.c
->>> @@ -78,10 +78,10 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
->>>  
->>>  void __init cpu_read_bootcpu_ops(void)
->>>  {
->>> -	struct device_node *dn = NULL;
->>> +	struct device_node *dn;
->>>  	u64 mpidr = cpu_logical_map(0);
->>>  
->>> -	while ((dn = of_find_node_by_type(dn, "cpu"))) {
->>> +	for_each_node_by_type(dn, "cpu") {
->>>  		u64 hwid;
->>>  		const __be32 *prop;
->>>  
->>
->> In fact this function can be simplified by making use of OF helper directly,
->> something like below snippet. But it requires [1] for correct functionality.
-> 
-> Thanks. Could you please send a properly formatted patch on top of [1]?
+The auto cmd settings bits should be cleared before sending new commands
+or we may receive command timeout error for normal commands due to wrongly
+pre-sent auto cmd.
 
-Yes it's done [2]
+e.g. we receive CMD13 timeout error due to ACMD23 is wrongly enabled
+by former data commands.
 
-Regards,
-Sudeep
+mmc2: new high speed DDR MMC card at address 0001
+mmcblk1: mmc2:0001 SEM08G 7.39 GiB
+mmcblk1boot0: mmc2:0001 SEM08G partition 1 2.00 MiB
+mmcblk1boot1: mmc2:0001 SEM08G partition 2 2.00 MiB
+mmcblk1rpmb: mmc2:0001 SEM08G partition 3 128 KiB
+ mmcblk1: p1 p2 p3 p4 < p5 p6 p7 >
+mmc2: Timeout waiting for hardware interrupt.
+ mmcblk1boot1: unknown partition table
+mmc2: Timeout waiting for hardware interrupt.
+ mmcblk1boot0: unknown partition table
 
-[2] http://www.spinics.net/lists/arm-kernel/msg283243.html
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+ drivers/mmc/host/sdhci.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 68b3cac..22eab3a 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -903,8 +903,13 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
+ 	u16 mode;
+ 	struct mmc_data *data = cmd->data;
+ 
+-	if (data == NULL)
++	if (data == NULL) {
++		/* clear Auto CMD settings for no data CMDs */
++		mode = sdhci_readw(host, SDHCI_TRANSFER_MODE);
++		sdhci_writew(host, mode & ~(SDHCI_TRNS_AUTO_CMD12 |
++				SDHCI_TRNS_AUTO_CMD23), SDHCI_TRANSFER_MODE);
+ 		return;
++	}
+ 
+ 	WARN_ON(!host->data);
+ 
+-- 
+1.7.2.rc3
