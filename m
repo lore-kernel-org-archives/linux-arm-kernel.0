@@ -1,117 +1,51 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Wed, 30 Oct 2013 12:07:52 +0900
-Subject: [PATCH v9 1/5] ARM: add basic support for Trusted Foundations
-In-Reply-To: <0232E02C-5F41-4EC6-9011-86D67005433D@codeaurora.org>
-References: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
- <D49A3E92-54FD-4275-82F5-DBB476086B03@codeaurora.org>
- <20131028215649.GB10833@quad.lixom.net> <2702565.PHk13m6fVo@flatron>
- <20131029002543.GF4763@kartoffel>
- <0232E02C-5F41-4EC6-9011-86D67005433D@codeaurora.org>
-Message-ID: <52707808.8020503@nvidia.com>
+From: jiada_wang@mentor.com (jiada)
+Date: Tue, 29 Oct 2013 20:13:02 -0700
+Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
+In-Reply-To: <20131028074524.GE2839@S2101-09.ap.freescale.net>
+References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
+ <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
+ <5264A06B.2040202@mentor.com>
+ <20131021045917.GH17165@S2101-09.ap.freescale.net>
+ <857E9EDCA6C0904DB3357321AA9123EB62506BEA@NA-MBX-01.mgc.mentorg.com>
+ <5264C615.4070504@mentor.com>
+ <20131021070451.GI17165@S2101-09.ap.freescale.net>
+ <526DCED3.2070704@mentor.com>
+ <20131028074524.GE2839@S2101-09.ap.freescale.net>
+Message-ID: <5270793E.9000605@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2013 05:12 PM, Kumar Gala wrote:
->
-> On Oct 28, 2013, at 7:25 PM, Mark Rutland wrote:
->
->> On Mon, Oct 28, 2013 at 11:31:36PM +0000, Tomasz Figa wrote:
->>> On Monday 28 of October 2013 14:56:49 Olof Johansson wrote:
->>>> On Mon, Oct 28, 2013 at 05:57:04AM -0500, Kumar Gala wrote:
->>>>> On Oct 28, 2013, at 5:28 AM, Alexandre Courbot wrote:
->>>>>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
->>>>>> can be invoked using the same SMC-based API on all supported
->>>>>> platforms. This patch adds initial basic support for Trusted
->>>>>> Foundations using the ARM firmware API. Current features are limited
->>>>>> to the ability to boot secondary processors.
->>>>>>
->>>>>> Note: The API followed by Trusted Foundations does *not* follow the
->>>>>> SMC
->>>>>> calling conventions. It has nothing to do with PSCI neither and is
->>>>>> only
->>>>>> relevant to devices that use Trusted Foundations (like most
->>>>>> Tegra-based
->>>>>> retail devices).
->>>>>>
->>>>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->>>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->>>>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->>>>>> ---
->>>>>> .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
->>>>>> .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->>>>>> arch/arm/Kconfig                                   |  2 +
->>>>>> arch/arm/Makefile                                  |  1 +
->>>>>> arch/arm/firmware/Kconfig                          | 28 ++++++++
->>>>>> arch/arm/firmware/Makefile                         |  1 +
->>>>>> arch/arm/firmware/trusted_foundations.c            | 79
->>>>>> ++++++++++++++++++++++ arch/arm/include/asm/trusted_foundations.h
->>>>>>       | 67 ++++++++++++++++++ 8 files changed, 199 insertions(+)
->>>>>> create mode 100644
->>>>>> Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundatio
->>>>>> ns.txt create mode 100644 arch/arm/firmware/Kconfig
->>>>>> create mode 100644 arch/arm/firmware/Makefile
->>>>>> create mode 100644 arch/arm/firmware/trusted_foundations.c
->>>>>> create mode 100644 arch/arm/include/asm/trusted_foundations.h
->>>>>>
->>>>>> diff --git
->>>>>> a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
->>>>>> ions.txt
->>>>>> b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
->>>>>> ions.txt new file mode 100644
->>>>>> index 0000000..2ec75c9
->>>>>> --- /dev/null
->>>>>> +++
->>>>>> b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
->>>>>> ions.txt @@ -0,0 +1,20 @@
->>>>>> +Trusted Foundations
->>>>>> +-------------------
->>>>>> +
->>>>>> +Boards that use the Trusted Foundations secure monitor can signal
->>>>>> its
->>>>>> +presence by declaring a node compatible with
->>>>>> "tl,trusted-foundations"
->>>>>> +under the /firmware/ node
->>>>>> +
->>>>>> +Required properties:
->>>>>> +- compatible : "tl,trusted-foundations"
->>>>>> +- version-major : major version number of Trusted Foundations
->>>>>> firmware
->>>>>> +- version-minor: minor version number of Trusted Foundations
->>>>>> firmware
->>>>>
->>>>> vendor prefix version.
->>>>
->>>> Are you saying he should use tl,version-major tl,version-minor? For
->>>> bindings that are already vendor-specific we haven't (on ARM) asked for
->>>> vendor prefix on properties. It doesn't mean that we should keep going
->>>> down that route though, so I'm just asking for clarification for my own
->>>> edification. :)
->>>
->>> This is a good question. We should decide what the right thing (TM) is and
->>> write it down. I, on the contrary, was convinced that it's the way Kumar
->>> says.
->>
->> The impression I got was that properties should be prefixed when they're
->> extremely vendor-specific and could clash with a more generic property. I'm not
->> sure that firmware will ever have a generic binding given the variation even in
->> the set of implemented functionality.
->>
->> I would imagine that there are many ways different firmwares might be
->> versioned, and I can't see version-major or version-minor clashing with a
->> generic property we might add later. However prefixing would not be harmful, so
->> I'm not opposed to it if others want that.
->>
->> Another option would be to support a fallback compatible list (e.g.
->> "tl,trusted-foundations-${MAJOR}-${MINOR}", "tl,trusted-foundations"), and get
->> versioning information from there. Given that could be painful to handle I
->> don't want to force it if not required.
->>
->> Thanks,
->> Mark.
->
-> I'm of the opinion that making all vendor specific properties vendor prefixed is the easiest rule of thumb and leaves no gray area to have to argue about.
+Hi
 
-All good points, I will vendor-prefix these properties.
+On 10/28/2013 12:45 AM, Shawn Guo wrote:
+> On Sun, Oct 27, 2013 at 07:41:23PM -0700, jiada wrote:
+>> as per discussion locally, when do you think you will post the fix patch
+>> for the system hang I observed?
+>> I would like to test for your patch, and then pull it to my kernel.
+>
+> Sorry, Jiada.  After another closer look at the fix I provided before,
+> it's not correct, because emergency_restart() is a function that is safe
+> to call in interrupt context, while migrate_to_reboot_cpu() is not.
+> That said, we cannot call migrate_to_reboot_cpu() in emergency_restart()
+> at all.
+>
+> I just found a more easier fix at platform level.  The following is what
+> you need to do on your 3.5 kernel.
+>
+> 1. Apply the following change
+>
+> https://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=commitdiff;h=6050d181a4fd4abb745506a6e565d55f1f9df964
+>
+> 2. Remove imx_src_prepare_restart() from imx6q_restart().
+>
+> I will send a patch against the latest kernel.
+>
+Thanks Shawn, I have verified with these two changes,
+system reboot by "echo b > /proc/sysrq-trigger" works
+for me.
+
+> Shawn
+>
 
 Thanks,
-Alex.
+Jiada
