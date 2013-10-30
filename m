@@ -1,60 +1,81 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 30 Oct 2013 22:12:14 +0800
-Subject: [PATCH 1/5] mmc: sdhci-pltfm: export pltfm suspend/resume api
+Date: Wed, 30 Oct 2013 22:12:16 +0800
+Subject: [PATCH 3/5] mmc: sdhci-esdhc-imx: clear SDHCI_CTRL_EXEC_TUNING should
+ not affect other bits
 In-Reply-To: <1383142338-25062-1-git-send-email-b29396@freescale.com>
 References: <1383142338-25062-1-git-send-email-b29396@freescale.com>
-Message-ID: <1383142338-25062-2-git-send-email-b29396@freescale.com>
+Message-ID: <1383142338-25062-4-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is helpful for platforms code to use to elimiate duplicated code.
+Current code will clear all turning related bits like ESDHC_STD_TUNING_EN
+and ESDHC_MIX_CTRL_FBCLK_SEL when clear SDHCI_CTRL_EXEC_TUNING.
+This may cause the card which has already passed the turning to become
+unwork since the turning status lost.
+We observed this failure when enable runtime pm.
+
+BTW, imx needs to enable ESDHC_MIX_CTRL_FBCLK_SEL bit for turned clock.
+The FBCLK_SEL will be cleared when SDHCI_CTRL_TUNED_CLK is cleared
+and SDHCI_CTRL_EXEC_TUNING is not set.
+This is used in case we change to another normal card from a UHS card
+in the same slot. FBCLK_SEL is not needed for normal card.
+
+After that, SDHCI_CTRL_EXEC_TUNING will only affect ESDHC_MIX_CTRL_EXE_TUNE.
+Clearing it does not affect the turned card to remain working on UHS mode.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/mmc/host/sdhci-pltfm.c |    6 ++++--
- drivers/mmc/host/sdhci-pltfm.h |    2 ++
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |   24 +++++++++++++-----------
+ 1 files changed, 13 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index e2065a4..bef250e 100644
---- a/drivers/mmc/host/sdhci-pltfm.c
-+++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -237,19 +237,21 @@ int sdhci_pltfm_unregister(struct platform_device *pdev)
- EXPORT_SYMBOL_GPL(sdhci_pltfm_unregister);
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index f5e1dcf..0bd99eb 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -439,24 +439,20 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+ 		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
+ 			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
+ 			u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
+-			new_val = readl(host->ioaddr + ESDHC_TUNING_CTRL);
++			if (val & SDHCI_CTRL_TUNED_CLK) {
++				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
++			} else {
++				v &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
++				m &= ~ESDHC_MIX_CTRL_FBCLK_SEL;
++			}
++
+ 			if (val & SDHCI_CTRL_EXEC_TUNING) {
+-				new_val |= ESDHC_STD_TUNING_EN |
+-						ESDHC_TUNING_START_TAP;
+ 				v |= ESDHC_MIX_CTRL_EXE_TUNE;
+ 				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
+ 			} else {
+-				new_val &= ~ESDHC_STD_TUNING_EN;
+ 				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
+-				m &= ~ESDHC_MIX_CTRL_FBCLK_SEL;
+ 			}
  
- #ifdef CONFIG_PM
--static int sdhci_pltfm_suspend(struct device *dev)
-+int sdhci_pltfm_suspend(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
- 
- 	return sdhci_suspend_host(host);
- }
-+EXPORT_SYMBOL_GPL(sdhci_pltfm_suspend);
- 
--static int sdhci_pltfm_resume(struct device *dev)
-+int sdhci_pltfm_resume(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
- 
- 	return sdhci_resume_host(host);
- }
-+EXPORT_SYMBOL_GPL(sdhci_pltfm_resume);
- 
- const struct dev_pm_ops sdhci_pltfm_pmops = {
- 	.suspend	= sdhci_pltfm_suspend,
-diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
-index e15ced79..04bc248 100644
---- a/drivers/mmc/host/sdhci-pltfm.h
-+++ b/drivers/mmc/host/sdhci-pltfm.h
-@@ -111,6 +111,8 @@ static inline void *sdhci_pltfm_priv(struct sdhci_pltfm_host *host)
- }
- 
- #ifdef CONFIG_PM
-+extern int sdhci_pltfm_suspend(struct device *dev);
-+extern int sdhci_pltfm_resume(struct device *dev);
- extern const struct dev_pm_ops sdhci_pltfm_pmops;
- #define SDHCI_PLTFM_PMOPS (&sdhci_pltfm_pmops)
- #else
+-			if (val & SDHCI_CTRL_TUNED_CLK)
+-				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
+-			else
+-				v &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
+-
+-			writel(new_val, host->ioaddr + ESDHC_TUNING_CTRL);
+ 			writel(v, host->ioaddr + SDHCI_ACMD12_ERR);
+ 			writel(m, host->ioaddr + ESDHC_MIX_CTRL);
+ 		}
+@@ -1038,6 +1034,12 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 	if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING)
+ 		sdhci_esdhc_ops.platform_execute_tuning =
+ 					esdhc_executing_tuning;
++
++	if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING)
++		writel(readl(host->ioaddr + ESDHC_TUNING_CTRL) |
++			ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP,
++			host->ioaddr + ESDHC_TUNING_CTRL);
++
+ 	boarddata = &imx_data->boarddata;
+ 	if (sdhci_esdhc_imx_probe_dt(pdev, boarddata) < 0) {
+ 		if (!host->mmc->parent->platform_data) {
 -- 
 1.7.2.rc3
