@@ -1,37 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Oct 2013 13:07:28 +0000
-Subject: [PATCH] ARM: mm: Fix ECC mem policy printk
-In-Reply-To: <8986e8f1a3761e45a7927bdb0e54393c9155e6bf.1383137171.git.michal.simek@xilinx.com>
-References: <8986e8f1a3761e45a7927bdb0e54393c9155e6bf.1383137171.git.michal.simek@xilinx.com>
-Message-ID: <20131030130728.GA16735@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 30 Oct 2013 06:24:32 -0700
+Subject: [PATCH 1/2] misc: atmel_pwm: add deferred-probing support
+In-Reply-To: <20131030112551.GB29813@localhost>
+References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+ <1382459560-26596-2-git-send-email-jhovold@gmail.com>
+ <20131030112551.GB29813@localhost>
+Message-ID: <20131030132432.GB30447@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 01:46:18PM +0100, Michal Simek wrote:
-> Russell, Will: We discussed this at KS that will be good
-> to rephrase it or have different logic around this.
-> I am not sure if we can also test that this bit is
-> implemented by particular SoC or not.
+On Wed, Oct 30, 2013 at 12:25:51PM +0100, Johan Hovold wrote:
+> On Tue, Oct 22, 2013 at 06:32:39PM +0200, Johan Hovold wrote:
+> > Two drivers (atmel-pwm-bl and leds-atmel-pwm) currently depend on the
+> > atmel_pwm driver to have bound to any pwm-device before their devices
+> > are probed.
+> > 
+> > Support deferred probing of such devices by making sure to return
+> > -EPROBE_DEFER from pwm_channel_alloc when no pwm-device has yet been
+> > bound.
+> > 
+> > Signed-off-by: Johan Hovold <jhovold@gmail.com>
 > 
-> Maybe logic should be that if SoC uses this bit
-> that message is shown in origin format to declare
-> that ECC is enabled or disabled.
-> When SoC doesn't implement it then do not show this message.
+> This patch, 5c6d6fd1 ("misc: atmel_pwm: add deferred-probing support"),
+> and 9d3fde86 ("backlight: atmel-pwm-bl: fix deferred probe from __init")
+> in linux-next should probably be considered for inclusion in stable.
+> 
+> Without them the atmel-pwm-bl driver may always fail to probe depending
+> on link order.
 
-This is not quite what I meant - by making the change you have, you also
-omit to print the data cache policy.
+Ok, I'll watch this for when it hits Linus's tree, thanks for letting me
+know.
 
-> @@ -556,8 +556,9 @@ static void __init build_mem_type_table(void)
->  		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WB;
->  		break;
->  	}
-> -	printk("Memory policy: ECC %sabled, Data cache %s\n",
-> -		ecc_mask ? "en" : "dis", cp->policy);
-> +	if (ecc_mask)
-> +		pr_info("Memory policy: ECC enabled, Data cache %s\n",
-> +			cp->policy);
-
-	pr_info("Memory policy: %sData cache %s\n",
-		ecc_mask ? "ECC enabled, " : "", cp->policy);
-
-is more what I was suggesting.
+greg k-h
