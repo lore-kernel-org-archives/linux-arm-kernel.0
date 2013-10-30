@@ -1,124 +1,112 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 31 Oct 2013 02:19:58 +0300
-Subject: [PATCH 2/2] ARM: shmobile: Koelsch: add Ether support
-In-Reply-To: <201310310216.28673.sergei.shtylyov@cogentembedded.com>
-References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201310310219.58963.sergei.shtylyov@cogentembedded.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 30 Oct 2013 23:23:37 +0100 (CET)
+Subject: [PATCH 07/12] mmc: sh_mmcif: Convert to clk_prepare/unprepare
+In-Reply-To: <Pine.LNX.4.64.1310290910160.8404@axis700.grange>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <Pine.LNX.4.64.1310290910160.8404@axis700.grange>
+Message-ID: <Pine.LNX.4.64.1310302322480.25391@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register Ether platform device and pin data on  the  Koelsch board. 
-Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
+On Tue, 29 Oct 2013, Guennadi Liakhovetski wrote:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> On Mon, 28 Oct 2013, Laurent Pinchart wrote:
+> 
+> > Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
+> > clk_disable_unprepare() to get ready for the migration to the common
+> > clock framework.
+> > 
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > Cc: linux-mmc at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+Sorry, I just realised, that an identical patch
+
+http://patches.linaro.org/21212/
+
+has been submitted prior to this one, so, we should really take the other 
+one.
+
+Thanks
+Guennadi
+> 
+> > ---
+> >  drivers/mmc/host/sh_mmcif.c | 12 ++++++------
+> >  1 file changed, 6 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+> > index 36629a0..37a6c57 100644
+> > --- a/drivers/mmc/host/sh_mmcif.c
+> > +++ b/drivers/mmc/host/sh_mmcif.c
+> > @@ -964,7 +964,7 @@ static void sh_mmcif_request(struct mmc_host *mmc, struct mmc_request *mrq)
+> >  
+> >  static int sh_mmcif_clk_update(struct sh_mmcif_host *host)
+> >  {
+> > -	int ret = clk_enable(host->hclk);
+> > +	int ret = clk_prepare_enable(host->hclk);
+> >  
+> >  	if (!ret) {
+> >  		host->clk = clk_get_rate(host->hclk);
+> > @@ -1018,7 +1018,7 @@ static void sh_mmcif_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> >  		}
+> >  		if (host->power) {
+> >  			pm_runtime_put_sync(&host->pd->dev);
+> > -			clk_disable(host->hclk);
+> > +			clk_disable_unprepare(host->hclk);
+> >  			host->power = false;
+> >  			if (ios->power_mode == MMC_POWER_OFF)
+> >  				sh_mmcif_set_power(host, ios);
+> > @@ -1466,7 +1466,7 @@ static int sh_mmcif_probe(struct platform_device *pdev)
+> >  
+> >  	mutex_init(&host->thread_lock);
+> >  
+> > -	clk_disable(host->hclk);
+> > +	clk_disable_unprepare(host->hclk);
+> >  	ret = mmc_add_host(mmc);
+> >  	if (ret < 0)
+> >  		goto emmcaddh;
+> > @@ -1487,7 +1487,7 @@ ereqirq1:
+> >  ereqirq0:
+> >  	pm_runtime_suspend(&pdev->dev);
+> >  eresume:
+> > -	clk_disable(host->hclk);
+> > +	clk_disable_unprepare(host->hclk);
+> >  eclkupdate:
+> >  	clk_put(host->hclk);
+> >  eclkget:
+> > @@ -1505,7 +1505,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
+> >  	int irq[2];
+> >  
+> >  	host->dying = true;
+> > -	clk_enable(host->hclk);
+> > +	clk_prepare_enable(host->hclk);
+> >  	pm_runtime_get_sync(&pdev->dev);
+> >  
+> >  	dev_pm_qos_hide_latency_limit(&pdev->dev);
+> > @@ -1530,7 +1530,7 @@ static int sh_mmcif_remove(struct platform_device *pdev)
+> >  	if (irq[1] >= 0)
+> >  		free_irq(irq[1], host);
+> >  
+> > -	clk_disable(host->hclk);
+> > +	clk_disable_unprepare(host->hclk);
+> >  	mmc_free_host(host->mmc);
+> >  	pm_runtime_put_sync(&pdev->dev);
+> >  	pm_runtime_disable(&pdev->dev);
+> > -- 
+> > 1.8.1.5
+> > 
+> 
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+> 
 
 ---
- arch/arm/mach-shmobile/board-koelsch.c |   61 ++++++++++++++++++++++++++++++++-
- 1 file changed, 60 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/mach-shmobile/board-koelsch.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
-+++ renesas/arch/arm/mach-shmobile/board-koelsch.c
-@@ -24,14 +24,31 @@
- #include <linux/input.h>
- #include <linux/kernel.h>
- #include <linux/leds.h>
-+#include <linux/phy.h>
-+#include <linux/pinctrl/machine.h>
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_device.h>
-+#include <linux/sh_eth.h>
- #include <mach/common.h>
-+#include <mach/irqs.h>
- #include <mach/r8a7791.h>
- #include <mach/rcar-gen2.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+/* Ether */
-+static const struct sh_eth_plat_data ether_pdata __initconst = {
-+	.phy			= 0x1,
-+	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
-+	.phy_interface		= PHY_INTERFACE_MODE_RMII,
-+	.ether_link_active_low	= 1,
-+};
-+
-+static const struct resource ether_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xee700000, 0x400),
-+	DEFINE_RES_IRQ(gic_spi(162)),
-+};
-+
- /* LEDS */
- static struct gpio_led koelsch_leds[] = {
- 	{
-@@ -70,11 +87,29 @@ static const struct gpio_keys_platform_d
- 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
- };
- 
-+static const struct pinctrl_map koelsch_pinctrl_map[] = {
-+	/* Ether */
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
-+				  "eth_link", "eth"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
-+				  "eth_mdio", "eth"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
-+				  "eth_rmii", "eth"),
-+};
-+
- static void __init koelsch_add_standard_devices(void)
- {
- 	r8a7791_clock_init();
-+
-+	pinctrl_register_mappings(koelsch_pinctrl_map,
-+				  ARRAY_SIZE(koelsch_pinctrl_map));
- 	r8a7791_pinmux_init();
-+
- 	r8a7791_add_standard_devices();
-+	platform_device_register_resndata(&platform_bus, "r8a7790-ether", -1,
-+					  ether_resources,
-+					  ARRAY_SIZE(ether_resources),
-+					  &ether_pdata, sizeof(ether_pdata));
- 	platform_device_register_data(&platform_bus, "leds-gpio", -1,
- 				      &koelsch_leds_pdata,
- 				      sizeof(koelsch_leds_pdata));
-@@ -83,6 +118,30 @@ static void __init koelsch_add_standard_
- 				      sizeof(koelsch_keys_pdata));
- }
- 
-+/*
-+ * Ether LEDs on the Koelsch board are named LINK and ACTIVE which corresponds
-+ * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
-+ * 14-15. We have to set them back to 01 from the default 00 value each time
-+ * the PHY is reset. It's also important because the PHY's LED0 signal is
-+ * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
-+ * bounce on and off after each packet, which we apparently want to avoid.
-+ */
-+static int koelsch_ksz8041_fixup(struct phy_device *phydev)
-+{
-+	u16 phyctrl1 = phy_read(phydev, 0x1e);
-+
-+	phyctrl1 &= ~0xc000;
-+	phyctrl1 |= 0x4000;
-+	return phy_write(phydev, 0x1e, phyctrl1);
-+}
-+
-+static void __init koelsch_init(void)
-+{
-+	koelsch_add_standard_devices();
-+
-+	phy_register_fixup_for_id("r8a7790-ether-ff:01", koelsch_ksz8041_fixup);
-+}
-+
- static const char * const koelsch_boards_compat_dt[] __initconst = {
- 	"renesas,koelsch",
- 	NULL,
-@@ -91,7 +150,7 @@ static const char * const koelsch_boards
- DT_MACHINE_START(KOELSCH_DT, "koelsch")
- 	.smp		= smp_ops(r8a7791_smp_ops),
- 	.init_early	= r8a7791_init_early,
--	.init_machine	= koelsch_add_standard_devices,
-+	.init_machine	= koelsch_init,
- 	.init_time	= rcar_gen2_timer_init,
- 	.dt_compat	= koelsch_boards_compat_dt,
- MACHINE_END
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
