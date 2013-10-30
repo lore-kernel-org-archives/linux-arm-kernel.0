@@ -1,50 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 30 Oct 2013 13:46:20 -0700
-Subject: [PATCH 1/2] dmaengine: add msm bam dma driver
-In-Reply-To: <20131030203105.GA14525@agross>
-References: <1382732643-8184-1-git-send-email-agross@codeaurora.org>
- <1382732643-8184-2-git-send-email-agross@codeaurora.org>
- <20131029175603.GF21983@codeaurora.org> <20131030203105.GA14525@agross>
-Message-ID: <5271701C.3010706@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Oct 2013 14:05:36 -0700
+Subject: [GIT PULL] bcm soc updates for 3.13
+In-Reply-To: <CAEPRUYrrFiU6KkQ=1byXLXP3CJnUB++afuQfOfj2D+hZaDZTxg@mail.gmail.com>
+References: <CAEPRUYrrFiU6KkQ=1byXLXP3CJnUB++afuQfOfj2D+hZaDZTxg@mail.gmail.com>
+Message-ID: <CAOesGMiNwZ3z==T34ux3yXqjc2UmZQnAAn7GaJ7QZHJk-T8BaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/13 13:31, Andy Gross wrote:
-> On Tue, Oct 29, 2013 at 10:56:03AM -0700, Stephen Boyd wrote:
->> On 10/25, Andy Gross wrote:
->>> +#include <linux/scatterlist.h>
->>> +#include <linux/device.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/of_irq.h>
->>> +#include <linux/of_dma.h>
->>> +#include <linux/clk.h>
->>> +#include <linux/msm_bam_dma.h>
->>> +
->>> +#include "dmaengine.h"
->>> +#include "msm_bam_dma_priv.h"
->> Why do we need this file? Can't we just put the #defines in this
->> file?
->  
-> There were enough definitions and structures to warrant another file.
+On Tue, Oct 29, 2013 at 11:18 PM, Christian Daudt <bcm@fixthebug.org> wrote:
+> Hi Olof,
+>  This git pull request replaces the previous git pull for 3.13/soc. It
+> contains the mods for the ARCH_BCM_MOBILE patch to align better with
+> other MULTIPLATFORM usage.
 >
+>  Thanks,
+>    csd
+>
+>
+> The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+>
+>   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+>
+> are available in the git repository at:
+>
+>   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.13-soc2
+>
+> for you to fetch changes up to 2d58b26550ad5d869118c77b3db8feb942e54be0:
+>
+>   ARM: bcm_defconfig: Run "make savedefconfig" (2013-10-29 23:09:10 -0700)
 
-Ah ok. I find it annoying to flip between two files but I guess that's
-my problem.
+Pulled, thanks.
 
->>> +	if (!bdev) {
->>> +		dev_err(&pdev->dev, "insufficient memory for private data\n");
->> kmalloc calls already print errors when they fail, so this can be
->> removed.
->  
-> has this always been the case?
 
-The warning in the page allocator seems to have been there since pre-git
-days (see __alloc_pages_slowpath() and how it calls warn_alloc_failed())
-. Other warnings in the sl*b allocators seem to have come later (see
-8bdec192b40cf7f7eec170b317c76089eb5eeddb for example).
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+-Olof
