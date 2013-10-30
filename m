@@ -1,53 +1,26 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Wed, 30 Oct 2013 12:38:41 -0500
-Subject: [PATCHv9 05/43] CLK: TI: add DT alias clock registration mechanism
-In-Reply-To: <5270C368.9000701@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-6-git-send-email-t-kristo@ti.com>
- <CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>
- <5270C368.9000701@ti.com>
-Message-ID: <CAHCPf3vcdriV3n2BvG2+saJFH6hR_gEFU=BhTBa0yqZUUWcg1A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Oct 2013 17:43:30 +0000
+Subject: [PULL REQ] Big Endian initial patch series
+In-Reply-To: <CAA3XUr0yr0Vh_rpM7bKJGBkOpWhOarUs=pRAx40mwqRp2V=mfg@mail.gmail.com>
+References: <20131018205405.GA28835@codethink.co.uk>
+ <20131019170954.GC25076@mudshark.cambridge.arm.com>
+ <5262E2C7.7000106@codethink.co.uk>
+ <20131028004736.GG16735@n2100.arm.linux.org.uk>
+ <20131028084455.GA20218@mudshark.cambridge.arm.com>
+ <20131028085328.GI16735@n2100.arm.linux.org.uk>
+ <526E89E6.8010202@codethink.co.uk>
+ <CAA3XUr0yr0Vh_rpM7bKJGBkOpWhOarUs=pRAx40mwqRp2V=mfg@mail.gmail.com>
+Message-ID: <20131030174329.GJ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 3:29 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> On 10/29/2013 07:50 PM, Matt Sealey wrote:
->>
->> I have one question here, what makes this part of the patch
->> TI-specific at all except the definition of the structure ti_dt_clk?
->> Mapping DT clocks to generic clkdev legacy namings seems like it would
->> be a necessary evil across *all* SoC platforms.
->>
->> I would say there is a good case for this being generic
->
-> An earlier implementation of this patch (or at least a patch that tries to
-> accomplish the same as this does, add support for legacy devices) did try to
-> add generic solution. There was some discussion on it and I decided to drop
-> it due to bad feedback.
->
-> See: http://www.spinics.net/lists/linux-omap/msg95147.html
+On Tue, Oct 29, 2013 at 09:05:09PM -0700, Victor Kamensky wrote:
+> I just fetched rmk/for-next as of 10/29/2013 8pm PST. I see that big
+> endian patch series is in. I believe conflict resolution 580dac83 in head.S
+> is correct. I've added typo and .align fix as in [1] to head.S and
+> tested BE image on TC2 in both ARM and THUMB2 modes - both boot
+> and look fine to me.
 
-I don't see anything that says this should not be generic, just that
-it was implemented relatively poorly at the time...
-
-I agree with Tomasz, find_by_name in device trees is basically evil
-(it's only supposed to be used if you already know the name because
-something else passed it to you, and just want it's phandle, but names
-CAN be ambiguous. The real fix is always pass phandles and not strings
-of the name property), but that's not to say this thing needs to be
-TI-specific..
-
-Ah well. If it ends up getting used elsewhere, it can be quickly
-patched into a generic version anyway, so.. yay!
-
-I'm really interested in this all going in - but I would love to see
-where this is just all patched into a tree already. Pulling things out
-against a bunch of trees gave me more merge failures and weird
-happenings than I care to deal with. Is there a TI clock development
-tree with all this in somewhere publically accessible? I'd like to get
-a feel for how the DT looks and what's going on, I can't "see" it from
-the patches. Once it's there.. I'll spend a week or 5 doing all of the
-i.MX chips and you'll have a second test case for any problems :)
-
-Ta,
-Matt Sealey <neko@bakuhatsu.net>
+Although it's in for-next, I won't be pushing the series until we know
+that there are no known problems - so we need to get the patch you refer
+to in as well along side it.
