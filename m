@@ -1,53 +1,35 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 30 Oct 2013 12:47:22 -0700
-Subject: [PATCH] clk: mux: Return a sane value on error
-In-Reply-To: <1382345990-20623-1-git-send-email-Russ.Dill@ti.com>
-References: <1382345990-20623-1-git-send-email-Russ.Dill@ti.com>
-Message-ID: <20131030194722.11662.27225@quantum>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 30 Oct 2013 12:47:45 -0700 (PDT)
+Subject: [PATCH 0/2] cpufreq support for the big.LITTLE switcher
+In-Reply-To: <5107459.zGbYpZKUI5@vostro.rjw.lan>
+References: <1382500691-634-1-git-send-email-nicolas.pitre@linaro.org>
+ <5107459.zGbYpZKUI5@vostro.rjw.lan>
+Message-ID: <alpine.LFD.2.03.1310301246440.18059@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russ Dill (2013-10-21 01:59:50)
-> The get_parent op is defined as returning u8, but clk-mux is
-> returning negative values on error.  Code within drivers/clk/clk.c
-> uses this return value as an index into an array which could
-> cause an oops.
+On Wed, 30 Oct 2013, Rafael J. Wysocki wrote:
+
+> On Tuesday, October 22, 2013 11:58:09 PM Nicolas Pitre wrote:
+> > This is the third and final set of patches towards a fully functional
+> > and production quality switcher solution for big.LITTLE systems,
+> > establishing a landmark to compare against for any scheduler based
+> > solution meant to eventually surpass the switcher's power efficiency
+> > available in the mainline kernel.
+> > 
+> > Rationale for this code: http://lwn.net/Articles/481055/
+> > 
+> > The first and second patch sets have already been merged by RMK.  They
+> > implement the core switcher mechanism.  This set adds the necessary code
+> > to drive the switcher based on cpufreq governor decisions.
 > 
-> Signed-off-by: Russ Dill <Russ.Dill@ti.com>
-
-Hi Russ,
-
-Thanks for the fix. Haojian Zhuang sent an identical fix the day before
-you so I took his in ;-)
-
-Regards,
-Mike
-
-> ---
->  drivers/clk/clk-mux.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Patch [1/2] doesn't apply any more after all of the recent changes from Viresh.
 > 
-> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index 4f96ff3..cc06015 100644
-> --- a/drivers/clk/clk-mux.c
-> +++ b/drivers/clk/clk-mux.c
-> @@ -51,7 +51,7 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
->                 for (i = 0; i < num_parents; i++)
->                         if (mux->table[i] == val)
->                                 return i;
-> -               return -EINVAL;
-> +               return 0;
->         }
->  
->         if (val && (mux->flags & CLK_MUX_INDEX_BIT))
-> @@ -61,7 +61,7 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
->                 val--;
->  
->         if (val >= num_parents)
-> -               return -EINVAL;
-> +               return 0;
->  
->         return val;
->  }
-> -- 
-> 1.8.3.2
+> Please rebase on top of linux-pm/linux-next and resend.
+
+I just resent those patches after some testing.
+
+Thanks!
+
+
+Nicolas
