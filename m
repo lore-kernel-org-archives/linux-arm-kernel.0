@@ -1,38 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Oct 2013 09:28:54 -0700
-Subject: [PATCH v3] iommu: shmobile: Enable the driver on all ARM platforms
-In-Reply-To: <1652955.Gs3XDiEUHO@avalon>
-References: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131030112625.GZ16735@n2100.arm.linux.org.uk>
- <1652955.Gs3XDiEUHO@avalon>
-Message-ID: <20131030162854.GB2493@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Oct 2013 17:11:28 +0000
+Subject: [PATCH v2] arm/arm64: KVM: MMIO support for BE guest
+In-Reply-To: <CAAhSdy0UdzKz8sKBgbZFQFWAAiC59PWcvc+-w8o=3Hsx+4UkaQ@mail.gmail.com>
+References: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
+ <b7620ddbce4278713635321bd9a708f4@www.loen.fr>
+ <CAAhSdy0UdzKz8sKBgbZFQFWAAiC59PWcvc+-w8o=3Hsx+4UkaQ@mail.gmail.com>
+Message-ID: <52713DC0.8040703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 12:40:12PM +0100, Laurent Pinchart wrote:
+On 30/10/13 17:06, Anup Patel wrote:
+> On Wed, Oct 30, 2013 at 1:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 2013-10-30 01:10, Anup Patel wrote:
+>>>
+>>> On Wed, Oct 30, 2013 at 12:19 AM, Marc Zyngier <marc.zyngier@arm.com>
+>>> wrote:
+>>>>
+>>>> Do the necessary byteswap when host and guest have different
+>>>> views of the universe. Actually, the only case we need to take
+>>>> care of is when the guest is BE. All the other cases are naturally
+>>>> handled.
+>>>
+>>>
+>>> You might want to handle the case where we have LE guest on BE host
+>>> because for ARM64 kernel we might have lot of people interested in
+>>> running host kernel in BE mode with KVM enabled.
+>>
+>>
+>> What makes you think it is not handled already?
+> 
+> What I understood here is that you are trying to ensure that MMIO data
+> passed to/from user space (i.e. QEMU or KVMTOOL) is host endian
+> using vcpu_data_guest_to_host() and vcpu_data_host_to_guest(). This
+> makes lot of sense for having all combinations of host and guest endianness.
+> 
+> If the above is correct then I see an issue in vcpu_data_guest_to_host() and
+> vcpu_data_host_to_guest() for LE guest on BE host because this patch does
+> endianness conversion for BE VCPUs only in vcpu_data_guest_to_host() and
+> vcpu_data_host_to_guest(). If we have LE guest on BE host then these
+> functions won't do any endianness conversion.
 
-> > For similar reasons as x86, can we please think about using:
+And no conversion is exactly what we want. MMIO is always LE.
 
-> > 	depends on ARM
-> > 	depends on ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI || COMPILE_TEST
-
-> I'm fine with your proposed option. As I don't want to respin the series 
-> dozens of time let's first agree on the course of action, I will then repost 
-> the patches. Mark, you've pushed towards as few platform dependencies as 
-> possible, what's your opinion on this ?
-
-In general I think we should have whatever the real depedencies are or
-COMPILE_TEST (to the extent that they will actually build cleanly on
-other targets).  That way only people who explicitly go looking to
-compile test things for build coverage (eg, when doing global cleanups
-or API updates) need to be bothered by the extra compile test options.
-
-I'd read the above as saying the code needs ARM to build at all and that
-the hardware will only ever appear on SHMOBILE.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131030/ed1df549/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
