@@ -1,561 +1,62 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Wed, 30 Oct 2013 23:38:57 +0100
-Subject: [PATCH v3 1/2] ARM: sun4i/sun7i: RTC driver
-Message-ID: <1383172738-8206-1-git-send-email-carlo.caione@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 30 Oct 2013 23:40:24 +0100
+Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: convert to platform driver
+In-Reply-To: <52717D97.8090905@linaro.org>
+References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
+ <526AEF6B.2000404@linaro.org> <52717D97.8090905@linaro.org>
+Message-ID: <1807659.lxGmRkUGnf@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the driver for the RTC in the Allwinner A10 and
-A20 SoCs.
+Hi Daniel,
 
-Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
----
-v1->v2:
-- Patch split in two
-- Fix coding style
-- New driver description
-- Rework macros
-- Add comments
-- Change while in for cycles
+On Wednesday 30 of October 2013 14:43:51 Daniel Lezcano wrote:
+> On 10/25/2013 03:23 PM, Daniel Lezcano wrote:
+> 
+> [ ... ]
+> 
+> >>> Won't it be worth to add a new WFI_SLEEP state to the cpuidle driver
+> >>> ?
+> >> 
+> >> I don't think so. How a suspend-to-RAM specific thing like WFI_SLEEP
+> >> could
+> >> be relevant to a cpuidle driver? (Unless there are some plans to
+> >> consolidate STR with cpuidle that I haven't heard about...)
+> > 
+> > I finally found a documentation for the s3c6410x and the description
+> > of
+> > the different modes. Indeed, the sleep mode is not adequate for a
+> > cpuidle state. What about the 'stop' and 'deep stop' state ?
+> 
+> Hi Thomas,
+> 
+> just a reminder about the question above, so I can go ahead: fix what
+> you pointed out or remove the driver directly.
+> 
+> You mentionned in the previous email the STOP is not usful because it
+> can be controlled by manually outside of the cpuidle driver. But I see
+> in the documentation, the stop states power gates the cpu and deep-stop
+> stops the regulator.
 
-v2->v3
-- Fix comments
-- Rename alarm->alrm
-- Fix comments style
-- Remove useless newline
----
- drivers/rtc/Kconfig     |   7 +
- drivers/rtc/Makefile    |   1 +
- drivers/rtc/rtc-sunxi.c | 491 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 499 insertions(+)
- create mode 100644 drivers/rtc/rtc-sunxi.c
+STOP clock-gates the CPU and DEEP-STOP power-gates it by stopping the 
+regulator.
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 9654aa3..ef45e0b 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1076,6 +1076,13 @@ config RTC_DRV_SUN4V
- 	  If you say Y here you will get support for the Hypervisor
- 	  based RTC on SUN4V systems.
- 
-+config RTC_DRV_SUNXI
-+	tristate "Allwinner sun4i/sun7i RTC"
-+	depends on ARCH_SUNXI
-+	help
-+	  If you say Y here you will get support for the RTC found on
-+	  Allwinner A10/A20.
-+
- config RTC_DRV_STARFIRE
- 	bool "Starfire RTC"
- 	depends on SPARC64
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 2dff3d2..8b52b5a 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -115,6 +115,7 @@ obj-$(CONFIG_RTC_DRV_STARFIRE)	+= rtc-starfire.o
- obj-$(CONFIG_RTC_DRV_STK17TA8)	+= rtc-stk17ta8.o
- obj-$(CONFIG_RTC_DRV_STMP)	+= rtc-stmp3xxx.o
- obj-$(CONFIG_RTC_DRV_SUN4V)	+= rtc-sun4v.o
-+obj-$(CONFIG_RTC_DRV_SUNXI)	+= rtc-sunxi.o
- obj-$(CONFIG_RTC_DRV_TEGRA)	+= rtc-tegra.o
- obj-$(CONFIG_RTC_DRV_TEST)	+= rtc-test.o
- obj-$(CONFIG_RTC_DRV_TILE)	+= rtc-tile.o
-diff --git a/drivers/rtc/rtc-sunxi.c b/drivers/rtc/rtc-sunxi.c
-new file mode 100644
-index 0000000..89c331f
---- /dev/null
-+++ b/drivers/rtc/rtc-sunxi.c
-@@ -0,0 +1,491 @@
-+/*
-+ * An RTC driver for Allwinner A10/A20
-+ *
-+ * Copyright (c) 2013, Carlo Caione <carlo.caione@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/fs.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+#include <linux/types.h>
-+
-+#define SUNXI_LOSC_CTRL				0x0000
-+#define SUNXI_LOSC_CTRL_RTC_HMS_ACC		BIT(8)
-+#define SUNXI_LOSC_CTRL_RTC_YMD_ACC		BIT(7)
-+
-+#define SUNXI_RTC_YMD				0x0004
-+
-+#define SUNXI_RTC_HMS				0x0008
-+
-+#define SUNXI_ALRM_DHMS				0x000c
-+
-+#define SUNXI_ALRM_EN				0x0014
-+#define SUNXI_ALRM_EN_CNT_EN			BIT(8)
-+
-+#define SUNXI_ALRM_IRQ_EN			0x0018
-+#define SUNXI_ALRM_IRQ_EN_CNT_IRQ_EN		BIT(0)
-+
-+#define SUNXI_ALRM_IRQ_STA			0x001c
-+#define SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND		BIT(0)
-+
-+#define SUNXI_LOSC_CTRL_RTC_ACC \
-+	(SUNXI_LOSC_CTRL_RTC_HMS_ACC | SUNXI_LOSC_CTRL_RTC_YMD_ACC)
-+
-+#define SUNXI_MASK_DH				0x0000001f
-+#define SUNXI_MASK_SM				0x0000003f
-+#define SUNXI_MASK_M				0x0000000f
-+#define SUNXI_MASK_LY				0x00000001
-+#define SUNXI_MASK_D				0x00000ffe
-+#define SUNXI_MASK_M				0x0000000f
-+
-+#define SUNXI_GET(x, mask, shift)		(((x) & ((mask) << (shift))) \
-+							>> (shift))
-+
-+#define SUNXI_SET(x, mask, shift)		(((x) & (mask)) << (shift))
-+
-+/* Get date values */
-+#define SUNXI_DATE_GET_DAY_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_DH, 0)
-+#define SUNXI_DATE_GET_MON_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_M, 8)
-+#define SUNXI_DATE_GET_YEAR_VALUE(x, mask)	SUNXI_GET(x, mask, 16)
-+
-+/* Get time values */
-+#define SUNXI_TIME_GET_SEC_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_SM, 0)
-+#define SUNXI_TIME_GET_MIN_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_SM, 8)
-+#define SUNXI_TIME_GET_HOUR_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_DH, 16)
-+
-+/* Get alarm values */
-+#define SUNXI_ALRM_GET_SEC_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_SM, 0)
-+#define SUNXI_ALRM_GET_MIN_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_SM, 8)
-+#define SUNXI_ALRM_GET_HOUR_VALUE(x)		SUNXI_GET(x, SUNXI_MASK_DH, 16)
-+
-+/* Set date values */
-+#define SUNXI_DATE_SET_DAY_VALUE(x)		SUNXI_DATE_GET_DAY_VALUE(x)
-+#define SUNXI_DATE_SET_MON_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_M, 8)
-+#define SUNXI_DATE_SET_YEAR_VALUE(x, mask)	SUNXI_SET(x, mask, 16)
-+#define SUNXI_LEAP_SET_VALUE(x, shift)		SUNXI_SET(x, SUNXI_MASK_LY, shift)
-+
-+/* Set time values */
-+#define SUNXI_TIME_SET_SEC_VALUE(x)		SUNXI_TIME_GET_SEC_VALUE(x)
-+#define SUNXI_TIME_SET_MIN_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_SM, 8)
-+#define SUNXI_TIME_SET_HOUR_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_DH, 16)
-+
-+/* set alarm values */
-+#define SUNXI_ALRM_SET_SEC_VALUE(x)		SUNXI_ALRM_GET_SEC_VALUE(x)
-+#define SUNXI_ALRM_SET_MIN_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_SM, 8)
-+#define SUNXI_ALRM_SET_HOUR_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_DH, 16)
-+#define SUNXI_ALRM_SET_DAY_VALUE(x)		SUNXI_SET(x, SUNXI_MASK_D, 21)
-+
-+/* time unit conversions */
-+#define SEC_IN_MIN				60
-+#define SEC_IN_HOUR				(60 * SEC_IN_MIN)
-+#define SEC_IN_DAY				(24 * SEC_IN_HOUR)
-+
-+struct sunxi_rtc_data_year {
-+	unsigned int min;		/* min year allowed */
-+	unsigned int max;		/* max year allowed */
-+	unsigned int off;		/* year offset to get the current year */
-+	unsigned int mask;
-+	unsigned char leap_shift;	/* bit shift to get the leap year */
-+};
-+
-+static struct sunxi_rtc_data_year data_year_param[] = {
-+	[0] = {
-+		.min		= 1970,
-+		.max		= 2100,
-+		.off		= 0,
-+		.mask		= 0x000000ff,
-+		.leap_shift	= 24,
-+	},
-+	[1] = {
-+		.min		= 2010,
-+		.max		= 2073,
-+		.off		= 110,
-+		.mask		= 0x0000003f,
-+		.leap_shift	= 22,
-+	},
-+};
-+
-+struct sunxi_rtc_dev {
-+	struct rtc_device *rtc;
-+	struct device *dev;
-+	struct sunxi_rtc_data_year *data_year;
-+	void __iomem *base;
-+	int irq;
-+};
-+
-+static irqreturn_t sunxi_rtc_alarmirq(int irq, void *id)
-+{
-+	struct sunxi_rtc_dev *chip = (struct sunxi_rtc_dev *) id;
-+	u32 val;
-+
-+	val = readl(chip->base + SUNXI_ALRM_IRQ_STA);
-+
-+	if (val & SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND) {
-+		val |= SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND;
-+		writel(val, chip->base + SUNXI_ALRM_IRQ_STA);
-+
-+		rtc_update_irq(chip->rtc, 1, RTC_AF | RTC_IRQF);
-+
-+		return IRQ_HANDLED;
-+	}
-+
-+	return IRQ_NONE;
-+}
-+
-+static void sunxi_rtc_setaie(int to, struct sunxi_rtc_dev *chip)
-+{
-+	u32 alrm_val = 0;
-+	u32 alrm_irq_val = 0;
-+
-+	if (to) {
-+		alrm_val = readl(chip->base + SUNXI_ALRM_EN);
-+		alrm_val |= SUNXI_ALRM_EN_CNT_EN;
-+
-+		alrm_irq_val = readl(chip->base + SUNXI_ALRM_IRQ_EN);
-+		alrm_irq_val |= SUNXI_ALRM_IRQ_EN_CNT_IRQ_EN;
-+	} else {
-+		writel(SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND,
-+				chip->base + SUNXI_ALRM_IRQ_STA);
-+	}
-+
-+	writel(alrm_val, chip->base + SUNXI_ALRM_EN);
-+	writel(alrm_irq_val, chip->base + SUNXI_ALRM_IRQ_EN);
-+}
-+
-+static int sunxi_rtc_getalarm(struct device *dev, struct rtc_wkalrm *wkalrm)
-+{
-+	struct sunxi_rtc_dev *chip = dev_get_drvdata(dev);
-+	struct rtc_time *alrm_tm = &wkalrm->time;
-+	u32 alrm;
-+	u32 alrm_en;
-+	u32 date;
-+
-+	alrm = readl(chip->base + SUNXI_ALRM_DHMS);
-+	date = readl(chip->base + SUNXI_RTC_YMD);
-+
-+	alrm_tm->tm_sec = SUNXI_ALRM_GET_SEC_VALUE(alrm);
-+	alrm_tm->tm_min = SUNXI_ALRM_GET_MIN_VALUE(alrm);
-+	alrm_tm->tm_hour = SUNXI_ALRM_GET_HOUR_VALUE(alrm);
-+
-+	alrm_tm->tm_mday = SUNXI_DATE_GET_DAY_VALUE(date);
-+	alrm_tm->tm_mon = SUNXI_DATE_GET_MON_VALUE(date);
-+	alrm_tm->tm_year = SUNXI_DATE_GET_YEAR_VALUE(date,
-+			chip->data_year->mask);
-+
-+	alrm_tm->tm_year += chip->data_year->off;
-+	alrm_tm->tm_mon -= 1;
-+
-+	alrm_en = readl(chip->base + SUNXI_ALRM_IRQ_EN);
-+	if (alrm_en & SUNXI_ALRM_EN_CNT_EN)
-+		wkalrm->enabled = 1;
-+
-+	return 0;
-+}
-+
-+static int sunxi_rtc_gettime(struct device *dev, struct rtc_time *rtc_tm)
-+{
-+	struct sunxi_rtc_dev *chip = dev_get_drvdata(dev);
-+	u32 date, time;
-+	int t;
-+
-+	/*
-+	 * read again if the system was mid-updated
-+	 */
-+	for (t = 0; t < 2; t++) {
-+		date = readl(chip->base + SUNXI_RTC_YMD);
-+		time = readl(chip->base + SUNXI_RTC_HMS);
-+
-+		rtc_tm->tm_sec  = SUNXI_TIME_GET_SEC_VALUE(time);
-+		rtc_tm->tm_min  = SUNXI_TIME_GET_MIN_VALUE(time);
-+		rtc_tm->tm_hour = SUNXI_TIME_GET_HOUR_VALUE(time);
-+
-+		rtc_tm->tm_mday = SUNXI_DATE_GET_DAY_VALUE(date);
-+		rtc_tm->tm_mon  = SUNXI_DATE_GET_MON_VALUE(date);
-+		rtc_tm->tm_year = SUNXI_DATE_GET_YEAR_VALUE(date,
-+				chip->data_year->mask);
-+
-+		if (rtc_tm->tm_sec == 0)
-+			msleep(500);
-+		else
-+			break;
-+	}
-+
-+	rtc_tm->tm_year += chip->data_year->off;
-+	rtc_tm->tm_mon  -= 1;
-+
-+	return rtc_valid_tm(rtc_tm);
-+}
-+
-+static int sunxi_rtc_setalarm(struct device *dev, struct rtc_wkalrm *wkalrm)
-+{
-+	struct sunxi_rtc_dev *chip = dev_get_drvdata(dev);
-+	struct rtc_time *alrm_tm = &wkalrm->time;
-+	struct rtc_time tm_now;
-+	u32 alrm = 0;
-+	unsigned long time_now = 0;
-+	unsigned long time_set = 0;
-+	unsigned long time_gap = 0;
-+	unsigned long time_gap_day = 0;
-+	unsigned long time_gap_hour = 0;
-+	unsigned long time_gap_min = 0;
-+	int ret = 0;
-+
-+	ret = sunxi_rtc_gettime(dev, &tm_now);
-+	if (ret < 0) {
-+		dev_err(dev, "Error in getting time\n");
-+		return -EINVAL;
-+	}
-+
-+	rtc_tm_to_time(alrm_tm, &time_set);
-+	rtc_tm_to_time(&tm_now, &time_now);
-+	if (time_set <= time_now) {
-+		dev_err(dev, "Date to set in the past\n");
-+		return -EINVAL;
-+	}
-+
-+	time_gap = time_set - time_now;
-+	time_gap_day = time_gap / SEC_IN_DAY;
-+	time_gap -= time_gap_day * SEC_IN_DAY;
-+	time_gap_hour = time_gap / SEC_IN_HOUR;
-+	time_gap -= time_gap_hour * SEC_IN_HOUR;
-+	time_gap_min = time_gap / SEC_IN_MIN;
-+	time_gap -= time_gap_min * SEC_IN_MIN;
-+
-+	if (time_gap_day > 255) {
-+		dev_err(dev, "Day must be in the range 0 - 255\n");
-+		return -EINVAL;
-+	}
-+
-+	sunxi_rtc_setaie(0, chip);
-+	writel(0, chip->base + SUNXI_ALRM_DHMS);
-+	usleep_range(100, 300);
-+
-+	alrm = SUNXI_ALRM_SET_SEC_VALUE(time_gap) |
-+		SUNXI_ALRM_SET_MIN_VALUE(time_gap_min) |
-+		SUNXI_ALRM_SET_HOUR_VALUE(time_gap_hour) |
-+		SUNXI_ALRM_SET_DAY_VALUE(time_gap_day);
-+	writel(alrm, chip->base + SUNXI_ALRM_DHMS);
-+
-+	writel(0, chip->base + SUNXI_ALRM_IRQ_EN);
-+	writel(SUNXI_ALRM_IRQ_EN_CNT_IRQ_EN, chip->base + SUNXI_ALRM_IRQ_EN);
-+
-+	sunxi_rtc_setaie(wkalrm->enabled, chip);
-+
-+	return 0;
-+}
-+
-+static int sunxi_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
-+{
-+	struct sunxi_rtc_dev *chip = dev_get_drvdata(dev);
-+	u32 date = 0;
-+	u32 time = 0;
-+	int year;
-+	int t;
-+
-+	year = rtc_tm->tm_year + 1900;
-+	if (year < chip->data_year->min || year > chip->data_year->max) {
-+		dev_err(dev, "rtc only supports year in range %d - %d\n",
-+				chip->data_year->min, chip->data_year->max);
-+		return -EINVAL;
-+	}
-+
-+	rtc_tm->tm_year -= chip->data_year->off;
-+	rtc_tm->tm_mon += 1;
-+
-+	date = SUNXI_DATE_SET_DAY_VALUE(rtc_tm->tm_mday) |
-+		SUNXI_DATE_SET_MON_VALUE(rtc_tm->tm_mon)  |
-+		SUNXI_DATE_SET_YEAR_VALUE(rtc_tm->tm_year,
-+				chip->data_year->mask);
-+
-+	if (is_leap_year(year))
-+		date |= SUNXI_LEAP_SET_VALUE(1, chip->data_year->leap_shift);
-+
-+	time = SUNXI_TIME_SET_SEC_VALUE(rtc_tm->tm_sec)  |
-+		SUNXI_TIME_SET_MIN_VALUE(rtc_tm->tm_min)  |
-+		SUNXI_TIME_SET_HOUR_VALUE(rtc_tm->tm_hour);
-+
-+	writel(0, chip->base + SUNXI_RTC_HMS);
-+	writel(0, chip->base + SUNXI_RTC_YMD);
-+
-+	writel(time, chip->base + SUNXI_RTC_HMS);
-+
-+	/*
-+	 * After writing the RCT HH-MM-SS register, the
-+	 * SUNXI_LOSC_CTRL_RTC_HMS_ACC bit is set and it will be cleared until
-+	 * the real writing operation is finished
-+	 */
-+	for (t = 0; t < 3; t++) {
-+		if ((readl(chip->base + SUNXI_LOSC_CTRL) &
-+			SUNXI_LOSC_CTRL_RTC_HMS_ACC) && --t)
-+			break;
-+		else
-+			msleep(50);
-+	}
-+	if (t == 0) {
-+		dev_err(dev, "Failed to set rtc time.\n");
-+		return -1;
-+	}
-+
-+	writel(date, chip->base + SUNXI_RTC_YMD);
-+
-+	/*
-+	 * After writing the RCT YY-MM-DD register, the
-+	 * SUNXI_LOSC_CTRL_RTC_YMD_ACC bit is set and it will be cleared until
-+	 * the real writing operation is finished
-+	 */
-+	for (t = 0; t < 3; t++) {
-+		if ((readl(chip->base + SUNXI_LOSC_CTRL) &
-+			SUNXI_LOSC_CTRL_RTC_YMD_ACC) && --t)
-+			break;
-+		else
-+			msleep(50);
-+	}
-+	if (t == 0) {
-+		dev_err(dev, "Failed to set rtc date.\n");
-+		return -1;
-+	}
-+
-+	/*
-+	 * wait about 70us to make sure the the time is really written into
-+	 * target
-+	 */
-+	usleep_range(70, 100);
-+
-+	return 0;
-+}
-+
-+static int sunxi_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
-+{
-+	struct sunxi_rtc_dev *chip = dev_get_drvdata(dev);
-+
-+	if (!enabled)
-+		sunxi_rtc_setaie(enabled, chip);
-+
-+	return 0;
-+}
-+
-+static const struct rtc_class_ops sunxi_rtc_ops = {
-+	.read_time		= sunxi_rtc_gettime,
-+	.set_time		= sunxi_rtc_settime,
-+	.read_alarm		= sunxi_rtc_getalarm,
-+	.set_alarm		= sunxi_rtc_setalarm,
-+	.alarm_irq_enable	= sunxi_rtc_alarm_irq_enable
-+};
-+
-+static const struct of_device_id sunxi_rtc_dt_ids[] = {
-+	{ .compatible = "allwinner,sun4i-rtc", .data = &data_year_param[0] },
-+	{ .compatible = "allwinner,sun7i-a20-rtc", .data = &data_year_param[1] },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, sunxi_rtc_dt_ids);
-+
-+static int sunxi_rtc_probe(struct platform_device *pdev)
-+{
-+	struct sunxi_rtc_dev *chip;
-+	struct resource *res;
-+	const struct of_device_id *of_id;
-+	int ret;
-+
-+	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
-+	if (!chip)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, chip);
-+	chip->dev = &pdev->dev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	chip->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(chip->base))
-+		return PTR_ERR(chip->base);
-+
-+	chip->irq = platform_get_irq(pdev, 0);
-+	if (chip->irq < 0) {
-+		dev_err(&pdev->dev, "No IRQ resource\n");
-+		return chip->irq;
-+	}
-+	ret = devm_request_irq(&pdev->dev, chip->irq, sunxi_rtc_alarmirq,
-+			0, dev_name(&pdev->dev), chip);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Could not request IRQ\n");
-+		return ret;
-+	}
-+
-+	of_id = of_match_device(sunxi_rtc_dt_ids, &pdev->dev);
-+	if (!of_id) {
-+		dev_err(&pdev->dev, "Unable to setup RTC data\n");
-+		return -ENODEV;
-+	}
-+	chip->data_year = (struct sunxi_rtc_data_year *) of_id->data;
-+
-+	/* clear the alarm count value */
-+	writel(0, chip->base + SUNXI_ALRM_DHMS);
-+
-+	/* disable alarm, not generate irq pending */
-+	writel(0, chip->base + SUNXI_ALRM_EN);
-+
-+	/* disable alarm week/cnt irq, unset to cpu */
-+	writel(0, chip->base + SUNXI_ALRM_IRQ_EN);
-+
-+	/* clear alarm week/cnt irq pending */
-+	writel(SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND, chip->base + SUNXI_ALRM_IRQ_STA);
-+
-+	chip->rtc = rtc_device_register("rtc-sunxi", &pdev->dev,
-+			&sunxi_rtc_ops, THIS_MODULE);
-+	if (IS_ERR(chip->rtc)) {
-+		dev_err(&pdev->dev, "unable to register device\n");
-+		return PTR_ERR(chip->rtc);
-+	}
-+
-+	dev_info(&pdev->dev, "RTC enabled\n");
-+
-+	return 0;
-+}
-+
-+static int sunxi_rtc_remove(struct platform_device *pdev)
-+{
-+	struct sunxi_rtc_dev *chip = platform_get_drvdata(pdev);
-+
-+	rtc_device_unregister(chip->rtc);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver sunxi_rtc_driver = {
-+	.probe		= sunxi_rtc_probe,
-+	.remove		= sunxi_rtc_remove,
-+	.driver		= {
-+		.name		= "sunxi-rtc",
-+		.owner		= THIS_MODULE,
-+		.of_match_table = sunxi_rtc_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(sunxi_rtc_driver);
-+
-+MODULE_DESCRIPTION("sunxi RTC driver");
-+MODULE_AUTHOR("Carlo Caione <carlo.caione@gmail.com>");
-+MODULE_LICENSE("GPL");
--- 
-1.8.4.2
+There are some interesting aspects of those modes, like memory self-
+refresh, PLL power-off and system-wide down clocking, but I believe they 
+are too tricky to handle (coupling with device PM, stopped timers) and 
+with too little possible power saving to justify the effort of adding 
+support for them.
+
+In the end, I haven't seen support for them implemented even in strange 
+vendor kernels used even on production devices, like Android phones.
+
+> 
+> If these states have to been added later, still it worth to remove the
+> driver ?
+
+I don't think that anybody is even going to add support for them and by 
+anybody I should probably mean myself, since I'm currently the only person 
+actively adding new code for this platform, as a part of my hobby.
+
+Best regards,
+Tomasz
