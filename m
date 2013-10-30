@@ -1,16 +1,48 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 31 Oct 2013 04:50:57 +0530
-Subject: [PATCH v2 0/2] cpufreq support for the big.LITTLE switcher
-In-Reply-To: <44629257.8AhBlXWpZK@vostro.rjw.lan>
-References: <1383162281-24204-1-git-send-email-nicolas.pitre@linaro.org>
- <7822477.lBueQHUY4E@vostro.rjw.lan>
- <CAKohpom-Oo81U_J5sC8qG7uzjW=yRJLvAPDpNyV6Sst7uw=hag@mail.gmail.com>
- <44629257.8AhBlXWpZK@vostro.rjw.lan>
-Message-ID: <CAKohpomi+UJXTcKuPxko--KuPFWNph0hmKtj11huoFvTiyzPNQ@mail.gmail.com>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Wed, 30 Oct 2013 16:25:32 -0700
+Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
+In-Reply-To: <87ob66nyqc.fsf@linaro.org>
+References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
+ <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
+ <20131029132043.GA28165@fifo99.com>
+ <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+ <87ob66nyqc.fsf@linaro.org>
+Message-ID: <20131030232412.GA10229@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2013 04:55, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> I've just fixed it up manually, please check the result in bleeding-edge.
+On Wed, Oct 30, 2013 at 04:08:27PM -0700, Kevin Hilman wrote:
+> Olof Johansson <olof@lixom.net> writes:
+> 
+> > I would be very happy to take more code for the older Qualcomm chipset
+> > to enable full functionality for them, but it's been my impression
+> > that far from all that is needed to make it a useful platform is in
+> > the upstream kernel, and there's been no signs of more of it showing
+> > up at least in the last two years.
+> >
+> > So we have a bit of a stalemate here -- the current Qualcomm team
+> > wants to avoid having to deal too much with the legacy platforms --
+> > they are technically quite different from the current platforms and
+> > the divergence makes it hard to deal with supporting it all in a
+> > modern way without risking regressions. I tend to agree with them.
+> 
+> As do I.
+> 
+> > Just like omap split between omap1 and omap2plus, I think it's a time
+> > to create a mach-qcom instead, and move the modern (v7, most likely)
+> > platforms there -- enable them with device tree, modern framework
+> > infrastructure, etc. That way you can keep older platforms in mach-msm
+> > without risk of regressions, and they have a clean base to start on
+> > with their later platforms.
+> 
+> I think this split approach is a good compromise.
+> 
+> If the maintainers of the current older platforms wish to bring them up
+> to modern frameworks, we can consider combining again.  If not, they the
+> older platforms will take the same path as the rest of the older
+> platforms that slowly fade away.
+> 
 
-It crossed 80 columns, otherwise its fine :)
+So the current users of those platforms are, what SOL ?
+
+Daniel
