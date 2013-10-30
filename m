@@ -1,58 +1,42 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 30 Oct 2013 10:25:37 -0600
-Subject: [PATCH 0/6] PCI: imx6: Random fixes
-In-Reply-To: <201310301552.28866.marex@denx.de>
-References: <1381853200-5534-1-git-send-email-marex@denx.de>
- <CAErSpo6v4nvKQ4W9BhnUsNEjzsXoCiLxeFY-K=z=bMZ4AFOyGg@mail.gmail.com>
- <201310301552.28866.marex@denx.de>
-Message-ID: <CAErSpo5dcqA+OkORmPO41THd+QaG53jXgZPogw3U5-1GP-hyoA@mail.gmail.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Wed, 30 Oct 2013 09:27:07 -0700
+Subject: [PATCH] Documentation/Changes: update binutils version requirement
+ for ARMv7 builds
+Message-ID: <alpine.DEB.2.02.1310300923080.12006@tamien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 8:52 AM, Marek Vasut <marex@denx.de> wrote:
-> Dear Bjorn Helgaas,
->
->> On Tue, Oct 15, 2013 at 10:06 AM, Marek Vasut <marex@denx.de> wrote:
->> > Set of random fixes for the PCIe driver for i.MX6 . With these fixes, my
->> > setup with MX6Q -> PCIe bridge -> i210 ethernet adapter works as
->> > expected.
->> >
->> > NOTE: I'm sure this will start some discussion. There are quite a few
->> > patches
->> >
->> >       that are more of a hacks. Shawn, I didn't ignore your remark about
->> >       the clock patches, I will test it ASAP, I just want to have these
->> >       fixes in the public so others can comment/test.
->> >
->> > Marek Vasut (6):
->> >   PCI: imx6: Make reset-gpio optional
->> >   PCI: imx6: Fix the clock for PCIe
->> >   ARM: dts: imx6qdl: Fix the clock for PCIe
->> >   PCI: imx6: Probe the PCIe in fs_initcall()
->> >   PCI: imx6: Force Gen1 operation
->> >   PCI: designware: Fix DT resource retrieval
->> >
->> >  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
->> >  arch/arm/boot/dts/imx6qdl.dtsi                     |  4 +-
->> >  drivers/pci/host/pci-imx6.c                        | 63
->> >  ++++++++++++++++------ drivers/pci/host/pcie-designware.c
->> >    | 17 +++---
->> >  4 files changed, 55 insertions(+), 31 deletions(-)
->>
->> I'm ignoring this series for now.  I assume you'll post an updated
->> series as mentioned in your Oct 17 response to "[Patch 5/6] PCI: imx6:
->> Force Gen1 operation."  Please mark that series as "v2" when you post
->> it.  My assumption is still that Shawn Guo will ack the
->> drivers/pci/host/ pieces before I apply them [1].
->
-> Can you maybe pick at least these two:
->
-> PCI: imx6: Make reset-gpio optional
-> PCI: imx6: Probe the PCIe in fs_initcall()
->
-> I think they should be harmless and the later one fixes a problem on MX6. I'm
-> now digging in the PCIe MX6 again btw.
 
-I'm fine with taking these as long as Shawn acks them.
+ARMv7 builds now make use of the pldw opcode and the ".arch_extension mp"
+pragma.  These aren't supported in binutils prior to 2.21.  So, update
+Documentation/Changes accordingly.
 
-Bjorn
+Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Thierry Reding <treding@nvidia.com>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+---
+Intended for 3.13.
+
+  Documentation/Changes | 3 +++
+  1 file changed, 3 insertions(+)
+
+diff --git a/Documentation/Changes b/Documentation/Changes
+index b175808..97fcbdf 100644
+--- a/Documentation/Changes
++++ b/Documentation/Changes
+@@ -67,6 +67,9 @@ assembling the 16-bit boot code, removing the need for as86 to compile
+  your kernel.  This change does, however, mean that you need a recent
+  release of binutils.
+
++ARMv7 builds require binutils 2.21 or later due to the use of the pldw
++opcode and ".arch_extension mp".
++
+  Perl
+  ----
+
+-- 
+1.8.1.5
