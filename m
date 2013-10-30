@@ -1,291 +1,137 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 30 Oct 2013 06:40:43 +0530
-Subject: [PATCH v2] arm/arm64: KVM: MMIO support for BE guest
-In-Reply-To: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
-References: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 30 Oct 2013 08:53:42 +0800
+Subject: [PATCH v3 2/5] usb: chipidea: add freescale imx28 special
+ write register method
+In-Reply-To: <20131029235447.GA21367@kroah.com>
+References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
+ <1382680943-9258-2-git-send-email-peter.chen@freescale.com>
+ <526E3E2C.3030706@digi.com> <201310281147.53982.marex@denx.de>
+ <20131029235447.GA21367@kroah.com>
+Message-ID: <20131030005341.GA31544@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 12:19 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Do the necessary byteswap when host and guest have different
-> views of the universe. Actually, the only case we need to take
-> care of is when the guest is BE. All the other cases are naturally
-> handled.
+On Tue, Oct 29, 2013 at 04:54:47PM -0700, gregkh at linuxfoundation.org wrote:
+> On Mon, Oct 28, 2013 at 11:47:53AM +0100, Marek Vasut wrote:
+> > Dear Hector Palacios,
+> > 
+> > > Dear Peter,
+> > > 
+> > > On 10/25/2013 08:02 AM, Peter Chen wrote:
+> > > > According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
+> > > > register error issue", All USB register write operations must
+> > > > use the ARM SWP instruction. So, we implement special hw_write
+> > > > and hw_test_and_clear for imx28.
+> > > > 
+> > > > Discussion for it at below:
+> > > > http://marc.info/?l=linux-usb&m=137996395529294&w=2
+> > > > 
+> > > > Signed-off-by: Peter Chen
+> > > > <peter.chen-KZfg59tc24xl57MIdRCFDg@public.gmane.org> ---
+> > > > Changes for v2:
+> > > > - Rebase to latest usb-next tree
+> > > > 
+> > > >   drivers/usb/chipidea/ci.h    |   23 +++++++++++++++++++++++
+> > > >   drivers/usb/chipidea/core.c  |    2 ++
+> > > >   drivers/usb/chipidea/host.c  |    1 +
+> > > >   include/linux/usb/chipidea.h |    1 +
+> > > >   4 files changed, 27 insertions(+), 0 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+> > > > index 1c94fc5..4eb61d0 100644
+> > > > --- a/drivers/usb/chipidea/ci.h
+> > > > +++ b/drivers/usb/chipidea/ci.h
+> > > > @@ -173,6 +173,8 @@ struct ci_hdrc {
+> > > > 
+> > > >   	struct dentry			*debugfs;
+> > > >   	bool				id_event;
+> > > >   	bool				b_sess_valid_event;
+> > > > 
+> > > > +	/* imx28 needs swp instruction for writing */
+> > > > +	bool				imx28_write_fix;
+> > > > 
+> > > >   };
+> > > >   
+> > > >   static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
+> > > > 
+> > > > @@ -253,6 +255,13 @@ static inline u32 hw_read(struct ci_hdrc *ci, enum
+> > > > ci_hw_regs reg, u32 mask)
+> > > > 
+> > > >   	return ioread32(ci->hw_bank.regmap[reg]) & mask;
+> > > >   
+> > > >   }
+> > > > 
+> > > > +#ifdef CONFIG_SOC_IMX28
+> > > > +static inline void imx28_ci_writel(u32 val32, volatile u32 *addr)
+> > > > +{
+> > > > +	__asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
+> > > > +}
+> > > > +#endif
+> > > > +
+> > > > 
+> > > >   /**
+> > > >   
+> > > >    * hw_write: writes to a hw register
+> > > >    * @reg:  register index
+> > > > 
+> > > > @@ -266,7 +275,14 @@ static inline void hw_write(struct ci_hdrc *ci, enum
+> > > > ci_hw_regs reg,
+> > > > 
+> > > >   		data = (ioread32(ci->hw_bank.regmap[reg]) & ~mask)
+> > > >   		
+> > > >   			| (data & mask);
+> > > > 
+> > > > +#ifdef CONFIG_SOC_IMX28
+> > > > +	if (ci->imx28_write_fix)
+> > > > +		imx28_ci_writel(data, ci->hw_bank.regmap[reg]);
+> > > > +	else
+> > > > +		iowrite32(data, ci->hw_bank.regmap[reg]);
+> > > > +#else
+> > > > 
+> > > >   	iowrite32(data, ci->hw_bank.regmap[reg]);
+> > > > 
+> > > > +#endif
+> > > > 
+> > > >   }
+> > > >   
+> > > >   /**
+> > > > 
+> > > > @@ -281,7 +297,14 @@ static inline u32 hw_test_and_clear(struct ci_hdrc
+> > > > *ci, enum ci_hw_regs reg,
+> > > > 
+> > > >   {
+> > > >   
+> > > >   	u32 val = ioread32(ci->hw_bank.regmap[reg]) & mask;
+> > > > 
+> > > > +#ifdef CONFIG_SOC_IMX28
+> > > > +	if (ci->imx28_write_fix)
+> > > > +		imx28_ci_writel(val, ci->hw_bank.regmap[reg]);
+> > > > +	else
+> > > > +		iowrite32(val, ci->hw_bank.regmap[reg]);
+> > > > +#else
+> > > > 
+> > > >   	iowrite32(val, ci->hw_bank.regmap[reg]);
+> > > > 
+> > > > +#endif
+> > > > 
+> > > >   	return val;
+> > > >   
+> > > >   }
+> > > 
+> > > Can't we remove the #ifdefs CONFIG_SOC_IMX28 all around?
+> > > The check is done on the new flag ci->imx28_write_fix which exists for all
+> > > platforms, isn't it?.
+> > 
+> > The SWP instruction is specific to ARM, so you'd need to stub-out the 
+> > imx28_ci_writel() with ifdef then.
+> 
+> That's better than the mess of #ifdefs this patch adds, which isn't ok
+> at all :(
+> 
 
-You might want to handle the case where we have LE guest on BE host
-because for ARM64 kernel we might have lot of people interested in
-running host kernel in BE mode with KVM enabled.
+You mean try to reduce the number of #ifdef?
 
---
-Anup
+-- 
 
->
-> Also be careful about endianness when the data is being memcopy-ed
-> from/to the run buffer.
->
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> >From v1:
-> - Moved data insertion/extraction into specific functions
-> - Bit of tidying up making the patch more readable
->
->  arch/arm/include/asm/kvm_emulate.h   | 41 +++++++++++++++++
->  arch/arm/kvm/mmio.c                  | 87 +++++++++++++++++++++++++++++++-----
->  arch/arm64/include/asm/kvm_emulate.h | 48 ++++++++++++++++++++
->  3 files changed, 165 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index a464e8d..8a6be05 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -157,4 +157,45 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
->         return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
->  }
->
-> +static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
-> +{
-> +       return !!(*vcpu_cpsr(vcpu) & PSR_E_BIT);
-> +}
-> +
-> +static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
-> +                                                   unsigned long data,
-> +                                                   unsigned int len)
-> +{
-> +       if (kvm_vcpu_is_be(vcpu)) {
-> +               switch (len) {
-> +               case 1:
-> +                       return data & 0xff;
-> +               case 2:
-> +                       return be16_to_cpu(data & 0xffff);
-> +               default:
-> +                       return be32_to_cpu(data);
-> +               }
-> +       }
-> +
-> +       return data;            /* Leave LE untouched */
-> +}
-> +
-> +static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-> +                                                   unsigned long data,
-> +                                                   unsigned int len)
-> +{
-> +       if (kvm_vcpu_is_be(vcpu)) {
-> +               switch (len) {
-> +               case 1:
-> +                       return data & 0xff;
-> +               case 2:
-> +                       return cpu_to_be16(data & 0xffff);
-> +               default:
-> +                       return cpu_to_be32(data);
-> +               }
-> +       }
-> +
-> +       return data;            /* Leave LE untouched */
-> +}
-> +
->  #endif /* __ARM_KVM_EMULATE_H__ */
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index 0c25d94..54105f1b 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -23,6 +23,69 @@
->
->  #include "trace.h"
->
-> +static void mmio_write_data(struct kvm_exit_mmio *mmio, unsigned long data)
-> +{
-> +       void *datap = NULL;
-> +       union {
-> +               u8      byte;
-> +               u16     hword;
-> +               u32     word;
-> +               u64     dword;
-> +       } tmp;
-> +
-> +       switch (mmio->len) {
-> +       case 1:
-> +               tmp.byte        = data;
-> +               datap           = &tmp.byte;
-> +               break;
-> +       case 2:
-> +               tmp.hword       = data;
-> +               datap           = &tmp.hword;
-> +               break;
-> +       case 4:
-> +               tmp.word        = data;
-> +               datap           = &tmp.word;
-> +               break;
-> +       case 8:
-> +               tmp.dword       = data;
-> +               datap           = &tmp.dword;
-> +               break;
-> +       }
-> +
-> +       memcpy(mmio->data, datap, mmio->len);
-> +}
-> +
-> +static unsigned long mmio_read_data(struct kvm_run *run)
-> +{
-> +       unsigned long data = 0;
-> +       unsigned int len = run->mmio.len;
-> +       union {
-> +               u16     hword;
-> +               u32     word;
-> +               u64     dword;
-> +       } tmp;
-> +
-> +       switch (len) {
-> +       case 1:
-> +               data = run->mmio.data[0];
-> +               break;
-> +       case 2:
-> +               memcpy(&tmp.hword, run->mmio.data, len);
-> +               data = tmp.hword;
-> +               break;
-> +       case 4:
-> +               memcpy(&tmp.word, run->mmio.data, len);
-> +               data = tmp.word;
-> +               break;
-> +       case 8:
-> +               memcpy(&tmp.dword, run->mmio.data, len);
-> +               data = tmp.dword;
-> +               break;
-> +       }
-> +
-> +       return data;
-> +}
-> +
->  /**
->   * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
->   * @vcpu: The VCPU pointer
-> @@ -33,28 +96,27 @@
->   */
->  int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
-> -       unsigned long *dest;
-> +       unsigned long data;
->         unsigned int len;
->         int mask;
->
->         if (!run->mmio.is_write) {
-> -               dest = vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt);
-> -               *dest = 0;
-> -
->                 len = run->mmio.len;
->                 if (len > sizeof(unsigned long))
->                         return -EINVAL;
->
-> -               memcpy(dest, run->mmio.data, len);
-> -
-> -               trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
-> -                               *((u64 *)run->mmio.data));
-> +               data = mmio_read_data(run);
->
->                 if (vcpu->arch.mmio_decode.sign_extend &&
->                     len < sizeof(unsigned long)) {
->                         mask = 1U << ((len * 8) - 1);
-> -                       *dest = (*dest ^ mask) - mask;
-> +                       data = (data ^ mask) - mask;
->                 }
-> +
-> +               trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
-> +                              data);
-> +               data = vcpu_data_host_to_guest(vcpu, data, len);
-> +               *vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
->         }
->
->         return 0;
-> @@ -105,6 +167,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->                  phys_addr_t fault_ipa)
->  {
->         struct kvm_exit_mmio mmio;
-> +       unsigned long data;
->         unsigned long rt;
->         int ret;
->
-> @@ -125,13 +188,15 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->         }
->
->         rt = vcpu->arch.mmio_decode.rt;
-> +       data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), mmio.len);
-> +
->         trace_kvm_mmio((mmio.is_write) ? KVM_TRACE_MMIO_WRITE :
->                                          KVM_TRACE_MMIO_READ_UNSATISFIED,
->                         mmio.len, fault_ipa,
-> -                       (mmio.is_write) ? *vcpu_reg(vcpu, rt) : 0);
-> +                       (mmio.is_write) ? data : 0);
->
->         if (mmio.is_write)
-> -               memcpy(mmio.data, vcpu_reg(vcpu, rt), mmio.len);
-> +               mmio_write_data(&mmio, data);
->
->         if (vgic_handle_mmio(vcpu, run, &mmio))
->                 return 1;
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index eec0738..3a7d058 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -177,4 +177,52 @@ static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
->         return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
->  }
->
-> +static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
-> +{
-> +       if (vcpu_mode_is_32bit(vcpu))
-> +               return !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_E_BIT);
-> +
-> +       return !!(vcpu_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
-> +}
-> +
-> +static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
-> +                                                   unsigned long data,
-> +                                                   unsigned int len)
-> +{
-> +       if (kvm_vcpu_is_be(vcpu)) {
-> +               switch (len) {
-> +               case 1:
-> +                       return data & 0xff;
-> +               case 2:
-> +                       return be16_to_cpu(data & 0xffff);
-> +               case 4:
-> +                       return be32_to_cpu(data & ((1UL << 32) - 1));
-> +               default:
-> +                       return be64_to_cpu(data);
-> +               }
-> +       }
-> +
-> +       return data;            /* Leave LE untouched */
-> +}
-> +
-> +static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-> +                                                   unsigned long data,
-> +                                                   unsigned int len)
-> +{
-> +       if (kvm_vcpu_is_be(vcpu)) {
-> +               switch (len) {
-> +               case 1:
-> +                       return data & 0xff;
-> +               case 2:
-> +                       return cpu_to_be16(data & 0xffff);
-> +               case 4:
-> +                       return cpu_to_be32(data & ((1UL << 32) - 1));
-> +               default:
-> +                       return cpu_to_be64(data);
-> +               }
-> +       }
-> +
-> +       return data;            /* Leave LE untouched */
-> +}
-> +
->  #endif /* __ARM64_KVM_EMULATE_H__ */
-> --
-> 1.8.2.3
->
->
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Best Regards,
+Peter Chen
