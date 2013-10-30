@@ -1,38 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Oct 2013 17:54:26 +0000
-Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
-In-Reply-To: <5270793E.9000605@mentor.com>
-References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
- <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
- <5264A06B.2040202@mentor.com>
- <20131021045917.GH17165@S2101-09.ap.freescale.net>
- <857E9EDCA6C0904DB3357321AA9123EB62506BEA@NA-MBX-01.mgc.mentorg.com>
- <5264C615.4070504@mentor.com>
- <20131021070451.GI17165@S2101-09.ap.freescale.net>
- <526DCED3.2070704@mentor.com>
- <20131028074524.GE2839@S2101-09.ap.freescale.net>
- <5270793E.9000605@mentor.com>
-Message-ID: <20131030175426.GK16735@n2100.arm.linux.org.uk>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 30 Oct 2013 18:58:41 +0100
+Subject: [PATCHv8][ 2/4] ARM: dts: cpuimx35 Add touchscreen support.
+In-Reply-To: <1383155923-24076-1-git-send-email-denis@eukrea.com>
+References: <1383155923-24076-1-git-send-email-denis@eukrea.com>
+Message-ID: <1383155923-24076-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 08:13:02PM -0700, jiada wrote:
-> Hi
->
-> On 10/28/2013 12:45 AM, Shawn Guo wrote:
->> 1. Apply the following change
->>
->> https://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=commitdiff;h=6050d181a4fd4abb745506a6e565d55f1f9df964
->>
->> 2. Remove imx_src_prepare_restart() from imx6q_restart().
->>
->> I will send a patch against the latest kernel.
->>
-> Thanks Shawn, I have verified with these two changes,
-> system reboot by "echo b > /proc/sysrq-trigger" works
-> for me.
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: linux-input at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v7->v8:
+- Added Shawn Guo in the cc list.
+---
+ arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-The test you really want to do is a reboot via serial console: <break> b.
-That's definitely the one which will get you if your restart handler has
-anything in it which sleeps.  This will definitely call the restart
-handler from IRQ context.
+diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+index 2c2d4cd..a22230b 100644
+--- a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
++++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
+@@ -41,6 +41,17 @@
+ 		compatible = "nxp,pcf8563";
+ 		reg = <0x51>;
+ 	};
++
++	tsc2007: tsc2007 at 48 {
++		compatible = "ti,tsc2007";
++		reg = <0x48>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_tsc2007_1>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <0x2 0x8>;
++		gpios = <&gpio3 2 0>;
++		ti,x-plate-ohms = <180>;
++	};
+ };
+ 
+ &iomuxc {
+-- 
+1.7.9.5
