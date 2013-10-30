@@ -1,88 +1,32 @@
-From: b42378@freescale.com (Nicolin Chen)
-Date: Wed, 30 Oct 2013 12:48:48 +0800
-Subject: [PATCH 1/3] dma: imx-sdma: Add ssi dual fifo script support
-In-Reply-To: <20131029135142.GT30088@pengutronix.de>
-References: <cover.1383047327.git.b42378@freescale.com>
- <9ed025d4e98f716ba80b27acaaa98f43ad3bd75a.1383047327.git.b42378@freescale.com>
- <20131029135142.GT30088@pengutronix.de>
-Message-ID: <20131030044848.GE9605@MrMyself>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 30 Oct 2013 14:01:33 +0900
+Subject: arm64: add ftrace support
+In-Reply-To: <ED7794875F7BEB4F95284BF9597F2D902D1CC5A8@lhreml512-mbx>
+References: <ED7794875F7BEB4F95284BF9597F2D902D1CC5A8@lhreml512-mbx>
+Message-ID: <527092AD.6000406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On 10/25/2013 08:39 PM, Jens Meier wrote:
+> Hi,
+>
+> I had some problems applying/compiling Akashi?s ftrace patches.
+> - There is an invocation of insn.o missing in the first Makefile patch
+> - <asm/insn.h> is missing in the patch set as well as in the latest upstream kernel although included from ftrace.c
 
-On Tue, Oct 29, 2013 at 02:51:43PM +0100, Sascha Hauer wrote:
-> Look at drivers/dma/imx-sdma.c:
-> 
-> > /**
-> >  * struct sdma_firmware_header - Layout of the firmware image
-> >  *
-> >  * @magic		"SDMA"
-> >  * @version_major	increased whenever layout of struct
-> >  * sdma_script_start_addrs
-> >  *			changes.
-> 
-> Can you image why this firmware has a version field? Right, it's because
-> it encodes the layout of struct sdma_script_start_addrs.
-> 
-> As the comment clearly states you have to *increase this field* when you
-> add scripts.
-> 
-> Obviously you missed that, as the firmware on lkml posted recently
-> shows:
-> 
-> > 00000000: 414d4453 00000001 00000001 0000001c SDMA............
->                      ^^^^^^^^
->                      Still '1'
-> 
-> > 00000010: 00000026 000000b4 0000067a 00000282 &.......z.......
-> > 00000020: ffffffff 00000000 ffffffff ffffffff ................
-> > 00000030: ffffffff ffffffff ffffffff ffffffff ................
-> > 00000040: ffffffff ffffffff 00001a6a ffffffff ........j.......
-> > 00000050: 000002eb 000018bb ffffffff 00000408 ................
-> > 00000060: ffffffff 000003c0 ffffffff ffffffff ................
-> > 00000070: ffffffff 000002ab ffffffff 0000037b ............{...
-> > 00000080: ffffffff ffffffff 0000044c 0000046e ........L...n...
-> > 00000090: ffffffff 00001800 ffffffff ffffffff ................
-> > 000000a0: 00000000 00001800 00001862 00001a16 ........b.......
->                               ^^^^^^^^^^^^^^^^^
->                               new script addresses introduced
-> 
-> 
-> > -#define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	34
-> > +#define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	37
-> 
-> And no, this is not a bug. It's your firmware header that is buggy.
-> 
+Yeah, my patches requires "hotpatch code" interfaces from Jiang Liu, Huawei:
+    [PATCH v5 0/7] Optimize jump label implementation for ARM64
 
-I wasn't aware that the problem is far more complicated than I thought.
-And thank you for telling me all this.
+Sorry for not mentioning it clearly.
+Actually <asm/insn.h> is necessary only in patch [2/6].
 
-> What you need is:
-> 
-> #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V2      37
-> 
-> You (you as a company, not you as a person) knew that it was me who
-> created this firmware format. So it was absolutely unnecessary to create
-> an incompatible firmware instead of dropping me a short note.
-> 
-> Please add a version check to the driver as necessary and provide a proper
-> firmware.
-> 
+-Takahiro AKASHI
 
-Just currently it's not easy for me to create a new proper firmware,
-and I's been told that besides this version number, it also lacks a
-decent license info. So may I just refine this patch as you suggested
-to add a version check and add those new scripts first?
-
-Thank you,
-Nicolin Chen
-
-> Sascha
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
+>
+> Best Regards
+> Jens
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
