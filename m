@@ -1,22 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 30 Oct 2013 10:54:19 +0000
-Subject: [PATCH -next v2] arm64: use for_each_node_by_type() macro
-In-Reply-To: <CAPgLHd_r3_svSfrraO-oHyZbXg0O9brsjheO6ds9jL9rYbOfmA@mail.gmail.com>
-References: <CAPgLHd_aQROa0-vycghYz9A9Jx4MbC131C819xPHZg_hrTQC7w@mail.gmail.com>
- <52709A9E.8060800@gmail.com>
- <CAPgLHd_r3_svSfrraO-oHyZbXg0O9brsjheO6ds9jL9rYbOfmA@mail.gmail.com>
-Message-ID: <20131030105405.GA3975@mbp>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 30 Oct 2013 12:59:08 +0200
+Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
+In-Reply-To: <20131030000501.GE21262@verge.net.au>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1577821.Q7gttkPE2J@avalon> <20131029172331.GA20251@sirena.org.uk>
+ <1422562.0L87CDt5Gd@avalon> <20131029175834.GD20251@sirena.org.uk>
+ <20131030000501.GE21262@verge.net.au>
+Message-ID: <5270E67C.1030307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 05:54:41AM +0000, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 2013-10-30 02:05, Simon Horman wrote:
+> On Tue, Oct 29, 2013 at 10:58:34AM -0700, Mark Brown wrote:
+>> On Tue, Oct 29, 2013 at 06:29:59PM +0100, Laurent Pinchart wrote:
+>>> On Tuesday 29 October 2013 10:23:31 Mark Brown wrote:
+>>>> On Tue, Oct 29, 2013 at 06:05:53PM +0100, Laurent Pinchart wrote:
+>>>>> The first one is that I can't compile-test all those drivers on all
+>>>>> architectures. The spi-sh-msiof driver, for instance, uses
+>>>>> io(read|write)(16|
+>>
+>>>> Which architectures are these and is there not a symbol we can depend on
+>>>> for them?
+>>
+>>> arch/cris for instance. We can use readl/writel instead (maybe it would be 
+>>> time to rationalize and document the I/O accessors across all architectures, 
+>>> but that's another topic).
+>>
+>> It'd certainly be sensible, or adding a config option to depend on if
+>> you rely on these functions.
+>>
+>>> My point is that there might be other issues that I won't be able to easily 
+>>> catch. This would break compilation for everybody for no reason, as the 
+>>> drivers are useless on non-SuperH, non-ARM platforms. That's why I believe 
+>>> COMPILE_TEST would be a better option as a first step.
+>>
+>> Yes, it would - please do that.  Note that it won't stop anyone running
+>> into build issues on other architectures though, it's just about
+>> stopping Kconfig noise.
 > 
-> Use for_each_node_by_type() macro instead of open coding it.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> FWIW, I am happy with using COMPILE_TEST for this series.
 
-Applied. Thanks.
+I'd also go for COMPILE_TEST. I once enabled omapdss and omapfb to be
+compilable without any extra dependencies, and Linus wasn't fond of
+getting asked if he wants to compile omapfb or not...
 
--- 
-Catalin
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131030/b75b2a9a/attachment.sig>
