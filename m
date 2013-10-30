@@ -1,178 +1,31 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 30 Oct 2013 06:47:02 -0700
-Subject: [PATCH 0/2] Revert support for reserved memory regions defined in
- device tree
-In-Reply-To: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
-References: <1381476448-14548-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20131030134702.19B57C402A0@trevor.secretlab.ca>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 30 Oct 2013 15:01:05 +0100
+Subject: [PATCH 0/2] cpufreq support for the big.LITTLE switcher
+In-Reply-To: <1382500691-634-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1382500691-634-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <5107459.zGbYpZKUI5@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Oct 2013 09:27:26 +0200, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hi all!
+On Tuesday, October 22, 2013 11:58:09 PM Nicolas Pitre wrote:
+> This is the third and final set of patches towards a fully functional
+> and production quality switcher solution for big.LITTLE systems,
+> establishing a landmark to compare against for any scheduler based
+> solution meant to eventually surpass the switcher's power efficiency
+> available in the mainline kernel.
 > 
-> Benjamin Herrenschmidt pointed a few issues in the proposed design of
-> device tree bindings for contiguous memory allocator and reserved memory
-> regions:
-> https://lkml.org/lkml/2013/9/15/151
-> http://www.spinics.net/lists/arm-kernel/msg273548.html
+> Rationale for this code: http://lwn.net/Articles/481055/
 > 
-> Some time has passed, but there is still no consensus on the bindings
-> for the reserved memory and various drawback of this solution has been
-> shown, so in my opinion the best I can do now is to revert them
-> completely and start from scratch again later.
+> The first and second patch sets have already been merged by RMK.  They
+> implement the core switcher mechanism.  This set adds the necessary code
+> to drive the switcher based on cpufreq governor decisions.
 
-Hi Marek,
+Patch [1/2] doesn't apply any more after all of the recent changes from Viresh.
 
-At the ARM summit last week in Edinburgh, several of us sat down and
-hammered out a new proposal for handling reserved memory regions based
-on the work that you started here. Below you will find a new binding
-document. I started looking at implementing this, but haven't made much
-progress.
+Please rebase on top of linux-pm/linux-next and resend.
 
-Please take a look and let me know what you think.
+Thanks!
 
-Also, while I'm thinking about it, I took another look at the code and I
-think the code supporting reserved regions should go directly into
-drivers/of/fdt.c and drivers/of/memory.c.  Also, the reserved regions
-parsing should be enabled unconditionally insted of filtered by (DMA_CMA
-|| (HAVE_GENERIC_DMA_COHERENT && HAVE_MEMBLOCK). If the hardware
-description says to reserve a region, then the kernel must always do so,
-even if it doesn't actually use it for anything.
-
-g.
-
--------
-
-*** Reserved memory regions ***
-
-Reserved memory is specified as a node under the /reserved-memory node.
-The operating system shall exclude reserved memory from normal usage
-one can create child nodes describing particular reserved (excluded from
-normal use) memory regions. Such memory regions are usually designed for
-the special usage by various device drivers.
-
-Parameters for each memory region can be encoded into the device tree
-with the following nodes:
-
-/reserved-memory node
----------------------
-#address-cells, #size-cells (required) - standard definition
-    - Should use the same values as the root node
-ranges (required) - standard definition
-    - Should be empty
-
-/reserved-memory/ child nodes
------------------------------
-Each child of the reserved-memory node specifies one or more regions of
-reserved memory. Each child node may either use a 'reg' property to
-specify a specific range of reserved memory, or a 'size' property with
-optional constraints to request a dynamically allocated block of memory.
-
-Following the generic-names recommended practice, node names should
-reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
-address (@<address>) should be appended to the name if the node is a
-static allocation.
-
-Properties:
-Requires either a) or b) below.
-a) static allocation
-   reg (required) - standard definition
-b) dynamic allocation
-   size (required) - length based on parent's #size-cells
-                   - Size in bytes of memory to reserve.
-   alignment (optional) - length based on parent's #size-cells
-                        - Address boundary for alignment of allocation.
-   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
-                           - Specifies regions of memory that are
-                             acceptable to allocate from.
-
-If both reg and size are present, then the reg property takes precedence
-and size is ignored.
-
-Additional properties:
-compatible (optional) - standard definition
-    - may contain the following strings:
-        - shared-dma-pool: This indicates a region of memory meant to be
-          used as a shared pool of DMA buffers for a set of devices. It can
-          be used by an operating system to instanciate the necessary pool
-          management subsystem if necessary.
-        - vendor specific string in the form <vendor>,[<device>-]<usage>
-no-map (optional) - empty property
-    - Indicates the operating system must not create a virtual mapping
-      of the region as part of its standard mapping of system memory,
-      nor permit speculative access to it under any circumstances other
-      than under the control of the device driver using the region.
-reusable (optional) - empty property
-    - The operating system can use the memory in this region with the
-      limitation that the device driver(s) owning the region need to be
-      able to reclaim it back. Typically that means that the operating
-      system can use that region to store volatile or cached data that
-      can be otherwise regenerated or migrated elsewhere.
-
-Linux implementation note:
-- If a "linux,cma-default" property is present, then Linux will use the
-  region for the default pool of the contiguous memory allocator.
-
-Device node references to reserved memory
------------------------------------------
-Regions in the /reserved-memory node may be referenced by other device
-nodes by adding a memory-region property to the device node.
-
-memory-region (optional) - phandle to child of /reserved-memory
-
-Example
--------
-This example defines 3 contiguous regions are defined for Linux kernel:
-one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
-one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
-one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
-
-/ {
-	#address-cells = <1>;
-	#size-cells = <1>;
-
-	memory {
-		reg = <0x40000000 0x40000000>;
-	};
-
-	reserved-memory {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
-
-		/* global autoconfigured region for contiguous allocations */
-		linux,cma {
-			compatible = "shared-dma-pool";
-			size = <0x4000000>;
-			alignment = <0x2000>;
-			linux,cma-default;
-		};
-
-		display_reserved: framebuffer at 78000000 {
-			reg = <0x78000000 0x800000>;
-		};
-
-		multimedia_reserved: multimedia at 77000000 {
-			compatible = "acme,multimedia-memory";
-			reg = <0x77000000 0x4000000>;
-		};
-	};
-
-	/* ... */
-
-	fb0: video at 12300000 {
-		memory-region = <&display_reserved>;
-		/* ... */
-	};
-
-	scaler: scaler at 12500000 {
-		memory-region = <&multimedia_reserved>;
-		/* ... */
-	};
-
-	codec: codec at 12600000 {
-		memory-region = <&multimedia_reserved>;
-		/* ... */
-	};
-};
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
