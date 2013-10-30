@@ -1,30 +1,49 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 30 Oct 2013 22:52:49 +0100
-Subject: [PATCH v2 0/2] cpufreq support for the big.LITTLE switcher
-In-Reply-To: <1383162281-24204-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1383162281-24204-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <7822477.lBueQHUY4E@vostro.rjw.lan>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 30 Oct 2013 14:43:51 -0700
+Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: convert to platform driver
+In-Reply-To: <526AEF6B.2000404@linaro.org>
+References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
+ <6431720.IUjkN7MGOG@thinkpad> <526AC2DF.2020904@linaro.org>
+ <1953577.TBW5ixuUM5@thinkpad> <526AEF6B.2000404@linaro.org>
+Message-ID: <52717D97.8090905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 30, 2013 03:44:39 PM Nicolas Pitre wrote:
-> This is the third and final set of patches towards a fully functional
-> and production quality switcher solution for big.LITTLE systems,
-> establishing a landmark to compare against for any scheduler based
-> solution meant to eventually surpass the switcher's power efficiency
-> available in the mainline kernel.
-> 
-> Rationale for this code: http://lwn.net/Articles/481055/
-> 
-> The first and second patch sets have already been merged by RMK.  They
-> implement the core switcher mechanism.  This set adds the necessary code
-> to drive the switcher based on cpufreq governor decisions.
-> 
-> This set (v2) was rebased on top of the latest linux-pm tree as
-> requested by Rafael.
+On 10/25/2013 03:23 PM, Daniel Lezcano wrote:
 
-Queued up for 3.13, thanks!
+[ ... ]
+
+>>> Won't it be worth to add a new WFI_SLEEP state to the cpuidle driver ?
+>>
+>> I don't think so. How a suspend-to-RAM specific thing like WFI_SLEEP
+>> could
+>> be relevant to a cpuidle driver? (Unless there are some plans to
+>> consolidate STR with cpuidle that I haven't heard about...)
+>
+> I finally found a documentation for the s3c6410x and the description of
+> the different modes. Indeed, the sleep mode is not adequate for a
+> cpuidle state. What about the 'stop' and 'deep stop' state ?
+
+Hi Thomas,
+
+just a reminder about the question above, so I can go ahead: fix what 
+you pointed out or remove the driver directly.
+
+You mentionned in the previous email the STOP is not usful because it 
+can be controlled by manually outside of the cpuidle driver. But I see 
+in the documentation, the stop states power gates the cpu and deep-stop 
+stops the regulator.
+
+If these states have to been added later, still it worth to remove the 
+driver ?
+
+Thanks!
+   -- Daniel
+
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
