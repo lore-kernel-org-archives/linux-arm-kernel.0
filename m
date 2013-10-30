@@ -1,59 +1,72 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Wed, 30 Oct 2013 08:50:32 -0700
-Subject: [PATCH 4/4] ARM: msm: Remove 8x50 support
-In-Reply-To: <201310301430.24115.arnd@arndb.de>
-References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
- <1382993006-27359-5-git-send-email-davidb@codeaurora.org>
- <20131029211901.GB16284@fifo99.com>
- <201310301430.24115.arnd@arndb.de>
-Message-ID: <20131030155032.GA5822@fifo99.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Wed, 30 Oct 2013 08:53:08 -0700
+Subject: [GIT PULL] prefetch support for 3.13
+In-Reply-To: <20131030152553.GD16735@n2100.arm.linux.org.uk>
+References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
+ <527124B3.9090305@nvidia.com> <20131030152553.GD16735@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1310300846520.12006@tamien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 02:30:23PM +0100, Arnd Bergmann wrote:
-> On Tuesday 29 October 2013, Daniel Walker wrote:
-> > Isn't this the Nexus one platform ? Same as the last one , why don't you
-> > just update it to use the device tree? This doesn't seem like it would
-> > be all that difficult. 
-> 
-> Please don't top-post.
+Hi Russell,
 
-Seriously ? I was responding to the whole comment, don't be so pedantic
-..
+On Wed, 30 Oct 2013, Russell King - ARM Linux wrote:
 
-> 
-> > On Mon, Oct 28, 2013 at 01:43:26PM -0700, David Brown wrote:
-> > > 
-> > > This code has not been converted to device tree, and is hindering
-> > > support for the multi-platform kernel on ARM.  If someone wishes to
-> > > continue support for this target, patches that provide devicetree and
-> > > multi-platform support can start by re-adding these files.
-> 
->     ^ Here is your answer.
-> 
-> 
-> While I'd definitely love to see support for the Nexus One upstream,
-> it is evident that nobody has been working on this for a long time.
+> On Wed, Oct 30, 2013 at 08:24:35AM -0700, Paul Walmsley wrote:
+>> Hi Will et al.,
+>>
+>> On 10/09/2013 10:13 AM, Will Deacon wrote:
+>>> Hi Russell,
+>>>
+>>> Please pull the following patches for 3.13. They add support for the pldw
+>>> instruction (prefetch with intent to modify) in ARMv7 SMP cores, which is
+>>> then used to gain a measurable performance boost for particular atomic
+>>> sequences.
+>>
+>> Looks like the pldw changes require binutils >= 2.21.  Might be worth
+>> considering a patch to update Documentation/Changes?
+>
+> Not really - because that says "for all architectures the minimum
+> requirement is now 2.21 or later" and that's certainly not the case.
+>
+> It's only ARMv7 which requires this.
 
-I have a device with this chip in it .. I would like that device not to
-disappear from Linux .. Doing this puts an un-do burden on users
-who would like to see this support go in, but if it's removed like this
-that will never happen. No one has an much information on these chips as
-Qualcomm .. It's not realistic that any user would be able to do a
-lot without their support.. By allowing them to remove code for these
-device it effectively ends and chance of them have more code support added..
-Yet the devices exist in mass amounts.
+Would you consider something like the following?
 
-To be honest your not an MSM maintainer, are there are political issue
-related to this.. This isn't particularly technical because converting
-these relatively simple platform to the device tree shouldn't be all
-that difficult. To me Your involvement is puzzling .. Myself and my
-co-maintainers need to be the ones discussing this..
 
-G1 code is also getting removed in this series, and the code for this
-creates a usable device .. The problem here is that you really can't
-start randomly removing support for platforms that people have and want
-them to continue working. We have a process for that, and typically user
-objections weight heavily in that process (read, feature-removal-schedule.txt)
+- Paul
 
-Daniel
+From: Paul Walmsley <pwalmsley@nvidia.com>
+Date: Wed, 30 Oct 2013 08:51:26 -0700
+Subject: [PATCH] Documentation/Changes: update binutils version requirement
+  for ARMv7 builds
+
+ARMv7 builds now make use of the pldw opcode and the ".arch_extension mp"
+pragma.  These aren't supported in binutils prior to 2.21.  So, update
+Documentation/Changes accordingly.
+
+Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Thierry Reding <treding@nvidia.com>
+---
+  Documentation/Changes | 3 +++
+  1 file changed, 3 insertions(+)
+
+diff --git a/Documentation/Changes b/Documentation/Changes
+index b175808..97fcbdf 100644
+--- a/Documentation/Changes
++++ b/Documentation/Changes
+@@ -67,6 +67,9 @@ assembling the 16-bit boot code, removing the need for as86 to compile
+  your kernel.  This change does, however, mean that you need a recent
+  release of binutils.
+
++ARMv7 builds require binutils 2.21 or later due to the use of the pldw
++opcode and ".arch_extension mp".
++
+  Perl
+  ----
+
+-- 
+1.8.1.5
