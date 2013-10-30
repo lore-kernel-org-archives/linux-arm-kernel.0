@@ -1,61 +1,59 @@
-From: m.chehab@samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 30 Oct 2013 10:26:23 -0200
-Subject: [PATCH 07/19] v4l: sh_vou: Enable the driver on all ARM platforms
-In-Reply-To: <1383004027-25036-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383004027-25036-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131030102623.1d498c16@samsung.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 30 Oct 2013 13:46:18 +0100
+Subject: [PATCH] ARM: mm: Fix ECC mem policy printk
+Message-ID: <8986e8f1a3761e45a7927bdb0e54393c9155e6bf.1383137171.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+ECC policy can be applied to the whole system
+when this bit is implemented by SoC vendor
+(IMP - bit 9 - in L1 page table entry format).
+When this bit is not implemented by SoC vendor
+it doesn't mean that system has no other way
+how to do ECC.
+This patch ensures to show this message only when ECC
+is requested via cmd line ecc=on and runs on
+appropriate ARM core.
 
-Em Tue, 29 Oct 2013 00:46:55 +0100
-Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com> escreveu:
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
+Russell, Will: We discussed this at KS that will be good
+to rephrase it or have different logic around this.
+I am not sure if we can also test that this bit is
+implemented by particular SoC or not.
 
-> Renesas ARM platforms are transitioning from single-platform to
-> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> and ARCH_SHMOBILE_MULTI and increase build testing coverage.
-> 
-> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> Cc: linux-media at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Maybe logic should be that if SoC uses this bit
+that message is shown in origin format to declare
+that ECC is enabled or disabled.
+When SoC doesn't implement it then do not show this message.
 
-I'm understanding that the plan is to commit it via an ARM tree, right?
+---
+ arch/arm/mm/mmu.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-If so:
-	Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index b1d17ee..1b88ce3 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -556,8 +556,9 @@ static void __init build_mem_type_table(void)
+ 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WB;
+ 		break;
+ 	}
+-	printk("Memory policy: ECC %sabled, Data cache %s\n",
+-		ecc_mask ? "en" : "dis", cp->policy);
++	if (ecc_mask)
++		pr_info("Memory policy: ECC enabled, Data cache %s\n",
++			cp->policy);
 
-PS.: With regards to the discussions about this patch series,
-I'm ok on having this enabled for all archs or just for the
-archs that are known have this IP block, of course provided that
-not includes to march are there.
+ 	for (i = 0; i < ARRAY_SIZE(mem_types); i++) {
+ 		struct mem_type *t = &mem_types[i];
+--
+1.8.2.3
 
-The rationale is that, in the specific case of V4L, the platform 
-drivers are already on a separate Kconfig menu, with makes no sense
-to be enabled on any non SoC configuration.
-
-> ---
->  drivers/media/platform/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-> index c7caf94..a726f86 100644
-> --- a/drivers/media/platform/Kconfig
-> +++ b/drivers/media/platform/Kconfig
-> @@ -36,7 +36,7 @@ source "drivers/media/platform/blackfin/Kconfig"
->  config VIDEO_SH_VOU
->  	tristate "SuperH VOU video output driver"
->  	depends on MEDIA_CAMERA_SUPPORT
-> -	depends on VIDEO_DEV && ARCH_SHMOBILE && I2C
-> +	depends on VIDEO_DEV && ARM && I2C
->  	select VIDEOBUF_DMA_CONTIG
->  	help
->  	  Support for the Video Output Unit (VOU) on SuperH SoCs.
-
-
--- 
-
-Cheers,
-Mauro
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131030/a4e0a6ef/attachment-0001.sig>
