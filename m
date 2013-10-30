@@ -1,36 +1,50 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 30 Oct 2013 12:06:00 +0000
-Subject: [PATCH] ARM64: DT: define ARM64 specific arch_match_cpu_phys_id
-In-Reply-To: <5270F042.6060600@arm.com>
-References: <1382358582-32726-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
- <5270F042.6060600@arm.com>
-Message-ID: <20131030120600.GH3975@mbp>
+Date: Wed, 30 Oct 2013 12:16:11 +0000
+Subject: [PATCH -next v2] arm64: use for_each_node_by_type() macro
+In-Reply-To: <5270F238.6010602@arm.com>
+References: <CAPgLHd_aQROa0-vycghYz9A9Jx4MbC131C819xPHZg_hrTQC7w@mail.gmail.com>
+ <52709A9E.8060800@gmail.com>
+ <CAPgLHd_r3_svSfrraO-oHyZbXg0O9brsjheO6ds9jL9rYbOfmA@mail.gmail.com>
+ <5270F238.6010602@arm.com>
+Message-ID: <20131030121610.GJ3975@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 11:40:50AM +0000, Sudeep KarkadaNagesha wrote:
-> On 21/10/13 13:29, Sudeep KarkadaNagesha wrote:
-> > From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+On Wed, Oct 30, 2013 at 11:49:12AM +0000, Sudeep KarkadaNagesha wrote:
+> On 30/10/13 05:54, Wei Yongjun wrote:
+> > From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > > 
-> > OF/DT core library provides architecture specific hook to match the
-> > logical cpu index with the corresponding physical identifier.
+> > Use for_each_node_by_type() macro instead of open coding it.
 > > 
-> > On ARM64, the MPIDR_EL1 contains specific bitfields(MPIDR_EL1.Aff{3..0})
-> > which uniquely identify a CPU, in addition to some non-identifying
-> > information and reserved bits. The ARM cpu binding defines the 'reg'
-> > property to only contain the affinity bits, and any cpu nodes with other
-> > bits set in their 'reg' entry are skipped.
+> > Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> > ---
+> > v1 -> v2: remove extra space
+> > ---
+> >  arch/arm64/kernel/cpu_ops.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
 > > 
-> > This patch overrides the weak definition of arch_match_cpu_phys_id
-> > with ARM64 specific version using MPIDR_EL1.Aff{3..0} as cpu physical
-> > identifiers.
-> > 
+> > diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+> > index aa0c9e7..37a4977 100644
+> > --- a/arch/arm64/kernel/cpu_ops.c
+> > +++ b/arch/arm64/kernel/cpu_ops.c
+> > @@ -78,10 +78,10 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
+> >  
+> >  void __init cpu_read_bootcpu_ops(void)
+> >  {
+> > -	struct device_node *dn = NULL;
+> > +	struct device_node *dn;
+> >  	u64 mpidr = cpu_logical_map(0);
+> >  
+> > -	while ((dn = of_find_node_by_type(dn, "cpu"))) {
+> > +	for_each_node_by_type(dn, "cpu") {
+> >  		u64 hwid;
+> >  		const __be32 *prop;
+> >  
 > 
-> Can you take this trivial patch for v3.13 ?
+> In fact this function can be simplified by making use of OF helper directly,
+> something like below snippet. But it requires [1] for correct functionality.
 
-I will take it (missed it with the KS event).
-
-Thanks.
+Thanks. Could you please send a properly formatted patch on top of [1]?
 
 -- 
 Catalin
