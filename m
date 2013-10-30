@@ -1,44 +1,44 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 30 Oct 2013 16:08:27 -0700
-Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
-In-Reply-To: <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
- (Olof Johansson's message of "Tue, 29 Oct 2013 08:37:28 -0700")
-References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
- <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
- <20131029132043.GA28165@fifo99.com>
- <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
-Message-ID: <87ob66nyqc.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Oct 2013 23:09:20 +0000
+Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
+In-Reply-To: <87ob6aeyg4.fsf@rustcorp.com.au>
+References: <20131024084559.GD16735@n2100.arm.linux.org.uk>
+ <87mwlyclng.fsf@rustcorp.com.au>
+ <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
+ <87y55h7vcd.fsf@rustcorp.com.au>
+ <CACVXFVPXEUX9JQ2NZvL8=J34zbw2fn202QW2SQtpKjdQ+tv=vg@mail.gmail.com>
+ <87sivp7eai.fsf@rustcorp.com.au>
+ <CACVXFVN7PiU1dorkeamtC9-Wg_TVQE8xFiJtad-C8q4_=Rc1Ow@mail.gmail.com>
+ <874n82gk89.fsf@rustcorp.com.au> <20131028132348.62f7e368@tom-ThinkPad-T410>
+ <87ob6aeyg4.fsf@rustcorp.com.au>
+Message-ID: <20131030230920.GQ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson <olof@lixom.net> writes:
+On Mon, Oct 28, 2013 at 04:20:19PM +1030, Rusty Russell wrote:
+> Ming Lei <tom.leiming@gmail.com> writes:
+> > On Mon, 28 Oct 2013 13:44:30 +1030
+> > Rusty Russell <rusty@rustcorp.com.au> wrote:
+> >
+> >> Ming Lei <tom.leiming@gmail.com> writes:
+> >> 
+> >> I don't know...  It would be your job, as the person making the change,
+> >> to find all the users of kallsyms and prove that.
+> >> 
+> >> This is why it is easier not to include incorrect values in the kernel's
+> >> kallsyms in the first place.
+> >
+> > OK, thanks for your comment, and I figured out one way to do it in
+> > scripts/kallsyms.c, could you comment on below patch?
+> 
+> Looks great! Seems like we spent more time arguing than it took you to
+> code that up.
+> 
+> Acked-by: Rusty Russell <rusty@rustcorp.com.au>
+> 
+> Russell, this seems logical for you to take along with the changes which
+> caused the problem?
 
-> I would be very happy to take more code for the older Qualcomm chipset
-> to enable full functionality for them, but it's been my impression
-> that far from all that is needed to make it a useful platform is in
-> the upstream kernel, and there's been no signs of more of it showing
-> up at least in the last two years.
->
-> So we have a bit of a stalemate here -- the current Qualcomm team
-> wants to avoid having to deal too much with the legacy platforms --
-> they are technically quite different from the current platforms and
-> the divergence makes it hard to deal with supporting it all in a
-> modern way without risking regressions. I tend to agree with them.
-
-As do I.
-
-> Just like omap split between omap1 and omap2plus, I think it's a time
-> to create a mach-qcom instead, and move the modern (v7, most likely)
-> platforms there -- enable them with device tree, modern framework
-> infrastructure, etc. That way you can keep older platforms in mach-msm
-> without risk of regressions, and they have a clean base to start on
-> with their later platforms.
-
-I think this split approach is a good compromise.
-
-If the maintainers of the current older platforms wish to bring them up
-to modern frameworks, we can consider combining again.  If not, they the
-older platforms will take the same path as the rest of the older
-platforms that slowly fade away.
-
-Kevin
+The changes are already in mainline since a long time (back in July/August
+time).  Am I the right person to take stuff for scripts/ ?  Isn't that
+more kbuild territory?
