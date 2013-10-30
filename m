@@ -1,94 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Oct 2013 19:36:22 +0000
-Subject: [PATCH v3] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <1382992009-19407-1-git-send-email-festevam@gmail.com>
-References: <1382992009-19407-1-git-send-email-festevam@gmail.com>
-Message-ID: <20131030193622.GN16735@n2100.arm.linux.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 30 Oct 2013 12:42:52 -0700
+Subject: [PATCH v7 0/5] clk: clock deregistration support
+In-Reply-To: <1383076268-8984-1-git-send-email-s.nawrocki@samsung.com>
+References: <1383076268-8984-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20131030194252.11662.92657@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 06:26:49PM -0200, Fabio Estevam wrote:
-> +	/*Wait for PHY PLL lock */
-> +	msec = 4;
-> +	val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
-> +	while (!val) {
-> +		udelay(1000);
-> +		if (msec-- == 0) {
-> +			dev_dbg(hdmi->dev, "PHY PLL not locked\n");
-> +			return -EINVAL;
-> +		}
-> +		val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
-> +	}
+Quoting Sylwester Nawrocki (2013-10-29 12:51:03)
+> This patch series implements clock deregistration in the common clock
+> framework. Detailed changes are listed at each patch. I have included
+> an additional patch in this series for the omap3isp driver, required 
+> to avoid regressions.
 
-This loop is not always sufficient for the PLL to always lock.  It's also
-buggy because it behaves like this:
+Taken into clk-next. Thanks for the fine rework!
 
-	msec = 4
-	read register
-	check bit - still one?
-		yes - wait 1ms
-		msec == 0?
-			no - msec = 3
-			read register
-... msec eventually msec = 0
-	read register
-	check bit - still one
-		yes - wait 1ms
-		msec == 0?
-			yes - print debug and exit
+Regards,
+Mike
 
-So the last wait for 1ms performs no real function other than to delay
-the inevitable exit.  If we really want to wait 5ms for the condition
-we're testing to become true, then do it like this:
-
-	msec = 5;
-	do {
-		val = hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
-		if (!val)
-			break;
- 
-		if (msec == 0) {
-			dev_err(hdmi->dev, "PHY PLL not locked\n");
-			return -EINVAL;
-		}
- 
-		udelay(1000);
-		msec--;
-	} while (1);
-
-This way, we check for the success condition immediately before checking
-for the failure condition, and only waiting after that.
-
-I'd also suggest making it a dev_err() so that it's obvious when it
-doesn't lock - the current dev_dbg() remains hidden and causes
-failures which don't seem to be visible to the user via the logs.
-Hence why this issue has been overlooked...
-
-> +static void hdmi_av_composer(struct imx_hdmi *hdmi,
-> +			     const struct drm_display_mode *mode)
-> +{
-> +	u8 inv_val;
-> +	struct hdmi_vmode *vmode = &hdmi->hdmi_data.video_mode;
-> +	int hblank, vblank, h_de_hs, v_de_vs, hsync_len, vsync_len;
-> +
-> +	vmode->mhsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PHSYNC);
-> +	vmode->mvsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PVSYNC);
-> +	vmode->minterlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
-> +	vmode->mpixelclock = mode->htotal * mode->vtotal *
-> +			     drm_mode_vrefresh(mode);
-
-We can do better here:
-
-	vmode->mpixelclock = mode->clock * 1000;
-
-as the above is not quite correct when considering all the
-possibilities.  Since we're given the pixel clock in the mode structure,
-we might as well make use it.
-
-> +	/* Set up VSYNC active edge delay (in pixel clks) */
-> +	vsync_len = mode->vsync_end - mode->vsync_start;
-> +	hdmi_writeb(hdmi, vsync_len, HDMI_FC_VSYNCINWIDTH);
-
-Commentry - vsync len is in lines not pixel clocks.
-
-Other than that, it seems to work here on the Carrier-1.  Thanks.
+> 
+> Changes since v5:
+>  - fixed NULL clock handling in __clk_get(), __clk_put (patch 5/5).
+> 
+> Changes since v4:
+>  - removed stray struct module forward declaration in patch 3/5.
+> 
+> Changes since v3:
+>  - replaced WARN_ON() with WARN_ON_ONCE() in clk_nodrv_disable_unprepare()
+>    callback.
+> 
+> Changes since v2:
+>  - reordered the patches so the race condition is fixed before it can
+>    actually cause any issues,
+>  - fixed handling of NULL clock pointers in __clk_get(), __clk_put(),
+>  - added patch adding actual asignment of clk->owner; more details are
+>    discussed in that specific patch.
+> 
+> Changes since v1:
+>  - moved of_clk_{lock, unlock}, __of_clk_get_from_provider() function
+>    declaractions to a local header,
+>  - renamed clk_dummy_* to clk_nodrv_*.
+> 
+> Sylwester Nawrocki (5):
+>   omap3isp: Modify clocks registration to avoid circular references
+>   clk: Provide not locked variant of of_clk_get_from_provider()
+>   clkdev: Fix race condition in clock lookup from device tree
+>   clk: Add common __clk_get(), __clk_put() implementations
+>   clk: Implement clk_unregister()
+> 
+>  arch/arm/include/asm/clkdev.h         |    2 +
+>  arch/blackfin/include/asm/clkdev.h    |    2 +
+>  arch/mips/include/asm/clkdev.h        |    2 +
+>  arch/sh/include/asm/clkdev.h          |    2 +
+>  drivers/clk/clk.c                     |  185 +++++++++++++++++++++++++++++++--
+>  drivers/clk/clk.h                     |   16 +++
+>  drivers/clk/clkdev.c                  |   12 ++-
+>  drivers/media/platform/omap3isp/isp.c |   22 ++--
+>  drivers/media/platform/omap3isp/isp.h |    1 +
+>  include/linux/clk-private.h           |    5 +
+>  include/linux/clkdev.h                |    5 +
+>  11 files changed, 235 insertions(+), 19 deletions(-)
+>  create mode 100644 drivers/clk/clk.h
+> 
+> -- 
+> 1.7.9.5
