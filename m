@@ -1,53 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Oct 2013 16:15:41 +0000
-Subject: [PATCH v2] vfp: clear vfp_current_hw_state for dying cpu
-In-Reply-To: <1382470553-19624-1-git-send-email-zyy@motorola.com>
-References: <1382470553-19624-1-git-send-email-zyy@motorola.com>
-Message-ID: <20131030161541.GF16735@n2100.arm.linux.org.uk>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 30 Oct 2013 10:25:37 -0600
+Subject: [PATCH 0/6] PCI: imx6: Random fixes
+In-Reply-To: <201310301552.28866.marex@denx.de>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+ <CAErSpo6v4nvKQ4W9BhnUsNEjzsXoCiLxeFY-K=z=bMZ4AFOyGg@mail.gmail.com>
+ <201310301552.28866.marex@denx.de>
+Message-ID: <CAErSpo5dcqA+OkORmPO41THd+QaG53jXgZPogw3U5-1GP-hyoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 02:35:53PM -0500, Yuanyuan Zhong wrote:
-> Previous version of the patch can be found at:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/201893.html
-> 
-> The CPU_DYING notifier is called by cpu stopper task which
-> does not own the context held in the VFP hardware. Calling
-> vfp_force_reload() has no effect.
-> Replace it with clearing vfp_current_hw_state.
-> 
-> Change-Id: Icb2c726334c5b0463b8126170cac2b44cd4ac38f
-> Signed-off-by: Yuanyuan Zhong <zyy@motorola.com>
+On Wed, Oct 30, 2013 at 8:52 AM, Marek Vasut <marex@denx.de> wrote:
+> Dear Bjorn Helgaas,
+>
+>> On Tue, Oct 15, 2013 at 10:06 AM, Marek Vasut <marex@denx.de> wrote:
+>> > Set of random fixes for the PCIe driver for i.MX6 . With these fixes, my
+>> > setup with MX6Q -> PCIe bridge -> i210 ethernet adapter works as
+>> > expected.
+>> >
+>> > NOTE: I'm sure this will start some discussion. There are quite a few
+>> > patches
+>> >
+>> >       that are more of a hacks. Shawn, I didn't ignore your remark about
+>> >       the clock patches, I will test it ASAP, I just want to have these
+>> >       fixes in the public so others can comment/test.
+>> >
+>> > Marek Vasut (6):
+>> >   PCI: imx6: Make reset-gpio optional
+>> >   PCI: imx6: Fix the clock for PCIe
+>> >   ARM: dts: imx6qdl: Fix the clock for PCIe
+>> >   PCI: imx6: Probe the PCIe in fs_initcall()
+>> >   PCI: imx6: Force Gen1 operation
+>> >   PCI: designware: Fix DT resource retrieval
+>> >
+>> >  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
+>> >  arch/arm/boot/dts/imx6qdl.dtsi                     |  4 +-
+>> >  drivers/pci/host/pci-imx6.c                        | 63
+>> >  ++++++++++++++++------ drivers/pci/host/pcie-designware.c
+>> >    | 17 +++---
+>> >  4 files changed, 55 insertions(+), 31 deletions(-)
+>>
+>> I'm ignoring this series for now.  I assume you'll post an updated
+>> series as mentioned in your Oct 17 response to "[Patch 5/6] PCI: imx6:
+>> Force Gen1 operation."  Please mark that series as "v2" when you post
+>> it.  My assumption is still that Shawn Guo will ack the
+>> drivers/pci/host/ pieces before I apply them [1].
+>
+> Can you maybe pick at least these two:
+>
+> PCI: imx6: Make reset-gpio optional
+> PCI: imx6: Probe the PCIe in fs_initcall()
+>
+> I think they should be harmless and the later one fixes a problem on MX6. I'm
+> now digging in the PCIe MX6 again btw.
 
-This is fine, please put the patch into the patch system and I'll send it
-to Linus soon.  Please omit the Change-Id though.  Thanks.
+I'm fine with taking these as long as Shawn acks them.
 
-> ---
->  arch/arm/vfp/vfpmodule.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 52b8f40..2f37e1d 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -642,9 +642,9 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
->  static int vfp_hotplug(struct notifier_block *b, unsigned long action,
->  	void *hcpu)
->  {
-> -	if (action == CPU_DYING || action == CPU_DYING_FROZEN) {
-> -		vfp_force_reload((long)hcpu, current_thread_info());
-> -	} else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
-> +	if (action == CPU_DYING || action == CPU_DYING_FROZEN)
-> +		vfp_current_hw_state[(long)hcpu] = NULL;
-> +	else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
->  		vfp_enable(NULL);
->  	return NOTIFY_OK;
->  }
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Bjorn
