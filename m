@@ -1,45 +1,47 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 30 Oct 2013 18:58:43 +0100
-Subject: [PATCHv8][ 4/4] ARM: imx_v6_v7_defconfig: Enable tsc2007 support.
-In-Reply-To: <1383155923-24076-1-git-send-email-denis@eukrea.com>
-References: <1383155923-24076-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383155923-24076-4-git-send-email-denis@eukrea.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Oct 2013 18:01:09 +0000
+Subject: [PULL REQ] Big Endian initial patch series
+In-Reply-To: <526E89E6.8010202@codethink.co.uk>
+References: <20131018205405.GA28835@codethink.co.uk>
+ <20131019170954.GC25076@mudshark.cambridge.arm.com>
+ <5262E2C7.7000106@codethink.co.uk>
+ <20131028004736.GG16735@n2100.arm.linux.org.uk>
+ <20131028084455.GA20218@mudshark.cambridge.arm.com>
+ <20131028085328.GI16735@n2100.arm.linux.org.uk>
+ <526E89E6.8010202@codethink.co.uk>
+Message-ID: <20131030180109.GL16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eukrea cpuimx35 and cpuimx51 have a tsc2007 touchscreen controller,
-  so we turn it on.
+On Mon, Oct 28, 2013 at 03:59:34PM +0000, Ben Dooks wrote:
+> On 28/10/13 08:53, Russell King - ARM Linux wrote:
+>
+>>> +#ifdef __ARMEB_
+>>> +#define LOW_OFFSET     0x4
+>>> +#define HIGH_OFFSET    0x0
+>>> +#else
+>>> +#define LOW_OFFSET     0x0
+>>> +#define HIGH_OFFSET    0x4
+>>> +#endif
+>>>
+>>> (spot the missing underscore).
+>>
+>> Yep, well spotted.
+>>
+>> Well, we have some time to get this all fixed, so I'm going to drop
+>> Ben's tree.  I think we need to first commit a patch to fix the error
+>> in Santosh's patch
+>
+> Ok, shall I look at re-basing to -rc6?
+>
+> I have a bug report with a change to the SCU reading for the SMP
+> fix-up case which could do with fixing, so I could add this and send
+> another pull request (complete with description this time).
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+Rebasing on a later kernel from Linus doesn't do much good, because the
+conflicting changes aren't in Linus' tree, but are part of Santosh's
+patch set for high physical memory for LPAE systems.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 1a0e3d9..53e854a 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -130,6 +130,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_EGALAX=y
- CONFIG_TOUCHSCREEN_MC13783=y
-+CONFIG_TOUCHSCREEN_TSC2007=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MMA8450=y
- CONFIG_SERIO_SERPORT=m
--- 
-1.7.9.5
+I think we're fine with knowing what the merge fixes are now.  There's
+only one remaining problem left, which is a missing .align.  Someone
+needs to send a patch for that. :)
