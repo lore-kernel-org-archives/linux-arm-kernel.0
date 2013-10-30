@@ -1,61 +1,178 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Oct 2013 00:11:37 +0000
-Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
-In-Reply-To: <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
-Message-ID: <20131030001137.GW16735@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Oct 2013 00:12:45 +0000
+Subject: [PATCH v5 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <1382109602-27432-3-git-send-email-liuj97@gmail.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+ <1382109602-27432-3-git-send-email-liuj97@gmail.com>
+Message-ID: <20131030001245.GB25346@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 01:12:35PM -0500, Josh Cartwright wrote:
-> From: Kenneth Heitke <kheitke@codeaurora.org>
+Hi Jinag Liu,
+
+Sorry for the delayed review, I've been travelling.
+
+On Fri, Oct 18, 2013 at 04:19:56PM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
+
+If I try and email you at your Huawei address, I get a bounce from the mail
+server. Is that expected? If so, it's not very helpful from a commit log
+perspective if you use that address as the author on your patches.
+
+> Introduce three interfaces to patch kernel and module code:
+> aarch64_insn_patch_text_nosync():
+> 	patch code without synchronization, it's caller's responsibility
+> 	to synchronize all CPUs if needed.
+> aarch64_insn_patch_text_sync():
+> 	patch code and always synchronize with stop_machine()
+> aarch64_insn_patch_text():
+> 	patch code and synchronize with stop_machine() if needed
 > 
-> System Power Management Interface (SPMI) is a specification
-> developed by the MIPI (Mobile Industry Process Interface) Alliance
-> optimized for the real time control of Power Management ICs (PMIC).
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/include/asm/insn.h | 19 ++++++++-
+>  arch/arm64/kernel/insn.c      | 91 +++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 109 insertions(+), 1 deletion(-)
 > 
-> SPMI is a two-wire serial interface that supports up to 4 master
-> devices and up to 16 logical slaves.
-> 
-> The framework supports message APIs, multiple busses (1 controller
-> per bus) and multiple clients/slave devices per controller.
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index 7499490..7a69491 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -71,8 +71,25 @@ enum aarch64_insn_hint_op {
+>  
+>  bool aarch64_insn_is_nop(u32 insn);
+>  
+> -enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+> +/*
+> + * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
+> + * little-endian.
+> + */
+> +static __always_inline u32 aarch64_insn_read(void *addr)
+> +{
+> +	return le32_to_cpu(*(u32 *)addr);
+> +}
+>  
+> +static __always_inline void aarch64_insn_write(void *addr, u32 insn)
+> +{
+> +	*(u32 *)addr = cpu_to_le32(insn);
+> +}
 
-I haven't read this in depth, but... if you want to support runtime PM
-for your spmi devices, then I suggest that you also include the fragments
-to setup runtime PM in the bus-level probe handler and clean it up in
-the bus-level remove handler.
+I wouldn't bother with these helpers. You should probably be using
+probe_kernel_address or similar, then doing the endianness swabbing on the
+return value in-line.
 
-What that means is doing what PCI, AMBA and similar buses do:
+> +enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>  
+> +int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+> +int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+> +int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+> +
+>  #endif	/* __ASM_INSN_H */
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index f5b779f..3879db4 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -16,6 +16,9 @@
+>   */
+>  #include <linux/compiler.h>
+>  #include <linux/kernel.h>
+> +#include <linux/smp.h>
+> +#include <linux/stop_machine.h>
+> +#include <asm/cacheflush.h>
+>  #include <asm/insn.h>
+>  
+>  static int aarch64_insn_encoding_class[] = {
+> @@ -88,3 +91,91 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+>  	return __aarch64_insn_hotpatch_safe(old_insn) &&
+>  	       __aarch64_insn_hotpatch_safe(new_insn);
+>  }
+> +
+> +int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+> +{
+> +	u32 *tp = addr;
+> +
+> +	/* A64 instructions must be word aligned */
+> +	if ((uintptr_t)tp & 0x3)
+> +		return -EINVAL;
+> +
+> +	aarch64_insn_write(tp, insn);
+> +	flush_icache_range((uintptr_t)tp, (uintptr_t)tp + sizeof(u32));
 
-	pm_runtime_get_noresume(dev);
-	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
+sizeof(insn) is clearer here.
 
-	ret = driver->probe(dev);
-	if (ret != 0) {
-		pm_runtime_disable(dev);
-		pm_runtime_set_suspended(dev);
-		pm_runtime_put_noidle(dev);
-	}
+> +
+> +	return 0;
+> +}
+> +
+> +struct aarch64_insn_patch {
+> +	void	**text_addrs;
+> +	u32	*new_insns;
+> +	int	insn_cnt;
+> +};
+> +
+> +static DEFINE_MUTEX(text_patch_lock);
+> +static atomic_t text_patch_id;
+> +
+> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+> +{
+> +	int i, ret = 0;
+> +	struct aarch64_insn_patch *pp = arg;
+> +
+> +	if (atomic_read(&text_patch_id) == smp_processor_id()) {
 
-and:
+You could actually pass in the test_patch_id as zero-initialised parameter
+to this function (i.e. it points to something on the stack of the guy
+issuing the stop_machine). Then you do an inc_return here. If you see zero,
+you go ahead and do the patching.
 
-	pm_runtime_get_sync(dev);
-	ret = driver->remove(dev);
-	pm_runtime_put_noidle(dev);
+> +		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
+> +			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
+> +							     pp->new_insns[i]);
+> +		/* Let other CPU continue */
+> +		atomic_set(&text_patch_id, -1);
 
-	pm_runtime_disable(dev);
-	pm_runtime_set_suspended(dev);
-	pm_runtime_put_noidle(dev);
+You're relying on the barrier in flush_icache_range to order this
+atomic_set. I think you should add a comment describing that, because it's
+very subtle.
 
-What this means is that your devices get runtime enabled by default,
-but they have to do a pm_runtime_put() or similar in their probe
-function to benefit from it and a balancing pm_runtime_get() in
-their remove method.
+> +	} else {
+> +		while (atomic_read(&text_patch_id) != -1)
+> +			cpu_relax();
+> +		isb();
+> +	}
+> +
+> +	return ret;
+> +}
 
-The set_active() call above may need to be conditional upon whether
-the device really is in a powered up state at that point or not.
+I don't think you need the isb -- the exception return should do the trick
+(but again, a comment would be useful).
 
-Others have made comments on various other issues so I won't repeat
-those points here.
+> +
+> +int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
+> +{
+> +	int ret;
+> +	struct aarch64_insn_patch patch = {
+> +		.text_addrs = addrs,
+> +		.new_insns = insns,
+> +		.insn_cnt = cnt,
+> +	};
+> +
+> +	if (cnt <= 0)
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&text_patch_lock);
+
+Again, if you use a loacl variable, I don't think you need the mutex. What
+do you think?
+
+> +	atomic_set(&text_patch_id, smp_processor_id());
+> +	ret = stop_machine(aarch64_insn_patch_text_cb, &patch, cpu_online_mask);
+
+Instead of doing this, why not instead call aarch64_insn_patch_text_nosync
+inline, then call kick_all_cpus_sync immediately afterwards, without the
+need to stop_machine.
+
+Will
