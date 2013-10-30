@@ -1,61 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 30 Oct 2013 12:45:57 -0700
-Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
-In-Reply-To: <20131030193717.GP20207@joshc.qualcomm.com>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
- <526FE7BF.1060402@codeaurora.org> <20131030193717.GP20207@joshc.qualcomm.com>
-Message-ID: <527161F5.8060507@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 30 Oct 2013 12:47:22 -0700
+Subject: [PATCH] clk: mux: Return a sane value on error
+In-Reply-To: <1382345990-20623-1-git-send-email-Russ.Dill@ti.com>
+References: <1382345990-20623-1-git-send-email-Russ.Dill@ti.com>
+Message-ID: <20131030194722.11662.27225@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/13 12:37, Josh Cartwright wrote:
-> On Tue, Oct 29, 2013 at 09:52:15AM -0700, Stephen Boyd wrote:
->> On 10/28/13 11:12, Josh Cartwright wrote:
->>> +int spmi_register_read(struct spmi_device *sdev, u8 addr, u8 *buf)
->>> +{
->>> +	/* 5-bit register address */
->>> +	if (addr > 0x1F)
->> Perhaps 0x1f should be a #define.
-> Is 0x1F with the comment above it not clear enough?
+Quoting Russ Dill (2013-10-21 01:59:50)
+> The get_parent op is defined as returning u8, but clk-mux is
+> returning negative values on error.  Code within drivers/clk/clk.c
+> uses this return value as an index into an array which could
+> cause an oops.
+> 
+> Signed-off-by: Russ Dill <Russ.Dill@ti.com>
 
-It triggered my 'magic number used twice' alarm. I'm ok with it either way.
+Hi Russ,
 
->>> +struct spmi_controller *spmi_controller_alloc(struct device *parent,
->>> +					      size_t size)
->>> +{
->>> +	struct spmi_controller *ctrl;
->>> +	int id;
->>> +
->>> +	if (WARN_ON(!parent))
->>> +		return NULL;
->>> +
->>> +	ctrl = kzalloc(sizeof(*ctrl) + size, GFP_KERNEL);
->>> +	if (!ctrl)
->>> +		return NULL;
->>> +
->>> +	device_initialize(&ctrl->dev);
->>> +	ctrl->dev.type = &spmi_ctrl_type;
->>> +	ctrl->dev.bus = &spmi_bus_type;
->>> +	ctrl->dev.parent = parent;
->>> +	ctrl->dev.of_node = parent->of_node;
->>> +	spmi_controller_set_drvdata(ctrl, &ctrl[1]);
->>> +
->>> +	idr_preload(GFP_KERNEL);
->>> +	mutex_lock(&ctrl_idr_lock);
->>> +	id = idr_alloc(&ctrl_idr, ctrl, 0, 0, GFP_NOWAIT);
->>> +	mutex_unlock(&ctrl_idr_lock);
->>> +	idr_preload_end();
->> This can just be:
->>
->>     mutex_lock(&ctrl_idr_lock);
->>     id = idr_alloc(&ctrl_idr, ctrl, 0, 0, GFP_KERNEL);
->>     mutex_unlock(&ctrl_idr_lock);
-> Actually, I'm wondering if it's just easier to leverage the simpler
-> ida_simple_* APIs instead.
+Thanks for the fix. Haojian Zhuang sent an identical fix the day before
+you so I took his in ;-)
 
-Yes that also works.
+Regards,
+Mike
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> ---
+>  drivers/clk/clk-mux.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> index 4f96ff3..cc06015 100644
+> --- a/drivers/clk/clk-mux.c
+> +++ b/drivers/clk/clk-mux.c
+> @@ -51,7 +51,7 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+>                 for (i = 0; i < num_parents; i++)
+>                         if (mux->table[i] == val)
+>                                 return i;
+> -               return -EINVAL;
+> +               return 0;
+>         }
+>  
+>         if (val && (mux->flags & CLK_MUX_INDEX_BIT))
+> @@ -61,7 +61,7 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+>                 val--;
+>  
+>         if (val >= num_parents)
+> -               return -EINVAL;
+> +               return 0;
+>  
+>         return val;
+>  }
+> -- 
+> 1.8.3.2
