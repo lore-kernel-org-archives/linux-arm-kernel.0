@@ -1,39 +1,128 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 30 Oct 2013 09:05:03 +0900
-Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
-In-Reply-To: <20131029175834.GD20251@sirena.org.uk>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1577821.Q7gttkPE2J@avalon> <20131029172331.GA20251@sirena.org.uk>
- <1422562.0L87CDt5Gd@avalon> <20131029175834.GD20251@sirena.org.uk>
-Message-ID: <20131030000501.GE21262@verge.net.au>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 30 Oct 2013 01:06:04 +0100
+Subject: [PATCH 2/3] clk: shmobile: Add MSTP clock support
+In-Reply-To: <F8268ACF-E4E8-4411-84F1-D967450BE440@codeaurora.org>
+References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <F8268ACF-E4E8-4411-84F1-D967450BE440@codeaurora.org>
+Message-ID: <1481817.doGcO1nQB0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 10:58:34AM -0700, Mark Brown wrote:
-> On Tue, Oct 29, 2013 at 06:29:59PM +0100, Laurent Pinchart wrote:
-> > On Tuesday 29 October 2013 10:23:31 Mark Brown wrote:
-> > > On Tue, Oct 29, 2013 at 06:05:53PM +0100, Laurent Pinchart wrote:
-> > > > The first one is that I can't compile-test all those drivers on all
-> > > > architectures. The spi-sh-msiof driver, for instance, uses
-> > > > io(read|write)(16|
-> 
-> > > Which architectures are these and is there not a symbol we can depend on
-> > > for them?
-> 
-> > arch/cris for instance. We can use readl/writel instead (maybe it would be 
-> > time to rationalize and document the I/O accessors across all architectures, 
-> > but that's another topic).
-> 
-> It'd certainly be sensible, or adding a config option to depend on if
-> you rely on these functions.
-> 
-> > My point is that there might be other issues that I won't be able to easily 
-> > catch. This would break compilation for everybody for no reason, as the 
-> > drivers are useless on non-SuperH, non-ARM platforms. That's why I believe 
-> > COMPILE_TEST would be a better option as a first step.
-> 
-> Yes, it would - please do that.  Note that it won't stop anyone running
-> into build issues on other architectures though, it's just about
-> stopping Kconfig noise.
+Hi Kumar,
 
-FWIW, I am happy with using COMPILE_TEST for this series.
+Thank you for the review.
+
+On Tuesday 29 October 2013 18:36:06 Kumar Gala wrote:
+> On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
+> > MSTP clocks are gate clocks controlled through a register that handles
+> > up to 32 clocks. The register is often sparsely populated.
+> > 
+> > Those clocks are found on Renesas ARM SoCs.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  47 +++++
+> > drivers/clk/shmobile/Makefile                      |   1 +
+> > drivers/clk/shmobile/clk-mstp.c                    | 229 +++++++++++++++++
+> > include/dt-bindings/clock/r8a7790-clock.h          |  56 +++++
+> > 4 files changed, 333 insertions(+)
+> > create mode 100644
+> > Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> > create mode 100644 drivers/clk/shmobile/clk-mstp.c
+> > create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
+> > 
+> > diff --git
+> > a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> > b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt new
+> > file mode 100644
+> > index 0000000..b3a1ce0
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> > @@ -0,0 +1,47 @@
+> > +* Renesas R8A7790 MSTP Clocks
+> 
+> can we spell out MSTP once in the heading?
+
+Sure thing. It stands for Module Stop.
+
+> > +
+> > +The CPG can gate SoC device clocks. The gates are organized in groups of
+> > up to
+> > +32 gates.
+> > +
+> > +This device tree binding describes a single 32 gate clocks group per
+> > node.
+> > +Clocks are referenced by user nodes by the MSTP node phandle and the
+> > clock
+> > +index in the group, from 0 to 31.
+> > +
+> > +Required Properties:
+> > +
+> > +  - compatible: Must be one of the following
+> > +    - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate
+> > clocks
+> > +    - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
+> > +  - reg: Base address and length of the memory resource used by the MSTP
+> > +    clocks
+> > +  - clocks: Reference to the parent clocks
+> > +  - #clock-cells: Must be 1
+> > +  - clock-output-names: The name of the clocks as free-form strings
+> > +  - renesas,indices: Index of the gate clocks (0 to 31)
+> 
+> Index of the gate clock into what?
+
+Into the 32 gates clock group. Groups have 32 entries with a 32-bit register 
+that controls 32 gate clocks. The groups (and thus registers) are sparsly 
+populated, this property lists the indices for the register bits corresponding 
+to the clocks.
+
+Would
+
+  - renesas,indices: Indices of the gate clocks into the group (0 to 31)
+
+be explicit enough ?
+
+> > +
+> > +The clocks, clock-output-names and renesas,indices properties contain one
+> > +entry per gate. The MSTP groups are sparsely populated. Unimplemented
+> > gates
+> per gate clock. (?)
+
+I'll change that.
+
+> > +must not be declared.
+> > +
+> > +
+> > +Example
+> > +-------
+> > +
+> > +	#include <dt-bindings/clock/r8a7790-clock.h>
+> > +
+> > +	mstp3_clks: mstp3_clks {
+
+mstp3_clks at e615013c I suppose.
+
+> > +		compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> > +		reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+> > +		clocks = <&cp_clk>, <&mmc1_clk>, <&sd3_clk>, <&sd2_clk>,
+> > +			 <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks 
+R8A7790_CLK_SD0>,
+> > +			 <&mmc0_clk>;
+> > +		#clock-cells = <1>;
+> > +		clock-output-names =
+> > +			"tpu0", "mmcif1", "sdhi3", "sdhi2",
+> > +			 "sdhi1", "sdhi0", "mmcif0";
+> > +		renesas,clock-indices = <
+> > +			R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
+> > +			R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
+> > +			R8A7790_CLK_MMCIF0
+> > +		>;
+> > +	};
+
+-- 
+Regards,
+
+Laurent Pinchart
