@@ -1,24 +1,38 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 30 Oct 2013 22:10:40 +0800
-Subject: [PATCH 0/2] mmc: sdhci-esdhc-imx: adding eMMC HS200 mode support
-Message-ID: <1383142242-24989-1-git-send-email-b29396@freescale.com>
+Date: Wed, 30 Oct 2013 22:10:42 +0800
+Subject: [PATCH 2/2] mmc: sdhci-esdhc-imx: add eMMC HS200 mode support
+In-Reply-To: <1383142242-24989-1-git-send-email-b29396@freescale.com>
+References: <1383142242-24989-1-git-send-email-b29396@freescale.com>
+Message-ID: <1383142242-24989-3-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tuning in latest tree is broken.
-This patch fixed it and add HS200 support for imx usdhc.
+Add support for eMMC 4.5 cards to work on hs200 mode.
 
-Patch 2 had been sent out in:
-[PATCH 0/7] mmc: sdhci-esdhc-imx: fix acmd23 unwork and ddr not supported on sabresd issues
-No changes since that.
-
-Dong Aisheng (2):
-  mmc: sdhci: replace msleep with mdelay for tuning
-  mmc: sdhci-esdhc-imx: add eMMC HS200 mode support
-
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
  drivers/mmc/host/sdhci-esdhc-imx.c |    2 ++
- drivers/mmc/host/sdhci.c           |    2 +-
- 2 files changed, 3 insertions(+), 1 deletions(-)
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index ec25421..5816585 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -825,6 +825,7 @@ static int esdhc_change_pinstate(struct sdhci_host *host,
+ 		pinctrl = imx_data->pins_100mhz;
+ 		break;
+ 	case MMC_TIMING_UHS_SDR104:
++	case MMC_TIMING_MMC_HS200:
+ 		pinctrl = imx_data->pins_200mhz;
+ 		break;
+ 	default:
+@@ -852,6 +853,7 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ 		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR50;
+ 		break;
+ 	case MMC_TIMING_UHS_SDR104:
++	case MMC_TIMING_MMC_HS200:
+ 		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR104;
+ 		break;
+ 	case MMC_TIMING_UHS_DDR50:
 -- 
 1.7.2.rc3
