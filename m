@@ -1,36 +1,38 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 30 Oct 2013 13:26:05 -0400
+Date: Wed, 30 Oct 2013 13:27:33 -0400
 Subject: acked
-In-Reply-To: <20131030172007.GI16735@n2100.arm.linux.org.uk>
+In-Reply-To: <52714040.4040308@free-electrons.com>
 References: <1383152110-19577-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <1383152110-19577-2-git-send-email-thomas.petazzoni@free-electrons.com>
  <52713B10.9060809@free-electrons.com>
  <20131030171544.GF26784@titan.lakedaemon.net>
- <20131030172007.GI16735@n2100.arm.linux.org.uk>
-Message-ID: <20131030172605.GG26784@titan.lakedaemon.net>
+ <52714040.4040308@free-electrons.com>
+Message-ID: <20131030172732.GH26784@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 05:20:07PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Oct 30, 2013 at 01:15:44PM -0400, Jason Cooper wrote:
+On Wed, Oct 30, 2013 at 06:22:08PM +0100, Gregory CLEMENT wrote:
+> Hi Jason,
+> 
+> On 30/10/2013 18:15, Jason Cooper wrote:
 > > Gregory,
 > > 
 > > I like the idea, and if you perhaps do '[PATCH X/Y] Acked' it should
 > > make it through the filters.  (they currently whitelist 'GIT PULL' and
 > > 'PATCH' subjects).
 > > 
-> > Sure would make things easier when going through the threads...
 > 
-> NAK. :)
-> 
-> The reason being that some mailing list archivers will break threads
-> with a subject line change, which will detach the "acked" from the
-> original messages.
+> Well actually it was a mistake! I ended to use a plugin to automatically
+> writing some pattern instead of writing it myself each time, but I
+> mis-configured it!
 
-Ahhh, you're right.  I completely forgot about the archives.  Shame on
-me.
+yeah, saw that on irc after I hit send.
 
-Oh well, back to writing better scripts...
+> I am not sure that everybody like the idea to hijack the subject of a thread,
+> but if there a agreement on it, now I know hot to do it! ;)
+
+No, rmk has a very valid point.  It would break most ml archiving.  We
+don't want to do that.
 
 thx,
 
