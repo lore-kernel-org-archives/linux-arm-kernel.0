@@ -1,66 +1,51 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 30 Oct 2013 13:25:31 -0700
-Subject: [PATCH v2 1/6] edac: Don't try to cancel workqueue when it's never
- setup
-In-Reply-To: <1383164736-1849-1-git-send-email-sboyd@codeaurora.org>
-References: <1383164736-1849-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1383164736-1849-2-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 30 Oct 2013 13:25:30 -0700
+Subject: [PATCH v2 0/6] Krait L1/L2 EDAC driver
+Message-ID: <1383164736-1849-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We only setup a workqueue for edac devices that use the polling
-method. We still try to cancel the workqueue if an edac_device
-uses the irq method though. This causes a warning from debug
-objects when we remove an edac device:
+This patchset adds support for the Krait L1/L2 cache error detection
+hardware. The first patch fixes a generic framework bug. The next
+two patches lay the groundwork for this driver to be added by 
+exporting percpu irq functions as well as adding the Krait l2 indirection
+register code. The next two patches add the driver and the binding and 
+the final patch hooks it all up by adding the device tree node.
 
-WARNING: CPU: 0 PID: 56 at lib/debugobjects.c:260 debug_print_object+0x98/0xc0()
-ODEBUG: assert_init not available (active state 0) object type: timer_list hint: stub_timer+0x0/0x28
-Modules linked in: krait_edac(-)
-CPU: 0 PID: 56 Comm: rmmod Not tainted 3.12.0-rc2-00035-g15292a0 #69
-(unwind_backtrace+0x0/0x144)
-(show_stack+0x20/0x24)
-(dump_stack+0x74/0xb4)
-(warn_slowpath_common+0x78/0x9c)
-(warn_slowpath_fmt+0x40/0x48)
-(debug_print_object+0x98/0xc0)
-(debug_object_assert_init+0xdc/0xec)
-(del_timer+0x24/0x7c)
-(try_to_grab_pending+0xc0/0x1b0)
-(cancel_delayed_work+0x2c/0xa0)
-(edac_device_workq_teardown+0x1c/0x38)
-(edac_device_del_device+0xb8/0xe4)
-(krait_edac_remove+0x50/0x70 [krait_edac])
-(platform_drv_remove+0x24/0x28)
-(__device_release_driver+0x68/0xc0)
-(driver_detach+0xc4/0xc8)
-(bus_remove_driver+0xac/0x114)
-(driver_unregister+0x38/0x58)
-(platform_driver_unregister+0x1c/0x20)
-(krait_edac_driver_exit+0x14/0x1c [krait_edac])
-(SyS_delete_module+0x178/0x2b4)
+I'm not sure which tree this is supposed to go through. Ideally we could
+send the first 3 plus the 5th one through an edac tree. The final dts changes
+could go through arm-soc via davidb's tree and the Documentation patch could
+go through the devicetree tree.
 
-Fix it by skipping the workqueue teardown for such devices.
+Changes since v1:
+ * Moved binding into cpus node
+ * Picked up acks on first two patches
+ * Commented krait l2 accessor functions
 
-Acked-by: Borislav Petkov <bp@suse.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/edac/edac_device.c | 3 +++
- 1 file changed, 3 insertions(+)
+Stephen Boyd (6):
+  edac: Don't try to cancel workqueue when it's never setup
+  genirq: export percpu irq functions for module usage
+  ARM: Add Krait L2 accessor functions
+  edac: Document Krait L1/L2 EDAC driver binding
+  edac: Add support for Krait CPU cache error detection
+  ARM: dts: msm: Add Krait CPU/L2 nodes
 
-diff --git a/drivers/edac/edac_device.c b/drivers/edac/edac_device.c
-index 211021d..203561b 100644
---- a/drivers/edac/edac_device.c
-+++ b/drivers/edac/edac_device.c
-@@ -437,6 +437,9 @@ void edac_device_workq_teardown(struct edac_device_ctl_info *edac_dev)
- {
- 	int status;
- 
-+	if (!edac_dev->edac_check)
-+		return;
-+
- 	status = cancel_delayed_work(&edac_dev->work);
- 	if (status == 0) {
- 		/* workq instance might be running, wait for it */
+ Documentation/devicetree/bindings/arm/cpus.txt |  49 ++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi            |  37 +++
+ arch/arm/common/Kconfig                        |   3 +
+ arch/arm/common/Makefile                       |   1 +
+ arch/arm/common/krait-l2-accessors.c           |  58 +++++
+ arch/arm/include/asm/krait-l2-accessors.h      |  20 ++
+ drivers/edac/Kconfig                           |   8 +
+ drivers/edac/Makefile                          |   2 +
+ drivers/edac/edac_device.c                     |   3 +
+ drivers/edac/krait_edac.c                      | 346 +++++++++++++++++++++++++
+ kernel/irq/manage.c                            |   2 +
+ 11 files changed, 529 insertions(+)
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
+ create mode 100644 drivers/edac/krait_edac.c
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
