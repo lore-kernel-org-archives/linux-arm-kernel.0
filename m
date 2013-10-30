@@ -1,75 +1,55 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Oct 2013 12:23:51 +0100
-Subject: [PATCH] mmc: sdhi: Enable the driver on all ARM platforms
-In-Reply-To: <1383132190-5285-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383086274-11049-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383132190-5285-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1385571.1fe3ciztcs@avalon>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Wed, 30 Oct 2013 12:25:51 +0100
+Subject: [PATCH 1/2] misc: atmel_pwm: add deferred-probing support
+In-Reply-To: <1382459560-26596-2-git-send-email-jhovold@gmail.com>
+References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+ <1382459560-26596-2-git-send-email-jhovold@gmail.com>
+Message-ID: <20131030112551.GB29813@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The subject line should have read 'PATCH v3', my bad.
+On Tue, Oct 22, 2013 at 06:32:39PM +0200, Johan Hovold wrote:
+> Two drivers (atmel-pwm-bl and leds-atmel-pwm) currently depend on the
+> atmel_pwm driver to have bound to any pwm-device before their devices
+> are probed.
+> 
+> Support deferred probing of such devices by making sure to return
+> -EPROBE_DEFER from pwm_channel_alloc when no pwm-device has yet been
+> bound.
+> 
+> Signed-off-by: Johan Hovold <jhovold@gmail.com>
 
-On Wednesday 30 October 2013 12:23:10 Laurent Pinchart wrote:
-> Renesas ARM platforms are transitioning from single-platform to
-> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> and ARCH_SHMOBILE_MULTI and increase build testing coverage.
-> 
-> Don't enable COMPILE_TEST support as the driver doesn't compile on x86
-> due (possibly among others) to missing readsw/writesw I/O accessors.
-> 
-> Whether the CTL_DMA_ENABLE register is part of the standard TMIO
-> controller or is Renesas-specific is unknown and impossible to test as
-> we have no current or planned TMIO DMA users other than SUPERH and
-> ARCH_SHMOBILE. Writing to the register is thus conditionally compiled
-> for SUPERH and ARCH_SHMOBILE only. Adding ARCH_SHMOBILE_MULTI to the
-> list would extend this to multiarch kernels, but would break the driver
-> for non-shmobile platforms if the register is Renesas-specific. We can
-> thus get rid of the conditional compilation completely without
-> introducing any further issue, and let future non-Renesas users deal
-> with the situation if it turns out to be a the problem.
-> 
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Cc: Ian Molton <ian@mnementh.co.uk>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+This patch, 5c6d6fd1 ("misc: atmel_pwm: add deferred-probing support"),
+and 9d3fde86 ("backlight: atmel-pwm-bl: fix deferred probe from __init")
+in linux-next should probably be considered for inclusion in stable.
+
+Without them the atmel-pwm-bl driver may always fail to probe depending
+on link order.
+
+Thanks,
+Johan
+
 > ---
->  drivers/mmc/host/Kconfig        | 2 +-
->  drivers/mmc/host/tmio_mmc_dma.c | 4 +---
->  2 files changed, 2 insertions(+), 4 deletions(-)
+>  drivers/misc/atmel_pwm.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 7fc5099..51957d4 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -479,7 +479,7 @@ config MMC_TMIO
+> diff --git a/drivers/misc/atmel_pwm.c b/drivers/misc/atmel_pwm.c
+> index 494d050..a6dc56e 100644
+> --- a/drivers/misc/atmel_pwm.c
+> +++ b/drivers/misc/atmel_pwm.c
+> @@ -90,8 +90,10 @@ int pwm_channel_alloc(int index, struct pwm_channel *ch)
+>  	unsigned long	flags;
+>  	int		status = 0;
+>  
+> -	/* insist on PWM init, with this signal pinned out */
+> -	if (!pwm || !(pwm->mask & 1 << index))
+> +	if (!pwm)
+> +		return -EPROBE_DEFER;
+> +
+> +	if (!(pwm->mask & 1 << index))
+>  		return -ENODEV;
+>  
+>  	if (index < 0 || index >= PWM_NCHAN || !ch)
+> -- 
+> 1.8.4
 > 
->  config MMC_SDHI
->  	tristate "SH-Mobile SDHI SD/SDIO controller support"
-> -	depends on SUPERH || ARCH_SHMOBILE
-> +	depends on SUPERH || ARM
->  	select MMC_TMIO_CORE
->  	help
->  	  This provides support for the SDHI SD/SDIO controller found in
-> diff --git a/drivers/mmc/host/tmio_mmc_dma.c
-> b/drivers/mmc/host/tmio_mmc_dma.c index 65edb4a..8a4fd2d 100644
-> --- a/drivers/mmc/host/tmio_mmc_dma.c
-> +++ b/drivers/mmc/host/tmio_mmc_dma.c
-> @@ -28,10 +28,8 @@ void tmio_mmc_enable_dma(struct tmio_mmc_host *host, bool
-> enable) if (!host->chan_tx || !host->chan_rx)
->  		return;
-> 
-> -#if defined(CONFIG_SUPERH) || defined(CONFIG_ARCH_SHMOBILE)
-> -	/* Switch DMA mode on or off - SuperH specific? */
-> +	/* Switch DMA mode on or off. This might be Renesas-specific. */
->  	sd_ctrl_write16(host, CTL_DMA_ENABLE, enable ? 2 : 0);
-> -#endif
->  }
-> 
->  void tmio_mmc_abort_dma(struct tmio_mmc_host *host)
--- 
-Regards,
-
-Laurent Pinchart
