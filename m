@@ -1,31 +1,26 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 30 Oct 2013 15:01:05 +0100
-Subject: [PATCH 0/2] cpufreq support for the big.LITTLE switcher
-In-Reply-To: <1382500691-634-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1382500691-634-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <5107459.zGbYpZKUI5@vostro.rjw.lan>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 30 Oct 2013 06:53:07 -0700
+Subject: [PATCHv2 1/3] Input: twl4030-keypad - add device tree support
+In-Reply-To: <20131027114753.GB14901@amd.pavel.ucw.cz>
+References: <1382446042-27099-1-git-send-email-sre@debian.org>
+ <1382446042-27099-2-git-send-email-sre@debian.org>
+ <20131027111715.GA2437@xo-6d-61-c0.localdomain>
+ <20131027114026.GB14091@earth.universe>
+ <20131027114753.GB14901@amd.pavel.ucw.cz>
+Message-ID: <20131030135307.D8CE1C402A0@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 22, 2013 11:58:09 PM Nicolas Pitre wrote:
-> This is the third and final set of patches towards a fully functional
-> and production quality switcher solution for big.LITTLE systems,
-> establishing a landmark to compare against for any scheduler based
-> solution meant to eventually surpass the switcher's power efficiency
-> available in the mainline kernel.
+On Sun, 27 Oct 2013 12:47:53 +0100, Pavel Machek <pavel@ucw.cz> wrote:
+> > > > +#if IS_ENABLED(CONFIG_OF)
+> > > I'm probably missing something here, but why not #ifdef CONFIG_OF?
+> > 
+> > I have been told for other drivers, that IS_ENABLED() is
+> > the prefered way to check for configuration these days.
 > 
-> Rationale for this code: http://lwn.net/Articles/481055/
-> 
-> The first and second patch sets have already been merged by RMK.  They
-> implement the core switcher mechanism.  This set adds the necessary code
-> to drive the switcher based on cpufreq governor decisions.
+> CONFIG_OF can not be module, using IS_ENABLED() on it is just wrong.
 
-Patch [1/2] doesn't apply any more after all of the recent changes from Viresh.
+That makes no sense. There is absolutely nothing wrong with using
+IS_ENABLED() for CONFIG_OF.
 
-Please rebase on top of linux-pm/linux-next and resend.
-
-Thanks!
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+g.
