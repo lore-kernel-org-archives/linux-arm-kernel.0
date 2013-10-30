@@ -1,44 +1,55 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 30 Oct 2013 16:30:31 +0100 (CET)
-Subject: [PATCH V2 2/7] DRIVERS: IRQCHIP: CROSSBAR: Add support for
- Crossbar IP
-In-Reply-To: <1383145040-15852-3-git-send-email-r.sricharan@ti.com>
-References: <1383145040-15852-1-git-send-email-r.sricharan@ti.com>
- <1383145040-15852-3-git-send-email-r.sricharan@ti.com>
-Message-ID: <alpine.DEB.2.02.1310301615430.24686@ionos.tec.linutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 30 Oct 2013 15:52:28 +0100
+Subject: [PATCH 0/6] PCI: imx6: Random fixes
+In-Reply-To: <CAErSpo6v4nvKQ4W9BhnUsNEjzsXoCiLxeFY-K=z=bMZ4AFOyGg@mail.gmail.com>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+ <CAErSpo6v4nvKQ4W9BhnUsNEjzsXoCiLxeFY-K=z=bMZ4AFOyGg@mail.gmail.com>
+Message-ID: <201310301552.28866.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Oct 2013, Sricharan R wrote:
-> +static inline const u32 allocate_free_irq(int cb_no)
+Dear Bjorn Helgaas,
 
-I understand the "static inline" part, but "const u32" is more than
-fishy. What's wrong with "static inline int" ?
+> On Tue, Oct 15, 2013 at 10:06 AM, Marek Vasut <marex@denx.de> wrote:
+> > Set of random fixes for the PCIe driver for i.MX6 . With these fixes, my
+> > setup with MX6Q -> PCIe bridge -> i210 ethernet adapter works as
+> > expected.
+> > 
+> > NOTE: I'm sure this will start some discussion. There are quite a few
+> > patches
+> > 
+> >       that are more of a hacks. Shawn, I didn't ignore your remark about
+> >       the clock patches, I will test it ASAP, I just want to have these
+> >       fixes in the public so others can comment/test.
+> > 
+> > Marek Vasut (6):
+> >   PCI: imx6: Make reset-gpio optional
+> >   PCI: imx6: Fix the clock for PCIe
+> >   ARM: dts: imx6qdl: Fix the clock for PCIe
+> >   PCI: imx6: Probe the PCIe in fs_initcall()
+> >   PCI: imx6: Force Gen1 operation
+> >   PCI: designware: Fix DT resource retrieval
+> >  
+> >  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
+> >  arch/arm/boot/dts/imx6qdl.dtsi                     |  4 +-
+> >  drivers/pci/host/pci-imx6.c                        | 63
+> >  ++++++++++++++++------ drivers/pci/host/pcie-designware.c              
+> >    | 17 +++---
+> >  4 files changed, 55 insertions(+), 31 deletions(-)
+> 
+> I'm ignoring this series for now.  I assume you'll post an updated
+> series as mentioned in your Oct 17 response to "[Patch 5/6] PCI: imx6:
+> Force Gen1 operation."  Please mark that series as "v2" when you post
+> it.  My assumption is still that Shawn Guo will ack the
+> drivers/pci/host/ pieces before I apply them [1].
 
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < cb->int_max; i++) {
-> +		if (cb->irq_map[i] == IRQ_FREE) {
-> +			cb->irq_map[i] = cb_no;
-> +			return i;
-> +		}
-> +	}
-> +
-> +	return -ENODEV;
-> +}
+Can you maybe pick at least these two:
 
-> +static int crossbar_domain_xlate(struct irq_domain *d,
-> +				 struct device_node *controller,
-> +				 const u32 *intspec, unsigned int intsize,
-> +				 unsigned long *out_hwirq,
-> +				 unsigned int *out_type)
-> +{
-> +	unsigned long ret = 0;
+PCI: imx6: Make reset-gpio optional
+PCI: imx6: Probe the PCIe in fs_initcall()
 
-Why do you need to initialize ret when you assign a value to it in the
-next line?
+I think they should be harmless and the later one fixes a problem on MX6. I'm 
+now digging in the PCIe MX6 again btw.
 
-Thanks,
-
-	tglx
+Best regards,
+Marek Vasut
