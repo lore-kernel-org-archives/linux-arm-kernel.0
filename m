@@ -1,61 +1,49 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 30 Oct 2013 17:51:15 +0100
-Subject: [PATCHv6][ 3/3] ARM: imx_v6_v7_defconfig: Enable some drivers used on
- the cpuimx35.
-In-Reply-To: <1383151875-7708-1-git-send-email-denis@eukrea.com>
-References: <1383151875-7708-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383151875-7708-3-git-send-email-denis@eukrea.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Oct 2013 16:51:16 +0000
+Subject: [PATCH] Documentation/Changes: update binutils version
+ requirement for ARMv7 builds
+In-Reply-To: <alpine.DEB.2.02.1310300923080.12006@tamien>
+References: <alpine.DEB.2.02.1310300923080.12006@tamien>
+Message-ID: <20131030165116.GG16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eukrea cpuimx35 has a pcf8563 RTC and a LCD gpio regulator.
+On Wed, Oct 30, 2013 at 09:27:07AM -0700, Paul Walmsley wrote:
+>
+> ARMv7 builds now make use of the pldw opcode and the ".arch_extension mp"
+> pragma.  These aren't supported in binutils prior to 2.21.  So, update
+> Documentation/Changes accordingly.
+>
+> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-We enable the respective drivers in order to be able to use theses
-  features with this configuration.
+You can drop this Cc: line, thanks.
 
-We also enabled the i.MX35 DT support because the cpuimx35 has now DT support.
-
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v5->v6:
-- Removed leds support addition because it has already been added by 
-  94425a1 ARM: imx_v6_v7_defconfig: Enable LEDS_GPIO related options
----
- arch/arm/configs/imx_v6_v7_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 8d0c5a0..1a0e3d9 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -28,6 +28,7 @@ CONFIG_MACH_QONG=y
- CONFIG_MACH_ARMADILLO5X0=y
- CONFIG_MACH_KZM_ARM11_01=y
- CONFIG_MACH_IMX31_DT=y
-+CONFIG_MACH_IMX35_DT=y
- CONFIG_MACH_PCM043=y
- CONFIG_MACH_MX35_3DS=y
- CONFIG_MACH_VPR200=y
-@@ -160,6 +161,7 @@ CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_DA9052=y
-+CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
-@@ -216,6 +218,7 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
- CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-+CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
- CONFIG_RTC_DRV_SNVS=y
--- 
-1.7.9.5
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: Thierry Reding <treding@nvidia.com>
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>
+> ---
+> Intended for 3.13.
+>
+>  Documentation/Changes | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/Documentation/Changes b/Documentation/Changes
+> index b175808..97fcbdf 100644
+> --- a/Documentation/Changes
+> +++ b/Documentation/Changes
+> @@ -67,6 +67,9 @@ assembling the 16-bit boot code, removing the need for as86 to compile
+>  your kernel.  This change does, however, mean that you need a recent
+>  release of binutils.
+>
+> +ARMv7 builds require binutils 2.21 or later due to the use of the pldw
+> +opcode and ".arch_extension mp".
+> +
+>  Perl
+>  ----
+>
+> -- 
+> 1.8.1.5
+>
