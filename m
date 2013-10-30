@@ -1,107 +1,129 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 29 Oct 2013 17:07:25 -0700
-Subject: [PATCH 4/6] edac: Document Krait L1/L2 EDAC driver binding
-In-Reply-To: <526FF7DB.5040805@codeaurora.org>
-References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
- <1383006690-6754-5-git-send-email-sboyd@codeaurora.org>
- <90D2FDE5-C43F-4ACF-B287-4E0AD8617892@codeaurora.org>
- <526FF7DB.5040805@codeaurora.org>
-Message-ID: <20131030000725.GH21983@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 30 Oct 2013 09:10:19 +0900
+Subject: [PATCH 01/12] clocksource: sh_cmt: Add clk_prepare/unprepare
+ support
+In-Reply-To: <9952506.6pWpQZf7WG@avalon>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131029055534.GB11580@verge.net.au> <9952506.6pWpQZf7WG@avalon>
+Message-ID: <20131030001018.GF21262@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29, Stephen Boyd wrote:
-> On 10/29/13 01:21, Kumar Gala wrote:
-> > On Oct 28, 2013, at 7:31 PM, Stephen Boyd wrote:
-> >
-> >> The Krait L1/L2 error reporting device is made up of two
-> >> interrupts, one per-CPU interrupt for the L1 caches and one
-> >> interrupt for the L2 cache.
-> >>
-> >> Cc: <devicetree@vger.kernel.org>
-> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> >> ---
-> >> .../devicetree/bindings/arm/qcom,krait-cache-erp.txt     | 16 ++++++++++++++++
-> >> 1 file changed, 16 insertions(+)
-> >> create mode 100644 Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-> >> new file mode 100644
-> >> index 0000000..01fe8a8
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
-> >> @@ -0,0 +1,16 @@
-> >> +* Qualcomm Krait L1 / L2 cache error reporting
-> >> +
-> >> +Required properties:
-> >> +- compatible: Should be "qcom,krait-cache-erp"
-> >> +- interrupts: Should contain the L1/CPU error interrupt number and
-> >> +  then the L2 cache error interrupt number
-> >> +
-> >> +Optional properties:
-> >> +- interrupt-names: Should contain the interrupt names "l1_irq" and
-> >> +  "l2_irq"
-> >> +
-> >> +Example:
-> >> +	edac {
-> >> +		compatible = "qcom,krait-cache-erp";
-> >> +		interrupts = <1 9 0xf04>, <0 2 0x4>;
-> >> +	};
-> > Why wouldn't we have these as part of cache nodes in the dts?  (which begs the question why we don't have cache nodes?)
-> >
+On Tue, Oct 29, 2013 at 10:55:05AM +0100, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> I can certainly add cache nodes and cpu nodes and then put the
-> interrupts in those nodes. I was thinking along those same lines when I
-> ported this driver but figured it would be good to get something out
-> there. The only question I have is how am I supposed to hook that up
-> into the linux device model? Will the edac driver bind to the device
-> created for the cpus node and the cache node? I guess it will have to be
-> a driver that binds to two devices.
+> On Tuesday 29 October 2013 14:55:35 Simon Horman wrote:
+> > On Mon, Oct 28, 2013 at 11:49:18PM +0100, Laurent Pinchart wrote:
+> > > Prepare the clock at probe time, as there is no other appropriate place
+> > > in the driver where we're allowed to sleep.
+> > > 
+> > > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > > Cc: linux-kernel at vger.kernel.org
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > 
+> > Thanks Laurent,
+> > 
+> > I have queued this up in the clocksources branch of my renesas tree.
+> > I will send a pull request to Mike once v3.13-rc1 has hit the shelves.
+> > Mike, please let me know if you would prefer something earlier than that.
 > 
-> One could argue that we should put the cp15 based architected timers in
-> the cpus node also but so far nobody has done that and I think there was
-> some reasoning behind that, Mark?
+> I thought the clocksource patches had to go through Daniel's tree. If you can 
+> take them directly that's easier, so I'm fine with that. Does this imply your 
+> Acked-by (for patches 01 to 03) ?
+
+Sorry, my mistake. The do go through Daniel. As a convenience
+I have been picking up Renesas clocksource patches and passing
+them on to Daniel. I'm happy to keep doing this. And I'm happy to
+go the next step and add some entries to MAINTAINERS if that is
+useful to others.
+
+As I mentioned above I have queued these up (though not yet pushed them
+as I got bogged down yesterday afternoon). But if you would
+prefer Daniel to take them directly then please use the following:
+
+Patches 01 - 03:
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
 > 
-
-Ok I've come up with this:
-
-	cpus {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		compatible = "qcom,krait";
-		interrupts = <1 9 0xf04>;
-
-		cpu at 0 {
-			reg = <0>;
-			next-level-cache = <&L2>;
-		};
-
-		cpu at 1 {
-			reg = <1>;
-			next-level-cache = <&L2>;
-		};
-
-		cpu at 2 {
-			reg = <2>;
-			next-level-cache = <&L2>;
-		};
-
-		cpu at 3 {
-			reg = <3>;
-			next-level-cache = <&L2>;
-		};
-
-		L2: l2-cache {
-			compatible = "qcom,krait-l2", "cache";
-			cache-level = <2>;
-			interrupts = <0 2 0x4>;
-		};
-	};
-
-But now I don't know where to document this. Should I make a
-krait-edac.txt file and document it there? The problem is now
-we're documenting more than the error interrupts.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> > > ---
+> > > 
+> > >  drivers/clocksource/sh_cmt.c | 20 ++++++++++++++++----
+> > >  1 file changed, 16 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+> > > index 0965e98..940341a 100644
+> > > --- a/drivers/clocksource/sh_cmt.c
+> > > +++ b/drivers/clocksource/sh_cmt.c
+> > > @@ -634,12 +634,18 @@ static int sh_cmt_clock_event_next(unsigned long
+> > > delta,> 
+> > >  static void sh_cmt_clock_event_suspend(struct clock_event_device *ced)
+> > >  {
+> > > -	pm_genpd_syscore_poweroff(&ced_to_sh_cmt(ced)->pdev->dev);
+> > > +	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
+> > > +
+> > > +	pm_genpd_syscore_poweroff(&p->pdev->dev);
+> > > +	clk_unprepare(p->clk);
+> > >  }
+> > >  
+> > >  static void sh_cmt_clock_event_resume(struct clock_event_device *ced)
+> > >  {
+> > > -	pm_genpd_syscore_poweron(&ced_to_sh_cmt(ced)->pdev->dev);
+> > > +	struct sh_cmt_priv *p = ced_to_sh_cmt(ced);
+> > > +
+> > > +	clk_prepare(p->clk);
+> > > +	pm_genpd_syscore_poweron(&p->pdev->dev);
+> > >  }
+> > >  
+> > >  static void sh_cmt_register_clockevent(struct sh_cmt_priv *p,
+> > > 
+> > > @@ -737,6 +743,10 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct
+> > > platform_device *pdev)> 
+> > >  		goto err2;
+> > >  	}
+> > > 
+> > > +	ret = clk_prepare(p->clk);
+> > > +	if (ret < 0)
+> > > +		goto err3;
+> > > +
+> > >  	if (res2 && (resource_size(res2) == 4)) {
+> > >  		/* assume both CMSTR and CMCSR to be 32-bit */
+> > >  		p->read_control = sh_cmt_read32;
+> > > @@ -773,19 +783,21 @@ static int sh_cmt_setup(struct sh_cmt_priv *p,
+> > > struct platform_device *pdev)> 
+> > >  			      cfg->clocksource_rating);
+> > >  	if (ret) {
+> > >  		dev_err(&p->pdev->dev, "registration failed\n");
+> > > -		goto err3;
+> > > +		goto err4;
+> > >  	}
+> > >  	p->cs_enabled = false;
+> > >  	
+> > >  	ret = setup_irq(irq, &p->irqaction);
+> > >  	if (ret) {
+> > >  		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
+> > > -		goto err3;
+> > > +		goto err4;
+> > >  	}
+> > >  	
+> > >  	platform_set_drvdata(pdev, p);
+> > >  	
+> > >  	return 0;
+> > > 
+> > > +err4:
+> > > +	clk_unprepare(p->clk);
+> > >  err3:
+> > >  	clk_put(p->clk);
+> > >  err2:
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
