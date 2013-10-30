@@ -1,56 +1,57 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 30 Oct 2013 12:59:08 +0200
-Subject: [PATCH 00/19] Enable various Renesas drivers on all ARM platforms
-In-Reply-To: <20131030000501.GE21262@verge.net.au>
-References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1577821.Q7gttkPE2J@avalon> <20131029172331.GA20251@sirena.org.uk>
- <1422562.0L87CDt5Gd@avalon> <20131029175834.GD20251@sirena.org.uk>
- <20131030000501.GE21262@verge.net.au>
-Message-ID: <5270E67C.1030307@ti.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Wed, 30 Oct 2013 12:07:05 +0100
+Subject: [PATCH 2/2] misc: atmel_pwm: set initcall level to subsys
+In-Reply-To: <20131029232249.GA20476@kroah.com>
+References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+ <1382459560-26596-3-git-send-email-jhovold@gmail.com>
+ <20131029232249.GA20476@kroah.com>
+Message-ID: <20131030110705.GA29813@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-10-30 02:05, Simon Horman wrote:
-> On Tue, Oct 29, 2013 at 10:58:34AM -0700, Mark Brown wrote:
->> On Tue, Oct 29, 2013 at 06:29:59PM +0100, Laurent Pinchart wrote:
->>> On Tuesday 29 October 2013 10:23:31 Mark Brown wrote:
->>>> On Tue, Oct 29, 2013 at 06:05:53PM +0100, Laurent Pinchart wrote:
->>>>> The first one is that I can't compile-test all those drivers on all
->>>>> architectures. The spi-sh-msiof driver, for instance, uses
->>>>> io(read|write)(16|
->>
->>>> Which architectures are these and is there not a symbol we can depend on
->>>> for them?
->>
->>> arch/cris for instance. We can use readl/writel instead (maybe it would be 
->>> time to rationalize and document the I/O accessors across all architectures, 
->>> but that's another topic).
->>
->> It'd certainly be sensible, or adding a config option to depend on if
->> you rely on these functions.
->>
->>> My point is that there might be other issues that I won't be able to easily 
->>> catch. This would break compilation for everybody for no reason, as the 
->>> drivers are useless on non-SuperH, non-ARM platforms. That's why I believe 
->>> COMPILE_TEST would be a better option as a first step.
->>
->> Yes, it would - please do that.  Note that it won't stop anyone running
->> into build issues on other architectures though, it's just about
->> stopping Kconfig noise.
+On Tue, Oct 29, 2013 at 04:22:49PM -0700, Greg KH wrote:
+> On Tue, Oct 22, 2013 at 06:32:40PM +0200, Johan Hovold wrote:
+> > Even with the atmel_pwm driver and the atmel-pwm-bl backlight driver
+> > supporting deferred probing, we still want to make sure that any
+> > pwm-device is available when the backlight devices are probed to avoid
+> > any unnecessary delays before enabling the backlight.
+> > 
+> > Signed-off-by: Johan Hovold <jhovold@gmail.com>
+> > ---
+> >  drivers/misc/atmel_pwm.c | 12 +++++++++++-
+> >  1 file changed, 11 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/misc/atmel_pwm.c b/drivers/misc/atmel_pwm.c
+> > index a6dc56e..0d0f599 100644
+> > --- a/drivers/misc/atmel_pwm.c
+> > +++ b/drivers/misc/atmel_pwm.c
+> > @@ -395,7 +395,17 @@ static struct platform_driver atmel_pwm_driver = {
+> >  	 */
+> >  };
+> >  
+> > -module_platform_driver_probe(atmel_pwm_driver, pwm_probe);
+> > +static int __init pwm_init(void)
+> > +{
+> > +	return platform_driver_probe(&atmel_pwm_driver, pwm_probe);
+> > +}
+> > +subsys_initcall(pwm_init);
 > 
-> FWIW, I am happy with using COMPILE_TEST for this series.
+> I really hate this type of patch, as it's papering over the real
+> problem.  What happens when someone else moves their driver to this
+> level?  Then you are back to the original problem.
 
-I'd also go for COMPILE_TEST. I once enabled omapdss and omapfb to be
-compilable without any extra dependencies, and Linus wasn't fond of
-getting asked if he wants to compile omapfb or not...
+Yes, it's crude, but it's currently the only way to express a preferred
+probe order.
 
- Tomi
+> This is what deferred probing was supposed to fix.  If it doesn't, then
+> something else needs to be done, or fix the deferred probing mess...
 
+Deferred probing (the first patch) fixes the dependency problem, but may
+introduce delays. I can live with that.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131030/b75b2a9a/attachment.sig>
+> Sorry, I can't take this.
+
+Fair enough.
+
+Thanks,
+Johan
