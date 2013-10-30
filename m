@@ -1,26 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Oct 2013 00:19:25 +0000
-Subject: [PATCH v7 4/5] clk: Add common __clk_get(), __clk_put()
- implementations
-In-Reply-To: <1383076268-8984-5-git-send-email-s.nawrocki@samsung.com>
-References: <1383076268-8984-1-git-send-email-s.nawrocki@samsung.com>
- <1383076268-8984-5-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20131030001924.GX16735@n2100.arm.linux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 30 Oct 2013 09:24:22 +0900
+Subject: [PATCH 3/3] ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial
+ ports in DT
+In-Reply-To: <106392683.JP0nTO1Rqa@avalon>
+References: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383060193-1505-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <526FF9DE.9090909@cogentembedded.com> <106392683.JP0nTO1Rqa@avalon>
+Message-ID: <20131030002421.GJ21262@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 08:51:07PM +0100, Sylwester Nawrocki wrote:
-> This patch adds common __clk_get(), __clk_put() clkdev helpers that
-> replace their platform specific counterparts when the common clock
-> API is used.
+On Tue, Oct 29, 2013 at 07:30:05PM +0100, Laurent Pinchart wrote:
+> Hi Sergei,
 > 
-> The owner module pointer field is added to struct clk so a reference
-> to the clock supplier module can be taken by the clock consumers.
+> On Tuesday 29 October 2013 22:09:34 Sergei Shtylyov wrote:
+> > On 29-10-2013 19:23, Laurent Pinchart wrote:
+> > > SCIF0 and SCIF1 are used as debug serial ports. Enable them and
+> > > configure pinmuxing appropriately. We can now remove the clkdev
+> > > registration hack for SCIF devices from the Lager reference board file.
+> > > 
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > ---
+> > > 
+> > >   arch/arm/boot/dts/r8a7790-lager.dts            | 24 ++++++++++++++++----
+> > >   arch/arm/mach-shmobile/board-lager-reference.c | 18 ++----------------
+> > >   2 files changed, 22 insertions(+), 20 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts
+> > > b/arch/arm/boot/dts/r8a7790-lager.dts index a923ab6..9830c87 100644
+> > > --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> > > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> > > @@ -16,8 +16,13 @@
+> > >   	model = "Lager";
+> > >   	compatible = "renesas,lager", "renesas,r8a7790";
+> > > 
+> > > +	aliases {
+> > > +		serial0 = &scif0;
+> > > +		serial1 = &scif1;
+> > > +	};
+> > > +
+> > >   	chosen {
+> > > -		bootargs = "console=ttySC6,115200 ignore_loglevel rw
+> > > root=/dev/nfs ip=dhcp";
+> > > +		bootargs = "console=ttySC0,115200 ignore_loglevel rw
+> > > root=/dev/nfs ip=dhcp";
+> >
+> > Hm... is the rename a by-product of the SCIF device tree enablement?
 > 
-> The owner module is assigned while the clock is being registered,
-> in functions _clk_register() and __clk_register().
+> I suppose we could keep the same serial port name using serial6 and serial7 in 
+> the aliases. However, moving to DT will get rid of all other serial ports, so 
+> we would be left with ttySC6 and ttySC7, without ttySC0 to ttySC5. I'm not 
+> sure if I like that.
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> (CC'ing Simon and Magnus to get their opinion on the subject)
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+It seems logical to me that if we only have two serial ports initialised
+that they should be ttySC0 and ttySC1. Even if that leaves us with the pain
+of switching over to use ttySC0 instead of ttySC6 as the console.
+
+> 
+> > [...]
+> > 
+> > > diff --git a/arch/arm/mach-shmobile/board-lager-reference.c
+> > > b/arch/arm/mach-shmobile/board-lager-reference.c index bc3d0d2..1f5d6e2
+> > > 100644
+> > > --- a/arch/arm/mach-shmobile/board-lager-reference.c
+> > > +++ b/arch/arm/mach-shmobile/board-lager-reference.c
+> > > @@ -36,24 +36,10 @@ static void __init lager_init_time(void)
+> > > 
+> > >   static void __init lager_add_standard_devices(void)
+> > >   {
+> > >   	/*
+> > > -	 * This is a really crude hack to provide clkdev support to the SCIF
+> > > -	 * and CMT devices until they get moved to DT.
+> > > +	 * This is a really crude hack to provide clkdev support to the CMT
+> > > +	 * CMT device until it gets moved to DT.
+> > 
+> > Minor nit: "CMT" repeated twice.
+> 
+> I'll fix that. If no other change is required I won't repost the patch before 
+> sending the pull request.
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
