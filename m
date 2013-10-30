@@ -1,29 +1,39 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Wed, 30 Oct 2013 13:38:34 +0800
-Subject: [PATCH -next] ARM i.MX53: remove duplicated include from
- clk-imx51-imx53.c
-Message-ID: <CAPgLHd9smv2Jcb7SUxKsXHqnDos53A3ZhVWPMSyDJckR9_URKQ@mail.gmail.com>
+Date: Wed, 30 Oct 2013 13:54:41 +0800
+Subject: [PATCH -next v2] arm64: use for_each_node_by_type() macro
+In-Reply-To: <52709A9E.8060800@gmail.com>
+References: <CAPgLHd_aQROa0-vycghYz9A9Jx4MbC131C819xPHZg_hrTQC7w@mail.gmail.com>
+ <52709A9E.8060800@gmail.com>
+Message-ID: <CAPgLHd_r3_svSfrraO-oHyZbXg0O9brsjheO6ds9jL9rYbOfmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Remove duplicated include.
+Use for_each_node_by_type() macro instead of open coding it.
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c | 1 -
- 1 file changed, 1 deletion(-)
+v1 -> v2: remove extra space
+---
+ arch/arm64/kernel/cpu_ops.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index ce37af2..2828ea65 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -12,7 +12,6 @@
- #include <linux/io.h>
- #include <linux/clkdev.h>
- #include <linux/clk-provider.h>
--#include <linux/of.h>
- #include <linux/err.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
+diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+index aa0c9e7..37a4977 100644
+--- a/arch/arm64/kernel/cpu_ops.c
++++ b/arch/arm64/kernel/cpu_ops.c
+@@ -78,10 +78,10 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
+ 
+ void __init cpu_read_bootcpu_ops(void)
+ {
+-	struct device_node *dn = NULL;
++	struct device_node *dn;
+ 	u64 mpidr = cpu_logical_map(0);
+ 
+-	while ((dn = of_find_node_by_type(dn, "cpu"))) {
++	for_each_node_by_type(dn, "cpu") {
+ 		u64 hwid;
+ 		const __be32 *prop;
+ 
+ 
