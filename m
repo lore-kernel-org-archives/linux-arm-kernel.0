@@ -1,89 +1,56 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 30 Oct 2013 09:24:22 +0900
-Subject: [PATCH 3/3] ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial
- ports in DT
-In-Reply-To: <106392683.JP0nTO1Rqa@avalon>
-References: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383060193-1505-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <526FF9DE.9090909@cogentembedded.com> <106392683.JP0nTO1Rqa@avalon>
-Message-ID: <20131030002421.GJ21262@verge.net.au>
+Date: Wed, 30 Oct 2013 09:27:02 +0900
+Subject: [PATCH 01/12] clocksource: sh_cmt: Add clk_prepare/unprepare
+ support
+In-Reply-To: <1577850.BRVoxx5piP@avalon>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <9952506.6pWpQZf7WG@avalon> <20131030001018.GF21262@verge.net.au>
+ <1577850.BRVoxx5piP@avalon>
+Message-ID: <20131030002702.GK21262@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 07:30:05PM +0100, Laurent Pinchart wrote:
-> Hi Sergei,
+On Wed, Oct 30, 2013 at 01:13:40AM +0100, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> On Tuesday 29 October 2013 22:09:34 Sergei Shtylyov wrote:
-> > On 29-10-2013 19:23, Laurent Pinchart wrote:
-> > > SCIF0 and SCIF1 are used as debug serial ports. Enable them and
-> > > configure pinmuxing appropriately. We can now remove the clkdev
-> > > registration hack for SCIF devices from the Lager reference board file.
+> On Wednesday 30 October 2013 09:10:19 Simon Horman wrote:
+> > On Tue, Oct 29, 2013 at 10:55:05AM +0100, Laurent Pinchart wrote:
+> > > On Tuesday 29 October 2013 14:55:35 Simon Horman wrote:
+> > > > On Mon, Oct 28, 2013 at 11:49:18PM +0100, Laurent Pinchart wrote:
+> > > > > Prepare the clock at probe time, as there is no other appropriate
+> > > > > place in the driver where we're allowed to sleep.
+> > > > > 
+> > > > > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > > > > Cc: linux-kernel at vger.kernel.org
+> > > > > Signed-off-by: Laurent Pinchart
+> > > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > 
+> > > > Thanks Laurent,
+> > > > 
+> > > > I have queued this up in the clocksources branch of my renesas tree.
+> > > > I will send a pull request to Mike once v3.13-rc1 has hit the shelves.
+> > > > Mike, please let me know if you would prefer something earlier than
+> > > > that.
 > > > 
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > ---
-> > > 
-> > >   arch/arm/boot/dts/r8a7790-lager.dts            | 24 ++++++++++++++++----
-> > >   arch/arm/mach-shmobile/board-lager-reference.c | 18 ++----------------
-> > >   2 files changed, 22 insertions(+), 20 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts
-> > > b/arch/arm/boot/dts/r8a7790-lager.dts index a923ab6..9830c87 100644
-> > > --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> > > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> > > @@ -16,8 +16,13 @@
-> > >   	model = "Lager";
-> > >   	compatible = "renesas,lager", "renesas,r8a7790";
-> > > 
-> > > +	aliases {
-> > > +		serial0 = &scif0;
-> > > +		serial1 = &scif1;
-> > > +	};
-> > > +
-> > >   	chosen {
-> > > -		bootargs = "console=ttySC6,115200 ignore_loglevel rw
-> > > root=/dev/nfs ip=dhcp";
-> > > +		bootargs = "console=ttySC0,115200 ignore_loglevel rw
-> > > root=/dev/nfs ip=dhcp";
-> >
-> > Hm... is the rename a by-product of the SCIF device tree enablement?
-> 
-> I suppose we could keep the same serial port name using serial6 and serial7 in 
-> the aliases. However, moving to DT will get rid of all other serial ports, so 
-> we would be left with ttySC6 and ttySC7, without ttySC0 to ttySC5. I'm not 
-> sure if I like that.
-> 
-> (CC'ing Simon and Magnus to get their opinion on the subject)
-
-It seems logical to me that if we only have two serial ports initialised
-that they should be ttySC0 and ttySC1. Even if that leaves us with the pain
-of switching over to use ttySC0 instead of ttySC6 as the console.
-
-> 
-> > [...]
+> > > I thought the clocksource patches had to go through Daniel's tree. If you
+> > > can take them directly that's easier, so I'm fine with that. Does this
+> > > imply your Acked-by (for patches 01 to 03) ?
 > > 
-> > > diff --git a/arch/arm/mach-shmobile/board-lager-reference.c
-> > > b/arch/arm/mach-shmobile/board-lager-reference.c index bc3d0d2..1f5d6e2
-> > > 100644
-> > > --- a/arch/arm/mach-shmobile/board-lager-reference.c
-> > > +++ b/arch/arm/mach-shmobile/board-lager-reference.c
-> > > @@ -36,24 +36,10 @@ static void __init lager_init_time(void)
-> > > 
-> > >   static void __init lager_add_standard_devices(void)
-> > >   {
-> > >   	/*
-> > > -	 * This is a really crude hack to provide clkdev support to the SCIF
-> > > -	 * and CMT devices until they get moved to DT.
-> > > +	 * This is a really crude hack to provide clkdev support to the CMT
-> > > +	 * CMT device until it gets moved to DT.
+> > Sorry, my mistake. The do go through Daniel. As a convenience
+> > I have been picking up Renesas clocksource patches and passing
+> > them on to Daniel. I'm happy to keep doing this. And I'm happy to
+> > go the next step and add some entries to MAINTAINERS if that is
+> > useful to others.
 > > 
-> > Minor nit: "CMT" repeated twice.
+> > As I mentioned above I have queued these up (though not yet pushed them
+> > as I got bogged down yesterday afternoon). But if you would
+> > prefer Daniel to take them directly then please use the following:
+> > 
+> > Patches 01 - 03:
+> > 
+> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> I'll fix that. If no other change is required I won't repost the patch before 
-> sending the pull request.
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
+> I'm certainly fine with you picking the patches up, that would be helpful. 
+> Could I ask you to pick v2 up instead though ? :-)
+
+Sure. I have dropped v1 and will pick up v2 when I see them.
