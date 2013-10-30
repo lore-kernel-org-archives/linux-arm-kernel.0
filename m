@@ -1,65 +1,32 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 30 Oct 2013 22:49:26 +0530
-Subject: [PATCH v2] arm/arm64: KVM: MMIO support for BE guest
-In-Reply-To: <52713DC0.8040703@arm.com>
-References: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
- <b7620ddbce4278713635321bd9a708f4@www.loen.fr>
- <CAAhSdy0UdzKz8sKBgbZFQFWAAiC59PWcvc+-w8o=3Hsx+4UkaQ@mail.gmail.com>
- <52713DC0.8040703@arm.com>
-Message-ID: <CAAhSdy06D6Nyqkq2R6cA1MNpV2XVQYZH0eo07K57E4Db-ShWNQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Oct 2013 17:20:07 +0000
+Subject: acked
+In-Reply-To: <20131030171544.GF26784@titan.lakedaemon.net>
+References: <1383152110-19577-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1383152110-19577-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <52713B10.9060809@free-electrons.com>
+ <20131030171544.GF26784@titan.lakedaemon.net>
+Message-ID: <20131030172007.GI16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 10:41 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 30/10/13 17:06, Anup Patel wrote:
->> On Wed, Oct 30, 2013 at 1:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On 2013-10-30 01:10, Anup Patel wrote:
->>>>
->>>> On Wed, Oct 30, 2013 at 12:19 AM, Marc Zyngier <marc.zyngier@arm.com>
->>>> wrote:
->>>>>
->>>>> Do the necessary byteswap when host and guest have different
->>>>> views of the universe. Actually, the only case we need to take
->>>>> care of is when the guest is BE. All the other cases are naturally
->>>>> handled.
->>>>
->>>>
->>>> You might want to handle the case where we have LE guest on BE host
->>>> because for ARM64 kernel we might have lot of people interested in
->>>> running host kernel in BE mode with KVM enabled.
->>>
->>>
->>> What makes you think it is not handled already?
->>
->> What I understood here is that you are trying to ensure that MMIO data
->> passed to/from user space (i.e. QEMU or KVMTOOL) is host endian
->> using vcpu_data_guest_to_host() and vcpu_data_host_to_guest(). This
->> makes lot of sense for having all combinations of host and guest endianness.
->>
->> If the above is correct then I see an issue in vcpu_data_guest_to_host() and
->> vcpu_data_host_to_guest() for LE guest on BE host because this patch does
->> endianness conversion for BE VCPUs only in vcpu_data_guest_to_host() and
->> vcpu_data_host_to_guest(). If we have LE guest on BE host then these
->> functions won't do any endianness conversion.
->
-> And no conversion is exactly what we want. MMIO is always LE.
+On Wed, Oct 30, 2013 at 01:15:44PM -0400, Jason Cooper wrote:
+> Gregory,
+> 
+> I like the idea, and if you perhaps do '[PATCH X/Y] Acked' it should
+> make it through the filters.  (they currently whitelist 'GIT PULL' and
+> 'PATCH' subjects).
+> 
+> Sure would make things easier when going through the threads...
 
-Ok got it.
+NAK. :)
 
-I think vcpu_data_guest_to_host() and vcpu_data_host_to_guest() have
-little misleading names. Can we name it vcpu_data_guest_to_le() and
-vcpu_data_le_to_guest()?
+The reason being that some mailing list archivers will break threads
+with a subject line change, which will detach the "acked" from the
+original messages.
 
-Now if we are always passing LE MMIO data to QEMU (even for BE host)
-then this will have to be handled properly for BE QEMU which means
-code flow for LE QEMU and BE QEMU will not be same.
-
---
-Anup
-
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
+If a patch made it though with "[PATCH" in the subject line, then a
+reply (though *correctly* trimmed down as per Internet Etiquette
+which is something people - including yourself as evidenced by the
+message to which I'm replying - regularly don't do) will get through
+without any issues.
