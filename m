@@ -1,128 +1,107 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Oct 2013 01:06:04 +0100
-Subject: [PATCH 2/3] clk: shmobile: Add MSTP clock support
-In-Reply-To: <F8268ACF-E4E8-4411-84F1-D967450BE440@codeaurora.org>
-References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <F8268ACF-E4E8-4411-84F1-D967450BE440@codeaurora.org>
-Message-ID: <1481817.doGcO1nQB0@avalon>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 29 Oct 2013 17:07:25 -0700
+Subject: [PATCH 4/6] edac: Document Krait L1/L2 EDAC driver binding
+In-Reply-To: <526FF7DB.5040805@codeaurora.org>
+References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
+ <1383006690-6754-5-git-send-email-sboyd@codeaurora.org>
+ <90D2FDE5-C43F-4ACF-B287-4E0AD8617892@codeaurora.org>
+ <526FF7DB.5040805@codeaurora.org>
+Message-ID: <20131030000725.GH21983@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kumar,
-
-Thank you for the review.
-
-On Tuesday 29 October 2013 18:36:06 Kumar Gala wrote:
-> On Oct 29, 2013, at 9:55 AM, Laurent Pinchart wrote:
-> > MSTP clocks are gate clocks controlled through a register that handles
-> > up to 32 clocks. The register is often sparsely populated.
-> > 
-> > Those clocks are found on Renesas ARM SoCs.
-> > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  47 +++++
-> > drivers/clk/shmobile/Makefile                      |   1 +
-> > drivers/clk/shmobile/clk-mstp.c                    | 229 +++++++++++++++++
-> > include/dt-bindings/clock/r8a7790-clock.h          |  56 +++++
-> > 4 files changed, 333 insertions(+)
-> > create mode 100644
-> > Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> > create mode 100644 drivers/clk/shmobile/clk-mstp.c
-> > create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
-> > 
-> > diff --git
-> > a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> > b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt new
-> > file mode 100644
-> > index 0000000..b3a1ce0
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> > @@ -0,0 +1,47 @@
-> > +* Renesas R8A7790 MSTP Clocks
+On 10/29, Stephen Boyd wrote:
+> On 10/29/13 01:21, Kumar Gala wrote:
+> > On Oct 28, 2013, at 7:31 PM, Stephen Boyd wrote:
+> >
+> >> The Krait L1/L2 error reporting device is made up of two
+> >> interrupts, one per-CPU interrupt for the L1 caches and one
+> >> interrupt for the L2 cache.
+> >>
+> >> Cc: <devicetree@vger.kernel.org>
+> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> >> ---
+> >> .../devicetree/bindings/arm/qcom,krait-cache-erp.txt     | 16 ++++++++++++++++
+> >> 1 file changed, 16 insertions(+)
+> >> create mode 100644 Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
+> >> new file mode 100644
+> >> index 0000000..01fe8a8
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
+> >> @@ -0,0 +1,16 @@
+> >> +* Qualcomm Krait L1 / L2 cache error reporting
+> >> +
+> >> +Required properties:
+> >> +- compatible: Should be "qcom,krait-cache-erp"
+> >> +- interrupts: Should contain the L1/CPU error interrupt number and
+> >> +  then the L2 cache error interrupt number
+> >> +
+> >> +Optional properties:
+> >> +- interrupt-names: Should contain the interrupt names "l1_irq" and
+> >> +  "l2_irq"
+> >> +
+> >> +Example:
+> >> +	edac {
+> >> +		compatible = "qcom,krait-cache-erp";
+> >> +		interrupts = <1 9 0xf04>, <0 2 0x4>;
+> >> +	};
+> > Why wouldn't we have these as part of cache nodes in the dts?  (which begs the question why we don't have cache nodes?)
+> >
 > 
-> can we spell out MSTP once in the heading?
-
-Sure thing. It stands for Module Stop.
-
-> > +
-> > +The CPG can gate SoC device clocks. The gates are organized in groups of
-> > up to
-> > +32 gates.
-> > +
-> > +This device tree binding describes a single 32 gate clocks group per
-> > node.
-> > +Clocks are referenced by user nodes by the MSTP node phandle and the
-> > clock
-> > +index in the group, from 0 to 31.
-> > +
-> > +Required Properties:
-> > +
-> > +  - compatible: Must be one of the following
-> > +    - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate
-> > clocks
-> > +    - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
-> > +  - reg: Base address and length of the memory resource used by the MSTP
-> > +    clocks
-> > +  - clocks: Reference to the parent clocks
-> > +  - #clock-cells: Must be 1
-> > +  - clock-output-names: The name of the clocks as free-form strings
-> > +  - renesas,indices: Index of the gate clocks (0 to 31)
+> I can certainly add cache nodes and cpu nodes and then put the
+> interrupts in those nodes. I was thinking along those same lines when I
+> ported this driver but figured it would be good to get something out
+> there. The only question I have is how am I supposed to hook that up
+> into the linux device model? Will the edac driver bind to the device
+> created for the cpus node and the cache node? I guess it will have to be
+> a driver that binds to two devices.
 > 
-> Index of the gate clock into what?
+> One could argue that we should put the cp15 based architected timers in
+> the cpus node also but so far nobody has done that and I think there was
+> some reasoning behind that, Mark?
+> 
 
-Into the 32 gates clock group. Groups have 32 entries with a 32-bit register 
-that controls 32 gate clocks. The groups (and thus registers) are sparsly 
-populated, this property lists the indices for the register bits corresponding 
-to the clocks.
+Ok I've come up with this:
 
-Would
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "qcom,krait";
+		interrupts = <1 9 0xf04>;
 
-  - renesas,indices: Indices of the gate clocks into the group (0 to 31)
+		cpu at 0 {
+			reg = <0>;
+			next-level-cache = <&L2>;
+		};
 
-be explicit enough ?
+		cpu at 1 {
+			reg = <1>;
+			next-level-cache = <&L2>;
+		};
 
-> > +
-> > +The clocks, clock-output-names and renesas,indices properties contain one
-> > +entry per gate. The MSTP groups are sparsely populated. Unimplemented
-> > gates
-> per gate clock. (?)
+		cpu at 2 {
+			reg = <2>;
+			next-level-cache = <&L2>;
+		};
 
-I'll change that.
+		cpu at 3 {
+			reg = <3>;
+			next-level-cache = <&L2>;
+		};
 
-> > +must not be declared.
-> > +
-> > +
-> > +Example
-> > +-------
-> > +
-> > +	#include <dt-bindings/clock/r8a7790-clock.h>
-> > +
-> > +	mstp3_clks: mstp3_clks {
+		L2: l2-cache {
+			compatible = "qcom,krait-l2", "cache";
+			cache-level = <2>;
+			interrupts = <0 2 0x4>;
+		};
+	};
 
-mstp3_clks at e615013c I suppose.
-
-> > +		compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-
-clocks";
-> > +		reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
-> > +		clocks = <&cp_clk>, <&mmc1_clk>, <&sd3_clk>, <&sd2_clk>,
-> > +			 <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks 
-R8A7790_CLK_SD0>,
-> > +			 <&mmc0_clk>;
-> > +		#clock-cells = <1>;
-> > +		clock-output-names =
-> > +			"tpu0", "mmcif1", "sdhi3", "sdhi2",
-> > +			 "sdhi1", "sdhi0", "mmcif0";
-> > +		renesas,clock-indices = <
-> > +			R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
-> > +			R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
-> > +			R8A7790_CLK_MMCIF0
-> > +		>;
-> > +	};
+But now I don't know where to document this. Should I make a
+krait-edac.txt file and document it there? The problem is now
+we're documenting more than the error interrupts.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
