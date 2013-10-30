@@ -1,62 +1,128 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 30 Oct 2013 23:40:24 +0100
-Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: convert to platform driver
-In-Reply-To: <52717D97.8090905@linaro.org>
-References: <1382685074-16502-1-git-send-email-daniel.lezcano@linaro.org>
- <526AEF6B.2000404@linaro.org> <52717D97.8090905@linaro.org>
-Message-ID: <1807659.lxGmRkUGnf@flatron>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 30 Oct 2013 23:49:19 +0100
+Subject: [PATCH 5/5] mmc: sdhci-esdhc-imx: add runtime pm support
+In-Reply-To: <1383142338-25062-6-git-send-email-b29396@freescale.com>
+References: <1383142338-25062-1-git-send-email-b29396@freescale.com>
+ <1383142338-25062-6-git-send-email-b29396@freescale.com>
+Message-ID: <CAPDyKFoRkdbmj3kkbaEhTsoRtHCZyYO+D-AOObhSFMZ9Zusb4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 30 October 2013 15:12, Dong Aisheng <b29396@freescale.com> wrote:
+> The root clock will be disabled in runtime pm which can be used to save power.
+>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c |   53 ++++++++++++++++++++++++++++++++++-
+>  1 files changed, 51 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index da8026b..60201fd 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/of_gpio.h>
+>  #include <linux/pinctrl/consumer.h>
+>  #include <linux/platform_data/mmc-esdhc-imx.h>
+> +#include <linux/pm_runtime.h>
+>  #include "sdhci-pltfm.h"
+>  #include "sdhci-esdhc.h"
+>
+> @@ -1117,9 +1118,17 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>                 host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
+>         }
+>
 
-On Wednesday 30 of October 2013 14:43:51 Daniel Lezcano wrote:
-> On 10/25/2013 03:23 PM, Daniel Lezcano wrote:
-> 
-> [ ... ]
-> 
-> >>> Won't it be worth to add a new WFI_SLEEP state to the cpuidle driver
-> >>> ?
-> >> 
-> >> I don't think so. How a suspend-to-RAM specific thing like WFI_SLEEP
-> >> could
-> >> be relevant to a cpuidle driver? (Unless there are some plans to
-> >> consolidate STR with cpuidle that I haven't heard about...)
-> > 
-> > I finally found a documentation for the s3c6410x and the description
-> > of
-> > the different modes. Indeed, the sleep mode is not adequate for a
-> > cpuidle state. What about the 'stop' and 'deep stop' state ?
-> 
-> Hi Thomas,
-> 
-> just a reminder about the question above, so I can go ahead: fix what
-> you pointed out or remove the driver directly.
-> 
-> You mentionned in the previous email the STOP is not usful because it
-> can be controlled by manually outside of the cpuidle driver. But I see
-> in the documentation, the stop states power gates the cpu and deep-stop
-> stops the regulator.
+Add:
+pm_runtime_set_active
 
-STOP clock-gates the CPU and DEEP-STOP power-gates it by stopping the 
-regulator.
+> +       pm_runtime_enable(&pdev->dev);
+> +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> +       pm_runtime_use_autosuspend(&pdev->dev);
+> +       pm_suspend_ignore_children(&pdev->dev, 1);
+> +
+>         err = sdhci_add_host(host);
+> -       if (err)
+> +       if (err) {
+> +               pm_runtime_forbid(&pdev->dev);
+> +               pm_runtime_get_noresume(&pdev->dev);
+>                 goto disable_clk;
+> +       }
+>
+>         return 0;
+>
+> @@ -1141,6 +1150,9 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+>
+>         sdhci_remove_host(host, dead);
+>
+> +       pm_runtime_dont_use_autosuspend(&pdev->dev);
+> +       pm_runtime_disable(&pdev->dev);
+> +
+>         clk_disable_unprepare(imx_data->clk_per);
+>         clk_disable_unprepare(imx_data->clk_ipg);
+>         clk_disable_unprepare(imx_data->clk_ahb);
+> @@ -1150,12 +1162,49 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> +#ifdef CONFIG_PM_RUNTIME
+> +static int sdhci_esdhc_runtime_suspend(struct device *dev)
+> +{
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> +       int ret;
+> +
+> +       ret = sdhci_runtime_suspend_host(host);
+> +
+> +       clk_disable_unprepare(imx_data->clk_per);
+> +       clk_disable_unprepare(imx_data->clk_ipg);
+> +       clk_disable_unprepare(imx_data->clk_ahb);
+> +
+> +       return ret;
+> +}
+> +
+> +static int sdhci_esdhc_runtime_resume(struct device *dev)
+> +{
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct pltfm_imx_data *imx_data = pltfm_host->priv;
+> +
+> +       clk_prepare_enable(imx_data->clk_per);
+> +       clk_prepare_enable(imx_data->clk_ipg);
+> +       clk_prepare_enable(imx_data->clk_ahb);
+> +
+> +       return sdhci_runtime_resume_host(host);
+> +}
+> +#endif
+> +
+> +static const struct dev_pm_ops sdhci_esdhc_pmops = {
+> +       SET_SYSTEM_SLEEP_PM_OPS(sdhci_pltfm_suspend, sdhci_pltfm_resume)
+> +       SET_RUNTIME_PM_OPS(sdhci_esdhc_runtime_suspend,
+> +                               sdhci_esdhc_runtime_resume, NULL)
+> +};
+> +
+>  static struct platform_driver sdhci_esdhc_imx_driver = {
+>         .driver         = {
+>                 .name   = "sdhci-esdhc-imx",
+>                 .owner  = THIS_MODULE,
+>                 .of_match_table = imx_esdhc_dt_ids,
+> -               .pm     = SDHCI_PLTFM_PMOPS,
+> +               .pm     = &sdhci_esdhc_pmops,
+>         },
+>         .id_table       = imx_esdhc_devtype,
+>         .probe          = sdhci_esdhc_imx_probe,
+> --
+> 1.7.2.rc3
 
-There are some interesting aspects of those modes, like memory self-
-refresh, PLL power-off and system-wide down clocking, but I believe they 
-are too tricky to handle (coupling with device PM, stopped timers) and 
-with too little possible power saving to justify the effort of adding 
-support for them.
+Apart from the minor issue in the probe function, looks good to me.
 
-In the end, I haven't seen support for them implemented even in strange 
-vendor kernels used even on production devices, like Android phones.
+Kind regards
+Ulf Hansson
 
-> 
-> If these states have to been added later, still it worth to remove the
-> driver ?
-
-I don't think that anybody is even going to add support for them and by 
-anybody I should probably mean myself, since I'm currently the only person 
-actively adding new code for this platform, as a part of my hobby.
-
-Best regards,
-Tomasz
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
