@@ -1,49 +1,26 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 30 Oct 2013 20:45:09 +0000
-Subject: [PATCH 6/6] imx-drm: hdmi: minor cleanups
-In-Reply-To: <20131030193622.GN16735@n2100.arm.linux.org.uk>
-References: <20131030193622.GN16735@n2100.arm.linux.org.uk>
-Message-ID: <E1VbcdZ-000633-My@rmk-PC.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Oct 2013 21:46:17 +0100
+Subject: [PATCH 2/2] misc: atmel_pwm: set initcall level to subsys
+In-Reply-To: <20131030110705.GA29813@localhost>
+References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+ <20131029232249.GA20476@kroah.com> <20131030110705.GA29813@localhost>
+Message-ID: <201310302146.18248.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some minor cleanups to the HDMI driver.
+On Wednesday 30 October 2013, Johan Hovold wrote:
+> > I really hate this type of patch, as it's papering over the real
+> > problem.  What happens when someone else moves their driver to this
+> > level?  Then you are back to the original problem.
+> 
+> Yes, it's crude, but it's currently the only way to express a preferred
+> probe order.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/staging/imx-drm/imx-hdmi.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+Does the same problem occur with the generic PWM subsystem?
 
-diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
-index 1eb12c57aa3e..ee0fceb7b5b2 100644
---- a/drivers/staging/imx-drm/imx-hdmi.c
-+++ b/drivers/staging/imx-drm/imx-hdmi.c
-@@ -19,7 +19,6 @@
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
--
- #include <linux/of_device.h>
- 
- #include <drm/drmP.h>
-@@ -37,7 +36,7 @@
- #define YCBCR444		1
- #define YCBCR422_16BITS		2
- #define YCBCR422_8BITS		3
--#define	XVYCC444		4
-+#define XVYCC444		4
- 
- enum hdmi_datamap {
- 	RGB444_8B = 0x01,
-@@ -1762,8 +1761,8 @@ static int imx_hdmi_platform_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	struct device_node *ddc_node;
- 	struct imx_hdmi *hdmi;
--	int ret, irq;
- 	struct resource *iores;
-+	int ret, irq;
- 
- 	hdmi = devm_kzalloc(&pdev->dev, sizeof(*hdmi), GFP_KERNEL);
- 	if (!hdmi)
--- 
-1.7.4.4
+The atmel_pwm driver apparently is the last PWM driver that has
+not been converted to the generic subsystem yet. Doing that would
+also let us drop the atmel-pwm-bl driver in favor of the generic
+backlight.
+
+	Arnd
