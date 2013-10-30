@@ -1,62 +1,124 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 31 Oct 2013 00:19:32 +0200
-Subject: [PATCH] clk: tegra: use pll_ref as the pll_e parent
-In-Reply-To: <1383147850.4095.3.camel@weser.hi.pengutronix.de>
-References: <1383093707-10312-1-git-send-email-pdeschrijver@nvidia.com>
- <527128B5.2020101@wwwdotorg.org>
- <1383147850.4095.3.camel@weser.hi.pengutronix.de>
-Message-ID: <20131030221932.GR22111@tbergstrom-lnx.Nvidia.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 31 Oct 2013 02:19:58 +0300
+Subject: [PATCH 2/2] ARM: shmobile: Koelsch: add Ether support
+In-Reply-To: <201310310216.28673.sergei.shtylyov@cogentembedded.com>
+References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201310310219.58963.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 04:44:10PM +0100, Lucas Stach wrote:
-> Am Mittwoch, den 30.10.2013, 09:41 -0600 schrieb Stephen Warren:
-> > On 10/29/2013 06:41 PM, Peter De Schrijver wrote:
-> > > Use pll_ref instead of pll_re_vco as the pll_e parent on Tegra114 and
-> > > Tegra124. Also add a pll_ref table entry for pll_e for Tegra114.
-> > 
-> > Why? What benefit does this give, or what bug does this fix?
-> > 
-> > > diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
-> > 
-> > >  	val_aux = pll_readl(pll_params->aux_reg, pll);
-> > >  
-> > >  	if (val & PLL_BASE_ENABLE) {
-> > > -		if (!(val_aux & PLLE_AUX_PLLRE_SEL))
-> > > +		if ((val_aux & PLLE_AUX_PLLRE_SEL) || (val_aux & val_aux))
-> > 
-> > Isn't "|| (val_aux & val_aux)" always true, at least if the value is
-> > non-zero? Either this should be simply "|| val_aux", or one of those two
-> > "val_aux" is the wrong thing.
-> > 
-> > >  			WARN(1, "pll_e enabled with unsupported parent %s\n",
-> > > -			  (val & PLLE_AUX_PLLP_SEL) ? "pllp_out0" : "pll_ref");
-> > > +			  (val_aux & PLLE_AUX_PLLP_SEL) ? "pllp_out0" :
-> > > +					"pll_re_vco");
-> > >  	} else {
-> > > -		val_aux |= PLLE_AUX_PLLRE_SEL;
-> > > +		val_aux &= ~(PLLE_AUX_PLLRE_SEL | PLLE_AUX_PLLP_SEL);
-> > >  		pll_writel(val, pll_params->aux_reg, pll);
-> > >  	}
-> > 
-> > > diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-> > 
-> > > @@ -560,6 +560,7 @@ static struct tegra_clk_pll_freq_table pll_e_freq_table[] = {
-> > >  	/* PLLE special case: use cpcon field to store cml divider value */
-> > >  	{336000000, 100000000, 100, 21, 16, 11},
-> > >  	{312000000, 100000000, 200, 26, 24, 13},
-> > > +	{12000000, 100000000, 200,  1,  24, 13},
-> > 
-> > Presumably this is because pll_ref is the crystal, which runs at 12MHz.
-> > What if it doesn't; Tegra supports a bunch of other crystal rates. Don't
-> > we need entries for all the other potential crystal rates too?
-> 
-> The TRM states that PCIe and thus PLLE are only supported with 12MHz
-> external crystal rate.
-> 
+Register Ether platform device and pin data on  the  Koelsch board. 
+Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
 
-This is has been different for Tegra114 at least (where PLLE is used for USB3)
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Cheers,
+---
+ arch/arm/mach-shmobile/board-koelsch.c |   61 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 60 insertions(+), 1 deletion(-)
 
-Peter.
+Index: renesas/arch/arm/mach-shmobile/board-koelsch.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
++++ renesas/arch/arm/mach-shmobile/board-koelsch.c
+@@ -24,14 +24,31 @@
+ #include <linux/input.h>
+ #include <linux/kernel.h>
+ #include <linux/leds.h>
++#include <linux/phy.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_device.h>
++#include <linux/sh_eth.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <mach/r8a7791.h>
+ #include <mach/rcar-gen2.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++/* Ether */
++static const struct sh_eth_plat_data ether_pdata __initconst = {
++	.phy			= 0x1,
++	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
++	.phy_interface		= PHY_INTERFACE_MODE_RMII,
++	.ether_link_active_low	= 1,
++};
++
++static const struct resource ether_resources[] __initconst = {
++	DEFINE_RES_MEM(0xee700000, 0x400),
++	DEFINE_RES_IRQ(gic_spi(162)),
++};
++
+ /* LEDS */
+ static struct gpio_led koelsch_leds[] = {
+ 	{
+@@ -70,11 +87,29 @@ static const struct gpio_keys_platform_d
+ 	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+ };
+ 
++static const struct pinctrl_map koelsch_pinctrl_map[] = {
++	/* Ether */
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
++				  "eth_link", "eth"),
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
++				  "eth_mdio", "eth"),
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
++				  "eth_rmii", "eth"),
++};
++
+ static void __init koelsch_add_standard_devices(void)
+ {
+ 	r8a7791_clock_init();
++
++	pinctrl_register_mappings(koelsch_pinctrl_map,
++				  ARRAY_SIZE(koelsch_pinctrl_map));
+ 	r8a7791_pinmux_init();
++
+ 	r8a7791_add_standard_devices();
++	platform_device_register_resndata(&platform_bus, "r8a7790-ether", -1,
++					  ether_resources,
++					  ARRAY_SIZE(ether_resources),
++					  &ether_pdata, sizeof(ether_pdata));
+ 	platform_device_register_data(&platform_bus, "leds-gpio", -1,
+ 				      &koelsch_leds_pdata,
+ 				      sizeof(koelsch_leds_pdata));
+@@ -83,6 +118,30 @@ static void __init koelsch_add_standard_
+ 				      sizeof(koelsch_keys_pdata));
+ }
+ 
++/*
++ * Ether LEDs on the Koelsch board are named LINK and ACTIVE which corresponds
++ * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
++ * 14-15. We have to set them back to 01 from the default 00 value each time
++ * the PHY is reset. It's also important because the PHY's LED0 signal is
++ * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
++ * bounce on and off after each packet, which we apparently want to avoid.
++ */
++static int koelsch_ksz8041_fixup(struct phy_device *phydev)
++{
++	u16 phyctrl1 = phy_read(phydev, 0x1e);
++
++	phyctrl1 &= ~0xc000;
++	phyctrl1 |= 0x4000;
++	return phy_write(phydev, 0x1e, phyctrl1);
++}
++
++static void __init koelsch_init(void)
++{
++	koelsch_add_standard_devices();
++
++	phy_register_fixup_for_id("r8a7790-ether-ff:01", koelsch_ksz8041_fixup);
++}
++
+ static const char * const koelsch_boards_compat_dt[] __initconst = {
+ 	"renesas,koelsch",
+ 	NULL,
+@@ -91,7 +150,7 @@ static const char * const koelsch_boards
+ DT_MACHINE_START(KOELSCH_DT, "koelsch")
+ 	.smp		= smp_ops(r8a7791_smp_ops),
+ 	.init_early	= r8a7791_init_early,
+-	.init_machine	= koelsch_add_standard_devices,
++	.init_machine	= koelsch_init,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.dt_compat	= koelsch_boards_compat_dt,
+ MACHINE_END
