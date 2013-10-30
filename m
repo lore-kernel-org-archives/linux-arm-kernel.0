@@ -1,35 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 30 Oct 2013 14:05:36 -0700
-Subject: [GIT PULL] bcm soc updates for 3.13
-In-Reply-To: <CAEPRUYrrFiU6KkQ=1byXLXP3CJnUB++afuQfOfj2D+hZaDZTxg@mail.gmail.com>
-References: <CAEPRUYrrFiU6KkQ=1byXLXP3CJnUB++afuQfOfj2D+hZaDZTxg@mail.gmail.com>
-Message-ID: <CAOesGMiNwZ3z==T34ux3yXqjc2UmZQnAAn7GaJ7QZHJk-T8BaA@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 30 Oct 2013 17:11:07 -0400
+Subject: [PATCH v2 02/13] uprobes: allow ignoring of probe hits
+In-Reply-To: <20131028185425.GA12863@redhat.com>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-3-git-send-email-dave.long@linaro.org>
+ <20131019170214.GA8324@redhat.com> <20131028185425.GA12863@redhat.com>
+Message-ID: <527175EB.9000809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 11:18 PM, Christian Daudt <bcm@fixthebug.org> wrote:
-> Hi Olof,
->  This git pull request replaces the previous git pull for 3.13/soc. It
-> contains the mods for the ARCH_BCM_MOBILE patch to align better with
-> other MULTIPLATFORM usage.
->
->  Thanks,
->    csd
->
->
-> The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
->
->   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
->
-> are available in the git repository at:
->
->   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.13-soc2
->
-> for you to fetch changes up to 2d58b26550ad5d869118c77b3db8feb942e54be0:
->
->   ARM: bcm_defconfig: Run "make savedefconfig" (2013-10-29 23:09:10 -0700)
-
-Pulled, thanks.
+Sorry for the delay, all this week it's me that's traveling.
 
 
--Olof
+On 10/28/13 14:54, Oleg Nesterov wrote:
+> David, sorry for delay.
+>
+> On 10/19, Oleg Nesterov wrote:
+>>
+>> On 10/15, David Long wrote:
+>>>
+>>> @@ -1732,9 +1732,6 @@ static void handle_swbp(struct pt_regs *regs)
+>>>   		return;
+>>>   	}
+>>>
+>>> -	/* change it in advance for ->handler() and restart */
+>>> -	instruction_pointer_set(regs, bp_vaddr);
+>>> -
+>>
+>> Well, this looks obviously wrong. This SET_IP() has the comment ;)
+>>
+>> Note also that with this breaks __skip_sstep() on x86.
+>
+> Hmm. Thinking more, it seems that this patch has another problem.
+>
+> IIUC, the whole point of arch_uprobe_ignore() is to avoid
+> handler_chain() if the condition was not satisfied, so you need
+> to call it before handler_chain() ?
+
+Yes, you're right.  I can see now that is a bad merge of an earlier 
+version of the patch.  I have just tested the fix.  Thanks for finding this.
+
+>
+> Otherwise this logic should go into can_skip_sstep() and we simply
+> do not need the new hook, just we need to tweak the (ugly)
+> UPROBE_SKIP_SSTEP logic.
+>
+> Oleg.
+>
+
+
+-dl
