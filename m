@@ -1,46 +1,29 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 30 Oct 2013 00:35:26 -0500
-Subject: [PATCH -next] arm64: use for_each_node_by_type() macro
-In-Reply-To: <CAPgLHd_aQROa0-vycghYz9A9Jx4MbC131C819xPHZg_hrTQC7w@mail.gmail.com>
-References: <CAPgLHd_aQROa0-vycghYz9A9Jx4MbC131C819xPHZg_hrTQC7w@mail.gmail.com>
-Message-ID: <52709A9E.8060800@gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Wed, 30 Oct 2013 13:38:18 +0800
+Subject: [PATCH -next] ARM: ixp4xx: remove duplicated include from
+ dsmg600-setup.c
+Message-ID: <CAPgLHd9U4t3K4ziGQub9fat6Wqwj2PXh0O+DDYFNnf7r5eB_2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2013 12:25 AM, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> Use for_each_node_by_type() macro instead of open coding it.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
->  arch/arm64/kernel/cpu_ops.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-> index aa0c9e7..37a4977 100644
-> --- a/arch/arm64/kernel/cpu_ops.c
-> +++ b/arch/arm64/kernel/cpu_ops.c
-> @@ -78,10 +78,10 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
->  
->  void __init cpu_read_bootcpu_ops(void)
->  {
-> -	struct device_node *dn = NULL;
-> +	struct device_node *dn;
->  	u64 mpidr = cpu_logical_map(0);
->  
-> -	while ((dn = of_find_node_by_type(dn, "cpu"))) {
-> +	for_each_node_by_type(dn,  "cpu") {
-                                  ^
-Extra space here.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
->  		u64 hwid;
->  		const __be32 *prop;
->  
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Remove duplicated include.
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/mach-ixp4xx/dsmg600-setup.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-ixp4xx/dsmg600-setup.c b/arch/arm/mach-ixp4xx/dsmg600-setup.c
+index 736dc69..7740e13 100644
+--- a/arch/arm/mach-ixp4xx/dsmg600-setup.c
++++ b/arch/arm/mach-ixp4xx/dsmg600-setup.c
+@@ -26,7 +26,6 @@
+ #include <linux/reboot.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-gpio.h>
+-#include <linux/gpio.h>
+ 
+ #include <mach/hardware.h>
+ 
