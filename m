@@ -1,123 +1,61 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 30 Oct 2013 15:44:41 -0400
-Subject: [PATCH v2 2/2] cpufreq: arm_big_little: reconfigure switcher behavior
- at run time
-In-Reply-To: <1383162281-24204-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1383162281-24204-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1383162281-24204-3-git-send-email-nicolas.pitre@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 30 Oct 2013 12:45:57 -0700
+Subject: [PATCH v3 02/10] spmi: Linux driver framework for SPMI
+In-Reply-To: <20131030193717.GP20207@joshc.qualcomm.com>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <149bbfe89e37376cc176c3aeb6c1fab9e4fd2b91.1382985169.git.joshc@codeaurora.org>
+ <526FE7BF.1060402@codeaurora.org> <20131030193717.GP20207@joshc.qualcomm.com>
+Message-ID: <527161F5.8060507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The b.L switcher can be turned on/off at run time.  It is therefore
-necessary to change the cpufreq driver behavior accordingly.
+On 10/30/13 12:37, Josh Cartwright wrote:
+> On Tue, Oct 29, 2013 at 09:52:15AM -0700, Stephen Boyd wrote:
+>> On 10/28/13 11:12, Josh Cartwright wrote:
+>>> +int spmi_register_read(struct spmi_device *sdev, u8 addr, u8 *buf)
+>>> +{
+>>> +	/* 5-bit register address */
+>>> +	if (addr > 0x1F)
+>> Perhaps 0x1f should be a #define.
+> Is 0x1F with the comment above it not clear enough?
 
-The driver must be unregistered/registered with the cpufreq core
-to reconfigure freq tables for the virtual or actual CPUs. This is
-accomplished via the b.L switcher notifier callback.
+It triggered my 'magic number used twice' alarm. I'm ok with it either way.
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/arm_big_little.c | 54 +++++++++++++++++++++++++++++++++++++---
- 1 file changed, 51 insertions(+), 3 deletions(-)
+>>> +struct spmi_controller *spmi_controller_alloc(struct device *parent,
+>>> +					      size_t size)
+>>> +{
+>>> +	struct spmi_controller *ctrl;
+>>> +	int id;
+>>> +
+>>> +	if (WARN_ON(!parent))
+>>> +		return NULL;
+>>> +
+>>> +	ctrl = kzalloc(sizeof(*ctrl) + size, GFP_KERNEL);
+>>> +	if (!ctrl)
+>>> +		return NULL;
+>>> +
+>>> +	device_initialize(&ctrl->dev);
+>>> +	ctrl->dev.type = &spmi_ctrl_type;
+>>> +	ctrl->dev.bus = &spmi_bus_type;
+>>> +	ctrl->dev.parent = parent;
+>>> +	ctrl->dev.of_node = parent->of_node;
+>>> +	spmi_controller_set_drvdata(ctrl, &ctrl[1]);
+>>> +
+>>> +	idr_preload(GFP_KERNEL);
+>>> +	mutex_lock(&ctrl_idr_lock);
+>>> +	id = idr_alloc(&ctrl_idr, ctrl, 0, 0, GFP_NOWAIT);
+>>> +	mutex_unlock(&ctrl_idr_lock);
+>>> +	idr_preload_end();
+>> This can just be:
+>>
+>>     mutex_lock(&ctrl_idr_lock);
+>>     id = idr_alloc(&ctrl_idr, ctrl, 0, 0, GFP_KERNEL);
+>>     mutex_unlock(&ctrl_idr_lock);
+> Actually, I'm wondering if it's just easier to leverage the simpler
+> ida_simple_* APIs instead.
 
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index a6a8f74811..f63dc8dd80 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -40,9 +40,12 @@
- #define MAX_CLUSTERS	2
- 
- #ifdef CONFIG_BL_SWITCHER
--#define is_bL_switching_enabled()	true
-+static bool bL_switching_enabled;
-+#define is_bL_switching_enabled()	bL_switching_enabled
-+#define set_switching_enabled(x)	(bL_switching_enabled = (x))
- #else
- #define is_bL_switching_enabled()	false
-+#define set_switching_enabled(x)	do { } while (0)
- #endif
- 
- #define ACTUAL_FREQ(cluster, freq)  ((cluster == A7_CLUSTER) ? freq << 1 : freq)
-@@ -508,6 +511,38 @@ static struct cpufreq_driver bL_cpufreq_driver = {
- 	.attr			= cpufreq_generic_attr,
- };
- 
-+static int bL_cpufreq_switcher_notifier(struct notifier_block *nfb,
-+					unsigned long action, void *_arg)
-+{
-+	pr_debug("%s: action: %ld\n", __func__, action);
-+
-+	switch (action) {
-+	case BL_NOTIFY_PRE_ENABLE:
-+	case BL_NOTIFY_PRE_DISABLE:
-+		cpufreq_unregister_driver(&bL_cpufreq_driver);
-+		break;
-+
-+	case BL_NOTIFY_POST_ENABLE:
-+		set_switching_enabled(true);
-+		cpufreq_register_driver(&bL_cpufreq_driver);
-+		break;
-+
-+	case BL_NOTIFY_POST_DISABLE:
-+		set_switching_enabled(false);
-+		cpufreq_register_driver(&bL_cpufreq_driver);
-+		break;
-+
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block bL_switcher_notifier = {
-+	.notifier_call = bL_cpufreq_switcher_notifier,
-+};
-+
- int bL_cpufreq_register(struct cpufreq_arm_bL_ops *ops)
- {
- 	int ret, i;
-@@ -525,6 +560,9 @@ int bL_cpufreq_register(struct cpufreq_arm_bL_ops *ops)
- 
- 	arm_bL_ops = ops;
- 
-+	ret = bL_switcher_get_enabled();
-+	set_switching_enabled(ret);
-+
- 	for (i = 0; i < MAX_CLUSTERS; i++)
- 		mutex_init(&cluster_lock[i]);
- 
-@@ -534,10 +572,17 @@ int bL_cpufreq_register(struct cpufreq_arm_bL_ops *ops)
- 				__func__, ops->name, ret);
- 		arm_bL_ops = NULL;
- 	} else {
--		pr_info("%s: Registered platform driver: %s\n", __func__,
--				ops->name);
-+		ret = bL_switcher_register_notifier(&bL_switcher_notifier);
-+		if (ret) {
-+			cpufreq_unregister_driver(&bL_cpufreq_driver);
-+			arm_bL_ops = NULL;
-+		} else {
-+			pr_info("%s: Registered platform driver: %s\n",
-+					__func__, ops->name);
-+		}
- 	}
- 
-+	bL_switcher_put_enabled();
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(bL_cpufreq_register);
-@@ -550,7 +595,10 @@ void bL_cpufreq_unregister(struct cpufreq_arm_bL_ops *ops)
- 		return;
- 	}
- 
-+	bL_switcher_get_enabled();
-+	bL_switcher_unregister_notifier(&bL_switcher_notifier);
- 	cpufreq_unregister_driver(&bL_cpufreq_driver);
-+	bL_switcher_put_enabled();
- 	pr_info("%s: Un-registered platform driver: %s\n", __func__,
- 			arm_bL_ops->name);
- 	arm_bL_ops = NULL;
+Yes that also works.
+
 -- 
-1.8.4.108.g55ea5f6
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
