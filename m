@@ -1,55 +1,32 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Wed, 30 Oct 2013 12:25:51 +0100
-Subject: [PATCH 1/2] misc: atmel_pwm: add deferred-probing support
-In-Reply-To: <1382459560-26596-2-git-send-email-jhovold@gmail.com>
-References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
- <1382459560-26596-2-git-send-email-jhovold@gmail.com>
-Message-ID: <20131030112551.GB29813@localhost>
+From: jiada_wang@mentor.com (jiada_wang at mentor.com)
+Date: Wed, 30 Oct 2013 04:25:51 -0700
+Subject: [PATCH] ARM: i.MX6q: fix the wrong parent of can_root clock
+Message-ID: <1383132351-32112-1-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 22, 2013 at 06:32:39PM +0200, Johan Hovold wrote:
-> Two drivers (atmel-pwm-bl and leds-atmel-pwm) currently depend on the
-> atmel_pwm driver to have bound to any pwm-device before their devices
-> are probed.
-> 
-> Support deferred probing of such devices by making sure to return
-> -EPROBE_DEFER from pwm_channel_alloc when no pwm-device has yet been
-> bound.
-> 
-> Signed-off-by: Johan Hovold <jhovold@gmail.com>
+From: Jiada Wang <jiada_wang@mentor.com>
 
-This patch, 5c6d6fd1 ("misc: atmel_pwm: add deferred-probing support"),
-and 9d3fde86 ("backlight: atmel-pwm-bl: fix deferred probe from __init")
-in linux-next should probably be considered for inclusion in stable.
+instead of pll3_usb_otg the parent of can_root clock
+should be pll3_60m.
 
-Without them the atmel-pwm-bl driver may always fail to probe depending
-on link order.
+Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+---
+ arch/arm/mach-imx/clk-imx6q.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Johan
-
-> ---
->  drivers/misc/atmel_pwm.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/misc/atmel_pwm.c b/drivers/misc/atmel_pwm.c
-> index 494d050..a6dc56e 100644
-> --- a/drivers/misc/atmel_pwm.c
-> +++ b/drivers/misc/atmel_pwm.c
-> @@ -90,8 +90,10 @@ int pwm_channel_alloc(int index, struct pwm_channel *ch)
->  	unsigned long	flags;
->  	int		status = 0;
->  
-> -	/* insist on PWM init, with this signal pinned out */
-> -	if (!pwm || !(pwm->mask & 1 << index))
-> +	if (!pwm)
-> +		return -EPROBE_DEFER;
-> +
-> +	if (!(pwm->mask & 1 << index))
->  		return -ENODEV;
->  
->  	if (index < 0 || index >= PWM_NCHAN || !ch)
-> -- 
-> 1.8.4
-> 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 9181a24..ef85ac4 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -428,7 +428,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[asrc_podf]        = imx_clk_divider("asrc_podf",        "asrc_pred",         base + 0x30, 9,  3);
+ 	clk[spdif_pred]       = imx_clk_divider("spdif_pred",       "spdif_sel",         base + 0x30, 25, 3);
+ 	clk[spdif_podf]       = imx_clk_divider("spdif_podf",       "spdif_pred",        base + 0x30, 22, 3);
+-	clk[can_root]         = imx_clk_divider("can_root",         "pll3_usb_otg",      base + 0x20, 2,  6);
++	clk[can_root]         = imx_clk_divider("can_root",         "pll3_60m",          base + 0x20, 2,  6);
+ 	clk[ecspi_root]       = imx_clk_divider("ecspi_root",       "pll3_60m",          base + 0x38, 19, 6);
+ 	clk[gpu2d_core_podf]  = imx_clk_divider("gpu2d_core_podf",  "gpu2d_core_sel",    base + 0x18, 23, 3);
+ 	clk[gpu3d_core_podf]  = imx_clk_divider("gpu3d_core_podf",  "gpu3d_core_sel",    base + 0x18, 26, 3);
+-- 
+1.7.9.5
