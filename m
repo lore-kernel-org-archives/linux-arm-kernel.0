@@ -1,93 +1,57 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 30 Oct 2013 10:00:34 -0500
-Subject: [PATCHv9 00/43] ARM: TI SoC clock DT conversion
-In-Reply-To: <5270C1F3.6000409@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <526FDFF4.9030806@ti.com> <5270C1F3.6000409@ti.com>
-Message-ID: <52711F12.1090008@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Oct 2013 15:01:06 +0000
+Subject: [PATCH] ARM: mm: Fix ECC mem policy printk
+In-Reply-To: <52711869.60703@monstr.eu>
+References: <8986e8f1a3761e45a7927bdb0e54393c9155e6bf.1383137171.git.michal.simek@xilinx.com>
+ <20131030130728.GA16735@n2100.arm.linux.org.uk> <5271165A.4050509@monstr.eu>
+ <52711869.60703@monstr.eu>
+Message-ID: <20131030150106.GC16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2013 03:23 AM, Tero Kristo wrote:
-> On 10/29/2013 06:19 PM, Nishanth Menon wrote:
->> On 10/25/2013 10:56 AM, Tero Kristo wrote:
->> <snip>
->>> Testing done:
->>> - omap3-beagle: boot + suspend/resume (ret + off)
->>> - omap4-panda-es: boot + suspend/resume
->>> - omap5-uevm: boot
->>> - dra7-evm: boot
->>> - am335x-bone: boot
->>>
->>> Test branches available:
->>>
->>> tree: https://github.com/t-kristo/linux-pm.git
->>
->> <snip>
->>> Fully functioning test branch: 3.12-rc6-dt-clks-v9
->>>
->> ^^ I tested this branch (boot testing):
->> Beagle-XM: http://pastebin.com/50A1qtFq (crashes + clkdm issues, dpll5
->> failed to transition)
-> 
-> I just sent you a private email with a patch to try out, should fix the 
-> boot crash at least hopefully. Basically I forgot to convert one part of 
-> the kernel to the new regmap stuff for omap36xx.
+On Wed, Oct 30, 2013 at 03:32:09PM +0100, Michal Simek wrote:
+> btw: passing ecc=on through command line will caused that "ECC enabled"
+> message will be there even on systems which don't implement this bit.
+> It is just side effect for both these solutions.
 
-it does bootup yes.
-> 
-> clkdm issues are caused by wrong data in omap_hwmod_3xxx_data.c, USB 
-> nodes are listing l3_init_clkdm for them, but this only exists on 
-> omap4+. Seems like some copy paste bug introduced by someone.
-> 
-> dpll5 part I am not too sure, can you check if the same happens with 
-> non-dt boot?
+It is a hint, nothing more.  There is no way to detect whether it's
+implemented or even how it has been implemented.
 
-no-dt: http://pastebin.com/bYP9fTzH
-dt: http://pastebin.com/xHup4L9Y
+> Isn't there any easy way to test if this bit is implemented or not just
+> by setting it up and clear it?
 
-dpll5 warning seems to be only in dt-boot?
+So... let's summerise the message that you're giving.
 
-> 
->> Panda-ES: http://pastebin.com/dWMp7D1z (bandgap_fclk not found)
->> OMAP5-UEVM: http://pastebin.com/pHEx6Yzg (omap-gpmc 50000000.gpmc:
->> error: clk_get)
-> 
-> Again, I don't think this is related to this series, but rather to 
-> missing/wrong hwmod data.
+"My SoC doesn't implement this bit other than to provide ECC at the L1
+cache, instead implementing a separate ECC scheme for system memory.
+Therefore, I want to change it to describe my implementation, because
+my customers are complaining that it says ECC is disabled when that
+is not the case.  If it can't describe my setup, I want to remove the
+whole facility."
 
-seems the bandgap_fclk stuff is generated from
-drivers/thermal/ti-soc-thermal/omap4-thermal-data.c
+That's a very selfish attitude.  Sorry, but it would be wrong of me
+to allow your situation to change what we have beyond the proposed
+patch.
 
-anyways..
-> 
-> -Tero
-> 
->> DRA7-EVM: http://pastebin.com/uYNQ6Sss
->> BeagleBone-Black: http://pastebin.com/biGXS2vi
->> AM335x-evm: http://pastebin.com/K7qwJpCb
->>
->>
-> 
+I've shown you the ARM architecture reference manual where this bit in
+the page tables is described, both older and newer versions.  What we're
+doing is in the spirit of the descriptions of bit 9 in the L1 page tables.
 
-Btw, I also noticed the following section mimatches:
-WARNING: vmlinux.o(.text+0x2abd4): Section mismatch in reference from
-the function prcm_probe() to the (unknown reference) .init.data:(unknown)
-The function prcm_probe() references
-the (unknown reference) __initdata (unknown).
-This is often because prcm_probe lacks a __initdata
-annotation or the annotation of (unknown) is wrong.
+I don't think there's any sensible short description which would
+adequately describe this setting which would satisfy both your situation
+and situations on other SoCs.  We could make the kernel print an entire
+paragraph on it, something like:
 
-WARNING: vmlinux.o(.data+0x3e30): Section mismatch in reference from
-the variable prcm_driver to the (unknown reference) .init.data:(unknown)
-The variable prcm_driver references
-the (unknown reference) __initdata (unknown)
-If the reference is valid then annotate the
-variable with __init* or __refdata (see linux/init.h) or name the
-variable:
-*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+"ECC might be %sabled.  The exact ECC setting depends on how your SoC
+is implemented.  Please refer to your SoCs technical reference manual
+for a description of bit 9 in the level one page tables for further
+information on how to interpret this statement."
 
+but that would be idiotic.
 
--- 
-Regards,
-Nishanth Menon
+Of course, we could just print nothing, but the purpose of printing this
+is so that _we_ as developers looking at the kernel messages know the
+status of this bit, particularly when interpreting oops dumps.  Hiding
+this information would make some oops dumps harder to diagnose.  So...
+this is a matter for user education if your users are complaining about
+it.
