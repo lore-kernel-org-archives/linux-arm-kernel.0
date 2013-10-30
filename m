@@ -1,70 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Oct 2013 17:48:26 +0000
-Subject: [PATCH v2] arm/arm64: KVM: MMIO support for BE guest
-In-Reply-To: <CAAhSdy06D6Nyqkq2R6cA1MNpV2XVQYZH0eo07K57E4Db-ShWNQ@mail.gmail.com>
-References: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
- <b7620ddbce4278713635321bd9a708f4@www.loen.fr>
- <CAAhSdy0UdzKz8sKBgbZFQFWAAiC59PWcvc+-w8o=3Hsx+4UkaQ@mail.gmail.com>
- <52713DC0.8040703@arm.com>
- <CAAhSdy06D6Nyqkq2R6cA1MNpV2XVQYZH0eo07K57E4Db-ShWNQ@mail.gmail.com>
-Message-ID: <5271466A.8060006@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Oct 2013 17:54:26 +0000
+Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
+In-Reply-To: <5270793E.9000605@mentor.com>
+References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
+ <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
+ <5264A06B.2040202@mentor.com>
+ <20131021045917.GH17165@S2101-09.ap.freescale.net>
+ <857E9EDCA6C0904DB3357321AA9123EB62506BEA@NA-MBX-01.mgc.mentorg.com>
+ <5264C615.4070504@mentor.com>
+ <20131021070451.GI17165@S2101-09.ap.freescale.net>
+ <526DCED3.2070704@mentor.com>
+ <20131028074524.GE2839@S2101-09.ap.freescale.net>
+ <5270793E.9000605@mentor.com>
+Message-ID: <20131030175426.GK16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/10/13 17:19, Anup Patel wrote:
-> On Wed, Oct 30, 2013 at 10:41 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 30/10/13 17:06, Anup Patel wrote:
->>> On Wed, Oct 30, 2013 at 1:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> On 2013-10-30 01:10, Anup Patel wrote:
->>>>>
->>>>> On Wed, Oct 30, 2013 at 12:19 AM, Marc Zyngier <marc.zyngier@arm.com>
->>>>> wrote:
->>>>>>
->>>>>> Do the necessary byteswap when host and guest have different
->>>>>> views of the universe. Actually, the only case we need to take
->>>>>> care of is when the guest is BE. All the other cases are naturally
->>>>>> handled.
->>>>>
->>>>>
->>>>> You might want to handle the case where we have LE guest on BE host
->>>>> because for ARM64 kernel we might have lot of people interested in
->>>>> running host kernel in BE mode with KVM enabled.
->>>>
->>>>
->>>> What makes you think it is not handled already?
->>>
->>> What I understood here is that you are trying to ensure that MMIO data
->>> passed to/from user space (i.e. QEMU or KVMTOOL) is host endian
->>> using vcpu_data_guest_to_host() and vcpu_data_host_to_guest(). This
->>> makes lot of sense for having all combinations of host and guest endianness.
->>>
->>> If the above is correct then I see an issue in vcpu_data_guest_to_host() and
->>> vcpu_data_host_to_guest() for LE guest on BE host because this patch does
->>> endianness conversion for BE VCPUs only in vcpu_data_guest_to_host() and
->>> vcpu_data_host_to_guest(). If we have LE guest on BE host then these
->>> functions won't do any endianness conversion.
+On Tue, Oct 29, 2013 at 08:13:02PM -0700, jiada wrote:
+> Hi
+>
+> On 10/28/2013 12:45 AM, Shawn Guo wrote:
+>> 1. Apply the following change
 >>
->> And no conversion is exactly what we want. MMIO is always LE.
-> 
-> Ok got it.
-> 
-> I think vcpu_data_guest_to_host() and vcpu_data_host_to_guest() have
-> little misleading names. Can we name it vcpu_data_guest_to_le() and
-> vcpu_data_le_to_guest()?
+>> https://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=commitdiff;h=6050d181a4fd4abb745506a6e565d55f1f9df964
+>>
+>> 2. Remove imx_src_prepare_restart() from imx6q_restart().
+>>
+>> I will send a patch against the latest kernel.
+>>
+> Thanks Shawn, I have verified with these two changes,
+> system reboot by "echo b > /proc/sysrq-trigger" works
+> for me.
 
-My view is that encoding the endianness in the name is also confusing.
-We're actually going from guest-endianness to "no-endianness".
-
-> Now if we are always passing LE MMIO data to QEMU (even for BE host)
-> then this will have to be handled properly for BE QEMU which means
-> code flow for LE QEMU and BE QEMU will not be same.
-
-Why so? As long as MMIO is dealt with using the same endianness, it
-should behave the exact same, and the code should be the same. At least,
-it definitely is for kvmtool, and from what I gathered, the PPC guys
-didn't have much issues running LE guests on BE hosts using QEMU.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The test you really want to do is a reboot via serial console: <break> b.
+That's definitely the one which will get you if your restart handler has
+anything in it which sleeps.  This will definitely call the restart
+handler from IRQ context.
