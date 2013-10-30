@@ -1,50 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 30 Oct 2013 12:16:11 +0000
-Subject: [PATCH -next v2] arm64: use for_each_node_by_type() macro
-In-Reply-To: <5270F238.6010602@arm.com>
-References: <CAPgLHd_aQROa0-vycghYz9A9Jx4MbC131C819xPHZg_hrTQC7w@mail.gmail.com>
- <52709A9E.8060800@gmail.com>
- <CAPgLHd_r3_svSfrraO-oHyZbXg0O9brsjheO6ds9jL9rYbOfmA@mail.gmail.com>
- <5270F238.6010602@arm.com>
-Message-ID: <20131030121610.GJ3975@mbp>
+From: m.chehab@samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 30 Oct 2013 10:26:23 -0200
+Subject: [PATCH 07/19] v4l: sh_vou: Enable the driver on all ARM platforms
+In-Reply-To: <1383004027-25036-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383004027-25036-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383004027-25036-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131030102623.1d498c16@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 11:49:12AM +0000, Sudeep KarkadaNagesha wrote:
-> On 30/10/13 05:54, Wei Yongjun wrote:
-> > From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> > 
-> > Use for_each_node_by_type() macro instead of open coding it.
-> > 
-> > Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> > ---
-> > v1 -> v2: remove extra space
-> > ---
-> >  arch/arm64/kernel/cpu_ops.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-> > index aa0c9e7..37a4977 100644
-> > --- a/arch/arm64/kernel/cpu_ops.c
-> > +++ b/arch/arm64/kernel/cpu_ops.c
-> > @@ -78,10 +78,10 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
-> >  
-> >  void __init cpu_read_bootcpu_ops(void)
-> >  {
-> > -	struct device_node *dn = NULL;
-> > +	struct device_node *dn;
-> >  	u64 mpidr = cpu_logical_map(0);
-> >  
-> > -	while ((dn = of_find_node_by_type(dn, "cpu"))) {
-> > +	for_each_node_by_type(dn, "cpu") {
-> >  		u64 hwid;
-> >  		const __be32 *prop;
-> >  
-> 
-> In fact this function can be simplified by making use of OF helper directly,
-> something like below snippet. But it requires [1] for correct functionality.
+Hi Laurent,
 
-Thanks. Could you please send a properly formatted patch on top of [1]?
+Em Tue, 29 Oct 2013 00:46:55 +0100
+Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com> escreveu:
+
+> Renesas ARM platforms are transitioning from single-platform to
+> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> and ARCH_SHMOBILE_MULTI and increase build testing coverage.
+> 
+> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
+> Cc: linux-media at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+
+I'm understanding that the plan is to commit it via an ARM tree, right?
+
+If so:
+	Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+
+PS.: With regards to the discussions about this patch series,
+I'm ok on having this enabled for all archs or just for the
+archs that are known have this IP block, of course provided that
+not includes to march are there.
+
+The rationale is that, in the specific case of V4L, the platform 
+drivers are already on a separate Kconfig menu, with makes no sense
+to be enabled on any non SoC configuration.
+
+> ---
+>  drivers/media/platform/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+> index c7caf94..a726f86 100644
+> --- a/drivers/media/platform/Kconfig
+> +++ b/drivers/media/platform/Kconfig
+> @@ -36,7 +36,7 @@ source "drivers/media/platform/blackfin/Kconfig"
+>  config VIDEO_SH_VOU
+>  	tristate "SuperH VOU video output driver"
+>  	depends on MEDIA_CAMERA_SUPPORT
+> -	depends on VIDEO_DEV && ARCH_SHMOBILE && I2C
+> +	depends on VIDEO_DEV && ARM && I2C
+>  	select VIDEOBUF_DMA_CONTIG
+>  	help
+>  	  Support for the Video Output Unit (VOU) on SuperH SoCs.
+
 
 -- 
-Catalin
+
+Cheers,
+Mauro
