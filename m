@@ -1,171 +1,39 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 30 Oct 2013 21:21:08 +0100
-Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
-Message-ID: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 30 Oct 2013 13:25:32 -0700
+Subject: [PATCH v2 2/6] genirq: export percpu irq functions for module usage
+In-Reply-To: <1383164736-1849-1-git-send-email-sboyd@codeaurora.org>
+References: <1383164736-1849-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1383164736-1849-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the edma driver resume correctly after suspend. Tested
-on an AM33xx platform with cyclic audio streams and omap_hsmmc.
+In the near future we're going to use these percpu irq functions
+in the Krait CPU EDAC driver. Export them so that the EDAC driver
+can be compiled as a module.
 
-All information can be reconstructed by already known runtime
-information.
-
-As we now use some functions that were previously only used from __init
-context, annotations had to be dropped.
-
-Signed-off-by: Daniel Mack <zonque@gmail.com>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
-There was actually only a v3 ever, I made a mistake when formating the
-first version of this patch. To prevent confusion though, I named this
-one v4.
+ kernel/irq/manage.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-v3 -> v4:
-	* dropped extra allocations, and reconstruct register values
-	  from already known driver states.
-
-
-
-Hi Joel, Gururaja, Balaji,
-
-thanks a lot for your feedback. I successfully tested this version with
-davinci mcasp as well as omap_hsmmc. I'd appreciate another round of
-reviews :)
-
-
-Thanks,
-Daniel
-
- arch/arm/common/edma.c | 82 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 79 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 8e1a024..f15cdb9 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -239,6 +239,8 @@ struct edma {
- 	/* list of channels with no even trigger; terminated by "-1" */
- 	const s8	*noevent;
- 
-+	struct edma_soc_info *info;
-+
- 	/* The edma_inuse bit for each PaRAM slot is clear unless the
- 	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
- 	 */
-@@ -290,13 +292,13 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
- 			~(0x7 << bit), queue_no << bit);
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 514bcfd..c6009d1 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1623,6 +1623,7 @@ void free_percpu_irq(unsigned int irq, void __percpu *dev_id)
+ 	kfree(__free_percpu_irq(irq, dev_id));
+ 	chip_bus_sync_unlock(desc);
  }
++EXPORT_SYMBOL_GPL(free_percpu_irq);
  
--static void __init map_queue_tc(unsigned ctlr, int queue_no, int tc_no)
-+static void map_queue_tc(unsigned ctlr, int queue_no, int tc_no)
- {
- 	int bit = queue_no * 4;
- 	edma_modify(ctlr, EDMA_QUETCMAP, ~(0x7 << bit), ((tc_no & 0x7) << bit));
+ /**
+  *	setup_percpu_irq - setup a per-cpu interrupt
+@@ -1693,3 +1694,4 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+ 
+ 	return retval;
  }
- 
--static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-+static void assign_priority_to_queue(unsigned ctlr, int queue_no,
- 		int priority)
- {
- 	int bit = queue_no * 4;
-@@ -315,7 +317,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-  * included in that particular EDMA variant (Eg : dm646x)
-  *
-  */
--static void __init map_dmach_param(unsigned ctlr)
-+static void map_dmach_param(unsigned ctlr)
- {
- 	int i;
- 	for (i = 0; i < EDMA_MAX_DMACH; i++)
-@@ -1785,15 +1787,89 @@ static int edma_probe(struct platform_device *pdev)
- 			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
- 			edma_write_array(j, EDMA_QRAE, i, 0x0);
- 		}
-+		edma_cc[j]->info = info[j];
- 		arch_num_cc++;
- 	}
- 
- 	return 0;
- }
- 
-+static int edma_pm_suspend(struct device *dev)
-+{
-+	int j;
-+
-+	pm_runtime_get_sync(dev);
-+
-+	for (j = 0; j < arch_num_cc; j++) {
-+		struct edma *ecc = edma_cc[j];
-+
-+		disable_irq(ecc->irq_res_start);
-+		disable_irq(ecc->irq_res_end);
-+	}
-+
-+	pm_runtime_put_sync(dev);
-+
-+	return 0;
-+}
-+
-+static int edma_pm_resume(struct device *dev)
-+{
-+	int i, j;
-+
-+	pm_runtime_get_sync(dev);
-+
-+	for (j = 0; j < arch_num_cc; j++) {
-+		struct edma *cc = edma_cc[j];
-+
-+		s8 (*queue_priority_mapping)[2];
-+		s8 (*queue_tc_mapping)[2];
-+
-+		queue_tc_mapping = cc->info->queue_tc_mapping;
-+		queue_priority_mapping = cc->info->queue_priority_mapping;
-+
-+		/* Event queue to TC mapping */
-+		for (i = 0; queue_tc_mapping[i][0] != -1; i++)
-+			map_queue_tc(j, queue_tc_mapping[i][0],
-+					queue_tc_mapping[i][1]);
-+
-+		/* Event queue priority mapping */
-+		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
-+			assign_priority_to_queue(j,
-+						queue_priority_mapping[i][0],
-+						queue_priority_mapping[i][1]);
-+
-+		/* Map the channel to param entry if channel mapping logic
-+		 * exist
-+		 */
-+		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
-+			map_dmach_param(j);
-+
-+		for (i = 0; i < cc->num_channels; i++)
-+			if (test_bit(i, cc->edma_inuse)) {
-+				/* ensure access through shadow region 0 */
-+				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
-+						BIT(i & 0x1f));
-+
-+				setup_dma_interrupt(i,
-+						    cc->intr_data[i].callback,
-+						    cc->intr_data[i].data);
-+			}
-+
-+		enable_irq(cc->irq_res_start);
-+		enable_irq(cc->irq_res_end);
-+	}
-+
-+	pm_runtime_put_sync(dev);
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
-+
- static struct platform_driver edma_driver = {
- 	.driver = {
- 		.name	= "edma",
-+		.pm	= &edma_pm_ops,
- 		.of_match_table = edma_of_ids,
- 	},
- 	.probe = edma_probe,
++EXPORT_SYMBOL_GPL(request_percpu_irq);
 -- 
-1.8.3.1
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
