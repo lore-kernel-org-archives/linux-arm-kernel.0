@@ -1,136 +1,117 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Tue, 29 Oct 2013 20:09:21 -0700
-Subject: [PATCH v3 2/5] usb: chipidea: add freescale imx28 special write
- register method
-In-Reply-To: <20131030005341.GA31544@shlinux1.ap.freescale.net>
-References: <1382680943-9258-1-git-send-email-peter.chen@freescale.com>
- <1382680943-9258-2-git-send-email-peter.chen@freescale.com>
- <526E3E2C.3030706@digi.com> <201310281147.53982.marex@denx.de>
- <20131029235447.GA21367@kroah.com>
- <20131030005341.GA31544@shlinux1.ap.freescale.net>
-Message-ID: <20131030030921.GC12179@kroah.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Wed, 30 Oct 2013 12:07:52 +0900
+Subject: [PATCH v9 1/5] ARM: add basic support for Trusted Foundations
+In-Reply-To: <0232E02C-5F41-4EC6-9011-86D67005433D@codeaurora.org>
+References: <1382956118-12495-1-git-send-email-acourbot@nvidia.com>
+ <D49A3E92-54FD-4275-82F5-DBB476086B03@codeaurora.org>
+ <20131028215649.GB10833@quad.lixom.net> <2702565.PHk13m6fVo@flatron>
+ <20131029002543.GF4763@kartoffel>
+ <0232E02C-5F41-4EC6-9011-86D67005433D@codeaurora.org>
+Message-ID: <52707808.8020503@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 08:53:42AM +0800, Peter Chen wrote:
-> On Tue, Oct 29, 2013 at 04:54:47PM -0700, gregkh at linuxfoundation.org wrote:
-> > On Mon, Oct 28, 2013 at 11:47:53AM +0100, Marek Vasut wrote:
-> > > Dear Hector Palacios,
-> > > 
-> > > > Dear Peter,
-> > > > 
-> > > > On 10/25/2013 08:02 AM, Peter Chen wrote:
-> > > > > According to Freescale imx28 Errata, "ENGR119653 USB: ARM to USB
-> > > > > register error issue", All USB register write operations must
-> > > > > use the ARM SWP instruction. So, we implement special hw_write
-> > > > > and hw_test_and_clear for imx28.
-> > > > > 
-> > > > > Discussion for it at below:
-> > > > > http://marc.info/?l=linux-usb&m=137996395529294&w=2
-> > > > > 
-> > > > > Signed-off-by: Peter Chen
-> > > > > <peter.chen-KZfg59tc24xl57MIdRCFDg@public.gmane.org> ---
-> > > > > Changes for v2:
-> > > > > - Rebase to latest usb-next tree
-> > > > > 
-> > > > >   drivers/usb/chipidea/ci.h    |   23 +++++++++++++++++++++++
-> > > > >   drivers/usb/chipidea/core.c  |    2 ++
-> > > > >   drivers/usb/chipidea/host.c  |    1 +
-> > > > >   include/linux/usb/chipidea.h |    1 +
-> > > > >   4 files changed, 27 insertions(+), 0 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-> > > > > index 1c94fc5..4eb61d0 100644
-> > > > > --- a/drivers/usb/chipidea/ci.h
-> > > > > +++ b/drivers/usb/chipidea/ci.h
-> > > > > @@ -173,6 +173,8 @@ struct ci_hdrc {
-> > > > > 
-> > > > >   	struct dentry			*debugfs;
-> > > > >   	bool				id_event;
-> > > > >   	bool				b_sess_valid_event;
-> > > > > 
-> > > > > +	/* imx28 needs swp instruction for writing */
-> > > > > +	bool				imx28_write_fix;
-> > > > > 
-> > > > >   };
-> > > > >   
-> > > > >   static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
-> > > > > 
-> > > > > @@ -253,6 +255,13 @@ static inline u32 hw_read(struct ci_hdrc *ci, enum
-> > > > > ci_hw_regs reg, u32 mask)
-> > > > > 
-> > > > >   	return ioread32(ci->hw_bank.regmap[reg]) & mask;
-> > > > >   
-> > > > >   }
-> > > > > 
-> > > > > +#ifdef CONFIG_SOC_IMX28
-> > > > > +static inline void imx28_ci_writel(u32 val32, volatile u32 *addr)
-> > > > > +{
-> > > > > +	__asm__ ("swp %0, %0, [%1]" : : "r"(val32), "r"(addr));
-> > > > > +}
-> > > > > +#endif
-> > > > > +
-> > > > > 
-> > > > >   /**
-> > > > >   
-> > > > >    * hw_write: writes to a hw register
-> > > > >    * @reg:  register index
-> > > > > 
-> > > > > @@ -266,7 +275,14 @@ static inline void hw_write(struct ci_hdrc *ci, enum
-> > > > > ci_hw_regs reg,
-> > > > > 
-> > > > >   		data = (ioread32(ci->hw_bank.regmap[reg]) & ~mask)
-> > > > >   		
-> > > > >   			| (data & mask);
-> > > > > 
-> > > > > +#ifdef CONFIG_SOC_IMX28
-> > > > > +	if (ci->imx28_write_fix)
-> > > > > +		imx28_ci_writel(data, ci->hw_bank.regmap[reg]);
-> > > > > +	else
-> > > > > +		iowrite32(data, ci->hw_bank.regmap[reg]);
-> > > > > +#else
-> > > > > 
-> > > > >   	iowrite32(data, ci->hw_bank.regmap[reg]);
-> > > > > 
-> > > > > +#endif
-> > > > > 
-> > > > >   }
-> > > > >   
-> > > > >   /**
-> > > > > 
-> > > > > @@ -281,7 +297,14 @@ static inline u32 hw_test_and_clear(struct ci_hdrc
-> > > > > *ci, enum ci_hw_regs reg,
-> > > > > 
-> > > > >   {
-> > > > >   
-> > > > >   	u32 val = ioread32(ci->hw_bank.regmap[reg]) & mask;
-> > > > > 
-> > > > > +#ifdef CONFIG_SOC_IMX28
-> > > > > +	if (ci->imx28_write_fix)
-> > > > > +		imx28_ci_writel(val, ci->hw_bank.regmap[reg]);
-> > > > > +	else
-> > > > > +		iowrite32(val, ci->hw_bank.regmap[reg]);
-> > > > > +#else
-> > > > > 
-> > > > >   	iowrite32(val, ci->hw_bank.regmap[reg]);
-> > > > > 
-> > > > > +#endif
-> > > > > 
-> > > > >   	return val;
-> > > > >   
-> > > > >   }
-> > > > 
-> > > > Can't we remove the #ifdefs CONFIG_SOC_IMX28 all around?
-> > > > The check is done on the new flag ci->imx28_write_fix which exists for all
-> > > > platforms, isn't it?.
-> > > 
-> > > The SWP instruction is specific to ARM, so you'd need to stub-out the 
-> > > imx28_ci_writel() with ifdef then.
-> > 
-> > That's better than the mess of #ifdefs this patch adds, which isn't ok
-> > at all :(
-> > 
-> 
-> You mean try to reduce the number of #ifdef?
+On 10/29/2013 05:12 PM, Kumar Gala wrote:
+>
+> On Oct 28, 2013, at 7:25 PM, Mark Rutland wrote:
+>
+>> On Mon, Oct 28, 2013 at 11:31:36PM +0000, Tomasz Figa wrote:
+>>> On Monday 28 of October 2013 14:56:49 Olof Johansson wrote:
+>>>> On Mon, Oct 28, 2013 at 05:57:04AM -0500, Kumar Gala wrote:
+>>>>> On Oct 28, 2013, at 5:28 AM, Alexandre Courbot wrote:
+>>>>>> Trusted Foundations is a TrustZone-based secure monitor for ARM that
+>>>>>> can be invoked using the same SMC-based API on all supported
+>>>>>> platforms. This patch adds initial basic support for Trusted
+>>>>>> Foundations using the ARM firmware API. Current features are limited
+>>>>>> to the ability to boot secondary processors.
+>>>>>>
+>>>>>> Note: The API followed by Trusted Foundations does *not* follow the
+>>>>>> SMC
+>>>>>> calling conventions. It has nothing to do with PSCI neither and is
+>>>>>> only
+>>>>>> relevant to devices that use Trusted Foundations (like most
+>>>>>> Tegra-based
+>>>>>> retail devices).
+>>>>>>
+>>>>>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>>>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>>>>> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>>>>>> ---
+>>>>>> .../arm/firmware/tl,trusted-foundations.txt        | 20 ++++++
+>>>>>> .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>>>>>> arch/arm/Kconfig                                   |  2 +
+>>>>>> arch/arm/Makefile                                  |  1 +
+>>>>>> arch/arm/firmware/Kconfig                          | 28 ++++++++
+>>>>>> arch/arm/firmware/Makefile                         |  1 +
+>>>>>> arch/arm/firmware/trusted_foundations.c            | 79
+>>>>>> ++++++++++++++++++++++ arch/arm/include/asm/trusted_foundations.h
+>>>>>>       | 67 ++++++++++++++++++ 8 files changed, 199 insertions(+)
+>>>>>> create mode 100644
+>>>>>> Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundatio
+>>>>>> ns.txt create mode 100644 arch/arm/firmware/Kconfig
+>>>>>> create mode 100644 arch/arm/firmware/Makefile
+>>>>>> create mode 100644 arch/arm/firmware/trusted_foundations.c
+>>>>>> create mode 100644 arch/arm/include/asm/trusted_foundations.h
+>>>>>>
+>>>>>> diff --git
+>>>>>> a/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+>>>>>> ions.txt
+>>>>>> b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+>>>>>> ions.txt new file mode 100644
+>>>>>> index 0000000..2ec75c9
+>>>>>> --- /dev/null
+>>>>>> +++
+>>>>>> b/Documentation/devicetree/bindings/arm/firmware/tl,trusted-foundat
+>>>>>> ions.txt @@ -0,0 +1,20 @@
+>>>>>> +Trusted Foundations
+>>>>>> +-------------------
+>>>>>> +
+>>>>>> +Boards that use the Trusted Foundations secure monitor can signal
+>>>>>> its
+>>>>>> +presence by declaring a node compatible with
+>>>>>> "tl,trusted-foundations"
+>>>>>> +under the /firmware/ node
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +- compatible : "tl,trusted-foundations"
+>>>>>> +- version-major : major version number of Trusted Foundations
+>>>>>> firmware
+>>>>>> +- version-minor: minor version number of Trusted Foundations
+>>>>>> firmware
+>>>>>
+>>>>> vendor prefix version.
+>>>>
+>>>> Are you saying he should use tl,version-major tl,version-minor? For
+>>>> bindings that are already vendor-specific we haven't (on ARM) asked for
+>>>> vendor prefix on properties. It doesn't mean that we should keep going
+>>>> down that route though, so I'm just asking for clarification for my own
+>>>> edification. :)
+>>>
+>>> This is a good question. We should decide what the right thing (TM) is and
+>>> write it down. I, on the contrary, was convinced that it's the way Kumar
+>>> says.
+>>
+>> The impression I got was that properties should be prefixed when they're
+>> extremely vendor-specific and could clash with a more generic property. I'm not
+>> sure that firmware will ever have a generic binding given the variation even in
+>> the set of implemented functionality.
+>>
+>> I would imagine that there are many ways different firmwares might be
+>> versioned, and I can't see version-major or version-minor clashing with a
+>> generic property we might add later. However prefixing would not be harmful, so
+>> I'm not opposed to it if others want that.
+>>
+>> Another option would be to support a fallback compatible list (e.g.
+>> "tl,trusted-foundations-${MAJOR}-${MINOR}", "tl,trusted-foundations"), and get
+>> versioning information from there. Given that could be painful to handle I
+>> don't want to force it if not required.
+>>
+>> Thanks,
+>> Mark.
+>
+> I'm of the opinion that making all vendor specific properties vendor prefixed is the easiest rule of thumb and leaves no gray area to have to argue about.
 
-Of course you should.
+All good points, I will vendor-prefix these properties.
+
+Thanks,
+Alex.
