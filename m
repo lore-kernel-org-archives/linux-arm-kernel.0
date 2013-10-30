@@ -1,51 +1,93 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 30 Oct 2013 20:27:19 +0530
-Subject: [PATCH V2 6/7] ARM: OMAP4+: Correct Wakeup-gen code to use physical
- irq number
-In-Reply-To: <1383145040-15852-1-git-send-email-r.sricharan@ti.com>
-References: <1383145040-15852-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1383145040-15852-7-git-send-email-r.sricharan@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 30 Oct 2013 10:00:34 -0500
+Subject: [PATCHv9 00/43] ARM: TI SoC clock DT conversion
+In-Reply-To: <5270C1F3.6000409@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <526FDFF4.9030806@ti.com> <5270C1F3.6000409@ti.com>
+Message-ID: <52711F12.1090008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wakeup gen mask/unmask callback uses the irq element of the
-irq_data to setup. The irq is the linux virtual irq number and
-is same as the hardware irq number only when the parent irqchip
-is setup as a legacy domain. When it is used as a linear domain,
-the virtual irqs are allocated dynamically and wakeup gen code
-cannot rely on these numbers to access the irq registers. Instead
-use the hwirq element of the irq_data which represent the physical
-irq number.
+On 10/30/2013 03:23 AM, Tero Kristo wrote:
+> On 10/29/2013 06:19 PM, Nishanth Menon wrote:
+>> On 10/25/2013 10:56 AM, Tero Kristo wrote:
+>> <snip>
+>>> Testing done:
+>>> - omap3-beagle: boot + suspend/resume (ret + off)
+>>> - omap4-panda-es: boot + suspend/resume
+>>> - omap5-uevm: boot
+>>> - dra7-evm: boot
+>>> - am335x-bone: boot
+>>>
+>>> Test branches available:
+>>>
+>>> tree: https://github.com/t-kristo/linux-pm.git
+>>
+>> <snip>
+>>> Fully functioning test branch: 3.12-rc6-dt-clks-v9
+>>>
+>> ^^ I tested this branch (boot testing):
+>> Beagle-XM: http://pastebin.com/50A1qtFq (crashes + clkdm issues, dpll5
+>> failed to transition)
+> 
+> I just sent you a private email with a patch to try out, should fix the 
+> boot crash at least hopefully. Basically I forgot to convert one part of 
+> the kernel to the new regmap stuff for omap36xx.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
----
- arch/arm/mach-omap2/omap-wakeupgen.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+it does bootup yes.
+> 
+> clkdm issues are caused by wrong data in omap_hwmod_3xxx_data.c, USB 
+> nodes are listing l3_init_clkdm for them, but this only exists on 
+> omap4+. Seems like some copy paste bug introduced by someone.
+> 
+> dpll5 part I am not too sure, can you check if the same happens with 
+> non-dt boot?
 
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index e3274bb..c9a5b3c 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -137,7 +137,7 @@ static void wakeupgen_mask(struct irq_data *d)
- 	unsigned long flags;
- 
- 	raw_spin_lock_irqsave(&wakeupgen_lock, flags);
--	_wakeupgen_clear(d->irq, irq_target_cpu[d->irq]);
-+	_wakeupgen_clear(d->hwirq, irq_target_cpu[d->hwirq]);
- 	raw_spin_unlock_irqrestore(&wakeupgen_lock, flags);
- }
- 
-@@ -149,7 +149,7 @@ static void wakeupgen_unmask(struct irq_data *d)
- 	unsigned long flags;
- 
- 	raw_spin_lock_irqsave(&wakeupgen_lock, flags);
--	_wakeupgen_set(d->irq, irq_target_cpu[d->irq]);
-+	_wakeupgen_set(d->hwirq, irq_target_cpu[d->hwirq]);
- 	raw_spin_unlock_irqrestore(&wakeupgen_lock, flags);
- }
- 
+no-dt: http://pastebin.com/bYP9fTzH
+dt: http://pastebin.com/xHup4L9Y
+
+dpll5 warning seems to be only in dt-boot?
+
+> 
+>> Panda-ES: http://pastebin.com/dWMp7D1z (bandgap_fclk not found)
+>> OMAP5-UEVM: http://pastebin.com/pHEx6Yzg (omap-gpmc 50000000.gpmc:
+>> error: clk_get)
+> 
+> Again, I don't think this is related to this series, but rather to 
+> missing/wrong hwmod data.
+
+seems the bandgap_fclk stuff is generated from
+drivers/thermal/ti-soc-thermal/omap4-thermal-data.c
+
+anyways..
+> 
+> -Tero
+> 
+>> DRA7-EVM: http://pastebin.com/uYNQ6Sss
+>> BeagleBone-Black: http://pastebin.com/biGXS2vi
+>> AM335x-evm: http://pastebin.com/K7qwJpCb
+>>
+>>
+> 
+
+Btw, I also noticed the following section mimatches:
+WARNING: vmlinux.o(.text+0x2abd4): Section mismatch in reference from
+the function prcm_probe() to the (unknown reference) .init.data:(unknown)
+The function prcm_probe() references
+the (unknown reference) __initdata (unknown).
+This is often because prcm_probe lacks a __initdata
+annotation or the annotation of (unknown) is wrong.
+
+WARNING: vmlinux.o(.data+0x3e30): Section mismatch in reference from
+the variable prcm_driver to the (unknown reference) .init.data:(unknown)
+The variable prcm_driver references
+the (unknown reference) __initdata (unknown)
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the
+variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+
+
 -- 
-1.7.9.5
+Regards,
+Nishanth Menon
