@@ -1,27 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Oct 2013 08:28:22 +0000
-Subject: [PATCH v2] arm/arm64: KVM: MMIO support for BE guest
-In-Reply-To: <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
-References: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
- <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
-Message-ID: <b7620ddbce4278713635321bd9a708f4@www.loen.fr>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 30 Oct 2013 10:29:28 +0200
+Subject: [PATCHv9 05/43] CLK: TI: add DT alias clock registration mechanism
+In-Reply-To: <CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>	<1382716658-6964-6-git-send-email-t-kristo@ti.com>
+ <CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>
+Message-ID: <5270C368.9000701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-10-30 01:10, Anup Patel wrote:
-> On Wed, Oct 30, 2013 at 12:19 AM, Marc Zyngier <marc.zyngier@arm.com> 
-> wrote:
->> Do the necessary byteswap when host and guest have different
->> views of the universe. Actually, the only case we need to take
->> care of is when the guest is BE. All the other cases are naturally
->> handled.
+On 10/29/2013 07:50 PM, Matt Sealey wrote:
+> On Fri, Oct 25, 2013 at 10:56 AM, Tero Kristo <t-kristo@ti.com> wrote:
+>> Some devices require their clocks to be available with a specific
+>> dev-id con-id mapping. With DT, the clocks can be found by default
+>> only with their name, or alternatively through the device node of
+>> the consumer. With drivers, that don't support DT fully yet, add
+>> mechanism to register specific clock names.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> Tested-by: Nishanth Menon <nm@ti.com>
+>> Acked-by: Tony Lindgren <tony@atomide.com>
 >
-> You might want to handle the case where we have LE guest on BE host
-> because for ARM64 kernel we might have lot of people interested in
-> running host kernel in BE mode with KVM enabled.
+> You guys are wonderful, by the way ;)
+>
+>> +void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
+>> +{
+>> +       struct ti_dt_clk *c;
+>> +       struct device_node *node;
+>> +       struct clk *clk;
+>> +       struct of_phandle_args clkspec;
+>> +
+>> +       for (c = oclks; c->node_name != NULL; c++) {
+>> +               node = of_find_node_by_name(NULL, c->node_name);
+>> +               clkspec.np = node;
+>> +               clk = of_clk_get_from_provider(&clkspec);
+>> +
+>> +               if (!IS_ERR(clk)) {
+>> +                       c->lk.clk = clk;
+>> +                       clkdev_add(&c->lk);
+>> +               } else {
+>> +                       pr_warn("%s: failed to lookup clock node %s\n",
+>> +                               __func__, c->node_name);
+>> +               }
+>> +       }
+>> +}
+>
+> I have one question here, what makes this part of the patch
+> TI-specific at all except the definition of the structure ti_dt_clk?
+> Mapping DT clocks to generic clkdev legacy namings seems like it would
+> be a necessary evil across *all* SoC platforms.
+>
+> I would say there is a good case for this being generic and used by
+> all platforms waiting for con->id/dev->id to be moved to DT-awareness,
+> the structure itself is very generic within clkdev as long as the
+> drivers conformed anyway (and if they didn't, none of this helps) and
+> I don't think it really needs to be a TI-only thing. The next thing
+> that's going to happen when another platform arrives that wants to do
+> the same thing is duplication or consolidation - so it would probably
+> be a good idea to make this generic to start.
+>
+> While there the names could be a bit more descriptive -
+> dt_clk_name_lookup_map_register(), struct dt_clk_name_lookup_map,
+> DT_CLK_LOOKUP_MAP() ..? The current namespace makes it look like this
+> is the absolute correct thing to do under all circumstances, but in
+> fact this is purely for mapping the old way to the new, better way..
+> in the event a brand new platform arrives, with all new drivers (or
+> only compliant drivers), none of this code should be implemented for
+> it and it should be presented this way.
 
-What makes you think it is not handled already?
+An earlier implementation of this patch (or at least a patch that tries 
+to accomplish the same as this does, add support for legacy devices) did 
+try to add generic solution. There was some discussion on it and I 
+decided to drop it due to bad feedback.
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+See: http://www.spinics.net/lists/linux-omap/msg95147.html
+
+-Tero
