@@ -1,56 +1,82 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Wed, 30 Oct 2013 14:23:24 +0800
-Subject: [RFCv2][PATCHv5 4/4] Documentation: Add device tree bindings for
- Freescale FTM PWM.
-In-Reply-To: <1383114204-17264-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1383114204-17264-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1383114204-17264-5-git-send-email-Li.Xiubo@freescale.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 30 Oct 2013 02:19:00 -0500
+Subject: [PATCH 4/6] edac: Document Krait L1/L2 EDAC driver binding
+In-Reply-To: <20131030003805.GC3268@kartoffel>
+References: <1383006690-6754-1-git-send-email-sboyd@codeaurora.org>
+ <1383006690-6754-5-git-send-email-sboyd@codeaurora.org>
+ <90D2FDE5-C43F-4ACF-B287-4E0AD8617892@codeaurora.org>
+ <526FF7DB.5040805@codeaurora.org> <20131030003805.GC3268@kartoffel>
+Message-ID: <302FC9DF-1149-4B71-AFC6-7DE05885F2CE@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Document for Freescale FTM PWM driver under
-Documentation/devicetree/bindings/pwm/.
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- .../devicetree/bindings/pwm/pwm-fsl-ftm.txt        | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
+On Oct 29, 2013, at 7:38 PM, Mark Rutland wrote:
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-new file mode 100644
-index 0000000..5c1cd2b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-fsl-ftm.txt
-@@ -0,0 +1,29 @@
-+Freescale FlexTimer Module(FTM) PWM controller
-+
-+Required properties:
-+- compatible: Should be "fsl,vf610-ftm-pwm"
-+- reg: Physical base address and length of the controller's registers
-+- #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-+  the cells format.
-+- clock-names : Should includes the following module clock source entries:
-+    "ftm0" (module clock),
-+    "ftm0_counter" (counter clock),
-+- clocks : Must contain a clock specifier for each entry in clock-names,
-+  See clock/clock-bindings.txt for details of the property values.
-+- pinctrl-names: must contain a "default" entry.
-+- pinctrl-NNN: One property must exist for each entry in pinctrl-names.
-+  See pinctrl/pinctrl-bindings.txt for details of the property values.
-+
-+
-+Example:
-+
-+pwm0: pwm at 40038000 {
-+		compatible = "fsl,vf610-ftm-pwm";
-+		reg = <0x40038000 0x1000>;
-+		#pwm-cells = <3>;
-+		clock-names = "ftm0", "ftm0_counter;
-+		clocks = <&clks VF610_CLK_FTM0>,
-+			<&clks VF610_CLK_FTM0_FIX_SEL>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pwm0_1>;
-+};
+> On Tue, Oct 29, 2013 at 06:00:59PM +0000, Stephen Boyd wrote:
+>> On 10/29/13 01:21, Kumar Gala wrote:
+>>> On Oct 28, 2013, at 7:31 PM, Stephen Boyd wrote:
+>>> 
+>>>> The Krait L1/L2 error reporting device is made up of two
+>>>> interrupts, one per-CPU interrupt for the L1 caches and one
+>>>> interrupt for the L2 cache.
+>>>> 
+>>>> Cc: <devicetree@vger.kernel.org>
+>>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>>> ---
+>>>> .../devicetree/bindings/arm/qcom,krait-cache-erp.txt     | 16 ++++++++++++++++
+>>>> 1 file changed, 16 insertions(+)
+>>>> create mode 100644 Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
+>>>> 
+>>>> diff --git a/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
+>>>> new file mode 100644
+>>>> index 0000000..01fe8a8
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/arm/qcom,krait-cache-erp.txt
+>>>> @@ -0,0 +1,16 @@
+>>>> +* Qualcomm Krait L1 / L2 cache error reporting
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: Should be "qcom,krait-cache-erp"
+>>>> +- interrupts: Should contain the L1/CPU error interrupt number and
+>>>> +  then the L2 cache error interrupt number
+>>>> +
+>>>> +Optional properties:
+>>>> +- interrupt-names: Should contain the interrupt names "l1_irq" and
+>>>> +  "l2_irq"
+>>>> +
+>>>> +Example:
+>>>> +	edac {
+>>>> +		compatible = "qcom,krait-cache-erp";
+>>>> +		interrupts = <1 9 0xf04>, <0 2 0x4>;
+>>>> +	};
+>>> Why wouldn't we have these as part of cache nodes in the dts?  (which begs the question why we don't have cache nodes?)
+>>> 
+>> 
+>> I can certainly add cache nodes and cpu nodes and then put the
+>> interrupts in those nodes. I was thinking along those same lines when I
+>> ported this driver but figured it would be good to get something out
+>> there. The only question I have is how am I supposed to hook that up
+>> into the linux device model? Will the edac driver bind to the device
+>> created for the cpus node and the cache node? I guess it will have to be
+>> a driver that binds to two devices.
+>> 
+>> One could argue that we should put the cp15 based architected timers in
+>> the cpus node also but so far nobody has done that and I think there was
+>> some reasoning behind that, Mark?
+> 
+> The architected timer binding was created at a time I wasn't involved in kernel
+> development, and I'm not aware of any particular reasoning. I've heard that
+> there was a decision to not duplicate banked resources, which would explain not
+> having the timer under /cpus/cpu at N, but doesn't imply that having it under
+> /cpus is bad.
+> 
+> Do we have precedent for putting any devices other than CPUs in /cpus?
+
+On PPC we had core cache's (depending on topology) that would be there, and thus why I raised the suggestion.
+
+- k
+
 -- 
-1.8.4
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
