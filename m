@@ -1,47 +1,191 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Oct 2013 18:01:09 +0000
-Subject: [PULL REQ] Big Endian initial patch series
-In-Reply-To: <526E89E6.8010202@codethink.co.uk>
-References: <20131018205405.GA28835@codethink.co.uk>
- <20131019170954.GC25076@mudshark.cambridge.arm.com>
- <5262E2C7.7000106@codethink.co.uk>
- <20131028004736.GG16735@n2100.arm.linux.org.uk>
- <20131028084455.GA20218@mudshark.cambridge.arm.com>
- <20131028085328.GI16735@n2100.arm.linux.org.uk>
- <526E89E6.8010202@codethink.co.uk>
-Message-ID: <20131030180109.GL16735@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 30 Oct 2013 11:05:36 -0700
+Subject: [PATCH v3 04/10] spmi: Add MSM PMIC Arbiter SPMI controller
+In-Reply-To: <7467ed718314cb98c9e40f135e9926cf14ed218b.1382985169.git.joshc@codeaurora.org>
+References: <cover.1382985169.git.joshc@codeaurora.org>
+ <7467ed718314cb98c9e40f135e9926cf14ed218b.1382985169.git.joshc@codeaurora.org>
+Message-ID: <20131030180536.GI21983@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 03:59:34PM +0000, Ben Dooks wrote:
-> On 28/10/13 08:53, Russell King - ARM Linux wrote:
->
->>> +#ifdef __ARMEB_
->>> +#define LOW_OFFSET     0x4
->>> +#define HIGH_OFFSET    0x0
->>> +#else
->>> +#define LOW_OFFSET     0x0
->>> +#define HIGH_OFFSET    0x4
->>> +#endif
->>>
->>> (spot the missing underscore).
->>
->> Yep, well spotted.
->>
->> Well, we have some time to get this all fixed, so I'm going to drop
->> Ben's tree.  I think we need to first commit a patch to fix the error
->> in Santosh's patch
->
-> Ok, shall I look at re-basing to -rc6?
->
-> I have a bug report with a change to the SCU reading for the SMP
-> fix-up case which could do with fixing, so I could add this and send
-> another pull request (complete with description this time).
+On 10/28, Josh Cartwright wrote:
+> +
+> +/**
+> + * pa_write_data: write 1..4 bytes from buf to pmic-arb's register
+> + * @bc byte-count -1. range: 0..3
+> + * @reg register's address
+> + * @buf buffer to write. length must be bc+1
 
-Rebasing on a later kernel from Linus doesn't do much good, because the
-conflicting changes aren't in Linus' tree, but are part of Santosh's
-patch set for high physical memory for LPAE systems.
+Missing colon between variable and description.
 
-I think we're fine with knowing what the merge fixes are now.  There's
-only one remaining problem left, which is a missing .align.  Someone
-needs to send a patch for that. :)
+> + */
+> +static void
+> +pa_write_data(struct spmi_pmic_arb_dev *dev, const u8 *buf, u32 reg, u8 bc)
+> +{
+> +	u32 data = 0;
+> +	memcpy(&data, buf, (bc & 3) + 1);
+> +	pmic_arb_base_write(dev, reg, data);
+> +}
+> +
+[...]
+> +static int pmic_arb_read_cmd(struct spmi_controller *ctrl,
+> +			     u8 opc, u8 sid, u16 addr, u8 bc, u8 *buf)
+> +{
+> +	struct spmi_pmic_arb_dev *pmic_arb = spmi_controller_get_drvdata(ctrl);
+> +	unsigned long flags;
+> +	u32 cmd;
+> +	int rc;
+> +
+> +	if (bc >= PMIC_ARB_MAX_TRANS_BYTES) {
+> +		dev_err(&ctrl->dev,
+> +			"pmic-arb supports 1..%d bytes per trans, but:%d requested",
+
+Nitpick: Please replace the colon between but and %d with a space.
+
+> +			PMIC_ARB_MAX_TRANS_BYTES, bc+1);
+
+Space around that '+' please.
+
+> +		return  -EINVAL;
+> +	}
+> +	dev_dbg(&ctrl->dev,
+> +		"op:0x%x sid:%d bc:%d addr:0x%x\n", opc, sid, bc, addr);
+> +
+> +	/* Check the opcode */
+> +	if (opc >= 0x60 && opc <= 0x7F)
+> +		opc = PMIC_ARB_OP_READ;
+> +	else if (opc >= 0x20 && opc <= 0x2F)
+> +		opc = PMIC_ARB_OP_EXT_READ;
+> +	else if (opc >= 0x38 && opc <= 0x3F)
+> +		opc = PMIC_ARB_OP_EXT_READL;
+> +	else
+> +		return -EINVAL;
+> +
+> +	cmd = (opc << 27) | ((sid & 0xf) << 20) | (addr << 4) | (bc & 0x7);
+> +
+> +	spin_lock_irqsave(&pmic_arb->lock, flags);
+> +	pmic_arb_base_write(pmic_arb, PMIC_ARB_CMD(pmic_arb->channel), cmd);
+> +	rc = pmic_arb_wait_for_done(ctrl);
+> +	if (rc)
+> +		goto done;
+> +
+> +	/* Read from FIFO, note 'bc' is actually number of bytes minus 1 */
+> +	pa_read_data(pmic_arb, buf, PMIC_ARB_RDATA0(pmic_arb->channel)
+> +							, min_t(u8, bc, 3));
+
+Nitpick: Weird comma starting a line here.
+
+> +
+> +	if (bc > 3)
+> +		pa_read_data(pmic_arb, buf + 4,
+> +				PMIC_ARB_RDATA1(pmic_arb->channel), bc - 4);
+> +
+> +done:
+> +	spin_unlock_irqrestore(&pmic_arb->lock, flags);
+> +	return rc;
+> +}
+> +
+[...]
+> +static int spmi_pmic_arb_probe(struct platform_device *pdev)
+> +{
+> +	struct spmi_pmic_arb_dev *pa;
+> +	struct spmi_controller *ctrl;
+> +	struct resource *res;
+> +	int err, i;
+> +
+> +	ctrl = spmi_controller_alloc(&pdev->dev, sizeof(*pa));
+> +	if (!ctrl)
+> +		return -ENOMEM;
+> +
+> +	pa = spmi_controller_get_drvdata(ctrl);
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "core");
+> +	pa->base = devm_ioremap_resource(&ctrl->dev, res);
+> +	if (IS_ERR(pa->base)) {
+> +		err = PTR_ERR(pa->base);
+> +		goto err_put_ctrl;
+> +	}
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "intr");
+> +	pa->intr = devm_ioremap_resource(&ctrl->dev, res);
+> +	if (IS_ERR(pa->intr)) {
+> +		err = PTR_ERR(pa->intr);
+> +		goto err_put_ctrl;
+> +	}
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cnfg");
+> +	pa->cnfg = devm_ioremap_resource(&ctrl->dev, res);
+> +	if (IS_ERR(pa->cnfg)) {
+> +		err = PTR_ERR(pa->cnfg);
+> +		goto err_put_ctrl;
+> +	}
+> +
+> +	for (i = 0; i < ARRAY_SIZE(pa->mapping_table); ++i)
+> +		pa->mapping_table[i] = readl_relaxed(
+> +				pa->cnfg + SPMI_MAPPING_TABLE_REG(i));
+> +
+> +	platform_set_drvdata(pdev, ctrl);
+> +	spin_lock_init(&pa->lock);
+> +
+> +	pa->channel = 0;
+> +	pa->max_apid = 0;
+> +	pa->min_apid = PMIC_ARB_MAX_PERIPHS - 1;
+
+That looks backwards. Is this right?
+
+> +
+> +	ctrl->cmd = pmic_arb_cmd;
+> +	ctrl->read_cmd = pmic_arb_read_cmd;
+> +	ctrl->write_cmd = pmic_arb_write_cmd;
+> +
+> +	err = spmi_controller_add(ctrl);
+> +	if (err)
+> +		goto err_put_ctrl;
+> +
+> +	dev_dbg(&ctrl->dev, "PMIC Arb Version 0x%x\n",
+> +		pmic_arb_base_read(pa, PMIC_ARB_VERSION));
+> +
+> +	return 0;
+> +
+> +err_put_ctrl:
+> +	spmi_controller_put(ctrl);
+> +	return err;
+> +}
+> +
+> +static int __exit spmi_pmic_arb_remove(struct platform_device *pdev)
+
+__exit shouldn't be here. We want this function in modules.
+
+> +{
+> +	struct spmi_controller *ctrl = platform_get_drvdata(pdev);
+> +	spmi_controller_remove(ctrl);
+> +	return 0;
+> +}
+> +
+> +static struct of_device_id spmi_pmic_arb_match_table[] = {
+> +	{	.compatible = "qcom,spmi-pmic-arb", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, spmi_pmic_arb_match_table);
+> +
+> +static struct platform_driver spmi_pmic_arb_driver = {
+> +	.probe		= spmi_pmic_arb_probe,
+> +	.remove		= __exit_p(spmi_pmic_arb_remove),
+
+Please drop this __exit_p() usage as well.
+
+> +	.driver		= {
+> +		.name	= "spmi_pmic_arb",
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = spmi_pmic_arb_match_table,
+> +	},
+> +};
+> +module_platform_driver(spmi_pmic_arb_driver);
+
+MODULE_LICENSE()
+MODULE_ALIAS()
+?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
