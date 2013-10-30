@@ -1,34 +1,40 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 30 Oct 2013 06:24:32 -0700
-Subject: [PATCH 1/2] misc: atmel_pwm: add deferred-probing support
-In-Reply-To: <20131030112551.GB29813@localhost>
-References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
- <1382459560-26596-2-git-send-email-jhovold@gmail.com>
- <20131030112551.GB29813@localhost>
-Message-ID: <20131030132432.GB30447@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Oct 2013 14:23:21 +0100
+Subject: [PATCH 3/4] ARM: msm: Remove 7x30 supporty
+In-Reply-To: <20131029211554.GA16284@fifo99.com>
+References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
+ <1382993006-27359-4-git-send-email-davidb@codeaurora.org>
+ <20131029211554.GA16284@fifo99.com>
+Message-ID: <201310301423.21711.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 12:25:51PM +0100, Johan Hovold wrote:
-> On Tue, Oct 22, 2013 at 06:32:39PM +0200, Johan Hovold wrote:
-> > Two drivers (atmel-pwm-bl and leds-atmel-pwm) currently depend on the
-> > atmel_pwm driver to have bound to any pwm-device before their devices
-> > are probed.
-> > 
-> > Support deferred probing of such devices by making sure to return
-> > -EPROBE_DEFER from pwm_channel_alloc when no pwm-device has yet been
-> > bound.
-> > 
-> > Signed-off-by: Johan Hovold <jhovold@gmail.com>
+On Tuesday 29 October 2013, Daniel Walker wrote:
+> Why wouldn't you just update it to use the device tree ? There are lots
+> of phones our there using 7x30 .. 
 > 
-> This patch, 5c6d6fd1 ("misc: atmel_pwm: add deferred-probing support"),
-> and 9d3fde86 ("backlight: atmel-pwm-bl: fix deferred probe from __init")
-> in linux-next should probably be considered for inclusion in stable.
-> 
-> Without them the atmel-pwm-bl driver may always fail to probe depending
-> on link order.
+> This is one that Qualcomm specifically upstreamed, so what was the point
+> of upstreaming it ?
 
-Ok, I'll watch this for when it hits Linus's tree, thanks for letting me
-know.
+Things like this happen a lot: you start with great ambitions, then real
+life takes over and everybody who was once working on it has moved on to
+other projects before the code actually works. 
 
-greg k-h
+We have the policy to let new code for incomplete platforms into the
+tree very liberally, but the flip side is that we have to remove them
+as swiftly if progress stops. Note that this is completely different
+from most of the older platforms like the StrongARM based machines
+that are way more outdated but are actually working just fine and
+getting fixed when they don't.
+
+The MSM platform is currently a mess with most SoCs broken most of 
+the time. I definitely agree with David's approach of removing the
+ones that are not being worked on and finally getting the newer ones
+to work properly, and on the same level as the other platforms.
+
+Once that work is complete, adding back support for the older SoCs
+should become much easier if anyone is still interested, since the
+required changes (multiplatform, DT, ...) are targetted at reducing
+the effort of maintaining platforms.
+
+	Arnd
