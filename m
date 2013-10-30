@@ -1,40 +1,101 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 30 Oct 2013 02:47:52 +0200
-Subject: pull request for Tegra clock rework and Tegra124 clock support
-In-Reply-To: <20131023084631.GG22111@tbergstrom-lnx.Nvidia.com>
-References: <20131021135638.GA10943@tbergstrom-lnx.Nvidia.com>
- <20131022101904.7554.73999@quantum>
- <20131023084631.GG22111@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20131030004752.GH22111@tbergstrom-lnx.Nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Oct 2013 00:48:40 +0000
+Subject: [PATCH v5 4/7] arm64: introduce
+ aarch64_insn_gen_{nop|branch_imm}() helper functions
+In-Reply-To: <1382109602-27432-5-git-send-email-liuj97@gmail.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+ <1382109602-27432-5-git-send-email-liuj97@gmail.com>
+Message-ID: <20131030004840.GC25346@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+On Fri, Oct 18, 2013 at 04:19:58PM +0100, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
+> 
+> Introduce aarch64_insn_gen_{nop|branch_imm}() helper functions, which
+> will be used to implement jump label on ARM64.
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Jiang Liu <liuj97@gmail.com>
+> ---
+>  arch/arm64/include/asm/insn.h | 13 +++++++++++++
+>  arch/arm64/kernel/insn.c      | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 41 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index 8f94e48..ee4a60d 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -96,9 +96,22 @@ static __always_inline void aarch64_insn_write(void *addr, u32 insn)
+>  	*(u32 *)addr = cpu_to_le32(insn);
+>  }
+>  
+> +static __always_inline u32 aarch64_insn_gen_hint(enum aarch64_insn_hint_op op)
+> +{
+> +	return aarch64_insn_get_hint_value() | op;
 
-This is an update to the previous pull request which fixes some late bugs.
+What's the point in that helper function? Does it just return an immediate
+value (and are there are other users of it?).
 
-Thanks,
+> +}
+> +
+> +static __always_inline u32 aarch64_insn_gen_nop(void)
+> +{
+> +	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
+> +}
 
-Peter.
+Either use plain old `inline' or write these as preprocessor macros.
 
-The following changes since commit 6c984fc8c6314596c302bbecf79dc59d9f98f348:
+> +
+>  enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+>  u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+>  				  u32 insn, u64 imm);
+> +u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
+> +				bool link);
+> +
+>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>  
+>  int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 886821f..f7498cc 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -14,6 +14,7 @@
+>   * You should have received a copy of the GNU General Public License
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+> +#include <linux/bitops.h>
+>  #include <linux/compiler.h>
+>  #include <linux/kernel.h>
+>  #include <linux/smp.h>
+> @@ -233,3 +234,30 @@ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+>  
+>  	return insn;
+>  }
+> +
+> +u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr, bool link)
+> +{
+> +	u32 insn;
+> +	long offset;
+> +
+> +	/*
+> +	 * PC: A 64-bit Program Counter holding the address of the current
+> +	 * instruction. A64 instructions may be word-aligned.
+> +	 */
+> +	BUG_ON((pc & 0x3) || (addr & 0x3));
+> +
+> +	/*
+> +	 * B/BL support [-128M, 128M) offset
+> +	 * ARM64 virtual address arrangement garantees all kernel and module
 
-  clk: tegra124: add suspend/resume function for tegra_cpu_car_ops (2013-10-21 16:39:24 +0300)
+Typo: `guarantees'.
 
-are available in the git repository at:
-  git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-tegra124-0
+> +	 * texts are within +/-128M.
+> +	 */
+> +	offset = ((long)addr - (long)pc) >> 2;
+> +	BUG_ON(abs(offset) > BIT(25) || offset == BIT(25));
 
-Mikko Perttunen (1):
-      clk: tegra114: Initialize clocks needed for HDMI
+I really struggle to follow this range checking. Why don't you just compare
+the absolute difference between addr and pc with SZ_128M?
 
-Peter De Schrijver (1):
-      clk: tegra: use pll_ref as the pll_e parent
-
-Thierry Reding (2):
-      clk: tegra: Initialize secondary gr3d clock on Tegra30
-      clk: tegra: Properly setup PWM clock on Tegra30
-
- drivers/clk/tegra/clk-pll.c      |    7 ++++---
- drivers/clk/tegra/clk-tegra114.c |    5 ++++-
- drivers/clk/tegra/clk-tegra30.c  |    5 ++++-
- 3 files changed, 12 insertions(+), 5 deletions(-)
+Will
