@@ -1,59 +1,53 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 30 Oct 2013 02:41:29 +0200
-Subject: [PATCH] clk: tegra: use pll_ref as the pll_e parent
-Message-ID: <1383093707-10312-1-git-send-email-pdeschrijver@nvidia.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Wed, 30 Oct 2013 01:43:38 +0100
+Subject: [PATCH 3/7] video: exynos_mipi_dsim: Use the generic PHY driver
+In-Reply-To: <526F7412.60004@samsung.com>
+References: <1381940896-9355-1-git-send-email-kishon@ti.com>
+ <526997BC.8070602@gmail.com> <526E0038.7050805@samsung.com>
+ <23467785.uRr31aFEN8@amdc1227> <526F7412.60004@samsung.com>
+Message-ID: <5270563A.5080605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pll_ref instead of pll_re_vco as the pll_e parent on Tegra114 and
-Tegra124. Also add a pll_ref table entry for pll_e for Tegra114.
+On 10/29/2013 09:38 AM, Donghwa Lee wrote:
+> On Tue, OCT 28, 2013 21:24, Tomasz Figa wrote:
+>> On Monday 28 of October 2013 15:12:08 Donghwa Lee wrote:
+[...]
+>> First of all, the exynos_mipi_dsim driver has currently no users in
+>> mainline kernel, so it is essentially dead code. In addition, on
+>> a platform that is the primary candidate for using it, which is Exynos,
+>> there is no way to use it, due to no DT support.
+>
+> As I mentioned above, patches are submitted sometimes and I will update
+> this driver as soon as possible to support DT.
+>
+>> As for the driver itself, it is not really a great example of good code.
+>> It contains a hacks, like calling msleep() without any clear reason and
+>> also many coding style issues. I'd prefer to replace it with the new
+>> exynos-dsi driver rewritten completely in SRPOL, when CDF is finished.
+>
+> Yes, I know this drivers had been changed about only minor issues and
+> it is not really good code style. And CDF is more good and light.
+> But discussion for CDF is still remaining a kind of requests. If it is merged
+> into linux kernel and many users use it, existing MIPI DSI drivers will be
+> replaced with the new drivers naturally, isn't it?
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- drivers/clk/tegra/clk-pll.c      |    7 ++++---
- drivers/clk/tegra/clk-tegra114.c |    3 ++-
- 2 files changed, 6 insertions(+), 4 deletions(-)
+Not necessarily. Our goal should be to have fairly stable DT binding at the
+SoC side so all available panels can possibly be used with any SoC without
+problems.
 
-diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
-index 7d775a9..193457b 100644
---- a/drivers/clk/tegra/clk-pll.c
-+++ b/drivers/clk/tegra/clk-pll.c
-@@ -1712,11 +1712,12 @@ struct clk *tegra_clk_register_plle_tegra114(const char *name,
- 	val_aux = pll_readl(pll_params->aux_reg, pll);
- 
- 	if (val & PLL_BASE_ENABLE) {
--		if (!(val_aux & PLLE_AUX_PLLRE_SEL))
-+		if ((val_aux & PLLE_AUX_PLLRE_SEL) || (val_aux & val_aux))
- 			WARN(1, "pll_e enabled with unsupported parent %s\n",
--			  (val & PLLE_AUX_PLLP_SEL) ? "pllp_out0" : "pll_ref");
-+			  (val_aux & PLLE_AUX_PLLP_SEL) ? "pllp_out0" :
-+					"pll_re_vco");
- 	} else {
--		val_aux |= PLLE_AUX_PLLRE_SEL;
-+		val_aux &= ~(PLLE_AUX_PLLRE_SEL | PLLE_AUX_PLLP_SEL);
- 		pll_writel(val, pll_params->aux_reg, pll);
- 	}
- 
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index e365b35..5cfcd3e 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -560,6 +560,7 @@ static struct tegra_clk_pll_freq_table pll_e_freq_table[] = {
- 	/* PLLE special case: use cpcon field to store cml divider value */
- 	{336000000, 100000000, 100, 21, 16, 11},
- 	{312000000, 100000000, 200, 26, 24, 13},
-+	{12000000, 100000000, 200,  1,  24, 13},
- 	{0, 0, 0, 0, 0, 0},
- };
- 
-@@ -1178,7 +1179,7 @@ static void __init tegra114_pll_init(void __iomem *clk_base,
- 	clks[TEGRA114_CLK_PLL_RE_OUT] = clk;
- 
- 	/* PLLE */
--	clk = tegra_clk_register_plle_tegra114("pll_e_out0", "pll_re_vco",
-+	clk = tegra_clk_register_plle_tegra114("pll_e_out0", "pll_ref",
- 				      clk_base, 0, &pll_e_params, NULL);
- 	clks[TEGRA114_CLK_PLL_E_OUT0] = clk;
- }
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+Then please refrain for a while from pushing entirely vendor specific DT
+bindings upstream. Let's focus instead on an as much as possible common
+framework and the DT bindings. Whether the CDF will be part of DRM or not
+the DT bindings are supposed to be generic, so they work with whatever
+driver architecture.
+
+I guess you could try to come up with an unstable DT binding for the
+MIPI DSIM and display panels it is used with, but at this stage it seems
+just a waste of time.
+If there were no SoC specific panel drivers in the kernel there would be
+now much less trouble with DT support.
+
+--
+Thanks,
+Sylwester
