@@ -1,27 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Oct 2013 11:26:25 +0000
-Subject: [PATCH v3] iommu: shmobile: Enable the driver on all ARM platforms
-In-Reply-To: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131030112625.GZ16735@n2100.arm.linux.org.uk>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 30 Oct 2013 12:34:52 +0100
+Subject: [PATCH v3 2/3] mmc: sh_mmcif: Fix compilation warning on 64-bit
+ platforms
+In-Reply-To: <1383132893-27008-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383086274-11049-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383132893-27008-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383132893-27008-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 12:20:43PM +0100, Laurent Pinchart wrote:
-> Renesas ARM platforms are transitioning from single-platform to
-> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> and ARCH_SHMOBILE_MULTI and increase build testing coverage.
-> 
-> Don't enable COMPILE_TEST support as the driver doesn't compile on
-> non-ARM platforms due to usage of the ARM DMA IOMMU API.
+From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-For similar reasons as x86, can we please think about using:
+Casting an integer to a void * generates a "cast to pointer from integer
+of different size" warning. Cast the integer to an unsigned long first
+to fix it.
 
-	depends on ARM
-	depends on ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI || COMPILE_TEST
+Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ drivers/mmc/host/sh_mmcif.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This way we don't end up polluting the configuration for non-shmobile
-platforms.  Same goes for other ARM stuff... the number of options is
-getting rather large and we need to think about keeping that in check
-where its easily possible to do so.
+I've kept this change separate from 1/3 to show why 1/3 and 2/3 are required
+to fix a compilation warning before applying 3/3. Feel free to squash 1/3 and
+2/3 if preferred.
+
+diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+index 92b9273..1f1438f 100644
+--- a/drivers/mmc/host/sh_mmcif.c
++++ b/drivers/mmc/host/sh_mmcif.c
+@@ -403,7 +403,7 @@ sh_mmcif_request_dma_one(struct sh_mmcif_host *host,
+ 		slave_id = 0;
+ 
+ 	chan = dma_request_slave_channel_compat(mask, shdma_chan_filter,
+-				(void *)slave_id, &host->pd->dev,
++				(void *)(unsigned long)slave_id, &host->pd->dev,
+ 				direction == DMA_MEM_TO_DEV ? "tx" : "rx");
+ 
+ 	dev_dbg(&host->pd->dev, "%s: %s: got channel %p\n", __func__,
+-- 
+1.8.1.5
