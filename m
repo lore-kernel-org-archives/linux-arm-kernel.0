@@ -1,108 +1,112 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed, 30 Oct 2013 14:17:25 -0500
-Subject: [PATCH v3 04/10] spmi: Add MSM PMIC Arbiter SPMI controller
-In-Reply-To: <20131030180536.GI21983@codeaurora.org>
-References: <cover.1382985169.git.joshc@codeaurora.org>
- <7467ed718314cb98c9e40f135e9926cf14ed218b.1382985169.git.joshc@codeaurora.org>
- <20131030180536.GI21983@codeaurora.org>
-Message-ID: <20131030191725.GO20207@joshc.qualcomm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 30 Oct 2013 20:34:02 +0100
+Subject: [PATCHv8][ 1/6] video: imxfb: Introduce regulator support.
+In-Reply-To: <1383061860-25035-1-git-send-email-denis@eukrea.com>
+References: <1383061860-25035-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131030193402.GX18477@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 11:05:36AM -0700, Stephen Boyd wrote:
-> On 10/28, Josh Cartwright wrote:
-> > +
-> > +/**
-> > + * pa_write_data: write 1..4 bytes from buf to pmic-arb's register
-> > + * @bc byte-count -1. range: 0..3
-> > + * @reg register's address
-> > + * @buf buffer to write. length must be bc+1
+On 16:50 Tue 29 Oct     , Denis Carikli wrote:
+> This commit is based on the following commit by Fabio Estevam:
+>   4344429 video: mxsfb: Introduce regulator support
 > 
-> Missing colon between variable and description.
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+>  drivers/video/imxfb.c |   29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+> 
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index 44ee678..4bf3837 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/cpufreq.h>
+>  #include <linux/clk.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/io.h>
+>  #include <linux/math64.h>
+> @@ -145,6 +146,7 @@ struct imxfb_info {
+>  	struct clk		*clk_ipg;
+>  	struct clk		*clk_ahb;
+>  	struct clk		*clk_per;
+> +	struct regulator	*reg_lcd;
+>  	enum imxfb_type		devtype;
+>  	bool			enabled;
+>  
+> @@ -563,12 +565,23 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+>  
+>  static void imxfb_enable_controller(struct imxfb_info *fbi)
+>  {
+> +	int ret;
 
-I'll clean the documentation up a bit and push it all to the
-implementation (as suggested in a previous review).
-
-[..]
-> > +	if (bc >= PMIC_ARB_MAX_TRANS_BYTES) {
-> > +		dev_err(&ctrl->dev,
-> > +			"pmic-arb supports 1..%d bytes per trans, but:%d requested",
+	return the error so you can return it in imxfb_blank
+>  
+>  	if (fbi->enabled)
+>  		return;
+>  
+>  	pr_debug("Enabling LCD controller\n");
+>  
+> +	if (fbi->reg_lcd) {
+> +		ret = regulator_enable(fbi->reg_lcd);
+> +		if (ret) {
+> +			dev_err(&fbi->pdev->dev,
+> +				"lcd regulator enable failed with error: %d\n",
+> +				ret);
+> +			return;
+> +		}
+> +	}
+> +
+>  	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+>  
+>  	/* panning offset 0 (0 pixel offset)        */
+> @@ -597,6 +610,8 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+>  
+>  static void imxfb_disable_controller(struct imxfb_info *fbi)
+>  {
+> +	int ret;
+> +
+>  	if (!fbi->enabled)
+>  		return;
+>  
+> @@ -613,6 +628,14 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+>  	fbi->enabled = false;
+>  
+>  	writel(0, fbi->regs + LCDC_RMCR);
+> +
+> +	if (fbi->reg_lcd) {
+> +		ret = regulator_disable(fbi->reg_lcd);
+> +		if (ret)
+> +			dev_err(&fbi->pdev->dev,
+> +				"lcd regulator disable failed with error: %d\n",
+> +				ret);
+> +	}
+	ditto here
+>  }
+>  
+>  static int imxfb_blank(int blank, struct fb_info *info)
+> @@ -1020,6 +1043,12 @@ static int imxfb_probe(struct platform_device *pdev)
+>  		goto failed_register;
+>  	}
+>  
+> +	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
+> +	if (IS_ERR(fbi->reg_lcd)) {
+> +		dev_info(&pdev->dev, "No lcd regulator used.\n");
+> +		fbi->reg_lcd = NULL;
+> +	}
+> +
+>  	imxfb_enable_controller(fbi);
+>  	fbi->pdev = pdev;
+>  #ifdef PWMR_BACKLIGHT_AVAILABLE
+> -- 
+> 1.7.9.5
 > 
-> Nitpick: Please replace the colon between but and %d with a space.
-> 
-> > +			PMIC_ARB_MAX_TRANS_BYTES, bc+1);
-> 
-> Space around that '+' please.
-
-Sure.
-
-> > +		return  -EINVAL;
-> > +	}
-> > +	dev_dbg(&ctrl->dev,
-> > +		"op:0x%x sid:%d bc:%d addr:0x%x\n", opc, sid, bc, addr);
-> > +
-> > +	/* Check the opcode */
-> > +	if (opc >= 0x60 && opc <= 0x7F)
-> > +		opc = PMIC_ARB_OP_READ;
-> > +	else if (opc >= 0x20 && opc <= 0x2F)
-> > +		opc = PMIC_ARB_OP_EXT_READ;
-> > +	else if (opc >= 0x38 && opc <= 0x3F)
-> > +		opc = PMIC_ARB_OP_EXT_READL;
-> > +	else
-> > +		return -EINVAL;
-> > +
-> > +	cmd = (opc << 27) | ((sid & 0xf) << 20) | (addr << 4) | (bc & 0x7);
-> > +
-> > +	spin_lock_irqsave(&pmic_arb->lock, flags);
-> > +	pmic_arb_base_write(pmic_arb, PMIC_ARB_CMD(pmic_arb->channel), cmd);
-> > +	rc = pmic_arb_wait_for_done(ctrl);
-> > +	if (rc)
-> > +		goto done;
-> > +
-> > +	/* Read from FIFO, note 'bc' is actually number of bytes minus 1 */
-> > +	pa_read_data(pmic_arb, buf, PMIC_ARB_RDATA0(pmic_arb->channel)
-> > +							, min_t(u8, bc, 3));
->
-> Nitpick: Weird comma starting a line here.
-
-Okay.
-
-[..]
-> > +static int __exit spmi_pmic_arb_remove(struct platform_device *pdev)
-> 
-> __exit shouldn't be here. We want this function in modules.
-> 
-> > +{
-> > +	struct spmi_controller *ctrl = platform_get_drvdata(pdev);
-> > +	spmi_controller_remove(ctrl);
-> > +	return 0;
-> > +}
-> > +
-> > +static struct of_device_id spmi_pmic_arb_match_table[] = {
-> > +	{	.compatible = "qcom,spmi-pmic-arb", },
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, spmi_pmic_arb_match_table);
-> > +
-> > +static struct platform_driver spmi_pmic_arb_driver = {
-> > +	.probe		= spmi_pmic_arb_probe,
-> > +	.remove		= __exit_p(spmi_pmic_arb_remove),
-> 
-> Please drop this __exit_p() usage as well.
-> 
-> > +	.driver		= {
-> > +		.name	= "spmi_pmic_arb",
-> > +		.owner	= THIS_MODULE,
-> > +		.of_match_table = spmi_pmic_arb_match_table,
-> > +	},
-> > +};
-> > +module_platform_driver(spmi_pmic_arb_driver);
-> 
-> MODULE_LICENSE()
-> MODULE_ALIAS()
-
-Yep,  will re-add.  Not sure why I dropped these...
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
