@@ -1,81 +1,34 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 30 Oct 2013 22:12:16 +0800
-Subject: [PATCH 3/5] mmc: sdhci-esdhc-imx: clear SDHCI_CTRL_EXEC_TUNING should
- not affect other bits
-In-Reply-To: <1383142338-25062-1-git-send-email-b29396@freescale.com>
-References: <1383142338-25062-1-git-send-email-b29396@freescale.com>
-Message-ID: <1383142338-25062-4-git-send-email-b29396@freescale.com>
+Date: Wed, 30 Oct 2013 22:12:13 +0800
+Subject: [PATCH 0/5] mmc: sdhci-esdhc-imx: add runtime pm support
+Message-ID: <1383142338-25062-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current code will clear all turning related bits like ESDHC_STD_TUNING_EN
-and ESDHC_MIX_CTRL_FBCLK_SEL when clear SDHCI_CTRL_EXEC_TUNING.
-This may cause the card which has already passed the turning to become
-unwork since the turning status lost.
-We observed this failure when enable runtime pm.
+We disable root clock in runtime pm to save power.
 
-BTW, imx needs to enable ESDHC_MIX_CTRL_FBCLK_SEL bit for turned clock.
-The FBCLK_SEL will be cleared when SDHCI_CTRL_TUNED_CLK is cleared
-and SDHCI_CTRL_EXEC_TUNING is not set.
-This is used in case we change to another normal card from a UHS card
-in the same slot. FBCLK_SEL is not needed for normal card.
+Patch 2~4 are some fixes needed for enable runtime pm or it may
+break the UHS cards(SD3.0/eMMC4.5).
 
-After that, SDHCI_CTRL_EXEC_TUNING will only affect ESDHC_MIX_CTRL_EXE_TUNE.
-Clearing it does not affect the turned card to remain working on UHS mode.
+Below are some tests result i ran which passed mmc_test tool after enable rpm:
+SDHC UHS1 on imx6q sabreauto
+eMMC 4.5 on imx6sl evk
+SDXC UHS1 on imx6sl evk
+eMMC DDR on imx6q sabresd
+SDHC on imx6q sabresd
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   24 +++++++++++++-----------
- 1 files changed, 13 insertions(+), 11 deletions(-)
+Dong Aisheng (5):
+  mmc: sdhci-pltfm: export pltfm suspend/resume api
+  mmc: sdhci-esdhc-imx: tuning bits should not be cleared during reset
+  mmc: sdhci-esdhc-imx: clear SDHCI_CTRL_EXEC_TUNING should not affect
+    other bits
+  mmc: sdhci-esdhc-imx: fix runtime pm unblance issue
+  mmc: sdhci-esdhc-imx: add runtime pm support
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index f5e1dcf..0bd99eb 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -439,24 +439,20 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
- 			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
- 			u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
--			new_val = readl(host->ioaddr + ESDHC_TUNING_CTRL);
-+			if (val & SDHCI_CTRL_TUNED_CLK) {
-+				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
-+			} else {
-+				v &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
-+				m &= ~ESDHC_MIX_CTRL_FBCLK_SEL;
-+			}
-+
- 			if (val & SDHCI_CTRL_EXEC_TUNING) {
--				new_val |= ESDHC_STD_TUNING_EN |
--						ESDHC_TUNING_START_TAP;
- 				v |= ESDHC_MIX_CTRL_EXE_TUNE;
- 				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
- 			} else {
--				new_val &= ~ESDHC_STD_TUNING_EN;
- 				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
--				m &= ~ESDHC_MIX_CTRL_FBCLK_SEL;
- 			}
- 
--			if (val & SDHCI_CTRL_TUNED_CLK)
--				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
--			else
--				v &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
--
--			writel(new_val, host->ioaddr + ESDHC_TUNING_CTRL);
- 			writel(v, host->ioaddr + SDHCI_ACMD12_ERR);
- 			writel(m, host->ioaddr + ESDHC_MIX_CTRL);
- 		}
-@@ -1038,6 +1034,12 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING)
- 		sdhci_esdhc_ops.platform_execute_tuning =
- 					esdhc_executing_tuning;
-+
-+	if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING)
-+		writel(readl(host->ioaddr + ESDHC_TUNING_CTRL) |
-+			ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP,
-+			host->ioaddr + ESDHC_TUNING_CTRL);
-+
- 	boarddata = &imx_data->boarddata;
- 	if (sdhci_esdhc_imx_probe_dt(pdev, boarddata) < 0) {
- 		if (!host->mmc->parent->platform_data) {
+ drivers/mmc/host/sdhci-esdhc-imx.c |   85 ++++++++++++++++++++++++++++++------
+ drivers/mmc/host/sdhci-pltfm.c     |    6 ++-
+ drivers/mmc/host/sdhci-pltfm.h     |    2 +
+ 3 files changed, 77 insertions(+), 16 deletions(-)
+
 -- 
 1.7.2.rc3
