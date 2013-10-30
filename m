@@ -1,77 +1,59 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 30 Oct 2013 10:29:28 +0200
-Subject: [PATCHv9 05/43] CLK: TI: add DT alias clock registration mechanism
-In-Reply-To: <CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>	<1382716658-6964-6-git-send-email-t-kristo@ti.com>
- <CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>
-Message-ID: <5270C368.9000701@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 30 Oct 2013 16:34:27 +0800
+Subject: imx-drm: Add HDMI support
+In-Reply-To: <20131021131758.GA25034@n2100.arm.linux.org.uk>
+References: <52602EEA.6060402@prisktech.co.nz>
+ <20131017193948.GT25034@n2100.arm.linux.org.uk>
+ <1382039535.976669051@f130.i.mail.ru>
+ <20131017203545.GV25034@n2100.arm.linux.org.uk>
+ <20131019121218.GH25034@n2100.arm.linux.org.uk>
+ <20131021091259.GB9716@S2101-09.ap.freescale.net>
+ <20131021093448.GX25034@n2100.arm.linux.org.uk>
+ <20131021123652.GN17165@S2101-09.ap.freescale.net>
+ <20131021131758.GA25034@n2100.arm.linux.org.uk>
+Message-ID: <20131030083423.GL2839@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2013 07:50 PM, Matt Sealey wrote:
-> On Fri, Oct 25, 2013 at 10:56 AM, Tero Kristo <t-kristo@ti.com> wrote:
->> Some devices require their clocks to be available with a specific
->> dev-id con-id mapping. With DT, the clocks can be found by default
->> only with their name, or alternatively through the device node of
->> the consumer. With drivers, that don't support DT fully yet, add
->> mechanism to register specific clock names.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> Tested-by: Nishanth Menon <nm@ti.com>
->> Acked-by: Tony Lindgren <tony@atomide.com>
->
-> You guys are wonderful, by the way ;)
->
->> +void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
->> +{
->> +       struct ti_dt_clk *c;
->> +       struct device_node *node;
->> +       struct clk *clk;
->> +       struct of_phandle_args clkspec;
->> +
->> +       for (c = oclks; c->node_name != NULL; c++) {
->> +               node = of_find_node_by_name(NULL, c->node_name);
->> +               clkspec.np = node;
->> +               clk = of_clk_get_from_provider(&clkspec);
->> +
->> +               if (!IS_ERR(clk)) {
->> +                       c->lk.clk = clk;
->> +                       clkdev_add(&c->lk);
->> +               } else {
->> +                       pr_warn("%s: failed to lookup clock node %s\n",
->> +                               __func__, c->node_name);
->> +               }
->> +       }
->> +}
->
-> I have one question here, what makes this part of the patch
-> TI-specific at all except the definition of the structure ti_dt_clk?
-> Mapping DT clocks to generic clkdev legacy namings seems like it would
-> be a necessary evil across *all* SoC platforms.
->
-> I would say there is a good case for this being generic and used by
-> all platforms waiting for con->id/dev->id to be moved to DT-awareness,
-> the structure itself is very generic within clkdev as long as the
-> drivers conformed anyway (and if they didn't, none of this helps) and
-> I don't think it really needs to be a TI-only thing. The next thing
-> that's going to happen when another platform arrives that wants to do
-> the same thing is duplication or consolidation - so it would probably
-> be a good idea to make this generic to start.
->
-> While there the names could be a bit more descriptive -
-> dt_clk_name_lookup_map_register(), struct dt_clk_name_lookup_map,
-> DT_CLK_LOOKUP_MAP() ..? The current namespace makes it look like this
-> is the absolute correct thing to do under all circumstances, but in
-> fact this is purely for mapping the old way to the new, better way..
-> in the event a brand new platform arrives, with all new drivers (or
-> only compliant drivers), none of this code should be implemented for
-> it and it should be presented this way.
+On Mon, Oct 21, 2013 at 02:17:58PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 21, 2013 at 08:36:55PM +0800, Shawn Guo wrote:
+> > On Mon, Oct 21, 2013 at 10:34:48AM +0100, Russell King - ARM Linux wrote:
+> > > However, the IPU is more stable with switching to bypass while it relocks
+> > > than not.
+> > 
+> > As far as I know, FSL kernel has always been doing relock without
+> > switching to bypass, and I haven't heard unstable IPU issue from their
+> > testing.  Do you have a case that I can set up here to see the issue?
+> 
+> export DISPLAY=:0
+> while :; do
+>   xrandr -s 1280x720 -r 50
+>   sleep 5
+>   xrandr -s 1280x720 -r 60
+>   sleep 5
+> done
 
-An earlier implementation of this patch (or at least a patch that tries 
-to accomplish the same as this does, add support for legacy devices) did 
-try to add generic solution. There was some discussion on it and I 
-decided to drop it due to bad feedback.
+Sorry, it took me a long time to set up this test on xubuntu 13.10.
+Building an image using your cubox-i branch, I can still see the above
+test plays my HDMI device to death quite easily.  That said, I'm not
+sure if the BYPASS handling in .set_rate() does help the unstable issue
+we're seeing.
 
-See: http://www.spinics.net/lists/linux-omap/msg95147.html
+BTW, the xubuntu session can crash quite easily here if I play the
+desktop a little bit, dragging a window and moving it around, popping
+up a dialog, or something.
 
--Tero
+Shawn
+
+> 
+> is one way.  Another way is to switch between all possible resolutions
+> supported by the connected device, keeping each resolution for 30 seconds
+> a time.  Normally after one or two run-throughs, the IPU will be deader
+> than the parrot in Monty Python's parrot sketch, requiring a reboot to
+> get it working again.
+> 
+> As I've said previously, when it gets into this state, all the status
+> registers I can find report that all FIFOs in the IPU are sitting in
+> their empty state.  The TMDS clock is correct, and the frame composer
+> in the HDMI block is working, but it's not producing any sync signals or
+> pixel data.
