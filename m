@@ -1,28 +1,291 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Oct 2013 00:49:27 +0000
-Subject: [PATCH v5 5/7] arm64, jump label: detect %c support for ARM64
-In-Reply-To: <1382109602-27432-6-git-send-email-liuj97@gmail.com>
-References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
- <1382109602-27432-6-git-send-email-liuj97@gmail.com>
-Message-ID: <20131030004927.GD25346@mudshark.cambridge.arm.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Wed, 30 Oct 2013 06:40:43 +0530
+Subject: [PATCH v2] arm/arm64: KVM: MMIO support for BE guest
+In-Reply-To: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
+References: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 04:19:59PM +0100, Jiang Liu wrote:
-> From: Jiang Liu <jiang.liu@huawei.com>
-> 
-> As commit a9468f30b5eac6 "ARM: 7333/2: jump label: detect %c
-> support for ARM", this patch detects the same thing for ARM64
-> because some ARM64 GCC versions have the same issue.
-> 
-> Some versions of ARM64 GCC which do support asm goto, do not
-> support the %c specifier. Since we need the %c to support jump
-> labels on ARM64, detect that too in the asm goto detection script
-> to avoid build errors with these versions.
+On Wed, Oct 30, 2013 at 12:19 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Do the necessary byteswap when host and guest have different
+> views of the universe. Actually, the only case we need to take
+> care of is when the guest is BE. All the other cases are naturally
+> handled.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+You might want to handle the case where we have LE guest on BE host
+because for ARM64 kernel we might have lot of people interested in
+running host kernel in BE mode with KVM enabled.
 
-The toolchain is being fixed upstream for this, but we should have the check
-for older versions.
+--
+Anup
 
-Will
+>
+> Also be careful about endianness when the data is being memcopy-ed
+> from/to the run buffer.
+>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> >From v1:
+> - Moved data insertion/extraction into specific functions
+> - Bit of tidying up making the patch more readable
+>
+>  arch/arm/include/asm/kvm_emulate.h   | 41 +++++++++++++++++
+>  arch/arm/kvm/mmio.c                  | 87 +++++++++++++++++++++++++++++++-----
+>  arch/arm64/include/asm/kvm_emulate.h | 48 ++++++++++++++++++++
+>  3 files changed, 165 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index a464e8d..8a6be05 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -157,4 +157,45 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
+>         return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
+>  }
+>
+> +static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
+> +{
+> +       return !!(*vcpu_cpsr(vcpu) & PSR_E_BIT);
+> +}
+> +
+> +static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
+> +                                                   unsigned long data,
+> +                                                   unsigned int len)
+> +{
+> +       if (kvm_vcpu_is_be(vcpu)) {
+> +               switch (len) {
+> +               case 1:
+> +                       return data & 0xff;
+> +               case 2:
+> +                       return be16_to_cpu(data & 0xffff);
+> +               default:
+> +                       return be32_to_cpu(data);
+> +               }
+> +       }
+> +
+> +       return data;            /* Leave LE untouched */
+> +}
+> +
+> +static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+> +                                                   unsigned long data,
+> +                                                   unsigned int len)
+> +{
+> +       if (kvm_vcpu_is_be(vcpu)) {
+> +               switch (len) {
+> +               case 1:
+> +                       return data & 0xff;
+> +               case 2:
+> +                       return cpu_to_be16(data & 0xffff);
+> +               default:
+> +                       return cpu_to_be32(data);
+> +               }
+> +       }
+> +
+> +       return data;            /* Leave LE untouched */
+> +}
+> +
+>  #endif /* __ARM_KVM_EMULATE_H__ */
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 0c25d94..54105f1b 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -23,6 +23,69 @@
+>
+>  #include "trace.h"
+>
+> +static void mmio_write_data(struct kvm_exit_mmio *mmio, unsigned long data)
+> +{
+> +       void *datap = NULL;
+> +       union {
+> +               u8      byte;
+> +               u16     hword;
+> +               u32     word;
+> +               u64     dword;
+> +       } tmp;
+> +
+> +       switch (mmio->len) {
+> +       case 1:
+> +               tmp.byte        = data;
+> +               datap           = &tmp.byte;
+> +               break;
+> +       case 2:
+> +               tmp.hword       = data;
+> +               datap           = &tmp.hword;
+> +               break;
+> +       case 4:
+> +               tmp.word        = data;
+> +               datap           = &tmp.word;
+> +               break;
+> +       case 8:
+> +               tmp.dword       = data;
+> +               datap           = &tmp.dword;
+> +               break;
+> +       }
+> +
+> +       memcpy(mmio->data, datap, mmio->len);
+> +}
+> +
+> +static unsigned long mmio_read_data(struct kvm_run *run)
+> +{
+> +       unsigned long data = 0;
+> +       unsigned int len = run->mmio.len;
+> +       union {
+> +               u16     hword;
+> +               u32     word;
+> +               u64     dword;
+> +       } tmp;
+> +
+> +       switch (len) {
+> +       case 1:
+> +               data = run->mmio.data[0];
+> +               break;
+> +       case 2:
+> +               memcpy(&tmp.hword, run->mmio.data, len);
+> +               data = tmp.hword;
+> +               break;
+> +       case 4:
+> +               memcpy(&tmp.word, run->mmio.data, len);
+> +               data = tmp.word;
+> +               break;
+> +       case 8:
+> +               memcpy(&tmp.dword, run->mmio.data, len);
+> +               data = tmp.dword;
+> +               break;
+> +       }
+> +
+> +       return data;
+> +}
+> +
+>  /**
+>   * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
+>   * @vcpu: The VCPU pointer
+> @@ -33,28 +96,27 @@
+>   */
+>  int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> -       unsigned long *dest;
+> +       unsigned long data;
+>         unsigned int len;
+>         int mask;
+>
+>         if (!run->mmio.is_write) {
+> -               dest = vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt);
+> -               *dest = 0;
+> -
+>                 len = run->mmio.len;
+>                 if (len > sizeof(unsigned long))
+>                         return -EINVAL;
+>
+> -               memcpy(dest, run->mmio.data, len);
+> -
+> -               trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
+> -                               *((u64 *)run->mmio.data));
+> +               data = mmio_read_data(run);
+>
+>                 if (vcpu->arch.mmio_decode.sign_extend &&
+>                     len < sizeof(unsigned long)) {
+>                         mask = 1U << ((len * 8) - 1);
+> -                       *dest = (*dest ^ mask) - mask;
+> +                       data = (data ^ mask) - mask;
+>                 }
+> +
+> +               trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
+> +                              data);
+> +               data = vcpu_data_host_to_guest(vcpu, data, len);
+> +               *vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
+>         }
+>
+>         return 0;
+> @@ -105,6 +167,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>                  phys_addr_t fault_ipa)
+>  {
+>         struct kvm_exit_mmio mmio;
+> +       unsigned long data;
+>         unsigned long rt;
+>         int ret;
+>
+> @@ -125,13 +188,15 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>         }
+>
+>         rt = vcpu->arch.mmio_decode.rt;
+> +       data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), mmio.len);
+> +
+>         trace_kvm_mmio((mmio.is_write) ? KVM_TRACE_MMIO_WRITE :
+>                                          KVM_TRACE_MMIO_READ_UNSATISFIED,
+>                         mmio.len, fault_ipa,
+> -                       (mmio.is_write) ? *vcpu_reg(vcpu, rt) : 0);
+> +                       (mmio.is_write) ? data : 0);
+>
+>         if (mmio.is_write)
+> -               memcpy(mmio.data, vcpu_reg(vcpu, rt), mmio.len);
+> +               mmio_write_data(&mmio, data);
+>
+>         if (vgic_handle_mmio(vcpu, run, &mmio))
+>                 return 1;
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index eec0738..3a7d058 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -177,4 +177,52 @@ static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
+>         return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
+>  }
+>
+> +static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
+> +{
+> +       if (vcpu_mode_is_32bit(vcpu))
+> +               return !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_E_BIT);
+> +
+> +       return !!(vcpu_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
+> +}
+> +
+> +static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
+> +                                                   unsigned long data,
+> +                                                   unsigned int len)
+> +{
+> +       if (kvm_vcpu_is_be(vcpu)) {
+> +               switch (len) {
+> +               case 1:
+> +                       return data & 0xff;
+> +               case 2:
+> +                       return be16_to_cpu(data & 0xffff);
+> +               case 4:
+> +                       return be32_to_cpu(data & ((1UL << 32) - 1));
+> +               default:
+> +                       return be64_to_cpu(data);
+> +               }
+> +       }
+> +
+> +       return data;            /* Leave LE untouched */
+> +}
+> +
+> +static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+> +                                                   unsigned long data,
+> +                                                   unsigned int len)
+> +{
+> +       if (kvm_vcpu_is_be(vcpu)) {
+> +               switch (len) {
+> +               case 1:
+> +                       return data & 0xff;
+> +               case 2:
+> +                       return cpu_to_be16(data & 0xffff);
+> +               case 4:
+> +                       return cpu_to_be32(data & ((1UL << 32) - 1));
+> +               default:
+> +                       return cpu_to_be64(data);
+> +               }
+> +       }
+> +
+> +       return data;            /* Leave LE untouched */
+> +}
+> +
+>  #endif /* __ARM64_KVM_EMULATE_H__ */
+> --
+> 1.8.2.3
+>
+>
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
