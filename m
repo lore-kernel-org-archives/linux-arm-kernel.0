@@ -1,40 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 30 Oct 2013 18:00:39 +0100
-Subject: [PATCH 2/2] ARM: kirkwood: enable HIGHMEM in defconfig
-In-Reply-To: <1383152110-19577-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1383152110-19577-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1383152110-19577-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20131030170039.GD7655@lunn.ch>
+From: anup@brainfault.org (Anup Patel)
+Date: Wed, 30 Oct 2013 22:36:07 +0530
+Subject: [PATCH v2] arm/arm64: KVM: MMIO support for BE guest
+In-Reply-To: <b7620ddbce4278713635321bd9a708f4@www.loen.fr>
+References: <1383072593-28916-1-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy3SUiF8k-WokdsBEM5WLx2ifzDL__ta_sLrHge3Lp34JA@mail.gmail.com>
+ <b7620ddbce4278713635321bd9a708f4@www.loen.fr>
+Message-ID: <CAAhSdy0UdzKz8sKBgbZFQFWAAiC59PWcvc+-w8o=3Hsx+4UkaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 05:55:10PM +0100, Thomas Petazzoni wrote:
-> The Kirkwood-based OpenBlocks A7 platform has 1 GB of memory. To make
-> use of this memory completely, enabling HIGHMEM is needed, so we
-> enable it by default in the kirkwood_defconfig.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Wed, Oct 30, 2013 at 1:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 2013-10-30 01:10, Anup Patel wrote:
+>>
+>> On Wed, Oct 30, 2013 at 12:19 AM, Marc Zyngier <marc.zyngier@arm.com>
+>> wrote:
+>>>
+>>> Do the necessary byteswap when host and guest have different
+>>> views of the universe. Actually, the only case we need to take
+>>> care of is when the guest is BE. All the other cases are naturally
+>>> handled.
+>>
+>>
+>> You might want to handle the case where we have LE guest on BE host
+>> because for ARM64 kernel we might have lot of people interested in
+>> running host kernel in BE mode with KVM enabled.
+>
+>
+> What makes you think it is not handled already?
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+What I understood here is that you are trying to ensure that MMIO data
+passed to/from user space (i.e. QEMU or KVMTOOL) is host endian
+using vcpu_data_guest_to_host() and vcpu_data_host_to_guest(). This
+makes lot of sense for having all combinations of host and guest endianness.
 
-	  Andrew
+If the above is correct then I see an issue in vcpu_data_guest_to_host() and
+vcpu_data_host_to_guest() for LE guest on BE host because this patch does
+endianness conversion for BE VCPUs only in vcpu_data_guest_to_host() and
+vcpu_data_host_to_guest(). If we have LE guest on BE host then these
+functions won't do any endianness conversion.
 
-> ---
->  arch/arm/configs/kirkwood_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-> index 0ae0eaeb..2e762d9 100644
-> --- a/arch/arm/configs/kirkwood_defconfig
-> +++ b/arch/arm/configs/kirkwood_defconfig
-> @@ -27,6 +27,7 @@ CONFIG_PCI_MVEBU=y
->  CONFIG_PREEMPT=y
->  CONFIG_AEABI=y
->  # CONFIG_OABI_COMPAT is not set
-> +CONFIG_HIGHMEM=y
->  CONFIG_ZBOOT_ROM_TEXT=0x0
->  CONFIG_ZBOOT_ROM_BSS=0x0
->  CONFIG_CPU_FREQ=y
-> -- 
-> 1.8.1.2
-> 
+--
+Anup
+
+>
+>         M.
+> --
+> Fast, cheap, reliable. Pick two.
