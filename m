@@ -1,74 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Oct 2013 17:40:50 +0000
-Subject: ARM: add support to dump the kernel page tables
-In-Reply-To: <52729346.7080709@codeaurora.org>
-References: <20131024071600.GC16735@n2100.arm.linux.org.uk>
- <52729346.7080709@codeaurora.org>
-Message-ID: <20131031174050.GF16735@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 31 Oct 2013 12:44:39 -0500
+Subject: [PATCH v2 4/6] edac: Document Krait L1/L2 EDAC driver binding
+In-Reply-To: <20131031173047.GK21983@codeaurora.org>
+References: <1383164736-1849-1-git-send-email-sboyd@codeaurora.org>
+ <1383164736-1849-5-git-send-email-sboyd@codeaurora.org>
+ <872F86E8-85CE-472B-9546-CDCC96F6F08B@codeaurora.org>
+ <52717EA5.6030208@codeaurora.org>
+ <F38814D8-723E-4A41-839D-DEE351738017@codeaurora.org>
+ <52718118.1020009@codeaurora.org>
+ <D081E03B-01D6-497F-B8D0-E994219C8282@codeaurora.org>
+ <20131031173047.GK21983@codeaurora.org>
+Message-ID: <C796381F-AE3B-4577-BC97-DA041E5F40E8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 10:28:38AM -0700, Laura Abbott wrote:
-> On 10/24/2013 12:16 AM, Russell King - ARM Linux wrote:
-> ...
->> +	}, {
->> +		.mask	= L_PTE_MT_MASK,
->> +		.val	= L_PTE_MT_DEV_SHARED,
->> +		.set	= "DEV/SHARED",
->> +	}, {
->> +		.mask	= L_PTE_MT_MASK,
->> +		.val	= L_PTE_MT_DEV_NONSHARED,
->> +		.set	= "DEV/NONSHARED",
->> +	}, {
->
-> L_PTE_MT_DEV_SHARED and L_PTE_MT_DEV_NONSHARED are the same on LPAE  
-> systems which leads to bad output:
->
-> 0xcd400000-0xcd401000           4K     RW NX SHD DEV/SHARED DEV/NONSHARED
 
-So we probably want to make this conditional:
+On Oct 31, 2013, at 12:30 PM, Stephen Boyd wrote:
 
-#if L_PTE_MT_DEV_SHARED != L_PTE_MT_DEV_NONSHARED
-	... dev/non-shared entry
-#endif
+> On 10/30, Kumar Gala wrote:
+>> 
+>> On Oct 30, 2013, at 4:58 PM, Stephen Boyd wrote:
+>> 
+>>> On 10/30/13 14:56, Kumar Gala wrote:
+>>>> On Oct 30, 2013, at 4:48 PM, Stephen Boyd wrote:
+>>>> 
+>>>>> On 10/30/13 14:45, Kumar Gala wrote:
+>>>>>> On Oct 30, 2013, at 3:25 PM, Stephen Boyd wrote:
+>>>>>>> +l2-cache node containing the following properties:
+>>>>>> Is the L1 interrupt not per core L1 cache (even if they are OR together at PIC)?
+>>>>> Yes it is per CPU. That is what the 0xf part of the cpus interrupts
+>>>>> property is showing.
+>>>> Than why not have it in each cpu node?
+>>> 
+>>> Because that duplicates things unnecessarily? The cpus node can hold
+>>> things that are common to all CPUs to avoid duplication. If it was a
+>>> different PPI for each CPU then I would agree that we need to put it in
+>>> each cpu node.
+>> 
+>> Ok, I'll accept that as the binding is specific to Krait (and I assume all SoCs w/Krait wire this up to a common interrupt)
+>> 
+> 
+> Can I take that as an ack? I'll resend with the s/an/a/ fix
+> today.
 
-or we use a separate table for LPAE.
+Yes, you can take that as an ack.
 
->> +		.mask	= L_PTE_MT_MASK,
->> +		.val	= L_PTE_MT_DEV_WC,
->> +		.set	= "DEV/WC",
->> +	}, {
->> +		.mask	= L_PTE_MT_MASK,
->> +		.val	= L_PTE_MT_DEV_CACHED,
->> +		.set	= "DEV/CACHED",
->> +	},
->> +};
->> +
->> +static const struct prot_bits section_bits[] = {
->> +	/* These are approximate */
->> +	{
->> +		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
->> +		.val	= 0,
->> +		.set	= "    ro",
->> +	}, {
->> +		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
->> +		.val	= PMD_SECT_AP_WRITE,
->> +		.set	= "    RW",
->> +	}, {
->> +		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
->> +		.val	= PMD_SECT_AP_READ,
->> +		.set	= "USR RO",
->> +	}, {
->> +		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
->> +		.val	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
->> +		.set	= "USR RW",
->> +	}, {
->
-> Same issue here for PMD_SECT_AP_READ and PMD_SEC_AP_WRITE, both of those  
-> are 0 on LPAE so the output looks strange:
->
-> 0xc0000000-0xcd400000         212M     ro     RW USR RO USR RW x  SHD
+- k
 
-I think this needs to be a separate table - it's just too different,
-and it looks like the PMD_SECT_USER and PMD_SECT_RDONLY can be
-separately decoded.
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
