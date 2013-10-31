@@ -1,92 +1,103 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 01 Nov 2013 08:37:23 +0900
+Date: Fri, 01 Nov 2013 08:44:48 +0900
 Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <20131022200141.GA8037@mithrandir>
+In-Reply-To: <1389386.JnbumUe76M@avalon>
 References: <20131019104555.GI18477@ns203013.ovh.net>
- <1382346813-8449-1-git-send-email-denis@eukrea.com>
- <20131022045833.GB17512@ns203013.ovh.net>
- <20131022072307.GA8681@ulmo.nvidia.com>
- <20131022153445.GD17512@ns203013.ovh.net> <20131022200141.GA8037@mithrandir>
-Message-ID: <001e01ced692$267a6d90$736f48b0$%han@samsung.com>
+ <2730370.0UKsY9Ox0H@avalon> <20131024110524.GB11296@ulmo.nvidia.com>
+ <1389386.JnbumUe76M@avalon>
+Message-ID: <003701ced693$2f856150$8e9023f0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 23, 2013 5:02 AM, Thierry Reding wrote:
-> On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 09:23 Tue 22 Oct     , Thierry Reding wrote:
-> > > On Tue, Oct 22, 2013 at 06:58:33AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > On 11:13 Mon 21 Oct     , Denis Carikli wrote:
-> > > > > Cc: Richard Purdie <rpurdie@rpsys.net>
-> > > > > Cc: Jingoo Han <jg1.han@samsung.com>
-> > > > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > > > Cc: Pawel Moll <pawel.moll@arm.com>
-> > > > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > > > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > > > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > > > > Cc: devicetree at vger.kernel.org
-> > > > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > > > Cc: linux-arm-kernel at lists.infradead.org
-> > > > > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > > > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> > > > > Cc: Eric B?nard <eric@eukrea.com>
-> > > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > > > > ---
-> > > > > ChangeLog v3->v4:
-> > > > > - The default-brightness property is now optional, it defaults to 1 if not set.
-> > > > by default we set OFF not ON
+On Friday, October 25, 2013 10:58 PM, Laurent Pinchart wrote:
+> On Thursday 24 October 2013 13:05:25 Thierry Reding wrote:
+> > On Thu, Oct 24, 2013 at 12:38:59AM +0200, Laurent Pinchart wrote:
+> > > On Wednesday 23 October 2013 22:20:12 Thierry Reding wrote:
+> > > > On Wed, Oct 23, 2013 at 05:51:13PM +0100, Stephen Warren wrote:
+> > > > > On 10/22/2013 09:01 PM, Thierry Reding wrote:
+> > > > > > On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe
+> > > > >
+> > > > > > PLAGNIOL-VILLARD wrote:
+> > > > > ...
+> > > > >
+> > > > > >> I'm sorry but the blacklight descibe in DT have nothing to do
+> > > > > >> with the common pratice that the current driver have today
+> > > > > >
+> > > > > > That's not at all what I said. What I said was that the majority
+> > > > > > of backlight drivers currently default to turning the backlight on
+> > > > > > when probed. Therefore I think it would be consistent if this
+> > > > > > driver did the same.
+> > > > > >
+> > > > > > I also said that I don't think it's a very good default, but at the
+> > > > > > same time we can't just go and change the default behaviour at will
+> > > > > > because people may rely on it.
+> > > > >
+> > > > > It may well be reasonable to change the default behaviour for devices
+> > > > > instantiated from DT. If it's not possible to instantiate the device
+> > > > > from DT yet, then it's not possible for anyone to be relying on the
+> > > > > default behaviour yet, since there is none. So, perhaps the default
+> > > > > could be:
+> > > > >
+> > > > > * If device instantiated from a board file, default to on, for
+> > > > > backwards-compatibility.
+> > > > >
+> > > > > * If device instantiated from DT, there is no backwards compatibility
+> > > > > to be concerned with, since this is a new feature, hence default to
+> > > > > off, since we think that's the correct thing to do.
 > > > >
-> > > > do not actiate driver or properti by default you can not known to consequence
-> > > > on the hw
+> > > > I actually had a patch to do precisely that. However I then realized
+> > > > that people have actually been using pwm-backlight in DT for a while
+> > > > already and therefore may be relying on that behaviour as well.
+> > > >
+> > > > It also isn't really an issue of DT vs. non-DT. The simple fact is that
+> > > > besides the backlight driver there's usually no other code that enables
+> > > > a backlight on boot. The only way to do so that I know of is using the
+> > > > DRM panel patches that I've been working on.
 > > >
-> > > Turning on a backlight by default is what pretty much every backlight
-> > > driver does. I personally think that's the wrong default, I even tried
-> > > to get some discussion started recently about how we could change this.
-> > > However, given that this has been the case for possibly as long as the
-> > > subsystem has existed, suddenly changing it might cause quite a few of
-> > > our users to boot the new kernel and not see their display come up. As
-> > > with any other ABI, this isn't something we can just change without a
-> > > very good migration path.
+> > > I would very much welcome a refactoring of the backlight code that would
+> > > remove the fbdev dependency and hook backlights to panel drivers. That's
+> > > something I wanted to work on myself, but that I pushed back after CDF :-)
 > >
-> > I'm sorry but the blacklight descibe in DT have nothing to do with the common
-> > pratice that the current driver have today
+> > Yeah, that would certainly be very welcome. But it's also a pretty
+> > daunting job since there are a whole lot of devices out there that
+> > aren't easy to test because, well, they're pretty old and chances
+> > are that nobody that actually has one is around.
+> >
+> > But I guess that we can always try to solve it on a best effort basis,
+> > though. Perhaps things can even be done in a backwards-compatible way.
+> > I'm thinking for instance that we could introduce a new property, say
+> > .enable, but keep any of the others suhc as state, power, fb_blank for
+> > backwards-compatibility. Perhaps even emulate them for a while until
+> > we've gone and cleaned up all users.
 > 
-> That's not at all what I said. What I said was that the majority of
-> backlight drivers currently default to turning the backlight on when
-> probed. Therefore I think it would be consistent if this driver did the
-> same.
-> 
-> I also said that I don't think it's a very good default, but at the same
-> time we can't just go and change the default behaviour at will because
-> people may rely on it.
+> That would work with me. I don't think we need more than a best effort
+> approach to porting existing backlight drivers to the new model. When it comes
+> to compatibility with the current interface, I'd like to move the
+> compatibility code to the core instead of leaving it in the individual drivers
+> if possible.
 
-I agree with your opinion.
-But, I can't decide how to change it.
+I agree with you.
+Moving the compatibility code to the core from the individual drivers
+looks good. :-)
 
 > 
-> > put on by default if wrong specially without the property define. Even put it
-> > on by default it wrong as the bootloader may have set it already for splash
-> > screen and to avoid glitch the drivers need to detect this.
-> 
-> I agree that would be preferable, but I don't know of any way to detect
-> what value the bootloader set a GPIO to. The GPIO API requires that you
-> call gpio_direction_output(), and that requires a value parameter which
-> will be used as the output level of the GPIO.
+> > Or is there still a reason to have more than a single bit for backlight
+> > state? I don't know any hardware that actually makes a difference
+> > between FB_BLANK_NORMAL, FB_BLANK_VSYNC_SUSPEND, FB_BLANK_HSYNC_SUSPEND
+> > or FB_BLANK_POWERDOWN.
 
-Jean-Christophe's point is right.
+On Exynos side, I have never seen that FB_BLANK_VSYNC_SUSPEND,
+FB_BLANK_HSYNC_SUSPEND are used for controlling display panels or
+Display controllers.
 
-We may need to discuss 'the way to detect what value the bootloader
-set a GPIO to'.
-
-> > For me this should not even be a property but handled by the driver them
-> > selves in C.
-> 
-> Agreed. There has been some discussion recently about whether devicetree
-> should be extended (or supplemented) to allow defining behaviour as well
-> (in addition to just hardware). But that's not immediately relevant here
-> at this time.
-
-Agreed.
+However, I heard that FB_BLANK_VSYNC_SUSPEND, FB_BLANK_HSYNC_SUSPEND are
+used for some monitors.
 
 Best regards,
 Jingoo Han
+
+> > Many drivers in drivers/video seem to be using
+> > those, but for backlights I can see no use other than FB_BLANK_UNBLANK
+> > meaning enabled and anything else meaning disabled.
+> I see no use case for the fine-grained state in backlights at the moment.
+> 
