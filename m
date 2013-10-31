@@ -1,67 +1,48 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 31 Oct 2013 19:18:54 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the devicetree tree
-Message-ID: <20131031191854.f182b66eaf9e03d78e18e27f@canb.auug.org.au>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Thu, 31 Oct 2013 16:22:37 +0800
+Subject: [PATCH v3 0/4] Add dual-fifo mode support of i.MX ssi
+Message-ID: <cover.1383207153.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Changelog
+v3:
+ * PATCH-1: Add comments to indicate the end of v1 and v2 array.
+ * PATCH-3: Use better way to keep watermark as even number.
+ *
+ * Nothing changes for PATCH-2 and PATCH-4
+v2:
+ * Instead of adding rogue scripts to current SDMA driver based on firmware
+ * V1, we define the new SDMA firmware as version 2 and bisect the PATCH-1
+ * to two patches: The first is to add version check code to the SDMA driver;
+ * And the second is to add SSI dual FIFO DMATYPE.
+ *
+ * Nothing changes for the last two patches.
+v1:
+ * SSI can reduce hardware overrun/underrun possibility when using dual
+ * fifo mode. To support this mode, we need to first update sdma sciprt
+ * list, and then enable dual fifo BIT in SSI driver, and last update DT
+ * bindings of i.MX series.
+ *
+ * ! This series of patches has a direct dependency between them. When
+ * ! applying them, we need to apply to one single branch. Otherwise,
+ * ! it would break currect branches.
+Nicolin Chen (4):
+  dma: imx-sdma: Add sdma firmware version 2 support
+  dma: imx-sdma: Add new dma type for ssi dual fifo script
+  ASoC: fsl_ssi: Add dual fifo mode support
+  ARM: dts: imx: use dual-fifo sdma script for ssi
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-integrator/pci_v3.c between commit 16b84e5a505c ("of/irq:
-Create of_irq_parse_and_map_pci() to consolidate arch code") from the
-devicetree tree and commit d7057e1de8d6 ("ARM: integrator: delete
-non-devicetree boot path") from the arm-soc tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+ .../devicetree/bindings/dma/fsl-imx-sdma.txt       |  1 +
+ arch/arm/boot/dts/imx51.dtsi                       |  4 ++--
+ arch/arm/boot/dts/imx53.dtsi                       |  4 ++--
+ arch/arm/boot/dts/imx6qdl.dtsi                     | 12 ++++++------
+ arch/arm/boot/dts/imx6sl.dtsi                      | 12 ++++++------
+ drivers/dma/imx-sdma.c                             | 19 ++++++++++++++++++-
+ include/linux/platform_data/dma-imx-sdma.h         |  5 +++++
+ include/linux/platform_data/dma-imx.h              |  1 +
+ sound/soc/fsl/fsl_ssi.c                            | 22 +++++++++++++++++++++-
+ 9 files changed, 62 insertions(+), 18 deletions(-)
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-integrator/pci_v3.c
-index a87e510fe0c4,c9c5a33bc802..000000000000
---- a/arch/arm/mach-integrator/pci_v3.c
-+++ b/arch/arm/mach-integrator/pci_v3.c
-@@@ -809,21 -808,22 +808,6 @@@ static u8 __init pci_v3_swizzle(struct 
-  	return pci_common_swizzle(dev, pinp);
-  }
-  
-- static int irq_tab[4] __initdata = {
-- 	IRQ_AP_PCIINT0,	IRQ_AP_PCIINT1,	IRQ_AP_PCIINT2,	IRQ_AP_PCIINT3
-- };
-- 
-- /*
--  * map the specified device/slot/pin to an IRQ.  This works out such
--  * that slot 9 pin 1 is INT0, pin 2 is INT1, and slot 10 pin 1 is INT1.
--  */
-- static int __init pci_v3_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- -static int __init pci_v3_map_irq_dt(const struct pci_dev *dev, u8 slot, u8 pin)
---{
-- 	int intnr = ((slot - 9) + (pin - 1)) & 3;
- -	struct of_irq oirq;
- -	int ret;
---
-- 	return irq_tab[intnr];
- -	ret = of_irq_map_pci(dev, &oirq);
- -	if (ret) {
- -		dev_err(&dev->dev, "of_irq_map_pci() %d\n", ret);
- -		/* Proper return code 0 == NO_IRQ */
- -		return 0;
- -	}
- -
- -	return irq_create_of_mapping(oirq.controller, oirq.specifier,
- -				     oirq.size);
---}
---
-  static struct hw_pci pci_v3 __initdata = {
-  	.swizzle		= pci_v3_swizzle,
-  	.setup			= pci_v3_setup,
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131031/f9064be7/attachment.sig>
+1.8.4
