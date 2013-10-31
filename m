@@ -1,35 +1,152 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 31 Oct 2013 22:03:39 +0300
-Subject: [PATCH 2/2] ARM: shmobile: Koelsch: add Ether support
-In-Reply-To: <CANqRtoTa6-UP88146KPy9zNXNTRynBVqWZYb1k=0MK03NMJqhw@mail.gmail.com>
-References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>	<201310310219.58963.sergei.shtylyov@cogentembedded.com>
- <CANqRtoTa6-UP88146KPy9zNXNTRynBVqWZYb1k=0MK03NMJqhw@mail.gmail.com>
-Message-ID: <5272A98B.3030705@cogentembedded.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 31 Oct 2013 13:12:48 -0500
+Subject: [PATCHv9 10/43] clk: ti: add support for TI fixed factor clock
+In-Reply-To: <1382716658-6964-11-git-send-email-t-kristo@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-11-git-send-email-t-kristo@ti.com>
+Message-ID: <52729DA0.8010506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 10/25/2013 10:57 AM, Tero Kristo wrote:
+> This behaves exactly in similar manner to basic fixed-factor-clock, but
+> adds a few properties on top for handling clock hardware autoidling.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  .../bindings/clock/ti/fixed-factor-clock.txt       |   29 +++++++++
+>  drivers/clk/ti/Makefile                            |    2 +-
+>  drivers/clk/ti/fixed-factor.c                      |   65 ++++++++++++++++++++
+>  3 files changed, 95 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
+>  create mode 100644 drivers/clk/ti/fixed-factor.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
+> new file mode 100644
+> index 0000000..60b9e34
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/ti/fixed-factor-clock.txt
+> @@ -0,0 +1,29 @@
+> +Binding for TI fixed factor rate clock sources.
+> +
+> +Binding status: Unstable - ABI compatibility may be broken in the future
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties:
+> +- compatible : shall be "ti,fixed-factor-clock".
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- ti,clock-div: fixed divider.
+> +- ti,clock-mult: fixed multiplier.
+> +- clocks: parent clock.
+> +
+> +Optional properties:
+> +- ti,autoidle-shift: bit shift of the autoidle enable bit for the clock
+> +- reg: offset for the autoidle register of this clock
+> +- ti,invert-autoidle-bit: autoidle is enabled by setting the bit to 0
 
-On 10/31/2013 11:06 AM, Magnus Damm wrote:
+The above three belong to autoidle stuff I think.. maybe pointing to
+it's binding will help?
 
->> Register Ether platform device and pin data on  the  Koelsch board.
->> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
+> +- ti,set-rate-parent: clk_set_rate is propagated to parent
+> +
+> +Example:
+> +	clock {
+> +		compatible = "ti,fixed-factor-clock";
+> +		clocks = <&parentclk>;
+> +		#clock-cells = <0>;
+> +		ti,clock-div = <2>;
+> +		ti,clock-mult = <1>;
+> +	};
+> diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
+> index 640ebf9..f57fc4b 100644
+> --- a/drivers/clk/ti/Makefile
+> +++ b/drivers/clk/ti/Makefile
+> @@ -1,4 +1,4 @@
+>  ifneq ($(CONFIG_OF),)
+>  obj-y					+= clk.o dpll.o autoidle.o divider.o \
+> -					   composite.o
+> +					   fixed-factor.o composite.o
+>  endif
+> diff --git a/drivers/clk/ti/fixed-factor.c b/drivers/clk/ti/fixed-factor.c
+> new file mode 100644
+> index 0000000..e0549c6
+> --- /dev/null
+> +++ b/drivers/clk/ti/fixed-factor.c
+> @@ -0,0 +1,65 @@
+> +/*
+> + * TI Fixed Factor Clock
+> + *
+> + * Copyright (C) 2013 Texas Instruments, Inc.
+> + *
+> + * Tero Kristo <t-kristo@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clk/ti.h>
+> +
+> +/**
+> + * of_ti_fixed_factor_clk_setup() - Setup function for TI fixed factor clock
+> + */
+> +static int __init of_ti_fixed_factor_clk_setup(struct device_node *node,
+> +					       struct regmap *regmap)
+> +{
+> +	struct clk *clk;
+> +	const char *clk_name = node->name;
+> +	const char *parent_name;
+> +	u32 div, mult;
+> +	u32 flags = 0;
+> +
+> +	if (of_property_read_u32(node, "ti,clock-div", &div)) {
+> +		pr_err("%s Fixed factor clock <%s> must have a clock-div property\n",
+> +		       __func__, node->name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (of_property_read_u32(node, "ti,clock-mult", &mult)) {
+> +		pr_err("%s Fixed factor clock <%s> must have a clokc-mult property\n",
+> +		       __func__, node->name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (of_property_read_bool(node, "ti,set-rate-parent"))
+> +		flags |= CLK_SET_RATE_PARENT;
+> +
+> +	parent_name = of_clk_get_parent_name(node, 0);
+> +
+> +	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, flags,
+> +					mult, div);
+> +
+> +	if (!IS_ERR(clk)) {
+> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +		return of_ti_autoidle_setup(node, regmap);
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+if this fails, remove provider and unregister?
 
-> Thanks for your patch. Just like on the Lager board we also need to
-> tie in the PHY IRQ pin.
+> +	}
+> +
+> +	return PTR_ERR(clk);
+> +}
+> +CLK_OF_DECLARE(ti_fixed_factor_clk, "ti,fixed-factor-clock",
+> +	       of_ti_fixed_factor_clk_setup);
+> 
 
-    Not only on the Lager board, BOCK-W also I think.
 
-> Polling is not good enough when the hardware
-> can do better. Can you please share your PHY IRQ plans with us?
-
-    It's on my agenda now -- will start after I do away with the CAN driver 
-and the current Koelsch Ether support.
-
-> Best,
-
-> / magnus
-
-WBR, Sergei
+-- 
+Regards,
+Nishanth Menon
