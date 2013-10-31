@@ -1,28 +1,48 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Thu, 31 Oct 2013 07:04:29 -0500
-Subject: [PATCH v3 3/4] ASoC: fsl_ssi: Add dual fifo mode support
-In-Reply-To: <da997ce67d9817364248ca1eba716bb6c7814a24.1383207153.git.b42378@freescale.com>
-References: <cover.1383207153.git.b42378@freescale.com>
- <da997ce67d9817364248ca1eba716bb6c7814a24.1383207153.git.b42378@freescale.com>
-Message-ID: <5272474D.5000207@tabi.org>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 31 Oct 2013 13:04:51 +0100
+Subject: [PATCH] ARM: imx6q: add missing sentinel to divider table
+In-Reply-To: <1383220548-8622-1-git-send-email-LW@KARO-electronics.de>
+References: <1383220548-8622-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20131031130451.15e90077@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolin Chen wrote:
-> +	if (ssi_private->use_dual_fifo) {
-> +		write_ssi_mask(&ssi->srcr, 0, CCSR_SSI_SRCR_RFEN1);
-> +		write_ssi_mask(&ssi->stcr, 0, CCSR_SSI_STCR_TFEN1);
-> +		write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_TCH_EN);
-> +	} else {
-> +		write_ssi_mask(&ssi->srcr, CCSR_SSI_SRCR_RFEN1, 0);
-> +		write_ssi_mask(&ssi->stcr, CCSR_SSI_STCR_TFEN1, 0);
-> +		write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_TCH_EN, 0);
-> +	}
+Hi,
 
-Why do you need the "else" part?  Why can't you just do this:
+Lothar Wa?mann wrote:
+> The clk_enet_ref_table[] is missing a final empty entry as end of list
+> marker. Also make the existing markers more obvious.
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  arch/arm/mach-imx/clk-imx6q.c |    5 +++--
+>
+There is something else that looks suspicious in this file:
+The video_div_table[] has four entries:
+|	{ .val = 0, .div = 1, },
+|	{ .val = 1, .div = 2, },
+|	{ .val = 2, .div = 1, },
+|	{ .val = 3, .div = 4, },
 
-if (ssi_private->use_dual_fifo) {
-	write_ssi_mask(&ssi->srcr, 0, CCSR_SSI_SRCR_RFEN1);
-	write_ssi_mask(&ssi->stcr, 0, CCSR_SSI_STCR_TFEN1);
-	write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_TCH_EN);
-}
+But the code that sets the dividers to '1' as a workaround for the TO1.0
+chip revision only two dividers are modified, one of which is already
+'1':
+|if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_1_0) {
+|	post_div_table[1].div = 1;
+|	post_div_table[2].div = 1;
+|	video_div_table[1].div = 1;
+|	video_div_table[2].div = 1;
+	                ^
+This probably should be '3' instead?
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
