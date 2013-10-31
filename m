@@ -1,61 +1,29 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 31 Oct 2013 13:56:34 +0800
-Subject: [PATCH] ARM: dts: Add initial support for cm-fx6.
-In-Reply-To: <1383048703-2101-1-git-send-email-valentin@compulab.co.il>
-References: <1383048703-2101-1-git-send-email-valentin@compulab.co.il>
-Message-ID: <20131031055631.GA23549@S2101-09.ap.freescale.net>
+Date: Thu, 31 Oct 2013 13:59:37 +0800
+Subject: [PATCHv2 0/7] ARM: imx: add IMX50 SoC support
+In-Reply-To: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
+References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
+Message-ID: <20131031055935.GB23549@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 02:11:43PM +0200, Valentin Raevsky wrote:
-> Add initial support for cm-fx6 module.
+On Tue, Oct 29, 2013 at 03:15:50PM +1000, gerg at uclinux.org wrote:
+> From: Greg Ungerer <gerg@uclinux.org>
 > 
-> cm-fx6 is a module based on mx6q SoC with the following features:
-> - Up to 4GB of DDR3
-> - 1 LCD/DVI output port
-> - 1 HDMI output port
-> - 2 LVDS LCD ports
-> - Gigabit Ethernet
-> - Analog Audio
-> - CAN
-> - SATA
-> - NAND
-> - PCIE
+> This set of patches is the code and device tree support for the Freescale
+> IMX50 SoC. This part is similar to the IMX53 SoC family, and I have resued
+> as much of its support as possible. These patches are against Shawn Guo's
+> linux-2.6.git for-next branch.
 > 
-> This patch allows to boot up the module, configures the serial console,
-> the Ethernet adapter and the heartbeat led.
+> This loads and runs on the Freescale IMX50-EVK board.
 > 
-> cm-fx6 is embedded inside the Utilite computer.
-> 
-> Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 > ---
-> 
-> Shawn, can this still be applied for 3.13 ?
+> v2: made the pinctrl changes a separate patch stream
+>     fixups for applying to Shawn's for-next branch
+>     initial values for some pad control settings
 
-Sorry, it's late for 3.13.  Applied for 3.14 with a small fix-up below.
-
-> 
->  arch/arm/boot/dts/Makefile         |    1 +
->  arch/arm/boot/dts/imx6q-cm-fx6.dts |   53 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 54 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-cm-fx6.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 641b3c9..87ca7ca 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -131,6 +131,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->  	imx6q-sabrelite.dtb \
->  	imx6q-sabresd.dtb \
->  	imx6q-sbc6x.dtb \
-> +	imx6q-cm-fx6.dtb \
-
-If you look at the list, you can find that they are sorted
-alphabetically.  I just moved it around to maintain the order.
+Thanks for the respin.  I just applied the series except patch #3, where
+I still have some small comment.
 
 Shawn
-
->  	imx6sl-evk.dtb \
->  	vf610-twr.dtb
->  dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
