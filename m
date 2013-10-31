@@ -1,44 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 Oct 2013 15:23:08 -0700
-Subject: [PATCHv7][ 2/5] ASoC: eukrea-tlv320: Add DT support.
-In-Reply-To: <CAHCPf3tt8sbXnABUomg_w1ttBTgBQL=VNwsRoFazzuVdgzzO=g@mail.gmail.com>
-References: <20131026114840.GX2443@sirena.org.uk>
- <CAHCPf3vHWt5XJCwvGDMfX9rTPKqHU43SHORqpxLtLaDL6RGb8A@mail.gmail.com>
- <20131029174445.GB20251@sirena.org.uk>
- <CAHCPf3sm9BawgCKrPH_mbD-Mhb-uXzSyZTjxhJf1W25pG3wZUA@mail.gmail.com>
- <20131030212927.GM2493@sirena.org.uk>
- <CAHCPf3s46E=s85ohfqajr-VbavAM+gernXkkYeSwd4NYN8AEHw@mail.gmail.com>
- <20131031012830.GZ2493@sirena.org.uk>
- <CAHCPf3vUvg6w-OYO5yM8wj1Gr3p0xQZ=+bZ29ZKrZiQGAYektA@mail.gmail.com>
- <20131031174549.GG2493@sirena.org.uk>
- <CAHCPf3tt8sbXnABUomg_w1ttBTgBQL=VNwsRoFazzuVdgzzO=g@mail.gmail.com>
-Message-ID: <20131031222308.GL2493@sirena.org.uk>
+From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
+Date: Thu, 31 Oct 2013 18:25:22 -0400
+Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
+In-Reply-To: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+Message-ID: <CANacCWz_ahKaACbAHuue1XwaN3gutBA7Z6W+=zWBn8LvLwDM5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 04:19:05PM -0500, Matt Sealey wrote:
+Hi Daniel,
 
-> Yes, I can make a big list and even send a patch, but I think it's
-> putting a band-aid on a non-surgical limb amputation.
+On Wed, Oct 30, 2013 at 4:21 PM, Daniel Mack <zonque@gmail.com> wrote:
+[...]
+> +
+> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
+> +
+>  static struct platform_driver edma_driver = {
+>         .driver = {
+>                 .name   = "edma",
+> +               .pm     = &edma_pm_ops,
+>                 .of_match_table = edma_of_ids,
+>         },
 
-It would be moving the situation forwards which is something that
-lengthy e-mails full of architecting with zero code won't do. 
+A while back we discovered a nasty race condition here that had us move the EDMA
+PM callbacks to the noirq phase. IIRC the MMC driver was resuming
+before the EDMA
+driver had a chance to run and that was leading to a deadlock. I am
+not sure how to force
+this scenario but i do remember spending time debugging this on a
+random codebase.
+Maybe some else has some better ideas on how to force this race condition...
 
-> > To repeat myself yet again: what is done to the CODEC here is system
-> > dependent.  This includes interaction with other components in the
-> > system.
+I think logically it makes sense to have the DMA controllers in any
+system resume before
+any of the client drivers. Maybe a set of syscore_ops similar to the
+timekeeping stuff needs
+to be added (in the dmaengine framework?) to get this right.
 
-> In this particular use case (init setting sysclk, and bias_level
-> callbacks setting sysclk and pll for WM8962), there is no system
-> dependency except a fixed, unchanging parent clock (it's fixed at card
-> init and NEVER updated) which the DT binding can solve really easily
-
-That is the chosen configuration for the systems you are looking at;
-other systems do exist.  This is the nature of board specifics.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131031/b23d31b1/attachment.sig>
+Regards,
+Vaibhav
