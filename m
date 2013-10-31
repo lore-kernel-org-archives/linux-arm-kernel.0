@@ -1,40 +1,23 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 31 Oct 2013 10:37:09 -0700
-Subject: [PATCH] arm: zynq: platsmp: Remove CPU presence check
-In-Reply-To: <20131031161739.GE16735@n2100.arm.linux.org.uk>
-References: <20131031161739.GE16735@n2100.arm.linux.org.uk>
-Message-ID: <1383241029-32018-1-git-send-email-soren.brinkmann@xilinx.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 31 Oct 2013 10:38:00 -0700
+Subject: [GIT PULL] bcm dt updates for 3.13
+In-Reply-To: <CAEPRUYro7a_o0EMachJY5GWJRv7By_u+0r5D9s2aKBRw++DCXw@mail.gmail.com>
+References: <CAEPRUYro7a_o0EMachJY5GWJRv7By_u+0r5D9s2aKBRw++DCXw@mail.gmail.com>
+Message-ID: <CAOesGMgdXLEqZ9u+4Vw5RV61kfEZSmRvgs3FMZVxp+BYWQARhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic code already checks that the CPU being requested is legal if
-the cpu possible/present masks are set correctly.
+On Mon, Oct 21, 2013 at 10:37 PM, Christian Daudt <bcm@fixthebug.org> wrote:
+> The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+>
+>   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+>
+> are available in the git repository at:
+>
+>   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.13-dt
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-As per Russel's suggestion, consider this alternative for 1/6.
+Pulled and merged (and after discussion on IRC, rebased to reword the
+DTS rename patch and add S-o-b lines as appropriate).
 
-	S?ren
 
- arch/arm/mach-zynq/platsmp.c | 5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-index bc730eb38f00..8021499e7b70 100644
---- a/arch/arm/mach-zynq/platsmp.c
-+++ b/arch/arm/mach-zynq/platsmp.c
-@@ -39,11 +39,6 @@ int zynq_cpun_start(u32 address, int cpu)
- 	u32 trampoline_code_size = &zynq_secondary_trampoline_end -
- 						&zynq_secondary_trampoline;
- 
--	if (cpu > ncores) {
--		pr_warn("CPU No. is not available in the system\n");
--		return -1;
--	}
--
- 	/* MS: Expectation that SLCR are directly map and accessible */
- 	/* Not possible to jump to non aligned address */
- 	if (!(address & 3) && (!address || (address >= trampoline_code_size))) {
--- 
-1.8.4.1
+-olof
