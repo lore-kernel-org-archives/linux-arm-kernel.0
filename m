@@ -1,110 +1,88 @@
-From: m.chehab@samsung.com (Mauro Carvalho Chehab)
-Date: Thu, 31 Oct 2013 11:18:32 -0200
-Subject: [Patch v2][ 13/37] staging: imx-drm: Add RGB666 support for
- parallel display
-In-Reply-To: <1382022155-21954-14-git-send-email-denis@eukrea.com>
-References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
- <1382022155-21954-14-git-send-email-denis@eukrea.com>
-Message-ID: <20131031111832.4246128f@samsung.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 31 Oct 2013 09:20:31 -0400
+Subject: [PATCH 1/2] ARM: kirkwood: add support for OpenBlocks A7 platform
+In-Reply-To: <52725312.4090208@free-electrons.com>
+References: <1383152110-19577-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1383152110-19577-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20131030195724.GI26784@titan.lakedaemon.net>
+ <20131031093735.68aa7df1@skate>
+ <52722037.8050808@free-electrons.com>
+ <20131031102123.5eff2255@skate>
+ <20131031125030.GJ26784@titan.lakedaemon.net>
+ <52725312.4090208@free-electrons.com>
+Message-ID: <20131031132031.GL26784@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 17 Oct 2013 17:02:11 +0200
-Denis Carikli <denis@eukrea.com> escreveu:
-
-> Support the RGB666 format on the IPUv3 parallel display.
+On Thu, Oct 31, 2013 at 01:54:42PM +0100, Gregory CLEMENT wrote:
+> On 31/10/2013 13:50, Jason Cooper wrote:
+> > On Thu, Oct 31, 2013 at 10:21:23AM +0100, Thomas Petazzoni wrote:
+> >> Dear Gregory CLEMENT,
+> >>
+> >> On Thu, 31 Oct 2013 10:17:43 +0100, Gregory CLEMENT wrote:
+> >>
+> >>>> Strange. 'make dtbs' was working here. What was wrong exactly? Just
+> >>>> that the unit address (@90000) didn't match the starting address
+> >>>> 0x1c0000 ?
+> >>>
+> >>> The unit address has no special meaning for the device tree it's just a
+> >>> way to give a unique name to a node right?
+> >>
+> >> Yes, that's also my understanding.
+> > 
+> > Correct, that's not what caused the error.
+> > 
+> >>> So in this case it is not really a problem, but it's just nicer for the
+> >>> coherency of the information in the dt to have the unit address which match
+> >>> the starting address.
+> >>
+> >> Indeed, it's much better if they match (shame on me for the silly
+> >> copy/paste), but having then *not* matching should not cause any DTC
+> >> error, I believe.
+> >>
+> >>> I also do a make dtbs ans I didn't get any errors:
+> >>> $ make dtbs
+> >>>  [...]
+> >>>   DTC     arch/arm/boot/dts/kirkwood-openblocks_a6.dtb
+> >>>   DTC     arch/arm/boot/dts/kirkwood-openblocks_a7.dtb
+> >>
+> >> Same here.
+> > 
+> > With Thomas' original patch (on top of mvebu/dt, based on v3.12-rc1):
 > 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: driverdev-devel at linuxdriverproject.org
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: linux-media at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> On my side I tested the patch on top on v3.12-rc7. So the difference should
+> be there.
 
-It seems better to apply this one together with the other DRM patches via
-DRM tree. So:
-	Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Ok, I get no warnings when I rebase the original patch onto v3.12-rc7.
 
-> ---
->  .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    2 +-
->  drivers/staging/imx-drm/ipu-v3/ipu-dc.c            |    9 +++++++++
->  drivers/staging/imx-drm/parallel-display.c         |    2 ++
->  3 files changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> index b876d49..2d24425 100644
-> --- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> +++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-> @@ -29,7 +29,7 @@ Required properties:
->  - crtc: the crtc this display is connected to, see below
->  Optional properties:
->  - interface_pix_fmt: How this display is connected to the
-> -  crtc. Currently supported types: "rgb24", "rgb565", "bgr666"
-> +  crtc. Currently supported types: "rgb24", "rgb565", "bgr666", "rgb666"
->  - edid: verbatim EDID data block describing attached display.
->  - ddc: phandle describing the i2c bus handling the display data
->    channel
-> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-> index 21bf1c8..c84ad22 100644
-> --- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-> @@ -91,6 +91,7 @@ enum ipu_dc_map {
->  	IPU_DC_MAP_RGB565,
->  	IPU_DC_MAP_GBR24, /* TVEv2 */
->  	IPU_DC_MAP_BGR666,
-> +	IPU_DC_MAP_RGB666,
->  };
->  
->  struct ipu_dc {
-> @@ -152,6 +153,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
->  		return IPU_DC_MAP_GBR24;
->  	case V4L2_PIX_FMT_BGR666:
->  		return IPU_DC_MAP_BGR666;
-> +	case V4L2_PIX_FMT_RGB666:
-> +		return IPU_DC_MAP_RGB666;
->  	default:
->  		return -EINVAL;
->  	}
-> @@ -395,6 +398,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
->  	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
->  	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
->  
-> +	/* rgb666 */
-> +	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
-> +	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
-> +	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
-> +	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
-> +
->  	return 0;
->  }
->  
-> diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-> index c04b017..1c8f63f 100644
-> --- a/drivers/staging/imx-drm/parallel-display.c
-> +++ b/drivers/staging/imx-drm/parallel-display.c
-> @@ -238,6 +238,8 @@ static int imx_pd_probe(struct platform_device *pdev)
->  			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
->  		else if (!strcmp(fmt, "bgr666"))
->  			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
-> +		else if (!strcmp(fmt, "rgb666"))
-> +			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB666;
->  	}
->  
->  	imxpd->dev = &pdev->dev;
+Since Thomas is ok with my version, I'm going to send it up since it
+doesn't generate warnings.  There's no point merging in v3.12-rc7 just
+to silence a few warnings.
 
+thx,
 
--- 
+Jason.
 
-Cheers,
-Mauro
+> > $ make kirkwood_defconfig
+> > $ make dtbs
+> > ...
+> >   DTC     arch/arm/boot/dts/kirkwood-openblocks_a6.dtb
+> >   DTC     arch/arm/boot/dts/kirkwood-openblocks_a7.dtb
+> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at 0 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
+> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at 90000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
+> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at d4000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
+> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at f4000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
+> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at 4f4000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
+> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at 2214000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
+> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at 0
+> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at 0
+> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at 90000
+> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at 90000
+> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at d4000
+> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at d4000
+> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at f4000
+> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at f4000
+> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at 4f4000
+> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at 4f4000
+> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at 2214000
+> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at 2214000
