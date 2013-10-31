@@ -1,29 +1,42 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 31 Oct 2013 14:22:33 -0400
-Subject: [PATCH v2 00/27] Armada 370/XP NAND support
-In-Reply-To: <20131031155808.GB2468@localhost>
-References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131031155808.GB2468@localhost>
-Message-ID: <CAN8TOE-XdPgHykzzJtpkQ3ApTLXjZ+hCiAPpOBCZqa7uVt=kcA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 31 Oct 2013 11:22:33 -0700
+Subject: [PATCH] clk: Do not dereference potential NULL pointer
+In-Reply-To: <1383221036-26890-1-git-send-email-treding@nvidia.com>
+References: <1383221036-26890-1-git-send-email-treding@nvidia.com>
+Message-ID: <20131031182233.11662.77737@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 12:58:09PM -0300, Ezequiel Garcia wrote:
-> Can we start discussing this patchset?
-> I realize is a big series, but better starting sooner than later! :)
+Quoting Thierry Reding (2013-10-31 05:03:56)
+> A NULL pointer may be passed to _clk_register() for the dev parameter
+> (via clk_register()). Make sure not to dereference it before checking
+> that it's valid.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 
-Yeah, I'm still figuring out prioritization here. I got a little
-side-tracked on a few other patch series, some of which had
-dependencies on each other. I will take a look at yours next.
+Hi Thierry,
 
-...
+I saw Olof's fix first so I took that and applied your Ack.
 
-> >   mtd: nand: pxa3xx: Introduce multiple page I/O support
-> ^^^
-> .. this one seems to me like the most conflicting patches as
-> they extend the ECC, adding BCH. Could you review them and
-> provide any comments?
+Regards,
+Mike
 
-Sure thing.
-
-Brian
+> ---
+>  drivers/clk/clk.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index b68a999..c0b52e3 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1976,7 +1976,7 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
+>                 hw->regmap = hw->init->regmap;
+>         else if (dev && dev_get_regmap(dev, NULL))
+>                 hw->regmap = dev_get_regmap(dev, NULL);
+> -       else if (dev->parent)
+> +       else if (dev && dev->parent)
+>                 hw->regmap = dev_get_regmap(dev->parent, NULL);
+>  
+>         /* allocate local copy in case parent_names is __initdata */
+> -- 
+> 1.8.4
