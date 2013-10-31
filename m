@@ -1,71 +1,46 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 31 Oct 2013 15:06:45 +0100
-Subject: [Patch v2][ 04/37] [media] v4l2: add new V4L2_PIX_FMT_RGB666
- pixel format.
-In-Reply-To: <20131031111806.72b6856b@samsung.com>
-References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
- <1382022155-21954-5-git-send-email-denis@eukrea.com>
- <20131031111806.72b6856b@samsung.com>
-Message-ID: <27124564.ioQJs5F4eu@avalon>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Thu, 31 Oct 2013 15:07:47 +0100
+Subject: [PATCH 2/2] misc: atmel_pwm: set initcall level to subsys
+In-Reply-To: <20131031053037.GA30542@ns203013.ovh.net>
+References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+ <20131029232249.GA20476@kroah.com>
+ <20131030110705.GA29813@localhost>
+ <201310302146.18248.arnd@arndb.de> <5271B012.4060200@atmel.com>
+ <20131031053037.GA30542@ns203013.ovh.net>
+Message-ID: <20131031140747.GH29813@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 31 October 2013 11:18:06 Mauro Carvalho Chehab wrote:
-> Em Thu, 17 Oct 2013 17:02:02 +0200
+On Thu, Oct 31, 2013 at 06:30:37AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 09:19 Thu 31 Oct     , Bo Shen wrote:
+> > Hi Arnd,
+> > 
+> > On 10/31/2013 04:46, Arnd Bergmann wrote:
+> > >On Wednesday 30 October 2013, Johan Hovold wrote:
+> > >>>I really hate this type of patch, as it's papering over the real
+> > >>>problem.  What happens when someone else moves their driver to this
+> > >>>level?  Then you are back to the original problem.
+> > >>
+> > >>Yes, it's crude, but it's currently the only way to express a preferred
+> > >>probe order.
+> > >
+> > >Does the same problem occur with the generic PWM subsystem?
+> > >
+> > >The atmel_pwm driver apparently is the last PWM driver that has
+> > >not been converted to the generic subsystem yet. Doing that would
+> > >also let us drop the atmel-pwm-bl driver in favor of the generic
+> > >backlight.
+> > 
+> > The atmel pwm driver is on the way to generic subsystem. more
+> > information at:
+> > --->8---
+> > PWM: atmel-pwm: add PWM controller driver:
+> >    https://patchwork.kernel.org/patch/2963081/
 > 
-> Denis Carikli <denis@eukrea.com> escreveu:
-> > That new macro is needed by the imx_drm staging driver
-> > 
-> >   for supporting the QVGA display of the eukrea-cpuimx51 board.
-> > 
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: driverdev-devel at linuxdriverproject.org
-> > Cc: David Airlie <airlied@linux.ie>
-> > Cc: dri-devel at lists.freedesktop.org
-> > Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > Cc: linux-media at vger.kernel.org
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: Eric B?nard <eric@eukrea.com>
-> > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> 
-> It seems better to apply this one together with the other DRM patches via
-> DRM tree. So:
-> 	Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+> so the fix can be drop in favor of the conversion
 
-Actually, if I might, I'd like to nak this patch, as adding new pixel formats 
-requires updating the documentation as well (see 
-Documentation/DocBook/media/v4l/pixfmt*.xml).
+This patch (2/2) has been dropped, but the dependency issue still has to
+be addressed (by adding deferred-probing support). The atmel-pwm-bl
+driver has not been removed yet and the fix is also needed in stable.
 
-> > ---
-> > 
-> >  include/uapi/linux/videodev2.h |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/include/uapi/linux/videodev2.h
-> > b/include/uapi/linux/videodev2.h index 437f1b0..e8ff410 100644
-> > --- a/include/uapi/linux/videodev2.h
-> > +++ b/include/uapi/linux/videodev2.h
-> > @@ -294,6 +294,7 @@ struct v4l2_pix_format {
-> > 
-> >  #define V4L2_PIX_FMT_RGB555X v4l2_fourcc('R', 'G', 'B', 'Q') /* 16 
-> >  RGB-5-5-5 BE  */ #define V4L2_PIX_FMT_RGB565X v4l2_fourcc('R', 'G', 'B',
-> >  'R') /* 16  RGB-5-6-5 BE  */ #define V4L2_PIX_FMT_BGR666 
-> >  v4l2_fourcc('B', 'G', 'R', 'H') /* 18  BGR-6-6-6	  */> 
-> > +#define V4L2_PIX_FMT_RGB666  v4l2_fourcc('R', 'G', 'B', 'H') /* 18 
-> > RGB-6-6-6	  */> 
-> >  #define V4L2_PIX_FMT_BGR24   v4l2_fourcc('B', 'G', 'R', '3') /* 24 
-> >  BGR-8-8-8     */ #define V4L2_PIX_FMT_RGB24   v4l2_fourcc('R', 'G', 'B',
-> >  '3') /* 24  RGB-8-8-8     */ #define V4L2_PIX_FMT_BGR32  
-> >  v4l2_fourcc('B', 'G', 'R', '4') /* 32  BGR-8-8-8-8   */
--- 
-Regards,
-
-Laurent Pinchart
+Johan
