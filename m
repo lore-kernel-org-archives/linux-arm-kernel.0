@@ -1,45 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 31 Oct 2013 15:18:29 +0800
-Subject: [PATCH 2/2] mmc: sdhci-esdhc-imx: add eMMC HS200 mode support
-In-Reply-To: <1383142242-24989-3-git-send-email-b29396@freescale.com>
-References: <1383142242-24989-1-git-send-email-b29396@freescale.com>
- <1383142242-24989-3-git-send-email-b29396@freescale.com>
-Message-ID: <20131031071826.GF23549@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 31 Oct 2013 08:29:07 +0100
+Subject: [PATCH v2 1/4] dma: imx-sdma: Add sdma firmware version 2 support
+In-Reply-To: <cfe6edbff010aefc8a35df8a719b26bd238cb3cc.1383197521.git.b42378@freescale.com>
+References: <cover.1383197521.git.b42378@freescale.com>
+ <cfe6edbff010aefc8a35df8a719b26bd238cb3cc.1383197521.git.b42378@freescale.com>
+Message-ID: <20131031072907.GG24559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 10:10:42PM +0800, Dong Aisheng wrote:
-> Add support for eMMC 4.5 cards to work on hs200 mode.
+On Thu, Oct 31, 2013 at 02:32:03PM +0800, Nicolin Chen wrote:
+> On i.MX5/6 series, SDMA is using new version firmware to support SSI
+> dual FIFO feature and HDMI Audio (i.MX6Q/DL only). Thus add it.
 > 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
+> Signed-off-by: Nicolin Chen <b42378@freescale.com>
 > ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index ec25421..5816585 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -825,6 +825,7 @@ static int esdhc_change_pinstate(struct sdhci_host *host,
->  		pinctrl = imx_data->pins_100mhz;
->  		break;
->  	case MMC_TIMING_UHS_SDR104:
-> +	case MMC_TIMING_MMC_HS200:
->  		pinctrl = imx_data->pins_200mhz;
->  		break;
->  	default:
-> @@ -852,6 +853,7 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
->  		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR50;
->  		break;
->  	case MMC_TIMING_UHS_SDR104:
-> +	case MMC_TIMING_MMC_HS200:
->  		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR104;
->  		break;
->  	case MMC_TIMING_UHS_DDR50:
+> diff --git a/include/linux/platform_data/dma-imx-sdma.h b/include/linux/platform_data/dma-imx-sdma.h
+> index 3a39428..14ca582 100644
+> --- a/include/linux/platform_data/dma-imx-sdma.h
+> +++ b/include/linux/platform_data/dma-imx-sdma.h
+> @@ -43,6 +43,9 @@ struct sdma_script_start_addrs {
+>  	s32 dptc_dvfs_addr;
+>  	s32 utra_addr;
+>  	s32 ram_code_start_addr;
+
+You could add a comment here, like: /* End of v1 array */
+
+Otherwise:
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+> +	s32 mcu_2_ssish_addr;
+> +	s32 ssish_2_mcu_addr;
+> +	s32 hdmi_dma_addr;
+>  };
+>  
+>  /**
 > -- 
-> 1.7.2.rc3
+> 1.8.4
 > 
 > 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
