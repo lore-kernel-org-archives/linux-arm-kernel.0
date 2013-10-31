@@ -1,49 +1,92 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 1 Nov 2013 00:49:27 +0200
-Subject: [PATCH] lib/scatterlist.c: don't flush_kernel_dcache_page on
- slab page
-In-Reply-To: <20131031152745.821d2b5dbe93e2ca69d45264@linux-foundation.org>
-References: <1382977205-26268-1-git-send-email-ming.lei@canonical.com>
- <20131031152745.821d2b5dbe93e2ca69d45264@linux-foundation.org>
-Message-ID: <20131031224927.GK17447@blackmetal.musicnaut.iki.fi>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 01 Nov 2013 08:37:23 +0900
+Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
+In-Reply-To: <20131022200141.GA8037@mithrandir>
+References: <20131019104555.GI18477@ns203013.ovh.net>
+ <1382346813-8449-1-git-send-email-denis@eukrea.com>
+ <20131022045833.GB17512@ns203013.ovh.net>
+ <20131022072307.GA8681@ulmo.nvidia.com>
+ <20131022153445.GD17512@ns203013.ovh.net> <20131022200141.GA8037@mithrandir>
+Message-ID: <001e01ced692$267a6d90$736f48b0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Oct 31, 2013 at 03:27:45PM -0700, Andrew Morton wrote:
-> On Tue, 29 Oct 2013 00:20:05 +0800 Ming Lei <ming.lei@canonical.com> wrote:
+On Wednesday, October 23, 2013 5:02 AM, Thierry Reding wrote:
+> On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 09:23 Tue 22 Oct     , Thierry Reding wrote:
+> > > On Tue, Oct 22, 2013 at 06:58:33AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > On 11:13 Mon 21 Oct     , Denis Carikli wrote:
+> > > > > Cc: Richard Purdie <rpurdie@rpsys.net>
+> > > > > Cc: Jingoo Han <jg1.han@samsung.com>
+> > > > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > > > Cc: Rob Herring <rob.herring@calxeda.com>
+> > > > > Cc: Pawel Moll <pawel.moll@arm.com>
+> > > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > > > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > > > > Cc: devicetree at vger.kernel.org
+> > > > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > > > Cc: linux-arm-kernel at lists.infradead.org
+> > > > > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> > > > > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > > > > Cc: Eric B?nard <eric@eukrea.com>
+> > > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > > > > ---
+> > > > > ChangeLog v3->v4:
+> > > > > - The default-brightness property is now optional, it defaults to 1 if not set.
+> > > > by default we set OFF not ON
+> > > >
+> > > > do not actiate driver or properti by default you can not known to consequence
+> > > > on the hw
+> > >
+> > > Turning on a backlight by default is what pretty much every backlight
+> > > driver does. I personally think that's the wrong default, I even tried
+> > > to get some discussion started recently about how we could change this.
+> > > However, given that this has been the case for possibly as long as the
+> > > subsystem has existed, suddenly changing it might cause quite a few of
+> > > our users to boot the new kernel and not see their display come up. As
+> > > with any other ABI, this isn't something we can just change without a
+> > > very good migration path.
+> >
+> > I'm sorry but the blacklight descibe in DT have nothing to do with the common
+> > pratice that the current driver have today
 > 
-> > Commit b1adaf65ba03([SCSI] block: add sg buffer copy helper functions)
-> > introduces two sg buffer copy helpers, and calls flush_kernel_dcache_page()
-> > on pages in SG list after these pages are written to.
-> > 
-> > Unfortunately, the commit may introduce a potential bug:
-> > 
-> > 	- Before sending some SCSI commands, kmalloc() buffer may be
-> > 	passed to block layper, so flush_kernel_dcache_page() can
-> > 	see a slab page finally
-> > 
-> > 	- According to cachetlb.txt, flush_kernel_dcache_page() is
-> > 	only called on "a user page", which surely can't be a slab page.
-> > 
-> > 	- ARCH's implementation of flush_kernel_dcache_page() may
-> > 	use page mapping information to do optimization so page_mapping()
-> > 	will see the slab page, then VM_BUG_ON() is triggered.
-> > 
-> > Aaro Koskinen reported the bug on ARM/kirkwood when DEBUG_VM is enabled,
-> > and this patch fixes the bug by adding test of '!PageSlab(miter->page)'
-> > before calling flush_kernel_dcache_page().
+> That's not at all what I said. What I said was that the majority of
+> backlight drivers currently default to turning the backlight on when
+> probed. Therefore I think it would be consistent if this driver did the
+> same.
 > 
-> We should work out which kernel(s) need this patch.  b1adaf65ba03 was
-> merged in 2008, so presumably some more recent patch has exposed the
-> problem, but I don't know what one that was.
+> I also said that I don't think it's a very good default, but at the same
+> time we can't just go and change the default behaviour at will because
+> people may rely on it.
+
+I agree with your opinion.
+But, I can't decide how to change it.
+
 > 
-> Help me out here?
+> > put on by default if wrong specially without the property define. Even put it
+> > on by default it wrong as the bootloader may have set it already for splash
+> > screen and to avoid glitch the drivers need to detect this.
+> 
+> I agree that would be preferable, but I don't know of any way to detect
+> what value the bootloader set a GPIO to. The GPIO API requires that you
+> call gpio_direction_output(), and that requires a value parameter which
+> will be used as the output level of the GPIO.
 
-On ARM, this problem started to appear after
-1bc39742aab09248169ef9d3727c9def3528b3f3 (ARM: 7755/1: handle user space
-mapped pages in flush_kernel_dcache_page) and that was tagged for 3.2+
-stable kernels.
+Jean-Christophe's point is right.
 
-A.
+We may need to discuss 'the way to detect what value the bootloader
+set a GPIO to'.
+
+> > For me this should not even be a property but handled by the driver them
+> > selves in C.
+> 
+> Agreed. There has been some discussion recently about whether devicetree
+> should be extended (or supplemented) to allow defining behaviour as well
+> (in addition to just hardware). But that's not immediately relevant here
+> at this time.
+
+Agreed.
+
+Best regards,
+Jingoo Han
