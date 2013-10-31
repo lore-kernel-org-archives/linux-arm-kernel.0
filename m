@@ -1,62 +1,65 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 31 Oct 2013 11:48:09 +0100
-Subject: [PATCH 11/12] fbdev: shmobile-hdmi: Convert to
- clk_prepare/unprepare
-In-Reply-To: <1383000569-8916-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383000569-8916-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131031104809.GB18477@ns203013.ovh.net>
+From: r.sricharan@ti.com (R, Sricharan)
+Date: Thu, 31 Oct 2013 10:50:04 +0000
+Subject: [PATCH V2 1/7] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
+ routable irqs
+In-Reply-To: <alpine.DEB.2.02.1310301608380.24686@ionos.tec.linutronix.de>
+References: <1383145040-15852-1-git-send-email-r.sricharan@ti.com>
+ <1383145040-15852-2-git-send-email-r.sricharan@ti.com>,
+ <alpine.DEB.2.02.1310301608380.24686@ionos.tec.linutronix.de>
+Message-ID: <F934AE11CE617240AE4A874A49F629E4832564@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:49 Mon 28 Oct     , Laurent Pinchart wrote:
-> Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
-> clk_disable_unprepare() to get ready for the migration to the common
-> clock framework.
-> 
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Hi Thomas,
+  Sorry for top posting. My mailer is not allowing me any formatting.
 
-Bset Regards,
-J.
-> Cc: linux-fbdev at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/video/sh_mobile_hdmi.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/video/sh_mobile_hdmi.c b/drivers/video/sh_mobile_hdmi.c
-> index bfe4728..190145e 100644
-> --- a/drivers/video/sh_mobile_hdmi.c
-> +++ b/drivers/video/sh_mobile_hdmi.c
-> @@ -1326,7 +1326,7 @@ static int __init sh_hdmi_probe(struct platform_device *pdev)
->  		goto erate;
->  	}
->  
-> -	ret = clk_enable(hdmi->hdmi_clk);
-> +	ret = clk_prepare_enable(hdmi->hdmi_clk);
->  	if (ret < 0) {
->  		dev_err(hdmi->dev, "Cannot enable clock: %d\n", ret);
->  		goto erate;
-> @@ -1404,7 +1404,7 @@ emap_htop1:
->  emap:
->  	release_mem_region(res->start, resource_size(res));
->  ereqreg:
-> -	clk_disable(hdmi->hdmi_clk);
-> +	clk_disable_unprepare(hdmi->hdmi_clk);
->  erate:
->  	clk_put(hdmi->hdmi_clk);
->  egetclk:
-> @@ -1427,7 +1427,7 @@ static int __exit sh_hdmi_remove(struct platform_device *pdev)
->  	cancel_delayed_work_sync(&hdmi->edid_work);
->  	pm_runtime_put(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
-> -	clk_disable(hdmi->hdmi_clk);
-> +	clk_disable_unprepare(hdmi->hdmi_clk);
->  	clk_put(hdmi->hdmi_clk);
->  	if (hdmi->htop1)
->  		iounmap(hdmi->htop1);
-> -- 
-> 1.8.1.5
-> 
+  I agree with both of your comments below.
+  I will post V3 for this.
+
+Regards,
+ Sricharan
+
+________________________________________
+From: Thomas Gleixner [tglx at linutronix.de]
+Sent: Wednesday, October 30, 2013 8:45 PM
+To: R, Sricharan
+Cc: linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-doc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org; linus.walleij at linaro.org; linux at arm.linux.org.uk; tony at atomide.com; Nayak, Rajendra; marc.zyngier at arm.com; grant.likely at linaro.org; mark.rutland at arm.com; robherring2 at gmail.com; Shilimkar, Santosh; Rob Herring
+Subject: Re: [PATCH V2 1/7] DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
+
+On Wed, 30 Oct 2013, Sricharan R wrote:
+> @@ -700,11 +709,22 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+>       *out_hwirq = intspec[1] + 16;
+>
+>       /* For SPIs, we need to add 16 more to get the GIC irq ID number */
+> -     if (!intspec[0])
+> +     if (!intspec[0]) {
+>               *out_hwirq += 16;
+
+Minor nit. This should be in the default implementation. The crossbar
+implementation will fill out_hwirq in its own way and is not
+interested in the +16 operation at all.
+
+> +             ret = gic_routable_irq_domain_ops->xlate(d, controller,
+> +                                                      intspec,
+> +                                                      intsize,
+> +                                                      out_hwirq,
+> +                                                      out_type);
+> +
+
+> +             gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
+> +                                     hwirq_base, &gic_irq_domain_ops, gic);
+> +     } else {
+> +             if (WARN_ON(!gic_routable_irq_domain_ops))
+> +                     return;
+
+This warning is pointless, because you have default ops now.
+
+> +
+> +             gic->domain = irq_domain_add_linear(node, nr_routable_irqs,
+> +                                                 &gic_irq_domain_ops,
+> +                                                 gic);
+>       }
+
+Thanks,
+
+        tglx
