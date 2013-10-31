@@ -1,31 +1,28 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 31 Oct 2013 13:03:56 +0100
-Subject: [PATCH] clk: Do not dereference potential NULL pointer
-Message-ID: <1383221036-26890-1-git-send-email-treding@nvidia.com>
+From: timur@tabi.org (Timur Tabi)
+Date: Thu, 31 Oct 2013 07:04:29 -0500
+Subject: [PATCH v3 3/4] ASoC: fsl_ssi: Add dual fifo mode support
+In-Reply-To: <da997ce67d9817364248ca1eba716bb6c7814a24.1383207153.git.b42378@freescale.com>
+References: <cover.1383207153.git.b42378@freescale.com>
+ <da997ce67d9817364248ca1eba716bb6c7814a24.1383207153.git.b42378@freescale.com>
+Message-ID: <5272474D.5000207@tabi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A NULL pointer may be passed to _clk_register() for the dev parameter
-(via clk_register()). Make sure not to dereference it before checking
-that it's valid.
+Nicolin Chen wrote:
+> +	if (ssi_private->use_dual_fifo) {
+> +		write_ssi_mask(&ssi->srcr, 0, CCSR_SSI_SRCR_RFEN1);
+> +		write_ssi_mask(&ssi->stcr, 0, CCSR_SSI_STCR_TFEN1);
+> +		write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_TCH_EN);
+> +	} else {
+> +		write_ssi_mask(&ssi->srcr, CCSR_SSI_SRCR_RFEN1, 0);
+> +		write_ssi_mask(&ssi->stcr, CCSR_SSI_STCR_TFEN1, 0);
+> +		write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_TCH_EN, 0);
+> +	}
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/clk/clk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Why do you need the "else" part?  Why can't you just do this:
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index b68a999..c0b52e3 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1976,7 +1976,7 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
- 		hw->regmap = hw->init->regmap;
- 	else if (dev && dev_get_regmap(dev, NULL))
- 		hw->regmap = dev_get_regmap(dev, NULL);
--	else if (dev->parent)
-+	else if (dev && dev->parent)
- 		hw->regmap = dev_get_regmap(dev->parent, NULL);
- 
- 	/* allocate local copy in case parent_names is __initdata */
--- 
-1.8.4
+if (ssi_private->use_dual_fifo) {
+	write_ssi_mask(&ssi->srcr, 0, CCSR_SSI_SRCR_RFEN1);
+	write_ssi_mask(&ssi->stcr, 0, CCSR_SSI_STCR_TFEN1);
+	write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_TCH_EN);
+}
