@@ -1,30 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 Oct 2013 08:33:16 -0700
-Subject: [RFC 4/4] ASoC: RX-51: Add DT support to sound driver
-In-Reply-To: <CACRpkdb1dAiDCeZkOiZ6inbDruaUwLgk3joWwuQmSRNZ9WkDGw@mail.gmail.com>
-References: <1382909086-10493-1-git-send-email-sre@debian.org>
- <1382909086-10493-5-git-send-email-sre@debian.org>
- <CACRpkdb1dAiDCeZkOiZ6inbDruaUwLgk3joWwuQmSRNZ9WkDGw@mail.gmail.com>
-Message-ID: <20131031153316.GB2493@sirena.org.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 31 Oct 2013 17:41:42 +0200
+Subject: [PATCH] clk: tegra: use pll_ref as the pll_e parent
+In-Reply-To: <52718D1B.6030106@wwwdotorg.org>
+References: <1383093707-10312-1-git-send-email-pdeschrijver@nvidia.com>
+ <527128B5.2020101@wwwdotorg.org>
+ <20131030221833.GQ22111@tbergstrom-lnx.Nvidia.com>
+ <52718D1B.6030106@wwwdotorg.org>
+Message-ID: <20131031154142.GX22111@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 07:44:22AM -0700, Linus Walleij wrote:
-> On Sun, Oct 27, 2013 at 2:24 PM, Sebastian Reichel <sre@debian.org> wrote:
+On Wed, Oct 30, 2013 at 11:50:03PM +0100, Stephen Warren wrote:
+> On 10/30/2013 04:18 PM, Peter De Schrijver wrote:
+> > On Wed, Oct 30, 2013 at 04:41:41PM +0100, Stephen Warren wrote:
+> >> On 10/29/2013 06:41 PM, Peter De Schrijver wrote:
+> >>> Use pll_ref instead of pll_re_vco as the pll_e parent on Tegra114 and
+> >>> Tegra124. Also add a pll_ref table entry for pll_e for Tegra114.
+> >>
+> >> Why? What benefit does this give, or what bug does this fix?
+> > 
+> > Otherrwise Tegra114 will crash on boot.
+> 
+> Sigh. For what reason?
 
-> > +- eci-sw-gpio: GPIO for ECI SW
-> > +- speaker-amp-gpio: GPIO for Speaker Amp
+pll_re_vco having an unsupported rate of 300Mhz. My guess is that it depends
+on the bootloader if you will see this. I'm fairly sure I verified this on
+my dalmore in helsinki and it worked, but it failed on Paul's test setup.
 
-> Can you please spell out the acronyms? ECI? SW? Amp?
+Cheers,
 
-> I guess SW=switch, Amp=amplifier, but ECI beats me.
-
-ECI is the name of Nokia's accesory interface spec, it should be as
-clear as GPIO for anyone working on Nokia hardware (which this is).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131031/4c452316/attachment-0001.sig>
+Peter.
