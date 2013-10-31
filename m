@@ -1,98 +1,35 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 31 Oct 2013 08:55:00 -0500
-Subject: [PATCHv9 00/43] ARM: TI SoC clock DT conversion
-In-Reply-To: <52721E95.4080806@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <526FDFF4.9030806@ti.com> <5270C1F3.6000409@ti.com> <52711F12.1090008@ti.com>
- <52716799.6040002@ti.com> <52721E95.4080806@ti.com>
-Message-ID: <52726134.8040505@ti.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Thu, 31 Oct 2013 15:01:40 +0100
+Subject: [PATCH 2/2] misc: atmel_pwm: set initcall level to subsys
+In-Reply-To: <201310302146.18248.arnd@arndb.de>
+References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
+ <20131029232249.GA20476@kroah.com>
+ <20131030110705.GA29813@localhost>
+ <201310302146.18248.arnd@arndb.de>
+Message-ID: <20131031140140.GG29813@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 04:10 AM, Tero Kristo wrote:
-> On 10/30/2013 10:10 PM, Nishanth Menon wrote:
->> On 10/30/2013 10:00 AM, Nishanth Menon wrote:
->>> On 10/30/2013 03:23 AM, Tero Kristo wrote:
->>>> On 10/29/2013 06:19 PM, Nishanth Menon wrote:
->>>>> On 10/25/2013 10:56 AM, Tero Kristo wrote:
->>>>> <snip>
->>>>>> Testing done:
->>>>>> - omap3-beagle: boot + suspend/resume (ret + off)
->>>>>> - omap4-panda-es: boot + suspend/resume
->>>>>> - omap5-uevm: boot
->>>>>> - dra7-evm: boot
->>>>>> - am335x-bone: boot
->>>>>>
->>>>>> Test branches available:
->>>>>>
->>>>>> tree: https://github.com/t-kristo/linux-pm.git
->>>>>
->>>>> <snip>
->>>>>> Fully functioning test branch: 3.12-rc6-dt-clks-v9
->>>>>>
->>>>> ^^ I tested this branch (boot testing):
->>>>> Beagle-XM: http://pastebin.com/50A1qtFq (crashes + clkdm issues, dpll5
->>>>> failed to transition)
->>>>
->>>> I just sent you a private email with a patch to try out, should fix the
->>>> boot crash at least hopefully. Basically I forgot to convert one part of
->>>> the kernel to the new regmap stuff for omap36xx.
->>>
->>> it does bootup yes.
->>>>
->>>> clkdm issues are caused by wrong data in omap_hwmod_3xxx_data.c, USB
->>>> nodes are listing l3_init_clkdm for them, but this only exists on
->>>> omap4+. Seems like some copy paste bug introduced by someone.
->>>>
->>>> dpll5 part I am not too sure, can you check if the same happens with
->>>> non-dt boot?
->>>
->>> no-dt: http://pastebin.com/bYP9fTzH
->>> dt: http://pastebin.com/xHup4L9Y
->>>
->>> dpll5 warning seems to be only in dt-boot?
->>>
->>
->> Tracked this down: you were missing the following - looks like the
->> conversion script might be missing converting the flags clock data
->> over to dts?
->>
->> diff --git
->> a/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
->> b/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
->> index 7e37e3e..c9b77c8 100644
->> --- a/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
->> +++ b/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
->> @@ -30,6 +30,7 @@
->>                  compatible = "ti,omap3-dpll-clock";
->>                  clocks = <&sys_ck>, <&sys_ck>;
->>                  reg = <0x0d04>, <0x0d24>, <0x0d34>, <0x0d4c>;
->> +               ti,low-power-stop;
->>          };
->>
->>          dpll5_m2_ck: dpll5_m2_ck {
->>
->>
->>
+On Wed, Oct 30, 2013 at 09:46:17PM +0100, Arnd Bergmann wrote:
+> On Wednesday 30 October 2013, Johan Hovold wrote:
+> > > I really hate this type of patch, as it's papering over the real
+> > > problem.  What happens when someone else moves their driver to this
+> > > level?  Then you are back to the original problem.
+> > 
+> > Yes, it's crude, but it's currently the only way to express a preferred
+> > probe order.
 > 
-> Yea, seems I introduced the problem with the conversion script changes. 
-> The valid fix for this is actually at the end of this mail (this fixes 
-> both of the problems introduced, and also completes the fix you did), I 
-> will add the fixes to the next rev. 
+> Does the same problem occur with the generic PWM subsystem?
 
-One debug feedback:
-reg = <0x0d04>, <0x0d24>, <0x0d34>, <0x0d4c>;
-clocks = <&sys_ck>, <&sys_ck>;
+It does not suffer from the problem with failed probe as it supports
+deferred probing, but there could be added delays depending on probe
+order.
 
-we used indexing for varied register and clocks. however the register
-meaning per index changes based on type of DPLL. This was one painful
-thing to track down when debugging. the only robust option to debug
-was to use prints as part of register write/reads to ensure that right
-sequence was being followed.
+> The atmel_pwm driver apparently is the last PWM driver that has
+> not been converted to the generic subsystem yet. Doing that would
+> also let us drop the atmel-pwm-bl driver in favor of the generic
+> backlight.
 
-I understand based on review comments for dtb size, we have removed
-the names, but we lost sane debug capability as well with that.
+As Bo mentioned, it's work in progress that hasn't been merged yet.
 
--- 
-Regards,
-Nishanth Menon
+Johan
