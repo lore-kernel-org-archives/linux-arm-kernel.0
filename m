@@ -1,45 +1,34 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Thu, 31 Oct 2013 09:33:40 -0700
-Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
-In-Reply-To: <CAOesGMge9JADoLtM8s0LWfy3gs4mpaD1Kofdnn=scOhF86+GcA@mail.gmail.com>
-References: <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
- <20131029132043.GA28165@fifo99.com>
- <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
- <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
- <CAOesGMi2E1Ynr4rWY1eBmcZeB7Vahb5VdPUVs1ebLJowH1kpWw@mail.gmail.com>
- <20131031024538.GA17886@fifo99.com>
- <CAOesGMiEGJ8iMe=_-eJzhx3sRQO8VKbKGD-iLWsRztxUeJWJbQ@mail.gmail.com>
- <20131031120727.GA28330@fifo99.com>
- <CAOesGMge9JADoLtM8s0LWfy3gs4mpaD1Kofdnn=scOhF86+GcA@mail.gmail.com>
-Message-ID: <20131031163339.GA31282@fifo99.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 31 Oct 2013 10:41:23 -0600
+Subject: [PATCH] clk: tegra: use pll_ref as the pll_e parent
+In-Reply-To: <20131031154142.GX22111@tbergstrom-lnx.Nvidia.com>
+References: <1383093707-10312-1-git-send-email-pdeschrijver@nvidia.com>
+ <527128B5.2020101@wwwdotorg.org>
+ <20131030221833.GQ22111@tbergstrom-lnx.Nvidia.com>
+ <52718D1B.6030106@wwwdotorg.org>
+ <20131031154142.GX22111@tbergstrom-lnx.Nvidia.com>
+Message-ID: <52728833.2030709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 08:53:58AM -0700, Olof Johansson wrote:
-> On Thu, Oct 31, 2013 at 5:07 AM, Daniel Walker <dwalker@fifo99.com> wrote:
-> > On Wed, Oct 30, 2013 at 10:19:30PM -0700, Olof Johansson wrote:
-> >> On Wed, Oct 30, 2013 at 7:45 PM, Daniel Walker <dwalker@fifo99.com> wrote:
-> >> > On Wed, Oct 30, 2013 at 05:36:58PM -0700, Olof Johansson wrote:
-> >> >> On Wed, Oct 30, 2013 at 4:25 PM, Daniel Walker <dwalker@fifo99.com> wrote:
-> >> >>
-> >> >> > So the current users of those platforms are, what SOL ?
-> >> >>
-> >> >> What users? Show me one.
-> >> >
-> >> > What am I chop liver ?
-> >>
-> >> Ah, right. So, what platforms do you currently rely on mainline
-> >> support for? Please be precise so we can figure out what needs to be
-> >> kept and not.
-> >
-> > The only one I don't have is 7x30, as I said in prior emails.
+On 10/31/2013 09:41 AM, Peter De Schrijver wrote:
+> On Wed, Oct 30, 2013 at 11:50:03PM +0100, Stephen Warren wrote:
+>> On 10/30/2013 04:18 PM, Peter De Schrijver wrote:
+>>> On Wed, Oct 30, 2013 at 04:41:41PM +0100, Stephen Warren wrote:
+>>>> On 10/29/2013 06:41 PM, Peter De Schrijver wrote:
+>>>>> Use pll_ref instead of pll_re_vco as the pll_e parent on Tegra114 and
+>>>>> Tegra124. Also add a pll_ref table entry for pll_e for Tegra114.
+>>>>
+>>>> Why? What benefit does this give, or what bug does this fix?
+>>>
+>>> Otherrwise Tegra114 will crash on boot.
+>>
+>> Sigh. For what reason?
 > 
-> That's not actually what I asked. Which ones of them do you rely on
-> mainline support for?
+> pll_re_vco having an unsupported rate of 300Mhz. My guess is that it depends
+> on the bootloader if you will see this. I'm fairly sure I verified this on
+> my dalmore in helsinki and it worked, but it failed on Paul's test setup.
 
-I rely on mainline support for 8x50 and G1 trout. This is starting to feel
-like an interogation .. The only reason I'm tolerating this is because I
-know you'll make some attempt to accept these patches over my already
-explicit objections.
-
-Daniel
+OK, so this is primarily a SW issue, because pll_e's freq_table simply
+doesn't have an entry for input frequency 300MHz. Can you make sure the
+commit description explains that?
