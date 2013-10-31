@@ -1,48 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 31 Oct 2013 13:20:37 +0900
-Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
-In-Reply-To: <20131031031549.15985.23547.sendpatchset@w520>
-References: <20131031031549.15985.23547.sendpatchset@w520>
-Message-ID: <20131031042035.GG1603@verge.net.au>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 31 Oct 2013 12:55:47 +0800
+Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
+In-Reply-To: <87zjpqb08q.fsf@rustcorp.com.au>
+References: <20131024084559.GD16735@n2100.arm.linux.org.uk>
+ <87mwlyclng.fsf@rustcorp.com.au>
+ <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
+ <87y55h7vcd.fsf@rustcorp.com.au>
+ <CACVXFVPXEUX9JQ2NZvL8=J34zbw2fn202QW2SQtpKjdQ+tv=vg@mail.gmail.com>
+ <87sivp7eai.fsf@rustcorp.com.au>
+ <CACVXFVN7PiU1dorkeamtC9-Wg_TVQE8xFiJtad-C8q4_=Rc1Ow@mail.gmail.com>
+ <874n82gk89.fsf@rustcorp.com.au>
+ <20131028132348.62f7e368@tom-ThinkPad-T410>
+ <87ob6aeyg4.fsf@rustcorp.com.au>
+ <20131030230920.GQ16735@n2100.arm.linux.org.uk>
+ <87zjpqb08q.fsf@rustcorp.com.au>
+Message-ID: <CACVXFVMp-NWEVEG4-de2QHjUtwHUj+gWXOBjtUZge6_ZrT0UsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 12:15:49PM +0900, Magnus Damm wrote:
-> From: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
-> 
-> Add 1GiB of DRAM at 0x2_0000_0000 to support the full 2GiB
-> of APE6EVM system memory.
-> 
-> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  For correct run time operation regardless of kernel configuration
->  ARM patches 7863/1 and 7864/1 are needed.
+On Thu, Oct 31, 2013 at 11:14 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>
+> Kallsyms tends to fall between modules and scripts.  I assume it's not
+> urgent, so no cc:stable on this one.
 
-I take it that I should wait for those patches before applying this one.
+Rusty, thanks a lot.
 
-With those two patches and this one applied on top of
-renesas-devel-v3.12-rc7-20131030 I was able to successfully
-boot an ape6evm board. But /proc/meminfo still indicates only 1Gb of
-memory. What am I missing.
+BTW, there is already other report on the problem:
 
-> 
->  arch/arm/boot/dts/r8a73a4-ape6evm.dts |    5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> --- 0001/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> +++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-10-31 11:44:53.000000000 +0900
-> @@ -24,6 +24,11 @@
->  		reg = <0 0x40000000 0 0x40000000>;
->  	};
->  
-> +	memory at 200000000 {
-> +		device_type = "memory";
-> +		reg = <2 0x00000000 0 0x40000000>;
-> +	};
-> +
->  	ape6evm_fixed_3v3: fixedregulator at 0 {
->  		compatible = "regulator-fixed";
->  		regulator-name = "3V3";
-> 
+   http://lkml.indiana.edu/hypermail/linux/kernel/1310.3/02772.html
+
+
+Thanks,
+-- 
+Ming Lei
