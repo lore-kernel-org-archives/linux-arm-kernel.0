@@ -1,88 +1,43 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 31 Oct 2013 09:20:31 -0400
-Subject: [PATCH 1/2] ARM: kirkwood: add support for OpenBlocks A7 platform
-In-Reply-To: <52725312.4090208@free-electrons.com>
-References: <1383152110-19577-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1383152110-19577-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20131030195724.GI26784@titan.lakedaemon.net>
- <20131031093735.68aa7df1@skate>
- <52722037.8050808@free-electrons.com>
- <20131031102123.5eff2255@skate>
- <20131031125030.GJ26784@titan.lakedaemon.net>
- <52725312.4090208@free-electrons.com>
-Message-ID: <20131031132031.GL26784@titan.lakedaemon.net>
+Date: Thu, 31 Oct 2013 09:35:50 -0400
+Subject: [GIT PULL] ARM: mvebu: dt changes for v3.13 (really, last one!)
+Message-ID: <20131031133550.GM26784@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 01:54:42PM +0100, Gregory CLEMENT wrote:
-> On 31/10/2013 13:50, Jason Cooper wrote:
-> > On Thu, Oct 31, 2013 at 10:21:23AM +0100, Thomas Petazzoni wrote:
-> >> Dear Gregory CLEMENT,
-> >>
-> >> On Thu, 31 Oct 2013 10:17:43 +0100, Gregory CLEMENT wrote:
-> >>
-> >>>> Strange. 'make dtbs' was working here. What was wrong exactly? Just
-> >>>> that the unit address (@90000) didn't match the starting address
-> >>>> 0x1c0000 ?
-> >>>
-> >>> The unit address has no special meaning for the device tree it's just a
-> >>> way to give a unique name to a node right?
-> >>
-> >> Yes, that's also my understanding.
-> > 
-> > Correct, that's not what caused the error.
-> > 
-> >>> So in this case it is not really a problem, but it's just nicer for the
-> >>> coherency of the information in the dt to have the unit address which match
-> >>> the starting address.
-> >>
-> >> Indeed, it's much better if they match (shame on me for the silly
-> >> copy/paste), but having then *not* matching should not cause any DTC
-> >> error, I believe.
-> >>
-> >>> I also do a make dtbs ans I didn't get any errors:
-> >>> $ make dtbs
-> >>>  [...]
-> >>>   DTC     arch/arm/boot/dts/kirkwood-openblocks_a6.dtb
-> >>>   DTC     arch/arm/boot/dts/kirkwood-openblocks_a7.dtb
-> >>
-> >> Same here.
-> > 
-> > With Thomas' original patch (on top of mvebu/dt, based on v3.12-rc1):
-> 
-> On my side I tested the patch on top on v3.12-rc7. So the difference should
-> be there.
+Olof,
 
-Ok, I get no warnings when I rebase the original patch onto v3.12-rc7.
-
-Since Thomas is ok with my version, I'm going to send it up since it
-doesn't generate warnings.  There's no point merging in v3.12-rc7 just
-to silence a few warnings.
+At your request, here's Thomas' patch adding the Openblocks A7 board.
+It made it through -next last night.
 
 thx,
 
 Jason.
 
-> > $ make kirkwood_defconfig
-> > $ make dtbs
-> > ...
-> >   DTC     arch/arm/boot/dts/kirkwood-openblocks_a6.dtb
-> >   DTC     arch/arm/boot/dts/kirkwood-openblocks_a7.dtb
-> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at 0 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
-> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at 90000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
-> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at d4000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
-> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at f4000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
-> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at 4f4000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
-> > Warning (reg_format): "reg" property in /ocp at f1000000/nand at 3000000/partition at 2214000 has invalid length (8 bytes) (#address-cells == 2, #size-cells == 1)
-> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at 0
-> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at 0
-> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at 90000
-> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at 90000
-> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at d4000
-> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at d4000
-> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at f4000
-> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at f4000
-> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at 4f4000
-> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at 4f4000
-> > Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp at f1000000/nand at 3000000/partition at 2214000
-> > Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp at f1000000/nand at 3000000/partition at 2214000
+
+The following changes since commit f039dfb51b36a2d7e4ac25e65ffbd03e3ac77a0c:
+
+  ARM: mvebu: Add the core-divider clock to Armada 370/XP (2013-10-23 11:04:31 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/dt-3.13-5
+
+for you to fetch changes up to f24b56cbcd9d39cb2ed45b4b451f8614f9494c17:
+
+  ARM: kirkwood: add support for OpenBlocks A7 platform (2013-10-30 19:55:34 +0000)
+
+----------------------------------------------------------------
+mvebu dt changes for v3.13 (round 5)
+
+ - kirkwood
+    - add the Openblocks A7 board
+
+----------------------------------------------------------------
+Thomas Petazzoni (1):
+      ARM: kirkwood: add support for OpenBlocks A7 platform
+
+ arch/arm/boot/dts/Makefile                   |   5 +-
+ arch/arm/boot/dts/kirkwood-openblocks_a7.dts | 223 +++++++++++++++++++++++++++
+ 2 files changed, 226 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-openblocks_a7.dts
