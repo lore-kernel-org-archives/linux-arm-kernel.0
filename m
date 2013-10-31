@@ -1,47 +1,33 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 31 Oct 2013 00:54:53 -0700
-Subject: [PATCH v2 04/19] input: sh_keysc: Enable the driver on all ARM
- platforms
-In-Reply-To: <1383086274-11049-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383086274-11049-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131031075453.GB2098@core.coreip.homeip.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 31 Oct 2013 16:00:18 +0800
+Subject: [PATCHv8][ 4/4] ARM: imx_v6_v7_defconfig: Enable tsc2007 support.
+In-Reply-To: <1383155923-24076-4-git-send-email-denis@eukrea.com>
+References: <1383155923-24076-1-git-send-email-denis@eukrea.com>
+ <1383155923-24076-4-git-send-email-denis@eukrea.com>
+Message-ID: <20131031080016.GI23549@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 11:37:39PM +0100, Laurent Pinchart wrote:
-> Renesas ARM platforms are transitioning from single-platform to
-> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
-> COMPILE_TEST.
+On Wed, Oct 30, 2013 at 06:58:43PM +0100, Denis Carikli wrote:
+> The eukrea cpuimx35 and cpuimx51 have a tsc2007 touchscreen controller,
+>   so we turn it on.
 > 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
 > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 > Cc: linux-input at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
 
-Applied, thank you.
+Applied this one.
 
-> ---
->  drivers/input/keyboard/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> index c1edd39..28d75c7 100644
-> --- a/drivers/input/keyboard/Kconfig
-> +++ b/drivers/input/keyboard/Kconfig
-> @@ -525,7 +525,7 @@ config KEYBOARD_SUNKBD
->  
->  config KEYBOARD_SH_KEYSC
->  	tristate "SuperH KEYSC keypad support"
-> -	depends on SUPERH || ARCH_SHMOBILE
-> +	depends on SUPERH || ARM || COMPILE_TEST
->  	help
->  	  Say Y here if you want to use a keypad attached to the KEYSC block
->  	  on SuperH processors such as sh7722 and sh7343.
-> -- 
-> 1.8.1.5
-> 
-
--- 
-Dmitry
+Shawn
