@@ -1,254 +1,417 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Oct 2013 17:55:11 +0000
-Subject: [PATCH 4/6] iommu/arm-smmu: Introduce automatic stream-id-masking
-In-Reply-To: <1382127195-15261-5-git-send-email-andreas.herrmann@calxeda.com>
-References: <1382127195-15261-1-git-send-email-andreas.herrmann@calxeda.com>
- <1382127195-15261-5-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20131031175511.GA31082@mudshark.cambridge.arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 31 Oct 2013 13:02:56 -0500
+Subject: [PATCHv9 09/43] CLK: ti: add support for ti divider-clock
+In-Reply-To: <1382716658-6964-10-git-send-email-t-kristo@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-10-git-send-email-t-kristo@ti.com>
+Message-ID: <52729B50.5060503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
-
-Cheers for the new patch, some comments/questions in line...
-
-On Fri, Oct 18, 2013 at 09:13:13PM +0100, Andreas Herrmann wrote:
-> Try to determine a mask that can be used for all StreamIDs of a master
-> device. This allows to use just one SMR group instead of
-> number-of-streamids SMR groups for a master device.
+On 10/25/2013 10:57 AM, Tero Kristo wrote:
+> This patch adds support for TI divider clock binding, which simply uses
+> the basic clock divider to provide the features needed.
 > 
-> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 > ---
->  drivers/iommu/arm-smmu.c |  121 ++++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 105 insertions(+), 16 deletions(-)
+>  .../devicetree/bindings/clock/ti/divider.txt       |   86 +++++++
+>  drivers/clk/ti/Makefile                            |    3 +-
+>  drivers/clk/ti/divider.c                           |  239 ++++++++++++++++++++
+>  3 files changed, 327 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/ti/divider.txt
+>  create mode 100644 drivers/clk/ti/divider.c
 > 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index a65a559..5f585fc 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -28,6 +28,7 @@
->   *	- Context fault reporting
->   */
->  
-> +#define DEBUG
+> diff --git a/Documentation/devicetree/bindings/clock/ti/divider.txt b/Documentation/devicetree/bindings/clock/ti/divider.txt
+> new file mode 100644
+> index 0000000..65e3dcd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/ti/divider.txt
+> @@ -0,0 +1,86 @@
+> +Binding for TI divider clock
+> +
+> +Binding status: Unstable - ABI compatibility may be broken in the future
+> +
+> +This binding uses the common clock binding[1].  It assumes a
+> +register-mapped adjustable clock rate divider that does not gate and has
+> +only one input clock or parent.  By default the value programmed into
+> +the register is one less than the actual divisor value.  E.g:
+> +
+> +register value		actual divisor value
+> +0			1
+> +1			2
+> +2			3
+> +
+> +This assumption may be modified by the following optional properties:
+> +
+> +ti,index-starts-at-one - valid divisor values start at 1, not the default
+> +of 0.  E.g:
+> +register value		actual divisor value
+> +1			1
+> +2			2
+> +3			3
+> +
+> +ti,index-power-of-two - valid divisor values are powers of two.  E.g:
+> +register value		actual divisor value
+> +0			1
+> +1			2
+> +2			4
+> +
+> +Additionally an array of valid dividers may be supplied like so:
+> +
+> +	dividers = <4>, <8>, <0>, <16>;
+ti,dividers I believe.
 
-You can drop this change from the patch.
+> +
+> +Which will map the resulting values to a divisor table by their index:
+> +register value		actual divisor value
+> +0			4
+> +1			8
+> +2			<invalid divisor, skipped>
+> +3			16
+> +
+> +Any zero value in this array means the corresponding bit-value is invalid
+> +and must not be used.
+> +
+> +The binding must also provide the register to control the divider and
+> +unless the divider array is provided, min and max dividers. Optionally
+> +the number of bits to shift that mask, if necessary. If the shift value
+> +is missing it is the same as supplying a zero shift.
+> +
+> +Required properties:
+> +- compatible : shall be "ti,divider-clock".
 
->  #define pr_fmt(fmt) "arm-smmu: " fmt
->  
->  #include <linux/delay.h>
-> @@ -42,6 +43,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> +#include <linux/bitops.h>
->  
->  #include <linux/amba/bus.h>
->  
-> @@ -338,8 +340,9 @@ struct arm_smmu_master {
->  	 * SMMU chain.
->  	 */
->  	struct rb_node			node;
-> -	int				num_streamids;
-> +	u32				num_streamids;
->  	u16				streamids[MAX_MASTER_STREAMIDS];
-> +	int				num_used_smrs;
->  
->  	/*
->  	 * We only need to allocate these on the root SMMU, as we
-> @@ -1025,10 +1028,90 @@ static void arm_smmu_domain_destroy(struct iommu_domain *domain)
->  	kfree(smmu_domain);
->  }
->  
-> +static int determine_smr_mask(struct arm_smmu_master *master,
-> +			struct arm_smmu_smr *smr, int start, int nr)
+ti,composite-divider-clock undocumented?
+
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clocks : link to phandle of parent clock
+> +- reg : offset for register controlling adjustable divider
+> +
+> +Optional properties:
+> +- clock-output-names : from common clock binding.
+> +- ti,dividers : array of integers defining divisors
+> +- ti,bit-shift : number of bits to shift the divider value, defaults to 0
+> +- ti,min-div : min divisor for dividing the input clock rate, only
+> +  needed if the first divisor is offset from the default value (1)
+> +- ti,max-div : max divisor for dividing the input clock rate, only needed
+> +  if ti,dividers is not defined.
+> +- ti,index-starts-at-one : valid divisor programming starts at 1, not zero
+
+makes sense only if ti,dividers are not defined, right?
+CLK_DIVIDER_ONE_BASED is used with !table
+
+> +- ti,index-power-of-two : valid divisor programming must be a power of two
+
+makes sense only if ti,dividers are not defined, right?
+CLK_DIVIDER_POWER_OF_TWO is used with !table
+
+> +- ti,autoidle-shift : bit shift of the autoidle enable bit for the clock
+> +- ti,invert-autoidle-bit : autoidle is enabled by setting the bit to 0
+
+These are part of auto idle driver bindings, so maybe give a link to that?
+
+> +- ti,set-rate-parent : clk_set_rate is propagated to parent
+
+yeah - this is one of those properties that should probably become
+generic at a later point in time.
+
+> +
+> +Examples:
+> +dpll_usb_m2_ck: dpll_usb_m2_ck at 4a008190 {
+> +	#clock-cells = <0>;
+> +	compatible = "ti,divider-clock";
+> +	clocks = <&dpll_usb_ck>;
+> +	ti,max-div = <127>;
+> +	reg = <0x190>;
+> +	ti,index-starts-at-one;
+> +};
+> +
+> +aess_fclk: aess_fclk at 4a004528 {
+> +	#clock-cells = <0>;
+> +	compatible = "ti,divider-clock";
+> +	clocks = <&abe_clk>;
+> +	ti,bit-shift = <24>;
+> +	reg = <0x528>;
+> +	ti,max-div = <2>;
+> +};
+
+an example of ti,dividers will be useful as well.
+
+> diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
+> index a4a7595..640ebf9 100644
+> --- a/drivers/clk/ti/Makefile
+> +++ b/drivers/clk/ti/Makefile
+> @@ -1,3 +1,4 @@
+>  ifneq ($(CONFIG_OF),)
+> -obj-y					+= clk.o dpll.o autoidle.o composite.o
+> +obj-y					+= clk.o dpll.o autoidle.o divider.o \
+> +					   composite.o
+>  endif
+> diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
+> new file mode 100644
+> index 0000000..787bc8f
+> --- /dev/null
+> +++ b/drivers/clk/ti/divider.c
+> @@ -0,0 +1,239 @@
+> +/*
+> + * TI Divider Clock
+> + *
+> + * Copyright (C) 2013 Texas Instruments, Inc.
+> + *
+> + * Tero Kristo <t-kristo@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clk/ti.h>
+> +
+> +static struct clk_div_table
+> +__init *ti_clk_get_div_table(struct device_node *node)
 > +{
-> +	u16 i, zero_bits_mask, one_bits_mask, const_mask;
+> +	struct clk_div_table *table;
+> +	const __be32 *divspec;
+> +	u32 val;
+> +	u32 num_div;
+> +	u32 valid_div;
+> +	int i;
 > +
-> +	BUG_ON(!is_power_of_2(nr));
-
-If you change the parameters to take a bit number instead of a value, then
-you don't need the BUG_ON by construction.
-
-> +	if (nr == 1) {
-> +		/* no mask, use streamid to match and be done with it */
-> +		smr->mask = 0;
-> +		smr->id = master->streamids[start];
-> +		return 0;
+> +	divspec = of_get_property(node, "ti,dividers", &num_div);
+> +
+> +	if (!divspec)
+> +		return NULL;
+> +
+> +	num_div /= 4;
+> +
+> +	valid_div = 0;
+> +
+> +	/* Determine required size for divider table */
+> +	for (i = 0; i < num_div; i++) {
+> +		of_property_read_u32_index(node, "ti,dividers", i, &val);
+> +		if (val)
+> +			valid_div++;
 > +	}
 > +
-> +	zero_bits_mask = 0;
-> +	one_bits_mask = 0xffff;
-> +	for (i = start; i < start + nr; i++) {
-> +		zero_bits_mask |= master->streamids[i];   /* const 0 bits */
-> +		one_bits_mask &= master->streamids[i]; /* const 1 bits */
-> +	}
-> +	zero_bits_mask = ~zero_bits_mask;
-> +
-> +	/* bits having constant values (either 0 or 1) */
-> +	const_mask = zero_bits_mask | one_bits_mask;
-> +
-> +	i = hweight16(~const_mask);
-> +	if ((1 << i) == nr) {
-> +		smr->mask = ~const_mask;
-> +		smr->id = one_bits_mask;
-
-An extra thing to think about is the number of implemented bits in the SMR
-registers (I believe this is implemented defined). We currently do a basic
-sanity check in arm_smmu_device_cfg_probe, where we check that the mask and
-id fields are sufficient for each other, but we should also check this
-against the real ids and masks once they are known.
-
-> +	} else {
-> +		/* no usable mask for this set of streamids */
-> +		return 1;
+> +	if (!valid_div) {
+> +		pr_err("%s: no valid dividers for %s table\n", __func__,
+> +		       node->name);
+> +		return ERR_PTR(-EINVAL);
 > +	}
 > +
-> +	return 0;
+> +	table = kzalloc(sizeof(*table) * (valid_div + 1), GFP_KERNEL);
+> +
+> +	if (!table) {
+> +		pr_err("%s: unable to allocate memory for %s table\n", __func__,
+> +		       node->name);
+
+you could drop this.
+
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	valid_div = 0;
+> +
+> +	for (i = 0; i < num_div; i++) {
+> +		of_property_read_u32_index(node, "ti,dividers", i, &val);
+> +		if (val) {
+> +			table[valid_div].div = val;
+> +			table[valid_div].val = i;
+> +			valid_div++;
+> +		}
+> +	}
+> +
+> +	return table;
 > +}
 > +
-> +static int determine_smr_mapping(struct arm_smmu_master *master,
-> +				struct arm_smmu_smr *smrs, int max_smrs)
+> +static int _get_divider_width(struct device_node *node,
+> +			      const struct clk_div_table *table,
+> +			      u8 flags)
 > +{
-> +	int nr_sid, nr, i, bit, start;
+> +	u32 min_div;
+> +	u32 max_div;
+> +	u32 val = 0;
+> +	u32 div;
 > +
-> +	start = nr = 0;
-> +	nr_sid = master->num_streamids;
-> +	do {
-> +		/*
-> +		 * largest power-of-2 number of streamids for which to
-> +		 * determine a usable mask/id pair for stream matching
-> +		 */
-> +		bit = fls(nr_sid);
-> +		if (!bit)
-> +			return 0;
-> +
-> +		/*
-> +		 * iterate over power-of-2 numbers to determine
-> +		 * largest possible mask/id pair for stream matching
-> +		 * of next <nr> streamids
-> +		 */
-> +		for (i = bit - 1; i >= 0; i--) {
-> +			nr = 1 << i;
-> +			if(!determine_smr_mask(master,
-> +						&smrs[master->num_used_smrs],
-> +						start, nr))
-
-Does this rely on the stream IDs being sorted? We're not actually trying all
-combinations of IDs, so it seems like changing the order of IDs in the
-device tree will potentially change the number of smrs you end up using.
-
-> +				break;
+> +	if (!table) {
+> +		/* Clk divider table not provided, determine min/max divs */
+> +		if (of_property_read_u32(node, "ti,min-div", &min_div)) {
+> +			pr_debug("%s: no min-div for %s, default=1\n",
+> +				 __func__, node->name);
+> +			min_div = 1;
 > +		}
 > +
-> +		nr_sid -= nr;
-> +		start += nr;
-> +		master->num_used_smrs++;
+> +		if (of_property_read_u32(node, "ti,max-div", &max_div)) {
+> +			pr_err("%s: no max-div for %s!\n", __func__,
+> +			       node->name);
+> +			return -EINVAL;
 
-Does the manipulation of num_used_smrs here mean that we should only call
-this function exactly once? Would it be worth checking that num_used_smrs is
-zero when we enter this function?
+will be nice to get warning if ti,divider is defined and any of the
+non-operational properties are defined as well.
 
-Also, in v1, we discussed about checking for duplicate stream ids in
-register_smmu_master. Did you look into that?
-
-> +	} while (master->num_used_smrs <= max_smrs);
+> +		}
 > +
-> +	if (nr_sid) {
-> +		/* not enough mapping groups available */
-> +		master->num_used_smrs = 0;
-> +		return -ENOSPC;
+> +		/* Determine bit width for the field */
+> +		if (flags & CLK_DIVIDER_ONE_BASED)
+> +			val = 1;
+> +
+> +		div = min_div;
+> +
+> +		while (div < max_div) {
+> +			if (flags & CLK_DIVIDER_POWER_OF_TWO)
+> +				div <<= 1;
+> +			else
+> +				div++;
+> +			val++;
+> +		}
+> +	} else {
+> +		div = 0;
+> +
+> +		while (table[div].div) {
+> +			val = table[div].val;
+> +			div++;
+> +		}
 > +	}
 > +
-> +	return 0;
+> +	return fls(val);
 > +}
 > +
->  static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
->  					  struct arm_smmu_master *master)
->  {
-> -	int i;
-> +	int i, max_smrs, ret;
->  	struct arm_smmu_smr *smrs;
->  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
->  
-> @@ -1038,42 +1121,45 @@ static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
->  	if (master->smrs)
->  		return -EEXIST;
->  
-> -	smrs = kmalloc(sizeof(*smrs) * master->num_streamids, GFP_KERNEL);
-> +	max_smrs = min(smmu->num_mapping_groups, master->num_streamids);
-> +	smrs = kmalloc(sizeof(*smrs) * max_smrs, GFP_KERNEL);
->  	if (!smrs) {
->  		dev_err(smmu->dev, "failed to allocate %d SMRs for master %s\n",
-> -			master->num_streamids, master->of_node->name);
-> +			max_smrs, master->of_node->name);
->  		return -ENOMEM;
->  	}
->  
-> +	ret = determine_smr_mapping(master, smrs, max_smrs);
-> +	if (ret)
-> +		goto err_free_smrs;
+> +/**
+> + * of_ti_divider_clk_setup() - Setup function for simple div rate clock
+> + */
+> +static int __init of_ti_divider_clk_setup(struct device_node *node,
+> +					  struct regmap *regmap)
+> +{
+> +	struct clk *clk;
+> +	const char *clk_name = node->name;
+> +	void __iomem *reg;
+> +	const char *parent_name;
+> +	u8 clk_divider_flags = 0;
+> +	u8 width = 0;
+> +	u8 shift = 0;
+> +	struct clk_div_table *table = NULL;
+> +	u32 val = 0;
+> +	u32 flags = 0;
+> +	int ret = 0;
 > +
->  	/* Allocate the SMRs on the root SMMU */
-> -	for (i = 0; i < master->num_streamids; ++i) {
-> +	for (i = 0; i < master->num_used_smrs; ++i) {
->  		int idx = __arm_smmu_alloc_bitmap(smmu->smr_map, 0,
->  						  smmu->num_mapping_groups);
->  		if (IS_ERR_VALUE(idx)) {
->  			dev_err(smmu->dev, "failed to allocate free SMR\n");
-> -			goto err_free_smrs;
-> +			goto err_free_bitmap;
->  		}
-> -
-> -		smrs[i] = (struct arm_smmu_smr) {
-> -			.idx	= idx,
-> -			.mask	= 0, /* We don't currently share SMRs */
-> -			.id	= master->streamids[i],
-> -		};
-> +		smrs[i].idx = idx;
->  	}
->  
->  	/* It worked! Now, poke the actual hardware */
-> -	for (i = 0; i < master->num_streamids; ++i) {
-> +	for (i = 0; i < master->num_used_smrs; ++i) {
->  		u32 reg = SMR_VALID | smrs[i].id << SMR_ID_SHIFT |
->  			  smrs[i].mask << SMR_MASK_SHIFT;
-> +		dev_dbg(smmu->dev, "SMR%d: 0x%x\n", smrs[i].idx, reg);
->  		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_SMR(smrs[i].idx));
->  	}
->  
->  	master->smrs = smrs;
->  	return 0;
->  
-> -err_free_smrs:
-> +err_free_bitmap:
->  	while (--i >= 0)
->  		__arm_smmu_free_bitmap(smmu->smr_map, smrs[i].idx);
-> +	master->num_used_smrs = 0;
-> +err_free_smrs:
->  	kfree(smrs);
->  	return -ENOSPC;
->  }
-> @@ -1112,7 +1198,7 @@ static void arm_smmu_bypass_stream_mapping(struct arm_smmu_device *smmu,
->  static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
->  				      struct arm_smmu_master *master)
->  {
-> -	int i, ret;
-> +	int i, ret, num_s2crs;
->  	struct arm_smmu_device *parent, *smmu = smmu_domain->root_cfg.smmu;
->  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
->  
-> @@ -1136,11 +1222,14 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
->  	}
->  
->  	/* Now we're at the root, time to point at our context bank */
-> -	for (i = 0; i < master->num_streamids; ++i) {
-> +	num_s2crs = master->num_used_smrs ? master->num_used_smrs :
-> +		master->num_streamids;
+> +	parent_name = of_clk_get_parent_name(node, 0);
+> +
+> +	if (of_property_read_u32(node, "reg", &val)) {
+> +		pr_err("%s: %s must have reg\n", __func__, clk_name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	reg = (void *)val;
+> +
+> +	if (!of_property_read_u32(node, "ti,bit-shift", &val))
+> +		shift = val;
+> +
+> +	if (of_property_read_bool(node, "ti,index-starts-at-one"))
+> +		clk_divider_flags |= CLK_DIVIDER_ONE_BASED;
+> +
+> +	if (of_property_read_bool(node, "ti,index-power-of-two"))
+> +		clk_divider_flags |= CLK_DIVIDER_POWER_OF_TWO;
+> +
+> +	if (of_property_read_bool(node, "ti,set-rate-parent"))
+> +		flags |= CLK_SET_RATE_PARENT;
+> +
+> +	table = ti_clk_get_div_table(node);
+> +
+> +	if (IS_ERR(table))
+> +		return PTR_ERR(table);
+> +
+> +	ret = _get_divider_width(node, table, clk_divider_flags);
+> +	if (ret < 0)
+> +		goto cleanup;
+> +
+> +	width = ret;
+> +
+> +	clk = clk_register_divider_table_regmap(NULL, clk_name, parent_name,
+> +						flags, reg, regmap, shift,
+> +						width, clk_divider_flags, table,
+> +						NULL);
+> +
+> +	if (!IS_ERR(clk)) {
+> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +		ret = of_ti_autoidle_setup(node, regmap);
 
-I know we already changed it once, but checks like this are ugly, so perhaps
-renaming num_user_smrs (again!) to something like num_s2crs, then just
-making sure that it is set to num_streamids if we're not using stream
-matching?
+if this fails, table will be freed though, we have added provider and
+registerd table_regmap, no?
 
-Will
+> +	} else {
+> +		ret = PTR_ERR(clk);
+> +	}
+> +
+> +	if (!ret)
+> +		return 0;
+> +cleanup:
+> +	kfree(table);
+> +	return ret;
+> +}
+> +CLK_OF_DECLARE(divider_clk, "ti,divider-clock", of_ti_divider_clk_setup);
+> +
+> +static int __init of_ti_composite_divider_clk_setup(struct device_node *node,
+> +						     struct regmap *regmap)
+> +{
+> +	struct clk_divider *div;
+> +	u32 val;
+> +	int ret;
+> +
+> +	div = kzalloc(sizeof(*div), GFP_KERNEL);
+> +	if (!div)
+> +		return -ENOMEM;
+> +
+> +	of_property_read_u32(node, "reg", &val);
+
+reg is a mandatory property, no? error checks?
+
+> +	div->reg = (void *)val;
+> +	div->regmap = regmap;
+> +
+> +	div->table = ti_clk_get_div_table(node);
+> +
+> +	if (of_property_read_bool(node, "ti,index-starts-at-one"))
+> +		div->flags |= CLK_DIVIDER_ONE_BASED;
+
+alright, this does not really map back to ti,divder-clock style
+handling.. aren't they supposed to be consistent?
+how about "ti,index-power-of-two", bit shift etc?
+> +
+> +	ret = _get_divider_width(node, div->table, div->flags);
+> +	if (ret < 0)
+> +		goto cleanup;
+> +
+> +	div->width = ret;
+> +
+> +	if (of_property_read_u32(node, "ti,bit-shift", &val)) {
+> +		pr_debug("%s: missing bit-shift property for %s, default=0\n",
+> +			 __func__, node->name);
+> +		val = 0;
+> +	}
+> +	div->shift = val;
+> +
+> +	ret = ti_clk_add_component(node, &div->hw, CLK_COMPONENT_TYPE_DIVIDER);
+> +	if (!ret)
+> +		return 0;
+> +
+> +cleanup:
+> +	kfree(div);
+> +	return ret;
+> +}
+> +CLK_OF_DECLARE(ti_composite_divider_clk, "ti,composite-divider-clock",
+> +	       of_ti_composite_divider_clk_setup);
+> 
+
+
+-- 
+Regards,
+Nishanth Menon
