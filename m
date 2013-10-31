@@ -1,39 +1,44 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 31 Oct 2013 16:38:05 +0530
-Subject: [PATCH 3/5] iommu/arm-smmu: Use devm_ioremap_resource
-In-Reply-To: <1383217687-12037-1-git-send-email-tushar.behera@linaro.org>
-References: <1383217687-12037-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1383217687-12037-4-git-send-email-tushar.behera@linaro.org>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Thu, 31 Oct 2013 12:19:27 +0100
+Subject: [PATCH] ARM: kirkwood: Cleanup comments in Sheevaplug dts files
+Message-ID: <1383218367-4012-1-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While at it, propagate the error code.
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-CC: linux-arm-kernel at lists.infradead.org
-CC: iommu at lists.linux-foundation.org
-CC: Will Deacon <will.deacon@arm.com>
-CC: Joerg Roedel <joro@8bytes.org>
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 ---
- drivers/iommu/arm-smmu.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Hi,
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 2349d62..fe275b3 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1790,9 +1790,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	}
- 
- 	smmu->size = resource_size(res);
--	smmu->base = devm_request_and_ioremap(dev, res);
--	if (!smmu->base)
--		return -EADDRNOTAVAIL;
-+	smmu->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(smmu->base))
-+		return PTR_ERR(smmu->base);
- 
- 	if (of_property_read_u32(dev->of_node, "#global-interrupts",
- 				 &smmu->num_global_irqs)) {
+just two fixes for silly copy and paste errors.
+
+- Simon
+
+ arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi |    2 +-
+ arch/arm/boot/dts/kirkwood-sheevaplug.dts         |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+index 5696b63..c2bedb6 100644
+--- a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+@@ -1,5 +1,5 @@
+ /*
+- * kirkwood-sheevaplug-common.dts - Common parts for Sheevaplugs
++ * kirkwood-sheevaplug-common.dtsi - Common parts for Sheevaplugs
+  *
+  * Copyright (C) 2013 Simon Baatz <gmbnomis@gmail.com>
+  *
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug.dts b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
+index bb61918..0de8278 100644
+--- a/arch/arm/boot/dts/kirkwood-sheevaplug.dts
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
+@@ -1,5 +1,5 @@
+ /*
+- * kirkwood-sheevaplug-esata.dts - Device tree file for Sheevaplug
++ * kirkwood-sheevaplug.dts - Device tree file for Sheevaplug
+  *
+  * Copyright (C) 2013 Simon Baatz <gmbnomis@gmail.com>
+  *
 -- 
 1.7.9.5
