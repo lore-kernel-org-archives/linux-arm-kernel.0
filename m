@@ -1,43 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 31 Oct 2013 09:37:35 +0100
-Subject: [PATCH 1/2] ARM: kirkwood: add support for OpenBlocks A7 platform
-In-Reply-To: <20131030195724.GI26784@titan.lakedaemon.net>
-References: <1383152110-19577-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1383152110-19577-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20131030195724.GI26784@titan.lakedaemon.net>
-Message-ID: <20131031093735.68aa7df1@skate>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 31 Oct 2013 16:44:23 +0800
+Subject: [PATCH] ARM: imx: v7_cpu_resume() is needed by imx6sl build
+Message-ID: <1383209063-27549-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Building a kernel with the following options,
 
-On Wed, 30 Oct 2013 15:57:25 -0400, Jason Cooper wrote:
+  CONFIG_SMP=n
+  CONFIG_PM=y
+  CONFIG_SOC_IMX6SL=y
+  CONFIG_SOC_IMX6Q=n
 
-> > +			partition at 0 {
-> > +				label = "uboot";
-> > +				reg = <0x0 0x1c0000>;
-> > +			};
-> > +
-> > +			partition at 90000 {
-> > +				label = "env";
-> > +				reg = <0x1c0000 0x2c0000>;
-> > +			};
-> 
-> Hmm, something doesn't look right here.  Cut-n-paste problem?  Did you
-> run 'make dtbs' against this?  I get address size errors when I do.
+we will see the build error below.
 
-Strange. 'make dtbs' was working here. What was wrong exactly? Just
-that the unit address (@90000) didn't match the starting address
-0x1c0000 ?
+  arch/arm/mach-imx/built-in.o: In function `imx6q_pm_enter':
+  platform-spi_imx.c:(.text+0x2648): undefined reference to `v7_cpu_resume'
+  make[1]: *** [vmlinux] Error 1
 
-> let me know if it's ok with you and I'll push it tomorrow.
+This is because that v7_cpu_resume() implemented in headsmp.S is also
+needed by imx6sl build.  Let's build headsmp.S for CONFIG_SOC_IMX6SL as
+well.
 
-This all looks good to me!
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/Makefile |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks a lot,
-
-Thomas
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index bbe1f5b..1789e2b 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -102,8 +102,8 @@ obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
+ 
+ ifeq ($(CONFIG_PM),y)
+ obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
+-# i.MX6SL reuses pm-imx6q.c
+-obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o
++# i.MX6SL reuses i.MX6Q code
++obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
+ endif
+ 
+ # i.MX5 based machines
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
