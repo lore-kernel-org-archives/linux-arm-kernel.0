@@ -1,27 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 31 Oct 2013 15:49:18 -0600
-Subject: [PATCH 00/11] RFC: Common machine reset handling
-In-Reply-To: <20131031062708.520968323@linux.com>
-References: <20131031062708.520968323@linux.com>
-Message-ID: <5272D05E.1070207@wwwdotorg.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 31 Oct 2013 23:26:29 +0100
+Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu
+ node in DT.
+In-Reply-To: <1383247111-26834-4-git-send-email-andrew@lunn.ch>
+References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
+ <1383247111-26834-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1429743.Nz1AUEe5Hi@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 12:27 AM, Domenico Andreoli wrote:
-> Hi,
+On Thursday, October 31, 2013 08:18:31 PM Andrew Lunn wrote:
+> The dove-cpufreq driver needs access to the DDR and CPU clock.  There
+> is also an interrupt generated when the DFS hardware completes a
+> change of frequencey. Add these to the cpu node in DT.
 > 
->   I've been looking for a solution to my bcm4760 watchdog based restart
-> hook when I noticed that the kernel reboot/shutdown mechanism is having
-> a few unaddressed issues.
-> 
-> Those I identified are:
-> 
->  1) context pointer often needed by the reset hook
->     (currently local static data is used for this pourpose)
->  2) unclear ownership/policy in case of multiple reset hooks
->     (currently almost nobody seems to care much)
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-I'm not sure how this patchset solves (2); even with the new API, it's
-still the case that whichever code calls set_machine_reset() last wins,
-just like before where whichever code wrote to pm_power_off won. I'm not
-sure what this series attempts to solve.
+I need someone with DT bindings knowledge to ACK this for me.
+
+Thanks!
+
+> ---
+>  arch/arm/boot/dts/dove.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 1fd615d27532..e96d7a6a2fb8 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -19,6 +19,10 @@
+>  			device_type = "cpu";
+>  			next-level-cache = <&l2>;
+>  			reg = <0>;
+> +			clocks = <&core_clk 1>, <&core_clk 3>;
+> +			clock-names = "cpu_clk", "ddrclk";
+> +			interrupt-parent = <&pmu_intc>;
+> +			interrupts = <0>;
+>  		};
+>  	};
+>  
+> 
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
