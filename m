@@ -1,28 +1,21 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Oct 2013 00:27:51 +0000
-Subject: [PATCH v3 3/4] AArch64: KGDB: Add step debugging support
-In-Reply-To: <1382094469-7971-4-git-send-email-vijay.kilari@gmail.com>
-References: <1382094469-7971-1-git-send-email-vijay.kilari@gmail.com>
- <1382094469-7971-4-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20131031002750.GH27743@mudshark.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 30 Oct 2013 17:36:58 -0700
+Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
+In-Reply-To: <20131030232412.GA10229@fifo99.com>
+References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
+ <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
+ <20131029132043.GA28165@fifo99.com>
+ <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+ <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
+Message-ID: <CAOesGMi2E1Ynr4rWY1eBmcZeB7Vahb5VdPUVs1ebLJowH1kpWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 12:07:48PM +0100, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> 
-> Add KGDB software step debugging support for EL1 debug
-> in AArch64 mode.
-> 
-> KGDB registers step debug handler with debug monitor.
-> On receiving 'step' command from GDB tool, target enables
-> software step debugging and step address is updated.
-> If no step address is received from GDB tool, target assumes
-> next step address is current PC.
-> 
-> Software Step debugging is disabled when 'continue' command
-> is received
+On Wed, Oct 30, 2013 at 4:25 PM, Daniel Walker <dwalker@fifo99.com> wrote:
 
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
+> So the current users of those platforms are, what SOL ?
 
-Will
+What users? Show me one.
+
+
+-Olof
