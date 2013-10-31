@@ -1,29 +1,81 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 31 Oct 2013 19:06:50 +0530
-Subject: [PATCH] dmaengine: imx-dma: fix format warnings
-In-Reply-To: <E1VbgJK-0006iu-9m@rmk-PC.arm.linux.org.uk>
-References: <E1VbgJK-0006iu-9m@rmk-PC.arm.linux.org.uk>
-Message-ID: <20131031133650.GG18788@intel.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 31 Oct 2013 09:32:51 -0500
+Subject: [PATCH V2 1/7] DRIVERS: IRQCHIP: IRQ-GIC: Add support for
+ routable irqs
+In-Reply-To: <1383145040-15852-2-git-send-email-r.sricharan@ti.com>
+References: <1383145040-15852-1-git-send-email-r.sricharan@ti.com>
+ <1383145040-15852-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <7A94EADA-645A-4287-9D68-AB5163DC1782@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 12:40:30AM +0000, Russell King wrote:
-> drivers/dma/imx-dma.c:575:3: warning: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t'
-> drivers/dma/imx-dma.c:575:3: warning: format '%x' expects argument of type 'unsigned int', but argument 7 has type 'dma_addr_t'
-> drivers/dma/imx-dma.c:589:4: warning: format '%x' expects argument of type 'unsigned int', but argument 9 has type 'dma_addr_t'
-> drivers/dma/imx-dma.c:599:4: warning: format '%x' expects argument of type 'unsigned int', but argument 9 has type 'dma_addr_t'
-> drivers/dma/imx-dma.c:929:2: warning: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t'
-> drivers/dma/imx-dma.c:929:2: warning: format '%x' expects argument of type 'unsigned int', but argument 7 has type 'dma_addr_t'
-> drivers/dma/imx-dma.c:959:2: warning: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t'
-> drivers/dma/imx-dma.c:959:2: warning: format '%x' expects argument of type 'unsigned int', but argument 7 has type 'dma_addr_t'
-> 
-> We can't use the %pa format for these because this relates to phys_addr_t,
-> and dma_addr_t can be a different size.  So, fix these by converting them
-> to %llx and casting the dma_addr_t to always be unsigned long long.
-> 
-> While we're here, also use %zu for size_t.
 
-Applied, thanks
+On Oct 30, 2013, at 9:57 AM, Sricharan R wrote:
 
---
-~Vinod
+> In some socs the gic can be preceded by a crossbar IP which
+> routes the peripheral interrupts to the gic inputs. The peripheral
+> interrupts are associated with a fixed crossbar input line and the
+> crossbar routes that to one of the free gic input line.
+> 
+> The DT entries for peripherals provides the fixed crossbar input line
+> as its interrupt number and the mapping code should associate this with
+> a free gic input line. This patch adds the support inside the gic irqchip
+> to handle such routable irqs. The routable irqs are registered in a linear
+> domain. The registered routable domain's callback should be implemented
+> to get a free irq and to configure the IP to route it.
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+> [V2] Added default routable-irqs functions to avoid
+>      unnessecary if checks as per Thomas Gleixner comments
+>      and renamed routable-irq binding as per
+>      Kumar Gala <galak@codeaurora.org> comments.
+> 
+> Documentation/devicetree/bindings/arm/gic.txt |    6 ++
+> drivers/irqchip/irq-gic.c                     |   83 ++++++++++++++++++++++---
+> include/linux/irqchip/arm-gic.h               |    8 ++-
+> 3 files changed, 87 insertions(+), 10 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> index 3dfb0c0..5357745 100644
+> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -49,6 +49,11 @@ Optional
+>   regions, used when the GIC doesn't have banked registers. The offset is
+>   cpu-offset * cpu-nr.
+> 
+> +- arm,routable-irqs : Total number of gic irq inputs which are not directly
+> +		  connected from the peripherals, but are routed dynamically
+> +		  by a crossbar/multiplexer preceding the GIC. The GIC irq
+> +		  input line is assigned dynamically when the corresponding
+> +		  peripheral's crossbar line is mapped.
+> Example:
+> 
+> 	intc: interrupt-controller at fff11000 {
+> @@ -56,6 +61,7 @@ Example:
+> 		#interrupt-cells = <3>;
+> 		#address-cells = <1>;
+> 		interrupt-controller;
+> +		arm,routable-irqs = <160>;
+> 		reg = <0xfff11000 0x1000>,
+> 		      <0xfff10100 0x100>;
+> 	};
+
+DT Binding portion:
+
+Acked-by: Kumar Gala <galak@codeaurora.org>
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
