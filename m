@@ -1,49 +1,67 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 31 Oct 2013 17:10:03 +0900
-Subject: [PATCH 2/2] ARM: shmobile: Koelsch: add Ether support
-In-Reply-To: <201310310219.58963.sergei.shtylyov@cogentembedded.com>
-References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>
- <201310310219.58963.sergei.shtylyov@cogentembedded.com>
-Message-ID: <CANqRtoTNJAnqavonOwtqe5_HDdPwK1-JAixNuz5z7ttQw-T64Q@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 31 Oct 2013 19:18:54 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the devicetree tree
+Message-ID: <20131031191854.f182b66eaf9e03d78e18e27f@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi all,
 
-On Thu, Oct 31, 2013 at 8:19 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Register Ether platform device and pin data on  the  Koelsch board.
-> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> ---
->  arch/arm/mach-shmobile/board-koelsch.c |   61 ++++++++++++++++++++++++++++++++-
->  1 file changed, 60 insertions(+), 1 deletion(-)
->
-> Index: renesas/arch/arm/mach-shmobile/board-koelsch.c
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
-> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-integrator/pci_v3.c between commit 16b84e5a505c ("of/irq:
+Create of_irq_parse_and_map_pci() to consolidate arch code") from the
+devicetree tree and commit d7057e1de8d6 ("ARM: integrator: delete
+non-devicetree boot path") from the arm-soc tree.
 
-> @@ -70,11 +87,29 @@ static const struct gpio_keys_platform_d
->         .nbuttons       = ARRAY_SIZE(gpio_buttons),
->  };
->
-> +static const struct pinctrl_map koelsch_pinctrl_map[] = {
-> +       /* Ether */
-> +       PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
-> +                                 "eth_link", "eth"),
-> +       PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
-> +                                 "eth_mdio", "eth"),
-> +       PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
-> +                                 "eth_rmii", "eth"),
-> +};
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Once again we seem to be using r8a7790 when the actual SoC is r8a7791.
-If you're going to go down the route of using the SoC name then please
-use the correct one at least.
-
+-- 
 Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-/ magnus
+diff --cc arch/arm/mach-integrator/pci_v3.c
+index a87e510fe0c4,c9c5a33bc802..000000000000
+--- a/arch/arm/mach-integrator/pci_v3.c
++++ b/arch/arm/mach-integrator/pci_v3.c
+@@@ -809,21 -808,22 +808,6 @@@ static u8 __init pci_v3_swizzle(struct 
+  	return pci_common_swizzle(dev, pinp);
+  }
+  
+- static int irq_tab[4] __initdata = {
+- 	IRQ_AP_PCIINT0,	IRQ_AP_PCIINT1,	IRQ_AP_PCIINT2,	IRQ_AP_PCIINT3
+- };
+- 
+- /*
+-  * map the specified device/slot/pin to an IRQ.  This works out such
+-  * that slot 9 pin 1 is INT0, pin 2 is INT1, and slot 10 pin 1 is INT1.
+-  */
+- static int __init pci_v3_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ -static int __init pci_v3_map_irq_dt(const struct pci_dev *dev, u8 slot, u8 pin)
+--{
+- 	int intnr = ((slot - 9) + (pin - 1)) & 3;
+ -	struct of_irq oirq;
+ -	int ret;
+--
+- 	return irq_tab[intnr];
+ -	ret = of_irq_map_pci(dev, &oirq);
+ -	if (ret) {
+ -		dev_err(&dev->dev, "of_irq_map_pci() %d\n", ret);
+ -		/* Proper return code 0 == NO_IRQ */
+ -		return 0;
+ -	}
+ -
+ -	return irq_create_of_mapping(oirq.controller, oirq.specifier,
+ -				     oirq.size);
+--}
+--
+  static struct hw_pci pci_v3 __initdata = {
+  	.swizzle		= pci_v3_swizzle,
+  	.setup			= pci_v3_setup,
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131031/f9064be7/attachment.sig>
