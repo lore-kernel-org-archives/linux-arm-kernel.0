@@ -1,14 +1,14 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 31 Oct 2013 12:21:41 +0900
-Subject: [PATCH] ARM: shmobile: Include all 4 GiB of memory on Lager
-Message-ID: <20131031032141.16014.78225.sendpatchset@w520>
+Date: Thu, 31 Oct 2013 12:24:36 +0900
+Subject: [PATCH] ARM: shmobile: Include all 4 GiB of memory on Lager DT Ref
+Message-ID: <20131031032436.16031.48305.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
 Add 2GiB of DRAM at 0x1_8000_0000 to support the full 4GiB
-of Lager system memory.
+of Lager system memory in case of DT Reference.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
@@ -18,12 +18,12 @@ Signed-off-by: Magnus Damm <damm@opensource.se>
 
  Written on top of renesas-devel-v3.12-rc7-20131030
 
- arch/arm/boot/dts/r8a7790-lager.dts |    5 +++++
+ arch/arm/boot/dts/r8a7790-lager-reference.dts |    5 +++++
  1 file changed, 5 insertions(+)
 
---- 0001/arch/arm/boot/dts/r8a7790-lager.dts
-+++ work/arch/arm/boot/dts/r8a7790-lager.dts	2013-10-31 11:49:43.000000000 +0900
-@@ -24,6 +24,11 @@
+--- 0001/arch/arm/boot/dts/r8a7790-lager-reference.dts
++++ work/arch/arm/boot/dts/r8a7790-lager-reference.dts	2013-10-31 11:51:18.000000000 +0900
+@@ -25,6 +25,11 @@
  		reg = <0 0x40000000 0 0x80000000>;
  	};
  
