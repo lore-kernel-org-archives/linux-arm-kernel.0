@@ -1,29 +1,19 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Oct 2013 10:21:48 +0000
-Subject: [PATCH 00/11] RFC: Common machine reset handling
-In-Reply-To: <20131031062708.520968323@linux.com>
-References: <20131031062708.520968323@linux.com>
-Message-ID: <20131031102148.GW16735@n2100.arm.linux.org.uk>
+Date: Thu, 31 Oct 2013 10:29:09 +0000
+Subject: [PATCH RFC] ARM: dts: imx6qdl: make pinctrl nodes board specific
+In-Reply-To: <20131031080326.GK24559@pengutronix.de>
+References: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
+ <20131031080326.GK24559@pengutronix.de>
+Message-ID: <20131031102908.GX16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 07:27:08AM +0100, Domenico Andreoli wrote:
-> Hi,
+On Thu, Oct 31, 2013 at 09:03:26AM +0100, Sascha Hauer wrote:
+> So:
 > 
->   I've been looking for a solution to my bcm4760 watchdog based restart
-> hook when I noticed that the kernel reboot/shutdown mechanism is having
-> a few unaddressed issues.
-> 
-> Those I identified are:
-> 
->  1) context pointer often needed by the reset hook
->     (currently local static data is used for this pourpose)
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-I don't think that's a problem at all.
-
-> I don't see these impressive diffstats but at least it's possible to free
-> some static data along the way. Maybe there are some other desiderata that
-> could be satisfied?
-
-If that's the only benefit, then I don't think this is worth the churn,
-sorry.
+Ok, I'll wait for this to hit mainline before re-spinning the Carrier-1
+DT files.  That's going to upset those who want to see Carrier-1 support
+in mainline at the next merge window (like Olof) and out mainline support
+for this board into 2014, but I don't see any other alternative.
