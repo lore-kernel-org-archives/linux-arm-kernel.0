@@ -1,115 +1,45 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 31 Oct 2013 11:32:30 -0500
-Subject: [PATCHv9 08/43] clk: ti: add composite clock support
-In-Reply-To: <527284DC.2070701@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-9-git-send-email-t-kristo@ti.com> <527284DC.2070701@ti.com>
-Message-ID: <5272861E.3090506@ti.com>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Thu, 31 Oct 2013 09:33:40 -0700
+Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
+In-Reply-To: <CAOesGMge9JADoLtM8s0LWfy3gs4mpaD1Kofdnn=scOhF86+GcA@mail.gmail.com>
+References: <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
+ <20131029132043.GA28165@fifo99.com>
+ <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+ <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
+ <CAOesGMi2E1Ynr4rWY1eBmcZeB7Vahb5VdPUVs1ebLJowH1kpWw@mail.gmail.com>
+ <20131031024538.GA17886@fifo99.com>
+ <CAOesGMiEGJ8iMe=_-eJzhx3sRQO8VKbKGD-iLWsRztxUeJWJbQ@mail.gmail.com>
+ <20131031120727.GA28330@fifo99.com>
+ <CAOesGMge9JADoLtM8s0LWfy3gs4mpaD1Kofdnn=scOhF86+GcA@mail.gmail.com>
+Message-ID: <20131031163339.GA31282@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 11:27 AM, Nishanth Menon wrote:
-> On 10/25/2013 10:57 AM, Tero Kristo wrote:
->> This is a multipurpose clock node, which contains support for multiple
->> sub-clocks. Uses basic composite clock type to implement the actual
->> functionality, and TI specific gate, mux and divider clocks.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>  .../devicetree/bindings/clock/ti/composite.txt     |   54 +++++
->>  drivers/clk/ti/Makefile                            |    2 +-
->>  drivers/clk/ti/composite.c                         |  222 ++++++++++++++++++++
->>  include/linux/clk/ti.h                             |    8 +
->>  4 files changed, 285 insertions(+), 1 deletion(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/ti/composite.txt
->>  create mode 100644 drivers/clk/ti/composite.c
->>
->> diff --git a/Documentation/devicetree/bindings/clock/ti/composite.txt b/Documentation/devicetree/bindings/clock/ti/composite.txt
->> new file mode 100644
->> index 0000000..5f43c47
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/ti/composite.txt
->> @@ -0,0 +1,54 @@
->> +Binding for TI composite clock.
->> +
->> +Binding status: Unstable - ABI compatibility may be broken in the future
->> +
->> +This binding uses the common clock binding[1]. It assumes a
->> +register-mapped composite clock with multiple different sub-types;
->> +
->> +a multiplexer clock with multiple input clock signals or parents, one
->> +of which can be selected as output, this behaves exactly as [2]
->> +
->> +an adjustable clock rate divider, this behaves exactly as [3]
->> +
->> +a gating function which can be used to enable and disable the output
->> +clock, this behaves exactly as [4]
->> +
->> +The binding must provide a list of the component clocks that shall be
->> +merged to this clock. The component clocks shall be of one of the
->> +"ti,*composite*-clock" types.
->> +
->> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->> +[2] Documentation/devicetree/bindings/clock/ti/mux.txt
->> +[3] Documentation/devicetree/bindings/clock/ti/divider.txt
->> +[4] Documentation/devicetree/bindings/clock/ti/gate.txt
->> +
->> +Required properties:
->> +- compatible : shall be: "ti,composite-clock"
->> +- clocks : link phandles of component clocks
->> +- #clock-cells : from common clock binding; shall be set to 0.
->> +
->> +Examples:
->> +
->> +usb_l4_gate_ick: usb_l4_gate_ick {
->> +	#clock-cells = <0>;
->> +	compatible = "ti,composite-interface-clock";
->> +	clocks = <&l4_ick>;
->> +	ti,bit-shift = <5>;
->> +	reg = <0x0a10>;
->> +};
->> +
->> +usb_l4_div_ick: usb_l4_div_ick {
->> +	#clock-cells = <0>;
->> +	compatible = "ti,composite-divider-clock";
->> +	clocks = <&l4_ick>;
->> +	ti,bit-shift = <4>;
->> +	ti,max-div = <1>;
->> +	reg = <0x0a40>;
->> +	ti,index-starts-at-one;
->> +};
->> +
->> +usb_l4_ick: usb_l4_ick {
->> +	#clock-cells = <0>;
->> +	compatible = "ti,composite-clock";
->> +	clocks = <&usb_l4_gate_ick>, <&usb_l4_div_ick>;
->> +};
+On Thu, Oct 31, 2013 at 08:53:58AM -0700, Olof Johansson wrote:
+> On Thu, Oct 31, 2013 at 5:07 AM, Daniel Walker <dwalker@fifo99.com> wrote:
+> > On Wed, Oct 30, 2013 at 10:19:30PM -0700, Olof Johansson wrote:
+> >> On Wed, Oct 30, 2013 at 7:45 PM, Daniel Walker <dwalker@fifo99.com> wrote:
+> >> > On Wed, Oct 30, 2013 at 05:36:58PM -0700, Olof Johansson wrote:
+> >> >> On Wed, Oct 30, 2013 at 4:25 PM, Daniel Walker <dwalker@fifo99.com> wrote:
+> >> >>
+> >> >> > So the current users of those platforms are, what SOL ?
+> >> >>
+> >> >> What users? Show me one.
+> >> >
+> >> > What am I chop liver ?
+> >>
+> >> Ah, right. So, what platforms do you currently rely on mainline
+> >> support for? Please be precise so we can figure out what needs to be
+> >> kept and not.
+> >
+> > The only one I don't have is 7x30, as I said in prior emails.
+> 
+> That's not actually what I asked. Which ones of them do you rely on
+> mainline support for?
 
->From Topology perspective, would this be a better approach?
+I rely on mainline support for 8x50 and G1 trout. This is starting to feel
+like an interogation .. The only reason I'm tolerating this is because I
+know you'll make some attempt to accept these patches over my already
+explicit objections.
 
-usb_l4_ick: usb_l4_ick {
-	#clock-cells = <0>;
-	compatible = "ti,composite-clock";
-
-	usb_l4_gate_ick: usb_l4_gate_ick {
-		#clock-cells = <0>;
-		compatible = "ti,composite-interface-clock";
-		clocks = <&l4_ick>;
-		ti,bit-shift = <5>;
-		reg = <0x0a10>;
-	};
-
-	usb_l4_div_ick: usb_l4_div_ick {
-		#clock-cells = <0>;
-		compatible = "ti,composite-divider-clock";
-		clocks = <&l4_ick>;
-		ti,bit-shift = <4>;
-		ti,max-div = <1>;
-		reg = <0x0a40>;
-		ti,index-starts-at-one;
-	};
-};
-
--- 
-Regards,
-Nishanth Menon
+Daniel
