@@ -1,27 +1,21 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 31 Oct 2013 13:23:26 +0800
-Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
-In-Reply-To: <20131030175426.GK16735@n2100.arm.linux.org.uk>
-References: <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
- <5264A06B.2040202@mentor.com>
- <20131021045917.GH17165@S2101-09.ap.freescale.net>
- <857E9EDCA6C0904DB3357321AA9123EB62506BEA@NA-MBX-01.mgc.mentorg.com>
- <5264C615.4070504@mentor.com>
- <20131021070451.GI17165@S2101-09.ap.freescale.net>
- <526DCED3.2070704@mentor.com>
- <20131028074524.GE2839@S2101-09.ap.freescale.net>
- <5270793E.9000605@mentor.com>
- <20131030175426.GK16735@n2100.arm.linux.org.uk>
-Message-ID: <20131031052324.GA14308@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 31 Oct 2013 14:23:24 +0900
+Subject: [PATCH v2 2/2] clocksource: sh_mtu2: Add clk_prepare/unprepare
+ support
+In-Reply-To: <1383057045-22608-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383057045-22608-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383057045-22608-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131031052324.GL1603@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 05:54:26PM +0000, Russell King - ARM Linux wrote:
-> The test you really want to do is a reboot via serial console: <break> b.
-> That's definitely the one which will get you if your restart handler has
-> anything in it which sleeps.  This will definitely call the restart
-> handler from IRQ context.
+On Tue, Oct 29, 2013 at 03:30:45PM +0100, Laurent Pinchart wrote:
+> Prepare the clock at probe time, as there is no other appropriate place
+> in the driver where we're allowed to sleep.
+> 
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Yea, I tested it.
-
-Shawn
+Thanks, I have queued this up.
