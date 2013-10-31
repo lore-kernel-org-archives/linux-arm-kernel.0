@@ -1,34 +1,75 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 31 Oct 2013 14:31:44 +0900
-Subject: [PATCH 0/3] ARM: shmobile: Lager reference serial port support
-In-Reply-To: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131031053144.GP1603@verge.net.au>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 31 Oct 2013 13:30:36 +0800
+Subject: [PATCH v5] PWM: atmel-pwm: add PWM controller driver
+In-Reply-To: <526E797A.9010509@atmel.com>
+References: <1380532240-18650-1-git-send-email-voice.shen@atmel.com>
+ <20131008131727.GB12839@ulmo.nvidia.com> <52664FB6.4000004@atmel.com>
+ <526E797A.9010509@atmel.com>
+Message-ID: <5271EAFC.3040608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 04:23:10PM +0100, Laurent Pinchart wrote:
-> Hello,
-> 
-> This patch set implements serial port support for the Lager reference board,
-> and adds early debugging support for the r8a7790 SoC.
-> 
-> The code is available in my git tree at
-> 
->         git://linuxtv.org/pinchartl/fbdev.git clocks/ccf/serial-lager
-> 
-> The branch is based on a merge of renesas-devel-20131016, v3.12-rc7 and
-> multiarch drivers, clk-prepare, r8a7790 CCF and sh-sci OF patches I've posted
-> earlier today.
-> 
-> Laurent Pinchart (3):
->   ARM: shmobile: r8a7790: Add early debugging support
+Hi Nicolas,
 
-The patch above could be applied now, right?
-If so, Magnus, could you review it?
+On 10/28/2013 10:49 PM, Nicolas Ferre wrote:
+> On 22/10/2013 12:13, Bo Shen :
+>> Hi All,
+>>
+>> On 10/8/2013 21:17, Thierry Reding wrote:
+>>> On Mon, Sep 30, 2013 at 05:10:40PM +0800, Bo Shen wrote:
+>>>> Add Atmel PWM controller driver based on PWM framework.
+>>>>
+>>>> This is the basic function implementation of Atmel PWM controller.
+>>>> It can work with PWM based led and backlight.
+>>>>
+>>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>>>>
+>>>> ---
+>>>> Changes in v5:
+>>>>     - call clk_disable directly, if so, it won't cause more than one
+>>>> channel
+>>>>       enabled, the clock can not be disabled.
+>>>>
+>>>> Changes in v4:
+>>>>     - check the return value of clk_prepare()
+>>>>     - change channel register size as constant
+>>>>
+>>>> Changes in v3:
+>>>>     - change compatible string from "atmel,sama5-pwm" to
+>>>> "atmel,sama5d3-pwm"
+>>>>     - Add PWM led example in binding documentation
+>>>>     - Using micro replace hard code
+>>>>
+>>>> Changes in v2:
+>>>>     - Address the comments from Thierry Reding
+>>>>
+>>>>    .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 +++
+>>>>    drivers/pwm/Kconfig                                |    9 +
+>>>>    drivers/pwm/Makefile                               |    1 +
+>>>>    drivers/pwm/pwm-atmel.c                            |  344
+>>>> ++++++++++++++++++++
+>>>>    4 files changed, 395 insertions(+)
+>>>>    create mode 100644
+>>>> Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+>>>>    create mode 100644 drivers/pwm/pwm-atmel.c
+>>>
+>>> I haven't seen an Acked-by from the device tree bindings maintainers on
+>>> this. I've Cc'ed them, so hopefully one of them has time to review.
+>>
+>> Any comments?
+>
+> As a recommendation from the recent Kernel Summit stated, you will have
+> to separate the binding itself from the driver and associated code.
+> Simply send the binding documentation to the DT maintainers but still
+> keep the two patches linked together in a series (but without putting DT
+> maintainers nor the DT mailing-list in CC of the non-documentation
+> patches).
+>
+> This way you may have more chances to get feedback.
 
->   ARM: shmobile: r8a7790: Add serial ports to the device tree
->   ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports in DT
+Thanks, I will split the binding document as a separate patch.
 
-I would like to ask you to repost these patches once their
-pre-requisites have been merged.
+> Thanks, bye,
+
+Best Regards,
+Bo Shen
