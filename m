@@ -1,236 +1,104 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 31 Oct 2013 11:13:50 +0100
-Subject: [PATCH] watchdog: at91sam9_wdt: various fixes
-In-Reply-To: <20131029212738.GA16739@roeck-us.net>
-References: <20131029075028.GF19704@spo001.leaseweb.com>
- <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
- <20131029154519.GB9266@roeck-us.net> <526FE0DA.1020308@overkiz.com>
- <20131029164323.GF9266@roeck-us.net> <526FEEE7.7030708@overkiz.com>
- <20131029212738.GA16739@roeck-us.net>
-Message-ID: <20131031101350.GB28304@ns203013.ovh.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 31 Oct 2013 11:20:46 +0100 (CET)
+Subject: [PATCH] ARM: pcm037: convert custom GPIO-based power function to a
+ regulator
+Message-ID: <Pine.LNX.4.64.1310311118370.30523@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:27 Tue 29 Oct     , Guenter Roeck wrote:
-> On Tue, Oct 29, 2013 at 06:22:47PM +0100, boris brezillon wrote:
-> > On 29/10/2013 17:43, Guenter Roeck wrote:
-> > >On Tue, Oct 29, 2013 at 05:22:50PM +0100, boris brezillon wrote:
-> > >>On 29/10/2013 16:45, Guenter Roeck wrote:
-> > >>>On Tue, Oct 29, 2013 at 11:37:33AM +0100, Boris BREZILLON wrote:
-> > >>>>Fix the secs_to_ticks macro in case 0 is passed as an argument.
-> > >>>>
-> > >>>>Rework the heartbeat calculation to increase the security margin of the
-> > >>>>watchdog reset timer.
-> > >>>>
-> > >>>>Use the min_heartbeat value instead of the calculated heartbeat value for
-> > >>>>the first watchdog reset.
-> > >>>>
-> > >>>>Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> > >>>Hi Boris,
-> > >>>
-> > >>>can you possibly split the three changes into separate patches ?
-> > >>Sure. My first idea was to split this in 3 patches, but, as the
-> > >>buggy at91 watchdog series was
-> > >>already applied to linux-watchdog-next, I thought it would be faster
-> > >>to only provide one
-> > >>patch to fix all the issues at once.
-> > >>
-> > >>>The first is a no-brainer. Gives my opinion of my code review capabilities
-> > >>>a slight damper ;-).
-> > >>>
-> > >>>For the other two problems, it might make sense to describe
-> > >>>the problems you are trying to solve.
-> > >>>
-> > >>>Couple of comments inline.
-> > >>>
-> > >>>Thanks,
-> > >>>Guenter
-> > >>>
-> > >>>
-> > >>>>---
-> > >>>>  drivers/watchdog/at91sam9_wdt.c |   35 ++++++++++++++++++++++++-----------
-> > >>>>  1 file changed, 24 insertions(+), 11 deletions(-)
-> > >>>>
-> > >>>>diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> > >>>>index 9bd089e..f1b59f1 100644
-> > >>>>--- a/drivers/watchdog/at91sam9_wdt.c
-> > >>>>+++ b/drivers/watchdog/at91sam9_wdt.c
-> > >>>>@@ -51,7 +51,7 @@
-> > >>>>  #define ticks_to_hz_rounddown(t)	((((t) + 1) * HZ) >> 8)
-> > >>>>  #define ticks_to_hz_roundup(t)		(((((t) + 1) * HZ) + 255) >> 8)
-> > >>>>  #define ticks_to_secs(t)		(((t) + 1) >> 8)
-> > >>>>-#define secs_to_ticks(s)		(((s) << 8) - 1)
-> > >>>>+#define secs_to_ticks(s)		(s ? (((s) << 8) - 1) : 0)
-> > >>>	(s)
-> > >>>
-> > >>>>  #define WDT_MR_RESET	0x3FFF2FFF
-> > >>>>@@ -61,6 +61,11 @@
-> > >>>>  /* Watchdog max delta/value in secs */
-> > >>>>  #define WDT_COUNTER_MAX_SECS	ticks_to_secs(WDT_COUNTER_MAX_TICKS)
-> > >>>>+/* Watchdog heartbeat shift used for security margin:
-> > >>>>+ * we'll try to rshift the heartbeat value with this value to secure
-> > >>>>+ * the watchdog reset. */
-> > >>>>+#define WDT_HEARTBEAT_SHIFT	2
-> > >>>>+
-> > >>>>  /* Hardware timeout in seconds */
-> > >>>>  #define WDT_HW_TIMEOUT 2
-> > >>>>@@ -158,7 +163,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
-> > >>>>  	int err;
-> > >>>>  	u32 mask = wdt->mr_mask;
-> > >>>>  	unsigned long min_heartbeat = 1;
-> > >>>>+	unsigned long max_heartbeat;
-> > >>>>  	struct device *dev = &pdev->dev;
-> > >>>>+	int shift;
-> > >>>>  	tmp = wdt_read(wdt, AT91_WDT_MR);
-> > >>>>  	if ((tmp & mask) != (wdt->mr & mask)) {
-> > >>>>@@ -181,23 +188,27 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
-> > >>>>  	if (delta < value)
-> > >>>>  		min_heartbeat = ticks_to_hz_roundup(value - delta);
-> > >>>>-	wdt->heartbeat = ticks_to_hz_rounddown(value);
-> > >>>>-	if (!wdt->heartbeat) {
-> > >>>>+	max_heartbeat = ticks_to_hz_rounddown(value);
-> > >>>>+	if (!max_heartbeat) {
-> > >>>>  		dev_err(dev,
-> > >>>>  			"heartbeat is too small for the system to handle it correctly\n");
-> > >>>>  		return -EINVAL;
-> > >>>>  	}
-> > >>>>-	if (wdt->heartbeat < min_heartbeat + 4) {
-> > >>>>+	for (shift = WDT_HEARTBEAT_SHIFT; shift > 0; shift--) {
-> > >>>>+		if ((max_heartbeat >> shift) < min_heartbeat)
-> > >>>>+			continue;
-> > >>>>+
-> > >>>>+		wdt->heartbeat = max_heartbeat >> shift;
-> > >>>>+		break;
-> > >>>>+	}
-> > >>>>+
-> > >>>>+	if (!shift)
-> > >>>>  		wdt->heartbeat = min_heartbeat;
-> > >>>Correct me if I am wrong, but it seems to me that
-> > >>>
-> > >>>	if ((max_heartbeat >> 2) >= min_heartbeat)
-> > >>>		 wdt->heartbeat = max_heartbeat >> 2;
-> > >>>	else if ((max_heartbeat >> 1) >= min_heartbeat)
-> > >>>		wdt->heartbeat = max_heartbeat >> 1;
-> > >>>	else
-> > >>>		wdt->heartbeat = min_heartbeat;
-> > >>>
-> > >>>would accomplish the same and be easier to understand.
-> > >>This is exactly what I'm trying to accomplish.
-> > >>I used the for loop in case we ever want to change the
-> > >>WDT_HEARTBEAT_SHIFT value
-> > >>(which is unlikely to happen).
-> > >>
-> > >>I'll move to your proposition.
-> > >>
-> > >>>However, given that, I wonder if it is really necessary to bail out above if
-> > >>>max_heartbeat is 0. After all, you set heartbeat to min_heartbeat anyway
-> > >>>in this case.
-> > >>Yes it is necessary. The max_heartbeat is a configuration that
-> > >>cannot be changed once configured.
-> > >>We have to inform the user that his max_heartbeat value is too small
-> > >>to be handled correctly by the Linux kernel.
-> > >>
-> > >>If we simply use the min_heartbeat value as heartbeat and ignore the
-> > >>wrong max_heartbeat value,
-> > >>the watchdog will reset the SoC before we can ever reset the
-> > >>watchdog counter.
-> > >>
-> > >>>>+
-> > >>>>+	if (max_heartbeat < min_heartbeat + 4)
-> > >>>>  		dev_warn(dev,
-> > >>>>  			 "min heartbeat and max heartbeat might be too close for the system to handle it correctly\n");
-> > >>>>-		if (wdt->heartbeat < 4)
-> > >>>>-			dev_warn(dev,
-> > >>>>-				 "heartbeat might be too small for the system to handle it correctly\n");
-> > >>>>-	} else {
-> > >>>>-		wdt->heartbeat -= 4;
-> > >>>>-	}
-> > >>>>  	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
-> > >>>>  		err = request_irq(wdt->irq, wdt_interrupt,
-> > >>>>@@ -213,7 +224,9 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
-> > >>>>  			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
-> > >>>>  	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
-> > >>>>-	mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
-> > >>>>+	/* Use min_heartbeat the first time because the watchdog timer might
-> > >>>>+	 * be running for a long time when we reach this init function. */
-> > >>>	/*
-> > >>>	 * Multi-line comment style
-> > >>>	 *
-> > >>>	 * Not really sure I understand what this accomplishes. What problem
-> > >>>	 * are you trying to solve here ?
-> > >>>	 */
-> > >>Sure, I'll change the comment style.
-> > >>
-> > >>What, I'm trying to explain, is that the watchdog might (or should)
-> > >>have been resetted
-> > >>before loading the linux kernel. But loading the kernel takes some
-> > >>time (uncompressing,
-> > >>low level init, ...), and if we take the heartbeat (or max_heartbeat
-> > >>/ 4 in the common case) value as
-> > >>the next trigger to reset the watchdog counter, the watchdog timer
-> > >>might have already expired.
-> > >>
-> > >But increasing anything in the watchdog driver itself won't help you there.
-> > >You can not execute any kernel code before that kernel code is running.
-> > 
-> > Of course, but you can at least try to minimize the time between the
-> > watchdog driver init
-> > and the first wathdog counter reset.
-> > 
-> Sure.
-> 
-> > >>Here is an example:
-> > >>  - max_heartbeat configured to 8 seconds
-> > >>  - min_heartbeat configured to 1 second
-> > >>  => heartbeat = 2s
-> > >>  - kernel boot time (before at91 watchdog is loaded) = 6 secs
-> > >>
-> > >Guess that is where I got lost. Do you mean the time from loading the driver
-> > >to starting the watchdog application ? Because the init function is only
-> > >executed after the driver is loaded, so nothing will help you if it takes
-> > >too long for the driver to load.
-> > 
-> > I think there is another bug here: the driver should not be compiled
-> > as a module.
-> > 
-> > Here is why:
-> > 
-> > At POR the at91 SoC configure its watchdog with these default values:
-> >  - enabled
-> >  - min heartbeat = 0 ticks
-> >  - max heartbeat = 0xfff ticks <=> 16 secs
-> >  - some reset options
-> > After a POR the watchdog can only be reconfigured once (and only once).
-> > This configuration oftenly takes place in the the bootstrap (or bootloader),
-> > but can eventually be done by the Linux kernel.
-> > 
-> > If the watchdog is kept enabled by the bootstrap (or bootloader), this means
-> > the linux kernel will have to reset the watchdog counter as soon as
-> > possible to avoid
-> > a possible watchdog reset.
-> > 
-> > => If we authorize the at91 sam9 watchdog to be compiled as a
-> > module, we're not sure
-> > the module will be loaded soon enough to be able to reset the
-> > watchdog counter.
-> > 
-> Agreed, but that is only an issue _if_ the watchdog is enabled from ROMMON,
-> which we don't know. This makes it a configuration issue: If the watchdog 
-> is enabled by ROMMON, the driver should not be built as module. On the other
-> side, unless it is known for sure (say, from the HW architecture) that it
-> is always enabled, we should not force everyone to build it into the kernel.
-> 
-> Other drivers deal with that condition by only resetting and re-initializing
-> the watchdog if it is already running. This driver is a bit of an exception,
-> as it always enables the watchdog during initialization. Which is actually
-> another reason to be able to build it as module: If the watchdog was not
-> enabled by ROMMON, this ensures that it only starts running when the module
-> is loaded.
+Add a fixed-voltage GPIO-enabled regulator to switch the camera on and off
+instead of using a .power() platform callback.
 
-this make no sense on at91 as the watchdog is always ON and can be disable
-only once
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
 
-so always enable as builtin is the right way to do
+Only tested to grab the regulator during probing, couldn't test 
+functionality due to the lack of an mt9t031 sensor.
 
-Best Regards
-J.
+ arch/arm/mach-imx/mach-pcm037.c |   50 ++++++++++++++++++++++++++++-----------
+ 1 files changed, 36 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
+index 639a3df..6c19eb1 100644
+--- a/arch/arm/mach-imx/mach-pcm037.c
++++ b/arch/arm/mach-imx/mach-pcm037.c
+@@ -288,12 +288,39 @@ static struct at24_platform_data board_eeprom = {
+ 	.flags = AT24_FLAG_ADDR16,
+ };
+ 
+-static int pcm037_camera_power(struct device *dev, int on)
+-{
+-	/* disable or enable the camera in X7 or X8 PCM970 connector */
+-	gpio_set_value(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), !on);
+-	return 0;
+-}
++/* Fixed 3.3V regulator to be used by cameras */
++static struct regulator_consumer_supply vcc_cam_consumers[] = {
++	REGULATOR_SUPPLY("vcc", "soc-camera-pdrv.0"),
++};
++
++static struct regulator_init_data vcc_cam_init_data = {
++	.constraints = {
++		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies  = ARRAY_SIZE(vcc_cam_consumers),
++	.consumer_supplies      = vcc_cam_consumers,
++};
++
++static struct fixed_voltage_config vcc_cam_info = {
++	.supply_name = "Camera Vcc",
++	.microvolts = 2800000,
++	.gpio = IOMUX_TO_GPIO(MX31_PIN_CSI_D5),
++	.init_data = &vcc_cam_init_data,
++};
++
++static struct platform_device vcc_cam = {
++	.name = "reg-fixed-voltage",
++	.id   = 1,
++	.dev  = {
++		.platform_data = &vcc_cam_info,
++	},
++};
++
++static struct regulator_bulk_data cam_supply[] = {
++	{
++		.supply = "vcc",
++	},
++};
+ 
+ static struct i2c_board_info pcm037_i2c_camera[] = {
+ 	{
+@@ -311,7 +338,8 @@ static struct soc_camera_link iclink_mt9v022 = {
+ 
+ static struct soc_camera_link iclink_mt9t031 = {
+ 	.bus_id		= 0,		/* Must match with the camera ID */
+-	.power		= pcm037_camera_power,
++	.num_regulators	= ARRAY_SIZE(cam_supply),
++	.regulators	= cam_supply,
+ 	.board_info	= &pcm037_i2c_camera[0],
+ 	.i2c_adapter_id	= 2,
+ };
+@@ -436,6 +464,7 @@ err:
+ static struct platform_device *devices[] __initdata = {
+ 	&pcm037_flash,
+ 	&pcm037_sram_device,
++	&vcc_cam,
+ 	&pcm037_mt9t031,
+ 	&pcm037_mt9v022,
+ };
+@@ -647,13 +676,6 @@ static void __init pcm037_init(void)
+ 	imx31_add_mx3_sdc_fb(&mx3fb_pdata);
+ 
+ 	/* CSI */
+-	/* Camera power: default - off */
+-	ret = gpio_request(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), "mt9t031-power");
+-	if (!ret)
+-		gpio_direction_output(IOMUX_TO_GPIO(MX31_PIN_CSI_D5), 1);
+-	else
+-		iclink_mt9t031.power = NULL;
+-
+ 	pcm037_init_camera();
+ 
+ 	pcm970_sja1000_resources[1].start =
+-- 
+1.7.2.5
