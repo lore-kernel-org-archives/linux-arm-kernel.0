@@ -1,56 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Oct 2013 16:17:39 +0000
-Subject: [PATCH 1/6] arm: zynq: platsmp: Fix CPU presence check
-In-Reply-To: <1383235819-2552-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
- <1383235819-2552-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20131031161739.GE16735@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 31 Oct 2013 09:16:03 -0700
+Subject: [PATCH 3/4] mfd: sec-core: Add cells for S5M8767-clocks
+In-Reply-To: <1383202124-1775-4-git-send-email-tushar.behera@linaro.org>
+References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
+ <1383202124-1775-4-git-send-email-tushar.behera@linaro.org>
+Message-ID: <20131031161603.GB9587@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 09:10:14AM -0700, Soren Brinkmann wrote:
-> From: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
-> 
-> Fix an off-by-one error in the logic that checks if a CPU is present.
-> The ncores variable is a count of cores while the cpu variable is a
-> 0 based index. So if ncores == cpu, cpu is out of range. Fix this
-> comparison so non-existent CPUs are not probed.
-> 
-> Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+On Thu, 31 Oct 2013, Tushar Behera wrote:
 
-There's another two bugs here.
-
+> S5M8767 chip has 3 crystal oscillators running at 32KHz. These are
+> supported by s2mps11-clk driver.
+> 
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> CC: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/mach-zynq/platsmp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/mfd/sec-core.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-> index 689fbbc3d9c8..2512624e657d 100644
-> --- a/arch/arm/mach-zynq/platsmp.c
-> +++ b/arch/arm/mach-zynq/platsmp.c
-> @@ -39,7 +39,7 @@ int zynq_cpun_start(u32 address, int cpu)
->  	u32 trampoline_code_size = &zynq_secondary_trampoline_end -
->  						&zynq_secondary_trampoline;
+> diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
+> index 34c18fb..020b86b 100644
+> --- a/drivers/mfd/sec-core.c
+> +++ b/drivers/mfd/sec-core.c
+> @@ -56,7 +56,9 @@ static struct mfd_cell s5m8767_devs[] = {
+>  		.name = "s5m8767-pmic",
+>  	}, {
+>  		.name = "s5m-rtc",
+> -	},
+> +	}, {
+> +		.name = "s5m8767-clk",
+> +	}
+>  };
 >  
-> -	if (cpu > ncores) {
-> +	if (cpu >= ncores) {
->  		pr_warn("CPU No. is not available in the system\n");
+>  static struct mfd_cell s2mps11_devs[] = {
 
-Much better: pr_warn("CPU%d is not available\n", cpu);
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-However, if you have set the cpu possible/present masks correctly,
-you will never hit this because the generic code already checks that
-the CPU being requested is legal.  So actually I'd suggest getting
-rid of this entire if() statement and block.
+I'd prefer to take this patch in via the MFD tree once you have
+support from the other maintainers for the set.
 
->  		return -1;
-
-The second issue is one of laziness.  -1 as a return code for something
-that gets propagated back to userspace.  Do we really mean to return to
-userspace -EPERM because of this or other failures in this function?
-All those idiotic and lazy (and that's exactly what they are - idiotic
-and lazy) "return -1" statements need to be fixed.
-
-Shame on the arm-soc maintainers for not having an automatic filter for
-this kind of sloppy programming.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
