@@ -1,147 +1,53 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 31 Oct 2013 14:02:16 +0900
-Subject: [PATCH 2/2] ARM: shmobile: Koelsch: add Ether support
-In-Reply-To: <201310310219.58963.sergei.shtylyov@cogentembedded.com>
-References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>
- <201310310219.58963.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20131031050215.GH1603@verge.net.au>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 31 Oct 2013 13:02:47 +0800
+Subject: [PATCH 1/1] mmc: core: fix build warning
+In-Reply-To: <38271231-f570-40ca-99d0-aedd312657d1@email.android.com>
+References: <1383142380-25091-1-git-send-email-b29396@freescale.com>
+ <38271231-f570-40ca-99d0-aedd312657d1@email.android.com>
+Message-ID: <20131031050246.GA18050@b29396-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 02:19:58AM +0300, Sergei Shtylyov wrote:
-> Register Ether platform device and pin data on  the  Koelsch board. 
-> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
+On Wed, Oct 30, 2013 at 07:55:32AM -0700, Ulf Hansson wrote:
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-Thanks, I have been able to use this to successfully boot a Koelsch board
-using nfsroot.  However, I believe there is a minor build problem which I
-have commented on below.
-
-> ---
->  arch/arm/mach-shmobile/board-koelsch.c |   61 ++++++++++++++++++++++++++++++++-
->  1 file changed, 60 insertions(+), 1 deletion(-)
 > 
-> Index: renesas/arch/arm/mach-shmobile/board-koelsch.c
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
-> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
-> @@ -24,14 +24,31 @@
->  #include <linux/input.h>
->  #include <linux/kernel.h>
->  #include <linux/leds.h>
-> +#include <linux/phy.h>
-> +#include <linux/pinctrl/machine.h>
->  #include <linux/platform_data/gpio-rcar.h>
->  #include <linux/platform_device.h>
-> +#include <linux/sh_eth.h>
->  #include <mach/common.h>
-> +#include <mach/irqs.h>
->  #include <mach/r8a7791.h>
->  #include <mach/rcar-gen2.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
->  
-> +/* Ether */
-> +static const struct sh_eth_plat_data ether_pdata __initconst = {
-> +	.phy			= 0x1,
-> +	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
-> +	.phy_interface		= PHY_INTERFACE_MODE_RMII,
-> +	.ether_link_active_low	= 1,
-> +};
-> +
-> +static const struct resource ether_resources[] __initconst = {
-> +	DEFINE_RES_MEM(0xee700000, 0x400),
-> +	DEFINE_RES_IRQ(gic_spi(162)),
-> +};
-> +
->  /* LEDS */
->  static struct gpio_led koelsch_leds[] = {
->  	{
-> @@ -70,11 +87,29 @@ static const struct gpio_keys_platform_d
->  	.nbuttons	= ARRAY_SIZE(gpio_buttons),
->  };
->  
-> +static const struct pinctrl_map koelsch_pinctrl_map[] = {
-> +	/* Ether */
-> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
-> +				  "eth_link", "eth"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
-> +				  "eth_mdio", "eth"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("r8a7790-ether", "pfc-r8a7791",
-> +				  "eth_rmii", "eth"),
-> +};
-> +
->  static void __init koelsch_add_standard_devices(void)
->  {
->  	r8a7791_clock_init();
-> +
-> +	pinctrl_register_mappings(koelsch_pinctrl_map,
-> +				  ARRAY_SIZE(koelsch_pinctrl_map));
->  	r8a7791_pinmux_init();
-> +
->  	r8a7791_add_standard_devices();
-> +	platform_device_register_resndata(&platform_bus, "r8a7790-ether", -1,
-> +					  ether_resources,
-> +					  ARRAY_SIZE(ether_resources),
-> +					  &ether_pdata, sizeof(ether_pdata));
->  	platform_device_register_data(&platform_bus, "leds-gpio", -1,
->  				      &koelsch_leds_pdata,
->  				      sizeof(koelsch_leds_pdata));
-> @@ -83,6 +118,30 @@ static void __init koelsch_add_standard_
->  				      sizeof(koelsch_keys_pdata));
->  }
->  
-> +/*
-> + * Ether LEDs on the Koelsch board are named LINK and ACTIVE which corresponds
-> + * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
-> + * 14-15. We have to set them back to 01 from the default 00 value each time
-> + * the PHY is reset. It's also important because the PHY's LED0 signal is
-> + * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
-> + * bounce on and off after each packet, which we apparently want to avoid.
-> + */
-> +static int koelsch_ksz8041_fixup(struct phy_device *phydev)
-> +{
-> +	u16 phyctrl1 = phy_read(phydev, 0x1e);
-> +
-> +	phyctrl1 &= ~0xc000;
-> +	phyctrl1 |= 0x4000;
-> +	return phy_write(phydev, 0x1e, phyctrl1);
-> +}
-> +
-> +static void __init koelsch_init(void)
-> +{
-> +	koelsch_add_standard_devices();
-> +
-> +	phy_register_fixup_for_id("r8a7790-ether-ff:01", koelsch_ksz8041_fixup);
+> Dong Aisheng <b29396@freescale.com> skrev:
+> >drivers/mmc/core/mmc_ops.c: In function '__mmc_switch':
+> >drivers/mmc/core/mmc_ops.c:484:11: warning: 'status' may be used
+> >uninitialized in this function [-Wuninitialized]
+> >
+> >Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> 
+> Hi Dong,
+> 
+> I have already sent a patch for this, it was more or less me causing it.:-)
+> 
+> Kind regards
+> Ulf Hansson
 
-It seems to me that this code requires CONFIG_PHYLIB in order to compile.
-So I propose the following enhancement to this patch which replaces
-the line immediately above.
+Hi Ulf,
 
-	if (IS_ENABLED(CONFIG_PHYLIB))
-		phy_register_fixup_for_id("r8a7790-ether-ff:01",
-					  koelsch_ksz8041_fixup);
+Got it, thanks for the information. :-)
 
-I believe a similar enhancement is also needed for board-lager.c
-which I just realised does not compile if CONFIG_PHYLIB is not set.
-
-> +}
-> +
->  static const char * const koelsch_boards_compat_dt[] __initconst = {
->  	"renesas,koelsch",
->  	NULL,
-> @@ -91,7 +150,7 @@ static const char * const koelsch_boards
->  DT_MACHINE_START(KOELSCH_DT, "koelsch")
->  	.smp		= smp_ops(r8a7791_smp_ops),
->  	.init_early	= r8a7791_init_early,
-> -	.init_machine	= koelsch_add_standard_devices,
-> +	.init_machine	= koelsch_init,
->  	.init_time	= rcar_gen2_timer_init,
->  	.dt_compat	= koelsch_boards_compat_dt,
->  MACHINE_END
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards
+Dong Aisheng
+> >---
+> > drivers/mmc/core/mmc_ops.c |    2 +-
+> > 1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> >diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> >index aae8d8b..651260c 100644
+> >--- a/drivers/mmc/core/mmc_ops.c
+> >+++ b/drivers/mmc/core/mmc_ops.c
+> >@@ -414,7 +414,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8
+> >index, u8 value,
+> > 	int err;
+> > 	struct mmc_command cmd = {0};
+> > 	unsigned long timeout;
+> >-	u32 status;
+> >+	u32 uninitialized_var(status);
+> > 	bool ignore_crc = false;
+> > 
+> > 	BUG_ON(!card);
+> 
 > 
