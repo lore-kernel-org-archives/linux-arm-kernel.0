@@ -1,34 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 31 Oct 2013 10:41:23 -0600
-Subject: [PATCH] clk: tegra: use pll_ref as the pll_e parent
-In-Reply-To: <20131031154142.GX22111@tbergstrom-lnx.Nvidia.com>
-References: <1383093707-10312-1-git-send-email-pdeschrijver@nvidia.com>
- <527128B5.2020101@wwwdotorg.org>
- <20131030221833.GQ22111@tbergstrom-lnx.Nvidia.com>
- <52718D1B.6030106@wwwdotorg.org>
- <20131031154142.GX22111@tbergstrom-lnx.Nvidia.com>
-Message-ID: <52728833.2030709@wwwdotorg.org>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Thu, 31 Oct 2013 16:42:41 +0000
+Subject: [PATCH 1/6] arm: zynq: platsmp: Fix CPU presence check
+In-Reply-To: <1383235819-2552-2-git-send-email-soren.brinkmann@xilinx.com>
+References: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1383235819-2552-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <52728881.7000902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 09:41 AM, Peter De Schrijver wrote:
-> On Wed, Oct 30, 2013 at 11:50:03PM +0100, Stephen Warren wrote:
->> On 10/30/2013 04:18 PM, Peter De Schrijver wrote:
->>> On Wed, Oct 30, 2013 at 04:41:41PM +0100, Stephen Warren wrote:
->>>> On 10/29/2013 06:41 PM, Peter De Schrijver wrote:
->>>>> Use pll_ref instead of pll_re_vco as the pll_e parent on Tegra114 and
->>>>> Tegra124. Also add a pll_ref table entry for pll_e for Tegra114.
->>>>
->>>> Why? What benefit does this give, or what bug does this fix?
->>>
->>> Otherrwise Tegra114 will crash on boot.
->>
->> Sigh. For what reason?
-> 
-> pll_re_vco having an unsupported rate of 300Mhz. My guess is that it depends
-> on the bootloader if you will see this. I'm fairly sure I verified this on
-> my dalmore in helsinki and it worked, but it failed on Paul's test setup.
+Hi Soren,
 
-OK, so this is primarily a SW issue, because pll_e's freq_table simply
-doesn't have an entry for input frequency 300MHz. Can you make sure the
-commit description explains that?
+On 31/10/13 16:10, Soren Brinkmann wrote:
+> From: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+> 
+> Fix an off-by-one error in the logic that checks if a CPU is present.
+> The ncores variable is a count of cores while the cpu variable is a
+> 0 based index. So if ncores == cpu, cpu is out of range. Fix this
+> comparison so non-existent CPUs are not probed.
+>
+
+Not entirely related to this patch, I had found that zynq_smp_prepare_cpus is
+setting cpu_present_mask which is redundant(CMIIW present == possible). I had
+posted a patch[1] to remove that, consider including that in the series if you
+think it make sense.
+
+Regards,
+Sudeep
+
+[1] http://www.spinics.net/lists/arm-kernel/msg260734.html
+
+> Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>  arch/arm/mach-zynq/platsmp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+> index 689fbbc3d9c8..2512624e657d 100644
+> --- a/arch/arm/mach-zynq/platsmp.c
+> +++ b/arch/arm/mach-zynq/platsmp.c
+> @@ -39,7 +39,7 @@ int zynq_cpun_start(u32 address, int cpu)
+>  	u32 trampoline_code_size = &zynq_secondary_trampoline_end -
+>  						&zynq_secondary_trampoline;
+>  
+> -	if (cpu > ncores) {
+> +	if (cpu >= ncores) {
+>  		pr_warn("CPU No. is not available in the system\n");
+>  		return -1;
+>  	}
+> 
