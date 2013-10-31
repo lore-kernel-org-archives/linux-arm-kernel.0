@@ -1,40 +1,38 @@
-From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
-Date: Thu, 31 Oct 2013 18:25:22 -0400
-Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
-In-Reply-To: <1383164468-4610-1-git-send-email-zonque@gmail.com>
-References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
-Message-ID: <CANacCWz_ahKaACbAHuue1XwaN3gutBA7Z6W+=zWBn8LvLwDM5w@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 31 Oct 2013 15:27:45 -0700
+Subject: [PATCH] lib/scatterlist.c: don't flush_kernel_dcache_page on
+ slab page
+In-Reply-To: <1382977205-26268-1-git-send-email-ming.lei@canonical.com>
+References: <1382977205-26268-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <20131031152745.821d2b5dbe93e2ca69d45264@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Tue, 29 Oct 2013 00:20:05 +0800 Ming Lei <ming.lei@canonical.com> wrote:
 
-On Wed, Oct 30, 2013 at 4:21 PM, Daniel Mack <zonque@gmail.com> wrote:
-[...]
-> +
-> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
-> +
->  static struct platform_driver edma_driver = {
->         .driver = {
->                 .name   = "edma",
-> +               .pm     = &edma_pm_ops,
->                 .of_match_table = edma_of_ids,
->         },
+> Commit b1adaf65ba03([SCSI] block: add sg buffer copy helper functions)
+> introduces two sg buffer copy helpers, and calls flush_kernel_dcache_page()
+> on pages in SG list after these pages are written to.
+> 
+> Unfortunately, the commit may introduce a potential bug:
+> 
+> 	- Before sending some SCSI commands, kmalloc() buffer may be
+> 	passed to block layper, so flush_kernel_dcache_page() can
+> 	see a slab page finally
+> 
+> 	- According to cachetlb.txt, flush_kernel_dcache_page() is
+> 	only called on "a user page", which surely can't be a slab page.
+> 
+> 	- ARCH's implementation of flush_kernel_dcache_page() may
+> 	use page mapping information to do optimization so page_mapping()
+> 	will see the slab page, then VM_BUG_ON() is triggered.
+> 
+> Aaro Koskinen reported the bug on ARM/kirkwood when DEBUG_VM is enabled,
+> and this patch fixes the bug by adding test of '!PageSlab(miter->page)'
+> before calling flush_kernel_dcache_page().
 
-A while back we discovered a nasty race condition here that had us move the EDMA
-PM callbacks to the noirq phase. IIRC the MMC driver was resuming
-before the EDMA
-driver had a chance to run and that was leading to a deadlock. I am
-not sure how to force
-this scenario but i do remember spending time debugging this on a
-random codebase.
-Maybe some else has some better ideas on how to force this race condition...
+We should work out which kernel(s) need this patch.  b1adaf65ba03 was
+merged in 2008, so presumably some more recent patch has exposed the
+problem, but I don't know what one that was.
 
-I think logically it makes sense to have the DMA controllers in any
-system resume before
-any of the client drivers. Maybe a set of syscore_ops similar to the
-timekeeping stuff needs
-to be added (in the dmaengine framework?) to get this right.
-
-Regards,
-Vaibhav
+Help me out here?
