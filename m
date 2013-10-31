@@ -1,24 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Oct 2013 00:54:13 +0000
-Subject: [BUG] build error: undefined reference to `v7_cpu_resume'
-Message-ID: <20131031005413.GU16735@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Oct 2013 00:59:02 +0000
+Subject: [GIT PULL] iommu/arm-smmu: updates for 3.13
+In-Reply-To: <20131009170238.GH8378@mudshark.cambridge.arm.com>
+References: <20131009170238.GH8378@mudshark.cambridge.arm.com>
+Message-ID: <20131031005902.GD28613@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Last night, my autobuilder failed on one randconfig with this:
+On Wed, Oct 09, 2013 at 06:02:38PM +0100, Will Deacon wrote:
+> Hi Joerg,
+> 
+> Please pull these ARM SMMU updates for 3.13. The bulk of the changes are
+> from Andreas, who has been having fun running the driver on real hardware. I
+> expect some additional patches from him in the future to add support for
+> things like device isolation once we've ironed out the wrinkles in the
+> current proposals.
+> 
+> I've successfully tested this lot in my modelled environments without any
+> observed regressions.
 
-arch/arm/mach-imx/built-in.o: In function `imx6q_pm_enter':
-platform-spi_imx.c:(.text+0x2648): undefined reference to `v7_cpu_resume'
-make[1]: *** [vmlinux] Error 1
-make[1]: Target `uImage' not remade because of errors.
-make: *** [sub-make] Error 2
-make: Target `uImage' not remade because of errors.
+Could you pull this please, Joerg? It would be good to have this in next
+before the merge window...
 
-This is caused by CONFIG_SMP=n, CONFIG_PM=y, CONFIG_SOC_IMX6SL=y and
-CONFIG_SOC_IMX6Q=n.  This results in pm-imx6q.c being built, which
-references v7_cpu_resume, but that is only defined in headsmp.o.
-
-Full config is available for the next 6 days via:
- http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=6442
-
-Please fix. :)
+Will
