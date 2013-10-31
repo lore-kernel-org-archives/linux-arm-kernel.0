@@ -1,20 +1,63 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 1 Nov 2013 05:22:21 +0530
-Subject: [PATCH v3 3/4] mvebu: Dove: Enable cpufreq driver in defconfig
-In-Reply-To: <1383247111-26834-3-git-send-email-andrew@lunn.ch>
-References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
- <1383247111-26834-3-git-send-email-andrew@lunn.ch>
-Message-ID: <CAKohpomOpfg3+OVooum9jVK2H12bu1Nz=zPMFWF02sCh6MdUhQ@mail.gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Fri, 01 Nov 2013 00:57:26 +0100
+Subject: [PATCH] clk: fix boot panic with non-dev-associated clocks
+In-Reply-To: <CAPtuhTgmgionMHoG0g5ntnODAwnubWBnjuuxH3RBP236Jh_jBg@mail.gmail.com>
+References: <1383238174-14650-1-git-send-email-olof@lixom.net>
+ <CAOMZO5C4+K+RfHOpex7EwLObPV4Uy8YmjdVx2HPv36ZGAKeSZA@mail.gmail.com>
+ <CAOesGMgU6qJMpXi5DGe7=XbObiWh8icNFRhZv_9ot+KZMNcTnw@mail.gmail.com>
+ <CAOMZO5BsMuN3bZuK+06X6ukAEmRyZDpvoKXdhatNiG61x_GZsA@mail.gmail.com>
+ <CAOesGMj2hVOc_NV6UfJpx7399puasY_zgpHDmPj0pd1VC_Ou6A@mail.gmail.com>
+ <CAPtuhTgmgionMHoG0g5ntnODAwnubWBnjuuxH3RBP236Jh_jBg@mail.gmail.com>
+Message-ID: <5272EE66.4060701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 November 2013 00:48, Andrew Lunn <andrew@lunn.ch> wrote:
-> Add cpufreq to dove_defconfig, so it is built by default.
+On 10/31/2013 08:00 PM, Mike Turquette wrote:
+> On Thu, Oct 31, 2013 at 11:54 AM, Olof Johansson<olof@lixom.net>  wrote:
+>> On Thu, Oct 31, 2013 at 11:47 AM, Fabio Estevam<festevam@gmail.com>  wrote:
+>>> On Thu, Oct 31, 2013 at 3:07 PM, Olof Johansson<olof@lixom.net>  wrote:
+>>>> On Thu, Oct 31, 2013 at 10:05 AM, Fabio Estevam<festevam@gmail.com>  wrote:
+>>>>> Hi Olof,
+>>>>>
+>>>>> On Thu, Oct 31, 2013 at 2:49 PM, Olof Johansson<olof@lixom.net>  wrote:
+>>>>>> Fixes a panic at boot on many platforms. For example, on imx (wandboard),
+>>>>>> I get:
+>>>>>
+>>>>> With this patch applied console messages appears on 20131031, but it
+>>>>> seems we still have other issues:
+>>>>
+>>>>
+>>>> Yeah, there's lots of badness in last night's -next. :(
+>>>
+>>> If I apply this change:
+>>>
+>>> --- a/drivers/clk/clkdev.c
+>>> +++ b/drivers/clk/clkdev.c
+>>> @@ -44,7 +44,7 @@ struct clk *of_clk_get(struct device_node *np, int index)
+>>>          of_clk_lock();
+>>>          clk = __of_clk_get_from_provider(&clkspec);
+>>>
+>>> -       if (!IS_ERR(clk)&&  !__clk_get(clk))
+>>> +       if (IS_ERR(clk)&&  !__clk_get(clk))
+>>>                  clk = ERR_PTR(-ENOENT);
+>>
+>> That doesn't look right, it'll call __clk_get() with an error code as the clock.
+>>
+>> Mike, seems like reverting back the clock tree to a known good state
+>> (same as yesterday) and re-target 3.14 for the latest changes is a
+>> suitable course of action at this time in the release cycle.
 >
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
->  arch/arm/configs/dove_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
+> I think removal of the MSM series and clock deregistration stuff is
+> prudent. The Tegra pull request (with updated fixes) and EFM32 driver
+> should be OK.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+I agree, I thought the clock deregistration patches is something better
+had exposure for couple weeks in -next. It's a bit late now for those
+changes unfortunately.
+
+> I'll cull out the questionable bits and force update.
+
+Thanks.
+
+Regards,
+Sylwester
