@@ -1,29 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 31 Oct 2013 13:59:37 +0800
-Subject: [PATCHv2 0/7] ARM: imx: add IMX50 SoC support
-In-Reply-To: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
-References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
-Message-ID: <20131031055935.GB23549@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 31 Oct 2013 15:03:05 +0900
+Subject: [PATCH v3] iommu: shmobile: Enable the driver on all ARM platforms
+In-Reply-To: <20131030162854.GB2493@sirena.org.uk>
+References: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131030112625.GZ16735@n2100.arm.linux.org.uk>
+ <1652955.Gs3XDiEUHO@avalon> <20131030162854.GB2493@sirena.org.uk>
+Message-ID: <20131031060305.GU1603@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 03:15:50PM +1000, gerg at uclinux.org wrote:
-> From: Greg Ungerer <gerg@uclinux.org>
+On Wed, Oct 30, 2013 at 09:28:54AM -0700, Mark Brown wrote:
+> On Wed, Oct 30, 2013 at 12:40:12PM +0100, Laurent Pinchart wrote:
 > 
-> This set of patches is the code and device tree support for the Freescale
-> IMX50 SoC. This part is similar to the IMX53 SoC family, and I have resued
-> as much of its support as possible. These patches are against Shawn Guo's
-> linux-2.6.git for-next branch.
+> > > For similar reasons as x86, can we please think about using:
 > 
-> This loads and runs on the Freescale IMX50-EVK board.
+> > > 	depends on ARM
+> > > 	depends on ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI || COMPILE_TEST
 > 
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> ---
-> v2: made the pinctrl changes a separate patch stream
->     fixups for applying to Shawn's for-next branch
->     initial values for some pad control settings
+> > I'm fine with your proposed option. As I don't want to respin the series 
+> > dozens of time let's first agree on the course of action, I will then repost 
+> > the patches. Mark, you've pushed towards as few platform dependencies as 
+> > possible, what's your opinion on this ?
+> 
+> In general I think we should have whatever the real depedencies are or
+> COMPILE_TEST (to the extent that they will actually build cleanly on
+> other targets).  That way only people who explicitly go looking to
+> compile test things for build coverage (eg, when doing global cleanups
+> or API updates) need to be bothered by the extra compile test options.
+> 
+> I'd read the above as saying the code needs ARM to build at all and that
+> the hardware will only ever appear on SHMOBILE.
 
-Thanks for the respin.  I just applied the series except patch #3, where
-I still have some small comment.
-
-Shawn
+I am curious to know the value of "depends ARM".
+Is it to aid the reading that you spelt out?
