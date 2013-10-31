@@ -1,41 +1,65 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 31 Oct 2013 16:47:51 -0200
-Subject: [PATCH] clk: fix boot panic with non-dev-associated clocks
-In-Reply-To: <CAOesGMgU6qJMpXi5DGe7=XbObiWh8icNFRhZv_9ot+KZMNcTnw@mail.gmail.com>
-References: <1383238174-14650-1-git-send-email-olof@lixom.net>
- <CAOMZO5C4+K+RfHOpex7EwLObPV4Uy8YmjdVx2HPv36ZGAKeSZA@mail.gmail.com>
- <CAOesGMgU6qJMpXi5DGe7=XbObiWh8icNFRhZv_9ot+KZMNcTnw@mail.gmail.com>
-Message-ID: <CAOMZO5BsMuN3bZuK+06X6ukAEmRyZDpvoKXdhatNiG61x_GZsA@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 31 Oct 2013 11:51:34 -0700
+Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
+In-Reply-To: <20131031173506.GA31722@fifo99.com> (Daniel Walker's message of
+ "Thu, 31 Oct 2013 10:35:06 -0700")
+References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
+ <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
+ <20131029132043.GA28165@fifo99.com>
+ <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+ <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
+ <8738nhnz4s.fsf@linaro.org> <20131031173506.GA31722@fifo99.com>
+Message-ID: <87eh71mfyh.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 3:07 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Oct 31, 2013 at 10:05 AM, Fabio Estevam <festevam@gmail.com> wrote:
->> Hi Olof,
->>
->> On Thu, Oct 31, 2013 at 2:49 PM, Olof Johansson <olof@lixom.net> wrote:
->>> Fixes a panic at boot on many platforms. For example, on imx (wandboard),
->>> I get:
->>
->> With this patch applied console messages appears on 20131031, but it
->> seems we still have other issues:
+Daniel Walker <dwalker@fifo99.com> writes:
+
+> On Thu, Oct 31, 2013 at 10:12:03AM -0700, Kevin Hilman wrote:
+>> Daniel Walker <dwalker@fifo99.com> writes:
+>> 
+>> 
+>> No.  The idea behind splitting them is to allow current platforms with
+>> active maintainers to progress without being held back.  The older
+>> platforms can stay and have an opportunity to modernize. 
+>> 
+>> The kernel is a moving target, without some minimal effort to keep
+>> platforms up to date, the effort to continue to maintain/modernize them
+>> can become more of a pain than it's worth.  If maintainers of these older
+>> platforms are willing to put in the work, nobody will be SOL.  If
+>> nobody shows interest in modernizing these older platforms (which seems
+>> to be the case based on the last couple years), then it is reasonable
+>> IMO for them to fade away slowly.
 >
 >
-> Yeah, there's lots of badness in last night's -next. :(
+> According to a prior email Tony suggested that OMAP was split for purely
+> technical reasons.. If code is shared in some way , or has synergies, and there's no
+> technical reason to split a sub-architecture, then to me there's no win in splitting
+> things.. 
 
-If I apply this change:
+The wins have already been well described in this thread in terms of
+maintenance of newer platforms using modern kernel infrastructure.
 
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -44,7 +44,7 @@ struct clk *of_clk_get(struct device_node *np, int index)
-        of_clk_lock();
-        clk = __of_clk_get_from_provider(&clkspec);
+> It's just more directories, more confusion etc.. The confusion
+> would come from someone wanting to find the code related to a platform,
+> but woops there's a bunch of directories, or code flow and how the
+> sub-architecture is strung together .. Personally I found OMAP very
+> confusing in that regard.
+>
+> ARM and the sub-architectures is already confusing I don't think we need
+> to start compounding the problem by allowing random whatever-you-want
+> sub-directories from every sub-architecture.
 
--       if (!IS_ERR(clk) && !__clk_get(clk))
-+       if (IS_ERR(clk) && !__clk_get(clk))
-                clk = ERR_PTR(-ENOENT);
+Randomness is quite a bit of an exaggeration of what's been proposed
+here.
 
-        of_clk_unlock();
+These decisions are made on a case-by-case basis and is this case is
+being done for ease of maintainence for newer platforms, which may not
+be a "technical reason" for you, but is important for overall
+maintenance of arm-soc.
 
-Then I am able to boot until the prompt. (Still get the warning
-_clk_get warning though).
+If we do this split, you are more than welcome to demonstrate the
+commonality by modernizing mach-msm, combining it with mach-qcom,
+removing mach-msm, and then removing all the "confusion."
+
+Kevin
