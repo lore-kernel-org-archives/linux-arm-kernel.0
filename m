@@ -1,63 +1,47 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 31 Oct 2013 11:18:03 +0200
-Subject: [PATCHv9 05/43] CLK: TI: add DT alias clock registration mechanism
-In-Reply-To: <CAHCPf3vcdriV3n2BvG2+saJFH6hR_gEFU=BhTBa0yqZUUWcg1A@mail.gmail.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>	<1382716658-6964-6-git-send-email-t-kristo@ti.com>	<CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>	<5270C368.9000701@ti.com>
- <CAHCPf3vcdriV3n2BvG2+saJFH6hR_gEFU=BhTBa0yqZUUWcg1A@mail.gmail.com>
-Message-ID: <5272204B.2030106@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 31 Oct 2013 10:21:23 +0100
+Subject: [PATCH 1/2] ARM: kirkwood: add support for OpenBlocks A7 platform
+In-Reply-To: <52722037.8050808@free-electrons.com>
+References: <1383152110-19577-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1383152110-19577-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20131030195724.GI26784@titan.lakedaemon.net>
+ <20131031093735.68aa7df1@skate>
+ <52722037.8050808@free-electrons.com>
+Message-ID: <20131031102123.5eff2255@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2013 07:38 PM, Matt Sealey wrote:
-> On Wed, Oct 30, 2013 at 3:29 AM, Tero Kristo <t-kristo@ti.com> wrote:
->> On 10/29/2013 07:50 PM, Matt Sealey wrote:
->>>
->>> I have one question here, what makes this part of the patch
->>> TI-specific at all except the definition of the structure ti_dt_clk?
->>> Mapping DT clocks to generic clkdev legacy namings seems like it would
->>> be a necessary evil across *all* SoC platforms.
->>>
->>> I would say there is a good case for this being generic
->>
->> An earlier implementation of this patch (or at least a patch that tries to
->> accomplish the same as this does, add support for legacy devices) did try to
->> add generic solution. There was some discussion on it and I decided to drop
->> it due to bad feedback.
->>
->> See: http://www.spinics.net/lists/linux-omap/msg95147.html
->
-> I don't see anything that says this should not be generic, just that
-> it was implemented relatively poorly at the time...
->
-> I agree with Tomasz, find_by_name in device trees is basically evil
-> (it's only supposed to be used if you already know the name because
-> something else passed it to you, and just want it's phandle, but names
-> CAN be ambiguous. The real fix is always pass phandles and not strings
-> of the name property), but that's not to say this thing needs to be
-> TI-specific..
->
-> Ah well. If it ends up getting used elsewhere, it can be quickly
-> patched into a generic version anyway, so.. yay!
+Dear Gregory CLEMENT,
 
-Yeah, this can be converted to generic version easily if need be. The 
-thing with this patch is also that it is kind of temporary solution, it 
-should not be needed anymore once all the drivers are converted to DT.
+On Thu, 31 Oct 2013 10:17:43 +0100, Gregory CLEMENT wrote:
 
->
-> I'm really interested in this all going in - but I would love to see
-> where this is just all patched into a tree already. Pulling things out
-> against a bunch of trees gave me more merge failures and weird
-> happenings than I care to deal with. Is there a TI clock development
-> tree with all this in somewhere publically accessible? I'd like to get
-> a feel for how the DT looks and what's going on, I can't "see" it from
-> the patches. Once it's there.. I'll spend a week or 5 doing all of the
-> i.MX chips and you'll have a second test case for any problems :)
+> > Strange. 'make dtbs' was working here. What was wrong exactly? Just
+> > that the unit address (@90000) didn't match the starting address
+> > 0x1c0000 ?
+> 
+> The unit address has no special meaning for the device tree it's just a
+> way to give a unique name to a node right?
 
-Did you try the fully integrated test tree I mentioned in the cover letter?
+Yes, that's also my understanding.
 
-tree: https://github.com/t-kristo/linux-pm.git
-branch: 3.12-rc6-dt-clks-v9
+> So in this case it is not really a problem, but it's just nicer for the
+> coherency of the information in the dt to have the unit address which match
+> the starting address.
 
-This has everything in it, and compiles cleanly.
+Indeed, it's much better if they match (shame on me for the silly
+copy/paste), but having then *not* matching should not cause any DTC
+error, I believe.
 
--Tero
+> I also do a make dtbs ans I didn't get any errors:
+> $ make dtbs
+>  [...]
+>   DTC     arch/arm/boot/dts/kirkwood-openblocks_a6.dtb
+>   DTC     arch/arm/boot/dts/kirkwood-openblocks_a7.dtb
+
+Same here.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
