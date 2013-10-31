@@ -1,160 +1,39 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 31 Oct 2013 17:33:00 -0600
-Subject: [PATCH v3 2/2] PCI: mvebu - Support a bridge with no IO port window
-In-Reply-To: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
-References: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
-Message-ID: <1383262380-6984-2-git-send-email-jgunthorpe@obsidianresearch.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 31 Oct 2013 18:44:59 -0500
+Subject: [RFC] ARM: OMAP: DRA7xx: Make L4SEC clock domain SWSUP only
+Message-ID: <1383263099-3315-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make pcie-io-aperture and the IO port MBUS ID in ranges optional.
-If not provided the bridge reports to Linux that IO space mapping is
-not supported and refuses to configure an IO mbus window.
+Using HWSUP for l4sec clock domain is causing warnings in HWMOD code for DRA7.
+Based on some observations, once the clock domain goes into an IDLE state
+(because of no activity etc), the IDLEST for the module goes to '0x2' value
+which means Interface IDLE condition. So far so go, however once the MODULEMODE
+is set to disabled for the particular IP, the IDLEST for the module should go
+to '0x3', per the HW AUTO IDLE protocol. However this is not observed and there
+is no reason per the protocl for the transition to not happen. This could
+potentially be a bug in the HW AUTO state-machine.
 
-This allows both complete disable (do not specify pcie-io-aperture) and
-per-port disable (do not specify a IO target ranges entry for the port)
+Work around for this is to use SWSUP only for the particular clockdomain. With
+this all the transitions of IDLEST happen correctly and warnings don't occur.
 
-Most PCIE devices these days do not require IO support to function,
-so having an option to disable it in the driver is useful.
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+--
+ arch/arm/mach-omap2/clockdomains7xx_data.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- drivers/pci/host/pci-mvebu.c | 63 ++++++++++++++++++++++++++++++--------------
- 1 file changed, 43 insertions(+), 20 deletions(-)
-
-v3 changes:
- - Remove the bogus <= changes when checking the IO limit register
- - Rebase ontop of 'PCI: mvebu - The bridge should obey the MEM and IO command bits'
-   which is a necessary dependency.
-
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 721fca9..b36b91b 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -132,6 +132,11 @@ struct mvebu_pcie_port {
- 	size_t iowin_size;
+diff --git a/arch/arm/mach-omap2/clockdomains7xx_data.c b/arch/arm/mach-omap2/clockdomains7xx_data.c
+index 57d5df0..13bda1b1 100644
+--- a/arch/arm/mach-omap2/clockdomains7xx_data.c
++++ b/arch/arm/mach-omap2/clockdomains7xx_data.c
+@@ -409,7 +409,7 @@ static struct clockdomain l4sec_7xx_clkdm = {
+ 	.dep_bit	  = DRA7XX_L4SEC_STATDEP_SHIFT,
+ 	.wkdep_srcs	  = l4sec_wkup_sleep_deps,
+ 	.sleepdep_srcs	  = l4sec_wkup_sleep_deps,
+-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
++	.flags		  = CLKDM_CAN_SWSUP,
  };
  
-+static inline bool mvebu_has_ioport(struct mvebu_pcie_port *port)
-+{
-+	return port->io_target != -1 && port->io_attr != -1;
-+}
-+
- static bool mvebu_pcie_link_up(struct mvebu_pcie_port *port)
- {
- 	return !(readl(port->base + PCIE_STAT_OFF) & PCIE_STAT_LINK_DOWN);
-@@ -293,6 +298,12 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
- 		return;
- 	}
- 
-+	if (!mvebu_has_ioport(port)) {
-+		dev_WARN(&port->pcie->pdev->dev,
-+			 "Attempt to set IO when IO is disabled\n");
-+		return;
-+	}
-+
- 	/*
- 	 * We read the PCI-to-PCI bridge emulated registers, and
- 	 * calculate the base address and size of the address decoding
-@@ -407,9 +418,12 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
- 		break;
- 
- 	case PCI_IO_BASE:
--		*value = (bridge->secondary_status << 16 |
--			  bridge->iolimit          <<  8 |
--			  bridge->iobase);
-+		if (!mvebu_has_ioport(port))
-+			*value = bridge->secondary_status << 16;
-+		else
-+			*value = (bridge->secondary_status << 16 |
-+				  bridge->iolimit          <<  8 |
-+				  bridge->iobase);
- 		break;
- 
- 	case PCI_MEMORY_BASE:
-@@ -469,6 +483,9 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
- 	{
- 		u32 old = bridge->command;
- 
-+		if (!mvebu_has_ioport(port))
-+			value &= ~PCI_COMMAND_IO;
-+
- 		bridge->command = value & 0xffff;
- 		if ((old ^ bridge->command) & PCI_COMMAND_IO)
- 			mvebu_pcie_handle_iobase_change(port);
-@@ -639,7 +656,9 @@ static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	struct mvebu_pcie *pcie = sys_to_pcie(sys);
- 	int i;
- 
--	pci_add_resource_offset(&sys->resources, &pcie->realio, sys->io_offset);
-+	if (resource_size(&pcie->realio) != 0)
-+		pci_add_resource_offset(&sys->resources, &pcie->realio,
-+					sys->io_offset);
- 	pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
- 	pci_add_resource(&sys->resources, &pcie->busn);
- 
-@@ -748,12 +767,17 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
- #define DT_CPUADDR_TO_ATTR(cpuaddr)   (((cpuaddr) >> 48) & 0xFF)
- 
- static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
--			      unsigned long type, int *tgt, int *attr)
-+			      unsigned long type,
-+			      unsigned int *tgt,
-+			      unsigned int *attr)
- {
- 	const int na = 3, ns = 2;
- 	const __be32 *range;
- 	int rlen, nranges, rangesz, pna, i;
- 
-+	*tgt = -1;
-+	*attr = -1;
-+
- 	range = of_get_property(np, "ranges", &rlen);
- 	if (!range)
- 		return -EINVAL;
-@@ -807,16 +831,15 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 	}
- 
- 	mvebu_mbus_get_pcie_io_aperture(&pcie->io);
--	if (resource_size(&pcie->io) == 0) {
--		dev_err(&pdev->dev, "invalid I/O aperture size\n");
--		return -EINVAL;
--	}
- 
--	pcie->realio.flags = pcie->io.flags;
--	pcie->realio.start = PCIBIOS_MIN_IO;
--	pcie->realio.end = min_t(resource_size_t,
--				  IO_SPACE_LIMIT,
--				  resource_size(&pcie->io));
-+	if (resource_size(&pcie->io) != 0) {
-+		pcie->realio.flags = pcie->io.flags;
-+		pcie->realio.start = PCIBIOS_MIN_IO;
-+		pcie->realio.end = min_t(resource_size_t,
-+					 IO_SPACE_LIMIT,
-+					 resource_size(&pcie->io));
-+	} else
-+		pcie->realio = pcie->io;
- 
- 	/* Get the bus range */
- 	ret = of_pci_parse_bus_range(np, &pcie->busn);
-@@ -873,12 +896,12 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 			continue;
- 		}
- 
--		ret = mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
--					 &port->io_target, &port->io_attr);
--		if (ret < 0) {
--			dev_err(&pdev->dev, "PCIe%d.%d: cannot get tgt/attr for io window\n",
--				port->port, port->lane);
--			continue;
-+		if (resource_size(&pcie->io) != 0)
-+			mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
-+					   &port->io_target, &port->io_attr);
-+		else {
-+			port->io_target = -1;
-+			port->io_attr = -1;
- 		}
- 
- 		port->base = mvebu_pcie_map_registers(pdev, child, port);
+ static struct clockdomain l3main1_7xx_clkdm = {
 -- 
 1.8.1.2
