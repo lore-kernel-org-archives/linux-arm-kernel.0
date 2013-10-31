@@ -1,47 +1,53 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Thu, 31 Oct 2013 18:36:59 +0800
-Subject: [PATCH -next] clk: keystone: fix return value check in
- _of_pll_clk_init()
-Message-ID: <CAPgLHd_PCo3SC+CVH6agnRfQf1+E85Lyec7YiBFZ7j9wNPvUHg@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 31 Oct 2013 11:47:40 +0100
+Subject: [PATCH 12/12] fbdev: shmobile-lcdcfb: Convert to
+ clk_prepare/unprepare
+In-Reply-To: <1383000569-8916-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20131031104740.GA18477@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 23:49 Mon 28 Oct     , Laurent Pinchart wrote:
+> Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
+> clk_disable_unprepare() to get ready for the migration to the common
+> clock framework.
+> 
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-clk_register_pll() returns ERR_PTR() when memory alloc fail and NULL
-in the other case, the user of this function should used IS_ERR_OR_NULL()
-to check the return value. this patch change clk_register_pll() to return
-only ERR_PTR(), and also fixed the user.
-
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/clk/keystone/pll.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/clk/keystone/pll.c b/drivers/clk/keystone/pll.c
-index 47a1bd9..78a6e0e 100644
---- a/drivers/clk/keystone/pll.c
-+++ b/drivers/clk/keystone/pll.c
-@@ -127,12 +127,9 @@ static struct clk *clk_register_pll(struct device *dev,
- 
- 	clk = clk_register(NULL, &pll->hw);
- 	if (IS_ERR(clk))
--		goto out;
-+		kfree(pll);
- 
- 	return clk;
--out:
--	kfree(pll);
--	return NULL;
- }
- 
- /**
-@@ -182,7 +179,7 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
- 	}
- 
- 	clk = clk_register_pll(NULL, node->name, parent_name, pll_data);
--	if (clk) {
-+	if (!IS_ERR(clk)) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
- 		return;
- 	}
+Best Regards,
+J.
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  drivers/video/sh_mobile_lcdcfb.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/video/sh_mobile_lcdcfb.c b/drivers/video/sh_mobile_lcdcfb.c
+> index 0264704..eaeae0f 100644
+> --- a/drivers/video/sh_mobile_lcdcfb.c
+> +++ b/drivers/video/sh_mobile_lcdcfb.c
+> @@ -344,7 +344,7 @@ static void sh_mobile_lcdc_clk_on(struct sh_mobile_lcdc_priv *priv)
+>  {
+>  	if (atomic_inc_and_test(&priv->hw_usecnt)) {
+>  		if (priv->dot_clk)
+> -			clk_enable(priv->dot_clk);
+> +			clk_prepare_enable(priv->dot_clk);
+>  		pm_runtime_get_sync(priv->dev);
+>  		if (priv->meram_dev && priv->meram_dev->pdev)
+>  			pm_runtime_get_sync(&priv->meram_dev->pdev->dev);
+> @@ -358,7 +358,7 @@ static void sh_mobile_lcdc_clk_off(struct sh_mobile_lcdc_priv *priv)
+>  			pm_runtime_put_sync(&priv->meram_dev->pdev->dev);
+>  		pm_runtime_put(priv->dev);
+>  		if (priv->dot_clk)
+> -			clk_disable(priv->dot_clk);
+> +			clk_disable_unprepare(priv->dot_clk);
+>  	}
+>  }
+>  
+> -- 
+> 1.8.1.5
+> 
