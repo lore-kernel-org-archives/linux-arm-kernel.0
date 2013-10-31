@@ -1,44 +1,77 @@
 From: b42378@freescale.com (Nicolin Chen)
-Date: Thu, 31 Oct 2013 14:32:02 +0800
-Subject: [PATCH v2 0/4] Add dual-fifo mode support of i.MX ssi
-Message-ID: <cover.1383197521.git.b42378@freescale.com>
+Date: Thu, 31 Oct 2013 14:32:05 +0800
+Subject: [PATCH v2 3/4] ASoC: fsl_ssi: Add dual fifo mode support
+In-Reply-To: <cover.1383197521.git.b42378@freescale.com>
+References: <cover.1383197521.git.b42378@freescale.com>
+Message-ID: <0e947536358af7bd6e179559006a3526801a1abe.1383197521.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog
-v2:
- * Instead of adding rogue scripts to current SDMA driver based on firmware
- * V1, we define the new SDMA firmware as version 2 and bisect the PATCH-1
- * to two patches: The first is to add version check code to the SDMA driver;
- * And the second is to add SSI dual FIFO DMATYPE.
- *
- * Nothing changes for the last two patches.
-v1:
- * SSI can reduce hardware overrun/underrun possibility when using dual
- * fifo mode. To support this mode, we need to first update sdma sciprt
- * list, and then enable dual fifo BIT in SSI driver, and last update DT
- * bindings of i.MX series.
- *
- * ! This series of patches has a direct dependency between them. When
- * ! applying them, we need to apply in one single branch. Otherwise,
- * ! it would break currect branches.
+By enabling dual fifo mode, it would allow SSI enter a better performance
+to transimit/receive data without occasional hardware underrun/overrun.
 
-Nicolin Chen (4):
-  dma: imx-sdma: Add sdma firmware version 2 support
-  dma: imx-sdma: Add new dma type for ssi dual fifo script
-  ASoC: fsl_ssi: Add dual fifo mode support
-  ARM: dts: imx: use dual-fifo sdma script for ssi
+[ Passed compile-test with mpc85xx_defconfig ]
 
- .../devicetree/bindings/dma/fsl-imx-sdma.txt       |  1 +
- arch/arm/boot/dts/imx51.dtsi                       |  4 ++--
- arch/arm/boot/dts/imx53.dtsi                       |  4 ++--
- arch/arm/boot/dts/imx6qdl.dtsi                     | 12 +++++------
- arch/arm/boot/dts/imx6sl.dtsi                      | 12 +++++------
- drivers/dma/imx-sdma.c                             | 19 ++++++++++++++++-
- include/linux/platform_data/dma-imx-sdma.h         |  3 +++
- include/linux/platform_data/dma-imx.h              |  1 +
- sound/soc/fsl/fsl_ssi.c                            | 24 +++++++++++++++++++++-
- 9 files changed, 62 insertions(+), 18 deletions(-)
+Signed-off-by: Nicolin Chen <b42378@freescale.com>
+---
+ sound/soc/fsl/fsl_ssi.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 35e2773..0dfb7d6 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -143,6 +143,7 @@ struct fsl_ssi_private {
+ 	bool ssi_on_imx;
+ 	bool imx_ac97;
+ 	bool use_dma;
++	bool use_dual_fifo;
+ 	struct clk *clk;
+ 	struct snd_dmaengine_dai_dma_data dma_params_tx;
+ 	struct snd_dmaengine_dai_dma_data dma_params_rx;
+@@ -413,6 +414,16 @@ static int fsl_ssi_setup(struct fsl_ssi_private *ssi_private)
+ 		write_ssi(CCSR_SSI_SOR_WAIT(3), &ssi->sor);
+ 	}
+ 
++	if (ssi_private->use_dual_fifo) {
++		write_ssi_mask(&ssi->srcr, 0, CCSR_SSI_SRCR_RFEN1);
++		write_ssi_mask(&ssi->stcr, 0, CCSR_SSI_STCR_TFEN1);
++		write_ssi_mask(&ssi->scr, 0, CCSR_SSI_SCR_TCH_EN);
++	} else {
++		write_ssi_mask(&ssi->srcr, CCSR_SSI_SRCR_RFEN1, 0);
++		write_ssi_mask(&ssi->stcr, CCSR_SSI_STCR_TFEN1, 0);
++		write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_TCH_EN, 0);
++	}
++
+ 	return 0;
+ }
+ 
+@@ -947,7 +958,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		ssi_private->fifo_depth = 8;
+ 
+ 	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx21-ssi")) {
+-		u32 dma_events[2];
++		u32 dma_events[2], dmas[4];
+ 		ssi_private->ssi_on_imx = true;
+ 
+ 		ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
+@@ -1001,6 +1012,17 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 			dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+ 		imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
+ 			dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
++		if (!of_property_read_u32_array(pdev->dev.of_node, "dmas", dmas, 4)
++				&& dmas[2] == IMX_DMATYPE_SSI_DUAL) {
++			ssi_private->use_dual_fifo = true;
++			/* When using dual fifo mode, we need to keep watermark
++			 * as even numbers due to dma script limitation.
++			 */
++			ssi_private->dma_params_tx.maxburst /= 2;
++			ssi_private->dma_params_tx.maxburst *= 2;
++			ssi_private->dma_params_rx.maxburst /= 2;
++			ssi_private->dma_params_rx.maxburst *= 2;
++		}
+ 	} else if (ssi_private->use_dma) {
+ 		/* The 'name' should not have any slashes in it. */
+ 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
 -- 
 1.8.4
