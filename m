@@ -1,51 +1,39 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 31 Oct 2013 06:30:37 +0100
-Subject: [PATCH 2/2] misc: atmel_pwm: set initcall level to subsys
-In-Reply-To: <5271B012.4060200@atmel.com>
-References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
- <20131029232249.GA20476@kroah.com>
- <20131030110705.GA29813@localhost>
- <201310302146.18248.arnd@arndb.de> <5271B012.4060200@atmel.com>
-Message-ID: <20131031053037.GA30542@ns203013.ovh.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 31 Oct 2013 13:30:04 +0800
+Subject: [PATCH] ARM: imx: improve mxc_restart() on the SRC bit writes
+Message-ID: <1383197404-17968-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:19 Thu 31 Oct     , Bo Shen wrote:
-> Hi Arnd,
-> 
-> On 10/31/2013 04:46, Arnd Bergmann wrote:
-> >On Wednesday 30 October 2013, Johan Hovold wrote:
-> >>>I really hate this type of patch, as it's papering over the real
-> >>>problem.  What happens when someone else moves their driver to this
-> >>>level?  Then you are back to the original problem.
-> >>
-> >>Yes, it's crude, but it's currently the only way to express a preferred
-> >>probe order.
-> >
-> >Does the same problem occur with the generic PWM subsystem?
-> >
-> >The atmel_pwm driver apparently is the last PWM driver that has
-> >not been converted to the generic subsystem yet. Doing that would
-> >also let us drop the atmel-pwm-bl driver in favor of the generic
-> >backlight.
-> 
-> The atmel pwm driver is on the way to generic subsystem. more
-> information at:
-> --->8---
-> PWM: atmel-pwm: add PWM controller driver:
->    https://patchwork.kernel.org/patch/2963081/
+The current comment in the code does not make it clear why the double writes
+on SRC bit is needed.  Let's quote the errata to get it clear.  Also, to
+ensure there are at least 2 writes happen in the same one 32kHz period,
+we actually need 3 writes.  Let's add the third one.
 
-so the fix can be drop in favor of the conversion
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/system.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Best Regards,
-J.
-> ---<8---
-> 
-> Best Regards,
-> Bo Shen
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index 826b72b..5e3027d 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -52,7 +52,14 @@ void mxc_restart(enum reboot_mode mode, const char *cmd)
+ 
+ 	/* Assert SRS signal */
+ 	__raw_writew(wcr_enable, wdog_base);
+-	/* write twice to ensure the request will not get ignored */
++	/*
++	 * Due to imx6q errata ERR004346 (WDOG: WDOG SRS bit requires to be
++	 * written twice), we add another two writes to ensure there must be at
++	 * least two writes happen in the same one 32kHz clock period.  We save
++	 * the target check here, since the writes shouldn't be a huge burden
++	 * for other platforms.
++	 */
++	__raw_writew(wcr_enable, wdog_base);
+ 	__raw_writew(wcr_enable, wdog_base);
+ 
+ 	/* wait for reset to assert... */
+-- 
+1.7.9.5
