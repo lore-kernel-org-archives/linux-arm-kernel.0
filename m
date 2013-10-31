@@ -1,37 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 31 Oct 2013 20:18:31 +0100
-Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu node
- in DT.
-In-Reply-To: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
-References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1383247111-26834-4-git-send-email-andrew@lunn.ch>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Thu, 31 Oct 2013 20:35:19 +0100
+Subject: [PATCH v2] ARM: kirkwood: Cleanup comments in Sheevaplug dts files
+Message-ID: <1383248119-17883-1-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dove-cpufreq driver needs access to the DDR and CPU clock.  There
-is also an interrupt generated when the DFS hardware completes a
-change of frequencey. Add these to the cpu node in DT.
+Change the file names given in the comments of the Sheevaplug
+dts files to actually match the real file names.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/dove.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Changes v2:
+ - Added comment body
+ - Added Ack from Andrew
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 1fd615d27532..e96d7a6a2fb8 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -19,6 +19,10 @@
- 			device_type = "cpu";
- 			next-level-cache = <&l2>;
- 			reg = <0>;
-+			clocks = <&core_clk 1>, <&core_clk 3>;
-+			clock-names = "cpu_clk", "ddrclk";
-+			interrupt-parent = <&pmu_intc>;
-+			interrupts = <0>;
- 		};
- 	};
- 
+- Simon
+
+ arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi |    2 +-
+ arch/arm/boot/dts/kirkwood-sheevaplug.dts         |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+index 5696b63..c2bedb6 100644
+--- a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+@@ -1,5 +1,5 @@
+ /*
+- * kirkwood-sheevaplug-common.dts - Common parts for Sheevaplugs
++ * kirkwood-sheevaplug-common.dtsi - Common parts for Sheevaplugs
+  *
+  * Copyright (C) 2013 Simon Baatz <gmbnomis@gmail.com>
+  *
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug.dts b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
+index bb61918..0de8278 100644
+--- a/arch/arm/boot/dts/kirkwood-sheevaplug.dts
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
+@@ -1,5 +1,5 @@
+ /*
+- * kirkwood-sheevaplug-esata.dts - Device tree file for Sheevaplug
++ * kirkwood-sheevaplug.dts - Device tree file for Sheevaplug
+  *
+  * Copyright (C) 2013 Simon Baatz <gmbnomis@gmail.com>
+  *
 -- 
-1.8.4.rc3
+1.7.9.5
