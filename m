@@ -1,80 +1,100 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Thu, 31 Oct 2013 12:39:13 -0700
-Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
-In-Reply-To: <87eh71mfyh.fsf@linaro.org>
-References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
- <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
- <20131029132043.GA28165@fifo99.com>
- <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
- <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
- <8738nhnz4s.fsf@linaro.org> <20131031173506.GA31722@fifo99.com>
- <87eh71mfyh.fsf@linaro.org>
-Message-ID: <20131031193912.GB31722@fifo99.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 31 Oct 2013 20:42:52 +0100 (CET)
+Subject: [PATCH v2 19/19] fbdev: sh-mobile-lcdcfb: Enable the driver on
+ all ARM platforms
+In-Reply-To: <1383086274-11049-20-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383086274-11049-20-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <alpine.DEB.2.02.1310312039330.13521@ayla.of.borg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 11:51:34AM -0700, Kevin Hilman wrote:
-> Daniel Walker <dwalker@fifo99.com> writes:
-> 
-> > On Thu, Oct 31, 2013 at 10:12:03AM -0700, Kevin Hilman wrote:
-> >> Daniel Walker <dwalker@fifo99.com> writes:
-> >> 
-> >> 
-> >> No.  The idea behind splitting them is to allow current platforms with
-> >> active maintainers to progress without being held back.  The older
-> >> platforms can stay and have an opportunity to modernize. 
-> >> 
-> >> The kernel is a moving target, without some minimal effort to keep
-> >> platforms up to date, the effort to continue to maintain/modernize them
-> >> can become more of a pain than it's worth.  If maintainers of these older
-> >> platforms are willing to put in the work, nobody will be SOL.  If
-> >> nobody shows interest in modernizing these older platforms (which seems
-> >> to be the case based on the last couple years), then it is reasonable
-> >> IMO for them to fade away slowly.
-> >
-> >
-> > According to a prior email Tony suggested that OMAP was split for purely
-> > technical reasons.. If code is shared in some way , or has synergies, and there's no
-> > technical reason to split a sub-architecture, then to me there's no win in splitting
-> > things.. 
-> 
-> The wins have already been well described in this thread in terms of
-> maintenance of newer platforms using modern kernel infrastructure.
+	Hi Laurent,
 
+On Tue, 29 Oct 2013, Laurent Pinchart wrote:
+> Renesas ARM platforms are transitioning from single-platform to
+> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
+> COMPILE_TEST.
 
-That's not very concrete .. Can you be specific, and what platforms are
-we talking about?
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 84b685f..32b5c86 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -2482,7 +2482,7 @@ endif
+>  
+>  config FB_SH_MOBILE_MERAM
+>  	tristate "SuperH Mobile MERAM read ahead support"
+> -	depends on (SUPERH || ARCH_SHMOBILE)
+> +	depends on (SUPERH || ARM || COMPILE_TEST)
+>  	select GENERIC_ALLOCATOR
+>  	---help---
+>  	  Enable MERAM support for the SuperH controller.
 
+While the below compiler warnings have been seen with sh-randconfig
+before, they're more likely to happen with COMPILE_TEST=y.
+I now see them with e.g. m68k-allmodconfig, so I created a patch.
 
-> > It's just more directories, more confusion etc.. The confusion
-> > would come from someone wanting to find the code related to a platform,
-> > but woops there's a bunch of directories, or code flow and how the
-> > sub-architecture is strung together .. Personally I found OMAP very
-> > confusing in that regard.
-> >
-> > ARM and the sub-architectures is already confusing I don't think we need
-> > to start compounding the problem by allowing random whatever-you-want
-> > sub-directories from every sub-architecture.
-> 
-> Randomness is quite a bit of an exaggeration of what's been proposed
-> here.
+>From 15eb69172457c675cde177a6f742b6f1dabdeb18 Mon Sep 17 00:00:00 2001
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Thu, 31 Oct 2013 20:35:14 +0100
+Subject: [PATCH] fbdev: sh_mobile_meram: Fix defined but not used compiler
+ warnings
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
-No one has proposed anything, as far as I can tell.
+If CONFIG_PM_SLEEP resp. CONFIG_PM_RUNTIME are not set:
 
+drivers/video/sh_mobile_meram.c:573: warning: ?sh_mobile_meram_suspend? defined but not used
+drivers/video/sh_mobile_meram.c:597: warning: ?sh_mobile_meram_resume? defined but not used
 
-> These decisions are made on a case-by-case basis and is this case is
-> being done for ease of maintainence for newer platforms, which may not
-> be a "technical reason" for you, but is important for overall
-> maintenance of arm-soc.
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+---
+ drivers/video/sh_mobile_meram.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Who's making this decision ? If there's some reason why maintenance is
-easier , can you explain it ? That's typically how we make decisions in
-this community there needs to be a clear reason to do something.
+diff --git a/drivers/video/sh_mobile_meram.c b/drivers/video/sh_mobile_meram.c
+index e0f098562a74..56a8e47ffceb 100644
+--- a/drivers/video/sh_mobile_meram.c
++++ b/drivers/video/sh_mobile_meram.c
+@@ -569,6 +569,7 @@ EXPORT_SYMBOL_GPL(sh_mobile_meram_cache_update);
+  * Power management
+  */
+ 
++#ifdef CONFIG_PM_SLEEP
+ static int sh_mobile_meram_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -592,7 +593,9 @@ static int sh_mobile_meram_suspend(struct device *dev)
+ 	}
+ 	return 0;
+ }
++#endif
+ 
++#ifdef CONFIG_PM_RUNTIME
+ static int sh_mobile_meram_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -611,6 +614,7 @@ static int sh_mobile_meram_resume(struct device *dev)
+ 		meram_write_reg(priv->base, common_regs[i], priv->regs[i]);
+ 	return 0;
+ }
++#endif
+ 
+ static UNIVERSAL_DEV_PM_OPS(sh_mobile_meram_dev_pm_ops,
+ 			    sh_mobile_meram_suspend,
+-- 
+1.7.9.5
 
-> If we do this split, you are more than welcome to demonstrate the
-> commonality by modernizing mach-msm, combining it with mach-qcom,
-> removing mach-msm, and then removing all the "confusion."
+Gr{oetje,eeting}s,
 
-Thanks, why not get it right the first time..
+						Geert
 
-Daniel
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
