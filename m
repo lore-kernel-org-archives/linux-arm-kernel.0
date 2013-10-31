@@ -1,35 +1,55 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Thu, 31 Oct 2013 15:01:40 +0100
-Subject: [PATCH 2/2] misc: atmel_pwm: set initcall level to subsys
-In-Reply-To: <201310302146.18248.arnd@arndb.de>
-References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
- <20131029232249.GA20476@kroah.com>
- <20131030110705.GA29813@localhost>
- <201310302146.18248.arnd@arndb.de>
-Message-ID: <20131031140140.GG29813@localhost>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 31 Oct 2013 09:03:46 -0500
+Subject: [PATCHv9 01/43] clk: Add support for regmap register read/write
+In-Reply-To: <1382716658-6964-2-git-send-email-t-kristo@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-2-git-send-email-t-kristo@ti.com>
+Message-ID: <52726342.6030406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 09:46:17PM +0100, Arnd Bergmann wrote:
-> On Wednesday 30 October 2013, Johan Hovold wrote:
-> > > I really hate this type of patch, as it's papering over the real
-> > > problem.  What happens when someone else moves their driver to this
-> > > level?  Then you are back to the original problem.
-> > 
-> > Yes, it's crude, but it's currently the only way to express a preferred
-> > probe order.
+On 10/25/2013 10:56 AM, Tero Kristo wrote:
+[...]
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 7e59253..63ff78c 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+
+[...]
+> -static inline u32 clk_readl(u32 __iomem *reg)
+> +static inline u32 clk_readl(u32 __iomem *reg, struct regmap *regmap)
+>  {
+> -	return readl(reg);
+> +	u32 val;
+> +
+> +	if (regmap)
+> +		regmap_read(regmap, (u32)reg, &val);
+> +	else
+> +		val = readl(reg);
+> +	return val;
+>  }
+>  
+> -static inline void clk_writel(u32 val, u32 __iomem *reg)
+> +static inline void clk_writel(u32 val, u32 __iomem *reg, struct regmap *regmap)
+>  {
+> -	writel(val, reg);
+> +	if (regmap)
+> +		regmap_write(regmap, (u32)reg, val);
+> +	else
+> +		writel(val, reg);
+>  }
+>  
+>  #endif /* CONFIG_COMMON_CLK */
 > 
-> Does the same problem occur with the generic PWM subsystem?
 
-It does not suffer from the problem with failed probe as it supports
-deferred probing, but there could be added delays depending on probe
-order.
+Might it not be better to introduce regmap variants?
+static inline void clk_regmap_writel(u32 val, u32 reg, struct regmap
+*regmap)
+and corresponding readl? that allows cleaner readability for clk
+drivers that use regmap and those that dont.
 
-> The atmel_pwm driver apparently is the last PWM driver that has
-> not been converted to the generic subsystem yet. Doing that would
-> also let us drop the atmel-pwm-bl driver in favor of the generic
-> backlight.
+regmap can also return error value that could also be handled as a result.
 
-As Bo mentioned, it's work in progress that hasn't been merged yet.
-
-Johan
+-- 
+Regards,
+Nishanth Menon
