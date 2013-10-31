@@ -1,61 +1,47 @@
-From: r.sricharan@ti.com (R, Sricharan)
-Date: Thu, 31 Oct 2013 10:57:47 +0000
-Subject: [PATCH V2 2/7] DRIVERS: IRQCHIP: CROSSBAR: Add support for
- Crossbar IP
-In-Reply-To: <alpine.DEB.2.02.1310301615430.24686@ionos.tec.linutronix.de>
-References: <1383145040-15852-1-git-send-email-r.sricharan@ti.com>
- <1383145040-15852-3-git-send-email-r.sricharan@ti.com>,
- <alpine.DEB.2.02.1310301615430.24686@ionos.tec.linutronix.de>
-Message-ID: <F934AE11CE617240AE4A874A49F629E4832579@DBDE04.ent.ti.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 31 Oct 2013 16:38:02 +0530
+Subject: [PATCH 0/5] Remove remaining instances of devm_request_and_ioremap
+Message-ID: <1383217687-12037-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-  Again sorry for top post. 
+devm_request_and_ioremap is now obsolete and is replaced by
+devm_ioremap_resource. Update the remaining places where
+devm_request_and_ioremap is still used and remove its definition.
 
-  I agree and will fix both of the comments below.
+The patches are based on next-20131030.
 
-  Thanks for the reviews.
+Tushar Behera (5):
+  MIPS: ralink: Use devm_ioremap_resource
+  DRM: Armada: Use devm_ioremap_resource
+  iommu/arm-smmu: Use devm_ioremap_resource
+  watchdog: ralink: Use devm_ioremap_resource
+  lib: devres: Remove deprecated devm_request_and_ioremap
 
-Regards,
- Sricharan
-________________________________________
-From: Thomas Gleixner [tglx at linutronix.de]
-Sent: Wednesday, October 30, 2013 9:00 PM
-To: R, Sricharan
-Cc: linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-doc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org; linus.walleij at linaro.org; linux at arm.linux.org.uk; tony at atomide.com; Nayak, Rajendra; marc.zyngier at arm.com; grant.likely at linaro.org; mark.rutland at arm.com; robherring2 at gmail.com; Shilimkar, Santosh; Rob Herring
-Subject: Re: [PATCH V2 2/7] DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+ Documentation/driver-model/devres.txt |    1 -
+ arch/mips/ralink/timer.c              |    2 +-
+ drivers/gpu/drm/armada/armada_crtc.c  |    8 +++-----
+ drivers/iommu/arm-smmu.c              |    6 +++---
+ drivers/watchdog/rt2880_wdt.c         |    2 +-
+ include/linux/device.h                |    2 --
+ lib/devres.c                          |   28 ----------------------------
+ 7 files changed, 8 insertions(+), 41 deletions(-)
 
-On Wed, 30 Oct 2013, Sricharan R wrote:
-> +static inline const u32 allocate_free_irq(int cb_no)
+CC: dri-devel at lists.freedesktop.org
+CC: iommu at lists.linux-foundation.org
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-doc at vger.kernel.org
+CC: linux-mips at linux-mips.org
+CC: linux-watchdog at vger.kernel.org
+CC: David Airlie <airlied@linux.ie>
+CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+CC: Joerg Roedel <joro@8bytes.org>
+CC: John Crispin <blogic@openwrt.org>
+CC: Ralf Baechle <ralf@linux-mips.org>
+CC: Rob Landley <rob@landley.net>
+CC: Russell King <rmk+kernel@arm.linux.org.uk>
+CC: Will Deacon <will.deacon@arm.com>
+CC: Wim Van Sebroeck <wim@iguana.be>
 
-I understand the "static inline" part, but "const u32" is more than
-fishy. What's wrong with "static inline int" ?
-
-> +{
-> +     int i;
-> +
-> +     for (i = 0; i < cb->int_max; i++) {
-> +             if (cb->irq_map[i] == IRQ_FREE) {
-> +                     cb->irq_map[i] = cb_no;
-> +                     return i;
-> +             }
-> +     }
-> +
-> +     return -ENODEV;
-> +}
-
-> +static int crossbar_domain_xlate(struct irq_domain *d,
-> +                              struct device_node *controller,
-> +                              const u32 *intspec, unsigned int intsize,
-> +                              unsigned long *out_hwirq,
-> +                              unsigned int *out_type)
-> +{
-> +     unsigned long ret = 0;
-
-Why do you need to initialize ret when you assign a value to it in the
-next line?
-
-Thanks,
-
-        tglx
+-- 
+1.7.9.5
