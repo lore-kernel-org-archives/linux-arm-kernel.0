@@ -1,51 +1,61 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 31 Oct 2013 08:57:13 -0400
-Subject: linux-next: manual merge of the arm-soc tree with the
- devicetree tree
-In-Reply-To: <20131031192354.32945644fbdca2e0d6ca5455@canb.auug.org.au>
-References: <20131031192354.32945644fbdca2e0d6ca5455@canb.auug.org.au>
-Message-ID: <20131031125713.GK26784@titan.lakedaemon.net>
+From: m.chehab@samsung.com (Mauro Carvalho Chehab)
+Date: Thu, 31 Oct 2013 11:18:06 -0200
+Subject: [Patch v2][ 04/37] [media] v4l2: add new V4L2_PIX_FMT_RGB666 pixel
+ format.
+In-Reply-To: <1382022155-21954-5-git-send-email-denis@eukrea.com>
+References: <1382022155-21954-1-git-send-email-denis@eukrea.com>
+ <1382022155-21954-5-git-send-email-denis@eukrea.com>
+Message-ID: <20131031111806.72b6856b@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+Em Thu, 17 Oct 2013 17:02:02 +0200
+Denis Carikli <denis@eukrea.com> escreveu:
 
-Glad to see you're back at it!  Nice meeting you and your wife in
-Edinburgh.
-
-Adding Thomas Petazzoni to the Cc.
-
-On Thu, Oct 31, 2013 at 07:23:54PM +1100, Stephen Rothwell wrote:
-> Hi all,
+> That new macro is needed by the imx_drm staging driver
+>   for supporting the QVGA display of the eukrea-cpuimx51 board.
 > 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/pci/host/pci-mvebu.c between commit 16b84e5a505c ("of/irq: Create
-> of_irq_parse_and_map_pci() to consolidate arch code.") from the
-> devicetree tree and commit e5615c30c1c9 ("PCI: mvebu: remove
-> subsys_initcall") from the arm-soc tree.
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: driverdev-devel at linuxdriverproject.org
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: linux-media at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+
+It seems better to apply this one together with the other DRM patches via
+DRM tree. So:
+	Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+
+> ---
+>  include/uapi/linux/videodev2.h |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index 437f1b0..e8ff410 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -294,6 +294,7 @@ struct v4l2_pix_format {
+>  #define V4L2_PIX_FMT_RGB555X v4l2_fourcc('R', 'G', 'B', 'Q') /* 16  RGB-5-5-5 BE  */
+>  #define V4L2_PIX_FMT_RGB565X v4l2_fourcc('R', 'G', 'B', 'R') /* 16  RGB-5-6-5 BE  */
+>  #define V4L2_PIX_FMT_BGR666  v4l2_fourcc('B', 'G', 'R', 'H') /* 18  BGR-6-6-6	  */
+> +#define V4L2_PIX_FMT_RGB666  v4l2_fourcc('R', 'G', 'B', 'H') /* 18  RGB-6-6-6	  */
+>  #define V4L2_PIX_FMT_BGR24   v4l2_fourcc('B', 'G', 'R', '3') /* 24  BGR-8-8-8     */
+>  #define V4L2_PIX_FMT_RGB24   v4l2_fourcc('R', 'G', 'B', '3') /* 24  RGB-8-8-8     */
+>  #define V4L2_PIX_FMT_BGR32   v4l2_fourcc('B', 'G', 'R', '4') /* 32  BGR-8-8-8-8   */
 
-This looks fine by me.
 
-thx,
+-- 
 
-Jason.
-
-> diff --cc drivers/pci/host/pci-mvebu.c
-> index 07ddb3a13c6e,80b2250ea19a..000000000000
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@@ -693,9 -732,10 +719,10 @@@ static void mvebu_pcie_enable(struct mv
->   	hw.private_data   = (void **)&pcie;
->   	hw.setup          = mvebu_pcie_setup;
->   	hw.scan           = mvebu_pcie_scan_bus;
->  -	hw.map_irq        = mvebu_pcie_map_irq;
->  +	hw.map_irq        = of_irq_parse_and_map_pci;
->   	hw.ops            = &mvebu_pcie_ops;
->   	hw.align_resource = mvebu_pcie_align_resource;
-> + 	hw.add_bus        = mvebu_pcie_add_bus;
->   
->   	pci_common_init(&hw);
->   }
+Cheers,
+Mauro
