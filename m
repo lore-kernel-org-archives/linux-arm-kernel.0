@@ -1,125 +1,98 @@
-From: b42378@freescale.com (Nicolin Chen)
-Date: Thu, 31 Oct 2013 21:44:16 +0800
-Subject: [PATCH v4 4/4] ARM: dts: imx: use dual-fifo sdma script for ssi
-In-Reply-To: <cover.1383226444.git.b42378@freescale.com>
-References: <cover.1383226444.git.b42378@freescale.com>
-Message-ID: <6a0d22c80eadc0ec9008264bb71d00d67932f5cc.1383226444.git.b42378@freescale.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 31 Oct 2013 08:55:00 -0500
+Subject: [PATCHv9 00/43] ARM: TI SoC clock DT conversion
+In-Reply-To: <52721E95.4080806@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <526FDFF4.9030806@ti.com> <5270C1F3.6000409@ti.com> <52711F12.1090008@ti.com>
+ <52716799.6040002@ti.com> <52721E95.4080806@ti.com>
+Message-ID: <52726134.8040505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dual-fifo sdma scripts instead of shared scripts for ssi on i.MX series.
+On 10/31/2013 04:10 AM, Tero Kristo wrote:
+> On 10/30/2013 10:10 PM, Nishanth Menon wrote:
+>> On 10/30/2013 10:00 AM, Nishanth Menon wrote:
+>>> On 10/30/2013 03:23 AM, Tero Kristo wrote:
+>>>> On 10/29/2013 06:19 PM, Nishanth Menon wrote:
+>>>>> On 10/25/2013 10:56 AM, Tero Kristo wrote:
+>>>>> <snip>
+>>>>>> Testing done:
+>>>>>> - omap3-beagle: boot + suspend/resume (ret + off)
+>>>>>> - omap4-panda-es: boot + suspend/resume
+>>>>>> - omap5-uevm: boot
+>>>>>> - dra7-evm: boot
+>>>>>> - am335x-bone: boot
+>>>>>>
+>>>>>> Test branches available:
+>>>>>>
+>>>>>> tree: https://github.com/t-kristo/linux-pm.git
+>>>>>
+>>>>> <snip>
+>>>>>> Fully functioning test branch: 3.12-rc6-dt-clks-v9
+>>>>>>
+>>>>> ^^ I tested this branch (boot testing):
+>>>>> Beagle-XM: http://pastebin.com/50A1qtFq (crashes + clkdm issues, dpll5
+>>>>> failed to transition)
+>>>>
+>>>> I just sent you a private email with a patch to try out, should fix the
+>>>> boot crash at least hopefully. Basically I forgot to convert one part of
+>>>> the kernel to the new regmap stuff for omap36xx.
+>>>
+>>> it does bootup yes.
+>>>>
+>>>> clkdm issues are caused by wrong data in omap_hwmod_3xxx_data.c, USB
+>>>> nodes are listing l3_init_clkdm for them, but this only exists on
+>>>> omap4+. Seems like some copy paste bug introduced by someone.
+>>>>
+>>>> dpll5 part I am not too sure, can you check if the same happens with
+>>>> non-dt boot?
+>>>
+>>> no-dt: http://pastebin.com/bYP9fTzH
+>>> dt: http://pastebin.com/xHup4L9Y
+>>>
+>>> dpll5 warning seems to be only in dt-boot?
+>>>
+>>
+>> Tracked this down: you were missing the following - looks like the
+>> conversion script might be missing converting the flags clock data
+>> over to dts?
+>>
+>> diff --git
+>> a/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
+>> b/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
+>> index 7e37e3e..c9b77c8 100644
+>> --- a/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
+>> +++ b/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
+>> @@ -30,6 +30,7 @@
+>>                  compatible = "ti,omap3-dpll-clock";
+>>                  clocks = <&sys_ck>, <&sys_ck>;
+>>                  reg = <0x0d04>, <0x0d24>, <0x0d34>, <0x0d4c>;
+>> +               ti,low-power-stop;
+>>          };
+>>
+>>          dpll5_m2_ck: dpll5_m2_ck {
+>>
+>>
+>>
+> 
+> Yea, seems I introduced the problem with the conversion script changes. 
+> The valid fix for this is actually at the end of this mail (this fixes 
+> both of the problems introduced, and also completes the fix you did), I 
+> will add the fixes to the next rev. 
 
-Signed-off-by: Nicolin Chen <b42378@freescale.com>
----
- arch/arm/boot/dts/imx51.dtsi   |  4 ++--
- arch/arm/boot/dts/imx53.dtsi   |  4 ++--
- arch/arm/boot/dts/imx6qdl.dtsi | 12 ++++++------
- arch/arm/boot/dts/imx6sl.dtsi  | 12 ++++++------
- 4 files changed, 16 insertions(+), 16 deletions(-)
+One debug feedback:
+reg = <0x0d04>, <0x0d24>, <0x0d34>, <0x0d4c>;
+clocks = <&sys_ck>, <&sys_ck>;
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 54cee65..1a71eac 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -154,8 +154,8 @@
- 					reg = <0x70014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
--					dmas = <&sdma 24 1 0>,
--					       <&sdma 25 1 0>;
-+					dmas = <&sdma 24 22 0>,
-+					       <&sdma 25 22 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 4307e80..7208fde 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -153,8 +153,8 @@
- 					reg = <0x50014000 0x4000>;
- 					interrupts = <30>;
- 					clocks = <&clks 49>;
--					dmas = <&sdma 24 1 0>,
--					       <&sdma 25 1 0>;
-+					dmas = <&sdma 24 22 0>,
-+					       <&sdma 25 22 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 57e9c38..6e096ca 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -223,8 +223,8 @@
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 0x04>;
- 					clocks = <&clks 178>;
--					dmas = <&sdma 37 1 0>,
--					       <&sdma 38 1 0>;
-+					dmas = <&sdma 37 22 0>,
-+					       <&sdma 38 22 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <38 37>;
-@@ -236,8 +236,8 @@
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 0x04>;
- 					clocks = <&clks 179>;
--					dmas = <&sdma 41 1 0>,
--					       <&sdma 42 1 0>;
-+					dmas = <&sdma 41 22 0>,
-+					       <&sdma 42 22 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <42 41>;
-@@ -249,8 +249,8 @@
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 0x04>;
- 					clocks = <&clks 180>;
--					dmas = <&sdma 45 1 0>,
--					       <&sdma 46 1 0>;
-+					dmas = <&sdma 45 22 0>,
-+					       <&sdma 46 22 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					fsl,ssi-dma-events = <46 45>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index c46651e..b32ba99 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -195,8 +195,8 @@
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI1>;
--					dmas = <&sdma 37 1 0>,
--					       <&sdma 38 1 0>;
-+					dmas = <&sdma 37 22 0>,
-+					       <&sdma 38 22 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					status = "disabled";
-@@ -207,8 +207,8 @@
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI2>;
--					dmas = <&sdma 41 1 0>,
--					       <&sdma 42 1 0>;
-+					dmas = <&sdma 41 22 0>,
-+					       <&sdma 42 22 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					status = "disabled";
-@@ -219,8 +219,8 @@
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 0x04>;
- 					clocks = <&clks IMX6SL_CLK_SSI3>;
--					dmas = <&sdma 45 1 0>,
--					       <&sdma 46 1 0>;
-+					dmas = <&sdma 45 22 0>,
-+					       <&sdma 46 22 0>;
- 					dma-names = "rx", "tx";
- 					fsl,fifo-depth = <15>;
- 					status = "disabled";
+we used indexing for varied register and clocks. however the register
+meaning per index changes based on type of DPLL. This was one painful
+thing to track down when debugging. the only robust option to debug
+was to use prints as part of register write/reads to ensure that right
+sequence was being followed.
+
+I understand based on review comments for dtb size, we have removed
+the names, but we lost sane debug capability as well with that.
+
 -- 
-1.8.4
+Regards,
+Nishanth Menon
