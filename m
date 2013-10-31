@@ -1,171 +1,93 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 30 Nov 2013 15:05:49 -0800
-Subject: [PATCH v6 00/16] ARM: at91: move to common clk framework
-In-Reply-To: <1385642184-6467-1-git-send-email-b.brezillon@overkiz.com>
-References: <1385642184-6467-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20131130230549.16819.84161@quantum>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 01 Nov 2013 00:24:56 +0300
+Subject: [PATCH 2/2] ARM: shmobile: Koelsch: add Ether support
+In-Reply-To: <20131031050215.GH1603@verge.net.au>
+References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>
+ <201310310219.58963.sergei.shtylyov@cogentembedded.com>
+ <20131031050215.GH1603@verge.net.au>
+Message-ID: <5272CAA8.8070407@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris BREZILLON (2013-11-28 04:36:24)
-> Hello,
-> 
-> This patch series is the 5th version of the at91 clk implementations
-> using the Common Clk Framework.
+Hello.
 
-Oops, I just replied to v5 of this series. Thanks for the fixes. Which
-tree do you want this to go through?
+On 10/31/2013 08:02 AM, Simon Horman wrote:
 
-Regards,
-Mike
+>> Register Ether platform device and pin data on  the  Koelsch board.
+>> Register platform fixup for Micrel KSZ8041 PHY, just like on the Lager board.
 
-> 
-> Most of the clock provided by the PMC (Power Management Controller) are
-> implemented :
-> - main clock (main oscillator)
-> - pll clocks
-> - master clock
-> - programmable clocks
-> - utmi clock
-> - peripheral clocks
-> - system clocks
-> 
-> Actually some clk drivers are missing (slow clk, main clk and processor
-> clk), and some drivers only implement a subset of the hardware capabilities
-> (master clk rate change is missing).
-> But this series implements all the already available clks, and I will hopefully
-> add missing features in a near future.
-> 
-> This implementation is only compatible with device tree definition.
-> The goal is to define the whole clock tree using the device tree.
-> 
-> Just a note to let you know these bindings are currently unstable and might
-> change in the future.
-> 
-> 
-> Best Regards,
-> Boris
-> 
-> Changes since v5:
->  - remove peripheral divisors macros from dt binding include file
->  - remove file path from comment blocks
->  - replace pll and utmi disable function by unprepare function to
->    avoid issue when disabling and reenabling a clk
->  - fix programmable clk interrupt retrieval
->  - fix OF_CLK_DECLARE names (xxx_clk_main -> xxx_clk_pmc)
->  - add missing comma in at91rm9200 main clk dt declaration
->  - fix num_parents check in smd clk driver
-> 
-> Changes since v4:
->  - rework dt bindings:
->    * replace "atmel,clk-id" property by the standard "reg" property
->    * reference system, peripheral and programmable clks using the direct
->      clk node instead of the parent node plus a clk id
->  - provide a new helper function (of_at91_get_clk_range) to retrieve a clk
->    range from the device tree
-> 
-> Changes since v3:
->  - simplify master clk implementation (drop set_rate/parent support)
->  - fix bug in set_rate function of pll driver
->  - fix coding style issues
->  - define macros and constants where needed
->  - remove peripheral id macro references
->  - remove sam9g35 specific handling (sam9g35 = sam9x5)
->  - rework main clk prepare function to handle automatic rate calculation
-> 
-> Changes since v2:
->  - fix several bugs in clk implementations
->  - drop non-dt boards support
->  - split the series to ease review and tests:
->    * 1 patch series for new clk implementations (this series)
->    * 1 patch series to move each at91 SoC to common clk framework (coming soon)
->  - modify dt-bindings (add atmel,clk- prefix to atmel specific properties)
->  - add clk macros for dt-bindings
->  - add pmc framework (helper function to access pmc registers)
->  - add interrupt support to enable passive wait in clk_prepare functions
-> 
-> Changes since v1:
->  - fix bugs in pll, programmable and system clock implementations
->    (wrong bit position).
->  - add usb clock configuration support (ohci and udc drivers +
->    clk_lookup for non dt boards)
->  - rework of the system clock interfaces (no need to define a parent clock,
->    system clock is a gate with no rate info)
->  - change system, peripheral and programmable clk dt bindings (1 master node
->    and multiple child nodes each defining a system/peripheral or prog clock)
->  - fix bugs in sama5 dt definition
-> 
-> Boris BREZILLON (16):
->   ARM: at91: move at91_pmc.h to include/linux/clk/at91_pmc.h
->   ARM: at91: add Kconfig options for common clk support
->   clk: at91: add PMC base support
->   clk: at91: add PMC macro file for dt definitions
->   clk: at91: add PMC main clock
->   clk: at91: add PMC pll clocks
->   clk: at91: add PMC master clock
->   clk: at91: add PMC system clocks
->   clk: at91: add PMC peripheral clocks
->   clk: at91: add PMC programmable clocks
->   clk: at91: add PMC utmi clock
->   clk: at91: add PMC usb clock
->   clk: at91: add PMC smd clock
->   dt: binding: add at91 clks dt bindings documentation
->   ARM: at91: move pit timer to common clk framework
->   ARM: at91: add new compatible strings for pmc driver
-> 
->  .../devicetree/bindings/clock/at91-clock.txt       |  339 +++++++++++++
->  arch/arm/mach-at91/Kconfig                         |   44 ++
->  arch/arm/mach-at91/Kconfig.non_dt                  |    6 +
->  arch/arm/mach-at91/Makefile                        |    2 +-
->  arch/arm/mach-at91/at91rm9200.c                    |    2 +-
->  arch/arm/mach-at91/at91sam9260.c                   |    2 +-
->  arch/arm/mach-at91/at91sam9261.c                   |    2 +-
->  arch/arm/mach-at91/at91sam9263.c                   |    2 +-
->  arch/arm/mach-at91/at91sam926x_time.c              |   14 +-
->  arch/arm/mach-at91/at91sam9g45.c                   |    2 +-
->  arch/arm/mach-at91/at91sam9n12.c                   |    2 +-
->  arch/arm/mach-at91/at91sam9rl.c                    |    2 +-
->  arch/arm/mach-at91/at91sam9x5.c                    |    2 +-
->  arch/arm/mach-at91/clock.c                         |    7 +-
->  arch/arm/mach-at91/generic.h                       |    3 +-
->  arch/arm/mach-at91/pm.c                            |    2 +-
->  arch/arm/mach-at91/pm_slowclock.S                  |    2 +-
->  arch/arm/mach-at91/sama5d3.c                       |    2 +-
->  arch/arm/mach-at91/setup.c                         |    8 +-
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/at91/Makefile                          |   12 +
->  drivers/clk/at91/clk-main.c                        |  187 +++++++
->  drivers/clk/at91/clk-master.c                      |  270 ++++++++++
->  drivers/clk/at91/clk-peripheral.c                  |  410 +++++++++++++++
->  drivers/clk/at91/clk-pll.c                         |  531 ++++++++++++++++++++
->  drivers/clk/at91/clk-plldiv.c                      |  135 +++++
->  drivers/clk/at91/clk-programmable.c                |  366 ++++++++++++++
->  drivers/clk/at91/clk-smd.c                         |  171 +++++++
->  drivers/clk/at91/clk-system.c                      |  135 +++++
->  drivers/clk/at91/clk-usb.c                         |  398 +++++++++++++++
->  drivers/clk/at91/clk-utmi.c                        |  159 ++++++
->  drivers/clk/at91/pmc.c                             |  397 +++++++++++++++
->  drivers/clk/at91/pmc.h                             |  116 +++++
->  drivers/usb/gadget/atmel_usba_udc.c                |    2 +-
->  include/dt-bindings/clk/at91.h                     |   22 +
->  .../include/mach => include/linux/clk}/at91_pmc.h  |    4 +-
->  36 files changed, 3741 insertions(+), 20 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/at91-clock.txt
->  create mode 100644 drivers/clk/at91/Makefile
->  create mode 100644 drivers/clk/at91/clk-main.c
->  create mode 100644 drivers/clk/at91/clk-master.c
->  create mode 100644 drivers/clk/at91/clk-peripheral.c
->  create mode 100644 drivers/clk/at91/clk-pll.c
->  create mode 100644 drivers/clk/at91/clk-plldiv.c
->  create mode 100644 drivers/clk/at91/clk-programmable.c
->  create mode 100644 drivers/clk/at91/clk-smd.c
->  create mode 100644 drivers/clk/at91/clk-system.c
->  create mode 100644 drivers/clk/at91/clk-usb.c
->  create mode 100644 drivers/clk/at91/clk-utmi.c
->  create mode 100644 drivers/clk/at91/pmc.c
->  create mode 100644 drivers/clk/at91/pmc.h
->  create mode 100644 include/dt-bindings/clk/at91.h
->  rename {arch/arm/mach-at91/include/mach => include/linux/clk}/at91_pmc.h (98%)
-> 
-> -- 
-> 1.7.9.5
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+> Thanks, I have been able to use this to successfully boot a Koelsch board
+> using nfsroot.  However, I believe there is a minor build problem which I
+> have commented on below.
+
+    Yes, there is. Unfortunately, I haven't tested the build with 
+koelsch_defconfig...
+
+>> ---
+>>   arch/arm/mach-shmobile/board-koelsch.c |   61 ++++++++++++++++++++++++++++++++-
+>>   1 file changed, 60 insertions(+), 1 deletion(-)
+
+>> Index: renesas/arch/arm/mach-shmobile/board-koelsch.c
+>> ===================================================================
+>> --- renesas.orig/arch/arm/mach-shmobile/board-koelsch.c
+>> +++ renesas/arch/arm/mach-shmobile/board-koelsch.c
+[...]
+>> @@ -83,6 +118,30 @@ static void __init koelsch_add_standard_
+>>   				      sizeof(koelsch_keys_pdata));
+>>   }
+>>
+>> +/*
+>> + * Ether LEDs on the Koelsch board are named LINK and ACTIVE which corresponds
+>> + * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
+>> + * 14-15. We have to set them back to 01 from the default 00 value each time
+>> + * the PHY is reset. It's also important because the PHY's LED0 signal is
+>> + * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
+>> + * bounce on and off after each packet, which we apparently want to avoid.
+>> + */
+>> +static int koelsch_ksz8041_fixup(struct phy_device *phydev)
+>> +{
+>> +	u16 phyctrl1 = phy_read(phydev, 0x1e);
+>> +
+>> +	phyctrl1 &= ~0xc000;
+>> +	phyctrl1 |= 0x4000;
+>> +	return phy_write(phydev, 0x1e, phyctrl1);
+>> +}
+>> +
+>> +static void __init koelsch_init(void)
+>> +{
+>> +	koelsch_add_standard_devices();
+>> +
+>> +	phy_register_fixup_for_id("r8a7790-ether-ff:01", koelsch_ksz8041_fixup);
+
+> It seems to me that this code requires CONFIG_PHYLIB in order to compile.
+
+    Not really -- only in order to link.
+
+> So I propose the following enhancement to this patch which replaces
+> the line immediately above.
+
+> 	if (IS_ENABLED(CONFIG_PHYLIB))
+> 		phy_register_fixup_for_id("r8a7790-ether-ff:01",
+> 					  koelsch_ksz8041_fixup);
+
+    Strictly speaking, this is not enough. I'm getting:
+
+arch/arm/mach-shmobile/built-in.o: In function `koelsch_ksz8041_fixup':
+platsmp-apmu.c:(.text+0xb8): undefined reference to `mdiobus_read'
+platsmp-apmu.c:(.text+0xd0): undefined reference to `mdiobus_write'
+arch/arm/mach-shmobile/built-in.o: In function `koelsch_init':
+platsmp-apmu.c:(.init.text+0xa90): undefined reference to 
+`phy_register_fixup_for_id'
+
+So I guess the fixup function should be enclosed into #ifdef CONFIG_PHYLIB 
+too. However, in practice this change seems enough (gcc probably drops unused 
+static functions?)...
+
+> I believe a similar enhancement is also needed for board-lager.c
+> which I just realised does not compile if CONFIG_PHYLIB is not set.
+
+    I believe you meant to say it doesn't link too.
+
+WBR, Sergei
