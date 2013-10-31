@@ -1,39 +1,56 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 31 Oct 2013 18:44:59 -0500
-Subject: [RFC] ARM: OMAP: DRA7xx: Make L4SEC clock domain SWSUP only
-Message-ID: <1383263099-3315-1-git-send-email-joelf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Oct 2013 23:53:29 +0000
+Subject: [PATCH] scripts/kallsyms: filter symbols not in kernel address
+ space
+In-Reply-To: <20131031155831.4dce58a80c621cf450967de0@linux-foundation.org>
+References: <1382975339-25831-1-git-send-email-tom.leiming@gmail.com>
+ <20131031154311.e65d16d79ba540ced736413b@linux-foundation.org>
+ <20131031225022.GJ16735@n2100.arm.linux.org.uk>
+ <20131031155831.4dce58a80c621cf450967de0@linux-foundation.org>
+Message-ID: <20131031235329.GK16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using HWSUP for l4sec clock domain is causing warnings in HWMOD code for DRA7.
-Based on some observations, once the clock domain goes into an IDLE state
-(because of no activity etc), the IDLEST for the module goes to '0x2' value
-which means Interface IDLE condition. So far so go, however once the MODULEMODE
-is set to disabled for the particular IP, the IDLEST for the module should go
-to '0x3', per the HW AUTO IDLE protocol. However this is not observed and there
-is no reason per the protocl for the transition to not happen. This could
-potentially be a bug in the HW AUTO state-machine.
+On Thu, Oct 31, 2013 at 03:58:31PM -0700, Andrew Morton wrote:
+> On Thu, 31 Oct 2013 22:50:22 +0000 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Thu, Oct 31, 2013 at 03:43:11PM -0700, Andrew Morton wrote:
+> > > On Mon, 28 Oct 2013 23:48:59 +0800 Ming Lei <tom.leiming@gmail.com> wrote:
+> > > 
+> > > > This patch uses CONFIG_PAGE_OFFSET to filter symbols which
+> > > > are not in kernel address space because these symbols are
+> > > > generally for generating code purpose and can't be run at
+> > > > kernel mode, so we needn't keep them in /proc/kallsyms.
+> > > > 
+> > > > For example, on ARM there are some symbols which are
+> > > > linked in relocatable code section, then perf can't parse
+> > > > symbols any more from /proc/kallsyms, and this patch fixes
+> > > > the problem.
+> > > 
+> > > This is a non-back-compatible change and I'd like to see a much
+> > > stronger assurance that it is safe to merge and will not break any
+> > > existing application on the planet, please.
+> > > 
+> > > For a start, please describe with great precision what these excluded
+> > > symbols are (examples would help) and explain why no application will
+> > > conceivably have had any use for them.
+> > 
+> > These symbols are used to build what is relocatable code; the code which
+> > ends up being placed in the machine vectors and the following page.
+> > 
+> > Rather than have to manually calculate them, I merged a patch which used
+> > the tools we have, namely the assembler and linker, to do the job for us.
+> 
+> OK.  Do you recall which patch that was?  And is it the case that this
+> patch excludes only the symbols which that patch accidentally added?
 
-Work around for this is to use SWSUP only for the particular clockdomain. With
-this all the transitions of IDLEST happen correctly and warnings don't occur.
+It's not a case of "accidentally added" - as we include all symbols in
+kallsyms which are marked as text/data etc, irrespective of whether they
+are local or global.
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
---
- arch/arm/mach-omap2/clockdomains7xx_data.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+b9b32bf70f2fb made the change, backported to stable trees.  e39e3f3ebfef
+depended on that change so that it could get at the correct offset to
+copy FIQ code.
 
-diff --git a/arch/arm/mach-omap2/clockdomains7xx_data.c b/arch/arm/mach-omap2/clockdomains7xx_data.c
-index 57d5df0..13bda1b1 100644
---- a/arch/arm/mach-omap2/clockdomains7xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains7xx_data.c
-@@ -409,7 +409,7 @@ static struct clockdomain l4sec_7xx_clkdm = {
- 	.dep_bit	  = DRA7XX_L4SEC_STATDEP_SHIFT,
- 	.wkdep_srcs	  = l4sec_wkup_sleep_deps,
- 	.sleepdep_srcs	  = l4sec_wkup_sleep_deps,
--	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
-+	.flags		  = CLKDM_CAN_SWSUP,
- };
- 
- static struct clockdomain l3main1_7xx_clkdm = {
--- 
-1.8.1.2
+Both commits are part of closing an information leak from the kernel
+as part of a security report back in July.
