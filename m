@@ -1,84 +1,66 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 31 Oct 2013 17:32:45 -0600
-Subject: [PATCH v2] PCI: mvebu - Support a bridge with no IO port window
-In-Reply-To: <CAErSpo7bUP63J5RkXr-DkQE8qmvKT7ri-vjkfq+TtGEaYWxSwA@mail.gmail.com>
-References: <1381868182-8544-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20131031101357.5a56e2d0@skate>
- <20131031164810.GA26426@obsidianresearch.com>
- <CAErSpo7bUP63J5RkXr-DkQE8qmvKT7ri-vjkfq+TtGEaYWxSwA@mail.gmail.com>
-Message-ID: <20131031233245.GA9853@obsidianresearch.com>
+Date: Thu, 31 Oct 2013 17:32:59 -0600
+Subject: [PATCH 1/2] PCI: mvebu - The bridge should obey the MEM and IO
+ command bits
+Message-ID: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 11:10:42AM -0600, Bjorn Helgaas wrote:
-> On Thu, Oct 31, 2013 at 10:48 AM, Jason Gunthorpe
-> <jgunthorpe@obsidianresearch.com> wrote:
-> 
-> > Indeed.. I was having problems here because linux was writing 0,0
-> > during discovery to the base,limit registers to 'disable' the IO
-> > window, which triggered a window allocation. So I re-read the PCI
-> > bridge spec (apparently too quickly) and decided 0,0 was OK, and it
-> > should be <=.
-> >
-> > However, looking again at the spec - it is very clear, < is the
-> > correct test, and when the values is equal a 4k window should be
-> > created.
-> >
-> > So, I wonder if there is a little bug in the Linux discovery code
-> > path, should it write FFFF,0 instead?
-> 
-> Sounds like a bug to me.  Do you want to fix it, or point me at it the
-> place where we write 0,0 so I can fix it?
+When PCI_COMMAND_MEMORY/PCI_COMMAND_IO are cleared the bridge should not
+allocate windows or even look at the window limit/base registers.
 
-Okay, I remember this now, it was annoying to debug because the PCI
-driver inits before the serial port starts working, fortunately
-Sebastian fixed that up, now it is much easier to see what is going
-on..
+Otherwise it can attempt to setup bogus windows that the PCI core code
+creates during discovery. The core will leave PCI_COMMAND_IO cleared if
+it doesn't need an IO window.
 
-The 0,0 write comes from this trace:
+Have mvebu_pcie_handle_*_change respect the bits, and call the change
+function whenever the bits changes.
 
- [<c0111b58>] (mvebu_pcie_handle_iobase_change+0x0/0x140) from [<c0111e70>] (mvebu_pcie_wr_conf+0x1d8/0x318) r5:00000000 r4:c78d0850
- [<c0111c98>] (mvebu_pcie_wr_conf+0x0/0x318) from [<c0100e90>] (pci_bus_write_config_word+0x40/0x4c)
- [<c0100e50>] (pci_bus_write_config_word+0x0/0x4c) from [<c02273d0>] (__pci_bus_size_bridges+0x2e4/0x744) r4:00000000
- [<c02270ec>] (__pci_bus_size_bridges+0x0/0x744) from [<c0227344>] (__pci_bus_size_bridges+0x258/0x744)
- [<c02270ec>] (__pci_bus_size_bridges+0x0/0x744) from [<c0227844>] (pci_bus_size_bridges+0x14/0x18)
- [<c0227830>] (pci_bus_size_bridges+0x0/0x18) from [<c000cdc0>] (pci_common_init_dev+0x26c/0x2c0)
- [<c000cb54>] (pci_common_init_dev+0x0/0x2c0) from [<c0111608>] (mvebu_pcie_probe+0x41c/0x480)
- [<c01111ec>] (mvebu_pcie_probe+0x0/0x480) from [<c01335f0>] (platform_drv_probe+0x1c/0x20)
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ drivers/pci/host/pci-mvebu.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-And specifically this code sequence in pci_bridge_check_ranges:
-
-	pci_read_config_word(bridge, PCI_IO_BASE, &io);
-	if (!io) {
-		pci_write_config_word(bridge, PCI_IO_BASE, 0xf0f0);
-		pci_read_config_word(bridge, PCI_IO_BASE, &io);
- 		pci_write_config_word(bridge, PCI_IO_BASE, 0x0);
- 	}
- 	if (io)
-		b_res[0].flags |= IORESOURCE_IO;
-
-If I read this properly, the first sets the IO window to a 4k region
-at 0xF000, and the second sets the IO window to a 4k region at 0x0.
-
-How about this instead:
-
-	if (!io) {
-	        /* Disable the IO window by setting limit < base */
-		pci_write_config_word(bridge, PCI_IO_BASE, 0x00f0);
-		pci_read_config_word(bridge, PCI_IO_BASE, &io);
-	}
-        /* Bridges without IO support must wire the IO register to 0 */
- 	if (io)
-		b_res[0].flags |= IORESOURCE_IO;
-
-3.2.5.6 is clear that limit < base disables the decoder (however this
-alone is not reliable if the upper 16 bits are programmed)
-
-However, I'm guessing earlier in the sequence the PCI core clears
-PCI_COMMAND_IO in the bridge command register? If so this isn't a
-functional problem, it is just weird looking.
-
-Which is the reason why my assert triggers, the driver ignores
-PCI_COMMAND_IO/MEMORY.. Fixing that solves the issue completely.
-
-Jason
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 19d77c9..721fca9 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -279,7 +279,8 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+ 
+ 	/* Are the new iobase/iolimit values invalid? */
+ 	if (port->bridge.iolimit < port->bridge.iobase ||
+-	    port->bridge.iolimitupper < port->bridge.iobaseupper) {
++	    port->bridge.iolimitupper < port->bridge.iobaseupper ||
++	    !(port->bridge.command & PCI_COMMAND_IO)) {
+ 
+ 		/* If a window was configured, remove it */
+ 		if (port->iowin_base) {
+@@ -316,7 +317,8 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+ {
+ 	/* Are the new membase/memlimit values invalid? */
+-	if (port->bridge.memlimit < port->bridge.membase) {
++	if (port->bridge.memlimit < port->bridge.membase ||
++	    !(port->bridge.command & PCI_COMMAND_MEMORY)) {
+ 
+ 		/* If a window was configured, remove it */
+ 		if (port->memwin_base) {
+@@ -464,8 +466,16 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+ 
+ 	switch (where & ~3) {
+ 	case PCI_COMMAND:
++	{
++		u32 old = bridge->command;
++
+ 		bridge->command = value & 0xffff;
++		if ((old ^ bridge->command) & PCI_COMMAND_IO)
++			mvebu_pcie_handle_iobase_change(port);
++		if ((old ^ bridge->command) & PCI_COMMAND_MEMORY)
++			mvebu_pcie_handle_membase_change(port);
+ 		break;
++	}
+ 
+ 	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+ 		bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4] = value;
+-- 
+1.8.1.2
