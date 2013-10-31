@@ -1,32 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 31 Oct 2013 20:18:30 +0100
-Subject: [PATCH v3 3/4] mvebu: Dove: Enable cpufreq driver in defconfig
-In-Reply-To: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
-References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1383247111-26834-3-git-send-email-andrew@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Oct 2013 19:23:30 +0000
+Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
+In-Reply-To: <20131031173506.GA31722@fifo99.com>
+References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
+ <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
+ <20131029132043.GA28165@fifo99.com>
+ <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+ <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
+ <8738nhnz4s.fsf@linaro.org> <20131031173506.GA31722@fifo99.com>
+Message-ID: <20131031192330.GG16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpufreq to dove_defconfig, so it is built by default.
+On Thu, Oct 31, 2013 at 10:35:06AM -0700, Daniel Walker wrote:
+> ARM and the sub-architectures is already confusing I don't think we need
+> to start compounding the problem by allowing random whatever-you-want
+> sub-directories from every sub-architecture.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
- arch/arm/configs/dove_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Confusing?
 
-diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
-index 110105476848..3d9235017e89 100644
---- a/arch/arm/configs/dove_defconfig
-+++ b/arch/arm/configs/dove_defconfig
-@@ -22,6 +22,8 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_GOV_ONDEMAND=y
- CONFIG_VFP=y
- CONFIG_NET=y
- CONFIG_PACKET=y
--- 
-1.8.4.rc3
+I'm not sure about that.  It's actually really simple from my perspective:
+
+arch/arm - the ARM 32-bit architecture
+
+arch/arm/mach-* - support for a single SoC or a group of similar SoCs
+
+arch/arm/plat-* - common support for a set of dissimilar SoCs which want
+	to share code between themselves
+
+How is that confusing?
