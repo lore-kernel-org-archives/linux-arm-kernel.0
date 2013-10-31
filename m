@@ -1,75 +1,50 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 31 Oct 2013 13:30:36 +0800
-Subject: [PATCH v5] PWM: atmel-pwm: add PWM controller driver
-In-Reply-To: <526E797A.9010509@atmel.com>
-References: <1380532240-18650-1-git-send-email-voice.shen@atmel.com>
- <20131008131727.GB12839@ulmo.nvidia.com> <52664FB6.4000004@atmel.com>
- <526E797A.9010509@atmel.com>
-Message-ID: <5271EAFC.3040608@atmel.com>
+From: jiada_wang@mentor.com (jiada)
+Date: Wed, 30 Oct 2013 22:31:54 -0700
+Subject: [PATCH] ARM: imx: replace imx6q_restart() with mxc_restart()
+In-Reply-To: <20131030175426.GK16735@n2100.arm.linux.org.uk>
+References: <1381050370-3301-1-git-send-email-shawn.guo@linaro.org>
+ <857E9EDCA6C0904DB3357321AA9123EB62506837@NA-MBX-01.mgc.mentorg.com>
+ <5264A06B.2040202@mentor.com>
+ <20131021045917.GH17165@S2101-09.ap.freescale.net>
+ <857E9EDCA6C0904DB3357321AA9123EB62506BEA@NA-MBX-01.mgc.mentorg.com>
+ <5264C615.4070504@mentor.com>
+ <20131021070451.GI17165@S2101-09.ap.freescale.net>
+ <526DCED3.2070704@mentor.com>
+ <20131028074524.GE2839@S2101-09.ap.freescale.net>
+ <5270793E.9000605@mentor.com> <20131030175426.GK16735@n2100.arm.linux.org.uk>
+Message-ID: <5271EB4A.2080707@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi
 
-On 10/28/2013 10:49 PM, Nicolas Ferre wrote:
-> On 22/10/2013 12:13, Bo Shen :
->> Hi All,
+On 10/30/2013 10:54 AM, Russell King - ARM Linux wrote:
+> On Tue, Oct 29, 2013 at 08:13:02PM -0700, jiada wrote:
+>> Hi
 >>
->> On 10/8/2013 21:17, Thierry Reding wrote:
->>> On Mon, Sep 30, 2013 at 05:10:40PM +0800, Bo Shen wrote:
->>>> Add Atmel PWM controller driver based on PWM framework.
->>>>
->>>> This is the basic function implementation of Atmel PWM controller.
->>>> It can work with PWM based led and backlight.
->>>>
->>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->>>>
->>>> ---
->>>> Changes in v5:
->>>>     - call clk_disable directly, if so, it won't cause more than one
->>>> channel
->>>>       enabled, the clock can not be disabled.
->>>>
->>>> Changes in v4:
->>>>     - check the return value of clk_prepare()
->>>>     - change channel register size as constant
->>>>
->>>> Changes in v3:
->>>>     - change compatible string from "atmel,sama5-pwm" to
->>>> "atmel,sama5d3-pwm"
->>>>     - Add PWM led example in binding documentation
->>>>     - Using micro replace hard code
->>>>
->>>> Changes in v2:
->>>>     - Address the comments from Thierry Reding
->>>>
->>>>    .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 +++
->>>>    drivers/pwm/Kconfig                                |    9 +
->>>>    drivers/pwm/Makefile                               |    1 +
->>>>    drivers/pwm/pwm-atmel.c                            |  344
->>>> ++++++++++++++++++++
->>>>    4 files changed, 395 insertions(+)
->>>>    create mode 100644
->>>> Documentation/devicetree/bindings/pwm/atmel-pwm.txt
->>>>    create mode 100644 drivers/pwm/pwm-atmel.c
+>> On 10/28/2013 12:45 AM, Shawn Guo wrote:
+>>> 1. Apply the following change
 >>>
->>> I haven't seen an Acked-by from the device tree bindings maintainers on
->>> this. I've Cc'ed them, so hopefully one of them has time to review.
->>
->> Any comments?
+>>> https://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=commitdiff;h=6050d181a4fd4abb745506a6e565d55f1f9df964
+>>>
+>>> 2. Remove imx_src_prepare_restart() from imx6q_restart().
+>>>
+>>> I will send a patch against the latest kernel.
+>>>
+>> Thanks Shawn, I have verified with these two changes,
+>> system reboot by "echo b > /proc/sysrq-trigger" works
+>> for me.
 >
-> As a recommendation from the recent Kernel Summit stated, you will have
-> to separate the binding itself from the driver and associated code.
-> Simply send the binding documentation to the DT maintainers but still
-> keep the two patches linked together in a series (but without putting DT
-> maintainers nor the DT mailing-list in CC of the non-documentation
-> patches).
+> The test you really want to do is a reboot via serial console: <break> b.
+> That's definitely the one which will get you if your restart handler has
+> anything in it which sleeps.  This will definitely call the restart
+> handler from IRQ context.
 >
-> This way you may have more chances to get feedback.
+Yes, I tested both "echo b > /proc/sysrq-trigger" and console: <break> b
+reboot, but with out this fix patch, previously I saw problem when
+reboot by "echo b > /proc/sysrq-trigger".
+with this fix patch, both way work fine.
 
-Thanks, I will split the binding document as a separate patch.
 
-> Thanks, bye,
-
-Best Regards,
-Bo Shen
+Thanks,
+Jiada
