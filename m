@@ -1,32 +1,37 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 31 Oct 2013 09:10:13 -0700
-Subject: [PATCH 0/6] arm: zynq: BSP update
-Message-ID: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Thu, 31 Oct 2013 09:10:14 -0700
+Subject: [PATCH 1/6] arm: zynq: platsmp: Fix CPU presence check
+In-Reply-To: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1383235819-2552-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are a few updates and fixes for the Zynq BSP coming
-cherry-picked/ported from the Xilinx vendor tree.
+From: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
 
-	S?ren
+Fix an off-by-one error in the logic that checks if a CPU is present.
+The ncores variable is a count of cores while the cpu variable is a
+0 based index. So if ncores == cpu, cpu is out of range. Fix this
+comparison so non-existent CPUs are not probed.
 
-Michal Simek (1):
-  arm: zynq: Add support for zynq_cpu_kill function
+Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
+ arch/arm/mach-zynq/platsmp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Peter Crosthwaite (1):
-  arm: zynq: platsmp: Fix CPU presence check
-
-Soren Brinkmann (4):
-  arm: zynq: Invalidate L1 in secondary boot
-  arm: zynq: Use of_platform_populate instead of bus_probe
-  arm: zynq: Set proper GIC flags
-  arm: zynq: headsmp: Move .glbl out of actual code
-
- arch/arm/mach-zynq/common.c  | 16 ++++++++++------
- arch/arm/mach-zynq/common.h  |  2 ++
- arch/arm/mach-zynq/headsmp.S | 11 ++++++++---
- arch/arm/mach-zynq/platsmp.c | 13 +++++++++++--
- 4 files changed, 31 insertions(+), 11 deletions(-)
-
+diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+index 689fbbc3d9c8..2512624e657d 100644
+--- a/arch/arm/mach-zynq/platsmp.c
++++ b/arch/arm/mach-zynq/platsmp.c
+@@ -39,7 +39,7 @@ int zynq_cpun_start(u32 address, int cpu)
+ 	u32 trampoline_code_size = &zynq_secondary_trampoline_end -
+ 						&zynq_secondary_trampoline;
+ 
+-	if (cpu > ncores) {
++	if (cpu >= ncores) {
+ 		pr_warn("CPU No. is not available in the system\n");
+ 		return -1;
+ 	}
 -- 
 1.8.4.1
