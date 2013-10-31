@@ -1,59 +1,48 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 31 Oct 2013 09:10:18 -0700
-Subject: [PATCH 5/6] arm: zynq: Set proper GIC flags
+Date: Thu, 31 Oct 2013 09:10:17 -0700
+Subject: [PATCH 4/6] arm: zynq: Use of_platform_populate instead of bus_probe
 In-Reply-To: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1383235819-2552-6-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1383235819-2552-5-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zynq is able to wake up on any IRQ, so flag it with
-IRQCHIP_SKIP_SET_WAKE, and we want to mask off the IRQs when
-going to suspend to avoid transient effects so also flag
-this with IRQCHIP_MASK_ON_SUSPEND.
+All new boards should be using this function instead of
+of_platform_bus_probe.
 
-This is essentially, making the same changes as commit
-'ARM: ux500: set proper GIC flags'
-(sha1: 7e1f97ea8ffa66679252520dbbbd6ec413ecae68) for Zynq.
+Two side effects:
+1. Possible to probe node which are not in the bus
+2. Remove bus_id table from platform code
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- arch/arm/mach-zynq/common.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-zynq/common.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 5690925519bf..eb59bae37c04 100644
+index 5f252569c689..5690925519bf 100644
 --- a/arch/arm/mach-zynq/common.c
 +++ b/arch/arm/mach-zynq/common.c
-@@ -25,6 +25,8 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/of.h>
-+#include <linux/irqchip.h>
-+#include <linux/irqchip/arm-gic.h>
+@@ -39,11 +39,6 @@
  
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -86,6 +88,12 @@ static void __init zynq_map_io(void)
- 	zynq_scu_map_io();
+ void __iomem *zynq_scu_base;
+ 
+-static struct of_device_id zynq_of_bus_ids[] __initdata = {
+-	{ .compatible = "simple-bus", },
+-	{}
+-};
+-
+ /**
+  * zynq_init_machine - System specific initialization, intended to be
+  *		       called from board specific initialization.
+@@ -55,7 +50,7 @@ static void __init zynq_init_machine(void)
+ 	 */
+ 	l2x0_of_init(0x02060000, 0xF0F0FFFF);
+ 
+-	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  }
  
-+static void __init zynq_irq_init(void)
-+{
-+	gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
-+	irqchip_init();
-+}
-+
- static void zynq_system_reset(enum reboot_mode mode, const char *cmd)
- {
- 	zynq_slcr_system_reset();
-@@ -99,6 +107,7 @@ static const char * const zynq_dt_match[] = {
- DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
- 	.smp		= smp_ops(zynq_smp_ops),
- 	.map_io		= zynq_map_io,
-+	.init_irq	= zynq_irq_init,
- 	.init_machine	= zynq_init_machine,
- 	.init_time	= zynq_timer_init,
- 	.dt_compat	= zynq_dt_match,
+ static void __init zynq_timer_init(void)
 -- 
 1.8.4.1
