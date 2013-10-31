@@ -1,45 +1,56 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Thu, 31 Oct 2013 10:35:06 -0700
-Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
-In-Reply-To: <8738nhnz4s.fsf@linaro.org>
-References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
- <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
- <20131029132043.GA28165@fifo99.com>
- <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
- <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
- <8738nhnz4s.fsf@linaro.org>
-Message-ID: <20131031173506.GA31722@fifo99.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 31 Oct 2013 11:36:23 -0600
+Subject: [PATCH 0/6] PCI: imx6: Random fixes
+In-Reply-To: <201310301552.28866.marex@denx.de>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+ <CAErSpo6v4nvKQ4W9BhnUsNEjzsXoCiLxeFY-K=z=bMZ4AFOyGg@mail.gmail.com>
+ <201310301552.28866.marex@denx.de>
+Message-ID: <CAErSpo7Bba=b_eH=TpxM7E8xqvSJQdfeCUuTSPsDKiOAkiSOrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 10:12:03AM -0700, Kevin Hilman wrote:
-> Daniel Walker <dwalker@fifo99.com> writes:
-> 
-> 
-> No.  The idea behind splitting them is to allow current platforms with
-> active maintainers to progress without being held back.  The older
-> platforms can stay and have an opportunity to modernize. 
-> 
-> The kernel is a moving target, without some minimal effort to keep
-> platforms up to date, the effort to continue to maintain/modernize them
-> can become more of a pain than it's worth.  If maintainers of these older
-> platforms are willing to put in the work, nobody will be SOL.  If
-> nobody shows interest in modernizing these older platforms (which seems
-> to be the case based on the last couple years), then it is reasonable
-> IMO for them to fade away slowly.
+On Wed, Oct 30, 2013 at 8:52 AM, Marek Vasut <marex@denx.de> wrote:
+> Dear Bjorn Helgaas,
+>
+>> On Tue, Oct 15, 2013 at 10:06 AM, Marek Vasut <marex@denx.de> wrote:
+>> > Set of random fixes for the PCIe driver for i.MX6 . With these fixes, my
+>> > setup with MX6Q -> PCIe bridge -> i210 ethernet adapter works as
+>> > expected.
+>> >
+>> > NOTE: I'm sure this will start some discussion. There are quite a few
+>> > patches
+>> >
+>> >       that are more of a hacks. Shawn, I didn't ignore your remark about
+>> >       the clock patches, I will test it ASAP, I just want to have these
+>> >       fixes in the public so others can comment/test.
+>> >
+>> > Marek Vasut (6):
+>> >   PCI: imx6: Make reset-gpio optional
+>> >   PCI: imx6: Fix the clock for PCIe
+>> >   ARM: dts: imx6qdl: Fix the clock for PCIe
+>> >   PCI: imx6: Probe the PCIe in fs_initcall()
+>> >   PCI: imx6: Force Gen1 operation
+>> >   PCI: designware: Fix DT resource retrieval
+>> >
+>> >  .../devicetree/bindings/pci/designware-pcie.txt    |  2 +-
+>> >  arch/arm/boot/dts/imx6qdl.dtsi                     |  4 +-
+>> >  drivers/pci/host/pci-imx6.c                        | 63
+>> >  ++++++++++++++++------ drivers/pci/host/pcie-designware.c
+>> >    | 17 +++---
+>> >  4 files changed, 55 insertions(+), 31 deletions(-)
+>>
+>> I'm ignoring this series for now.  I assume you'll post an updated
+>> series as mentioned in your Oct 17 response to "[Patch 5/6] PCI: imx6:
+>> Force Gen1 operation."  Please mark that series as "v2" when you post
+>> it.  My assumption is still that Shawn Guo will ack the
+>> drivers/pci/host/ pieces before I apply them [1].
+>
+> Can you maybe pick at least these two:
+>
+> PCI: imx6: Make reset-gpio optional
+> PCI: imx6: Probe the PCIe in fs_initcall()
 
+Applied "Probe the PCIe in fs_initcall()" with Shawn's ack to my
+pci/host-imx6 branch for v3.13, thanks.
 
-According to a prior email Tony suggested that OMAP was split for purely
-technical reasons.. If code is shared in some way , or has synergies, and there's no
-technical reason to split a sub-architecture, then to me there's no win in splitting
-things.. It's just more directories, more confusion etc.. The confusion
-would come from someone wanting to find the code related to a platform,
-but woops there's a bunch of directories, or code flow and how the
-sub-architecture is strung together .. Personally I found OMAP very
-confusing in that regard.
-
-ARM and the sub-architectures is already confusing I don't think we need
-to start compounding the problem by allowing random whatever-you-want
-sub-directories from every sub-architecture.
-
-Daniel
+Bjorn
