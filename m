@@ -1,40 +1,62 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 31 Oct 2013 08:53:58 -0700
-Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
-In-Reply-To: <20131031120727.GA28330@fifo99.com>
-References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
- <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
- <20131029132043.GA28165@fifo99.com>
- <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
- <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
- <CAOesGMi2E1Ynr4rWY1eBmcZeB7Vahb5VdPUVs1ebLJowH1kpWw@mail.gmail.com>
- <20131031024538.GA17886@fifo99.com>
- <CAOesGMiEGJ8iMe=_-eJzhx3sRQO8VKbKGD-iLWsRztxUeJWJbQ@mail.gmail.com>
- <20131031120727.GA28330@fifo99.com>
-Message-ID: <CAOesGMge9JADoLtM8s0LWfy3gs4mpaD1Kofdnn=scOhF86+GcA@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 31 Oct 2013 11:56:27 -0400
+Subject: [GIT PULL V2] ARM: mvebu: dt changes for v3.13 (really, last one!)
+In-Reply-To: <20131031133550.GM26784@titan.lakedaemon.net>
+References: <20131031133550.GM26784@titan.lakedaemon.net>
+Message-ID: <20131031155627.GP26784@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 5:07 AM, Daniel Walker <dwalker@fifo99.com> wrote:
-> On Wed, Oct 30, 2013 at 10:19:30PM -0700, Olof Johansson wrote:
->> On Wed, Oct 30, 2013 at 7:45 PM, Daniel Walker <dwalker@fifo99.com> wrote:
->> > On Wed, Oct 30, 2013 at 05:36:58PM -0700, Olof Johansson wrote:
->> >> On Wed, Oct 30, 2013 at 4:25 PM, Daniel Walker <dwalker@fifo99.com> wrote:
->> >>
->> >> > So the current users of those platforms are, what SOL ?
->> >>
->> >> What users? Show me one.
->> >
->> > What am I chop liver ?
->>
->> Ah, right. So, what platforms do you currently rely on mainline
->> support for? Please be precise so we can figure out what needs to be
->> kept and not.
->
-> The only one I don't have is 7x30, as I said in prior emails.
+Olof,
 
-That's not actually what I asked. Which ones of them do you rely on
-mainline support for?
+On Thu, Oct 31, 2013 at 09:35:50AM -0400, Jason Cooper wrote:
+> Olof,
+> 
+> At your request, here's Thomas' patch adding the Openblocks A7 board.
+> It made it through -next last night.
+
+Small amendment.  In all the hussle of KS last week, I forgot there was
+one other dts-only board addition that I had held off.  Doesn't seem
+right to push Thomas' without Arnaud's. :)
+
+Thanks for the gentle reminder, Arnaud!
+
+thx,
+
+Jason.
 
 
--Olof
+The following changes since commit f039dfb51b36a2d7e4ac25e65ffbd03e3ac77a0c:
+
+  ARM: mvebu: Add the core-divider clock to Armada 370/XP (2013-10-23 11:04:31 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/dt-3.13-5
+
+for you to fetch changes up to 45e8815fc1b7ed66729bbbc9464228ee1769b580:
+
+  ARM: mvebu: Add Netgear ReadyNAS 104 board (2013-10-31 15:42:07 +0000)
+
+----------------------------------------------------------------
+mvebu dt changes for v3.13 (round 5)
+
+ - kirkwood
+    - add the Openblocks A7 board
+
+ - mvebu
+    - add Netgear ReadyNAS 104 board
+
+----------------------------------------------------------------
+Arnaud Ebalard (1):
+      ARM: mvebu: Add Netgear ReadyNAS 104 board
+
+Thomas Petazzoni (1):
+      ARM: kirkwood: add support for OpenBlocks A7 platform
+
+ arch/arm/boot/dts/Makefile                     |   6 +-
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts | 193 +++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-openblocks_a7.dts   | 223 +++++++++++++++++++++++++
+ 3 files changed, 420 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-370-netgear-rn104.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-openblocks_a7.dts
