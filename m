@@ -1,52 +1,70 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 31 Oct 2013 12:44:39 -0500
-Subject: [PATCH v2 4/6] edac: Document Krait L1/L2 EDAC driver binding
-In-Reply-To: <20131031173047.GK21983@codeaurora.org>
-References: <1383164736-1849-1-git-send-email-sboyd@codeaurora.org>
- <1383164736-1849-5-git-send-email-sboyd@codeaurora.org>
- <872F86E8-85CE-472B-9546-CDCC96F6F08B@codeaurora.org>
- <52717EA5.6030208@codeaurora.org>
- <F38814D8-723E-4A41-839D-DEE351738017@codeaurora.org>
- <52718118.1020009@codeaurora.org>
- <D081E03B-01D6-497F-B8D0-E994219C8282@codeaurora.org>
- <20131031173047.GK21983@codeaurora.org>
-Message-ID: <C796381F-AE3B-4577-BC97-DA041E5F40E8@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 31 Oct 2013 10:45:49 -0700
+Subject: [PATCHv7][ 2/5] ASoC: eukrea-tlv320: Add DT support.
+In-Reply-To: <CAHCPf3vUvg6w-OYO5yM8wj1Gr3p0xQZ=+bZ29ZKrZiQGAYektA@mail.gmail.com>
+References: <1382616832-23593-2-git-send-email-denis@eukrea.com>
+ <20131025191513.5345BC4042C@trevor.secretlab.ca>
+ <20131026114840.GX2443@sirena.org.uk>
+ <CAHCPf3vHWt5XJCwvGDMfX9rTPKqHU43SHORqpxLtLaDL6RGb8A@mail.gmail.com>
+ <20131029174445.GB20251@sirena.org.uk>
+ <CAHCPf3sm9BawgCKrPH_mbD-Mhb-uXzSyZTjxhJf1W25pG3wZUA@mail.gmail.com>
+ <20131030212927.GM2493@sirena.org.uk>
+ <CAHCPf3s46E=s85ohfqajr-VbavAM+gernXkkYeSwd4NYN8AEHw@mail.gmail.com>
+ <20131031012830.GZ2493@sirena.org.uk>
+ <CAHCPf3vUvg6w-OYO5yM8wj1Gr3p0xQZ=+bZ29ZKrZiQGAYektA@mail.gmail.com>
+Message-ID: <20131031174549.GG2493@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 31, 2013 at 10:32:00AM -0500, Matt Sealey wrote:
+> On Wed, Oct 30, 2013 at 8:28 PM, Mark Brown <broonie@kernel.org> wrote:
 
-On Oct 31, 2013, at 12:30 PM, Stephen Boyd wrote:
+> > Please consider prioritising this over writing e-mails; talking about
+> > device tree does often seem more popular than solving the harder
+> > problems.
 
-> On 10/30, Kumar Gala wrote:
->> 
->> On Oct 30, 2013, at 4:58 PM, Stephen Boyd wrote:
->> 
->>> On 10/30/13 14:56, Kumar Gala wrote:
->>>> On Oct 30, 2013, at 4:48 PM, Stephen Boyd wrote:
->>>> 
->>>>> On 10/30/13 14:45, Kumar Gala wrote:
->>>>>> On Oct 30, 2013, at 3:25 PM, Stephen Boyd wrote:
->>>>>>> +l2-cache node containing the following properties:
->>>>>> Is the L1 interrupt not per core L1 cache (even if they are OR together at PIC)?
->>>>> Yes it is per CPU. That is what the 0xf part of the cpus interrupts
->>>>> property is showing.
->>>> Than why not have it in each cpu node?
->>> 
->>> Because that duplicates things unnecessarily? The cpus node can hold
->>> things that are common to all CPUs to avoid duplication. If it was a
->>> different PPI for each CPU then I would agree that we need to put it in
->>> each cpu node.
->> 
->> Ok, I'll accept that as the binding is specific to Krait (and I assume all SoCs w/Krait wire this up to a common interrupt)
->> 
-> 
-> Can I take that as an ack? I'll resend with the s/an/a/ fix
-> today.
+> If it doesn't get talked about, what happens is people copy paste crap
 
-Yes, you can take that as an ack.
+...
 
-- k
+> like writing any because it mostly already exists. Device trees aren't
+> something that appeared a year and a half ago and are new
+> technology.).
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+These empty discussions aren't anything new either.  If we just keep on
+endlessly going through the basics over and over again without any
+associated code this just reinforces the perception that people are more
+focused on talking than on actually accomplishing anything.  Lengthy
+reiterations of design discussions won't move things forwards.
+
+This is why I keep asking you to review and engage with the prior
+discussion or to do concrete things to improve the situation.
+
+> Why some of those internal names don't match the manuals despite the
+> binding saying they do. It's because if you go through history of the
+
+Do you see any specific issues here?  It sounds like you're perfectly
+aware of what the bindings are supposed to be doing with routing signals
+to and from CODECs and have found some errors but you haven't told us
+what those are.
+
+Like I keep saying, do concrete things to move things forwards.
+
+> All of which exist here. There are levels of indirection for a good
+> reason, I understand that, but in this implementation
+> card->set_bias_level calls functions which do purely codec-level
+> operations (set fll/mclk/sysclk), codec->set_bias_level does it's
+> obviously purely codec-level operations, and then
+> card->set_bias_level_post finishes up by doing some, again,
+> codec-level operations.
+
+To repeat myself yet again: what is done to the CODEC here is system
+dependent.  This includes interaction with other components in the
+system.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131031/7b9a31a9/attachment.sig>
