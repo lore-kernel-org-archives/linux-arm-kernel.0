@@ -1,132 +1,240 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Thu, 31 Oct 2013 16:19:05 -0500
-Subject: [PATCHv7][ 2/5] ASoC: eukrea-tlv320: Add DT support.
-In-Reply-To: <20131031174549.GG2493@sirena.org.uk>
-References: <1382616832-23593-2-git-send-email-denis@eukrea.com>
- <20131025191513.5345BC4042C@trevor.secretlab.ca>
- <20131026114840.GX2443@sirena.org.uk>
- <CAHCPf3vHWt5XJCwvGDMfX9rTPKqHU43SHORqpxLtLaDL6RGb8A@mail.gmail.com>
- <20131029174445.GB20251@sirena.org.uk>
- <CAHCPf3sm9BawgCKrPH_mbD-Mhb-uXzSyZTjxhJf1W25pG3wZUA@mail.gmail.com>
- <20131030212927.GM2493@sirena.org.uk>
- <CAHCPf3s46E=s85ohfqajr-VbavAM+gernXkkYeSwd4NYN8AEHw@mail.gmail.com>
- <20131031012830.GZ2493@sirena.org.uk>
- <CAHCPf3vUvg6w-OYO5yM8wj1Gr3p0xQZ=+bZ29ZKrZiQGAYektA@mail.gmail.com>
- <20131031174549.GG2493@sirena.org.uk>
-Message-ID: <CAHCPf3tt8sbXnABUomg_w1ttBTgBQL=VNwsRoFazzuVdgzzO=g@mail.gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 31 Oct 2013 16:31:23 -0500
+Subject: [PATCH v2] dma: edma: Add support for Cyclic DMA
+Message-ID: <1383255083-31186-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 12:45 PM, Mark Brown <broonie@kernel.org> wrote:
->
->> Why some of those internal names don't match the manuals despite the
->> binding saying they do. It's because if you go through history of the
->
-> Do you see any specific issues here?  It sounds like you're perfectly
-> aware of what the bindings are supposed to be doing with routing signals
-> to and from CODECs and have found some errors but you haven't told us
-> what those are.
+Using the PaRAM configuration function that we split for reuse by the
+different DMA types, we implement Cyclic DMA support.
+For the cyclic case, we pass different configuration parameters to this
+function, and handle all the Cyclic-specific functionality separately.
 
-Yes, I can make a big list and even send a patch, but I think it's
-putting a band-aid on a non-surgical limb amputation.
+Callbacks to the DMA users are handled using vchan_cyclic_callback in
+the virt-dma layer. Linking is handled the same way as the slave SG case
+except for the last slot where we link it back to the first one in a
+cyclic fashion.
 
-In summary, concisely:
+For continuity, we check for cases where no.of periods is great than the
+MAX number of slots the driver can allocate for a particular descriptor
+and error out on such cases.
 
-* The internal components don't match the manuals they say they
-follow, and that is if they even say they follow them at all.
-* The external components names in the routing paths have arbitrary,
-potentially non-real-life names and are hardcoded into the driver at
-certain DAPM widgets, in order for the DAPM paths to work
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+Patch is rebased on slave-dma.git 'next' branch.
 
-What I've got going right now is, respectively:
+ drivers/dma/edma.c | 159 ++++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 151 insertions(+), 8 deletions(-)
 
-* a 90% done rewrite of these bindings with no functional changes
-(i.e. documentation clarification ONLY)
-* a fully complete addition to the bindings and a patch to the drivers
-that rationalizes the internal path name strings to the manuals (i.e.
-documentation AND binding change with code to match)
-
-That's basically the band-aid, but the second one is like rubbing salt
-on the wound first because of the binding change. Given that "make
-arbitrary strings less arbitrary" constitutes a binding change, this
-is what both annoys and worries the piss out of me with the current
-bindings.
-
-What I am trying to figure out is a way to have real component names
-for the external ones, and somehow codify the internal path naming, so
-that if a binding change comes in, it's worth it, and drivers don't
-need to include string names of parts of the chips in question, when
-they're stuffed way, way down into some abstracted sub-layer anyway.
-
-Close.. not there yet.
-
-> Like I keep saying, do concrete things to move things forwards.
-
-I don't want to be the source of an incremental, agile binding change
-going on for every merge window, just because I didn't fully grasp one
-issue right at the start.
-
->> All of which exist here. There are levels of indirection for a good
->> reason, I understand that, but in this implementation
->> card->set_bias_level calls functions which do purely codec-level
->> operations (set fll/mclk/sysclk), codec->set_bias_level does it's
->> obviously purely codec-level operations, and then
->> card->set_bias_level_post finishes up by doing some, again,
->> codec-level operations.
->
-> To repeat myself yet again: what is done to the CODEC here is system
-> dependent.  This includes interaction with other components in the
-> system.
-
-In this particular use case (init setting sysclk, and bias_level
-callbacks setting sysclk and pll for WM8962), there is no system
-dependency except a fixed, unchanging parent clock (it's fixed at card
-init and NEVER updated) which the DT binding can solve really easily
-by using the existing clock bindings. The only other example I can
-find is the "Cragganmore 6410" board support (which mentions wm8692 in
-passing, it seems) vs. specific speyside/wm8996/wm9081/wm1250/wm0010
-audio support (which mostly all has your name at the top) and it
-doesn't do anything "system dependent", either, except defining it in
-the card layer, and doing things which only affect register changes at
-the codec level. It doesn't even use or set data at the card layer.
-
-If every implementation eventually gets down to a call inside the
-actual codec driver, making the extra abstraction just something
-that's fuzzing the issue, and reproducing the same layering in
-separate drivers doing almost the same thing - only different by some
-clock id and direction - is a lot of code with the potential for
-consolidation under one roof with a DT binding that takes it into
-account.
-
-For the SGTL5000 case, setting the sysclk on init is overridden by the
-DT provided clock anyway inside the codec driver (it gets the clock in
-both places, and shoves the value) so this is a compatibility stub for
-non-DT boards (none of which should exist by now).. it shouldn't do
-anything if it's on devicetree (or at least, in every implementation
-existing, it's basically pointless), which is a patch in itself I
-should add to the list.
-
-BTW speyside is a good demonstration of a pre-DT "hardcoded strings"
-issue. The DAPM widgets get hardcoded and that's where those route
-strings come from in the bindings (as above, they don't exist in the
-drivers anymore).. it's entirely board-specific because that card
-driver is board-specific, but for a single SoC, or even where SoCs use
-codecs in exactly the same way, we shouldn't need to entertain a whole
-new card driver where that information can be ascertained from the
-device tree - that's what device trees are for! If it ever goes DT,
-porting this to the DT bindings just means moving the audio routing
-table from the middle of the driver into the tree, except this bit:
-
-        { "MICB2", NULL, "Headset Mic", speyside_get_micbias },
-
-.. which can't be represented and would mean parsing the routing
-property, then hacking that callback in afterwards.
-
-After that, it's ditching all the very-board-specific i2c addressing,
-and it shows the same "system dependent" clocking and bias level
-setting which essentially all calls down to the codec level. Would you
-consider it a good example of the kind of linking of codecs and audio
-interfaces you're talking about? Is there a block diagram? :)
-
-Thanks,
-Matt Sealey <neko@bakuhatsu.net>
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 183ec85..592f3be 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -60,6 +60,7 @@
+ struct edma_desc {
+ 	struct virt_dma_desc		vdesc;
+ 	struct list_head		node;
++	int				cyclic;
+ 	int				absync;
+ 	int				pset_nr;
+ 	int				processed;
+@@ -173,8 +174,13 @@ static void edma_execute(struct edma_chan *echan)
+ 	 * then setup a link to the dummy slot, this results in all future
+ 	 * events being absorbed and that's OK because we're done
+ 	 */
+-	if (edesc->processed == edesc->pset_nr)
+-		edma_link(echan->slot[nslots-1], echan->ecc->dummy_slot);
++	if (edesc->processed == edesc->pset_nr) {
++		if (edesc->cyclic)
++			edma_link(echan->slot[nslots-1], echan->slot[1]);
++		else
++			edma_link(echan->slot[nslots-1],
++				  echan->ecc->dummy_slot);
++	}
+ 
+ 	edma_resume(echan->ch_num);
+ 
+@@ -459,6 +465,138 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+ }
+ 
++static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
++	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
++	size_t period_len, enum dma_transfer_direction direction,
++	unsigned long tx_flags, void *context)
++{
++	struct edma_chan *echan = to_edma_chan(chan);
++	struct device *dev = chan->device->dev;
++	struct edma_desc *edesc;
++	dma_addr_t src_addr, dst_addr;
++	enum dma_slave_buswidth dev_width;
++	u32 burst;
++	int i, ret, nslots;
++
++	if (unlikely(!echan || !buf_len || !period_len))
++		return NULL;
++
++	if (direction == DMA_DEV_TO_MEM) {
++		src_addr = echan->cfg.src_addr;
++		dst_addr = buf_addr;
++		dev_width = echan->cfg.src_addr_width;
++		burst = echan->cfg.src_maxburst;
++	} else if (direction == DMA_MEM_TO_DEV) {
++		src_addr = buf_addr;
++		dst_addr = echan->cfg.dst_addr;
++		dev_width = echan->cfg.dst_addr_width;
++		burst = echan->cfg.dst_maxburst;
++	} else {
++		dev_err(dev, "%s: bad direction?\n", __func__);
++		return NULL;
++	}
++
++	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
++		dev_err(dev, "Undefined slave buswidth\n");
++		return NULL;
++	}
++
++	if (unlikely(buf_len % period_len)) {
++		dev_err(dev, "Period should be multiple of Buffer length\n");
++		return NULL;
++	}
++
++	nslots = (buf_len / period_len) + 1;
++
++	/*
++	 * Cyclic DMA users such as audio cannot tolerate delays introduced
++	 * by cases where the number of periods is more than the maximum
++	 * number of SGs the EDMA driver can handle at a time. For DMA types
++	 * such as Slave SGs, such delays are tolerable and synchronized,
++	 * but the synchronization is difficult to achieve with Cyclic and
++	 * cannot be guaranteed, so we error out early.
++	 */
++	if (nslots > MAX_NR_SG)
++		return NULL;
++
++	edesc = kzalloc(sizeof(*edesc) + nslots *
++		sizeof(edesc->pset[0]), GFP_ATOMIC);
++	if (!edesc) {
++		dev_dbg(dev, "Failed to allocate a descriptor\n");
++		return NULL;
++	}
++
++	edesc->cyclic = 1;
++	edesc->pset_nr = nslots;
++
++	dev_dbg(dev, "%s: nslots=%d\n", __func__, nslots);
++	dev_dbg(dev, "%s: period_len=%d\n", __func__, period_len);
++	dev_dbg(dev, "%s: buf_len=%d\n", __func__, buf_len);
++
++	for (i = 0; i < nslots; i++) {
++		/* Allocate a PaRAM slot, if needed */
++		if (echan->slot[i] < 0) {
++			echan->slot[i] =
++				edma_alloc_slot(EDMA_CTLR(echan->ch_num),
++						EDMA_SLOT_ANY);
++			if (echan->slot[i] < 0) {
++				dev_err(dev, "Failed to allocate slot\n");
++				return NULL;
++			}
++		}
++
++		if (i == nslots - 1) {
++			memcpy(&edesc->pset[i], &edesc->pset[0],
++			       sizeof(edesc->pset[0]));
++			break;
++		}
++
++		ret = edma_config_pset(chan, &edesc->pset[i], src_addr,
++				       dst_addr, burst, dev_width, period_len,
++				       direction);
++		if (ret < 0)
++			return NULL;
++
++		if (direction == DMA_DEV_TO_MEM)
++			dst_addr += period_len;
++		else
++			src_addr += period_len;
++
++		dev_dbg(dev, "%s: Configure period %d of buf:\n", __func__, i);
++		dev_dbg(dev,
++			"\n pset[%d]:\n"
++			"  chnum\t%d\n"
++			"  slot\t%d\n"
++			"  opt\t%08x\n"
++			"  src\t%08x\n"
++			"  dst\t%08x\n"
++			"  abcnt\t%08x\n"
++			"  ccnt\t%08x\n"
++			"  bidx\t%08x\n"
++			"  cidx\t%08x\n"
++			"  lkrld\t%08x\n",
++			i, echan->ch_num, echan->slot[i],
++			edesc->pset[i].opt,
++			edesc->pset[i].src,
++			edesc->pset[i].dst,
++			edesc->pset[i].a_b_cnt,
++			edesc->pset[i].ccnt,
++			edesc->pset[i].src_dst_bidx,
++			edesc->pset[i].src_dst_cidx,
++			edesc->pset[i].link_bcntrld);
++
++		edesc->absync = ret;
++
++		/*
++		 * Enable interrupts for every period because callback
++		 * has to be called for every period.
++		 */
++		edesc->pset[i].opt |= TCINTEN;
++	}
++
++	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
++}
++
+ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
+ {
+ 	struct edma_chan *echan = data;
+@@ -467,24 +605,28 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
+ 	unsigned long flags;
+ 	struct edmacc_param p;
+ 
+-	/* Pause the channel */
+-	edma_pause(echan->ch_num);
++	edesc = echan->edesc;
++
++	/* Pause the channel for non-cyclic */
++	if (!edesc || (edesc && !edesc->cyclic))
++		edma_pause(echan->ch_num);
+ 
+ 	switch (ch_status) {
+ 	case EDMA_DMA_COMPLETE:
+ 		spin_lock_irqsave(&echan->vchan.lock, flags);
+ 
+-		edesc = echan->edesc;
+ 		if (edesc) {
+-			if (edesc->processed == edesc->pset_nr) {
++			if (edesc->cyclic) {
++				vchan_cyclic_callback(&edesc->vdesc);
++			} else if (edesc->processed == edesc->pset_nr) {
+ 				dev_dbg(dev, "Transfer complete, stopping channel %d\n", ch_num);
+ 				edma_stop(echan->ch_num);
+ 				vchan_cookie_complete(&edesc->vdesc);
++				edma_execute(echan);
+ 			} else {
+ 				dev_dbg(dev, "Intermediate transfer complete on channel %d\n", ch_num);
++				edma_execute(echan);
+ 			}
+-
+-			edma_execute(echan);
+ 		}
+ 
+ 		spin_unlock_irqrestore(&echan->vchan.lock, flags);
+@@ -680,6 +822,7 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
+ 			  struct device *dev)
+ {
+ 	dma->device_prep_slave_sg = edma_prep_slave_sg;
++	dma->device_prep_dma_cyclic = edma_prep_dma_cyclic;
+ 	dma->device_alloc_chan_resources = edma_alloc_chan_resources;
+ 	dma->device_free_chan_resources = edma_free_chan_resources;
+ 	dma->device_issue_pending = edma_issue_pending;
+-- 
+1.8.1.2
