@@ -1,174 +1,230 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 31 Oct 2013 15:15:12 +0100
-Subject: [PATCH v2] videobuf2: Add missing lock held on vb2_fop_relase
-In-Reply-To: <20131031114243.2416bc88@samsung.com>
-References: <1382198877-27164-1-git-send-email-ricardo.ribalda@gmail.com>
- <20131031114243.2416bc88@samsung.com>
-Message-ID: <527265F0.6020706@samsung.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 31 Oct 2013 09:19:48 -0500
+Subject: [PATCHv9 04/43] CLK: TI: Add DPLL clock support
+In-Reply-To: <1382716658-6964-5-git-send-email-t-kristo@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-5-git-send-email-t-kristo@ti.com>
+Message-ID: <52726704.5070300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/13 14:42, Mauro Carvalho Chehab wrote:
-> Em Sat, 19 Oct 2013 18:07:57 +0200
-> Ricardo Ribalda <ricardo.ribalda@gmail.com> escreveu:
-> 
->> vb2_fop_relase does not held the lock although it is modifying the
->> queue->owner field.
->>
->> This could lead to race conditions on the vb2_perform_io function
->> when multiple applications are accessing the video device via
->> read/write API:
+On 10/25/2013 10:56 AM, Tero Kristo wrote:
 [...]
->> Signed-off-by: Ricardo Ribalda <ricardo.ribalda@gmail.com>
->> ---
->>  drivers/media/platform/exynos4-is/fimc-capture.c |  2 +-
->>  drivers/media/platform/exynos4-is/fimc-lite.c    |  2 +-
->>  drivers/media/usb/em28xx/em28xx-video.c          |  2 +-
->>  drivers/media/v4l2-core/videobuf2-core.c         | 18 +++++++++++++++++-
->>  include/media/videobuf2-core.h                   |  2 ++
->>  5 files changed, 22 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
->> index fb27ff7..c38d247c 100644
->> --- a/drivers/media/platform/exynos4-is/fimc-capture.c
->> +++ b/drivers/media/platform/exynos4-is/fimc-capture.c
->> @@ -549,7 +549,7 @@ static int fimc_capture_release(struct file *file)
->>  		vc->streaming = false;
->>  	}
->>  
->> -	ret = vb2_fop_release(file);
->> +	ret = __vb2_fop_release(file, true);
->>  
->>  	if (close) {
->>  		clear_bit(ST_CAPT_BUSY, &fimc->state);
->> diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
->> index e5798f7..021d804 100644
->> --- a/drivers/media/platform/exynos4-is/fimc-lite.c
->> +++ b/drivers/media/platform/exynos4-is/fimc-lite.c
->> @@ -546,7 +546,7 @@ static int fimc_lite_release(struct file *file)
->>  		mutex_unlock(&entity->parent->graph_mutex);
->>  	}
->>  
->> -	vb2_fop_release(file);
->> +	__vb2_fop_release(file, true);
->>  	pm_runtime_put(&fimc->pdev->dev);
->>  	clear_bit(ST_FLITE_SUSPENDED, &fimc->state);
->>  
->> diff --git a/drivers/media/usb/em28xx/em28xx-video.c b/drivers/media/usb/em28xx/em28xx-video.c
->> index 9d10334..6a5c147 100644
->> --- a/drivers/media/usb/em28xx/em28xx-video.c
->> +++ b/drivers/media/usb/em28xx/em28xx-video.c
->> @@ -1664,7 +1664,7 @@ static int em28xx_v4l2_close(struct file *filp)
->>  	em28xx_videodbg("users=%d\n", dev->users);
->>  
->>  	mutex_lock(&dev->lock);
->> -	vb2_fop_release(filp);
->> +	__vb2_fop_release(filp, false);
->>  
->>  	if (dev->users == 1) {
->>  		/* the device is already disconnect,
->> diff --git a/drivers/media/v4l2-core/videobuf2-core.c b/drivers/media/v4l2-core/videobuf2-core.c
->> index 594c75e..ce309a8 100644
->> --- a/drivers/media/v4l2-core/videobuf2-core.c
->> +++ b/drivers/media/v4l2-core/videobuf2-core.c
->> @@ -2619,16 +2619,32 @@ int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma)
->>  }
->>  EXPORT_SYMBOL_GPL(vb2_fop_mmap);
->>  
->> -int vb2_fop_release(struct file *file)
->> +int __vb2_fop_release(struct file *file, bool lock_is_held)
->>  {
->>  	struct video_device *vdev = video_devdata(file);
->> +	struct mutex *lock;
->>  
->>  	if (file->private_data == vdev->queue->owner) {
->> +		if (lock_is_held)
->> +			lock = NULL;
->> +		else
->> +			lock = vdev->queue->lock ?
->> +				vdev->queue->lock : vdev->lock;
->> +		if (lock)
->> +			mutex_lock(lock);
->>  		vb2_queue_release(vdev->queue);
->>  		vdev->queue->owner = NULL;
->> +		if (lock)
->> +			mutex_unlock(lock);
->>  	}
->>  	return v4l2_fh_release(file);
->>  }
->> +EXPORT_SYMBOL_GPL(__vb2_fop_release);
->> +
->> +int vb2_fop_release(struct file *file)
->> +{
->> +	return __vb2_fop_release(file, false);
->> +}
->>  EXPORT_SYMBOL_GPL(vb2_fop_release);
-> 
-> In general, when a symbol has both locked/unlocked versions, we
-> use the __symbol for unlocked versions (as the usage of the __symbol
-> requires the caller do do additional protection).
-> 
-> On this patch, (and on  Sylwester's version) you're seeming to be doing 
-> just the opposite. That sounds inconsistent with other Kernel symbols.
 
-Actually the version with double underscore prefix in my proposed changes
-doesn't take the lock internally (please see below). Hence it follows
-the common convention you're ponting out.
+> diff --git a/Documentation/devicetree/bindings/clock/ti/dpll.txt b/Documentation/devicetree/bindings/clock/ti/dpll.txt
+> new file mode 100644
+> index 0000000..7b87721
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/ti/dpll.txt
+> @@ -0,0 +1,81 @@
+> +Binding for Texas Instruments DPLL clock.
+> +
+> +Binding status: Unstable - ABI compatibility may be broken in the future
+> +
+> +This binding uses the common clock binding[1].  It assumes a
+> +register-mapped DPLL with usually two selectable input clocks
+> +(reference clock and bypass clock), with digital phase locked
+> +loop logic for multiplying the input clock to a desired output
+> +clock. This clock also typically supports different operation
+> +modes (locked, low power stop etc.) This binding has several
+> +sub-types, which effectively result in slightly different setup
+> +for the actual DPLL clock.
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties:
+> +- compatible : shall be one of:
+> +		"ti,omap3-dpll-clock",
+> +		"ti,omap3-dpll-core-clock",
+> +		"ti,omap3-dpll-per-clock",
+> +		"ti,omap3-dpll-per-j-type-clock",
+> +		"ti,omap4-dpll-clock",
+> +		"ti,omap4-dpll-x2-clock",
+> +		"ti,omap4-dpll-core-clock",
+> +		"ti,omap4-dpll-m4xen-clock",
+> +		"ti,omap4-dpll-j-type-clock",
+> +		"ti,am3-dpll-no-gate-clock",
+> +		"ti,am3-dpll-j-type-clock",
+> +		"ti,am3-dpll-no-gate-j-type-clock",
+> +		"ti,am3-dpll-clock",
+> +		"ti,am3-dpll-core-clock",
+> +		"ti,am3-dpll-x2-clock",
+> +
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clocks : link phandles of parent clocks, first entry lists reference clock
+> +  and second entry bypass clock
+> +- reg : offsets for the register set for controlling the DPLL.
+> +  Registers are listed in following order:
+> +	"control" - contains the control register base address
+> +	"idlest" - contains the idle status register base address
+> +	"autoidle" - contains the autoidle register base address
+> +	"mult-div1" - contains the multiplier / divider register base address
+If we move mult-div1 above autoidle, indices for control, idlest,
+mult-div1 will be constant with DPLLs that dont have autoidle. a
+little easier to debug.
 
-> Please either use that version or add a suffix (like _locked / __unlocked)
-> to allow a clearer understanding about what's the locked version.
-> 
-> Btw, Does it even make sense to have both options, or wouldn't be better
-> to just make sure that all drivers will do the same? My concern here is
-> with race conditions that may happen at device removal, if the lock is
-> released/retaken inside the routine that unbinds the driver.
+> +  ti,am3-* dpll types list the registers in the same order, except "autoidle"
+> +  register is left out as this hardware does not have it, e.g.:
+> +	reg = <0x40>, <0x50>, <0x60>;
+> +  results in following register map:
+> +	base + 0x40 - control
+> +	base + 0x50 - idlest
+> +	base + 0x60 - mult-div1
+> +
+> +Optional properties:
+> +- DPLL mode setting - defining any one or more of the following overrides
+> +  default setting.
+> +	- ti,low-power-stop : DPLL supports low power stop mode, gating output
+> +	- ti,low-power-bypass : DPLL output matches rate of parent bypass clock
+> +	- ti,lock : DPLL locks in programmed rate
 
-Exactly for this reason, i.e. not needing to release and reacquire lock
-in driver release() callback I suggested to have the
-int __vb2_fop_release(struct file *file); version, for cases when drivers
-use their custom handler and call __vb2_fop_release() from within it with
-the lock already held.
+> arch/arm/mach-omap2/cclock3xxx_data.c:  .modes          = (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+> arch/arm/mach-omap2/cclock3xxx_data.c:  .modes          = (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED),
+> arch/arm/mach-omap2/cclock3xxx_data.c:  .modes          = (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED),
+> arch/arm/mach-omap2/cclock3xxx_data.c:  .modes          = ((1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED) |
+> arch/arm/mach-omap2/cclock3xxx_data.c:  .modes          = (1 << DPLL_LOW_POWER_STOP) | (1 << DPLL_LOCKED),
+> arch/arm/mach-omap2/dpll3xxx.c: _omap3_dpll_write_clken(clk, DPLL_LOCKED);
 
-static int _vb2_fop_release(struct file *file, bool locked)
-{
-   	struct video_device *vdev = video_devdata(file);
-	struct mutex *lock;
+There is no if checks for DPLL_LOCKED which is set with ti,lock,
+should we just drop it?
 
-   	if (file->private_data == vdev->queue->owner) {
-		lock = vdev->queue->lock ?
-			vdev->queue->lock : vdev->lock;
+[...]
+> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+> new file mode 100644
+> index 0000000..89733c9
+> --- /dev/null
+> +++ b/drivers/clk/ti/dpll.c
 
-		if (lock && !locked)
-			mutex_lock(lock);
+[...]
 
-   		vb2_queue_release(vdev->queue);
-    		vdev->queue->owner = NULL;
-		if (lock && !locked)
-			mutex_unlock(lock);
-   	}
-    	return v4l2_fh_release(file);
-}
+> +/**
+> + * ti_clk_register_dpll() - Registers the DPLL clock
+> + * @name:	Name of the clock node
+> + * @parent_names: list of parent names
+> + * @num_parents: num of parents in parent_names
+> + * @flags:	init flags
+> + * @dpll_data:	DPLL data
+> + * @ops:	ops for DPLL
+> + */
+> +static struct clk *ti_clk_register_dpll(const char *name,
+> +					const char **parent_names,
+> +					int num_parents, unsigned long flags,
+> +					struct dpll_data *dpll_data,
+> +					const struct clk_ops *ops,
+> +					struct regmap *regmap)
+> +{
+> +	struct clk *clk;
+> +	struct clk_init_data init = { NULL };
+> +	struct clk_hw_omap *clk_hw;
+> +
+> +	/* allocate the divider */
+> +	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
+> +	if (!clk_hw) {
+> +		pr_err("%s: could not allocate clk_hw_omap\n", __func__);
 
-This function takes the lock internally.
+here and in every other driver - please dont add pr_err for kzalloc
+not able to allocate, kzalloc will provide the warning anyways.
 
-int vb2_fop_release(struct file *file)
-{
-	return _vb2_fop_release(file, false);
-}
-EXPORT_SYMBOL_GPL(vb2_fop_release);
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	clk_hw->dpll_data = dpll_data;
+> +	clk_hw->ops = &clkhwops_omap3_dpll;
+> +	clk_hw->hw.init = &init;
+> +	clk_hw->regmap = regmap;
+> +
+> +	init.name = name;
+> +	init.ops = ops;
+> +	init.flags = flags;
+> +	init.parent_names = parent_names;
+> +	init.num_parents = num_parents;
+> +
+> +	/* register the clock */
+> +	clk = clk_register(NULL, &clk_hw->hw);
+> +
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: failed clk_register for %s (%ld)\n", __func__, name,
+> +		       PTR_ERR(clk));
+> +		kfree(clk_hw);
+> +	} else {
+> +		omap2_init_clk_hw_omap_clocks(clk);
+> +	}
+> +
+> +	return clk;
+> +}
+> +
+> +#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+> +	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM33XX)
+> +/**
+> + * ti_clk_register_dpll_x2() -  Registers the DPLLx2 clock
+> + * @dev:	device pointer (if any)
+> + * @name:	Name of the clock node
+> + * @parent_name: parent name (only 1 parent)
+> + * @reg:	register address for DPLL
+> + * @ops:	ops for DPLL
+> + */
+> +static struct clk *ti_clk_register_dpll_x2(struct device_node *node,
+> +					   const struct clk_ops *ops,
+> +					   const struct clk_hw_omap_ops *hw_ops,
+> +					   struct regmap *regmap)
+> +{
+> +	struct clk *clk;
+> +	struct clk_init_data init = { NULL };
+> +	struct clk_hw_omap *clk_hw;
+> +	const char *name = node->name;
+> +	const char *parent_name;
+> +
+> +	of_property_read_string(node, "clock-output-names", &name);
+> +
+> +	parent_name = of_clk_get_parent_name(node, 0);
+> +	if (!parent_name) {
+> +		pr_err("%s: dpll_x2 must have parent\n", __func__);
 
-And this one deesn't.
+print node->name as well?
 
-int __vb2_fop_release(struct file *file)
-{
-	return _vb2_fop_release(file, true);
-}
-EXPORT_SYMBOL_GPL(__vb2_fop_release);
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
+> +	if (!clk_hw) {
+> +		pr_err("%s: could not allocate clk_hw_omap\n", __func__);
 
-It probably makes sense to move the locking out of _vb2_fop_release()
-and do it only vb2_fop_release(), even though v4l2_fh_release() may
-be unnecessarily called while keeping the mutex.
+^^ here again.
 
---
-Thanks,
-Sylwester
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	clk_hw->ops = hw_ops;
+> +	of_property_read_u32(node, "reg", (u32 *)&clk_hw->clksel_reg);
+> +	clk_hw->regmap = regmap;
+> +	clk_hw->hw.init = &init;
+> +
+> +	init.name = name;
+> +	init.ops = ops;
+> +	init.parent_names = &parent_name;
+> +	init.num_parents = 1;
+> +
+> +	/* register the clock */
+> +	clk = clk_register(NULL, &clk_hw->hw);
+> +
+> +	if (IS_ERR(clk))
+> +		kfree(clk_hw);
+> +	else
+> +		omap2_init_clk_hw_omap_clocks(clk);
+> +
+> +	return clk;
+> +}
+> +#endif
+[...]
+> +
+> +#ifdef CONFIG_ARCH_OMAP3
+
+just a mention - I understand we are still in transition and we need
+these #ifdefs, but eventually, we should be able to make the dpll.c
+independent of SoC variant #ifdefs.
+[...]
+
+
+-- 
+Regards,
+Nishanth Menon
