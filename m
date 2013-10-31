@@ -1,63 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 31 Oct 2013 10:17:43 +0100
-Subject: [PATCH 1/2] ARM: kirkwood: add support for OpenBlocks A7 platform
-In-Reply-To: <20131031093735.68aa7df1@skate>
-References: <1383152110-19577-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1383152110-19577-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20131030195724.GI26784@titan.lakedaemon.net> <20131031093735.68aa7df1@skate>
-Message-ID: <52722037.8050808@free-electrons.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 31 Oct 2013 11:18:03 +0200
+Subject: [PATCHv9 05/43] CLK: TI: add DT alias clock registration mechanism
+In-Reply-To: <CAHCPf3vcdriV3n2BvG2+saJFH6hR_gEFU=BhTBa0yqZUUWcg1A@mail.gmail.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>	<1382716658-6964-6-git-send-email-t-kristo@ti.com>	<CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>	<5270C368.9000701@ti.com>
+ <CAHCPf3vcdriV3n2BvG2+saJFH6hR_gEFU=BhTBa0yqZUUWcg1A@mail.gmail.com>
+Message-ID: <5272204B.2030106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/2013 09:37, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Wed, 30 Oct 2013 15:57:25 -0400, Jason Cooper wrote:
-> 
->>> +			partition at 0 {
->>> +				label = "uboot";
->>> +				reg = <0x0 0x1c0000>;
->>> +			};
->>> +
->>> +			partition at 90000 {
->>> +				label = "env";
->>> +				reg = <0x1c0000 0x2c0000>;
->>> +			};
+On 10/30/2013 07:38 PM, Matt Sealey wrote:
+> On Wed, Oct 30, 2013 at 3:29 AM, Tero Kristo <t-kristo@ti.com> wrote:
+>> On 10/29/2013 07:50 PM, Matt Sealey wrote:
+>>>
+>>> I have one question here, what makes this part of the patch
+>>> TI-specific at all except the definition of the structure ti_dt_clk?
+>>> Mapping DT clocks to generic clkdev legacy namings seems like it would
+>>> be a necessary evil across *all* SoC platforms.
+>>>
+>>> I would say there is a good case for this being generic
 >>
->> Hmm, something doesn't look right here.  Cut-n-paste problem?  Did you
->> run 'make dtbs' against this?  I get address size errors when I do.
-> 
-> Strange. 'make dtbs' was working here. What was wrong exactly? Just
-> that the unit address (@90000) didn't match the starting address
-> 0x1c0000 ?
+>> An earlier implementation of this patch (or at least a patch that tries to
+>> accomplish the same as this does, add support for legacy devices) did try to
+>> add generic solution. There was some discussion on it and I decided to drop
+>> it due to bad feedback.
+>>
+>> See: http://www.spinics.net/lists/linux-omap/msg95147.html
+>
+> I don't see anything that says this should not be generic, just that
+> it was implemented relatively poorly at the time...
+>
+> I agree with Tomasz, find_by_name in device trees is basically evil
+> (it's only supposed to be used if you already know the name because
+> something else passed it to you, and just want it's phandle, but names
+> CAN be ambiguous. The real fix is always pass phandles and not strings
+> of the name property), but that's not to say this thing needs to be
+> TI-specific..
+>
+> Ah well. If it ends up getting used elsewhere, it can be quickly
+> patched into a generic version anyway, so.. yay!
 
-The unit address has no special meaning for the device tree it's just a
-way to give a unique name to a node right?
+Yeah, this can be converted to generic version easily if need be. The 
+thing with this patch is also that it is kind of temporary solution, it 
+should not be needed anymore once all the drivers are converted to DT.
 
-So in this case it is not really a problem, but it's just nicer for the
-coherency of the information in the dt to have the unit address which match
-the starting address.
+>
+> I'm really interested in this all going in - but I would love to see
+> where this is just all patched into a tree already. Pulling things out
+> against a bunch of trees gave me more merge failures and weird
+> happenings than I care to deal with. Is there a TI clock development
+> tree with all this in somewhere publically accessible? I'd like to get
+> a feel for how the DT looks and what's going on, I can't "see" it from
+> the patches. Once it's there.. I'll spend a week or 5 doing all of the
+> i.MX chips and you'll have a second test case for any problems :)
 
-I also do a make dtbs ans I didn't get any errors:
-$ make dtbs
- [...]
-  DTC     arch/arm/boot/dts/kirkwood-openblocks_a6.dtb
-  DTC     arch/arm/boot/dts/kirkwood-openblocks_a7.dtb
+Did you try the fully integrated test tree I mentioned in the cover letter?
 
-Regards,
-> 
->> let me know if it's ok with you and I'll push it tomorrow.
-> 
-> This all looks good to me!
-> 
-> Thanks a lot,
-> 
-> Thomas
-> 
+tree: https://github.com/t-kristo/linux-pm.git
+branch: 3.12-rc6-dt-clks-v9
 
+This has everything in it, and compiles cleanly.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-Tero
