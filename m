@@ -1,29 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 31 Oct 2013 10:37:03 -0700
-Subject: [GIT PULL V2] ARM: mvebu: dt changes for v3.13 (really, last one!)
-In-Reply-To: <20131031155627.GP26784@titan.lakedaemon.net>
-References: <20131031133550.GM26784@titan.lakedaemon.net>
- <20131031155627.GP26784@titan.lakedaemon.net>
-Message-ID: <CAOesGMhtD0xLCbi=J6Fa6EZu7M6xVMda7z_XGnrSY=pev1=LiA@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Thu, 31 Oct 2013 10:37:09 -0700
+Subject: [PATCH] arm: zynq: platsmp: Remove CPU presence check
+In-Reply-To: <20131031161739.GE16735@n2100.arm.linux.org.uk>
+References: <20131031161739.GE16735@n2100.arm.linux.org.uk>
+Message-ID: <1383241029-32018-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 8:56 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> Olof,
->
-> On Thu, Oct 31, 2013 at 09:35:50AM -0400, Jason Cooper wrote:
->> Olof,
->>
->> At your request, here's Thomas' patch adding the Openblocks A7 board.
->> It made it through -next last night.
->
-> Small amendment.  In all the hussle of KS last week, I forgot there was
-> one other dts-only board addition that I had held off.  Doesn't seem
-> right to push Thomas' without Arnaud's. :)
+The generic code already checks that the CPU being requested is legal if
+the cpu possible/present masks are set correctly.
 
-Yep, fair enough.
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+As per Russel's suggestion, consider this alternative for 1/6.
 
-Pulled.
+	S?ren
 
+ arch/arm/mach-zynq/platsmp.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
--Olof
+diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+index bc730eb38f00..8021499e7b70 100644
+--- a/arch/arm/mach-zynq/platsmp.c
++++ b/arch/arm/mach-zynq/platsmp.c
+@@ -39,11 +39,6 @@ int zynq_cpun_start(u32 address, int cpu)
+ 	u32 trampoline_code_size = &zynq_secondary_trampoline_end -
+ 						&zynq_secondary_trampoline;
+ 
+-	if (cpu > ncores) {
+-		pr_warn("CPU No. is not available in the system\n");
+-		return -1;
+-	}
+-
+ 	/* MS: Expectation that SLCR are directly map and accessible */
+ 	/* Not possible to jump to non aligned address */
+ 	if (!(address & 3) && (!address || (address >= trampoline_code_size))) {
+-- 
+1.8.4.1
