@@ -1,63 +1,42 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 31 Oct 2013 10:12:03 -0700
-Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
-In-Reply-To: <20131030232412.GA10229@fifo99.com> (Daniel Walker's message of
- "Wed, 30 Oct 2013 16:25:32 -0700")
-References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
- <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
- <20131029132043.GA28165@fifo99.com>
- <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
- <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
-Message-ID: <8738nhnz4s.fsf@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 31 Oct 2013 10:12:32 -0700
+Subject: [PATCH] clk: Do not dereference potential NULL pointer
+In-Reply-To: <1383221036-26890-1-git-send-email-treding@nvidia.com>
+References: <1383221036-26890-1-git-send-email-treding@nvidia.com>
+Message-ID: <52728F80.8080203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Walker <dwalker@fifo99.com> writes:
-
-> On Wed, Oct 30, 2013 at 04:08:27PM -0700, Kevin Hilman wrote:
->> Olof Johansson <olof@lixom.net> writes:
->> 
->> > I would be very happy to take more code for the older Qualcomm chipset
->> > to enable full functionality for them, but it's been my impression
->> > that far from all that is needed to make it a useful platform is in
->> > the upstream kernel, and there's been no signs of more of it showing
->> > up at least in the last two years.
->> >
->> > So we have a bit of a stalemate here -- the current Qualcomm team
->> > wants to avoid having to deal too much with the legacy platforms --
->> > they are technically quite different from the current platforms and
->> > the divergence makes it hard to deal with supporting it all in a
->> > modern way without risking regressions. I tend to agree with them.
->> 
->> As do I.
->> 
->> > Just like omap split between omap1 and omap2plus, I think it's a time
->> > to create a mach-qcom instead, and move the modern (v7, most likely)
->> > platforms there -- enable them with device tree, modern framework
->> > infrastructure, etc. That way you can keep older platforms in mach-msm
->> > without risk of regressions, and they have a clean base to start on
->> > with their later platforms.
->> 
->> I think this split approach is a good compromise.
->> 
->> If the maintainers of the current older platforms wish to bring them up
->> to modern frameworks, we can consider combining again.  If not, they the
->> older platforms will take the same path as the rest of the older
->> platforms that slowly fade away.
->> 
+On 10/31/13 05:03, Thierry Reding wrote:
+> A NULL pointer may be passed to _clk_register() for the dev parameter
+> (via clk_register()). Make sure not to dereference it before checking
+> that it's valid.
 >
-> So the current users of those platforms are, what SOL ?
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
 
-No.  The idea behind splitting them is to allow current platforms with
-active maintainers to progress without being held back.  The older
-platforms can stay and have an opportunity to modernize. 
+Ugh I had this fixed but didn't send it.
 
-The kernel is a moving target, without some minimal effort to keep
-platforms up to date, the effort to continue to maintain/modernize them
-can become more of a pain than it's worth.  If maintainers of these older
-platforms are willing to put in the work, nobody will be SOL.  If
-nobody shows interest in modernizing these older platforms (which seems
-to be the case based on the last couple years), then it is reasonable
-IMO for them to fade away slowly.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Kevin
+>  drivers/clk/clk.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index b68a999..c0b52e3 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1976,7 +1976,7 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
+>  		hw->regmap = hw->init->regmap;
+>  	else if (dev && dev_get_regmap(dev, NULL))
+>  		hw->regmap = dev_get_regmap(dev, NULL);
+> -	else if (dev->parent)
+> +	else if (dev && dev->parent)
+>  		hw->regmap = dev_get_regmap(dev->parent, NULL);
+>  
+>  	/* allocate local copy in case parent_names is __initdata */
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
