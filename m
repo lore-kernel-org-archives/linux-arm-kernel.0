@@ -1,35 +1,22 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 31 Oct 2013 12:18:44 +0530
-Subject: [PATCH 4/4] ARM: dts: Add S5M8767 clock nodes on Arndale board
-In-Reply-To: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
-References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1383202124-1775-5-git-send-email-tushar.behera@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 31 Oct 2013 15:04:45 +0800
+Subject: [PATCH v2 0/6] mmc: sdhci-esdhc-imx: fix acmd23 unwork and ddr
+ not supported on sabresd issues
+In-Reply-To: <1383142193-24950-1-git-send-email-b29396@freescale.com>
+References: <1383142193-24950-1-git-send-email-b29396@freescale.com>
+Message-ID: <20131031070442.GD23549@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-CC: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/boot/dts/exynos5250-arndale.dts |    7 +++++++
- 1 file changed, 7 insertions(+)
+On Wed, Oct 30, 2013 at 10:09:47PM +0800, Dong Aisheng wrote:
+> Dong Aisheng (6):
+>   mmc: sdhci: clear auto cmd setting bits for no data cmds
+>   mmc: sdhci-esdhc-imx: add SDHCI_TRANSFER_MODE read function
+>   ARM: dts: sabresd: add usdhc4 support
+>   mmc: sdhci-esdhc-imx: fix cpas over write issue
+>   mmc: sdhci-esdhc-imx: add MMC_CAP_1_8V_DDR for mx6
+>   mmc: core: mmc DDR mode should not depend on UHS_DDR50
 
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index b77a37e..34b305d 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -70,6 +70,13 @@
- 			s5m8767,pmic-buck-ds-gpios = <&gpx2 3 0>,
- 							<&gpx2 4 0>,
- 							<&gpx2 5 0>;
-+
-+			s5m8767_osc: clocks {
-+				#clock-cells = <1>;
-+				clock-output-names = "s5m8767_ap",
-+						"s5m8767_cp", "s5m8767_bt";
-+			};
-+
- 			regulators {
- 				ldo1_reg: LDO1 {
- 					regulator-name = "VDD_ALIVE_1.0V";
--- 
-1.7.9.5
+For the series:
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
