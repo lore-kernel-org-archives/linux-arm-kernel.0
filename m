@@ -1,46 +1,44 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 31 Oct 2013 23:26:29 +0100
-Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu
- node in DT.
-In-Reply-To: <1383247111-26834-4-git-send-email-andrew@lunn.ch>
-References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
- <1383247111-26834-4-git-send-email-andrew@lunn.ch>
-Message-ID: <1429743.Nz1AUEe5Hi@vostro.rjw.lan>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 31 Oct 2013 15:23:08 -0700
+Subject: [PATCHv7][ 2/5] ASoC: eukrea-tlv320: Add DT support.
+In-Reply-To: <CAHCPf3tt8sbXnABUomg_w1ttBTgBQL=VNwsRoFazzuVdgzzO=g@mail.gmail.com>
+References: <20131026114840.GX2443@sirena.org.uk>
+ <CAHCPf3vHWt5XJCwvGDMfX9rTPKqHU43SHORqpxLtLaDL6RGb8A@mail.gmail.com>
+ <20131029174445.GB20251@sirena.org.uk>
+ <CAHCPf3sm9BawgCKrPH_mbD-Mhb-uXzSyZTjxhJf1W25pG3wZUA@mail.gmail.com>
+ <20131030212927.GM2493@sirena.org.uk>
+ <CAHCPf3s46E=s85ohfqajr-VbavAM+gernXkkYeSwd4NYN8AEHw@mail.gmail.com>
+ <20131031012830.GZ2493@sirena.org.uk>
+ <CAHCPf3vUvg6w-OYO5yM8wj1Gr3p0xQZ=+bZ29ZKrZiQGAYektA@mail.gmail.com>
+ <20131031174549.GG2493@sirena.org.uk>
+ <CAHCPf3tt8sbXnABUomg_w1ttBTgBQL=VNwsRoFazzuVdgzzO=g@mail.gmail.com>
+Message-ID: <20131031222308.GL2493@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 31, 2013 08:18:31 PM Andrew Lunn wrote:
-> The dove-cpufreq driver needs access to the DDR and CPU clock.  There
-> is also an interrupt generated when the DFS hardware completes a
-> change of frequencey. Add these to the cpu node in DT.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+On Thu, Oct 31, 2013 at 04:19:05PM -0500, Matt Sealey wrote:
 
-I need someone with DT bindings knowledge to ACK this for me.
+> Yes, I can make a big list and even send a patch, but I think it's
+> putting a band-aid on a non-surgical limb amputation.
 
-Thanks!
+It would be moving the situation forwards which is something that
+lengthy e-mails full of architecting with zero code won't do. 
 
-> ---
->  arch/arm/boot/dts/dove.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 1fd615d27532..e96d7a6a2fb8 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -19,6 +19,10 @@
->  			device_type = "cpu";
->  			next-level-cache = <&l2>;
->  			reg = <0>;
-> +			clocks = <&core_clk 1>, <&core_clk 3>;
-> +			clock-names = "cpu_clk", "ddrclk";
-> +			interrupt-parent = <&pmu_intc>;
-> +			interrupts = <0>;
->  		};
->  	};
->  
-> 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> > To repeat myself yet again: what is done to the CODEC here is system
+> > dependent.  This includes interaction with other components in the
+> > system.
+
+> In this particular use case (init setting sysclk, and bias_level
+> callbacks setting sysclk and pll for WM8962), there is no system
+> dependency except a fixed, unchanging parent clock (it's fixed at card
+> init and NEVER updated) which the DT binding can solve really easily
+
+That is the chosen configuration for the systems you are looking at;
+other systems do exist.  This is the nature of board specifics.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131031/b23d31b1/attachment.sig>
