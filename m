@@ -1,28 +1,28 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 1 Nov 2013 05:16:30 +0530
-Subject: [PATCH v3 1/4] cpufreq: Add a cpufreq driver for Marvell Dove
-In-Reply-To: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
+Date: Fri, 1 Nov 2013 05:21:03 +0530
+Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu
+ node in DT.
+In-Reply-To: <1429743.Nz1AUEe5Hi@vostro.rjw.lan>
 References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
-Message-ID: <CAKohpo=m1SR3mJoFuGzQRW5-AWSujtMYZ7V3-_LyRn5WoTCcuw@mail.gmail.com>
+ <1383247111-26834-4-git-send-email-andrew@lunn.ch>
+ <1429743.Nz1AUEe5Hi@vostro.rjw.lan>
+Message-ID: <CAKohpokTWfBnhWj+bdA9zx-+hyXUdp4ir5BYkZNLe08mcwVwLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 November 2013 00:48, Andrew Lunn <andrew@lunn.ch> wrote:
-> The Marvell Dove SoC can run the CPU at two frequencies. The high
-> frequencey is from a PLL, while the lower is the same as the DDR
-> clock. Add a cpufreq driver to swap between these frequences.
+On 1 November 2013 03:56, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Thursday, October 31, 2013 08:18:31 PM Andrew Lunn wrote:
+>> The dove-cpufreq driver needs access to the DDR and CPU clock.  There
+>> is also an interrupt generated when the DFS hardware completes a
+>> change of frequencey. Add these to the cpu node in DT.
+>>
+>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 >
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> I need someone with DT bindings knowledge to ACK this for me.
 
-As I have said early, you need to rebase this now over linux-next, which
-has got over 150 patches for cpufreq for 3.13..
+I can do that, but this set has to be rebased over all the latest developments
+in cpufreq core before getting posted again..
 
-Over that following patchset would be included in linux-next as soon as
-3.13-rc1 or rc2 is going to be released and so probably before your
-patch makes it:
-
-https://lkml.org/lkml/2013/10/30/553
-
-So, please rebase your driver over linux-next & above patchset and
-resend again..
+@Andrew: you can add my: Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+for this patch..
