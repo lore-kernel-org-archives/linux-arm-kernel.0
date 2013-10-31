@@ -1,24 +1,21 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 Oct 2013 11:36:44 -0700
-Subject: [PATCH v4 3/4] ASoC: fsl_ssi: Add dual fifo mode support
-In-Reply-To: <dda0bc1221f053405da616192577228c51821040.1383226444.git.b42378@freescale.com>
-References: <cover.1383226444.git.b42378@freescale.com>
- <dda0bc1221f053405da616192577228c51821040.1383226444.git.b42378@freescale.com>
-Message-ID: <20131031183644.GJ2493@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 31 Oct 2013 17:39:46 +0000
+Subject: [PATCH v5 1/7] arm64: introduce basic aarch64 instruction
+ decoding helpers
+In-Reply-To: <1382109602-27432-2-git-send-email-liuj97@gmail.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+ <1382109602-27432-2-git-send-email-liuj97@gmail.com>
+Message-ID: <20131031173946.GL26009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 09:44:15PM +0800, Nicolin Chen wrote:
-> By enabling dual fifo mode, it would allow SSI enter a better performance
-> to transimit/receive data without occasional hardware underrun/overrun.
-> 
-> [ Passed compile-test with mpc85xx_defconfig ]
+On Fri, Oct 18, 2013 at 04:19:55PM +0100, Jiang Liu wrote:
+> +/*
+> + * ARMv8-A Section B2.6.5:
 
-Acked-by: Mark Brown <broonie@linaro.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131031/09322872/attachment.sig>
+Minor comment - please specify the document revision and the title of
+the section as they keep changing in subsequent ARMv8 ARM updates and
+this comment would no longer match.
+
+-- 
+Catalin
