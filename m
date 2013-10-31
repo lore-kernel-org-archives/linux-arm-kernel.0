@@ -1,78 +1,34 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 31 Oct 2013 10:46:12 -0500
-Subject: [PATCHv9 01/43] clk: Add support for regmap register read/write
-In-Reply-To: <52726BD5.3080704@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-2-git-send-email-t-kristo@ti.com> <52726342.6030406@ti.com>
- <52726BD5.3080704@ti.com>
-Message-ID: <52727B44.4020102@ti.com>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Thu, 31 Oct 2013 10:45:08 -0500
+Subject: [PATCH RFC] ARM: dts: imx6qdl: make pinctrl nodes board specific
+In-Reply-To: <20131031102908.GX16735@n2100.arm.linux.org.uk>
+References: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
+ <20131031080326.GK24559@pengutronix.de>
+ <20131031102908.GX16735@n2100.arm.linux.org.uk>
+Message-ID: <CAHCPf3vTcu9RCk8=9MUs4nkyJ-8jevh5koxfzdLzE5+qM0ZspQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 09:40 AM, Tero Kristo wrote:
-> On 10/31/2013 04:03 PM, Nishanth Menon wrote:
->> On 10/25/2013 10:56 AM, Tero Kristo wrote:
->> [...]
->>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->>> index 7e59253..63ff78c 100644
->>> --- a/include/linux/clk-provider.h
->>> +++ b/include/linux/clk-provider.h
+I suggested this to Shawn a couple weeks ago and got a bit of pushback.
+
+There's probably a ton more to do in this regard to keep the DT
+per-board more concise, but this drops tree size by a respectable
+amount on i.MX51 too (just on a tree I have internally, it's something
+like 8.5KiB) and I can't see any redundant data in the ones he
+patched.
+
+I can follow this up with i.MX51/i.MX53 if nobody is already doing that..
+
+Acked-by: Matt Sealey <neko@bakuhatsu.net>
+
+On Thu, Oct 31, 2013 at 5:29 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Oct 31, 2013 at 09:03:26AM +0100, Sascha Hauer wrote:
+>> So:
 >>
->> [...]
->>> -static inline u32 clk_readl(u32 __iomem *reg)
->>> +static inline u32 clk_readl(u32 __iomem *reg, struct regmap *regmap)
->>>   {
->>> -	return readl(reg);
->>> +	u32 val;
->>> +
->>> +	if (regmap)
->>> +		regmap_read(regmap, (u32)reg, &val);
->>> +	else
->>> +		val = readl(reg);
->>> +	return val;
->>>   }
->>>
->>> -static inline void clk_writel(u32 val, u32 __iomem *reg)
->>> +static inline void clk_writel(u32 val, u32 __iomem *reg, struct regmap *regmap)
->>>   {
->>> -	writel(val, reg);
->>> +	if (regmap)
->>> +		regmap_write(regmap, (u32)reg, val);
->>> +	else
->>> +		writel(val, reg);
->>>   }
->>>
->>>   #endif /* CONFIG_COMMON_CLK */
->>>
->>
->> Might it not be better to introduce regmap variants?
->> static inline void clk_regmap_writel(u32 val, u32 reg, struct regmap
->> *regmap)
->> and corresponding readl? that allows cleaner readability for clk
->> drivers that use regmap and those that dont.
-> 
-> Well, doing that will introduce a lot of redundant code, as the checks 
-> for the presence of regmap must be copied all over the place. With this 
-> patch, all the generic clock drivers support internally both regmap or 
-> non-regmap register accesses.
-> 
-
-using function pointers might be an appropriate solution. in general a
-low level reg access api that uses two different approaches sounds a
-little.. umm.. fishy..
-
->> regmap can also return error value that could also be handled as a result.
-> 
-> True, however if the regmap fails for the clock code, not sure what we 
-> can do but panic. If this code is expanded, it is probably better to not 
-> inline it anymore.
-> 
-let the compiler deal with that decision. regmap operation fail should
-be percollated back to initiator of the request. in some cases that
-will be ir-recoverable, but on other cases panic might be the right
-answer - at the low level we are in no position to make that distinction.
-
-
--- 
-Regards,
-Nishanth Menon
+>> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+>
+> Ok, I'll wait for this to hit mainline before re-spinning the Carrier-1
+> DT files.  That's going to upset those who want to see Carrier-1 support
+> in mainline at the next merge window (like Olof) and out mainline support
+> for this board into 2014, but I don't see any other alternative.
