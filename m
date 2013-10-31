@@ -1,131 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 31 Oct 2013 14:52:28 +0900
-Subject: [PATCH v2 00/19] Enable various Renesas drivers on all ARM
- platforms
-In-Reply-To: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20131031055228.GS1603@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 31 Oct 2013 13:56:34 +0800
+Subject: [PATCH] ARM: dts: Add initial support for cm-fx6.
+In-Reply-To: <1383048703-2101-1-git-send-email-valentin@compulab.co.il>
+References: <1383048703-2101-1-git-send-email-valentin@compulab.co.il>
+Message-ID: <20131031055631.GA23549@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 11:37:35PM +0100, Laurent Pinchart wrote:
-> Hello,
+On Tue, Oct 29, 2013 at 02:11:43PM +0200, Valentin Raevsky wrote:
+> Add initial support for cm-fx6 module.
 > 
-> This patch series, based on v3.12-rc7, prepares various Renesas drivers
-> for migration to multiplatform kernels by enabling their compilation or
-> otherwise fixing them on all ARM platforms. The patches are pretty
-> straightforward and are described in their commit message.
+> cm-fx6 is a module based on mx6q SoC with the following features:
+> - Up to 4GB of DDR3
+> - 1 LCD/DVI output port
+> - 1 HDMI output port
+> - 2 LVDS LCD ports
+> - Gigabit Ethernet
+> - Analog Audio
+> - CAN
+> - SATA
+> - NAND
+> - PCIE
 > 
-> Changes since v1:
+> This patch allows to boot up the module, configures the serial console,
+> the Ethernet adapter and the heartbeat led.
 > 
-> - The drivers can also be selected when COMPILE_TEST is enabled, regardless of
->   the architecture. This should provide a good compromise between wide build
->   test coverage and not clobbering configuration with drivers useless on
->   non-SuperH, non-ARM platforms.
+> cm-fx6 is embedded inside the Utilite computer.
 > 
-> - DMA configuration is now unconditional in patch 08/19
+> Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> ---
 > 
-> I'd like to get all these patches merged in v3.14. As they will need to go
-> through their respective subsystems' trees, I would appreciate if all
-> maintainers involved could notify me when they merge patches from this series
-> in their tree to help me tracking the merge status. I don't plan to send pull
-> requests individually for these patches, and I will repost patches
-> individually if changes are requested during review.
-> 
-> If you believe the issue should be solved in a different way please reply to
-> the cover letter to let other maintainers chime in.
+> Shawn, can this still be applied for 3.13 ?
 
-All patches, including the v3 ones present in the thread at this time:
+Sorry, it's late for 3.13.  Applied for 3.14 with a small fix-up below.
 
-Acked-by: Simon Horman <horms@verge.net.au>
+> 
+>  arch/arm/boot/dts/Makefile         |    1 +
+>  arch/arm/boot/dts/imx6q-cm-fx6.dts |   53 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 54 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-cm-fx6.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 641b3c9..87ca7ca 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -131,6 +131,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx6q-sabrelite.dtb \
+>  	imx6q-sabresd.dtb \
+>  	imx6q-sbc6x.dtb \
+> +	imx6q-cm-fx6.dtb \
 
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> Cc: Ian Molton <ian@mnementh.co.uk>
-> Cc: iommu at lists.linux-foundation.org
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> Cc: Samuel Ortiz <samuel@sortiz.org>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: dmaengine at vger.kernel.org
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: linux-i2c at vger.kernel.org
-> Cc: linux-input at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-media at vger.kernel.org
-> Cc: linux-mmc at vger.kernel.org
-> Cc: linux-mtd at lists.infradead.org
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-pwm at vger.kernel.org
-> Cc: linux-serial at vger.kernel.org
-> Cc: linux-spi at vger.kernel.org
-> Cc: netdev at vger.kernel.org
-> 
-> Laurent Pinchart (19):
->   serial: sh-sci: Enable the driver on all ARM platforms
->   DMA: shdma: Enable the driver on all ARM platforms
->   i2c: sh_mobile: Enable the driver on all ARM platforms
->   input: sh_keysc: Enable the driver on all ARM platforms
->   iommu: shmobile: Enable the driver on all ARM platforms
->   i2c: rcar: Enable the driver on all ARM platforms
->   v4l: sh_vou: Enable the driver on all ARM platforms
->   mmc: sdhi: Enable the driver on all ARM platforms
->   mmc: sh_mmcif: Enable the driver on all ARM platforms
->   mtd: sh_flctl: Enable the driver on all ARM platforms
->   net: sh_eth: Set receive alignment correctly on all ARM platforms
->   irda: sh_irda: Enable the driver on all ARM platforms
->   pinctrl: sh-pfc: Enable the driver on all ARM platforms
->   pwm: pwm-renesas-tpu: Enable the driver on all ARM platforms
->   sh: intc: Enable the driver on all ARM platforms
->   spi: sh_msiof: Enable the driver on all ARM platforms
->   spi: sh_hspi: Enable the driver on all ARM platforms
->   thermal: rcar-thermal: Enable the driver on all ARM platforms
->   fbdev: sh-mobile-lcdcfb: Enable the driver on all ARM platforms
-> 
->  drivers/dma/sh/Kconfig                | 2 +-
->  drivers/dma/sh/shdmac.c               | 6 +++---
->  drivers/i2c/busses/Kconfig            | 4 ++--
->  drivers/input/keyboard/Kconfig        | 2 +-
->  drivers/iommu/Kconfig                 | 2 +-
->  drivers/media/platform/Kconfig        | 2 +-
->  drivers/mmc/host/Kconfig              | 4 ++--
->  drivers/mmc/host/tmio_mmc_dma.c       | 4 +---
->  drivers/mtd/nand/Kconfig              | 2 +-
->  drivers/net/ethernet/renesas/sh_eth.c | 2 +-
->  drivers/net/ethernet/renesas/sh_eth.h | 2 +-
->  drivers/net/irda/Kconfig              | 2 +-
->  drivers/pinctrl/Makefile              | 2 +-
->  drivers/pinctrl/sh-pfc/Kconfig        | 2 +-
->  drivers/pwm/Kconfig                   | 2 +-
->  drivers/sh/intc/Kconfig               | 2 +-
->  drivers/spi/Kconfig                   | 4 ++--
->  drivers/thermal/Kconfig               | 2 +-
->  drivers/tty/serial/Kconfig            | 2 +-
->  drivers/video/Kconfig                 | 6 +++---
->  20 files changed, 27 insertions(+), 29 deletions(-)
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+If you look at the list, you can find that they are sorted
+alphabetically.  I just moved it around to maintain the order.
+
+Shawn
+
+>  	imx6sl-evk.dtb \
+>  	vf610-twr.dtb
+>  dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
