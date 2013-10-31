@@ -1,48 +1,34 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 31 Oct 2013 13:04:51 +0100
-Subject: [PATCH] ARM: imx6q: add missing sentinel to divider table
-In-Reply-To: <1383220548-8622-1-git-send-email-LW@KARO-electronics.de>
-References: <1383220548-8622-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20131031130451.15e90077@ipc1.ka-ro>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Thu, 31 Oct 2013 05:07:28 -0700
+Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
+In-Reply-To: <CAOesGMiEGJ8iMe=_-eJzhx3sRQO8VKbKGD-iLWsRztxUeJWJbQ@mail.gmail.com>
+References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
+ <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
+ <20131029132043.GA28165@fifo99.com>
+ <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
+ <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
+ <CAOesGMi2E1Ynr4rWY1eBmcZeB7Vahb5VdPUVs1ebLJowH1kpWw@mail.gmail.com>
+ <20131031024538.GA17886@fifo99.com>
+ <CAOesGMiEGJ8iMe=_-eJzhx3sRQO8VKbKGD-iLWsRztxUeJWJbQ@mail.gmail.com>
+Message-ID: <20131031120727.GA28330@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Oct 30, 2013 at 10:19:30PM -0700, Olof Johansson wrote:
+> On Wed, Oct 30, 2013 at 7:45 PM, Daniel Walker <dwalker@fifo99.com> wrote:
+> > On Wed, Oct 30, 2013 at 05:36:58PM -0700, Olof Johansson wrote:
+> >> On Wed, Oct 30, 2013 at 4:25 PM, Daniel Walker <dwalker@fifo99.com> wrote:
+> >>
+> >> > So the current users of those platforms are, what SOL ?
+> >>
+> >> What users? Show me one.
+> >
+> > What am I chop liver ?
+> 
+> Ah, right. So, what platforms do you currently rely on mainline
+> support for? Please be precise so we can figure out what needs to be
+> kept and not.
 
-Lothar Wa?mann wrote:
-> The clk_enet_ref_table[] is missing a final empty entry as end of list
-> marker. Also make the existing markers more obvious.
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  arch/arm/mach-imx/clk-imx6q.c |    5 +++--
->
-There is something else that looks suspicious in this file:
-The video_div_table[] has four entries:
-|	{ .val = 0, .div = 1, },
-|	{ .val = 1, .div = 2, },
-|	{ .val = 2, .div = 1, },
-|	{ .val = 3, .div = 4, },
+The only one I don't have is 7x30, as I said in prior emails. 
 
-But the code that sets the dividers to '1' as a workaround for the TO1.0
-chip revision only two dividers are modified, one of which is already
-'1':
-|if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_1_0) {
-|	post_div_table[1].div = 1;
-|	post_div_table[2].div = 1;
-|	video_div_table[1].div = 1;
-|	video_div_table[2].div = 1;
-	                ^
-This probably should be '3' instead?
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Daniel
