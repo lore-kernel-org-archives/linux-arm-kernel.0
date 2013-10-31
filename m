@@ -1,28 +1,61 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 31 Oct 2013 09:54:46 +0100
-Subject: [PATCH] PCI: mvebu - The bridge secondary status register
- should be 0
-In-Reply-To: <1381868190-8595-1-git-send-email-jgunthorpe@obsidianresearch.com>
-References: <1381868190-8595-1-git-send-email-jgunthorpe@obsidianresearch.com>
-Message-ID: <20131031095446.3c95fbb5@skate>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Thu, 31 Oct 2013 09:58:40 +0100
+Subject: [PATCH 5/6] ARM: dts: Add nodes for SMMUs on Calxeda ECX-2000
+In-Reply-To: <20131031011521.GE28613@mudshark.cambridge.arm.com>
+References: <1382127195-15261-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1382127195-15261-6-git-send-email-andreas.herrmann@calxeda.com>
+ <20131031011521.GE28613@mudshark.cambridge.arm.com>
+Message-ID: <20131031085840.GS10330@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
-
-On Tue, 15 Oct 2013 14:16:30 -0600, Jason Gunthorpe wrote:
-> There are no writable bits in the secondary status register, only
-> write 1 to clear bits. The driver never sets any of the write 1 to
-> clear bits so the status register should always be 0, just remove
-> the set from the write path.
+On Wed, Oct 30, 2013 at 09:15:21PM -0400, Will Deacon wrote:
+> On Fri, Oct 18, 2013 at 09:13:14PM +0100, Andreas Herrmann wrote:
+> > Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> > ---
+> >  arch/arm/boot/dts/ecx-2000.dts    |   44 +++++++++++++++++++++++++++++++++++--
+> >  arch/arm/boot/dts/ecx-common.dtsi |    9 +++++---
+> >  drivers/iommu/arm-smmu.c          |    2 +-
+> >  include/linux/of.h                |    2 +-
+> >  4 files changed, 50 insertions(+), 7 deletions(-)
 > 
-> Someday the write 1 to clear bits should be copied/cleared directly
-> from registers in the HW.
+> [...]
 > 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 5f585fc..9fc34d1 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -55,7 +55,7 @@
+> >  #define ARM_SMMU_OPT_SECURE_CONFIG_ACCESS	(1 << 1)
+> >  
+> >  /* Maximum number of stream IDs assigned to a single device */
+> > -#define MAX_MASTER_STREAMIDS		8
+> > +#define MAX_MASTER_STREAMIDS		10
+> 
+> Maybe we should define this to be MAX_PHANDLE_ARGS instead, since we're
+> really bound by the DT parsing code rather than anything else.
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Agreed.
+
+> 
+> >  /* Maximum number of context banks per SMMU */
+> >  #define ARM_SMMU_MAX_CBS		128
+> > diff --git a/include/linux/of.h b/include/linux/of.h
+> > index f95aee3..47f4857 100644
+> > --- a/include/linux/of.h
+> > +++ b/include/linux/of.h
+> > @@ -67,7 +67,7 @@ struct device_node {
+> >  #endif
+> >  };
+> >  
+> > -#define MAX_PHANDLE_ARGS 8
+> > +#define MAX_PHANDLE_ARGS 10
+> >  struct of_phandle_args {
+> >  	struct device_node *np;
+> >  	int args_count;
+> 
+> This should be a separate patch.
+
+Ok.
+
+Andreas
