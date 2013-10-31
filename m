@@ -1,45 +1,39 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 30 Oct 2013 17:43:38 -0700
-Subject: [PATCH] watchdog: imx2_wdt: add module device table
-In-Reply-To: <E1VbfdE-0003gA-4q@rmk-PC.arm.linux.org.uk>
-References: <E1VbfdE-0003gA-4q@rmk-PC.arm.linux.org.uk>
-Message-ID: <20131031004338.GA20335@roeck-us.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Oct 2013 00:46:53 +0000
+Subject: [PATCH 2/6] iommu/arm-smmu: Introduce bus notifier block
+In-Reply-To: <1382127195-15261-3-git-send-email-andreas.herrmann@calxeda.com>
+References: <1382127195-15261-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1382127195-15261-3-git-send-email-andreas.herrmann@calxeda.com>
+Message-ID: <20131031004653.GB28613@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 11:57:00PM +0000, Russell King wrote:
-> Add the module device table declaration so the module can be loaded
-> automatically at boot time.
+On Fri, Oct 18, 2013 at 09:13:11PM +0100, Andreas Herrmann wrote:
+> At the moment just handle BUS_NOTIFY_BIND_DRIVER to conditionally
+> isolate all master devices for an SMMU.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-Hi Russell,
-
-Wim should have this patch in his queue already, as 'watchdog: imx2_wdt:
-expose module alias for loading from device-tree', submitted by Niels
-de Vos back in July.
-
-Thanks,
-Guenter
-
-> ---
->  drivers/watchdog/imx2_wdt.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> Depending on DT information each device is put into its own protection
+> domain (if possible).  For configuration with one or just a few
+> masters per SMMU that is easy to achieve.
 > 
-> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> index 693ac3f4de5a..ae1ac198d968 100644
-> --- a/drivers/watchdog/imx2_wdt.c
-> +++ b/drivers/watchdog/imx2_wdt.c
-> @@ -340,3 +340,4 @@ MODULE_DESCRIPTION("Watchdog driver for IMX2 and later");
->  MODULE_LICENSE("GPL v2");
->  MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
->  MODULE_ALIAS("platform:" DRIVER_NAME);
-> +MODULE_DEVICE_TABLE(of, imx2_wdt_dt_ids);
-> -- 
-> 1.7.4.4
+> In case of many devices per SMMU (e.g. MMU-500 with it's distributed
+> translation support) isolation of each device might not be possible --
+> depending on number of available SMR groups and/or context banks.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Default is that device isolation is contolled per SMMU with SMMU node
+> property "arm,smmu-isolate-devices" in a DT. If this property is set
+> for an SMMU node, device isolation is performed.
 > 
+> W/o device isolation the driver detects SMMUs but no translation is
+> configured (transactions just bypass translation process).
+> 
+> Note that for device isolation dma_base and size are fixed as 0 and
+> SZ_128M at the moment.
+
+I still think we need to solve the base/size issue before these can be
+merged (the option parsing code in patch 1 looks fine).
+
+Maybe we could it all on demand by registering a fault handler with an
+empty IOMMU domain?
+
+Will
