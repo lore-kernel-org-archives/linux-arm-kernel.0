@@ -1,38 +1,44 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 31 Oct 2013 15:31:38 +0900
-Subject: [PATCH] RM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
-Message-ID: <1383201098-4258-1-git-send-email-horms+renesas@verge.net.au>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Thu, 31 Oct 2013 14:32:02 +0800
+Subject: [PATCH v2 0/4] Add dual-fifo mode support of i.MX ssi
+Message-ID: <cover.1383197521.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
-Other than not being useful it is also not possible to compile
-the code under this condition as phy_register_fixup_for_id()
-is not defined.
+Changelog
+v2:
+ * Instead of adding rogue scripts to current SDMA driver based on firmware
+ * V1, we define the new SDMA firmware as version 2 and bisect the PATCH-1
+ * to two patches: The first is to add version check code to the SDMA driver;
+ * And the second is to add SSI dual FIFO DMATYPE.
+ *
+ * Nothing changes for the last two patches.
+v1:
+ * SSI can reduce hardware overrun/underrun possibility when using dual
+ * fifo mode. To support this mode, we need to first update sdma sciprt
+ * list, and then enable dual fifo BIT in SSI driver, and last update DT
+ * bindings of i.MX series.
+ *
+ * ! This series of patches has a direct dependency between them. When
+ * ! applying them, we need to apply in one single branch. Otherwise,
+ * ! it would break currect branches.
 
-This problem was introduced by 48c8b96f21817aad
-("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
+Nicolin Chen (4):
+  dma: imx-sdma: Add sdma firmware version 2 support
+  dma: imx-sdma: Add new dma type for ssi dual fifo script
+  ASoC: fsl_ssi: Add dual fifo mode support
+  ARM: dts: imx: use dual-fifo sdma script for ssi
 
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-lager.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/dma/fsl-imx-sdma.txt       |  1 +
+ arch/arm/boot/dts/imx51.dtsi                       |  4 ++--
+ arch/arm/boot/dts/imx53.dtsi                       |  4 ++--
+ arch/arm/boot/dts/imx6qdl.dtsi                     | 12 +++++------
+ arch/arm/boot/dts/imx6sl.dtsi                      | 12 +++++------
+ drivers/dma/imx-sdma.c                             | 19 ++++++++++++++++-
+ include/linux/platform_data/dma-imx-sdma.h         |  3 +++
+ include/linux/platform_data/dma-imx.h              |  1 +
+ sound/soc/fsl/fsl_ssi.c                            | 24 +++++++++++++++++++++-
+ 9 files changed, 62 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 78a31b6..d1a8ddd 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -245,7 +245,9 @@ static void __init lager_init(void)
- {
- 	lager_add_standard_devices();
- 
--	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
-+	if (IS_ENABLED(CONFIG_PHYLIB))
-+		phy_register_fixup_for_id("r8a7790-ether-ff:01",
-+					  lager_ksz8041_fixup);
- }
- 
- static const char * const lager_boards_compat_dt[] __initconst = {
 -- 
 1.8.4
