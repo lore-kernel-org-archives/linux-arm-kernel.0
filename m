@@ -1,386 +1,73 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 31 Oct 2013 10:15:28 +0100
-Subject: [PATCHv9][ 6/6] ARM: dts: Add support for the cpuimx25 board from
- Eukrea and its baseboard.
-In-Reply-To: <1383210928-18906-1-git-send-email-denis@eukrea.com>
-References: <1383210928-18906-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383210928-18906-6-git-send-email-denis@eukrea.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Thu, 31 Oct 2013 10:16:57 +0100
+Subject: [PATCH 6/6] documentation/iommu: Update description of ARM
+ System MMU binding
+In-Reply-To: <CAL_JsqKV4r9eYMT4NazmGJTEGtwg+XuvTE3rH3pEL_h7nyvb-w@mail.gmail.com>
+References: <1382127195-15261-1-git-send-email-andreas.herrmann@calxeda.com>
+ <1382127195-15261-7-git-send-email-andreas.herrmann@calxeda.com>
+ <20131031011715.GF28613@mudshark.cambridge.arm.com>
+ <CAL_JsqKV4r9eYMT4NazmGJTEGtwg+XuvTE3rH3pEL_h7nyvb-w@mail.gmail.com>
+Message-ID: <20131031091657.GT10330@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following devices/functionalities were added:
- * Main and secondary UARTs.
- * i2c and the pcf8563 device.
- * CMO-QVGA(With backlight), DVI-VGA and DVI-SVGA displays
- * Ethernet.
- * NAND.
- * The BP1 button.
- * The LED.
- * Watchdog
- * SD.
+On Thu, Oct 31, 2013 at 02:45:55AM -0400, Rob Herring wrote:
+> On Wed, Oct 30, 2013 at 8:17 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Oct 18, 2013 at 09:13:15PM +0100, Andreas Herrmann wrote:
+> >> This patch adds descriptions fore new properties of device tree
+> >> binding for the ARM SMMU architecture. These properties control
+> >> arm-smmu driver options.
+> >>
+> >> Cc: Rob Herring <robherring2@gmail.com>
+> >> Cc: Grant Likely <grant.likely@linaro.org>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> >> ---
+> >>  .../devicetree/bindings/iommu/arm,smmu.txt         |   12 ++++++++++++
+> >>  1 file changed, 12 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >> index e34c6cd..de88cf9 100644
+> >> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >> @@ -48,6 +48,17 @@ conditions.
+> >>                    from the mmu-masters towards memory) node for this
+> >>                    SMMU.
+> >>
+> >> +- arm,smmu-isolate-devices : Enable device isolation for all masters
+> >> +                             of this SMMU. Ie. each master will be
+> >> +                             attached to its own iommu domain.
+> >> +
+> >> +- arm,smmu-secure-config-access : Enable proper handling of buggy
+> >> +                                  implementations that always use
+> >> +                                  secure access to SMMU configuration
+> >> +                                  registers. In this case non-secure
+> >> +                                  aliases of secure registers have to
+> >> +                                  be used during SMMU configuration.
+> >
+> > Why are you using the "arm" vendor prefix for the secure config access
+> > stuff? Wouldn't it make more sense to use "calxeda", just in case somebody
+> > else finds a different way to wire things up in this regard?
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v8->v9:
-- Licenses were shortened.
----
- arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi       |   48 +++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts  |   58 ++++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts  |   45 ++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts   |   45 ++++++++
- .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |  111 ++++++++++++++++++++
- 5 files changed, 307 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+I think in an early version I've used calxeda prefix but later thought
+it has to match the arm prefix. I'm also fine with
+calxeda,smmu-secure-config-access. But in case someone else screws
+this up in a similar way and needs the same driver behaviour it's odd
+if XYZ has to use the calxeda prefix instead of the arm prefix for
+this option.
 
-diff --git a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
-new file mode 100644
-index 0000000..62b97b3
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
-@@ -0,0 +1,48 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25.dtsi"
-+
-+/ {
-+	model = "Eukrea CPUIMX25";
-+	compatible = "eukrea,cpuimx25", "fsl,imx25";
-+
-+	memory {
-+		reg = <0x80000000 0x4000000>; /* 64M */
-+	};
-+};
-+
-+&fec {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec_1>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1>;
-+	status = "okay";
-+
-+	pcf8563 at 51 {
-+		compatible = "nxp,pcf8563";
-+		reg = <0x51>;
-+	};
-+};
-+
-+&nfc {
-+	nand-bus-width = <8>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-new file mode 100644
-index 0000000..fcb5bfd
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-@@ -0,0 +1,58 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the CMO-QVGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-cmo-qvga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	cmo_qvga: display {
-+		model = "CMO-QVGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xcad08b80>;
-+		bus-width = <18>;
-+		native-mode = <&qvga_timings>;
-+		display-timings {
-+			qvga_timings: 320x240 {
-+				clock-frequency = <6500000>;
-+				hactive = <320>;
-+				vactive = <240>;
-+				hback-porch = <30>;
-+				hfront-porch = <38>;
-+				vback-porch = <20>;
-+				vfront-porch = <3>;
-+				hsync-len = <15>;
-+				vsync-len = <4>;
-+			};
-+		};
-+	};
-+
-+	reg_lcd_3v3: lcd-en {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
-+		regulator-name = "lcd-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 26 0>;
-+		enable-active-high;
-+	};
-+};
-+
-+&lcdc {
-+	display = <&cmo_qvga>;
-+	fsl,pwmr = <0x00a903ff>;
-+	lcd-supply = <&reg_lcd_3v3>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
-new file mode 100644
-index 0000000..8eee2f6
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the DVI-SVGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-dvi-svga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	dvi_svga: display {
-+		model = "DVI-SVGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xfa208b80>;
-+		bus-width = <18>;
-+		native-mode = <&dvi_svga_timings>;
-+		display-timings {
-+			dvi_svga_timings: 800x600 {
-+				clock-frequency = <40000000>;
-+				hactive = <800>;
-+				vactive = <600>;
-+				hback-porch = <75>;
-+				hfront-porch = <75>;
-+				vback-porch = <7>;
-+				vfront-porch = <75>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&dvi_svga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-new file mode 100644
-index 0000000..447da62
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the DVI-VGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-dvi-vga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	dvi_vga: display {
-+		model = "DVI-VGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xfa208b80>;
-+		bus-width = <18>;
-+		native-mode = <&dvi_vga_timings>;
-+		display-timings {
-+			dvi_vga_timings: 640x480 {
-+				clock-frequency = <31250000>;
-+				hactive = <640>;
-+				vactive = <480>;
-+				hback-porch = <100>;
-+				hfront-porch = <100>;
-+				vback-porch = <7>;
-+				vfront-porch = <100>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&dvi_vga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-new file mode 100644
-index 0000000..b54a9db
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-@@ -0,0 +1,111 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "imx25-eukrea-cpuimx25.dtsi"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25";
-+	compatible = "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpiokeys_1>;
-+
-+		bp1 {
-+			label = "BP1";
-+			gpios = <&gpio3 18 1>;
-+			linux,code = <256>;
-+			gpio-key,wakeup;
-+			linux,input-type = <1>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpioled>;
-+
-+		led1 {
-+			label = "led1";
-+			gpios = <&gpio3 19 1>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux_1>;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1_1>;
-+	cd-gpios = <&gpio1 20>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	tlv320aic23: codec at 1a {
-+		compatible = "ti,tlv320aic23";
-+		reg = <0x1a>;
-+	};
-+};
-+
-+&iomuxc {
-+	gpio_keys {
-+		pinctrl_gpiokeys_1: gpiokeysgrp-1 {
-+			fsl,pins = <
-+				MX25_PAD_VSTBY_ACK__GPIO_3_18 0x80000000
-+			>;
-+		};
-+	};
-+
-+	leds {
-+		pinctrl_gpioled: gpioledgrp-1 {
-+			fsl,pins = <
-+				MX25_PAD_POWER_FAIL__GPIO_3_19 0x80000000
-+			>;
-+		};
-+	};
-+
-+	reg_lcd_3v3 {
-+		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
-+			fsl,pins = <
-+				MX25_PAD_PWM__GPIO_1_26  0x80000000
-+			>;
-+		};
-+	};
-+};
-+
-+&ssi1 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2_1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
--- 
-1.7.9.5
+> I think that the property prefix should match the compatible vendor
+> prefix. You could then argue that the compatible string itself should
+> be prefixed with "calxeda". In that case, this property would not be
+> needed at all as you could just key off the compatible string to
+> determine this characteristic. Of the options, my preference would be
+> just to leave things as is.
+
+I think Will's main point is that Calxeda has a bug in the wiring and
+that this is not ARM's fault. Renaming the prefix will kind of
+emphasize this. In case we keep the arm prefix, how about modifying
+the description for the option to state that currently only Calxeda
+ECX-2000 screwed up the wiring?
+
+
+Andreas
