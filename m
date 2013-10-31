@@ -1,66 +1,160 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 31 Oct 2013 17:32:59 -0600
-Subject: [PATCH 1/2] PCI: mvebu - The bridge should obey the MEM and IO
- command bits
-Message-ID: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Date: Thu, 31 Oct 2013 17:33:00 -0600
+Subject: [PATCH v3 2/2] PCI: mvebu - Support a bridge with no IO port window
+In-Reply-To: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1383262380-6984-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <1383262380-6984-2-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When PCI_COMMAND_MEMORY/PCI_COMMAND_IO are cleared the bridge should not
-allocate windows or even look at the window limit/base registers.
+Make pcie-io-aperture and the IO port MBUS ID in ranges optional.
+If not provided the bridge reports to Linux that IO space mapping is
+not supported and refuses to configure an IO mbus window.
 
-Otherwise it can attempt to setup bogus windows that the PCI core code
-creates during discovery. The core will leave PCI_COMMAND_IO cleared if
-it doesn't need an IO window.
+This allows both complete disable (do not specify pcie-io-aperture) and
+per-port disable (do not specify a IO target ranges entry for the port)
 
-Have mvebu_pcie_handle_*_change respect the bits, and call the change
-function whenever the bits changes.
+Most PCIE devices these days do not require IO support to function,
+so having an option to disable it in the driver is useful.
 
 Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
- drivers/pci/host/pci-mvebu.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ drivers/pci/host/pci-mvebu.c | 63 ++++++++++++++++++++++++++++++--------------
+ 1 file changed, 43 insertions(+), 20 deletions(-)
+
+v3 changes:
+ - Remove the bogus <= changes when checking the IO limit register
+ - Rebase ontop of 'PCI: mvebu - The bridge should obey the MEM and IO command bits'
+   which is a necessary dependency.
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 19d77c9..721fca9 100644
+index 721fca9..b36b91b 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -279,7 +279,8 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+@@ -132,6 +132,11 @@ struct mvebu_pcie_port {
+ 	size_t iowin_size;
+ };
  
- 	/* Are the new iobase/iolimit values invalid? */
- 	if (port->bridge.iolimit < port->bridge.iobase ||
--	    port->bridge.iolimitupper < port->bridge.iobaseupper) {
-+	    port->bridge.iolimitupper < port->bridge.iobaseupper ||
-+	    !(port->bridge.command & PCI_COMMAND_IO)) {
- 
- 		/* If a window was configured, remove it */
- 		if (port->iowin_base) {
-@@ -316,7 +317,8 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
- static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
++static inline bool mvebu_has_ioport(struct mvebu_pcie_port *port)
++{
++	return port->io_target != -1 && port->io_attr != -1;
++}
++
+ static bool mvebu_pcie_link_up(struct mvebu_pcie_port *port)
  {
- 	/* Are the new membase/memlimit values invalid? */
--	if (port->bridge.memlimit < port->bridge.membase) {
-+	if (port->bridge.memlimit < port->bridge.membase ||
-+	    !(port->bridge.command & PCI_COMMAND_MEMORY)) {
+ 	return !(readl(port->base + PCIE_STAT_OFF) & PCIE_STAT_LINK_DOWN);
+@@ -293,6 +298,12 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+ 		return;
+ 	}
  
- 		/* If a window was configured, remove it */
- 		if (port->memwin_base) {
-@@ -464,8 +466,16 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
++	if (!mvebu_has_ioport(port)) {
++		dev_WARN(&port->pcie->pdev->dev,
++			 "Attempt to set IO when IO is disabled\n");
++		return;
++	}
++
+ 	/*
+ 	 * We read the PCI-to-PCI bridge emulated registers, and
+ 	 * calculate the base address and size of the address decoding
+@@ -407,9 +418,12 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+ 		break;
  
- 	switch (where & ~3) {
- 	case PCI_COMMAND:
-+	{
-+		u32 old = bridge->command;
+ 	case PCI_IO_BASE:
+-		*value = (bridge->secondary_status << 16 |
+-			  bridge->iolimit          <<  8 |
+-			  bridge->iobase);
++		if (!mvebu_has_ioport(port))
++			*value = bridge->secondary_status << 16;
++		else
++			*value = (bridge->secondary_status << 16 |
++				  bridge->iolimit          <<  8 |
++				  bridge->iobase);
+ 		break;
+ 
+ 	case PCI_MEMORY_BASE:
+@@ -469,6 +483,9 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+ 	{
+ 		u32 old = bridge->command;
+ 
++		if (!mvebu_has_ioport(port))
++			value &= ~PCI_COMMAND_IO;
 +
  		bridge->command = value & 0xffff;
-+		if ((old ^ bridge->command) & PCI_COMMAND_IO)
-+			mvebu_pcie_handle_iobase_change(port);
-+		if ((old ^ bridge->command) & PCI_COMMAND_MEMORY)
-+			mvebu_pcie_handle_membase_change(port);
- 		break;
-+	}
+ 		if ((old ^ bridge->command) & PCI_COMMAND_IO)
+ 			mvebu_pcie_handle_iobase_change(port);
+@@ -639,7 +656,9 @@ static int __init mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+ 	int i;
  
- 	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
- 		bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4] = value;
+-	pci_add_resource_offset(&sys->resources, &pcie->realio, sys->io_offset);
++	if (resource_size(&pcie->realio) != 0)
++		pci_add_resource_offset(&sys->resources, &pcie->realio,
++					sys->io_offset);
+ 	pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
+ 	pci_add_resource(&sys->resources, &pcie->busn);
+ 
+@@ -748,12 +767,17 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
+ #define DT_CPUADDR_TO_ATTR(cpuaddr)   (((cpuaddr) >> 48) & 0xFF)
+ 
+ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+-			      unsigned long type, int *tgt, int *attr)
++			      unsigned long type,
++			      unsigned int *tgt,
++			      unsigned int *attr)
+ {
+ 	const int na = 3, ns = 2;
+ 	const __be32 *range;
+ 	int rlen, nranges, rangesz, pna, i;
+ 
++	*tgt = -1;
++	*attr = -1;
++
+ 	range = of_get_property(np, "ranges", &rlen);
+ 	if (!range)
+ 		return -EINVAL;
+@@ -807,16 +831,15 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	mvebu_mbus_get_pcie_io_aperture(&pcie->io);
+-	if (resource_size(&pcie->io) == 0) {
+-		dev_err(&pdev->dev, "invalid I/O aperture size\n");
+-		return -EINVAL;
+-	}
+ 
+-	pcie->realio.flags = pcie->io.flags;
+-	pcie->realio.start = PCIBIOS_MIN_IO;
+-	pcie->realio.end = min_t(resource_size_t,
+-				  IO_SPACE_LIMIT,
+-				  resource_size(&pcie->io));
++	if (resource_size(&pcie->io) != 0) {
++		pcie->realio.flags = pcie->io.flags;
++		pcie->realio.start = PCIBIOS_MIN_IO;
++		pcie->realio.end = min_t(resource_size_t,
++					 IO_SPACE_LIMIT,
++					 resource_size(&pcie->io));
++	} else
++		pcie->realio = pcie->io;
+ 
+ 	/* Get the bus range */
+ 	ret = of_pci_parse_bus_range(np, &pcie->busn);
+@@ -873,12 +896,12 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
+-		ret = mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
+-					 &port->io_target, &port->io_attr);
+-		if (ret < 0) {
+-			dev_err(&pdev->dev, "PCIe%d.%d: cannot get tgt/attr for io window\n",
+-				port->port, port->lane);
+-			continue;
++		if (resource_size(&pcie->io) != 0)
++			mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_IO,
++					   &port->io_target, &port->io_attr);
++		else {
++			port->io_target = -1;
++			port->io_attr = -1;
+ 		}
+ 
+ 		port->base = mvebu_pcie_map_registers(pdev, child, port);
 -- 
 1.8.1.2
