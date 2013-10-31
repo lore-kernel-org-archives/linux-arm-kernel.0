@@ -1,47 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 31 Oct 2013 11:54:17 -0700
-Subject: [PATCH] clk: fix boot panic with non-dev-associated clocks
-In-Reply-To: <CAOMZO5BsMuN3bZuK+06X6ukAEmRyZDpvoKXdhatNiG61x_GZsA@mail.gmail.com>
-References: <1383238174-14650-1-git-send-email-olof@lixom.net>
- <CAOMZO5C4+K+RfHOpex7EwLObPV4Uy8YmjdVx2HPv36ZGAKeSZA@mail.gmail.com>
- <CAOesGMgU6qJMpXi5DGe7=XbObiWh8icNFRhZv_9ot+KZMNcTnw@mail.gmail.com>
- <CAOMZO5BsMuN3bZuK+06X6ukAEmRyZDpvoKXdhatNiG61x_GZsA@mail.gmail.com>
-Message-ID: <CAOesGMj2hVOc_NV6UfJpx7399puasY_zgpHDmPj0pd1VC_Ou6A@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 31 Oct 2013 19:55:28 +0100
+Subject: [PATCH v7 5/5] clk: Implement clk_unregister()
+In-Reply-To: <5272A24A.30800@wwwdotorg.org>
+References: <1383076268-8984-1-git-send-email-s.nawrocki@samsung.com>
+ <1383076268-8984-6-git-send-email-s.nawrocki@samsung.com>
+ <5272A24A.30800@wwwdotorg.org>
+Message-ID: <5272A7A0.7020800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 11:47 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Thu, Oct 31, 2013 at 3:07 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Thu, Oct 31, 2013 at 10:05 AM, Fabio Estevam <festevam@gmail.com> wrote:
->>> Hi Olof,
->>>
->>> On Thu, Oct 31, 2013 at 2:49 PM, Olof Johansson <olof@lixom.net> wrote:
->>>> Fixes a panic at boot on many platforms. For example, on imx (wandboard),
->>>> I get:
->>>
->>> With this patch applied console messages appears on 20131031, but it
->>> seems we still have other issues:
->>
->>
->> Yeah, there's lots of badness in last night's -next. :(
+On 31/10/13 19:32, Stephen Warren wrote:
+> On 10/29/2013 01:51 PM, Sylwester Nawrocki wrote:
+>> > clk_unregister() is currently not implemented and it is required when
+>> > a clock provider module needs to be unloaded.
+>> > 
+>> > Normally the clock supplier module is prevented to be unloaded by
+>> > taking reference on the module in clk_get().
+>> > 
+>> > For cases when the clock supplier module deinitializes despite the
+>> > consumers of its clocks holding a reference on the module, e.g. when
+>> > the driver is unbound through "unbind" sysfs attribute, there are
+>> > empty clock ops added. These ops are assigned temporarily to struct
+>> > clk and used until all consumers release the clock, to avoid invoking
+>> > callbacks from the module which just got removed.
 >
-> If I apply this change:
->
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -44,7 +44,7 @@ struct clk *of_clk_get(struct device_node *np, int index)
->         of_clk_lock();
->         clk = __of_clk_get_from_provider(&clkspec);
->
-> -       if (!IS_ERR(clk) && !__clk_get(clk))
-> +       if (IS_ERR(clk) && !__clk_get(clk))
->                 clk = ERR_PTR(-ENOENT);
+> This patch is now in Mike's clk-next and hence next-20131031, and causes
+> both a WARN and an OOPS when booting the Tegra Dalmore board. (See log
+> below)
+> 
+> If I do the following to fix some other issues:
+> 
+> 1) Apply:
+> http://www.spinics.net/lists/arm-kernel/msg283619.html
+> clk: fix boot panic with non-dev-associated clocks
+> 
+> 2) Merge some Tegra-specific bug-fixes:
+> https://lkml.org/lkml/2013/10/29/771
+> Re: pull request for Tegra clock rework and Tegra124 clock support
+> 
+> ... then revert this patch a336ed7 "clk: Implement clk_unregister()",
+> everything works again.
 
-That doesn't look right, it'll call __clk_get() with an error code as the clock.
+Does it still crash when you apply this patch
+http://www.spinics.net/lists/arm-kernel/msg283550.html ?
 
-Mike, seems like reverting back the clock tree to a known good state
-(same as yesterday) and re-target 3.14 for the latest changes is a
-suitable course of action at this time in the release cycle.
-
-
--Olof
+--
+Thanks,
+Sylwester
