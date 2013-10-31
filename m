@@ -1,38 +1,30 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 31 Oct 2013 09:19:14 +0800
-Subject: [PATCH 2/2] misc: atmel_pwm: set initcall level to subsys
-In-Reply-To: <201310302146.18248.arnd@arndb.de>
-References: <1382459560-26596-1-git-send-email-jhovold@gmail.com>
- <20131029232249.GA20476@kroah.com> <20131030110705.GA29813@localhost>
- <201310302146.18248.arnd@arndb.de>
-Message-ID: <5271B012.4060200@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 31 Oct 2013 09:26:18 +0800
+Subject: [PATCH 0/6] PCI: imx6: Random fixes
+In-Reply-To: <CAErSpo5dcqA+OkORmPO41THd+QaG53jXgZPogw3U5-1GP-hyoA@mail.gmail.com>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+ <CAErSpo6v4nvKQ4W9BhnUsNEjzsXoCiLxeFY-K=z=bMZ4AFOyGg@mail.gmail.com>
+ <201310301552.28866.marex@denx.de>
+ <CAErSpo5dcqA+OkORmPO41THd+QaG53jXgZPogw3U5-1GP-hyoA@mail.gmail.com>
+Message-ID: <20131031012615.GA19362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Oct 30, 2013 at 10:25:37AM -0600, Bjorn Helgaas wrote:
+> > Can you maybe pick at least these two:
+> >
+> > PCI: imx6: Make reset-gpio optional
 
-On 10/31/2013 04:46, Arnd Bergmann wrote:
-> On Wednesday 30 October 2013, Johan Hovold wrote:
->>> I really hate this type of patch, as it's papering over the real
->>> problem.  What happens when someone else moves their driver to this
->>> level?  Then you are back to the original problem.
->>
->> Yes, it's crude, but it's currently the only way to express a preferred
->> probe order.
->
-> Does the same problem occur with the generic PWM subsystem?
->
-> The atmel_pwm driver apparently is the last PWM driver that has
-> not been converted to the generic subsystem yet. Doing that would
-> also let us drop the atmel-pwm-bl driver in favor of the generic
-> backlight.
+Isn't there a comment from Jingoo on this patch unresolved?
 
-The atmel pwm driver is on the way to generic subsystem. more 
-information at:
---->8---
-PWM: atmel-pwm: add PWM controller driver:
-    https://patchwork.kernel.org/patch/2963081/
----<8---
+> > PCI: imx6: Probe the PCIe in fs_initcall()
 
-Best Regards,
-Bo Shen
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+> >
+> > I think they should be harmless and the later one fixes a problem on MX6. I'm
+> > now digging in the PCIe MX6 again btw.
+> 
+> I'm fine with taking these as long as Shawn acks them.
+> 
+> Bjorn
