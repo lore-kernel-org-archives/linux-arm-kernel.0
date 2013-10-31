@@ -1,39 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Oct 2013 00:46:53 +0000
-Subject: [PATCH 2/6] iommu/arm-smmu: Introduce bus notifier block
-In-Reply-To: <1382127195-15261-3-git-send-email-andreas.herrmann@calxeda.com>
-References: <1382127195-15261-1-git-send-email-andreas.herrmann@calxeda.com>
- <1382127195-15261-3-git-send-email-andreas.herrmann@calxeda.com>
-Message-ID: <20131031004653.GB28613@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Oct 2013 00:48:15 +0000
+Subject: [PATCH] watchdog: imx2_wdt: add module device table
+In-Reply-To: <20131031004338.GA20335@roeck-us.net>
+References: <E1VbfdE-0003gA-4q@rmk-PC.arm.linux.org.uk>
+ <20131031004338.GA20335@roeck-us.net>
+Message-ID: <20131031004815.GT16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 09:13:11PM +0100, Andreas Herrmann wrote:
-> At the moment just handle BUS_NOTIFY_BIND_DRIVER to conditionally
-> isolate all master devices for an SMMU.
+On Wed, Oct 30, 2013 at 05:43:38PM -0700, Guenter Roeck wrote:
+> On Wed, Oct 30, 2013 at 11:57:00PM +0000, Russell King wrote:
+> > Add the module device table declaration so the module can be loaded
+> > automatically at boot time.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> Depending on DT information each device is put into its own protection
-> domain (if possible).  For configuration with one or just a few
-> masters per SMMU that is easy to achieve.
+> Hi Russell,
 > 
-> In case of many devices per SMMU (e.g. MMU-500 with it's distributed
-> translation support) isolation of each device might not be possible --
-> depending on number of available SMR groups and/or context banks.
-> 
-> Default is that device isolation is contolled per SMMU with SMMU node
-> property "arm,smmu-isolate-devices" in a DT. If this property is set
-> for an SMMU node, device isolation is performed.
-> 
-> W/o device isolation the driver detects SMMUs but no translation is
-> configured (transactions just bypass translation process).
-> 
-> Note that for device isolation dma_base and size are fixed as 0 and
-> SZ_128M at the moment.
+> Wim should have this patch in his queue already, as 'watchdog: imx2_wdt:
+> expose module alias for loading from device-tree', submitted by Niels
+> de Vos back in July.
 
-I still think we need to solve the base/size issue before these can be
-merged (the option parsing code in patch 1 looks fine).
-
-Maybe we could it all on demand by registering a fault handler with an
-empty IOMMU domain?
-
-Will
+Any reason it hasn't made it in yet?  We had a merge window back in
+September where, if we're not happy to apply it as a fix during -rc,
+it could have gone in.  I see watchdog stuff did merge during the
+last merge window...
