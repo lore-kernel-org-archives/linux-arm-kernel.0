@@ -1,33 +1,47 @@
 From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Thu, 31 Oct 2013 09:15:12 -0300
-Subject: [PATCH] clk: composite: .determine_rate support
-In-Reply-To: <524CB920.2030901@elopez.com.ar>
-References: <1379205479-26001-1-git-send-email-emilio@elopez.com.ar>
- <524CB920.2030901@elopez.com.ar>
-Message-ID: <527249D0.6040900@elopez.com.ar>
+Date: Thu, 31 Oct 2013 09:18:12 -0300
+Subject: [PATCH 0/3] sunxi clock fixes
+In-Reply-To: <52555135.1080501@elopez.com.ar>
+References: <1379725392-30202-1-git-send-email-emilio@elopez.com.ar>
+ <52555135.1080501@elopez.com.ar>
+Message-ID: <52724A84.1010806@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 02/10/13 21:24, Emilio L?pez escribi?:
+El 09/10/13 09:51, Emilio L?pez escribi?:
 > Hi Mike,
 >
-> El 14/09/13 21:37, Emilio L?pez escribi?:
->> This commit adds .determine_rate support to the composite clock. It will
->> use the .determine_rate callback from the rate component if available,
->> and fall back on the mux component otherwise. This allows composite
->> clocks to enjoy the benefits of automatic clock reparenting.
+> El 20/09/13 22:03, Emilio L?pez escribi?:
+>> Hi,
 >>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> ---
+>> This small series contains two bug fixes and a patch to solve the issue
+>> of accidental clock gating, as discussed earlier on my RFC patch, "of:
+>> add a basic memory driver".
 >>
->> Hi Mike,
+>> I believe the two first patches should go into -rcN, although I have not
+>> noticed any issues so far coming from the bugs themselves.
 >>
->> This is a prerequisite patch for the sunxi driver changes that I'll send
->> shortly; I believe you already looked at this diff on IRC and agreed it
->> was sensible, so I hope it can be merged early for the 3.13 cycle
->> (unless someone else has any objections to the patch, that is).
+>> The third patch should be a no-op for now, and I'd like to have it
+>> merged before these clocks actually appear on the driver; in this way
+>> they will never be gated accidentally, and it remains bisectable. I will
+>> be sending PLL5/6 support patches in short order.
+>>
+>> Cheers,
+>>
+>> Emilio
+>>
+>> Emilio L?pez (3):
+>>    clk: sunxi: factors: fix off-by-one masks
+>>    clk: sunxi: factors: clear variables before using them
+>>    clk: sunxi: protect core clocks from accidental shutdown
+>>
+>>   drivers/clk/sunxi/clk-factors.c |  4 ++--
+>>   drivers/clk/sunxi/clk-sunxi.c   | 28 ++++++++++++++++++++++++++++
+>>   2 files changed, 30 insertions(+), 2 deletions(-)
+>>
 >
-> A couple of weeks have passed now; can you please review and apply this
-> to your tree for 3.13 if you are ok with it?
+> Can you please take a look at this series and pick the patches if you
+> are ok with them? It would be nice to see the first two fixes on -rcN by
+> the way.
 
-Mike?
+$ ping Mike
