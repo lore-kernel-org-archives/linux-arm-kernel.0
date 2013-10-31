@@ -1,35 +1,51 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 31 Oct 2013 15:03:05 +0900
-Subject: [PATCH v3] iommu: shmobile: Enable the driver on all ARM platforms
-In-Reply-To: <20131030162854.GB2493@sirena.org.uk>
-References: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131030112625.GZ16735@n2100.arm.linux.org.uk>
- <1652955.Gs3XDiEUHO@avalon> <20131030162854.GB2493@sirena.org.uk>
-Message-ID: <20131031060305.GU1603@verge.net.au>
+Date: Thu, 31 Oct 2013 15:06:49 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7791: add Ether clock
+In-Reply-To: <201310310218.37578.sergei.shtylyov@cogentembedded.com>
+References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>
+ <201310310218.37578.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20131031060649.GW1603@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 09:28:54AM -0700, Mark Brown wrote:
-> On Wed, Oct 30, 2013 at 12:40:12PM +0100, Laurent Pinchart wrote:
+On Thu, Oct 31, 2013 at 02:18:37AM +0300, Sergei Shtylyov wrote:
+> Add support for R8A7791 Ether clock.
 > 
-> > > For similar reasons as x86, can we please think about using:
-> 
-> > > 	depends on ARM
-> > > 	depends on ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI || COMPILE_TEST
-> 
-> > I'm fine with your proposed option. As I don't want to respin the series 
-> > dozens of time let's first agree on the course of action, I will then repost 
-> > the patches. Mark, you've pushed towards as few platform dependencies as 
-> > possible, what's your opinion on this ?
-> 
-> In general I think we should have whatever the real depedencies are or
-> COMPILE_TEST (to the extent that they will actually build cleanly on
-> other targets).  That way only people who explicitly go looking to
-> compile test things for build coverage (eg, when doing global cleanups
-> or API updates) need to be bothered by the extra compile test options.
-> 
-> I'd read the above as saying the code needs ARM to build at all and that
-> the hardware will only ever appear on SHMOBILE.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-I am curious to know the value of "depends ARM".
-Is it to aid the reading that you spelt out?
+Thanks, I have queued this up.
+
+> 
+> ---
+>  arch/arm/mach-shmobile/clock-r8a7791.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> Index: renesas/arch/arm/mach-shmobile/clock-r8a7791.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/clock-r8a7791.c
+> +++ renesas/arch/arm/mach-shmobile/clock-r8a7791.c
+> @@ -120,6 +120,7 @@ static struct clk *main_clks[] = {
+>  
+>  /* MSTP */
+>  enum {
+> +	MSTP813,
+>  	MSTP721, MSTP720,
+>  	MSTP719, MSTP718, MSTP715, MSTP714,
+>  	MSTP216, MSTP207, MSTP206,
+> @@ -129,6 +130,7 @@ enum {
+>  };
+>  
+>  static struct clk mstp_clks[MSTP_NR] = {
+> +	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
+>  	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
+>  	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
+>  	[MSTP719] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 19, 0), /* SCIF2 */
+> @@ -180,6 +182,7 @@ static struct clk_lookup lookups[] = {
+>  	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
+>  	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
+>  	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
+> +	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]), /* Ether */
+>  };
+>  
+>  #define R8A7791_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
+> 
