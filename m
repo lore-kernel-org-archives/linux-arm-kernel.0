@@ -1,32 +1,84 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 31 Oct 2013 14:10:43 +0800
-Subject: [PATCHv2 3/7] ARM: imx: add support code for IMX50 based machines
-In-Reply-To: <1383023757-30711-4-git-send-email-gerg@uclinux.org>
-References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
- <1383023757-30711-4-git-send-email-gerg@uclinux.org>
-Message-ID: <20131031061041.GC23549@S2101-09.ap.freescale.net>
+From: domenico.andreoli@linux.com (Domenico Andreoli)
+Date: Thu, 31 Oct 2013 07:27:08 +0100
+Subject: [PATCH 00/11] RFC: Common machine reset handling
+Message-ID: <20131031062708.520968323@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 03:15:53PM +1000, gerg at uclinux.org wrote:
-> +DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
-> +	.map_io		= mx53_map_io,
-> +	.init_early	= imx53_init_early,
-> +	.init_irq	= mx53_init_irq,
-> +	.handle_irq	= imx53_handle_irq,
-> +	.init_machine	= imx50_dt_init,
-> +	.init_late	= imx53_init_late,
-> +	.dt_compat	= imx50_dt_board_compat,
-> +	.restart	= mxc_restart,
-> +MACHINE_END
+Hi,
 
-The imx53 is a platform that was converted from non-DT to DT.  Some of
-these imx53 hooks may not even necessary for imx53 now, since imx53
-supports DT boot only today.  So I do not prefer to reuse these imx53
-hooks on the brand new imx50 DT machine.  I would suggest to maintain a
-mach-imx50.c and machine descriptor for imx50 with only the necessary
-hooks implemented as local functions inside mach-imx50.c.  After imx53
-machine descriptor and hooks gets cleaned up, we can look at how we can
-consolidate these descriptors if they are pretty much in common.
+  I've been looking for a solution to my bcm4760 watchdog based restart
+hook when I noticed that the kernel reboot/shutdown mechanism is having
+a few unaddressed issues.
 
-Shawn
+Those I identified are:
+
+ 1) context pointer often needed by the reset hook
+    (currently local static data is used for this pourpose)
+ 2) unclear ownership/policy in case of multiple reset hooks
+    (currently almost nobody seems to care much)
+ 
+I put together this patchset to explore some possible interface
+and improve the status, essentially moving away from the
+function-pointer-assignament kind of reset hook registration.
+
+It is meant to be platform agnostic and sits in kernel/machine_reset.c. It
+opts in only when needed and when supported.
+
+A common usage, as reset hook provider (drivers, boardfiles):
+
+	void restart_hook(void *dev, enum reboot_mode mode, const char *cmd)
+{
+	/* reboot the board */
+}
+
+void release_hook(void *dev)
+{
+	/* release the hook */
+}
+
+void init_restart_hook(void *dev)
+{
+	struct reset_hook hook;
+	reset_hook_init(&hook);
+	hook.restart = restart_hook;
+	hook.release = release_hook; /* optional */
+	set_machine_reset(RESET_RESTART, &hook, dev);
+}
+
+
+A common usage, as reset hook consumer (arch specific hooks, kernel):
+
+	void machine_restart(char *command)
+{
+	if (_machine_restart)
+		_machine_restart(command);
+	else
+		default_restart(reboot_mode, command);
+}
+
+void machine_halt(void)
+{
+	if (_machine_halt)
+		_machine_halt();
+	else
+		default_halt();
+}
+
+void machine_power_off(void)
+{
+	if (pm_power_off)
+		pm_power_off();
+	else
+		default_power_off();
+}
+
+
+I don't see these impressive diffstats but at least it's possible to free
+some static data along the way. Maybe there are some other desiderata that
+could be satisfied?
+
+Comments are welcome.
+
+Thanks,
+Domenico
