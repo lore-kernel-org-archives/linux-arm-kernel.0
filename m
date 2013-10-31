@@ -1,42 +1,20 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Thu, 31 Oct 2013 12:43:46 -0700
-Subject: [PATCH 2/4] ARM: msm: Remove 7x00 support
-In-Reply-To: <20131031192330.GG16735@n2100.arm.linux.org.uk>
-References: <1382993006-27359-1-git-send-email-davidb@codeaurora.org>
- <1382993006-27359-3-git-send-email-davidb@codeaurora.org>
- <20131029132043.GA28165@fifo99.com>
- <CAOesGMhg8HN4Su9FXSeoAgmH6NVKXW+wmnreUvWH+1G6GWkkaA@mail.gmail.com>
- <87ob66nyqc.fsf@linaro.org> <20131030232412.GA10229@fifo99.com>
- <8738nhnz4s.fsf@linaro.org> <20131031173506.GA31722@fifo99.com>
- <20131031192330.GG16735@n2100.arm.linux.org.uk>
-Message-ID: <20131031194346.GC31722@fifo99.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 31 Oct 2013 18:03:09 -0200
+Subject: [PATCH] clk: Properly initialize reference count
+In-Reply-To: <1383220962-26836-1-git-send-email-treding@nvidia.com>
+References: <1383220962-26836-1-git-send-email-treding@nvidia.com>
+Message-ID: <CAOMZO5AmQV1yv-4PBfs86cJ27K4gTFS0BXa=JYN+LSaV-pAcmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 07:23:30PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Oct 31, 2013 at 10:35:06AM -0700, Daniel Walker wrote:
-> > ARM and the sub-architectures is already confusing I don't think we need
-> > to start compounding the problem by allowing random whatever-you-want
-> > sub-directories from every sub-architecture.
-> 
-> Confusing?
-> 
-> I'm not sure about that.  It's actually really simple from my perspective:
-> 
-> arch/arm - the ARM 32-bit architecture
-> 
-> arch/arm/mach-* - support for a single SoC or a group of similar SoCs
-> 
-> arch/arm/plat-* - common support for a set of dissimilar SoCs which want
-> 	to share code between themselves
-> 
-> How is that confusing?
-> 
+On Thu, Oct 31, 2013 at 10:02 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> Commit a336ed7 (clk: Implement clk_unregister()) initializes the kref in
+> clk_set_parent(), which is obviously the wrong place. Further research
+> shows that the original patches initialized it correctly, so it probably
+> ended up in clk_set_parent() by mistake during manual application of the
+> patch.
+>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 
-It's the relationship between the arch/arm/mach-* and the
-arch/arm/plat-* and which ones connect with each other etc, and how the
-connection was actually done..
-
-For me as a developer I found it confusing vs something that was fully integrated.
-
-Daniel
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
