@@ -1,39 +1,101 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 1 Nov 2013 16:42:49 +0800
-Subject: [PATCH] ARM: imx: remove mxc_iomux_v3_init() call from
- imx53_init_early()
-Message-ID: <1383295369-14448-1-git-send-email-shawn.guo@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 1 Nov 2013 10:57:28 +0200
+Subject: [PATCHv9 01/43] clk: Add support for regmap register read/write
+In-Reply-To: <52727B44.4020102@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-2-git-send-email-t-kristo@ti.com> <52726342.6030406@ti.com>
+ <52726BD5.3080704@ti.com> <52727B44.4020102@ti.com>
+Message-ID: <52736CF8.2010001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Today, imx53 handles iomux configuration using pinctrl driver, so
-mxc_iomux_v3_init() call in imx53_init_early() is there for nothing.
-Remove the call from there.
+On 10/31/2013 05:46 PM, Nishanth Menon wrote:
+> On 10/31/2013 09:40 AM, Tero Kristo wrote:
+>> On 10/31/2013 04:03 PM, Nishanth Menon wrote:
+>>> On 10/25/2013 10:56 AM, Tero Kristo wrote:
+>>> [...]
+>>>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>>>> index 7e59253..63ff78c 100644
+>>>> --- a/include/linux/clk-provider.h
+>>>> +++ b/include/linux/clk-provider.h
+>>>
+>>> [...]
+>>>> -static inline u32 clk_readl(u32 __iomem *reg)
+>>>> +static inline u32 clk_readl(u32 __iomem *reg, struct regmap *regmap)
+>>>>    {
+>>>> -	return readl(reg);
+>>>> +	u32 val;
+>>>> +
+>>>> +	if (regmap)
+>>>> +		regmap_read(regmap, (u32)reg, &val);
+>>>> +	else
+>>>> +		val = readl(reg);
+>>>> +	return val;
+>>>>    }
+>>>>
+>>>> -static inline void clk_writel(u32 val, u32 __iomem *reg)
+>>>> +static inline void clk_writel(u32 val, u32 __iomem *reg, struct regmap *regmap)
+>>>>    {
+>>>> -	writel(val, reg);
+>>>> +	if (regmap)
+>>>> +		regmap_write(regmap, (u32)reg, val);
+>>>> +	else
+>>>> +		writel(val, reg);
+>>>>    }
+>>>>
+>>>>    #endif /* CONFIG_COMMON_CLK */
+>>>>
+>>>
+>>> Might it not be better to introduce regmap variants?
+>>> static inline void clk_regmap_writel(u32 val, u32 reg, struct regmap
+>>> *regmap)
+>>> and corresponding readl? that allows cleaner readability for clk
+>>> drivers that use regmap and those that dont.
+>>
+>> Well, doing that will introduce a lot of redundant code, as the checks
+>> for the presence of regmap must be copied all over the place. With this
+>> patch, all the generic clock drivers support internally both regmap or
+>> non-regmap register accesses.
+>>
+>
+> using function pointers might be an appropriate solution. in general a
+> low level reg access api that uses two different approaches sounds a
+> little.. umm.. fishy..
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/mm-imx5.c |    8 --------
- 1 file changed, 8 deletions(-)
+Initial work I did for v9 had clk_reg_ops struct in place which pretty 
+much did this, however Mike recommended looking at the regmap so I did. 
+I could put the reg_ops struct back and just have it use internally 
+regmap if that would be better, but I guess we need comment from Mike 
+how he wants this to be done.
 
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index d1d5260..4c11202 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -89,15 +89,7 @@ void __init imx51_init_early(void)
- 
- void __init imx53_init_early(void)
- {
--	struct device_node *np;
--	void __iomem *base;
--
- 	mxc_set_cpu_type(MXC_CPU_MX53);
--
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx53-iomuxc");
--	base = of_iomap(np, 0);
--	WARN_ON(!base);
--	mxc_iomux_v3_init(base);
- 	imx_src_init();
- }
- 
--- 
-1.7.9.5
+We could have:
+
+struct clk_reg_ops {
+	int (*clk_readl)(u32 addr, u32 *val);
+	int (*clk_writel)(u32 addr, u32 val);
+};
+
+struct clk_foo {
+	...
+	void __iomem *reg;
+	struct clk_reg_ops *regops;
+};
+
+>
+>>> regmap can also return error value that could also be handled as a result.
+>>
+>> True, however if the regmap fails for the clock code, not sure what we
+>> can do but panic. If this code is expanded, it is probably better to not
+>> inline it anymore.
+>>
+> let the compiler deal with that decision. regmap operation fail should
+> be percollated back to initiator of the request. in some cases that
+> will be ir-recoverable, but on other cases panic might be the right
+> answer - at the low level we are in no position to make that distinction.
+
+Currently, none of the clock drivers handle failures for regmap 
+operations, I can of course add some sort of support for this given what 
+we do with above point and what the API for the register accesses ends 
+up like.
+
+-Tero
