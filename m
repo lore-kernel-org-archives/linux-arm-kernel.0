@@ -1,46 +1,94 @@
 From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 01 Nov 2013 12:58:29 +1030
-Subject: [RFC PATCH] kernel/kallsyms.c: only show legal kernel symbol
-In-Reply-To: <CACVXFVMp-NWEVEG4-de2QHjUtwHUj+gWXOBjtUZge6_ZrT0UsA@mail.gmail.com>
-References: <20131024084559.GD16735@n2100.arm.linux.org.uk>
- <87mwlyclng.fsf@rustcorp.com.au>
- <CACVXFVO86u0h0V-1_DCkO5HNyUp2i_UsjPrVWDb-ZBtmwVk28A@mail.gmail.com>
- <87y55h7vcd.fsf@rustcorp.com.au>
- <CACVXFVPXEUX9JQ2NZvL8=J34zbw2fn202QW2SQtpKjdQ+tv=vg@mail.gmail.com>
- <87sivp7eai.fsf@rustcorp.com.au>
- <CACVXFVN7PiU1dorkeamtC9-Wg_TVQE8xFiJtad-C8q4_=Rc1Ow@mail.gmail.com>
- <874n82gk89.fsf@rustcorp.com.au> <20131028132348.62f7e368@tom-ThinkPad-T410>
- <87ob6aeyg4.fsf@rustcorp.com.au>
- <20131030230920.GQ16735@n2100.arm.linux.org.uk>
- <87zjpqb08q.fsf@rustcorp.com.au>
- <CACVXFVMp-NWEVEG4-de2QHjUtwHUj+gWXOBjtUZge6_ZrT0UsA@mail.gmail.com>
-Message-ID: <87fvrgc0tu.fsf@rustcorp.com.au>
+Date: Fri, 01 Nov 2013 13:06:27 +1030
+Subject: [PATCH] scripts/kallsyms: filter symbols not in kernel address space
+In-Reply-To: <CACVXFVMJmQJd0cFaZcmZZvFpUQUmTPJRj87QBVr0kbgZxjq8dw@mail.gmail.com>
+References: <1382975339-25831-1-git-send-email-tom.leiming@gmail.com>
+ <20131031154311.e65d16d79ba540ced736413b@linux-foundation.org>
+ <CACVXFVMJmQJd0cFaZcmZZvFpUQUmTPJRj87QBVr0kbgZxjq8dw@mail.gmail.com>
+Message-ID: <87d2mkc0gk.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei <tom.leiming@gmail.com> writes:
+From: Ming Lei <tom.leiming@gmail.com>
 
-> On Thu, Oct 31, 2013 at 11:14 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
->> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
->>
->> Kallsyms tends to fall between modules and scripts.  I assume it's not
->> urgent, so no cc:stable on this one.
->
-> Rusty, thanks a lot.
->
-> BTW, there is already other report on the problem:
->
->    http://lkml.indiana.edu/hypermail/linux/kernel/1310.3/02772.html
+This patch uses CONFIG_PAGE_OFFSET to filter symbols which
+are not in kernel address space because these symbols are
+generally for generating code purpose and can't be run at
+kernel mode, so we needn't keep them in /proc/kallsyms.
 
-OK, *that* references the commit which is the problem, when went into
-v3.11 (b9b32bf70f2fb710b07c94e13afbc729afe221da)
+For example, on ARM there are some symbols which may be
+linked in relocatable code section, then perf can't parse
+symbols any more from /proc/kallsyms, this patch fixes the
+problem (introduced b9b32bf70f2fb710b07c94e13afbc729afe221da)
 
-Unfortunately, *that commit* was cc:stable, so this needs to be
-cc:stable as well, not just >= 3.11.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Michal Marek <mmarek@suse.cz>
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+Cc: stable at kernel.org
+---
+Stephen, please run this on todays' linux-next, so I can push to Linus
+asap.  Thanks...
 
-Looking back on those patches, there's a mass of cc:stable on them.  The
-descriptions are either misleading, or these patches prevent theoretical
-attacks which means they shouldn't have been cc:stable.
+ scripts/kallsyms.c      | 12 +++++++++++-
+ scripts/link-vmlinux.sh |  2 ++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-Grr...
-Rusty.
+diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+index 487ac6f..9a11f9f 100644
+--- a/scripts/kallsyms.c
++++ b/scripts/kallsyms.c
+@@ -55,6 +55,7 @@ static struct sym_entry *table;
+ static unsigned int table_size, table_cnt;
+ static int all_symbols = 0;
+ static char symbol_prefix_char = '\0';
++static unsigned long long kernel_start_addr = 0;
+ 
+ int token_profit[0x10000];
+ 
+@@ -65,7 +66,10 @@ unsigned char best_table_len[256];
+ 
+ static void usage(void)
+ {
+-	fprintf(stderr, "Usage: kallsyms [--all-symbols] [--symbol-prefix=<prefix char>] < in.map > out.S\n");
++	fprintf(stderr, "Usage: kallsyms [--all-symbols] "
++			"[--symbol-prefix=<prefix char>] "
++			"[--page-offset=<CONFIG_PAGE_OFFSET>] "
++			"< in.map > out.S\n");
+ 	exit(1);
+ }
+ 
+@@ -194,6 +198,9 @@ static int symbol_valid(struct sym_entry *s)
+ 	int i;
+ 	int offset = 1;
+ 
++	if (s->addr < kernel_start_addr)
++		return 0;
++
+ 	/* skip prefix char */
+ 	if (symbol_prefix_char && *(s->sym + 1) == symbol_prefix_char)
+ 		offset++;
+@@ -646,6 +653,9 @@ int main(int argc, char **argv)
+ 				if ((*p == '"' && *(p+2) == '"') || (*p == '\'' && *(p+2) == '\''))
+ 					p++;
+ 				symbol_prefix_char = *p;
++			} else if (strncmp(argv[i], "--page-offset=", 14) == 0) {
++				const char *p = &argv[i][14];
++				kernel_start_addr = strtoull(p, NULL, 16);
+ 			} else
+ 				usage();
+ 		}
+diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
+index 0149949..32b10f5 100644
+--- a/scripts/link-vmlinux.sh
++++ b/scripts/link-vmlinux.sh
+@@ -82,6 +82,8 @@ kallsyms()
+ 		kallsymopt="${kallsymopt} --all-symbols"
+ 	fi
+ 
++	kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
++
+ 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
+ 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
+ 
