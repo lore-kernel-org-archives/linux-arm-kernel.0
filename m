@@ -1,138 +1,159 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  1 Nov 2013 15:08:56 -0700
-Subject: [PATCH 08/11] ARM: msm: Add SMP support for KPSSv1
+Date: Fri,  1 Nov 2013 15:08:53 -0700
+Subject: [PATCH 05/11] ARM: Introduce CPU_METHOD_OF_DECLARE() for cpu
+ hotplug/smp
 In-Reply-To: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
 References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1383343739-23080-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1383343739-23080-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rohit Vaswani <rvaswani@codeaurora.org>
+The goal of multi-platform kernels is to remove the need for mach
+directories and machine descriptors. To further that goal,
+introduce CPU_METHOD_OF_DECLARE() to allow cpu hotplug/smp
+support to be separated from the machine descriptors.
+Implementers should specify an enable-method property in their
+cpus node and then implement a matching set of smp_ops in their
+hotplug/smp code, wiring it up with the CPU_METHOD_OF_DECLARE()
+macro. When the kernel is compiled we'll collect all the
+enable-method smp_ops into one section for use at boot.
 
-Implement support for the Krait CPU release sequence when the
-CPUs are part of the first version of the krait processor
-subsystem.
+At boot time we'll look for an enable-method in each cpu node and
+try to match that against all known CPU enable methods in the
+kernel. If there are no enable-methods in the cpu nodes we
+fallback to the cpus node and try to use any enable-method found
+there. If that doesn't work we fall back to the old way of using
+the machine descriptor.
 
-Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/platsmp.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-msm/scm-boot.h |  8 ++++---
- 2 files changed, 61 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/smp.h        |  9 +++++++++
+ arch/arm/kernel/devtree.c         | 38 ++++++++++++++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h | 10 ++++++++++
+ 3 files changed, 57 insertions(+)
 
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index 369d8f7..e187c6e 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -17,6 +17,7 @@
- #include <linux/of_address.h>
- #include <linux/smp.h>
- #include <linux/io.h>
-+#include <linux/sizes.h>
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index a8cae71c..c27ec55 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -112,6 +112,15 @@ struct smp_operations {
+ #endif
+ };
  
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
-@@ -30,6 +31,10 @@
- #define SCSS_CPU1CORE_RESET		0x2d80
- #define SCSS_DBG_STATUS_CORE_PWRDUP	0x2e64
- 
-+#define APCS_CPU_PWR_CTL	0x04
++struct of_cpu_method {
++	const char *method;
++	struct smp_operations *ops;
++};
 +
-+#define APCS_SAW2_VCTL		0x14
-+
- extern void secondary_startup(void);
++#define CPU_METHOD_OF_DECLARE(name, _method, _ops)			\
++	static const struct of_cpu_method __cpu_method_of_table_##name	\
++		__used __section(__cpu_method_of_table)			\
++		= { .method = _method, .ops = _ops }
+ /*
+  * set platform specific SMP operations
+  */
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index f35906b..71a8592 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -25,6 +25,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
++#include <asm/smp.h>
  
- static DEFINE_SPINLOCK(boot_lock);
-@@ -66,6 +71,54 @@ static int scss_release_secondary(struct device_node *node, unsigned int cpu)
- 	return 0;
+ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+ {
+@@ -63,6 +64,36 @@ void __init arm_dt_memblock_reserve(void)
+ 	}
  }
  
-+static int kpssv1_release_secondary(struct device_node *node, unsigned int cpu)
++#ifdef CONFIG_SMP
++extern struct of_cpu_method __cpu_method_of_table[];
++
++static const struct of_cpu_method __cpu_method_of_table_sentinel
++	__used __section(__cpu_method_of_table_end);
++
++static int __init set_smp_ops_by_method(struct device_node *node)
 +{
-+	u32 off;
-+	struct resource res;
-+	void __iomem *reg;
++	const char *method;
++	struct of_cpu_method *m = __cpu_method_of_table;
 +
-+	if (of_property_read_u32(node, "cpu-offset", &off))
-+		return -EINVAL;
++	if (of_property_read_string(node, "enable-method", &method))
++		return 0;
 +
-+	if (of_address_to_resource(node, 0, &res))
-+		return -EINVAL;
++	for (; m != &__cpu_method_of_table_sentinel; m++)
++		if (!strcmp(m->method, method)) {
++			smp_set_ops(m->ops);
++			return 1;
++		}
 +
-+	/* The SAW base is always next to the ACC base so just map both */
-+	reg = ioremap(res.start + off + (SZ_64K * cpu),
-+			resource_size(&res) + SZ_4K);
-+	if (!reg)
-+		return -ENOMEM;
-+
-+	/* Turn on CPU rail */
-+	writel_relaxed(0xA4, reg + SZ_4K + APCS_SAW2_VCTL);
-+	mb();
-+	udelay(512);
-+
-+	/* Krait bring-up sequence */
-+	writel_relaxed(0x109, reg + APCS_CPU_PWR_CTL);
-+	writel_relaxed(0x101, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+	ndelay(300);
-+
-+	writel_relaxed(0x121, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+	udelay(2);
-+
-+	writel_relaxed(0x120, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+	udelay(2);
-+
-+	writel_relaxed(0x100, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+	udelay(100);
-+
-+	writel_relaxed(0x180, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+
-+	iounmap(reg);
 +	return 0;
 +}
++#else
++static inline int set_smp_ops_by_method(struct device_node *node)
++{
++	return 1;
++}
++#endif
 +
- static DEFINE_PER_CPU(int, cold_boot_done);
++
+ /*
+  * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
+  * and builds the cpu logical map array containing MPIDR values related to
+@@ -79,6 +110,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 	 * read as 0.
+ 	 */
+ 	struct device_node *cpu, *cpus;
++	int found_method = 0;
+ 	u32 i, j, cpuidx = 1;
+ 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
  
- static int boot_cold_cpu(unsigned int cpu)
-@@ -77,6 +130,7 @@ static int boot_cold_cpu(unsigned int cpu)
- #define M(c, f) { .compatible = c, .data = f }
- 	static const struct of_device_id match_table[] = {
- 		M("qcom,gcc-8660", scss_release_secondary),
-+		M("qcom,kpss-acc-v1", kpssv1_release_secondary),
- 	};
- #undef M
+@@ -150,8 +182,14 @@ void __init arm_dt_init_cpu_maps(void)
+ 		}
  
-@@ -155,6 +209,8 @@ static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
- 	static const int cold_boot_flags[] = {
- 		0,
- 		SCM_FLAG_COLDBOOT_CPU1,
-+		SCM_FLAG_COLDBOOT_CPU2,
-+		SCM_FLAG_COLDBOOT_CPU3,
- 	};
+ 		tmp_map[i] = hwid;
++
++		if (!found_method)
++			found_method = set_smp_ops_by_method(cpu);
+ 	}
  
- 	for_each_present_cpu(cpu) {
-diff --git a/arch/arm/mach-msm/scm-boot.h b/arch/arm/mach-msm/scm-boot.h
-index 7be32ff..6aabb24 100644
---- a/arch/arm/mach-msm/scm-boot.h
-+++ b/arch/arm/mach-msm/scm-boot.h
-@@ -13,9 +13,11 @@
- #define __MACH_SCM_BOOT_H
++	if (!found_method)
++		set_smp_ops_by_method(cpus);
++
+ 	if (!bootcpu_valid) {
+ 		pr_warn("DT missing boot CPU MPIDR[23:0], fall back to default cpu_logical_map\n");
+ 		return;
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index 83e2c31..918b1b5 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -167,6 +167,15 @@
+ #define CLK_OF_TABLES()
+ #endif
  
- #define SCM_BOOT_ADDR			0x1
--#define SCM_FLAG_COLDBOOT_CPU1		0x1
--#define SCM_FLAG_WARMBOOT_CPU1		0x2
--#define SCM_FLAG_WARMBOOT_CPU0		0x4
-+#define SCM_FLAG_COLDBOOT_CPU1		0x01
-+#define SCM_FLAG_COLDBOOT_CPU2		0x08
-+#define SCM_FLAG_COLDBOOT_CPU3		0x20
-+#define SCM_FLAG_WARMBOOT_CPU0		0x04
-+#define SCM_FLAG_WARMBOOT_CPU1		0x02
- 
- int scm_set_boot_addr(phys_addr_t addr, int flags);
++#ifdef CONFIG_SMP
++#define CPU_METHOD_OF_TABLES() . = ALIGN(8);				\
++			   VMLINUX_SYMBOL(__cpu_method_of_table) = .;	\
++			   *(__cpu_method_of_table)			\
++			   *(__cpu_method_of_table_end)
++#else
++#define CPU_METHOD_OF_TABLES()
++#endif
++
+ #define KERNEL_DTB()							\
+ 	STRUCT_ALIGN();							\
+ 	VMLINUX_SYMBOL(__dtb_start) = .;				\
+@@ -490,6 +499,7 @@
+ 	MEM_DISCARD(init.rodata)					\
+ 	CLK_OF_TABLES()							\
+ 	CLKSRC_OF_TABLES()						\
++	CPU_METHOD_OF_TABLES()						\
+ 	KERNEL_DTB()							\
+ 	IRQCHIP_OF_MATCH_TABLE()
  
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
