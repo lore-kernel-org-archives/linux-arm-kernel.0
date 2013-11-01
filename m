@@ -1,41 +1,128 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Fri, 1 Nov 2013 23:16:30 +0100
-Subject: Donation of Allwinner-based CubieTruck to anyone interested in
- developing & upstreaming
-In-Reply-To: <CAPNxggaCNab7S3E5S1f01Gmaf9nuOGBB9FHSS1Xa79Z=RP0mgA@mail.gmail.com>
-References: <CAOJ6w=FGjOrW5Ukzet4gsa4grkyZQei+OJfU4N_HqdKmaFjntw@mail.gmail.com>
- <CAPNxggaCNab7S3E5S1f01Gmaf9nuOGBB9FHSS1Xa79Z=RP0mgA@mail.gmail.com>
-Message-ID: <20131101221630.GE26440@lukather>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Fri, 01 Nov 2013 23:36:48 +0100
+Subject: [[PATCH v3]] videobuf2: Add missing lock held on vb2_fop_relase
+In-Reply-To: <1383252859-24221-1-git-send-email-ricardo.ribalda@gmail.com>
+References: <1383252859-24221-1-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <52742D00.7090805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 01, 2013 at 05:49:41PM +0100, Arokux X wrote:
-> > Worth reading: Getting Allwinner SoC support upstream:
-> > http://www.phoronix.com/scan.php?page=news_item&px=MTM4NDc
-> >
-> > and here:
-> > http://lkml.indiana.edu/hypermail/linux/kernel/1306.0/02744.html
-> >
-> 
-> Please take a look at this wiki page
-> http://linux-sunxi.org/Linux_mainlining_effort and get in touch with
-> sunxi.org through a public mailing list at
-> linux-sunxi at googlegroups.com see http://sunxi.org/Mailing_list
+Hi Ricardo,
 
-I'm sorry, but redirecting someone complaining that the only relevant
-kernel for sunxi is a fork of 3.4 to the community that actually
-maintains it seems a bit odd to me. Anyway...
+On 10/31/2013 09:54 PM, Ricardo Ribalda Delgado wrote:
+> From: Ricardo Ribalda<ricardo.ribalda@gmail.com>
+>
+> vb2_fop_relase does not held the lock although it is modifying the
+> queue->owner field.
+>
+> This could lead to race conditions on the vb2_perform_io function
+> when multiple applications are accessing the video device via
+> read/write API:
+[...]
+> v2: Add bug found by Sylvester Nawrocki
 
-Maxime
+"v2: Add fix for a bug found..." ? :)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131101/3a36f585/attachment.sig>
+> fimc-capture and fimc-lite where calling vb2_fop_release with the lock held.
+> Therefore a new __vb2_fop_release function has been created to be used by
+> drivers that overload the release function.
+>
+> v3: Comments by Sylvester Nawrocki and Mauro Carvalho Chehab
+>
+> Use vb2_fop_release_locked instead of __vb2_fop_release
+
+Such notes normally go after the scissors line ("---") after Signed-off-by
+lines.
+
+> Signed-off-by: Ricardo Ribalda<ricardo.ribalda@gmail.com>
+> Signed-off-by: Ricardo Ribalda Delgado<ricardo.ribalda@gmail.com>
+
+Is this duplication really needed ?
+
+> ---
+
+>   drivers/media/platform/exynos4-is/fimc-capture.c |  2 +-
+>   drivers/media/platform/exynos4-is/fimc-lite.c    |  2 +-
+>   drivers/media/v4l2-core/videobuf2-core.c         | 24 +++++++++++++++++++++++-
+>   include/media/videobuf2-core.h                   |  1 +
+>   4 files changed, 26 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
+> index fb27ff7..c3c3b3b 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-capture.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-capture.c
+> @@ -549,7 +549,7 @@ static int fimc_capture_release(struct file *file)
+>   		vc->streaming = false;
+>   	}
+>
+> -	ret = vb2_fop_release(file);
+> +	ret = vb2_fop_release_locked(file);
+
+I'm personally not happy with such a change. It is still not obvious
+if "locked" means that this function takes the lock internally or it
+should be called with the lock held. How about sticking to the common
+practice and instead naming it __vb2_fop_release() ?
+
+>   	if (close) {
+>   		clear_bit(ST_CAPT_BUSY,&fimc->state);
+> diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
+> index e5798f7..b8d417f 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-lite.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-lite.c
+> @@ -546,7 +546,7 @@ static int fimc_lite_release(struct file *file)
+>   		mutex_unlock(&entity->parent->graph_mutex);
+>   	}
+>
+> -	vb2_fop_release(file);
+> +	vb2_fop_release_locked(file);
+>   	pm_runtime_put(&fimc->pdev->dev);
+>   	clear_bit(ST_FLITE_SUSPENDED,&fimc->state);
+>
+> diff --git a/drivers/media/v4l2-core/videobuf2-core.c b/drivers/media/v4l2-core/videobuf2-core.c
+> index 594c75e..06e6dbd 100644
+> --- a/drivers/media/v4l2-core/videobuf2-core.c
+> +++ b/drivers/media/v4l2-core/videobuf2-core.c
+> @@ -2619,18 +2619,40 @@ int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma)
+>   }
+>   EXPORT_SYMBOL_GPL(vb2_fop_mmap);
+>
+> -int vb2_fop_release(struct file *file)
+> +int __vb2_fop_release(struct file *file, bool lock_is_held)
+>   {
+>   	struct video_device *vdev = video_devdata(file);
+> +	struct mutex *lock;
+>
+>   	if (file->private_data == vdev->queue->owner) {
+> +		if (lock_is_held)
+> +			lock = NULL;
+> +		else
+> +			lock = vdev->queue->lock ?
+> +				vdev->queue->lock : vdev->lock;
+> +		if (lock)
+> +			mutex_lock(lock);
+>   		vb2_queue_release(vdev->queue);
+>   		vdev->queue->owner = NULL;
+> +		if (lock)
+> +			mutex_unlock(lock);
+>   	}
+>   	return v4l2_fh_release(file);
+>   }
+> +EXPORT_SYMBOL_GPL(__vb2_fop_release);
+
+We don't need to export this function, do we ?
+
+> +int vb2_fop_release(struct file *file)
+> +{
+> +	return __vb2_fop_release(file, false);
+> +}
+>   EXPORT_SYMBOL_GPL(vb2_fop_release);
+>
+> +int vb2_fop_release_locked(struct file *file)
+> +{
+> +	return __vb2_fop_release(file, true);
+> +}
+> +EXPORT_SYMBOL_GPL(vb2_fop_release_locked);
+
+--
+Thanks,
+Sylwester
