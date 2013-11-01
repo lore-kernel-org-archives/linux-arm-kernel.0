@@ -1,128 +1,126 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 1 Nov 2013 11:13:47 +0100
-Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <001e01ced692$267a6d90$736f48b0$%han@samsung.com>
-References: <20131019104555.GI18477@ns203013.ovh.net>
- <1382346813-8449-1-git-send-email-denis@eukrea.com>
- <20131022045833.GB17512@ns203013.ovh.net>
- <20131022072307.GA8681@ulmo.nvidia.com>
- <20131022153445.GD17512@ns203013.ovh.net>
- <20131022200141.GA8037@mithrandir>
- <001e01ced692$267a6d90$736f48b0$%han@samsung.com>
-Message-ID: <20131101101346.GK27864@ulmo.nvidia.com>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Fri, 1 Nov 2013 18:02:03 +0800
+Subject: [PATCHv2 5/8] ASoC: SGTL5000: Enhance the SGTL5000 codec driver
+ about regulator.
+In-Reply-To: <1383289495-24523-6-git-send-email-Li.Xiubo@freescale.com>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-6-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20131101100201.GF28401@MrMyself>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 01, 2013 at 08:37:23AM +0900, Jingoo Han wrote:
-> On Wednesday, October 23, 2013 5:02 AM, Thierry Reding wrote:
-> > On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 09:23 Tue 22 Oct     , Thierry Reding wrote:
-> > > > On Tue, Oct 22, 2013 at 06:58:33AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > On 11:13 Mon 21 Oct     , Denis Carikli wrote:
-> > > > > > Cc: Richard Purdie <rpurdie@rpsys.net>
-> > > > > > Cc: Jingoo Han <jg1.han@samsung.com>
-> > > > > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > > > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > > > > Cc: Pawel Moll <pawel.moll@arm.com>
-> > > > > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > > > > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > > > > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > > > > > Cc: devicetree at vger.kernel.org
-> > > > > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > > > > Cc: linux-arm-kernel at lists.infradead.org
-> > > > > > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > > > > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> > > > > > Cc: Eric B?nard <eric@eukrea.com>
-> > > > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > > > > > ---
-> > > > > > ChangeLog v3->v4:
-> > > > > > - The default-brightness property is now optional, it defaults to 1 if not set.
-> > > > > by default we set OFF not ON
-> > > > >
-> > > > > do not actiate driver or properti by default you can not known to consequence
-> > > > > on the hw
-> > > >
-> > > > Turning on a backlight by default is what pretty much every backlight
-> > > > driver does. I personally think that's the wrong default, I even tried
-> > > > to get some discussion started recently about how we could change this.
-> > > > However, given that this has been the case for possibly as long as the
-> > > > subsystem has existed, suddenly changing it might cause quite a few of
-> > > > our users to boot the new kernel and not see their display come up. As
-> > > > with any other ABI, this isn't something we can just change without a
-> > > > very good migration path.
-> > >
-> > > I'm sorry but the blacklight descibe in DT have nothing to do with the common
-> > > pratice that the current driver have today
-> > 
-> > That's not at all what I said. What I said was that the majority of
-> > backlight drivers currently default to turning the backlight on when
-> > probed. Therefore I think it would be consistent if this driver did the
-> > same.
-> > 
-> > I also said that I don't think it's a very good default, but at the same
-> > time we can't just go and change the default behaviour at will because
-> > people may rely on it.
+On Fri, Nov 01, 2013 at 03:04:52PM +0800, Xiubo Li wrote:
+> On VF610 series there are no regulators used, and now whether the
+> CONFIG_REGULATOR mirco is enabled or not, for the VF610 audio
+
+micro? or macro?
+
+> patch series, the board cannot be probe successfully.
+> And this patch will solve this issue.
 > 
-> I agree with your opinion.
-> But, I can't decide how to change it.
 
-One solution that Stephen proposed was to make all DT-based setups use a
-new default (off). An advantage of that is that such setups are still
-fairly actively being worked on, so we can probably get early adopters
-to cope with the new default.
+I finally got your idea about what this patch does. But it seems to
+be more likely a work around. Maybe I here can't think it through
+comprehensively, but I think you can try to add a fixed regulator to
+sgtl5000 in the devicetree, rather than disabling common functions
+even if not breaking others.
 
-Looking through some DTS files it seems that many use the pwm-backlight
-driver. So if we can get some concensus from all the users that changing
-the default would be okay, then I think we could reasonably change it.
-
-Another solution perhaps would be to add a property to DT which encodes
-the default state of the backlight on boot. This used to be impossible
-because the general concensus was that DT should describe hardware only
-and not software policy. During the kernel summit this requirement was
-somewhat relaxed and it should now be okay to describe system
-configuration data, and I think this would be a good match. If the
-system is designed to keep the backlight off by default because some
-other component (display panel driver) is meant to turn it on later,
-that's system configuration data, right?
-
-Perhaps a boolean property could be used:
-
-	backlight {
-		compatible = "pwm-backlight";
-
-		...
-
-		backlight-default-off;
-	};
-
-> > > put on by default if wrong specially without the property define. Even put it
-> > > on by default it wrong as the bootloader may have set it already for splash
-> > > screen and to avoid glitch the drivers need to detect this.
-> > 
-> > I agree that would be preferable, but I don't know of any way to detect
-> > what value the bootloader set a GPIO to. The GPIO API requires that you
-> > call gpio_direction_output(), and that requires a value parameter which
-> > will be used as the output level of the GPIO.
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> ---
+>  sound/soc/codecs/sgtl5000.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> Jean-Christophe's point is right.
+> diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
+> index 1f4093f..c2f6d86 100644
+> --- a/sound/soc/codecs/sgtl5000.c
+> +++ b/sound/soc/codecs/sgtl5000.c
+> @@ -61,6 +61,7 @@ static const struct reg_default sgtl5000_reg_defaults[] = {
+>  	{ SGTL5000_DAP_AVC_DECAY,		0x0050 },
+>  };
+>  
+> +#ifdef CONFIG_REGULATOR
+>  /* regulator supplies for sgtl5000, VDDD is an optional external supply */
+>  enum sgtl5000_regulator_supplies {
+>  	VDDA,
+> @@ -93,6 +94,9 @@ static struct regulator_init_data ldo_init_data = {
+>  	.num_consumer_supplies = 1,
+>  	.consumer_supplies = &ldo_consumer[0],
+>  };
+> +#else
+> +#define SGTL5000_SUPPLY_NUM 0
+> +#endif
+>  
+>  /*
+>   * sgtl5000 internal ldo regulator,
+> @@ -112,7 +116,9 @@ struct sgtl5000_priv {
+>  	int master;	/* i2s master or not */
+>  	int fmt;	/* i2s data format */
+>  	struct regulator_bulk_data supplies[SGTL5000_SUPPLY_NUM];
+> +#ifdef CONFIG_REGULATOR
+>  	struct ldo_regulator *ldo;
+> +#endif
+>  	struct regmap *regmap;
+>  	struct clk *mclk;
+>  };
+> @@ -879,6 +885,7 @@ static int ldo_regulator_remove(struct snd_soc_codec *codec)
+>  	return 0;
+>  }
+>  #else
+> +#ifndef CONFIG_SND_SOC_FSL_SGTL5000_VF610
+
+Checking a platform or SoC specific define here is just a bit....
+
+Could you pls find a better solution? Like I said at first, use fixed regulator
+or figure out why your System would hang with current sgtl5000 driver. If it
+really has a critical bug in its regulator-related code, I think you can then
+make a greater contribution by fixing the bug rather than bypassing it.
+
+Best regards,
+Nicolin Chen
+
+>  static int ldo_regulator_register(struct snd_soc_codec *codec,
+>  				struct regulator_init_data *init_data,
+>  				int voltage)
+> @@ -886,6 +893,7 @@ static int ldo_regulator_register(struct snd_soc_codec *codec,
+>  	dev_err(codec->dev, "this setup needs regulator support in the kernel\n");
+>  	return -EINVAL;
+>  }
+> +#endif
+>  
+>  static int ldo_regulator_remove(struct snd_soc_codec *codec)
+>  {
+> @@ -1137,6 +1145,7 @@ static int sgtl5000_resume(struct snd_soc_codec *codec)
+>  #define sgtl5000_resume  NULL
+>  #endif	/* CONFIG_SUSPEND */
+>  
+> +#ifdef CONFIG_REGULATOR
+>  /*
+>   * sgtl5000 has 3 internal power supplies:
+>   * 1. VAG, normally set to vdda/2
+> @@ -1373,6 +1382,7 @@ err_regulator_free:
+>  	return ret;
+>  
+>  }
+> +#endif
+>  
+>  static int sgtl5000_probe(struct snd_soc_codec *codec)
+>  {
+> @@ -1387,6 +1397,7 @@ static int sgtl5000_probe(struct snd_soc_codec *codec)
+>  		return ret;
+>  	}
+>  
+> +#ifdef CONFIG_REGULATOR
+>  	ret = sgtl5000_enable_regulators(codec);
+>  	if (ret)
+>  		return ret;
+> @@ -1395,6 +1406,7 @@ static int sgtl5000_probe(struct snd_soc_codec *codec)
+>  	ret = sgtl5000_set_power_regs(codec);
+>  	if (ret)
+>  		goto err;
+> +#endif
+>  
+>  	/* enable small pop, introduce 400ms delay in turning off */
+>  	snd_soc_update_bits(codec, SGTL5000_CHIP_REF_CTRL,
+> -- 
+> 1.8.4
 > 
-> We may need to discuss 'the way to detect what value the bootloader
-> set a GPIO to'.
-
-Since some GPIO hardware simply can't do it, I guess we could resolve to
-passing such information via DT. That obviously won't work for non-DT
-setups, but I guess that's something we could live with.
-
-One possibility would be to supplement the backlight-default-off
-property with another property (backlight-boot-on) that can be passed on
-to the kernel from the bootloader to signal that it has turned the
-backlight on.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131101/72ee32dc/attachment-0001.sig>
