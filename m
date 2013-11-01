@@ -1,111 +1,166 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 1 Nov 2013 16:25:00 -0500
-Subject: [PATCHv9 00/43] ARM: TI SoC clock DT conversion
-In-Reply-To: <52726134.8040505@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <526FDFF4.9030806@ti.com> <5270C1F3.6000409@ti.com> <52711F12.1090008@ti.com>
- <52716799.6040002@ti.com> <52721E95.4080806@ti.com> <52726134.8040505@ti.com>
-Message-ID: <52741C2C.4060209@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 01 Nov 2013 16:52:44 -0500
+Subject: [PATCH v2 1/4] ARM: EXYNOS: Add support for EXYNOS5410 SoC
+In-Reply-To: <1381763305-7085-2-git-send-email-v.tyrtov@samsung.com>
+References: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
+ <1381763305-7085-2-git-send-email-v.tyrtov@samsung.com>
+Message-ID: <527422AC.1050105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 08:55 AM, Nishanth Menon wrote:
-> On 10/31/2013 04:10 AM, Tero Kristo wrote:
->> On 10/30/2013 10:10 PM, Nishanth Menon wrote:
->>> On 10/30/2013 10:00 AM, Nishanth Menon wrote:
->>>> On 10/30/2013 03:23 AM, Tero Kristo wrote:
->>>>> On 10/29/2013 06:19 PM, Nishanth Menon wrote:
->>>>>> On 10/25/2013 10:56 AM, Tero Kristo wrote:
->>>>>> <snip>
->>>>>>> Testing done:
->>>>>>> - omap3-beagle: boot + suspend/resume (ret + off)
->>>>>>> - omap4-panda-es: boot + suspend/resume
->>>>>>> - omap5-uevm: boot
->>>>>>> - dra7-evm: boot
->>>>>>> - am335x-bone: boot
->>>>>>>
->>>>>>> Test branches available:
->>>>>>>
->>>>>>> tree: https://github.com/t-kristo/linux-pm.git
->>>>>>
->>>>>> <snip>
->>>>>>> Fully functioning test branch: 3.12-rc6-dt-clks-v9
->>>>>>>
->>>>>> ^^ I tested this branch (boot testing):
->>>>>> Beagle-XM: http://pastebin.com/50A1qtFq (crashes + clkdm issues, dpll5
->>>>>> failed to transition)
->>>>>
->>>>> I just sent you a private email with a patch to try out, should fix the
->>>>> boot crash at least hopefully. Basically I forgot to convert one part of
->>>>> the kernel to the new regmap stuff for omap36xx.
->>>>
->>>> it does bootup yes.
->>>>>
->>>>> clkdm issues are caused by wrong data in omap_hwmod_3xxx_data.c, USB
->>>>> nodes are listing l3_init_clkdm for them, but this only exists on
->>>>> omap4+. Seems like some copy paste bug introduced by someone.
->>>>>
->>>>> dpll5 part I am not too sure, can you check if the same happens with
->>>>> non-dt boot?
->>>>
->>>> no-dt: http://pastebin.com/bYP9fTzH
->>>> dt: http://pastebin.com/xHup4L9Y
->>>>
->>>> dpll5 warning seems to be only in dt-boot?
->>>>
->>>
->>> Tracked this down: you were missing the following - looks like the
->>> conversion script might be missing converting the flags clock data
->>> over to dts?
->>>
->>> diff --git
->>> a/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
->>> b/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
->>> index 7e37e3e..c9b77c8 100644
->>> --- a/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
->>> +++ b/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
->>> @@ -30,6 +30,7 @@
->>>                  compatible = "ti,omap3-dpll-clock";
->>>                  clocks = <&sys_ck>, <&sys_ck>;
->>>                  reg = <0x0d04>, <0x0d24>, <0x0d34>, <0x0d4c>;
->>> +               ti,low-power-stop;
->>>          };
->>>
->>>          dpll5_m2_ck: dpll5_m2_ck {
->>>
->>>
->>>
->>
->> Yea, seems I introduced the problem with the conversion script changes. 
->> The valid fix for this is actually at the end of this mail (this fixes 
->> both of the problems introduced, and also completes the fix you did), I 
->> will add the fixes to the next rev. 
+On 10/14/2013 10:08 AM, Vyacheslav Tyrtov wrote:
+> From: Tarek Dakhran <t.dakhran@samsung.com>
 > 
-> One debug feedback:
-> reg = <0x0d04>, <0x0d24>, <0x0d34>, <0x0d4c>;
-> clocks = <&sys_ck>, <&sys_ck>;
+> EXYNOS5410 is SoC in Samsung's Exynos5 SoC series.
+> Add initial support for this SoC.
+
+I think this entire patch is mostly unnecessary and this information
+should all be coming from DT. I'll leave it to arm-soc maintainers
+whether they want to accept this addition rather than see some clean-up
+here.
+
+"samsung,exynos5410" does need to be documented though.
+
+Rob
+
+> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig             | 12 ++++++++++++
+>  arch/arm/mach-exynos/common.c            | 18 ++++++++++++++++++
+>  arch/arm/mach-exynos/include/mach/map.h  |  1 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c   |  1 +
+>  arch/arm/plat-samsung/include/plat/cpu.h |  8 ++++++++
+>  5 files changed, 40 insertions(+)
 > 
-> we used indexing for varied register and clocks. however the register
-> meaning per index changes based on type of DPLL. This was one painful
-> thing to track down when debugging. the only robust option to debug
-> was to use prints as part of register write/reads to ensure that right
-> sequence was being followed.
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 56fe819..9ea1799 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -84,6 +84,18 @@ config SOC_EXYNOS5250
+>  	help
+>  	  Enable EXYNOS5250 SoC support
+>  
+> +config SOC_EXYNOS5410
+> +	bool "SAMSUNG EXYNOS5410"
+> +	default y
+> +	depends on ARCH_EXYNOS5
+> +	select MCPM
+> +	select ARM_CCI
+> +	select PM_GENERIC_DOMAINS if PM
+> +	select S5P_PM if PM
+> +	select S5P_SLEEP if PM
+> +	help
+> +	  Enable EXYNOS5410 SoC support
+> +
+>  config SOC_EXYNOS5420
+>  	bool "SAMSUNG EXYNOS5420"
+>  	default y
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index ba95e5d..187c0a4 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -53,6 +53,7 @@ static const char name_exynos4210[] = "EXYNOS4210";
+>  static const char name_exynos4212[] = "EXYNOS4212";
+>  static const char name_exynos4412[] = "EXYNOS4412";
+>  static const char name_exynos5250[] = "EXYNOS5250";
+> +static const char name_exynos5410[] = "EXYNOS5410";
+>  static const char name_exynos5420[] = "EXYNOS5420";
+>  static const char name_exynos5440[] = "EXYNOS5440";
+>  
+> @@ -86,6 +87,12 @@ static struct cpu_table cpu_ids[] __initdata = {
+>  		.init		= exynos_init,
+>  		.name		= name_exynos5250,
+>  	}, {
+> +		.idcode		= EXYNOS5410_SOC_ID,
+> +		.idmask		= EXYNOS5_SOC_MASK,
+> +		.map_io		= exynos5_map_io,
+> +		.init		= exynos_init,
+> +		.name		= name_exynos5410,
+> +	}, {
+>  		.idcode		= EXYNOS5420_SOC_ID,
+>  		.idmask		= EXYNOS5_SOC_MASK,
+>  		.map_io		= exynos5_map_io,
+> @@ -216,6 +223,15 @@ static struct map_desc exynos4x12_iodesc[] __initdata = {
+>  	},
+>  };
+>  
+> +static struct map_desc exynos5410_iodesc[] __initdata = {
+> +	{
+> +		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+> +		.pfn		= __phys_to_pfn(EXYNOS5410_PA_SYSRAM_NS),
+> +		.length		= SZ_4K,
+> +		.type		= MT_DEVICE,
+> +	},
+> +};
+> +
+>  static struct map_desc exynos5250_iodesc[] __initdata = {
+>  	{
+>  		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+> @@ -365,6 +381,8 @@ static void __init exynos5_map_io(void)
+>  
+>  	if (soc_is_exynos5250())
+>  		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
+> +	if (soc_is_exynos5410())
+> +		iotable_init(exynos5410_iodesc, ARRAY_SIZE(exynos5410_iodesc));
+>  }
+>  
+>  void __init exynos_init_time(void)
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+> index 7b046b5..894f431 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -29,6 +29,7 @@
+>  #define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
+>  #define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
+>  #define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
+> +#define EXYNOS5410_PA_SYSRAM_NS		0x02073000
+>  
+>  #define EXYNOS_PA_CHIPID		0x10000000
+>  
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> index f874b77..9515186 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -52,6 +52,7 @@ static void __init exynos5_dt_machine_init(void)
+>  
+>  static char const *exynos5_dt_compat[] __initdata = {
+>  	"samsung,exynos5250",
+> +	"samsung,exynos5410",
+>  	"samsung,exynos5420",
+>  	"samsung,exynos5440",
+>  	NULL
+> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+> index 4fb1f03..aad7c40 100644
+> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+> @@ -46,6 +46,7 @@ extern unsigned long samsung_cpu_id;
+>  #define EXYNOS4_CPU_MASK	0xFFFE0000
+>  
+>  #define EXYNOS5250_SOC_ID	0x43520000
+> +#define EXYNOS5410_SOC_ID	0xE5410023
+>  #define EXYNOS5420_SOC_ID	0xE5420000
+>  #define EXYNOS5440_SOC_ID	0xE5440000
+>  #define EXYNOS5_SOC_MASK	0xFFFFF000
+> @@ -68,6 +69,7 @@ IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
+>  IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
+>  IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
+>  IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
+> +IS_SAMSUNG_CPU(exynos5410, EXYNOS5410_SOC_ID, EXYNOS5_SOC_MASK)
+>  IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
+>  IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+>  
+> @@ -144,6 +146,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+>  # define soc_is_exynos5250()	0
+>  #endif
+>  
+> +#if defined(CONFIG_SOC_EXYNOS5410)
+> +# define soc_is_exynos5410()	is_samsung_exynos5410()
+> +#else
+> +# define soc_is_exynos5410()	0
+> +#endif
+> +
+>  #if defined(CONFIG_SOC_EXYNOS5420)
+>  # define soc_is_exynos5420()	is_samsung_exynos5420()
+>  #else
 > 
-> I understand based on review comments for dtb size, we have removed
-> the names, but we lost sane debug capability as well with that.
-> 
-
-I dont have any further feedback at this point beyond what is already
-shared and so far my minimal tests have been good..
-
-I have the following warnings:
-sparse build warnings: http://pastebin.com/HZ1TWzyh
-kernel-doc warnings: http://pastebin.com/JQwFEuaC
-
-Hopefully, the next rev will not introducing nothing newer that what
-we have in mainline.
-
-
--- 
-Regards,
-Nishanth Menon
