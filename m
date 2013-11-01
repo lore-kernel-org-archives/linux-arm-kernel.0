@@ -1,227 +1,58 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 1 Nov 2013 11:18:45 +0200
-Subject: [PATCHv9 07/43] CLK: TI: add autoidle support
-In-Reply-To: <52727FDA.7060009@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-8-git-send-email-t-kristo@ti.com> <52727FDA.7060009@ti.com>
-Message-ID: <527371F5.9080702@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 1 Nov 2013 10:23:28 +0100
+Subject: [PATCH] clk: Properly initialize reference count
+In-Reply-To: <5272AAD7.9050305@wwwdotorg.org>
+References: <1383220962-26836-1-git-send-email-treding@nvidia.com>
+ <5272AAD7.9050305@wwwdotorg.org>
+Message-ID: <20131101092327.GD27864@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 06:05 PM, Nishanth Menon wrote:
-> On 10/25/2013 10:57 AM, Tero Kristo wrote:
->> TI clk driver now routes some of the basic clocks through own
->> registration routine to allow autoidle support. This routine just
->> checks a couple of device node properties and adds autoidle support
->> if required, and just passes the registration forward to basic clocks.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   arch/arm/mach-omap2/clock.c |    6 +++
->>   drivers/clk/ti/Makefile     |    2 +-
->>   drivers/clk/ti/autoidle.c   |  109 +++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/clk/ti.h      |    9 ++++
->>   4 files changed, 125 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/clk/ti/autoidle.c
->>
->> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
->> index 0c38ca9..223f432b 100644
->> --- a/arch/arm/mach-omap2/clock.c
->> +++ b/arch/arm/mach-omap2/clock.c
->> @@ -520,6 +520,9 @@ int omap2_clk_enable_autoidle_all(void)
->>   	list_for_each_entry(c, &clk_hw_omap_clocks, node)
->>   		if (c->ops && c->ops->allow_idle)
->>   			c->ops->allow_idle(c);
->> +
->> +	of_ti_clk_allow_autoidle_all();
->> +
->>   	return 0;
->>   }
->>
->> @@ -539,6 +542,9 @@ int omap2_clk_disable_autoidle_all(void)
->>   	list_for_each_entry(c, &clk_hw_omap_clocks, node)
->>   		if (c->ops && c->ops->deny_idle)
->>   			c->ops->deny_idle(c);
->> +
->> +	of_ti_clk_deny_autoidle_all();
->> +
->>   	return 0;
->>   }
->>
->> diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
->> index 05af5d8..533efb4 100644
->> --- a/drivers/clk/ti/Makefile
->> +++ b/drivers/clk/ti/Makefile
->> @@ -1,3 +1,3 @@
->>   ifneq ($(CONFIG_OF),)
->> -obj-y					+= clk.o dpll.o
->> +obj-y					+= clk.o dpll.o autoidle.o
->>   endif
->> diff --git a/drivers/clk/ti/autoidle.c b/drivers/clk/ti/autoidle.c
->> new file mode 100644
->> index 0000000..efa2a3e
->> --- /dev/null
->> +++ b/drivers/clk/ti/autoidle.c
->> @@ -0,0 +1,109 @@
->> +/*
->> + * TI clock autoidle support
->> + *
->> + * Copyright (C) 2013 Texas Instruments, Inc.
->> + *
->> + * Tero Kristo <t-kristo@ti.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/slab.h>
->> +#include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/clk/ti.h>
->> +
->> +struct clk_ti_autoidle {
->> +	u32			reg;
->> +	struct regmap		*regmap;
->> +	u8			shift;
->> +	u8			flags;
->> +	const char		*name;
->> +	struct list_head	node;
->> +};
->> +
->> +#define AUTOIDLE_LOW		0x1
->> +
->> +static LIST_HEAD(autoidle_clks);
->> +
->> +static void ti_allow_autoidle(struct clk_ti_autoidle *clk)
->> +{
->> +	u32 val;
->> +
->> +	regmap_read(clk->regmap, clk->reg, &val);
->> +
->> +	if (clk->flags & AUTOIDLE_LOW)
->> +		val &= ~(1 << clk->shift);
->> +	else
->> +		val |= (1 << clk->shift);
->> +
->> +	regmap_write(clk->regmap, clk->reg, val);
-> regmap_update_bits ?
+On Thu, Oct 31, 2013 at 01:09:11PM -0600, Stephen Warren wrote:
+> On 10/31/2013 06:02 AM, Thierry Reding wrote:
+> > Commit a336ed7 (clk: Implement clk_unregister()) initializes the kref in
+> > clk_set_parent(), which is obviously the wrong place. Further research
+> > shows that the original patches initialized it correctly, so it probably
+> > ended up in clk_set_parent() by mistake during manual application of the
+> > patch.
+> 
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> 
+> BTW, it'd be nice to Cc fixes like this to linux-next at vger.kernel.org;
 
-Hmm yea that would work.
+Yes, perhaps that would've been a good idea.
 
->> +}
->> +
->> +static void ti_deny_autoidle(struct clk_ti_autoidle *clk)
->> +{
->> +	u32 val;
->> +
->> +	regmap_read(clk->regmap, clk->reg, &val);
->> +
->> +	if (clk->flags & AUTOIDLE_LOW)
->> +		val |= (1 << clk->shift);
->> +	else
->> +		val &= ~(1 << clk->shift);
->> +
->> +	regmap_write(clk->regmap, clk->reg, val);
-> regmap_update_bits ?
+> I /might/ have avoided doing a bisect if I'd seen this patch first!
 
-Same.
+I get that bisect is a really nice tool. But I don't understand why
+people seem to rely on it to track down *everything* nowadays. In this
+particular case there was a fairly obvious warning that pretty clearly
+pointed at something wrong with the reference counting and some simple
+code inspection revealed the issue at hand. No need to rebuild and boot
+the kernel dozens of times to find this out.
 
->
-> and ofcourse error handling for regmap ops..
+But perhaps other people have much faster machines and bisection is
+actually faster...
 
-What do you propose to do in error case? Panic, WARN() or just printk?
+> I see the benefit of that "linux-next plus today's accumulated
+> bug-fixes" tree that I think you proposed:-)
 
->
->> +}
->> +
->> +void of_ti_clk_allow_autoidle_all(void)
->> +{
->> +	struct clk_ti_autoidle *c;
->> +
->> +	list_for_each_entry(c, &autoidle_clks, node)
->> +		ti_allow_autoidle(c);
->> +}
->> +
->> +void of_ti_clk_deny_autoidle_all(void)
->> +{
->> +	struct clk_ti_autoidle *c;
->> +
->> +	list_for_each_entry(c, &autoidle_clks, node)
->> +		ti_deny_autoidle(c);
->> +}
->> +
->> +int __init of_ti_autoidle_setup(struct device_node *node,
->> +				struct regmap *regmap)
->
-> will be nice if you could kernel-doc all public functions at the very
-> least.
+Yeah, this is precisely the situation where this would be good to have.
+Both of these issues together took about 45-60 minutes to track down and
+fix. I suppose it took Olof and you a similar amount of time. Yet if the
+fixes were already collected in some standard location it would free you
+up to do something more productive instead of wasting your time on
+duplicate work.
 
-Ok, I can try to do that for next. :P
+I'll ask Stephen (Rothwell) if he'd be willing to set up shared access
+to linux-next so that I can push collected fixes. Alternatively I could
+do that in a separate repository.
 
->
->> +{
->> +	u32 shift;
->> +	struct clk_ti_autoidle *clk;
->> +
->> +	if (of_property_read_u32(node, "ti,autoidle-shift", &shift))
->> +		return 0;
->> +
->> +	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
->> +
->> +	if (!clk) {
->> +		pr_err("%s: kzalloc failed\n", __func__);
->> +		return -ENOMEM;
->> +	}
->> +
->> +	clk->shift = shift;
->> +	clk->name = node->name;
->> +	of_property_read_u32(node, "reg", &clk->reg);
->
-> dt binding?
-> what happens if someone forgets this?
-
-You get zero offset.
-
-I can add a check for this though.
-
->
->> +	clk->regmap = regmap;
->> +
->> +	if (of_property_read_bool(node, "ti,invert-autoidle-bit"))
->> +		clk->flags |= AUTOIDLE_LOW;
->> +
->> +	list_add(&clk->node, &autoidle_clks);
->> +
->> +	return 0;
->> +}
->> diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
->> index 7ab02fa..e45005c 100644
->> --- a/include/linux/clk/ti.h
->> +++ b/include/linux/clk/ti.h
->> @@ -178,6 +178,15 @@ int omap3_dpll4_set_rate(struct clk_hw *clk, unsigned long rate,
->>
->>   void ti_dt_clocks_register(struct ti_dt_clk *oclks);
->>   void ti_dt_clk_init_provider(struct device_node *np, struct regmap *regmap);
->> +int of_ti_autoidle_setup(struct device_node *node, struct regmap *regmap);
->> +
->> +#ifdef CONFIG_OF
->> +void of_ti_clk_allow_autoidle_all(void);
->> +void of_ti_clk_deny_autoidle_all(void);
->> +#else
->> +static inline void of_ti_clk_allow_autoidle_all(void) { }
->> +static inline void of_ti_clk_deny_autoidle_all(void) { }
->> +#endif
->>
->>   extern const struct clk_hw_omap_ops clkhwops_omap3_dpll;
->>   extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
->>
->
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131101/97b366d5/attachment.sig>
