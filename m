@@ -1,121 +1,35 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Fri, 1 Nov 2013 00:13:37 -0700
-Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <001401ced6cb$04e2a330$0ea7e990$%jun@samsung.com>
-References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
- <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
- <001401ced6cb$04e2a330$0ea7e990$%jun@samsung.com>
-Message-ID: <CAMj5BkgHE6FwBv6hUi8Mth1Ox40ed2sot4p9LQBxOToN=Fu7Qg@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Fri, 1 Nov 2013 15:04:47 +0800
+Subject: No subject
+Message-ID: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Seungwon
 
-Thanks for giving suggestion.
+Hello,
 
-On Thu, Oct 31, 2013 at 11:24 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> Hi Zhangfei,
+This patch series is mostly Freescale's SAI SoC Digital Audio Interface driver implementation. And the implementation is only compatible with device tree definition.
 
->> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->> +{
->> +     struct dw_mci_k3_priv_data *priv = host->priv;
->> +
->> +     if (priv->type == DW_MCI_TYPE_HI4511)
-> There are several checking controller type.
-> But now DW_MCI_TYPE_HI4511 is just introduced alone.
-> It seems like unnecessary.
+This patch series is based on linux-next and has been tested on Vybrid VF610 Tower board using device tree.
 
-Yes, currently only K3V2 is added, and k3v3 code will be added soon.
-Do you think type is more suitable to add later?
+Changed in v2:
+- Use default settings for the generic dmaengine PCM driver.
+- Separate receive and transmit setting in most functions, but some couldn't for the HW limitation.
+- Drop some not reduntant code.
+- Use devm_snd_soc_register_component() instead of snd_soc_register_component().
+- Use devm_snd_soc_register_card() instead of devm_snd_soc_register_card().
+- Adjust the code sentences sequence.
+- Make the namespacing consistent.
+- Rename CONFIG_SND_SOC_FSL_SGTL5000 to CONFIG_SND_SOC_FSL_SGTL5000_VF610.
+- Drop some meaningless lines.
+- Rename the binding document file.
 
->> +static int dw_mci_k3_parse_dt(struct dw_mci *host)
->> +{
->> +     struct dw_mci_k3_priv_data *priv = host->priv;
->> +     struct device_node *np = host->dev->of_node;
->> +     u32 data[3];
->> +     int ret;
->> +
->> +     if (priv->type == DW_MCI_TYPE_HI4511) {
-> Didn't you see Kernel panic here?
-> host->priv is not allocated yet, it's a invalid pointer dereference.
-> dw_mci_k3_parse_dt() is called prior to dw_mci_k3_priv_init().
-> You can check dw_mci_probe() sequence.
-
-It is no problem here
-dw_mci_pltfm_register -> drv_data->init(host) -> dw_mci_probe -> dw_mci_parse_dt
-
->
->> +             ret = of_property_read_u32_array(np,
->> +                             "clken-reg", data, 2);
->> +             if (!ret) {
->> +                     priv->clken_reg = data[0];
->> +                     priv->clken_bit = data[1];
->> +             }
->> +
->> +             ret = of_property_read_u32_array(np,
->> +                             "drv-sel-reg", data, 3);
->> +             if (!ret) {
->> +                     priv->drv_reg = data[0];
->> +                     priv->drv_off = data[1];
->> +                     priv->drv_bits = data[2];
->> +             }
->> +
->> +             ret = of_property_read_u32_array(np,
->> +                             "sam-sel-reg", data, 3);
->> +             if (!ret) {
->> +                     priv->sam_reg = data[0];
->> +                     priv->sam_off = data[1];
->> +                     priv->sam_bits = data[2];
->> +             }
->> +
->> +             ret = of_property_read_u32_array(np,
->> +                             "div-reg", data, 3);
->> +             if (!ret) {
->> +                     priv->div_reg = data[0];
->> +                     priv->div_off = data[1];
->> +                     priv->div_bits = data[2];
->> +             }
-> Should these register information be got from dt?
-> It could be define in source code instead.
-
-There are many register from pctrl node instead of mmc controller.
-If set in code, we may read id and then switch id, set register, start
-bit, bits number,
-which is no rules for different controller, using defiine is not helpful.
-for example:
- switch (idx) {
-        case 0:
-                clken_reg = 0x1F8;
-                clken_bit = 0;
-                drv_sel_reg = 0x1F8;
-                drv_sel_bit = 4;
-                sam_sel_reg = 0x1F8;
-                sam_sel_bit = 8;
-                div_reg = 0x1F8;
-                div_bit = 1;
-                break;
-        case 1:
-                clken_reg = 0x1F8;
-                clken_bit = 12;
-                drv_sel_reg = 0x1F8;
-                drv_sel_bit = 16;
-                sam_sel_reg = 0x1F8;
-                sam_sel_bit = 20;
-                div_reg = 0x1F8;
-                div_bit = 13;
-                break;
-        case 2:
-                clken_reg = 0x1F8;
-                clken_bit = 24;
-                drv_sel_reg = 0x1F8;
-                drv_sel_bit = 28;
-                sam_sel_reg = 0x1FC;
-                sam_sel_bit = 0;
-                div_reg = 0x1F8;
-                div_bit = 25;
-                break;
-
-So define register offset, start bit and bits number in dts make it simplier.
-Is this acceptable?
-
-Thanks.
+Added in v1:
+- Add SAI SoC Digital Audio Interface driver.
+- Add Freescale SAI ALSA SoC Digital Audio Interface node for VF610.
+- Enables SAI ALSA SoC DAI device for Vybrid VF610 TOWER board.
+- Add device tree bindings for Freescale SAI.
+- Revise the bugs about the sgt15000 codec.
+- Add SGT15000 based audio machine driver.
+- Enable SGT15000 codec based audio driver node for VF610.
+- Add device tree bindings for Freescale VF610 sound.
