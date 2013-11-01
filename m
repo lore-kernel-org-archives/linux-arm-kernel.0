@@ -1,75 +1,143 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  1 Nov 2013 15:08:59 -0700
-Subject: [PATCH 11/11] ARM: msm: Remove nr_cpus detection logic
+Date: Fri,  1 Nov 2013 15:08:58 -0700
+Subject: [PATCH 10/11] ARM: dts: msm: Add nodes necessary for SMP boot
 In-Reply-To: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
 References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1383343739-23080-12-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1383343739-23080-11-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the SMP supported MSM devices are using devicetree and they
-have a cpus node in DT. Given this we know that arm generic code
-detects the number of cpus from the cpus node so we can drop
-support for detecting the number of CPUs from the mpidr register
-here.
+From: Rohit Vaswani <rvaswani@codeaurora.org>
 
+Add the necessary nodes to support SMP on MSM8960 and
+MSM8974/APQ8074. While we're here also add in the error
+interrupts for the krait cache error detection.
+
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+[sboyd: Split into separate patch, add error interrupts]
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/platsmp.c | 27 ---------------------------
- 1 file changed, 27 deletions(-)
+ arch/arm/boot/dts/qcom-msm8960-cdp.dts | 32 ++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi    | 49 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 81 insertions(+)
 
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index 87e4fdc..36b2294 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -41,12 +41,6 @@ extern void secondary_startup(void);
+diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+index 91efaec..0621037c 100644
+--- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
++++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+@@ -9,6 +9,32 @@
+ 	compatible = "qcom,msm8960-cdp", "qcom,msm8960";
+ 	interrupt-parent = <&intc>;
  
- static DEFINE_SPINLOCK(boot_lock);
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <1 14 0x304>;
++		compatible = "qcom,krait";
++		enable-method = "qcom,mmio";
++
++		cpu at 0 {
++			device_type = "cpu";
++			reg = <0>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			reg = <1>;
++			next-level-cache = <&L2>;
++		};
++
++		L2: l2-cache {
++			compatible = "cache";
++			cache-level = <2>;
++			interrupts = <0 2 0x4>;
++		};
++	};
++
+ 	intc: interrupt-controller at 2000000 {
+ 		compatible = "qcom,msm-qgic2";
+ 		interrupt-controller;
+@@ -53,6 +79,12 @@
+ 		#reset-cells = <1>;
+ 	};
  
--static inline int get_core_count(void)
--{
--	/* 1 + the PART[1:0] field of MIDR */
--	return ((read_cpuid_id() >> 4) & 3) + 1;
--}
--
- static void msm_secondary_init(unsigned int cpu)
- {
- 	/*
-@@ -268,26 +262,6 @@ static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return 0;
- }
++	clock-controller at 2008000 {
++		compatible = "qcom,kpss-acc-v1";
++		reg = <0x02008000 0x1000>;
++		cpu-offset = <0x80000>;
++	};
++
+ 	serial at 16440000 {
+ 		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+ 		reg = <0x16440000 0x1000>,
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 152879d..0eac2ea 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -9,6 +9,44 @@
+ 	compatible = "qcom,msm8974";
+ 	interrupt-parent = <&intc>;
  
--/*
-- * Initialise the CPU possible map early - this describes the CPUs
-- * which may be present or become present in the system. The msm8x60
-- * does not support the ARM SCU, so just set the possible cpu mask to
-- * NR_CPUS.
-- */
--static void __init msm_smp_init_cpus(void)
--{
--	unsigned int i, ncores = get_core_count();
--
--	if (ncores > nr_cpu_ids) {
--		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
--			ncores, nr_cpu_ids);
--		ncores = nr_cpu_ids;
--	}
--
--	for (i = 0; i < ncores; i++)
--		set_cpu_possible(i, true);
--}
--
- static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int cpu, map;
-@@ -319,7 +293,6 @@ static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
- }
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <1 9 0xf04>;
++		compatible = "qcom,krait";
++		enable-method = "qcom,mmio";
++
++		cpu at 0 {
++			device_type = "cpu";
++			reg = <0>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			reg = <1>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			reg = <2>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			reg = <3>;
++			next-level-cache = <&L2>;
++		};
++
++		L2: l2-cache {
++			compatible = "cache";
++			cache-level = <2>;
++			interrupts = <0 2 0x4>;
++		};
++	};
++
+ 	soc: soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -91,6 +129,17 @@
+ 			};
+ 		};
  
- struct smp_operations msm_smp_ops __initdata = {
--	.smp_init_cpus		= msm_smp_init_cpus,
- 	.smp_prepare_cpus	= msm_smp_prepare_cpus,
- 	.smp_secondary_init	= msm_secondary_init,
- 	.smp_boot_secondary	= msm_boot_secondary,
++		regulator at f9012000 {
++			compatible = "qcom,l2-saw2", "qcom,saw2";
++			reg = <0xf9012000 0x1000>;
++		};
++
++		clock-controller at f9008000 {
++			compatible = "qcom,kpss-acc-v2";
++			reg = <0xf9008000 0x1000>;
++			cpu-offset = <0x80000>;
++		};
++
+ 		restart at fc4ab000 {
+ 			compatible = "qcom,pshold";
+ 			reg = <0xfc4ab000 0x4>;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
