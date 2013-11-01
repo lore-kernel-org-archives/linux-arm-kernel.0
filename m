@@ -1,36 +1,162 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 1 Nov 2013 10:07:37 +0100
-Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu
- node in DT.
-In-Reply-To: <CAKohpokTWfBnhWj+bdA9zx-+hyXUdp4ir5BYkZNLe08mcwVwLg@mail.gmail.com>
-References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
- <1383247111-26834-4-git-send-email-andrew@lunn.ch>
- <1429743.Nz1AUEe5Hi@vostro.rjw.lan>
- <CAKohpokTWfBnhWj+bdA9zx-+hyXUdp4ir5BYkZNLe08mcwVwLg@mail.gmail.com>
-Message-ID: <20131101090737.GB26890@lunn.ch>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 1 Nov 2013 11:12:53 +0200
+Subject: [PATCHv9 06/43] CLK: ti: add init support for clock IP blocks
+In-Reply-To: <52727A58.9010903@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-7-git-send-email-t-kristo@ti.com> <52727A58.9010903@ti.com>
+Message-ID: <52737095.10900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 01, 2013 at 05:21:03AM +0530, Viresh Kumar wrote:
-> On 1 November 2013 03:56, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Thursday, October 31, 2013 08:18:31 PM Andrew Lunn wrote:
-> >> The dove-cpufreq driver needs access to the DDR and CPU clock.  There
-> >> is also an interrupt generated when the DFS hardware completes a
-> >> change of frequencey. Add these to the cpu node in DT.
-> >>
-> >> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> >> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >
-> > I need someone with DT bindings knowledge to ACK this for me.
-> 
-> I can do that
+On 10/31/2013 05:42 PM, Nishanth Menon wrote:
+> On 10/25/2013 10:57 AM, Tero Kristo wrote:
+>> ti_dt_clk_init_provider() can now be used to initialize the contents of
+>> a single clock IP block. This parses all the clocks under the IP block
+>> and calls the corresponding init function for them.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>>   drivers/clk/ti/clk.c   |   59 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/clk/ti.h |    1 +
+>>   2 files changed, 60 insertions(+)
+>>
+>> diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
+>> index ad58b01..7f030d7 100644
+>> --- a/drivers/clk/ti/clk.c
+>> +++ b/drivers/clk/ti/clk.c
+>> @@ -19,6 +19,9 @@
+>>   #include <linux/clkdev.h>
+>>   #include <linux/clk/ti.h>
+>>   #include <linux/of.h>
+>> +#include <linux/list.h>
+>> +
+>> +extern struct of_device_id __clk_of_table[];
+>>
+>>   /**
+>>    * ti_dt_clocks_register - register DT duplicate clocks during boot
+>> @@ -50,3 +53,59 @@ void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
+>>   		}
+>>   	}
+>>   }
+>> +
+>> +typedef int (*ti_of_clk_init_cb_t)(struct device_node *, struct regmap *);
+>> +
+>> +struct clk_init_item {
+>> +	struct regmap *regmap;
+>> +	struct device_node *np;
+>> +	ti_of_clk_init_cb_t init_cb;
+>> +	struct list_head node;
+>> +};
+>> +
+>> +static LIST_HEAD(retry_list);
+>> +
+>> +void __init ti_dt_clk_init_provider(struct device_node *parent,
+>> +				    struct regmap *regmap)
+>> +{
+>> +	const struct of_device_id *match;
+>> +	struct device_node *np;
+>> +	ti_of_clk_init_cb_t clk_init_cb;
+>> +	struct clk_init_item *retry;
+>> +	struct clk_init_item *tmp;
+>> +	int ret;
+>> +
+>> +	for_each_child_of_node(parent, np) {
+>> +		match = of_match_node(__clk_of_table, np);
+>> +		if (!match)
+>> +			continue;
+>> +		clk_init_cb = match->data;
+>
+> I must admit I am confused here.
 
-Thanks.
+Yea this patch is something I am not quite comfortable myself yet and 
+would like improvement ideas....
 
-, but this set has to be rebased over all the latest developments
-> in cpufreq core before getting posted again..
+> a) of_clk_init (in the generic clk.c) uses of_clk_init_cb_t as match
+> data. The prototype of the generic of_clk_init_cb_t is typedef void
+> (*of_clk_init_cb_t)(struct device_node *);
+> b) both of_clk_init and ti_dt_clk_init_provider looks up clock nodes
+> from __clk_of_table
 
-I will wait for -rc1 and rebase. 
+__clk_of_table contains the function pointers for the clock init 
+functions, not clock nodes.
 
-Thanks
-	Andrew
+>
+> I assume we need ti_dt_clk_init_provider to be always called with
+> clock list, as a result of_clk_init(NULL); will never be invoked. This
+> is counter productive as you have have generic non SoC clock providers
+> as well who would have been invoked with of_clk_init(NULL);
+
+Can't call of_clk_init(NULL) anymore, as Paul wants to map the clock 
+nodes under respective IP blocks. Two reasons here:
+
+a) This requires me to pass some info from the IP block (CM1/CM2/PRM) to 
+the clock init functions, basically the pointer to the memory map region 
+(regmap.)
+b) of_clk_init(NULL) will initialize all the clock nodes in the system, 
+irrespective of the hierarchy considerations.
+
+Only thing that can be done, is to make the API introduced in this patch 
+a generic API and call it something like of_clk_init_children().
+
+>
+> I do strongly encourage using of_clk_init(NULL) and not having to
+> switch the clk_init call back with SoC specific one as it forces
+> un-intended dependency.
+
+Can't do this as mentioned above.
+
+>
+>
+> Further such as SoC specific callback should have been in a header.
+>> +		pr_debug("%s: initializing: %s\n", __func__, np->name);
+>
+>
+> one further comment - using pr_fmt will save us from using __func__
+> for every pr_* message :(
+
+Hmm good comment, will fix that for next rev.
+
+>
+>> +		ret = clk_init_cb(np, regmap);
+>> +		if (ret == -EAGAIN) {
+>> +			pr_debug("%s: adding to again list...\n", np->name);
+>> +			retry = kzalloc(sizeof(*retry), GFP_KERNEL);
+>> +			retry->np = np;
+>> +			retry->regmap = regmap;
+>> +			retry->init_cb = clk_init_cb;
+>> +			list_add(&retry->node, &retry_list);
+>> +		} else if (ret) {
+>> +			pr_err("%s: clock init failed for %s (%d)!\n", __func__,
+>> +			       np->name, ret);
+>> +		}
+>> +	}
+>> +
+>> +	list_for_each_entry_safe(retry, tmp, &retry_list, node) {
+>> +		pr_debug("%s: retry-init: %s\n", __func__, retry->np->name);
+>> +		ret = retry->init_cb(retry->np, retry->regmap);
+>> +		if (ret == -EAGAIN) {
+>> +			pr_debug("%s failed again?\n", retry->np->name);
+>> +		} else {
+>> +			if (ret)
+>> +				pr_err("%s: clock init failed for %s (%d)!\n",
+>> +				       __func__, retry->np->name, ret);
+>> +			list_del(&retry->node);
+>> +			kfree(retry);
+>> +		}
+>> +	}
+>> +}
+>> diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+>> index 9786752..7ab02fa 100644
+>> --- a/include/linux/clk/ti.h
+>> +++ b/include/linux/clk/ti.h
+>> @@ -177,6 +177,7 @@ int omap3_dpll4_set_rate(struct clk_hw *clk, unsigned long rate,
+>>   			 unsigned long parent_rate);
+>>
+>>   void ti_dt_clocks_register(struct ti_dt_clk *oclks);
+>> +void ti_dt_clk_init_provider(struct device_node *np, struct regmap *regmap);
+>>
+>>   extern const struct clk_hw_omap_ops clkhwops_omap3_dpll;
+>>   extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
+>>
+>
+>
