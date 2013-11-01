@@ -1,85 +1,31 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 1 Nov 2013 06:26:14 +0100
-Subject: [PATCH 04/11] MIPS: use the common machine reset handling
-In-Reply-To: <5273381A.9020103@synopsys.com>
-References: <20131031062708.520968323@linux.com>
- <20131031062959.169063871@linux.com>
- <5273381A.9020103@synopsys.com>
-Message-ID: <20131101052614.GB28233@glitch>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 1 Nov 2013 13:56:55 +0800
+Subject: [PATCH] ARM: imx: remove .map_io from imx6sl machine descriptor
+Message-ID: <1383285415-3504-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 01, 2013 at 10:41:54AM +0530, Vineet Gupta wrote:
-> On 10/31/2013 11:57 AM, Domenico Andreoli wrote:
-> > From: Domenico Andreoli <domenico.andreoli@linux.com>
-> > 
-> > Proof of concept: MIPS as a consumer of the machine reset hooks.
-> > 
-> > Cc: Ralf Baechle <ralf@linux-mips.org>
-> > Cc: linux-arch at vger.kernel.org
-> > Cc: linux-mips at vger.kernel.org
-> > Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
-> > ---
-> >  arch/mips/kernel/reset.c |    7 +++++++
-> >  kernel/power/Kconfig     |    2 +-
-> >  2 files changed, 8 insertions(+), 1 deletion(-)
-> > 
-> > Index: b/arch/mips/kernel/reset.c
-> > ===================================================================
-> > --- a/arch/mips/kernel/reset.c
-> > +++ b/arch/mips/kernel/reset.c
-> > @@ -11,6 +11,7 @@
-> >  #include <linux/pm.h>
-> >  #include <linux/types.h>
-> >  #include <linux/reboot.h>
-> > +#include <linux/machine_reset.h>
-> >  
-> >  #include <asm/reboot.h>
-> >  
-> > @@ -29,16 +30,22 @@ void machine_restart(char *command)
-> >  {
-> >  	if (_machine_restart)
-> >  		_machine_restart(command);
-> > +	else
-> > +		default_restart(reboot_mode, command);
-> >  }
-> >  
-> >  void machine_halt(void)
-> >  {
-> >  	if (_machine_halt)
-> >  		_machine_halt();
-> > +	else
-> > +		default_halt();
-> >  }
-> >  
-> >  void machine_power_off(void)
-> >  {
-> >  	if (pm_power_off)
-> >  		pm_power_off();
-> > +	else
-> > +		default_power_off();
-> >  }
-> > Index: b/kernel/power/Kconfig
-> > ===================================================================
-> > --- a/kernel/power/Kconfig
-> > +++ b/kernel/power/Kconfig
-> > @@ -297,4 +297,4 @@ config CPU_PM
-> >  config MACHINE_RESET
-> >  	bool
-> >  	default n
-> > -	depends on ARM || ARM64
-> > +	depends on ARM || ARM64 || MIPS
-> 
-> This particular idiom is frowned upon for new code. As new arches get added this
-> list keeps getting bigger and then those who don't need the feature need to add
-> the anti dependency. Also in this particular case the dependency is trivial so you
-> can just "select" it in arch/*/Kconfig
+Since bc37324 (ARM: mmu: Call debug_ll_io_init if no map_io function is
+specified), the .map_io hook can be saved if calling debug_ll_io_init()
+is the only thing to be done in there.  So the .map_io hook imx6sl
+machine descriptor can just be dropped.
 
-this dependency guarantees only that the option is available only on the
-supported arches.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/mach-imx6sl.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-anyway I've not a strong opinion, I only picked the least invasive solution
-I was able to think.
-
-thanks,
-Domenico
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index 2f952e3..2c6f63a 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -67,7 +67,6 @@ static const char *imx6sl_dt_compat[] __initdata = {
+ };
+ 
+ DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite (Device Tree)")
+-	.map_io		= debug_ll_io_init,
+ 	.init_irq	= imx6sl_init_irq,
+ 	.init_machine	= imx6sl_init_machine,
+ 	.dt_compat	= imx6sl_dt_compat,
+-- 
+1.7.9.5
