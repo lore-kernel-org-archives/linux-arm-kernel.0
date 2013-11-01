@@ -1,73 +1,75 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 1 Nov 2013 10:56:09 -0600
-Subject: [PATCH v2] PCI: mvebu - Support a bridge with no IO port window
-In-Reply-To: <CAErSpo5Y5TH+iapqzhQAcLY6V0rvK=7QAEStcbzLv4mAuLKPDg@mail.gmail.com>
-References: <1381868182-8544-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20131031101357.5a56e2d0@skate>
- <20131031164810.GA26426@obsidianresearch.com>
- <CAErSpo7bUP63J5RkXr-DkQE8qmvKT7ri-vjkfq+TtGEaYWxSwA@mail.gmail.com>
- <20131031233245.GA9853@obsidianresearch.com>
- <CAErSpo4NDuNJ4mj1n4V8UgsdAJxMrSRy43Qz=3JNvtsrv2rMjA@mail.gmail.com>
- <20131101052848.GA20163@obsidianresearch.com>
- <CAErSpo5Y5TH+iapqzhQAcLY6V0rvK=7QAEStcbzLv4mAuLKPDg@mail.gmail.com>
-Message-ID: <20131101165609.GA25978@obsidianresearch.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 01 Nov 2013 17:58:34 +0100
+Subject: [PATCH v2 2/4] clk: exynos5410: register clocks using common
+ clock framework
+In-Reply-To: <1381763305-7085-3-git-send-email-v.tyrtov@samsung.com>
+References: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
+ <1381763305-7085-3-git-send-email-v.tyrtov@samsung.com>
+Message-ID: <1421095.b3lQaz2kV9@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I don't know why 0xf0f0.  Anything that's non-zero in the upper four
-> bits of each byte should work to determine writability.  It seems like
-> it would be safer to write 0x00f0 so the window is disabled, because
-> even if we're enumerating the bridge at hot-plug time, nobody else
-> should be trying to access a device behind the bridge, and we wouldn't
-> inadvertently claim something destined for [io 0xf000-0xffff].
+Hi,
 
-What do you think of this?
+On Monday 14 of October 2013 19:08:23 Vyacheslav Tyrtov wrote:
+> From: Tarek Dakhran <t.dakhran@samsung.com>
+> 
+> The EXYNOS5410 clocks are statically listed and registered
+> using the Samsung specific common clock helper functions.
+> 
+> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+> ---
+>  .../devicetree/bindings/clock/exynos5410-clock.txt |  37 +++
+>  drivers/clk/samsung/Makefile                       |   1 +
+>  drivers/clk/samsung/clk-exynos5410.c               | 251
+> +++++++++++++++++++++ include/dt-bindings/clock/exynos5410.h           
+>  | 175 ++++++++++++++ 4 files changed, 464 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/exynos5410-clock.txt create
+> mode 100644 drivers/clk/samsung/clk-exynos5410.c
+>  create mode 100644 include/dt-bindings/clock/exynos5410.h
 
->From f1f0d6a5b192a46585c5fefdc7ec06808639be4d Mon Sep 17 00:00:00 2001
-From: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Date: Fri, 1 Nov 2013 10:54:13 -0600
-Subject: [PATCH] PCI: Use a safer method to determine if a bridge has IO
- support
+The driver looks pretty good now, thanks for addressing my comments to 
+previous version. There are still few issues remaining, though. Please see 
+my comments inline.
 
-We want to avoid disturbing an active an enabled bus during IO detection,
-so first check if IO is enabled - if so then we know for sure that
-the bridge has IO.
+[snip]
+> diff --git a/drivers/clk/samsung/clk-exynos5410.c
+> b/drivers/clk/samsung/clk-exynos5410.c new file mode 100644
+> index 0000000..c5eba08
+> --- /dev/null
+> +++ b/drivers/clk/samsung/clk-exynos5410.c
+[snip]
+> +static struct of_device_id ext_clk_match[] __initdata = {
+> +	{ .compatible = "samsung,clock-oscclk", .data = (void *)0, },
+> +	{ },
+> +};
 
-Otherwise we can safely fiddle with the IO window register to detect IO,
-as IO is disabled.
+I don't see anything in binding documentation mentioning this compatible 
+value. Anyway, since there is already a generic binding for fixed rate 
+clocks, this shouldn't be needed at all.
 
-This also changes the probe value to 0x00f0, which is intended to be
-clearer to the reader that this is just a probe.
+> +
+> +/* register exynos5410 clocks */
+> +static void __init exynos5410_clk_init(struct device_node *np)
+> +{
+> +	void __iomem *reg_base;
+> +
+> +	reg_base = of_iomap(np, 0);
+> +	if (!reg_base)
+> +		panic("%s: failed to map registers\n", __func__);
+> +
+> +	samsung_clk_init(np, reg_base, CLK_NR_CLKS,
+> +			exynos5410_clk_regs, 
+ARRAY_SIZE(exynos5410_clk_regs),
+> +			NULL, 0);
+> +	samsung_clk_of_register_fixed_ext(exynos5410_frt_ext_clks,
+> +			ARRAY_SIZE(exynos5410_frt_ext_clks),
+> +			ext_clk_match);
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- drivers/pci/setup-bus.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+This call could be dropped after moving to generic fixed rate clock 
+bindings.
 
-diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-index bc26d79..d63087f 100644
---- a/drivers/pci/setup-bus.c
-+++ b/drivers/pci/setup-bus.c
-@@ -665,10 +665,16 @@ static void pci_bridge_check_ranges(struct pci_bus *bus)
- 
- 	pci_read_config_word(bridge, PCI_IO_BASE, &io);
- 	if (!io) {
--		pci_write_config_word(bridge, PCI_IO_BASE, 0xf0f0);
--		pci_read_config_word(bridge, PCI_IO_BASE, &io);
-- 		pci_write_config_word(bridge, PCI_IO_BASE, 0x0);
-- 	}
-+		u16 command;
-+		pci_read_config_word(bridge, PCI_COMMAND, &command);
-+		if (command & PCI_COMMAND_IO)
-+			b_res[0].flags |= IORESOURCE_IO;
-+		else {
-+			pci_write_config_word(bridge, PCI_IO_BASE, 0x00f0);
-+			pci_read_config_word(bridge, PCI_IO_BASE, &io);
-+			pci_write_config_word(bridge, PCI_IO_BASE, 0x0);
-+		}
-+	}
-  	if (io)
- 		b_res[0].flags |= IORESOURCE_IO;
- 	/*  DECchip 21050 pass 2 errata: the bridge may miss an address
--- 
-1.8.1.2
+Best regards,
+Tomasz
