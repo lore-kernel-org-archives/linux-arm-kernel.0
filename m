@@ -1,128 +1,52 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 01 Nov 2013 23:36:48 +0100
-Subject: [[PATCH v3]] videobuf2: Add missing lock held on vb2_fop_relase
-In-Reply-To: <1383252859-24221-1-git-send-email-ricardo.ribalda@gmail.com>
-References: <1383252859-24221-1-git-send-email-ricardo.ribalda@gmail.com>
-Message-ID: <52742D00.7090805@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 01 Nov 2013 23:52:16 +0100
+Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu
+ node in DT.
+In-Reply-To: <20131101131452.GJ26890@lunn.ch>
+References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
+ <1436787.LWqDTIBNS8@vostro.rjw.lan> <20131101131452.GJ26890@lunn.ch>
+Message-ID: <1597404.WcAR96MJS1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ricardo,
+On Friday, November 01, 2013 02:14:52 PM Andrew Lunn wrote:
+> On Fri, Nov 01, 2013 at 02:16:37PM +0100, Rafael J. Wysocki wrote:
+> > On Friday, November 01, 2013 10:07:37 AM Andrew Lunn wrote:
+> > > On Fri, Nov 01, 2013 at 05:21:03AM +0530, Viresh Kumar wrote:
+> > > > On 1 November 2013 03:56, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > > > > On Thursday, October 31, 2013 08:18:31 PM Andrew Lunn wrote:
+> > > > >> The dove-cpufreq driver needs access to the DDR and CPU clock.  There
+> > > > >> is also an interrupt generated when the DFS hardware completes a
+> > > > >> change of frequencey. Add these to the cpu node in DT.
+> > > > >>
+> > > > >> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > > >> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > > >
+> > > > > I need someone with DT bindings knowledge to ACK this for me.
+> > > > 
+> > > > I can do that
+> > > 
+> > > Thanks.
+> > > 
+> > > , but this set has to be rebased over all the latest developments
+> > > > in cpufreq core before getting posted again..
+> > > 
+> > > I will wait for -rc1 and rebase.
+> > 
+> > Actually, it is possible that 3.12-rc8 will be released this weekend.  If that
+> > happens, please rebase your patchset on top of the current linux-next and
+> > resubmit it next week.
+> 
+> Hi Rafael
+> 
+> Just be to sure, since we have had problems with terminology before.
+> Do you mean the The linux-next, or your linux next branch?
 
-On 10/31/2013 09:54 PM, Ricardo Ribalda Delgado wrote:
-> From: Ricardo Ribalda<ricardo.ribalda@gmail.com>
->
-> vb2_fop_relase does not held the lock although it is modifying the
-> queue->owner field.
->
-> This could lead to race conditions on the vb2_perform_io function
-> when multiple applications are accessing the video device via
-> read/write API:
-[...]
-> v2: Add bug found by Sylvester Nawrocki
+That shouldn't matter a lot at this point I think.  Generally, if I'm supposed
+to take the patches, it's safer to rebase them against my linux-next branch.
 
-"v2: Add fix for a bug found..." ? :)
+Thanks!
 
-> fimc-capture and fimc-lite where calling vb2_fop_release with the lock held.
-> Therefore a new __vb2_fop_release function has been created to be used by
-> drivers that overload the release function.
->
-> v3: Comments by Sylvester Nawrocki and Mauro Carvalho Chehab
->
-> Use vb2_fop_release_locked instead of __vb2_fop_release
-
-Such notes normally go after the scissors line ("---") after Signed-off-by
-lines.
-
-> Signed-off-by: Ricardo Ribalda<ricardo.ribalda@gmail.com>
-> Signed-off-by: Ricardo Ribalda Delgado<ricardo.ribalda@gmail.com>
-
-Is this duplication really needed ?
-
-> ---
-
->   drivers/media/platform/exynos4-is/fimc-capture.c |  2 +-
->   drivers/media/platform/exynos4-is/fimc-lite.c    |  2 +-
->   drivers/media/v4l2-core/videobuf2-core.c         | 24 +++++++++++++++++++++++-
->   include/media/videobuf2-core.h                   |  1 +
->   4 files changed, 26 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
-> index fb27ff7..c3c3b3b 100644
-> --- a/drivers/media/platform/exynos4-is/fimc-capture.c
-> +++ b/drivers/media/platform/exynos4-is/fimc-capture.c
-> @@ -549,7 +549,7 @@ static int fimc_capture_release(struct file *file)
->   		vc->streaming = false;
->   	}
->
-> -	ret = vb2_fop_release(file);
-> +	ret = vb2_fop_release_locked(file);
-
-I'm personally not happy with such a change. It is still not obvious
-if "locked" means that this function takes the lock internally or it
-should be called with the lock held. How about sticking to the common
-practice and instead naming it __vb2_fop_release() ?
-
->   	if (close) {
->   		clear_bit(ST_CAPT_BUSY,&fimc->state);
-> diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
-> index e5798f7..b8d417f 100644
-> --- a/drivers/media/platform/exynos4-is/fimc-lite.c
-> +++ b/drivers/media/platform/exynos4-is/fimc-lite.c
-> @@ -546,7 +546,7 @@ static int fimc_lite_release(struct file *file)
->   		mutex_unlock(&entity->parent->graph_mutex);
->   	}
->
-> -	vb2_fop_release(file);
-> +	vb2_fop_release_locked(file);
->   	pm_runtime_put(&fimc->pdev->dev);
->   	clear_bit(ST_FLITE_SUSPENDED,&fimc->state);
->
-> diff --git a/drivers/media/v4l2-core/videobuf2-core.c b/drivers/media/v4l2-core/videobuf2-core.c
-> index 594c75e..06e6dbd 100644
-> --- a/drivers/media/v4l2-core/videobuf2-core.c
-> +++ b/drivers/media/v4l2-core/videobuf2-core.c
-> @@ -2619,18 +2619,40 @@ int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma)
->   }
->   EXPORT_SYMBOL_GPL(vb2_fop_mmap);
->
-> -int vb2_fop_release(struct file *file)
-> +int __vb2_fop_release(struct file *file, bool lock_is_held)
->   {
->   	struct video_device *vdev = video_devdata(file);
-> +	struct mutex *lock;
->
->   	if (file->private_data == vdev->queue->owner) {
-> +		if (lock_is_held)
-> +			lock = NULL;
-> +		else
-> +			lock = vdev->queue->lock ?
-> +				vdev->queue->lock : vdev->lock;
-> +		if (lock)
-> +			mutex_lock(lock);
->   		vb2_queue_release(vdev->queue);
->   		vdev->queue->owner = NULL;
-> +		if (lock)
-> +			mutex_unlock(lock);
->   	}
->   	return v4l2_fh_release(file);
->   }
-> +EXPORT_SYMBOL_GPL(__vb2_fop_release);
-
-We don't need to export this function, do we ?
-
-> +int vb2_fop_release(struct file *file)
-> +{
-> +	return __vb2_fop_release(file, false);
-> +}
->   EXPORT_SYMBOL_GPL(vb2_fop_release);
->
-> +int vb2_fop_release_locked(struct file *file)
-> +{
-> +	return __vb2_fop_release(file, true);
-> +}
-> +EXPORT_SYMBOL_GPL(vb2_fop_release_locked);
-
---
-Thanks,
-Sylwester
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
