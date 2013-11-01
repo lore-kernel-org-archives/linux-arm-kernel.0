@@ -1,29 +1,43 @@
-From: srinivas.kandagatla@st.com (srinivas kandagatla)
-Date: Fri, 1 Nov 2013 12:50:25 +0000
-Subject: [PATCH v5 1/4] i2c: busses: i2c-st: Add ST I2C controller
-In-Reply-To: <526E7C8C.8080603@st.com>
-References: <1381754813-4679-1-git-send-email-maxime.coquelin@st.com>
- <1381754813-4679-2-git-send-email-maxime.coquelin@st.com>
- <20131016151419.GA14104@ns203013.ovh.net> <525F915D.9020501@st.com>
- <525FAEED.7030207@st.com> <20131017141957.GE14104@ns203013.ovh.net>
- <525FF498.3060202@st.com> <1382021369.4093.44.camel@weser.hi.pengutronix.de>
- <5260EFDC.804@st.com> <526E7C8C.8080603@st.com>
-Message-ID: <5273A391.5000302@st.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 01 Nov 2013 14:16:37 +0100
+Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu
+ node in DT.
+In-Reply-To: <20131101090737.GB26890@lunn.ch>
+References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
+ <CAKohpokTWfBnhWj+bdA9zx-+hyXUdp4ir5BYkZNLe08mcwVwLg@mail.gmail.com>
+ <20131101090737.GB26890@lunn.ch>
+Message-ID: <1436787.LWqDTIBNS8@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/10/13 15:02, Maxime Coquelin wrote:
->>
->> 6> IMHO, the compatible string should be "vendor,<IP-name>-<IP-version>"
->> rather than first SoC.
-> I agree.
-> In this case, we add support to revision 4 of SSC IP.
-Its not the revision its name of the new IP which is SSC4. However  this
-driver is also compatible with old SSC IP, so It would be nice to have
-something like two compatible strings "st,comms-ssc-i2c" and
-"st,comms-ssc4-i2c"
-
-Thanks,
-srini
+On Friday, November 01, 2013 10:07:37 AM Andrew Lunn wrote:
+> On Fri, Nov 01, 2013 at 05:21:03AM +0530, Viresh Kumar wrote:
+> > On 1 November 2013 03:56, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > > On Thursday, October 31, 2013 08:18:31 PM Andrew Lunn wrote:
+> > >> The dove-cpufreq driver needs access to the DDR and CPU clock.  There
+> > >> is also an interrupt generated when the DFS hardware completes a
+> > >> change of frequencey. Add these to the cpu node in DT.
+> > >>
+> > >> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > >> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > >
+> > > I need someone with DT bindings knowledge to ACK this for me.
+> > 
+> > I can do that
 > 
-> Is "st,comms-ssc-v4" okay?
+> Thanks.
+> 
+> , but this set has to be rebased over all the latest developments
+> > in cpufreq core before getting posted again..
+> 
+> I will wait for -rc1 and rebase.
+
+Actually, it is possible that 3.12-rc8 will be released this weekend.  If that
+happens, please rebase your patchset on top of the current linux-next and
+resubmit it next week.
+
+Thanks!
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
