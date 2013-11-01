@@ -1,55 +1,49 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 1 Nov 2013 14:35:31 -0500
-Subject: [PATCHv9 09/43] CLK: ti: add support for ti divider-clock
-In-Reply-To: <52737A73.5010700@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-10-git-send-email-t-kristo@ti.com> <52729B50.5060503@ti.com>
- <527378FF.6020905@ti.com> <52737A73.5010700@ti.com>
-Message-ID: <52740283.8040201@ti.com>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Fri,  1 Nov 2013 15:45:51 -0400
+Subject: [PATCH v2 2/9] staging: dwc2: update DT binding to add generic
+ clock/phy properties
+In-Reply-To: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
+References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
+Message-ID: <1383335158-19730-3-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2013 04:54 AM, Tero Kristo wrote:
-> On 11/01/2013 11:48 AM, Tero Kristo wrote:
->> On 10/31/2013 08:02 PM, Nishanth Menon wrote:
->>> On 10/25/2013 10:57 AM, Tero Kristo wrote:
+dwc2/s3c-hsotg require a single clock to be specified and optionally
+a generic phy. On the s3c-hsotg driver old style USB phy support is
+present as a fallback so the generic phy properties are optional.
 
-[...]
->>>> diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
->>>> new file mode 100644
->>>> index 0000000..787bc8f
->>>> --- /dev/null
->>>> +++ b/drivers/clk/ti/divider.c
+Signed-off-by: Matt Porter <matt.porter@linaro.org>
+---
+ Documentation/devicetree/bindings/staging/dwc2.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-[...]
->>>> +    if (!IS_ERR(clk)) {
->>>> +        of_clk_add_provider(node, of_clk_src_simple_get, clk);
->>>> +        ret = of_ti_autoidle_setup(node, regmap);
->>>
->>> if this fails, table will be freed though, we have added provider and
->>> registerd table_regmap, no?
->>
->> Provider and regmap are shared for the whole IP block (CM/PRM whatever.)
->> Those are only initialized once.
-> 
-> Some minor confusion here in my comment, sorry about that.
-> 
-> Regmap is shared for the whole IP block and initialized only once, we 
-> can't remove it here as it is not owned by this clock. For 
-> clock-provider / unregister part, I don't want to clean those up as 1) 
-> unregister doesn't currently do anything 2) autoidle setup is not 
-> critical failure, it just breaks PM. I can add error print for it though.
-
-Would IP blocks driven by clocks work with the autoidle configuration
-broken? I believe we will be writing to DPLL_XYZ_GATE_CTRL? the usage
-I believe is around
-of_ti_clk_deny_autoidle_all/of_ti_clk_allow_autoidle_all which gets
-invoked in omap2_clk_disable_autoidle_all part of xyz SoC init call.
-is'nt the reason we do that to ensure we have no potential race when
-clocks dissapear on their own without explicit control in critical
-configuration paths?
-
-
+diff --git a/Documentation/devicetree/bindings/staging/dwc2.txt b/Documentation/devicetree/bindings/staging/dwc2.txt
+index 1a1b7cf..f60477e 100644
+--- a/Documentation/devicetree/bindings/staging/dwc2.txt
++++ b/Documentation/devicetree/bindings/staging/dwc2.txt
+@@ -5,6 +5,14 @@ Required properties:
+ - compatible : "snps,dwc2"
+ - reg : Should contain 1 register range (address and length)
+ - interrupts : Should contain 1 interrupt
++- clocks: clock provider specifier
++- clock-names: shall be "otg"
++Refer to clk/clock-bindings.txt for generic clock consumer properties
++
++Optional properties:
++- phys: phy provider specifier
++- phy-names: shall be "usb2-phy"
++Refer to phy/phy-bindings.txt for generic phy consumer properties
+ 
+ Example:
+ 
+@@ -12,4 +20,8 @@ Example:
+                 compatible = "ralink,rt3050-usb, snps,dwc2";
+                 reg = <0x101c0000 40000>;
+                 interrupts = <18>;
++		clocks = <&usb_otg_ahb_clk>;
++		clock-names = "otg";
++		phys = <&usbphy>;
++		phy-names = "usb2-phy";
+         };
 -- 
-Regards,
-Nishanth Menon
+1.8.4
