@@ -1,30 +1,66 @@
-From: dmitry_eremin@mentor.com (Dmitry Eremin-Solenikov)
-Date: Fri, 1 Nov 2013 23:54:53 +0400
-Subject: [PATCH 4/4] ARM: sa1100: switch to COMMON_CLK framework
-In-Reply-To: <20131101105933.GL16735@n2100.arm.linux.org.uk>
-References: <1383303131-29550-1-git-send-email-dmitry_eremin@mentor.com>
- <1383303131-29550-4-git-send-email-dmitry_eremin@mentor.com>
- <20131101105933.GL16735@n2100.arm.linux.org.uk>
-Message-ID: <5274070D.1030206@mentor.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 01 Nov 2013 23:56:33 +0300
+Subject: [PATCH v2 9/9] ARM: dts: add usb udc support to bcm281xx
+In-Reply-To: <1383335158-19730-10-git-send-email-matt.porter@linaro.org>
+References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
+ <1383335158-19730-10-git-send-email-matt.porter@linaro.org>
+Message-ID: <52741581.9020106@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/13 14:59, Russell King - ARM Linux wrote:
-> On Fri, Nov 01, 2013 at 02:52:11PM +0400, Dmitry Eremin-Solenikov wrote:
->> +#include <linux/kernel.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +
->> +#include <mach/hardware.h>
-> 
-> If the aim of this patch set is to move SA11x0 towards multiplatform,
-> then this has just failed with the above include.  It would be better
-> not to try this without first solving the problem of the SoC register
-> definitions.
+Hello.
 
-Also what about first three patches?
+On 11/01/2013 10:45 PM, Matt Porter wrote:
+
+> Adds USB OTG/PHY and clock support to BCM281xx and enables
+> UDC support on the bcm11351-brt and bcm28155-ap boards.
+
+> Signed-off-by: Matt Porter <matt.porter@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
+> ---
+>   arch/arm/boot/dts/bcm11351-brt.dts |  6 ++++++
+>   arch/arm/boot/dts/bcm11351.dtsi    | 18 ++++++++++++++++++
+>   arch/arm/boot/dts/bcm28155-ap.dts  |  8 ++++++++
+>   3 files changed, 32 insertions(+)
+
+[...]
+> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+> index 0755f43..247f9fd 100644
+> --- a/arch/arm/boot/dts/bcm11351.dtsi
+> +++ b/arch/arm/boot/dts/bcm11351.dtsi
+> @@ -284,4 +284,22 @@
+>   			#clock-cells = <0>;
+>   		};
+>   	};
+> +
+> +	usbotg: usbotg at 3f120000 {
+
+    According to ePAPR spec [1], the node name should be "usb at 3f120000".
 
 
--- 
-With best wishes
-Dmitry
+> +		compatible = "snps,dwc2";
+> +		reg = <0x3f120000 0x10000>;
+> +		interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&usb_otg_ahb_clk>;
+> +		clock-names = "otg";
+> +		phys = <&usbphy>;
+> +		phy-names = "usb2-phy";
+> +		status = "disabled";
+> +	};
+> +
+> +	usbphy: usbphy at 3f130000 {
+
+    This one should probably be named "usb-phy at 3f130000", just like 
+"ethernet-phy" from the ePAPR spec.
+
+> +		compatible = "brcm,kona-usb2-phy";
+> +		reg = <0x3f130000 0x28>;
+> +		#phy-cells = <0>;
+> +		status = "disabled";
+> +	};
+>   };
+
+[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+
+WBR, Sergei
