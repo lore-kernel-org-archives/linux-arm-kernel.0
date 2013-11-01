@@ -1,141 +1,186 @@
 From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri,  1 Nov 2013 10:13:29 +0000
-Subject: [PATCH 2/2] arm: Support for platforms with split GIC cpu interface
- registers.
+Date: Fri,  1 Nov 2013 10:13:28 +0000
+Subject: [PATCH 1/2] arm: correct GIC cpu interface range for Cortex A15/GIC
+ 400
 In-Reply-To: <1383300776.4332.3.camel@hastur.hellion.org.uk>
 References: <1383300776.4332.3.camel@hastur.hellion.org.uk>
-Message-ID: <1383300809-7527-2-git-send-email-ian.campbell@citrix.com>
+Message-ID: <1383300809-7527-1-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least one platform (APM Storm) places the two pages of the GIC cpu interface
-(and the vcpu side) at non-contiguous locations. Document two additional
-regions to cover this split and update the corresponding dtsi. Note that Linux
-(including KVM) does not use any registers in the second page so there is no
-associated code change here.  Xen will use these new regions, although I've not
-written the corresponding code yet.
+GICv2 (Cortex A15/GIC 400) have CPU interface registers up to offset 0x1004
+(the 32-bit GICC_DIR register a 0x1000). The GIC 400 documentation specifies
+the CPU interface region as being 0x2000 in size.
 
-The ordering of these new regs is slightly counter intuitive but is inteded to
-be backward compatible. It is also assumed that all such systems will implement
-the GIC virtualisation extensions.
+Update all DTS entries claiming "arm,cortex-a15-gic" compatibility. Of these I
+only have personal experience with the vexpress a Calxeda (ecx) platforms and
+annecdotal evidence for omap and exynos. For the others I'm just assuming.
 
-Add comments to all of the reg examples to help clarify what is going on.
+Also update the example a15 binding in the documentation.
+
+The "Texas Instruments Keystone 2 SoC" platform which claim to have an a15
+compatible GIC but does not include the GICH/GICV registers. I've not touched
+that here.
 
 Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
 Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Kumar Sankaran <ksankaran@apm.com>
-Cc: Loc Ho <lho@apm.com>
-Cc: Feng Kan <fkan@apm.com>
 ---
- Documentation/devicetree/bindings/arm/gic.txt | 57 +++++++++++++++++++++------
- arch/arm64/boot/dts/apm-storm.dtsi            |  6 ++-
- 2 files changed, 50 insertions(+), 13 deletions(-)
+ Documentation/devicetree/bindings/arm/gic.txt | 2 +-
+ arch/arm/boot/dts/ecx-2000.dts                | 2 +-
+ arch/arm/boot/dts/exynos5.dtsi                | 2 +-
+ arch/arm/boot/dts/exynos5440.dtsi             | 2 +-
+ arch/arm/boot/dts/omap5.dtsi                  | 2 +-
+ arch/arm/boot/dts/tegra114.dtsi               | 2 +-
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts   | 2 +-
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts    | 2 +-
+ arch/arm/boot/dts/xenvm-4.2.dts               | 2 +-
+ arch/arm64/boot/dts/foundation-v8.dts         | 2 +-
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts        | 2 +-
+ 11 files changed, 11 insertions(+), 11 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index ea215e8..00836d9 100644
+index 3dfb0c0..ea215e8 100644
 --- a/Documentation/devicetree/bindings/arm/gic.txt
 +++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -38,7 +38,8 @@ Main node required properties:
- 
- - reg : Specifies base physical address(s) and size of the GIC registers. The
-   first region is the GIC distributor register base and size. The 2nd region is
--  the GIC cpu interface register base and size.
-+  the GIC cpu interface register base and size (See also "Split GIC
-+  cpu interface", below).
- 
- Optional
- - interrupts	: Interrupt source of the parent interrupt controller on
-@@ -56,8 +57,8 @@ Example:
- 		#interrupt-cells = <3>;
- 		#address-cells = <1>;
- 		interrupt-controller;
--		reg = <0xfff11000 0x1000>,
--		      <0xfff10100 0x100>;
-+		reg = <0xfff11000 0x1000>,      /* GIC Dist */
-+		      <0xfff10100 0x100>;       /* GIC CPU */
- 	};
- 
- 
-@@ -70,9 +71,11 @@ primary interrupt controller).
- Required properties:
- 
- - reg : Additional regions specifying the base physical address and
--  size of the VGIC registers. The first additional region is the GIC
--  virtual interface control register base and size. The 2nd additional
--  region is the GIC virtual cpu interface register base and size.
-+  size of the VGIC registers. The first additional region (i.e. third
-+  overall) is the GIC virtual interface control register base and
-+  size. The 2nd additional region (i.e. forth overall) is the GIC
-+  virtual cpu interface register base and size (See also "Split GIC
-+  cpu interface", below).
- 
- - interrupts : VGIC maintenance interrupt.
- 
-@@ -82,9 +85,41 @@ Example:
- 		compatible = "arm,cortex-a15-gic";
+@@ -83,7 +83,7 @@ Example:
  		#interrupt-cells = <3>;
  		interrupt-controller;
--		reg = <0x2c001000 0x1000>,
--		      <0x2c002000 0x2000>,
--		      <0x2c004000 0x2000>,
--		      <0x2c006000 0x2000>;
--		interrupts = <1 9 0xf04>;
-+		reg = <0x2c001000 0x1000>,      /* GIC Dist */
-+		      <0x2c002000 0x2000>,      /* GIC CPU */
-+		      <0x2c004000 0x2000>,      /* GIC VCPU Control */
-+		      <0x2c006000 0x2000>;      /* GIC VCPU1 */
-+		interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
-+	};
-+
-+* Split GIC cpu interface
-+
-+  The cpu interfaces (bare-metal in region 2 and virtual in region 4)
-+  may be spread over two pages, with the GICC_DIR (Deactivate
-+  Interrupt Register) register falling at the start of the second
-+  page. If these pages are contiguous then this is described via the
-+  size of the second and fourth entries as described above
-+  (e.g. 0x2000 rather than 0x1000).
-+
-+  However if the two pages are not contiguous then two additional
-+  regions are present (5th and 6th) describing the location of the the
-+  second half of the GIC cpu interface and GIC virtual cpu interface
-+  respectively.
-+
-+  It is assumed that all such systems will implement the GIC
-+  virtualisation extensions.
-+
-+Example:
-+
-+	gic: interrupt-controller at 78010000 {
-+		compatible = "arm,cortex-a15-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x78010000 0x1000>,      /* GIC Dist */
-+		      <0x78020000 0x1000>,      /* GIC CPU1 */
-+		      <0x78040000 0x2000>,      /* GIC VCPU Control */
-+		      <0x78060000 0x1000>,      /* GIC VCPU1 */
-+		      <0x78030000 0x1000>,      /* GIC CPU2 */
-+		      <0x78070000 0x1000>;      /* GIC VCPU2 */
-+		interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
- 	};
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index bfdc578..b5d141a 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -82,9 +82,11 @@
+ 		reg = <0x2c001000 0x1000>,
+-		      <0x2c002000 0x1000>,
++		      <0x2c002000 0x2000>,
+ 		      <0x2c004000 0x2000>,
+ 		      <0x2c006000 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+diff --git a/arch/arm/boot/dts/ecx-2000.dts b/arch/arm/boot/dts/ecx-2000.dts
+index 139b40c..61927de 100644
+--- a/arch/arm/boot/dts/ecx-2000.dts
++++ b/arch/arm/boot/dts/ecx-2000.dts
+@@ -93,7 +93,7 @@
+ 			interrupt-controller;
+ 			interrupts = <1 9 0xf04>;
+ 			reg = <0xfff11000 0x1000>,
+-			      <0xfff12000 0x1000>,
++			      <0xfff12000 0x2000>,
+ 			      <0xfff14000 0x2000>,
+ 			      <0xfff16000 0x2000>;
+ 		};
+diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+index f65e124..c72782f 100644
+--- a/arch/arm/boot/dts/exynos5.dtsi
++++ b/arch/arm/boot/dts/exynos5.dtsi
+@@ -44,7 +44,7 @@
  		#interrupt-cells = <3>;
  		interrupt-controller;
- 		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
--		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
-+		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU1 */
- 		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
--		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
-+		      <0x0 0x78060000 0x0 0x1000>,	/* GIC VCPU1 */
-+		      <0x0 0x78030000 0x0 0x1000>,	/* GIC CPU2 */
-+		      <0x0 0x78070000 0x0 0x1000>;	/* GIC VCPU2 */
- 		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
+ 		reg =	<0x10481000 0x1000>,
+-			<0x10482000 0x1000>,
++			<0x10482000 0x2000>,
+ 			<0x10484000 0x2000>,
+ 			<0x10486000 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index ff7f5d8..19c9636 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -31,7 +31,7 @@
+ 		#interrupt-cells = <3>;
+ 		interrupt-controller;
+ 		reg =	<0x2E1000 0x1000>,
+-			<0x2E2000 0x1000>,
++			<0x2E2000 0x2000>,
+ 			<0x2E4000 0x2000>,
+ 			<0x2E6000 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index e643620..6c4fe08 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -60,7 +60,7 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <3>;
+ 		reg = <0x48211000 0x1000>,
+-		      <0x48212000 0x1000>,
++		      <0x48212000 0x2000>,
+ 		      <0x48214000 0x2000>,
+ 		      <0x48216000 0x2000>;
+ 	};
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index abf6c40..eb7a0c4 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -20,7 +20,7 @@
+ 		#interrupt-cells = <3>;
+ 		interrupt-controller;
+ 		reg = <0x50041000 0x1000>,
+-		      <0x50042000 0x1000>,
++		      <0x50042000 0x2000>,
+ 		      <0x50044000 0x2000>,
+ 		      <0x50046000 0x2000>;
+ 		interrupts = <GIC_PPI 9
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+index 9420053..f0ec2be 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+@@ -81,7 +81,7 @@
+ 		#address-cells = <0>;
+ 		interrupt-controller;
+ 		reg = <0 0x2c001000 0 0x1000>,
+-		      <0 0x2c002000 0 0x1000>,
++		      <0 0x2c002000 0 0x2000>,
+ 		      <0 0x2c004000 0 0x2000>,
+ 		      <0 0x2c006000 0 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index d2803be..c2db05e 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -98,7 +98,7 @@
+ 		#address-cells = <0>;
+ 		interrupt-controller;
+ 		reg = <0 0x2c001000 0 0x1000>,
+-		      <0 0x2c002000 0 0x1000>,
++		      <0 0x2c002000 0 0x2000>,
+ 		      <0 0x2c004000 0 0x2000>,
+ 		      <0 0x2c006000 0 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+diff --git a/arch/arm/boot/dts/xenvm-4.2.dts b/arch/arm/boot/dts/xenvm-4.2.dts
+index 3369151..92e63eb 100644
+--- a/arch/arm/boot/dts/xenvm-4.2.dts
++++ b/arch/arm/boot/dts/xenvm-4.2.dts
+@@ -56,7 +56,7 @@
+ 		#address-cells = <0>;
+ 		interrupt-controller;
+ 		reg = <0 0x2c001000 0 0x1000>,
+-		      <0 0x2c002000 0 0x100>;
++		      <0 0x2c002000 0 0x2000>;
  	};
  
+ 	timer {
+diff --git a/arch/arm64/boot/dts/foundation-v8.dts b/arch/arm64/boot/dts/foundation-v8.dts
+index 84fcc50..3e63def 100644
+--- a/arch/arm64/boot/dts/foundation-v8.dts
++++ b/arch/arm64/boot/dts/foundation-v8.dts
+@@ -68,7 +68,7 @@
+ 		#address-cells = <0>;
+ 		interrupt-controller;
+ 		reg = <0x0 0x2c001000 0 0x1000>,
+-		      <0x0 0x2c002000 0 0x1000>,
++		      <0x0 0x2c002000 0 0x2000>,
+ 		      <0x0 0x2c004000 0 0x2000>,
+ 		      <0x0 0x2c006000 0 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+index 572005e..0d271ce 100644
+--- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
++++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+@@ -73,7 +73,7 @@
+ 		#address-cells = <0>;
+ 		interrupt-controller;
+ 		reg = <0x0 0x2c001000 0 0x1000>,
+-		      <0x0 0x2c002000 0 0x1000>,
++		      <0x0 0x2c002000 0 0x2000>,
+ 		      <0x0 0x2c004000 0 0x2000>,
+ 		      <0x0 0x2c006000 0 0x2000>;
+ 		interrupts = <1 9 0xf04>;
 -- 
 1.8.4.rc3
