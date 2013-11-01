@@ -1,70 +1,55 @@
 From: matt.porter@linaro.org (Matt Porter)
-Date: Fri,  1 Nov 2013 15:45:50 -0400
-Subject: [PATCH v2 1/9] phy: add phy_get_bus_width()/phy_set_bus_width() calls
+Date: Fri,  1 Nov 2013 15:45:52 -0400
+Subject: [PATCH v2 3/9] usb: gadget: s3c-hsotg: enable build for other
+ platforms
 In-Reply-To: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
 References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
-Message-ID: <1383335158-19730-2-git-send-email-matt.porter@linaro.org>
+Message-ID: <1383335158-19730-4-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a pair of APIs that allows the generic PHY subsystem to
-provide information on the PHY bus width. The PHY provider driver may
-use phy_set_bus_width() to set the bus width that the PHY supports.
-The controller driver may then use phy_get_bus_width() to fetch the
-PHY bus width in order to properly configure the controller.
+Remove unused Samsung-specific machine include and Kconfig
+dependency on S3C.
 
 Signed-off-by: Matt Porter <matt.porter@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
 ---
- include/linux/phy/phy.h | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/usb/gadget/Kconfig     | 7 +++----
+ drivers/usb/gadget/s3c-hsotg.c | 2 --
+ 2 files changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-index 6d72269..e858ce1 100644
---- a/include/linux/phy/phy.h
-+++ b/include/linux/phy/phy.h
-@@ -46,6 +46,7 @@ struct phy_ops {
-  * @mutex: mutex to protect phy_ops
-  * @init_count: used to protect when the PHY is used by multiple consumers
-  * @power_count: used to protect when the PHY is used by multiple consumers
-+ * @bus_width: used to specify data width of the PHY bus
-  */
- struct phy {
- 	struct device		dev;
-@@ -55,6 +56,7 @@ struct phy {
- 	struct mutex		mutex;
- 	int			init_count;
- 	int			power_count;
-+	int			bus_width;
- };
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 48cddf3..2e69fa0 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -280,11 +280,10 @@ config USB_PXA27X
+ 	   gadget drivers to also be dynamically linked.
  
- /**
-@@ -127,6 +129,12 @@ int phy_init(struct phy *phy);
- int phy_exit(struct phy *phy);
- int phy_power_on(struct phy *phy);
- int phy_power_off(struct phy *phy);
-+static inline int phy_get_bus_width(struct phy *phy) {
-+	return phy->bus_width;
-+};
-+static inline void phy_set_bus_width(struct phy *phy, int bus_width) {
-+	phy->bus_width = bus_width;
-+};
- struct phy *phy_get(struct device *dev, const char *string);
- struct phy *devm_phy_get(struct device *dev, const char *string);
- void phy_put(struct phy *phy);
-@@ -199,6 +207,14 @@ static inline int phy_power_off(struct phy *phy)
- 	return -ENOSYS;
- }
+ config USB_S3C_HSOTG
+-	tristate "S3C HS/OtG USB Device controller"
+-	depends on S3C_DEV_USB_HSOTG
++	tristate "Designware/S3C HS/OtG USB Device controller"
+ 	help
+-	  The Samsung S3C64XX USB2.0 high-speed gadget controller
+-	  integrated into the S3C64XX series SoC.
++	  The Designware USB2.0 high-speed gadget controller
++	  integrated into the S3C64XX and BCM281xx series SoC.
  
-+static inline int phy_get_bus_width(struct phy *phy) {
-+	return -ENOSYS;
-+};
-+
-+static inline void phy_set_bus_width(struct phy *phy, bus_width) {
-+	return;
-+};
-+
- static inline struct phy *phy_get(struct device *dev, const char *string)
- {
- 	return ERR_PTR(-ENOSYS);
+ config USB_S3C2410
+ 	tristate "S3C2410 USB Device Controller"
+diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+index a8a99e4..258bc73 100644
+--- a/drivers/usb/gadget/s3c-hsotg.c
++++ b/drivers/usb/gadget/s3c-hsotg.c
+@@ -36,8 +36,6 @@
+ #include <linux/usb/phy.h>
+ #include <linux/platform_data/s3c-hsotg.h>
+ 
+-#include <mach/map.h>
+-
+ #include "s3c-hsotg.h"
+ 
+ static const char * const s3c_hsotg_supply_names[] = {
 -- 
 1.8.4
