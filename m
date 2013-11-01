@@ -1,39 +1,88 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  1 Nov 2013 09:31:52 -0700
-Subject: [PATCH v3 2/6] genirq: export percpu irq functions for module usage
+Date: Fri,  1 Nov 2013 09:31:54 -0700
+Subject: [PATCH v3 4/6] edac: Document Krait L1/L2 EDAC driver binding
 In-Reply-To: <1383323516-31357-1-git-send-email-sboyd@codeaurora.org>
 References: <1383323516-31357-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1383323516-31357-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1383323516-31357-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the near future we're going to use these percpu irq functions
-in the Krait CPU EDAC driver. Export them so that the EDAC driver
-can be compiled as a module.
+The Krait L1/L2 error reporting device is made up of two
+interrupts, one per-CPU interrupt for the L1 caches and one
+interrupt for the L2 cache.
 
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Kumar Gala <galak@codeaurora.org>
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- kernel/irq/manage.c | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/arm/cpus.txt | 49 ++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 514bcfd..c6009d1 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -1623,6 +1623,7 @@ void free_percpu_irq(unsigned int irq, void __percpu *dev_id)
- 	kfree(__free_percpu_irq(irq, dev_id));
- 	chip_bus_sync_unlock(desc);
- }
-+EXPORT_SYMBOL_GPL(free_percpu_irq);
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index f32494d..c30d547 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -44,6 +44,8 @@ For the ARM architecture every CPU node must contain the following properties:
+ 		"marvell,mohawk"
+ 		"marvell,xsc3"
+ 		"marvell,xscale"
++		"qcom,scorpion"
++		"qcom,krait"
  
- /**
-  *	setup_percpu_irq - setup a per-cpu interrupt
-@@ -1693,3 +1694,4 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+ Example:
  
- 	return retval;
- }
-+EXPORT_SYMBOL_GPL(request_percpu_irq);
+@@ -75,3 +77,50 @@ Example:
+ 			reg = <0x101>;
+ 		};
+ 	};
++
++If the compatible string contains "qcom,krait" there shall be an interrupts
++property containing the L1/CPU error interrupt number. There shall also be a
++l2-cache node containing the following properties:
++
++ - compatible: Shall contain at least "cache"
++ - cache-level: Must be 2
++ - interrupts: Shall contain the L2 error interrupt
++
++Example:
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <1 9 0xf04>;
++		compatible = "qcom,krait";
++
++		cpu at 0 {
++			device_type = "cpu";
++			reg = <0>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			reg = <1>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			reg = <2>;
++			next-level-cache = <&L2>;
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			reg = <3>;
++			next-level-cache = <&L2>;
++		};
++
++		L2: l2-cache {
++			compatible = "cache";
++			cache-level = <2>;
++			interrupts = <0 2 0x4>;
++		};
++	};
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
