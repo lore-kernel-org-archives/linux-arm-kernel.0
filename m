@@ -1,53 +1,64 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 1 Nov 2013 12:42:24 +0100
-Subject: [PATCH v10 00/20] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <20131007105212.1c2a9e29166ff4b4a33468f8@samsung.com>
-References: <20131007105212.1c2a9e29166ff4b4a33468f8@samsung.com>
-Message-ID: <20131101114224.GG17455@8bytes.org>
+From: b42378@freescale.com (Nicolin Chen)
+Date: Fri, 1 Nov 2013 19:48:13 +0800
+Subject: [PATCH][RESEND 0/8] Add and implement gen_pool_dma_alloc()
+Message-ID: <cover.1383306365.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 07, 2013 at 10:52:12AM +0900, Cho KyongHo wrote:
-> Patch summary:
-> [PATCH 01/20] iommu/exynos: do not include removed header
-> [PATCH 02/20] iommu/exynos: add missing cache flush for removed page table entries
-> [PATCH 03/20] iommu/exynos: change error handling when page table update is failed
-> [PATCH 04/20] iommu/exynos: fix L2TLB invalidation
-> [PATCH 05/20] iommu/exynos: allocate lv2 page table from own slab
-> [PATCH 06/20] iommu/exynos: always enable runtime PM
-> [PATCH 07/20] iommu/exynos: always use a single clock descriptor
-> [PATCH 08/20] iommu/exynos: remove dbgname from drvdata of a System MMU
-> [PATCH 09/20] iommu/exynos: use managed device helper functions
-> [PATCH 10/20] clk: exynos: add gate clock descriptions of System MMU
-> [PATCH 11/20] ARM: dts: Add description of System MMU of Exynos SoCs
-> [PATCH 12/20] iommu/exynos: support for device tree
-> [PATCH 13/20] iommu/exynos: gating clocks of master H/W
-> [PATCH 14/20] iommu/exynos: remove custom fault handler
-> [PATCH 15/20] iommu/exynos: remove calls to Runtime PM API functions
-> [PATCH 16/20] iommu/exynos: turn on useful configuration options
-> [PATCH 17/20] iommu/exynos: add support for power management subsystems.
-> [PATCH 18/20] iommu/exynos: change rwlock to spinlock
-> [PATCH 19/20] iommu/exynos: return 0 if iommu_attach_device() successes
-> [PATCH 20/20] iommu/exynos: add devices attached to the System MMU to an IOMMU group
-> 
-> Diffstats:
->  .../devicetree/bindings/clock/exynos5250-clock.txt |   28 +
->  .../devicetree/bindings/clock/exynos5420-clock.txt |    3 +
->  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |   76 ++
->  arch/arm/boot/dts/exynos4.dtsi                     |  105 ++
->  arch/arm/boot/dts/exynos4210.dtsi                  |   21 +
->  arch/arm/boot/dts/exynos4x12.dtsi                  |   82 ++
->  arch/arm/boot/dts/exynos5250.dtsi                  |  262 +++++
->  arch/arm/boot/dts/exynos5420.dtsi                  |  296 ++++++
->  drivers/clk/samsung/clk-exynos5250.c               |   49 +-
->  drivers/clk/samsung/clk-exynos5420.c               |   12 +-
->  drivers/iommu/Kconfig                              |    5 +-
->  drivers/iommu/exynos-iommu.c                       | 1033 +++++++++++++-------
->  12 files changed, 1585 insertions(+), 387 deletions(-)
+Previously, we don't have a specific gen_pool_alloc() for DMA usage;
+Instead, we need to use gen_pool_virt_to_phys() to convert the addr
+returned from gen_pool_alloc(). So each implementation of this has
+duplicated code. Thus add new helper function -- gen_pool_dma_alloc().
 
-What is the state of this series? It would be good to have some
-Acked-bys and/or Reviewed-bys on it.
+After gen_pool_dma_alloc() is introduced, we can replace the original
+combination of gen_pool_alloc()+gen_pool_virt_to_phys() with this new
+helper function. Thus this patch implement the helper function to all
+the current drivers which use gen_pool_virt_to_phys().
+
+!!-------------------important------------------!!
+
+The later 7 patches need all related driver owner to test. We can
+here define a simple rule:
+1, If one driver owner or maintainer doesn't like the mofication
+   to his/her driver, just let me know. I would drop that patch.
+2, If there's a bug and issue found after patch-testing, please
+   reply the mail so that I can fix and refine the patch.
+3, If one driver owner or maintainer is too busy and doesn't have
+   bandwidth to test the patch, I would drop that patch from this
+   series. We can reimplement it till there's someone test it.
+
+!!-------------------current progress-----------!!
+
+  lib/genalloc: [Okay]
+  ARM: davinci: [Untested]
+  dma: mmp_tdma: [Untested]
+  [media] coda: [Untested]
+  uio: uio_pruss: [Untested]
+  ALSA: memalloc: [Tested] by Nicolin Chen with i.MX6Q SabreSD
+  ASoC: davinci: [Untested]
+  ASoC: pxa: use [Untested]
 
 
-	Joerg
+Nicolin Chen (8):
+  lib/genalloc: add a helper function for DMA buffer allocation
+  ARM: davinci: use gen_pool_dma_alloc() to sram.c
+  dma: mmp_tdma: use gen_pool_dma_alloc() to allocate descriptor
+  [media] coda: use gen_pool_dma_alloc() to allocate iram buffer
+  uio: uio_pruss: use gen_pool_dma_alloc() to allocate sram memory
+  ALSA: memalloc: use gen_pool_dma_alloc() to allocate iram buffer
+  ASoC: davinci: use gen_pool_dma_alloc() in davinci-pcm.c
+  ASoC: pxa: use gen_pool_dma_alloc() to allocate dma buffer
+
+ arch/arm/mach-davinci/sram.c    |  9 +--------
+ drivers/dma/mmp_tdma.c          |  7 +------
+ drivers/media/platform/coda.c   |  5 ++---
+ drivers/uio/uio_pruss.c         |  6 ++----
+ include/linux/genalloc.h        |  2 ++
+ lib/genalloc.c                  | 28 ++++++++++++++++++++++++++++
+ sound/core/memalloc.c           |  6 +-----
+ sound/soc/davinci/davinci-pcm.c |  3 +--
+ sound/soc/pxa/mmp-pcm.c         |  3 +--
+ 9 files changed, 39 insertions(+), 30 deletions(-)
+
+-- 
+1.8.4
