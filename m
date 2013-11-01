@@ -1,33 +1,55 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 1 Nov 2013 09:39:30 +0900
-Subject: [PATCH v3] iommu: shmobile: Enable the driver on all ARM platforms
-In-Reply-To: <20131031174945.GI2493@sirena.org.uk>
-References: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131030112625.GZ16735@n2100.arm.linux.org.uk>
- <1652955.Gs3XDiEUHO@avalon> <20131030162854.GB2493@sirena.org.uk>
- <20131031060305.GU1603@verge.net.au>
- <20131031174945.GI2493@sirena.org.uk>
-Message-ID: <20131101003930.GJ6818@verge.net.au>
+Date: Fri, 1 Nov 2013 09:43:59 +0900
+Subject: [PATCH] RM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
+In-Reply-To: <5272CC16.3020700@cogentembedded.com>
+References: <1383201098-4258-1-git-send-email-horms+renesas@verge.net.au>
+ <5272CC16.3020700@cogentembedded.com>
+Message-ID: <20131101004359.GK6818@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 10:49:45AM -0700, Mark Brown wrote:
-> On Thu, Oct 31, 2013 at 03:03:05PM +0900, Simon Horman wrote:
-> > On Wed, Oct 30, 2013 at 09:28:54AM -0700, Mark Brown wrote:
-> > > On Wed, Oct 30, 2013 at 12:40:12PM +0100, Laurent Pinchart wrote:
+On Fri, Nov 01, 2013 at 12:31:02AM +0300, Sergei Shtylyov wrote:
+> On 10/31/2013 09:31 AM, Simon Horman wrote:
 > 
-> > > > > For similar reasons as x86, can we please think about using:
-> > > 
-> > > > > 	depends on ARM
-> > > > > 	depends on ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI || COMPILE_TEST
+> >Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
+> >Other than not being useful it is also not possible to compile
 > 
-> > > I'd read the above as saying the code needs ARM to build at all and that
-> > > the hardware will only ever appear on SHMOBILE.
+>    s/compile/link/.
 > 
-> > I am curious to know the value of "depends ARM".
-> > Is it to aid the reading that you spelt out?
+> >the code under this condition as phy_register_fixup_for_id()
+> >is not defined.
 > 
-> That's a function of the compile time dependencies, if ARM is required
-> to build then it needs to be an unconditional dependency.
+>    Not only this function is absent...
+> 
+> >This problem was introduced by 48c8b96f21817aad
+> >("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
+> 
+> >Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/mach-shmobile/board-lager.c | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> >diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+> >index 78a31b6..d1a8ddd 100644
+> >--- a/arch/arm/mach-shmobile/board-lager.c
+> >+++ b/arch/arm/mach-shmobile/board-lager.c
+> >@@ -245,7 +245,9 @@ static void __init lager_init(void)
+> >  {
+> >  	lager_add_standard_devices();
+> >
+> >-	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
+> >+	if (IS_ENABLED(CONFIG_PHYLIB))
+> >+		phy_register_fixup_for_id("r8a7790-ether-ff:01",
+> >+					  lager_ksz8041_fixup);
+> 
+>    Perhaps you would consider enclosing the fixup function itself
+> into #ifdef as it causes link errors as well?  Doesn't seem
+> necessary as gcc probably drops it anyway but for completeness'
+> sake...
 
-Thanks, sorry for missing the obvious.
+My understanding of the motivation for IS_ENABLED() is to
+take advantage of gcc optimising away unused code and making such
+problems disappear.
+
+With this patch in place do you still see any warnings?
