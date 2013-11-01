@@ -1,79 +1,129 @@
 From: matt.porter@linaro.org (Matt Porter)
-Date: Fri,  1 Nov 2013 15:45:55 -0400
-Subject: [PATCH v2 6/9] usb: gadget: s3c-hsotg: get phy bus width from phy
- subsystem
+Date: Fri,  1 Nov 2013 15:45:54 -0400
+Subject: [PATCH v2 5/9] usb: gadget: s3c-hsotg: enable generic phy support
 In-Reply-To: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
 References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
-Message-ID: <1383335158-19730-7-git-send-email-matt.porter@linaro.org>
+Message-ID: <1383335158-19730-6-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for querying the phy bus width from the generic phy
-subsystem. Configure UTMI bus width in GUSBCFG based on this value.
+Adds support for the generic PHY subsystem. Generic PHY
+support is probed and then the driver falls back to checking
+for an old style USB PHY and pdata if not found.
 
 Signed-off-by: Matt Porter <matt.porter@linaro.org>
 ---
- drivers/usb/gadget/s3c-hsotg.c | 14 +++++++++++++-
- drivers/usb/gadget/s3c-hsotg.h |  1 +
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ drivers/usb/gadget/s3c-hsotg.c | 54 ++++++++++++++++++++++++++++--------------
+ 1 file changed, 36 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index f97978b..0be6242 100644
+index 3e0c124..f97978b 100644
 --- a/drivers/usb/gadget/s3c-hsotg.c
 +++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -139,6 +139,7 @@ struct s3c_hsotg_ep {
+@@ -34,6 +34,7 @@
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/phy.h>
++#include <linux/phy/phy.h>
+ #include <linux/platform_data/s3c-hsotg.h>
+ 
+ #include "s3c-hsotg.h"
+@@ -131,7 +132,8 @@ struct s3c_hsotg_ep {
+  * struct s3c_hsotg - driver state.
+  * @dev: The parent device supplied to the probe function
+  * @driver: USB gadget driver
+- * @phy: The otg phy transceiver structure for phy control.
++ * @phy: The otg phy transceiver structure for old USB phy control.
++ * @gphy: The otg phy transceiver structure for generic phy control.
+  * @plat: The platform specific configuration data. This can be removed once
+  * all SoCs support usb transceiver.
   * @regs: The memory area mapped for accessing registers.
-  * @irq: The IRQ number we are using
-  * @supplies: Definition of USB power supplies
-+ * @phyif: PHY interface width
-  * @dedicated_fifos: Set if the hardware has dedicated IN-EP fifos.
-  * @num_of_eps: Number of available EPs (excluding EP0)
-  * @debug_root: root directrory for debugfs.
-@@ -167,6 +168,7 @@ struct s3c_hsotg {
+@@ -154,6 +156,7 @@ struct s3c_hsotg {
+ 	struct device		 *dev;
+ 	struct usb_gadget_driver *driver;
+ 	struct usb_phy		*phy;
++	struct phy		*gphy;
+ 	struct s3c_hsotg_plat	 *plat;
  
- 	struct regulator_bulk_data supplies[ARRAY_SIZE(s3c_hsotg_supply_names)];
+ 	spinlock_t              lock;
+@@ -2820,9 +2823,12 @@ static void s3c_hsotg_phy_enable(struct s3c_hsotg *hsotg)
  
-+	u32			phyif;
- 	unsigned int		dedicated_fifos:1;
- 	unsigned char           num_of_eps;
+ 	dev_dbg(hsotg->dev, "pdev 0x%p\n", pdev);
  
-@@ -2215,7 +2217,7 @@ static void s3c_hsotg_core_init(struct s3c_hsotg *hsotg)
- 	 */
+-	if (hsotg->phy)
++	if (hsotg->gphy) {
++		phy_init(hsotg->gphy);
++		phy_power_on(hsotg->gphy);
++	} else if (hsotg->phy) {
+ 		usb_phy_init(hsotg->phy);
+-	else if (hsotg->plat->phy_init)
++	} else if (hsotg->plat->phy_init)
+ 		hsotg->plat->phy_init(pdev, hsotg->plat->phy_type);
+ }
  
- 	/* set the PLL on, remove the HNP/SRP and set the PHY */
--	writel(GUSBCFG_PHYIf16 | GUSBCFG_TOutCal(7) |
-+	writel(hsotg->phyif | GUSBCFG_TOutCal(7) |
- 	       (0x5 << 10), hsotg->regs + GUSBCFG);
+@@ -2837,9 +2843,12 @@ static void s3c_hsotg_phy_disable(struct s3c_hsotg *hsotg)
+ {
+ 	struct platform_device *pdev = to_platform_device(hsotg->dev);
  
- 	s3c_hsotg_init_fifo(hsotg);
-@@ -3557,6 +3559,16 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
- 		goto err_supplies;
+-	if (hsotg->phy)
++	if (hsotg->gphy) {
++		phy_power_off(hsotg->gphy);
++		phy_exit(hsotg->gphy);
++	} else if (hsotg->phy) {
+ 		usb_phy_shutdown(hsotg->phy);
+-	else if (hsotg->plat->phy_exit)
++	} else if (hsotg->plat->phy_exit)
+ 		hsotg->plat->phy_exit(pdev, hsotg->plat->phy_type);
+ }
+ 
+@@ -3446,6 +3455,7 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+ {
+ 	struct s3c_hsotg_plat *plat = dev_get_platdata(&pdev->dev);
+ 	struct usb_phy *phy;
++	struct phy *gphy;
+ 	struct device *dev = &pdev->dev;
+ 	struct s3c_hsotg_ep *eps;
+ 	struct s3c_hsotg *hsotg;
+@@ -3460,19 +3470,27 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  	}
  
-+	/* Set default UTMI width */
-+	hsotg->phyif = GUSBCFG_PHYIf16;
-+
+-	phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+-	if (IS_ERR(phy)) {
+-		/* Fallback for pdata */
+-		plat = dev_get_platdata(&pdev->dev);
+-		if (!plat) {
+-			dev_err(&pdev->dev, "no platform data or transceiver defined\n");
+-			return -EPROBE_DEFER;
+-		} else {
+-			hsotg->plat = plat;
+-		}
+-	} else {
+-		hsotg->phy = phy;
+-	}
 +	/*
-+	 * If using the generic PHY framework, check if the PHY bus
-+	 * width is 8-bit and set the phyif appropriately.
++	 * Attempt to find a generic PHY, then look for an old style
++	 *  USB PHY, finally fall back to pdata
 +	 */
-+	if (hsotg->gphy && (phy_get_bus_width(gphy) == 8))
-+		hsotg->phyif = GUSBCFG_PHYIf8;
-+
- 	/* usb phy enable */
- 	s3c_hsotg_phy_enable(hsotg);
++	gphy = devm_phy_get(dev, "usb2-phy");
++	if (IS_ERR(gphy)) {
++		phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
++		if (IS_ERR(phy)) {
++			/* Fallback for pdata */
++			plat = dev_get_platdata(&pdev->dev);
++			if (!plat) {
++				dev_err(&pdev->dev,
++					"no platform data or transceiver defined\n");
++				return -EPROBE_DEFER;
++			} else {
++				hsotg->plat = plat;
++			}
++		} else
++			hsotg->phy = phy;
++	} else
++		hsotg->gphy = gphy;
  
-diff --git a/drivers/usb/gadget/s3c-hsotg.h b/drivers/usb/gadget/s3c-hsotg.h
-index d650b12..85f549f 100644
---- a/drivers/usb/gadget/s3c-hsotg.h
-+++ b/drivers/usb/gadget/s3c-hsotg.h
-@@ -55,6 +55,7 @@
- #define GUSBCFG_HNPCap				(1 << 9)
- #define GUSBCFG_SRPCap				(1 << 8)
- #define GUSBCFG_PHYIf16			(1 << 3)
-+#define GUSBCFG_PHYIf8				(0 << 3)
- #define GUSBCFG_TOutCal_MASK			(0x7 << 0)
- #define GUSBCFG_TOutCal_SHIFT			(0)
- #define GUSBCFG_TOutCal_LIMIT			(0x7)
+ 	hsotg->dev = dev;
+ 
 -- 
 1.8.4
