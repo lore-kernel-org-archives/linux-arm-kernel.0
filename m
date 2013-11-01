@@ -1,47 +1,57 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 1 Nov 2013 14:14:52 +0100
-Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu
- node in DT.
-In-Reply-To: <1436787.LWqDTIBNS8@vostro.rjw.lan>
-References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
- <CAKohpokTWfBnhWj+bdA9zx-+hyXUdp4ir5BYkZNLe08mcwVwLg@mail.gmail.com>
- <20131101090737.GB26890@lunn.ch>
- <1436787.LWqDTIBNS8@vostro.rjw.lan>
-Message-ID: <20131101131452.GJ26890@lunn.ch>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 01 Nov 2013 06:30:11 -0700
+Subject: [Ksummit-2013-discuss] ARM topic: Is DT on ARM the solution,
+ or is there something better?
+In-Reply-To: <20131101103614.GM27864@ulmo.nvidia.com>
+References: <5265AFED.1040503@roeck-us.net> <52665314.2040904@imgtec.com>
+ <232aa6e4-19fe-4460-8101-8bf1d639ff3c@email.android.com>
+ <20131022164922.GA29852@roeck-us.net> <20131022203546.GC8037@mithrandir>
+ <20131022211000.GA30394@roeck-us.net> <20131023075758.GA7404@ulmo.nvidia.com>
+ <20131023160131.GA20675@roeck-us.net> <20131023210715.GF8828@mithrandir>
+ <20131024151853.GB25355@roeck-us.net>
+ <20131101103614.GM27864@ulmo.nvidia.com>
+Message-ID: <5273ACE3.5080200@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 01, 2013 at 02:16:37PM +0100, Rafael J. Wysocki wrote:
-> On Friday, November 01, 2013 10:07:37 AM Andrew Lunn wrote:
-> > On Fri, Nov 01, 2013 at 05:21:03AM +0530, Viresh Kumar wrote:
-> > > On 1 November 2013 03:56, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > > > On Thursday, October 31, 2013 08:18:31 PM Andrew Lunn wrote:
-> > > >> The dove-cpufreq driver needs access to the DDR and CPU clock.  There
-> > > >> is also an interrupt generated when the DFS hardware completes a
-> > > >> change of frequencey. Add these to the cpu node in DT.
-> > > >>
-> > > >> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > > >> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > > >
-> > > > I need someone with DT bindings knowledge to ACK this for me.
-> > > 
-> > > I can do that
-> > 
-> > Thanks.
-> > 
-> > , but this set has to be rebased over all the latest developments
-> > > in cpufreq core before getting posted again..
-> > 
-> > I will wait for -rc1 and rebase.
-> 
-> Actually, it is possible that 3.12-rc8 will be released this weekend.  If that
-> happens, please rebase your patchset on top of the current linux-next and
-> resubmit it next week.
+On 11/01/2013 03:36 AM, Thierry Reding wrote:
+> On Thu, Oct 24, 2013 at 08:18:53AM -0700, Guenter Roeck wrote:
+>> On Wed, Oct 23, 2013 at 11:07:16PM +0200, Thierry Reding wrote:
+>> [ ... ]
+>>>>
+>>>> Was this just a matter of enabling OF on this platform, or do you have an
+>>>> out-of-tree set of patches ? If the latter, is it available somewhere
+>>>> to look at (including the complete devicetree from your above example) ?
+>>>
+>>> It was mostly a matter of enabling OF and writing the device tree. Most
+>>> of the generic kernel code changes I even got merged, but there were a
+>>> few patches that I never got around to merge. Some weren't anywhere
+>>> close to a mergeable state either.
+>>>
+>>> I no longer work for the company and don't have access to the patches.
+>>> But I can ping a few people and see if I can dig up something for you.
+>>>
+>> That would be great.
+>
+> Hi Guenter,
+>
+> It took some time, but here's the tree:
+>
+> 	https://github.com/avionic-design/linux/commits/medatom/master
+>
+> The device tree files are in arch/x86/boot/dts (as expected I guess). A
+> linux-next from over a year ago was used as the base for that branch, so
+> some of that will be stale, but DT is a stable ABI, so that should still
+> be valid. =)
+>
+> If you have any questions, please don't hesitate to ask. Although I have
+> not been working on that for a while, so my memories about it aren't all
+> that fresh anymore.
+>
+> Thierry
+>
+Hi Thierry,
 
-Hi Rafael
+that is great - thanks a lot!
 
-Just be to sure, since we have had problems with terminology before.
-Do you mean the The linux-next, or your linux next branch?
-
-Thanks
-	Andrew
+Guenter
