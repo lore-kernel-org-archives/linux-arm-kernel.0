@@ -1,186 +1,128 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri,  1 Nov 2013 10:13:28 +0000
-Subject: [PATCH 1/2] arm: correct GIC cpu interface range for Cortex A15/GIC
- 400
-In-Reply-To: <1383300776.4332.3.camel@hastur.hellion.org.uk>
-References: <1383300776.4332.3.camel@hastur.hellion.org.uk>
-Message-ID: <1383300809-7527-1-git-send-email-ian.campbell@citrix.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 1 Nov 2013 11:13:47 +0100
+Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
+In-Reply-To: <001e01ced692$267a6d90$736f48b0$%han@samsung.com>
+References: <20131019104555.GI18477@ns203013.ovh.net>
+ <1382346813-8449-1-git-send-email-denis@eukrea.com>
+ <20131022045833.GB17512@ns203013.ovh.net>
+ <20131022072307.GA8681@ulmo.nvidia.com>
+ <20131022153445.GD17512@ns203013.ovh.net>
+ <20131022200141.GA8037@mithrandir>
+ <001e01ced692$267a6d90$736f48b0$%han@samsung.com>
+Message-ID: <20131101101346.GK27864@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GICv2 (Cortex A15/GIC 400) have CPU interface registers up to offset 0x1004
-(the 32-bit GICC_DIR register a 0x1000). The GIC 400 documentation specifies
-the CPU interface region as being 0x2000 in size.
+On Fri, Nov 01, 2013 at 08:37:23AM +0900, Jingoo Han wrote:
+> On Wednesday, October 23, 2013 5:02 AM, Thierry Reding wrote:
+> > On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 09:23 Tue 22 Oct     , Thierry Reding wrote:
+> > > > On Tue, Oct 22, 2013 at 06:58:33AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > On 11:13 Mon 21 Oct     , Denis Carikli wrote:
+> > > > > > Cc: Richard Purdie <rpurdie@rpsys.net>
+> > > > > > Cc: Jingoo Han <jg1.han@samsung.com>
+> > > > > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > > > > Cc: Rob Herring <rob.herring@calxeda.com>
+> > > > > > Cc: Pawel Moll <pawel.moll@arm.com>
+> > > > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > > > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > > > > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > > > > > Cc: devicetree at vger.kernel.org
+> > > > > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > > > > Cc: linux-arm-kernel at lists.infradead.org
+> > > > > > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> > > > > > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > > > > > Cc: Eric B?nard <eric@eukrea.com>
+> > > > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
+> > > > > > ---
+> > > > > > ChangeLog v3->v4:
+> > > > > > - The default-brightness property is now optional, it defaults to 1 if not set.
+> > > > > by default we set OFF not ON
+> > > > >
+> > > > > do not actiate driver or properti by default you can not known to consequence
+> > > > > on the hw
+> > > >
+> > > > Turning on a backlight by default is what pretty much every backlight
+> > > > driver does. I personally think that's the wrong default, I even tried
+> > > > to get some discussion started recently about how we could change this.
+> > > > However, given that this has been the case for possibly as long as the
+> > > > subsystem has existed, suddenly changing it might cause quite a few of
+> > > > our users to boot the new kernel and not see their display come up. As
+> > > > with any other ABI, this isn't something we can just change without a
+> > > > very good migration path.
+> > >
+> > > I'm sorry but the blacklight descibe in DT have nothing to do with the common
+> > > pratice that the current driver have today
+> > 
+> > That's not at all what I said. What I said was that the majority of
+> > backlight drivers currently default to turning the backlight on when
+> > probed. Therefore I think it would be consistent if this driver did the
+> > same.
+> > 
+> > I also said that I don't think it's a very good default, but at the same
+> > time we can't just go and change the default behaviour at will because
+> > people may rely on it.
+> 
+> I agree with your opinion.
+> But, I can't decide how to change it.
 
-Update all DTS entries claiming "arm,cortex-a15-gic" compatibility. Of these I
-only have personal experience with the vexpress a Calxeda (ecx) platforms and
-annecdotal evidence for omap and exynos. For the others I'm just assuming.
+One solution that Stephen proposed was to make all DT-based setups use a
+new default (off). An advantage of that is that such setups are still
+fairly actively being worked on, so we can probably get early adopters
+to cope with the new default.
 
-Also update the example a15 binding in the documentation.
+Looking through some DTS files it seems that many use the pwm-backlight
+driver. So if we can get some concensus from all the users that changing
+the default would be okay, then I think we could reasonably change it.
 
-The "Texas Instruments Keystone 2 SoC" platform which claim to have an a15
-compatible GIC but does not include the GICH/GICV registers. I've not touched
-that here.
+Another solution perhaps would be to add a property to DT which encodes
+the default state of the backlight on boot. This used to be impossible
+because the general concensus was that DT should describe hardware only
+and not software policy. During the kernel summit this requirement was
+somewhat relaxed and it should now be okay to describe system
+configuration data, and I think this would be a good match. If the
+system is designed to keep the backlight off by default because some
+other component (display panel driver) is meant to turn it on later,
+that's system configuration data, right?
 
-Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- Documentation/devicetree/bindings/arm/gic.txt | 2 +-
- arch/arm/boot/dts/ecx-2000.dts                | 2 +-
- arch/arm/boot/dts/exynos5.dtsi                | 2 +-
- arch/arm/boot/dts/exynos5440.dtsi             | 2 +-
- arch/arm/boot/dts/omap5.dtsi                  | 2 +-
- arch/arm/boot/dts/tegra114.dtsi               | 2 +-
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts   | 2 +-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts    | 2 +-
- arch/arm/boot/dts/xenvm-4.2.dts               | 2 +-
- arch/arm64/boot/dts/foundation-v8.dts         | 2 +-
- arch/arm64/boot/dts/rtsm_ve-aemv8a.dts        | 2 +-
- 11 files changed, 11 insertions(+), 11 deletions(-)
+Perhaps a boolean property could be used:
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index 3dfb0c0..ea215e8 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -83,7 +83,7 @@ Example:
- 		#interrupt-cells = <3>;
- 		interrupt-controller;
- 		reg = <0x2c001000 0x1000>,
--		      <0x2c002000 0x1000>,
-+		      <0x2c002000 0x2000>,
- 		      <0x2c004000 0x2000>,
- 		      <0x2c006000 0x2000>;
- 		interrupts = <1 9 0xf04>;
-diff --git a/arch/arm/boot/dts/ecx-2000.dts b/arch/arm/boot/dts/ecx-2000.dts
-index 139b40c..61927de 100644
---- a/arch/arm/boot/dts/ecx-2000.dts
-+++ b/arch/arm/boot/dts/ecx-2000.dts
-@@ -93,7 +93,7 @@
- 			interrupt-controller;
- 			interrupts = <1 9 0xf04>;
- 			reg = <0xfff11000 0x1000>,
--			      <0xfff12000 0x1000>,
-+			      <0xfff12000 0x2000>,
- 			      <0xfff14000 0x2000>,
- 			      <0xfff16000 0x2000>;
- 		};
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index f65e124..c72782f 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -44,7 +44,7 @@
- 		#interrupt-cells = <3>;
- 		interrupt-controller;
- 		reg =	<0x10481000 0x1000>,
--			<0x10482000 0x1000>,
-+			<0x10482000 0x2000>,
- 			<0x10484000 0x2000>,
- 			<0x10486000 0x2000>;
- 		interrupts = <1 9 0xf04>;
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index ff7f5d8..19c9636 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -31,7 +31,7 @@
- 		#interrupt-cells = <3>;
- 		interrupt-controller;
- 		reg =	<0x2E1000 0x1000>,
--			<0x2E2000 0x1000>,
-+			<0x2E2000 0x2000>,
- 			<0x2E4000 0x2000>,
- 			<0x2E6000 0x2000>;
- 		interrupts = <1 9 0xf04>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index e643620..6c4fe08 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -60,7 +60,7 @@
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
- 		reg = <0x48211000 0x1000>,
--		      <0x48212000 0x1000>,
-+		      <0x48212000 0x2000>,
- 		      <0x48214000 0x2000>,
- 		      <0x48216000 0x2000>;
- 	};
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index abf6c40..eb7a0c4 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -20,7 +20,7 @@
- 		#interrupt-cells = <3>;
- 		interrupt-controller;
- 		reg = <0x50041000 0x1000>,
--		      <0x50042000 0x1000>,
-+		      <0x50042000 0x2000>,
- 		      <0x50044000 0x2000>,
- 		      <0x50046000 0x2000>;
- 		interrupts = <GIC_PPI 9
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-index 9420053..f0ec2be 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-@@ -81,7 +81,7 @@
- 		#address-cells = <0>;
- 		interrupt-controller;
- 		reg = <0 0x2c001000 0 0x1000>,
--		      <0 0x2c002000 0 0x1000>,
-+		      <0 0x2c002000 0 0x2000>,
- 		      <0 0x2c004000 0 0x2000>,
- 		      <0 0x2c006000 0 0x2000>;
- 		interrupts = <1 9 0xf04>;
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index d2803be..c2db05e 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -98,7 +98,7 @@
- 		#address-cells = <0>;
- 		interrupt-controller;
- 		reg = <0 0x2c001000 0 0x1000>,
--		      <0 0x2c002000 0 0x1000>,
-+		      <0 0x2c002000 0 0x2000>,
- 		      <0 0x2c004000 0 0x2000>,
- 		      <0 0x2c006000 0 0x2000>;
- 		interrupts = <1 9 0xf04>;
-diff --git a/arch/arm/boot/dts/xenvm-4.2.dts b/arch/arm/boot/dts/xenvm-4.2.dts
-index 3369151..92e63eb 100644
---- a/arch/arm/boot/dts/xenvm-4.2.dts
-+++ b/arch/arm/boot/dts/xenvm-4.2.dts
-@@ -56,7 +56,7 @@
- 		#address-cells = <0>;
- 		interrupt-controller;
- 		reg = <0 0x2c001000 0 0x1000>,
--		      <0 0x2c002000 0 0x100>;
-+		      <0 0x2c002000 0 0x2000>;
- 	};
- 
- 	timer {
-diff --git a/arch/arm64/boot/dts/foundation-v8.dts b/arch/arm64/boot/dts/foundation-v8.dts
-index 84fcc50..3e63def 100644
---- a/arch/arm64/boot/dts/foundation-v8.dts
-+++ b/arch/arm64/boot/dts/foundation-v8.dts
-@@ -68,7 +68,7 @@
- 		#address-cells = <0>;
- 		interrupt-controller;
- 		reg = <0x0 0x2c001000 0 0x1000>,
--		      <0x0 0x2c002000 0 0x1000>,
-+		      <0x0 0x2c002000 0 0x2000>,
- 		      <0x0 0x2c004000 0 0x2000>,
- 		      <0x0 0x2c006000 0 0x2000>;
- 		interrupts = <1 9 0xf04>;
-diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-index 572005e..0d271ce 100644
---- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-+++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-@@ -73,7 +73,7 @@
- 		#address-cells = <0>;
- 		interrupt-controller;
- 		reg = <0x0 0x2c001000 0 0x1000>,
--		      <0x0 0x2c002000 0 0x1000>,
-+		      <0x0 0x2c002000 0 0x2000>,
- 		      <0x0 0x2c004000 0 0x2000>,
- 		      <0x0 0x2c006000 0 0x2000>;
- 		interrupts = <1 9 0xf04>;
--- 
-1.8.4.rc3
+	backlight {
+		compatible = "pwm-backlight";
+
+		...
+
+		backlight-default-off;
+	};
+
+> > > put on by default if wrong specially without the property define. Even put it
+> > > on by default it wrong as the bootloader may have set it already for splash
+> > > screen and to avoid glitch the drivers need to detect this.
+> > 
+> > I agree that would be preferable, but I don't know of any way to detect
+> > what value the bootloader set a GPIO to. The GPIO API requires that you
+> > call gpio_direction_output(), and that requires a value parameter which
+> > will be used as the output level of the GPIO.
+> 
+> Jean-Christophe's point is right.
+> 
+> We may need to discuss 'the way to detect what value the bootloader
+> set a GPIO to'.
+
+Since some GPIO hardware simply can't do it, I guess we could resolve to
+passing such information via DT. That obviously won't work for non-DT
+setups, but I guess that's something we could live with.
+
+One possibility would be to supplement the backlight-default-off
+property with another property (backlight-boot-on) that can be passed on
+to the kernel from the bootloader to signal that it has turned the
+backlight on.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131101/72ee32dc/attachment-0001.sig>
