@@ -1,133 +1,58 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Fri, 01 Nov 2013 17:21:00 +0900
-Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <CAMj5BkgHE6FwBv6hUi8Mth1Ox40ed2sot4p9LQBxOToN=Fu7Qg@mail.gmail.com>
-References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
- <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
- <001401ced6cb$04e2a330$0ea7e990$%jun@samsung.com>
- <CAMj5BkgHE6FwBv6hUi8Mth1Ox40ed2sot4p9LQBxOToN=Fu7Qg@mail.gmail.com>
-Message-ID: <001b01ced6db$4c31d840$e49588c0$%jun@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 1 Nov 2013 16:21:39 +0800
+Subject: [PATCHv2 3/7] ARM: imx: add support code for IMX50 based machines
+In-Reply-To: <52730AEE.1000408@uclinux.org>
+References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
+ <1383023757-30711-4-git-send-email-gerg@uclinux.org>
+ <20131031061041.GC23549@S2101-09.ap.freescale.net>
+ <52730AEE.1000408@uclinux.org>
+Message-ID: <20131101082137.GA10324@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, November 01, 2013, zhangfei gao wrote:
-> Dear Seungwon
+On Fri, Nov 01, 2013 at 11:59:10AM +1000, Greg Ungerer wrote:
+> Hi Shawn,
 > 
-> Thanks for giving suggestion.
+> On 31/10/13 16:10, Shawn Guo wrote:
+> > On Tue, Oct 29, 2013 at 03:15:53PM +1000, gerg at uclinux.org wrote:
+> >> +DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
+> >> +	.map_io		= mx53_map_io,
+> >> +	.init_early	= imx53_init_early,
+> >> +	.init_irq	= mx53_init_irq,
+> >> +	.handle_irq	= imx53_handle_irq,
+> >> +	.init_machine	= imx50_dt_init,
+> >> +	.init_late	= imx53_init_late,
+> >> +	.dt_compat	= imx50_dt_board_compat,
+> >> +	.restart	= mxc_restart,
+> >> +MACHINE_END
+> > 
+> > The imx53 is a platform that was converted from non-DT to DT.  Some of
+> > these imx53 hooks may not even necessary for imx53 now, since imx53
+> > supports DT boot only today.  So I do not prefer to reuse these imx53
+> > hooks on the brand new imx50 DT machine.  I would suggest to maintain a
+> > mach-imx50.c and machine descriptor for imx50 with only the necessary
+> > hooks implemented as local functions inside mach-imx50.c.  After imx53
+> > machine descriptor and hooks gets cleaned up, we can look at how we can
+> > consolidate these descriptors if they are pretty much in common.
 > 
-> On Thu, Oct 31, 2013 at 11:24 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> > Hi Zhangfei,
+> With the current support I could drop .init_early and .init_late
+> I believe. All the other mx53 functions are needed to successfully
+> boot.
 > 
-> >> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
-> >> +{
-> >> +     struct dw_mci_k3_priv_data *priv = host->priv;
-> >> +
-> >> +     if (priv->type == DW_MCI_TYPE_HI4511)
-> > There are several checking controller type.
-> > But now DW_MCI_TYPE_HI4511 is just introduced alone.
-> > It seems like unnecessary.
+> imx53_handle_irq is easy to fix, it is just defined to be
+> tzic_handle_irq anyway.
 > 
-> Yes, currently only K3V2 is added, and k3v3 code will be added soon.
-> Do you think type is more suitable to add later?
-Yes, it would be better.
+> mx53_map_io and mx53_init_irq are coded in mm-imx5.c. They look strait
+> forward. Do you want me to create imx50 specific versions in there?
 
-> 
-> >> +static int dw_mci_k3_parse_dt(struct dw_mci *host)
-> >> +{
-> >> +     struct dw_mci_k3_priv_data *priv = host->priv;
-> >> +     struct device_node *np = host->dev->of_node;
-> >> +     u32 data[3];
-> >> +     int ret;
-> >> +
-> >> +     if (priv->type == DW_MCI_TYPE_HI4511) {
-> > Didn't you see Kernel panic here?
-> > host->priv is not allocated yet, it's a invalid pointer dereference.
-> > dw_mci_k3_parse_dt() is called prior to dw_mci_k3_priv_init().
-> > You can check dw_mci_probe() sequence.
-> 
-> It is no problem here
-> dw_mci_pltfm_register -> drv_data->init(host) -> dw_mci_probe -> dw_mci_parse_dt
-I guess your base is not latest.
-Can you check cjb's tree?
+Oh, right.  I overlooked the fact that the static mapping created in
+mx53_map_io() is still used by clock driver everywhere.  It does not
+make too much sense to clean them up before imx51 gets converted to be
+DT only.
 
-> 
-> >
-> >> +             ret = of_property_read_u32_array(np,
-> >> +                             "clken-reg", data, 2);
-> >> +             if (!ret) {
-> >> +                     priv->clken_reg = data[0];
-> >> +                     priv->clken_bit = data[1];
-> >> +             }
-> >> +
-> >> +             ret = of_property_read_u32_array(np,
-> >> +                             "drv-sel-reg", data, 3);
-> >> +             if (!ret) {
-> >> +                     priv->drv_reg = data[0];
-> >> +                     priv->drv_off = data[1];
-> >> +                     priv->drv_bits = data[2];
-> >> +             }
-> >> +
-> >> +             ret = of_property_read_u32_array(np,
-> >> +                             "sam-sel-reg", data, 3);
-> >> +             if (!ret) {
-> >> +                     priv->sam_reg = data[0];
-> >> +                     priv->sam_off = data[1];
-> >> +                     priv->sam_bits = data[2];
-> >> +             }
-> >> +
-> >> +             ret = of_property_read_u32_array(np,
-> >> +                             "div-reg", data, 3);
-> >> +             if (!ret) {
-> >> +                     priv->div_reg = data[0];
-> >> +                     priv->div_off = data[1];
-> >> +                     priv->div_bits = data[2];
-> >> +             }
-> > Should these register information be got from dt?
-> > It could be define in source code instead.
-> 
-> There are many register from pctrl node instead of mmc controller.
-> If set in code, we may read id and then switch id, set register, start
-> bit, bits number,
-> which is no rules for different controller, using defiine is not helpful.
-> for example:
->  switch (idx) {
->         case 0:
->                 clken_reg = 0x1F8;
->                 clken_bit = 0;
->                 drv_sel_reg = 0x1F8;
->                 drv_sel_bit = 4;
->                 sam_sel_reg = 0x1F8;
->                 sam_sel_bit = 8;
->                 div_reg = 0x1F8;
->                 div_bit = 1;
->                 break;
->         case 1:
->                 clken_reg = 0x1F8;
->                 clken_bit = 12;
->                 drv_sel_reg = 0x1F8;
->                 drv_sel_bit = 16;
->                 sam_sel_reg = 0x1F8;
->                 sam_sel_bit = 20;
->                 div_reg = 0x1F8;
->                 div_bit = 13;
->                 break;
->         case 2:
->                 clken_reg = 0x1F8;
->                 clken_bit = 24;
->                 drv_sel_reg = 0x1F8;
->                 drv_sel_bit = 28;
->                 sam_sel_reg = 0x1FC;
->                 sam_sel_bit = 0;
->                 div_reg = 0x1F8;
->                 div_bit = 25;
->                 break;
-> 
-> So define register offset, start bit and bits number in dts make it simplier.
-> Is this acceptable?
-It's up to you. I think there will be better ways.
-For example, some table for variable register can be used for each controller type.
-Additionally, if you intend to use dt, error handling is needed.
-dw_mci_k3_parse_dt always returns success although of_property_read_u32_array is failed.
+Okay, I'm fine with reusing some of the imx53 hooks as required.  But
+at least imx53_init_early() shouldn't be reused on imx50, because it
+sets cpu type specifically for imx53, and calls mxc_iomux_v3_init()
+which is not needed for imx50 (even for imx53 as well today).
 
-Thanks,
-Seungwon Jeon
+Shawn
