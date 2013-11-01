@@ -1,26 +1,39 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 1 Nov 2013 16:33:34 +0800
-Subject: [PATCH RFC] ARM: dts: imx6qdl: make pinctrl nodes board specific
-In-Reply-To: <CAHCPf3vTcu9RCk8=9MUs4nkyJ-8jevh5koxfzdLzE5+qM0ZspQ@mail.gmail.com>
-References: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
- <20131031080326.GK24559@pengutronix.de>
- <20131031102908.GX16735@n2100.arm.linux.org.uk>
- <CAHCPf3vTcu9RCk8=9MUs4nkyJ-8jevh5koxfzdLzE5+qM0ZspQ@mail.gmail.com>
-Message-ID: <20131101083332.GB10324@S2101-09.ap.freescale.net>
+Date: Fri, 1 Nov 2013 16:42:49 +0800
+Subject: [PATCH] ARM: imx: remove mxc_iomux_v3_init() call from
+ imx53_init_early()
+Message-ID: <1383295369-14448-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 10:45:08AM -0500, Matt Sealey wrote:
-> I suggested this to Shawn a couple weeks ago and got a bit of pushback.
-> 
-> There's probably a ton more to do in this regard to keep the DT
-> per-board more concise, but this drops tree size by a respectable
-> amount on i.MX51 too (just on a tree I have internally, it's something
-> like 8.5KiB) and I can't see any redundant data in the ones he
-> patched.
-> 
-> I can follow this up with i.MX51/i.MX53 if nobody is already doing that..
+Today, imx53 handles iomux configuration using pinctrl driver, so
+mxc_iomux_v3_init() call in imx53_init_early() is there for nothing.
+Remove the call from there.
 
-I'm taking care of them as a move of while IMX family.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/mm-imx5.c |    8 --------
+ 1 file changed, 8 deletions(-)
 
-Shawn
+diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
+index d1d5260..4c11202 100644
+--- a/arch/arm/mach-imx/mm-imx5.c
++++ b/arch/arm/mach-imx/mm-imx5.c
+@@ -89,15 +89,7 @@ void __init imx51_init_early(void)
+ 
+ void __init imx53_init_early(void)
+ {
+-	struct device_node *np;
+-	void __iomem *base;
+-
+ 	mxc_set_cpu_type(MXC_CPU_MX53);
+-
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx53-iomuxc");
+-	base = of_iomap(np, 0);
+-	WARN_ON(!base);
+-	mxc_iomux_v3_init(base);
+ 	imx_src_init();
+ }
+ 
+-- 
+1.7.9.5
