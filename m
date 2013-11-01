@@ -1,101 +1,28 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 1 Nov 2013 10:57:28 +0200
-Subject: [PATCHv9 01/43] clk: Add support for regmap register read/write
-In-Reply-To: <52727B44.4020102@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-2-git-send-email-t-kristo@ti.com> <52726342.6030406@ti.com>
- <52726BD5.3080704@ti.com> <52727B44.4020102@ti.com>
-Message-ID: <52736CF8.2010001@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 1 Nov 2013 17:02:22 +0800
+Subject: [PATCH 0/3] ARM: imx: pllv3 relock fixes
+Message-ID: <1383296545-18652-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 05:46 PM, Nishanth Menon wrote:
-> On 10/31/2013 09:40 AM, Tero Kristo wrote:
->> On 10/31/2013 04:03 PM, Nishanth Menon wrote:
->>> On 10/25/2013 10:56 AM, Tero Kristo wrote:
->>> [...]
->>>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->>>> index 7e59253..63ff78c 100644
->>>> --- a/include/linux/clk-provider.h
->>>> +++ b/include/linux/clk-provider.h
->>>
->>> [...]
->>>> -static inline u32 clk_readl(u32 __iomem *reg)
->>>> +static inline u32 clk_readl(u32 __iomem *reg, struct regmap *regmap)
->>>>    {
->>>> -	return readl(reg);
->>>> +	u32 val;
->>>> +
->>>> +	if (regmap)
->>>> +		regmap_read(regmap, (u32)reg, &val);
->>>> +	else
->>>> +		val = readl(reg);
->>>> +	return val;
->>>>    }
->>>>
->>>> -static inline void clk_writel(u32 val, u32 __iomem *reg)
->>>> +static inline void clk_writel(u32 val, u32 __iomem *reg, struct regmap *regmap)
->>>>    {
->>>> -	writel(val, reg);
->>>> +	if (regmap)
->>>> +		regmap_write(regmap, (u32)reg, val);
->>>> +	else
->>>> +		writel(val, reg);
->>>>    }
->>>>
->>>>    #endif /* CONFIG_COMMON_CLK */
->>>>
->>>
->>> Might it not be better to introduce regmap variants?
->>> static inline void clk_regmap_writel(u32 val, u32 reg, struct regmap
->>> *regmap)
->>> and corresponding readl? that allows cleaner readability for clk
->>> drivers that use regmap and those that dont.
->>
->> Well, doing that will introduce a lot of redundant code, as the checks
->> for the presence of regmap must be copied all over the place. With this
->> patch, all the generic clock drivers support internally both regmap or
->> non-regmap register accesses.
->>
->
-> using function pointers might be an appropriate solution. in general a
-> low level reg access api that uses two different approaches sounds a
-> little.. umm.. fishy..
+The series includes a couple of pllv3 relock updates which should fix
+IPU clocking problem found in HDMI testing.
 
-Initial work I did for v9 had clk_reg_ops struct in place which pretty 
-much did this, however Mike recommended looking at the regmap so I did. 
-I could put the reg_ops struct back and just have it use internally 
-regmap if that would be better, but I guess we need comment from Mike 
-how he wants this to be done.
+Russell,
 
-We could have:
+I did not add BYPASS handling in .set_rate() operation in this series,
+because so far it's unclear to me if it solves any problem for us.  We
+can add it later if we confirm it does help.
 
-struct clk_reg_ops {
-	int (*clk_readl)(u32 addr, u32 *val);
-	int (*clk_writel)(u32 addr, u32 val);
-};
+Shawn
 
-struct clk_foo {
-	...
-	void __iomem *reg;
-	struct clk_reg_ops *regops;
-};
+Shawn Guo (3):
+  ARM: imx: add sleep for pllv3 relock
+  ARM: imx: pllv3 needs relock in .set_rate() call
+  ARM: imx: set up pllv3 POWER and BYPASS sequentially
 
->
->>> regmap can also return error value that could also be handled as a result.
->>
->> True, however if the regmap fails for the clock code, not sure what we
->> can do but panic. If this code is expanded, it is probably better to not
->> inline it anymore.
->>
-> let the compiler deal with that decision. regmap operation fail should
-> be percollated back to initiator of the request. in some cases that
-> will be ir-recoverable, but on other cases panic might be the right
-> answer - at the low level we are in no position to make that distinction.
+ arch/arm/mach-imx/clk-pllv3.c |   51 +++++++++++++++++++++++++++--------------
+ 1 file changed, 34 insertions(+), 17 deletions(-)
 
-Currently, none of the clock drivers handle failures for regmap 
-operations, I can of course add some sort of support for this given what 
-we do with above point and what the API for the register accesses ends 
-up like.
-
--Tero
+-- 
+1.7.9.5
