@@ -1,171 +1,121 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 1 Nov 2013 07:39:29 +0100
-Subject: [PATCHv9][ 1/6] video: imxfb: Introduce regulator support.
-In-Reply-To: <1383210928-18906-1-git-send-email-denis@eukrea.com>
-References: <1383210928-18906-1-git-send-email-denis@eukrea.com>
-Message-ID: <20131101063929.GC18477@ns203013.ovh.net>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Fri, 1 Nov 2013 00:13:37 -0700
+Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <001401ced6cb$04e2a330$0ea7e990$%jun@samsung.com>
+References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
+ <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
+ <001401ced6cb$04e2a330$0ea7e990$%jun@samsung.com>
+Message-ID: <CAMj5BkgHE6FwBv6hUi8Mth1Ox40ed2sot4p9LQBxOToN=Fu7Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:15 Thu 31 Oct     , Denis Carikli wrote:
-> This commit is based on the following commit by Fabio Estevam:
->   4344429 video: mxsfb: Introduce regulator support
-> 
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: Eric B?nard <eric@eukrea.com>
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
+Dear Seungwon
 
-next time you need to add a patch 0/3 with the description and ALL the history
-of the different change between version so we can follow
+Thanks for giving suggestion.
 
-Best Regards,
-J.
-> ChangeLog v8->v9:
-> - return an error if regulator_{enable,disable} fails in
->   imxfb_{enable,disable}_controller, and use it.
-> ---
->  drivers/video/imxfb.c |   53 ++++++++++++++++++++++++++++++++++++++-----------
->  1 file changed, 41 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index 44ee678..322b358 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -28,6 +28,7 @@
->  #include <linux/cpufreq.h>
->  #include <linux/clk.h>
->  #include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/io.h>
->  #include <linux/math64.h>
-> @@ -145,6 +146,7 @@ struct imxfb_info {
->  	struct clk		*clk_ipg;
->  	struct clk		*clk_ahb;
->  	struct clk		*clk_per;
-> +	struct regulator	*reg_lcd;
->  	enum imxfb_type		devtype;
->  	bool			enabled;
->  
-> @@ -561,14 +563,25 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
->  }
->  #endif
->  
-> -static void imxfb_enable_controller(struct imxfb_info *fbi)
-> +static int imxfb_enable_controller(struct imxfb_info *fbi)
->  {
-> +	int ret;
->  
->  	if (fbi->enabled)
-> -		return;
-> +		return 0;
->  
->  	pr_debug("Enabling LCD controller\n");
->  
-> +	if (fbi->reg_lcd) {
-> +		ret = regulator_enable(fbi->reg_lcd);
-> +		if (ret) {
-> +			dev_err(&fbi->pdev->dev,
-> +				"lcd regulator enable failed with error: %d\n",
-> +				ret);
-> +			return ret;
-> +		}
-> +	}
-> +
->  	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
->  
->  	/* panning offset 0 (0 pixel offset)        */
-> @@ -593,12 +606,16 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
->  		fbi->backlight_power(1);
->  	if (fbi->lcd_power)
->  		fbi->lcd_power(1);
-> +
-> +	return 0;
->  }
->  
-> -static void imxfb_disable_controller(struct imxfb_info *fbi)
-> +static int imxfb_disable_controller(struct imxfb_info *fbi)
->  {
-> +	int ret;
-> +
->  	if (!fbi->enabled)
-> -		return;
-> +		return 0;
->  
->  	pr_debug("Disabling LCD controller\n");
->  
-> @@ -613,6 +630,15 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
->  	fbi->enabled = false;
->  
->  	writel(0, fbi->regs + LCDC_RMCR);
-> +
-> +	if (fbi->reg_lcd) {
-> +		ret = regulator_disable(fbi->reg_lcd);
-> +		if (ret)
-> +			dev_err(&fbi->pdev->dev,
-> +				"lcd regulator disable failed with error: %d\n",
-> +				ret);
-> +			return ret;
-> +	}
->  }
->  
->  static int imxfb_blank(int blank, struct fb_info *info)
-> @@ -626,13 +652,12 @@ static int imxfb_blank(int blank, struct fb_info *info)
->  	case FB_BLANK_VSYNC_SUSPEND:
->  	case FB_BLANK_HSYNC_SUSPEND:
->  	case FB_BLANK_NORMAL:
-> -		imxfb_disable_controller(fbi);
-> -		break;
-> +		return imxfb_disable_controller(fbi);
->  
->  	case FB_BLANK_UNBLANK:
-> -		imxfb_enable_controller(fbi);
-> -		break;
-> +		return imxfb_enable_controller(fbi);
->  	}
-> +
->  	return 0;
->  }
->  
-> @@ -734,8 +759,7 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
->  
->  	pr_debug("%s\n", __func__);
->  
-> -	imxfb_disable_controller(fbi);
-> -	return 0;
-> +	return imxfb_disable_controller(fbi);
->  }
->  
->  static int imxfb_resume(struct platform_device *dev)
-> @@ -745,8 +769,7 @@ static int imxfb_resume(struct platform_device *dev)
->  
->  	pr_debug("%s\n", __func__);
->  
-> -	imxfb_enable_controller(fbi);
-> -	return 0;
-> +	return imxfb_enable_controller(fbi);
->  }
->  #else
->  #define imxfb_suspend	NULL
-> @@ -1020,6 +1043,12 @@ static int imxfb_probe(struct platform_device *pdev)
->  		goto failed_register;
->  	}
->  
-> +	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
-> +	if (IS_ERR(fbi->reg_lcd)) {
-> +		dev_info(&pdev->dev, "No lcd regulator used.\n");
-> +		fbi->reg_lcd = NULL;
-> +	}
-> +
->  	imxfb_enable_controller(fbi);
->  	fbi->pdev = pdev;
->  #ifdef PWMR_BACKLIGHT_AVAILABLE
-> -- 
-> 1.7.9.5
-> 
+On Thu, Oct 31, 2013 at 11:24 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> Hi Zhangfei,
+
+>> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>> +{
+>> +     struct dw_mci_k3_priv_data *priv = host->priv;
+>> +
+>> +     if (priv->type == DW_MCI_TYPE_HI4511)
+> There are several checking controller type.
+> But now DW_MCI_TYPE_HI4511 is just introduced alone.
+> It seems like unnecessary.
+
+Yes, currently only K3V2 is added, and k3v3 code will be added soon.
+Do you think type is more suitable to add later?
+
+>> +static int dw_mci_k3_parse_dt(struct dw_mci *host)
+>> +{
+>> +     struct dw_mci_k3_priv_data *priv = host->priv;
+>> +     struct device_node *np = host->dev->of_node;
+>> +     u32 data[3];
+>> +     int ret;
+>> +
+>> +     if (priv->type == DW_MCI_TYPE_HI4511) {
+> Didn't you see Kernel panic here?
+> host->priv is not allocated yet, it's a invalid pointer dereference.
+> dw_mci_k3_parse_dt() is called prior to dw_mci_k3_priv_init().
+> You can check dw_mci_probe() sequence.
+
+It is no problem here
+dw_mci_pltfm_register -> drv_data->init(host) -> dw_mci_probe -> dw_mci_parse_dt
+
+>
+>> +             ret = of_property_read_u32_array(np,
+>> +                             "clken-reg", data, 2);
+>> +             if (!ret) {
+>> +                     priv->clken_reg = data[0];
+>> +                     priv->clken_bit = data[1];
+>> +             }
+>> +
+>> +             ret = of_property_read_u32_array(np,
+>> +                             "drv-sel-reg", data, 3);
+>> +             if (!ret) {
+>> +                     priv->drv_reg = data[0];
+>> +                     priv->drv_off = data[1];
+>> +                     priv->drv_bits = data[2];
+>> +             }
+>> +
+>> +             ret = of_property_read_u32_array(np,
+>> +                             "sam-sel-reg", data, 3);
+>> +             if (!ret) {
+>> +                     priv->sam_reg = data[0];
+>> +                     priv->sam_off = data[1];
+>> +                     priv->sam_bits = data[2];
+>> +             }
+>> +
+>> +             ret = of_property_read_u32_array(np,
+>> +                             "div-reg", data, 3);
+>> +             if (!ret) {
+>> +                     priv->div_reg = data[0];
+>> +                     priv->div_off = data[1];
+>> +                     priv->div_bits = data[2];
+>> +             }
+> Should these register information be got from dt?
+> It could be define in source code instead.
+
+There are many register from pctrl node instead of mmc controller.
+If set in code, we may read id and then switch id, set register, start
+bit, bits number,
+which is no rules for different controller, using defiine is not helpful.
+for example:
+ switch (idx) {
+        case 0:
+                clken_reg = 0x1F8;
+                clken_bit = 0;
+                drv_sel_reg = 0x1F8;
+                drv_sel_bit = 4;
+                sam_sel_reg = 0x1F8;
+                sam_sel_bit = 8;
+                div_reg = 0x1F8;
+                div_bit = 1;
+                break;
+        case 1:
+                clken_reg = 0x1F8;
+                clken_bit = 12;
+                drv_sel_reg = 0x1F8;
+                drv_sel_bit = 16;
+                sam_sel_reg = 0x1F8;
+                sam_sel_bit = 20;
+                div_reg = 0x1F8;
+                div_bit = 13;
+                break;
+        case 2:
+                clken_reg = 0x1F8;
+                clken_bit = 24;
+                drv_sel_reg = 0x1F8;
+                drv_sel_bit = 28;
+                sam_sel_reg = 0x1FC;
+                sam_sel_bit = 0;
+                div_reg = 0x1F8;
+                div_bit = 25;
+                break;
+
+So define register offset, start bit and bits number in dts make it simplier.
+Is this acceptable?
+
+Thanks.
