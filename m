@@ -1,48 +1,162 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Fri, 1 Nov 2013 21:54:10 +0100
-Subject: [PATCH v2 7/9] phy: add Broadcom Kona USB2 PHY DT binding
-In-Reply-To: <1383335158-19730-8-git-send-email-matt.porter@linaro.org>
-References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
- <1383335158-19730-8-git-send-email-matt.porter@linaro.org>
-Message-ID: <527414F2.7090402@broadcom.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 1 Nov 2013 16:01:15 -0500
+Subject: [PATCHv9 13/43] clk: ti: add support for basic mux clock
+In-Reply-To: <1382716658-6964-14-git-send-email-t-kristo@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-14-git-send-email-t-kristo@ti.com>
+Message-ID: <5274169B.70004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2013 08:45 PM, Matt Porter wrote:
-> Add a binding that describes the Broadcom Kona USB2 PHY found
-> on the BCM281xx family of SoCs.
->
-> Signed-off-by: Matt Porter <matt.porter@linaro.org>
-> ---
->   .../devicetree/bindings/phy/bcm-kona-usb2-phy.txt         | 15 +++++++++++++++
->   1 file changed, 15 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
->
-> diff --git a/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt b/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
+On 10/25/2013 10:57 AM, Tero Kristo wrote:
+[...]
+> diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
 > new file mode 100644
-> index 0000000..db309e2
+> index 0000000..9c5259a
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
-> @@ -0,0 +1,15 @@
-> +BROADCOM KONA USB2 PHY
-> +
-> +Required properties:
-> + - compatible: brcm,kona-usb2-phy
-> + - regs: offset and length of the PHY registers
-> + - #phy-cells: must be 0
-> +Refer to phy/phy-bindings.txt for the generic PHY binding properties
-> +
-> +Example:
-> +
-> +	usbphy: usbphy at 3f130000 {
-> +		compatible = "brcm,kona-usb2-phy";
-> +		reg = <0x3f130000 0x28>;
+> +++ b/drivers/clk/ti/mux.c
+[...]
+> +/**
+> + * of_mux_clk_setup() - Setup function for simple mux rate clock
+> + */
+> +static int of_mux_clk_setup(struct device_node *node, struct regmap *regmap)
 
-I expect 'regs' iso 'reg' in this example.
+$ ./scripts/kernel-doc drivers/clk/ti/mux.c >/dev/null
+Warning(drivers/clk/ti/mux.c:29): No description found for parameter
+'node'
+Warning(drivers/clk/ti/mux.c:29): No description found for parameter
+'regmap'
 
+I suggest in the next rev we do a verification if we have kernel doc
+errors as well..
+
+> +{
+> +	struct clk *clk;
+> +	const char *clk_name = node->name;
+> +	void __iomem *reg;
+> +	int num_parents;
+> +	const char **parent_names;
+> +	int i;
+> +	u8 clk_mux_flags = 0;
+> +	u32 mask = 0;
+> +	u32 shift = 0;
+> +	u32 flags = 0;
+> +	u32 val;
+> +
+> +	num_parents = of_clk_get_parent_count(node);
+> +	if (num_parents < 1) {
+> +		pr_err("%s: mux-clock %s must have parent(s)\n",
+> +		       __func__, node->name);
+> +		return -EINVAL;
+> +	}
+> +	parent_names = kzalloc((sizeof(char *) * num_parents), GFP_KERNEL);
+> +	if (!parent_names) {
+> +		pr_err("%s: memory alloc failed\n", __func__);
+
+as discussed, could be dropped.
+
+> +		return -ENOMEM;
+> +	}
+> +
+> +	for (i = 0; i < num_parents; i++)
+> +		parent_names[i] = of_clk_get_parent_name(node, i);
+> +
+> +	of_property_read_u32(node, "reg", &val);
+
+is'nt this mandatory? error check?
+
+> +	reg = (void *)val;
+> +
+> +	if (of_property_read_u32(node, "ti,bit-shift", &shift)) {
+> +		pr_debug("%s: bit-shift property defaults to 0x%x for %s\n",
+> +			 __func__, shift, node->name);
+
+why a debug if this is optional?
+
+> +	}
+> +
+> +	if (of_property_read_bool(node, "ti,index-starts-at-one"))
+> +		clk_mux_flags |= CLK_MUX_INDEX_ONE;
+> +
+> +	if (of_property_read_bool(node, "ti,set-rate-parent"))
+> +		flags |= CLK_SET_RATE_PARENT;
+> +
+> +	/* Generate bit-mask based on parent info */
+> +	mask = num_parents;
+> +	if (!(clk_mux_flags & CLK_MUX_INDEX_ONE))
+> +		mask--;
+
+we are assuming there wont be holes in the map (like reserved mux option?)
+
+> +
+> +	mask = (1 << fls(mask)) - 1;
+> +
+> +	clk = clk_register_mux_table_regmap(NULL, clk_name, parent_names,
+> +					    num_parents, flags, reg, regmap,
+> +					    shift, mask, clk_mux_flags, NULL,
+> +					    NULL);
+> +
+> +	if (!IS_ERR(clk)) {
+> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +		return 0;
+> +	}
+> +
+
+kfree(parent_names)?
+
+> +	return PTR_ERR(clk);
+> +}
+> +CLK_OF_DECLARE(mux_clk, "ti,mux-clock", of_mux_clk_setup);
+> +
+> +static int __init of_ti_composite_mux_clk_setup(struct device_node *node,
+> +						struct regmap *regmap)
+> +{
+> +	struct clk_mux *mux;
+> +	int num_parents;
+> +	int ret;
+> +	u32 val;
+> +
+> +	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
+> +	if (!mux)
+> +		return -ENOMEM;
+> +
+> +	of_property_read_u32(node, "reg", &val);
+is'nt this mandatory? error check?
+
+> +
+> +	mux->reg = (void *)val;
+> +	mux->regmap = regmap;
+> +
+> +	if (of_property_read_u32(node, "ti,bit-shift", &val)) {
+> +		pr_debug("%s: no bit-shift for %s, default=0\n",
+> +			 __func__, node->name);
+> +		val = 0;
+> +	}
+> +	mux->shift = val;
+> +
+> +	num_parents = of_clk_get_parent_count(node);
+
+mandatory parameter without check?
+
+ti,index-starts-at-one, ti,set-rate-parent
+these seem not supported here even though the bindings dont tell us that.
+
+> +
+> +	mux->mask = num_parents - 1;
+> +	mux->mask = (1 << fls(mux->mask)) - 1;
+> +
+> +	ret = ti_clk_add_component(node, &mux->hw, CLK_COMPONENT_TYPE_MUX);
+> +	if (!ret)
+> +		return 0;
+> +
+> +	kfree(mux);
+> +	return -ret;
+> +}
+> +CLK_OF_DECLARE(ti_composite_mux_clk_setup, "ti,composite-mux-clock",
+> +	       of_ti_composite_mux_clk_setup);
+> 
+
+
+-- 
 Regards,
-Arend
-
-> +		#phy-cells = <0>;
-> +	};
->
+Nishanth Menon
