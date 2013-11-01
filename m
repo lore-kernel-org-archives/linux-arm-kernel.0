@@ -1,63 +1,68 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 01 Nov 2013 00:57:26 +0100
-Subject: [PATCH] clk: fix boot panic with non-dev-associated clocks
-In-Reply-To: <CAPtuhTgmgionMHoG0g5ntnODAwnubWBnjuuxH3RBP236Jh_jBg@mail.gmail.com>
-References: <1383238174-14650-1-git-send-email-olof@lixom.net>
- <CAOMZO5C4+K+RfHOpex7EwLObPV4Uy8YmjdVx2HPv36ZGAKeSZA@mail.gmail.com>
- <CAOesGMgU6qJMpXi5DGe7=XbObiWh8icNFRhZv_9ot+KZMNcTnw@mail.gmail.com>
- <CAOMZO5BsMuN3bZuK+06X6ukAEmRyZDpvoKXdhatNiG61x_GZsA@mail.gmail.com>
- <CAOesGMj2hVOc_NV6UfJpx7399puasY_zgpHDmPj0pd1VC_Ou6A@mail.gmail.com>
- <CAPtuhTgmgionMHoG0g5ntnODAwnubWBnjuuxH3RBP236Jh_jBg@mail.gmail.com>
-Message-ID: <5272EE66.4060701@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 1 Nov 2013 09:16:22 +0900
+Subject: [PATCH 0/3] ARM: shmobile: Lager reference serial port support
+In-Reply-To: <3965826.mx1T873Bg9@avalon>
+References: <1383060193-1505-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131031053144.GP1603@verge.net.au> <3965826.mx1T873Bg9@avalon>
+Message-ID: <20131101001621.GC6818@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 08:00 PM, Mike Turquette wrote:
-> On Thu, Oct 31, 2013 at 11:54 AM, Olof Johansson<olof@lixom.net>  wrote:
->> On Thu, Oct 31, 2013 at 11:47 AM, Fabio Estevam<festevam@gmail.com>  wrote:
->>> On Thu, Oct 31, 2013 at 3:07 PM, Olof Johansson<olof@lixom.net>  wrote:
->>>> On Thu, Oct 31, 2013 at 10:05 AM, Fabio Estevam<festevam@gmail.com>  wrote:
->>>>> Hi Olof,
->>>>>
->>>>> On Thu, Oct 31, 2013 at 2:49 PM, Olof Johansson<olof@lixom.net>  wrote:
->>>>>> Fixes a panic at boot on many platforms. For example, on imx (wandboard),
->>>>>> I get:
->>>>>
->>>>> With this patch applied console messages appears on 20131031, but it
->>>>> seems we still have other issues:
->>>>
->>>>
->>>> Yeah, there's lots of badness in last night's -next. :(
->>>
->>> If I apply this change:
->>>
->>> --- a/drivers/clk/clkdev.c
->>> +++ b/drivers/clk/clkdev.c
->>> @@ -44,7 +44,7 @@ struct clk *of_clk_get(struct device_node *np, int index)
->>>          of_clk_lock();
->>>          clk = __of_clk_get_from_provider(&clkspec);
->>>
->>> -       if (!IS_ERR(clk)&&  !__clk_get(clk))
->>> +       if (IS_ERR(clk)&&  !__clk_get(clk))
->>>                  clk = ERR_PTR(-ENOENT);
->>
->> That doesn't look right, it'll call __clk_get() with an error code as the clock.
->>
->> Mike, seems like reverting back the clock tree to a known good state
->> (same as yesterday) and re-target 3.14 for the latest changes is a
->> suitable course of action at this time in the release cycle.
->
-> I think removal of the MSM series and clock deregistration stuff is
-> prudent. The Tegra pull request (with updated fixes) and EFM32 driver
-> should be OK.
+[ CC Magnus ]
 
-I agree, I thought the clock deregistration patches is something better
-had exposure for couple weeks in -next. It's a bit late now for those
-changes unfortunately.
+On Thu, Oct 31, 2013 at 01:21:23PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Thursday 31 October 2013 14:31:44 Simon Horman wrote:
+> > On Tue, Oct 29, 2013 at 04:23:10PM +0100, Laurent Pinchart wrote:
+> > > Hello,
+> > > 
+> > > This patch set implements serial port support for the Lager reference
+> > > board, and adds early debugging support for the r8a7790 SoC.
+> > > 
+> > > The code is available in my git tree at
+> > > 
+> > >         git://linuxtv.org/pinchartl/fbdev.git clocks/ccf/serial-lager
+> > > 
+> > > The branch is based on a merge of renesas-devel-20131016, v3.12-rc7 and
+> > > multiarch drivers, clk-prepare, r8a7790 CCF and sh-sci OF patches I've
+> > > posted earlier today.
+> > > 
+> > > Laurent Pinchart (3):
+> > >   ARM: shmobile: r8a7790: Add early debugging support
+> > 
+> > The patch above could be applied now, right?
+> 
+> That's correct. It will be useless though, as DEBUG_LL can only be used on 
+> multiarch.
 
-> I'll cull out the questionable bits and force update.
+I will wait, especially in the light of the point you raise below.
 
-Thanks.
+> Given that the SCIF/SCIFA/SCIFB port operate similarly, I wonder whether it 
+> wouldn't make more sense to add a generic DEBUG_SHMOBILE_SCIF implementation 
+> instead. We could then have sub-options to select the exact SoC type and port 
+> number, and compute the base address from that.
 
-Regards,
-Sylwester
+That makes a lot of sense to me.
+Perhaps Magnus has an opinion?
+
+> > If so, Magnus, could you review it?
+> > 
+> > >   ARM: shmobile: r8a7790: Add serial ports to the device tree
+> > >   ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports in DT
+> > 
+> > I would like to ask you to repost these patches once their
+> > pre-requisites have been merged.
+> 
+> Sure, no problem.
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
