@@ -1,66 +1,75 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  1 Nov 2013 15:08:48 -0700
-Subject: [PATCH 00/11] CPU enable method based SMP/hotplug + MSM conversion
-Message-ID: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
+Date: Fri,  1 Nov 2013 15:08:59 -0700
+Subject: [PATCH 11/11] ARM: msm: Remove nr_cpus detection logic
+In-Reply-To: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
+References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1383343739-23080-12-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a rework of patches sent a few months back by Rohit[1].
-The goal of these patches is to add support for SMP and (basic)
-hotplug on MSM based SoCs. To get there, we add support for a
-generic way to add SMP/hotplug support code in the kernel. To
-show how it's used, we convert the MSM8660 SMP support code over
-to the new method. After that we add support for the rest of the
-upstream MSM SoCs (note these patches are piled high on top of
-Rohit's patches to add 8074 support to MSM[2] and my follow ups[3,4],
-but this should only matter to the MSM maintainers).
+All the SMP supported MSM devices are using devicetree and they
+have a cpus node in DT. Given this we know that arm generic code
+detects the number of cpus from the cpus node so we can drop
+support for detecting the number of CPUs from the mpidr register
+here.
 
-This is one of the last items of code that still requires us to have
-a mach directory and a machine descriptor. We should be able to move
-the hotplug/smp code out of mach directories if this approach is
-accepted.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/platsmp.c | 27 ---------------------------
+ 1 file changed, 27 deletions(-)
 
-[1] https://lkml.org/lkml/2013/8/1/770
-[2] https://lkml.org/lkml/2013/10/17/520
-[3] https://lkml.org/lkml/2013/10/18/406
-[4] http://lkml.org/lkml/2013/10/28/501
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 87e4fdc..36b2294 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -41,12 +41,6 @@ extern void secondary_startup(void);
  
-Rohit Vaswani (7):
-  devicetree: bindings: Document cpu enable-method for ARM CPUs
-  devicetree: bindings: Document Qualcomm cpus and enable-method
-  ARM: msm: Remove pen_release usage
-  ARM: msm: Re-organize platsmp to make it extensible
-  ARM: msm: Add SMP support for KPSSv1
-  ARM: msm: Add SMP support for KPSSv2
-  ARM: dts: msm: Add nodes necessary for SMP boot
-
-Stephen Boyd (4):
-  devicetree: bindings: Document qcom,kpss-acc
-  devicetree: bindings: Document qcom,saw2 node
-  ARM: Introduce CPU_METHOD_OF_DECLARE() for cpu hotplug/smp
-  ARM: msm: Remove nr_cpus detection logic
-
- Documentation/devicetree/bindings/arm/cpus.txt     |  11 +
- .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |  21 ++
- .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  23 ++
- arch/arm/boot/dts/qcom-msm8660-surf.dts            |  24 ++
- arch/arm/boot/dts/qcom-msm8960-cdp.dts             |  32 +++
- arch/arm/boot/dts/qcom-msm8974.dtsi                |  49 ++++
- arch/arm/include/asm/smp.h                         |   9 +
- arch/arm/kernel/devtree.c                          |  38 +++
- arch/arm/mach-msm/Makefile                         |   2 +-
- arch/arm/mach-msm/board-dt.c                       |  14 -
- arch/arm/mach-msm/common.h                         |   1 -
- arch/arm/mach-msm/headsmp.S                        |  39 ---
- arch/arm/mach-msm/hotplug.c                        |  31 +--
- arch/arm/mach-msm/platsmp.c                        | 301 +++++++++++++++------
- arch/arm/mach-msm/scm-boot.h                       |   8 +-
- include/asm-generic/vmlinux.lds.h                  |  10 +
- 16 files changed, 448 insertions(+), 165 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
- create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
- delete mode 100644 arch/arm/mach-msm/headsmp.S
-
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+-static inline int get_core_count(void)
+-{
+-	/* 1 + the PART[1:0] field of MIDR */
+-	return ((read_cpuid_id() >> 4) & 3) + 1;
+-}
+-
+ static void msm_secondary_init(unsigned int cpu)
+ {
+ 	/*
+@@ -268,26 +262,6 @@ static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	return 0;
+ }
+ 
+-/*
+- * Initialise the CPU possible map early - this describes the CPUs
+- * which may be present or become present in the system. The msm8x60
+- * does not support the ARM SCU, so just set the possible cpu mask to
+- * NR_CPUS.
+- */
+-static void __init msm_smp_init_cpus(void)
+-{
+-	unsigned int i, ncores = get_core_count();
+-
+-	if (ncores > nr_cpu_ids) {
+-		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
+-			ncores, nr_cpu_ids);
+-		ncores = nr_cpu_ids;
+-	}
+-
+-	for (i = 0; i < ncores; i++)
+-		set_cpu_possible(i, true);
+-}
+-
+ static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	int cpu, map;
+@@ -319,7 +293,6 @@ static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
+ }
+ 
+ struct smp_operations msm_smp_ops __initdata = {
+-	.smp_init_cpus		= msm_smp_init_cpus,
+ 	.smp_prepare_cpus	= msm_smp_prepare_cpus,
+ 	.smp_secondary_init	= msm_secondary_init,
+ 	.smp_boot_secondary	= msm_boot_secondary,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
