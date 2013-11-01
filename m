@@ -1,91 +1,48 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 1 Nov 2013 15:22:17 -0500
-Subject: [PATCHv9 12/43] CLK: TI: add support for clockdomain binding
-In-Reply-To: <1382716658-6964-13-git-send-email-t-kristo@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-13-git-send-email-t-kristo@ti.com>
-Message-ID: <52740D79.3090107@ti.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Fri, 1 Nov 2013 21:54:10 +0100
+Subject: [PATCH v2 7/9] phy: add Broadcom Kona USB2 PHY DT binding
+In-Reply-To: <1383335158-19730-8-git-send-email-matt.porter@linaro.org>
+References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
+ <1383335158-19730-8-git-send-email-matt.porter@linaro.org>
+Message-ID: <527414F2.7090402@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2013 10:57 AM, Tero Kristo wrote:
-[...]
-> diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
+On 11/01/2013 08:45 PM, Matt Porter wrote:
+> Add a binding that describes the Broadcom Kona USB2 PHY found
+> on the BCM281xx family of SoCs.
+>
+> Signed-off-by: Matt Porter <matt.porter@linaro.org>
+> ---
+>   .../devicetree/bindings/phy/bcm-kona-usb2-phy.txt         | 15 +++++++++++++++
+>   1 file changed, 15 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
+>
+> diff --git a/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt b/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
 > new file mode 100644
-> index 0000000..1b3099e
+> index 0000000..db309e2
 > --- /dev/null
-> +++ b/drivers/clk/ti/clockdomain.c
-> @@ -0,0 +1,58 @@
-> +/*
-> + * OMAP clockdomain support
-> + *
-> + * Copyright (C) 2013 Texas Instruments, Inc.
-> + *
-> + * Tero Kristo <t-kristo@ti.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+> +++ b/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
+> @@ -0,0 +1,15 @@
+> +BROADCOM KONA USB2 PHY
 > +
-> +#include <linux/clk-provider.h>
-> +#include <linux/slab.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/clk/ti.h>
+> +Required properties:
+> + - compatible: brcm,kona-usb2-phy
+> + - regs: offset and length of the PHY registers
+> + - #phy-cells: must be 0
+> +Refer to phy/phy-bindings.txt for the generic PHY binding properties
 > +
-> +static void __init of_ti_clockdomain_setup(struct device_node *node)
-> +{
-> +	struct clk *clk;
-> +	struct clk_hw *clk_hw;
-> +	const char *clkdm_name = node->name;
-> +	int i;
-> +	int num_clks;
+> +Example:
 > +
-> +	num_clks = of_count_phandle_with_args(node, "clocks", "#clock-cells");
-> +
-> +	for (i = 0; i < num_clks; i++) {
-> +		clk = of_clk_get(node, i);
-> +		if (__clk_get_flags(clk) & CLK_IS_BASIC) {
-> +			pr_warn("%s: can't setup clkdm for basic clk %s\n",
-> +				__func__, __clk_get_name(clk));
-> +			continue;
-> +		}
-> +		clk_hw = __clk_get_hw(clk);
-> +		to_clk_hw_omap(clk_hw)->clkdm_name = clkdm_name;
-> +		omap2_init_clk_clkdm(clk_hw);
+> +	usbphy: usbphy at 3f130000 {
+> +		compatible = "brcm,kona-usb2-phy";
+> +		reg = <0x3f130000 0x28>;
 
-eventually, this can disappear ofcourse.. and that will pave way to
-remove the clock domain data to dts as well.. but yes, we have to find
-a proper home for this away from current location..
+I expect 'regs' iso 'reg' in this example.
 
-> +	}
-> +}
-> +
-> +static struct of_device_id ti_clkdm_match_table[] __initdata = {
-> +	{ .compatible = "ti,clockdomain" },
-> +	{ }
-> +};
-> +
-> +void __init ti_dt_clockdomains_setup(void)
-
-since we are using of_clk_get, it will be good to provide
-documentation w.r.t when the call is expected to be invoked.
-
-> +{
-> +	struct device_node *np;
-> +	for_each_matching_node(np, ti_clkdm_match_table) {
-> +		of_ti_clockdomain_setup(np);
-> +	}
-> +}
-
-
-
--- 
 Regards,
-Nishanth Menon
+Arend
+
+> +		#phy-cells = <0>;
+> +	};
+>
