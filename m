@@ -1,54 +1,35 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Fri, 1 Nov 2013 18:56:14 -0400
-Subject: [PATCH v2 7/9] phy: add Broadcom Kona USB2 PHY DT binding
-In-Reply-To: <527414F2.7090402@broadcom.com>
-References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
- <1383335158-19730-8-git-send-email-matt.porter@linaro.org>
- <527414F2.7090402@broadcom.com>
-Message-ID: <20131101225614.GC17505@beef>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 02 Nov 2013 00:02:36 +0100
+Subject: [PATCH v2 1/4] ARM: EXYNOS: Add support for EXYNOS5410 SoC
+In-Reply-To: <527422AC.1050105@gmail.com>
+References: <1381763305-7085-1-git-send-email-v.tyrtov@samsung.com>
+ <1381763305-7085-2-git-send-email-v.tyrtov@samsung.com>
+ <527422AC.1050105@gmail.com>
+Message-ID: <2801293.Bp2raaCeuk@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 01, 2013 at 09:54:10PM +0100, Arend van Spriel wrote:
-> On 11/01/2013 08:45 PM, Matt Porter wrote:
-> >Add a binding that describes the Broadcom Kona USB2 PHY found
-> >on the BCM281xx family of SoCs.
-> >
-> >Signed-off-by: Matt Porter <matt.porter@linaro.org>
-> >---
-> >  .../devicetree/bindings/phy/bcm-kona-usb2-phy.txt         | 15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
-> >
-> >diff --git a/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt b/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
-> >new file mode 100644
-> >index 0000000..db309e2
-> >--- /dev/null
-> >+++ b/Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
-> >@@ -0,0 +1,15 @@
-> >+BROADCOM KONA USB2 PHY
-> >+
-> >+Required properties:
-> >+ - compatible: brcm,kona-usb2-phy
-> >+ - regs: offset and length of the PHY registers
-> >+ - #phy-cells: must be 0
-> >+Refer to phy/phy-bindings.txt for the generic PHY binding properties
-> >+
-> >+Example:
-> >+
-> >+	usbphy: usbphy at 3f130000 {
-> >+		compatible = "brcm,kona-usb2-phy";
-> >+		reg = <0x3f130000 0x28>;
-> 
-> I expect 'regs' iso 'reg' in this example.
+Hi Rob,
 
-Yes, will fix the typo in that property for v3.
-
-Thanks,
-Matt
-
-> >+		#phy-cells = <0>;
-> >+	};
-> >
+On Friday 01 of November 2013 16:52:44 Rob Herring wrote:
+> On 10/14/2013 10:08 AM, Vyacheslav Tyrtov wrote:
+> > From: Tarek Dakhran <t.dakhran@samsung.com>
+> > 
+> > EXYNOS5410 is SoC in Samsung's Exynos5 SoC series.
+> > Add initial support for this SoC.
 > 
+> I think this entire patch is mostly unnecessary and this information
+> should all be coming from DT. I'll leave it to arm-soc maintainers
+> whether they want to accept this addition rather than see some clean-up
+> here.
+
+The clean-up here is already in plans, but this is much more than can be 
+seen just from this patch, so it needs some time.
+
 > 
+> "samsung,exynos5410" does need to be documented though.
+
+Right.
+
+Best regards,
+Tomasz
