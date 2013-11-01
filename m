@@ -1,83 +1,171 @@
-From: B47053@freescale.com (Li Xiubo)
-Date: Fri, 1 Nov 2013 06:34:00 +0000
-Subject: [RFCv2][PATCHv5 0/4] Add Freescale FTM PWM driver.
-In-Reply-To: <1383114204-17264-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1383114204-17264-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82871744@039-SN2MPN1-013.039d.mgd.msft.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 1 Nov 2013 07:39:29 +0100
+Subject: [PATCHv9][ 1/6] video: imxfb: Introduce regulator support.
+In-Reply-To: <1383210928-18906-1-git-send-email-denis@eukrea.com>
+References: <1383210928-18906-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131101063929.GC18477@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Therry,
+On 10:15 Thu 31 Oct     , Denis Carikli wrote:
+> This commit is based on the following commit by Fabio Estevam:
+>   4344429 video: mxsfb: Introduce regulator support
+> 
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
 
-The binding patch has been acked, how about the other patches ?
+next time you need to add a patch 0/3 with the description and ALL the history
+of the different change between version so we can follow
 
-If they are all okey, should I sent a another official version again ?
-
-
-Thanks.
-
-
---
-Xiubo
-
-
-
-> Subject: [RFCv2][PATCHv5 0/4] Add Freescale FTM PWM driver.
+Best Regards,
+J.
+> ChangeLog v8->v9:
+> - return an error if regulator_{enable,disable} fails in
+>   imxfb_{enable,disable}_controller, and use it.
+> ---
+>  drivers/video/imxfb.c |   53 ++++++++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 41 insertions(+), 12 deletions(-)
 > 
-> Hello,
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index 44ee678..322b358 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/cpufreq.h>
+>  #include <linux/clk.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/io.h>
+>  #include <linux/math64.h>
+> @@ -145,6 +146,7 @@ struct imxfb_info {
+>  	struct clk		*clk_ipg;
+>  	struct clk		*clk_ahb;
+>  	struct clk		*clk_per;
+> +	struct regulator	*reg_lcd;
+>  	enum imxfb_type		devtype;
+>  	bool			enabled;
+>  
+> @@ -561,14 +563,25 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+>  }
+>  #endif
+>  
+> -static void imxfb_enable_controller(struct imxfb_info *fbi)
+> +static int imxfb_enable_controller(struct imxfb_info *fbi)
+>  {
+> +	int ret;
+>  
+>  	if (fbi->enabled)
+> -		return;
+> +		return 0;
+>  
+>  	pr_debug("Enabling LCD controller\n");
+>  
+> +	if (fbi->reg_lcd) {
+> +		ret = regulator_enable(fbi->reg_lcd);
+> +		if (ret) {
+> +			dev_err(&fbi->pdev->dev,
+> +				"lcd regulator enable failed with error: %d\n",
+> +				ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+>  	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+>  
+>  	/* panning offset 0 (0 pixel offset)        */
+> @@ -593,12 +606,16 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+>  		fbi->backlight_power(1);
+>  	if (fbi->lcd_power)
+>  		fbi->lcd_power(1);
+> +
+> +	return 0;
+>  }
+>  
+> -static void imxfb_disable_controller(struct imxfb_info *fbi)
+> +static int imxfb_disable_controller(struct imxfb_info *fbi)
+>  {
+> +	int ret;
+> +
+>  	if (!fbi->enabled)
+> -		return;
+> +		return 0;
+>  
+>  	pr_debug("Disabling LCD controller\n");
+>  
+> @@ -613,6 +630,15 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+>  	fbi->enabled = false;
+>  
+>  	writel(0, fbi->regs + LCDC_RMCR);
+> +
+> +	if (fbi->reg_lcd) {
+> +		ret = regulator_disable(fbi->reg_lcd);
+> +		if (ret)
+> +			dev_err(&fbi->pdev->dev,
+> +				"lcd regulator disable failed with error: %d\n",
+> +				ret);
+> +			return ret;
+> +	}
+>  }
+>  
+>  static int imxfb_blank(int blank, struct fb_info *info)
+> @@ -626,13 +652,12 @@ static int imxfb_blank(int blank, struct fb_info *info)
+>  	case FB_BLANK_VSYNC_SUSPEND:
+>  	case FB_BLANK_HSYNC_SUSPEND:
+>  	case FB_BLANK_NORMAL:
+> -		imxfb_disable_controller(fbi);
+> -		break;
+> +		return imxfb_disable_controller(fbi);
+>  
+>  	case FB_BLANK_UNBLANK:
+> -		imxfb_enable_controller(fbi);
+> -		break;
+> +		return imxfb_enable_controller(fbi);
+>  	}
+> +
+>  	return 0;
+>  }
+>  
+> @@ -734,8 +759,7 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+>  
+>  	pr_debug("%s\n", __func__);
+>  
+> -	imxfb_disable_controller(fbi);
+> -	return 0;
+> +	return imxfb_disable_controller(fbi);
+>  }
+>  
+>  static int imxfb_resume(struct platform_device *dev)
+> @@ -745,8 +769,7 @@ static int imxfb_resume(struct platform_device *dev)
+>  
+>  	pr_debug("%s\n", __func__);
+>  
+> -	imxfb_enable_controller(fbi);
+> -	return 0;
+> +	return imxfb_enable_controller(fbi);
+>  }
+>  #else
+>  #define imxfb_suspend	NULL
+> @@ -1020,6 +1043,12 @@ static int imxfb_probe(struct platform_device *pdev)
+>  		goto failed_register;
+>  	}
+>  
+> +	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
+> +	if (IS_ERR(fbi->reg_lcd)) {
+> +		dev_info(&pdev->dev, "No lcd regulator used.\n");
+> +		fbi->reg_lcd = NULL;
+> +	}
+> +
+>  	imxfb_enable_controller(fbi);
+>  	fbi->pdev = pdev;
+>  #ifdef PWMR_BACKLIGHT_AVAILABLE
+> -- 
+> 1.7.9.5
 > 
-> This patch series is the Freescale FTM PWM implementation. And there are
-> 8 channels most supported by the FTM PWM. This implementation is only
-> compatible with device tree definition.
-> 
-> This patch series is based on linux-next and has been tested on Vybrid
-> VF610 Tower board using device tree.
-> 
-> 
-> 
-> Changes in RFCv2 of PATVHv5:
-> - Remove "fsl,pwm-counter-clk"(all the four patches are modified).
-> 
-> Changes in v5:
-> - Remove active/idle pinctrl stuff.
-> 
-> Changes in v4:
-> - Check for the result and return an error for devm_kzalloc().
-> - Move pinmux setting from the SoC file to the board specific file.
-> - Revise the written mistake of 'ret |= FTMSC_CLKEXT;' --> 'reg |=
-> FTMSC_CLKEXT;'.
-> 
-> 
-> Changes in v3:
-> - Remove "availabe" field.
-> - Remove "fsl,pwm-avaliable-chs" property.
-> - ...
-> 
-> Changes in v2:
-> - Remove PWM CPWM/EPWM feature and sysfs.
-> - Remove some redundant code.
-> - Revise some code for more readable.
-> - Remove "fsl,pwm-clk-ps", "fsl,pwm-number", "fsl,pwm-channels",etc.
-> - Add "fsl,pwm-avaliable-chs", "fsl,pwm-counter-clk", etc.
-> - Support 8 channels default in dtsi file.
-> - Add counter clock source selection.
-> - Rename some function name, macro name, etc.
-> - Use PWM's and OF's existing function interfaces.
-> - Split clk_unprepare_enable to clk_unprepare and clk_enable,etc.
-> - ...
-> 
-> Added in v1:
-> - Add Freescale FTM PWM driver support.
-> - Add Freescale FTM PWM node for VF610.
-> - Enable Enables FTM PWM device for Vybrid VF610 TOWER.
-> - Add device tree bindings for Freescale.
-> 
-> 
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
