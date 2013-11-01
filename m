@@ -1,67 +1,175 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Fri, 01 Nov 2013 21:37:45 +0900
-Subject: [PATCH v10 00/20] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <20131101114224.GG17455@8bytes.org>
-References: <20131007105212.1c2a9e29166ff4b4a33468f8@samsung.com>
- <20131101114224.GG17455@8bytes.org>
-Message-ID: <20131101213745.68172e8d47182cc64a591775@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 1 Nov 2013 13:49:58 +0100
+Subject: [RESEND PATCH 1/4] i2c: i2c-bcm-kona: Introduce Broadcom I2C
+ Driver
+In-Reply-To: <1381960909-1735-2-git-send-email-tim.kryger@linaro.org>
+References: <1381960909-1735-1-git-send-email-tim.kryger@linaro.org>
+ <1381960909-1735-2-git-send-email-tim.kryger@linaro.org>
+Message-ID: <20131101124958.GB6734@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 01 Nov 2013 12:42:24 +0100, Joerg Roedel wrote:
-> On Mon, Oct 07, 2013 at 10:52:12AM +0900, Cho KyongHo wrote:
-> > Patch summary:
-> > [PATCH 01/20] iommu/exynos: do not include removed header
-> > [PATCH 02/20] iommu/exynos: add missing cache flush for removed page table entries
-> > [PATCH 03/20] iommu/exynos: change error handling when page table update is failed
-> > [PATCH 04/20] iommu/exynos: fix L2TLB invalidation
-> > [PATCH 05/20] iommu/exynos: allocate lv2 page table from own slab
-> > [PATCH 06/20] iommu/exynos: always enable runtime PM
-> > [PATCH 07/20] iommu/exynos: always use a single clock descriptor
-> > [PATCH 08/20] iommu/exynos: remove dbgname from drvdata of a System MMU
-> > [PATCH 09/20] iommu/exynos: use managed device helper functions
-> > [PATCH 10/20] clk: exynos: add gate clock descriptions of System MMU
-> > [PATCH 11/20] ARM: dts: Add description of System MMU of Exynos SoCs
-> > [PATCH 12/20] iommu/exynos: support for device tree
-> > [PATCH 13/20] iommu/exynos: gating clocks of master H/W
-> > [PATCH 14/20] iommu/exynos: remove custom fault handler
-> > [PATCH 15/20] iommu/exynos: remove calls to Runtime PM API functions
-> > [PATCH 16/20] iommu/exynos: turn on useful configuration options
-> > [PATCH 17/20] iommu/exynos: add support for power management subsystems.
-> > [PATCH 18/20] iommu/exynos: change rwlock to spinlock
-> > [PATCH 19/20] iommu/exynos: return 0 if iommu_attach_device() successes
-> > [PATCH 20/20] iommu/exynos: add devices attached to the System MMU to an IOMMU group
-> > 
-> > Diffstats:
-> >  .../devicetree/bindings/clock/exynos5250-clock.txt |   28 +
-> >  .../devicetree/bindings/clock/exynos5420-clock.txt |    3 +
-> >  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |   76 ++
-> >  arch/arm/boot/dts/exynos4.dtsi                     |  105 ++
-> >  arch/arm/boot/dts/exynos4210.dtsi                  |   21 +
-> >  arch/arm/boot/dts/exynos4x12.dtsi                  |   82 ++
-> >  arch/arm/boot/dts/exynos5250.dtsi                  |  262 +++++
-> >  arch/arm/boot/dts/exynos5420.dtsi                  |  296 ++++++
-> >  drivers/clk/samsung/clk-exynos5250.c               |   49 +-
-> >  drivers/clk/samsung/clk-exynos5420.c               |   12 +-
-> >  drivers/iommu/Kconfig                              |    5 +-
-> >  drivers/iommu/exynos-iommu.c                       | 1033 +++++++++++++-------
-> >  12 files changed, 1585 insertions(+), 387 deletions(-)
+On Wed, Oct 16, 2013 at 03:01:46PM -0700, Tim Kryger wrote:
+> Introduce support for Broadcom Serial Controller (BSC) I2C bus found
+> in the Kona family of Mobile SoCs.  FIFO hardware is utilized but only
+> standard mode (100kHz), fast mode (400kHz), and fast mode plus (1MHz)
+> bus speeds are supported.
 > 
-> What is the state of this series? It would be good to have some
-> Acked-bys and/or Reviewed-bys on it.
-> 
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 
-I am preparing next patches to apply Alex Williamson's comment that
-description of IOMMU's masters must be aligned with ARM SMMU.
+Looks mostly good, some remarks:
 
-It is delayed due to my jobs in the office.
+> +struct bcm_kona_i2c_dev {
+> +	/* Pointer to linux device struct */
+> +	struct device *device;
+> +
+> +	/* Virtual address where registers are mapped */
+> +	void __iomem *base;
+> +
+> +	/* Interrupt */
+> +	int irq;
+> +
+> +	/* Standard Speed configuration */
+> +	const struct bus_speed_cfg *std_cfg;
+> +
+> +	/* Linux I2C adapter struct */
+> +	struct i2c_adapter adapter;
+> +
+> +	/* Lock for the I2C device */
+> +	struct mutex i2c_bcm_lock;
+> +
+> +	/* Completion to signal an operation finished */
+> +	struct completion done;
+> +
+> +	/* Handle for external clock */
+> +	struct clk *external_clk;
+> +};
 
-I will post the next patche series in two weeks.
+IMO most of the comments could go. Kind of stating the obvious :)
 
-Thanks.
 
-> 
-> 	Joerg
-> 
-> 
+> +/* Read any amount of data using the RX FIFO from the i2c bus */
+> +static int bcm_kona_i2c_read_fifo(struct bcm_kona_i2c_dev *dev,
+> +				  struct i2c_msg *msg)
+> +{
+> +	unsigned int bytes_to_read = MAX_RX_FIFO_SIZE;
+> +	unsigned int last_byte_nak = 0;
+> +	unsigned int bytes_read = 0;
+> +	unsigned int rc;
+
+Should be signed.
+
+> +/* Write any amount of data using TX FIFO to the i2c bus */
+> +static int bcm_kona_i2c_write_fifo(struct bcm_kona_i2c_dev *dev,
+> +				   struct i2c_msg *msg)
+> +{
+> +	unsigned int bytes_to_write = MAX_TX_FIFO_SIZE;
+> +	unsigned int bytes_written = 0;
+> +	unsigned int rc;
+
+Ditto signed.
+
+> +/* Master transfer function */
+> +static int bcm_kona_i2c_xfer(struct i2c_adapter *adapter,
+> +			     struct i2c_msg msgs[], int num)
+> +{
+> +	struct bcm_kona_i2c_dev *dev = i2c_get_adapdata(adapter);
+> +	struct i2c_msg *pmsg;
+> +	int rc = 0;
+> +	int i;
+> +
+> +	mutex_lock(&dev->i2c_bcm_lock);
+
+Huh? Why do you need that? The core has locks per bus.
+
+> +static int bcm_kona_i2c_assign_bus_speed(struct bcm_kona_i2c_dev *dev)
+> +{
+> +	unsigned int bus_speed;
+> +	int ret = of_property_read_u32(dev->device->of_node, "clock-frequency",
+> +				       &bus_speed);
+> +	if (ret < 0) {
+> +		dev_err(dev->device, "missing clock-frequency property\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	switch (bus_speed) {
+> +	case 100000:
+> +		dev->std_cfg = &std_cfg_table[BCM_SPD_100K];
+> +		break;
+> +	case 400000:
+> +		dev->std_cfg = &std_cfg_table[BCM_SPD_400K];
+> +		break;
+> +	case 1000000:
+> +		dev->std_cfg = &std_cfg_table[BCM_SPD_1MHZ];
+> +		break;
+> +	default:
+> +		pr_err("%d hz bus speed not supported\n", bus_speed);
+> +		return -EINVAL;
+> +	};
+
+Unneeded semicolon.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int bcm_kona_i2c_probe(struct platform_device *pdev)
+> +{
+> +	int rc = 0;
+> +	struct bcm_kona_i2c_dev *dev;
+> +	struct i2c_adapter *adap;
+> +	struct resource *iomem;
+> +
+> +	/* Allocate memory for private data structure */
+> +	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
+> +	if (!dev) {
+> +		rc = -ENOMEM;
+> +		goto probe_return;
+
+I'd prefer simply return -Esomething. The printout at probe_return is
+also available via driver core.
+
+...
+
+> +	/* Add the i2c adapter */
+> +	adap = &dev->adapter;
+> +	i2c_set_adapdata(adap, dev);
+> +	adap->owner = THIS_MODULE;
+> +	adap->class = UINT_MAX;	/* can be used by any I2C device */
+
+Why do you need class based instantiation. It will most likely cost
+boot-time and you have devicetree means for doing instantiation.
+
+
+> +	strlcpy(adap->name, "Broadcom I2C adapter", sizeof(adap->name));
+> +	adap->algo = &bcm_algo;
+> +	adap->dev.parent = &pdev->dev;
+> +	adap->nr = pdev->id;
+> +	adap->dev.of_node = pdev->dev.of_node;
+> +
+> +	rc = i2c_add_numbered_adapter(adap);
+
+Maybe you want simply i2c_add_adapter here since the core has no
+built-in support for of aliases?
+
+> +
+> +MODULE_AUTHOR("Broadcom");
+
+Some email address please.
+
+> +MODULE_DESCRIPTION("Broadcom Kona I2C Driver");
+> +MODULE_LICENSE("GPL v2");
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131101/3fae3248/attachment.sig>
