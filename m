@@ -1,54 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 1 Nov 2013 20:04:19 -0500
-Subject: [PATCH 02/11] devicetree: bindings: Document Qualcomm cpus and
- enable-method
-In-Reply-To: <1383343739-23080-3-git-send-email-sboyd@codeaurora.org>
-References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
- <1383343739-23080-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAL_JsqLObXEWJJ=SuifTjpPz9qTW0n43fyQNA-vjLNeLy-7-XA@mail.gmail.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Sat, 02 Nov 2013 09:16:40 +1030
+Subject: [PULL] symbol fix for ARM kallsyms
+Message-ID: <87txfvagfj.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 1, 2013 at 5:08 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> From: Rohit Vaswani <rvaswani@codeaurora.org>
->
-> Scorpion and Krait are Qualcomm cpus. These cpus don't use the
-> spin-table enable-method. Instead they rely on mmio register
-> accesses to enable power and clocks to bring CPUs out of reset.
->
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> [sboyd: Split off into separate patch, renamed method to
-> qcom,mmio]
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->
-> This slightly conflicts with my krait EDAC series.
->
->  Documentation/devicetree/bindings/arm/cpus.txt | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 37258f9..e2969fa2 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -44,6 +44,8 @@ For the ARM architecture every CPU node must contain the following properties:
->                 "marvell,mohawk"
->                 "marvell,xsc3"
->                 "marvell,xscale"
-> +               "qcom,scorpion"
-> +               "qcom,krait"
->
->  And the following optional properties:
->
-> @@ -52,6 +54,7 @@ And the following optional properties:
->                  different types of cpus.
->                  This should be one of:
->                  "spin-table"
-> +                "qcom,mmio"
+The following changes since commit 12aee278b50c4a94a93fa0b4d201ae35d792c696:
 
-Not exactly specific. How would you handle variations in the enable
-method? The mmio method to enable is tied to the core type or SOC
-type?
+  Merge branch 'akpm' (fixes from Andrew Morton) (2013-10-30 14:27:10 -0700)
 
-Rob
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/rusty/linux.git tags/fixes-for-linus
+
+for you to fetch changes up to f6537f2f0eba4eba3354e48dbe3047db6d8b6254:
+
+  scripts/kallsyms: filter symbols not in kernel address space (2013-11-02 09:13:02 +1030)
+
+----------------------------------------------------------------
+Last minute perf unbreakage for ARM modules; spent a day in linux-next.
+
+----------------------------------------------------------------
+Ming Lei (1):
+      scripts/kallsyms: filter symbols not in kernel address space
+
+ scripts/kallsyms.c      | 12 +++++++++++-
+ scripts/link-vmlinux.sh |  2 ++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
