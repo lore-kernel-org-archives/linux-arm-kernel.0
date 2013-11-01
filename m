@@ -1,52 +1,57 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  1 Nov 2013 15:08:57 -0700
-Subject: [PATCH 09/11] ARM: msm: Add SMP support for KPSSv2
+Date: Fri,  1 Nov 2013 15:08:56 -0700
+Subject: [PATCH 08/11] ARM: msm: Add SMP support for KPSSv1
 In-Reply-To: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
 References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1383343739-23080-10-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1383343739-23080-9-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rohit Vaswani <rvaswani@codeaurora.org>
 
 Implement support for the Krait CPU release sequence when the
-CPUs are part of the second version of the Krait processor
+CPUs are part of the first version of the krait processor
 subsystem.
 
 Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/platsmp.c | 86 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 86 insertions(+)
+ arch/arm/mach-msm/platsmp.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/scm-boot.h |  8 ++++---
+ 2 files changed, 61 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index e187c6e..87e4fdc 100644
+index 369d8f7..e187c6e 100644
 --- a/arch/arm/mach-msm/platsmp.c
 +++ b/arch/arm/mach-msm/platsmp.c
-@@ -32,8 +32,10 @@
+@@ -17,6 +17,7 @@
+ #include <linux/of_address.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+@@ -30,6 +31,10 @@
+ #define SCSS_CPU1CORE_RESET		0x2d80
  #define SCSS_DBG_STATUS_CORE_PWRDUP	0x2e64
  
- #define APCS_CPU_PWR_CTL	0x04
-+#define APC_PWR_GATE_CTL	0x14
- 
- #define APCS_SAW2_VCTL		0x14
-+#define L2_SAW2_VCTL		0x1c
- 
++#define APCS_CPU_PWR_CTL	0x04
++
++#define APCS_SAW2_VCTL		0x14
++
  extern void secondary_startup(void);
  
-@@ -119,6 +121,89 @@ static int kpssv1_release_secondary(struct device_node *node, unsigned int cpu)
+ static DEFINE_SPINLOCK(boot_lock);
+@@ -66,6 +71,54 @@ static int scss_release_secondary(struct device_node *node, unsigned int cpu)
  	return 0;
  }
  
-+static int kpssv2_release_secondary(struct device_node *node, unsigned int cpu)
++static int kpssv1_release_secondary(struct device_node *node, unsigned int cpu)
 +{
 +	u32 off;
 +	struct resource res;
 +	void __iomem *reg;
-+	struct device_node *l2_node;
-+	void __iomem *l2_saw_base;
-+	unsigned reg_val;
-+	int err;
 +
 +	if (of_property_read_u32(node, "cpu-offset", &off))
 +		return -EINVAL;
@@ -54,83 +59,80 @@ index e187c6e..87e4fdc 100644
 +	if (of_address_to_resource(node, 0, &res))
 +		return -EINVAL;
 +
-+	l2_node = of_find_compatible_node(NULL, NULL, "qcom,l2-saw2");
-+	if (!l2_node)
-+		return -ENODEV;
++	/* The SAW base is always next to the ACC base so just map both */
++	reg = ioremap(res.start + off + (SZ_64K * cpu),
++			resource_size(&res) + SZ_4K);
++	if (!reg)
++		return -ENOMEM;
 +
-+	reg = ioremap(res.start + off + (SZ_64K * cpu), resource_size(&res));
-+	if (!reg) {
-+		err = -ENOMEM;
-+		goto err_map;
-+	}
-+
-+	l2_saw_base = of_iomap(l2_node, 0);
-+	if (!l2_saw_base) {
-+		err = -ENOMEM;
-+		goto err_l2_map;
-+	}
-+
-+	/* Turn on the BHS, turn off LDO Bypass and power down LDO */
-+	reg_val =  0x403f0001;
-+	writel_relaxed(reg_val, reg + APC_PWR_GATE_CTL);
-+
-+	/* complete the above write before the delay */
++	/* Turn on CPU rail */
++	writel_relaxed(0xA4, reg + SZ_4K + APCS_SAW2_VCTL);
 +	mb();
-+	/* wait for the bhs to settle */
-+	udelay(1);
++	udelay(512);
 +
-+	/* Turn on BHS segments */
-+	reg_val |= 0x3f << 1;
-+	writel_relaxed(reg_val, reg + APC_PWR_GATE_CTL);
-+
-+	/* complete the above write before the delay */
++	/* Krait bring-up sequence */
++	writel_relaxed(0x109, reg + APCS_CPU_PWR_CTL);
++	writel_relaxed(0x101, reg + APCS_CPU_PWR_CTL);
 +	mb();
-+	 /* wait for the bhs to settle */
-+	udelay(1);
++	ndelay(300);
 +
-+	/* Finally turn on the bypass so that BHS supplies power */
-+	reg_val |= 0x3f << 8;
-+	writel_relaxed(reg_val, reg + APC_PWR_GATE_CTL);
-+
-+	/* enable max phases */
-+	writel_relaxed(0x10003, l2_saw_base + L2_SAW2_VCTL);
-+	mb();
-+	udelay(50);
-+
-+	iounmap(l2_saw_base);
-+
-+	writel_relaxed(0x021, reg + APCS_CPU_PWR_CTL);
++	writel_relaxed(0x121, reg + APCS_CPU_PWR_CTL);
 +	mb();
 +	udelay(2);
 +
-+	writel_relaxed(0x020, reg + APCS_CPU_PWR_CTL);
++	writel_relaxed(0x120, reg + APCS_CPU_PWR_CTL);
 +	mb();
 +	udelay(2);
 +
-+	writel_relaxed(0x000, reg + APCS_CPU_PWR_CTL);
++	writel_relaxed(0x100, reg + APCS_CPU_PWR_CTL);
++	mb();
++	udelay(100);
++
++	writel_relaxed(0x180, reg + APCS_CPU_PWR_CTL);
 +	mb();
 +
-+	writel_relaxed(0x080, reg + APCS_CPU_PWR_CTL);
-+	mb();
-+
-+	err = 0;
-+err_l2_map:
 +	iounmap(reg);
-+err_map:
-+	of_node_put(l2_node);
-+	return err;
++	return 0;
 +}
 +
  static DEFINE_PER_CPU(int, cold_boot_done);
  
  static int boot_cold_cpu(unsigned int cpu)
-@@ -131,6 +216,7 @@ static int boot_cold_cpu(unsigned int cpu)
+@@ -77,6 +130,7 @@ static int boot_cold_cpu(unsigned int cpu)
+ #define M(c, f) { .compatible = c, .data = f }
  	static const struct of_device_id match_table[] = {
  		M("qcom,gcc-8660", scss_release_secondary),
- 		M("qcom,kpss-acc-v1", kpssv1_release_secondary),
-+		M("qcom,kpss-acc-v2", kpssv2_release_secondary),
++		M("qcom,kpss-acc-v1", kpssv1_release_secondary),
  	};
  #undef M
+ 
+@@ -155,6 +209,8 @@ static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
+ 	static const int cold_boot_flags[] = {
+ 		0,
+ 		SCM_FLAG_COLDBOOT_CPU1,
++		SCM_FLAG_COLDBOOT_CPU2,
++		SCM_FLAG_COLDBOOT_CPU3,
+ 	};
+ 
+ 	for_each_present_cpu(cpu) {
+diff --git a/arch/arm/mach-msm/scm-boot.h b/arch/arm/mach-msm/scm-boot.h
+index 7be32ff..6aabb24 100644
+--- a/arch/arm/mach-msm/scm-boot.h
++++ b/arch/arm/mach-msm/scm-boot.h
+@@ -13,9 +13,11 @@
+ #define __MACH_SCM_BOOT_H
+ 
+ #define SCM_BOOT_ADDR			0x1
+-#define SCM_FLAG_COLDBOOT_CPU1		0x1
+-#define SCM_FLAG_WARMBOOT_CPU1		0x2
+-#define SCM_FLAG_WARMBOOT_CPU0		0x4
++#define SCM_FLAG_COLDBOOT_CPU1		0x01
++#define SCM_FLAG_COLDBOOT_CPU2		0x08
++#define SCM_FLAG_COLDBOOT_CPU3		0x20
++#define SCM_FLAG_WARMBOOT_CPU0		0x04
++#define SCM_FLAG_WARMBOOT_CPU1		0x02
+ 
+ int scm_set_boot_addr(phys_addr_t addr, int flags);
  
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
