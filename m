@@ -1,129 +1,67 @@
 From: matt.porter@linaro.org (Matt Porter)
-Date: Fri,  1 Nov 2013 15:45:54 -0400
-Subject: [PATCH v2 5/9] usb: gadget: s3c-hsotg: enable generic phy support
-In-Reply-To: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
-References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
-Message-ID: <1383335158-19730-6-git-send-email-matt.porter@linaro.org>
+Date: Fri,  1 Nov 2013 15:45:49 -0400
+Subject: [PATCH v2 0/9] USB Device Controller support for BCM281xx
+Message-ID: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for the generic PHY subsystem. Generic PHY
-support is probed and then the driver falls back to checking
-for an old style USB PHY and pdata if not found.
+Changes since v1:
+	- Convert USB phy driver to generic phy subsystem
+	- Add phy bus width apis
+	- Drop dwc2 phy bus width DT property in favor of querying the
+	  phy provider for bus width
+	- Add generic phy/clock properties to dwc2 DT binding
+	- Add generic phy subsystem support to s3c-hsotg with the
+	  existing usb phy and pdata phy methods as a fallback
+	- Split bindings out to separate patches to match the latest
+	  DT binding review guidelines
 
-Signed-off-by: Matt Porter <matt.porter@linaro.org>
----
- drivers/usb/gadget/s3c-hsotg.c | 54 ++++++++++++++++++++++++++++--------------
- 1 file changed, 36 insertions(+), 18 deletions(-)
+This series adds USB Device Controller support for the Broadcom
+BCM281xx family of parts. BCM281xx contains a DWC2 OTG block and
+s3c-hsotg is used to support UDC operation.
 
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index 3e0c124..f97978b 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -34,6 +34,7 @@
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/phy.h>
-+#include <linux/phy/phy.h>
- #include <linux/platform_data/s3c-hsotg.h>
- 
- #include "s3c-hsotg.h"
-@@ -131,7 +132,8 @@ struct s3c_hsotg_ep {
-  * struct s3c_hsotg - driver state.
-  * @dev: The parent device supplied to the probe function
-  * @driver: USB gadget driver
-- * @phy: The otg phy transceiver structure for phy control.
-+ * @phy: The otg phy transceiver structure for old USB phy control.
-+ * @gphy: The otg phy transceiver structure for generic phy control.
-  * @plat: The platform specific configuration data. This can be removed once
-  * all SoCs support usb transceiver.
-  * @regs: The memory area mapped for accessing registers.
-@@ -154,6 +156,7 @@ struct s3c_hsotg {
- 	struct device		 *dev;
- 	struct usb_gadget_driver *driver;
- 	struct usb_phy		*phy;
-+	struct phy		*gphy;
- 	struct s3c_hsotg_plat	 *plat;
- 
- 	spinlock_t              lock;
-@@ -2820,9 +2823,12 @@ static void s3c_hsotg_phy_enable(struct s3c_hsotg *hsotg)
- 
- 	dev_dbg(hsotg->dev, "pdev 0x%p\n", pdev);
- 
--	if (hsotg->phy)
-+	if (hsotg->gphy) {
-+		phy_init(hsotg->gphy);
-+		phy_power_on(hsotg->gphy);
-+	} else if (hsotg->phy) {
- 		usb_phy_init(hsotg->phy);
--	else if (hsotg->plat->phy_init)
-+	} else if (hsotg->plat->phy_init)
- 		hsotg->plat->phy_init(pdev, hsotg->plat->phy_type);
- }
- 
-@@ -2837,9 +2843,12 @@ static void s3c_hsotg_phy_disable(struct s3c_hsotg *hsotg)
- {
- 	struct platform_device *pdev = to_platform_device(hsotg->dev);
- 
--	if (hsotg->phy)
-+	if (hsotg->gphy) {
-+		phy_power_off(hsotg->gphy);
-+		phy_exit(hsotg->gphy);
-+	} else if (hsotg->phy) {
- 		usb_phy_shutdown(hsotg->phy);
--	else if (hsotg->plat->phy_exit)
-+	} else if (hsotg->plat->phy_exit)
- 		hsotg->plat->phy_exit(pdev, hsotg->plat->phy_type);
- }
- 
-@@ -3446,6 +3455,7 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
- {
- 	struct s3c_hsotg_plat *plat = dev_get_platdata(&pdev->dev);
- 	struct usb_phy *phy;
-+	struct phy *gphy;
- 	struct device *dev = &pdev->dev;
- 	struct s3c_hsotg_ep *eps;
- 	struct s3c_hsotg *hsotg;
-@@ -3460,19 +3470,27 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
--	if (IS_ERR(phy)) {
--		/* Fallback for pdata */
--		plat = dev_get_platdata(&pdev->dev);
--		if (!plat) {
--			dev_err(&pdev->dev, "no platform data or transceiver defined\n");
--			return -EPROBE_DEFER;
--		} else {
--			hsotg->plat = plat;
--		}
--	} else {
--		hsotg->phy = phy;
--	}
-+	/*
-+	 * Attempt to find a generic PHY, then look for an old style
-+	 *  USB PHY, finally fall back to pdata
-+	 */
-+	gphy = devm_phy_get(dev, "usb2-phy");
-+	if (IS_ERR(gphy)) {
-+		phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-+		if (IS_ERR(phy)) {
-+			/* Fallback for pdata */
-+			plat = dev_get_platdata(&pdev->dev);
-+			if (!plat) {
-+				dev_err(&pdev->dev,
-+					"no platform data or transceiver defined\n");
-+				return -EPROBE_DEFER;
-+			} else {
-+				hsotg->plat = plat;
-+			}
-+		} else
-+			hsotg->phy = phy;
-+	} else
-+		hsotg->gphy = gphy;
- 
- 	hsotg->dev = dev;
- 
+Part 1 adds phy bus width support to the generic phy subsystem
+
+Parts 2-6 allows s3c-hsotg to build on non-Samsung platforms, supports
+the dwc2 binding, and enables generic phy support to support fetching
+of the phy bus width.
+
+Part 7-8 add a generic phy binding and driver for the BCM Kona USB PHY.
+
+Part 9 adds the DT nodes to enable UDC support on both BCM281xx boards
+in the kernel.
+
+This series depends on the "Update Kona drivers to use clocks" series
+(https://lkml.org/lkml/2013/10/3/645). The dependencies noted for that
+series are already queued for 3.13. It also depends on the generic PHY
+subsystem which has also been queued for 3.13.
+
+Matt Porter (9):
+  phy: add phy_get_bus_width()/phy_set_bus_width() calls
+  staging: dwc2: update DT binding to add generic clock/phy properties
+  usb: gadget: s3c-hsotg: enable build for other platforms
+  usb: gadget: s3c-hsotg: add snps,dwc2 compatible string
+  usb: gadget: s3c-hsotg: enable generic phy support
+  usb: gadget: s3c-hsotg: get phy bus width from phy subsystem
+  phy: add Broadcom Kona USB2 PHY DT binding
+  phy: add Broadcom Kona USB2 PHY driver
+  ARM: dts: add usb udc support to bcm281xx
+
+ .../devicetree/bindings/phy/bcm-kona-usb2-phy.txt  |  15 ++
+ Documentation/devicetree/bindings/staging/dwc2.txt |  12 ++
+ arch/arm/boot/dts/bcm11351-brt.dts                 |   6 +
+ arch/arm/boot/dts/bcm11351.dtsi                    |  18 +++
+ arch/arm/boot/dts/bcm28155-ap.dts                  |   8 +
+ drivers/phy/Kconfig                                |   6 +
+ drivers/phy/Makefile                               |   2 +
+ drivers/phy/phy-bcm-kona-usb2.c                    | 161 +++++++++++++++++++++
+ drivers/usb/gadget/Kconfig                         |   7 +-
+ drivers/usb/gadget/s3c-hsotg.c                     |  71 ++++++---
+ drivers/usb/gadget/s3c-hsotg.h                     |   1 +
+ include/linux/phy/phy.h                            |  16 ++
+ 12 files changed, 298 insertions(+), 25 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/bcm-kona-usb2-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-kona-usb2.c
+
 -- 
 1.8.4
