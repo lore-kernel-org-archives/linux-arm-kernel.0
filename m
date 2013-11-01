@@ -1,9 +1,10 @@
 From: b42378@freescale.com (Nicolin Chen)
-Date: Fri, 1 Nov 2013 19:36:00 +0800
-Subject: [PATCH 2/8] ARM: davinci: use gen_pool_dma_alloc() to sram.c
+Date: Fri, 1 Nov 2013 19:36:01 +0800
+Subject: [PATCH 3/8] dma: mmp_tdma: use gen_pool_dma_alloc() to allocate
+ descriptor
 In-Reply-To: <cover.1383303752.git.b42378@freescale.com>
 References: <cover.1383303752.git.b42378@freescale.com>
-Message-ID: <9536ee2bbb1a8463ebb21068a750b61fa59900df.1383303752.git.b42378@freescale.com>
+Message-ID: <b7d5dce9fcc118a60261824196c820de6fb434a2.1383303752.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,35 +12,26 @@ Since gen_pool_dma_alloc() is introduced, we implement it to simplify code.
 
 Signed-off-by: Nicolin Chen <b42378@freescale.com>
 ---
- arch/arm/mach-davinci/sram.c | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ drivers/dma/mmp_tdma.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
-index f18928b..8540ddd 100644
---- a/arch/arm/mach-davinci/sram.c
-+++ b/arch/arm/mach-davinci/sram.c
-@@ -25,7 +25,6 @@ struct gen_pool *sram_get_gen_pool(void)
- 
- void *sram_alloc(size_t len, dma_addr_t *dma)
- {
--	unsigned long vaddr;
- 	dma_addr_t dma_base = davinci_soc_info.sram_dma;
- 
- 	if (dma)
-@@ -33,13 +32,7 @@ void *sram_alloc(size_t len, dma_addr_t *dma)
- 	if (!sram_pool || (dma && !dma_base))
+diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
+index 2b4026d..3ddacc1 100644
+--- a/drivers/dma/mmp_tdma.c
++++ b/drivers/dma/mmp_tdma.c
+@@ -378,12 +378,7 @@ struct mmp_tdma_desc *mmp_tdma_alloc_descriptor(struct mmp_tdma_chan *tdmac)
+ 	if (!gpool)
  		return NULL;
  
--	vaddr = gen_pool_alloc(sram_pool, len);
--	if (!vaddr)
+-	tdmac->desc_arr = (void *)gen_pool_alloc(gpool, size);
+-	if (!tdmac->desc_arr)
 -		return NULL;
 -
--	if (dma)
--		*dma = gen_pool_virt_to_phys(sram_pool, vaddr);
--	return (void *)vaddr;
-+	return gen_pool_dma_alloc(sram_pool, len, dma);
+-	tdmac->desc_arr_phys = gen_pool_virt_to_phys(gpool,
+-			(unsigned long)tdmac->desc_arr);
++	tdmac->desc_arr = gen_pool_dma_alloc(gpool, size, &tdmac->desc_arr_phys);
  
+ 	return tdmac->desc_arr;
  }
- EXPORT_SYMBOL(sram_alloc);
 -- 
 1.8.4
