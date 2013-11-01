@@ -1,27 +1,83 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 1 Nov 2013 15:29:06 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7791: add Ether clock
-In-Reply-To: <5272D0B6.3090604@cogentembedded.com>
-References: <201310310216.28673.sergei.shtylyov@cogentembedded.com>
- <201310310218.37578.sergei.shtylyov@cogentembedded.com>
- <20131031060649.GW1603@verge.net.au>
- <5272D0B6.3090604@cogentembedded.com>
-Message-ID: <20131101062906.GB22183@verge.net.au>
+From: B47053@freescale.com (Li Xiubo)
+Date: Fri, 1 Nov 2013 06:34:00 +0000
+Subject: [RFCv2][PATCHv5 0/4] Add Freescale FTM PWM driver.
+In-Reply-To: <1383114204-17264-1-git-send-email-Li.Xiubo@freescale.com>
+References: <1383114204-17264-1-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82871744@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 01, 2013 at 12:50:46AM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 10/31/2013 09:06 AM, Simon Horman wrote:
-> 
-> >>Add support for R8A7791 Ether clock.
-> 
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >Thanks, I have queued this up.
-> 
->    Perhaps you were too quick, taking into account Magnus' mail
-> about the device name...
+Hi Therry,
 
-Yes I was. I will drop this patch.
+The binding patch has been acked, how about the other patches ?
+
+If they are all okey, should I sent a another official version again ?
+
+
+Thanks.
+
+
+--
+Xiubo
+
+
+
+> Subject: [RFCv2][PATCHv5 0/4] Add Freescale FTM PWM driver.
+> 
+> Hello,
+> 
+> This patch series is the Freescale FTM PWM implementation. And there are
+> 8 channels most supported by the FTM PWM. This implementation is only
+> compatible with device tree definition.
+> 
+> This patch series is based on linux-next and has been tested on Vybrid
+> VF610 Tower board using device tree.
+> 
+> 
+> 
+> Changes in RFCv2 of PATVHv5:
+> - Remove "fsl,pwm-counter-clk"(all the four patches are modified).
+> 
+> Changes in v5:
+> - Remove active/idle pinctrl stuff.
+> 
+> Changes in v4:
+> - Check for the result and return an error for devm_kzalloc().
+> - Move pinmux setting from the SoC file to the board specific file.
+> - Revise the written mistake of 'ret |= FTMSC_CLKEXT;' --> 'reg |=
+> FTMSC_CLKEXT;'.
+> 
+> 
+> Changes in v3:
+> - Remove "availabe" field.
+> - Remove "fsl,pwm-avaliable-chs" property.
+> - ...
+> 
+> Changes in v2:
+> - Remove PWM CPWM/EPWM feature and sysfs.
+> - Remove some redundant code.
+> - Revise some code for more readable.
+> - Remove "fsl,pwm-clk-ps", "fsl,pwm-number", "fsl,pwm-channels",etc.
+> - Add "fsl,pwm-avaliable-chs", "fsl,pwm-counter-clk", etc.
+> - Support 8 channels default in dtsi file.
+> - Add counter clock source selection.
+> - Rename some function name, macro name, etc.
+> - Use PWM's and OF's existing function interfaces.
+> - Split clk_unprepare_enable to clk_unprepare and clk_enable,etc.
+> - ...
+> 
+> Added in v1:
+> - Add Freescale FTM PWM driver support.
+> - Add Freescale FTM PWM node for VF610.
+> - Enable Enables FTM PWM device for Vybrid VF610 TOWER.
+> - Add device tree bindings for Freescale.
+> 
+> 
+> 
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
