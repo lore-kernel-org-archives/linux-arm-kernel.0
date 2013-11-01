@@ -1,38 +1,28 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 1 Nov 2013 14:08:35 +0100
-Subject: [RESEND PATCH 2/4] i2c: i2c-bcm-kona: Add support for high-speed
- mode
-In-Reply-To: <1381960909-1735-3-git-send-email-tim.kryger@linaro.org>
-References: <1381960909-1735-1-git-send-email-tim.kryger@linaro.org>
- <1381960909-1735-3-git-send-email-tim.kryger@linaro.org>
-Message-ID: <20131101130835.GC6734@katana>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 1 Nov 2013 14:10:47 +0100
+Subject: [PATCH v10 00/20] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <20131101213745.68172e8d47182cc64a591775@samsung.com>
+References: <20131007105212.1c2a9e29166ff4b4a33468f8@samsung.com>
+ <20131101114224.GG17455@8bytes.org>
+ <20131101213745.68172e8d47182cc64a591775@samsung.com>
+Message-ID: <20131101131044.GB3348@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 16, 2013 at 03:01:47PM -0700, Tim Kryger wrote:
-> Add support for I2C high-speed mode (3.4 MHz).
+Hi Cho,
+
+On Fri, Nov 01, 2013 at 09:37:45PM +0900, Cho KyongHo wrote:
+> I am preparing next patches to apply Alex Williamson's comment that
+> description of IOMMU's masters must be aligned with ARM SMMU.
 > 
-> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-> Reviewed-by: Matt Porter <matt.porter@linaro.org>
-> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+> It is delayed due to my jobs in the office.
+> 
+> I will post the next patche series in two weeks.
 
-Mostly good as well:
-
-> +enum hs_bus_speed_index {
-> +	BCM_SPD_3P4MHZ = 0,
-> +};
-
-I just realized that you should update both patches to add the supported
-bus speeds to the binding documentation.
+Thanks for the update. If the merge window is open by then please wait
+with the re-send until the merge window closes.
 
 Thanks,
 
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131101/4fa35ef6/attachment.sig>
+	Joerg
