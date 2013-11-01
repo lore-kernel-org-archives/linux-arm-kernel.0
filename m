@@ -1,43 +1,38 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 01 Nov 2013 14:16:37 +0100
-Subject: [PATCH v3 4/4] mvebu: Dove: Add clocks and DFS interrupt to cpu
- node in DT.
-In-Reply-To: <20131101090737.GB26890@lunn.ch>
-References: <1383247111-26834-1-git-send-email-andrew@lunn.ch>
- <CAKohpokTWfBnhWj+bdA9zx-+hyXUdp4ir5BYkZNLe08mcwVwLg@mail.gmail.com>
- <20131101090737.GB26890@lunn.ch>
-Message-ID: <1436787.LWqDTIBNS8@vostro.rjw.lan>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 1 Nov 2013 14:08:35 +0100
+Subject: [RESEND PATCH 2/4] i2c: i2c-bcm-kona: Add support for high-speed
+ mode
+In-Reply-To: <1381960909-1735-3-git-send-email-tim.kryger@linaro.org>
+References: <1381960909-1735-1-git-send-email-tim.kryger@linaro.org>
+ <1381960909-1735-3-git-send-email-tim.kryger@linaro.org>
+Message-ID: <20131101130835.GC6734@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 01, 2013 10:07:37 AM Andrew Lunn wrote:
-> On Fri, Nov 01, 2013 at 05:21:03AM +0530, Viresh Kumar wrote:
-> > On 1 November 2013 03:56, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > > On Thursday, October 31, 2013 08:18:31 PM Andrew Lunn wrote:
-> > >> The dove-cpufreq driver needs access to the DDR and CPU clock.  There
-> > >> is also an interrupt generated when the DFS hardware completes a
-> > >> change of frequencey. Add these to the cpu node in DT.
-> > >>
-> > >> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > >> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > >
-> > > I need someone with DT bindings knowledge to ACK this for me.
-> > 
-> > I can do that
+On Wed, Oct 16, 2013 at 03:01:47PM -0700, Tim Kryger wrote:
+> Add support for I2C high-speed mode (3.4 MHz).
 > 
-> Thanks.
-> 
-> , but this set has to be rebased over all the latest developments
-> > in cpufreq core before getting posted again..
-> 
-> I will wait for -rc1 and rebase.
+> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 
-Actually, it is possible that 3.12-rc8 will be released this weekend.  If that
-happens, please rebase your patchset on top of the current linux-next and
-resubmit it next week.
+Mostly good as well:
 
-Thanks!
+> +enum hs_bus_speed_index {
+> +	BCM_SPD_3P4MHZ = 0,
+> +};
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+I just realized that you should update both patches to add the supported
+bus speeds to the binding documentation.
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131101/4fa35ef6/attachment.sig>
