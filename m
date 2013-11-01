@@ -1,10 +1,10 @@
 From: b42378@freescale.com (Nicolin Chen)
-Date: Fri, 1 Nov 2013 19:48:20 +0800
-Subject: [PATCH][RESEND 7/8] ASoC: davinci: use gen_pool_dma_alloc() in
- davinci-pcm.c
+Date: Fri, 1 Nov 2013 19:48:21 +0800
+Subject: [PATCH][RESEND 8/8] ASoC: pxa: use gen_pool_dma_alloc() to allocate
+ dma buffer
 In-Reply-To: <cover.1383306365.git.b42378@freescale.com>
 References: <cover.1383306365.git.b42378@freescale.com>
-Message-ID: <8bd26b17552315f0a3ea63c166a97a938c88dcf0.1383306365.git.b42378@freescale.com>
+Message-ID: <290c4ed99f88c1d07544bf5f8f0c9a1d09395bed.1383306365.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,24 +12,24 @@ Since gen_pool_dma_alloc() is introduced, we implement it to simplify code.
 
 Signed-off-by: Nicolin Chen <b42378@freescale.com>
 ---
- sound/soc/davinci/davinci-pcm.c | 3 +--
+ sound/soc/pxa/mmp-pcm.c | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/sound/soc/davinci/davinci-pcm.c b/sound/soc/davinci/davinci-pcm.c
-index 84a63c6..fa64cd8 100644
---- a/sound/soc/davinci/davinci-pcm.c
-+++ b/sound/soc/davinci/davinci-pcm.c
-@@ -267,10 +267,9 @@ static int allocate_sram(struct snd_pcm_substream *substream,
- 		return 0;
+diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
+index 8235e23..7929e19 100644
+--- a/sound/soc/pxa/mmp-pcm.c
++++ b/sound/soc/pxa/mmp-pcm.c
+@@ -201,10 +201,9 @@ static int mmp_pcm_preallocate_dma_buffer(struct snd_pcm_substream *substream,
+ 	if (!gpool)
+ 		return -ENOMEM;
  
- 	ppcm->period_bytes_max = size;
--	iram_virt = (void *)gen_pool_alloc(sram_pool, size);
-+	iram_virt = gen_pool_dma_alloc(sram_pool, size, &iram_phys);
- 	if (!iram_virt)
- 		goto exit1;
--	iram_phys = gen_pool_virt_to_phys(sram_pool, (unsigned)iram_virt);
- 	iram_dma = kzalloc(sizeof(*iram_dma), GFP_KERNEL);
- 	if (!iram_dma)
- 		goto exit2;
+-	buf->area = (unsigned char *)gen_pool_alloc(gpool, size);
++	buf->area = gen_pool_dma_alloc(gpool, size, &buf->addr);
+ 	if (!buf->area)
+ 		return -ENOMEM;
+-	buf->addr = gen_pool_virt_to_phys(gpool, (unsigned long)buf->area);
+ 	buf->bytes = size;
+ 	return 0;
+ }
 -- 
 1.8.4
