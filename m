@@ -1,31 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 1 Nov 2013 13:56:55 +0800
-Subject: [PATCH] ARM: imx: remove .map_io from imx6sl machine descriptor
-Message-ID: <1383285415-3504-1-git-send-email-shawn.guo@linaro.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 1 Nov 2013 15:38:33 +1100
+Subject: [PATCH] scripts/kallsyms: filter symbols not in kernel address
+ space
+In-Reply-To: <87d2mkc0gk.fsf@rustcorp.com.au>
+References: <1382975339-25831-1-git-send-email-tom.leiming@gmail.com>
+ <20131031154311.e65d16d79ba540ced736413b@linux-foundation.org>
+ <CACVXFVMJmQJd0cFaZcmZZvFpUQUmTPJRj87QBVr0kbgZxjq8dw@mail.gmail.com>
+ <87d2mkc0gk.fsf@rustcorp.com.au>
+Message-ID: <20131101153833.bbf03337eaf943052dae662b@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since bc37324 (ARM: mmu: Call debug_ll_io_init if no map_io function is
-specified), the .map_io hook can be saved if calling debug_ll_io_init()
-is the only thing to be done in there.  So the .map_io hook imx6sl
-machine descriptor can just be dropped.
+Hi Rusty,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/mach-imx6sl.c |    1 -
- 1 file changed, 1 deletion(-)
+On Fri, 01 Nov 2013 13:06:27 +1030 Rusty Russell <rusty@rustcorp.com.au> wrote:
+>
+> Stephen, please run this on todays' linux-next, so I can push to Linus
+> asap.  Thanks...
 
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index 2f952e3..2c6f63a 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -67,7 +67,6 @@ static const char *imx6sl_dt_compat[] __initdata = {
- };
- 
- DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite (Device Tree)")
--	.map_io		= debug_ll_io_init,
- 	.init_irq	= imx6sl_init_irq,
- 	.init_machine	= imx6sl_init_machine,
- 	.dt_compat	= imx6sl_dt_compat,
+OK, I will apply this near the end of linux-next today.
+
 -- 
-1.7.9.5
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131101/47f0e676/attachment.sig>
