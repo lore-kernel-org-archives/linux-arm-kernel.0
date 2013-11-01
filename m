@@ -1,145 +1,55 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Fri, 1 Nov 2013 12:31:26 -0700
-Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
-In-Reply-To: <001b01ced6db$4c31d840$e49588c0$%jun@samsung.com>
-References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
- <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
- <001401ced6cb$04e2a330$0ea7e990$%jun@samsung.com>
- <CAMj5BkgHE6FwBv6hUi8Mth1Ox40ed2sot4p9LQBxOToN=Fu7Qg@mail.gmail.com>
- <001b01ced6db$4c31d840$e49588c0$%jun@samsung.com>
-Message-ID: <CAMj5BkhoBPxZOHPF5QJs6XqXd-m9hj1Ru=n9AztB3VTEM=W7+Q@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 1 Nov 2013 14:35:31 -0500
+Subject: [PATCHv9 09/43] CLK: ti: add support for ti divider-clock
+In-Reply-To: <52737A73.5010700@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-10-git-send-email-t-kristo@ti.com> <52729B50.5060503@ti.com>
+ <527378FF.6020905@ti.com> <52737A73.5010700@ti.com>
+Message-ID: <52740283.8040201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 1, 2013 at 1:21 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> On Fri, November 01, 2013, zhangfei gao wrote:
->> Dear Seungwon
->>
->> Thanks for giving suggestion.
->>
->> On Thu, Oct 31, 2013 at 11:24 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
->> > Hi Zhangfei,
->>
->> >> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->> >> +{
->> >> +     struct dw_mci_k3_priv_data *priv = host->priv;
->> >> +
->> >> +     if (priv->type == DW_MCI_TYPE_HI4511)
->> > There are several checking controller type.
->> > But now DW_MCI_TYPE_HI4511 is just introduced alone.
->> > It seems like unnecessary.
->>
->> Yes, currently only K3V2 is added, and k3v3 code will be added soon.
->> Do you think type is more suitable to add later?
-> Yes, it would be better.
-OK, got it.
+On 11/01/2013 04:54 AM, Tero Kristo wrote:
+> On 11/01/2013 11:48 AM, Tero Kristo wrote:
+>> On 10/31/2013 08:02 PM, Nishanth Menon wrote:
+>>> On 10/25/2013 10:57 AM, Tero Kristo wrote:
 
->
->>
->> >> +static int dw_mci_k3_parse_dt(struct dw_mci *host)
->> >> +{
->> >> +     struct dw_mci_k3_priv_data *priv = host->priv;
->> >> +     struct device_node *np = host->dev->of_node;
->> >> +     u32 data[3];
->> >> +     int ret;
->> >> +
->> >> +     if (priv->type == DW_MCI_TYPE_HI4511) {
->> > Didn't you see Kernel panic here?
->> > host->priv is not allocated yet, it's a invalid pointer dereference.
->> > dw_mci_k3_parse_dt() is called prior to dw_mci_k3_priv_init().
->> > You can check dw_mci_probe() sequence.
->>
->> It is no problem here
->> dw_mci_pltfm_register -> drv_data->init(host) -> dw_mci_probe -> dw_mci_parse_dt
-> I guess your base is not latest.
-> Can you check cjb's tree?
+[...]
+>>>> diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
+>>>> new file mode 100644
+>>>> index 0000000..787bc8f
+>>>> --- /dev/null
+>>>> +++ b/drivers/clk/ti/divider.c
 
-Yes, thanks for the info.
-It is changed in 3.12-rc2
-While what we use is 3.12-rc1, will rebase.
-
->
+[...]
+>>>> +    if (!IS_ERR(clk)) {
+>>>> +        of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>>>> +        ret = of_ti_autoidle_setup(node, regmap);
+>>>
+>>> if this fails, table will be freed though, we have added provider and
+>>> registerd table_regmap, no?
 >>
->> >
->> >> +             ret = of_property_read_u32_array(np,
->> >> +                             "clken-reg", data, 2);
->> >> +             if (!ret) {
->> >> +                     priv->clken_reg = data[0];
->> >> +                     priv->clken_bit = data[1];
->> >> +             }
->> >> +
->> >> +             ret = of_property_read_u32_array(np,
->> >> +                             "drv-sel-reg", data, 3);
->> >> +             if (!ret) {
->> >> +                     priv->drv_reg = data[0];
->> >> +                     priv->drv_off = data[1];
->> >> +                     priv->drv_bits = data[2];
->> >> +             }
->> >> +
->> >> +             ret = of_property_read_u32_array(np,
->> >> +                             "sam-sel-reg", data, 3);
->> >> +             if (!ret) {
->> >> +                     priv->sam_reg = data[0];
->> >> +                     priv->sam_off = data[1];
->> >> +                     priv->sam_bits = data[2];
->> >> +             }
->> >> +
->> >> +             ret = of_property_read_u32_array(np,
->> >> +                             "div-reg", data, 3);
->> >> +             if (!ret) {
->> >> +                     priv->div_reg = data[0];
->> >> +                     priv->div_off = data[1];
->> >> +                     priv->div_bits = data[2];
->> >> +             }
->> > Should these register information be got from dt?
->> > It could be define in source code instead.
->>
->> There are many register from pctrl node instead of mmc controller.
->> If set in code, we may read id and then switch id, set register, start
->> bit, bits number,
->> which is no rules for different controller, using defiine is not helpful.
->> for example:
->>  switch (idx) {
->>         case 0:
->>                 clken_reg = 0x1F8;
->>                 clken_bit = 0;
->>                 drv_sel_reg = 0x1F8;
->>                 drv_sel_bit = 4;
->>                 sam_sel_reg = 0x1F8;
->>                 sam_sel_bit = 8;
->>                 div_reg = 0x1F8;
->>                 div_bit = 1;
->>                 break;
->>         case 1:
->>                 clken_reg = 0x1F8;
->>                 clken_bit = 12;
->>                 drv_sel_reg = 0x1F8;
->>                 drv_sel_bit = 16;
->>                 sam_sel_reg = 0x1F8;
->>                 sam_sel_bit = 20;
->>                 div_reg = 0x1F8;
->>                 div_bit = 13;
->>                 break;
->>         case 2:
->>                 clken_reg = 0x1F8;
->>                 clken_bit = 24;
->>                 drv_sel_reg = 0x1F8;
->>                 drv_sel_bit = 28;
->>                 sam_sel_reg = 0x1FC;
->>                 sam_sel_bit = 0;
->>                 div_reg = 0x1F8;
->>                 div_bit = 25;
->>                 break;
->>
->> So define register offset, start bit and bits number in dts make it simplier.
->> Is this acceptable?
-> It's up to you. I think there will be better ways.
-> For example, some table for variable register can be used for each controller type.
-> Additionally, if you intend to use dt, error handling is needed.
-> dw_mci_k3_parse_dt always returns success although of_property_read_u32_array is failed.
+>> Provider and regmap are shared for the whole IP block (CM/PRM whatever.)
+>> Those are only initialized once.
+> 
+> Some minor confusion here in my comment, sorry about that.
+> 
+> Regmap is shared for the whole IP block and initialized only once, we 
+> can't remove it here as it is not owned by this clock. For 
+> clock-provider / unregister part, I don't want to clean those up as 1) 
+> unregister doesn't currently do anything 2) autoidle setup is not 
+> critical failure, it just breaks PM. I can add error print for it though.
 
-The reason is they are optional property.
-SD would fail if not setting the property, while emmc does not matter.
-So set for optional, dw_mci_k3_set_timing will check whether they exists.
+Would IP blocks driven by clocks work with the autoidle configuration
+broken? I believe we will be writing to DPLL_XYZ_GATE_CTRL? the usage
+I believe is around
+of_ti_clk_deny_autoidle_all/of_ti_clk_allow_autoidle_all which gets
+invoked in omap2_clk_disable_autoidle_all part of xyz SoC init call.
+is'nt the reason we do that to ensure we have no potential race when
+clocks dissapear on their own without explicit control in critical
+configuration paths?
 
-Thanks
+
+-- 
+Regards,
+Nishanth Menon
