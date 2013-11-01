@@ -1,148 +1,67 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 1 Nov 2013 20:31:07 +0800
-Subject: [PATCH 5/5] mmc: sdhci-esdhc-imx: add runtime pm support
-In-Reply-To: <CAPDyKFoRkdbmj3kkbaEhTsoRtHCZyYO+D-AOObhSFMZ9Zusb4Q@mail.gmail.com>
-References: <1383142338-25062-1-git-send-email-b29396@freescale.com>
- <1383142338-25062-6-git-send-email-b29396@freescale.com>
- <CAPDyKFoRkdbmj3kkbaEhTsoRtHCZyYO+D-AOObhSFMZ9Zusb4Q@mail.gmail.com>
-Message-ID: <20131101123106.GA18102@b29396-Latitude-E6410>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 01 Nov 2013 21:37:45 +0900
+Subject: [PATCH v10 00/20] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <20131101114224.GG17455@8bytes.org>
+References: <20131007105212.1c2a9e29166ff4b4a33468f8@samsung.com>
+ <20131101114224.GG17455@8bytes.org>
+Message-ID: <20131101213745.68172e8d47182cc64a591775@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 11:49:19PM +0100, Ulf Hansson wrote:
-> On 30 October 2013 15:12, Dong Aisheng <b29396@freescale.com> wrote:
-> > The root clock will be disabled in runtime pm which can be used to save power.
-> >
-> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> > ---
-> >  drivers/mmc/host/sdhci-esdhc-imx.c |   53 ++++++++++++++++++++++++++++++++++-
-> >  1 files changed, 51 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > index da8026b..60201fd 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > @@ -27,6 +27,7 @@
-> >  #include <linux/of_gpio.h>
-> >  #include <linux/pinctrl/consumer.h>
-> >  #include <linux/platform_data/mmc-esdhc-imx.h>
-> > +#include <linux/pm_runtime.h>
-> >  #include "sdhci-pltfm.h"
-> >  #include "sdhci-esdhc.h"
-> >
-> > @@ -1117,9 +1118,17 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
-> >                 host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
-> >         }
-> >
+On Fri, 01 Nov 2013 12:42:24 +0100, Joerg Roedel wrote:
+> On Mon, Oct 07, 2013 at 10:52:12AM +0900, Cho KyongHo wrote:
+> > Patch summary:
+> > [PATCH 01/20] iommu/exynos: do not include removed header
+> > [PATCH 02/20] iommu/exynos: add missing cache flush for removed page table entries
+> > [PATCH 03/20] iommu/exynos: change error handling when page table update is failed
+> > [PATCH 04/20] iommu/exynos: fix L2TLB invalidation
+> > [PATCH 05/20] iommu/exynos: allocate lv2 page table from own slab
+> > [PATCH 06/20] iommu/exynos: always enable runtime PM
+> > [PATCH 07/20] iommu/exynos: always use a single clock descriptor
+> > [PATCH 08/20] iommu/exynos: remove dbgname from drvdata of a System MMU
+> > [PATCH 09/20] iommu/exynos: use managed device helper functions
+> > [PATCH 10/20] clk: exynos: add gate clock descriptions of System MMU
+> > [PATCH 11/20] ARM: dts: Add description of System MMU of Exynos SoCs
+> > [PATCH 12/20] iommu/exynos: support for device tree
+> > [PATCH 13/20] iommu/exynos: gating clocks of master H/W
+> > [PATCH 14/20] iommu/exynos: remove custom fault handler
+> > [PATCH 15/20] iommu/exynos: remove calls to Runtime PM API functions
+> > [PATCH 16/20] iommu/exynos: turn on useful configuration options
+> > [PATCH 17/20] iommu/exynos: add support for power management subsystems.
+> > [PATCH 18/20] iommu/exynos: change rwlock to spinlock
+> > [PATCH 19/20] iommu/exynos: return 0 if iommu_attach_device() successes
+> > [PATCH 20/20] iommu/exynos: add devices attached to the System MMU to an IOMMU group
+> > 
+> > Diffstats:
+> >  .../devicetree/bindings/clock/exynos5250-clock.txt |   28 +
+> >  .../devicetree/bindings/clock/exynos5420-clock.txt |    3 +
+> >  .../bindings/iommu/samsung,exynos4210-sysmmu.txt   |   76 ++
+> >  arch/arm/boot/dts/exynos4.dtsi                     |  105 ++
+> >  arch/arm/boot/dts/exynos4210.dtsi                  |   21 +
+> >  arch/arm/boot/dts/exynos4x12.dtsi                  |   82 ++
+> >  arch/arm/boot/dts/exynos5250.dtsi                  |  262 +++++
+> >  arch/arm/boot/dts/exynos5420.dtsi                  |  296 ++++++
+> >  drivers/clk/samsung/clk-exynos5250.c               |   49 +-
+> >  drivers/clk/samsung/clk-exynos5420.c               |   12 +-
+> >  drivers/iommu/Kconfig                              |    5 +-
+> >  drivers/iommu/exynos-iommu.c                       | 1033 +++++++++++++-------
+> >  12 files changed, 1585 insertions(+), 387 deletions(-)
 > 
-> Add:
-> pm_runtime_set_active
-> 
-
-Right.
-Thanks for reminder.
-
-BTW, it seems with adding pm_runtime_set_active, i need
-put pm_runtime_* related functions right behind sdhci_add_host
-since i observed that pm_runtime_set_autosuspend_delay would trigger a suspend
-automatically if the device initial state is ACTIVE and during this time,
-the host structure is still not initialized which will lead to a crash
-when access it in sdhci_runtime_suspend_host.
-
-> > +       pm_runtime_enable(&pdev->dev);
-> > +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-> > +       pm_runtime_use_autosuspend(&pdev->dev);
-> > +       pm_suspend_ignore_children(&pdev->dev, 1);
-> > +
-> >         err = sdhci_add_host(host);
-> > -       if (err)
-> > +       if (err) {
-> > +               pm_runtime_forbid(&pdev->dev);
-> > +               pm_runtime_get_noresume(&pdev->dev);
-> >                 goto disable_clk;
-> > +       }
-> >
-> >         return 0;
-> >
-> > @@ -1141,6 +1150,9 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
-> >
-> >         sdhci_remove_host(host, dead);
-> >
-> > +       pm_runtime_dont_use_autosuspend(&pdev->dev);
-> > +       pm_runtime_disable(&pdev->dev);
-> > +
-> >         clk_disable_unprepare(imx_data->clk_per);
-> >         clk_disable_unprepare(imx_data->clk_ipg);
-> >         clk_disable_unprepare(imx_data->clk_ahb);
-> > @@ -1150,12 +1162,49 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
-> >         return 0;
-> >  }
-> >
-> > +#ifdef CONFIG_PM_RUNTIME
-> > +static int sdhci_esdhc_runtime_suspend(struct device *dev)
-> > +{
-> > +       struct sdhci_host *host = dev_get_drvdata(dev);
-> > +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> > +       struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> > +       int ret;
-> > +
-> > +       ret = sdhci_runtime_suspend_host(host);
-> > +
-> > +       clk_disable_unprepare(imx_data->clk_per);
-> > +       clk_disable_unprepare(imx_data->clk_ipg);
-> > +       clk_disable_unprepare(imx_data->clk_ahb);
-> > +
-> > +       return ret;
-> > +}
-> > +
-> > +static int sdhci_esdhc_runtime_resume(struct device *dev)
-> > +{
-> > +       struct sdhci_host *host = dev_get_drvdata(dev);
-> > +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> > +       struct pltfm_imx_data *imx_data = pltfm_host->priv;
-> > +
-> > +       clk_prepare_enable(imx_data->clk_per);
-> > +       clk_prepare_enable(imx_data->clk_ipg);
-> > +       clk_prepare_enable(imx_data->clk_ahb);
-> > +
-> > +       return sdhci_runtime_resume_host(host);
-> > +}
-> > +#endif
-> > +
-> > +static const struct dev_pm_ops sdhci_esdhc_pmops = {
-> > +       SET_SYSTEM_SLEEP_PM_OPS(sdhci_pltfm_suspend, sdhci_pltfm_resume)
-> > +       SET_RUNTIME_PM_OPS(sdhci_esdhc_runtime_suspend,
-> > +                               sdhci_esdhc_runtime_resume, NULL)
-> > +};
-> > +
-> >  static struct platform_driver sdhci_esdhc_imx_driver = {
-> >         .driver         = {
-> >                 .name   = "sdhci-esdhc-imx",
-> >                 .owner  = THIS_MODULE,
-> >                 .of_match_table = imx_esdhc_dt_ids,
-> > -               .pm     = SDHCI_PLTFM_PMOPS,
-> > +               .pm     = &sdhci_esdhc_pmops,
-> >         },
-> >         .id_table       = imx_esdhc_devtype,
-> >         .probe          = sdhci_esdhc_imx_probe,
-> > --
-> > 1.7.2.rc3
-> 
-> Apart from the minor issue in the probe function, looks good to me.
-> 
-> Kind regards
-> Ulf Hansson
+> What is the state of this series? It would be good to have some
+> Acked-bys and/or Reviewed-bys on it.
 > 
 
-Thanks for the review.
-Will update it in v2.
+I am preparing next patches to apply Alex Williamson's comment that
+description of IOMMU's masters must be aligned with ARM SMMU.
 
-Regards
-Dong Aisheng
-> >
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+It is delayed due to my jobs in the office.
+
+I will post the next patche series in two weeks.
+
+Thanks.
+
+> 
+> 	Joerg
+> 
 > 
