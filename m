@@ -1,76 +1,145 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 1 Nov 2013 14:24:08 -0500
-Subject: [PATCHv9 08/43] clk: ti: add composite clock support
-In-Reply-To: <527375FB.2000905@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-9-git-send-email-t-kristo@ti.com> <527284DC.2070701@ti.com>
- <527375FB.2000905@ti.com>
-Message-ID: <5273FFD8.1030003@ti.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Fri, 1 Nov 2013 12:31:26 -0700
+Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <001b01ced6db$4c31d840$e49588c0$%jun@samsung.com>
+References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
+ <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
+ <001401ced6cb$04e2a330$0ea7e990$%jun@samsung.com>
+ <CAMj5BkgHE6FwBv6hUi8Mth1Ox40ed2sot4p9LQBxOToN=Fu7Qg@mail.gmail.com>
+ <001b01ced6db$4c31d840$e49588c0$%jun@samsung.com>
+Message-ID: <CAMj5BkhoBPxZOHPF5QJs6XqXd-m9hj1Ru=n9AztB3VTEM=W7+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2013 04:35 AM, Tero Kristo wrote:
-> On 10/31/2013 06:27 PM, Nishanth Menon wrote:
->> On 10/25/2013 10:57 AM, Tero Kristo wrote:
-
-[..]
->>> diff --git a/drivers/clk/ti/composite.c b/drivers/clk/ti/composite.c
->>> new file mode 100644
->>> index 0000000..9ce7e54
->>> --- /dev/null
->>> +++ b/drivers/clk/ti/composite.c
-[...]
+On Fri, Nov 1, 2013 at 1:21 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> On Fri, November 01, 2013, zhangfei gao wrote:
+>> Dear Seungwon
 >>
->>> +	}
->>> +
->>> +	clk = clk_register_composite(NULL, name, parent_names, num_parents,
->>> +				     _get_hw(clks[CLK_COMPONENT_TYPE_MUX]),
->>> +				     &clk_mux_ops,
->>> +				     _get_hw(clks[CLK_COMPONENT_TYPE_DIVIDER]),
->>> +				     &ti_composite_divider_ops,
->>> +				     _get_hw(clks[CLK_COMPONENT_TYPE_GATE]),
->>> +				     &ti_composite_gate_ops, 0);
->>> +
->>> +	if (!IS_ERR(clk)) {
->>> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
->>> +		goto cleanup;
->>> +	}
->>> +
->>> +	ret = PTR_ERR(clk);
->>> +cleanup:
->>> +	/* Free component clock list entries */
->>> +	for (i = 0; i < 3; i++) {
->>> +		if (!clks[i])
->>> +			continue;
->>> +		list_del(&clks[i]->link);
->>> +		kfree(clks[i]);
->>> +	}
+>> Thanks for giving suggestion.
 >>
->> could you not just do a kfree(clks[i]) and set the component_clks to NULL?
+>> On Thu, Oct 31, 2013 at 11:24 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+>> > Hi Zhangfei,
 >>
->> Further, if there are only 3 clocks that can ever be present and we do
->> not allow for duplicates types, could we not do those checks in
->> ti_clk_add_component instead of having a harder recovery in setup of
->> composite clk?
-> 
-> The list is shared between all composite clocks, as we don't have 
-> knowledge into which clock each component will go to at the time of the 
-> component registration. Consider this setup (comp = component):
-> 
-> comp-a1
-> comp-a2
-> composite-a : comp-a1 + comp-a2
-> comp-b1
-> comp-b2
-> comp-b3
-> composite-b : comp-b1 + comp-b2 + comp-b3
-> 
-> Depending on clock init order, we will potentially have 5 components in 
-> the list at max, which of 2 + 2 are of same type.
+>> >> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>> >> +{
+>> >> +     struct dw_mci_k3_priv_data *priv = host->priv;
+>> >> +
+>> >> +     if (priv->type == DW_MCI_TYPE_HI4511)
+>> > There are several checking controller type.
+>> > But now DW_MCI_TYPE_HI4511 is just introduced alone.
+>> > It seems like unnecessary.
+>>
+>> Yes, currently only K3V2 is added, and k3v3 code will be added soon.
+>> Do you think type is more suitable to add later?
+> Yes, it would be better.
+OK, got it.
 
-makes sense. Thanks for clarifying.
+>
+>>
+>> >> +static int dw_mci_k3_parse_dt(struct dw_mci *host)
+>> >> +{
+>> >> +     struct dw_mci_k3_priv_data *priv = host->priv;
+>> >> +     struct device_node *np = host->dev->of_node;
+>> >> +     u32 data[3];
+>> >> +     int ret;
+>> >> +
+>> >> +     if (priv->type == DW_MCI_TYPE_HI4511) {
+>> > Didn't you see Kernel panic here?
+>> > host->priv is not allocated yet, it's a invalid pointer dereference.
+>> > dw_mci_k3_parse_dt() is called prior to dw_mci_k3_priv_init().
+>> > You can check dw_mci_probe() sequence.
+>>
+>> It is no problem here
+>> dw_mci_pltfm_register -> drv_data->init(host) -> dw_mci_probe -> dw_mci_parse_dt
+> I guess your base is not latest.
+> Can you check cjb's tree?
 
+Yes, thanks for the info.
+It is changed in 3.12-rc2
+While what we use is 3.12-rc1, will rebase.
 
--- 
-Regards,
-Nishanth Menon
+>
+>>
+>> >
+>> >> +             ret = of_property_read_u32_array(np,
+>> >> +                             "clken-reg", data, 2);
+>> >> +             if (!ret) {
+>> >> +                     priv->clken_reg = data[0];
+>> >> +                     priv->clken_bit = data[1];
+>> >> +             }
+>> >> +
+>> >> +             ret = of_property_read_u32_array(np,
+>> >> +                             "drv-sel-reg", data, 3);
+>> >> +             if (!ret) {
+>> >> +                     priv->drv_reg = data[0];
+>> >> +                     priv->drv_off = data[1];
+>> >> +                     priv->drv_bits = data[2];
+>> >> +             }
+>> >> +
+>> >> +             ret = of_property_read_u32_array(np,
+>> >> +                             "sam-sel-reg", data, 3);
+>> >> +             if (!ret) {
+>> >> +                     priv->sam_reg = data[0];
+>> >> +                     priv->sam_off = data[1];
+>> >> +                     priv->sam_bits = data[2];
+>> >> +             }
+>> >> +
+>> >> +             ret = of_property_read_u32_array(np,
+>> >> +                             "div-reg", data, 3);
+>> >> +             if (!ret) {
+>> >> +                     priv->div_reg = data[0];
+>> >> +                     priv->div_off = data[1];
+>> >> +                     priv->div_bits = data[2];
+>> >> +             }
+>> > Should these register information be got from dt?
+>> > It could be define in source code instead.
+>>
+>> There are many register from pctrl node instead of mmc controller.
+>> If set in code, we may read id and then switch id, set register, start
+>> bit, bits number,
+>> which is no rules for different controller, using defiine is not helpful.
+>> for example:
+>>  switch (idx) {
+>>         case 0:
+>>                 clken_reg = 0x1F8;
+>>                 clken_bit = 0;
+>>                 drv_sel_reg = 0x1F8;
+>>                 drv_sel_bit = 4;
+>>                 sam_sel_reg = 0x1F8;
+>>                 sam_sel_bit = 8;
+>>                 div_reg = 0x1F8;
+>>                 div_bit = 1;
+>>                 break;
+>>         case 1:
+>>                 clken_reg = 0x1F8;
+>>                 clken_bit = 12;
+>>                 drv_sel_reg = 0x1F8;
+>>                 drv_sel_bit = 16;
+>>                 sam_sel_reg = 0x1F8;
+>>                 sam_sel_bit = 20;
+>>                 div_reg = 0x1F8;
+>>                 div_bit = 13;
+>>                 break;
+>>         case 2:
+>>                 clken_reg = 0x1F8;
+>>                 clken_bit = 24;
+>>                 drv_sel_reg = 0x1F8;
+>>                 drv_sel_bit = 28;
+>>                 sam_sel_reg = 0x1FC;
+>>                 sam_sel_bit = 0;
+>>                 div_reg = 0x1F8;
+>>                 div_bit = 25;
+>>                 break;
+>>
+>> So define register offset, start bit and bits number in dts make it simplier.
+>> Is this acceptable?
+> It's up to you. I think there will be better ways.
+> For example, some table for variable register can be used for each controller type.
+> Additionally, if you intend to use dt, error handling is needed.
+> dw_mci_k3_parse_dt always returns success although of_property_read_u32_array is failed.
+
+The reason is they are optional property.
+SD would fail if not setting the property, while emmc does not matter.
+So set for optional, dw_mci_k3_set_timing will check whether they exists.
+
+Thanks
