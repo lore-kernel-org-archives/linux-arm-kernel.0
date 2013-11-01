@@ -1,73 +1,133 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri,  1 Nov 2013 16:00:11 +0800
-Subject: [PATCH v6 2/2] PWM: atmel-pwm: add device tree binding document
-Message-ID: <1383292811-11343-1-git-send-email-voice.shen@atmel.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Fri, 01 Nov 2013 17:21:00 +0900
+Subject: [PATCH 2/2] mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+In-Reply-To: <CAMj5BkgHE6FwBv6hUi8Mth1Ox40ed2sot4p9LQBxOToN=Fu7Qg@mail.gmail.com>
+References: <1382339639-16764-3-git-send-email-zhangfei.gao@linaro.org>
+ <1382533396-6584-1-git-send-email-zhangfei.gao@linaro.org>
+ <001401ced6cb$04e2a330$0ea7e990$%jun@samsung.com>
+ <CAMj5BkgHE6FwBv6hUi8Mth1Ox40ed2sot4p9LQBxOToN=Fu7Qg@mail.gmail.com>
+Message-ID: <001b01ced6db$4c31d840$e49588c0$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add atmel pwm driver device tree binding document
+On Fri, November 01, 2013, zhangfei gao wrote:
+> Dear Seungwon
+> 
+> Thanks for giving suggestion.
+> 
+> On Thu, Oct 31, 2013 at 11:24 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> > Hi Zhangfei,
+> 
+> >> +static void dw_mci_k3_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+> >> +{
+> >> +     struct dw_mci_k3_priv_data *priv = host->priv;
+> >> +
+> >> +     if (priv->type == DW_MCI_TYPE_HI4511)
+> > There are several checking controller type.
+> > But now DW_MCI_TYPE_HI4511 is just introduced alone.
+> > It seems like unnecessary.
+> 
+> Yes, currently only K3V2 is added, and k3v3 code will be added soon.
+> Do you think type is more suitable to add later?
+Yes, it would be better.
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> 
+> >> +static int dw_mci_k3_parse_dt(struct dw_mci *host)
+> >> +{
+> >> +     struct dw_mci_k3_priv_data *priv = host->priv;
+> >> +     struct device_node *np = host->dev->of_node;
+> >> +     u32 data[3];
+> >> +     int ret;
+> >> +
+> >> +     if (priv->type == DW_MCI_TYPE_HI4511) {
+> > Didn't you see Kernel panic here?
+> > host->priv is not allocated yet, it's a invalid pointer dereference.
+> > dw_mci_k3_parse_dt() is called prior to dw_mci_k3_priv_init().
+> > You can check dw_mci_probe() sequence.
+> 
+> It is no problem here
+> dw_mci_pltfm_register -> drv_data->init(host) -> dw_mci_probe -> dw_mci_parse_dt
+I guess your base is not latest.
+Can you check cjb's tree?
 
----
-Changes in v6:
-  - New, split binding document as a separate patch
+> 
+> >
+> >> +             ret = of_property_read_u32_array(np,
+> >> +                             "clken-reg", data, 2);
+> >> +             if (!ret) {
+> >> +                     priv->clken_reg = data[0];
+> >> +                     priv->clken_bit = data[1];
+> >> +             }
+> >> +
+> >> +             ret = of_property_read_u32_array(np,
+> >> +                             "drv-sel-reg", data, 3);
+> >> +             if (!ret) {
+> >> +                     priv->drv_reg = data[0];
+> >> +                     priv->drv_off = data[1];
+> >> +                     priv->drv_bits = data[2];
+> >> +             }
+> >> +
+> >> +             ret = of_property_read_u32_array(np,
+> >> +                             "sam-sel-reg", data, 3);
+> >> +             if (!ret) {
+> >> +                     priv->sam_reg = data[0];
+> >> +                     priv->sam_off = data[1];
+> >> +                     priv->sam_bits = data[2];
+> >> +             }
+> >> +
+> >> +             ret = of_property_read_u32_array(np,
+> >> +                             "div-reg", data, 3);
+> >> +             if (!ret) {
+> >> +                     priv->div_reg = data[0];
+> >> +                     priv->div_off = data[1];
+> >> +                     priv->div_bits = data[2];
+> >> +             }
+> > Should these register information be got from dt?
+> > It could be define in source code instead.
+> 
+> There are many register from pctrl node instead of mmc controller.
+> If set in code, we may read id and then switch id, set register, start
+> bit, bits number,
+> which is no rules for different controller, using defiine is not helpful.
+> for example:
+>  switch (idx) {
+>         case 0:
+>                 clken_reg = 0x1F8;
+>                 clken_bit = 0;
+>                 drv_sel_reg = 0x1F8;
+>                 drv_sel_bit = 4;
+>                 sam_sel_reg = 0x1F8;
+>                 sam_sel_bit = 8;
+>                 div_reg = 0x1F8;
+>                 div_bit = 1;
+>                 break;
+>         case 1:
+>                 clken_reg = 0x1F8;
+>                 clken_bit = 12;
+>                 drv_sel_reg = 0x1F8;
+>                 drv_sel_bit = 16;
+>                 sam_sel_reg = 0x1F8;
+>                 sam_sel_bit = 20;
+>                 div_reg = 0x1F8;
+>                 div_bit = 13;
+>                 break;
+>         case 2:
+>                 clken_reg = 0x1F8;
+>                 clken_bit = 24;
+>                 drv_sel_reg = 0x1F8;
+>                 drv_sel_bit = 28;
+>                 sam_sel_reg = 0x1FC;
+>                 sam_sel_bit = 0;
+>                 div_reg = 0x1F8;
+>                 div_bit = 25;
+>                 break;
+> 
+> So define register offset, start bit and bits number in dts make it simplier.
+> Is this acceptable?
+It's up to you. I think there will be better ways.
+For example, some table for variable register can be used for each controller type.
+Additionally, if you intend to use dt, error handling is needed.
+dw_mci_k3_parse_dt always returns success although of_property_read_u32_array is failed.
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
-
- .../devicetree/bindings/pwm/atmel-pwm.txt          |   41 ++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-new file mode 100644
-index 0000000..1c1a5fa
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-@@ -0,0 +1,41 @@
-+Atmel PWM controller
-+
-+Required properties:
-+  - compatible: should be one of:
-+    - "atmel,at91sam9rl-pwm"
-+    - "atmel,sama5d3-pwm"
-+  - reg: physical base address and length of the controller's registers
-+  - #pwm-cells: Should be 3. See pwm.txt in this directory for a
-+    description of the cells format
-+
-+Example:
-+
-+	pwm0: pwm at f8034000 {
-+		compatible = "atmel,at91sam9rl-pwm";
-+		reg = <0xf8034000 0x400>;
-+		#pwm-cells = <3>;
-+	};
-+
-+The following the pwm led based example:
-+
-+	pwm0: pwm at f8034000 {
-+		compatible = "atmel,at91sam9rl-pwm";
-+		reg = <0xf8034000 0x400>;
-+		#pwm-cells = <3>;
-+	};
-+
-+	pwdleds {
-+		compatible = "pwm-leds";
-+
-+		d1 {
-+			label = "d1";
-+			pwms = <&pwm0 3 5000 0>
-+			max-brightness = <255>;
-+		};
-+
-+		d2 {
-+			label = "d2";
-+			pwms = <&pwm0 1 5000 1>
-+			max-brightness = <255>;
-+		};
-+	};
--- 
-1.7.9.5
+Thanks,
+Seungwon Jeon
