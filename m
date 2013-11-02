@@ -1,36 +1,28 @@
 From: silvio.maillist@gmail.com (Silvio F)
-Date: Sat,  2 Nov 2013 08:29:04 +0100
-Subject: [PATCH 1/3] DT: sort vendor-prefixes.txt
+Date: Sat,  2 Nov 2013 08:29:05 +0100
+Subject: [PATCH 2/3] DT: Add Data Modul vendor prefix
 In-Reply-To: <cover.1383376255.git.silvio.fricke@gmail.com>
 References: <cover.1383376255.git.silvio.fricke@gmail.com>
-Message-ID: <a84f9531670c3bf71e3b4acf367477372eaa76df.1383376255.git.silvio.fricke@gmail.com>
+Message-ID: <764fbbdb21ca8aa278901f40f0f0f819842dc110.1383376255.git.silvio.fricke@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Silvio F <silvio.fricke@gmail.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 8319844..2faf4a3 100644
+index 2faf4a3..005a196 100644
 --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
 +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -65,13 +65,13 @@ snps 	Synopsys, Inc.
- st	STMicroelectronics
- ste	ST-Ericsson
- stericsson	ST-Ericsson
--toumaz	Toumaz
- ti	Texas Instruments
- toshiba	Toshiba Corporation
-+toumaz	Toumaz
- v3	V3 Semiconductor
- via	VIA Technologies, Inc.
- voipac	Voipac Technologies s.r.o.
-+winbond Winbond Electronics corp.
- wlf	Wolfson Microelectronics
- wm	Wondermedia Technologies, Inc.
--winbond Winbond Electronics corp.
- xlnx	Xilinx
+@@ -22,6 +22,7 @@ cortina	Cortina Systems, Inc.
+ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
+ davicom	DAVICOM Semiconductor, Inc.
+ denx	Denx Software Engineering
++dmo	Data Modul AG
+ emmicro	EM Microelectronic
+ epson	Seiko Epson Corp.
+ est	ESTeem Wireless Modems
 -- 
 1.8.4
