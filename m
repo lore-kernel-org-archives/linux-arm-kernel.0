@@ -1,63 +1,146 @@
-From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
-Date: Sat,  2 Nov 2013 21:09:35 +0530
-Subject: [PATCH v4 6/6] ARM: davinci: da850 evm: add GPIO pinumux entries DT
- node
-In-Reply-To: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
-References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
-Message-ID: <1383406775-14902-7-git-send-email-prabhakar.csenng@gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Sat, 2 Nov 2013 21:19:59 +0530
+Subject: [PATCH v3 1/3] gpio: davinci: add OF support
+In-Reply-To: <525BE2B2.8020105@ti.com>
+References: <1380902596-4693-1-git-send-email-sujithkv@ti.com>
+ <1380902596-4693-2-git-send-email-sujithkv@ti.com>
+ <CACRpkdYxegBSYXR1-98smUNnDXpyRHo_vuYdnr3r7zhawENiUA@mail.gmail.com>
+ <CA+V-a8vyPyL0j0nPOZyjxrecusFzXovFPsNBLKYXns5ASWR-wg@mail.gmail.com>
+ <CACRpkdYNexWWXuQ052xuQ4NOdXm2gt-+ByREKeGo-VAnbH4D2w@mail.gmail.com>
+ <CA+V-a8vH7VXqz=2cz-uD=YfRBRYrJ10K1Aptw28vV8gP+PiT2g@mail.gmail.com>
+ <525BE2B2.8020105@ti.com>
+Message-ID: <CA+V-a8uqErBvzjnHq4yvtti4cJ1D6sXx3_r-p=E+yhMCTZ6JJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: KV Sujith <sujithkv@ti.com>
+Hi Grygorii,
 
-Add GPIO DT node and pinmux entries for DA850 EVM. GPIO is
-configurable differently on different boards. So add GPIO
-pinmuxing in dts file.
+On Mon, Oct 14, 2013 at 5:55 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+> Hi Prabhakar Lad,
+>
+> On 10/11/2013 07:18 PM, Prabhakar Lad wrote:
+>> Hi Linus,
+>>
+>> On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Fri, Oct 11, 2013 at 4:59 PM, Prabhakar Lad
+>>> <prabhakar.csengg@gmail.com> wrote:
+>>>> On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>>>> On Fri, Oct 4, 2013 at 6:03 PM, Prabhakar Lad
+>>>>> <prabhakar.csengg@gmail.com> wrote:
+>>>
+>>>>>> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering
+>>>>>> starts.
+>>>>>
+>>>>> What is this?
+>>>>>
+>>>>> If I have ever ACKed this I have been drunk. I take it back.
+>>>>>
+>>>> here is the ACK https://patchwork.kernel.org/patch/2721181/
+>>>
+>>> And as suspected that version of the patch did not contain
+>>> this strange node property.
+>>>
+>> The property did exist in the patch 'intc_irq_num', I just renamed
+>> it and gave a proper description to it.
+>>
+>>> Don't keep my ACK on patches if you change basic stuff like
+>>> that, they need to be re-acked, this runs the risk of abusing
+>>> my trust amongst other subsystem maintainers who might
+>>> go and merge this because "aha the GPIO maintainer
+>>> thinks that this is OK".
+>>>
+>> Agreed, I carry forwarded the ACK since it had minor changes.
+>>
+>>>>> This "base" is a Linux-specific thing and has no place in the
+>>>>> device tree, and shall not be there. You have to find some way to
+>>>>> avoid this, what do you think some other OS should do with
+>>>>> this value...
+>>>>>
+>>>>> All IRQs in Linux are assumed to be dynamically assigned numbers
+>>>>> nowadays, with a property like this you can never switch on
+>>>>> SPARSE_IRQ for the DaVinci.
+>>>>>
+>>>> Can you point to any alternative solution if you have any ?
+>>>
+>>> First convert this GPIO driver to use an irqdomain to map
+>>> HW IRQs to Linux IRQs, and grab a few IRQ descriptors
+>>> dynamically off the irq descriptor heap.
+>>> Example: commit
+>>> a6c45b99a658521291cfb66ecf035cc58b38f206
+>>> "pinctrl/coh901: use irqdomain, allocate irqdescs"
+>>>
+>>> Then on a longer term convert DaVinci to use dynamically
+>>> allocated IRQs for all interrupt controllers, and move it over
+>>> to SPARSE_IRQ so you know this works.
+>>>
+>> Thanks for the pointers.
+>>
+>
+> Could it be possible to use "interrupts" and "interrupt-names" to identify
+> assigned banked & unbanked IRQs?
+>
+I did give thought for it but found out its taken as a single interrupt,
+and comparing the names in the driver would be tedious. so as
+of now I have kept as is for this.
 
-Signed-off-by: KV Sujith <sujithkv@ti.com>
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- arch/arm/boot/dts/da850-evm.dts |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+> For example DM646x (http://www.ti.com/lit/ug/sprueq8a/sprueq8a.pdf):
+>
+> interrupts = <48 IRQ_TYPE_EDGE_BOTH>,
+>              <49 IRQ_TYPE_EDGE_BOTH>,
+>              <50 IRQ_TYPE_EDGE_BOTH>,
+>              <51 IRQ_TYPE_EDGE_BOTH>,
+>              <52 IRQ_TYPE_EDGE_BOTH>,
+>              <53 IRQ_TYPE_EDGE_BOTH>,
+>              <54 IRQ_TYPE_EDGE_BOTH>,
+>              <55 IRQ_TYPE_EDGE_BOTH>,
+>              <56 IRQ_TYPE_EDGE_BOTH>,
+>              <57 IRQ_TYPE_EDGE_BOTH>,
+>              <58 IRQ_TYPE_EDGE_BOTH>;
+> interrupt-names = "gpio0", "gpio1", "gpio2", "gpio3", "gpio4", "gpio5", "gpio6", "gpio7", "bank0", "bank1", "bank2";
+>
+> For example OMAP-L138 (http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf):
+>
+> interrupts = <42 IRQ_TYPE_EDGE_BOTH>,
+>              <43 IRQ_TYPE_EDGE_BOTH>,
+>              <44 IRQ_TYPE_EDGE_BOTH>,
+>              <45 IRQ_TYPE_EDGE_BOTH>,
+>              <46 IRQ_TYPE_EDGE_BOTH>,
+>              <47 IRQ_TYPE_EDGE_BOTH>,
+>              <48 IRQ_TYPE_EDGE_BOTH>,
+>              <49 IRQ_TYPE_EDGE_BOTH>,
+>              <50 IRQ_TYPE_EDGE_BOTH>;
+>
+> interrupt-names = "bank0", "bank1", "bank2", "bank3", "bank4", "bank5", "bank6", "bank7", "bank8";
+>
+> For example Keystone 66AK2E05/02
+>  (http://www.ti.com/lit/ds/sprs865a/sprs865a.pdf and http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf):
+>
+> interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
+>              <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+> [..]
+>              <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
+>              <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
+>
+>
+> interrupt-names = "gpio0", "gpio1", [...], "gpio30", "gpio31";
+>
+> So then, following properties would not be needed at all, because all inf. can be
+> taken from interrupt's properties:
+> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering starts.
+Yeah dropped this.
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 588ce58..f82c129 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -17,6 +17,21 @@
- 	soc {
- 		pmx_core: pinmux at 1c14120 {
- 			status = "okay";
-+
-+			gpio_pins: pinmux_gpio_pins {
-+				pinctrl-single,bits = <
-+					/* GPIO2_4 GPIO2_6 */
-+					0x18 0x00008080 0x0000f0f0
-+					/* GPIO2_8 GPIO2_15 */
-+					0x14 0x80000008 0xf000000f
-+					/* GPIO3_12 GPIO3_13 */
-+					0x1C 0x00008800 0x0000ff00
-+					/* GPIO4_0 GPIO4_1 */
-+					0x28 0x88000000 0xff000000
-+					/* GPIO6_9 GPIO6_10 GPIO6_13 */
-+					0x34 0x08800800 0x0ff00f00
-+				>;
-+			};
- 		};
- 		serial0: serial at 1c42000 {
- 			status = "okay";
-@@ -101,6 +116,11 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mii_pins>;
- 		};
-+		gpio: gpio at 1e26000 {
-+			status = "okay";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&gpio_pins>;
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
--- 
-1.7.9.5
+> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt line to processor.
+>
+Kept as is
+> It should work good if Davinci-gpio driver will be converted to use
+> linear IRQ domains for banked irqs.
+>
+Yeah migrated it to use IRQ domains.
+
+I have posted the updated patch series at [1], please have a look at it.
+
+[1] http://linux.omap.com/pipermail/davinci-linux-open-source/2013-November/028220.html
+
+Regards,
+--Prabhakar Lad
