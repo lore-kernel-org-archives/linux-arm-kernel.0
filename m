@@ -1,59 +1,191 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 02 Nov 2013 03:30:25 +0300
-Subject: [PATCH] RM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
-In-Reply-To: <20131101004359.GK6818@verge.net.au>
-References: <1383201098-4258-1-git-send-email-horms+renesas@verge.net.au>
- <5272CC16.3020700@cogentembedded.com> <20131101004359.GK6818@verge.net.au>
-Message-ID: <527447A1.2000607@cogentembedded.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Fri, 1 Nov 2013 17:32:42 -0700
+Subject: [RESEND PATCH 1/4] i2c: i2c-bcm-kona: Introduce Broadcom I2C
+ Driver
+In-Reply-To: <20131101124958.GB6734@katana>
+References: <1381960909-1735-1-git-send-email-tim.kryger@linaro.org>
+ <1381960909-1735-2-git-send-email-tim.kryger@linaro.org>
+ <20131101124958.GB6734@katana>
+Message-ID: <CAAYSxho8nd3TOsJ8LGfs94pHxoFYDxyZL0xjPA-CqVKVf7Nafw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2013 03:43 AM, Simon Horman wrote:
+On Fri, Nov 1, 2013 at 5:49 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Wed, Oct 16, 2013 at 03:01:46PM -0700, Tim Kryger wrote:
+>> Introduce support for Broadcom Serial Controller (BSC) I2C bus found
+>> in the Kona family of Mobile SoCs.  FIFO hardware is utilized but only
+>> standard mode (100kHz), fast mode (400kHz), and fast mode plus (1MHz)
+>> bus speeds are supported.
+>>
+>> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+>
+> Looks mostly good, some remarks:
+>
+>> +struct bcm_kona_i2c_dev {
+>> +     /* Pointer to linux device struct */
+>> +     struct device *device;
+>> +
+>> +     /* Virtual address where registers are mapped */
+>> +     void __iomem *base;
+>> +
+>> +     /* Interrupt */
+>> +     int irq;
+>> +
+>> +     /* Standard Speed configuration */
+>> +     const struct bus_speed_cfg *std_cfg;
+>> +
+>> +     /* Linux I2C adapter struct */
+>> +     struct i2c_adapter adapter;
+>> +
+>> +     /* Lock for the I2C device */
+>> +     struct mutex i2c_bcm_lock;
+>> +
+>> +     /* Completion to signal an operation finished */
+>> +     struct completion done;
+>> +
+>> +     /* Handle for external clock */
+>> +     struct clk *external_clk;
+>> +};
+>
+> IMO most of the comments could go. Kind of stating the obvious :)
 
->>> Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
->>> Other than not being useful it is also not possible to compile
+Sure thing.
 
->>     s/compile/link/.
+>
+>> +/* Read any amount of data using the RX FIFO from the i2c bus */
+>> +static int bcm_kona_i2c_read_fifo(struct bcm_kona_i2c_dev *dev,
+>> +                               struct i2c_msg *msg)
+>> +{
+>> +     unsigned int bytes_to_read = MAX_RX_FIFO_SIZE;
+>> +     unsigned int last_byte_nak = 0;
+>> +     unsigned int bytes_read = 0;
+>> +     unsigned int rc;
+>
+> Should be signed.
 
->>> the code under this condition as phy_register_fixup_for_id()
->>> is not defined.
+Absolutely.  Thanks for catching this one.
 
->>     Not only this function is absent...
+>
+>> +/* Write any amount of data using TX FIFO to the i2c bus */
+>> +static int bcm_kona_i2c_write_fifo(struct bcm_kona_i2c_dev *dev,
+>> +                                struct i2c_msg *msg)
+>> +{
+>> +     unsigned int bytes_to_write = MAX_TX_FIFO_SIZE;
+>> +     unsigned int bytes_written = 0;
+>> +     unsigned int rc;
+>
+> Ditto signed.
 
->>> This problem was introduced by 48c8b96f21817aad
->>> ("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
+I shall fix it.
 
->>> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>> ---
->>>   arch/arm/mach-shmobile/board-lager.c | 4 +++-
->>>   1 file changed, 3 insertions(+), 1 deletion(-)
+>
+>> +/* Master transfer function */
+>> +static int bcm_kona_i2c_xfer(struct i2c_adapter *adapter,
+>> +                          struct i2c_msg msgs[], int num)
+>> +{
+>> +     struct bcm_kona_i2c_dev *dev = i2c_get_adapdata(adapter);
+>> +     struct i2c_msg *pmsg;
+>> +     int rc = 0;
+>> +     int i;
+>> +
+>> +     mutex_lock(&dev->i2c_bcm_lock);
+>
+> Huh? Why do you need that? The core has locks per bus.
 
->>> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
->>> index 78a31b6..d1a8ddd 100644
->>> --- a/arch/arm/mach-shmobile/board-lager.c
->>> +++ b/arch/arm/mach-shmobile/board-lager.c
->>> @@ -245,7 +245,9 @@ static void __init lager_init(void)
->>>   {
->>>   	lager_add_standard_devices();
->>>
->>> -	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
->>> +	if (IS_ENABLED(CONFIG_PHYLIB))
->>> +		phy_register_fixup_for_id("r8a7790-ether-ff:01",
->>> +					  lager_ksz8041_fixup);
+In that case, I will remove the local mutex.
 
->>     Perhaps you would consider enclosing the fixup function itself
->> into #ifdef as it causes link errors as well?  Doesn't seem
->> necessary as gcc probably drops it anyway but for completeness'
->> sake...
+>> +static int bcm_kona_i2c_assign_bus_speed(struct bcm_kona_i2c_dev *dev)
+>> +{
+>> +     unsigned int bus_speed;
+>> +     int ret = of_property_read_u32(dev->device->of_node, "clock-frequency",
+>> +                                    &bus_speed);
+>> +     if (ret < 0) {
+>> +             dev_err(dev->device, "missing clock-frequency property\n");
+>> +             return -ENODEV;
+>> +     }
+>> +
+>> +     switch (bus_speed) {
+>> +     case 100000:
+>> +             dev->std_cfg = &std_cfg_table[BCM_SPD_100K];
+>> +             break;
+>> +     case 400000:
+>> +             dev->std_cfg = &std_cfg_table[BCM_SPD_400K];
+>> +             break;
+>> +     case 1000000:
+>> +             dev->std_cfg = &std_cfg_table[BCM_SPD_1MHZ];
+>> +             break;
+>> +     default:
+>> +             pr_err("%d hz bus speed not supported\n", bus_speed);
+>> +             return -EINVAL;
+>> +     };
+>
+> Unneeded semicolon.
+>
 
-> My understanding of the motivation for IS_ENABLED() is to
-> take advantage of gcc optimising away unused code and making such
-> problems disappear.
+Sure.  It will be removed.
 
-> With this patch in place do you still see any warnings?
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int bcm_kona_i2c_probe(struct platform_device *pdev)
+>> +{
+>> +     int rc = 0;
+>> +     struct bcm_kona_i2c_dev *dev;
+>> +     struct i2c_adapter *adap;
+>> +     struct resource *iomem;
+>> +
+>> +     /* Allocate memory for private data structure */
+>> +     dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
+>> +     if (!dev) {
+>> +             rc = -ENOMEM;
+>> +             goto probe_return;
+>
+> I'd prefer simply return -Esomething. The printout at probe_return is
+> also available via driver core.
 
-    No (but those were errors :-).
-    I'd like the changelog to be adjusted at least...
+Agreed.
 
-WBR, Sergei
+> ...
+>
+>> +     /* Add the i2c adapter */
+>> +     adap = &dev->adapter;
+>> +     i2c_set_adapdata(adap, dev);
+>> +     adap->owner = THIS_MODULE;
+>> +     adap->class = UINT_MAX; /* can be used by any I2C device */
+>
+> Why do you need class based instantiation. It will most likely cost
+> boot-time and you have devicetree means for doing instantiation.
+>
+>
+
+Agreed.
+
+>> +     strlcpy(adap->name, "Broadcom I2C adapter", sizeof(adap->name));
+>> +     adap->algo = &bcm_algo;
+>> +     adap->dev.parent = &pdev->dev;
+>> +     adap->nr = pdev->id;
+>> +     adap->dev.of_node = pdev->dev.of_node;
+>> +
+>> +     rc = i2c_add_numbered_adapter(adap);
+>
+> Maybe you want simply i2c_add_adapter here since the core has no
+> built-in support for of aliases?
+>
+
+Okay.  I will switch to i2c_add_adapter and remove the adap->nr assignment.
+
+>> +
+>> +MODULE_AUTHOR("Broadcom");
+>
+> Some email address please.
+>
+>> +MODULE_DESCRIPTION("Broadcom Kona I2C Driver");
+>> +MODULE_LICENSE("GPL v2");
+>
+> Thanks,
+>
+>    Wolfram
+>
