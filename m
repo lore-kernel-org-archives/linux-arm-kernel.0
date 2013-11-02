@@ -1,34 +1,39 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 02 Nov 2013 14:14:59 +0100
-Subject: [PATCH v2 1/9] phy: add phy_get_bus_width()/phy_set_bus_width()
- calls
-In-Reply-To: <1383335158-19730-2-git-send-email-matt.porter@linaro.org>
-References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
- <1383335158-19730-2-git-send-email-matt.porter@linaro.org>
-Message-ID: <2395941.Lp2U7sdS37@flatron>
+Date: Sat, 02 Nov 2013 14:26:53 +0100
+Subject: [PATCHv9 01/43] clk: Add support for regmap register read/write
+In-Reply-To: <1382716658-6964-2-git-send-email-t-kristo@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-2-git-send-email-t-kristo@ti.com>
+Message-ID: <62888417.HVneXSeQuy@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+Hi Tero,
 
-On Friday 01 of November 2013 15:45:50 Matt Porter wrote:
-> This adds a pair of APIs that allows the generic PHY subsystem to
-> provide information on the PHY bus width. The PHY provider driver may
-> use phy_set_bus_width() to set the bus width that the PHY supports.
-> The controller driver may then use phy_get_bus_width() to fetch the
-> PHY bus width in order to properly configure the controller.
+On Friday 25 of October 2013 18:56:55 Tero Kristo wrote:
+> Previously, only direct register read/write was supported. Now a
+> per-clock regmap can be provided for same purpose, which allows the
+> clock drivers to access clock registers behind e.g. I2C bus.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  drivers/clk/clk-divider.c    |    6 +++---
+>  drivers/clk/clk-gate.c       |    6 +++---
+>  drivers/clk/clk-mux.c        |    6 +++---
+>  include/linux/clk-provider.h |   23 +++++++++++++++++++----
+>  4 files changed, 28 insertions(+), 13 deletions(-)
 
-I somehow does not like this. If we take this path for any further 
-properties that we may need, we will end up with a lot of consumer 
-specific properties stored in a PHY object having their own accessor 
-functions.
+The idea itself sounds not bad, but patch description fails to specify 
+what is the need for this. I mean, if you know that this will have some 
+actual users, it is nice to specify them.
 
-Since this is just an integration detail, what about simply adding this as 
-a property in device tree node of the OTG controller (and pdata if 
-considering non-DT support)?
+Also IMHO the variant with clk_reg_ops (but with regmap used) would look a 
+bit better in terms of readability and extensibility, but I'm leaving this 
+completely to Mike's decision.
 
-Another option would be some framework for retrieving arbitrary properties 
-from the PHY, but I'm not really sure there is a need for such.
+(OR maybe you could migrate this fully to regmap, which can do MMIO 
+accesses as well, without the need of having separate code paths for both 
+in clock code?)
 
 Best regards,
 Tomasz
