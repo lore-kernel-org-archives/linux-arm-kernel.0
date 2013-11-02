@@ -1,146 +1,43 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Sat, 2 Nov 2013 21:19:59 +0530
-Subject: [PATCH v3 1/3] gpio: davinci: add OF support
-In-Reply-To: <525BE2B2.8020105@ti.com>
-References: <1380902596-4693-1-git-send-email-sujithkv@ti.com>
- <1380902596-4693-2-git-send-email-sujithkv@ti.com>
- <CACRpkdYxegBSYXR1-98smUNnDXpyRHo_vuYdnr3r7zhawENiUA@mail.gmail.com>
- <CA+V-a8vyPyL0j0nPOZyjxrecusFzXovFPsNBLKYXns5ASWR-wg@mail.gmail.com>
- <CACRpkdYNexWWXuQ052xuQ4NOdXm2gt-+ByREKeGo-VAnbH4D2w@mail.gmail.com>
- <CA+V-a8vH7VXqz=2cz-uD=YfRBRYrJ10K1Aptw28vV8gP+PiT2g@mail.gmail.com>
- <525BE2B2.8020105@ti.com>
-Message-ID: <CA+V-a8uqErBvzjnHq4yvtti4cJ1D6sXx3_r-p=E+yhMCTZ6JJw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Sat, 2 Nov 2013 22:46:55 +0530
+Subject: [PATCH v2 1/9] phy: add phy_get_bus_width()/phy_set_bus_width()
+ calls
+In-Reply-To: <2395941.Lp2U7sdS37@flatron>
+References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
+ <1383335158-19730-2-git-send-email-matt.porter@linaro.org>
+ <2395941.Lp2U7sdS37@flatron>
+Message-ID: <52753387.5030202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+Hi Tomasz,
 
-On Mon, Oct 14, 2013 at 5:55 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> Hi Prabhakar Lad,
+On Saturday 02 November 2013 06:44 PM, Tomasz Figa wrote:
+> Hi Matt,
 >
-> On 10/11/2013 07:18 PM, Prabhakar Lad wrote:
->> Hi Linus,
->>
->> On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> On Fri, Oct 11, 2013 at 4:59 PM, Prabhakar Lad
->>> <prabhakar.csengg@gmail.com> wrote:
->>>> On 10/11/13, Linus Walleij <linus.walleij@linaro.org> wrote:
->>>>> On Fri, Oct 4, 2013 at 6:03 PM, Prabhakar Lad
->>>>> <prabhakar.csengg@gmail.com> wrote:
->>>
->>>>>> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering
->>>>>> starts.
->>>>>
->>>>> What is this?
->>>>>
->>>>> If I have ever ACKed this I have been drunk. I take it back.
->>>>>
->>>> here is the ACK https://patchwork.kernel.org/patch/2721181/
->>>
->>> And as suspected that version of the patch did not contain
->>> this strange node property.
->>>
->> The property did exist in the patch 'intc_irq_num', I just renamed
->> it and gave a proper description to it.
->>
->>> Don't keep my ACK on patches if you change basic stuff like
->>> that, they need to be re-acked, this runs the risk of abusing
->>> my trust amongst other subsystem maintainers who might
->>> go and merge this because "aha the GPIO maintainer
->>> thinks that this is OK".
->>>
->> Agreed, I carry forwarded the ACK since it had minor changes.
->>
->>>>> This "base" is a Linux-specific thing and has no place in the
->>>>> device tree, and shall not be there. You have to find some way to
->>>>> avoid this, what do you think some other OS should do with
->>>>> this value...
->>>>>
->>>>> All IRQs in Linux are assumed to be dynamically assigned numbers
->>>>> nowadays, with a property like this you can never switch on
->>>>> SPARSE_IRQ for the DaVinci.
->>>>>
->>>> Can you point to any alternative solution if you have any ?
->>>
->>> First convert this GPIO driver to use an irqdomain to map
->>> HW IRQs to Linux IRQs, and grab a few IRQ descriptors
->>> dynamically off the irq descriptor heap.
->>> Example: commit
->>> a6c45b99a658521291cfb66ecf035cc58b38f206
->>> "pinctrl/coh901: use irqdomain, allocate irqdescs"
->>>
->>> Then on a longer term convert DaVinci to use dynamically
->>> allocated IRQs for all interrupt controllers, and move it over
->>> to SPARSE_IRQ so you know this works.
->>>
->> Thanks for the pointers.
->>
+> On Friday 01 of November 2013 15:45:50 Matt Porter wrote:
+>> This adds a pair of APIs that allows the generic PHY subsystem to
+>> provide information on the PHY bus width. The PHY provider driver may
+>> use phy_set_bus_width() to set the bus width that the PHY supports.
+>> The controller driver may then use phy_get_bus_width() to fetch the
+>> PHY bus width in order to properly configure the controller.
 >
-> Could it be possible to use "interrupts" and "interrupt-names" to identify
-> assigned banked & unbanked IRQs?
->
-I did give thought for it but found out its taken as a single interrupt,
-and comparing the names in the driver would be tedious. so as
-of now I have kept as is for this.
+> I somehow does not like this. If we take this path for any further
+> properties that we may need, we will end up with a lot of consumer
+> specific properties stored in a PHY object having their own accessor
+> functions.
 
-> For example DM646x (http://www.ti.com/lit/ug/sprueq8a/sprueq8a.pdf):
+Only after all of us feel that a property is *generic* enough, we allow 
+it to be added in the PHY object.
 >
-> interrupts = <48 IRQ_TYPE_EDGE_BOTH>,
->              <49 IRQ_TYPE_EDGE_BOTH>,
->              <50 IRQ_TYPE_EDGE_BOTH>,
->              <51 IRQ_TYPE_EDGE_BOTH>,
->              <52 IRQ_TYPE_EDGE_BOTH>,
->              <53 IRQ_TYPE_EDGE_BOTH>,
->              <54 IRQ_TYPE_EDGE_BOTH>,
->              <55 IRQ_TYPE_EDGE_BOTH>,
->              <56 IRQ_TYPE_EDGE_BOTH>,
->              <57 IRQ_TYPE_EDGE_BOTH>,
->              <58 IRQ_TYPE_EDGE_BOTH>;
-> interrupt-names = "gpio0", "gpio1", "gpio2", "gpio3", "gpio4", "gpio5", "gpio6", "gpio7", "bank0", "bank1", "bank2";
->
-> For example OMAP-L138 (http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf):
->
-> interrupts = <42 IRQ_TYPE_EDGE_BOTH>,
->              <43 IRQ_TYPE_EDGE_BOTH>,
->              <44 IRQ_TYPE_EDGE_BOTH>,
->              <45 IRQ_TYPE_EDGE_BOTH>,
->              <46 IRQ_TYPE_EDGE_BOTH>,
->              <47 IRQ_TYPE_EDGE_BOTH>,
->              <48 IRQ_TYPE_EDGE_BOTH>,
->              <49 IRQ_TYPE_EDGE_BOTH>,
->              <50 IRQ_TYPE_EDGE_BOTH>;
->
-> interrupt-names = "bank0", "bank1", "bank2", "bank3", "bank4", "bank5", "bank6", "bank7", "bank8";
->
-> For example Keystone 66AK2E05/02
->  (http://www.ti.com/lit/ds/sprs865a/sprs865a.pdf and http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf):
->
-> interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
->              <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-> [..]
->              <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
->              <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
->
->
-> interrupt-names = "gpio0", "gpio1", [...], "gpio30", "gpio31";
->
-> So then, following properties would not be needed at all, because all inf. can be
-> taken from interrupt's properties:
-> +- ti,davinci-gpio-irq-base: Base from where GPIO interrupt numbering starts.
-Yeah dropped this.
+> Since this is just an integration detail, what about simply adding this as
+> a property in device tree node of the OTG controller (and pdata if
+> considering non-DT support)?
 
-> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt line to processor.
->
-Kept as is
-> It should work good if Davinci-gpio driver will be converted to use
-> linear IRQ domains for banked irqs.
->
-Yeah migrated it to use IRQ domains.
+We already had a discussion about this and the dt maintainers suggested 
+the property should be in the PHY. [1]
 
-I have posted the updated patch series at [1], please have a look at it.
+[1] ->  http://www.spinics.net/lists/devicetree/msg08851.html
 
-[1] http://linux.omap.com/pipermail/davinci-linux-open-source/2013-November/028220.html
-
-Regards,
---Prabhakar Lad
+Thanks
+Kishon
