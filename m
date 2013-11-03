@@ -1,32 +1,53 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Sun,  3 Nov 2013 18:52:41 +0100
-Subject: [PATCH 0/3] watchdog: at91sam9_wdt: various fixes and improvements
-Message-ID: <1383501164-8111-1-git-send-email-b.brezillon@overkiz.com>
+Date: Sun,  3 Nov 2013 18:52:43 +0100
+Subject: [PATCH 2/3] watchdog: at91sam9_wdt: avoid spurious watchdog reset
+ during init
+In-Reply-To: <1383501164-8111-1-git-send-email-b.brezillon@overkiz.com>
+References: <1383501164-8111-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1383501164-8111-3-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Use the min_heartbeat value instead of the calculated heartbeat value for
+the first watchdog reset to avoid spurious watchdog reset.
 
-This patch series fix the secs_to_ticks macro in case 0 is passed as an
-argument.
+Resetting the watchdog counter during init might lead to a watchdog fault
+reset because the watchdog counter has to be running for at least
+min_heartbeat.
 
-It also rework the heartbeat calculation to increase the security margin of the
-watchdog reset timer, and use the min_heartbeat value instead of the calculated
-heartbeat value for the first watchdog reset (to avoid spurious watchdog
-reset).
+Resetting the watchdog counter after heartbeat might lead to a watchdog
+timeout reset because the watchdog counter is running for more than
+max_heartbeat time.
 
-Best Regards,
+Using min_heartbeat instead of heartbeat does not guarantee that the
+watchdog won't trigger a reset, but at least it reduces the chances to be
+in such a case.
 
-Boris
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/watchdog/at91sam9_wdt.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Boris BREZILLON (3):
-  watchdog: at91sam9_wdt: fix secs_to_ticks
-  watchdog: at91sam9_wdt: avoid spurious watchdog reset during init
-  watchdog: at91sam9_wdt: increase security margin on watchdog counter
-    reset
-
- drivers/watchdog/at91sam9_wdt.c |   38 +++++++++++++++++++++++++++-----------
- 1 file changed, 27 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+index 65f4691..ab0c4e0 100644
+--- a/drivers/watchdog/at91sam9_wdt.c
++++ b/drivers/watchdog/at91sam9_wdt.c
+@@ -213,7 +213,15 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
+ 			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
+ 
+ 	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
+-	mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
++
++	/*
++	 * Use min_heartbeat the first time to avoid spurious watchdog reset:
++	 * we don't know for how long the watchdog counter is running, and
++	 *  - resetting it right now might trigger a watchdog fault reset
++	 *  - waiting for heartbeat time might lead to a watchdog timeout
++	 *    reset
++	 */
++	mod_timer(&wdt->timer, jiffies + min_heartbeat);
+ 
+ 	/* Try to set timeout from device tree first */
+ 	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
 -- 
 1.7.9.5
