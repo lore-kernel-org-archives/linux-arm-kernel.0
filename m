@@ -1,32 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  3 Nov 2013 10:30:11 +0100
-Subject: [PATCH 0/2] Add SMP support for the Allwinner A31 SoCs
-Message-ID: <1383471013-21695-1-git-send-email-maxime.ripard@free-electrons.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sun, 3 Nov 2013 17:36:50 -0500
+Subject: [PATCH v2 09/27] mtd: nand: pxa3xx: Split FIFO size from
+ to-be-read FIFO count
+In-Reply-To: <1382137374-21251-10-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1382137374-21251-10-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131103223646.GC5896@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On Fri, Oct 18, 2013 at 08:02:36PM -0300, Ezequiel Garcia wrote:
+>  
+> -	switch (host->page_size) {
+> +	switch (info->fifo_size) {
+>  	case 2048:
+	
+there is a item in the builtin_flash_types:
+{ "4GiB 8-bit",    0xd7ec, 128, 4096,  8,  8, 8192, &timing[1] },
 
-The Allwinner A31 is a quad-Cortex-A7 SoC. This patchset adds support
-for the bringup of the others CPUs at startup.
+The original host->page_size could be 4096, how can the old code support
+this nand with page-size is 4096?
 
-Thanks,
-Maxime
-
-Maxime Ripard (2):
-  ARM: sun6i: dt: Add IP needed to bring up the additional cores
-  ARM: sun6i: Add SMP support for the Allwinner A31
-
- arch/arm/boot/dts/sun6i-a31.dtsi |  10 ++++
- arch/arm/mach-sunxi/Makefile     |   1 +
- arch/arm/mach-sunxi/common.h     |  19 +++++++
- arch/arm/mach-sunxi/headsmp.S    |  11 ++++
- arch/arm/mach-sunxi/platsmp.c    | 115 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-sunxi/sunxi.c      |   3 +
- 6 files changed, 159 insertions(+)
- create mode 100644 arch/arm/mach-sunxi/common.h
- create mode 100644 arch/arm/mach-sunxi/headsmp.S
- create mode 100644 arch/arm/mach-sunxi/platsmp.c
-
--- 
-1.8.4
+thanks
+Huang Shijie
