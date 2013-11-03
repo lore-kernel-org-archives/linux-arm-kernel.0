@@ -1,310 +1,212 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Sun, 03 Nov 2013 15:42:11 +0100
-Subject: [PATCH] watchdog: at91sam9_wdt: various fixes
-In-Reply-To: <526FEEE7.7030708@overkiz.com>
-References: <20131029075028.GF19704@spo001.leaseweb.com>
- <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
- <20131029154519.GB9266@roeck-us.net> <526FE0DA.1020308@overkiz.com>
- <20131029164323.GF9266@roeck-us.net> <526FEEE7.7030708@overkiz.com>
-Message-ID: <527660C3.2050509@overkiz.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Sun, 03 Nov 2013 23:55:21 +0800
+Subject: [PATCH v5 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <20131030001245.GB25346@mudshark.cambridge.arm.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+ <1382109602-27432-3-git-send-email-liuj97@gmail.com>
+ <20131030001245.GB25346@mudshark.cambridge.arm.com>
+Message-ID: <527671E9.8040704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Guenter,
+On 10/30/2013 08:12 AM, Will Deacon wrote:
+> Hi Jinag Liu,
+> 
+> Sorry for the delayed review, I've been travelling.
+> 
+> On Fri, Oct 18, 2013 at 04:19:56PM +0100, Jiang Liu wrote:
+>> From: Jiang Liu <jiang.liu@huawei.com>
+> 
+> If I try and email you at your Huawei address, I get a bounce from the mail
+> server. Is that expected? If so, it's not very helpful from a commit log
+> perspective if you use that address as the author on your patches.
+> 
+Hi Will,
+	Sorry for the inconvenience. I have left Huawei recently and
+have had a vacation last two weeks. I will use my gmail account next
+time.
 
-Are you okay with the 3 fixes/improvements provided by this patch,
-and the explanation I gave regarding the reason for these changes ?
-
-If so, I will submit a new series splitting the patch and including your 
-suggestions.
-
-Best Regards,
-
-Boris
-
-On 29/10/2013 18:22, boris brezillon wrote:
-> On 29/10/2013 17:43, Guenter Roeck wrote:
->> On Tue, Oct 29, 2013 at 05:22:50PM +0100, boris brezillon wrote:
->>> On 29/10/2013 16:45, Guenter Roeck wrote:
->>>> On Tue, Oct 29, 2013 at 11:37:33AM +0100, Boris BREZILLON wrote:
->>>>> Fix the secs_to_ticks macro in case 0 is passed as an argument.
->>>>>
->>>>> Rework the heartbeat calculation to increase the security margin 
->>>>> of the
->>>>> watchdog reset timer.
->>>>>
->>>>> Use the min_heartbeat value instead of the calculated heartbeat 
->>>>> value for
->>>>> the first watchdog reset.
->>>>>
->>>>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->>>> Hi Boris,
->>>>
->>>> can you possibly split the three changes into separate patches ?
->>> Sure. My first idea was to split this in 3 patches, but, as the
->>> buggy at91 watchdog series was
->>> already applied to linux-watchdog-next, I thought it would be faster
->>> to only provide one
->>> patch to fix all the issues at once.
->>>
->>>> The first is a no-brainer. Gives my opinion of my code review 
->>>> capabilities
->>>> a slight damper ;-).
->>>>
->>>> For the other two problems, it might make sense to describe
->>>> the problems you are trying to solve.
->>>>
->>>> Couple of comments inline.
->>>>
->>>> Thanks,
->>>> Guenter
->>>>
->>>>
->>>>> ---
->>>>>   drivers/watchdog/at91sam9_wdt.c |   35 
->>>>> ++++++++++++++++++++++++-----------
->>>>>   1 file changed, 24 insertions(+), 11 deletions(-)
->>>>>
->>>>> diff --git a/drivers/watchdog/at91sam9_wdt.c 
->>>>> b/drivers/watchdog/at91sam9_wdt.c
->>>>> index 9bd089e..f1b59f1 100644
->>>>> --- a/drivers/watchdog/at91sam9_wdt.c
->>>>> +++ b/drivers/watchdog/at91sam9_wdt.c
->>>>> @@ -51,7 +51,7 @@
->>>>>   #define ticks_to_hz_rounddown(t)    ((((t) + 1) * HZ) >> 8)
->>>>>   #define ticks_to_hz_roundup(t)        (((((t) + 1) * HZ) + 255) 
->>>>> >> 8)
->>>>>   #define ticks_to_secs(t)        (((t) + 1) >> 8)
->>>>> -#define secs_to_ticks(s)        (((s) << 8) - 1)
->>>>> +#define secs_to_ticks(s)        (s ? (((s) << 8) - 1) : 0)
->>>>     (s)
->>>>
->>>>>   #define WDT_MR_RESET    0x3FFF2FFF
->>>>> @@ -61,6 +61,11 @@
->>>>>   /* Watchdog max delta/value in secs */
->>>>>   #define WDT_COUNTER_MAX_SECS ticks_to_secs(WDT_COUNTER_MAX_TICKS)
->>>>> +/* Watchdog heartbeat shift used for security margin:
->>>>> + * we'll try to rshift the heartbeat value with this value to secure
->>>>> + * the watchdog reset. */
->>>>> +#define WDT_HEARTBEAT_SHIFT    2
->>>>> +
->>>>>   /* Hardware timeout in seconds */
->>>>>   #define WDT_HW_TIMEOUT 2
->>>>> @@ -158,7 +163,9 @@ static int at91_wdt_init(struct 
->>>>> platform_device *pdev, struct at91wdt *wdt)
->>>>>       int err;
->>>>>       u32 mask = wdt->mr_mask;
->>>>>       unsigned long min_heartbeat = 1;
->>>>> +    unsigned long max_heartbeat;
->>>>>       struct device *dev = &pdev->dev;
->>>>> +    int shift;
->>>>>       tmp = wdt_read(wdt, AT91_WDT_MR);
->>>>>       if ((tmp & mask) != (wdt->mr & mask)) {
->>>>> @@ -181,23 +188,27 @@ static int at91_wdt_init(struct 
->>>>> platform_device *pdev, struct at91wdt *wdt)
->>>>>       if (delta < value)
->>>>>           min_heartbeat = ticks_to_hz_roundup(value - delta);
->>>>> -    wdt->heartbeat = ticks_to_hz_rounddown(value);
->>>>> -    if (!wdt->heartbeat) {
->>>>> +    max_heartbeat = ticks_to_hz_rounddown(value);
->>>>> +    if (!max_heartbeat) {
->>>>>           dev_err(dev,
->>>>>               "heartbeat is too small for the system to handle it 
->>>>> correctly\n");
->>>>>           return -EINVAL;
->>>>>       }
->>>>> -    if (wdt->heartbeat < min_heartbeat + 4) {
->>>>> +    for (shift = WDT_HEARTBEAT_SHIFT; shift > 0; shift--) {
->>>>> +        if ((max_heartbeat >> shift) < min_heartbeat)
->>>>> +            continue;
->>>>> +
->>>>> +        wdt->heartbeat = max_heartbeat >> shift;
->>>>> +        break;
->>>>> +    }
->>>>> +
->>>>> +    if (!shift)
->>>>>           wdt->heartbeat = min_heartbeat;
->>>> Correct me if I am wrong, but it seems to me that
->>>>
->>>>     if ((max_heartbeat >> 2) >= min_heartbeat)
->>>>          wdt->heartbeat = max_heartbeat >> 2;
->>>>     else if ((max_heartbeat >> 1) >= min_heartbeat)
->>>>         wdt->heartbeat = max_heartbeat >> 1;
->>>>     else
->>>>         wdt->heartbeat = min_heartbeat;
->>>>
->>>> would accomplish the same and be easier to understand.
->>> This is exactly what I'm trying to accomplish.
->>> I used the for loop in case we ever want to change the
->>> WDT_HEARTBEAT_SHIFT value
->>> (which is unlikely to happen).
->>>
->>> I'll move to your proposition.
->>>
->>>> However, given that, I wonder if it is really necessary to bail out 
->>>> above if
->>>> max_heartbeat is 0. After all, you set heartbeat to min_heartbeat 
->>>> anyway
->>>> in this case.
->>> Yes it is necessary. The max_heartbeat is a configuration that
->>> cannot be changed once configured.
->>> We have to inform the user that his max_heartbeat value is too small
->>> to be handled correctly by the Linux kernel.
->>>
->>> If we simply use the min_heartbeat value as heartbeat and ignore the
->>> wrong max_heartbeat value,
->>> the watchdog will reset the SoC before we can ever reset the
->>> watchdog counter.
->>>
->>>>> +
->>>>> +    if (max_heartbeat < min_heartbeat + 4)
->>>>>           dev_warn(dev,
->>>>>                "min heartbeat and max heartbeat might be too close 
->>>>> for the system to handle it correctly\n");
->>>>> -        if (wdt->heartbeat < 4)
->>>>> -            dev_warn(dev,
->>>>> -                 "heartbeat might be too small for the system to 
->>>>> handle it correctly\n");
->>>>> -    } else {
->>>>> -        wdt->heartbeat -= 4;
->>>>> -    }
->>>>>       if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
->>>>>           err = request_irq(wdt->irq, wdt_interrupt,
->>>>> @@ -213,7 +224,9 @@ static int at91_wdt_init(struct 
->>>>> platform_device *pdev, struct at91wdt *wdt)
->>>>>                tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
->>>>>       setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
->>>>> -    mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
->>>>> +    /* Use min_heartbeat the first time because the watchdog 
->>>>> timer might
->>>>> +     * be running for a long time when we reach this init 
->>>>> function. */
->>>>     /*
->>>>      * Multi-line comment style
->>>>      *
->>>>      * Not really sure I understand what this accomplishes. What 
->>>> problem
->>>>      * are you trying to solve here ?
->>>>      */
->>> Sure, I'll change the comment style.
->>>
->>> What, I'm trying to explain, is that the watchdog might (or should)
->>> have been resetted
->>> before loading the linux kernel. But loading the kernel takes some
->>> time (uncompressing,
->>> low level init, ...), and if we take the heartbeat (or max_heartbeat
->>> / 4 in the common case) value as
->>> the next trigger to reset the watchdog counter, the watchdog timer
->>> might have already expired.
->>>
->> But increasing anything in the watchdog driver itself won't help you 
->> there.
->> You can not execute any kernel code before that kernel code is running.
->
-> Of course, but you can at least try to minimize the time between the 
-> watchdog driver init
-> and the first wathdog counter reset.
->
->>> Here is an example:
->>>   - max_heartbeat configured to 8 seconds
->>>   - min_heartbeat configured to 1 second
->>>   => heartbeat = 2s
->>>   - kernel boot time (before at91 watchdog is loaded) = 6 secs
->>>
->> Guess that is where I got lost. Do you mean the time from loading the 
->> driver
->> to starting the watchdog application ? Because the init function is only
->> executed after the driver is loaded, so nothing will help you if it 
->> takes
->> too long for the driver to load.
->
-> I think there is another bug here: the driver should not be compiled 
-> as a module.
->
-> Here is why:
->
-> At POR the at91 SoC configure its watchdog with these default values:
->  - enabled
->  - min heartbeat = 0 ticks
->  - max heartbeat = 0xfff ticks <=> 16 secs
->  - some reset options
-> After a POR the watchdog can only be reconfigured once (and only once).
-> This configuration oftenly takes place in the the bootstrap (or 
-> bootloader),
-> but can eventually be done by the Linux kernel.
->
-> If the watchdog is kept enabled by the bootstrap (or bootloader), this 
-> means
-> the linux kernel will have to reset the watchdog counter as soon as 
-> possible to avoid
-> a possible watchdog reset.
->
-> => If we authorize the at91 sam9 watchdog to be compiled as a module, 
-> we're not sure
-> the module will be loaded soon enough to be able to reset the watchdog 
-> counter.
->
+>> Introduce three interfaces to patch kernel and module code:
+>> aarch64_insn_patch_text_nosync():
+>> 	patch code without synchronization, it's caller's responsibility
+>> 	to synchronize all CPUs if needed.
+>> aarch64_insn_patch_text_sync():
+>> 	patch code and always synchronize with stop_machine()
+>> aarch64_insn_patch_text():
+>> 	patch code and synchronize with stop_machine() if needed
 >>
->> You really have two times to deal with:
->> - Time from ROMMON handoff to loading the driver
->>    Nothing you can do there. If the watchdog fires before the driver 
->> is loaded,
->>    you are lost. Only way t handle this situation is to increase the 
->> timeout
->>    in the ROMMON.
->> - Time from loading driver to watchdog device open. This is really 
->> the time
->>    you are increasing with your change.
->
-> This is where it gets a bit tricky.
->
-> The heartbeat I'm talking about is not the "user space" heartbeat
-> (struct watchdog_device timeout field), it's the "hardware watchdog 
-> counter reset"
-> heartbeat (struct at91wdt heartbeat field).
->
-> Actually the at91 sam9 wdt driver does not provide a direct access to 
-> the watchdog reset
-> counter functionnality.
-> Instead, it periodically reset the watchdog counter (based on the 
-> timing config retrieved from
-> the hw registers), and eventually, if the user open a the watchdog dev 
-> file and fails to reset
-> the watchdog (using the user space API), the drivers stops resetting 
-> the hw counter, which leads
-> to a watchdog reset.
->
-> I hope I'm clear enough, cause it's quite complicated to explain.
->
-> Best Regards,
->
-> Boris
->
->> Thanks,
->> Guenter
+>> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+>> Cc: Jiang Liu <liuj97@gmail.com>
+>> ---
+>>  arch/arm64/include/asm/insn.h | 19 ++++++++-
+>>  arch/arm64/kernel/insn.c      | 91 +++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 109 insertions(+), 1 deletion(-)
 >>
->>> If I use the heartbeat value when configuring the first expiration
->>> of the timer,
->>> it might be too late to reset the watchdog counter.
->>>
->>> I'll try to find a proper to explain this use case :-).
->>>
->>>>> +    mod_timer(&wdt->timer, jiffies + min_heartbeat);
->>>>>       /* Try to set timeout from device tree first */
->>>>>       if (watchdog_init_timeout(&wdt->wdd, 0, dev))
->>>>> -- 
->>>>> 1.7.9.5
->>>>>
->>>>> -- 
->>>>> To unsubscribe from this list: send the line "unsubscribe 
->>>>> linux-watchdog" in
->>>>> the body of a message to majordomo at vger.kernel.org
->>>>> More majordomo info at http://vger.kernel.org/majordomo-info.html
->>>>>
->>> -- 
->>> To unsubscribe from this list: send the line "unsubscribe 
->>> linux-watchdog" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at http://vger.kernel.org/majordomo-info.html
->>>
->
+>> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+>> index 7499490..7a69491 100644
+>> --- a/arch/arm64/include/asm/insn.h
+>> +++ b/arch/arm64/include/asm/insn.h
+>> @@ -71,8 +71,25 @@ enum aarch64_insn_hint_op {
+>>  
+>>  bool aarch64_insn_is_nop(u32 insn);
+>>  
+>> -enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+>> +/*
+>> + * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
+>> + * little-endian.
+>> + */
+>> +static __always_inline u32 aarch64_insn_read(void *addr)
+>> +{
+>> +	return le32_to_cpu(*(u32 *)addr);
+>> +}
+>>  
+>> +static __always_inline void aarch64_insn_write(void *addr, u32 insn)
+>> +{
+>> +	*(u32 *)addr = cpu_to_le32(insn);
+>> +}
+> 
+> I wouldn't bother with these helpers. You should probably be using
+> probe_kernel_address or similar, then doing the endianness swabbing on the
+> return value in-line.
+How about keeping and refining aarch64_insn_read/write interfaces
+by using probe_kernel_address()? I think they may be used in other
+places when supporting big endian ARM64 kernel.
+
+> 
+>> +enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+>>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>>  
+>> +int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+>> +int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+>> +int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+>> +
+>>  #endif	/* __ASM_INSN_H */
+>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>> index f5b779f..3879db4 100644
+>> --- a/arch/arm64/kernel/insn.c
+>> +++ b/arch/arm64/kernel/insn.c
+>> @@ -16,6 +16,9 @@
+>>   */
+>>  #include <linux/compiler.h>
+>>  #include <linux/kernel.h>
+>> +#include <linux/smp.h>
+>> +#include <linux/stop_machine.h>
+>> +#include <asm/cacheflush.h>
+>>  #include <asm/insn.h>
+>>  
+>>  static int aarch64_insn_encoding_class[] = {
+>> @@ -88,3 +91,91 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+>>  	return __aarch64_insn_hotpatch_safe(old_insn) &&
+>>  	       __aarch64_insn_hotpatch_safe(new_insn);
+>>  }
+>> +
+>> +int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+>> +{
+>> +	u32 *tp = addr;
+>> +
+>> +	/* A64 instructions must be word aligned */
+>> +	if ((uintptr_t)tp & 0x3)
+>> +		return -EINVAL;
+>> +
+>> +	aarch64_insn_write(tp, insn);
+>> +	flush_icache_range((uintptr_t)tp, (uintptr_t)tp + sizeof(u32));
+> 
+> sizeof(insn) is clearer here.
+> 
+Will make this change in next version.
+
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +struct aarch64_insn_patch {
+>> +	void	**text_addrs;
+>> +	u32	*new_insns;
+>> +	int	insn_cnt;
+>> +};
+>> +
+>> +static DEFINE_MUTEX(text_patch_lock);
+>> +static atomic_t text_patch_id;
+>> +
+>> +static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>> +{
+>> +	int i, ret = 0;
+>> +	struct aarch64_insn_patch *pp = arg;
+>> +
+>> +	if (atomic_read(&text_patch_id) == smp_processor_id()) {
+> 
+> You could actually pass in the test_patch_id as zero-initialised parameter
+> to this function (i.e. it points to something on the stack of the guy
+> issuing the stop_machine). Then you do an inc_return here. If you see zero,
+> you go ahead and do the patching.
+Good suggestion!
+Function stop_machine() already has a mutex to serialize all callers,
+so we don't need explicitly serialization here. Will simplify the
+code in next version.
+
+> 
+>> +		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
+>> +			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
+>> +							     pp->new_insns[i]);
+>> +		/* Let other CPU continue */
+>> +		atomic_set(&text_patch_id, -1);
+> 
+> You're relying on the barrier in flush_icache_range to order this
+> atomic_set. I think you should add a comment describing that, because it's
+> very subtle.
+How about an explicitly smp_wmb() here? That would be more
+maintainable.
+
+> 
+>> +	} else {
+>> +		while (atomic_read(&text_patch_id) != -1)
+>> +			cpu_relax();
+>> +		isb();
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+> 
+> I don't think you need the isb -- the exception return should do the trick
+> (but again, a comment would be useful).
+stop_machine() is implemented by thread scheduling instead of cross CPU
+function call(IPI), so there may be no "eret" after returning from
+this callback function. So used an "isb" here.
+
+> 
+>> +
+>> +int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
+>> +{
+>> +	int ret;
+>> +	struct aarch64_insn_patch patch = {
+>> +		.text_addrs = addrs,
+>> +		.new_insns = insns,
+>> +		.insn_cnt = cnt,
+>> +	};
+>> +
+>> +	if (cnt <= 0)
+>> +		return -EINVAL;
+>> +
+>> +	mutex_lock(&text_patch_lock);
+> 
+> Again, if you use a loacl variable, I don't think you need the mutex. What
+> do you think?
+Sure, will make the change.
+
+> 
+>> +	atomic_set(&text_patch_id, smp_processor_id());
+>> +	ret = stop_machine(aarch64_insn_patch_text_cb, &patch, cpu_online_mask);
+> 
+> Instead of doing this, why not instead call aarch64_insn_patch_text_nosync
+> inline, then call kick_all_cpus_sync immediately afterwards, without the
+> need to stop_machine.
+Sandeepa, who is working on kprobe for ARM64, needs the stop_machine()
+mechanism to synchronize all online CPUs, so it's a preparation for
+kprobe.
+
+Thanks!
+Gerry
+> 
+> Will
+> 
