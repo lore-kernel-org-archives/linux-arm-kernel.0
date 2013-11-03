@@ -1,25 +1,32 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 03 Nov 2013 08:22:24 -0800
-Subject: [PATCH] watchdog: at91sam9_wdt: various fixes
-In-Reply-To: <527660C3.2050509@overkiz.com>
-References: <20131029075028.GF19704@spo001.leaseweb.com>
- <1383043053-3520-1-git-send-email-b.brezillon@overkiz.com>
- <20131029154519.GB9266@roeck-us.net> <526FE0DA.1020308@overkiz.com>
- <20131029164323.GF9266@roeck-us.net> <526FEEE7.7030708@overkiz.com>
- <527660C3.2050509@overkiz.com>
-Message-ID: <52767840.2050209@roeck-us.net>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun,  3 Nov 2013 18:38:12 +0200
+Subject: [PATCH] serial: pl011: remove redundant early amba_ports declaration
+Message-ID: <d4b3369bcc83cb33275661041faab1815775ceec.1383496607.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2013 06:42 AM, boris brezillon wrote:
-> Hello Guenter,
->
-> Are you okay with the 3 fixes/improvements provided by this patch,
-> and the explanation I gave regarding the reason for these changes ?
->
-> If so, I will submit a new series splitting the patch and including your suggestions.
->
-Yes, sorry, I was waiting for your patches.
+This early amba_ports declaration was introduced by commit c16d51a32 (amba
+pl011: workaround for uart registers lockup) for use in the pl011_lockup_wa()
+routine. This routine was later removed by commit 4fd0690bb (serial: pl011:
+implement workaround for CTS clear event issue).
 
-Thanks,
-Guenter
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ drivers/tty/serial/amba-pl011.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index aaa2286..4a50d92 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -112,8 +112,6 @@ static struct vendor_data vendor_st = {
+ 	.get_fifosize		= get_fifosize_st,
+ };
+ 
+-static struct uart_amba_port *amba_ports[UART_NR];
+-
+ /* Deals with DMA transactions */
+ 
+ struct pl011_sgbuf {
+-- 
+1.8.4.rc3
