@@ -1,32 +1,32 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Sun, 3 Nov 2013 16:32:40 -0500
-Subject: [PATCH v2 08/27] mtd: nand: pxa3xx: Use chip->cmdfunc instead of
- the internal
-In-Reply-To: <1382137374-21251-9-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1382137374-21251-9-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131103213237.GB5896@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun,  3 Nov 2013 10:30:11 +0100
+Subject: [PATCH 0/2] Add SMP support for the Allwinner A31 SoCs
+Message-ID: <1383471013-21695-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 18, 2013 at 08:02:35PM -0300, Ezequiel Garcia wrote:
-> @@ -1011,14 +1011,16 @@ static void pxa3xx_nand_free_buff(struct pxa3xx_nand_info *info)
->  static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
->  {
->  	struct mtd_info *mtd;
-> +	struct nand_chip *chip;
->  	int ret;
-Please add a empty line here.
+Hi everyone,
 
->  	mtd = info->host[info->cs]->mtd;
-> +	chip = mtd->priv;
->  	/* use the common timing to make a try */
->  	ret = pxa3xx_nand_config_flash(info, &builtin_flash_types[0]);
->  	if (ret)
->  		return ret;
->  
-> -	pxa3xx_nand_cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
-> +	chip->cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
->  	if (info->is_ready)
->  		return 0;
-Reviewed-by: Huang Shijie <shijie8@gmail.com>
+The Allwinner A31 is a quad-Cortex-A7 SoC. This patchset adds support
+for the bringup of the others CPUs at startup.
+
+Thanks,
+Maxime
+
+Maxime Ripard (2):
+  ARM: sun6i: dt: Add IP needed to bring up the additional cores
+  ARM: sun6i: Add SMP support for the Allwinner A31
+
+ arch/arm/boot/dts/sun6i-a31.dtsi |  10 ++++
+ arch/arm/mach-sunxi/Makefile     |   1 +
+ arch/arm/mach-sunxi/common.h     |  19 +++++++
+ arch/arm/mach-sunxi/headsmp.S    |  11 ++++
+ arch/arm/mach-sunxi/platsmp.c    | 115 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-sunxi/sunxi.c      |   3 +
+ 6 files changed, 159 insertions(+)
+ create mode 100644 arch/arm/mach-sunxi/common.h
+ create mode 100644 arch/arm/mach-sunxi/headsmp.S
+ create mode 100644 arch/arm/mach-sunxi/platsmp.c
+
+-- 
+1.8.4
