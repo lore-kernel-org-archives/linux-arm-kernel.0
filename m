@@ -1,32 +1,32 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun,  3 Nov 2013 18:38:12 +0200
-Subject: [PATCH] serial: pl011: remove redundant early amba_ports declaration
-Message-ID: <d4b3369bcc83cb33275661041faab1815775ceec.1383496607.git.baruch@tkos.co.il>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Sun,  3 Nov 2013 18:52:41 +0100
+Subject: [PATCH 0/3] watchdog: at91sam9_wdt: various fixes and improvements
+Message-ID: <1383501164-8111-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This early amba_ports declaration was introduced by commit c16d51a32 (amba
-pl011: workaround for uart registers lockup) for use in the pl011_lockup_wa()
-routine. This routine was later removed by commit 4fd0690bb (serial: pl011:
-implement workaround for CTS clear event issue).
+Hello,
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- drivers/tty/serial/amba-pl011.c | 2 --
- 1 file changed, 2 deletions(-)
+This patch series fix the secs_to_ticks macro in case 0 is passed as an
+argument.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index aaa2286..4a50d92 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -112,8 +112,6 @@ static struct vendor_data vendor_st = {
- 	.get_fifosize		= get_fifosize_st,
- };
- 
--static struct uart_amba_port *amba_ports[UART_NR];
--
- /* Deals with DMA transactions */
- 
- struct pl011_sgbuf {
+It also rework the heartbeat calculation to increase the security margin of the
+watchdog reset timer, and use the min_heartbeat value instead of the calculated
+heartbeat value for the first watchdog reset (to avoid spurious watchdog
+reset).
+
+Best Regards,
+
+Boris
+
+Boris BREZILLON (3):
+  watchdog: at91sam9_wdt: fix secs_to_ticks
+  watchdog: at91sam9_wdt: avoid spurious watchdog reset during init
+  watchdog: at91sam9_wdt: increase security margin on watchdog counter
+    reset
+
+ drivers/watchdog/at91sam9_wdt.c |   38 +++++++++++++++++++++++++++-----------
+ 1 file changed, 27 insertions(+), 11 deletions(-)
+
 -- 
-1.8.4.rc3
+1.7.9.5
