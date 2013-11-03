@@ -1,66 +1,31 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 03 Nov 2013 12:37:42 +0200
-Subject: [PATCH] ARM: dts: Add initial support for cm-fx6.
-In-Reply-To: <20131031055631.GA23549@S2101-09.ap.freescale.net>
-References: <1383048703-2101-1-git-send-email-valentin@compulab.co.il>
- <20131031055631.GA23549@S2101-09.ap.freescale.net>
-Message-ID: <52762776.4010303@compulab.co.il>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Sun, 3 Nov 2013 13:36:21 +0100
+Subject: [next:master 23/358] undefined reference to `i2c_add_adapter'
+In-Reply-To: <20131103120853.GA1731@localhost>
+References: <5275bf42.KMmrPUiia86VoRbL%fengguang.wu@intel.com>
+ <20131103120853.GA1731@localhost>
+Message-ID: <20131103123621.GA9756@type.youpi.perso.aquilenet.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/13 07:56, Shawn Guo wrote:
-> On Tue, Oct 29, 2013 at 02:11:43PM +0200, Valentin Raevsky wrote:
->> Add initial support for cm-fx6 module.
->>
->> cm-fx6 is a module based on mx6q SoC with the following features:
->> - Up to 4GB of DDR3
->> - 1 LCD/DVI output port
->> - 1 HDMI output port
->> - 2 LVDS LCD ports
->> - Gigabit Ethernet
->> - Analog Audio
->> - CAN
->> - SATA
->> - NAND
->> - PCIE
->>
->> This patch allows to boot up the module, configures the serial console,
->> the Ethernet adapter and the heartbeat led.
->>
->> cm-fx6 is embedded inside the Utilite computer.
->>
->> Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
->> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->> ---
->>
->> Shawn, can this still be applied for 3.13 ?
+Fengguang Wu, le Sun 03 Nov 2013 20:08:53 +0800, a ?crit :
+> It's a bug fix that unveils the link errors.
 > 
-> Sorry, it's late for 3.13.  Applied for 3.14 with a small fix-up below.
+>    drivers/built-in.o: In function `__input_unregister_device':
+>    input.c:(.text+0xf0e55): undefined reference to `input_led_disconnect'
 
-Thanks!
+Ok, so the "something like this" in the patch review was really not so
+trivial :)
 
-> 
->>
->>  arch/arm/boot/dts/Makefile         |    1 +
->>  arch/arm/boot/dts/imx6q-cm-fx6.dts |   53 ++++++++++++++++++++++++++++++++++++
->>  2 files changed, 54 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/imx6q-cm-fx6.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 641b3c9..87ca7ca 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -131,6 +131,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->>  	imx6q-sabrelite.dtb \
->>  	imx6q-sabresd.dtb \
->>  	imx6q-sbc6x.dtb \
->> +	imx6q-cm-fx6.dtb \
-> 
-> If you look at the list, you can find that they are sorted
-> alphabetically.  I just moved it around to maintain the order.
+To summarize, input.c needs to call leds.c to register its LEDs,
+and leds.c uses input.c functions, such as input_event. So in the
+all-modules case we have a circular dependency, and when one is built-in
+but not the other, we get an undefined reference.  In my original patch
+input.c would not call leds.c when built as module, and then the module
+wouldn't be useful any more.
 
-Sorry for that. Thanks for fixing this up!
+So in the end it would probably be simpler to just stuff leds.c along
+input.c in input.ko or built-in. CONFIG_INPUT_LEDS will thus become a
+bool.  I'm working on that now.
 
--- 
-Regards,
-Igor.
+Samuel
