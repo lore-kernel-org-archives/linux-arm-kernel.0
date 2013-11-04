@@ -1,34 +1,30 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Mon,  4 Nov 2013 10:28:03 +0100
-Subject: [PATCH] ARM: remove unused XSCALE_PMU Kconfig parameter
-Message-ID: <1383557283-4666-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Nov 2013 10:28:49 +0100
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <25161583.XICaeMWvPh@flatron>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <1432962.yW4lKnaQJE@flatron> <25161583.XICaeMWvPh@flatron>
+Message-ID: <2443024.JdDKnfkC18@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the XSCALE_PMU Kconfig parameter,
-which was no longer used anywhere in the source code
-and Makefiles.
+On Monday 04 November 2013 00:26:29 Tomasz Figa wrote:
+> 
+> Aha, one more thing. As it was mentioned on ARM Mini Summit, as a long 
+> term goal, we will eventually have to introduce another validation tool 
+> that checks device drivers against device tree bindings. We should keep 
+> this in mind when considering schema design.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/Kconfig | 5 -----
- 1 file changed, 5 deletions(-)
+Incidentally I have just had an idea for a new driver-level API that
+should let us do this much easier. I hope to find some time in the
+next few days to come up with draft kernel patches. If you don't hear
+back from me soon but want to work on validating the drivers against
+the bindings, please contact me again.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1ad6fb6c094d..6de847c74759 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1091,11 +1091,6 @@ config IWMMXT
- 	  Enable support for iWMMXt context switching at run time if
- 	  running on a CPU that supports it.
- 
--config XSCALE_PMU
--	bool
--	depends on CPU_XSCALE
--	default y
--
- config MULTI_IRQ_HANDLER
- 	bool
- 	help
--- 
-1.8.1.2
+The basic idea is to extend 'devres' to automatically register
+all the resources (registers, irq, dma, gpio, pinctrl, clk, regulator, ...)
+and simple properties before the ->probe() callback is even called,
+based on a per-driver data structure that describes them, and that
+can be easily parsed by an external tool.
+
+	Arnd
