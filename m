@@ -1,57 +1,29 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Mon, 04 Nov 2013 10:15:40 +0100
-Subject: [PATCH] ARM: S3C24XX: remove unused Kconfig parameter
-In-Reply-To: <1383463529-3113-1-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1383463529-3113-1-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <527765BC.5010904@free-electrons.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  4 Nov 2013 10:24:03 +0100
+Subject: [PATCH] ARM: orion5x: drop unused include from common.c
+Message-ID: <1383557043-18891-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2013 08:25 AM, Michael Opdenacker wrote:
-> This removes the MACH_S3C2413 Kconfig parameter,
-> which was no longer used anywhere in the source code
-> and Makefiles.
->
-> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
-> ---
->  arch/arm/mach-s3c24xx/Kconfig | 7 -------
->  1 file changed, 7 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index dba2173e70f3..9d90dd06cf2f 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -415,13 +415,6 @@ config MACH_JIVE_SHOW_BOOTLOADER
->  	bool "Allow access to bootloader partitions in MTD"
->  	depends on MACH_JIVE
->  
-> -config MACH_S3C2413
-> -	bool
-> -	help
-> -	  Internal node for S3C2413 version of SMDK2413, so that
-> -	  machine_is_s3c2413() will work when MACH_SMDK2413 is
-> -	  selected
-> -
->  config MACH_SMDK2412
->  	bool "SMDK2412"
->  	select MACH_SMDK2413
+asm/times.h only defines CLOCK_TICK_RATE, cycles_t and get_cycles. All
+three are not used in this file.
 
-Actually, in another thread, Sascha Hauer made me realize that this
-symbol is actually used to make machine_is_s3c2413() become true when
-the kernel is started with the corresponding machine id.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-orion5x/common.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-However, this patch doesn't hurt as machine_is_s3c2413() isn't used in
-the code.
-
-You can either keep it or wait for s3c2413 support to be removed or to
-be converted to the device tree.
-
-Cheers,
-
-Michael.
-
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index 91a5852..afa6b08 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -24,7 +24,6 @@
+ #include <asm/page.h>
+ #include <asm/setup.h>
+ #include <asm/system_misc.h>
+-#include <asm/timex.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
 -- 
-Michael Opdenacker, CEO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
-+33 484 258 098
+1.8.4.rc3
