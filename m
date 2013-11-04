@@ -1,104 +1,108 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 04 Nov 2013 09:42:29 -0700
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <1432962.yW4lKnaQJE@flatron>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <E1VZjCU-0005RE-Vt@jdl.com> <20131025231106.GC17659@voom.redhat.com>
- <1432962.yW4lKnaQJE@flatron>
-Message-ID: <5277CE75.6070804@wwwdotorg.org>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Mon, 04 Nov 2013 16:53:17 +0000
+Subject: [linux-sunxi] [PATCH 2/2] ARM: sun6i: Add SMP support for the
+ Allwinner A31
+In-Reply-To: <1383471013-21695-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1383471013-21695-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1383471013-21695-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1383583997.8826.123.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2013 04:15 PM, Tomasz Figa wrote:
-> On Saturday 26 of October 2013 10:11:06 David Gibson wrote:
->> On Fri, Oct 25, 2013 at 10:21:22AM -0500, Jon Loeliger wrote:
->>>> On 10/25/2013 12:43 AM, Grant Likely wrote:
->>>>> On Thu, 24 Oct 2013 22:51:28 +0100, Stephen Warren
->>>>> <swarren@wwwdotorg.org>> > 
->>>> wrote:
->>>>>> From: Stephen Warren <swarren@nvidia.com>
->>>>>>
->>>>>> This is a very quick proof-of-concept re: how a DT schema checker
->>>>>> might
->>>>>> look if written in C, and integrated into dtc.
->>>>>
->>>>> Thanks for looking at this.
->>>>>
->>>>> Very interesting. Certainly an expedient way to start checking
->>>>> schemas,
->>>>> and for certain bindings it may be the best approach. The downside
->>>>> is it forces a recompilation of DTC to bring in new bindings and
->>>>> it isn't a great meduim for mixing schema with documentation in
->>>>> the bindings.> > 
->>>> This approach would certainly require recompiling something. I threw
->>>> the code into dtc simply because it was the easiest container for
->>>> the demonstration. It could be a separate DT validation utility if
->>>> we wanted, although we'd need to split the DT parser from dtc into
->>>> a library to avoid code duplication. The resultant utility could be
->>>> part of the repo containing the DTs, so it didn't end up as a
->>>> separate package to manage.
->>>>
->>>> I think the additional documentation could be added as comments in
->>>> the
->>>> validation functions, just like IIRC it was to be represented as
->>>> comments even in the .dts-based schema proposals.
->>>
->>> DTers,
->>>
->>> I think the additional benefit of starting with a direct C
->>> implementation is that it causes us to begin to actually
->>> codify the schema requirements.  Sure, it may not be ideal
->>> at first, but over time it may reveal consistent patterns
->>> that can be extracted.  And it may reveal what a real schema
->>> might look like and how it might be expressed better.  Which
->>> is to say that perhaps we are letting "perfect" get in the
->>> way of "good enough to start"?
->>>
->>> In the meantime, someone has shown us the code and we can
->>> get started.  It's a Small Matter of Refactoring later. :-)
->>
->> Yes!  This!
->>
->> Think of this prototype as a mechanism for collating and applying a
->> bunch of schemas to the tree.  At the moment the schemas are all hard
->> coded in C, but it can be extended to load some or all of them
->> dynamically from a description / template / whatever.
->>
->> That also gives us the flexibility to start out with a simple but
->> limited schema language which handles common cases, while leaving the
->> complex cases in C, at least until we understand the requirements well
->> enough to extend the schema language.
+Not a comment on the patch, or even A31, but a question about how the
+SMP boot process works on sunxi generally...
+
+On Sun, 2013-11-03 at 10:30 +0100, Maxime Ripard wrote:
+> The A31 is a quad Cortex-A7. Add the logic to use the IPs used to
+> control the CPU configuration and the CPU power so that we can bring up
+> secondary CPUs at boot.
+> [...]
+> +	/* Set CPU boot address */
+> +	writel(virt_to_phys(sun6i_secondary_startup),
+> +	       cpucfg_membase + CPUCFG_PRIVATE0_REG);
+
+Does the secondary CPU jump straight here from the lowlevel firmware or
+does it go through the bootloader which reads the reg and does the jump?
+I can't see any reference to this reg in u-boot so I guess the former?
+
+I'm trying to work out if we can make this work with the requirement
+which both Xen and KVM have to enter the kernel in NS-HYP mode.
+
+The way this works on e.g. vexpress is (roughly) that u-boot wakes up
+the secondary CPUs from the lowlevel firmware and places them into its
+own holding pen, which has the same wake up protocol as the firmware so
+the kernel can just use the same code. If u-boot never gets to run on
+secondary CPUs that isn't going to help much. 
+
+My concern is that the sequence here appears to involve resetting the
+secondary CPU, which I figure will probably defeat that strategy by
+kicking the CPU back into the lowlevel firmware in the reset state,
+meaning it can't be done by a u-boot only change.
+
+Hrm, what to do ... perhaps a DT driven selection between this mechanism
+and sev to kick a wfe loop reading the private register?
+
+Ian.
+
+> +
+> +	/* Assert the CPU core in reset */
+> +	writel(0, cpucfg_membase + CPUCFG_CPU_RST_CTRL_REG(cpu));
+> +
+> +	/* Assert the L1 cache in reset */
+> +	reg = readl(cpucfg_membase + CPUCFG_GEN_CTRL_REG);
+> +	writel(reg & ~BIT(cpu), cpucfg_membase + CPUCFG_GEN_CTRL_REG);
+> +
+> +	/* Disable external debug access */
+> +	reg = readl(cpucfg_membase + CPUCFG_DBG_CTL1_REG);
+> +	writel(reg & ~BIT(cpu), cpucfg_membase + CPUCFG_DBG_CTL1_REG);
+> +
+> +	/* Power up the CPU */
+> +	for (i = 0; i <= 8; i++)
+> +		writel(0xff >> i, prcm_membase + PRCM_CPU_PWR_CLAMP_REG(cpu));
+> +	mdelay(10);
+> +
+> +	/* Clear CPU power-off gating */
+> +	reg = readl(prcm_membase + PRCM_CPU_PWROFF_REG);
+> +	writel(reg & ~BIT(cpu), prcm_membase + PRCM_CPU_PWROFF_REG);
+> +	mdelay(1);
+> +
+> +	/* Deassert the CPU core reset */
+> +	writel(3, cpucfg_membase + CPUCFG_CPU_RST_CTRL_REG(cpu));
+> +
+> +	/* Enable back the external debug accesses */
+> +	reg = readl(cpucfg_membase + CPUCFG_DBG_CTL1_REG);
+> +	writel(reg | BIT(cpu), cpucfg_membase + CPUCFG_DBG_CTL1_REG);
+> +
+> +	spin_unlock(&cpu_lock);
+> +
+> +	return 0;
+> +}
+> +
+> +struct smp_operations sun6i_smp_ops __initdata = {
+> +	.smp_prepare_cpus	= sun6i_smp_prepare_cpus,
+> +	.smp_boot_secondary	= sun6i_smp_boot_secondary,
+> +};
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index f184f6c2fa33..b2e570253a8f 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -26,6 +26,8 @@
+>  #include <asm/mach/map.h>
+>  #include <asm/system_misc.h>
+>  
+> +#include "common.h"
+> +
+>  #define SUN4I_WATCHDOG_CTRL_REG		0x00
+>  #define SUN4I_WATCHDOG_CTRL_RESTART		BIT(0)
+>  #define SUN4I_WATCHDOG_MODE_REG		0x04
+> @@ -147,6 +149,7 @@ DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
+>  	.init_time	= sunxi_timer_init,
+>  	.dt_compat	= sun6i_board_dt_compat,
+>  	.restart	= sun6i_restart,
+> +	.smp		= smp_ops(sun6i_smp_ops),
+>  MACHINE_END
+>  
+>  static const char * const sun7i_board_dt_compat[] = {
+> -- 
+> 1.8.4
 > 
-> This is fine as an intermediate step, but I'm afraid that the overhead of 
-> work needed to describe all the bindings using C language directly will be 
-> pretty big. C language isn't really best fitted for such purposes.
-
-My opinion is the exact opposite.
-
-If you create a custom schema language, you have to develop:
-
-* An entire new language specification, and perhaps syntax to represent
-the schema.
-
-* A new parser (if not lexer).
-
-* Keep extending that as new schemas require more and more different
-validation that wasn't originally considered.
-
-Once we've specified every schema, we'll end up having had to invent a
-completely new Turing-complete language.
-
-However, if schemas are simply C code, you simply write code to validate
-the data. In my opinion, nothing could be simpler. Everyone working on
-the kernel is already familiar with C. We can refactor common patterns
-into function calls so people don't have to re-implement it.
-
-I don't see any reason why the C schema checker couldn't be linked into
-the kernel and applied at run-time, assuming we take a little care to
-write is as a library we call from dtc, rather than something closely
-coupled with dtc's internals. (Or implement it as a separate app).
-
-(Note that there's a bit more information in a .dts that a DTB, so some
-schema checking might be harder on a DTB). For example, phandle
-references are just another cell in the binary, but have a unique syntax
-in the source.
