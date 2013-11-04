@@ -1,55 +1,52 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 4 Nov 2013 12:54:43 +0200
-Subject: [PATCHv9 09/43] CLK: ti: add support for ti divider-clock
-In-Reply-To: <52740283.8040201@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-10-git-send-email-t-kristo@ti.com> <52729B50.5060503@ti.com>
- <527378FF.6020905@ti.com> <52737A73.5010700@ti.com> <52740283.8040201@ti.com>
-Message-ID: <52777CF3.7000802@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 4 Nov 2013 11:58:36 +0100
+Subject: [PATCH v4 0/4] Energy Micro efm32 support
+Message-ID: <20131104105836.GI14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2013 09:35 PM, Nishanth Menon wrote:
-> On 11/01/2013 04:54 AM, Tero Kristo wrote:
->> On 11/01/2013 11:48 AM, Tero Kristo wrote:
->>> On 10/31/2013 08:02 PM, Nishanth Menon wrote:
->>>> On 10/25/2013 10:57 AM, Tero Kristo wrote:
->
-> [...]
->>>>> diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
->>>>> new file mode 100644
->>>>> index 0000000..787bc8f
->>>>> --- /dev/null
->>>>> +++ b/drivers/clk/ti/divider.c
->
-> [...]
->>>>> +    if (!IS_ERR(clk)) {
->>>>> +        of_clk_add_provider(node, of_clk_src_simple_get, clk);
->>>>> +        ret = of_ti_autoidle_setup(node, regmap);
->>>>
->>>> if this fails, table will be freed though, we have added provider and
->>>> registerd table_regmap, no?
->>>
->>> Provider and regmap are shared for the whole IP block (CM/PRM whatever.)
->>> Those are only initialized once.
->>
->> Some minor confusion here in my comment, sorry about that.
->>
->> Regmap is shared for the whole IP block and initialized only once, we
->> can't remove it here as it is not owned by this clock. For
->> clock-provider / unregister part, I don't want to clean those up as 1)
->> unregister doesn't currently do anything 2) autoidle setup is not
->> critical failure, it just breaks PM. I can add error print for it though.
->
-> Would IP blocks driven by clocks work with the autoidle configuration
-> broken? I believe we will be writing to DPLL_XYZ_GATE_CTRL? the usage
-> I believe is around
-> of_ti_clk_deny_autoidle_all/of_ti_clk_allow_autoidle_all which gets
-> invoked in omap2_clk_disable_autoidle_all part of xyz SoC init call.
-> is'nt the reason we do that to ensure we have no potential race when
-> clocks dissapear on their own without explicit control in critical
-> configuration paths?
+Hello,
 
-They will work, but they just don't transition to low-power mode ever.
+now that 3.12 is out, I patted my efm32 tree and I consider the base
+platform support ready for merging. I put it into my for-next branch at
 
--Tero
+	git://git.pengutronix.de/git/ukl/linux.git for-next
+
+so it should make it into the next next. I target 3.14-rc1 to make it
+in. The patches have a few runtime (but no compile-time) dependencies on
+these patches:
+
+	ARM: call of_clk_init from default time_init handler
+	clocksource: Provide timekeeping for efm32 SoCs
+	clk: new driver for efm32 SoC
+
+All but the last patch are already in next, Mike promised to take the
+last one. DEBUG_LL is broken without
+
+	ARM: DEBUG_LL on efm32 SoCs
+
+which already is in next, too. There are no device tree source files yet
+as they have a compile time dependency on the clk patch above.
+
+I'm not using multiarch here. I'm still unsure if it makes sense or not
+to use it for v7-M, I'm sticking to not using it mainly because of
+Russell's objections. Still the patch adding the platform is very small
+now (just a trivial machine file, a defconfig and Makefile/Kconfig
+adaptions) and is easily switched to multiarch if need be.
+
+The complete and runnable tree is available in my master branch.
+
+I suggest to let it go in via Russell as it has less potential to
+conflict with arm-soc.
+
+As the patches changed a bit I will repost them here. Note I called them
+all "v4" even though patches 1 to 3 are really only (a resent of) v1.
+
+Any feed back is welcome.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
