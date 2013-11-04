@@ -1,49 +1,83 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 04 Nov 2013 15:36:42 +0800
-Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
- "include/asm/atomic.h"
-In-Reply-To: <794E70F6-80D3-4100-A0FF-A6F34AFB9A59@arm.com>
-References: <5256117A.4000009@asianux.com> <5256121A.9030504@asianux.com>
- <52561269.60900@asianux.com>
- <20131010100733.GH3817@mudshark.cambridge.arm.com>
- <52568998.2080108@asianux.com>
- <20131010142305.GG6199@mudshark.cambridge.arm.com>
- <525751E2.3020207@asianux.com>
- <20131011104419.GE14732@mudshark.cambridge.arm.com>
- <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
- <20131011165530.GS14732@mudshark.cambridge.arm.com>
- <794E70F6-80D3-4100-A0FF-A6F34AFB9A59@arm.com>
-Message-ID: <52774E8A.2080901@asianux.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 4 Nov 2013 08:42:27 +0100
+Subject: [PATCH RFC] clk: add gpio controlled clock
+In-Reply-To: <c52a7910c6ce33ceed0f38b89953527eee06b0b5.1383312867.git.jsarha@ti.com>
+References: <cover.1383312867.git.jsarha@ti.com>
+ <c52a7910c6ce33ceed0f38b89953527eee06b0b5.1383312867.git.jsarha@ti.com>
+Message-ID: <20131104084227.3323f98e@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maintainers:
+Hi,
 
-Are these related patches for "arm[64]/include/asm/atomic.h" OK? If also
-need me do something, please let me know, and I will/should try.
-
-Thanks.
-
-
-On 10/13/2013 06:28 AM, Catalin Marinas wrote:
-> On 11 Oct 2013, at 17:55, Will Deacon <will.deacon@arm.com> wrote:
->> On Fri, Oct 11, 2013 at 12:47:05PM +0100, Chen Gang wrote:
->>> In current kernel wide source code, except other architectures, only
->>> s390 scsi drivers use atomic_clear_mask(), and arm/arm64 need not
->>> support s390 drivers.
->>>
->>> So remove atomic_clear_mask() from "arm[64]/include/asm/atomic.h".
->>
->>  Acked-by: Will Deacon <will.deacon@arm.com>
->>
->> Catalin, are you happy for me to send this via the ARM tree?
+Jyri Sarha wrote:
+> The added clk-gpio is a basic clock that can be enabled and disabled
+> trough a gpio output. The DT binding document for the clock is also
+> added.
 > 
-> Fine by me.
+> Signed-off-by: Jyri Sarha <jsarha@ti.com>
+> ---
+>  .../devicetree/bindings/clock/gpio-clock.txt       |   21 +++
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/clk-gpio.c                             |  154 ++++++++++++++++++++
+>  include/linux/clk-provider.h                       |   25 ++++
+>  4 files changed, 201 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/gpio-clock.txt
+>  create mode 100644 drivers/clk/clk-gpio.c
 > 
-> Catalin
-> 
-> 
+> diff --git a/Documentation/devicetree/bindings/clock/gpio-clock.txt b/Documentation/devicetree/bindings/clock/gpio-clock.txt
+> new file mode 100644
+> index 0000000..54fea39
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/gpio-clock.txt
+[...]
+> +/**
+> + * clk_register_gpio - register a gpip clock with the clock framework
+> + * @dev: device that is registering this clock
+> + * @name: name of this clock
+> + * @parent_name: name of this clock's parent
+> + * @flags: framework-specific flags for this clock
+> + * @gpio: gpio to control this clock
+> + * @active_low: gpio polarity
+> + */
+> +struct clk *clk_register_gpio(struct device *dev, const char *name,
+> +		const char *parent_name, unsigned long flags,
+> +		unsigned int gpio, bool active_low)
+> +{
+> +	struct clk_gpio *clk_gpio;
+> +	struct clk *clk;
+> +	struct clk_init_data init = { NULL };
+> +	unsigned long gpio_flags;
+> +	int err;
+> +
+> +	if (active_low)
+> +		gpio_flags = GPIOF_OUT_INIT_LOW;
+> +	else
+> +		gpio_flags = GPIOF_OUT_INIT_HIGH;
+> +
+> +	err = gpio_request_one(gpio, gpio_flags, name);
+> +	if (err) {
+> +		pr_err("%s: Error requesting clock control gpio %u\n",
+> +		       __func__, gpio);
+> +		return ERR_PTR(-EINVAL);
+>
+You already have an error code from the gpio_request_one() call.
+Why return a different one?
+
+> +
+> +	clk_gpio = kzalloc(sizeof(struct clk_gpio), GFP_KERNEL);
+>
+devm_kzalloc()?
 
 
+Lothar Wa?mann
 -- 
-Chen Gang
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
