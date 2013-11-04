@@ -1,36 +1,55 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 4 Nov 2013 09:01:11 -0300
-Subject: [PATCH v2 07/27] mtd: nand: pxa3xx: Early variant detection
-In-Reply-To: <20131103211856.GA5896@gmail.com>
-References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1382137374-21251-8-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131103211856.GA5896@gmail.com>
-Message-ID: <20131104120110.GC2516@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 4 Nov 2013 13:01:59 +0100
+Subject: [PATCHv7][ 1/4] Input: tsc2007: Add device tree support.
+In-Reply-To: <20131024151736.GE9044@ulmo.nvidia.com>
+References: <1382618536-25320-1-git-send-email-denis@eukrea.com>
+ <20131024151736.GE9044@ulmo.nvidia.com>
+Message-ID: <CACRpkdbuB6g+Qo0FCXaueKpAvT6vUKuNmoceWCGfG0KLa8+3Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 03, 2013 at 04:18:58PM -0500, Huang Shijie wrote:
-> On Fri, Oct 18, 2013 at 08:02:34PM -0300, Ezequiel Garcia wrote:
-> > In order to customize early settings depending on the detected SoC variant,
-> what's the early settings depending on the variant?
+On Thu, Oct 24, 2013 at 5:17 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Thu, Oct 24, 2013 at 02:42:13PM +0200, Denis Carikli wrote:
 
-We need to detect the variant *before* alloc_nand_resource(),
-in order to set a different cmdfunc() for each variant.
+>> +Optional properties:
+>> +- gpios: the interrupt gpio the chip is connected to (trough the penirq pin)
+>> +  (see GPIO binding[2] for more details).
+>> +- interrupt-parent: the phandle for the gpio controller
+>> +  (see interrupt binding[1]).
+>> +- interrupts: (gpio) interrupt to which the chip is connected
+>> +  (see interrupt binding[1]).
+>> +- pinctrl-0: Should specify pin control groups used for the gpio
+>> +  (see pinctrl bindings[0]).
+>> +- pinctrl-names: Should contain only one value - "default"
+>> +  (see pinctrl bindings[0]).
+>
+> Also I haven't seen a response as to why this can't be handled by the
+> GPIO driver. Adding Linus Walleij, perhaps he knows a more definitive
+> answer.
+>
+> Linus, the issue here is that the pinctrl properties for this chip are
+> supposed to pinmux the pendown GPIO for this chip. I was under the
+> impression that this should be handled by the GPIO controller itself, so
+> that when gpio_request() was called on a pin it would be the GPIO
+> controller driver's responsibility to pinmux it appropriately.
 
-Having a separate cmdfunc() is, IMO, the best solution for two
-reasons:
+If this is the only thing it does (just mux in the GPIO and not setting
+any pulls or other pin config properties) then it can fall through from
+the GPIO controller's request function to pinctrl_request_gpio()
+and then pinctrl_free_gpio(), pinctrl_gpio_direction_input()
+and pinctrl_gpio_direction_output() respectively so that pin control
+provides a muxing back end to the GPIO driver.
 
-1. We keep the legacy pxa platform away from our intrusive changes,
-which such platform won't use.
+Actually these functions are up to the driver to implement, but
+the core will call ->gpio_request_enable() on the pinctrl driver,
+and if all GPIOs are set up the same way (i.e. the same bits
+are always poked into the hardware) then this can be done
+in that routine.
 
-2. The 'splitted' command semantic is weird and complex enough
-to live in its own function.
+If more fine-grained control is needed, this approach providing
+a full pin control handle and state settings connected to the
+struct device * can and should be used instead.
 
-> could you add them in the commit?
-> 
-
-Yes, that sound better. Thanks for the feedback.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
