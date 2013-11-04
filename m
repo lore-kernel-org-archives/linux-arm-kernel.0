@@ -1,108 +1,38 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Mon, 04 Nov 2013 16:53:17 +0000
-Subject: [linux-sunxi] [PATCH 2/2] ARM: sun6i: Add SMP support for the
- Allwinner A31
-In-Reply-To: <1383471013-21695-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1383471013-21695-1-git-send-email-maxime.ripard@free-electrons.com>
- <1383471013-21695-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1383583997.8826.123.camel@kazak.uk.xensource.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 4 Nov 2013 15:05:37 -0200
+Subject: [PATCHv4][ 5/6] ARM: dts: i.MX35: Add display support.
+In-Reply-To: <1383581724-14817-5-git-send-email-denis@eukrea.com>
+References: <1383581724-14817-1-git-send-email-denis@eukrea.com>
+ <1383581724-14817-5-git-send-email-denis@eukrea.com>
+Message-ID: <CAOMZO5AScU=eNjnoBxUHibJihZewQdjT-PB-4yZ-fmQMgc4ZHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not a comment on the patch, or even A31, but a question about how the
-SMP boot process works on sunxi generally...
+Hi Denis,
 
-On Sun, 2013-11-03 at 10:30 +0100, Maxime Ripard wrote:
-> The A31 is a quad Cortex-A7. Add the logic to use the IPs used to
-> control the CPU configuration and the CPU power so that we can bring up
-> secondary CPUs at boot.
-> [...]
-> +	/* Set CPU boot address */
-> +	writel(virt_to_phys(sun6i_secondary_startup),
-> +	       cpucfg_membase + CPUCFG_PRIVATE0_REG);
+On Mon, Nov 4, 2013 at 2:15 PM, Denis Carikli <denis@eukrea.com> wrote:
+> +                       ipu: ipu at 53fc0000 {
+> +                               compatible = "fsl,imx31-ipu";
+> +                               reg = < 0x53fc0000 0x5f
+> +                                       0x53fc0088 0x2b >;
+> +                               interrupts = <42 41>;
+> +                               clocks = <&clks 55>;
+> +                               status = "disabled";
+> +                       };
+> +
+> +                       lcdc: mx3fb at 53fc00b4 {
+> +                               compatible = "fsl,mx3-fb";
+> +                               reg = <0x53fc00b4 0x0b>;
+> +                               clocks = <&clks 55>;
+> +                               status = "disabled";
+> +                       };
 
-Does the secondary CPU jump straight here from the lowlevel firmware or
-does it go through the bootloader which reads the reg and does the jump?
-I can't see any reference to this reg in u-boot so I guess the former?
+MX35 Reference Manual states that the IPU address range is 0x53fc0000
+- 0x53fc3fff
 
-I'm trying to work out if we can make this work with the requirement
-which both Xen and KVM have to enter the kernel in NS-HYP mode.
+There is no 'lcdc' peripheral listed there, so I don't think 'lcdc'
+should be included here.
 
-The way this works on e.g. vexpress is (roughly) that u-boot wakes up
-the secondary CPUs from the lowlevel firmware and places them into its
-own holding pen, which has the same wake up protocol as the firmware so
-the kernel can just use the same code. If u-boot never gets to run on
-secondary CPUs that isn't going to help much. 
+Regards,
 
-My concern is that the sequence here appears to involve resetting the
-secondary CPU, which I figure will probably defeat that strategy by
-kicking the CPU back into the lowlevel firmware in the reset state,
-meaning it can't be done by a u-boot only change.
-
-Hrm, what to do ... perhaps a DT driven selection between this mechanism
-and sev to kick a wfe loop reading the private register?
-
-Ian.
-
-> +
-> +	/* Assert the CPU core in reset */
-> +	writel(0, cpucfg_membase + CPUCFG_CPU_RST_CTRL_REG(cpu));
-> +
-> +	/* Assert the L1 cache in reset */
-> +	reg = readl(cpucfg_membase + CPUCFG_GEN_CTRL_REG);
-> +	writel(reg & ~BIT(cpu), cpucfg_membase + CPUCFG_GEN_CTRL_REG);
-> +
-> +	/* Disable external debug access */
-> +	reg = readl(cpucfg_membase + CPUCFG_DBG_CTL1_REG);
-> +	writel(reg & ~BIT(cpu), cpucfg_membase + CPUCFG_DBG_CTL1_REG);
-> +
-> +	/* Power up the CPU */
-> +	for (i = 0; i <= 8; i++)
-> +		writel(0xff >> i, prcm_membase + PRCM_CPU_PWR_CLAMP_REG(cpu));
-> +	mdelay(10);
-> +
-> +	/* Clear CPU power-off gating */
-> +	reg = readl(prcm_membase + PRCM_CPU_PWROFF_REG);
-> +	writel(reg & ~BIT(cpu), prcm_membase + PRCM_CPU_PWROFF_REG);
-> +	mdelay(1);
-> +
-> +	/* Deassert the CPU core reset */
-> +	writel(3, cpucfg_membase + CPUCFG_CPU_RST_CTRL_REG(cpu));
-> +
-> +	/* Enable back the external debug accesses */
-> +	reg = readl(cpucfg_membase + CPUCFG_DBG_CTL1_REG);
-> +	writel(reg | BIT(cpu), cpucfg_membase + CPUCFG_DBG_CTL1_REG);
-> +
-> +	spin_unlock(&cpu_lock);
-> +
-> +	return 0;
-> +}
-> +
-> +struct smp_operations sun6i_smp_ops __initdata = {
-> +	.smp_prepare_cpus	= sun6i_smp_prepare_cpus,
-> +	.smp_boot_secondary	= sun6i_smp_boot_secondary,
-> +};
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index f184f6c2fa33..b2e570253a8f 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -26,6 +26,8 @@
->  #include <asm/mach/map.h>
->  #include <asm/system_misc.h>
->  
-> +#include "common.h"
-> +
->  #define SUN4I_WATCHDOG_CTRL_REG		0x00
->  #define SUN4I_WATCHDOG_CTRL_RESTART		BIT(0)
->  #define SUN4I_WATCHDOG_MODE_REG		0x04
-> @@ -147,6 +149,7 @@ DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
->  	.init_time	= sunxi_timer_init,
->  	.dt_compat	= sun6i_board_dt_compat,
->  	.restart	= sun6i_restart,
-> +	.smp		= smp_ops(sun6i_smp_ops),
->  MACHINE_END
->  
->  static const char * const sun7i_board_dt_compat[] = {
-> -- 
-> 1.8.4
-> 
+Fabio Estevam
