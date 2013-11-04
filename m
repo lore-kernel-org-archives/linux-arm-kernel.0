@@ -1,30 +1,28 @@
-From: B47053@freescale.com (Li Xiubo)
-Date: Mon, 4 Nov 2013 09:52:44 +0000
-Subject: [PATCHv2 6/8] ASoC: fsl: add SGTL5000 based audio machine driver.
-In-Reply-To: <20131101184008.GF2493@sirena.org.uk>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-7-git-send-email-Li.Xiubo@freescale.com>
- <20131101184008.GF2493@sirena.org.uk>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82874583@039-SN2MPN1-013.039d.mgd.msft.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 04 Nov 2013 18:56:57 +0900
+Subject: [PATCH] ARM: SAMSUNG: remove unused SAMSUNG_GPIOLIB_4BIT Kconfig
+ parameter
+In-Reply-To: <1383558685-5343-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1383558685-5343-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <000001ced944$33386320$99a92960$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > Conflicts:
-> > 	sound/soc/fsl/Makefile
+On Monday, November 04, 2013 6:51 PM, Michael Opdenacker wrote:
 > 
-> Ahem.
+> This removes the SAMSUNG_GPIOLIB_4BIT Kconfig parameter,
+> which was no longer used anywhere in the source code
+> and Makefiles.
 > 
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
 
-This will be removed.
+It looks good.
+Reviewed-by: Jingoo Han <jg1.han@samsung.com>
 
-> > +static int fsl_sgtl5000_remove(struct platform_device *pdev) {
-> > +	snd_soc_unregister_card(&fsl_sgt1500_card);
-> > +
-> > +	return 0;
-> > +}
-> 
-> You're using snd_soc_unregister_card() so you don't need to do this.
->
+Best regards,
+Jingoo Han
 
-See the next version.
+> ---
+>  arch/arm/Kconfig              | 1 -
+>  arch/arm/plat-samsung/Kconfig | 8 --------
+>  2 files changed, 9 deletions(-)
