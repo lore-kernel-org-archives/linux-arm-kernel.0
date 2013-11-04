@@ -1,42 +1,37 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 4 Nov 2013 12:46:27 -0800
-Subject: Tegra baseline test results for v3.12
-Message-ID: <527807A3.10108@nvidia.com>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 04 Nov 2013 16:25:40 -0500
+Subject: [PATCH] uprobes: introduce arch_uprobe->ixol
+In-Reply-To: <20131104194901.GA28022@redhat.com>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-4-git-send-email-dave.long@linaro.org>
+ <20131019163627.GA7837@redhat.com> <52671265.2020107@linaro.org>
+ <20131029154006.GA22344@redhat.com> <20131104194901.GA28022@redhat.com>
+Message-ID: <527810D4.2060109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.12.
-Logs and other details at:
-
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.12/20131104103421/
-
-
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-headless, tegra30-beaver
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.12-rc7 (test_v3.12-rc7)):
-    text     data      bss    total  kernel
-       0        0        0        0  multi_v7_defconfig
-    -404        0        0     -404  tegra_defconfig
+On 11/04/13 14:49, Oleg Nesterov wrote:
+> On 10/29, Oleg Nesterov wrote:
+>>
+>> David. Perhaps we can avoid the new hook altogether? What if we do
+>> the simple change below (it ignores powerpc) ?
+>>
+>> Then arm can add "unsigned long ixol[2]" into its arch_uprobe, and
+>> arch_uprobe_analyze_insn() can initialize this member correctly.
+>>
+>> What do you think?
+>
+> Seriouly, how about the patch below?
+>
+> In fact, given that you are going to reimplement set_swbp/orig_insn,
+> the new member is not strictly needed (afaics). But it looks more
+> clear this way, and we need s/MAX_UINSN_BYTES/sizeof()/ anyway.
+>
+> Oleg.
+>
 
 
+Sorry for the delay, have not quite been successful in getting this to 
+work yet.  Hopefully will have better results shortly.
 
-Boot-time memory difference
-(delta in bytes from test_v3.12-rc7 (test_v3.12-rc7))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-hea   multi_v7_defconfig     tegra114-dalmore
-         .        .        .        . tegra114-dalmore-hea      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-dl
