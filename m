@@ -1,37 +1,104 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Mon,  4 Nov 2013 06:19:26 +0100
-Subject: [PATCH] ARM: imx: removed unused MACH_MXLADS Kconfig parameter
-Message-ID: <1383542366-6270-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 4 Nov 2013 11:34:37 +0530
+Subject: [PATCH v2 1/9] phy: add phy_get_bus_width()/phy_set_bus_width()
+ calls
+In-Reply-To: <1391452.2H43C6z4fl@flatron>
+References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
+ <52753387.5030202@ti.com> <20131102174709.GE17505@beef>
+ <1391452.2H43C6z4fl@flatron>
+Message-ID: <527738F5.1040305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the MACH_MXLADS Kconfig parameter,
-which was no longer used anywhere in the source code
-and Makefiles.
+Hi,
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/mach-imx/Kconfig | 3 ---
- 1 file changed, 3 deletions(-)
+On Saturday 02 November 2013 11:28 PM, Tomasz Figa wrote:
+> On Saturday 02 of November 2013 13:47:09 Matt Porter wrote:
+>> On Sat, Nov 02, 2013 at 10:46:55PM +0530, Kishon Vijay Abraham I wrote:
+>>> Hi Tomasz,
+>>>
+>>> On Saturday 02 November 2013 06:44 PM, Tomasz Figa wrote:
+>>>> Hi Matt,
+>>>>
+>>>> On Friday 01 of November 2013 15:45:50 Matt Porter wrote:
+>>>>> This adds a pair of APIs that allows the generic PHY subsystem to
+>>>>> provide information on the PHY bus width. The PHY provider driver
+>>>>> may
+>>>>> use phy_set_bus_width() to set the bus width that the PHY supports.
+>>>>> The controller driver may then use phy_get_bus_width() to fetch the
+>>>>> PHY bus width in order to properly configure the controller.
+>>>>
+>>>> I somehow does not like this. If we take this path for any further
+>>>> properties that we may need, we will end up with a lot of consumer
+>>>> specific properties stored in a PHY object having their own accessor
+>>>> functions.
+>>>
+>>> Only after all of us feel that a property is *generic* enough, we
+>>> allow it to be added in the PHY object.
+>>
+>> I also want to note that this was discussed over in another thread [2]
+>> where you did consider my rough stab at a more generic attribute
+>> accessor. It was definitely my first reaction as the way to do it like
+>> Tomasz has said. The specific accessors are more readable to me besides
+>> the justification you mention above.
+>>
+>> [2] http://lkml.indiana.edu/hypermail/linux/kernel/1310.3/00673.html
+>
+> Personally I like that version much better, but still it would need to be
+> polished a bit.
+>
+> How I imagine such interface to be implemented:
+>
+> phy.h:
+>
+> struct phy {
+> 	// ...
+> 	const struct phy_attrs *attrs;
+> 	// ...
+> };
+>
+> static inline const struct phy_attrs *phy_get_attrs(struct phy *phy) {
+> 	return phy->attrs;
+> };
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 29a8af6922a8..d84a772bbc68 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -158,14 +158,11 @@ config	SOC_IMX51
- if ARCH_MULTI_V4T
- 
- comment "MX1 platforms:"
--config MACH_MXLADS
--	bool
- 
- config ARCH_MX1ADS
- 	bool "MX1ADS platform"
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_UART
--	select MACH_MXLADS
- 	select SOC_IMX1
- 	help
- 	  Say Y here if you are using Motorola MX1ADS/MXLADS boards
--- 
-1.8.1.2
+API's like get_attrs is loosely defined. I'd prefer to have fully 
+defined APIs. There might be other attributes which the consumer might 
+not be interested in. Instead of returning the entire structure, it 
+would be better if we have facilities for the consumer to request only 
+the required attributes.
+>
+> phy driver:
+>
+> static const struct phy_attrs my_phy_attrs = {
+> 	// ...
+> };
+>
+> static int my_phy_probe(...)
+> {
+> 	// ...
+> 	phy = devm_phy_create_attrs(dev, &ops, &my_phy_attrs, NULL);
+> 	// ...
+> }
+>
+> phy consumer:
+>
+> 	// ...
+> 	const struct phy_attrs *phy_attrs;
+>
+> 	phy_attrs = phy_get_attrs(phy);
+> 	// ...
+>
+> Why I think it is better than what I've seen in this and previous instance
+> of this thread? (in random order)
+>   a) Only the PHY driver can set the attrs.
+>   b) PHY consumer has access only to a const pointer.
+>   c) PHY attributes can be placed in a static struct inside a driver file,
+> without the need to call any functions to set particular attributes.
+
+Agree with all your points for setting the attributes apart from the 
+fact that we won't be able to add any validation criteria for the 
+attributes while setting it if needed and also there won't be symmetric 
+APIs for getting and setting the attributes..
+
+Cheers
+Kishon
