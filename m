@@ -1,58 +1,69 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 4 Nov 2013 16:15:19 +0200
-Subject: [PATCHv9 33/43] ARM: dts: am43xx clock data
-In-Reply-To: <52741A2C.1000707@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-34-git-send-email-t-kristo@ti.com> <52741A2C.1000707@ti.com>
-Message-ID: <5277ABF7.70104@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 04 Nov 2013 15:24:26 +0100
+Subject: [PATCH v4] videobuf2: Add missing lock held on vb2_fop_relase
+In-Reply-To: <5277AB62.5000505@xs4all.nl>
+References: <1383385994-11422-1-git-send-email-ricardo.ribalda@gmail.com>
+ <527794F0.40901@xs4all.nl>
+ <CAPybu_0cKxMxhXoSqbK2nTyX3DGCVZdUZPt2bTE6aZR65xDG=w@mail.gmail.com>
+ <5277AB62.5000505@xs4all.nl>
+Message-ID: <5277AE1A.6090303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2013 11:16 PM, Nishanth Menon wrote:
-> On 10/25/2013 10:57 AM, Tero Kristo wrote:
-> [...]
->> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
->> index 974d103..1fb3ac2 100644
->> --- a/arch/arm/boot/dts/am4372.dtsi
->> +++ b/arch/arm/boot/dts/am4372.dtsi
->> @@ -67,6 +67,8 @@
->>   		ranges;
->>   		ti,hwmods = "l3_main";
->>
->> +		/include/ "am43xx-clocks.dtsi"
->> +
->>   		edma: edma at 49000000 {
->>   			compatible = "ti,edma3";
->>   			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
->> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
->> new file mode 100644
->> index 0000000..1cc5071
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
->> @@ -0,0 +1,666 @@
->> +/*
->> + * Device Tree Source for AM43xx clock data
->> + *
->> + * Copyright (C) 2013 Texas Instruments, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +scrm: scrm at 44e10000 {
->> +	compatible = "ti,scrm";
->> +	#address-cells = <1>;
->> +	#size-cells = <0>;
->> +	reg = <0x44e10000 0x2000>;
+On 04/11/13 15:12, Hans Verkuil wrote:
+> On 11/04/2013 02:54 PM, Ricardo Ribalda Delgado wrote:
+>> > Hello Hans
+>> > 
+>> > Thanks for your comments.
+>> > 
+>> > Please take a look to v4 of this patch
+>> > https://patchwork.linuxtv.org/patch/20529/
+>> > 
+>> > On Mon, Nov 4, 2013 at 1:37 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+>>> >> On 11/02/2013 10:53 AM, Ricardo Ribalda Delgado wrote:
+>>>> >>> From: Ricardo Ribalda <ricardo.ribalda@gmail.com>
+>>>> >>>
+>>>> >>> vb2_fop_relase does not held the lock although it is modifying the
+>>>> >>> queue->owner field.
+>>>> >>>
+>>>> >>> This could lead to race conditions on the vb2_perform_io function
+>>>> >>> when multiple applications are accessing the video device via
+>>>> >>> read/write API:
+>>> >>
+>>> >> It's also called directly by drivers/media/usb/em28xx/em28xx-video.c!
+>>> >>
+>> > 
+>> > em28xx-video does not hold the lock, therefore it can call the normal
+>> > function. On v2 we made a internal function that should be called if
+>> > the funciton is called directly by the driver. Please take a look to
+>> > the old comments. https://patchwork.linuxtv.org/patch/20460/
 >
-> here and other dts -> could we keep the scrm, prm, cm devices in
-> SoC.dtsi? and clocks.dtsi just contains the clock nodes?
+> static int em28xx_v4l2_close(struct file *filp)
+> {
+>         struct em28xx_fh *fh  = filp->private_data;
+>         struct em28xx    *dev = fh->dev;
+>         int              errCode;
+> 
+>         em28xx_videodbg("users=%d\n", dev->users);
+> 
+>         mutex_lock(&dev->lock);
+>         vb2_fop_release(filp);
+> 	...
+> 
+> vb2_fop_release(filp) will, with your patch, also try to get dev->lock.
+> 
+> Sylwester's comment re em28xx is incorrect.
 
-Could do that with some links yea, similar to how the clock data mods 
-are done in this rev. Will check it out how it works.
+dev->lock is not used as the video queue lock:
 
--Tero
+$ git grep "lock =" drivers/media/usb/em28xx/
+...
+drivers/media/usb/em28xx/em28xx-video.c:        dev->vdev->queue->lock = &dev->vb_queue_lock;
+drivers/media/usb/em28xx/em28xx-video.c:                dev->vbi_dev->queue->lock = &dev->vb_vbi_queue_lock;
 
->
-> [...]
->
+There is a separate mutex for the video queue which needs to be acquired
+independently.
+
+--
+Regards,
+Sylwester
