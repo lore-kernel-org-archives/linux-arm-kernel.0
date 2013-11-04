@@ -1,59 +1,28 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 4 Nov 2013 12:00:34 +0200
-Subject: [PATCHv9 07/43] CLK: TI: add autoidle support
-In-Reply-To: <5273FDF1.6090405@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-8-git-send-email-t-kristo@ti.com> <52727FDA.7060009@ti.com>
- <527371F5.9080702@ti.com> <5273FDF1.6090405@ti.com>
-Message-ID: <52777042.40703@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 4 Nov 2013 10:07:11 +0000
+Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
+ "include/asm/atomic.h"
+In-Reply-To: <52774E8A.2080901@asianux.com>
+References: <20131010100733.GH3817@mudshark.cambridge.arm.com>
+ <52568998.2080108@asianux.com>
+ <20131010142305.GG6199@mudshark.cambridge.arm.com>
+ <525751E2.3020207@asianux.com>
+ <20131011104419.GE14732@mudshark.cambridge.arm.com>
+ <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
+ <20131011165530.GS14732@mudshark.cambridge.arm.com>
+ <794E70F6-80D3-4100-A0FF-A6F34AFB9A59@arm.com>
+ <52774E8A.2080901@asianux.com>
+Message-ID: <20131104100711.GC8419@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2013 09:16 PM, Nishanth Menon wrote:
-> On 11/01/2013 04:18 AM, Tero Kristo wrote:
->> On 10/31/2013 06:05 PM, Nishanth Menon wrote:
->>> On 10/25/2013 10:57 AM, Tero Kristo wrote:
->
-> [...]
->>>> diff --git a/drivers/clk/ti/autoidle.c b/drivers/clk/ti/autoidle.c
->>>> new file mode 100644
->>>> index 0000000..efa2a3e
->>>> --- /dev/null
->>>> +++ b/drivers/clk/ti/autoidle.c
-> [...]
->>>> +}
->>>> +
->>>> +static void ti_deny_autoidle(struct clk_ti_autoidle *clk)
->>>> +{
->>>> +	u32 val;
->>>> +
->>>> +	regmap_read(clk->regmap, clk->reg, &val);
->>>> +
->>>> +	if (clk->flags & AUTOIDLE_LOW)
->>>> +		val |= (1 << clk->shift);
->>>> +	else
->>>> +		val &= ~(1 << clk->shift);
->>>> +
->>>> +	regmap_write(clk->regmap, clk->reg, val);
->>> regmap_update_bits ?
->>
->> Same.
->>
->>>
->>> and ofcourse error handling for regmap ops..
->>
->> What do you propose to do in error case? Panic, WARN() or just printk?
->
-> return error to caller and percolate back up the call stack.
+On Mon, Nov 04, 2013 at 07:36:42AM +0000, Chen Gang wrote:
+> Hello Maintainers:
+> 
+> Are these related patches for "arm[64]/include/asm/atomic.h" OK? If also
+> need me do something, please let me know, and I will/should try.
 
-Ok can do that.
+They're sitting in the patch system, so you don't need to do anything else
+unless there is a merge conflict.
 
-> one other thing I missed, will be nice to introduce a common bindings
-> for autoidle which tends to be reused in other drivers..
-
-You mean documentation or? Autoidle from this patch is only used by two 
-clock drivers (divider + fixed-factor.) DPLLs use completely different 
-setup. Converting the interface clocks to use the same might be rather 
-nasty thing to do.
-
--Tero
+Will
