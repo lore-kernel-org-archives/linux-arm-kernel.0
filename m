@@ -1,104 +1,91 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 5 Nov 2013 00:26:55 +0100
-Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
-In-Reply-To: <CACRpkdYSLxp2M4HghcUdjEYGh-UQ+DaiCGp6yee+Qds6DR9poA@mail.gmail.com>
-References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
- <051069C10411E24D9749790C498526FA1BE0B7D7@SJEXCHMB12.corp.ad.broadcom.com>
- <CACRpkdYSLxp2M4HghcUdjEYGh-UQ+DaiCGp6yee+Qds6DR9poA@mail.gmail.com>
-Message-ID: <201311050026.56321.heiko@sntech.de>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Mon, 4 Nov 2013 17:20:20 -0600
+Subject: [PATCH v4] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <CAHCPf3v0G_551Oeq-dL61J0Ce-iUMv+ou8+q671S8=GEcNjv5w@mail.gmail.com>
+References: <1383181127-12013-1-git-send-email-festevam@gmail.com>
+ <5272BC59.1080109@boundarydevices.com>
+ <5272BFE0.5040409@boundarydevices.com>
+ <CAOMZO5C39JNVv0vz-38eOrKHXMqWHCeCknhSvfGFe5t0EGkDsg@mail.gmail.com>
+ <20131031210053.GH16735@n2100.arm.linux.org.uk>
+ <CAOMZO5DAAXg4wP2UuYCN6BgN5-q3sv0Lrqvk8xMDmEW_TXepXg@mail.gmail.com>
+ <CAHCPf3v0G_551Oeq-dL61J0Ce-iUMv+ou8+q671S8=GEcNjv5w@mail.gmail.com>
+Message-ID: <CAHCPf3tSdn=TJ86QEtL3r9iSP0j88WP-y2=z96ZUfW-7VecMbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 4. November 2013, 13:24:10 schrieb Linus Walleij:
-> > In my driver, I have the "one entry per pin" support for all my
-> > properties instead of just the function property, like the "drive_str"
-> > property below:
-> > 
-> > +               grp_1 {
-> > +                       brcm,pins       = "pin1", "pin2", "pin3";
-> > +                       brcm,function   = "alt1", "alt2", "alt1";
-> > +                       brcm,drive_str  = <2 4 6>;
-> > +                       brcm,slew       = <1>;
-> > +               };
+On Thu, Oct 31, 2013 at 4:48 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
+> On Thu, Oct 31, 2013 at 4:08 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> On Thu, Oct 31, 2013 at 7:00 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>
+>>>> Interesting. With the monitor I have tested I am not able to see this
+>>>> magenta line.
+>>>
+>>> Monitor or TV?  Beware of overscans which will hide this effect.
+>>
+>> I used a PC monitor on my tests.
+>>
+>> I sent v5 using 4 as the number of loops according to Troy's results.
 >
-> On Sat, Oct 26, 2013 at 12:48 AM, Sherman Yin <syin@broadcom.com> wrote:
-> > I thought that would be convenient and allow users to group pins together
-> > based on functionality and without the restriction that the pins must
-> > have the same properties.
-> > Do you think that's a good idea and are there
-> > plans to support that in the generic pinconfig?  If so, I can look into
-> > porting my implementation to pinconf-generic.c - but first I have to
-> > figure out how some of the properties would work if more than one value
-> > could be specified (eg. "bias-disable" which takes no values)
-> 
-> Hm I don't quite get it I think. It depends on the old bindings still
-> working and full compatibility with old device trees. It might be a bit
-> confusing.
-> 
-> I need help from Heiko on this I think.
+> Stop, stop, stop!
+>
+> Has nobody noticed this register isn't described in the reference manual?
+>
+> What does it even do? How can we quantify Troy's results by just
+> throwing numbers at it and then saying "no magenta line here"?
 
-I remember we had a discussion about how things like bias-disable explicitly 
-shouldn't have a value, when they are represented in the list-format:
+Okay a little worry here is that the last time I kicked an HDMI
+transmitter around a huge magenta line was basically a side effect of
+doing the following things that weren't necessary to spec; either
+enabling audio infoframes when in DVI mode (the transmitter doesn't
+care if you're in DVI mode, it will shove audio out there anyway) or
+some really weird timing effects, almost a race condition, if you're
+generating infoframes at the wrong points (such as SPD or suchlike) -
+sometimes the monitor will figure it out. Sometimes not.
 
-		pcfg_pull_none: pcfg_pull_none {
-			bias-disable;
-		};
+The easiest case is enable "HDMI transmitter mode" on a monitor that
+does not actually have an HDMI-spec-capable decoder on it. If you have
+an HDMI to DVI cable, you have this. If you have an older or cheaper
+monitor with no speakers, this can also be entirely possible. You
+almost never see this on TVs, but you DO see it on maybe the "3rd"
+HDMI port on some TVs (where audio mysteriously doesn't work, but it
+works fine on the other two ports). I wrote a little treatise on this
+about those Radeon HDMI->DVI dongles to the DRM list, it's the same
+deal.
 
-so a bias-disable = <1> was explicitly "forbidden" [for a lack of a better 
-word]. And it was similar for other options, the parameter not meant to be 
-indicating if they are active but really only setting the "strength" or so.
+Essentially there's not a lot of point enabling HDMI mode if your
+monitor doesn't support audio, and if you do enable it, you HAVE to
+make sure your AVI InfoFrames are being sent (but, obviously, don't
+send AVI InfoFrames in DVI mode or all you'll see is a magenta line if
+it extends the blanking timings, and the monitor doesn't handle it).
 
-But how to represent this in the list variant above, I don't know.
+I notice the register enums have DVI mode in there, also I saw a weird
+case where the CEA modes in the kernel that got introduced with DRM
+had a couple backwards polarities, and one or two of them on some
+monitors that specified them would give the magenta line (and on
+others that had the same VIC in their CEA list) would work fine.. I
+guess they had more resilient logic to detect things like the wrong
+HSYNC polarity.
 
-Having a brcm,bias-disable = <0>, <1>, ... thus looks wrong and also does not 
-seem to scale well to all the possible options (bias-* and the others).
+What modes are being set here (are they derived from VIC codes or
+actual detail timings?) that cause the magenta line? The actual fix
+may be to go through the HDMI spec and fix the CEA mode definitions
+that correspond to each VIC and be sure they're accurate.
 
-Having a brcm,bias = <x>, <y>, <z>, ... with constants denoting pull-up, -
-down, disable, etc might be possible, but I'm missing the electrical 
-engineering knowledge on the possibility of those bias-things being combined.
+Hammering the register 4 times probably just resolves it by
+approaching what seems like a more correct waveform by constantly
+re-starting the transmission path. That might explain why some values
+work for some and some don't for others.
 
+I'm concerned that the real problem isn't addressed (and I did see a
+patch that fiddled a polarity value earlier..) and the actual effects
+of these bits is not actually documented in the manuals.
 
+Fabio, Shawn, could you go so far as to bring this up with the i.MX
+guys responsible for documentation or find the original transmitter IP
+specs, or find the two pages missing from the manual? This is a really
+important register if the definition in the source code is to be
+believed (do we believe it?) if working HDMI output is to be achieved.
 
-For example on my rockchip-pinctrl driver, the pins also do not need to have 
-the same configuration to be grouped together - inspired at the time by the 
-format the at91 driver uses. Here each pin forms a tuple instead of being 
-identified by an index. In it the basic function is set directly and then 
-references a predefined list of pinctrl options.
-
-
-		pcfg_pull_none: pcfg_pull_none {
-			bias-disable;
-		};
-
-		uart0 {
-			uart0_xfer: uart0-xfer {
-				rockchip,pins = <RK_GPIO1 0 RK_FUNC_1 &pcfg_pull_none>,
-							 <RK_GPIO1 1 RK_FUNC_1 &pcfg_pull_none>;
-			};
-
-...
-		};
-
-
-
-A switch to something like to following would also be a possibility:
-
-	pcfg1: pcfg1 {
-		bias-disable;
-		slew-rate = <1>;
-	};
-
-	pcfg2: pcfg2 {
-		drive-strength = <2>;
-	};
-
-	grp_1 {
-		brcm,pins       = "pin1", "pin2", "pin3";
-		brcm,function   = "alt1", "alt2", "alt1";
-		brcm,pinconf = <&pcfg1>, <&pcfg2>
-	};
-
-
-
-So far my unsorted thoughts [and recoverable memory] on this :-)
-Heiko
+Thanks,
+Matt Sealey <neko@bakuhatsu.net>
