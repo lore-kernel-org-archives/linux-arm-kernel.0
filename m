@@ -1,95 +1,47 @@
-From: gerg@uclinux.org (gerg at uclinux.org)
-Date: Mon,  4 Nov 2013 10:13:40 +1000
-Subject: [PATCHv3] ARM: imx: add support code for IMX50 based machines
-Message-ID: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 04 Nov 2013 09:20:08 +0900
+Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
+In-Reply-To: <20131101095754.GJ27864@ulmo.nvidia.com>
+References: <20131019104555.GI18477@ns203013.ovh.net>
+ <2730370.0UKsY9Ox0H@avalon> <20131024110524.GB11296@ulmo.nvidia.com>
+ <1389386.JnbumUe76M@avalon> <003701ced693$2f856150$8e9023f0$%han@samsung.com>
+ <20131101095754.GJ27864@ulmo.nvidia.com>
+Message-ID: <004101ced8f3$9e4e7ec0$daeb7c40$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Greg Ungerer <gerg@uclinux.org>
+On Friday, November 01, 2013 6:58 PM, Thierry Reding wrote:
+> On Fri, Nov 01, 2013 at 08:44:48AM +0900, Jingoo Han wrote:
+>> On Friday, October 25, 2013 10:58 PM, Laurent Pinchart wrote:
+>>> On Thursday 24 October 2013 13:05:25 Thierry Reding wrote:
 
-Add machine support code for the Freescale IMX50 SoC.
+[....]
 
-The IMX50 is quite similar to the Freescale IMX53, and contains many of the
-same periperhal hardware modules, at the same address offsets as the IMX53.
-(Notable exceptions are that the IMX50 contains no CAN bus hardware, less
-GPIO, no VPU, it does contain an Electrophoretic display controller though).
+>>>> Or is there still a reason to have more than a single bit for backlight
+>>>> state? I don't know any hardware that actually makes a difference
+>>>> between FB_BLANK_NORMAL, FB_BLANK_VSYNC_SUSPEND, FB_BLANK_HSYNC_SUSPEND
+>>>> or FB_BLANK_POWERDOWN.
+>>
+>> On Exynos side, I have never seen that FB_BLANK_VSYNC_SUSPEND,
+>> FB_BLANK_HSYNC_SUSPEND are used for controlling display panels or
+>> Display controllers.
+>>
+>> However, I heard that FB_BLANK_VSYNC_SUSPEND, FB_BLANK_HSYNC_SUSPEND are
+>> used for some monitors.
+> 
+> I think that those may make sense in the context of fbdev, and looking
+> at some fbdev drivers seems to substantiate that.
+> 
+> However, I don't think backlights have any such capability. I mean they
+> are either on or off, right? There's no such thing as partially off, or
+> partially on. How would a backlight behave differently if the panel was
+> in HSYNC suspend mode or VSYNC suspend mode?
 
-This support code uses some of the IMX53 setup code to reduce duplication
-of what would be identical init IO setup.
+Hi Thierry Reding.
 
-Signed-off-by: Greg Ungerer <gerg@uclinux.org>
----
- arch/arm/mach-imx/Makefile     |  1 +
- arch/arm/mach-imx/common.h     |  1 +
- arch/arm/mach-imx/mach-imx50.c | 36 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 38 insertions(+)
- create mode 100644 arch/arm/mach-imx/mach-imx50.c
+I agree with you.
+In the case of backlight, there is no need that a backlight behaves
+differently in HSYNC suspend mode or VSYNC suspend mode.
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index bbe1f5b..924e117 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -112,6 +112,7 @@ obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
- obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
- 
- obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
-+obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
- obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
- 
- obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 7cbe22d..9b67672 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -108,6 +108,7 @@ void tzic_handle_irq(struct pt_regs *);
- #define imx27_handle_irq avic_handle_irq
- #define imx31_handle_irq avic_handle_irq
- #define imx35_handle_irq avic_handle_irq
-+#define imx50_handle_irq tzic_handle_irq
- #define imx51_handle_irq tzic_handle_irq
- #define imx53_handle_irq tzic_handle_irq
- 
-diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
-new file mode 100644
-index 0000000..dc93bbb
---- /dev/null
-+++ b/arch/arm/mach-imx/mach-imx50.c
-@@ -0,0 +1,36 @@
-+/*
-+ * Copyright 2013 Greg Ungerer <gerg@uclinux.org>
-+ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+
-+#include "common.h"
-+
-+static void __init imx50_dt_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char *imx50_dt_board_compat[] __initdata = {
-+	"fsl,imx50",
-+	NULL
-+};
-+
-+DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
-+	.map_io		= mx53_map_io,
-+	.init_irq	= mx53_init_irq,
-+	.handle_irq	= imx50_handle_irq,
-+	.init_machine	= imx50_dt_init,
-+	.dt_compat	= imx50_dt_board_compat,
-+	.restart	= mxc_restart,
-+MACHINE_END
--- 
-1.8.1.4
+Best regards,
+Jingoo Han
