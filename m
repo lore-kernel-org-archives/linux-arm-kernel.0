@@ -1,188 +1,110 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 4 Nov 2013 20:28:34 +0200
-Subject: [PATCH v4 4/6] gpio: davinci: add OF support
-In-Reply-To: <1383406775-14902-5-git-send-email-prabhakar.csenng@gmail.com>
-References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
- <1383406775-14902-5-git-send-email-prabhakar.csenng@gmail.com>
-Message-ID: <5277E752.8090005@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 4 Nov 2013 18:38:05 +0000
+Subject: [PATCH v9 01/18] arm: make SWIOTLB available
+In-Reply-To: <alpine.DEB.2.02.1310300112520.26077@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
+ <1382698313-13161-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1310251206450.26077@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1310290441260.26077@kaball.uk.xensource.com>
+ <20131029142023.GE20487@phenom.dumpdata.com>
+ <20131029142626.GQ16735@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1310291716120.26077@kaball.uk.xensource.com>
+ <20131029180105.GR16735@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1310300112520.26077@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1311041837430.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar Lad,
+On Wed, 30 Oct 2013, Stefano Stabellini wrote:
+> On Tue, 29 Oct 2013, Russell King - ARM Linux wrote:
+> > So... what I'm saying is please fix xgmac to use the DMA API properly
+> > rather than working around such problems. :)
+>  
+> OK.
+> Would the appended patch fix your concerns?
 
-On 11/02/2013 05:39 PM, Lad, Prabhakar wrote:
-> From: KV Sujith <sujithkv@ti.com>
->
-> This patch adds OF parser support for davinci gpio
-> driver and also appropriate documentation in gpio-davinci.txt
-> located at Documentation/devicetree/bindings/gpio/.
+ping?
 
-I worry, do we need to have gpio_chip.of_xlate() callback implemented?
-- From one side, Davinci GPIO controller in DT described by one entry
-which defines number of supported GPIOs as "ti,ngpio = <144>;"
-
-- From other side, on Linux level more than one gpio_chip objects are 
-instantiated (one per each 32 GPIO).
-
-How the standard GPIO biding will work in this case? .. And will they?
-
-Linus, I'd very appreciate if you will be able to clarify this point.
-
->
-> Signed-off-by: KV Sujith <sujithkv@ti.com>
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-> [prabhakar.csengg at gmail.com: simplified the OF code, removed
-> 		unnecessary DT property and also simplified
-> 		the commit message]
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 > ---
->   .../devicetree/bindings/gpio/gpio-davinci.txt      |   32 ++++++++++++
->   drivers/gpio/gpio-davinci.c                        |   54 ++++++++++++++++++--
->   2 files changed, 83 insertions(+), 3 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
->
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> new file mode 100644
-> index 0000000..55aae1c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> @@ -0,0 +1,32 @@
-> +Davinci GPIO controller bindings
+> 
+> arm: make SWIOTLB available
+> 
+> IOMMU_HELPER is needed because SWIOTLB calls iommu_is_span_boundary,
+> provided by lib/iommu_helper.c.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> 
+> Changes in v9:
+> - remove uneeded include asm/cacheflush.h;
+> - just return 0 if !dev->dma_mask in dma_capable.
+> 
+> ---
+>  arch/arm/Kconfig                   |    6 ++++++
+>  arch/arm/include/asm/dma-mapping.h |   33 +++++++++++++++++++++++++++++++++
+>  2 files changed, 39 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 1ad6fb6..b08374f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1872,6 +1872,12 @@ config CC_STACKPROTECTOR
+>  	  neutralized via a kernel panic.
+>  	  This feature requires gcc version 4.2 or above.
+>  
+> +config SWIOTLB
+> +	def_bool y
 > +
-> +Required Properties:
-> +- compatible: should be "ti,dm6441-gpio"
+> +config IOMMU_HELPER
+> +	def_bool SWIOTLB
 > +
-> +- reg: Physical base address of the controller and the size of memory mapped
-> +       registers.
-> +
-> +- gpio-controller : Marks the device node as a gpio controller.
-> +
-> +- interrupts: Array of GPIO interrupt number.
-
-May be meaning of <interrupts> property need to be extended, because,
-as of now, only banked or unbanked IRQs are supported - and not both.
-
-> +
-> +- ti,ngpio: The number of GPIO pins supported.
-> +
-> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt
-> +		             line to processor.
-
-Should interrupt-controller; specifier be added here?
-
-> +
-> +Example:
-> +
-> +gpio: gpio at 1e26000 {
-> +	compatible = "ti,dm6441-gpio";
-> +	gpio-controller;
-> +	reg = <0x226000 0x1000>;
-> +	interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
-> +		44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
-> +		46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
-> +		48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
-> +		50 IRQ_TYPE_EDGE_BOTH>;
-> +	ti,ngpio = <144>;
-> +	ti,davinci-gpio-irq-base = <101>;
-
-         ^^ Is it still needed?
-
-> +	ti,davinci-gpio-unbanked = <0>;
-> +};
-> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-> index bcb6d8d..bb20a39 100644
-> --- a/drivers/gpio/gpio-davinci.c
-> +++ b/drivers/gpio/gpio-davinci.c
-> @@ -17,6 +17,9 @@
->   #include <linux/io.h>
->   #include <linux/irq.h>
->   #include <linux/irqdomain.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->   #include <linux/platform_device.h>
->   #include <linux/platform_data/gpio-davinci.h>
->
-> @@ -134,6 +137,40 @@ davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
->   	__raw_writel((1 << offset), value ? &g->set_data : &g->clr_data);
->   }
->
-> +static struct davinci_gpio_platform_data *
-> +davinci_gpio_get_pdata(struct platform_device *pdev)
+>  config XEN_DOM0
+>  	def_bool y
+>  	depends on XEN
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 5b579b9..1ad2c17 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -86,6 +86,39 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>  }
+>  #endif
+>  
+> +static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
 > +{
-> +	struct device_node *dn = pdev->dev.of_node;
-> +	struct davinci_gpio_platform_data *pdata;
-> +	int ret;
-> +	u32 val;
-> +
-> +	if (!IS_ENABLED(CONFIG_OF) || !pdev->dev.of_node)
-> +		return pdev->dev.platform_data;
-> +
-> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata)
-> +		return NULL;
-> +
-> +	ret = of_property_read_u32(dn, "ti,ngpio", &val);
-> +	if (ret)
-> +		goto of_err;
-> +
-> +	pdata->ngpio = val;
-> +
-> +	ret = of_property_read_u32(dn, "ti,davinci-gpio-unbanked", &val);
-> +	if (ret)
-> +		goto of_err;
-> +
-> +	pdata->gpio_unbanked = val;
-> +
-> +	return pdata;
-> +
-> +of_err:
-> +	dev_err(&pdev->dev, "Populating pdata from DT failed: err %d\n", ret);
-> +	return NULL;
+> +	unsigned int offset = paddr & ~PAGE_MASK;
+> +	return pfn_to_dma(dev, __phys_to_pfn(paddr)) + offset;
 > +}
 > +
->   static int davinci_gpio_probe(struct platform_device *pdev)
->   {
->   	int i, base;
-> @@ -144,12 +181,14 @@ static int davinci_gpio_probe(struct platform_device *pdev)
->   	struct device *dev = &pdev->dev;
->   	struct resource *res;
->
-> -	pdata = dev->platform_data;
-> +	pdata = davinci_gpio_get_pdata(pdev);
->   	if (!pdata) {
->   		dev_err(dev, "No platform data found\n");
->   		return -EINVAL;
->   	}
->
-> +	dev->platform_data = pdata;
+> +static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+> +{
+> +	unsigned int offset = dev_addr & ~PAGE_MASK;
+> +	return __pfn_to_phys(dma_to_pfn(dev, dev_addr)) + offset;
+> +}
 > +
->   	/*
->   	 * The gpio banks conceptually expose a segmented bitmap,
->   	 * and "ngpio" is one more than the largest zero-based
-> @@ -501,11 +540,20 @@ done:
->   	return 0;
->   }
->
-> +#if IS_ENABLED(CONFIG_OF)
-> +static const struct of_device_id davinci_gpio_ids[] = {
-> +	{ .compatible = "ti,dm6441-gpio", },
-> +	{ /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
-> +#endif
+> +static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+> +{
+> +	u64 limit, mask;
 > +
->   static struct platform_driver davinci_gpio_driver = {
->   	.probe		= davinci_gpio_probe,
->   	.driver		= {
-> -		.name	= "davinci_gpio",
-> -		.owner	= THIS_MODULE,
-> +		.name		= "davinci_gpio",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= of_match_ptr(davinci_gpio_ids),
->   	},
->   };
->
->
-Regards,
-- Grygorii
+> +	if (!dev->dma_mask)
+> +		return 0;
+> +
+> +	mask = *dev->dma_mask;
+> +
+> +	limit = (mask + 1) & ~mask;
+> +	if (limit && size > limit)
+> +		return 0;
+> +
+> +	if ((addr | (addr + size - 1)) & ~mask)
+> +		return 0;
+> +
+> +	return 1;
+> +}
+> +
+> +static inline void dma_mark_clean(void *addr, size_t size) { }
+> +
+>  /*
+>   * DMA errors are defined by all-bits-set in the DMA address.
+>   */
+> -- 
+> 1.7.2.5
+> 
