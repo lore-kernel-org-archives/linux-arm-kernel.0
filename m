@@ -1,82 +1,65 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 4 Nov 2013 15:21:35 -0700
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <527814E4.9050204@wwwdotorg.org>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <2443024.JdDKnfkC18@wuerfel> <5277CD33.6030003@wwwdotorg.org>
- <1704730.RnIqE1USnv@wuerfel>
- <20131104212930.GB9638@obsidianresearch.com>
- <527814E4.9050204@wwwdotorg.org>
-Message-ID: <20131104222135.GA10711@obsidianresearch.com>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Mon, 4 Nov 2013 16:45:57 -0600
+Subject: [PATCHv9 05/43] CLK: TI: add DT alias clock registration mechanism
+In-Reply-To: <1545474.t3t8VtRE27@flatron>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-6-git-send-email-t-kristo@ti.com>
+ <CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>
+ <1545474.t3t8VtRE27@flatron>
+Message-ID: <CAHCPf3vkKMmTsk_Pdm5tAmPm7yRW7_yxLGr1w18A4aqbYh2+5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 02:43:00PM -0700, Stephen Warren wrote:
-> On 11/04/2013 02:29 PM, Jason Gunthorpe wrote:
-> > On Mon, Nov 04, 2013 at 09:43:22PM +0100, Arnd Bergmann wrote:
-> > 
-> >> /*
-> >>  * this lists all properties we access from the driver. The list
-> >>  * is interpreted by devm_probe() and can be programmatically
-> >>  * verified to match the binding.
-> >>  */
-> >> static const struct devm_probe foo_probe_list[] = {
-> >> 	DEVM_ALLOC(foo_priv),
-> >> 	DEVM_IOMAP(foo_priv, regs, 0, 0),
-> >> 	DEVM_PROP_BOOL(foo_priv, oldstyle_dma, "foo,oldstyle-dma"),
-> >> 	DEVM_DMA_SLAVE(foo_priv, rxdma, "rx");
-> >> 	DEVM_DMA_SLAVE(foo_priv, txdma, "tx");
-> >> 	DEVM_GPIO(foo_priv, gpio, 0);
-> >> 	DEVM_IRQ_NAMED(foo_priv, irq, foo_irq_handler, "fifo", IRQF_SHARED),
-> >> 	{},
-> >> };
-> > 
-> > Drivers are required to gain control of, and disable the device before
-> > they bind and enable things like DMA or interrupts.
-> > 
-> > At the very least the action list above needs an explicit callback to
-> > do that step..
-> 
-> For IRQs, it looks like Arnd's code was simply parsing the IRQ
-> specifier, and converting it to the Linux-internal number. The actual
-> request of the IRQ was presumably left to probe(). I think theren's no
-> issue here.
+On Sat, Nov 2, 2013 at 8:49 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Matt,
+>
+>> I have one question here, what makes this part of the patch
+>> TI-specific at all except the definition of the structure ti_dt_clk?
+>> Mapping DT clocks to generic clkdev legacy namings seems like it would
+>> be a necessary evil across *all* SoC platforms.
+>
+> SoC platforms that are fully converted to Device Tree do not need any
+> legacy clkdev namings, because they have all clkdev look-ups performed
+> using data from DT (see generic clock bindings).
+>
+> So this would be not "*all* SoC platforms", but instead "SoC platforms,
+> which are currently undergoing conversion to DT or conversion of which is
+> yet to be started".
 
-The handler is an argument to DEMV_IRQ_* so it can be passed to
-request_irq..
+That is well understood here, I have a long-running hobby project to
+do this for i.MX5 and i.MX6 - I have a tree from months ago where I
+restructured the way clocks are probed for both these (moving from
+mach-imx to drivers/clk and putting in the right places) and
+successfully moved 8 clocks (on i.MX51, 3 core PLLs, some fixed clocks
+which got done in the meantime upstream, and one in the CCM - the CPU
+freq divider) with the correct references and it all operated really
+well.
 
-int devm_probe_irq(struct device *dev, const struct devm_probe *probe)
-{
-[..]
-	return devm_request_irq(dev, irq, probe->arg, probe->flags, name, probe->dev);
-}
+In the meantime I had to add a bunch of weird hacks to the drivers to
+deal with the missing connection names, so this being generic would
+allow the core clock work to be finished while the drivers are brought
+up to the new convention.
 
-Which is nice because it gives a chance to centralize the error
-handling printks as well.
+> Still this might be a good enough justification for having a generic
+> solution for this problem, but I would wait with this until the real need
+> on some of such platforms shows up. I don't see anything wrong in
+> implementing this first as TI-specific quirk and then possibly making it
+> generic if such need shows up.
 
-> For DMA, it does look like Arnd's code was requesting it too, but that
-> should also be fine; as long as no transactions are actually issued
-> against that DMA slave channel, then the HW state shouldn't matter?
+Indeed.. and I would like to make use of it but I'm not coding on a TI
+platform or a Samsung platform:)
 
-TBH, I'm not really familiar with how the DMA slave API works.
+> By the way, we already have something like this in clk/samsung/clk.c .
+> This is called aliases there and allows registering clkdev look-ups for
+> particular clocks. However this is specific to our clock drivers that
+> register all clocks inside a single clock privder, based on static ID
+> assignment and all clocks statically listed in clock driver - see
+> clk/samsung/clk-s3c64xx.c for an example.
 
-As long as the API and HW guarantees that the channel cannot do any
-DMAs no matter what the connected IP does, it is obviously fine..
+Right. I'll keep it in mind as I do this.
 
-But not all DMA is like that, eg bus master DMA in PCI requires
-drivers to call pci_enable_device only after they disable DMA in the
-device, which is why I mentioned it..
+Thanks, this does make my life a lot easier, means I might have it
+working and submitted before the end of the month instead of sometime
+next year, I was dreading reworking all these drivers up front ;)
 
-It would be nice to see a general API like this unambiguously make
-clear the steps required:
-
-- Gain access to registers
-- Gain control of the device
-- Enable DMA, bind interrupts, etc
-- Finalize device setup
-- Make the device visible to the rest of the system
-
-I've seen lots of drivers where the above is just not done right.
-
-Regards,
-Jason
+Matt Sealey <neko@bakuhatsu.net>
