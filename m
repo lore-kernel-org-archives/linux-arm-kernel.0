@@ -1,223 +1,74 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Mon,  4 Nov 2013 17:15:24 +0100
-Subject: [PATCHv4][ 6/6] ARM: dts: mbimxsd35 Add video and displays support.
-In-Reply-To: <1383581724-14817-1-git-send-email-denis@eukrea.com>
-References: <1383581724-14817-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383581724-14817-6-git-send-email-denis@eukrea.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Nov 2013 08:15:37 -0800
+Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
+In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F8287439D@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
+ <20131101182514.GE2493@sirena.org.uk>
+ <1DD289F6464F0949A2FCA5AA6DC23F8287439D@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <20131104161537.GI2493@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Eric B?nard <eric@eukrea.com>
+On Mon, Nov 04, 2013 at 07:35:12AM +0000, Li Xiubo wrote:
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v3->v4:
-- Shortened the licenses.
-- adapted the dts(i) to the new bindings.
-ChangeLog v2->v3:
-- The dts were adapted to the new DT bindings which looks more like the IPUv3
-  ones.
----
- .../imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts  |   62 ++++++++++++++++++++
- .../imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts  |   51 ++++++++++++++++
- .../imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts   |   52 ++++++++++++++++
- 3 files changed, 165 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
+> From the ASoC subsystem comments we can see that:
+> ++++++
+> Configures the clock dividers. This is used to derive the best DAI bit and
+> frame clocks from the system or master clock. It's best to set the DAI bit
+> and frame clocks as low as possible to save system power.
+> ------
 
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
-new file mode 100644
-index 0000000..b060f08
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
-@@ -0,0 +1,62 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx35-eukrea-mbimxsd35-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD35 with the CMO-QVGA Display";
-+	compatible = "eukrea,mbimxsd35-baseboard-cmo-qvga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+
-+	cmo_qvga: display at di0 {
-+		compatible = "fsl,mx3-parallel-display";
-+		regulator-name = "lcd";
-+		interface-pix-fmt = "rgb666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcdc_1>;
-+		lcd-supply = <&reg_lcd_3v3>;
-+		model = "CMO-QVGA";
-+		display-timings {
-+			qvga_timings: 320x240 {
-+				clock-frequency = <6500000>;
-+				hactive = <320>;
-+				vactive = <240>;
-+				hback-porch = <68>;
-+				hfront-porch = <20>;
-+				vback-porch = <15>;
-+				vfront-porch = <4>;
-+				hsync-len = <30>;
-+				vsync-len = <3>;
-+			};
-+		};
-+	};
-+
-+	reg_lcd_3v3: lcd-en {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
-+		regulator-name = "lcd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 4 0>;
-+		enable-active-high;
-+	};
-+};
-+
-+&ipu {
-+	status = "okay";
-+};
-+
-+&lcdc {
-+	display = <&cmo_qvga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
-new file mode 100644
-index 0000000..ec1a713
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
-@@ -0,0 +1,51 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx35-eukrea-mbimxsd35-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD35 with the DVI-SVGA Display";
-+	compatible = "eukrea,mbimxsd35-baseboard-dvi-svga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+	dvi_svga: display at di0 {
-+		interface-pix-fmt = "rgb666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcdc_1>;
-+		model = "DVI-SVGA";
-+		display-timings {
-+			svga_timings: 800x600 {
-+				clock-frequency = <40000000>;
-+				hactive = <800>;
-+				vactive = <600>;
-+				hback-porch = <75>;
-+				hfront-porch = <75>;
-+				vback-porch = <7>;
-+				vfront-porch = <75>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+&ipu {
-+	status = "okay";
-+};
-+
-+&lcdc {
-+	display = <&dvi_svga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
-new file mode 100644
-index 0000000..9e3d08a
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
-@@ -0,0 +1,52 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx35-eukrea-mbimxsd35-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD35 with the DVI-VGA Display";
-+	compatible = "eukrea,mbimxsd35-baseboard-dvi-vga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+	dvi_vga: display at di0 {
-+		interface-pix-fmt = "rgb666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcdc_1>;
-+		model = "DVI-VGA";
-+		display-timings {
-+			vga_timings: 640x480 {
-+				clock-frequency = <31250000>;
-+				hactive = <640>;
-+				vactive = <480>;
-+				hback-porch = <100>;
-+				hfront-porch = <100>;
-+				vback-porch = <7>;
-+				vfront-porch = <100>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+
-+&ipu {
-+	status = "okay";
-+};
-+
-+&lcdc {
-+	display = <&dvi_vga>;
-+	status = "okay";
-+};
--- 
-1.7.9.5
+You should never use this unless you have to, there is no point in every
+single machine driver using your driver having to duplicate the same
+calculations.
+
+> 
+> > > +static int fsl_sai_dai_probe(struct snd_soc_dai *dai) {
+> > > +	int ret;
+> > > +	struct fsl_sai *sai = dev_get_drvdata(dai->dev);
+> > > +
+> > > +	ret = clk_prepare_enable(sai->clk);
+> > > +	if (ret)
+> > > +		return ret;
+
+> > It'd be nicer to only enable the clock while the device is in active use.
+
+> While if the module clock is not enabled here, the followed registers cannot read/write in the same function.
+> And this _probe function is the _dai_probe not the driver's module _probe.
+
+So you can enable the clock when you explicitly need to write to the
+registers...
+
+> If the clk_prepare_enable(sai->clk) is not here, where should it be will be nicer ?
+> One of the following functions ?
+>         .set_sysclk     = fsl_sai_set_dai_sysclk,
+>         .set_clkdiv     = fsl_sai_set_dai_clkdiv,
+>         .set_fmt        = fsl_sai_set_dai_fmt,
+>         .set_tdm_slot   = fsl_sai_set_dai_tdm_slot,
+>         .hw_params      = fsl_sai_hw_params,
+>         .trigger        = fsl_sai_trigger,
+
+It could be in any or all of them except trigger (where the core should
+hold a runtime PM reference anyway).  You can always take a reference
+for the duration of the function if you're concerned it may be called
+when the referent isn't otherwise held.
+
+> > > +	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL,
+> > > +			SND_DMAENGINE_PCM_FLAG_NO_RESIDUE);
+> > > +	if (ret)
+> > > +		return ret;
+
+> > We should have a devm_ version of this.
+
+> Sorry, is there one patch for adding the devm_ version of snd_dmaengine_pcm_register() already ?
+> In the -next and other topics branches I could not find it.
+
+No, there isn't one but there should be one.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131104/ae3affc4/attachment.sig>
