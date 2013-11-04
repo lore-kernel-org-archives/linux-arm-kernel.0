@@ -1,81 +1,104 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 4 Nov 2013 16:38:27 +0800
-Subject: [PATCH v2 3/5] mmc: sdhci-esdhc-imx: clear SDHCI_CTRL_EXEC_TUNING
- should not affect other bits
+Date: Mon, 4 Nov 2013 16:38:29 +0800
+Subject: [PATCH v2 5/5] mmc: sdhci-esdhc-imx: add runtime pm support
 In-Reply-To: <1383554309-29065-1-git-send-email-b29396@freescale.com>
 References: <1383554309-29065-1-git-send-email-b29396@freescale.com>
-Message-ID: <1383554309-29065-4-git-send-email-b29396@freescale.com>
+Message-ID: <1383554309-29065-6-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current code will clear all turning related bits like ESDHC_STD_TUNING_EN
-and ESDHC_MIX_CTRL_FBCLK_SEL when clear SDHCI_CTRL_EXEC_TUNING.
-This may cause the card which has already passed the turning to become
-unwork since the turning status lost.
-We observed this failure when enable runtime pm.
-
-BTW, imx needs to enable ESDHC_MIX_CTRL_FBCLK_SEL bit for turned clock.
-The FBCLK_SEL will be cleared when SDHCI_CTRL_TUNED_CLK is cleared
-and SDHCI_CTRL_EXEC_TUNING is not set.
-This is used in case we change to another normal card from a UHS card
-in the same slot. FBCLK_SEL is not needed for normal card.
-
-After that, SDHCI_CTRL_EXEC_TUNING will only affect ESDHC_MIX_CTRL_EXE_TUNE.
-Clearing it does not affect the turned card to remain working on UHS mode.
+The root clock will be disabled in runtime pm which can be used to save power.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |   24 +++++++++++++-----------
- 1 files changed, 13 insertions(+), 11 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |   49 +++++++++++++++++++++++++++++++++++-
+ 1 files changed, 48 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index f5e1dcf..0bd99eb 100644
+index da8026b..6e64981 100644
 --- a/drivers/mmc/host/sdhci-esdhc-imx.c
 +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -439,24 +439,20 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
- 			u32 v = readl(host->ioaddr + SDHCI_ACMD12_ERR);
- 			u32 m = readl(host->ioaddr + ESDHC_MIX_CTRL);
--			new_val = readl(host->ioaddr + ESDHC_TUNING_CTRL);
-+			if (val & SDHCI_CTRL_TUNED_CLK) {
-+				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
-+			} else {
-+				v &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
-+				m &= ~ESDHC_MIX_CTRL_FBCLK_SEL;
-+			}
-+
- 			if (val & SDHCI_CTRL_EXEC_TUNING) {
--				new_val |= ESDHC_STD_TUNING_EN |
--						ESDHC_TUNING_START_TAP;
- 				v |= ESDHC_MIX_CTRL_EXE_TUNE;
- 				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
- 			} else {
--				new_val &= ~ESDHC_STD_TUNING_EN;
- 				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
--				m &= ~ESDHC_MIX_CTRL_FBCLK_SEL;
- 			}
+@@ -27,6 +27,7 @@
+ #include <linux/of_gpio.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/platform_data/mmc-esdhc-imx.h>
++#include <linux/pm_runtime.h>
+ #include "sdhci-pltfm.h"
+ #include "sdhci-esdhc.h"
  
--			if (val & SDHCI_CTRL_TUNED_CLK)
--				v |= ESDHC_MIX_CTRL_SMPCLK_SEL;
--			else
--				v &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
--
--			writel(new_val, host->ioaddr + ESDHC_TUNING_CTRL);
- 			writel(v, host->ioaddr + SDHCI_ACMD12_ERR);
- 			writel(m, host->ioaddr + ESDHC_MIX_CTRL);
- 		}
-@@ -1038,6 +1034,12 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING)
- 		sdhci_esdhc_ops.platform_execute_tuning =
- 					esdhc_executing_tuning;
+@@ -1121,6 +1122,12 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto disable_clk;
+ 
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
++	pm_runtime_use_autosuspend(&pdev->dev);
++	pm_suspend_ignore_children(&pdev->dev, 1);
 +
-+	if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING)
-+		writel(readl(host->ioaddr + ESDHC_TUNING_CTRL) |
-+			ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP,
-+			host->ioaddr + ESDHC_TUNING_CTRL);
+ 	return 0;
+ 
+ disable_clk:
+@@ -1141,6 +1148,9 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+ 
+ 	sdhci_remove_host(host, dead);
+ 
++	pm_runtime_dont_use_autosuspend(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
 +
- 	boarddata = &imx_data->boarddata;
- 	if (sdhci_esdhc_imx_probe_dt(pdev, boarddata) < 0) {
- 		if (!host->mmc->parent->platform_data) {
+ 	clk_disable_unprepare(imx_data->clk_per);
+ 	clk_disable_unprepare(imx_data->clk_ipg);
+ 	clk_disable_unprepare(imx_data->clk_ahb);
+@@ -1150,12 +1160,49 @@ static int sdhci_esdhc_imx_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_RUNTIME
++static int sdhci_esdhc_runtime_suspend(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct pltfm_imx_data *imx_data = pltfm_host->priv;
++	int ret;
++
++	ret = sdhci_runtime_suspend_host(host);
++
++	clk_disable_unprepare(imx_data->clk_per);
++	clk_disable_unprepare(imx_data->clk_ipg);
++	clk_disable_unprepare(imx_data->clk_ahb);
++
++	return ret;
++}
++
++static int sdhci_esdhc_runtime_resume(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct pltfm_imx_data *imx_data = pltfm_host->priv;
++
++	clk_prepare_enable(imx_data->clk_per);
++	clk_prepare_enable(imx_data->clk_ipg);
++	clk_prepare_enable(imx_data->clk_ahb);
++
++	return sdhci_runtime_resume_host(host);
++}
++#endif
++
++static const struct dev_pm_ops sdhci_esdhc_pmops = {
++	SET_SYSTEM_SLEEP_PM_OPS(sdhci_pltfm_suspend, sdhci_pltfm_resume)
++	SET_RUNTIME_PM_OPS(sdhci_esdhc_runtime_suspend,
++				sdhci_esdhc_runtime_resume, NULL)
++};
++
+ static struct platform_driver sdhci_esdhc_imx_driver = {
+ 	.driver		= {
+ 		.name	= "sdhci-esdhc-imx",
+ 		.owner	= THIS_MODULE,
+ 		.of_match_table = imx_esdhc_dt_ids,
+-		.pm	= SDHCI_PLTFM_PMOPS,
++		.pm	= &sdhci_esdhc_pmops,
+ 	},
+ 	.id_table	= imx_esdhc_devtype,
+ 	.probe		= sdhci_esdhc_imx_probe,
 -- 
 1.7.2.rc3
