@@ -1,113 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Nov 2013 09:41:29 +0100
-Subject: [PATCH] ARM: imx: drop support for irq priorisation
-In-Reply-To: <1383553022-6983-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1383553022-6983-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20131104084129.GS24559@pengutronix.de>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon, 4 Nov 2013 09:43:20 +0100
+Subject: [PATCH v7 0/5] clk: clock deregistration support
+In-Reply-To: <5273D9CD.2010800@gmail.com>
+References: <1383076268-8984-1-git-send-email-s.nawrocki@samsung.com>
+ <CACmBeS2TiiTJ_n0bEzXGKN8B=U9EKXeVtrE2q0jgxsxf5TBivw@mail.gmail.com>
+ <5273D9CD.2010800@gmail.com>
+Message-ID: <CACmBeS3DhHnQR7Ze8oZVAC9HThmXR4n7f90yje+R=8uRq9Nvsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 09:17:02AM +0100, Uwe Kleine-K?nig wrote:
-> The code for irq priorisation support doesn't have any in-tree users and
-> the Kconfig description does wrong promises because nowadays irq
-> handlers are called with irqs disabled, so no high prioritized irq can
-> interrupt a lower prioritized handler.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On 1 November 2013 17:41, Sylwester Nawrocki
+<sylvester.nawrocki@gmail.com> wrote:
+> It is recommended to quote also human readable patch summary line,
+> so it's more immediately clear which patch you refer to.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Sorry about that. This was tested on a clean (some added moxart
+drivers but no other patches) next-20131031, reverting the following
+patch:
+"clkdev: Fix race condition in clock lookup from device tree" -
+0b35b92fb3600a2f9ca114a6142db95f760d55f5
 
-Sascha
+> Is the warning still triggered when you apply this patch:
+> http://www.spinics.net/lists/arm-kernel/msg283550.html
+> onto next-20131031 instead of reverting ?
 
-> ---
->  arch/arm/mach-imx/Kconfig      | 10 ----------
->  arch/arm/mach-imx/avic.c       | 25 -------------------------
->  arch/arm/mach-imx/irq-common.h |  1 -
->  3 files changed, 36 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 15c9ae3..9431729 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -20,16 +20,6 @@ config ARCH_MXC
->  menu "Freescale i.MX support"
->  	depends on ARCH_MXC
->  
-> -config MXC_IRQ_PRIOR
-> -	bool "Use IRQ priority"
-> -	help
-> -	  Select this if you want to use prioritized IRQ handling.
-> -	  This feature prevents higher priority ISR to be interrupted
-> -	  by lower priority IRQ.
-> -	  This may be useful in embedded applications, where are strong
-> -	  requirements for timing.
-> -	  Say N here, unless you have a specialized requirement.
-> -
->  config MXC_TZIC
->  	bool
->  
-> diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
-> index e163ec7..8d1df2e 100644
-> --- a/arch/arm/mach-imx/avic.c
-> +++ b/arch/arm/mach-imx/avic.c
-> @@ -54,28 +54,6 @@
->  static void __iomem *avic_base;
->  static struct irq_domain *domain;
->  
-> -#ifdef CONFIG_MXC_IRQ_PRIOR
-> -static int avic_irq_set_priority(unsigned char irq, unsigned char prio)
-> -{
-> -	struct irq_data *d = irq_get_irq_data(irq);
-> -	unsigned int temp;
-> -	unsigned int mask = 0x0F << irq % 8 * 4;
-> -
-> -	irq = d->hwirq;
-> -
-> -	if (irq >= AVIC_NUM_IRQS)
-> -		return -EINVAL;
-> -
-> -	temp = __raw_readl(avic_base + AVIC_NIPRIORITY(irq / 8));
-> -	temp &= ~mask;
-> -	temp |= prio & mask;
-> -
-> -	__raw_writel(temp, avic_base + AVIC_NIPRIORITY(irq / 8));
-> -
-> -	return 0;
-> -}
-> -#endif
-> -
->  #ifdef CONFIG_FIQ
->  static int avic_set_irq_fiq(unsigned int irq, unsigned int type)
->  {
-> @@ -102,9 +80,6 @@ static int avic_set_irq_fiq(unsigned int irq, unsigned int type)
->  
->  
->  static struct mxc_extra_irq avic_extra_irq = {
-> -#ifdef CONFIG_MXC_IRQ_PRIOR
-> -	.set_priority = avic_irq_set_priority,
-> -#endif
->  #ifdef CONFIG_FIQ
->  	.set_irq_fiq = avic_set_irq_fiq,
->  #endif
-> diff --git a/arch/arm/mach-imx/irq-common.h b/arch/arm/mach-imx/irq-common.h
-> index 5b2dabb..6e3175d 100644
-> --- a/arch/arm/mach-imx/irq-common.h
-> +++ b/arch/arm/mach-imx/irq-common.h
-> @@ -24,7 +24,6 @@
->  
->  struct mxc_extra_irq
->  {
-> -	int (*set_priority)(unsigned char irq, unsigned char prio);
->  	int (*set_irq_fiq)(unsigned int irq, unsigned int type);
->  };
->  
-> -- 
-> 1.8.4.rc3
-> 
-> 
+After patch, the warning is no longer triggered.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Jonas
