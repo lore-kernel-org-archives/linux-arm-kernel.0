@@ -1,67 +1,209 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  4 Nov 2013 12:00:51 +0100
-Subject: [PATCH v4 2/4] ARM: make mach-xyz/Makefile.boot optional for
- !ARCH_MULTIPLATFORM
+Date: Mon,  4 Nov 2013 12:00:53 +0100
+Subject: [PATCH v4 4/4] ARM: new platform for Energy Micro's EFM32 Cortex-M3
+ SoCs
 In-Reply-To: <20131104105836.GI14892@pengutronix.de>
 References: <20131104105836.GI14892@pengutronix.de>
-Message-ID: <1383562853-17202-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1383562853-17202-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Makefile.boot is supposed to define zreladdr-y, params_phys-y and
-initrd_phys-y. The first one is only needed in the absence of AUTO_ZRELADDR
-and when building a zImage. The latters are only needed for bootp stuff.
-So ignore errors on including Makefile.boot and error out in the targets
-that need the corresponding settings.
-
-This makes it unnecessary to create dummy Makefile.boot files.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/Makefile | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ arch/arm/Kconfig                 |  19 +++++++-
+ arch/arm/Makefile                |   1 +
+ arch/arm/configs/efm32_defconfig | 102 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-efm32/Makefile     |   1 +
+ arch/arm/mach-efm32/dtmachine.c  |  15 ++++++
+ 5 files changed, 137 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/configs/efm32_defconfig
+ create mode 100644 arch/arm/mach-efm32/Makefile
+ create mode 100644 arch/arm/mach-efm32/dtmachine.c
 
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index 84aa2ca..44203b3 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -12,7 +12,7 @@
- #
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7ae0615..d8145fe 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -413,6 +413,23 @@ config ARCH_EBSA110
+ 	  Ethernet interface, two PCMCIA sockets, two serial ports and a
+ 	  parallel port.
  
- ifneq ($(MACHINE),)
--include $(srctree)/$(MACHINE)/Makefile.boot
-+sinclude $(srctree)/$(MACHINE)/Makefile.boot
- endif
- 
- # Note: the following conditions must always be true:
-@@ -51,10 +51,19 @@ $(obj)/Image: vmlinux FORCE
- $(obj)/compressed/vmlinux: $(obj)/Image FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
- 
-+ifneq ($(CONFIG_AUTO_ZRELADDR)$(ZRELADDR),)
++config ARCH_EFM32
++	bool "Energy Micro efm32"
++	depends on !MMU
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_NVIC
++	select CLKSRC_MMIO
++	select CLKSRC_OF
++	select COMMON_CLK
++	select CPU_V7M
++	select GENERIC_CLOCKEVENTS
++	select NO_DMA
++	select NO_IOPORT
++	select SPARSE_IRQ
++	select USE_OF
++	help
++	  Support for Energy Micro's (now Silicon Labs) efm32 processors.
 +
- $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
- 	$(call if_changed,objcopy)
- 	@$(kecho) '  Kernel: $@ is ready'
- 
-+else
+ config ARCH_EP93XX
+ 	bool "EP93xx-based"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+@@ -1812,7 +1829,7 @@ config FORCE_MAX_ZONEORDER
+ 	int "Maximum zone order" if ARCH_SHMOBILE
+ 	range 11 64 if ARCH_SHMOBILE
+ 	default "12" if SOC_AM33XX
+-	default "9" if SA1111
++	default "9" if SA1111 || ARCH_EFM32
+ 	default "11"
+ 	help
+ 	  The kernel memory allocator divides physically contiguous memory
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index a37a50f..bee8be4 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -152,6 +152,7 @@ machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
+ machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
+ machine-$(CONFIG_ARCH_DOVE)		+= dove
+ machine-$(CONFIG_ARCH_EBSA110)		+= ebsa110
++machine-$(CONFIG_ARCH_EFM32)		+= efm32
+ machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
+ machine-$(CONFIG_ARCH_EXYNOS)		+= exynos
+ machine-$(CONFIG_ARCH_GEMINI)		+= gemini
+diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
+new file mode 100644
+index 0000000..f59fffb
+--- /dev/null
++++ b/arch/arm/configs/efm32_defconfig
+@@ -0,0 +1,102 @@
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=12
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++# CONFIG_UID16 is not set
++# CONFIG_BASE_FULL is not set
++# CONFIG_FUTEX is not set
++# CONFIG_EPOLL is not set
++# CONFIG_SIGNALFD is not set
++# CONFIG_EVENTFD is not set
++# CONFIG_AIO is not set
++CONFIG_EMBEDDED=y
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_EFM32=y
++# CONFIG_KUSER_HELPERS is not set
++CONFIG_SET_MEM_PARAM=y
++CONFIG_DRAM_BASE=0x88000000
++CONFIG_DRAM_SIZE=0x00400000
++CONFIG_FLASH_MEM_BASE=0x8c000000
++CONFIG_FLASH_SIZE=0x01000000
++CONFIG_PREEMPT=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_XIP_KERNEL=y
++CONFIG_XIP_PHYS_ADDR=0x8c000000
++CONFIG_BINFMT_FLAT=y
++CONFIG_BINFMT_SHARED_FLAT=y
++# CONFIG_COREDUMP is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_FW_LOADER is not set
++CONFIG_MTD=y
++CONFIG_MTD_BLOCK_RO=y
++CONFIG_MTD_ROM=y
++CONFIG_MTD_UCLINUX=y
++CONFIG_PROC_DEVICETREE=y
++# CONFIG_BLK_DEV is not set
++CONFIG_NETDEVICES=y
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++CONFIG_KS8851=y
++# CONFIG_NET_VENDOR_MICROCHIP is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_UNIX98_PTYS is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_NONSTANDARD=y
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_EFM32_UART=y
++CONFIG_SERIAL_EFM32_UART_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_SPI=y
++CONFIG_SPI_EFM32=y
++CONFIG_GPIO_SYSFS=y
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_SPI=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EXT2_FS=y
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++CONFIG_ROMFS_FS=y
++CONFIG_ROMFS_BACKED_BY_MTD=y
++# CONFIG_NETWORK_FILESYSTEMS is not set
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_FTRACE is not set
+diff --git a/arch/arm/mach-efm32/Makefile b/arch/arm/mach-efm32/Makefile
+new file mode 100644
+index 0000000..3a74af7
+--- /dev/null
++++ b/arch/arm/mach-efm32/Makefile
+@@ -0,0 +1 @@
++obj-y += dtmachine.o
+diff --git a/arch/arm/mach-efm32/dtmachine.c b/arch/arm/mach-efm32/dtmachine.c
+new file mode 100644
+index 0000000..2367495
+--- /dev/null
++++ b/arch/arm/mach-efm32/dtmachine.c
+@@ -0,0 +1,15 @@
++#include <linux/kernel.h>
 +
-+$(obj)/zImage: FORCE
-+	@echo 'Either enable CONFIG_AUTO_ZRELADDR or provide zreladdr-y in Makefile.boot'
-+	@false
++#include <asm/v7m.h>
 +
-+endif
- endif
- 
- ifneq ($(LOADADDR),)
-@@ -81,6 +90,8 @@ $(obj)/uImage:	$(obj)/zImage FORCE
- 	@$(kecho) '  Image $@ is ready'
- 
- $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
-+	@test -n "$(PARAMS_PHYS)" || \
-+	(echo This machine does not support BOOTP; exit -1)
- 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
- 	@:
- 
++#include <asm/mach/arch.h>
++
++static const char *const efm32gg_compat[] __initconst = {
++	"efm32,dk3750",
++	NULL
++};
++
++DT_MACHINE_START(EFM32DT, "EFM32 (Device Tree Support)")
++	.dt_compat = efm32gg_compat,
++	.restart = armv7m_restart,
++MACHINE_END
 -- 
 1.8.4.rc3
