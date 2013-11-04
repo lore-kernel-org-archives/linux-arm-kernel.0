@@ -1,40 +1,62 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Mon,  4 Nov 2013 09:50:42 +0100
-Subject: [PATCH] ARM: iop3xx: remove unused MACH_EP80219 Kconfig parameter
-Message-ID: <1383555042-4135-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 4 Nov 2013 09:51:46 +0100
+Subject: [PATCH] ARM: imx: removed unused MACH_MXLADS Kconfig parameter
+In-Reply-To: <1383542366-6270-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1383542366-6270-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <20131104085146.GT24559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the MACH_EP80219 Kconfig parameter,
-which was no longer used anywhere in the source code
-and Makefiles.
+On Mon, Nov 04, 2013 at 06:19:26AM +0100, Michael Opdenacker wrote:
+> This removes the MACH_MXLADS Kconfig parameter,
+> which was no longer used anywhere in the source code
+> and Makefiles.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/mach-iop32x/Kconfig | 4 ----
- 1 file changed, 4 deletions(-)
+Hehe, this one is a bit tricky. Indeed MACH_MXLADS isn't used directly
+anywhere. Nevertheless having CONFIG_MACH_MXLADS defined makes
+machine_is_mxlads() become true when the kernel is started with a
+machine id of 1851.
 
-diff --git a/arch/arm/mach-iop32x/Kconfig b/arch/arm/mach-iop32x/Kconfig
-index 5e8c6f7dfabb..65f3500258e5 100644
---- a/arch/arm/mach-iop32x/Kconfig
-+++ b/arch/arm/mach-iop32x/Kconfig
-@@ -4,9 +4,6 @@ menu "IOP32x Implementation Options"
- 
- comment "IOP32x Platform Types"
- 
--config MACH_EP80219
--	bool
--
- config MACH_GLANTANK
- 	bool "Enable support for the IO-Data GLAN Tank"
- 	help
-@@ -22,7 +19,6 @@ config ARCH_IQ80321
- 
- config ARCH_IQ31244
- 	bool "Enable support for EP80219/IQ31244"
--	select MACH_EP80219
- 	help
- 	  Say Y here if you want to run your kernel on the Intel EP80219
- 	  evaluation kit for the Intel 80219 processor (a IOP321 variant)
+machine_is_mxlads() is unused in the kernel, so this patch indeed
+doesn't hurt. Anyway, the code is correct currently, so I suggest
+keeping it until the mx[1l]ads is either removed or converted to
+devicetree.
+
+Sascha
+
+
+> 
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+> ---
+>  arch/arm/mach-imx/Kconfig | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 29a8af6922a8..d84a772bbc68 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -158,14 +158,11 @@ config	SOC_IMX51
+>  if ARCH_MULTI_V4T
+>  
+>  comment "MX1 platforms:"
+> -config MACH_MXLADS
+> -	bool
+>  
+>  config ARCH_MX1ADS
+>  	bool "MX1ADS platform"
+>  	select IMX_HAVE_PLATFORM_IMX_I2C
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+> -	select MACH_MXLADS
+>  	select SOC_IMX1
+>  	help
+>  	  Say Y here if you are using Motorola MX1ADS/MXLADS boards
+> -- 
+> 1.8.1.2
+> 
+> 
+
 -- 
-1.8.1.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
