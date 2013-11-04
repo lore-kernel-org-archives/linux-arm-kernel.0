@@ -1,57 +1,40 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Mon, 4 Nov 2013 13:51:53 +0100
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <20131030130325.GA18788@intel.com>
-References: <20131017020745.GA14013@intel.com>
- <20131017142755.GA4477@breakpoint.cc>
- <20131017134846.GG14013@intel.com>
- <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
- <20131025042310.GC21230@intel.com>
- <Pine.LNX.4.64.1310250813370.6186@axis700.grange>
- <20131025054321.GD21230@intel.com>
- <Pine.LNX.4.64.1310250840350.6186@axis700.grange>
- <CAOesGMivD_3zSL503R0OaqyGv4Rj8qJqnbM2TdmjtxR2U63ztw@mail.gmail.com>
- <20131030130325.GA18788@intel.com>
-Message-ID: <20131104125152.GA27260@breakpoint.cc>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 4 Nov 2013 14:06:08 +0100
+Subject: [PATCH] pinctrl: imx50: add pinctrl support code for the IMX50 SoC
+In-Reply-To: <CACRpkdb5U2xBBVerbspTnW5=61kwx0+mvLGZF=VmdOKrN3QhHg@mail.gmail.com>
+References: <1383023635-30640-1-git-send-email-gerg@uclinux.org>
+ <CACRpkdb5U2xBBVerbspTnW5=61kwx0+mvLGZF=VmdOKrN3QhHg@mail.gmail.com>
+Message-ID: <20131104130608.GU24559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.10.13, Vinod Koul wrote:
-> I fixed up the error with below, can you pls verify. Pls note this is compile
-> tested only!
+On Mon, Nov 04, 2013 at 01:14:32PM +0100, Linus Walleij wrote:
+> On Tue, Oct 29, 2013 at 6:13 AM,  <gerg@uclinux.org> wrote:
+> 
+> > From: Greg Ungerer <gerg@uclinux.org>
+> >
+> > Add code to support the specific pin arrangements of the Freescale IMX50 SoC.
+> >
+> > Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> 
+> Can I get some maintainer to review this for the next cycle?
+> 
+> BTW: how many i.MX:es does remain? Have we not covered
+> them all soon?
 
-I tested this and my mmc driver using edma via drivers/dma seems to
-work.
-Tested-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+We have three different iomux ips. I once ordered them by an arbitrary
+version number. We have
 
-However you missed one piece:
+iomux-v1: i.MX1, i.MX21, i.MX27
+iomux-v2: i.MX31
+iomux-v3: i.MX25, i.MX35, i.MX50 i.MX51, i.MX53, i.MX6
 
-  CC [M]  sound/soc/davinci/davinci-pcm.o
-sound/soc/davinci/davinci-pcm.c: In function ?davinci_pcm_dma_irq?:
-sound/soc/davinci/davinci-pcm.c:241: error: ?DMA_COMPLETE? undeclared (first use in this function)
-sound/soc/davinci/davinci-pcm.c:241: error: (Each undeclared identifier is reported only once
-sound/soc/davinci/davinci-pcm.c:241: error: for each function it appears in.)
+I think it's quite unlikely that someone writes a iomux-v2 driver.
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- sound/soc/davinci/davinci-pcm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Sascha
 
-diff --git a/sound/soc/davinci/davinci-pcm.c b/sound/soc/davinci/davinci-pcm.c
-index 8460edc..e68ba31 100644
---- a/sound/soc/davinci/davinci-pcm.c
-+++ b/sound/soc/davinci/davinci-pcm.c
-@@ -238,7 +238,7 @@ static void davinci_pcm_dma_irq(unsigned link, u16 ch_status, void *data)
- 	print_buf_info(prtd->ram_channel, "i ram_channel");
- 	pr_debug("davinci_pcm: link=%d, status=0x%x\n", link, ch_status);
- 
--	if (unlikely(ch_status != DMA_COMPLETE))
-+	if (unlikely(ch_status != EDMA_DMA_COMPLETE))
- 		return;
- 
- 	if (snd_pcm_running(substream)) {
 -- 
-1.8.4.rc3
-
-Sebastian
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
