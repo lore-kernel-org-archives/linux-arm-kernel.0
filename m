@@ -1,30 +1,90 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 4 Nov 2013 08:59:07 -0600
-Subject: [PATCHv9 07/43] CLK: TI: add autoidle support
-In-Reply-To: <52777042.40703@ti.com>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-8-git-send-email-t-kristo@ti.com> <52727FDA.7060009@ti.com>
- <527371F5.9080702@ti.com> <5273FDF1.6090405@ti.com> <52777042.40703@ti.com>
-Message-ID: <5277B63B.7080106@ti.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 04 Nov 2013 16:19:59 +0100
+Subject: [PATCH v4] videobuf2: Add missing lock held on vb2_fop_relase
+In-Reply-To: <5277AE1A.6090303@samsung.com>
+References: <1383385994-11422-1-git-send-email-ricardo.ribalda@gmail.com>
+ <527794F0.40901@xs4all.nl>
+ <CAPybu_0cKxMxhXoSqbK2nTyX3DGCVZdUZPt2bTE6aZR65xDG=w@mail.gmail.com>
+ <5277AB62.5000505@xs4all.nl> <5277AE1A.6090303@samsung.com>
+Message-ID: <5277BB1F.1010501@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2013 04:00 AM, Tero Kristo wrote:
-> On 11/01/2013 09:16 PM, Nishanth Menon wrote:
->> On 11/01/2013 04:18 AM, Tero Kristo wrote:
-
-[...]
->> one other thing I missed, will be nice to introduce a common bindings
->> for autoidle which tends to be reused in other drivers..
+On 11/04/2013 03:24 PM, Sylwester Nawrocki wrote:
+> On 04/11/13 15:12, Hans Verkuil wrote:
+>> On 11/04/2013 02:54 PM, Ricardo Ribalda Delgado wrote:
+>>>> Hello Hans
+>>>>
+>>>> Thanks for your comments.
+>>>>
+>>>> Please take a look to v4 of this patch
+>>>> https://patchwork.linuxtv.org/patch/20529/
+>>>>
+>>>> On Mon, Nov 4, 2013 at 1:37 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+>>>>>> On 11/02/2013 10:53 AM, Ricardo Ribalda Delgado wrote:
+>>>>>>>> From: Ricardo Ribalda <ricardo.ribalda@gmail.com>
+>>>>>>>>
+>>>>>>>> vb2_fop_relase does not held the lock although it is modifying the
+>>>>>>>> queue->owner field.
+>>>>>>>>
+>>>>>>>> This could lead to race conditions on the vb2_perform_io function
+>>>>>>>> when multiple applications are accessing the video device via
+>>>>>>>> read/write API:
+>>>>>>
+>>>>>> It's also called directly by drivers/media/usb/em28xx/em28xx-video.c!
+>>>>>>
+>>>>
+>>>> em28xx-video does not hold the lock, therefore it can call the normal
+>>>> function. On v2 we made a internal function that should be called if
+>>>> the funciton is called directly by the driver. Please take a look to
+>>>> the old comments. https://patchwork.linuxtv.org/patch/20460/
+>>
+>> static int em28xx_v4l2_close(struct file *filp)
+>> {
+>>         struct em28xx_fh *fh  = filp->private_data;
+>>         struct em28xx    *dev = fh->dev;
+>>         int              errCode;
+>>
+>>         em28xx_videodbg("users=%d\n", dev->users);
+>>
+>>         mutex_lock(&dev->lock);
+>>         vb2_fop_release(filp);
+>> 	...
+>>
+>> vb2_fop_release(filp) will, with your patch, also try to get dev->lock.
+>>
+>> Sylwester's comment re em28xx is incorrect.
 > 
-> You mean documentation or? Autoidle from this patch is only used by two 
-> clock drivers (divider + fixed-factor.) DPLLs use completely different 
-> setup. Converting the interface clocks to use the same might be rather 
-> nasty thing to do.
-The definitions are common - so, yes, it will be nice to have
-autoidle.txt which is then pointed to by divider, fixed-clock etc..
+> dev->lock is not used as the video queue lock:
+> 
+> $ git grep "lock =" drivers/media/usb/em28xx/
+> ...
+> drivers/media/usb/em28xx/em28xx-video.c:        dev->vdev->queue->lock = &dev->vb_queue_lock;
+> drivers/media/usb/em28xx/em28xx-video.c:                dev->vbi_dev->queue->lock = &dev->vb_vbi_queue_lock;
+> 
+> There is a separate mutex for the video queue which needs to be acquired
+> independently.
 
+Darn, I missed that one. I was looking for it in em28xx_vdev_init(), which is
+where I expected the queue->lock to be set, if there was any.
 
--- 
+That said, wouldn't it be a good idea to swap the order:
+
+        vb2_fop_release(filp);
+        mutex_lock(&dev->lock);
+
+I don't believe there is a good reason for nesting mutexes here.
+
 Regards,
-Nishanth Menon
+
+	Hans
+
+> 
+> --
+> Regards,
+> Sylwester
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
