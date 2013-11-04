@@ -1,62 +1,40 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Mon, 04 Nov 2013 15:49:59 +0100
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <20130826191615.GA20192@obsidianresearch.com>
-References: <51DD88A4.1030506@keymile.com> <20130731100359.3e789236@skate>
- <51F8CA44.4080802@keymile.com> <20130731110045.2dc84981@skate>
- <20130731205034.GA17615@obsidianresearch.com> <20130809140140.GA14990@ulmo>
- <521B1F6A.1090304@keymile.com> <20130826120200.GA15842@ulmo>
- <521B6AF3.9070909@keymile.com> <20130826191615.GA20192@obsidianresearch.com>
-Message-ID: <5277B417.2030506@keymile.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 4 Nov 2013 09:51:51 -0500
+Subject: [PATCHv3] ARM: imx: add support code for IMX50 based machines
+In-Reply-To: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
+References: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
+Message-ID: <20131104145151.GD3060@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks,
+Greg,
 
-thank you for your patience...
+On Mon, Nov 04, 2013 at 10:13:40AM +1000, gerg at uclinux.org wrote:
+> From: Greg Ungerer <gerg@uclinux.org>
+> 
+> Add machine support code for the Freescale IMX50 SoC.
+> 
+> The IMX50 is quite similar to the Freescale IMX53, and contains many of the
+> same periperhal hardware modules, at the same address offsets as the IMX53.
+> (Notable exceptions are that the IMX50 contains no CAN bus hardware, less
+> GPIO, no VPU, it does contain an Electrophoretic display controller though).
+> 
+> This support code uses some of the IMX53 setup code to reduce duplication
+> of what would be identical init IO setup.
+> 
+> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> ---
+>  arch/arm/mach-imx/Makefile     |  1 +
+>  arch/arm/mach-imx/common.h     |  1 +
+>  arch/arm/mach-imx/mach-imx50.c | 36 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 38 insertions(+)
+>  create mode 100644 arch/arm/mach-imx/mach-imx50.c
 
-So, thanks to Thierry's example:
+What happened to the rest of the series?  If this is a new version of
+just a single patch in the V2 series (which I suspect it is), we usually
+make it an in-reply-to the previous version of the patch it replaces.
+Not a big deal, it just helps us keep track of things more easily.
 
- > 
-https://gitorious.org/thierryreding/linux/commit/b85c03d73288f6e376fc158ceac30f29680b4192
+thx,
 
-and Jason's explanation:
-
- > The reg must encode the bus number according to the OF format:
- >
- >                 33222222 22221111 11111100 00000000
- >                 10987654 32109876 54321098 76543210
- >   phys.hi cell: npt000ss bbbbbbbb dddddfff rrrrrrrr
- > phys.mid cell: hhhhhhhh hhhhhhhh hhhhhhhh hhhhhhhh
- >   phys.lo cell: llllllll llllllll llllllll llllllll
- >
- > bbbbbbbb is the 8-bit Bus Number
- > ddddd is the 5-bit Device Number
- > fff is the 3-bit Function Number
- >
- > Others are 0.
-
-I'm finally starting to make some sense out of this, and I checked that 
-Jason's statement is indeed true, at least on 3.10:
-
- > Device tree can include the discovered PCI devices, you have to use
- > the special reg encoding and all that weirdness, but it does work. The
- > of_node will be attached to the struct pci device automatically.
-
-[Hi latency was also due to other activities, not just the low 
-throughput of my brain cells] ;-)
-
-I have one last question for Thierry though: what's the point of things 
-such as
-
-+					pci at 0,0 {
-+						compatible = "opencores,spi";
-
-(apart from clarity, of course)?
-I mean, wouldn't the driver be bound to the device through its PCI 
-vendor ID / device ID?
-Are we also supposed to register a platform driver based on a compatible 
-string instead?
-
-Thanks again guys!
-Gerlando
+Jason.
