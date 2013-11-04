@@ -1,32 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 4 Nov 2013 21:53:03 +0800
-Subject: [PATCH] ARM: imx: drop support for irq priorisation
-In-Reply-To: <20131104094810.GH14892@pengutronix.de>
-References: <1383553022-6983-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20131104084129.GS24559@pengutronix.de>
- <20131104094810.GH14892@pengutronix.de>
-Message-ID: <20131104135259.GC11031@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 4 Nov 2013 14:53:09 +0100
+Subject: [PATCH v4 1/4] ARM: deprecate mach/timex.h for !ARCH_MULTIPLATFORM
+In-Reply-To: <1383562853-17202-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20131104105836.GI14892@pengutronix.de>
+ <1383562853-17202-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <201311041453.09897.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-On Mon, Nov 04, 2013 at 10:48:10AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Shawn,
+On Monday 04 November 2013, Uwe Kleine-K?nig wrote:
+> While mach/timex.h isn't used for multi-platform builds it still is for
+> "normal" builds. As there are only three platforms that do something else
+> than only defining CLOCK_TICK_RATE (and these are probably easy to fix),
+> deprecate mach/timex.h and drop the corresponding files.
 > 
-> I didn't add you to the list of recipents for this patch after
-> consulting the MAINTAINERS file. Sascha now told me that it's probably
-> you who takes this patch?!
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Ah, yes.  I've been helping collect i.MX patches for a couple of cycles
-with Sascha's nod.
++LinusW, +rmk
 
-> I suggest to fix MAINTAINERS accordingly.
-> Maybe just merge the entries "ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
-> and "ARM/FREESCALE IMX6"?
+I don't think we can do this (yet): IIRC, CLOCK_TICK_RATE is required
+at least for platforms using CONFIG_ARCH_USES_GETTIMEOFFSET (which
+is not allowed for multiplatform).
 
-Yea, that should help me handle i.MX patches more quickly.  If you send
-a patch for it, I would suggest merge MXS entry into IMX one as well,
-and add "F: arch/arm/boot/dts/imx*" line.
-
-Shawn
+	Arnd
