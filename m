@@ -1,46 +1,658 @@
-From: dave.long@linaro.org (David Long)
-Date: Sun, 03 Nov 2013 22:24:51 -0500
-Subject: [PATCH v2 04/13] uprobes: allow arch-specific initialization
-In-Reply-To: <20131101135247.GA16509@redhat.com>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-5-git-send-email-dave.long@linaro.org>
- <20131019164223.GB7837@redhat.com> <52672484.9010201@linaro.org>
- <20131028185818.GB12863@redhat.com> <5272A45B.20507@linaro.org>
- <20131101135247.GA16509@redhat.com>
-Message-ID: <52771383.5090907@linaro.org>
+From: B47053@freescale.com (Li Xiubo)
+Date: Mon, 4 Nov 2013 03:45:10 +0000
+Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
+In-Reply-To: <20131101085904.GC28401@MrMyself>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
+ <20131101085904.GC28401@MrMyself>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82874201@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/13 09:52, Oleg Nesterov wrote:
-> On 10/31, David Long wrote:
->> On 10/28/13 14:58, Oleg Nesterov wrote:
->>> On 10/22, David Long wrote:
->>> I simply do not understand why uprobes.c uses module_init/module_exit,
->>> it can't be compiled as a module.
->>
->> I guess that makes sense, assuming it can never be made a module.  I saw
->> you recent commit for this.
->>
->>> I think that module_exit/exit_uprobes should be killed, and module_init()
->>> should be turned into __initcall(). uprobes-arm.c can have another one.
->>>
->>
->> I will see if I can make this work.
->
-> If this can't work, then we need the new hook (this patch). But in this
-> case please update the changelog to explain the reason.
->
->> Right now the arch-specific
->> initialization call is done in the middle of the generic initialization
->> code, but I don't know that it *has* to be that way.  I have some
->> concern too about getting the order right, since these are built from
->> different makefiles.
->
-> Not sure I understand... But grep shows a lot of core_initcall()'s in
-> arch/arm/ which do register_undef_hook(). And I guess you can use any
-> initcall level.
+> > This adds Freescale SAI ASoC Audio support.
+> > This implementation is only compatible with device tree definition.
+> > Features:
+> > o Supports playback/capture
+> > o Supports 16/20/24 bit PCM
+> > o Supports 8k - 96k sample rates
+> > o Supports slave mode only.
+> >
+> 
+> Just for curiosity, I found there're quite a bit code actually support
+> I2S master mode such as set_sysclk() and register configuration to FMT
+> SND_SOC_DAIFMT_CBS_CFS.
+> 
+> Is that really "supports slave mode only"? Or just you haven't make it
+> properly work?
+> 
 
-Just to close on this, I implemented your suggested __initcall change 
-and it tested out fine.
+Sorry, this comments is not very consistent with the driver implementation.
+On VF610 there only supports slave mode.
 
--dl
+So, I will revise this.
+
+
+> > diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig index
+> > b7ab71f..9a8851e 100644
+> > --- a/sound/soc/fsl/Kconfig
+> > +++ b/sound/soc/fsl/Kconfig
+> > @@ -213,3 +213,19 @@ config SND_SOC_IMX_MC13783
+> >  	select SND_SOC_IMX_PCM_DMA
+> >
+> >  endif # SND_IMX_SOC
+> > +
+> > +menuconfig SND_FSL_SOC
+> > +	tristate "SoC Audio for Freescale FSL CPUs"
+> > +	help
+> > +	  Say Y or M if you want to add support for codecs attached to
+> > +	  the FSL CPUs.
+> > +
+> > +	  This will enable Freeacale SAI, SGT15000 codec.
+> > +
+> > +if SND_FSL_SOC
+> 
+> Why check this here? SAI should be a regular IP module which can be used
+> by other SoC as well. We would never know if next i.MX SoC won't contain
+> SAI.
+> 
+> > +
+> > +config SND_SOC_FSL_SAI
+> > +	tristate
+> > +	select SND_SOC_GENERIC_DMAENGINE_PCM
+> 
+> I think you should keep SAI beside SSI/SPDIF directly.
+> 
+
+That's right.
+
+> > +
+> > +endif # SND_FSL_SOC
+> > diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile index
+> > 8db705b..e5acc03 100644
+> > --- a/sound/soc/fsl/Makefile
+> > +++ b/sound/soc/fsl/Makefile
+> > @@ -56,3 +56,8 @@ obj-$(CONFIG_SND_SOC_IMX_SGTL5000) +=
+> > snd-soc-imx-sgtl5000.o
+> >  obj-$(CONFIG_SND_SOC_IMX_WM8962) += snd-soc-imx-wm8962.o
+> >  obj-$(CONFIG_SND_SOC_IMX_SPDIF) += snd-soc-imx-spdif.o
+> >  obj-$(CONFIG_SND_SOC_IMX_MC13783) += snd-soc-imx-mc13783.o
+> > +
+> > +# FSL ARM SAI/SGT15000 Platform Support
+> 
+> Should be SGTL5000, not SGT1. And SAI should not be used with SGTL5000
+> only, it's a bit confusing to mention SGTL5000 here.
+> 
+
+Yes, this will be revised then.
+
+> > +snd-soc-fsl-sai-objs := fsl-sai.o
+> 
+> And I think it should be better to put it along with fsl-ssi.o and fsl-
+> spdif.o
+> 
+
+But fsl-ssi.o and fsl-spdif.o is based PowrePC platform? Which we can see from the comments.
+While fsl-sai.o is base ARM platform.
+Despite whether there is any different between ARM and PPC or not, the comments won't be correct.
+
+
+> > +
+> > +obj-$(CONFIG_SND_SOC_FSL_SAI) += snd-soc-fsl-sai.o
+> 
+> Ditto
+> 
+> > diff --git a/sound/soc/fsl/fsl-sai.c b/sound/soc/fsl/fsl-sai.c new
+> > file mode 100644 index 0000000..bb57e67
+> > --- /dev/null
+> > +++ b/sound/soc/fsl/fsl-sai.c
+> > @@ -0,0 +1,472 @@
+> > +/*
+> > + * Freescale SAI ALSA SoC Digital Audio Interface driver.
+> > + *
+> > + * Copyright 2012-2013 Freescale Semiconductor, Inc.
+> > + *
+> > + * This program is free software; you can redistribute  it and/or
+> > +modify it
+> > + * under  the terms of  the GNU General  Public License as published
+> > +by the
+> > + * Free Software Foundation;  either version 2 of the  License, or
+> > +(at your
+> > + * option) any later version.
+> 
+> There're too many double space inside. Could you pls revise it?
+> 
+
+Yes, see the next version.
+
+> > + *
+> > + */
+> > +
+> > +#include <linux/clk.h>
+> > +#include <linux/module.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/of_address.h>
+> > +#include <sound/core.h>
+> > +#include <sound/pcm_params.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/dmaengine.h>
+> > +#include <sound/dmaengine_pcm.h>
+> 
+> I think it's better to keep <sound/xxx.h> together. And basically we can
+> keep header files ordered by alphabet.
+> 
+
+Okey.
+
+> > +
+> > +#include "fsl-sai.h"
+> > +
+> > +static int fsl_sai_set_dai_sysclk_tr(struct snd_soc_dai *cpu_dai,
+> > +		int clk_id, unsigned int freq, int fsl_dir) {
+> > +	u32 val_cr2, reg_cr2;
+> > +	struct fsl_sai *sai = snd_soc_dai_get_drvdata(cpu_dai);
+> > +
+> > +	if (fsl_dir == FSL_FMT_TRANSMITTER)
+> > +		reg_cr2 = FSL_SAI_TCR2;
+> > +	else
+> > +		reg_cr2 = FSL_SAI_RCR2;
+> > +
+> > +	val_cr2 = readl(sai->base + reg_cr2);
+> > +	switch (clk_id) {
+> > +	case FSL_SAI_CLK_BUS:
+> > +		val_cr2 &= ~FSL_SAI_CR2_MSEL_MASK;
+> > +		val_cr2 |= FSL_SAI_CR2_MSEL_BUS;
+> > +		break;
+> > +	case FSL_SAI_CLK_MAST1:
+> > +		val_cr2 &= ~FSL_SAI_CR2_MSEL_MASK;
+> > +		val_cr2 |= FSL_SAI_CR2_MSEL_MCLK1;
+> > +		break;
+> > +	case FSL_SAI_CLK_MAST2:
+> > +		val_cr2 &= ~FSL_SAI_CR2_MSEL_MASK;
+> > +		val_cr2 |= FSL_SAI_CR2_MSEL_MCLK2;
+> > +		break;
+> > +	case FSL_SAI_CLK_MAST3:
+> > +		val_cr2 &= ~FSL_SAI_CR2_MSEL_MASK;
+> > +		val_cr2 |= FSL_SAI_CR2_MSEL_MCLK3;
+> > +		break;
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> > +	writel(val_cr2, sai->base + reg_cr2);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int fsl_sai_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
+> > +		int clk_id, unsigned int freq, int dir) {
+> > +	int ret;
+> > +
+> > +	if (dir == SND_SOC_CLOCK_IN)
+> > +		return 0;
+> > +
+> > +	ret = fsl_sai_set_dai_sysclk_tr(cpu_dai, clk_id, freq,
+> > +					FSL_FMT_TRANSMITTER);
+> > +	if (ret) {
+> > +		dev_err(cpu_dai->dev,
+> > +				"Cannot set sai's transmitter sysclk: %d\n",
+> > +				ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = fsl_sai_set_dai_sysclk_tr(cpu_dai, clk_id, freq,
+> > +					FSL_FMT_RECEIVER);
+> > +	if (ret) {
+> > +		dev_err(cpu_dai->dev,
+> > +				"Cannot set sai's receiver sysclk: %d\n",
+> > +				ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int fsl_sai_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
+> > +		int div_id, int div)
+> > +{
+> > +	struct fsl_sai *sai = snd_soc_dai_get_drvdata(cpu_dai);
+> > +	u32 tcr2, rcr2;
+> > +
+> > +	if (div_id == FSL_SAI_TX_DIV) {
+> > +		tcr2 = readl(sai->base + FSL_SAI_TCR2);
+> > +		tcr2 &= ~FSL_SAI_CR2_DIV_MASK;
+> > +		tcr2 |= FSL_SAI_CR2_DIV(div);
+> > +		writel(tcr2, sai->base + FSL_SAI_TCR2);
+> > +
+> > +	} else if (div_id == FSL_SAI_RX_DIV) {
+> > +		rcr2 = readl(sai->base + FSL_SAI_RCR2);
+> > +		rcr2 &= ~FSL_SAI_CR2_DIV_MASK;
+> > +		rcr2 |= FSL_SAI_CR2_DIV(div);
+> > +		writel(rcr2, sai->base + FSL_SAI_RCR2);
+> > +
+> > +	} else
+> > +		return -EINVAL;
+> 
+> It would look better if using switch-case. And the last 'else'
+> could be 'default:'.
+> 
+
+I'll think it over.
+
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int fsl_sai_set_dai_fmt_tr(struct snd_soc_dai *cpu_dai,
+> > +				unsigned int fmt, int fsl_dir)
+> > +{
+> > +	u32 val_cr2, val_cr3, val_cr4, reg_cr2, reg_cr3, reg_cr4;
+> > +	struct fsl_sai *sai = snd_soc_dai_get_drvdata(cpu_dai);
+> > +
+> > +	if (fsl_dir == FSL_FMT_TRANSMITTER) {
+> > +		reg_cr2 = FSL_SAI_TCR2;
+> > +		reg_cr3 = FSL_SAI_TCR3;
+> > +		reg_cr4 = FSL_SAI_TCR4;
+> > +	} else {
+> > +		reg_cr2 = FSL_SAI_RCR2;
+> > +		reg_cr3 = FSL_SAI_RCR3;
+> > +		reg_cr4 = FSL_SAI_RCR4;
+> > +	}
+> > +
+> > +	val_cr2 = readl(sai->base + reg_cr2);
+> > +	val_cr3 = readl(sai->base + reg_cr3);
+> > +	val_cr4 = readl(sai->base + reg_cr4);
+> > +
+> > +	if (sai->fbt == FSL_SAI_FBT_MSB)
+> > +		val_cr4 |= FSL_SAI_CR4_MF;
+> > +	else if (sai->fbt == FSL_SAI_FBT_LSB)
+> > +		val_cr4 &= ~FSL_SAI_CR4_MF;
+> > +
+> > +	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+> > +	case SND_SOC_DAIFMT_I2S:
+> > +		val_cr4 |= FSL_SAI_CR4_FSE;
+> > +		val_cr4 |= FSL_SAI_CR4_FSP;
+> > +		break;
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
+> > +	case SND_SOC_DAIFMT_IB_IF:
+> > +		val_cr4 |= FSL_SAI_CR4_FSP;
+> > +		val_cr2 &= ~FSL_SAI_CR2_BCP;
+> > +		break;
+> > +	case SND_SOC_DAIFMT_IB_NF:
+> > +		val_cr4 &= ~FSL_SAI_CR4_FSP;
+> > +		val_cr2 &= ~FSL_SAI_CR2_BCP;
+> > +		break;
+> > +	case SND_SOC_DAIFMT_NB_IF:
+> > +		val_cr4 |= FSL_SAI_CR4_FSP;
+> > +		val_cr2 |= FSL_SAI_CR2_BCP;
+> > +		break;
+> > +	case SND_SOC_DAIFMT_NB_NF:
+> > +		val_cr4 &= ~FSL_SAI_CR4_FSP;
+> > +		val_cr2 |= FSL_SAI_CR2_BCP;
+> > +		break;
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> > +	case SND_SOC_DAIFMT_CBS_CFS:
+> > +		val_cr2 |= FSL_SAI_CR2_BCD_MSTR;
+> > +		val_cr4 |= FSL_SAI_CR4_FSD_MSTR;
+> > +		break;
+> > +	case SND_SOC_DAIFMT_CBM_CFM:
+> > +		val_cr2 &= ~FSL_SAI_CR2_BCD_MSTR;
+> > +		val_cr4 &= ~FSL_SAI_CR4_FSD_MSTR;
+> > +		break;
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	val_cr3 |= FSL_SAI_CR3_TRCE;
+> > +
+> > +	if (fsl_dir == FSL_FMT_RECEIVER)
+> > +		val_cr2 |= FSL_SAI_CR2_SYNC;
+> > +
+> > +	writel(val_cr2, sai->base + reg_cr2);
+> > +	writel(val_cr3, sai->base + reg_cr3);
+> > +	writel(val_cr4, sai->base + reg_cr4);
+> > +
+> > +	return 0;
+> 
+> > +
+> 
+> Pls drop this extra line.
+>
+
+See the next version.
+
+> 
+> > +}
+> > +
+> > +static int fsl_sai_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned
+> > +int fmt) {
+> > +	int ret;
+> > +
+> > +	ret = fsl_sai_set_dai_fmt_tr(cpu_dai, fmt, FSL_FMT_TRANSMITTER);
+> > +	if (ret) {
+> > +		dev_err(cpu_dai->dev,
+> > +				"Cannot set sai's transmitter format: %d\n",
+> > +				ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = fsl_sai_set_dai_fmt_tr(cpu_dai, fmt, FSL_FMT_RECEIVER);
+> > +	if (ret) {
+> > +		dev_err(cpu_dai->dev,
+> > +				"Cannot set sai's receiver format: %d\n",
+> > +				ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int fsl_sai_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai,
+> > +		unsigned int tx_mask, unsigned int rx_mask,
+> > +		int slots, int slot_width)
+> > +{
+> > +	struct fsl_sai *sai = snd_soc_dai_get_drvdata(cpu_dai);
+> > +	u32 tcr4, rcr4;
+> > +
+> > +	tcr4 = readl(sai->base + FSL_SAI_TCR4);
+> > +	tcr4 &= ~FSL_SAI_CR4_FRSZ_MASK;
+> > +	tcr4 |= FSL_SAI_CR4_FRSZ(2);
+> > +	writel(tcr4, sai->base + FSL_SAI_TCR4);
+> > +	writel(tx_mask, sai->base + FSL_SAI_TMR);
+> > +
+> > +	rcr4 = readl(sai->base + FSL_SAI_RCR4);
+> > +	rcr4 &= ~FSL_SAI_CR4_FRSZ_MASK;
+> > +	rcr4 |= FSL_SAI_CR4_FRSZ(2);
+> > +	writel(rcr4, sai->base + FSL_SAI_RCR4);
+> > +	writel(rx_mask, sai->base + FSL_SAI_RMR);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
+> > +		struct snd_pcm_hw_params *params,
+> > +		struct snd_soc_dai *cpu_dai)
+> > +{
+> > +	u32 val_cr4, val_cr5, reg_cr4, reg_cr5, word_width;
+> > +	struct fsl_sai *sai = snd_soc_dai_get_drvdata(cpu_dai);
+> > +
+> > +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+> > +		reg_cr4 = FSL_SAI_TCR4;
+> > +		reg_cr5 = FSL_SAI_TCR5;
+> > +	} else {
+> > +		reg_cr4 = FSL_SAI_RCR4;
+> > +		reg_cr5 = FSL_SAI_RCR5;
+> > +	}
+> > +
+> > +	val_cr4 = readl(sai->base + reg_cr4);
+> > +	val_cr4 &= ~FSL_SAI_CR4_SYWD_MASK;
+> > +
+> > +	val_cr5 = readl(sai->base + reg_cr5);
+> > +	val_cr5 &= ~FSL_SAI_CR5_WNW_MASK;
+> > +	val_cr5 &= ~FSL_SAI_CR5_W0W_MASK;
+> > +	val_cr5 &= ~FSL_SAI_CR5_FBT_MASK;
+> > +
+> > +	switch (params_format(params)) {
+> > +	case SNDRV_PCM_FORMAT_S16_LE:
+> > +		word_width = 16;
+> > +		break;
+> > +	case SNDRV_PCM_FORMAT_S20_3LE:
+> > +		word_width = 20;
+> > +		break;
+> > +	case SNDRV_PCM_FORMAT_S24_LE:
+> > +		word_width = 24;
+> > +		break;
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	val_cr4 |= FSL_SAI_CR4_SYWD(word_width);
+> > +	val_cr5 |= FSL_SAI_CR5_WNW(word_width);
+> > +	val_cr5 |= FSL_SAI_CR5_W0W(word_width);
+> > +
+> > +	if (sai->fbt == FSL_SAI_FBT_MSB)
+> > +		val_cr5 |= FSL_SAI_CR5_FBT(word_width - 1);
+> > +	else if (sai->fbt == FSL_SAI_FBT_LSB)
+> > +		val_cr5 |= FSL_SAI_CR5_FBT(0);
+> > +
+> > +	writel(val_cr4, sai->base + reg_cr4);
+> > +	writel(val_cr5, sai->base + reg_cr5);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int fsl_sai_trigger(struct snd_pcm_substream *substream, int
+> cmd,
+> > +		struct snd_soc_dai *dai)
+> > +{
+> > +	struct fsl_sai *sai = snd_soc_dai_get_drvdata(dai);
+> > +	unsigned int tcsr, rcsr;
+> > +
+> > +	tcsr = readl(sai->base + FSL_SAI_TCSR);
+> > +	rcsr = readl(sai->base + FSL_SAI_RCSR);
+> > +
+> > +	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+> > +		tcsr |= FSL_SAI_CSR_FRDE;
+> > +		rcsr &= ~FSL_SAI_CSR_FRDE;
+> > +	} else {
+> > +		rcsr |= FSL_SAI_CSR_FRDE;
+> > +		tcsr &= ~FSL_SAI_CSR_FRDE;
+> > +	}
+> > +
+> > +	switch (cmd) {
+> > +	case SNDRV_PCM_TRIGGER_START:
+> > +	case SNDRV_PCM_TRIGGER_RESUME:
+> > +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> > +		tcsr |= FSL_SAI_CSR_TERE;
+> > +		rcsr |= FSL_SAI_CSR_TERE;
+> > +		writel(rcsr, sai->base + FSL_SAI_RCSR);
+> > +		udelay(10);
+> 
+> Does SAI really needs this udelay() here? Required by IP's operation flow?
+> If so, I think it's better to add comments here to explain it.
+> 
++++++++++++++++++
+Synchronous mode
+The SAI transmitter and receiver can be configured to operate with synchronous bit clock
+and frame sync.
+
+1,
+If the transmitter bit clock and frame sync are to be used by both the transmitter and
+receiver:
+	...
+* It is recommended that the transmitter is the last enabled and the first disabled.
+
+2,
+If the receiver bit clock and frame sync are to be used by both the transmitter and
+receiver:
+	...
+* It is recommended that the receiver is the last enabled and the first disabled.
+------------------
+
+So I think the delay is needed, and I still tunning it.
+
+
+
+> > +		writel(tcsr, sai->base + FSL_SAI_TCSR);
+> > +		break;
+> > +
+> > +	case SNDRV_PCM_TRIGGER_STOP:
+> > +	case SNDRV_PCM_TRIGGER_SUSPEND:
+> > +	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+> > +		if (!(dai->playback_active || dai->capture_active)) {
+> > +			tcsr &= ~FSL_SAI_CSR_TERE;
+> > +			rcsr &= ~FSL_SAI_CSR_TERE;
+> > +		}
+> > +		writel(rcsr, sai->base + FSL_SAI_RCSR);
+> > +		udelay(10);
+> > +		writel(tcsr, sai->base + FSL_SAI_TCSR);
+> > +		break;
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct snd_soc_dai_ops fsl_sai_pcm_dai_ops = {
+> > +	.set_sysclk	= fsl_sai_set_dai_sysclk,
+> > +	.set_clkdiv	= fsl_sai_set_dai_clkdiv,
+> > +	.set_fmt	= fsl_sai_set_dai_fmt,
+> > +	.set_tdm_slot	= fsl_sai_set_dai_tdm_slot,
+> > +	.hw_params	= fsl_sai_hw_params,
+> > +	.trigger	= fsl_sai_trigger,
+> > +};
+> > +
+> > +static int fsl_sai_dai_probe(struct snd_soc_dai *dai) {
+> > +	int ret;
+> > +	struct fsl_sai *sai = dev_get_drvdata(dai->dev);
+> > +
+> > +	ret = clk_prepare_enable(sai->clk);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	writel(0x0, sai->base + FSL_SAI_RCSR);
+> > +	writel(0x0, sai->base + FSL_SAI_TCSR);
+> > +	writel(sai->dma_params_tx.maxburst, sai->base + FSL_SAI_TCR1);
+> > +	writel(sai->dma_params_rx.maxburst, sai->base + FSL_SAI_RCR1);
+> > +
+> > +	dai->playback_dma_data = &sai->dma_params_tx;
+> > +	dai->capture_dma_data = &sai->dma_params_rx;
+> > +
+> > +	snd_soc_dai_set_drvdata(dai, sai);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +int fsl_sai_dai_remove(struct snd_soc_dai *dai)
+> 
+> static
+> 
+
+Yes.
+
+> > +{
+> > +	struct fsl_sai *sai = dev_get_drvdata(dai->dev);
+> > +
+> > +	clk_disable_unprepare(sai->clk);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct snd_soc_dai_driver fsl_sai_dai = {
+> > +	.probe = fsl_sai_dai_probe,
+> > +	.remove = fsl_sai_dai_remove,
+> > +	.playback = {
+> > +		.channels_min = 1,
+> > +		.channels_max = 2,
+> > +		.rates = SNDRV_PCM_RATE_8000_96000,
+> > +		.formats = FSL_SAI_FORMATS,
+> > +	},
+> > +	.capture = {
+> > +		.channels_min = 1,
+> > +		.channels_max = 2,
+> > +		.rates = SNDRV_PCM_RATE_8000_96000,
+> > +		.formats = FSL_SAI_FORMATS,
+> > +	},
+> > +	.ops = &fsl_sai_pcm_dai_ops,
+> > +};
+> > +
+> > +static const struct snd_soc_component_driver fsl_component = {
+> > +	.name           = "fsl-sai",
+> > +};
+> > +
+> > +static int fsl_sai_probe(struct platform_device *pdev) {
+> > +	struct resource *res;
+> > +	struct fsl_sai *sai;
+> > +	int ret = 0;
+> > +
+> > +	sai = devm_kzalloc(&pdev->dev, sizeof(*sai), GFP_KERNEL);
+> > +	if (!sai)
+> > +		return -ENOMEM;
+> > +
+> > +	sai->fbt = FSL_SAI_FBT_MSB;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	sai->base = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (IS_ERR(sai->base))
+> > +		return PTR_ERR(sai->base);
+> > +
+> > +	sai->clk = devm_clk_get(&pdev->dev, "sai");
+> > +	if (IS_ERR(sai->clk)) {
+> > +		dev_err(&pdev->dev, "Cannot get sai's clock: %d\n", ret);
+> > +		return PTR_ERR(sai->clk);
+> > +	}
+> > +
+> > +	sai->dma_params_rx.addr = res->start + FSL_SAI_RDR;
+> > +	sai->dma_params_rx.maxburst = 6;
+> > +
+> > +	sai->dma_params_tx.addr = res->start + FSL_SAI_TDR;
+> > +	sai->dma_params_tx.maxburst = 6;
+> > +
+> > +	platform_set_drvdata(pdev, sai);
+> > +
+> > +	ret = devm_snd_soc_register_component(&pdev->dev, &fsl_component,
+> > +			&fsl_sai_dai, 1);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL,
+> > +			SND_DMAENGINE_PCM_FLAG_NO_RESIDUE);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int fsl_sai_remove(struct platform_device *pdev) {
+> > +	snd_dmaengine_pcm_unregister(&pdev->dev);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id fsl_sai_ids[] = {
+> > +	{ .compatible = "fsl,vf610-sai", },
+> 
+> > +	{ /*sentinel*/ }
+> 
+> I think this could be left in blank without comments inside.
+> And if you really want to add it, pls add like: /* sentinel */
+> 						  ^        ^
+
+Okey.
+
+> > +};
+> > +
+> > +static struct platform_driver fsl_sai_driver = {
+> > +	.probe = fsl_sai_probe,
+> > +	.remove = fsl_sai_remove,
+> > +
+> > +	.driver = {
+> > +		.name = "fsl-sai",
+> > +		.owner = THIS_MODULE,
+> > +		.of_match_table = fsl_sai_ids,
+> > +	},
+> > +};
+> > +module_platform_driver(fsl_sai_driver);
+> > +
+> > +MODULE_AUTHOR("Xiubo Li, <Li.Xiubo@freescale.com>");
+> > +MODULE_AUTHOR("Alison Wang, <b18965@freescale.com>");
+> > +MODULE_DESCRIPTION("Freescale Soc SAI Interface");
+> > +MODULE_LICENSE("GPL");
+> 
+> Should be better if added:
+> MODULE_ALIAS("platform:fsl-sai");
+> 
+> This would support module auto-load feature in some Linux-OS.
+> 
+
+I will think it over.
+
+BRS,
+Xiubo
