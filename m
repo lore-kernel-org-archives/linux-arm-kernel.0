@@ -1,55 +1,135 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 4 Nov 2013 14:56:27 +0100
-Subject: [PATCH v4 4/4] ARM: new platform for Energy Micro's EFM32
- Cortex-M3 SoCs
-In-Reply-To: <1383562853-17202-4-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20131104105836.GI14892@pengutronix.de>
- <1383562853-17202-4-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <201311041456.27654.arnd@arndb.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 04 Nov 2013 15:12:26 +0100
+Subject: [PATCH v4] videobuf2: Add missing lock held on vb2_fop_relase
+In-Reply-To: <CAPybu_0cKxMxhXoSqbK2nTyX3DGCVZdUZPt2bTE6aZR65xDG=w@mail.gmail.com>
+References: <1383385994-11422-1-git-send-email-ricardo.ribalda@gmail.com>
+ <527794F0.40901@xs4all.nl>
+ <CAPybu_0cKxMxhXoSqbK2nTyX3DGCVZdUZPt2bTE6aZR65xDG=w@mail.gmail.com>
+Message-ID: <5277AB4A.5050007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 November 2013, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/Kconfig                 |  19 +++++++-
->  arch/arm/Makefile                |   1 +
->  arch/arm/configs/efm32_defconfig | 102 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-efm32/Makefile     |   1 +
->  arch/arm/mach-efm32/dtmachine.c  |  15 ++++++
->  5 files changed, 137 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/configs/efm32_defconfig
->  create mode 100644 arch/arm/mach-efm32/Makefile
->  create mode 100644 arch/arm/mach-efm32/dtmachine.c
+Hi,
+
+On 04/11/13 14:54, Ricardo Ribalda Delgado wrote:
+> Hello Hans
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 7ae0615..d8145fe 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -413,6 +413,23 @@ config ARCH_EBSA110
->           Ethernet interface, two PCMCIA sockets, two serial ports and a
->           parallel port.
->  
-> +config ARCH_EFM32
-> +       bool "Energy Micro efm32"
-> +       depends on !MMU
-> +       select ARCH_REQUIRE_GPIOLIB
-> +       select ARM_NVIC
-> +       select CLKSRC_MMIO
-> +       select CLKSRC_OF
-> +       select COMMON_CLK
-> +       select CPU_V7M
-> +       select GENERIC_CLOCKEVENTS
-> +       select NO_DMA
-> +       select NO_IOPORT
-> +       select SPARSE_IRQ
-> +       select USE_OF
-> +       help
-> +         Support for Energy Micro's (now Silicon Labs) efm32 processors.
-> +
+> Thanks for your comments.
+> 
+> Please take a look to v4 of this patch
+> https://patchwork.linuxtv.org/patch/20529/
 
-It would be good to have at least in either the changeset description or the Kconfig
-text (or both) some description about the platform: which SoCs have been tested,
-what is this platform used for, where can one find data sheets etc.
+We're discussing v4 actually ;)
 
-	Arnd
+> On Mon, Nov 4, 2013 at 1:37 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+>> On 11/02/2013 10:53 AM, Ricardo Ribalda Delgado wrote:
+>>> From: Ricardo Ribalda <ricardo.ribalda@gmail.com>
+>>>
+>>> vb2_fop_relase does not held the lock although it is modifying the
+>>> queue->owner field.
+>>>
+>>> This could lead to race conditions on the vb2_perform_io function
+>>> when multiple applications are accessing the video device via
+>>> read/write API:
+>>
+>> It's also called directly by drivers/media/usb/em28xx/em28xx-video.c!
+>>
+> 
+> em28xx-video does not hold the lock, therefore it can call the normal
+> function. On v2 we made a internal function that should be called if
+> the funciton is called directly by the driver. Please take a look to
+> the old comments. https://patchwork.linuxtv.org/patch/20460/
+[...]
+>>> -int vb2_fop_release(struct file *file)
+>>> +static int _vb2_fop_release(struct file *file, bool lock_is_held)
+>>>  {
+>>>       struct video_device *vdev = video_devdata(file);
+>>> +     struct mutex *lock;
+>>>
+>>>       if (file->private_data == vdev->queue->owner) {
+>>> +             if (lock_is_held)
+>>> +                     lock = NULL;
+>>> +             else
+>>> +                     lock = vdev->queue->lock ?
+>>> +                             vdev->queue->lock : vdev->lock;
+>>> +             if (lock)
+>>> +                     mutex_lock(lock);
+>>>               vb2_queue_release(vdev->queue);
+>>>               vdev->queue->owner = NULL;
+>>> +             if (lock)
+>>> +                     mutex_unlock(lock);
+>>>       }
+>>>       return v4l2_fh_release(file);
+>>>  }
+>>> +
+>>> +int vb2_fop_release(struct file *file)
+>>> +{
+>>> +     return _vb2_fop_release(file, false);
+>>> +}
+>>>  EXPORT_SYMBOL_GPL(vb2_fop_release);
+>>>
+>>> +int __vb2_fop_release(struct file *file)
+>>> +{
+>>> +     return _vb2_fop_release(file, true);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(__vb2_fop_release);
+>>
+>> Sorry for introducing yet another opinion, but I think this is very confusing.
+> 
+> It is confusing the lock_held parameter or the __ naming for unlocked versions?
+> 
+>>
+>> I would do this:
+>>
+>> static int __vb2_fop_release(struct file *file, struct mutex *lock)
+>> {
+>>         struct video_device *vdev = video_devdata(file);
+>>
+>>         if (file->private_data == vdev->queue->owner) {
+>>                 if (lock)
+>>                         mutex_lock(lock);
+>>                 vb2_queue_release(vdev->queue);
+>>                 vdev->queue->owner = NULL;
+>>                 if (lock)
+>>                         mutex_unlock(lock);
+>>         }
+>>         return v4l2_fh_release(file);
+>> }
+>>
+>> int vb2_fop_release(struct file *file)
+>> {
+>>         struct video_device *vdev = video_devdata(file);
+>>         struct mutex *lock = vdev->queue->lock ?
+>>                                 vdev->queue->lock : vdev->lock;
+>>
+>>         return __vb2_fop_release(file, lock);
+>> }
+>> EXPORT_SYMBOL_GPL(vb2_fop_release);
+>>
+>> int vb2_fop_release_unlock(struct file *file)
+>> {
+>>         return __vb2_fop_release(file, NULL);
+>> }
+>> EXPORT_SYMBOL_GPL(vb2_fop_release_unlock);
+>>
+>> Optionally, __vb2_fop_release can be exported and then vb2_fop_release_unlock
+>> isn't necessary.
+>>
+> 
+> i dont have any strong opinion in any direction. All I really care is
+> that the oops is fixed :).
+> 
+> If your concern about the patch is the is_lock_held function, I can
+> make a patch with the params on your proposal and the __naming as
+> Sylvester suggested, so everyone is happy.
+> 
+> Sylvester, Hanshat do you think?
+
+I like Hans' proposal, probably it's better to export __vb2_fop_release(),
+so it can be also used in cases like em28xx, to make things a bit more
+clear. But I'm fine with vb2_fop_release_unlock() as well, don't really
+have strong preference. It's up to you.
+
+--
+Thanks,
+Sylwester
