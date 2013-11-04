@@ -1,45 +1,67 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 4 Nov 2013 12:09:04 -0400
-Subject: [PATCH] thermal: imx_thermal: add module device table
-In-Reply-To: <E1VbfcJ-0003g5-SK@rmk-PC.arm.linux.org.uk>
-References: <E1VbfcJ-0003g5-SK@rmk-PC.arm.linux.org.uk>
-Message-ID: <5277C6A0.80402@ti.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Mon,  4 Nov 2013 17:15:19 +0100
+Subject: [PATCHv4][ 1/6] fbdev: Add the lacking FB_SYNC_* for matching the
+ DISPLAY_FLAGS_*
+Message-ID: <1383581724-14817-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30-10-2013 19:56, Russell King wrote:
-> Add the module device table declaration so the module can be loaded
-> automatically at boot time.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Without that fix, drivers using the fb_videomode_from_videomode
+  function will not be able to get certain information because
+  some DISPLAY_FLAGS_* have no corresponding FB_SYNC_*.
 
-Acked-by: Eduardo Valentin <eduardo.valentin@ti.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ChangeLog v3->v4:
+- Fixed the issue with FB_SYNC_PIXDAT_HIGH_ACT value.
 
-> ---
->  drivers/thermal/imx_thermal.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-> index 1d6c801c1eb9..ab31552f0360 100644
-> --- a/drivers/thermal/imx_thermal.c
-> +++ b/drivers/thermal/imx_thermal.c
-> @@ -539,3 +539,4 @@ MODULE_AUTHOR("Freescale Semiconductor, Inc.");
->  MODULE_DESCRIPTION("Thermal driver for Freescale i.MX SoCs");
->  MODULE_LICENSE("GPL v2");
->  MODULE_ALIAS("platform:imx-thermal");
-> +MODULE_DEVICE_TABLE(of, of_imx_thermal_match);
-> 
+ChangeLog v2->v3:
+- Added Jean-Christophe PLAGNIOL-VILLARD's ACK.
+---
+ drivers/video/fbmon.c   |    4 ++++
+ include/uapi/linux/fb.h |    2 ++
+ 2 files changed, 6 insertions(+)
 
-
+diff --git a/drivers/video/fbmon.c b/drivers/video/fbmon.c
+index 6103fa6..29a9ed0 100644
+--- a/drivers/video/fbmon.c
++++ b/drivers/video/fbmon.c
+@@ -1402,6 +1402,10 @@ int fb_videomode_from_videomode(const struct videomode *vm,
+ 		fbmode->sync |= FB_SYNC_HOR_HIGH_ACT;
+ 	if (vm->flags & DISPLAY_FLAGS_VSYNC_HIGH)
+ 		fbmode->sync |= FB_SYNC_VERT_HIGH_ACT;
++	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
++		fbmode->sync |= FB_SYNC_DE_HIGH_ACT;
++	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
++		fbmode->sync |= FB_SYNC_PIXDAT_HIGH_ACT;
+ 	if (vm->flags & DISPLAY_FLAGS_INTERLACED)
+ 		fbmode->vmode |= FB_VMODE_INTERLACED;
+ 	if (vm->flags & DISPLAY_FLAGS_DOUBLESCAN)
+diff --git a/include/uapi/linux/fb.h b/include/uapi/linux/fb.h
+index fb795c3..c618cfc 100644
+--- a/include/uapi/linux/fb.h
++++ b/include/uapi/linux/fb.h
+@@ -215,6 +215,8 @@ struct fb_bitfield {
+ 					/* vtotal = 144d/288n/576i => PAL  */
+ 					/* vtotal = 121d/242n/484i => NTSC */
+ #define FB_SYNC_ON_GREEN	32	/* sync on green */
++#define FB_SYNC_DE_HIGH_ACT	64	/* data enable high active */
++#define FB_SYNC_PIXDAT_HIGH_ACT	128	/* data enable high active */
+ 
+ #define FB_VMODE_NONINTERLACED  0	/* non interlaced */
+ #define FB_VMODE_INTERLACED	1	/* interlaced	*/
 -- 
-You have got to be excited about what you are doing. (L. Lamport)
-
-Eduardo Valentin
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131104/f6b14c19/attachment.sig>
+1.7.9.5
