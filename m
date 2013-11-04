@@ -1,35 +1,40 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 04 Nov 2013 18:15:57 +0800
-Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
- "include/asm/atomic.h"
-In-Reply-To: <20131104100711.GC8419@mudshark.cambridge.arm.com>
-References: <20131010100733.GH3817@mudshark.cambridge.arm.com>
- <52568998.2080108@asianux.com>
- <20131010142305.GG6199@mudshark.cambridge.arm.com>
- <525751E2.3020207@asianux.com>
- <20131011104419.GE14732@mudshark.cambridge.arm.com>
- <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
- <20131011165530.GS14732@mudshark.cambridge.arm.com>
- <794E70F6-80D3-4100-A0FF-A6F34AFB9A59@arm.com> <52774E8A.2080901@asianux.com>
- <20131104100711.GC8419@mudshark.cambridge.arm.com>
-Message-ID: <527773DD.50001@asianux.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 4 Nov 2013 11:35:48 +0100
+Subject: [PATCH] ARM: orion5x: drop unused include from common.c
+In-Reply-To: <1383557043-18891-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1383557043-18891-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131104103548.GD6051@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2013 06:07 PM, Will Deacon wrote:
-> On Mon, Nov 04, 2013 at 07:36:42AM +0000, Chen Gang wrote:
->> > Hello Maintainers:
->> > 
->> > Are these related patches for "arm[64]/include/asm/atomic.h" OK? If also
->> > need me do something, please let me know, and I will/should try.
-> They're sitting in the patch system, so you don't need to do anything else
-> unless there is a merge conflict.
+On Mon, Nov 04, 2013 at 10:24:03AM +0100, Uwe Kleine-K?nig wrote:
+> asm/times.h only defines CLOCK_TICK_RATE, cycles_t and get_cycles. All
+> three are not used in this file.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-orion5x/common.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+> index 91a5852..afa6b08 100644
+> --- a/arch/arm/mach-orion5x/common.c
+> +++ b/arch/arm/mach-orion5x/common.c
+> @@ -24,7 +24,6 @@
+>  #include <asm/page.h>
+>  #include <asm/setup.h>
+>  #include <asm/system_misc.h>
+> -#include <asm/timex.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/time.h>
+> -- 
+> 1.8.4.rc3
+ 
+Hi Uwe
 
-OK, thanks.
+I build tested this patch.
 
-And excuse me, I am not quite familiar with our kernel version merging,
-so send the original redundant mail.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Thanks.
--- 
-Chen Gang
+	  Andrew
