@@ -1,65 +1,37 @@
 From: neko@bakuhatsu.net (Matt Sealey)
-Date: Mon, 4 Nov 2013 16:45:57 -0600
-Subject: [PATCHv9 05/43] CLK: TI: add DT alias clock registration mechanism
-In-Reply-To: <1545474.t3t8VtRE27@flatron>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-6-git-send-email-t-kristo@ti.com>
- <CAHCPf3uPhkVhdn3Db06YZfrwQuA7khdZEXiZ+pqJ06J9YdBoLg@mail.gmail.com>
- <1545474.t3t8VtRE27@flatron>
-Message-ID: <CAHCPf3vkKMmTsk_Pdm5tAmPm7yRW7_yxLGr1w18A4aqbYh2+5Q@mail.gmail.com>
+Date: Mon, 4 Nov 2013 16:50:01 -0600
+Subject: [PATCH RFC] ARM: dts: imx6qdl: make pinctrl nodes board specific
+In-Reply-To: <20131101083332.GB10324@S2101-09.ap.freescale.net>
+References: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
+ <20131031080326.GK24559@pengutronix.de>
+ <20131031102908.GX16735@n2100.arm.linux.org.uk>
+ <CAHCPf3vTcu9RCk8=9MUs4nkyJ-8jevh5koxfzdLzE5+qM0ZspQ@mail.gmail.com>
+ <20131101083332.GB10324@S2101-09.ap.freescale.net>
+Message-ID: <CAHCPf3vhyjTnqHXYRj49AL80Z_jGd4LbaRfySjK-=Axkk4FNqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 2, 2013 at 8:49 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Matt,
+On Fri, Nov 1, 2013 at 3:33 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Oct 31, 2013 at 10:45:08AM -0500, Matt Sealey wrote:
+>> I suggested this to Shawn a couple weeks ago and got a bit of pushback.
+>>
+>> There's probably a ton more to do in this regard to keep the DT
+>> per-board more concise, but this drops tree size by a respectable
+>> amount on i.MX51 too (just on a tree I have internally, it's something
+>> like 8.5KiB) and I can't see any redundant data in the ones he
+>> patched.
+>>
+>> I can follow this up with i.MX51/i.MX53 if nobody is already doing that..
 >
->> I have one question here, what makes this part of the patch
->> TI-specific at all except the definition of the structure ti_dt_clk?
->> Mapping DT clocks to generic clkdev legacy namings seems like it would
->> be a necessary evil across *all* SoC platforms.
->
-> SoC platforms that are fully converted to Device Tree do not need any
-> legacy clkdev namings, because they have all clkdev look-ups performed
-> using data from DT (see generic clock bindings).
->
-> So this would be not "*all* SoC platforms", but instead "SoC platforms,
-> which are currently undergoing conversion to DT or conversion of which is
-> yet to be started".
+> I'm taking care of them as a move of while IMX family.
 
-That is well understood here, I have a long-running hobby project to
-do this for i.MX5 and i.MX6 - I have a tree from months ago where I
-restructured the way clocks are probed for both these (moving from
-mach-imx to drivers/clk and putting in the right places) and
-successfully moved 8 clocks (on i.MX51, 3 core PLLs, some fixed clocks
-which got done in the meantime upstream, and one in the CCM - the CPU
-freq divider) with the correct references and it all operated really
-well.
+I'd quite like to push the Efika MX trees at the state they're at,
+sometime in the near future; if this work is going to take a while
+could I just do it and submit it and see your objections?
 
-In the meantime I had to add a bunch of weird hacks to the drivers to
-deal with the missing connection names, so this being generic would
-allow the core clock work to be finished while the drivers are brought
-up to the new convention.
+I have no merge deadline like Russell, but I would like to put some
+closure on some parts of my local tree and sync upstream. My Trello
+cards are getting unmanageable ;)
 
-> Still this might be a good enough justification for having a generic
-> solution for this problem, but I would wait with this until the real need
-> on some of such platforms shows up. I don't see anything wrong in
-> implementing this first as TI-specific quirk and then possibly making it
-> generic if such need shows up.
-
-Indeed.. and I would like to make use of it but I'm not coding on a TI
-platform or a Samsung platform:)
-
-> By the way, we already have something like this in clk/samsung/clk.c .
-> This is called aliases there and allows registering clkdev look-ups for
-> particular clocks. However this is specific to our clock drivers that
-> register all clocks inside a single clock privder, based on static ID
-> assignment and all clocks statically listed in clock driver - see
-> clk/samsung/clk-s3c64xx.c for an example.
-
-Right. I'll keep it in mind as I do this.
-
-Thanks, this does make my life a lot easier, means I might have it
-working and submitted before the end of the month instead of sometime
-next year, I was dreading reworking all these drivers up front ;)
-
+Thanks,
 Matt Sealey <neko@bakuhatsu.net>
