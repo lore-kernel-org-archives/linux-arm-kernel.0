@@ -1,110 +1,49 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 4 Nov 2013 18:38:05 +0000
-Subject: [PATCH v9 01/18] arm: make SWIOTLB available
-In-Reply-To: <alpine.DEB.2.02.1310300112520.26077@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
- <1382698313-13161-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1310251206450.26077@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1310290441260.26077@kaball.uk.xensource.com>
- <20131029142023.GE20487@phenom.dumpdata.com>
- <20131029142626.GQ16735@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1310291716120.26077@kaball.uk.xensource.com>
- <20131029180105.GR16735@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1310300112520.26077@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1311041837430.26077@kaball.uk.xensource.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 4 Nov 2013 10:57:36 -0800
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <5277CD33.6030003@wwwdotorg.org>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <1432962.yW4lKnaQJE@flatron> <25161583.XICaeMWvPh@flatron>
+ <2443024.JdDKnfkC18@wuerfel> <5277CD33.6030003@wwwdotorg.org>
+Message-ID: <CAOesGMhHH7XENmEVJEbOQX03Zc_Q8775ijUfg5r1fLLGTLUymw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Oct 2013, Stefano Stabellini wrote:
-> On Tue, 29 Oct 2013, Russell King - ARM Linux wrote:
-> > So... what I'm saying is please fix xgmac to use the DMA API properly
-> > rather than working around such problems. :)
->  
-> OK.
-> Would the appended patch fix your concerns?
+On Mon, Nov 4, 2013 at 8:37 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-ping?
+> I had suggested that while talking to someone at the kernel summit,
+> basically each driver supplies functions like:
+>
+> 1) ACPI -> platform data or resources converter
+> 2) DT -> platform or resources data converter
+> 3) anything else -> platform or resources data converter
+> 4) probe()
+>
+> One of (1)..(3) (depending on device instantiation source) is called to
+> translate the data source to platform data or resources, before probe
+> (and could indeed handle much of deferred probe I suppose).
+>
+> (4) is called to actually initialize the device, and always has complete
+> pre-parsed platform data/resources available, and does no DT/ACPI/...
+> parsing.
+>
+> I forget who I was talking to, but it was asserted something like this
+> had been proposed before, and wasn't accepted. Unfortunately, I don't
+> entirely recall why...
+>
+> It may have been due to the fact I proposed (1) and (2) above being
+> separate, rather than identical, due to using some unified API to read
+> data from ACPI and DT. That wasn't the most interesting aspect of the
+> proposal though. Still, I think conceptually there could be other data
+> sources in the future, so we may need to allow different types of
+> conversion function at some point, even if the ACPI and DT
+> implementations can end up being the same.
 
-> ---
-> 
-> arm: make SWIOTLB available
-> 
-> IOMMU_HELPER is needed because SWIOTLB calls iommu_is_span_boundary,
-> provided by lib/iommu_helper.c.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> 
-> Changes in v9:
-> - remove uneeded include asm/cacheflush.h;
-> - just return 0 if !dev->dma_mask in dma_capable.
-> 
-> ---
->  arch/arm/Kconfig                   |    6 ++++++
->  arch/arm/include/asm/dma-mapping.h |   33 +++++++++++++++++++++++++++++++++
->  2 files changed, 39 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 1ad6fb6..b08374f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1872,6 +1872,12 @@ config CC_STACKPROTECTOR
->  	  neutralized via a kernel panic.
->  	  This feature requires gcc version 4.2 or above.
->  
-> +config SWIOTLB
-> +	def_bool y
-> +
-> +config IOMMU_HELPER
-> +	def_bool SWIOTLB
-> +
->  config XEN_DOM0
->  	def_bool y
->  	depends on XEN
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 5b579b9..1ad2c17 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -86,6 +86,39 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
->  }
->  #endif
->  
-> +static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-> +{
-> +	unsigned int offset = paddr & ~PAGE_MASK;
-> +	return pfn_to_dma(dev, __phys_to_pfn(paddr)) + offset;
-> +}
-> +
-> +static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-> +{
-> +	unsigned int offset = dev_addr & ~PAGE_MASK;
-> +	return __pfn_to_phys(dma_to_pfn(dev, dev_addr)) + offset;
-> +}
-> +
-> +static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-> +{
-> +	u64 limit, mask;
-> +
-> +	if (!dev->dma_mask)
-> +		return 0;
-> +
-> +	mask = *dev->dma_mask;
-> +
-> +	limit = (mask + 1) & ~mask;
-> +	if (limit && size > limit)
-> +		return 0;
-> +
-> +	if ((addr | (addr + size - 1)) & ~mask)
-> +		return 0;
-> +
-> +	return 1;
-> +}
-> +
-> +static inline void dma_mark_clean(void *addr, size_t size) { }
-> +
->  /*
->   * DMA errors are defined by all-bits-set in the DMA address.
->   */
-> -- 
-> 1.7.2.5
-> 
+I think it might have been me you were talking to. I know Grant
+considered something like that when first doing the device tree
+enablement, and chose not to do it then but I am not sure what the
+motivations were. Given that we have cleaned up a lot of driver
+probing already by now, it might be suitable to try again.
+
+
+-Olof
