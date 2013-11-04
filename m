@@ -1,65 +1,97 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  4 Nov 2013 09:04:56 +0100
-Subject: [PATCH] ARM: footbridge: fix build warning
-Message-ID: <1383552296-16275-1-git-send-email-linus.walleij@linaro.org>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  4 Nov 2013 09:17:02 +0100
+Subject: [PATCH] ARM: imx: drop support for irq priorisation
+Message-ID: <1383553022-6983-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The raw spinlock in the netwinder GPIO implementation was using
-non-raw accessors, fix this warning from the autobuilder:
+The code for irq priorisation support doesn't have any in-tree users and
+the Kconfig description does wrong promises because nowadays irq
+handlers are called with irqs disabled, so no high prioritized irq can
+interrupt a lower prioritized handler.
 
-arch/arm/mach-footbridge/netwinder-hw.c:695:2:
-warning: passing argument 1 of 'spinlock_check' from
-incompatible pointer type [enabled by default]
-arch/arm/mach-footbridge/netwinder-hw.c:702:2:
-warning: passing argument 1 of 'spin_unlock_irqrestore' from
-incompatible pointer type [enabled by default]
-arch/arm/mach-footbridge/netwinder-hw.c:712:2:
-warning: passing argument 1 of 'spinlock_check' from
-incompatible pointer type [enabled by default]
-arch/arm/mach-footbridge/netwinder-hw.c:714:2:
-warning: passing argument 1 of 'spin_unlock_irqrestore' from
-incompatible pointer type [enabled by default]
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-ARM SoC folks: please apply this directly to fixes.
----
- arch/arm/mach-footbridge/netwinder-hw.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/Kconfig      | 10 ----------
+ arch/arm/mach-imx/avic.c       | 25 -------------------------
+ arch/arm/mach-imx/irq-common.h |  1 -
+ 3 files changed, 36 deletions(-)
 
-diff --git a/arch/arm/mach-footbridge/netwinder-hw.c b/arch/arm/mach-footbridge/netwinder-hw.c
-index 1fd2cf097e30..eb1fa5c84723 100644
---- a/arch/arm/mach-footbridge/netwinder-hw.c
-+++ b/arch/arm/mach-footbridge/netwinder-hw.c
-@@ -692,14 +692,14 @@ static void netwinder_led_set(struct led_classdev *cdev,
- 	unsigned long flags;
- 	u32 reg;
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 15c9ae3..9431729 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -20,16 +20,6 @@ config ARCH_MXC
+ menu "Freescale i.MX support"
+ 	depends on ARCH_MXC
  
--	spin_lock_irqsave(&nw_gpio_lock, flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, flags);
- 	reg = nw_gpio_read();
- 	if (b != LED_OFF)
- 		reg &= ~led->mask;
- 	else
- 		reg |= led->mask;
- 	nw_gpio_modify_op(led->mask, reg);
--	spin_unlock_irqrestore(&nw_gpio_lock, flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, flags);
- }
+-config MXC_IRQ_PRIOR
+-	bool "Use IRQ priority"
+-	help
+-	  Select this if you want to use prioritized IRQ handling.
+-	  This feature prevents higher priority ISR to be interrupted
+-	  by lower priority IRQ.
+-	  This may be useful in embedded applications, where are strong
+-	  requirements for timing.
+-	  Say N here, unless you have a specialized requirement.
+-
+ config MXC_TZIC
+ 	bool
  
- static enum led_brightness netwinder_led_get(struct led_classdev *cdev)
-@@ -709,9 +709,9 @@ static enum led_brightness netwinder_led_get(struct led_classdev *cdev)
- 	unsigned long flags;
- 	u32 reg;
+diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
+index e163ec7..8d1df2e 100644
+--- a/arch/arm/mach-imx/avic.c
++++ b/arch/arm/mach-imx/avic.c
+@@ -54,28 +54,6 @@
+ static void __iomem *avic_base;
+ static struct irq_domain *domain;
  
--	spin_lock_irqsave(&nw_gpio_lock, flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, flags);
- 	reg = nw_gpio_read();
--	spin_unlock_irqrestore(&nw_gpio_lock, flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, flags);
+-#ifdef CONFIG_MXC_IRQ_PRIOR
+-static int avic_irq_set_priority(unsigned char irq, unsigned char prio)
+-{
+-	struct irq_data *d = irq_get_irq_data(irq);
+-	unsigned int temp;
+-	unsigned int mask = 0x0F << irq % 8 * 4;
+-
+-	irq = d->hwirq;
+-
+-	if (irq >= AVIC_NUM_IRQS)
+-		return -EINVAL;
+-
+-	temp = __raw_readl(avic_base + AVIC_NIPRIORITY(irq / 8));
+-	temp &= ~mask;
+-	temp |= prio & mask;
+-
+-	__raw_writel(temp, avic_base + AVIC_NIPRIORITY(irq / 8));
+-
+-	return 0;
+-}
+-#endif
+-
+ #ifdef CONFIG_FIQ
+ static int avic_set_irq_fiq(unsigned int irq, unsigned int type)
+ {
+@@ -102,9 +80,6 @@ static int avic_set_irq_fiq(unsigned int irq, unsigned int type)
  
- 	return (reg & led->mask) ? LED_OFF : LED_FULL;
- }
+ 
+ static struct mxc_extra_irq avic_extra_irq = {
+-#ifdef CONFIG_MXC_IRQ_PRIOR
+-	.set_priority = avic_irq_set_priority,
+-#endif
+ #ifdef CONFIG_FIQ
+ 	.set_irq_fiq = avic_set_irq_fiq,
+ #endif
+diff --git a/arch/arm/mach-imx/irq-common.h b/arch/arm/mach-imx/irq-common.h
+index 5b2dabb..6e3175d 100644
+--- a/arch/arm/mach-imx/irq-common.h
++++ b/arch/arm/mach-imx/irq-common.h
+@@ -24,7 +24,6 @@
+ 
+ struct mxc_extra_irq
+ {
+-	int (*set_priority)(unsigned char irq, unsigned char prio);
+ 	int (*set_irq_fiq)(unsigned int irq, unsigned int type);
+ };
+ 
 -- 
-1.8.3.1
+1.8.4.rc3
