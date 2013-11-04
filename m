@@ -1,258 +1,829 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Mon, 4 Nov 2013 14:54:10 +0100
-Subject: [PATCH v4] videobuf2: Add missing lock held on vb2_fop_relase
-In-Reply-To: <527794F0.40901@xs4all.nl>
-References: <1383385994-11422-1-git-send-email-ricardo.ribalda@gmail.com>
- <527794F0.40901@xs4all.nl>
-Message-ID: <CAPybu_0cKxMxhXoSqbK2nTyX3DGCVZdUZPt2bTE6aZR65xDG=w@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 4 Nov 2013 14:55:03 +0100
+Subject: [PATCH v3 4/7] ARM: at91/dt: define sama5d3 clocks
+In-Reply-To: <1382132907-30198-1-git-send-email-b.brezillon@overkiz.com>
+References: <5260F959.2090705@atmel.com>
+ <1382132907-30198-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <5277A737.5080705@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hans
+On 18/10/2013 23:48, Boris BREZILLON :
+> Define sama5d3 clocks in sama5d3 device tree.
+> Add references to the appropriate clocks in each peripheral.
+>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> ---
+> Changes since v2:
+>   - add usb_clk to usb ehci controller node
 
-Thanks for your comments.
+Yes. Tested and it works okay.
 
-Please take a look to v4 of this patch
-https://patchwork.linuxtv.org/patch/20529/
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-On Mon, Nov 4, 2013 at 1:37 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> On 11/02/2013 10:53 AM, Ricardo Ribalda Delgado wrote:
->> From: Ricardo Ribalda <ricardo.ribalda@gmail.com>
->>
->> vb2_fop_relase does not held the lock although it is modifying the
->> queue->owner field.
->>
->> This could lead to race conditions on the vb2_perform_io function
->> when multiple applications are accessing the video device via
->> read/write API:
->
-> It's also called directly by drivers/media/usb/em28xx/em28xx-video.c!
->
+Bye,
 
-em28xx-video does not hold the lock, therefore it can call the normal
-function. On v2 we made a internal function that should be called if
-the funciton is called directly by the driver. Please take a look to
-the old comments. https://patchwork.linuxtv.org/patch/20460/
-
->>
->> [ 308.297741] BUG: unable to handle kernel NULL pointer dereference at
->> 0000000000000260
->> [ 308.297759] IP: [<ffffffffa07a9fd2>] vb2_perform_fileio+0x372/0x610
->> [videobuf2_core]
->> [ 308.297794] PGD 159719067 PUD 158119067 PMD 0
->> [ 308.297812] Oops: 0000 #1 SMP
->> [ 308.297826] Modules linked in: qt5023_video videobuf2_dma_sg
->> qtec_xform videobuf2_vmalloc videobuf2_memops videobuf2_core
->> qtec_white qtec_mem gpio_xilinx qtec_cmosis qtec_pcie fglrx(PO)
->> spi_xilinx spi_bitbang qt5023
->> [ 308.297888] CPU: 1 PID: 2189 Comm: java Tainted: P O 3.11.0-qtec-standard #1
->> [ 308.297919] Hardware name: QTechnology QT5022/QT5022, BIOS
->> PM_2.1.0.309 X64 05/23/2013
->> [ 308.297952] task: ffff8801564e1690 ti: ffff88014dc02000 task.ti:
->> ffff88014dc02000
->> [ 308.297962] RIP: 0010:[<ffffffffa07a9fd2>] [<ffffffffa07a9fd2>]
->> vb2_perform_fileio+0x372/0x610 [videobuf2_core]
->> [ 308.297985] RSP: 0018:ffff88014dc03df8 EFLAGS: 00010202
->> [ 308.297995] RAX: 0000000000000000 RBX: ffff880158a23000 RCX: dead000000100100
->> [ 308.298003] RDX: 0000000000000000 RSI: dead000000200200 RDI: 0000000000000000
->> [ 308.298012] RBP: ffff88014dc03e58 R08: 0000000000000000 R09: 0000000000000001
->> [ 308.298020] R10: ffffea00051e8380 R11: ffff88014dc03fd8 R12: ffff880158a23070
->> [ 308.298029] R13: ffff8801549040b8 R14: 0000000000198000 R15: 0000000001887e60
->> [ 308.298040] FS: 00007f65130d5700(0000) GS:ffff88015ed00000(0000)
->> knlGS:0000000000000000
->> [ 308.298049] CS: 0010 DS: 0000 ES: 0000 CR0: 0000000080050033
->> [ 308.298057] CR2: 0000000000000260 CR3: 0000000159630000 CR4: 00000000000007e0
->> [ 308.298064] Stack:
->> [ 308.298071] ffff880156416c00 0000000000198000 0000000000000000
->> ffff880100000001
->> [ 308.298087] ffff88014dc03f50 00000000810a79ca 0002000000000001
->> ffff880154904718
->> [ 308.298101] ffff880156416c00 0000000000198000 ffff880154904338
->> ffff88014dc03f50
->> [ 308.298116] Call Trace:
->> [ 308.298143] [<ffffffffa07aa3c4>] vb2_read+0x14/0x20 [videobuf2_core]
->> [ 308.298198] [<ffffffffa07aa494>] vb2_fop_read+0xc4/0x120 [videobuf2_core]
->> [ 308.298252] [<ffffffff8154ee9e>] v4l2_read+0x7e/0xc0
->> [ 308.298296] [<ffffffff8116e639>] vfs_read+0xa9/0x160
->> [ 308.298312] [<ffffffff8116e882>] SyS_read+0x52/0xb0
->> [ 308.298328] [<ffffffff81784179>] tracesys+0xd0/0xd5
->> [ 308.298335] Code: e5 d6 ff ff 83 3d be 24 00 00 04 89 c2 4c 8b 45 b0
->> 44 8b 4d b8 0f 8f 20 02 00 00 85 d2 75 32 83 83 78 03 00 00 01 4b 8b
->> 44 c5 48 <8b> 88 60 02 00 00 85 c9 0f 84 b0 00 00 00 8b 40 58 89 c2 41
->> 89
->> [ 308.298487] RIP [<ffffffffa07a9fd2>] vb2_perform_fileio+0x372/0x610
->> [videobuf2_core]
->> [ 308.298507] RSP <ffff88014dc03df8>
->> [ 308.298514] CR2: 0000000000000260
->> [ 308.298526] ---[ end trace e8f01717c96d1e41 ]---
->>
->> Signed-off-by: Ricardo Ribalda <ricardo.ribalda@gmail.com>
->> ---
->> v2: Comments by Sylvester Nawrocki
->>
->> fimc-capture and fimc-lite where calling vb2_fop_release with the lock held.
->> Therefore a new __vb2_fop_release function has been created to be used by
->> drivers that overload the release function.
->>
->> v3: Comments by Sylvester Nawrocki and Mauro Carvalho Chehab
->>
->> Use vb2_fop_release_locked instead of __vb2_fop_release
->>
->> v4: Comments by Sylvester Nawrocki
->>
->> Rename vb2_fop_release_locked to __vb2_fop_release and fix patch format
->>
->>  drivers/media/platform/exynos4-is/fimc-capture.c |  2 +-
->>  drivers/media/platform/exynos4-is/fimc-lite.c    |  2 +-
->>  drivers/media/v4l2-core/videobuf2-core.c         | 23 ++++++++++++++++++++++-
->>  include/media/videobuf2-core.h                   |  1 +
->>  4 files changed, 25 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
->> index fb27ff7..8192fe0 100644
->> --- a/drivers/media/platform/exynos4-is/fimc-capture.c
->> +++ b/drivers/media/platform/exynos4-is/fimc-capture.c
->> @@ -549,7 +549,7 @@ static int fimc_capture_release(struct file *file)
->>               vc->streaming = false;
->>       }
->>
->> -     ret = vb2_fop_release(file);
->> +     ret = __vb2_fop_release(file);
->>
->>       if (close) {
->>               clear_bit(ST_CAPT_BUSY, &fimc->state);
->> diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
->> index e5798f7..cbe51cd 100644
->> --- a/drivers/media/platform/exynos4-is/fimc-lite.c
->> +++ b/drivers/media/platform/exynos4-is/fimc-lite.c
->> @@ -546,7 +546,7 @@ static int fimc_lite_release(struct file *file)
->>               mutex_unlock(&entity->parent->graph_mutex);
->>       }
->>
->> -     vb2_fop_release(file);
->> +     __vb2_fop_release(file);
->>       pm_runtime_put(&fimc->pdev->dev);
->>       clear_bit(ST_FLITE_SUSPENDED, &fimc->state);
->>
->> diff --git a/drivers/media/v4l2-core/videobuf2-core.c b/drivers/media/v4l2-core/videobuf2-core.c
->> index 594c75e..f48d72a 100644
->> --- a/drivers/media/v4l2-core/videobuf2-core.c
->> +++ b/drivers/media/v4l2-core/videobuf2-core.c
->> @@ -2619,18 +2619,39 @@ int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma)
->>  }
->>  EXPORT_SYMBOL_GPL(vb2_fop_mmap);
->>
->> -int vb2_fop_release(struct file *file)
->> +static int _vb2_fop_release(struct file *file, bool lock_is_held)
->>  {
->>       struct video_device *vdev = video_devdata(file);
->> +     struct mutex *lock;
->>
->>       if (file->private_data == vdev->queue->owner) {
->> +             if (lock_is_held)
->> +                     lock = NULL;
->> +             else
->> +                     lock = vdev->queue->lock ?
->> +                             vdev->queue->lock : vdev->lock;
->> +             if (lock)
->> +                     mutex_lock(lock);
->>               vb2_queue_release(vdev->queue);
->>               vdev->queue->owner = NULL;
->> +             if (lock)
->> +                     mutex_unlock(lock);
->>       }
->>       return v4l2_fh_release(file);
->>  }
->> +
->> +int vb2_fop_release(struct file *file)
->> +{
->> +     return _vb2_fop_release(file, false);
->> +}
->>  EXPORT_SYMBOL_GPL(vb2_fop_release);
->>
->> +int __vb2_fop_release(struct file *file)
->> +{
->> +     return _vb2_fop_release(file, true);
->> +}
->> +EXPORT_SYMBOL_GPL(__vb2_fop_release);
+> This new version (and the associated patch
+> "USB: ehci-atmel: add usb_clk for transition to CCF") fixes a bug in ehci clk
+> initialization.
 >
-> Sorry for introducing yet another opinion, but I think this is very confusing.
-
-It is confusing the lock_held parameter or the __ naming for unlocked versions?
-
+>   arch/arm/boot/dts/sama5d3.dtsi      |  331 ++++++++++++++++++++++++++++++++++-
+>   arch/arm/boot/dts/sama5d3_can.dtsi  |   18 ++
+>   arch/arm/boot/dts/sama5d3_emac.dtsi |   10 ++
+>   arch/arm/boot/dts/sama5d3_gmac.dtsi |   10 ++
+>   arch/arm/boot/dts/sama5d3_lcd.dtsi  |   15 ++
+>   arch/arm/boot/dts/sama5d3_mci2.dtsi |   11 ++
+>   arch/arm/boot/dts/sama5d3_tcb1.dtsi |   12 ++
+>   arch/arm/boot/dts/sama5d3_uart.dtsi |   19 ++
+>   8 files changed, 425 insertions(+), 1 deletion(-)
 >
-> I would do this:
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 5cdaba4..20a6e4e 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -13,6 +13,7 @@
+>   #include <dt-bindings/pinctrl/at91.h>
+>   #include <dt-bindings/interrupt-controller/irq.h>
+>   #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/clk/at91.h>
 >
-> static int __vb2_fop_release(struct file *file, struct mutex *lock)
-> {
->         struct video_device *vdev = video_devdata(file);
+>   / {
+>   	model = "Atmel SAMA5D3 family SoC";
+> @@ -56,6 +57,14 @@
+>   		reg = <0x20000000 0x8000000>;
+>   	};
 >
->         if (file->private_data == vdev->queue->owner) {
->                 if (lock)
->                         mutex_lock(lock);
->                 vb2_queue_release(vdev->queue);
->                 vdev->queue->owner = NULL;
->                 if (lock)
->                         mutex_unlock(lock);
->         }
->         return v4l2_fh_release(file);
-> }
+> +	clocks {
+> +		adc_op_clk: adc_op_clk{
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <20000000>;
+> +		};
+> +	};
+> +
+>   	ahb {
+>   		compatible = "simple-bus";
+>   		#address-cells = <1>;
+> @@ -79,6 +88,8 @@
+>   				status = "disabled";
+>   				#address-cells = <1>;
+>   				#size-cells = <0>;
+> +				clocks = <&periph 21>;
+> +				clock-names = "mci_clk";
+>   			};
 >
-> int vb2_fop_release(struct file *file)
-> {
->         struct video_device *vdev = video_devdata(file);
->         struct mutex *lock = vdev->queue->lock ?
->                                 vdev->queue->lock : vdev->lock;
+>   			spi0: spi at f0004000 {
+> @@ -92,6 +103,8 @@
+>   				dma-names = "tx", "rx";
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_spi0>;
+> +				clocks = <&periph 24>;
+> +				clock-names = "spi_clk";
+>   				status = "disabled";
+>   			};
 >
->         return __vb2_fop_release(file, lock);
-> }
-> EXPORT_SYMBOL_GPL(vb2_fop_release);
+> @@ -101,6 +114,8 @@
+>   				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 4>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+> +				clocks = <&periph 38>;
+> +				clock-names = "pclk";
+>   				status = "disabled";
+>   			};
 >
-> int vb2_fop_release_unlock(struct file *file)
-> {
->         return __vb2_fop_release(file, NULL);
-> }
-> EXPORT_SYMBOL_GPL(vb2_fop_release_unlock);
+> @@ -108,6 +123,8 @@
+>   				compatible = "atmel,at91sam9x5-tcb";
+>   				reg = <0xf0010000 0x100>;
+>   				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 0>;
+> +				clocks = <&periph 26>;
+> +				clock-names = "t0_clk";
+>   			};
 >
-> Optionally, __vb2_fop_release can be exported and then vb2_fop_release_unlock
-> isn't necessary.
+>   			i2c0: i2c at f0014000 {
+> @@ -121,6 +138,7 @@
+>   				pinctrl-0 = <&pinctrl_i2c0>;
+>   				#address-cells = <1>;
+>   				#size-cells = <0>;
+> +				clocks = <&periph 18>;
+>   				status = "disabled";
+>   			};
 >
-
-i dont have any strong opinion in any direction. All I really care is
-that the oops is fixed :).
-
-If your concern about the patch is the is_lock_held function, I can
-make a patch with the params on your proposal and the __naming as
-Sylvester suggested, so everyone is happy.
-
-Sylvester, Hanshat do you think?
-
-Thanks for your comments!
-
-> Regards,
+> @@ -135,6 +153,7 @@
+>   				pinctrl-0 = <&pinctrl_i2c1>;
+>   				#address-cells = <1>;
+>   				#size-cells = <0>;
+> +				clocks = <&periph 19>;
+>   				status = "disabled";
+>   			};
 >
->         Hans
+> @@ -144,6 +163,8 @@
+>   				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 5>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_usart0>;
+> +				clocks = <&periph 12>;
+> +				clock-names = "usart";
+>   				status = "disabled";
+>   			};
 >
->> +
->>  ssize_t vb2_fop_write(struct file *file, char __user *buf,
->>               size_t count, loff_t *ppos)
->>  {
->> diff --git a/include/media/videobuf2-core.h b/include/media/videobuf2-core.h
->> index 6781258..76400fa 100644
->> --- a/include/media/videobuf2-core.h
->> +++ b/include/media/videobuf2-core.h
->> @@ -491,6 +491,7 @@ int vb2_ioctl_expbuf(struct file *file, void *priv,
->>
->>  int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma);
->>  int vb2_fop_release(struct file *file);
->> +int __vb2_fop_release(struct file *file);
->>  ssize_t vb2_fop_write(struct file *file, char __user *buf,
->>               size_t count, loff_t *ppos);
->>  ssize_t vb2_fop_read(struct file *file, char __user *buf,
->>
+> @@ -153,6 +174,8 @@
+>   				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 5>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_usart1>;
+> +				clocks = <&periph 13>;
+> +				clock-names = "usart";
+>   				status = "disabled";
+>   			};
 >
-
+> @@ -174,6 +197,8 @@
+>   				status = "disabled";
+>   				#address-cells = <1>;
+>   				#size-cells = <0>;
+> +				clocks = <&periph 22>;
+> +				clock-names = "mci_clk";
+>   			};
+>
+>   			spi1: spi at f8008000 {
+> @@ -187,6 +212,8 @@
+>   				dma-names = "tx", "rx";
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_spi1>;
+> +				clocks = <&periph 25>;
+> +				clock-names = "spi_clk";
+>   				status = "disabled";
+>   			};
+>
+> @@ -196,6 +223,8 @@
+>   				interrupts = <39 IRQ_TYPE_LEVEL_HIGH 4>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+> +				clocks = <&periph 39>;
+> +				clock-names = "pclk";
+>   				status = "disabled";
+>   			};
+>
+> @@ -219,6 +248,9 @@
+>   					&pinctrl_adc0_ad10
+>   					&pinctrl_adc0_ad11
+>   					>;
+> +				clocks = <&periph 29>,
+> +					 <&adc_op_clk>;
+> +				clock-names = "adc_clk", "adc_op_clk";
+>   				atmel,adc-channel-base = <0x50>;
+>   				atmel,adc-channels-used = <0xfff>;
+>   				atmel,adc-drdy-mask = <0x1000000>;
+> @@ -274,6 +306,7 @@
+>   				dma-names = "tx", "rx";
+>   				#address-cells = <1>;
+>   				#size-cells = <0>;
+> +				clocks = <&periph 20>;
+>   				status = "disabled";
+>   			};
+>
+> @@ -283,6 +316,8 @@
+>   				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_usart2>;
+> +				clocks = <&periph 14>;
+> +				clock-names = "usart";
+>   				status = "disabled";
+>   			};
+>
+> @@ -292,6 +327,8 @@
+>   				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_usart3>;
+> +				clocks = <&periph 15>;
+> +				clock-names = "usart";
+>   				status = "disabled";
+>   			};
+>
+> @@ -318,6 +355,8 @@
+>   				reg = <0xffffe600 0x200>;
+>   				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 0>;
+>   				#dma-cells = <2>;
+> +				clocks = <&periph 30>;
+> +				clock-names = "dma_clk";
+>   			};
+>
+>   			dma1: dma-controller at ffffe800 {
+> @@ -325,6 +364,8 @@
+>   				reg = <0xffffe800 0x200>;
+>   				interrupts = <31 IRQ_TYPE_LEVEL_HIGH 0>;
+>   				#dma-cells = <2>;
+> +				clocks = <&periph 31>;
+> +				clock-names = "dma_clk";
+>   			};
+>
+>   			ramc0: ramc at ffffea00 {
+> @@ -338,6 +379,8 @@
+>   				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_dbgu>;
+> +				clocks = <&periph 2>;
+> +				clock-names = "usart";
+>   				status = "disabled";
+>   			};
+>
+> @@ -626,6 +669,7 @@
+>   					gpio-controller;
+>   					interrupt-controller;
+>   					#interrupt-cells = <2>;
+> +					clocks = <&periph 6>;
+>   				};
+>
+>   				pioB: gpio at fffff400 {
+> @@ -636,6 +680,7 @@
+>   					gpio-controller;
+>   					interrupt-controller;
+>   					#interrupt-cells = <2>;
+> +					clocks = <&periph 7>;
+>   				};
+>
+>   				pioC: gpio at fffff600 {
+> @@ -646,6 +691,7 @@
+>   					gpio-controller;
+>   					interrupt-controller;
+>   					#interrupt-cells = <2>;
+> +					clocks = <&periph 8>;
+>   				};
+>
+>   				pioD: gpio at fffff800 {
+> @@ -656,6 +702,7 @@
+>   					gpio-controller;
+>   					interrupt-controller;
+>   					#interrupt-cells = <2>;
+> +					clocks = <&periph 9>;
+>   				};
+>
+>   				pioE: gpio at fffffa00 {
+> @@ -666,12 +713,286 @@
+>   					gpio-controller;
+>   					interrupt-controller;
+>   					#interrupt-cells = <2>;
+> +					clocks = <&periph 10>;
+>   				};
+>   			};
+>
+>   			pmc: pmc at fffffc00 {
+> -				compatible = "atmel,at91rm9200-pmc";
+> +				compatible = "atmel,sama5d3-pmc";
+>   				reg = <0xfffffc00 0x120>;
+> +				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <1>;
+> +
+> +				clk32k: slck {
+> +					compatible = "fixed-clock";
+> +					#clock-cells = <0>;
+> +					clock-frequency = <32768>;
+> +				};
+> +
+> +				main: mainck {
+> +					compatible = "atmel,at91rm9200-clk-main";
+> +					interrupt-parent = <&pmc>;
+> +					interrupts = <AT91_PMC_MOSCS>;
+> +					#clock-cells = <0>;
+> +					clocks = <&clk32k>;
+> +				};
+> +
+> +				plla: pllack {
+> +					compatible = "atmel,sama5d3-clk-pll";
+> +					interrupt-parent = <&pmc>;
+> +					interrupts = <AT91_PMC_LOCKA>;
+> +					#clock-cells = <0>;
+> +					clocks = <&main>;
+> +					atmel,clk-id = <0>;
+> +					atmel,clk-input-range = <8000000 50000000>;
+> +					#atmel,pll-clk-output-range-cells = <4>;
+> +					atmel,pll-clk-output-ranges = <400000000 1000000000 0 0>;
+> +				};
+> +
+> +				plladiv: plladivck {
+> +					compatible = "atmel,at91sam9x5-clk-plldiv";
+> +					#clock-cells = <0>;
+> +					clocks = <&plla>;
+> +				};
+> +
+> +				utmi: utmick {
+> +					compatible = "atmel,at91sam9x5-clk-utmi";
+> +					interrupt-parent = <&pmc>;
+> +					interrupts = <AT91_PMC_LOCKU>;
+> +					#clock-cells = <0>;
+> +					clocks = <&main>;
+> +				};
+> +
+> +				mck: masterck {
+> +					compatible = "atmel,at91sam9x5-clk-master";
+> +					interrupt-parent = <&pmc>;
+> +					interrupts = <AT91_PMC_MCKRDY>;
+> +					#clock-cells = <0>;
+> +					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>;
+> +					atmel,clk-output-range = <0 166000000>;
+> +					atmel,clk-divisors = <1 2 4 3>;
+> +				};
+> +
+> +				usb: usbck {
+> +					compatible = "atmel,at91sam9x5-clk-usb";
+> +					#clock-cells = <0>;
+> +					clocks = <&plladiv>, <&utmi>;
+> +				};
+> +
+> +				prog: progck {
+> +					compatible = "atmel,at91sam9x5-clk-programmable";
+> +					interrupt-parent = <&pmc>;
+> +					#clock-cells = <1>;
+> +					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
+> +
+> +					prog0 {
+> +						atmel,clk-id = <0>;
+> +						interrupts = <AT91_PMC_PCKRDY(0)>;
+> +					};
+> +
+> +					prog1 {
+> +						atmel,clk-id = <1>;
+> +						interrupts = <AT91_PMC_PCKRDY(1)>;
+> +					};
+> +
+> +					prog2 {
+> +						atmel,clk-id = <2>;
+> +						interrupts = <AT91_PMC_PCKRDY(2)>;
+> +					};
+> +				};
+> +
+> +				smd: smdclk {
+> +					compatible = "atmel,at91sam9x5-clk-smd";
+> +					#clock-cells = <0>;
+> +					clocks = <&plladiv>, <&utmi>;
+> +				};
+> +
+> +				system: systemck {
+> +					compatible = "atmel,at91rm9200-clk-system";
+> +					#clock-cells = <1>;
+> +
+> +					ddrck {
+> +						atmel,clk-id = <2>;
+> +						clocks = <&mck>;
+> +					};
+> +
+> +					smdck {
+> +						atmel,clk-id = <4>;
+> +						clocks = <&smd>;
+> +					};
+> +
+> +					uhpck {
+> +						atmel,clk-id = <6>;
+> +						clocks = <&usb>;
+> +					};
+> +
+> +					udpck {
+> +						atmel,clk-id = <7>;
+> +						clocks = <&usb>;
+> +					};
+> +
+> +					pck0 {
+> +						atmel,clk-id = <8>;
+> +						clocks = <&prog 0>;
+> +					};
+> +
+> +					pck1 {
+> +						atmel,clk-id = <9>;
+> +						clocks = <&prog 1>;
+> +					};
+> +
+> +					pck2 {
+> +						atmel,clk-id = <10>;
+> +						clocks = <&prog 2>;
+> +					};
+> +				};
+> +
+> +				periph: periphck {
+> +					compatible = "atmel,at91sam9x5-clk-peripheral";
+> +					#clock-cells = <1>;
+> +					clocks = <&mck>;
+> +
+> +					dbgu_clk {
+> +						atmel,clk-id = <2>;
+> +					};
+> +
+> +					pioA_clk {
+> +						atmel,clk-id = <6>;
+> +					};
+> +
+> +					pioB_clk {
+> +						atmel,clk-id = <7>;
+> +					};
+> +
+> +					pioC_clk {
+> +						atmel,clk-id = <8>;
+> +					};
+> +
+> +					pioD_clk {
+> +						atmel,clk-id = <9>;
+> +					};
+> +
+> +					pioE_clk {
+> +						atmel,clk-id = <10>;
+> +					};
+> +
+> +					usart0_clk {
+> +						atmel,clk-id = <12>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					usart1_clk {
+> +						atmel,clk-id = <13>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					usart2_clk {
+> +						atmel,clk-id = <14>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					usart3_clk {
+> +						atmel,clk-id = <15>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					twi0_clk {
+> +						atmel,clk-id = <18>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					twi1_clk {
+> +						atmel,clk-id = <19>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					twi2_clk {
+> +						atmel,clk-id = <20>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					mci0_clk {
+> +						atmel,clk-id = <21>;
+> +					};
+> +
+> +					mci1_clk {
+> +						atmel,clk-id = <22>;
+> +					};
+> +
+> +					spi0_clk {
+> +						atmel,clk-id = <24>;
+> +					};
+> +
+> +					spi1_clk {
+> +						atmel,clk-id = <25>;
+> +					};
+> +
+> +					tcb0_clk {
+> +						atmel,clk-id = <26>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					pwm_clk {
+> +						atmel,clk-id = <28>;
+> +					};
+> +
+> +					adc_clk {
+> +						atmel,clk-id = <29>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					dma0_clk {
+> +						atmel,clk-id = <30>;
+> +					};
+> +
+> +					dma1_clk {
+> +						atmel,clk-id = <31>;
+> +					};
+> +
+> +					uhphs_clk {
+> +						atmel,clk-id = <32>;
+> +					};
+> +
+> +					udphs_clk {
+> +						atmel,clk-id = <33>;
+> +					};
+> +
+> +					isi_clk {
+> +						atmel,clk-id = <37>;
+> +					};
+> +
+> +					ssc0_clk {
+> +						atmel,clk-id = <38>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					ssc1_clk {
+> +						atmel,clk-id = <39>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					sha_clk {
+> +						atmel,clk-id = <42>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV8>;
+> +					};
+> +
+> +					aes_clk {
+> +						atmel,clk-id = <43>;
+> +					};
+> +
+> +					tdes_clk {
+> +						atmel,clk-id = <44>;
+> +					};
+> +
+> +					trng_clk {
+> +						atmel,clk-id = <45>;
+> +					};
+> +
+> +					fuse_clk {
+> +						atmel,clk-id = <48>;
+> +					};
+> +				};
+>   			};
+>
+>   			rstc at fffffe00 {
+> @@ -683,6 +1004,7 @@
+>   				compatible = "atmel,at91sam9260-pit";
+>   				reg = <0xfffffe30 0xf>;
+>   				interrupts = <3 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				clocks = <&mck>;
+>   			};
+>
+>   			watchdog at fffffe40 {
+> @@ -705,6 +1027,8 @@
+>   			reg = <0x00500000 0x100000
+>   			       0xf8030000 0x4000>;
+>   			interrupts = <33 IRQ_TYPE_LEVEL_HIGH 2>;
+> +			clocks = <&periph 33>, <&utmi>;
+> +			clock-names = "pclk", "hclk";
+>   			status = "disabled";
+>
+>   			ep0 {
+> @@ -817,6 +1141,9 @@
+>   			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+>   			reg = <0x00600000 0x100000>;
+>   			interrupts = <32 IRQ_TYPE_LEVEL_HIGH 2>;
+> +			clocks = <&usb>, <&periph 32>, <&periph 32>,
+> +				 <&system 6>;
+> +			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
+>   			status = "disabled";
+>   		};
+>
+> @@ -824,6 +1151,8 @@
+>   			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+>   			reg = <0x00700000 0x100000>;
+>   			interrupts = <32 IRQ_TYPE_LEVEL_HIGH 2>;
+> +			clocks = <&usb>, <&periph 32>, <&system 6>;
+> +			clock-names = "usb_clk", "ehci_clk", "uhpck";
+>   			status = "disabled";
+>   		};
+>
+> diff --git a/arch/arm/boot/dts/sama5d3_can.dtsi b/arch/arm/boot/dts/sama5d3_can.dtsi
+> index 8ed3260..019a0d5 100644
+> --- a/arch/arm/boot/dts/sama5d3_can.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_can.dtsi
+> @@ -32,12 +32,28 @@
+>
+>   			};
+>
+> +			pmc: pmc at fffffc00 {
+> +				periph: periphck {
+> +					can0_clk {
+> +						atmel,clk-id = <40>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					can1_clk {
+> +						atmel,clk-id = <41>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +				};
+> +			};
+> +
+>   			can0: can at f000c000 {
+>   				compatible = "atmel,at91sam9x5-can";
+>   				reg = <0xf000c000 0x300>;
+>   				interrupts = <40 IRQ_TYPE_LEVEL_HIGH 3>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_can0_rx_tx>;
+> +				clocks = <&periph 40>;
+> +				clock-names = "can_clk";
+>   				status = "disabled";
+>   			};
+>
+> @@ -47,6 +63,8 @@
+>   				interrupts = <41 IRQ_TYPE_LEVEL_HIGH 3>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_can1_rx_tx>;
+> +				clocks = <&periph 41>;
+> +				clock-names = "can_clk";
+>   				status = "disabled";
+>   			};
+>   		};
+> diff --git a/arch/arm/boot/dts/sama5d3_emac.dtsi b/arch/arm/boot/dts/sama5d3_emac.dtsi
+> index 4d4f351..15f00e5 100644
+> --- a/arch/arm/boot/dts/sama5d3_emac.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_emac.dtsi
+> @@ -31,12 +31,22 @@
+>   				};
+>   			};
+>
+> +			pmc: pmc at fffffc00 {
+> +				periph: periphck {
+> +					macb1_clk {
+> +						atmel,clk-id = <35>;
+> +					};
+> +				};
+> +			};
+> +
+>   			macb1: ethernet at f802c000 {
+>   				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+>   				reg = <0xf802c000 0x100>;
+>   				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 3>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_macb1_rmii>;
+> +				clocks = <&periph 35>, <&periph 35>;
+> +				clock-names = "hclk", "pclk";
+>   				status = "disabled";
+>   			};
+>   		};
+> diff --git a/arch/arm/boot/dts/sama5d3_gmac.dtsi b/arch/arm/boot/dts/sama5d3_gmac.dtsi
+> index 0ba8be3..04f8a80 100644
+> --- a/arch/arm/boot/dts/sama5d3_gmac.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_gmac.dtsi
+> @@ -64,12 +64,22 @@
+>   				};
+>   			};
+>
+> +			pmc: pmc at fffffc00 {
+> +				periph: periphck {
+> +					macb0_clk {
+> +						atmel,clk-id = <34>;
+> +					};
+> +				};
+> +			};
+> +
+>   			macb0: ethernet at f0028000 {
+>   				compatible = "cdns,pc302-gem", "cdns,gem";
+>   				reg = <0xf0028000 0x100>;
+>   				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 3>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_macb0_data_rgmii &pinctrl_macb0_signal_rgmii>;
+> +				clocks = <&periph 34>, <&periph 34>;
+> +				clock-names = "hclk", "pclk";
+>   				status = "disabled";
+>   			};
+>   		};
+> diff --git a/arch/arm/boot/dts/sama5d3_lcd.dtsi b/arch/arm/boot/dts/sama5d3_lcd.dtsi
+> index 01f52a7..bcb0e47 100644
+> --- a/arch/arm/boot/dts/sama5d3_lcd.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_lcd.dtsi
+> @@ -50,6 +50,21 @@
+>   					};
+>   				};
+>   			};
+> +
+> +			pmc: pmc at fffffc00 {
+> +				periph: periphck {
+> +					lcdc_clk {
+> +						atmel,clk-id = <36>;
+> +					};
+> +				};
+> +
+> +				system: systemck {
+> +					lcdck {
+> +						atmel,clk-id = <3>;
+> +						clocks = <&mck>;
+> +					};
+> +				};
+> +			};
+>   		};
+>   	};
+>   };
+> diff --git a/arch/arm/boot/dts/sama5d3_mci2.dtsi b/arch/arm/boot/dts/sama5d3_mci2.dtsi
+> index 38e88e3..72b0d00 100644
+> --- a/arch/arm/boot/dts/sama5d3_mci2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_mci2.dtsi
+> @@ -9,6 +9,7 @@
+>
+>   #include <dt-bindings/pinctrl/at91.h>
+>   #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/clk/at91.h>
+>
+>   / {
+>   	ahb {
+> @@ -30,6 +31,14 @@
+>   				};
+>   			};
+>
+> +			pmc: pmc at fffffc00 {
+> +				periph: periphck {
+> +					mci2_clk {
+> +						atmel,clk-id = <23>;
+> +					};
+> +				};
+> +			};
+> +
+>   			mmc2: mmc at f8004000 {
+>   				compatible = "atmel,hsmci";
+>   				reg = <0xf8004000 0x600>;
+> @@ -38,6 +47,8 @@
+>   				dma-names = "rxtx";
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_mmc2_clk_cmd_dat0 &pinctrl_mmc2_dat1_3>;
+> +				clocks = <&periph 23>;
+> +				clock-names = "mci_clk";
+>   				status = "disabled";
+>   				#address-cells = <1>;
+>   				#size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/sama5d3_tcb1.dtsi b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+> index 5264bb4..de1c7b6 100644
+> --- a/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+> @@ -9,6 +9,7 @@
+>
+>   #include <dt-bindings/pinctrl/at91.h>
+>   #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/clk/at91.h>
+>
+>   / {
+>   	aliases {
+> @@ -17,10 +18,21 @@
+>
+>   	ahb {
+>   		apb {
+> +			pmc: pmc at fffffc00 {
+> +				periph: periphck {
+> +					tcb1_clk {
+> +						atmel,clk-id = <27>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +				};
+> +			};
+> +
+>   			tcb1: timer at f8014000 {
+>   				compatible = "atmel,at91sam9x5-tcb";
+>   				reg = <0xf8014000 0x100>;
+>   				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 0>;
+> +				clocks = <&periph 27>;
+> +				clock-names = "t0_clk";
+>   			};
+>   		};
+>   	};
+> diff --git a/arch/arm/boot/dts/sama5d3_uart.dtsi b/arch/arm/boot/dts/sama5d3_uart.dtsi
+> index 98fcb2d..483705e 100644
+> --- a/arch/arm/boot/dts/sama5d3_uart.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_uart.dtsi
+> @@ -9,6 +9,7 @@
+>
+>   #include <dt-bindings/pinctrl/at91.h>
+>   #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/clk/at91.h>
+>
+>   / {
+>   	ahb {
+> @@ -31,12 +32,28 @@
+>   				};
+>   			};
+>
+> +			pmc: pmc at fffffc00 {
+> +				periph: periphck {
+> +					uart0_clk {
+> +						atmel,clk-id = <16>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +
+> +					uart1_clk {
+> +						atmel,clk-id = <17>;
+> +						atmel,clk-default-divisor = <AT91SAM9X5_PERIPH_CLK_DIV2>;
+> +					};
+> +				};
+> +			};
+> +
+>   			uart0: serial at f0024000 {
+>   				compatible = "atmel,at91sam9260-usart";
+>   				reg = <0xf0024000 0x200>;
+>   				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 5>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_uart0>;
+> +				clocks = <&periph 16>;
+> +				clock-names = "usart";
+>   				status = "disabled";
+>   			};
+>
+> @@ -46,6 +63,8 @@
+>   				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 5>;
+>   				pinctrl-names = "default";
+>   				pinctrl-0 = <&pinctrl_uart1>;
+> +				clocks = <&periph 17>;
+> +				clock-names = "usart";
+>   				status = "disabled";
+>   			};
+>   		};
+>
 
 
 -- 
-Ricardo Ribalda
+Nicolas Ferre
