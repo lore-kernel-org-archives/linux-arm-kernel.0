@@ -1,63 +1,95 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Mon, 04 Nov 2013 10:11:00 +1000
-Subject: [PATCHv2 3/7] ARM: imx: add support code for IMX50 based machines
-In-Reply-To: <20131101082137.GA10324@S2101-09.ap.freescale.net>
-References: <1383023757-30711-1-git-send-email-gerg@uclinux.org>
- <1383023757-30711-4-git-send-email-gerg@uclinux.org>
- <20131031061041.GC23549@S2101-09.ap.freescale.net>
- <52730AEE.1000408@uclinux.org>
- <20131101082137.GA10324@S2101-09.ap.freescale.net>
-Message-ID: <5276E614.6070803@uclinux.org>
+From: gerg@uclinux.org (gerg at uclinux.org)
+Date: Mon,  4 Nov 2013 10:13:40 +1000
+Subject: [PATCHv3] ARM: imx: add support code for IMX50 based machines
+Message-ID: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+From: Greg Ungerer <gerg@uclinux.org>
 
-On 01/11/13 18:21, Shawn Guo wrote:
-> On Fri, Nov 01, 2013 at 11:59:10AM +1000, Greg Ungerer wrote:
->> On 31/10/13 16:10, Shawn Guo wrote:
->>> On Tue, Oct 29, 2013 at 03:15:53PM +1000, gerg at uclinux.org wrote:
->>>> +DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
->>>> +	.map_io		= mx53_map_io,
->>>> +	.init_early	= imx53_init_early,
->>>> +	.init_irq	= mx53_init_irq,
->>>> +	.handle_irq	= imx53_handle_irq,
->>>> +	.init_machine	= imx50_dt_init,
->>>> +	.init_late	= imx53_init_late,
->>>> +	.dt_compat	= imx50_dt_board_compat,
->>>> +	.restart	= mxc_restart,
->>>> +MACHINE_END
->>>
->>> The imx53 is a platform that was converted from non-DT to DT.  Some of
->>> these imx53 hooks may not even necessary for imx53 now, since imx53
->>> supports DT boot only today.  So I do not prefer to reuse these imx53
->>> hooks on the brand new imx50 DT machine.  I would suggest to maintain a
->>> mach-imx50.c and machine descriptor for imx50 with only the necessary
->>> hooks implemented as local functions inside mach-imx50.c.  After imx53
->>> machine descriptor and hooks gets cleaned up, we can look at how we can
->>> consolidate these descriptors if they are pretty much in common.
->>
->> With the current support I could drop .init_early and .init_late
->> I believe. All the other mx53 functions are needed to successfully
->> boot.
->>
->> imx53_handle_irq is easy to fix, it is just defined to be
->> tzic_handle_irq anyway.
->>
->> mx53_map_io and mx53_init_irq are coded in mm-imx5.c. They look strait
->> forward. Do you want me to create imx50 specific versions in there?
-> 
-> Oh, right.  I overlooked the fact that the static mapping created in
-> mx53_map_io() is still used by clock driver everywhere.  It does not
-> make too much sense to clean them up before imx51 gets converted to be
-> DT only.
-> 
-> Okay, I'm fine with reusing some of the imx53 hooks as required.  But
-> at least imx53_init_early() shouldn't be reused on imx50, because it
-> sets cpu type specifically for imx53, and calls mxc_iomux_v3_init()
-> which is not needed for imx50 (even for imx53 as well today).
+Add machine support code for the Freescale IMX50 SoC.
 
-Yep, that sounds right. I'll modify that patch and resend.
+The IMX50 is quite similar to the Freescale IMX53, and contains many of the
+same periperhal hardware modules, at the same address offsets as the IMX53.
+(Notable exceptions are that the IMX50 contains no CAN bus hardware, less
+GPIO, no VPU, it does contain an Electrophoretic display controller though).
 
-Thanks
-Greg
+This support code uses some of the IMX53 setup code to reduce duplication
+of what would be identical init IO setup.
+
+Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+---
+ arch/arm/mach-imx/Makefile     |  1 +
+ arch/arm/mach-imx/common.h     |  1 +
+ arch/arm/mach-imx/mach-imx50.c | 36 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 38 insertions(+)
+ create mode 100644 arch/arm/mach-imx/mach-imx50.c
+
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index bbe1f5b..924e117 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -112,6 +112,7 @@ obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
+ obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
+ 
+ obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
++obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
+ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+ 
+ obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 7cbe22d..9b67672 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -108,6 +108,7 @@ void tzic_handle_irq(struct pt_regs *);
+ #define imx27_handle_irq avic_handle_irq
+ #define imx31_handle_irq avic_handle_irq
+ #define imx35_handle_irq avic_handle_irq
++#define imx50_handle_irq tzic_handle_irq
+ #define imx51_handle_irq tzic_handle_irq
+ #define imx53_handle_irq tzic_handle_irq
+ 
+diff --git a/arch/arm/mach-imx/mach-imx50.c b/arch/arm/mach-imx/mach-imx50.c
+new file mode 100644
+index 0000000..dc93bbb
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-imx50.c
+@@ -0,0 +1,36 @@
++/*
++ * Copyright 2013 Greg Ungerer <gerg@uclinux.org>
++ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++
++#include "common.h"
++
++static void __init imx50_dt_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static const char *imx50_dt_board_compat[] __initdata = {
++	"fsl,imx50",
++	NULL
++};
++
++DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
++	.map_io		= mx53_map_io,
++	.init_irq	= mx53_init_irq,
++	.handle_irq	= imx50_handle_irq,
++	.init_machine	= imx50_dt_init,
++	.dt_compat	= imx50_dt_board_compat,
++	.restart	= mxc_restart,
++MACHINE_END
+-- 
+1.8.1.4
