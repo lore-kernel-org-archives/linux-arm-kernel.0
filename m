@@ -1,74 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Nov 2013 08:15:37 -0800
-Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F8287439D@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
- <20131101182514.GE2493@sirena.org.uk>
- <1DD289F6464F0949A2FCA5AA6DC23F8287439D@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20131104161537.GI2493@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 04 Nov 2013 09:37:07 -0700
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <2443024.JdDKnfkC18@wuerfel>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <1432962.yW4lKnaQJE@flatron> <25161583.XICaeMWvPh@flatron>
+ <2443024.JdDKnfkC18@wuerfel>
+Message-ID: <5277CD33.6030003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 07:35:12AM +0000, Li Xiubo wrote:
-
-> From the ASoC subsystem comments we can see that:
-> ++++++
-> Configures the clock dividers. This is used to derive the best DAI bit and
-> frame clocks from the system or master clock. It's best to set the DAI bit
-> and frame clocks as low as possible to save system power.
-> ------
-
-You should never use this unless you have to, there is no point in every
-single machine driver using your driver having to duplicate the same
-calculations.
-
+On 11/04/2013 02:28 AM, Arnd Bergmann wrote:
+> On Monday 04 November 2013 00:26:29 Tomasz Figa wrote:
+>>
+>> Aha, one more thing. As it was mentioned on ARM Mini Summit, as a long 
+>> term goal, we will eventually have to introduce another validation tool 
+>> that checks device drivers against device tree bindings. We should keep 
+>> this in mind when considering schema design.
 > 
-> > > +static int fsl_sai_dai_probe(struct snd_soc_dai *dai) {
-> > > +	int ret;
-> > > +	struct fsl_sai *sai = dev_get_drvdata(dai->dev);
-> > > +
-> > > +	ret = clk_prepare_enable(sai->clk);
-> > > +	if (ret)
-> > > +		return ret;
+> Incidentally I have just had an idea for a new driver-level API that
+> should let us do this much easier. I hope to find some time in the
+> next few days to come up with draft kernel patches. If you don't hear
+> back from me soon but want to work on validating the drivers against
+> the bindings, please contact me again.
+> 
+> The basic idea is to extend 'devres' to automatically register
+> all the resources (registers, irq, dma, gpio, pinctrl, clk, regulator, ...)
+> and simple properties before the ->probe() callback is even called,
+> based on a per-driver data structure that describes them, and that
+> can be easily parsed by an external tool.
 
-> > It'd be nicer to only enable the clock while the device is in active use.
+I had suggested that while talking to someone at the kernel summit,
+basically each driver supplies functions like:
 
-> While if the module clock is not enabled here, the followed registers cannot read/write in the same function.
-> And this _probe function is the _dai_probe not the driver's module _probe.
+1) ACPI -> platform data or resources converter
+2) DT -> platform or resources data converter
+3) anything else -> platform or resources data converter
+4) probe()
 
-So you can enable the clock when you explicitly need to write to the
-registers...
+One of (1)..(3) (depending on device instantiation source) is called to
+translate the data source to platform data or resources, before probe
+(and could indeed handle much of deferred probe I suppose).
 
-> If the clk_prepare_enable(sai->clk) is not here, where should it be will be nicer ?
-> One of the following functions ?
->         .set_sysclk     = fsl_sai_set_dai_sysclk,
->         .set_clkdiv     = fsl_sai_set_dai_clkdiv,
->         .set_fmt        = fsl_sai_set_dai_fmt,
->         .set_tdm_slot   = fsl_sai_set_dai_tdm_slot,
->         .hw_params      = fsl_sai_hw_params,
->         .trigger        = fsl_sai_trigger,
+(4) is called to actually initialize the device, and always has complete
+pre-parsed platform data/resources available, and does no DT/ACPI/...
+parsing.
 
-It could be in any or all of them except trigger (where the core should
-hold a runtime PM reference anyway).  You can always take a reference
-for the duration of the function if you're concerned it may be called
-when the referent isn't otherwise held.
+I forget who I was talking to, but it was asserted something like this
+had been proposed before, and wasn't accepted. Unfortunately, I don't
+entirely recall why...
 
-> > > +	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL,
-> > > +			SND_DMAENGINE_PCM_FLAG_NO_RESIDUE);
-> > > +	if (ret)
-> > > +		return ret;
-
-> > We should have a devm_ version of this.
-
-> Sorry, is there one patch for adding the devm_ version of snd_dmaengine_pcm_register() already ?
-> In the -next and other topics branches I could not find it.
-
-No, there isn't one but there should be one.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131104/ae3affc4/attachment.sig>
+It may have been due to the fact I proposed (1) and (2) above being
+separate, rather than identical, due to using some unified API to read
+data from ACPI and DT. That wasn't the most interesting aspect of the
+proposal though. Still, I think conceptually there could be other data
+sources in the future, so we may need to allow different types of
+conversion function at some point, even if the ACPI and DT
+implementations can end up being the same.
