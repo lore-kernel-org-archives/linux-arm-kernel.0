@@ -1,40 +1,65 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 4 Nov 2013 14:06:08 +0100
-Subject: [PATCH] pinctrl: imx50: add pinctrl support code for the IMX50 SoC
-In-Reply-To: <CACRpkdb5U2xBBVerbspTnW5=61kwx0+mvLGZF=VmdOKrN3QhHg@mail.gmail.com>
-References: <1383023635-30640-1-git-send-email-gerg@uclinux.org>
- <CACRpkdb5U2xBBVerbspTnW5=61kwx0+mvLGZF=VmdOKrN3QhHg@mail.gmail.com>
-Message-ID: <20131104130608.GU24559@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 4 Nov 2013 21:08:53 +0800
+Subject: [PATCHv3] ARM: imx: add support code for IMX50 based machines
+In-Reply-To: <CAL_Jsq+Uon4QBU0wUYvWib4AYg=m0EFEBm7i03Zzy=bxU4c_zA@mail.gmail.com>
+References: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
+ <CAL_Jsq+Uon4QBU0wUYvWib4AYg=m0EFEBm7i03Zzy=bxU4c_zA@mail.gmail.com>
+Message-ID: <20131104130850.GB24970@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 01:14:32PM +0100, Linus Walleij wrote:
-> On Tue, Oct 29, 2013 at 6:13 AM,  <gerg@uclinux.org> wrote:
+On Sun, Nov 03, 2013 at 09:16:52PM -0600, Rob Herring wrote:
+> > @@ -108,6 +108,7 @@ void tzic_handle_irq(struct pt_regs *);
+> >  #define imx27_handle_irq avic_handle_irq
+> >  #define imx31_handle_irq avic_handle_irq
+> >  #define imx35_handle_irq avic_handle_irq
+> > +#define imx50_handle_irq tzic_handle_irq
 > 
-> > From: Greg Ungerer <gerg@uclinux.org>
-> >
-> > Add code to support the specific pin arrangements of the Freescale IMX50 SoC.
-> >
-> > Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> Has no one converted AVIC and TZIC to use IRQCHIP_DECLARE? This and
+> the corresponding handle_irq hook would not be needed if that was
+> done.
+
+No, not yet.  There are still non-DT users for avic and tzic, which
+makes the adoption of IRQCHIP_DECLARE less meaningful and a little
+difficult.  So my plan is that we convert all those non-DT users over to
+DT, and then move avic and tzic to IRQCHIP_DECLARE.
+
+<snip>
+
+> > +static void __init imx50_dt_init(void)
+> > +{
+> > +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 > 
-> Can I get some maintainer to review this for the next cycle?
+> This is the default operation now if init_machine is NULL.
+
+Oh, it reminds me that mxc_arch_reset_init_dt() should be called here to
+get mxc_restart() work.
+
+> > +}
+> > +
+> > +static const char *imx50_dt_board_compat[] __initdata = {
+> > +       "fsl,imx50",
+> > +       NULL
+> > +};
+> > +
+> > +DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
+> > +       .map_io         = mx53_map_io,
+> > +       .init_irq       = mx53_init_irq,
+> > +       .handle_irq     = imx50_handle_irq,
+> > +       .init_machine   = imx50_dt_init,
+> > +       .dt_compat      = imx50_dt_board_compat,
+> > +       .restart        = mxc_restart,
+> > +MACHINE_END
 > 
-> BTW: how many i.MX:es does remain? Have we not covered
-> them all soon?
+> I still think any mx53 clean-up should be done first to enable mx50
+> rather than adding a mx50 machine first and then trying to consolidate
+> mx50 and mx53.
 
-We have three different iomux ips. I once ordered them by an arbitrary
-version number. We have
+We already reuse imx53 stuff as much as possible here, and I do not see
+there will be so much code to be consolidated further.  There are indeed
+something to be cleaned up as part of the whole i.MX DT conversion, like
+static mapping, but it's nothing related to imx50 addition.  Since the
+imx50 addition does not make the cleanup later more difficult, I would
+prefer to just support it now.
 
-iomux-v1: i.MX1, i.MX21, i.MX27
-iomux-v2: i.MX31
-iomux-v3: i.MX25, i.MX35, i.MX50 i.MX51, i.MX53, i.MX6
-
-I think it's quite unlikely that someone writes a iomux-v2 driver.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Shawn
