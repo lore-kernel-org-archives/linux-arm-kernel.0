@@ -1,104 +1,137 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 4 Nov 2013 11:34:37 +0530
-Subject: [PATCH v2 1/9] phy: add phy_get_bus_width()/phy_set_bus_width()
- calls
-In-Reply-To: <1391452.2H43C6z4fl@flatron>
+Date: Mon, 4 Nov 2013 11:57:10 +0530
+Subject: [PATCH v2 8/9] phy: add Broadcom Kona USB2 PHY driver
+In-Reply-To: <1383335158-19730-9-git-send-email-matt.porter@linaro.org>
 References: <1383335158-19730-1-git-send-email-matt.porter@linaro.org>
- <52753387.5030202@ti.com> <20131102174709.GE17505@beef>
- <1391452.2H43C6z4fl@flatron>
-Message-ID: <527738F5.1040305@ti.com>
+ <1383335158-19730-9-git-send-email-matt.porter@linaro.org>
+Message-ID: <52773E3E.10909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Saturday 02 November 2013 11:28 PM, Tomasz Figa wrote:
-> On Saturday 02 of November 2013 13:47:09 Matt Porter wrote:
->> On Sat, Nov 02, 2013 at 10:46:55PM +0530, Kishon Vijay Abraham I wrote:
->>> Hi Tomasz,
->>>
->>> On Saturday 02 November 2013 06:44 PM, Tomasz Figa wrote:
->>>> Hi Matt,
->>>>
->>>> On Friday 01 of November 2013 15:45:50 Matt Porter wrote:
->>>>> This adds a pair of APIs that allows the generic PHY subsystem to
->>>>> provide information on the PHY bus width. The PHY provider driver
->>>>> may
->>>>> use phy_set_bus_width() to set the bus width that the PHY supports.
->>>>> The controller driver may then use phy_get_bus_width() to fetch the
->>>>> PHY bus width in order to properly configure the controller.
->>>>
->>>> I somehow does not like this. If we take this path for any further
->>>> properties that we may need, we will end up with a lot of consumer
->>>> specific properties stored in a PHY object having their own accessor
->>>> functions.
->>>
->>> Only after all of us feel that a property is *generic* enough, we
->>> allow it to be added in the PHY object.
->>
->> I also want to note that this was discussed over in another thread [2]
->> where you did consider my rough stab at a more generic attribute
->> accessor. It was definitely my first reaction as the way to do it like
->> Tomasz has said. The specific accessors are more readable to me besides
->> the justification you mention above.
->>
->> [2] http://lkml.indiana.edu/hypermail/linux/kernel/1310.3/00673.html
+On Saturday 02 November 2013 01:15 AM, Matt Porter wrote:
+> Add a driver for the internal Broadcom Kona USB 2.0 PHY found
+> on the BCM281xx family of SoCs.
 >
-> Personally I like that version much better, but still it would need to be
-> polished a bit.
+> Signed-off-by: Matt Porter <matt.porter@linaro.org>
+> ---
+>   drivers/phy/Kconfig             |   6 ++
+>   drivers/phy/Makefile            |   2 +
+>   drivers/phy/phy-bcm-kona-usb2.c | 161 ++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 169 insertions(+)
+>   create mode 100644 drivers/phy/phy-bcm-kona-usb2.c
 >
-> How I imagine such interface to be implemented:
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 349bef2..cedada5 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -15,4 +15,10 @@ config GENERIC_PHY
+>   	  phy users can obtain reference to the PHY. All the users of this
+>   	  framework should select this config.
 >
-> phy.h:
+> +config BCM_KONA_USB2_PHY
+> +	tristate "Broadcom Kona USB2 PHY Driver"
+> +	depends on GENERIC_PHY
+> +	help
+> +	  Enable this to support the Broadcom Kona USB 2.0 PHY.
+> +
+>   endmenu
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 9e9560f..ce83a14 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -3,3 +3,5 @@
+>   #
 >
-> struct phy {
-> 	// ...
-> 	const struct phy_attrs *attrs;
-> 	// ...
-> };
->
-> static inline const struct phy_attrs *phy_get_attrs(struct phy *phy) {
-> 	return phy->attrs;
-> };
+>   obj-$(CONFIG_GENERIC_PHY)	+= phy-core.o
+> +
+> +obj-$(CONFIG_BCM_KONA_USB2_PHY)	+= phy-bcm-kona-usb2.o
+> diff --git a/drivers/phy/phy-bcm-kona-usb2.c b/drivers/phy/phy-bcm-kona-usb2.c
+> new file mode 100644
+> index 0000000..1beea7f
+> --- /dev/null
+> +++ b/drivers/phy/phy-bcm-kona-usb2.c
+> @@ -0,0 +1,161 @@
+> +/*
+> + * phy-bcm-kona-usb2.c - Broadcom Kona USB2 Phy Driver
+> + *
+> + * Copyright (C) 2013 Linaro Limited
+> + * Matt Porter <matt.porter@linaro.org>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/delay.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/clk.h>
+> +#include <linux/phy/phy.h>
+> +
+> +#define OTGCTL_OTGSTAT2		(1 << 31)
+> +#define OTGCTL_OTGSTAT1		(1 << 30)
+> +#define OTGCTL_PRST_N_SW	(1 << 11)
+> +#define OTGCTL_HRESET_N		(1 << 10)
+> +#define OTGCTL_UTMI_LINE_STATE1	(1 << 9)
+> +#define OTGCTL_UTMI_LINE_STATE0	(1 << 8)
+> +
+> +#define P1CTL_SOFT_RESET	(1 << 1)
+> +#define P1CTL_NON_DRIVING	(1 << 0)
+> +
+> +struct bcm_kona_usb_phy_regs {
+> +	u32 ctrl;
+> +	u32 cfg;
+> +	u32 p1ctl;
+> +	u32 status;
+> +	u32 bc_cfg;
+> +	u32 tp_in;
+> +	u32 tp_out;
+> +	u32 phy_ctrl;
+> +	u32 usbreg;
+> +	u32 usbproben;
+> +};
 
-API's like get_attrs is loosely defined. I'd prefer to have fully 
-defined APIs. There might be other attributes which the consumer might 
-not be interested in. Instead of returning the entire structure, it 
-would be better if we have facilities for the consumer to request only 
-the required attributes.
->
-> phy driver:
->
-> static const struct phy_attrs my_phy_attrs = {
-> 	// ...
-> };
->
-> static int my_phy_probe(...)
-> {
-> 	// ...
-> 	phy = devm_phy_create_attrs(dev, &ops, &my_phy_attrs, NULL);
-> 	// ...
-> }
->
-> phy consumer:
->
-> 	// ...
-> 	const struct phy_attrs *phy_attrs;
->
-> 	phy_attrs = phy_get_attrs(phy);
-> 	// ...
->
-> Why I think it is better than what I've seen in this and previous instance
-> of this thread? (in random order)
->   a) Only the PHY driver can set the attrs.
->   b) PHY consumer has access only to a const pointer.
->   c) PHY attributes can be placed in a static struct inside a driver file,
-> without the need to call any functions to set particular attributes.
+I would prefer to have constant macros for register offset unless you 
+have a good reason to do otherwise.
+> +
+> +struct bcm_kona_usb {
+> +	struct bcm_kona_usb_phy_regs *regs;
+> +};
+> +
+> +static void bcm_kona_usb_phy_power(struct bcm_kona_usb *phy, int on)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(&phy->regs->ctrl);
+> +	if (on) {
+> +		/* Configure and power PHY */
+> +		val &= ~(OTGCTL_OTGSTAT2 | OTGCTL_OTGSTAT1 |
+> +			 OTGCTL_UTMI_LINE_STATE1 | OTGCTL_UTMI_LINE_STATE0);
+> +		val |= OTGCTL_PRST_N_SW | OTGCTL_HRESET_N;
+> +		writel(val, &phy->regs->ctrl);
+> +
+> +		/* Soft reset PHY */
+> +		val = readl(&phy->regs->p1ctl);
+> +		val &= ~P1CTL_NON_DRIVING;
+> +		val |= P1CTL_SOFT_RESET;
+> +		writel(val, &phy->regs->p1ctl);
+> +		writel(val & ~P1CTL_SOFT_RESET, &phy->regs->p1ctl);
+> +		/* Reset needs to be asserted for 2ms */
+> +		mdelay(2);
+> +		writel(val | P1CTL_SOFT_RESET, &phy->regs->p1ctl);
 
-Agree with all your points for setting the attributes apart from the 
-fact that we won't be able to add any validation criteria for the 
-attributes while setting it if needed and also there won't be symmetric 
-APIs for getting and setting the attributes..
+Is soft reset needed for every power-on? Shouldn't soft reset be present 
+in phy_init?
 
 Cheers
 Kishon
