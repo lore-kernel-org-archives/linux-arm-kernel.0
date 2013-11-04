@@ -1,52 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 4 Nov 2013 11:58:36 +0100
-Subject: [PATCH v4 0/4] Energy Micro efm32 support
-Message-ID: <20131104105836.GI14892@pengutronix.de>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 4 Nov 2013 16:23:25 +0530
+Subject: [PATCH v3 2/4] AArch64: KGDB: Add Basic KGDB support
+In-Reply-To: <5271BEBF.2010100@linaro.org>
+References: <1382094469-7971-1-git-send-email-vijay.kilari@gmail.com>
+ <1382094469-7971-3-git-send-email-vijay.kilari@gmail.com>
+ <5271BEBF.2010100@linaro.org>
+Message-ID: <CALicx6vGXhi_Zrs9M_oBaUfS=+KZCMGiS6DwHp0XEkEF+AiJMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Oct 31, 2013 at 7:51 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Hi,
+>
+>
+> On 10/18/2013 08:07 PM, vijay.kilari at gmail.com wrote:
+>>
+>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>>
+>> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+>> new file mode 100644
+>> index 0000000..50cef79
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/kgdb.c
+>
+>> ...
+>
+>> +int kgdb_arch_handle_exception(int exception_vector, int signo,
+>> +                              int err_code, char *remcom_in_buffer,
+>> +                              char *remcom_out_buffer,
+>> +                              struct pt_regs *linux_regs)
+>> +{
+>> +       unsigned long addr;
+>> +       char *ptr;
+>> +       int err;
+>> +
+>> +       switch (remcom_in_buffer[0]) {
+>> +       case 'D':
+>> +       case 'k':
+>> +       case 'c':
+>> +               /*
+>> +                * Packet D (Detach), k (kill) & c (Continue) requires
+>> +                * to continue executing. Set pc to required address.
+>> +                * Try to read optional parameter, pc unchanged if no
+>> parm.
+>
+>
+> Are you sure that there may be an option parameter even in 'D' or 'k'?
+> 'D' means "detach" and 'k' means "kill", AFAIK, they don't take any
+> parameters. No other architectures (except arm) handle the case
+> in such way, neither.
+>
+right, they generally don't carry parameter. However 'D' packet can
+take pid (see gdb serial protocol)
+https://sourceware.org/gdb/onlinedocs/gdb/Packets.html#Packets
+However in this case we are parsing packet for pc address.
+I will re-send new version of patch
 
-now that 3.12 is out, I patted my efm32 tree and I consider the base
-platform support ready for merging. I put it into my for-next branch at
-
-	git://git.pengutronix.de/git/ukl/linux.git for-next
-
-so it should make it into the next next. I target 3.14-rc1 to make it
-in. The patches have a few runtime (but no compile-time) dependencies on
-these patches:
-
-	ARM: call of_clk_init from default time_init handler
-	clocksource: Provide timekeeping for efm32 SoCs
-	clk: new driver for efm32 SoC
-
-All but the last patch are already in next, Mike promised to take the
-last one. DEBUG_LL is broken without
-
-	ARM: DEBUG_LL on efm32 SoCs
-
-which already is in next, too. There are no device tree source files yet
-as they have a compile time dependency on the clk patch above.
-
-I'm not using multiarch here. I'm still unsure if it makes sense or not
-to use it for v7-M, I'm sticking to not using it mainly because of
-Russell's objections. Still the patch adding the platform is very small
-now (just a trivial machine file, a defconfig and Makefile/Kconfig
-adaptions) and is easily switched to multiarch if need be.
-
-The complete and runnable tree is available in my master branch.
-
-I suggest to let it go in via Russell as it has less potential to
-conflict with arm-soc.
-
-As the patches changed a bit I will repost them here. Note I called them
-all "v4" even though patches 1 to 3 are really only (a resent of) v1.
-
-Any feed back is welcome.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> -Takahiro AKASHI
