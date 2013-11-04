@@ -1,49 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Nov 2013 10:57:36 -0800
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <5277CD33.6030003@wwwdotorg.org>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <1432962.yW4lKnaQJE@flatron> <25161583.XICaeMWvPh@flatron>
- <2443024.JdDKnfkC18@wuerfel> <5277CD33.6030003@wwwdotorg.org>
-Message-ID: <CAOesGMhHH7XENmEVJEbOQX03Zc_Q8775ijUfg5r1fLLGTLUymw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 4 Nov 2013 20:01:41 +0100
+Subject: [PATCHv4][ 1/6] fbdev: Add the lacking FB_SYNC_* for matching the
+ DISPLAY_FLAGS_*
+In-Reply-To: <1383581724-14817-1-git-send-email-denis@eukrea.com>
+References: <1383581724-14817-1-git-send-email-denis@eukrea.com>
+Message-ID: <CAMuHMdVmQCeYd5=r6zqmKRTbTFhh_5RHmeVVhaoq0BVwXoFgsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 4, 2013 at 8:37 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Mon, Nov 4, 2013 at 5:15 PM, Denis Carikli <denis@eukrea.com> wrote:
+> --- a/include/uapi/linux/fb.h
+> +++ b/include/uapi/linux/fb.h
 
-> I had suggested that while talking to someone at the kernel summit,
-> basically each driver supplies functions like:
->
-> 1) ACPI -> platform data or resources converter
-> 2) DT -> platform or resources data converter
-> 3) anything else -> platform or resources data converter
-> 4) probe()
->
-> One of (1)..(3) (depending on device instantiation source) is called to
-> translate the data source to platform data or resources, before probe
-> (and could indeed handle much of deferred probe I suppose).
->
-> (4) is called to actually initialize the device, and always has complete
-> pre-parsed platform data/resources available, and does no DT/ACPI/...
-> parsing.
->
-> I forget who I was talking to, but it was asserted something like this
-> had been proposed before, and wasn't accepted. Unfortunately, I don't
-> entirely recall why...
->
-> It may have been due to the fact I proposed (1) and (2) above being
-> separate, rather than identical, due to using some unified API to read
-> data from ACPI and DT. That wasn't the most interesting aspect of the
-> proposal though. Still, I think conceptually there could be other data
-> sources in the future, so we may need to allow different types of
-> conversion function at some point, even if the ACPI and DT
-> implementations can end up being the same.
+> +#define FB_SYNC_DE_HIGH_ACT    64      /* data enable high active */
+> +#define FB_SYNC_PIXDAT_HIGH_ACT        128     /* data enable high active */
 
-I think it might have been me you were talking to. I know Grant
-considered something like that when first doing the device tree
-enablement, and chose not to do it then but I am not sure what the
-motivations were. Given that we have cleaned up a lot of driver
-probing already by now, it might be suitable to try again.
+copy and paste of the comment above?
 
+Gr{oetje,eeting}s,
 
--Olof
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
