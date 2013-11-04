@@ -1,69 +1,36 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 4 Nov 2013 09:24:54 -0300
-Subject: [PATCH v2 10/27] mtd: nand: pxa3xx: Replace host->page_size by
- mtd->writesize
-In-Reply-To: <20131103225211.GD5896@gmail.com>
-References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1382137374-21251-11-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131103225211.GD5896@gmail.com>
-Message-ID: <20131104122453.GE2516@localhost>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 04 Nov 2013 13:26:44 +0100
+Subject: [PATCH RFC 1/4] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <527744B2.4090303@ti.com>
+References: <1383205544-32244-1-git-send-email-gautam.vivek@samsung.com>
+ <1383205544-32244-2-git-send-email-gautam.vivek@samsung.com>
+ <527744B2.4090303@ti.com>
+Message-ID: <1539581.zprt32081v@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 03, 2013 at 05:52:13PM -0500, Huang Shijie wrote:
-> On Fri, Oct 18, 2013 at 08:02:37PM -0300, Ezequiel Garcia wrote:
-> > There's no need to privately store the device page size as it's
-> > available in mtd structure field mtd->writesize.
-> > Also, this removes the hardcoded page size value, leaving the
-> > auto-detected value only.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  drivers/mtd/nand/pxa3xx_nand.c | 8 ++------
-> >  1 file changed, 2 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> > index fe2e27c..83ba036 100644
-> > --- a/drivers/mtd/nand/pxa3xx_nand.c
-> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> > @@ -149,7 +149,6 @@ struct pxa3xx_nand_host {
-> >  	void			*info_data;
-> >  
-> >  	/* page size of attached chip */
-> > -	unsigned int		page_size;
-> >  	int			use_ecc;
-> >  	int			cs;
-> >  
-> > @@ -612,12 +611,12 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
-> >  			info->buf_start += mtd->writesize;
-> >  
-> >  		/* Second command setting for large pages */
-> > -		if (host->page_size >= PAGE_CHUNK_SIZE)
-> > +		if (mtd->writesize >= PAGE_CHUNK_SIZE)
-> >  			info->ndcb0 |= NDCB0_DBC | (NAND_CMD_READSTART << 8);
-> >  
-> >  	case NAND_CMD_SEQIN:
-> >  		/* small page addr setting */
-> > -		if (unlikely(host->page_size < PAGE_CHUNK_SIZE)) {
-> > +		if (unlikely(mtd->writesize < PAGE_CHUNK_SIZE)) {
-> >  			info->ndcb1 = ((page_addr & 0xFFFFFF) << 8)
-> >  					| (column & 0xFF);
-> >  
-> > @@ -891,7 +890,6 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
-> >  	}
-> >  
-> >  	/* calculate flash information */
-> > -	host->page_size = f->page_size;
-> you remove this line, but how the following code get the right value:?
-> 
-> 	chip->ecc.size = host->page_size;
-> this line in the pxa3xx_nand_scan.
-> 
+Hi Kishon,
 
-Ah, nice catch. I guess it splipped through the million rebases I did...
+On Monday 04 of November 2013 12:24:42 Kishon Vijay Abraham I wrote:
+> Hi Vivek,
+> 
+> On Thursday 31 October 2013 01:15 PM, Vivek Gautam wrote:
+> > Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+> > The new driver uses the generic PHY framework and will interact
+> > with DWC3 controller present on Exynos5 series of SoCs.
+> 
+> In Exynos, you have a single IP that supports both USB3 and USB2 PHY 
+> right? I think that needs to be mentioned here.
 
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Nope. There are two separate, different IPs.
+
+> Do you have separate registers that should be used for 
+> initializing/powerin_on/powering_off etc.. for usb2 phy and usb3 phy? If 
+> so, then you should model this driver as a single driver that supports 
+> two PHYs similar to what Sylwester has done before?
+
+Sylwester's MIPI PHY uses such model because it has a single register
+that controls both PHYs.
+
+Best regards,
+Tomasz
