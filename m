@@ -1,30 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 4 Nov 2013 13:03:34 +0100
-Subject: [GIT PULL FOR v3.13] SH Mobile PFC patches
-In-Reply-To: <1863828.HbOPaS1OIe@avalon>
-References: <1863828.HbOPaS1OIe@avalon>
-Message-ID: <CACRpkdbVOOzmSrCJCKY3HV6_r2HGA5fiZoj2tWPy=H1LeOgoeQ@mail.gmail.com>
+Date: Mon, 4 Nov 2013 13:05:19 +0100
+Subject: [PATCH 1/1] pinctrl: imx: fix using pin->input_val wrongly
+In-Reply-To: <1382940076-11898-1-git-send-email-peter.chen@freescale.com>
+References: <1382940076-11898-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <CACRpkdboYNgLPh0=HiMyd6e21xjruwzb1PqP69_hL3Ds+wun8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 4:47 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
+On Mon, Oct 28, 2013 at 7:01 AM, Peter Chen <peter.chen@freescale.com> wrote:
 
-> Here are two patches that I would like to get merged in v3.13 if possible.
-> They first one adds CAN pin groups for the r8a7778 SoC, while the second one
-> adds support for the r8a7791 SoC to the sh-pfc driver. Despite the large size
-> of the diffstat there's nothing special to mention here.
+> The commit: "pinctrl: imx: Use struct type for pins" relaced
+> pin->input_reg by pin->input_val wrongly, fix it at this commit.
 >
-> The following changes since commit c6ce2b6bffe5740d572fdc5b5e690d5261abee51:
->
->   gpio: add TB10x GPIO driver (2013-10-25 23:42:34 +0200)
->
-> are available in the git repository at:
->
->   git://linuxtv.org/pinchartl/fbdev.git pinmux/next/pfc
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-Pulled this as it is mostly a new driver, and it's been discussed
-for a while.
+Patch applied with Sascha's ACK.
 
-Yours,
+Yours.
 Linus Walleij
