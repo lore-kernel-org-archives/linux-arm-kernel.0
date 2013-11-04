@@ -1,215 +1,209 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 4 Nov 2013 09:51:24 -0800
-Subject: [PATCH] phy: Add MOXA RTL8201CP PHY support
-In-Reply-To: <CACmBeS3aUq_yPVg_GaKmQRQMhAmO8RZVzUGY=T6Ghn7v0sP8Dw@mail.gmail.com>
-References: <1383317673-14704-1-git-send-email-jonas.jensen@gmail.com>
- <CAGVrzcYfdChFNgkh=VAFZQfCRHyNTe_pZxx1Z6Sz1S8_1vzgtA@mail.gmail.com>
- <CACmBeS3aUq_yPVg_GaKmQRQMhAmO8RZVzUGY=T6Ghn7v0sP8Dw@mail.gmail.com>
-Message-ID: <CAGVrzcZW=CLWPZgRqkqR1wNh+S7dfwRZAzn1Uq7Ji6K0=iGYtg@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 04 Nov 2013 19:00:11 +0100
+Subject: [BUG?] ARM: mvebu: is second PCIe unit of Armada XP mv78230 x1 or x4?
+Message-ID: <87ppqgyrmc.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/4 Jonas Jensen <jonas.jensen@gmail.com>:
-> Thanks for the replies.
->
-> On 1 November 2013 18:01, Florian Fainelli <florian@openwrt.org> wrote:
->>> +       dev_err(&bus->dev, "%s timed out\n", __func__);
->>
->> I would keep these as a debugging aid and not spawn error messages on
->> the console by default.
->
-> Done.
->
->
->>> +       snprintf(bus->id, MII_BUS_ID_SIZE, "%s-mii", dev_name(&pdev->dev));
->>
->> If you only support device tree probing, this might be fine, but you
->> might want to be safe in case someone does a !OF instantiation and
->> also use pdev->id as an additional unique identifier, so something
->> like:
->>
->> %s-%d-mii, pdev->name, pdev->id
->>
->> will work.
->
-> Done.
->
->
->>> +       /* Setting PHY_IGNORE_INTERRUPT here even if it has no effect,
->>> +        * of_mdiobus_register() sets these PHY_POLL.
->>> +        * Ideally, the interrupt from MAC controller could be used to
->>> +        * detect link state changes, not polling, i.e. if there was
->>> +        * a way phy_driver could set PHY_HAS_INTERRUPT but have that
->>> +        * interrupt handled in ethernet drivercode.
->>> +        */
->>> +       for (i = 0; i < PHY_MAX_ADDR; i++)
->>> +               bus->irq[i] = PHY_IGNORE_INTERRUPT;
->>
->> This type of configuration where the PHY interrupt is actually
->> serviced by a link interrupt bit in the Ethernet MAC driver now works
->> since 5ea94e768 ("phy: add phy_mac_interrupt() to use with
->> PHY_IGNORE_INTERRUPT") so setting PHY_IGNORE_INTERRUPT is the right
->> way to signal this and this will no longer make the PHY library poll
->> for the link state.
->
-> Yes, I tried using phy_mac_interrupt() but had some difficulties (I'll
-> explain below). It seemed to be what I want and is wrapped with
-> EXPORT_SYMBOL().
->
-> However, as of next-20131104 I don't see how this works for DT probed
-> devices (those that set PHY_IGNORE_INTERRUPT).
->
-> As I tried to explain in my comment, of_mdiobus_register() assigns
-> PHY_POLL to the IRQ array:
->
-> drivers/of/of_mdio.c
-> ..
-> int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
-> {
-> ..
->         /* Clear all the IRQ properties */
->         if (mdio->irq)
->                 for (i=0; i<PHY_MAX_ADDR; i++)
->                         mdio->irq[i] = PHY_POLL;
+Hi,
 
-You are right, I missed that part. We can't really assign a dedicated
-interrupt line for your PHY, so we need another way of dealing with
-these PHY interrupts present at the Ethernet MAC level.
+I am currently playing with a NETGEAR ReadyNAS 2120. It is powered by a
+2-core Armada XP SoC, more precisely a 78230 (this is what NETGEAR
+advertises about the product; see the u-boot and /proc/cpuinfo info at
+the end of this message).
 
-[snip]
+I spent some time this week-end trying to figure out why I was unable to
+see the Fresco Logic FL1009 XHCI controller (PCIe Gen II x1) connected
+to the PCIe bus on a 3.12-rc7 with a custom .dts: Even after enabling
+all available ports referenced in armada-xp-mv78230.dtsi, I still only
+see the 2 Marvell SATA controllers (on Lane 0 and 1 of port 0) but not
+the FL1009.
 
-> This is why I ended up setting PHY_IGNORE_INTERRUPT and the comment
-> about its effectiveness. Polling works but the extra reads on the bus
-> seem unnecessary.
-> Ideas how they can be eliminated are appreciated.
+At some point, because I suspected a PCIe definition issue, I decided to
+modify my .dts and make it inherit from armada-xp-mv78460.dtsi with all
+PCIe ports enabled. At that point, here is what I got: 
 
-As of today, the only way to work around it is not to use
-of_mdiobus_register() and use mdiobus_register() directly which will
-allow you to properly describe such a configuration.
+root at thin:~# lspci 
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:03.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:04.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:05.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:06.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:07.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:08.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:09.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:0a.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+01:00.0 SATA controller: Marvell Technology Group Ltd. Device 9170 (rev 12)
+02:00.0 SATA controller: Marvell Technology Group Ltd. Device 9170 (rev 12)
+03:00.0 Memory controller: Marvell Technology Group Ltd. Device 7846 (rev 02)
+04:00.0 Memory controller: Marvell Technology Group Ltd. Device 7846 (rev 02)
+05:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02)
+06:00.0 Memory controller: Marvell Technology Group Ltd. Device 7846 (rev 02)
+07:00.0 Memory controller: Marvell Technology Group Ltd. Device 7846 (rev 02)
+08:00.0 Memory controller: Marvell Technology Group Ltd. Device 7846 (rev 02)
+09:00.0 Memory controller: Marvell Technology Group Ltd. Device 7846 (rev 02)
+0a:00.0 Memory controller: Marvell Technology Group Ltd. Device 7846 (rev 02)
 
->
->
-> Another problem, when phy_mac_interrupt() is called from NAPI it looks
-> like it's trying to take a lock it already has. I tried moving it out
-> of poll, placing it directly in IRQ handler, with the same result:
->
-> [   18.230000] moxart-ethernet 90900000.mac eth0: moxart_poll: PHYSTS_CHG
-> [   18.240000]
-> [   18.240000] =================================
-> [   18.240000] [ INFO: inconsistent lock state ]
-> [   18.240000] 3.12.0-rc7-next-20131104+ #1067 Not tainted
-> [   18.240000] ---------------------------------
-> [   18.240000] inconsistent {IN-SOFTIRQ-W} -> {SOFTIRQ-ON-W} usage.
-> [   18.240000] kworker/0:1/123 [HC0[0]:SC0[0]:HE1:SE1] takes:
-> [   18.240000]  ((&dev->phy_queue)){+.?...}, at: [<c0028c08>]
-> process_one_work+0x13c/0x430
-> [   18.240000] {IN-SOFTIRQ-W} state was registered at:
-> [   18.240000]   [<c0055648>] mark_lock+0x144/0x670
-> [   18.240000]   [<c005777c>] __lock_acquire+0x5e4/0x1c24
-> [   18.240000]   [<c00592cc>] lock_acquire+0x6c/0x80
-> [   18.240000]   [<c002a024>] flush_work+0x44/0x278
-> [   18.240000]   [<c002a2e0>] __cancel_work_timer+0x88/0x124
-> [   18.240000]   [<c002a390>] cancel_work_sync+0x14/0x18
-> [   18.240000]   [<c01b0190>] phy_mac_interrupt+0x20/0x40
-> [   18.240000]   [<c01b3450>] moxart_poll+0x2b4/0x4b4
-> [   18.240000]   [<c01fe3c8>] net_rx_action+0x130/0x22c
-> [   18.240000]   [<c00174cc>] __do_softirq+0xe8/0x238
-> [   18.240000]   [<c0017a2c>] irq_exit+0xac/0xfc
-> [   18.240000]   [<c0009b40>] handle_IRQ+0x3c/0x8c
-> [   18.240000]   [<c0008534>] handle_irq+0x98/0xa8
-> [   18.240000]   [<c000c478>] __irq_svc+0x38/0x68
-> [   18.240000]   [<c00487ec>] rcu_idle_exit+0x78/0xdc
-> [   18.240000]   [<c0040618>] cpu_startup_entry+0x88/0x130
-> [   18.240000]   [<c026d3c8>] rest_init+0xb8/0xe0
-> [   18.240000]   [<c033ea1c>] start_kernel+0x298/0x2dc
-> [   18.240000] irq event stamp: 2659
-> [   18.240000] hardirqs last  enabled at (2659): [<c0276298>]
-> _raw_spin_unlock_irq+0x2c/0x60
-> [   18.240000] hardirqs last disabled at (2658): [<c02760f0>]
-> _raw_spin_lock_irq+0x28/0x78
-> [   18.240000] softirqs last  enabled at (2654): [<c0017568>]
-> __do_softirq+0x184/0x238
-> [   18.240000] softirqs last disabled at (2637): [<c0017a2c>] irq_exit+0xac/0xfc
-> [   18.240000]
-> [   18.240000] other info that might help us debug this:
-> [   18.240000]  Possible unsafe locking scenario:
-> [   18.240000]
-> [   18.240000]        CPU0
-> [   18.240000]        ----
-> [   18.240000]   lock([   18.240000] moxart-ethernet 90900000.mac
-> eth0: TX ring end reached
-> [   18.240000] (&dev->phy_queue));
-> [   18.240000]   <Interrupt>
-> [   18.240000]     lock((&dev->phy_queue));
-> [   18.240000]
-> [   18.240000]  *** DEADLOCK ***
-> [   18.240000]
-> [   18.240000] 1 lock held by kworker/0:1/123:
-> [   18.240000]  #0:  (events){.+.+..}, at: [<c0028c08>]
-> process_one_work+0x13c/0x430
-> [   18.240000]
-> [   18.240000] stack backtrace:
-> [   18.240000] CPU: 0 PID: 123 Comm: kworker/0:1 Not tainted
-> 3.12.0-rc7-next-20131104+ #1067
-> [   18.240000] Workqueue: events phy_change
-> [   18.240000] [<c000d214>] (unwind_backtrace+0x0/0xf4) from
-> [<c000b964>] (show_stack+0x18/0x1c)
-> [   18.240000] [<c000b964>] (show_stack+0x18/0x1c) from [<c0271614>]
-> (dump_stack+0x20/0x28)
-> [   18.240000] [<c0271614>] (dump_stack+0x20/0x28) from [<c026fee0>]
-> (print_usage_bug.part.26+0x220/0x288)
-> [   18.240000] [<c026fee0>] (print_usage_bug.part.26+0x220/0x288) from
-> [<c0055b3c>] (mark_lock+0x638/0x670)
-> [   18.240000] [<c0055b3c>] (mark_lock+0x638/0x670) from [<c00577c4>]
-> (__lock_acquire+0x62c/0x1c24)
-> [   18.240000] [<c00577c4>] (__lock_acquire+0x62c/0x1c24) from
-> [<c00592cc>] (lock_acquire+0x6c/0x80)
-> [   18.240000] [<c00592cc>] (lock_acquire+0x6c/0x80) from [<c0028c70>]
-> (process_one_work+0x1a4/0x430)
-> [   18.240000] [<c0028c70>] (process_one_work+0x1a4/0x430) from
-> [<c0029304>] (worker_thread+0x13c/0x3dc)
-> [   18.240000] [<c0029304>] (worker_thread+0x13c/0x3dc) from
-> [<c002f500>] (kthread+0xb8/0xd4)
-> [   18.240000] [<c002f500>] (kthread+0xb8/0xd4) from [<c0009360>]
-> (ret_from_fork+0x14/0x34)
-> [   18.610000] libphy: phy_change
+Then, I took a look at the [laconic] public documentation on the various
+flavours of the Armada XP (mv7823, mv78260 and mv78460) regarding PCIe
+aspects. I noticed that [1] reports a x1 second PCIe unit for mv78230
+when [2] reports one x4 second unit for mv78230. FWIW, armada-xp-mv78230.dtsi
+currently states the second unit is x4/x1.
 
-Ok, I will take a look into this, I realize that I was calling this
-from a workqueue which won't show the locking problem, thanks for the
-report.
+[1]: http://www.marvell.com/embedded-processors/armada-xp/
+[2]: http://www.marvell.com/embedded-processors/armada-xp/assets/Marvell-ArmadaXP-SoC-product%20brief.pdf
 
->
->
->>> +       ret = of_mdiobus_register(bus, np);
->>> +       if (ret < 0)
->>> +               return ret;
->>
->> You still need to call mdiobus_free() here in case registration fails.
->
-> Done.
->
->
->>> +/* RTL8201CP */
->>> +static struct phy_driver rtl8201cp_driver = {
->>> +       .phy_id         = 0x00008201,
->>> +       .name           = "RTL8201CP Ethernet",
->>> +       .phy_id_mask    = 0x0000ffff,
->>> +       .features       = PHY_BASIC_FEATURES,
->>
->> If this PHY is internal to your SoC (same die/package) you should also
->> add PHY_IS_INTERNAL to get a consistent ethtool reporting (among
->> others).
->
-> I was wondering about that, and now I'm sure it should not be set, the
-> physical chip is separate, as can be seen here:
->
-> https://lh4.googleusercontent.com/-A-2FXDrObU8/UMcMc_K2vEI/AAAAAAAABwg/ldaLZ7ps1P4/w1331-h998-no/UC-7112-LX-picture4.jpg
+I started modifying the 3.12-rc7 armada-xp-mv78230.dtsi considering [1]
+was right and [2] was wrong. With the attached patch, here is what I get
+with a .dts based on the modified armada-xp-mv78230.dtsi. Simply put,
+it works (can see FL1009 and use it):
 
-Right, then make that a separate patch instead.
---
-Florian
+root at thin:~# lspci
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:05.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+01:00.0 SATA controller: Marvell Technology Group Ltd. Device 9170 (rev 12)
+02:00.0 SATA controller: Marvell Technology Group Ltd. Device 9170 (rev 12)
+03:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02)
+
+At that point, my .dts contains the following:
+
+	pcie-controller {
+		status = "okay";
+
+		/* Connected to first Marvell 88SE9170 SATA controller */
+		pcie at 1,0 {
+			/* Port 0, Lane 0 */
+			status = "okay";
+		};
+
+		/* Connected to second Marvell 88SE9170 SATA controller */
+		pcie at 2,0 {
+			/* Port 0, Lane 1 */
+			status = "okay";
+		};
+
+		/* Connected to Fresco Logic FL1009 USB 3.0 controller */
+		pcie at 5,0 {
+			/* Port 1, Lane 0 */
+			status = "okay";
+		};
+	};
+
+As I am way out of my league on the topic and do not have access to any
+proper documentation, can someone give me some hints (based on symptoms
+and working patch) on what may be happening? If I am correct on the root
+cause, can someone comment on the patch?
+
+Cheers,
+
+a+
 
 
+For the records, here is what NETGEAR u-boot reports:
 
--- 
-Florian
+U-Boot 2011.12 (Apr 09 2013 - 10:24:15) Marvell version: 2012_Q4.0
+Netgear version: 04/09/2013 ReadyNAS-2120 V1.7.8
+
+Board: DB-78460-BP rev 2.0
+SoC:   MV78230 B0
+       running 2 CPUs
+       Custom configuration
+CPU:   Marvell PJ4B (584) v7 (Rev 2) LE
+       CPU 0
+       CPU    @ 1200 [MHz]
+       L2     @ 600 [MHz]
+       TClock @ 250 [MHz]
+       DDR    @ 600 [MHz]
+       DDR 32Bit Width, FastPath Memory Access
+       DDR ECC Disabled
+DRAM:  2 GiB
+
+and what I get on current 3.12-rc7 kernel:
+
+/ # cat /proc/cpuinfo
+Processor	: Marvell PJ4Bv7 Processor rev 2 (v7l)
+processor	: 0
+BogoMIPS	: 1196.85
+
+processor	: 1
+BogoMIPS	: 1196.85
+
+Features	: swp half thumb fastmult vfp edsp vfpv3 
+CPU implementer	: 0x56
+CPU architecture: 7
+CPU variant	: 0x2
+CPU part	: 0x584
+CPU revision	: 2
+
+Hardware	: Marvell Armada XP Development Board
+Revision	: 0000
+Serial		: 0000000000000000
+
+
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index 0358a33..9dc7381 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -47,7 +47,7 @@
+ 		/*
+ 		 * MV78230 has 2 PCIe units Gen2.0: One unit can be
+ 		 * configured as x4 or quad x1 lanes. One unit is
+-		 * x4/x1.
++		 * x1 only.
+ 		 */
+ 		pcie-controller {
+ 			compatible = "marvell,armada-xp-pcie";
+@@ -61,10 +61,10 @@
+ 
+ 			ranges =
+ 			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
+-				0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
+ 				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
+ 				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
+ 				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
++				0x82000000 0 0x80000 MBUS_ID(0xf0, 0x01) 0x80000 0 0x00002000   /* Port 1.0 registers */
+ 				0x82000000 0x1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
+ 				0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */
+ 				0x82000000 0x2 0       MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 0.1 MEM */
+@@ -73,8 +73,8 @@
+ 				0x81000000 0x3 0       MBUS_ID(0x04, 0xb0) 0 1 0 /* Port 0.2 IO  */
+ 				0x82000000 0x4 0       MBUS_ID(0x04, 0x78) 0 1 0 /* Port 0.3 MEM */
+ 				0x81000000 0x4 0       MBUS_ID(0x04, 0x70) 0 1 0 /* Port 0.3 IO  */
+-				0x82000000 0x9 0       MBUS_ID(0x04, 0xf8) 0 1 0 /* Port 2.0 MEM */
+-				0x81000000 0x9 0       MBUS_ID(0x04, 0xf0) 0 1 0 /* Port 2.0 IO  */>;
++				0x82000000 0x5 0       MBUS_ID(0x08, 0xe8) 0 1 0 /* Port 1.0 MEM */
++				0x81000000 0x5 0       MBUS_ID(0x08, 0xe0) 0 1 0 /* Port 1.0 IO  */>;
+ 
+ 			pcie at 1,0 {
+ 				device_type = "pci";
+@@ -144,20 +144,20 @@
+ 				status = "disabled";
+ 			};
+ 
+-			pcie at 9,0 {
++			pcie at 5,0 {
+ 				device_type = "pci";
+-				assigned-addresses = <0x82000800 0 0x42000 0 0x2000>;
+-				reg = <0x4800 0 0 0 0>;
++				assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
++				reg = <0x2800 0 0 0 0>;
+ 				#address-cells = <3>;
+ 				#size-cells = <2>;
+ 				#interrupt-cells = <1>;
+-				ranges = <0x82000000 0 0 0x82000000 0x9 0 1 0
+-					  0x81000000 0 0 0x81000000 0x9 0 1 0>;
++				ranges = <0x82000000 0 0 0x82000000 0x5 0 1 0
++					  0x81000000 0 0 0x81000000 0x5 0 1 0>;
+ 				interrupt-map-mask = <0 0 0 0>;
+-				interrupt-map = <0 0 0 0 &mpic 99>;
+-				marvell,pcie-port = <2>;
++				interrupt-map = <0 0 0 0 &mpic 62>;
++				marvell,pcie-port = <1>;
+ 				marvell,pcie-lane = <0>;
+-				clocks = <&gateclk 26>;
++				clocks = <&gateclk 9>;
+ 				status = "disabled";
+ 			};
+ 		};
