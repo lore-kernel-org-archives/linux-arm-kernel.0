@@ -1,65 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 4 Nov 2013 21:08:53 +0800
-Subject: [PATCHv3] ARM: imx: add support code for IMX50 based machines
-In-Reply-To: <CAL_Jsq+Uon4QBU0wUYvWib4AYg=m0EFEBm7i03Zzy=bxU4c_zA@mail.gmail.com>
-References: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
- <CAL_Jsq+Uon4QBU0wUYvWib4AYg=m0EFEBm7i03Zzy=bxU4c_zA@mail.gmail.com>
-Message-ID: <20131104130850.GB24970@S2101-09.ap.freescale.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 4 Nov 2013 18:39:00 +0530
+Subject: [PATCH RFC 1/4] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <1539581.zprt32081v@amdc1227>
+References: <1383205544-32244-1-git-send-email-gautam.vivek@samsung.com>
+ <1383205544-32244-2-git-send-email-gautam.vivek@samsung.com>
+ <527744B2.4090303@ti.com> <1539581.zprt32081v@amdc1227>
+Message-ID: <52779C6C.1090603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 03, 2013 at 09:16:52PM -0600, Rob Herring wrote:
-> > @@ -108,6 +108,7 @@ void tzic_handle_irq(struct pt_regs *);
-> >  #define imx27_handle_irq avic_handle_irq
-> >  #define imx31_handle_irq avic_handle_irq
-> >  #define imx35_handle_irq avic_handle_irq
-> > +#define imx50_handle_irq tzic_handle_irq
-> 
-> Has no one converted AVIC and TZIC to use IRQCHIP_DECLARE? This and
-> the corresponding handle_irq hook would not be needed if that was
-> done.
+On Monday 04 November 2013 05:56 PM, Tomasz Figa wrote:
+> Hi Kishon,
+>
+> On Monday 04 of November 2013 12:24:42 Kishon Vijay Abraham I wrote:
+>> Hi Vivek,
+>>
+>> On Thursday 31 October 2013 01:15 PM, Vivek Gautam wrote:
+>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+>>> The new driver uses the generic PHY framework and will interact
+>>> with DWC3 controller present on Exynos5 series of SoCs.
+>>
+>> In Exynos, you have a single IP that supports both USB3 and USB2 PHY
+>> right? I think that needs to be mentioned here.
+>
+> Nope. There are two separate, different IPs.
 
-No, not yet.  There are still non-DT users for avic and tzic, which
-makes the adoption of IRQCHIP_DECLARE less meaningful and a little
-difficult.  So my plan is that we convert all those non-DT users over to
-DT, and then move avic and tzic to IRQCHIP_DECLARE.
+Alright. Thanks for the clarification.
 
-<snip>
+Cheers
+Kishon
 
-> > +static void __init imx50_dt_init(void)
-> > +{
-> > +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> 
-> This is the default operation now if init_machine is NULL.
-
-Oh, it reminds me that mxc_arch_reset_init_dt() should be called here to
-get mxc_restart() work.
-
-> > +}
-> > +
-> > +static const char *imx50_dt_board_compat[] __initdata = {
-> > +       "fsl,imx50",
-> > +       NULL
-> > +};
-> > +
-> > +DT_MACHINE_START(IMX50_DT, "Freescale i.MX50 (Device Tree Support)")
-> > +       .map_io         = mx53_map_io,
-> > +       .init_irq       = mx53_init_irq,
-> > +       .handle_irq     = imx50_handle_irq,
-> > +       .init_machine   = imx50_dt_init,
-> > +       .dt_compat      = imx50_dt_board_compat,
-> > +       .restart        = mxc_restart,
-> > +MACHINE_END
-> 
-> I still think any mx53 clean-up should be done first to enable mx50
-> rather than adding a mx50 machine first and then trying to consolidate
-> mx50 and mx53.
-
-We already reuse imx53 stuff as much as possible here, and I do not see
-there will be so much code to be consolidated further.  There are indeed
-something to be cleaned up as part of the whole i.MX DT conversion, like
-static mapping, but it's nothing related to imx50 addition.  Since the
-imx50 addition does not make the cleanup later more difficult, I would
-prefer to just support it now.
-
-Shawn
+>
+>> Do you have separate registers that should be used for
+>> initializing/powerin_on/powering_off etc.. for usb2 phy and usb3 phy? If
+>> so, then you should model this driver as a single driver that supports
+>> two PHYs similar to what Sylwester has done before?
+>
+> Sylwester's MIPI PHY uses such model because it has a single register
+> that controls both PHYs.
+>
+> Best regards,
+> Tomasz
+>
