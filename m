@@ -1,107 +1,37 @@
-From: b42378@freescale.com (Nicolin Chen)
-Date: Mon, 4 Nov 2013 12:33:39 +0800
-Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F82874201@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
- <20131101085904.GC28401@MrMyself>
- <1DD289F6464F0949A2FCA5AA6DC23F82874201@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20131104043338.GA2345@MrMyself>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Mon,  4 Nov 2013 06:19:26 +0100
+Subject: [PATCH] ARM: imx: removed unused MACH_MXLADS Kconfig parameter
+Message-ID: <1383542366-6270-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 11:45:10AM +0800, Xiubo Li-B47053 wrote:
-> > > +snd-soc-fsl-sai-objs := fsl-sai.o
-> > 
-> > And I think it should be better to put it along with fsl-ssi.o and fsl-
-> > spdif.o
-> > 
-> 
-> But fsl-ssi.o and fsl-spdif.o is based PowrePC platform? Which we can see from the comments.
+This removes the MACH_MXLADS Kconfig parameter,
+which was no longer used anywhere in the source code
+and Makefiles.
 
-No. fsl-ssi.c is compatible to both ARM and PPC. And fsl-spdif.c is currently
-used on ARM only. So please just put along with them.
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/mach-imx/Kconfig | 3 ---
+ 1 file changed, 3 deletions(-)
 
-> > > +	case SNDRV_PCM_TRIGGER_START:
-> > > +	case SNDRV_PCM_TRIGGER_RESUME:
-> > > +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-> > > +		tcsr |= FSL_SAI_CSR_TERE;
-> > > +		rcsr |= FSL_SAI_CSR_TERE;
-> > > +		writel(rcsr, sai->base + FSL_SAI_RCSR);
-> > > +		udelay(10);
-> > 
-> > Does SAI really needs this udelay() here? Required by IP's operation flow?
-> > If so, I think it's better to add comments here to explain it.
-> > 
-> +++++++++++++++++
-> Synchronous mode
-> The SAI transmitter and receiver can be configured to operate with synchronous bit clock
-> and frame sync.
-> 
-> 1,
-> If the transmitter bit clock and frame sync are to be used by both the transmitter and
-> receiver:
-> 	...
-> * It is recommended that the transmitter is the last enabled and the first disabled.
-> 
-> 2,
-> If the receiver bit clock and frame sync are to be used by both the transmitter and
-> receiver:
-> 	...
-> * It is recommended that the receiver is the last enabled and the first disabled.
-> ------------------
-> 
-> So I think the delay is needed, and I still tunning it.
-> 
-
-The udelay just doesn't make sense to what you are talking about.
-
-Does SAI really need 10us delay between two register-updating?
-
-We basically use udelay only if the IP hardware actually needs it: some
-IP needs time to boot itself up after doing software reset for example.
-But it doesn't look reasonable to me by using udelay to make sure "the 
-last enabled".
-
-And from the 'Synchronous mode' you just provided, there're another issue:
-
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_RESUME:
-+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+		tcsr |= FSL_SAI_CSR_TERE;
-+		rcsr |= FSL_SAI_CSR_TERE;
-+		writel(rcsr, sai->base + FSL_SAI_RCSR);
-+		udelay(10);
-+		writel(tcsr, sai->base + FSL_SAI_TCSR);
-+		break;
-+
-+	case SNDRV_PCM_TRIGGER_STOP:
-+	case SNDRV_PCM_TRIGGER_SUSPEND:
-+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+		if (!(dai->playback_active || dai->capture_active)) {
-+			tcsr &= ~FSL_SAI_CSR_TERE;
-+			rcsr &= ~FSL_SAI_CSR_TERE;
-+		}
-+		writel(rcsr, sai->base + FSL_SAI_RCSR);
-+		udelay(10);
-+		writel(tcsr, sai->base + FSL_SAI_TCSR);
-+		break;
-
-ISSUE 1: You might make sure transmitter is the last enabled.
-	 However, it's not the first disabled. Is this okay?
-
-ISSUE 2: There are two cases listed in 'Synchronous mode'.
-	 However, your driver doesn't take care of them.
-	 The SAI's synchronous mode looks like more flexible
-	 than SSI's. The driver needs to be more sophisticated
-	 so that it can handle multiple cases when TX/RX clocks
-	 are controlled by either TX or RX, and surely, the
-	 asynchronous mode as well.
-
-
-And there's another personal tip: I think you can first try to focus on
-this SAI driver and pend the others. There might be two many things you
-need to refine if you are doing them at the same time.
-
-Best regards,
-Nicolin Chen
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 29a8af6922a8..d84a772bbc68 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -158,14 +158,11 @@ config	SOC_IMX51
+ if ARCH_MULTI_V4T
+ 
+ comment "MX1 platforms:"
+-config MACH_MXLADS
+-	bool
+ 
+ config ARCH_MX1ADS
+ 	bool "MX1ADS platform"
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+-	select MACH_MXLADS
+ 	select SOC_IMX1
+ 	help
+ 	  Say Y here if you are using Motorola MX1ADS/MXLADS boards
+-- 
+1.8.1.2
