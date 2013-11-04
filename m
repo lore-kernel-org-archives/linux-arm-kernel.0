@@ -1,153 +1,423 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 4 Nov 2013 14:36:04 -0600
-Subject: [PATCHv2 3/4] mmc: dw_mmc-socfpga: Clean up SOCFPGA platform specific
- functionality
-In-Reply-To: <1383597364-25613-1-git-send-email-dinguyen@altera.com>
-References: <1383597364-25613-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1383597364-25613-4-git-send-email-dinguyen@altera.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 04 Nov 2013 21:43:22 +0100
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <5277CD33.6030003@wwwdotorg.org>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <2443024.JdDKnfkC18@wuerfel> <5277CD33.6030003@wwwdotorg.org>
+Message-ID: <1704730.RnIqE1USnv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Monday 04 November 2013 09:37:07 Stephen Warren wrote:
+> > The basic idea is to extend 'devres' to automatically register
+> > all the resources (registers, irq, dma, gpio, pinctrl, clk, regulator, ...)
+> > and simple properties before the ->probe() callback is even called,
+> > based on a per-driver data structure that describes them, and that
+> > can be easily parsed by an external tool.
+> 
+> I had suggested that while talking to someone at the kernel summit,
+> basically each driver supplies functions like:
+> 
+> 1) ACPI -> platform data or resources converter
+> 2) DT -> platform or resources data converter
+> 3) anything else -> platform or resources data converter
+> 4) probe()
 
-The SDR timing registers for the SD/MMC IP block for SOCFPGA is located
-in the system manager. This system manager IP block is located outside of
-the SD IP block itself. We can use the normal clock API to set the SDR
-settings.
+FWIW, here is a very early draft of the interfaces I have in mind.
+At the moment the implementation is DT focused, but that should
+be extensible to ACPI if necessary.
 
-Also, there is no need for "altr,dw-mshc-ciu-div" as the driver can get
-the value of the CIU clock from the common clock API.
+At the end, you can see how a probe function could end up looking.
+I'm sure this is full of bugs at the moment, incomplete and needs
+to be moved into actual header and C files, but it should be enough
+to get across where I'm getting with this, and to see if anyone
+thinks it's a really bad idea or won't actually work.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-Cc: Mike Turquette <mturquette@linaro.org>
-CC: Olof Johansson <olof@lixom.net>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
-Cc: Seungwon Jeon <tgih.jun@samsung.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-mmc at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
----
- drivers/mmc/host/dw_mmc-socfpga.c |   80 +++++--------------------------------
- 1 file changed, 10 insertions(+), 70 deletions(-)
+	Arnd
 
-diff --git a/drivers/mmc/host/dw_mmc-socfpga.c b/drivers/mmc/host/dw_mmc-socfpga.c
-index 14b5961..4999454 100644
---- a/drivers/mmc/host/dw_mmc-socfpga.c
-+++ b/drivers/mmc/host/dw_mmc-socfpga.c
-@@ -13,97 +13,37 @@
-  * Taken from dw_mmc-exynos.c
-  */
- #include <linux/clk.h>
--#include <linux/mfd/syscon.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/dw_mmc.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
--#include <linux/regmap.h>
- 
- #include "dw_mmc.h"
- #include "dw_mmc-pltfm.h"
- 
--#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
--#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
--#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
--	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
--
--/* SOCFPGA implementation specific driver private data */
--struct dw_mci_socfpga_priv_data {
--	u8	ciu_div; /* card interface unit divisor */
--	u32	hs_timing; /* bitmask for CIU clock phase shift */
--	struct regmap   *sysreg; /* regmap for system manager register */
--};
--
--static int dw_mci_socfpga_priv_init(struct dw_mci *host)
--{
--	struct dw_mci_socfpga_priv_data *priv;
--
--	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
--	if (!priv) {
--		dev_err(host->dev, "mem alloc failed for private data\n");
--		return -ENOMEM;
--	}
--
--	priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
--	if (IS_ERR(priv->sysreg)) {
--		dev_err(host->dev, "regmap for altr,sys-mgr lookup failed.\n");
--		return PTR_ERR(priv->sysreg);
--	}
--	host->priv = priv;
--
--	return 0;
--}
--
- static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
- {
--	struct dw_mci_socfpga_priv_data *priv = host->priv;
--
--	clk_disable_unprepare(host->ciu_clk);
--	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET,
--		priv->hs_timing);
--	clk_prepare_enable(host->ciu_clk);
--
--	host->bus_hz /= (priv->ciu_div + 1);
-+	struct clk *sysmgr_clk = devm_clk_get(host->dev, "sysmgr-sdr-mmc");
-+
-+	if (IS_ERR(sysmgr_clk))
-+		dev_err(host->dev, "sysmgr-sdr-mmc not available\n");
-+	else {
-+		clk_disable_unprepare(host->ciu_clk);
-+		clk_prepare_enable(sysmgr_clk);
-+		clk_prepare_enable(host->ciu_clk);
-+	}
- 	return 0;
- }
- 
- static void dw_mci_socfpga_prepare_command(struct dw_mci *host, u32 *cmdr)
- {
--	struct dw_mci_socfpga_priv_data *priv = host->priv;
--
--	if (priv->hs_timing & DRV_CLK_PHASE_SHIFT_SEL_MASK)
--		*cmdr |= SDMMC_CMD_USE_HOLD_REG;
--}
--
--static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
--{
--	struct dw_mci_socfpga_priv_data *priv = host->priv;
--	struct device_node *np = host->dev->of_node;
--	u32 timing[2];
--	u32 div = 0;
--	int ret;
--
--	ret = of_property_read_u32(np, "altr,dw-mshc-ciu-div", &div);
--	if (ret)
--		dev_info(host->dev, "No dw-mshc-ciu-div specified, assuming 1");
--	priv->ciu_div = div;
--
--	ret = of_property_read_u32_array(np,
--			"altr,dw-mshc-sdr-timing", timing, 2);
--	if (ret)
--		return ret;
--
--	priv->hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[0], timing[1]);
--	return 0;
-+	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
- }
- 
- static const struct dw_mci_drv_data socfpga_drv_data = {
--	.init			= dw_mci_socfpga_priv_init,
- 	.setup_clock		= dw_mci_socfpga_setup_clock,
- 	.prepare_command	= dw_mci_socfpga_prepare_command,
--	.parse_dt		= dw_mci_socfpga_parse_dt,
- };
- 
- static const struct of_device_id dw_mci_socfpga_match[] = {
--- 
-1.7.9.5
+#if 0
+/* allocate drvdata */
+DEVM_ALLOC,
+
+/* request hardware properties */
+DEVM_IRQ,
+DEVM_IOMAP,
+DEVM_GPIO,
+DEVM_DMA_SLAVE,
+DEVM_PINCTRL,
+DEVM_REGULATOR,
+DEVM_CLK,
+DEVM_PWM,
+DEVM_USBPHY,
+
+/* auxiliary information */
+DEVM_PROP_BOOL
+DEVM_PROP_U32
+DEVM_PROP_STRING
+#endif
+
+#error don't bother compiling this file, it's only proof-of-concept
+
+struct device;
+
+struct devm_probe {
+	int (*initfunc)(struct device *dev, const struct devm_probe *probe);
+	ptrdiff_t offset;
+	unsigned int index;
+	const char *name;
+	void *arg;
+	unsigned int flags;
+};
+
+/* like offsetof(), but ensures that MEMBER is of type MEMBERTYPE */
+#define offsetof_t(TYPE, MEMBER, MEMBERTYPE) \
+	((typeof(MEMBER)*)0 - typeof(MEMBERTYPE*)0 + offsetof((TYPE), (MEMBER)))
+
+/* cast 'ptr' to void* and cause a build warning if it wasn't of 'type' before */
+#define typecheck_ptr(ptr, type) \
+	(void *)(ptr - (type)NULL + (type)NULL)
+
+/*
+ * This is the main entry point for drivers: 
+ *
+ * Given an zero-terminated array of 'struct devm_probe' entries,
+ * this calls all initfunc pointers in the given order. Each initfunc
+ * may manipulate a field in the driver_data, as pointed to by
+ * the 'offset' member.
+ */
+int devm_probe(struct device *dev, const struct devm_probe *probe)
+{
+	int ret;
+
+	for (ret = 0; !ret && probe->initfunc, probe++)
+		ret = probe->initfunc(dev, probe);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(devm_probe);
+
+/*
+ * this must be the called before any of the others, or not at
+ * all, if dev_set_drvdata() has already been called.
+ */
+static void devm_probe_alloc_release(struct device *dev, void *res)
+{
+	dev_set_drvdata(dev, NULL);
+}
+int devm_probe_alloc(struct device *dev, const struct devm_probe *probe)
+{
+	void *dr;
+
+	if (dev_get_drvdata)
+		return -EBUSY;
+
+	dr = alloc_dr(devm_probe_alloc_release, probe->offset, GFP_KERNEL);
+	if (unlikely(!dr))
+		return -ENOMEM;
+
+	dev_set_drvdata(dev, dr);
+	set_node_dbginfo(&dr->node, "devm_probe_alloc", size);
+	devres_add(dev, dr->data);
+}
+EXPORT_SYMBOL_GPL(devm_probe_alloc);
+
+
+#define DEVM_ALLOC(_struct) \
+	{ .initfunc = devm_probe_alloc, .offset = sizeof(struct _struct), }
+
+int devm_probe_irq(struct device *dev, const struct devm_probe *probe)
+{
+	int ret;
+	int irq;
+	int *irqp;
+	int index;
+	const char *name;
+
+	/* come up with a reasonable string for the irq name,
+	   maybe create devm_kasprintf() to allow arbitrary length? */
+	name = devm_kmalloc(dev, 32, GFP_KERNEL);
+	if (!name)
+		return -ENOMEM;
+	if (probe->name)
+		snprintf(name, 32 - 1, "%s:%s", dev_name(dev), probe->name);
+	else
+		snprintf(name, 32 - 1, "%s:%n", dev_name(dev), probe->index);
+
+	/* find IRQ number from resource if platform device */
+	irq = 0;
+	if (dev->bus_type == &platform_bus) {
+		struct platform_device *pdev = to_platform_device(dev);
+
+		if (probe->name)
+			irq = platform_get_irq_byname(pdev, probe->name);
+		else
+			irq = platform_get_irq(pdev, probe->index);
+	}
+
+	/* try getting irq number from device tree if that failed */
+	if (!irq && dev->of_node) {
+		if (probe->name)
+			index = of_property_match_string(dev->of_node,
+							 "interrupt-names",
+							 probe->name);
+		else
+			index = probe->index;
+
+		irq = irq_of_parse_and_map(dev->of_node, index);
+	}
+
+	/* copy irq number to driver data */
+	irqp = dev_get_drvdata(dev) + probe->offset;
+	*irqp = irq;
+	
+	return devm_request_irq(dev, irq, probe->arg, probe->flags, name, probe->dev);
+}
+EXPORT_SYMBOL_GPL(devm_probe_irq);
+
+#define DEVM_IRQ(_struct, _member, _index, _handler, _flags) {	\
+	.initfunc = devm_probe_irq,				\
+	.offset = offsetof_t(struct _struct, _member, int),	\
+	.index = _index,					\
+	.arg = typecheck_ptr((_handler), irq_handler_t),	\
+	.flags = _flags,					\
+}	
+
+#define DEVM_IRQ_NAMED(_struct, _member, _name, _handler, _flags) { \
+	.initfunc = devm_probe_irq,				\
+	.offset = offsetof_t(struct _struct, _member, int),	\
+	.name = _name,						\
+	.arg = typecheck_ptr((_handler), irq_handler_t),	\
+	.flags = _flags,					\
+}	
+
+
+#define DEVM_IOMAP_NOREQUEST 1
+
+int devm_probe_iomap(struct device *dev, const struct devm_probe *probe)
+{
+	struct resource res, *resp;
+	void __iomem *vaddr;
+	void * __iomem *vaddrp;
+	int ret;
+
+	/* find mem resource from platform device */
+	if (dev->bus_type == &platform_bus) {
+		struct platform_device *pdev = to_platform_device(dev);
+
+		if (probe->name)
+			resp = platform_get_resource_byname(pdev,
+					IORESOURCE_MEM, probe->name);
+		else
+			resp = platform_get_resource(pdev,
+					IORESOURCE_MEM, probe->index);
+	}
+
+	/* try getting resource from device tree if that failed */
+	if (!resp && dev->of_node) {
+		if (probe->name)
+			index = of_property_match_string(dev->of_node,
+							 "reg-names",
+							 probe->name);
+		else
+			index = probe->index;
+
+		ret = of_address_to_resource(dev->of_node, index, &res);
+		if (ret)
+			return ret;
+		resp = &res;
+	}
+
+
+	if (probe->flags & DEVM_IOMAP_NOREQUEST) {
+		vaddr = devm_ioremap(dev, resp->start, resource_size(resp));
+		if (!vaddr)
+			return -EINVAL;
+	} else {
+		vaddr = devm_ioremap_resource(dev, resp);
+		if (IS_ERR(vaddr))
+			return PTR_ERR(vaddr);
+	}
+
+	vaddrp = dev_get_drvdata(dev) + probe->offset;
+	*vaddrp = vaddr;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(devm_probe_iomap);
+
+#define DEVM_IOMAP(_struct, _member, _index, _flags) {			\
+	.initfunc = devm_probe_iomap,					\
+	.offset = offsetof_t(struct _struct, _member, void __iomem *),	\
+	.index = _index,						\
+	.flags = _flags,						\
+}	
+
+#define DEVM_IOMAP_NAMED(_struct, _member, _name, _flags) { 		\
+	.initfunc = devm_probe_iomap,					\
+	.offset = offsetof_t(struct _struct, _member, void __iomem *),	\
+	.name = _name,							\
+	.flags = _flags,						\
+}	
+
+int devm_probe_gpio(struct device *dev, const struct devm_probe *probe)
+{
+	struct gpio_desc *desc, **descp;
+
+	desc = devm_gpiod_get_index(dev, probe->name, probe->index);
+	if (IS_ERR(desc)) {
+		/* FIXME: this looks wrong */
+		desc = of_get_named_gpiod_flags(dev->of_node, probe->name,
+						probe->index, NULL);
+		if (IS_ERR(desc))
+			return PTR_ERR(desc);
+		devm_gpio_request(dev, desc_to_gpio(desc), probe->name);
+	}
+
+	descp = dev_get_drvdata(dev) + probe->offset;
+	*descp = desc;
+
+	return 0;
+}
+
+#define DEVM_GPIO(_struct, _member, _index) {				 \
+	.initfunc = devm_probe_iomap,					 \
+	.offset = offsetof_t(struct _struct, _member, struct gpio_desc*),\
+	.name = "gpios",						 \
+	.index = _index,						 \
+}	
+
+#define DEVM_GPIO_NAMED(_struct, _member, _name) { 			 \
+	.initfunc = devm_probe_iomap,					 \
+	.offset = offsetof_t(struct _struct, _member, struct gpio_desc*),\
+	.name = _name,							 \
+}	
+
+static void devm_probe_dma_release(struct device *dev, void *chanp)
+{
+	dma_release_channel(*(struct dma_chan**)chanp);
+}
+
+int devm_probe_dma(struct device *dev, const struct devm_probe *probe)
+{
+	struct dma_chan *chan, **chanp;
+
+	/* there is no devm_dma_request_channel yet, so build our own */
+	chanp = devres_alloc(devm_probe_dma_release, sizeof(chanp), GFP_KERNEL);
+	if (!chanp)
+		return -ENOMEM;
+
+	chan = dma_request_slave_channel(dev, probe->name);
+	if (!chan) {
+		devres_free(chanp);
+		return -EINVAL;
+	}
+
+	*chanp = chan;
+	devres_add(dev, chanp);
+
+	/* add pointer to the private data */
+	chanp = dev_get_drvdata(dev) + probe->offset;
+	*chanp = chan;
+
+	return 0;
+}
+
+#define DEVM_DMA_SLAVE(_struct, _member, _name)				\
+	.offset = offsetof_t(struct _struct, _member, struct dma_chan*),\
+	.name = _name,							\
+}
+
+/*
+ * simple properties: bool, u32, string
+ * no actual need for managed interfaces, just a way to abstract the
+ * access to DT or other information source
+ */
+int devm_probe_prop_bool(struct device *dev, struct devm_probe *probe)
+{
+	bool *val;
+
+	val = dev_get_drvdata(dev) + probe->offset;
+	*val = of_property_read_bool(dev->of_node, probe->name);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(devm_probe_prop_bool);
+
+#define DEVM_PROP_BOOL(_struct, _member, _name)			\
+	.offset = offsetof_t(struct _struct, _member, bool),	\
+	.name = _name,						\
+}
+
+int devm_probe_prop_u32(struct device *dev, struct devm_probe *probe)
+{
+	u32 *val;
+	int ret;
+
+	val = dev_get_drvdata(dev) + probe->offset;
+	ret = of_property_read_u32(dev->of_node, probe->name, val);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(devm_probe_prop_bool);
+
+#define DEVM_PROP_U32(_struct, _member, _name)			\
+	.offset = offsetof_t(struct _struct, _member, u32),	\
+	.name = _name,						\
+}
+
+int devm_probe_prop_string(struct device *dev, struct devm_probe *probe)
+{
+	const char **val;
+	int ret;
+
+	val = dev_get_drvdata(dev) + probe->offset;
+	ret = of_property_read_string(dev->of_node, probe->name, val);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(devm_probe_prop_bool);
+
+#define DEVM_PROP_STRING(_struct, _member, _name)			\
+	.offset = offsetof_t(struct _struct, _member, const char *),	\
+	.name = _name,							\
+}
+
+/* example driver */
+struct foo_priv {
+	spinlock_t lock;
+	void __iomem *regs;
+	int irq;
+	struct gpio_desc *gpio;
+	struct dma_chan *rxdma;
+	struct dma_chan *txdma;
+	bool oldstyle_dma;
+};
+
+static irqreturn_t foo_irq_handler(int irq, void *dev);
+
+/*
+ * this lists all properties we access from the driver. The list
+ * is interpreted by devm_probe() and can be programmatically
+ * verified to match the binding.
+ */
+static const struct devm_probe foo_probe_list[] = {
+	DEVM_ALLOC(foo_priv),
+	DEVM_IOMAP(foo_priv, regs, 0, 0),
+	DEVM_PROP_BOOL(foo_priv, oldstyle_dma, "foo,oldstyle-dma"),
+	DEVM_DMA_SLAVE(foo_priv, rxdma, "rx");
+	DEVM_DMA_SLAVE(foo_priv, txdma, "tx");
+	DEVM_GPIO(foo_priv, gpio, 0);
+	DEVM_IRQ_NAMED(foo_priv, irq, foo_irq_handler, "fifo", IRQF_SHARED),
+	{},
+};
+
+static int foo_probe(struct platform_device *dev)
+{
+	int ret;
+
+	ret = devm_probe(dev->dev, foo_probe_list);
+	if (ret)
+		return ret;
+
+	return bar_subsystem_register(&foo_bar_ops, dev);
+}
