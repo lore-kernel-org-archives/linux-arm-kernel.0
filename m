@@ -1,79 +1,49 @@
-From: B47053@freescale.com (Li Xiubo)
-Date: Mon, 4 Nov 2013 07:35:12 +0000
-Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
-In-Reply-To: <20131101182514.GE2493@sirena.org.uk>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
- <20131101182514.GE2493@sirena.org.uk>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F8287439D@039-SN2MPN1-013.039d.mgd.msft.net>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 04 Nov 2013 15:36:42 +0800
+Subject: [PATCH] arm/arm64: remove atomic_clear_mask() in
+ "include/asm/atomic.h"
+In-Reply-To: <794E70F6-80D3-4100-A0FF-A6F34AFB9A59@arm.com>
+References: <5256117A.4000009@asianux.com> <5256121A.9030504@asianux.com>
+ <52561269.60900@asianux.com>
+ <20131010100733.GH3817@mudshark.cambridge.arm.com>
+ <52568998.2080108@asianux.com>
+ <20131010142305.GG6199@mudshark.cambridge.arm.com>
+ <525751E2.3020207@asianux.com>
+ <20131011104419.GE14732@mudshark.cambridge.arm.com>
+ <5257E033.3090607@asianux.com> <5257E539.9080902@asianux.com>
+ <20131011165530.GS14732@mudshark.cambridge.arm.com>
+ <794E70F6-80D3-4100-A0FF-A6F34AFB9A59@arm.com>
+Message-ID: <52774E8A.2080901@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +static int fsl_sai_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
-> > +		int div_id, int div)
-> > +{
-> > +	struct fsl_sai *sai = snd_soc_dai_get_drvdata(cpu_dai);
-> > +	u32 tcr2, rcr2;
-> > +
-> > +	if (div_id == FSL_SAI_TX_DIV) {
-> > +		tcr2 = readl(sai->base + FSL_SAI_TCR2);
-> > +		tcr2 &= ~FSL_SAI_CR2_DIV_MASK;
-> > +		tcr2 |= FSL_SAI_CR2_DIV(div);
-> > +		writel(tcr2, sai->base + FSL_SAI_TCR2);
+Hello Maintainers:
+
+Are these related patches for "arm[64]/include/asm/atomic.h" OK? If also
+need me do something, please let me know, and I will/should try.
+
+Thanks.
+
+
+On 10/13/2013 06:28 AM, Catalin Marinas wrote:
+> On 11 Oct 2013, at 17:55, Will Deacon <will.deacon@arm.com> wrote:
+>> On Fri, Oct 11, 2013 at 12:47:05PM +0100, Chen Gang wrote:
+>>> In current kernel wide source code, except other architectures, only
+>>> s390 scsi drivers use atomic_clear_mask(), and arm/arm64 need not
+>>> support s390 drivers.
+>>>
+>>> So remove atomic_clear_mask() from "arm[64]/include/asm/atomic.h".
+>>
+>>  Acked-by: Will Deacon <will.deacon@arm.com>
+>>
+>> Catalin, are you happy for me to send this via the ARM tree?
 > 
-> What is this divider and why does the user have to set it manually?
+> Fine by me.
 > 
-
-This is the bit clock divider. I'll add some comments or rename them to be more readable.
->From the IP spec:
-++++++
-Bit Clock Divide
-Divides down the audio master clock to generate the bit clock when configured for an internal bit clock.
-------
-
->From the ASoC subsystem comments we can see that:
-++++++
-Configures the clock dividers. This is used to derive the best DAI bit and
-frame clocks from the system or master clock. It's best to set the DAI bit
-and frame clocks as low as possible to save system power.
-------
-
-
-> > +static int fsl_sai_dai_probe(struct snd_soc_dai *dai) {
-> > +	int ret;
-> > +	struct fsl_sai *sai = dev_get_drvdata(dai->dev);
-> > +
-> > +	ret = clk_prepare_enable(sai->clk);
-> > +	if (ret)
-> > +		return ret;
+> Catalin
 > 
-> It'd be nicer to only enable the clock while the device is in active use.
 > 
 
-While if the module clock is not enabled here, the followed registers cannot read/write in the same function.
-And this _probe function is the _dai_probe not the driver's module _probe.
 
-If the clk_prepare_enable(sai->clk) is not here, where should it be will be nicer ?
-One of the following functions ?
-        .set_sysclk     = fsl_sai_set_dai_sysclk,
-        .set_clkdiv     = fsl_sai_set_dai_clkdiv,
-        .set_fmt        = fsl_sai_set_dai_fmt,
-        .set_tdm_slot   = fsl_sai_set_dai_tdm_slot,
-        .hw_params      = fsl_sai_hw_params,
-        .trigger        = fsl_sai_trigger,
-
-
-> > +	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL,
-> > +			SND_DMAENGINE_PCM_FLAG_NO_RESIDUE);
-> > +	if (ret)
-> > +		return ret;
-> 
-> We should have a devm_ version of this.
-
-Sorry, is there one patch for adding the devm_ version of snd_dmaengine_pcm_register() already ?
-In the -next and other topics branches I could not find it.
-
-
-
-Best Regards,
-Xiubo
+-- 
+Chen Gang
