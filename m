@@ -1,70 +1,215 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 4 Nov 2013 09:36:06 -0800
-Subject: [PATCH 02/11] devicetree: bindings: Document Qualcomm cpus and
- enable-method
-In-Reply-To: <CAL_JsqLObXEWJJ=SuifTjpPz9qTW0n43fyQNA-vjLNeLy-7-XA@mail.gmail.com>
-References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
- <1383343739-23080-3-git-send-email-sboyd@codeaurora.org>
- <CAL_JsqLObXEWJJ=SuifTjpPz9qTW0n43fyQNA-vjLNeLy-7-XA@mail.gmail.com>
-Message-ID: <20131104173606.GL21983@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 4 Nov 2013 09:51:24 -0800
+Subject: [PATCH] phy: Add MOXA RTL8201CP PHY support
+In-Reply-To: <CACmBeS3aUq_yPVg_GaKmQRQMhAmO8RZVzUGY=T6Ghn7v0sP8Dw@mail.gmail.com>
+References: <1383317673-14704-1-git-send-email-jonas.jensen@gmail.com>
+ <CAGVrzcYfdChFNgkh=VAFZQfCRHyNTe_pZxx1Z6Sz1S8_1vzgtA@mail.gmail.com>
+ <CACmBeS3aUq_yPVg_GaKmQRQMhAmO8RZVzUGY=T6Ghn7v0sP8Dw@mail.gmail.com>
+Message-ID: <CAGVrzcZW=CLWPZgRqkqR1wNh+S7dfwRZAzn1Uq7Ji6K0=iGYtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01, Rob Herring wrote:
-> On Fri, Nov 1, 2013 at 5:08 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > From: Rohit Vaswani <rvaswani@codeaurora.org>
-> >
-> > Scorpion and Krait are Qualcomm cpus. These cpus don't use the
-> > spin-table enable-method. Instead they rely on mmio register
-> > accesses to enable power and clocks to bring CPUs out of reset.
-> >
-> > Cc: <devicetree@vger.kernel.org>
-> > Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> > [sboyd: Split off into separate patch, renamed method to
-> > qcom,mmio]
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> >
-> > This slightly conflicts with my krait EDAC series.
-> >
-> >  Documentation/devicetree/bindings/arm/cpus.txt | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> > index 37258f9..e2969fa2 100644
-> > --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> > @@ -44,6 +44,8 @@ For the ARM architecture every CPU node must contain the following properties:
-> >                 "marvell,mohawk"
-> >                 "marvell,xsc3"
-> >                 "marvell,xscale"
-> > +               "qcom,scorpion"
-> > +               "qcom,krait"
-> >
-> >  And the following optional properties:
-> >
-> > @@ -52,6 +54,7 @@ And the following optional properties:
-> >                  different types of cpus.
-> >                  This should be one of:
-> >                  "spin-table"
-> > +                "qcom,mmio"
-> 
-> Not exactly specific. How would you handle variations in the enable
-> method? The mmio method to enable is tied to the core type or SOC
-> type?
+2013/11/4 Jonas Jensen <jonas.jensen@gmail.com>:
+> Thanks for the replies.
+>
+> On 1 November 2013 18:01, Florian Fainelli <florian@openwrt.org> wrote:
+>>> +       dev_err(&bus->dev, "%s timed out\n", __func__);
+>>
+>> I would keep these as a debugging aid and not spawn error messages on
+>> the console by default.
+>
+> Done.
+>
+>
+>>> +       snprintf(bus->id, MII_BUS_ID_SIZE, "%s-mii", dev_name(&pdev->dev));
+>>
+>> If you only support device tree probing, this might be fine, but you
+>> might want to be safe in case someone does a !OF instantiation and
+>> also use pdev->id as an additional unique identifier, so something
+>> like:
+>>
+>> %s-%d-mii, pdev->name, pdev->id
+>>
+>> will work.
+>
+> Done.
+>
+>
+>>> +       /* Setting PHY_IGNORE_INTERRUPT here even if it has no effect,
+>>> +        * of_mdiobus_register() sets these PHY_POLL.
+>>> +        * Ideally, the interrupt from MAC controller could be used to
+>>> +        * detect link state changes, not polling, i.e. if there was
+>>> +        * a way phy_driver could set PHY_HAS_INTERRUPT but have that
+>>> +        * interrupt handled in ethernet drivercode.
+>>> +        */
+>>> +       for (i = 0; i < PHY_MAX_ADDR; i++)
+>>> +               bus->irq[i] = PHY_IGNORE_INTERRUPT;
+>>
+>> This type of configuration where the PHY interrupt is actually
+>> serviced by a link interrupt bit in the Ethernet MAC driver now works
+>> since 5ea94e768 ("phy: add phy_mac_interrupt() to use with
+>> PHY_IGNORE_INTERRUPT") so setting PHY_IGNORE_INTERRUPT is the right
+>> way to signal this and this will no longer make the PHY library poll
+>> for the link state.
+>
+> Yes, I tried using phy_mac_interrupt() but had some difficulties (I'll
+> explain below). It seemed to be what I want and is wrapped with
+> EXPORT_SYMBOL().
+>
+> However, as of next-20131104 I don't see how this works for DT probed
+> devices (those that set PHY_IGNORE_INTERRUPT).
+>
+> As I tried to explain in my comment, of_mdiobus_register() assigns
+> PHY_POLL to the IRQ array:
+>
+> drivers/of/of_mdio.c
+> ..
+> int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
+> {
+> ..
+>         /* Clear all the IRQ properties */
+>         if (mdio->irq)
+>                 for (i=0; i<PHY_MAX_ADDR; i++)
+>                         mdio->irq[i] = PHY_POLL;
 
-Variations in the enable method are handled by searching for
-another node with different compatible strings. Later on in this
-series you'll see that we search for gcc-8660, kpss-acc-v1, or
-kpps-acc-v2. Once we find one of these nodes we perform the
-correct cold boot routine.
+You are right, I missed that part. We can't really assign a dedicated
+interrupt line for your PHY, so we need another way of dealing with
+these PHY interrupts present at the Ethernet MAC level.
 
-I'm actually considering renaming this to "qcom,cold-boot". We
-could further extend the enable-metho property to allow
-"qcom,warm-boot" and then for cases like kexec we could make the
-enable method be warm boot and our smp code could be smart enough
-to know to skip the whole cold boot sequence.
+[snip]
+
+> This is why I ended up setting PHY_IGNORE_INTERRUPT and the comment
+> about its effectiveness. Polling works but the extra reads on the bus
+> seem unnecessary.
+> Ideas how they can be eliminated are appreciated.
+
+As of today, the only way to work around it is not to use
+of_mdiobus_register() and use mdiobus_register() directly which will
+allow you to properly describe such a configuration.
+
+>
+>
+> Another problem, when phy_mac_interrupt() is called from NAPI it looks
+> like it's trying to take a lock it already has. I tried moving it out
+> of poll, placing it directly in IRQ handler, with the same result:
+>
+> [   18.230000] moxart-ethernet 90900000.mac eth0: moxart_poll: PHYSTS_CHG
+> [   18.240000]
+> [   18.240000] =================================
+> [   18.240000] [ INFO: inconsistent lock state ]
+> [   18.240000] 3.12.0-rc7-next-20131104+ #1067 Not tainted
+> [   18.240000] ---------------------------------
+> [   18.240000] inconsistent {IN-SOFTIRQ-W} -> {SOFTIRQ-ON-W} usage.
+> [   18.240000] kworker/0:1/123 [HC0[0]:SC0[0]:HE1:SE1] takes:
+> [   18.240000]  ((&dev->phy_queue)){+.?...}, at: [<c0028c08>]
+> process_one_work+0x13c/0x430
+> [   18.240000] {IN-SOFTIRQ-W} state was registered at:
+> [   18.240000]   [<c0055648>] mark_lock+0x144/0x670
+> [   18.240000]   [<c005777c>] __lock_acquire+0x5e4/0x1c24
+> [   18.240000]   [<c00592cc>] lock_acquire+0x6c/0x80
+> [   18.240000]   [<c002a024>] flush_work+0x44/0x278
+> [   18.240000]   [<c002a2e0>] __cancel_work_timer+0x88/0x124
+> [   18.240000]   [<c002a390>] cancel_work_sync+0x14/0x18
+> [   18.240000]   [<c01b0190>] phy_mac_interrupt+0x20/0x40
+> [   18.240000]   [<c01b3450>] moxart_poll+0x2b4/0x4b4
+> [   18.240000]   [<c01fe3c8>] net_rx_action+0x130/0x22c
+> [   18.240000]   [<c00174cc>] __do_softirq+0xe8/0x238
+> [   18.240000]   [<c0017a2c>] irq_exit+0xac/0xfc
+> [   18.240000]   [<c0009b40>] handle_IRQ+0x3c/0x8c
+> [   18.240000]   [<c0008534>] handle_irq+0x98/0xa8
+> [   18.240000]   [<c000c478>] __irq_svc+0x38/0x68
+> [   18.240000]   [<c00487ec>] rcu_idle_exit+0x78/0xdc
+> [   18.240000]   [<c0040618>] cpu_startup_entry+0x88/0x130
+> [   18.240000]   [<c026d3c8>] rest_init+0xb8/0xe0
+> [   18.240000]   [<c033ea1c>] start_kernel+0x298/0x2dc
+> [   18.240000] irq event stamp: 2659
+> [   18.240000] hardirqs last  enabled at (2659): [<c0276298>]
+> _raw_spin_unlock_irq+0x2c/0x60
+> [   18.240000] hardirqs last disabled at (2658): [<c02760f0>]
+> _raw_spin_lock_irq+0x28/0x78
+> [   18.240000] softirqs last  enabled at (2654): [<c0017568>]
+> __do_softirq+0x184/0x238
+> [   18.240000] softirqs last disabled at (2637): [<c0017a2c>] irq_exit+0xac/0xfc
+> [   18.240000]
+> [   18.240000] other info that might help us debug this:
+> [   18.240000]  Possible unsafe locking scenario:
+> [   18.240000]
+> [   18.240000]        CPU0
+> [   18.240000]        ----
+> [   18.240000]   lock([   18.240000] moxart-ethernet 90900000.mac
+> eth0: TX ring end reached
+> [   18.240000] (&dev->phy_queue));
+> [   18.240000]   <Interrupt>
+> [   18.240000]     lock((&dev->phy_queue));
+> [   18.240000]
+> [   18.240000]  *** DEADLOCK ***
+> [   18.240000]
+> [   18.240000] 1 lock held by kworker/0:1/123:
+> [   18.240000]  #0:  (events){.+.+..}, at: [<c0028c08>]
+> process_one_work+0x13c/0x430
+> [   18.240000]
+> [   18.240000] stack backtrace:
+> [   18.240000] CPU: 0 PID: 123 Comm: kworker/0:1 Not tainted
+> 3.12.0-rc7-next-20131104+ #1067
+> [   18.240000] Workqueue: events phy_change
+> [   18.240000] [<c000d214>] (unwind_backtrace+0x0/0xf4) from
+> [<c000b964>] (show_stack+0x18/0x1c)
+> [   18.240000] [<c000b964>] (show_stack+0x18/0x1c) from [<c0271614>]
+> (dump_stack+0x20/0x28)
+> [   18.240000] [<c0271614>] (dump_stack+0x20/0x28) from [<c026fee0>]
+> (print_usage_bug.part.26+0x220/0x288)
+> [   18.240000] [<c026fee0>] (print_usage_bug.part.26+0x220/0x288) from
+> [<c0055b3c>] (mark_lock+0x638/0x670)
+> [   18.240000] [<c0055b3c>] (mark_lock+0x638/0x670) from [<c00577c4>]
+> (__lock_acquire+0x62c/0x1c24)
+> [   18.240000] [<c00577c4>] (__lock_acquire+0x62c/0x1c24) from
+> [<c00592cc>] (lock_acquire+0x6c/0x80)
+> [   18.240000] [<c00592cc>] (lock_acquire+0x6c/0x80) from [<c0028c70>]
+> (process_one_work+0x1a4/0x430)
+> [   18.240000] [<c0028c70>] (process_one_work+0x1a4/0x430) from
+> [<c0029304>] (worker_thread+0x13c/0x3dc)
+> [   18.240000] [<c0029304>] (worker_thread+0x13c/0x3dc) from
+> [<c002f500>] (kthread+0xb8/0xd4)
+> [   18.240000] [<c002f500>] (kthread+0xb8/0xd4) from [<c0009360>]
+> (ret_from_fork+0x14/0x34)
+> [   18.610000] libphy: phy_change
+
+Ok, I will take a look into this, I realize that I was calling this
+from a workqueue which won't show the locking problem, thanks for the
+report.
+
+>
+>
+>>> +       ret = of_mdiobus_register(bus, np);
+>>> +       if (ret < 0)
+>>> +               return ret;
+>>
+>> You still need to call mdiobus_free() here in case registration fails.
+>
+> Done.
+>
+>
+>>> +/* RTL8201CP */
+>>> +static struct phy_driver rtl8201cp_driver = {
+>>> +       .phy_id         = 0x00008201,
+>>> +       .name           = "RTL8201CP Ethernet",
+>>> +       .phy_id_mask    = 0x0000ffff,
+>>> +       .features       = PHY_BASIC_FEATURES,
+>>
+>> If this PHY is internal to your SoC (same die/package) you should also
+>> add PHY_IS_INTERNAL to get a consistent ethtool reporting (among
+>> others).
+>
+> I was wondering about that, and now I'm sure it should not be set, the
+> physical chip is separate, as can be seen here:
+>
+> https://lh4.googleusercontent.com/-A-2FXDrObU8/UMcMc_K2vEI/AAAAAAAABwg/ldaLZ7ps1P4/w1331-h998-no/UC-7112-LX-picture4.jpg
+
+Right, then make that a separate patch instead.
+--
+Florian
+
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Florian
