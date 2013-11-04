@@ -1,20 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 4 Nov 2013 09:57:39 -0500
-Subject: [PATCHv3] ARM: imx: add support code for IMX50 based machines
-In-Reply-To: <20131104145151.GD3060@titan.lakedaemon.net>
-References: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
- <20131104145151.GD3060@titan.lakedaemon.net>
-Message-ID: <20131104145739.GE3060@titan.lakedaemon.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 4 Nov 2013 08:59:07 -0600
+Subject: [PATCHv9 07/43] CLK: TI: add autoidle support
+In-Reply-To: <52777042.40703@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-8-git-send-email-t-kristo@ti.com> <52727FDA.7060009@ti.com>
+ <527371F5.9080702@ti.com> <5273FDF1.6090405@ti.com> <52777042.40703@ti.com>
+Message-ID: <5277B63B.7080106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 09:51:51AM -0500, Jason Cooper wrote:
-> What happened to the rest of the series?
+On 11/04/2013 04:00 AM, Tero Kristo wrote:
+> On 11/01/2013 09:16 PM, Nishanth Menon wrote:
+>> On 11/01/2013 04:18 AM, Tero Kristo wrote:
 
-Crap.  Nevermind.  I just saw that Shawn had already taken the other
-patches into his tree.  And here I thought I was caught up on
-everything...
+[...]
+>> one other thing I missed, will be nice to introduce a common bindings
+>> for autoidle which tends to be reused in other drivers..
+> 
+> You mean documentation or? Autoidle from this patch is only used by two 
+> clock drivers (divider + fixed-factor.) DPLLs use completely different 
+> setup. Converting the interface clocks to use the same might be rather 
+> nasty thing to do.
+The definitions are common - so, yes, it will be nice to have
+autoidle.txt which is then pointed to by divider, fixed-clock etc..
 
-thx,
 
-Jason.
+-- 
+Regards,
+Nishanth Menon
