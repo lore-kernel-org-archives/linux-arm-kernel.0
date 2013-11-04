@@ -1,97 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  4 Nov 2013 09:17:02 +0100
-Subject: [PATCH] ARM: imx: drop support for irq priorisation
-Message-ID: <1383553022-6983-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: jsarha@ti.com (Sarha, Jyri)
+Date: Mon, 4 Nov 2013 08:17:15 +0000
+Subject: [PATCH RFC] clk: add gpio controlled clock
+In-Reply-To: <20131104084227.3323f98e@ipc1.ka-ro>
+References: <cover.1383312867.git.jsarha@ti.com>
+ <c52a7910c6ce33ceed0f38b89953527eee06b0b5.1383312867.git.jsarha@ti.com>
+ <20131104084227.3323f98e@ipc1.ka-ro>
+Message-ID: <0EB243F40EB34A418EAED8001C4B3AD019EA5EF2@DNCE05.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code for irq priorisation support doesn't have any in-tree users and
-the Kconfig description does wrong promises because nowadays irq
-handlers are called with irqs disabled, so no high prioritized irq can
-interrupt a lower prioritized handler.
+>
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-imx/Kconfig      | 10 ----------
- arch/arm/mach-imx/avic.c       | 25 -------------------------
- arch/arm/mach-imx/irq-common.h |  1 -
- 3 files changed, 36 deletions(-)
+-----Original Message-----
+>From: Lothar Wa?mann [mailto:LW at KARO-electronics.de]
+>Sent: Monday, November 04, 2013 9:42 AM
+>
+>Hi,
+>
+>Jyri Sarha wrote:
+>> The added clk-gpio is a basic clock that can be enabled and disabled
+...
+>> +    err = gpio_request_one(gpio, gpio_flags, name);
+>> +    if (err) {
+>> +            pr_err("%s: Error requesting clock control gpio %u\n",
+>> +                   __func__, gpio);
+>> +            return ERR_PTR(-EINVAL);
+>>
+>You already have an error code from the gpio_request_one() call.
+>Why return a different one?
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 15c9ae3..9431729 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -20,16 +20,6 @@ config ARCH_MXC
- menu "Freescale i.MX support"
- 	depends on ARCH_MXC
- 
--config MXC_IRQ_PRIOR
--	bool "Use IRQ priority"
--	help
--	  Select this if you want to use prioritized IRQ handling.
--	  This feature prevents higher priority ISR to be interrupted
--	  by lower priority IRQ.
--	  This may be useful in embedded applications, where are strong
--	  requirements for timing.
--	  Say N here, unless you have a specialized requirement.
--
- config MXC_TZIC
- 	bool
- 
-diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
-index e163ec7..8d1df2e 100644
---- a/arch/arm/mach-imx/avic.c
-+++ b/arch/arm/mach-imx/avic.c
-@@ -54,28 +54,6 @@
- static void __iomem *avic_base;
- static struct irq_domain *domain;
- 
--#ifdef CONFIG_MXC_IRQ_PRIOR
--static int avic_irq_set_priority(unsigned char irq, unsigned char prio)
--{
--	struct irq_data *d = irq_get_irq_data(irq);
--	unsigned int temp;
--	unsigned int mask = 0x0F << irq % 8 * 4;
--
--	irq = d->hwirq;
--
--	if (irq >= AVIC_NUM_IRQS)
--		return -EINVAL;
--
--	temp = __raw_readl(avic_base + AVIC_NIPRIORITY(irq / 8));
--	temp &= ~mask;
--	temp |= prio & mask;
--
--	__raw_writel(temp, avic_base + AVIC_NIPRIORITY(irq / 8));
--
--	return 0;
--}
--#endif
--
- #ifdef CONFIG_FIQ
- static int avic_set_irq_fiq(unsigned int irq, unsigned int type)
- {
-@@ -102,9 +80,6 @@ static int avic_set_irq_fiq(unsigned int irq, unsigned int type)
- 
- 
- static struct mxc_extra_irq avic_extra_irq = {
--#ifdef CONFIG_MXC_IRQ_PRIOR
--	.set_priority = avic_irq_set_priority,
--#endif
- #ifdef CONFIG_FIQ
- 	.set_irq_fiq = avic_set_irq_fiq,
- #endif
-diff --git a/arch/arm/mach-imx/irq-common.h b/arch/arm/mach-imx/irq-common.h
-index 5b2dabb..6e3175d 100644
---- a/arch/arm/mach-imx/irq-common.h
-+++ b/arch/arm/mach-imx/irq-common.h
-@@ -24,7 +24,6 @@
- 
- struct mxc_extra_irq
- {
--	int (*set_priority)(unsigned char irq, unsigned char prio);
- 	int (*set_irq_fiq)(unsigned int irq, unsigned int type);
- };
- 
--- 
-1.8.4.rc3
+I was just thinking the gpio number is more useful for debugging that the error code. Could print the both of cource.
+
+>> +
+>> +    clk_gpio = kzalloc(sizeof(struct clk_gpio), GFP_KERNEL);
+>
+>devm_kzalloc()?
+
+Good point. I'll change that.
+
+Thanks,
+Jyri
