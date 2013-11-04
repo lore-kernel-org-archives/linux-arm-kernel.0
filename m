@@ -1,46 +1,40 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Mon, 04 Nov 2013 09:49:58 +0100
-Subject: [PATCH][RESEND 6/8] ALSA: memalloc: use gen_pool_dma_alloc() to
- allocate iram buffer
-In-Reply-To: <db9e59951cdcf55b4903c0358ebe220e58155bc1.1383306365.git.b42378@freescale.com>
-References: <cover.1383306365.git.b42378@freescale.com>
- <db9e59951cdcf55b4903c0358ebe220e58155bc1.1383306365.git.b42378@freescale.com>
-Message-ID: <s5h38ncsg95.wl%tiwai@suse.de>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Mon,  4 Nov 2013 09:50:42 +0100
+Subject: [PATCH] ARM: iop3xx: remove unused MACH_EP80219 Kconfig parameter
+Message-ID: <1383555042-4135-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri, 1 Nov 2013 19:48:19 +0800,
-Nicolin Chen wrote:
-> 
-> Since gen_pool_dma_alloc() is introduced, we implement it to simplify code.
-> 
-> Signed-off-by: Nicolin Chen <b42378@freescale.com>
+This removes the MACH_EP80219 Kconfig parameter,
+which was no longer used anywhere in the source code
+and Makefiles.
 
-Acked-by: Takashi Iwai <tiwai@suse.de>
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/mach-iop32x/Kconfig | 4 ----
+ 1 file changed, 4 deletions(-)
 
-
-> ---
->  sound/core/memalloc.c | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
-> 
-> diff --git a/sound/core/memalloc.c b/sound/core/memalloc.c
-> index 9d93f02..5e1c7bc 100644
-> --- a/sound/core/memalloc.c
-> +++ b/sound/core/memalloc.c
-> @@ -184,11 +184,7 @@ static void snd_malloc_dev_iram(struct snd_dma_buffer *dmab, size_t size)
->  	/* Assign the pool into private_data field */
->  	dmab->private_data = pool;
->  
-> -	dmab->area = (void *)gen_pool_alloc(pool, size);
-> -	if (!dmab->area)
-> -		return;
-> -
-> -	dmab->addr = gen_pool_virt_to_phys(pool, (unsigned long)dmab->area);
-> +	dmab->area = gen_pool_dma_alloc(pool, size, &dmab->addr);
->  }
->  
->  /**
-> -- 
-> 1.8.4
-> 
-> 
+diff --git a/arch/arm/mach-iop32x/Kconfig b/arch/arm/mach-iop32x/Kconfig
+index 5e8c6f7dfabb..65f3500258e5 100644
+--- a/arch/arm/mach-iop32x/Kconfig
++++ b/arch/arm/mach-iop32x/Kconfig
+@@ -4,9 +4,6 @@ menu "IOP32x Implementation Options"
+ 
+ comment "IOP32x Platform Types"
+ 
+-config MACH_EP80219
+-	bool
+-
+ config MACH_GLANTANK
+ 	bool "Enable support for the IO-Data GLAN Tank"
+ 	help
+@@ -22,7 +19,6 @@ config ARCH_IQ80321
+ 
+ config ARCH_IQ31244
+ 	bool "Enable support for EP80219/IQ31244"
+-	select MACH_EP80219
+ 	help
+ 	  Say Y here if you want to run your kernel on the Intel EP80219
+ 	  evaluation kit for the Intel 80219 processor (a IOP321 variant)
+-- 
+1.8.1.2
