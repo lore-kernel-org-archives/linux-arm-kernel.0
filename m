@@ -1,19 +1,46 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 4 Nov 2013 09:47:08 +0100
-Subject: [PATCH] clk: Properly initialize reference count
-In-Reply-To: <1383220962-26836-1-git-send-email-treding@nvidia.com>
-References: <1383220962-26836-1-git-send-email-treding@nvidia.com>
-Message-ID: <CACmBeS3ZuzaQmb+V10Je8+9NyXzdULWKTcm9R4ZjE=DdiNN+oQ@mail.gmail.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 04 Nov 2013 09:49:58 +0100
+Subject: [PATCH][RESEND 6/8] ALSA: memalloc: use gen_pool_dma_alloc() to
+ allocate iram buffer
+In-Reply-To: <db9e59951cdcf55b4903c0358ebe220e58155bc1.1383306365.git.b42378@freescale.com>
+References: <cover.1383306365.git.b42378@freescale.com>
+ <db9e59951cdcf55b4903c0358ebe220e58155bc1.1383306365.git.b42378@freescale.com>
+Message-ID: <s5h38ncsg95.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2013 13:02, Thierry Reding <thierry.reding@gmail.com> wrote:
-> Commit a336ed7 (clk: Implement clk_unregister()) initializes the kref in
-> clk_set_parent(), which is obviously the wrong place. Further research
-> shows that the original patches initialized it correctly, so it probably
-> ended up in clk_set_parent() by mistake during manual application of the
-> patch.
+At Fri, 1 Nov 2013 19:48:19 +0800,
+Nicolin Chen wrote:
+> 
+> Since gen_pool_dma_alloc() is introduced, we implement it to simplify code.
+> 
+> Signed-off-by: Nicolin Chen <b42378@freescale.com>
 
-Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
+Acked-by: Takashi Iwai <tiwai@suse.de>
 
-Thanks!
+
+> ---
+>  sound/core/memalloc.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+> 
+> diff --git a/sound/core/memalloc.c b/sound/core/memalloc.c
+> index 9d93f02..5e1c7bc 100644
+> --- a/sound/core/memalloc.c
+> +++ b/sound/core/memalloc.c
+> @@ -184,11 +184,7 @@ static void snd_malloc_dev_iram(struct snd_dma_buffer *dmab, size_t size)
+>  	/* Assign the pool into private_data field */
+>  	dmab->private_data = pool;
+>  
+> -	dmab->area = (void *)gen_pool_alloc(pool, size);
+> -	if (!dmab->area)
+> -		return;
+> -
+> -	dmab->addr = gen_pool_virt_to_phys(pool, (unsigned long)dmab->area);
+> +	dmab->area = gen_pool_dma_alloc(pool, size, &dmab->addr);
+>  }
+>  
+>  /**
+> -- 
+> 1.8.4
+> 
+> 
