@@ -1,44 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 4 Nov 2013 12:11:40 +0000
-Subject: [Patch] arm/arm64: Thumb=>ARM signal handling setup skips the a
- few instructions on Snapdragon S4/Krait
-In-Reply-To: <CANXG-LJ699jUyw19pVnSdAtXdHof4u+YRnvK1A6O9MMrtu+X0Q@mail.gmail.com>
-References: <CANXG-LJ699jUyw19pVnSdAtXdHof4u+YRnvK1A6O9MMrtu+X0Q@mail.gmail.com>
-Message-ID: <CAHkRjk7N8-f5_oEkowqMRgppZQTQDxsR_OYGEhtjS34cTjw2=g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 4 Nov 2013 13:12:40 +0100
+Subject: [PATCHv9][ 4/6] pinctrl: pinctrl-imx: add imx25 pinctrl driver
+In-Reply-To: <1383210928-18906-4-git-send-email-denis@eukrea.com>
+References: <1383210928-18906-1-git-send-email-denis@eukrea.com>
+ <1383210928-18906-4-git-send-email-denis@eukrea.com>
+Message-ID: <CACRpkdbKzFFSmC9sE8o+L=HBQ9E-p=Aw7i2e5nNsRHTEt4JFNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc'ing the Linux ARM kernel list)
+On Thu, Oct 31, 2013 at 10:15 AM, Denis Carikli <denis@eukrea.com> wrote:
 
-On 25 October 2013 05:54, T.J. Purtell <tj@mobisocial.us> wrote:
-> The ARM architecture reference specifies that the IT state bits in the
-> PSR must be all zeros in ARM mode or behavior is unspecified.  On the
-> Qualcomm Snapdragon S4/Krait architecture CPUs the processor continues
-> to consider the IT state bits while in ARM mode.  This makes it so
-> that some instructions are skipped by the CPU.
-
-Good catch.
-
-> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-> index e393174..8f6c3be 100644
-> --- a/arch/arm64/kernel/signal32.c
-> +++ b/arch/arm64/kernel/signal32.c
-> @@ -474,9 +474,11 @@ static void compat_setup_return(struct pt_regs
-> *regs, struct k_sigaction *ka,
->   /* Check if the handler is written for ARM or Thumb */
->   thumb = handler & 1;
+> This is mostly cut and paste from the imx35 pinctrl driver.
+> The data was generated using sed and awk on
+>   arch/arm/plat-mxc/include/mach/iomux-mx25.h.
 >
-> + /* ARM spec requires this to be all 000s in ARM mode */
-> + spsr &= ~COMPAT_PSR_IT_MASK;
-> +
->   if (thumb) {
->   spsr |= COMPAT_PSR_T_BIT;
-> - spsr &= ~COMPAT_PSR_IT_MASK;
->   } else {
->   spsr &= ~COMPAT_PSR_T_BIT;
->   }
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> ---
+> ChangeLog v8->v9:
+> - Whitespace cleanup betwen the CC: and Signed-off-by.
+> - Kconfig: rebased to make it apply on the new HEAD.
 
-Please send me a separate arm64 patch, I'll push it via my tree (and
-cc stable as well).
+This will be for the next kernel cycle.
 
-Catalin
+I want to see a review from the maintainers first ...
+and Markus, can you look at this too?
+
+Yours,
+Linus Walleij
