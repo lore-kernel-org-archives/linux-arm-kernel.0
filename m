@@ -1,33 +1,57 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 4 Nov 2013 09:41:38 -0300
-Subject: [PATCH v2 11/27] mtd: nand: pxa3xx: Disable OOB on arbitrary
- length commands
-In-Reply-To: <20131103225903.GE5896@gmail.com>
-References: <1382137374-21251-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1382137374-21251-12-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131103225903.GE5896@gmail.com>
-Message-ID: <20131104124137.GF2516@localhost>
+From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
+Date: Mon, 4 Nov 2013 13:51:53 +0100
+Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
+ status
+In-Reply-To: <20131030130325.GA18788@intel.com>
+References: <20131017020745.GA14013@intel.com>
+ <20131017142755.GA4477@breakpoint.cc>
+ <20131017134846.GG14013@intel.com>
+ <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
+ <20131025042310.GC21230@intel.com>
+ <Pine.LNX.4.64.1310250813370.6186@axis700.grange>
+ <20131025054321.GD21230@intel.com>
+ <Pine.LNX.4.64.1310250840350.6186@axis700.grange>
+ <CAOesGMivD_3zSL503R0OaqyGv4Rj8qJqnbM2TdmjtxR2U63ztw@mail.gmail.com>
+ <20131030130325.GA18788@intel.com>
+Message-ID: <20131104125152.GA27260@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 03, 2013 at 05:59:05PM -0500, Huang Shijie wrote:
-> On Fri, Oct 18, 2013 at 08:02:38PM -0300, Ezequiel Garcia wrote:
-> > READID, STATUS and PARAM (aka ONFI read paramater page) don't read
-> > the OOB area. Set the oob_size to zero and prevent it.
-> The ERASE, RESET also donot need to read the OOB,
->    why not zero the oob_size for these commands?
-> 
+On 30.10.13, Vinod Koul wrote:
+> I fixed up the error with below, can you pls verify. Pls note this is compile
+> tested only!
 
-Because this only matters for commands that will use the oob_size field
-when doing some I/O operation. Both ERASE and RESET commands have no data
-cycle, so it makes no sense to haev a non-zero oob_size field.
+I tested this and my mmc driver using edma via drivers/dma seems to
+work.
+Tested-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-On the other side, this patch is rather stupid, as oob_size is already
-cleared at the beggining of a command sequence. So, I'll either rework
-this or drop it entirely.
+However you missed one piece:
 
-Thanks,
+  CC [M]  sound/soc/davinci/davinci-pcm.o
+sound/soc/davinci/davinci-pcm.c: In function ?davinci_pcm_dma_irq?:
+sound/soc/davinci/davinci-pcm.c:241: error: ?DMA_COMPLETE? undeclared (first use in this function)
+sound/soc/davinci/davinci-pcm.c:241: error: (Each undeclared identifier is reported only once
+sound/soc/davinci/davinci-pcm.c:241: error: for each function it appears in.)
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ sound/soc/davinci/davinci-pcm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/davinci/davinci-pcm.c b/sound/soc/davinci/davinci-pcm.c
+index 8460edc..e68ba31 100644
+--- a/sound/soc/davinci/davinci-pcm.c
++++ b/sound/soc/davinci/davinci-pcm.c
+@@ -238,7 +238,7 @@ static void davinci_pcm_dma_irq(unsigned link, u16 ch_status, void *data)
+ 	print_buf_info(prtd->ram_channel, "i ram_channel");
+ 	pr_debug("davinci_pcm: link=%d, status=0x%x\n", link, ch_status);
+ 
+-	if (unlikely(ch_status != DMA_COMPLETE))
++	if (unlikely(ch_status != EDMA_DMA_COMPLETE))
+ 		return;
+ 
+ 	if (snd_pcm_running(substream)) {
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.4.rc3
+
+Sebastian
