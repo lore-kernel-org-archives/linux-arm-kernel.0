@@ -1,22 +1,18 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 4 Nov 2013 21:27:49 +0800
-Subject: [PATCH] pinctrl: imx50: add pinctrl support code for the IMX50 SoC
-In-Reply-To: <CACRpkdb5U2xBBVerbspTnW5=61kwx0+mvLGZF=VmdOKrN3QhHg@mail.gmail.com>
-References: <1383023635-30640-1-git-send-email-gerg@uclinux.org>
- <CACRpkdb5U2xBBVerbspTnW5=61kwx0+mvLGZF=VmdOKrN3QhHg@mail.gmail.com>
-Message-ID: <20131104132743.GA11031@S2101-09.ap.freescale.net>
+Date: Mon, 4 Nov 2013 21:44:58 +0800
+Subject: [PATCH] ARM: imx: drop support for irq priorisation
+In-Reply-To: <1383553022-6983-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1383553022-6983-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20131104134454.GB11031@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 01:14:32PM +0100, Linus Walleij wrote:
-> On Tue, Oct 29, 2013 at 6:13 AM,  <gerg@uclinux.org> wrote:
+On Mon, Nov 04, 2013 at 09:17:02AM +0100, Uwe Kleine-K?nig wrote:
+> The code for irq priorisation support doesn't have any in-tree users and
+> the Kconfig description does wrong promises because nowadays irq
+> handlers are called with irqs disabled, so no high prioritized irq can
+> interrupt a lower prioritized handler.
 > 
-> > From: Greg Ungerer <gerg@uclinux.org>
-> >
-> > Add code to support the specific pin arrangements of the Freescale IMX50 SoC.
-> >
-> > Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> 
-> Can I get some maintainer to review this for the next cycle?
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Applied, thanks.
