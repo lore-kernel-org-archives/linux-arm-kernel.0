@@ -1,415 +1,69 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Tue,  5 Nov 2013 11:38:38 +0100
-Subject: [PATCHv10][ 7/7] ARM: dts: Add support for the cpuimx25 board from
- Eukrea and its baseboard.
-In-Reply-To: <1383647918-27315-1-git-send-email-denis@eukrea.com>
-References: <1383647918-27315-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383647918-27315-7-git-send-email-denis@eukrea.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 05 Nov 2013 10:45:59 +0000
+Subject: [PATCH 2/3] virtio: mmio: fix signature checking for BE guests
+In-Reply-To: <87a9hja5aw.fsf@rustcorp.com.au>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <1381502171-8187-3-git-send-email-marc.zyngier@arm.com>
+ <1381740385.3247.6.camel@hornet> <87li1wb4k4.fsf@rustcorp.com.au>
+ <87a9hja5aw.fsf@rustcorp.com.au>
+Message-ID: <1383648359.11540.1.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following devices/functionalities were added:
- * Main and secondary UARTs.
- * i2c and the pcf8563 device.
- * CMO-QVGA(With backlight), DVI-VGA and DVI-SVGA displays
- * Ethernet.
- * NAND.
- * The BP1 button.
- * The LED.
- * Watchdog
- * SD.
+On Tue, 2013-11-05 at 03:36 +0000, Rusty Russell wrote:
+> Rusty Russell <rusty@rustcorp.com.au> writes:
+> > Pawel Moll <pawel.moll@arm.com> writes:
+> >> On Fri, 2013-10-11 at 15:36 +0100, Marc Zyngier wrote:
+> >>> As virtio-mmio config registers are specified to be little-endian,
+> >>> using readl() to read the magic value and then memcmp() to check it
+> >>> fails on BE (as readl() has an implicit swab).
+> >>> 
+> >>> Fix it by encoding the magic value as an integer instead of a string.
+> >>> 
+> >>> Cc: Rusty Russell <rusty@rustcorp.com.au>
+> >>> Cc: Michael S. Tsirkin <mst@redhat.com>
+> >>> Cc: Pawel Moll <pawel.moll@arm.com>
+> >>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>> ---
+> >>>  drivers/virtio/virtio_mmio.c | 2 +-
+> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>> 
+> >>> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> >>> index 1ba0d68..57f24fd 100644
+> >>> --- a/drivers/virtio/virtio_mmio.c
+> >>> +++ b/drivers/virtio/virtio_mmio.c
+> >>> @@ -470,7 +470,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+> >>>  
+> >>>  	/* Check magic value */
+> >>>  	magic = readl(vm_dev->base + VIRTIO_MMIO_MAGIC_VALUE);
+> >>> -	if (memcmp(&magic, "virt", 4) != 0) {
+> >>> +	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
+> >>>  		dev_warn(&pdev->dev, "Wrong magic value 0x%08lx!\n", magic);
+> >>>  		return -ENODEV;
+> >>>  	}
+> >>
+> >> The new spec will clarify this:
+> >>
+> >> * 0x000 | R | MagicValue
+> >>   Magic value. Must be 0x74726976 (a Little Endian equivalent
+> >>   of a "virt" string).
+> >>
+> >> ... but I like the 'v'i'r't' characters still being there :-)
+> >>
+> >> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> >
+> > Applied, thanks.
+> 
+> OK, I *said* applied, but left it in my pending queue.
+> 
+> Pawel, do you want to open this can of worms?  If so, I'l merge this
+> now.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v9->v10:
-- Adapted to the new pingrp patches.
+This particular can is empty - all worms already escaped :-)
 
-ChangeLog v8->v9:
-- Licenses were shortened.
----
- arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi       |   60 ++++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts  |   66 +++++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts  |   45 ++++++++
- .../imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts   |   45 ++++++++
- .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  |  117 ++++++++++++++++++++
- 5 files changed, 333 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
- create mode 100644 arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
+It's a bugfix, not changing anything for the existing hosts. So - yes
+please, do merge this one.
 
-diff --git a/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
-new file mode 100644
-index 0000000..8abd45a
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi
-@@ -0,0 +1,60 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25.dtsi"
-+
-+/ {
-+	model = "Eukrea CPUIMX25";
-+	compatible = "eukrea,cpuimx25", "fsl,imx25";
-+
-+	memory {
-+		reg = <0x80000000 0x4000000>; /* 64M */
-+	};
-+};
-+
-+&fec {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pcf8563 at 51 {
-+		compatible = "nxp,pcf8563";
-+		reg = <0x51>;
-+	};
-+};
-+
-+&iomuxc {
-+	imx25-eukrea-cpuimx25 {
-+		pinctrl_fec: fecgrp {
-+			fsl,pins = <MX25_FEC_PINGRP1>;
-+		};
-+
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <MX25_I2C1_PINGRP1>;
-+		};
-+	};
-+};
-+
-+&nfc {
-+	nand-bus-width = <8>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-new file mode 100644
-index 0000000..622de82
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the CMO-QVGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-cmo-qvga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	cmo_qvga: display {
-+		model = "CMO-QVGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xcad08b80>;
-+		bus-width = <18>;
-+		native-mode = <&qvga_timings>;
-+		display-timings {
-+			qvga_timings: 320x240 {
-+				clock-frequency = <6500000>;
-+				hactive = <320>;
-+				vactive = <240>;
-+				hback-porch = <30>;
-+				hfront-porch = <38>;
-+				vback-porch = <20>;
-+				vfront-porch = <3>;
-+				hsync-len = <15>;
-+				vsync-len = <4>;
-+			};
-+		};
-+	};
-+
-+	reg_lcd_3v3: lcd-en {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
-+		regulator-name = "lcd-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 26 0>;
-+		enable-active-high;
-+	};
-+};
-+
-+&iomuxc {
-+	imx25-eukrea-mbimxsd25-baseboard-cmo-qvga {
-+		pinctrl_reg_lcd_3v3: reg_lcd_3v3 {
-+			fsl,pins = <MX25_PAD_PWM__GPIO_1_26  0x80000000>;
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&cmo_qvga>;
-+	fsl,pwmr = <0x00a903ff>;
-+	lcd-supply = <&reg_lcd_3v3>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
-new file mode 100644
-index 0000000..8eee2f6
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the DVI-SVGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-dvi-svga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	dvi_svga: display {
-+		model = "DVI-SVGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xfa208b80>;
-+		bus-width = <18>;
-+		native-mode = <&dvi_svga_timings>;
-+		display-timings {
-+			dvi_svga_timings: 800x600 {
-+				clock-frequency = <40000000>;
-+				hactive = <800>;
-+				vactive = <600>;
-+				hback-porch = <75>;
-+				hfront-porch = <75>;
-+				vback-porch = <7>;
-+				vfront-porch = <75>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&dvi_svga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-new file mode 100644
-index 0000000..447da62
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx25-eukrea-mbimxsd25-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25 with the DVI-VGA Display";
-+	compatible = "eukrea,mbimxsd25-baseboard-dvi-vga", "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	dvi_vga: display {
-+		model = "DVI-VGA";
-+		bits-per-pixel = <16>;
-+		fsl,pcr = <0xfa208b80>;
-+		bus-width = <18>;
-+		native-mode = <&dvi_vga_timings>;
-+		display-timings {
-+			dvi_vga_timings: 640x480 {
-+				clock-frequency = <31250000>;
-+				hactive = <640>;
-+				vactive = <480>;
-+				hback-porch = <100>;
-+				hfront-porch = <100>;
-+				vback-porch = <7>;
-+				vfront-porch = <100>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcdc {
-+	display = <&dvi_vga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-new file mode 100644
-index 0000000..fad6847
---- /dev/null
-+++ b/arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts
-@@ -0,0 +1,117 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "imx25-eukrea-cpuimx25.dtsi"
-+
-+/ {
-+	model = "Eukrea MBIMXSD25";
-+	compatible = "eukrea,mbimxsd25-baseboard", "eukrea,cpuimx25", "fsl,imx25";
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpiokeys>;
-+
-+		bp1 {
-+			label = "BP1";
-+			gpios = <&gpio3 18 1>;
-+			linux,code = <256>;
-+			gpio-key,wakeup;
-+			linux,input-type = <1>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpioled>;
-+
-+		led1 {
-+			label = "led1";
-+			gpios = <&gpio3 19 1>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	cd-gpios = <&gpio1 20>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	tlv320aic23: codec at 1a {
-+		compatible = "ti,tlv320aic23";
-+		reg = <0x1a>;
-+	};
-+};
-+
-+&iomuxc {
-+	imx25-eukrea-mbimxsd25-baseboard {
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <MX25_AUDMUX_PINGRP1>;
-+		};
-+
-+		pinctrl_esdhc1: esdhc1grp {
-+			fsl,pins = <MX25_ESDHC1_PINGRP1>;
-+		};
-+
-+		pinctrl_gpiokeys: gpiokeysgrp {
-+			fsl,pins = <MX25_PAD_VSTBY_ACK__GPIO_3_18 0x80000000>;
-+		};
-+
-+		pinctrl_gpioled: gpioledgrp {
-+			fsl,pins = <MX25_PAD_POWER_FAIL__GPIO_3_19 0x80000000>;
-+		};
-+
-+		pinctrl_lcdc: lcdcgrp {
-+			fsl,pins = <MX25_LCDC_PINGRP1>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <MX25_UART1_PINGRP1>;
-+		};
-+
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <MX25_UART2_PINGRP1>;
-+		};
-+	};
-+};
-+
-+&ssi1 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
--- 
-1.7.9.5
+Thanks
+
+Pawe?
