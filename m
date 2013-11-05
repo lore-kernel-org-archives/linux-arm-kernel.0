@@ -1,61 +1,44 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 5 Nov 2013 10:23:01 -0800
-Subject: [PATCH v3 13/28] mtd: nand: pxa3xx: Add bad block handling
-In-Reply-To: <1383656135-8627-14-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-14-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131105182301.GN20061@ld-irv-0074.broadcom.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 5 Nov 2013 18:03:49 +0000
+Subject: [PATCH] typo fixes (coordiante -> coordinate) in am335x
+In-Reply-To: <1383673871.6753.36.camel@polaris.local>
+References: <1373901928-19605-1-git-send-email-zubair.lutfullah@gmail.com>
+ <20130821075828.GZ7656@atomide.com>
+ <1382198544.22609.8.camel@polaris.local>
+ <20131022090552.GE19112@lee--X1>
+ <1383667293.6753.35.camel@polaris.local>
+ <20131105171553.GB30901@lee--X1>
+ <1383673871.6753.36.camel@polaris.local>
+Message-ID: <20131105180349.GD30901@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+On Tue, 05 Nov 2013, Jan L?bbe wrote:
 
-I wrote up some comments on your v2 series while on a plane Sunday, but
-I didn't make time to send them out until now. Oh well.
+> On Tue, 2013-11-05 at 17:15 +0000, Lee Jones wrote:
+> > On Tue, 05 Nov 2013, Jan L?bbe wrote:
+> > 
+> > > On Tue, 2013-10-22 at 10:05 +0100, Lee Jones wrote:
+> > > > This is the first time this patch has been sent to me.
+> > > > 
+> > > > I need Dmitry's input (no pun intended) on how he's like to deal with
+> > > > this. At a bare minimum I'd like his Ack.
+> > > 
+> > > Is there anything I can do to push this forward? The earlier we get the
+> > > typo fixed in the documentation, the less chance that someone will use
+> > > it that way.
+> > 
+> > I think you should sent it again, but this time Cc the Device Tree
+> > list, Dmitry and myself when you submit.
+> 
+> The original patch was not from me. But sure, I can resend it.
 
-On Tue, Nov 05, 2013 at 09:55:20AM -0300, Ezequiel Garcia wrote:
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -1128,6 +1152,14 @@ KEEP_CONFIG:
->  
->  	if (nand_scan_ident(mtd, 1, def))
->  		return -ENODEV;
-> +
-> +	if (pdata->flash_bbt) {
-> +		chip->bbt_options |= NAND_BBT_USE_FLASH |
-> +				     NAND_BBT_NO_OOB_BBM;
+I'm not worried about who re-sends the patch. Just make sure whoever
+does sends in correctly with regards to the $SUBJECT line etc. The one
+on this patch looks odd.
 
-You're using NAND_BBT_NO_OOB_BBM? So you are unable to write bad block
-markers to flash at all? Is this related to your independent patch for
-trying to scan BBM from the data area? Could you instead write a
-nand_chip.block_markbad() callback routine that would program BBM to the
-appropriate data area?
-
-Or, if you really want to avoid programming new BBMs, then you should
-probably describe this decision in the patch description more clearly.
-
-> +		chip->bbt_td = &bbt_main_descr;
-> +		chip->bbt_md = &bbt_mirror_descr;
-> +	}
-> +
->  	/* calculate addressing information */
->  	if (mtd->writesize >= 2048)
->  		host->col_addr_cycles = 2;
-> @@ -1323,6 +1355,7 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
->  	if (of_get_property(np, "marvell,nand-keep-config", NULL))
->  		pdata->keep_config = 1;
->  	of_property_read_u32(np, "num-cs", &pdata->num_cs);
-> +	pdata->flash_bbt = of_get_nand_on_flash_bbt(np);
-
-Now that you're using the "nand-on-flash-bbt" property, you should
-document it in Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-like the other drivers do. (It's already documented generically in
-Documentation/.../nand.txt, but I think it's good practice to explicitly
-note which drivers support the binding, since nand_base doesn't do this
-generically for all NAND drivers.)
-
->  
->  	pdev->dev.platform_data = pdata;
->  
-
-Brian
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
