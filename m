@@ -1,112 +1,73 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 5 Nov 2013 17:57:05 +0100
-Subject: [PATCH] ARM/serial: at91: specify RTS in DT using gpio
-In-Reply-To: <A7887CC8-A1F9-4A05-B7F5-4F69FD942F22@jcrosoft.com>
-References: <1383654959-18112-1-git-send-email-linus.walleij@linaro.org>
- <1383665383-5606-1-git-send-email-nicolas.ferre@atmel.com>
- <A7887CC8-A1F9-4A05-B7F5-4F69FD942F22@jcrosoft.com>
-Message-ID: <52792361.6030803@atmel.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 05 Nov 2013 20:53:06 +0300
+Subject: [PATCH] RM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
+In-Reply-To: <20131104235828.GB18844@verge.net.au>
+References: <1383201098-4258-1-git-send-email-horms+renesas@verge.net.au>
+ <5272CC16.3020700@cogentembedded.com> <20131101004359.GK6818@verge.net.au>
+ <527447A1.2000607@cogentembedded.com> <20131104235828.GB18844@verge.net.au>
+Message-ID: <52793082.50606@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2013 16:59, Jean-Christophe PLAGNIOL-VILLARD :
->
-> On Nov 5, 2013, at 11:29 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->> Documentation/devicetree/bindings/serial/atmel-usart.txt |  3 +++
->> drivers/tty/serial/atmel_serial.c                        | 13 ++++++++++---
->> 2 files changed, 13 insertions(+), 3 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
->> index 2191dcb..3adc61c 100644
->> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
->> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
->> @@ -10,6 +10,8 @@ Required properties:
->> Optional properties:
->> - atmel,use-dma-rx: use of PDC or DMA for receiving data
->> - atmel,use-dma-tx: use of PDC or DMA for transmitting data
->> +- rts-gpios: specify a GPIO for RTS line. It will use specified PIO instead of the peripheral
->> +  function pin for the USART RTS feature. If unsure, don't specify this property.
->> - add dma bindings for dma transfer:
->> 	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
->> 		memory peripheral interface and USART DMA channel ID, FIFO configuration.
->> @@ -28,6 +30,7 @@ Example:
->> 		interrupts = <7>;
->> 		atmel,use-dma-rx;
->> 		atmel,use-dma-tx;
->> +		rts-gpios = <&pioD 15 0>;
->> 	};
->
-> gpios means 2 gpio
->
-> I?ll rts-gpio as we can only use one anyway
+Hello.
 
-Cf. Andrew's comment.
+On 11/05/2013 02:58 AM, Simon Horman wrote:
 
+>>>>> Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
+>>>>> Other than not being useful it is also not possible to compile
 
->> - use DMA:
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index b4e0794..71f8ea9 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -35,6 +35,7 @@
->> #include <linux/platform_device.h>
->> #include <linux/of.h>
->> #include <linux/of_device.h>
->> +#include <linux/of_gpio.h>
->> #include <linux/dma-mapping.h>
->> #include <linux/atmel_pdc.h>
->> #include <linux/atmel_serial.h>
->> @@ -2327,6 +2328,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
->> 	struct device_node *np = pdev->dev.of_node;
->> 	struct atmel_uart_data *pdata = dev_get_platdata(&pdev->dev);
->> 	void *data;
->> +	int rts_pin = -EINVAL;
->> 	int ret = -ENODEV;
->>
->> 	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
->> @@ -2364,13 +2366,18 @@ static int atmel_serial_probe(struct platform_device *pdev)
->> 	 * structs to indicate "no RTS GPIO" instead of open-coding some
->> 	 * invalid value everywhere.
->> 	 */
->> -	if (pdata->rts_gpio > 0) {
->> -		ret = devm_gpio_request(&pdev->dev, pdata->rts_gpio, "RTS");
->> +	if (pdata && pdata->rts_gpio > 0)
->> +		rts_pin = pdata->rts_gpio;
->> +	else if (np)
->> +		rts_pin = of_get_named_gpio(np, "rts-gpios", 0);
->> +
->
-> 	use directly port->rts_gpio  so we can drop the assign after
->
-> 	if the gpio is invalid the port->rts_gpio need to be < 0 too
+>>>>     s/compile/link/.
 
-Yes this is definitively an option. I cook a v2 right now.
+>>>>> the code under this condition as phy_register_fixup_for_id()
+>>>>> is not defined.
 
->
-> Best Regards,
-> J.
->
->> +	if (gpio_is_valid(rts_pin)) {
->> +		ret = devm_gpio_request(&pdev->dev, rts_pin, "RTS");
->> 		if (ret) {
->> 			dev_err(&pdev->dev, "error requesting RTS GPIO\n");
->> 			goto err;
->> 		}
->> -		port->rts_gpio = pdata->rts_gpio;
->> +		port->rts_gpio = rts_pin;
->> 		ret = gpio_direction_output(port->rts_gpio, 0);
->> 		if (ret) {
->> 			dev_err(&pdev->dev, "error setting up RTS GPIO\n");
->> --
->> 1.8.2.2
->>
->
->
->
+>>>>     Not only this function is absent...
 
+>>>>> This problem was introduced by 48c8b96f21817aad
+>>>>> ("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
 
--- 
-Nicolas Ferre
+>>>>> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>>>> ---
+>>>>>   arch/arm/mach-shmobile/board-lager.c | 4 +++-
+>>>>>   1 file changed, 3 insertions(+), 1 deletion(-)
+
+>>>>> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+>>>>> index 78a31b6..d1a8ddd 100644
+>>>>> --- a/arch/arm/mach-shmobile/board-lager.c
+>>>>> +++ b/arch/arm/mach-shmobile/board-lager.c
+>>>>> @@ -245,7 +245,9 @@ static void __init lager_init(void)
+>>>>>   {
+>>>>>   	lager_add_standard_devices();
+>>>>>
+>>>>> -	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
+>>>>> +	if (IS_ENABLED(CONFIG_PHYLIB))
+>>>>> +		phy_register_fixup_for_id("r8a7790-ether-ff:01",
+>>>>> +					  lager_ksz8041_fixup);
+
+>>>>     Perhaps you would consider enclosing the fixup function itself
+>>>> into #ifdef as it causes link errors as well?  Doesn't seem
+>>>> necessary as gcc probably drops it anyway but for completeness'
+>>>> sake...
+
+>>> My understanding of the motivation for IS_ENABLED() is to
+>>> take advantage of gcc optimising away unused code and making such
+>>> problems disappear.
+
+>>> With this patch in place do you still see any warnings?
+
+>>     No (but those were errors :-).
+>>     I'd like the changelog to be adjusted at least...
+
+> Sure. Would you like me to list in the changelog the compile problems that
+> gcc reports without this patch?
+
+    Erm... gcc doesn't report any compile problems, it's ld that does report 
+link errors. That would be good to include them, yes.
+
+> Or do you have something else in mind?
+
+    See the top of the mail for my comments to the changelog. Also, you need 
+to fix the subject which has "RM:" instead of "ARM:"...
+
+WBR, Sergei
