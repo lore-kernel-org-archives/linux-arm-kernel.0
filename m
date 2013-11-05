@@ -1,27 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 5 Nov 2013 21:35:53 -0200
-Subject: [PATCH v4] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <CAHCPf3s-dxzqAGHhOaemJeCW0LmxOhYThrtif+QpGb4LzeWDpg@mail.gmail.com>
-References: <1383181127-12013-1-git-send-email-festevam@gmail.com>
- <5272BC59.1080109@boundarydevices.com>
- <5272BFE0.5040409@boundarydevices.com>
- <CAOMZO5C39JNVv0vz-38eOrKHXMqWHCeCknhSvfGFe5t0EGkDsg@mail.gmail.com>
- <20131031210053.GH16735@n2100.arm.linux.org.uk>
- <CAOMZO5DAAXg4wP2UuYCN6BgN5-q3sv0Lrqvk8xMDmEW_TXepXg@mail.gmail.com>
- <CAHCPf3v0G_551Oeq-dL61J0Ce-iUMv+ou8+q671S8=GEcNjv5w@mail.gmail.com>
- <CAHCPf3tSdn=TJ86QEtL3r9iSP0j88WP-y2=z96ZUfW-7VecMbQ@mail.gmail.com>
- <CAOMZO5DU9y2tvgkEbastQdhJvtLGLJ-b49WY8RsvpbmJhzMxLA@mail.gmail.com>
- <CAHCPf3s-dxzqAGHhOaemJeCW0LmxOhYThrtif+QpGb4LzeWDpg@mail.gmail.com>
-Message-ID: <CAOMZO5DTB085wL1NOwGF5EynoQh1r2_ztR754dLrf1EMOuN75g@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 06 Nov 2013 00:38:19 +0100
+Subject: [PATCH 0/2] More Allwinner SoC timer fixes
+In-Reply-To: <1382699771-4396-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1382699771-4396-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5279816B.90808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 5, 2013 at 9:29 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
+On 10/25/2013 01:16 PM, Maxime Ripard wrote:
+> Hi,
+>
+> Here are more fixes to the sun4i timer that we spotted during the review of the
+> High Speed timers patches, and that we hunted down during the Kernel Summit.
+>
+> Since they are not critical fixes for the current code we have, it doesn't have
+> to be merged in 3.12 and can wait.
+>
+> Thanks!
+> Maxime
+>
+> Maxime Ripard (2):
+>    clockevent: sun4i: Fill the irq field in the clockevent structure
+>    clocksource: sun4i: change CPU mask to cpu_possible_mask
+>
+>   drivers/clocksource/sun4i_timer.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
 
-> I know about that one. BTW this isn't in the MX6SDL errata
-> documentation, but it is in the MX6QD errata. If this actually affects
-> the Solo etc. as Russell dictates, isn't the errata document missing
-> some info here?
+Hi Maxime,
 
-If you read the code you will notice that the multiple writes affects
-only mx6quad.
+just a head up to tell I have been very busy last week for the Linaro 
+connect. I will take care of the patches tomorrow.
+
+Thanks
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
