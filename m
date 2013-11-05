@@ -1,80 +1,85 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 5 Nov 2013 16:29:43 +0100
-Subject: [PATCH] ARM/serial: at91: specify RTS in DT using gpio
-In-Reply-To: <1383654959-18112-1-git-send-email-linus.walleij@linaro.org>
-References: <1383654959-18112-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1383665383-5606-1-git-send-email-nicolas.ferre@atmel.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 5 Nov 2013 12:37:46 -0300
+Subject: [PATCH v3 25/28] ARM: mvebu: Add support for NAND controller in
+ Armada 370/XP
+In-Reply-To: <20131105151531.GK3060@titan.lakedaemon.net>
+References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383656135-8627-26-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131105132905.GJ3060@titan.lakedaemon.net>
+ <20131105135145.GA2676@localhost>
+ <20131105151531.GK3060@titan.lakedaemon.net>
+Message-ID: <20131105153745.GA9955@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- Documentation/devicetree/bindings/serial/atmel-usart.txt |  3 +++
- drivers/tty/serial/atmel_serial.c                        | 13 ++++++++++---
- 2 files changed, 13 insertions(+), 3 deletions(-)
+On Tue, Nov 05, 2013 at 10:15:31AM -0500, Jason Cooper wrote:
+> On Tue, Nov 05, 2013 at 10:51:46AM -0300, Ezequiel Garcia wrote:
+> > On Tue, Nov 05, 2013 at 08:29:05AM -0500, Jason Cooper wrote:
+> > > On Tue, Nov 05, 2013 at 09:55:32AM -0300, Ezequiel Garcia wrote:
+> > > > The Armada 370 and Armada XP SoC have a NAND controller (aka NFCv2).
+> > > > This commit adds support for it in Armada 370 and Armada XP SoC
+> > > > common devicetree.
+> > > > 
+> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/armada-370-xp.dtsi | 9 +++++++++
+> > > >  1 file changed, 9 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> > > > index 01e69fc..b4e6898 100644
+> > > > --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> > > > +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> > > > @@ -258,6 +258,15 @@
+> > > >  				status = "disabled";
+> > > >  			};
+> > > >  
+> > > > +			nand at d0000 {
+> > > > +				compatible = "marvell,armada370-nand";
+> > > 
+> > > Could you please provide a separate patch updating the devicetree
+> > > binding documentation?  You can also Cc the entire series to the
+> > > devicetree ml as long as the documentation patch is easy to find in the
+> > > series.  eg 'dt: binding: ...'
+> > > 
+> > 
+> > Hm.. actually the controller already supports the new compatible string
+> > so the binding documentation should be added now.
+> 
+> $ git grep -n 'marvell,armada370-nand' -- Documentation/devicetree/bindings/
+> $
 
-diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-index 2191dcb..3adc61c 100644
---- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-@@ -10,6 +10,8 @@ Required properties:
- Optional properties:
- - atmel,use-dma-rx: use of PDC or DMA for receiving data
- - atmel,use-dma-tx: use of PDC or DMA for transmitting data
-+- rts-gpios: specify a GPIO for RTS line. It will use specified PIO instead of the peripheral
-+  function pin for the USART RTS feature. If unsure, don't specify this property.
- - add dma bindings for dma transfer:
- 	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
- 		memory peripheral interface and USART DMA channel ID, FIFO configuration.
-@@ -28,6 +30,7 @@ Example:
- 		interrupts = <7>;
- 		atmel,use-dma-rx;
- 		atmel,use-dma-tx;
-+		rts-gpios = <&pioD 15 0>;
- 	};
- 
- - use DMA:
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index b4e0794..71f8ea9 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -35,6 +35,7 @@
- #include <linux/platform_device.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_gpio.h>
- #include <linux/dma-mapping.h>
- #include <linux/atmel_pdc.h>
- #include <linux/atmel_serial.h>
-@@ -2327,6 +2328,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	struct atmel_uart_data *pdata = dev_get_platdata(&pdev->dev);
- 	void *data;
-+	int rts_pin = -EINVAL;
- 	int ret = -ENODEV;
- 
- 	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
-@@ -2364,13 +2366,18 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 	 * structs to indicate "no RTS GPIO" instead of open-coding some
- 	 * invalid value everywhere.
- 	 */
--	if (pdata->rts_gpio > 0) {
--		ret = devm_gpio_request(&pdev->dev, pdata->rts_gpio, "RTS");
-+	if (pdata && pdata->rts_gpio > 0)
-+		rts_pin = pdata->rts_gpio;
-+	else if (np)
-+		rts_pin = of_get_named_gpio(np, "rts-gpios", 0);
-+
-+	if (gpio_is_valid(rts_pin)) {
-+		ret = devm_gpio_request(&pdev->dev, rts_pin, "RTS");
- 		if (ret) {
- 			dev_err(&pdev->dev, "error requesting RTS GPIO\n");
- 			goto err;
- 		}
--		port->rts_gpio = pdata->rts_gpio;
-+		port->rts_gpio = rts_pin;
- 		ret = gpio_direction_output(port->rts_gpio, 0);
- 		if (ret) {
- 			dev_err(&pdev->dev, "error setting up RTS GPIO\n");
+Well the controller supports it, but I never updated the binding:
+
+$ git grep -n 'marvell,armada370-nand' -- drivers/mtd/nand/pxa3xx-nand.c
+
+So that's why I think a separate patch to be taken by Brian now is more
+appropriate.
+
+> > And I'd rather do that in a separate patch, to avoid cluttering the poor
+> > devicetree people with an unrelated 28-piece patch :-)
+> 
+> No (really), according to Grant and Mark during the closing session, I
+> asked this specific question.  They _do_ want the entire series so they
+> can refer to the corresponding code changes if necessary.  As I stated
+> above, we can make their job easier by making the binding a separate
+> patch that is clearly marked as such.
+> 
+
+Ah, good to know.
+
+> > BTW: who should take such a patch? I'm still a little lost regarding
+> > who takes the binding or dts patches for a given subsystem.
+> 
+> The appropriate sub-system maintainer still takes the patches, we simply
+> wait a bit for the DT binding maintainers to chime in.  If they don't
+> after a few weeks, we can take it without their Ack.
+> 
+> If the maintainer is unsure, or needs help reviewing the binding, they
+> can always ping the DT folks for assistance.
+> 
+
+Ok, great.
 -- 
-1.8.2.2
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
