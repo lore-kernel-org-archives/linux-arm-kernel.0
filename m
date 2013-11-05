@@ -1,30 +1,69 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 5 Nov 2013 11:08:08 -0800
-Subject: [PATCH v3 22/28] mtd: nand: pxa3xx: Introduce multiple page
- I/O support
-In-Reply-To: <1383656135-8627-23-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-23-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131105190808.GR20061@ld-irv-0074.broadcom.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 5 Nov 2013 12:12:30 -0700
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <201311051948.11992.arnd@arndb.de>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <201311050939.21071.arnd@arndb.de>
+ <20131105180314.GB14706@obsidianresearch.com>
+ <201311051948.11992.arnd@arndb.de>
+Message-ID: <20131105191230.GA20600@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One more thing on this patch:
+On Tue, Nov 05, 2013 at 07:48:11PM +0100, Arnd Bergmann wrote:
+> On Tuesday 05 November 2013, Jason Gunthorpe wrote:
+> > I've been brewing a patch set to fix TPM, but it is a large effort. I
+> > would think other legacy subsystems that are not fully class device
+> > enabled will have similar challenges?
+> 
+> I think a common pattern is to have the subsystem data be referenced from
+> the driver data using a pointer, and contain a back reference to the struct
+> device, which should not be a problem.
 
-On Tue, Nov 05, 2013 at 09:55:29AM -0300, Ezequiel Garcia wrote:
-> @@ -437,7 +487,7 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
->  
->  static void handle_data_pio(struct pxa3xx_nand_info *info)
->  {
-> -	unsigned int do_bytes = min(info->data_size, info->fifo_size);
-> +	unsigned int do_bytes = min(info->data_size, info->chunk_size);
+The issue is sysfs, the TPM core attaches attributes to the driver's
+struct device, which means it has to convert from struct device * to
+its own private data. It is totally wrong, but that is the way
+it has been for ever. :(
 
-After this change, you no longer are using fifo_size globally (you only
-use it locally in pxa3xx_nand_detect_config() to set the chunk_size).
-Perhaps you can drop the field?
+> Yes, that would work, but it would prevent another idea I had that I
+> haven't mentioned here: If we add a pointer to the 'struct
+> devm_probe' array to
 
->  
->  	switch (info->state) {
->  	case STATE_PIO_WRITING:
+Seems quiet reasonable, but having two entry points just means drivers
+that need to use the 2nd can't use the pointer in struct devm_probe.
 
-Brian
+The other thing that occured to me is your method could reduce the
+devm overhead. If you keep a pointer to the probe list and to the
+private data structure then you can unwide all the allocations just by
+running backwards along the probe list. You don't need to do any
+per-resource devm allocations..
+
+> which would fit in nicely with the rest of the design, but now I'm no longer
+> sure if that would actually work with the lifetime rules of the netdev, which
+> would pin the refcount on the 'struct device', which in turn could prevent
+> the devres cleanup to be executed.
+
+I looked into this question recently, while trying to fixup TPM..
+
+I concluded that devm doesn't actually really follow the refcount on
+struct device. devm cleanup is called unconditionally after remove()
+is called, and remove is called unconditionally when the device_driver
+is deleted, which is called unconditionally on module unload.
+
+So anything that used to be in the remove() function can be safely
+moved into devm, including netdev deallocation. This makes sense,
+considering what devm is for..
+
+This process is separate from the refcount driven release, which
+happens once all krefs to the struct device are dropped (eg, sysfs
+open files, open char devices, etc)
+
+Which creates the nasty bit, a sysfs callback/etc can be run even
+after the device release function has finished and after the private
+data has been deleted..
+
+At least, that is where my search ended up, would appreciate it if
+anyone knows different :)
+
+Regards,
+Jason
