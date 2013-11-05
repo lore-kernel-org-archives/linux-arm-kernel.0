@@ -1,73 +1,156 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 05 Nov 2013 20:53:06 +0300
-Subject: [PATCH] RM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
-In-Reply-To: <20131104235828.GB18844@verge.net.au>
-References: <1383201098-4258-1-git-send-email-horms+renesas@verge.net.au>
- <5272CC16.3020700@cogentembedded.com> <20131101004359.GK6818@verge.net.au>
- <527447A1.2000607@cogentembedded.com> <20131104235828.GB18844@verge.net.au>
-Message-ID: <52793082.50606@cogentembedded.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 5 Nov 2013 18:59:27 +0200
+Subject: [PATCH v4 4/6] gpio: davinci: add OF support
+In-Reply-To: <CA+V-a8uV0g36LoQtxFjR56SaMxj7KOE2ztC+pfT_Pn1wGcqEmw@mail.gmail.com>
+References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
+ <1383406775-14902-5-git-send-email-prabhakar.csenng@gmail.com>
+ <5277E752.8090005@ti.com>
+ <CA+V-a8uV0g36LoQtxFjR56SaMxj7KOE2ztC+pfT_Pn1wGcqEmw@mail.gmail.com>
+Message-ID: <527923EF.4070602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 11/05/2013 10:53 AM, Prabhakar Lad wrote:> Hi Grygorii,
+ >
+ > Thanks for the review.
+ >
+ > On Mon, Nov 4, 2013 at 11:58 PM, Grygorii Strashko
+ > <grygorii.strashko@ti.com> wrote:
+ >> Hi Prabhakar Lad,
+ >>
+ >>
+ >> On 11/02/2013 05:39 PM, Lad, Prabhakar wrote:
+ >>>
+ >>> From: KV Sujith <sujithkv@ti.com>
+ >>>
+ >>> This patch adds OF parser support for davinci gpio
+ >>> driver and also appropriate documentation in gpio-davinci.txt
+ >>> located at Documentation/devicetree/bindings/gpio/.
+ >>
+ >>
+ >> I worry, do we need to have gpio_chip.of_xlate() callback implemented?
+ >
+ > I looked for the other OF GPIO implementations with same "ngpio"
+ > property (marvel, msm) but I don?t see of_xlate() callback implemented.
 
-On 11/05/2013 02:58 AM, Simon Horman wrote:
+The question: will below definitions in DT work or not after this series?
+  Will of_get_gpio()/of_get_named_gpio() work?
 
->>>>> Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
->>>>> Other than not being useful it is also not possible to compile
+Example1 - leds:
+	leds {
+		compatible = "gpio-leds";
+		debug0 {
+			label = "green:debug0";
+			gpios = <&gpio 29 GPIO_ACTIVE_HIGH>;
+		};
+	};
 
->>>>     s/compile/link/.
+Example2 - any dev:
+devA {
+	compatible = "devA";
+	gpios = <&gpio 120 GPIO_ACTIVE_LOW>;
+}
 
->>>>> the code under this condition as phy_register_fixup_for_id()
->>>>> is not defined.
 
->>>>     Not only this function is absent...
+ >
+ >> - From one side, Davinci GPIO controller in DT described by one entry
+ >> which defines number of supported GPIOs as "ti,ngpio = <144>;"
+ >>
+ >> - From other side, on Linux level more than one gpio_chip objects are
+ >> instantiated (one per each 32 GPIO).
+ >>
+ >> How the standard GPIO biding will work in this case? .. And will they?
+ >>
+ >> Linus, I'd very appreciate if you will be able to clarify this point.
+ >>
+ >>
+ >>>
+ >>> Signed-off-by: KV Sujith <sujithkv@ti.com>
+ >>> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+ >>> [prabhakar.csengg at gmail.com: simplified the OF code, removed
+ >>>                  unnecessary DT property and also simplified
+ >>>                  the commit message]
+ >>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+ >>> ---
+ >>>    .../devicetree/bindings/gpio/gpio-davinci.txt      |   32 
+++++++++++++
+ >>>    drivers/gpio/gpio-davinci.c                        |   54
+ >>> ++++++++++++++++++--
+ >>>    2 files changed, 83 insertions(+), 3 deletions(-)
+ >>>    create mode 100644
+ >>> Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+ >>>
+ >>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+ >>> b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+ >>> new file mode 100644
+ >>> index 0000000..55aae1c
+ >>> --- /dev/null
+ >>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+ >>> @@ -0,0 +1,32 @@
+ >>> +Davinci GPIO controller bindings29
+ >>> +
+ >>> +Required Properties:
+ >>> +- compatible: should be "ti,dm6441-gpio"
+ >>> +
+ >>> +- reg: Physical base address of the controller and the size of memory
+ >>> mapped
+ >>> +       registers.
+ >>> +
+ >>> +- gpio-controller : Marks the device node as a gpio controller.
+ >>> +
+ >>> +- interrupts: Array of GPIO interrupt number.
+ >>
+ >>
+ >> May be meaning of <interrupts> property need to be extended, because,
+ >> as of now, only banked or unbanked IRQs are supported - and not both.
+ >>
+ >>
+ > OK
+ >
+ >>> +
+ >>> +- ti,ngpio: The number of GPIO pins supported.
+ >>> +
+ >>> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an 
+individual
+ >>> interrupt
+ >>> +                            line to processor.
+ >>
+ >>
+ >> Should interrupt-controller; specifier be added here?
+ >>
+ > No
 
->>>>> This problem was introduced by 48c8b96f21817aad
->>>>> ("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
+So, it would be impossible to map GPIO IRQ to device through DT. Right?
+Like:
+	devX at 0 {
+		compatible = "devX";
+		interrupt-parent = <&gpio>;
+		interrupts = <50 IRQ_TYPE_EDGE_FALLING>; /* gpio line 50 */
 
->>>>> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>>>> ---
->>>>>   arch/arm/mach-shmobile/board-lager.c | 4 +++-
->>>>>   1 file changed, 3 insertions(+), 1 deletion(-)
+	};
 
->>>>> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
->>>>> index 78a31b6..d1a8ddd 100644
->>>>> --- a/arch/arm/mach-shmobile/board-lager.c
->>>>> +++ b/arch/arm/mach-shmobile/board-lager.c
->>>>> @@ -245,7 +245,9 @@ static void __init lager_init(void)
->>>>>   {
->>>>>   	lager_add_standard_devices();
->>>>>
->>>>> -	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
->>>>> +	if (IS_ENABLED(CONFIG_PHYLIB))
->>>>> +		phy_register_fixup_for_id("r8a7790-ether-ff:01",
->>>>> +					  lager_ksz8041_fixup);
 
->>>>     Perhaps you would consider enclosing the fixup function itself
->>>> into #ifdef as it causes link errors as well?  Doesn't seem
->>>> necessary as gcc probably drops it anyway but for completeness'
->>>> sake...
-
->>> My understanding of the motivation for IS_ENABLED() is to
->>> take advantage of gcc optimising away unused code and making such
->>> problems disappear.
-
->>> With this patch in place do you still see any warnings?
-
->>     No (but those were errors :-).
->>     I'd like the changelog to be adjusted at least...
-
-> Sure. Would you like me to list in the changelog the compile problems that
-> gcc reports without this patch?
-
-    Erm... gcc doesn't report any compile problems, it's ld that does report 
-link errors. That would be good to include them, yes.
-
-> Or do you have something else in mind?
-
-    See the top of the mail for my comments to the changelog. Also, you need 
-to fix the subject which has "RM:" instead of "ARM:"...
-
-WBR, Sergei
+ >
+ >>
+ >>> +
+ >>> +Example:
+ >>> +
+ >>> +gpio: gpio at 1e26000 {
+ >>> +       compatible = "ti,dm6441-gpio";
+ >>> +       gpio-controller;
+ >>> +       reg = <0x226000 0x1000>;
+ >>> +       interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
+ >>> +               44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
+ >>> +               46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
+ >>> +               48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
+ >>> +               50 IRQ_TYPE_EDGE_BOTH>;
+ >>> +       ti,ngpio = <144>;
+ >>> +       ti,davinci-gpio-irq-base = <101>;
+ >>
+ >>
+ >>          ^^ Is it still needed?
+ >>
+ > OOps missed to remove that.
+ >
+Regards,
+-grygorii
