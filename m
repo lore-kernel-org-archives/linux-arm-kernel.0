@@ -1,53 +1,30 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 5 Nov 2013 10:51:46 -0300
-Subject: [PATCH v3 25/28] ARM: mvebu: Add support for NAND controller in
- Armada 370/XP
-In-Reply-To: <20131105132905.GJ3060@titan.lakedaemon.net>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-26-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105132905.GJ3060@titan.lakedaemon.net>
-Message-ID: <20131105135145.GA2676@localhost>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue,  5 Nov 2013 18:00:18 +0400
+Subject: [PATCH] ARM: dts: i.MX51: Fix OTG PHY clock
+Message-ID: <1383660018-32259-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 08:29:05AM -0500, Jason Cooper wrote:
-> On Tue, Nov 05, 2013 at 09:55:32AM -0300, Ezequiel Garcia wrote:
-> > The Armada 370 and Armada XP SoC have a NAND controller (aka NFCv2).
-> > This commit adds support for it in Armada 370 and Armada XP SoC
-> > common devicetree.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/armada-370-xp.dtsi | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> > index 01e69fc..b4e6898 100644
-> > --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> > +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> > @@ -258,6 +258,15 @@
-> >  				status = "disabled";
-> >  			};
-> >  
-> > +			nand at d0000 {
-> > +				compatible = "marvell,armada370-nand";
-> 
-> Could you please provide a separate patch updating the devicetree
-> binding documentation?  You can also Cc the entire series to the
-> devicetree ml as long as the documentation patch is easy to find in the
-> series.  eg 'dt: binding: ...'
-> 
+Proper clock ID for USB OTG PHY is "usb_phy_gate".
+The patch changes this mismatch.
 
-Hm.. actually the controller already supports the new compatible string
-so the binding documentation should be added now.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx51.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-And I'd rather do that in a separate patch, to avoid cluttering the poor
-devicetree people with an unrelated 28-piece patch :-)
-
-BTW: who should take such a patch? I'm still a little lost regarding
-who takes the binding or dts patches for a given subsystem.
-
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 48fa41b..06bb184 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -190,7 +190,7 @@
+ 
+ 			usbphy0: usbphy at 0 {
+ 				compatible = "usb-nop-xceiv";
+-				clocks = <&clks 124>;
++				clocks = <&clks 75>;
+ 				clock-names = "main_clk";
+ 				status = "okay";
+ 			};
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.1.5
