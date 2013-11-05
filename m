@@ -1,122 +1,34 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Tue, 5 Nov 2013 23:28:17 +0530
-Subject: [PATCH RFC 1/4] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <000101ceda1f$04ca6f20$0e5f4d60$%han@samsung.com>
-References: <1383205544-32244-1-git-send-email-gautam.vivek@samsung.com>
- <1383205544-32244-2-git-send-email-gautam.vivek@samsung.com>
- <527744B2.4090303@ti.com>
- <030d01ced946$d6e23490$84a69db0$%debski@samsung.com>
- <52779D28.9000905@ti.com>
- <CAFp+6iH7vQ-OtMFL4pyr4tFDRchH4oh1Z0753WNgrHiUzj+kzw@mail.gmail.com>
- <00fe01ceda0a$941957a0$bc4c06e0$%debski@samsung.com>
- <000001ceda17$f41c2030$dc546090$%han@samsung.com>
- <000101ceda1f$04ca6f20$0e5f4d60$%han@samsung.com>
-Message-ID: <CAFp+6iFAZab35F-MOOZHcHpzSEOL=51gWBK2KZbOJS+0731GJQ@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 5 Nov 2013 19:01:10 +0100
+Subject: [PATCH] uprobes: introduce arch_uprobe->ixol
+In-Reply-To: <527916F4.1010805@linaro.org>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-4-git-send-email-dave.long@linaro.org>
+ <20131019163627.GA7837@redhat.com> <52671265.2020107@linaro.org>
+ <20131029154006.GA22344@redhat.com> <20131104194901.GA28022@redhat.com>
+ <527916F4.1010805@linaro.org>
+Message-ID: <20131105180110.GA6943@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 5, 2013 at 5:33 PM, Jingoo Han <jg1.han@samsung.com> wrote:
-> On Tuesday, November 05, 2013 8:13 PM, Jingoo Han wrote:
->> On Tuesday, November 05, 2013 6:37 PM, Kamil Debski wrote:
->> > On Tuesday, November 05, 2013 8:20 AM, Vivek Gautam wrote:
->> > > On Mon, Nov 4, 2013 at 6:42 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> > > > On Monday 04 November 2013 03:45 PM, Kamil Debski wrote:
->> > > >> On Monday, November 04, 2013 7:55 AM, Kishon Vijay Abraham I wrote:
->> > > >>> On Thursday 31 October 2013 01:15 PM, Vivek Gautam wrote:
->> > > >>>>
->> > > >>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->> > > >>>> The new driver uses the generic PHY framework and will interact
->> > > >>>> with
->> > > >>>> DWC3 controller present on Exynos5 series of SoCs.
->> > > >>>
->> > > >>>
->> > > >>> In Exynos, you have a single IP that supports both USB3 and USB2
->> > > PHY
->> > > >>> right? I think that needs to be mentioned here.
->> > > >>
->> > > >>
->> > > >> As far as I know the IP is different.
->> > > >
->> > > >
->> > > > Ok. Sometime back Vivek was mentioning about a single IP for both
->> > > USB3
->> > > > and USB2. Thought it should be this driver. Anyway thanks for the
->> > > clarification.
->> > >
->> > > Right Kishon, I had mentioned that Exynos5's dwc3 controller have a
->> > > single IP for USB2 and USB3 phy.
->> > > From what i see, on exynos5 systems the dwc3 controller uses a combo of
->> > > usb 2 (utmi+) and usb 3 (pipe 3) phy (with base address starting
->> > > 0x12100000).
->> > >
->> > > Kamil, Tomasz,
->> > >
->> > > Please correct me if i am wrong.
->> >
->> > I have the Exynos 5250 documentation and I found two phy register ranges:
->> > 1) USB 2.0 PHY having the base address of 0x1213 0000
->> >     Chapter 33. USB 2.0 Host Controller
->> >     Subchapter 33.5.2 Phy Control Register p. 1696
->> >     First register's description is
->> >     "USB2.0 phy control register"
->> > 2) USB 3.0 PHY (I guess) with the base address 0x1210 0000
->> >     Chapter 35. USB 3.0 DRD Controller
->> >     Subchapter 35.4.6 PHY Control Register p. 1872
->> >
->> > Jingoo, could you comment on the above? You may know more than we do :)
+On 11/05, David Long wrote:
+>
+> On 11/04/13 14:49, Oleg Nesterov wrote:
+>> On 10/29, Oleg Nesterov wrote:
+>>>
+>> Seriouly, how about the patch below?
 >>
->> Hi Kamil,
+>> In fact, given that you are going to reimplement set_swbp/orig_insn,
+>> the new member is not strictly needed (afaics). But it looks more
+>> clear this way, and we need s/MAX_UINSN_BYTES/sizeof()/ anyway.
 >>
->> Thank you for trusting me. :-)
->> I just asked my validation engineer about 5250 USB PHY.
+>> Oleg.
+>> ---
+>
+> I agree that this is cleaner than another weak callout.  I have it
+> working for ARM now.
 
-Thank you for clarifying this. This was really kind of you to help in
-making things clear.
+OK, I am going to add this patch to my tree, thanks. Can I add your
+acked-by ?
 
->> As I know, she has the best knowledge about Samsung SoC USB hardware.
->> She said that there are 2 PHY controllers such as USB 2.0 PHY, USB 3.0 PHY.
->>
->>   1) USB2.0 PHY: USB2.0 HOST, USB2.0 Device
->>   2) USB3.0 PHY: USB3.0 DRD (3.0 HOST & 3.0 Device)
->>
->> > In addition, I have a question to you Vivek - does your USB 3.0
->> > PHY support both host and device?
->>
->> According to her, USB3.0 PHY can support both 3.0 Host and 3.0 Device.
->> Thank you.
->
-> In addition to this,
->
-> Vivek's comment is also right. :-)
-> A few minutes ago, I asked one of my USB S/W engineers.
->
-> USB3.0 PHY consists of two blocks such as 3.0 block and 2.0 block.
-> This USB3.0 PHY can support UTMI+ and PIPE3 interface for 3.0 block
-> and 2.0 block, respectively.
->
-> Conclusion:
->
->    1) USB2.0 PHY: USB2.0 HOST, USB2.0 Device
->                        Base address: 0x1213 0000
->
->    2) USB3.0 PHY: USB3.0 DRD (3.0 HOST & 3.0 Device)
->                        Base address: 0x1210 0000
->                        2.0 block(UTMI+) & 3.0 block(PIPE3)
-
-And this is ofcourse the PHY used by DWC3 controller, which works at
-both High speed as well as Super Speed.
-Right ?
-
->
->
-> Best regards,
-> Jingoo Han
->
-
-
-
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Oleg.
