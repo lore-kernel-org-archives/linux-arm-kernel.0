@@ -1,64 +1,31 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 5 Nov 2013 11:51:07 -0600
-Subject: [PATCH 03/11] devicetree: bindings: Document qcom,kpss-acc
-In-Reply-To: <52792E78.4060600@codeaurora.org>
-References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
- <1383343739-23080-4-git-send-email-sboyd@codeaurora.org>
- <EA8C3C10-2AD6-4179-A785-12001E439364@codeaurora.org>
- <52792E78.4060600@codeaurora.org>
-Message-ID: <E034522B-A62C-40A4-800C-00D592AAEF47@codeaurora.org>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Tue, 05 Nov 2013 18:51:11 +0100
+Subject: [PATCH] typo fixes (coordiante -> coordinate) in am335x
+In-Reply-To: <20131105171553.GB30901@lee--X1>
+References: <1373901928-19605-1-git-send-email-zubair.lutfullah@gmail.com>
+ <20130821075828.GZ7656@atomide.com>
+ <1382198544.22609.8.camel@polaris.local> <20131022090552.GE19112@lee--X1>
+ <1383667293.6753.35.camel@polaris.local> <20131105171553.GB30901@lee--X1>
+Message-ID: <1383673871.6753.36.camel@polaris.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Nov 5, 2013, at 11:44 AM, Stephen Boyd wrote:
-
-> On 11/05/13 09:13, Kumar Gala wrote:
->> On Nov 1, 2013, at 5:08 PM, Stephen Boyd wrote:
->> 
->>> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
->>> new file mode 100644
->>> index 0000000..ed4a9c8
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
->>> @@ -0,0 +1,21 @@
->>> +* Krait Processor Sub-system (KPSS) Application Clock Controller (ACC)
->>> +
->>> +The KPSS ACC provides clock, power domain, and reset control to a Krait CPU.
->>> +There is one ACC register region per CPU within the KPSS remaped region as
->>> +well as an alias register region that remaps accesses to the ACC associated
->>> +with the CPU accessing the region.
->>> +
->>> +Required Properties:
->>> +
->>> +- compatible : Shall contain "qcom,kpss-acc-v1" or "qcom,kpss-acc-v2".
->>> +- reg: Specifies the base address and size of the banked register region.
->>> +- cpu-offset : per-cpu offset used when the device is accessed without the
->>> +		CPU remapping facilities.
->>> +		The offset is cpu-offset + (0x10000 * cpu-nr).
->>> +
->>> +Example:
->>> +
->>> +	clock-controller at 2008000 {
->>> +		compatible = "qcom,kpss-acc-v2";
->>> +		reg = <0x02008000 0x1000>;
->>> +	};
->>> -- 
->> I don't get the cpu-offset business, shouldn't this just be:
->> 	reg = <0x02008000 0x1000>, <0x02018000 0x1000>, <0x02028000 0x1000>, <0x02038000 0x1000>;
->> 
+On Tue, 2013-11-05 at 17:15 +0000, Lee Jones wrote:
+> On Tue, 05 Nov 2013, Jan L?bbe wrote:
 > 
-> (Sorry I forgot to add the cpu-offset to the example.)
+> > On Tue, 2013-10-22 at 10:05 +0100, Lee Jones wrote:
+> > > This is the first time this patch has been sent to me.
+> > > 
+> > > I need Dmitry's input (no pun intended) on how he's like to deal with
+> > > this. At a bare minimum I'd like his Ack.
+> > 
+> > Is there anything I can do to push this forward? The earlier we get the
+> > typo fixed in the documentation, the less chance that someone will use
+> > it that way.
 > 
-> Your reg property is one way to do it. I was following the example of
-> the GIC binding which just specifies the alias region of the GIC's CPU
-> registers and then has a cpu-offset property to describe how to reach a
-> specific CPU's region.
+> I think you should sent it again, but this time Cc the Device Tree
+> list, Dmitry and myself when you submit.
 
-Even in the gic's case I think we should have the reg property cover the memory map.
+The original patch was not from me. But sure, I can resend it.
 
-- k
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Jan
