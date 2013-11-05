@@ -1,122 +1,30 @@
-From: dave.long@linaro.org (David Long)
-Date: Tue, 05 Nov 2013 14:13:04 -0500
-Subject: [PATCH v2 01/13] uprobes: move function declarations out of arch
-In-Reply-To: <20131105181614.GA7614@redhat.com>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-2-git-send-email-dave.long@linaro.org>
- <20131105160150.GA1539@redhat.com> <20131105181614.GA7614@redhat.com>
-Message-ID: <52794340.7030009@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Nov 2013 20:34:00 +0100
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <20131105191230.GA20600@obsidianresearch.com>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <201311051948.11992.arnd@arndb.de>
+ <20131105191230.GA20600@obsidianresearch.com>
+Message-ID: <201311052034.01114.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/13 13:16, Oleg Nesterov wrote:
-> On 11/05, Oleg Nesterov wrote:
->>
->> On 10/15, David Long wrote:
->>>
->>> Move the function declarations from the arch header to the common
->>> header, since only the function bodies are architecture-specific.
->>> These changes are from Vincent Rabin's uprobes patch.
->>
->> Hmm. I didn't look at this patch because I thought it is obviously
->> fine, but...
->>
->>>   arch/x86/include/asm/uprobes.h | 7 -------
->>>   include/linux/uprobes.h        | 8 ++++++++
->>>   2 files changed, 8 insertions(+), 7 deletions(-)
->>
->> it should also update arch/powerpc/include/asm/uprobes.h ?
->>
->> And 12/13 should not touch arch/powerpc/ or include/linux/uprobes.h.
->
-> And I think we can merge this change separately to reduce the
-> number of non-arm changes in the next version.
->
-> Please see the patch I am going to add to my tree below.
->
-> Oleg.
-> ---
->
-> Subject: [PATCH] uprobes: move function declarations out of arch
-> From: David A. Long <dave.long@linaro.org>
-> Date: Tue, 15 Oct 2013 17:04:16 -0400
->
-> Move the function declarations from the arch headers to the common
-> header, since only the function bodies are architecture-specific.
-> These changes are from Vincent Rabin's uprobes patch.
->
-> [ oleg: update arch/powerpc/include/asm/uprobes.h ]
->
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> Signed-off-by: Oleg Nesterov <oleg@redhat.com>
-> ---
->   arch/powerpc/include/asm/uprobes.h |    7 -------
->   arch/x86/include/asm/uprobes.h     |    7 -------
->   include/linux/uprobes.h            |    8 ++++++++
->   3 files changed, 8 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/powerpc/include/asm/uprobes.h b/arch/powerpc/include/asm/uprobes.h
-> index 541fd6f..75c6ecd 100644
-> --- a/arch/powerpc/include/asm/uprobes.h
-> +++ b/arch/powerpc/include/asm/uprobes.h
-> @@ -46,11 +46,4 @@ struct arch_uprobe_task {
->   	unsigned long	saved_trap_nr;
->   };
->
-> -extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
-> -extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-> -extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-> -extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
-> -extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
-> -extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-> -extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
->   #endif	/* _ASM_UPROBES_H */
-> diff --git a/arch/x86/include/asm/uprobes.h b/arch/x86/include/asm/uprobes.h
-> index 2a24180..3087ea9 100644
-> --- a/arch/x86/include/asm/uprobes.h
-> +++ b/arch/x86/include/asm/uprobes.h
-> @@ -52,11 +52,4 @@ struct arch_uprobe_task {
->   	unsigned int			saved_tf;
->   };
->
-> -extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
-> -extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-> -extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-> -extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
-> -extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
-> -extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-> -extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
->   #endif	/* _ASM_UPROBES_H */
-> diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-> index 06f28be..9fd60c5 100644
-> --- a/include/linux/uprobes.h
-> +++ b/include/linux/uprobes.h
-> @@ -30,6 +30,7 @@
->   struct vm_area_struct;
->   struct mm_struct;
->   struct inode;
-> +struct notifier_block;
->
->   #ifdef CONFIG_ARCH_SUPPORTS_UPROBES
->   # include <asm/uprobes.h>
-> @@ -125,6 +126,13 @@ extern void uprobe_notify_resume(struct pt_regs *regs);
->   extern bool uprobe_deny_signal(void);
->   extern bool __weak arch_uprobe_skip_sstep(struct arch_uprobe *aup, struct pt_regs *regs);
->   extern void uprobe_clear_state(struct mm_struct *mm);
-> +extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
-> +extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-> +extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-> +extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
-> +extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
-> +extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-> +extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
->   #else /* !CONFIG_UPROBES */
->   struct uprobes_state {
->   };
->
+On Tuesday 05 November 2013, Jason Gunthorpe wrote:
+> The issue is sysfs, the TPM core attaches attributes to the driver's
+> struct device, which means it has to convert from struct device * to
+> its own private data. It is totally wrong, but that is the way
+> it has been for ever. :(
 
-Looks good to me.  ARM builds/runs fine with your patch.  I will remove 
-my (updated) version from my patch set.
+I've just had a very brief look at that subsystem, and the first driver
+I looked at (tpm_atmel) actually creates a child platform_device for
+the sole purpose of registering that with the tpm subsystem, which seems
+to avoid this problem. Maybe the same can be done for the other drivers
+as well. Unfortunately, that will change the sysfs structure, which might
+break user space relying on the current path to the device. The TPM
+subsystem definely seems a bit unusual in this regard, so I hope not too
+many other parts of the kernel have this particular problem.
 
--dl
+(side note: another unusual aspect of the TPM subsystem is the use of a
+ custom 'release' function override. Seems harmless, but very weird).	
+
+	Arnd
