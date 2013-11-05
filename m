@@ -1,38 +1,52 @@
-From: B47053@freescale.com (Li Xiubo)
-Date: Tue, 5 Nov 2013 06:17:32 +0000
-Subject: [PATCHv2 6/8] ASoC: fsl: add SGTL5000 based audio machine driver.
-In-Reply-To: <20131101120700.GE10324@S2101-09.ap.freescale.net>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-7-git-send-email-Li.Xiubo@freescale.com>
- <20131101102805.GG28401@MrMyself>
- <20131101120700.GE10324@S2101-09.ap.freescale.net>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F8287564A@039-SN2MPN1-013.039d.mgd.msft.net>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 5 Nov 2013 11:59:54 +0530
+Subject: [PATCH 3/4] mfd: sec-core: Add cells for S5M8767-clocks
+In-Reply-To: <20131031161603.GB9587@lee--X1>
+References: <1383202124-1775-1-git-send-email-tushar.behera@linaro.org>
+ <1383202124-1775-4-git-send-email-tushar.behera@linaro.org>
+ <20131031161603.GB9587@lee--X1>
+Message-ID: <CAHbNUh2GRv3bQD30PtBcoW9-K8PFm4FYWUNXBQEDUH-iVb_JOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 31 October 2013 21:46, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 31 Oct 2013, Tushar Behera wrote:
+>
+>> S5M8767 chip has 3 crystal oscillators running at 32KHz. These are
+>> supported by s2mps11-clk driver.
+>>
+>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+>> CC: Lee Jones <lee.jones@linaro.org>
+>> ---
+>>  drivers/mfd/sec-core.c |    4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
+>> index 34c18fb..020b86b 100644
+>> --- a/drivers/mfd/sec-core.c
+>> +++ b/drivers/mfd/sec-core.c
+>> @@ -56,7 +56,9 @@ static struct mfd_cell s5m8767_devs[] = {
+>>               .name = "s5m8767-pmic",
+>>       }, {
+>>               .name = "s5m-rtc",
+>> -     },
+>> +     }, {
+>> +             .name = "s5m8767-clk",
+>> +     }
+>>  };
+>>
+>>  static struct mfd_cell s2mps11_devs[] = {
+>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+>
 
-> > >  sound/soc/fsl/fsl-sgtl5000-vf610.c | 208
-> > > +++++++++++++++++++++++++++++++++++++
-> >
-> > I just doubt if this file naming is appropriate. Even if we might not
-> > have rigor rule for the file names, according to existing ones, they
-> > are all in a same pattern: [SoC name]-[codec name].c
-> >
-> > "imx-sgtl5000.c" for example
-> >
-> > I think it would make user less confused about what this file exactly
-> > is if this machine driver also follow the pattern: vf610-sgtl5000.c
-> >
-> >
-> > @Shawn
-> >
-> > What do you think about the file name?
-> 
-> Yeah, it would be better to name the file following the existing the
-> pattern.
-> 
+Thanks.
 
-Please see the next version.
+> I'd prefer to take this patch in via the MFD tree once you have
+> support from the other maintainers for the set.
+>
 
-Best Regards,
-Xiubo
+Ok. I will let you know once I get the clock patches through.
+
+-- 
+Tushar Behera
