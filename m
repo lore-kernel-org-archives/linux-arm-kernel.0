@@ -1,32 +1,24 @@
-From: lisovy@gmail.com (Rostislav Lisovy)
-Date: Tue,  5 Nov 2013 13:49:20 +0100
-Subject: [PATCH] ARM: dts: voipac: Improve fixed voltage regulator definition
-Message-ID: <1383655760-28206-1-git-send-email-lisovy@gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 5 Nov 2013 04:53:29 -0800
+Subject: [PATCH 1/4] ARM/serial: at91: move machine quirk into machine
+In-Reply-To: <1383643722-14189-1-git-send-email-linus.walleij@linaro.org>
+References: <1383643722-14189-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20131105125329.GC18093@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
----
- arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+On Tue, Nov 05, 2013 at 10:28:42AM +0100, Linus Walleij wrote:
+> This removes the dependency on <mach/gpio.h> from the AT91 serial
+> driver by adding an mctrl callback quirk.
+> 
+> Long term it is better if the driver calls the generic GPIO
+> interface (gpio_set_value()), but this gets a hairy cross-depency
+> into the machine-local headers out of the way for now.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Greg, if you're OK with this approach please give me an ACK
+> so I can take this through the ARM SoC or GPIO tree in the end.
 
-diff --git a/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi b/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
-index a7d03ad..4f1d8fa 100644
---- a/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
-+++ b/arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi
-@@ -27,9 +27,12 @@
- 
- 	regulators {
- 		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 
--		reg_3p3v: 3p3v {
-+		reg_3p3v: regulator at 0 {
- 			compatible = "regulator-fixed";
-+			reg = <0>;
- 			regulator-name = "3P3V";
- 			regulator-min-microvolt = <3300000>;
- 			regulator-max-microvolt = <3300000>;
--- 
-1.7.10.4
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
