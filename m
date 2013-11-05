@@ -1,180 +1,40 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  5 Nov 2013 09:55:21 -0300
-Subject: [PATCH v3 14/28] mtd: nand: pxa3xx: Add driver-specific ECC BCH
- support
+Date: Tue,  5 Nov 2013 09:55:22 -0300
+Subject: [PATCH v3 15/28] mtd: nand: pxa3xx: Clear cmd buffer #3 (NDCB3) on
+ command start
 In-Reply-To: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383656135-8627-15-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1383656135-8627-16-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the BCH ECC support available in NFCv2 controller.
-Depending on the detected required strength the respective ECC layout
-is selected.
-
-This commit adds an empty ECC layout, since support to access large
-pages is first required. Once that support is added, a proper ECC
-layout will be added as well.
+Command buffer #3 is not properly cleared and it keeps the last
+set value. Fix this by clearing when a command is setup.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 88 ++++++++++++++++++++++++++++++++++--------
- 1 file changed, 71 insertions(+), 17 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 9a5913d..92abe7c 100644
+index 92abe7c..6544300 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -56,6 +56,7 @@
- #define NDPCR		(0x18) /* Page Count Register */
- #define NDBDR0		(0x1C) /* Bad Block Register 0 */
- #define NDBDR1		(0x20) /* Bad Block Register 1 */
-+#define NDECCCTRL	(0x28) /* ECC control */
- #define NDDB		(0x40) /* Data Buffer */
- #define NDCB0		(0x48) /* Command Buffer0 */
- #define NDCB1		(0x4C) /* Command Buffer1 */
-@@ -196,6 +197,7 @@ struct pxa3xx_nand_info {
- 
- 	int			cs;
- 	int			use_ecc;	/* use HW ECC ? */
-+	int			ecc_bch;	/* using BCH ECC? */
- 	int			use_dma;	/* use DMA ? */
- 	int			use_spare;	/* use spare ? */
- 
-@@ -209,6 +211,8 @@ struct pxa3xx_nand_info {
- 	unsigned int		fifo_size;	/* max. data size in the FIFO */
- 	unsigned int		data_size;	/* data to be read from FIFO */
- 	unsigned int		oob_size;
-+	unsigned int		spare_size;
-+	unsigned int		ecc_size;
- 	int 			retcode;
- 
- 	/* cached register value */
-@@ -343,19 +347,12 @@ static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
- 	int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
- 
- 	info->data_size = info->fifo_size;
--	if (!oob_enable) {
--		info->oob_size = 0;
-+	if (!oob_enable)
- 		return;
--	}
- 
--	switch (info->fifo_size) {
--	case 2048:
--		info->oob_size = (info->use_ecc) ? 40 : 64;
--		break;
--	case 512:
--		info->oob_size = (info->use_ecc) ? 8 : 16;
--		break;
--	}
-+	info->oob_size = info->spare_size;
-+	if (!info->use_ecc)
-+		info->oob_size += info->ecc_size;
- }
- 
- /**
-@@ -370,10 +367,15 @@ static void pxa3xx_nand_start(struct pxa3xx_nand_info *info)
- 
- 	ndcr = info->reg_ndcr;
- 
--	if (info->use_ecc)
-+	if (info->use_ecc) {
- 		ndcr |= NDCR_ECC_EN;
--	else
-+		if (info->ecc_bch)
-+			nand_writel(info, NDECCCTRL, 0x1);
-+	} else {
- 		ndcr &= ~NDCR_ECC_EN;
-+		if (info->ecc_bch)
-+			nand_writel(info, NDECCCTRL, 0x0);
-+	}
- 
- 	if (info->use_dma)
- 		ndcr |= NDCR_DMA_EN;
-@@ -1073,6 +1075,43 @@ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
- 	return -ENODEV;
- }
- 
-+static int pxa_ecc_init(struct pxa3xx_nand_info *info,
-+			struct nand_ecc_ctrl *ecc,
-+			int strength, int page_size)
-+{
-+	/*
-+	 * We don't use strength here as the PXA variant
-+	 * is used with non-ONFI compliant devices.
-+	 */
-+	if (page_size == 2048) {
-+		ecc->mode = NAND_ECC_HW;
-+		ecc->size = 512;
-+		ecc->strength = 1;
-+
-+		info->spare_size = 40;
-+		info->ecc_size = 24;
-+		return 1;
-+
-+	} else if (page_size == 512) {
-+		ecc->mode = NAND_ECC_HW;
-+		ecc->size = 512;
-+		ecc->strength = 1;
-+
-+		info->spare_size = 8;
-+		info->ecc_size = 8;
-+		return 1;
-+	}
-+	return 0;
-+}
-+
-+static int armada370_ecc_init(struct pxa3xx_nand_info *info,
-+			      struct nand_ecc_ctrl *ecc,
-+			      int strength, int page_size)
-+{
-+	/* Unimplemented yet */
-+	return 0;
-+}
-+
- static int pxa3xx_nand_scan(struct mtd_info *mtd)
- {
- 	struct pxa3xx_nand_host *host = mtd->priv;
-@@ -1143,13 +1182,13 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 	pxa3xx_flash_ids[1].name = NULL;
- 	def = pxa3xx_flash_ids;
- KEEP_CONFIG:
--	chip->ecc.mode = NAND_ECC_HW;
--	chip->ecc.size = info->fifo_size;
--	chip->ecc.strength = 1;
--
- 	if (info->reg_ndcr & NDCR_DWIDTH_M)
- 		chip->options |= NAND_BUSWIDTH_16;
- 
-+	/* Device detection must be done with ECC disabled */
-+	if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
-+		nand_writel(info, NDECCCTRL, 0x0);
-+
- 	if (nand_scan_ident(mtd, 1, def))
- 		return -ENODEV;
- 
-@@ -1160,6 +1199,21 @@ KEEP_CONFIG:
- 		chip->bbt_md = &bbt_mirror_descr;
+@@ -611,6 +611,7 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 	info->use_ecc		= 0;
+ 	info->use_spare		= 1;
+ 	info->retcode		= ERR_NONE;
++	info->ndcb3		= 0;
+ 	if (info->cs != 0)
+ 		info->ndcb0 = NDCB0_CSEL;
+ 	else
+@@ -632,7 +633,6 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 	default:
+ 		info->ndcb1 = 0;
+ 		info->ndcb2 = 0;
+-		info->ndcb3 = 0;
+ 		break;
  	}
  
-+	if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
-+		ret = armada370_ecc_init(info, &chip->ecc,
-+				   chip->ecc_strength_ds,
-+				   mtd->writesize);
-+	else
-+		ret = pxa_ecc_init(info, &chip->ecc,
-+				   chip->ecc_strength_ds,
-+				   mtd->writesize);
-+	if (!ret) {
-+		dev_err(&info->pdev->dev,
-+			"ECC strength %d at page size %d is not supported\n",
-+			chip->ecc_strength_ds, mtd->writesize);
-+		return -ENODEV;
-+	}
-+
- 	/* calculate addressing information */
- 	if (mtd->writesize >= 2048)
- 		host->col_addr_cycles = 2;
 -- 
 1.8.1.5
