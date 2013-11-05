@@ -1,102 +1,77 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 5 Nov 2013 20:24:26 -0300
-Subject: [PATCH v3 14/28] mtd: nand: pxa3xx: Add driver-specific ECC BCH
- support
-In-Reply-To: <20131105183156.GO20061@ld-irv-0074.broadcom.com>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-15-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105183156.GO20061@ld-irv-0074.broadcom.com>
-Message-ID: <20131105232425.GD11759@localhost>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Tue, 5 Nov 2013 17:29:24 -0600
+Subject: [PATCH v4] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <CAOMZO5DU9y2tvgkEbastQdhJvtLGLJ-b49WY8RsvpbmJhzMxLA@mail.gmail.com>
+References: <1383181127-12013-1-git-send-email-festevam@gmail.com>
+ <5272BC59.1080109@boundarydevices.com>
+ <5272BFE0.5040409@boundarydevices.com>
+ <CAOMZO5C39JNVv0vz-38eOrKHXMqWHCeCknhSvfGFe5t0EGkDsg@mail.gmail.com>
+ <20131031210053.GH16735@n2100.arm.linux.org.uk>
+ <CAOMZO5DAAXg4wP2UuYCN6BgN5-q3sv0Lrqvk8xMDmEW_TXepXg@mail.gmail.com>
+ <CAHCPf3v0G_551Oeq-dL61J0Ce-iUMv+ou8+q671S8=GEcNjv5w@mail.gmail.com>
+ <CAHCPf3tSdn=TJ86QEtL3r9iSP0j88WP-y2=z96ZUfW-7VecMbQ@mail.gmail.com>
+ <CAOMZO5DU9y2tvgkEbastQdhJvtLGLJ-b49WY8RsvpbmJhzMxLA@mail.gmail.com>
+Message-ID: <CAHCPf3s-dxzqAGHhOaemJeCW0LmxOhYThrtif+QpGb4LzeWDpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 10:31:56AM -0800, Brian Norris wrote:
-> On Tue, Nov 05, 2013 at 09:55:21AM -0300, Ezequiel Garcia wrote:
-> > --- a/drivers/mtd/nand/pxa3xx_nand.c
-> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> > @@ -1073,6 +1075,43 @@ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
-> >  	return -ENODEV;
-> >  }
-> >  
-> > +static int pxa_ecc_init(struct pxa3xx_nand_info *info,
-> > +			struct nand_ecc_ctrl *ecc,
-> > +			int strength, int page_size)
-> > +{
-> > +	/*
-> > +	 * We don't use strength here as the PXA variant
-> > +	 * is used with non-ONFI compliant devices.
-> 
-> Hmm, rather than assuming you never get any relevant 'strength' info
-> from nand_base, could you check if it is zero and only ignore it if it
-> is zero? But if it is non-zero, you could at least use it to validate
-> the strength settings below.
-> 
-> At the same time, I would also caution against fragile ECC determination
-> methods that can indirectly cause regressions in the future, such as
-> with Huang's recent GPMI ECC layout regressions. Perhaps you'll want a
-> DT binding for the ECC strength to future proof this? (Not a
-> requirement; just a thought.)
-> 
+On Mon, Nov 4, 2013 at 7:13 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Mon, Nov 4, 2013 at 9:20 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
+>
+>> Fabio, Shawn, could you go so far as to bring this up with the i.MX
+>> guys responsible for documentation or find the original transmitter IP
+>> specs, or find the two pages missing from the manual? This is a really
+>
+> The multiple writes comes from the following erratum:
+> ERR005173 HDMI: Clarification on HDMI programming procedure to avoid
+> FIFO overflow
 
-Well, for the PXA path, as I don't have this hardware enabled to test
-I try do clean-ups and change but without *functionality changes*.
+I know about that one. BTW this isn't in the MX6SDL errata
+documentation, but it is in the MX6QD errata. If this actually affects
+the Solo etc. as Russell dictates, isn't the errata document missing
+some info here?
 
-So, you'll notice this pxa_ecc_init() is a different way of doing the
-old initialization:
+Also the patch doesn't ACTUALLY do what the erratum states you should
+do - nobody is checking audio FIFO status here before retrying.
 
-       chip->ecc.mode = NAND_ECC_HW;
-       chip->ecc.size = info->fifo_size;
-       chip->ecc.strength = 1;
+What I am more curious about is the net effect of every bit in this 8
+bit undocumented register which seems to have a major errata around
+it.
 
-And in fact...
+I noticed a couple which have very abstract definitions which could
+mean a couple things regarding packetizing information. What does
+R_V_BLANK_IN_OSC mean? It's being set when the VIC selected is 39,
+which makes sense in that there is a magic interlace timing for this
+VIC if it also exists in the EDID DTDs. However, no check for this is
+made, it just sets it outright. In fact, it doesn't even make sense
+since in theory it would not be being told to set the VIC timing, it
+would be passed the DTD timing, which need to match a very specific
+set of values, and if they match you need to, instead, fix up the
+timing used based on the fact that VIC 39 was also listed in the CEA
+extension block...
 
-> > +	 */
-> > +	if (page_size == 2048) {
-> > +		ecc->mode = NAND_ECC_HW;
-> > +		ecc->size = 512;
+If you don't follow the CEA-861-E specs or HDMI 1.3a specs *at least*
+when configuring a mode, and packetizing your infoframes, and the
+content of those infoframes, then you're going to end up with magenta
+lines regardless of esoteric audio FIFO underflows.
 
-To match the previous code, this should be "ecc->size = 2048"! :/
+What I don't understand here is how a FIFO underflow in the audio
+packetizer is causing this magenta line. What you should get is a pop
+or crackle in the audio (or silence..) or just zero effect on the
+display if the packetizer can't put valid data in there. There aren't
+any reasons why a FIFO underflow would somehow change mode timings to
+cause a magenta line.
 
-> > +		ecc->strength = 1;
-> 
-> I assume this is actually a 1-bit ECC, not just a dummy value? Note that
-> the ecc->strength and ecc->size fields are used by nand_base for some
-> bitflip calculations and are also exposed via sysfs.
-> 
+That said, I got the same thing accidentally enabling audio on a DVI
+monitor, although this was an SPDIF connection to an external
+transmitter (not an internal IP block) - even if you didn't enable
+audio and it was in DVI mode, it caused enough "drag" on the logic to
+sample audio and be getting nothing over the audio link to put a huge
+pink line down the side of at least 2 monitors. There doesn't seem to
+be any audio setup going on in the driver, so I would suggest trying
+to just force DVI mode and see if the line goes away or gets worse
+with those different values for retrying, and then forcing HDMI mode..
+same test.
 
-Right. Well, as I said: I tried not to change anything that I'm not able
-to fully test.
 
-> > +
-> > +		info->spare_size = 40;
-> > +		info->ecc_size = 24;
-> > +		return 1;
-> > +
-> > +	} else if (page_size == 512) {
-> > +		ecc->mode = NAND_ECC_HW;
-> > +		ecc->size = 512;
-> > +		ecc->strength = 1;
-> > +
-> > +		info->spare_size = 8;
-> > +		info->ecc_size = 8;
-> > +		return 1;
-> > +	}
-> > +	return 0;
-> > +}
-> > +
-> > +static int armada370_ecc_init(struct pxa3xx_nand_info *info,
-> > +			      struct nand_ecc_ctrl *ecc,
-> > +			      int strength, int page_size)
-> > +{
-> > +	/* Unimplemented yet */
-> > +	return 0;
-> > +}
-> > +
-> >  static int pxa3xx_nand_scan(struct mtd_info *mtd)
-> >  {
-> >  	struct pxa3xx_nand_host *host = mtd->priv;
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Matt Sealey <neko@bakuhatsu.net>
