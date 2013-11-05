@@ -1,35 +1,48 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon,  4 Nov 2013 18:16:03 -0800
-Subject: [PATCH 1/3] ARM: __fixup_smp read of SCU config should do byteswap in
- BE case
+Date: Mon,  4 Nov 2013 18:16:05 -0800
+Subject: [PATCH 3/3] ARM: fix mov to mvn conversion in case of 64 bit
+ phys_addr_t and BE
 In-Reply-To: <1383617765-28052-1-git-send-email-victor.kamensky@linaro.org>
 References: <1383617765-28052-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1383617765-28052-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1383617765-28052-4-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit "bc41b8724f24b9a27d1dcc6c974b8f686b38d554 ARM: 7846/1:
-Update SMP_ON_UP code to detect A9MPCore with 1 CPU devices"
-added read of SCU config register into __fixup_smp function.
-Such read should be followed by byteswap, if kernel runs in
-BE mode.
+Fix patching code to convert mov instruction into mvn instruction
+in case of CONFIG_ARCH_PHYS_ADDR_T_64BIT and CONFIG_ARM_PATCH_PHYS_VIRT.
+
+In BE case store into r0 proper bits so byte swapped instruction
+could be modified correctly.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 ---
- arch/arm/kernel/head.S | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/kernel/head.S | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 7801866..cd788d5 100644
+index cd788d5..11d59b3 100644
 --- a/arch/arm/kernel/head.S
 +++ b/arch/arm/kernel/head.S
-@@ -508,6 +508,7 @@ __fixup_smp:
- 	teq	r0, #0x0		@ '0' on actual UP A9 hardware
- 	beq	__fixup_smp_on_up	@ So its an A9 UP
- 	ldr	r0, [r0, #4]		@ read SCU Config
-+ARM_BE8(rev	r0, r0)			@ byteswap if big endian
- 	and	r0, r0, #0x3		@ number of CPUs
- 	teq	r0, #0x0		@ is 1?
- 	movne	pc, lr
+@@ -645,7 +645,11 @@ ARM_BE8(rev16	ip, ip)
+ 	bcc	1b
+ 	bx	lr
+ #else
++#ifdef CONFIG_CPU_ENDIAN_BE8
++	moveq	r0, #0x00004000	@ set bit 22, mov to mvn instruction
++#else
+ 	moveq	r0, #0x400000	@ set bit 22, mov to mvn instruction
++#endif
+ 	b	2f
+ 1:	ldr	ip, [r7, r3]
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+@@ -654,7 +658,7 @@ ARM_BE8(rev16	ip, ip)
+ 	tst	ip, #0x000f0000	@ check the rotation field
+ 	orrne	ip, ip, r6, lsl #24 @ mask in offset bits 31-24
+ 	biceq	ip, ip, #0x00004000 @ clear bit 22
+-	orreq	ip, ip, r0, lsl #24 @ mask in offset bits 7-0
++	orreq	ip, ip, r0      @ mask in offset bits 7-0
+ #else
+ 	bic	ip, ip, #0x000000ff
+ 	tst	ip, #0xf00	@ check the rotation field
 -- 
 1.8.1.4
