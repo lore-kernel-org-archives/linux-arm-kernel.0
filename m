@@ -1,122 +1,36 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 06 Nov 2013 00:57:16 +0100
-Subject: [PATCH 3/3] clk: shmobile: Add R8A7790 clocks support
-In-Reply-To: <87r4avnsc6.wl%kuninori.morimoto.gx@renesas.com>
-References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383058511-26046-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <87r4avnsc6.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <2199055.1gOuVSSAtq@avalon>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Tue, 5 Nov 2013 17:59:42 -0600
+Subject: [PATCH v4] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <CAOMZO5DTB085wL1NOwGF5EynoQh1r2_ztR754dLrf1EMOuN75g@mail.gmail.com>
+References: <1383181127-12013-1-git-send-email-festevam@gmail.com>
+ <5272BC59.1080109@boundarydevices.com>
+ <5272BFE0.5040409@boundarydevices.com>
+ <CAOMZO5C39JNVv0vz-38eOrKHXMqWHCeCknhSvfGFe5t0EGkDsg@mail.gmail.com>
+ <20131031210053.GH16735@n2100.arm.linux.org.uk>
+ <CAOMZO5DAAXg4wP2UuYCN6BgN5-q3sv0Lrqvk8xMDmEW_TXepXg@mail.gmail.com>
+ <CAHCPf3v0G_551Oeq-dL61J0Ce-iUMv+ou8+q671S8=GEcNjv5w@mail.gmail.com>
+ <CAHCPf3tSdn=TJ86QEtL3r9iSP0j88WP-y2=z96ZUfW-7VecMbQ@mail.gmail.com>
+ <CAOMZO5DU9y2tvgkEbastQdhJvtLGLJ-b49WY8RsvpbmJhzMxLA@mail.gmail.com>
+ <CAHCPf3s-dxzqAGHhOaemJeCW0LmxOhYThrtif+QpGb4LzeWDpg@mail.gmail.com>
+ <CAOMZO5DTB085wL1NOwGF5EynoQh1r2_ztR754dLrf1EMOuN75g@mail.gmail.com>
+Message-ID: <CAHCPf3vn==dK1xdvQDkyDpPpHOeT_u52HYN-m__9E4GN1e5GhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Morimoto-san,
+On Tue, Nov 5, 2013 at 5:35 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Tue, Nov 5, 2013 at 9:29 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
+>
+>> I know about that one. BTW this isn't in the MX6SDL errata
+>> documentation, but it is in the MX6QD errata. If this actually affects
+>> the Solo etc. as Russell dictates, isn't the errata document missing
+>> some info here?
+>
+> If you read the code you will notice that the multiple writes affects
+> only mx6quad.
 
-On Tuesday 05 November 2013 00:52:29 Kuninori Morimoto wrote:
-> Hi Laurent
-> 
-> > +Required Properties:
-> > +
-> > +  - compatible: Must be "renesas,r8a7790-cpg-clocks"
-> > +  - reg: Base address and length of the memory resource used by the CPG
-> > +  - clocks: Reference to the parent clock
-> > +  - #clock-cells: Must be 1
-> > +  - clock-output-names: The name of the clocks, must be "main", "pll1",
-> > +    "pll3", "lb", "qspi", "sdh", "sd0", "sd1".
-> 
-> (snip)
-> 
-> > +	for (i = 0; i < CPG_NUM_CLOCKS; ++i) {
-> > +		const struct clk_div_table *table = NULL;
-> > +		const char *parent_name = "main";
-> > +		const char *name;
-> > +		unsigned int shift;
-> > +		unsigned int mult = 1;
-> > +		unsigned int div = 1;
-> > +		struct clk *clk;
-> > +
-> > +		of_property_read_string_index(np, "clock-output-names", i,
-> > +					      &name);
-> > +
-> > +		switch (i) {
-> > +		case R8A7790_CLK_MAIN:
-> > +			parent_name = of_clk_get_parent_name(np, 0);
-> > +			div = config->extal_div;
-> > +			break;
-> > +		case R8A7790_CLK_PLL1:
-> > +			mult = config->pll1_mult / 2;
-> > +			break;
-> > +		case R8A7790_CLK_PLL3:
-> > +			mult = config->pll3_mult;
-> > +			break;
-> > +		case R8A7790_CLK_LB:
-> > +			div = cpg_mode & BIT(18) ? 36 : 24;
-> > +			break;
-> > +		case R8A7790_CLK_QSPI:
-> > +			div = (cpg_mode & (BIT(3) | BIT(2) | BIT(1))) == BIT(2)
-> > +			    ? 16 : 20;
-> > +			break;
-> > +		case R8A7790_CLK_SDH:
-> > +			table = cpg_sdh_div_table;
-> > +			shift = 8;
-> > +			break;
-> > +		case R8A7790_CLK_SD0:
-> > +			table = cpg_sd01_div_table;
-> > +			shift = 4;
-> > +			break;
-> > +		case R8A7790_CLK_SD1:
-> > +			table = cpg_sd01_div_table;
-> > +			shift = 0;
-> > +			break;
-> > +		}
-> 
-> Is this clock-output-names realy "Required" property ?
-> The "name" and "order" seem fixed, then,
-> I guess it can simply use "name array" ?
+I might have missed a patch.. mails are going missing.
 
-The clock-output-names property is required by the of_clk_get_parent_name() 
-function. The property is mandatory for all clocks that need to be referenced 
-by name, which is the case of all non-leaf clocks on our platforms. We thus 
-need it.
+Who's tree is this in, as actual code with git commits and not a
+stream of mis-threaded emails?
 
-> > +static void __init r8a7790_cpg_clocks_init(struct device_node *np)
-> > +{
-> > +	const struct cpg_pll_config *config;
-> > +	struct r8a7790_cpg *cpg;
-> > +	struct clk **clks;
-> > +	unsigned int i;
-> > +
-> > +	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
-> > +	clks = kzalloc(CPG_NUM_CLOCKS * sizeof(*clks), GFP_KERNEL);
-> > +	if (cpg == NULL || clks == NULL) {
-> > +		kfree(clks);
-> > +		kfree(cpg);
-> > +		pr_err("%s: failed to allocate cpg\n", __func__);
-> > +		return;
-> > +	}
-> > +
-> > +	spin_lock_init(&cpg->lock);
-> > +
-> > +	cpg->data.clks = clks;
-> > +	cpg->data.clk_num = CPG_NUM_CLOCKS;
-> > +
-> > +	cpg->reg = of_iomap(np, 0);
-> > +	if (WARN_ON(cpg->reg == NULL)) {
-> > +		kfree(cpg->data.clks);
-> > +		kfree(cpg);
-> > +		return;
-> > +	}
-> 
-> Above 2 error cases are doing same thing.
-> If can use goto xxx_error.
-
-Good point.
-
-Given that a failure to allocate memory or ioremap registers will lead to a 
-boot failure, I wonder whether we couldn't just remove the kfree() calls and 
-leak memory. Is there a point in cleaning up behind us if the system will no 
-boot due to missing core clocks anyway ?
-
--- 
-Regards,
-
-Laurent Pinchart
+Matt <neko@bakuhatsu.net>
