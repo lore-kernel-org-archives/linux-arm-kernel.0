@@ -1,77 +1,25 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 5 Nov 2013 10:31:56 -0800
-Subject: [PATCH v3 14/28] mtd: nand: pxa3xx: Add driver-specific ECC
- BCH support
-In-Reply-To: <1383656135-8627-15-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Tue, 5 Nov 2013 10:32:53 -0800
+Subject: [PATCH v3 18/28] mtd: nand: pxa3xx: Split
+ prepare_command_pool() in two stages
+In-Reply-To: <1383656135-8627-19-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-15-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131105183156.GO20061@ld-irv-0074.broadcom.com>
+ <1383656135-8627-19-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131105183253.GP20061@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 09:55:21AM -0300, Ezequiel Garcia wrote:
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -1073,6 +1075,43 @@ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
->  	return -ENODEV;
->  }
->  
-> +static int pxa_ecc_init(struct pxa3xx_nand_info *info,
-> +			struct nand_ecc_ctrl *ecc,
-> +			int strength, int page_size)
-> +{
-> +	/*
-> +	 * We don't use strength here as the PXA variant
-> +	 * is used with non-ONFI compliant devices.
+On Tue, Nov 05, 2013 at 09:55:25AM -0300, Ezequiel Garcia wrote:
+> This commit splits the prepare_command_pool() function into two
+> stages: prepare_start_command() / prepare_set_command().
+> 
+> This is a preparation patch without any functionality changes,
+> and is meant to allow support fir multiple page reading/writing
 
-Hmm, rather than assuming you never get any relevant 'strength' info
-from nand_base, could you check if it is zero and only ignore it if it
-is zero? But if it is non-zero, you could at least use it to validate
-the strength settings below.
+s/fir/for/
 
-At the same time, I would also caution against fragile ECC determination
-methods that can indirectly cause regressions in the future, such as
-with Huang's recent GPMI ECC layout regressions. Perhaps you'll want a
-DT binding for the ECC strength to future proof this? (Not a
-requirement; just a thought.)
-
-> +	 */
-> +	if (page_size == 2048) {
-> +		ecc->mode = NAND_ECC_HW;
-> +		ecc->size = 512;
-> +		ecc->strength = 1;
-
-I assume this is actually a 1-bit ECC, not just a dummy value? Note that
-the ecc->strength and ecc->size fields are used by nand_base for some
-bitflip calculations and are also exposed via sysfs.
-
-> +
-> +		info->spare_size = 40;
-> +		info->ecc_size = 24;
-> +		return 1;
-> +
-> +	} else if (page_size == 512) {
-> +		ecc->mode = NAND_ECC_HW;
-> +		ecc->size = 512;
-> +		ecc->strength = 1;
-> +
-> +		info->spare_size = 8;
-> +		info->ecc_size = 8;
-> +		return 1;
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int armada370_ecc_init(struct pxa3xx_nand_info *info,
-> +			      struct nand_ecc_ctrl *ecc,
-> +			      int strength, int page_size)
-> +{
-> +	/* Unimplemented yet */
-> +	return 0;
-> +}
-> +
->  static int pxa3xx_nand_scan(struct mtd_info *mtd)
->  {
->  	struct pxa3xx_nand_host *host = mtd->priv;
+> operations.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
 Brian
