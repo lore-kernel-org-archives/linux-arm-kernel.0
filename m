@@ -1,75 +1,64 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Tue, 5 Nov 2013 11:44:17 -0600
-Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
-In-Reply-To: <CAL_Jsq+hO_euGM4eBtpeFUaQdo5rDgmyD0HaU0GEHN=S27f0Vg@mail.gmail.com>
-References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
- <CACxGe6sMXjcsGNEiGQ923_yEKXwaAj_qfqZQPpXqHgh1znsF0Q@mail.gmail.com>
- <CAL_Jsq+hO_euGM4eBtpeFUaQdo5rDgmyD0HaU0GEHN=S27f0Vg@mail.gmail.com>
-Message-ID: <CAHCPf3uGnz3iYZYnvH=JwkzKCLx19o-kyRc3H=YeESg_dTLOWg@mail.gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 5 Nov 2013 11:51:07 -0600
+Subject: [PATCH 03/11] devicetree: bindings: Document qcom,kpss-acc
+In-Reply-To: <52792E78.4060600@codeaurora.org>
+References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
+ <1383343739-23080-4-git-send-email-sboyd@codeaurora.org>
+ <EA8C3C10-2AD6-4179-A785-12001E439364@codeaurora.org>
+ <52792E78.4060600@codeaurora.org>
+Message-ID: <E034522B-A62C-40A4-800C-00D592AAEF47@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 5, 2013 at 8:34 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On Mon, Nov 4, 2013 at 5:36 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Sun, Nov 3, 2013 at 8:50 PM, Rob Herring <robherring2@gmail.com> wrote:
->>> From: Rob Herring <rob.herring@calxeda.com>
->>>
->>> As part of the effort to ultimately remove struct machine_desc, the
->>> machine name is not really needed. It is only used for /proc/cpuinfo
->>> "Hardware" field. Get this information from the DT instead and remove
->>> the name string in the machine descriptor for DT machine descriptors. The
->>> model or machine compatible property from the DT is used instead.
->>
->> I've obviously missed some discussions because I wasn't aware of the
->> plan to remove machine_desc. That's neither here not there, but for as
->> long as the structure still exists it is really useful to discover
->> which machine_desc the kernel chooses at boot time. If you're going to
->> remove this, then at the very least I would embed the filename or
->> something similar into the machine desc so it is available for
->> debugging. It can go away when the structure is removed.
->
-> It's a very long term goal to remove it completely, but it is now
-> optional for "simple" platforms with the default machine_desc and
-> default init ptrs. You might want to look at the patches and the WIP
-> branch I posted[1] which removes the machine_desc for highbank.
-> There's some core boilerplate I'd like your opinion on. Also, I'm sure
-> you are aware of the resistance to add a machine_desc to arm64, so I'm
-> looking at this from that perspective as well. I'm sure there will be
-> platforms which look very similar across arm and arm64.
->
-> On boot, the model or compatible string from the DTB is printed out
 
-So in the case of a DTS for a generic, get-started-here board with no
-"external" features, you might see "fsl,imx53" as your board name?
+On Nov 5, 2013, at 11:44 AM, Stephen Boyd wrote:
 
-> (that change is actually in my DT arch clean-up series, not this
-> patch). This has made what is printed out on boot consistent across
-> arches using DT. There is no good reason for this to be arch specific.
-> Presumably the compatible string is unique
+> On 11/05/13 09:13, Kumar Gala wrote:
+>> On Nov 1, 2013, at 5:08 PM, Stephen Boyd wrote:
+>> 
+>>> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+>>> new file mode 100644
+>>> index 0000000..ed4a9c8
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+>>> @@ -0,0 +1,21 @@
+>>> +* Krait Processor Sub-system (KPSS) Application Clock Controller (ACC)
+>>> +
+>>> +The KPSS ACC provides clock, power domain, and reset control to a Krait CPU.
+>>> +There is one ACC register region per CPU within the KPSS remaped region as
+>>> +well as an alias register region that remaps accesses to the ACC associated
+>>> +with the CPU accessing the region.
+>>> +
+>>> +Required Properties:
+>>> +
+>>> +- compatible : Shall contain "qcom,kpss-acc-v1" or "qcom,kpss-acc-v2".
+>>> +- reg: Specifies the base address and size of the banked register region.
+>>> +- cpu-offset : per-cpu offset used when the device is accessed without the
+>>> +		CPU remapping facilities.
+>>> +		The offset is cpu-offset + (0x10000 * cpu-nr).
+>>> +
+>>> +Example:
+>>> +
+>>> +	clock-controller at 2008000 {
+>>> +		compatible = "qcom,kpss-acc-v2";
+>>> +		reg = <0x02008000 0x1000>;
+>>> +	};
+>>> -- 
+>> I don't get the cpu-offset business, shouldn't this just be:
+>> 	reg = <0x02008000 0x1000>, <0x02018000 0x1000>, <0x02028000 0x1000>, <0x02038000 0x1000>;
+>> 
+> 
+> (Sorry I forgot to add the cpu-offset to the example.)
+> 
+> Your reg property is one way to do it. I was following the example of
+> the GIC binding which just specifies the alias region of the GIC's CPU
+> registers and then has a cpu-offset property to describe how to reach a
+> specific CPU's region.
 
-Not necessarily. Most compatible strings in the root node have more
-than one string (fsl,imx51-babbage, fsl,imx51) - which do you print?
-First? Both/All? Without the model property it's not completely
-deterministic (since it's externally provided data, no matter what)
-and I don't see code that brings out more than one.
+Even in the gic's case I think we should have the reg property cover the memory map.
 
-Essentially meaning for anything that never had or never will have a
-true model property, something a little more relevant (and entirely
-deterministic per-SoC) ends up in the device property.
-
-I really like the idea of ditching machine_desc, but this is one place
-where probably init code for the board is the place to parse (and
-stuff in) the board name to some global structure.
-
-BTW with the of matching patch, what REALLY guarantees ordering of
-these calls, for instance how does it replace map_io, init_irq, etc.?
-Highbank seems a special case where it basically didn't need or do any
-of this so it's not affected by it going away. What I'm trying to
-understand is what replaces those hooks, because I'd like to throw
-this into i.MX and see what happens, but I'm not sure what the
-eventual goal is. Nonetheless I like the theme;
-
-Acked-by: Matt Sealey <neko@bakuhatsu.net>
+- k
 
 -- 
-Matt Sealey <neko@bakuhatsu.net>
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
