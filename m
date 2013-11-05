@@ -1,137 +1,117 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Tue, 5 Nov 2013 23:42:16 +0530
-Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
- indicates the presence of PHY's
-In-Reply-To: <CAFp+6iFFk9Bg1xDaKbuQwF_vEmnVtFtai6LPEsNDodpH5WF4ow@mail.gmail.com>
-References: <1381866857-3861-1-git-send-email-kishon@ti.com>
- <1381866857-3861-2-git-send-email-kishon@ti.com>
- <525E8E93.9010503@ti.com> <525E9046.3090209@ti.com>
- <CAFp+6iFFk9Bg1xDaKbuQwF_vEmnVtFtai6LPEsNDodpH5WF4ow@mail.gmail.com>
-Message-ID: <CAFp+6iHLxrY1mwG=MB3aUty-h43Q_i3yBKY7An02TMRqEyd6Mg@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 5 Nov 2013 19:16:14 +0100
+Subject: [PATCH v2 01/13] uprobes: move function declarations out of arch
+In-Reply-To: <20131105160150.GA1539@redhat.com>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-2-git-send-email-dave.long@linaro.org>
+ <20131105160150.GA1539@redhat.com>
+Message-ID: <20131105181614.GA7614@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 5, 2013 at 11:41 PM, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
-> Dear Kishon, Roger
+On 11/05, Oleg Nesterov wrote:
 >
+> On 10/15, David Long wrote:
+> >
+> > Move the function declarations from the arch header to the common
+> > header, since only the function bodies are architecture-specific.
+> > These changes are from Vincent Rabin's uprobes patch.
 >
-> On Wed, Oct 16, 2013 at 6:40 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi roger,
->>
->> On Wednesday 16 October 2013 06:33 PM, Roger Quadros wrote:
->>> Hi Kishon,
+> Hmm. I didn't look at this patch because I thought it is obviously
+> fine, but...
 >
-> Apologies for missing this thread for so long.
+> >  arch/x86/include/asm/uprobes.h | 7 -------
+> >  include/linux/uprobes.h        | 8 ++++++++
+> >  2 files changed, 8 insertions(+), 7 deletions(-)
 >
->>>
->>> On 10/15/2013 10:54 PM, Kishon Vijay Abraham I wrote:
->>>> There can be systems which does not have a external usb_phy, so get
->>>> usb_phy only if dt data indicates the presence of PHY in the case of dt boot or
->>>> if platform_data indicates the presence of PHY. Also remove checking if
->>>> return value is -ENXIO since it's now changed to always enable usb_phy layer.
->>>>
->>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> ---
->>>> In usb_get_phy_by_phandle, index 0 always refers to usb2 phy and index 1 always
->>>> refers to usb3 phy. Since we've lived so long with this, this patch will make
->>>> an assumption that if only one entry is populated in *usb-phy* property, it will
->>>> be usb2 phy and the next entry will be usb3 phy.
->>>>
->>>>  drivers/usb/dwc3/Kconfig         |    1 +
->>>>  drivers/usb/dwc3/core.c          |   72 ++++++++++++++++++++------------------
->>>>  drivers/usb/dwc3/platform_data.h |    2 ++
->>>>  3 files changed, 41 insertions(+), 34 deletions(-)
->>>>
->>>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
->>>> index 70fc430..8e385b4 100644
->>>> --- a/drivers/usb/dwc3/Kconfig
->>>> +++ b/drivers/usb/dwc3/Kconfig
->>>> @@ -1,6 +1,7 @@
->>>>  config USB_DWC3
->>>>      tristate "DesignWare USB3 DRD Core Support"
->>>>      depends on (USB || USB_GADGET) && HAS_DMA
->>>> +    select USB_PHY
->>>>      select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
->>>>      help
->>>>        Say Y or M here if your system has a Dual Role SuperSpeed
->>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
->>>> index 474162e..cb91d70 100644
->>>> --- a/drivers/usb/dwc3/core.c
->>>> +++ b/drivers/usb/dwc3/core.c
->>>> @@ -354,6 +354,7 @@ static int dwc3_probe(struct platform_device *pdev)
->>>>      struct device_node      *node = dev->of_node;
->>>>      struct resource         *res;
->>>>      struct dwc3             *dwc;
->>>> +    int                     count;
->>>>
->>>>      int                     ret = -ENOMEM;
->>>>
->>>> @@ -387,16 +388,49 @@ static int dwc3_probe(struct platform_device *pdev)
->>>>      if (node) {
->>>>              dwc->maximum_speed = of_usb_get_maximum_speed(node);
->>>>
->>>> -            dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
->>>> -            dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
->>>> +            count = of_count_phandle_with_args(node, "usb-phy", NULL);
->>>> +            switch (count) {
->>>> +            case 2:
->>>> +                    dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
->>>> +                            "usb-phy", 1);
->>>> +                    if (IS_ERR(dwc->usb3_phy)) {
->>>> +                            dev_err(dev, "usb3 phy not found\n");
->>>> +                            return PTR_ERR(dwc->usb3_phy);
->>>> +                    }
->>>> +            case 1:
->>>> +                    dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
->>>> +                            "usb-phy", 0);
->>>> +                    if (IS_ERR(dwc->usb2_phy)) {
->>>> +                            dev_err(dev, "usb2 phy not found\n");
->>>> +                            return PTR_ERR(dwc->usb2_phy);
->>>> +                    }
->>>> +                    break;
->>>
->>> In the Exynos case, there is only 1 phy and it is the USB3 phy. This code
->>> will wrongly treat it as usb2_phy.
+> it should also update arch/powerpc/include/asm/uprobes.h ?
 >
-> Thank you Roger for your concern regarding Exynos case.
-> It's true that, Exynos5 series of SoCs have got only one IP block for
-> DWC3'c PHY.
-> This block is actually a combo of USB2 phy (UTMI+) as well as USB3 phy (PIPE3).
-> And the same is served by a single USB phy driver. This is also
-> clarified in the thread : https://lkml.org/lkml/2013/11/5/160
->
->>
->> That was the case even before this patch no? Unfortunately the old USB PHY
->> library doesn't have APIs to get PHYs in a better way. If we try modifying the
->> USB PHY library, it'll be kind of duplicating what is already there in the
->> Generic PHY library. I'd rather prefer Exynos guys to use the new framework.
+> And 12/13 should not touch arch/powerpc/ or include/linux/uprobes.h.
 
-we have tried moving Samsung's USB phy controller driver for DWC3, to
-generic phy framework
-so that things look clearer on Samsung's side too. The necessary
-patches are availble at:
-https://lkml.org/lkml/2013/10/31/79
+And I think we can merge this change separately to reduce the
+number of non-arm changes in the next version.
 
->>
->> Thanks
->> Kishon
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
->
-> --
-> Best Regards
-> Vivek Gautam
-> Samsung R&D Institute, Bangalore
-> India
+Please see the patch I am going to add to my tree below.
 
+Oleg.
+---
 
+Subject: [PATCH] uprobes: move function declarations out of arch
+From: David A. Long <dave.long@linaro.org>
+Date: Tue, 15 Oct 2013 17:04:16 -0400
 
+Move the function declarations from the arch headers to the common
+header, since only the function bodies are architecture-specific.
+These changes are from Vincent Rabin's uprobes patch.
+
+[ oleg: update arch/powerpc/include/asm/uprobes.h ]
+
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+Signed-off-by: David A. Long <dave.long@linaro.org>
+Signed-off-by: Oleg Nesterov <oleg@redhat.com>
+---
+ arch/powerpc/include/asm/uprobes.h |    7 -------
+ arch/x86/include/asm/uprobes.h     |    7 -------
+ include/linux/uprobes.h            |    8 ++++++++
+ 3 files changed, 8 insertions(+), 14 deletions(-)
+
+diff --git a/arch/powerpc/include/asm/uprobes.h b/arch/powerpc/include/asm/uprobes.h
+index 541fd6f..75c6ecd 100644
+--- a/arch/powerpc/include/asm/uprobes.h
++++ b/arch/powerpc/include/asm/uprobes.h
+@@ -46,11 +46,4 @@ struct arch_uprobe_task {
+ 	unsigned long	saved_trap_nr;
+ };
+ 
+-extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
+-extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+-extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+-extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
+-extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
+-extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+-extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
+ #endif	/* _ASM_UPROBES_H */
+diff --git a/arch/x86/include/asm/uprobes.h b/arch/x86/include/asm/uprobes.h
+index 2a24180..3087ea9 100644
+--- a/arch/x86/include/asm/uprobes.h
++++ b/arch/x86/include/asm/uprobes.h
+@@ -52,11 +52,4 @@ struct arch_uprobe_task {
+ 	unsigned int			saved_tf;
+ };
+ 
+-extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
+-extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+-extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+-extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
+-extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
+-extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+-extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
+ #endif	/* _ASM_UPROBES_H */
+diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
+index 06f28be..9fd60c5 100644
+--- a/include/linux/uprobes.h
++++ b/include/linux/uprobes.h
+@@ -30,6 +30,7 @@
+ struct vm_area_struct;
+ struct mm_struct;
+ struct inode;
++struct notifier_block;
+ 
+ #ifdef CONFIG_ARCH_SUPPORTS_UPROBES
+ # include <asm/uprobes.h>
+@@ -125,6 +126,13 @@ extern void uprobe_notify_resume(struct pt_regs *regs);
+ extern bool uprobe_deny_signal(void);
+ extern bool __weak arch_uprobe_skip_sstep(struct arch_uprobe *aup, struct pt_regs *regs);
+ extern void uprobe_clear_state(struct mm_struct *mm);
++extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
++extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
++extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
++extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
++extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
++extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
++extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
+ #else /* !CONFIG_UPROBES */
+ struct uprobes_state {
+ };
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+1.5.5.1
