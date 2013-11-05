@@ -1,37 +1,75 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 05 Nov 2013 09:46:30 -0800
-Subject: [PATCH 02/11] devicetree: bindings: Document Qualcomm cpus and
- enable-method
-In-Reply-To: <1A27B0E2-FB92-488D-A0B3-65E677525720@codeaurora.org>
-References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
- <1383343739-23080-3-git-send-email-sboyd@codeaurora.org>
- <CAL_JsqLObXEWJJ=SuifTjpPz9qTW0n43fyQNA-vjLNeLy-7-XA@mail.gmail.com>
- <20131104173606.GL21983@codeaurora.org>
- <378446F7-DC51-448D-AF99-93F98CEAFB03@codeaurora.org>
- <52792C60.2030405@codeaurora.org>
- <1A27B0E2-FB92-488D-A0B3-65E677525720@codeaurora.org>
-Message-ID: <52792EF6.2040005@codeaurora.org>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Tue, 5 Nov 2013 11:44:17 -0600
+Subject: [PATCH v2] ARM: remove name from machine_desc for DT platforms
+In-Reply-To: <CAL_Jsq+hO_euGM4eBtpeFUaQdo5rDgmyD0HaU0GEHN=S27f0Vg@mail.gmail.com>
+References: <1383511801-31682-1-git-send-email-robherring2@gmail.com>
+ <CACxGe6sMXjcsGNEiGQ923_yEKXwaAj_qfqZQPpXqHgh1znsF0Q@mail.gmail.com>
+ <CAL_Jsq+hO_euGM4eBtpeFUaQdo5rDgmyD0HaU0GEHN=S27f0Vg@mail.gmail.com>
+Message-ID: <CAHCPf3uGnz3iYZYnvH=JwkzKCLx19o-kyRc3H=YeESg_dTLOWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/13 09:43, Kumar Gala wrote:
-> On Nov 5, 2013, at 11:35 AM, Stephen Boyd wrote:
->
->> On 11/05/13 09:12, Kumar Gala wrote:
->>> I think this should be more specific than just 'qcom,mmio' or 'qcom,warm-boot'.  It should be 'qcom,kpss-acc-v1' or 'qcom-gcc-8660'.
+On Tue, Nov 5, 2013 at 8:34 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On Mon, Nov 4, 2013 at 5:36 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> On Sun, Nov 3, 2013 at 8:50 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
 >>>
->> Do you have any reasons why? I don't see why we need to keep adding more
->> and more enable-methods every time the subsystem surrounding the CPU
->> changes. The method is the same, write some registers to power up the
->> CPU for the first time (cold boot) or ping the CPU to wake it up
->> (warmboot). The only difference is where those registers live and a
->> slight variation in the sequence that we perform.
-> By that argument every device could just be compatible with 'mmio' and be done with it ;)
+>>> As part of the effort to ultimately remove struct machine_desc, the
+>>> machine name is not really needed. It is only used for /proc/cpuinfo
+>>> "Hardware" field. Get this information from the DT instead and remove
+>>> the name string in the machine descriptor for DT machine descriptors. The
+>>> model or machine compatible property from the DT is used instead.
+>>
+>> I've obviously missed some discussions because I wasn't aware of the
+>> plan to remove machine_desc. That's neither here not there, but for as
+>> long as the structure still exists it is really useful to discover
+>> which machine_desc the kernel chooses at boot time. If you're going to
+>> remove this, then at the very least I would embed the filename or
+>> something similar into the machine desc so it is available for
+>> debugging. It can go away when the structure is removed.
 >
-> As the registers you write vary, the compatible should vary.
+> It's a very long term goal to remove it completely, but it is now
+> optional for "simple" platforms with the default machine_desc and
+> default init ptrs. You might want to look at the patches and the WIP
+> branch I posted[1] which removes the machine_desc for highbank.
+> There's some core boilerplate I'd like your opinion on. Also, I'm sure
+> you are aware of the resistance to add a machine_desc to arm64, so I'm
+> looking at this from that perspective as well. I'm sure there will be
+> platforms which look very similar across arm and arm64.
+>
+> On boot, the model or compatible string from the DTB is printed out
 
-The compatible does vary. The enable-method is not a compatible property.
+So in the case of a DTS for a generic, get-started-here board with no
+"external" features, you might see "fsl,imx53" as your board name?
+
+> (that change is actually in my DT arch clean-up series, not this
+> patch). This has made what is printed out on boot consistent across
+> arches using DT. There is no good reason for this to be arch specific.
+> Presumably the compatible string is unique
+
+Not necessarily. Most compatible strings in the root node have more
+than one string (fsl,imx51-babbage, fsl,imx51) - which do you print?
+First? Both/All? Without the model property it's not completely
+deterministic (since it's externally provided data, no matter what)
+and I don't see code that brings out more than one.
+
+Essentially meaning for anything that never had or never will have a
+true model property, something a little more relevant (and entirely
+deterministic per-SoC) ends up in the device property.
+
+I really like the idea of ditching machine_desc, but this is one place
+where probably init code for the board is the place to parse (and
+stuff in) the board name to some global structure.
+
+BTW with the of matching patch, what REALLY guarantees ordering of
+these calls, for instance how does it replace map_io, init_irq, etc.?
+Highbank seems a special case where it basically didn't need or do any
+of this so it's not affected by it going away. What I'm trying to
+understand is what replaces those hooks, because I'd like to throw
+this into i.MX and see what happens, but I'm not sure what the
+eventual goal is. Nonetheless I like the theme;
+
+Acked-by: Matt Sealey <neko@bakuhatsu.net>
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Matt Sealey <neko@bakuhatsu.net>
