@@ -1,156 +1,100 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  5 Nov 2013 09:55:19 -0300
-Subject: [PATCH v3 12/28] mtd: nand: pxa3xx: Use a completion to signal device
- ready
+Date: Tue,  5 Nov 2013 09:55:20 -0300
+Subject: [PATCH v3 13/28] mtd: nand: pxa3xx: Add bad block handling
 In-Reply-To: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383656135-8627-13-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1383656135-8627-14-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apparently, the expected behavior of the waitfunc() NAND chip call
-is to wait for the device to be READY (this is a standard chip line).
-However, the current implementation does almost nothing, which opens
-a possibility to issue a command to a non-ready device.
-
-Fix this by adding a new completion to wait for the ready event to arrive.
-
-Because the "is ready" flag is cleared from the controller status
-register, it's needed to store that state in the driver, and because the
-field is accesed from an interruption, the field needs to be of an
-atomic type.
+Add support for flash-based bad block table using Marvell's
+custom in-flash bad block table layout. The support is enabled
+a 'flash_bbt' platform data or device tree parameter.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 45 +++++++++++++++++++++++++++++-------------
- 1 file changed, 31 insertions(+), 14 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c                | 33 +++++++++++++++++++++++++++
+ include/linux/platform_data/mtd-nand-pxa3xx.h |  3 +++
+ 2 files changed, 36 insertions(+)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 2fb0f38..e198c94 100644
+index e198c94..9a5913d 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -35,6 +35,7 @@
+@@ -24,6 +24,7 @@
+ #include <linux/slab.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/of_mtd.h>
  
- #include <linux/platform_data/mtd-nand-pxa3xx.h>
+ #if defined(CONFIG_ARCH_PXA) || defined(CONFIG_ARCH_MMP)
+ #define ARCH_HAS_DMA
+@@ -245,6 +246,29 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
+ { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
+ };
  
-+#define NAND_DEV_READY_TIMEOUT  50
- #define	CHIP_DELAY_TIMEOUT	(2 * HZ/10)
- #define NAND_STOP_DELAY		(2 * HZ/50)
- #define PAGE_CHUNK_SIZE		(2048)
-@@ -166,7 +167,7 @@ struct pxa3xx_nand_info {
- 	struct clk		*clk;
- 	void __iomem		*mmio_base;
- 	unsigned long		mmio_phys;
--	struct completion	cmd_complete;
-+	struct completion	cmd_complete, dev_ready;
- 
- 	unsigned int 		buf_start;
- 	unsigned int		buf_count;
-@@ -196,7 +197,13 @@ struct pxa3xx_nand_info {
- 	int			use_ecc;	/* use HW ECC ? */
- 	int			use_dma;	/* use DMA ? */
- 	int			use_spare;	/* use spare ? */
--	int			is_ready;
++static u8 bbt_pattern[] = {'M', 'V', 'B', 'b', 't', '0' };
++static u8 bbt_mirror_pattern[] = {'1', 't', 'b', 'B', 'V', 'M' };
 +
-+	/*
-+	 * The is_ready flag is accesed from several places,
-+	 * including an interruption hander. We need an atomic
-+	 * type to avoid races.
-+	 */
-+	atomic_t		is_ready;
- 
- 	unsigned int		fifo_size;	/* max. data size in the FIFO */
- 	unsigned int		data_size;	/* data to be read from FIFO */
-@@ -478,7 +485,7 @@ static void start_data_dma(struct pxa3xx_nand_info *info)
- static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
- {
- 	struct pxa3xx_nand_info *info = devid;
--	unsigned int status, is_completed = 0;
-+	unsigned int status, is_completed = 0, is_ready = 0;
- 	unsigned int ready, cmd_done;
- 
- 	if (info->cs == 0) {
-@@ -514,8 +521,9 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
- 		is_completed = 1;
- 	}
- 	if (status & ready) {
--		info->is_ready = 1;
-+		atomic_set(&info->is_ready, 1);
- 		info->state = STATE_READY;
-+		is_ready = 1;
- 	}
- 
- 	if (status & NDSR_WRCMDREQ) {
-@@ -544,6 +552,8 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
- 	nand_writel(info, NDSR, status);
- 	if (is_completed)
- 		complete(&info->cmd_complete);
-+	if (is_ready)
-+		complete(&info->dev_ready);
- NORMAL_IRQ_EXIT:
- 	return IRQ_HANDLED;
- }
-@@ -574,7 +584,6 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
- 	info->oob_size		= 0;
- 	info->use_ecc		= 0;
- 	info->use_spare		= 1;
--	info->is_ready		= 0;
- 	info->retcode		= ERR_NONE;
- 	if (info->cs != 0)
- 		info->ndcb0 = NDCB0_CSEL;
-@@ -747,6 +756,8 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
- 	exec_cmd = prepare_command_pool(info, command, column, page_addr);
- 	if (exec_cmd) {
- 		init_completion(&info->cmd_complete);
-+		init_completion(&info->dev_ready);
-+		atomic_set(&info->is_ready, 0);
- 		pxa3xx_nand_start(info);
- 
- 		ret = wait_for_completion_timeout(&info->cmd_complete,
-@@ -859,21 +870,27 @@ static int pxa3xx_nand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
- {
- 	struct pxa3xx_nand_host *host = mtd->priv;
- 	struct pxa3xx_nand_info *info = host->info_data;
-+	int ret;
++static struct nand_bbt_descr bbt_main_descr = {
++	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
++		| NAND_BBT_2BIT | NAND_BBT_VERSION,
++	.offs =	8,
++	.len = 6,
++	.veroffs = 14,
++	.maxblocks = 8,		/* Last 8 blocks in each chip */
++	.pattern = bbt_pattern
++};
 +
-+	/* Need to wait? */
-+	if (!atomic_read(&info->is_ready)) {
-+		ret = wait_for_completion_timeout(&info->dev_ready,
-+				CHIP_DELAY_TIMEOUT);
-+		if (!ret) {
-+			dev_err(&info->pdev->dev, "Ready time out!!!\n");
-+			return NAND_STATUS_FAIL;
-+		}
++static struct nand_bbt_descr bbt_mirror_descr = {
++	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
++		| NAND_BBT_2BIT | NAND_BBT_VERSION,
++	.offs =	8,
++	.len = 6,
++	.veroffs = 14,
++	.maxblocks = 8,		/* Last 8 blocks in each chip */
++	.pattern = bbt_mirror_pattern
++};
++
+ /* Define a default flash type setting serve as flash detecting only */
+ #define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
+ 
+@@ -1128,6 +1152,14 @@ KEEP_CONFIG:
+ 
+ 	if (nand_scan_ident(mtd, 1, def))
+ 		return -ENODEV;
++
++	if (pdata->flash_bbt) {
++		chip->bbt_options |= NAND_BBT_USE_FLASH |
++				     NAND_BBT_NO_OOB_BBM;
++		chip->bbt_td = &bbt_main_descr;
++		chip->bbt_md = &bbt_mirror_descr;
 +	}
++
+ 	/* calculate addressing information */
+ 	if (mtd->writesize >= 2048)
+ 		host->col_addr_cycles = 2;
+@@ -1323,6 +1355,7 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
+ 	if (of_get_property(np, "marvell,nand-keep-config", NULL))
+ 		pdata->keep_config = 1;
+ 	of_property_read_u32(np, "num-cs", &pdata->num_cs);
++	pdata->flash_bbt = of_get_nand_on_flash_bbt(np);
  
- 	/* pxa3xx_nand_send_command has waited for command complete */
- 	if (this->state == FL_WRITING || this->state == FL_ERASING) {
- 		if (info->retcode == ERR_NONE)
- 			return 0;
--		else {
--			/*
--			 * any error make it return 0x01 which will tell
--			 * the caller the erase and write fail
--			 */
--			return 0x01;
--		}
-+		else
-+			return NAND_STATUS_FAIL;
- 	}
+ 	pdev->dev.platform_data = pdata;
  
--	return 0;
-+	return NAND_STATUS_READY;
- }
+diff --git a/include/linux/platform_data/mtd-nand-pxa3xx.h b/include/linux/platform_data/mtd-nand-pxa3xx.h
+index ffb8019..a941471 100644
+--- a/include/linux/platform_data/mtd-nand-pxa3xx.h
++++ b/include/linux/platform_data/mtd-nand-pxa3xx.h
+@@ -55,6 +55,9 @@ struct pxa3xx_nand_platform_data {
+ 	/* indicate how many chip selects will be used */
+ 	int	num_cs;
  
- static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
-@@ -1026,7 +1043,7 @@ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
- 		return ret;
++	/* use an flash-based bad block table */
++	bool	flash_bbt;
++
+ 	const struct mtd_partition		*parts[NUM_CHIP_SELECT];
+ 	unsigned int				nr_parts[NUM_CHIP_SELECT];
  
- 	chip->cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
--	if (info->is_ready)
-+	if (atomic_read(&info->is_ready))
- 		return 0;
- 
- 	return -ENODEV;
 -- 
 1.8.1.5
