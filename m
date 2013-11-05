@@ -1,63 +1,52 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 5 Nov 2013 08:58:29 +0900
-Subject: [PATCH] RM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
-In-Reply-To: <527447A1.2000607@cogentembedded.com>
-References: <1383201098-4258-1-git-send-email-horms+renesas@verge.net.au>
- <5272CC16.3020700@cogentembedded.com>
- <20131101004359.GK6818@verge.net.au>
- <527447A1.2000607@cogentembedded.com>
-Message-ID: <20131104235828.GB18844@verge.net.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 04 Nov 2013 17:04:14 -0700
+Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <201311050026.56321.heiko@sntech.de>
+References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
+ <051069C10411E24D9749790C498526FA1BE0B7D7@SJEXCHMB12.corp.ad.broadcom.com>
+ <CACRpkdYSLxp2M4HghcUdjEYGh-UQ+DaiCGp6yee+Qds6DR9poA@mail.gmail.com>
+ <201311050026.56321.heiko@sntech.de>
+Message-ID: <527835FE.2030102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 02, 2013 at 03:30:25AM +0300, Sergei Shtylyov wrote:
-> On 11/01/2013 03:43 AM, Simon Horman wrote:
-> 
-> >>>Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
-> >>>Other than not being useful it is also not possible to compile
-> 
-> >>    s/compile/link/.
-> 
-> >>>the code under this condition as phy_register_fixup_for_id()
-> >>>is not defined.
-> 
-> >>    Not only this function is absent...
-> 
-> >>>This problem was introduced by 48c8b96f21817aad
-> >>>("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
-> 
-> >>>Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >>>---
-> >>>  arch/arm/mach-shmobile/board-lager.c | 4 +++-
-> >>>  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> >>>diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-> >>>index 78a31b6..d1a8ddd 100644
-> >>>--- a/arch/arm/mach-shmobile/board-lager.c
-> >>>+++ b/arch/arm/mach-shmobile/board-lager.c
-> >>>@@ -245,7 +245,9 @@ static void __init lager_init(void)
-> >>>  {
-> >>>  	lager_add_standard_devices();
-> >>>
-> >>>-	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
-> >>>+	if (IS_ENABLED(CONFIG_PHYLIB))
-> >>>+		phy_register_fixup_for_id("r8a7790-ether-ff:01",
-> >>>+					  lager_ksz8041_fixup);
-> 
-> >>    Perhaps you would consider enclosing the fixup function itself
-> >>into #ifdef as it causes link errors as well?  Doesn't seem
-> >>necessary as gcc probably drops it anyway but for completeness'
-> >>sake...
-> 
-> >My understanding of the motivation for IS_ENABLED() is to
-> >take advantage of gcc optimising away unused code and making such
-> >problems disappear.
-> 
-> >With this patch in place do you still see any warnings?
-> 
->    No (but those were errors :-).
->    I'd like the changelog to be adjusted at least...
+On 11/04/2013 04:26 PM, Heiko St?bner wrote:
 
-Sure. Would you like me to list in the changelog the compile problems that
-gcc reports without this patch? Or do you have something else in mind?
+> I remember we had a discussion about how things like bias-disable explicitly 
+> shouldn't have a value, when they are represented in the list-format:
+> 
+> 		pcfg_pull_none: pcfg_pull_none {
+> 			bias-disable;
+> 		};
+> 
+> so a bias-disable = <1> was explicitly "forbidden" [for a lack of a better 
+> word]. And it was similar for other options, the parameter not meant to be 
+> indicating if they are active but really only setting the "strength" or so.
+
+Pure Boolean values should be represented as a valueless property. If
+the property is present, the value is true, otherwise false.
+
+However, pinctrl bindings often don't represent Boolean values, but
+rather tri-states, with the following values:
+
+* Don't touch this configuration option at all (missing)
+* Enable the option (<1>)
+* Disable the option (<0>)
+
+The reason for using tri-states being that you might want to write:
+
+xxx1 {
+    pins = <PINA>, <PINB>, <PINC>;
+    function = <...>;
+    // this node doesn't affect pullup
+}
+xxx2 {
+    pins = <PINA>, <PINB>;
+    // this node doesn't affect function
+    pull-up = <1>; // change, and enable
+}
+xxx3 {
+    pins = <PINAC>;
+    // this node doesn't affect function
+    pull-up = <0>; // change, and disable
+}
