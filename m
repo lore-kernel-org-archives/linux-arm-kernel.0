@@ -1,75 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  5 Nov 2013 18:58:15 +0000
-Subject: [PATCH v3 2/2] arm/arm64: KVM: propagate caller endianness to the
- incomming vcpu
-In-Reply-To: <1383677895-3728-1-git-send-email-marc.zyngier@arm.com>
-References: <1383677895-3728-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1383677895-3728-3-git-send-email-marc.zyngier@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 05 Nov 2013 19:59:14 +0100
+Subject: [PATCH v3] iommu: shmobile: Enable the driver on all ARM platforms
+In-Reply-To: <20131030162854.GB2493@sirena.org.uk>
+References: <1383132043-5190-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1652955.Gs3XDiEUHO@avalon> <20131030162854.GB2493@sirena.org.uk>
+Message-ID: <1675842.yXNSE5Ofkv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting a vcpu using PSCI, make sure we start it with the
-endianness of the caller. Otherwise, secondaries can be pretty
-unhappy to execute a BE kernel in LE mode...
+On Wednesday 30 October 2013 09:28:54 Mark Brown wrote:
+> On Wed, Oct 30, 2013 at 12:40:12PM +0100, Laurent Pinchart wrote:
+> > > For similar reasons as x86, can we please think about using:
+> > > 	depends on ARM
+> > > 	depends on ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI || COMPILE_TEST
+> > 
+> > I'm fine with your proposed option. As I don't want to respin the series
+> > dozens of time let's first agree on the course of action, I will then
+> > repost the patches. Mark, you've pushed towards as few platform
+> > dependencies as possible, what's your opinion on this ?
+> 
+> In general I think we should have whatever the real depedencies are or
+> COMPILE_TEST (to the extent that they will actually build cleanly on
+> other targets).  That way only people who explicitly go looking to
+> compile test things for build coverage (eg, when doing global cleanups
+> or API updates) need to be bothered by the extra compile test options.
+> 
+> I'd read the above as saying the code needs ARM to build at all and that
+> the hardware will only ever appear on SHMOBILE.
 
-This conforms to PSCI spec Rev B, 5.13.3.
+That's my reading as well, and it makes sense to express it that way to me. 
+I'll resubmit the whole series (minus the patches that have been applied 
+already, I'll fix those in follow-up patches) with the dependencies expressed 
+that way.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_emulate.h   | 5 +++++
- arch/arm/kvm/psci.c                  | 4 ++++
- arch/arm64/include/asm/kvm_emulate.h | 8 ++++++++
- 3 files changed, 17 insertions(+)
-
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 8a6be05..e844b33 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -157,6 +157,11 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
- 	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
- }
- 
-+static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-+{
-+	*vcpu_cpsr(vcpu) |= PSR_E_BIT;
-+}
-+
- static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
- {
- 	return !!(*vcpu_cpsr(vcpu) & PSR_E_BIT);
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 86a693a..ae0e06b 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -62,6 +62,10 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 		vcpu_set_thumb(vcpu);
- 	}
- 
-+	/* Propagate caller endianness */
-+	if (kvm_vcpu_is_be(source_vcpu))
-+		kvm_vcpu_set_be(vcpu);
-+
- 	*vcpu_pc(vcpu) = target_pc;
- 	vcpu->arch.pause = false;
- 	smp_mb();		/* Make sure the above is visible */
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 3a7d058..c8ea23f 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -177,6 +177,14 @@ static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
- 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
- }
- 
-+static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-+{
-+	if (vcpu_mode_is_32bit(vcpu))
-+		*vcpu_cpsr(vcpu) |= COMPAT_PSR_E_BIT;
-+	else
-+		vcpu_sys_reg(vcpu, SCTLR_EL1) |= (1 << 25);
-+}
-+
- static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
- {
- 	if (vcpu_mode_is_32bit(vcpu))
 -- 
-1.8.2.3
+Regards,
+
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131105/a21f7815/attachment.sig>
