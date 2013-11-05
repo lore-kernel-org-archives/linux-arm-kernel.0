@@ -1,56 +1,130 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  5 Nov 2013 09:55:34 -0300
-Subject: [PATCH v3 27/28] ARM: mvebu: Enable NAND controller in Armada 370
- Mirabox
+Date: Tue,  5 Nov 2013 09:55:35 -0300
+Subject: [PATCH v3 28/28] mtd: nand: pxa3xx: Add documentation about the
+ controller
 In-Reply-To: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383656135-8627-28-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1383656135-8627-29-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 Mirabox has a NAND flash, so enable it in the devicetree
-and add the partitions as prepared in the factory images.
+Given there's no public specification to this date, and in order
+to capture some important details and singularities about the
+controller let's document them once and for good.
 
-In order to skip the driver's custom device detection and use only
-ONFI detection, the "marvell,keep-config" parameter is used.
-This is needed because we have no support for setting the timings parameters yet.
-
+Cc: linux-doc at vger.kernel.org
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-mirabox.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ Documentation/mtd/nand/pxa3xx-nand.txt | 101 +++++++++++++++++++++++++++++++++
+ 1 file changed, 101 insertions(+)
+ create mode 100644 Documentation/mtd/nand/pxa3xx-nand.txt
 
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index 2471d9d..1e73017 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -139,6 +139,27 @@
- 					reg = <0x25>;
- 				};
- 			};
+diff --git a/Documentation/mtd/nand/pxa3xx-nand.txt b/Documentation/mtd/nand/pxa3xx-nand.txt
+new file mode 100644
+index 0000000..912f7c6
+--- /dev/null
++++ b/Documentation/mtd/nand/pxa3xx-nand.txt
+@@ -0,0 +1,101 @@
 +
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
++About this document
++===================
 +
-+				partition at 0 {
-+					label = "U-Boot";
-+					reg = <0 0x400000>;
-+				};
-+				partition at 400000 {
-+					label = "Linux";
-+					reg = <0x400000 0x400000>;
-+				};
-+				partition at 800000 {
-+					label = "Filesystem";
-+					reg = <0x800000 0x3f800000>;
-+				};
-+			};
- 		};
- 	};
- };
++Some notes about Marvell's NAND controller available in PXA and Armada 370/XP
++SoC (aka NFCv1 and NFCv2), with an emphasis on the latter.
++
++NFCv2 controller background
++===========================
++
++The controller has a 2176 bytes FIFO buffer. Therefore, in order to support
++larger pages, I/O operations on 4 KiB and 8 KiB pages is done with a set of
++chunked transfers.
++
++For instance, if we choose a 2048 data chunk and set "BCH" ECC (see below)
++we'll have this layout in the pages:
++
++  ------------------------------------------------------------------------------
++  | 2048B data | 32B spare | 30B ECC || 2048B data | 32B spare | 30B ECC | ... |
++  ------------------------------------------------------------------------------
++
++The driver reads the data and spare portions independently and builds an internal
++buffer with this layout (in the 4 KiB page case):
++
++  ------------------------------------------
++  |     4096B data     |     64B spare     |
++  ------------------------------------------
++
++Also, for the READOOB command the driver disables the ECC and reads a 'spare + ECC'
++OOB, one per chunk read.
++
++  -------------------------------------------------------------------
++  |     4096B data     |  32B spare | 30B ECC | 32B spare | 30B ECC |
++  -------------------------------------------------------------------
++
++So, in order to achieve reading (for instance), we issue several READ0 commands
++(with some additional controller-specific magic) and read two chunks of 2080B
++(2048 data + 32 spare) each.
++The driver accomodates this data to expose the NAND core a contiguous buffer
++(4096 data + spare) or (4096 + spare + ECC + spare + ECC).
++
++ECC
++===
++
++The controller has built-in hardware ECC capabilities. In addition it is
++configurable between two modes: 1) Hamming, 2) BCH.
++
++Note that the actual BCH mode: BCH-4 or BCH-8 will depend on the way
++the controller is configured to transfer the data.
++
++In the BCH mode the ECC code will be calculated for each transfered chunk
++and expected to be located (when reading/programming) right after the spare
++bytes as the figure above shows.
++
++So, repeating the above scheme, a 2048B data chunk will be followed by 32B
++spare, and then the ECC controller will read/write the ECC code (30B in
++this case):
++
++  ------------------------------------
++  | 2048B data | 32B spare | 30B ECC |
++  ------------------------------------
++
++If the ECC mode is 'BCH' then the ECC is *always* 30 bytes long.
++If the ECC mode is 'Hamming' the ECC is 6 bytes long, for each 512B block.
++So in Hamming mode, a 2048B page will have a 24B ECC.
++
++Despite all of the above, the controller requires the driver to only read or
++write in multiples of 8-bytes, because the data buffer is 64-bits.
++
++OOB
++===
++
++Because of the above scheme, and because the "spare" OOB is really located in
++the middle of a page, spare OOB cannot be read or write independently of the
++data area. In other words, in order to read the OOB (aka READOOB), the entire
++page (aka READ0) has to be read.
++
++In the same sense, in order to write to the spare OOB the driver has to write
++an *entire* page.
++
++Factory bad blocks handling
++===========================
++
++Given the ECC BCH requires to layout the device's pages in a splitted
++data/OOB/data/OOB way, the controller has a view of the flash page that's
++different from the specified (aka the manufacturer's) view. In other words,
++
++Factory view:
++
++  -----------------------------------------------
++  |                    Data           |x  OOB   |
++  -----------------------------------------------
++
++Driver's view:
++
++  -----------------------------------------------
++  |      Data      | OOB |      Data   x  | OOB |
++  -----------------------------------------------
++
++It can be seen from the above, that the factory bad block marker must be
++searched within the 'data' region, and not in the usual OOB region.
 -- 
 1.8.1.5
