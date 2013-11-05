@@ -1,38 +1,71 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 05 Nov 2013 23:17:38 +0100
-Subject: [PATCH] net: mv643xx_eth: Add missing phy_addr_set in DT mode
-In-Reply-To: <87sivacxcf.fsf@natisbad.org>
-References: <1383611239-14556-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <87sivacxcf.fsf@natisbad.org>
-Message-ID: <52796E82.5010800@gmail.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Tue, 5 Nov 2013 14:36:56 -0800
+Subject: ARM audit, seccomp, etc are broken wrt OABI syscalls
+Message-ID: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2013 11:12 PM, Arnaud Ebalard wrote:
-> Hi Jason,
->
-> Jason Gunthorpe <jgunthorpe@obsidianresearch.com> writes:
->
->> Commit cc9d4598 'net: mv643xx_eth: use of_phy_connect if phy_node
->> present' made the call to phy_scan optional, if the DT has a link to
->> the phy node.
->>
->> However phy_scan has the side effect of calling phy_addr_set, which
->> writes the phy MDIO address to the ethernet controller. If phy_addr_set
->> is not called, and the bootloader has not set the correct address then
->> the driver will fail to function.
->
-> Thanks *a lot* for fixing this one! I had the issue on my ReadyNAS 102
-> (Armada 370 based) which I had put on a todo list and temporarily
+[cc: some ARM people]
 
-Erm, just to make sure: Armada 370 isn't using mv643xx_eth but mvneta,
-are you sure it is (was) related to Jason's fix?
+After a bit of an adventure, I got QEMU working.  (Linux 3.12's smc91x
+driver and qemu 1.6 don't get along.  It would be great if some
+kernel.org page described a standard way to boot a modern Linux image
+on a modern QEMU version, but I digress.)
 
-Sebastian
+The current state of affairs is unhealthy.  I wrote a program
+(attached) that does 'svc $0x90002f' (silly GNU syntax for "Issue the
+getgid syscall in OABI").  The registers I program are:
 
-> workarounded by including a 'ping whatever' call in my u-boot env in
-> order to force it to do the init. Without it, I was unable to properly
-> use the interface. With your fix, after multiple reboots to test it,
-> everything works as expected. So, FWIW:
->
-> Tested-by: Arnaud Ebalard <arno@natisbad.org>
+r0: 1
+r1: 2
+r2: 3
+r3: 4
+r4: 5
+r5: 6
+
+(i.e. the arguments are 1,2,3,4,5,6, although getgid ignores them)
+
+r7: 1
+
+(r7 is the EABI syscall register.  On a kernel without OABI support,
+the immediate svc argument is ignored and syscall 1, i.e. _exit, will
+be invoked).
+
+Seccomp sees the registers as I set them (unsurprisingly) and it sees
+nr == 0x2f.  It passes those values on to a SIGSYS handler, if one
+exists.  This is, IMO, bad.  The OABI and EABI argument passing
+conventions are *not* the same, and seccomp filters that check syscall
+argument values may be spoofable by using OABI calls.
+
+I suspect that audit, perf, ftrace, and maybe even ptrace are broken
+as well for exactly the same reason.
+
+I would argue that there are two reasonable fixes:
+
+1. Set a different audit arch for OABI syscalls (e.g.
+AUDIT_ARCH_ARMOABI).  That is, treat OABI syscall entries the same way
+that x86_64 treats int 80.
+
+2. Leave the 0x900000 bits set in the syscall nr.  That way OABI
+syscalls would look like a different set of syscalls on the same
+architecture.  That is, treat OABI syscall entries kind of like x86_64
+treats x32 syscalls.  (There's probably no reason to accept 0x900000 +
+N as an r7 value to cause 'svc 0' to invoke OABI syscall N, though.)
+
+3. Unconditionally kill any process that makes an OABI syscall with
+seccomp enabled (because there should be no such programs).  Eww.
+
+Options 1 and 2 are both break ABI, but I doubt that anythink cares.
+OABI is, AFAICT, mostly dead.  That being said, even if nothing
+legitimate uses OABI, exploits against seccomp-using programs can
+certainly use OABI, so I think that this needs to be fixed somehow.
+
+Thoughts?  I think I prefer option 1.  I don't really want to make the
+change because my ARM assembly skills are lacking.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: seccomp_oabi.c
+Type: text/x-csrc
+Size: 2375 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131105/5e363192/attachment.bin>
