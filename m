@@ -1,65 +1,30 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Tue,  5 Nov 2013 14:37:07 +0100
-Subject: [PATCHv9][ 2/2] ARM: dts: cpuimx51 Add touchscreen support.
-In-Reply-To: <1383658627-1948-1-git-send-email-denis@eukrea.com>
-References: <1383658627-1948-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383658627-1948-2-git-send-email-denis@eukrea.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Nov 2013 13:47:46 +0000
+Subject: [PATCHv4][ 1/6] fbdev: Add the lacking FB_SYNC_* for matching
+ the DISPLAY_FLAGS_*
+In-Reply-To: <1383581724-14817-1-git-send-email-denis@eukrea.com>
+References: <1383581724-14817-1-git-send-email-denis@eukrea.com>
+Message-ID: <20131105134746.GR16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Eric B?nard <eric@eukrea.com>
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v8->v9:
-- Rebased.
-- Adapted to request the tsc2007 gpio pinctrl outside of the tsc2007 bindings.
+On Mon, Nov 04, 2013 at 05:15:19PM +0100, Denis Carikli wrote:
+> Without that fix, drivers using the fb_videomode_from_videomode
+>   function will not be able to get certain information because
+>   some DISPLAY_FLAGS_* have no corresponding FB_SYNC_*.
 
-ChangeLog v7->v8:
-- Added Shawn Guo in the cc list.
----
- arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi |   14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+Please describe how userspace knows how to set these flags.
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-index b22841a..dfd9549 100644
---- a/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-+++ b/arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi
-@@ -42,11 +42,23 @@
- 		compatible = "nxp,pcf8563";
- 		reg = <0x51>;
- 	};
-+
-+	tsc2007: tsc2007 at 49 {
-+		compatible = "ti,tsc2007";
-+		reg = <0x49>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <0x0 0x8>;
-+		gpios = <&gpio4 0 0>;
-+		ti,x-plate-ohms = <180>;
-+	};
- };
- 
- &iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
- 	imx51-eukrea {
--		pinctrl_tsc2007_1: tsc2007grp-1 {
-+		pinctrl_hog: hoggrp {
- 			fsl,pins = <
- 				MX51_PAD_GPIO_NAND__GPIO_NAND 0x1f5
- 				MX51_PAD_NANDF_D8__GPIO4_0 0x1f5
--- 
-1.7.9.5
+Flags such as the polarity of the hsync and vsync signals are fairly well
+defined based upon the display mode, but aren't things like data enable
+and the pixel clock edge a property of the attached LCD panel, which is
+something that is configured according to the panel which is attached.
+
+In other words, this information should not be passed from userspace, but
+should be part of the DT description about the connected panel.  So should
+be the polarity of the line and frame pulses (iow, hsync and vsync pulses)
+in the case of a connected panel.
+
+Moreover, in the case of a connected LCD panel, chances are it can only
+support a very limited number of settings, so support for userspace
+changing the timings is arguably incorrect from a system point of view.
