@@ -1,108 +1,81 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Nov 2013 09:55:20 +0800
-Subject: [PATCH v3 05/10] usb: chipidea: usbmisc_imx: add set_wakup API
+Date: Tue, 5 Nov 2013 09:55:19 +0800
+Subject: [PATCH v3 04/10] usb: chipidea: usbmisc_imx: remove the controller's
+ clock information
 In-Reply-To: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
 References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1383616525-10769-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1383616525-10769-5-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is used to enable USB wakeup, currently only imx6 SoC serial
-usb's wakeup is enabled.
+Currently, the usbmisc is just an API supplier for controller
+driver, the controller calls related APIs to handle different
+things among the SoCs, before calling it, the clock must
+be on. So the clock operation is useless for usbmisc, it also
+increases the difficulties to manage the clock, especially at
+runtime power management situation.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci_hdrc_imx.h |    1 +
- drivers/usb/chipidea/usbmisc_imx.c |   41 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 0 deletions(-)
+ drivers/usb/chipidea/usbmisc_imx.c |   18 ------------------
+ 1 files changed, 0 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.h b/drivers/usb/chipidea/ci_hdrc_imx.h
-index c727159..92f4c30 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.h
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.h
-@@ -18,3 +18,4 @@ struct imx_usbmisc_data {
- 
- int imx_usbmisc_init(struct imx_usbmisc_data *);
- int imx_usbmisc_init_post(struct imx_usbmisc_data *);
-+int imx_usbmisc_set_wakeup(struct imx_usbmisc_data *, bool);
 diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index 1fd9a12..55b59e0 100644
+index 8a1094b..1fd9a12 100644
 --- a/drivers/usb/chipidea/usbmisc_imx.c
 +++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -28,12 +28,18 @@
- #define MX53_BM_OVER_CUR_DIS_UHx	BIT(30)
+@@ -11,7 +11,6 @@
  
- #define MX6_BM_OVER_CUR_DIS		BIT(7)
-+#define MX6_BM_WAKEUP_ENABLE		BIT(10)
-+#define MX6_BM_ID_WAKEUP		BIT(16)
-+#define MX6_BM_VBUS_WAKEUP		BIT(17)
-+#define MX6_BM_WAKEUP_INTR		BIT(31)
- 
- struct usbmisc_ops {
- 	/* It's called once when probe a usb device */
- 	int (*init)(struct imx_usbmisc_data *data);
- 	/* It's called once after adding a usb device */
- 	int (*post)(struct imx_usbmisc_data *data);
-+	/* It's called when we need to enable usb wakeup */
-+	int (*set_wakeup)(struct imx_usbmisc_data *data, bool enabled);
+ #include <linux/module.h>
+ #include <linux/of_platform.h>
+-#include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
+@@ -40,7 +39,6 @@ struct usbmisc_ops {
+ struct imx_usbmisc {
+ 	void __iomem *base;
+ 	spinlock_t lock;
+-	struct clk *clk;
+ 	const struct usbmisc_ops *ops;
  };
  
- struct imx_usbmisc {
-@@ -122,6 +128,30 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
+@@ -177,7 +175,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
+ {
+ 	struct resource	*res;
+ 	struct imx_usbmisc *data;
+-	int ret;
+ 	struct of_device_id *tmp_dev;
+ 
+ 	if (usbmisc)
+@@ -194,20 +191,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
+ 	if (IS_ERR(data->base))
+ 		return PTR_ERR(data->base);
+ 
+-	data->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(data->clk)) {
+-		dev_err(&pdev->dev,
+-			"failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+-		return PTR_ERR(data->clk);
+-	}
+-
+-	ret = clk_prepare_enable(data->clk);
+-	if (ret) {
+-		dev_err(&pdev->dev,
+-			"clk_prepare_enable failed, err=%d\n", ret);
+-		return ret;
+-	}
+-
+ 	tmp_dev = (struct of_device_id *)
+ 		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
+ 	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
+@@ -218,7 +201,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
+ 
+ static int usbmisc_imx_remove(struct platform_device *pdev)
+ {
+-	clk_disable_unprepare(usbmisc->clk);
+ 	usbmisc = NULL;
  	return 0;
  }
- 
-+static int usbmisc_imx6q_set_wakeup
-+	(struct imx_usbmisc_data *data, bool enabled)
-+{
-+	unsigned long flags;
-+	u32 reg, val = (MX6_BM_WAKEUP_ENABLE | MX6_BM_VBUS_WAKEUP
-+		| MX6_BM_ID_WAKEUP);
-+
-+	if (data->index > 3)
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&usbmisc->lock, flags);
-+	reg = readl(usbmisc->base + data->index * 4);
-+	if (enabled) {
-+		writel(reg | val, usbmisc->base + data->index * 4);
-+	} else {
-+		if (reg & MX6_BM_WAKEUP_INTR)
-+			pr_debug("wakeup int at ci_hdrc.%d\n", data->index);
-+		writel(reg & ~val, usbmisc->base + data->index * 4);
-+	}
-+	spin_unlock_irqrestore(&usbmisc->lock, flags);
-+
-+	return 0;
-+}
-+
- static const struct usbmisc_ops imx25_usbmisc_ops = {
- 	.post = usbmisc_imx25_post,
- };
-@@ -132,6 +162,7 @@ static const struct usbmisc_ops imx53_usbmisc_ops = {
- 
- static const struct usbmisc_ops imx6q_usbmisc_ops = {
- 	.init = usbmisc_imx6q_init,
-+	.set_wakeup = usbmisc_imx6q_set_wakeup,
- };
- 
- int imx_usbmisc_init(struct imx_usbmisc_data *data)
-@@ -154,6 +185,16 @@ int imx_usbmisc_init_post(struct imx_usbmisc_data *data)
- }
- EXPORT_SYMBOL_GPL(imx_usbmisc_init_post);
- 
-+int imx_usbmisc_set_wakeup(struct imx_usbmisc_data *data, bool enabled)
-+{
-+	if (!usbmisc)
-+		return -ENODEV;
-+	if (!usbmisc->ops->set_wakeup)
-+		return 0;
-+	return usbmisc->ops->set_wakeup(data, enabled);
-+}
-+EXPORT_SYMBOL_GPL(imx_usbmisc_set_wakeup);
-+
- static const struct of_device_id usbmisc_imx_dt_ids[] = {
- 	{
- 		.compatible = "fsl,imx25-usbmisc",
 -- 
 1.7.1
