@@ -1,15 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue,  5 Nov 2013 15:28:40 +0100
-Subject: [PATCH v3 6/9] ARM: add Marvell Berlin UART0 lowlevel debug
+Date: Tue,  5 Nov 2013 15:28:38 +0100
+Subject: [PATCH v3 4/9] ARM: add Marvell Berlin SoC familiy to Marvell doc
 In-Reply-To: <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1383661723-17956-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1383661723-17956-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds UART0 as found on Marvell 88DE3xxx SoCs, e.g. Armada 1500
-to the list of possible lowlevel debug options.
+This adds known facts and rumors about the Marvell Berlin (88DE3xxx) SoC
+family to the Marvell SoC documentation.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Reviewed-by: Jason Cooper <jason@lakedaemon.net>
@@ -17,56 +17,61 @@ Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
 Changelog:
-v1->v2:
-- replace 88DE3xxx numbering with SoC variant name
-  (Requested by Jisheng Zhang)
+v2->v3:
+- add stepping Z1 to Armada 1000 (88DE3010)
+RFCv2->v1:
+- move Berlin below PXA/MMP[23] where it belongs to
+- add note about IP (re-)used in Berlin SoCs
 RFCv1->RFCv2:
-- have separate DEBUG option due to separate mach- directory
+- initial patch
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Rob Landley <rob@landley.net>
+Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/Kconfig.debug |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ Documentation/arm/Marvell/README |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 9762c84..ae6e85a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -94,6 +94,14 @@ choice
- 		depends on ARCH_BCM2835
- 		select DEBUG_UART_PL01X
+diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
+index 8f08a86..53ecf08 100644
+--- a/Documentation/arm/Marvell/README
++++ b/Documentation/arm/Marvell/README
+@@ -210,6 +210,35 @@ MMP/MMP2 family (communication processor)
+    Linux kernel mach directory: arch/arm/mach-mmp
+    Linux kernel plat directory: arch/arm/plat-pxa
  
-+	config DEBUG_BERLIN_UART
-+		bool "Marvell Berlin SoC Debug UART"
-+		depends on ARCH_BERLIN
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Marvell Berlin SoC based platforms.
++Berlin family (Digital Entertainment)
++-------------------------------------
 +
- 	config DEBUG_CLPS711X_UART1
- 		bool "Kernel low-level debugging messages via UART1"
- 		depends on ARCH_CLPS711X
-@@ -973,6 +981,7 @@ config DEBUG_UART_PHYS
- 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
- 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
- 				ARCH_ORION5X
-+	default 0xf7fc9000 if DEBUG_BERLIN_UART
- 	default 0xf8b00000 if DEBUG_HI3716_UART
- 	default 0xfcb00000 if DEBUG_HI3620_UART
- 	default 0xfe800000 if ARCH_IOP32X
-@@ -997,6 +1006,7 @@ config DEBUG_UART_VIRT
- 	default 0xf2100000 if DEBUG_PXA_UART1
- 	default 0xf4090000 if ARCH_LPC32XX
- 	default 0xf4200000 if ARCH_GEMINI
-+	default 0xf7fc9000 if DEBUG_BERLIN_UART
- 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
- 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
- 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
++  Flavors:
++	88DE3005, Armada 1500-mini
++		Design name:	BG2CD(A0)
++		Core:		ARM Cortex-A9, PL310 L2CC
++		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500-mini/
++	88DE3010, Armada 1000
++		Design name:	BG2(Z1)
++		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
++		Product Brief:	http://www.marvell.com/digital-entertainment/assets/armada_1000_pb.pdf
++	88DE3100, Armada 1500
++		Design name:	BG2(A0)
++		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
++		Homepage:	http://www.marvell.com/digital-entertainment/armada-1500/
++		Product Brief:	http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
++	88DE????
++		Design name:	BG3
++		Core:		ARM Cortex-A15, CA15 integrated L2CC
++
++  Homepage: http://www.marvell.com/digital-entertainment/
++  Directory: arch/arm/mach-berlin
++
++  Comments:
++   * This line of SoCs is based on Marvell Sheeva or ARM Cortex CPUs
++     with Synopsys DesignWare (IRQ, GPIO, Timers, ...) and PXA IP (SDHCI, USB, ETH, ...).
++   * Currently known design names are: C2, BG2(Z1), BG2(A0), BG2CD(A0), BG2CT(A0)
++
+ Long-term plans
+ ---------------
+ 
 -- 
 1.7.10.4
