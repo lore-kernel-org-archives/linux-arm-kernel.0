@@ -1,100 +1,109 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 5 Nov 2013 23:59:38 +0800
-Subject: [PATCH] ARM/serial: at91: specify RTS in DT using gpio
-In-Reply-To: <1383665383-5606-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1383654959-18112-1-git-send-email-linus.walleij@linaro.org>
- <1383665383-5606-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <A7887CC8-A1F9-4A05-B7F5-4F69FD942F22@jcrosoft.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Wed,  6 Nov 2013 00:22:10 +0800
+Subject: [PATCH] ARM: mm: Ensure get_unmapped_area() returns higher address
+ than mmap_min_addr
+Message-ID: <1383668531-24648-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ming Lei <ming.lei@canonical.com>
 
-On Nov 5, 2013, at 11:29 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+This patch is the arm version of below patch, which is already in
+-mm tree:
 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Documentation/devicetree/bindings/serial/atmel-usart.txt |  3 +++
-> drivers/tty/serial/atmel_serial.c                        | 13 ++++++++++---
-> 2 files changed, 13 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> index 2191dcb..3adc61c 100644
-> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> @@ -10,6 +10,8 @@ Required properties:
-> Optional properties:
-> - atmel,use-dma-rx: use of PDC or DMA for receiving data
-> - atmel,use-dma-tx: use of PDC or DMA for transmitting data
-> +- rts-gpios: specify a GPIO for RTS line. It will use specified PIO instead of the peripheral
-> +  function pin for the USART RTS feature. If unsure, don't specify this property.
-> - add dma bindings for dma transfer:
-> 	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
-> 		memory peripheral interface and USART DMA channel ID, FIFO configuration.
-> @@ -28,6 +30,7 @@ Example:
-> 		interrupts = <7>;
-> 		atmel,use-dma-rx;
-> 		atmel,use-dma-tx;
-> +		rts-gpios = <&pioD 15 0>;
-> 	};
+	http://marc.info/?t=138251444500006&r=1&w=2
 
-gpios means 2 gpio 
+Without this patch, the below syscall may return failure when
+'/proc/sys/vm/mmap_min_addr' is set 32768:
 
-I?ll rts-gpio as we can only use one anyway
+	mmap(0, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 
+but actually there is surely enough VM space for current task, for
+example arch_get_unmapped_area() may return 0x7000, but which can't
+pass security check, so finally -EPERM is returned to the caller, and
+cause bug from user space's view.
 
+Cc: <stable@vger.kernel.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Akira Takeuchi <takeuchi.akr@jp.panasonic.com>
+Cc: Kiyoshi Owada <owada.kiyoshi@jp.panasonic.com>
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
+---
+ arch/arm/mm/mmap.c |   15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-> 
-> - use DMA:
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index b4e0794..71f8ea9 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -35,6 +35,7 @@
-> #include <linux/platform_device.h>
-> #include <linux/of.h>
-> #include <linux/of_device.h>
-> +#include <linux/of_gpio.h>
-> #include <linux/dma-mapping.h>
-> #include <linux/atmel_pdc.h>
-> #include <linux/atmel_serial.h>
-> @@ -2327,6 +2328,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
-> 	struct device_node *np = pdev->dev.of_node;
-> 	struct atmel_uart_data *pdata = dev_get_platdata(&pdev->dev);
-> 	void *data;
-> +	int rts_pin = -EINVAL;
-> 	int ret = -ENODEV;
-> 
-> 	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
-> @@ -2364,13 +2366,18 @@ static int atmel_serial_probe(struct platform_device *pdev)
-> 	 * structs to indicate "no RTS GPIO" instead of open-coding some
-> 	 * invalid value everywhere.
-> 	 */
-> -	if (pdata->rts_gpio > 0) {
-> -		ret = devm_gpio_request(&pdev->dev, pdata->rts_gpio, "RTS");
-> +	if (pdata && pdata->rts_gpio > 0)
-> +		rts_pin = pdata->rts_gpio;
-> +	else if (np)
-> +		rts_pin = of_get_named_gpio(np, "rts-gpios", 0);
-> +
-
-	use directly port->rts_gpio  so we can drop the assign after
-
-	if the gpio is invalid the port->rts_gpio need to be < 0 too
-
-Best Regards,
-J.
-
-> +	if (gpio_is_valid(rts_pin)) {
-> +		ret = devm_gpio_request(&pdev->dev, rts_pin, "RTS");
-> 		if (ret) {
-> 			dev_err(&pdev->dev, "error requesting RTS GPIO\n");
-> 			goto err;
-> 		}
-> -		port->rts_gpio = pdata->rts_gpio;
-> +		port->rts_gpio = rts_pin;
-> 		ret = gpio_direction_output(port->rts_gpio, 0);
-> 		if (ret) {
-> 			dev_err(&pdev->dev, "error setting up RTS GPIO\n");
-> -- 
-> 1.8.2.2
-> 
+diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+index d27158c..c2fbb91 100644
+--- a/arch/arm/mm/mmap.c
++++ b/arch/arm/mm/mmap.c
+@@ -9,6 +9,7 @@
+ #include <linux/io.h>
+ #include <linux/personality.h>
+ #include <linux/random.h>
++#include <linux/security.h>
+ #include <asm/cachetype.h>
+ 
+ #define COLOUR_ALIGN(addr,pgoff)		\
+@@ -78,7 +79,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
+ 		return addr;
+ 	}
+ 
+-	if (len > TASK_SIZE)
++	if (len > TASK_SIZE - mmap_min_addr)
+ 		return -ENOMEM;
+ 
+ 	if (addr) {
+@@ -88,14 +89,14 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
+ 			addr = PAGE_ALIGN(addr);
+ 
+ 		vma = find_vma(mm, addr);
+-		if (TASK_SIZE - len >= addr &&
++		if (TASK_SIZE - len >= addr && addr >= mmap_min_addr &&
+ 		    (!vma || addr + len <= vma->vm_start))
+ 			return addr;
+ 	}
+ 
+ 	info.flags = 0;
+ 	info.length = len;
+-	info.low_limit = mm->mmap_base;
++	info.low_limit = max(mm->mmap_base, mmap_min_addr);
+ 	info.high_limit = TASK_SIZE;
+ 	info.align_mask = do_align ? (PAGE_MASK & (SHMLBA - 1)) : 0;
+ 	info.align_offset = pgoff << PAGE_SHIFT;
+@@ -122,7 +123,7 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+ 		do_align = filp || (flags & MAP_SHARED);
+ 
+ 	/* requested length too big for entire address space */
+-	if (len > TASK_SIZE)
++	if (len > TASK_SIZE - mmap_min_addr)
+ 		return -ENOMEM;
+ 
+ 	if (flags & MAP_FIXED) {
+@@ -139,14 +140,14 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+ 		else
+ 			addr = PAGE_ALIGN(addr);
+ 		vma = find_vma(mm, addr);
+-		if (TASK_SIZE - len >= addr &&
++		if (TASK_SIZE - len >= addr && addr >= mmap_min_addr &&
+ 				(!vma || addr + len <= vma->vm_start))
+ 			return addr;
+ 	}
+ 
+ 	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
+ 	info.length = len;
+-	info.low_limit = PAGE_SIZE;
++	info.low_limit = max(PAGE_SIZE, mmap_min_addr);
+ 	info.high_limit = mm->mmap_base;
+ 	info.align_mask = do_align ? (PAGE_MASK & (SHMLBA - 1)) : 0;
+ 	info.align_offset = pgoff << PAGE_SHIFT;
+@@ -161,7 +162,7 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+ 	if (addr & ~PAGE_MASK) {
+ 		VM_BUG_ON(addr != -ENOMEM);
+ 		info.flags = 0;
+-		info.low_limit = mm->mmap_base;
++		info.low_limit = max(mm->mmap_base, mmap_min_addr);
+ 		info.high_limit = TASK_SIZE;
+ 		addr = vm_unmapped_area(&info);
+ 	}
+-- 
+1.7.9.5
