@@ -1,44 +1,77 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 5 Nov 2013 18:03:49 +0000
-Subject: [PATCH] typo fixes (coordiante -> coordinate) in am335x
-In-Reply-To: <1383673871.6753.36.camel@polaris.local>
-References: <1373901928-19605-1-git-send-email-zubair.lutfullah@gmail.com>
- <20130821075828.GZ7656@atomide.com>
- <1382198544.22609.8.camel@polaris.local>
- <20131022090552.GE19112@lee--X1>
- <1383667293.6753.35.camel@polaris.local>
- <20131105171553.GB30901@lee--X1>
- <1383673871.6753.36.camel@polaris.local>
-Message-ID: <20131105180349.GD30901@lee--X1>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 5 Nov 2013 10:31:56 -0800
+Subject: [PATCH v3 14/28] mtd: nand: pxa3xx: Add driver-specific ECC
+ BCH support
+In-Reply-To: <1383656135-8627-15-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383656135-8627-15-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131105183156.GO20061@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 05 Nov 2013, Jan L?bbe wrote:
+On Tue, Nov 05, 2013 at 09:55:21AM -0300, Ezequiel Garcia wrote:
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -1073,6 +1075,43 @@ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
+>  	return -ENODEV;
+>  }
+>  
+> +static int pxa_ecc_init(struct pxa3xx_nand_info *info,
+> +			struct nand_ecc_ctrl *ecc,
+> +			int strength, int page_size)
+> +{
+> +	/*
+> +	 * We don't use strength here as the PXA variant
+> +	 * is used with non-ONFI compliant devices.
 
-> On Tue, 2013-11-05 at 17:15 +0000, Lee Jones wrote:
-> > On Tue, 05 Nov 2013, Jan L?bbe wrote:
-> > 
-> > > On Tue, 2013-10-22 at 10:05 +0100, Lee Jones wrote:
-> > > > This is the first time this patch has been sent to me.
-> > > > 
-> > > > I need Dmitry's input (no pun intended) on how he's like to deal with
-> > > > this. At a bare minimum I'd like his Ack.
-> > > 
-> > > Is there anything I can do to push this forward? The earlier we get the
-> > > typo fixed in the documentation, the less chance that someone will use
-> > > it that way.
-> > 
-> > I think you should sent it again, but this time Cc the Device Tree
-> > list, Dmitry and myself when you submit.
-> 
-> The original patch was not from me. But sure, I can resend it.
+Hmm, rather than assuming you never get any relevant 'strength' info
+from nand_base, could you check if it is zero and only ignore it if it
+is zero? But if it is non-zero, you could at least use it to validate
+the strength settings below.
 
-I'm not worried about who re-sends the patch. Just make sure whoever
-does sends in correctly with regards to the $SUBJECT line etc. The one
-on this patch looks odd.
+At the same time, I would also caution against fragile ECC determination
+methods that can indirectly cause regressions in the future, such as
+with Huang's recent GPMI ECC layout regressions. Perhaps you'll want a
+DT binding for the ECC strength to future proof this? (Not a
+requirement; just a thought.)
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +	 */
+> +	if (page_size == 2048) {
+> +		ecc->mode = NAND_ECC_HW;
+> +		ecc->size = 512;
+> +		ecc->strength = 1;
+
+I assume this is actually a 1-bit ECC, not just a dummy value? Note that
+the ecc->strength and ecc->size fields are used by nand_base for some
+bitflip calculations and are also exposed via sysfs.
+
+> +
+> +		info->spare_size = 40;
+> +		info->ecc_size = 24;
+> +		return 1;
+> +
+> +	} else if (page_size == 512) {
+> +		ecc->mode = NAND_ECC_HW;
+> +		ecc->size = 512;
+> +		ecc->strength = 1;
+> +
+> +		info->spare_size = 8;
+> +		info->ecc_size = 8;
+> +		return 1;
+> +	}
+> +	return 0;
+> +}
+> +
+> +static int armada370_ecc_init(struct pxa3xx_nand_info *info,
+> +			      struct nand_ecc_ctrl *ecc,
+> +			      int strength, int page_size)
+> +{
+> +	/* Unimplemented yet */
+> +	return 0;
+> +}
+> +
+>  static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  {
+>  	struct pxa3xx_nand_host *host = mtd->priv;
+
+Brian
