@@ -1,80 +1,142 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon,  4 Nov 2013 18:16:02 -0800
-Subject: [PATCH 0/3] follow up fixes for V7 big endian changes
-Message-ID: <1383617765-28052-1-git-send-email-victor.kamensky@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 5 Nov 2013 10:29:50 +0800
+Subject: [PATCH v3 01/11] usb: phy-mxs: Add platform judgement code
+In-Reply-To: <1383616183-10511-2-git-send-email-peter.chen@freescale.com>
+References: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
+ <1383616183-10511-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131105022948.GE19770@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 05, 2013 at 09:49:33AM +0800, Peter Chen wrote:
+> The mxs-phy has several bugs and features at different
+> versions, the driver code can get it through of_device_id.data.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |   59 ++++++++++++++++++++++++++++++++++------
+>  1 files changed, 50 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index fdd33b4..8b9d80c 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
+>   * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+>   * on behalf of DENX Software Engineering GmbH
+>   *
+> @@ -20,6 +20,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+> +#include <linux/of_device.h>
+>  
+>  #define DRIVER_NAME "mxs_phy"
+>  
+> @@ -34,13 +35,55 @@
+>  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+>  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+>  
+> +#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+> +
+> +/* Do disconnection between PHY and controller without vbus */
+> +#define MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS	BIT(0)
+> +
+> +/*
+> + * The PHY will be in messy if there is an wakeup after putting
+> + * bus to suspend (set portsc.suspendM) but before setting PHY to low
+> + * power mode (set portsc.phcd).
+> + */
+> +#define MXS_PHY_ABNORAML_IN_SUSPEND		BIT(1)
+> +
+> +/*
+> + * The SOF sends too fast after resuming, it will cause disconnection
+> + * between host and high speed device.
+> + */
+> +#define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
+> +
+> +struct mxs_phy_platform_flag {
+> +	unsigned int flags;
+> +};
 
-I've tested a bit more big endian images from rmk/for-next
-which has Ben's big endian series merged. I've run into several
-issues while testing Pandaboard and Arndale. All three issues 
-have fairly simple fix once detected.
+We should design it as a structure not only for flags but any data that
+we may need to define.  That said, mxs_phy_platform_flag is not a good
+name to me.  I think mxs_phy_data should be more scalable and future
+proof, considering one day we may have more to add into the structure.
 
-Here is short explanation/note for each fix 
+> +
+> +static const struct mxs_phy_platform_flag imx23_phy_data = {
+> +	.flags = MXS_PHY_ABNORAML_IN_SUSPEND | MXS_PHY_SENDING_SOF_TOO_FAST,
+> +};
+> +
+> +static const struct mxs_phy_platform_flag imx6q_phy_data = {
+> +	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
+> +		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
+> +};
+> +
+> +static const struct mxs_phy_platform_flag imx6sl_phy_data = {
+> +	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
+> +};
+> +
+> +static const struct of_device_id mxs_phy_dt_ids[] = {
+> +	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
+> +	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
+> +	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+> +
+>  struct mxs_phy {
+>  	struct usb_phy phy;
+>  	struct clk *clk;
+> +	unsigned int flags;
 
-1) ARM: __fixup_smp read of SCU config should do byteswap in BE case
-[1] introduced SCU read in __fixup_smp function in case of A9 cpu. 
-Such read need byteswap in case of BE.
+Here, we should have a pointer to struct mxs_phy_data.
 
-2) ARM: mm: fix __phys_to_virt to work with 64 bit phys_addr_t in BE case
-[2] changed type of __phys_to_virt from 'unsigned long' to 'phys_addr_t' 
-but that causes problem with inline assembler in __phys_to_virt function
-that expects 'r' operand but gets 64 bit value. It is very similar to 
-ASID issue [3]. Small test cases that illustrate inline asm and 64 bit
-operand issue could be found in [4].
+Shawn
 
-3) ARM: fix mov to mvn conversion in case of 64 bit phys_addr_t and BE
-Conflict resolution between [5] and [6] was not entirely correct for 
-the case when 'mov' instruction has to be converted into 'mvn'
-instruction. I missed it in my previos testing because the issue manifests 
-itself only if CONFIG_ARCH_PHYS_ADDR_T_64BIT is enabled, which was not,
-and I saw this issue only when I got to Arndale testing. In proposed
-patch I've fixed  this issue trying to push spirit of [6] and do it in
-most optimized way. However personally, I think code could be much
-readable if we just add instruction byteswap under ARM_BE8 after
-read, and before write with common patch logic in between. After all, in
-THUMB2 case few lines above code just do that. Please let me know if
-folks like this idea better I can respin this fix.
-
-Tests: boots and runs
-
-TC2: LE/BE Thumb2/Non-Thumb2 (no LPAE, no ARCH_PHYS_ADDR_T_64BIT)
-Pandaboard: LE/BE multiarch (non-thumb2)
-Arndale: LE/BE Thumb2/Non-Thumb2 (with LPAE, with ARCH_PHYS_ADDR_T_64BIT,
-no KVM, no MMC_DW_IDMAC)
-
-For testing Arndale and Pandaboard BE BSP changes were used on top of
-these patches.
-
-References:
-
-[1] bc41b8724f24b9a27d1dcc6c974b8f686b38d554 
-ARM: 7846/1: Update SMP_ON_UP code to detect A9MPCore with 1 CPU devices
-
-[2] ca5a45c06cd4764fb8510740f7fc550d9a0208d4 
-ARM: mm: use phys_addr_t appropriately in p2v and v2p conversions
-
-[3] a1af3474487cc3b8731b990dceac6b6aad7f3ed8
-ARM: tlb: ASID macro should give 32bit result for BE correct operation
-
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/202584.html
-
-[5] f52bb722547f43caeaecbcc62db9f3c3b80ead9b
-ARM: mm: Correct virt_to_phys patching for 64 bit physical addresses
-
-[6] 2f9bf9beddb1649485b47302a5aba9761cbc9084
-ARM: fixup_pv_table bug when CPU_ENDIAN_BE8
-
-Victor Kamensky (3):
-  ARM: __fixup_smp read of SCU config should do byteswap in BE case
-  ARM: mm: fix __phys_to_virt to work with 64 bit phys_addr_t in BE case
-  ARM: fix mov to mvn conversion in case of 64 bit phys_addr_t and BE
-
- arch/arm/include/asm/memory.h | 8 +++++++-
- arch/arm/kernel/head.S        | 7 ++++++-
- 2 files changed, 13 insertions(+), 2 deletions(-)
-
--- 
-1.8.1.4
+>  };
+>  
+> -#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
+> -
+>  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+>  {
+>  	int ret;
+> @@ -131,6 +174,9 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>  	struct clk *clk;
+>  	struct mxs_phy *mxs_phy;
+>  	int ret;
+> +	const struct of_device_id *of_id =
+> +			of_match_device(mxs_phy_dt_ids, &pdev->dev);
+> +	const struct mxs_phy_platform_flag *platform_flag = of_id->data;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	base = devm_ioremap_resource(&pdev->dev, res);
+> @@ -163,6 +209,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>  	ATOMIC_INIT_NOTIFIER_HEAD(&mxs_phy->phy.notifier);
+>  
+>  	mxs_phy->clk = clk;
+> +	mxs_phy->flags = platform_flag->flags;
+>  
+>  	platform_set_drvdata(pdev, &mxs_phy->phy);
+>  
+> @@ -182,12 +229,6 @@ static int mxs_phy_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id mxs_phy_dt_ids[] = {
+> -	{ .compatible = "fsl,imx23-usbphy", },
+> -	{ /* sentinel */ }
+> -};
+> -MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+> -
+>  static struct platform_driver mxs_phy_driver = {
+>  	.probe = mxs_phy_probe,
+>  	.remove = mxs_phy_remove,
+> -- 
+> 1.7.1
+> 
+> 
