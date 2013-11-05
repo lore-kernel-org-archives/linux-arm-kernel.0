@@ -1,130 +1,37 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  5 Nov 2013 09:55:35 -0300
-Subject: [PATCH v3 28/28] mtd: nand: pxa3xx: Add documentation about the
- controller
-In-Reply-To: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383656135-8627-29-git-send-email-ezequiel.garcia@free-electrons.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Tue, 05 Nov 2013 23:03:38 +1000
+Subject: [PATCH] pinctrl: imx50: add pinctrl support code for the IMX50 SoC
+In-Reply-To: <CACRpkdb_c1u8ANtnfPhtYu9ybapmrputwJA=KwZiGpibpqc4OQ@mail.gmail.com>
+References: <1383023635-30640-1-git-send-email-gerg@uclinux.org>	<CACRpkdb5U2xBBVerbspTnW5=61kwx0+mvLGZF=VmdOKrN3QhHg@mail.gmail.com>	<20131104132743.GA11031@S2101-09.ap.freescale.net>
+ <CACRpkdb_c1u8ANtnfPhtYu9ybapmrputwJA=KwZiGpibpqc4OQ@mail.gmail.com>
+Message-ID: <5278ECAA.3070606@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given there's no public specification to this date, and in order
-to capture some important details and singularities about the
-controller let's document them once and for good.
+Hi Linus,
 
-Cc: linux-doc at vger.kernel.org
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- Documentation/mtd/nand/pxa3xx-nand.txt | 101 +++++++++++++++++++++++++++++++++
- 1 file changed, 101 insertions(+)
- create mode 100644 Documentation/mtd/nand/pxa3xx-nand.txt
+On 05/11/13 19:54, Linus Walleij wrote:
+> On Mon, Nov 4, 2013 at 2:27 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> On Mon, Nov 04, 2013 at 01:14:32PM +0100, Linus Walleij wrote:
+>>> On Tue, Oct 29, 2013 at 6:13 AM,  <gerg@uclinux.org> wrote:
+>>>
+>>>> From: Greg Ungerer <gerg@uclinux.org>
+>>>>
+>>>> Add code to support the specific pin arrangements of the Freescale IMX50 SoC.
+>>>>
+>>>> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+>>>
+>>> Can I get some maintainer to review this for the next cycle?
+>>
+>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>
+> OK I actually tried to apply it now since it is a new driver,
+> but it needs rebasing.
+>
+> Greg could you rebase this on top of the "devel" branch in
+> my pinctrl tree so I can  apply the patch?
 
-diff --git a/Documentation/mtd/nand/pxa3xx-nand.txt b/Documentation/mtd/nand/pxa3xx-nand.txt
-new file mode 100644
-index 0000000..912f7c6
---- /dev/null
-+++ b/Documentation/mtd/nand/pxa3xx-nand.txt
-@@ -0,0 +1,101 @@
-+
-+About this document
-+===================
-+
-+Some notes about Marvell's NAND controller available in PXA and Armada 370/XP
-+SoC (aka NFCv1 and NFCv2), with an emphasis on the latter.
-+
-+NFCv2 controller background
-+===========================
-+
-+The controller has a 2176 bytes FIFO buffer. Therefore, in order to support
-+larger pages, I/O operations on 4 KiB and 8 KiB pages is done with a set of
-+chunked transfers.
-+
-+For instance, if we choose a 2048 data chunk and set "BCH" ECC (see below)
-+we'll have this layout in the pages:
-+
-+  ------------------------------------------------------------------------------
-+  | 2048B data | 32B spare | 30B ECC || 2048B data | 32B spare | 30B ECC | ... |
-+  ------------------------------------------------------------------------------
-+
-+The driver reads the data and spare portions independently and builds an internal
-+buffer with this layout (in the 4 KiB page case):
-+
-+  ------------------------------------------
-+  |     4096B data     |     64B spare     |
-+  ------------------------------------------
-+
-+Also, for the READOOB command the driver disables the ECC and reads a 'spare + ECC'
-+OOB, one per chunk read.
-+
-+  -------------------------------------------------------------------
-+  |     4096B data     |  32B spare | 30B ECC | 32B spare | 30B ECC |
-+  -------------------------------------------------------------------
-+
-+So, in order to achieve reading (for instance), we issue several READ0 commands
-+(with some additional controller-specific magic) and read two chunks of 2080B
-+(2048 data + 32 spare) each.
-+The driver accomodates this data to expose the NAND core a contiguous buffer
-+(4096 data + spare) or (4096 + spare + ECC + spare + ECC).
-+
-+ECC
-+===
-+
-+The controller has built-in hardware ECC capabilities. In addition it is
-+configurable between two modes: 1) Hamming, 2) BCH.
-+
-+Note that the actual BCH mode: BCH-4 or BCH-8 will depend on the way
-+the controller is configured to transfer the data.
-+
-+In the BCH mode the ECC code will be calculated for each transfered chunk
-+and expected to be located (when reading/programming) right after the spare
-+bytes as the figure above shows.
-+
-+So, repeating the above scheme, a 2048B data chunk will be followed by 32B
-+spare, and then the ECC controller will read/write the ECC code (30B in
-+this case):
-+
-+  ------------------------------------
-+  | 2048B data | 32B spare | 30B ECC |
-+  ------------------------------------
-+
-+If the ECC mode is 'BCH' then the ECC is *always* 30 bytes long.
-+If the ECC mode is 'Hamming' the ECC is 6 bytes long, for each 512B block.
-+So in Hamming mode, a 2048B page will have a 24B ECC.
-+
-+Despite all of the above, the controller requires the driver to only read or
-+write in multiples of 8-bytes, because the data buffer is 64-bits.
-+
-+OOB
-+===
-+
-+Because of the above scheme, and because the "spare" OOB is really located in
-+the middle of a page, spare OOB cannot be read or write independently of the
-+data area. In other words, in order to read the OOB (aka READOOB), the entire
-+page (aka READ0) has to be read.
-+
-+In the same sense, in order to write to the spare OOB the driver has to write
-+an *entire* page.
-+
-+Factory bad blocks handling
-+===========================
-+
-+Given the ECC BCH requires to layout the device's pages in a splitted
-+data/OOB/data/OOB way, the controller has a view of the flash page that's
-+different from the specified (aka the manufacturer's) view. In other words,
-+
-+Factory view:
-+
-+  -----------------------------------------------
-+  |                    Data           |x  OOB   |
-+  -----------------------------------------------
-+
-+Driver's view:
-+
-+  -----------------------------------------------
-+  |      Data      | OOB |      Data   x  | OOB |
-+  -----------------------------------------------
-+
-+It can be seen from the above, that the factory bad block marker must be
-+searched within the 'data' region, and not in the usual OOB region.
--- 
-1.8.1.5
+Yep, sure thing. New patch coming right up.
+
+Regards
+Greg
