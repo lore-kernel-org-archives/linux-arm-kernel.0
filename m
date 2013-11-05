@@ -1,47 +1,137 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 5 Nov 2013 12:12:14 -0600
-Subject: [PATCH 02/11] devicetree: bindings: Document Qualcomm cpus and
- enable-method
-In-Reply-To: <52792EF6.2040005@codeaurora.org>
-References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
- <1383343739-23080-3-git-send-email-sboyd@codeaurora.org>
- <CAL_JsqLObXEWJJ=SuifTjpPz9qTW0n43fyQNA-vjLNeLy-7-XA@mail.gmail.com>
- <20131104173606.GL21983@codeaurora.org>
- <378446F7-DC51-448D-AF99-93F98CEAFB03@codeaurora.org>
- <52792C60.2030405@codeaurora.org>
- <1A27B0E2-FB92-488D-A0B3-65E677525720@codeaurora.org>
- <52792EF6.2040005@codeaurora.org>
-Message-ID: <C287AB4F-B8E5-4D48-9C49-62C7EFAE154A@codeaurora.org>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Tue, 5 Nov 2013 23:42:16 +0530
+Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
+ indicates the presence of PHY's
+In-Reply-To: <CAFp+6iFFk9Bg1xDaKbuQwF_vEmnVtFtai6LPEsNDodpH5WF4ow@mail.gmail.com>
+References: <1381866857-3861-1-git-send-email-kishon@ti.com>
+ <1381866857-3861-2-git-send-email-kishon@ti.com>
+ <525E8E93.9010503@ti.com> <525E9046.3090209@ti.com>
+ <CAFp+6iFFk9Bg1xDaKbuQwF_vEmnVtFtai6LPEsNDodpH5WF4ow@mail.gmail.com>
+Message-ID: <CAFp+6iHLxrY1mwG=MB3aUty-h43Q_i3yBKY7An02TMRqEyd6Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 5, 2013 at 11:41 PM, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
+> Dear Kishon, Roger
+>
+>
+> On Wed, Oct 16, 2013 at 6:40 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi roger,
+>>
+>> On Wednesday 16 October 2013 06:33 PM, Roger Quadros wrote:
+>>> Hi Kishon,
+>
+> Apologies for missing this thread for so long.
+>
+>>>
+>>> On 10/15/2013 10:54 PM, Kishon Vijay Abraham I wrote:
+>>>> There can be systems which does not have a external usb_phy, so get
+>>>> usb_phy only if dt data indicates the presence of PHY in the case of dt boot or
+>>>> if platform_data indicates the presence of PHY. Also remove checking if
+>>>> return value is -ENXIO since it's now changed to always enable usb_phy layer.
+>>>>
+>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>> ---
+>>>> In usb_get_phy_by_phandle, index 0 always refers to usb2 phy and index 1 always
+>>>> refers to usb3 phy. Since we've lived so long with this, this patch will make
+>>>> an assumption that if only one entry is populated in *usb-phy* property, it will
+>>>> be usb2 phy and the next entry will be usb3 phy.
+>>>>
+>>>>  drivers/usb/dwc3/Kconfig         |    1 +
+>>>>  drivers/usb/dwc3/core.c          |   72 ++++++++++++++++++++------------------
+>>>>  drivers/usb/dwc3/platform_data.h |    2 ++
+>>>>  3 files changed, 41 insertions(+), 34 deletions(-)
+>>>>
+>>>> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+>>>> index 70fc430..8e385b4 100644
+>>>> --- a/drivers/usb/dwc3/Kconfig
+>>>> +++ b/drivers/usb/dwc3/Kconfig
+>>>> @@ -1,6 +1,7 @@
+>>>>  config USB_DWC3
+>>>>      tristate "DesignWare USB3 DRD Core Support"
+>>>>      depends on (USB || USB_GADGET) && HAS_DMA
+>>>> +    select USB_PHY
+>>>>      select USB_XHCI_PLATFORM if USB_SUPPORT && USB_XHCI_HCD
+>>>>      help
+>>>>        Say Y or M here if your system has a Dual Role SuperSpeed
+>>>> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+>>>> index 474162e..cb91d70 100644
+>>>> --- a/drivers/usb/dwc3/core.c
+>>>> +++ b/drivers/usb/dwc3/core.c
+>>>> @@ -354,6 +354,7 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>>      struct device_node      *node = dev->of_node;
+>>>>      struct resource         *res;
+>>>>      struct dwc3             *dwc;
+>>>> +    int                     count;
+>>>>
+>>>>      int                     ret = -ENOMEM;
+>>>>
+>>>> @@ -387,16 +388,49 @@ static int dwc3_probe(struct platform_device *pdev)
+>>>>      if (node) {
+>>>>              dwc->maximum_speed = of_usb_get_maximum_speed(node);
+>>>>
+>>>> -            dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+>>>> -            dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+>>>> +            count = of_count_phandle_with_args(node, "usb-phy", NULL);
+>>>> +            switch (count) {
+>>>> +            case 2:
+>>>> +                    dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
+>>>> +                            "usb-phy", 1);
+>>>> +                    if (IS_ERR(dwc->usb3_phy)) {
+>>>> +                            dev_err(dev, "usb3 phy not found\n");
+>>>> +                            return PTR_ERR(dwc->usb3_phy);
+>>>> +                    }
+>>>> +            case 1:
+>>>> +                    dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
+>>>> +                            "usb-phy", 0);
+>>>> +                    if (IS_ERR(dwc->usb2_phy)) {
+>>>> +                            dev_err(dev, "usb2 phy not found\n");
+>>>> +                            return PTR_ERR(dwc->usb2_phy);
+>>>> +                    }
+>>>> +                    break;
+>>>
+>>> In the Exynos case, there is only 1 phy and it is the USB3 phy. This code
+>>> will wrongly treat it as usb2_phy.
+>
+> Thank you Roger for your concern regarding Exynos case.
+> It's true that, Exynos5 series of SoCs have got only one IP block for
+> DWC3'c PHY.
+> This block is actually a combo of USB2 phy (UTMI+) as well as USB3 phy (PIPE3).
+> And the same is served by a single USB phy driver. This is also
+> clarified in the thread : https://lkml.org/lkml/2013/11/5/160
+>
+>>
+>> That was the case even before this patch no? Unfortunately the old USB PHY
+>> library doesn't have APIs to get PHYs in a better way. If we try modifying the
+>> USB PHY library, it'll be kind of duplicating what is already there in the
+>> Generic PHY library. I'd rather prefer Exynos guys to use the new framework.
 
-On Nov 5, 2013, at 11:46 AM, Stephen Boyd wrote:
+we have tried moving Samsung's USB phy controller driver for DWC3, to
+generic phy framework
+so that things look clearer on Samsung's side too. The necessary
+patches are availble at:
+https://lkml.org/lkml/2013/10/31/79
 
-> On 11/05/13 09:43, Kumar Gala wrote:
->> On Nov 5, 2013, at 11:35 AM, Stephen Boyd wrote:
->> 
->>> On 11/05/13 09:12, Kumar Gala wrote:
->>>> I think this should be more specific than just 'qcom,mmio' or 'qcom,warm-boot'.  It should be 'qcom,kpss-acc-v1' or 'qcom-gcc-8660'.
->>>> 
->>> Do you have any reasons why? I don't see why we need to keep adding more
->>> and more enable-methods every time the subsystem surrounding the CPU
->>> changes. The method is the same, write some registers to power up the
->>> CPU for the first time (cold boot) or ping the CPU to wake it up
->>> (warmboot). The only difference is where those registers live and a
->>> slight variation in the sequence that we perform.
->> By that argument every device could just be compatible with 'mmio' and be done with it ;)
->> 
->> As the registers you write vary, the compatible should vary.
-> 
-> The compatible does vary. The enable-method is not a compatible property.
-> 
-> -- 
+>>
+>> Thanks
+>> Kishon
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+>
+> --
+> Best Regards
+> Vivek Gautam
+> Samsung R&D Institute, Bangalore
+> India
 
-I've always felt that the enable-method is equivalent of a compatible property.
 
-- k
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
