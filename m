@@ -1,48 +1,33 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Nov 2013 10:50:02 +0800
-Subject: [PATCH v3 03/11] usb: doc: phy-mxs: update binding for adding
- anatop phandle
-In-Reply-To: <20131105023404.GF19770@S2101-09.ap.freescale.net>
-References: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
- <1383616183-10511-4-git-send-email-peter.chen@freescale.com>
- <20131105023404.GF19770@S2101-09.ap.freescale.net>
-Message-ID: <20131105025001.GB13472@shlinux1.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 5 Nov 2013 11:13:27 +0800
+Subject: [PATCHv3] ARM: imx: add support code for IMX50 based machines
+In-Reply-To: <52785FAE.7040904@uclinux.org>
+References: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
+ <20131104145151.GD3060@titan.lakedaemon.net>
+ <20131104145739.GE3060@titan.lakedaemon.net>
+ <52785FAE.7040904@uclinux.org>
+Message-ID: <20131105031325.GJ19770@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 10:34:06AM +0800, Shawn Guo wrote:
-> On Tue, Nov 05, 2013 at 09:49:35AM +0800, Peter Chen wrote:
-> > Add anatop phandle which is used to access anatop registers to
-> > control PHY's power and other USB operations.
+On Tue, Nov 05, 2013 at 01:02:06PM +1000, Greg Ungerer wrote:
+> Hi Jason,
+> 
+> On 05/11/13 00:57, Jason Cooper wrote:
+> > On Mon, Nov 04, 2013 at 09:51:51AM -0500, Jason Cooper wrote:
+> >> What happened to the rest of the series?
 > > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
-> >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> > index 5835b27..e2d5211 100644
-> > --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> > +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> > @@ -4,10 +4,12 @@ Required properties:
-> >  - compatible: Should be "fsl,imx23-usbphy"
+> > Crap.  Nevermind.  I just saw that Shawn had already taken the other
+> > patches into his tree.  And here I thought I was caught up on
+> > everything...
 > 
-> This needs update too, as we now have another two compatible strings.
+> :-)
 > 
+> Are you going to try and test out the imx50 support from Shawn's branch?
 
-One question, this is needed to change when adding compatible string
-to dts or using that compatible string at driver?
+My for-next branch below should have all the bits except imx50 pinctrl
+driver.
 
-> >  - reg: Should contain registers location and length
-> >  - interrupts: Should contain phy interrupt
-> > +- fsl,anatop: phandle for anatop register, it is only for mx6 SoC serial
-> 
-> imx6 SoC series
-> 
+  git://git.linaro.org/people/shawnguo/linux-2.6.git for-next
 
-Will change
-
--- 
-
-Best Regards,
-Peter Chen
+Shawn
