@@ -1,53 +1,44 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 5 Nov 2013 22:56:58 +0100 (CET)
-Subject: [PATCH] ARM: pcm037: convert custom GPIO-based power function
- to a regulator
-In-Reply-To: <20131104084047.GR24559@pengutronix.de>
-References: <Pine.LNX.4.64.1310311118370.30523@axis700.grange>
- <20131104084047.GR24559@pengutronix.de>
-Message-ID: <Pine.LNX.4.64.1311052252340.3700@axis700.grange>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Tue, 5 Nov 2013 16:00:51 -0600
+Subject: [PATCH RFC] ARM: dts: imx6qdl: make pinctrl nodes board specific
+In-Reply-To: <20131105020611.GD19770@S2101-09.ap.freescale.net>
+References: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
+ <20131031080326.GK24559@pengutronix.de>
+ <20131031102908.GX16735@n2100.arm.linux.org.uk>
+ <CAHCPf3vTcu9RCk8=9MUs4nkyJ-8jevh5koxfzdLzE5+qM0ZspQ@mail.gmail.com>
+ <20131101083332.GB10324@S2101-09.ap.freescale.net>
+ <CAHCPf3vhyjTnqHXYRj49AL80Z_jGd4LbaRfySjK-=Axkk4FNqA@mail.gmail.com>
+ <20131105020611.GD19770@S2101-09.ap.freescale.net>
+Message-ID: <CAHCPf3tjH-ptig-gKtFkChGZkYzv24qi022Qk4rvy236+QBF4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Mon, Nov 4, 2013 at 8:06 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Mon, Nov 04, 2013 at 04:50:01PM -0600, Matt Sealey wrote:
+>> On Fri, Nov 1, 2013 at 3:33 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> > On Thu, Oct 31, 2013 at 10:45:08AM -0500, Matt Sealey wrote:
+>> >> I suggested this to Shawn a couple weeks ago and got a bit of pushback.
+>> >>
+>> >> There's probably a ton more to do in this regard to keep the DT
+>> >> per-board more concise, but this drops tree size by a respectable
+>> >> amount on i.MX51 too (just on a tree I have internally, it's something
+>> >> like 8.5KiB) and I can't see any redundant data in the ones he
+>> >> patched.
+>> >>
+>> >> I can follow this up with i.MX51/i.MX53 if nobody is already doing that..
+>> >
+>> > I'm taking care of them as a move of while IMX family.
+>>
+>> I'd quite like to push the Efika MX trees at the state they're at,
+>> sometime in the near future; if this work is going to take a while
+>> could I just do it and submit it and see your objections?
+>
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/277649
+>
+> It's on my for-next branch for testing now.
 
-On Mon, 4 Nov 2013, Sascha Hauer wrote:
 
-> Hi Guennadi,
-> 
-> On Thu, Oct 31, 2013 at 11:20:46AM +0100, Guennadi Liakhovetski wrote:
-> > Add a fixed-voltage GPIO-enabled regulator to switch the camera on and off
-> > instead of using a .power() platform callback.
-> > 
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > ---
-> > 
-> > Only tested to grab the regulator during probing, couldn't test 
-> > functionality due to the lack of an mt9t031 sensor.
-> > 
-> >  arch/arm/mach-imx/mach-pcm037.c |   50 ++++++++++++++++++++++++++++-----------
-> >  1 files changed, 36 insertions(+), 14 deletions(-)
-> 
-> What's the motivation for this patch? It probably does the right thing,
-> but I think we need a plan for converting this to devicetree rather than
-> adding more stuff.
+Got it. Will jiggle everything to suit and just base against that.
 
-It's not adding stuff. It's getting rid of a custom callback and replacing 
-it with a proper regulator. Sure, if there's a plan to port this platform 
-to DT in a foreseeable future - feel free to drop this. But such a port 
-would require adding DT support to the mx3_camera driver / the soc-camera 
-framework, which might take some time, and this board isn't too new 
-either, so, maybe not many customers will be prepared to pay for that kind 
-of work ;) Anyway, I find this useful in its present form, but if there 
-are plans to switch to DT soon enough - no problem with dropping it 
-either.
-
-Thanks
-Guennadi
-
-> Sascha
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Thanks,
+Matt Sealey <neko@bakuhatsu.net>
