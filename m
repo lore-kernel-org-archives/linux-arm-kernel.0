@@ -1,104 +1,122 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 05 Nov 2013 00:52:29 -0800 (PST)
-Subject: [PATCH 3/3] clk: shmobile: Add R8A7790 clocks support
-In-Reply-To: <1383058511-26046-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383058511-26046-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <87r4avnsc6.wl%kuninori.morimoto.gx@renesas.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Tue, 5 Nov 2013 14:23:54 +0530
+Subject: [PATCH v4 4/6] gpio: davinci: add OF support
+In-Reply-To: <5277E752.8090005@ti.com>
+References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
+ <1383406775-14902-5-git-send-email-prabhakar.csenng@gmail.com>
+ <5277E752.8090005@ti.com>
+Message-ID: <CA+V-a8uV0g36LoQtxFjR56SaMxj7KOE2ztC+pfT_Pn1wGcqEmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Grygorii,
 
-Hi Laurent
+Thanks for the review.
 
-> +Required Properties:
-> +
-> +  - compatible: Must be "renesas,r8a7790-cpg-clocks"
-> +  - reg: Base address and length of the memory resource used by the CPG
-> +  - clocks: Reference to the parent clock
-> +  - #clock-cells: Must be 1
-> +  - clock-output-names: The name of the clocks, must be "main", "pll1",
-> +    "pll3", "lb", "qspi", "sdh", "sd0", "sd1".
-(snip)
-> +	for (i = 0; i < CPG_NUM_CLOCKS; ++i) {
-> +		const struct clk_div_table *table = NULL;
-> +		const char *parent_name = "main";
-> +		const char *name;
-> +		unsigned int shift;
-> +		unsigned int mult = 1;
-> +		unsigned int div = 1;
-> +		struct clk *clk;
-> +
-> +		of_property_read_string_index(np, "clock-output-names", i,
-> +					      &name);
-> +
-> +		switch (i) {
-> +		case R8A7790_CLK_MAIN:
-> +			parent_name = of_clk_get_parent_name(np, 0);
-> +			div = config->extal_div;
-> +			break;
-> +		case R8A7790_CLK_PLL1:
-> +			mult = config->pll1_mult / 2;
-> +			break;
-> +		case R8A7790_CLK_PLL3:
-> +			mult = config->pll3_mult;
-> +			break;
-> +		case R8A7790_CLK_LB:
-> +			div = cpg_mode & BIT(18) ? 36 : 24;
-> +			break;
-> +		case R8A7790_CLK_QSPI:
-> +			div = (cpg_mode & (BIT(3) | BIT(2) | BIT(1))) == BIT(2)
-> +			    ? 16 : 20;
-> +			break;
-> +		case R8A7790_CLK_SDH:
-> +			table = cpg_sdh_div_table;
-> +			shift = 8;
-> +			break;
-> +		case R8A7790_CLK_SD0:
-> +			table = cpg_sd01_div_table;
-> +			shift = 4;
-> +			break;
-> +		case R8A7790_CLK_SD1:
-> +			table = cpg_sd01_div_table;
-> +			shift = 0;
-> +			break;
-> +		}
+On Mon, Nov 4, 2013 at 11:58 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+> Hi Prabhakar Lad,
+>
+>
+> On 11/02/2013 05:39 PM, Lad, Prabhakar wrote:
+>>
+>> From: KV Sujith <sujithkv@ti.com>
+>>
+>> This patch adds OF parser support for davinci gpio
+>> driver and also appropriate documentation in gpio-davinci.txt
+>> located at Documentation/devicetree/bindings/gpio/.
+>
+>
+> I worry, do we need to have gpio_chip.of_xlate() callback implemented?
 
-Is this clock-output-names realy "Required" property ?
-The "name" and "order" seem fixed, then,
-I guess it can simply use "name array" ?
+I looked for the other OF GPIO implementations with same "ngpio"
+property (marvel, msm) but I don?t see of_xlate() callback implemented.
 
-> +static void __init r8a7790_cpg_clocks_init(struct device_node *np)
-> +{
-> +	const struct cpg_pll_config *config;
-> +	struct r8a7790_cpg *cpg;
-> +	struct clk **clks;
-> +	unsigned int i;
-> +
-> +	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
-> +	clks = kzalloc(CPG_NUM_CLOCKS * sizeof(*clks), GFP_KERNEL);
-> +	if (cpg == NULL || clks == NULL) {
-> +		kfree(clks);
-> +		kfree(cpg);
-> +		pr_err("%s: failed to allocate cpg\n", __func__);
-> +		return;
-> +	}
-> +
-> +	spin_lock_init(&cpg->lock);
-> +
-> +	cpg->data.clks = clks;
-> +	cpg->data.clk_num = CPG_NUM_CLOCKS;
-> +
-> +	cpg->reg = of_iomap(np, 0);
-> +	if (WARN_ON(cpg->reg == NULL)) {
-> +		kfree(cpg->data.clks);
-> +		kfree(cpg);
-> +		return;
-> +	}
+> - From one side, Davinci GPIO controller in DT described by one entry
+> which defines number of supported GPIOs as "ti,ngpio = <144>;"
+>
+> - From other side, on Linux level more than one gpio_chip objects are
+> instantiated (one per each 32 GPIO).
+>
+> How the standard GPIO biding will work in this case? .. And will they?
+>
+> Linus, I'd very appreciate if you will be able to clarify this point.
+>
+>
+>>
+>> Signed-off-by: KV Sujith <sujithkv@ti.com>
+>> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+>> [prabhakar.csengg at gmail.com: simplified the OF code, removed
+>>                 unnecessary DT property and also simplified
+>>                 the commit message]
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>> ---
+>>   .../devicetree/bindings/gpio/gpio-davinci.txt      |   32 ++++++++++++
+>>   drivers/gpio/gpio-davinci.c                        |   54
+>> ++++++++++++++++++--
+>>   2 files changed, 83 insertions(+), 3 deletions(-)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> new file mode 100644
+>> index 0000000..55aae1c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>> @@ -0,0 +1,32 @@
+>> +Davinci GPIO controller bindings
+>> +
+>> +Required Properties:
+>> +- compatible: should be "ti,dm6441-gpio"
+>> +
+>> +- reg: Physical base address of the controller and the size of memory
+>> mapped
+>> +       registers.
+>> +
+>> +- gpio-controller : Marks the device node as a gpio controller.
+>> +
+>> +- interrupts: Array of GPIO interrupt number.
+>
+>
+> May be meaning of <interrupts> property need to be extended, because,
+> as of now, only banked or unbanked IRQs are supported - and not both.
+>
+>
+OK
 
-Above 2 error cases are doing same thing.
-If can use goto xxx_error.
+>> +
+>> +- ti,ngpio: The number of GPIO pins supported.
+>> +
+>> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual
+>> interrupt
+>> +                            line to processor.
+>
+>
+> Should interrupt-controller; specifier be added here?
+>
+No
 
-Best regards
----
-Kuninori Morimoto
+>
+>> +
+>> +Example:
+>> +
+>> +gpio: gpio at 1e26000 {
+>> +       compatible = "ti,dm6441-gpio";
+>> +       gpio-controller;
+>> +       reg = <0x226000 0x1000>;
+>> +       interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
+>> +               44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
+>> +               46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
+>> +               48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
+>> +               50 IRQ_TYPE_EDGE_BOTH>;
+>> +       ti,ngpio = <144>;
+>> +       ti,davinci-gpio-irq-base = <101>;
+>
+>
+>         ^^ Is it still needed?
+>
+OOps missed to remove that.
+
+Regards,
+--Prabhakar Lad
