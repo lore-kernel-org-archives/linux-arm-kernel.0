@@ -1,52 +1,61 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 05 Nov 2013 11:34:26 +0800
-Subject: [PATCH trivial] include: uapi: standard all files' macro prefix
- and suffix, excluding "linux/" sub-directory
-In-Reply-To: <11907.1383602624@warthog.procyon.org.uk>
-References: <51FB6216.6010008@asianux.com>
- <11907.1383602624@warthog.procyon.org.uk>
-Message-ID: <52786742.1080509@asianux.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Tue, 05 Nov 2013 14:06:07 +1030
+Subject: [PATCH 2/3] virtio: mmio: fix signature checking for BE guests
+In-Reply-To: <87li1wb4k4.fsf@rustcorp.com.au>
+References: <1381502171-8187-1-git-send-email-marc.zyngier@arm.com>
+ <1381502171-8187-3-git-send-email-marc.zyngier@arm.com>
+ <1381740385.3247.6.camel@hornet> <87li1wb4k4.fsf@rustcorp.com.au>
+Message-ID: <87a9hja5aw.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2013 06:03 AM, David Howells wrote:
-> Chen Gang <gang.chen@asianux.com> wrote:
-> 
->> For "include/uapi/*", excluding "linux/" sub-directory, let all files'
->> macro prefix match the standard format, and give related stand comments
->> for their macro suffix.
+Rusty Russell <rusty@rustcorp.com.au> writes:
+> Pawel Moll <pawel.moll@arm.com> writes:
+>> On Fri, 2013-10-11 at 15:36 +0100, Marc Zyngier wrote:
+>>> As virtio-mmio config registers are specified to be little-endian,
+>>> using readl() to read the magic value and then memcmp() to check it
+>>> fails on BE (as readl() has an implicit swab).
+>>> 
+>>> Fix it by encoding the magic value as an integer instead of a string.
+>>> 
+>>> Cc: Rusty Russell <rusty@rustcorp.com.au>
+>>> Cc: Michael S. Tsirkin <mst@redhat.com>
+>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  drivers/virtio/virtio_mmio.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>> 
+>>> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+>>> index 1ba0d68..57f24fd 100644
+>>> --- a/drivers/virtio/virtio_mmio.c
+>>> +++ b/drivers/virtio/virtio_mmio.c
+>>> @@ -470,7 +470,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
+>>>  
+>>>  	/* Check magic value */
+>>>  	magic = readl(vm_dev->base + VIRTIO_MMIO_MAGIC_VALUE);
+>>> -	if (memcmp(&magic, "virt", 4) != 0) {
+>>> +	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
+>>>  		dev_warn(&pdev->dev, "Wrong magic value 0x%08lx!\n", magic);
+>>>  		return -ENODEV;
+>>>  	}
 >>
->> The related standard format is:
+>> The new spec will clarify this:
 >>
->>   "_SUBDIRNAME_SUBDIRNAME[_SUBDIRNAME]_FILENAME" (1st _SUBDIRNAME is _UAPI), and use '_' instead of '.' and '-'.
-> 
-> I strongly recommend _against_ this without very careful consideration.
+>> * 0x000 | R | MagicValue
+>>   Magic value. Must be 0x74726976 (a Little Endian equivalent
+>>   of a "virt" string).
+>>
+>> ... but I like the 'v'i'r't' characters still being there :-)
+>>
+>> Acked-by: Pawel Moll <pawel.moll@arm.com>
+>
+> Applied, thanks.
 
-All first-send interface related patches are not for applying, they are
-only for discussing.
+OK, I *said* applied, but left it in my pending queue.
 
+Pawel, do you want to open this can of worms?  If so, I'l merge this
+now.
 
-> Userspace sometimes depends on the name in the guard macro:-/
-> 
-
-"the guard macro" is only for prevent itself from being included by
-multiple times (an id used by itself -- like a handle), it is not an id
-to let other files know about it (it is not a normal using way).
-
-If we really want to check "a file id", normally we will check some
-macros which already defined in this header file (or in some scripts,
-check file path) instead of checking "its file id"
-
-Using the standard format can be sure of file id is always unique in the
-future, and it also can let our interface (Linux's address) more cleaner
-and beautiful.
-
-
-Hmm.. do you mean as an interface, if really have unusual(incorrect)
-using ways, we have to bear and compatible with them -- although the
-interface never says "it will not be changed in the future".
-
-
-Thanks.
--- 
-Chen Gang
+Cheers,
+Rusty.
