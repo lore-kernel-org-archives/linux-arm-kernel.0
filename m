@@ -1,147 +1,61 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 5 Nov 2013 18:08:34 +0800
-Subject: [PATCH 2/2] ARM: at91: sama5d3/dt: add sama5d36ek dts file
-In-Reply-To: <5278AE5F.9010409@overkiz.com>
-References: <1383634689-15343-1-git-send-email-josh.wu@atmel.com>
- <1383634689-15343-3-git-send-email-josh.wu@atmel.com>
- <5278AE5F.9010409@overkiz.com>
-Message-ID: <5278C3A2.6020900@atmel.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Tue,  5 Nov 2013 11:38:33 +0100
+Subject: [PATCHv10][ 2/7] video: imxfb: Also add pwmr for the device tree.
+In-Reply-To: <1383647918-27315-1-git-send-email-denis@eukrea.com>
+References: <1383647918-27315-1-git-send-email-denis@eukrea.com>
+Message-ID: <1383647918-27315-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Boris
+pwmr has to be set to get the imxfb backlight work,
+though pwmr was only configurable trough the platform data.
 
-On 11/5/2013 4:37 PM, boris brezillon wrote:
-> Hello Josh,
->
-> On 05/11/2013 07:58, Josh Wu wrote:
->> Add a dts file to support sama5d36ek board.
->>
->> Also update the the comments for sama5d36 in sama5d3.dtsi.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>   arch/arm/boot/dts/Makefile       |    1 +
->>   arch/arm/boot/dts/sama5d3.dtsi   |    2 +-
->>   arch/arm/boot/dts/sama5d36ek.dts |   52 
->> ++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 54 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm/boot/dts/sama5d36ek.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 802720e..1eccf61 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -40,6 +40,7 @@ dtb-$(CONFIG_ARCH_AT91)    += sama5d31ek.dtb
->>   dtb-$(CONFIG_ARCH_AT91)    += sama5d33ek.dtb
->>   dtb-$(CONFIG_ARCH_AT91)    += sama5d34ek.dtb
->>   dtb-$(CONFIG_ARCH_AT91)    += sama5d35ek.dtb
->> +dtb-$(CONFIG_ARCH_AT91)    += sama5d36ek.dtb
->>
->>   dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
->>
->> diff --git a/arch/arm/boot/dts/sama5d3.dtsi 
->> b/arch/arm/boot/dts/sama5d3.dtsi
->> index b7f4961..5bcd9b4 100644
->> --- a/arch/arm/boot/dts/sama5d3.dtsi
->> +++ b/arch/arm/boot/dts/sama5d3.dtsi
->> @@ -1,6 +1,6 @@
->>   /*
->>    * sama5d3.dtsi - Device Tree Include file for SAMA5D3 family SoC
->> - *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35 SoC
->> + *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35, 
->> SAMA5D36 SoC
->>    *
->>    *  Copyright (C) 2013 Atmel,
->>    *                2013 Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> Could you add a new file named sama5d36.dtsi and including all the 
-> optional peripherals provided by this SoC (see 
-> https://github.com/at91linux/linux-at91/blob/at91-3.13-cleanup/arch/arm/boot/dts/sama5d31.dtsi) 
-> :
->
-> #include "sama5d3.dtsi"
-> #include "sama5d3_can.dtsi"
-> #include "sama5d3_emac.dtsi"
-> #include "sama5d3_gmac.dtsi"
-> #include "sama5d3_mci2.dtsi"
-> #include "sama5d3_lcd.dtsi"
-> #include "sama5d3_tcb1.dtsi"
-> #include "sama5d3_uart.dtsi"
->
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Grant Likely <grant.likely@linaro.org>
+---
+ .../devicetree/bindings/video/fsl,imx-fb.txt       |    3 +++
+ drivers/video/imxfb.c                              |    2 ++
+ 2 files changed, 5 insertions(+)
 
-Ok.
-
->
->
->> diff --git a/arch/arm/boot/dts/sama5d36ek.dts 
->> b/arch/arm/boot/dts/sama5d36ek.dts
->> new file mode 100644
->> index 0000000..68d0227
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sama5d36ek.dts
->> @@ -0,0 +1,52 @@
->> +/*
->> + * sama5d36ek.dts - Device Tree file for SAMA5D36-EK board
->> + *
->> + *  Copyright (C) 2013 Atmel,
->> + *                2013 Josh Wu <josh.wu@atmel.com>
->> + *
->> + * Licensed under GPLv2 or later.
->> + */
->> +/dts-v1/;
->
-> #include "sama5d36.dtsi"
-
-I will modify them in v2. Thanks.
-
-Best Regards,
-Josh Wu
-
->
->> +#include "sama5d3xmb.dtsi"
->> +#include "sama5d3xdm.dtsi"
->> +
->> +/ {
->> +    model = "Atmel SAMA5D36-EK";
->> +    compatible = "atmel,sama5d36ek", "atmel,sama5d3xmb", 
->> "atmel,sama5d3xcm", "atmel,sama5d3", "atmel,sama5";
->> +
->> +    ahb {
->> +        apb {
->> +            spi0: spi at f0004000 {
->> +                status = "okay";
->> +            };
->> +
->> +            ssc0: ssc at f0008000 {
->> +                status = "okay";
->> +            };
->> +
->> +            can0: can at f000c000 {
->> +                status = "okay";
->> +            };
->> +
->> +            i2c0: i2c at f0014000 {
->> +                status = "okay";
->> +            };
->> +
->> +            i2c1: i2c at f0018000 {
->> +                status = "okay";
->> +            };
->> +
->> +            macb0: ethernet at f0028000 {
->> +                status = "okay";
->> +            };
->> +
->> +            macb1: ethernet at f802c000 {
->> +                status = "okay";
->> +            };
->> +        };
->> +    };
->> +
->> +    sound {
->> +        status = "okay";
->> +    };
->> +};
->>
->
+diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+index 46da08d..ac457ae 100644
+--- a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
++++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+@@ -17,6 +17,9 @@ Required nodes:
+ Optional properties:
+ - fsl,dmacr: DMA Control Register value. This is optional. By default, the
+ 	register is not modified as recommended by the datasheet.
++- fsl,pwmr:  LCDC PWM Contrast Control Register value. That property is
++	optional, but defining it is necessary to get the backlight working. If that
++	property is ommited, the register is zeroed.
+ - fsl,lscr1: LCDC Sharp Configuration Register value.
+ 
+ Example:
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index a2fe8bd..d2447d2 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -835,6 +835,8 @@ static int imxfb_init_fbinfo(struct platform_device *pdev)
+ 
+ 		of_property_read_u32(np, "fsl,dmacr", &fbi->dmacr);
+ 
++		of_property_read_u32(np, "fsl,pwmr", &fbi->pwmr);
++
+ 		/* These two function pointers could be used by some specific
+ 		 * platforms. */
+ 		fbi->lcd_power = NULL;
+-- 
+1.7.9.5
