@@ -1,155 +1,73 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Nov 2013 09:49:43 +0800
-Subject: [PATCH v3 11/11] usb: phy-mxs: Add system suspend/resume API
-In-Reply-To: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
-References: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1383616183-10511-12-git-send-email-peter.chen@freescale.com>
+Date: Tue, 5 Nov 2013 09:55:15 +0800
+Subject: [PATCH v3 00/10] Add power management support for chipidea
+Message-ID: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need this to keep PHY's power on or off during the system
-suspend mode. If we need to enable USB wakeup, then we
-must keep PHY's power being on during the system suspend mode.
-Otherwise, we need to keep PHY's power being off to save power.
+Hi Greg,
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/phy/phy-mxs-usb.c |   66 +++++++++++++++++++++++++++++++++++++++--
- 1 files changed, 63 insertions(+), 3 deletions(-)
+This serial adds power management (system & runtime) for chipidea core.
+With this, the chipidea controller can be at low power mode when it is not in
+use, and the chipidea controller can be the system wakeup source.
+It needs to depend on my patch[1], since [1]-"Add power management support for MXS PHY"
+adds some common PHY APIs, and this serial uses it.
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index ff8b98c..4588c72 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -55,11 +55,18 @@
- #define BM_USBPHY_DEBUG_CLKGATE			BIT(30)
- 
- /* Anatop Registers */
-+#define ANADIG_ANA_MISC0			0x150
-+#define ANADIG_ANA_MISC0_SET			0x154
-+#define ANADIG_ANA_MISC0_CLR			0x158
-+
- #define ANADIG_USB1_VBUS_DET_STAT		0x1c0
- 
- #define ANADIG_USB1_LOOPBACK_SET		0x1e4
- #define ANADIG_USB1_LOOPBACK_CLR		0x1e8
- 
-+#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	BIT(12)
-+#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL BIT(11)
-+
- #define BM_ANADIG_USB1_VBUS_DET_STAT_VBUS_VALID	BIT(3)
- 
- #define BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1	BIT(2)
-@@ -83,6 +90,15 @@
-  */
- #define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
- 
-+/* imx23 style PHY */
-+#define MXS_PHY_IMX23				BIT(3)
-+
-+/* imx6q style PHY */
-+#define MXS_PHY_IMX6Q				BIT(4)
-+
-+/* imx6sl style PHY */
-+#define MXS_PHY_IMX6SL				BIT(5)
-+
- /*
-  * IC fix for MXS_PHY_ABNORAML_IN_SUSPEND, bit 17 is the effective bit
-  * in HW_USBPHY_IP.
-@@ -100,19 +116,23 @@ struct mxs_phy_platform_flag {
- };
- 
- static const struct mxs_phy_platform_flag imx23_phy_data = {
--	.flags = MXS_PHY_ABNORAML_IN_SUSPEND | MXS_PHY_SENDING_SOF_TOO_FAST,
-+	.flags = MXS_PHY_ABNORAML_IN_SUSPEND |
-+		MXS_PHY_SENDING_SOF_TOO_FAST |
-+		MXS_PHY_IMX23,
- };
- 
- static const struct mxs_phy_platform_flag imx6q_phy_data = {
- 	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
- 		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
--		MXS_PHY_FIX_ABNORAML_IN_SUSPEND,
-+		MXS_PHY_FIX_ABNORAML_IN_SUSPEND |
-+		MXS_PHY_IMX6Q,
- };
- 
- static const struct mxs_phy_platform_flag imx6sl_phy_data = {
- 	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
- 		MXS_PHY_FIX_ABNORAML_IN_SUSPEND |
--		MXS_PHY_FIX_SENDING_SOF_TOO_FAST,
-+		MXS_PHY_FIX_SENDING_SOF_TOO_FAST |
-+		MXS_PHY_IMX6SL,
- };
- 
- static const struct of_device_id mxs_phy_dt_ids[] = {
-@@ -210,6 +230,22 @@ static void mxs_phy_disconnect_line(struct mxs_phy *mxs_phy, bool on)
- 			? "disconnected" : "connected");
- }
- 
-+static void mxs_phy_enable_ldo_in_suspend(struct mxs_phy *mxs_phy, bool on)
-+{
-+	unsigned int reg = on ? ANADIG_ANA_MISC0_SET : ANADIG_ANA_MISC0_CLR;
-+
-+	/* If the SoCs don't have anatop, quit */
-+	if (!mxs_phy->regmap_anatop)
-+		return;
-+
-+	if (mxs_phy->flags & MXS_PHY_IMX6Q)
-+		regmap_write(mxs_phy->regmap_anatop, reg,
-+			BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG);
-+	else if (mxs_phy->flags & MXS_PHY_IMX6SL)
-+		regmap_write(mxs_phy->regmap_anatop,
-+			reg, BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL);
-+}
-+
- static int mxs_phy_init(struct usb_phy *phy)
- {
- 	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
-@@ -395,6 +431,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, &mxs_phy->phy);
- 
-+	device_set_wakeup_capable(&pdev->dev, true);
- 	ret = usb_add_phy_dev(&mxs_phy->phy);
- 	if (ret)
- 		return ret;
-@@ -411,6 +448,28 @@ static int mxs_phy_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int mxs_phy_system_suspend(struct device *dev)
-+{
-+	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-+
-+	if (device_may_wakeup(dev))
-+		mxs_phy_enable_ldo_in_suspend(mxs_phy, true);
-+
-+	return 0;
-+}
-+
-+static int mxs_phy_system_resume(struct device *dev)
-+{
-+	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-+
-+	if (device_may_wakeup(dev))
-+		mxs_phy_enable_ldo_in_suspend(mxs_phy, false);
-+
-+	return 0;
-+}
-+
-+SIMPLE_DEV_PM_OPS(mxs_phy_pm, mxs_phy_system_suspend, mxs_phy_system_resume);
-+
- static struct platform_driver mxs_phy_driver = {
- 	.probe = mxs_phy_probe,
- 	.remove = mxs_phy_remove,
-@@ -418,6 +477,7 @@ static struct platform_driver mxs_phy_driver = {
- 		.name = DRIVER_NAME,
- 		.owner	= THIS_MODULE,
- 		.of_match_table = mxs_phy_dt_ids,
-+		.pm = &mxs_phy_pm,
- 	 },
- };
- 
--- 
-1.7.1
+It has been verified at Freescale i.mx6Q/DL SabreSD, i.mx28 evk platform
+(no runtime pm support), I will verify it at other FSL platforms during
+the patch review.
+
+Hi Alan,
+
+Due to chipidea core and imx concontroller needs some special operations
+during the standard ehci routine, I override .hub_control, .bus_suspend,
+and .bus_resume.
+
+There is one special thing is I use flag ehci->bus_suspended to know it
+was a global suspend before due to I need to notify PHY when the suspend
+has finished (portsc.suspendM is set) and the resume signal has finished
+(portsc.fpr is cleared) for high speed device, but there are two places
+will send suspend/resume, and I don't want to patch ehci-hub.c (if you think
+patch ehci-hub.c is a good way, I can do it).
+
+The related host patches:
+
+usb: chipidea: host: add quirk for ehci operation
+usb: chipidea: host: add ehci quirk for imx controller
+
+My github tree: https://github.com/hzpeterchen/linux-usb
+branch: master
+It is based on linux-next-1029.
+
+Changes for v3:
+- Using flag bit to indicate SoC features/bugs [7/10][10/10]
+
+Changes for v2:
+- Do not use atomic_read and atomic_set for ci->in_lpm
+- Do not use "supports_runtime_pm" as DT property due to it is
+not a hardware feature, instead of it, we use compatible string
+to enable it.
+
+Peter Chen (10):
+  usb: chipidea: Add power management support
+  usb: chipidea: imx: add power management support
+  usb: chipidea: add wakeup interrupt handler
+  usb: chipidea: usbmisc_imx: remove the controller's clock information
+  usb: chipidea: usbmisc_imx: add set_wakup API
+  usb: chipidea: imx: call set_wakeup when necessary
+  usb: chipidea: imx: Enable runtime pm support for imx6q
+  usb: chipidea: host: add quirk for ehci operation
+  usb: chipidea: host: add ehci quirk for imx controller
+  usb: chipidea: imx: Enable CI_HDRC_IMX_EHCI_QUIRK
+
+ drivers/usb/chipidea/ci.h          |    3 +
+ drivers/usb/chipidea/ci_hdrc_imx.c |  156 ++++++++++++++++++++++++++++++-
+ drivers/usb/chipidea/ci_hdrc_imx.h |    1 +
+ drivers/usb/chipidea/core.c        |  139 +++++++++++++++++++++++++++
+ drivers/usb/chipidea/host.c        |  180 ++++++++++++++++++++++++++++++++++++
+ drivers/usb/chipidea/otg.c         |    5 +
+ drivers/usb/chipidea/usbmisc_imx.c |   59 ++++++++----
+ include/linux/usb/chipidea.h       |    2 +
+ 8 files changed, 522 insertions(+), 23 deletions(-)
+
+[1] http://marc.info/?l=linux-usb&m=138361739523355&w=2
