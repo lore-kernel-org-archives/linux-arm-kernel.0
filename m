@@ -1,51 +1,20 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 5 Nov 2013 18:44:16 +0530
-Subject: [PATCH V3 6/7] ARM: OMAP4+: Correct Wakeup-gen code to use physical
- irq number
-In-Reply-To: <1383657257-3458-1-git-send-email-r.sricharan@ti.com>
-References: <1383657257-3458-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1383657257-3458-7-git-send-email-r.sricharan@ti.com>
+From: timur@tabi.org (Timur Tabi)
+Date: Tue, 05 Nov 2013 07:26:18 -0600
+Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
+In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F82874201@039-SN2MPN1-013.039d.mgd.msft.net>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
+ <20131101085904.GC28401@MrMyself>
+ <1DD289F6464F0949A2FCA5AA6DC23F82874201@039-SN2MPN1-013.039d.mgd.msft.net>
+Message-ID: <5278F1FA.1060706@tabi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wakeup gen mask/unmask callback uses the irq element of the
-irq_data to setup. The irq is the linux virtual irq number and
-is same as the hardware irq number only when the parent irqchip
-is setup as a legacy domain. When it is used as a linear domain,
-the virtual irqs are allocated dynamically and wakeup gen code
-cannot rely on these numbers to access the irq registers. Instead
-use the hwirq element of the irq_data which represent the physical
-irq number.
+Li Xiubo wrote:
+> But fsl-ssi.o and fsl-spdif.o is based PowrePC platform? Which we can see from the comments.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
----
- arch/arm/mach-omap2/omap-wakeupgen.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+fsl_ssi was originally PPC-only, but it now supports PPC and ARM.  You 
+can see that from the git history.
 
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 813c615..b813f4b 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -134,7 +134,7 @@ static void wakeupgen_mask(struct irq_data *d)
- 	unsigned long flags;
- 
- 	raw_spin_lock_irqsave(&wakeupgen_lock, flags);
--	_wakeupgen_clear(d->irq, irq_target_cpu[d->irq]);
-+	_wakeupgen_clear(d->hwirq, irq_target_cpu[d->hwirq]);
- 	raw_spin_unlock_irqrestore(&wakeupgen_lock, flags);
- }
- 
-@@ -146,7 +146,7 @@ static void wakeupgen_unmask(struct irq_data *d)
- 	unsigned long flags;
- 
- 	raw_spin_lock_irqsave(&wakeupgen_lock, flags);
--	_wakeupgen_set(d->irq, irq_target_cpu[d->irq]);
-+	_wakeupgen_set(d->hwirq, irq_target_cpu[d->hwirq]);
- 	raw_spin_unlock_irqrestore(&wakeupgen_lock, flags);
- }
- 
--- 
-1.7.9.5
+If there are any comments that say PPC but are not PPC-specific, that 
+should be fixed.
