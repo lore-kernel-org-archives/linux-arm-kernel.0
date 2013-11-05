@@ -1,16 +1,14 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Tue,  5 Nov 2013 11:38:34 +0100
-Subject: [PATCHv10][ 3/7] video: Kconfig: Allow more broad selection of the
- imxfb framebuffer driver.
+Date: Tue,  5 Nov 2013 11:38:36 +0100
+Subject: [PATCHv10][ 5/7] ARM: dts: imx25.dtsi: Permit to use the iomuxc in
+ the dts.
 In-Reply-To: <1383647918-27315-1-git-send-email-denis@eukrea.com>
 References: <1383647918-27315-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383647918-27315-3-git-send-email-denis@eukrea.com>
+Message-ID: <1383647918-27315-5-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without that patch, a user can't select the imxfb driver when the i.MX25 and/or
-  the i.MX27 device tree board are selected and that no boards that selects
-  IMX_HAVE_PLATFORM_IMX_FB are compiled in.
+An iomuxc label was added, and imx25-pingrp.h was included.
 
 Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Pawel Moll <pawel.moll@arm.com>
@@ -20,34 +18,36 @@ Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Cc: devicetree at vger.kernel.org
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
 Cc: Eric B?nard <eric@eukrea.com>
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
-ChangeLog v8->v9:
-- Added Jean-Christophe PLAGNIOL-VILLARD's ACK.
+ChangeLog v9->v10:
+- New patch made from the remaining parts of the "ARM: dts: imx25.dtsi: Add
+  some pinmux pins." patch in the old serie.
 ---
- drivers/video/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx25.dtsi |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 84b685f..f65e577 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -363,7 +363,7 @@ config FB_SA1100
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 1c19ad3..1a86eab 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -11,6 +11,7 @@
  
- config FB_IMX
- 	tristate "Freescale i.MX1/21/25/27 LCD support"
--	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
-+	depends on FB && ARCH_MXC
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
+ #include "skeleton.dtsi"
+ #include "imx25-pinfunc.h"
++#include "imx25-pingrp.h"
+ 
+ / {
+ 	aliases {
+@@ -174,7 +175,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			iomuxc at 43fac000{
++			iomuxc: iomuxc at 43fac000 {
+ 				compatible = "fsl,imx25-iomuxc";
+ 				reg = <0x43fac000 0x4000>;
+ 			};
 -- 
 1.7.9.5
