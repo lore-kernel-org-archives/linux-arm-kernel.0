@@ -1,117 +1,61 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 5 Nov 2013 19:16:14 +0100
-Subject: [PATCH v2 01/13] uprobes: move function declarations out of arch
-In-Reply-To: <20131105160150.GA1539@redhat.com>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-2-git-send-email-dave.long@linaro.org>
- <20131105160150.GA1539@redhat.com>
-Message-ID: <20131105181614.GA7614@redhat.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 5 Nov 2013 10:23:01 -0800
+Subject: [PATCH v3 13/28] mtd: nand: pxa3xx: Add bad block handling
+In-Reply-To: <1383656135-8627-14-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383656135-8627-14-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20131105182301.GN20061@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05, Oleg Nesterov wrote:
->
-> On 10/15, David Long wrote:
-> >
-> > Move the function declarations from the arch header to the common
-> > header, since only the function bodies are architecture-specific.
-> > These changes are from Vincent Rabin's uprobes patch.
->
-> Hmm. I didn't look at this patch because I thought it is obviously
-> fine, but...
->
-> >  arch/x86/include/asm/uprobes.h | 7 -------
-> >  include/linux/uprobes.h        | 8 ++++++++
-> >  2 files changed, 8 insertions(+), 7 deletions(-)
->
-> it should also update arch/powerpc/include/asm/uprobes.h ?
->
-> And 12/13 should not touch arch/powerpc/ or include/linux/uprobes.h.
+Hi Ezequiel,
 
-And I think we can merge this change separately to reduce the
-number of non-arm changes in the next version.
+I wrote up some comments on your v2 series while on a plane Sunday, but
+I didn't make time to send them out until now. Oh well.
 
-Please see the patch I am going to add to my tree below.
+On Tue, Nov 05, 2013 at 09:55:20AM -0300, Ezequiel Garcia wrote:
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -1128,6 +1152,14 @@ KEEP_CONFIG:
+>  
+>  	if (nand_scan_ident(mtd, 1, def))
+>  		return -ENODEV;
+> +
+> +	if (pdata->flash_bbt) {
+> +		chip->bbt_options |= NAND_BBT_USE_FLASH |
+> +				     NAND_BBT_NO_OOB_BBM;
 
-Oleg.
----
+You're using NAND_BBT_NO_OOB_BBM? So you are unable to write bad block
+markers to flash at all? Is this related to your independent patch for
+trying to scan BBM from the data area? Could you instead write a
+nand_chip.block_markbad() callback routine that would program BBM to the
+appropriate data area?
 
-Subject: [PATCH] uprobes: move function declarations out of arch
-From: David A. Long <dave.long@linaro.org>
-Date: Tue, 15 Oct 2013 17:04:16 -0400
+Or, if you really want to avoid programming new BBMs, then you should
+probably describe this decision in the patch description more clearly.
 
-Move the function declarations from the arch headers to the common
-header, since only the function bodies are architecture-specific.
-These changes are from Vincent Rabin's uprobes patch.
+> +		chip->bbt_td = &bbt_main_descr;
+> +		chip->bbt_md = &bbt_mirror_descr;
+> +	}
+> +
+>  	/* calculate addressing information */
+>  	if (mtd->writesize >= 2048)
+>  		host->col_addr_cycles = 2;
+> @@ -1323,6 +1355,7 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
+>  	if (of_get_property(np, "marvell,nand-keep-config", NULL))
+>  		pdata->keep_config = 1;
+>  	of_property_read_u32(np, "num-cs", &pdata->num_cs);
+> +	pdata->flash_bbt = of_get_nand_on_flash_bbt(np);
 
-[ oleg: update arch/powerpc/include/asm/uprobes.h ]
+Now that you're using the "nand-on-flash-bbt" property, you should
+document it in Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+like the other drivers do. (It's already documented generically in
+Documentation/.../nand.txt, but I think it's good practice to explicitly
+note which drivers support the binding, since nand_base doesn't do this
+generically for all NAND drivers.)
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
-Signed-off-by: David A. Long <dave.long@linaro.org>
-Signed-off-by: Oleg Nesterov <oleg@redhat.com>
----
- arch/powerpc/include/asm/uprobes.h |    7 -------
- arch/x86/include/asm/uprobes.h     |    7 -------
- include/linux/uprobes.h            |    8 ++++++++
- 3 files changed, 8 insertions(+), 14 deletions(-)
+>  
+>  	pdev->dev.platform_data = pdata;
+>  
 
-diff --git a/arch/powerpc/include/asm/uprobes.h b/arch/powerpc/include/asm/uprobes.h
-index 541fd6f..75c6ecd 100644
---- a/arch/powerpc/include/asm/uprobes.h
-+++ b/arch/powerpc/include/asm/uprobes.h
-@@ -46,11 +46,4 @@ struct arch_uprobe_task {
- 	unsigned long	saved_trap_nr;
- };
- 
--extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
--extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
--extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
--extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
--extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
--extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
--extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
- #endif	/* _ASM_UPROBES_H */
-diff --git a/arch/x86/include/asm/uprobes.h b/arch/x86/include/asm/uprobes.h
-index 2a24180..3087ea9 100644
---- a/arch/x86/include/asm/uprobes.h
-+++ b/arch/x86/include/asm/uprobes.h
-@@ -52,11 +52,4 @@ struct arch_uprobe_task {
- 	unsigned int			saved_tf;
- };
- 
--extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
--extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
--extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
--extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
--extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
--extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
--extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
- #endif	/* _ASM_UPROBES_H */
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index 06f28be..9fd60c5 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -30,6 +30,7 @@
- struct vm_area_struct;
- struct mm_struct;
- struct inode;
-+struct notifier_block;
- 
- #ifdef CONFIG_ARCH_SUPPORTS_UPROBES
- # include <asm/uprobes.h>
-@@ -125,6 +126,13 @@ extern void uprobe_notify_resume(struct pt_regs *regs);
- extern bool uprobe_deny_signal(void);
- extern bool __weak arch_uprobe_skip_sstep(struct arch_uprobe *aup, struct pt_regs *regs);
- extern void uprobe_clear_state(struct mm_struct *mm);
-+extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
-+extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
-+extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
-+extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
- #else /* !CONFIG_UPROBES */
- struct uprobes_state {
- };
--- 
-1.5.5.1
+Brian
