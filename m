@@ -1,73 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Nov 2013 09:22:01 +0100
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <527816AE.1080508@wwwdotorg.org>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <1704730.RnIqE1USnv@wuerfel> <527816AE.1080508@wwwdotorg.org>
-Message-ID: <201311050922.01970.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 5 Nov 2013 09:33:36 +0100
+Subject: [PATCH v4 1/4] ARM: deprecate mach/timex.h for !ARCH_MULTIPLATFORM
+In-Reply-To: <201311041453.09897.arnd@arndb.de>
+References: <20131104105836.GI14892@pengutronix.de>
+ <1383562853-17202-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <201311041453.09897.arnd@arndb.de>
+Message-ID: <20131105083336.GK14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 November 2013, Stephen Warren wrote:
-> On 11/04/2013 01:43 PM, Arnd Bergmann wrote:
-> > int devm_probe_gpio(struct device *dev, const struct devm_probe *probe)
-> ...
-> > #define DEVM_GPIO(_struct, _member, _index) {				 \
-> ...
-> > #define DEVM_GPIO_NAMED(_struct, _member, _name) { 			 \
+On Mon, Nov 04, 2013 at 02:53:09PM +0100, Arnd Bergmann wrote:
+> On Monday 04 November 2013, Uwe Kleine-K?nig wrote:
+> > While mach/timex.h isn't used for multi-platform builds it still is for
+> > "normal" builds. As there are only three platforms that do something else
+> > than only defining CLOCK_TICK_RATE (and these are probably easy to fix),
+> > deprecate mach/timex.h and drop the corresponding files.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > 
-> Should those save the GPIO flags too? Or, do we assume that gpiod-based
-> GPIOs already handle the flags inside the gpiod API?
-
-The latter. I would certainly hope to get away with assigning just one
-structure field per callback function.
- 
-> > /*
-> >  * this lists all properties we access from the driver. The list
-> >  * is interpreted by devm_probe() and can be programmatically
-> >  * verified to match the binding.
-> >  */
-> > static const struct devm_probe foo_probe_list[] = {
-> > 	DEVM_ALLOC(foo_priv),
-> > 	DEVM_IOMAP(foo_priv, regs, 0, 0),
-> > 	DEVM_PROP_BOOL(foo_priv, oldstyle_dma, "foo,oldstyle-dma"),
+> +LinusW, +rmk
 > 
-> I wonder if it makes sense to handle pure data here, or whether this
-> only makes sense for resources/services that are provided by some other
-> device?
-> 
-> I guess it's nice for all resources and configuration to come through to
-> probe() in the same way, but I rather wonder how we'd handle bindings
-> that have large custom (driver-specific) tables of data. Would be simply
-> defer such things to custom code in probe()? If so, it feels slightly
-> inconsistent to handle some data in the probe_list[] and some in code in
-> probe(). Still, I guess there's something to be said for keeping the
-> simple cases simple.
+> I don't think we can do this (yet): IIRC, CLOCK_TICK_RATE is required
+> at least for platforms using CONFIG_ARCH_USES_GETTIMEOFFSET (which
+> is not allowed for multiplatform).
+Hmm, I indeed missed some uses, i.e. ep93xx, mmp, netx, sa1100, u300,
+ixp4xx and rpc use CLOCK_TICK_RATE (or LATCH). Also
+drivers/rtc/rtc-pxa.c uses CLOCK_TICK_RATE. I didn't find that
+ARCH_USES_GETTIMEOFFSET implies a use of CLOCK_TICK_RATE though. Did I
+miss something?
 
-Right, and I didn't intend to solve all cases in a completely generic way.
-Thinking about it some more, a driver could actually add a custom callback
-for some properties, but I don't know if that adds any value over just
-interpreting them from the regular probe() function.
+For now I took the patch out of my next branch and will rework it to at
+least let the above listed platforms also continue to use timex.h.
 
-> > 	DEVM_DMA_SLAVE(foo_priv, rxdma, "rx");
-> > 	DEVM_DMA_SLAVE(foo_priv, txdma, "tx");
-> > 	DEVM_GPIO(foo_priv, gpio, 0);
-> > 	DEVM_IRQ_NAMED(foo_priv, irq, foo_irq_handler, "fifo", IRQF_SHARED),
-> 
-> What about the case where some resources are optional, or only required
-> based on the values of certain other properties? I suppose that probe()
-> could call devm_probe() multiple times, with different probe_list[]s,
-> based on whatever algorithm they need.
+Best regards
+Uwe
 
-That's one open question that I haven't found the best solution for yet.
-My first take on that was to add another field in struct devm_probe to
-mark a property as optional, but that would increase the overall
-complexity. I'd first want to do a survey of what kinds of properties
-are typically optional. If it's only a few of them, we could have
-something like
-
-DEVM_DMA_SLAVE_OPTIONAL()
-
-for the cases that need it, with a variant of the callback function.
-
-	Arnd
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
