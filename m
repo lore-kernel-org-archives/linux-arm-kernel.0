@@ -1,73 +1,150 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Nov 2013 09:55:15 +0800
-Subject: [PATCH v3 00/10] Add power management support for chipidea
-Message-ID: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
+Date: Tue, 5 Nov 2013 09:55:17 +0800
+Subject: [PATCH v3 02/10] usb: chipidea: imx: add power management support
+In-Reply-To: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
+References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1383616525-10769-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Add system and runtime power management support for imx gluy layer.
 
-This serial adds power management (system & runtime) for chipidea core.
-With this, the chipidea controller can be at low power mode when it is not in
-use, and the chipidea controller can be the system wakeup source.
-It needs to depend on my patch[1], since [1]-"Add power management support for MXS PHY"
-adds some common PHY APIs, and this serial uses it.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/chipidea/ci_hdrc_imx.c |   94 ++++++++++++++++++++++++++++++++++-
+ 1 files changed, 91 insertions(+), 3 deletions(-)
 
-It has been verified at Freescale i.mx6Q/DL SabreSD, i.mx28 evk platform
-(no runtime pm support), I will verify it at other FSL platforms during
-the patch review.
-
-Hi Alan,
-
-Due to chipidea core and imx concontroller needs some special operations
-during the standard ehci routine, I override .hub_control, .bus_suspend,
-and .bus_resume.
-
-There is one special thing is I use flag ehci->bus_suspended to know it
-was a global suspend before due to I need to notify PHY when the suspend
-has finished (portsc.suspendM is set) and the resume signal has finished
-(portsc.fpr is cleared) for high speed device, but there are two places
-will send suspend/resume, and I don't want to patch ehci-hub.c (if you think
-patch ehci-hub.c is a good way, I can do it).
-
-The related host patches:
-
-usb: chipidea: host: add quirk for ehci operation
-usb: chipidea: host: add ehci quirk for imx controller
-
-My github tree: https://github.com/hzpeterchen/linux-usb
-branch: master
-It is based on linux-next-1029.
-
-Changes for v3:
-- Using flag bit to indicate SoC features/bugs [7/10][10/10]
-
-Changes for v2:
-- Do not use atomic_read and atomic_set for ci->in_lpm
-- Do not use "supports_runtime_pm" as DT property due to it is
-not a hardware feature, instead of it, we use compatible string
-to enable it.
-
-Peter Chen (10):
-  usb: chipidea: Add power management support
-  usb: chipidea: imx: add power management support
-  usb: chipidea: add wakeup interrupt handler
-  usb: chipidea: usbmisc_imx: remove the controller's clock information
-  usb: chipidea: usbmisc_imx: add set_wakup API
-  usb: chipidea: imx: call set_wakeup when necessary
-  usb: chipidea: imx: Enable runtime pm support for imx6q
-  usb: chipidea: host: add quirk for ehci operation
-  usb: chipidea: host: add ehci quirk for imx controller
-  usb: chipidea: imx: Enable CI_HDRC_IMX_EHCI_QUIRK
-
- drivers/usb/chipidea/ci.h          |    3 +
- drivers/usb/chipidea/ci_hdrc_imx.c |  156 ++++++++++++++++++++++++++++++-
- drivers/usb/chipidea/ci_hdrc_imx.h |    1 +
- drivers/usb/chipidea/core.c        |  139 +++++++++++++++++++++++++++
- drivers/usb/chipidea/host.c        |  180 ++++++++++++++++++++++++++++++++++++
- drivers/usb/chipidea/otg.c         |    5 +
- drivers/usb/chipidea/usbmisc_imx.c |   59 ++++++++----
- include/linux/usb/chipidea.h       |    2 +
- 8 files changed, 522 insertions(+), 23 deletions(-)
-
-[1] http://marc.info/?l=linux-usb&m=138361739523355&w=2
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index 0bd7ce1..803630e 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -48,6 +48,8 @@ struct ci_hdrc_imx_data {
+ 	struct platform_device *ci_pdev;
+ 	struct clk *clk;
+ 	struct imx_usbmisc_data *usbmisc_data;
++	bool supports_runtime_pm;
++	bool in_lpm;
+ };
+ 
+ /* Common functions shared by usbmisc drivers */
+@@ -176,8 +178,12 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, data);
+ 
+-	pm_runtime_no_callbacks(&pdev->dev);
+-	pm_runtime_enable(&pdev->dev);
++	device_set_wakeup_capable(&pdev->dev, true);
++
++	if (data->supports_runtime_pm) {
++		pm_runtime_set_active(&pdev->dev);
++		pm_runtime_enable(&pdev->dev);
++	}
+ 
+ 	return 0;
+ 
+@@ -192,13 +198,94 @@ static int ci_hdrc_imx_remove(struct platform_device *pdev)
+ {
+ 	struct ci_hdrc_imx_data *data = platform_get_drvdata(pdev);
+ 
+-	pm_runtime_disable(&pdev->dev);
+ 	ci_hdrc_remove_device(data->ci_pdev);
++	if (data->supports_runtime_pm) {
++		pm_runtime_get_sync(&pdev->dev);
++		pm_runtime_disable(&pdev->dev);
++		pm_runtime_put_noidle(&pdev->dev);
++	}
++	clk_disable_unprepare(data->clk);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int imx_controller_suspend(struct device *dev)
++{
++	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
++
++	dev_dbg(dev, "at %s\n", __func__);
++
++	if (data->in_lpm)
++		return 0;
++
+ 	clk_disable_unprepare(data->clk);
+ 
++	data->in_lpm = true;
++
+ 	return 0;
+ }
+ 
++static int imx_controller_resume(struct device *dev)
++{
++	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
++	int ret = 0;
++
++	dev_dbg(dev, "at %s\n", __func__);
++
++	if (!data->in_lpm)
++		return 0;
++
++	ret = clk_prepare_enable(data->clk);
++	if (ret)
++		return ret;
++
++	data->in_lpm = false;
++
++	return ret;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int ci_hdrc_imx_suspend(struct device *dev)
++{
++	return imx_controller_suspend(dev);
++}
++
++static int ci_hdrc_imx_resume(struct device *dev)
++{
++	struct ci_hdrc_imx_data *data = dev_get_drvdata(dev);
++	int ret;
++
++	ret = imx_controller_resume(dev);
++	if (!ret && data->supports_runtime_pm) {
++		pm_runtime_disable(dev);
++		pm_runtime_set_active(dev);
++		pm_runtime_enable(dev);
++	}
++
++	return ret;
++}
++#endif /* CONFIG_PM_SLEEP */
++
++#ifdef CONFIG_PM_RUNTIME
++static int ci_hdrc_imx_runtime_suspend(struct device *dev)
++{
++	return imx_controller_suspend(dev);
++}
++
++static int ci_hdrc_imx_runtime_resume(struct device *dev)
++{
++	return imx_controller_resume(dev);
++}
++#endif /* CONFIG_PM_RUNTIME */
++
++#endif /* CONFIG_PM */
++static const struct dev_pm_ops ci_hdrc_imx_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(ci_hdrc_imx_suspend, ci_hdrc_imx_resume)
++	SET_RUNTIME_PM_OPS(ci_hdrc_imx_runtime_suspend,
++			ci_hdrc_imx_runtime_resume, NULL)
++};
++
+ static struct platform_driver ci_hdrc_imx_driver = {
+ 	.probe = ci_hdrc_imx_probe,
+ 	.remove = ci_hdrc_imx_remove,
+@@ -206,6 +293,7 @@ static struct platform_driver ci_hdrc_imx_driver = {
+ 		.name = "imx_usb",
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = ci_hdrc_imx_dt_ids,
++		.pm = &ci_hdrc_imx_pm_ops,
+ 	 },
+ };
+ 
+-- 
+1.7.1
