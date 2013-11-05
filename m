@@ -1,85 +1,35 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 5 Nov 2013 12:37:46 -0300
-Subject: [PATCH v3 25/28] ARM: mvebu: Add support for NAND controller in
- Armada 370/XP
-In-Reply-To: <20131105151531.GK3060@titan.lakedaemon.net>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-26-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105132905.GJ3060@titan.lakedaemon.net>
- <20131105135145.GA2676@localhost>
- <20131105151531.GK3060@titan.lakedaemon.net>
-Message-ID: <20131105153745.GA9955@localhost>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 5 Nov 2013 16:42:29 +0100
+Subject: [PATCH] ARM: at91/trivial: fix at91rm9200 rts/cts pinctrl definitions
+Message-ID: <1383666149-5837-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 10:15:31AM -0500, Jason Cooper wrote:
-> On Tue, Nov 05, 2013 at 10:51:46AM -0300, Ezequiel Garcia wrote:
-> > On Tue, Nov 05, 2013 at 08:29:05AM -0500, Jason Cooper wrote:
-> > > On Tue, Nov 05, 2013 at 09:55:32AM -0300, Ezequiel Garcia wrote:
-> > > > The Armada 370 and Armada XP SoC have a NAND controller (aka NFCv2).
-> > > > This commit adds support for it in Armada 370 and Armada XP SoC
-> > > > common devicetree.
-> > > > 
-> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/armada-370-xp.dtsi | 9 +++++++++
-> > > >  1 file changed, 9 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> > > > index 01e69fc..b4e6898 100644
-> > > > --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> > > > +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> > > > @@ -258,6 +258,15 @@
-> > > >  				status = "disabled";
-> > > >  			};
-> > > >  
-> > > > +			nand at d0000 {
-> > > > +				compatible = "marvell,armada370-nand";
-> > > 
-> > > Could you please provide a separate patch updating the devicetree
-> > > binding documentation?  You can also Cc the entire series to the
-> > > devicetree ml as long as the documentation patch is easy to find in the
-> > > series.  eg 'dt: binding: ...'
-> > > 
-> > 
-> > Hm.. actually the controller already supports the new compatible string
-> > so the binding documentation should be added now.
-> 
-> $ git grep -n 'marvell,armada370-nand' -- Documentation/devicetree/bindings/
-> $
+Swap names as they were improperly defined.
 
-Well the controller supports it, but I never updated the binding:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91rm9200.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-$ git grep -n 'marvell,armada370-nand' -- drivers/mtd/nand/pxa3xx-nand.c
-
-So that's why I think a separate patch to be taken by Brian now is more
-appropriate.
-
-> > And I'd rather do that in a separate patch, to avoid cluttering the poor
-> > devicetree people with an unrelated 28-piece patch :-)
-> 
-> No (really), according to Grant and Mark during the closing session, I
-> asked this specific question.  They _do_ want the entire series so they
-> can refer to the corresponding code changes if necessary.  As I stated
-> above, we can make their job easier by making the binding a separate
-> patch that is clearly marked as such.
-> 
-
-Ah, good to know.
-
-> > BTW: who should take such a patch? I'm still a little lost regarding
-> > who takes the binding or dts patches for a given subsystem.
-> 
-> The appropriate sub-system maintainer still takes the patches, we simply
-> wait a bit for the DT binding maintainers to chime in.  If they don't
-> after a few weeks, we can take it without their Ack.
-> 
-> If the maintainer is unsure, or needs help reviewing the binding, they
-> can always ping the DT folks for assistance.
-> 
-
-Ok, great.
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index f770655..c61b16f 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -191,12 +191,12 @@
+ 							 AT91_PIOA 18 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA18 periph A */
+ 					};
+ 
+-					pinctrl_uart0_rts: uart0_rts-0 {
++					pinctrl_uart0_cts: uart0_cts-0 {
+ 						atmel,pins =
+ 							<AT91_PIOA 20 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA20 periph A */
+ 					};
+ 
+-					pinctrl_uart0_cts: uart0_cts-0 {
++					pinctrl_uart0_rts: uart0_rts-0 {
+ 						atmel,pins =
+ 							<AT91_PIOA 21 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA21 periph A */
+ 					};
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.2.2
