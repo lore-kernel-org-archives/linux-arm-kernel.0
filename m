@@ -1,196 +1,63 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Nov 2013 09:55:24 +0800
-Subject: [PATCH v3 09/10] usb: chipidea: host: add ehci quirk for imx
- controller
-In-Reply-To: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
-References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1383616525-10769-10-git-send-email-peter.chen@freescale.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Mon,  4 Nov 2013 18:16:04 -0800
+Subject: [PATCH 2/3] ARM: mm: fix __phys_to_virt to work with 64 bit
+ phys_addr_t in BE case
+In-Reply-To: <1383617765-28052-1-git-send-email-victor.kamensky@linaro.org>
+References: <1383617765-28052-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1383617765-28052-3-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the port goes to suspend or finishes resme, it needs to
-notify PHY, it is not a standard EHCI operation, so we add a
-quirk for it.
+Make sure that inline assembler that expects 'r' operand
+receives 32 bit value.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Before this fix in case of CONFIG_ARCH_PHYS_ADDR_T_64BIT and
+CONFIG_ARM_PATCH_PHYS_VIRT __phys_to_virt function passed 64 bit
+value to __pv_stub inline assembler where 'r' operand is
+expected. Compiler behavior in such case is not well specified.
+It worked in little endian case, but in big endian case
+incorrect code was generated, where compiler confused which
+part of 64 bit value it needed to modify. For example BE
+snippet looked like this:
+
+N:0x80904E08 : MOV      r2,#0
+N:0x80904E0C : SUB      r2,r2,#0x81000000
+
+when LE similar code looked like this
+
+N:0x808FCE2C : MOV      r2,r0
+N:0x808FCE30 : SUB      r2,r2,#0xc0, 8 ; #0xc0000000
+
+Note 'r0' register is va that have to be translated into phys
+
+To avoid this situation use explicit cast to 'unsigned long',
+which explicitly discard upper part of phys address and convert
+value to 32 bit. Also add comment so such cast will not be
+removed in the future.
+
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 ---
- drivers/usb/chipidea/host.c  |  129 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/usb/chipidea.h |    1 +
- 2 files changed, 130 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/memory.h | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index de0c2de..66866cd 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -34,6 +34,10 @@
- 
- static struct hc_driver __read_mostly ci_ehci_hc_driver;
- static int (*orig_bus_suspend)(struct usb_hcd *hcd);
-+static int (*orig_bus_resume)(struct usb_hcd *hcd);
-+static int (*orig_hub_control)(struct usb_hcd *hcd,
-+				u16 typeReq, u16 wValue, u16 wIndex,
-+				char *buf, u16 wLength);
- 
- static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 4dd2145..7a8599c 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -226,7 +226,13 @@ static inline phys_addr_t __virt_to_phys(unsigned long x)
+ static inline unsigned long __phys_to_virt(phys_addr_t x)
  {
-@@ -75,12 +79,131 @@ static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
- 				 */
- 				udelay(125);
- 			}
-+			if (hcd->phy && test_bit(port, &ehci->bus_suspended)
-+				&& (ehci_port_speed(ehci, portsc) ==
-+					USB_PORT_STAT_HIGH_SPEED))
-+				/*
-+				 * notify the USB PHY, it is for global
-+				 * suspend case.
-+				 */
-+				usb_phy_notify_suspend(hcd->phy,
-+					USB_SPEED_HIGH);
- 		}
- 	}
- 
- 	return 0;
+ 	unsigned long t;
+-	__pv_stub(x, t, "sub", __PV_BITS_31_24);
++        /*
++         * 'unsigned long' cast discard upper word when
++         * phys_addr_t is 64 bit, and makes sure that inline
++         * assembler expression receives 32 bit argument
++         * in place where 'r' 32 bit operand is expected.
++         */
++	__pv_stub((unsigned long) x, t, "sub", __PV_BITS_31_24);
+ 	return t;
  }
  
-+static int ci_imx_ehci_bus_resume(struct usb_hcd *hcd)
-+{
-+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-+	int port;
-+
-+	int ret = orig_bus_resume(hcd);
-+
-+	if (ret)
-+		return ret;
-+
-+	port = HCS_N_PORTS(ehci->hcs_params);
-+	while (port--) {
-+		u32 __iomem *reg = &ehci->regs->port_status[port];
-+		u32 portsc = ehci_readl(ehci, reg);
-+		/*
-+		 * Notify PHY after resume signal has finished, it is
-+		 * for global suspend case.
-+		 */
-+		if (hcd->phy
-+			&& test_bit(port, &ehci->bus_suspended)
-+			&& (portsc & PORT_CONNECT)
-+			&& (ehci_port_speed(ehci, portsc) ==
-+				USB_PORT_STAT_HIGH_SPEED))
-+			/* notify the USB PHY */
-+			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
-+	}
-+
-+	return 0;
-+}
-+
-+/* The below code is based on tegra ehci driver */
-+static int ci_imx_ehci_hub_control(
-+	struct usb_hcd	*hcd,
-+	u16		typeReq,
-+	u16		wValue,
-+	u16		wIndex,
-+	char		*buf,
-+	u16		wLength
-+)
-+{
-+	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
-+	u32 __iomem	*status_reg;
-+	u32		temp;
-+	unsigned long	flags;
-+	int		retval = 0;
-+
-+	status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
-+
-+	spin_lock_irqsave(&ehci->lock, flags);
-+
-+	if (typeReq == SetPortFeature && wValue == USB_PORT_FEAT_SUSPEND) {
-+		temp = ehci_readl(ehci, status_reg);
-+		if ((temp & PORT_PE) == 0 || (temp & PORT_RESET) != 0) {
-+			retval = -EPIPE;
-+			goto done;
-+		}
-+
-+		temp &= ~(PORT_RWC_BITS | PORT_WKCONN_E);
-+		temp |= PORT_WKDISC_E | PORT_WKOC_E;
-+		ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
-+
-+		/*
-+		 * If a transaction is in progress, there may be a delay in
-+		 * suspending the port. Poll until the port is suspended.
-+		 */
-+		if (ehci_handshake(ehci, status_reg, PORT_SUSPEND,
-+						PORT_SUSPEND, 5000))
-+			ehci_err(ehci, "timeout waiting for SUSPEND\n");
-+
-+		spin_unlock_irqrestore(&ehci->lock, flags);
-+		if (ehci_port_speed(ehci, temp) ==
-+				USB_PORT_STAT_HIGH_SPEED && hcd->phy) {
-+			/* notify the USB PHY */
-+			usb_phy_notify_suspend(hcd->phy, USB_SPEED_HIGH);
-+		}
-+		spin_lock_irqsave(&ehci->lock, flags);
-+
-+		set_bit((wIndex & 0xff) - 1, &ehci->suspended_ports);
-+		goto done;
-+	}
-+
-+	/*
-+	 * After resume has finished, it needs do some post resume
-+	 * operation for some SoCs.
-+	 */
-+	else if (typeReq == ClearPortFeature &&
-+					wValue == USB_PORT_FEAT_C_SUSPEND) {
-+
-+		/* Make sure the resume has finished, it should be finished */
-+		if (ehci_handshake(ehci, status_reg, PORT_RESUME, 0, 25000))
-+			ehci_err(ehci, "timeout waiting for resume\n");
-+
-+		temp = ehci_readl(ehci, status_reg);
-+
-+		if (ehci_port_speed(ehci, temp) ==
-+				USB_PORT_STAT_HIGH_SPEED && hcd->phy) {
-+			/* notify the USB PHY */
-+			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
-+		}
-+	}
-+
-+	spin_unlock_irqrestore(&ehci->lock, flags);
-+
-+	/* Handle the hub control events here */
-+	return orig_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
-+done:
-+	spin_unlock_irqrestore(&ehci->lock, flags);
-+	return retval;
-+}
-+
- static irqreturn_t host_irq(struct ci_hdrc *ci)
- {
- 	return usb_hcd_irq(ci->irq, ci->hcd);
-@@ -183,8 +306,14 @@ int ci_hdrc_host_init(struct ci_hdrc *ci)
- 	ehci_init_driver(&ci_ehci_hc_driver, NULL);
- 
- 	orig_bus_suspend = ci_ehci_hc_driver.bus_suspend;
-+	orig_bus_resume = ci_ehci_hc_driver.bus_resume;
-+	orig_hub_control = ci_ehci_hc_driver.hub_control;
- 
- 	ci_ehci_hc_driver.bus_suspend = ci_ehci_bus_suspend;
-+	if (ci->platdata->flags & CI_HDRC_IMX_EHCI_QUIRK) {
-+		ci_ehci_hc_driver.bus_resume = ci_imx_ehci_bus_resume;
-+		ci_ehci_hc_driver.hub_control = ci_imx_ehci_hub_control;
-+	}
- 
- 	return 0;
- }
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 3842431..8c3b7e2 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -26,6 +26,7 @@ struct ci_hdrc_platform_data {
- 	 */
- #define CI_HDRC_DUAL_ROLE_NOT_OTG	BIT(4)
- #define CI_HDRC_IMX28_WRITE_FIX		BIT(5)
-+#define CI_HDRC_IMX_EHCI_QUIRK		BIT(6)
- 	enum usb_dr_mode	dr_mode;
- #define CI_HDRC_CONTROLLER_RESET_EVENT		0
- #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
 -- 
-1.7.1
+1.8.1.4
