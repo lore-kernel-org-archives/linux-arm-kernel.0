@@ -1,63 +1,77 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 5 Nov 2013 13:36:59 -0700
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <201311052117.33443.arnd@arndb.de>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <201311052034.01114.arnd@arndb.de>
- <20131105195820.GB20600@obsidianresearch.com>
- <201311052117.33443.arnd@arndb.de>
-Message-ID: <20131105203659.GA26576@obsidianresearch.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 05 Nov 2013 21:45:33 +0100
+Subject: [PATCH 0/2] ARM: mvebu: fix DT def. of PCIe units for mv78230 and
+ mv78260
+Message-ID: <cover.1383681717.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 09:17:32PM +0100, Arnd Bergmann wrote:
-> Creating a platform_device (or a plain device, for that matter)
-> from a proper probe() function would have a similar effect from
-> the perspective of the TPM subsystem (or other subsystems using
+Hi,
 
-I'd rather see the core get fixed than more muck in the drivers,
-especially since things are going in that direction :)
+As discussed earlier, here is a set of two patches fixing Armada XP
+mv78230 and mv78260 PCIe units definition. AFAICT, the most accurate
+information available regarding those is the table available on the
+following page:
 
-> Yes. Note that the use of new 'class'es is not recommended any more,
-> nowadays we are supposed to use 'bus_type' for this, which is
-> traditionally something slightly different, but technically almost
-> the same implementation-wise.
+ http://www.marvell.com/embedded-processors/armada-xp/
 
-Thanks, I will look into that!
- 
-> That depends: the requirement is that no user space breaks after
-> a change. I assume that there is a fairly limited set of packages
-> accessing the tpm sysfs files. If all of them are written properly,
-> they should be able to deal with looking at the files in a different
-> place in sysfs.
+First patch is simply a resend of the one Thomas reviewed with my
+SoB. It fixes mv78230 .dtsi and has been tested on real hardware.
 
-The other issue is that none of the sysfs files are even close to
-following the one value per file rule, they are all wrong. I actually
-think that nothing in userspace ever uses them and they were only ever
-done for debugfs-like purposes.
+Second patch fixes mv78260 .dtsi to reflect the fact that the two first
+units are x4 and quad x1 capable, and third (and last) interface is x4
+only. This patch has only been compiled and not tested on real hardware.
+As associated changes are quite error-prone, I think it needs some
+careful review.
 
-My dark hope is to move them all to debugfs and entirely out of
-sysfs.. But I think it will be through a CONFIG_TPM_SYSFS_COMPAT=y +
-printk_once("Stop using these sysfs attributes!") kind of scheme.
- 
-> Another option is to change the TPM core sysfs attributes not to
-> look at drvdata, but to use devres_find() to find the data they
-> need.
+As a side note, Thomas, I noticed one more thing, this time in mv78460
+.dtsi when comparing it w/ mv78230 and mv78260 ones. The first address
+of "assigned-address" property varies in the former for each pcie
+node:
 
-Ooh, that looks like it could work well, I will keep that in mind!
+$ grep assigned-address armada-xp-mv78230.dtsi 
+         assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x48000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x4c000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
+$ grep assigned-address armada-xp-mv78260.dtsi 
+         assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x48000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x4c000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x84000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x88000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x8c000 0 0x2000>;
+         assigned-addresses = <0x82000800 0 0x42000 0 0x2000>;
+$ grep assigned-address armada-xp-mv78460.dtsi 
+         assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
+         assigned-addresses = <0x82001000 0 0x44000 0 0x2000>;
+         assigned-addresses = <0x82001800 0 0x48000 0 0x2000>;
+         assigned-addresses = <0x82002000 0 0x4c000 0 0x2000>;
+         assigned-addresses = <0x82002800 0 0x80000 0 0x2000>;
+         assigned-addresses = <0x82003000 0 0x84000 0 0x2000>;
+         assigned-addresses = <0x82003800 0 0x88000 0 0x2000>;
+         assigned-addresses = <0x82004000 0 0x8c000 0 0x2000>;
+         assigned-addresses = <0x82004800 0 0x42000 0 0x2000>;
+         assigned-addresses = <0x82005000 0 0x82000 0 0x2000>;
 
-So there is a path forward, it is just long :)
+I took at Documentation/devicetree/bindings/pci/mvebu-pci.txt but
+failed to find an answer. Can you explain where the difference comes
+from?
 
-BTW, in the final form TPM will require a 2 stage init much like net,
-the sequence will be:
- - Allocate the core and driver memory and resources
- - Setup the driver fully
- - Perform TPM commands on the fully active driver to setup the
-   TPM itself
- - Register the TPM with the system
+Cheers,
 
-Just remarking,I don't see a problem with this and your devm_probe
-plan.
+a+
 
-Thanks
-Jason
+Arnaud Ebalard (2):
+  ARM: mvebu: second PCIe unit of Armada XP mv78230 is only x1 capable
+  ARM: mvebu: fix second and third PCIe units of Armada XP mv78260
+
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi |  24 +++----
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi | 109 ++++++++++++++++++++++++-------
+ 2 files changed, 97 insertions(+), 36 deletions(-)
+
+-- 
+1.8.4.rc3
