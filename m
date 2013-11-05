@@ -1,128 +1,68 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Tue, 05 Nov 2013 09:37:51 +0100
-Subject: [PATCH 2/2] ARM: at91: sama5d3/dt: add sama5d36ek dts file
-In-Reply-To: <1383634689-15343-3-git-send-email-josh.wu@atmel.com>
-References: <1383634689-15343-1-git-send-email-josh.wu@atmel.com>
- <1383634689-15343-3-git-send-email-josh.wu@atmel.com>
-Message-ID: <5278AE5F.9010409@overkiz.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Nov 2013 09:39:20 +0100
+Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
+In-Reply-To: <20131104212930.GB9638@obsidianresearch.com>
+References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
+ <1704730.RnIqE1USnv@wuerfel> <20131104212930.GB9638@obsidianresearch.com>
+Message-ID: <201311050939.21071.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Josh,
+On Monday 04 November 2013, Jason Gunthorpe wrote:
+> On Mon, Nov 04, 2013 at 09:43:22PM +0100, Arnd Bergmann wrote:
+> 
+> > /*
+> >  * this lists all properties we access from the driver. The list
+> >  * is interpreted by devm_probe() and can be programmatically
+> >  * verified to match the binding.
+> >  */
+> > static const struct devm_probe foo_probe_list[] = {
+> > 	DEVM_ALLOC(foo_priv),
+> > 	DEVM_IOMAP(foo_priv, regs, 0, 0),
+> > 	DEVM_PROP_BOOL(foo_priv, oldstyle_dma, "foo,oldstyle-dma"),
+> > 	DEVM_DMA_SLAVE(foo_priv, rxdma, "rx");
+> > 	DEVM_DMA_SLAVE(foo_priv, txdma, "tx");
+> > 	DEVM_GPIO(foo_priv, gpio, 0);
+> > 	DEVM_IRQ_NAMED(foo_priv, irq, foo_irq_handler, "fifo", IRQF_SHARED),
+> > 	{},
+> > };
+> 
+> Drivers are required to gain control of, and disable the device before
+> they bind and enable things like DMA or interrupts.
+> 
+> At the very least the action list above needs an explicit callback to
+> do that step..
 
-On 05/11/2013 07:58, Josh Wu wrote:
-> Add a dts file to support sama5d36ek board.
->
-> Also update the the comments for sama5d36 in sama5d3.dtsi.
->
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->   arch/arm/boot/dts/Makefile       |    1 +
->   arch/arm/boot/dts/sama5d3.dtsi   |    2 +-
->   arch/arm/boot/dts/sama5d36ek.dts |   52 ++++++++++++++++++++++++++++++++++++++
->   3 files changed, 54 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/boot/dts/sama5d36ek.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 802720e..1eccf61 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -40,6 +40,7 @@ dtb-$(CONFIG_ARCH_AT91)	+= sama5d31ek.dtb
->   dtb-$(CONFIG_ARCH_AT91)	+= sama5d33ek.dtb
->   dtb-$(CONFIG_ARCH_AT91)	+= sama5d34ek.dtb
->   dtb-$(CONFIG_ARCH_AT91)	+= sama5d35ek.dtb
-> +dtb-$(CONFIG_ARCH_AT91)	+= sama5d36ek.dtb
->
->   dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
->
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index b7f4961..5bcd9b4 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -1,6 +1,6 @@
->   /*
->    * sama5d3.dtsi - Device Tree Include file for SAMA5D3 family SoC
-> - *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35 SoC
-> + *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35, SAMA5D36 SoC
->    *
->    *  Copyright (C) 2013 Atmel,
->    *                2013 Ludovic Desroches <ludovic.desroches@atmel.com>
+I was aware of this for the interrupts, my plan for this was to either
+leave the interrupt disabled when requesting it and leave it up to the
+probe function to call enable_irq(), or to have the irq request function
+last in the list, and preceded by a custom per-driver callback. AFAIK
+this is only required for some drivers anyway, while other drivers
+would function just fine when the irq is enabled early, because they
+never raise an IRQ without first having something touch their registers.
+Another option would be to have a flag in the driver data that lets
+the irq handler know it should ignore the interrupt (or disable the source)
+if the probe function has not completed yet.
 
-Could you add a new file named sama5d36.dtsi and including all the 
-optional peripherals provided by this SoC (see 
-https://github.com/at91linux/linux-at91/blob/at91-3.13-cleanup/arch/arm/boot/dts/sama5d31.dtsi) 
-:
+What is the requirement for DMA channels? I did not expect the
+dma_request_slave_channel step to have any ordering requirements.
 
-#include "sama5d3.dtsi"
-#include "sama5d3_can.dtsi"
-#include "sama5d3_emac.dtsi"
-#include "sama5d3_gmac.dtsi"
-#include "sama5d3_mci2.dtsi"
-#include "sama5d3_lcd.dtsi"
-#include "sama5d3_tcb1.dtsi"
-#include "sama5d3_uart.dtsi"
+> > static int foo_probe(struct platform_device *dev)
+> > {
+> > 	int ret;
+> > 
+> > 	ret = devm_probe(dev->dev, foo_probe_list);
+> 
+> Some subsystems (like net) have the core system allocate the private
+> data, and some subsystem (like tpm) steal the drvdata for use in the
+> core, drivers can't touch it.
 
+I think we can handle the first case by adding a per-subsystem DEV_ALLOC
+variant. For the second case, I don't see a solution other than than
+changing the subsystem not to steal the driver_data pointer. I need
+to find out how common this case is. If a lot of subsystems do it,
+we probably want a different solution.
 
+Thanks a lot for your insights!
 
-> diff --git a/arch/arm/boot/dts/sama5d36ek.dts b/arch/arm/boot/dts/sama5d36ek.dts
-> new file mode 100644
-> index 0000000..68d0227
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sama5d36ek.dts
-> @@ -0,0 +1,52 @@
-> +/*
-> + * sama5d36ek.dts - Device Tree file for SAMA5D36-EK board
-> + *
-> + *  Copyright (C) 2013 Atmel,
-> + *                2013 Josh Wu <josh.wu@atmel.com>
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +/dts-v1/;
-
-#include "sama5d36.dtsi"
-
-> +#include "sama5d3xmb.dtsi"
-> +#include "sama5d3xdm.dtsi"
-> +
-> +/ {
-> +	model = "Atmel SAMA5D36-EK";
-> +	compatible = "atmel,sama5d36ek", "atmel,sama5d3xmb", "atmel,sama5d3xcm", "atmel,sama5d3", "atmel,sama5";
-> +
-> +	ahb {
-> +		apb {
-> +			spi0: spi at f0004000 {
-> +				status = "okay";
-> +			};
-> +
-> +			ssc0: ssc at f0008000 {
-> +				status = "okay";
-> +			};
-> +
-> +			can0: can at f000c000 {
-> +				status = "okay";
-> +			};
-> +
-> +			i2c0: i2c at f0014000 {
-> +				status = "okay";
-> +			};
-> +
-> +			i2c1: i2c at f0018000 {
-> +				status = "okay";
-> +			};
-> +
-> +			macb0: ethernet at f0028000 {
-> +				status = "okay";
-> +			};
-> +
-> +			macb1: ethernet at f802c000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	sound {
-> +		status = "okay";
-> +	};
-> +};
->
+	Arnd
