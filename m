@@ -1,69 +1,122 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 5 Nov 2013 12:12:30 -0700
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <201311051948.11992.arnd@arndb.de>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <201311050939.21071.arnd@arndb.de>
- <20131105180314.GB14706@obsidianresearch.com>
- <201311051948.11992.arnd@arndb.de>
-Message-ID: <20131105191230.GA20600@obsidianresearch.com>
+From: dave.long@linaro.org (David Long)
+Date: Tue, 05 Nov 2013 14:13:04 -0500
+Subject: [PATCH v2 01/13] uprobes: move function declarations out of arch
+In-Reply-To: <20131105181614.GA7614@redhat.com>
+References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
+ <1381871068-27660-2-git-send-email-dave.long@linaro.org>
+ <20131105160150.GA1539@redhat.com> <20131105181614.GA7614@redhat.com>
+Message-ID: <52794340.7030009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 07:48:11PM +0100, Arnd Bergmann wrote:
-> On Tuesday 05 November 2013, Jason Gunthorpe wrote:
-> > I've been brewing a patch set to fix TPM, but it is a large effort. I
-> > would think other legacy subsystems that are not fully class device
-> > enabled will have similar challenges?
-> 
-> I think a common pattern is to have the subsystem data be referenced from
-> the driver data using a pointer, and contain a back reference to the struct
-> device, which should not be a problem.
+On 11/05/13 13:16, Oleg Nesterov wrote:
+> On 11/05, Oleg Nesterov wrote:
+>>
+>> On 10/15, David Long wrote:
+>>>
+>>> Move the function declarations from the arch header to the common
+>>> header, since only the function bodies are architecture-specific.
+>>> These changes are from Vincent Rabin's uprobes patch.
+>>
+>> Hmm. I didn't look at this patch because I thought it is obviously
+>> fine, but...
+>>
+>>>   arch/x86/include/asm/uprobes.h | 7 -------
+>>>   include/linux/uprobes.h        | 8 ++++++++
+>>>   2 files changed, 8 insertions(+), 7 deletions(-)
+>>
+>> it should also update arch/powerpc/include/asm/uprobes.h ?
+>>
+>> And 12/13 should not touch arch/powerpc/ or include/linux/uprobes.h.
+>
+> And I think we can merge this change separately to reduce the
+> number of non-arm changes in the next version.
+>
+> Please see the patch I am going to add to my tree below.
+>
+> Oleg.
+> ---
+>
+> Subject: [PATCH] uprobes: move function declarations out of arch
+> From: David A. Long <dave.long@linaro.org>
+> Date: Tue, 15 Oct 2013 17:04:16 -0400
+>
+> Move the function declarations from the arch headers to the common
+> header, since only the function bodies are architecture-specific.
+> These changes are from Vincent Rabin's uprobes patch.
+>
+> [ oleg: update arch/powerpc/include/asm/uprobes.h ]
+>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> Signed-off-by: Oleg Nesterov <oleg@redhat.com>
+> ---
+>   arch/powerpc/include/asm/uprobes.h |    7 -------
+>   arch/x86/include/asm/uprobes.h     |    7 -------
+>   include/linux/uprobes.h            |    8 ++++++++
+>   3 files changed, 8 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/powerpc/include/asm/uprobes.h b/arch/powerpc/include/asm/uprobes.h
+> index 541fd6f..75c6ecd 100644
+> --- a/arch/powerpc/include/asm/uprobes.h
+> +++ b/arch/powerpc/include/asm/uprobes.h
+> @@ -46,11 +46,4 @@ struct arch_uprobe_task {
+>   	unsigned long	saved_trap_nr;
+>   };
+>
+> -extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
+> -extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+> -extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+> -extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
+> -extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
+> -extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+> -extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
+>   #endif	/* _ASM_UPROBES_H */
+> diff --git a/arch/x86/include/asm/uprobes.h b/arch/x86/include/asm/uprobes.h
+> index 2a24180..3087ea9 100644
+> --- a/arch/x86/include/asm/uprobes.h
+> +++ b/arch/x86/include/asm/uprobes.h
+> @@ -52,11 +52,4 @@ struct arch_uprobe_task {
+>   	unsigned int			saved_tf;
+>   };
+>
+> -extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
+> -extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+> -extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+> -extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
+> -extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
+> -extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+> -extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
+>   #endif	/* _ASM_UPROBES_H */
+> diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
+> index 06f28be..9fd60c5 100644
+> --- a/include/linux/uprobes.h
+> +++ b/include/linux/uprobes.h
+> @@ -30,6 +30,7 @@
+>   struct vm_area_struct;
+>   struct mm_struct;
+>   struct inode;
+> +struct notifier_block;
+>
+>   #ifdef CONFIG_ARCH_SUPPORTS_UPROBES
+>   # include <asm/uprobes.h>
+> @@ -125,6 +126,13 @@ extern void uprobe_notify_resume(struct pt_regs *regs);
+>   extern bool uprobe_deny_signal(void);
+>   extern bool __weak arch_uprobe_skip_sstep(struct arch_uprobe *aup, struct pt_regs *regs);
+>   extern void uprobe_clear_state(struct mm_struct *mm);
+> +extern int  arch_uprobe_analyze_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long addr);
+> +extern int  arch_uprobe_pre_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+> +extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+> +extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
+> +extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
+> +extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+> +extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
+>   #else /* !CONFIG_UPROBES */
+>   struct uprobes_state {
+>   };
+>
 
-The issue is sysfs, the TPM core attaches attributes to the driver's
-struct device, which means it has to convert from struct device * to
-its own private data. It is totally wrong, but that is the way
-it has been for ever. :(
+Looks good to me.  ARM builds/runs fine with your patch.  I will remove 
+my (updated) version from my patch set.
 
-> Yes, that would work, but it would prevent another idea I had that I
-> haven't mentioned here: If we add a pointer to the 'struct
-> devm_probe' array to
-
-Seems quiet reasonable, but having two entry points just means drivers
-that need to use the 2nd can't use the pointer in struct devm_probe.
-
-The other thing that occured to me is your method could reduce the
-devm overhead. If you keep a pointer to the probe list and to the
-private data structure then you can unwide all the allocations just by
-running backwards along the probe list. You don't need to do any
-per-resource devm allocations..
-
-> which would fit in nicely with the rest of the design, but now I'm no longer
-> sure if that would actually work with the lifetime rules of the netdev, which
-> would pin the refcount on the 'struct device', which in turn could prevent
-> the devres cleanup to be executed.
-
-I looked into this question recently, while trying to fixup TPM..
-
-I concluded that devm doesn't actually really follow the refcount on
-struct device. devm cleanup is called unconditionally after remove()
-is called, and remove is called unconditionally when the device_driver
-is deleted, which is called unconditionally on module unload.
-
-So anything that used to be in the remove() function can be safely
-moved into devm, including netdev deallocation. This makes sense,
-considering what devm is for..
-
-This process is separate from the refcount driven release, which
-happens once all krefs to the struct device are dropped (eg, sysfs
-open files, open char devices, etc)
-
-Which creates the nasty bit, a sysfs callback/etc can be run even
-after the device release function has finished and after the private
-data has been deleted..
-
-At least, that is where my search ended up, would appreciate it if
-anyone knows different :)
-
-Regards,
-Jason
+-dl
