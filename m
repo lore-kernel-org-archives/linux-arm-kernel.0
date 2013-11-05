@@ -1,46 +1,147 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 5 Nov 2013 11:01:42 +0100
-Subject: [PATCH v5 1/4] ARM: deprecate mach/timex.h for !ARCH_MULTIPLATFORM
-In-Reply-To: <CACRpkdacQhwccK8nKf7m5aTA9ciHPuWth11v-OVPo0kS9WcUCQ@mail.gmail.com>
-References: <20131105083336.GK14892@pengutronix.de>
- <1383642757-9762-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdacQhwccK8nKf7m5aTA9ciHPuWth11v-OVPo0kS9WcUCQ@mail.gmail.com>
-Message-ID: <20131105100142.GM14892@pengutronix.de>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 5 Nov 2013 18:08:34 +0800
+Subject: [PATCH 2/2] ARM: at91: sama5d3/dt: add sama5d36ek dts file
+In-Reply-To: <5278AE5F.9010409@overkiz.com>
+References: <1383634689-15343-1-git-send-email-josh.wu@atmel.com>
+ <1383634689-15343-3-git-send-email-josh.wu@atmel.com>
+ <5278AE5F.9010409@overkiz.com>
+Message-ID: <5278C3A2.6020900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 10:42:48AM +0100, Linus Walleij wrote:
-> On Tue, Nov 5, 2013 at 10:12 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > +config NEED_MACH_TIMEX_H
-> > +       bool
-> > +       help
-> > +         Select this when mach/timex.h is required to provide special
-> > +         definitions for this platform. This should be avoided when possible.
-> 
-> OK this is no blocker, and do proceed with this as the kernel sure
-> looks better after this than before it.
-> 
-> However as the next step I would prefer that we start to get rid of
-> all the NEED_MACH_FOO_H used for just refactoring out headers.
-> 
-> Can we not completely do away with this header next, and provide
-> the services it supplied locally in the mach-foo folder for these machines
-> instead so we do not need to have all these Kconfig things and preserve
-> the <mach/*> namespace for them?
-> 
-> The real trick is to make CLOCK_TICK_RATE and LATCH runtime
-> variables instead of a compile-time variables, right? Can't we do
-> this?
-Well, for LATCH there is no problem because it just uses CLOCK_TICK_RATE
-and if the latter is provided correctly there is no problem. However I
-don't see a way how to determine CLOCK_TICK_RATE at runtime. IMHO here
-you need to fix all users as I just did for the u300 timer code.
+Hi, Boris
 
-Best regards
-Uwe
+On 11/5/2013 4:37 PM, boris brezillon wrote:
+> Hello Josh,
+>
+> On 05/11/2013 07:58, Josh Wu wrote:
+>> Add a dts file to support sama5d36ek board.
+>>
+>> Also update the the comments for sama5d36 in sama5d3.dtsi.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile       |    1 +
+>>   arch/arm/boot/dts/sama5d3.dtsi   |    2 +-
+>>   arch/arm/boot/dts/sama5d36ek.dts |   52 
+>> ++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 54 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm/boot/dts/sama5d36ek.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 802720e..1eccf61 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -40,6 +40,7 @@ dtb-$(CONFIG_ARCH_AT91)    += sama5d31ek.dtb
+>>   dtb-$(CONFIG_ARCH_AT91)    += sama5d33ek.dtb
+>>   dtb-$(CONFIG_ARCH_AT91)    += sama5d34ek.dtb
+>>   dtb-$(CONFIG_ARCH_AT91)    += sama5d35ek.dtb
+>> +dtb-$(CONFIG_ARCH_AT91)    += sama5d36ek.dtb
+>>
+>>   dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d3.dtsi 
+>> b/arch/arm/boot/dts/sama5d3.dtsi
+>> index b7f4961..5bcd9b4 100644
+>> --- a/arch/arm/boot/dts/sama5d3.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+>> @@ -1,6 +1,6 @@
+>>   /*
+>>    * sama5d3.dtsi - Device Tree Include file for SAMA5D3 family SoC
+>> - *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35 SoC
+>> + *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35, 
+>> SAMA5D36 SoC
+>>    *
+>>    *  Copyright (C) 2013 Atmel,
+>>    *                2013 Ludovic Desroches <ludovic.desroches@atmel.com>
+>
+> Could you add a new file named sama5d36.dtsi and including all the 
+> optional peripherals provided by this SoC (see 
+> https://github.com/at91linux/linux-at91/blob/at91-3.13-cleanup/arch/arm/boot/dts/sama5d31.dtsi) 
+> :
+>
+> #include "sama5d3.dtsi"
+> #include "sama5d3_can.dtsi"
+> #include "sama5d3_emac.dtsi"
+> #include "sama5d3_gmac.dtsi"
+> #include "sama5d3_mci2.dtsi"
+> #include "sama5d3_lcd.dtsi"
+> #include "sama5d3_tcb1.dtsi"
+> #include "sama5d3_uart.dtsi"
+>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Ok.
+
+>
+>
+>> diff --git a/arch/arm/boot/dts/sama5d36ek.dts 
+>> b/arch/arm/boot/dts/sama5d36ek.dts
+>> new file mode 100644
+>> index 0000000..68d0227
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sama5d36ek.dts
+>> @@ -0,0 +1,52 @@
+>> +/*
+>> + * sama5d36ek.dts - Device Tree file for SAMA5D36-EK board
+>> + *
+>> + *  Copyright (C) 2013 Atmel,
+>> + *                2013 Josh Wu <josh.wu@atmel.com>
+>> + *
+>> + * Licensed under GPLv2 or later.
+>> + */
+>> +/dts-v1/;
+>
+> #include "sama5d36.dtsi"
+
+I will modify them in v2. Thanks.
+
+Best Regards,
+Josh Wu
+
+>
+>> +#include "sama5d3xmb.dtsi"
+>> +#include "sama5d3xdm.dtsi"
+>> +
+>> +/ {
+>> +    model = "Atmel SAMA5D36-EK";
+>> +    compatible = "atmel,sama5d36ek", "atmel,sama5d3xmb", 
+>> "atmel,sama5d3xcm", "atmel,sama5d3", "atmel,sama5";
+>> +
+>> +    ahb {
+>> +        apb {
+>> +            spi0: spi at f0004000 {
+>> +                status = "okay";
+>> +            };
+>> +
+>> +            ssc0: ssc at f0008000 {
+>> +                status = "okay";
+>> +            };
+>> +
+>> +            can0: can at f000c000 {
+>> +                status = "okay";
+>> +            };
+>> +
+>> +            i2c0: i2c at f0014000 {
+>> +                status = "okay";
+>> +            };
+>> +
+>> +            i2c1: i2c at f0018000 {
+>> +                status = "okay";
+>> +            };
+>> +
+>> +            macb0: ethernet at f0028000 {
+>> +                status = "okay";
+>> +            };
+>> +
+>> +            macb1: ethernet at f802c000 {
+>> +                status = "okay";
+>> +            };
+>> +        };
+>> +    };
+>> +
+>> +    sound {
+>> +        status = "okay";
+>> +    };
+>> +};
+>>
+>
