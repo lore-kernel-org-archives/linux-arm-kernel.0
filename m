@@ -1,37 +1,29 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 4 Nov 2013 19:36:35 -0500
-Subject: [PATCH] net: mv643xx_eth: Add missing phy_addr_set in DT mode
-In-Reply-To: <1383611239-14556-1-git-send-email-jgunthorpe@obsidianresearch.com>
-References: <1383611239-14556-1-git-send-email-jgunthorpe@obsidianresearch.com>
-Message-ID: <20131105003635.GG3060@titan.lakedaemon.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 4 Nov 2013 23:13:04 -0200
+Subject: [PATCH v4] imx-drm: Add mx6 hdmi transmitter support
+In-Reply-To: <CAHCPf3tSdn=TJ86QEtL3r9iSP0j88WP-y2=z96ZUfW-7VecMbQ@mail.gmail.com>
+References: <1383181127-12013-1-git-send-email-festevam@gmail.com>
+ <5272BC59.1080109@boundarydevices.com>
+ <5272BFE0.5040409@boundarydevices.com>
+ <CAOMZO5C39JNVv0vz-38eOrKHXMqWHCeCknhSvfGFe5t0EGkDsg@mail.gmail.com>
+ <20131031210053.GH16735@n2100.arm.linux.org.uk>
+ <CAOMZO5DAAXg4wP2UuYCN6BgN5-q3sv0Lrqvk8xMDmEW_TXepXg@mail.gmail.com>
+ <CAHCPf3v0G_551Oeq-dL61J0Ce-iUMv+ou8+q671S8=GEcNjv5w@mail.gmail.com>
+ <CAHCPf3tSdn=TJ86QEtL3r9iSP0j88WP-y2=z96ZUfW-7VecMbQ@mail.gmail.com>
+Message-ID: <CAOMZO5DU9y2tvgkEbastQdhJvtLGLJ-b49WY8RsvpbmJhzMxLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+On Mon, Nov 4, 2013 at 9:20 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
 
-On Mon, Nov 04, 2013 at 05:27:19PM -0700, Jason Gunthorpe wrote:
-> Commit cc9d4598 'net: mv643xx_eth: use of_phy_connect if phy_node
+> Fabio, Shawn, could you go so far as to bring this up with the i.MX
+> guys responsible for documentation or find the original transmitter IP
+> specs, or find the two pages missing from the manual? This is a really
 
-fyi: set core.abbrev = 12 in your git config, according to Linus, 7/8
-was a bad decision...
+The multiple writes comes from the following erratum:
+ERR005173 HDMI: Clarification on HDMI programming procedure to avoid
+FIFO overflow
 
-> present' made the call to phy_scan optional, if the DT has a link to
-> the phy node.
-> 
-> However phy_scan has the side effect of calling phy_addr_set, which
-> writes the phy MDIO address to the ethernet controller. If phy_addr_set
-> is not called, and the bootloader has not set the correct address then
-> the driver will fail to function.
-> 
-> Tested on Kirkwood.
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Regards,
 
-Fixes: cc9d459894b0 "net: mv643xx_eth: use of_phy_connect if phy_node present"
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-And it should be suitable for v3.11+
-
-thx,
-
-Jason.
+Fabio Estevam
