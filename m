@@ -1,185 +1,50 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 05 Nov 2013 21:46:02 +0100
-Subject: [PATCH 2/2] ARM: mvebu: fix second and third PCIe unit of Armada XP
- mv78260
-In-Reply-To: <cover.1383681717.git.arno@natisbad.org>
-References: <cover.1383681717.git.arno@natisbad.org>
-Message-ID: <404b8db0e3019337ff872ca0f3b5c8eefd808525.1383681717.git.arno@natisbad.org>
+From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Tue, 5 Nov 2013 22:02:35 +0100
+Subject: [PATCH v3 08/11] usb: phy-mxs: Enable IC fixes for related SoCs
+In-Reply-To: <1383616183-10511-9-git-send-email-peter.chen@freescale.com>
+References: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
+ <1383616183-10511-9-git-send-email-peter.chen@freescale.com>
+Message-ID: <CAHXqBFKTTY8vxs9BzK1xQAa7HeRLSBucsxb4wkLejLWmCnckaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mv78260 flavour of Marvell Armada XP SoC has 3 PCIe units. The
-two first units are both x4 and quad x1 capable. The third unit
-is only x4 capable. This patch fixes mv78260 .dtsi to reflect
-those capabilities.
+2013/11/5 Peter Chen <peter.chen@freescale.com>
+>
+> Some PHY bugs are fixed by IC logic, but these bits are not
+> enabled by default, so we enable them at driver.
+>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |   32 ++++++++++++++++++++++++++++++--
+>  1 files changed, 30 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index c794011..b7e1744 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -31,6 +31,10 @@
+>  #define HW_USBPHY_CTRL_SET                     0x34
+>  #define HW_USBPHY_CTRL_CLR                     0x38
+>
+> +#define HW_USBPHY_IP                           0x90
+> +#define HW_USBPHY_IP_SET                       0x94
+> +#define HW_USBPHY_IP_CLR                       0x98
+> +
+>  #define BM_USBPHY_CTRL_SFTRST                  BIT(31)
+>  #define BM_USBPHY_CTRL_CLKGATE                 BIT(30)
+>  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS       BIT(26)
+> @@ -60,6 +64,18 @@
+>   */
+>  #define MXS_PHY_SENDING_SOF_TOO_FAST           BIT(2)
+>
+> +/*
+> + * IC fix for MXS_PHY_ABNORAML_IN_SUSPEND, bit 17 is the effective bit
+> + * in HW_USBPHY_IP.
+> + */
+> +#define MXS_PHY_FIX_ABNORAML_IN_SUSPEND                BIT(17)
+[...]
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 109 ++++++++++++++++++++++++-------
- 1 file changed, 85 insertions(+), 24 deletions(-)
+s/ABNORAML/ABNORMAL/ ?
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 0e82c50..a598ce9 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -48,7 +48,7 @@
- 		/*
- 		 * MV78260 has 3 PCIe units Gen2.0: Two units can be
- 		 * configured as x4 or quad x1 lanes. One unit is
--		 * x4/x1.
-+		 * x4 only.
- 		 */
- 		pcie-controller {
- 			compatible = "marvell,armada-xp-pcie";
-@@ -67,7 +67,9 @@
- 				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
- 				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
- 				0x82000000 0 0x80000 MBUS_ID(0xf0, 0x01) 0x80000 0 0x00002000   /* Port 1.0 registers */
--				0x82000000 0 0x82000 MBUS_ID(0xf0, 0x01) 0x82000 0 0x00002000   /* Port 3.0 registers */
-+				0x82000000 0 0x84000 MBUS_ID(0xf0, 0x01) 0x84000 0 0x00002000   /* Port 1.1 registers */
-+				0x82000000 0 0x88000 MBUS_ID(0xf0, 0x01) 0x88000 0 0x00002000   /* Port 1.2 registers */
-+				0x82000000 0 0x8c000 MBUS_ID(0xf0, 0x01) 0x8c000 0 0x00002000   /* Port 1.3 registers */
- 				0x82000000 0x1 0     MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
- 				0x81000000 0x1 0     MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */
- 				0x82000000 0x2 0     MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 0.1 MEM */
-@@ -76,10 +78,18 @@
- 				0x81000000 0x3 0     MBUS_ID(0x04, 0xb0) 0 1 0 /* Port 0.2 IO  */
- 				0x82000000 0x4 0     MBUS_ID(0x04, 0x78) 0 1 0 /* Port 0.3 MEM */
- 				0x81000000 0x4 0     MBUS_ID(0x04, 0x70) 0 1 0 /* Port 0.3 IO  */
--				0x82000000 0x9 0     MBUS_ID(0x08, 0xe8) 0 1 0 /* Port 1.0 MEM */
--				0x81000000 0x9 0     MBUS_ID(0x08, 0xe0) 0 1 0 /* Port 1.0 IO  */
--				0x82000000 0xa 0     MBUS_ID(0x08, 0xf8) 0 1 0 /* Port 3.0 MEM */
--				0x81000000 0xa 0     MBUS_ID(0x08, 0xf0) 0 1 0 /* Port 3.0 IO  */>;
-+
-+				0x82000000 0x5 0     MBUS_ID(0x08, 0xe8) 0 1 0 /* Port 1.0 MEM */
-+				0x81000000 0x5 0     MBUS_ID(0x08, 0xe0) 0 1 0 /* Port 1.0 IO  */
-+				0x82000000 0x6 0     MBUS_ID(0x08, 0xd8) 0 1 0 /* Port 1.1 MEM */
-+				0x81000000 0x6 0     MBUS_ID(0x08, 0xd0) 0 1 0 /* Port 1.1 IO  */
-+				0x82000000 0x7 0     MBUS_ID(0x08, 0xb8) 0 1 0 /* Port 1.2 MEM */
-+				0x81000000 0x7 0     MBUS_ID(0x08, 0xb0) 0 1 0 /* Port 1.2 IO  */
-+				0x82000000 0x8 0     MBUS_ID(0x08, 0x78) 0 1 0 /* Port 1.3 MEM */
-+				0x81000000 0x8 0     MBUS_ID(0x08, 0x70) 0 1 0 /* Port 1.3 IO  */
-+
-+				0x82000000 0x9 0     MBUS_ID(0x04, 0xf8) 0 1 0 /* Port 2.0 MEM */
-+				0x81000000 0x9 0     MBUS_ID(0x04, 0xf0) 0 1 0 /* Port 2.0 IO  */>;
- 
- 			pcie at 1,0 {
- 				device_type = "pci";
-@@ -105,8 +115,8 @@
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 				#interrupt-cells = <1>;
--                                ranges = <0x82000000 0 0 0x82000000 0x2 0 1 0
--                                          0x81000000 0 0 0x81000000 0x2 0 1 0>;
-+				ranges = <0x82000000 0 0 0x82000000 0x2 0 1 0
-+					  0x81000000 0 0 0x81000000 0x2 0 1 0>;
- 				interrupt-map-mask = <0 0 0 0>;
- 				interrupt-map = <0 0 0 0 &mpic 59>;
- 				marvell,pcie-port = <0>;
-@@ -149,37 +159,88 @@
- 				status = "disabled";
- 			};
- 
--			pcie at 9,0 {
-+			pcie at 5,0 {
- 				device_type = "pci";
--				assigned-addresses = <0x82000800 0 0x42000 0 0x2000>;
--				reg = <0x4800 0 0 0 0>;
-+				assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
-+				reg = <0x2800 0 0 0 0>;
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 				#interrupt-cells = <1>;
--				ranges = <0x82000000 0 0 0x82000000 0x9 0 1 0
--					  0x81000000 0 0 0x81000000 0x9 0 1 0>;
-+				ranges = <0x82000000 0 0 0x82000000 0x5 0 1 0
-+					  0x81000000 0 0 0x81000000 0x5 0 1 0>;
- 				interrupt-map-mask = <0 0 0 0>;
--				interrupt-map = <0 0 0 0 &mpic 99>;
--				marvell,pcie-port = <2>;
-+				interrupt-map = <0 0 0 0 &mpic 62>;
-+				marvell,pcie-port = <1>;
- 				marvell,pcie-lane = <0>;
--				clocks = <&gateclk 26>;
-+				clocks = <&gateclk 9>;
- 				status = "disabled";
- 			};
- 
--			pcie at 10,0 {
-+			pcie at 6,0 {
- 				device_type = "pci";
--				assigned-addresses = <0x82000800 0 0x82000 0 0x2000>;
--				reg = <0x5000 0 0 0 0>;
-+				assigned-addresses = <0x82000800 0 0x84000 0 0x2000>;
-+				reg = <0x3000 0 0 0 0>;
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 				#interrupt-cells = <1>;
--				ranges = <0x82000000 0 0 0x82000000 0xa 0 1 0
--					  0x81000000 0 0 0x81000000 0xa 0 1 0>;
-+				ranges = <0x82000000 0 0 0x82000000 0x6 0 1 0
-+					  0x81000000 0 0 0x81000000 0x6 0 1 0>;
- 				interrupt-map-mask = <0 0 0 0>;
--				interrupt-map = <0 0 0 0 &mpic 103>;
--				marvell,pcie-port = <3>;
-+				interrupt-map = <0 0 0 0 &mpic 63>;
-+				marvell,pcie-port = <1>;
-+				marvell,pcie-lane = <1>;
-+				clocks = <&gateclk 10>;
-+				status = "disabled";
-+			};
-+
-+			pcie at 7,0 {
-+				device_type = "pci";
-+				assigned-addresses = <0x82000800 0 0x88000 0 0x2000>;
-+				reg = <0x3800 0 0 0 0>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				#interrupt-cells = <1>;
-+				ranges = <0x82000000 0 0 0x82000000 0x7 0 1 0
-+					  0x81000000 0 0 0x81000000 0x7 0 1 0>;
-+				interrupt-map-mask = <0 0 0 0>;
-+				interrupt-map = <0 0 0 0 &mpic 64>;
-+				marvell,pcie-port = <1>;
-+				marvell,pcie-lane = <2>;
-+				clocks = <&gateclk 11>;
-+				status = "disabled";
-+			};
-+
-+			pcie at 8,0 {
-+				device_type = "pci";
-+				assigned-addresses = <0x82000800 0 0x8c000 0 0x2000>;
-+				reg = <0x4000 0 0 0 0>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				#interrupt-cells = <1>;
-+				ranges = <0x82000000 0 0 0x82000000 0x8 0 1 0
-+					  0x81000000 0 0 0x81000000 0x8 0 1 0>;
-+				interrupt-map-mask = <0 0 0 0>;
-+				interrupt-map = <0 0 0 0 &mpic 65>;
-+				marvell,pcie-port = <1>;
-+				marvell,pcie-lane = <3>;
-+				clocks = <&gateclk 12>;
-+				status = "disabled";
-+			};
-+
-+			pcie at 9,0 {
-+				device_type = "pci";
-+				assigned-addresses = <0x82000800 0 0x42000 0 0x2000>;
-+				reg = <0x4800 0 0 0 0>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				#interrupt-cells = <1>;
-+				ranges = <0x82000000 0 0 0x82000000 0x9 0 1 0
-+					  0x81000000 0 0 0x81000000 0x9 0 1 0>;
-+				interrupt-map-mask = <0 0 0 0>;
-+				interrupt-map = <0 0 0 0 &mpic 99>;
-+				marvell,pcie-port = <2>;
- 				marvell,pcie-lane = <0>;
--				clocks = <&gateclk 27>;
-+				clocks = <&gateclk 26>;
- 				status = "disabled";
- 			};
- 		};
--- 
-1.8.4.rc3
+Best Regards,
+Micha? Miros?aw
