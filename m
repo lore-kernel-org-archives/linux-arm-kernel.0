@@ -1,62 +1,53 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Tue, 5 Nov 2013 15:45:39 -0600
-Subject: [PATCH v7] arm: use built-in byte swap function
-In-Reply-To: <alpine.LFD.2.03.1310262235310.1951@syhkavp.arg>
-References: <20130129181046.GC25415@pd.tnic>
- <20130219203115.114eab79e8d2099c6306d921@freescale.com>
- <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
- <1361356696.13482.269.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
- <1361367842.13482.279.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
- <1361372008.13482.280.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
- <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
- <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
- <20130221005221.15279b1372501af12c1e4f32@freescale.com>
- <alpine.LFD.2.03.1302211134160.6419@syhkavp.arg>
- <20130221203327.6558f89277468f7ffffa6506@freescale.com>
- <alpine.LFD.2.03.1302212219100.6419@syhkavp.arg>
- <20130222194032.f7b44aefa5e2723d16767a1b@freescale.com>
- <1361661654.18110.102.camel@shinybook.infradead.org>
- <20130523114654.1f273241725205c6703b2226@freescale.com>
- <alpine.LFD.2.03.1310262235310.1951@syhkavp.arg>
-Message-ID: <20131105154539.571de66098b77166db039a3b@freescale.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 5 Nov 2013 22:56:58 +0100 (CET)
+Subject: [PATCH] ARM: pcm037: convert custom GPIO-based power function
+ to a regulator
+In-Reply-To: <20131104084047.GR24559@pengutronix.de>
+References: <Pine.LNX.4.64.1310311118370.30523@axis700.grange>
+ <20131104084047.GR24559@pengutronix.de>
+Message-ID: <Pine.LNX.4.64.1311052252340.3700@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Oct 2013 22:41:34 -0400
-Nicolas Pitre <nico@fluxnic.net> wrote:
+Hi Sascha,
 
-> On Thu, 23 May 2013, Kim Phillips wrote:
+On Mon, 4 Nov 2013, Sascha Hauer wrote:
+
+> Hi Guennadi,
 > 
-> > Enable the compiler intrinsic for byte swapping on arch ARM.  This
-> > allows the compiler to detect and be able to optimize out byte
-> > swappings, and has a very modest benefit on vmlinux size (Linaro gcc
-> > 4.8):
+> On Thu, Oct 31, 2013 at 11:20:46AM +0100, Guennadi Liakhovetski wrote:
+> > Add a fixed-voltage GPIO-enabled regulator to switch the camera on and off
+> > instead of using a .power() platform callback.
 > > 
-> >    text	   data	    bss	    dec	    hex	filename
-> > 2840310	 123932	  61960	3026202	 2e2d1a	vmlinux-lart #orig
-> > 2840152	 123932	  61960	3026044	 2e2c7c	vmlinux-lart #builtin-bswap
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > ---
 > > 
-> > 6473120	 314840	5616016	12403976 bd4508	vmlinux-mxs #orig
-> > 6472586	 314848	5616016	12403450 bd42fa	vmlinux-mxs #builtin-bswap
+> > Only tested to grab the regulator during probing, couldn't test 
+> > functionality due to the lack of an mt9t031 sensor.
 > > 
-> > 7419872	 318372	 379556	8117800	 7bde28	vmlinux-imx_v6_v7 #orig
-> > 7419170	 318364	 379556	8117090	 7bdb62	vmlinux-imx_v6_v7 #builtin-bswap
-> > 
-> > Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
-> > Reviewed-by: Nicolas Pitre <nico@linaro.org>
-> > Acked-by: David Woodhouse <David.Woodhouse@intel.com>
+> >  arch/arm/mach-imx/mach-pcm037.c |   50 ++++++++++++++++++++++++++++-----------
+> >  1 files changed, 36 insertions(+), 14 deletions(-)
 > 
-> Did this ever go somewhere?
-> 
-> Russell suggested at the time to base it against a mainline kernel 
-> (since it was patching files which apparently were already patched with 
-> out-of-tree lz4 patches) and send it to his patch system.
+> What's the motivation for this patch? It probably does the right thing,
+> but I think we need a plan for converting this to devicetree rather than
+> adding more stuff.
 
-I'll re-base and send it to his patch system.
+It's not adding stuff. It's getting rid of a custom callback and replacing 
+it with a proper regulator. Sure, if there's a plan to port this platform 
+to DT in a foreseeable future - feel free to drop this. But such a port 
+would require adding DT support to the mx3_camera driver / the soc-camera 
+framework, which might take some time, and this board isn't too new 
+either, so, maybe not many customers will be prepared to pay for that kind 
+of work ;) Anyway, I find this useful in its present form, but if there 
+are plans to switch to DT soon enough - no problem with dropping it 
+either.
 
-Thanks,
+Thanks
+Guennadi
 
-Kim
+> Sascha
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
