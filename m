@@ -1,81 +1,196 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Nov 2013 09:55:19 +0800
-Subject: [PATCH v3 04/10] usb: chipidea: usbmisc_imx: remove the controller's
- clock information
+Date: Tue, 5 Nov 2013 09:55:24 +0800
+Subject: [PATCH v3 09/10] usb: chipidea: host: add ehci quirk for imx
+ controller
 In-Reply-To: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
 References: <1383616525-10769-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1383616525-10769-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1383616525-10769-10-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the usbmisc is just an API supplier for controller
-driver, the controller calls related APIs to handle different
-things among the SoCs, before calling it, the clock must
-be on. So the clock operation is useless for usbmisc, it also
-increases the difficulties to manage the clock, especially at
-runtime power management situation.
+When the port goes to suspend or finishes resme, it needs to
+notify PHY, it is not a standard EHCI operation, so we add a
+quirk for it.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/usbmisc_imx.c |   18 ------------------
- 1 files changed, 0 insertions(+), 18 deletions(-)
+ drivers/usb/chipidea/host.c  |  129 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/usb/chipidea.h |    1 +
+ 2 files changed, 130 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index 8a1094b..1fd9a12 100644
---- a/drivers/usb/chipidea/usbmisc_imx.c
-+++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -11,7 +11,6 @@
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index de0c2de..66866cd 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -34,6 +34,10 @@
  
- #include <linux/module.h>
- #include <linux/of_platform.h>
--#include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/delay.h>
-@@ -40,7 +39,6 @@ struct usbmisc_ops {
- struct imx_usbmisc {
- 	void __iomem *base;
- 	spinlock_t lock;
--	struct clk *clk;
- 	const struct usbmisc_ops *ops;
- };
+ static struct hc_driver __read_mostly ci_ehci_hc_driver;
+ static int (*orig_bus_suspend)(struct usb_hcd *hcd);
++static int (*orig_bus_resume)(struct usb_hcd *hcd);
++static int (*orig_hub_control)(struct usb_hcd *hcd,
++				u16 typeReq, u16 wValue, u16 wIndex,
++				char *buf, u16 wLength);
  
-@@ -177,7 +175,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
+ static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
  {
- 	struct resource	*res;
- 	struct imx_usbmisc *data;
--	int ret;
- 	struct of_device_id *tmp_dev;
+@@ -75,12 +79,131 @@ static int ci_ehci_bus_suspend(struct usb_hcd *hcd)
+ 				 */
+ 				udelay(125);
+ 			}
++			if (hcd->phy && test_bit(port, &ehci->bus_suspended)
++				&& (ehci_port_speed(ehci, portsc) ==
++					USB_PORT_STAT_HIGH_SPEED))
++				/*
++				 * notify the USB PHY, it is for global
++				 * suspend case.
++				 */
++				usb_phy_notify_suspend(hcd->phy,
++					USB_SPEED_HIGH);
+ 		}
+ 	}
  
- 	if (usbmisc)
-@@ -194,20 +191,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
- 	if (IS_ERR(data->base))
- 		return PTR_ERR(data->base);
- 
--	data->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(data->clk)) {
--		dev_err(&pdev->dev,
--			"failed to get clock, err=%ld\n", PTR_ERR(data->clk));
--		return PTR_ERR(data->clk);
--	}
--
--	ret = clk_prepare_enable(data->clk);
--	if (ret) {
--		dev_err(&pdev->dev,
--			"clk_prepare_enable failed, err=%d\n", ret);
--		return ret;
--	}
--
- 	tmp_dev = (struct of_device_id *)
- 		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
- 	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
-@@ -218,7 +201,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
- 
- static int usbmisc_imx_remove(struct platform_device *pdev)
- {
--	clk_disable_unprepare(usbmisc->clk);
- 	usbmisc = NULL;
  	return 0;
  }
+ 
++static int ci_imx_ehci_bus_resume(struct usb_hcd *hcd)
++{
++	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++	int port;
++
++	int ret = orig_bus_resume(hcd);
++
++	if (ret)
++		return ret;
++
++	port = HCS_N_PORTS(ehci->hcs_params);
++	while (port--) {
++		u32 __iomem *reg = &ehci->regs->port_status[port];
++		u32 portsc = ehci_readl(ehci, reg);
++		/*
++		 * Notify PHY after resume signal has finished, it is
++		 * for global suspend case.
++		 */
++		if (hcd->phy
++			&& test_bit(port, &ehci->bus_suspended)
++			&& (portsc & PORT_CONNECT)
++			&& (ehci_port_speed(ehci, portsc) ==
++				USB_PORT_STAT_HIGH_SPEED))
++			/* notify the USB PHY */
++			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
++	}
++
++	return 0;
++}
++
++/* The below code is based on tegra ehci driver */
++static int ci_imx_ehci_hub_control(
++	struct usb_hcd	*hcd,
++	u16		typeReq,
++	u16		wValue,
++	u16		wIndex,
++	char		*buf,
++	u16		wLength
++)
++{
++	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
++	u32 __iomem	*status_reg;
++	u32		temp;
++	unsigned long	flags;
++	int		retval = 0;
++
++	status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
++
++	spin_lock_irqsave(&ehci->lock, flags);
++
++	if (typeReq == SetPortFeature && wValue == USB_PORT_FEAT_SUSPEND) {
++		temp = ehci_readl(ehci, status_reg);
++		if ((temp & PORT_PE) == 0 || (temp & PORT_RESET) != 0) {
++			retval = -EPIPE;
++			goto done;
++		}
++
++		temp &= ~(PORT_RWC_BITS | PORT_WKCONN_E);
++		temp |= PORT_WKDISC_E | PORT_WKOC_E;
++		ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
++
++		/*
++		 * If a transaction is in progress, there may be a delay in
++		 * suspending the port. Poll until the port is suspended.
++		 */
++		if (ehci_handshake(ehci, status_reg, PORT_SUSPEND,
++						PORT_SUSPEND, 5000))
++			ehci_err(ehci, "timeout waiting for SUSPEND\n");
++
++		spin_unlock_irqrestore(&ehci->lock, flags);
++		if (ehci_port_speed(ehci, temp) ==
++				USB_PORT_STAT_HIGH_SPEED && hcd->phy) {
++			/* notify the USB PHY */
++			usb_phy_notify_suspend(hcd->phy, USB_SPEED_HIGH);
++		}
++		spin_lock_irqsave(&ehci->lock, flags);
++
++		set_bit((wIndex & 0xff) - 1, &ehci->suspended_ports);
++		goto done;
++	}
++
++	/*
++	 * After resume has finished, it needs do some post resume
++	 * operation for some SoCs.
++	 */
++	else if (typeReq == ClearPortFeature &&
++					wValue == USB_PORT_FEAT_C_SUSPEND) {
++
++		/* Make sure the resume has finished, it should be finished */
++		if (ehci_handshake(ehci, status_reg, PORT_RESUME, 0, 25000))
++			ehci_err(ehci, "timeout waiting for resume\n");
++
++		temp = ehci_readl(ehci, status_reg);
++
++		if (ehci_port_speed(ehci, temp) ==
++				USB_PORT_STAT_HIGH_SPEED && hcd->phy) {
++			/* notify the USB PHY */
++			usb_phy_notify_resume(hcd->phy, USB_SPEED_HIGH);
++		}
++	}
++
++	spin_unlock_irqrestore(&ehci->lock, flags);
++
++	/* Handle the hub control events here */
++	return orig_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
++done:
++	spin_unlock_irqrestore(&ehci->lock, flags);
++	return retval;
++}
++
+ static irqreturn_t host_irq(struct ci_hdrc *ci)
+ {
+ 	return usb_hcd_irq(ci->irq, ci->hcd);
+@@ -183,8 +306,14 @@ int ci_hdrc_host_init(struct ci_hdrc *ci)
+ 	ehci_init_driver(&ci_ehci_hc_driver, NULL);
+ 
+ 	orig_bus_suspend = ci_ehci_hc_driver.bus_suspend;
++	orig_bus_resume = ci_ehci_hc_driver.bus_resume;
++	orig_hub_control = ci_ehci_hc_driver.hub_control;
+ 
+ 	ci_ehci_hc_driver.bus_suspend = ci_ehci_bus_suspend;
++	if (ci->platdata->flags & CI_HDRC_IMX_EHCI_QUIRK) {
++		ci_ehci_hc_driver.bus_resume = ci_imx_ehci_bus_resume;
++		ci_ehci_hc_driver.hub_control = ci_imx_ehci_hub_control;
++	}
+ 
+ 	return 0;
+ }
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 3842431..8c3b7e2 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -26,6 +26,7 @@ struct ci_hdrc_platform_data {
+ 	 */
+ #define CI_HDRC_DUAL_ROLE_NOT_OTG	BIT(4)
+ #define CI_HDRC_IMX28_WRITE_FIX		BIT(5)
++#define CI_HDRC_IMX_EHCI_QUIRK		BIT(6)
+ 	enum usb_dr_mode	dr_mode;
+ #define CI_HDRC_CONTROLLER_RESET_EVENT		0
+ #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
 -- 
 1.7.1
