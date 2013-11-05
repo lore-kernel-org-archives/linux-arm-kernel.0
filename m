@@ -1,72 +1,164 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 5 Nov 2013 10:48:55 +0100
-Subject: [PATCH v4 4/4] ARM: new platform for Energy Micro's EFM32
- Cortex-M3 SoCs
-In-Reply-To: <201311041456.27654.arnd@arndb.de>
-References: <20131104105836.GI14892@pengutronix.de>
- <1383562853-17202-4-git-send-email-u.kleine-koenig@pengutronix.de>
- <201311041456.27654.arnd@arndb.de>
-Message-ID: <20131105094854.GL14892@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 5 Nov 2013 10:48:45 +0100
+Subject: [BUG?] ARM: mvebu: is second PCIe unit of Armada XP mv78230 x1
+ or x4?
+In-Reply-To: <87ppqgyrmc.fsf@natisbad.org>
+References: <87ppqgyrmc.fsf@natisbad.org>
+Message-ID: <20131105104845.4fc9e216@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 02:56:27PM +0100, Arnd Bergmann wrote:
-> On Monday 04 November 2013, Uwe Kleine-K?nig wrote:
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  arch/arm/Kconfig                 |  19 +++++++-
-> >  arch/arm/Makefile                |   1 +
-> >  arch/arm/configs/efm32_defconfig | 102 +++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-efm32/Makefile     |   1 +
-> >  arch/arm/mach-efm32/dtmachine.c  |  15 ++++++
-> >  5 files changed, 137 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/configs/efm32_defconfig
-> >  create mode 100644 arch/arm/mach-efm32/Makefile
-> >  create mode 100644 arch/arm/mach-efm32/dtmachine.c
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 7ae0615..d8145fe 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -413,6 +413,23 @@ config ARCH_EBSA110
-> >           Ethernet interface, two PCMCIA sockets, two serial ports and a
-> >           parallel port.
-> >  
-> > +config ARCH_EFM32
-> > +       bool "Energy Micro efm32"
-> > +       depends on !MMU
-> > +       select ARCH_REQUIRE_GPIOLIB
-> > +       select ARM_NVIC
-> > +       select CLKSRC_MMIO
-> > +       select CLKSRC_OF
-> > +       select COMMON_CLK
-> > +       select CPU_V7M
-> > +       select GENERIC_CLOCKEVENTS
-> > +       select NO_DMA
-> > +       select NO_IOPORT
-> > +       select SPARSE_IRQ
-> > +       select USE_OF
-> > +       help
-> > +         Support for Energy Micro's (now Silicon Labs) efm32 processors.
-> > +
-> 
-> It would be good to have at least in either the changeset description or the Kconfig
-> text (or both) some description about the platform: which SoCs have been tested,
-> what is this platform used for, where can one find data sheets etc.
-I have links to the datasheet of the processor and the user manual of
-the board in the corresponding device trees. Also I added a paragraph to
-the commit log mentioning the development board I used:
+Dear Arnaud Ebalard,
 
-	There are still some missing parts (e.g. board support, device
-	trees), but with these bits added on top of this patch I can
-	successfully boot a EFM32GG-DK3750 board that uses an
-	EFM32GG990F1024.
+On Mon, 04 Nov 2013 19:00:11 +0100, Arnaud Ebalard wrote:
 
-Good enough?
+> Then, I took a look at the [laconic] public documentation on the various
+> flavours of the Armada XP (mv7823, mv78260 and mv78460) regarding PCIe
+> aspects. I noticed that [1] reports a x1 second PCIe unit for mv78230
+> when [2] reports one x4 second unit for mv78230. FWIW, armada-xp-mv78230.dtsi
+> currently states the second unit is x4/x1.
 
-Best regards
-Uwe
+Thanks for the great investigation! There is indeed something wrong in
+our .dts files, and the datasheet doesn't make everything entirely
+clear.
 
+The functional datasheet (which covers the three SoC variants 78230,
+78260 and 78460) says:
+
+MV78230 2 PCIe units Gen2.0.
+
+	One unit can be configured as x4 or quad x1 lanes. The other
+	unit is x1.
+
+MV78260 3 PCIe units Gen2.0
+
+	Two units can be configured as x4 or quad x1 lanes.
+	One unit is x4/x1.
+
+MV78460 4 PCIe units Gen2.0
+
+	Two of those units can be configured as x4 or quad x1 lanes. The
+	other 2 units are x4 or x1.
+
+but for those variants (78230 and 78260) that don't have *all* PCIe
+interfaces, it doesn't say *which* ones are available from the set of
+10 possibles interfaces in 78460, and therefore the 10 register areas
+that are available.
+
+The only place where we (Gregory pointed me in the right direction)
+could find some relation between the SoC variants and the available PCIe
+interfaces is in the hardware manual of each SoC variant, where the
+SERDES lanes are described.
+
+For MV78230, it says:
+
+	PCIe 0.0, 0.1, 0.2, 0.3, 1.0, 1.1 and 1.2
+
+For MV78260, it says:
+
+	PCIe 0.0, 0.1, 0.2, 0.3, 1.0, 1.1, 1.2, 1.3 and 2 x4
+
+For MV78460, it says
+
+	PCIe 0.0, 0.1, 0.2, 0.3, 1.0, 1.1, 1.2, 1.3, 2 x4 and 3 x4
+
+What it says for 78230 it a bit weird, because I don't see why it
+mentions 1.1 and 1.2 since the second PCIe interface on 78230 is said
+to be x1. Maybe that's a mistake in the datasheet, I'll try to get a
+confirmation about this.
+
+But indeed it seems like the second PCIe interface on 78230 is 1.0 and
+not 2.0, as you found out. So your patch below looks correct to me, and
+the mv78260.dtsi should also be modified to expose the correct PCIe
+interfaces.
+
+(We've mostly had access to 78460 hardware until now, and the only
+78260 hardware I had access to only exposes the PCIe 0.0 interface, so
+I couldn't test the other ones).
+
+> diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> index 0358a33..9dc7381 100644
+> --- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+> @@ -47,7 +47,7 @@
+>  		/*
+>  		 * MV78230 has 2 PCIe units Gen2.0: One unit can be
+>  		 * configured as x4 or quad x1 lanes. One unit is
+> -		 * x4/x1.
+> +		 * x1 only.
+
+Ack.
+
+>  		 */
+>  		pcie-controller {
+>  			compatible = "marvell,armada-xp-pcie";
+> @@ -61,10 +61,10 @@
+>  
+>  			ranges =
+>  			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
+> -				0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
+>  				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
+>  				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
+>  				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
+> +				0x82000000 0 0x80000 MBUS_ID(0xf0, 0x01) 0x80000 0 0x00002000   /* Port 1.0 registers */
+
+Ack.
+
+>  				0x82000000 0x1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
+>  				0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */
+>  				0x82000000 0x2 0       MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 0.1 MEM */
+> @@ -73,8 +73,8 @@
+>  				0x81000000 0x3 0       MBUS_ID(0x04, 0xb0) 0 1 0 /* Port 0.2 IO  */
+>  				0x82000000 0x4 0       MBUS_ID(0x04, 0x78) 0 1 0 /* Port 0.3 MEM */
+>  				0x81000000 0x4 0       MBUS_ID(0x04, 0x70) 0 1 0 /* Port 0.3 IO  */
+> -				0x82000000 0x9 0       MBUS_ID(0x04, 0xf8) 0 1 0 /* Port 2.0 MEM */
+> -				0x81000000 0x9 0       MBUS_ID(0x04, 0xf0) 0 1 0 /* Port 2.0 IO  */>;
+> +				0x82000000 0x5 0       MBUS_ID(0x08, 0xe8) 0 1 0 /* Port 1.0 MEM */
+> +				0x81000000 0x5 0       MBUS_ID(0x08, 0xe0) 0 1 0 /* Port 1.0 IO  */>;
+
+Ack.
+
+>  
+>  			pcie at 1,0 {
+>  				device_type = "pci";
+> @@ -144,20 +144,20 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			pcie at 9,0 {
+> +			pcie at 5,0 {
+>  				device_type = "pci";
+> -				assigned-addresses = <0x82000800 0 0x42000 0 0x2000>;
+> -				reg = <0x4800 0 0 0 0>;
+> +				assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
+> +				reg = <0x2800 0 0 0 0>;
+>  				#address-cells = <3>;
+>  				#size-cells = <2>;
+>  				#interrupt-cells = <1>;
+> -				ranges = <0x82000000 0 0 0x82000000 0x9 0 1 0
+> -					  0x81000000 0 0 0x81000000 0x9 0 1 0>;
+> +				ranges = <0x82000000 0 0 0x82000000 0x5 0 1 0
+> +					  0x81000000 0 0 0x81000000 0x5 0 1 0>;
+>  				interrupt-map-mask = <0 0 0 0>;
+> -				interrupt-map = <0 0 0 0 &mpic 99>;
+> -				marvell,pcie-port = <2>;
+> +				interrupt-map = <0 0 0 0 &mpic 62>;
+> +				marvell,pcie-port = <1>;
+>  				marvell,pcie-lane = <0>;
+> -				clocks = <&gateclk 26>;
+> +				clocks = <&gateclk 9>;
+>  				status = "disabled";
+>  			};
+>  		};
+
+This all looks good. Would you mind submitting a proper patch with your
+SoB ? Of course, if you also want to fix 78260, feel free to do so. If
+not, then please let me know so I can send a patch.
+
+Again, thanks a lot for your investigation!
+
+Thomas
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
