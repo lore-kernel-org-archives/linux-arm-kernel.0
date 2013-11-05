@@ -1,77 +1,102 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 06 Nov 2013 00:14:34 +0100
-Subject: [PATCH] net: mv643xx_eth: Add missing phy_addr_set in DT mode
-In-Reply-To: <52796E82.5010800@gmail.com> (Sebastian Hesselbarth's message of
- "Tue, 05 Nov 2013 23:17:38 +0100")
-References: <1383611239-14556-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <87sivacxcf.fsf@natisbad.org> <52796E82.5010800@gmail.com>
-Message-ID: <87iow6cug5.fsf@natisbad.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 5 Nov 2013 20:24:26 -0300
+Subject: [PATCH v3 14/28] mtd: nand: pxa3xx: Add driver-specific ECC BCH
+ support
+In-Reply-To: <20131105183156.GO20061@ld-irv-0074.broadcom.com>
+References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383656135-8627-15-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131105183156.GO20061@ld-irv-0074.broadcom.com>
+Message-ID: <20131105232425.GD11759@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 05, 2013 at 10:31:56AM -0800, Brian Norris wrote:
+> On Tue, Nov 05, 2013 at 09:55:21AM -0300, Ezequiel Garcia wrote:
+> > --- a/drivers/mtd/nand/pxa3xx_nand.c
+> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> > @@ -1073,6 +1075,43 @@ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
+> >  	return -ENODEV;
+> >  }
+> >  
+> > +static int pxa_ecc_init(struct pxa3xx_nand_info *info,
+> > +			struct nand_ecc_ctrl *ecc,
+> > +			int strength, int page_size)
+> > +{
+> > +	/*
+> > +	 * We don't use strength here as the PXA variant
+> > +	 * is used with non-ONFI compliant devices.
+> 
+> Hmm, rather than assuming you never get any relevant 'strength' info
+> from nand_base, could you check if it is zero and only ignore it if it
+> is zero? But if it is non-zero, you could at least use it to validate
+> the strength settings below.
+> 
+> At the same time, I would also caution against fragile ECC determination
+> methods that can indirectly cause regressions in the future, such as
+> with Huang's recent GPMI ECC layout regressions. Perhaps you'll want a
+> DT binding for the ECC strength to future proof this? (Not a
+> requirement; just a thought.)
+> 
 
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
+Well, for the PXA path, as I don't have this hardware enabled to test
+I try do clean-ups and change but without *functionality changes*.
 
-> On 11/05/2013 11:12 PM, Arnaud Ebalard wrote:
->> Hi Jason,
->>
->> Jason Gunthorpe <jgunthorpe@obsidianresearch.com> writes:
->>
->>> Commit cc9d4598 'net: mv643xx_eth: use of_phy_connect if phy_node
->>> present' made the call to phy_scan optional, if the DT has a link to
->>> the phy node.
->>>
->>> However phy_scan has the side effect of calling phy_addr_set, which
->>> writes the phy MDIO address to the ethernet controller. If phy_addr_set
->>> is not called, and the bootloader has not set the correct address then
->>> the driver will fail to function.
->>
->> Thanks *a lot* for fixing this one! I had the issue on my ReadyNAS 102
->> (Armada 370 based) which I had put on a todo list and temporarily
->
-> Erm, just to make sure: Armada 370 isn't using mv643xx_eth but mvneta,
-> are you sure it is (was) related to Jason's fix?
+So, you'll notice this pxa_ecc_init() is a different way of doing the
+old initialization:
 
-Thanks for pointing this, Sebastian and my apologies for the noise.
-Jason's fix is indeed for a file which is not compiled for my RN102.
+       chip->ecc.mode = NAND_ECC_HW;
+       chip->ecc.size = info->fifo_size;
+       chip->ecc.strength = 1;
 
-As the problem perfectly matched the issue I had and current kernel w/
-the patch applied does indeed fix it, I did not try and do the test w/o
-the patch applied. It would have showed the problem was fixed by
-something else in 3.12. Well, I spent some time digging the changes on
-mvneta.c and: 
+And in fact...
 
-commit 714086029116b6b0a34e67ba1dd2f0d1cf26770c
-Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date:   Wed Sep 4 16:21:18 2013 +0200
+> > +	 */
+> > +	if (page_size == 2048) {
+> > +		ecc->mode = NAND_ECC_HW;
+> > +		ecc->size = 512;
 
-    net: mvneta: properly disable HW PHY polling and ensure adjust_link() works
-    
-    This commit fixes a long-standing bug that has been reported by many
-    users: on some Armada 370 platforms, only the network interface that
-    has been used in U-Boot to tftp the kernel works properly in
-    Linux. The other network interfaces can see a 'link up', but are
-    unable to transmit data. The reports were generally made on the Armada
-    370-based Mirabox, but have also been given on the Armada 370-RD
-    board.
+To match the previous code, this should be "ecc->size = 2048"! :/
 
-    [SNIP]
+> > +		ecc->strength = 1;
+> 
+> I assume this is actually a 1-bit ECC, not just a dummy value? Note that
+> the ecc->strength and ecc->size fields are used by nand_base for some
+> bitflip calculations and are also exposed via sysfs.
+> 
 
-$ git tag --contains 714086029116
-v3.12
-v3.12-rc1
-v3.12-rc2
-v3.12-rc3
-v3.12-rc4
-v3.12-rc5
-v3.12-rc6
-v3.12-rc7
+Right. Well, as I said: I tried not to change anything that I'm not able
+to fully test.
 
-So the problem was indeed fixed at the beginning of 3.12 series by Thomas.
+> > +
+> > +		info->spare_size = 40;
+> > +		info->ecc_size = 24;
+> > +		return 1;
+> > +
+> > +	} else if (page_size == 512) {
+> > +		ecc->mode = NAND_ECC_HW;
+> > +		ecc->size = 512;
+> > +		ecc->strength = 1;
+> > +
+> > +		info->spare_size = 8;
+> > +		info->ecc_size = 8;
+> > +		return 1;
+> > +	}
+> > +	return 0;
+> > +}
+> > +
+> > +static int armada370_ecc_init(struct pxa3xx_nand_info *info,
+> > +			      struct nand_ecc_ctrl *ecc,
+> > +			      int strength, int page_size)
+> > +{
+> > +	/* Unimplemented yet */
+> > +	return 0;
+> > +}
+> > +
+> >  static int pxa3xx_nand_scan(struct mtd_info *mtd)
+> >  {
+> >  	struct pxa3xx_nand_host *host = mtd->priv;
 
-Anyway, my bad and thanks again for pointing it out.
-
-Cheers,
-
-a+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
