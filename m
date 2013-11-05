@@ -1,8 +1,8 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Tue, 05 Nov 2013 07:59:58 -0800
+Date: Tue, 05 Nov 2013 08:00:13 -0800
 Subject: Patch "clockevents: Sanitize ticks to nsec conversion" has been added
- to the 3.10-stable tree
-Message-ID: <138366719860@kroah.com>
+ to the 3.11-stable tree
+Message-ID: <13836672133074@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,12 +11,12 @@ This is a note to let you know that I've just added the patch titled
 
     clockevents: Sanitize ticks to nsec conversion
 
-to the 3.10-stable tree which can be found at:
+to the 3.11-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
      clockevents-sanitize-ticks-to-nsec-conversion.patch
-and it can be found in the queue-3.10 subdirectory.
+and it can be found in the queue-3.11 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
@@ -95,9 +95,9 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/kernel/time/clockevents.c
 +++ b/kernel/time/clockevents.c
-@@ -30,29 +30,64 @@ static RAW_NOTIFIER_HEAD(clockevents_cha
- /* Protection for the above */
- static DEFINE_RAW_SPINLOCK(clockevents_lock);
+@@ -33,29 +33,64 @@ struct ce_unbind {
+ 	int res;
+ };
  
 -/**
 - * clockevents_delta2ns - Convert a latch value (device ticks) to nanoseconds
@@ -173,7 +173,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  }
  EXPORT_SYMBOL_GPL(clockevent_delta2ns);
  
-@@ -317,8 +352,8 @@ void clockevents_config(struct clock_eve
+@@ -380,8 +415,8 @@ void clockevents_config(struct clock_eve
  		sec = 600;
  
  	clockevents_calc_mult_shift(dev, freq, sec);
@@ -188,4 +188,4 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 Patches currently in stable-queue which might be from tglx at linutronix.de are
 
-queue-3.10/clockevents-sanitize-ticks-to-nsec-conversion.patch
+queue-3.11/clockevents-sanitize-ticks-to-nsec-conversion.patch
