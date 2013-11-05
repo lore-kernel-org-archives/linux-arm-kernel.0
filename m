@@ -1,340 +1,390 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 5 Nov 2013 18:44:12 +0530
-Subject: [PATCH V3 2/7] DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+Date: Tue, 5 Nov 2013 18:44:14 +0530
+Subject: [PATCH V3 4/7] ARM: DTS: DRA: Replace peripheral interrupt numbers
+ with crossbar inputs
 In-Reply-To: <1383657257-3458-1-git-send-email-r.sricharan@ti.com>
 References: <1383657257-3458-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1383657257-3458-3-git-send-email-r.sricharan@ti.com>
+Message-ID: <1383657257-3458-5-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some socs have a large number of interrupts requests to service
-the needs of its many peripherals and subsystems. All of the
-interrupt lines from the subsystems are not needed at the same
-time, so they have to be muxed to the irq-controller appropriately.
-In such places a interrupt controllers are preceded by an CROSSBAR
-that provides flexibility in muxing the device requests to the controller
-inputs.
+Now with the crossbar IP in picture, the peripherals do not have the
+fixed interrupt lines. Instead they rely on the crossbar irqchip to
+allocate and map a free interrupt line to its crossbar input. So replacing
+all the peripheral interrupt numbers with its fixed crossbar input lines.
 
-This driver takes care a allocating a free irq and then configuring the
-crossbar IP as a part of the mpu's irqchip callbacks. crossbar_init should
-be called right before the irqchip_init, so that it is setup to handle the
-irqchip callbacks.
-
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Benoit Cousson <bcousson@baylibre.com>
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Tony Lindgren <tony@atomide.com>
 Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Acked-by: Kumar Gala <galak@codeaurora.org> (for DT binding portion)
 ---
- [V2] Addressed Thomas Gleixner <tglx@linutronix.de> comments
-      and renamed the bindings as per Kumar Gala <galak@codeaurora.org>
-      comments.
- [V3] Changed static inline const to static inline int and removed
-      unnecessary variable initialization as per
-      Thomas Gleixner <tglx@linutronix.de>. Updated commit tags
+ arch/arm/boot/dts/dra7.dtsi |   86 +++++++++++++++++++++----------------------
+ 1 file changed, 43 insertions(+), 43 deletions(-)
 
- .../devicetree/bindings/arm/omap/crossbar.txt      |   27 +++
- drivers/irqchip/Kconfig                            |    8 +
- drivers/irqchip/Makefile                           |    1 +
- drivers/irqchip/irq-crossbar.c                     |  206 ++++++++++++++++++++
- include/linux/irqchip/irq-crossbar.h               |   11 ++
- 5 files changed, 253 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/omap/crossbar.txt
- create mode 100644 drivers/irqchip/irq-crossbar.c
- create mode 100644 include/linux/irqchip/irq-crossbar.h
-
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-new file mode 100644
-index 0000000..fb88585
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -0,0 +1,27 @@
-+Some socs have a large number of interrupts requests to service
-+the needs of its many peripherals and subsystems. All of the
-+interrupt lines from the subsystems are not needed at the same
-+time, so they have to be muxed to the irq-controller appropriately.
-+In such places a interrupt controllers are preceded by an CROSSBAR
-+that provides flexibility in muxing the device requests to the controller
-+inputs.
-+
-+Required properties:
-+- compatible : Should be "ti,irq-crossbar"
-+- reg: Base address and the size of the crossbar registers.
-+- ti,max-irqs: Total number of irqs available at the interrupt controller.
-+- ti,reg-size: Size of a individual register in bytes. Every individual
-+	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
-+- ti,irqs-reserved: List of the reserved irq lines that are not muxed using
-+		 crossbar. These interrupt lines are reserved in the soc,
-+		 so crossbar bar driver should not consider them as free
-+		 lines.
-+
-+Examples:
-+		crossbar_mpu: @4a020000 {
-+			compatible = "ti,irq-crossbar";
-+			reg = <0x4a002a48 0x130>;
-+			ti,max-irqs = <160>;
-+			ti,reg-size = <2>;
-+			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
-+		};
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 3792a1a..2efcde6 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -61,3 +61,11 @@ config VERSATILE_FPGA_IRQ_NR
-        int
-        default 4
-        depends on VERSATILE_FPGA_IRQ
-+
-+config IRQ_CROSSBAR
-+	bool
-+	help
-+	  Support for a CROSSBAR ip that preceeds the main interrupt controller.
-+	  The primary irqchip invokes the crossbar's callback which inturn allocates
-+	  a free irq and configures the IP. Thus the peripheral interrupts are
-+	  routed to one of the free irqchip interrupt lines.
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index c60b901..2edead9 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -22,3 +22,4 @@ obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
- obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
- obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
- obj-$(CONFIG_TB10X_IRQC)		+= irq-tb10x.o
-+obj-$(CONFIG_IRQ_CROSSBAR)		+= irq-crossbar.o
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-new file mode 100644
-index 0000000..0af209e
---- /dev/null
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -0,0 +1,206 @@
-+/*
-+ *  drivers/irqchip/irq-crossbar.c
-+ *
-+ *  Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
-+ *  Author: Sricharan R <r.sricharan@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/slab.h>
-+#include <linux/irqchip/arm-gic.h>
-+
-+#define IRQ_FREE	-1
-+#define GIC_IRQ_START	32
-+
-+/*
-+ * @int_max: maximum number of supported interrupts
-+ * @irq_map: array of interrupts to crossbar number mapping
-+ * @crossbar_base: crossbar base address
-+ * @register_offsets: offsets for each irq number
-+ */
-+struct crossbar_device {
-+	uint int_max;
-+	uint *irq_map;
-+	void __iomem *crossbar_base;
-+	int *register_offsets;
-+	void (*write) (int, int);
-+};
-+
-+static struct crossbar_device *cb;
-+
-+static inline void crossbar_writel(int irq_no, int cb_no)
-+{
-+	writel(cb_no, cb->crossbar_base + cb->register_offsets[irq_no]);
-+}
-+
-+static inline void crossbar_writew(int irq_no, int cb_no)
-+{
-+	writew(cb_no, cb->crossbar_base + cb->register_offsets[irq_no]);
-+}
-+
-+static inline void crossbar_writeb(int irq_no, int cb_no)
-+{
-+	writeb(cb_no, cb->crossbar_base + cb->register_offsets[irq_no]);
-+}
-+
-+static inline int allocate_free_irq(int cb_no)
-+{
-+	int i;
-+
-+	for (i = 0; i < cb->int_max; i++) {
-+		if (cb->irq_map[i] == IRQ_FREE) {
-+			cb->irq_map[i] = cb_no;
-+			return i;
-+		}
-+	}
-+
-+	return -ENODEV;
-+}
-+
-+static int crossbar_domain_map(struct irq_domain *d, unsigned int irq,
-+			       irq_hw_number_t hw)
-+{
-+	cb->write(hw - GIC_IRQ_START, cb->irq_map[hw - GIC_IRQ_START]);
-+	return 0;
-+}
-+
-+static void crossbar_domain_unmap(struct irq_domain *d, unsigned int irq)
-+{
-+	irq_hw_number_t hw = irq_get_irq_data(irq)->hwirq;
-+
-+	if (hw > GIC_IRQ_START)
-+		cb->irq_map[hw - GIC_IRQ_START] = IRQ_FREE;
-+}
-+
-+static int crossbar_domain_xlate(struct irq_domain *d,
-+				 struct device_node *controller,
-+				 const u32 *intspec, unsigned int intsize,
-+				 unsigned long *out_hwirq,
-+				 unsigned int *out_type)
-+{
-+	unsigned long ret;
-+
-+	ret = allocate_free_irq(intspec[1]);
-+
-+	if (IS_ERR_VALUE(ret))
-+		return ret;
-+
-+	*out_hwirq = ret + GIC_IRQ_START;
-+	return 0;
-+}
-+
-+const struct irq_domain_ops routable_irq_domain_ops = {
-+	.map = crossbar_domain_map,
-+	.unmap = crossbar_domain_unmap,
-+	.xlate = crossbar_domain_xlate
-+};
-+
-+static int __init crossbar_of_init(struct device_node *node)
-+{
-+	int i, size, max, reserved = 0, entry;
-+	const __be32 *irqsr;
-+
-+	cb = kzalloc(sizeof(struct cb_device *), GFP_KERNEL);
-+
-+	if (!cb)
-+		return -ENOMEM;
-+
-+	cb->crossbar_base = of_iomap(node, 0);
-+	if (!cb->crossbar_base)
-+		goto err1;
-+
-+	of_property_read_u32(node, "ti,max-irqs", &max);
-+	cb->irq_map = kzalloc(max * sizeof(int), GFP_KERNEL);
-+	if (!cb->irq_map)
-+		goto err2;
-+
-+	cb->int_max = max;
-+
-+	for (i = 0; i < max; i++)
-+		cb->irq_map[i] = IRQ_FREE;
-+
-+	/* Get and mark reserved irqs */
-+	irqsr = of_get_property(node, "ti,irqs-reserved", &size);
-+	if (irqsr) {
-+		size /= sizeof(__be32);
-+
-+		for (i = 0; i < size; i++) {
-+			entry = be32_to_cpup(irqsr + i);
-+			if (entry > max) {
-+				pr_err("Invalid reserved entry\n");
-+				goto err3;
-+			}
-+			cb->irq_map[entry] = 0;
-+		}
-+	}
-+
-+	cb->register_offsets = kzalloc(max * sizeof(int), GFP_KERNEL);
-+	if (!cb->register_offsets)
-+		goto err3;
-+
-+	of_property_read_u32(node, "ti,reg-size", &size);
-+
-+	switch (size) {
-+	case 1:
-+		cb->write = crossbar_writeb;
-+		break;
-+	case 2:
-+		cb->write = crossbar_writew;
-+		break;
-+	case 4:
-+		cb->write = crossbar_writel;
-+		break;
-+	default:
-+		pr_err("Invalid reg-size property\n");
-+		goto err4;
-+		break;
-+	}
-+
-+	/*
-+	 * Register offsets are not linear because of the
-+	 * reserved irqs. so find and store the offsets once.
-+	 */
-+	for (i = 0; i < max; i++) {
-+		if (!cb->irq_map[i])
-+			continue;
-+
-+		cb->register_offsets[i] = reserved;
-+		reserved += size;
-+	}
-+
-+	register_routable_domain_ops(&routable_irq_domain_ops);
-+	return 0;
-+
-+err4:
-+	kfree(cb->register_offsets);
-+err3:
-+	kfree(cb->irq_map);
-+err2:
-+	iounmap(cb->crossbar_base);
-+err1:
-+	kfree(cb);
-+	return -ENOMEM;
-+}
-+
-+static const struct of_device_id crossbar_match[] __initconst = {
-+	{ .compatible = "ti,irq-crossbar" },
-+	{}
-+};
-+
-+int crossbar_init(void)
-+{
-+	struct device_node *np;
-+	np = of_find_matching_node(NULL, crossbar_match);
-+	if (!np)
-+		return -ENODEV;
-+
-+	crossbar_of_init(np);
-+	return 0;
-+}
-diff --git a/include/linux/irqchip/irq-crossbar.h b/include/linux/irqchip/irq-crossbar.h
-new file mode 100644
-index 0000000..ad2f744
---- /dev/null
-+++ b/include/linux/irqchip/irq-crossbar.h
-@@ -0,0 +1,11 @@
-+/*
-+ *  drivers/irqchip/irq-crossbar.h
-+ *
-+ *  Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+int crossbar_init(void);
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index cf0d6ca..8b93b7a 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -122,10 +122,10 @@
+ 		sdma: dma-controller at 4a056000 {
+ 			compatible = "ti,omap4430-sdma";
+ 			reg = <0x4a056000 0x1000>;
+-			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+-				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
+-				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+-				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+ 			#dma-cells = <1>;
+ 			#dma-channels = <32>;
+ 			#dma-requests = <127>;
+@@ -134,7 +134,7 @@
+ 		gpio1: gpio at 4ae10000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4ae10000 0x200>;
+-			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio1";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -145,7 +145,7 @@
+ 		gpio2: gpio at 48055000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48055000 0x200>;
+-			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio2";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -156,7 +156,7 @@
+ 		gpio3: gpio at 48057000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48057000 0x200>;
+-			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio3";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -167,7 +167,7 @@
+ 		gpio4: gpio at 48059000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48059000 0x200>;
+-			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio4";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -178,7 +178,7 @@
+ 		gpio5: gpio at 4805b000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4805b000 0x200>;
+-			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio5";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -189,7 +189,7 @@
+ 		gpio6: gpio at 4805d000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4805d000 0x200>;
+-			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio6";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -200,7 +200,7 @@
+ 		gpio7: gpio at 48051000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48051000 0x200>;
+-			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio7";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -211,7 +211,7 @@
+ 		gpio8: gpio at 48053000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48053000 0x200>;
+-			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio8";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -222,7 +222,7 @@
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806a000 0x100>;
+-			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart1";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -231,7 +231,7 @@
+ 		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806c000 0x100>;
+-			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart2";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -240,7 +240,7 @@
+ 		uart3: serial at 48020000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48020000 0x100>;
+-			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart3";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -249,7 +249,7 @@
+ 		uart4: serial at 4806e000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806e000 0x100>;
+-			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
+                         status = "disabled";
+@@ -258,7 +258,7 @@
+ 		uart5: serial at 48066000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48066000 0x100>;
+-			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart5";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -267,7 +267,7 @@
+ 		uart6: serial at 48068000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48068000 0x100>;
+-			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart6";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -308,7 +308,7 @@
+ 		timer1: timer at 4ae18000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4ae18000 0x80>;
+-			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer1";
+ 			ti,timer-alwon;
+ 		};
+@@ -316,28 +316,28 @@
+ 		timer2: timer at 48032000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48032000 0x80>;
+-			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer2";
+ 		};
+ 
+ 		timer3: timer at 48034000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48034000 0x80>;
+-			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer3";
+ 		};
+ 
+ 		timer4: timer at 48036000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48036000 0x80>;
+-			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer4";
+ 		};
+ 
+ 		timer5: timer at 48820000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48820000 0x80>;
+-			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer5";
+ 			ti,timer-dsp;
+ 		};
+@@ -345,7 +345,7 @@
+ 		timer6: timer at 48822000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48822000 0x80>;
+-			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer6";
+ 			ti,timer-dsp;
+ 			ti,timer-pwm;
+@@ -354,7 +354,7 @@
+ 		timer7: timer at 48824000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48824000 0x80>;
+-			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer7";
+ 			ti,timer-dsp;
+ 		};
+@@ -362,7 +362,7 @@
+ 		timer8: timer at 48826000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48826000 0x80>;
+-			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer8";
+ 			ti,timer-dsp;
+ 			ti,timer-pwm;
+@@ -371,21 +371,21 @@
+ 		timer9: timer at 4803e000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4803e000 0x80>;
+-			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer9";
+ 		};
+ 
+ 		timer10: timer at 48086000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48086000 0x80>;
+-			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer10";
+ 		};
+ 
+ 		timer11: timer at 48088000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48088000 0x80>;
+-			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer11";
+ 			ti,timer-pwm;
+ 		};
+@@ -421,14 +421,14 @@
+ 		wdt2: wdt at 4ae14000 {
+ 			compatible = "ti,omap4-wdt";
+ 			reg = <0x4ae14000 0x80>;
+-			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "wd_timer2";
+ 		};
+ 
+ 		i2c1: i2c at 48070000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48070000 0x100>;
+-			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c1";
+@@ -438,7 +438,7 @@
+ 		i2c2: i2c at 48072000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48072000 0x100>;
+-			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c2";
+@@ -448,7 +448,7 @@
+ 		i2c3: i2c at 48060000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48060000 0x100>;
+-			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c3";
+@@ -458,7 +458,7 @@
+ 		i2c4: i2c at 4807a000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x4807a000 0x100>;
+-			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c4";
+@@ -468,7 +468,7 @@
+ 		i2c5: i2c at 4807c000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x4807c000 0x100>;
+-			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c5";
+@@ -478,7 +478,7 @@
+ 		mmc1: mmc at 4809c000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x4809c000 0x400>;
+-			interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmc1";
+ 			ti,dual-volt;
+ 			ti,needs-special-reset;
+@@ -490,7 +490,7 @@
+ 		mmc2: mmc at 480b4000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x480b4000 0x400>;
+-			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmc2";
+ 			ti,needs-special-reset;
+ 			dmas = <&sdma 47>, <&sdma 48>;
+@@ -501,7 +501,7 @@
+ 		mmc3: mmc at 480ad000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x480ad000 0x400>;
+-			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmc3";
+ 			ti,needs-special-reset;
+ 			dmas = <&sdma 77>, <&sdma 78>;
+@@ -512,7 +512,7 @@
+ 		mmc4: mmc at 480d1000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x480d1000 0x400>;
+-			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmc4";
+ 			ti,needs-special-reset;
+ 			dmas = <&sdma 57>, <&sdma 58>;
+@@ -523,7 +523,7 @@
+ 		mcspi1: spi at 48098000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x48098000 0x200>;
+-			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi1";
+@@ -544,7 +544,7 @@
+ 		mcspi2: spi at 4809a000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x4809a000 0x200>;
+-			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi2";
+@@ -560,7 +560,7 @@
+ 		mcspi3: spi at 480b8000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x480b8000 0x200>;
+-			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi3";
+@@ -573,7 +573,7 @@
+ 		mcspi4: spi at 480ba000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x480ba000 0x200>;
+-			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi4";
 -- 
 1.7.9.5
