@@ -1,65 +1,57 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Nov 2013 09:49:37 +0800
-Subject: [PATCH v3 05/11] usb: phy-mxs: Add anatop regmap
+Date: Tue, 5 Nov 2013 09:49:34 +0800
+Subject: [PATCH v3 02/11] usb: phy-mxs: Add auto clock and power setting
 In-Reply-To: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
 References: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1383616183-10511-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <1383616183-10511-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is needed by imx6 SoC serial, but not for imx23 and imx28.
+With the auto setting, the PHY's clock and power can be
+recovered correctly from low power mode, it is ganranteed by IC logic.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |   20 +++++++++++++++++---
+ 1 files changed, 17 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 472fe36..8cdfbf1 100644
+index 8b9d80c..472fe36 100644
 --- a/drivers/usb/phy/phy-mxs-usb.c
 +++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -21,6 +21,8 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/of_device.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
+@@ -31,6 +31,11 @@
  
- #define DRIVER_NAME "mxs_phy"
+ #define BM_USBPHY_CTRL_SFTRST			BIT(31)
+ #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
++#define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
++#define BM_USBPHY_CTRL_ENAUTOCLR_USBCLKGATE	BIT(25)
++#define BM_USBPHY_CTRL_ENAUTOCLR_PHY_PWD	BIT(20)
++#define BM_USBPHY_CTRL_ENAUTOCLR_CLKGATE	BIT(19)
++#define BM_USBPHY_CTRL_ENAUTO_PWRON_PLL		BIT(18)
+ #define BM_USBPHY_CTRL_ENUTMILEVEL3		BIT(15)
+ #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
+ #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+@@ -96,9 +101,18 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+ 	/* Power up the PHY */
+ 	writel(0, base + HW_USBPHY_PWD);
  
-@@ -87,6 +89,7 @@ struct mxs_phy {
- 	struct usb_phy phy;
- 	struct clk *clk;
- 	unsigned int flags;
-+	struct regmap *regmap_anatop;
- };
+-	/* enable FS/LS device */
+-	writel(BM_USBPHY_CTRL_ENUTMILEVEL2 |
+-	       BM_USBPHY_CTRL_ENUTMILEVEL3,
++	/*
++	 * USB PHY Ctrl Setting
++	 * - Auto clock/power on
++	 * - Enable full/low speed support
++	 */
++	writel(BM_USBPHY_CTRL_ENAUTOSET_USBCLKS |
++		BM_USBPHY_CTRL_ENAUTOCLR_USBCLKGATE |
++		BM_USBPHY_CTRL_ENAUTOCLR_PHY_PWD |
++		BM_USBPHY_CTRL_ENAUTOCLR_CLKGATE |
++		BM_USBPHY_CTRL_ENAUTO_PWRON_PLL |
++		BM_USBPHY_CTRL_ENUTMILEVEL2 |
++		BM_USBPHY_CTRL_ENUTMILEVEL3,
+ 	       base + HW_USBPHY_CTRL_SET);
  
- static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
-@@ -191,6 +194,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 	const struct of_device_id *of_id =
- 			of_match_device(mxs_phy_dt_ids, &pdev->dev);
- 	const struct mxs_phy_platform_flag *platform_flag = of_id->data;
-+	struct device_node *np = pdev->dev.of_node;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res);
-@@ -210,6 +214,17 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	/* Some SoCs don't have anatop registers */
-+	if (of_get_property(np, "fsl,anatop", NULL)) {
-+		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
-+			(np, "fsl,anatop");
-+		if (IS_ERR(mxs_phy->regmap_anatop)) {
-+			dev_dbg(&pdev->dev,
-+				"failed to find regmap for anatop\n");
-+			return PTR_ERR(mxs_phy->regmap_anatop);
-+		}
-+	}
-+
- 	mxs_phy->phy.io_priv		= base;
- 	mxs_phy->phy.dev		= &pdev->dev;
- 	mxs_phy->phy.label		= DRIVER_NAME;
+ 	return 0;
 -- 
 1.7.1
