@@ -1,36 +1,71 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 05 Nov 2013 09:27:17 -0800
-Subject: [PATCH 05/11] ARM: Introduce CPU_METHOD_OF_DECLARE() for cpu
- hotplug/smp
-In-Reply-To: <E3155290-B7BD-4559-BB0E-6C6C7D74ACFB@codeaurora.org>
-References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
- <1383343739-23080-6-git-send-email-sboyd@codeaurora.org>
- <E3155290-B7BD-4559-BB0E-6C6C7D74ACFB@codeaurora.org>
-Message-ID: <52792A75.6060306@codeaurora.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 5 Nov 2013 18:29:02 +0100
+Subject: [PATCH v2] ARM/serial: at91: specify RTS in DT using gpio
+In-Reply-To: <1383665383-5606-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1383665383-5606-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1383672542-10050-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/13 09:24, Kumar Gala wrote:
-> On Nov 1, 2013, at 5:08 PM, Stephen Boyd wrote:
->
->> @@ -150,8 +182,14 @@ void __init arm_dt_init_cpu_maps(void)
->> 		}
->>
->> 		tmp_map[i] = hwid;
->> +
->> +		if (!found_method)
->> +			found_method = set_smp_ops_by_method(cpu);
->> 	}
->>
->> +	if (!found_method)
->> +		set_smp_ops_by_method(cpus);
->> +
-> I assume this if for the case that the enable method is in the cpus{ } container but not in a specific cpu node?
->
-> If so, the binding is not clear that we allow this.  Also a comment would probably be nice.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ Documentation/devicetree/bindings/serial/atmel-usart.txt |  3 +++
+ drivers/tty/serial/atmel_serial.c                        | 11 ++++++++---
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-Sure I'll add a comment to that effect and clarify the binding.
-
+diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+index 2191dcb..3adc61c 100644
+--- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+@@ -10,6 +10,8 @@ Required properties:
+ Optional properties:
+ - atmel,use-dma-rx: use of PDC or DMA for receiving data
+ - atmel,use-dma-tx: use of PDC or DMA for transmitting data
++- rts-gpios: specify a GPIO for RTS line. It will use specified PIO instead of the peripheral
++  function pin for the USART RTS feature. If unsure, don't specify this property.
+ - add dma bindings for dma transfer:
+ 	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
+ 		memory peripheral interface and USART DMA channel ID, FIFO configuration.
+@@ -28,6 +30,7 @@ Example:
+ 		interrupts = <7>;
+ 		atmel,use-dma-rx;
+ 		atmel,use-dma-tx;
++		rts-gpios = <&pioD 15 0>;
+ 	};
+ 
+ - use DMA:
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index b4e0794..582166f 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -35,6 +35,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/of_gpio.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/atmel_pdc.h>
+ #include <linux/atmel_serial.h>
+@@ -2364,13 +2365,17 @@ static int atmel_serial_probe(struct platform_device *pdev)
+ 	 * structs to indicate "no RTS GPIO" instead of open-coding some
+ 	 * invalid value everywhere.
+ 	 */
+-	if (pdata->rts_gpio > 0) {
+-		ret = devm_gpio_request(&pdev->dev, pdata->rts_gpio, "RTS");
++	if (pdata && pdata->rts_gpio > 0)
++		port->rts_gpio = pdata->rts_gpio;
++	else if (np)
++		port->rts_gpio = of_get_named_gpio(np, "rts-gpios", 0);
++
++	if (gpio_is_valid(port->rts_gpio)) {
++		ret = devm_gpio_request(&pdev->dev, port->rts_gpio, "RTS");
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "error requesting RTS GPIO\n");
+ 			goto err;
+ 		}
+-		port->rts_gpio = pdata->rts_gpio;
+ 		ret = gpio_direction_output(port->rts_gpio, 0);
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "error setting up RTS GPIO\n");
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.2.2
