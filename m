@@ -1,52 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 04 Nov 2013 17:04:14 -0700
-Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
-In-Reply-To: <201311050026.56321.heiko@sntech.de>
-References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
- <051069C10411E24D9749790C498526FA1BE0B7D7@SJEXCHMB12.corp.ad.broadcom.com>
- <CACRpkdYSLxp2M4HghcUdjEYGh-UQ+DaiCGp6yee+Qds6DR9poA@mail.gmail.com>
- <201311050026.56321.heiko@sntech.de>
-Message-ID: <527835FE.2030102@wwwdotorg.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon,  4 Nov 2013 17:27:19 -0700
+Subject: [PATCH] net: mv643xx_eth: Add missing phy_addr_set in DT mode
+Message-ID: <1383611239-14556-1-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2013 04:26 PM, Heiko St?bner wrote:
+Commit cc9d4598 'net: mv643xx_eth: use of_phy_connect if phy_node
+present' made the call to phy_scan optional, if the DT has a link to
+the phy node.
 
-> I remember we had a discussion about how things like bias-disable explicitly 
-> shouldn't have a value, when they are represented in the list-format:
-> 
-> 		pcfg_pull_none: pcfg_pull_none {
-> 			bias-disable;
-> 		};
-> 
-> so a bias-disable = <1> was explicitly "forbidden" [for a lack of a better 
-> word]. And it was similar for other options, the parameter not meant to be 
-> indicating if they are active but really only setting the "strength" or so.
+However phy_scan has the side effect of calling phy_addr_set, which
+writes the phy MDIO address to the ethernet controller. If phy_addr_set
+is not called, and the bootloader has not set the correct address then
+the driver will fail to function.
 
-Pure Boolean values should be represented as a valueless property. If
-the property is present, the value is true, otherwise false.
+Tested on Kirkwood.
 
-However, pinctrl bindings often don't represent Boolean values, but
-rather tri-states, with the following values:
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+Cc: David Miller <davem@davemloft.net>
+Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/net/ethernet/marvell/mv643xx_eth.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-* Don't touch this configuration option at all (missing)
-* Enable the option (<1>)
-* Disable the option (<0>)
-
-The reason for using tri-states being that you might want to write:
-
-xxx1 {
-    pins = <PINA>, <PINB>, <PINC>;
-    function = <...>;
-    // this node doesn't affect pullup
-}
-xxx2 {
-    pins = <PINA>, <PINB>;
-    // this node doesn't affect function
-    pull-up = <1>; // change, and enable
-}
-xxx3 {
-    pins = <PINAC>;
-    // this node doesn't affect function
-    pull-up = <0>; // change, and disable
-}
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 2c210ec..00e43b5 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -2890,6 +2890,7 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 					 PHY_INTERFACE_MODE_GMII);
+ 		if (!mp->phy)
+ 			err = -ENODEV;
++		phy_addr_set(mp, mp->phy->addr);
+ 	} else if (pd->phy_addr != MV643XX_ETH_PHY_NONE) {
+ 		mp->phy = phy_scan(mp, pd->phy_addr);
+ 
+-- 
+1.8.1.2
