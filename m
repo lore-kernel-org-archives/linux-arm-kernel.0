@@ -1,148 +1,78 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 5 Nov 2013 22:18:07 +0100
-Subject: [PATCH 20/23] ARM: signal: sigreturn_codes should be endian
- neutral to work in BE8
-In-Reply-To: <1381271679-27804-21-git-send-email-ben.dooks@codethink.co.uk>
-References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
- <1381271679-27804-21-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20131105211807.GR14892@pengutronix.de>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue, 5 Nov 2013 22:43:20 +0100
+Subject: [PATCHv9 01/43] clk: Add support for regmap register read/write
+In-Reply-To: <52726BD5.3080704@ti.com>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-2-git-send-email-t-kristo@ti.com>
+ <52726342.6030406@ti.com> <52726BD5.3080704@ti.com>
+Message-ID: <20131105214320.GC17929@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Oct 31, 2013 at 16:40 +0200, Tero Kristo wrote:
+> 
+> On 10/31/2013 04:03 PM, Nishanth Menon wrote:
+> >On 10/25/2013 10:56 AM, Tero Kristo wrote:
+> >[...]
+> >>diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> >>index 7e59253..63ff78c 100644
+> >>--- a/include/linux/clk-provider.h
+> >>+++ b/include/linux/clk-provider.h
+> >
+> >[...]
+> >>-static inline u32 clk_readl(u32 __iomem *reg)
+> >>+static inline u32 clk_readl(u32 __iomem *reg, struct regmap *regmap)
+> >>  {
+> >>-	return readl(reg);
+> >>+	u32 val;
+> >>+
+> >>+	if (regmap)
+> >>+		regmap_read(regmap, (u32)reg, &val);
+> >>+	else
+> >>+		val = readl(reg);
+> >>+	return val;
+> >>  }
+> >>
+> >>-static inline void clk_writel(u32 val, u32 __iomem *reg)
+> >>+static inline void clk_writel(u32 val, u32 __iomem *reg, struct regmap *regmap)
+> >>  {
+> >>-	writel(val, reg);
+> >>+	if (regmap)
+> >>+		regmap_write(regmap, (u32)reg, val);
+> >>+	else
+> >>+		writel(val, reg);
+> >>  }
+> >>
+> >>  #endif /* CONFIG_COMMON_CLK */
+> >>
+> >
+> >Might it not be better to introduce regmap variants?
+> >static inline void clk_regmap_writel(u32 val, u32 reg, struct regmap
+> >*regmap)
+> >and corresponding readl? that allows cleaner readability for clk
+> >drivers that use regmap and those that dont.
+> 
+> Well, doing that will introduce a lot of redundant code, as the
+> checks for the presence of regmap must be copied all over the place.
+> With this patch, all the generic clock drivers support internally
+> both regmap or non-regmap register accesses.
 
-On Wed, Oct 09, 2013 at 12:34:36AM +0200, Ben Dooks wrote:
-> From: Victor Kamensky <victor.kamensky@linaro.org>
-> 
-> In case of BE8 kernel data is in BE order whereas code stays in LE
-> order. Move sigreturn_codes to separate .S file and use proper
-> assembler mnemonics for these code snippets. In this case compiler
-> will take care of proper instructions byteswaps for BE8 case.
-> Change assumes that sufficiently Thumb-capable tools are used to
-> build kernel.
-> 
-> Problem was discovered during ltp testing of BE system: all rt_sig*
-> tests failed. Tested against the same tests in both BE and LE modes.
-> 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  arch/arm/kernel/Makefile          |  3 +-
->  arch/arm/kernel/signal.c          | 24 +-----------
->  arch/arm/kernel/sigreturn_codes.S | 80 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 83 insertions(+), 24 deletions(-)
->  create mode 100644 arch/arm/kernel/sigreturn_codes.S
-> 
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 5140df5f..39c9834 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -17,7 +17,8 @@ CFLAGS_REMOVE_return_address.o = -pg
->  
->  obj-y		:= elf.o entry-common.o irq.o opcodes.o \
->  		   process.o ptrace.o return_address.o \
-> -		   setup.o signal.o stacktrace.o sys_arm.o time.o traps.o
-> +		   setup.o signal.o sigreturn_codes.o \
-> +		   stacktrace.o sys_arm.o time.o traps.o
->  
->  obj-$(CONFIG_ATAGS)		+= atags_parse.o
->  obj-$(CONFIG_ATAGS_PROC)	+= atags_proc.o
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index ab33042..64845fc 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -21,29 +21,7 @@
->  #include <asm/unistd.h>
->  #include <asm/vfp.h>
->  
-> -/*
-> - * For ARM syscalls, we encode the syscall number into the instruction.
-> - */
-> -#define SWI_SYS_SIGRETURN	(0xef000000|(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE))
-> -#define SWI_SYS_RT_SIGRETURN	(0xef000000|(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE))
-> -
-> -/*
-> - * With EABI, the syscall number has to be loaded into r7.
-> - */
-> -#define MOV_R7_NR_SIGRETURN	(0xe3a07000 | (__NR_sigreturn - __NR_SYSCALL_BASE))
-> -#define MOV_R7_NR_RT_SIGRETURN	(0xe3a07000 | (__NR_rt_sigreturn - __NR_SYSCALL_BASE))
-> -
-> -/*
-> - * For Thumb syscalls, we pass the syscall number via r7.  We therefore
-> - * need two 16-bit instructions.
-> - */
-> -#define SWI_THUMB_SIGRETURN	(0xdf00 << 16 | 0x2700 | (__NR_sigreturn - __NR_SYSCALL_BASE))
-> -#define SWI_THUMB_RT_SIGRETURN	(0xdf00 << 16 | 0x2700 | (__NR_rt_sigreturn - __NR_SYSCALL_BASE))
-> -
-> -static const unsigned long sigreturn_codes[7] = {
-> -	MOV_R7_NR_SIGRETURN,    SWI_SYS_SIGRETURN,    SWI_THUMB_SIGRETURN,
-> -	MOV_R7_NR_RT_SIGRETURN, SWI_SYS_RT_SIGRETURN, SWI_THUMB_RT_SIGRETURN,
-> -};
-> +extern const unsigned long sigreturn_codes[7];
->  
->  static unsigned long signal_return_offset;
->  
-> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
-> new file mode 100644
-> index 0000000..3c5d0f2
-> --- /dev/null
-> +++ b/arch/arm/kernel/sigreturn_codes.S
-> @@ -0,0 +1,80 @@
-> +/*
-> + * sigreturn_codes.S - code sinpets for sigreturn syscalls
-> + *
-> + * Created by:	Victor Kamensky, 2013-08-13
-> + * Copyright:	(C) 2013  Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <asm/unistd.h>
-> +
-> +/*
-> + * For ARM syscalls, we encode the syscall number into the instruction.
-> + * With EABI, the syscall number has to be loaded into r7. As result
-> + * ARM syscall sequence snippet will have move and svc in .arm encoding
-> + *
-> + * For Thumb syscalls, we pass the syscall number via r7.  We therefore
-> + * need two 16-bit instructions in .thumb encoding
-> + *
-> + * Please note sigreturn_codes code are not executed in place. Instead
-> + * they just copied by kernel into appropriate places. Code inside of
-> + * arch/arm/kernel/signal.c is very sensitive to layout of these code
-> + * snippets.
-> + */
-> +
-> +#if __LINUX_ARM_ARCH__ <= 4
-> +	/*
-> +	 * Note we manually set minimally required arch that supports
-> +	 * required thumb opcodes for early arch versions. It is OK
-> +	 * for this file to be used in combination with other
-> +	 * lower arch variants, since these code snippets are only
-> +	 * used as input data.
-> +	 */
-> +	.arch armv4t
-> +#endif
-> +
-> +	.section .rodata
-> +	.global sigreturn_codes
-> +	.type	sigreturn_codes, #object
-> +
-> +	.arm
-This breaks a ARMv7-M build, see
-http://arm-soc.lixom.net/buildlogs/misc/next-20131105-1-g2b29c44/buildall.arm.efm32_defconfig.log.failed
+Please keep in mind that the "identity" of clk_readl() and
+readl() only applies in the current source code (ARM only use of
+common CCF primitives), while patches are pending (currently
+under review and receiving further improvement) which introduce
+several alternative implementations of clk_readl() depending on
+the platform.  Making all of them duplicate the "regmap vs direct
+register access" branch would be as bad.  Keeping one set of
+clk_readl() and clk_writel() routines and adding #ifdefs around
+the direct register access would be rather ugly, and I understand
+that preprocessor ifdef counts should get reduced instead of
+introduced.
 
-Best regards
-Uwe
 
+virtually yours
+Gerhard Sittig
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
