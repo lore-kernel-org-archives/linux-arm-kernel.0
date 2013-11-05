@@ -1,371 +1,166 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue,  5 Nov 2013 15:28:41 +0100
-Subject: [PATCH v3 7/9] ARM: add Armada 1500 and Sony NSZ-GS7 device tree files
-In-Reply-To: <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1383661723-17956-8-git-send-email-sebastian.hesselbarth@gmail.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Tue,  5 Nov 2013 15:39:08 +0100
+Subject: [PATCHv11][ 1/7] video: imxfb: Introduce regulator support.
+Message-ID: <1383662354-22417-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds very basic device tree files for the Marvell Armada 1500 SoC
-(Berlin BG2) and the Sony NSZ-GS7 GoogleTV board. Currently, SoC only has
-nodes for cpus, some clocks, l2 cache controller, local timer, apb timers,
-uart, and interrupt controllers. The Sony NSZ-GS7 is a GoogleTV consumer
-device comprising the Armada 1500 SoC above.
+This commit is based on the following commit by Fabio Estevam:
+  4344429 video: mxsfb: Introduce regulator support
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reviewed-by: Jason Cooper <jason@lakedaemon.net>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-Reviewed-by: Jisheng Zhang <jszhang@marvell.com>
----
-Changelog:
-v1->v2:
-- add "arm,pl310-cache" compatible to l2cc (Suggested by Mark Rutland)
-- replace 88DE3xxx numbering with SoC variant name
-  (Requested by Jisheng Zhang)
-RCFv2->v1:
-- switch to (soon to be) correct "marvell,pj4b" cpu compatible
-- reference fixed-clock for uarts instead of hard-coded clock-frequency
-- disable timers except two for clksrc and clkevt
-RFCv1->RFCv2:
-- add binding documentation (Reported by Jason Cooper)
-- change l2cc from aurora to tauros3 (Reported by Thomas Petazzoni)
-- add copyright reference
-- adapt compatibles to mach-berlin instead of mach-mvebu
-
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Rob Landley <rob@landley.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- .../devicetree/bindings/arm/marvell,berlin.txt     |   24 +++
- arch/arm/boot/dts/Makefile                         |    2 +
- arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |   29 +++
- arch/arm/boot/dts/berlin2.dtsi                     |  227 ++++++++++++++++++++
- 4 files changed, 282 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
- create mode 100644 arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
- create mode 100644 arch/arm/boot/dts/berlin2.dtsi
+ChangeLog v9->v10:
+- Added a return 0; at the end of imxfb_disable_controller.
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-new file mode 100644
-index 0000000..737afa5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
-@@ -0,0 +1,24 @@
-+Marvell Berlin SoC Family Device Tree Bindings
-+---------------------------------------------------------------
+ChangeLog v8->v9:
+- return an error if regulator_{enable,disable} fails in
+  imxfb_{enable,disable}_controller, and use it.
+---
+ drivers/video/imxfb.c |   55 ++++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 43 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 38733ac..a2fe8bd 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -28,6 +28,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/math64.h>
+@@ -145,6 +146,7 @@ struct imxfb_info {
+ 	struct clk		*clk_ipg;
+ 	struct clk		*clk_ahb;
+ 	struct clk		*clk_per;
++	struct regulator	*reg_lcd;
+ 	enum imxfb_type		devtype;
+ 	bool			enabled;
+ 
+@@ -561,14 +563,25 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ }
+ #endif
+ 
+-static void imxfb_enable_controller(struct imxfb_info *fbi)
++static int imxfb_enable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
+ 
+ 	if (fbi->enabled)
+-		return;
++		return 0;
+ 
+ 	pr_debug("Enabling LCD controller\n");
+ 
++	if (fbi->reg_lcd) {
++		ret = regulator_enable(fbi->reg_lcd);
++		if (ret) {
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator enable failed with error: %d\n",
++				ret);
++			return ret;
++		}
++	}
 +
-+Boards with a SoC of the Marvell Berlin family, e.g. Armada 1500
-+shall have the following properties:
+ 	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+ 
+ 	/* panning offset 0 (0 pixel offset)        */
+@@ -593,12 +606,16 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 		fbi->backlight_power(1);
+ 	if (fbi->lcd_power)
+ 		fbi->lcd_power(1);
 +
-+* Required root node properties:
-+compatible: must contain "marvell,berlin"
++	return 0;
+ }
+ 
+-static void imxfb_disable_controller(struct imxfb_info *fbi)
++static int imxfb_disable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
 +
-+In addition, the above compatible shall be extended with the specific
-+SoC and board used. Currently known SoC compatibles are:
-+    "marvell,berlin2"      for Marvell Armada 1500 (BG2, 88DE3100),
-+    "marvell,berlin2cd"    for Marvell Armada 1500-mini (BG2CD, 88DE3005)
-+    "marvell,berlin2ct"    for Marvell Armada ? (BG2CT, 88DE????)
-+    "marvell,berlin3"      for Marvell Armada ? (BG3, 88DE????)
+ 	if (!fbi->enabled)
+-		return;
++		return 0;
+ 
+ 	pr_debug("Disabling LCD controller\n");
+ 
+@@ -613,6 +630,17 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	fbi->enabled = false;
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
 +
-+* Example:
++	if (fbi->reg_lcd) {
++		ret = regulator_disable(fbi->reg_lcd);
++		if (ret)
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator disable failed with error: %d\n",
++				ret);
++			return ret;
++	}
 +
-+/ {
-+	model = "Sony NSZ-GS7";
-+	compatible = "sony,nsz-gs7", "marvell,berlin2", "marvell,berlin";
++	return 0;
+ }
+ 
+ static int imxfb_blank(int blank, struct fb_info *info)
+@@ -626,13 +654,12 @@ static int imxfb_blank(int blank, struct fb_info *info)
+ 	case FB_BLANK_VSYNC_SUSPEND:
+ 	case FB_BLANK_HSYNC_SUSPEND:
+ 	case FB_BLANK_NORMAL:
+-		imxfb_disable_controller(fbi);
+-		break;
++		return imxfb_disable_controller(fbi);
+ 
+ 	case FB_BLANK_UNBLANK:
+-		imxfb_enable_controller(fbi);
+-		break;
++		return imxfb_enable_controller(fbi);
+ 	}
 +
-+	...
-+}
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 802720e..c9c1a6c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -46,6 +46,8 @@ dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
- dtb-$(CONFIG_ARCH_BCM) += bcm11351-brt.dtb \
- 	bcm28155-ap.dtb
-+dtb-$(CONFIG_ARCH_BERLIN) += \
-+	berlin2-sony-nsz-gs7.dtb
- dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
- dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
-diff --git a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-new file mode 100644
-index 0000000..c72bfd4
---- /dev/null
-+++ b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-@@ -0,0 +1,29 @@
-+/*
-+ * Device Tree file for Sony NSZ-GS7
-+ *
-+ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
+ 	return 0;
+ }
+ 
+@@ -734,8 +761,7 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+ 
+ 	pr_debug("%s\n", __func__);
+ 
+-	imxfb_disable_controller(fbi);
+-	return 0;
++	return imxfb_disable_controller(fbi);
+ }
+ 
+ static int imxfb_resume(struct platform_device *dev)
+@@ -745,8 +771,7 @@ static int imxfb_resume(struct platform_device *dev)
+ 
+ 	pr_debug("%s\n", __func__);
+ 
+-	imxfb_enable_controller(fbi);
+-	return 0;
++	return imxfb_enable_controller(fbi);
+ }
+ #else
+ #define imxfb_suspend	NULL
+@@ -1020,6 +1045,12 @@ static int imxfb_probe(struct platform_device *pdev)
+ 		goto failed_register;
+ 	}
+ 
++	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
++	if (IS_ERR(fbi->reg_lcd)) {
++		dev_info(&pdev->dev, "No lcd regulator used.\n");
++		fbi->reg_lcd = NULL;
++	}
 +
-+/dts-v1/;
-+
-+#include "berlin2.dtsi"
-+
-+/ {
-+	model = "Sony NSZ-GS7";
-+	compatible = "sony,nsz-gs7", "marvell,berlin2", "marvell,berlin";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000>; /* 1 GB */
-+	};
-+};
-+
-+&uart0 { status = "okay"; };
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-new file mode 100644
-index 0000000..56a1af2
---- /dev/null
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -0,0 +1,227 @@
-+/*
-+ * Device Tree Include file for Marvell Armada 1500 (Berlin BG2) SoC
-+ *
-+ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ *
-+ * based on GPL'ed 2.6 kernel sources
-+ *  (c) Marvell International Ltd.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "Marvell Armada 1500 (BG2) SoC";
-+	compatible = "marvell,berlin2", "marvell,berlin";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "marvell,pj4b";
-+			device_type = "cpu";
-+			next-level-cache = <&l2>;
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "marvell,pj4b";
-+			device_type = "cpu";
-+			next-level-cache = <&l2>;
-+			reg = <1>;
-+		};
-+	};
-+
-+	clocks {
-+		smclk: sysmgr-clock {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
-+
-+		cfgclk: cfg-clock {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <100000000>;
-+		};
-+
-+		sysclk: system-clock {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <400000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		interrupt-parent = <&gic>;
-+
-+		ranges = <0 0xf7000000 0x1000000>;
-+
-+		l2: l2-cache-controller at ac0000 {
-+			compatible = "marvell,tauros3-cache", "arm,pl310-cache";
-+			reg = <0xac0000 0x1000>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+
-+		gic: interrupt-controller at ad1000 {
-+			compatible = "arm,cortex-a9-gic";
-+			reg = <0xad1000 0x1000>, <0xad0100 0x0100>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
-+
-+		local-timer at ad0600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0xad0600 0x20>;
-+			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysclk>;
-+		};
-+
-+		apb at e80000 {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			ranges = <0 0xe80000 0x10000>;
-+			interrupt-parent = <&aic>;
-+
-+			timer0: timer at 2c00 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c00 0x14>;
-+				interrupts = <8>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "okay";
-+			};
-+
-+			timer1: timer at 2c14 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c14 0x14>;
-+				interrupts = <9>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "okay";
-+			};
-+
-+			timer2: timer at 2c28 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c28 0x14>;
-+				interrupts = <10>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer3: timer at 2c3c {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c3c 0x14>;
-+				interrupts = <11>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer4: timer at 2c50 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c50 0x14>;
-+				interrupts = <12>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer5: timer at 2c64 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c64 0x14>;
-+				interrupts = <13>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer6: timer at 2c78 {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c78 0x14>;
-+				interrupts = <14>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			timer7: timer at 2c8c {
-+				compatible = "snps,dw-apb-timer";
-+				reg = <0x2c8c 0x14>;
-+				interrupts = <15>;
-+				clocks = <&cfgclk>;
-+				clock-names = "timer";
-+				status = "disabled";
-+			};
-+
-+			aic: interrupt-controller at 3000 {
-+				compatible = "snps,dw-apb-ictl";
-+				reg = <0x3000 0xc00>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+
-+		apb at fc0000 {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			ranges = <0 0xfc0000 0x10000>;
-+			interrupt-parent = <&sic>;
-+
-+			uart0: serial at 9000 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0x9000 0x100>;
-+				reg-shift = <2>;
-+				reg-io-width = <1>;
-+				interrupts = <8>;
-+				clocks = <&smclk>;
-+				status = "disabled";
-+			};
-+
-+			uart1: serial at a000 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0xa000 0x100>;
-+				reg-shift = <2>;
-+				reg-io-width = <1>;
-+				interrupts = <9>;
-+				clocks = <&smclk>;
-+				status = "disabled";
-+			};
-+
-+			uart2: serial at b000 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0xb000 0x100>;
-+				reg-shift = <2>;
-+				reg-io-width = <1>;
-+				interrupts = <10>;
-+				clocks = <&smclk>;
-+				status = "disabled";
-+			};
-+
-+			sic: interrupt-controller at e000 {
-+				compatible = "snps,dw-apb-ictl";
-+				reg = <0xe000 0x400>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+	};
-+};
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
+ #ifdef PWMR_BACKLIGHT_AVAILABLE
 -- 
-1.7.10.4
+1.7.9.5
