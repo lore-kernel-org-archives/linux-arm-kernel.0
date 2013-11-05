@@ -1,48 +1,46 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 5 Nov 2013 10:34:06 +0800
-Subject: [PATCH v3 03/11] usb: doc: phy-mxs: update binding for adding
- anatop phandle
-In-Reply-To: <1383616183-10511-4-git-send-email-peter.chen@freescale.com>
+Date: Tue, 5 Nov 2013 10:41:33 +0800
+Subject: [PATCH v3 04/11] ARM: dts: imx6: add anatop phandle for usbphy
+In-Reply-To: <1383616183-10511-5-git-send-email-peter.chen@freescale.com>
 References: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
- <1383616183-10511-4-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131105023404.GF19770@S2101-09.ap.freescale.net>
+ <1383616183-10511-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131105024130.GG19770@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 09:49:35AM +0800, Peter Chen wrote:
-> Add anatop phandle which is used to access anatop registers to
-> control PHY's power and other USB operations.
+On Tue, Nov 05, 2013 at 09:49:36AM +0800, Peter Chen wrote:
+> Add anatop phandle for usbphy
 > 
 > Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
+>  arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
 >  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> index 5835b27..e2d5211 100644
-> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> @@ -4,10 +4,12 @@ Required properties:
->  - compatible: Should be "fsl,imx23-usbphy"
 
-This needs update too, as we now have another two compatible strings.
-
->  - reg: Should contain registers location and length
->  - interrupts: Should contain phy interrupt
-> +- fsl,anatop: phandle for anatop register, it is only for mx6 SoC serial
-
-imx6 SoC series
+Does imx6sl.dtsi need the same update?
 
 Shawn
 
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 226ce75..bb79678 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -559,6 +559,7 @@
+>  				reg = <0x020c9000 0x1000>;
+>  				interrupts = <0 44 0x04>;
+>  				clocks = <&clks 182>;
+> +				fsl,anatop = <&anatop>;
+>  			};
 >  
->  Example:
->  usbphy1: usbphy at 020c9000 {
->  	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
->  	reg = <0x020c9000 0x1000>;
->  	interrupts = <0 44 0x04>;
-> +	fsl,anatop = <&anatop>;
->  };
+>  			usbphy2: usbphy at 020ca000 {
+> @@ -566,6 +567,7 @@
+>  				reg = <0x020ca000 0x1000>;
+>  				interrupts = <0 45 0x04>;
+>  				clocks = <&clks 183>;
+> +				fsl,anatop = <&anatop>;
+>  			};
+>  
+>  			snvs at 020cc000 {
 > -- 
 > 1.7.1
 > 
