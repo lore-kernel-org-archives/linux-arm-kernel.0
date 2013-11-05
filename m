@@ -1,68 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Nov 2013 09:39:20 +0100
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <20131104212930.GB9638@obsidianresearch.com>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <1704730.RnIqE1USnv@wuerfel> <20131104212930.GB9638@obsidianresearch.com>
-Message-ID: <201311050939.21071.arnd@arndb.de>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Tue,  5 Nov 2013 14:15:42 +0530
+Subject: [PATCH v4 0/4] AArch64: KGDB support
+Message-ID: <1383641146-27274-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 November 2013, Jason Gunthorpe wrote:
-> On Mon, Nov 04, 2013 at 09:43:22PM +0100, Arnd Bergmann wrote:
-> 
-> > /*
-> >  * this lists all properties we access from the driver. The list
-> >  * is interpreted by devm_probe() and can be programmatically
-> >  * verified to match the binding.
-> >  */
-> > static const struct devm_probe foo_probe_list[] = {
-> > 	DEVM_ALLOC(foo_priv),
-> > 	DEVM_IOMAP(foo_priv, regs, 0, 0),
-> > 	DEVM_PROP_BOOL(foo_priv, oldstyle_dma, "foo,oldstyle-dma"),
-> > 	DEVM_DMA_SLAVE(foo_priv, rxdma, "rx");
-> > 	DEVM_DMA_SLAVE(foo_priv, txdma, "tx");
-> > 	DEVM_GPIO(foo_priv, gpio, 0);
-> > 	DEVM_IRQ_NAMED(foo_priv, irq, foo_irq_handler, "fifo", IRQF_SHARED),
-> > 	{},
-> > };
-> 
-> Drivers are required to gain control of, and disable the device before
-> they bind and enable things like DMA or interrupts.
-> 
-> At the very least the action list above needs an explicit callback to
-> do that step..
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-I was aware of this for the interrupts, my plan for this was to either
-leave the interrupt disabled when requesting it and leave it up to the
-probe function to call enable_irq(), or to have the irq request function
-last in the list, and preceded by a custom per-driver callback. AFAIK
-this is only required for some drivers anyway, while other drivers
-would function just fine when the irq is enabled early, because they
-never raise an IRQ without first having something touch their registers.
-Another option would be to have a flag in the driver data that lets
-the irq handler know it should ignore the interrupt (or disable the source)
-if the probe function has not completed yet.
+Based on the step-handler and break-handler hooks patch from
+Sandeepa (Patch 1), KGDB debugging support is added for EL1
+debug in AArch64 mode. Any updates that come for Patch 1 from
+Sandeepa will be rebased in next version
 
-What is the requirement for DMA channels? I did not expect the
-dma_request_slave_channel step to have any ordering requirements.
+With second patch,register layout is updated to be inline with GDB tool.
+Basic GDB connection, break point set/clear and info commands
+are supported except step/next debugging
 
-> > static int foo_probe(struct platform_device *dev)
-> > {
-> > 	int ret;
-> > 
-> > 	ret = devm_probe(dev->dev, foo_probe_list);
-> 
-> Some subsystems (like net) have the core system allocate the private
-> data, and some subsystem (like tpm) steal the drvdata for use in the
-> core, drivers can't touch it.
+With third patch, step/next debugging support is added, where in
+pc is updated to point to the instruction to be stepped and
+stopped.
 
-I think we can handle the first case by adding a per-subsystem DEV_ALLOC
-variant. For the second case, I don't see a solution other than than
-changing the subsystem not to steal the driver_data pointer. I need
-to find out how common this case is. If a lot of subsystems do it,
-we probably want a different solution.
+with fourth patch, the compile time breakpoint instruction
+reordering is fixed by making kgbd_breakpoint() as noinline
 
-Thanks a lot for your insights!
+v4:
+ - Updated kgdb_single_step and kgdb_cpu_doing_single_step
+   variables properly based on gdb state
 
-	Arnd
+v3:
+ - Rebased to v4 version of Sandeepa Prabhu's patch (patch 1)
+ - Made dynamic break point instruction encoding generic
+ - Made ESR value encoding generic for dynamic and compile break point
+ - Used memcpy and memset to copy register contents to gdb buffer
+ - Fixed reordering of break point instruction by compiler with
+   patch 3
+ - Rebased against AAach64 upstream kernel
+
+v2:
+ - Moved break instruction encoding to debug-monitors.h file
+ - Fixed endianess of compile break instruction encoding
+ - Updated I/O buffer sizes
+ - Updated register buffer size
+ - Remove changes to debug_exception handler in entry.S for
+ - ELR update and step debugging with update pc instead of ELR
+ - Rebased against AArch64 upstream kernel
+
+v1:
+ - Initial patch-set
+
+Sandeepa Prabhu (1):
+  arm64: support single-step and breakpoint handler hooks
+
+Vijaya Kumar K (3):
+  AArch64: KGDB: Add Basic KGDB support
+  AArch64: KGDB: Add step debugging support
+  KGDB: make kgdb_breakpoint() as noinline
+
+ arch/arm64/include/asm/debug-monitors.h |   67 ++++++
+ arch/arm64/include/asm/kgdb.h           |   86 ++++++++
+ arch/arm64/kernel/Makefile              |    1 +
+ arch/arm64/kernel/debug-monitors.c      |   86 +++++++-
+ arch/arm64/kernel/entry.S               |    2 +
+ arch/arm64/kernel/kgdb.c                |  338 +++++++++++++++++++++++++++++++
+ kernel/debug/debug_core.c               |    2 +-
+ 7 files changed, 580 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kgdb.h
+ create mode 100644 arch/arm64/kernel/kgdb.c
+
+-- 
+1.7.9.5
