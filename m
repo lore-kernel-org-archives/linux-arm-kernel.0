@@ -1,81 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Nov 2013 21:17:32 +0100
-Subject: [RFC PATCH dtc] C-based DT schema checker integrated into dtc
-In-Reply-To: <20131105195820.GB20600@obsidianresearch.com>
-References: <1382651488-9696-1-git-send-email-swarren@wwwdotorg.org>
- <201311052034.01114.arnd@arndb.de>
- <20131105195820.GB20600@obsidianresearch.com>
-Message-ID: <201311052117.33443.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 06 Nov 2013 00:25:35 +0300
+Subject: [PATCH] RM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
+In-Reply-To: <5272CC16.3020700@cogentembedded.com>
+References: <1383201098-4258-1-git-send-email-horms+renesas@verge.net.au>
+ <5272CC16.3020700@cogentembedded.com>
+Message-ID: <5279624F.1030903@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 November 2013, Jason Gunthorpe wrote:
-> On Tue, Nov 05, 2013 at 08:34:00PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 05 November 2013, Jason Gunthorpe wrote:
-> > > The issue is sysfs, the TPM core attaches attributes to the driver's
-> > > struct device, which means it has to convert from struct device * to
-> > > its own private data. It is totally wrong, but that is the way
-> > > it has been for ever. :(
-> > 
-> > I've just had a very brief look at that subsystem, and the first driver
-> > I looked at (tpm_atmel) actually creates a child platform_device for
-> > the sole purpose of registering that with the tpm subsystem, which seems
-> > to avoid this problem. 
-> 
-> The TPM subsystem requires a struct device to bind onto (for sysfs at
-> least), so drivers that don't have one are required to create one :|
-> 
-> atmel is unusual as most drivers have a pre-existing device.
+Hello.
 
-Eeek, yes I see now. OTOH, it would still be able to do the same thing
-by binding to the actual platform_device. Judging from the copyright
-notice, this driver predates the move to creating 'struct device'
-instances for (most) device nodes, and it uses the old-style
-method of searching the DT from the module_init function, which is
-not how we do things today.
+On 11/01/2013 12:31 AM, Sergei Shtylyov wrote:
 
-Creating a platform_device (or a plain device, for that matter)
-from a proper probe() function would have a similar effect from
-the perspective of the TPM subsystem (or other subsystems using
-the same drvdata trick), and make it possible to use my proposed
-devm_probe method from any tpm driver. The main downside I can
-see is that it requires duplicating some code in each TPM driver
-that wants to convert to devm_probe, but on the upside it doesn't
-require any changes to the TPM subsystem or to other drivers the
-way that a proper fix would.
+>> Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
+>> Other than not being useful it is also not possible to compile
 
-> > Maybe the same can be done for the other drivers as
-> > well. Unfortunately, that will change the sysfs structure, which
-> > might break user space relying on the current path to the
-> > device. 
-> 
-> AFAIK the correct fix is to have the TPM subsystem core create a
-> struct device for its own use (eg tpm0), under its own class, which is
-> what other subsystems I looked at do.
+>     s/compile/link/.
 
-Yes. Note that the use of new 'class'es is not recommended any more,
-nowadays we are supposed to use 'bus_type' for this, which is
-traditionally something slightly different, but technically almost
-the same implementation-wise.
+>> the code under this condition as phy_register_fixup_for_id()
+>> is not defined.
 
-> This way the subsystem can have
-> access to a release function that is properly tied to the actual
-> object lifetime, and it can use container_of to retrieve its own
-> private data from, eg sysfs. Combined with get_ops/put_ops style
-> access I think you can solve the unload lifetime issues with sysfs..
-> 
-> However, even if all that is done, compatibility sysfs's under the
-> driver's struct device will still be needed, which AFAICT will still
-> require the drvdata be owned by the subsystem not the driver :(
+>     Not only this function is absent...
 
-That depends: the requirement is that no user space breaks after
-a change. I assume that there is a fairly limited set of packages
-accessing the tpm sysfs files. If all of them are written properly,
-they should be able to deal with looking at the files in a different
-place in sysfs.
+>> This problem was introduced by 48c8b96f21817aad
+>> ("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
 
-Another option is to change the TPM core sysfs attributes not to
-look at drvdata, but to use devres_find() to find the data they
-need.
+>> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> ---
+>>   arch/arm/mach-shmobile/board-lager.c | 4 +++-
+>>   1 file changed, 3 insertions(+), 1 deletion(-)
 
-	Arnd
+>> diff --git a/arch/arm/mach-shmobile/board-lager.c
+>> b/arch/arm/mach-shmobile/board-lager.c
+>> index 78a31b6..d1a8ddd 100644
+>> --- a/arch/arm/mach-shmobile/board-lager.c
+>> +++ b/arch/arm/mach-shmobile/board-lager.c
+>> @@ -245,7 +245,9 @@ static void __init lager_init(void)
+>>   {
+>>       lager_add_standard_devices();
+>>
+>> -    phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
+>> +    if (IS_ENABLED(CONFIG_PHYLIB))
+>> +        phy_register_fixup_for_id("r8a7790-ether-ff:01",
+>> +                      lager_ksz8041_fixup);
+
+>     Perhaps you would consider enclosing the fixup function itself into #ifdef
+> as it causes link errors as well?  Doesn't seem necessary as gcc probably
+> drops it anyway but for completeness' sake...
+
+    It's not necessary and it won't even work (causes compilation failure) as 
+my testing has shown, so sorry for wasting your time on this suggestion.
+
+WBR, Sergei
