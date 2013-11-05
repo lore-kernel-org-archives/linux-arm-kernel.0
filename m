@@ -1,156 +1,79 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 5 Nov 2013 18:59:27 +0200
-Subject: [PATCH v4 4/6] gpio: davinci: add OF support
-In-Reply-To: <CA+V-a8uV0g36LoQtxFjR56SaMxj7KOE2ztC+pfT_Pn1wGcqEmw@mail.gmail.com>
-References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
- <1383406775-14902-5-git-send-email-prabhakar.csenng@gmail.com>
- <5277E752.8090005@ti.com>
- <CA+V-a8uV0g36LoQtxFjR56SaMxj7KOE2ztC+pfT_Pn1wGcqEmw@mail.gmail.com>
-Message-ID: <527923EF.4070602@ti.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 5 Nov 2013 11:12:27 -0600
+Subject: [PATCH 02/11] devicetree: bindings: Document Qualcomm cpus and
+ enable-method
+In-Reply-To: <20131104173606.GL21983@codeaurora.org>
+References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
+ <1383343739-23080-3-git-send-email-sboyd@codeaurora.org>
+ <CAL_JsqLObXEWJJ=SuifTjpPz9qTW0n43fyQNA-vjLNeLy-7-XA@mail.gmail.com>
+ <20131104173606.GL21983@codeaurora.org>
+Message-ID: <378446F7-DC51-448D-AF99-93F98CEAFB03@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2013 10:53 AM, Prabhakar Lad wrote:> Hi Grygorii,
- >
- > Thanks for the review.
- >
- > On Mon, Nov 4, 2013 at 11:58 PM, Grygorii Strashko
- > <grygorii.strashko@ti.com> wrote:
- >> Hi Prabhakar Lad,
- >>
- >>
- >> On 11/02/2013 05:39 PM, Lad, Prabhakar wrote:
- >>>
- >>> From: KV Sujith <sujithkv@ti.com>
- >>>
- >>> This patch adds OF parser support for davinci gpio
- >>> driver and also appropriate documentation in gpio-davinci.txt
- >>> located at Documentation/devicetree/bindings/gpio/.
- >>
- >>
- >> I worry, do we need to have gpio_chip.of_xlate() callback implemented?
- >
- > I looked for the other OF GPIO implementations with same "ngpio"
- > property (marvel, msm) but I don?t see of_xlate() callback implemented.
 
-The question: will below definitions in DT work or not after this series?
-  Will of_get_gpio()/of_get_named_gpio() work?
+On Nov 4, 2013, at 11:36 AM, Stephen Boyd wrote:
 
-Example1 - leds:
-	leds {
-		compatible = "gpio-leds";
-		debug0 {
-			label = "green:debug0";
-			gpios = <&gpio 29 GPIO_ACTIVE_HIGH>;
-		};
-	};
-
-Example2 - any dev:
-devA {
-	compatible = "devA";
-	gpios = <&gpio 120 GPIO_ACTIVE_LOW>;
-}
-
-
- >
- >> - From one side, Davinci GPIO controller in DT described by one entry
- >> which defines number of supported GPIOs as "ti,ngpio = <144>;"
- >>
- >> - From other side, on Linux level more than one gpio_chip objects are
- >> instantiated (one per each 32 GPIO).
- >>
- >> How the standard GPIO biding will work in this case? .. And will they?
- >>
- >> Linus, I'd very appreciate if you will be able to clarify this point.
- >>
- >>
- >>>
- >>> Signed-off-by: KV Sujith <sujithkv@ti.com>
- >>> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
- >>> [prabhakar.csengg at gmail.com: simplified the OF code, removed
- >>>                  unnecessary DT property and also simplified
- >>>                  the commit message]
- >>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
- >>> ---
- >>>    .../devicetree/bindings/gpio/gpio-davinci.txt      |   32 
-++++++++++++
- >>>    drivers/gpio/gpio-davinci.c                        |   54
- >>> ++++++++++++++++++--
- >>>    2 files changed, 83 insertions(+), 3 deletions(-)
- >>>    create mode 100644
- >>> Documentation/devicetree/bindings/gpio/gpio-davinci.txt
- >>>
- >>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
- >>> b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
- >>> new file mode 100644
- >>> index 0000000..55aae1c
- >>> --- /dev/null
- >>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
- >>> @@ -0,0 +1,32 @@
- >>> +Davinci GPIO controller bindings29
- >>> +
- >>> +Required Properties:
- >>> +- compatible: should be "ti,dm6441-gpio"
- >>> +
- >>> +- reg: Physical base address of the controller and the size of memory
- >>> mapped
- >>> +       registers.
- >>> +
- >>> +- gpio-controller : Marks the device node as a gpio controller.
- >>> +
- >>> +- interrupts: Array of GPIO interrupt number.
- >>
- >>
- >> May be meaning of <interrupts> property need to be extended, because,
- >> as of now, only banked or unbanked IRQs are supported - and not both.
- >>
- >>
- > OK
- >
- >>> +
- >>> +- ti,ngpio: The number of GPIO pins supported.
- >>> +
- >>> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an 
-individual
- >>> interrupt
- >>> +                            line to processor.
- >>
- >>
- >> Should interrupt-controller; specifier be added here?
- >>
- > No
-
-So, it would be impossible to map GPIO IRQ to device through DT. Right?
-Like:
-	devX at 0 {
-		compatible = "devX";
-		interrupt-parent = <&gpio>;
-		interrupts = <50 IRQ_TYPE_EDGE_FALLING>; /* gpio line 50 */
-
-	};
+> On 11/01, Rob Herring wrote:
+>> On Fri, Nov 1, 2013 at 5:08 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>> From: Rohit Vaswani <rvaswani@codeaurora.org>
+>>> 
+>>> Scorpion and Krait are Qualcomm cpus. These cpus don't use the
+>>> spin-table enable-method. Instead they rely on mmio register
+>>> accesses to enable power and clocks to bring CPUs out of reset.
+>>> 
+>>> Cc: <devicetree@vger.kernel.org>
+>>> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+>>> [sboyd: Split off into separate patch, renamed method to
+>>> qcom,mmio]
+>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>> ---
+>>> 
+>>> This slightly conflicts with my krait EDAC series.
+>>> 
+>>> Documentation/devicetree/bindings/arm/cpus.txt | 3 +++
+>>> 1 file changed, 3 insertions(+)
+>>> 
+>>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>>> index 37258f9..e2969fa2 100644
+>>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>>> @@ -44,6 +44,8 @@ For the ARM architecture every CPU node must contain the following properties:
+>>>                "marvell,mohawk"
+>>>                "marvell,xsc3"
+>>>                "marvell,xscale"
+>>> +               "qcom,scorpion"
+>>> +               "qcom,krait"
+>>> 
+>>> And the following optional properties:
+>>> 
+>>> @@ -52,6 +54,7 @@ And the following optional properties:
+>>>                 different types of cpus.
+>>>                 This should be one of:
+>>>                 "spin-table"
+>>> +                "qcom,mmio"
+>> 
+>> Not exactly specific. How would you handle variations in the enable
+>> method? The mmio method to enable is tied to the core type or SOC
+>> type?
+> 
+> Variations in the enable method are handled by searching for
+> another node with different compatible strings. Later on in this
+> series you'll see that we search for gcc-8660, kpss-acc-v1, or
+> kpps-acc-v2. Once we find one of these nodes we perform the
+> correct cold boot routine.
+> 
+> I'm actually considering renaming this to "qcom,cold-boot". We
+> could further extend the enable-metho property to allow
+> "qcom,warm-boot" and then for cases like kexec we could make the
+> enable method be warm boot and our smp code could be smart enough
+> to know to skip the whole cold boot sequence.
 
 
- >
- >>
- >>> +
- >>> +Example:
- >>> +
- >>> +gpio: gpio at 1e26000 {
- >>> +       compatible = "ti,dm6441-gpio";
- >>> +       gpio-controller;
- >>> +       reg = <0x226000 0x1000>;
- >>> +       interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
- >>> +               44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
- >>> +               46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
- >>> +               48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
- >>> +               50 IRQ_TYPE_EDGE_BOTH>;
- >>> +       ti,ngpio = <144>;
- >>> +       ti,davinci-gpio-irq-base = <101>;
- >>
- >>
- >>          ^^ Is it still needed?
- >>
- > OOps missed to remove that.
- >
-Regards,
--grygorii
+I think this should be more specific than just 'qcom,mmio' or 'qcom,warm-boot'.  It should be 'qcom,kpss-acc-v1' or 'qcom-gcc-8660'.
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
