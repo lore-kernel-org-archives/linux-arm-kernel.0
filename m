@@ -1,47 +1,46 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 5 Nov 2013 17:59:07 +0800
-Subject: [PATCH] mtd: atmel_nand: fix bug driver will in a dead lock if no
- nand detected
-Message-ID: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 5 Nov 2013 11:01:42 +0100
+Subject: [PATCH v5 1/4] ARM: deprecate mach/timex.h for !ARCH_MULTIPLATFORM
+In-Reply-To: <CACRpkdacQhwccK8nKf7m5aTA9ciHPuWth11v-OVPo0kS9WcUCQ@mail.gmail.com>
+References: <20131105083336.GK14892@pengutronix.de>
+ <1383642757-9762-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdacQhwccK8nKf7m5aTA9ciHPuWth11v-OVPo0kS9WcUCQ@mail.gmail.com>
+Message-ID: <20131105100142.GM14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the atmel driver probe function, the code shows like following:
-  atmel_nand_probe(...) {
-        ...
+On Tue, Nov 05, 2013 at 10:42:48AM +0100, Linus Walleij wrote:
+> On Tue, Nov 5, 2013 at 10:12 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> > +config NEED_MACH_TIMEX_H
+> > +       bool
+> > +       help
+> > +         Select this when mach/timex.h is required to provide special
+> > +         definitions for this platform. This should be avoided when possible.
+> 
+> OK this is no blocker, and do proceed with this as the kernel sure
+> looks better after this than before it.
+> 
+> However as the next step I would prefer that we start to get rid of
+> all the NEED_MACH_FOO_H used for just refactoring out headers.
+> 
+> Can we not completely do away with this header next, and provide
+> the services it supplied locally in the mach-foo folder for these machines
+> instead so we do not need to have all these Kconfig things and preserve
+> the <mach/*> namespace for them?
+> 
+> The real trick is to make CLOCK_TICK_RATE and LATCH runtime
+> variables instead of a compile-time variables, right? Can't we do
+> this?
+Well, for LATCH there is no problem because it just uses CLOCK_TICK_RATE
+and if the latter is provided correctly there is no problem. However I
+don't see a way how to determine CLOCK_TICK_RATE at runtime. IMHO here
+you need to fix all users as I just did for the u300 timer code.
 
-  err_nand_ioremap:
-        platform_driver_unregister(&atmel_nand_nfc_driver);
-        return res;
-  }
+Best regards
+Uwe
 
-If no nand flash detected, the driver probe function will goto
-err_nand_ioremap label.
-Then platform_driver_unregister() will be called. It will get the
-lock of atmel_nand device since it is parent of nfc_device. The
-problem is the lock is already hold by atmel_nand_probe itself.
-So system will be in a dead lock.
-
-This patch just simply removed to platform_driver_unregister() call.
-When atmel_nand driver is quit the platform_driver_unregister() will
-be called in atmel_nand_remove().
-
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/mtd/nand/atmel_nand.c |    1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index ef9c9f5..469d4e2 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -2142,7 +2142,6 @@ err_no_card:
- 	if (host->dma_chan)
- 		dma_release_channel(host->dma_chan);
- err_nand_ioremap:
--	platform_driver_unregister(&atmel_nand_nfc_driver);
- 	return res;
- }
- 
 -- 
-1.7.9.5
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
