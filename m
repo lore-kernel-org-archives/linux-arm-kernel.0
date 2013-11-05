@@ -1,198 +1,148 @@
-From: mhei@heimpold.de (Michael Heimpold)
-Date: Tue,  5 Nov 2013 22:07:50 +0100
-Subject: [PATCH] ARM: mxs: add support for I2SE's duckbill series
-Message-ID: <1383685670-10046-1-git-send-email-mhei@heimpold.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 5 Nov 2013 22:18:07 +0100
+Subject: [PATCH 20/23] ARM: signal: sigreturn_codes should be endian
+ neutral to work in BE8
+In-Reply-To: <1381271679-27804-21-git-send-email-ben.dooks@codethink.co.uk>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1381271679-27804-21-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20131105211807.GR14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Michael Heimpold <mhei@heimpold.de>
----
- arch/arm/boot/dts/Makefile           |    1 +
- arch/arm/boot/dts/imx28-duckbill.dts |  118 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/mach-mxs.c         |   13 ++++
- 3 files changed, 132 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx28-duckbill.dts
+Hello,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 802720e..f0fbc09 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -158,6 +158,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
- 	imx28-cfa10056.dtb \
- 	imx28-cfa10057.dtb \
- 	imx28-cfa10058.dtb \
-+	imx28-duckbill.dtb \
- 	imx28-evk.dtb \
- 	imx28-m28evk.dtb \
- 	imx28-sps1.dtb \
-diff --git a/arch/arm/boot/dts/imx28-duckbill.dts b/arch/arm/boot/dts/imx28-duckbill.dts
-new file mode 100644
-index 0000000..bd231e7
---- /dev/null
-+++ b/arch/arm/boot/dts/imx28-duckbill.dts
-@@ -0,0 +1,118 @@
-+/*
-+ * Copyright (C) 2013 Michael Heimpold <mhei@heimpold.de>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx28.dtsi"
-+
-+/ {
-+	model = "I2SE Duckbill";
-+	compatible = "i2se,duckbill", "fsl,imx28";
-+
-+	memory {
-+		reg = <0x40000000 0x08000000>;
-+	};
-+
-+	apb at 80000000 {
-+		apbh at 80000000 {
-+			ssp0: ssp at 80010000 {
-+				compatible = "fsl,imx28-mmc";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&mmc0_8bit_pins_a
-+					&mmc0_cd_cfg &mmc0_sck_cfg>;
-+				bus-width = <8>;
-+				vmmc-supply = <&reg_3p3v>;
-+				status = "okay";
-+			};
-+
-+			pinctrl at 80018000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&hog_pins_a>;
-+
-+				hog_pins_a: hog at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x40d3 /* MX28_PAD_ENET0_RX_CLK__GPIO_4_13, PHY Reset */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
-+				led_pins_a: led_gpio at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x3043 /* MX28_PAD_AUART1_RX__GPIO_3_4 */
-+						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+			};
-+		};
-+
-+		apbx at 80040000 {
-+			duart: serial at 80074000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&duart_pins_a>;
-+				status = "okay";
-+			};
-+
-+			usbphy0: usbphy at 8007c000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ahb at 80080000 {
-+		usb0: usb at 80080000 {
-+			status = "okay";
-+		};
-+
-+		mac0: ethernet at 800f0000 {
-+			phy-mode = "rmii";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mac0_pins_a>;
-+			phy-supply = <&reg_3p3v>;
-+			phy-reset-gpios = <&gpio4 13 0>;
-+			phy-reset-duration = <100>;
-+			status = "okay";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_3p3v: 3p3v {
-+			compatible = "regulator-fixed";
-+			regulator-name = "3P3V";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_a>;
-+
-+		status {
-+			label = "duckbill:green:status";
-+			gpios = <&gpio3 5 0>;
-+		};
-+
-+		failure {
-+			label = "duckbill:red:status";
-+			gpios = <&gpio3 4 0>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 98f6e2a..60073c7 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -159,6 +159,7 @@ enum mac_oui {
- 	OUI_FSL,
- 	OUI_DENX,
- 	OUI_CRYSTALFONTZ,
-+	OUI_I2SE,
- };
- 
- static void __init update_fec_mac_prop(enum mac_oui oui)
-@@ -213,6 +214,11 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
- 			macaddr[1] = 0xb9;
- 			macaddr[2] = 0xe1;
- 			break;
-+		case OUI_I2SE:
-+			macaddr[0] = 0x00;
-+			macaddr[1] = 0x01;
-+			macaddr[2] = 0x87;
-+			break;
- 		}
- 		val = ocotp[i];
- 		macaddr[3] = (val >> 16) & 0xff;
-@@ -332,6 +338,11 @@ static void __init crystalfontz_init(void)
- 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
- }
- 
-+static void __init duckbill_init(void)
-+{
-+	update_fec_mac_prop(OUI_I2SE);
-+}
-+
- static const char __init *mxs_get_soc_id(void)
- {
- 	struct device_node *np;
-@@ -459,6 +470,8 @@ static void __init mxs_machine_init(void)
- 		apx4devkit_init();
- 	else if (of_machine_is_compatible("crystalfontz,cfa10036"))
- 		crystalfontz_init();
-+	else if (of_machine_is_compatible("i2se,duckbill"))
-+		duckbill_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			     NULL, parent);
+On Wed, Oct 09, 2013 at 12:34:36AM +0200, Ben Dooks wrote:
+> From: Victor Kamensky <victor.kamensky@linaro.org>
+> 
+> In case of BE8 kernel data is in BE order whereas code stays in LE
+> order. Move sigreturn_codes to separate .S file and use proper
+> assembler mnemonics for these code snippets. In this case compiler
+> will take care of proper instructions byteswaps for BE8 case.
+> Change assumes that sufficiently Thumb-capable tools are used to
+> build kernel.
+> 
+> Problem was discovered during ltp testing of BE system: all rt_sig*
+> tests failed. Tested against the same tests in both BE and LE modes.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/kernel/Makefile          |  3 +-
+>  arch/arm/kernel/signal.c          | 24 +-----------
+>  arch/arm/kernel/sigreturn_codes.S | 80 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 83 insertions(+), 24 deletions(-)
+>  create mode 100644 arch/arm/kernel/sigreturn_codes.S
+> 
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 5140df5f..39c9834 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -17,7 +17,8 @@ CFLAGS_REMOVE_return_address.o = -pg
+>  
+>  obj-y		:= elf.o entry-common.o irq.o opcodes.o \
+>  		   process.o ptrace.o return_address.o \
+> -		   setup.o signal.o stacktrace.o sys_arm.o time.o traps.o
+> +		   setup.o signal.o sigreturn_codes.o \
+> +		   stacktrace.o sys_arm.o time.o traps.o
+>  
+>  obj-$(CONFIG_ATAGS)		+= atags_parse.o
+>  obj-$(CONFIG_ATAGS_PROC)	+= atags_proc.o
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index ab33042..64845fc 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -21,29 +21,7 @@
+>  #include <asm/unistd.h>
+>  #include <asm/vfp.h>
+>  
+> -/*
+> - * For ARM syscalls, we encode the syscall number into the instruction.
+> - */
+> -#define SWI_SYS_SIGRETURN	(0xef000000|(__NR_sigreturn)|(__NR_OABI_SYSCALL_BASE))
+> -#define SWI_SYS_RT_SIGRETURN	(0xef000000|(__NR_rt_sigreturn)|(__NR_OABI_SYSCALL_BASE))
+> -
+> -/*
+> - * With EABI, the syscall number has to be loaded into r7.
+> - */
+> -#define MOV_R7_NR_SIGRETURN	(0xe3a07000 | (__NR_sigreturn - __NR_SYSCALL_BASE))
+> -#define MOV_R7_NR_RT_SIGRETURN	(0xe3a07000 | (__NR_rt_sigreturn - __NR_SYSCALL_BASE))
+> -
+> -/*
+> - * For Thumb syscalls, we pass the syscall number via r7.  We therefore
+> - * need two 16-bit instructions.
+> - */
+> -#define SWI_THUMB_SIGRETURN	(0xdf00 << 16 | 0x2700 | (__NR_sigreturn - __NR_SYSCALL_BASE))
+> -#define SWI_THUMB_RT_SIGRETURN	(0xdf00 << 16 | 0x2700 | (__NR_rt_sigreturn - __NR_SYSCALL_BASE))
+> -
+> -static const unsigned long sigreturn_codes[7] = {
+> -	MOV_R7_NR_SIGRETURN,    SWI_SYS_SIGRETURN,    SWI_THUMB_SIGRETURN,
+> -	MOV_R7_NR_RT_SIGRETURN, SWI_SYS_RT_SIGRETURN, SWI_THUMB_RT_SIGRETURN,
+> -};
+> +extern const unsigned long sigreturn_codes[7];
+>  
+>  static unsigned long signal_return_offset;
+>  
+> diff --git a/arch/arm/kernel/sigreturn_codes.S b/arch/arm/kernel/sigreturn_codes.S
+> new file mode 100644
+> index 0000000..3c5d0f2
+> --- /dev/null
+> +++ b/arch/arm/kernel/sigreturn_codes.S
+> @@ -0,0 +1,80 @@
+> +/*
+> + * sigreturn_codes.S - code sinpets for sigreturn syscalls
+> + *
+> + * Created by:	Victor Kamensky, 2013-08-13
+> + * Copyright:	(C) 2013  Linaro Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <asm/unistd.h>
+> +
+> +/*
+> + * For ARM syscalls, we encode the syscall number into the instruction.
+> + * With EABI, the syscall number has to be loaded into r7. As result
+> + * ARM syscall sequence snippet will have move and svc in .arm encoding
+> + *
+> + * For Thumb syscalls, we pass the syscall number via r7.  We therefore
+> + * need two 16-bit instructions in .thumb encoding
+> + *
+> + * Please note sigreturn_codes code are not executed in place. Instead
+> + * they just copied by kernel into appropriate places. Code inside of
+> + * arch/arm/kernel/signal.c is very sensitive to layout of these code
+> + * snippets.
+> + */
+> +
+> +#if __LINUX_ARM_ARCH__ <= 4
+> +	/*
+> +	 * Note we manually set minimally required arch that supports
+> +	 * required thumb opcodes for early arch versions. It is OK
+> +	 * for this file to be used in combination with other
+> +	 * lower arch variants, since these code snippets are only
+> +	 * used as input data.
+> +	 */
+> +	.arch armv4t
+> +#endif
+> +
+> +	.section .rodata
+> +	.global sigreturn_codes
+> +	.type	sigreturn_codes, #object
+> +
+> +	.arm
+This breaks a ARMv7-M build, see
+http://arm-soc.lixom.net/buildlogs/misc/next-20131105-1-g2b29c44/buildall.arm.efm32_defconfig.log.failed
+
+Best regards
+Uwe
+
 -- 
-1.7.10.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
