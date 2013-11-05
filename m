@@ -1,46 +1,76 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 5 Nov 2013 10:41:33 +0800
-Subject: [PATCH v3 04/11] ARM: dts: imx6: add anatop phandle for usbphy
-In-Reply-To: <1383616183-10511-5-git-send-email-peter.chen@freescale.com>
+Date: Tue, 5 Nov 2013 10:47:55 +0800
+Subject: [PATCH v3 05/11] usb: phy-mxs: Add anatop regmap
+In-Reply-To: <1383616183-10511-6-git-send-email-peter.chen@freescale.com>
 References: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
- <1383616183-10511-5-git-send-email-peter.chen@freescale.com>
-Message-ID: <20131105024130.GG19770@S2101-09.ap.freescale.net>
+ <1383616183-10511-6-git-send-email-peter.chen@freescale.com>
+Message-ID: <20131105024753.GH19770@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 09:49:36AM +0800, Peter Chen wrote:
-> Add anatop phandle for usbphy
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+On Tue, Nov 05, 2013 at 09:49:37AM +0800, Peter Chen wrote:
+> It is needed by imx6 SoC serial, but not for imx23 and imx28.
 
-Does imx6sl.dtsi need the same update?
+s/serial/series
+
+Should we have another MXS_PHY_XXX flag for this, so that we can
+explicitly check when anatop must be there?
 
 Shawn
 
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 226ce75..bb79678 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -559,6 +559,7 @@
->  				reg = <0x020c9000 0x1000>;
->  				interrupts = <0 44 0x04>;
->  				clocks = <&clks 182>;
-> +				fsl,anatop = <&anatop>;
->  			};
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |   15 +++++++++++++++
+>  1 files changed, 15 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> index 472fe36..8cdfbf1 100644
+> --- a/drivers/usb/phy/phy-mxs-usb.c
+> +++ b/drivers/usb/phy/phy-mxs-usb.c
+> @@ -21,6 +21,8 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/of_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
 >  
->  			usbphy2: usbphy at 020ca000 {
-> @@ -566,6 +567,7 @@
->  				reg = <0x020ca000 0x1000>;
->  				interrupts = <0 45 0x04>;
->  				clocks = <&clks 183>;
-> +				fsl,anatop = <&anatop>;
->  			};
+>  #define DRIVER_NAME "mxs_phy"
 >  
->  			snvs at 020cc000 {
+> @@ -87,6 +89,7 @@ struct mxs_phy {
+>  	struct usb_phy phy;
+>  	struct clk *clk;
+>  	unsigned int flags;
+> +	struct regmap *regmap_anatop;
+>  };
+>  
+>  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+> @@ -191,6 +194,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>  	const struct of_device_id *of_id =
+>  			of_match_device(mxs_phy_dt_ids, &pdev->dev);
+>  	const struct mxs_phy_platform_flag *platform_flag = of_id->data;
+> +	struct device_node *np = pdev->dev.of_node;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	base = devm_ioremap_resource(&pdev->dev, res);
+> @@ -210,6 +214,17 @@ static int mxs_phy_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	/* Some SoCs don't have anatop registers */
+> +	if (of_get_property(np, "fsl,anatop", NULL)) {
+> +		mxs_phy->regmap_anatop = syscon_regmap_lookup_by_phandle
+> +			(np, "fsl,anatop");
+> +		if (IS_ERR(mxs_phy->regmap_anatop)) {
+> +			dev_dbg(&pdev->dev,
+> +				"failed to find regmap for anatop\n");
+> +			return PTR_ERR(mxs_phy->regmap_anatop);
+> +		}
+> +	}
+> +
+>  	mxs_phy->phy.io_priv		= base;
+>  	mxs_phy->phy.dev		= &pdev->dev;
+>  	mxs_phy->phy.label		= DRIVER_NAME;
 > -- 
 > 1.7.1
 > 
