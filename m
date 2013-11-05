@@ -1,55 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 06 Nov 2013 00:25:35 +0300
-Subject: [PATCH] RM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
-In-Reply-To: <5272CC16.3020700@cogentembedded.com>
-References: <1383201098-4258-1-git-send-email-horms+renesas@verge.net.au>
- <5272CC16.3020700@cogentembedded.com>
-Message-ID: <5279624F.1030903@cogentembedded.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 5 Nov 2013 13:28:43 -0700
+Subject: [PATCH v6 3/3] PCI: imx6: Add support for i.MX6 PCIe controller
+In-Reply-To: <52792C5E.6030008@writeme.com>
+References: <1379319655-20210-1-git-send-email-xobs@kosagi.com>
+ <1379319655-20210-4-git-send-email-xobs@kosagi.com>
+ <CAJ+vNU36neHP77dVnqSP=+oMxaU=-6PxWQ8Afni-tTRjNTkM_A@mail.gmail.com>
+ <0E83723C55F66F43A6041464FE31119D40FC99@039-SN2MPN1-011.039d.mgd.msft.net>
+ <CAJ+vNU13FA5s7tt-yEnBYNSBV+FHmHqZNoykFq8aF=O=TvqTnA@mail.gmail.com>
+ <0E83723C55F66F43A6041464FE31119D40FD55@039-SN2MPN1-011.039d.mgd.msft.net>
+ <CAJ+vNU2ifxfprYsgcQs+Kkgu37+diXHJS6DEqs4d51+U3F4sLQ@mail.gmail.com>
+ <52792C5E.6030008@writeme.com>
+Message-ID: <CAErSpo7c1KiOKqpM1+v6GM09Mspge=Yq9orwXVYjZZjsQssCHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Nov 5, 2013 at 10:35 AM, Sinan Akman <sinan@writeme.com> wrote:
+>   Tim, Sean what is the status of this patch ? Is it part of any tree
+> already ? I'd like to test few things.
 
-On 11/01/2013 12:31 AM, Sergei Shtylyov wrote:
+This patch is in my "next" branch and will be merged into Linus' tree
+during the v3.13 merge window (probably next week).  It's also in the
+linux-next tree.
 
->> Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
->> Other than not being useful it is also not possible to compile
-
->     s/compile/link/.
-
->> the code under this condition as phy_register_fixup_for_id()
->> is not defined.
-
->     Not only this function is absent...
-
->> This problem was introduced by 48c8b96f21817aad
->> ("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
-
->> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> ---
->>   arch/arm/mach-shmobile/board-lager.c | 4 +++-
->>   1 file changed, 3 insertions(+), 1 deletion(-)
-
->> diff --git a/arch/arm/mach-shmobile/board-lager.c
->> b/arch/arm/mach-shmobile/board-lager.c
->> index 78a31b6..d1a8ddd 100644
->> --- a/arch/arm/mach-shmobile/board-lager.c
->> +++ b/arch/arm/mach-shmobile/board-lager.c
->> @@ -245,7 +245,9 @@ static void __init lager_init(void)
->>   {
->>       lager_add_standard_devices();
->>
->> -    phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
->> +    if (IS_ENABLED(CONFIG_PHYLIB))
->> +        phy_register_fixup_for_id("r8a7790-ether-ff:01",
->> +                      lager_ksz8041_fixup);
-
->     Perhaps you would consider enclosing the fixup function itself into #ifdef
-> as it causes link errors as well?  Doesn't seem necessary as gcc probably
-> drops it anyway but for completeness' sake...
-
-    It's not necessary and it won't even work (causes compilation failure) as 
-my testing has shown, so sorry for wasting your time on this suggestion.
-
-WBR, Sergei
+http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=next&id=bb38919ec56e0758c3ae56dfc091dcde1391353e
