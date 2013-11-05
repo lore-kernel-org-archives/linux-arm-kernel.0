@@ -1,71 +1,289 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 5 Nov 2013 18:29:02 +0100
-Subject: [PATCH v2] ARM/serial: at91: specify RTS in DT using gpio
-In-Reply-To: <1383665383-5606-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1383665383-5606-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1383672542-10050-1-git-send-email-nicolas.ferre@atmel.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 5 Nov 2013 11:32:10 -0600
+Subject: [PATCH 07/11] ARM: msm: Re-organize platsmp to make it extensible
+In-Reply-To: <1383343739-23080-8-git-send-email-sboyd@codeaurora.org>
+References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
+ <1383343739-23080-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20D43120-30FF-4404-AD7A-B75E31809812@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- Documentation/devicetree/bindings/serial/atmel-usart.txt |  3 +++
- drivers/tty/serial/atmel_serial.c                        | 11 ++++++++---
- 2 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-index 2191dcb..3adc61c 100644
---- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-@@ -10,6 +10,8 @@ Required properties:
- Optional properties:
- - atmel,use-dma-rx: use of PDC or DMA for receiving data
- - atmel,use-dma-tx: use of PDC or DMA for transmitting data
-+- rts-gpios: specify a GPIO for RTS line. It will use specified PIO instead of the peripheral
-+  function pin for the USART RTS feature. If unsure, don't specify this property.
- - add dma bindings for dma transfer:
- 	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
- 		memory peripheral interface and USART DMA channel ID, FIFO configuration.
-@@ -28,6 +30,7 @@ Example:
- 		interrupts = <7>;
- 		atmel,use-dma-rx;
- 		atmel,use-dma-tx;
-+		rts-gpios = <&pioD 15 0>;
- 	};
- 
- - use DMA:
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index b4e0794..582166f 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -35,6 +35,7 @@
- #include <linux/platform_device.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_gpio.h>
- #include <linux/dma-mapping.h>
- #include <linux/atmel_pdc.h>
- #include <linux/atmel_serial.h>
-@@ -2364,13 +2365,17 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 	 * structs to indicate "no RTS GPIO" instead of open-coding some
- 	 * invalid value everywhere.
- 	 */
--	if (pdata->rts_gpio > 0) {
--		ret = devm_gpio_request(&pdev->dev, pdata->rts_gpio, "RTS");
-+	if (pdata && pdata->rts_gpio > 0)
-+		port->rts_gpio = pdata->rts_gpio;
-+	else if (np)
-+		port->rts_gpio = of_get_named_gpio(np, "rts-gpios", 0);
-+
-+	if (gpio_is_valid(port->rts_gpio)) {
-+		ret = devm_gpio_request(&pdev->dev, port->rts_gpio, "RTS");
- 		if (ret) {
- 			dev_err(&pdev->dev, "error requesting RTS GPIO\n");
- 			goto err;
- 		}
--		port->rts_gpio = pdata->rts_gpio;
- 		ret = gpio_direction_output(port->rts_gpio, 0);
- 		if (ret) {
- 			dev_err(&pdev->dev, "error setting up RTS GPIO\n");
+On Nov 1, 2013, at 5:08 PM, Stephen Boyd wrote:
+
+> From: Rohit Vaswani <rvaswani@codeaurora.org>
+> 
+> This makes it easy to add SMP support for new devices by keying
+> on a device node for the release sequence. We add the
+> enable-method property for the cpus property to specify that we
+> want to use the mmio release sequence (which is going to look for
+> a device node to map some Scorpion specific power and control
+> registers). While at it, add the 8660 cpus bindings to make SMP
+> work.
+> 
+> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+> [sboyd: Port to CPU_METHOD_OF_DECLARE, replace if/else with match
+> table method]
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> arch/arm/boot/dts/qcom-msm8660-surf.dts |  24 ++++++++
+> arch/arm/mach-msm/board-dt.c            |  14 -----
+> arch/arm/mach-msm/common.h              |   1 -
+> arch/arm/mach-msm/platsmp.c             | 103 ++++++++++++++++++++++++--------
+> 4 files changed, 103 insertions(+), 39 deletions(-)
+
+This feels like a few different patches munged together.
+
+> diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+> index 386d428..ac5ea76 100644
+> --- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
+> +++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+> @@ -7,6 +7,23 @@
+> 	compatible = "qcom,msm8660-surf", "qcom,msm8660";
+> 	interrupt-parent = <&intc>;
+> 
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "qcom,scorpion";
+> +		enable-method = "qcom,mmio";
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			reg = <0>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			reg = <1>;
+> +		};
+> +	};
+> +
+> 	intc: interrupt-controller at 2080000 {
+> 		compatible = "qcom,msm-8660-qgic";
+> 		interrupt-controller;
+> @@ -37,6 +54,13 @@
+> 		#interrupt-cells = <2>;
+> 	};
+> 
+> +	clock-controller at 900000 {
+> +		compatible = "qcom,gcc-8660";
+> +		reg = <0x00900000 0x4000>;
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> 	serial at 19c40000 {
+> 		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+> 		reg = <0x19c40000 0x1000>,
+> diff --git a/arch/arm/mach-msm/board-dt.c b/arch/arm/mach-msm/board-dt.c
+> index 1f11d93..1e3af2b 100644
+> --- a/arch/arm/mach-msm/board-dt.c
+> +++ b/arch/arm/mach-msm/board-dt.c
+> @@ -11,31 +11,17 @@
+>  */
+> 
+> #include <linux/init.h>
+> -#include <linux/of.h>
+> -#include <linux/of_platform.h>
+> 
+> #include <asm/mach/arch.h>
+> -#include <asm/mach/map.h>
+> -
+> -#include "common.h"
+> 
+> static const char * const msm_dt_match[] __initconst = {
+> 	"qcom,msm8660-fluid",
+> 	"qcom,msm8660-surf",
+> 	"qcom,msm8960-cdp",
+> -	NULL
+> -};
+> -
+> -static const char * const apq8074_dt_match[] __initconst = {
+> 	"qcom,apq8074-dragonboard",
+> 	NULL
+> };
+> 
+> DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+> -	.smp = smp_ops(msm_smp_ops),
+> 	.dt_compat = msm_dt_match,
+> MACHINE_END
+> -
+> -DT_MACHINE_START(APQ_DT, "Qualcomm MSM (Flattened Device Tree)")
+> -	.dt_compat = apq8074_dt_match,
+> -MACHINE_END
+> diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
+> index 33c7725..1513f2c 100644
+> --- a/arch/arm/mach-msm/common.h
+> +++ b/arch/arm/mach-msm/common.h
+> @@ -23,7 +23,6 @@ extern void msm_map_qsd8x50_io(void);
+> extern void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
+> 					  unsigned int mtype, void *caller);
+> 
+> -extern struct smp_operations msm_smp_ops;
+> extern void msm_cpu_die(unsigned int cpu);
+> 
+> struct msm_mmc_platform_data;
+> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+> index 5b481db..369d8f7 100644
+> --- a/arch/arm/mach-msm/platsmp.c
+> +++ b/arch/arm/mach-msm/platsmp.c
+> @@ -13,6 +13,8 @@
+> #include <linux/delay.h>
+> #include <linux/device.h>
+> #include <linux/jiffies.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> #include <linux/smp.h>
+> #include <linux/io.h>
+> 
+> @@ -24,9 +26,9 @@
+> #include "scm-boot.h"
+> #include "common.h"
+> 
+> -#define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
+> -#define SCSS_CPU1CORE_RESET 0xD80
+> -#define SCSS_DBG_STATUS_CORE_PWRDUP 0xE64
+> +#define VDD_SC1_ARRAY_CLAMP_GFS_CTL	0x35a0
+> +#define SCSS_CPU1CORE_RESET		0x2d80
+> +#define SCSS_DBG_STATUS_CORE_PWRDUP	0x2e64
+> 
+> extern void secondary_startup(void);
+> 
+> @@ -47,34 +49,62 @@ static void msm_secondary_init(unsigned int cpu)
+> 	spin_unlock(&boot_lock);
+> }
+> 
+> -static void prepare_cold_cpu(unsigned int cpu)
+> +static int scss_release_secondary(struct device_node *node, unsigned int cpu)
+> +{
+> +	void __iomem *base;
+> +
+> +	base = of_iomap(node, 0);
+> +	if (!base)
+> +		return -ENOMEM;
+> +
+> +	writel_relaxed(0, base + VDD_SC1_ARRAY_CLAMP_GFS_CTL);
+> +	writel_relaxed(0, base + SCSS_CPU1CORE_RESET);
+> +	writel_relaxed(3, base + SCSS_DBG_STATUS_CORE_PWRDUP);
+> +	mb();
+> +	iounmap(base);
+> +
+> +	return 0;
+> +}
+> +
+> +static DEFINE_PER_CPU(int, cold_boot_done);
+> +
+> +static int boot_cold_cpu(unsigned int cpu)
+> {
+> 	int ret;
+> -	ret = scm_set_boot_addr(virt_to_phys(secondary_startup),
+> -				SCM_FLAG_COLDBOOT_CPU1);
+> -	if (ret == 0) {
+> -		void __iomem *sc1_base_ptr;
+> -		sc1_base_ptr = ioremap_nocache(0x00902000, SZ_4K*2);
+> -		if (sc1_base_ptr) {
+> -			writel(0, sc1_base_ptr + VDD_SC1_ARRAY_CLAMP_GFS_CTL);
+> -			writel(0, sc1_base_ptr + SCSS_CPU1CORE_RESET);
+> -			writel(3, sc1_base_ptr + SCSS_DBG_STATUS_CORE_PWRDUP);
+> -			iounmap(sc1_base_ptr);
+> -		}
+> -	} else
+> -		printk(KERN_DEBUG "Failed to set secondary core boot "
+> -				  "address\n");
+> +	struct device_node *node;
+> +	const struct of_device_id *match;
+> +	const int (*func)(struct device_node *, int);
+> +#define M(c, f) { .compatible = c, .data = f }
+> +	static const struct of_device_id match_table[] = {
+> +		M("qcom,gcc-8660", scss_release_secondary),
+> +	};
+> +#undef M
+
+Uughh..
+
+Can't we just do a of_find_compatible_node(), however I think this will change based on my other comments.
+
+> +
+> +	if (per_cpu(cold_boot_done, cpu))
+> +		return 0;
+> +
+> +	node = of_find_matching_node_and_match(NULL, match_table, &match);
+> +	if (!node) {
+> +		pr_err("%s: can't find subsystem node\n", __func__);
+> +		return -ENXIO;
+> +	}
+> +
+> +	func = match->data;
+> +	ret = func(node, cpu);
+> +	if (!ret)
+> +		per_cpu(cold_boot_done, cpu) = true;
+> +	of_node_put(node);
+> +
+> +	return ret;
+> }
+> 
+> static int msm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> {
+> -	static int cold_boot_done;
+> +	int ret;
+> 
+> -	/* Only need to bring cpu out of reset this way once */
+> -	if (cold_boot_done == false) {
+> -		prepare_cold_cpu(cpu);
+> -		cold_boot_done = true;
+> -	}
+> +	ret = boot_cold_cpu(cpu);
+> +	if (ret)
+> +		return ret;
+> 
+> 	/*
+> 	 * set synchronisation state between this boot processor
+> @@ -120,6 +150,30 @@ static void __init msm_smp_init_cpus(void)
+> 
+> static void __init msm_smp_prepare_cpus(unsigned int max_cpus)
+> {
+> +	int cpu, map;
+> +	unsigned int flags = 0;
+> +	static const int cold_boot_flags[] = {
+> +		0,
+> +		SCM_FLAG_COLDBOOT_CPU1,
+> +	};
+> +
+> +	for_each_present_cpu(cpu) {
+> +		map = cpu_logical_map(cpu);
+> +		if (WARN_ON(map >= ARRAY_SIZE(cold_boot_flags))) {
+> +			set_cpu_present(cpu, false);
+> +			continue;
+> +		}
+> +		flags |= cold_boot_flags[map];
+> +	}
+> +
+> +	if (scm_set_boot_addr(virt_to_phys(secondary_startup), flags)) {
+> +		for_each_present_cpu(cpu) {
+> +			if (cpu == smp_processor_id())
+> +				continue;
+> +			set_cpu_present(cpu, false);
+> +		}
+> +		pr_warn("Failed to set CPU boot address, disabling SMP\n");
+> +	}
+> }
+> 
+> struct smp_operations msm_smp_ops __initdata = {
+> @@ -131,3 +185,4 @@ struct smp_operations msm_smp_ops __initdata = {
+> 	.cpu_die		= msm_cpu_die,
+> #endif
+> };
+> +CPU_METHOD_OF_DECLARE(msm_smp, "qcom,mmio", &msm_smp_ops);
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-1.8.2.2
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
