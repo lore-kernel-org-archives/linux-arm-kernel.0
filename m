@@ -1,37 +1,38 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 5 Nov 2013 10:03:37 +0800
-Subject: [PATCH v2 0/5] mmc: sdhci-esdhc-imx: add runtime pm support
-In-Reply-To: <1383554309-29065-1-git-send-email-b29396@freescale.com>
-References: <1383554309-29065-1-git-send-email-b29396@freescale.com>
-Message-ID: <20131105020335.GC19770@S2101-09.ap.freescale.net>
+Date: Tue, 5 Nov 2013 10:06:13 +0800
+Subject: [PATCH RFC] ARM: dts: imx6qdl: make pinctrl nodes board specific
+In-Reply-To: <CAHCPf3vhyjTnqHXYRj49AL80Z_jGd4LbaRfySjK-=Axkk4FNqA@mail.gmail.com>
+References: <1382672542-16100-1-git-send-email-shawn.guo@linaro.org>
+ <20131031080326.GK24559@pengutronix.de>
+ <20131031102908.GX16735@n2100.arm.linux.org.uk>
+ <CAHCPf3vTcu9RCk8=9MUs4nkyJ-8jevh5koxfzdLzE5+qM0ZspQ@mail.gmail.com>
+ <20131101083332.GB10324@S2101-09.ap.freescale.net>
+ <CAHCPf3vhyjTnqHXYRj49AL80Z_jGd4LbaRfySjK-=Axkk4FNqA@mail.gmail.com>
+Message-ID: <20131105020611.GD19770@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 04:38:24PM +0800, Dong Aisheng wrote:
-> We disable root clock in runtime pm to save power.
+On Mon, Nov 04, 2013 at 04:50:01PM -0600, Matt Sealey wrote:
+> On Fri, Nov 1, 2013 at 3:33 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Thu, Oct 31, 2013 at 10:45:08AM -0500, Matt Sealey wrote:
+> >> I suggested this to Shawn a couple weeks ago and got a bit of pushback.
+> >>
+> >> There's probably a ton more to do in this regard to keep the DT
+> >> per-board more concise, but this drops tree size by a respectable
+> >> amount on i.MX51 too (just on a tree I have internally, it's something
+> >> like 8.5KiB) and I can't see any redundant data in the ones he
+> >> patched.
+> >>
+> >> I can follow this up with i.MX51/i.MX53 if nobody is already doing that..
+> >
+> > I'm taking care of them as a move of while IMX family.
 > 
-> Patch 2~4 are some fixes needed for enable runtime pm or it may
-> break the UHS cards(SD3.0/eMMC4.5).
-> 
-> Below are some tests result i ran which passed mmc_test tool after enable rpm:
-> SDHC UHS1 on imx6q sabreauto
-> eMMC 4.5 on imx6sl evk
-> SDXC UHS1 on imx6sl evk
-> eMMC DDR on imx6q sabresd
-> SDHC on imx6q sabresd
-> 
-> ChangeLog:
-> v1->v2: only patch 5 changed. Add pm_runtime_set_active
-> 	based on Ulf's comments.
-> 
-> Dong Aisheng (5):
->   mmc: sdhci-pltfm: export pltfm suspend/resume api
->   mmc: sdhci-esdhc-imx: tuning bits should not be cleared during reset
->   mmc: sdhci-esdhc-imx: clear SDHCI_CTRL_EXEC_TUNING should not affect
->     other bits
->   mmc: sdhci-esdhc-imx: fix runtime pm unblance issue
->   mmc: sdhci-esdhc-imx: add runtime pm support
+> I'd quite like to push the Efika MX trees at the state they're at,
+> sometime in the near future; if this work is going to take a while
+> could I just do it and submit it and see your objections?
 
-For the series,
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/277649
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+It's on my for-next branch for testing now.
+
+Shawn
