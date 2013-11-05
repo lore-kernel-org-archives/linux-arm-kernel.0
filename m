@@ -1,41 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 5 Nov 2013 12:40:33 +0100
-Subject: [PATCH 0/3] v7-M support using MULTIPLATFORM
-In-Reply-To: <20131104082513.GG14892@pengutronix.de>
-References: <1380534577-15076-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <alpine.LFD.2.03.1310032143190.3023@syhkavp.arg>
- <20131104082513.GG14892@pengutronix.de>
-Message-ID: <201311051240.34212.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Nov 2013 11:45:48 +0000
+Subject: [PATCH v5 1/4] ARM: deprecate mach/timex.h for !ARCH_MULTIPLATFORM
+In-Reply-To: <201311051234.43321.arnd@arndb.de>
+References: <20131105083336.GK14892@pengutronix.de>
+ <1383642757-9762-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdacQhwccK8nKf7m5aTA9ciHPuWth11v-OVPo0kS9WcUCQ@mail.gmail.com>
+ <201311051234.43321.arnd@arndb.de>
+Message-ID: <20131105114548.GQ16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 November 2013, Uwe Kleine-K?nig wrote:
-> Hello Nicolas,
-> 
-> On Thu, Oct 03, 2013 at 09:46:42PM -0400, Nicolas Pitre wrote:
-> > On Fri, 4 Oct 2013, Russell King - ARM Linux wrote:
-> > 
-> > > On Fri, Oct 04, 2013 at 12:28:01AM +0200, Uwe Kleine-K?nig wrote:
-> > > > Right, but do we agree that it should be possible to create an XIP image
-> > > > for i.MX6? If so: You currently cannot, because i.MX6 isn't configurable
-> > > > without MULTIPLATFORM. Also in the times before MULTIPLATFORM XIP was
-> > > > special.
-> > > 
-> > > That's one of the consequences of pushing to multiplatform support - XIP
-> > > has fallen by the way side as a result of this effort (it was discussed
-> > > previously) and we had decided that almost no one uses it anymore and it
-> > > would not be part of the multiplatform stuff.  It was only really used
-> > > by very few SA11x0 and PXA platforms anyway.
-> > 
-> > Semantically, MULTIPLATFORM is incompatible with XIP as well as NOMMU.
-> > 
-> > So if a platform exists only when MULTIPLATFORM is selected, preventing 
-> > it from being configured as NOMMU or XIP then something is broken with 
-> > MULTIPLATFORM.
-> Is this an Ack for patch 1 in this series?
+On Tue, Nov 05, 2013 at 12:34:42PM +0100, Arnd Bergmann wrote:
+> config CLOCK_TICK_RATE
+> 	int
+> 	depends on !ARCH_MULTIPLATFORM && ARCH_USES_GETTIMEOFFSET
+> 	depends on ARCH_GEMINI || ARCH_SA1100 || ARCH_EBSA110 || ARCH_EP93XX || ARCH_RPC || ARCH_AT91X40
+> 	default 40000000 if ARCH_AT91X40
+> 	default 38000000 if ARCH_GEMINI
+> 	default 3686400 if ARCH_SA1100
+> 	default 47894000 if ARCH_EBSA110
+> 	default 983040 if ARCH_EP93xx
+> 	default 2000000 if ARCH_RPC
+> 	# don't even think about adding more to this list, better get rid of the
+> 	# existing ones by converting them to proper clocksources
 
-Uwe, have you seen that patch that Jonathan Austin was working on to reorganize
-the platform selection for multiplatform? I don't know if he has gotten around
-the time to post it on the mailing list, if not he can probably follow up here.
+That's a pipedream.  It really is.  Some of those are impossible to
+convert because you don't have enough timers/counters to provide the
+clocksource and clockevents - as I've mentioned several times in the
+past.
 
-	Arnd
+clocksource and clockevents are all very nice and such, but they don't
+always fit real hardware.
