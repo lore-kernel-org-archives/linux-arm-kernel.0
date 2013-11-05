@@ -1,189 +1,143 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 5 Nov 2013 10:59:17 +0800
-Subject: [PATCH v3 11/11] usb: phy-mxs: Add system suspend/resume API
-In-Reply-To: <20131105030513.GI19770@S2101-09.ap.freescale.net>
-References: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
- <1383616183-10511-12-git-send-email-peter.chen@freescale.com>
- <20131105030513.GI19770@S2101-09.ap.freescale.net>
-Message-ID: <20131105025916.GD13472@shlinux1.ap.freescale.net>
+From: B47053@freescale.com (Li Xiubo)
+Date: Tue, 5 Nov 2013 03:21:49 +0000
+Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
+In-Reply-To: <20131104161537.GI2493@sirena.org.uk>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
+ <20131101182514.GE2493@sirena.org.uk>
+ <1DD289F6464F0949A2FCA5AA6DC23F8287439D@039-SN2MPN1-013.039d.mgd.msft.net>
+ <20131104161537.GI2493@sirena.org.uk>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82875482@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 11:05:15AM +0800, Shawn Guo wrote:
-> On Tue, Nov 05, 2013 at 09:49:43AM +0800, Peter Chen wrote:
-> > We need this to keep PHY's power on or off during the system
-> > suspend mode. If we need to enable USB wakeup, then we
-> > must keep PHY's power being on during the system suspend mode.
-> > Otherwise, we need to keep PHY's power being off to save power.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/phy/phy-mxs-usb.c |   66 +++++++++++++++++++++++++++++++++++++++--
-> >  1 files changed, 63 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> > index ff8b98c..4588c72 100644
-> > --- a/drivers/usb/phy/phy-mxs-usb.c
-> > +++ b/drivers/usb/phy/phy-mxs-usb.c
-> > @@ -55,11 +55,18 @@
-> >  #define BM_USBPHY_DEBUG_CLKGATE			BIT(30)
-> >  
-> >  /* Anatop Registers */
-> > +#define ANADIG_ANA_MISC0			0x150
-> > +#define ANADIG_ANA_MISC0_SET			0x154
-> > +#define ANADIG_ANA_MISC0_CLR			0x158
-> > +
-> >  #define ANADIG_USB1_VBUS_DET_STAT		0x1c0
-> >  
-> >  #define ANADIG_USB1_LOOPBACK_SET		0x1e4
-> >  #define ANADIG_USB1_LOOPBACK_CLR		0x1e8
-> >  
-> > +#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	BIT(12)
-> > +#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL BIT(11)
-> > +
-> >  #define BM_ANADIG_USB1_VBUS_DET_STAT_VBUS_VALID	BIT(3)
-> >  
-> >  #define BM_ANADIG_USB1_LOOPBACK_UTMI_DIG_TST1	BIT(2)
-> > @@ -83,6 +90,15 @@
-> >   */
-> >  #define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
-> >  
-> > +/* imx23 style PHY */
-> > +#define MXS_PHY_IMX23				BIT(3)
-> > +
-> > +/* imx6q style PHY */
-> > +#define MXS_PHY_IMX6Q				BIT(4)
-> > +
-> > +/* imx6sl style PHY */
-> > +#define MXS_PHY_IMX6SL				BIT(5)
-> > +
+> > From the ASoC subsystem comments we can see that:
+> > ++++++
+> > Configures the clock dividers. This is used to derive the best DAI bit
+> > and frame clocks from the system or master clock. It's best to set the
+> > DAI bit and frame clocks as low as possible to save system power.
+> > ------
 > 
-> We will not need these, if we do what I suggested to carry a pointer
-> to mxs_phy_data in mxs_phy.
-> 
-> struct mxs_phy {
-> 	...
-> 	struct mxs_phy_data *data;
-> };
-> 
-> The check then can be done like below.
-> 
-> static inline int is_imx6q_phy(struct mxs_phy *mxs_phy)
-> {
->         return mxs_phy->data == &imx6q_phy_data;
-> }
+> You should never use this unless you have to, there is no point in every
+> single machine driver using your driver having to duplicate the same
+> calculations.
 > 
 
-What's the benefit compared to current one?
+Okey, I'll think it over, if not have to, I will revise this.
 
-Peter
-
-> Shawn
+> >
+> > > > +static int fsl_sai_dai_probe(struct snd_soc_dai *dai) {
+> > > > +	int ret;
+> > > > +	struct fsl_sai *sai = dev_get_drvdata(dai->dev);
+> > > > +
+> > > > +	ret = clk_prepare_enable(sai->clk);
+> > > > +	if (ret)
+> > > > +		return ret;
 > 
-> >  /*
-> >   * IC fix for MXS_PHY_ABNORAML_IN_SUSPEND, bit 17 is the effective bit
-> >   * in HW_USBPHY_IP.
-> > @@ -100,19 +116,23 @@ struct mxs_phy_platform_flag {
-> >  };
-> >  
-> >  static const struct mxs_phy_platform_flag imx23_phy_data = {
-> > -	.flags = MXS_PHY_ABNORAML_IN_SUSPEND | MXS_PHY_SENDING_SOF_TOO_FAST,
-> > +	.flags = MXS_PHY_ABNORAML_IN_SUSPEND |
-> > +		MXS_PHY_SENDING_SOF_TOO_FAST |
-> > +		MXS_PHY_IMX23,
-> >  };
-> >  
-> >  static const struct mxs_phy_platform_flag imx6q_phy_data = {
-> >  	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
-> >  		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-> > -		MXS_PHY_FIX_ABNORAML_IN_SUSPEND,
-> > +		MXS_PHY_FIX_ABNORAML_IN_SUSPEND |
-> > +		MXS_PHY_IMX6Q,
-> >  };
-> >  
-> >  static const struct mxs_phy_platform_flag imx6sl_phy_data = {
-> >  	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-> >  		MXS_PHY_FIX_ABNORAML_IN_SUSPEND |
-> > -		MXS_PHY_FIX_SENDING_SOF_TOO_FAST,
-> > +		MXS_PHY_FIX_SENDING_SOF_TOO_FAST |
-> > +		MXS_PHY_IMX6SL,
-> >  };
-> >  
-> >  static const struct of_device_id mxs_phy_dt_ids[] = {
-> > @@ -210,6 +230,22 @@ static void mxs_phy_disconnect_line(struct mxs_phy *mxs_phy, bool on)
-> >  			? "disconnected" : "connected");
-> >  }
-> >  
-> > +static void mxs_phy_enable_ldo_in_suspend(struct mxs_phy *mxs_phy, bool on)
-> > +{
-> > +	unsigned int reg = on ? ANADIG_ANA_MISC0_SET : ANADIG_ANA_MISC0_CLR;
-> > +
-> > +	/* If the SoCs don't have anatop, quit */
-> > +	if (!mxs_phy->regmap_anatop)
-> > +		return;
-> > +
-> > +	if (mxs_phy->flags & MXS_PHY_IMX6Q)
-> > +		regmap_write(mxs_phy->regmap_anatop, reg,
-> > +			BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG);
-> > +	else if (mxs_phy->flags & MXS_PHY_IMX6SL)
-> > +		regmap_write(mxs_phy->regmap_anatop,
-> > +			reg, BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL);
-> > +}
-> > +
-> >  static int mxs_phy_init(struct usb_phy *phy)
-> >  {
-> >  	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
-> > @@ -395,6 +431,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
-> >  
-> >  	platform_set_drvdata(pdev, &mxs_phy->phy);
-> >  
-> > +	device_set_wakeup_capable(&pdev->dev, true);
-> >  	ret = usb_add_phy_dev(&mxs_phy->phy);
-> >  	if (ret)
-> >  		return ret;
-> > @@ -411,6 +448,28 @@ static int mxs_phy_remove(struct platform_device *pdev)
-> >  	return 0;
-> >  }
-> >  
-> > +static int mxs_phy_system_suspend(struct device *dev)
-> > +{
-> > +	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-> > +
-> > +	if (device_may_wakeup(dev))
-> > +		mxs_phy_enable_ldo_in_suspend(mxs_phy, true);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int mxs_phy_system_resume(struct device *dev)
-> > +{
-> > +	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-> > +
-> > +	if (device_may_wakeup(dev))
-> > +		mxs_phy_enable_ldo_in_suspend(mxs_phy, false);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +SIMPLE_DEV_PM_OPS(mxs_phy_pm, mxs_phy_system_suspend, mxs_phy_system_resume);
-> > +
-> >  static struct platform_driver mxs_phy_driver = {
-> >  	.probe = mxs_phy_probe,
-> >  	.remove = mxs_phy_remove,
-> > @@ -418,6 +477,7 @@ static struct platform_driver mxs_phy_driver = {
-> >  		.name = DRIVER_NAME,
-> >  		.owner	= THIS_MODULE,
-> >  		.of_match_table = mxs_phy_dt_ids,
-> > +		.pm = &mxs_phy_pm,
-> >  	 },
-> >  };
-> >  
-> > -- 
-> > 1.7.1
-> > 
-> > 
+> > > It'd be nicer to only enable the clock while the device is in active
+> use.
+> 
+> > While if the module clock is not enabled here, the followed registers
+> cannot read/write in the same function.
+> > And this _probe function is the _dai_probe not the driver's module
+> _probe.
+> 
+> So you can enable the clock when you explicitly need to write to the
+> registers...
+> 
+> > If the clk_prepare_enable(sai->clk) is not here, where should it be
+> will be nicer ?
+> > One of the following functions ?
+> >         .set_sysclk     = fsl_sai_set_dai_sysclk,
+> >         .set_clkdiv     = fsl_sai_set_dai_clkdiv,
+> >         .set_fmt        = fsl_sai_set_dai_fmt,
+> >         .set_tdm_slot   = fsl_sai_set_dai_tdm_slot,
+> >         .hw_params      = fsl_sai_hw_params,
+> >         .trigger        = fsl_sai_trigger,
+> 
+> It could be in any or all of them except trigger (where the core should
+> hold a runtime PM reference anyway).  You can always take a reference for
+> the duration of the function if you're concerned it may be called when
+> the referent isn't otherwise held.
+> 
 
--- 
+While in this _sai_dai_probe function just followed the clock enable sentence, there are some register writing operations:
+The PATCH:
++++++++++++++++++++++++
++static int fsl_sai_dai_probe(struct snd_soc_dai *dai) {
++	int ret;
++	struct fsl_sai *sai = dev_get_drvdata(dai->dev);
++
++	ret = clk_prepare_enable(sai->clk);                     =====> clock enable here
++	if (ret)
++		return ret;
++
++	writel(0x0, sai->base + FSL_SAI_RCSR);			  ======>registers writing here.
++	writel(0x0, sai->base + FSL_SAI_TCSR);			  ======> and here
++	writel(sai->dma_params_tx.maxburst, sai->base + FSL_SAI_TCR1); =======>and here
++	writel(sai->dma_params_rx.maxburst, sai->base + FSL_SAI_RCR1); =======>and here
++
++	dai->playback_dma_data = &sai->dma_params_tx;
++	dai->capture_dma_data = &sai->dma_params_rx;
++
++	snd_soc_dai_set_drvdata(dai, sai);
++
++	return 0;
++}
+-------------------------
 
-Best Regards,
-Peter Chen
+As your opinions, should I move the four register writing operations to .set_sysclk/set_clkdiv/... functions too ?
+Or just add a clk_disable_unprepare() after them here, and then add clk_prepare_enable in one of .set_sysclk/set_clkdiv/...?
+
+And the first two of this four registers must be initialize as early as possible, and if move them to one of the .set_sysclk/set_clkdiv/... functions,
+How can I very ensure which one is the first to be called ?
+Won't the calling sequence be changed in the feature ?
+
+>From the debug logs, we can see that:
+1, _sai_probe
+This is called when the machine brings up and has one SAI device.
+
+2, _sai_dai_probe
+3, .set_sysclk
+4, .set_fmt
+Are called in order when the machine has Audio driver and is enabled, and also while the machine brings up.
+
+The above four steps only be called one time in order.
+
+When aplay/arecord is runs the following will be called in order:
+5, .set_tdm_slot
+6, .hw_param
+7, .trigger -->begain 
+8, .trigger --> end
+
+The 2,3,4 are always called almost the same time, and they are all have register read/write operations.
+Now the clk_prepare_enable() is in step 2, and it won't be any different moving to step 3 or 4.
+
+So, only could move it to step 5 or 6, if so every time the aplay/arecord runs, clk_prepare_enable() will be
+called, and there has no chance to call clk_disable_unprepare().
+
+Now from the code we can see that I have add clk_prepare_enable() in _sai_dai_probe() and clk_disable_unprepare() in _sai_dai_remove().
+Isn't this okey ?
+
+
+
+> > > > +	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL,
+> > > > +			SND_DMAENGINE_PCM_FLAG_NO_RESIDUE);
+> > > > +	if (ret)
+> > > > +		return ret;
+> 
+> > > We should have a devm_ version of this.
+> 
+> > Sorry, is there one patch for adding the devm_ version of
+> snd_dmaengine_pcm_register() already ?
+> > In the -next and other topics branches I could not find it.
+> 
+> No, there isn't one but there should be one.
+>
+And if it has existed then I will use it.
+
+
+
+
+BRs,
+Xiubo
