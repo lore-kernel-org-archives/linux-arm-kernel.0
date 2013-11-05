@@ -1,100 +1,180 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  5 Nov 2013 09:55:20 -0300
-Subject: [PATCH v3 13/28] mtd: nand: pxa3xx: Add bad block handling
+Date: Tue,  5 Nov 2013 09:55:21 -0300
+Subject: [PATCH v3 14/28] mtd: nand: pxa3xx: Add driver-specific ECC BCH
+ support
 In-Reply-To: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383656135-8627-14-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1383656135-8627-15-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for flash-based bad block table using Marvell's
-custom in-flash bad block table layout. The support is enabled
-a 'flash_bbt' platform data or device tree parameter.
+This commit adds the BCH ECC support available in NFCv2 controller.
+Depending on the detected required strength the respective ECC layout
+is selected.
+
+This commit adds an empty ECC layout, since support to access large
+pages is first required. Once that support is added, a proper ECC
+layout will be added as well.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c                | 33 +++++++++++++++++++++++++++
- include/linux/platform_data/mtd-nand-pxa3xx.h |  3 +++
- 2 files changed, 36 insertions(+)
+ drivers/mtd/nand/pxa3xx_nand.c | 88 ++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 71 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index e198c94..9a5913d 100644
+index 9a5913d..92abe7c 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -24,6 +24,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_mtd.h>
+@@ -56,6 +56,7 @@
+ #define NDPCR		(0x18) /* Page Count Register */
+ #define NDBDR0		(0x1C) /* Bad Block Register 0 */
+ #define NDBDR1		(0x20) /* Bad Block Register 1 */
++#define NDECCCTRL	(0x28) /* ECC control */
+ #define NDDB		(0x40) /* Data Buffer */
+ #define NDCB0		(0x48) /* Command Buffer0 */
+ #define NDCB1		(0x4C) /* Command Buffer1 */
+@@ -196,6 +197,7 @@ struct pxa3xx_nand_info {
  
- #if defined(CONFIG_ARCH_PXA) || defined(CONFIG_ARCH_MMP)
- #define ARCH_HAS_DMA
-@@ -245,6 +246,29 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
- { "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
- };
+ 	int			cs;
+ 	int			use_ecc;	/* use HW ECC ? */
++	int			ecc_bch;	/* using BCH ECC? */
+ 	int			use_dma;	/* use DMA ? */
+ 	int			use_spare;	/* use spare ? */
  
-+static u8 bbt_pattern[] = {'M', 'V', 'B', 'b', 't', '0' };
-+static u8 bbt_mirror_pattern[] = {'1', 't', 'b', 'B', 'V', 'M' };
+@@ -209,6 +211,8 @@ struct pxa3xx_nand_info {
+ 	unsigned int		fifo_size;	/* max. data size in the FIFO */
+ 	unsigned int		data_size;	/* data to be read from FIFO */
+ 	unsigned int		oob_size;
++	unsigned int		spare_size;
++	unsigned int		ecc_size;
+ 	int 			retcode;
+ 
+ 	/* cached register value */
+@@ -343,19 +347,12 @@ static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
+ 	int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
+ 
+ 	info->data_size = info->fifo_size;
+-	if (!oob_enable) {
+-		info->oob_size = 0;
++	if (!oob_enable)
+ 		return;
+-	}
+ 
+-	switch (info->fifo_size) {
+-	case 2048:
+-		info->oob_size = (info->use_ecc) ? 40 : 64;
+-		break;
+-	case 512:
+-		info->oob_size = (info->use_ecc) ? 8 : 16;
+-		break;
+-	}
++	info->oob_size = info->spare_size;
++	if (!info->use_ecc)
++		info->oob_size += info->ecc_size;
+ }
+ 
+ /**
+@@ -370,10 +367,15 @@ static void pxa3xx_nand_start(struct pxa3xx_nand_info *info)
+ 
+ 	ndcr = info->reg_ndcr;
+ 
+-	if (info->use_ecc)
++	if (info->use_ecc) {
+ 		ndcr |= NDCR_ECC_EN;
+-	else
++		if (info->ecc_bch)
++			nand_writel(info, NDECCCTRL, 0x1);
++	} else {
+ 		ndcr &= ~NDCR_ECC_EN;
++		if (info->ecc_bch)
++			nand_writel(info, NDECCCTRL, 0x0);
++	}
+ 
+ 	if (info->use_dma)
+ 		ndcr |= NDCR_DMA_EN;
+@@ -1073,6 +1075,43 @@ static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
+ 	return -ENODEV;
+ }
+ 
++static int pxa_ecc_init(struct pxa3xx_nand_info *info,
++			struct nand_ecc_ctrl *ecc,
++			int strength, int page_size)
++{
++	/*
++	 * We don't use strength here as the PXA variant
++	 * is used with non-ONFI compliant devices.
++	 */
++	if (page_size == 2048) {
++		ecc->mode = NAND_ECC_HW;
++		ecc->size = 512;
++		ecc->strength = 1;
 +
-+static struct nand_bbt_descr bbt_main_descr = {
-+	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
-+		| NAND_BBT_2BIT | NAND_BBT_VERSION,
-+	.offs =	8,
-+	.len = 6,
-+	.veroffs = 14,
-+	.maxblocks = 8,		/* Last 8 blocks in each chip */
-+	.pattern = bbt_pattern
-+};
++		info->spare_size = 40;
++		info->ecc_size = 24;
++		return 1;
 +
-+static struct nand_bbt_descr bbt_mirror_descr = {
-+	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
-+		| NAND_BBT_2BIT | NAND_BBT_VERSION,
-+	.offs =	8,
-+	.len = 6,
-+	.veroffs = 14,
-+	.maxblocks = 8,		/* Last 8 blocks in each chip */
-+	.pattern = bbt_mirror_pattern
-+};
++	} else if (page_size == 512) {
++		ecc->mode = NAND_ECC_HW;
++		ecc->size = 512;
++		ecc->strength = 1;
 +
- /* Define a default flash type setting serve as flash detecting only */
- #define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
++		info->spare_size = 8;
++		info->ecc_size = 8;
++		return 1;
++	}
++	return 0;
++}
++
++static int armada370_ecc_init(struct pxa3xx_nand_info *info,
++			      struct nand_ecc_ctrl *ecc,
++			      int strength, int page_size)
++{
++	/* Unimplemented yet */
++	return 0;
++}
++
+ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ {
+ 	struct pxa3xx_nand_host *host = mtd->priv;
+@@ -1143,13 +1182,13 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ 	pxa3xx_flash_ids[1].name = NULL;
+ 	def = pxa3xx_flash_ids;
+ KEEP_CONFIG:
+-	chip->ecc.mode = NAND_ECC_HW;
+-	chip->ecc.size = info->fifo_size;
+-	chip->ecc.strength = 1;
+-
+ 	if (info->reg_ndcr & NDCR_DWIDTH_M)
+ 		chip->options |= NAND_BUSWIDTH_16;
  
-@@ -1128,6 +1152,14 @@ KEEP_CONFIG:
- 
++	/* Device detection must be done with ECC disabled */
++	if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
++		nand_writel(info, NDECCCTRL, 0x0);
++
  	if (nand_scan_ident(mtd, 1, def))
  		return -ENODEV;
-+
-+	if (pdata->flash_bbt) {
-+		chip->bbt_options |= NAND_BBT_USE_FLASH |
-+				     NAND_BBT_NO_OOB_BBM;
-+		chip->bbt_td = &bbt_main_descr;
-+		chip->bbt_md = &bbt_mirror_descr;
+ 
+@@ -1160,6 +1199,21 @@ KEEP_CONFIG:
+ 		chip->bbt_md = &bbt_mirror_descr;
+ 	}
+ 
++	if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
++		ret = armada370_ecc_init(info, &chip->ecc,
++				   chip->ecc_strength_ds,
++				   mtd->writesize);
++	else
++		ret = pxa_ecc_init(info, &chip->ecc,
++				   chip->ecc_strength_ds,
++				   mtd->writesize);
++	if (!ret) {
++		dev_err(&info->pdev->dev,
++			"ECC strength %d at page size %d is not supported\n",
++			chip->ecc_strength_ds, mtd->writesize);
++		return -ENODEV;
 +	}
 +
  	/* calculate addressing information */
  	if (mtd->writesize >= 2048)
  		host->col_addr_cycles = 2;
-@@ -1323,6 +1355,7 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
- 	if (of_get_property(np, "marvell,nand-keep-config", NULL))
- 		pdata->keep_config = 1;
- 	of_property_read_u32(np, "num-cs", &pdata->num_cs);
-+	pdata->flash_bbt = of_get_nand_on_flash_bbt(np);
- 
- 	pdev->dev.platform_data = pdata;
- 
-diff --git a/include/linux/platform_data/mtd-nand-pxa3xx.h b/include/linux/platform_data/mtd-nand-pxa3xx.h
-index ffb8019..a941471 100644
---- a/include/linux/platform_data/mtd-nand-pxa3xx.h
-+++ b/include/linux/platform_data/mtd-nand-pxa3xx.h
-@@ -55,6 +55,9 @@ struct pxa3xx_nand_platform_data {
- 	/* indicate how many chip selects will be used */
- 	int	num_cs;
- 
-+	/* use an flash-based bad block table */
-+	bool	flash_bbt;
-+
- 	const struct mtd_partition		*parts[NUM_CHIP_SELECT];
- 	unsigned int				nr_parts[NUM_CHIP_SELECT];
- 
 -- 
 1.8.1.5
