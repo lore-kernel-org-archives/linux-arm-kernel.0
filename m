@@ -1,77 +1,90 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 05 Nov 2013 21:45:33 +0100
-Subject: [PATCH 0/2] ARM: mvebu: fix DT def. of PCIe units for mv78230 and
- mv78260
-Message-ID: <cover.1383681717.git.arno@natisbad.org>
+Date: Tue, 05 Nov 2013 21:45:48 +0100
+Subject: [PATCH 1/2] ARM: mvebu: second PCIe unit of Armada XP mv78230 is only
+ x1 capable
+In-Reply-To: <cover.1383681717.git.arno@natisbad.org>
+References: <cover.1383681717.git.arno@natisbad.org>
+Message-ID: <b5f36f547bb12ed4e5398401685523625ca50312.1383681717.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Various Marvell datasheets advertise second PCIe unit of mv78230
+flavour of Armada XP as x4/quad x1 capable. This second unit is in
+fact only x1 capable. This patch fixes current mv78230 .dtsi to
+reflect that, i.e. makes 1.0 the second interface (instead of 2.0
+at the moment). This was successfully tested on a mv78230-based
+ReadyNAS 2120 platform with a x1 device (FL1009 XHCI controller)
+connected to this second interface.
 
-As discussed earlier, here is a set of two patches fixing Armada XP
-mv78230 and mv78260 PCIe units definition. AFAICT, the most accurate
-information available regarding those is the table available on the
-following page:
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
- http://www.marvell.com/embedded-processors/armada-xp/
-
-First patch is simply a resend of the one Thomas reviewed with my
-SoB. It fixes mv78230 .dtsi and has been tested on real hardware.
-
-Second patch fixes mv78260 .dtsi to reflect the fact that the two first
-units are x4 and quad x1 capable, and third (and last) interface is x4
-only. This patch has only been compiled and not tested on real hardware.
-As associated changes are quite error-prone, I think it needs some
-careful review.
-
-As a side note, Thomas, I noticed one more thing, this time in mv78460
-.dtsi when comparing it w/ mv78230 and mv78260 ones. The first address
-of "assigned-address" property varies in the former for each pcie
-node:
-
-$ grep assigned-address armada-xp-mv78230.dtsi 
-         assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x48000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x4c000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
-$ grep assigned-address armada-xp-mv78260.dtsi 
-         assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x48000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x4c000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x84000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x88000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x8c000 0 0x2000>;
-         assigned-addresses = <0x82000800 0 0x42000 0 0x2000>;
-$ grep assigned-address armada-xp-mv78460.dtsi 
-         assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
-         assigned-addresses = <0x82001000 0 0x44000 0 0x2000>;
-         assigned-addresses = <0x82001800 0 0x48000 0 0x2000>;
-         assigned-addresses = <0x82002000 0 0x4c000 0 0x2000>;
-         assigned-addresses = <0x82002800 0 0x80000 0 0x2000>;
-         assigned-addresses = <0x82003000 0 0x84000 0 0x2000>;
-         assigned-addresses = <0x82003800 0 0x88000 0 0x2000>;
-         assigned-addresses = <0x82004000 0 0x8c000 0 0x2000>;
-         assigned-addresses = <0x82004800 0 0x42000 0 0x2000>;
-         assigned-addresses = <0x82005000 0 0x82000 0 0x2000>;
-
-I took at Documentation/devicetree/bindings/pci/mvebu-pci.txt but
-failed to find an answer. Can you explain where the difference comes
-from?
-
-Cheers,
-
-a+
-
-Arnaud Ebalard (2):
-  ARM: mvebu: second PCIe unit of Armada XP mv78230 is only x1 capable
-  ARM: mvebu: fix second and third PCIe units of Armada XP mv78260
-
- arch/arm/boot/dts/armada-xp-mv78230.dtsi |  24 +++----
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 109 ++++++++++++++++++++++++-------
- 2 files changed, 97 insertions(+), 36 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index 0358a33..9dc7381 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -47,7 +47,7 @@
+ 		/*
+ 		 * MV78230 has 2 PCIe units Gen2.0: One unit can be
+ 		 * configured as x4 or quad x1 lanes. One unit is
+-		 * x4/x1.
++		 * x1 only.
+ 		 */
+ 		pcie-controller {
+ 			compatible = "marvell,armada-xp-pcie";
+@@ -61,10 +61,10 @@
+ 
+ 			ranges =
+ 			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
+-				0x82000000 0 0x42000 MBUS_ID(0xf0, 0x01) 0x42000 0 0x00002000   /* Port 2.0 registers */
+ 				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000   /* Port 0.1 registers */
+ 				0x82000000 0 0x48000 MBUS_ID(0xf0, 0x01) 0x48000 0 0x00002000   /* Port 0.2 registers */
+ 				0x82000000 0 0x4c000 MBUS_ID(0xf0, 0x01) 0x4c000 0 0x00002000   /* Port 0.3 registers */
++				0x82000000 0 0x80000 MBUS_ID(0xf0, 0x01) 0x80000 0 0x00002000   /* Port 1.0 registers */
+ 				0x82000000 0x1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
+ 				0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */
+ 				0x82000000 0x2 0       MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 0.1 MEM */
+@@ -73,8 +73,8 @@
+ 				0x81000000 0x3 0       MBUS_ID(0x04, 0xb0) 0 1 0 /* Port 0.2 IO  */
+ 				0x82000000 0x4 0       MBUS_ID(0x04, 0x78) 0 1 0 /* Port 0.3 MEM */
+ 				0x81000000 0x4 0       MBUS_ID(0x04, 0x70) 0 1 0 /* Port 0.3 IO  */
+-				0x82000000 0x9 0       MBUS_ID(0x04, 0xf8) 0 1 0 /* Port 2.0 MEM */
+-				0x81000000 0x9 0       MBUS_ID(0x04, 0xf0) 0 1 0 /* Port 2.0 IO  */>;
++				0x82000000 0x5 0       MBUS_ID(0x08, 0xe8) 0 1 0 /* Port 1.0 MEM */
++				0x81000000 0x5 0       MBUS_ID(0x08, 0xe0) 0 1 0 /* Port 1.0 IO  */>;
+ 
+ 			pcie at 1,0 {
+ 				device_type = "pci";
+@@ -144,20 +144,20 @@
+ 				status = "disabled";
+ 			};
+ 
+-			pcie at 9,0 {
++			pcie at 5,0 {
+ 				device_type = "pci";
+-				assigned-addresses = <0x82000800 0 0x42000 0 0x2000>;
+-				reg = <0x4800 0 0 0 0>;
++				assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
++				reg = <0x2800 0 0 0 0>;
+ 				#address-cells = <3>;
+ 				#size-cells = <2>;
+ 				#interrupt-cells = <1>;
+-				ranges = <0x82000000 0 0 0x82000000 0x9 0 1 0
+-					  0x81000000 0 0 0x81000000 0x9 0 1 0>;
++				ranges = <0x82000000 0 0 0x82000000 0x5 0 1 0
++					  0x81000000 0 0 0x81000000 0x5 0 1 0>;
+ 				interrupt-map-mask = <0 0 0 0>;
+-				interrupt-map = <0 0 0 0 &mpic 99>;
+-				marvell,pcie-port = <2>;
++				interrupt-map = <0 0 0 0 &mpic 62>;
++				marvell,pcie-port = <1>;
+ 				marvell,pcie-lane = <0>;
+-				clocks = <&gateclk 26>;
++				clocks = <&gateclk 9>;
+ 				status = "disabled";
+ 			};
+ 		};
 -- 
 1.8.4.rc3
