@@ -1,130 +1,119 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 6 Nov 2013 13:07:09 -0700
-Subject: address translation for PCIe-to-localbus bridge
-In-Reply-To: <527A9AB9.2050903@keymile.com>
-References: <527A1983.6020603@keymile.com>
- <20131106173649.GA25515@obsidianresearch.com>
- <527A9AB9.2050903@keymile.com>
-Message-ID: <20131106200709.GB26881@obsidianresearch.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 06 Nov 2013 21:08:39 +0100
+Subject: [PATCH 0/2] ARM: mvebu: fix DT def. of PCIe units for mv78230 and
+ mv78260
+In-Reply-To: <20131106183724.GB25879@obsidianresearch.com> (Jason Gunthorpe's
+ message of "Wed, 6 Nov 2013 11:37:24 -0700")
+References: <cover.1383681717.git.arno@natisbad.org>
+ <87y551bdnx.fsf@natisbad.org> <20131106192233.3599d256@skate>
+ <20131106183724.GB25879@obsidianresearch.com>
+Message-ID: <87txfpqomw.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 08:38:33PM +0100, Gerlando Falauto wrote:
+Hi Jason,
 
-> So let me get this straight.
-> First of all (though slightly unrelated), I looked at
-> drivers/gpio/gpio-generic.c and found no reference whatsoever to the
-> of_* infrastructure.
+Jason Gunthorpe <jgunthorpe@obsidianresearch.com> writes:
 
-Yes, I have a patch to enable that:
-https://github.com/jgunthorpe/linux/commit/da2881f55c094338f3b76617962e6af6c15f9cb9
+> On Wed, Nov 06, 2013 at 07:22:33PM +0100, Thomas Petazzoni wrote:
+>> Dear Arnaud Ebalard,
+>> 
+>> On Wed, 06 Nov 2013 19:14:42 +0100, Arnaud Ebalard wrote:
+>> 
+>> > > As a side note, Thomas, I noticed one more thing, this time in mv78460
+>> > > .dtsi when comparing it w/ mv78230 and mv78260 ones. The first address
+>> > > of "assigned-address" property varies in the former for each pcie
+>> > > node:
+>> > >
+>> > > $ grep assigned-address armada-xp-mv78230.dtsi 
+>> > >          assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x48000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x4c000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
+>> > > $ grep assigned-address armada-xp-mv78260.dtsi 
+>> > >          assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x48000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x4c000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x80000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x84000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x88000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x8c000 0 0x2000>;
+>> > >          assigned-addresses = <0x82000800 0 0x42000 0 0x2000>;
+>> > > $ grep assigned-address armada-xp-mv78460.dtsi 
+>> > >          assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
+>> > >          assigned-addresses = <0x82001000 0 0x44000 0 0x2000>;
+>> > >          assigned-addresses = <0x82001800 0 0x48000 0 0x2000>;
+>> > >          assigned-addresses = <0x82002000 0 0x4c000 0 0x2000>;
+>> > >          assigned-addresses = <0x82002800 0 0x80000 0 0x2000>;
+>> > >          assigned-addresses = <0x82003000 0 0x84000 0 0x2000>;
+>> > >          assigned-addresses = <0x82003800 0 0x88000 0 0x2000>;
+>> > >          assigned-addresses = <0x82004000 0 0x8c000 0 0x2000>;
+>> > >          assigned-addresses = <0x82004800 0 0x42000 0 0x2000>;
+>> > >          assigned-addresses = <0x82005000 0 0x82000 0 0x2000>;
+>> > >
+>> > > I took at Documentation/devicetree/bindings/pci/mvebu-pci.txt but
+>> > > failed to find an answer. Can you explain where the difference comes
+>> > > from?
+>> > 
+>> > Sorry to bother you again with the one above (it was in the cover
+>> > letter) but the difference looks quite odd for someone not familiar
+>> > with the syntax and the semantic.
+>> 
+>> I do still have this question in mind, I wanted to reply to it today
+>> but just hadn't had the time to do it. I'm adding Jason Gunthorpe in Cc
+>> because he knows better than me the precise meaning of
+>> assigned-addresses. If it doesn't reply, I'll try to have a look
+>> tomorrow. This is the kind of stuff I can't answer without
+>> concentrating for a bit of time to re-understand again how it all fits
+>> together :-)
+>
+> In this context the assigned-addresses encodes the PCI device bus
+> function as well as the BAR #.
+>
+> This PCI stuff would be 100% more readable with some macros ..
+>
+> #define PCI_REG_BDF(bus,device,function) (....)
+> #define PCI_MEM_BAR_BDF(bus,device,function,bar) \
+>    (0x82000000 | PCI_REG_BDF(bus,device,function) + bar*XX) 0)
+>
+> So that:
+>  reg = <PCI_REG_BDF(0,1,0) 0 0>
+>  assigned-addresses = <PCI_MEM_BAR_BDF(0,1,0,0)  0x40000  0 0x2000>
+>
+> When done properly the assigned-address and reg should have the same
+> BDF. As you've noticed there is a copy and paste mistake in some of
+> the dts's:
+>
+> eg:
+>  pcie at 2,0 {
+>      assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
+>      reg = <0x1000 0 0 0 0>;
+>
+> The assigned-addresses in that instance should be 0x82001000 to match
+> the reg.
+>
+> It probably works because the Linux machinery doesn't check the BDF
+> value?
 
-People didn't like the DT binding, so I'm just sitting on it.
+ok.
 
-> So I realized of_device_alloc() populates the resource table of the
-> platform_device automatically -- I wasn't aware of that.
+> The purpose of assigned-address in this specific context is to tell
+> the driver how to find its control registers. So the 0x44000 above is
+> the base for the PEX register. The "pci at 3,0", assigned-addresses, and
+> reg are encoding this statement: "Create a PCI bridge at B:D.F using
+> the PEX registers at 0x44000" The B:D.F in all three places should be
+> the same.
 
-Yes, in most cases platform drivers should not call of functions to get
-resources 
+Thanks for the explanation.
 
-> Second of all, if I understand it correctly (guessing the values for
-> #size-cells and #address-cells), your translation scheme works as
-> follows (let's say for the first register 0x8 of gpio3):
-> 
-> gpio3 (0x8)
-> -> range 0 of fpga at 0       ==> 0x00000000 0x82000000 0x00000000
-> -> range 0 of pcie at 1,0     ==> 0x82000000 0x1 0
-> -> range 1 of pex at e0000000 ==> MBUS_ID(0x04, 0xe8) 0
-> -> range 0 of mbus         ==> 0xe0000000
-> 
-> so you end up accessing @0xe0000008, is that right?
+> I recommend adding some macros and constants derived from the OF PCI
+> spec. It will save us all headaches :)
 
-Almost:
- -> reg 0x8 pf gpio3
- -> range 0 of fpga at 0       ==> 0x82000000 0x00000000 0x00000008
- -> range 0 of pcie at 1,0     ==> 0x82000000 0x1 8
- -> range 1 of pex at e0000000 ==> MBUS_ID(0x04, 0xe8) 8
- -> range 0 of mbus         ==> 0xe0000008
+Too bad it was not that clear in mvebu-pci.txt; I could have taken the
+opportunity to fix mv782{30,60} .dtsi in two previous patches.
 
-Each translation represents something concrete:
- 0x8 -> 0x82000000 0x00000000 0x00000008
-    This is the BAR 0 decoder of the PCI device
- 0x82000000 0x00000000 0x00000008 -> 0x82000000 0x1 8
-    This is the PCI bridge's memory window decoder
-  0x82000000 0x1 8 -> MBUS_ID(0x04, 0xe8) 8
-    This is the MBUS window associated with the PEX
- MBUS_ID(0x04, 0xe8) 8 -> 0xe0000008
-    This is the physical CPU BUS address associated with the MBUS
-    window
+Cheers,
 
-> Looks like it ends up at the beginning of the memory region for
-> PCIe, and that's no wonder since you only have a single device with
-> a single BAR... right?
-
-The mapping of the FPGA bus into a BAR is done by a single ranges:
-
-> >                                 fpga at 0 {
-> >                                         reg = <0x8 0 0  0 0>;
-> >                                         ranges = <0x00000000  0x82000000 0x00000000 0x00000000  0x8000000>;
-> >                                         gpio3: fpga_gpio at 8 {
-
-That ranges says 'put address 0 of the child bus at 0x82000000
-0x00000000 0x00000000', which is the BAR 0 address, relative to the
-bridge's memory window.
-
-> So suppose you also had a bigger BAR1 which would then shift your
-> GPIO block at @0xe8000000.
-> Until we get that figured out, where would you hardcode such offset then?
-
-Since your BAR layout of your device is fixed you can adjust the
-single ranges:
-
-  ranges = <0x00000000  0x82000000 0x00000000 0x08000000  0x8000000>;
-
-It is possible as well to do this in code in the FPGA driver.
-
-> How would you also deal with a second (let's say identical) device on BAR1?
-
-  ranges = <0x00000000  0x82000000 0x00000000 0x08000000  0x8000000  //  BAR 0
-            0x10000000  0x82000000 0x00000000 0x08000000  0x8000000> // BAR 1
-
-Use reg <0x10000abc xxx> to refer to the 2nd BAR. There are other ways
-to organize things.
-
-> I guess I could live with hardcoded values in the DT, as long as
-> they're easy to spot and there's only one per BAR/device.
-> Then it's easy to do a comparison with whatever gets assigned during
-> probing.
-
-I'd see it as an interm step, pending on some kind of core support for
-this sort of stuff.
-
-> >I use code like this in the FPGA PCI driver to load the DT nodes:
-> >
-> >         struct of_device_id match_table[2] = {};
-> >         struct device_node *child;
-> >         int rc = 0;
-> >
-> >         for_each_child_of_node(root, child) {
-> >                 /* Can't just create a single device.. */
-> >                 strlcpy(match_table[0].name, child->name,
-> >                         sizeof(match_table[0].name));
-> >                 strlcpy(match_table[0].type, child->type,
-> >                         sizeof(match_table[0].type));
-> >                 rc = of_platform_bus_probe(child, match_table,
-> >                                            parent);
-> >                 if (rc)
-> >                         break;
-> >         }
-> >(root would be the of_node of the FPGA)
-> 
-> Stupid question... why not the following:
-> 
-> rc = of_platform_populate(root, NULL, NULL, parent);
-
-Yes, that probably works. My version of the above has an additional
-bit of code that I removed which filters the children to
-create. Basically FPGA version 1.0 has a different list of devices
-than version 1.1, etc.
-
-Jason
+a+
