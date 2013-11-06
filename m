@@ -1,25 +1,25 @@
 From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Wed,  6 Nov 2013 09:25:13 +0100
-Subject: [PATCH v6 2/4] ARM: STi: Supply I2C configuration to STiH416 SoC
+Date: Wed,  6 Nov 2013 09:25:14 +0100
+Subject: [PATCH v6 3/4] ARM: STi: Supply I2C configuration to STiH415 SoC
 In-Reply-To: <1383726315-27534-1-git-send-email-maxime.coquelin@st.com>
 References: <1383726315-27534-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1383726315-27534-3-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1383726315-27534-4-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supplies I2C configuration to STiH416 SoC.
+This patch supplies I2C configuration to STiH415 SoC.
 
 Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- arch/arm/boot/dts/stih416-pinctrl.dtsi |   35 +++++++++++++++++++++
- arch/arm/boot/dts/stih416.dtsi         |   53 ++++++++++++++++++++++++++++++++
- 2 files changed, 88 insertions(+)
+ arch/arm/boot/dts/stih415-pinctrl.dtsi |   36 ++++++++++++++++++++++
+ arch/arm/boot/dts/stih415.dtsi         |   53 ++++++++++++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index 0f246c9..b29ff4b 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -97,6 +97,24 @@
+diff --git a/arch/arm/boot/dts/stih415-pinctrl.dtsi b/arch/arm/boot/dts/stih415-pinctrl.dtsi
+index 1d322b2..e56449d 100644
+--- a/arch/arm/boot/dts/stih415-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih415-pinctrl.dtsi
+@@ -86,6 +86,24 @@
  					};
  				};
  			};
@@ -44,10 +44,11 @@ index 0f246c9..b29ff4b 100644
  		};
  
  		pin-controller-front {
-@@ -175,6 +193,23 @@
- 				};
+@@ -143,6 +161,24 @@
+ 				reg		= <0x7000 0x100>;
+ 				st,bank-name	= "PIO12";
  			};
- 
++
 +			i2c0 {
 +				pinctrl_i2c0_default: i2c0-default {
 +					st,pins {
@@ -68,28 +69,28 @@ index 0f246c9..b29ff4b 100644
  		};
  
  		pin-controller-rear {
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 1a0326e..b7ab47b 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
+diff --git a/arch/arm/boot/dts/stih415.dtsi b/arch/arm/boot/dts/stih415.dtsi
+index 74ab8de..d9c7dd1 100644
+--- a/arch/arm/boot/dts/stih415.dtsi
++++ b/arch/arm/boot/dts/stih415.dtsi
 @@ -9,6 +9,7 @@
  #include "stih41x.dtsi"
- #include "stih416-clock.dtsi"
- #include "stih416-pinctrl.dtsi"
+ #include "stih415-clock.dtsi"
+ #include "stih415-pinctrl.dtsi"
 +#include <dt-bindings/interrupt-controller/arm-gic.h>
  / {
+ 
  	L2: cache-controller {
- 		compatible = "arm,pl310-cache";
-@@ -92,5 +93,57 @@
- 			pinctrl-0 	= <&pinctrl_sbc_serial1>;
- 			clocks          = <&CLK_SYSIN>;
+@@ -83,5 +84,57 @@
+ 			pinctrl-names 	= "default";
+ 			pinctrl-0	= <&pinctrl_sbc_serial1>;
  		};
 +
 +		i2c at fed40000 {
 +			compatible	= "st,comms-ssc4-i2c";
 +			reg		= <0xfed40000 0x110>;
 +			interrupts	= <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks		= <&CLK_S_ICN_REG_0>;
++			clocks		= <&CLKS_ICN_REG_0>;
 +			clock-names	= "ssc";
 +			clock-frequency = <400000>;
 +			pinctrl-names	= "default";
@@ -102,7 +103,7 @@ index 1a0326e..b7ab47b 100644
 +			compatible	= "st,comms-ssc4-i2c";
 +			reg		= <0xfed41000 0x110>;
 +			interrupts	= <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks		= <&CLK_S_ICN_REG_0>;
++			clocks		= <&CLKS_ICN_REG_0>;
 +			clock-names	= "ssc";
 +			clock-frequency = <400000>;
 +			pinctrl-names	= "default";
