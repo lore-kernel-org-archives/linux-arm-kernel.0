@@ -1,29 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 6 Nov 2013 10:03:05 +0000
-Subject: [PATCHv2 5/8] ASoC: SGTL5000: Enhance the SGTL5000 codec driver
- about regulator.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F82876EFF@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-6-git-send-email-Li.Xiubo@freescale.com>
- <20131101185045.GG2493@sirena.org.uk>
- <1DD289F6464F0949A2FCA5AA6DC23F82876EFF@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20131106100305.GI11602@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  6 Nov 2013 10:05:41 +0000
+Subject: [PATCH 0/7] ARM: ux500: More DT only clean-ups for the platform
+Message-ID: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 08:59:53AM +0000, Li Xiubo wrote:
+Hi Linus,
 
-Please fix your mailer to word wrap within paragraphs.
+I was bored on the plane home, so knocked this together. This is
+probably the penultimate set of clean-ups. The final one will be
+the removal of MSP devices once my Audio patch-set lands.
 
-> The SGTL5000 is based on regulators and when it is disabled, there
-> will be an error returns directly while the SGTL5000 codec is probing.
-
-What makes you say this?  That's not how the regulator API works.  Have
-you actually seen any problems?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131106/3e04c897/attachment.sig>
+ arch/arm/mach-ux500/Makefile             |   7 +++---
+ arch/arm/mach-ux500/board-mop500-audio.c |   2 --
+ arch/arm/mach-ux500/board-mop500-sdi.c   | 168 ----------------------------------------------------------------------------------------------------------------------------------
+ arch/arm/mach-ux500/board-mop500.c       |  78 ------------------------------------------------------------
+ arch/arm/mach-ux500/board-mop500.h       |   5 ----
+ arch/arm/mach-ux500/cpu-db8500.c         |  18 +++++++++++---
+ arch/arm/mach-ux500/cpu.c                |  23 +++++-------------
+ arch/arm/mach-ux500/devices-db8500.c     |  28 ----------------------
+ arch/arm/mach-ux500/devices-db8500.h     |  19 ---------------
+ arch/arm/mach-ux500/devices.c            |  26 --------------------
+ arch/arm/mach-ux500/devices.h            |  15 ------------
+ arch/arm/mach-ux500/setup.h              |   6 -----
+ arch/arm/mach-ux500/timer.c              |  28 +++++++---------------
+ 13 files changed, 32 insertions(+), 391 deletions(-)
