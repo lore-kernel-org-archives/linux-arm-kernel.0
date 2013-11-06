@@ -1,89 +1,107 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 5 Nov 2013 16:14:49 -0800
-Subject: ARM audit, seccomp, etc are broken wrt OABI syscalls
-In-Reply-To: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
-References: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
-Message-ID: <CAGXu5jJreo001uBLV8oAgR_Z2WZK2qtH8YfvriQJVAQ4SgdRzw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 06 Nov 2013 01:27:30 +0100
+Subject: [PATCH v2 19/19] fbdev: sh-mobile-lcdcfb: Enable the driver on
+ all ARM platforms
+In-Reply-To: <alpine.DEB.2.02.1310312039330.13521@ayla.of.borg>
+References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383086274-11049-20-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <alpine.DEB.2.02.1310312039330.13521@ayla.of.borg>
+Message-ID: <1671829.6znfm3IPYO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 5, 2013 at 2:36 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> [cc: some ARM people]
->
-> After a bit of an adventure, I got QEMU working.  (Linux 3.12's smc91x
-> driver and qemu 1.6 don't get along.  It would be great if some
-> kernel.org page described a standard way to boot a modern Linux image
-> on a modern QEMU version, but I digress.)
+Hi Geert,
 
-Yeah, I kept losing this battle too, and most recently switch to using
-mmc emulation instead of the SCSI emulation (CONFIG_MMC=y, and qemu's
-"sd" disk driver).
+Thank you for the patch.
 
-> The current state of affairs is unhealthy.  I wrote a program
-> (attached) that does 'svc $0x90002f' (silly GNU syntax for "Issue the
-> getgid syscall in OABI").  The registers I program are:
->
-> r0: 1
-> r1: 2
-> r2: 3
-> r3: 4
-> r4: 5
-> r5: 6
->
-> (i.e. the arguments are 1,2,3,4,5,6, although getgid ignores them)
->
-> r7: 1
->
-> (r7 is the EABI syscall register.  On a kernel without OABI support,
-> the immediate svc argument is ignored and syscall 1, i.e. _exit, will
-> be invoked).
+On Thursday 31 October 2013 20:42:52 Geert Uytterhoeven wrote:
+> On Tue, 29 Oct 2013, Laurent Pinchart wrote:
+> > Renesas ARM platforms are transitioning from single-platform to
+> > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> > driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> > and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
+> > COMPILE_TEST.
+> > 
+> > diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> > index 84b685f..32b5c86 100644
+> > --- a/drivers/video/Kconfig
+> > +++ b/drivers/video/Kconfig
+> > @@ -2482,7 +2482,7 @@ endif
+> > 
+> >  config FB_SH_MOBILE_MERAM
+> >  
+> >  	tristate "SuperH Mobile MERAM read ahead support"
+> > 
+> > -	depends on (SUPERH || ARCH_SHMOBILE)
+> > +	depends on (SUPERH || ARM || COMPILE_TEST)
+> > 
+> >  	select GENERIC_ALLOCATOR
+> >  	---help---
+> >  	
+> >  	  Enable MERAM support for the SuperH controller.
+> 
+> While the below compiler warnings have been seen with sh-randconfig
+> before, they're more likely to happen with COMPILE_TEST=y.
+> I now see them with e.g. m68k-allmodconfig, so I created a patch.
+> 
+> From 15eb69172457c675cde177a6f742b6f1dabdeb18 Mon Sep 17 00:00:00 2001
+> From: Geert Uytterhoeven <geert@linux-m68k.org>
+> Date: Thu, 31 Oct 2013 20:35:14 +0100
+> Subject: [PATCH] fbdev: sh_mobile_meram: Fix defined but not used compiler
+>  warnings
+> MIME-Version: 1.0
+> Content-Type: text/plain; charset=UTF-8
+> Content-Transfer-Encoding: 8bit
+> 
+> If CONFIG_PM_SLEEP resp. CONFIG_PM_RUNTIME are not set:
+> 
+> drivers/video/sh_mobile_meram.c:573: warning: ?sh_mobile_meram_suspend?
+> defined but not used drivers/video/sh_mobile_meram.c:597: warning:
+> ?sh_mobile_meram_resume? defined but not used
+> 
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> ---
+>  drivers/video/sh_mobile_meram.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/video/sh_mobile_meram.c
+> b/drivers/video/sh_mobile_meram.c index e0f098562a74..56a8e47ffceb 100644
+> --- a/drivers/video/sh_mobile_meram.c
+> +++ b/drivers/video/sh_mobile_meram.c
+> @@ -569,6 +569,7 @@ EXPORT_SYMBOL_GPL(sh_mobile_meram_cache_update);
+>   * Power management
+>   */
+> 
+> +#ifdef CONFIG_PM_SLEEP
+>  static int sh_mobile_meram_suspend(struct device *dev)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+> @@ -592,7 +593,9 @@ static int sh_mobile_meram_suspend(struct device *dev)
+>  	}
+>  	return 0;
+>  }
+> +#endif
+> 
+> +#ifdef CONFIG_PM_RUNTIME
+>  static int sh_mobile_meram_resume(struct device *dev)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+> @@ -611,6 +614,7 @@ static int sh_mobile_meram_resume(struct device *dev)
+>  		meram_write_reg(priv->base, common_regs[i], priv->regs[i]);
+>  	return 0;
+>  }
+> +#endif
+> 
+>  static UNIVERSAL_DEV_PM_OPS(sh_mobile_meram_dev_pm_ops,
+>  			    sh_mobile_meram_suspend,
 
-Just to clarify: without CONFIG_OABI_COMPAT, all OABI syscalls turn into _exit?
-
-> Seccomp sees the registers as I set them (unsurprisingly) and it sees
-> nr == 0x2f.  It passes those values on to a SIGSYS handler, if one
-> exists.  This is, IMO, bad.  The OABI and EABI argument passing
-> conventions are *not* the same, and seccomp filters that check syscall
-> argument values may be spoofable by using OABI calls.
->
-> I suspect that audit, perf, ftrace, and maybe even ptrace are broken
-> as well for exactly the same reason.
->
-> I would argue that there are two reasonable fixes:
->
-> 1. Set a different audit arch for OABI syscalls (e.g.
-> AUDIT_ARCH_ARMOABI).  That is, treat OABI syscall entries the same way
-> that x86_64 treats int 80.
->
-> 2. Leave the 0x900000 bits set in the syscall nr.  That way OABI
-> syscalls would look like a different set of syscalls on the same
-> architecture.  That is, treat OABI syscall entries kind of like x86_64
-> treats x32 syscalls.  (There's probably no reason to accept 0x900000 +
-> N as an r7 value to cause 'svc 0' to invoke OABI syscall N, though.)
->
-> 3. Unconditionally kill any process that makes an OABI syscall with
-> seccomp enabled (because there should be no such programs).  Eww.
->
-> Options 1 and 2 are both break ABI, but I doubt that anythink cares.
-> OABI is, AFAICT, mostly dead.  That being said, even if nothing
-> legitimate uses OABI, exploits against seccomp-using programs can
-> certainly use OABI, so I think that this needs to be fixed somehow.
->
-> Thoughts?  I think I prefer option 1.  I don't really want to make the
-> change because my ARM assembly skills are lacking.
-
-I would agree: option 1 seems cleanest of the 3. 3 is sort of like a
-built-in automatic check for a mismatched arch, so maybe that works
-better?
-
-Alternatively, CONFIG_SECCOMP_FILTER could depend on
-!CONFIG_OABI_COMPAT. That seems like the least work, given the desire
-to kill OABI in the real world. (Though I would note that at least
-Ubuntu's ARM kernels build with CONFIG_OABI_COMPAT; Chrome OS does
-not.)
-
--Kees
+I'm a bit surprised, looking at the definition of UNIVERSAL_DEV_PM_OPS, I 
+would have thought that both functions would be used when either 
+CONFIG_PM_SLEEP or CONFIG_PM_RUNTIME is defined. I would thus have guarded 
+both functions with #if defined(CONFIG_PM_SLEEP) || 
+defined(CONFIG_PM_RUNTIME).
 
 -- 
-Kees Cook
-Chrome OS Security
+Regards,
+
+Laurent Pinchart
