@@ -1,23 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Nov 2013 15:51:04 +0000
-Subject: [libseccomp-discuss] ARM audit, seccomp, etc are broken wrt
- OABI syscalls
-In-Reply-To: <1383751951.28218.64.camel@flatline.rdu.redhat.com>
-References: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
- <1383751951.28218.64.camel@flatline.rdu.redhat.com>
-Message-ID: <20131106155104.GZ16735@n2100.arm.linux.org.uk>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Thu, 07 Nov 2013 00:12:13 +0800
+Subject: [PATCH v5 2/7] arm64: introduce interfaces to hotpatch kernel
+ and module code
+In-Reply-To: <20131106104110.GC21074@mudshark.cambridge.arm.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+ <1382109602-27432-3-git-send-email-liuj97@gmail.com>
+ <20131030001245.GB25346@mudshark.cambridge.arm.com>
+ <527671E9.8040704@gmail.com>
+ <CA+b37P2WU74NU7wG_H+KfmL6Y-fdhipsuOruU-z=wv=8ENwrfQ@mail.gmail.com>
+ <20131106104110.GC21074@mudshark.cambridge.arm.com>
+Message-ID: <527A6A5D.2050206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 10:32:31AM -0500, Eric Paris wrote:
-> On Tue, 2013-11-05 at 14:36 -0800, Andy Lutomirski wrote:
-> > 1. Set a different audit arch for OABI syscalls (e.g.
-> > AUDIT_ARCH_ARMOABI).  That is, treat OABI syscall entries the same way
-> > that x86_64 treats int 80.
+On 11/06/2013 06:41 PM, Will Deacon wrote:
+> On Mon, Nov 04, 2013 at 03:12:56PM +0000, Sandeepa Prabhu wrote:
+>> On 3 November 2013 23:55, Jiang Liu <liuj97@gmail.com> wrote:
+>>> On 10/30/2013 08:12 AM, Will Deacon wrote:
+>>>> On Fri, Oct 18, 2013 at 04:19:56PM +0100, Jiang Liu wrote:
+>>>>> +    atomic_set(&text_patch_id, smp_processor_id());
+>>>>> +    ret = stop_machine(aarch64_insn_patch_text_cb, &patch, cpu_online_mask);
+>>>>
+>>>> Instead of doing this, why not instead call aarch64_insn_patch_text_nosync
+>>>> inline, then call kick_all_cpus_sync immediately afterwards, without the
+>>>> need to stop_machine.
+>>> Sandeepa, who is working on kprobe for ARM64, needs the stop_machine()
+>>> mechanism to synchronize all online CPUs, so it's a preparation for
+>>> kprobe.
+>>
+>> I had published kprobes patches for ARM64:
+>> http://lwn.net/Articles/570648/  and using your patcset (v3) for
+>> patching support, it works so far.
+>> I CCed you on my RFC but unfortunately to your huawei email not the gmail.
+>>
+>> I can give a try with kick_all_cpus_sync but wanted to understand this
+>> a bit  detail on hows different from stop_machine and how this work.
 > 
-> As the audit maintainer, I like #1.  It might break ABI, but the ABI is
-> flat wrong now and not maintainable...
+> My point was just that for nosync patching, the update to the instruction
+> stream is atomic with respect to instruction fetch, so stop_machine seems a
+> bit overkill. kick_all_cpus can be used to ensure visibility of the new
+> instruction.
+> 
+> Jiang Liu seemed to imply that this isn't suitable for kprobes, but I would
+> like to know if/why that is the case.
+> 
+> Will
+> 
+Hi Will and Sandeepa,
+	Seems some misunderstanding here. We provide three interfaces
+here.
+1) aarch64_insn_patch_text_nosync(), which patches kernel/module text
+without explicitly synchronization. It may be used in cases of
+1.a) There's only one CPU running during early boot stage
+1.b) All other CPU has been put into safe state in kgdb.
+1.c) The instructions before and after patching are both hot-patch safe.
 
-If you read the whole thread, you will see that this corner case is just
-not worth the effort to support.  Audit may as well be disabled by
-kernel config if any OABI support is enabled.
+2) aarch64_insn_patch_text_sync(), which patches kernel/module text
+with explicitly synchronization by stop_machine() mechanism. It may
+be used to support kprobe because kprobe may patch multiple and/or
+non-hotpatch safe instructions at runtime, so we need stop_machine()
+for synchronization.
+
+3) aarch64_insn_patch_text() intelligently choose
+aarch64_insn_patch_text_nosync() or aarch64_insn_patch_text_sync().
+
+So for kprobe, I think need to use stop_machine() for synchronization.
+
+Thanks!
+Gerry
