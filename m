@@ -1,31 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Nov 2013 10:54:00 +0000
-Subject: mm: get_user_pages_fast()
-In-Reply-To: <52797483.2000105@cs.bris.ac.uk>
-References: <52797483.2000105@cs.bris.ac.uk>
-Message-ID: <20131106105400.GV16735@n2100.arm.linux.org.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 6 Nov 2013 12:54:53 +0200
+Subject: [PATCHv9 01/43] clk: Add support for regmap register read/write
+In-Reply-To: <20131105214320.GC17929@book.gsilab.sittig.org>
+References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
+ <1382716658-6964-2-git-send-email-t-kristo@ti.com> <52726342.6030406@ti.com>
+ <52726BD5.3080704@ti.com> <20131105214320.GC17929@book.gsilab.sittig.org>
+Message-ID: <527A1FFD.1080506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 10:43:15PM +0000, Michael McTernan wrote:
-> I think there's a problem on ARM with futex calls to FUTEX_WAIT and  
-> similar for addresses that have been mapped to userspace from /dev/mem  
-> or a device which sets VM_IO or VM_PFNMAP.  This can break  
-> pthread_mutex_lock() if placed on such mapped memory and attributed as  
-> process-shared.
+On 11/05/2013 11:43 PM, Gerhard Sittig wrote:
+> On Thu, Oct 31, 2013 at 16:40 +0200, Tero Kristo wrote:
+>>
+>> On 10/31/2013 04:03 PM, Nishanth Menon wrote:
+>>> On 10/25/2013 10:56 AM, Tero Kristo wrote:
+>>> [...]
+>>>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>>>> index 7e59253..63ff78c 100644
+>>>> --- a/include/linux/clk-provider.h
+>>>> +++ b/include/linux/clk-provider.h
+>>>
+>>> [...]
+>>>> -static inline u32 clk_readl(u32 __iomem *reg)
+>>>> +static inline u32 clk_readl(u32 __iomem *reg, struct regmap *regmap)
+>>>>   {
+>>>> -	return readl(reg);
+>>>> +	u32 val;
+>>>> +
+>>>> +	if (regmap)
+>>>> +		regmap_read(regmap, (u32)reg, &val);
+>>>> +	else
+>>>> +		val = readl(reg);
+>>>> +	return val;
+>>>>   }
+>>>>
+>>>> -static inline void clk_writel(u32 val, u32 __iomem *reg)
+>>>> +static inline void clk_writel(u32 val, u32 __iomem *reg, struct regmap *regmap)
+>>>>   {
+>>>> -	writel(val, reg);
+>>>> +	if (regmap)
+>>>> +		regmap_write(regmap, (u32)reg, val);
+>>>> +	else
+>>>> +		writel(val, reg);
+>>>>   }
+>>>>
+>>>>   #endif /* CONFIG_COMMON_CLK */
+>>>>
+>>>
+>>> Might it not be better to introduce regmap variants?
+>>> static inline void clk_regmap_writel(u32 val, u32 reg, struct regmap
+>>> *regmap)
+>>> and corresponding readl? that allows cleaner readability for clk
+>>> drivers that use regmap and those that dont.
+>>
+>> Well, doing that will introduce a lot of redundant code, as the
+>> checks for the presence of regmap must be copied all over the place.
+>> With this patch, all the generic clock drivers support internally
+>> both regmap or non-regmap register accesses.
+>
+> Please keep in mind that the "identity" of clk_readl() and
+> readl() only applies in the current source code (ARM only use of
+> common CCF primitives), while patches are pending (currently
+> under review and receiving further improvement) which introduce
+> several alternative implementations of clk_readl() depending on
+> the platform.  Making all of them duplicate the "regmap vs direct
+> register access" branch would be as bad.  Keeping one set of
+> clk_readl() and clk_writel() routines and adding #ifdefs around
+> the direct register access would be rather ugly, and I understand
+> that preprocessor ifdef counts should get reduced instead of
+> introduced.
 
-Firstly, please stop this madness.  Placing futexes in IO memory is not
-supported, period.  You can't map random bits of /dev/mem and expect
-this stuff to work.
+So, it might be better to provide platform / or clock specific 
+clk_reg_ops or something, so we can cover all the possible cases easily.
 
-(a) you're generally not allowed to map kernel memory via /dev/mem, so
-that rules out all kernel managed memory.
-(b) you are allowed to map memory outside of that, but you get it as
-strongly ordered memory.
+The requirement from TI SoC point of view is that:
 
-(b) means that the load/store exclusives, which userspace mutexes will
-use on ARMv6+, will not work correctly.  (they're not supported to
-strongly ordered memory by the architecture.)
+1) need to be able to specify custom register read/write ops
+2) need to be able to provide an index parameter to the read/write ops
+3) need to be able to provide a register offset to the read/write ops
 
-In other words, don't put mutexes in memory you've remapped from /dev/mem.
-In fact, as an application, you should not be mapping /dev/mem at all.
+This could be done in following way for example:
+
+clk_readl / clk_writel would be accessed through a single platform 
+specific struct which provides function pointers to both.
+
+The content of 'reg' provided to the clk_readl / clk_writel would be 
+internally interpreted as a
+
+struct omap_clk_reg_internal {
+	u16 offset;
+	u16 index;
+};
+
+... the index part would be used to select the appropriate regmap to 
+use, and TI SoC:s would be using 3...4 regmaps for actually accessing 
+the physical registers themselves.
+
+-Tero
+
+>
+>
+> virtually yours
+> Gerhard Sittig
+>
