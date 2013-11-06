@@ -1,76 +1,97 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 6 Nov 2013 12:50:15 -0700
-Subject: address translation for PCIe-to-localbus bridge
-In-Reply-To: <20246965-EEE8-4EF0-A632-0633774A572A@antoniou-consulting.com>
-References: <527A1983.6020603@keymile.com>
- <20131106173649.GA25515@obsidianresearch.com>
- <20131106190308.01f7a4a9@skate>
- <334037D0-02FB-459F-9E40-129EC830AF65@antoniou-consulting.com>
- <20131106185658.GC25879@obsidianresearch.com>
- <20246965-EEE8-4EF0-A632-0633774A572A@antoniou-consulting.com>
-Message-ID: <20131106195015.GA26881@obsidianresearch.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Nov 2013 19:57:25 +0000
+Subject: mm: get_user_pages_fast()
+In-Reply-To: <527A9AB9.8060306@cs.bris.ac.uk>
+References: <52797483.2000105@cs.bris.ac.uk>
+ <20131106105400.GV16735@n2100.arm.linux.org.uk>
+ <527A9AB9.8060306@cs.bris.ac.uk>
+Message-ID: <20131106195725.GD16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 09:16:13PM +0200, Pantelis Antoniou wrote:
-> > Your camera driver attaches to the 'my device' node, not to the chip
-> > select node. The chip select node is used only by the bus bridge
-> > driver to setup that specific chip select.
-> 
-> No. I get the point about the bridge driver, but that's not what I want.
-> 
-> I agree that the bridge driver configures the chip selects, address ranges
-> and timings, but it shouldn't do that at the time the bridge driver is
-> instantiated. 
+On Wed, Nov 06, 2013 at 07:38:33PM +0000, Michael McTernan wrote:
+> On 11/06/2013 10:54 AM, Russell King - ARM Linux wrote:
+>> Firstly, please stop this madness.
+>
+> In the context of an embedded system, where memory is shared between  
+> CPUs, DSP, FPGAs and some peripherals, and where the SCU is maintaining  
+> coherency on selected areas, this is a feature of the platform, not  
+> madness.
 
-But that is normal Linux behavior. The bus driver controls the bus,
-and it takes control when it is instantiated.
+Please expose the memory in a saner way rather than re-using /dev/mem.
+/dev/mem is all well and good, but it has side effects with the way it
+maps memory.  Having your own driver gives you control over that.  It's
+also better practice because it avoids a whole load of security issues.
 
-> That would mean that all configuration is fixed at boot time.
+> > Placing futexes in IO memory is not supported, period.
+>
+> Except the _PRIVATE futex calls do work fine in IO memory since they  
+> don't walk the process page tables to determine the 'key' from the  
+> address.  These a limited to only sync between threads in the same  
+> processes though.
 
-No, it means at boot time the configuration data in the DT is
-programmed into the hardware at boot time.
+Sorry, I should have said mutexes.  The point here is that userspace
+pthreads can ldrex/strex on that memory before issuing any futex calls.
 
-If you hotplug the environment later during run time then you have to
-notify the bridge driver and have it make whatever changes. This is no
-different than PCI which requires notifying the PCI layer to have it
-reprogram bridge devices.
+> > You can't map random bits of /dev/mem and expect
+> > this stuff to work.
+>
+> Nothing I am mapping is random.
 
-This is why the nodes must be under the bridge, only the bridge knows
-when it is safe to create struct device's for the children.
+As far as I'm concerned, it's random areas of system memory - random in
+the sense that it's not well defined what it is and what attributes it
+should have in the page tables for things like memory type etc.  I
+somehow doubt that you've thought about this at all, you just decided
+that opening /dev/mem is a solution to your problem.
 
-> All the drivers that are controlled by a chip select and/or bus
-> access method are written without ever dealing with the bridge; they
-> just expect the configuration to be valid and need to only know the
-> address range they reside.
+>> (b) means that the load/store exclusives, which userspace mutexes will
+>> use on ARMv6+, will not work correctly.
+>> (they're not supported to strongly ordered memory by the architecture.)
+>
+> I don't see this stated in the ARM Architecture Reference Manual.  
+> Instead I see it saying that it is implementation dependent whether  
+> LDREX and STREX work on strongly ordered memory (section A3.4.5).
 
-That is exactly what my example is showing. The driver has no idea
-about the bridge. Ezequiel's MVEBU version does this today, IIRC, he
-has the standard every day memory mapped NOR driver working as a node
-under the bridge, with full configurability, and no changes to the NOR
-driver.
+Here's the latest wording:
 
-> As you pointed the i2c component, which was a child of the device
-> node, it is better to become a phandle reference.
+  It is IMPLEMENTATION DEFINED whether LDREX and STREX operations can be
+  performed to a memory region with the Device or Strongly-ordered memory
+  attribute. Unless the implementation documentation explicitly states
+  that LDREX and STREX operations to a memory region with the Device or
+  Strongly-ordered attribute are permitted, the effect of such operations
+  is UNPREDICTABLE.
 
-Again, the DT parent/child reflects bus ownership/address
-translation.
+In other words, it is only supported where it is explicitly documented
+that it works on these memory types; otherwise it must be assumed that
+they do not work...
 
-It is incorrect to put an i2c device below any node other than the i2c
-bus it is attached to.
+However, that concern goes away if you provide your own device driver
+in Linux to provide _just_ a mechanism to map this memory.  Plus, you
+can restrict it to just being able to map this specific memory without
+exposing the entire system RAM to anything which happens to exploit
+your application.
 
-> That's what I'm proposing for the bridge configuration as well, so
-> that the configuration is applied only when a device requests
-> it. This is important for hot-plugging, and or when using stuff like
-> device overlays.
+>> In other words, don't put mutexes in memory you've remapped from /dev/mem.
+>> In fact, as an application, you should not be mapping /dev/mem at all.
+>
+> It's certainly more standard to map the mutexes() out of something like  
+> file backed mmap(), but that isn't as elegant for my application.
+>
+> To give a bit of background, what we have is some memory at a know  
+> address which controls a peripheral.  Part of the peripheral addresses  
+> are buffers and registers, but some is set aside for use by software.  
+> Being able to map this whole section into userspace makes for really  
+> fast fast-paths where the driver is basically outside the kernel.  Also  
+> keeping driver state variables in the peripheral RAM means things can be  
+> restarted if the Linux processes crash or die, or even if the whole of  
+> Linux were to be restarted for some reason.  So it's more than  
+> convenient to have the mutexes work there, though as an easier goal I'll  
+> probably just get the futex calls to work for my applications.
 
-If there is no children to a chip select then the bridge can leave it
-turned off and keep address space deallocated.
+So, what happens if Linux crashes having taken a pthread mutex in this
+region, and your application then comes along and tries to regain that
+lock?
 
-The bridge driver simply has to be involved in the hot plug process,
-which is again normal in Linux.
-
-Device tree overlays provide a mechanism to create new chip select
-nodes under the bridge, I don't see the problem you do :)
-
-Jason
+Do you always re-initialise the mutexes (you technically have to if you
+read the man page for pthread_mutex_lock() which tells you about a whole
+raft of undefined behaviours concerning the pthread mutex implementation.)
