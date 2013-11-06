@@ -1,38 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Nov 2013 10:29:47 +0100
-Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
-In-Reply-To: <527835FE.2030102@wwwdotorg.org>
-References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
- <051069C10411E24D9749790C498526FA1BE0B7D7@SJEXCHMB12.corp.ad.broadcom.com>
- <CACRpkdYSLxp2M4HghcUdjEYGh-UQ+DaiCGp6yee+Qds6DR9poA@mail.gmail.com>
- <201311050026.56321.heiko@sntech.de>
- <527835FE.2030102@wwwdotorg.org>
-Message-ID: <CACRpkdaNnsM1cVTooYH=ePgjtvjrCiwuOD4oyYBZ_uzTYBnA_A@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Wed, 6 Nov 2013 15:03:55 +0530
+Subject: [PATCH v4 1/6] gpio: davinci: Fixed a check for unbanked gpio
+In-Reply-To: <CACRpkdZ7pwGQnK0NN4tybLUNdMxu5WVaGX8Dqu+kMgVBuyF16w@mail.gmail.com>
+References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
+ <1383406775-14902-2-git-send-email-prabhakar.csenng@gmail.com>
+ <CACRpkdZ7pwGQnK0NN4tybLUNdMxu5WVaGX8Dqu+kMgVBuyF16w@mail.gmail.com>
+Message-ID: <CA+V-a8tE3bxsHMSh2i3Xeq=kJUjmxTjcU25Kuka5e_iXeB--pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 5, 2013 at 1:04 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/04/2013 04:26 PM, Heiko St?bner wrote:
+Hi Linus,
 
-> Pure Boolean values should be represented as a valueless property. If
-> the property is present, the value is true, otherwise false.
+On Tue, Nov 5, 2013 at 6:09 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Nov 2, 2013 at 4:39 PM, Lad, Prabhakar
+> <prabhakar.csengg@gmail.com> wrote:
 >
-> However, pinctrl bindings often don't represent Boolean values, but
-> rather tri-states, with the following values:
+>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>
+>> This patch fixes the check for the offset in
+>> gpio_to_irq_unbanked() function.
+>>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 >
-> * Don't touch this configuration option at all (missing)
-> * Enable the option (<1>)
-> * Disable the option (<0>)
+> Is this a regression that should go in right now?
+>
+Yes it needs too.
 
-But in this case we actually have these booleans to specify
-exactly what we want to do:
-
-bias-disable            - disable any pin bias
-bias-high-impedance     - high impedance mode ("third-state", "floating")
-bias-bus-hold           - latch weakly
-bias-pull-up            - pull up the pin
-bias-pull-down          - pull down the pin
-bias-pull-pin-default   - use pin-default pull state
-
-Yours,
-Linus Walleij
+Regards,
+--Prabhakar Lad
