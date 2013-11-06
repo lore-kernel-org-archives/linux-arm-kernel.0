@@ -1,42 +1,64 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 6 Nov 2013 14:33:10 -0800
-Subject: ARM audit, seccomp, etc are broken wrt OABI syscalls
-In-Reply-To: <CAHCPf3umr-v+2oWyjG3F0W=+qu_NoXVVSN95RAJdrjaLxWAfow@mail.gmail.com>
-References: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
- <CAGXu5jJreo001uBLV8oAgR_Z2WZK2qtH8YfvriQJVAQ4SgdRzw@mail.gmail.com>
- <CAHCPf3umr-v+2oWyjG3F0W=+qu_NoXVVSN95RAJdrjaLxWAfow@mail.gmail.com>
-Message-ID: <CALCETrVe1mmrkSfoXkuLGmFaeRKbA7p1GsC9OeKH9NXMdtpvyg@mail.gmail.com>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Wed, 6 Nov 2013 16:43:37 -0600
+Subject: [PATCH v6 4/8] ARM: dts: imx27 pinctrl
+In-Reply-To: <1382950843-26066-5-git-send-email-mpa@pengutronix.de>
+References: <1382950843-26066-1-git-send-email-mpa@pengutronix.de>
+ <1382950843-26066-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <CAHCPf3sz6eOYrnNDfOTo5Z5dZP2U9+GtQMKYZEb-1WfuXepa6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 6, 2013 at 2:30 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
-> On Tue, Nov 5, 2013 at 6:14 PM, Kees Cook <keescook@chromium.org> wrote:
->>
->> Alternatively, CONFIG_SECCOMP_FILTER could depend on
->> !CONFIG_OABI_COMPAT. That seems like the least work, given the desire
->> to kill OABI in the real world. (Though I would note that at least
->> Ubuntu's ARM kernels build with CONFIG_OABI_COMPAT; Chrome OS does
->> not.)
+On Mon, Oct 28, 2013 at 4:00 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> Pinctrl driver node and pin group definitions for other driver nodes.
 >
-> I think CONFIG_OABI_COMPAT probably leaked in from the original
-> configurations of the kernel taken from Debian.
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx27.dtsi | 102 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 102 insertions(+)
 >
-> There were several big decisions they made (build for ARMv5 soft
-> float, then switch to ARMv7 softfp, then switch to ARMv7 hardfp, then
-> switch to using THUMB2 kernels) which would have just broken OABI
-> binaries at every step of the way since they had some subtle
-> implications in kernel configuration (note: Ubuntu have never, ever
-> enabled FPA emulation in the kernel, and all Debian's OABI userspace
-> is built for FPA, for example. A good chunk of the original Debian arm
-> port probably would just pitch a SIGILL if you ran it under an Ubuntu
-> kernel).
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index b7a1c6d..641a63d 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -10,6 +10,7 @@
+>   */
 >
-> I would ignore anyone who enables it in a distribution, since they
-> probably weren't intending to enable it in the first place, and never
-> noticed the.. what.. 3-4KiB it adds to the kernel?
+>  #include "skeleton.dtsi"
+> +#include "imx27-pinfunc.h"
 >
+>  / {
+>         aliases {
+> @@ -235,6 +236,12 @@
+>                                 status = "disabled";
+>                         };
+>
+> +                       iomuxc: iomuxc at 10015000 {
+> +                               compatible = "fsl,imx27-iomuxc";
+> +                               reg = <0x10015000 0x600>;
+> +
+> +                       };
+> +
+>                         gpio1: gpio at 10015000 {
+>                                 compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
+>                                 reg = <0x10015000 0x100>;
 
-Forget the size -- it adds a fair amount of complexity and a D-cache
-miss on every syscall.
+Linus,
 
---Andy
+Case in point, you can't have two nodes which overlap registers.
+
+Probably the most reasonable way to effect this is to keep the GPIO
+bindings, put pinctrl definitions in there (there's no reason pinctrl
+and gpio drivers can't probe the same compatible property) and use
+regmap internally on that single node.
+
+On the good news side, this makes the pinctrl binding easier as every
+single one would be is parented by a gpio instance (gpio1 as above,
+for example), so it doesn't need to specify a port number anymore or
+do any (port*32)+pin math - just a pin index within that port.
+
+Schema guys: is the DT validator code prepped for checking for
+overlapping register spaces, because this is totally undesirable
+behavior in device trees..
+
+Matt Sealey <neko@bakuhatsu.net>
