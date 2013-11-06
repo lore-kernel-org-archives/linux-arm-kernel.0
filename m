@@ -1,55 +1,33 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Wed, 6 Nov 2013 16:35:44 +0530
-Subject: [PATCH RFC 6/6] kprobes: Add cases for arm and arm64 in sample
- module
-In-Reply-To: <20131025152428.GD10673@mudshark.cambridge.arm.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-7-git-send-email-sandeepa.prabhu@linaro.org>
- <20131025152428.GD10673@mudshark.cambridge.arm.com>
-Message-ID: <CA+b37P16kSi9Zja=oLRSCn74-ystxpcfKsy5A8r3eDEMfzZycQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Nov 2013 11:15:34 +0000
+Subject: [PATCH] clk: divider: fix rate calculation for fractional rates
+In-Reply-To: <1383736008-22764-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1383736008-22764-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20131106111534.GW16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 October 2013 20:54, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Oct 17, 2013 at 12:17:51PM +0100, Sandeepa Prabhu wrote:
->> Add info prints in sample kprobe handlers for ARM and ARM64
->> architecture.
->>
->> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
->> ---
->>  samples/kprobes/kprobe_example.c | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
->> index 366db1a..0521246 100644
->> --- a/samples/kprobes/kprobe_example.c
->> +++ b/samples/kprobes/kprobe_example.c
->> @@ -42,6 +42,14 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
->>                       " ex1 = 0x%lx\n",
->>               p->addr, regs->pc, regs->ex1);
->>  #endif
->> +#ifdef CONFIG_ARM
->> +     printk(KERN_INFO "pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
->> +                     p->addr, regs->ARM_pc);
->> +#endif
->> +#ifdef CONFIG_ARM64
->> +     printk(KERN_INFO "pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
->> +             p->addr, (long)regs->pc);
->> +#endif
->
-> Huh? Why can't you combine these two together and either unconditionall cast
-> to long, or use void * and %p?
-pt_regs member names are different: regs->pc (arm64) vs. regs->ARM_pc
-(arm32). It is still possible to use instruction_pointer(regs) for
-both architectures, but this needs including asm/ptrace.h which I am
-not sure good thing to do in samples/
+On Wed, Nov 06, 2013 at 01:06:48PM +0200, Tomi Valkeinen wrote:
+> This means that the following code works a bit oddly:
+> 
+> rate = clk_round_rate(clk, 123428572);
+> clk_set_rate(clk, rate);
 
-Thanks,
-Sandeepa
->
-> Will
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+You're right, but the above sequence is quite a crass thing to do.  Why?
+
+clk_round_rate() returns the clock rate that clk_set_rate() would give
+you if you were to use this sequence:
+
+	clk_rate_rate(clk, 123428572);
+	rate = clk_get_rate(clk);
+
+The difference is that it doesn't change the actual clock rate itself;
+clk_round_rate() is meant to answer the question:
+
+	"If I were to set _this_ rate, what clock rate would
+	 the clock give me?"
+
+thereby providing a method for drivers to inquire what the effect would
+be when changing such a clock without actually affecting it.
+
+So please, don't use clk_round_rate() followed by clk_set_rate().
