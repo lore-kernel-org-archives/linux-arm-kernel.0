@@ -1,47 +1,65 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 5 Nov 2013 23:37:54 -0800
-Subject: [PATCH 0/3] follow up fixes for V7 big endian changes
-In-Reply-To: <20131105152042.GT16735@n2100.arm.linux.org.uk>
-References: <1383617765-28052-1-git-send-email-victor.kamensky@linaro.org>
- <20131105152042.GT16735@n2100.arm.linux.org.uk>
-Message-ID: <CAA3XUr0_xvVGhfo0WLav53eBR1XffTeKYedquCEw8HEPCfp9fg@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 06 Nov 2013 08:46:37 +0100
+Subject: [PATCH 6/6] arm: zynq: headsmp: Move .glbl out of actual code
+In-Reply-To: <1383235819-2552-7-git-send-email-soren.brinkmann@xilinx.com>
+References: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1383235819-2552-7-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <5279F3DD.9040605@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2013 07:20, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 04, 2013 at 06:16:02PM -0800, Victor Kamensky wrote:
->> 3) ARM: fix mov to mvn conversion in case of 64 bit phys_addr_t and BE
->> Conflict resolution between [5] and [6] was not entirely correct for
->> the case when 'mov' instruction has to be converted into 'mvn'
->> instruction.
->
-> This is a good reason why rushing stuff along when there's two people
-> working in the same area is bad news.  The person who gets to do the
-> conflict resolution doesn't always know what the correct solution is,
-> so many of them are pure guesses, and many of them won't be adequately
-> tested.
->
-> Quite honestly, I would have preferred *not* to have pulled Ben's BE
-> changes along with Santosh's other changes, and have Ben rebase for
-> the _following_ merge window to prevent exactly this kind of mess.
+On 10/31/2013 05:10 PM, Soren Brinkmann wrote:
+> Move the .glbl lines exporting symbols to the top of the file and out of
+> the actual code, in order to make the code more readable.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  arch/arm/mach-zynq/headsmp.S | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
+> index 57a32869f0aa..12d1b40c7d78 100644
+> --- a/arch/arm/mach-zynq/headsmp.S
+> +++ b/arch/arm/mach-zynq/headsmp.S
+> @@ -9,14 +9,15 @@
+>  #include <linux/linkage.h>
+>  #include <linux/init.h>
+>  
+> +.globl zynq_secondary_trampoline_jump
+> +.globl zynq_secondary_trampoline_end
+> +
+>  ENTRY(zynq_secondary_trampoline)
+>  	ldr	r0, [pc]
+>  	bx	r0
+> -.globl zynq_secondary_trampoline_jump
+>  zynq_secondary_trampoline_jump:
+>  	/* Space for jumping address */
+>  	.word	/* cpu 1 */
+> -.globl zynq_secondary_trampoline_end
+>  zynq_secondary_trampoline_end:
+>  ENDPROC(zynq_secondary_trampoline)
+>  
 
-Sorry, I probably confused folks and pushed too hard with my tc2
-"all fine" testing message. Lesson learned.
-
-> The BE stuff has been one problem after another...
-
-In what sense? Does it create problems for something
-or someone? I hope not. I think it is in pair with other efforts,
-and I think we go after issues quickly enough. Or you mean that
-we keep discovering more and more BE issues to fix. I agree
-with that. I think we will see more. We are working on few
-known issues like BE V7 kprobes, and BE V7 KVM. I think we will
-see BE breakages and follow up fixes too. And IMHO it is
-normal, BE is side feature, outside of main direction
-and it is easy for guys to miss BE issue. That is why Linaro
-is going to setup automatic BE builds and tests, and we
-will monitor and fix discovered issues.
+I don't want this one.
+I have applied 1-5 to zynq/cleanup branch.
 
 Thanks,
-Victor
+Michal
+
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131106/b15b0ad0/attachment.sig>
