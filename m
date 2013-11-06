@@ -1,50 +1,52 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 6 Nov 2013 12:21:06 -0500
-Subject: [PATCH v3 25/28] ARM: mvebu: Add support for NAND controller
- in Armada 370/XP
-In-Reply-To: <20131106135654.336e06c3@skate>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-26-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105132905.GJ3060@titan.lakedaemon.net>
- <20131105135145.GA2676@localhost>
- <20131105151531.GK3060@titan.lakedaemon.net>
- <20131106092435.5f95aa55@skate>
- <20131106114244.GC8308@titan.lakedaemon.net>
- <20131106135654.336e06c3@skate>
-Message-ID: <20131106172106.GD8308@titan.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Nov 2013 17:27:40 +0000
+Subject: [PATCH] arm: add support for the Cortex-A12 processor
+In-Reply-To: <1382532376-22758-1-git-send-email-jonathan.austin@arm.com>
+References: <1382532376-22758-1-git-send-email-jonathan.austin@arm.com>
+Message-ID: <20131106172740.GA4524@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 01:56:54PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On Wed, Oct 23, 2013 at 01:46:16PM +0100, Jonathan Austin wrote:
+> The A12 behaves as the A7/A15 does with respect to setting the SMP bit, and
+> doesn't require TLB ops broadcasting to be explicitly enabled like the A9 does.
 > 
-> On Wed, 6 Nov 2013 06:42:44 -0500, Jason Cooper wrote:
+> Note that as the ACTLR cannot (usually) be written from non-secure, it is the
+> responsibility of the bootloader/firmware to set this bit per core - it is
+> done here in Linux as last resort in case of bad firmware.
 > 
-> > > Interesting, because I had understood exactly the opposite from the
-> > > discussions at the ARM kernel summit. But maybe the DT folks changed
-> > > their mind between the ARM kernel summit and the closing session of
-> > > the kernel summit :-)
-> > 
-> > Yes, that's why I asked the question.  Mark Rutland said he wanted to
-> > see the code changes when he was reviewing a binding.  Which is indeed
-> > the opposite of what we had arrived at during the ARM mini-summit.
-> > 
-> > So I asked Grant (last question of the Q&A) what he wanted us to tell
-> > the contributors.  He said (bad paraphrasing here) "I have better
-> > filters now for finding the binding changes, so send the whole series"
-> > 
-> > As him and Mark aren't the only reviewers, I took the extra step of
-> > saying send the DT bindings as a separate patch with it clearly
-> > identified in the subject line...
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+> ---
+>  arch/arm/mm/proc-v7.S |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> Ok, thanks for the clarification. Those rules seem to be changing from
-> one day to the next, not really easy to follow :)
-> 
-> Is there some .txt file in Documentation/ that explains what the DT
-> maintainers expect?
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 3a5922d..9745288 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -164,6 +164,7 @@ __v7_cr7mp_setup:
+>  	mov	r10, #(1 << 0)			@ Cache/TLB ops broadcasting
+>  	b	1f
+>  __v7_ca7mp_setup:
+> +__v7_ca12mp_setup:
+>  __v7_ca15mp_setup:
+>  	mov	r10, #0
+>  1:
+> @@ -440,6 +441,16 @@ __v7_ca7mp_proc_info:
+>  	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
+>  
+>  	/*
+> +	 * ARM Ltd. Cortex A12 processor.
+> +	 */
+> +	.type	__v7_ca12mp_proc_info, #object
+> +__v7_ca12mp_proc_info:
+> +	.long	0x410fc0d0
 
-hmmm.  Give me a bit. :)
+Great, looks like we can't count.
 
-thx,
+Please put this into the patch system:
 
-Jason.
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
