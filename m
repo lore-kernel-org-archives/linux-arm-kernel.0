@@ -1,113 +1,48 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Thu, 07 Nov 2013 00:31:55 +0800
-Subject: [PATCH v5 4/7] arm64: introduce
- aarch64_insn_gen_{nop|branch_imm}() helper functions
-In-Reply-To: <20131030004840.GC25346@mudshark.cambridge.arm.com>
-References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
- <1382109602-27432-5-git-send-email-liuj97@gmail.com>
- <20131030004840.GC25346@mudshark.cambridge.arm.com>
-Message-ID: <527A6EFB.4080000@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  6 Nov 2013 17:32:47 +0100
+Subject: [PATCH trivial] arm64: constify hwcap_str
+Message-ID: <1383755567-17244-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2013 08:48 AM, Will Deacon wrote:
-> On Fri, Oct 18, 2013 at 04:19:58PM +0100, Jiang Liu wrote:
->> From: Jiang Liu <jiang.liu@huawei.com>
->>
->> Introduce aarch64_insn_gen_{nop|branch_imm}() helper functions, which
->> will be used to implement jump label on ARM64.
->>
->> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
->> Cc: Jiang Liu <liuj97@gmail.com>
->> ---
->>  arch/arm64/include/asm/insn.h | 13 +++++++++++++
->>  arch/arm64/kernel/insn.c      | 28 ++++++++++++++++++++++++++++
->>  2 files changed, 41 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
->> index 8f94e48..ee4a60d 100644
->> --- a/arch/arm64/include/asm/insn.h
->> +++ b/arch/arm64/include/asm/insn.h
->> @@ -96,9 +96,22 @@ static __always_inline void aarch64_insn_write(void *addr, u32 insn)
->>  	*(u32 *)addr = cpu_to_le32(insn);
->>  }
->>  
->> +static __always_inline u32 aarch64_insn_gen_hint(enum aarch64_insn_hint_op op)
->> +{
->> +	return aarch64_insn_get_hint_value() | op;
-> 
-> What's the point in that helper function? Does it just return an immediate
-> value (and are there are other users of it?).
-It just returns a const value. The helper function is just for ease
-maintainence.
+Turn hwcap_str from a 'writable array of pointers to const char[]'
+to a multidimensional const char[][].
 
-> 
->> +}
->> +
->> +static __always_inline u32 aarch64_insn_gen_nop(void)
->> +{
->> +	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
->> +}
-> 
-> Either use plain old `inline' or write these as preprocessor macros.
-Will change to normal (non-inline) and add __kprobe property.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-> 
->> +
->>  enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
->>  u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
->>  				  u32 insn, u64 imm);
->> +u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
->> +				bool link);
->> +
->>  bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
->>  
->>  int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->> index 886821f..f7498cc 100644
->> --- a/arch/arm64/kernel/insn.c
->> +++ b/arch/arm64/kernel/insn.c
->> @@ -14,6 +14,7 @@
->>   * You should have received a copy of the GNU General Public License
->>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>   */
->> +#include <linux/bitops.h>
->>  #include <linux/compiler.h>
->>  #include <linux/kernel.h>
->>  #include <linux/smp.h>
->> @@ -233,3 +234,30 @@ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
->>  
->>  	return insn;
->>  }
->> +
->> +u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr, bool link)
->> +{
->> +	u32 insn;
->> +	long offset;
->> +
->> +	/*
->> +	 * PC: A 64-bit Program Counter holding the address of the current
->> +	 * instruction. A64 instructions may be word-aligned.
->> +	 */
->> +	BUG_ON((pc & 0x3) || (addr & 0x3));
->> +
->> +	/*
->> +	 * B/BL support [-128M, 128M) offset
->> +	 * ARM64 virtual address arrangement garantees all kernel and module
-> 
-> Typo: `guarantees'.
-Thanks, will fix it.
+This is something I noticed when looking at Steve Capper's hwcaps patch: really
+no point in having a writable array of 8-byte pointers in .data keeping track of
+these hwcap strings.
+ 
+ arch/arm64/kernel/setup.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> 
->> +	 * texts are within +/-128M.
->> +	 */
->> +	offset = ((long)addr - (long)pc) >> 2;
->> +	BUG_ON(abs(offset) > BIT(25) || offset == BIT(25));
-> 
-> I really struggle to follow this range checking. Why don't you just compare
-> the absolute difference between addr and pc with SZ_128M?
-Will change code to follow your suggestion.
-
-> 
-> Will
-> 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 055cfb8..b6aa6b4 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -301,10 +301,10 @@ static int __init topology_init(void)
+ }
+ subsys_initcall(topology_init);
+ 
+-static const char *hwcap_str[] = {
++static const char hwcap_str[][8] = {
+ 	"fp",
+ 	"asimd",
+-	NULL
++	""
+ };
+ 
+ static int c_show(struct seq_file *m, void *v)
+@@ -328,7 +328,7 @@ static int c_show(struct seq_file *m, void *v)
+ 	/* dump out the processor features */
+ 	seq_puts(m, "Features\t: ");
+ 
+-	for (i = 0; hwcap_str[i]; i++)
++	for (i = 0; hwcap_str[i][0]; i++)
+ 		if (elf_hwcap & (1 << i))
+ 			seq_printf(m, "%s ", hwcap_str[i]);
+ 
+-- 
+1.8.3.2
