@@ -1,34 +1,22 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Wed, 6 Nov 2013 13:33:04 +0200
-Subject: Fwd: [PATCH 8/8] arm: dts: keystone: add watchdog entry
-In-Reply-To: <1383680783-12114-9-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1383680783-12114-9-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <527A28F0.6050406@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 6 Nov 2013 12:34:52 +0100 (CET)
+Subject: [PATCH v3 1/9] irqchip: add DesignWare APB ICTL interrupt
+ controller
+In-Reply-To: <1383661723-17956-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1383661723-17956-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <alpine.DEB.2.02.1311061233010.23353@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog entry to keystone device tree.
+On Tue, 5 Nov 2013, Sebastian Hesselbarth wrote:
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- arch/arm/boot/dts/keystone.dts |    6 ++++++
- 1 file changed, 6 insertions(+)
+> This adds an irqchip driver and corresponding devicetree binding for the
+> secondary interrupt controllers based on Synopsys DesignWare IP dw_apb_ictl.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Jisheng Zhang <jszhang@marvell.com>
 
-diff --git a/arch/arm/boot/dts/keystone.dts b/arch/arm/boot/dts/keystone.dts
-index 100bdf5..a6e5f91 100644
---- a/arch/arm/boot/dts/keystone.dts
-+++ b/arch/arm/boot/dts/keystone.dts
-@@ -179,5 +179,11 @@
- 			interrupts = <GIC_SPI 300 IRQ_TYPE_EDGE_RISING>;
- 			clocks = <&clkspi>;
- 		};
-+
-+		wdt: wdt at 022f0080 {
-+			compatible = "ti,keystone-wdt";
-+			reg = <0x022f0080 0x80>;
-+			clocks = <&clkwdtimer0>;
-+		};
- 	};
- };
--- 
-1.7.9.5
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
