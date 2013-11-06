@@ -1,96 +1,75 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 5 Nov 2013 17:36:02 -0800
-Subject: [PATCH v3 13/28] mtd: nand: pxa3xx: Add bad block handling
-In-Reply-To: <20131105234055.GE11759@localhost>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-14-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105182301.GN20061@ld-irv-0074.broadcom.com>
- <20131105234055.GE11759@localhost>
-Message-ID: <CAN8TOE_BVQA4CHZL0=krzakw4izsaaw4_tGFwvdUAj12ZZr19w@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 6 Nov 2013 10:48:03 +0900
+Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
+In-Reply-To: <CANqRtoSW6jFX3pa94ZBgrKkvx5YNKqgxVSsYkSxMP_btcxFh7A@mail.gmail.com>
+References: <20131031031549.15985.23547.sendpatchset@w520>
+ <20131031042035.GG1603@verge.net.au>
+ <CANqRtoSW6jFX3pa94ZBgrKkvx5YNKqgxVSsYkSxMP_btcxFh7A@mail.gmail.com>
+Message-ID: <20131106014801.GD22183@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 5, 2013 at 3:40 PM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> On Tue, Nov 05, 2013 at 10:23:01AM -0800, Brian Norris wrote:
->> On Tue, Nov 05, 2013 at 09:55:20AM -0300, Ezequiel Garcia wrote:
->> > --- a/drivers/mtd/nand/pxa3xx_nand.c
->> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
->> > @@ -1128,6 +1152,14 @@ KEEP_CONFIG:
->> >
->> >     if (nand_scan_ident(mtd, 1, def))
->> >             return -ENODEV;
->> > +
->> > +   if (pdata->flash_bbt) {
->> > +           chip->bbt_options |= NAND_BBT_USE_FLASH |
->> > +                                NAND_BBT_NO_OOB_BBM;
->>
->> You're using NAND_BBT_NO_OOB_BBM? So you are unable to write bad block
->> markers to flash at all? Is this related to your independent patch for
->> trying to scan BBM from the data area?
->
-> Yes.
->
->> Could you instead write a
->> nand_chip.block_markbad() callback routine that would program BBM to the
->> appropriate data area?
->
-> No :-)
+On Thu, Oct 31, 2013 at 05:02:13PM +0900, Magnus Damm wrote:
+> Hi Simon,
+> 
+> On Thu, Oct 31, 2013 at 1:20 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Oct 31, 2013 at 12:15:49PM +0900, Magnus Damm wrote:
+> >> From: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> >>
+> >> Add 1GiB of DRAM at 0x2_0000_0000 to support the full 2GiB
+> >> of APE6EVM system memory.
+> >>
+> >> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >> ---
+> >>
+> >>  For correct run time operation regardless of kernel configuration
+> >>  ARM patches 7863/1 and 7864/1 are needed.
+> >
+> > I take it that I should wait for those patches before applying this one.
+> 
+> That's probably a good idea. RMK has applied them to "git-curr", so I
+> suppose they are queued up for something at least:
+> 
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7863/1
 
-Well given the reset of your comments, I guess you could write an
-empty one (or one with a BUG() or WARN()?).
+I have also sighted them in linux-next.
+So I expect they will show up in v3.13-rc1 or thereabouts.
 
->> Or, if you really want to avoid programming new BBMs, then you should
->> probably describe this decision in the patch description more clearly.
->>
->
-> Right.
->
-> I'll have to describe a bunch of stuff about the controller so this
-> NO_OOB_BBM makes sense. Please bare with me and keep reading :)
+> > With those two patches and this one applied on top of
+> > renesas-devel-v3.12-rc7-20131030 I was able to successfully
+> > boot an ape6evm board. But /proc/meminfo still indicates only 1Gb of
+> > memory. What am I missing.
+> 
+> You probably need to enable HIGHMEM and LPAE to be able to access to
+> all memory. Same thing on Lager, to get the full 4GiB you need to
+> select those in your kernel configuration too.
 
-[snip nice description; I did read it!]
+Thanks, I have been able to successfully test all 4 patches in this
+series with those settings enabled.
 
-> So, there's no point in marking a block as bad, because good blocks
-> are *also* mark as bad. We need to rely in the bad block table, and only
-> perform the scan in on the very first time (when the device is unused).
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
 
-Right. I didn't quite think through this whole process.
+> Please note that having memory located on 64-bit addresses may break
+> some drivers doing bus mastering or using the DMAC. These drivers need
+> to be fixed both with short term DMA zone workarounds and proper
+> 64-bit address support whenever possible.
+> 
+> So if I could suggest a policy then having LPAE=n in defconfig for the
+> C board code for default stable operation. This together with LPAE=y
+> in the case of DT reference and/or Multiplatform where we can be a bit
+> more experimental. I don't care enough to send defconfig patches, but
+> if some issue comes up then perhaps adjusting the defconfig to disable
+> LPAE may work well as a workaround.
 
-I think a short (few lines) comment in the code to describe the
-justification for using NAND_BBT_NO_OOB_BBM is in order for v4. And
-maybe include a bit of this in the commit message as well.
+Thanks.
 
-> We're aware this sounds kind of crappy since we'll get completely screwed
-> in case the bad block table is somehow lost or corrupted, but we don't
-> care about such case.
->
-> Still, I'd like to know:
->
-> 1. Do you think the bad block table could be corrupted or is this not
-> likely to ever happen?
+As it stands the defconfig for both APE6EVM and Lager lead to a
+configuration with LPAE disabled, although neither explicitly disable LPAE.
+I think it is best to leave things as-is in this regards and explicitly
+disable LPAE in the defconfigs if the need arises.
 
-Yes, it can be. But no, I don't think it's likely. There are very few,
-rare instances where we have to modify the BBT (and thereby make it
-susceptible to corruption), and those instances have some level of
-robustness to them. Of course, they still have room for improvement.
-(I suppose there could as be corruption due to read disturb; but this
-is also handled now, by scrubbing the affected BBT blocks that return
--EUCLEAN, refreshing them with clean data.)
-
-Personally, I've experienced "corruption" primarily when I have boards
-where I change the ECC configuration; then the BBT scan sees -EBADMSG
-and has to rebuild the table.
-
-> 2. Do you have any ideas to 'avoid' writing to the marker? or maybe to
-> otherwise scan the factory markers the first time, but then use some
-> other position for the kernel in-flash BB marker?
-
-Hmm, not really. We've kind of co-opted the idea of the factory bad
-block marker as a secondary, distributed bad block table in the
-kernel. It's not really the expected use case, and it breaks in cases
-like yours, since we don't support a third form of bad block
-marker/table for post-initial-scan markers. I think the best solution
-in this case is just to rely solely on the BBT after the first scan.
-
-Brian
+While looking over this I noticed that the APE6EVM defconfig selects
+HIGHMEM while the Lager defconfig does not and it is not selected in the
+resulting config. Would it be worth updating the Lager defconfig to enable
+HIGHMEM? If so, I'll make a patch.
