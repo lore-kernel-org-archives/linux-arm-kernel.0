@@ -1,57 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:16:17 +0000
-Subject: [PATCH 05/13] ARM: ux500: Add ID properties to 'simply' differentiate
- between MSPs
+Date: Wed,  6 Nov 2013 10:16:20 +0000
+Subject: [PATCH 08/13] ASoC: generic-dmaengine-pcm: Clear slave_config memory
 In-Reply-To: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
 References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732985-18928-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732985-18928-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We currently assume that the DMA Slave Config will be fully populated
+by the platform, however some DMA Engines make decisions based on zero
+(default) flags such as DMA_SLAVE_BUSWIDTH_UNDEFINED and as this is a
+static declaration we need to memset it to clear the data area.
+
+Cc: alsa-devel at alsa-project.org
+Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ sound/soc/soc-generic-dmaengine-pcm.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index 50ff5ab..63861ee 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -920,6 +920,8 @@
- 			clocks = <&prcc_kclk 1 3>, <&prcc_pclk 1 3>;
- 			clock-names = "msp", "apb_pclk";
+diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
+index ee07903..6ad4c7a 100644
+--- a/sound/soc/soc-generic-dmaengine-pcm.c
++++ b/sound/soc/soc-generic-dmaengine-pcm.c
+@@ -90,6 +90,8 @@ static int dmaengine_pcm_hw_params(struct snd_pcm_substream *substream,
+ 	struct dma_slave_config slave_config;
+ 	int ret;
  
-+			id = <0>;
++	memset(&slave_config, 0, sizeof(slave_config));
 +
- 			status = "disabled";
- 		};
- 
-@@ -935,6 +937,8 @@
- 			clocks = <&prcc_kclk 1 4>, <&prcc_pclk 1 4>;
- 			clock-names = "msp", "apb_pclk";
- 
-+			id = <1>;
-+
- 			status = "disabled";
- 		};
- 
-@@ -953,6 +957,8 @@
- 			clocks = <&prcc_kclk 2 3>, <&prcc_pclk 2 5>;
- 			clock-names = "msp", "apb_pclk";
- 
-+			id = <2>;
-+
- 			status = "disabled";
- 		};
- 
-@@ -968,6 +974,8 @@
- 			clocks = <&prcc_kclk 1 10>, <&prcc_pclk 1 11>;
- 			clock-names = "msp", "apb_pclk";
- 
-+			id = <3>;
-+
- 			status = "disabled";
- 		};
- 
+ 	if (!pcm->config)
+ 		prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config;
+ 	else
 -- 
 1.8.1.2
