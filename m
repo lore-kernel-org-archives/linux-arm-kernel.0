@@ -1,35 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 6 Nov 2013 13:23:03 -0800
-Subject: [PATCH] ARM: make OABI default to off
-In-Reply-To: <20131106211352.GA24006@www.outflux.net>
-References: <20131106211352.GA24006@www.outflux.net>
-Message-ID: <CAOesGMiJFt0sP1tjsLogDh0n6CXtE3POUpFLPH=XoFQapbir8Q@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 6 Nov 2013 13:24:39 -0800
+Subject: [PATCH v2] ARM: make OABI default to off
+Message-ID: <20131106212439.GA24343@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 6, 2013 at 1:13 PM, Kees Cook <keescook@chromium.org> wrote:
-> Given recent discussions about the lack of OABI in the wild, switch
-> CONFIG_OABI_COMPAT to off-by-default to encourage more system builders
-> to avoid it.
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/arm/Kconfig |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 1ad6fb6c094d..4ace7f33e8a1 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1728,7 +1728,7 @@ config AEABI
->  config OABI_COMPAT
->         bool "Allow old ABI binaries to run with this kernel (EXPERIMENTAL)"
->         depends on AEABI && !THUMB2_KERNEL
-> -       default y
-> +       default n
+Given recent discussions about the lack of OABI in the wild, switch
+CONFIG_OABI_COMPAT to off-by-default to encourage more system builders
+to avoid it.
 
-Nit: "default n" is the default default. So you can just delete the
-line instead.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+v2:
+ - drop "default n", it is redundant; Olof Johansson
+---
+ arch/arm/Kconfig |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1ad6fb6c094d..0a1dc697333c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1728,7 +1728,6 @@ config AEABI
+ config OABI_COMPAT
+ 	bool "Allow old ABI binaries to run with this kernel (EXPERIMENTAL)"
+ 	depends on AEABI && !THUMB2_KERNEL
+-	default y
+ 	help
+ 	  This option preserves the old syscall interface along with the
+ 	  new (ARM EABI) one. It also provides a compatibility layer to
+@@ -1740,7 +1739,7 @@ config OABI_COMPAT
+ 	  can say N here. If this option is not selected and you attempt
+ 	  to execute a legacy ABI binary then the result will be
+ 	  UNPREDICTABLE (in fact it can be predicted that it won't work
+-	  at all). If in doubt say Y.
++	  at all). If in doubt say N.
+ 
+ config ARCH_HAS_HOLES_MEMORYMODEL
+ 	bool
+-- 
+1.7.9.5
 
 
--Olof
+-- 
+Kees Cook
+Chrome OS Security
