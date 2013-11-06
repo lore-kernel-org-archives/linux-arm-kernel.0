@@ -1,43 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Nov 2013 10:19:02 +0000
-Subject: mm: get_user_pages_fast()
-In-Reply-To: <52797483.2000105@cs.bris.ac.uk>
-References: <52797483.2000105@cs.bris.ac.uk>
-Message-ID: <20131106101901.GA21074@mudshark.cambridge.arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed,  6 Nov 2013 19:25:42 +0900
+Subject: [PATCH 0/4] arm64: Add audit support
+Message-ID: <1383733546-2846-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 10:43:15PM +0000, Michael McTernan wrote:
-> Hi all,
+This patchset adds audit support on arm64.
+The implementation is just like in other architectures,
+and so I think little explanation is needed.
 
-Hi Mike,
+I verified this patch with some commands on both 64-bit rootfs
+and 32-bit rootfs(, but only in little-endian):
+  # auditctl -a exit,always -S openat -F path=/etc/inittab
+  # auditctl -a exit,always -F dir=/tmp -F perm=rw
+  # auditctl -a task,always
+  # autrace /bin/ls
+What else?
+(Thanks to Clayton for his cross-compiling patch)
 
-> I think there's a problem on ARM with futex calls to FUTEX_WAIT and 
-> similar for addresses that have been mapped to userspace from /dev/mem 
-> or a device which sets VM_IO or VM_PFNMAP.  This can break 
-> pthread_mutex_lock() if placed on such mapped memory and attributed as 
-> process-shared.
-> 
-> The cause looks to be that ARM doesn't yet implement 
-> get_user_pages_fast(), which is called in get_futex_key() for a 
-> non-process private futex.
 
-[...]
+I'd like to discuss about the following issues:
+(issues)
+* AUDIT_ARCH_*
+  Why do we need to distiguish big-endian and little-endian? [2/4]
+* AArch32
+  We need to add a check for identifying the endian in 32-bit tasks. [3/4]
+* syscall no in AArch32
+  Currently all the definitions are added in unistd32.h with
+  "ifdef __AARCH32_AUDITSYSCALL" to use asm-generic/audit_*.h. [3/4]
+  "ifdef" is necessary to avoid a conflict with 64-bit definitions.
+  Do we need a more sophisticated way?
+* TIF_AUDITSYSCALL
+  Most architectures, except x86, do not check TIF_AUDITSYSCALL. Why not? [4/4]
+* Userspace audit package
+  There are some missing syscall definitions in lib/aarch64_table.h.
+  There is no support for AUDIT_ARCH_ARM (I mean LE. armeb is BE).
 
-> I've seen a couple of patches go by that provide get_user_pages_fast() 
-> on ARM, but none yet accepted.  I therefore would like to highlight this 
-> particular case for context, and also to perhaps generate some movement 
-> on this issue, which I also reported here:
-> 
-> https://bugzilla.kernel.org/show_bug.cgi?id=64321
 
-The latest patches from Steve are here:
+AKASHI Takahiro (4):
+  audit: Enable arm64 support
+  arm64: Add audit support
+  arm64: audit: Add AArch32 support
+  arm64: audit: Add audit hook in ptrace/syscall_trace
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/205951.html
+ arch/arm64/Kconfig                   |    3 +
+ arch/arm64/include/asm/audit32.h     |   12 ++
+ arch/arm64/include/asm/ptrace.h      |    5 +
+ arch/arm64/include/asm/syscall.h     |   18 ++
+ arch/arm64/include/asm/thread_info.h |    1 +
+ arch/arm64/include/asm/unistd32.h    |  387 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/Makefile           |    4 +
+ arch/arm64/kernel/audit.c            |   77 +++++++
+ arch/arm64/kernel/audit32.c          |   46 ++++
+ arch/arm64/kernel/entry.S            |    3 +
+ arch/arm64/kernel/ptrace.c           |   12 ++
+ include/uapi/linux/audit.h           |    2 +
+ init/Kconfig                         |    2 +-
+ 13 files changed, 571 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/audit32.h
+ create mode 100644 arch/arm64/kernel/audit.c
+ create mode 100644 arch/arm64/kernel/audit32.c
 
-but we need some feedback from the MM guys regarding the atomics in patch 2
-(since we don't require IPIs for TLB invalidation). I'd also like to see
-some numbers comparing the two schemes (since we could add a dummy IPI to
-our huge TLB flushing code if it's cheaper).
-
-Will
+-- 
+1.7.9.5
