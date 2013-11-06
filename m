@@ -1,45 +1,92 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 6 Nov 2013 15:31:17 -0800
-Subject: [PATCH] seccomp: not compatible with ARM OABI
-Message-ID: <20131106233117.GA24545@www.outflux.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 07 Nov 2013 08:39:52 +0900
+Subject: [PATCH/RFC] clk: shmobile: DT property SoC <-> CCF interface prototype
+Message-ID: <20131106233952.8558.85734.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure that seccomp filter won't be built when ARM OABI is in use,
-since there is work needed to distinguish calling conventions. Until
-that is done (which is likely never since OABI is deprecated), make
-sure seccomp filter is unavailable in the OABI compat world.
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
+Prototype patch to use a DT property to pass "CPG mode"
+(clock device boot time hardware configuration) from
+SoC code in arch/arm/ to CCF bits in drivers/clk/
+
+Applies on top of the r8a7790 CCF code by Laurent.
+Mainly written to show how a property can be used
+instead of introducing a custom symbol dependency.
+
+The SoC specific code needs to use of_update_property()
+to setup this DT property after reading out the boot
+mode from hardware during boot.
+
+Not-Yet-Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
- arch/Kconfig |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index af2cc6eabcc7..6eaca7d92399 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -331,12 +331,15 @@ config HAVE_ARCH_SECCOMP_FILTER
+ drivers/clk/shmobile/clk-r8a7790.c |   15 ++++++---------
+ include/linux/clk/shmobile.h       |   19 -------------------
+ 2 files changed, 6 insertions(+), 28 deletions(-)
+
+--- 0018/drivers/clk/shmobile/clk-r8a7790.c
++++ work/drivers/clk/shmobile/clk-r8a7790.c	2013-11-06 17:28:36.000000000 +0900
+@@ -12,7 +12,6 @@
  
- config SECCOMP_FILTER
- 	def_bool y
--	depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET
-+	depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET && !OABI_COMPAT
- 	help
- 	  Enable tasks to build secure computing environments defined
- 	  in terms of Berkeley Packet Filter programs which implement
- 	  task-defined system call filtering polices.
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+-#include <linux/clk/shmobile.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/of.h>
+@@ -70,8 +69,6 @@ static const struct clk_div_table cpg_sd
+ 	{ 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
+ };
  
-+	  Not available on ARM when built with OABI compatibility due to
-+	  lack of a sensible way to distinguish the calling conventions.
+-static u32 cpg_mode __initdata;
+-
+ #define CPG_SDCKCR			0x00000074
+ 
+ static void __init r8a7790_cpg_clocks_init(struct device_node *np)
+@@ -80,6 +77,12 @@ static void __init r8a7790_cpg_clocks_in
+ 	struct r8a7790_cpg *cpg;
+ 	struct clk **clks;
+ 	unsigned int i;
++	u32 cpg_mode;
 +
- 	  See Documentation/prctl/seccomp_filter.txt for details.
++	if (of_property_read_u32(np, "cpg-mode", &cpg_mode)) {
++		pr_err("%s: failed to determine CPG mode\n", __func__);
++		return;
++	}
  
- config HAVE_CONTEXT_TRACKING
--- 
-1.7.9.5
-
-
--- 
-Kees Cook
-Chrome OS Security
+ 	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
+ 	clks = kzalloc(CPG_NUM_CLOCKS * sizeof(*clks), GFP_KERNEL);
+@@ -168,9 +171,3 @@ static void __init r8a7790_cpg_clocks_in
+ CLK_OF_DECLARE(r8a7790_cpg_clks, "renesas,r8a7790-cpg-clocks",
+ 	       r8a7790_cpg_clocks_init);
+ 
+-void __init r8a7790_clocks_init(u32 mode)
+-{
+-	cpg_mode = mode;
+-
+-	of_clk_init(NULL);
+-}
+--- 0018/include/linux/clk/shmobile.h
++++ /dev/null	2013-06-03 21:41:10.638032047 +0900
+@@ -1,19 +0,0 @@
+-/*
+- * Copyright 2013 Ideas On Board SPRL
+- *
+- * Contact: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef __LINUX_CLK_SHMOBILE_H_
+-#define __LINUX_CLK_SHMOBILE_H_
+-
+-#include <linux/types.h>
+-
+-void r8a7790_clocks_init(u32 mode);
+-
+-#endif
