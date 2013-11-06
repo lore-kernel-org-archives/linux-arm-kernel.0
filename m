@@ -1,202 +1,96 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 5 Nov 2013 22:13:52 -0300
-Subject: [PATCH v3 22/28] mtd: nand: pxa3xx: Introduce multiple page I/O
- support
-In-Reply-To: <20131105190432.GQ20061@ld-irv-0074.broadcom.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 5 Nov 2013 17:36:02 -0800
+Subject: [PATCH v3 13/28] mtd: nand: pxa3xx: Add bad block handling
+In-Reply-To: <20131105234055.GE11759@localhost>
 References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-23-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105190432.GQ20061@ld-irv-0074.broadcom.com>
-Message-ID: <20131106011351.GH11759@localhost>
+ <1383656135-8627-14-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131105182301.GN20061@ld-irv-0074.broadcom.com>
+ <20131105234055.GE11759@localhost>
+Message-ID: <CAN8TOE_BVQA4CHZL0=krzakw4izsaaw4_tGFwvdUAj12ZZr19w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 11:04:32AM -0800, Brian Norris wrote:
-> On Tue, Nov 05, 2013 at 09:55:29AM -0300, Ezequiel Garcia wrote:
-> > --- a/drivers/mtd/nand/pxa3xx_nand.c
-> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> > @@ -826,7 +887,8 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
-> >  	prepare_start_command(info, command);
-> >  
-> >  	info->state = STATE_PREPARED;
-> > -	exec_cmd = prepare_set_command(info, command, column, page_addr);
-> > +	exec_cmd = prepare_set_command(info, command, -1, column, page_addr);
-> 
-> Is it safe to use -1 for the third parameter (ext_cmd_type)? AFAICT,
-> this doesn't make for correct input to the NDCB0_EXT_CMD_TYPE() macro.
-> 
+On Tue, Nov 5, 2013 at 3:40 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> On Tue, Nov 05, 2013 at 10:23:01AM -0800, Brian Norris wrote:
+>> On Tue, Nov 05, 2013 at 09:55:20AM -0300, Ezequiel Garcia wrote:
+>> > --- a/drivers/mtd/nand/pxa3xx_nand.c
+>> > +++ b/drivers/mtd/nand/pxa3xx_nand.c
+>> > @@ -1128,6 +1152,14 @@ KEEP_CONFIG:
+>> >
+>> >     if (nand_scan_ident(mtd, 1, def))
+>> >             return -ENODEV;
+>> > +
+>> > +   if (pdata->flash_bbt) {
+>> > +           chip->bbt_options |= NAND_BBT_USE_FLASH |
+>> > +                                NAND_BBT_NO_OOB_BBM;
+>>
+>> You're using NAND_BBT_NO_OOB_BBM? So you are unable to write bad block
+>> markers to flash at all? Is this related to your independent patch for
+>> trying to scan BBM from the data area?
+>
+> Yes.
+>
+>> Could you instead write a
+>> nand_chip.block_markbad() callback routine that would program BBM to the
+>> appropriate data area?
+>
+> No :-)
 
-Right. Probably '0' is a saner value.
+Well given the reset of your comments, I guess you could write an
+empty one (or one with a BUG() or WARN()?).
 
-> > +
-> >  	if (exec_cmd) {
-> >  		init_completion(&info->cmd_complete);
-> >  		init_completion(&info->dev_ready);
-> > @@ -844,6 +906,91 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
-> >  	info->state = STATE_IDLE;
-> >  }
-> >  
-> > +static void armada370_nand_cmdfunc(struct mtd_info *mtd,
-> > +				   const unsigned command,
-> > +				   int column, int page_addr)
-> > +{
-> > +	struct pxa3xx_nand_host *host = mtd->priv;
-> > +	struct pxa3xx_nand_info *info = host->info_data;
-> > +	int ret, exec_cmd, ext_cmd_type;
-> > +
-> > +	/*
-> > +	 * if this is a x16 device ,then convert the input
-> 
-> Misplaced comma/whitespace.
-> 
+>> Or, if you really want to avoid programming new BBMs, then you should
+>> probably describe this decision in the patch description more clearly.
+>>
+>
+> Right.
+>
+> I'll have to describe a bunch of stuff about the controller so this
+> NO_OOB_BBM makes sense. Please bare with me and keep reading :)
 
-Ack.
+[snip nice description; I did read it!]
 
-> > +	 * "byte" address into a "word" address appropriate
-> > +	 * for indexing a word-oriented device
-> > +	 */
-> > +	if (info->reg_ndcr & NDCR_DWIDTH_M)
-> > +		column /= 2;
-> > +
-> > +	/*
-> > +	 * There may be different NAND chip hooked to
-> > +	 * different chip select, so check whether
-> > +	 * chip select has been changed, if yes, reset the timing
-> > +	 */
-> > +	if (info->cs != host->cs) {
-> > +		info->cs = host->cs;
-> > +		nand_writel(info, NDTR0CS0, info->ndtr0cs0);
-> > +		nand_writel(info, NDTR1CS0, info->ndtr1cs0);
-> > +	}
-> > +
-> > +	/* Select the extended command for the first command */
-> > +	switch (command) {
-> > +	case NAND_CMD_READ0:
-> > +	case NAND_CMD_READOOB:
-> > +		ext_cmd_type = EXT_CMD_TYPE_MONO;
-> > +		break;
-> > +	}
-> 
-> You have no default case for this switch statement, leaving ext_cmd_type
-> uninitialized in some cases. You add the other cases in a later patch,
-> but this patch is temporarily broken.
-> 
+> So, there's no point in marking a block as bad, because good blocks
+> are *also* mark as bad. We need to rely in the bad block table, and only
+> perform the scan in on the very first time (when the device is unused).
 
-Right, I'll add a zero-valued default.
+Right. I didn't quite think through this whole process.
 
-> > +
-> > +	prepare_start_command(info, command);
-> > +
-> > +	/*
-> > +	 * Prepare the "is ready" completion before starting a command
-> > +	 * transaction sequence. If the command is not executed the
-> > +	 * completion will be completed, see below.
-> > +	 *
-> > +	 * We can do that inside the loop because the command variable
-> > +	 * is invariant and thus so is the exec_cmd.
-> > +	 */
-> > +	atomic_set(&info->is_ready, 0);
-> > +	init_completion(&info->dev_ready);
-> > +	do {
-> > +		info->state = STATE_PREPARED;
-> > +		exec_cmd = prepare_set_command(info, command, ext_cmd_type,
-> > +					       column, page_addr);
-> 
-> [...]
-> 
-> > @@ -1155,7 +1306,30 @@ static int armada370_ecc_init(struct pxa3xx_nand_info *info,
-> >  			      struct nand_ecc_ctrl *ecc,
-> >  			      int strength, int page_size)
-> >  {
-> > -	/* Unimplemented yet */
-> > +	if (strength == 4 && page_size == 4096) {
-> 
-> You compare only to ecc_strength_ds, and not ecc_step_ds. While it is
-> likely that a 4-bit ECC NAND will have a 512-byte ECC step size, you
-> should probably check this.
-> 
+I think a short (few lines) comment in the code to describe the
+justification for using NAND_BBT_NO_OOB_BBM is in order for v4. And
+maybe include a bit of this in the commit message as well.
 
-OK.
+> We're aware this sounds kind of crappy since we'll get completely screwed
+> in case the bad block table is somehow lost or corrupted, but we don't
+> care about such case.
+>
+> Still, I'd like to know:
+>
+> 1. Do you think the bad block table could be corrupted or is this not
+> likely to ever happen?
 
-> What about strength < 4? Shouldn't you be able to support a 1-bit ECC
-> NAND with your 4-bit ECC?
-> 
+Yes, it can be. But no, I don't think it's likely. There are very few,
+rare instances where we have to modify the BBT (and thereby make it
+susceptible to corruption), and those instances have some level of
+robustness to them. Of course, they still have room for improvement.
+(I suppose there could as be corruption due to read disturb; but this
+is also handled now, by scrubbing the affected BBT blocks that return
+-EUCLEAN, refreshing them with clean data.)
 
-Yes, probably. The rationale behind these xxx_ecc_init() functions is
-to only validate the devices I've tested or that are known to work.
+Personally, I've experienced "corruption" primarily when I have boards
+where I change the ECC configuration; then the BBT scan sees -EBADMSG
+and has to rebuild the table.
 
-That said, maybe I'm being too paranoid.
+> 2. Do you have any ideas to 'avoid' writing to the marker? or maybe to
+> otherwise scan the factory markers the first time, but then use some
+> other position for the kernel in-flash BB marker?
 
-> Also, do you plan to support non-ONFI NAND?
+Hmm, not really. We've kind of co-opted the idea of the factory bad
+block marker as a secondary, distributed bad block table in the
+kernel. It's not really the expected use case, and it breaks in cases
+like yours, since we don't support a third form of bad block
+marker/table for post-initial-scan markers. I think the best solution
+in this case is just to rely solely on the BBT after the first scan.
 
-Not for the time being. (Are there any new non-ONFI NAND devices?)
-
-> Remember that nand_base
-> doesn't guarantee giving you a non-zero ECC strength. You might need a
-> DT binding to specify this, if it's not automatically detectable.
-> 
-
-Given this series is already long and complex, I'd like to push as much
-features as possible to follow-up patches. That way we can support the
-current boards out there now (Mirabox's a relevant example) and add support
-for more later, gradually.
-
-> > +		ecc->mode = NAND_ECC_HW;
-> > +		ecc->size = 512;
-> > +		ecc->layout = &ecc_layout_4KB_bch4bit;
-> > +		ecc->strength = 4;
-> > +
-> > +		info->ecc_bch = 1;
-> > +		info->chunk_size = 2048;
-> > +		info->spare_size = 32;
-> > +		info->ecc_size = 32;
-> > +		return 1;
-> > +
-> > +	} else if (strength == 8 && page_size == 4096) {
-> > +		ecc->mode = NAND_ECC_HW;
-> > +		ecc->size = 512;
-> > +		ecc->layout = &ecc_layout_4KB_bch8bit;
-> > +		ecc->strength = 8;
-> 
-> These ECC parameters (8-bit per 512 and 4-bit per 512) sound reasonable
-> and consistent with other ECC schemes I've seen. But I'm still not clear
-> if we are 100% certain that matches the actual hardware implementation.
-> Did you do any further research since the last time we talked about
-> this?
-> 
-
-Yes, and I tried to answer your questions in detail in the cover letters
-(which now is in a patch for Documentation/mtd/nand/...) and in past
-discussion.
-
-See for instance: http://permalink.gmane.org/gmane.linux.drivers.mtd/48895.
-
-Feel free to ask any further clarification about how the ECC engine
-works. If you think it'll help, I can write a separate mail describing
-it (to the best of my knowledge) and we can discuss there.
-
-In particular, the above link contains a question that is still
-unanswered and that would help me understand this better.
-I'll copy-paste it here:
-
-"""
-Regarding this: I'd really like to understand better this 'step' concept
-and it applicability on this controller. So any clarification is welcome
-:)
-
-As far as I can see: currently the hardware does ECC corrections in a
-completely transparent fashion and merely 'reports' the no. of corrected
-bits through some IRQ plus some registers.
-Therefore, it implements the ecc.{read,write}_page() functions.
-
-So, why should I tell the NAND core any of the ECC details?
-
-I see other drivers need to implement some of the functions in the
-nand_ecc_ctrl struct, such as: hwctl(), calculate() or correct().
-However, I can't see how any of that applies on this controller.
-"""
-
-Thanks a lot for reviewing all of this!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Brian
