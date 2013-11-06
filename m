@@ -1,63 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:16:16 +0000
-Subject: [PATCH 04/13] ARM: ux500: Add DMA config bindings for MSP devices
+Date: Wed,  6 Nov 2013 10:16:18 +0000
+Subject: [PATCH 06/13] ASoC: ux500_pcm: Extend ux500 MSP binding for
+ enumeration
 In-Reply-To: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
 References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732985-18928-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732985-18928-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Cc: devicetree at vger.kernel.org
+Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ Documentation/devicetree/bindings/sound/ux500-msp.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index 7da99fe..50ff5ab 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -913,6 +913,10 @@
- 			interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
+diff --git a/Documentation/devicetree/bindings/sound/ux500-msp.txt b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+index 99acd9c..33bd000 100644
+--- a/Documentation/devicetree/bindings/sound/ux500-msp.txt
++++ b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+@@ -3,6 +3,7 @@
+ Required properties:
+  - compatible       :"stericsson,ux500-msp-i2s"
+  - reg              : Physical base address and length of the device's registers.
++ - id               : MSP ID - used during component registration
  
-+			dmas = <&dma 31 0 0x12>, /* Logical - DevToMem - HighPrio */
-+			       <&dma 31 0 0x10>; /* Logical - MemToDev - HighPrio */
-+			dma-names = "rx", "tx";
-+
- 			clocks = <&prcc_kclk 1 3>, <&prcc_pclk 1 3>;
- 			clock-names = "msp", "apb_pclk";
+ Optional properties:
+  - interrupts       : The interrupt output from the device.
+@@ -28,6 +29,7 @@ Example:
+ 		reg = <0x80124000 0x1000>;
+ 		interrupts = <0 62 0x4>;
+ 		v-ape-supply = <&db8500_vape_reg>;
++		id = <1>;
+ 	};
  
-@@ -925,6 +929,9 @@
- 			interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
+ 	msp3: msp at 80125000 {
+@@ -35,6 +37,7 @@ Example:
+ 		reg = <0x80125000 0x1000>;
+ 		interrupts = <0 62 0x4>;
+ 		v-ape-supply = <&db8500_vape_reg>;
++		id = <3>;
+ 	};
  
-+			dmas = <&dma 30 0 0x10>; /* Logical - MemToDev - HighPrio */
-+			dma-names = "tx";
-+
- 			clocks = <&prcc_kclk 1 4>, <&prcc_pclk 1 4>;
- 			clock-names = "msp", "apb_pclk";
- 
-@@ -938,6 +945,11 @@
- 			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
- 
-+			dmas = <&dma 14 0 0x12>, /* Logical  - DevToMem - HighPrio */
-+			       <&dma 14 1 0x19>; /* Physical Chan 1 - MemToDev
-+                                                    HighPrio - Fixed */
-+			dma-names = "rx", "tx";
-+
- 			clocks = <&prcc_kclk 2 3>, <&prcc_pclk 2 5>;
- 			clock-names = "msp", "apb_pclk";
- 
-@@ -950,6 +962,9 @@
- 			interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
- 
-+			dmas = <&dma 30 0 0x12>; /* Logical - DevToMem - HighPrio */
-+			dma-names = "rx";
-+
- 			clocks = <&prcc_kclk 1 10>, <&prcc_pclk 1 11>;
- 			clock-names = "msp", "apb_pclk";
- 
+ 	codec: ab8500-codec {
 -- 
 1.8.1.2
