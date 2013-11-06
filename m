@@ -1,76 +1,57 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 6 Nov 2013 09:41:17 +0100
-Subject: linux-next: manual merge of the gpio tree with the arm-soc and
- cortex trees
-In-Reply-To: <20131106191454.5f45b0b5300f03e74a6a09eb@canb.auug.org.au>
-References: <20131106191454.5f45b0b5300f03e74a6a09eb@canb.auug.org.au>
-Message-ID: <20131106084117.GT14892@pengutronix.de>
+Date: Wed, 6 Nov 2013 09:46:04 +0100
+Subject: [PATCH 20/23] ARM: signal: sigreturn_codes should be endian
+ neutral to work in BE8
+In-Reply-To: <CAA3XUr0RbbbB6md96DLW_XQXSB7K-qhggVcNeLxowS7xzZwdRA@mail.gmail.com>
+References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1381271679-27804-21-git-send-email-ben.dooks@codethink.co.uk>
+ <20131105211807.GR14892@pengutronix.de>
+ <CAA3XUr0RbbbB6md96DLW_XQXSB7K-qhggVcNeLxowS7xzZwdRA@mail.gmail.com>
+Message-ID: <20131106084604.GU14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen,
+Hello Victor,
 
-On Wed, Nov 06, 2013 at 07:14:54PM +1100, Stephen Rothwell wrote:
-> Hi Linus,
+On Tue, Nov 05, 2013 at 07:48:42PM -0800, Victor Kamensky wrote:
+> Hi Uwe, and All,
 > 
-> Today's linux-next merge of the gpio tree got a conflict in
-> arch/arm/Kconfig between commit f3372c01816e ("ARM: gemini: convert to
-> GENERIC_CLOCKEVENTS") from the arm-soc tree and f5caa3b59e18 ("ARM:
-> deprecate mach/timex.h for !ARCH_MULTIPLATFORM") from the cortex tree and
-> commits ffde39ea61ea ("ARM: mmp: delete the custom GPIO header"),
-> 88f718e3fa4d ("ARM: pxa: delete the custom GPIO header") and 85649711a895
-> ("ARM: gemini: delete <mach/gpio.h>") from the gpio tree.
+> On 5 November 2013 13:18, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
-looks correct.
+> <snip>
+> 
+> >> +
+> >> +#if __LINUX_ARM_ARCH__ <= 4
+> >> +     /*
+> >> +      * Note we manually set minimally required arch that supports
+> >> +      * required thumb opcodes for early arch versions. It is OK
+> >> +      * for this file to be used in combination with other
+> >> +      * lower arch variants, since these code snippets are only
+> >> +      * used as input data.
+> >> +      */
+> >> +     .arch armv4t
+> >> +#endif
+> >> +
+> >> +     .section .rodata
+> >> +     .global sigreturn_codes
+> >> +     .type   sigreturn_codes, #object
+> >> +
+> >> +     .arm
+> > This breaks a ARMv7-M build, see
+> > http://arm-soc.lixom.net/buildlogs/misc/next-20131105-1-g2b29c44/buildall.arm.efm32_defconfig.log.failed
+> 
+> Could you please point to git tree and branch from which efm32_defconfig
+> was built - I could not find such in my tree.
+next-20131105 contains both, your patch and the efm32 support.
+(i.e. git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+next/master)
 
-BTW, "cortex" is a bit too general. My tree is only about Cortex-M. Also
-you can drop -2.6 from the URL.
+The problem is, that armv7-M doesn't support ARM, only Thumb-2.
+If you go the ifdef route, CONFIG_CPU_THUMBONLY is what you want to use.
 
 Best regards
 Uwe
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc arch/arm/Kconfig
-> index 568d6471dd18,c6debe07f036..000000000000
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@@ -397,10 -386,8 +397,9 @@@ config ARCH_CLPS711
->   config ARCH_GEMINI
->   	bool "Cortina Systems Gemini"
->   	select ARCH_REQUIRE_GPIOLIB
->  -	select ARCH_USES_GETTIMEOFFSET
->  +	select CLKSRC_MMIO
->   	select CPU_FA526
->  +	select GENERIC_CLOCKEVENTS
-> - 	select NEED_MACH_GPIO_H
->   	help
->   	  Support for the Cortina Systems Gemini family SoCs
->   
-> @@@ -593,8 -558,6 +592,7 @@@ config ARCH_MM
->   	select GPIO_PXA
->   	select IRQ_DOMAIN
->   	select MULTI_IRQ_HANDLER
-> - 	select NEED_MACH_GPIO_H
->  +	select NEED_MACH_TIMEX_H
->   	select PINCTRL
->   	select PLAT_PXA
->   	select SPARSE_IRQ
-> @@@ -658,8 -620,6 +656,7 @@@ config ARCH_PX
->   	select GPIO_PXA
->   	select HAVE_IDE
->   	select MULTI_IRQ_HANDLER
-> - 	select NEED_MACH_GPIO_H
->  +	select NEED_MACH_TIMEX_H
->   	select PLAT_PXA
->   	select SPARSE_IRQ
->   	help
-
-
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
