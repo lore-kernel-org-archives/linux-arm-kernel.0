@@ -1,46 +1,80 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed, 06 Nov 2013 10:50:00 +1000
-Subject: [PATCHv3] ARM: imx: add support code for IMX50 based machines
-In-Reply-To: <20131105155701.GL3060@titan.lakedaemon.net>
-References: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
- <20131104145151.GD3060@titan.lakedaemon.net>
- <20131104145739.GE3060@titan.lakedaemon.net> <52785FAE.7040904@uclinux.org>
- <20131105155701.GL3060@titan.lakedaemon.net>
-Message-ID: <52799238.9010803@uclinux.org>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 05 Nov 2013 16:54:31 -0800 (PST)
+Subject: [PATCH 3/3] clk: shmobile: Add R8A7790 clocks support
+In-Reply-To: <2199055.1gOuVSSAtq@avalon>
+References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383058511-26046-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <87r4avnsc6.wl%kuninori.morimoto.gx@renesas.com>
+ <2199055.1gOuVSSAtq@avalon>
+Message-ID: <874n7q1ha3.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
 
-On 06/11/13 01:57, Jason Cooper wrote:
-> On Tue, Nov 05, 2013 at 01:02:06PM +1000, Greg Ungerer wrote:
->> Hi Jason,
->>
->> On 05/11/13 00:57, Jason Cooper wrote:
->>> On Mon, Nov 04, 2013 at 09:51:51AM -0500, Jason Cooper wrote:
->>>> What happened to the rest of the series?
->>>
->>> Crap.  Nevermind.  I just saw that Shawn had already taken the other
->>> patches into his tree.  And here I thought I was caught up on
->>> everything...
->>
->> :-)
->>
->> Are you going to try and test out the imx50 support from Shawn's branch?
-> 
-> I did manage to get it to boot, but I'm not confident in it yet.  There
-> is still a nagging problem (I had with my implementation as well) where
-> 
-> $ sleep 10
-> 
-> takes greater than 20 seconds. :(  Which is why I originally asked you
-> about the apll...
+Hi Laurent
 
-I have seen that. I haven't had a chance to look properly into it.
-If you boot Freescales old LTIB code that supports the iMX50 it seems
-they are messing with the clock setup to get it just right. It may
-be that they just didn't get it right in their boot loader to start
-with.
+> > > +	for (i = 0; i < CPG_NUM_CLOCKS; ++i) {
+> > > +		const struct clk_div_table *table = NULL;
+> > > +		const char *parent_name = "main";
+> > > +		const char *name;
+> > > +		unsigned int shift;
+> > > +		unsigned int mult = 1;
+> > > +		unsigned int div = 1;
+> > > +		struct clk *clk;
+> > > +
+> > > +		of_property_read_string_index(np, "clock-output-names", i,
+> > > +					      &name);
+> > > +
+> > > +		switch (i) {
+> > > +		case R8A7790_CLK_MAIN:
+> > > +			parent_name = of_clk_get_parent_name(np, 0);
+> > > +			div = config->extal_div;
+> > > +			break;
+> > > +		case R8A7790_CLK_PLL1:
+> > > +			mult = config->pll1_mult / 2;
+> > > +			break;
+> > > +		case R8A7790_CLK_PLL3:
+> > > +			mult = config->pll3_mult;
+> > > +			break;
+> > > +		case R8A7790_CLK_LB:
+> > > +			div = cpg_mode & BIT(18) ? 36 : 24;
+> > > +			break;
+> > > +		case R8A7790_CLK_QSPI:
+> > > +			div = (cpg_mode & (BIT(3) | BIT(2) | BIT(1))) == BIT(2)
+> > > +			    ? 16 : 20;
+> > > +			break;
+> > > +		case R8A7790_CLK_SDH:
+> > > +			table = cpg_sdh_div_table;
+> > > +			shift = 8;
+> > > +			break;
+> > > +		case R8A7790_CLK_SD0:
+> > > +			table = cpg_sd01_div_table;
+> > > +			shift = 4;
+> > > +			break;
+> > > +		case R8A7790_CLK_SD1:
+> > > +			table = cpg_sd01_div_table;
+> > > +			shift = 0;
+> > > +			break;
+> > > +		}
+> > 
+> > Is this clock-output-names realy "Required" property ?
+> > The "name" and "order" seem fixed, then,
+> > I guess it can simply use "name array" ?
+> 
+> The clock-output-names property is required by the of_clk_get_parent_name() 
+> function. The property is mandatory for all clocks that need to be referenced 
+> by name, which is the case of all non-leaf clocks on our platforms. We thus 
+> need it.
 
-Regards
-Greg
+Please correct me if my understanding was wrong.
+Does your "of_clk_get_parent_name()" means "case R8A7790_CLK_MAIN"'s one ?
+If Yes, it is needed on "parent" clock side, not here ?
+If No,  who need/call of_clk_get_parent_name() for this ?
+does "qspi", "sdh", "sd0", "sd1" can be parent clock for some device ??
+
+And, parent of main clock is fixed by MD pin settings.
+SW can't exchange it.
+
+Best regards
+---
+Kuninori Morimoto
