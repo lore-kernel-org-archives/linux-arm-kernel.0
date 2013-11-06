@@ -1,30 +1,57 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 6 Nov 2013 11:45:30 -0500
-Subject: [PATCH v5 4/7] arm64: introduce
- aarch64_insn_gen_{nop|branch_imm}() helper functions
-In-Reply-To: <20131030004840.GC25346@mudshark.cambridge.arm.com>
-References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
- <1382109602-27432-5-git-send-email-liuj97@gmail.com>
- <20131030004840.GC25346@mudshark.cambridge.arm.com>
-Message-ID: <20131106114530.76b63b05@gandalf.local.home>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Wed, 6 Nov 2013 10:54:02 -0600
+Subject: [PATCH v7] pinctrl: imx27: imx27 pincontrol driver
+In-Reply-To: <CACRpkdYKgA5E4-APSTHsM=zVbb3X2R4v+V4EeK3+W1tKPR1FeA@mail.gmail.com>
+References: <1382950843-26066-3-git-send-email-mpa@pengutronix.de>
+ <1383057139-25304-1-git-send-email-mpa@pengutronix.de>
+ <CACRpkdYKgA5E4-APSTHsM=zVbb3X2R4v+V4EeK3+W1tKPR1FeA@mail.gmail.com>
+Message-ID: <CAHCPf3v3dsTyk9Cd93GBLBKQLSQ+Mb0mpq134X7Ko4U8m-b-qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Oct 2013 00:48:40 +0000
-Will Deacon <will.deacon@arm.com> wrote:
+On Tue, Oct 29, 2013 at 11:00 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Tue, Oct 29, 2013 at 7:32 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+>
+>> imx27 pincontrol driver using the imx1 core driver. The DT bindings are
+>> similar to other imx pincontrol drivers.
+>>
+>> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+>> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>> ---
+>> Hi,
+>>
+>> another binding documentation update. The MUX_ID components are described more
+>> detailed now.
+>
+> Patch tentatively applied unless someone has very fundamental
+> issues with it, it stays in. I really want a full transfer of i.MX
+> pin controllers to the subsystem, using device tree so we can
+> get rid of the old i.MX cruft in arch/arm.
 
+I think this is a rush-in patch. I actually read the manual last night
+and found some serious weirdness.
 
-> > +}
-> > +
-> > +static __always_inline u32 aarch64_insn_gen_nop(void)
-> > +{
-> > +	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
-> > +}
-> 
-> Either use plain old `inline' or write these as preprocessor macros.
-> 
+The i.MX27 doesn't have a dedicated IOMUX controller so actually
+having a whole separate node for it in the device tree - or even a
+separate driver - makes very little sense. I understand pinctrl and
+gpiolib are somewhat separated as software, but this is encoding a
+Linuxism into the tree.
 
-I'm curious to why you say that? Preprocessor macros are rather ugly,
-and in x86 we use "__always_inline" quite liberally.
+In fact, the binding will conflict with actual binding of the GPIO
+(i.e. setting data, receiving interrupts) module since it's all one
+register set, and the "fsl,imx27-iomuxc" compatible property does not
+represent reality except to collect data in a different spot. There's
+no reason for it except to cut the documentation and tree definition
+in half, and have two nodes for Linux.
 
--- Steve
+Would it be so bad to implement this as a regmap and have two drivers
+access the same regmap on the Linux side? You don't need two nodes for
+that, and the IOMUX definitions can live under the GPIO node. There is
+NOTHING stopping two drivers on Linux matching the same compatible
+property. Locking and coordination in software of a single IP block
+used by two drivers shouldn't be arbitrated by the device tree.
+
+Thanks,
+Matt Sealey <neko@bakuhatsu.net>
