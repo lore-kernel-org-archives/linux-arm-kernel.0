@@ -1,14 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Nov 2013 15:02:34 +0000
-Subject: omap2plus_defconfig build failure in v3.12
-In-Reply-To: <20131106150015.GA20674@netboy>
-References: <20131106150015.GA20674@netboy>
-Message-ID: <20131106150234.GY16735@n2100.arm.linux.org.uk>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed, 06 Nov 2013 23:10:12 +0800
+Subject: [PATCH v5 1/7] arm64: introduce basic aarch64 instruction decoding
+ helpers
+In-Reply-To: <20131031173946.GL26009@arm.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+ <1382109602-27432-2-git-send-email-liuj97@gmail.com>
+ <20131031173946.GL26009@arm.com>
+Message-ID: <527A5BD4.3000405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 04:00:15PM +0100, Richard Cochran wrote:
-> Is my toolchain too old, or what is going on here?
-
-You need a later binutils for ARM - you don't have to upgrade the entire
-toolchain, just the binutils.
+On 11/01/2013 01:39 AM, Catalin Marinas wrote:
+> On Fri, Oct 18, 2013 at 04:19:55PM +0100, Jiang Liu wrote:
+>> +/*
+>> + * ARMv8-A Section B2.6.5:
+> 
+> Minor comment - please specify the document revision and the title of
+> the section as they keep changing in subsequent ARMv8 ARM updates and
+> this comment would no longer match.
+> 
+Thanks for review, will improve it in next version.
