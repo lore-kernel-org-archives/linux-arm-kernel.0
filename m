@@ -1,140 +1,89 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 06 Nov 2013 01:08:35 +0100
-Subject: [PATCHv4] video: backlight: gpio-backlight: Add DT support.
-In-Reply-To: <20131101101346.GK27864@ulmo.nvidia.com>
-References: <20131019104555.GI18477@ns203013.ovh.net>
- <001e01ced692$267a6d90$736f48b0$%han@samsung.com>
- <20131101101346.GK27864@ulmo.nvidia.com>
-Message-ID: <3967459.E0IoUGONBn@avalon>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 5 Nov 2013 16:14:49 -0800
+Subject: ARM audit, seccomp, etc are broken wrt OABI syscalls
+In-Reply-To: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
+References: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
+Message-ID: <CAGXu5jJreo001uBLV8oAgR_Z2WZK2qtH8YfvriQJVAQ4SgdRzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Tue, Nov 5, 2013 at 2:36 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> [cc: some ARM people]
+>
+> After a bit of an adventure, I got QEMU working.  (Linux 3.12's smc91x
+> driver and qemu 1.6 don't get along.  It would be great if some
+> kernel.org page described a standard way to boot a modern Linux image
+> on a modern QEMU version, but I digress.)
 
-On Friday 01 November 2013 11:13:47 Thierry Reding wrote:
-> On Fri, Nov 01, 2013 at 08:37:23AM +0900, Jingoo Han wrote:
-> > On Wednesday, October 23, 2013 5:02 AM, Thierry Reding wrote:
-> > > On Tue, Oct 22, 2013 at 05:34:45PM +0200, Jean-Christophe PLAGNIOL-
-VILLARD wrote:
-> > > > On 09:23 Tue 22 Oct     , Thierry Reding wrote:
-> > > > > On Tue, Oct 22, 2013 at 06:58:33AM +0200, Jean-Christophe PLAGNIOL-
-VILLARD wrote:
-> > > > > > On 11:13 Mon 21 Oct     , Denis Carikli wrote:
-> > > > > > > Cc: Richard Purdie <rpurdie@rpsys.net>
-> > > > > > > Cc: Jingoo Han <jg1.han@samsung.com>
-> > > > > > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > > > > > Cc: Rob Herring <rob.herring@calxeda.com>
-> > > > > > > Cc: Pawel Moll <pawel.moll@arm.com>
-> > > > > > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > > > > > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > > > > > > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > > > > > > Cc: devicetree at vger.kernel.org
-> > > > > > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > > > > > Cc: linux-arm-kernel at lists.infradead.org
-> > > > > > > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > > > > > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> > > > > > > Cc: Eric B?nard <eric@eukrea.com>
-> > > > > > > Signed-off-by: Denis Carikli <denis@eukrea.com>
-> > > > > > > ---
-> > > > > > > ChangeLog v3->v4:
-> > > > > > > - The default-brightness property is now optional, it defaults
-> > > > > > > to 1 if not set.> > > > > 
-> > > > > > by default we set OFF not ON
-> > > > > > 
-> > > > > > do not actiate driver or properti by default you can not known to
-> > > > > > consequence on the hw
-> > > > > 
-> > > > > Turning on a backlight by default is what pretty much every
-> > > > > backlight driver does. I personally think that's the wrong default,
-> > > > > I even tried to get some discussion started recently about how we
-> > > > > could change this. However, given that this has been the case for
-> > > > > possibly as long as the subsystem has existed, suddenly changing it
-> > > > > might cause quite a few of our users to boot the new kernel and not
-> > > > > see their display come up. As with any other ABI, this isn't
-> > > > > something we can just change without a very good migration path.
-> > > > 
-> > > > I'm sorry but the blacklight descibe in DT have nothing to do with the
-> > > > common pratice that the current driver have today
-> > > 
-> > > That's not at all what I said. What I said was that the majority of
-> > > backlight drivers currently default to turning the backlight on when
-> > > probed. Therefore I think it would be consistent if this driver did the
-> > > same.
-> > > 
-> > > I also said that I don't think it's a very good default, but at the same
-> > > time we can't just go and change the default behaviour at will because
-> > > people may rely on it.
-> > 
-> > I agree with your opinion.
-> > But, I can't decide how to change it.
-> 
-> One solution that Stephen proposed was to make all DT-based setups use a
-> new default (off). An advantage of that is that such setups are still
-> fairly actively being worked on, so we can probably get early adopters
-> to cope with the new default.
-> 
-> Looking through some DTS files it seems that many use the pwm-backlight
-> driver. So if we can get some concensus from all the users that changing
-> the default would be okay, then I think we could reasonably change it.
-> 
-> Another solution perhaps would be to add a property to DT which encodes
-> the default state of the backlight on boot. This used to be impossible
-> because the general concensus was that DT should describe hardware only
-> and not software policy. During the kernel summit this requirement was
-> somewhat relaxed and it should now be okay to describe system
-> configuration data, and I think this would be a good match. If the
-> system is designed to keep the backlight off by default because some
-> other component (display panel driver) is meant to turn it on later,
-> that's system configuration data, right?
-> 
-> Perhaps a boolean property could be used:
-> 
-> 	backlight {
-> 		compatible = "pwm-backlight";
-> 
-> 		...
-> 
-> 		backlight-default-off;
-> 	};
-> 
-> > > > put on by default if wrong specially without the property define. Even
-> > > > put it on by default it wrong as the bootloader may have set it
-> > > > already for splash screen and to avoid glitch the drivers need to
-> > > > detect this.
-> > > 
-> > > I agree that would be preferable, but I don't know of any way to detect
-> > > what value the bootloader set a GPIO to. The GPIO API requires that you
-> > > call gpio_direction_output(), and that requires a value parameter which
-> > > will be used as the output level of the GPIO.
-> > 
-> > Jean-Christophe's point is right.
-> > 
-> > We may need to discuss 'the way to detect what value the bootloader
-> > set a GPIO to'.
-> 
-> Since some GPIO hardware simply can't do it, I guess we could resolve to
-> passing such information via DT. That obviously won't work for non-DT
-> setups, but I guess that's something we could live with.
+Yeah, I kept losing this battle too, and most recently switch to using
+mmc emulation instead of the SCSI emulation (CONFIG_MMC=y, and qemu's
+"sd" disk driver).
 
-For what it's worth, the pcf857x GPIO controllers suffer from this problem, 
-and the solution was to use a DT property to specify the initial GPIOs state. 
-The driver can thus implement gpio_get_value() properly and the hardware 
-limitation is hidden from the clients.
+> The current state of affairs is unhealthy.  I wrote a program
+> (attached) that does 'svc $0x90002f' (silly GNU syntax for "Issue the
+> getgid syscall in OABI").  The registers I program are:
+>
+> r0: 1
+> r1: 2
+> r2: 3
+> r3: 4
+> r4: 5
+> r5: 6
+>
+> (i.e. the arguments are 1,2,3,4,5,6, although getgid ignores them)
+>
+> r7: 1
+>
+> (r7 is the EABI syscall register.  On a kernel without OABI support,
+> the immediate svc argument is ignored and syscall 1, i.e. _exit, will
+> be invoked).
 
-https://lkml.org/lkml/2013/9/21/105
+Just to clarify: without CONFIG_OABI_COMPAT, all OABI syscalls turn into _exit?
 
-> One possibility would be to supplement the backlight-default-off property
-> with another property (backlight-boot-on) that can be passed on to the
-> kernel from the bootloader to signal that it has turned the backlight on.
+> Seccomp sees the registers as I set them (unsurprisingly) and it sees
+> nr == 0x2f.  It passes those values on to a SIGSYS handler, if one
+> exists.  This is, IMO, bad.  The OABI and EABI argument passing
+> conventions are *not* the same, and seccomp filters that check syscall
+> argument values may be spoofable by using OABI calls.
+>
+> I suspect that audit, perf, ftrace, and maybe even ptrace are broken
+> as well for exactly the same reason.
+>
+> I would argue that there are two reasonable fixes:
+>
+> 1. Set a different audit arch for OABI syscalls (e.g.
+> AUDIT_ARCH_ARMOABI).  That is, treat OABI syscall entries the same way
+> that x86_64 treats int 80.
+>
+> 2. Leave the 0x900000 bits set in the syscall nr.  That way OABI
+> syscalls would look like a different set of syscalls on the same
+> architecture.  That is, treat OABI syscall entries kind of like x86_64
+> treats x32 syscalls.  (There's probably no reason to accept 0x900000 +
+> N as an r7 value to cause 'svc 0' to invoke OABI syscall N, though.)
+>
+> 3. Unconditionally kill any process that makes an OABI syscall with
+> seccomp enabled (because there should be no such programs).  Eww.
+>
+> Options 1 and 2 are both break ABI, but I doubt that anythink cares.
+> OABI is, AFAICT, mostly dead.  That being said, even if nothing
+> legitimate uses OABI, exploits against seccomp-using programs can
+> certainly use OABI, so I think that this needs to be fixed somehow.
+>
+> Thoughts?  I think I prefer option 1.  I don't really want to make the
+> change because my ARM assembly skills are lacking.
+
+I would agree: option 1 seems cleanest of the 3. 3 is sort of like a
+built-in automatic check for a mismatched arch, so maybe that works
+better?
+
+Alternatively, CONFIG_SECCOMP_FILTER could depend on
+!CONFIG_OABI_COMPAT. That seems like the least work, given the desire
+to kill OABI in the real world. (Though I would note that at least
+Ubuntu's ARM kernels build with CONFIG_OABI_COMPAT; Chrome OS does
+not.)
+
+-Kees
 
 -- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131106/83d67344/attachment.sig>
+Kees Cook
+Chrome OS Security
