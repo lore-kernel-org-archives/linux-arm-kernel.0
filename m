@@ -1,66 +1,54 @@
-From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
-Date: Wed, 6 Nov 2013 13:31:59 +0200
-Subject: Fwd: [PATCH 3/8] watchdog: davinci: add GET_TIMELEFT option support
-In-Reply-To: <1383680783-12114-4-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1383680783-12114-4-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <527A28AF.9040308@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 6 Nov 2013 06:42:44 -0500
+Subject: [PATCH v3 25/28] ARM: mvebu: Add support for NAND controller
+ in Armada 370/XP
+In-Reply-To: <20131106092435.5f95aa55@skate>
+References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383656135-8627-26-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131105132905.GJ3060@titan.lakedaemon.net>
+ <20131105135145.GA2676@localhost>
+ <20131105151531.GK3060@titan.lakedaemon.net>
+ <20131106092435.5f95aa55@skate>
+Message-ID: <20131106114244.GC8308@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the davinci watchdog can be read while counting,
-so we can add ability to report the remaining time before
-the system will reboot.
+Thomas,
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- drivers/watchdog/davinci_wdt.c |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Adding Grant and Mark to the Cc to make sure they don't have buyer's
+remorse ;-)
 
-diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
-index 1fc2093..6cbf2e1 100644
---- a/drivers/watchdog/davinci_wdt.c
-+++ b/drivers/watchdog/davinci_wdt.c
-@@ -117,6 +117,33 @@ static int davinci_wdt_ping(struct watchdog_device *wdd)
- 	return 0;
- }
- 
-+static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
-+{
-+	u64 timer_counter;
-+	unsigned long freq;
-+	u32 val;
-+	struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
-+
-+	/* if timeout is occured then return 0 */
-+	val = ioread32(davinci_wdt->base + WDTCR);
-+	if (val & WDFLAG)
-+		return 0;
-+
-+	freq = clk_get_rate(davinci_wdt->clk);
-+
-+	if (!freq) {
-+		dev_err(wdd->dev, "clock freq is not set\n");
-+		return 0;
-+	}
-+
-+	timer_counter = ioread32(davinci_wdt->base + TIM12);
-+	timer_counter |= ((u64)ioread32(davinci_wdt->base + TIM34) << 32);
-+
-+	do_div(timer_counter, freq);
-+
-+	return wdd->timeout - timer_counter;
-+}
-+
- static const struct watchdog_info davinci_wdt_info = {
- 	.options = WDIOF_KEEPALIVEPING,
- 	.identity = "DaVinci Watchdog",
-@@ -127,6 +154,7 @@ static const struct watchdog_ops davinci_wdt_ops = {
- 	.start		= davinci_wdt_start,
- 	.stop		= davinci_wdt_ping,
- 	.ping		= davinci_wdt_ping,
-+	.get_timeleft	= davinci_wdt_get_timeleft,
- };
- 
- static int davinci_wdt_probe(struct platform_device *pdev)
--- 
-1.7.9.5
+On Wed, Nov 06, 2013 at 09:24:35AM +0100, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
+> 
+> On Tue, 5 Nov 2013 10:15:31 -0500, Jason Cooper wrote:
+> 
+> > > And I'd rather do that in a separate patch, to avoid cluttering the poor
+> > > devicetree people with an unrelated 28-piece patch :-)
+> > 
+> > No (really), according to Grant and Mark during the closing session, I
+> > asked this specific question.  They _do_ want the entire series so they
+> > can refer to the corresponding code changes if necessary.  As I stated
+> > above, we can make their job easier by making the binding a separate
+> > patch that is clearly marked as such.
+> 
+> Interesting, because I had understood exactly the opposite from the
+> discussions at the ARM kernel summit. But maybe the DT folks changed
+> their mind between the ARM kernel summit and the closing session of the
+> kernel summit :-)
+
+Yes, that's why I asked the question.  Mark Rutland said he wanted to
+see the code changes when he was reviewing a binding.  Which is indeed
+the opposite of what we had arrived at during the ARM mini-summit.
+
+So I asked Grant (last question of the Q&A) what he wanted us to tell
+the contributors.  He said (bad paraphrasing here) "I have better
+filters now for finding the binding changes, so send the whole series"
+
+As him and Mark aren't the only reviewers, I took the extra step of
+saying send the DT bindings as a separate patch with it clearly
+identified in the subject line...
+
+thx,
+
+Jason.
