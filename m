@@ -1,54 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 6 Nov 2013 06:42:44 -0500
-Subject: [PATCH v3 25/28] ARM: mvebu: Add support for NAND controller
- in Armada 370/XP
-In-Reply-To: <20131106092435.5f95aa55@skate>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-26-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105132905.GJ3060@titan.lakedaemon.net>
- <20131105135145.GA2676@localhost>
- <20131105151531.GK3060@titan.lakedaemon.net>
- <20131106092435.5f95aa55@skate>
-Message-ID: <20131106114244.GC8308@titan.lakedaemon.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 6 Nov 2013 17:12:47 +0530
+Subject: [PATCH v4 1/6] gpio: davinci: Fixed a check for unbanked gpio
+In-Reply-To: <527A28EF.9070601@ti.com>
+References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
+ <1383406775-14902-2-git-send-email-prabhakar.csenng@gmail.com>
+ <CACRpkdZ7pwGQnK0NN4tybLUNdMxu5WVaGX8Dqu+kMgVBuyF16w@mail.gmail.com>
+ <CA+V-a8tE3bxsHMSh2i3Xeq=kJUjmxTjcU25Kuka5e_iXeB--pQ@mail.gmail.com>
+ <CACRpkdbLTopHMaog7FDW7O4-yLyv+mmnvgkNuXgeQR-pEtbz6Q@mail.gmail.com>
+ <CA+V-a8tZTm9bh+arQ+uFyTVHxfdf07bWaM_Sdqo08TO=UCMMUg@mail.gmail.com>
+ <527A1EC7.20400@ti.com> <527A28EF.9070601@ti.com>
+Message-ID: <527A2B37.4040308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+Hi Grygorii,
 
-Adding Grant and Mark to the Cc to make sure they don't have buyer's
-remorse ;-)
-
-On Wed, Nov 06, 2013 at 09:24:35AM +0100, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On Wednesday 06 November 2013 05:03 PM, Grygorii Strashko wrote:
+> Hi Sekhar, Linus,
 > 
-> On Tue, 5 Nov 2013 10:15:31 -0500, Jason Cooper wrote:
+> On 11/06/2013 12:49 PM, Sekhar Nori wrote:
+>> On Wednesday 06 November 2013 03:45 PM, Prabhakar Lad wrote:
+>>> Hi Linus,
+>>>
+>>> On Wed, Nov 6, 2013 at 3:26 PM, Linus Walleij
+>>> <linus.walleij@linaro.org> wrote:
+>>>> On Wed, Nov 6, 2013 at 10:33 AM, Prabhakar Lad
+>>>> <prabhakar.csengg@gmail.com> wrote:
+>>>>> On Tue, Nov 5, 2013 at 6:09 PM, Linus Walleij
+>>>>> <linus.walleij@linaro.org> wrote:
+>>>>>> On Sat, Nov 2, 2013 at 4:39 PM, Lad, Prabhakar
+>>>>>> <prabhakar.csengg@gmail.com> wrote:
+>>>>>>
+>>>>>>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>>>>>>
+>>>>>>> This patch fixes the check for the offset in
+>>>>>>> gpio_to_irq_unbanked() function.
+>>>>>>>
+>>>>>>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>>>>>
+>>>>>> Is this a regression that should go in right now?
+>>>>>>
+>>>>> Yes it needs too.
+>>>>
+>>>> But on top of *what* exactly?
+>>>>
+>>>> This does not apply to my gpio tree devel branch and
+>>>> not even on the mainline kernel.
+>>>>
+>>> Looks like this needs to go via ARM tree as the earlier
+>>> patches have  gone via ARM tree itself [1].
+>>> If you can ACK it Sekhar can get it in via ARM tree.
+>>
+>> The dependent patches are all in linux-next through ARM SoC queued for
+>> v3.13 merge. This fix can either be sent late in merge cycle once Linus
+>> has pulled ARM SoC or after v3.13-rc1 comes out.
 > 
-> > > And I'd rather do that in a separate patch, to avoid cluttering the poor
-> > > devicetree people with an unrelated 28-piece patch :-)
-> > 
-> > No (really), according to Grant and Mark during the closing session, I
-> > asked this specific question.  They _do_ want the entire series so they
-> > can refer to the corresponding code changes if necessary.  As I stated
-> > above, we can make their job easier by making the binding a separate
-> > patch that is clearly marked as such.
-> 
-> Interesting, because I had understood exactly the opposite from the
-> discussions at the ARM kernel summit. But maybe the DT folks changed
-> their mind between the ARM kernel summit and the closing session of the
-> kernel summit :-)
+> Pls, wait a bit - this fix is incomplete :( The below changes have to be
+> done too:
 
-Yes, that's why I asked the question.  Mark Rutland said he wanted to
-see the code changes when he was reviewing a binding.  Which is indeed
-the opposite of what we had arrived at during the ARM mini-summit.
+Can either you or Prabhakar send a separate patch (series) with only the
+fixes?
 
-So I asked Grant (last question of the Q&A) what he wanted us to tell
-the contributors.  He said (bad paraphrasing here) "I have better
-filters now for finding the binding changes, so send the whole series"
-
-As him and Mark aren't the only reviewers, I took the extra step of
-saying send the DT bindings as a separate patch with it clearly
-identified in the subject line...
-
-thx,
-
-Jason.
+Thanks,
+Sekhar
