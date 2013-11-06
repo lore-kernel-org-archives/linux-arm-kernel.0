@@ -1,37 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:16:25 +0000
-Subject: [PATCH 13/13] ASoC: ux500_pcm: Take out pointless dev_dbg() call
-In-Reply-To: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732985-18928-14-git-send-email-lee.jones@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Nov 2013 10:19:02 +0000
+Subject: mm: get_user_pages_fast()
+In-Reply-To: <52797483.2000105@cs.bris.ac.uk>
+References: <52797483.2000105@cs.bris.ac.uk>
+Message-ID: <20131106101901.GA21074@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: alsa-devel at alsa-project.org
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- sound/soc/ux500/ux500_pcm.c | 4 ----
- 1 file changed, 4 deletions(-)
+On Tue, Nov 05, 2013 at 10:43:15PM +0000, Michael McTernan wrote:
+> Hi all,
 
-diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
-index acfec98..fd7f12e 100644
---- a/sound/soc/ux500/ux500_pcm.c
-+++ b/sound/soc/ux500/ux500_pcm.c
-@@ -65,14 +65,10 @@ static struct dma_chan *ux500_pcm_request_chan(struct snd_soc_pcm_runtime *rtd,
- 	struct snd_pcm_substream *substream)
- {
- 	struct snd_soc_dai *dai = rtd->cpu_dai;
--	struct device *dev = dai->dev;
- 	u16 per_data_width, mem_data_width;
- 	struct stedma40_chan_cfg *dma_cfg;
- 	struct ux500_msp_dma_params *dma_params;
- 
--	dev_dbg(dev, "%s: MSP %d (%s): Enter.\n", __func__, dai->id,
--		snd_pcm_stream_str(substream));
--
- 	dma_params = snd_soc_dai_get_dma_data(dai, substream);
- 	dma_cfg = dma_params->dma_cfg;
- 
--- 
-1.8.1.2
+Hi Mike,
+
+> I think there's a problem on ARM with futex calls to FUTEX_WAIT and 
+> similar for addresses that have been mapped to userspace from /dev/mem 
+> or a device which sets VM_IO or VM_PFNMAP.  This can break 
+> pthread_mutex_lock() if placed on such mapped memory and attributed as 
+> process-shared.
+> 
+> The cause looks to be that ARM doesn't yet implement 
+> get_user_pages_fast(), which is called in get_futex_key() for a 
+> non-process private futex.
+
+[...]
+
+> I've seen a couple of patches go by that provide get_user_pages_fast() 
+> on ARM, but none yet accepted.  I therefore would like to highlight this 
+> particular case for context, and also to perhaps generate some movement 
+> on this issue, which I also reported here:
+> 
+> https://bugzilla.kernel.org/show_bug.cgi?id=64321
+
+The latest patches from Steve are here:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/205951.html
+
+but we need some feedback from the MM guys regarding the atomics in patch 2
+(since we don't require IPIs for TLB invalidation). I'd also like to see
+some numbers comparing the two schemes (since we could add a dummy IPI to
+our huge TLB flushing code if it's cheaper).
+
+Will
