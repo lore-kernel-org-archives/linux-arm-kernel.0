@@ -1,37 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 6 Nov 2013 00:40:58 +0000
-Subject: ARM audit, seccomp, etc are broken wrt OABI syscalls
-In-Reply-To: <CAGXu5jJreo001uBLV8oAgR_Z2WZK2qtH8YfvriQJVAQ4SgdRzw@mail.gmail.com>
-References: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
- <CAGXu5jJreo001uBLV8oAgR_Z2WZK2qtH8YfvriQJVAQ4SgdRzw@mail.gmail.com>
-Message-ID: <20131106004058.GU16735@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 5 Nov 2013 21:46:42 -0300
+Subject: [PATCH v3 12/28] mtd: nand: pxa3xx: Use a completion to signal
+ device ready
+In-Reply-To: <20131106002759.GF11759@localhost>
+References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383656135-8627-13-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131105195136.GS20061@ld-irv-0074.broadcom.com>
+ <20131106002759.GF11759@localhost>
+Message-ID: <20131106004641.GG11759@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 04:14:49PM -0800, Kees Cook wrote:
-> I would agree: option 1 seems cleanest of the 3. 3 is sort of like a
-> built-in automatic check for a mismatched arch, so maybe that works
-> better?
-> 
-> Alternatively, CONFIG_SECCOMP_FILTER could depend on
-> !CONFIG_OABI_COMPAT. That seems like the least work, given the desire
-> to kill OABI in the real world. (Though I would note that at least
-> Ubuntu's ARM kernels build with CONFIG_OABI_COMPAT; Chrome OS does
-> not.)
+On Tue, Nov 05, 2013 at 09:27:59PM -0300, Ezequiel Garcia wrote:
+> > 
+> > I believe your handling of this 'is_ready' bit is a little unwise, as
+> > you are actually creating extra concurrency that is unneeded. I'll
+> > summarize what you're doing with this 'is_ready' field:
+> > 
+> >   cmdfunc() -> sets info->is_ready=0 for appropriate commands
+> >             -> kicks off the hardware
+> > 
+> > The following two sequences may then occur concurrently:
+> > 
+> >   (1) pxa3xx_nand_irq -> ready interrupt occurs
+> >                       -> set info->is_ready=1
+> > 		      -> signal 'dev_ready' completion
+> > 
+> >   (2) waitfunc -> check info->is_ready, if it is 0...
+> >                   |_ ... wait for the dev_ready completion
+> > 
+> > Instead of setting info->is_ready=1 under (1), you could set it in (2),
 
-OABI compat is really only something you want to deal with if you have
-a reason to run OABI programs on the kernel; it is in no way guaranteed
-that the OABI programs will run properly (many ALSA programs will not
-because of different layouts with ioctls).
+So, after some more careful thought and some testings, it seems you're
+correct. Setting is_read in waitfunc() results in a non-racy solution and
+the atomic_t can go away.
 
-OABI compat was meant to allow a transition from OABI to EABI.  While
-a lot of effort went in to the kernel side of that, which does allow
-OABI based userspace to boot with an EABI kernel, and allows OABI built
-test programs to run under an EABI kernel, actually being able to
-migrate userland is far from trivial - and something that I've never
-been able to do.  Hence, virtually all my long-running ARM machines
-here are stuck with OABI, and I don't see that situation ever changing.
+I'll take a look at the other remaining issues and see about preparing
+a v4, so we can try to converge quick enough for v3.14.
 
-As a rule, distros should not be enabling OABI compat.  OABI compat
-is more something that a developer (like me) who has a reason to enable
-it turns it on.
+Thanks!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
