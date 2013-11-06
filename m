@@ -1,43 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed,  6 Nov 2013 09:57:27 +0100
-Subject: [PATCH -v2] fbdev: sh_mobile_meram: Fix defined but not used compiler
- warnings
-Message-ID: <1383728247-19294-1-git-send-email-geert@linux-m68k.org>
+From: B47053@freescale.com (Li Xiubo)
+Date: Wed, 6 Nov 2013 08:59:53 +0000
+Subject: [PATCHv2 5/8] ASoC: SGTL5000: Enhance the SGTL5000 codec driver
+ about regulator.
+In-Reply-To: <20131101185045.GG2493@sirena.org.uk>
+References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
+ <1383289495-24523-6-git-send-email-Li.Xiubo@freescale.com>
+ <20131101185045.GG2493@sirena.org.uk>
+Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F82876EFF@039-SN2MPN1-013.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If both CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME are not set:
+> > On VF610 series there are no regulators used, and now whether the
+> > CONFIG_REGULATOR mirco is enabled or not, for the VF610 audio patch
+> > series, the board cannot be probe successfully.
+> > And this patch will solve this issue.
+> 
+> I don't understand what this is for at all, you're just saying there is a
+> problem you're trying to solve but you don't explain anything about what
+> the problem is or how your changes address it.
+> 
 
-drivers/video/sh_mobile_meram.c:573: warning: ?sh_mobile_meram_suspend? defined but not used
-drivers/video/sh_mobile_meram.c:597: warning: ?sh_mobile_meram_resume? defined but not used
+Sorry for confusing.
 
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
----
-v2: Both functions are used if CONFIG_PM_SLEEP || CONFIG_PM_RUNTIME,
-    as pointed out by Laurent
+The SGTL5000 is based on regulators and when it is disabled, there will be an error returns directly while the SGTL5000 codec is probing.
+But on VF610 boards there has no regulators or needn't configure them, so the CONFIG_REGULATOR is disabled, and then the error is returned causing
+to the SGTL5000 probe broken. 
 
- drivers/video/sh_mobile_meram.c |    2 ++
- 1 file changed, 2 insertions(+)
+Has I make it clear?
 
-diff --git a/drivers/video/sh_mobile_meram.c b/drivers/video/sh_mobile_meram.c
-index e0f098562a74..a297de5cc859 100644
---- a/drivers/video/sh_mobile_meram.c
-+++ b/drivers/video/sh_mobile_meram.c
-@@ -569,6 +569,7 @@ EXPORT_SYMBOL_GPL(sh_mobile_meram_cache_update);
-  * Power management
-  */
- 
-+#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_RUNTIME)
- static int sh_mobile_meram_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
-@@ -611,6 +612,7 @@ static int sh_mobile_meram_resume(struct device *dev)
- 		meram_write_reg(priv->base, common_regs[i], priv->regs[i]);
- 	return 0;
- }
-+#endif /* CONFIG_PM_SLEEP || CONFIG_PM_RUNTIME */
- 
- static UNIVERSAL_DEV_PM_OPS(sh_mobile_meram_dev_pm_ops,
- 			    sh_mobile_meram_suspend,
--- 
-1.7.9.5
+> > +#ifndef CONFIG_SND_SOC_FSL_SGTL5000_VF610
+> >  static int ldo_regulator_register(struct snd_soc_codec *codec,
+> 
+> This is definitely broken, it won't work with multi-platform kernels, and
+> I don't understand what this is supposed to do - what is the reason for
+> making this change?
+>
+
+Yes, it is.
+
+How about adding one node properties like : "regulator-exist", which will be controlled by platform data ?
