@@ -1,107 +1,71 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Wed, 6 Nov 2013 09:26:16 +0100
-Subject: [PATCH v4] videobuf2: Add missing lock held on vb2_fop_relase
-In-Reply-To: <5277BB1F.1010501@xs4all.nl>
-References: <1383385994-11422-1-git-send-email-ricardo.ribalda@gmail.com>
- <527794F0.40901@xs4all.nl>
- <CAPybu_0cKxMxhXoSqbK2nTyX3DGCVZdUZPt2bTE6aZR65xDG=w@mail.gmail.com>
- <5277AB62.5000505@xs4all.nl> <5277AE1A.6090303@samsung.com>
- <5277BB1F.1010501@xs4all.nl>
-Message-ID: <CAPybu_3rnWU7puF4PQChXMXVo8sRC=Rh6cghxu6kOTX+s2h3mw@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Wed,  6 Nov 2013 09:25:15 +0100
+Subject: [PATCH v6 4/4] ARM: STi: Add I2C config to B2000 and B2020 boards
+In-Reply-To: <1383726315-27534-1-git-send-email-maxime.coquelin@st.com>
+References: <1383726315-27534-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1383726315-27534-5-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hans and Sywester
+This patch supplies I2C configuration to B2000 and B2020
+based on either STiH415 or STiH416 SoCs.
 
-I have just posted a new patch. I think it fits the suggestions from
-both of you, please take a look to it and please post any comment.
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+---
+ arch/arm/boot/dts/stih41x-b2000.dtsi |    9 +++++++++
+ arch/arm/boot/dts/stih41x-b2020.dtsi |   22 ++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-I will also send a patch about the em28xx, to swap the lock order.
-
-Thanks for your comments
-
-On Mon, Nov 4, 2013 at 4:19 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> On 11/04/2013 03:24 PM, Sylwester Nawrocki wrote:
->> On 04/11/13 15:12, Hans Verkuil wrote:
->>> On 11/04/2013 02:54 PM, Ricardo Ribalda Delgado wrote:
->>>>> Hello Hans
->>>>>
->>>>> Thanks for your comments.
->>>>>
->>>>> Please take a look to v4 of this patch
->>>>> https://patchwork.linuxtv.org/patch/20529/
->>>>>
->>>>> On Mon, Nov 4, 2013 at 1:37 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
->>>>>>> On 11/02/2013 10:53 AM, Ricardo Ribalda Delgado wrote:
->>>>>>>>> From: Ricardo Ribalda <ricardo.ribalda@gmail.com>
->>>>>>>>>
->>>>>>>>> vb2_fop_relase does not held the lock although it is modifying the
->>>>>>>>> queue->owner field.
->>>>>>>>>
->>>>>>>>> This could lead to race conditions on the vb2_perform_io function
->>>>>>>>> when multiple applications are accessing the video device via
->>>>>>>>> read/write API:
->>>>>>>
->>>>>>> It's also called directly by drivers/media/usb/em28xx/em28xx-video.c!
->>>>>>>
->>>>>
->>>>> em28xx-video does not hold the lock, therefore it can call the normal
->>>>> function. On v2 we made a internal function that should be called if
->>>>> the funciton is called directly by the driver. Please take a look to
->>>>> the old comments. https://patchwork.linuxtv.org/patch/20460/
->>>
->>> static int em28xx_v4l2_close(struct file *filp)
->>> {
->>>         struct em28xx_fh *fh  = filp->private_data;
->>>         struct em28xx    *dev = fh->dev;
->>>         int              errCode;
->>>
->>>         em28xx_videodbg("users=%d\n", dev->users);
->>>
->>>         mutex_lock(&dev->lock);
->>>         vb2_fop_release(filp);
->>>      ...
->>>
->>> vb2_fop_release(filp) will, with your patch, also try to get dev->lock.
->>>
->>> Sylwester's comment re em28xx is incorrect.
->>
->> dev->lock is not used as the video queue lock:
->>
->> $ git grep "lock =" drivers/media/usb/em28xx/
->> ...
->> drivers/media/usb/em28xx/em28xx-video.c:        dev->vdev->queue->lock = &dev->vb_queue_lock;
->> drivers/media/usb/em28xx/em28xx-video.c:                dev->vbi_dev->queue->lock = &dev->vb_vbi_queue_lock;
->>
->> There is a separate mutex for the video queue which needs to be acquired
->> independently.
->
-> Darn, I missed that one. I was looking for it in em28xx_vdev_init(), which is
-> where I expected the queue->lock to be set, if there was any.
->
-> That said, wouldn't it be a good idea to swap the order:
->
->         vb2_fop_release(filp);
->         mutex_lock(&dev->lock);
->
-> I don't believe there is a good reason for nesting mutexes here.
->
-> Regards,
->
->         Hans
->
->>
->> --
->> Regards,
->> Sylwester
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-media" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->
-
-
-
+diff --git a/arch/arm/boot/dts/stih41x-b2000.dtsi b/arch/arm/boot/dts/stih41x-b2000.dtsi
+index 8e694d2..1e6aa92 100644
+--- a/arch/arm/boot/dts/stih41x-b2000.dtsi
++++ b/arch/arm/boot/dts/stih41x-b2000.dtsi
+@@ -37,5 +37,14 @@
+ 			};
+ 		};
+ 
++		/* HDMI Tx I2C */
++		i2c at fed41000 {
++			/* HDMI V1.3a supports Standard mode only */
++			clock-frequency = <100000>;
++			i2c-min-scl-pulse-width-us = <0>;
++			i2c-min-sda-pulse-width-us = <5>;
++
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
+index 133e181..0ef0a69 100644
+--- a/arch/arm/boot/dts/stih41x-b2020.dtsi
++++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
+@@ -38,5 +38,27 @@
+ 				default-state = "off";
+ 			};
+ 		};
++
++		i2c at fed40000 {
++			status = "okay";
++		};
++
++		/* HDMI Tx I2C */
++		i2c at fed41000 {
++			/* HDMI V1.3a supports Standard mode only */
++			clock-frequency = <100000>;
++			i2c-min-scl-pulse-width-us = <0>;
++			i2c-min-sda-pulse-width-us = <5>;
++
++			status = "okay";
++		};
++
++		i2c at fe540000 {
++			status = "okay";
++		};
++
++		i2c at fe541000 {
++			status = "okay";
++		};
+ 	};
+ };
 -- 
-Ricardo Ribalda
+1.7.9.5
