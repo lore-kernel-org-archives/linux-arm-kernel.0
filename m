@@ -1,124 +1,77 @@
-From: ricardo.ribalda@gmail.com (Ricardo Ribalda Delgado)
-Date: Wed, 6 Nov 2013 09:40:31 +0100
-Subject: [PATCH v4] videobuf2: Add missing lock held on vb2_fop_relase
-In-Reply-To: <CAPybu_3rnWU7puF4PQChXMXVo8sRC=Rh6cghxu6kOTX+s2h3mw@mail.gmail.com>
-References: <1383385994-11422-1-git-send-email-ricardo.ribalda@gmail.com>
- <527794F0.40901@xs4all.nl>
- <CAPybu_0cKxMxhXoSqbK2nTyX3DGCVZdUZPt2bTE6aZR65xDG=w@mail.gmail.com>
- <5277AB62.5000505@xs4all.nl> <5277AE1A.6090303@samsung.com>
- <5277BB1F.1010501@xs4all.nl>
- <CAPybu_3rnWU7puF4PQChXMXVo8sRC=Rh6cghxu6kOTX+s2h3mw@mail.gmail.com>
-Message-ID: <CAPybu_1kXvrDuHJi3dtwiUooYj_rB5_N-pZpVHHfNQyEnnVhyw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 6 Nov 2013 09:41:17 +0100
+Subject: linux-next: manual merge of the gpio tree with the arm-soc and
+ cortex trees
+In-Reply-To: <20131106191454.5f45b0b5300f03e74a6a09eb@canb.auug.org.au>
+References: <20131106191454.5f45b0b5300f03e74a6a09eb@canb.auug.org.au>
+Message-ID: <20131106084117.GT14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are the patches
+Hello Stephen,
 
+On Wed, Nov 06, 2013 at 07:14:54PM +1100, Stephen Rothwell wrote:
+> Hi Linus,
+> 
+> Today's linux-next merge of the gpio tree got a conflict in
+> arch/arm/Kconfig between commit f3372c01816e ("ARM: gemini: convert to
+> GENERIC_CLOCKEVENTS") from the arm-soc tree and f5caa3b59e18 ("ARM:
+> deprecate mach/timex.h for !ARCH_MULTIPLATFORM") from the cortex tree and
+> commits ffde39ea61ea ("ARM: mmp: delete the custom GPIO header"),
+> 88f718e3fa4d ("ARM: pxa: delete the custom GPIO header") and 85649711a895
+> ("ARM: gemini: delete <mach/gpio.h>") from the gpio tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+looks correct.
 
+BTW, "cortex" is a bit too general. My tree is only about Cortex-M. Also
+you can drop -2.6 from the URL.
 
-https://patchwork.linuxtv.org/patch/20668/
-https://patchwork.linuxtv.org/patch/20669/
-
-Thanks!
-
-On Wed, Nov 6, 2013 at 9:26 AM, Ricardo Ribalda Delgado
-<ricardo.ribalda@gmail.com> wrote:
-> Hello Hans and Sywester
->
-> I have just posted a new patch. I think it fits the suggestions from
-> both of you, please take a look to it and please post any comment.
->
-> I will also send a patch about the em28xx, to swap the lock order.
->
-> Thanks for your comments
->
-> On Mon, Nov 4, 2013 at 4:19 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
->> On 11/04/2013 03:24 PM, Sylwester Nawrocki wrote:
->>> On 04/11/13 15:12, Hans Verkuil wrote:
->>>> On 11/04/2013 02:54 PM, Ricardo Ribalda Delgado wrote:
->>>>>> Hello Hans
->>>>>>
->>>>>> Thanks for your comments.
->>>>>>
->>>>>> Please take a look to v4 of this patch
->>>>>> https://patchwork.linuxtv.org/patch/20529/
->>>>>>
->>>>>> On Mon, Nov 4, 2013 at 1:37 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
->>>>>>>> On 11/02/2013 10:53 AM, Ricardo Ribalda Delgado wrote:
->>>>>>>>>> From: Ricardo Ribalda <ricardo.ribalda@gmail.com>
->>>>>>>>>>
->>>>>>>>>> vb2_fop_relase does not held the lock although it is modifying the
->>>>>>>>>> queue->owner field.
->>>>>>>>>>
->>>>>>>>>> This could lead to race conditions on the vb2_perform_io function
->>>>>>>>>> when multiple applications are accessing the video device via
->>>>>>>>>> read/write API:
->>>>>>>>
->>>>>>>> It's also called directly by drivers/media/usb/em28xx/em28xx-video.c!
->>>>>>>>
->>>>>>
->>>>>> em28xx-video does not hold the lock, therefore it can call the normal
->>>>>> function. On v2 we made a internal function that should be called if
->>>>>> the funciton is called directly by the driver. Please take a look to
->>>>>> the old comments. https://patchwork.linuxtv.org/patch/20460/
->>>>
->>>> static int em28xx_v4l2_close(struct file *filp)
->>>> {
->>>>         struct em28xx_fh *fh  = filp->private_data;
->>>>         struct em28xx    *dev = fh->dev;
->>>>         int              errCode;
->>>>
->>>>         em28xx_videodbg("users=%d\n", dev->users);
->>>>
->>>>         mutex_lock(&dev->lock);
->>>>         vb2_fop_release(filp);
->>>>      ...
->>>>
->>>> vb2_fop_release(filp) will, with your patch, also try to get dev->lock.
->>>>
->>>> Sylwester's comment re em28xx is incorrect.
->>>
->>> dev->lock is not used as the video queue lock:
->>>
->>> $ git grep "lock =" drivers/media/usb/em28xx/
->>> ...
->>> drivers/media/usb/em28xx/em28xx-video.c:        dev->vdev->queue->lock = &dev->vb_queue_lock;
->>> drivers/media/usb/em28xx/em28xx-video.c:                dev->vbi_dev->queue->lock = &dev->vb_vbi_queue_lock;
->>>
->>> There is a separate mutex for the video queue which needs to be acquired
->>> independently.
->>
->> Darn, I missed that one. I was looking for it in em28xx_vdev_init(), which is
->> where I expected the queue->lock to be set, if there was any.
->>
->> That said, wouldn't it be a good idea to swap the order:
->>
->>         vb2_fop_release(filp);
->>         mutex_lock(&dev->lock);
->>
->> I don't believe there is a good reason for nesting mutexes here.
->>
->> Regards,
->>
->>         Hans
->>
->>>
->>> --
->>> Regards,
->>> Sylwester
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-media" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>
->
->
->
-> --
-> Ricardo Ribalda
+Best regards
+Uwe
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc arch/arm/Kconfig
+> index 568d6471dd18,c6debe07f036..000000000000
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@@ -397,10 -386,8 +397,9 @@@ config ARCH_CLPS711
+>   config ARCH_GEMINI
+>   	bool "Cortina Systems Gemini"
+>   	select ARCH_REQUIRE_GPIOLIB
+>  -	select ARCH_USES_GETTIMEOFFSET
+>  +	select CLKSRC_MMIO
+>   	select CPU_FA526
+>  +	select GENERIC_CLOCKEVENTS
+> - 	select NEED_MACH_GPIO_H
+>   	help
+>   	  Support for the Cortina Systems Gemini family SoCs
+>   
+> @@@ -593,8 -558,6 +592,7 @@@ config ARCH_MM
+>   	select GPIO_PXA
+>   	select IRQ_DOMAIN
+>   	select MULTI_IRQ_HANDLER
+> - 	select NEED_MACH_GPIO_H
+>  +	select NEED_MACH_TIMEX_H
+>   	select PINCTRL
+>   	select PLAT_PXA
+>   	select SPARSE_IRQ
+> @@@ -658,8 -620,6 +656,7 @@@ config ARCH_PX
+>   	select GPIO_PXA
+>   	select HAVE_IDE
+>   	select MULTI_IRQ_HANDLER
+> - 	select NEED_MACH_GPIO_H
+>  +	select NEED_MACH_TIMEX_H
+>   	select PLAT_PXA
+>   	select SPARSE_IRQ
+>   	help
 
 
 
 -- 
-Ricardo Ribalda
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
