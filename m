@@ -1,56 +1,69 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:05:45 +0000
-Subject: [PATCH 4/7] ARM: ux500: Clean-up non-DT IRQ initialisation
+Date: Wed,  6 Nov 2013 10:05:48 +0000
+Subject: [PATCH 7/7] ARM: ux500: Remove checking for DT during timer init as
+ we are now DT only
 In-Reply-To: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
 References: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732348-18576-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732348-18576-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu.c | 22 ++++++----------------
- 1 file changed, 6 insertions(+), 16 deletions(-)
+ arch/arm/mach-ux500/timer.c | 28 ++++++++--------------------
+ 1 file changed, 8 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 8f8004f..d11ac4b 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -63,12 +63,7 @@ void __init ux500_init_irq(void)
- 	} else
- 		ux500_unknown_soc();
+diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
+index 05a4ff7..ca60bbd 100644
+--- a/arch/arm/mach-ux500/timer.c
++++ b/arch/arm/mach-ux500/timer.c
+@@ -27,18 +27,11 @@ static DEFINE_TWD_LOCAL_TIMER(u8500_twd_local_timer,
+ static void __init ux500_twd_init(void)
+ {
+ 	struct twd_local_timer *twd_local_timer;
+-	int err;
  
--#ifdef CONFIG_OF
+ 	/* Use this to switch local timer base if changed in new ASICs */
+ 	twd_local_timer = &u8500_twd_local_timer;
+ 
 -	if (of_have_populated_dt())
--		irqchip_init();
--	else
+-		clocksource_of_init();
+-	else {
+-		err = twd_local_timer_register(twd_local_timer);
+-		if (err)
+-			pr_err("twd_local_timer_register failed %d\n", err);
+-	}
++	clocksource_of_init();
+ }
+ #else
+ #define ux500_twd_init()	do { } while(0)
+@@ -63,20 +56,15 @@ void __init ux500_timer_init(void)
+ 		ux500_unknown_soc();
+ 	}
+ 
+-	/* TODO: Once MTU has been DT:ed place code above into else. */
+-	if (of_have_populated_dt()) {
+-#ifdef CONFIG_OF
+-		np = of_find_matching_node(NULL, prcmu_timer_of_match);
+-		if (!np)
 -#endif
--		gic_init(0, 29, dist_base, cpu_base);
-+	irqchip_init();
+-			goto dt_fail;
++	np = of_find_matching_node(NULL, prcmu_timer_of_match);
++	if (!np)
++		goto dt_fail;
  
- 	/*
- 	 * Init clocks here so that they are available for system timer
-@@ -78,16 +73,11 @@ void __init ux500_init_irq(void)
- 		prcmu_early_init(U8500_PRCMU_BASE, SZ_8K - 1);
- 		ux500_pm_init(U8500_PRCMU_BASE, SZ_8K - 1);
+-		tmp_base = of_iomap(np, 0);
+-		if (!tmp_base)
+-			goto dt_fail;
++	tmp_base = of_iomap(np, 0);
++	if (!tmp_base)
++		goto dt_fail;
  
--		if (of_have_populated_dt())
--			u8500_of_clk_init(U8500_CLKRST1_BASE,
--					  U8500_CLKRST2_BASE,
--					  U8500_CLKRST3_BASE,
--					  U8500_CLKRST5_BASE,
--					  U8500_CLKRST6_BASE);
--		else
--			u8500_clk_init(U8500_CLKRST1_BASE, U8500_CLKRST2_BASE,
--				       U8500_CLKRST3_BASE, U8500_CLKRST5_BASE,
--				       U8500_CLKRST6_BASE);
-+		u8500_of_clk_init(U8500_CLKRST1_BASE,
-+				  U8500_CLKRST2_BASE,
-+				  U8500_CLKRST3_BASE,
-+				  U8500_CLKRST5_BASE,
-+				  U8500_CLKRST6_BASE);
- 	} else if (cpu_is_u9540()) {
- 		prcmu_early_init(U8500_PRCMU_BASE, SZ_8K - 1);
- 		ux500_pm_init(U8500_PRCMU_BASE, SZ_8K - 1);
+-		prcmu_timer_base = tmp_base;
+-	}
++	prcmu_timer_base = tmp_base;
+ 
+ dt_fail:
+ 	/* Doing it the old fashioned way. */
 -- 
 1.8.1.2
