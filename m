@@ -1,36 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Nov 2013 18:02:41 +0000
-Subject: [PATCH v5 4/7] arm64: introduce
- aarch64_insn_gen_{nop|branch_imm}() helper functions
-In-Reply-To: <20131106114530.76b63b05@gandalf.local.home>
-References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
- <1382109602-27432-5-git-send-email-liuj97@gmail.com>
- <20131030004840.GC25346@mudshark.cambridge.arm.com>
- <20131106114530.76b63b05@gandalf.local.home>
-Message-ID: <20131106180241.GB4524@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 6 Nov 2013 13:06:39 -0500
+Subject: Raw notes from ARM summit.
+In-Reply-To: <CACxGe6vwNv7a4h_SzyN2pgnY_2HfDLQqtw9ZsJqqba4HeQKD0A@mail.gmail.com>
+References: <CACxGe6vwNv7a4h_SzyN2pgnY_2HfDLQqtw9ZsJqqba4HeQKD0A@mail.gmail.com>
+Message-ID: <20131106180639.GE8308@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 04:45:30PM +0000, Steven Rostedt wrote:
-> On Wed, 30 Oct 2013 00:48:40 +0000
-> Will Deacon <will.deacon@arm.com> wrote:
-> 
-> 
-> > > +}
-> > > +
-> > > +static __always_inline u32 aarch64_insn_gen_nop(void)
-> > > +{
-> > > +	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
-> > > +}
-> > 
-> > Either use plain old `inline' or write these as preprocessor macros.
-> > 
-> 
-> I'm curious to why you say that? Preprocessor macros are rather ugly,
-> and in x86 we use "__always_inline" quite liberally.
+Grant,
 
-I can understand why you might use __always_inline over the preprocessor
-when you *really* need something inlined, but in this case I don't see why
-`inline' isn't sufficient. It's just a cosmetic issue, really.
+On Wed, Nov 06, 2013 at 02:57:05PM +0000, Grant Likely wrote:
+> I'm really close to getting a summarized report from the arm summit
+> finished and posted, but it has dragged out longer than I would like.
+> Therefore here are the raw notes from Etherpad. You can expect the
+> report form to be published in the next 24 hours.
+> 
+> http://etherpad.osuosl.org/arm-ksummit-2013
+> 
+> The calendar:
+> http://goo.gl/ifLxHl
+> 
+...
+>  Draft policy:
+> Binding must be acked by subsy maintainer
+> Binding should be looked at by DT people *but* if they're 'sleepy' it
+> rests with the subsys maintainer
+> 
+> JonathanCameron: Is it the case then that subsystem maintainers are
+> welcome to say "DT people were too slow, I' ve merged that"
+> Grant: yep - that's okay
+> 
+> LinusW: Subsystem maintainers get forced to learn about all the
+> possible hardware description mechanisms to be able to review patches,
+> which is a problem.
+> [...]
+> 
+> Arnd: some people making bindings know exactly what they're doing and
+> just need an Ack, some people *don't* and need more handholding
+> 
+> Grant: What we need to do today
+> - Document policy
+> - Statement on what ABI actually means: What IS ABI and what is NOT
+> (What's stable and what's not)
 
-Will
+Hmm, looks like we crossed emails.  I just sent a patch (rfc) adding a
+submitting-patches.txt to devicetree/bindings/...  Maybe I got it
+started before others?  Or did I duplicate effort?
+
+thx,
+
+Jason.
