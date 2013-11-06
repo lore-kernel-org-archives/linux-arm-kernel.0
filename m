@@ -1,42 +1,51 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 6 Nov 2013 17:33:39 +0900
-Subject: [PATCH 2/3] clk: shmobile: Add MSTP clock support
-In-Reply-To: <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CANqRtoRe2repacDdWhoZxY7sMP=AOhW=Mtwm3P9AgzVvwoBGKA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 6 Nov 2013 17:35:58 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790: Correct typo in clocks
+In-Reply-To: <87zjpiysh4.wl%kuninori.morimoto.gx@renesas.com>
+References: <1383714098-28770-1-git-send-email-horms+renesas@verge.net.au>
+ <87zjpiysh4.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20131106083556.GC14694@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Tue, Nov 05, 2013 at 10:06:20PM -0800, Kuninori Morimoto wrote:
+> 
+> Hi Simon
+> 
+> > This is the r8a7790 SoC not the r8a77a4 SoC and
+> > clocks are updated in r8a7790_clock_init.  not r8a73a4_clock_init.
 
-On Tue, Oct 29, 2013 at 11:55 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
-> MSTP clocks are gate clocks controlled through a register that handles
-> up to 32 clocks. The register is often sparsely populated.
->
-> Those clocks are found on Renesas ARM SoCs.
->
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Ironically there is a typo in the line above.
+I'll fix that up before applying the patch.
+
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/mach-shmobile/clock-r8a7790.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+> > index 9fa39d1..6107571 100644
+> > --- a/arch/arm/mach-shmobile/clock-r8a7790.c
+> > +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+> > @@ -77,7 +77,7 @@ static struct sh_clk_ops followparent_clk_ops = {
+> >  };
+> >  
+> >  static struct clk main_clk = {
+> > -	/* .parent will be set r8a73a4_clock_init */
+> > +	/* .parent will be set r8a7790_clock_init */
+> >  	.ops	= &followparent_clk_ops,
+> >  };
+> 
+> Hahaha, Nice catch :)
+> 
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+> Best regards
 > ---
->  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  47 +++++
->  drivers/clk/shmobile/Makefile                      |   1 +
->  drivers/clk/shmobile/clk-mstp.c                    | 229 +++++++++++++++++++++
->  include/dt-bindings/clock/r8a7790-clock.h          |  56 +++++
->  4 files changed, 333 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
->  create mode 100644 drivers/clk/shmobile/clk-mstp.c
-
-Thanks for this. The MSTP driver looks fine to me, but..
-
->  create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
-
-.. why do you bundle r8a7790-specific bits with the generic MSTP
-driver in this patch?
-
-It looks to me that you want these r8a7790 bits included with the
-r8a7790 support code.
-
-Cheers,
-
-/ magnus
+> Kuninori Morimoto
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
