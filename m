@@ -1,75 +1,111 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 6 Nov 2013 10:48:03 +0900
-Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
-In-Reply-To: <CANqRtoSW6jFX3pa94ZBgrKkvx5YNKqgxVSsYkSxMP_btcxFh7A@mail.gmail.com>
-References: <20131031031549.15985.23547.sendpatchset@w520>
- <20131031042035.GG1603@verge.net.au>
- <CANqRtoSW6jFX3pa94ZBgrKkvx5YNKqgxVSsYkSxMP_btcxFh7A@mail.gmail.com>
-Message-ID: <20131106014801.GD22183@verge.net.au>
+From: syin@broadcom.com (Sherman Yin)
+Date: Tue, 5 Nov 2013 18:02:01 -0800
+Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <527835FE.2030102@wwwdotorg.org>
+References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
+ <051069C10411E24D9749790C498526FA1BE0B7D7@SJEXCHMB12.corp.ad.broadcom.com>
+ <CACRpkdYSLxp2M4HghcUdjEYGh-UQ+DaiCGp6yee+Qds6DR9poA@mail.gmail.com>
+ <201311050026.56321.heiko@sntech.de> <527835FE.2030102@wwwdotorg.org>
+Message-ID: <5279A319.5060701@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 31, 2013 at 05:02:13PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Thu, Oct 31, 2013 at 1:20 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Oct 31, 2013 at 12:15:49PM +0900, Magnus Damm wrote:
-> >> From: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
-> >>
-> >> Add 1GiB of DRAM at 0x2_0000_0000 to support the full 2GiB
-> >> of APE6EVM system memory.
-> >>
-> >> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> ---
-> >>
-> >>  For correct run time operation regardless of kernel configuration
-> >>  ARM patches 7863/1 and 7864/1 are needed.
-> >
-> > I take it that I should wait for those patches before applying this one.
-> 
-> That's probably a good idea. RMK has applied them to "git-curr", so I
-> suppose they are queued up for something at least:
-> 
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7863/1
+On 13-11-04 04:04 PM, Stephen Warren wrote:
+> On 11/04/2013 04:26 PM, Heiko St?bner wrote:
+>
+>> I remember we had a discussion about how things like bias-disable explicitly
+>> shouldn't have a value, when they are represented in the list-format:
+>>
+>> 		pcfg_pull_none: pcfg_pull_none {
+>> 			bias-disable;
+>> 		};
+>>
+>> so a bias-disable = <1> was explicitly "forbidden" [for a lack of a better
+>> word]. And it was similar for other options, the parameter not meant to be
+>> indicating if they are active but really only setting the "strength" or so.
+>
+> Pure Boolean values should be represented as a valueless property. If
+> the property is present, the value is true, otherwise false.
+>
+> However, pinctrl bindings often don't represent Boolean values, but
+> rather tri-states, with the following values:
+>
+> * Don't touch this configuration option at all (missing)
+> * Enable the option (<1>)
+> * Disable the option (<0>)
+>
+> The reason for using tri-states being that you might want to write:
+>
+> xxx1 {
+>      pins = <PINA>, <PINB>, <PINC>;
+>      function = <...>;
+>      // this node doesn't affect pullup
+> }
+> xxx2 {
+>      pins = <PINA>, <PINB>;
+>      // this node doesn't affect function
+>      pull-up = <1>; // change, and enable
+> }
+> xxx3 {
+>      pins = <PINAC>;
+>      // this node doesn't affect function
+>      pull-up = <0>; // change, and disable
+> }
 
-I have also sighted them in linux-next.
-So I expect they will show up in v3.13-rc1 or thereabouts.
+If I understand correctly, in Stephen's example, if a certain driver 
+wants to configure PINA PINB and PINC, the pin configuration nodes 
+"xxx1", "xxx2", and "xxx3" will all have to be selected for the 
+particular pin state.  This works fine.  However, I'm just thinking that 
+it would have been easier if we could specify just one node:
 
-> > With those two patches and this one applied on top of
-> > renesas-devel-v3.12-rc7-20131030 I was able to successfully
-> > boot an ape6evm board. But /proc/meminfo still indicates only 1Gb of
-> > memory. What am I missing.
-> 
-> You probably need to enable HIGHMEM and LPAE to be able to access to
-> all memory. Same thing on Lager, to get the full 4GiB you need to
-> select those in your kernel configuration too.
+xxx {
+	pins = <PINA>, <PINB>, <PINC>;
+	function = <...>;
+	pull-up = <1 1 0>;
+}
 
-Thanks, I have been able to successfully test all 4 patches in this
-series with those settings enabled.
+This "feature" seems a bit more concise to me and is what I did for my 
+original pinctrl driver.  The only downside is that with this method, 
+one cannot specify "don't touch this option for this pin" if the same 
+property must provide values for other pins.
 
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
+When Linus asked me to try using generic pinconf instead, I ran into 
+problems with this feature due to how the generic pinconf properties are 
+defined differently than my properties - perhaps this feature just 
+doesn't work for generic pinconf-based drivers with the (Unless we are 
+ok with using 1/0 for boolean properties, but it has already been 
+pointed out that these should be valueless.).
 
-> Please note that having memory located on 64-bit addresses may break
-> some drivers doing bus mastering or using the DMAC. These drivers need
-> to be fixed both with short term DMA zone workarounds and proper
-> 64-bit address support whenever possible.
-> 
-> So if I could suggest a policy then having LPAE=n in defconfig for the
-> C board code for default stable operation. This together with LPAE=y
-> in the case of DT reference and/or Multiplatform where we can be a bit
-> more experimental. I don't care enough to send defconfig patches, but
-> if some issue comes up then perhaps adjusting the defconfig to disable
-> LPAE may work well as a workaround.
+While I'd love to be able define my pin config nodes this way, if I have 
+to use generic pinconf for the driver to be upstreamed, then I'm fine 
+with it.
 
-Thanks.
+Going back to some questions regarding generic pinconf properties - 
+could I get some help with these?
 
-As it stands the defconfig for both APE6EVM and Lager lead to a
-configuration with LPAE disabled, although neither explicitly disable LPAE.
-I think it is best to leave things as-is in this regards and explicitly
-disable LPAE in the defconfigs if the need arises.
+ >"input disable"
+ >This setting disconnects the input (DIN) to the internal logic from 
+ >the pin pad. However, the output (DOUT) can still drive the pad.  It
+ >seems to match PIN_CONFIG_OUTPUT, but the current generic option is
+ >either "output-low" or "output-high" - are these referring to a static
+ >output of 0 and 1?
 
-While looking over this I noticed that the APE6EVM defconfig selects
-HIGHMEM while the Lager defconfig does not and it is not selected in the
-resulting config. Would it be worth updating the Lager defconfig to enable
-HIGHMEM? If so, I'll make a patch.
+What's the best property to use in this case?
+
+ >"mode"
+ >This controls several aspect of the pin (slew rate, pull up strength,
+ >etc) to meet I2C specs for Standard/Fast mode vs High Speed mode.  I
+ >think the best way is to map this to slew rate, which would require
+ >some explanation because the meaning of slew rate differs depending on
+ >what pin function is selected:
+ >- When I2C (*_SCL or *_SDA) function is selected for the pin: 0:
+ >  Standard (100kbps)
+ >  & Fast mode (400kbps), 1: High Speed mode (3.4Mbps)
+ >- When IC_DM or IC_DP function is selected, 0: normal slew rate, 1:
+ >  fast slew rate
+ >- Else: 0: fast slew rate, 1: normal slew rate
+
+Do we agree that the "slew rate" is the best property to use for "mode"?
+
+Thanks,
+Sherman
