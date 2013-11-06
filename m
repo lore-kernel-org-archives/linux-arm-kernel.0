@@ -1,208 +1,95 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 07 Nov 2013 08:21:38 +0900
-Subject: [PATCH 04/04] ARM: shmobile: Remove legacy platform devices from
- EMEV2 SoC code
-In-Reply-To: <20131106232102.8081.20523.sendpatchset@w520>
-References: <20131106232102.8081.20523.sendpatchset@w520>
-Message-ID: <20131106232138.8081.51260.sendpatchset@w520>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 06 Nov 2013 17:24:04 -0600
+Subject: undocumented bindings in linux-next
+Message-ID: <527ACF94.5080204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+This list is newly added compatible strings in ARM dts files in
+linux-next without documentation. Unlike my prior list, this is only the
+diff of v3.12 to linux-next. I believe I've eliminated all the false
+positives. Documentation patches welcome.
 
-Now when KZM9D legacy C board support code is
-gone then remove emev2_add_standard_devices()
-and all the platform devices from setup-emev2.c.
+287 compatible strings documented
+80 compatible strings undocumented
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- arch/arm/mach-shmobile/include/mach/emev2.h |    5 
- arch/arm/mach-shmobile/setup-emev2.c        |  148 ---------------------------
- 2 files changed, 153 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/include/mach/emev2.h
-+++ work/arch/arm/mach-shmobile/include/mach/emev2.h	2013-11-05 16:02:39.000000000 +0900
-@@ -3,12 +3,7 @@
- 
- extern void emev2_map_io(void);
- extern void emev2_init_delay(void);
--extern void emev2_add_standard_devices(void);
- extern void emev2_clock_init(void);
--
--#define EMEV2_GPIO_BASE 200
--#define EMEV2_GPIO_IRQ(n) (EMEV2_GPIO_BASE + (n))
--
- extern struct smp_operations emev2_smp_ops;
- 
- #endif /* __ASM_EMEV2_H__ */
---- 0003/arch/arm/mach-shmobile/setup-emev2.c
-+++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-11-06 19:04:20.000000000 +0900
-@@ -19,22 +19,12 @@
- #include <linux/clk-provider.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/platform_device.h>
--#include <linux/platform_data/gpio-em.h>
- #include <linux/of_platform.h>
--#include <linux/delay.h>
--#include <linux/input.h>
--#include <linux/io.h>
--#include <linux/irqchip/arm-gic.h>
- #include <mach/common.h>
- #include <mach/emev2.h>
--#include <mach/irqs.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <asm/mach/time.h>
- 
- static struct map_desc emev2_io_desc[] __initdata = {
- #ifdef CONFIG_SMP
-@@ -53,144 +43,6 @@ void __init emev2_map_io(void)
- 	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
- }
- 
--/* UART */
--static struct resource uart0_resources[] = {
--	DEFINE_RES_MEM(0xe1020000, 0x38),
--	DEFINE_RES_IRQ(40),
--};
--
--static struct resource uart1_resources[] = {
--	DEFINE_RES_MEM(0xe1030000, 0x38),
--	DEFINE_RES_IRQ(41),
--};
--
--static struct resource uart2_resources[] = {
--	DEFINE_RES_MEM(0xe1040000, 0x38),
--	DEFINE_RES_IRQ(42),
--};
--
--static struct resource uart3_resources[] = {
--	DEFINE_RES_MEM(0xe1050000, 0x38),
--	DEFINE_RES_IRQ(43),
--};
--
--#define emev2_register_uart(idx)					\
--	platform_device_register_simple("serial8250-em", idx,		\
--					uart##idx##_resources,		\
--					ARRAY_SIZE(uart##idx##_resources))
--
--/* STI */
--static struct resource sti_resources[] = {
--	DEFINE_RES_MEM(0xe0180000, 0x54),
--	DEFINE_RES_IRQ(157),
--};
--
--#define emev2_register_sti()					\
--	platform_device_register_simple("em_sti", 0,		\
--					sti_resources,		\
--					ARRAY_SIZE(sti_resources))
--
--/* GIO */
--static struct gpio_em_config gio0_config = {
--	.gpio_base = 0,
--	.irq_base = EMEV2_GPIO_IRQ(0),
--	.number_of_pins = 32,
--};
--
--static struct resource gio0_resources[] = {
--	DEFINE_RES_MEM(0xe0050000, 0x2c),
--	DEFINE_RES_MEM(0xe0050040, 0x20),
--	DEFINE_RES_IRQ(99),
--	DEFINE_RES_IRQ(100),
--};
--
--static struct gpio_em_config gio1_config = {
--	.gpio_base = 32,
--	.irq_base = EMEV2_GPIO_IRQ(32),
--	.number_of_pins = 32,
--};
--
--static struct resource gio1_resources[] = {
--	DEFINE_RES_MEM(0xe0050080, 0x2c),
--	DEFINE_RES_MEM(0xe00500c0, 0x20),
--	DEFINE_RES_IRQ(101),
--	DEFINE_RES_IRQ(102),
--};
--
--static struct gpio_em_config gio2_config = {
--	.gpio_base = 64,
--	.irq_base = EMEV2_GPIO_IRQ(64),
--	.number_of_pins = 32,
--};
--
--static struct resource gio2_resources[] = {
--	DEFINE_RES_MEM(0xe0050100, 0x2c),
--	DEFINE_RES_MEM(0xe0050140, 0x20),
--	DEFINE_RES_IRQ(103),
--	DEFINE_RES_IRQ(104),
--};
--
--static struct gpio_em_config gio3_config = {
--	.gpio_base = 96,
--	.irq_base = EMEV2_GPIO_IRQ(96),
--	.number_of_pins = 32,
--};
--
--static struct resource gio3_resources[] = {
--	DEFINE_RES_MEM(0xe0050180, 0x2c),
--	DEFINE_RES_MEM(0xe00501c0, 0x20),
--	DEFINE_RES_IRQ(105),
--	DEFINE_RES_IRQ(106),
--};
--
--static struct gpio_em_config gio4_config = {
--	.gpio_base = 128,
--	.irq_base = EMEV2_GPIO_IRQ(128),
--	.number_of_pins = 31,
--};
--
--static struct resource gio4_resources[] = {
--	DEFINE_RES_MEM(0xe0050200, 0x2c),
--	DEFINE_RES_MEM(0xe0050240, 0x20),
--	DEFINE_RES_IRQ(107),
--	DEFINE_RES_IRQ(108),
--};
--
--#define emev2_register_gio(idx)						\
--	platform_device_register_resndata(&platform_bus, "em_gio",	\
--					  idx, gio##idx##_resources,	\
--					  ARRAY_SIZE(gio##idx##_resources), \
--					  &gio##idx##_config,		\
--					  sizeof(struct gpio_em_config))
--
--static struct resource pmu_resources[] = {
--	DEFINE_RES_IRQ(152),
--	DEFINE_RES_IRQ(153),
--};
--
--#define emev2_register_pmu()					\
--	platform_device_register_simple("arm-pmu", -1,		\
--					pmu_resources,		\
--					ARRAY_SIZE(pmu_resources))
--
--void __init emev2_add_standard_devices(void)
--{
--	if (!IS_ENABLED(CONFIG_COMMON_CLK))
--		emev2_clock_init();
--
--	emev2_register_uart(0);
--	emev2_register_uart(1);
--	emev2_register_uart(2);
--	emev2_register_uart(3);
--	emev2_register_sti();
--	emev2_register_gio(0);
--	emev2_register_gio(1);
--	emev2_register_gio(2);
--	emev2_register_gio(3);
--	emev2_register_gio(4);
--	emev2_register_pmu();
--}
--
- void __init emev2_init_delay(void)
- {
- 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
+acx565akm
+adi,adv7180
+adi,adv7393
+adi,adv7611
+altr,socfpga-perip-clk
+at24,24c256
+at,24c1024
+atmel,24c08
+atmel,at91sam9g45-isi
+atmel,sam9g46-sha
+dallas,ds1672
+edt,edt-ft5x06
+fsl,fxos8700
+fsl,imx28-tx28-sgtl5000
+fsl,imx53-voipac-sgtl5000
+fsl,imx6q-sabrelite-sgtl5000
+fsl,imx6sl-anatop
+fsl,imx6sl-iomuxc-gpr
+fsl,tzic
+fsl,vf610-sai
+gw,gsp
+ltc,ltc3676
+marvell,sky2
+mcp,24c02
+mxim,ds1339
+nvidia,tegra124
+nxp,pca9554
+onnn,nct1008
+pixcir,pixcir_ts
+plx,pex8606
+plx,pex8609
+qt1070
+renesas,irqc
+renesas,r7s72100
+renesas,r8a7778
+renesas,r8a7791
+renesas,sh-mmcif
+rohm,bh1780gli
+samsung,exynos5420-dw-mshc-smu
+sil,si52147
+sil,si53156
+sirf,atlas6-ble
+sirf,prima2-cphifbg
+sirf,prima2-memc
+sirf,prima2-memcmon
+sirf,prima2-rsc
+sirf,prima2-spi
+spidev
+sst,w25q256
+stericsson,cpufreq-ux500
+stericsson,db8500-cpufreq-cooling
+st-ericsson,u8500
+stericsson,u8500-clks
+st,m25l1605d
+st,nomadik-mtu
+st,stw4811
+st,stw481x-vmmc
+tc3589x
+tc3589x-gpio
+ti,bq27200
+ti,emif-4d5
+ti,omap2-mcspi
+ti,omap3-1w
+ti,omap36xx
+ti,omap4430-sdma
+ti,omap4-des
+ti,omap4-hwspinlock
+ti,omap4-mailbox
+ti,omap5-mpu
+ti,omap5-sham
+ti,omap-control-usb
+ti,omap-infra
+ti,palmas-usb-vid
+ti,tlv320aic23
+ti,tps659038-pmic
+ti,tsc2007
+ti,twl4030-pwrbutton
+ti,twl5031
+tps61052
+tsc2005
