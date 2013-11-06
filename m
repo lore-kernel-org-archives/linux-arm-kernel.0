@@ -1,350 +1,77 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 6 Nov 2013 13:41:25 -0800
-Subject: [PATCH v2 1/2] mmc: arasan: Add driver for Arasan SDHCI
-In-Reply-To: <1383151090-13885-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1383151090-13885-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <b3f788b3-dfc3-422e-9a74-b796c0fd3207@DB8EHSMHS004.ehs.local>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 6 Nov 2013 13:49:43 -0800
+Subject: [libseccomp-discuss] ARM audit, seccomp,
+ etc are broken wrt OABI syscalls
+In-Reply-To: <CAGXu5jLr3G+n3SRrpJOZbHsdY76dN34TNP0arL2_FyBg7c2EAg@mail.gmail.com>
+References: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
+ <1383751951.28218.64.camel@flatline.rdu.redhat.com>
+ <20131106155104.GZ16735@n2100.arm.linux.org.uk>
+ <CABqD9hbaZhAztYF_H8RTuTdhh+J4WHaGpdRLR3EqHbtH2OLU+Q@mail.gmail.com>
+ <CAGXu5jLr3G+n3SRrpJOZbHsdY76dN34TNP0arL2_FyBg7c2EAg@mail.gmail.com>
+Message-ID: <CALCETrV8TNtc6oc=UdeoskSfaU5M79gW=EnvkHqw6=q=1DDnTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Wed, Nov 6, 2013 at 1:26 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Wed, Nov 6, 2013 at 1:20 PM, Will Drewry <wad@chromium.org> wrote:
+>> On Wed, Nov 6, 2013 at 9:51 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Wed, Nov 06, 2013 at 10:32:31AM -0500, Eric Paris wrote:
+>>>> On Tue, 2013-11-05 at 14:36 -0800, Andy Lutomirski wrote:
+>>>> > 1. Set a different audit arch for OABI syscalls (e.g.
+>>>> > AUDIT_ARCH_ARMOABI).  That is, treat OABI syscall entries the same way
+>>>> > that x86_64 treats int 80.
+>>>>
+>>>> As the audit maintainer, I like #1.  It might break ABI, but the ABI is
+>>>> flat wrong now and not maintainable...
+>>>
+>>> If you read the whole thread, you will see that this corner case is just
+>>> not worth the effort to support.  Audit may as well be disabled by
+>>> kernel config if any OABI support is enabled.
+>>
+>> This might be the best move for seccomp too (as Kees suggested).  I'd
+>> love to have audit arch visibility, but it's not clear that it's worth
+>> any sort of larger changes ...
+>>
+>> ... like adding a task_thread_info.compat flag that bubbles up to
+>> syscall_get_arch(), or if we assume consumers of syscall_get_nr() are
+>> broken today (I haven't checked), then it would be possible to at
+>> least re-add the 0x900000 bits, if compat, before handing back the
+>> system call number but leave the audit arch pieces alone.
 
-any comments from your side? Could you consider applying it to your
-tree, please?
+That would fix the main issue, but I bet that no one will ever do
+anything on the userspace side other than treating those syscalls like
+any other unknown syscall.
 
-	Thanks,
-	S?ren
+>
+> How does this look, for the seccomp part?
+>
+> -Kees
+>
+> diff --git a/arch/Kconfig b/arch/Kconfig
+> index af2cc6eabcc7..3610c2d9910f 100644
+> --- a/arch/Kconfig
+> +++ b/arch/Kconfig
+> @@ -331,7 +331,7 @@ config HAVE_ARCH_SECCOMP_FILTER
+>
+>  config SECCOMP_FILTER
+>         def_bool y
+> -       depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET
+> +       depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET && !OABI_COMPAT
+>         help
+>           Enable tasks to build secure computing environments defined
+>           in terms of Berkeley Packet Filter programs which implement
+>
 
-On Wed, Oct 30, 2013 at 09:38:09AM -0700, Soren Brinkmann wrote:
-> Add a driver for Arasan's SDHCI controller core.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> v2:
->  - document 'interrupts' and 'interrupt-parent' properties in the driver
->    bindings
->  - append '-8.9a' IP version specifier to comaptibility string
-> ---
->  .../devicetree/bindings/mmc/arasan,sdhci.txt       |  27 +++
->  MAINTAINERS                                        |   1 +
->  drivers/mmc/host/Kconfig                           |  12 ++
->  drivers/mmc/host/Makefile                          |   1 +
->  drivers/mmc/host/sdhci-of-arasan.c                 | 224 +++++++++++++++++++++
->  5 files changed, 265 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
->  create mode 100644 drivers/mmc/host/sdhci-of-arasan.c
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> new file mode 100644
-> index 000000000000..ef4c5ac753e8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -0,0 +1,27 @@
-> +Device Tree Bindings for the Arasan SDCHI Controller
-> +
-> +  The bindings follow the mmc[1], clock[2] and interrupt[3] bindings. Only
-> +  deviations are documented here.
-> +
-> +  [1] Documentation/devicetree/bindings/mmc/mmc.txt
-> +  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +  [3] Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-> +
-> +Required Properties:
-> +  - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a'
-> +  - reg: From mmc bindings: Register location and length.
-> +  - clocks: From clock bindings: Handles to clock inputs.
-> +  - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
-> +  - interrupts: Interrupt specifier
-> +  - interrupt-parent: Phandle for the interrupt controller that services
-> +		      interrupts for this device.
-> +
-> +Example:
-> +	sdhci at e0100000 {
-> +		compatible = "arasan,sdhci-8.9a";
-> +		reg = <0xe0100000 0x1000>;
-> +		clock-names = "clk_xin", "clk_ahb";
-> +		clocks = <&clkc 21>, <&clkc 32>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 24 4>;
-> +	} ;
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 3438384d270c..5ede7f722025 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1357,6 +1357,7 @@ T:	git git://git.xilinx.com/linux-xlnx.git
->  S:	Supported
->  F:	arch/arm/mach-zynq/
->  F:	drivers/cpuidle/cpuidle-zynq.c
-> +F:	drivers/mmc/host/sdhci-of-arasan.c
->  
->  ARM SMMU DRIVER
->  M:	Will Deacon <will.deacon@arm.com>
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 7fc5099e44b2..1eb090c187bb 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -104,6 +104,18 @@ config MMC_SDHCI_PLTFM
->  
->  	  If unsure, say N.
->  
-> +config MMC_SDHCI_OF_ARASAN
-> +	tristate "SDHCI OF support for the Arasan SDHCI controllers"
-> +	depends on MMC_SDHCI_PLTFM
-> +	depends on OF
-> +	help
-> +	  This selects the Arasan Secure Digital Host Controller Interface
-> +	  (SDHCI). This hardware is found e.g. in Xilinx' Zynq SoC.
-> +
-> +	  If you have a controller with this interface, say Y or M here.
-> +
-> +	  If unsure, say N.
-> +
->  config MMC_SDHCI_OF_ESDHC
->  	tristate "SDHCI OF support for the Freescale eSDHC controller"
->  	depends on MMC_SDHCI_PLTFM
-> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> index c41d0c364509..f93617ec6548 100644
-> --- a/drivers/mmc/host/Makefile
-> +++ b/drivers/mmc/host/Makefile
-> @@ -57,6 +57,7 @@ obj-$(CONFIG_MMC_SDHCI_CNS3XXX)		+= sdhci-cns3xxx.o
->  obj-$(CONFIG_MMC_SDHCI_ESDHC_IMX)	+= sdhci-esdhc-imx.o
->  obj-$(CONFIG_MMC_SDHCI_DOVE)		+= sdhci-dove.o
->  obj-$(CONFIG_MMC_SDHCI_TEGRA)		+= sdhci-tegra.o
-> +obj-$(CONFIG_MMC_SDHCI_OF_ARASAN)	+= sdhci-of-arasan.o
->  obj-$(CONFIG_MMC_SDHCI_OF_ESDHC)	+= sdhci-of-esdhc.o
->  obj-$(CONFIG_MMC_SDHCI_OF_HLWD)		+= sdhci-of-hlwd.o
->  obj-$(CONFIG_MMC_SDHCI_BCM_KONA)	+= sdhci-bcm-kona.o
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> new file mode 100644
-> index 000000000000..98464bc732f6
-> --- /dev/null
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -0,0 +1,224 @@
-> +/*
-> + * Arasan Secure Digital Host Controller Interface.
-> + * Copyright (C) 2011 - 2012 Michal Simek <monstr@monstr.eu>
-> + * Copyright (c) 2012 Wind River Systems, Inc.
-> + * Copyright (C) 2013 Pengutronix e.K.
-> + * Copyright (C) 2013 Xilinx Inc.
-> + *
-> + * Based on sdhci-of-esdhc.c
-> + *
-> + * Copyright (c) 2007 Freescale Semiconductor, Inc.
-> + * Copyright (c) 2009 MontaVista Software, Inc.
-> + *
-> + * Authors: Xiaobo Xie <X.Xie@freescale.com>
-> + *	    Anton Vorontsov <avorontsov@ru.mvista.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or (at
-> + * your option) any later version.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include "sdhci-pltfm.h"
-> +
-> +#define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
-> +
-> +#define CLK_CTRL_TIMEOUT_SHIFT		16
-> +#define CLK_CTRL_TIMEOUT_MASK		(0xf << CLK_CTRL_TIMEOUT_SHIFT)
-> +#define CLK_CTRL_TIMEOUT_MIN_EXP	13
-> +
-> +/**
-> + * struct sdhci_arasan_data
-> + * @clk_ahb:	Pointer to the AHB clock
-> + */
-> +struct sdhci_arasan_data {
-> +	struct clk	*clk_ahb;
-> +};
-> +
-> +static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
-> +{
-> +	u32 div;
-> +	unsigned long freq;
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +
-> +	div = readl(host->ioaddr + SDHCI_ARASAN_CLK_CTRL_OFFSET);
-> +	div = (div & CLK_CTRL_TIMEOUT_MASK) >> CLK_CTRL_TIMEOUT_SHIFT;
-> +
-> +	freq = clk_get_rate(pltfm_host->clk);
-> +	freq /= 1 << (CLK_CTRL_TIMEOUT_MIN_EXP + div);
-> +
-> +	return freq;
-> +}
-> +
-> +static struct sdhci_ops sdhci_arasan_ops = {
-> +	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-> +	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
-> +};
-> +
-> +static struct sdhci_pltfm_data sdhci_arasan_pdata = {
-> +	.ops = &sdhci_arasan_ops,
-> +};
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +/**
-> + * sdhci_arasan_suspend - Suspend method for the driver
-> + * @dev:	Address of the device structure
-> + * Returns 0 on success and error value on error
-> + *
-> + * Put the device in a low power state.
-> + */
-> +static int sdhci_arasan_suspend(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct sdhci_host *host = platform_get_drvdata(pdev);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_arasan_data *sdhci_arasan = pltfm_host->priv;
-> +	int ret;
-> +
-> +	ret = sdhci_suspend_host(host);
-> +	if (ret)
-> +		return ret;
-> +
-> +	clk_disable(pltfm_host->clk);
-> +	clk_disable(sdhci_arasan->clk_ahb);
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * sdhci_arasan_resume - Resume method for the driver
-> + * @dev:	Address of the device structure
-> + * Returns 0 on success and error value on error
-> + *
-> + * Resume operation after suspend
-> + */
-> +static int sdhci_arasan_resume(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct sdhci_host *host = platform_get_drvdata(pdev);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_arasan_data *sdhci_arasan = pltfm_host->priv;
-> +	int ret;
-> +
-> +	ret = clk_enable(sdhci_arasan->clk_ahb);
-> +	if (ret) {
-> +		dev_err(dev, "Cannot enable AHB clock.\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_enable(pltfm_host->clk);
-> +	if (ret) {
-> +		dev_err(dev, "Cannot enable SD clock.\n");
-> +		clk_disable(sdhci_arasan->clk_ahb);
-> +		return ret;
-> +	}
-> +
-> +	return sdhci_resume_host(host);
-> +}
-> +#endif /* ! CONFIG_PM_SLEEP */
-> +
-> +static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
-> +			 sdhci_arasan_resume);
-> +
-> +static int sdhci_arasan_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +	struct clk *clk_xin;
-> +	struct sdhci_host *host;
-> +	struct sdhci_pltfm_host *pltfm_host;
-> +	struct sdhci_arasan_data *sdhci_arasan;
-> +
-> +	sdhci_arasan = devm_kzalloc(&pdev->dev, sizeof(*sdhci_arasan),
-> +			GFP_KERNEL);
-> +	if (!sdhci_arasan)
-> +		return -ENOMEM;
-> +
-> +	sdhci_arasan->clk_ahb = devm_clk_get(&pdev->dev, "clk_ahb");
-> +	if (IS_ERR(sdhci_arasan->clk_ahb)) {
-> +		dev_err(&pdev->dev, "clk_ahb clock not found.\n");
-> +		return PTR_ERR(sdhci_arasan->clk_ahb);
-> +	}
-> +
-> +	clk_xin = devm_clk_get(&pdev->dev, "clk_xin");
-> +	if (IS_ERR(clk_xin)) {
-> +		dev_err(&pdev->dev, "clk_xin clock not found.\n");
-> +		return PTR_ERR(clk_xin);
-> +	}
-> +
-> +	ret = clk_prepare_enable(sdhci_arasan->clk_ahb);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Unable to enable AHB clock.\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(clk_xin);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Unable to enable SD clock.\n");
-> +		goto clk_dis_ahb;
-> +	}
-> +
-> +	host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata, 0);
-> +	if (IS_ERR(host)) {
-> +		ret = PTR_ERR(host);
-> +		dev_err(&pdev->dev, "platform init failed (%u)\n", ret);
-> +		goto clk_disable_all;
-> +	}
-> +
-> +	sdhci_get_of_property(pdev);
-> +	pltfm_host = sdhci_priv(host);
-> +	pltfm_host->priv = sdhci_arasan;
-> +	pltfm_host->clk = clk_xin;
-> +
-> +	ret = sdhci_add_host(host);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "platform register failed (%u)\n", ret);
-> +		goto err_pltfm_free;
-> +	}
-> +
-> +	return 0;
-> +
-> +err_pltfm_free:
-> +	sdhci_pltfm_free(pdev);
-> +clk_disable_all:
-> +	clk_disable_unprepare(clk_xin);
-> +clk_dis_ahb:
-> +	clk_disable_unprepare(sdhci_arasan->clk_ahb);
-> +
-> +	return ret;
-> +}
-> +
-> +static int sdhci_arasan_remove(struct platform_device *pdev)
-> +{
-> +	struct sdhci_host *host = platform_get_drvdata(pdev);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_arasan_data *sdhci_arasan = pltfm_host->priv;
-> +
-> +	clk_disable_unprepare(pltfm_host->clk);
-> +	clk_disable_unprepare(sdhci_arasan->clk_ahb);
-> +
-> +	return sdhci_pltfm_unregister(pdev);
-> +}
-> +
-> +static const struct of_device_id sdhci_arasan_of_match[] = {
-> +	{ .compatible = "arasan,sdhci-8.9a" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
-> +
-> +static struct platform_driver sdhci_arasan_driver = {
-> +	.driver = {
-> +		.name = "sdhci-arasan",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = sdhci_arasan_of_match,
-> +		.pm = &sdhci_arasan_dev_pm_ops,
-> +	},
-> +	.probe = sdhci_arasan_probe,
-> +	.remove = sdhci_arasan_remove,
-> +};
-> +
-> +module_platform_driver(sdhci_arasan_driver);
-> +
-> +MODULE_DESCRIPTION("Driver for the Arasan SDHCI Controller");
-> +MODULE_AUTHOR("Soeren Brinkmann <soren.brinkmann@xilinx.com");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 1.8.4.1
-> 
-> 
+Works for me.  Of course, I don't maintain any of this stuff, so I
+don't have to deal with it :)
+
+It's probably work adding some text either in CONFIG_SECCOMP_FILTER or
+CONFIG_OABI_COMPAT explaining what the problem is.
+
+
+FWIW, does syscall restart work with OABI_COMPAT?  I've never
+understood the syscall restart mechanism, but x86 had an issue awhile
+back when with sysenter vs. syscall that was kind of similar.
+
+--Andy
