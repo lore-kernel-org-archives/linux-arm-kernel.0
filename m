@@ -1,58 +1,166 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 6 Nov 2013 09:46:24 +0100
-Subject: [PATCH v2 19/19] fbdev: sh-mobile-lcdcfb: Enable the driver on
- all ARM platforms
-In-Reply-To: <1671829.6znfm3IPYO@avalon>
-References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383086274-11049-20-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <alpine.DEB.2.02.1310312039330.13521@ayla.of.borg>
- <1671829.6znfm3IPYO@avalon>
-Message-ID: <CAMuHMdWaprjsfyO548HCzou4W0yP1nqfw2rP66BudXWgY7uKww@mail.gmail.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed,  6 Nov 2013 09:52:12 +0100
+Subject: [PATCHv12][ 1/8] video: imxfb: Introduce regulator support.
+Message-ID: <1383727939-4190-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 6, 2013 at 1:27 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> +#ifdef CONFIG_PM_SLEEP
->>  static int sh_mobile_meram_suspend(struct device *dev)
->>  {
->>       struct platform_device *pdev = to_platform_device(dev);
->> @@ -592,7 +593,9 @@ static int sh_mobile_meram_suspend(struct device *dev)
->>       }
->>       return 0;
->>  }
->> +#endif
->>
->> +#ifdef CONFIG_PM_RUNTIME
->>  static int sh_mobile_meram_resume(struct device *dev)
->>  {
->>       struct platform_device *pdev = to_platform_device(dev);
->> @@ -611,6 +614,7 @@ static int sh_mobile_meram_resume(struct device *dev)
->>               meram_write_reg(priv->base, common_regs[i], priv->regs[i]);
->>       return 0;
->>  }
->> +#endif
->>
->>  static UNIVERSAL_DEV_PM_OPS(sh_mobile_meram_dev_pm_ops,
->>                           sh_mobile_meram_suspend,
->
-> I'm a bit surprised, looking at the definition of UNIVERSAL_DEV_PM_OPS, I
-> would have thought that both functions would be used when either
-> CONFIG_PM_SLEEP or CONFIG_PM_RUNTIME is defined. I would thus have guarded
-> both functions with #if defined(CONFIG_PM_SLEEP) ||
-> defined(CONFIG_PM_RUNTIME).
+This commit is based on the following commit by Fabio Estevam:
+  4344429 video: mxsfb: Introduce regulator support
 
-You're right. I missed that both function pointers are passed to both macros.
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v9->v10:
+- Added a return 0; at the end of imxfb_disable_controller.
 
-Will send v2.
+ChangeLog v8->v9:
+- return an error if regulator_{enable,disable} fails in
+  imxfb_{enable,disable}_controller, and use it.
+---
+ drivers/video/imxfb.c |   55 ++++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 43 insertions(+), 12 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index 38733ac..a2fe8bd 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -28,6 +28,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/math64.h>
+@@ -145,6 +146,7 @@ struct imxfb_info {
+ 	struct clk		*clk_ipg;
+ 	struct clk		*clk_ahb;
+ 	struct clk		*clk_per;
++	struct regulator	*reg_lcd;
+ 	enum imxfb_type		devtype;
+ 	bool			enabled;
+ 
+@@ -561,14 +563,25 @@ static void imxfb_exit_backlight(struct imxfb_info *fbi)
+ }
+ #endif
+ 
+-static void imxfb_enable_controller(struct imxfb_info *fbi)
++static int imxfb_enable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
+ 
+ 	if (fbi->enabled)
+-		return;
++		return 0;
+ 
+ 	pr_debug("Enabling LCD controller\n");
+ 
++	if (fbi->reg_lcd) {
++		ret = regulator_enable(fbi->reg_lcd);
++		if (ret) {
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator enable failed with error: %d\n",
++				ret);
++			return ret;
++		}
++	}
++
+ 	writel(fbi->screen_dma, fbi->regs + LCDC_SSA);
+ 
+ 	/* panning offset 0 (0 pixel offset)        */
+@@ -593,12 +606,16 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 		fbi->backlight_power(1);
+ 	if (fbi->lcd_power)
+ 		fbi->lcd_power(1);
++
++	return 0;
+ }
+ 
+-static void imxfb_disable_controller(struct imxfb_info *fbi)
++static int imxfb_disable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
++
+ 	if (!fbi->enabled)
+-		return;
++		return 0;
+ 
+ 	pr_debug("Disabling LCD controller\n");
+ 
+@@ -613,6 +630,17 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	fbi->enabled = false;
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
++
++	if (fbi->reg_lcd) {
++		ret = regulator_disable(fbi->reg_lcd);
++		if (ret)
++			dev_err(&fbi->pdev->dev,
++				"lcd regulator disable failed with error: %d\n",
++				ret);
++			return ret;
++	}
++
++	return 0;
+ }
+ 
+ static int imxfb_blank(int blank, struct fb_info *info)
+@@ -626,13 +654,12 @@ static int imxfb_blank(int blank, struct fb_info *info)
+ 	case FB_BLANK_VSYNC_SUSPEND:
+ 	case FB_BLANK_HSYNC_SUSPEND:
+ 	case FB_BLANK_NORMAL:
+-		imxfb_disable_controller(fbi);
+-		break;
++		return imxfb_disable_controller(fbi);
+ 
+ 	case FB_BLANK_UNBLANK:
+-		imxfb_enable_controller(fbi);
+-		break;
++		return imxfb_enable_controller(fbi);
+ 	}
++
+ 	return 0;
+ }
+ 
+@@ -734,8 +761,7 @@ static int imxfb_suspend(struct platform_device *dev, pm_message_t state)
+ 
+ 	pr_debug("%s\n", __func__);
+ 
+-	imxfb_disable_controller(fbi);
+-	return 0;
++	return imxfb_disable_controller(fbi);
+ }
+ 
+ static int imxfb_resume(struct platform_device *dev)
+@@ -745,8 +771,7 @@ static int imxfb_resume(struct platform_device *dev)
+ 
+ 	pr_debug("%s\n", __func__);
+ 
+-	imxfb_enable_controller(fbi);
+-	return 0;
++	return imxfb_enable_controller(fbi);
+ }
+ #else
+ #define imxfb_suspend	NULL
+@@ -1020,6 +1045,12 @@ static int imxfb_probe(struct platform_device *pdev)
+ 		goto failed_register;
+ 	}
+ 
++	fbi->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
++	if (IS_ERR(fbi->reg_lcd)) {
++		dev_info(&pdev->dev, "No lcd regulator used.\n");
++		fbi->reg_lcd = NULL;
++	}
++
+ 	imxfb_enable_controller(fbi);
+ 	fbi->pdev = pdev;
+ #ifdef PWMR_BACKLIGHT_AVAILABLE
+-- 
+1.7.9.5
