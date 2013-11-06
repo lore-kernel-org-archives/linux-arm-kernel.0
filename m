@@ -1,155 +1,111 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 6 Nov 2013 17:48:23 +0530
-Subject: [PATCH V2 5/5] power: reset: as3722: add power-off driver
-In-Reply-To: <1383740303-10956-1-git-send-email-ldewangan@nvidia.com>
-References: <1383740303-10956-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1383740303-10956-6-git-send-email-ldewangan@nvidia.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 06 Nov 2013 13:22:44 +0100
+Subject: [PATCH 2/3] clk: shmobile: Add MSTP clock support
+In-Reply-To: <20131106020928.GA17384@verge.net.au>
+References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131106020928.GA17384@verge.net.au>
+Message-ID: <2388201.Z5FWo3Tb4E@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ams AS3722 supports the power off functionality to turn off
-system.
+Hi Simon,
 
-Add power off driver for ams AS3722.
+On Wednesday 06 November 2013 11:09:31 Simon Horman wrote:
+> On Tue, Oct 29, 2013 at 03:55:10PM +0100, Laurent Pinchart wrote:
+> > MSTP clocks are gate clocks controlled through a register that handles
+> > up to 32 clocks. The register is often sparsely populated.
+> > 
+> > Those clocks are found on Renesas ARM SoCs.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  47 +++++
+> >  drivers/clk/shmobile/Makefile                      |   1 +
+> >  drivers/clk/shmobile/clk-mstp.c                    | 229 ++++++++++++++++
+> >  include/dt-bindings/clock/r8a7790-clock.h          |  56 +++++
+> >  4 files changed, 333 insertions(+)
+> >  create mode 100644
+> >  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> >  create mode 100644 drivers/clk/shmobile/clk-mstp.c
+> >  create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
+> 
+> [snip]
+> 
+> > diff --git a/include/dt-bindings/clock/r8a7790-clock.h
+> > b/include/dt-bindings/clock/r8a7790-clock.h new file mode 100644
+> > index 0000000..19f2b48
+> > --- /dev/null
+> > +++ b/include/dt-bindings/clock/r8a7790-clock.h
+> 
+> I wonder if it would be best to put this in a separate patch
+> as it is SoC-specific.
+> 
+> > @@ -0,0 +1,56 @@
+> > +/*
+> > + * Copyright 2013 Ideas On Board SPRL
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + */
+> > +
+> > +#ifndef __DT_BINDINGS_CLOCK_R8A7790_H__
+> > +#define __DT_BINDINGS_CLOCK_R8A7790_H__
+> > +
+> > +/* MSTP1 */
+> > +#define R8A7790_CLK_CMT0		20
+> 
+> I believe that R8A7790_CLK_CMT0 should be 24.
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
-Changes from V1:
-- None
+Good catch, thank you.
 
- drivers/power/reset/Kconfig           |    6 ++
- drivers/power/reset/Makefile          |    1 +
- drivers/power/reset/as3722-poweroff.c |   96 +++++++++++++++++++++++++++++++++
- 3 files changed, 103 insertions(+), 0 deletions(-)
- create mode 100644 drivers/power/reset/as3722-poweroff.c
-
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 9b3ea53..6d452a7 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -6,6 +6,12 @@ menuconfig POWER_RESET
- 
- 	  Say Y here to enable board reset and power off
- 
-+config POWER_RESET_AS3722
-+	bool "ams AS3722 power-off driver"
-+	depends on MFD_AS3722 && POWER_RESET
-+	help
-+	  This driver supports turning off board via a ams AS3722 power-off.
-+
- config POWER_RESET_GPIO
- 	bool "GPIO power-off driver"
- 	depends on OF_GPIO && POWER_RESET
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index 3e6ed88..a5b4a77 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -1,3 +1,4 @@
-+obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
- obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
- obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
- obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
-diff --git a/drivers/power/reset/as3722-poweroff.c b/drivers/power/reset/as3722-poweroff.c
-new file mode 100644
-index 0000000..0e489ff
---- /dev/null
-+++ b/drivers/power/reset/as3722-poweroff.c
-@@ -0,0 +1,96 @@
-+/*
-+ * Power off driver for ams AS3722 device.
-+ *
-+ * Copyright (c) 2013, NVIDIA Corporation.
-+ *
-+ * Author: Laxman Dewangan <ldewangan@nvidia.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
-+ * whether express or implied; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-+ * General Public License for more details.
-+ */
-+
-+#include <linux/mfd/as3722.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+struct as3722_poweroff {
-+	struct device *dev;
-+	struct as3722 *as3722;
-+};
-+
-+static struct as3722_poweroff *as3722_pm_poweroff;
-+
-+static void as3722_pm_power_off(void)
-+{
-+	int ret;
-+
-+	if (!as3722_pm_poweroff) {
-+		pr_err("AS3722 poweroff is not initialised\n");
-+		return;
-+	}
-+
-+	ret = as3722_update_bits(as3722_pm_poweroff->as3722,
-+		AS3722_RESET_CONTROL_REG, AS3722_POWER_OFF, AS3722_POWER_OFF);
-+	if (ret < 0)
-+		dev_err(as3722_pm_poweroff->dev,
-+			"RESET_CONTROL_REG update failed, %d\n", ret);
-+}
-+
-+static int as3722_poweroff_probe(struct platform_device *pdev)
-+{
-+	struct as3722_poweroff *as3722_poweroff;
-+	struct device_node *np = pdev->dev.parent->of_node;
-+
-+	if (!np)
-+		return -EINVAL;
-+
-+	if (!of_property_read_bool(np, "ams,system-power-controller"))
-+		return 0;
-+
-+	as3722_poweroff = devm_kzalloc(&pdev->dev, sizeof(*as3722_poweroff),
-+				GFP_KERNEL);
-+	if (!as3722_poweroff)
-+		return -ENOMEM;
-+
-+	as3722_poweroff->as3722 = dev_get_drvdata(pdev->dev.parent);
-+	as3722_poweroff->dev = &pdev->dev;
-+	as3722_pm_poweroff = as3722_poweroff;
-+	if (!pm_power_off)
-+		pm_power_off = as3722_pm_power_off;
-+
-+	return 0;
-+}
-+
-+static int as3722_poweroff_remove(struct platform_device *pdev)
-+{
-+	if (pm_power_off == as3722_pm_power_off)
-+		pm_power_off = NULL;
-+	as3722_pm_poweroff = NULL;
-+
-+	return 0;
-+}
-+
-+static struct platform_driver as3722_poweroff_driver = {
-+	.driver = {
-+		.name = "as3722-power-off",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = as3722_poweroff_probe,
-+	.remove = as3722_poweroff_remove,
-+};
-+
-+module_platform_driver(as3722_poweroff_driver);
-+
-+MODULE_DESCRIPTION("Power off driver for ams AS3722 PMIC Device");
-+MODULE_ALIAS("platform:as3722-power-off");
-+MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
-+MODULE_LICENSE("GPL v2");
+> > +
+> > +/* MSTP2 */
+> > +#define R8A7790_CLK_SCIFA2		2
+> > +#define R8A7790_CLK_SCIFA1		3
+> > +#define R8A7790_CLK_SCIFA0		4
+> > +#define R8A7790_CLK_SCIFB0		6
+> > +#define R8A7790_CLK_SCIFB1		7
+> > +#define R8A7790_CLK_SCIFB2		16
+> > +
+> > +/* MSTP3 */
+> > +#define R8A7790_CLK_TPU0		4
+> > +#define R8A7790_CLK_MMCIF1		5
+> > +#define R8A7790_CLK_SDHI3		11
+> > +#define R8A7790_CLK_SDHI2		12
+> > +#define R8A7790_CLK_SDHI1		13
+> > +#define R8A7790_CLK_SDHI0		14
+> > +#define R8A7790_CLK_MMCIF0		15
+> > +
+> > +/* MSTP5 */
+> > +#define R8A7790_CLK_THERMAL		22
+> > +
+> > +/* MSTP7 */
+> > +#define R8A7790_CLK_HSCIF1		16
+> > +#define R8A7790_CLK_HSCIF0		17
+> > +#define R8A7790_CLK_SCIF1		20
+> > +#define R8A7790_CLK_SCIF0		21
+> > +#define R8A7790_CLK_DU2			22
+> > +#define R8A7790_CLK_DU1			23
+> > +#define R8A7790_CLK_DU0			24
+> > +#define R8A7790_CLK_LVDS1		25
+> > +#define R8A7790_CLK_LVDS0		26
+> > +
+> > +/* MSTP8 */
+> > +#define R8A7790_CLK_ETHER		13
+> > +
+> > +/* MSTP9 */
+> > +#define R8A7790_CLK_I2C3		28
+> > +#define R8A7790_CLK_I2C2		29
+> > +#define R8A7790_CLK_I2C1		30
+> > +#define R8A7790_CLK_I2C0		31
+> > +
+> > +#endif /* __DT_BINDINGS_CLOCK_R8A7790_H__ */
 -- 
-1.7.1.1
+Regards,
+
+Laurent Pinchart
