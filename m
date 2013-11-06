@@ -1,92 +1,175 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 07 Nov 2013 08:39:52 +0900
-Subject: [PATCH/RFC] clk: shmobile: DT property SoC <-> CCF interface prototype
-Message-ID: <20131106233952.8558.85734.sendpatchset@w520>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Thu,  7 Nov 2013 00:54:21 +0100
+Subject: [PATCH/RFC] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
+Message-ID: <1383782061-7111-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+SH-Mobile platforms are transitioning from non-multiplatform to
+multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
+been created to group all multiplatform-enabled SH-Mobile SoCs. The
+existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
+been converted yet.
 
-Prototype patch to use a DT property to pass "CPG mode"
-(clock device boot time hardware configuration) from
-SoC code in arch/arm/ to CCF bits in drivers/clk/
+This arrangement works fine for the arch/ code, but lots of drivers
+needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
+ARCH_SHMOBILE only. In order to avoid changing them, rename
+ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
+ARCH_SHMOBILE configuration symbol that is selected by both
+ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
 
-Applies on top of the r8a7790 CCF code by Laurent.
-Mainly written to show how a property can be used
-instead of introducing a custom symbol dependency.
-
-The SoC specific code needs to use of_update_property()
-to setup this DT property after reading out the boot
-mode from hardware during boot.
-
-Not-Yet-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
+ arch/arm/Kconfig                  | 14 ++++++++------
+ arch/arm/Makefile                 |  1 -
+ arch/arm/boot/compressed/Makefile |  2 +-
+ arch/arm/boot/dts/Makefile        |  2 +-
+ arch/arm/mach-shmobile/Kconfig    |  8 ++++++--
+ drivers/Makefile                  |  2 +-
+ 6 files changed, 17 insertions(+), 12 deletions(-)
 
- drivers/clk/shmobile/clk-r8a7790.c |   15 ++++++---------
- include/linux/clk/shmobile.h       |   19 -------------------
- 2 files changed, 6 insertions(+), 28 deletions(-)
+This patch is an alternative approach to adding ARCH_SHMOBILE_MULTI or ARM
+dependencies to all the SH-Mobile-related drivers (see
+http://www.spinics.net/lists/arm-kernel/msg283128.html). If accepted I will
+modify the previous series to only add COMPILE_TEST support without touching
+the other dependencies.
 
---- 0018/drivers/clk/shmobile/clk-r8a7790.c
-+++ work/drivers/clk/shmobile/clk-r8a7790.c	2013-11-06 17:28:36.000000000 +0900
-@@ -12,7 +12,6 @@
+I believe this approach to be simpler. It will also not required dropping the
+ARCH_SHMOBILE_MULTI dependency from all drivers when we will eventually get
+rid of the non-multiplatform platforms and rename ARCH_SHMOBILE_MULTI to
+ARCH_SHMOBILE.
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1ad6fb6..588b46b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -642,8 +642,9 @@ config ARCH_MSM
+ 	  stack and controls some vital subsystems
+ 	  (clock and power control, etc).
  
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
--#include <linux/clk/shmobile.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
-@@ -70,8 +69,6 @@ static const struct clk_div_table cpg_sd
- 	{ 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
- };
+-config ARCH_SHMOBILE
+-	bool "Renesas SH-Mobile / R-Mobile"
++config ARCH_SHMOBILE_LEGACY
++	bool "Renesas SH-Mobile / R-Mobile (non-multiplatform)"
++	select ARCH_SHMOBILE
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+@@ -659,7 +660,8 @@ config ARCH_SHMOBILE
+ 	select PM_GENERIC_DOMAINS if PM
+ 	select SPARSE_IRQ
+ 	help
+-	  Support for Renesas's SH-Mobile and R-Mobile ARM platforms.
++	  Support for Renesas's SH-Mobile and R-Mobile ARM platforms using
++	  a non-multiplatform kernel.
  
--static u32 cpg_mode __initdata;
--
- #define CPG_SDCKCR			0x00000074
+ config ARCH_RPC
+ 	bool "RiscPC"
+@@ -1619,7 +1621,7 @@ config HZ_FIXED
+ 	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
+ 		ARCH_S5PV210 || ARCH_EXYNOS4
+ 	default AT91_TIMER_HZ if ARCH_AT91
+-	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
++	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE_LEGACY
+ 	default 0
  
- static void __init r8a7790_cpg_clocks_init(struct device_node *np)
-@@ -80,6 +77,12 @@ static void __init r8a7790_cpg_clocks_in
- 	struct r8a7790_cpg *cpg;
- 	struct clk **clks;
- 	unsigned int i;
-+	u32 cpg_mode;
+ choice
+@@ -1800,8 +1802,8 @@ config ARCH_WANT_GENERAL_HUGETLB
+ source "mm/Kconfig"
+ 
+ config FORCE_MAX_ZONEORDER
+-	int "Maximum zone order" if ARCH_SHMOBILE
+-	range 11 64 if ARCH_SHMOBILE
++	int "Maximum zone order" if ARCH_SHMOBILE_LEGACY
++	range 11 64 if ARCH_SHMOBILE_LEGACY
+ 	default "12" if SOC_AM33XX
+ 	default "9" if SA1111
+ 	default "11"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index db50b62..dca2e84 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -190,7 +190,6 @@ machine-$(CONFIG_ARCH_S5PV210)		+= s5pv210
+ machine-$(CONFIG_ARCH_SA1100)		+= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		+= shark
+ machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
+-machine-$(CONFIG_ARCH_SHMOBILE_MULTI) 	+= shmobile
+ machine-$(CONFIG_ARCH_SIRF)		+= prima2
+ machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
+ machine-$(CONFIG_ARCH_STI)		+= sti
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 7ac1610..bafbb4c7 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -68,7 +68,7 @@ else
+ endif
+ endif
+ 
+-ifeq ($(CONFIG_ARCH_SHMOBILE),y)
++ifeq ($(CONFIG_ARCH_SHMOBILE_LEGACY),y)
+ OBJS		+= head-shmobile.o
+ endif
+ 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 891b724..7d98d3a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -197,7 +197,7 @@ dtb-$(CONFIG_ARCH_U8500) += ste-snowball.dtb \
+ 	ste-ccu8540.dtb \
+ 	ste-ccu9540.dtb
+ dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
+-dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
++dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb \
+ 	r7s72100-genmai.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7778-bockw.dtb \
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 4bb548f..b31ceda 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -1,6 +1,10 @@
++config ARCH_SHMOBILE
++	bool
 +
-+	if (of_property_read_u32(np, "cpg-mode", &cpg_mode)) {
-+		pr_err("%s: failed to determine CPG mode\n", __func__);
-+		return;
-+	}
+ config ARCH_SHMOBILE_MULTI
+ 	bool "SH-Mobile Series" if ARCH_MULTI_V7
+ 	depends on MMU
++	select ARCH_SHMOBILE
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_ARM_SCU if SMP
+@@ -30,7 +34,7 @@ config MACH_KZM9D
+ comment "SH-Mobile System Configuration"
+ endif
  
- 	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
- 	clks = kzalloc(CPG_NUM_CLOCKS * sizeof(*clks), GFP_KERNEL);
-@@ -168,9 +171,3 @@ static void __init r8a7790_cpg_clocks_in
- CLK_OF_DECLARE(r8a7790_cpg_clks, "renesas,r8a7790-cpg-clocks",
- 	       r8a7790_cpg_clocks_init);
+-if ARCH_SHMOBILE
++if ARCH_SHMOBILE_LEGACY
  
--void __init r8a7790_clocks_init(u32 mode)
--{
--	cpg_mode = mode;
--
--	of_clk_init(NULL);
--}
---- 0018/include/linux/clk/shmobile.h
-+++ /dev/null	2013-06-03 21:41:10.638032047 +0900
-@@ -1,19 +0,0 @@
--/*
-- * Copyright 2013 Ideas On Board SPRL
-- *
-- * Contact: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef __LINUX_CLK_SHMOBILE_H_
--#define __LINUX_CLK_SHMOBILE_H_
--
--#include <linux/types.h>
--
--void r8a7790_clocks_init(u32 mode);
--
--#endif
+ comment "SH-Mobile System Type"
+ 
+@@ -288,7 +292,7 @@ source "drivers/sh/Kconfig"
+ 
+ endif
+ 
+-if ARCH_SHMOBILE || ARCH_SHMOBILE_MULTI
++if ARCH_SHMOBILE
+ 
+ menu "Timer and clock configuration"
+ 
+diff --git a/drivers/Makefile b/drivers/Makefile
+index ab93de8..8a50222 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -116,7 +116,7 @@ obj-$(CONFIG_SGI_SN)		+= sn/
+ obj-y				+= firmware/
+ obj-$(CONFIG_CRYPTO)		+= crypto/
+ obj-$(CONFIG_SUPERH)		+= sh/
+-obj-$(CONFIG_ARCH_SHMOBILE)	+= sh/
++obj-$(CONFIG_ARCH_SHMOBILE_LEGACY)	+= sh/
+ ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
+ obj-y				+= clocksource/
+ endif
+-- 
+Regards,
+
+Laurent Pinchart
