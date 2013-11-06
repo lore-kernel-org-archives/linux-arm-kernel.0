@@ -1,155 +1,208 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 07 Nov 2013 08:21:29 +0900
-Subject: [PATCH 03/04] ARM: shmobile: Remove legacy KZM9D board code
+Date: Thu, 07 Nov 2013 08:21:38 +0900
+Subject: [PATCH 04/04] ARM: shmobile: Remove legacy platform devices from
+ EMEV2 SoC code
 In-Reply-To: <20131106232102.8081.20523.sendpatchset@w520>
 References: <20131106232102.8081.20523.sendpatchset@w520>
-Message-ID: <20131106232129.8081.77546.sendpatchset@w520>
+Message-ID: <20131106232138.8081.51260.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Remove the C and platform device version of KZM9D.
-
-The DT version of KZM9D board support can now instead
-directly be used with SoC specific code in setup-emev2.c.
+Now when KZM9D legacy C board support code is
+gone then remove emev2_add_standard_devices()
+and all the platform devices from setup-emev2.c.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/Kconfig       |    6 --
- arch/arm/mach-shmobile/Makefile      |    1 
- arch/arm/mach-shmobile/Makefile.boot |    1 
- arch/arm/mach-shmobile/board-kzm9d.c |   92 ----------------------------------
- 4 files changed, 100 deletions(-)
+ arch/arm/mach-shmobile/include/mach/emev2.h |    5 
+ arch/arm/mach-shmobile/setup-emev2.c        |  148 ---------------------------
+ 2 files changed, 153 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-11-05 15:36:05.000000000 +0900
-@@ -245,12 +245,6 @@ config MACH_KOELSCH_REFERENCE
+--- 0001/arch/arm/mach-shmobile/include/mach/emev2.h
++++ work/arch/arm/mach-shmobile/include/mach/emev2.h	2013-11-05 16:02:39.000000000 +0900
+@@ -3,12 +3,7 @@
  
- 	   This is intended to aid developers
+ extern void emev2_map_io(void);
+ extern void emev2_init_delay(void);
+-extern void emev2_add_standard_devices(void);
+ extern void emev2_clock_init(void);
+-
+-#define EMEV2_GPIO_BASE 200
+-#define EMEV2_GPIO_IRQ(n) (EMEV2_GPIO_BASE + (n))
+-
+ extern struct smp_operations emev2_smp_ops;
  
--config MACH_KZM9D
--	bool "KZM9D board"
--	depends on ARCH_EMEV2
--	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	select USE_OF
--
- config MACH_KZM9G
- 	bool "KZM-A9-GT board"
- 	depends on ARCH_SH73A0
---- 0001/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-11-05 15:35:45.000000000 +0900
-@@ -72,7 +72,6 @@ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= bo
- obj-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE)	+= board-armadillo800eva-reference.o
- obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch.o
- obj-$(CONFIG_MACH_KOELSCH_REFERENCE)	+= board-koelsch-reference.o
--obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
- obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
- obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
- endif
---- 0001/arch/arm/mach-shmobile/Makefile.boot
-+++ work/arch/arm/mach-shmobile/Makefile.boot	2013-11-05 15:36:46.000000000 +0900
-@@ -9,7 +9,6 @@ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE)
- loadaddr-$(CONFIG_MACH_GENMAI) += 0x8008000
- loadaddr-$(CONFIG_MACH_KOELSCH) += 0x40008000
- loadaddr-$(CONFIG_MACH_KOELSCH_REFERENCE) += 0x40008000
--loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
- loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
- loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
- loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
---- 0001/arch/arm/mach-shmobile/board-kzm9d.c
-+++ /dev/null	2013-06-03 21:41:10.638032047 +0900
-@@ -1,92 +0,0 @@
--/*
-- * kzm9d board support
-- *
-- * Copyright (C) 2012  Renesas Solutions Corp.
-- * Copyright (C) 2012  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- */
--
--#include <linux/kernel.h>
+ #endif /* __ASM_EMEV2_H__ */
+--- 0003/arch/arm/mach-shmobile/setup-emev2.c
++++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-11-06 19:04:20.000000000 +0900
+@@ -19,22 +19,12 @@
+ #include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
 -#include <linux/interrupt.h>
+-#include <linux/irq.h>
 -#include <linux/platform_device.h>
--#include <linux/regulator/fixed.h>
--#include <linux/regulator/machine.h>
--#include <linux/smsc911x.h>
--#include <mach/common.h>
--#include <mach/emev2.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--
--/* Dummy supplies, where voltage doesn't matter */
--static struct regulator_consumer_supply dummy_supplies[] = {
--	REGULATOR_SUPPLY("vddvario", "smsc911x"),
--	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
+-#include <linux/platform_data/gpio-em.h>
+ #include <linux/of_platform.h>
+-#include <linux/delay.h>
+-#include <linux/input.h>
+-#include <linux/io.h>
+-#include <linux/irqchip/arm-gic.h>
+ #include <mach/common.h>
+ #include <mach/emev2.h>
+-#include <mach/irqs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/time.h>
+ 
+ static struct map_desc emev2_io_desc[] __initdata = {
+ #ifdef CONFIG_SMP
+@@ -53,144 +43,6 @@ void __init emev2_map_io(void)
+ 	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
+ }
+ 
+-/* UART */
+-static struct resource uart0_resources[] = {
+-	DEFINE_RES_MEM(0xe1020000, 0x38),
+-	DEFINE_RES_IRQ(40),
 -};
 -
--/* Ether */
--static struct resource smsc911x_resources[] = {
--	[0] = {
--		.start	= 0x20000000,
--		.end	= 0x2000ffff,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= EMEV2_GPIO_IRQ(1),
--		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_HIGH,
--	},
+-static struct resource uart1_resources[] = {
+-	DEFINE_RES_MEM(0xe1030000, 0x38),
+-	DEFINE_RES_IRQ(41),
 -};
 -
--static struct smsc911x_platform_config smsc911x_platdata = {
--	.flags		= SMSC911X_USE_32BIT,
--	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
--	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
+-static struct resource uart2_resources[] = {
+-	DEFINE_RES_MEM(0xe1040000, 0x38),
+-	DEFINE_RES_IRQ(42),
 -};
 -
--static struct platform_device smsc91x_device = {
--	.name	= "smsc911x",
--	.id	= -1,
--	.dev	= {
--		  .platform_data = &smsc911x_platdata,
--		},
--	.num_resources	= ARRAY_SIZE(smsc911x_resources),
--	.resource	= smsc911x_resources,
+-static struct resource uart3_resources[] = {
+-	DEFINE_RES_MEM(0xe1050000, 0x38),
+-	DEFINE_RES_IRQ(43),
 -};
 -
--static struct platform_device *kzm9d_devices[] __initdata = {
--	&smsc91x_device,
+-#define emev2_register_uart(idx)					\
+-	platform_device_register_simple("serial8250-em", idx,		\
+-					uart##idx##_resources,		\
+-					ARRAY_SIZE(uart##idx##_resources))
+-
+-/* STI */
+-static struct resource sti_resources[] = {
+-	DEFINE_RES_MEM(0xe0180000, 0x54),
+-	DEFINE_RES_IRQ(157),
 -};
 -
--void __init kzm9d_add_standard_devices(void)
+-#define emev2_register_sti()					\
+-	platform_device_register_simple("em_sti", 0,		\
+-					sti_resources,		\
+-					ARRAY_SIZE(sti_resources))
+-
+-/* GIO */
+-static struct gpio_em_config gio0_config = {
+-	.gpio_base = 0,
+-	.irq_base = EMEV2_GPIO_IRQ(0),
+-	.number_of_pins = 32,
+-};
+-
+-static struct resource gio0_resources[] = {
+-	DEFINE_RES_MEM(0xe0050000, 0x2c),
+-	DEFINE_RES_MEM(0xe0050040, 0x20),
+-	DEFINE_RES_IRQ(99),
+-	DEFINE_RES_IRQ(100),
+-};
+-
+-static struct gpio_em_config gio1_config = {
+-	.gpio_base = 32,
+-	.irq_base = EMEV2_GPIO_IRQ(32),
+-	.number_of_pins = 32,
+-};
+-
+-static struct resource gio1_resources[] = {
+-	DEFINE_RES_MEM(0xe0050080, 0x2c),
+-	DEFINE_RES_MEM(0xe00500c0, 0x20),
+-	DEFINE_RES_IRQ(101),
+-	DEFINE_RES_IRQ(102),
+-};
+-
+-static struct gpio_em_config gio2_config = {
+-	.gpio_base = 64,
+-	.irq_base = EMEV2_GPIO_IRQ(64),
+-	.number_of_pins = 32,
+-};
+-
+-static struct resource gio2_resources[] = {
+-	DEFINE_RES_MEM(0xe0050100, 0x2c),
+-	DEFINE_RES_MEM(0xe0050140, 0x20),
+-	DEFINE_RES_IRQ(103),
+-	DEFINE_RES_IRQ(104),
+-};
+-
+-static struct gpio_em_config gio3_config = {
+-	.gpio_base = 96,
+-	.irq_base = EMEV2_GPIO_IRQ(96),
+-	.number_of_pins = 32,
+-};
+-
+-static struct resource gio3_resources[] = {
+-	DEFINE_RES_MEM(0xe0050180, 0x2c),
+-	DEFINE_RES_MEM(0xe00501c0, 0x20),
+-	DEFINE_RES_IRQ(105),
+-	DEFINE_RES_IRQ(106),
+-};
+-
+-static struct gpio_em_config gio4_config = {
+-	.gpio_base = 128,
+-	.irq_base = EMEV2_GPIO_IRQ(128),
+-	.number_of_pins = 31,
+-};
+-
+-static struct resource gio4_resources[] = {
+-	DEFINE_RES_MEM(0xe0050200, 0x2c),
+-	DEFINE_RES_MEM(0xe0050240, 0x20),
+-	DEFINE_RES_IRQ(107),
+-	DEFINE_RES_IRQ(108),
+-};
+-
+-#define emev2_register_gio(idx)						\
+-	platform_device_register_resndata(&platform_bus, "em_gio",	\
+-					  idx, gio##idx##_resources,	\
+-					  ARRAY_SIZE(gio##idx##_resources), \
+-					  &gio##idx##_config,		\
+-					  sizeof(struct gpio_em_config))
+-
+-static struct resource pmu_resources[] = {
+-	DEFINE_RES_IRQ(152),
+-	DEFINE_RES_IRQ(153),
+-};
+-
+-#define emev2_register_pmu()					\
+-	platform_device_register_simple("arm-pmu", -1,		\
+-					pmu_resources,		\
+-					ARRAY_SIZE(pmu_resources))
+-
+-void __init emev2_add_standard_devices(void)
 -{
--	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+-	if (!IS_ENABLED(CONFIG_COMMON_CLK))
+-		emev2_clock_init();
 -
--	emev2_add_standard_devices();
--
--	platform_add_devices(kzm9d_devices, ARRAY_SIZE(kzm9d_devices));
+-	emev2_register_uart(0);
+-	emev2_register_uart(1);
+-	emev2_register_uart(2);
+-	emev2_register_uart(3);
+-	emev2_register_sti();
+-	emev2_register_gio(0);
+-	emev2_register_gio(1);
+-	emev2_register_gio(2);
+-	emev2_register_gio(3);
+-	emev2_register_gio(4);
+-	emev2_register_pmu();
 -}
 -
--static const char *kzm9d_boards_compat_dt[] __initdata = {
--	"renesas,kzm9d",
--	NULL,
--};
--
--DT_MACHINE_START(KZM9D_DT, "kzm9d")
--	.smp		= smp_ops(emev2_smp_ops),
--	.map_io		= emev2_map_io,
--	.init_early	= emev2_init_delay,
--	.init_machine	= kzm9d_add_standard_devices,
--	.init_late	= shmobile_init_late,
--	.dt_compat	= kzm9d_boards_compat_dt,
--MACHINE_END
+ void __init emev2_init_delay(void)
+ {
+ 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
