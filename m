@@ -1,142 +1,76 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Wed, 06 Nov 2013 20:38:33 +0100
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 6 Nov 2013 12:50:15 -0700
 Subject: address translation for PCIe-to-localbus bridge
-In-Reply-To: <20131106173649.GA25515@obsidianresearch.com>
+In-Reply-To: <20246965-EEE8-4EF0-A632-0633774A572A@antoniou-consulting.com>
 References: <527A1983.6020603@keymile.com>
  <20131106173649.GA25515@obsidianresearch.com>
-Message-ID: <527A9AB9.2050903@keymile.com>
+ <20131106190308.01f7a4a9@skate>
+ <334037D0-02FB-459F-9E40-129EC830AF65@antoniou-consulting.com>
+ <20131106185658.GC25879@obsidianresearch.com>
+ <20246965-EEE8-4EF0-A632-0633774A572A@antoniou-consulting.com>
+Message-ID: <20131106195015.GA26881@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On Wed, Nov 06, 2013 at 09:16:13PM +0200, Pantelis Antoniou wrote:
+> > Your camera driver attaches to the 'my device' node, not to the chip
+> > select node. The chip select node is used only by the bus bridge
+> > driver to setup that specific chip select.
+> 
+> No. I get the point about the bridge driver, but that's not what I want.
+> 
+> I agree that the bridge driver configures the chip selects, address ranges
+> and timings, but it shouldn't do that at the time the bridge driver is
+> instantiated. 
 
-thank you for your feeback.
+But that is normal Linux behavior. The bus driver controls the bus,
+and it takes control when it is instantiated.
 
-On 11/06/2013 06:36 PM, Jason Gunthorpe wrote:
-> On Wed, Nov 06, 2013 at 11:27:15AM +0100, Gerlando Falauto wrote:
->> Hi everyone,
->>
->> I am currently trying to describe an external device within a device
->> tree in a Kirkwood design.
->
-> Here is what works for me:
->
->          mbus {
->                  compatible = "marvell,kirkwood-mbus", "simple-bus";
->                  ranges = <MBUS_ID(0x04, 0xe8) 0 0xe0000000 0x8000000  /* PEX 0 MEM */
->                            MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000     /* internal-regs */
->                            MBUS_ID(0x01, 0x2f) 0 0xf4000000 0x10000      /* nand flash */
->                            MBUS_ID(0x01, 0x1d) 0 0xffe00000 0x10000      /* boot rom */
->                            MBUS_ID(0x01, 0x1e) 0 0xfff00000 0x10000      /* spi */
->                            >;
->                  pcie-mem-aperture = <0xe0000000 0x10000000>; /* 256 MiB memory space */
->                  pex at e0000000 {
->                          compatible = "marvell,kirkwood-pcie";
->                          device_type = "pci";
->                          ranges = <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000 /* Controller regs */
->                                    0x82000000 1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
->                                    >;
->
->                          bus-range = <0x0 0xFF>;
->                          pcie at 1,0 {
->                                  device_type = "pci";
->                                  assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
->                                  reg = <0x0800 0 0 0 0>;
->                                  ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
->                                            0x81000000 0 0 0x81000000 0x1 0 1 0>;
->                                  fpga at 0 {
->                                          reg = <0x8 0 0  0 0>;
->                                          ranges = <0x00000000  0x82000000 0x00000000 0x00000000  0x8000000>;
->                                          gpio3: fpga_gpio at 8 {
->                                                  #gpio-cells = <2>;
->                                                  compatible = "linux,basic-mmio-gpio";
->                                                  gpio-controller;
->                                                  reg-names = "dat", "set", "dirin";
->                                                  reg = <0x8 4>,
->                                                        <0xc 4>,
->                                                        <0x10 4>;
->                                          };
->
-> (some hopefully irrelevant items omitted for brevity)
+> That would mean that all configuration is fixed at boot time.
 
-So let me get this straight.
-First of all (though slightly unrelated), I looked at 
-drivers/gpio/gpio-generic.c and found no reference whatsoever to the 
-of_* infrastructure.
-So I realized of_device_alloc() populates the resource table of the 
-platform_device automatically -- I wasn't aware of that.
+No, it means at boot time the configuration data in the DT is
+programmed into the hardware at boot time.
 
-Second of all, if I understand it correctly (guessing the values for 
-#size-cells and #address-cells), your translation scheme works as 
-follows (let's say for the first register 0x8 of gpio3):
+If you hotplug the environment later during run time then you have to
+notify the bridge driver and have it make whatever changes. This is no
+different than PCI which requires notifying the PCI layer to have it
+reprogram bridge devices.
 
-gpio3 (0x8)
--> range 0 of fpga at 0       ==> 0x00000000 0x82000000 0x00000000
--> range 0 of pcie at 1,0     ==> 0x82000000 0x1 0
--> range 1 of pex at e0000000 ==> MBUS_ID(0x04, 0xe8) 0
--> range 0 of mbus         ==> 0xe0000000
+This is why the nodes must be under the bridge, only the bridge knows
+when it is safe to create struct device's for the children.
 
-so you end up accessing @0xe0000008, is that right?
+> All the drivers that are controlled by a chip select and/or bus
+> access method are written without ever dealing with the bridge; they
+> just expect the configuration to be valid and need to only know the
+> address range they reside.
 
-Looks like it ends up at the beginning of the memory region for PCIe, 
-and that's no wonder since you only have a single device with a single 
-BAR... right?
+That is exactly what my example is showing. The driver has no idea
+about the bridge. Ezequiel's MVEBU version does this today, IIRC, he
+has the standard every day memory mapped NOR driver working as a node
+under the bridge, with full configurability, and no changes to the NOR
+driver.
 
-So suppose you also had a bigger BAR1 which would then shift your GPIO 
-block at @0xe8000000.
-I believe we've established (in other followup mails) it would be nice 
-to have a dynamic translation mechanism, which is not in place yet.
-Until we get that figured out, where would you hardcode such offset then?
-How would you also deal with a second (let's say identical) device on BAR1?
-I guess I could live with hardcoded values in the DT, as long as they're 
-easy to spot and there's only one per BAR/device.
-Then it's easy to do a comparison with whatever gets assigned during 
-probing.
+> As you pointed the i2c component, which was a child of the device
+> node, it is better to become a phandle reference.
 
-(Apologies in advance if I'm talking nonsense, but I only see a bunch of 
-numbers in the above tree, I'm having a really hard time figuring out 
-how this whole translation works...)
+Again, the DT parent/child reflects bus ownership/address
+translation.
 
-> I use code like this in the FPGA PCI driver to load the DT nodes:
->
->          struct of_device_id match_table[2] = {};
->          struct device_node *child;
->          int rc = 0;
->
->          for_each_child_of_node(root, child) {
->                  /* Can't just create a single device.. */
->                  strlcpy(match_table[0].name, child->name,
->                          sizeof(match_table[0].name));
->                  strlcpy(match_table[0].type, child->type,
->                          sizeof(match_table[0].type));
->                  rc = of_platform_bus_probe(child, match_table,
->                                             parent);
->                  if (rc)
->                          break;
->          }
-> (root would be the of_node of the FPGA)
+It is incorrect to put an i2c device below any node other than the i2c
+bus it is attached to.
 
-Stupid question... why not the following:
+> That's what I'm proposing for the bridge configuration as well, so
+> that the configuration is applied only when a device requests
+> it. This is important for hot-plugging, and or when using stuff like
+> device overlays.
 
-rc = of_platform_populate(root, NULL, NULL, parent);
+If there is no children to a chip select then the bridge can leave it
+turned off and keep address space deallocated.
 
-I've been using this in several places, though I've always wondered 
-whether there was indeed something wrong it...
+The bridge driver simply has to be involved in the hot plug process,
+which is again normal in Linux.
 
-[...]
->> But I found no way to describe which BAR it should refer to, for instance.
->>
->> Perhaps the "rrrrrrrr" part of phys.hi, using BAR0=0x10, BAR1=0x14,
->> and so on?  Or else I should define a new instance of of bus (i.e.
->> "pci_lbus_bridge") and invent yet another address encoding syntax?
->
-> I do feel there is some missing dynamic elements in this scheme, eg
-> the ranges value at the FPGA node should be dynamic based on the BAR
-> offset, but that is a generality that isn't important if you have only
-> one PCI device.
+Device tree overlays provide a mechanism to create new chip select
+nodes under the bridge, I don't see the problem you do :)
 
-Right, which is my case... except, I have several BARs within it, which 
-does complicate things quite a bit, I'm afraid.
-
-Thanks again Jason!
-Gerlando
+Jason
