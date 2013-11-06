@@ -1,58 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 6 Nov 2013 09:46:04 +0100
-Subject: [PATCH 20/23] ARM: signal: sigreturn_codes should be endian
- neutral to work in BE8
-In-Reply-To: <CAA3XUr0RbbbB6md96DLW_XQXSB7K-qhggVcNeLxowS7xzZwdRA@mail.gmail.com>
-References: <1381271679-27804-1-git-send-email-ben.dooks@codethink.co.uk>
- <1381271679-27804-21-git-send-email-ben.dooks@codethink.co.uk>
- <20131105211807.GR14892@pengutronix.de>
- <CAA3XUr0RbbbB6md96DLW_XQXSB7K-qhggVcNeLxowS7xzZwdRA@mail.gmail.com>
-Message-ID: <20131106084604.GU14892@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 6 Nov 2013 09:46:24 +0100
+Subject: [PATCH v2 19/19] fbdev: sh-mobile-lcdcfb: Enable the driver on
+ all ARM platforms
+In-Reply-To: <1671829.6znfm3IPYO@avalon>
+References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383086274-11049-20-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <alpine.DEB.2.02.1310312039330.13521@ayla.of.borg>
+ <1671829.6znfm3IPYO@avalon>
+Message-ID: <CAMuHMdWaprjsfyO548HCzou4W0yP1nqfw2rP66BudXWgY7uKww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Victor,
+On Wed, Nov 6, 2013 at 1:27 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>> +#ifdef CONFIG_PM_SLEEP
+>>  static int sh_mobile_meram_suspend(struct device *dev)
+>>  {
+>>       struct platform_device *pdev = to_platform_device(dev);
+>> @@ -592,7 +593,9 @@ static int sh_mobile_meram_suspend(struct device *dev)
+>>       }
+>>       return 0;
+>>  }
+>> +#endif
+>>
+>> +#ifdef CONFIG_PM_RUNTIME
+>>  static int sh_mobile_meram_resume(struct device *dev)
+>>  {
+>>       struct platform_device *pdev = to_platform_device(dev);
+>> @@ -611,6 +614,7 @@ static int sh_mobile_meram_resume(struct device *dev)
+>>               meram_write_reg(priv->base, common_regs[i], priv->regs[i]);
+>>       return 0;
+>>  }
+>> +#endif
+>>
+>>  static UNIVERSAL_DEV_PM_OPS(sh_mobile_meram_dev_pm_ops,
+>>                           sh_mobile_meram_suspend,
+>
+> I'm a bit surprised, looking at the definition of UNIVERSAL_DEV_PM_OPS, I
+> would have thought that both functions would be used when either
+> CONFIG_PM_SLEEP or CONFIG_PM_RUNTIME is defined. I would thus have guarded
+> both functions with #if defined(CONFIG_PM_SLEEP) ||
+> defined(CONFIG_PM_RUNTIME).
 
-On Tue, Nov 05, 2013 at 07:48:42PM -0800, Victor Kamensky wrote:
-> Hi Uwe, and All,
-> 
-> On 5 November 2013 13:18, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> <snip>
-> 
-> >> +
-> >> +#if __LINUX_ARM_ARCH__ <= 4
-> >> +     /*
-> >> +      * Note we manually set minimally required arch that supports
-> >> +      * required thumb opcodes for early arch versions. It is OK
-> >> +      * for this file to be used in combination with other
-> >> +      * lower arch variants, since these code snippets are only
-> >> +      * used as input data.
-> >> +      */
-> >> +     .arch armv4t
-> >> +#endif
-> >> +
-> >> +     .section .rodata
-> >> +     .global sigreturn_codes
-> >> +     .type   sigreturn_codes, #object
-> >> +
-> >> +     .arm
-> > This breaks a ARMv7-M build, see
-> > http://arm-soc.lixom.net/buildlogs/misc/next-20131105-1-g2b29c44/buildall.arm.efm32_defconfig.log.failed
-> 
-> Could you please point to git tree and branch from which efm32_defconfig
-> was built - I could not find such in my tree.
-next-20131105 contains both, your patch and the efm32 support.
-(i.e. git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-next/master)
+You're right. I missed that both function pointers are passed to both macros.
 
-The problem is, that armv7-M doesn't support ARM, only Thumb-2.
-If you go the ifdef route, CONFIG_CPU_THUMBONLY is what you want to use.
+Will send v2.
 
-Best regards
-Uwe
+Gr{oetje,eeting}s,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
