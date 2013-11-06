@@ -1,47 +1,42 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:16:18 +0000
-Subject: [PATCH 06/13] ASoC: ux500_pcm: Extend ux500 MSP binding for
- enumeration
+Date: Wed,  6 Nov 2013 10:16:14 +0000
+Subject: [PATCH 02/13] dma: ste_dma40: Parse flags property for new 'high
+ priority channel' request
 In-Reply-To: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
 References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732985-18928-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732985-18928-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: devicetree at vger.kernel.org
-Cc: Mark Brown <broonie@kernel.org>
+This is used for MSP (audio) devices which is about to be fully DT:ed.
+
+Cc: Vinod Koul <vinod.koul@intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/sound/ux500-msp.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/dma/ste_dma40.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/ux500-msp.txt b/Documentation/devicetree/bindings/sound/ux500-msp.txt
-index 99acd9c..33bd000 100644
---- a/Documentation/devicetree/bindings/sound/ux500-msp.txt
-+++ b/Documentation/devicetree/bindings/sound/ux500-msp.txt
-@@ -3,6 +3,7 @@
- Required properties:
-  - compatible       :"stericsson,ux500-msp-i2s"
-  - reg              : Physical base address and length of the device's registers.
-+ - id               : MSP ID - used during component registration
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index b8c031b..00a2de9 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -2409,6 +2409,7 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
+ #define D40_DT_FLAGS_DIR(flags)        ((flags >> 1) & 0x1)
+ #define D40_DT_FLAGS_BIG_ENDIAN(flags) ((flags >> 2) & 0x1)
+ #define D40_DT_FLAGS_FIXED_CHAN(flags) ((flags >> 3) & 0x1)
++#define D40_DT_FLAGS_HIGH_PRIO(flags)  ((flags >> 4) & 0x1)
  
- Optional properties:
-  - interrupts       : The interrupt output from the device.
-@@ -28,6 +29,7 @@ Example:
- 		reg = <0x80124000 0x1000>;
- 		interrupts = <0 62 0x4>;
- 		v-ape-supply = <&db8500_vape_reg>;
-+		id = <1>;
- 	};
+ static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
+ 				  struct of_dma *ofdma)
+@@ -2446,6 +2447,9 @@ static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
+ 		cfg.use_fixed_channel = true;
+ 	}
  
- 	msp3: msp at 80125000 {
-@@ -35,6 +37,7 @@ Example:
- 		reg = <0x80125000 0x1000>;
- 		interrupts = <0 62 0x4>;
- 		v-ape-supply = <&db8500_vape_reg>;
-+		id = <3>;
- 	};
++	if (D40_DT_FLAGS_HIGH_PRIO(flags))
++		cfg.high_priority = true;
++
+ 	return dma_request_channel(cap, stedma40_filter, &cfg);
+ }
  
- 	codec: ab8500-codec {
 -- 
 1.8.1.2
