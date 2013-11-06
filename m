@@ -1,36 +1,46 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Tue, 5 Nov 2013 17:59:42 -0600
-Subject: [PATCH v4] imx-drm: Add mx6 hdmi transmitter support
-In-Reply-To: <CAOMZO5DTB085wL1NOwGF5EynoQh1r2_ztR754dLrf1EMOuN75g@mail.gmail.com>
-References: <1383181127-12013-1-git-send-email-festevam@gmail.com>
- <5272BC59.1080109@boundarydevices.com>
- <5272BFE0.5040409@boundarydevices.com>
- <CAOMZO5C39JNVv0vz-38eOrKHXMqWHCeCknhSvfGFe5t0EGkDsg@mail.gmail.com>
- <20131031210053.GH16735@n2100.arm.linux.org.uk>
- <CAOMZO5DAAXg4wP2UuYCN6BgN5-q3sv0Lrqvk8xMDmEW_TXepXg@mail.gmail.com>
- <CAHCPf3v0G_551Oeq-dL61J0Ce-iUMv+ou8+q671S8=GEcNjv5w@mail.gmail.com>
- <CAHCPf3tSdn=TJ86QEtL3r9iSP0j88WP-y2=z96ZUfW-7VecMbQ@mail.gmail.com>
- <CAOMZO5DU9y2tvgkEbastQdhJvtLGLJ-b49WY8RsvpbmJhzMxLA@mail.gmail.com>
- <CAHCPf3s-dxzqAGHhOaemJeCW0LmxOhYThrtif+QpGb4LzeWDpg@mail.gmail.com>
- <CAOMZO5DTB085wL1NOwGF5EynoQh1r2_ztR754dLrf1EMOuN75g@mail.gmail.com>
-Message-ID: <CAHCPf3vn==dK1xdvQDkyDpPpHOeT_u52HYN-m__9E4GN1e5GhA@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 06 Nov 2013 09:07:00 +0900
+Subject: [PATCH RFC 1/4] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <CAFp+6iFAZab35F-MOOZHcHpzSEOL=51gWBK2KZbOJS+0731GJQ@mail.gmail.com>
+References: <1383205544-32244-1-git-send-email-gautam.vivek@samsung.com>
+ <1383205544-32244-2-git-send-email-gautam.vivek@samsung.com>
+ <527744B2.4090303@ti.com> <030d01ced946$d6e23490$84a69db0$%debski@samsung.com>
+ <52779D28.9000905@ti.com>
+ <CAFp+6iH7vQ-OtMFL4pyr4tFDRchH4oh1Z0753WNgrHiUzj+kzw@mail.gmail.com>
+ <00fe01ceda0a$941957a0$bc4c06e0$%debski@samsung.com>
+ <000001ceda17$f41c2030$dc546090$%han@samsung.com>
+ <000101ceda1f$04ca6f20$0e5f4d60$%han@samsung.com>
+ <CAFp+6iFAZab35F-MOOZHcHpzSEOL=51gWBK2KZbOJS+0731GJQ@mail.gmail.com>
+Message-ID: <000301ceda84$1d648bf0$582da3d0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 5, 2013 at 5:35 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Tue, Nov 5, 2013 at 9:29 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
+On Wednesday, November 06, 2013 2:58 AM, Vivek Gautam wrote:
+> On Tue, Nov 5, 2013 at 5:33 PM, Jingoo Han <jg1.han@samsung.com> wrote:
+
+[.....]
+
+>> USB3.0 PHY consists of two blocks such as 3.0 block and 2.0 block.
+>> This USB3.0 PHY can support UTMI+ and PIPE3 interface for 3.0 block
+>> and 2.0 block, respectively.
+>>
+>> Conclusion:
+>>
+>>    1) USB2.0 PHY: USB2.0 HOST, USB2.0 Device
+>>                        Base address: 0x1213 0000
+>>
+>>    2) USB3.0 PHY: USB3.0 DRD (3.0 HOST & 3.0 Device)
+>>                        Base address: 0x1210 0000
+>>                        2.0 block(UTMI+) & 3.0 block(PIPE3)
 >
->> I know about that one. BTW this isn't in the MX6SDL errata
->> documentation, but it is in the MX6QD errata. If this actually affects
->> the Solo etc. as Russell dictates, isn't the errata document missing
->> some info here?
->
-> If you read the code you will notice that the multiple writes affects
-> only mx6quad.
+> And this is of course the PHY used by DWC3 controller, which works at
+> both High speed as well as Super Speed.
+> Right ?
 
-I might have missed a patch.. mails are going missing.
+Right.
 
-Who's tree is this in, as actual code with git commits and not a
-stream of mis-threaded emails?
+While 3.0 block(PIPE3) can be used for Super Speed, 2.0 block(UTMI+)
+can be used for High speed.
 
-Matt <neko@bakuhatsu.net>
+Best regards,
+Jingoo Han
