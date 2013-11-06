@@ -1,52 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Nov 2013 17:27:40 +0000
-Subject: [PATCH] arm: add support for the Cortex-A12 processor
-In-Reply-To: <1382532376-22758-1-git-send-email-jonathan.austin@arm.com>
-References: <1382532376-22758-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <20131106172740.GA4524@mudshark.cambridge.arm.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 6 Nov 2013 11:36:32 -0600
+Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
+In-Reply-To: <CANacCWz_ahKaACbAHuue1XwaN3gutBA7Z6W+=zWBn8LvLwDM5w@mail.gmail.com>
+References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+ <CANacCWz_ahKaACbAHuue1XwaN3gutBA7Z6W+=zWBn8LvLwDM5w@mail.gmail.com>
+Message-ID: <527A7E20.4040107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 23, 2013 at 01:46:16PM +0100, Jonathan Austin wrote:
-> The A12 behaves as the A7/A15 does with respect to setting the SMP bit, and
-> doesn't require TLB ops broadcasting to be explicitly enabled like the A9 does.
+Hi Vaibhav,
+
+On 10/31/2013 05:25 PM, Vaibhav Bedia wrote:
+> Hi Daniel,
 > 
-> Note that as the ACTLR cannot (usually) be written from non-secure, it is the
-> responsibility of the bootloader/firmware to set this bit per core - it is
-> done here in Linux as last resort in case of bad firmware.
+> On Wed, Oct 30, 2013 at 4:21 PM, Daniel Mack <zonque@gmail.com> wrote:
+> [...]
+>> +
+>> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
+>> +
+>>  static struct platform_driver edma_driver = {
+>>         .driver = {
+>>                 .name   = "edma",
+>> +               .pm     = &edma_pm_ops,
+>>                 .of_match_table = edma_of_ids,
+>>         },
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> ---
->  arch/arm/mm/proc-v7.S |   11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 3a5922d..9745288 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -164,6 +164,7 @@ __v7_cr7mp_setup:
->  	mov	r10, #(1 << 0)			@ Cache/TLB ops broadcasting
->  	b	1f
->  __v7_ca7mp_setup:
-> +__v7_ca12mp_setup:
->  __v7_ca15mp_setup:
->  	mov	r10, #0
->  1:
-> @@ -440,6 +441,16 @@ __v7_ca7mp_proc_info:
->  	.size	__v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
->  
->  	/*
-> +	 * ARM Ltd. Cortex A12 processor.
-> +	 */
-> +	.type	__v7_ca12mp_proc_info, #object
-> +__v7_ca12mp_proc_info:
-> +	.long	0x410fc0d0
+> A while back we discovered a nasty race condition here that had us move the EDMA
+> PM callbacks to the noirq phase. IIRC the MMC driver was resuming
+> before the EDMA
+> driver had a chance to run and that was leading to a deadlock. I am
+> not sure how to force
+> this scenario but i do remember spending time debugging this on a
+> random codebase.
+> Maybe some else has some better ideas on how to force this race condition...
 
-Great, looks like we can't count.
+I think you're talking about the patch at [1] which is not upstream. A quick
+question with my limited knowledge of suspend/resume- How can there be pending
+I/O operations between suspend/resume cycles? The sync is done before suspend,
+so I don't understand how one is receiving a response from the card after resume
+before EDMA can resume? I'd imagine that until all devices are resumed, there
+will be no I/O operation issued. Let me know your thoughts.
 
-Please put this into the patch system:
+thanks,
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+-Joel
 
-Will
+[1]
+https://www.gitorious.org/x0148406-public/linux-kernel/commit/b81bf04091986fa3893f31955564594567be3b61
