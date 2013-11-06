@@ -1,45 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 6 Nov 2013 12:07:58 +0000
-Subject: [PATCH 06/13] ASoC: ux500_pcm: Extend ux500 MSP binding for
- enumeration
-In-Reply-To: <CACRpkdZgi9Egvm585Y9tJpmj0YX-oJBDg-C7pCu91Pf5ALMGLg@mail.gmail.com>
-References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
- <1383732985-18928-7-git-send-email-lee.jones@linaro.org>
- <20131106104658.GE11602@sirena.org.uk>
- <CACRpkdZgi9Egvm585Y9tJpmj0YX-oJBDg-C7pCu91Pf5ALMGLg@mail.gmail.com>
-Message-ID: <20131106120758.GG30901@lee--X1>
+From: vkale@apm.com (Vinayak Kale)
+Date: Wed,  6 Nov 2013 17:37:35 +0530
+Subject: [PATCH 0/2] genirq: arm64: perf: support for percpu pmu interrupt
+Message-ID: <1383739658-10036-1-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 Nov 2013, Linus Walleij wrote:
+This patch series adds support to handle interrupt registration/deregistration
+in arm64 pmu driver when pmu interrupt type is percpu.
 
-> On Wed, Nov 6, 2013 at 11:46 AM, Mark Brown <broonie@kernel.org> wrote:
-> > On Wed, Nov 06, 2013 at 10:16:18AM +0000, Lee Jones wrote:
-> 
-> >> + - id               : MSP ID - used during component registration
-> >
-> > I have no idea what this means or how one would pick the number?  It
-> > looks like something purely internal to the driver...
-> 
-> Actually it's quite common when we have several HW blocks of the
-> same thing to add something like an id. For example for different
-> GPIO banks.
-> 
-> But in this case I guess it may make more sense to flag one MSP
-> for RX and one for TX or something?
-> 
-> There are also two more such MSPs for streaming audio to the
-> Bluetooth audio portions.
+Patches in this patch series were previously sent out as separate patches [1].
+This patch series incorporates comments/fixes suggested for original patches.
 
-Right, we have 4 of them:
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/205888.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204414.html 
 
-MSP0: Tx and Rx
-MSP1: Tx
-MSP2: Tx and Rx
-MSP3: Rx
+Vinayak Kale (2):
+  genirq: error reporting in request_percpu_irq() and
+    request_threaded_irq()
+  arm64: perf: add support for percpu pmu interrupt
+
+ arch/arm64/kernel/perf_event.c |  109 +++++++++++++++++++++++++++++-----------
+ kernel/irq/manage.c            |   12 +++--
+ 2 files changed, 89 insertions(+), 32 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
