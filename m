@@ -1,50 +1,30 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 6 Nov 2013 08:41:44 -0800
-Subject: [PATCH 6/6] arm: zynq: headsmp: Move .glbl out of actual code
-In-Reply-To: <5279F3DD.9040605@monstr.eu>
-References: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
- <1383235819-2552-7-git-send-email-soren.brinkmann@xilinx.com>
- <5279F3DD.9040605@monstr.eu>
-Message-ID: <e1194cb0-825b-4cb1-919c-8879aef95d77@VA3EHSMHS008.ehs.local>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 6 Nov 2013 11:45:30 -0500
+Subject: [PATCH v5 4/7] arm64: introduce
+ aarch64_insn_gen_{nop|branch_imm}() helper functions
+In-Reply-To: <20131030004840.GC25346@mudshark.cambridge.arm.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+ <1382109602-27432-5-git-send-email-liuj97@gmail.com>
+ <20131030004840.GC25346@mudshark.cambridge.arm.com>
+Message-ID: <20131106114530.76b63b05@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 08:46:37AM +0100, Michal Simek wrote:
-> On 10/31/2013 05:10 PM, Soren Brinkmann wrote:
-> > Move the .glbl lines exporting symbols to the top of the file and out of
-> > the actual code, in order to make the code more readable.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >  arch/arm/mach-zynq/headsmp.S | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
-> > index 57a32869f0aa..12d1b40c7d78 100644
-> > --- a/arch/arm/mach-zynq/headsmp.S
-> > +++ b/arch/arm/mach-zynq/headsmp.S
-> > @@ -9,14 +9,15 @@
-> >  #include <linux/linkage.h>
-> >  #include <linux/init.h>
-> >  
-> > +.globl zynq_secondary_trampoline_jump
-> > +.globl zynq_secondary_trampoline_end
-> > +
-> >  ENTRY(zynq_secondary_trampoline)
-> >  	ldr	r0, [pc]
-> >  	bx	r0
-> > -.globl zynq_secondary_trampoline_jump
-> >  zynq_secondary_trampoline_jump:
-> >  	/* Space for jumping address */
-> >  	.word	/* cpu 1 */
-> > -.globl zynq_secondary_trampoline_end
-> >  zynq_secondary_trampoline_end:
-> >  ENDPROC(zynq_secondary_trampoline)
-> >  
-> 
-> I don't want this one.
-> I have applied 1-5 to zynq/cleanup branch.
-Up to you. But having these .global statements in the middle of actual
-code does not help reading the code. And IMHO, they don't belong there.
+On Wed, 30 Oct 2013 00:48:40 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-	S?ren
+
+> > +}
+> > +
+> > +static __always_inline u32 aarch64_insn_gen_nop(void)
+> > +{
+> > +	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
+> > +}
+> 
+> Either use plain old `inline' or write these as preprocessor macros.
+> 
+
+I'm curious to why you say that? Preprocessor macros are rather ugly,
+and in x86 we use "__always_inline" quite liberally.
+
+-- Steve
