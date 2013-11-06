@@ -1,32 +1,63 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 07 Nov 2013 08:21:02 +0900
-Subject: [PATCH 00/04] ARM: shmobile: KZM9D legacy board code removal
-Message-ID: <20131106232102.8081.20523.sendpatchset@w520>
+Date: Thu, 07 Nov 2013 08:21:11 +0900
+Subject: [PATCH 01/04] ARM: shmobile: Add shared EMEV2 code for
+ ->init_machine()
+In-Reply-To: <20131106232102.8081.20523.sendpatchset@w520>
+References: <20131106232102.8081.20523.sendpatchset@w520>
+Message-ID: <20131106232111.8081.53457.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: shmobile: KZM9D legacy board code removal
+From: Magnus Damm <damm@opensource.se>
 
-[PATCH 01/04] ARM: shmobile: Add shared EMEV2 code for ->init_machine()
-[PATCH 02/04] ARM: shmobile: Use ->init_late() in shared EMEV2 case
-[PATCH 03/04] ARM: shmobile: Remove legacy KZM9D board code
-[PATCH 04/04] ARM: shmobile: Remove legacy platform devices from EMEV2 SoC code 
+Add a SoC specific function that initializes
+clocks and starts DT probing in case of EMEV2.
 
-With this patch set applied it is possible to use DT for KZM9D board support.
-Because of this is the KZM9D legacy C board code removed together with EMEV2
-platform devices. All these devices are available via DT anyway, so there is
-no need to keep the C version. This saves some lines of code and shows where
-mach-shmobile is heading in the future for all the SoCs.
+This EMEV2 SoC support code may be built for
+either legacy SHMOBILE or SMOBILE_MULTI.
+
+The change allows us to support existing board
+specific KZM9D DTB with these SoC specific
+DT_MACHINE_START() callbacks.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- Written against renesas.git tag renesas-devel-v3.12-rc7-20131101
+ arch/arm/mach-shmobile/setup-emev2.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
- arch/arm/mach-shmobile/Kconfig              |    6 -
- arch/arm/mach-shmobile/Makefile             |    1 
- arch/arm/mach-shmobile/Makefile.boot        |    1 
- arch/arm/mach-shmobile/board-kzm9d.c        |   92 ---------------
- arch/arm/mach-shmobile/include/mach/emev2.h |    5 
- arch/arm/mach-shmobile/setup-emev2.c        |  161 ++-------------------------
- 6 files changed, 13 insertions(+), 253 deletions(-)
+--- 0001/arch/arm/mach-shmobile/setup-emev2.c
++++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-11-05 15:21:42.000000000 +0900
+@@ -16,6 +16,7 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
++#include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+@@ -197,6 +198,16 @@ void __init emev2_init_delay(void)
+ 
+ #ifdef CONFIG_USE_OF
+ 
++static void __init emev2_add_standard_devices_dt(void)
++{
++#ifdef CONFIG_COMMON_CLK
++	of_clk_init(NULL);
++#else
++	emev2_clock_init();
++#endif
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
+ static const char *emev2_boards_compat_dt[] __initdata = {
+ 	"renesas,emev2",
+ 	NULL,
+@@ -206,6 +217,7 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma
+ 	.smp		= smp_ops(emev2_smp_ops),
+ 	.map_io		= emev2_map_io,
+ 	.init_early	= emev2_init_delay,
++	.init_machine	= emev2_add_standard_devices_dt,
+ 	.dt_compat	= emev2_boards_compat_dt,
+ MACHINE_END
+ 
