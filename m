@@ -1,148 +1,47 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 6 Nov 2013 16:53:27 +0800
-Subject: [PATCH bugfix] mtd: gpmi: serialize all the dma operations
-Message-ID: <1383728007-15564-1-git-send-email-b32955@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Nov 2013 10:16:45 +0100
+Subject: [PATCH] ARM/serial: at91: switch atmel serial to use gpiolib
+In-Reply-To: <20131105162828.GC28304@ns203013.ovh.net>
+References: <1383654959-18112-1-git-send-email-linus.walleij@linaro.org>
+ <20131105162828.GC28304@ns203013.ovh.net>
+Message-ID: <CACRpkdY3uK56K2YPB2AjOQzjJxUmkpX0AR0kOpfPyckwv2nztQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[1] The gpmi uses the nand_command_lp to issue the commands to NAND chips.
-    It will issue a DMA operation when it handles a NAND_CMD_NONE control
-    command. So when we read a page(NAND_CMD_READ0) from the NAND, we may send
-    two DMA operations back-to-back.
+On Tue, Nov 5, 2013 at 5:28 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 13:35 Tue 05 Nov     , Linus Walleij wrote:
 
-    If we do not serialize the two DMA operations, we will meet a bug when
+>> +     /*
+>> +      * AT91RM9200 Errata #39: RTS0 is not internally connected
+>> +      * to PA21. We need to drive the pin as a GPIO.
+>> +      */
+>> +     if (gpio_is_valid(atmel_port->rts_gpio) &&
+>> +         port->mapbase == AT91RM9200_BASE_US0) {
 
-    1.1) we enable CONFIG_DMA_API_DEBUG, CONFIG_DMADEVICES_DEBUG,
-         and CONFIG_DEBUG_SG.
+> not really a fon of this hack
+>
+> if we use a uart for rs485 we need to use a gpio for rts too
 
-    1.2) Use the following commands in an UART console and a SSH console:
-         cmd 1: while true;do dd if=/dev/mtd0 of=/dev/null;done
-         cmd 1: while true;do dd if=/dev/mmcblk0 of=/dev/null;done
+Hm it was completely unnecessary anyway, as I now specify
+the RTS pin per UART instance, it will only be valid for
+those setting it right.
 
-    The kernel log shows below:
-    -----------------------------------------------------------------
-    kernel BUG at lib/scatterlist.c:28!
-    Unable to handle kernel NULL pointer dereference at virtual address 00000000
-      .........................
-    [<80044a0c>] (__bug+0x18/0x24) from [<80249b74>] (sg_next+0x48/0x4c)
-    [<80249b74>] (sg_next+0x48/0x4c) from [<80255398>] (debug_dma_unmap_sg+0x170/0x1a4)
-    [<80255398>] (debug_dma_unmap_sg+0x170/0x1a4) from [<8004af58>] (dma_unmap_sg+0x14/0x6c)
-    [<8004af58>] (dma_unmap_sg+0x14/0x6c) from [<8027e594>] (mxs_dma_tasklet+0x18/0x1c)
-    [<8027e594>] (mxs_dma_tasklet+0x18/0x1c) from [<8007d444>] (tasklet_action+0x114/0x164)
-    -----------------------------------------------------------------
+>> +     /*
+>> +      * In theory the GPIO pin controlling RTS could be zero and
+>> +      * this would be an improper check, but we know that the only
+>> +      * existing case is != 0 and it's nice to use the zero-initialized
+>> +      * structs to indicate "no RTS GPIO" instead of open-coding some
+>> +      * invalid value everywhere.
+>> +      */
+>> +     if (pdata->rts_gpio > 0) {
 
-    1.3) Assume the two DMA operations is X (first) and Y (second).
-         The root cause of the bug:
-         X's tasklet mxs_dma_tasklet trid to unmap the scatterlist, while Y is
-         trying to set up a new DMA operation with the _SAME_ scatterlist in
-         another ARM core.
+>         this can not work 0 is a valid gpio if you do this you need to update
+>         ALL the bard filee too to set it as -EINVAL;
 
-[2] This patch adds a wait queue and two helpers gpmi_enter_dma/gpmi_exit_dma to
-    serialize all the DMA operations.
+Isn't it the other way around? I did this exactly to avoid updating
+all the boardfiles, as the rts_gpio == 0 for all those not
+defining it. This is why I test for > 0.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
-Cc: stable at vger.kernel.org
----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   24 ++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    2 ++
- 2 files changed, 26 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 71df69e..b849b92 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -392,6 +392,20 @@ void prepare_data_dma(struct gpmi_nand_data *this, enum dma_data_direction dr)
- 	}
- }
- 
-+static void gpmi_enter_dma(struct gpmi_nand_data *this)
-+{
-+	/* Wait until the previous DMA is finished. */
-+	wait_event(this->dma_wait, !this->dma_is_working);
-+
-+	this->dma_is_working = true;
-+}
-+
-+static void gpmi_exit_dma(struct gpmi_nand_data *this)
-+{
-+	this->dma_is_working = false;
-+	wake_up(&this->dma_wait);
-+}
-+
- /* This will be called after the DMA operation is finished. */
- static void dma_irq_callback(void *param)
- {
-@@ -424,6 +438,7 @@ static void dma_irq_callback(void *param)
- 	default:
- 		pr_err("in wrong DMA operation.\n");
- 	}
-+	gpmi_exit_dma(this);
- }
- 
- int start_dma_without_bch_irq(struct gpmi_nand_data *this,
-@@ -906,6 +921,8 @@ static void gpmi_cmd_ctrl(struct mtd_info *mtd, int data, unsigned int ctrl)
- 	if (!this->command_length)
- 		return;
- 
-+	gpmi_enter_dma(this);
-+
- 	ret = gpmi_send_command(this);
- 	if (ret)
- 		pr_err("Chip: %u, Error %d\n", this->current_chip, ret);
-@@ -943,6 +960,8 @@ static void gpmi_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- 	this->upper_buf	= buf;
- 	this->upper_len	= len;
- 
-+	gpmi_enter_dma(this);
-+
- 	gpmi_read_data(this);
- }
- 
-@@ -955,6 +974,8 @@ static void gpmi_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
- 	this->upper_buf	= (uint8_t *)buf;
- 	this->upper_len	= len;
- 
-+	gpmi_enter_dma(this);
-+
- 	gpmi_send_data(this);
- }
- 
-@@ -1031,6 +1052,7 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 	int           ret;
- 
- 	pr_debug("page number is : %d\n", page);
-+	gpmi_enter_dma(this);
- 	ret = read_page_prepare(this, buf, mtd->writesize,
- 					this->payload_virt, this->payload_phys,
- 					nfc_geo->payload_size,
-@@ -1107,6 +1129,7 @@ static int gpmi_ecc_write_page(struct mtd_info *mtd, struct nand_chip *chip,
- 	int        ret;
- 
- 	pr_debug("ecc write page.\n");
-+	gpmi_enter_dma(this);
- 	if (this->swap_block_mark) {
- 		/*
- 		 * If control arrives here, we're doing block mark swapping.
-@@ -1745,6 +1768,7 @@ static int gpmi_nand_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, this);
- 	this->pdev  = pdev;
- 	this->dev   = &pdev->dev;
-+	init_waitqueue_head(&this->dma_wait);
- 
- 	ret = acquire_resources(this);
- 	if (ret)
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index a7685e3..9597615 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -160,6 +160,8 @@ struct gpmi_nand_data {
- 
- 	/* for DMA operations */
- 	bool			direct_dma_map_ok;
-+	bool			dma_is_working;
-+	wait_queue_head_t	dma_wait;
- 
- 	struct scatterlist	cmd_sgl;
- 	char			*cmd_buffer;
--- 
-1.7.2.rc3
+Yours,
+Linus Walleij
