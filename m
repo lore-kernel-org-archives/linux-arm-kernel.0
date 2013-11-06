@@ -1,37 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 6 Nov 2013 12:11:46 +0000
-Subject: [PATCH 01/13] dma: ste_dma40: Expand DT binding to accept
- 'high-priority channel' flag
-In-Reply-To: <CACRpkdaVPy8yuhYKohL7ewnmT5y7QrQ7ig2qf4t49YZ-+noDvQ@mail.gmail.com>
-References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
- <1383732985-18928-2-git-send-email-lee.jones@linaro.org>
- <CACRpkdaVPy8yuhYKohL7ewnmT5y7QrQ7ig2qf4t49YZ-+noDvQ@mail.gmail.com>
-Message-ID: <20131106121146.GI30901@lee--X1>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 06 Nov 2013 13:13:06 +0100
+Subject: [PATCH 2/3] clk: shmobile: Add MSTP clock support
+In-Reply-To: <CANqRtoRe2repacDdWhoZxY7sMP=AOhW=Mtwm3P9AgzVvwoBGKA@mail.gmail.com>
+References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383058511-26046-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CANqRtoRe2repacDdWhoZxY7sMP=AOhW=Mtwm3P9AgzVvwoBGKA@mail.gmail.com>
+Message-ID: <1469822.fWgxvRAPOn@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 Nov 2013, Linus Walleij wrote:
+Hi Magnus,
 
-> On Wed, Nov 6, 2013 at 11:16 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wednesday 06 November 2013 17:33:39 Magnus Damm wrote:
+> On Tue, Oct 29, 2013 at 11:55 PM, Laurent Pinchart wrote:
+> > MSTP clocks are gate clocks controlled through a register that handles
+> > up to 32 clocks. The register is often sparsely populated.
+> > 
+> > Those clocks are found on Renesas ARM SoCs.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |  47 +++++
+> >  drivers/clk/shmobile/Makefile                      |   1 +
+> >  drivers/clk/shmobile/clk-mstp.c                    | 229 ++++++++++++++++
+> >  include/dt-bindings/clock/r8a7790-clock.h          |  56 +++++
+> >  4 files changed, 333 insertions(+)
+> >  create mode 100644
+> >  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> >  create mode 100644 drivers/clk/shmobile/clk-mstp.c
 > 
-> > --- a/Documentation/devicetree/bindings/dma/ste-dma40.txt
-> > +++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
-> > @@ -50,6 +50,9 @@ Each dmas request consists of 4 cells:
-> >          0x00000008: Use fixed channel:
-> >                  Use automatic channel selection when unset
-> >                  Use DMA request line number when set
-> > +        0x00000010: Set channel as high priority:
-> > +                Normal priority when unset
-> > +                High priority when set
+> Thanks for this. The MSTP driver looks fine to me, but..
 > 
-> We should probably switch these magic numbers to #defines
-> but it's another subject so
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >  create mode 100644 include/dt-bindings/clock/r8a7790-clock.h
+> 
+> .. why do you bundle r8a7790-specific bits with the generic MSTP
+> driver in this patch?
+> 
+> It looks to me that you want these r8a7790 bits included with the
+> r8a7790 support code.
 
-Happy to do that in a subsequent set.
+My mistake, I'll fix that.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+
+Laurent Pinchart
