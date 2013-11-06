@@ -1,87 +1,90 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 6 Nov 2013 18:48:45 +0900
-Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
-In-Reply-To: <20131106014801.GD22183@verge.net.au>
-References: <20131031031549.15985.23547.sendpatchset@w520>
- <20131031042035.GG1603@verge.net.au>
- <CANqRtoSW6jFX3pa94ZBgrKkvx5YNKqgxVSsYkSxMP_btcxFh7A@mail.gmail.com>
- <20131106014801.GD22183@verge.net.au>
-Message-ID: <CANqRtoRD3xFx-OKP1AxRPpn8VrOsDeNXKCYtUA57cCu8Dbtqvg@mail.gmail.com>
+From: a.anurag@samsung.com (Anurag Aggarwal)
+Date: Wed, 06 Nov 2013 15:20:48 +0530
+Subject: [PATCH] ARM: unwinder: Handle Stackoverflow in unwind_exec_insn
+Message-ID: <1383731448-847-1-git-send-email-a.anurag@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Altough stack overflow is expected in unwind_exec_insn, but in cases when area beyond stack is not mapped to physical memory this can cause data abort. 
 
-On Wed, Nov 6, 2013 at 10:48 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Oct 31, 2013 at 05:02:13PM +0900, Magnus Damm wrote:
->> Hi Simon,
->>
->> On Thu, Oct 31, 2013 at 1:20 PM, Simon Horman <horms@verge.net.au> wrote:
->> > On Thu, Oct 31, 2013 at 12:15:49PM +0900, Magnus Damm wrote:
->> >> From: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
->> >>
->> >> Add 1GiB of DRAM at 0x2_0000_0000 to support the full 2GiB
->> >> of APE6EVM system memory.
->> >>
->> >> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
->> >> Signed-off-by: Magnus Damm <damm@opensource.se>
->> >> ---
->> >>
->> >>  For correct run time operation regardless of kernel configuration
->> >>  ARM patches 7863/1 and 7864/1 are needed.
->> >
->> > I take it that I should wait for those patches before applying this one.
->>
->> That's probably a good idea. RMK has applied them to "git-curr", so I
->> suppose they are queued up for something at least:
->>
->> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7863/1
->
-> I have also sighted them in linux-next.
-> So I expect they will show up in v3.13-rc1 or thereabouts.
->
->> > With those two patches and this one applied on top of
->> > renesas-devel-v3.12-rc7-20131030 I was able to successfully
->> > boot an ape6evm board. But /proc/meminfo still indicates only 1Gb of
->> > memory. What am I missing.
->>
->> You probably need to enable HIGHMEM and LPAE to be able to access to
->> all memory. Same thing on Lager, to get the full 4GiB you need to
->> select those in your kernel configuration too.
->
-> Thanks, I have been able to successfully test all 4 patches in this
-> series with those settings enabled.
->
-> Tested-by: Simon Horman <horms+renesas@verge.net.au>
->
->> Please note that having memory located on 64-bit addresses may break
->> some drivers doing bus mastering or using the DMAC. These drivers need
->> to be fixed both with short term DMA zone workarounds and proper
->> 64-bit address support whenever possible.
->>
->> So if I could suggest a policy then having LPAE=n in defconfig for the
->> C board code for default stable operation. This together with LPAE=y
->> in the case of DT reference and/or Multiplatform where we can be a bit
->> more experimental. I don't care enough to send defconfig patches, but
->> if some issue comes up then perhaps adjusting the defconfig to disable
->> LPAE may work well as a workaround.
->
-> Thanks.
->
-> As it stands the defconfig for both APE6EVM and Lager lead to a
-> configuration with LPAE disabled, although neither explicitly disable LPAE.
-> I think it is best to leave things as-is in this regards and explicitly
-> disable LPAE in the defconfigs if the need arises.
->
-> While looking over this I noticed that the APE6EVM defconfig selects
-> HIGHMEM while the Lager defconfig does not and it is not selected in the
-> resulting config. Would it be worth updating the Lager defconfig to enable
-> HIGHMEM? If so, I'll make a patch.
+To avoid above condition handle stack overflow in unwind_exec_insn by checking vsp pointer from top of stack 
+Signed-off-by: Anurag Aggarwal <a.anurag@samsung.com>
+---
+ arch/arm/kernel/unwind.c | 23 +++++++++++++++--------
+ 1 files changed, 15 insertions(+), 8 deletions(-) 
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c 
+index 00df012..d8b8721 100644 
+--- a/arch/arm/kernel/unwind.c 
++++ b/arch/arm/kernel/unwind.c 
+@@ -241,6 +241,10 @@ static unsigned long unwind_get_byte(struct unwind_ctrl_block *ctrl)
+static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+ {
+ 	unsigned long insn = unwind_get_byte(ctrl); 
++	unsigned long high, low; 
++	unsigned long *vsp = (unsigned long *)ctrl->vrs[SP]; 
++	low = ctrl->vrs[SP]; 
++	high = ALIGN(low, THREAD_SIZE);
+ 
+ 	pr_debug("%s: insn = %08lx\n", __func__, insn);
+ 
+@@ -263,27 +267,27 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+ 
+ 		/* pop R4-R15 according to mask */
+ 		load_sp = mask & (1 << (13 - 4)); 
+- 		while (mask) { 
++ 		while (mask && vsp < high) {
+ 			if (mask & 1)
+ 				ctrl->vrs[reg] = *vsp++;
+ 			mask >>= 1;
+ 			reg++;
+ 		}
+- 		if (!load_sp) 
++ 		if (!load_sp && vsp < high)
+ 			ctrl->vrs[SP] = (unsigned long)vsp;
+ 	} else if ((insn & 0xf0) == 0x90 &&
+ 		   (insn & 0x0d) != 0x0d)
+ 		ctrl->vrs[SP] = ctrl->vrs[insn & 0x0f];
+ 	else if ((insn & 0xf0) == 0xa0) { 
+- 		unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
+ 		int reg;
 
-Thanks. I think it mainly makes sense to enable LPAE and HIGHMEM
-together, so easiest is probably just to wait with both Lager and
-APE6EVM.
-
-Cheers,
-
-/ magnus
+ 		/* pop R4-R[4+bbb] */
+-		for (reg = 4; reg <= 4 + (insn & 7); reg++)
++		for (reg = 4;  (reg <= 4 + (insn & 7)) && (vsp < high; reg++)
+ 			ctrl->vrs[reg] = *vsp++;
+-		if (insn & 0x80)
++		if (insn & 0x80 && vsp < high)
+ 			ctrl->vrs[14] = *vsp++;
+-		ctrl->vrs[SP] = (unsigned long)vsp;
++		if (vsp < high)
++			ctrl->vrs[SP] = (unsigned long)vsp;
+ 	} else if (insn == 0xb0) {
+ 		if (ctrl->vrs[PC] == 0)
+ 			ctrl->vrs[PC] = ctrl->vrs[LR];
+@@ -301,13 +305,14 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+ 		}
+ 
+ 		/* pop R0-R3 according to mask */
+-		while (mask) {
++		while (mask && vsp < high) {
+ 			if (mask & 1)
+ 				ctrl->vrs[reg] = *vsp++;
+ 			mask >>= 1;
+ 			reg++;
+ 		}
+-		ctrl->vrs[SP] = (unsigned long)vsp;
++		if (vsp < high)
++			ctrl->vrs[SP] = (unsigned long)vsp;
+ 	} else if (insn == 0xb2) {
+ 		unsigned long uleb128 = unwind_get_byte(ctrl);
+ 
+@@ -317,6 +322,8 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+ 		return -URC_FAILURE;
+ 	}
+ 
++	if (vsp >= high)
++		return -URC_FAILURE;
+ 	pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
+ 		 ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
+ 
+-- 
