@@ -1,58 +1,43 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 06 Nov 2013 12:57:54 +0100
-Subject: [PATCH -v2] fbdev: sh_mobile_meram: Fix defined but not used
- compiler warnings
-In-Reply-To: <1383728247-19294-1-git-send-email-geert@linux-m68k.org>
-References: <1383728247-19294-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <5204468.CmggZzW3kO@avalon>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 06 Nov 2013 12:55:35 +0100
+Subject: [alsa-devel] [PATCH 08/13] ASoC: generic-dmaengine-pcm: Clear
+ slave_config memory
+In-Reply-To: <1383732985-18928-9-git-send-email-lee.jones@linaro.org>
+References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
+ <1383732985-18928-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <527A2E37.2040100@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-Thank you for the patch.
-
-On Wednesday 06 November 2013 09:57:27 Geert Uytterhoeven wrote:
-> If both CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME are not set:
+On 11/06/2013 11:16 AM, Lee Jones wrote:
+> We currently assume that the DMA Slave Config will be fully populated
+> by the platform, however some DMA Engines make decisions based on zero
+> (default) flags such as DMA_SLAVE_BUSWIDTH_UNDEFINED and as this is a
+> static declaration we need to memset it to clear the data area.
 > 
-> drivers/video/sh_mobile_meram.c:573: warning: ?sh_mobile_meram_suspend?
-> defined but not used drivers/video/sh_mobile_meram.c:597: warning:
-> ?sh_mobile_meram_resume? defined but not used
-> 
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: alsa-devel at alsa-project.org
+> Cc: Mark Brown <broonie@kernel.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Lars-Peter Clausen <lars@metafoo.de>
 
-and applied to my tree.
+Thanks.
 
 > ---
-> v2: Both functions are used if CONFIG_PM_SLEEP || CONFIG_PM_RUNTIME,
->     as pointed out by Laurent
-> 
->  drivers/video/sh_mobile_meram.c |    2 ++
+>  sound/soc/soc-generic-dmaengine-pcm.c | 2 ++
 >  1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/video/sh_mobile_meram.c
-> b/drivers/video/sh_mobile_meram.c index e0f098562a74..a297de5cc859 100644
-> --- a/drivers/video/sh_mobile_meram.c
-> +++ b/drivers/video/sh_mobile_meram.c
-> @@ -569,6 +569,7 @@ EXPORT_SYMBOL_GPL(sh_mobile_meram_cache_update);
->   * Power management
->   */
+> diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
+> index ee07903..6ad4c7a 100644
+> --- a/sound/soc/soc-generic-dmaengine-pcm.c
+> +++ b/sound/soc/soc-generic-dmaengine-pcm.c
+> @@ -90,6 +90,8 @@ static int dmaengine_pcm_hw_params(struct snd_pcm_substream *substream,
+>  	struct dma_slave_config slave_config;
+>  	int ret;
+>  
+> +	memset(&slave_config, 0, sizeof(slave_config));
+> +
+>  	if (!pcm->config)
+>  		prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config;
+>  	else
 > 
-> +#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_RUNTIME)
->  static int sh_mobile_meram_suspend(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
-> @@ -611,6 +612,7 @@ static int sh_mobile_meram_resume(struct device *dev)
->  		meram_write_reg(priv->base, common_regs[i], priv->regs[i]);
->  	return 0;
->  }
-> +#endif /* CONFIG_PM_SLEEP || CONFIG_PM_RUNTIME */
-> 
->  static UNIVERSAL_DEV_PM_OPS(sh_mobile_meram_dev_pm_ops,
->  			    sh_mobile_meram_suspend,
--- 
-Regards,
-
-Laurent Pinchart
