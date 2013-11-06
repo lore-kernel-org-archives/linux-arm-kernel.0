@@ -1,75 +1,50 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 06 Nov 2013 19:43:32 +0900
-Subject: [PATCH] ARM: shmobile: Enable MTU2 on r7s72100
-Message-ID: <20131106104332.6327.73303.sendpatchset@w520>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 6 Nov 2013 16:19:43 +0530
+Subject: [PATCH v4 1/6] gpio: davinci: Fixed a check for unbanked gpio
+In-Reply-To: <CA+V-a8tZTm9bh+arQ+uFyTVHxfdf07bWaM_Sdqo08TO=UCMMUg@mail.gmail.com>
+References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
+ <1383406775-14902-2-git-send-email-prabhakar.csenng@gmail.com>
+ <CACRpkdZ7pwGQnK0NN4tybLUNdMxu5WVaGX8Dqu+kMgVBuyF16w@mail.gmail.com>
+ <CA+V-a8tE3bxsHMSh2i3Xeq=kJUjmxTjcU25Kuka5e_iXeB--pQ@mail.gmail.com>
+ <CACRpkdbLTopHMaog7FDW7O4-yLyv+mmnvgkNuXgeQR-pEtbz6Q@mail.gmail.com>
+ <CA+V-a8tZTm9bh+arQ+uFyTVHxfdf07bWaM_Sdqo08TO=UCMMUg@mail.gmail.com>
+Message-ID: <527A1EC7.20400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Wednesday 06 November 2013 03:45 PM, Prabhakar Lad wrote:
+> Hi Linus,
+> 
+> On Wed, Nov 6, 2013 at 3:26 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Wed, Nov 6, 2013 at 10:33 AM, Prabhakar Lad
+>> <prabhakar.csengg@gmail.com> wrote:
+>>> On Tue, Nov 5, 2013 at 6:09 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>>> On Sat, Nov 2, 2013 at 4:39 PM, Lad, Prabhakar
+>>>> <prabhakar.csengg@gmail.com> wrote:
+>>>>
+>>>>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>>>>
+>>>>> This patch fixes the check for the offset in
+>>>>> gpio_to_irq_unbanked() function.
+>>>>>
+>>>>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>>>
+>>>> Is this a regression that should go in right now?
+>>>>
+>>> Yes it needs too.
+>>
+>> But on top of *what* exactly?
+>>
+>> This does not apply to my gpio tree devel branch and
+>> not even on the mainline kernel.
+>>
+> Looks like this needs to go via ARM tree as the earlier
+> patches have  gone via ARM tree itself [1].
+> If you can ACK it Sekhar can get it in via ARM tree.
 
-Add MTU2 as r7s72100 system timer.
+The dependent patches are all in linux-next through ARM SoC queued for
+v3.13 merge. This fix can either be sent late in merge cycle once Linus
+has pulled ARM SoC or after v3.13-rc1 comes out.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Built on top of "renesas-devel-v3.12-rc7-20131101"
-
- arch/arm/mach-shmobile/clock-r7s72100.c |    1 +
- arch/arm/mach-shmobile/setup-r7s72100.c |   22 ++++++++++++++++++++++
- 2 files changed, 23 insertions(+)
-
---- 0001/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ work/arch/arm/mach-shmobile/clock-r7s72100.c	2013-11-05 21:07:13.000000000 +0900
-@@ -178,6 +178,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.5", &mstp_clks[MSTP42]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.6", &mstp_clks[MSTP41]),
- 	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
-+	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
- };
- 
- void __init r7s72100_clock_init(void)
---- 0001/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ work/arch/arm/mach-shmobile/setup-r7s72100.c	2013-11-05 21:07:13.000000000 +0900
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/serial_sci.h>
-+#include <linux/sh_timer.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/r7s72100.h>
-@@ -58,6 +59,26 @@ static inline void r7s72100_register_sci
- 				      sizeof(struct plat_sci_port));
- }
- 
-+
-+static struct sh_timer_config mtu2_0_platform_data __initdata = {
-+	.name = "MTU2_0",
-+	.timer_bit = 0,
-+	.channel_offset = -0x80,
-+	.clockevent_rating = 200,
-+};
-+
-+static struct resource mtu2_0_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xfcff0300, 0x27),
-+	DEFINE_RES_IRQ(gic_iid(139)), /* MTU2 TGI0A */
-+};
-+
-+#define r7s72100_register_mtu2(idx)					\
-+	platform_device_register_resndata(&platform_bus, "sh_mtu2",	\
-+					  idx, mtu2_##idx##_resources,	\
-+					  ARRAY_SIZE(mtu2_##idx##_resources), \
-+					  &mtu2_##idx##_platform_data,	\
-+					  sizeof(struct sh_timer_config))
-+
- void __init r7s72100_add_dt_devices(void)
- {
- 	r7s72100_register_scif(SCIF0);
-@@ -68,6 +89,7 @@ void __init r7s72100_add_dt_devices(void
- 	r7s72100_register_scif(SCIF5);
- 	r7s72100_register_scif(SCIF6);
- 	r7s72100_register_scif(SCIF7);
-+	r7s72100_register_mtu2(0);
- }
- 
- void __init r7s72100_init_early(void)
+Thanks,
+Sekhar
