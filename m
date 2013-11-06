@@ -1,27 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 6 Nov 2013 09:53:38 +0000
-Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F82875482@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
- <20131101182514.GE2493@sirena.org.uk>
- <1DD289F6464F0949A2FCA5AA6DC23F8287439D@039-SN2MPN1-013.039d.mgd.msft.net>
- <20131104161537.GI2493@sirena.org.uk>
- <1DD289F6464F0949A2FCA5AA6DC23F82875482@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20131106095338.GG11602@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  6 Nov 2013 09:54:44 +0000
+Subject: [PATCH 1/2] ASoC: ab8500: Revert "ASoC: ab8500: Explicitly set I/O up"
+Message-ID: <1383731685-18441-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 03:21:49AM +0000, Li Xiubo wrote:
+This reverts commit 2245e3c31c15c2d2a26926c4b734f4d3a37ae252, as it
+is one of two patches which stop audio from working on Snowball.
 
-> As your opinions, should I move the four register writing operations to .set_sysclk/set_clkdiv/... functions too ?
-> Or just add a clk_disable_unprepare() after them here, and then add clk_prepare_enable in one of .set_sysclk/set_clkdiv/...?
+Cc: alsa-devel at alsa-project.org
+Cc: Mark Brown <broonie@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ sound/soc/codecs/ab8500-codec.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-The latter.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131106/4797fbb6/attachment.sig>
+diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
+index a0394a8..ca500fd 100644
+--- a/sound/soc/codecs/ab8500-codec.c
++++ b/sound/soc/codecs/ab8500-codec.c
+@@ -2473,8 +2473,6 @@ static int ab8500_codec_probe(struct snd_soc_codec *codec)
+ 
+ 	dev_dbg(dev, "%s: Enter.\n", __func__);
+ 
+-	snd_soc_codec_set_cache_io(codec, 0, 0, SND_SOC_REGMAP);
+-
+ 	/* Setup AB8500 according to board-settings */
+ 	pdata = dev_get_platdata(dev->parent);
+ 
+-- 
+1.8.1.2
