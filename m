@@ -1,126 +1,86 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 6 Nov 2013 10:36:49 -0700
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 6 Nov 2013 19:03:08 +0100
 Subject: address translation for PCIe-to-localbus bridge
-In-Reply-To: <527A1983.6020603@keymile.com>
+In-Reply-To: <20131106173649.GA25515@obsidianresearch.com>
 References: <527A1983.6020603@keymile.com>
-Message-ID: <20131106173649.GA25515@obsidianresearch.com>
+ <20131106173649.GA25515@obsidianresearch.com>
+Message-ID: <20131106190308.01f7a4a9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 11:27:15AM +0100, Gerlando Falauto wrote:
-> Hi everyone,
-> 
-> I am currently trying to describe an external device within a device
-> tree in a Kirkwood design.
+Dear Jason Gunthorpe,
 
-Here is what works for me:
+(Adding a bunch of mvebu people in Cc)
 
-        mbus {
-                compatible = "marvell,kirkwood-mbus", "simple-bus";
-                ranges = <MBUS_ID(0x04, 0xe8) 0 0xe0000000 0x8000000  /* PEX 0 MEM */
-                          MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000     /* internal-regs */
-                          MBUS_ID(0x01, 0x2f) 0 0xf4000000 0x10000      /* nand flash */
-                          MBUS_ID(0x01, 0x1d) 0 0xffe00000 0x10000      /* boot rom */
-                          MBUS_ID(0x01, 0x1e) 0 0xfff00000 0x10000      /* spi */
-                          >;
-                pcie-mem-aperture = <0xe0000000 0x10000000>; /* 256 MiB memory space */
-                pex at e0000000 {
-                        compatible = "marvell,kirkwood-pcie";
-                        device_type = "pci";
-                        ranges = <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000 /* Controller regs */
-                                  0x82000000 1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
-                                  >;
+On Wed, 6 Nov 2013 10:36:49 -0700, Jason Gunthorpe wrote:
 
-                        bus-range = <0x0 0xFF>;
-                        pcie at 1,0 {
-                                device_type = "pci";
-                                assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
-                                reg = <0x0800 0 0 0 0>;
-                                ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
-                                          0x81000000 0 0 0x81000000 0x1 0 1 0>;
-                                fpga at 0 {
-                                        reg = <0x8 0 0  0 0>;
-                                        ranges = <0x00000000  0x82000000 0x00000000 0x00000000  0x8000000>;
-                                        gpio3: fpga_gpio at 8 {
-                                                #gpio-cells = <2>;
-                                                compatible = "linux,basic-mmio-gpio";
-                                                gpio-controller;
-                                                reg-names = "dat", "set", "dirin";
-                                                reg = <0x8 4>,
-                                                      <0xc 4>,
-                                                      <0x10 4>;
-                                        };
+> Thomas: There is one buglet here that I haven't had time to do
+> anything about. Notice the DT is listing the PEX memory window in its
+> ranges. I've done this for two reasons
+>  - The bootloader sets this address range up, so it is correct to
+>    include in the DT
 
-(some hopefully irrelevant items omitted for brevity)
+The fact that the bootloader sets this MBus window is more-or-less
+irrelevant because when the mvebu-mbus driver is initialized, it
+completely clears *all* existing MBus windows:
 
-I use code like this in the FPGA PCI driver to load the DT nodes:
+   http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/bus/mvebu-mbus.c#n722
 
-        struct of_device_id match_table[2] = {};
-        struct device_node *child;
-        int rc = 0;
+Therefore, when the kernel starts, what the bootloader may have set up
+in terms of MBus windows is irrelevant.
 
-        for_each_child_of_node(root, child) {
-                /* Can't just create a single device.. */
-                strlcpy(match_table[0].name, child->name,
-                        sizeof(match_table[0].name));
-                strlcpy(match_table[0].type, child->type,
-                        sizeof(match_table[0].type));
-                rc = of_platform_bus_probe(child, match_table,
-                                           parent);
-                if (rc)
-                        break;
-        }
-(root would be the of_node of the FPGA)
+>  - The address translation machinery requires it, otherwise we can't
+>    translate addreses of the non-PCI sub devices (eg gpio3)
 
-My system hot plugs the FPGA in and out, so I use this in the FPGA
-remove function to tear it all down:
+Right.
 
-        struct device_node *child;
-        struct platform_device *devs[100];
-        unsigned int cur = 0;
+> The latter is a kernel issue. As we discussed when mbus was first put
+> together something needs to make the ranges consistent with the actual
+> mapping so that address translation works. IIRC people objected to
+> actually changing the ranges at runtime, so the alternate mechanism of
+> hooking the address translation seems necessary?
 
-        /* We need to remove the platform devices in the reverse of the order
-           we created them. The DT is topo sorted in dependency order. */
-        for_each_child_of_node(pdev->dev.of_node, child) {
-                struct platform_device *dev = of_find_device_by_node(child);
-                if (dev)
-                        devs[cur++] = dev;
-        }
+I indeed remember some objections, but I'm not sure what they were
+precisely. Maybe we didn't had a precise use case back at the time, to
+really make people objecting realize what the problem was?
 
-        while (cur != 0) {
-                cur--;
-                platform_device_unregister(devs[cur]);
-        }
+On the other hand, I think the of_*() API is quite limited when it
+comes to updating the DT. If I remember correctly, you can update some
+nodes, but you can never reclaim the memory that was used for the
+previous value of the node. So any change to the in-memory DT
+representation is basically a memory leak for the entire lifetime of
+the system (of course, I might be wrong on this, I haven't dived into
+all the hardcore details of DT manipulation in the kernel).
 
-Which is a bit tricky and suboptimal.
+I'm not sure what would be the alternate mechanism to hook into the
+address translation. of_translate_one(), where all the translation
+through ranges takes place is really tied to the DT only, adding
+another mechanism to hook some custom address translation in there
+seems a bit weird, no?
 
-Thomas: There is one buglet here that I haven't had time to do
-anything about. Notice the DT is listing the PEX memory window in its
-ranges. I've done this for two reasons
- - The bootloader sets this address range up, so it is correct to
-   include in the DT
- - The address translation machinery requires it, otherwise we can't
-   translate addreses of the non-PCI sub devices (eg gpio3)
+> Unfortunately if you add the ranges then the mbus driver throws a
+> warning that it is trying to overwrite existing windows, but otherwise
+> things work OK.
 
-The latter is a kernel issue. As we discussed when mbus was first put
-together something needs to make the ranges consistent with the actual
-mapping so that address translation works. IIRC people objected to
-actually changing the ranges at runtime, so the alternate mechanism of
-hooking the address translation seems necessary?
+Yes, because at boot time the mvebu-mbus driver will set up windows for
+the statically defined ranges (the one you've written explicitly in the
+DT), and then later one when the PCIe driver will initialize, it will
+enumerate devices, realize that it needs a PCIe memory window, and ask
+the mvebu-mbus driver to create, which will fail because an overlapping
+window already exists.
 
-Unfortunately if you add the ranges then the mbus driver throws a
-warning that it is trying to overwrite existing windows, but otherwise
-things work OK.
+However, it just works by pure luck: nothing guarantees you that the
+PCIe 0 memory window will start at 0xe0000000. Of course, since you
+have only one PCIe interface enabled, you have a guarantee from one
+boot to another. But in the general case, if you have several PCIe
+interfaces, on which you may plug/unplug different devices, you have no
+guarantee a priori as to what will be the base address of the PCIe
+memory window for a given PCIe interface.
 
-> But I found no way to describe which BAR it should refer to, for instance.
-> 
-> Perhaps the "rrrrrrrr" part of phys.hi, using BAR0=0x10, BAR1=0x14,
-> and so on?  Or else I should define a new instance of of bus (i.e.
-> "pci_lbus_bridge") and invent yet another address encoding syntax?
+Best regards,
 
-I do feel there is some missing dynamic elements in this scheme, eg
-the ranges value at the FPGA node should be dynamic based on the BAR
-offset, but that is a generality that isn't important if you have only
-one PCI device.
-
-Jason
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
