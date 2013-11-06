@@ -1,45 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 6 Nov 2013 16:12:59 +0800
-Subject: [PATCHv2 1/8] ALSA: Add SAI SoC Digital Audio Interface driver.
-In-Reply-To: <1DD289F6464F0949A2FCA5AA6DC23F82876B08@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-2-git-send-email-Li.Xiubo@freescale.com>
- <20131101085904.GC28401@MrMyself>
- <1DD289F6464F0949A2FCA5AA6DC23F82874201@039-SN2MPN1-013.039d.mgd.msft.net>
- <5278F1FA.1060706@tabi.org>
- <1DD289F6464F0949A2FCA5AA6DC23F82876A53@039-SN2MPN1-013.039d.mgd.msft.net>
- <5279B822.9010401@tabi.org>
- <1DD289F6464F0949A2FCA5AA6DC23F82876B08@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20131106081257.GR19770@S2101-09.ap.freescale.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 6 Nov 2013 19:14:54 +1100
+Subject: linux-next: manual merge of the gpio tree with the arm-soc and
+ cortex trees
+Message-ID: <20131106191454.5f45b0b5300f03e74a6a09eb@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 03:53:24AM +0000, Li Xiubo wrote:
-> > >> If there are any comments that say PPC but are not PPC-specific, that
-> > >> >should be fixed.
-> > > Yes, find it.
-> > >
-> > > The comments is in "sound/soc/fsl/Makefile" :
-> > > +++++++++++
-> > > "# Freescale PowerPC SSI/DMA Platform Support"
-> > > -----------
-> > >
-> > > But fsl-spdif.o is also under it.
-> > > And this is also support ARM and PowerPC platforms at the same time ?
-> > > If so, the comments should be modified to :
-> > > +++++++++++
-> > > "# Freescale PowerPC and ARM SSI/DMA Platform Support"
-> > > -----------
-> > 
-> > Yes, this should be changed.
-> > 
-> 
-> How about :
-> +++++++++
-> "# Freescale PowerPC and ARM SSI/DMA/SAI/SPDIF Platform Support"	
-> ---------
->  ?
+Hi Linus,
 
-Or we can just drop 'PowerPC and ARM'?
+Today's linux-next merge of the gpio tree got a conflict in
+arch/arm/Kconfig between commit f3372c01816e ("ARM: gemini: convert to
+GENERIC_CLOCKEVENTS") from the arm-soc tree and f5caa3b59e18 ("ARM:
+deprecate mach/timex.h for !ARCH_MULTIPLATFORM") from the cortex tree and
+commits ffde39ea61ea ("ARM: mmp: delete the custom GPIO header"),
+88f718e3fa4d ("ARM: pxa: delete the custom GPIO header") and 85649711a895
+("ARM: gemini: delete <mach/gpio.h>") from the gpio tree.
 
-Shawn
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/Kconfig
+index 568d6471dd18,c6debe07f036..000000000000
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@@ -397,10 -386,8 +397,9 @@@ config ARCH_CLPS711
+  config ARCH_GEMINI
+  	bool "Cortina Systems Gemini"
+  	select ARCH_REQUIRE_GPIOLIB
+ -	select ARCH_USES_GETTIMEOFFSET
+ +	select CLKSRC_MMIO
+  	select CPU_FA526
+ +	select GENERIC_CLOCKEVENTS
+- 	select NEED_MACH_GPIO_H
+  	help
+  	  Support for the Cortina Systems Gemini family SoCs
+  
+@@@ -593,8 -558,6 +592,7 @@@ config ARCH_MM
+  	select GPIO_PXA
+  	select IRQ_DOMAIN
+  	select MULTI_IRQ_HANDLER
+- 	select NEED_MACH_GPIO_H
+ +	select NEED_MACH_TIMEX_H
+  	select PINCTRL
+  	select PLAT_PXA
+  	select SPARSE_IRQ
+@@@ -658,8 -620,6 +656,7 @@@ config ARCH_PX
+  	select GPIO_PXA
+  	select HAVE_IDE
+  	select MULTI_IRQ_HANDLER
+- 	select NEED_MACH_GPIO_H
+ +	select NEED_MACH_TIMEX_H
+  	select PLAT_PXA
+  	select SPARSE_IRQ
+  	help
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131106/7eda13d9/attachment.sig>
