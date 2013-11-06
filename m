@@ -1,65 +1,23 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 6 Nov 2013 17:12:47 +0530
-Subject: [PATCH v4 1/6] gpio: davinci: Fixed a check for unbanked gpio
-In-Reply-To: <527A28EF.9070601@ti.com>
-References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
- <1383406775-14902-2-git-send-email-prabhakar.csenng@gmail.com>
- <CACRpkdZ7pwGQnK0NN4tybLUNdMxu5WVaGX8Dqu+kMgVBuyF16w@mail.gmail.com>
- <CA+V-a8tE3bxsHMSh2i3Xeq=kJUjmxTjcU25Kuka5e_iXeB--pQ@mail.gmail.com>
- <CACRpkdbLTopHMaog7FDW7O4-yLyv+mmnvgkNuXgeQR-pEtbz6Q@mail.gmail.com>
- <CA+V-a8tZTm9bh+arQ+uFyTVHxfdf07bWaM_Sdqo08TO=UCMMUg@mail.gmail.com>
- <527A1EC7.20400@ti.com> <527A28EF.9070601@ti.com>
-Message-ID: <527A2B37.4040308@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Nov 2013 12:44:10 +0100
+Subject: [PATCH 04/13] ARM: ux500: Add DMA config bindings for MSP devices
+In-Reply-To: <1383732985-18928-5-git-send-email-lee.jones@linaro.org>
+References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
+ <1383732985-18928-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaNy_h60FJYyTmxVFR8V87znP6KtzY48VhA7jHDTziAcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+On Wed, Nov 6, 2013 at 11:16 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On Wednesday 06 November 2013 05:03 PM, Grygorii Strashko wrote:
-> Hi Sekhar, Linus,
-> 
-> On 11/06/2013 12:49 PM, Sekhar Nori wrote:
->> On Wednesday 06 November 2013 03:45 PM, Prabhakar Lad wrote:
->>> Hi Linus,
->>>
->>> On Wed, Nov 6, 2013 at 3:26 PM, Linus Walleij
->>> <linus.walleij@linaro.org> wrote:
->>>> On Wed, Nov 6, 2013 at 10:33 AM, Prabhakar Lad
->>>> <prabhakar.csengg@gmail.com> wrote:
->>>>> On Tue, Nov 5, 2013 at 6:09 PM, Linus Walleij
->>>>> <linus.walleij@linaro.org> wrote:
->>>>>> On Sat, Nov 2, 2013 at 4:39 PM, Lad, Prabhakar
->>>>>> <prabhakar.csengg@gmail.com> wrote:
->>>>>>
->>>>>>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>>>>>>
->>>>>>> This patch fixes the check for the offset in
->>>>>>> gpio_to_irq_unbanked() function.
->>>>>>>
->>>>>>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->>>>>>
->>>>>> Is this a regression that should go in right now?
->>>>>>
->>>>> Yes it needs too.
->>>>
->>>> But on top of *what* exactly?
->>>>
->>>> This does not apply to my gpio tree devel branch and
->>>> not even on the mainline kernel.
->>>>
->>> Looks like this needs to go via ARM tree as the earlier
->>> patches have  gone via ARM tree itself [1].
->>> If you can ACK it Sekhar can get it in via ARM tree.
->>
->> The dependent patches are all in linux-next through ARM SoC queued for
->> v3.13 merge. This fix can either be sent late in merge cycle once Linus
->> has pulled ARM SoC or after v3.13-rc1 comes out.
-> 
-> Pls, wait a bit - this fix is incomplete :( The below changes have to be
-> done too:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Can either you or Prabhakar send a separate patch (series) with only the
-fixes?
+Usually I would like to apply this separately to my ux500-dt branch.
 
-Thanks,
-Sekhar
+While we should keep patches together for bisectability, the dts
+files is something of an exception in my book since they will
+be moved out of the kernel one day. Anyway, do as you please:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
