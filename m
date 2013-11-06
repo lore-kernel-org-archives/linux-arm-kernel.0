@@ -1,50 +1,37 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Nov 2013 09:41:09 +0900
-Subject: [PATCH v2] ARM: shmobile: lager: phy fixup needs CONFIG_PHYLIB
-Message-ID: <1383698469-15239-1-git-send-email-horms+renesas@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Nov 2013 00:40:58 +0000
+Subject: ARM audit, seccomp, etc are broken wrt OABI syscalls
+In-Reply-To: <CAGXu5jJreo001uBLV8oAgR_Z2WZK2qtH8YfvriQJVAQ4SgdRzw@mail.gmail.com>
+References: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
+ <CAGXu5jJreo001uBLV8oAgR_Z2WZK2qtH8YfvriQJVAQ4SgdRzw@mail.gmail.com>
+Message-ID: <20131106004058.GU16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not build the phy fixup unless CONFIG_PHYLIB is enabled.
+On Tue, Nov 05, 2013 at 04:14:49PM -0800, Kees Cook wrote:
+> I would agree: option 1 seems cleanest of the 3. 3 is sort of like a
+> built-in automatic check for a mismatched arch, so maybe that works
+> better?
+> 
+> Alternatively, CONFIG_SECCOMP_FILTER could depend on
+> !CONFIG_OABI_COMPAT. That seems like the least work, given the desire
+> to kill OABI in the real world. (Though I would note that at least
+> Ubuntu's ARM kernels build with CONFIG_OABI_COMPAT; Chrome OS does
+> not.)
 
-Other than not being useful it is also not possible to link
-the code under this condition as phy_register_fixup_for_id(),
-mdiobus_read() and mdiobus_write() are absent.
+OABI compat is really only something you want to deal with if you have
+a reason to run OABI programs on the kernel; it is in no way guaranteed
+that the OABI programs will run properly (many ALSA programs will not
+because of different layouts with ioctls).
 
-arch/arm/mach-shmobile/built-in.o: In function `lager_ksz8041_fixup':
-board-lager.c:(.text+0xb8): undefined reference to `mdiobus_read'
-board-lager.c:(.text+0xd4): undefined reference to `mdiobus_write'
-arch/arm/mach-shmobile/built-in.o: In function `lager_init':
-board-lager.c:(.init.text+0xafc): undefined reference to `phy_register_fixup_for_id'
+OABI compat was meant to allow a transition from OABI to EABI.  While
+a lot of effort went in to the kernel side of that, which does allow
+OABI based userspace to boot with an EABI kernel, and allows OABI built
+test programs to run under an EABI kernel, actually being able to
+migrate userland is far from trivial - and something that I've never
+been able to do.  Hence, virtually all my long-running ARM machines
+here are stuck with OABI, and I don't see that situation ever changing.
 
-This problem was introduced by 48c8b96f21817aad
-("ARM: shmobile: Lager: add Micrel KSZ8041 PHY fixup")
-
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
----
-
-v2
-* Correct and enhance changelog as suggested by Sergei Shtylyov.
----
- arch/arm/mach-shmobile/board-lager.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 78a31b6..d1a8ddd 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -245,7 +245,9 @@ static void __init lager_init(void)
- {
- 	lager_add_standard_devices();
- 
--	phy_register_fixup_for_id("r8a7790-ether-ff:01", lager_ksz8041_fixup);
-+	if (IS_ENABLED(CONFIG_PHYLIB))
-+		phy_register_fixup_for_id("r8a7790-ether-ff:01",
-+					  lager_ksz8041_fixup);
- }
- 
- static const char * const lager_boards_compat_dt[] __initconst = {
--- 
-1.8.4
+As a rule, distros should not be enabling OABI compat.  OABI compat
+is more something that a developer (like me) who has a reason to enable
+it turns it on.
