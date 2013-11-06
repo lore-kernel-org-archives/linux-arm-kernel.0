@@ -1,57 +1,138 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Wed, 6 Nov 2013 10:54:02 -0600
-Subject: [PATCH v7] pinctrl: imx27: imx27 pincontrol driver
-In-Reply-To: <CACRpkdYKgA5E4-APSTHsM=zVbb3X2R4v+V4EeK3+W1tKPR1FeA@mail.gmail.com>
-References: <1382950843-26066-3-git-send-email-mpa@pengutronix.de>
- <1383057139-25304-1-git-send-email-mpa@pengutronix.de>
- <CACRpkdYKgA5E4-APSTHsM=zVbb3X2R4v+V4EeK3+W1tKPR1FeA@mail.gmail.com>
-Message-ID: <CAHCPf3v3dsTyk9Cd93GBLBKQLSQ+Mb0mpq134X7Ko4U8m-b-qg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 06 Nov 2013 10:00:22 -0700
+Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
+In-Reply-To: <5279A319.5060701@broadcom.com>
+References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
+ <051069C10411E24D9749790C498526FA1BE0B7D7@SJEXCHMB12.corp.ad.broadcom.com>
+ <CACRpkdYSLxp2M4HghcUdjEYGh-UQ+DaiCGp6yee+Qds6DR9poA@mail.gmail.com>
+ <201311050026.56321.heiko@sntech.de> <527835FE.2030102@wwwdotorg.org>
+ <5279A319.5060701@broadcom.com>
+Message-ID: <527A75A6.5010904@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 11:00 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Tue, Oct 29, 2013 at 7:32 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
->
->> imx27 pincontrol driver using the imx1 core driver. The DT bindings are
->> similar to other imx pincontrol drivers.
+On 11/05/2013 07:02 PM, Sherman Yin wrote:
+> On 13-11-04 04:04 PM, Stephen Warren wrote:
+>> On 11/04/2013 04:26 PM, Heiko St?bner wrote:
 >>
->> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
->> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
->> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->> ---
->> Hi,
+>>> I remember we had a discussion about how things like bias-disable
+>>> explicitly
+>>> shouldn't have a value, when they are represented in the list-format:
+>>>
+>>>         pcfg_pull_none: pcfg_pull_none {
+>>>             bias-disable;
+>>>         };
+>>>
+>>> so a bias-disable = <1> was explicitly "forbidden" [for a lack of a
+>>> better
+>>> word]. And it was similar for other options, the parameter not meant
+>>> to be
+>>> indicating if they are active but really only setting the "strength"
+>>> or so.
 >>
->> another binding documentation update. The MUX_ID components are described more
->> detailed now.
->
-> Patch tentatively applied unless someone has very fundamental
-> issues with it, it stays in. I really want a full transfer of i.MX
-> pin controllers to the subsystem, using device tree so we can
-> get rid of the old i.MX cruft in arch/arm.
+>> Pure Boolean values should be represented as a valueless property. If
+>> the property is present, the value is true, otherwise false.
+>>
+>> However, pinctrl bindings often don't represent Boolean values, but
+>> rather tri-states, with the following values:
+>>
+>> * Don't touch this configuration option at all (missing)
+>> * Enable the option (<1>)
+>> * Disable the option (<0>)
+>>
+>> The reason for using tri-states being that you might want to write:
+>>
+>> xxx1 {
+>>      pins = <PINA>, <PINB>, <PINC>;
+>>      function = <...>;
+>>      // this node doesn't affect pullup
+>> }
+>> xxx2 {
+>>      pins = <PINA>, <PINB>;
+>>      // this node doesn't affect function
+>>      pull-up = <1>; // change, and enable
+>> }
+>> xxx3 {
+>>      pins = <PINAC>;
+>>      // this node doesn't affect function
+>>      pull-up = <0>; // change, and disable
+>> }
+> 
+> If I understand correctly, in Stephen's example, if a certain driver
+> wants to configure PINA PINB and PINC, the pin configuration nodes
+> "xxx1", "xxx2", and "xxx3" will all have to be selected for the
+> particular pin state.
 
-I think this is a rush-in patch. I actually read the manual last night
-and found some serious weirdness.
+You probably don't want to reference the individual xxx1/2/3 nodes in
+the client pinctrl properties, but instead wrap them in a higher-level
+node that represents the whole pinctrl state. Then, the client pinctrl
+properties can reference just that single parent node, instead of many
+small nodes. In other words:
 
-The i.MX27 doesn't have a dedicated IOMUX controller so actually
-having a whole separate node for it in the device tree - or even a
-separate driver - makes very little sense. I understand pinctrl and
-gpiolib are somewhat separated as software, but this is encoding a
-Linuxism into the tree.
+pinctrl at ... {
+	...
+	sx: state_xxx {
+		xxx1 { ... };
+		xxx2 { ... };
+		xxx3 { ... };
+	};
+	sy: state_yyy {
+		yyy1 { ... };
+		yyy2 { ... };
+	};
+}
 
-In fact, the binding will conflict with actual binding of the GPIO
-(i.e. setting data, receiving interrupts) module since it's all one
-register set, and the "fsl,imx27-iomuxc" compatible property does not
-represent reality except to collect data in a different spot. There's
-no reason for it except to cut the documentation and tree definition
-in half, and have two nodes for Linux.
+some_client at ... {
+	...
+	pinctrl-names = "default";
+	pinctrl-0 = <&sx>;
+};
 
-Would it be so bad to implement this as a regmap and have two drivers
-access the same regmap on the Linux side? You don't need two nodes for
-that, and the IOMUX definitions can live under the GPIO node. There is
-NOTHING stopping two drivers on Linux matching the same compatible
-property. Locking and coordination in software of a single IP block
-used by two drivers shouldn't be arbitrated by the device tree.
+other_client at ... {
+	...
+	pinctrl-names = "default";
+	pinctrl-0 = <&sy>;
+};
 
-Thanks,
-Matt Sealey <neko@bakuhatsu.net>
+rather than:
+
+pinctrl at ... {
+	...
+	sx1: xxx1 { ... };
+	sx2: xxx2 { ... };
+	sx3: xxx3 { ... };
+	sy1: yyy1 { ... };
+	sy2: yyy2 { ... };
+}
+
+some_client at ... {
+	...
+	pinctrl-names = "default";
+	pinctrl-0 = <&sx1 &sx2 &sx3>;
+};
+
+other_client at ... {
+	...
+	pinctrl-names = "default";
+	pinctrl-0 = <&sy1 &sy2>;
+};
+
+This is exactly how the Tegra pinctrl bindings work for example.
+
+
+> This works fine.  However, I'm just thinking that
+> it would have been easier if we could specify just one node:
+> 
+> xxx {
+>     pins = <PINA>, <PINB>, <PINC>;
+>     function = <...>;
+>     pull-up = <1 1 0>;
+> }
+> 
+> This "feature" seems a bit more concise to me and is what I did for my
+> original pinctrl driver.  The only downside is that with this method,
+> one cannot specify "don't touch this option for this pin" if the same
+> property must provide values for other pins.
+
+The other downside is that if the lists get even slightly long, it get
+really hard to match up the entries in the t properties.
