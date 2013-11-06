@@ -1,44 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Nov 2013 11:07:51 +0000
-Subject: mm: get_user_pages_fast()
-In-Reply-To: <20131106105400.GV16735@n2100.arm.linux.org.uk>
-References: <52797483.2000105@cs.bris.ac.uk>
- <20131106105400.GV16735@n2100.arm.linux.org.uk>
-Message-ID: <20131106110751.GE21074@mudshark.cambridge.arm.com>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Wed, 6 Nov 2013 16:35:44 +0530
+Subject: [PATCH RFC 6/6] kprobes: Add cases for arm and arm64 in sample
+ module
+In-Reply-To: <20131025152428.GD10673@mudshark.cambridge.arm.com>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-7-git-send-email-sandeepa.prabhu@linaro.org>
+ <20131025152428.GD10673@mudshark.cambridge.arm.com>
+Message-ID: <CA+b37P16kSi9Zja=oLRSCn74-ystxpcfKsy5A8r3eDEMfzZycQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 10:54:00AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 05, 2013 at 10:43:15PM +0000, Michael McTernan wrote:
-> > I think there's a problem on ARM with futex calls to FUTEX_WAIT and  
-> > similar for addresses that have been mapped to userspace from /dev/mem  
-> > or a device which sets VM_IO or VM_PFNMAP.  This can break  
-> > pthread_mutex_lock() if placed on such mapped memory and attributed as  
-> > process-shared.
-> 
-> Firstly, please stop this madness.  Placing futexes in IO memory is not
-> supported, period.  You can't map random bits of /dev/mem and expect
-> this stuff to work.
+On 25 October 2013 20:54, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Oct 17, 2013 at 12:17:51PM +0100, Sandeepa Prabhu wrote:
+>> Add info prints in sample kprobe handlers for ARM and ARM64
+>> architecture.
+>>
+>> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+>> ---
+>>  samples/kprobes/kprobe_example.c | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
+>> index 366db1a..0521246 100644
+>> --- a/samples/kprobes/kprobe_example.c
+>> +++ b/samples/kprobes/kprobe_example.c
+>> @@ -42,6 +42,14 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
+>>                       " ex1 = 0x%lx\n",
+>>               p->addr, regs->pc, regs->ex1);
+>>  #endif
+>> +#ifdef CONFIG_ARM
+>> +     printk(KERN_INFO "pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
+>> +                     p->addr, regs->ARM_pc);
+>> +#endif
+>> +#ifdef CONFIG_ARM64
+>> +     printk(KERN_INFO "pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
+>> +             p->addr, (long)regs->pc);
+>> +#endif
+>
+> Huh? Why can't you combine these two together and either unconditionall cast
+> to long, or use void * and %p?
+pt_regs member names are different: regs->pc (arm64) vs. regs->ARM_pc
+(arm32). It is still possible to use instruction_pointer(regs) for
+both architectures, but this needs including asm/ptrace.h which I am
+not sure good thing to do in samples/
 
-Yikes, I didn't notice that when I read the original post!
-
-> (a) you're generally not allowed to map kernel memory via /dev/mem, so
-> that rules out all kernel managed memory.
-> (b) you are allowed to map memory outside of that, but you get it as
-> strongly ordered memory.
-> 
-> (b) means that the load/store exclusives, which userspace mutexes will
-> use on ARMv6+, will not work correctly.  (they're not supported to
-> strongly ordered memory by the architecture.)
-> 
-> In other words, don't put mutexes in memory you've remapped from /dev/mem.
-> In fact, as an application, you should not be mapping /dev/mem at all.
-
-Completely agreed.
-
-As an aside, fastgup is still something we want on ARM (it is required to
-support futexes on transparent huge pages, which is what I originally
-assumed this was about), so my previous comments about Steve's patches still
-stand.
-
-Will
+Thanks,
+Sandeepa
+>
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
