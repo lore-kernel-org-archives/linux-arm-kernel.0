@@ -1,38 +1,122 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:16:21 +0000
-Subject: [PATCH 09/13] ASoC: Ux500: Match platform by device node when booting
- Device Tree
+Date: Wed,  6 Nov 2013 10:16:22 +0000
+Subject: [PATCH 10/13] ASoC: ux500_pcm: Extend Device Tree support to deal
+ with DMA data
 In-Reply-To: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
 References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732985-18928-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732985-18928-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're getting closer to fully enabling the Ux500 ASoC driver for Device
-Tree. When we switch over from using AUXDATA we'll need to match platform
-by only Device Tree nodes. In this patch we NULL out the platform_name,
-and supply nodes for each platform device.
+Soon we will strip out pdata support from the Ux500 set of ASoC drivers.
+When this happens it will have to supply a DMA slave_config to the
+dmaengine. At the moment a great deal of this comes from pdata via
+AUXDATA. We need to become independent of this soon. This patch starts
+the process by allocating memory for the associated data structures and
+fetches the MSP id used for const struct indexing.
 
 Cc: alsa-devel at alsa-project.org
 Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/ux500/mop500.c | 2 ++
- 1 file changed, 2 insertions(+)
+ sound/soc/ux500/ux500_msp_i2s.c | 68 ++++++++++++++++++++++++++++-------------
+ 1 file changed, 47 insertions(+), 21 deletions(-)
 
-diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
-index 178d1ba..4dc7b81 100644
---- a/sound/soc/ux500/mop500.c
-+++ b/sound/soc/ux500/mop500.c
-@@ -90,7 +90,9 @@ static int mop500_of_probe(struct platform_device *pdev,
+diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
+index 0a99372..2e916d1 100644
+--- a/sound/soc/ux500/ux500_msp_i2s.c
++++ b/sound/soc/ux500/ux500_msp_i2s.c
+@@ -646,6 +646,41 @@ int ux500_msp_i2s_close(struct ux500_msp *msp, unsigned int dir)
  
- 	for (i = 0; i < 2; i++) {
- 		mop500_dai_links[i].cpu_of_node = msp_np[i];
-+		mop500_dai_links[i].platform_of_node = msp_np[i];
- 		mop500_dai_links[i].cpu_dai_name = NULL;
-+		mop500_dai_links[i].platform_name = NULL;
- 		mop500_dai_links[i].codec_of_node = codec_np;
- 		mop500_dai_links[i].codec_name = NULL;
- 	}
+ }
+ 
++int ux500_msp_i2s_of_init_msp(struct platform_device *pdev,
++			      struct ux500_msp *msp,
++			      struct msp_i2s_platform_data **platform_data)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct msp_i2s_platform_data *pdata;
++
++	*platform_data = devm_kzalloc(&pdev->dev,
++				     sizeof(struct msp_i2s_platform_data),
++				     GFP_KERNEL);
++	pdata = *platform_data;
++	if (!pdata)
++		return -ENOMEM;
++
++	msp->playback_dma_data.dma_cfg = devm_kzalloc(&pdev->dev,
++					sizeof(struct stedma40_chan_cfg),
++					GFP_KERNEL);
++	if (!msp->playback_dma_data.dma_cfg)
++		return -ENOMEM;
++
++	msp->capture_dma_data.dma_cfg = devm_kzalloc(&pdev->dev,
++					sizeof(struct stedma40_chan_cfg),
++					GFP_KERNEL);
++	if (!msp->capture_dma_data.dma_cfg)
++		return -ENOMEM;
++
++	if (of_property_read_u32(np, "id", &pdata->id)) {
++		dev_err(&pdev->dev,
++			"No 'id' property found in DT\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
+ 			struct ux500_msp **msp_p,
+ 			struct msp_i2s_platform_data *platform_data)
+@@ -653,37 +688,28 @@ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
+ 	struct resource *res = NULL;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct ux500_msp *msp;
++	int ret;
+ 
+ 	*msp_p = devm_kzalloc(&pdev->dev, sizeof(struct ux500_msp), GFP_KERNEL);
+ 	msp = *msp_p;
+ 	if (!msp)
+ 		return -ENOMEM;
+ 
+-	if (np) {
+-		if (!platform_data) {
+-			platform_data = devm_kzalloc(&pdev->dev,
+-				sizeof(struct msp_i2s_platform_data), GFP_KERNEL);
+-			if (!platform_data)
+-				return -ENOMEM;
+-
+-			if (!of_property_read_u32(np, "id",
+-						  &platform_data->id)) {
+-				dev_err(&pdev->dev,
+-					"No 'id' property found in DT\n");
+-				return -EINVAL;
+-			}
+-		}
+-	} else
+-		if (!platform_data)
++	if (!platform_data) {
++		if (np) {
++			ret = ux500_msp_i2s_of_init_msp(pdev, msp,
++							&platform_data);
++			if (ret)
++				return ret;
++		} else
+ 			return -EINVAL;
+-
+-	dev_dbg(&pdev->dev, "%s: Enter (name: %s, id: %d).\n", __func__,
+-		pdev->name, platform_data->id);
++	} else {
++		msp->playback_dma_data.dma_cfg = platform_data->msp_i2s_dma_tx;
++		msp->capture_dma_data.dma_cfg = platform_data->msp_i2s_dma_rx;
++	}
+ 
+ 	msp->id = platform_data->id;
+ 	msp->dev = &pdev->dev;
+-	msp->playback_dma_data.dma_cfg = platform_data->msp_i2s_dma_tx;
+-	msp->capture_dma_data.dma_cfg = platform_data->msp_i2s_dma_rx;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (res == NULL) {
 -- 
 1.8.1.2
