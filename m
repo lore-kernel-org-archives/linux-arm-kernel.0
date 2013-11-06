@@ -1,22 +1,35 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Wed, 6 Nov 2013 11:01:02 +0100
-Subject: [PATCH v3 1/2] ARM: sun4i/sun7i: RTC driver
-In-Reply-To: <1383172738-8206-1-git-send-email-carlo.caione@gmail.com>
-References: <1383172738-8206-1-git-send-email-carlo.caione@gmail.com>
-Message-ID: <CAOQ7t2Yfv6XMMKdtsnbhtkw9n-yG1gfi+Jqj9GqXr7wpbMnxCA@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed,  6 Nov 2013 18:01:10 +0800
+Subject: [PATCH v3 0/2] ARM: at91: sama5d3: add sama5d36ek support 
+Message-ID: <1383732072-24938-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 11:38 PM, Carlo Caione <carlo.caione@gmail.com> wrote:
-> This patch introduces the driver for the RTC in the Allwinner A10 and
-> A20 SoCs.
->
-> Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
+This patch series add support for sama5d36 in sama5d3x family.
+It also adds the dts & dtsi file for sama5d36ek board.
 
-Ping.
-Alessandro, any feedback on this patch?
+v2 --> v3:
+  change the copyright.
 
-Best,
+v1 --> v2:
+  base on the at91-3.13-cleanup tree.
+  add a new sama5d36.dtsi to include the splitted peripherals.
 
---
-Carlo Caione
+Josh Wu (2):
+  ARM: at91: sama5d3: add support for sama5d36 chip
+  ARM: at91: sama5d3/dt: add sama5d36ek dts files
+
+ arch/arm/boot/dts/Makefile            |    1 +
+ arch/arm/boot/dts/sama5d3.dtsi        |    2 +-
+ arch/arm/boot/dts/sama5d36.dtsi       |   20 +++++++++++++
+ arch/arm/boot/dts/sama5d36ek.dts      |   53 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/Kconfig            |    2 +-
+ arch/arm/mach-at91/include/mach/cpu.h |    3 +-
+ arch/arm/mach-at91/sama5d3.c          |    7 ++---
+ arch/arm/mach-at91/setup.c            |    4 +++
+ 8 files changed, 85 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sama5d36.dtsi
+ create mode 100644 arch/arm/boot/dts/sama5d36ek.dts
+
+-- 
+1.7.10
