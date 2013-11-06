@@ -1,45 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Nov 2013 10:41:10 +0000
-Subject: [PATCH v5 2/7] arm64: introduce interfaces to hotpatch kernel
- and module code
-In-Reply-To: <CA+b37P2WU74NU7wG_H+KfmL6Y-fdhipsuOruU-z=wv=8ENwrfQ@mail.gmail.com>
-References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
- <1382109602-27432-3-git-send-email-liuj97@gmail.com>
- <20131030001245.GB25346@mudshark.cambridge.arm.com>
- <527671E9.8040704@gmail.com>
- <CA+b37P2WU74NU7wG_H+KfmL6Y-fdhipsuOruU-z=wv=8ENwrfQ@mail.gmail.com>
-Message-ID: <20131106104110.GC21074@mudshark.cambridge.arm.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 06 Nov 2013 19:43:32 +0900
+Subject: [PATCH] ARM: shmobile: Enable MTU2 on r7s72100
+Message-ID: <20131106104332.6327.73303.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 04, 2013 at 03:12:56PM +0000, Sandeepa Prabhu wrote:
-> On 3 November 2013 23:55, Jiang Liu <liuj97@gmail.com> wrote:
-> > On 10/30/2013 08:12 AM, Will Deacon wrote:
-> >> On Fri, Oct 18, 2013 at 04:19:56PM +0100, Jiang Liu wrote:
-> >>> +    atomic_set(&text_patch_id, smp_processor_id());
-> >>> +    ret = stop_machine(aarch64_insn_patch_text_cb, &patch, cpu_online_mask);
-> >>
-> >> Instead of doing this, why not instead call aarch64_insn_patch_text_nosync
-> >> inline, then call kick_all_cpus_sync immediately afterwards, without the
-> >> need to stop_machine.
-> > Sandeepa, who is working on kprobe for ARM64, needs the stop_machine()
-> > mechanism to synchronize all online CPUs, so it's a preparation for
-> > kprobe.
-> 
-> I had published kprobes patches for ARM64:
-> http://lwn.net/Articles/570648/  and using your patcset (v3) for
-> patching support, it works so far.
-> I CCed you on my RFC but unfortunately to your huawei email not the gmail.
-> 
-> I can give a try with kick_all_cpus_sync but wanted to understand this
-> a bit  detail on hows different from stop_machine and how this work.
+From: Magnus Damm <damm@opensource.se>
 
-My point was just that for nosync patching, the update to the instruction
-stream is atomic with respect to instruction fetch, so stop_machine seems a
-bit overkill. kick_all_cpus can be used to ensure visibility of the new
-instruction.
+Add MTU2 as r7s72100 system timer.
 
-Jiang Liu seemed to imply that this isn't suitable for kprobes, but I would
-like to know if/why that is the case.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-Will
+ Built on top of "renesas-devel-v3.12-rc7-20131101"
+
+ arch/arm/mach-shmobile/clock-r7s72100.c |    1 +
+ arch/arm/mach-shmobile/setup-r7s72100.c |   22 ++++++++++++++++++++++
+ 2 files changed, 23 insertions(+)
+
+--- 0001/arch/arm/mach-shmobile/clock-r7s72100.c
++++ work/arch/arm/mach-shmobile/clock-r7s72100.c	2013-11-05 21:07:13.000000000 +0900
+@@ -178,6 +178,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_ICK_ID("sci_fck", "sh-sci.5", &mstp_clks[MSTP42]),
+ 	CLKDEV_ICK_ID("sci_fck", "sh-sci.6", &mstp_clks[MSTP41]),
+ 	CLKDEV_ICK_ID("sci_fck", "sh-sci.7", &mstp_clks[MSTP40]),
++	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
+ };
+ 
+ void __init r7s72100_clock_init(void)
+--- 0001/arch/arm/mach-shmobile/setup-r7s72100.c
++++ work/arch/arm/mach-shmobile/setup-r7s72100.c	2013-11-05 21:07:13.000000000 +0900
+@@ -22,6 +22,7 @@
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+ #include <linux/serial_sci.h>
++#include <linux/sh_timer.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/r7s72100.h>
+@@ -58,6 +59,26 @@ static inline void r7s72100_register_sci
+ 				      sizeof(struct plat_sci_port));
+ }
+ 
++
++static struct sh_timer_config mtu2_0_platform_data __initdata = {
++	.name = "MTU2_0",
++	.timer_bit = 0,
++	.channel_offset = -0x80,
++	.clockevent_rating = 200,
++};
++
++static struct resource mtu2_0_resources[] __initdata = {
++	DEFINE_RES_MEM(0xfcff0300, 0x27),
++	DEFINE_RES_IRQ(gic_iid(139)), /* MTU2 TGI0A */
++};
++
++#define r7s72100_register_mtu2(idx)					\
++	platform_device_register_resndata(&platform_bus, "sh_mtu2",	\
++					  idx, mtu2_##idx##_resources,	\
++					  ARRAY_SIZE(mtu2_##idx##_resources), \
++					  &mtu2_##idx##_platform_data,	\
++					  sizeof(struct sh_timer_config))
++
+ void __init r7s72100_add_dt_devices(void)
+ {
+ 	r7s72100_register_scif(SCIF0);
+@@ -68,6 +89,7 @@ void __init r7s72100_add_dt_devices(void
+ 	r7s72100_register_scif(SCIF5);
+ 	r7s72100_register_scif(SCIF6);
+ 	r7s72100_register_scif(SCIF7);
++	r7s72100_register_mtu2(0);
+ }
+ 
+ void __init r7s72100_init_early(void)
