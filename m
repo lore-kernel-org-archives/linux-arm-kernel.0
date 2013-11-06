@@ -1,27 +1,69 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:05:41 +0000
-Subject: [PATCH 0/7] ARM: ux500: More DT only clean-ups for the platform
-Message-ID: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
+Date: Wed,  6 Nov 2013 10:05:42 +0000
+Subject: [PATCH 1/7] ARM: ux500: Remove legacy ATAG SSP support
+In-Reply-To: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
+References: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732348-18576-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This hasn't been used since we converted the platform to DT only.
 
-I was bored on the plane home, so knocked this together. This is
-probably the penultimate set of clean-ups. The final one will be
-the removal of MSP devices once my Audio patch-set lands.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c | 30 ------------------------------
+ arch/arm/mach-ux500/board-mop500.h |  1 -
+ 2 files changed, 31 deletions(-)
 
- arch/arm/mach-ux500/Makefile             |   7 +++---
- arch/arm/mach-ux500/board-mop500-audio.c |   2 --
- arch/arm/mach-ux500/board-mop500-sdi.c   | 168 ----------------------------------------------------------------------------------------------------------------------------------
- arch/arm/mach-ux500/board-mop500.c       |  78 ------------------------------------------------------------
- arch/arm/mach-ux500/board-mop500.h       |   5 ----
- arch/arm/mach-ux500/cpu-db8500.c         |  18 +++++++++++---
- arch/arm/mach-ux500/cpu.c                |  23 +++++-------------
- arch/arm/mach-ux500/devices-db8500.c     |  28 ----------------------
- arch/arm/mach-ux500/devices-db8500.h     |  19 ---------------
- arch/arm/mach-ux500/devices.c            |  26 --------------------
- arch/arm/mach-ux500/devices.h            |  15 ------------
- arch/arm/mach-ux500/setup.h              |   6 -----
- arch/arm/mach-ux500/timer.c              |  28 +++++++---------------
- 13 files changed, 32 insertions(+), 391 deletions(-)
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 514d40b..d552163 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -46,33 +46,3 @@ struct ab8500_platform_data ab8500_platdata = {
+ 	.irq_base	= MOP500_AB8500_IRQ_BASE,
+ 	.regulator	= &ab8500_regulator_plat_data,
+ };
+-
+-#ifdef CONFIG_STE_DMA40
+-static struct stedma40_chan_cfg ssp0_dma_cfg_rx = {
+-	.mode = STEDMA40_MODE_LOGICAL,
+-	.dir = DMA_DEV_TO_MEM,
+-	.dev_type = DB8500_DMA_DEV8_SSP0,
+-};
+-
+-static struct stedma40_chan_cfg ssp0_dma_cfg_tx = {
+-	.mode = STEDMA40_MODE_LOGICAL,
+-	.dir = DMA_MEM_TO_DEV,
+-	.dev_type = DB8500_DMA_DEV8_SSP0,
+-};
+-#endif
+-
+-struct pl022_ssp_controller ssp0_plat = {
+-	.bus_id = 0,
+-#ifdef CONFIG_STE_DMA40
+-	.enable_dma = 1,
+-	.dma_filter = stedma40_filter,
+-	.dma_rx_param = &ssp0_dma_cfg_rx,
+-	.dma_tx_param = &ssp0_dma_cfg_tx,
+-#else
+-	.enable_dma = 0,
+-#endif
+-	/* on this platform, gpio 31,142,144,214 &
+-	 * 224 are connected as chip selects
+-	 */
+-	.num_chipselect = 5,
+-};
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index 511d6fe..d48e866 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -87,7 +87,6 @@ extern struct msp_i2s_platform_data msp0_platform_data;
+ extern struct msp_i2s_platform_data msp1_platform_data;
+ extern struct msp_i2s_platform_data msp2_platform_data;
+ extern struct msp_i2s_platform_data msp3_platform_data;
+-extern struct pl022_ssp_controller ssp0_plat;
+ 
+ void __init mop500_pinmaps_init(void);
+ void __init snowball_pinmaps_init(void);
+-- 
+1.8.1.2
