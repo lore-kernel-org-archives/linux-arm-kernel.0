@@ -1,181 +1,144 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  6 Nov 2013 10:25:39 +0100
-Subject: [PATCH v2] ARM/serial: at91: switch atmel serial to use gpiolib
-Message-ID: <1383729939-10269-1-git-send-email-linus.walleij@linaro.org>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Wed, 06 Nov 2013 10:00:51 +0100
+Subject: [PATCH v2 2/2] ARM: at91: sama5d3/dt: add sama5d36ek dts files
+In-Reply-To: <1383705071-7332-3-git-send-email-josh.wu@atmel.com>
+References: <1383705071-7332-1-git-send-email-josh.wu@atmel.com>
+ <1383705071-7332-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <527A0543.8040405@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This passes the errata fix using a GPIO to control the RTS pin
-on one of the AT91 chips to use gpiolib instead of the
-AT91-specific interfaces. Also remove the reliance on
-compile-time #defines and the cpu_* check and rely on the
-platform passing down the proper GPIO pin through platform
-data.
+Hello Josh,
 
-This is a prerequisite for getting rid of the local GPIO
-implementation in the AT91 platform and move toward
-multiplatform.
+On 06/11/2013 03:31, Josh Wu wrote:
+> Add .dts and .dtsi file to support sama5d36ek board.
+> Also update the the comments for sama5d36 in sama5d3.dtsi.
 
-The patch also adds device tree support for getting the
-RTS GPIO pin from the device tree on DT boot paths.
+Could you change the Copyright line in sama5d36.dtsi (I'm not sure I can
+get credits for something I haven't done :)) ?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Skip check for UART base address from leftover hack,
-  if we have an RTS GPIO we just use it.
-- Set default error value on GPIO pin to -EINVAL
-- Fold in a device tree support patch from Nicolas Ferre
----
- .../devicetree/bindings/serial/atmel-usart.txt     |  3 ++
- arch/arm/mach-at91/at91rm9200_devices.c            |  1 +
- drivers/tty/serial/atmel_serial.c                  | 55 +++++++++++++++-------
- include/linux/platform_data/atmel.h                |  1 +
- 4 files changed, 42 insertions(+), 18 deletions(-)
+Anyway,
 
-diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-index 2191dcb9f1da..3adc61c2e4ca 100644
---- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-@@ -10,6 +10,8 @@ Required properties:
- Optional properties:
- - atmel,use-dma-rx: use of PDC or DMA for receiving data
- - atmel,use-dma-tx: use of PDC or DMA for transmitting data
-+- rts-gpios: specify a GPIO for RTS line. It will use specified PIO instead of the peripheral
-+  function pin for the USART RTS feature. If unsure, don't specify this property.
- - add dma bindings for dma transfer:
- 	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
- 		memory peripheral interface and USART DMA channel ID, FIFO configuration.
-@@ -28,6 +30,7 @@ Example:
- 		interrupts = <7>;
- 		atmel,use-dma-rx;
- 		atmel,use-dma-tx;
-+		rts-gpios = <&pioD 15 0>;
- 	};
- 
- - use DMA:
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index c721e9b08066..51d4c08962f6 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -961,6 +961,7 @@ static struct resource uart0_resources[] = {
- static struct atmel_uart_data uart0_data = {
- 	.use_dma_tx	= 1,
- 	.use_dma_rx	= 1,
-+	.rts_gpio	= AT91_PIN_PA21,
- };
- 
- static u64 uart0_dmamask = DMA_BIT_MASK(32);
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index d067285a2d20..e31f3319be64 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -35,21 +35,18 @@
- #include <linux/platform_device.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_gpio.h>
- #include <linux/dma-mapping.h>
- #include <linux/atmel_pdc.h>
- #include <linux/atmel_serial.h>
- #include <linux/uaccess.h>
- #include <linux/platform_data/atmel.h>
- #include <linux/timer.h>
-+#include <linux/gpio.h>
- 
- #include <asm/io.h>
- #include <asm/ioctls.h>
- 
--#ifdef CONFIG_ARM
--#include <mach/cpu.h>
--#include <asm/gpio.h>
--#endif
--
- #define PDC_BUFFER_SIZE		512
- /* Revisit: We should calculate this based on the actual port settings */
- #define PDC_RX_TIMEOUT		(3 * 10)		/* 3 bytes */
-@@ -167,6 +164,7 @@ struct atmel_uart_port {
- 	struct circ_buf		rx_ring;
- 
- 	struct serial_rs485	rs485;		/* rs485 settings */
-+	int			rts_gpio;	/* optional RTS GPIO */
- 	unsigned int		tx_done_mask;
- 	bool			is_usart;	/* usart or uart */
- 	struct timer_list	uart_timer;	/* uart timer */
-@@ -300,20 +298,16 @@ static void atmel_set_mctrl(struct uart_port *port, u_int mctrl)
- 	unsigned int mode;
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 
--#ifdef CONFIG_ARCH_AT91RM9200
--	if (cpu_is_at91rm9200()) {
--		/*
--		 * AT91RM9200 Errata #39: RTS0 is not internally connected
--		 * to PA21. We need to drive the pin manually.
--		 */
--		if (port->mapbase == AT91RM9200_BASE_US0) {
--			if (mctrl & TIOCM_RTS)
--				at91_set_gpio_value(AT91_PIN_PA21, 0);
--			else
--				at91_set_gpio_value(AT91_PIN_PA21, 1);
--		}
-+	/*
-+	 * AT91RM9200 Errata #39: RTS0 is not internally connected
-+	 * to PA21. We need to drive the pin as a GPIO.
-+	 */
-+	if (gpio_is_valid(atmel_port->rts_gpio)) {
-+		if (mctrl & TIOCM_RTS)
-+			gpio_set_value(atmel_port->rts_gpio, 0);
-+		else
-+			gpio_set_value(atmel_port->rts_gpio, 1);
- 	}
--#endif
- 
- 	if (mctrl & TIOCM_RTS)
- 		control |= ATMEL_US_RTSEN;
-@@ -2365,6 +2359,31 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 	port = &atmel_ports[ret];
- 	port->backup_imr = 0;
- 	port->uart.line = ret;
-+	port->rts_gpio = -EINVAL; /* Invalid, zero could be valid */
-+	/*
-+	 * In theory the GPIO pin controlling RTS could be zero and
-+	 * this would be an improper check, but we know that the only
-+	 * existing case is != 0 and it's nice to use the zero-initialized
-+	 * structs to indicate "no RTS GPIO" instead of open-coding some
-+	 * invalid value everywhere.
-+	 */
-+	if (pdata && pdata->rts_gpio > 0)
-+		port->rts_gpio = pdata->rts_gpio;
-+	else if (np)
-+		port->rts_gpio = of_get_named_gpio(np, "rts-gpios", 0);
-+
-+	if (gpio_is_valid(port->rts_gpio)) {
-+		ret = devm_gpio_request(&pdev->dev, port->rts_gpio, "RTS");
-+		if (ret) {
-+			dev_err(&pdev->dev, "error requesting RTS GPIO\n");
-+			goto err;
-+		}
-+		ret = gpio_direction_output(port->rts_gpio, 0);
-+		if (ret) {
-+			dev_err(&pdev->dev, "error setting up RTS GPIO\n");
-+			goto err;
-+		}
-+	}
- 
- 	ret = atmel_init_port(port, pdev);
- 	if (ret)
-diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-index cea9f70133c5..e26b0c14edea 100644
---- a/include/linux/platform_data/atmel.h
-+++ b/include/linux/platform_data/atmel.h
-@@ -84,6 +84,7 @@ struct atmel_uart_data {
- 	short			use_dma_rx;	/* use receive DMA? */
- 	void __iomem		*regs;		/* virt. base address, if any */
- 	struct serial_rs485	rs485;		/* rs485 settings */
-+	int			rts_gpio;	/* optional RTS GPIO */
- };
- 
-  /* Touchscreen Controller */
--- 
-1.8.3.1
+Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> v1 --> v2:
+>    add a new sama5d36.dtsi file to include the peripheral dtsi file.
+>
+>   arch/arm/boot/dts/Makefile       |    1 +
+>   arch/arm/boot/dts/sama5d3.dtsi   |    2 +-
+>   arch/arm/boot/dts/sama5d36.dtsi  |   19 ++++++++++++++
+>   arch/arm/boot/dts/sama5d36ek.dts |   53 ++++++++++++++++++++++++++++++++++++++
+>   4 files changed, 75 insertions(+), 1 deletion(-)
+>   create mode 100644 arch/arm/boot/dts/sama5d36.dtsi
+>   create mode 100644 arch/arm/boot/dts/sama5d36ek.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index e95af3f..ddbb049 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -40,6 +40,7 @@ dtb-$(CONFIG_ARCH_AT91)	+= sama5d31ek.dtb
+>   dtb-$(CONFIG_ARCH_AT91)	+= sama5d33ek.dtb
+>   dtb-$(CONFIG_ARCH_AT91)	+= sama5d34ek.dtb
+>   dtb-$(CONFIG_ARCH_AT91)	+= sama5d35ek.dtb
+> +dtb-$(CONFIG_ARCH_AT91)	+= sama5d36ek.dtb
+>   
+>   dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+>   dtb-$(CONFIG_ARCH_BCM) += bcm11351-brt.dtb \
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 5cdaba4..23b7669 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -1,6 +1,6 @@
+>   /*
+>    * sama5d3.dtsi - Device Tree Include file for SAMA5D3 family SoC
+> - *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35 SoC
+> + *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35, SAMA5D36 SoC
+>    *
+>    *  Copyright (C) 2013 Atmel,
+>    *                2013 Ludovic Desroches <ludovic.desroches@atmel.com>
+> diff --git a/arch/arm/boot/dts/sama5d36.dtsi b/arch/arm/boot/dts/sama5d36.dtsi
+> new file mode 100644
+> index 0000000..ec61c08
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sama5d36.dtsi
+> @@ -0,0 +1,19 @@
+> +/*
+> + * sama5d36.dtsi - Device Tree Include file for SAMA5D36 SoC
+> + *
+> + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +#include "sama5d3.dtsi"
+> +#include "sama5d3_can.dtsi"
+> +#include "sama5d3_emac.dtsi"
+> +#include "sama5d3_gmac.dtsi"
+> +#include "sama5d3_lcd.dtsi"
+> +#include "sama5d3_mci2.dtsi"
+> +#include "sama5d3_tcb1.dtsi"
+> +#include "sama5d3_uart.dtsi"
+> +
+> +/ {
+> +	compatible = "atmel,samad36", "atmel,sama5d3", "atmel,sama5";
+> +};
+> diff --git a/arch/arm/boot/dts/sama5d36ek.dts b/arch/arm/boot/dts/sama5d36ek.dts
+> new file mode 100644
+> index 0000000..59576c6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sama5d36ek.dts
+> @@ -0,0 +1,53 @@
+> +/*
+> + * sama5d36ek.dts - Device Tree file for SAMA5D36-EK board
+> + *
+> + *  Copyright (C) 2013 Atmel,
+> + *                2013 Josh Wu <josh.wu@atmel.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +#include "sama5d36.dtsi"
+> +#include "sama5d3xmb.dtsi"
+> +#include "sama5d3xdm.dtsi"
+> +
+> +/ {
+> +	model = "Atmel SAMA5D36-EK";
+> +	compatible = "atmel,sama5d36ek", "atmel,sama5d3xmb", "atmel,sama5d3xcm", "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
+> +
+> +	ahb {
+> +		apb {
+> +			spi0: spi at f0004000 {
+> +				status = "okay";
+> +			};
+> +
+> +			ssc0: ssc at f0008000 {
+> +				status = "okay";
+> +			};
+> +
+> +			can0: can at f000c000 {
+> +				status = "okay";
+> +			};
+> +
+> +			i2c0: i2c at f0014000 {
+> +				status = "okay";
+> +			};
+> +
+> +			i2c1: i2c at f0018000 {
+> +				status = "okay";
+> +			};
+> +
+> +			macb0: ethernet at f0028000 {
+> +				status = "okay";
+> +			};
+> +
+> +			macb1: ethernet at f802c000 {
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	sound {
+> +		status = "okay";
+> +	};
+> +};
