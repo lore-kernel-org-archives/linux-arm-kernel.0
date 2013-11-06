@@ -1,37 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 6 Nov 2013 13:10:01 +0100
-Subject: [PATCH] ARM: nommu: Implement dummy early_paging_init()
-In-Reply-To: <CAOesGMg0Ah7HoDOiOX+dDYCA3A17-VryiULuUzT-j-BHFyCaOw@mail.gmail.com>
-References: <1382533728-19495-1-git-send-email-treding@nvidia.com>
- <CAOesGMg0Ah7HoDOiOX+dDYCA3A17-VryiULuUzT-j-BHFyCaOw@mail.gmail.com>
-Message-ID: <20131106121000.GA6984@ulmo.nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 6 Nov 2013 12:10:34 +0000
+Subject: [PATCH 04/13] ARM: ux500: Add DMA config bindings for MSP devices
+In-Reply-To: <CACRpkdaNy_h60FJYyTmxVFR8V87znP6KtzY48VhA7jHDTziAcw@mail.gmail.com>
+References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
+ <1383732985-18928-5-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaNy_h60FJYyTmxVFR8V87znP6KtzY48VhA7jHDTziAcw@mail.gmail.com>
+Message-ID: <20131106121034.GH30901@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 11:47:13AM -0800, Olof Johansson wrote:
-> On Wed, Oct 23, 2013 at 6:08 AM, Thierry Reding
-> <thierry.reding@gmail.com> wrote:
-> > No-MMU configurations currenty fail to build because they are missing
-> > the early_paging_init() symbol.
-> >
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> This is still showing up on -next with at91x40_defconfig. Can you feed
-> it to the patch tracker if you haven't already?
+On Wed, 06 Nov 2013, Linus Walleij wrote:
 
-Done. I'm not sure exactly what the prerequisites are for submitting a
-patch to the tracker. The help text on the website says patches should
-be reviewed on the mailing list first and that's what I was waiting for.
-Is there some amount of time (a week or two) after which silence can be
-considered acknowledgement?
+> On Wed, Nov 6, 2013 at 11:16 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Usually I would like to apply this separately to my ux500-dt branch.
+> 
+> While we should keep patches together for bisectability, the dts
+> files is something of an exception in my book since they will
+> be moved out of the kernel one day. Anyway, do as you please:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131106/545a44f4/attachment.sig>
+Actually, you can take it if you like, as it makes no difference to
+this patch-set. Just make sure it's applied before I rip out the MSP
+platform data stuff (which I am yet to do).
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
