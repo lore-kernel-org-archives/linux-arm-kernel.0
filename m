@@ -1,19 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Nov 2013 12:41:56 +0100
-Subject: [PATCH 03/13] ARM: ux500: Don't use enums for MSP IDs - for easy
- DT conversion
-In-Reply-To: <1383732985-18928-4-git-send-email-lee.jones@linaro.org>
-References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
- <1383732985-18928-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdawabnMFfaVhjBq8DT1ovaitdoJVCcCdD79mTuABYdy9Q@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (ivan.khoronzhuk)
+Date: Wed, 6 Nov 2013 13:31:59 +0200
+Subject: Fwd: [PATCH 3/8] watchdog: davinci: add GET_TIMELEFT option support
+In-Reply-To: <1383680783-12114-4-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1383680783-12114-4-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <527A28AF.9040308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 6, 2013 at 11:16 AM, Lee Jones <lee.jones@linaro.org> wrote:
+Currently, the davinci watchdog can be read while counting,
+so we can add ability to report the remaining time before
+the system will reboot.
 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ drivers/watchdog/davinci_wdt.c |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
+index 1fc2093..6cbf2e1 100644
+--- a/drivers/watchdog/davinci_wdt.c
++++ b/drivers/watchdog/davinci_wdt.c
+@@ -117,6 +117,33 @@ static int davinci_wdt_ping(struct watchdog_device *wdd)
+ 	return 0;
+ }
+ 
++static unsigned int davinci_wdt_get_timeleft(struct watchdog_device *wdd)
++{
++	u64 timer_counter;
++	unsigned long freq;
++	u32 val;
++	struct davinci_wdt_device *davinci_wdt = watchdog_get_drvdata(wdd);
++
++	/* if timeout is occured then return 0 */
++	val = ioread32(davinci_wdt->base + WDTCR);
++	if (val & WDFLAG)
++		return 0;
++
++	freq = clk_get_rate(davinci_wdt->clk);
++
++	if (!freq) {
++		dev_err(wdd->dev, "clock freq is not set\n");
++		return 0;
++	}
++
++	timer_counter = ioread32(davinci_wdt->base + TIM12);
++	timer_counter |= ((u64)ioread32(davinci_wdt->base + TIM34) << 32);
++
++	do_div(timer_counter, freq);
++
++	return wdd->timeout - timer_counter;
++}
++
+ static const struct watchdog_info davinci_wdt_info = {
+ 	.options = WDIOF_KEEPALIVEPING,
+ 	.identity = "DaVinci Watchdog",
+@@ -127,6 +154,7 @@ static const struct watchdog_ops davinci_wdt_ops = {
+ 	.start		= davinci_wdt_start,
+ 	.stop		= davinci_wdt_ping,
+ 	.ping		= davinci_wdt_ping,
++	.get_timeleft	= davinci_wdt_get_timeleft,
+ };
+ 
+ static int davinci_wdt_probe(struct platform_device *pdev)
+-- 
+1.7.9.5
