@@ -1,45 +1,46 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 5 Nov 2013 21:46:42 -0300
-Subject: [PATCH v3 12/28] mtd: nand: pxa3xx: Use a completion to signal
- device ready
-In-Reply-To: <20131106002759.GF11759@localhost>
-References: <1383656135-8627-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383656135-8627-13-git-send-email-ezequiel.garcia@free-electrons.com>
- <20131105195136.GS20061@ld-irv-0074.broadcom.com>
- <20131106002759.GF11759@localhost>
-Message-ID: <20131106004641.GG11759@localhost>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Wed, 06 Nov 2013 10:50:00 +1000
+Subject: [PATCHv3] ARM: imx: add support code for IMX50 based machines
+In-Reply-To: <20131105155701.GL3060@titan.lakedaemon.net>
+References: <1383524020-1518-1-git-send-email-gerg@uclinux.org>
+ <20131104145151.GD3060@titan.lakedaemon.net>
+ <20131104145739.GE3060@titan.lakedaemon.net> <52785FAE.7040904@uclinux.org>
+ <20131105155701.GL3060@titan.lakedaemon.net>
+Message-ID: <52799238.9010803@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 09:27:59PM -0300, Ezequiel Garcia wrote:
-> > 
-> > I believe your handling of this 'is_ready' bit is a little unwise, as
-> > you are actually creating extra concurrency that is unneeded. I'll
-> > summarize what you're doing with this 'is_ready' field:
-> > 
-> >   cmdfunc() -> sets info->is_ready=0 for appropriate commands
-> >             -> kicks off the hardware
-> > 
-> > The following two sequences may then occur concurrently:
-> > 
-> >   (1) pxa3xx_nand_irq -> ready interrupt occurs
-> >                       -> set info->is_ready=1
-> > 		      -> signal 'dev_ready' completion
-> > 
-> >   (2) waitfunc -> check info->is_ready, if it is 0...
-> >                   |_ ... wait for the dev_ready completion
-> > 
-> > Instead of setting info->is_ready=1 under (1), you could set it in (2),
+Hi Jason,
 
-So, after some more careful thought and some testings, it seems you're
-correct. Setting is_read in waitfunc() results in a non-racy solution and
-the atomic_t can go away.
+On 06/11/13 01:57, Jason Cooper wrote:
+> On Tue, Nov 05, 2013 at 01:02:06PM +1000, Greg Ungerer wrote:
+>> Hi Jason,
+>>
+>> On 05/11/13 00:57, Jason Cooper wrote:
+>>> On Mon, Nov 04, 2013 at 09:51:51AM -0500, Jason Cooper wrote:
+>>>> What happened to the rest of the series?
+>>>
+>>> Crap.  Nevermind.  I just saw that Shawn had already taken the other
+>>> patches into his tree.  And here I thought I was caught up on
+>>> everything...
+>>
+>> :-)
+>>
+>> Are you going to try and test out the imx50 support from Shawn's branch?
+> 
+> I did manage to get it to boot, but I'm not confident in it yet.  There
+> is still a nagging problem (I had with my implementation as well) where
+> 
+> $ sleep 10
+> 
+> takes greater than 20 seconds. :(  Which is why I originally asked you
+> about the apll...
 
-I'll take a look at the other remaining issues and see about preparing
-a v4, so we can try to converge quick enough for v3.14.
+I have seen that. I haven't had a chance to look properly into it.
+If you boot Freescales old LTIB code that supports the iMX50 it seems
+they are messing with the clock setup to get it just right. It may
+be that they just didn't get it right in their boot loader to start
+with.
 
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards
+Greg
