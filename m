@@ -1,43 +1,163 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 06 Nov 2013 12:55:35 +0100
-Subject: [alsa-devel] [PATCH 08/13] ASoC: generic-dmaengine-pcm: Clear
- slave_config memory
-In-Reply-To: <1383732985-18928-9-git-send-email-lee.jones@linaro.org>
-References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
- <1383732985-18928-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <527A2E37.2040100@metafoo.de>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 6 Nov 2013 13:55:10 +0200
+Subject: [PATCH v4 4/6] gpio: davinci: add OF support
+In-Reply-To: <CA+V-a8tJ7yDJOPamoCiaX6Twnnqxp_o_L0rzo2dEeSDS2VoYLw@mail.gmail.com>
+References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
+ <1383406775-14902-5-git-send-email-prabhakar.csenng@gmail.com>
+ <5277E752.8090005@ti.com>
+ <CA+V-a8uV0g36LoQtxFjR56SaMxj7KOE2ztC+pfT_Pn1wGcqEmw@mail.gmail.com>
+ <527923EF.4070602@ti.com>
+ <CA+V-a8tJ7yDJOPamoCiaX6Twnnqxp_o_L0rzo2dEeSDS2VoYLw@mail.gmail.com>
+Message-ID: <527A2E1E.8030308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2013 11:16 AM, Lee Jones wrote:
-> We currently assume that the DMA Slave Config will be fully populated
-> by the platform, however some DMA Engines make decisions based on zero
-> (default) flags such as DMA_SLAVE_BUSWIDTH_UNDEFINED and as this is a
-> static declaration we need to memset it to clear the data area.
-> 
-> Cc: alsa-devel at alsa-project.org
-> Cc: Mark Brown <broonie@kernel.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On 11/06/2013 12:08 PM, Prabhakar Lad wrote:
+> Hi Grygorii,
+>
+> On Tue, Nov 5, 2013 at 10:29 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>> On 11/05/2013 10:53 AM, Prabhakar Lad wrote:> Hi Grygorii,
+>>
+>>>
+>>> Thanks for the review.
+>>>
+>>> On Mon, Nov 4, 2013 at 11:58 PM, Grygorii Strashko
+>>> <grygorii.strashko@ti.com> wrote:
+>>>> Hi Prabhakar Lad,
+>>>>
+>>>>
+>>>> On 11/02/2013 05:39 PM, Lad, Prabhakar wrote:
+>>>>>
+>>>>> From: KV Sujith <sujithkv@ti.com>
+>>>>>
+>>>>> This patch adds OF parser support for davinci gpio
+>>>>> driver and also appropriate documentation in gpio-davinci.txt
+>>>>> located at Documentation/devicetree/bindings/gpio/.
+>>>>
+>>>>
+>>>> I worry, do we need to have gpio_chip.of_xlate() callback implemented?
+>>>
+>>> I looked for the other OF GPIO implementations with same "ngpio"
+>>> property (marvel, msm) but I don?t see of_xlate() callback implemented.
+>>
+>> The question: will below definitions in DT work or not after this series?
+>>   Will of_get_gpio()/of_get_named_gpio() work?
+>>
+>> Example1 - leds:
+>>          leds {
+>>                  compatible = "gpio-leds";
+>>                  debug0 {
+>>                          label = "green:debug0";
+>>                          gpios = <&gpio 29 GPIO_ACTIVE_HIGH>;
+>>                  };
+>>          };
+>>
+>> Example2 - any dev:
+>> devA {
+>>          compatible = "devA";
+>>          gpios = <&gpio 120 GPIO_ACTIVE_LOW>;
+>>
+>> }
+>>
+>>
+> Agreed of_get_gpio()/of_get_named_gpio() wont work without
+> xlate callback implemented, but I think this can be added as a
+> incremental patch later.
+>
+>>>
+>>>> - From one side, Davinci GPIO controller in DT described by one entry
+>>>> which defines number of supported GPIOs as "ti,ngpio = <144>;"
+>>>>
+>>>> - From other side, on Linux level more than one gpio_chip objects are
+>>>> instantiated (one per each 32 GPIO).
+>>>>
+>>>> How the standard GPIO biding will work in this case? .. And will they?
+>>>>
+>>>> Linus, I'd very appreciate if you will be able to clarify this point.
+>>>>
+>>>>
+>>>>>
+>>>>> Signed-off-by: KV Sujith <sujithkv@ti.com>
+>>>>> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+>>>>> [prabhakar.csengg at gmail.com: simplified the OF code, removed
+>>>>>                   unnecessary DT property and also simplified
+>>>>>                   the commit message]
+>>>>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>>>> ---
+>>>>>     .../devicetree/bindings/gpio/gpio-davinci.txt      |   32
+>>>>> ++++++++++++
+>>>>>     drivers/gpio/gpio-davinci.c                        |   54
+>>>>> ++++++++++++++++++--
+>>>>>     2 files changed, 83 insertions(+), 3 deletions(-)
+>>>>>     create mode 100644
+>>>>> Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>>>> b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..55aae1c
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+>>>>> @@ -0,0 +1,32 @@
+>>>>> +Davinci GPIO controller bindings29
+>>
+>>>>> +
+>>>>> +Required Properties:
+>>>>> +- compatible: should be "ti,dm6441-gpio"
+>>>>> +
+>>>>> +- reg: Physical base address of the controller and the size of memory
+>>>>> mapped
+>>>>> +       registers.
+>>>>> +
+>>>>> +- gpio-controller : Marks the device node as a gpio controller.
+>>>>> +
+>>>>> +- interrupts: Array of GPIO interrupt number.
+>>>>
+>>>>
+>>>> May be meaning of <interrupts> property need to be extended, because,
+>>>> as of now, only banked or unbanked IRQs are supported - and not both.
+>>>>
+>>>>
+>>> OK
+>>>
+>>>>> +
+>>>>> +- ti,ngpio: The number of GPIO pins supported.
+>>>>> +
+>>>>> +- ti,davinci-gpio-unbanked: The number of GPIOs that have an individual
+>>>>> interrupt
+>>>>> +                            line to processor.
+>>>>
+>>>>
+>>>> Should interrupt-controller; specifier be added here?
+>>>>
+>>> No
+>>
+>> So, it would be impossible to map GPIO IRQ to device through DT. Right?
+>> Like:
+>>          devX at 0 {
+>>                  compatible = "devX";
+>>                  interrupt-parent = <&gpio>;
+>>                  interrupts = <50 IRQ_TYPE_EDGE_FALLING>; /* gpio line 50 */
+>>
+>>
+>>          };
+>>
+>>
+> may be I took you wrong here, the interrupt-controller is inherited
+> property taken from its parent, so didn?t mention that in the documentation
 
-Acked-by: Lars-Peter Clausen <lars@metafoo.de>
+The GPIO controller uses interrupts form parent controller INTC/GIC
+from one side, but from other side it can provide interrupts to its
+users.
+And as result can be interrupt-controller.
 
-Thanks.
+INTC/GIC -> GPIO -> user
 
-> ---
->  sound/soc/soc-generic-dmaengine-pcm.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
-> index ee07903..6ad4c7a 100644
-> --- a/sound/soc/soc-generic-dmaengine-pcm.c
-> +++ b/sound/soc/soc-generic-dmaengine-pcm.c
-> @@ -90,6 +90,8 @@ static int dmaengine_pcm_hw_params(struct snd_pcm_substream *substream,
->  	struct dma_slave_config slave_config;
->  	int ret;
->  
-> +	memset(&slave_config, 0, sizeof(slave_config));
-> +
->  	if (!pcm->config)
->  		prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config;
->  	else
-> 
+It could work for banked IRQs only now :)
+
+
+>
+> Regards,
+> --Prabhakar Lad
+>
