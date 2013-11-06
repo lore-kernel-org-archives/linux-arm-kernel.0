@@ -1,50 +1,63 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 6 Nov 2013 16:16:23 -0300
-Subject: [PATCH 0/3] omap2: Assorted GPMC cleanups
-In-Reply-To: <1382921508-5104-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1382921508-5104-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131106191622.GA3162@localhost>
+From: Michael.McTernan.2001@cs.bris.ac.uk (Michael McTernan)
+Date: Wed, 06 Nov 2013 19:38:33 +0000
+Subject: mm: get_user_pages_fast()
+In-Reply-To: <20131106105400.GV16735@n2100.arm.linux.org.uk>
+References: <52797483.2000105@cs.bris.ac.uk>
+ <20131106105400.GV16735@n2100.arm.linux.org.uk>
+Message-ID: <527A9AB9.8060306@cs.bris.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 27, 2013 at 09:51:45PM -0300, Ezequiel Garcia wrote:
-> (I'm CCing the MTD list, because GPMC is the memory controller
-> used for NOR, NAND and OneNAND devices).
-> 
-> Hi all,
-> 
-> Just a small patchset containing two small cleanups and a minor fix
-> for the GPMC memory controller. The first two are cleanups and can
-> be considered as preparation work for the fix.
-> 
-> The fix is patch 3/3: "Move legacy GPMC width setting". It makes
-> explicit use of the DT property "gpmc,device-width" and removes the
-> subsequent (and redundant) setting of the GPMC width, based in the
-> NAND bus widht.
-> 
-> Tested in AM335x (using DT) so I'd appreciate if someone can test using
-> a board-file, on a device with NAND flash.
-> 
-> Jon: If you happen to read this, I'd like if you could take a look at
-> patch 1/3, since you were the last to touch that part of the code.
-> 
-> Thanks!
-> 
-> Ezequiel Garcia (3):
->   omap2: gpmc: Move initialization outside the gpmc_t condition
->   omap2: gpmc: Introduce gpmc_set_legacy()
->   omap2: gpmc: Move legacy GPMC width setting
-> 
->  arch/arm/mach-omap2/gpmc-nand.c | 50 +++++++++++++++++++++++------------------
->  1 file changed, 28 insertions(+), 22 deletions(-)
-> 
+On 11/06/2013 10:54 AM, Russell King - ARM Linux wrote:
+> Firstly, please stop this madness.
 
-Any comments about this?
+In the context of an embedded system, where memory is shared between 
+CPUs, DSP, FPGAs and some peripherals, and where the SCU is maintaining 
+coherency on selected areas, this is a feature of the platform, not 
+madness.
 
-Pekon? Maybe you can comment or otherwise ack the patches?
+ > Placing futexes in IO memory is not supported, period.
 
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Except the _PRIVATE futex calls do work fine in IO memory since they 
+don't walk the process page tables to determine the 'key' from the 
+address.  These a limited to only sync between threads in the same 
+processes though.
+
+ > You can't map random bits of /dev/mem and expect
+ > this stuff to work.
+
+Nothing I am mapping is random.
+
+> (b) you are allowed to map memory outside of that, but you get it as
+> strongly ordered memory.
+>
+> (b) means that the load/store exclusives, which userspace mutexes will
+> use on ARMv6+, will not work correctly.
+> (they're not supported to strongly ordered memory by the architecture.)
+
+I don't see this stated in the ARM Architecture Reference Manual. 
+Instead I see it saying that it is implementation dependent whether 
+LDREX and STREX work on strongly ordered memory (section A3.4.5).
+
+> In other words, don't put mutexes in memory you've remapped from /dev/mem.
+> In fact, as an application, you should not be mapping /dev/mem at all.
+
+It's certainly more standard to map the mutexes() out of something like 
+file backed mmap(), but that isn't as elegant for my application.
+
+To give a bit of background, what we have is some memory at a know 
+address which controls a peripheral.  Part of the peripheral addresses 
+are buffers and registers, but some is set aside for use by software. 
+Being able to map this whole section into userspace makes for really 
+fast fast-paths where the driver is basically outside the kernel.  Also 
+keeping driver state variables in the peripheral RAM means things can be 
+restarted if the Linux processes crash or die, or even if the whole of 
+Linux were to be restarted for some reason.  So it's more than 
+convenient to have the mutexes work there, though as an easier goal I'll 
+probably just get the futex calls to work for my applications.
+
+Hopefully this doesn't sound as mad as first assumed & thanks for your time.
+
+Kind Regards,
+
+Mike
