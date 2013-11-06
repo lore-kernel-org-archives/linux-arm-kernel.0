@@ -1,40 +1,40 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue,  5 Nov 2013 21:17:25 -0800
-Subject: [PATCH 1/2] regulator: pfuze100: allow misprogrammed ID
-Message-ID: <1383715045-15341-1-git-send-email-tharvey@gateworks.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 05 Nov 2013 22:06:20 -0800 (PST)
+Subject: [PATCH] ARM: shmobile: r8a7790: Correct typo in clocks
+In-Reply-To: <1383714098-28770-1-git-send-email-horms+renesas@verge.net.au>
+References: <1383714098-28770-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <87zjpiysh4.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-prior to week 08 of 2013 Freescale misprogrammed between 1 and 3% of
-PFUZE1000 parts with a ID=0x8 instead of the expected ID=0x0
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+Hi Simon
+
+> This is the r8a7790 SoC not the r8a77a4 SoC and
+> clocks are updated in r8a7790_clock_init.  not r8a73a4_clock_init.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/mach-shmobile/clock-r8a7790.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+> index 9fa39d1..6107571 100644
+> --- a/arch/arm/mach-shmobile/clock-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+> @@ -77,7 +77,7 @@ static struct sh_clk_ops followparent_clk_ops = {
+>  };
+>  
+>  static struct clk main_clk = {
+> -	/* .parent will be set r8a73a4_clock_init */
+> +	/* .parent will be set r8a7790_clock_init */
+>  	.ops	= &followparent_clk_ops,
+>  };
+
+Hahaha, Nice catch :)
+
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+Best regards
 ---
- drivers/regulator/pfuze100-regulator.c |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
-index ba67b2c..032df37 100644
---- a/drivers/regulator/pfuze100-regulator.c
-+++ b/drivers/regulator/pfuze100-regulator.c
-@@ -308,9 +308,15 @@ static int pfuze_identify(struct pfuze_chip *pfuze_chip)
- 	if (ret)
- 		return ret;
- 
--	if (value & 0x0f) {
--		dev_warn(pfuze_chip->dev, "Illegal ID: %x\n", value);
--		return -ENODEV;
-+	switch (value & 0x0f) {
-+		/* Freescale misprogrammed 1-3% of parts prior to week 8 of 2013 as ID=8 */
-+		case 0x8:
-+			dev_info(pfuze_chip->dev, "Assuming misprogrammed ID=0x8");
-+		case 0x0:
-+			break;
-+		default:
-+			dev_warn(pfuze_chip->dev, "Illegal ID: %x\n", value);
-+			return -ENODEV;
- 	}
- 
- 	ret = regmap_read(pfuze_chip->regmap, PFUZE100_REVID, &value);
--- 
-1.7.9.5
+Kuninori Morimoto
