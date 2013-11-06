@@ -1,38 +1,57 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:16:19 +0000
-Subject: [PATCH 07/13] ASoC: ux500_pcm: Extract MSP IDs from Device Tree
+Date: Wed,  6 Nov 2013 10:16:17 +0000
+Subject: [PATCH 05/13] ARM: ux500: Add ID properties to 'simply' differentiate
+ between MSPs
 In-Reply-To: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
 References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732985-18928-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732985-18928-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is required for indexing pre-defined channel configuration structures.
-
-Cc: alsa-devel at alsa-project.org
-Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/ux500/ux500_msp_i2s.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
-index 1ca8b08..0a99372 100644
---- a/sound/soc/ux500/ux500_msp_i2s.c
-+++ b/sound/soc/ux500/ux500_msp_i2s.c
-@@ -665,6 +665,13 @@ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
- 				sizeof(struct msp_i2s_platform_data), GFP_KERNEL);
- 			if (!platform_data)
- 				return -ENOMEM;
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 50ff5ab..63861ee 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -920,6 +920,8 @@
+ 			clocks = <&prcc_kclk 1 3>, <&prcc_pclk 1 3>;
+ 			clock-names = "msp", "apb_pclk";
+ 
++			id = <0>;
 +
-+			if (!of_property_read_u32(np, "id",
-+						  &platform_data->id)) {
-+				dev_err(&pdev->dev,
-+					"No 'id' property found in DT\n");
-+				return -EINVAL;
-+			}
- 		}
- 	} else
- 		if (!platform_data)
+ 			status = "disabled";
+ 		};
+ 
+@@ -935,6 +937,8 @@
+ 			clocks = <&prcc_kclk 1 4>, <&prcc_pclk 1 4>;
+ 			clock-names = "msp", "apb_pclk";
+ 
++			id = <1>;
++
+ 			status = "disabled";
+ 		};
+ 
+@@ -953,6 +957,8 @@
+ 			clocks = <&prcc_kclk 2 3>, <&prcc_pclk 2 5>;
+ 			clock-names = "msp", "apb_pclk";
+ 
++			id = <2>;
++
+ 			status = "disabled";
+ 		};
+ 
+@@ -968,6 +974,8 @@
+ 			clocks = <&prcc_kclk 1 10>, <&prcc_pclk 1 11>;
+ 			clock-names = "msp", "apb_pclk";
+ 
++			id = <3>;
++
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.8.1.2
