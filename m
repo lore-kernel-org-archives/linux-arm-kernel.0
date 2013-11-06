@@ -1,48 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  6 Nov 2013 17:32:47 +0100
-Subject: [PATCH trivial] arm64: constify hwcap_str
-Message-ID: <1383755567-17244-1-git-send-email-ard.biesheuvel@linaro.org>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Thu, 07 Nov 2013 00:32:54 +0800
+Subject: [PATCH v5 5/7] arm64, jump label: detect %c support for ARM64
+In-Reply-To: <20131030004927.GD25346@mudshark.cambridge.arm.com>
+References: <1382109602-27432-1-git-send-email-liuj97@gmail.com>
+ <1382109602-27432-6-git-send-email-liuj97@gmail.com>
+ <20131030004927.GD25346@mudshark.cambridge.arm.com>
+Message-ID: <527A6F36.7030300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turn hwcap_str from a 'writable array of pointers to const char[]'
-to a multidimensional const char[][].
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-
-This is something I noticed when looking at Steve Capper's hwcaps patch: really
-no point in having a writable array of 8-byte pointers in .data keeping track of
-these hwcap strings.
- 
- arch/arm64/kernel/setup.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 055cfb8..b6aa6b4 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -301,10 +301,10 @@ static int __init topology_init(void)
- }
- subsys_initcall(topology_init);
- 
--static const char *hwcap_str[] = {
-+static const char hwcap_str[][8] = {
- 	"fp",
- 	"asimd",
--	NULL
-+	""
- };
- 
- static int c_show(struct seq_file *m, void *v)
-@@ -328,7 +328,7 @@ static int c_show(struct seq_file *m, void *v)
- 	/* dump out the processor features */
- 	seq_puts(m, "Features\t: ");
- 
--	for (i = 0; hwcap_str[i]; i++)
-+	for (i = 0; hwcap_str[i][0]; i++)
- 		if (elf_hwcap & (1 << i))
- 			seq_printf(m, "%s ", hwcap_str[i]);
- 
--- 
-1.8.3.2
+On 10/30/2013 08:49 AM, Will Deacon wrote:
+> On Fri, Oct 18, 2013 at 04:19:59PM +0100, Jiang Liu wrote:
+>> From: Jiang Liu <jiang.liu@huawei.com>
+>>
+>> As commit a9468f30b5eac6 "ARM: 7333/2: jump label: detect %c
+>> support for ARM", this patch detects the same thing for ARM64
+>> because some ARM64 GCC versions have the same issue.
+>>
+>> Some versions of ARM64 GCC which do support asm goto, do not
+>> support the %c specifier. Since we need the %c to support jump
+>> labels on ARM64, detect that too in the asm goto detection script
+>> to avoid build errors with these versions.
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> The toolchain is being fixed upstream for this, but we should have the check
+> for older versions.
+> 
+> Will
+> 
+Thanks for review!
