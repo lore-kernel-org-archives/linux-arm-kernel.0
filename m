@@ -1,9 +1,9 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Wed,  6 Nov 2013 09:52:17 +0100
-Subject: [PATCHv12][ 6/8] ARM: dts: imx25.dtsi: label the iomuxc.
+Date: Wed,  6 Nov 2013 09:52:18 +0100
+Subject: [PATCHv12][ 7/8] ARM i.MX25: build in pinctrl support.
 In-Reply-To: <1383727939-4190-1-git-send-email-denis@eukrea.com>
 References: <1383727939-4190-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383727939-4190-6-git-send-email-denis@eukrea.com>
+Message-ID: <1383727939-4190-7-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,32 +15,29 @@ Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Cc: devicetree at vger.kernel.org
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
-ChangeLog v10->v11:
-- Only the label addition was kept in this commit.
-- The commit message was adapted accordingly.
-
 ChangeLog v9->v10:
-- New patch made from the remaining parts of the "ARM: dts: imx25.dtsi: Add
-  some pinmux pins." patch in the old serie.
+- Splitted to make the automatic enabling of the functionality separate.
 ---
- arch/arm/boot/dts/imx25.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index ca8a20f..1a86eab 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -175,7 +175,7 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 2b90984..4df7305 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -102,6 +102,8 @@ config SOC_IMX25
+ 	select COMMON_CLK
+ 	select CPU_ARM926T
+ 	select MXC_AVIC
++	select PINCTRL
++	select PINCTRL_IMX25
  
--			iomuxc at 43fac000{
-+			iomuxc: iomuxc at 43fac000 {
- 				compatible = "fsl,imx25-iomuxc";
- 				reg = <0x43fac000 0x4000>;
- 			};
+ config SOC_IMX27
+ 	bool
 -- 
 1.7.9.5
