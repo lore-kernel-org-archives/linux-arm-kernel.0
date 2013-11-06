@@ -1,131 +1,98 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Wed, 06 Nov 2013 11:27:15 +0100
-Subject: address translation for PCIe-to-localbus bridge
-Message-ID: <527A1983.6020603@keymile.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 06 Nov 2013 19:40:01 +0900
+Subject: [PATCH] ARM: shmobile: Initial r8a7791 and Koelsch multiplatform
+ support
+Message-ID: <20131106104001.6305.85689.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+From: Magnus Damm <damm@opensource.se>
 
-I am currently trying to describe an external device within a device 
-tree in a Kirkwood design.
-Such device is accessed through a local (parallel) bus. Since Kirkwood 
-does not provide such an interface, we added a custom FPGA (PCIe device) 
-which implements a PCIe-to-localbus bridge.
-So essentially BAR0 provides the configuration space for such a bridge, 
-and BAR1 provides a remapped area where accesses to the localbus can be 
-performed. BAR2 and BAR3 provide other functions.
+Add Koelsch and r8a7791 to CONFIG_SHMOBILE_MULTI. At this
+point CCF is not yet supported so you cannot run this code
+yet. For CCF support to happen several different components
+are needed, and this is one simple portion that moves us
+forward. Other patches need to build on top of this one.
 
-So with the appropriate reg encoding of the PCI device, the PCI driver 
-for the FPGA will automatically get an of_node.
+Koelsch board support exists in 3 flavors:
+1) SHMOBILE_MULTI, MACH_KOELSCH - board-koelsch-reference.c (CCF + DT)
+2) SHMOBILE, MACH_KOELSCH_REFERENCE - board-koelsch-reference.c (DT)
+3) SHMOBILE, MACH_KOELSCH - board-koelsch.c (legacy C code)
 
-My question is: is there any way I can describe this external device (I 
-believe as a child node of the PCI device), so that a call to 
-of_address_to_resource() (or equivalent) from its driver will 
-automatically translate a localbus address (e.g. 0x0000abcd) to whatever 
-address was assigned to BAR1 (in my case 0xe0000000 -> 0xe000abcd)?
+When CCF is done then 2) will be removed. When 1) includes same features
+as 3) then 3) will be removed.
 
-I looked up drivers/of/address.c and found of_pci_address_to_resource() 
-which seems to do what I want, but it seems that this must be explicitly 
-called by the client driver. This means that the driver for the external 
-device must be aware it's connected through PCI, which should in 
-principle not be necessary.
-What I'd like to do instead is describe the device at the appropriate 
-location within the device tree (using the appropriate "ranges" 
-description) so that its driver can figure out its address space 
-automatically (after the PCI device gets probed and enabled of course).
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-But I found no way to describe which BAR it should refer to, for instance.
+ Built against "renesas-devel-v3.12-rc7-20131101"
 
-Perhaps the "rrrrrrrr" part of phys.hi, using BAR0=0x10, BAR1=0x14, and 
-so on?
-Or else I should define a new instance of of bus (i.e. 
-"pci_lbus_bridge") and invent yet another address encoding syntax?
-Any hints?
+ arch/arm/boot/dts/Makefile                       |    3 ++-
+ arch/arm/mach-shmobile/Kconfig                   |    8 ++++++++
+ arch/arm/mach-shmobile/Makefile                  |    1 +
+ arch/arm/mach-shmobile/board-koelsch-reference.c |    5 +++++
+ 4 files changed, 16 insertions(+), 1 deletion(-)
 
-Thank you su much in advance!
-Gerlando
-
-P.S. Here's the skeleton of the this part of the tree (up to the bridge).
-
-pcie-controller {
-	compatible = "marvell,kirkwood-pcie";
-	status = "okay";
-	device_type = "pci";
-
-	#address-cells = <3>;
-	#size-cells = <2>;
-	bus-range = <0x00 0xff>;
-
-	ranges = <0x82000000 0 0x00040000 0x00040000 0 0x00002000   /* Port 0.0 
-registers */
-		  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /* 
-non-prefetchable memory */
-	          0x81000000 0 0          0xe8000000 0 0x00100000>; /* 
-downstream I/O */
-
-			/* PCI BUS 1 */
-			pcie at 1,0 {
-				device_type = "pci";
-				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
-				reg = <0x0800 0 0 0 0>;
-				#address-cells = <3>;
-				#size-cells = <2>;
-				...
-
-				/* FPGA, device 0 */
-				km_fpga: pcie at 0,0 {
-					/* Only the first cell matters,
-					npt000ss bbbbbbbb dddddfff rrrrrrrr
-					where b is 8-bit bus, d is 5-bit device, f is 3-bit function */
-					reg = <0x010000 0 0 0 0>;
-					compatible = "km_fpga", "pci10ee,0009";
-					...
-				};
-			};
-		};
-
-	};
-};
-
-And this is what I get at startup:
-
-mvebu-pcie pcie-controller.1: PCIe0.0: link up
-mvebu-pcie pcie-controller.1: PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
-pci_bus 0000:00: root bus resource [mem 0xe0000000-0xebffffff]
-pci_bus 0000:00: root bus resource [bus 00-ff]
-pci 0000:00:01.0: [11ab:7846] type 01 class 0x060400
-PCI: bus0: Fast back to back transfers disabled
-pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:01:00.0: [10ee:0009] type 00 class 0x050000
-pci 0000:01:00.0: reg 10: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: reg 14: [mem 0x00000000-0x07ffffff]
-pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: reg 1c: [mem 0x00000000-0x00000fff]
-pci 0000:01:00.0: supports D1 D2
-pci 0000:01:00.0: PME# supported from D0 D1 D2 D3hot
-PCI: bus1: Fast back to back transfers disabled
-pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-pci 0000:00:01.0: BAR 8: assigned [mem 0xe0000000-0xebffffff]
-pci 0000:01:00.0: BAR 1: assigned [mem 0xe0000000-0xe7ffffff]
-pci 0000:01:00.0: BAR 0: assigned [mem 0xe8000000-0xe8000fff]
-pci 0000:01:00.0: BAR 2: assigned [mem 0xe8001000-0xe8001fff]
-pci 0000:01:00.0: BAR 3: assigned [mem 0xe8002000-0xe8002fff]
-pci 0000:00:01.0: PCI bridge to [bus 01]
-pci 0000:00:01.0:   bridge window [mem 0xe0000000-0xebffffff]
-PCI: enabling device 0000:00:01.0 (0140 -> 0143)
-
-What I'd like to have in the device tree is something like:
-
-&km_fpga {
-	...
-	device_type = "pci"  /* or pci_lbus_bridge? */
-	#address-cells = <2>;/* BAR + local bus address */
-	#size-cells = <1>;   /* 32-bit addressing is more than enough */
-	ranges = <?????>;    /* ???? */
-	slave at 0,0 {
-		compatible = "keymile,slave";
-		reg = <1 0x000 0x200>; /* Use address space 0x0-0x200 from BAR 1 */
-	}
-}
+--- 0001/arch/arm/boot/dts/Makefile
++++ work/arch/arm/boot/dts/Makefile	2013-11-06 19:06:45.000000000 +0900
+@@ -214,7 +214,8 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm
+ 	r8a73a4-ape6evm.dtb \
+ 	r8a73a4-ape6evm-reference.dtb \
+ 	sh7372-mackerel.dtb
+-dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb
++dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
++	r8a7791-koelsch-reference.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_cyclone5.dtb \
+ 	socfpga_vt.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+--- 0008/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-11-06 19:07:10.000000000 +0900
+@@ -20,8 +20,16 @@ comment "SH-Mobile System Type"
+ config ARCH_EMEV2
+ 	bool "Emma Mobile EV2"
+ 
++config ARCH_R8A7791
++	bool "R-Car M2 (R8A77910)"
++	select RENESAS_IRQC
++
+ comment "SH-Mobile Board Type"
+ 
++config MACH_KOELSCH
++	bool "Koelsch board"
++	depends on ARCH_R8A7791
++
+ config MACH_KZM9D
+ 	bool "KZM9D board"
+ 	depends on ARCH_EMEV2
+--- 0004/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2013-11-06 19:07:22.000000000 +0900
+@@ -56,6 +56,7 @@ obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779
+ 
+ # Board objects
+ ifdef CONFIG_ARCH_SHMOBILE_MULTI
++obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch-reference.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d-reference.o
+ else
+ obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
+--- 0001/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ work/arch/arm/mach-shmobile/board-koelsch-reference.c	2013-11-06 19:09:52.000000000 +0900
+@@ -19,6 +19,7 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+ #include <mach/rcar-gen2.h>
+@@ -27,7 +28,11 @@
+ 
+ static void __init koelsch_add_standard_devices(void)
+ {
++#ifdef CONFIG_COMMON_CLK
++	of_clk_init(NULL);
++#else
+ 	r8a7791_clock_init();
++#endif
+ 	r8a7791_add_dt_devices();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
