@@ -1,40 +1,151 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 05 Nov 2013 22:06:20 -0800 (PST)
-Subject: [PATCH] ARM: shmobile: r8a7790: Correct typo in clocks
-In-Reply-To: <1383714098-28770-1-git-send-email-horms+renesas@verge.net.au>
-References: <1383714098-28770-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <87zjpiysh4.wl%kuninori.morimoto.gx@renesas.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 6 Nov 2013 14:06:41 +0800
+Subject: [PATCH v2 2/2] ARM: at91: sama5d3/dt: add sama5d36ek dts files
+In-Reply-To: <5279CCAB.9000303@gmail.com>
+References: <1383705071-7332-1-git-send-email-josh.wu@atmel.com>
+ <1383705071-7332-3-git-send-email-josh.wu@atmel.com>
+ <5279CCAB.9000303@gmail.com>
+Message-ID: <5279DC71.6020401@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Dinh
 
-Hi Simon
+On 11/6/2013 12:59 PM, Dinh Nguyen wrote:
+> On 11/5/13 8:31 PM, Josh Wu wrote:
+>> Add .dts and .dtsi file to support sama5d36ek board.
+>> Also update the the comments for sama5d36 in sama5d3.dtsi.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>> v1 --> v2:
+>>    add a new sama5d36.dtsi file to include the peripheral dtsi file.
+>>
+>>   arch/arm/boot/dts/Makefile       |    1 +
+>>   arch/arm/boot/dts/sama5d3.dtsi   |    2 +-
+>>   arch/arm/boot/dts/sama5d36.dtsi  |   19 ++++++++++++++
+>>   arch/arm/boot/dts/sama5d36ek.dts |   53 ++++++++++++++++++++++++++++++++++++++
+>>   4 files changed, 75 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm/boot/dts/sama5d36.dtsi
+>>   create mode 100644 arch/arm/boot/dts/sama5d36ek.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index e95af3f..ddbb049 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -40,6 +40,7 @@ dtb-$(CONFIG_ARCH_AT91)	+= sama5d31ek.dtb
+>>   dtb-$(CONFIG_ARCH_AT91)	+= sama5d33ek.dtb
+>>   dtb-$(CONFIG_ARCH_AT91)	+= sama5d34ek.dtb
+>>   dtb-$(CONFIG_ARCH_AT91)	+= sama5d35ek.dtb
+>> +dtb-$(CONFIG_ARCH_AT91)	+= sama5d36ek.dtb
+> Just curious...but just wondering why there are a separate
+> CONFIG_ARCH_AT91 for each board?
+> Why can't there be just a single CONFIG_ARCH_AT91 for all the boards?
 
-> This is the r8a7790 SoC not the r8a77a4 SoC and
-> clocks are updated in r8a7790_clock_init.  not r8a73a4_clock_init.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/clock-r8a7790.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-> index 9fa39d1..6107571 100644
-> --- a/arch/arm/mach-shmobile/clock-r8a7790.c
-> +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-> @@ -77,7 +77,7 @@ static struct sh_clk_ops followparent_clk_ops = {
->  };
->  
->  static struct clk main_clk = {
-> -	/* .parent will be set r8a73a4_clock_init */
-> +	/* .parent will be set r8a7790_clock_init */
->  	.ops	= &followparent_clk_ops,
->  };
+right. that seems consistent with other boards.
+So in v3 I will add one more patch to do this. Thanks.
 
-Hahaha, Nice catch :)
+Best Regards,
+Josh Wu
 
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-Best regards
----
-Kuninori Morimoto
+>
+> Dinh
+>>   
+>>   dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+>>   dtb-$(CONFIG_ARCH_BCM) += bcm11351-brt.dtb \
+>> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+>> index 5cdaba4..23b7669 100644
+>> --- a/arch/arm/boot/dts/sama5d3.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+>> @@ -1,6 +1,6 @@
+>>   /*
+>>    * sama5d3.dtsi - Device Tree Include file for SAMA5D3 family SoC
+>> - *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35 SoC
+>> + *                applies to SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35, SAMA5D36 SoC
+>>    *
+>>    *  Copyright (C) 2013 Atmel,
+>>    *                2013 Ludovic Desroches <ludovic.desroches@atmel.com>
+>> diff --git a/arch/arm/boot/dts/sama5d36.dtsi b/arch/arm/boot/dts/sama5d36.dtsi
+>> new file mode 100644
+>> index 0000000..ec61c08
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sama5d36.dtsi
+>> @@ -0,0 +1,19 @@
+>> +/*
+>> + * sama5d36.dtsi - Device Tree Include file for SAMA5D36 SoC
+>> + *
+>> + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
+>> + *
+>> + * Licensed under GPLv2 or later.
+>> + */
+>> +#include "sama5d3.dtsi"
+>> +#include "sama5d3_can.dtsi"
+>> +#include "sama5d3_emac.dtsi"
+>> +#include "sama5d3_gmac.dtsi"
+>> +#include "sama5d3_lcd.dtsi"
+>> +#include "sama5d3_mci2.dtsi"
+>> +#include "sama5d3_tcb1.dtsi"
+>> +#include "sama5d3_uart.dtsi"
+>> +
+>> +/ {
+>> +	compatible = "atmel,samad36", "atmel,sama5d3", "atmel,sama5";
+>> +};
+>> diff --git a/arch/arm/boot/dts/sama5d36ek.dts b/arch/arm/boot/dts/sama5d36ek.dts
+>> new file mode 100644
+>> index 0000000..59576c6
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sama5d36ek.dts
+>> @@ -0,0 +1,53 @@
+>> +/*
+>> + * sama5d36ek.dts - Device Tree file for SAMA5D36-EK board
+>> + *
+>> + *  Copyright (C) 2013 Atmel,
+>> + *                2013 Josh Wu <josh.wu@atmel.com>
+>> + *
+>> + * Licensed under GPLv2 or later.
+>> + */
+>> +/dts-v1/;
+>> +#include "sama5d36.dtsi"
+>> +#include "sama5d3xmb.dtsi"
+>> +#include "sama5d3xdm.dtsi"
+>> +
+>> +/ {
+>> +	model = "Atmel SAMA5D36-EK";
+>> +	compatible = "atmel,sama5d36ek", "atmel,sama5d3xmb", "atmel,sama5d3xcm", "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
+>> +
+>> +	ahb {
+>> +		apb {
+>> +			spi0: spi at f0004000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			ssc0: ssc at f0008000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			can0: can at f000c000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			i2c0: i2c at f0014000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			i2c1: i2c at f0018000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			macb0: ethernet at f0028000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			macb1: ethernet at f802c000 {
+>> +				status = "okay";
+>> +			};
+>> +		};
+>> +	};
+>> +
+>> +	sound {
+>> +		status = "okay";
+>> +	};
+>> +};
