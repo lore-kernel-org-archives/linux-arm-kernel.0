@@ -1,32 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Nov 2013 12:55:51 +0100
-Subject: [PATCH 06/13] ASoC: ux500_pcm: Extend ux500 MSP binding for
- enumeration
-In-Reply-To: <20131106104658.GE11602@sirena.org.uk>
-References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
- <1383732985-18928-7-git-send-email-lee.jones@linaro.org>
- <20131106104658.GE11602@sirena.org.uk>
-Message-ID: <CACRpkdZgi9Egvm585Y9tJpmj0YX-oJBDg-C7pCu91Pf5ALMGLg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 06 Nov 2013 12:57:54 +0100
+Subject: [PATCH -v2] fbdev: sh_mobile_meram: Fix defined but not used
+ compiler warnings
+In-Reply-To: <1383728247-19294-1-git-send-email-geert@linux-m68k.org>
+References: <1383728247-19294-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <5204468.CmggZzW3kO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 6, 2013 at 11:46 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Nov 06, 2013 at 10:16:18AM +0000, Lee Jones wrote:
+Hi Geert,
 
->> + - id               : MSP ID - used during component registration
->
-> I have no idea what this means or how one would pick the number?  It
-> looks like something purely internal to the driver...
+Thank you for the patch.
 
-Actually it's quite common when we have several HW blocks of the
-same thing to add something like an id. For example for different
-GPIO banks.
+On Wednesday 06 November 2013 09:57:27 Geert Uytterhoeven wrote:
+> If both CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME are not set:
+> 
+> drivers/video/sh_mobile_meram.c:573: warning: ?sh_mobile_meram_suspend?
+> defined but not used drivers/video/sh_mobile_meram.c:597: warning:
+> ?sh_mobile_meram_resume? defined but not used
+> 
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-But in this case I guess it may make more sense to flag one MSP
-for RX and one for TX or something?
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-There are also two more such MSPs for streaming audio to the
-Bluetooth audio portions.
+and applied to my tree.
 
-Yours,
-Linus Walleij
+> ---
+> v2: Both functions are used if CONFIG_PM_SLEEP || CONFIG_PM_RUNTIME,
+>     as pointed out by Laurent
+> 
+>  drivers/video/sh_mobile_meram.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/video/sh_mobile_meram.c
+> b/drivers/video/sh_mobile_meram.c index e0f098562a74..a297de5cc859 100644
+> --- a/drivers/video/sh_mobile_meram.c
+> +++ b/drivers/video/sh_mobile_meram.c
+> @@ -569,6 +569,7 @@ EXPORT_SYMBOL_GPL(sh_mobile_meram_cache_update);
+>   * Power management
+>   */
+> 
+> +#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_RUNTIME)
+>  static int sh_mobile_meram_suspend(struct device *dev)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+> @@ -611,6 +612,7 @@ static int sh_mobile_meram_resume(struct device *dev)
+>  		meram_write_reg(priv->base, common_regs[i], priv->regs[i]);
+>  	return 0;
+>  }
+> +#endif /* CONFIG_PM_SLEEP || CONFIG_PM_RUNTIME */
+> 
+>  static UNIVERSAL_DEV_PM_OPS(sh_mobile_meram_dev_pm_ops,
+>  			    sh_mobile_meram_suspend,
+-- 
+Regards,
+
+Laurent Pinchart
