@@ -1,29 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Nov 2013 12:36:03 +0100
-Subject: [PATCH v4 1/6] gpio: davinci: Fixed a check for unbanked gpio
-In-Reply-To: <CA+V-a8tZTm9bh+arQ+uFyTVHxfdf07bWaM_Sdqo08TO=UCMMUg@mail.gmail.com>
-References: <1383406775-14902-1-git-send-email-prabhakar.csenng@gmail.com>
- <1383406775-14902-2-git-send-email-prabhakar.csenng@gmail.com>
- <CACRpkdZ7pwGQnK0NN4tybLUNdMxu5WVaGX8Dqu+kMgVBuyF16w@mail.gmail.com>
- <CA+V-a8tE3bxsHMSh2i3Xeq=kJUjmxTjcU25Kuka5e_iXeB--pQ@mail.gmail.com>
- <CACRpkdbLTopHMaog7FDW7O4-yLyv+mmnvgkNuXgeQR-pEtbz6Q@mail.gmail.com>
- <CA+V-a8tZTm9bh+arQ+uFyTVHxfdf07bWaM_Sdqo08TO=UCMMUg@mail.gmail.com>
-Message-ID: <CACRpkdYa4aKh+-h2CVJ6H2xZihcFzkh2zqjRbLRrw273t=SVrQ@mail.gmail.com>
+Date: Wed, 6 Nov 2013 12:40:17 +0100
+Subject: [PATCH 01/13] dma: ste_dma40: Expand DT binding to accept
+ 'high-priority channel' flag
+In-Reply-To: <1383732985-18928-2-git-send-email-lee.jones@linaro.org>
+References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
+ <1383732985-18928-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaVPy8yuhYKohL7ewnmT5y7QrQ7ig2qf4t49YZ-+noDvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 6, 2013 at 11:15 AM, Prabhakar Lad
-<prabhakar.csengg@gmail.com> wrote:
-> On Wed, Nov 6, 2013 at 3:26 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Wed, Nov 6, 2013 at 11:16 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
->> This does not apply to my gpio tree devel branch and
->> not even on the mainline kernel.
->>
-> Looks like this needs to go via ARM tree as the earlier
-> patches have  gone via ARM tree itself [1].
-> If you can ACK it Sekhar can get it in via ARM tree.
+> --- a/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> +++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> @@ -50,6 +50,9 @@ Each dmas request consists of 4 cells:
+>          0x00000008: Use fixed channel:
+>                  Use automatic channel selection when unset
+>                  Use DMA request line number when set
+> +        0x00000010: Set channel as high priority:
+> +                Normal priority when unset
+> +                High priority when set
 
-Aha OK.
+We should probably switch these magic numbers to #defines
+but it's another subject so
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
