@@ -1,61 +1,41 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 6 Nov 2013 13:26:52 -0800
-Subject: [libseccomp-discuss] ARM audit, seccomp,
- etc are broken wrt OABI syscalls
-In-Reply-To: <CABqD9hbaZhAztYF_H8RTuTdhh+J4WHaGpdRLR3EqHbtH2OLU+Q@mail.gmail.com>
-References: <CALCETrUt7Ojh5Yy4KYgBPj_wBr=fzKKJ=OOgGP9BtXoKrr9QnA@mail.gmail.com>
- <1383751951.28218.64.camel@flatline.rdu.redhat.com>
- <20131106155104.GZ16735@n2100.arm.linux.org.uk>
- <CABqD9hbaZhAztYF_H8RTuTdhh+J4WHaGpdRLR3EqHbtH2OLU+Q@mail.gmail.com>
-Message-ID: <CAGXu5jLr3G+n3SRrpJOZbHsdY76dN34TNP0arL2_FyBg7c2EAg@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 06 Nov 2013 22:32:57 +0100
+Subject: [PATCH 0/2] ARM: mvebu: fix DT def. of PCIe units for mv78230 and
+ mv78260
+In-Reply-To: <20131106205556.GH8308@titan.lakedaemon.net> (Jason Cooper's
+ message of "Wed, 6 Nov 2013 15:55:56 -0500")
+References: <cover.1383681717.git.arno@natisbad.org>
+ <87y551bdnx.fsf@natisbad.org> <20131106192233.3599d256@skate>
+ <20131106183724.GB25879@obsidianresearch.com>
+ <20131106205556.GH8308@titan.lakedaemon.net>
+Message-ID: <87ob5xqkqe.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 6, 2013 at 1:20 PM, Will Drewry <wad@chromium.org> wrote:
-> On Wed, Nov 6, 2013 at 9:51 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Wed, Nov 06, 2013 at 10:32:31AM -0500, Eric Paris wrote:
->>> On Tue, 2013-11-05 at 14:36 -0800, Andy Lutomirski wrote:
->>> > 1. Set a different audit arch for OABI syscalls (e.g.
->>> > AUDIT_ARCH_ARMOABI).  That is, treat OABI syscall entries the same way
->>> > that x86_64 treats int 80.
->>>
->>> As the audit maintainer, I like #1.  It might break ABI, but the ABI is
->>> flat wrong now and not maintainable...
->>
->> If you read the whole thread, you will see that this corner case is just
->> not worth the effort to support.  Audit may as well be disabled by
->> kernel config if any OABI support is enabled.
+Hi Jason,
+
+Jason Cooper <jason@lakedaemon.net> writes:
+
+> On Wed, Nov 06, 2013 at 11:37:24AM -0700, Jason Gunthorpe wrote:
+> ...
+>> This PCI stuff would be 100% more readable with some macros ..
+>> 
+>> #define PCI_REG_BDF(bus,device,function) (....)
+>> #define PCI_MEM_BAR_BDF(bus,device,function,bar) \
+>>    (0x82000000 | PCI_REG_BDF(bus,device,function) + bar*XX) 0)
+>> 
+>> So that:
+>>  reg = <PCI_REG_BDF(0,1,0) 0 0>
+>>  assigned-addresses = <PCI_MEM_BAR_BDF(0,1,0,0)  0x40000  0 0x2000>
 >
-> This might be the best move for seccomp too (as Kees suggested).  I'd
-> love to have audit arch visibility, but it's not clear that it's worth
-> any sort of larger changes ...
+> Do I smell a patch brewing?  :)
 >
-> ... like adding a task_thread_info.compat flag that bubbles up to
-> syscall_get_arch(), or if we assume consumers of syscall_get_nr() are
-> broken today (I haven't checked), then it would be possible to at
-> least re-add the 0x900000 bits, if compat, before handing back the
-> system call number but leave the audit arch pieces alone.
+> Arnaud, would you like to take a crack at it?
 
-How does this look, for the seccomp part?
+My understanding of the topic being in the end limited to what I learnt
+from recent discussions, I'll pass on that one but I'll be happy to test
+on a mv78230.
 
--Kees
+Cheers,
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index af2cc6eabcc7..3610c2d9910f 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -331,7 +331,7 @@ config HAVE_ARCH_SECCOMP_FILTER
-
- config SECCOMP_FILTER
-        def_bool y
--       depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET
-+       depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET && !OABI_COMPAT
-        help
-          Enable tasks to build secure computing environments defined
-          in terms of Berkeley Packet Filter programs which implement
-
-
--- 
-Kees Cook
-Chrome OS Security
+a+
