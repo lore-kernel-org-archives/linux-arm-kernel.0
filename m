@@ -1,65 +1,57 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 06 Nov 2013 08:46:37 +0100
-Subject: [PATCH 6/6] arm: zynq: headsmp: Move .glbl out of actual code
-In-Reply-To: <1383235819-2552-7-git-send-email-soren.brinkmann@xilinx.com>
-References: <1383235819-2552-1-git-send-email-soren.brinkmann@xilinx.com>
- <1383235819-2552-7-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <5279F3DD.9040605@monstr.eu>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 6 Nov 2013 15:35:48 +0800
+Subject: [PATCH v3 08/11] usb: phy-mxs: Enable IC fixes for related SoCs
+In-Reply-To: <CAHXqBFKTTY8vxs9BzK1xQAa7HeRLSBucsxb4wkLejLWmCnckaA@mail.gmail.com>
+References: <1383616183-10511-1-git-send-email-peter.chen@freescale.com>
+ <1383616183-10511-9-git-send-email-peter.chen@freescale.com>
+ <CAHXqBFKTTY8vxs9BzK1xQAa7HeRLSBucsxb4wkLejLWmCnckaA@mail.gmail.com>
+Message-ID: <20131106073548.GD16332@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 05:10 PM, Soren Brinkmann wrote:
-> Move the .glbl lines exporting symbols to the top of the file and out of
-> the actual code, in order to make the code more readable.
+On Tue, Nov 05, 2013 at 10:02:35PM +0100, Micha? Miros?aw wrote:
+> 2013/11/5 Peter Chen <peter.chen@freescale.com>
+> >
+> > Some PHY bugs are fixed by IC logic, but these bits are not
+> > enabled by default, so we enable them at driver.
+> >
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/phy/phy-mxs-usb.c |   32 ++++++++++++++++++++++++++++++--
+> >  1 files changed, 30 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> > index c794011..b7e1744 100644
+> > --- a/drivers/usb/phy/phy-mxs-usb.c
+> > +++ b/drivers/usb/phy/phy-mxs-usb.c
+> > @@ -31,6 +31,10 @@
+> >  #define HW_USBPHY_CTRL_SET                     0x34
+> >  #define HW_USBPHY_CTRL_CLR                     0x38
+> >
+> > +#define HW_USBPHY_IP                           0x90
+> > +#define HW_USBPHY_IP_SET                       0x94
+> > +#define HW_USBPHY_IP_CLR                       0x98
+> > +
+> >  #define BM_USBPHY_CTRL_SFTRST                  BIT(31)
+> >  #define BM_USBPHY_CTRL_CLKGATE                 BIT(30)
+> >  #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS       BIT(26)
+> > @@ -60,6 +64,18 @@
+> >   */
+> >  #define MXS_PHY_SENDING_SOF_TOO_FAST           BIT(2)
+> >
+> > +/*
+> > + * IC fix for MXS_PHY_ABNORAML_IN_SUSPEND, bit 17 is the effective bit
+> > + * in HW_USBPHY_IP.
+> > + */
+> > +#define MXS_PHY_FIX_ABNORAML_IN_SUSPEND                BIT(17)
+> [...]
 > 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  arch/arm/mach-zynq/headsmp.S | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> s/ABNORAML/ABNORMAL/ ?
 > 
-> diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
-> index 57a32869f0aa..12d1b40c7d78 100644
-> --- a/arch/arm/mach-zynq/headsmp.S
-> +++ b/arch/arm/mach-zynq/headsmp.S
-> @@ -9,14 +9,15 @@
->  #include <linux/linkage.h>
->  #include <linux/init.h>
->  
-> +.globl zynq_secondary_trampoline_jump
-> +.globl zynq_secondary_trampoline_end
-> +
->  ENTRY(zynq_secondary_trampoline)
->  	ldr	r0, [pc]
->  	bx	r0
-> -.globl zynq_secondary_trampoline_jump
->  zynq_secondary_trampoline_jump:
->  	/* Space for jumping address */
->  	.word	/* cpu 1 */
-> -.globl zynq_secondary_trampoline_end
->  zynq_secondary_trampoline_end:
->  ENDPROC(zynq_secondary_trampoline)
->  
 
-I don't want this one.
-I have applied 1-5 to zynq/cleanup branch.
-
-Thanks,
-Michal
-
-
+thanks.
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131106/b15b0ad0/attachment.sig>
+Best Regards,
+Peter Chen
