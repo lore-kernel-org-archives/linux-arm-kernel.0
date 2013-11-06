@@ -1,84 +1,60 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed,  6 Nov 2013 07:02:24 -0600
-Subject: [PATCH] arm64: enable EDAC on arm64
-Message-ID: <1383742944-28059-1-git-send-email-robherring2@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed,  6 Nov 2013 14:05:17 +0100
+Subject: [PATCH] arm,arm64: Conditionalize bio_vec usage
+Message-ID: <1383743117-4138-1-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Commit 3d1975b57097 (arm,arm64: do not always merge bio_vec if we are
+running on Xen) unconditionally added code using the bio_vec typedefs
+which causes build errors on configurations where CONFIG_BLOCK is
+disabled.
 
-Implement atomic_scrub and enable EDAC for arm64.
+Add #ifdef CONFIG_BLOCK protection to fix this.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/Kconfig            |  1 +
- arch/arm64/include/asm/edac.h | 44 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+)
- create mode 100644 arch/arm64/include/asm/edac.h
+ arch/arm/include/asm/io.h   | 2 ++
+ arch/arm64/include/asm/io.h | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7d70404..611f5f6 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -11,6 +11,7 @@ config ARM64
- 	select BUILDTIME_EXTABLE_SORT
- 	select CLONE_BACKWARDS
- 	select COMMON_CLK
-+	select EDAC_SUPPORT
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_IOMAP
- 	select GENERIC_IRQ_PROBE
-diff --git a/arch/arm64/include/asm/edac.h b/arch/arm64/include/asm/edac.h
-new file mode 100644
-index 0000000..ad81a7a
---- /dev/null
-+++ b/arch/arm64/include/asm/edac.h
-@@ -0,0 +1,44 @@
-+/*
-+ * Copyright 2013 Calxeda, Inc.
-+ * Based on PPC version Copyright 2007 MontaVista Software, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef ASM_EDAC_H
-+#define ASM_EDAC_H
-+/*
-+ * ECC atomic, DMA, SMP and interrupt safe scrub function.
-+ * Implements the per arch atomic_scrub() that EDAC use for software
-+ * ECC scrubbing.  It reads memory and then writes back the original
-+ * value, allowing the hardware to detect and correct memory errors.
-+ */
-+static inline void atomic_scrub(void *va, u32 size)
-+{
-+	unsigned int *virt_addr = va;
-+	unsigned int temp, temp2;
-+	unsigned int i;
-+
-+	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
-+		/*
-+		 * No need to check for store failure, another write means
-+		 * the scrubbing has effectively already been done for us.
-+		 */
-+		asm volatile("\n"
-+			"	ldxr	%0, %2\n"
-+			"	stxr	%w1, %0, %2\n"
-+			: "=&r" (temp), "=&r" (temp2), "+Q" (virt_addr)
-+			: : "cc");
-+	}
-+}
-+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index c45effc..68ef696 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -367,6 +367,7 @@ struct pci_dev;
+ 
+ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+ 
++#ifdef CONFIG_BLOCK
+ /*
+  * can the hardware map this into one segment or not, given no other
+  * constraints.
+@@ -379,6 +380,7 @@ extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+ #define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+ 	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+ 	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
 +#endif
+ 
+ #ifdef CONFIG_MMU
+ #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 5a482fc..940dbe2 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -266,11 +266,13 @@ extern int devmem_is_allowed(unsigned long pfn);
+  */
+ #define xlate_dev_kmem_ptr(p)	p
+ 
++#ifdef CONFIG_BLOCK
+ extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+ 				      const struct bio_vec *vec2);
+ #define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+ 	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+ 	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
++#endif
+ 
+ #endif	/* __KERNEL__ */
+ #endif	/* __ASM_IO_H */
 -- 
-1.8.1.2
+1.8.4
