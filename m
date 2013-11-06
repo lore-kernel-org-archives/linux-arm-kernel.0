@@ -1,92 +1,63 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:16:15 +0000
-Subject: [PATCH 03/13] ARM: ux500: Don't use enums for MSP IDs - for easy DT
- conversion
+Date: Wed,  6 Nov 2013 10:16:16 +0000
+Subject: [PATCH 04/13] ARM: ux500: Add DMA config bindings for MSP devices
 In-Reply-To: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
 References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732985-18928-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732985-18928-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-audio.c     | 8 ++++----
- include/linux/platform_data/asoc-ux500-msp.h | 9 +--------
- sound/soc/ux500/ux500_msp_i2s.h              | 2 +-
- 3 files changed, 6 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
-index d528059..c5eeee3 100644
---- a/arch/arm/mach-ux500/board-mop500-audio.c
-+++ b/arch/arm/mach-ux500/board-mop500-audio.c
-@@ -29,7 +29,7 @@ static struct stedma40_chan_cfg msp0_dma_tx = {
- };
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 7da99fe..50ff5ab 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -913,6 +913,10 @@
+ 			interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
+ 			v-ape-supply = <&db8500_vape_reg>;
  
- struct msp_i2s_platform_data msp0_platform_data = {
--	.id = MSP_I2S_0,
-+	.id = 0,
- 	.msp_i2s_dma_rx = &msp0_dma_rx,
- 	.msp_i2s_dma_tx = &msp0_dma_tx,
- };
-@@ -47,7 +47,7 @@ static struct stedma40_chan_cfg msp1_dma_tx = {
- };
++			dmas = <&dma 31 0 0x12>, /* Logical - DevToMem - HighPrio */
++			       <&dma 31 0 0x10>; /* Logical - MemToDev - HighPrio */
++			dma-names = "rx", "tx";
++
+ 			clocks = <&prcc_kclk 1 3>, <&prcc_pclk 1 3>;
+ 			clock-names = "msp", "apb_pclk";
  
- struct msp_i2s_platform_data msp1_platform_data = {
--	.id = MSP_I2S_1,
-+	.id = 1,
- 	.msp_i2s_dma_rx = NULL,
- 	.msp_i2s_dma_tx = &msp1_dma_tx,
- };
-@@ -67,13 +67,13 @@ static struct stedma40_chan_cfg msp2_dma_tx = {
- };
+@@ -925,6 +929,9 @@
+ 			interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
+ 			v-ape-supply = <&db8500_vape_reg>;
  
- struct msp_i2s_platform_data msp2_platform_data = {
--	.id = MSP_I2S_2,
-+	.id = 2,
- 	.msp_i2s_dma_rx = &msp2_dma_rx,
- 	.msp_i2s_dma_tx = &msp2_dma_tx,
- };
++			dmas = <&dma 30 0 0x10>; /* Logical - MemToDev - HighPrio */
++			dma-names = "tx";
++
+ 			clocks = <&prcc_kclk 1 4>, <&prcc_pclk 1 4>;
+ 			clock-names = "msp", "apb_pclk";
  
- struct msp_i2s_platform_data msp3_platform_data = {
--	.id		= MSP_I2S_3,
-+	.id		= 3,
- 	.msp_i2s_dma_rx	= &msp1_dma_rx,
- 	.msp_i2s_dma_tx	= NULL,
- };
-diff --git a/include/linux/platform_data/asoc-ux500-msp.h b/include/linux/platform_data/asoc-ux500-msp.h
-index 9991aea..2f34bb9 100644
---- a/include/linux/platform_data/asoc-ux500-msp.h
-+++ b/include/linux/platform_data/asoc-ux500-msp.h
-@@ -10,16 +10,9 @@
+@@ -938,6 +945,11 @@
+ 			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
+ 			v-ape-supply = <&db8500_vape_reg>;
  
- #include <linux/platform_data/dma-ste-dma40.h>
++			dmas = <&dma 14 0 0x12>, /* Logical  - DevToMem - HighPrio */
++			       <&dma 14 1 0x19>; /* Physical Chan 1 - MemToDev
++                                                    HighPrio - Fixed */
++			dma-names = "rx", "tx";
++
+ 			clocks = <&prcc_kclk 2 3>, <&prcc_pclk 2 5>;
+ 			clock-names = "msp", "apb_pclk";
  
--enum msp_i2s_id {
--	MSP_I2S_0 = 0,
--	MSP_I2S_1,
--	MSP_I2S_2,
--	MSP_I2S_3,
--};
--
- /* Platform data structure for a MSP I2S-device */
- struct msp_i2s_platform_data {
--	enum msp_i2s_id id;
-+	int id;
- 	struct stedma40_chan_cfg *msp_i2s_dma_rx;
- 	struct stedma40_chan_cfg *msp_i2s_dma_tx;
- };
-diff --git a/sound/soc/ux500/ux500_msp_i2s.h b/sound/soc/ux500/ux500_msp_i2s.h
-index 258d0bc..875de0f 100644
---- a/sound/soc/ux500/ux500_msp_i2s.h
-+++ b/sound/soc/ux500/ux500_msp_i2s.h
-@@ -475,7 +475,7 @@ struct ux500_msp_dma_params {
- };
+@@ -950,6 +962,9 @@
+ 			interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
+ 			v-ape-supply = <&db8500_vape_reg>;
  
- struct ux500_msp {
--	enum msp_i2s_id id;
-+	int id;
- 	void __iomem *registers;
- 	struct device *dev;
- 	struct ux500_msp_dma_params playback_dma_data;
++			dmas = <&dma 30 0 0x12>; /* Logical - DevToMem - HighPrio */
++			dma-names = "rx";
++
+ 			clocks = <&prcc_kclk 1 10>, <&prcc_pclk 1 11>;
+ 			clock-names = "msp", "apb_pclk";
+ 
 -- 
 1.8.1.2
