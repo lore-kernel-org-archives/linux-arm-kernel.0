@@ -1,36 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:16:20 +0000
-Subject: [PATCH 08/13] ASoC: generic-dmaengine-pcm: Clear slave_config memory
+Date: Wed,  6 Nov 2013 10:16:21 +0000
+Subject: [PATCH 09/13] ASoC: Ux500: Match platform by device node when booting
+ Device Tree
 In-Reply-To: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
 References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732985-18928-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732985-18928-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently assume that the DMA Slave Config will be fully populated
-by the platform, however some DMA Engines make decisions based on zero
-(default) flags such as DMA_SLAVE_BUSWIDTH_UNDEFINED and as this is a
-static declaration we need to memset it to clear the data area.
+We're getting closer to fully enabling the Ux500 ASoC driver for Device
+Tree. When we switch over from using AUXDATA we'll need to match platform
+by only Device Tree nodes. In this patch we NULL out the platform_name,
+and supply nodes for each platform device.
 
 Cc: alsa-devel at alsa-project.org
 Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/soc-generic-dmaengine-pcm.c | 2 ++
+ sound/soc/ux500/mop500.c | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
-index ee07903..6ad4c7a 100644
---- a/sound/soc/soc-generic-dmaengine-pcm.c
-+++ b/sound/soc/soc-generic-dmaengine-pcm.c
-@@ -90,6 +90,8 @@ static int dmaengine_pcm_hw_params(struct snd_pcm_substream *substream,
- 	struct dma_slave_config slave_config;
- 	int ret;
+diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
+index 178d1ba..4dc7b81 100644
+--- a/sound/soc/ux500/mop500.c
++++ b/sound/soc/ux500/mop500.c
+@@ -90,7 +90,9 @@ static int mop500_of_probe(struct platform_device *pdev,
  
-+	memset(&slave_config, 0, sizeof(slave_config));
-+
- 	if (!pcm->config)
- 		prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config;
- 	else
+ 	for (i = 0; i < 2; i++) {
+ 		mop500_dai_links[i].cpu_of_node = msp_np[i];
++		mop500_dai_links[i].platform_of_node = msp_np[i];
+ 		mop500_dai_links[i].cpu_dai_name = NULL;
++		mop500_dai_links[i].platform_name = NULL;
+ 		mop500_dai_links[i].codec_of_node = codec_np;
+ 		mop500_dai_links[i].codec_name = NULL;
+ 	}
 -- 
 1.8.1.2
