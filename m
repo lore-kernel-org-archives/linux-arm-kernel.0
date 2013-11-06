@@ -1,44 +1,222 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 6 Nov 2013 17:48:22 +0530
-Subject: [PATCH V2 4/5] mfd: AS3722: add dt node properties for system power
- controller
+Date: Wed, 6 Nov 2013 17:48:21 +0530
+Subject: [PATCH V2 3/5] clk: as3722: add clock driver for ams AS3722
 In-Reply-To: <1383740303-10956-1-git-send-email-ldewangan@nvidia.com>
 References: <1383740303-10956-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1383740303-10956-5-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1383740303-10956-4-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ams AS3722 device supports the power off by turning off its all rails.
-
-Add dt node properties to enable this functionality on this device.
+Device ams AS3722 supports one clock 32KHz output. Add clock driver
+to control the clock through clock framework.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
 Changes from V1:
-- None
+- None.
+ drivers/clk/Kconfig      |    8 ++
+ drivers/clk/Makefile     |    1 +
+ drivers/clk/clk-as3722.c |  161 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 170 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/clk-as3722.c
 
- Documentation/devicetree/bindings/mfd/as3722.txt |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/mfd/as3722.txt b/Documentation/devicetree/bindings/mfd/as3722.txt
-index e782f39..1a2fa8a 100644
---- a/Documentation/devicetree/bindings/mfd/as3722.txt
-+++ b/Documentation/devicetree/bindings/mfd/as3722.txt
-@@ -121,6 +121,15 @@ The device node should have the optional properties to support the clock:
- #clock-cells: from common clock binding; shall be set to 1. The clock id for
- 	single clock output is 0.
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 5c51115..03257bf 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -78,6 +78,14 @@ config CLK_TWL6040
+ 	  McPDM. McPDM module is using the external bit clock on the McPDM bus
+ 	  as functional clock.
  
-+Power-off:
-+=========
++config COMMON_CLK_AS3722
++	tristate "ams AS3722 clock32K driver"
++	depends on MFD_AS3722
++	help
++	---help---
++	  Supports the clocking subsystem of the ams AS3722 PMIC from ams.
++	  This device supports one 32KHz clock.
 +
-+AS3722 supports the system power off by turning off all its rail. The power off
-+is provided through pm power off.
-+The device node should have the following properties to enable power-off
-+functionality from ams AS3722:
-+ams,system-power-controller: To enable the power off functionality through
-+	device.
- Example:
- --------
- #include <dt-bindings/mfd/as3722.h>
+ config COMMON_CLK_AXI_CLKGEN
+ 	tristate "AXI clkgen driver"
+ 	depends on ARCH_ZYNQ || MICROBLAZE
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index fe3121b..b94624d 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -39,6 +39,7 @@ obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
+ obj-$(CONFIG_X86)		+= x86/
+ 
+ # Chip specific
++obj-$(CONFIG_COMMON_CLK_AS3722) += clk-as3722.o
+ obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN) += clk-axi-clkgen.o
+ obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+ obj-$(CONFIG_COMMON_CLK_MAX77686) += clk-max77686.o
+diff --git a/drivers/clk/clk-as3722.c b/drivers/clk/clk-as3722.c
+new file mode 100644
+index 0000000..0f786c3
+--- /dev/null
++++ b/drivers/clk/clk-as3722.c
+@@ -0,0 +1,161 @@
++/*
++ * Clock driver for ams AS3722 device.
++ *
++ * Copyright (c) 2013, NVIDIA Corporation.
++ *
++ * Author: Laxman Dewangan <ldewangan@nvidia.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
++ * whether express or implied; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++ * General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/clkdev.h>
++#include <linux/clk-provider.h>
++#include <linux/mfd/as3722.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++struct as3722_clks {
++	struct device *dev;
++	struct as3722 *as3722;
++	struct clk_hw hw;
++	struct clk *clk;
++	struct clk_onecell_data clk_data;
++};
++
++static inline struct as3722_clks *to_as3722_clks(struct clk_hw *hw)
++{
++	return container_of(hw, struct as3722_clks, hw);
++}
++
++static unsigned long as3722_clks_recalc_rate(struct clk_hw *hw,
++	unsigned long parent_rate)
++{
++	return 32768;
++}
++
++static int as3722_clks_prepare(struct clk_hw *hw)
++{
++	struct as3722_clks *as3722_clks = to_as3722_clks(hw);
++	int ret;
++
++	ret = as3722_update_bits(as3722_clks->as3722, AS3722_RTC_CONTROL_REG,
++			AS3722_RTC_CLK32K_OUT_EN, AS3722_RTC_CLK32K_OUT_EN);
++	if (ret < 0)
++		dev_err(as3722_clks->dev, "RTC_CONTROL_REG update failed, %d\n",
++			ret);
++
++	return ret;
++}
++
++static void as3722_clks_unprepare(struct clk_hw *hw)
++{
++	struct as3722_clks *as3722_clks = to_as3722_clks(hw);
++	int ret;
++
++	ret = as3722_update_bits(as3722_clks->as3722, AS3722_RTC_CONTROL_REG,
++			AS3722_RTC_CLK32K_OUT_EN, 0);
++	if (ret < 0)
++		dev_err(as3722_clks->dev, "RTC_CONTROL_REG update failed, %d\n",
++			ret);
++}
++
++static int as3722_clks_is_prepared(struct clk_hw *hw)
++{
++	struct as3722_clks *as3722_clks = to_as3722_clks(hw);
++	int ret;
++	u32 val;
++
++	ret = as3722_read(as3722_clks->as3722, AS3722_RTC_CONTROL_REG, &val);
++	if (ret < 0) {
++		dev_err(as3722_clks->dev, "RTC_CONTROL_REG read failed, %d\n",
++			ret);
++		return ret;
++	}
++
++	return !!(val & AS3722_RTC_CLK32K_OUT_EN);
++}
++
++static struct clk_ops as3722_clks_ops = {
++	.prepare	= as3722_clks_prepare,
++	.unprepare	= as3722_clks_unprepare,
++	.is_prepared	= as3722_clks_is_prepared,
++	.recalc_rate	= as3722_clks_recalc_rate,
++};
++
++static struct clk_init_data as3722_clks_hw_init = {
++	.name = "clk32k",
++	.ops = &as3722_clks_ops,
++	.flags = CLK_IS_ROOT | CLK_IGNORE_UNUSED,
++};
++
++static int as3722_clks_probe(struct platform_device *pdev)
++{
++	struct as3722_clks *as3722_clks;
++	struct clk *clk;
++	int ret;
++
++	as3722_clks = devm_kzalloc(&pdev->dev, sizeof(*as3722_clks),
++				GFP_KERNEL);
++	if (!as3722_clks)
++		return -ENOMEM;
++
++	as3722_clks->clk_data.clks = devm_kzalloc(&pdev->dev,
++			sizeof(*as3722_clks->clk_data.clks), GFP_KERNEL);
++	if (!as3722_clks->clk_data.clks)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, as3722_clks);
++
++	as3722_clks->as3722 = dev_get_drvdata(pdev->dev.parent);
++	as3722_clks->dev = &pdev->dev;
++	as3722_clks->hw.init = &as3722_clks_hw_init;
++
++	clk = devm_clk_register(&pdev->dev, &as3722_clks->hw);
++	if (IS_ERR(clk)) {
++		ret = PTR_ERR(clk);
++		dev_err(&pdev->dev, "Fail to register clock %s, %d\n",
++			as3722_clks_hw_init.name, ret);
++		return ret;
++	}
++	as3722_clks->clk = clk;
++	as3722_clks->clk_data.clks[0] = clk;
++	as3722_clks->clk_data.clk_num = 1;
++	ret = of_clk_add_provider(pdev->dev.parent->of_node,
++			of_clk_src_simple_get, &as3722_clks->clk_data);
++	if (ret < 0)
++		dev_err(&pdev->dev, "Fail to add clock driver, %d\n", ret);
++	return ret;
++}
++
++static int as3722_clks_remove(struct platform_device *pdev)
++{
++	of_clk_del_provider(pdev->dev.parent->of_node);
++	return 0;
++}
++
++static struct platform_driver as3722_clks_driver = {
++	.driver = {
++		.name = "as3722-clk",
++		.owner = THIS_MODULE,
++	},
++	.probe = as3722_clks_probe,
++	.remove = as3722_clks_remove,
++};
++
++module_platform_driver(as3722_clks_driver);
++
++MODULE_DESCRIPTION("Clock driver for ams AS3722 PMIC Device");
++MODULE_ALIAS("platform:as3722-clk");
++MODULE_AUTHOR("Laxman Dewangan <ldewangan@nvidia.com>");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.1.1
