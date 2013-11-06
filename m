@@ -1,105 +1,103 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 6 Nov 2013 12:54:53 +0200
-Subject: [PATCHv9 01/43] clk: Add support for regmap register read/write
-In-Reply-To: <20131105214320.GC17929@book.gsilab.sittig.org>
-References: <1382716658-6964-1-git-send-email-t-kristo@ti.com>
- <1382716658-6964-2-git-send-email-t-kristo@ti.com> <52726342.6030406@ti.com>
- <52726BD5.3080704@ti.com> <20131105214320.GC17929@book.gsilab.sittig.org>
-Message-ID: <527A1FFD.1080506@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 6 Nov 2013 13:06:48 +0200
+Subject: [PATCH] clk: divider: fix rate calculation for fractional rates
+Message-ID: <1383736008-22764-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2013 11:43 PM, Gerhard Sittig wrote:
-> On Thu, Oct 31, 2013 at 16:40 +0200, Tero Kristo wrote:
->>
->> On 10/31/2013 04:03 PM, Nishanth Menon wrote:
->>> On 10/25/2013 10:56 AM, Tero Kristo wrote:
->>> [...]
->>>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->>>> index 7e59253..63ff78c 100644
->>>> --- a/include/linux/clk-provider.h
->>>> +++ b/include/linux/clk-provider.h
->>>
->>> [...]
->>>> -static inline u32 clk_readl(u32 __iomem *reg)
->>>> +static inline u32 clk_readl(u32 __iomem *reg, struct regmap *regmap)
->>>>   {
->>>> -	return readl(reg);
->>>> +	u32 val;
->>>> +
->>>> +	if (regmap)
->>>> +		regmap_read(regmap, (u32)reg, &val);
->>>> +	else
->>>> +		val = readl(reg);
->>>> +	return val;
->>>>   }
->>>>
->>>> -static inline void clk_writel(u32 val, u32 __iomem *reg)
->>>> +static inline void clk_writel(u32 val, u32 __iomem *reg, struct regmap *regmap)
->>>>   {
->>>> -	writel(val, reg);
->>>> +	if (regmap)
->>>> +		regmap_write(regmap, (u32)reg, val);
->>>> +	else
->>>> +		writel(val, reg);
->>>>   }
->>>>
->>>>   #endif /* CONFIG_COMMON_CLK */
->>>>
->>>
->>> Might it not be better to introduce regmap variants?
->>> static inline void clk_regmap_writel(u32 val, u32 reg, struct regmap
->>> *regmap)
->>> and corresponding readl? that allows cleaner readability for clk
->>> drivers that use regmap and those that dont.
->>
->> Well, doing that will introduce a lot of redundant code, as the
->> checks for the presence of regmap must be copied all over the place.
->> With this patch, all the generic clock drivers support internally
->> both regmap or non-regmap register accesses.
->
-> Please keep in mind that the "identity" of clk_readl() and
-> readl() only applies in the current source code (ARM only use of
-> common CCF primitives), while patches are pending (currently
-> under review and receiving further improvement) which introduce
-> several alternative implementations of clk_readl() depending on
-> the platform.  Making all of them duplicate the "regmap vs direct
-> register access" branch would be as bad.  Keeping one set of
-> clk_readl() and clk_writel() routines and adding #ifdefs around
-> the direct register access would be rather ugly, and I understand
-> that preprocessor ifdef counts should get reduced instead of
-> introduced.
+clk-divider.c does not calculate the rates consistently at the moment.
 
-So, it might be better to provide platform / or clock specific 
-clk_reg_ops or something, so we can cover all the possible cases easily.
+As an example, on OMAP3 we have a clock divider with a source clock of
+864000000 Hz. With dividers 6, 7 and 8 the theoretical rates are:
 
-The requirement from TI SoC point of view is that:
+6: 144000000
+7: 123428571.428571...
+8: 108000000
 
-1) need to be able to specify custom register read/write ops
-2) need to be able to provide an index parameter to the read/write ops
-3) need to be able to provide a register offset to the read/write ops
+Calling clk_round_rate() with the rate in the first column will give the
+rate in the second column:
 
-This could be done in following way for example:
+144000000 -> 144000000
+143999999 -> 123428571
+123428572 -> 123428571
+123428571 -> 108000000
 
-clk_readl / clk_writel would be accessed through a single platform 
-specific struct which provides function pointers to both.
+Note how clk_round_rate() returns 123428571 for rates from 123428572 to
+143999999, which is mathematically correct, but when clk_round_rate() is
+called with 123428571, the returned value is surprisingly 108000000.
 
-The content of 'reg' provided to the clk_readl / clk_writel would be 
-internally interpreted as a
+This means that the following code works a bit oddly:
 
-struct omap_clk_reg_internal {
-	u16 offset;
-	u16 index;
-};
+rate = clk_round_rate(clk, 123428572);
+clk_set_rate(clk, rate);
 
-... the index part would be used to select the appropriate regmap to 
-use, and TI SoC:s would be using 3...4 regmaps for actually accessing 
-the physical registers themselves.
+As clk_set_rate() also does clock rate rounding, the result is that the
+clock is set to the rate of 108000000, not 123428571 returned by the
+clk_round_rate.
 
--Tero
+This patch changes the clk-divider.c to use DIV_ROUND_UP when
+calculating the rate. This gives the following behavior which fixes the
+inconsistency:
 
->
->
-> virtually yours
-> Gerhard Sittig
->
+144000000 -> 144000000
+143999999 -> 123428572
+123428572 -> 123428572
+123428571 -> 108000000
+
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/clk/clk-divider.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 8d3009e..43348f3 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -24,7 +24,7 @@
+  * Traits of this clock:
+  * prepare - clk_prepare only ensures that parents are prepared
+  * enable - clk_enable only ensures that parents are enabled
+- * rate - rate is adjustable.  clk->rate = parent->rate / divisor
++ * rate - rate is adjustable.  clk->rate = DIV_ROUND_UP(parent->rate / divisor)
+  * parent - fixed parent.  No clk_set_parent support
+  */
+ 
+@@ -115,7 +115,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+ 		return parent_rate;
+ 	}
+ 
+-	return parent_rate / div;
++	return DIV_ROUND_UP(parent_rate, div);
+ }
+ 
+ /*
+@@ -185,7 +185,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+ 		}
+ 		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+ 				MULT_ROUND_UP(rate, i));
+-		now = parent_rate / i;
++		now = DIV_ROUND_UP(parent_rate, i);
+ 		if (now <= rate && now > best) {
+ 			bestdiv = i;
+ 			best = now;
+@@ -207,7 +207,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	int div;
+ 	div = clk_divider_bestdiv(hw, rate, prate);
+ 
+-	return *prate / div;
++	return DIV_ROUND_UP(*prate, div);
+ }
+ 
+ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+@@ -218,7 +218,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long flags = 0;
+ 	u32 val;
+ 
+-	div = parent_rate / rate;
++	div = DIV_ROUND_UP(parent_rate, rate);
+ 	value = _get_val(divider, div);
+ 
+ 	if (value > div_mask(divider))
+-- 
+1.8.3.2
