@@ -1,42 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  6 Nov 2013 10:16:14 +0000
-Subject: [PATCH 02/13] dma: ste_dma40: Parse flags property for new 'high
- priority channel' request
+Date: Wed,  6 Nov 2013 10:16:19 +0000
+Subject: [PATCH 07/13] ASoC: ux500_pcm: Extract MSP IDs from Device Tree
 In-Reply-To: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
 References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1383732985-18928-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1383732985-18928-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is used for MSP (audio) devices which is about to be fully DT:ed.
+This is required for indexing pre-defined channel configuration structures.
 
-Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: alsa-devel at alsa-project.org
+Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ sound/soc/ux500/ux500_msp_i2s.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index b8c031b..00a2de9 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -2409,6 +2409,7 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
- #define D40_DT_FLAGS_DIR(flags)        ((flags >> 1) & 0x1)
- #define D40_DT_FLAGS_BIG_ENDIAN(flags) ((flags >> 2) & 0x1)
- #define D40_DT_FLAGS_FIXED_CHAN(flags) ((flags >> 3) & 0x1)
-+#define D40_DT_FLAGS_HIGH_PRIO(flags)  ((flags >> 4) & 0x1)
- 
- static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
- 				  struct of_dma *ofdma)
-@@ -2446,6 +2447,9 @@ static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
- 		cfg.use_fixed_channel = true;
- 	}
- 
-+	if (D40_DT_FLAGS_HIGH_PRIO(flags))
-+		cfg.high_priority = true;
+diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
+index 1ca8b08..0a99372 100644
+--- a/sound/soc/ux500/ux500_msp_i2s.c
++++ b/sound/soc/ux500/ux500_msp_i2s.c
+@@ -665,6 +665,13 @@ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
+ 				sizeof(struct msp_i2s_platform_data), GFP_KERNEL);
+ 			if (!platform_data)
+ 				return -ENOMEM;
 +
- 	return dma_request_channel(cap, stedma40_filter, &cfg);
- }
- 
++			if (!of_property_read_u32(np, "id",
++						  &platform_data->id)) {
++				dev_err(&pdev->dev,
++					"No 'id' property found in DT\n");
++				return -EINVAL;
++			}
+ 		}
+ 	} else
+ 		if (!platform_data)
 -- 
 1.8.1.2
