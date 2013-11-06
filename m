@@ -1,11 +1,12 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 6 Nov 2013 12:10:34 +0000
-Subject: [PATCH 04/13] ARM: ux500: Add DMA config bindings for MSP devices
-In-Reply-To: <CACRpkdaNy_h60FJYyTmxVFR8V87znP6KtzY48VhA7jHDTziAcw@mail.gmail.com>
+Date: Wed, 6 Nov 2013 12:11:46 +0000
+Subject: [PATCH 01/13] dma: ste_dma40: Expand DT binding to accept
+ 'high-priority channel' flag
+In-Reply-To: <CACRpkdaVPy8yuhYKohL7ewnmT5y7QrQ7ig2qf4t49YZ-+noDvQ@mail.gmail.com>
 References: <1383732985-18928-1-git-send-email-lee.jones@linaro.org>
- <1383732985-18928-5-git-send-email-lee.jones@linaro.org>
- <CACRpkdaNy_h60FJYyTmxVFR8V87znP6KtzY48VhA7jHDTziAcw@mail.gmail.com>
-Message-ID: <20131106121034.GH30901@lee--X1>
+ <1383732985-18928-2-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaVPy8yuhYKohL7ewnmT5y7QrQ7ig2qf4t49YZ-+noDvQ@mail.gmail.com>
+Message-ID: <20131106121146.GI30901@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,18 +14,21 @@ On Wed, 06 Nov 2013, Linus Walleij wrote:
 
 > On Wed, Nov 6, 2013 at 11:16 AM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > --- a/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> > +++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> > @@ -50,6 +50,9 @@ Each dmas request consists of 4 cells:
+> >          0x00000008: Use fixed channel:
+> >                  Use automatic channel selection when unset
+> >                  Use DMA request line number when set
+> > +        0x00000010: Set channel as high priority:
+> > +                Normal priority when unset
+> > +                High priority when set
 > 
-> Usually I would like to apply this separately to my ux500-dt branch.
-> 
-> While we should keep patches together for bisectability, the dts
-> files is something of an exception in my book since they will
-> be moved out of the kernel one day. Anyway, do as you please:
+> We should probably switch these magic numbers to #defines
+> but it's another subject so
 > Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Actually, you can take it if you like, as it makes no difference to
-this patch-set. Just make sure it's applied before I rip out the MSP
-platform data stuff (which I am yet to do).
+Happy to do that in a subsequent set.
 
 -- 
 Lee Jones
