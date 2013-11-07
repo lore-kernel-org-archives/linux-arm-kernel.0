@@ -1,63 +1,46 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 7 Nov 2013 13:12:29 -0800
-Subject: [PATCH bugfix] mtd: gpmi: serialize all the dma operations
-In-Reply-To: <1383728007-15564-1-git-send-email-b32955@freescale.com>
-References: <1383728007-15564-1-git-send-email-b32955@freescale.com>
-Message-ID: <20131107211229.GY20061@ld-irv-0074.broadcom.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 07 Nov 2013 22:22:35 +0100
+Subject: [PATCH v3 9/9] ARM: add initial support for Marvell Berlin SoCs
+In-Reply-To: <201311071720.47489.arnd@arndb.de>
+References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131107134033.59bd127a@xhacker> <527B67A1.3020803@gmail.com>
+ <201311071720.47489.arnd@arndb.de>
+Message-ID: <527C049B.4030608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
+On 11/07/2013 05:20 PM, Arnd Bergmann wrote:
+> On Thursday 07 November 2013, Sebastian Hesselbarth wrote:
+>> Actually, IIRC smp_twd does not compile without SMP set, so the above
+>> should at least be 'HAVE_ARM_TWD if SMP'. If you shrink MULTI_V7 down
+>> to non-SMP cores, you can disable it and it will fail to compile.
+>
+> If there are UP-systems for which TWD is the best clocksource, we should
+> probably fix the code to allow that configuration. IIRC there were already
+> patches recently in this area, maybe it's already solved.
 
-On Wed, Nov 06, 2013 at 04:53:27PM +0800, Huang Shijie wrote:
-> [1] The gpmi uses the nand_command_lp to issue the commands to NAND chips.
->     It will issue a DMA operation when it handles a NAND_CMD_NONE control
->     command. So when we read a page(NAND_CMD_READ0) from the NAND, we may send
->     two DMA operations back-to-back.
-> 
->     If we do not serialize the two DMA operations, we will meet a bug when
-> 
->     1.1) we enable CONFIG_DMA_API_DEBUG, CONFIG_DMADEVICES_DEBUG,
->          and CONFIG_DEBUG_SG.
-> 
->     1.2) Use the following commands in an UART console and a SSH console:
->          cmd 1: while true;do dd if=/dev/mtd0 of=/dev/null;done
->          cmd 1: while true;do dd if=/dev/mmcblk0 of=/dev/null;done
+I just tried barebox bootloader to use TWD as timer on berlin2cd and it
+perfectly works, i.e. with time related commands I can see the timer
+register decreasing. So the timer is available on this UP SoC.
 
-How does mmcblk0 have anything to do with the GPMI NAND DMA?
+As said before, compiling linux without CONFIG_SMP but with
+CONFIG_HAVE_ARM_TWD gives:
 
->     The kernel log shows below:
->     -----------------------------------------------------------------
->     kernel BUG at lib/scatterlist.c:28!
->     Unable to handle kernel NULL pointer dereference at virtual address 00000000
->       .........................
->     [<80044a0c>] (__bug+0x18/0x24) from [<80249b74>] (sg_next+0x48/0x4c)
->     [<80249b74>] (sg_next+0x48/0x4c) from [<80255398>] (debug_dma_unmap_sg+0x170/0x1a4)
->     [<80255398>] (debug_dma_unmap_sg+0x170/0x1a4) from [<8004af58>] (dma_unmap_sg+0x14/0x6c)
->     [<8004af58>] (dma_unmap_sg+0x14/0x6c) from [<8027e594>] (mxs_dma_tasklet+0x18/0x1c)
->     [<8027e594>] (mxs_dma_tasklet+0x18/0x1c) from [<8007d444>] (tasklet_action+0x114/0x164)
->     -----------------------------------------------------------------
-> 
->     1.3) Assume the two DMA operations is X (first) and Y (second).
->          The root cause of the bug:
->          X's tasklet mxs_dma_tasklet trid to unmap the scatterlist, while Y is
->          trying to set up a new DMA operation with the _SAME_ scatterlist in
->          another ARM core.
+warning: (SOC_OMAP5 && ARCH_ROCKCHIP && ARCH_SHMOBILE_MULTI && 
+MACH_BERLIN_BG2 && MACH_BERLIN_BG2CD) selects HAVE_ARM_TWD which has 
+unmet direct dependencies (SMP)
 
-How are X and Y occurring concurrently? MTD/NAND has locking such that
-only one I/O operation is working on the chip at one time, right?
+and
 
-> [2] This patch adds a wait queue and two helpers gpmi_enter_dma/gpmi_exit_dma to
->     serialize all the DMA operations.
+arch/arm/kernel/smp_twd.c: In function 'twd_local_timer_of_register':
+arch/arm/kernel/smp_twd.c:391: error: 'setup_max_cpus' undeclared (first 
+use in this function)
+arch/arm/kernel/smp_twd.c:391: error: (Each undeclared identifier is 
+reported only once
+arch/arm/kernel/smp_twd.c:391: error: for each function it appears in.)
+make[1]: *** [arch/arm/kernel/smp_twd.o] Error 1
 
-If you really need this serialization, wouldn't a spinlock or mutex
-suffice?
+I haven't looked deeper into this, but I guess it will not be hard
+to make ARM_TWD independent of SMP.
 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> Cc: stable at vger.kernel.org
-
-Perhaps I'm missing some things, but I don't feel like the problem is
-sufficiently well described, and I'm not sure this is the right
-solution. But please, educate me.
-
-Brian
+Sebastian
