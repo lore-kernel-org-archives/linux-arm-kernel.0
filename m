@@ -1,33 +1,34 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 7 Nov 2013 11:08:36 +0800
-Subject: [PATCH 2/4] arm: imx: make use of common scu_a9_get_base() interface
+Date: Thu, 7 Nov 2013 11:13:56 +0800
+Subject: [PATCH 0/4] arm: make use of common scu_a9_get_base() interface
 In-Reply-To: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
 References: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1383793720-4643-4-git-send-email-jszhang@marvell.com>
+Message-ID: <20131107111356.7575c85e@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of common scu_a9_get_base() and delete the comment since the
-interface is self commented.
+On Wed, 6 Nov 2013 19:08:33 -0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/mach-imx/platsmp.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+> Commit e9d6b3358ac35901ccc6a4a5a317670fa469db25 adds common APIs to
+> get scu base address from CP15. This patch series connverts some platforms
+> to use that interface.
 
-diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index 1f24c1f..369a566 100644
---- a/arch/arm/mach-imx/platsmp.c
-+++ b/arch/arm/mach-imx/platsmp.c
-@@ -35,8 +35,7 @@ void __init imx_scu_map_io(void)
- {
- 	unsigned long base;
- 
--	/* Get SCU base */
--	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
-+	base = scu_a9_get_base();
- 
- 	scu_io_desc.virtual = IMX_IO_P2V(base);
- 	scu_io_desc.pfn = __phys_to_pfn(base);
--- 
-1.8.4.2
+OOPS, sorry, I made an mistake when generating patches. Please ignore this
+serials. I'll submit V2 soon
+
+Sorry again.
+Jisheng
+> 
+> Jisheng Zhang (4):
+>   arm: highbank: make use of common scu_a9_get_base() interface
+>   arm: imx: make use of common scu_a9_get_base() interface
+>   arm: prima2: make use of common scu_a9_get_base() interface
+>   arm: socfgpa: make use of common scu_a9_get_base() interface
+> 
+>  arch/arm/mach-highbank/highbank.c | 4 ++--
+>  arch/arm/mach-imx/platsmp.c       | 3 +--
+>  arch/arm/mach-prima2/platsmp.c    | 3 +--
+>  arch/arm/mach-socfpga/socfpga.c   | 4 ++--
+>  4 files changed, 6 insertions(+), 8 deletions(-)
+> 
