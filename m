@@ -1,42 +1,79 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 07 Nov 2013 12:27:13 -0800
-Subject: [PATCH v2] serial: omap: Add support for optional wake-up
-In-Reply-To: <20131107194553.GL15154@atomide.com> (Tony Lindgren's message of
- "Thu, 7 Nov 2013 11:45:53 -0800")
-References: <20131022134947.GK15154@atomide.com> <87siv8rqmj.fsf@linaro.org>
- <20131107194553.GL15154@atomide.com>
-Message-ID: <87eh6srm8u.fsf@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 7 Nov 2013 20:33:34 +0000
+Subject: [PATCH v2] seccomp: not compatible with ARM OABI
+In-Reply-To: <CALCETrXpzmw7qvDPxkW+y=_h5W+a+uyJp1xkz55oBXu9sC+t3A@mail.gmail.com>
+References: <20131107174746.GA22344@www.outflux.net>
+ <CALCETrXpzmw7qvDPxkW+y=_h5W+a+uyJp1xkz55oBXu9sC+t3A@mail.gmail.com>
+Message-ID: <20131107203334.GC3129@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Thu, Nov 07, 2013 at 10:16:13AM -0800, Andy Lutomirski wrote:
+> On Thu, Nov 7, 2013 at 9:47 AM, Kees Cook <keescook@chromium.org> wrote:
+> > Make sure that seccomp filter won't be built when ARM OABI is in use,
+> > since there is work needed to distinguish calling conventions. Until
+> > that is done (which is likely never since OABI is deprecated), make
+> > sure seccomp filter is unavailable in the OABI world.
+> >
+> > Signed-off-by: Kees Cook <keescook@chromium.org>
+> > ---
+> > v2:
+> >  - toggle availability via HAVE_ARCH_SECCOMP_FILTER; James Hogan.
+> > ---
+> >  arch/arm/Kconfig |    7 ++++++-
+> >  1 file changed, 6 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 0a1dc697333c..a0a8590f3609 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -23,7 +23,7 @@ config ARM
+> >         select HARDIRQS_SW_RESEND
+> >         select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
+> >         select HAVE_ARCH_KGDB
+> > -       select HAVE_ARCH_SECCOMP_FILTER
+> > +       select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+> >         select HAVE_ARCH_TRACEHOOK
+> >         select HAVE_BPF_JIT
+> >         select HAVE_CONTEXT_TRACKING
+> > @@ -1735,6 +1735,11 @@ config OABI_COMPAT
+> >           in memory differs between the legacy ABI and the new ARM EABI
+> >           (only for non "thumb" binaries). This option adds a tiny
+> >           overhead to all syscalls and produces a slightly larger kernel.
+> > +
+> > +         The seccomp filter system will not be available when this is
+> > +         selected, since there is no way yet to sensibly distinguish
+> > +         between calling conventions during filtering.
+> > +
+> >           If you know you'll be using only pure EABI user space then you
+> >           can say N here. If this option is not selected and you attempt
+> >           to execute a legacy ABI binary then the result will be
+> > --
+> > 1.7.9.5
+> >
+> >
+> 
+> FWIW, OABI-only (i.e. !AEABI, as opposed to OABI_COMPAT) is, in
+> principle, supportable -- userspace would just have to know that, if
+> build for OABI, the calling convention is different.
+> 
+> I doubt this is worth supporting, though, and, if no one complains
+> about your patch for a couple releases, then that would mean we could
+> get away with adding AUDIT_ARCH_ARM_OABI or something (maybe for
+> seccomp only) if needed.
 
-> * Kevin Hilman <khilman@linaro.org> [131107 10:53]:
->> 
->> A bunch of DT boot failures on OMAP3 platforms with latest mainline were
->> bisected down to this patch.  Boot results here:
->> http://lists.linaro.org/pipermail/kernel-build-reports/2013-November/000954.html
->> 
->> This doesn't seem to properly handle the OMAP3 case where we have DT
->> nodes, but no reg or interrupts properties since they're still using
->> hwmod.
->> 
->> The problems seems to be because these OMAP3 platforms don't list any
->> interrupts in their DTS files for the UARTs, but a quick hack at adding
->> interrupts to omap3.dtsi didn't help either so something else is going
->> on.
->> 
->> This patch should probably be reverted until it gets broader testing.
->
-> Hmm I'm not seeing this with my tree, and sounds like it should be
-> already fixed by commit d7c8f2596 (ARM: dts: Add missing reg,
-> interrupt and dma entries for omap3).
->
-> Can you check that you have that commit in your tree?
+Won't SECCOMP (from arch/arm/Kconfig) still be visible and selectable
+in the Kconfig system?  That may cause confusion.
 
-Ah, that commit is in -next but not yet in mainline.   Indeed it works
-fine with that commit on top of mainline.
 
-Time to queue up our pull requests for linus.
+One option might be to make SECCOMP depend on AEABI, and treat all OABI
+syscalls as invalid after TIF_SECCOMP is set.  This would allow people
+to build modern kernels that can still run ancient userspace, without
+having to compile SECCOMP out.  I don't think we care about whether
+SECCOMP works for OABI userspace -- it's too recent a feature on ARM.
 
-Kevin
+That may be overkill nowadays, though.  The alternative would be to
+make SECCOMP depend on AEABI && !OABI_COMPAT.
+
+Cheer
+---Dave
