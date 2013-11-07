@@ -1,150 +1,61 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Thu, 7 Nov 2013 18:53:44 +0530
-Subject: [PATCH] ARM: dts: Exynos5420: Add device nodes for HSI2C blocks
-In-Reply-To: <1383830523-1767-1-git-send-email-ch.naveen@samsung.com>
-References: <1383830523-1767-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <CAHfPSqBpPoLqF+8+qjtL_zRA2+tdeqt=+zA+VfTOcvv2kq+5bg@mail.gmail.com>
+From: gururaja.hebbar@ti.com (Gururaja Hebbar)
+Date: Thu, 7 Nov 2013 19:00:11 +0530
+Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
+In-Reply-To: <527A7E20.4040107@ti.com>
+References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+ <CANacCWz_ahKaACbAHuue1XwaN3gutBA7Z6W+=zWBn8LvLwDM5w@mail.gmail.com>
+ <527A7E20.4040107@ti.com>
+Message-ID: <527B95E3.9060802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2013 18:52, Naveen Krishna Chatradhi
-<ch.naveen@samsung.com> wrote:
-> Exynos5420 SoC has 7 High speed I2C channels, This patch adds
-> the device tree nodes to the DT device list.
->
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> ---
->  arch/arm/boot/dts/exynos5420.dtsi |   98 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 98 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index 6ffefd1..12f612d 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -34,6 +34,13 @@
->                 i2c1 = &i2c_1;
->                 i2c2 = &i2c_2;
->                 i2c3 = &i2c_3;
-> +               i2c4 = &hsi2c_4;
-> +               i2c5 = &hsi2c_5;
-> +               i2c6 = &hsi2c_6;
-> +               i2c7 = &hsi2c_7;
-> +               i2c8 = &hsi2c_8;
-> +               i2c9 = &hsi2c_9;
-> +               i2c10 = &hsi2c_10;
->                 gsc0 = &gsc_0;
->                 gsc1 = &gsc_1;
->         };
-> @@ -333,6 +340,97 @@
->                 status = "disabled";
->         };
->
-> +       hsi2c_4: hsi2c at 12CA0000 {
-> +               compatible = "samsung,exynos5-hsi2c";
-> +               reg = <0x12CA0000 0x1000>;
-> +               interrupts = <0 60 0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&i2c4_hs_bus>;
-> +               clocks = <&clock 265>;
-> +               clock-names = "hsi2c";
-> +               status = "disabled";
-> +       };
-> +
-> +       hsi2c_5: hsi2c at 12CB0000 {
-> +               compatible = "samsung,exynos5-hsi2c";
-> +               reg = <0x12CB0000 0x1000>;
-> +               interrupts = <0 61 0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&i2c5_hs_bus>;
-> +               clocks = <&clock 266>;
-> +               clock-names = "hsi2c";
-> +               status = "disabled";
-> +       };
-> +
-> +       hsi2c_6: hsi2c at 12CC0000 {
-> +               compatible = "samsung,exynos5-hsi2c";
-> +               reg = <0x12CC0000 0x1000>;
-> +               interrupts = <0 62 0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&i2c6_hs_bus>;
-> +               clocks = <&clock 267>;
-> +               clock-names = "hsi2c";
-> +               status = "disabled";
-> +       };
-> +
-> +       hsi2c_7: hsi2c at 12CD0000 {
-> +               compatible = "samsung,exynos5-hsi2c";
-> +               reg = <0x12CD0000 0x1000>;
-> +               interrupts = <0 63 0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&i2c7_hs_bus>;
-> +               clocks = <&clock 268>;
-> +               clock-names = "hsi2c";
-> +               status = "disabled";
-> +       };
-> +
-> +       hsi2c_8: hsi2c at 12E00000 {
-> +               compatible = "samsung,exynos5-hsi2c";
-> +               reg = <0x12E00000 0x1000>;
-> +               interrupts = <0 87 0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&i2c8_hs_bus>;
-> +               clocks = <&clock 281>;
-> +               clock-names = "hsi2c";
-> +               status = "disabled";
-> +       };
-> +
-> +       hsi2c_9: hsi2c at 12E10000 {
-> +               compatible = "samsung,exynos5-hsi2c";
-> +               reg = <0x12E10000 0x1000>;
-> +               interrupts = <0 88 0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&i2c9_hs_bus>;
-> +               clocks = <&clock 282>;
-> +               clock-names = "hsi2c";
-> +               status = "disabled";
-> +       };
-> +
-> +       hsi2c_10: hsi2c at 12E20000 {
-> +               compatible = "samsung,exynos5-hsi2c";
-> +               reg = <0x12E20000 0x1000>;
-> +               interrupts = <0 203 0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&i2c10_hs_bus>;
-> +               clocks = <&clock 283>;
-> +               clock-names = "hsi2c";
-> +               status = "disabled";
-> +       };
-> +
->         hdmi at 14530000 {
->                 compatible = "samsung,exynos4212-hdmi";
->                 reg = <0x14530000 0x70000>;
-> --
-> 1.7.10.4
->
-Just found that Sachin Kamat already tried to post a similar patch.
-http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/24581
+On Wednesday 06 November 2013 11:06 PM, Joel Fernandes wrote:
+> Hi Vaibhav,
+> 
+> On 10/31/2013 05:25 PM, Vaibhav Bedia wrote:
+>> Hi Daniel,
+>>
+>> On Wed, Oct 30, 2013 at 4:21 PM, Daniel Mack <zonque@gmail.com> wrote:
+>> [...]
+>>> +
+>>> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
+>>> +
+>>>  static struct platform_driver edma_driver = {
+>>>         .driver = {
+>>>                 .name   = "edma",
+>>> +               .pm     = &edma_pm_ops,
+>>>                 .of_match_table = edma_of_ids,
+>>>         },
+>>
+>> A while back we discovered a nasty race condition here that had us move the EDMA
+>> PM callbacks to the noirq phase. IIRC the MMC driver was resuming
+>> before the EDMA
+>> driver had a chance to run and that was leading to a deadlock. I am
+>> not sure how to force
+>> this scenario but i do remember spending time debugging this on a
+>> random codebase.
+>> Maybe some else has some better ideas on how to force this race condition...
+> 
+> I think you're talking about the patch at [1] which is not upstream. A quick
+> question with my limited knowledge of suspend/resume- How can there be pending
+> I/O operations between suspend/resume cycles? 
 
-I was actually waiting for the High speed I2C driver to get merged
-before adding the device tree nodes.
+AFAIK, MMC framework started talking to cards immediately after resume.
+Due to race condition, EDMA resume callback had not yet completed and
+HSMMC driver had initiated a DMA operation. This resulted in Deadlock.
 
-The High speed I2C driver was accepted only a couple of days ago.
+regards
+Gururaja
 
--- 
-Shine bright,
-(: Nav :)
+> The sync is done before suspend,
+> so I don't understand how one is receiving a response from the card after resume
+> before EDMA can resume? I'd imagine that until all devices are resumed, there
+> will be no I/O operation issued. Let me know your thoughts.
+> 
+> thanks,
+> 
+> -Joel
+> 
+> [1]
+> https://www.gitorious.org/x0148406-public/linux-kernel/commit/b81bf04091986fa3893f31955564594567be3b61
+> 
