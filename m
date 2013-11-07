@@ -1,37 +1,99 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 07 Nov 2013 11:12:45 +0100
-Subject: [PATCH v3 8/9] ARM: add Armada 1500-mini and Chromecast device
- tree files
-In-Reply-To: <20131107134802.2234bff1@xhacker>
+Date: Thu, 07 Nov 2013 11:12:49 +0100
+Subject: [PATCH v3 9/9] ARM: add initial support for Marvell Berlin SoCs
+In-Reply-To: <20131107134033.59bd127a@xhacker>
 References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-9-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131107134802.2234bff1@xhacker>
-Message-ID: <527B679D.8040602@gmail.com>
+ <1383661723-17956-10-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131107134033.59bd127a@xhacker>
+Message-ID: <527B67A1.3020803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/13 06:48, Jisheng Zhang wrote:
-> On Tue, 5 Nov 2013 06:28:42 -0800
+On 11/07/13 06:40, Jisheng Zhang wrote:
+> On Tue, 5 Nov 2013 06:28:43 -0800
 > Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->> This adds very basic device tree files for the Marvell Armada
->> 1500-mini SoC (Berlin BG2CD) and the Google Chromecast. Currently,
->> SoC only has nodes for cpu, some clocks, l2 cache controller, local
->> timer, apb timers, uart, and interrupt controllers.
->> The Google Chromecast is a consumer device comprising the Armada
->> 1500-mini SoC above.
+>
+>> This adds initial support for the Marvell Berlin SoC family with
+>> Armada 1500 (88DE3100) and Armada 1500-mini (88DE3005) SoCs.
 >>
 >> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Reviewed-by: Jason Cooper <jason@lakedaemon.net>
+>> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 >> ---
 [...]
->> diff --git a/arch/arm/boot/dts/berlin2cd.dtsi
->> b/arch/arm/boot/dts/berlin2cd.dtsi new file mode 100644
->> index 0000000..40d1bed
+>> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+>> new file mode 100644
+>> index 0000000..c5b39b1
 >> --- /dev/null
->> +++ b/arch/arm/boot/dts/berlin2cd.dtsi
->> @@ -0,0 +1,212 @@
+>> +++ b/arch/arm/mach-berlin/Kconfig
+>> @@ -0,0 +1,30 @@
+>> +config ARCH_BERLIN
+>> +	bool "Marvell Berlin SoCs" if ARCH_MULTI_V7
+>> +	select GENERIC_CLOCKEVENTS
+>> +	select GENERIC_IRQ_CHIP
+>> +	select COMMON_CLK
+>> +	select DW_APB_ICTL
+>> +	select DW_APB_TIMER_OF
+>> +
+>> +if ARCH_BERLIN
+>> +
+>> +menu "Marvell Berlin SoC variants"
+>> +
+>> +config MACH_BERLIN_BG2
+>> +	bool "Marvell Armada 1500 (BG2)"
+>> +	select ARM_GIC
+> ARM_GIC is common on berlin SoCs. we can put it below ARCH_BERLIN?
+
+Sure, I guess BG3 is also using GIC?
+
+>> +	select CACHE_L2X0
+> ditto
+
+You already re-replied to that. I leave L2X0 here, BG3 will be
+different, as you stated.
+
+>> +	select CPU_PJ4B
+>> +	select HAVE_ARM_TWD
+>> +	select HAVE_SMP
+>> +
+>> +config MACH_BERLIN_BG2CD
+>> +	bool "Marvell Armada 1500-mini (BG2CD)"
+>> +	select ARM_GIC
+>> +	select CACHE_L2X0
+>> +	select CPU_V7
+>> +	select HAVE_ARM_TWD
+> BG2CD is single core, I'm not sure it have twd. I will check with SoC people.
+> But can twd be really used in single CA9 system?
+
+ From a quick view into Cortex-A9 MPCore TRM, I cannot see why it
+shouldn't be there even for single-core. If you can get more info,
+that would be great.
+
+Actually, IIRC smp_twd does not compile without SMP set, so the above
+should at least be 'HAVE_ARM_TWD if SMP'. If you shrink MULTI_V7 down
+to non-SMP cores, you can disable it and it will fail to compile.
+
+>> +
+>> +endmenu
+>> +
+>> +endif
+>> diff --git a/arch/arm/mach-berlin/Makefile b/arch/arm/mach-berlin/Makefile
+>> new file mode 100644
+>> index 0000000..ab69fe9
+>> --- /dev/null
+>> +++ b/arch/arm/mach-berlin/Makefile
+>> @@ -0,0 +1 @@
+>> +obj-y += berlin.o
+>> diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+>> new file mode 100644
+>> index 0000000..16c2942
+>> --- /dev/null
+>> +++ b/arch/arm/mach-berlin/berlin.c
+>> @@ -0,0 +1,39 @@
 >> +/*
->> + * Device Tree Include file for Marvell Armada 1500-mini (Berlin BG2CD) SoC
+>> + * Device Tree support for Marvell Berlin SoCs.
 >> + *
 >> + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 >> + *
@@ -43,102 +105,41 @@ On 11/07/13 06:48, Jisheng Zhang wrote:
 >> + * warranty of any kind, whether express or implied.
 >> + */
 >> +
->> +#include "skeleton.dtsi"
->> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +#include <linux/init.h>
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/of_platform.h>
+>> +#include <asm/hardware/cache-l2x0.h>
+>> +#include <asm/mach/arch.h>
 >> +
->> +/ {
->> +       model = "Marvell Armada 1500-mini (BG2CD) SoC";
->> +       compatible = "marvell,berlin2cd", "marvell,berlin";
+>> +static void __init berlin_init_machine(void)
+>> +{
+>> +	/*
+>> +	 * with DT probing for L2CCs, berlin_init_machine can be removed.
+>> +	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
+>> +	 */
+>> +	l2x0_of_init(0x70c00000, 0xfeffffff);
+> Per my experience, put l2x0 initialization in init_machine is too late. It
+> did cause some boot stability problems during our product massive bootup test.
+> In our internal 3.10.y tree, we put it in init_early, I also suggest we do
+> this too in mainline.
+
+Ok.
+
+>> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> If l2 initialization is put in init_early, this is not needed any more.
+
+Right, that's already in the comment right above l2x0_of_init ;)
+
+>> +}
 >> +
->> +       cpus {
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
+>> +static const char * const berlin_dt_compat[] = {
+>> +	"marvell,berlin",
+>> +	NULL,
+>> +};
 >> +
->> +               cpu at 0 {
->> +                       compatible = "arm,cortex-a9";
->> +                       device_type = "cpu";
->> +                       next-level-cache = <&l2>;
->> +                       reg = <0>;
->> +               };
->> +       };
->> +
-[...]
->> +       soc {
->> +               compatible = "simple-bus";
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +               interrupt-parent = <&gic>;
->> +
->> +               ranges = <0 0xf7000000 0x1000000>;
->> +
->> +               l2: l2-cache-controller at ac0000 {
->> +                       compatible = "arm,pl310-cache";
->> +                       reg = <0xac0000 0x1000>;
->> +                       cache-unified;
->> +                       cache-level = <2>;
->> +                       arm,prefetch-ctrl = <0x70000007>;
->> +                       arm,pwr-ctrl = <0x3>;
-> These two setting depend on the following prefetch and power control support patch.
-> We have it in our internal tree for a long time.
+>> +DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
+>> +	.dt_compat      = berlin_dt_compat,
+>> +	.init_machine   = berlin_init_machine,
+>> +MACHINE_END
 >
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/209700.html
-
-Right, consider the above as a debug left-over. I was blindly guessing
-and picked that patch and the both properties above from your tree.
-
-Will remove them now, we can add them later when the binding has been
-accepted. I will reply to that patch next, I guess arm,prefetch-ctrl
-will not be accepted that way, as we try to avoid hex-bashing
-properties.
-
-I did some research on feature/property matrix for the l2x0/l310 as
-there is public documentation, hope to find some time to polish the
-matrix and get a patch ready.
-
->> +               };
->> +
->> +               gic: interrupt-controller at ad1000 {
->> +                       compatible = "arm,cortex-a9-gic";
->> +                       reg = <0xad1000 0x1000>, <0xad0100 0x0100>;
->> +                       interrupt-controller;
->> +                       #interrupt-cells = <3>;
->> +               };
->> +
->> +               local-timer at ad0600 {
->> +                       compatible = "arm,cortex-a9-twd-timer";
->> +                       reg = <0xad0600 0x20>;
->> +                       interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&sysclk>;
->> +               };
->> +
->> +               apb at e80000 {
->> +                       compatible = "simple-bus";
->> +                       #address-cells = <1>;
->> +                       #size-cells = <1>;
->> +
->> +                       ranges = <0 0xe80000 0x10000>;
->> +                       interrupt-parent = <&aic>;
->> +
->> +                       timer0: timer at 2c00 {
->> +                               compatible = "snps,dw-apb-timer";
-> snps,dw-apb-timer-osc?
-
-As stated in the cover letter, snps,dw-apb-timer-osc/-sp have been
-deprecated by [1].
-
-[1] http://www.spinics.net/lists/arm-kernel/msg277763.html
-
->> +                               reg = <0x2c00 0x14>;
->> +                               interrupts = <8>;
->> +                               clocks = <&cfgclk>;
->> +                               clock-names = "timer";
->> +                               status = "okay";
->> +                       };
->> +
->> +                       timer1: timer at 2c14 {
->> +                               compatible = "snps,dw-apb-timer";
-> ditto for the remaining
-
-ditto.
-
-Sebastian
