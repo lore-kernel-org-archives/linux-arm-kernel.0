@@ -1,79 +1,68 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 7 Nov 2013 20:33:34 +0000
-Subject: [PATCH v2] seccomp: not compatible with ARM OABI
-In-Reply-To: <CALCETrXpzmw7qvDPxkW+y=_h5W+a+uyJp1xkz55oBXu9sC+t3A@mail.gmail.com>
-References: <20131107174746.GA22344@www.outflux.net>
- <CALCETrXpzmw7qvDPxkW+y=_h5W+a+uyJp1xkz55oBXu9sC+t3A@mail.gmail.com>
-Message-ID: <20131107203334.GC3129@localhost.localdomain>
+From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
+Date: Thu, 7 Nov 2013 15:34:58 -0500
+Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
+In-Reply-To: <527A7E20.4040107@ti.com>
+References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+ <CANacCWz_ahKaACbAHuue1XwaN3gutBA7Z6W+=zWBn8LvLwDM5w@mail.gmail.com>
+ <527A7E20.4040107@ti.com>
+Message-ID: <CANacCWywXesGuA7w0m-iVspUN7u4Y-XCdvmtwgOoyw0irJ+_gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 07, 2013 at 10:16:13AM -0800, Andy Lutomirski wrote:
-> On Thu, Nov 7, 2013 at 9:47 AM, Kees Cook <keescook@chromium.org> wrote:
-> > Make sure that seccomp filter won't be built when ARM OABI is in use,
-> > since there is work needed to distinguish calling conventions. Until
-> > that is done (which is likely never since OABI is deprecated), make
-> > sure seccomp filter is unavailable in the OABI world.
-> >
-> > Signed-off-by: Kees Cook <keescook@chromium.org>
-> > ---
-> > v2:
-> >  - toggle availability via HAVE_ARCH_SECCOMP_FILTER; James Hogan.
-> > ---
-> >  arch/arm/Kconfig |    7 ++++++-
-> >  1 file changed, 6 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 0a1dc697333c..a0a8590f3609 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -23,7 +23,7 @@ config ARM
-> >         select HARDIRQS_SW_RESEND
-> >         select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
-> >         select HAVE_ARCH_KGDB
-> > -       select HAVE_ARCH_SECCOMP_FILTER
-> > +       select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
-> >         select HAVE_ARCH_TRACEHOOK
-> >         select HAVE_BPF_JIT
-> >         select HAVE_CONTEXT_TRACKING
-> > @@ -1735,6 +1735,11 @@ config OABI_COMPAT
-> >           in memory differs between the legacy ABI and the new ARM EABI
-> >           (only for non "thumb" binaries). This option adds a tiny
-> >           overhead to all syscalls and produces a slightly larger kernel.
-> > +
-> > +         The seccomp filter system will not be available when this is
-> > +         selected, since there is no way yet to sensibly distinguish
-> > +         between calling conventions during filtering.
-> > +
-> >           If you know you'll be using only pure EABI user space then you
-> >           can say N here. If this option is not selected and you attempt
-> >           to execute a legacy ABI binary then the result will be
-> > --
-> > 1.7.9.5
-> >
-> >
-> 
-> FWIW, OABI-only (i.e. !AEABI, as opposed to OABI_COMPAT) is, in
-> principle, supportable -- userspace would just have to know that, if
-> build for OABI, the calling convention is different.
-> 
-> I doubt this is worth supporting, though, and, if no one complains
-> about your patch for a couple releases, then that would mean we could
-> get away with adding AUDIT_ARCH_ARM_OABI or something (maybe for
-> seccomp only) if needed.
+Hi Joel,
 
-Won't SECCOMP (from arch/arm/Kconfig) still be visible and selectable
-in the Kconfig system?  That may cause confusion.
+On Wed, Nov 6, 2013 at 12:36 PM, Joel Fernandes <joelf@ti.com> wrote:
+> Hi Vaibhav,
+>
+> On 10/31/2013 05:25 PM, Vaibhav Bedia wrote:
+>> Hi Daniel,
+>>
+>> On Wed, Oct 30, 2013 at 4:21 PM, Daniel Mack <zonque@gmail.com> wrote:
+>> [...]
+>>> +
+>>> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
+>>> +
+>>>  static struct platform_driver edma_driver = {
+>>>         .driver = {
+>>>                 .name   = "edma",
+>>> +               .pm     = &edma_pm_ops,
+>>>                 .of_match_table = edma_of_ids,
+>>>         },
+>>
+>> A while back we discovered a nasty race condition here that had us move the EDMA
+>> PM callbacks to the noirq phase. IIRC the MMC driver was resuming
+>> before the EDMA
+>> driver had a chance to run and that was leading to a deadlock. I am
+>> not sure how to force
+>> this scenario but i do remember spending time debugging this on a
+>> random codebase.
+>> Maybe some else has some better ideas on how to force this race condition...
+>
+> I think you're talking about the patch at [1] which is not upstream. A quick
 
+Yeah that's the one.
 
-One option might be to make SECCOMP depend on AEABI, and treat all OABI
-syscalls as invalid after TIF_SECCOMP is set.  This would allow people
-to build modern kernels that can still run ancient userspace, without
-having to compile SECCOMP out.  I don't think we care about whether
-SECCOMP works for OABI userspace -- it's too recent a feature on ARM.
+> question with my limited knowledge of suspend/resume- How can there be pending
+> I/O operations between suspend/resume cycles? The sync is done before suspend,
+> so I don't understand how one is receiving a response from the card after resume
+> before EDMA can resume? I'd imagine that until all devices are resumed, there
+> will be no I/O operation issued. Let me know your thoughts.
+>
 
-That may be overkill nowadays, though.  The alternative would be to
-make SECCOMP depend on AEABI && !OABI_COMPAT.
+Sadly the commit message does not capture the details to the level it
+should have.
 
-Cheer
----Dave
+>From what i remember, during the resume operation the driver was waiting for the
+response of the first cmd that it sends and that never happened since the driver
+was setup to use DMA mode and the EDMA driver hadn't resumed. Ideally such
+issues should have been noticed a long time back. One more thing to note is that
+the MMC controller on AMx series does not have the internal DMA like OMAPx.
+However i am not sure how much that, if at all, plays a role here.
+
+Maybe someone internally still has a copy of the analysis done and you could
+try to hunt that down for more details. In case you do it would be
+good to have it
+mentioned here.
+
+Regards,
+Vaibhav
