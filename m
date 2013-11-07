@@ -1,41 +1,47 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Thu, 07 Nov 2013 04:11:49 -0600
-Subject: [GIT PULL] clk: socfpga: Clock fix for 3.13
-In-Reply-To: <1382604095-3097-1-git-send-email-dinguyen@altera.com>
-References: <1382604095-3097-1-git-send-email-dinguyen@altera.com>
-Message-ID: <527B6765.1000409@gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 7 Nov 2013 19:11:39 +0900
+Subject: [PATCH v10 0/7] ARM: support for Trusted Foundations secure monitor
+Message-ID: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Just a set of small fixes to address the concerns expressed on v9 with the
+non-prefixed version DT properties. I hope there won't be a need for an
+eleventh (!) version. :P
 
-On 10/24/13 3:41 AM, dinguyen at altera.com wrote:
-> The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
->
->   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
->
-> are available in the git repository at:
->
->   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.13
->
-> for you to fetch changes up to f592c5da6869133de941e44ef2ed4ede7f6b2791:
->
->   clk: socfpga: Remove check for "reg" property in socfpga_clk_init (2013-10-24 03:18:30 -0500)
->
-> ----------------------------------------------------------------
-> Clock fix for SOCFPGA
->
-> Remove check for "reg" property in socfpga_clk_init() function
-> This allows for clk property to be assigned for the arm_twd timer, which
-> will lead to removing socfpga_init_clocks().
->
-> ----------------------------------------------------------------
-> Dinh Nguyen (1):
->       clk: socfpga: Remove check for "reg" property in socfpga_clk_init
->
->  drivers/clk/socfpga/clk.c |    4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
->
-Can you please pull this?
-Thanks,
-Dinh
+Changelog from v9:
+- Renamed tl vendor prefix to tlm (for Trusted Logic Mobility)
+- Prefixed version properties with "tlm,"
+- Split the DT bindings patches as per new recommendations
+
+Alexandre Courbot (7):
+  ARM: add basic support for Trusted Foundations
+  of: add vendor prefix for Trusted Logic Mobility
+  of: add Trusted Foundations bindings
+  ARM: tegra: add support for Trusted Foundations
+  ARM: tegra: split setting of CPU reset handler
+  ARM: tegra: set CPU reset handler with firmware op
+  ARM: tegra: support Trusted Foundations by default
+
+ .../arm/firmware/tlm,trusted-foundations.txt       | 20 ++++++
+ Documentation/devicetree/bindings/arm/tegra.txt    |  5 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/Kconfig                                   |  2 +
+ arch/arm/Makefile                                  |  1 +
+ arch/arm/configs/tegra_defconfig                   |  1 +
+ arch/arm/firmware/Kconfig                          | 28 ++++++++
+ arch/arm/firmware/Makefile                         |  1 +
+ arch/arm/firmware/trusted_foundations.c            | 81 ++++++++++++++++++++++
+ arch/arm/include/asm/trusted_foundations.h         | 67 ++++++++++++++++++
+ arch/arm/mach-tegra/Kconfig                        |  1 +
+ arch/arm/mach-tegra/common.c                       |  2 +
+ arch/arm/mach-tegra/reset.c                        | 40 ++++++++---
+ 13 files changed, 239 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/tlm,trusted-foundations.txt
+ create mode 100644 arch/arm/firmware/Kconfig
+ create mode 100644 arch/arm/firmware/Makefile
+ create mode 100644 arch/arm/firmware/trusted_foundations.c
+ create mode 100644 arch/arm/include/asm/trusted_foundations.h
+
+-- 
+1.8.4.2
