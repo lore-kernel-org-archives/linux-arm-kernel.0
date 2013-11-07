@@ -1,23 +1,42 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Thu, 7 Nov 2013 12:16:11 -0800
-Subject: [RESEND PATCH 2/4] i2c: i2c-bcm-kona: Add support for high-speed
- mode
-In-Reply-To: <20131107201332.GA7119@katana>
-References: <1381960909-1735-1-git-send-email-tim.kryger@linaro.org>
- <1381960909-1735-3-git-send-email-tim.kryger@linaro.org>
- <20131101130835.GC6734@katana>
- <CAAYSxhrrkSvOJpYPz7txVsot1you3fFzkXJ6fqaS4OgRM0Z2gA@mail.gmail.com>
- <20131107201332.GA7119@katana>
-Message-ID: <CAAYSxhp6bY==tyHXCUz4zYVS+Nc=hDBscf_QBrkxwY28AOA=ig@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 07 Nov 2013 12:27:13 -0800
+Subject: [PATCH v2] serial: omap: Add support for optional wake-up
+In-Reply-To: <20131107194553.GL15154@atomide.com> (Tony Lindgren's message of
+ "Thu, 7 Nov 2013 11:45:53 -0800")
+References: <20131022134947.GK15154@atomide.com> <87siv8rqmj.fsf@linaro.org>
+ <20131107194553.GL15154@atomide.com>
+Message-ID: <87eh6srm8u.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 7, 2013 at 12:13 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+Tony Lindgren <tony@atomide.com> writes:
 
-> OK. Then please change the error message for unsupported bus speeds to
-> contain the supported ones. I don't think it is good practice to force
-> users to look into the sourcecode to find this information.
+> * Kevin Hilman <khilman@linaro.org> [131107 10:53]:
+>> 
+>> A bunch of DT boot failures on OMAP3 platforms with latest mainline were
+>> bisected down to this patch.  Boot results here:
+>> http://lists.linaro.org/pipermail/kernel-build-reports/2013-November/000954.html
+>> 
+>> This doesn't seem to properly handle the OMAP3 case where we have DT
+>> nodes, but no reg or interrupts properties since they're still using
+>> hwmod.
+>> 
+>> The problems seems to be because these OMAP3 platforms don't list any
+>> interrupts in their DTS files for the UARTs, but a quick hack at adding
+>> interrupts to omap3.dtsi didn't help either so something else is going
+>> on.
+>> 
+>> This patch should probably be reverted until it gets broader testing.
+>
+> Hmm I'm not seeing this with my tree, and sounds like it should be
+> already fixed by commit d7c8f2596 (ARM: dts: Add missing reg,
+> interrupt and dma entries for omap3).
+>
+> Can you check that you have that commit in your tree?
 
-That works for me.  Thanks.
+Ah, that commit is in -next but not yet in mainline.   Indeed it works
+fine with that commit on top of mainline.
 
--Tim
+Time to queue up our pull requests for linus.
+
+Kevin
