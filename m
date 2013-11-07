@@ -1,128 +1,52 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu,  7 Nov 2013 12:45:07 +0400
-Subject: [PATCH 4/5] ARM: dts: i.MX51: Add missing pinctrl definitions
-In-Reply-To: <1383813908-26571-1-git-send-email-shc_work@mail.ru>
-References: <1383813908-26571-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1383813908-26571-4-git-send-email-shc_work@mail.ru>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 7 Nov 2013 17:52:57 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Remove unused clock constants
+In-Reply-To: <1395939.NimcadHhnk@avalon>
+References: <1383720523-9645-1-git-send-email-horms+renesas@verge.net.au>
+ <1395939.NimcadHhnk@avalon>
+Message-ID: <20131107085253.GE17384@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing pinctrl definitions for Keypad (columns 4 and 5),
-NFC, 1-Wire and WEIM.
+On Wed, Nov 06, 2013 at 01:59:20PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> Thank you for the patch.
+> 
+> On Wednesday 06 November 2013 15:48:43 Simon Horman wrote:
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/mach-shmobile/clock-r8a7779.c | 8 --------
+> >  1 file changed, 8 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c
+> > b/arch/arm/mach-shmobile/clock-r8a7779.c index b7ce0e7..3083c70 100644
+> > --- a/arch/arm/mach-shmobile/clock-r8a7779.c
+> > +++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+> > @@ -47,17 +47,9 @@
+> > 
+> >  #define MD(nr)	BIT(nr)
+> > 
+> > -#define FRQMR		IOMEM(0xffc80014)
+> >  #define MSTPCR0		IOMEM(0xffc80030)
+> >  #define MSTPCR1		IOMEM(0xffc80034)
+> >  #define MSTPCR3		IOMEM(0xffc8003c)
+> > -#define MSTPSR1		IOMEM(0xffc80044)
+> > -#define MSTPSR4		IOMEM(0xffc80048)
+> > -#define MSTPSR6		IOMEM(0xffc8004c)
+> > -#define MSTPCR4		IOMEM(0xffc80050)
+> > -#define MSTPCR5		IOMEM(0xffc80054)
+> > -#define MSTPCR6		IOMEM(0xffc80058)
+> > -#define MSTPCR7		IOMEM(0xffc80040)
+> 
+> It has been pointed out to me that the CPG requires waiting for clocks to be 
+> enabled on all R-Mobile and R-Car SoCs. I've send a patch series to implement 
+> this for r8a7790 ("[PATCH 0/2] ARM: shmobile: r8a7790: Wait for status on all 
+> MSTP clocks"). Should we expand that to the other SoCs as well ? In that case 
+> the constants would be needed.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx51-pingrp.h | 93 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
+That is a good question.
 
-diff --git a/arch/arm/boot/dts/imx51-pingrp.h b/arch/arm/boot/dts/imx51-pingrp.h
-index 550d0d1..41a67ba 100644
---- a/arch/arm/boot/dts/imx51-pingrp.h
-+++ b/arch/arm/boot/dts/imx51-pingrp.h
-@@ -157,6 +157,32 @@
- 	MX51_PAD_KEY_COL2__KEY_COL2			0xe8 \
- 	MX51_PAD_KEY_COL3__KEY_COL3			0xe8
- 
-+#define MX51_KPP_COL45_PINGRP1 \
-+	MX51_PAD_KEY_COL4__KEY_COL4			0xe8 \
-+	MX51_PAD_KEY_COL5__KEY_COL5			0xe8
-+
-+#define MX51_NFC_PINGRP1 \
-+	MX51_PAD_NANDF_D0__NANDF_D0			0x80000000 \
-+	MX51_PAD_NANDF_D1__NANDF_D1			0x80000000 \
-+	MX51_PAD_NANDF_D2__NANDF_D2			0x80000000 \
-+	MX51_PAD_NANDF_D3__NANDF_D3			0x80000000 \
-+	MX51_PAD_NANDF_D4__NANDF_D4			0x80000000 \
-+	MX51_PAD_NANDF_D5__NANDF_D5			0x80000000 \
-+	MX51_PAD_NANDF_D6__NANDF_D6			0x80000000 \
-+	MX51_PAD_NANDF_D7__NANDF_D7			0x80000000 \
-+	MX51_PAD_NANDF_ALE__NANDF_ALE			0x80000000 \
-+	MX51_PAD_NANDF_CLE__NANDF_CLE			0x80000000 \
-+	MX51_PAD_NANDF_RE_B__NANDF_RE_B			0x80000000 \
-+	MX51_PAD_NANDF_WE_B__NANDF_WE_B			0x80000000 \
-+	MX51_PAD_NANDF_WP_B__NANDF_WP_B			0x80000000
-+
-+#define MX51_NFC_CS0_PINGRP1 \
-+	MX51_PAD_NANDF_CS0__NANDF_CS0			0x80000000 \
-+	MX51_PAD_NANDF_RB0__NANDF_RB0			0x80000000
-+
-+#define MX51_OWIRE_PINGRP1 \
-+	X51_PAD_OWIRE_LINE__OWIRE_LINE			0x40000000
-+
- #define MX51_PATA_PINGRP1 \
- 	MX51_PAD_NANDF_WE_B__PATA_DIOW			0x2004 \
- 	MX51_PAD_NANDF_RE_B__PATA_DIOR			0x2004 \
-@@ -244,4 +270,71 @@
- 	MX51_PAD_EIM_A27__USBH2_NXT			0x1e5 \
- 	MX51_PAD_EIM_A26__USBH2_STP			0x1e5
- 
-+#define MX51_WEIM_PINGRP1 \
-+	MX51_PAD_EIM_DA0__EIM_DA0			0x80000000 \
-+	MX51_PAD_EIM_DA1__EIM_DA1			0x80000000 \
-+	MX51_PAD_EIM_DA2__EIM_DA2			0x80000000 \
-+	MX51_PAD_EIM_DA3__EIM_DA3			0x80000000 \
-+	MX51_PAD_EIM_DA4__EIM_DA4			0x80000000 \
-+	MX51_PAD_EIM_DA5__EIM_DA5			0x80000000 \
-+	MX51_PAD_EIM_DA6__EIM_DA6			0x80000000 \
-+	MX51_PAD_EIM_DA7__EIM_DA7			0x80000000 \
-+	MX51_PAD_EIM_DA8__EIM_DA8			0x80000000 \
-+	MX51_PAD_EIM_DA9__EIM_DA9			0x80000000 \
-+	MX51_PAD_EIM_DA10__EIM_DA10			0x80000000 \
-+	MX51_PAD_EIM_DA11__EIM_DA11			0x80000000 \
-+	MX51_PAD_EIM_DA12__EIM_DA12			0x80000000 \
-+	MX51_PAD_EIM_DA13__EIM_DA13			0x80000000 \
-+	MX51_PAD_EIM_DA14__EIM_DA14			0x80000000 \
-+	MX51_PAD_EIM_DA15__EIM_DA15			0x80000000 \
-+	MX51_PAD_EIM_A16__EIM_A16			0x80000000 \
-+	MX51_PAD_EIM_A17__EIM_A17			0x80000000 \
-+	MX51_PAD_EIM_A18__EIM_A18			0x80000000 \
-+	MX51_PAD_EIM_A19__EIM_A19			0x80000000 \
-+	MX51_PAD_EIM_A20__EIM_A20			0x80000000 \
-+	MX51_PAD_EIM_A21__EIM_A21			0x80000000 \
-+	MX51_PAD_EIM_A22__EIM_A22			0x80000000 \
-+	MX51_PAD_EIM_A23__EIM_A23			0x80000000 \
-+	MX51_PAD_EIM_A24__EIM_A24			0x80000000 \
-+	MX51_PAD_EIM_A25__EIM_A25			0x80000000 \
-+	MX51_PAD_EIM_A26__EIM_A26			0x80000000 \
-+	MX51_PAD_EIM_A27__EIM_A27			0x80000000 \
-+	MX51_PAD_EIM_D16__EIM_D16			0x80000000 \
-+	MX51_PAD_EIM_D17__EIM_D17			0x80000000 \
-+	MX51_PAD_EIM_D18__EIM_D18			0x80000000 \
-+	MX51_PAD_EIM_D19__EIM_D19			0x80000000 \
-+	MX51_PAD_EIM_D20__EIM_D20			0x80000000 \
-+	MX51_PAD_EIM_D21__EIM_D21			0x80000000 \
-+	MX51_PAD_EIM_D22__EIM_D22			0x80000000 \
-+	MX51_PAD_EIM_D23__EIM_D23			0x80000000 \
-+	MX51_PAD_EIM_D24__EIM_D24			0x80000000 \
-+	MX51_PAD_EIM_D25__EIM_D25			0x80000000 \
-+	MX51_PAD_EIM_D26__EIM_D26			0x80000000 \
-+	MX51_PAD_EIM_D27__EIM_D27			0x80000000 \
-+	MX51_PAD_EIM_D28__EIM_D28			0x80000000 \
-+	MX51_PAD_EIM_D29__EIM_D29			0x80000000 \
-+	MX51_PAD_EIM_D30__EIM_D30			0x80000000 \
-+	MX51_PAD_EIM_D31__EIM_D31			0x80000000 \
-+	MX51_PAD_EIM_OE__EIM_OE				0x80000000 \
-+	MX51_PAD_EIM_DTACK__EIM_DTACK			0x80000000 \
-+	MX51_PAD_EIM_LBA__EIM_LBA			0x80000000
-+
-+#define MX51_WEIM_CS0_PINGRP1 \
-+	MX51_PAD_EIM_CS0__EIM_CS0			0x80000000
-+
-+#define MX51_WEIM_CS1_PINGRP1 \
-+	MX51_PAD_EIM_CS1__EIM_CS1			0x80000000
-+
-+#define MX51_WEIM_CS2_PINGRP1 \
-+	MX51_PAD_EIM_CS2__EIM_CS2			0x80000000
-+
-+#define MX51_WEIM_CS3_PINGRP1 \
-+	MX51_PAD_EIM_CS3__EIM_CS3			0x80000000
-+
-+#define MX51_WEIM_CS4_PINGRP1 \
-+	MX51_PAD_EIM_CS4__EIM_CS4			0x80000000
-+
-+#define MX51_WEIM_CS5_PINGRP1 \
-+	MX51_PAD_EIM_CS5__EIM_CS5			0x80000000
-+
- #endif /* __DTS_IMX51_PINGRP_H */
--- 
-1.8.1.5
+I am unsure if waiting is only required for Gen2 R-Car SoCs or
+Gen1 as well. If it is requried for Gen1 then it would
+make sense to extend the coverage of your series to H1 (r8a7779).
