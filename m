@@ -1,39 +1,45 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 07 Nov 2013 14:40:49 +0100
-Subject: [PATCH v2 2/2] clocksource: sh_tmu: Add clk_prepare/unprepare
- support
-In-Reply-To: <20131031052406.GN1603@verge.net.au>
-References: <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383057097-22689-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383057097-22689-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131031052406.GN1603@verge.net.au>
-Message-ID: <527B9861.1020606@linaro.org>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 7 Nov 2013 16:43:26 +0300
+Subject: mfd: ab8500-debug: Add wake-up info
+In-Reply-To: <20130826150908.GB12428@elgon.mountain>
+References: <20130826150908.GB12428@elgon.mountain>
+Message-ID: <20131107134326.GO20521@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2013 06:24 AM, Simon Horman wrote:
-> On Tue, Oct 29, 2013 at 03:31:37PM +0100, Laurent Pinchart wrote:
->> Prepare the clock at probe time, as there is no other appropriate place
->> in the driver where we're allowed to sleep.
->>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: linux-kernel at vger.kernel.org
->> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->
-> Thanks, I have queued this up.
+What ever happened to this?  Can "desc" be NULL or not?
 
-Ok, so those patches go through your tree, right ?
+regards,
+dan carpenter
 
-I have been out for the Linaro connect but I saw you picked them. In the 
-future, I would prefer to take them in my tree as they fall under the 
-drivers/clocksource maintainer's umbrella.
-
-Thanks
-   -- Daniel
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+On Mon, Aug 26, 2013 at 06:09:08PM +0300, Dan Carpenter wrote:
+> Hello Jonas Aaberg,
+> 
+> This is a semi-automatic email about new static checker warnings.
+> 
+> The patch 2cf64e264828: "mfd: ab8500-debug: Add wake-up info" from 
+> May 31, 2012, leads to the following Smatch complaint:
+> 
+> drivers/mfd/ab8500-debugfs.c:1609 ab8500_interrupts_print()
+> 	 warn: variable dereferenced before check 'desc' (see line 1603)
+> 
+> drivers/mfd/ab8500-debugfs.c
+>   1602			struct irq_desc *desc = irq_to_desc(line + irq_first);
+>   1603			struct irqaction *action = desc->action;
+>                                                    ^^^^^^^^^^^^
+> Patch adds dereference.
+> 
+>   1604	
+>   1605			seq_printf(s, "%3i:  %6i %4i", line,
+>   1606				   num_interrupts[line],
+>   1607				   num_wake_interrupts[line]);
+>   1608	
+>   1609			if (desc && desc->name)
+>                             ^^^^
+> Patch adds check.
+> 
+>   1610				seq_printf(s, "-%-8s", desc->name);
+>   1611			if (action) {
+> 
+> regards,
+> dan carpenter
