@@ -1,46 +1,25 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 7 Nov 2013 11:08:37 +0800
-Subject: [PATCH v5 2/3] bus: mvebu: add missing of_node_put() to fix reference
- leak
-In-Reply-To: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
-References: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1383793720-4643-5-git-send-email-jszhang@marvell.com>
+Date: Thu, 7 Nov 2013 11:08:33 +0800
+Subject: [PATCH 0/4] arm: make use of common scu_a9_get_base() interface
+Message-ID: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_node_put to properly decrement the refcount when we are
-done using a given node.
+Commit e9d6b3358ac35901ccc6a4a5a317670fa469db25 adds common APIs to
+get scu base address from CP15. This patch series connverts some platforms
+to use that interface.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/bus/mvebu-mbus.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Jisheng Zhang (4):
+  arm: highbank: make use of common scu_a9_get_base() interface
+  arm: imx: make use of common scu_a9_get_base() interface
+  arm: prima2: make use of common scu_a9_get_base() interface
+  arm: socfgpa: make use of common scu_a9_get_base() interface
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 33c6947..20da90f 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -837,6 +837,7 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
- {
- 	struct mvebu_mbus_state *mbus = &mbus_state;
- 	const struct of_device_id *of_id;
-+	struct device_node *np;
- 	int win;
- 
- 	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
-@@ -860,8 +861,11 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
- 		return -ENOMEM;
- 	}
- 
--	if (of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
-+	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
-+	if (np) {
- 		mbus->hw_io_coherency = 1;
-+		of_node_put(np);
-+	}
- 
- 	for (win = 0; win < mbus->soc->num_wins; win++)
- 		mvebu_mbus_disable_window(mbus, win);
+ arch/arm/mach-highbank/highbank.c | 4 ++--
+ arch/arm/mach-imx/platsmp.c       | 3 +--
+ arch/arm/mach-prima2/platsmp.c    | 3 +--
+ arch/arm/mach-socfpga/socfpga.c   | 4 ++--
+ 4 files changed, 6 insertions(+), 8 deletions(-)
+
 -- 
-1.8.4.rc3
+1.8.4.2
