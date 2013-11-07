@@ -1,25 +1,37 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 7 Nov 2013 15:01:39 +0800
-Subject: [PATCH v3 9/9] ARM: add initial support for Marvell Berlin SoCs
-In-Reply-To: <20131107134033.59bd127a@xhacker>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-10-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131107134033.59bd127a@xhacker>
-Message-ID: <20131107150139.26b321f4@xhacker>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 06 Nov 2013 23:20:32 -0800 (PST)
+Subject: [PATCH 3/3] clk: shmobile: Add R8A7790 clocks support
+In-Reply-To: <87zjpggalc.wl%kuninori.morimoto.gx@renesas.com>
+References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2775658.fxp7sbhy9u@avalon>
+ <8738na1csg.wl%kuninori.morimoto.gx@renesas.com>
+ <1550251.naXFpxhfMk@avalon>
+ <87zjpggalc.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <871u2s65kz.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Nov 2013 21:40:33 -0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
 
-...
-> > +	select ARM_GIC  
-> ARM_GIC is common on berlin SoCs. we can put it below ARCH_BERLIN?
-> > +	select CACHE_L2X0  
-> ditto
+Hi Laurent again
 
-Sorry. After some consideration, CACHE_L2X0 is not common (BG3). So please ignore
-this line
+> In my SuperH experience, CPG clock divier has same pattern.
+> In H2's SDCKCR register, SDHFC and SD0FC looks different.
+> But, the real different is only enabled bit area,
+> the value is same.
+> You can find same pattern on FRQCRB register too,
+> and, you can find same pattern on M2.
+> 
+> I guess FRQCRB/SDHFC can share code if it has mask.
+> This idea was used on R-Mobile series on div4.
+> (ex clock-sh73a0.c :: div4_clks)
 
-Thanks
+I talked it with Magnus, and I understand your headache.
+I can agree about your approach now.
+
+But, I guess H2 and M2 are very similar SoC.
+and I don't want too many clock-${SoC} files.
+Is it possible to share code like clk-gen2.c ?
+
+Best regards
+---
+Kuninori Morimoto
