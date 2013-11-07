@@ -1,49 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 7 Nov 2013 10:32:10 -0500
-Subject: [PATCH v4 05/31] mtd: nand: pxa3xx: devicetree binding update
-In-Reply-To: <1383837455-30721-6-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383837455-30721-6-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131107153210.GK8308@titan.lakedaemon.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 7 Nov 2013 09:34:31 -0600
+Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
+In-Reply-To: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+Message-ID: <527BB307.7090401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 07, 2013 at 12:17:09PM -0300, Ezequiel Garcia wrote:
-> Since the driver supports the new compatible string, the binding
-> documentation must be updated to reflect it.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+On 10/30/2013 03:21 PM, Daniel Mack wrote:
+[...]
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index 8e1a024..f15cdb9 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
 
-Thanks for adding this, but please remember to update the Subject
-string in the future.  Both this patch and the next one are changing the
-Documentation/ portion of the tree, not drivers/.
+[...]
 
-And,
+> +static int edma_pm_suspend(struct device *dev)
+> +{
+> +	int j;
+> +
+> +	pm_runtime_get_sync(dev);
+> +
+error checks?
+> +	for (j = 0; j < arch_num_cc; j++) {
+> +		struct edma *ecc = edma_cc[j];
+> +
+> +		disable_irq(ecc->irq_res_start);
+> +		disable_irq(ecc->irq_res_end);
+> +	}
+> +
+> +	pm_runtime_put_sync(dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int edma_pm_resume(struct device *dev)
+> +{
+> +	int i, j;
+> +
+> +	pm_runtime_get_sync(dev);
+error checks?
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+[...]
 
-thx,
 
-Jason.
-
-> diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-> index f1421e2..bed8390 100644
-> --- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-> @@ -2,7 +2,9 @@ PXA3xx NAND DT bindings
->  
->  Required properties:
->  
-> - - compatible:		Should be "marvell,pxa3xx-nand"
-> + - compatible:		Should be set to one of the following:
-> +			marvell,pxa3xx-nand
-> +			marvell,armada370-nand
->   - reg: 		The register base for the controller
->   - interrupts:		The interrupt to map
->   - #address-cells:	Set to <1> if the node includes partitions
-> -- 
-> 1.8.1.5
-> 
+-- 
+Regards,
+Nishanth Menon
