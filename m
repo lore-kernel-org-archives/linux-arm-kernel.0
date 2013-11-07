@@ -1,15 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Nov 2013 11:46:54 +0000
-Subject: [PATCH 3/7] ARM: ux500: Remove ATAG support for SDI (MMC)
-In-Reply-To: <1383732348-18576-4-git-send-email-lee.jones@linaro.org>
-References: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
- <1383732348-18576-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20131107114654.GF16735@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 7 Nov 2013 06:47:14 -0500
+Subject: [PATCH] clk: mvebu: staticize of_cpu_clk_setup
+In-Reply-To: <1383814773-5231-1-git-send-email-jszhang@marvell.com>
+References: <1383814773-5231-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20131107114714.GI8308@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 10:05:44AM +0000, Lee Jones wrote:
-> This hasn't been used since we moved over to a Device Tree only platform.
+On Thu, Nov 07, 2013 at 04:59:33PM +0800, Jisheng Zhang wrote:
+> This symbol is used only in this file. The patch fix the following
+> sparse warning:
+> warning: symbol 'of_cpu_clk_setup' was not declared. Should it be static?
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  drivers/clk/mvebu/clk-cpu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-The patch summary line is slightly off.  There's nothing here to do with
-ATAGs.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
