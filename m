@@ -1,93 +1,56 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 7 Nov 2013 13:56:32 +0800
-Subject: [PATCH v3 4/9] ARM: add Marvell Berlin SoC familiy to Marvell doc
-In-Reply-To: <1383661723-17956-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20131107135632.6384d705@xhacker>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 7 Nov 2013 15:04:57 +0900
+Subject: [PATCH/RFC] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
+In-Reply-To: <1383782061-7111-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383782061-7111-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CANqRtoRDo6_VYhaq9KkSCo2TnhmwW-vFK99HuBS=umrC1_fD_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian,
+Hi Laurent,
 
-I have some permission to comment this patch now ;)
+On Thu, Nov 7, 2013 at 8:54 AM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+> SH-Mobile platforms are transitioning from non-multiplatform to
+> multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
+> been created to group all multiplatform-enabled SH-Mobile SoCs. The
+> existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
+> been converted yet.
+>
+> This arrangement works fine for the arch/ code, but lots of drivers
+> needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
+> ARCH_SHMOBILE only. In order to avoid changing them, rename
+> ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
+> ARCH_SHMOBILE configuration symbol that is selected by both
+> ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-On Tue, 5 Nov 2013 06:28:38 -0800
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+Thanks, this looks good to me.
 
-> This adds known facts and rumors about the Marvell Berlin (88DE3xxx) SoC
-> family to the Marvell SoC documentation.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reviewed-by: Jason Cooper <jason@lakedaemon.net>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Changelog:
-> v2->v3:
-> - add stepping Z1 to Armada 1000 (88DE3010)
-> RFCv2->v1:
-> - move Berlin below PXA/MMP[23] where it belongs to
-> - add note about IP (re-)used in Berlin SoCs
-> RFCv1->RFCv2:
-> - initial patch
-> 
-> Cc: Rob Landley <rob@landley.net>
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  Documentation/arm/Marvell/README |   29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/Documentation/arm/Marvell/README
-> b/Documentation/arm/Marvell/README index 8f08a86..53ecf08 100644
-> --- a/Documentation/arm/Marvell/README
-> +++ b/Documentation/arm/Marvell/README
-> @@ -210,6 +210,35 @@ MMP/MMP2 family (communication processor)
->     Linux kernel mach directory: arch/arm/mach-mmp
->     Linux kernel plat directory: arch/arm/plat-pxa
->  
-> +Berlin family (Digital Entertainment)
-> +-------------------------------------
-> +
-> +  Flavors:
-> +	88DE3005, Armada 1500-mini
-> +		Design name:	BG2CD(A0)
-> +		Core:		ARM Cortex-A9, PL310 L2CC
-> +		Homepage:
-> http://www.marvell.com/digital-entertainment/armada-1500-mini/
-> +	88DE3010, Armada 1000
-> +		Design name:	BG2(Z1)
-> +		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
-> +		Product Brief:
-> http://www.marvell.com/digital-entertainment/assets/armada_1000_pb.pdf
-88DE3010 is based on ARMv5 and is too old, I bet there are no real users now. Can we
-remove it?
-> +	88DE3100, Armada 1500
-> +		Design name:	BG2(A0)
-BG2(B0), BG2(A0) and BG2(Z1) are both called 88DE3100, Armada 1500. They are
-just different Step versions. And BG2(Zx) BG2(Ax) are rarely used outside marvell
-Mostly used version is BG2(B0)
-> +		Core:		Marvell PJ4B (ARMv7), Tauros3 L2CC
-> +		Homepage:
-> http://www.marvell.com/digital-entertainment/armada-1500/
-> +		Product Brief:
-> http://www.marvell.com/digital-entertainment/armada-1500/assets/Marvell-ARMADA-1500-Product-Brief.pdf
-> +	88DE????
-> +		Design name:	BG3
-> +		Core:		ARM Cortex-A15, CA15 integrated L2CC
-> +
-> +  Homepage: http://www.marvell.com/digital-entertainment/
-> +  Directory: arch/arm/mach-berlin
-> +
-> +  Comments:
-> +   * This line of SoCs is based on Marvell Sheeva or ARM Cortex CPUs
-> +     with Synopsys DesignWare (IRQ, GPIO, Timers, ...) and PXA IP (SDHCI,
-> USB, ETH, ...).
-> +   * Currently known design names are: C2, BG2(Z1), BG2(A0), BG2CD(A0),
-> BG2CT(A0) +
->  Long-term plans
->  ---------------
->  
+Acked-by: Magnus Damm <damm@opensource.se>
+
+I have one semi-related question below:
+
+> @@ -1619,7 +1621,7 @@ config HZ_FIXED
+>         default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
+>                 ARCH_S5PV210 || ARCH_EXYNOS4
+>         default AT91_TIMER_HZ if ARCH_AT91
+> -       default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
+> +       default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE_LEGACY
+>         default 0
+>
+>  choice
+
+For the hunk above, it makes sense that we cannot HZ in the
+multiplatform case, so I think your patch is right.
+
+I do however wonder what's the plan with multiplatform and the HZ
+value, how do we handle hardware platforms that use 32768 Hz as clock?
+Historically those platforms work best with a
+even-divide-by-a-power-of-two HZ value, so with a HZ=100 value things
+may drift slowly...
+
+Cheers,
+
+/ maganus
