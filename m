@@ -1,66 +1,33 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 7 Nov 2013 19:11:45 +0900
-Subject: [PATCH v10 6/7] ARM: tegra: set CPU reset handler with firmware op
+Date: Thu, 7 Nov 2013 19:11:46 +0900
+Subject: [PATCH v10 7/7] ARM: tegra: support Trusted Foundations by default
 In-Reply-To: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
 References: <1383819106-1400-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1383819106-1400-7-git-send-email-acourbot@nvidia.com>
+Message-ID: <1383819106-1400-8-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a firmware operation to set the CPU reset handler and only resort to
-doing it ourselves if there is none defined.
-
-This supports the booting of secondary CPUs on devices using a TrustZone
-secure monitor.
+Support for Trusted Foundations is light and allows the kernel to run on
+a wider range of devices, so enable it by default.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/reset.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+ arch/arm/configs/tegra_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index e282395b071c..368af0afde46 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -21,6 +21,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include <asm/firmware.h>
- 
- #include "iomap.h"
- #include "irammap.h"
-@@ -65,6 +66,7 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
- 	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
- 						tegra_cpu_reset_handler_offset;
-+	int err;
- 
- 	BUG_ON(is_enabled);
- 	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
-@@ -72,9 +74,18 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
- 			tegra_cpu_reset_handler_size);
- 
--	tegra_cpu_reset_handler_set(reset_address);
--
--	is_enabled = true;
-+	err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
-+	switch (err) {
-+	case -ENOSYS:
-+		tegra_cpu_reset_handler_set(reset_address);
-+		/* pass-through */
-+	case 0:
-+		is_enabled = true;
-+		break;
-+	default:
-+		pr_crit("Cannot set CPU reset handler: %d\n", err);
-+		BUG();
-+	}
- }
- 
- void __init tegra_cpu_reset_handler_init(void)
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index ea042e80e54d..dddb97b06b79 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -32,6 +32,7 @@ CONFIG_PCI=y
+ CONFIG_PCI_MSI=y
+ CONFIG_PCI_TEGRA=y
+ CONFIG_PCIEPORTBUS=y
++CONFIG_TRUSTED_FOUNDATIONS=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
 -- 
 1.8.4.2
