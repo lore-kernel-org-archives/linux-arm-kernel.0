@@ -1,40 +1,34 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  7 Nov 2013 12:17:08 -0300
-Subject: [PATCH v4 04/31] ARM: mvebu: Add the core-divider clock to Armada
- 370/XP
+Date: Thu,  7 Nov 2013 12:17:09 -0300
+Subject: [PATCH v4 05/31] mtd: nand: pxa3xx: devicetree binding update
 In-Reply-To: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383837455-30721-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1383837455-30721-6-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370/XP SoC has a clock provider called "Core Divider",
-that is derived from a fixed 2 GHz PLL clock.
+Since the driver supports the new compatible string, the binding
+documentation must be updated to reflect it.
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 924c721..01e69fc 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -137,6 +137,14 @@
- 				status = "disabled";
- 			};
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+index f1421e2..bed8390 100644
+--- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+@@ -2,7 +2,9 @@ PXA3xx NAND DT bindings
  
-+			coredivclk: corediv-clock at 18740 {
-+				compatible = "marvell,armada-370-corediv-clock";
-+				reg = <0x18740 0xc>;
-+				#clock-cells = <1>;
-+				clocks = <&mainpll>;
-+				clock-output-names = "nand";
-+			};
-+
- 			timer at 20300 {
- 				reg = <0x20300 0x30>, <0x21040 0x30>;
- 				interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+ Required properties:
+ 
+- - compatible:		Should be "marvell,pxa3xx-nand"
++ - compatible:		Should be set to one of the following:
++			marvell,pxa3xx-nand
++			marvell,armada370-nand
+  - reg: 		The register base for the controller
+  - interrupts:		The interrupt to map
+  - #address-cells:	Set to <1> if the node includes partitions
 -- 
 1.8.1.5
