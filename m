@@ -1,58 +1,68 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 7 Nov 2013 00:39:32 -0800
-Subject: [PATCH] mtd: atmel_nand: fix bug driver will in a dead lock if
- no nand detected
-In-Reply-To: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
-References: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20131107083932.GJ3805@norris.computersforpeace.net>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu,  7 Nov 2013 16:41:25 +0800
+Subject: [PATCH v11 0/6] enable hi3xxx SoC
+Message-ID: <1383813691-31587-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+v11:
+ 1. Add comments on iotable.
+ 2. Use dummy clock in DTS. Remove common clock binding in DTS file. Clock driver will be in another patchset.
 
-On Tue, Nov 05, 2013 at 05:59:07PM +0800, Josh Wu wrote:
-> In the atmel driver probe function, the code shows like following:
->   atmel_nand_probe(...) {
->         ...
-> 
->   err_nand_ioremap:
->         platform_driver_unregister(&atmel_nand_nfc_driver);
->         return res;
->   }
-> 
-> If no nand flash detected, the driver probe function will goto
-> err_nand_ioremap label.
-> Then platform_driver_unregister() will be called. It will get the
-> lock of atmel_nand device since it is parent of nfc_device. The
-> problem is the lock is already hold by atmel_nand_probe itself.
-> So system will be in a dead lock.
-> 
-> This patch just simply removed to platform_driver_unregister() call.
-> When atmel_nand driver is quit the platform_driver_unregister() will
-> be called in atmel_nand_remove().
+v10:
+ 1. Use static IO mapping in Hi3xxx.
+ 2. Totally drop to support of Hi3716.
+ 3. Rename smp-off property to smp-offset.
+ 4. Remove hardcoding in hotplug driver.
 
-The real key, here, is that the platform-driver probe() has no business
-un-registering another driver, right? Shouldn't both drivers just be
-registered/unregistered in the module init/exit, and not in probe()?
+v9:
+ 1. Clean code in DTS file according to Olof's comments.
+ 2. Since debug ll patch is going through Russell's tree, remove it
+ from this patch set.
 
-Also, should this be marked for -stable?
+ v8:
+ 1. Drop to support CLK_GATE_SEPERATED_REG in common clock gate driver.
+ Support this feature in hi3xxx clock driver.
+ 2. Clean unnecessary device node in DTS.
+ 3. Define all clocks in hi3620-clk.dtsi. And all clock nodes are defined
+ in the clocks node.
+ 4. Fix the clock gate & clock mux for timer.
+ 5. Rename timer0~4 to dual_timer0~4 in DTS file. It's used to make
+ name clearer.
 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  drivers/mtd/nand/atmel_nand.c |    1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index ef9c9f5..469d4e2 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -2142,7 +2142,6 @@ err_no_card:
->  	if (host->dma_chan)
->  		dma_release_channel(host->dma_chan);
->  err_nand_ioremap:
-> -	platform_driver_unregister(&atmel_nand_nfc_driver);
->  	return res;
->  }
->  
+ v7:
+ 1. Add hi3xxx_defconfig.
+ 2. Use reg property in clock node.
+ 3. Drop origin clock divider table.
+ 4. Reuse clock divider register helper.
+ 5. Reuse clock gate register helper.
+ 6. Append CLK_GATE_SEPERATED_REG flag in order to support Hisilicon
+    Hi3620 SoC.
+ 7. Rebase DEBUG_LL for Hi3xxx.
+ 8. Add more clock node in DTS file.
 
-Brian
+ v6:
+ 1. Remove hisilicon string from properties in clock driver.
+ 2. Replace array by pointer in clock driver. Since only sctrl parent
+    node exists at this time.
+
+ v5:
+ 1. Remove HIWORD clk patches since they're merged into clk git tree.
+ 2. Set hisilicon,clk-reset property of clkgate node is optional.
+ 3. Update on commandline args in DTS file. Remove earlyprintk, mem, nfs.
+ 4. Move gpio-keys out of amba node in DTS file.
+
+ v4:
+ 1. Add clk gate with HIWORD mask for Rockchip.
+ 2. Update comments and code of HIWORD flags for mux/divider.
+ 3. Append a mux without HIWORD mask in Hisilicon 3620.
+ 4. Fix the pinmux setting in Hi4511.
+
+ v3:
+ 1. Use clk_register_mux_table().
+
+ v2:
+ 1. Reuse mux & divider driver. So append CLK_MUX_HIWORD_MASK &
+ CLK_DIVIDER_HIWORD_MASK for Hi3620 SoC.
+ 2. Fix system timer running too fast because wrong divider is choosen.
+ 3. Remove .init_irq in DT machine descriptor.
