@@ -1,68 +1,21 @@
-From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
-Date: Thu, 7 Nov 2013 15:34:58 -0500
-Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
-In-Reply-To: <527A7E20.4040107@ti.com>
-References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
- <CANacCWz_ahKaACbAHuue1XwaN3gutBA7Z6W+=zWBn8LvLwDM5w@mail.gmail.com>
- <527A7E20.4040107@ti.com>
-Message-ID: <CANacCWywXesGuA7w0m-iVspUN7u4Y-XCdvmtwgOoyw0irJ+_gA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 07 Nov 2013 15:37:29 -0500 (EST)
+Subject: [PATCH v2] phy: Add MOXA MDIO driver
+In-Reply-To: <1383666901-22354-1-git-send-email-jonas.jensen@gmail.com>
+References: <1383317673-14704-1-git-send-email-jonas.jensen@gmail.com>
+ <1383666901-22354-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20131107.153729.485901803954655270.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel,
+From: Jonas Jensen <jonas.jensen@gmail.com>
+Date: Tue,  5 Nov 2013 16:55:01 +0100
 
-On Wed, Nov 6, 2013 at 12:36 PM, Joel Fernandes <joelf@ti.com> wrote:
-> Hi Vaibhav,
->
-> On 10/31/2013 05:25 PM, Vaibhav Bedia wrote:
->> Hi Daniel,
->>
->> On Wed, Oct 30, 2013 at 4:21 PM, Daniel Mack <zonque@gmail.com> wrote:
->> [...]
->>> +
->>> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
->>> +
->>>  static struct platform_driver edma_driver = {
->>>         .driver = {
->>>                 .name   = "edma",
->>> +               .pm     = &edma_pm_ops,
->>>                 .of_match_table = edma_of_ids,
->>>         },
->>
->> A while back we discovered a nasty race condition here that had us move the EDMA
->> PM callbacks to the noirq phase. IIRC the MMC driver was resuming
->> before the EDMA
->> driver had a chance to run and that was leading to a deadlock. I am
->> not sure how to force
->> this scenario but i do remember spending time debugging this on a
->> random codebase.
->> Maybe some else has some better ideas on how to force this race condition...
->
-> I think you're talking about the patch at [1] which is not upstream. A quick
+> The MOXA UC-711X hardware(s) has an ethernet controller that seem
+> to be developed internally. The IC used is "RTL8201CP".
+> 
+> This patch adds an MDIO driver which handles the MII bus.
+> 
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 
-Yeah that's the one.
-
-> question with my limited knowledge of suspend/resume- How can there be pending
-> I/O operations between suspend/resume cycles? The sync is done before suspend,
-> so I don't understand how one is receiving a response from the card after resume
-> before EDMA can resume? I'd imagine that until all devices are resumed, there
-> will be no I/O operation issued. Let me know your thoughts.
->
-
-Sadly the commit message does not capture the details to the level it
-should have.
-
->From what i remember, during the resume operation the driver was waiting for the
-response of the first cmd that it sends and that never happened since the driver
-was setup to use DMA mode and the EDMA driver hadn't resumed. Ideally such
-issues should have been noticed a long time back. One more thing to note is that
-the MMC controller on AMx series does not have the internal DMA like OMAPx.
-However i am not sure how much that, if at all, plays a role here.
-
-Maybe someone internally still has a copy of the analysis done and you could
-try to hunt that down for more details. In case you do it would be
-good to have it
-mentioned here.
-
-Regards,
-Vaibhav
+Applied, thanks Jonas.
