@@ -1,70 +1,41 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 07 Nov 2013 17:26:06 +0000
-Subject: [PATCH v2 09/13] ARM: Disable jprobe selftests in thumb kernels
-In-Reply-To: <1381871068-27660-10-git-send-email-dave.long@linaro.org>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-10-git-send-email-dave.long@linaro.org>
-Message-ID: <1383845166.3401.77.camel@linaro1.home>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 7 Nov 2013 09:26:45 -0800
+Subject: [PATCH] seccomp: not compatible with ARM OABI
+In-Reply-To: <527B72AF.50002@imgtec.com>
+References: <20131106233117.GA24545@www.outflux.net>
+ <527B72AF.50002@imgtec.com>
+Message-ID: <CAGXu5jJn3jJs+mB76ZxOu_ibXuo9Q3mVeKjruZsJRRKpuUJd3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> jprobe kernel selftests are not supported for thumb kernels. Conditionally
-> disable them in the kernel kprobes-test module.
+On Thu, Nov 7, 2013 at 2:59 AM, James Hogan <james.hogan@imgtec.com> wrote:
+> Hi,
+>
+> On 06/11/13 23:31, Kees Cook wrote:
+>> diff --git a/arch/Kconfig b/arch/Kconfig
+>> index af2cc6eabcc7..6eaca7d92399 100644
+>> --- a/arch/Kconfig
+>> +++ b/arch/Kconfig
+>> @@ -331,12 +331,15 @@ config HAVE_ARCH_SECCOMP_FILTER
+>>
+>>  config SECCOMP_FILTER
+>>       def_bool y
+>> -     depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET
+>> +     depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET && !OABI_COMPAT
+>
+> Isn't this the whole point of HAVE_ARCH_SECCOMP_FILTER?
+>
+> Just change the select in arch/arm/Kconfig to this:
+>
+>         select HAVE_ARCH_SECCOMP_FILTER if !OABI_COMPAT
 
-I don't think it's fair to say they aren't supported, it's just that the
-implementation of jprobes and/or symbol lookup has bugs on Thumb kernels
-which the test code is finding, see
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/063026.html
+Oh! Yeah, that's a much cleaner way to handle it. I totally forgot
+that "select" could be conditional. I will respin it that way.
 
-Note, the current code works OK if the function being probed is in a
-loadable module (which is why I didn't spot the problem when doing the
-original Thumb kprobes work).
+Thanks!
 
-Now I admit that having the tests always bombing out because of this
-hinders testing of kprobes, but simply disabling the test is just
-burying this long standing problem even more. So what do people think
-about something like the change below, to let other tests get run but
-make the overall test still fail...?
-
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -221,6 +221,7 @@ static int pre_handler_called;
- static int post_handler_called;
- static int jprobe_func_called;
- static int kretprobe_handler_called;
-+static int tests_failed;
- 
- #define FUNC_ARG1 0x12345678
- #define FUNC_ARG2 0xabcdef
-@@ -457,6 +458,13 @@ static int run_api_tests(long (*func)(long, long))
- 
- 	pr_info("    jprobe\n");
- 	ret = test_jprobe(func);
-+#if defined(CONFIG_THUMB2_KERNEL) && !defined(MODULE)
-+	if (ret == -EINVAL) {
-+		pr_err("FAIL: Known longtime bug with jprobe on Thumb kernels");
-+		tests_failed = ret;
-+		ret = 0;
-+	}
-+#endif
- 	if (ret < 0)
- 		return ret;
- 
-@@ -1667,6 +1675,8 @@ static int __init run_all_tests(void)
- 
- out:
- 	if (ret == 0)
-+		ret = tests_failed;
-+	if (ret == 0)
- 		pr_info("Finished kprobe tests OK\n");
- 	else
- 		pr_err("kprobe tests failed\n");
-
-
-
+-Kees
 
 -- 
-Tixy
+Kees Cook
+Chrome OS Security
