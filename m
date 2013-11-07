@@ -1,48 +1,44 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu,  7 Nov 2013 12:45:04 +0400
-Subject: [PATCH 1/5] ARM: dts: i.MX51: Move usbphy0 node from AIPS1
-Message-ID: <1383813908-26571-1-git-send-email-shc_work@mail.ru>
+Date: Thu,  7 Nov 2013 12:45:08 +0400
+Subject: [PATCH 5/5] ARM: dts: i.MX51: Switch to use standard IRQ flags
+ definitions
+In-Reply-To: <1383813908-26571-1-git-send-email-shc_work@mail.ru>
+References: <1383813908-26571-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1383813908-26571-5-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-usbphy0 is not a part of AIPS1, so move this node under usbotg.
-Additionally this patch removes useless "status" property.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx51.dtsi | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/imx51-babbage.dts | 2 +-
+ arch/arm/boot/dts/imx51.dtsi        | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 8245b1f..5a77d33 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -148,7 +148,7 @@
+ 		spi-cs-high;
+ 		reg = <0>;
+ 		interrupt-parent = <&gpio1>;
+-		interrupts = <8 0x4>;
++		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 		regulators {
+ 			sw1_reg: sw1 {
 diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 463dfe8..1075a7d 100644
+index e0d7f5b..0ffddb5 100644
 --- a/arch/arm/boot/dts/imx51.dtsi
 +++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -189,13 +189,6 @@
- 				};
- 			};
+@@ -13,6 +13,7 @@
+ #include "skeleton.dtsi"
+ #include "imx51-pinfunc.h"
+ #include "imx51-pingrp.h"
++#include <dt-bindings/interrupt-controller/irq.h>
  
--			usbphy0: usbphy at 0 {
--				compatible = "usb-nop-xceiv";
--				clocks = <&clks 75>;
--				clock-names = "main_clk";
--				status = "okay";
--			};
--
- 			usbotg: usb at 73f80000 {
- 				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
- 				reg = <0x73f80000 0x0200>;
-@@ -204,6 +197,12 @@
- 				fsl,usbmisc = <&usbmisc 0>;
- 				fsl,usbphy = <&usbphy0>;
- 				status = "disabled";
-+
-+				usbphy0: usbphy at 0 {
-+					compatible = "usb-nop-xceiv";
-+					clocks = <&clks 75>;
-+					clock-names = "main_clk";
-+				};
- 			};
- 
- 			usbh1: usb at 73f80200 {
+ / {
+ 	aliases {
 -- 
 1.8.1.5
