@@ -1,64 +1,264 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 7 Nov 2013 09:48:06 -0600
-Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
-In-Reply-To: <527BB38A.1060609@gmail.com>
-References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
- <CANacCWz_ahKaACbAHuue1XwaN3gutBA7Z6W+=zWBn8LvLwDM5w@mail.gmail.com>
- <527A7E20.4040107@ti.com> <527B95E3.9060802@ti.com>
- <527B9673.60400@gmail.com> <527BAF63.10308@ti.com>
- <527BB38A.1060609@gmail.com>
-Message-ID: <527BB636.60403@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 7 Nov 2013 15:52:30 +0000
+Subject: [PATCH v9 03/18] arm/xen,arm64/xen: introduce p2m
+In-Reply-To: <1383835328.32399.45.camel@kazak.uk.xensource.com>
+References: <alpine.DEB.2.02.1310251144020.26077@kaball.uk.xensource.com>
+ <1382698313-13161-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1383835328.32399.45.camel@kazak.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1311071543100.26077@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2013 09:36 AM, Daniel Mack wrote:
-> On 11/07/2013 04:18 PM, Nishanth Menon wrote:
->> Tested this on a vendor V3.12 tag based kernel:
->>
->> Test patch: http://pastebin.com/AmnktQ7B
->> test: echo -n "1">/sys/power/pm_print_times; rtcwake -d /dev/rtc0 -m
->> mem -s 5
->>
->>
->> with the current patch: http://pastebin.com/RujarRLV
->> suspend_late and resume_early: http://pastebin.com/RujarRLV
+On Thu, 7 Nov 2013, Ian Campbell wrote:
+> On Fri, 2013-10-25 at 11:51 +0100, Stefano Stabellini wrote:
+> > Introduce physical to machine and machine to physical tracking
+> > mechanisms based on rbtrees for arm/xen and arm64/xen.
+> > 
+> > We need it because any guests on ARM are an autotranslate guests,
+> > therefore a physical address is potentially different from a machine
+> > address. When programming a device to do DMA, we need to be
+> > extra-careful to use machine addresses rather than physical addresses to
+> > program the device. Therefore we need to know the physical to machine
+> > mappings.
+> > 
+> > For the moment we assume that dom0 starts with a 1:1 physical to machine
+> > mapping, in other words physical addresses correspond to machine
+> > addresses. However when mapping a foreign grant reference, obviously the
+> > 1:1 model doesn't work anymore. So at the very least we need to be able
+> > to track grant mappings.
+> > 
+> > We need locking to protect accesses to the two trees.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > 
+> > Changes in v8:
+> > - move pfn_to_mfn and mfn_to_pfn to page.h as static inline functions;
+> > - no need to walk the tree if phys_to_mach.rb_node is NULL;
+> > - correctly handle multipage p2m entries;
+> > - substitute the spin_lock with a rwlock.
+> > ---
+> >  arch/arm/include/asm/xen/page.h |   49 ++++++++--
+> >  arch/arm/xen/Makefile           |    2 +-
+> >  arch/arm/xen/p2m.c              |  208 +++++++++++++++++++++++++++++++++++++++
+> >  arch/arm64/xen/Makefile         |    2 +-
+> >  4 files changed, 252 insertions(+), 9 deletions(-)
+> >  create mode 100644 arch/arm/xen/p2m.c
+> > 
+> > diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> > index 359a7b5..d1b5dd5 100644
+> > --- a/arch/arm/include/asm/xen/page.h
+> > +++ b/arch/arm/include/asm/xen/page.h
+> > @@ -7,11 +7,10 @@
+> >  #include <linux/pfn.h>
+> >  #include <linux/types.h>
+> >  
+> > +#include <xen/xen.h>
+> >  #include <xen/interface/grant_table.h>
+> >  
+> > -#define pfn_to_mfn(pfn)			(pfn)
+> >  #define phys_to_machine_mapping_valid(pfn) (1)
+> > -#define mfn_to_pfn(mfn)			(mfn)
+> >  #define mfn_to_virt(m)			(__va(mfn_to_pfn(m) << PAGE_SHIFT))
+> >  
+> >  #define pte_mfn	    pte_pfn
+> > @@ -32,6 +31,44 @@ typedef struct xpaddr {
+> >  
+> >  #define INVALID_P2M_ENTRY      (~0UL)
+> >  
+> > +unsigned long __pfn_to_mfn(unsigned long pfn);
+> > +unsigned long __mfn_to_pfn(unsigned long mfn);
+> > +extern struct rb_root phys_to_mach;
+> > +
+> > +static inline unsigned long pfn_to_mfn(unsigned long pfn)
+> > +{
+> > +	unsigned long mfn;
+> > +	
+> > +	if (phys_to_mach.rb_node != NULL) {
+> > +		mfn = __pfn_to_mfn(pfn);
+> > +		if (mfn != INVALID_P2M_ENTRY)
+> > +			return mfn;
+> > +	}
+> > +
+> > +	if (xen_initial_domain())
+> > +		return pfn;
+> > +	else
+> > +		return INVALID_P2M_ENTRY;
 > 
-> These two are identical.
+> This breaks domU ballooning (for some reason only on 64-bit, I've no
+> clue why not 32-bit).
 > 
->> suspend_noirq and resume_noirq: http://pastebin.com/nKfbm7Mj
+> decrease_reservation does pfn_to_mfn in order to release the page, and
+> this ends up passing INVALID_P2M_ENTRY, which the hypervisor rightly
+> rejects.
+>
+> > +static inline unsigned long mfn_to_pfn(unsigned long mfn)
+> > +{
+> > +	unsigned long pfn;
+> > +
+> > +	if (phys_to_mach.rb_node != NULL) {
+> > +		pfn = __mfn_to_pfn(mfn);
+> > +		if (pfn != INVALID_P2M_ENTRY)
+> > +			return pfn;
+> > +	}
+> > +
+> > +	if (xen_initial_domain())
+> > +		return mfn;
+> > +	else
+> > +		return INVALID_P2M_ENTRY;
 > 
-> And I can't see any difference between this one and the first one,
-> except for slightly different timings. Am I missing anything?
-
-aah, that happens to be a little key :)
-if you see the current patch, it happens around line 417,
-with suspend_late, it moves deeper(or later) into suspend around 738
-with noirq - it is as late as it can get - around line 823 just before
-the last set of arch suspend calls are done.
-
->> one needs to be careful of the sequence - donot forget that
->> omap_device also does stuff in the background to every SoC device in
->> noirq - sequence is paramount. you would want to ensure edma is saving
->> after every single dependent device is done with it's stuff and
->> guarenteed to never request any further transaction, and resume is
->> done before any of the dependent devices need edma. but edma is also a
->> peripheral that omap_device and generic runtime pm framework deals
->> with - so ensure sequences consider that as well.
+> Same here I think.
 > 
-> So, what would you say which sequence is correct then? :)
+> Both of these should unconditionally return their inputs for !
+> xen_initial_domain() I think.
+ 
+The swiotlb code doesn't actually need pfn_to_mfn or mfn_to_pfn to
+return invalid. I did that to be able to spot cases where the generic
+code might do something that doesn't work properly with autotranslate
+guests. Although I still believe in the original concept I guess it
+might have been a bit premature. I'll fix the two function to return
+their input if phys_to_mach.rb_node != NULL and come up with a better
+patch later on.
 
-Disclaimer: I have not dug deeper, other than a cursory look. With
-proper error handling, proper split between suspend and suspend_late
-seems appropriate to me(at noirq, runtime_get could fail as pmruntime
-is disabled as part of suspend sequence and could race with
-omap_device handling in a future cleanup there) - with the assumption
-that all drivers that are using things have cleaned up prior to that.
-edma is a generic engine that many drivers may choose to use - example
-of MMC used in this discussion is just one of other potential users -
-for a generic driver like dma, you'd want to stay as deep in the
-suspend as possible. you may also want to ensure that further calls
-will not succeed until resume is invoked.
 
--- 
-Regards,
-Nishanth Menon
+> I presume hys_to_mach.rb_node != NULL should never trigger for a domU?
+
+Theoretically it shouldn't but I would like to keep phys_to_mach.rb_node
+decoupled from concepts like dom0 and domU. I know that today we
+wouldn't use it unless we need to map foreign grants, and that would
+happen only in dom0, but I would rather keep the code more flexible
+retaining the phys_to_mach.rb_node != NULL check.
+
+
+> > +static int xen_add_phys_to_mach_entry(struct xen_p2m_entry *new)
+> > +{
+> > +	struct rb_node **link = &phys_to_mach.rb_node;
+> > +	struct rb_node *parent = NULL;
+> > +	struct xen_p2m_entry *entry;
+> > +	int rc = 0;
+> > +
+> > +	while (*link) {
+> > +		parent = *link;
+> > +		entry = rb_entry(parent, struct xen_p2m_entry, rbnode_phys);
+> > +
+> > +		if (new->mfn == entry->mfn)
+> > +			goto err_out;
+> > +		if (new->pfn == entry->pfn)
+> > +			goto err_out;
+> > +
+> > +		if (new->pfn < entry->pfn)
+> > +			link = &(*link)->rb_left;
+> > +		else
+> > +			link = &(*link)->rb_right;
+> > +	}
+> 
+> Are there really no helpers for walking an rbtree?
+
+None that I could find.
+
+
+> > +	rb_link_node(&new->rbnode_phys, parent, link);
+> > +	rb_insert_color(&new->rbnode_phys, &phys_to_mach);
+> > +	goto out;
+> > +
+> > +err_out:
+> > +	rc = -EINVAL;
+> > +	pr_warn("%s: cannot add pfn=%pa -> mfn=%pa: pfn=%pa -> mfn=%pa already exists\n",
+> > +			__func__, &new->pfn, &new->mfn, &entry->pfn, &entry->mfn);
+> > +out:
+> > +	return rc;
+> > +}
+> > +
+> > +unsigned long __pfn_to_mfn(unsigned long pfn)
+> > +{
+> > +	struct rb_node *n = phys_to_mach.rb_node;
+> > +	struct xen_p2m_entry *entry;
+> > +	unsigned long irqflags;
+> > +
+> > +	read_lock_irqsave(&p2m_lock, irqflags);
+> > +	while (n) {
+> > +		entry = rb_entry(n, struct xen_p2m_entry, rbnode_phys);
+> > +		if (entry->pfn <= pfn &&
+> > +				entry->pfn + entry->nr_pages > pfn) {
+> > +			read_unlock_irqrestore(&p2m_lock, irqflags);
+> > +			return entry->mfn + (pfn - entry->pfn);
+> > +		}
+> > +		if (pfn < entry->pfn)
+> > +			n = n->rb_left;
+> > +		else
+> > +			n = n->rb_right;
+> > +	}
+> > +	read_unlock_irqrestore(&p2m_lock, irqflags);
+> > +
+> > +	return INVALID_P2M_ENTRY;
+> > +}
+> > +EXPORT_SYMBOL_GPL(__pfn_to_mfn);
+> > +
+> > +static int xen_add_mach_to_phys_entry(struct xen_p2m_entry *new)
+> > +{
+> > +	struct rb_node **link = &mach_to_phys.rb_node;
+> > +	struct rb_node *parent = NULL;
+> > +	struct xen_p2m_entry *entry;
+> > +	int rc = 0;
+> > +
+> > +	while (*link) {
+> > +		parent = *link;
+> > +		entry = rb_entry(parent, struct xen_p2m_entry, rbnode_mach);
+> > +
+> > +		if (new->mfn == entry->mfn)
+> > +			goto err_out;
+> > +		if (new->pfn == entry->pfn)
+> > +			goto err_out;
+> > +
+> > +		if (new->mfn < entry->mfn)
+> > +			link = &(*link)->rb_left;
+> > +		else
+> > +			link = &(*link)->rb_right;
+> > +	}
+> 
+> This looks close to identical to the one in xen_add_phys_to_mach_entry.
+> You could combine them with a simple "lookup mfn" boolean.
+> 
+> 
+> > +	rb_link_node(&new->rbnode_mach, parent, link);
+> > +	rb_insert_color(&new->rbnode_mach, &mach_to_phys);
+> > +	goto out;
+> > +
+> > +err_out:
+> > +	rc = -EINVAL;
+> > +	pr_warn("%s: cannot add pfn=%pa -> mfn=%pa: pfn=%pa -> mfn=%pa already exists\n",
+> > +			__func__, &new->pfn, &new->mfn, &entry->pfn, &entry->mfn);
+> > +out:
+> > +	return rc;
+> > +}
+> > +
+> > +unsigned long __mfn_to_pfn(unsigned long mfn)
+> > +{
+> > +	struct rb_node *n = mach_to_phys.rb_node;
+> > +	struct xen_p2m_entry *entry;
+> > +	unsigned long irqflags;
+> > +
+> > +	read_lock_irqsave(&p2m_lock, irqflags);
+> > +	while (n) {
+> > +		entry = rb_entry(n, struct xen_p2m_entry, rbnode_mach);
+> > +		if (entry->mfn <= mfn &&
+> > +				entry->mfn + entry->nr_pages > mfn) {
+> > +			read_unlock_irqrestore(&p2m_lock, irqflags);
+> > +			return entry->pfn + (mfn - entry->mfn);
+> > +		}
+> > +		if (mfn < entry->mfn)
+> > +			n = n->rb_left;
+> > +		else
+> > +			n = n->rb_right;
+> > +	}
+> 
+> and this looks basically identical to __pfn_to_mfn in the same way.
+> 
+> > +	read_unlock_irqrestore(&p2m_lock, irqflags);
+> > +
+> > +	return INVALID_P2M_ENTRY;
+> > +}
+> > +EXPORT_SYMBOL_GPL(__mfn_to_pfn);
+> > +
+> 
+> Ian.
+> 
