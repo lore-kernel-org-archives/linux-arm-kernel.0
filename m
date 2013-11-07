@@ -1,140 +1,70 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 07 Nov 2013 15:44:33 -0800
-Subject: [PATCH] ARM: OMAP2+: omap_device: maintain sane runtime pm status
- around suspend/resume
-In-Reply-To: <1383857942-23630-1-git-send-email-nm@ti.com> (Nishanth Menon's
- message of "Thu, 7 Nov 2013 14:59:01 -0600")
-References: <1383857942-23630-1-git-send-email-nm@ti.com>
-Message-ID: <87iow3rd3y.fsf@linaro.org>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Fri, 08 Nov 2013 10:14:44 +1030
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+References: <1383789208.5970.1.camel@phoenix>
+ <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
+ <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
+ <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
+ <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
+ <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+ <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+Message-ID: <87zjpf4w0j.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
-
-> OMAP device hooks around suspend|resume_noirq ensures that hwmod
-> devices are forced to idle using omap_device_idle/enable as part of
-> the last stage of suspend activity.
+Axel Lin <axel.lin@ingics.com> writes:
+> 2013/11/7 Ming Lei <tom.leiming@gmail.com>:
+>> Hi,
+>>
+>> On Thu, Nov 7, 2013 at 10:47 AM, Axel Lin <axel.lin@ingics.com> wrote:
+>>>
+>>> hi Ming,
+>>> Seems CONFIG_PAGE_OFFSET is not configurabe in "make menuconfig".
+>>> And I found CONFIG_PAGE_OFFSET=0xC0000000 for all below configs...
+>>> $ make at91_dt_defconfig; grep  CONFIG_PAGE_OFFSET .config
+>>> $ make ep93xx_defconfig; grep  CONFIG_PAGE_OFFSET .config
+>>> $ make imx_v4_v5_defconfig; grep CONFIG_PAGE_OFFSET .config
+>>> $ make mxs_defconfig; grep CONFIG_PAGE_OFFSET .config
+>>> $ make omap2plus_defconfig; grep CONFIG_PAGE_OFFSET .config
+>>> $ make s3c6400_defconfig; grep CONFIG_PAGE_OFFSET .config
+>>> $ make at91x40_defconfig; grep CONFIG_PAGE_OFFSET .config
+>>> ( at91x40_defconfig is also arm7tdmi )
+>>
+>> Firstly it can be configured via VMSPLIT_3GVMSPLIT_2G/VMSPLIT_1G.
+>>
+>> Secondly, configurable or not isn't the point, and maybe some uclinux
+>> platforms do not use CONFIG_PAGE_OFFSET at all, but they should
+>> set it as a reasonable value or at least be below than the start link
+>> address of vmlinux.
 >
-> For a device such as i2c who uses autosuspend, it is possible to enter
-> the suspend path with dev->power.runtime_status = RPM_ACTIVE.
+> Hi Ming,
 >
-> As part of the suspend flow, the generic runtime logic would increment
-> it's dev->power.disable_depth to 1. This should prevent further
-> pm_runtime_get_sync from succeeding once the runtime_status has been
-> set to RPM_SUSPENDED.
->
-> Now, as part of the suspend_noirq handler in omap_device, we force the
-> following: if the device status is !suspended, we force the device
-> to idle using omap_device_idle (clocks are cut etc..). This ensures
-> that from a hardware perspective, the device is "suspended". However,
-> runtime_status is left to be active.
->
-> *if* an operation is attempted after this point to
-> pm_runtime_get_sync, runtime framework depends on runtime_status to
-> indicate accurately the device status, and since it sees it to be
-> ACTIVE, it assumes the module is functional and returns a non-error
-> value. As a result the user will see pm_runtime_get succeed, however a
-> register access will crash due to the lack of clocks.
+> I found in arch/arm/include/asm/memory.h:
+> CONFIG_PAGE_OFFSET is not used if !CONFIG_MMU.
+> So looks like setting CONFIG_PAGE_OFFSET to other value still won't work.
 
-Ouch.
+This seems like the simplest solution, but it may mean you still have
+crap in /proc/kallsyms.
 
-Dumb Q: who is requesting an i2c transaction after ->suspend_noirq().
-The i2c driver itself should be able to detect that it's being accessed
-after this point and return an error.
+Does it work for you?
 
-That being said, I agree that omap_device should still be catching this
-case in order to find/fix driver races like this.
+Thanks,
+Rusty.
 
-> To prevent this from happening, we should ensure that runtime_status
-> exactly indicates the device status. As a result of this change
-> any further calls to pm_runtime_get* would return -EACCES (since
-> disable_depth is 1). On resume, we restore the clocks and runtime
-> status exactly as we suspended with.
->
-> Reported-by: J Keerthy <j-keerthy@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Acked-by: Rajendra Nayak <rnayak@ti.com>
-> ---
-> patch baseline: V3.12 tag (also applies on linux-next next-20131107 tag)
->
-> Logs from 3.12 based vendor kernel:
-> Before: http://pastebin.com/m5KxnB7a
-> After: http://pastebin.com/8AfX4e7r
->
-> The discussion on cpufreq side of the story which triggered this scenario:
-> 	http://marc.info/?l=linux-pm&m=138263811321921&w=2
->
-> Tested on TI vendor kernel (with dt boot):
-> 	AM335x: evm, BBB, sk, BBW
-> 	OMAP5uEVM, DRA7-evm
->
->  arch/arm/mach-omap2/omap_device.c |   16 ++++++++++++++--
->  arch/arm/mach-omap2/omap_device.h |    1 +
->  2 files changed, 15 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index b69dd9a..87ecbb0 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -621,6 +621,13 @@ static int _od_suspend_noirq(struct device *dev)
->  
->  	if (!ret && !pm_runtime_status_suspended(dev)) {
->  		if (pm_generic_runtime_suspend(dev) == 0) {
-> +			if (!pm_runtime_suspended(dev)) {
 
-Why the addition check for supended here?
-
-This version (as opposed to the _status_suspended() version above will
-fail if runtime PM has been disabled from userspace (via
-/sys/devices/.../power/control), and will thus prevent low power states
-from being hit in suspend if runtime suspend has been disabled from
-userspace.  That's a bug.
-
-> +				/* NOTE: *might* indicate driver race */
-
-Yes, a driver race which should then be fixed in the driver.
-
-> +				dev_dbg(dev, "%s: Force suspending\n",
-> +					__func__);
-> +				pm_runtime_set_suspended(dev);
-> +				od->flags |= OMAP_DEVICE_SUSPEND_FORCED;
-
-Not sure why you need an additonal flag.  Why not just always do this
-and use the existin OMAP_DEVICE_SUSPENDED flag.
-
-Kevin
-
-> +			}
->  			omap_device_idle(pdev);
->  			od->flags |= OMAP_DEVICE_SUSPENDED;
->  		}
-> @@ -634,10 +641,15 @@ static int _od_resume_noirq(struct device *dev)
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct omap_device *od = to_omap_device(pdev);
->  
-> -	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
-> -	    !pm_runtime_status_suspended(dev)) {
-> +	if (od->flags & OMAP_DEVICE_SUSPENDED) {
->  		od->flags &= ~OMAP_DEVICE_SUSPENDED;
->  		omap_device_enable(pdev);
-> +
-> +		if (od->flags & OMAP_DEVICE_SUSPEND_FORCED) {
-> +			pm_runtime_set_active(dev);
-> +			od->flags &= ~OMAP_DEVICE_SUSPEND_FORCED;
-> +		}
-> +
->  		pm_generic_runtime_resume(dev);
->  	}
->  
-> diff --git a/arch/arm/mach-omap2/omap_device.h b/arch/arm/mach-omap2/omap_device.h
-> index 17ca1ae..45885b0 100644
-> --- a/arch/arm/mach-omap2/omap_device.h
-> +++ b/arch/arm/mach-omap2/omap_device.h
-> @@ -38,6 +38,7 @@ extern struct dev_pm_domain omap_device_pm_domain;
->  
->  /* omap_device.flags values */
->  #define OMAP_DEVICE_SUSPENDED		BIT(0)
-> +#define OMAP_DEVICE_SUSPEND_FORCED	BIT(1)
->  
->  /**
->   * struct omap_device - omap_device wrapper for platform_devices
+diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
+index 32b10f53d0b4..c3bd3efec4cc 100644
+--- a/scripts/link-vmlinux.sh
++++ b/scripts/link-vmlinux.sh
+@@ -82,7 +82,9 @@ kallsyms()
+ 		kallsymopt="${kallsymopt} --all-symbols"
+ 	fi
+ 
+-	kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
++	if [ -n "${CONFIG_MMU}" ]; then
++		kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
++	fi
+ 
+ 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
+ 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
