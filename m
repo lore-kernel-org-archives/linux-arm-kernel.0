@@ -1,68 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 07 Nov 2013 09:34:08 +0100
-Subject: [RFC PATCH 2/3] ARM: imx: cpuidle: Convert imx6q driver to
- platform_driver
-In-Reply-To: <20131107080743.GB6500@S2101-09.ap.freescale.net>
-References: <1382978973-4034-1-git-send-email-daniel.lezcano@linaro.org>
- <1382978973-4034-2-git-send-email-daniel.lezcano@linaro.org>
- <20131107080743.GB6500@S2101-09.ap.freescale.net>
-Message-ID: <527B5080.9030003@linaro.org>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Thu, 7 Nov 2013 16:36:50 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+References: <1383789208.5970.1.camel@phoenix>
+ <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
+ <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
+ <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
+ <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
+ <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+Message-ID: <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2013 09:07 AM, Shawn Guo wrote:
-> On Mon, Oct 28, 2013 at 09:49:32AM -0700, Daniel Lezcano wrote:
->> +static struct platform_device imx6q_cpuidle_device = {
->> +	.name = "cpuidle-imx6q",
->> +	.dev = {
->> +		.platform_data = imx6q_pm_idle,
->> +	},
->> +};
->> +
->>   void __init imx6q_pm_init(void)
->>   {
->> +	/*
->> +	 * WAIT mode is broken on TO 1.0 and 1.1, so there is no point
->> +	 * to run cpuidle on them.
->> +	 */
->> +	if (imx6q_revision() > IMX_CHIP_REVISION_1_1) {
->> +
->> +		/* Need to enable SCU standby for entering WAIT modes */
->> +		imx_scu_standby_enable();
->> +
->> +		/* Set chicken bit to get a reliable WAIT mode support */
->> +		imx6q_set_chicken_bit();
+2013/11/7 Ming Lei <tom.leiming@gmail.com>:
+> Hi,
 >
-> So this is a behavior change.  Before the patch, these two functions
-> will not get called if CONFIG_CPU_IDLE is not enabled.  We only want to
-> call them when cpuidle driver is instantiated.
-
-Yep, I will look at changing that.
-
-Thanks for the review !
-
-  -- Daniel
-
->> +
->> +		platform_device_register(&imx6q_cpuidle_device);
->> +	}
->> +
->>   	suspend_set_ops(&imx6q_pm_ops);
->>   }
->> --
->> 1.7.9.5
+> On Thu, Nov 7, 2013 at 10:47 AM, Axel Lin <axel.lin@ingics.com> wrote:
 >>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> hi Ming,
+>> Seems CONFIG_PAGE_OFFSET is not configurabe in "make menuconfig".
+>> And I found CONFIG_PAGE_OFFSET=0xC0000000 for all below configs...
+>> $ make at91_dt_defconfig; grep  CONFIG_PAGE_OFFSET .config
+>> $ make ep93xx_defconfig; grep  CONFIG_PAGE_OFFSET .config
+>> $ make imx_v4_v5_defconfig; grep CONFIG_PAGE_OFFSET .config
+>> $ make mxs_defconfig; grep CONFIG_PAGE_OFFSET .config
+>> $ make omap2plus_defconfig; grep CONFIG_PAGE_OFFSET .config
+>> $ make s3c6400_defconfig; grep CONFIG_PAGE_OFFSET .config
+>> $ make at91x40_defconfig; grep CONFIG_PAGE_OFFSET .config
+>> ( at91x40_defconfig is also arm7tdmi )
 >
+> Firstly it can be configured via VMSPLIT_3GVMSPLIT_2G/VMSPLIT_1G.
+>
+> Secondly, configurable or not isn't the point, and maybe some uclinux
+> platforms do not use CONFIG_PAGE_OFFSET at all, but they should
+> set it as a reasonable value or at least be below than the start link
+> address of vmlinux.
 
+Hi Ming,
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+I found in arch/arm/include/asm/memory.h:
+CONFIG_PAGE_OFFSET is not used if !CONFIG_MMU.
+So looks like setting CONFIG_PAGE_OFFSET to other value still won't work.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks,
+Axel
