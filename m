@@ -1,10 +1,10 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 7 Nov 2013 11:08:34 +0800
-Subject: [PATCH 1/4] arm: highbank: make use of common scu_a9_get_base()
+Date: Thu, 7 Nov 2013 11:08:40 +0800
+Subject: [PATCH 4/4] arm: socfgpa: make use of common scu_a9_get_base()
  interface
 In-Reply-To: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
 References: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1383793720-4643-2-git-send-email-jszhang@marvell.com>
+Message-ID: <1383793720-4643-8-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,22 +13,22 @@ interface is self commented.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm/mach-highbank/highbank.c | 4 ++--
+ arch/arm/mach-socfpga/socfpga.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 8e63ccd..7df007b 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -29,6 +29,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
- #include <asm/smp_plat.h>
-+#include <asm/smp_scu.h>
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index bfce964..b695887 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -24,6 +24,7 @@
  #include <asm/hardware/cache-l2x0.h>
  #include <asm/mach/arch.h>
  #include <asm/mach/map.h>
-@@ -43,8 +44,7 @@ static void __init highbank_scu_map_io(void)
++#include <asm/smp_scu.h>
+ 
+ #include "core.h"
+ 
+@@ -51,8 +52,7 @@ static void __init socfpga_scu_map_io(void)
  {
  	unsigned long base;
  
@@ -36,7 +36,7 @@ index 8e63ccd..7df007b 100644
 -	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
 +	base = scu_a9_get_base();
  
- 	scu_base_addr = ioremap(base, SZ_4K);
- }
+ 	scu_io_desc.pfn = __phys_to_pfn(base);
+ 	iotable_init(&scu_io_desc, 1);
 -- 
 1.8.4.2
