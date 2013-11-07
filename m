@@ -1,51 +1,101 @@
-From: Li.Xiubo@freescale.com (Li Xiubo)
-Date: Thu, 7 Nov 2013 03:01:02 +0000
-Subject: [PATCHv2 5/8] ASoC: SGTL5000: Enhance the SGTL5000 codec driver
- about regulator.
-In-Reply-To: <20131106100305.GI11602@sirena.org.uk>
-References: <1383289495-24523-1-git-send-email-Li.Xiubo@freescale.com>
- <1383289495-24523-6-git-send-email-Li.Xiubo@freescale.com>
- <20131101185045.GG2493@sirena.org.uk>
- <1DD289F6464F0949A2FCA5AA6DC23F82876EFF@039-SN2MPN1-013.039d.mgd.msft.net>
- <20131106100305.GI11602@sirena.org.uk>
-Message-ID: <1DD289F6464F0949A2FCA5AA6DC23F828783E6@039-SN2MPN1-013.039d.mgd.msft.net>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 7 Nov 2013 11:08:35 +0800
+Subject: [PATCH v5 1/3] arm: mvebu: add missing of_node_put() to fix reference
+ leak
+In-Reply-To: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
+References: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1383793720-4643-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The SGTL5000 is based on regulators and when it is disabled, there
-> > will be an error returns directly while the SGTL5000 codec is probing.
-> 
-> What makes you say this?  
->
+Add of_node_put to properly decrement the refcount when we are
+done using a given node.
 
->From the code:
-File path: "sound/soc/codecs/sgtl5000.c"
-==================
-#ifdef CONFIG_REGULATOR
-.....
-#else
-static int ldo_regulator_register(struct snd_soc_codec *codec,
-                                struct regulator_init_data *init_data,
-                                int voltage)
-{
-        dev_err(codec->dev, "this setup needs regulator support in the kernel\n");
-        return -EINVAL;
-}
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/mach-mvebu/armada-370-xp.c     | 1 +
+ arch/arm/mach-mvebu/coherency.c         | 8 +++++++-
+ arch/arm/mach-mvebu/platsmp.c           | 1 +
+ arch/arm/mach-mvebu/pmsu.c              | 1 +
+ arch/arm/mach-mvebu/system-controller.c | 1 +
+ 5 files changed, 11 insertions(+), 1 deletion(-)
 
-static int ldo_regulator_remove(struct snd_soc_codec *codec)
-{
-        return 0;
-}
-#endif
--------------------
-
-sgtl5000_probe() -->
-sgtl5000_enable_regulators() -->
-sgtl5000_replace_vddd_with_ldo() -->
-ldo_regulator_register().
-
-
-> That's not how the regulator API works.  Have
-> you actually seen any problems?
-
-There are some regulator APIs implemented by SGTL5000 driver, not the regulator subsystem APIs.
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index 97cbb80..8a1ae83 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -64,6 +64,7 @@ static void __init armada_370_xp_mbus_init(void)
+ 			ARMADA_370_XP_MBUS_WINS_SIZE,
+ 			of_translate_address(dn, &sdram_wins_offs),
+ 			ARMADA_370_XP_SDRAM_WINS_SIZE);
++	of_node_put(dn);
+ }
+ 
+ static void __init armada_370_xp_timer_and_clk_init(void)
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 4c24303..58adf2f 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -140,6 +140,7 @@ int __init coherency_init(void)
+ 		coherency_base = of_iomap(np, 0);
+ 		coherency_cpu_base = of_iomap(np, 1);
+ 		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
++		of_node_put(np);
+ 	}
+ 
+ 	return 0;
+@@ -147,9 +148,14 @@ int __init coherency_init(void)
+ 
+ static int __init coherency_late_init(void)
+ {
+-	if (of_find_matching_node(NULL, of_coherency_table))
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, of_coherency_table);
++	if (np) {
+ 		bus_register_notifier(&platform_bus_type,
+ 				      &mvebu_hwcc_platform_nb);
++		of_node_put(np);
++	}
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index ce81d30..e7edb82 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -95,6 +95,7 @@ static void __init armada_xp_smp_init_cpus(void)
+ 		panic("No 'cpus' node found\n");
+ 
+ 	ncores = of_get_child_count(np);
++	of_node_put(np);
+ 	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
+ 		panic("Invalid number of CPUs in DT\n");
+ 
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 3cc4bef..27fc4f0 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -67,6 +67,7 @@ int __init armada_370_xp_pmsu_init(void)
+ 		pr_info("Initializing Power Management Service Unit\n");
+ 		pmsu_mp_base = of_iomap(np, 0);
+ 		pmsu_reset_base = of_iomap(np, 1);
++		of_node_put(np);
+ 	}
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+index f875124..5175083c 100644
+--- a/arch/arm/mach-mvebu/system-controller.c
++++ b/arch/arm/mach-mvebu/system-controller.c
+@@ -98,6 +98,7 @@ static int __init mvebu_system_controller_init(void)
+ 		BUG_ON(!match);
+ 		system_controller_base = of_iomap(np, 0);
+ 		mvebu_sc = (struct mvebu_system_controller *)match->data;
++		of_node_put(np);
+ 	}
+ 
+ 	return 0;
+-- 
+1.8.4.rc3
