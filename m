@@ -1,51 +1,77 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 07 Nov 2013 11:19:41 +0100
-Subject: [PATCH 2/2] clocksource: sun4i: change CPU mask to
- cpu_possible_mask
-In-Reply-To: <1382699771-4396-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1382699771-4396-1-git-send-email-maxime.ripard@free-electrons.com>
- <1382699771-4396-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <527B693D.9010304@linaro.org>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 7 Nov 2013 18:26:39 +0800
+Subject: [PATCH] mtd: atmel_nand: fix bug driver will in a dead lock if
+ no nand detected
+In-Reply-To: <20131107083932.GJ3805@norris.computersforpeace.net>
+References: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
+ <20131107083932.GJ3805@norris.computersforpeace.net>
+Message-ID: <527B6ADF.1090201@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2013 01:16 PM, Maxime Ripard wrote:
-> The interrupt for the timer is a shared processor interrupt, so any CPU
-> found in the system can handle it. Switch to our cpumask to
-> cpu_possible_mask instead of cpumask_of(0).
+Hi, Brian
+
+On 11/7/2013 4:39 PM, Brian Norris wrote:
+> Hi Josh,
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> On Tue, Nov 05, 2013 at 05:59:07PM +0800, Josh Wu wrote:
+>> In the atmel driver probe function, the code shows like following:
+>>    atmel_nand_probe(...) {
+>>          ...
+>>
+>>    err_nand_ioremap:
+>>          platform_driver_unregister(&atmel_nand_nfc_driver);
+>>          return res;
+>>    }
+>>
+>> If no nand flash detected, the driver probe function will goto
+>> err_nand_ioremap label.
+>> Then platform_driver_unregister() will be called. It will get the
+>> lock of atmel_nand device since it is parent of nfc_device. The
+>> problem is the lock is already hold by atmel_nand_probe itself.
+>> So system will be in a dead lock.
+>>
+>> This patch just simply removed to platform_driver_unregister() call.
+>> When atmel_nand driver is quit the platform_driver_unregister() will
+>> be called in atmel_nand_remove().
+> The real key, here, is that the platform-driver probe() has no business
+> un-registering another driver, right?
 
-Applied to my tree for 3.14
+right.
 
-Thanks !
+> Shouldn't both drivers just be
+> registered/unregistered in the module init/exit, and not in probe()?
 
-sidenote: did you look at the CLOCK_EVT_FEAT_DYNIRQ flag ? It may reduce 
-the number of wakeup for your system.
+currently the NFC driver is registered in the beginning of nand probe 
+function. After NFC driver is initialized, the rest of the nand probe 
+function
+will check the NFC driver status.
+I am not sure it is proper to registered another driver in a probe().
 
-> ---
->   drivers/clocksource/sun4i_timer.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-> index a7f492e..6a76b4e 100644
-> --- a/drivers/clocksource/sun4i_timer.c
-> +++ b/drivers/clocksource/sun4i_timer.c
-> @@ -187,7 +187,7 @@ static void __init sun4i_timer_init(struct device_node *node)
->   	val = readl(timer_base + TIMER_IRQ_EN_REG);
->   	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
->
-> -	sun4i_clockevent.cpumask = cpumask_of(0);
-> +	sun4i_clockevent.cpumask = cpu_possible_mask;
->   	sun4i_clockevent.irq = irq;
->
->   	clockevents_config_and_register(&sun4i_clockevent, rate,
->
+> Also, should this be marked for -stable?
 
+Shouldn't cc to stable after the patch is merged in mtd mail list?
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Best Regards,
+Josh Wu
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>   drivers/mtd/nand/atmel_nand.c |    1 -
+>>   1 file changed, 1 deletion(-)
+>>
+>> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+>> index ef9c9f5..469d4e2 100644
+>> --- a/drivers/mtd/nand/atmel_nand.c
+>> +++ b/drivers/mtd/nand/atmel_nand.c
+>> @@ -2142,7 +2142,6 @@ err_no_card:
+>>   	if (host->dma_chan)
+>>   		dma_release_channel(host->dma_chan);
+>>   err_nand_ioremap:
+>> -	platform_driver_unregister(&atmel_nand_nfc_driver);
+>>   	return res;
+>>   }
+>>   
+> Brian
