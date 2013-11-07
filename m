@@ -1,134 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 7 Nov 2013 13:26:55 +0100
-Subject: [RFC 3/4] ASoC: Allow Aux Codecs to be specified using DT
-In-Reply-To: <20131106142559.GC15551@amd.pavel.ucw.cz>
-References: <1382909086-10493-1-git-send-email-sre@debian.org>
- <1382909086-10493-4-git-send-email-sre@debian.org>
- <20131106142559.GC15551@amd.pavel.ucw.cz>
-Message-ID: <20131107122655.GA7110@amd.pavel.ucw.cz>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Thu,  7 Nov 2013 18:08:40 +0530
+Subject: [RFC v1 PATCH] ARM64: KGDB: Add FPSIMD debug support
+Message-ID: <1383827921-18526-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
+Based on ARM64 KGDB support patches, KGDB support for
+FPSIMD is added. Only debugging of FPSIMD is kernel context
+is supported.
 
-> So in (error) case of ! aux_dev->codec_of_node && ! aux_dev->codec_name 
-> we match first possible codec?
-> 
-> Given code similarity between this and the one above, should there be
-> helper function that does the comparison (or even walks the list)?
+This patch also requires Ard's patches where in kernel support
+for NEON is added. So CONFIG_KERNEL_MODE_NEON should  be enabled.
+with this, FPSIMD registers can be viewed or set from gdb tool.
 
-Something like this? soc_probe_aux_dev now looks better... (Only
-compile tested).
+Unlike CPU registers, the FPSIMD registers are not saved on 
+exception entry. With the known restriction that FPSIMD  should not be
+touched in interrupt/exception context, in this patch the FPSIMD
+registers are directly read/written on gdb tool request
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Here, the FPSIMD registers are read and restored for every FPSIMD
+register read and write by GDB tool. So this has impact on 
+gdb tool response which is neglible. Other architectures like
+mips are also implemented similarly
 
-diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-index 392f479..3097e17 100644
---- a/sound/soc/soc-core.c
-+++ b/sound/soc/soc-core.c
-@@ -1526,69 +1526,65 @@ static void soc_unregister_ac97_dai_link(struct snd_soc_codec *codec)
- }
- #endif
- 
--static int soc_check_aux_dev(struct snd_soc_card *card, int num)
-+struct snd_soc_codec *soc_find_matching_codec(struct snd_soc_card *card, int num)
- {
- 	struct snd_soc_aux_dev *aux_dev = &card->aux_dev[num];
--	const char *codecname = aux_dev->codec_name;
- 	struct snd_soc_codec *codec;
- 
--	/* find CODEC from registered CODECs*/
-+	/* find CODEC from registered CODECs */
- 	list_for_each_entry(codec, &codec_list, list) {
--		if (aux_dev->codec_of_node &&
--				codec->dev->of_node == aux_dev->codec_of_node)
--			return 0;
--		if (aux_dev->codec_name &&
--				!strcmp(codec->name, aux_dev->codec_name))
--			return 0;
-+		if (aux_dev->codec_of_node && 
-+		    (codec->dev->of_node != aux_dev->codec_of_node))
-+			continue;
-+		if (aux_dev->codec_name && strcmp(codec->name, aux_dev->codec_name))
-+			continue;
-+		return codec;
- 	}
-+	return NULL;
-+}
- 
-+static int soc_check_aux_dev(struct snd_soc_card *card, int num)
-+{
-+	struct snd_soc_aux_dev *aux_dev = &card->aux_dev[num];
-+	const char *codecname = aux_dev->codec_name;
-+	struct snd_soc_codec *codec = soc_find_matching_codec(card, num);
-+
-+	if (codec)
-+		return 0;
- 	if (aux_dev->codec_of_node)
- 		codecname = of_node_full_name(aux_dev->codec_of_node);
- 
- 	dev_err(card->dev, "ASoC: %s not registered\n", codecname);
--
- 	return -EPROBE_DEFER;
- }
- 
-+
- static int soc_probe_aux_dev(struct snd_soc_card *card, int num)
- {
- 	struct snd_soc_aux_dev *aux_dev = &card->aux_dev[num];
--	struct snd_soc_codec *codec;
- 	const char *codecname = aux_dev->codec_name;
- 	int ret = -ENODEV;
-+	struct snd_soc_codec *codec = soc_find_matching_codec(card, num);
- 
--	/* find CODEC from registered CODECs*/
--	list_for_each_entry(codec, &codec_list, list) {
--		if (aux_dev->codec_of_node &&
--				codec->dev->of_node != aux_dev->codec_of_node)
--			continue;
--		if (aux_dev->codec_name &&
--				strcmp(codec->name, aux_dev->codec_name))
--			continue;
-+	if (!codec) {
-+		if (aux_dev->codec_of_node)
-+			codecname = of_node_full_name(aux_dev->codec_of_node);
- 
--		if (codec->probed) {
--			dev_err(codec->dev, "ASoC: codec already probed");
--			ret = -EBUSY;
--			goto out;
--		}
--		goto found;
-+		/* codec not found */
-+		dev_err(card->dev, "ASoC: codec %s not found", codecname);
-+		return -EPROBE_DEFER;
- 	}
- 
--	if (aux_dev->codec_of_node)
--		codecname = of_node_full_name(aux_dev->codec_of_node);
--
--	/* codec not found */
--	dev_err(card->dev, "ASoC: codec %s not found", codecname);
--	return -EPROBE_DEFER;
-+	if (codec->probed) {
-+		dev_err(codec->dev, "ASoC: codec already probed");
-+		return -EBUSY;
-+	}
- 
--found:
- 	ret = soc_probe_codec(card, codec);
- 	if (ret < 0)
- 		return ret;
- 
- 	ret = soc_post_component_init(card, codec, num, 1);
--
--out:
- 	return ret;
- }
- 
+Tested on ARM64 simulator
 
+Vijaya Kumar K (1):
+  ARM64: KGDB: Add FP/SIMD debug support
+
+ arch/arm64/kernel/kgdb.c |   98 ++++++++++++++++++++++++++++------------------
+ 1 file changed, 60 insertions(+), 38 deletions(-)
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.9.5
