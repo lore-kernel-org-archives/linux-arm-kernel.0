@@ -1,42 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Nov 2013 10:41:02 +0100
-Subject: PINCTRL:We May need mutex protect in pinctrl API
-In-Reply-To: <201311071253281097419@gmail.com>
-References: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
- <1383732348-18576-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdZekui-CoPdwtyATQyAv07CZp3B9L=qU6xAk8J43=Bb6w@mail.gmail.com>
- <201311071253281097419@gmail.com>
-Message-ID: <CACRpkdYUKKLvMWcSxb24ZvYUq1QMzs9cw-h5CpZ1Q5S2s3RVBQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 7 Nov 2013 09:47:05 +0000
+Subject: [PATCH] arm64: enable EDAC on arm64
+In-Reply-To: <CAL_JsqLwFHeRZzaMAxNmPSfNeVb_W2Ng=mXBkyUPQx+=beHyTg@mail.gmail.com>
+References: <1383742944-28059-1-git-send-email-robherring2@gmail.com>
+ <20131106152608.GD979@arm.com>
+ <CAL_JsqLwFHeRZzaMAxNmPSfNeVb_W2Ng=mXBkyUPQx+=beHyTg@mail.gmail.com>
+Message-ID: <20131107094705.GB13674@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 7, 2013 at 5:53 AM, xulinuxkernel at gmail.com
-<xulinuxkernel@gmail.com> wrote:
+On Wed, Nov 06, 2013 at 06:39:18PM +0000, Rob Herring wrote:
+> On Wed, Nov 6, 2013 at 9:26 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Nov 06, 2013 at 01:02:24PM +0000, Rob Herring wrote:
+> >> +static inline void atomic_scrub(void *va, u32 size)
+> >> +{
+> >> +     unsigned int *virt_addr = va;
+> >> +     unsigned int temp, temp2;
+> >> +     unsigned int i;
+> >> +
+> >> +     for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
+> >> +             /*
+> >> +              * No need to check for store failure, another write means
+> >> +              * the scrubbing has effectively already been done for us.
+> >> +              */
+> >> +             asm volatile("\n"
+> >> +                     "       ldxr    %0, %2\n"
+> >> +                     "       stxr    %w1, %0, %2\n"
+> >> +                     : "=&r" (temp), "=&r" (temp2), "+Q" (virt_addr)
+> >> +                     : : "cc");
+> >
+> > But failure of stxr does not necessarily mean another write. It can be
+> > an interrupt, cache line migration etc. The exclusive monitor can be
+> > emulated in many ways.
+> 
+> Right, I was thinking I could simplify things.
+> 
+> In that case, I could implement this with just "atomic64_add(0,
+> virt_addr)", but is there any guarantee that atomic64_t has a size of
+> 8 bytes and that I can simply increment an atomic64_t ptr?
 
-> Recently, our company use kernel 3.10 instead of 3.8.When we test the kernel
-> we found there would be hang up in pinctrl subsystem,the reason may be as
-> following,
-> In out system,nand and spi pins are some of the same,so we need frequently
-> get pinctrl and put pinctrl. and sd card also frequently get and put
-> pinctrl.
-> when the nand and sd card both come in
-> pinctrl_lookup_state
+I would rather add just an asm volatile (as you've done) to avoid the
+'add' inside the loop and force casting to atomic64_t.
 
-If you're repeatedly doing pinctrl_lookup_state() in your driver,
-then *this* is the problem, not that the pinctrl_lookup_state()
-is not mutexed.
-
-You should lookup your states at probe() and at runtime
-only use pinctrl_select_state() to move between different
-states.
-
-Can you please refer me to the code in the upstream kernel
-that is causing this.
-
-If your code is not upstream and you're abusing the interface
-as described above, the actual problem you have is that
-you need to get your code upstream and properly reviewed
-by the community.
-
-Yours,
-Linus Walleij
+-- 
+Catalin
