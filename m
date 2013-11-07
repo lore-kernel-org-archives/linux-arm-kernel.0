@@ -1,11 +1,11 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 7 Nov 2013 11:46:06 -0500 (EST)
+Date: Thu, 7 Nov 2013 11:47:46 -0500 (EST)
 Subject: [PATCH v3 3/4] ARM: EXYNOS: add Exynos Dual Cluster Support
 In-Reply-To: <20131107130141.GA3129@localhost.localdomain>
 References: <1383811969-32712-1-git-send-email-v.tyrtov@samsung.com>
  <1383811969-32712-4-git-send-email-v.tyrtov@samsung.com>
  <20131107130141.GA3129@localhost.localdomain>
-Message-ID: <alpine.LFD.2.03.1311071123560.18068@syhkavp.arg>
+Message-ID: <alpine.LFD.2.03.1311071146090.18068@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
