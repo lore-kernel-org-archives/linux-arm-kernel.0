@@ -1,42 +1,46 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 7 Nov 2013 11:08:40 +0800
-Subject: [PATCH 4/4] arm: socfgpa: make use of common scu_a9_get_base()
- interface
+Date: Thu, 7 Nov 2013 11:08:37 +0800
+Subject: [PATCH v5 2/3] bus: mvebu: add missing of_node_put() to fix reference
+ leak
 In-Reply-To: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
 References: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1383793720-4643-8-git-send-email-jszhang@marvell.com>
+Message-ID: <1383793720-4643-5-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of common scu_a9_get_base() and delete the comment since the
-interface is self commented.
+Add of_node_put to properly decrement the refcount when we are
+done using a given node.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/mach-socfpga/socfpga.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/bus/mvebu-mbus.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index bfce964..b695887 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -24,6 +24,7 @@
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-+#include <asm/smp_scu.h>
- 
- #include "core.h"
- 
-@@ -51,8 +52,7 @@ static void __init socfpga_scu_map_io(void)
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 33c6947..20da90f 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -837,6 +837,7 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
  {
- 	unsigned long base;
+ 	struct mvebu_mbus_state *mbus = &mbus_state;
+ 	const struct of_device_id *of_id;
++	struct device_node *np;
+ 	int win;
  
--	/* Get SCU base */
--	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
-+	base = scu_a9_get_base();
+ 	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
+@@ -860,8 +861,11 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 		return -ENOMEM;
+ 	}
  
- 	scu_io_desc.pfn = __phys_to_pfn(base);
- 	iotable_init(&scu_io_desc, 1);
+-	if (of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
++	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
++	if (np) {
+ 		mbus->hw_io_coherency = 1;
++		of_node_put(np);
++	}
+ 
+ 	for (win = 0; win < mbus->soc->num_wins; win++)
+ 		mvebu_mbus_disable_window(mbus, win);
 -- 
-1.8.4.2
+1.8.4.rc3
