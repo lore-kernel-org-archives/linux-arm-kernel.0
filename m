@@ -1,48 +1,103 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  7 Nov 2013 12:17:13 -0300
-Subject: [PATCH v4 09/31] mtd: nand: pxa3xx: read_page() returns max_bitflips
+Date: Thu,  7 Nov 2013 12:17:14 -0300
+Subject: [PATCH v4 10/31] mtd: nand: pxa3xx: Early variant detection
 In-Reply-To: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383837455-30721-10-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1383837455-30721-11-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per the ecc.read_page() prototype, we must return the maximum number
-of bitflips that were corrected on any one region covering an ecc step.
+In order to customize early settings depending on the detected SoC variant,
+move the detection to be before the nand_chip struct filling.
+
+In a follow-up patch, this change is needed to detect the variant *before*
+the call to alloc_nand_resource(), which allows to set a different cmdfunc()
+for each variant.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 48 +++++++++++++++++++++---------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index c578ca7..521d43e 100644
+index 521d43e..c686adf 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -751,6 +751,7 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
+@@ -258,6 +258,29 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
+ /* convert nano-seconds to nand flash controller clock cycles */
+ #define ns2cycle(ns, clk)	(int)((ns) * (clk / 1000000) / 1000)
+ 
++static struct of_device_id pxa3xx_nand_dt_ids[] = {
++	{
++		.compatible = "marvell,pxa3xx-nand",
++		.data       = (void *)PXA3XX_NAND_VARIANT_PXA,
++	},
++	{
++		.compatible = "marvell,armada370-nand",
++		.data       = (void *)PXA3XX_NAND_VARIANT_ARMADA370,
++	},
++	{}
++};
++MODULE_DEVICE_TABLE(of, pxa3xx_nand_dt_ids);
++
++static enum pxa3xx_nand_variant
++pxa3xx_nand_get_variant(struct platform_device *pdev)
++{
++	const struct of_device_id *of_id =
++			of_match_device(pxa3xx_nand_dt_ids, &pdev->dev);
++	if (!of_id)
++		return PXA3XX_NAND_VARIANT_PXA;
++	return (enum pxa3xx_nand_variant)of_id->data;
++}
++
+ static void pxa3xx_nand_set_timing(struct pxa3xx_nand_host *host,
+ 				   const struct pxa3xx_nand_timing *t)
  {
- 	struct pxa3xx_nand_host *host = mtd->priv;
- 	struct pxa3xx_nand_info *info = host->info_data;
-+	int max_bitflips = 0;
+@@ -1125,6 +1148,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 		return -ENOMEM;
  
- 	chip->read_buf(mtd, buf, mtd->writesize);
- 	chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
-@@ -758,6 +759,7 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
- 	if (info->retcode == ERR_SBERR) {
- 		switch (info->use_ecc) {
- 		case 1:
-+			max_bitflips = 1;
- 			mtd->ecc_stats.corrected++;
- 			break;
- 		case 0:
-@@ -776,7 +778,7 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
- 			mtd->ecc_stats.failed++;
- 	}
- 
--	return 0;
-+	return max_bitflips;
+ 	info->pdev = pdev;
++	info->variant = pxa3xx_nand_get_variant(pdev);
+ 	for (cs = 0; cs < pdata->num_cs; cs++) {
+ 		mtd = (struct mtd_info *)((unsigned int)&info[1] +
+ 		      (sizeof(*mtd) + sizeof(*host)) * cs);
+@@ -1260,29 +1284,6 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
+ 	return 0;
  }
  
- static uint8_t pxa3xx_nand_read_byte(struct mtd_info *mtd)
+-static struct of_device_id pxa3xx_nand_dt_ids[] = {
+-	{
+-		.compatible = "marvell,pxa3xx-nand",
+-		.data       = (void *)PXA3XX_NAND_VARIANT_PXA,
+-	},
+-	{
+-		.compatible = "marvell,armada370-nand",
+-		.data       = (void *)PXA3XX_NAND_VARIANT_ARMADA370,
+-	},
+-	{}
+-};
+-MODULE_DEVICE_TABLE(of, pxa3xx_nand_dt_ids);
+-
+-static enum pxa3xx_nand_variant
+-pxa3xx_nand_get_variant(struct platform_device *pdev)
+-{
+-	const struct of_device_id *of_id =
+-			of_match_device(pxa3xx_nand_dt_ids, &pdev->dev);
+-	if (!of_id)
+-		return PXA3XX_NAND_VARIANT_PXA;
+-	return (enum pxa3xx_nand_variant)of_id->data;
+-}
+-
+ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
+ {
+ 	struct pxa3xx_nand_platform_data *pdata;
+@@ -1339,7 +1340,6 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	info = platform_get_drvdata(pdev);
+-	info->variant = pxa3xx_nand_get_variant(pdev);
+ 	probe_success = 0;
+ 	for (cs = 0; cs < pdata->num_cs; cs++) {
+ 		struct mtd_info *mtd = info->host[cs]->mtd;
 -- 
 1.8.1.5
