@@ -1,11 +1,11 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 7 Nov 2013 09:42:57 -0800
+Date: Thu, 7 Nov 2013 09:43:46 -0800
 Subject: [PATCH v3 1/2] arm/arm64: KVM: MMIO support for BE guest
 In-Reply-To: <527BCB7A.6010800@arm.com>
 References: <1383677895-3728-1-git-send-email-marc.zyngier@arm.com>
  <1383677895-3728-2-git-send-email-marc.zyngier@arm.com>
  <20131107051023.GA18387@cbox> <527BCB7A.6010800@arm.com>
-Message-ID: <CAMJs5B9VpR0=JHoasoKcZHumQ-NxG_d2VrsHo3FHgtk-8w5t1A@mail.gmail.com>
+Message-ID: <CAMJs5B-DV02qegxNvDQ37yzrjOBrP8Fzxpx7FeErGYxPA9T=ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -56,12 +56,6 @@ On 7 November 2013 09:18, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > They are not strictly mandatory, but I feel a lot more confident
 > trimming what we found in the register to the bare minimum.
 >
-
-hmm, yeah, I guess a strb would trim anything above the first 8 bits
-anyhow.  But I believe this is done through your typed assignments of
-mmio_write_data and mmio_write_read.  But ok, I can live with a bit of
-OCD here, as long as I know the reason.
-
 >>> +            case 2:
 >>> +                    return be16_to_cpu(data & 0xffff);
 >>> +            default:
@@ -170,11 +164,6 @@ OCD here, as long as I know the reason.
 > worth the complexity. I'll rename this for the time being, and look at
 > unifying the two.
 >
-
-If I'm not mistaken the mmio_{read,write} in the vgic code is
-basically just casting the data pointer to a u32* and assigning it a
-value.
-
 >>>  /**
 >>>   * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
 >>>   * @vcpu: The VCPU pointer
@@ -264,6 +253,10 @@ value.
 >
 > I'll so something similar in a separate patch.
 >
+
+you actually replicate bit 25 in the next patch as well, so you can
+gain immediate reuse of your define :)
+
 >>> +}
 >>> +
 >>> +static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
