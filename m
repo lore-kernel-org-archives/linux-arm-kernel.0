@@ -1,24 +1,63 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Thu, 07 Nov 2013 13:09:41 -0800
-Subject: [RFC PATCH 0/4] wire up CPU features to udev based module loading
-In-Reply-To: <1383844657-17487-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1383844657-17487-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <527C0195.50008@zytor.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 7 Nov 2013 13:12:29 -0800
+Subject: [PATCH bugfix] mtd: gpmi: serialize all the dma operations
+In-Reply-To: <1383728007-15564-1-git-send-email-b32955@freescale.com>
+References: <1383728007-15564-1-git-send-email-b32955@freescale.com>
+Message-ID: <20131107211229.GY20061@ld-irv-0074.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2013 09:17 AM, Ard Biesheuvel wrote:
-> This series implements automatic module loading based on optional CPU features,
-> and tries to do so in a generic way. Currently, 32 feature bits are supported,
-> and how they map to actual CPU features is entirely up to the architecture.
+Hi Huang,
 
-NAK.
+On Wed, Nov 06, 2013 at 04:53:27PM +0800, Huang Shijie wrote:
+> [1] The gpmi uses the nand_command_lp to issue the commands to NAND chips.
+>     It will issue a DMA operation when it handles a NAND_CMD_NONE control
+>     command. So when we read a page(NAND_CMD_READ0) from the NAND, we may send
+>     two DMA operations back-to-back.
+> 
+>     If we do not serialize the two DMA operations, we will meet a bug when
+> 
+>     1.1) we enable CONFIG_DMA_API_DEBUG, CONFIG_DMADEVICES_DEBUG,
+>          and CONFIG_DEBUG_SG.
+> 
+>     1.2) Use the following commands in an UART console and a SSH console:
+>          cmd 1: while true;do dd if=/dev/mtd0 of=/dev/null;done
+>          cmd 1: while true;do dd if=/dev/mmcblk0 of=/dev/null;done
 
-We in the x86 world already left 32 bits way behind; we currently have
-320 bit feature masks.
+How does mmcblk0 have anything to do with the GPMI NAND DMA?
 
-If you're aiming at doing this in a generic way, it needs to be able to
-accommodate the current x86cpu feature stuff as a subset, which this
-doesn't.
+>     The kernel log shows below:
+>     -----------------------------------------------------------------
+>     kernel BUG at lib/scatterlist.c:28!
+>     Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>       .........................
+>     [<80044a0c>] (__bug+0x18/0x24) from [<80249b74>] (sg_next+0x48/0x4c)
+>     [<80249b74>] (sg_next+0x48/0x4c) from [<80255398>] (debug_dma_unmap_sg+0x170/0x1a4)
+>     [<80255398>] (debug_dma_unmap_sg+0x170/0x1a4) from [<8004af58>] (dma_unmap_sg+0x14/0x6c)
+>     [<8004af58>] (dma_unmap_sg+0x14/0x6c) from [<8027e594>] (mxs_dma_tasklet+0x18/0x1c)
+>     [<8027e594>] (mxs_dma_tasklet+0x18/0x1c) from [<8007d444>] (tasklet_action+0x114/0x164)
+>     -----------------------------------------------------------------
+> 
+>     1.3) Assume the two DMA operations is X (first) and Y (second).
+>          The root cause of the bug:
+>          X's tasklet mxs_dma_tasklet trid to unmap the scatterlist, while Y is
+>          trying to set up a new DMA operation with the _SAME_ scatterlist in
+>          another ARM core.
 
-	-hpa
+How are X and Y occurring concurrently? MTD/NAND has locking such that
+only one I/O operation is working on the chip at one time, right?
+
+> [2] This patch adds a wait queue and two helpers gpmi_enter_dma/gpmi_exit_dma to
+>     serialize all the DMA operations.
+
+If you really need this serialization, wouldn't a spinlock or mutex
+suffice?
+
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> Cc: stable at vger.kernel.org
+
+Perhaps I'm missing some things, but I don't feel like the problem is
+sufficiently well described, and I'm not sure this is the right
+solution. But please, educate me.
+
+Brian
