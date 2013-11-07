@@ -1,69 +1,73 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 7 Nov 2013 10:09:42 -0800
-Subject: [PATCH] mtd: atmel_nand: fix bug driver will in a dead lock if
- no nand detected
-In-Reply-To: <527B6ADF.1090201@atmel.com>
-References: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
- <20131107083932.GJ3805@norris.computersforpeace.net>
- <527B6ADF.1090201@atmel.com>
-Message-ID: <20131107180942.GU20061@ld-irv-0074.broadcom.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Thu, 7 Nov 2013 10:16:13 -0800
+Subject: [PATCH v2] seccomp: not compatible with ARM OABI
+In-Reply-To: <20131107174746.GA22344@www.outflux.net>
+References: <20131107174746.GA22344@www.outflux.net>
+Message-ID: <CALCETrXpzmw7qvDPxkW+y=_h5W+a+uyJp1xkz55oBXu9sC+t3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 07, 2013 at 06:26:39PM +0800, Josh Wu wrote:
-> Hi, Brian
-> 
-> On 11/7/2013 4:39 PM, Brian Norris wrote:
-> >Hi Josh,
-> >
-> >On Tue, Nov 05, 2013 at 05:59:07PM +0800, Josh Wu wrote:
-> >>In the atmel driver probe function, the code shows like following:
-> >>   atmel_nand_probe(...) {
-> >>         ...
-> >>
-> >>   err_nand_ioremap:
-> >>         platform_driver_unregister(&atmel_nand_nfc_driver);
-> >>         return res;
-> >>   }
-> >>
-> >>If no nand flash detected, the driver probe function will goto
-> >>err_nand_ioremap label.
-> >>Then platform_driver_unregister() will be called. It will get the
-> >>lock of atmel_nand device since it is parent of nfc_device. The
-> >>problem is the lock is already hold by atmel_nand_probe itself.
-> >>So system will be in a dead lock.
-> >>
-> >>This patch just simply removed to platform_driver_unregister() call.
-> >>When atmel_nand driver is quit the platform_driver_unregister() will
-> >>be called in atmel_nand_remove().
-> >The real key, here, is that the platform-driver probe() has no business
-> >un-registering another driver, right?
-> 
-> right.
-> 
-> >Shouldn't both drivers just be
-> >registered/unregistered in the module init/exit, and not in probe()?
-> 
-> currently the NFC driver is registered in the beginning of nand
-> probe function. After NFC driver is initialized, the rest of the
-> nand probe function
-> will check the NFC driver status.
-> I am not sure it is proper to registered another driver in a probe().
+On Thu, Nov 7, 2013 at 9:47 AM, Kees Cook <keescook@chromium.org> wrote:
+> Make sure that seccomp filter won't be built when ARM OABI is in use,
+> since there is work needed to distinguish calling conventions. Until
+> that is done (which is likely never since OABI is deprecated), make
+> sure seccomp filter is unavailable in the OABI world.
+>
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+> v2:
+>  - toggle availability via HAVE_ARCH_SECCOMP_FILTER; James Hogan.
+> ---
+>  arch/arm/Kconfig |    7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 0a1dc697333c..a0a8590f3609 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -23,7 +23,7 @@ config ARM
+>         select HARDIRQS_SW_RESEND
+>         select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
+>         select HAVE_ARCH_KGDB
+> -       select HAVE_ARCH_SECCOMP_FILTER
+> +       select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+>         select HAVE_ARCH_TRACEHOOK
+>         select HAVE_BPF_JIT
+>         select HAVE_CONTEXT_TRACKING
+> @@ -1735,6 +1735,11 @@ config OABI_COMPAT
+>           in memory differs between the legacy ABI and the new ARM EABI
+>           (only for non "thumb" binaries). This option adds a tiny
+>           overhead to all syscalls and produces a slightly larger kernel.
+> +
+> +         The seccomp filter system will not be available when this is
+> +         selected, since there is no way yet to sensibly distinguish
+> +         between calling conventions during filtering.
+> +
+>           If you know you'll be using only pure EABI user space then you
+>           can say N here. If this option is not selected and you attempt
+>           to execute a legacy ABI binary then the result will be
+> --
+> 1.7.9.5
+>
+>
 
-This whole 2-driver registration process seems like a totally racy mess.
-Unless I'm reading this wrong, the code is entirely wrong. You are not
-properly expressing the dependency between the NFC device and the
-atmel_nand device, so I think you're relying purely on happenstance that
-when the NAND probe registers the NFC driver, it will complete the NFC
-probe before the NAND probe reaches:
+FWIW, OABI-only (i.e. !AEABI, as opposed to OABI_COMPAT) is, in
+principle, supportable -- userspace would just have to know that, if
+build for OABI, the calling convention is different.
 
-  if (nand_nfc.is_initialized) {
-    ...
+I doubt this is worth supporting, though, and, if no one complains
+about your patch for a couple releases, then that would mean we could
+get away with adding AUDIT_ARCH_ARM_OABI or something (maybe for
+seccomp only) if needed.
 
-This is a race, no?
+--Andy
 
-Anyway, I think the current patch (fixing a deadlock) is still ready for
-stable, while I would expect you can fix up this racy situation in a
-subsequent patch. Or perhaps I'm misreading something?
+> --
+> Kees Cook
+> Chrome OS Security
 
-Brian
+
+
+-- 
+Andy Lutomirski
+AMA Capital Management, LLC
