@@ -1,48 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 7 Nov 2013 19:53:06 +0100
-Subject: [PATCH trivial] arm64: constify hwcap_str
-In-Reply-To: <20131107175010.GI13674@arm.com>
-References: <1383755567-17244-1-git-send-email-ard.biesheuvel@linaro.org>
- <20131107175010.GI13674@arm.com>
-Message-ID: <CAKv+Gu9zw-1p6q6vnQWi=ZU53V-oeN_-vDH5Jfo0XvnBjMqN2g@mail.gmail.com>
+From: eparis@redhat.com (Eric Paris)
+Date: Thu, 07 Nov 2013 13:56:37 -0500
+Subject: [PATCH v2] seccomp: not compatible with ARM OABI
+In-Reply-To: <CAGXu5jJFv8Nkb89zq5029+35d9AwA4k1PRmP1VdY-LCCrJ4U6g@mail.gmail.com>
+References: <20131107174746.GA22344@www.outflux.net>
+ <CALCETrXpzmw7qvDPxkW+y=_h5W+a+uyJp1xkz55oBXu9sC+t3A@mail.gmail.com>
+ <CAGXu5jJFv8Nkb89zq5029+35d9AwA4k1PRmP1VdY-LCCrJ4U6g@mail.gmail.com>
+Message-ID: <1383850597.2938.52.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2013 18:50, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Nov 06, 2013 at 04:32:47PM +0000, Ard Biesheuvel wrote:
->> Turn hwcap_str from a 'writable array of pointers to const char[]'
->> to a multidimensional const char[][].
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> This is something I noticed when looking at Steve Capper's hwcaps patch: really
->> no point in having a writable array of 8-byte pointers in .data keeping track of
->> these hwcap strings.
->
-> I don't see a problem (few bytes wasted). If you want to make it
-> read-only, this would do:
->
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 9cf30f49610d..84a770fd7003 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -308,7 +308,7 @@ static int __init topology_init(void)
->  }
->  subsys_initcall(topology_init);
->
-> -static const char *hwcap_str[] = {
-> +static const char *const hwcap_str[] = {
->         "fp",
->         "asimd",
->         NULL
->
+On Thu, 2013-11-07 at 10:39 -0800, Kees Cook wrote:
+> On Thu, Nov 7, 2013 at 10:16 AM, Andy Lutomirski <luto@amacapital.net> wrote:
+> > On Thu, Nov 7, 2013 at 9:47 AM, Kees Cook <keescook@chromium.org> wrote:
+> >> Make sure that seccomp filter won't be built when ARM OABI is in use,
+> >> since there is work needed to distinguish calling conventions. Until
+> >> that is done (which is likely never since OABI is deprecated), make
+> >> sure seccomp filter is unavailable in the OABI world.
+> >>
+> >> Signed-off-by: Kees Cook <keescook@chromium.org>
+> >> ---
+> >> v2:
+> >>  - toggle availability via HAVE_ARCH_SECCOMP_FILTER; James Hogan.
+> >> ---
+> >>  arch/arm/Kconfig |    7 ++++++-
+> >>  1 file changed, 6 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> index 0a1dc697333c..a0a8590f3609 100644
+> >> --- a/arch/arm/Kconfig
+> >> +++ b/arch/arm/Kconfig
+> >> @@ -23,7 +23,7 @@ config ARM
+> >>         select HARDIRQS_SW_RESEND
+> >>         select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
+> >>         select HAVE_ARCH_KGDB
+> >> -       select HAVE_ARCH_SECCOMP_FILTER
+> >> +       select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+> >>         select HAVE_ARCH_TRACEHOOK
+> >>         select HAVE_BPF_JIT
+> >>         select HAVE_CONTEXT_TRACKING
+> >> @@ -1735,6 +1735,11 @@ config OABI_COMPAT
+> >>           in memory differs between the legacy ABI and the new ARM EABI
+> >>           (only for non "thumb" binaries). This option adds a tiny
+> >>           overhead to all syscalls and produces a slightly larger kernel.
+> >> +
+> >> +         The seccomp filter system will not be available when this is
+> >> +         selected, since there is no way yet to sensibly distinguish
+> >> +         between calling conventions during filtering.
+> >> +
+> >>           If you know you'll be using only pure EABI user space then you
+> >>           can say N here. If this option is not selected and you attempt
+> >>           to execute a legacy ABI binary then the result will be
+> >> --
+> >> 1.7.9.5
+> >>
+> >>
+> >
+> > FWIW, OABI-only (i.e. !AEABI, as opposed to OABI_COMPAT) is, in
+> > principle, supportable -- userspace would just have to know that, if
+> > build for OABI, the calling convention is different.
+> 
+> Right -- I opted for enforcing seccomp-on-ARM-means-EABI.
+> 
+> > I doubt this is worth supporting, though, and, if no one complains
+> > about your patch for a couple releases, then that would mean we could
+> > get away with adding AUDIT_ARCH_ARM_OABI or something (maybe for
+> > seccomp only) if needed.
 
-I agree that whether you want to put up with the additional layer of
-indirection, additional relocations etc is a matter of taste, but
-having writable pointers around that are easily dereferenced directly
-by unprivileged users is a bad idea in any case, so if this is your
-preferred solution, it's fine by me.
+Audit already has: (ARM && AEABI && !OABI_COMPAT)  adding
+AUDIT_ARCH_ARM_OABI means we could support it and no worries about ABI
+breakage.
 
-Regards,
-Ard.
+Isn't x32 similarly screwy?  Does it work because the syscall numbers
+are different?
+
+-Eric
