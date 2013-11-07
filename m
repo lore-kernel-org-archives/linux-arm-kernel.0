@@ -1,56 +1,35 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 7 Nov 2013 08:22:57 -0600
-Subject: [PATCH] arm64: enable EDAC on arm64
-In-Reply-To: <20131107095138.GA13139@mudshark.cambridge.arm.com>
-References: <1383742944-28059-1-git-send-email-robherring2@gmail.com>
- <20131106152608.GD979@arm.com>
- <CAL_JsqLwFHeRZzaMAxNmPSfNeVb_W2Ng=mXBkyUPQx+=beHyTg@mail.gmail.com>
- <20131107095138.GA13139@mudshark.cambridge.arm.com>
-Message-ID: <CAL_JsqLqhN0z3HUE4pDgyiiZJ-UK3aM8W0XvXxrdVRdRQzQi_A@mail.gmail.com>
+From: mad_soft@inbox.lv (Dmitry Artamonow)
+Date: Thu,  7 Nov 2013 18:36:53 +0400
+Subject: [PATCH] ARM: pxa/colibri: fix build with CONFIG_USB_OHCI_HCD=y
+Message-ID: <1383835013-22215-1-git-send-email-mad_soft@inbox.lv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 7, 2013 at 3:51 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Nov 06, 2013 at 06:39:18PM +0000, Rob Herring wrote:
->> On Wed, Nov 6, 2013 at 9:26 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Wed, Nov 06, 2013 at 01:02:24PM +0000, Rob Herring wrote:
->> >> +static inline void atomic_scrub(void *va, u32 size)
->> >> +{
->> >> +     unsigned int *virt_addr = va;
->> >> +     unsigned int temp, temp2;
->> >> +     unsigned int i;
->> >> +
->> >> +     for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
->> >> +             /*
->> >> +              * No need to check for store failure, another write means
->> >> +              * the scrubbing has effectively already been done for us.
->> >> +              */
->> >> +             asm volatile("\n"
->> >> +                     "       ldxr    %0, %2\n"
->> >> +                     "       stxr    %w1, %0, %2\n"
->> >> +                     : "=&r" (temp), "=&r" (temp2), "+Q" (virt_addr)
->> >> +                     : : "cc");
->> >
->> > But failure of stxr does not necessarily mean another write. It can be
->> > an interrupt, cache line migration etc. The exclusive monitor can be
->> > emulated in many ways.
->>
->> Right, I was thinking I could simplify things.
->>
->> In that case, I could implement this with just "atomic64_add(0,
->> virt_addr)", but is there any guarantee that atomic64_t has a size of
->> 8 bytes and that I can simply increment an atomic64_t ptr?
->>
->> > BTW, can you not use 64-bit loads/stores?
->>
->> Correct, that should be a long instead of int.
->
-> Are we guaranteed that va is a 64-bit aligned pointer? Also, usual comment
-> about the "cc" clobber.
+Fix following build failure observed when support for
+OHCI host controller is enabled.
 
-I'll have to check if the EDAC framework provides any guarantee, but
-we can force the alignment widening the scrubbing range if needed.
-Normally, DDR ECC would always be done on 64-bit units for 72-bit
-DIMMs. I can't imagine you would ever have 32-bit wide DDR with ECC.
+  CC      arch/arm/mach-pxa/colibri-evalboard.o
+arch/arm/mach-pxa/colibri-evalboard.c: In function 'colibri_ohci_init':
+arch/arm/mach-pxa/colibri-evalboard.c:68: error: implicit declaration of function 'IOMEM'
+make[1]: *** [arch/arm/mach-pxa/colibri-evalboard.o] Error 1
+make: *** [arch/arm/mach-pxa] Error 2
 
-Rob
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.lv>
+---
+ arch/arm/mach-pxa/colibri-evalboard.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-pxa/colibri-evalboard.c b/arch/arm/mach-pxa/colibri-evalboard.c
+index 8404b24..57f661d 100644
+--- a/arch/arm/mach-pxa/colibri-evalboard.c
++++ b/arch/arm/mach-pxa/colibri-evalboard.c
+@@ -15,6 +15,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/gpio.h>
++#include <linux/io.h>
+ #include <asm/mach-types.h>
+ #include <mach/hardware.h>
+ #include <asm/mach/arch.h>
+-- 
+1.8.1.2
