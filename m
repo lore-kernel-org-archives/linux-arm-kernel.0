@@ -1,37 +1,48 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 06 Nov 2013 23:20:32 -0800 (PST)
-Subject: [PATCH 3/3] clk: shmobile: Add R8A7790 clocks support
-In-Reply-To: <87zjpggalc.wl%kuninori.morimoto.gx@renesas.com>
-References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2775658.fxp7sbhy9u@avalon>
- <8738na1csg.wl%kuninori.morimoto.gx@renesas.com>
- <1550251.naXFpxhfMk@avalon>
- <87zjpggalc.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <871u2s65kz.wl%kuninori.morimoto.gx@renesas.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 7 Nov 2013 15:56:13 +0800
+Subject: [RFC PATCH 1/3] ARM: imx: cpuidle: Convert imx5 driver to
+ platform driver
+In-Reply-To: <1382978973-4034-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1382978973-4034-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20131107075607.GA6500@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 28, 2013 at 09:49:31AM -0700, Daniel Lezcano wrote:
+> @@ -149,6 +149,13 @@ static void imx5_pm_idle(void)
+>  	imx5_cpu_do_idle();
+>  }
+>  
+> +static struct platform_device imx5_cpuidle_pdev = {
+> +	.name = "cpuidle-imx5",
+> +	.dev = {
+> +		.platform_data = imx5_pm_idle,
 
-Hi Laurent again
+This is a little bit hackish and less future proof.  We should probably
+create a data structure with the function hook as a field in it.
 
-> In my SuperH experience, CPG clock divier has same pattern.
-> In H2's SDCKCR register, SDHFC and SD0FC looks different.
-> But, the real different is only enabled bit area,
-> the value is same.
-> You can find same pattern on FRQCRB register too,
-> and, you can find same pattern on M2.
+Shawn
+
+> +	},
+> +};
+> +
+>  static int __init imx5_pm_common_init(void)
+>  {
+>  	int ret;
+> @@ -166,7 +173,7 @@ static int __init imx5_pm_common_init(void)
+>  	/* Set the registers to the default cpu idle state. */
+>  	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
+>  
+> -	return imx5_cpuidle_init();
+> +	return platform_device_register(&imx5_cpuidle_pdev);
+>  }
+>  
+>  void __init imx5_pm_init(void)
+> -- 
+> 1.7.9.5
 > 
-> I guess FRQCRB/SDHFC can share code if it has mask.
-> This idea was used on R-Mobile series on div4.
-> (ex clock-sh73a0.c :: div4_clks)
-
-I talked it with Magnus, and I understand your headache.
-I can agree about your approach now.
-
-But, I guess H2 and M2 are very similar SoC.
-and I don't want too many clock-${SoC} files.
-Is it possible to share code like clk-gen2.c ?
-
-Best regards
----
-Kuninori Morimoto
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
