@@ -1,76 +1,38 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  7 Nov 2013 12:17:24 -0300
-Subject: [PATCH v4 20/31] mtd: nand: pxa3xx: Add helper function to set page
- address
+Date: Thu,  7 Nov 2013 12:17:25 -0300
+Subject: [PATCH v4 21/31] mtd: nand: pxa3xx: Remove READ0 switch/case
+ falltrough
 In-Reply-To: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383837455-30721-21-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1383837455-30721-22-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's simplify the code by first introducing a helper function
-to set the page address, as done by the READ0, READOOB and SEQIN
-commands.
+READ0 and READOOB command preparation has a falltrough to SEQIN
+case, where the command address is specified.
+This is certainly confusing and makes the code less readable with
+no added value. Let's remove it.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 36 +++++++++++++++++++++---------------
- 1 file changed, 21 insertions(+), 15 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index aa8768c..660427e 100644
+index 660427e..552f92a 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -587,6 +587,26 @@ static inline int is_buf_blank(uint8_t *buf, size_t len)
- 	return 1;
- }
- 
-+static void set_command_address(struct pxa3xx_nand_info *info,
-+		unsigned int page_size, uint16_t column, int page_addr)
-+{
-+	/* small page addr setting */
-+	if (page_size < PAGE_CHUNK_SIZE) {
-+		info->ndcb1 = ((page_addr & 0xFFFFFF) << 8)
-+				| (column & 0xFF);
-+
-+		info->ndcb2 = 0;
-+	} else {
-+		info->ndcb1 = ((page_addr & 0xFFFF) << 16)
-+				| (column & 0xFFFF);
-+
-+		if (page_addr & 0xFF0000)
-+			info->ndcb2 = (page_addr & 0xFF0000) >> 16;
-+		else
-+			info->ndcb2 = 0;
-+	}
-+}
-+
- static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
- 		uint16_t column, int page_addr)
- {
-@@ -650,22 +670,8 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+@@ -669,6 +669,11 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+ 		if (mtd->writesize >= PAGE_CHUNK_SIZE)
  			info->ndcb0 |= NDCB0_DBC | (NAND_CMD_READSTART << 8);
  
- 	case NAND_CMD_SEQIN:
--		/* small page addr setting */
--		if (unlikely(mtd->writesize < PAGE_CHUNK_SIZE)) {
--			info->ndcb1 = ((page_addr & 0xFFFFFF) << 8)
--					| (column & 0xFF);
--
--			info->ndcb2 = 0;
--		} else {
--			info->ndcb1 = ((page_addr & 0xFFFF) << 16)
--					| (column & 0xFFFF);
--
--			if (page_addr & 0xFF0000)
--				info->ndcb2 = (page_addr & 0xFF0000) >> 16;
--			else
--				info->ndcb2 = 0;
--		}
- 
 +		set_command_address(info, mtd->writesize, column, page_addr);
- 		info->buf_count = mtd->writesize + mtd->oobsize;
- 		memset(info->data_buff, 0xFF, info->buf_count);
++		info->buf_count = mtd->writesize + mtd->oobsize;
++		memset(info->data_buff, 0xFF, info->buf_count);
++		break;
++
+ 	case NAND_CMD_SEQIN:
  
+ 		set_command_address(info, mtd->writesize, column, page_addr);
 -- 
 1.8.1.5
