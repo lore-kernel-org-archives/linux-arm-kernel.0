@@ -1,46 +1,69 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 07 Nov 2013 22:22:35 +0100
-Subject: [PATCH v3 9/9] ARM: add initial support for Marvell Berlin SoCs
-In-Reply-To: <201311071720.47489.arnd@arndb.de>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20131107134033.59bd127a@xhacker> <527B67A1.3020803@gmail.com>
- <201311071720.47489.arnd@arndb.de>
-Message-ID: <527C049B.4030608@gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 7 Nov 2013 15:39:22 -0600
+Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
+In-Reply-To: <527BCFD8.9010207@gmail.com>
+References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+ <527BC118.1050609@ti.com> <527BCFD8.9010207@gmail.com>
+Message-ID: <527C088A.8080701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2013 05:20 PM, Arnd Bergmann wrote:
-> On Thursday 07 November 2013, Sebastian Hesselbarth wrote:
->> Actually, IIRC smp_twd does not compile without SMP set, so the above
->> should at least be 'HAVE_ARM_TWD if SMP'. If you shrink MULTI_V7 down
->> to non-SMP cores, you can disable it and it will fail to compile.
+On 11/07/2013 11:37 AM, Daniel Mack wrote:
+[..]
+>> I know ti,edma-regions property is not currently being used, but we should>>
+future proof this by setting up DRAE for like done in probe:
+>>
+>>                 for (i = 0; i < info[j]->n_region; i++) {
+>>                         edma_write_array2(j, EDMA_DRAE, i, 0, 0x0);
+>>                         edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
+>>                         edma_write_array(j, EDMA_QRAE, i, 0x0);
+>>                 }
 >
-> If there are UP-systems for which TWD is the best clocksource, we should
-> probably fix the code to allow that configuration. IIRC there were already
-> patches recently in this area, maybe it's already solved.
+> That doesn't work for me. I'm running long-time tests here on a device
+> which has a mwifiex connected to omap_hsmmc. The test procedure includes:
+>
+> a) a script on the device that puts the device to sleep some seconds
+> after it has been woken up
+>
+> b) a script on a host that wakes up the device with wake-on-lan every 10
+> seconds
+>
+> c) a flood ping that checks whether the device is responding
+>
+>
+> That precedure is running since a couple of hourse here, and it works
+> well with both by v3 and v4 patches. Moving the functions to
+> .suspend/resume _noirq doesn't seem to break anything.
+>
+> Setting QRAE to 0 as you mentioned above, however, makes the device fail
+> at resume.
 
-I just tried barebox bootloader to use TWD as timer on berlin2cd and it
-perfectly works, i.e. with time related commands I can see the timer
-register decreasing. So the timer is available on this UP SoC.
+Yes, I recall that. It definitely shouldn't be done.
 
-As said before, compiling linux without CONFIG_SMP but with
-CONFIG_HAVE_ARM_TWD gives:
+>>> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
+>>
+>> I agree with Nishanth here, it is better to do this in .suspend/resume _noirq
+>> stage to rule out any ordering bugs that may show up in the future, since such
+>> an issue already showed up in earlier testing.
+>
+> Alright, I already did that.
 
-warning: (SOC_OMAP5 && ARCH_ROCKCHIP && ARCH_SHMOBILE_MULTI && 
-MACH_BERLIN_BG2 && MACH_BERLIN_BG2CD) selects HAVE_ARM_TWD which has 
-unmet direct dependencies (SMP)
+Cool, can you post the updated patch? I'll run some more tests too..
 
-and
+>> I would appreciate it if you can make these 2 changes and post a v5. Thanks for
+>> a lot for all the hardwork.
+>
+> No problem at all :)
+>
+>> Acked-by: Joel Fernandes <joelf@ti.com>
+>
+> Still sure about that? What about your follow-up to your own reply?
+>
 
-arch/arm/kernel/smp_twd.c: In function 'twd_local_timer_of_register':
-arch/arm/kernel/smp_twd.c:391: error: 'setup_max_cpus' undeclared (first 
-use in this function)
-arch/arm/kernel/smp_twd.c:391: error: (Each undeclared identifier is 
-reported only once
-arch/arm/kernel/smp_twd.c:391: error: for each function it appears in.)
-make[1]: *** [arch/arm/kernel/smp_twd.o] Error 1
+Yes, the Ack definitely stands for the changes you made since the last revision.
+Only thing left is to fix the ordering, Let's do that (you seem to have already
+done it) and test this a bit more.
 
-I haven't looked deeper into this, but I guess it will not be hard
-to make ARM_TWD independent of SMP.
+Glad you're working on this, thanks!
 
-Sebastian
+-Joel
