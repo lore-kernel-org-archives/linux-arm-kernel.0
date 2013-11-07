@@ -1,19 +1,32 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 7 Nov 2013 23:29:19 +0000
-Subject: Report from 2013 ARM kernel summit
-Message-ID: <CACxGe6vvUOjWc=8iXH79emCdC6eZE4+Xn4iqN6S7RNea+5Saiw@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 7 Nov 2013 15:29:38 -0800
+Subject: [RFC PATCH 00/11] Embeddable Position Independent Executable
+In-Reply-To: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
+References: <1379421817-15759-1-git-send-email-Russ.Dill@ti.com>
+Message-ID: <CAGa+x85AJ6e4W3S73cv_ZJtb+uCLYTMk_DPmQO3Nj656-7QJMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On Tue, Sep 17, 2013 at 5:43 AM, Russ Dill <Russ.Dill@ti.com> wrote:
+> This patch adds support for and demonstrates the usage of an embedded
+> position independent executable (PIE). The goal is to allow the use of C
+> code in situations where carefully written position independent assembly
+> was previously required.
 
-Here is the report from the summit two weeks ago. I'm posting the
-Google docs link for now because the plain text version just looks
-plain ugly. I'll clean that up and post it tomorrow.
+Hmm, I thought I had already replied to this but it appears that I haven't.
 
-https://docs.google.com/document/d/1zQomH0H_wzb3tr3sDm1zNTyPWhMPkXalL7vmndF9D9U/edit?usp=sharing
+I really like this approach and think it's a major improvement on what
+we're already doing on OMAP and a few other ARM platforms.  This
+approach is done in a way that's significantly easier to maintain and
+extend IMO.
 
-Big thanks to Olof, Kevin and Mark for writing this report, and a huge
-shout out to Paul Walmsley for taking incredible notes.
+As a next step, I think you should drop the RFC and split it up into a
+few series that can go via the right trees:
 
-g.
+- asm-generic and lib/devres (patches 1, 2, 4)
+- drivers/sram (patch 3)
+- generic PIE: (patch 5)
+- core PIE: (patch 5-8)
+- AM33xx support (patch 9-11)
+
+Kevin
