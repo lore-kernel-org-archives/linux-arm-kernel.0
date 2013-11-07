@@ -1,52 +1,39 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 7 Nov 2013 09:47:46 -0800
-Subject: [PATCH v2] seccomp: not compatible with ARM OABI
-Message-ID: <20131107174746.GA22344@www.outflux.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 7 Nov 2013 17:50:11 +0000
+Subject: [PATCH trivial] arm64: constify hwcap_str
+In-Reply-To: <1383755567-17244-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1383755567-17244-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20131107175010.GI13674@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure that seccomp filter won't be built when ARM OABI is in use,
-since there is work needed to distinguish calling conventions. Until
-that is done (which is likely never since OABI is deprecated), make
-sure seccomp filter is unavailable in the OABI world.
+On Wed, Nov 06, 2013 at 04:32:47PM +0000, Ard Biesheuvel wrote:
+> Turn hwcap_str from a 'writable array of pointers to const char[]'
+> to a multidimensional const char[][].
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> This is something I noticed when looking at Steve Capper's hwcaps patch: really
+> no point in having a writable array of 8-byte pointers in .data keeping track of
+> these hwcap strings.
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-v2:
- - toggle availability via HAVE_ARCH_SECCOMP_FILTER; James Hogan.
----
- arch/arm/Kconfig |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+I don't see a problem (few bytes wasted). If you want to make it
+read-only, this would do:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0a1dc697333c..a0a8590f3609 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -23,7 +23,7 @@ config ARM
- 	select HARDIRQS_SW_RESEND
- 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
- 	select HAVE_ARCH_KGDB
--	select HAVE_ARCH_SECCOMP_FILTER
-+	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_BPF_JIT
- 	select HAVE_CONTEXT_TRACKING
-@@ -1735,6 +1735,11 @@ config OABI_COMPAT
- 	  in memory differs between the legacy ABI and the new ARM EABI
- 	  (only for non "thumb" binaries). This option adds a tiny
- 	  overhead to all syscalls and produces a slightly larger kernel.
-+
-+	  The seccomp filter system will not be available when this is
-+	  selected, since there is no way yet to sensibly distinguish
-+	  between calling conventions during filtering.
-+
- 	  If you know you'll be using only pure EABI user space then you
- 	  can say N here. If this option is not selected and you attempt
- 	  to execute a legacy ABI binary then the result will be
--- 
-1.7.9.5
-
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 9cf30f49610d..84a770fd7003 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -308,7 +308,7 @@ static int __init topology_init(void)
+ }
+ subsys_initcall(topology_init);
+ 
+-static const char *hwcap_str[] = {
++static const char *const hwcap_str[] = {
+ 	"fp",
+ 	"asimd",
+ 	NULL
 
 -- 
-Kees Cook
-Chrome OS Security
+Catalin
