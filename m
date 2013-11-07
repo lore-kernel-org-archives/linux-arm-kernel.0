@@ -1,71 +1,242 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 07 Nov 2013 12:03:51 +0100
-Subject: [PATCH v2 0/5] Allwinner SoCs High Speed Timer support
-In-Reply-To: <1382706463-3892-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1382706463-3892-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <527B7397.9020208@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 7 Nov 2013 12:40:07 +0100
+Subject: [PATCH 3/7] ARM: ux500: Remove ATAG support for SDI (MMC)
+In-Reply-To: <1383732348-18576-4-git-send-email-lee.jones@linaro.org>
+References: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
+ <1383732348-18576-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAPDyKFrd+UHYjZw7=8sf=gmATQ8rPubAVrjWYpbhODak+hOhZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2013 03:07 PM, Maxime Ripard wrote:
-> Hi everyone,
+On 6 November 2013 11:05, Lee Jones <lee.jones@linaro.org> wrote:
+> This hasn't been used since we moved over to a Device Tree only platform.
 >
-> Here is a few patches adding support for the High Speed Timers running on the
-> Allwinner SoCs.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/Makefile           |   3 +-
+>  arch/arm/mach-ux500/board-mop500-sdi.c | 166 ---------------------------------
+>  arch/arm/mach-ux500/board-mop500.h     |   4 -
+>  3 files changed, 1 insertion(+), 172 deletions(-)
+>  delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
 >
-> These timers are 64 bits timers running at a much higher speed than the timers
-> used for now on these SoCs, since they are no longer wired to the 24MHz
-> oscillator, but to the AHB clock.
+> diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+> index 66f351f..e34c010 100644
+> --- a/arch/arm/mach-ux500/Makefile
+> +++ b/arch/arm/mach-ux500/Makefile
+> @@ -5,8 +5,7 @@
+>  obj-y                          := cpu.o devices.o id.o timer.o pm.o
+>  obj-$(CONFIG_CACHE_L2X0)       += cache-l2x0.o
+>  obj-$(CONFIG_UX500_SOC_DB8500) += cpu-db8500.o
+> -obj-$(CONFIG_MACH_MOP500)      += board-mop500-sdi.o \
+> -                               board-mop500-regulators.o \
+> +obj-$(CONFIG_MACH_MOP500)      += board-mop500-regulators.o \
+>                                 board-mop500-pins.o \
+>                                 board-mop500-audio.o
+>  obj-$(CONFIG_SMP)              += platsmp.o headsmp.o
+> diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+> deleted file mode 100644
+> index fcbf3a1..0000000
+> --- a/arch/arm/mach-ux500/board-mop500-sdi.c
+> +++ /dev/null
+> @@ -1,166 +0,0 @@
+> -/*
+> - * Copyright (C) ST-Ericsson SA 2010
+> - *
+> - * Author: Hanumath Prasad <hanumath.prasad@stericsson.com>
+> - * License terms: GNU General Public License (GPL) version 2
+> - */
+> -
+> -#include <linux/kernel.h>
+> -#include <linux/gpio.h>
+> -#include <linux/amba/bus.h>
+> -#include <linux/amba/mmci.h>
+> -#include <linux/mmc/host.h>
+> -#include <linux/platform_device.h>
+> -#include <linux/platform_data/dma-ste-dma40.h>
+> -
+> -#include <asm/mach-types.h>
+> -
+> -#include "db8500-regs.h"
+> -#include "board-mop500.h"
+> -#include "ste-dma40-db8500.h"
+> -
+> -/*
+> - * v2 has a new version of this block that need to be forced, the number found
+> - * in hardware is incorrect
+> - */
+> -#define U8500_SDI_V2_PERIPHID 0x10480180
+> -
+> -/*
+> - * SDI 0 (MicroSD slot)
+> - */
+> -
+> -#ifdef CONFIG_STE_DMA40
+> -struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_DEV_TO_MEM,
+> -       .dev_type = DB8500_DMA_DEV29_SD_MM0,
+> -};
+> -
+> -static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_MEM_TO_DEV,
+> -       .dev_type = DB8500_DMA_DEV29_SD_MM0,
+> -};
+> -#endif
+> -
+> -struct mmci_platform_data mop500_sdi0_data = {
+> -       .f_max          = 100000000,
+> -       .capabilities   = MMC_CAP_4_BIT_DATA |
+> -                               MMC_CAP_SD_HIGHSPEED |
+> -                               MMC_CAP_MMC_HIGHSPEED |
+> -                               MMC_CAP_ERASE |
+> -                               MMC_CAP_UHS_SDR12 |
+> -                               MMC_CAP_UHS_SDR25,
+
+I guess all the above caps is having binders in DT then?
+
+> -       .gpio_wp        = -1,
+> -       .sigdir         = MCI_ST_FBCLKEN |
+> -                               MCI_ST_CMDDIREN |
+> -                               MCI_ST_DATA0DIREN |
+> -                               MCI_ST_DATA2DIREN,
+> -#ifdef CONFIG_STE_DMA40
+> -       .dma_filter     = stedma40_filter,
+> -       .dma_rx_param   = &mop500_sdi0_dma_cfg_rx,
+> -       .dma_tx_param   = &mop500_sdi0_dma_cfg_tx,
+> -#endif
+> -};
+> -
+> -/*
+> - * SDI1 (SDIO WLAN)
+> - */
+> -#ifdef CONFIG_STE_DMA40
+> -static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_DEV_TO_MEM,
+> -       .dev_type = DB8500_DMA_DEV32_SD_MM1,
+> -};
+> -
+> -static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_MEM_TO_DEV,
+> -       .dev_type = DB8500_DMA_DEV32_SD_MM1,
+> -};
+> -#endif
+> -
+> -struct mmci_platform_data mop500_sdi1_data = {
+> -       .ocr_mask       = MMC_VDD_29_30,
+> -       .f_max          = 100000000,
+> -       .capabilities   = MMC_CAP_4_BIT_DATA |
+> -                               MMC_CAP_NONREMOVABLE,
+> -       .gpio_cd        = -1,
+> -       .gpio_wp        = -1,
+> -#ifdef CONFIG_STE_DMA40
+> -       .dma_filter     = stedma40_filter,
+> -       .dma_rx_param   = &sdi1_dma_cfg_rx,
+> -       .dma_tx_param   = &sdi1_dma_cfg_tx,
+> -#endif
+> -};
+> -
+> -/*
+> - * SDI 2 (POP eMMC, not on DB8500ed)
+> - */
+> -
+> -#ifdef CONFIG_STE_DMA40
+> -struct stedma40_chan_cfg mop500_sdi2_dma_cfg_rx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_DEV_TO_MEM,
+> -       .dev_type =  DB8500_DMA_DEV28_SD_MM2,
+> -};
+> -
+> -static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_MEM_TO_DEV,
+> -       .dev_type = DB8500_DMA_DEV28_SD_MM2,
+> -};
+> -#endif
+> -
+> -struct mmci_platform_data mop500_sdi2_data = {
+> -       .ocr_mask       = MMC_VDD_165_195,
+> -       .f_max          = 100000000,
+> -       .capabilities   = MMC_CAP_4_BIT_DATA |
+> -                               MMC_CAP_8_BIT_DATA |
+> -                               MMC_CAP_NONREMOVABLE |
+> -                               MMC_CAP_MMC_HIGHSPEED |
+> -                               MMC_CAP_ERASE |
+> -                               MMC_CAP_CMD23,
+
+Dito
+
+> -       .gpio_cd        = -1,
+> -       .gpio_wp        = -1,
+> -#ifdef CONFIG_STE_DMA40
+> -       .dma_filter     = stedma40_filter,
+> -       .dma_rx_param   = &mop500_sdi2_dma_cfg_rx,
+> -       .dma_tx_param   = &mop500_sdi2_dma_cfg_tx,
+> -#endif
+> -};
+> -
+> -/*
+> - * SDI 4 (on-board eMMC)
+> - */
+> -
+> -#ifdef CONFIG_STE_DMA40
+> -struct stedma40_chan_cfg mop500_sdi4_dma_cfg_rx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_DEV_TO_MEM,
+> -       .dev_type =  DB8500_DMA_DEV42_SD_MM4,
+> -};
+> -
+> -static struct stedma40_chan_cfg mop500_sdi4_dma_cfg_tx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_MEM_TO_DEV,
+> -       .dev_type = DB8500_DMA_DEV42_SD_MM4,
+> -};
+> -#endif
+> -
+> -struct mmci_platform_data mop500_sdi4_data = {
+> -       .f_max          = 100000000,
+> -       .capabilities   = MMC_CAP_4_BIT_DATA |
+> -                               MMC_CAP_8_BIT_DATA |
+> -                               MMC_CAP_NONREMOVABLE |
+> -                               MMC_CAP_MMC_HIGHSPEED |
+> -                               MMC_CAP_ERASE |
+> -                               MMC_CAP_CMD23,
+
+Dito
+
+> -       .gpio_cd        = -1,
+> -       .gpio_wp        = -1,
+> -#ifdef CONFIG_STE_DMA40
+> -       .dma_filter     = stedma40_filter,
+> -       .dma_rx_param   = &mop500_sdi4_dma_cfg_rx,
+> -       .dma_tx_param   = &mop500_sdi4_dma_cfg_tx,
+> -#endif
+> -};
+> diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+> index d48e866..78861f6 100644
+> --- a/arch/arm/mach-ux500/board-mop500.h
+> +++ b/arch/arm/mach-ux500/board-mop500.h
+> @@ -79,10 +79,6 @@
+>  #define SNOWBALL_EN_3V3_ETH_GPIO       MOP500_AB8500_PIN_GPIO(26)      /* GPIO26 */
 >
-> This HS timers are actually found in all the supported SoCs but the A10.
-> However, the A20 and A31 come with 4 of these high speed timers, while the A10s
-> and A13 only have two, hence why we introduce two different compatibles.
+>  struct device;
+> -extern struct mmci_platform_data mop500_sdi0_data;
+> -extern struct mmci_platform_data mop500_sdi1_data;
+> -extern struct mmci_platform_data mop500_sdi2_data;
+> -extern struct mmci_platform_data mop500_sdi4_data;
+>  extern struct msp_i2s_platform_data msp0_platform_data;
+>  extern struct msp_i2s_platform_data msp1_platform_data;
+>  extern struct msp_i2s_platform_data msp2_platform_data;
+> --
+> 1.8.1.2
 >
-> The A31 is not using these for now, as its timers are asserted in reset by a
-> reset controller that first need to gain some support in the kernel first, but
-> that's for another patchset.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Hi Maxime,
-
-the patchset is applied in my tree for 3.14.
-
-Fixed a trivial conflict in the arch/arm/mach-sunxi/Kconfig
-
-Thanks !
-   -- Daniel
-
-> Changes from v1:
->    - Reported correctly the minimum ticks we can set
->    - No longer use the HS timers as the default timers in the system
->    - Removed the IRQF_DISABLED interrupt flag
->    - Filled the irq clock_event_device field
->    - Changed the cpumask to cpu_possible_mask
->
-> Maxime Ripard (5):
->    clocksource: sun4i: Increase a bit the clock event and sources rating
->    clocksource: Add Allwinner SoCs HS timers driver
->    ARM: sun5i: a10s: Add support for the High Speed Timers
->    ARM: sun5i: a13: Add support for the High Speed Timers
->    ARM: sun7i: a20: Add support for the High Speed Timers
->
->   .../bindings/timer/allwinner,sun5i-a13-hstimer.txt |  22 +++
->   arch/arm/boot/dts/sun5i-a10s.dtsi                  |   7 +
->   arch/arm/boot/dts/sun5i-a13.dtsi                   |   7 +
->   arch/arm/boot/dts/sun7i-a20.dtsi                   |  10 ++
->   arch/arm/mach-sunxi/Kconfig                        |   1 +
->   drivers/clocksource/Kconfig                        |   4 +
->   drivers/clocksource/Makefile                       |   1 +
->   drivers/clocksource/sun4i_timer.c                  |   4 +-
->   drivers/clocksource/timer-sun5i.c                  | 192 +++++++++++++++++++++
->   9 files changed, 246 insertions(+), 2 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
->   create mode 100644 drivers/clocksource/timer-sun5i.c
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Kind regards
+Ulf Hansson
