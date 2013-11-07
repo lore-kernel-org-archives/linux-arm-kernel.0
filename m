@@ -1,26 +1,24 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 7 Nov 2013 11:08:44 +0300
-Subject: [patch] clk: vexpress: NULL dereference on error path
-Message-ID: <20131107080844.GR21844@elgon.mountain>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 7 Nov 2013 16:17:25 +0800
+Subject: [PATCHv12][ 4/8] pinctrl: pinctrl-imx: add imx25 pinctrl driver
+In-Reply-To: <1383727939-4190-4-git-send-email-denis@eukrea.com>
+References: <1383727939-4190-1-git-send-email-denis@eukrea.com>
+ <1383727939-4190-4-git-send-email-denis@eukrea.com>
+Message-ID: <20131107081721.GC6500@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the allocation fails then we dereference the NULL in the error path.
-Just return directly.
+On Wed, Nov 06, 2013 at 09:52:15AM +0100, Denis Carikli wrote:
+> This is mostly cut and paste from the imx35 pinctrl driver.
+> The data was generated using sed and awk on
+>   arch/arm/plat-mxc/include/mach/iomux-mx25.h.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
-Fixes: ed27ff1db869 ('clk: Versatile Express clock generators ("osc") driver')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-
-diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
-index 2dc8b41..a535c7b 100644
---- a/drivers/clk/versatile/clk-vexpress-osc.c
-+++ b/drivers/clk/versatile/clk-vexpress-osc.c
-@@ -102,7 +102,7 @@ void __init vexpress_osc_of_setup(struct device_node *node)
- 
- 	osc = kzalloc(sizeof(*osc), GFP_KERNEL);
- 	if (!osc)
--		goto error;
-+		return;
- 
- 	osc->func = vexpress_config_func_get_by_node(node);
- 	if (!osc->func) {
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
