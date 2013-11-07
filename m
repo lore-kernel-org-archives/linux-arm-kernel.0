@@ -1,43 +1,42 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 07 Nov 2013 10:28:01 +0100
-Subject: [PATCH v7] pinctrl: imx27: imx27 pincontrol driver
-In-Reply-To: <20131107091212.GH15098@pengutronix.de>
-References: <1382950843-26066-3-git-send-email-mpa@pengutronix.de>
- <1383057139-25304-1-git-send-email-mpa@pengutronix.de>
- <CACRpkdYKgA5E4-APSTHsM=zVbb3X2R4v+V4EeK3+W1tKPR1FeA@mail.gmail.com>
- <CAHCPf3v3dsTyk9Cd93GBLBKQLSQ+Mb0mpq134X7Ko4U8m-b-qg@mail.gmail.com>
- <20131107091212.GH15098@pengutronix.de>
-Message-ID: <1383816481.4115.2.camel@weser.hi.pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Nov 2013 10:41:02 +0100
+Subject: PINCTRL:We May need mutex protect in pinctrl API
+In-Reply-To: <201311071253281097419@gmail.com>
+References: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
+ <1383732348-18576-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZekui-CoPdwtyATQyAv07CZp3B9L=qU6xAk8J43=Bb6w@mail.gmail.com>
+ <201311071253281097419@gmail.com>
+Message-ID: <CACRpkdYUKKLvMWcSxb24ZvYUq1QMzs9cw-h5CpZ1Q5S2s3RVBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 07.11.2013, 10:12 +0100 schrieb Markus Pargmann:
-> On Wed, Nov 06, 2013 at 10:54:02AM -0600, Matt Sealey wrote:
-[...]
-> > 
-> > Would it be so bad to implement this as a regmap and have two drivers
-> > access the same regmap on the Linux side? You don't need two nodes for
-> > that, and the IOMUX definitions can live under the GPIO node. There is
-> > NOTHING stopping two drivers on Linux matching the same compatible
-> > property. Locking and coordination in software of a single IP block
-> > used by two drivers shouldn't be arbitrated by the device tree.
-> 
-> I am not sure if it is practical to use the GPIO nodes for the IOMUX
-> driver. There are actually 6 GPIO nodes. This would lead to 6
-> iomux controllers? The different pin functions may be distributed over
-> different controllers then.
-> 
-> The first version of this series [1] was designed to have a iomux node
-> with 6 gpio subnodes.
+On Thu, Nov 7, 2013 at 5:53 AM, xulinuxkernel at gmail.com
+<xulinuxkernel@gmail.com> wrote:
 
-Why was this changed? Having two different DT nodes requesting the same
-IO region is certainly the wrong thing to do.
+> Recently, our company use kernel 3.10 instead of 3.8.When we test the kernel
+> we found there would be hang up in pinctrl subsystem,the reason may be as
+> following,
+> In out system,nand and spi pins are some of the same,so we need frequently
+> get pinctrl and put pinctrl. and sd card also frequently get and put
+> pinctrl.
+> when the nand and sd card both come in
+> pinctrl_lookup_state
 
-Regards,
-Lucas
+If you're repeatedly doing pinctrl_lookup_state() in your driver,
+then *this* is the problem, not that the pinctrl_lookup_state()
+is not mutexed.
 
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+You should lookup your states at probe() and at runtime
+only use pinctrl_select_state() to move between different
+states.
+
+Can you please refer me to the code in the upstream kernel
+that is causing this.
+
+If your code is not upstream and you're abusing the interface
+as described above, the actual problem you have is that
+you need to get your code upstream and properly reviewed
+by the community.
+
+Yours,
+Linus Walleij
