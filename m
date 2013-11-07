@@ -1,46 +1,58 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Thu, 7 Nov 2013 16:36:50 +0800
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
-References: <1383789208.5970.1.camel@phoenix>
- <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
- <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
- <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
- <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
- <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
-Message-ID: <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 7 Nov 2013 00:39:32 -0800
+Subject: [PATCH] mtd: atmel_nand: fix bug driver will in a dead lock if
+ no nand detected
+In-Reply-To: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
+References: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20131107083932.GJ3805@norris.computersforpeace.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/7 Ming Lei <tom.leiming@gmail.com>:
-> Hi,
->
-> On Thu, Nov 7, 2013 at 10:47 AM, Axel Lin <axel.lin@ingics.com> wrote:
->>
->> hi Ming,
->> Seems CONFIG_PAGE_OFFSET is not configurabe in "make menuconfig".
->> And I found CONFIG_PAGE_OFFSET=0xC0000000 for all below configs...
->> $ make at91_dt_defconfig; grep  CONFIG_PAGE_OFFSET .config
->> $ make ep93xx_defconfig; grep  CONFIG_PAGE_OFFSET .config
->> $ make imx_v4_v5_defconfig; grep CONFIG_PAGE_OFFSET .config
->> $ make mxs_defconfig; grep CONFIG_PAGE_OFFSET .config
->> $ make omap2plus_defconfig; grep CONFIG_PAGE_OFFSET .config
->> $ make s3c6400_defconfig; grep CONFIG_PAGE_OFFSET .config
->> $ make at91x40_defconfig; grep CONFIG_PAGE_OFFSET .config
->> ( at91x40_defconfig is also arm7tdmi )
->
-> Firstly it can be configured via VMSPLIT_3GVMSPLIT_2G/VMSPLIT_1G.
->
-> Secondly, configurable or not isn't the point, and maybe some uclinux
-> platforms do not use CONFIG_PAGE_OFFSET at all, but they should
-> set it as a reasonable value or at least be below than the start link
-> address of vmlinux.
+Hi Josh,
 
-Hi Ming,
+On Tue, Nov 05, 2013 at 05:59:07PM +0800, Josh Wu wrote:
+> In the atmel driver probe function, the code shows like following:
+>   atmel_nand_probe(...) {
+>         ...
+> 
+>   err_nand_ioremap:
+>         platform_driver_unregister(&atmel_nand_nfc_driver);
+>         return res;
+>   }
+> 
+> If no nand flash detected, the driver probe function will goto
+> err_nand_ioremap label.
+> Then platform_driver_unregister() will be called. It will get the
+> lock of atmel_nand device since it is parent of nfc_device. The
+> problem is the lock is already hold by atmel_nand_probe itself.
+> So system will be in a dead lock.
+> 
+> This patch just simply removed to platform_driver_unregister() call.
+> When atmel_nand driver is quit the platform_driver_unregister() will
+> be called in atmel_nand_remove().
 
-I found in arch/arm/include/asm/memory.h:
-CONFIG_PAGE_OFFSET is not used if !CONFIG_MMU.
-So looks like setting CONFIG_PAGE_OFFSET to other value still won't work.
+The real key, here, is that the platform-driver probe() has no business
+un-registering another driver, right? Shouldn't both drivers just be
+registered/unregistered in the module init/exit, and not in probe()?
 
-Thanks,
-Axel
+Also, should this be marked for -stable?
+
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>  drivers/mtd/nand/atmel_nand.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index ef9c9f5..469d4e2 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -2142,7 +2142,6 @@ err_no_card:
+>  	if (host->dma_chan)
+>  		dma_release_channel(host->dma_chan);
+>  err_nand_ioremap:
+> -	platform_driver_unregister(&atmel_nand_nfc_driver);
+>  	return res;
+>  }
+>  
+
+Brian
