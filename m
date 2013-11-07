@@ -1,20 +1,22 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 07 Nov 2013 18:56:25 +0100
-Subject: [PATCH v5 2/3] bus: mvebu: add missing of_node_put() to fix
- reference leak
-In-Reply-To: <1383793720-4643-5-git-send-email-jszhang@marvell.com>
+Date: Thu, 07 Nov 2013 18:57:11 +0100
+Subject: [PATCH v5 3/3] pinctrl: mvebu: Convert to use
+ devm_ioremap_resource
+In-Reply-To: <1383793720-4643-7-git-send-email-jszhang@marvell.com>
 References: <1383793720-4643-1-git-send-email-jszhang@marvell.com>
- <1383793720-4643-5-git-send-email-jszhang@marvell.com>
-Message-ID: <527BD449.4070809@free-electrons.com>
+ <1383793720-4643-7-git-send-email-jszhang@marvell.com>
+Message-ID: <527BD477.2090602@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/11/2013 04:08, Jisheng Zhang wrote:
-> Add of_node_put to properly decrement the refcount when we are
-> done using a given node.
+> The resource mapped by of_iomap() isn't unmapped in error path. This
+> patch fix the resource leakage by using devm_ioremap_resource() instead
+> of of_iomap().
 > 
 > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
@@ -24,34 +26,38 @@ Thanks,
 Gregory
 
 > ---
->  drivers/bus/mvebu-mbus.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+>  drivers/pinctrl/mvebu/pinctrl-mvebu.c | 11 +++++------
+>  1 file changed, 5 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> index 33c6947..20da90f 100644
-> --- a/drivers/bus/mvebu-mbus.c
-> +++ b/drivers/bus/mvebu-mbus.c
-> @@ -837,6 +837,7 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+> diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+> index bb7ddb1..1caa45f 100644
+> --- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+> +++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+> @@ -579,7 +579,7 @@ static int mvebu_pinctrl_build_functions(struct platform_device *pdev,
+>  int mvebu_pinctrl_probe(struct platform_device *pdev)
 >  {
->  	struct mvebu_mbus_state *mbus = &mbus_state;
->  	const struct of_device_id *of_id;
-> +	struct device_node *np;
->  	int win;
->  
->  	for (of_id = of_mvebu_mbus_ids; of_id->compatible; of_id++)
-> @@ -860,8 +861,11 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
->  		return -ENOMEM;
+>  	struct mvebu_pinctrl_soc_info *soc = dev_get_platdata(&pdev->dev);
+> -	struct device_node *np = pdev->dev.of_node;
+> +	struct resource *res;
+>  	struct mvebu_pinctrl *pctl;
+>  	void __iomem *base;
+>  	struct pinctrl_pin_desc *pdesc;
+> @@ -591,11 +591,10 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+>  		return -EINVAL;
 >  	}
 >  
-> -	if (of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
-> +	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
-> +	if (np) {
->  		mbus->hw_io_coherency = 1;
-> +		of_node_put(np);
-> +	}
+> -	base = of_iomap(np, 0);
+> -	if (!base) {
+> -		dev_err(&pdev->dev, "unable to get base address\n");
+> -		return -ENODEV;
+> -	}
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
 >  
->  	for (win = 0; win < mbus->soc->num_wins; win++)
->  		mvebu_mbus_disable_window(mbus, win);
+>  	pctl = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_pinctrl),
+>  			GFP_KERNEL);
 > 
 
 
