@@ -1,45 +1,209 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 07 Nov 2013 19:08:56 +0000
-Subject: [PATCH] ARM: kconfig: select GENERIC_CLOCKEVENTS if
- HAVE_ARM_ARCH_TIMER
-In-Reply-To: <1383850931-15512-1-git-send-email-will.deacon@arm.com>
-References: <1383850931-15512-1-git-send-email-will.deacon@arm.com>
-Message-ID: <527BE548.7060006@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu,  7 Nov 2013 11:20:42 -0800
+Subject: [PATCH] ARM: Use udiv/sdiv for __aeabi_{u}idiv library functions
+Message-ID: <1383852042-10780-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/13 19:02, Will Deacon wrote:
-> The ARM architected timer driver doesn't compile without
-> GENERIC_CLOCKEVENTS selected, so ensure that we select it when building
-> for a platform that has the timer.
-> 
-> Without this patch, mach-virt fails to build without something like
-> mach-vexpress also selected.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+If we're running on a v7 ARM CPU, detect if the CPU supports the
+sdiv/udiv instructions and replace the signed and unsigned
+division library functions with an sdiv/udiv instruction.
 
-Good catch.
+Running the perf messaging benchmark in pipe mode
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+ $ perf bench sched messaging -p
 
-> ---
->  arch/arm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 22700fda2047..bce493e8cb8f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1533,6 +1533,7 @@ config HAVE_ARM_ARCH_TIMER
->  	bool "Architected timer support"
->  	depends on CPU_V7
->  	select ARM_ARCH_TIMER
-> +	select GENERIC_CLOCKEVENTS
->  	help
->  	  This option enables support for the ARM architected timer
->  
-> 
+shows a modest improvement on my v7 CPU.
 
+before:
+(5.060 + 5.960 + 5.971 + 5.643 + 6.029 + 5.665 + 6.050 + 5.870 + 6.117 + 5.683) / 10 = 5.805
 
+after:
+(4.884 + 5.549 + 5.749 + 6.001 + 5.460 + 5.103 + 5.956 + 6.112 + 5.468 + 5.093) / 10 = 5.538
+
+(5.805 - 5.538) / 5.805 = 4.6%
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+Should we add in the __div0() call if the denominator is 0?
+
+ arch/arm/kernel/setup.c  | 10 +++++++++
+ arch/arm/lib/Makefile    |  3 +++
+ arch/arm/lib/div-v7.c    | 58 ++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/lib/lib1funcs.S | 16 +++++++++++++
+ 4 files changed, 87 insertions(+)
+ create mode 100644 arch/arm/lib/div-v7.c
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 0e1e2b3..7d519f4 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -30,6 +30,7 @@
+ #include <linux/bug.h>
+ #include <linux/compiler.h>
+ #include <linux/sort.h>
++#include <linux/static_key.h>
+ 
+ #include <asm/unified.h>
+ #include <asm/cp15.h>
+@@ -365,6 +366,8 @@ void __init early_print(const char *str, ...)
+ 	printk("%s", buf);
+ }
+ 
++struct static_key cpu_has_idiv = STATIC_KEY_INIT_FALSE;
++
+ static void __init cpuid_init_hwcaps(void)
+ {
+ 	unsigned int divide_instrs, vmsa;
+@@ -381,6 +384,13 @@ static void __init cpuid_init_hwcaps(void)
+ 		elf_hwcap |= HWCAP_IDIVT;
+ 	}
+ 
++#ifdef CONFIG_THUMB2_KERNEL
++	if (elf_hwcap & HWCAP_IDIVT)
++#else
++	if (elf_hwcap & HWCAP_IDIVA)
++#endif
++		static_key_slow_inc(&cpu_has_idiv);
++
+ 	/* LPAE implies atomic ldrd/strd instructions */
+ 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+ 	if (vmsa >= 5)
+diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+index bd454b0..6ed6496 100644
+--- a/arch/arm/lib/Makefile
++++ b/arch/arm/lib/Makefile
+@@ -15,6 +15,9 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
+ 		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
+ 		   call_with_stack.o
+ 
++lib-$(CONFIG_CPU_V7) += div-v7.o
++CFLAGS_div-v7.o := -march=armv7-a
++
+ mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
+ 
+ # the code in uaccess.S is not preemption safe and
+diff --git a/arch/arm/lib/div-v7.c b/arch/arm/lib/div-v7.c
+new file mode 100644
+index 0000000..96ceb92
+--- /dev/null
++++ b/arch/arm/lib/div-v7.c
+@@ -0,0 +1,58 @@
++/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/static_key.h>
++
++extern int ___aeabi_idiv(int, int);
++extern unsigned ___aeabi_uidiv(int, int);
++
++extern struct static_key cpu_has_idiv;
++
++int __aeabi_idiv(int numerator, int denominator)
++{
++	if (static_key_false(&cpu_has_idiv)) {
++		int ret;
++
++		asm volatile (
++		".arch_extension idiv\n"
++		"sdiv %0, %1, %2"
++		: "=&r" (ret)
++		: "r" (numerator), "r" (denominator));
++
++		return ret;
++	}
++
++	return ___aeabi_idiv(numerator, denominator);
++}
++
++int __divsi3(int numerator, int denominator)
++	__attribute__((alias("__aeabi_idiv")));
++
++unsigned __aeabi_uidiv(int numerator, int denominator)
++{
++	if (static_key_false(&cpu_has_idiv)) {
++		int ret;
++
++		asm volatile (
++		".arch_extension idiv\n"
++		"udiv %0, %1, %2"
++		: "=&r" (ret)
++		: "r" (numerator), "r" (denominator));
++
++		return ret;
++	}
++
++	return ___aeabi_uidiv(numerator, denominator);
++}
++
++unsigned __udivsi3(int numerator, int denominator)
++	__attribute__((alias("__aeabi_uidiv")));
+diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
+index c562f64..adea088 100644
+--- a/arch/arm/lib/lib1funcs.S
++++ b/arch/arm/lib/lib1funcs.S
+@@ -205,8 +205,12 @@ Boston, MA 02111-1307, USA.  */
+ .endm
+ 
+ 
++#if defined(ZIMAGE) || !defined(CONFIG_CPU_V7)
+ ENTRY(__udivsi3)
+ ENTRY(__aeabi_uidiv)
++#else
++ENTRY(___aeabi_uidiv)
++#endif
+ UNWIND(.fnstart)
+ 
+ 	subs	r2, r1, #1
+@@ -232,8 +236,12 @@ UNWIND(.fnstart)
+ 	mov	pc, lr
+ 
+ UNWIND(.fnend)
++#if defined(ZIMAGE) || !defined(CONFIG_CPU_V7)
+ ENDPROC(__udivsi3)
+ ENDPROC(__aeabi_uidiv)
++#else
++ENDPROC(___aeabi_uidiv)
++#endif
+ 
+ ENTRY(__umodsi3)
+ UNWIND(.fnstart)
+@@ -253,8 +261,12 @@ UNWIND(.fnstart)
+ UNWIND(.fnend)
+ ENDPROC(__umodsi3)
+ 
++#if defined(ZIMAGE) || !defined(CONFIG_CPU_V7)
+ ENTRY(__divsi3)
+ ENTRY(__aeabi_idiv)
++#else
++ENTRY(___aeabi_idiv)
++#endif
+ UNWIND(.fnstart)
+ 
+ 	cmp	r1, #0
+@@ -293,8 +305,12 @@ UNWIND(.fnstart)
+ 	mov	pc, lr
+ 
+ UNWIND(.fnend)
++#if defined(ZIMAGE) || !defined(CONFIG_CPU_V7)
+ ENDPROC(__divsi3)
+ ENDPROC(__aeabi_idiv)
++#else
++ENDPROC(___aeabi_idiv)
++#endif
+ 
+ ENTRY(__modsi3)
+ UNWIND(.fnstart)
 -- 
-Jazz is not dead. It just smells funny...
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
