@@ -1,41 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 7 Nov 2013 11:48:08 -0800
-Subject: [PATCH v2] serial: omap: Add support for optional wake-up
-In-Reply-To: <20131107194553.GL15154@atomide.com>
-References: <20131022134947.GK15154@atomide.com> <87siv8rqmj.fsf@linaro.org>
- <20131107194553.GL15154@atomide.com>
-Message-ID: <CAOesGMhoA3_ZcdsgANqrpY+U0uNiszOe3RUDk6hDNZ1+HMsTCw@mail.gmail.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Thu, 7 Nov 2013 11:57:57 -0800
+Subject: [RESEND PATCH 2/4] i2c: i2c-bcm-kona: Add support for high-speed
+ mode
+In-Reply-To: <20131101130835.GC6734@katana>
+References: <1381960909-1735-1-git-send-email-tim.kryger@linaro.org>
+ <1381960909-1735-3-git-send-email-tim.kryger@linaro.org>
+ <20131101130835.GC6734@katana>
+Message-ID: <CAAYSxhrrkSvOJpYPz7txVsot1you3fFzkXJ6fqaS4OgRM0Z2gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 7, 2013 at 11:45 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Kevin Hilman <khilman@linaro.org> [131107 10:53]:
+On Fri, Nov 1, 2013 at 6:08 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Wed, Oct 16, 2013 at 03:01:47PM -0700, Tim Kryger wrote:
+>> Add support for I2C high-speed mode (3.4 MHz).
 >>
->> A bunch of DT boot failures on OMAP3 platforms with latest mainline were
->> bisected down to this patch.  Boot results here:
->> http://lists.linaro.org/pipermail/kernel-build-reports/2013-November/000954.html
->>
->> This doesn't seem to properly handle the OMAP3 case where we have DT
->> nodes, but no reg or interrupts properties since they're still using
->> hwmod.
->>
->> The problems seems to be because these OMAP3 platforms don't list any
->> interrupts in their DTS files for the UARTs, but a quick hack at adding
->> interrupts to omap3.dtsi didn't help either so something else is going
->> on.
->>
->> This patch should probably be reverted until it gets broader testing.
+>> Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+>> Reviewed-by: Matt Porter <matt.porter@linaro.org>
+>> Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 >
-> Hmm I'm not seeing this with my tree, and sounds like it should be
-> already fixed by commit d7c8f2596 (ARM: dts: Add missing reg,
-> interrupt and dma entries for omap3).
+> Mostly good as well:
 >
-> Can you check that you have that commit in your tree?
+>> +enum hs_bus_speed_index {
+>> +     BCM_SPD_3P4MHZ = 0,
+>> +};
+>
+> I just realized that you should update both patches to add the supported
+> bus speeds to the binding documentation.
 
-Ah, that explains why we haven't seen it in -next.
+While the bus speed property is really a configuration parameter (and
+not a true description of of the hardware) it seems improper to put
+driver specific details into the binding document.
 
-We should probably queue up our branches for Linus to merge ASAP,
-that'll take care of it.
+Please let me know how you would like me to proceed.
 
+I should mention that I plan to break out the binding into its own
+patch as this seems to be the latest best practice just in case that
+influences your decision.
 
--Olof
+Thanks,
+Tim Kryger
