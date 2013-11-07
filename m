@@ -1,169 +1,102 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 7 Nov 2013 17:02:38 +0800
-Subject: [PATCH] arm: mvebu: fix some sparse warnings
-Message-ID: <1383814958-5272-1-git-send-email-jszhang@marvell.com>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Thu, 07 Nov 2013 10:07:01 +0100
+Subject: address translation for PCIe-to-localbus bridge
+In-Reply-To: <20131106200709.GB26881@obsidianresearch.com>
+References: <527A1983.6020603@keymile.com>
+ <20131106173649.GA25515@obsidianresearch.com> <527A9AB9.2050903@keymile.com>
+ <20131106200709.GB26881@obsidianresearch.com>
+Message-ID: <527B5835.3060906@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes conflicting types for 'set_cpu_coherent' and fixes the
-following sparse warnings.
+On 11/06/2013 09:07 PM, Jason Gunthorpe wrote:
+> On Wed, Nov 06, 2013 at 08:38:33PM +0100, Gerlando Falauto wrote:
+>
+[...]
+> Each translation represents something concrete:
+>   0x8 -> 0x82000000 0x00000000 0x00000008
+>      This is the BAR 0 decoder of the PCI device
+>   0x82000000 0x00000000 0x00000008 -> 0x82000000 0x1 8
+>      This is the PCI bridge's memory window decoder
+>    0x82000000 0x1 8 -> MBUS_ID(0x04, 0xe8) 8
+>      This is the MBUS window associated with the PEX
+>   MBUS_ID(0x04, 0xe8) 8 -> 0xe0000008
+>      This is the physical CPU BUS address associated with the MBUS
+>      window
 
-arch/arm/mach-mvebu/system-controller.c:42:38:
-warning: symbol 'armada_370_xp_system_controller' was not declared. Should it be static?
-arch/arm/mach-mvebu/system-controller.c:49:38:
-warning: symbol 'orion_system_controller' was not declared. Should it be static?
-arch/arm/mach-mvebu/system-controller.c:67:6:
-warning: symbol 'mvebu_restart' was not declared. Should it be static?
-arch/arm/mach-mvebu/coherency.c:31:15:
-warning: symbol 'coherency_phys_base' was not declared. Should it be static?
-arch/arm/mach-mvebu/coherency.c:48:5:
-warning: symbol 'set_cpu_coherent' was not declared. Should it be static?
-arch/arm/mach-mvebu/coherency.c:123:12:
-warning: symbol 'coherency_init' was not declared. Should it be static?
-arch/arm/mach-mvebu/pmsu.c:38:5: warning:
-symbol 'armada_xp_boot_cpu' was not declared. Should it be static?
-arch/arm/mach-mvebu/pmsu.c:61:12: warning:
-symbol 'armada_370_xp_pmsu_init' was not declared. Should it be static?
-arch/arm/mach-mvebu/platsmp.c:49:13: warning:
-symbol 'set_secondary_cpus_clock' was not declared. Should it be static?
-arch/arm/mach-mvebu/platsmp.c:97:13: warning:
-symbol 'armada_xp_smp_prepare_cpus' was not declared. Should it be static?
-arch/arm/mach-mvebu/hotplug.c:24:12: warning:
-symbol 'armada_xp_cpu_die' was not declared. Should it be static?
+Uhm, OK, sounds good. Except you must know the whole mapping in advance. 
+Fair enough.
+Would that work without the whole mbus driver (I guess Ezequiel's)?
+I'm dealing with 3.10.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/mach-mvebu/coherency.c         | 1 +
- arch/arm/mach-mvebu/coherency.h         | 4 +++-
- arch/arm/mach-mvebu/common.h            | 1 -
- arch/arm/mach-mvebu/hotplug.c           | 1 +
- arch/arm/mach-mvebu/platsmp.c           | 4 ++--
- arch/arm/mach-mvebu/pmsu.c              | 3 ++-
- arch/arm/mach-mvebu/system-controller.c | 5 +++--
- 7 files changed, 12 insertions(+), 7 deletions(-)
+Where does the 0x82000000 come from?
+What about the 0x1 (second cell)?
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 58adf2f..4e9d581 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -27,6 +27,7 @@
- #include <asm/smp_plat.h>
- #include <asm/cacheflush.h>
- #include "armada-370-xp.h"
-+#include "coherency.h"
- 
- unsigned long coherency_phys_base;
- static void __iomem *coherency_base;
-diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
-index df33ad8..760226c 100644
---- a/arch/arm/mach-mvebu/coherency.h
-+++ b/arch/arm/mach-mvebu/coherency.h
-@@ -14,7 +14,9 @@
- #ifndef __MACH_370_XP_COHERENCY_H
- #define __MACH_370_XP_COHERENCY_H
- 
--int set_cpu_coherent(int cpu_id, int smp_group_id);
-+extern unsigned long coherency_phys_base;
-+
-+int set_cpu_coherent(unsigned int cpu_id, int smp_group_id);
- int coherency_init(void);
- 
- #endif	/* __MACH_370_XP_COHERENCY_H */
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index e366010..0e6016f 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -26,7 +26,6 @@ void armada_370_xp_handle_irq(struct pt_regs *regs);
- 
- void armada_xp_cpu_die(unsigned int cpu);
- int armada_370_xp_coherency_init(void);
--int armada_370_xp_pmsu_init(void);
- void armada_xp_secondary_startup(void);
- extern struct smp_operations armada_xp_smp_ops;
- #endif
-diff --git a/arch/arm/mach-mvebu/hotplug.c b/arch/arm/mach-mvebu/hotplug.c
-index b228b6a..d95e910 100644
---- a/arch/arm/mach-mvebu/hotplug.c
-+++ b/arch/arm/mach-mvebu/hotplug.c
-@@ -15,6 +15,7 @@
- #include <linux/errno.h>
- #include <linux/smp.h>
- #include <asm/proc-fns.h>
-+#include "common.h"
- 
- /*
-  * platform-specific code to shutdown a CPU
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index ff69c2d..a6da03f 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -46,7 +46,7 @@ static struct clk *__init get_cpu_clk(int cpu)
- 	return cpu_clk;
- }
- 
--void __init set_secondary_cpus_clock(void)
-+static void __init set_secondary_cpus_clock(void)
- {
- 	int thiscpu, cpu;
- 	unsigned long rate;
-@@ -94,7 +94,7 @@ static void __init armada_xp_smp_init_cpus(void)
- 	set_smp_cross_call(armada_mpic_send_doorbell);
- }
- 
--void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	struct device_node *node;
- 	struct resource res;
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 27fc4f0..d71ef53 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -22,6 +22,7 @@
- #include <linux/io.h>
- #include <linux/smp.h>
- #include <asm/smp_plat.h>
-+#include "pmsu.h"
- 
- static void __iomem *pmsu_mp_base;
- static void __iomem *pmsu_reset_base;
-@@ -58,7 +59,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- }
- #endif
- 
--int __init armada_370_xp_pmsu_init(void)
-+static int __init armada_370_xp_pmsu_init(void)
- {
- 	struct device_node *np;
- 
-diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-index 5175083c..a7fb89a 100644
---- a/arch/arm/mach-mvebu/system-controller.c
-+++ b/arch/arm/mach-mvebu/system-controller.c
-@@ -27,6 +27,7 @@
- #include <linux/of_address.h>
- #include <linux/io.h>
- #include <linux/reboot.h>
-+#include "common.h"
- 
- static void __iomem *system_controller_base;
- 
-@@ -39,14 +40,14 @@ struct mvebu_system_controller {
- };
- static struct mvebu_system_controller *mvebu_sc;
- 
--const struct mvebu_system_controller armada_370_xp_system_controller = {
-+static const struct mvebu_system_controller armada_370_xp_system_controller = {
- 	.rstoutn_mask_offset = 0x60,
- 	.system_soft_reset_offset = 0x64,
- 	.rstoutn_mask_reset_out_en = 0x1,
- 	.system_soft_reset = 0x1,
- };
- 
--const struct mvebu_system_controller orion_system_controller = {
-+static const struct mvebu_system_controller orion_system_controller = {
- 	.rstoutn_mask_offset = 0x108,
- 	.system_soft_reset_offset = 0x10c,
- 	.rstoutn_mask_reset_out_en = 0x4,
--- 
-1.8.4.2
+>> Looks like it ends up at the beginning of the memory region for
+>> PCIe, and that's no wonder since you only have a single device with
+>> a single BAR... right?
+>
+> The mapping of the FPGA bus into a BAR is done by a single ranges:
+>
+>>>                                  fpga at 0 {
+>>>                                          reg = <0x8 0 0  0 0>;
+>>>                                          ranges = <0x00000000  0x82000000 0x00000000 0x00000000  0x8000000>;
+>>>                                          gpio3: fpga_gpio at 8 {
+>
+> That ranges says 'put address 0 of the child bus at 0x82000000
+> 0x00000000 0x00000000', which is the BAR 0 address, relative to the
+> bridge's memory window.
+>
+>> So suppose you also had a bigger BAR1 which would then shift your
+>> GPIO block at @0xe8000000.
+>> Until we get that figured out, where would you hardcode such offset then?
+>
+> Since your BAR layout of your device is fixed you can adjust the
+> single ranges:
+
+By "single" you mean that it's just *one* range, right?
+
+>
+>    ranges = <0x00000000  0x82000000 0x00000000 0x08000000  0x8000000>;
+>
+> It is possible as well to do this in code in the FPGA driver.
+
+Uhm... why? And how? You mean dynamically upgrading the ranges window?
+
+>
+>> How would you also deal with a second (let's say identical) device on BAR1?
+>
+>    ranges = <0x00000000  0x82000000 0x00000000 0x08000000  0x8000000  //  BAR 0
+>              0x10000000  0x82000000 0x00000000 0x08000000  0x8000000> // BAR 1
+
+Aren't in this case the two regions aliased? Shouldn't the fourth column 
+on either row be 0x00000000? Like:
+
+     ranges = <0x00000000  0x82000000 0x00000000 0x00000000  0x8000000 
+//  BAR 0
+               0x10000000  0x82000000 0x00000000 0x08000000  0x8000000> 
+// BAR 1
+
+> Use reg <0x10000abc xxx> to refer to the 2nd BAR. There are other ways
+> to organize things.
+
+Now I completely lost you. According to the above description (BTW, I 
+like the double space to separate groups -- it makes this whole mess a 
+little messy!) the child address should have a single cell.
+Why use two then?
+
+>> I guess I could live with hardcoded values in the DT, as long as
+>> they're easy to spot and there's only one per BAR/device.
+>> Then it's easy to do a comparison with whatever gets assigned during
+>> probing.
+>
+> I'd see it as an interm step, pending on some kind of core support for
+> this sort of stuff.
+
+Right.
+
+Sorry for being pedantic, but I'd really like to get this straight once 
+and for all...
+
+Thanks again,
+Gerlando
