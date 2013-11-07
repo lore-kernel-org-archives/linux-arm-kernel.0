@@ -1,128 +1,67 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 7 Nov 2013 10:34:32 -0600
-Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
-In-Reply-To: <1383164468-4610-1-git-send-email-zonque@gmail.com>
-References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
-Message-ID: <527BC118.1050609@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 7 Nov 2013 13:41:33 -0300
+Subject: [PATCH v4 05/31] mtd: nand: pxa3xx: devicetree binding update
+In-Reply-To: <20131107153210.GK8308@titan.lakedaemon.net>
+References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383837455-30721-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131107153210.GK8308@titan.lakedaemon.net>
+Message-ID: <20131107164132.GA30917@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, Nov 07, 2013 at 10:32:10AM -0500, Jason Cooper wrote:
+> On Thu, Nov 07, 2013 at 12:17:09PM -0300, Ezequiel Garcia wrote:
+> > Since the driver supports the new compatible string, the binding
+> > documentation must be updated to reflect it.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> Thanks for adding this, but please remember to update the Subject
+> string in the future.  Both this patch and the next one are changing the
+> Documentation/ portion of the tree, not drivers/.
+> 
 
-Thanks for your followup patch on this. It looks much better now using existing
-functions to save/restore the state.
+Come again?
 
-On 10/30/2013 03:21 PM, Daniel Mack wrote:
-> This patch makes the edma driver resume correctly after suspend. Tested
-> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
-> 
-> All information can be reconstructed by already known runtime
-> information.
-> 
-> As we now use some functions that were previously only used from __init
-> context, annotations had to be dropped.
-> 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
-> There was actually only a v3 ever, I made a mistake when formating the
-> first version of this patch. To prevent confusion though, I named this
-> one v4.
-> 
-> v3 -> v4:
-> 	* dropped extra allocations, and reconstruct register values
-> 	  from already known driver states.
-> 
-> 
-> 
-> Hi Joel, Gururaja, Balaji,
-> 
-> thanks a lot for your feedback. I successfully tested this version with
-> davinci mcasp as well as omap_hsmmc. I'd appreciate another round of
-> reviews :)
-> 
-> 
-> Thanks,
-> Daniel
-> 
->  arch/arm/common/edma.c | 82 ++++++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 79 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-[..]
-> +static int edma_pm_resume(struct device *dev)
-> +{
-> +	int i, j;
-> +
-> +	pm_runtime_get_sync(dev);
-> +
-> +	for (j = 0; j < arch_num_cc; j++) {
-> +		struct edma *cc = edma_cc[j];
-> +
-> +		s8 (*queue_priority_mapping)[2];
-> +		s8 (*queue_tc_mapping)[2];
-> +
-> +		queue_tc_mapping = cc->info->queue_tc_mapping;
-> +		queue_priority_mapping = cc->info->queue_priority_mapping;
-> +
-> +		/* Event queue to TC mapping */
-> +		for (i = 0; queue_tc_mapping[i][0] != -1; i++)
-> +			map_queue_tc(j, queue_tc_mapping[i][0],
-> +					queue_tc_mapping[i][1]);
-> +
-> +		/* Event queue priority mapping */
-> +		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
-> +			assign_priority_to_queue(j,
-> +						queue_priority_mapping[i][0],
-> +						queue_priority_mapping[i][1]);
+You mean "[PATCH] Documentation: mtd: nand: Do this"
 
-I know ti,edma-regions property is not currently being used, but we should
-future proof this by setting up DRAE for like done in probe:
+In that case: sorry, I do it differently on purpose, it looks better
+to me (focus the affected driver), but maybe I'm wrong.
 
-                for (i = 0; i < info[j]->n_region; i++) {
-                        edma_write_array2(j, EDMA_DRAE, i, 0, 0x0);
-                        edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
-                        edma_write_array(j, EDMA_QRAE, i, 0x0);
-                }
+> And,
+> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> 
 
+Thanks!
 
-> +
-> +		/* Map the channel to param entry if channel mapping logic
-> +		 * exist
-> +		 */
-> +		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
-> +			map_dmach_param(j);
-> +
-> +		for (i = 0; i < cc->num_channels; i++)
-> +			if (test_bit(i, cc->edma_inuse)) {
-> +				/* ensure access through shadow region 0 */
-> +				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
-> +						BIT(i & 0x1f));
-> +
-> +				setup_dma_interrupt(i,
-> +						    cc->intr_data[i].callback,
-> +						    cc->intr_data[i].data);
-> +			}
-> +
-> +		enable_irq(cc->irq_res_start);
-> +		enable_irq(cc->irq_res_end);
-> +	}
-> +
-> +	pm_runtime_put_sync(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
+> thx,
+> 
+> Jason.
+> 
+> > diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+> > index f1421e2..bed8390 100644
+> > --- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+> > +++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+> > @@ -2,7 +2,9 @@ PXA3xx NAND DT bindings
+> >  
+> >  Required properties:
+> >  
+> > - - compatible:		Should be "marvell,pxa3xx-nand"
+> > + - compatible:		Should be set to one of the following:
+> > +			marvell,pxa3xx-nand
+> > +			marvell,armada370-nand
+> >   - reg: 		The register base for the controller
+> >   - interrupts:		The interrupt to map
+> >   - #address-cells:	Set to <1> if the node includes partitions
+> > -- 
+> > 1.8.1.5
+> > 
 
-I agree with Nishanth here, it is better to do this in .suspend/resume _noirq
-stage to rule out any ordering bugs that may show up in the future, since such
-an issue already showed up in earlier testing.
-
-I would appreciate it if you can make these 2 changes and post a v5. Thanks for
-a lot for all the hardwork.
-
-Acked-by: Joel Fernandes <joelf@ti.com>
-
-regards,
-
--Joel
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
