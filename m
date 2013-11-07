@@ -1,156 +1,38 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  7 Nov 2013 12:17:10 -0300
-Subject: [PATCH v4 06/31] mtd: nand: pxa3xx: Add documentation about the
- controller
+Date: Thu,  7 Nov 2013 12:17:11 -0300
+Subject: [PATCH v4 07/31] mtd: nand: pxa3xx: Make config menu show supported
+ platforms
 In-Reply-To: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383837455-30721-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1383837455-30721-8-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given there's no public specification to this date, and in order
-to capture some important details and singularities about the
-controller let's document them once and for good.
+Since we have now support for the NFCv2 controller found on
+Armada 370/XP platforms.
 
-Cc: linux-doc at vger.kernel.org
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- Documentation/mtd/nand/pxa3xx-nand.txt | 113 +++++++++++++++++++++++++++++++++
- drivers/mtd/nand/pxa3xx_nand.c         |   2 +
- 2 files changed, 115 insertions(+)
- create mode 100644 Documentation/mtd/nand/pxa3xx-nand.txt
+ drivers/mtd/nand/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/mtd/nand/pxa3xx-nand.txt b/Documentation/mtd/nand/pxa3xx-nand.txt
-new file mode 100644
-index 0000000..00e601c
---- /dev/null
-+++ b/Documentation/mtd/nand/pxa3xx-nand.txt
-@@ -0,0 +1,113 @@
-+
-+About this document
-+===================
-+
-+Some notes about Marvell's NAND controller available in PXA and Armada 370/XP
-+SoC (aka NFCv1 and NFCv2), with an emphasis on the latter.
-+
-+NFCv2 controller background
-+===========================
-+
-+The controller has a 2176 bytes FIFO buffer. Therefore, in order to support
-+larger pages, I/O operations on 4 KiB and 8 KiB pages is done with a set of
-+chunked transfers.
-+
-+For instance, if we choose a 2048 data chunk and set "BCH" ECC (see below)
-+we'll have this layout in the pages:
-+
-+  ------------------------------------------------------------------------------
-+  | 2048B data | 32B spare | 30B ECC || 2048B data | 32B spare | 30B ECC | ... |
-+  ------------------------------------------------------------------------------
-+
-+The driver reads the data and spare portions independently and builds an internal
-+buffer with this layout (in the 4 KiB page case):
-+
-+  ------------------------------------------
-+  |     4096B data     |     64B spare     |
-+  ------------------------------------------
-+
-+Also, for the READOOB command the driver disables the ECC and reads a 'spare + ECC'
-+OOB, one per chunk read.
-+
-+  -------------------------------------------------------------------
-+  |     4096B data     |  32B spare | 30B ECC | 32B spare | 30B ECC |
-+  -------------------------------------------------------------------
-+
-+So, in order to achieve reading (for instance), we issue several READ0 commands
-+(with some additional controller-specific magic) and read two chunks of 2080B
-+(2048 data + 32 spare) each.
-+The driver accomodates this data to expose the NAND core a contiguous buffer
-+(4096 data + spare) or (4096 + spare + ECC + spare + ECC).
-+
-+ECC
-+===
-+
-+The controller has built-in hardware ECC capabilities. In addition it is
-+configurable between two modes: 1) Hamming, 2) BCH.
-+
-+Note that the actual BCH mode: BCH-4 or BCH-8 will depend on the way
-+the controller is configured to transfer the data.
-+
-+In the BCH mode the ECC code will be calculated for each transfered chunk
-+and expected to be located (when reading/programming) right after the spare
-+bytes as the figure above shows.
-+
-+So, repeating the above scheme, a 2048B data chunk will be followed by 32B
-+spare, and then the ECC controller will read/write the ECC code (30B in
-+this case):
-+
-+  ------------------------------------
-+  | 2048B data | 32B spare | 30B ECC |
-+  ------------------------------------
-+
-+If the ECC mode is 'BCH' then the ECC is *always* 30 bytes long.
-+If the ECC mode is 'Hamming' the ECC is 6 bytes long, for each 512B block.
-+So in Hamming mode, a 2048B page will have a 24B ECC.
-+
-+Despite all of the above, the controller requires the driver to only read or
-+write in multiples of 8-bytes, because the data buffer is 64-bits.
-+
-+OOB
-+===
-+
-+Because of the above scheme, and because the "spare" OOB is really located in
-+the middle of a page, spare OOB cannot be read or write independently of the
-+data area. In other words, in order to read the OOB (aka READOOB), the entire
-+page (aka READ0) has to be read.
-+
-+In the same sense, in order to write to the spare OOB the driver has to write
-+an *entire* page.
-+
-+Factory bad blocks handling
-+===========================
-+
-+Given the ECC BCH requires to layout the device's pages in a splitted
-+data/OOB/data/OOB way, the controller has a view of the flash page that's
-+different from the specified (aka the manufacturer's) view. In other words,
-+
-+Factory view:
-+
-+  -----------------------------------------------
-+  |                    Data           |x  OOB   |
-+  -----------------------------------------------
-+
-+Driver's view:
-+
-+  -----------------------------------------------
-+  |      Data      | OOB |      Data   x  | OOB |
-+  -----------------------------------------------
-+
-+It can be seen from the above, that the factory bad block marker must be
-+searched within the 'data' region, and not in the usual OOB region.
-+
-+In addition, this means under regular usage the driver will write such
-+position (since it belongs to the data region) and every used block is
-+likely to be marked as bad.
-+
-+For this reason, marking the block as bad in the OOB is explicitly
-+disabled by using the NAND_BBT_NO_OOB_BBM option in the driver. The rationale
-+for this is that there's no point in marking a block as bad, because good
-+blocks are also 'marked as bad' (in the OOB BBM sense) under normal usage.
-+
-+Instead, the drive relies in the bad block table alone, and should only perform
-+the bad block scan on the very first time (when the device hasn't been used).
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 64c258e..3359047 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -7,6 +7,8 @@
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-+ *
-+ * See Documentation/mtd/nand/pxa3xx-nand.txt for more details.
-  */
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 93ae6a6..942ef28 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -326,11 +326,11 @@ config MTD_NAND_ATMEL
+ 	  on Atmel AT91 and AVR32 processors.
  
- #include <linux/kernel.h>
+ config MTD_NAND_PXA3xx
+-	tristate "Support for NAND flash devices on PXA3xx"
++	tristate "NAND support on PXA3xx and Armada 370/XP"
+ 	depends on PXA3xx || ARCH_MMP || PLAT_ORION
+ 	help
+ 	  This enables the driver for the NAND flash device found on
+-	  PXA3xx processors
++	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
+ 
+ config MTD_NAND_SLC_LPC32XX
+ 	tristate "NXP LPC32xx SLC Controller"
 -- 
 1.8.1.5
