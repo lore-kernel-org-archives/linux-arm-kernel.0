@@ -1,71 +1,48 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 07 Nov 2013 10:52:36 -0800
-Subject: [PATCH v2] serial: omap: Add support for optional wake-up
-In-Reply-To: <20131022134947.GK15154@atomide.com> (Tony Lindgren's message of
- "Tue, 22 Oct 2013 06:49:48 -0700")
-References: <20131022134947.GK15154@atomide.com>
-Message-ID: <87siv8rqmj.fsf@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 7 Nov 2013 19:53:06 +0100
+Subject: [PATCH trivial] arm64: constify hwcap_str
+In-Reply-To: <20131107175010.GI13674@arm.com>
+References: <1383755567-17244-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20131107175010.GI13674@arm.com>
+Message-ID: <CAKv+Gu9zw-1p6q6vnQWi=ZU53V-oeN_-vDH5Jfo0XvnBjMqN2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On 7 November 2013 18:50, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Nov 06, 2013 at 04:32:47PM +0000, Ard Biesheuvel wrote:
+>> Turn hwcap_str from a 'writable array of pointers to const char[]'
+>> to a multidimensional const char[][].
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>
+>> This is something I noticed when looking at Steve Capper's hwcaps patch: really
+>> no point in having a writable array of 8-byte pointers in .data keeping track of
+>> these hwcap strings.
+>
+> I don't see a problem (few bytes wasted). If you want to make it
+> read-only, this would do:
+>
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 9cf30f49610d..84a770fd7003 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -308,7 +308,7 @@ static int __init topology_init(void)
+>  }
+>  subsys_initcall(topology_init);
+>
+> -static const char *hwcap_str[] = {
+> +static const char *const hwcap_str[] = {
+>         "fp",
+>         "asimd",
+>         NULL
+>
 
-> With the recent pinctrl-single changes, omaps can treat
-> wake-up events from deeper idle states as interrupts.
->
-> There's a separate "io chain" controller on most omaps
-> that stays enabled when the device hits off-idle and the
-> regular interrupt controller is powered off.
->
-> Let's add support for the optional second interrupt for
-> wake-up events. And then serial-omap can manage the
-> wake-up interrupt from it's runtime PM calls to avoid
-> spurious interrupts during runtime.
->
-> Note that the wake interrupt is board specific as it
-> uses the UART RX pin, and for omap3, there are six pin
-> options for UART3 RX pin.
->
-> Also Note that the legacy platform based booting handles
-> the wake-ups in the legacy mux driver and does not need to
-> pass the wake-up interrupt to the driver.
->
-> And finally, to pass the wake-up interrupt in the dts file,
-> either interrupt-map or the pending interrupts-extended
-> property needs to be passed. It's probably best to use
-> interrupts-extended when it's available.
->
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Reviewed-by: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
->
-> ---
->
-> Updated to simplify based on the review comments.
->
-> Greg, care to queue this for v3.13 if not too late?
->
-> This removes a dependency for omaps for having runtime
-> PM working with serial port using device tree, so we
-> can start moving to device tree only booting for omap3
-> for v3.14.
+I agree that whether you want to put up with the additional layer of
+indirection, additional relocations etc is a matter of taste, but
+having writable pointers around that are easily dereferenced directly
+by unprivileged users is a bad idea in any case, so if this is your
+preferred solution, it's fine by me.
 
-A bunch of DT boot failures on OMAP3 platforms with latest mainline were
-bisected down to this patch.  Boot results here:
-http://lists.linaro.org/pipermail/kernel-build-reports/2013-November/000954.html
-
-This doesn't seem to properly handle the OMAP3 case where we have DT
-nodes, but no reg or interrupts properties since they're still using
-hwmod.
-
-The problems seems to be because these OMAP3 platforms don't list any
-interrupts in their DTS files for the UARTs, but a quick hack at adding
-interrupts to omap3.dtsi didn't help either so something else is going
-on.
-
-This patch should probably be reverted until it gets broader testing.
-
-Kevin
+Regards,
+Ard.
