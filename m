@@ -1,43 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 7 Nov 2013 12:07:42 +0000
-Subject: [PATCH 3/7] ARM: ux500: Remove ATAG support for SDI (MMC)
-In-Reply-To: <CAPDyKFrd+UHYjZw7=8sf=gmATQ8rPubAVrjWYpbhODak+hOhZQ@mail.gmail.com>
-References: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
- <1383732348-18576-4-git-send-email-lee.jones@linaro.org>
- <CAPDyKFrd+UHYjZw7=8sf=gmATQ8rPubAVrjWYpbhODak+hOhZQ@mail.gmail.com>
-Message-ID: <20131107120742.GP30901@lee--X1>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 07 Nov 2013 13:15:26 +0100
+Subject: [PATCH 3/3] clk: shmobile: Add R8A7790 clocks support
+In-Reply-To: <871u2s65kz.wl%kuninori.morimoto.gx@renesas.com>
+References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <87zjpggalc.wl%kuninori.morimoto.gx@renesas.com>
+ <871u2s65kz.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <3394178.9T7q17vczr@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > -struct mmci_platform_data mop500_sdi0_data = {
-> > -       .f_max          = 100000000,
-> > -       .capabilities   = MMC_CAP_4_BIT_DATA |
-> > -                               MMC_CAP_SD_HIGHSPEED |
-> > -                               MMC_CAP_MMC_HIGHSPEED |
-> > -                               MMC_CAP_ERASE |
-> > -                               MMC_CAP_UHS_SDR12 |
-> > -                               MMC_CAP_UHS_SDR25,
+Hi Morimoto-san,
+
+On Wednesday 06 November 2013 23:20:32 Kuninori Morimoto wrote:
+> Hi Laurent again
 > 
-> I guess all the above caps is having binders in DT then?
+> > In my SuperH experience, CPG clock divier has same pattern.
+> > In H2's SDCKCR register, SDHFC and SD0FC looks different.
+> > But, the real different is only enabled bit area,
+> > the value is same.
+> > You can find same pattern on FRQCRB register too,
+> > and, you can find same pattern on M2.
+> > 
+> > I guess FRQCRB/SDHFC can share code if it has mask.
+> > This idea was used on R-Mobile series on div4.
+> > (ex clock-sh73a0.c :: div4_clks)
+> 
+> I talked it with Magnus, and I understand your headache.
+> I can agree about your approach now.
+> 
+> But, I guess H2 and M2 are very similar SoC.
+> and I don't want too many clock-${SoC} files.
+> Is it possible to share code like clk-gen2.c ?
 
-They're not there yet, no. But this stuff is not used anymore in
-Mainline hence the patch. I attempted to supply bindings for them, but
-they were rejected. Would you like to have a stab at that?
+Sure, if the hardware is very similar, it makes sense to share code. I've had 
+a quick look at the M2 documentation, and it seems to be indeed mostly 
+identical to H2. Only a couple of clocks are missing, and a new GPU clock 
+register is documented. As the GPU clock is mentioned in the H2 documentation 
+as being programmable I would assume that the GPU clock register exists and is 
+identical in H2 but has been forgotten in the documentation.
 
-We are suffering with some MMC issues presently on Snowball, this
-could well be the cause.
-
-> Dito
-> Dito
-
-Likewise.
-
-NB: When you post review comments, try not to forget to <snip> all
-unrelated cruft. Scrolling down for pages to find them is not optimal.
-
+We should probably extend clock-r8a7790.c with M2 support and rename it to 
+clock-rcar-gen2.c before pushing it to mainline. Would you like to submit a 
+patch ? :-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+
+Laurent Pinchart
