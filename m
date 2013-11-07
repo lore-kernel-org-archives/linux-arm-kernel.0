@@ -1,91 +1,140 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 7 Nov 2013 20:45:00 -0300
-Subject: [PATCH v4 26/31] mtd: nand: pxa3xx: Introduce multiple page I/O
- support
-In-Reply-To: <1383837455-30721-27-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1383837455-30721-27-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20131107234459.GB2467@localhost>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 07 Nov 2013 15:44:33 -0800
+Subject: [PATCH] ARM: OMAP2+: omap_device: maintain sane runtime pm status
+ around suspend/resume
+In-Reply-To: <1383857942-23630-1-git-send-email-nm@ti.com> (Nishanth Menon's
+ message of "Thu, 7 Nov 2013 14:59:01 -0600")
+References: <1383857942-23630-1-git-send-email-nm@ti.com>
+Message-ID: <87iow3rd3y.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Nishanth Menon <nm@ti.com> writes:
 
-I have a concern about the ECC mode and strength determination.
+> OMAP device hooks around suspend|resume_noirq ensures that hwmod
+> devices are forced to idle using omap_device_idle/enable as part of
+> the last stage of suspend activity.
+>
+> For a device such as i2c who uses autosuspend, it is possible to enter
+> the suspend path with dev->power.runtime_status = RPM_ACTIVE.
+>
+> As part of the suspend flow, the generic runtime logic would increment
+> it's dev->power.disable_depth to 1. This should prevent further
+> pm_runtime_get_sync from succeeding once the runtime_status has been
+> set to RPM_SUSPENDED.
+>
+> Now, as part of the suspend_noirq handler in omap_device, we force the
+> following: if the device status is !suspended, we force the device
+> to idle using omap_device_idle (clocks are cut etc..). This ensures
+> that from a hardware perspective, the device is "suspended". However,
+> runtime_status is left to be active.
+>
+> *if* an operation is attempted after this point to
+> pm_runtime_get_sync, runtime framework depends on runtime_status to
+> indicate accurately the device status, and since it sees it to be
+> ACTIVE, it assumes the module is functional and returns a non-error
+> value. As a result the user will see pm_runtime_get succeed, however a
+> register access will crash due to the lack of clocks.
 
-On Thu, Nov 07, 2013 at 12:17:30PM -0300, Ezequiel Garcia wrote:
-[..]
-> @@ -1152,7 +1289,28 @@ static int armada370_ecc_init(struct pxa3xx_nand_info *info,
->  			      struct nand_ecc_ctrl *ecc,
->  			      int strength, int page_size)
->  {
-> -	/* Unimplemented yet */
-> +	if (strength == 4 && page_size == 4096) {
-> +		info->ecc_bch = 1;
-> +		info->chunk_size = 2048;
-> +		info->spare_size = 32;
-> +		info->ecc_size = 32;
-> +		ecc->mode = NAND_ECC_HW;
-> +		ecc->size = info->chunk_size;
-> +		ecc->layout = &ecc_layout_4KB_bch4bit;
-> +		ecc->strength = 16;
-> +		return 1;
-> +
-> +	} else if (strength == 8 && page_size == 4096) {
-> +		info->ecc_bch = 1;
-> +		info->chunk_size = 1024;
-> +		info->spare_size = 0;
-> +		info->ecc_size = 32;
-> +		ecc->mode = NAND_ECC_HW;
-> +		ecc->size = info->chunk_size;
-> +		ecc->layout = &ecc_layout_4KB_bch8bit;
-> +		ecc->strength = 16;
-> +		return 1;
-> +	}
->  	return 0;
->  }
+Ouch.
+
+Dumb Q: who is requesting an i2c transaction after ->suspend_noirq().
+The i2c driver itself should be able to detect that it's being accessed
+after this point and return an error.
+
+That being said, I agree that omap_device should still be catching this
+case in order to find/fix driver races like this.
+
+> To prevent this from happening, we should ensure that runtime_status
+> exactly indicates the device status. As a result of this change
+> any further calls to pm_runtime_get* would return -EACCES (since
+> disable_depth is 1). On resume, we restore the clocks and runtime
+> status exactly as we suspended with.
+>
+> Reported-by: J Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Acked-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+> patch baseline: V3.12 tag (also applies on linux-next next-20131107 tag)
+>
+> Logs from 3.12 based vendor kernel:
+> Before: http://pastebin.com/m5KxnB7a
+> After: http://pastebin.com/8AfX4e7r
+>
+> The discussion on cpufreq side of the story which triggered this scenario:
+> 	http://marc.info/?l=linux-pm&m=138263811321921&w=2
+>
+> Tested on TI vendor kernel (with dt boot):
+> 	AM335x: evm, BBB, sk, BBW
+> 	OMAP5uEVM, DRA7-evm
+>
+>  arch/arm/mach-omap2/omap_device.c |   16 ++++++++++++++--
+>  arch/arm/mach-omap2/omap_device.h |    1 +
+>  2 files changed, 15 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> index b69dd9a..87ecbb0 100644
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -621,6 +621,13 @@ static int _od_suspend_noirq(struct device *dev)
 >  
+>  	if (!ret && !pm_runtime_status_suspended(dev)) {
+>  		if (pm_generic_runtime_suspend(dev) == 0) {
+> +			if (!pm_runtime_suspended(dev)) {
 
-The above shows I tried to be very careful (aka paranoid) in the ECC
-mode determination. Please note that what I call "ECC mode", is
-determined by the chunk->size value only.
+Why the addition check for supended here?
 
-As the included documentation explains this controller supports two
-different BCH ECC strength: 16-over-1024, or 16-over-2048. Setting the chunk
-size to either 1024 or 2048 is what determines which of the above will
-actually take effect.
+This version (as opposed to the _status_suspended() version above will
+fail if runtime PM has been disabled from userspace (via
+/sys/devices/.../power/control), and will thus prevent low power states
+from being hit in suspend if runtime suspend has been disabled from
+userspace.  That's a bug.
 
-In past mails, we've refered to these two as BCH4 or BCH8, but this is not
-really accurate (as Brian has pointed out) so I droped that terms in
-favor of the real thing: 16 correctable bits over 1024 data bytes, or
-16 correctable bits over 2048 data bytes.
+> +				/* NOTE: *might* indicate driver race */
 
-In turn, such BCH mode setting affects heavily the page layout, because
-after each transfered chunk (which is either 1024+spare or 2048+spare)
-the controller reads and writes a 30B ECC region.
+Yes, a driver race which should then be fixed in the driver.
 
-In other words, the kernel cannot arbitrarily change this setting, or
-the image won't be readable/writeable any longer.
+> +				dev_dbg(dev, "%s: Force suspending\n",
+> +					__func__);
+> +				pm_runtime_set_suspended(dev);
+> +				od->flags |= OMAP_DEVICE_SUSPEND_FORCED;
 
-For this reason, I'm starting to think the above method of picking
-the "ECC mode" based solely on the page size or the strength is slightly
-fragile (future developers might come and "improve" the driver breaking
-images).
+Not sure why you need an additonal flag.  Why not just always do this
+and use the existin OMAP_DEVICE_SUSPENDED flag.
 
-Besides: what if a user wants the kernel to use a "higher" than
-required strength?
+Kevin
 
-In conclusion: I'm starting to think a better (and long-term safer)
-approach is to set the ECC mode in the DT. I know this sucks, but from
-my point of view the flash device contains an image that "must" be
-read/write with a given ECC mode, and this ECC mode is by no means
-discoverable.
-
-Now, let's suppose we want to set this in the DT: what property
-would we use? "marvell,nand-ecc-opt = 16-2048"? (a bit odd, no?).
-
-What do you think?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> +			}
+>  			omap_device_idle(pdev);
+>  			od->flags |= OMAP_DEVICE_SUSPENDED;
+>  		}
+> @@ -634,10 +641,15 @@ static int _od_resume_noirq(struct device *dev)
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct omap_device *od = to_omap_device(pdev);
+>  
+> -	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
+> -	    !pm_runtime_status_suspended(dev)) {
+> +	if (od->flags & OMAP_DEVICE_SUSPENDED) {
+>  		od->flags &= ~OMAP_DEVICE_SUSPENDED;
+>  		omap_device_enable(pdev);
+> +
+> +		if (od->flags & OMAP_DEVICE_SUSPEND_FORCED) {
+> +			pm_runtime_set_active(dev);
+> +			od->flags &= ~OMAP_DEVICE_SUSPEND_FORCED;
+> +		}
+> +
+>  		pm_generic_runtime_resume(dev);
+>  	}
+>  
+> diff --git a/arch/arm/mach-omap2/omap_device.h b/arch/arm/mach-omap2/omap_device.h
+> index 17ca1ae..45885b0 100644
+> --- a/arch/arm/mach-omap2/omap_device.h
+> +++ b/arch/arm/mach-omap2/omap_device.h
+> @@ -38,6 +38,7 @@ extern struct dev_pm_domain omap_device_pm_domain;
+>  
+>  /* omap_device.flags values */
+>  #define OMAP_DEVICE_SUSPENDED		BIT(0)
+> +#define OMAP_DEVICE_SUSPEND_FORCED	BIT(1)
+>  
+>  /**
+>   * struct omap_device - omap_device wrapper for platform_devices
