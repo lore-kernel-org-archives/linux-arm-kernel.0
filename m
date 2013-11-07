@@ -1,38 +1,71 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 7 Nov 2013 10:43:06 -0800
-Subject: [PATCH] mtd: atmel_nand: fix bug driver will in a dead lock if
- no nand detected
-In-Reply-To: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
-References: <1383645547-21813-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20131107184306.GX20061@ld-irv-0074.broadcom.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 07 Nov 2013 10:52:36 -0800
+Subject: [PATCH v2] serial: omap: Add support for optional wake-up
+In-Reply-To: <20131022134947.GK15154@atomide.com> (Tony Lindgren's message of
+ "Tue, 22 Oct 2013 06:49:48 -0700")
+References: <20131022134947.GK15154@atomide.com>
+Message-ID: <87siv8rqmj.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 05:59:07PM +0800, Josh Wu wrote:
-> In the atmel driver probe function, the code shows like following:
->   atmel_nand_probe(...) {
->         ...
-> 
->   err_nand_ioremap:
->         platform_driver_unregister(&atmel_nand_nfc_driver);
->         return res;
->   }
-> 
-> If no nand flash detected, the driver probe function will goto
-> err_nand_ioremap label.
-> Then platform_driver_unregister() will be called. It will get the
-> lock of atmel_nand device since it is parent of nfc_device. The
-> problem is the lock is already hold by atmel_nand_probe itself.
-> So system will be in a dead lock.
-> 
-> This patch just simply removed to platform_driver_unregister() call.
-> When atmel_nand driver is quit the platform_driver_unregister() will
-> be called in atmel_nand_remove().
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Tony Lindgren <tony@atomide.com> writes:
 
-Pushed to l2-mtd.git, with a little extra note and a
-Cc: <stable@vger.kernel.org>
+> With the recent pinctrl-single changes, omaps can treat
+> wake-up events from deeper idle states as interrupts.
+>
+> There's a separate "io chain" controller on most omaps
+> that stays enabled when the device hits off-idle and the
+> regular interrupt controller is powered off.
+>
+> Let's add support for the optional second interrupt for
+> wake-up events. And then serial-omap can manage the
+> wake-up interrupt from it's runtime PM calls to avoid
+> spurious interrupts during runtime.
+>
+> Note that the wake interrupt is board specific as it
+> uses the UART RX pin, and for omap3, there are six pin
+> options for UART3 RX pin.
+>
+> Also Note that the legacy platform based booting handles
+> the wake-ups in the legacy mux driver and does not need to
+> pass the wake-up interrupt to the driver.
+>
+> And finally, to pass the wake-up interrupt in the dts file,
+> either interrupt-map or the pending interrupts-extended
+> property needs to be passed. It's probably best to use
+> interrupts-extended when it's available.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Reviewed-by: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> ---
+>
+> Updated to simplify based on the review comments.
+>
+> Greg, care to queue this for v3.13 if not too late?
+>
+> This removes a dependency for omaps for having runtime
+> PM working with serial port using device tree, so we
+> can start moving to device tree only booting for omap3
+> for v3.14.
 
-Thanks,
-Brian
+A bunch of DT boot failures on OMAP3 platforms with latest mainline were
+bisected down to this patch.  Boot results here:
+http://lists.linaro.org/pipermail/kernel-build-reports/2013-November/000954.html
+
+This doesn't seem to properly handle the OMAP3 case where we have DT
+nodes, but no reg or interrupts properties since they're still using
+hwmod.
+
+The problems seems to be because these OMAP3 platforms don't list any
+interrupts in their DTS files for the UARTs, but a quick hack at adding
+interrupts to omap3.dtsi didn't help either so something else is going
+on.
+
+This patch should probably be reverted until it gets broader testing.
+
+Kevin
