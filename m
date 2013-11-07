@@ -1,150 +1,43 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  7 Nov 2013 12:17:32 -0300
-Subject: [PATCH v4 28/31] mtd: nand: pxa3xx: Add ECC BCH correctable errors
- detection
+Date: Thu,  7 Nov 2013 12:17:34 -0300
+Subject: [PATCH v4 30/31] ARM: mvebu: Enable NAND controller in Armada XP GP
+ board
 In-Reply-To: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1383837455-30721-29-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1383837455-30721-31-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extends the ECC correctable error detection to include
-ECC BCH errors. The number of BCH correctable errors can be any up to 16,
-and the actual value is exposed in the NDSR register.
+The Armada XP GP board has a NAND flash, so enable it in the devicetree.
 
-Therefore, we change some symbol names to refer to correctable or
-uncorrectable (instead of single-bit or double-bit as it was in the
-Hamming case) and while at it, cleanup the detection code slightly.
+In order to skip the driver's custom device detection and use only ONFI
+detection, the "marvell,keep-config" parameter is used.
+This is needed because we haven't support for setting the timings
+parameters yet and must rely in bootloader's.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 57 ++++++++++++++++++++++++++----------------
- 1 file changed, 35 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/armada-xp-gp.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 4c9acf7..279e9fc 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -85,6 +85,9 @@
- #define NDCR_INT_MASK           (0xFFF)
- 
- #define NDSR_MASK		(0xfff)
-+#define NDSR_ERR_CNT_OFF	(16)
-+#define NDSR_ERR_CNT_MASK       (0x1f)
-+#define NDSR_ERR_CNT(sr)	((sr >> NDSR_ERR_CNT_OFF) & NDSR_ERR_CNT_MASK)
- #define NDSR_RDY                (0x1 << 12)
- #define NDSR_FLASH_RDY          (0x1 << 11)
- #define NDSR_CS0_PAGED		(0x1 << 10)
-@@ -93,8 +96,8 @@
- #define NDSR_CS1_CMDD		(0x1 << 7)
- #define NDSR_CS0_BBD		(0x1 << 6)
- #define NDSR_CS1_BBD		(0x1 << 5)
--#define NDSR_DBERR		(0x1 << 4)
--#define NDSR_SBERR		(0x1 << 3)
-+#define NDSR_UNCORERR		(0x1 << 4)
-+#define NDSR_CORERR		(0x1 << 3)
- #define NDSR_WRDREQ		(0x1 << 2)
- #define NDSR_RDDREQ		(0x1 << 1)
- #define NDSR_WRCMDREQ		(0x1)
-@@ -135,9 +138,9 @@ enum {
- 	ERR_NONE	= 0,
- 	ERR_DMABUSERR	= -1,
- 	ERR_SENDCMD	= -2,
--	ERR_DBERR	= -3,
-+	ERR_UNCORERR	= -3,
- 	ERR_BBERR	= -4,
--	ERR_SBERR	= -5,
-+	ERR_CORERR	= -5,
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 2298e4a..274e2ad 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -175,6 +175,14 @@
+ 					spi-max-frequency = <108000000>;
+ 				};
+ 			};
++
++			nand at d0000 {
++				status = "okay";
++				num-cs = <1>;
++				marvell,nand-keep-config;
++				marvell,nand-enable-arbiter;
++				nand-on-flash-bbt;
++			};
+ 		};
+ 	};
  };
- 
- enum {
-@@ -221,6 +224,8 @@ struct pxa3xx_nand_info {
- 	unsigned int		oob_size;
- 	unsigned int		spare_size;
- 	unsigned int		ecc_size;
-+	unsigned int		ecc_err_cnt;
-+	unsigned int		max_bitflips;
- 	int 			retcode;
- 
- 	/* cached register value */
-@@ -571,10 +576,25 @@ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
- 
- 	status = nand_readl(info, NDSR);
- 
--	if (status & NDSR_DBERR)
--		info->retcode = ERR_DBERR;
--	if (status & NDSR_SBERR)
--		info->retcode = ERR_SBERR;
-+	if (status & NDSR_UNCORERR)
-+		info->retcode = ERR_UNCORERR;
-+	if (status & NDSR_CORERR) {
-+		info->retcode = ERR_CORERR;
-+		if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370 &&
-+		    info->ecc_bch)
-+			info->ecc_err_cnt = NDSR_ERR_CNT(status);
-+		else
-+			info->ecc_err_cnt = 1;
-+
-+		/*
-+		 * Each chunk composing a page is corrected independently,
-+		 * and we need to store maximum number of corrected bitflips
-+		 * to return it to the MTD layer in ecc.read_page().
-+		 */
-+		info->max_bitflips = max_t(unsigned int,
-+					   info->max_bitflips,
-+					   info->ecc_err_cnt);
-+	}
- 	if (status & (NDSR_RDDREQ | NDSR_WRDREQ)) {
- 		/* whether use dma to transfer data */
- 		if (info->use_dma) {
-@@ -672,6 +692,7 @@ static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
- 	info->use_ecc		= 0;
- 	info->use_spare		= 1;
- 	info->retcode		= ERR_NONE;
-+	info->ecc_err_cnt	= 0;
- 	info->ndcb3		= 0;
- 
- 	switch (command) {
-@@ -1053,26 +1074,18 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
- {
- 	struct pxa3xx_nand_host *host = mtd->priv;
- 	struct pxa3xx_nand_info *info = host->info_data;
--	int max_bitflips = 0;
- 
- 	chip->read_buf(mtd, buf, mtd->writesize);
- 	chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
- 
--	if (info->retcode == ERR_SBERR) {
--		switch (info->use_ecc) {
--		case 1:
--			max_bitflips = 1;
--			mtd->ecc_stats.corrected++;
--			break;
--		case 0:
--		default:
--			break;
--		}
--	} else if (info->retcode == ERR_DBERR) {
-+	if (info->retcode == ERR_CORERR && info->use_ecc) {
-+		mtd->ecc_stats.corrected += info->ecc_err_cnt;
-+
-+	} else if (info->retcode == ERR_UNCORERR) {
- 		/*
- 		 * for blank page (all 0xff), HW will calculate its ECC as
- 		 * 0, which is different from the ECC information within
--		 * OOB, ignore such double bit errors
-+		 * OOB, ignore such ucorrectable errors
- 		 */
- 		if (is_buf_blank(buf, mtd->writesize))
- 			info->retcode = ERR_NONE;
-@@ -1080,7 +1093,7 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
- 			mtd->ecc_stats.failed++;
- 	}
- 
--	return max_bitflips;
-+	return info->max_bitflips;
- }
- 
- static uint8_t pxa3xx_nand_read_byte(struct mtd_info *mtd)
 -- 
 1.8.1.5
