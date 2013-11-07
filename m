@@ -1,52 +1,34 @@
-From: wad@chromium.org (Will Drewry)
-Date: Wed, 6 Nov 2013 21:26:15 -0600
-Subject: [PATCH] seccomp: not compatible with ARM OABI
-In-Reply-To: <20131106233117.GA24545@www.outflux.net>
-References: <20131106233117.GA24545@www.outflux.net>
-Message-ID: <CABqD9hYPYei4O5gcOdAQvsSqUCY7=HhAVQ78uPHNwtTz0SbiFQ@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 7 Nov 2013 11:16:43 +0800
+Subject: [PATCH V2 3/4] arm: prima2: make use of common scu_a9_get_base()
+ interface
+In-Reply-To: <1383794204-4714-1-git-send-email-jszhang@marvell.com>
+References: <1383794204-4714-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1383794204-4714-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks!
+Make use of common scu_a9_get_base() and delete the comment since the
+interface is self commented.
 
-Reviewed-By: Will Drewry <wad@chromium.org>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm/mach-prima2/platsmp.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-On Wed, Nov 6, 2013 at 5:31 PM, Kees Cook <keescook@chromium.org> wrote:
-> Make sure that seccomp filter won't be built when ARM OABI is in use,
-> since there is work needed to distinguish calling conventions. Until
-> that is done (which is likely never since OABI is deprecated), make
-> sure seccomp filter is unavailable in the OABI compat world.
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/Kconfig |    5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index af2cc6eabcc7..6eaca7d92399 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -331,12 +331,15 @@ config HAVE_ARCH_SECCOMP_FILTER
->
->  config SECCOMP_FILTER
->         def_bool y
-> -       depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET
-> +       depends on HAVE_ARCH_SECCOMP_FILTER && SECCOMP && NET && !OABI_COMPAT
->         help
->           Enable tasks to build secure computing environments defined
->           in terms of Berkeley Packet Filter programs which implement
->           task-defined system call filtering polices.
->
-> +         Not available on ARM when built with OABI compatibility due to
-> +         lack of a sensible way to distinguish the calling conventions.
-> +
->           See Documentation/prctl/seccomp_filter.txt for details.
->
->  config HAVE_CONTEXT_TRACKING
-> --
-> 1.7.9.5
->
->
-> --
-> Kees Cook
-> Chrome OS Security
+diff --git a/arch/arm/mach-prima2/platsmp.c b/arch/arm/mach-prima2/platsmp.c
+index 3dbcb1a..2d5bcc9 100644
+--- a/arch/arm/mach-prima2/platsmp.c
++++ b/arch/arm/mach-prima2/platsmp.c
+@@ -34,8 +34,7 @@ void __init sirfsoc_map_scu(void)
+ {
+ 	unsigned long base;
+ 
+-	/* Get SCU base */
+-	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
++	base = scu_a9_get_base();
+ 
+ 	scu_io_desc.virtual = SIRFSOC_VA(base);
+ 	scu_io_desc.pfn = __phys_to_pfn(base);
+-- 
+1.8.4.2
