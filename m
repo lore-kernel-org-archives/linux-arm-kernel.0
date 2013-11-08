@@ -1,93 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 08 Nov 2013 13:53:32 -0800
-Subject: [PATCH] ARM: Support arch_irq_work_raise() via self IPIs
-In-Reply-To: <CAOesGMhB2Akf_B2_J3LVdt1bDvcsTE7+8Kq=NvsXmkf3EwGsiw@mail.gmail.com>
-References: <526DBEAA.4030707@linaro.org>	<1382984701-2371-1-git-send-email-sboyd@codeaurora.org>	<878uxcq1m7.fsf@linaro.org>	<20131029060058.GD21983@codeaurora.org>	<CAOesGMhjC=NDn4YiY4tQ3ZcW_rK9_qOY03CVD1eyVFC74ucdrA@mail.gmail.com>
- <CAOesGMhB2Akf_B2_J3LVdt1bDvcsTE7+8Kq=NvsXmkf3EwGsiw@mail.gmail.com>
-Message-ID: <527D5D5C.2080409@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 8 Nov 2013 15:54:00 -0600
+Subject: [PATCH 2/2] ARM: dts: doc: Document missing binding for ti-sdma
+ controller
+In-Reply-To: <1383907129-7325-2-git-send-email-r.sricharan@ti.com>
+References: <1383907129-7325-1-git-send-email-r.sricharan@ti.com>
+ <1383907129-7325-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <CAL_JsqLT0zOMDEQD5gkvTN2KYD2D--=pM6xgwQqPQOmkgcQBVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/13 12:45, Olof Johansson wrote:
-> On Fri, Nov 8, 2013 at 12:06 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, Oct 28, 2013 at 11:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>> On 10/28, Kevin Hilman wrote:
->>>> Stephen Boyd <sboyd@codeaurora.org> writes:
->>>>
->>>>> This will allow the scheduler tick to be restarted if we're in
->>>>> full NOHZ mode.
->>>>>
->>>>> Cc: Kevin Hilman <khilman@linaro.org>
->>>>> Cc: Frederic Weisbecker <fweisbec@gmail.com>
->>>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>>> Minor nit, but I'd prefer a more verbose changelog (I forget things
->>>> quickly and like to rely on changelogs for my memory.)  Probably worth
->>>> adding something like: "By default, irq_work is tied to the tick
->>>> processing (update_process_times()) but in full NOHZ mode, no tick means
->>>> no IRQ work.  In order for IRQ work to be done in full NOHZ mode, a
->>>> self-IPI is used to process IRQ work."
->>>>
->>>> Other than the changelog nit, patch looks good, feel free to add
->>>>
->>>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
->>>>
->>>> If Russell is OK with this, it can go to his patch system.
->>>>
->>> Fair enough. This is what I came up with. I'll send it off to the
->>> patch tracker in about 12 hours if nobody else has anymore
->>> comments.
->>>
->>> ----8<-----
->>> ARM: Support arch_irq_work_raise() via self IPIs
->>>
->>> By default, IRQ work is run from the tick interrupt (see
->>> irq_work_run() in update_process_times()). When we're in full
->>> NOHZ mode, restarting the tick requires the use of IRQ work and
->>> if the only place we run IRQ work is in the tick interrupt we
->>> have an unbreakable cycle. Implement arch_irq_work_raise() via
->>> self IPIs to break this cycle and get the tick started again.
->>> Note that we implement this via IPIs which are only available on
->>> SMP builds. This shouldn't be a problem because full NOHZ is only
->>> supported on SMP builds anyway.
->>>
->>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
->>> Cc: Frederic Weisbecker <fweisbec@gmail.com>
->>
->> Hm, so I think this just landed in -next, which seems... late for
->> 3.13. Anyway, it causes boot failures on Cubieboards (Allwinner A10),
->> I just bisected it down to this patch (fails to boot
->> multi_v7_defconfig, no console output at all).
->>
->> Unfortunately I'm not getting any debug_ll output from the board at
->> the moment, so I can't actually get to a panic stack or other error
->> info. :( I hope I can get back to you with one later today.
-> Turns out that I hit this on the BeagleBone as well, and I got a trace
-> out of it. Seems like this might be broken on all non-SMP platforms
-> built with CONFIG_SMP=y?
+On Fri, Nov 8, 2013 at 4:38 AM, Sricharan R <r.sricharan@ti.com> wrote:
+> The binding and support for system DMA module present in OMAP2+ Socs
+> and DRA7 with dma-engine is already present. So adding the missing
+> documentation for the same.
+>
+> Cc: Benoit Cousson <bcousson@baylibre.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+>  Documentation/devicetree/bindings/dma/ti-sdma.txt |   28 +++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/ti-sdma.txt
+>
+> diff --git a/Documentation/devicetree/bindings/dma/ti-sdma.txt b/Documentation/devicetree/bindings/dma/ti-sdma.txt
+> new file mode 100644
+> index 0000000..7fb2342
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/ti-sdma.txt
+> @@ -0,0 +1,28 @@
+> +TI SDMA
+> +
+> +Required Properties:
+> +- compatible : Should be "ti,omap2420-sdma", "ti,omap2430-sdma" for OMAP2
+> +               Should be "ti,omap3430-sdma", "ti,omap3630-sdma" for OMAP3
+> +               Should be "ti,omap4430-sdma" for OMAP4, OMAP5 and DRA7
+> +- reg: Memory map for accessing module
+> +- interrupts: Interrupt request number from the dma controller to
 
-Ah yes. We don't have IPI support on UP kernels but SMP_ON_UP exposes
-arch_irq_work_raise(). How about this? We should just skip this function
-if we're running on UP.
+s/dma/DMA/
 
----8<----
+> +             interrupt controller
+> +- dma-cells: Should be set to <1>
+> +- dma-channels: Total number of logical DMA channels supported by the
+> +               controller
+> +- dma-requests: Total number of dma request signals supported by the
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index bf9a0d6d..e115cbb 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -453,7 +453,8 @@ void arch_send_call_function_single_ipi(int cpu)
- #ifdef CONFIG_IRQ_WORK
- void arch_irq_work_raise(void)
- {
--	smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
-+	if (is_smp())
-+		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
- }
- #endif
- 
+s/dma/DMA/
 
+> +               controller
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+These should have the # included.
+
+Rob
