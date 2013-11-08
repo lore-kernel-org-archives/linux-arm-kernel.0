@@ -1,74 +1,110 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 8 Nov 2013 10:39:56 +0800
-Subject: [PATCH bugfix] mtd: gpmi: serialize all the dma operations
-In-Reply-To: <20131107211229.GY20061@ld-irv-0074.broadcom.com>
-References: <1383728007-15564-1-git-send-email-b32955@freescale.com>
- <20131107211229.GY20061@ld-irv-0074.broadcom.com>
-Message-ID: <527C4EFC.8090701@freescale.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 8 Nov 2013 00:21:33 -0300
+Subject: [PATCH v4 26/31] mtd: nand: pxa3xx: Introduce multiple page I/O
+ support
+In-Reply-To: <20131108004600.GZ20061@ld-irv-0074.broadcom.com>
+References: <1383837455-30721-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1383837455-30721-27-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20131107234459.GB2467@localhost>
+ <20131108004600.GZ20061@ld-irv-0074.broadcom.com>
+Message-ID: <20131108032132.GA2425@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?11?08? 05:12, Brian Norris ??:
-> Hi Huang,
->
-> On Wed, Nov 06, 2013 at 04:53:27PM +0800, Huang Shijie wrote:
->> [1] The gpmi uses the nand_command_lp to issue the commands to NAND chips.
->>      It will issue a DMA operation when it handles a NAND_CMD_NONE control
->>      command. So when we read a page(NAND_CMD_READ0) from the NAND, we may send
->>      two DMA operations back-to-back.
->>
->>      If we do not serialize the two DMA operations, we will meet a bug when
->>
->>      1.1) we enable CONFIG_DMA_API_DEBUG, CONFIG_DMADEVICES_DEBUG,
->>           and CONFIG_DEBUG_SG.
->>
->>      1.2) Use the following commands in an UART console and a SSH console:
->>           cmd 1: while true;do dd if=/dev/mtd0 of=/dev/null;done
->>           cmd 1: while true;do dd if=/dev/mmcblk0 of=/dev/null;done
-> How does mmcblk0 have anything to do with the GPMI NAND DMA?
-Reading the mmcblk0 is just to heavy the arm core loading. Reading the 
-mmcblk0 also revokes the
-tasklets, and so make the tasklets of GPMI DMA not handled quickly enough.
->>      The kernel log shows below:
->>      -----------------------------------------------------------------
->>      kernel BUG at lib/scatterlist.c:28!
->>      Unable to handle kernel NULL pointer dereference at virtual address 00000000
->>        .........................
->>      [<80044a0c>] (__bug+0x18/0x24) from [<80249b74>] (sg_next+0x48/0x4c)
->>      [<80249b74>] (sg_next+0x48/0x4c) from [<80255398>] (debug_dma_unmap_sg+0x170/0x1a4)
->>      [<80255398>] (debug_dma_unmap_sg+0x170/0x1a4) from [<8004af58>] (dma_unmap_sg+0x14/0x6c)
->>      [<8004af58>] (dma_unmap_sg+0x14/0x6c) from [<8027e594>] (mxs_dma_tasklet+0x18/0x1c)
->>      [<8027e594>] (mxs_dma_tasklet+0x18/0x1c) from [<8007d444>] (tasklet_action+0x114/0x164)
->>      -----------------------------------------------------------------
->>
->>      1.3) Assume the two DMA operations is X (first) and Y (second).
->>           The root cause of the bug:
->>           X's tasklet mxs_dma_tasklet trid to unmap the scatterlist, while Y is
->>           trying to set up a new DMA operation with the _SAME_ scatterlist in
->>           another ARM core.
-> How are X and Y occurring concurrently? MTD/NAND has locking such that
-> only one I/O operation is working on the chip at one time, right?
-X and Y can not occur concurrently. X and Y is issue when the 
-nand_command_lp calls the:
-chip->cmd_ctrl(mtd, NAND_CMD_NONE, ....);
+On Thu, Nov 07, 2013 at 04:46:00PM -0800, Brian Norris wrote:
+> On Thu, Nov 07, 2013 at 08:45:00PM -0300, Ezequiel Garcia wrote:
+> > Hello,
+> > 
+> > I have a concern about the ECC mode and strength determination.
+> > 
+> > On Thu, Nov 07, 2013 at 12:17:30PM -0300, Ezequiel Garcia wrote:
+> > [..]
+> > > @@ -1152,7 +1289,28 @@ static int armada370_ecc_init(struct pxa3xx_nand_info *info,
+> > >  			      struct nand_ecc_ctrl *ecc,
+> > >  			      int strength, int page_size)
+> > >  {
+> > > -	/* Unimplemented yet */
+> > > +	if (strength == 4 && page_size == 4096) {
+> > > +		info->ecc_bch = 1;
+> > > +		info->chunk_size = 2048;
+> > > +		info->spare_size = 32;
+> > > +		info->ecc_size = 32;
+> > > +		ecc->mode = NAND_ECC_HW;
+> > > +		ecc->size = info->chunk_size;
+> > > +		ecc->layout = &ecc_layout_4KB_bch4bit;
+> > > +		ecc->strength = 16;
+> > > +		return 1;
+> > > +
+> > > +	} else if (strength == 8 && page_size == 4096) {
+> > > +		info->ecc_bch = 1;
+> > > +		info->chunk_size = 1024;
+> > > +		info->spare_size = 0;
+> > > +		info->ecc_size = 32;
+> > > +		ecc->mode = NAND_ECC_HW;
+> > > +		ecc->size = info->chunk_size;
+> > > +		ecc->layout = &ecc_layout_4KB_bch8bit;
+> > > +		ecc->strength = 16;
+> > > +		return 1;
+> > > +	}
+> > >  	return 0;
+> > >  }
+> > >  
+> > 
+> > The above shows I tried to be very careful (aka paranoid) in the ECC
+> > mode determination. Please note that what I call "ECC mode", is
+> > determined by the chunk->size value only.
+> > 
+> > As the included documentation explains this controller supports two
+> > different BCH ECC strength: 16-over-1024, or 16-over-2048. Setting the chunk
+> > size to either 1024 or 2048 is what determines which of the above will
+> > actually take effect.
+> > 
+> > In past mails, we've refered to these two as BCH4 or BCH8, but this is not
+> > really accurate (as Brian has pointed out) so I droped that terms in
+> > favor of the real thing: 16 correctable bits over 1024 data bytes, or
+> > 16 correctable bits over 2048 data bytes.
+> > 
+> > In turn, such BCH mode setting affects heavily the page layout, because
+> > after each transfered chunk (which is either 1024+spare or 2048+spare)
+> > the controller reads and writes a 30B ECC region.
+> > 
+> > In other words, the kernel cannot arbitrarily change this setting, or
+> > the image won't be readable/writeable any longer.
+> > 
+> > For this reason, I'm starting to think the above method of picking
+> > the "ECC mode" based solely on the page size or the strength is slightly
+> > fragile (future developers might come and "improve" the driver breaking
+> > images).
+> > 
+> > Besides: what if a user wants the kernel to use a "higher" than
+> > required strength?
+> > 
+> > In conclusion: I'm starting to think a better (and long-term safer)
+> > approach is to set the ECC mode in the DT. I know this sucks, but from
+> > my point of view the flash device contains an image that "must" be
+> > read/write with a given ECC mode, and this ECC mode is by no means
+> > discoverable.
+> 
+> I think that's the way to go, in general. We can get by with
+> "implementation defined behavior" (i.e., make the driver do what makes
+> sense) for now, but to avoid breakage in the future, the bootloader
+> needs to specify what ECC configuration is required -- via DT. But your
+> current patch is still probably fine without it, since you're supporting
+> new hardware.
+> 
 
-When we read a page from the NAND, the X and Y is issued back to back.
->> [2] This patch adds a wait queue and two helpers gpmi_enter_dma/gpmi_exit_dma to
->>      serialize all the DMA operations.
-> If you really need this serialization, wouldn't a spinlock or mutex
-> suffice?
->
-spinlock is too short for this case.
+That sounds good. The ECC mode is currently "selected" in the driver
+to be the one that "makes sense". In follow up patches we'll add a
+proper DT binding, so this ECC mode can be set by the user.
 
-mutex_unlock can not be call in the interrupt context, such as the in 
-the tasklet.
->> Signed-off-by: Huang Shijie<b32955@freescale.com>
->> Cc: stable at vger.kernel.org
-> Perhaps I'm missing some things, but I don't feel like the problem is
-> sufficiently well described, and I'm not sure this is the right
-> solution. But please, educate me.
->
-should i add more description in the section of the root cause?
+The latter is an improvement over the former (adding more flexibility),
+so there won't be any regressions.
 
-thanks
-Huang Shijie
+Just to confirm: I consider this patchset to be OK as it is, and I expect
+it to either get merged or receive some request for changes.
+
+Oh, and by the way: we __really__ need someone to test for regressions on PXA.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
