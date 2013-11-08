@@ -1,211 +1,413 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Fri,  8 Nov 2013 14:01:31 +0100
-Subject: [PATCHv5][ 3/5] video: mx3fb: Introduce regulator support.
-In-Reply-To: <1383915693-9422-1-git-send-email-denis@eukrea.com>
-References: <1383915693-9422-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383915693-9422-3-git-send-email-denis@eukrea.com>
+Date: Fri,  8 Nov 2013 14:17:37 +0100
+Subject: [PATCHv9][ 1/3] Input: tsc2007: Add device tree support.
+Message-ID: <1383916659-9988-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit is based on the following commit by Fabio Estevam:
-  4344429 video: mxsfb: Introduce regulator support
-
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: devicetree at vger.kernel.org
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: linux-input at vger.kernel.org
 Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
-ChangeLog v4->v5:
-- Added Shawn Guo in the Cc list.
-- Rebased to make it apply.
+ChangeLog v8->v9:
+- Added Grant Likely in the Cc list.
+- Removed the mention of the pinctrl properties in the documentation.
 
-ChangeLog v3->v4:
-- Some code style fixes.
-- Improved error handling in eremap.
-
-ChangeLog v2->v3:
-- The prints are now replaced with non line wrapped prints.
-- The regulator retrival has been adapted to the new DT bindings which looks
-  more like the IPUv3 ones.
-- The regulator_is_enabled checks were kept, because regulator_disable do not
-  do such check.
+ChangeLog v7->v8:
+- Fixed the lack of x and z fuzz properties.
+- The pendown gpio is better documented.
+- Added Shawn Guo in the cc list.
 ---
- drivers/video/mx3fb.c |   71 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 70 insertions(+), 1 deletion(-)
+ .../bindings/input/touchscreen/tsc2007.txt         |   41 ++++
+ drivers/input/touchscreen/tsc2007.c                |  204 ++++++++++++++++----
+ 2 files changed, 204 insertions(+), 41 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
 
-diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-index 7620e4f..8cf9c6f 100644
---- a/drivers/video/mx3fb.c
-+++ b/drivers/video/mx3fb.c
-@@ -27,6 +27,7 @@
- #include <linux/clk.h>
- #include <linux/mutex.h>
- #include <linux/dma/ipu-dma.h>
-+#include <linux/regulator/consumer.h>
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+new file mode 100644
+index 0000000..028aba66d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2007.txt
+@@ -0,0 +1,41 @@
++* Texas Instruments tsc2007 touchscreen controller
++
++Required properties:
++- compatible: must be "ti,tsc2007".
++- reg: I2C address of the chip.
++- ti,x-plate-ohms: X-plate resistance in ohms.
++
++Optional properties:
++- gpios: the interrupt gpio the chip is connected to (trough the penirq pin).
++  The penirq pin goes to low when the panel is touched.
++  (see GPIO binding[1] for more details).
++- interrupt-parent: the phandle for the gpio controller
++  (see interrupt binding[0]).
++- interrupts: (gpio) interrupt to which the chip is connected
++  (see interrupt binding[0]).
++- ti,max-rt: maximum pressure.
++- ti,fuzzx: specifies the absolute input fuzz x value.
++  If set, it will permit noise in the data up to +- the value given to the fuzz
++  parameter, that is used to filter noise from the event stream.
++- ti,fuzzy: specifies the absolute input fuzz y value.
++- ti,fuzzz: specifies the absolute input fuzz z value.
++- ti,poll-period: how much time to wait(in millisecond) before reading again the
++  values from the tsc2007.
++
++[0]: Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
++[1]: Documentation/devicetree/bindings/gpio/gpio.txt
++
++Example:
++	&i2c1 {
++		/* ... */
++		tsc2007 at 49 {
++			compatible = "ti,tsc2007";
++			reg = <0x49>;
++			interrupt-parent = <&gpio4>;
++			interrupts = <0x0 0x8>;
++			gpios = <&gpio4 0 0>;
++			ti,x-plate-ohms = <180>;
++		};
++
++		/* ... */
++	};
+diff --git a/drivers/input/touchscreen/tsc2007.c b/drivers/input/touchscreen/tsc2007.c
+index 0b67ba4..3168a99 100644
+--- a/drivers/input/touchscreen/tsc2007.c
++++ b/drivers/input/touchscreen/tsc2007.c
+@@ -26,6 +26,9 @@
+ #include <linux/interrupt.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/tsc2007.h>
++#include <linux/of_device.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
  
- #include <linux/platform_data/dma-imx.h>
- #include <linux/platform_data/video-mx3fb.h>
-@@ -269,6 +270,7 @@ struct mx3fb_info {
- 	struct dma_async_tx_descriptor	*txd;
- 	dma_cookie_t			cookie;
- 	struct scatterlist		sg[2];
-+	struct regulator		*reg_lcd;
+ #define TSC2007_MEASURE_TEMP0		(0x0 << 4)
+ #define TSC2007_MEASURE_AUX		(0x2 << 4)
+@@ -74,7 +77,12 @@ struct tsc2007 {
+ 	u16			max_rt;
+ 	unsigned long		poll_delay;
+ 	unsigned long		poll_period;
++	int			fuzzx;
++	int			fuzzy;
++	int			fuzzz;
++	char			of;
  
- 	struct fb_var_screeninfo	cur_var; /* current var info */
++	unsigned		gpio;
+ 	int			irq;
+ 
+ 	wait_queue_head_t	wait;
+@@ -84,6 +92,11 @@ struct tsc2007 {
+ 	void			(*clear_penirq)(void);
  };
-@@ -1005,6 +1007,7 @@ static void __blank(int blank, struct fb_info *fbi)
- 	struct mx3fb_info *mx3_fbi = fbi->par;
- 	struct mx3fb_data *mx3fb = mx3_fbi->mx3fb;
- 	int was_blank = mx3_fbi->blank;
-+	int ret;
  
- 	mx3_fbi->blank = blank;
- 
-@@ -1023,6 +1026,15 @@ static void __blank(int blank, struct fb_info *fbi)
- 	case FB_BLANK_HSYNC_SUSPEND:
- 	case FB_BLANK_NORMAL:
- 		sdc_set_brightness(mx3fb, 0);
-+		if (mx3_fbi->reg_lcd) {
-+			if (regulator_is_enabled(mx3_fbi->reg_lcd)) {
-+				ret = regulator_disable(mx3_fbi->reg_lcd);
-+				if (ret)
-+					dev_warn(fbi->device,
-+						 "lcd regulator disable failed with error: %d\n",
-+						 ret);
-+			}
-+		}
- 		memset((char *)fbi->screen_base, 0, fbi->fix.smem_len);
- 		/* Give LCD time to update - enough for 50 and 60 Hz */
- 		msleep(25);
-@@ -1030,6 +1042,15 @@ static void __blank(int blank, struct fb_info *fbi)
- 		break;
- 	case FB_BLANK_UNBLANK:
- 		sdc_enable_channel(mx3_fbi);
-+		if (mx3_fbi->reg_lcd) {
-+			if (!regulator_is_enabled(mx3_fbi->reg_lcd)) {
-+				ret = regulator_enable(mx3_fbi->reg_lcd);
-+				if (ret)
-+					dev_warn(fbi->device,
-+						 "lcd regulator enable failed with error: %d\n",
-+						 ret);
-+			}
-+		}
- 		sdc_set_brightness(mx3fb, mx3fb->backlight_level);
- 		break;
- 	}
-@@ -1206,6 +1227,7 @@ static int mx3fb_suspend(struct platform_device *pdev, pm_message_t state)
++static int tsc2007_get_pendown_state_dt(struct tsc2007 *ts)
++{
++	return !gpio_get_value(ts->gpio);
++}
++
+ static inline int tsc2007_xfer(struct tsc2007 *tsc, u8 cmd)
  {
- 	struct mx3fb_data *mx3fb = platform_get_drvdata(pdev);
- 	struct mx3fb_info *mx3_fbi = mx3fb->fbi->par;
-+	int ret;
- 
- 	console_lock();
- 	fb_set_suspend(mx3fb->fbi, 1);
-@@ -1214,7 +1236,15 @@ static int mx3fb_suspend(struct platform_device *pdev, pm_message_t state)
- 	if (mx3_fbi->blank == FB_BLANK_UNBLANK) {
- 		sdc_disable_channel(mx3_fbi);
- 		sdc_set_brightness(mx3fb, 0);
--
-+		if (mx3_fbi->reg_lcd) {
-+			if (regulator_is_enabled(mx3_fbi->reg_lcd)) {
-+				ret = regulator_disable(mx3_fbi->reg_lcd);
-+				if (ret)
-+					dev_warn(&pdev->dev,
-+						 "lcd regulator disable failed with error: %d\n",
-+						 ret);
-+			}
-+		}
- 	}
- 	return 0;
+ 	s32 data;
+@@ -142,6 +155,14 @@ static u32 tsc2007_calculate_pressure(struct tsc2007 *tsc, struct ts_event *tc)
+ 	return rt;
  }
-@@ -1226,10 +1256,20 @@ static int mx3fb_resume(struct platform_device *pdev)
- {
- 	struct mx3fb_data *mx3fb = platform_get_drvdata(pdev);
- 	struct mx3fb_info *mx3_fbi = mx3fb->fbi->par;
-+	int ret;
  
- 	if (mx3_fbi->blank == FB_BLANK_UNBLANK) {
- 		sdc_enable_channel(mx3_fbi);
- 		sdc_set_brightness(mx3fb, mx3fb->backlight_level);
-+		if (mx3_fbi->reg_lcd) {
-+			if (!regulator_is_enabled(mx3_fbi->reg_lcd)) {
-+				ret = regulator_enable(mx3_fbi->reg_lcd);
-+				if (ret)
-+					dev_warn(&pdev->dev,
-+						 "lcd regulator enable failed with error: %d\n",
-+						 ret);
-+			}
-+		}
++static bool tsc2007_is_pen_down_valid(struct tsc2007 *ts)
++{
++	if (ts->of)
++		return gpio_is_valid(ts->gpio);
++	else
++		return ts->get_pendown_state ? true : false;
++}
++
+ static bool tsc2007_is_pen_down(struct tsc2007 *ts)
+ {
+ 	/*
+@@ -158,10 +179,13 @@ static bool tsc2007_is_pen_down(struct tsc2007 *ts)
+ 	 * to fall back on the pressure reading.
+ 	 */
+ 
+-	if (!ts->get_pendown_state)
++	if (!tsc2007_is_pen_down_valid(ts))
+ 		return true;
+ 
+-	return ts->get_pendown_state();
++	if (ts->of)
++		return tsc2007_get_pendown_state_dt(ts);
++	else
++		return ts->get_pendown_state();
+ }
+ 
+ static irqreturn_t tsc2007_soft_irq(int irq, void *handle)
+@@ -178,7 +202,7 @@ static irqreturn_t tsc2007_soft_irq(int irq, void *handle)
+ 
+ 		rt = tsc2007_calculate_pressure(ts, &tc);
+ 
+-		if (rt == 0 && !ts->get_pendown_state) {
++		if (!rt && !tsc2007_is_pen_down_valid(ts)) {
+ 			/*
+ 			 * If pressure reported is 0 and we don't have
+ 			 * callback to check pendown state, we have to
+@@ -228,7 +252,7 @@ static irqreturn_t tsc2007_hard_irq(int irq, void *handle)
+ {
+ 	struct tsc2007 *ts = handle;
+ 
+-	if (!ts->get_pendown_state || likely(ts->get_pendown_state()))
++	if (tsc2007_is_pen_down(ts))
+ 		return IRQ_WAKE_THREAD;
+ 
+ 	if (ts->clear_penirq)
+@@ -273,34 +297,71 @@ static void tsc2007_close(struct input_dev *input_dev)
+ 	tsc2007_stop(ts);
+ }
+ 
+-static int tsc2007_probe(struct i2c_client *client,
+-				   const struct i2c_device_id *id)
++#ifdef CONFIG_OF
++static int tsc2007_probe_dt(struct i2c_client *client, struct tsc2007 *ts,
++			    struct device_node *np)
+ {
+-	struct tsc2007 *ts;
+-	struct tsc2007_platform_data *pdata = client->dev.platform_data;
+-	struct input_dev *input_dev;
+-	int err;
+-
+-	if (!pdata) {
+-		dev_err(&client->dev, "platform data is required!\n");
++	int err = 0;
++	u32 val32;
++	u64 val64;
++
++	if (!of_property_read_u32(np, "ti,max-rt", &val32))
++		ts->max_rt = val32;
++	else
++		ts->max_rt = MAX_12BIT;
++
++	if (!of_property_read_u32(np, "ti,fuzzx", &val32))
++		ts->fuzzx = val32;
++
++	if (!of_property_read_u32(np, "ti,fuzzy", &val32))
++		ts->fuzzy = val32;
++
++	if (!of_property_read_u32(np, "ti,fuzzz", &val32))
++		ts->fuzzz = val32;
++
++	if (!of_property_read_u64(np, "ti,poll-period", &val64))
++		ts->poll_period = val64;
++	else
++		ts->poll_period = 1;
++
++	if (!of_property_read_u32(np, "ti,x-plate-ohms", &val32)) {
++		ts->x_plate_ohms = val32;
++	} else {
++		dev_err(&client->dev,
++			"Error: lacking ti,x-plate-ohms devicetree property. (err %d).",
++			err);
+ 		return -EINVAL;
  	}
  
- 	console_lock();
-@@ -1373,6 +1413,7 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
- 	struct mx3fb_platform_data *mx3fb_pdata = dev->platform_data;
- 	struct device_node *np = dev->of_node;
- 	const char *name;
-+	const char *regulator_name;
- 	const char *ipu_disp_format;
- 	unsigned int irq;
- 	struct fb_info *fbi;
-@@ -1389,6 +1430,9 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
- 			return -EINVAL;
- 		}
+-	if (!i2c_check_functionality(client->adapter,
+-				     I2C_FUNC_SMBUS_READ_WORD_DATA))
+-		return -EIO;
++	ts->gpio = of_get_gpio(np, 0);
++	if (!gpio_is_valid(ts->gpio))
++		dev_err(&client->dev,
++			"GPIO not found (of_get_gpio returned %d)\n",
++			ts->gpio);
  
-+		of_property_read_string(display_np, "regulator-name",
-+					&regulator_name);
-+
- 		of_property_read_string(display_np, "interface-pix-fmt",
- 					&ipu_disp_format);
- 		if (!ipu_disp_format) {
-@@ -1503,6 +1547,25 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
- 	if (ret < 0)
- 		goto erfb;
- 
-+	/* In dt mode,
-+	 * using devm_regulator_get would require that the proprety referencing
-+	 * the regulator phandle has to be inside the mx3fb node.
+-	ts = kzalloc(sizeof(struct tsc2007), GFP_KERNEL);
+-	input_dev = input_allocate_device();
+-	if (!ts || !input_dev) {
+-		err = -ENOMEM;
+-		goto err_free_mem;
+-	}
++	/* Used to detect if it is probed trough the device tree,
++	 * in order to be able to use that information in the IRQ handler.
 +	 */
-+	if (np) {
-+		if (regulator_name)
-+			mx3fbi->reg_lcd = regulator_get(NULL, regulator_name);
-+	} else {
-+		mx3fbi->reg_lcd = devm_regulator_get(dev, "lcd");
-+	}
-+
-+	if (IS_ERR(mx3fbi->reg_lcd)) {
-+		dev_warn(mx3fb->dev, "Operating without regulator \"lcd\"\n");
-+		mx3fbi->reg_lcd = NULL;
-+	} else {
-+		dev_info(mx3fb->dev, "Using \"%s\" Regulator\n",
-+			 regulator_name);
-+	}
-+
- 	return 0;
++	ts->of = 1;
  
- erfb:
-@@ -1557,6 +1620,7 @@ static int mx3fb_probe(struct platform_device *pdev)
- 	struct dma_chan *chan;
- 	struct dma_chan_request rq;
- 	struct device_node *np = dev->of_node;
-+	struct mx3fb_info *mx3_fbi;
- 
- 	/*
- 	 * Display Interface (DI) and Synchronous Display Controller (SDC)
-@@ -1621,6 +1685,11 @@ ersdc0:
- 	dmaengine_put();
- 	iounmap(mx3fb->reg_base);
- eremap:
-+	if (mx3fb->fbi) {
-+		mx3_fbi = mx3fb->fbi->par;
-+		if (mx3_fbi->reg_lcd)
-+			regulator_put(mx3_fbi->reg_lcd);
+-	ts->client = client;
+-	ts->irq = client->irq;
+-	ts->input = input_dev;
+-	init_waitqueue_head(&ts->wait);
++	return 0;
++}
++#else
++static int tsc2007_probe_dt(struct i2c_client *client, struct tsc2007 *ts,
++			    struct device_node *np)
++{
++	return -ENODEV;
++}
++#endif
++
++static int tsc2007_probe_pdev(struct i2c_client *client, struct tsc2007 *ts,
++			      struct tsc2007_platform_data *pdata,
++			      const struct i2c_device_id *id)
++{
++	if (!pdata) {
++		dev_err(&client->dev, "platform data is required!\n");
++		return -EINVAL;
 +	}
- 	kfree(mx3fb);
- 	dev_err(dev, "mx3fb: failed to register fb\n");
- 	return ret;
+ 
+ 	ts->model             = pdata->model;
+ 	ts->x_plate_ohms      = pdata->x_plate_ohms;
+@@ -309,13 +370,59 @@ static int tsc2007_probe(struct i2c_client *client,
+ 	ts->poll_period       = pdata->poll_period ? : 1;
+ 	ts->get_pendown_state = pdata->get_pendown_state;
+ 	ts->clear_penirq      = pdata->clear_penirq;
++	ts->fuzzx             = pdata->fuzzx;
++	ts->fuzzy             = pdata->fuzzy;
++	ts->fuzzz             = pdata->fuzzz;
+ 
+ 	if (pdata->x_plate_ohms == 0) {
+ 		dev_err(&client->dev, "x_plate_ohms is not set up in platform data");
+-		err = -EINVAL;
+-		goto err_free_mem;
++		return -EINVAL;
+ 	}
+ 
++	/* Used to detect if it is probed trough the device tree,
++	 * in order to be able to use that information in the IRQ handler.
++	 */
++	ts->of = 0;
++
++	return 0;
++}
++
++static int tsc2007_probe(struct i2c_client *client,
++			 const struct i2c_device_id *id)
++{
++	struct device_node *np = client->dev.of_node;
++	struct tsc2007_platform_data *pdata = client->dev.platform_data;
++	struct tsc2007 *ts;
++	struct input_dev *input_dev;
++	int err = 0;
++
++	ts = devm_kzalloc(&client->dev, sizeof(struct tsc2007), GFP_KERNEL);
++	if (!ts)
++		return -ENOMEM;
++
++	if (np)
++		err = tsc2007_probe_dt(client, ts, np);
++	else
++		err = tsc2007_probe_pdev(client, ts, pdata, id);
++
++	if (err)
++		return err;
++
++	if (!i2c_check_functionality(client->adapter,
++				     I2C_FUNC_SMBUS_READ_WORD_DATA))
++		return -EIO;
++
++	input_dev = input_allocate_device();
++	if (!input_dev) {
++		err = -ENOMEM;
++		goto err_free_input;
++	};
++
++	ts->client = client;
++	ts->irq = client->irq;
++	ts->input = input_dev;
++	init_waitqueue_head(&ts->wait);
++
+ 	snprintf(ts->phys, sizeof(ts->phys),
+ 		 "%s/input0", dev_name(&client->dev));
+ 
+@@ -331,19 +438,21 @@ static int tsc2007_probe(struct i2c_client *client,
+ 	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
+ 	input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+ 
+-	input_set_abs_params(input_dev, ABS_X, 0, MAX_12BIT, pdata->fuzzx, 0);
+-	input_set_abs_params(input_dev, ABS_Y, 0, MAX_12BIT, pdata->fuzzy, 0);
++	input_set_abs_params(input_dev, ABS_X, 0, MAX_12BIT, ts->fuzzx, 0);
++	input_set_abs_params(input_dev, ABS_Y, 0, MAX_12BIT, ts->fuzzy, 0);
+ 	input_set_abs_params(input_dev, ABS_PRESSURE, 0, MAX_12BIT,
+-			pdata->fuzzz, 0);
++			     ts->fuzzz, 0);
+ 
+-	if (pdata->init_platform_hw)
+-		pdata->init_platform_hw();
++	if (!np) {
++		if (pdata->init_platform_hw)
++			pdata->init_platform_hw();
++	}
+ 
+ 	err = request_threaded_irq(ts->irq, tsc2007_hard_irq, tsc2007_soft_irq,
+ 				   IRQF_ONESHOT, client->dev.driver->name, ts);
+ 	if (err < 0) {
+ 		dev_err(&client->dev, "irq %d busy?\n", ts->irq);
+-		goto err_free_mem;
++		goto err_free_input;
+ 	}
+ 
+ 	tsc2007_stop(ts);
+@@ -358,23 +467,27 @@ static int tsc2007_probe(struct i2c_client *client,
+ 
+  err_free_irq:
+ 	free_irq(ts->irq, ts);
+-	if (pdata->exit_platform_hw)
+-		pdata->exit_platform_hw();
+- err_free_mem:
++	if (!np) {
++		if (pdata->exit_platform_hw)
++			pdata->exit_platform_hw();
++	}
++ err_free_input:
+ 	input_free_device(input_dev);
+-	kfree(ts);
+ 	return err;
+ }
+ 
+ static int tsc2007_remove(struct i2c_client *client)
+ {
++	struct device_node *np = client->dev.of_node;
+ 	struct tsc2007	*ts = i2c_get_clientdata(client);
+ 	struct tsc2007_platform_data *pdata = client->dev.platform_data;
+ 
+ 	free_irq(ts->irq, ts);
+ 
+-	if (pdata->exit_platform_hw)
+-		pdata->exit_platform_hw();
++	if (!np) {
++		if (pdata->exit_platform_hw)
++			pdata->exit_platform_hw();
++	}
+ 
+ 	input_unregister_device(ts->input);
+ 	kfree(ts);
+@@ -389,10 +502,19 @@ static const struct i2c_device_id tsc2007_idtable[] = {
+ 
+ MODULE_DEVICE_TABLE(i2c, tsc2007_idtable);
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id tsc2007_of_match[] = {
++	{ .compatible = "ti,tsc2007" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, tsc2007_of_match);
++#endif
++
+ static struct i2c_driver tsc2007_driver = {
+ 	.driver = {
+ 		.owner	= THIS_MODULE,
+-		.name	= "tsc2007"
++		.name	= "tsc2007",
++		.of_match_table = of_match_ptr(tsc2007_of_match),
+ 	},
+ 	.id_table	= tsc2007_idtable,
+ 	.probe		= tsc2007_probe,
 -- 
 1.7.9.5
