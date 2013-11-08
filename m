@@ -1,37 +1,107 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 08 Nov 2013 17:02:57 +0000
-Subject: [PATCH] ARM: Use udiv/sdiv for __aeabi_{u}idiv library functions
-In-Reply-To: <1383852042-10780-1-git-send-email-sboyd@codeaurora.org> (Stephen
- Boyd's message of "Thu, 7 Nov 2013 11:20:42 -0800")
-References: <1383852042-10780-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <yw1xr4aqx1vi.fsf@unicorn.mansr.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 Nov 2013 17:03:33 +0000
+Subject: [PATCH RFC 3/6] arm64: Kprobes instruction simulation support
+In-Reply-To: <1382008671-4515-4-git-send-email-sandeepa.prabhu@linaro.org>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-4-git-send-email-sandeepa.prabhu@linaro.org>
+Message-ID: <20131108170333.GE15074@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
+On Thu, Oct 17, 2013 at 12:17:48PM +0100, Sandeepa Prabhu wrote:
+> Add support for AArch64 instruction simulation in kprobes.
+> 
+> Kprobes need simulation of instructions that cannot be stepped
+> right-away from different memory location. i.e. those instructions
+> that uses PC-relative addressing. In simulation, the behaviour
+> of the instruction is implemented using copy of pt_regs.
+> 
+> Following instruction catagories are simulated:
+>  - All branching instructions(conditional, register, and immediate)
+>  - Literal access instructions(load-literal, adr/adrp)
+> 
+> conditional execution are limited to branching instructions in
+> ARM v8. If conditions at PSTATE does not match the condition fields
+> of opcode, the instruction is effectively NOP. Kprobes consider
+> this case as 'miss'.
 
-> +int __aeabi_idiv(int numerator, int denominator)
+[...]
+
+> diff --git a/arch/arm64/kernel/kprobes-arm64.c b/arch/arm64/kernel/kprobes-arm64.c
+> index 30d1c14..c690be3 100644
+> --- a/arch/arm64/kernel/kprobes-arm64.c
+> +++ b/arch/arm64/kernel/kprobes-arm64.c
+> @@ -20,6 +20,101 @@
+> 
+>  #include "probes-decode.h"
+>  #include "kprobes-arm64.h"
+> +#include "simulate-insn.h"
+> +
+> +/*
+> + * condition check functions for kprobes simulation
+> + */
+> +static unsigned long __kprobes
+> +__check_pstate(struct kprobe *p, struct pt_regs *regs)
 > +{
-> +	if (static_key_false(&cpu_has_idiv)) {
-> +		int ret;
+> +       struct arch_specific_insn *asi = &p->ainsn;
+> +       unsigned long pstate = regs->pstate & 0xffffffff;
 > +
-> +		asm volatile (
-> +		".arch_extension idiv\n"
-> +		"sdiv %0, %1, %2"
-> +		: "=&r" (ret)
-
-There is no need for the & in the output constraint.  Dropping it allows
-using one of the source registers as destination which may sometimes be
-beneficial.
-
-> +		: "r" (numerator), "r" (denominator));
-> +
-> +		return ret;
-> +	}
-> +
-> +	return ___aeabi_idiv(numerator, denominator);
+> +       return asi->pstate_cc(pstate);
 > +}
+> +
+> +static unsigned long __kprobes
+> +__check_cbz(struct kprobe *p, struct pt_regs *regs)
+> +{
+> +       return check_cbz((u32)p->opcode, regs);
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Isn't p->opcode already a u32? (by your definition of kprobe_opcode_t).
+
+> diff --git a/arch/arm64/kernel/simulate-insn.c b/arch/arm64/kernel/simulate-insn.c
+> new file mode 100644
+> index 0000000..10173cf
+> --- /dev/null
+> +++ b/arch/arm64/kernel/simulate-insn.c
+> @@ -0,0 +1,184 @@
+> +/*
+> + * arch/arm64/kernel/simulate-insn.c
+> + *
+> + * Copyright (C) 2013 Linaro Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/kprobes.h>
+> +#include <linux/module.h>
+> +
+> +#include "simulate-insn.h"
+> +
+> +#define sign_extend(x, signbit)                \
+> +       ((x) | (0 - ((x) & (1 << (signbit)))))
+> +
+> +#define bbl_displacement(insn)         \
+> +       sign_extend(((insn) & 0x3ffffff) << 2, 27)
+> +
+> +#define bcond_displacement(insn)       \
+> +       sign_extend(((insn >> 5) & 0xfffff) << 2, 21)
+> +
+> +#define cbz_displacement(insn) \
+> +       sign_extend(((insn >> 5) & 0xfffff) << 2, 21)
+> +
+> +#define tbz_displacement(insn) \
+> +       sign_extend(((insn >> 5) & 0x3fff) << 2, 15)
+> +
+> +#define ldr_displacement(insn) \
+> +       sign_extend(((insn >> 5) & 0xfffff) << 2, 21)
+
+The mask, shift and signbit position are all related here, so you could
+rework the definition of sign_extend to avoid having three magic numbers.
+
+Will
