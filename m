@@ -1,48 +1,40 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Nov 2013 17:31:59 -0800
-Subject: [PATCH 1/4] ARM: KVM: Fix MPIDR computing to support virtual clusters
+Date: Thu,  7 Nov 2013 17:32:00 -0800
+Subject: [PATCH 2/4] ARM: KVM: fix L2CTLR to be per-cluster
 In-Reply-To: <1383874322-12328-1-git-send-email-christoffer.dall@linaro.org>
 References: <1383874322-12328-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1383874322-12328-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1383874322-12328-3-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-In order to be able to support more than 4 A7 or A15 CPUs,
-we need to fix the MPIDR computing to reflect the fact that
-both A15 and A7 can only exist in clusters of at most 4 CPUs.
+The L2CTLR register contains the number of CPUs in this cluster.
 
-Fix the MPIDR computing to allow virtual clusters to be exposed
-to the guest.
+Make sure the register content is actually relevant to the vcpu
+that is being configured by computing the number of cores that are
+part of its cluster.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/coproc.c |   10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/kvm/coproc.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index a629f2c..631e6bd 100644
+index 631e6bd..78c0885 100644
 --- a/arch/arm/kvm/coproc.c
 +++ b/arch/arm/kvm/coproc.c
-@@ -74,11 +74,13 @@ int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
- static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
- {
- 	/*
--	 * Compute guest MPIDR. No need to mess around with different clusters
--	 * but we read the 'U' bit from the underlying hardware directly.
-+	 * Compute guest MPIDR. We build a virtual cluster out of the
-+	 * vcpu_id, but we read the 'U' bit from the underlying
-+	 * hardware directly.
- 	 */
--	vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & MPIDR_SMP_BITMASK)
--					| vcpu->vcpu_id;
-+	vcpu->arch.cp15[c0_MPIDR] = ((read_cpuid_mpidr() & MPIDR_SMP_BITMASK) |
-+				     ((vcpu->vcpu_id >> 2) << MPIDR_LEVEL_BITS) |
-+				     (vcpu->vcpu_id & 3));
- }
+@@ -124,6 +124,10 @@ static void reset_l2ctlr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+ 	asm volatile("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
+ 	l2ctlr &= ~(3 << 24);
+ 	ncores = atomic_read(&vcpu->kvm->online_vcpus) - 1;
++	/* How many cores in the current cluster and the next ones */
++	ncores -= (vcpu->vcpu_id & ~3);
++	/* Cap it to the maximum number of cores in a single cluster */
++	ncores = min(ncores, 3U);
+ 	l2ctlr |= (ncores & 3) << 24;
  
- /* TRM entries A7:4.3.31 A15:4.3.28 - RO WI */
+ 	vcpu->arch.cp15[c9_L2CTLR] = l2ctlr;
 -- 
 1.7.10.4
