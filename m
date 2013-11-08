@@ -1,22 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 8 Nov 2013 15:45:32 +0000
-Subject: [PATCH v5 3/4] ASoC: fsl_ssi: Add dual fifo mode support
-In-Reply-To: <1045921af1119333da2d14628473a20ed7a202bd.1383910029.git.b42378@freescale.com>
-References: <cover.1383910029.git.b42378@freescale.com>
- <1045921af1119333da2d14628473a20ed7a202bd.1383910029.git.b42378@freescale.com>
-Message-ID: <20131108154532.GO2493@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 8 Nov 2013 15:54:04 +0000
+Subject: [PATCH 2/2] mfd: max77693: reorder params in API for regmap
+ consistency
+In-Reply-To: <1383923118-26921-2-git-send-email-k.kozlowski@samsung.com>
+References: <1383923118-26921-1-git-send-email-k.kozlowski@samsung.com>
+ <1383923118-26921-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20131108155404.GA30901@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 08, 2013 at 07:32:53PM +0800, Nicolin Chen wrote:
-> By enabling dual fifo mode, it would allow SSI enter a better performance
-> to transimit/receive data without occasional hardware underrun/overrun.
+On Fri, 08 Nov 2013, Krzysztof Kozlowski wrote:
 
-Acked-by: Mark Brown <broonie@linaro.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131108/01e9af45/attachment.sig>
+> The last two parameters of certain register access functions were in
+> different order than regmap API. This was confusing and error-prone.
+> 
+> Reorder parameters for register access API to match regmap API:
+>  - max77693_bulk_read() reorder count and buf,
+>  - max77693_bulk_write() reorder count and buf,
+>  - max77693_update_reg() reorder val and mask.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/extcon/extcon-max77693.c     |   14 +++++++-------
+>  drivers/mfd/max77693-irq.c           |    2 +-
+>  drivers/mfd/max77693.c               |    6 +++---
+>  include/linux/mfd/max77693-private.h |   10 +++++-----
+>  4 files changed, 16 insertions(+), 16 deletions(-)
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
