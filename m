@@ -1,45 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 8 Nov 2013 10:06:08 +0100
-Subject: [PATCH 3/7] ARM: ux500: Remove ATAG support for SDI (MMC)
-In-Reply-To: <20131107120742.GP30901@lee--X1>
-References: <1383732348-18576-1-git-send-email-lee.jones@linaro.org>
- <1383732348-18576-4-git-send-email-lee.jones@linaro.org>
- <CAPDyKFrd+UHYjZw7=8sf=gmATQ8rPubAVrjWYpbhODak+hOhZQ@mail.gmail.com>
- <20131107120742.GP30901@lee--X1>
-Message-ID: <CACRpkdYuBL58Pj8EZmVGGxXk8mrOY=YkVwWC1Ho7SH01442z0Q@mail.gmail.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 08 Nov 2013 10:29:46 +0100
+Subject: [patch 1/1] ARM: kirkwood: stop printk TCLK value at boot for DT
+ boards
+In-Reply-To: <527CA812.9050003@gmail.com> (Sebastian Hesselbarth's message of
+ "Fri, 08 Nov 2013 10:00:02 +0100")
+References: <20131105180931.674625171@rtp-net.org> <527CA812.9050003@gmail.com>
+Message-ID: <87vc03s0l1.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 7, 2013 at 1:07 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
 
->> > -struct mmci_platform_data mop500_sdi0_data = {
->> > -       .f_max          = 100000000,
->> > -       .capabilities   = MMC_CAP_4_BIT_DATA |
->> > -                               MMC_CAP_SD_HIGHSPEED |
->> > -                               MMC_CAP_MMC_HIGHSPEED |
->> > -                               MMC_CAP_ERASE |
->> > -                               MMC_CAP_UHS_SDR12 |
->> > -                               MMC_CAP_UHS_SDR25,
+> On 11/05/2013 07:09 PM, Arnaud Patard (Rtp) wrote:
+>> Commit 2326f04321a9 (ARM: kirkwood: convert to DT irqchip and clocksource)
+>> dropped the call to kirkwood_timer_init() when booting with DT.
+>> This results in kirkwood_tclk not being set and the boot message is now:
 >>
->> I guess all the above caps is having binders in DT then?
+>> Kirkwood: MV88F6281-A0, TCLK=0
+>>
+>> This patch modifies the message for printing only the kirkwood id,
+>> as it allows to detect if we're running A0/A1/... variants with a simple
+>> dmesg.
 >
-> They're not there yet, no. But this stuff is not used anymore in
-> Mainline hence the patch. I attempted to supply bindings for them, but
-> they were rejected. Would you like to have a stab at that?
+> Arnaud,
+>
+> for DT based booting we also have the "Machine" printed right above the
+> "Kirkwood" string. Don't you think, that we can remove the pr_info
+> completely?
 
-Yeah but we basically regressed the ux500 with the patch now
-queued for v3.13:
-commit 49c129519a7a8840767321c38d2eaf84a263529b
-"ARM: ux500: Stop passing MMC's platform data for Device Tree boots"
+The Machine give some valuable information as one can load wrong dtb
+(already happened here). Moreover, it's a of thing (see
+of_flat_dt_match_machine) so not something that can be decided on
+kirkwookd side.
+About possible redundancy of informations between the "Kirkwood:" and
+the "Machine" lines, the former one gives the stepping. This allows to
+know easily if kwboot has a chance to work on the serial port.
 
-Which deleted the passing of this non-yet-DT:ed platform
-data.
-
-Since it's a regression we need to do a fixup patch for the
-v3.13 series adding it back.
-
-Since this patch probably needs to be rewritten on top of
-that I don't merge this patch as of now.
-
-Yours,
-Linus Walleij
+Arnaud
