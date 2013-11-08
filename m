@@ -1,56 +1,85 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 9 Nov 2013 08:34:10 +0900
-Subject: [PATCH 03/04] ARM: shmobile: Remove legacy KZM9D board code
-In-Reply-To: <CANqRtoQdgUqDC6LCkC91G6TD=cgK2ya-M4miPGdhdEPVmc_efQ@mail.gmail.com>
-References: <20131106232102.8081.20523.sendpatchset@w520>
- <20131106232129.8081.77546.sendpatchset@w520>
- <20131108084859.GA5213@verge.net.au>
- <CANqRtoQdgUqDC6LCkC91G6TD=cgK2ya-M4miPGdhdEPVmc_efQ@mail.gmail.com>
-Message-ID: <20131108233409.GC4017@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 8 Nov 2013 15:35:24 -0800
+Subject: [PATCH] ARM: Support arch_irq_work_raise() via self IPIs
+In-Reply-To: <527D5D5C.2080409@codeaurora.org>
+References: <526DBEAA.4030707@linaro.org>
+ <1382984701-2371-1-git-send-email-sboyd@codeaurora.org>
+ <878uxcq1m7.fsf@linaro.org> <20131029060058.GD21983@codeaurora.org>
+ <CAOesGMhjC=NDn4YiY4tQ3ZcW_rK9_qOY03CVD1eyVFC74ucdrA@mail.gmail.com>
+ <CAOesGMhB2Akf_B2_J3LVdt1bDvcsTE7+8Kq=NvsXmkf3EwGsiw@mail.gmail.com>
+ <527D5D5C.2080409@codeaurora.org>
+Message-ID: <CAOesGMhyPaMUs3XJshqZ-KYhtWhenttq7qDpF0+4dQ9PvBYVGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 08, 2013 at 07:03:22PM +0900, Magnus Damm wrote:
-> On Fri, Nov 8, 2013 at 5:49 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Nov 07, 2013 at 08:21:29AM +0900, Magnus Damm wrote:
-> >> From: Magnus Damm <damm@opensource.se>
-> >>
-> >> Remove the C and platform device version of KZM9D.
-> >>
-> >> The DT version of KZM9D board support can now instead
-> >> directly be used with SoC specific code in setup-emev2.c.
-> >
-> > Am I right in thinking that with this change in place we need the following
-> > change to the defconfig in order for it to compile.
-> >
-> > diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
-> > index 6c37f4a..002488a 100644
-> > --- a/arch/arm/configs/kzm9d_defconfig
-> > +++ b/arch/arm/configs/kzm9d_defconfig
-> > @@ -13,7 +13,7 @@ CONFIG_SLAB=y
-> >  # CONFIG_BLK_DEV_BSG is not set
-> >  # CONFIG_IOSCHED_DEADLINE is not set
-> >  # CONFIG_IOSCHED_CFQ is not set
-> > -CONFIG_ARCH_SHMOBILE=y
-> > +CONFIG_ARCH_SHMOBILE_MULTI=y
-> >  CONFIG_ARCH_EMEV2=y
-> >  CONFIG_MACH_KZM9D=y
-> >  CONFIG_MEMORY_START=0x40000000
-> >
-> >
-> > I am holding off on pushing the patches I queued up today until
-> > this can be resolved one way or another.
-> 
-> Oh, right, I guess it doesn't know the link address now when the C
-> bits are gone. Sorry about that, I totally forgot about the defconfig.
-> 
-> At this point I think we should fix up the defconfig to build for
-> kzm9d with single platform. So instead of enabling MULTI in the
-> kzmd_defconfig, how about this?
-> 
-> CONFIG_AUTO_ZRELADDR=y
-> 
-> Also, it seems that the "select USE_OF" went away with the board code
-> Kconfig bits. I will send a patch for that right away.
+On Fri, Nov 8, 2013 at 1:53 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 11/08/13 12:45, Olof Johansson wrote:
+>> On Fri, Nov 8, 2013 at 12:06 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Mon, Oct 28, 2013 at 11:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>>> On 10/28, Kevin Hilman wrote:
+>>>>> Stephen Boyd <sboyd@codeaurora.org> writes:
+>>>>>
+>>>>>> This will allow the scheduler tick to be restarted if we're in
+>>>>>> full NOHZ mode.
+>>>>>>
+>>>>>> Cc: Kevin Hilman <khilman@linaro.org>
+>>>>>> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+>>>>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>>>> Minor nit, but I'd prefer a more verbose changelog (I forget things
+>>>>> quickly and like to rely on changelogs for my memory.)  Probably worth
+>>>>> adding something like: "By default, irq_work is tied to the tick
+>>>>> processing (update_process_times()) but in full NOHZ mode, no tick means
+>>>>> no IRQ work.  In order for IRQ work to be done in full NOHZ mode, a
+>>>>> self-IPI is used to process IRQ work."
+>>>>>
+>>>>> Other than the changelog nit, patch looks good, feel free to add
+>>>>>
+>>>>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+>>>>>
+>>>>> If Russell is OK with this, it can go to his patch system.
+>>>>>
+>>>> Fair enough. This is what I came up with. I'll send it off to the
+>>>> patch tracker in about 12 hours if nobody else has anymore
+>>>> comments.
+>>>>
+>>>> ----8<-----
+>>>> ARM: Support arch_irq_work_raise() via self IPIs
+>>>>
+>>>> By default, IRQ work is run from the tick interrupt (see
+>>>> irq_work_run() in update_process_times()). When we're in full
+>>>> NOHZ mode, restarting the tick requires the use of IRQ work and
+>>>> if the only place we run IRQ work is in the tick interrupt we
+>>>> have an unbreakable cycle. Implement arch_irq_work_raise() via
+>>>> self IPIs to break this cycle and get the tick started again.
+>>>> Note that we implement this via IPIs which are only available on
+>>>> SMP builds. This shouldn't be a problem because full NOHZ is only
+>>>> supported on SMP builds anyway.
+>>>>
+>>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+>>>> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+>>>
+>>> Hm, so I think this just landed in -next, which seems... late for
+>>> 3.13. Anyway, it causes boot failures on Cubieboards (Allwinner A10),
+>>> I just bisected it down to this patch (fails to boot
+>>> multi_v7_defconfig, no console output at all).
+>>>
+>>> Unfortunately I'm not getting any debug_ll output from the board at
+>>> the moment, so I can't actually get to a panic stack or other error
+>>> info. :( I hope I can get back to you with one later today.
+>> Turns out that I hit this on the BeagleBone as well, and I got a trace
+>> out of it. Seems like this might be broken on all non-SMP platforms
+>> built with CONFIG_SMP=y?
+>
+> Ah yes. We don't have IPI support on UP kernels but SMP_ON_UP exposes
+> arch_irq_work_raise(). How about this? We should just skip this function
+> if we're running on UP.
 
-Thanks. USE_OF + CONFIG_AUTO_ZRELADDR appears to work :)
+Yep.
+
+Tested-by: Olof Johansson <olof@lixom.net>
+
+Send it to Russell's tracker, plz.
+
+
+-Olof
