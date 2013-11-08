@@ -1,45 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 8 Nov 2013 10:44:25 +0100
-Subject: [patch 1/1] ARM: kirkwood: stop printk TCLK value at boot for DT
- boards
-In-Reply-To: <20131105180931.674625171@rtp-net.org>
-References: <20131105180931.674625171@rtp-net.org>
-Message-ID: <20131108094425.GG4440@lunn.ch>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 8 Nov 2013 01:52:24 -0800 (PST)
+Subject: [patch] [media] exynos4-is: cleanup a define
+Message-ID: <20131108095224.GJ27977@elgon.mountain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 07:09:14PM +0100, Arnaud Patard wrote:
-> Commit 2326f04321a9 (ARM: kirkwood: convert to DT irqchip and clocksource)
-> dropped the call to kirkwood_timer_init() when booting with DT.
-> This results in kirkwood_tclk not being set and the boot message is now:
-> 
-> Kirkwood: MV88F6281-A0, TCLK=0
-> 
-> This patch modifies the message for printing only the kirkwood id,
-> as it allows to detect if we're running A0/A1/... variants with a simple
-> dmesg.
-> 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+This define is only used in s5pcsis_irq_handler():
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+	if ((status & S5PCSIS_INTSRC_NON_IMAGE_DATA) && pktbuf->data) {
 
-	  Andrew
+The problem is that "status" is a 32 bit and (0xff << 28) is larger than
+32 bits and that sets off a static checker warning.  I consulted with
+Sylwester Nawrocki and the define should actually be (0xf << 28).
 
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-
-> 
-> Index: linux-next/arch/arm/mach-kirkwood/board-dt.c
-> ===================================================================
-> --- linux-next.orig/arch/arm/mach-kirkwood/board-dt.c	2013-11-05 18:36:23.131191305 +0100
-> +++ linux-next/arch/arm/mach-kirkwood/board-dt.c	2013-11-05 18:36:35.867190745 +0100
-> @@ -140,7 +140,7 @@ eth_fixup_skip:
->  
->  static void __init kirkwood_dt_init(void)
->  {
-> -	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-> +	pr_info("Kirkwood: %s.\n", kirkwood_id());
->  
->  	/*
->  	 * Disable propagation of mbus errors to the CPU local bus,
-> 
-> 
+diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
+index 9fc2af6..31dfc50 100644
+--- a/drivers/media/platform/exynos4-is/mipi-csis.c
++++ b/drivers/media/platform/exynos4-is/mipi-csis.c
+@@ -91,7 +91,7 @@ MODULE_PARM_DESC(debug, "Debug level (0-2)");
+ #define S5PCSIS_INTSRC_ODD_BEFORE	(1 << 29)
+ #define S5PCSIS_INTSRC_ODD_AFTER	(1 << 28)
+ #define S5PCSIS_INTSRC_ODD		(0x3 << 28)
+-#define S5PCSIS_INTSRC_NON_IMAGE_DATA	(0xff << 28)
++#define S5PCSIS_INTSRC_NON_IMAGE_DATA	(0xf << 28)
+ #define S5PCSIS_INTSRC_FRAME_START	(1 << 27)
+ #define S5PCSIS_INTSRC_FRAME_END	(1 << 26)
+ #define S5PCSIS_INTSRC_ERR_SOT_HS	(0xf << 12)
