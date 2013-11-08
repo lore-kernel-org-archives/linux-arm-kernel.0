@@ -1,42 +1,22 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 8 Nov 2013 17:39:38 +0200
-Subject: [PATCH v5 1/7] gpio: davinci: remove unnecessary printk
-In-Reply-To: <1383905510-31760-2-git-send-email-prabhakar.csengg@gmail.com>
-References: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>
- <1383905510-31760-2-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <527D05BA.3000008@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 8 Nov 2013 15:45:32 +0000
+Subject: [PATCH v5 3/4] ASoC: fsl_ssi: Add dual fifo mode support
+In-Reply-To: <1045921af1119333da2d14628473a20ed7a202bd.1383910029.git.b42378@freescale.com>
+References: <cover.1383910029.git.b42378@freescale.com>
+ <1045921af1119333da2d14628473a20ed7a202bd.1383910029.git.b42378@freescale.com>
+Message-ID: <20131108154532.GO2493@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 12:11 PM, Prabhakar Lad wrote:
-> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->
-> the devm_*() helper prints error messages in case of
-> errors no need to do the same in the driver.
+On Fri, Nov 08, 2013 at 07:32:53PM +0800, Nicolin Chen wrote:
+> By enabling dual fifo mode, it would allow SSI enter a better performance
+> to transimit/receive data without occasional hardware underrun/overrun.
 
-Pls, drop it - devm_clk_get() doesn't always print error messages
->
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> ---
->   drivers/gpio/gpio-davinci.c |    6 ++----
->   1 file changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-> index 84be701..7230c43 100644
-> --- a/drivers/gpio/gpio-davinci.c
-> +++ b/drivers/gpio/gpio-davinci.c
-> @@ -389,11 +389,9 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->   	}
->
->   	clk = devm_clk_get(dev, "gpio");
-> -	if (IS_ERR(clk)) {
-> -		printk(KERN_ERR "Error %ld getting gpio clock?\n",
-> -		       PTR_ERR(clk));
-> +	if (IS_ERR(clk))
->   		return PTR_ERR(clk);
-> -	}
-> +
->   	clk_prepare_enable(clk);
->
->   	/*
->
+Acked-by: Mark Brown <broonie@linaro.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131108/01e9af45/attachment.sig>
