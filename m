@@ -1,56 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 08 Nov 2013 11:10:15 +0100
-Subject: [PATCH v2 1/2] clocksource: sh_mtu2: Release clock when
- sh_mtu2_register() fails
-In-Reply-To: <1383057045-22608-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383000569-8916-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383057045-22608-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <527CB887.8090703@linaro.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri,  8 Nov 2013 15:44:06 +0530
+Subject: [PATCH 1/3] clk: exynos5250: save/restore EPLL0 configuration
+Message-ID: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2013 03:30 PM, Laurent Pinchart wrote:
-> Fix the probe error path to release the clock resource when the
-> sh_mtu2_register() call fails.
->
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Andrew Bresticker <abrestic@chromium.org>
 
-Applied in my tree as 3.13 fixes
+The EPLL configuration register needs to be saved across
+suspend/resume.
 
-> ---
->   drivers/clocksource/sh_mtu2.c | 11 +++++++++--
->   1 file changed, 9 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-> index 4aac9ee..e6cfb32 100644
-> --- a/drivers/clocksource/sh_mtu2.c
-> +++ b/drivers/clocksource/sh_mtu2.c
-> @@ -313,8 +313,15 @@ static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
->   		goto err1;
->   	}
->
-> -	return sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
-> -				cfg->clockevent_rating);
-> +	ret = sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
-> +			       cfg->clockevent_rating);
-> +	if (ret < 0)
-> +		goto err2;
-> +
-> +	return 0;
-> +
-> + err2:
-> +	clk_put(p->clk);
->    err1:
->   	iounmap(p->mapbase);
->    err0:
->
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ drivers/clk/samsung/clk-exynos5250.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index ee866e377c80..6767635dc895 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -143,6 +143,7 @@ static unsigned long exynos5250_clk_regs[] __initdata = {
+ 	SRC_CPU,
+ 	DIV_CPU0,
+ 	SRC_CORE1,
++	EPLL_CON0,
+ 	SRC_TOP0,
+ 	SRC_TOP2,
+ 	SRC_TOP3,
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
