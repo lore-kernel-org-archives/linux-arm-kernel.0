@@ -1,79 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Nov 2013 17:04:48 +0000
-Subject: [PATCH RFC 4/6] arm64: Add kernel return probes
- support(kretprobes)
-In-Reply-To: <1382008671-4515-5-git-send-email-sandeepa.prabhu@linaro.org>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-5-git-send-email-sandeepa.prabhu@linaro.org>
-Message-ID: <20131108170448.GF15074@mudshark.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 8 Nov 2013 18:14:16 +0100
+Subject: [PATCH trivial] arm64: constify hwcap_str
+In-Reply-To: <20131108143807.GB17212@arm.com>
+References: <1383755567-17244-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20131107175010.GI13674@arm.com>
+ <CAKv+Gu9zw-1p6q6vnQWi=ZU53V-oeN_-vDH5Jfo0XvnBjMqN2g@mail.gmail.com>
+ <20131108143807.GB17212@arm.com>
+Message-ID: <CAKv+Gu_vvLmLxD_NfVzK16cRccXj9FOZwG39D39nqgedF3qVBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 17, 2013 at 12:17:49PM +0100, Sandeepa Prabhu wrote:
-> AArch64 ISA does not instructions to pop PC register value
-> from stack(like ARM v7 has ldmia {...,pc}) without using
-> one of the general purpose registers. This means return probes
-> cannot return to the actual return address directly without
-> modifying register context, and without trapping into debug exception.
-> 
-> So like many other architectures, we prepare a global routine
-> with NOPs, which serve as trampoline to hack away the
-> function return address, by placing an extra kprobe on the
-> trampoline entry.
-> 
-> The pre-handler of this special trampoline' kprobe execute return
-> probe handler functions and restore original return address in ELR_EL1,
-> this way, saved pt_regs still hold the original register context to be
-> carried back to the probed kernel function.
-> 
-> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> ---
->  arch/arm64/Kconfig               |   1 +
->  arch/arm64/include/asm/kprobes.h |   1 +
->  arch/arm64/include/asm/ptrace.h  |   5 ++
->  arch/arm64/kernel/kprobes.c      | 125 ++++++++++++++++++++++++++++++++++++++-
->  4 files changed, 129 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 2e89059..73eff55 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -28,6 +28,7 @@ config ARM64
->  	select HAVE_MEMBLOCK
->  	select HAVE_PERF_EVENTS
->  	select HAVE_KPROBES if !XIP_KERNEL
-> +	select HAVE_KRETPROBES if (HAVE_KPROBES)
+On 8 November 2013 15:38, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Nov 07, 2013 at 06:53:06PM +0000, Ard Biesheuvel wrote:
+[...]
+>> I agree that whether you want to put up with the additional layer of
+>> indirection, additional relocations etc is a matter of taste, but
+>> having writable pointers around that are easily dereferenced directly
+>> by unprivileged users is a bad idea in any case,
+>
+> "unprivileged users"?!
+>
 
-Don't need the brackets.
+Well, I know this may seem far fetched, but /proc/cpuinfo lacks any
+kind of access control because it is deemed harmless, while, as an
+unprivileged user, having some pointers in .data that you can clobber
+(through some other vulnerability) without breaking anything, and can
+conveniently dereference at your leisure by cat'ing /proc/cpuinfo, may
+well be something that could potentially be used in the wrong way.
 
->  	select IRQ_DOMAIN
->  	select MODULES_USE_ELF_RELA
->  	select NO_BOOTMEM
-> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
-> index 9b491d0..eaca849 100644
-> --- a/arch/arm64/include/asm/kprobes.h
-> +++ b/arch/arm64/include/asm/kprobes.h
-> @@ -55,5 +55,6 @@ void arch_remove_kprobe(struct kprobe *);
->  int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
->  int kprobe_exceptions_notify(struct notifier_block *self,
->  			     unsigned long val, void *data);
-> +void kretprobe_trampoline(void);
->  
->  #endif /* _ARM_KPROBES_H */
-> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-> index 89f1727..58b2589 100644
-> --- a/arch/arm64/include/asm/ptrace.h
-> +++ b/arch/arm64/include/asm/ptrace.h
-> @@ -166,6 +166,11 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
->  #define instruction_pointer(regs)	(regs)->pc
->  #define stack_pointer(regs)		((regs)->sp)
->  
-> +static inline long regs_return_value(struct pt_regs *regs)
-> +{
-> +	return regs->regs[0];
-> +}
+>> so if this is your preferred solution, it's fine by me.
+>
+> My preferred solution is to leave it as it is ;).
+>
 
-This is also being implemented by another patch series (I think the audit
-stuff?).
+It's a trivial fix, so why not apply it?
 
-Will
+-- 
+Ard.
