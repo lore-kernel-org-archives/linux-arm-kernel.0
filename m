@@ -1,34 +1,45 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Fri, 08 Nov 2013 10:49:21 +0100
-Subject: [PATCH] I2C: BCM2835: Linking platform nodes to adapter nodes
-Message-ID: <527CB3A1.7050808@koalo.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 8 Nov 2013 10:44:25 +0100
+Subject: [patch 1/1] ARM: kirkwood: stop printk TCLK value at boot for DT
+ boards
+In-Reply-To: <20131105180931.674625171@rtp-net.org>
+References: <20131105180931.674625171@rtp-net.org>
+Message-ID: <20131108094425.GG4440@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to find I2C devices in the device tree, the platform nodes
-have to be known by the I2C core. Analogous to the i2c-omap driver
-this requires setting the dev.of_node parameter of the adapter.
+On Tue, Nov 05, 2013 at 07:09:14PM +0100, Arnaud Patard wrote:
+> Commit 2326f04321a9 (ARM: kirkwood: convert to DT irqchip and clocksource)
+> dropped the call to kirkwood_timer_init() when booting with DT.
+> This results in kirkwood_tclk not being set and the boot message is now:
+> 
+> Kirkwood: MV88F6281-A0, TCLK=0
+> 
+> This patch modifies the message for printing only the kirkwood id,
+> as it allows to detect if we're running A0/A1/... variants with a simple
+> dmesg.
+> 
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
 
-Signed-off-by: Florian Meier <florian.meier@koalo.de>
----
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-I don't know if this is really necessary, but for me it does not work
-without this line.
+	  Andrew
 
- drivers/i2c/busses/i2c-bcm2835.c |    1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index ea4b08f..8beecfa 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -299,6 +299,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
- 	strlcpy(adap->name, "bcm2835 I2C adapter", sizeof(adap->name));
- 	adap->algo = &bcm2835_i2c_algo;
- 	adap->dev.parent = &pdev->dev;
-+	adap->dev.of_node = pdev->dev.of_node;
- 
- 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
- 
--- 
-1.7.9.5
+
+> 
+> Index: linux-next/arch/arm/mach-kirkwood/board-dt.c
+> ===================================================================
+> --- linux-next.orig/arch/arm/mach-kirkwood/board-dt.c	2013-11-05 18:36:23.131191305 +0100
+> +++ linux-next/arch/arm/mach-kirkwood/board-dt.c	2013-11-05 18:36:35.867190745 +0100
+> @@ -140,7 +140,7 @@ eth_fixup_skip:
+>  
+>  static void __init kirkwood_dt_init(void)
+>  {
+> -	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
+> +	pr_info("Kirkwood: %s.\n", kirkwood_id());
+>  
+>  	/*
+>  	 * Disable propagation of mbus errors to the CPU local bus,
+> 
+> 
