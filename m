@@ -1,69 +1,75 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 8 Nov 2013 12:06:55 -0800
-Subject: [PATCH] ARM: Support arch_irq_work_raise() via self IPIs
-In-Reply-To: <20131029060058.GD21983@codeaurora.org>
-References: <526DBEAA.4030707@linaro.org>
- <1382984701-2371-1-git-send-email-sboyd@codeaurora.org>
- <878uxcq1m7.fsf@linaro.org> <20131029060058.GD21983@codeaurora.org>
-Message-ID: <CAOesGMhjC=NDn4YiY4tQ3ZcW_rK9_qOY03CVD1eyVFC74ucdrA@mail.gmail.com>
+Date: Fri, 8 Nov 2013 12:10:27 -0800
+Subject: [PATCH v3 7/9] ARM: add Armada 1500 and Sony NSZ-GS7 device tree
+ files
+In-Reply-To: <20131108193054.GJ10335@titan.lakedaemon.net>
+References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1383661723-17956-8-git-send-email-sebastian.hesselbarth@gmail.com>
+ <0AF697FD-60AA-4B8B-A35F-3DF2FFBCF7AF@codeaurora.org>
+ <20131108165721.GA10335@titan.lakedaemon.net>
+ <8DC09031-553C-4FD5-8F05-F93D6FE40F3A@codeaurora.org>
+ <20131108182415.GG10335@titan.lakedaemon.net>
+ <CAOesGMhfr3CNxKNRJa+eJepr2Fc-jx4rTQ7cPerTkQM-CyzuCg@mail.gmail.com>
+ <20131108193054.GJ10335@titan.lakedaemon.net>
+Message-ID: <CAOesGMir+Zar0hskPQ+ZN6Z7+R-G5GhrafenQPgjZGbVGG9uwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 28, 2013 at 11:00 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 10/28, Kevin Hilman wrote:
->> Stephen Boyd <sboyd@codeaurora.org> writes:
->>
->> > This will allow the scheduler tick to be restarted if we're in
->> > full NOHZ mode.
+On Fri, Nov 8, 2013 at 11:30 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Fri, Nov 08, 2013 at 11:14:07AM -0800, Olof Johansson wrote:
+>> On Fri, Nov 8, 2013 at 10:24 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+>> > On Fri, Nov 08, 2013 at 12:06:26PM -0600, Kumar Gala wrote:
+>> >>
+>> >> On Nov 8, 2013, at 10:57 AM, Jason Cooper wrote:
+>> >>
+>> >> > On Fri, Nov 08, 2013 at 10:13:19AM -0600, Kumar Gala wrote:
+>> >> >> On Nov 5, 2013, at 8:28 AM, Sebastian Hesselbarth wrote:
+>> >> > ...
+>> >> >>> .../devicetree/bindings/arm/marvell,berlin.txt     |   24 +++
+>> >> >>> arch/arm/boot/dts/Makefile                         |    2 +
+>> >> >>> arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |   29 +++
+>> >> >>> arch/arm/boot/dts/berlin2.dtsi                     |  227 ++++++++++++++++++++
+>> >> >>> 4 files changed, 282 insertions(+)
+>> >> >>> create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
+>> >> >>> create mode 100644 arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
+>> >> >>> create mode 100644 arch/arm/boot/dts/berlin2.dtsi
+>> >> >>
+>> >> >> Haven't we been trying to go away from non-prefixed dts/dtsi?
+>> >> >
+>> >> > hmmm, this is the first I've heard of that.  Although, your proposal
+>> >> > (in another thread) makes more sense now.  :)
+>> >> >
+>> >> >> So should these be something like marvell-berlin2-...
+>> >> >
+>> >> > I don't recall this being brought up at the summit, nor in Grant's
+>> >> > report.  I do need to give it a more careful read this weekend, though.
+>> >> > Perhaps I missed something.
+>> >>
+>> >> This was based on review comments Olof gave when we pushed some .dts
+>> >> files for MSM/APQ Qualcomm Technologies soc/boards.
 >> >
->> > Cc: Kevin Hilman <khilman@linaro.org>
->> > Cc: Frederic Weisbecker <fweisbec@gmail.com>
->> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> > As Andrew Lunn mentioned to me earlier, we should consider the fact that
+>> > the dts file names are being used by Debian's flash-kernel.  Oh no!
+>> > Another ABI! ;-)
 >>
->> Minor nit, but I'd prefer a more verbose changelog (I forget things
->> quickly and like to rely on changelogs for my memory.)  Probably worth
->> adding something like: "By default, irq_work is tied to the tick
->> processing (update_process_times()) but in full NOHZ mode, no tick means
->> no IRQ work.  In order for IRQ work to be done in full NOHZ mode, a
->> self-IPI is used to process IRQ work."
+>> Yes, the names are mostly stable. ST-Ericsson renamed their dts files
+>> and it caused some pain, some build environments have them hardcoded,
+>> etc.
 >>
->> Other than the changelog nit, patch looks good, feel free to add
->>
->> Reviewed-by: Kevin Hilman <khilman@linaro.org>
->>
->> If Russell is OK with this, it can go to his patch system.
->>
+>> Still, it is a good idea to start adding new ones using family or
+>> vendor prefixes, so they are easier to group. Please keep that in mind
+>> on new ones too, Jason -- I don't think I've discussed with you in the
+>> past. :-)
 >
-> Fair enough. This is what I came up with. I'll send it off to the
-> patch tracker in about 12 hours if nobody else has anymore
-> comments.
+> Nope, I definitely missed that if you did ;-)  Will do in the future.
 >
-> ----8<-----
-> ARM: Support arch_irq_work_raise() via self IPIs
->
-> By default, IRQ work is run from the tick interrupt (see
-> irq_work_run() in update_process_times()). When we're in full
-> NOHZ mode, restarting the tick requires the use of IRQ work and
-> if the only place we run IRQ work is in the tick interrupt we
-> have an unbreakable cycle. Implement arch_irq_work_raise() via
-> self IPIs to break this cycle and get the tick started again.
-> Note that we implement this via IPIs which are only available on
-> SMP builds. This shouldn't be a problem because full NOHZ is only
-> supported on SMP builds anyway.
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Perhaps now is the time to consider separating the dts filename from the
+> dtb filename?  I'm warming up to my idea of globalscale,mirabox.dtb...
 
-
-Hm, so I think this just landed in -next, which seems... late for
-3.13. Anyway, it causes boot failures on Cubieboards (Allwinner A10),
-I just bisected it down to this patch (fails to boot
-multi_v7_defconfig, no console output at all).
-
-Unfortunately I'm not getting any debug_ll output from the board at
-the moment, so I can't actually get to a panic stack or other error
-info. :( I hope I can get back to you with one later today.
+Having a "dtb-install" make target that sets those up as softlinks
+could be a good idea, at least. I'm not sold on using them as
+filenames myself though.
 
 
 -Olof
