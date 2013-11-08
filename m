@@ -1,38 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 8 Nov 2013 18:41:56 -0500
-Subject: [PATCH 20/24] mm/memory_hotplug: Use memblock apis for early memory
- allocations
-In-Reply-To: <1383954120-24368-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1383954120-24368-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1383954120-24368-21-git-send-email-santosh.shilimkar@ti.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Sat,  9 Nov 2013 08:47:45 +0900
+Subject: [PATCH] ARM: shmobile: kzm9d: Enable AUTO_ZRELADDR in defconfig
+Message-ID: <1383954465-6056-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct ensure_zone_is_initialized() function description according
-to the introduced memblock APIs for early memory allocations.
+This is required to allow the load address to be supplied
+as an environment variable when building a uImage.
 
-Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
+LOADADDR=0x40008000 ARCH=arm make uImage
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+This is necessary since "ARM: shmobile: Remove legacy KZM9D board code"
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- mm/memory_hotplug.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/kzm9d_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
-index f7bda5e..3ffe114 100644
---- a/mm/memory_hotplug.c
-+++ b/mm/memory_hotplug.c
-@@ -267,7 +267,7 @@ static void fix_zone_id(struct zone *zone, unsigned long start_pfn,
- }
- 
- /* Can fail with -ENOMEM from allocating a wait table with vmalloc() or
-- * alloc_bootmem_node_nopanic() */
-+ * alloc_bootmem_node_nopanic()/memblock_virt_alloc_node_nopanic() */
- static int __ref ensure_zone_is_initialized(struct zone *zone,
- 			unsigned long start_pfn, unsigned long num_pages)
- {
+diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
+index 6c37f4a..e6aed23 100644
+--- a/arch/arm/configs/kzm9d_defconfig
++++ b/arch/arm/configs/kzm9d_defconfig
+@@ -32,6 +32,7 @@ CONFIG_FORCE_MAX_ZONEORDER=13
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
++CONFIG_AUTO_ZRELADDR=y
+ CONFIG_VFP=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_PM_RUNTIME=y
 -- 
-1.7.9.5
+1.8.4
