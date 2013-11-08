@@ -1,35 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 8 Nov 2013 14:22:22 +0900
-Subject: [PATCH v2 2/2] clocksource: sh_tmu: Add clk_prepare/unprepare
- support
-In-Reply-To: <527B9861.1020606@linaro.org>
-References: <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383057097-22689-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383057097-22689-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20131031052406.GN1603@verge.net.au> <527B9861.1020606@linaro.org>
-Message-ID: <20131108052222.GA9828@verge.net.au>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Fri,  8 Nov 2013 13:38:45 +0800
+Subject: [PATCH v3 0/2] mmc: dw_mmc: add dw_mmc-k3
+Message-ID: <1383889128-12540-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 07, 2013 at 02:40:49PM +0100, Daniel Lezcano wrote:
-> On 10/31/2013 06:24 AM, Simon Horman wrote:
-> >On Tue, Oct 29, 2013 at 03:31:37PM +0100, Laurent Pinchart wrote:
-> >>Prepare the clock at probe time, as there is no other appropriate place
-> >>in the driver where we're allowed to sleep.
-> >>
-> >>Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >>Cc: linux-kernel at vger.kernel.org
-> >>Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> >
-> >Thanks, I have queued this up.
-> 
-> Ok, so those patches go through your tree, right ?
-> 
-> I have been out for the Linaro connect but I saw you picked them. In
-> the future, I would prefer to take them in my tree as they fall
-> under the drivers/clocksource maintainer's umbrella.
+v3:
+0001: 
+Put set/clear_bit DW_MMC_CARD_PRESENT in dw_mci_get_cd, 
+Since dw_mci_request will check DW_MMC_CARD_PRESENT before sending cmd
 
-I was planning to send a pull request to you.
-But if you would rather just pick them up directly that is quite fine by me.
+0002:
+Follow suggestion from Chris, Kumar and Seungwon
+Sync to latest mmc-next, which is 3.12-rc2
+Remove enum dw_mci_k3_type etc
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+v2:
+Follow Jaehoon's suggestion
+Use slot-gpio.c handle cd pin
+Move table out to dts
+other suggestion
+
+Zhangfei Gao (2):
+  mmc: dw_mmc: add dw_mci_of_get_cd_gpio to handle cd pin
+  mmc: dw_mmc: add dw_mmc-k3 for k3 platform
+
+ .../devicetree/bindings/mmc/k3-dw-mshc.txt         |   83 +++++++
+ drivers/mmc/host/Kconfig                           |   10 +
+ drivers/mmc/host/Makefile                          |    1 +
+ drivers/mmc/host/dw_mmc-k3.c                       |  247 ++++++++++++++++++++
+ drivers/mmc/host/dw_mmc.c                          |   52 +++--
+ 5 files changed, 380 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/k3-dw-mshc.txt
+ create mode 100644 drivers/mmc/host/dw_mmc-k3.c
+
+-- 
+1.7.9.5
