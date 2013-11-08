@@ -1,80 +1,33 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri,  8 Nov 2013 14:48:40 +0100
-Subject: [PATCH 1/2] ARM: i.MX28: define ref_xtal frequency in DT
-In-Reply-To: <1383918521-4668-1-git-send-email-mkl@pengutronix.de>
-References: <1383918521-4668-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1383918521-4668-2-git-send-email-mkl@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 Nov 2013 13:47:32 +0000
+Subject: [PATCH v4 4/4] KGDB: make kgdb_breakpoint() as noinline
+In-Reply-To: <1383641146-27274-5-git-send-email-vijay.kilari@gmail.com>
+References: <1383641146-27274-1-git-send-email-vijay.kilari@gmail.com>
+ <1383641146-27274-5-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <20131108134732.GF17461@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Juergen Beisert <jbe@pengutronix.de>
+On Tue, Nov 05, 2013 at 08:45:46AM +0000, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> 
+> The function kgdb_breakpoint() sets up break point at
+> compile time by calling arch_kgdb_breakpoint();
+> Though this call is surrounded by wmb() barrier,
+> the compile can still re-order the break point,
+> because this scheduling barrier is not a code motion
+> barrier in gcc.
+> 
+> Making kgdb_breakpoint() as noinline solves this problem
+> of code reording around break point instruction and also
+> avoids problem of being called as inline function from
+> other places
+> 
+> More details about discussion on this can be found here
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/269732
+>
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-Instead of hardcoding the ref_xtal in the clk driver, get it from the DT.
+I thought I already acked this?
 
-Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- arch/arm/boot/dts/imx28.dtsi | 10 ++++++++++
- drivers/clk/mxs/clk-imx28.c  | 18 ++++++++++++++++--
- 2 files changed, 26 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 7363fde..979c37d 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -43,6 +43,16 @@
- 		};
- 	};
- 
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		xtal-24m {
-+			compatible = "fsl,mxs-xtal-24m", "fixed-clock";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+
- 	apb at 80000000 {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-index 4faf0af..874ca4e 100644
---- a/drivers/clk/mxs/clk-imx28.c
-+++ b/drivers/clk/mxs/clk-imx28.c
-@@ -156,7 +156,7 @@ static enum imx28_clk clks_init_on[] __initdata = {
- 
- int __init mx28_clocks_init(void)
- {
--	struct device_node *np;
-+	struct device_node *np, *np_tmp;
- 	u32 i;
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx28-digctl");
-@@ -169,7 +169,21 @@ int __init mx28_clocks_init(void)
- 
- 	clk_misc_init();
- 
--	clks[ref_xtal] = mxs_clk_fixed("ref_xtal", 24000000);
-+	/* retrieve the crystal's frequencies from device tree */
-+	for_each_compatible_node(np_tmp, NULL, "fixed-clock") {
-+		u32 rate;
-+
-+		if (of_property_read_u32(np_tmp, "clock-frequency", &rate))
-+			continue;
-+
-+		if (of_device_is_compatible(np_tmp, "fsl,mxs-xtal-24m"))
-+			clks[ref_xtal] = mxs_clk_fixed("ref_xtal", rate);
-+	}
-+
-+	/* if not set, use default frequency */
-+	if (!clks[ref_xtal])
-+		clks[ref_xtal] = mxs_clk_fixed("ref_xtal", 24000000);
-+
- 	clks[pll0] = mxs_clk_pll("pll0", "ref_xtal", PLL0CTRL0, 17, 480000000);
- 	clks[pll1] = mxs_clk_pll("pll1", "ref_xtal", PLL1CTRL0, 17, 480000000);
- 	clks[pll2] = mxs_clk_pll("pll2", "ref_xtal", PLL2CTRL0, 23, 50000000);
--- 
-1.8.4.rc3
+Will
