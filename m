@@ -1,31 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 7 Nov 2013 19:34:13 -0600
-Subject: [PATCH] ARM: Use udiv/sdiv for __aeabi_{u}idiv library functions
-In-Reply-To: <1383852042-10780-1-git-send-email-sboyd@codeaurora.org>
-References: <1383852042-10780-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAL_JsqJ9zbJFJePk2FHH8UhrUP2J7fuuiZLb+NhuTovRodqrCA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu,  7 Nov 2013 17:31:58 -0800
+Subject: [GIT PULL] Third and final KVM/ARM updates for 3.13
+Message-ID: <1383874322-12328-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 7, 2013 at 1:20 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> If we're running on a v7 ARM CPU, detect if the CPU supports the
-> sdiv/udiv instructions and replace the signed and unsigned
-> division library functions with an sdiv/udiv instruction.
+The following changes since commit e4b3c9c21bd5674e96988f7507fd924e00087cd0:
 
-[snip]
+  Merge branch 'kvm-arm-next-3.13-2' into kvm-arm-next (2013-10-17 20:41:44 -0700)
 
-> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-> index bd454b0..6ed6496 100644
-> --- a/arch/arm/lib/Makefile
-> +++ b/arch/arm/lib/Makefile
-> @@ -15,6 +15,9 @@ lib-y         := backtrace.o changebit.o csumipv6.o csumpartial.o   \
->                    io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
->                    call_with_stack.o
->
-> +lib-$(CONFIG_CPU_V7) += div-v7.o
-> +CFLAGS_div-v7.o := -march=armv7-a
+are available in the git repository at:
 
-Won't this fail to build if the compiler doesn't have armv7-a support.
-Perhaps we don't care about compilers that old.
 
-Rob
+  git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-for-3.13-3
+
+for you to fetch changes up to 79c648806f9034abf54332b78043bb242189d953:
+
+  arm/arm64: KVM: PSCI: use MPIDR to identify a target CPU (2013-10-22 08:00:06 -0700)
+
+Sorry about sending this out so late.  It has been in linux-next for a
+while and is well-tested.
+
+----------------------------------------------------------------
+Updates for KVM/ARM, take 3 supporting more than 4 CPUs.
+
+----------------------------------------------------------------
+Marc Zyngier (4):
+      ARM: KVM: Fix MPIDR computing to support virtual clusters
+      ARM: KVM: fix L2CTLR to be per-cluster
+      ARM: KVM: drop limitation to 4 CPU VMs
+      arm/arm64: KVM: PSCI: use MPIDR to identify a target CPU
+
+ arch/arm/include/asm/kvm_emulate.h   |    5 +++++
+ arch/arm/kvm/coproc.c                |   14 ++++++++++----
+ arch/arm/kvm/psci.c                  |   17 +++++++++++++----
+ arch/arm/kvm/reset.c                 |    4 ----
+ arch/arm64/include/asm/kvm_emulate.h |    5 +++++
+ 5 files changed, 33 insertions(+), 12 deletions(-)
