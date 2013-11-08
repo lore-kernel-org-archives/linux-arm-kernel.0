@@ -1,219 +1,203 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 Nov 2013 19:11:17 +0000
-Subject: [PATCH] dmaengine: Add support for BCM2835.
-In-Reply-To: <527D1DDA.2040004@koalo.de>
-References: <527D1DDA.2040004@koalo.de>
-Message-ID: <20131108191117.GT16735@n2100.arm.linux.org.uk>
+From: fkan@apm.com (Feng Kan)
+Date: Fri,  8 Nov 2013 11:13:30 -0800
+Subject: [PATCH] arm64: reboot driver missing dts entry and ACPI support for
+ storm platform.
+Message-ID: <1383938010-15296-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 08, 2013 at 06:22:34PM +0100, Florian Meier wrote:
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ arch/arm64/boot/dts/apm-storm.dtsi |    5 ++
+ drivers/power/reset/Kconfig        |    5 +-
+ drivers/power/reset/xgene-reboot.c |   94 +++++++++++++++++++++++++++++++-----
+ 3 files changed, 88 insertions(+), 16 deletions(-)
 
-Hi Florian, some initial comments.
-
-> +#define BCM2835_DMA_DATA_TYPE_S8 1
-> +#define BCM2835_DMA_DATA_TYPE_S16 2
-> +#define BCM2835_DMA_DATA_TYPE_S32 4
-> +#define BCM2835_DMA_DATA_TYPE_S128 16
-...
-> +
-> +static const unsigned es_bytes[] = {
-> +	[BCM2835_DMA_DATA_TYPE_S8] = 1,
-> +	[BCM2835_DMA_DATA_TYPE_S16] = 2,
-> +	[BCM2835_DMA_DATA_TYPE_S32] = 4,
-> +	[BCM2835_DMA_DATA_TYPE_S128] = 16
-> +};
-
-This looks rather fun - and the only place d->es is used is to convey
-this as an index into this table for bcm2835_dma_desc_size().  I can't
-quite see the point of this table existing.
-
-> +static void bcm2835_dma_start_sg(struct bcm2835_chan *c, struct bcm2835_desc *d,
-> +		unsigned idx)
-> +{
-> +	struct bcm2835_sg *sg = d->sg + idx;
-> +	int frame;
-> +	int frames = sg->fn;
-> +
-> +	/*
-> +	 * Iterate over all frames and create a control block
-> +	 * for each frame and link them together.
-> +	 */
-> +	for (frame = 0; frame < frames; frame++) {
-> +		struct bcm2835_dma_cb *control_block =
-> +			&d->control_block_base[frame];
-> +
-> +		/* Setup adresses */
-> +		if (d->dir == DMA_DEV_TO_MEM) {
-> +			control_block->info = BCM2835_DMA_D_INC;
-> +			control_block->src = d->dev_addr;
-> +			control_block->dst = sg->addr+frame*sg->en;
-> +		} else {
-> +			control_block->info = BCM2835_DMA_S_INC;
-> +			control_block->src = sg->addr+frame*sg->en;
-> +			control_block->dst = d->dev_addr;
-> +		}
-> +
-> +		/* Enable interrupt */
-> +		control_block->info |= BCM2835_DMA_INT_EN;
-> +
-> +		/* Setup synchronization */
-> +		if (d->sync_type != 0)
-> +			control_block->info |= d->sync_type;
-> +
-> +		/* Setup DREQ channel */
-> +		if (d->sync_dreq != 0)
-> +			control_block->info |=
-> +				BCM2835_DMA_PER_MAP(d->sync_dreq);
-> +
-> +		/* Length of a frame */
-> +		control_block->length = sg->en;
-> +
-> +		/*
-> +		 * Next block is the next frame.
-> +		 * This DMA engine driver currently only supports cyclic DMA.
-> +		 * Therefore, wrap around at number of frames.
-> +		 */
-> +		control_block->next = d->control_block_base_phys +
-> +			sizeof(struct bcm2835_dma_cb)*((frame+1)%(frames));
-> +
-> +		/* The following fields are not used here */
-> +		control_block->stride = 0;
-> +		control_block->pad[0] = 0;
-> +		control_block->pad[1] = 0;
-> +	}
-
-Why not move the initialisation of this control block to the preparation
-function?  I think doing that would simplify this code somewhat, as
-you won't be converting the information passed to the preparation function
-multiple times.
-
-> +static int bcm2835_dma_alloc_chan_resources(struct dma_chan *chan)
-> +{
-> +	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-> +	int ret;
-> +	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(chan->device);
-> +	uint32_t chans = d->chans_available;
-> +	int chanID = 0;
-> +
-> +	dev_dbg(c->vc.chan.device->dev,
-> +			"allocating channel for %u\n", c->dma_sig);
-> +
-> +	/* do not use the FIQ and BULK channels */
-> +	chans &= ~0xD;
-> +
-> +	if (chans) {
-> +		/* return the ordinal of the first channel in the bitmap */
-> +		while (chans != 0 && (chans & 1) == 0) {
-> +			chans >>= 1;
-> +			chanID++;
-> +		}
-> +
-> +		/* claim the channel */
-> +		d->chans_available &= ~(1 << chanID);
-> +
-> +		c->dma_chan_base = BCM2835_DMA_CHANIO(d->dma_base, chanID);
-> +
-> +		c->dma_irq_number = d->dma_irq_numbers[chanID];
-> +
-> +		c->dma_ch = chanID;
-> +	} else {
-> +		return -ENOMEM;
-> +	}
-> +
-> +	c->dma_irq_handler.name = "DMA engine IRQ handler";
-> +	c->dma_irq_handler.flags = 0;
-> +	c->dma_irq_handler.handler = bcm2835_dma_callback;
-> +
-> +	ret = request_any_context_irq(c->dma_irq_number,
-> +			bcm2835_dma_callback, 0, "DMA IRQ", c);
-
-Hmm.  Why "request_any_context_irq" ?  Looking at what your "dma callback"
-is doing, it's operating entirely beneath a spinlock with IRQs disabled.
-You might as well handle it in hard IRQ context.
-
-> +static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
-> +	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
-> +	size_t period_len, enum dma_transfer_direction direction,
-> +	unsigned long flags, void *context)
-> +{
-> +	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-> +	enum dma_slave_buswidth dev_width;
-> +	struct bcm2835_desc *d;
-> +	dma_addr_t dev_addr;
-> +	unsigned int es, sync_type, sync_dreq;
-> +
-> +	/* Grab configuration */
-> +	if (direction == DMA_DEV_TO_MEM) {
-> +		dev_addr = c->cfg.src_addr;
-> +		dev_width = c->cfg.src_addr_width;
-> +		sync_type = BCM2835_DMA_S_DREQ;
-> +		sync_dreq = c->cfg.slave_id;
-> +	} else if (direction == DMA_MEM_TO_DEV) {
-> +		dev_addr = c->cfg.dst_addr;
-> +		dev_width = c->cfg.dst_addr_width;
-> +		sync_type = BCM2835_DMA_D_DREQ;
-> +		sync_dreq = c->cfg.slave_id;
-> +	} else {
-> +		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
-> +		return NULL;
-> +	}
-
-Please move sync_dreq out of the if() statements; it doesn't appear to
-depend on the direction (there's only one of them in that structure too.)
-While there, you might as well assign it directly to d->sync_dreq below.
-
-Even better, with the code in bcm2835_dma_start_sg() moved into this
-function to generate the control block, you don't need to save a lot
-of the information in your descriptor.
-
-> +
-> +	/* Bus width translates to the element size (ES) */
-> +	switch (dev_width) {
-> +	case DMA_SLAVE_BUSWIDTH_4_BYTES:
-> +		es = BCM2835_DMA_DATA_TYPE_S32;
-> +		break;
-> +	default:
-> +		return NULL;
-> +	}
-> +
-> +	/* Now allocate and setup the descriptor. */
-> +	d = kzalloc(sizeof(*d) + sizeof(d->sg[0]), GFP_ATOMIC);
-> +	if (!d)
-> +		return NULL;
-> +
-> +	d->dir = direction;
-> +	d->dev_addr = dev_addr;
-> +	d->es = es;
-> +	d->sync_type = sync_type;
-> +	d->sync_dreq = sync_dreq;
-> +	d->sg[0].addr = buf_addr;
-> +	d->sg[0].en = period_len;
-> +	d->sg[0].fn = buf_len / period_len;
-> +	d->sglen = 1;
-> +
-> +	/* Allocate memory for control blocks */
-> +	d->control_block_size = d->sg[0].fn*sizeof(struct bcm2835_dma_cb);
-> +	d->control_block_base = dma_alloc_coherent(chan->device->dev,
-> +			d->control_block_size, &d->control_block_base_phys,
-> +			GFP_KERNEL);
-> +
-> +	if (!d->control_block_base) {
-> +		dev_err(chan->device->dev,
-> +				"%s: Memory allocation error\n", __func__);
-> +		return NULL;
-> +	}
-> +
-> +	memset(d->control_block_base, 0, d->control_block_size);
-> +
-> +	if (!c->cyclic) {
-> +		c->cyclic = true;
-> +		/* nothing else is implemented */
-> +	}
-
-This is needlessly complex; please simplify this.
-
-> +
-> +	return vchan_tx_prep(&c->vc, &d->vd, DMA_CTRL_ACK | DMA_PREP_INTERRUPT);
-
-You should pass 'flags' as the 3rd argument here.
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index bfdc578..4478bee 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -112,5 +112,10 @@
+ 			interrupt-parent = <&gic>;
+ 			interrupts = <0x0 0x4c 0x4>;
+ 		};
++
++		reboot at 17000014 {
++			compatible = "apm,xgene-reboot";
++			reg = <0x0 0x17000014 0x0 0x4>;
++		};
+ 	};
+ };
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 9b3ea53..84883bc 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -39,7 +39,7 @@ config POWER_RESET_RESTART
+ 
+ config POWER_RESET_VEXPRESS
+ 	bool "ARM Versatile Express power-off and reset driver"
+-	depends on ARM || ARM64
++	depends on (ARM || ARM64) && ARCH_VEXPRESS
+ 	depends on POWER_RESET && VEXPRESS_CONFIG
+ 	help
+ 	  Power off and reset support for the ARM Ltd. Versatile
+@@ -47,7 +47,6 @@ config POWER_RESET_VEXPRESS
+ 
+ config POWER_RESET_XGENE
+ 	bool "APM SoC X-Gene reset driver"
+-	depends on ARM64
+-	depends on POWER_RESET
++	default y if (ARM64 && ARCH_XGENE && POWER_RESET)
+ 	help
+ 	  Reboot support for the APM SoC X-Gene Eval boards.
+diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
+index ecd55f8..856fed1 100644
+--- a/drivers/power/reset/xgene-reboot.c
++++ b/drivers/power/reset/xgene-reboot.c
+@@ -30,6 +30,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/stat.h>
+ #include <linux/slab.h>
++#include <linux/acpi.h>
++#include <linux/efi.h>
+ #include <asm/system_misc.h>
+ 
+ struct xgene_reboot_context {
+@@ -40,7 +42,7 @@ struct xgene_reboot_context {
+ 
+ static struct xgene_reboot_context *xgene_restart_ctx;
+ 
+-static void xgene_restart(char str, const char *cmd)
++static void xgene_restart(enum reboot_mode reboot_mode, const char *cmd)
+ {
+ 	struct xgene_reboot_context *ctx = xgene_restart_ctx;
+ 	unsigned long timeout;
+@@ -56,48 +58,114 @@ static void xgene_restart(char str, const char *cmd)
+ 	dev_emerg(&ctx->pdev->dev, "Unable to restart system\n");
+ }
+ 
++static int xgene_reboot_get_resource(struct platform_device *pdev, int index,
++				     struct resource *res)
++{
++	struct resource *regs;
++	if (efi_enabled(EFI_BOOT)) {
++		regs = platform_get_resource(pdev, IORESOURCE_MEM, index);
++		if (regs == NULL)
++			return -ENODEV;
++		*res = *regs;
++		return 0;
++	}
++	return of_address_to_resource(pdev->dev.of_node, index, res);
++}
++
++static int xgene_reboot_get_u32_param(struct platform_device *pdev,
++				      const char *of_name, char *acpi_name,
++				      u32 *param)
++{
++#ifdef CONFIG_ACPI
++	if (efi_enabled(EFI_BOOT)) {
++		unsigned long long value;
++		acpi_status status;
++		if (acpi_name == NULL)
++			return -ENODEV;
++		status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
++					       acpi_name, NULL, &value);
++		if (ACPI_FAILURE(status))
++			return -ENODEV;
++		*param = value;
++		return 0;
++	}
++#endif
++	if (of_name == NULL)
++		return -ENODEV;
++	return of_property_read_u32(pdev->dev.of_node, of_name, param);
++}
++
+ static int xgene_reboot_probe(struct platform_device *pdev)
+ {
+ 	struct xgene_reboot_context *ctx;
++	struct resource res;
++	int rc;
++
++	/* Skip the ACPI probe if booting via DTS */
++	if (!efi_enabled(EFI_BOOT) && !pdev->dev.of_node)
++		goto error;
++
++	rc = xgene_reboot_get_resource(pdev, 0, &res);
++	if (rc) {
++		dev_err(&pdev->dev, "no resource address\n");
++		goto error;
++	}
+ 
+ 	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
+ 	if (!ctx) {
+ 		dev_err(&pdev->dev, "out of memory for context\n");
+-		return -ENODEV;
++		goto error;
+ 	}
+ 
+-	ctx->csr = of_iomap(pdev->dev.of_node, 0);
++	ctx->csr = devm_ioremap(&pdev->dev, res.start, resource_size(&res));
+ 	if (!ctx->csr) {
+-		devm_kfree(&pdev->dev, ctx);
+-		dev_err(&pdev->dev, "can not map resource\n");
+-		return -ENODEV;
++		dev_err(&pdev->dev, "can't map CSR resource\n");
++		rc = -ENOMEM;
++		goto error;
+ 	}
+ 
+-	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
+-		ctx->mask = 0xFFFFFFFF;
++	ctx->mask = 0x1;
++
++	dev_info(&pdev->dev, "X-Gene register reboot driver\n");
+ 
+ 	ctx->pdev = pdev;
+ 	arm_pm_restart = xgene_restart;
+ 	xgene_restart_ctx = ctx;
+-
+ 	return 0;
++
++error:
++	if (ctx->csr)
++		devm_iounmap(&pdev->dev, ctx->csr);
++	devm_kfree(&pdev->dev, ctx);
++	return rc;
+ }
+ 
+ static struct of_device_id xgene_reboot_of_match[] = {
+-	{ .compatible = "apm,xgene-reboot" },
++	{.compatible = "apm,xgene-reboot"},
+ 	{}
+ };
+ 
++#ifdef CONFIG_ACPI
++static const struct acpi_device_id xgene_reset_acpi_ids[] = {
++	{"APMC0D00", 0},
++	{}
++};
++#endif
++
+ static struct platform_driver xgene_reboot_driver = {
+ 	.probe = xgene_reboot_probe,
+ 	.driver = {
+-		.name = "xgene-reboot",
+-		.of_match_table = xgene_reboot_of_match,
+-	},
++		   .name = "xgene-reboot",
++		   .of_match_table = xgene_reboot_of_match,
++#ifdef CONFIG_ACPI
++		   .acpi_match_table = ACPI_PTR(xgene_reset_acpi_ids),
++#endif
++		   }
+ };
+ 
+ static int __init xgene_reboot_init(void)
+ {
+ 	return platform_driver_register(&xgene_reboot_driver);
+ }
++
+ device_initcall(xgene_reboot_init);
+-- 
+1.7.6.1
