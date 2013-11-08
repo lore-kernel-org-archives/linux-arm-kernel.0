@@ -1,22 +1,18 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Fri,  8 Nov 2013 14:01:30 +0100
-Subject: [PATCHv5][ 2/5] video: mx3fb: Add device tree suport.
+Date: Fri,  8 Nov 2013 14:01:31 +0100
+Subject: [PATCHv5][ 3/5] video: mx3fb: Introduce regulator support.
 In-Reply-To: <1383915693-9422-1-git-send-email-denis@eukrea.com>
 References: <1383915693-9422-1-git-send-email-denis@eukrea.com>
-Message-ID: <1383915693-9422-2-git-send-email-denis@eukrea.com>
+Message-ID: <1383915693-9422-3-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This commit is based on the following commit by Fabio Estevam:
+  4344429 video: mxsfb: Introduce regulator support
 
 Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
 Cc: linux-fbdev at vger.kernel.org
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: devicetree at vger.kernel.org
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
@@ -24,309 +20,192 @@ Cc: Eric B?nard <eric@eukrea.com>
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
 ChangeLog v4->v5:
-- Added some people in the Cc list.
-- The full ipu register range is now passed to the driver,
-  the code and the documentation were adapted to it.
-- Updated the documentation not to mention the lcd controller, the ipu was
-  mentioned instead.
-- The ipu patch was removed from this patchset, as a consequence the mx3fb code
-  has been adapted not to expect the dma ipu driver to be probed trough the device tree.
+- Added Shawn Guo in the Cc list.
+- Rebased to make it apply.
 
 ChangeLog v3->v4:
-- Updated bindings.
-- Updated documentation accordinly.
-- Updated code accordinly.
-- Fixed the lack of "ret =" in
-  of_property_read_string(display_np, "model", &name);
-- Supressed some compilation warnings.
+- Some code style fixes.
+- Improved error handling in eremap.
 
 ChangeLog v2->v3:
-- The device tree bindings were reworked in order to make it look more like the
-  IPUv3 bindings.
-- The interface_pix_fmt property now looks like the IPUv3 one.
+- The prints are now replaced with non line wrapped prints.
+- The regulator retrival has been adapted to the new DT bindings which looks
+  more like the IPUv3 ones.
+- The regulator_is_enabled checks were kept, because regulator_disable do not
+  do such check.
 ---
- .../devicetree/bindings/video/fsl,mx3-fb.txt       |   44 +++++++
- drivers/video/Kconfig                              |    2 +
- drivers/video/mx3fb.c                              |  123 +++++++++++++++++---
- 3 files changed, 151 insertions(+), 18 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
+ drivers/video/mx3fb.c |   71 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 70 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
-new file mode 100644
-index 0000000..c0409a4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/fsl,mx3-fb.txt
-@@ -0,0 +1,44 @@
-+Freescale MX3 IPU.
-+==================
-+
-+Required properties:
-+- compatible: Should be "fsl,<chip>-ipu". compatible chips include the imx31 and the
-+  imx35.
-+- reg: should be register base and length as documented in the datasheet.
-+- clocks: Handle to the ipu_gate clock.
-+- display: Phandle to a "fsl,mx3-parallel-display" compatible display node
-+  which is described below.
-+
-+Example:
-+
-+ipu: ipu at 53fc0000 {
-+	compatible = "fsl,imx35-ipu";
-+	reg = <0x53fc0000 0x4000>;
-+	clocks = <&clks 55>;
-+};
-+
-+Parallel display support
-+========================
-+
-+Required properties:
-+- compatible: Should be "fsl,mx3-parallel-display".
-+- model : The user-visible name of the display.
-+
-+Optional properties:
-+- interface_pix_fmt: How this display is connected to the
-+  crtc. Currently supported types: "rgb24", "rgb565", "rgb666".
-+
-+It can also have an optional timing subnode as described in
-+  Documentation/devicetree/bindings/video/display-timing.txt.
-+
-+Example:
-+
-+display0: display at di0 {
-+	compatible = "fsl,mx3-parallel-display";
-+	interface-pix-fmt = "rgb666";
-+	model = "CMO-QVGA";
-+};
-+
-+&ipu {
-+	display = <&display0>;
-+}
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 84b685f..edcfa33 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -2357,6 +2357,8 @@ config FB_MX3
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
-+	select VIDEOMODE_HELPERS
-+	select FB_MODE_HELPERS
- 	default y
- 	help
- 	  This is a framebuffer device for the i.MX31 LCD Controller. So
 diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-index cfdb380..7620e4f 100644
+index 7620e4f..8cf9c6f 100644
 --- a/drivers/video/mx3fb.c
 +++ b/drivers/video/mx3fb.c
-@@ -31,6 +31,8 @@
+@@ -27,6 +27,7 @@
+ #include <linux/clk.h>
+ #include <linux/mutex.h>
+ #include <linux/dma/ipu-dma.h>
++#include <linux/regulator/consumer.h>
+ 
  #include <linux/platform_data/dma-imx.h>
  #include <linux/platform_data/video-mx3fb.h>
+@@ -269,6 +270,7 @@ struct mx3fb_info {
+ 	struct dma_async_tx_descriptor	*txd;
+ 	dma_cookie_t			cookie;
+ 	struct scatterlist		sg[2];
++	struct regulator		*reg_lcd;
  
-+#include <video/of_display_timing.h>
-+
- #include <asm/io.h>
- #include <asm/uaccess.h>
+ 	struct fb_var_screeninfo	cur_var; /* current var info */
+ };
+@@ -1005,6 +1007,7 @@ static void __blank(int blank, struct fb_info *fbi)
+ 	struct mx3fb_info *mx3_fbi = fbi->par;
+ 	struct mx3fb_data *mx3fb = mx3_fbi->mx3fb;
+ 	int was_blank = mx3_fbi->blank;
++	int ret;
  
-@@ -757,11 +759,13 @@ static int __set_par(struct fb_info *fbi, bool lock)
- 			sig_cfg.Hsync_pol = true;
- 		if (fbi->var.sync & FB_SYNC_VERT_HIGH_ACT)
- 			sig_cfg.Vsync_pol = true;
--		if (fbi->var.sync & FB_SYNC_CLK_INVERT)
-+		if ((fbi->var.sync & FB_SYNC_CLK_INVERT) ||
-+		    (fbi->var.sync & FB_SYNC_PIXDAT_HIGH_ACT))
- 			sig_cfg.clk_pol = true;
- 		if (fbi->var.sync & FB_SYNC_DATA_INVERT)
- 			sig_cfg.data_pol = true;
--		if (fbi->var.sync & FB_SYNC_OE_ACT_HIGH)
-+		if ((fbi->var.sync & FB_SYNC_OE_ACT_HIGH) ||
-+		    (fbi->var.sync & FB_SYNC_DE_HIGH_ACT))
- 			sig_cfg.enable_pol = true;
- 		if (fbi->var.sync & FB_SYNC_CLK_IDLE_EN)
- 			sig_cfg.clkidle_en = true;
-@@ -1351,21 +1355,69 @@ static struct fb_info *mx3fb_init_fbinfo(struct device *dev, struct fb_ops *ops)
- 	return fbi;
- }
+ 	mx3_fbi->blank = blank;
  
-+static int match_dt_disp_data(const char *property)
-+{
-+	if (!strcmp("rgb666", property))
-+		return IPU_DISP_DATA_MAPPING_RGB666;
-+	else if (!strcmp("rgb565", property))
-+		return IPU_DISP_DATA_MAPPING_RGB565;
-+	else if (!strcmp("rgb24", property))
-+		return IPU_DISP_DATA_MAPPING_RGB888;
-+	else
-+		return -EINVAL;
-+}
-+
- static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
+@@ -1023,6 +1026,15 @@ static void __blank(int blank, struct fb_info *fbi)
+ 	case FB_BLANK_HSYNC_SUSPEND:
+ 	case FB_BLANK_NORMAL:
+ 		sdc_set_brightness(mx3fb, 0);
++		if (mx3_fbi->reg_lcd) {
++			if (regulator_is_enabled(mx3_fbi->reg_lcd)) {
++				ret = regulator_disable(mx3_fbi->reg_lcd);
++				if (ret)
++					dev_warn(fbi->device,
++						 "lcd regulator disable failed with error: %d\n",
++						 ret);
++			}
++		}
+ 		memset((char *)fbi->screen_base, 0, fbi->fix.smem_len);
+ 		/* Give LCD time to update - enough for 50 and 60 Hz */
+ 		msleep(25);
+@@ -1030,6 +1042,15 @@ static void __blank(int blank, struct fb_info *fbi)
+ 		break;
+ 	case FB_BLANK_UNBLANK:
+ 		sdc_enable_channel(mx3_fbi);
++		if (mx3_fbi->reg_lcd) {
++			if (!regulator_is_enabled(mx3_fbi->reg_lcd)) {
++				ret = regulator_enable(mx3_fbi->reg_lcd);
++				if (ret)
++					dev_warn(fbi->device,
++						 "lcd regulator enable failed with error: %d\n",
++						 ret);
++			}
++		}
+ 		sdc_set_brightness(mx3fb, mx3fb->backlight_level);
+ 		break;
+ 	}
+@@ -1206,6 +1227,7 @@ static int mx3fb_suspend(struct platform_device *pdev, pm_message_t state)
  {
- 	struct device *dev = mx3fb->dev;
+ 	struct mx3fb_data *mx3fb = platform_get_drvdata(pdev);
+ 	struct mx3fb_info *mx3_fbi = mx3fb->fbi->par;
++	int ret;
+ 
+ 	console_lock();
+ 	fb_set_suspend(mx3fb->fbi, 1);
+@@ -1214,7 +1236,15 @@ static int mx3fb_suspend(struct platform_device *pdev, pm_message_t state)
+ 	if (mx3_fbi->blank == FB_BLANK_UNBLANK) {
+ 		sdc_disable_channel(mx3_fbi);
+ 		sdc_set_brightness(mx3fb, 0);
+-
++		if (mx3_fbi->reg_lcd) {
++			if (regulator_is_enabled(mx3_fbi->reg_lcd)) {
++				ret = regulator_disable(mx3_fbi->reg_lcd);
++				if (ret)
++					dev_warn(&pdev->dev,
++						 "lcd regulator disable failed with error: %d\n",
++						 ret);
++			}
++		}
+ 	}
+ 	return 0;
+ }
+@@ -1226,10 +1256,20 @@ static int mx3fb_resume(struct platform_device *pdev)
+ {
+ 	struct mx3fb_data *mx3fb = platform_get_drvdata(pdev);
+ 	struct mx3fb_info *mx3_fbi = mx3fb->fbi->par;
++	int ret;
+ 
+ 	if (mx3_fbi->blank == FB_BLANK_UNBLANK) {
+ 		sdc_enable_channel(mx3_fbi);
+ 		sdc_set_brightness(mx3fb, mx3fb->backlight_level);
++		if (mx3_fbi->reg_lcd) {
++			if (!regulator_is_enabled(mx3_fbi->reg_lcd)) {
++				ret = regulator_enable(mx3_fbi->reg_lcd);
++				if (ret)
++					dev_warn(&pdev->dev,
++						 "lcd regulator enable failed with error: %d\n",
++						 ret);
++			}
++		}
+ 	}
+ 
+ 	console_lock();
+@@ -1373,6 +1413,7 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
  	struct mx3fb_platform_data *mx3fb_pdata = dev->platform_data;
--	const char *name = mx3fb_pdata->name;
-+	struct device_node *np = dev->of_node;
-+	const char *name;
-+	const char *ipu_disp_format;
+ 	struct device_node *np = dev->of_node;
+ 	const char *name;
++	const char *regulator_name;
+ 	const char *ipu_disp_format;
  	unsigned int irq;
  	struct fb_info *fbi;
- 	struct mx3fb_info *mx3fbi;
- 	const struct fb_videomode *mode;
- 	int ret, num_modes;
-+	struct fb_videomode of_mode;
-+	struct device_node *display_np;
-+
-+	if (np) {
-+		display_np = of_parse_phandle(np, "display", 0);
-+		if (!display_np) {
-+			dev_err(dev, "Can't get the display device node.\n");
-+			return -EINVAL;
-+		}
-+
-+		of_property_read_string(display_np, "interface-pix-fmt",
-+					&ipu_disp_format);
-+		if (!ipu_disp_format) {
-+			mx3fb->disp_data_fmt = IPU_DISP_DATA_MAPPING_RGB666;
-+			dev_warn(dev,
-+				"ipu display data mapping was not defined, using the default rgb666.\n");
-+		} else {
-+			mx3fb->disp_data_fmt =
-+				match_dt_disp_data(ipu_disp_format);
-+		}
-+
-+		if (mx3fb->disp_data_fmt == -EINVAL) {
-+			dev_err(dev, "Illegal display data format \"%s\"\n",
-+				ipu_disp_format);
-+			return -EINVAL;
-+		}
+@@ -1389,6 +1430,9 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
+ 			return -EINVAL;
+ 		}
  
--	if (mx3fb_pdata->disp_data_fmt >= ARRAY_SIZE(di_mappings)) {
--		dev_err(dev, "Illegal display data format %d\n",
-+		ret = of_property_read_string(display_np, "model", &name);
-+		if (ret) {
-+			dev_err(dev, "Missing display model name\n");
-+			return -EINVAL;
-+		}
++		of_property_read_string(display_np, "regulator-name",
++					&regulator_name);
++
+ 		of_property_read_string(display_np, "interface-pix-fmt",
+ 					&ipu_disp_format);
+ 		if (!ipu_disp_format) {
+@@ -1503,6 +1547,25 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
+ 	if (ret < 0)
+ 		goto erfb;
+ 
++	/* In dt mode,
++	 * using devm_regulator_get would require that the proprety referencing
++	 * the regulator phandle has to be inside the mx3fb node.
++	 */
++	if (np) {
++		if (regulator_name)
++			mx3fbi->reg_lcd = regulator_get(NULL, regulator_name);
 +	} else {
-+		name = mx3fb_pdata->name;
-+		if (mx3fb_pdata->disp_data_fmt >= ARRAY_SIZE(di_mappings)) {
-+			dev_err(dev, "Illegal display data format %d\n",
- 				mx3fb_pdata->disp_data_fmt);
--		return -EINVAL;
-+			return -EINVAL;
-+		}
- 	}
- 
- 	ichan->client = mx3fb;
-@@ -1386,12 +1438,24 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
- 		goto emode;
- 	}
- 
--	if (mx3fb_pdata->mode && mx3fb_pdata->num_modes) {
--		mode = mx3fb_pdata->mode;
--		num_modes = mx3fb_pdata->num_modes;
-+	if (np) {
-+		ret = of_get_fb_videomode(display_np, &of_mode,
-+					  OF_USE_NATIVE_MODE);
-+		if (!ret) {
-+			mode = &of_mode;
-+			num_modes = 1;
-+		} else {
-+			mode = mx3fb_modedb;
-+			num_modes = ARRAY_SIZE(mx3fb_modedb);
-+		}
- 	} else {
--		mode = mx3fb_modedb;
--		num_modes = ARRAY_SIZE(mx3fb_modedb);
-+		if (mx3fb_pdata->mode || !mx3fb_pdata->num_modes) {
-+			mode = mx3fb_pdata->mode;
-+			num_modes = mx3fb_pdata->num_modes;
-+		} else {
-+			mode = mx3fb_modedb;
-+			num_modes = ARRAY_SIZE(mx3fb_modedb);
-+		}
- 	}
- 
- 	if (!fb_find_mode(&fbi->var, fbi, fb_mode, mode,
-@@ -1421,7 +1485,8 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
- 	mx3fbi->mx3fb		= mx3fb;
- 	mx3fbi->blank		= FB_BLANK_NORMAL;
- 
--	mx3fb->disp_data_fmt	= mx3fb_pdata->disp_data_fmt;
-+	if (!np)
-+		mx3fb->disp_data_fmt = mx3fb_pdata->disp_data_fmt;
- 
- 	init_completion(&mx3fbi->flip_cmpl);
- 	disable_irq(ichan->eof_irq);
-@@ -1455,17 +1520,21 @@ static bool chan_filter(struct dma_chan *chan, void *arg)
- 	struct device *dev;
- 	struct mx3fb_platform_data *mx3fb_pdata;
- 
--	if (!imx_dma_is_ipu(chan))
--		return false;
--
- 	if (!rq)
- 		return false;
- 
- 	dev = rq->mx3fb->dev;
- 	mx3fb_pdata = dev->platform_data;
- 
--	return rq->id == chan->chan_id &&
--		mx3fb_pdata->dma_dev == chan->device->dev;
-+	if (!imx_dma_is_ipu(chan) && mx3fb_pdata)
-+		return false;
++		mx3fbi->reg_lcd = devm_regulator_get(dev, "lcd");
++	}
 +
-+	/* When using the devicetree, mx3fb_pdata is NULL */
-+	if (mx3fb_pdata)
-+		return rq->id == chan->chan_id &&
-+			mx3fb_pdata->dma_dev == chan->device->dev;
-+	else
-+		return rq->id == chan->chan_id;
- }
++	if (IS_ERR(mx3fbi->reg_lcd)) {
++		dev_warn(mx3fb->dev, "Operating without regulator \"lcd\"\n");
++		mx3fbi->reg_lcd = NULL;
++	} else {
++		dev_info(mx3fb->dev, "Using \"%s\" Regulator\n",
++			 regulator_name);
++	}
++
+ 	return 0;
  
- static void release_fbi(struct fb_info *fbi)
-@@ -1487,6 +1556,7 @@ static int mx3fb_probe(struct platform_device *pdev)
- 	dma_cap_mask_t mask;
+ erfb:
+@@ -1557,6 +1620,7 @@ static int mx3fb_probe(struct platform_device *pdev)
  	struct dma_chan *chan;
  	struct dma_chan_request rq;
-+	struct device_node *np = dev->of_node;
+ 	struct device_node *np = dev->of_node;
++	struct mx3fb_info *mx3_fbi;
  
  	/*
  	 * Display Interface (DI) and Synchronous Display Controller (SDC)
-@@ -1508,7 +1578,16 @@ static int mx3fb_probe(struct platform_device *pdev)
- 		goto eremap;
- 	}
- 
--	pr_debug("Remapped %pR at %p\n", sdc_reg, mx3fb->reg_base);
-+	/* The full IPU registers range is passed by the device tree,
-+	 * whereas the platform data only passes the SDC registers range.
-+	 */
-+	if (np) {
-+		mx3fb->reg_base += MX3FB_REG_OFFSET;
-+		pr_debug("Remapped %pR at %p\n", sdc_reg + MX3FB_REG_OFFSET,
-+			 mx3fb->reg_base);
-+	} else {
-+		pr_debug("Remapped %pR at %p\n", sdc_reg, mx3fb->reg_base);
+@@ -1621,6 +1685,11 @@ ersdc0:
+ 	dmaengine_put();
+ 	iounmap(mx3fb->reg_base);
+ eremap:
++	if (mx3fb->fbi) {
++		mx3_fbi = mx3fb->fbi->par;
++		if (mx3_fbi->reg_lcd)
++			regulator_put(mx3_fbi->reg_lcd);
 +	}
- 
- 	/* IDMAC interface */
- 	dmaengine_get();
-@@ -1565,9 +1644,17 @@ static int mx3fb_remove(struct platform_device *dev)
- 	return 0;
- }
- 
-+static struct of_device_id mx3fb_of_dev_id[] = {
-+	{ .compatible = "fsl,imx31-ipu", },
-+	{ .compatible = "fsl,imx35-ipu", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, mx3fb_of_dev_id);
-+
- static struct platform_driver mx3fb_driver = {
- 	.driver = {
- 		.name = MX3FB_NAME,
-+		.of_match_table = mx3fb_of_dev_id,
- 		.owner = THIS_MODULE,
- 	},
- 	.probe = mx3fb_probe,
+ 	kfree(mx3fb);
+ 	dev_err(dev, "mx3fb: failed to register fb\n");
+ 	return ret;
 -- 
 1.7.9.5
