@@ -1,29 +1,58 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 8 Nov 2013 10:09:28 +0100
-Subject: [patch 1/1] ARM: kirkwood: stop printk TCLK value at boot for DT
- boards
-In-Reply-To: <527CA812.9050003@gmail.com>
-References: <20131105180931.674625171@rtp-net.org> <527CA812.9050003@gmail.com>
-Message-ID: <20131108090928.GF4440@lunn.ch>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 8 Nov 2013 09:20:25 +0000
+Subject: mfd: ab8500-debug: Add wake-up info
+In-Reply-To: <20131107134326.GO20521@mwanda>
+References: <20130826150908.GB12428@elgon.mountain>
+ <20131107134326.GO20521@mwanda>
+Message-ID: <20131108092025.GS30901@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >Kirkwood: MV88F6281-A0, TCLK=0
-> >
-> >This patch modifies the message for printing only the kirkwood id,
-> >as it allows to detect if we're running A0/A1/... variants with a simple
-> >dmesg.
+> What ever happened to this?  Can "desc" be NULL or not?
+
+You'll be lucky to get a response. ST-Ericsson are quite dead.
+
+However, from my investigation it appears desc 'can' be NULL.
+
+> On Mon, Aug 26, 2013 at 06:09:08PM +0300, Dan Carpenter wrote:
+> > Hello Jonas Aaberg,
+> > 
+> > This is a semi-automatic email about new static checker warnings.
+> > 
+> > The patch 2cf64e264828: "mfd: ab8500-debug: Add wake-up info" from 
+> > May 31, 2012, leads to the following Smatch complaint:
+> > 
+> > drivers/mfd/ab8500-debugfs.c:1609 ab8500_interrupts_print()
+> > 	 warn: variable dereferenced before check 'desc' (see line 1603)
+> > 
+> > drivers/mfd/ab8500-debugfs.c
+> >   1602			struct irq_desc *desc = irq_to_desc(line + irq_first);
+> >   1603			struct irqaction *action = desc->action;
+> >                                                    ^^^^^^^^^^^^
+> > Patch adds dereference.
+> > 
+> >   1604	
+> >   1605			seq_printf(s, "%3i:  %6i %4i", line,
+> >   1606				   num_interrupts[line],
+> >   1607				   num_wake_interrupts[line]);
+> >   1608	
+> >   1609			if (desc && desc->name)
+> >                             ^^^^
+> > Patch adds check.
+> > 
+> >   1610				seq_printf(s, "-%-8s", desc->name);
+> >   1611			if (action) {
+> > 
+> > regards,
+> > dan carpenter
 > 
-> Arnaud,
-> 
-> for DT based booting we also have the "Machine" printed right above the
-> "Kirkwood" string. Don't you think, that we can remove the pr_info
-> completely?
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Hi Sebastian
-
-I think it is useful, as a debug tool. What is printed here is probed
-from the hardware. We know it is correct. The Machine string is from
-DT and somebody could be trying to boot with the wrong DT blob.
-
-   Andrew
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
