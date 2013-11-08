@@ -1,76 +1,319 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Nov 2013 14:18:41 +0000
-Subject: [PATCH v4 3/4] AArch64: KGDB: Add step debugging support
-In-Reply-To: <1383641146-27274-4-git-send-email-vijay.kilari@gmail.com>
-References: <1383641146-27274-1-git-send-email-vijay.kilari@gmail.com>
- <1383641146-27274-4-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20131108141841.GI17461@mudshark.cambridge.arm.com>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Fri, 8 Nov 2013 16:26:01 +0200
+Subject: [PATCH v3 RFC] clk: add gpio controlled clock
+In-Reply-To: <cover.1383312867.git.jsarha@ti.com>
+References: <cover.1383312867.git.jsarha@ti.com>
+Message-ID: <1383920761-7295-1-git-send-email-jsarha@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 05, 2013 at 08:45:45AM +0000, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> 
-> Add KGDB software step debugging support for EL1 debug
-> in AArch64 mode.
-> 
-> KGDB registers step debug handler with debug monitor.
-> On receiving 'step' command from GDB tool, target enables
-> software step debugging and step address is updated.
-> If no step address is received from GDB tool, target assumes
-> next step address is current PC.
-> 
-> Software Step debugging is disabled when 'continue' command
-> is received
-> 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> ---
->  arch/arm64/kernel/kgdb.c |   67 +++++++++++++++++++++++++++++++++++++++-------
->  1 file changed, 58 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> index ec624bc..f10f2ba 100644
-> --- a/arch/arm64/kernel/kgdb.c
-> +++ b/arch/arm64/kernel/kgdb.c
-> @@ -137,13 +137,26 @@ void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
->  
->  static int compiled_break;
->  
-> +static void kgdb_arch_update_addr(struct pt_regs *regs,
-> +				char *remcom_in_buffer)
-> +{
-> +	unsigned long addr;
-> +	char *ptr;
-> +
-> +	ptr = &remcom_in_buffer[1];
-> +	if (kgdb_hex2long(&ptr, &addr))
-> +		kgdb_arch_set_pc(regs, addr);
-> +	else if (compiled_break == 1)
-> +		kgdb_arch_set_pc(regs, regs->pc + 4);
-> +
-> +	compiled_break = 0;
-> +}
-> +
->  int kgdb_arch_handle_exception(int exception_vector, int signo,
->  			       int err_code, char *remcom_in_buffer,
->  			       char *remcom_out_buffer,
->  			       struct pt_regs *linux_regs)
->  {
-> -	unsigned long addr;
-> -	char *ptr;
->  	int err;
->  
->  	switch (remcom_in_buffer[0]) {
-> @@ -153,6 +166,8 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
->  		 * Packet D (Detach), k (kill). No special handling
->  		 * is required here
->  		 */
-> +		atomic_set(&kgdb_cpu_doing_single_step, -1);
-> +		kgdb_single_step =  0;
+The added clk-gpio is a basic clock that can be enabled and disabled
+trough a gpio output. The DT binding document for the clock is also
+added. For EPROBE_DEFER handling the registering of the clock has to
+be delayed until of_clk_get() call time.
 
-This looks really weird: you have two variables, which you attempt to keep
-in sync, only one of them is an atomic access and you don't have any
-locking or memory barriers between them, so it must be ok if they're not
-in-sync. In which case, why do we have two variables?
+Signed-off-by: Jyri Sarha <jsarha@ti.com>
+CC: t-kristo at ti.com
+---
+ .../devicetree/bindings/clock/gpio-clock.txt       |   21 ++
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-gpio.c                             |  211 ++++++++++++++++++++
+ include/linux/clk-provider.h                       |   25 +++
+ 4 files changed, 258 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/gpio-clock.txt
+ create mode 100644 drivers/clk/clk-gpio.c
 
-Will
+diff --git a/Documentation/devicetree/bindings/clock/gpio-clock.txt b/Documentation/devicetree/bindings/clock/gpio-clock.txt
+new file mode 100644
+index 0000000..54fea39
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/gpio-clock.txt
+@@ -0,0 +1,21 @@
++Binding for simple gpio controlled clock.
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible : shall be "gpio-clock".
++- #clock-cells : from common clock binding; shall be set to 0.
++- enable-gpios : GPIO reference for enabling and disabling the clock.
++
++Optional properties:
++- clocks: Maximum of one parent clock is supported.
++
++Example:
++	clock {
++		compatible = "gpio-clock";
++		clocks = <&parentclk>;
++		#clock-cells = <0>;
++		enable-gpios = <&gpio 1 GPIO_ACTIVE_HIGH>;
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 7d74d06..81b65a3 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -8,6 +8,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
++obj-$(CONFIG_COMMON_CLK)	+= clk-gpio.o
+ 
+ # SoCs specific
+ obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
+new file mode 100644
+index 0000000..c4c7c69
+--- /dev/null
++++ b/drivers/clk/clk-gpio.c
+@@ -0,0 +1,211 @@
++/*
++ * Copyright (C) 2012 Texas Instruments
++ * Author: Jyri Sarha <jsarha@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Gpio controlled clock implementation
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <linux/err.h>
++#include <linux/device.h>
++
++/**
++ * DOC: basic gpio controlled clock which can be enabled and disabled
++ *      with gpio output
++ * Traits of this clock:
++ * prepare - clk_(un)prepare only ensures parent is (un)prepared
++ * enable - clk_enable and clk_disable are functional & control gpio
++ * rate - inherits rate from parent.  No clk_set_rate support
++ * parent - fixed parent.  No clk_set_parent support
++ */
++
++#define to_clk_gpio(_hw) container_of(_hw, struct clk_gpio, hw)
++
++static int clk_gpio_enable(struct clk_hw *hw)
++{
++	struct clk_gpio *gpio = to_clk_gpio(hw);
++	int value = gpio->active_low ? 0 : 1;
++
++	gpio_set_value(gpio->gpio, value);
++
++	return 0;
++}
++
++static void clk_gpio_disable(struct clk_hw *hw)
++{
++	struct clk_gpio *gpio = to_clk_gpio(hw);
++	int value = gpio->active_low ? 1 : 0;
++
++	gpio_set_value(gpio->gpio, value);
++}
++
++static int clk_gpio_is_enabled(struct clk_hw *hw)
++{
++	struct clk_gpio *gpio = to_clk_gpio(hw);
++	int value = gpio_get_value(gpio->gpio);
++
++	return gpio->active_low ? !value : value;
++}
++
++const struct clk_ops clk_gpio_ops = {
++	.enable = clk_gpio_enable,
++	.disable = clk_gpio_disable,
++	.is_enabled = clk_gpio_is_enabled,
++};
++EXPORT_SYMBOL_GPL(clk_gpio_ops);
++
++/**
++ * clk_register_gpio - register a gpip clock with the clock framework
++ * @dev: device that is registering this clock
++ * @name: name of this clock
++ * @parent_name: name of this clock's parent
++ * @flags: framework-specific flags for this clock
++ * @gpio: gpio to control this clock
++ * @active_low: gpio polarity
++ */
++struct clk *clk_register_gpio(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		unsigned int gpio, bool active_low)
++{
++	struct clk_gpio *clk_gpio;
++	struct clk *clk;
++	struct clk_init_data init = { NULL };
++	unsigned long gpio_flags;
++	int err;
++
++	if (active_low)
++		gpio_flags = GPIOF_OUT_INIT_LOW;
++	else
++		gpio_flags = GPIOF_OUT_INIT_HIGH;
++
++	err = gpio_request_one(gpio, gpio_flags, name);
++	if (err) {
++		pr_err("%s: %s: Error requesting clock control gpio %u\n",
++		       __func__, name, gpio);
++		return ERR_PTR(err);
++	}
++
++	if (dev)
++		clk_gpio = devm_kzalloc(dev, sizeof(struct clk_gpio),
++					GFP_KERNEL);
++	else
++		clk_gpio = kzalloc(sizeof(struct clk_gpio), GFP_KERNEL);
++
++	if (!clk_gpio) {
++		pr_err("%s: %s: could not allocate gpio clk\n", __func__, name);
++		gpio_free(gpio);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	init.name = name;
++	init.ops = &clk_gpio_ops;
++	init.flags = flags | CLK_IS_BASIC;
++	init.parent_names = (parent_name ? &parent_name : NULL);
++	init.num_parents = (parent_name ? 1 : 0);
++
++	clk_gpio->gpio = gpio;
++	clk_gpio->active_low = active_low;
++	clk_gpio->hw.init = &init;
++
++	clk = clk_register(dev, &clk_gpio->hw);
++
++	if (IS_ERR(clk)) {
++		gpio_free(gpio);
++		kfree(clk_gpio);
++	}
++
++	pr_err("%s: gpio-clk %s with gpio %u succesfully registered\n",
++	       __func__, name, gpio);
++
++	return clk;
++}
++EXPORT_SYMBOL_GPL(clk_register_gpio);
++
++#ifdef CONFIG_OF
++/**
++ * The clk_register_gpio has to be delayed, because the EPROBE_DEFER
++ * can not be handled properly at of_clk_init() call time.
++ */
++
++struct clk_gpio_delayed_register_data {
++	struct device_node *node;
++	struct mutex lock;
++	struct clk *clk;
++};
++
++struct clk *of_clk_gpio_delayed_register_get(struct of_phandle_args *clkspec,
++					     void *_data)
++{
++	struct clk_gpio_delayed_register_data *data =
++		(struct clk_gpio_delayed_register_data *) _data;
++	struct clk *clk;
++	const char *clk_name = data->node->name;
++	const char *parent_name;
++	enum of_gpio_flags gpio_flags;
++	int gpio;
++	bool active_low;
++
++	mutex_lock(&data->lock);
++
++	if (data->clk) {
++		mutex_unlock(&data->lock);
++		return data->clk;
++	}
++
++	gpio = of_get_named_gpio_flags(data->node, "enable-gpios", 0,
++				       &gpio_flags);
++
++	if (gpio < 0) {
++		mutex_unlock(&data->lock);
++		if (gpio != -EPROBE_DEFER)
++			pr_err("%s: %s: Can't get 'enable-gpios' DT property\n",
++		       __func__, clk_name);
++		return ERR_PTR(gpio);
++	}
++
++	active_low = gpio_flags & OF_GPIO_ACTIVE_LOW;
++
++	parent_name = of_clk_get_parent_name(data->node, 0);
++
++	clk = clk_register_gpio(NULL, clk_name, parent_name, 0,
++				gpio, active_low);
++	if (IS_ERR(clk)) {
++		mutex_unlock(&data->lock);
++		return clk;
++	}
++
++	data->clk = clk;
++	mutex_unlock(&data->lock);
++
++	return clk;
++}
++
++/**
++ * of_gpio_clk_setup() - Setup function for gpio controlled clock
++ */
++void __init of_gpio_clk_setup(struct device_node *node)
++{
++	struct clk_gpio_delayed_register_data *data;
++	data = kzalloc(sizeof(struct clk_gpio_delayed_register_data),
++		       GFP_KERNEL);
++	if (!data) {
++		pr_err("%s: could not allocate gpio clk\n", __func__);
++		return;
++	}
++
++	data->node = node;
++	mutex_init(&data->lock);
++
++	of_clk_add_provider(node, of_clk_gpio_delayed_register_get, data);
++}
++EXPORT_SYMBOL_GPL(of_gpio_clk_setup);
++CLK_OF_DECLARE(gpio_clk, "gpio-clock", of_gpio_clk_setup);
++#endif
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 3493c76..f861568 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -439,6 +439,31 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+ 		unsigned long flags);
+ 
++/***
++ * struct clk_gpio - gpio controlled clock
++ *
++ * @hw:		handle between common and hardware-specific interfaces
++ * @gpio:	gpio
++ * @active_low:	gpio polarity
++ *
++ * Clock with a gpio control for enabling and disabling the parent clock.
++ * Implements .enable, .disable and .is_enabled
++ */
++
++struct clk_gpio {
++	struct clk_hw	hw;
++	unsigned int	gpio;
++	bool		active_low;
++};
++
++extern const struct clk_ops clk_gpio_ops;
++
++struct clk *clk_register_gpio(struct device *dev, const char *name,
++		const char *parent_name, unsigned long flags,
++		unsigned int gpio, bool active_low);
++
++void of_gpio_clk_setup(struct device_node *node);
++
+ /**
+  * clk_register - allocate a new clock, register it and return an opaque cookie
+  * @dev: device that is registering this clock
+-- 
+1.7.9.5
