@@ -1,42 +1,76 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 08 Nov 2013 12:44:01 +0000
-Subject: [patch] clk: vexpress: NULL dereference on error path
-In-Reply-To: <1383914574.3226.0.camel@hornet>
-References: <20131107080844.GR21844@elgon.mountain>
- <1383914574.3226.0.camel@hornet>
-Message-ID: <1383914641.3226.1.camel@hornet>
+From: denis@eukrea.com (Denis Carikli)
+Date: Fri,  8 Nov 2013 14:01:29 +0100
+Subject: [PATCHv5][ 1/5] fbdev: Add the lacking FB_SYNC_* for matching the
+ DISPLAY_FLAGS_*
+Message-ID: <1383915693-9422-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-11-08 at 12:42 +0000, Pawel Moll wrote:
-> On Thu, 2013-11-07 at 08:08 +0000, Dan Carpenter wrote:
-> > If the allocation fails then we dereference the NULL in the error path.
-> > Just return directly.
-> > 
-> > Fixes: ed27ff1db869 ('clk: Versatile Express clock generators ("osc") driver')
-> > Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> > 
-> > diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
-> > index 2dc8b41..a535c7b 100644
-> > --- a/drivers/clk/versatile/clk-vexpress-osc.c
-> > +++ b/drivers/clk/versatile/clk-vexpress-osc.c
-> > @@ -102,7 +102,7 @@ void __init vexpress_osc_of_setup(struct device_node *node)
-> >  
-> >  	osc = kzalloc(sizeof(*osc), GFP_KERNEL);
-> >  	if (!osc)
-> > -		goto error;
-> > +		return;
-> >  
-> >  	osc->func = vexpress_config_func_get_by_node(node);
-> >  	if (!osc->func) {
-> 
-> Well spotted, thanks!
-> 
-> Will get it queued with other vexpress clk changes.
+Without that fix, drivers using the fb_videomode_from_videomode
+  function will not be able to get certain information because
+  some DISPLAY_FLAGS_* have no corresponding FB_SYNC_*.
 
-Having said that - Mike, it's a bug fix. If you can still get it into
-the current merge window, please do:
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: devicetree at vger.kernel.org
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Eric B?nard <eric@eukrea.com>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ChangeLog v4->v5:
+- Added Geert Uytterhoeven, Grant Likely and Shawn Guo in the Cc list.
+- Moved the definitions to a non-userspace header.
+- Corrected the comment of the second define.
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+ChangeLog v3->v4:
+- Fixed the issue with FB_SYNC_PIXDAT_HIGH_ACT value.
 
-Pawe?
+ChangeLog v2->v3:
+- Added Jean-Christophe PLAGNIOL-VILLARD's ACK.
+---
+ drivers/video/fbmon.c |    4 ++++
+ include/linux/fb.h    |    3 +++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/drivers/video/fbmon.c b/drivers/video/fbmon.c
+index 6103fa6..29a9ed0 100644
+--- a/drivers/video/fbmon.c
++++ b/drivers/video/fbmon.c
+@@ -1402,6 +1402,10 @@ int fb_videomode_from_videomode(const struct videomode *vm,
+ 		fbmode->sync |= FB_SYNC_HOR_HIGH_ACT;
+ 	if (vm->flags & DISPLAY_FLAGS_VSYNC_HIGH)
+ 		fbmode->sync |= FB_SYNC_VERT_HIGH_ACT;
++	if (vm->flags & DISPLAY_FLAGS_DE_HIGH)
++		fbmode->sync |= FB_SYNC_DE_HIGH_ACT;
++	if (vm->flags & DISPLAY_FLAGS_PIXDATA_POSEDGE)
++		fbmode->sync |= FB_SYNC_PIXDAT_HIGH_ACT;
+ 	if (vm->flags & DISPLAY_FLAGS_INTERLACED)
+ 		fbmode->vmode |= FB_VMODE_INTERLACED;
+ 	if (vm->flags & DISPLAY_FLAGS_DOUBLESCAN)
+diff --git a/include/linux/fb.h b/include/linux/fb.h
+index ffac70a..cf2ad5d 100644
+--- a/include/linux/fb.h
++++ b/include/linux/fb.h
+@@ -45,6 +45,9 @@ struct device_node;
+ #define FB_SIGNAL_SYNC_ON_GREEN	8
+ #define FB_SIGNAL_SERRATION_ON	16
+ 
++#define FB_SYNC_DE_HIGH_ACT     64      /* data enable active high flag */
++#define FB_SYNC_PIXDAT_HIGH_ACT 128     /* drive data on positive edge */
++
+ #define FB_MISC_PRIM_COLOR	1
+ #define FB_MISC_1ST_DETAIL	2	/* First Detailed Timing is preferred */
+ struct fb_chroma {
+-- 
+1.7.9.5
