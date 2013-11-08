@@ -1,116 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard)
-Date: Fri, 08 Nov 2013 11:20:16 +0100
-Subject: [RFC PATCH 0/4] wire up CPU features to udev based module loading
-In-Reply-To: <527C1911.9030900@zytor.com>
-References: <1383844657-17487-1-git-send-email-ard.biesheuvel@linaro.org>	<527C0195.50008@zytor.com>	<20131107213944.GJ1962@tassilo.jf.intel.com>
- <CAKv+Gu9W-Pu4DGgB-85A3D4Ps9_FLSQgyK3EM7=k7KE1=xsnwg@mail.gmail.com>
- <527C1911.9030900@zytor.com>
-Message-ID: <527CBAE0.4070301@linaro.org>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Fri, 08 Nov 2013 10:25:55 +0000
+Subject: [linux-sunxi] [PATCH 2/2] ARM: sun6i: Add SMP support for the
+ Allwinner A31
+In-Reply-To: <20131108084056.GB26440@lukather>
+References: <1383471013-21695-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1383471013-21695-3-git-send-email-maxime.ripard@free-electrons.com>
+ <1383583997.8826.123.camel@kazak.uk.xensource.com>
+ <20131108084056.GB26440@lukather>
+Message-ID: <1383906355.3189.77.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2013 11:49 PM, H. Peter Anvin wrote:
-> On 11/07/2013 02:15 PM, Ard Biesheuvel wrote:
->>
->> That would involve repurposing/generalizing a bit more of the existing
->> x86-only code than I did the first time around, but if you (as x86
->> maintainers) are happy with that, I'm all for it.
->>
->> I do have a couple of questions then - the module aliases host tool has
->> no arch specific dependencies at all except having x86cpu as one of the
->> entries: would you mind dropping the x86 prefix there? Or rather add
->> dependencies on $ARCH? (If we drop it there, we basically end up with
->> 'cpu:' everywhere)
->
-> I think it makes sense to indicate what kind of CPU the string refers to,
-> as the top-level indicator of what is going on.  This might be possible to
-> macroize the generation of this prefix, though.
->
->> - in the vendor/family/model case, it may be preferable to drop these
->> fields entirely from certain modules' aliases if they match on 'any'
->> (provided that the module tools permit this) rather than add
->> architecture, variant, revision, etc  fields for all architectures if
->> they can only ever match on one
->
-> I think that can be CPU dependent.
->
->> - some of the X86_ macros would probable be redefined in terms of the
->> generic macros rather than the other way around, which would result in
->> some changes under arch/x86 as well, is that acceptable for you?
->
-> If you are talking about X86_FEATURE_* then almost certainly no, although
-> I'm willing to listen to what you have in mind.
->
+On Fri, 2013-11-08 at 09:40 +0100, Maxime Ripard wrote:
+> > I'm trying to work out if we can make this work with the requirement
+> > which both Xen and KVM have to enter the kernel in NS-HYP mode.
+> > 
+> > The way this works on e.g. vexpress is (roughly) that u-boot wakes up
+> > the secondary CPUs from the lowlevel firmware and places them into its
+> > own holding pen, which has the same wake up protocol as the firmware so
+> > the kernel can just use the same code. If u-boot never gets to run on
+> > secondary CPUs that isn't going to help much. 
+> > 
+> > My concern is that the sequence here appears to involve resetting the
+> > secondary CPU, which I figure will probably defeat that strategy by
+> > kicking the CPU back into the lowlevel firmware in the reset state,
+> > meaning it can't be done by a u-boot only change.
+> 
+> I think this is where we're headed for the A20, Marc was interested in
+> doing that,
 
-Actually, this should not be necessary at all, if we are happy to put up with
-distinct types for x86_cpu_id, generic_cpu_id, and perhaps other arch based
-ones in the future.
+Marc Zyngier is that?
 
-So what I have in mind for x86 is this (and this way, no other changes are
-needed to the existing x86 bits)
+>  since we already have pretty much this in u-boot already,
+> however, this is not the case for the A31.
 
-diff --git a/arch/x86/kernel/cpu/match.c b/arch/x86/kernel/cpu/match.c
-index ab6082a..82e92b2 100644
---- a/arch/x86/kernel/cpu/match.c
-+++ b/arch/x86/kernel/cpu/match.c
-@@ -56,8 +56,7 @@ ssize_t arch_print_cpu_modalias(struct device *dev,
-         int i, n;
-         char *buf = bufptr;
+> As far as I know, the Allwinner's bootloader that we currently use
+> isn't bringing up the secondary CPUs, and we don't have any port of
+> some sort of u-boot yet that we could work on.
 
--       n = snprintf(buf, size, "x86cpu:vendor:%04X:family:%04X:"
--                    "model:%04X:feature:",
-+       n = snprintf(buf, size, "cpu:type:x86,ven%04Xfam%04Xmod%04X:feature:",
-                 boot_cpu_data.x86_vendor,
-                 boot_cpu_data.x86,
-                 boot_cpu_data.x86_model);
-diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
-index 2370863..dea263a 100644
---- a/scripts/mod/file2alias.c
-+++ b/scripts/mod/file2alias.c
-@@ -1110,7 +1110,7 @@ static int do_amba_entry(const char *filename,
-  }
-  ADD_TO_DEVTABLE("amba", amba_id, do_amba_entry);
+Ah, OK. I'd assumed that A20 and A31 (indeed, most sunxi platforms) were
+mostly equivalent as far as u-boot support went.
 
--/* LOOKS like x86cpu:vendor:VVVV:family:FFFF:model:MMMM:feature:*,FEAT,*
-+/* LOOKS like cpu:type:x86,venVVVVfamFFFFmodMMMM:feature:*,FEAT,*
-   * All fields are numbers. It would be nicer to use strings for vendor
-   * and feature, but getting those out of the build system here is too
-   * complicated.
-@@ -1124,10 +1124,10 @@ static int do_x86cpu_entry(const char *filename, void
-*symval,
-         DEF_FIELD(symval, x86_cpu_id, model);
-         DEF_FIELD(symval, x86_cpu_id, vendor);
+> So, I guess we don't really have much choice in that case, even though
+> eventually I'd like to have this for the A31 too.
 
--       strcpy(alias, "x86cpu:");
--       ADD(alias, "vendor:",  vendor != X86_VENDOR_ANY, vendor);
--       ADD(alias, ":family:", family != X86_FAMILY_ANY, family);
--       ADD(alias, ":model:",  model  != X86_MODEL_ANY,  model);
-+       strcpy(alias, "cpu:type:x86,");
-+       ADD(alias, "ven", vendor != X86_VENDOR_ANY, vendor);
-+       ADD(alias, "fam", family != X86_FAMILY_ANY, family);
-+       ADD(alias, "mod", model  != X86_MODEL_ANY,  model);
-         strcat(alias, ":feature:*");
-         if (feature != X86_FEATURE_ANY)
-                 sprintf(alias + strlen(alias), "%04X*", feature);
+Right, I suppose it makes sense to consider what we want to do on the
+A20 now and keep in mind that A31 may want to follow in the future.
 
-The way I intend this to work is that, for instance, arm64 will emit something
-like
+> > Hrm, what to do ... perhaps a DT driven selection between this mechanism
+> > and sev to kick a wfe loop reading the private register?
+> 
+> We can discuss this whenever we will actually have that choice to
+> make, but maybe a kernel parameter would be better?
 
-cpu:type:arm64:features:,0000,0001,0002
+I don't think so -- u-boot would then have to munge the command line to
+say that it had/had not brought up secondaries. DTB seems more natural
+to me. e.g. on ARMv8 there is already a requirement to provide a per-CPU
+property describing the bringup protocol ("PSCI" and "spintable" are the
+options there).
 
-when the cpu uevent is raised, but as it is unclear whether we will want to
-match on variant, revision etc on arm64, we could use a generic
-MODULE_DEVICE_TABLE(cpu, ...) [as in patch #2 of this series] which would
-produce something like
+Anyway, once I get to the point of being able to do something I'll
+coordinate with Marc etc and figure out what to do. In the meantime I
+think having the kernel do the bringup (like this patch does) is
+sensible. It's very likely to be what we want to do in the absence of
+any instruction to the contrary (DTB or otherwise) in the future anyway.
 
-cpu:type:*:features:*00xx*
+Thanks,
 
-as a modalias to match on feature xx, whereas a plain X86_FEATURE_MATCH() will
-produce something like
-
-cpu:type:x86,ven*fam*mod*:features:*00xx*
-
-Does this look like a reasonable approach to you?
-
-Regards,
-Ard.
+Ian.
