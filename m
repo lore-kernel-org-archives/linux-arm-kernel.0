@@ -1,94 +1,23 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 8 Nov 2013 15:29:30 -0500
-Subject: [PATCH v3 7/9] ARM: add Armada 1500 and Sony NSZ-GS7 device
- tree files
-In-Reply-To: <CAOesGMir+Zar0hskPQ+ZN6Z7+R-G5GhrafenQPgjZGbVGG9uwA@mail.gmail.com>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-8-git-send-email-sebastian.hesselbarth@gmail.com>
- <0AF697FD-60AA-4B8B-A35F-3DF2FFBCF7AF@codeaurora.org>
- <20131108165721.GA10335@titan.lakedaemon.net>
- <8DC09031-553C-4FD5-8F05-F93D6FE40F3A@codeaurora.org>
- <20131108182415.GG10335@titan.lakedaemon.net>
- <CAOesGMhfr3CNxKNRJa+eJepr2Fc-jx4rTQ7cPerTkQM-CyzuCg@mail.gmail.com>
- <20131108193054.GJ10335@titan.lakedaemon.net>
- <CAOesGMir+Zar0hskPQ+ZN6Z7+R-G5GhrafenQPgjZGbVGG9uwA@mail.gmail.com>
-Message-ID: <20131108202930.GL10335@titan.lakedaemon.net>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Fri, 8 Nov 2013 12:44:46 -0800
+Subject: [PATCH 0/2] watchdog: bcm281xx: Watchdog Driver
+Message-ID: <1383943488-6537-1-git-send-email-markus.mayer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 08, 2013 at 12:10:27PM -0800, Olof Johansson wrote:
-> On Fri, Nov 8, 2013 at 11:30 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Fri, Nov 08, 2013 at 11:14:07AM -0800, Olof Johansson wrote:
-> >> On Fri, Nov 8, 2013 at 10:24 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> >> > On Fri, Nov 08, 2013 at 12:06:26PM -0600, Kumar Gala wrote:
-> >> >>
-> >> >> On Nov 8, 2013, at 10:57 AM, Jason Cooper wrote:
-> >> >>
-> >> >> > On Fri, Nov 08, 2013 at 10:13:19AM -0600, Kumar Gala wrote:
-> >> >> >> On Nov 5, 2013, at 8:28 AM, Sebastian Hesselbarth wrote:
-> >> >> > ...
-> >> >> >>> .../devicetree/bindings/arm/marvell,berlin.txt     |   24 +++
-> >> >> >>> arch/arm/boot/dts/Makefile                         |    2 +
-> >> >> >>> arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |   29 +++
-> >> >> >>> arch/arm/boot/dts/berlin2.dtsi                     |  227 ++++++++++++++++++++
-> >> >> >>> 4 files changed, 282 insertions(+)
-> >> >> >>> create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
-> >> >> >>> create mode 100644 arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-> >> >> >>> create mode 100644 arch/arm/boot/dts/berlin2.dtsi
-> >> >> >>
-> >> >> >> Haven't we been trying to go away from non-prefixed dts/dtsi?
-> >> >> >
-> >> >> > hmmm, this is the first I've heard of that.  Although, your proposal
-> >> >> > (in another thread) makes more sense now.  :)
-> >> >> >
-> >> >> >> So should these be something like marvell-berlin2-...
-> >> >> >
-> >> >> > I don't recall this being brought up at the summit, nor in Grant's
-> >> >> > report.  I do need to give it a more careful read this weekend, though.
-> >> >> > Perhaps I missed something.
-> >> >>
-> >> >> This was based on review comments Olof gave when we pushed some .dts
-> >> >> files for MSM/APQ Qualcomm Technologies soc/boards.
-> >> >
-> >> > As Andrew Lunn mentioned to me earlier, we should consider the fact that
-> >> > the dts file names are being used by Debian's flash-kernel.  Oh no!
-> >> > Another ABI! ;-)
-> >>
-> >> Yes, the names are mostly stable. ST-Ericsson renamed their dts files
-> >> and it caused some pain, some build environments have them hardcoded,
-> >> etc.
-> >>
-> >> Still, it is a good idea to start adding new ones using family or
-> >> vendor prefixes, so they are easier to group. Please keep that in mind
-> >> on new ones too, Jason -- I don't think I've discussed with you in the
-> >> past. :-)
-> >
-> > Nope, I definitely missed that if you did ;-)  Will do in the future.
-> >
-> > Perhaps now is the time to consider separating the dts filename from the
-> > dtb filename?  I'm warming up to my idea of globalscale,mirabox.dtb...
-> 
-> Having a "dtb-install" make target that sets those up as softlinks
-> could be a good idea, at least.
+This series introduces the watchdog driver for the BCM281xx family of
+mobile SoCs.
 
-oooh, I like that.  Something like
+Markus Mayer (2):
+  watchdog: bcm281xx: Watchdog Driver
+  ARM: bcm281xx: watchdog configuration
 
-$ dtc -L -o kirkwood-dreamplug.dtb kirkwood-dreamplug.dts
-$ ls
-...
-globalscale,dreamplug.dtb -> kirkwood-dreamplug.dtb
-...
-kirkwood-dreamplug.dtb
-...
-$
+ arch/arm/configs/bcm_defconfig  |    3 +
+ drivers/watchdog/Kconfig        |   21 +++
+ drivers/watchdog/Makefile       |    1 +
+ drivers/watchdog/bcm_kona_wdt.c |  399 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 424 insertions(+)
+ create mode 100644 drivers/watchdog/bcm_kona_wdt.c
 
-Otherwise the build system would have to learn to parse dts/dtbs...
-
-> I'm not sold on using them as filenames myself though.
-
-fair enough.
-
-thx,
-
-Jason.
+-- 
+1.7.9.5
