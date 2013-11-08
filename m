@@ -1,40 +1,44 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Nov 2013 17:32:00 -0800
-Subject: [PATCH 2/4] ARM: KVM: fix L2CTLR to be per-cluster
+Date: Thu,  7 Nov 2013 17:32:01 -0800
+Subject: [PATCH 3/4] ARM: KVM: drop limitation to 4 CPU VMs
 In-Reply-To: <1383874322-12328-1-git-send-email-christoffer.dall@linaro.org>
 References: <1383874322-12328-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1383874322-12328-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1383874322-12328-4-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-The L2CTLR register contains the number of CPUs in this cluster.
-
-Make sure the register content is actually relevant to the vcpu
-that is being configured by computing the number of cores that are
-part of its cluster.
+Now that the KVM/arm code knows about affinity, remove the hard
+limit of 4 vcpus per VM.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/coproc.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/kvm/reset.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 631e6bd..78c0885 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -124,6 +124,10 @@ static void reset_l2ctlr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
- 	asm volatile("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
- 	l2ctlr &= ~(3 << 24);
- 	ncores = atomic_read(&vcpu->kvm->online_vcpus) - 1;
-+	/* How many cores in the current cluster and the next ones */
-+	ncores -= (vcpu->vcpu_id & ~3);
-+	/* Cap it to the maximum number of cores in a single cluster */
-+	ncores = min(ncores, 3U);
- 	l2ctlr |= (ncores & 3) << 24;
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+index d9bbd83..2c5add0 100644
+--- a/arch/arm/kvm/reset.c
++++ b/arch/arm/kvm/reset.c
+@@ -33,8 +33,6 @@
+  * Cortex-A15 and Cortex-A7 Reset Values
+  */
  
- 	vcpu->arch.cp15[c9_L2CTLR] = l2ctlr;
+-static const int cortexa_max_cpu_idx = 3;
+-
+ static struct kvm_regs cortexa_regs_reset = {
+ 	.usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+ };
+@@ -64,8 +62,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	switch (vcpu->arch.target) {
+ 	case KVM_ARM_TARGET_CORTEX_A7:
+ 	case KVM_ARM_TARGET_CORTEX_A15:
+-		if (vcpu->vcpu_id > cortexa_max_cpu_idx)
+-			return -EINVAL;
+ 		cpu_reset = &cortexa_regs_reset;
+ 		vcpu->arch.midr = read_cpuid_id();
+ 		cpu_vtimer_irq = &cortexa_vtimer_irq;
 -- 
 1.7.10.4
