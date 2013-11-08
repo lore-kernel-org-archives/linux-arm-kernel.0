@@ -1,47 +1,69 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Nov 2013 18:37:09 +0000
-Subject: [PATCH 6/9] ARM: kprobes-test: Workaround GAS .align bug
+Date: Fri,  8 Nov 2013 18:37:12 +0000
+Subject: [PATCH 9/9] ARM: asm/opcodes.h: use ARM_HAVE_INST to use .inst to
+ build instructions
 In-Reply-To: <1383935832-20865-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1383935832-20865-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1383935832-20865-7-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1383935832-20865-10-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+Currently the <asm/opcodes.h> header uses .work and .short to build
+instructions. This means the output data does not get marked as an
+instruction which can cause issues such as BE8 code failures.
 
-By default if no fill symbol is given to .align directive in a code
-section it fills gap with NOPs. If previous fragment is not
-instruction-aligned, additional pre-alignment is done by zero bytes
-before NOPs. These zero bytes are marked as data by special symbol $d in
-symbol table. Unfortunately GAS assumes that there is only code in the
-code section so it "puts back" code symbol $a at the end of this
-pre-alignment. So if there is some data after alignment it will be
-interpreted as code and will be swapped back to LE for BE8 system during
-a final linking.
-
-If explicit fill value is given to .align, the NOP-padding code is
-skipped and symbol table does not get messed-up.
-
-So the workaround for this issue:
-Use explicit fill value if data should be aligned in the code section.
-
-Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/kernel/kprobes-test.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/opcodes.h | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/kernel/kprobes-test.h b/arch/arm/kernel/kprobes-test.h
-index e28a869..eecc90a 100644
---- a/arch/arm/kernel/kprobes-test.h
-+++ b/arch/arm/kernel/kprobes-test.h
-@@ -115,7 +115,7 @@ struct test_arg_end {
- 	/* multiple strings to be concatenated.  */		\
- 	".ascii "#title"				\n\t"	\
- 	".byte	0					\n\t"	\
--	".align	2					\n\t"
-+	".align	2, 0					\n\t"
+diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+index e796c59..4c7cac1 100644
+--- a/arch/arm/include/asm/opcodes.h
++++ b/arch/arm/include/asm/opcodes.h
+@@ -103,9 +103,15 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+ #define __opcode_to_mem_arm(x) ___opcode_swab32(x)
+ #define __opcode_to_mem_thumb16(x) ___opcode_swab16(x)
+ #define __opcode_to_mem_thumb32(x) ___opcode_swahb32(x)
++#ifdef ARM_HAVE_INST
+ #define ___asm_opcode_to_mem_arm(x) ___asm_opcode_swab32(x)
+ #define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_swab16(x)
+ #define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahb32(x)
++#else
++#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_identity32(x)
++#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_identity16(x)
++#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_identity32(x)
++#endif /* !ARM_HAVE_INST */
  
- #define	TEST_ARG_REG(reg, val)					\
- 	".byte	"__stringify(ARG_TYPE_REG)"		\n\t"	\
+ #else /* ! CONFIG_CPU_ENDIAN_BE8 */
+ 
+@@ -218,14 +224,27 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+ 
+ /* Helpers for the helpers.  Don't use these directly. */
+ #ifdef __ASSEMBLY__
++#ifdef ARM_HAVE_INST
++#define ___inst_arm(x) .inst x
++#define ___inst_thumb16(x) .inst.w x
++#define ___inst_thumb32(first, second) .inst.w first, second
++#else
+ #define ___inst_arm(x) .long x
+ #define ___inst_thumb16(x) .short x
+ #define ___inst_thumb32(first, second) .short first, second
++#endif /* !ARM_HAVE_INST */
++#else
++#ifdef ARM_HAVE_INST
++#define ___inst_arm(x) ".inst " __stringify(x) "\n\t"
++#define ___inst_thumb16(x) ".inst.w " __stringify(x) "\n\t"
++#define ___inst_thumb32(first, second) \
++	".inst.w " __stringify(first) ", " __stringify(second) "\n\t"
+ #else
+ #define ___inst_arm(x) ".long " __stringify(x) "\n\t"
+ #define ___inst_thumb16(x) ".short " __stringify(x) "\n\t"
+ #define ___inst_thumb32(first, second) \
+ 	".short " __stringify(first) ", " __stringify(second) "\n\t"
++#endif /* !ARM_HAVE_INST */
+ #endif
+ 
+ #endif /* __ASM_ARM_OPCODES_H */
 -- 
 1.8.4.rc3
