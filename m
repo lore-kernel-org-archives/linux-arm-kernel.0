@@ -1,75 +1,80 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri,  8 Nov 2013 14:48:41 +0100
-Subject: [PATCH 2/2] ARM: i.MX28: define external RTC crystal frequency in DT
+Date: Fri,  8 Nov 2013 14:48:40 +0100
+Subject: [PATCH 1/2] ARM: i.MX28: define ref_xtal frequency in DT
 In-Reply-To: <1383918521-4668-1-git-send-email-mkl@pengutronix.de>
 References: <1383918521-4668-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <1383918521-4668-3-git-send-email-mkl@pengutronix.de>
+Message-ID: <1383918521-4668-2-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Juergen Beisert <jbe@pengutronix.de>
 
-The RTC in the i.MX28 may be clocked with different crystals. Get the rate of
-the connected one from the DT.
+Instead of hardcoding the ref_xtal in the clk driver, get it from the DT.
 
 Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- Documentation/devicetree/bindings/clock/imx28-clock.txt | 1 +
- arch/arm/boot/dts/imx28.dtsi                            | 5 +++++
- drivers/clk/mxs/clk-imx28.c                             | 4 +++-
- 3 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx28.dtsi | 10 ++++++++++
+ drivers/clk/mxs/clk-imx28.c  | 18 ++++++++++++++++--
+ 2 files changed, 26 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/imx28-clock.txt b/Documentation/devicetree/bindings/clock/imx28-clock.txt
-index e6587af..c3a9d94 100644
---- a/Documentation/devicetree/bindings/clock/imx28-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx28-clock.txt
-@@ -76,6 +76,7 @@ clocks and IDs.
- 	usb0_phy	62
- 	usb1_phy	63
- 	enet_out	64
-+	rtc_32k		65
- 
- Examples:
- 
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 979c37d..6af9094 100644
+index 7363fde..979c37d 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -47,6 +47,11 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+@@ -43,6 +43,16 @@
+ 		};
+ 	};
  
-+		xtal-32k {
-+			compatible = "fsl,mxs-xtal-32k", "fixed-clock";
-+			clock-frequency = <0>;
-+		};
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
- 		xtal-24m {
- 			compatible = "fsl,mxs-xtal-24m", "fixed-clock";
- 			clock-frequency = <24000000>;
++		xtal-24m {
++			compatible = "fsl,mxs-xtal-24m", "fixed-clock";
++			clock-frequency = <24000000>;
++		};
++	};
++
+ 	apb at 80000000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-index 874ca4e..b6afeb1 100644
+index 4faf0af..874ca4e 100644
 --- a/drivers/clk/mxs/clk-imx28.c
 +++ b/drivers/clk/mxs/clk-imx28.c
-@@ -144,7 +144,7 @@ enum imx28_clk {
- 	clk32k_div, rtc, lradc, spdif_div, clk32k, pwm, uart, ssp0,
- 	ssp1, ssp2, ssp3, gpmi, spdif, emi, saif0, saif1, lcdif, etm,
- 	fec, can0, can1, usb0, usb1, usb0_phy, usb1_phy, enet_out,
--	clk_max
-+	rtc_32k, clk_max
- };
+@@ -156,7 +156,7 @@ static enum imx28_clk clks_init_on[] __initdata = {
  
- static struct clk *clks[clk_max];
-@@ -178,6 +178,8 @@ int __init mx28_clocks_init(void)
+ int __init mx28_clocks_init(void)
+ {
+-	struct device_node *np;
++	struct device_node *np, *np_tmp;
+ 	u32 i;
  
- 		if (of_device_is_compatible(np_tmp, "fsl,mxs-xtal-24m"))
- 			clks[ref_xtal] = mxs_clk_fixed("ref_xtal", rate);
-+		else if (of_device_is_compatible(np_tmp, "fsl,mxs-xtal-32k"))
-+			clks[rtc_32k] = mxs_clk_fixed("rtc_32k", rate);
- 	}
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx28-digctl");
+@@ -169,7 +169,21 @@ int __init mx28_clocks_init(void)
  
- 	/* if not set, use default frequency */
+ 	clk_misc_init();
+ 
+-	clks[ref_xtal] = mxs_clk_fixed("ref_xtal", 24000000);
++	/* retrieve the crystal's frequencies from device tree */
++	for_each_compatible_node(np_tmp, NULL, "fixed-clock") {
++		u32 rate;
++
++		if (of_property_read_u32(np_tmp, "clock-frequency", &rate))
++			continue;
++
++		if (of_device_is_compatible(np_tmp, "fsl,mxs-xtal-24m"))
++			clks[ref_xtal] = mxs_clk_fixed("ref_xtal", rate);
++	}
++
++	/* if not set, use default frequency */
++	if (!clks[ref_xtal])
++		clks[ref_xtal] = mxs_clk_fixed("ref_xtal", 24000000);
++
+ 	clks[pll0] = mxs_clk_pll("pll0", "ref_xtal", PLL0CTRL0, 17, 480000000);
+ 	clks[pll1] = mxs_clk_pll("pll1", "ref_xtal", PLL1CTRL0, 17, 480000000);
+ 	clks[pll2] = mxs_clk_pll("pll2", "ref_xtal", PLL2CTRL0, 23, 50000000);
 -- 
 1.8.4.rc3
