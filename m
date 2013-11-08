@@ -1,52 +1,73 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 08 Nov 2013 10:00:02 +0100
-Subject: [patch 1/1] ARM: kirkwood: stop printk TCLK value at boot for
- DT boards
-In-Reply-To: <20131105180931.674625171@rtp-net.org>
-References: <20131105180931.674625171@rtp-net.org>
-Message-ID: <527CA812.9050003@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 08 Nov 2013 10:10:37 +0100
+Subject: [PATCH 03/11] devicetree: bindings: Document qcom,kpss-acc
+In-Reply-To: <E034522B-A62C-40A4-800C-00D592AAEF47@codeaurora.org>
+References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
+ <52792E78.4060600@codeaurora.org>
+ <E034522B-A62C-40A4-800C-00D592AAEF47@codeaurora.org>
+Message-ID: <1986087.9ItmqCgipJ@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2013 07:09 PM, Arnaud Patard (Rtp) wrote:
-> Commit 2326f04321a9 (ARM: kirkwood: convert to DT irqchip and clocksource)
-> dropped the call to kirkwood_timer_init() when booting with DT.
-> This results in kirkwood_tclk not being set and the boot message is now:
->
-> Kirkwood: MV88F6281-A0, TCLK=0
->
-> This patch modifies the message for printing only the kirkwood id,
-> as it allows to detect if we're running A0/A1/... variants with a simple
-> dmesg.
+On Tuesday 05 of November 2013 11:51:07 Kumar Gala wrote:
+> On Nov 5, 2013, at 11:44 AM, Stephen Boyd wrote:
+> > On 11/05/13 09:13, Kumar Gala wrote:
+> >> On Nov 1, 2013, at 5:08 PM, Stephen Boyd wrote:
+> >>> diff --git
+> >>> a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+> >>> b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt new
+> >>> file mode 100644
+> >>> index 0000000..ed4a9c8
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+> >>> @@ -0,0 +1,21 @@
+> >>> +* Krait Processor Sub-system (KPSS) Application Clock Controller
+> >>> (ACC)
+> >>> +
+> >>> +The KPSS ACC provides clock, power domain, and reset control to a
+> >>> Krait CPU. +There is one ACC register region per CPU within the
+> >>> KPSS remaped region as +well as an alias register region that
+> >>> remaps accesses to the ACC associated +with the CPU accessing the
+> >>> region.
+> >>> +
+> >>> +Required Properties:
+> >>> +
+> >>> +- compatible : Shall contain "qcom,kpss-acc-v1" or
+> >>> "qcom,kpss-acc-v2".
+> >>> +- reg: Specifies the base address and size of the banked register
+> >>> region. +- cpu-offset : per-cpu offset used when the device is
+> >>> accessed without the +		CPU remapping facilities.
+> >>> +		The offset is cpu-offset + (0x10000 * cpu-nr).
+> >>> +
+> >>> +Example:
+> >>> +
+> >>> +	clock-controller at 2008000 {
+> >>> +		compatible = "qcom,kpss-acc-v2";
+> >>> +		reg = <0x02008000 0x1000>;
+> >>> +	};
+> >> 
+> >> I don't get the cpu-offset business, shouldn't this just be:
+> >> 	reg = <0x02008000 0x1000>, <0x02018000 0x1000>, <0x02028000 
+0x1000>,
+> >> 	<0x02038000 0x1000>;> 
+> > (Sorry I forgot to add the cpu-offset to the example.)
+> > 
+> > Your reg property is one way to do it. I was following the example of
+> > the GIC binding which just specifies the alias region of the GIC's CPU
+> > registers and then has a cpu-offset property to describe how to reach
+> > a
+> > specific CPU's region.
+> 
+> Even in the gic's case I think we should have the reg property cover the
+> memory map.
 
-Arnaud,
+The GIC case was supposed to be a hack for Exynos SoCs that do not have 
+banked per-CPU registers. Currently I consider it broken, because it does 
+not scale for multi cluster configurations. I believe you should consider 
+the same.
 
-for DT based booting we also have the "Machine" printed right above the
-"Kirkwood" string. Don't you think, that we can remove the pr_info
-completely?
+IMHO the way to provide per-CPU properties should involve CPU nodes to 
+make sure that the same CPU ID namespace is always used.
 
-Sebastian
-
-> ---
->
-> Index: linux-next/arch/arm/mach-kirkwood/board-dt.c
-> ===================================================================
-> --- linux-next.orig/arch/arm/mach-kirkwood/board-dt.c	2013-11-05 18:36:23.131191305 +0100
-> +++ linux-next/arch/arm/mach-kirkwood/board-dt.c	2013-11-05 18:36:35.867190745 +0100
-> @@ -140,7 +140,7 @@ eth_fixup_skip:
->
->   static void __init kirkwood_dt_init(void)
->   {
-> -	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-> +	pr_info("Kirkwood: %s.\n", kirkwood_id());
->
->   	/*
->   	 * Disable propagation of mbus errors to the CPU local bus,
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Best regards,
+Tomasz
