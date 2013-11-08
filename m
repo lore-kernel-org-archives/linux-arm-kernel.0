@@ -1,95 +1,29 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 08 Nov 2013 11:48:40 -0500
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 8 Nov 2013 16:52:23 +0000
 Subject: [PATCH] ARM: Use udiv/sdiv for __aeabi_{u}idiv library functions
-In-Reply-To: <1383852042-10780-1-git-send-email-sboyd@codeaurora.org>
+In-Reply-To: <20131108095842.GG28304@ns203013.ovh.net>
 References: <1383852042-10780-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <527D15E8.6070802@codeaurora.org>
+ <20131108095842.GG28304@ns203013.ovh.net>
+Message-ID: <20131108165223.GL16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Fri, Nov 08, 2013 at 10:58:42AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 11:20 Thu 07 Nov     , Stephen Boyd wrote:
+> > @@ -381,6 +384,13 @@ static void __init cpuid_init_hwcaps(void)
+> >  		elf_hwcap |= HWCAP_IDIVT;
+> >  	}
+> >  
+> > +#ifdef CONFIG_THUMB2_KERNEL
+> if (IS_ENABLED(CONFIG_THUMB2_KERNEL) && elf_hwcap & HWCAP_IDIVT)
+> > +	if (elf_hwcap & HWCAP_IDIVT)
+> > +#else
+> > +	if (elf_hwcap & HWCAP_IDIVA)
+> > +#endif
 
-On 11/07/2013 02:20 PM, Stephen Boyd wrote:
-> If we're running on a v7 ARM CPU, detect if the CPU supports the
-> sdiv/udiv instructions and replace the signed and unsigned
-> division library functions with an sdiv/udiv instruction.
+Take another look, and you'll see the change that you're suggesting is
+wrong.  Instead, the following may be a more reasonable suggestion as
+a suitable replacement:
 
-[...]
-
-> +++ b/arch/arm/lib/div-v7.c
-> @@ -0,0 +1,58 @@
-> +/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/static_key.h>
-> +
-> +extern int ___aeabi_idiv(int, int);
-> +extern unsigned ___aeabi_uidiv(int, int);
-
-Why are the input parameters signed?
-
-> +extern struct static_key cpu_has_idiv;
-> +
-> +int __aeabi_idiv(int numerator, int denominator)
-> +{
-> +	if (static_key_false(&cpu_has_idiv)) {
-> +		int ret;
-> +
-> +		asm volatile (
-> +		".arch_extension idiv\n"
-> +		"sdiv %0, %1, %2"
-> +		: "=&r" (ret)
-> +		: "r" (numerator), "r" (denominator));
-> +
-> +		return ret;
-> +	}
-> +
-> +	return ___aeabi_idiv(numerator, denominator);
-> +}
-> +
-> +int __divsi3(int numerator, int denominator)
-> +	__attribute__((alias("__aeabi_idiv")));
-> +
-> +unsigned __aeabi_uidiv(int numerator, int denominator)
-
-Unsigned inputs?
-
-> +{
-> +	if (static_key_false(&cpu_has_idiv)) {
-> +		int ret;
-> +
-> +		asm volatile (
-> +		".arch_extension idiv\n"
-> +		"udiv %0, %1, %2"
-> +		: "=&r" (ret)
-> +		: "r" (numerator), "r" (denominator));
-> +
-> +		return ret;
-> +	}
-> +
-> +	return ___aeabi_uidiv(numerator, denominator);
-> +}
-> +
-> +unsigned __udivsi3(int numerator, int denominator)
-> +	__attribute__((alias("__aeabi_uidiv")));
-
-Unsigned inputs?
-
-[...]
-
-Thanks,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+	if (elf_hwcap & (IS_ENABLED(CONFIG_THUMB2_KERNEL) ?
+				HWCAP_IDIVT : HWCAP_IDIVA))
