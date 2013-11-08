@@ -1,34 +1,87 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 07 Nov 2013 22:02:23 -0800 (PST)
-Subject: [PATCH 3/3] clk: shmobile: Add R8A7790 clocks support
-In-Reply-To: <2305074.dSYTpfKiqG@avalon>
-References: <1383058511-26046-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <3394178.9T7q17vczr@avalon>
- <87li0zrc3m.wl%kuninori.morimoto.gx@renesas.com>
- <2305074.dSYTpfKiqG@avalon>
-Message-ID: <87k3gjqvmb.wl%kuninori.morimoto.gx@renesas.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 8 Nov 2013 15:26:23 +0900
+Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
+In-Reply-To: <CANqRtoRD3xFx-OKP1AxRPpn8VrOsDeNXKCYtUA57cCu8Dbtqvg@mail.gmail.com>
+References: <20131031031549.15985.23547.sendpatchset@w520>
+ <20131031042035.GG1603@verge.net.au>
+ <CANqRtoSW6jFX3pa94ZBgrKkvx5YNKqgxVSsYkSxMP_btcxFh7A@mail.gmail.com>
+ <20131106014801.GD22183@verge.net.au>
+ <CANqRtoRD3xFx-OKP1AxRPpn8VrOsDeNXKCYtUA57cCu8Dbtqvg@mail.gmail.com>
+Message-ID: <20131108062622.GI9828@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Laurent
-
-> > Thank yor for your agreement.
-> > I don't want to send "rename patch",
-> > please consider it in your v2 patch if possible :P
+On Wed, Nov 06, 2013 at 06:48:45PM +0900, Magnus Damm wrote:
+> Hi Simon,
 > 
-> We also need to take into account that the two SoCs will have a different 
-> number of clocks. I'm thus inclined to replace the index-based switch 
-> statement by a similar construct that will match on the clock name instead. Do 
-> you have any opinion on that ?
+> On Wed, Nov 6, 2013 at 10:48 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Oct 31, 2013 at 05:02:13PM +0900, Magnus Damm wrote:
+> >> Hi Simon,
+> >>
+> >> On Thu, Oct 31, 2013 at 1:20 PM, Simon Horman <horms@verge.net.au> wrote:
+> >> > On Thu, Oct 31, 2013 at 12:15:49PM +0900, Magnus Damm wrote:
+> >> >> From: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> >> >>
+> >> >> Add 1GiB of DRAM at 0x2_0000_0000 to support the full 2GiB
+> >> >> of APE6EVM system memory.
+> >> >>
+> >> >> Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+> >> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >> >> ---
+> >> >>
+> >> >>  For correct run time operation regardless of kernel configuration
+> >> >>  ARM patches 7863/1 and 7864/1 are needed.
+> >> >
+> >> > I take it that I should wait for those patches before applying this one.
+> >>
+> >> That's probably a good idea. RMK has applied them to "git-curr", so I
+> >> suppose they are queued up for something at least:
+> >>
+> >> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7863/1
+> >
+> > I have also sighted them in linux-next.
+> > So I expect they will show up in v3.13-rc1 or thereabouts.
+> >
+> >> > With those two patches and this one applied on top of
+> >> > renesas-devel-v3.12-rc7-20131030 I was able to successfully
+> >> > boot an ape6evm board. But /proc/meminfo still indicates only 1Gb of
+> >> > memory. What am I missing.
+> >>
+> >> You probably need to enable HIGHMEM and LPAE to be able to access to
+> >> all memory. Same thing on Lager, to get the full 4GiB you need to
+> >> select those in your kernel configuration too.
+> >
+> > Thanks, I have been able to successfully test all 4 patches in this
+> > series with those settings enabled.
+> >
+> > Tested-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> >> Please note that having memory located on 64-bit addresses may break
+> >> some drivers doing bus mastering or using the DMAC. These drivers need
+> >> to be fixed both with short term DMA zone workarounds and proper
+> >> 64-bit address support whenever possible.
+> >>
+> >> So if I could suggest a policy then having LPAE=n in defconfig for the
+> >> C board code for default stable operation. This together with LPAE=y
+> >> in the case of DT reference and/or Multiplatform where we can be a bit
+> >> more experimental. I don't care enough to send defconfig patches, but
+> >> if some issue comes up then perhaps adjusting the defconfig to disable
+> >> LPAE may work well as a workaround.
+> >
+> > Thanks.
+> >
+> > As it stands the defconfig for both APE6EVM and Lager lead to a
+> > configuration with LPAE disabled, although neither explicitly disable LPAE.
+> > I think it is best to leave things as-is in this regards and explicitly
+> > disable LPAE in the defconfigs if the need arises.
+> >
+> > While looking over this I noticed that the APE6EVM defconfig selects
+> > HIGHMEM while the Lager defconfig does not and it is not selected in the
+> > resulting config. Would it be worth updating the Lager defconfig to enable
+> > HIGHMEM? If so, I'll make a patch.
+> 
+> Thanks. I think it mainly makes sense to enable LPAE and HIGHMEM
+> together, so easiest is probably just to wait with both Lager and
+> APE6EVM.
 
-Of course sharing code is very nice, but, 
-sometimes, it makes code difficult/dirty.
-
-Now, I understand your headache (I have same headache :),
-and, you and I are sharing same opinion I think.
-So, I believe your decision.
-
-Best regards
----
-Kuninori Morimoto
+Sure. I will immediately do nothing :)
