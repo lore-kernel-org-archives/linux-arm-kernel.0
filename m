@@ -1,37 +1,26 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 8 Nov 2013 12:44:33 +0100
-Subject: [patch] pinctrl: rockchip: testing the wrong variable
-In-Reply-To: <20131108100138.GO27977@elgon.mountain>
-References: <20131108100138.GO27977@elgon.mountain>
-Message-ID: <201311081244.34438.heiko@sntech.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 8 Nov 2013 11:44:41 +0000
+Subject: [PATCH v4 0/4] Add dual-fifo mode support of i.MX ssi
+In-Reply-To: <20131108112919.GA5159@MrMyself>
+References: <cover.1383907685.git.b42378@freescale.com>
+ <20131108112919.GA5159@MrMyself>
+Message-ID: <20131108114441.GM2493@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 8. November 2013, 11:01:38 schrieb Dan Carpenter:
-> There is a copy and paste bug so we test "info->reg_base" instead of
-> "info->reg_pull".
-> 
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+On Fri, Nov 08, 2013 at 07:29:20PM +0800, Nicolin Chen wrote:
 
-Thanks for the catch
+> Sorry all, I mistook the version number. It should be version 5.
 
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+> Please ignore this series version.
 
-> ---
-> I can't compile this.
-> 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index e939c28..fe2ec1b 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -1453,8 +1453,8 @@ static int rockchip_pinctrl_probe(struct
-> platform_device *pdev) if (ctrl->type == RK3188) {
->  		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
->  		info->reg_pull = devm_ioremap_resource(&pdev->dev, res);
-> -		if (IS_ERR(info->reg_base))
-> -			return PTR_ERR(info->reg_base);
-> +		if (IS_ERR(info->reg_pull))
-> +			return PTR_ERR(info->reg_pull);
->  	}
-> 
->  	ret = rockchip_gpiolib_register(pdev, info);
+There is no need to resend for things like getting the version number
+wrong in the subject line, that's just noise.  Please only resend things
+if there's a change in the actual patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131108/bffb478c/attachment-0001.sig>
