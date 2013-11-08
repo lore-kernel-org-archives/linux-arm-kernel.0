@@ -1,52 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 8 Nov 2013 16:59:41 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790: Correct typo in clocks
-In-Reply-To: <20131106083556.GC14694@verge.net.au>
-References: <1383714098-28770-1-git-send-email-horms+renesas@verge.net.au>
- <87zjpiysh4.wl%kuninori.morimoto.gx@renesas.com>
- <20131106083556.GC14694@verge.net.au>
-Message-ID: <20131108075939.GK23477@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 8 Nov 2013 16:04:51 +0800
+Subject: [RFC PATCH 1/3] ARM: imx: cpuidle: Convert imx5 driver to
+ platform driver
+In-Reply-To: <527B505E.9080409@linaro.org>
+References: <1382978973-4034-1-git-send-email-daniel.lezcano@linaro.org>
+ <20131107075607.GA6500@S2101-09.ap.freescale.net>
+ <527B505E.9080409@linaro.org>
+Message-ID: <20131108080448.GA8790@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 06, 2013 at 05:35:58PM +0900, Simon Horman wrote:
-> On Tue, Nov 05, 2013 at 10:06:20PM -0800, Kuninori Morimoto wrote:
-> > 
-> > Hi Simon
-> > 
-> > > This is the r8a7790 SoC not the r8a77a4 SoC and
-> > > clocks are updated in r8a7790_clock_init.  not r8a73a4_clock_init.
+On Thu, Nov 07, 2013 at 09:33:34AM +0100, Daniel Lezcano wrote:
+> On 11/07/2013 08:56 AM, Shawn Guo wrote:
+> >On Mon, Oct 28, 2013 at 09:49:31AM -0700, Daniel Lezcano wrote:
+> >>@@ -149,6 +149,13 @@ static void imx5_pm_idle(void)
+> >>  	imx5_cpu_do_idle();
+> >>  }
+> >>
+> >>+static struct platform_device imx5_cpuidle_pdev = {
+> >>+	.name = "cpuidle-imx5",
+> >>+	.dev = {
+> >>+		.platform_data = imx5_pm_idle,
+> >
+> >This is a little bit hackish and less future proof.  We should probably
+> >create a data structure with the function hook as a field in it.
 > 
-> Ironically there is a typo in the line above.
-> I'll fix that up before applying the patch.
+> Yeah, I agree that is what I was planning for the near future as
+> soon as the driver is moved into the drivers/cpuidle directory. As
+> the other drivers are following the same scheme I want to define a
+> common ops structure to be shared across the different driver. But I
+> need to have several drivers in the same place in order to define
+> the different idle callback.
+> 
+> Is it acceptable we keep this for the moment as the other cpuidle
+> driver like cpuidle-at91 and then consolidate with a structure with
+> an additional patchset addressing several drivers at once ?
 
-I have queued-up the following:
+Okay.
 
-From: Simon Horman <horms+renesas@verge.net.au>
-
-ARM: shmobile: r8a7790: Correct typo in clocks
-
-This is the r8a7790 SoC not the r8a77a4 SoC and
-clocks are updated in r8a7790_clock_init not r8a73a4_clock_init.
-
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7790.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index a64f965..fa1b477 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -77,7 +77,7 @@ static struct sh_clk_ops followparent_clk_ops = {
- };
- 
- static struct clk main_clk = {
--	/* .parent will be set r8a73a4_clock_init */
-+	/* .parent will be set r8a7790_clock_init */
- 	.ops	= &followparent_clk_ops,
- };
- 
--- 
-1.8.4
+Shawn
