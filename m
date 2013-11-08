@@ -1,39 +1,27 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Nov 2013 17:31:58 -0800
-Subject: [GIT PULL] Third and final KVM/ARM updates for 3.13
-Message-ID: <1383874322-12328-1-git-send-email-christoffer.dall@linaro.org>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 8 Nov 2013 02:43:33 +0100
+Subject: [PATCH] ARM: pxa/colibri: fix build with CONFIG_USB_OHCI_HCD=y
+In-Reply-To: <1383835013-22215-1-git-send-email-mad_soft@inbox.lv>
+References: <1383835013-22215-1-git-send-email-mad_soft@inbox.lv>
+Message-ID: <201311080243.33269.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e4b3c9c21bd5674e96988f7507fd924e00087cd0:
+Dear Dmitry Artamonow,
 
-  Merge branch 'kvm-arm-next-3.13-2' into kvm-arm-next (2013-10-17 20:41:44 -0700)
+> Fix following build failure observed when support for
+> OHCI host controller is enabled.
+> 
+>   CC      arch/arm/mach-pxa/colibri-evalboard.o
+> arch/arm/mach-pxa/colibri-evalboard.c: In function 'colibri_ohci_init':
+> arch/arm/mach-pxa/colibri-evalboard.c:68: error: implicit declaration of
+> function 'IOMEM' make[1]: *** [arch/arm/mach-pxa/colibri-evalboard.o]
+> Error 1
+> make: *** [arch/arm/mach-pxa] Error 2
+> 
+> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.lv>
 
-are available in the git repository at:
+Acked-by: Marek Vasut <marex@denx.de>
 
-
-  git://git.linaro.org/people/cdall/linux-kvm-arm.git tags/kvm-arm-for-3.13-3
-
-for you to fetch changes up to 79c648806f9034abf54332b78043bb242189d953:
-
-  arm/arm64: KVM: PSCI: use MPIDR to identify a target CPU (2013-10-22 08:00:06 -0700)
-
-Sorry about sending this out so late.  It has been in linux-next for a
-while and is well-tested.
-
-----------------------------------------------------------------
-Updates for KVM/ARM, take 3 supporting more than 4 CPUs.
-
-----------------------------------------------------------------
-Marc Zyngier (4):
-      ARM: KVM: Fix MPIDR computing to support virtual clusters
-      ARM: KVM: fix L2CTLR to be per-cluster
-      ARM: KVM: drop limitation to 4 CPU VMs
-      arm/arm64: KVM: PSCI: use MPIDR to identify a target CPU
-
- arch/arm/include/asm/kvm_emulate.h   |    5 +++++
- arch/arm/kvm/coproc.c                |   14 ++++++++++----
- arch/arm/kvm/psci.c                  |   17 +++++++++++++----
- arch/arm/kvm/reset.c                 |    4 ----
- arch/arm64/include/asm/kvm_emulate.h |    5 +++++
- 5 files changed, 33 insertions(+), 12 deletions(-)
+Best regards,
+Marek Vasut
