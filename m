@@ -1,113 +1,822 @@
-From: gururaja.hebbar@ti.com (Gururaja Hebbar)
-Date: Fri, 8 Nov 2013 09:37:09 +0530
-Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
-In-Reply-To: <527BCFD8.9010207@gmail.com>
-References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
- <527BC118.1050609@ti.com> <527BCFD8.9010207@gmail.com>
-Message-ID: <527C636D.4040007@ti.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Fri, 8 Nov 2013 12:20:13 +0800
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+References: <1383789208.5970.1.camel@phoenix>
+ <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
+ <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
+ <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
+ <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
+ <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
+ <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
+ <87zjpf4w0j.fsf@rustcorp.com.au>
+ <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+Message-ID: <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 November 2013 11:07 PM, Daniel Mack wrote:
-> Hi Joel,
-> 
-> On 11/07/2013 05:34 PM, Joel Fernandes wrote:
->> Thanks for your followup patch on this. It looks much better now using existing
->> functions to save/restore the state.
-> 
-> Yes, thanks for the suggesting it in the first place.
-> 
->> On 10/30/2013 03:21 PM, Daniel Mack wrote:
->>> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
->> [..]
->>> +static int edma_pm_resume(struct device *dev)
->>> +{
->>> +	int i, j;
->>> +
->>> +	pm_runtime_get_sync(dev);
->>> +
->>> +	for (j = 0; j < arch_num_cc; j++) {
->>> +		struct edma *cc = edma_cc[j];
->>> +
->>> +		s8 (*queue_priority_mapping)[2];
->>> +		s8 (*queue_tc_mapping)[2];
->>> +
->>> +		queue_tc_mapping = cc->info->queue_tc_mapping;
->>> +		queue_priority_mapping = cc->info->queue_priority_mapping;
->>> +
->>> +		/* Event queue to TC mapping */
->>> +		for (i = 0; queue_tc_mapping[i][0] != -1; i++)
->>> +			map_queue_tc(j, queue_tc_mapping[i][0],
->>> +					queue_tc_mapping[i][1]);
->>> +
->>> +		/* Event queue priority mapping */
->>> +		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
->>> +			assign_priority_to_queue(j,
->>> +						queue_priority_mapping[i][0],
->>> +						queue_priority_mapping[i][1]);
+>>> Hi Ming,
+>>>
+>>> I found in arch/arm/include/asm/memory.h:
+>>> CONFIG_PAGE_OFFSET is not used if !CONFIG_MMU.
+>>> So looks like setting CONFIG_PAGE_OFFSET to other value still won't work.
 >>
->> I know ti,edma-regions property is not currently being used, but we should
->> future proof this by setting up DRAE for like done in probe:
+>> This seems like the simplest solution, but it may mean you still have
+>> crap in /proc/kallsyms.
 >>
->>                 for (i = 0; i < info[j]->n_region; i++) {
->>                         edma_write_array2(j, EDMA_DRAE, i, 0, 0x0);
->>                         edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
->>                         edma_write_array(j, EDMA_QRAE, i, 0x0);
->>                 }
-> 
-> That doesn't work for me. I'm running long-time tests here on a device
-> which has a mwifiex connected to omap_hsmmc. The test procedure includes:
-> 
-> a) a script on the device that puts the device to sleep some seconds
-> after it has been woken up
+>> Does it work for you?
+>
+> Yes, it should work, but I am wondering if perf can work on uClinux.
+>
+> Axel, could you post your .config?
 
 
+Hi Ming,
 
-> 
-> b) a script on a host that wakes up the device with wake-on-lan every 10
-> seconds
-> 
-> c) a flood ping that checks whether the device is responding
+I have patches on top of 3.12 to support gpl32700 SoC.
+So you cannot find this platform on mainline kernel.
+I havn't tried perf, below is my config for your reference:
+(to make the config smaller, I grep out disabled config entries.)
 
-can you share above 2 (b & C) test scripts? (pastebin or inline if small)
+#
+# Automatically generated file; DO NOT EDIT.
+# Linux/arm 3.12.0 Kernel Configuration
+#
+CONFIG_ARM=y
+CONFIG_SYS_SUPPORTS_APM_EMULATION=y
+CONFIG_STACKTRACE_SUPPORT=y
+CONFIG_HAVE_LATENCYTOP_SUPPORT=y
+CONFIG_LOCKDEP_SUPPORT=y
+CONFIG_TRACE_IRQFLAGS_SUPPORT=y
+CONFIG_RWSEM_GENERIC_SPINLOCK=y
+CONFIG_GENERIC_HWEIGHT=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
+CONFIG_NEED_DMA_MAP_STATE=y
+CONFIG_VECTORS_BASE=0x00000000
+CONFIG_PHYS_OFFSET=0x00000000
+CONFIG_GENERIC_BUG=y
+CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
+CONFIG_IRQ_WORK=y
 
-thanks in advance
+#
+# General setup
+#
+CONFIG_BROKEN_ON_SMP=y
+CONFIG_INIT_ENV_ARG_LIMIT=32
+CONFIG_CROSS_COMPILE=""
+CONFIG_LOCALVERSION=""
+CONFIG_LOCALVERSION_AUTO=y
+CONFIG_HAVE_KERNEL_GZIP=y
+CONFIG_HAVE_KERNEL_LZMA=y
+CONFIG_HAVE_KERNEL_XZ=y
+CONFIG_HAVE_KERNEL_LZO=y
+CONFIG_HAVE_KERNEL_LZ4=y
+CONFIG_KERNEL_GZIP=y
+CONFIG_DEFAULT_HOSTNAME="(none)"
 
-regards
-Gururaja
+#
+# IRQ subsystem
+#
+CONFIG_GENERIC_IRQ_PROBE=y
+CONFIG_GENERIC_IRQ_SHOW=y
+CONFIG_HARDIRQS_SW_RESEND=y
+CONFIG_GENERIC_IRQ_CHIP=y
+CONFIG_IRQ_DOMAIN=y
+CONFIG_IRQ_FORCED_THREADING=y
+CONFIG_KTIME_SCALAR=y
+CONFIG_GENERIC_CLOCKEVENTS=y
+CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
 
+#
+# Timers subsystem
+#
+CONFIG_HZ_PERIODIC=y
 
-> 
-> 
-> That precedure is running since a couple of hourse here, and it works
-> well with both by v3 and v4 patches. Moving the functions to
-> .suspend/resume _noirq doesn't seem to break anything.
-> 
-> Setting QRAE to 0 as you mentioned above, however, makes the device fail
-> at resume.
-> 
->>> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
->>
->> I agree with Nishanth here, it is better to do this in .suspend/resume _noirq
->> stage to rule out any ordering bugs that may show up in the future, since such
->> an issue already showed up in earlier testing.
-> 
-> Alright, I already did that.
-> 
->> I would appreciate it if you can make these 2 changes and post a v5. Thanks for
->> a lot for all the hardwork.
-> 
-> No problem at all :)
-> 
->> Acked-by: Joel Fernandes <joelf@ti.com>
-> 
-> Still sure about that? What about your follow-up to your own reply?
-> 
-> 
-> Many thanks for all the feedback!
-> 
-> Daniel
-> 
-> 
-> 
-> 
+#
+# CPU/Task time and stats accounting
+#
+CONFIG_TICK_CPU_ACCOUNTING=y
+
+#
+# RCU Subsystem
+#
+CONFIG_TINY_RCU=y
+CONFIG_LOG_BUF_SHIFT=14
+CONFIG_GENERIC_SCHED_CLOCK=y
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE=""
+CONFIG_RD_GZIP=y
+CONFIG_SYSCTL=y
+CONFIG_ANON_INODES=y
+CONFIG_HAVE_UID16=y
+CONFIG_EXPERT=y
+CONFIG_UID16=y
+CONFIG_KALLSYMS=y
+CONFIG_KALLSYMS_ALL=y
+CONFIG_PRINTK=y
+CONFIG_BUG=y
+CONFIG_BASE_FULL=y
+CONFIG_EPOLL=y
+CONFIG_SIGNALFD=y
+CONFIG_EVENTFD=y
+CONFIG_AIO=y
+CONFIG_EMBEDDED=y
+CONFIG_HAVE_PERF_EVENTS=y
+CONFIG_PERF_USE_VMALLOC=y
+
+#
+# Kernel Performance Events And Counters
+#
+CONFIG_COMPAT_BRK=y
+CONFIG_SLAB=y
+CONFIG_HAVE_OPROFILE=y
+CONFIG_HAVE_KPROBES=y
+CONFIG_HAVE_KRETPROBES=y
+CONFIG_HAVE_ARCH_TRACEHOOK=y
+CONFIG_HAVE_DMA_ATTRS=y
+CONFIG_GENERIC_SMP_IDLE_THREAD=y
+CONFIG_GENERIC_IDLE_POLL_SETUP=y
+CONFIG_HAVE_REGS_AND_STACK_ACCESS_API=y
+CONFIG_HAVE_CLK=y
+CONFIG_HAVE_DMA_API_DEBUG=y
+CONFIG_HAVE_ARCH_JUMP_LABEL=y
+CONFIG_ARCH_WANT_IPC_PARSE_VERSION=y
+CONFIG_HAVE_ARCH_SECCOMP_FILTER=y
+CONFIG_HAVE_CONTEXT_TRACKING=y
+CONFIG_HAVE_IRQ_TIME_ACCOUNTING=y
+CONFIG_HAVE_MOD_ARCH_SPECIFIC=y
+CONFIG_MODULES_USE_ELF_REL=y
+CONFIG_CLONE_BACKWARDS=y
+CONFIG_OLD_SIGSUSPEND3=y
+CONFIG_OLD_SIGACTION=y
+
+#
+# GCOV-based kernel profiling
+#
+CONFIG_HAVE_GENERIC_DMA_COHERENT=y
+CONFIG_SLABINFO=y
+CONFIG_BASE_SMALL=0
+CONFIG_BLOCK=y
+
+#
+# Partition Types
+#
+CONFIG_MSDOS_PARTITION=y
+CONFIG_EFI_PARTITION=y
+
+#
+# IO Schedulers
+#
+CONFIG_IOSCHED_NOOP=y
+CONFIG_DEFAULT_NOOP=y
+CONFIG_DEFAULT_IOSCHED="noop"
+CONFIG_INLINE_SPIN_UNLOCK_IRQ=y
+CONFIG_INLINE_READ_UNLOCK=y
+CONFIG_INLINE_READ_UNLOCK_IRQ=y
+CONFIG_INLINE_WRITE_UNLOCK=y
+CONFIG_INLINE_WRITE_UNLOCK_IRQ=y
+
+#
+# System Type
+#
+CONFIG_ARCH_GPL327XX=y
+
+#
+# GPL327XX Implementations
+#
+CONFIG_ARCH_GPL32700=y
+
+#
+# Processor Type
+#
+CONFIG_CPU_ARM7TDMI=y
+CONFIG_CPU_32v4T=y
+CONFIG_CPU_ABRT_LV4T=y
+CONFIG_CPU_PABRT_LEGACY=y
+CONFIG_CPU_CACHE_V4=y
+
+#
+# Processor Features
+#
+CONFIG_TLS_REG_EMUL=y
+CONFIG_NEED_KUSER_HELPERS=y
+CONFIG_KUSER_HELPERS=y
+CONFIG_ARM_L1_CACHE_SHIFT=5
+CONFIG_ARM_NR_BANKS=8
+CONFIG_MULTI_IRQ_HANDLER=y
+CONFIG_SET_MEM_PARAM=y
+CONFIG_DRAM_BASE=0x00000000
+CONFIG_DRAM_SIZE=0x02000000
+CONFIG_FLASH_MEM_BASE=0x20000000
+CONFIG_FLASH_SIZE=0x00400000
+CONFIG_PROCESSOR_ID=0x41807700
+
+#
+# Bus support
+#
+
+#
+# Kernel Features
+#
+CONFIG_VMSPLIT_3G=y
+CONFIG_PAGE_OFFSET=0xC0000000
+CONFIG_ARCH_NR_GPIO=0
+CONFIG_PREEMPT_NONE=y
+CONFIG_HZ_FIXED=0
+CONFIG_HZ_100=y
+CONFIG_HZ=100
+CONFIG_AEABI=y
+CONFIG_HAVE_ARCH_PFN_VALID=y
+CONFIG_ARCH_WANT_GENERAL_HUGETLB=y
+CONFIG_FLATMEM=y
+CONFIG_FLAT_NODE_MEM_MAP=y
+CONFIG_HAVE_MEMBLOCK=y
+CONFIG_PAGEFLAGS_EXTENDED=y
+CONFIG_SPLIT_PTLOCK_CPUS=999999
+CONFIG_ZONE_DMA_FLAG=0
+CONFIG_NOMMU_INITIAL_TRIM_EXCESS=1
+CONFIG_NEED_PER_CPU_KM=y
+CONFIG_FORCE_MAX_ZONEORDER=11
+
+#
+# Boot options
+#
+CONFIG_USE_OF=y
+CONFIG_ZBOOT_ROM_TEXT=0x0
+CONFIG_ZBOOT_ROM_BSS=0x0
+CONFIG_CMDLINE=""
+CONFIG_AUTO_ZRELADDR=y
+
+#
+# CPU Power Management
+#
+
+#
+# CPU Idle
+#
+
+#
+# Floating point emulation
+#
+
+#
+# At least one emulation must be selected
+#
+
+#
+# Userspace binary formats
+#
+CONFIG_ARCH_BINFMT_ELF_RANDOMIZE_PIE=y
+CONFIG_BINFMT_SCRIPT=y
+CONFIG_BINFMT_FLAT=y
+CONFIG_COREDUMP=y
+
+#
+# Power management options
+#
+CONFIG_NET=y
+
+#
+# Networking options
+#
+CONFIG_XFRM=y
+CONFIG_INET=y
+CONFIG_NET_IP_TUNNEL=y
+CONFIG_INET_TUNNEL=y
+CONFIG_TCP_CONG_CUBIC=y
+CONFIG_DEFAULT_TCP_CONG="cubic"
+CONFIG_IPV6=y
+CONFIG_INET6_XFRM_MODE_TRANSPORT=y
+CONFIG_INET6_XFRM_MODE_TUNNEL=y
+CONFIG_INET6_XFRM_MODE_BEET=y
+CONFIG_IPV6_SIT=y
+CONFIG_IPV6_NDISC_NODETYPE=y
+CONFIG_HAVE_NET_DSA=y
+CONFIG_NET_RX_BUSY_POLL=y
+CONFIG_BQL=y
+
+#
+# Network testing
+#
+CONFIG_WIRELESS=y
+CONFIG_CFG80211=y
+CONFIG_NL80211_TESTMODE=y
+CONFIG_CFG80211_DEFAULT_PS=y
+CONFIG_MAC80211=y
+CONFIG_MAC80211_HAS_RC=y
+CONFIG_MAC80211_RC_MINSTREL=y
+CONFIG_MAC80211_RC_MINSTREL_HT=y
+CONFIG_MAC80211_RC_DEFAULT_MINSTREL=y
+CONFIG_MAC80211_RC_DEFAULT="minstrel_ht"
+CONFIG_HAVE_BPF_JIT=y
+
+#
+# Device Drivers
+#
+
+#
+# Generic Driver Options
+#
+CONFIG_UEVENT_HELPER_PATH=""
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_STANDALONE=y
+CONFIG_PREVENT_FIRMWARE_BUILD=y
+CONFIG_FW_LOADER=y
+CONFIG_FIRMWARE_IN_KERNEL=y
+CONFIG_EXTRA_FIRMWARE=""
+CONFIG_FW_LOADER_USER_HELPER=y
+
+#
+# Bus devices
+#
+CONFIG_MTD=y
+CONFIG_MTD_OF_PARTS=y
+
+#
+# User Modules And Translation Layers
+#
+CONFIG_MTD_BLKDEVS=y
+CONFIG_MTD_BLOCK=y
+
+#
+# RAM/ROM/Flash chip drivers
+#
+CONFIG_MTD_MAP_BANK_WIDTH_1=y
+CONFIG_MTD_MAP_BANK_WIDTH_2=y
+CONFIG_MTD_MAP_BANK_WIDTH_4=y
+CONFIG_MTD_CFI_I1=y
+CONFIG_MTD_CFI_I2=y
+CONFIG_MTD_RAM=y
+CONFIG_MTD_ROM=y
+
+#
+# Mapping drivers for chip access
+#
+
+#
+# Self-contained MTD device drivers
+#
+CONFIG_MTD_M25P80=y
+
+#
+# Disk-On-Chip Device Drivers
+#
+
+#
+# LPDDR flash memory drivers
+#
+CONFIG_DTC=y
+CONFIG_OF=y
+
+#
+# Device Tree and Open Firmware support
+#
+CONFIG_OF_FLATTREE=y
+CONFIG_OF_EARLY_FLATTREE=y
+CONFIG_OF_ADDRESS=y
+CONFIG_OF_IRQ=y
+CONFIG_OF_NET=y
+CONFIG_OF_MTD=y
+CONFIG_BLK_DEV=y
+CONFIG_BLK_DEV_LOOP=y
+CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
+CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_COUNT=16
+CONFIG_BLK_DEV_RAM_SIZE=4096
+
+#
+# Misc devices
+#
+
+#
+# EEPROM support
+#
+
+#
+# Texas Instruments shared transport line discipline
+#
+
+#
+# Altera FPGA firmware download module
+#
+
+#
+# SCSI device support
+#
+CONFIG_SCSI_MOD=y
+CONFIG_NETDEVICES=y
+CONFIG_NET_CORE=y
+
+#
+# CAIF transport drivers
+#
+
+#
+# Distributed Switch Architecture drivers
+#
+CONFIG_WLAN=y
+
+#
+# Enable WiMAX (Networking options) to see the WiMAX drivers
+#
+
+#
+# Input device support
+#
+CONFIG_INPUT=y
+
+#
+# Userland interfaces
+#
+
+#
+# Input Device Drivers
+#
+CONFIG_INPUT_KEYBOARD=y
+CONFIG_KEYBOARD_ATKBD=y
+
+#
+# Hardware I/O ports
+#
+CONFIG_SERIO=y
+CONFIG_SERIO_SERPORT=y
+CONFIG_SERIO_LIBPS2=y
+
+#
+# Character devices
+#
+CONFIG_TTY=y
+CONFIG_VT=y
+CONFIG_CONSOLE_TRANSLATIONS=y
+CONFIG_VT_CONSOLE=y
+CONFIG_HW_CONSOLE=y
+CONFIG_UNIX98_PTYS=y
+CONFIG_LEGACY_PTYS=y
+CONFIG_LEGACY_PTY_COUNT=256
+
+#
+# Serial drivers
+#
+
+#
+# Non-8250 serial port support
+#
+CONFIG_SERIAL_GPL327XX=y
+CONFIG_SERIAL_GPL327XX_UART_CONSOLE=y
+CONFIG_SERIAL_CORE=y
+CONFIG_SERIAL_CORE_CONSOLE=y
+CONFIG_SPI=y
+CONFIG_SPI_MASTER=y
+
+#
+# SPI Master Controller Drivers
+#
+CONFIG_SPI_GPL327XX=y
+
+#
+# SPI Protocol Masters
+#
+
+#
+# PPS support
+#
+
+#
+# PPS generators support
+#
+
+#
+# PTP clock support
+#
+
+#
+# Enable PHYLIB and NETWORK_PHY_TIMESTAMPING to see the additional clocks.
+#
+CONFIG_PINCTRL=y
+
+#
+# Pin controllers
+#
+CONFIG_PINMUX=y
+CONFIG_PINCONF=y
+CONFIG_GENERIC_PINCONF=y
+CONFIG_PINCTRL_GPL327XX=y
+CONFIG_PINCTRL_GPL32700=y
+CONFIG_ARCH_HAVE_CUSTOM_GPIO_H=y
+CONFIG_ARCH_REQUIRE_GPIOLIB=y
+CONFIG_GPIO_DEVRES=y
+CONFIG_GPIOLIB=y
+CONFIG_OF_GPIO=y
+
+#
+# Memory mapped GPIO drivers:
+#
+
+#
+# I2C GPIO expanders:
+#
+
+#
+# PCI GPIO expanders:
+#
+
+#
+# SPI GPIO expanders:
+#
+
+#
+# AC97 GPIO expanders:
+#
+
+#
+# LPC GPIO expanders:
+#
+
+#
+# MODULbus GPIO expanders:
+#
+
+#
+# USB GPIO expanders:
+#
+CONFIG_SSB_POSSIBLE=y
+
+#
+# Sonics Silicon Backplane
+#
+CONFIG_BCMA_POSSIBLE=y
+
+#
+# Broadcom specific AMBA
+#
+
+#
+# Multifunction device drivers
+#
+CONFIG_REGULATOR=y
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+
+#
+# Graphics support
+#
+
+#
+# Console display driver support
+#
+CONFIG_DUMMY_CONSOLE=y
+
+#
+# HID support
+#
+CONFIG_HID=y
+CONFIG_HID_GENERIC=y
+
+#
+# Special HID drivers
+#
+CONFIG_USB_OHCI_LITTLE_ENDIAN=y
+CONFIG_MMC=y
+CONFIG_MMC_DEBUG=y
+
+#
+# MMC/SD/SDIO Card Drivers
+#
+CONFIG_MMC_BLOCK=y
+CONFIG_MMC_BLOCK_MINORS=8
+CONFIG_MMC_BLOCK_BOUNCE=y
+
+#
+# MMC/SD/SDIO Host Controller Drivers
+#
+CONFIG_MMC_GPL327XX=y
+CONFIG_RTC_LIB=y
+CONFIG_DMADEVICES=y
+
+#
+# DMA Devices
+#
+CONFIG_DMA_OF=y
+
+#
+# Virtio drivers
+#
+
+#
+# Microsoft Hyper-V guest support
+#
+CONFIG_CLKDEV_LOOKUP=y
+CONFIG_HAVE_CLK_PREPARE=y
+CONFIG_COMMON_CLK=y
+
+#
+# Common Clock Framework
+#
+
+#
+# Hardware Spinlock drivers
+#
+CONFIG_CLKSRC_OF=y
+CONFIG_CLKSRC_MMIO=y
+
+#
+# Remoteproc drivers
+#
+
+#
+# Rpmsg drivers
+#
+CONFIG_IRQCHIP=y
+
+#
+# File systems
+#
+CONFIG_EXT2_FS=y
+CONFIG_FILE_LOCKING=y
+CONFIG_FSNOTIFY=y
+CONFIG_INOTIFY_USER=y
+
+#
+# Caches
+#
+
+#
+# CD-ROM/DVD Filesystems
+#
+
+#
+# DOS/FAT/NT Filesystems
+#
+CONFIG_FAT_FS=y
+CONFIG_VFAT_FS=y
+CONFIG_FAT_DEFAULT_CODEPAGE=437
+CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
+
+#
+# Pseudo filesystems
+#
+CONFIG_PROC_FS=y
+CONFIG_PROC_SYSCTL=y
+CONFIG_SYSFS=y
+CONFIG_MISC_FILESYSTEMS=y
+CONFIG_JFFS2_FS=y
+CONFIG_JFFS2_FS_DEBUG=2
+CONFIG_JFFS2_FS_WRITEBUFFER=y
+CONFIG_JFFS2_SUMMARY=y
+CONFIG_JFFS2_ZLIB=y
+CONFIG_JFFS2_RTIME=y
+CONFIG_ROMFS_FS=y
+CONFIG_ROMFS_BACKED_BY_BLOCK=y
+CONFIG_ROMFS_ON_BLOCK=y
+CONFIG_NLS=y
+CONFIG_NLS_DEFAULT="iso8859-1"
+CONFIG_NLS_CODEPAGE_437=y
+CONFIG_NLS_ISO8859_1=y
+
+#
+# Kernel hacking
+#
+
+#
+# printk and dmesg options
+#
+CONFIG_PRINTK_TIME=y
+CONFIG_DEFAULT_MESSAGE_LOGLEVEL=4
+
+#
+# Compile-time checks and compiler options
+#
+CONFIG_DEBUG_INFO=y
+CONFIG_ENABLE_WARN_DEPRECATED=y
+CONFIG_FRAME_WARN=1024
+CONFIG_DEBUG_KERNEL=y
+
+#
+# Memory Debugging
+#
+CONFIG_HAVE_DEBUG_KMEMLEAK=y
+
+#
+# Debug Lockups and Hangs
+#
+CONFIG_LOCKUP_DETECTOR=y
+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
+CONFIG_DETECT_HUNG_TASK=y
+CONFIG_DEFAULT_HUNG_TASK_TIMEOUT=120
+CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=1
+CONFIG_PANIC_ON_OOPS=y
+CONFIG_PANIC_ON_OOPS_VALUE=1
+
+#
+# Lock Debugging (spinlocks, mutexes, etc...)
+#
+CONFIG_DEBUG_BUGVERBOSE=y
+
+#
+# RCU Debugging
+#
+CONFIG_HAVE_FUNCTION_TRACER=y
+CONFIG_HAVE_FUNCTION_GRAPH_TRACER=y
+CONFIG_HAVE_DYNAMIC_FTRACE=y
+CONFIG_HAVE_FTRACE_MCOUNT_RECORD=y
+CONFIG_HAVE_SYSCALL_TRACEPOINTS=y
+CONFIG_HAVE_C_RECORDMCOUNT=y
+CONFIG_TRACING_SUPPORT=y
+
+#
+# Runtime Testing
+#
+CONFIG_HAVE_ARCH_KGDB=y
+CONFIG_ARM_UNWIND=y
+CONFIG_DEBUG_USER=y
+CONFIG_DEBUG_LL=y
+CONFIG_DEBUG_GPL327XX_UART=y
+CONFIG_DEBUG_LL_INCLUDE="debug/gpl327xx.S"
+CONFIG_UNCOMPRESS_INCLUDE="mach/uncompress.h"
+CONFIG_EARLY_PRINTK=y
+
+#
+# Security options
+#
+CONFIG_DEFAULT_SECURITY_DAC=y
+CONFIG_DEFAULT_SECURITY=""
+CONFIG_CRYPTO=y
+
+#
+# Crypto core or helper
+#
+CONFIG_CRYPTO_ALGAPI=y
+CONFIG_CRYPTO_ALGAPI2=y
+CONFIG_CRYPTO_AEAD2=y
+CONFIG_CRYPTO_BLKCIPHER=y
+CONFIG_CRYPTO_BLKCIPHER2=y
+CONFIG_CRYPTO_HASH=y
+CONFIG_CRYPTO_HASH2=y
+CONFIG_CRYPTO_RNG=y
+CONFIG_CRYPTO_RNG2=y
+CONFIG_CRYPTO_PCOMP2=y
+CONFIG_CRYPTO_MANAGER=y
+CONFIG_CRYPTO_MANAGER2=y
+CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
+CONFIG_CRYPTO_WORKQUEUE=y
+
+#
+# Authenticated Encryption with Associated Data
+#
+
+#
+# Block modes
+#
+CONFIG_CRYPTO_CBC=y
+
+#
+# Hash modes
+#
+
+#
+# Digest
+#
+CONFIG_CRYPTO_MD5=y
+CONFIG_CRYPTO_SHA1=y
+
+#
+# Ciphers
+#
+CONFIG_CRYPTO_AES=y
+CONFIG_CRYPTO_ARC4=y
+CONFIG_CRYPTO_DES=y
+
+#
+# Compression
+#
+CONFIG_CRYPTO_DEFLATE=y
+
+#
+# Random Number Generation
+#
+CONFIG_CRYPTO_ANSI_CPRNG=y
+CONFIG_CRYPTO_HW=y
+
+#
+# Library routines
+#
+CONFIG_BITREVERSE=y
+CONFIG_GENERIC_STRNCPY_FROM_USER=y
+CONFIG_GENERIC_STRNLEN_USER=y
+CONFIG_GENERIC_NET_UTILS=y
+CONFIG_GENERIC_PCI_IOMAP=y
+CONFIG_GENERIC_IO=y
+CONFIG_CRC32=y
+CONFIG_CRC32_SLICEBY8=y
+CONFIG_ZLIB_INFLATE=y
+CONFIG_ZLIB_DEFLATE=y
+CONFIG_DECOMPRESS_GZIP=y
+CONFIG_HAS_IOMEM=y
+CONFIG_HAS_IOPORT=y
+CONFIG_HAS_DMA=y
+CONFIG_DQL=y
+CONFIG_NLATTR=y
+CONFIG_GENERIC_ATOMIC64=y
+CONFIG_ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE=y
+CONFIG_AVERAGE=y
