@@ -1,10 +1,10 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 8 Nov 2013 18:41:48 -0500
-Subject: [PATCH 12/24] mm/page_alloc: Use memblock apis for early memory
+Date: Fri, 8 Nov 2013 18:41:52 -0500
+Subject: [PATCH 16/24] mm/sparse: Use memblock apis for early memory
  allocations
 In-Reply-To: <1383954120-24368-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1383954120-24368-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1383954120-24368-13-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1383954120-24368-17-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,95 +21,123 @@ Cc: Yinghai Lu <yinghai@kernel.org>
 Cc: Tejun Heo <tj@kernel.org>
 Cc: Andrew Morton <akpm@linux-foundation.org>
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- mm/page_alloc.c |   27 +++++++++++++++------------
- 1 file changed, 15 insertions(+), 12 deletions(-)
+ mm/sparse-vmemmap.c |    6 ++++--
+ mm/sparse.c         |   27 +++++++++++++++------------
+ 2 files changed, 19 insertions(+), 14 deletions(-)
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 0ee638f..5b9143e 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -4218,7 +4218,6 @@ static noinline __init_refok
- int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
+diff --git a/mm/sparse-vmemmap.c b/mm/sparse-vmemmap.c
+index 27eeab3..4cba9c2 100644
+--- a/mm/sparse-vmemmap.c
++++ b/mm/sparse-vmemmap.c
+@@ -40,7 +40,8 @@ static void * __init_refok __earlyonly_bootmem_alloc(int node,
+ 				unsigned long align,
+ 				unsigned long goal)
  {
- 	int i;
--	struct pglist_data *pgdat = zone->zone_pgdat;
- 	size_t alloc_size;
+-	return __alloc_bootmem_node_high(NODE_DATA(node), size, align, goal);
++	return memblock_virt_alloc_try_nid(size, align, goal,
++					    BOOTMEM_ALLOC_ACCESSIBLE, node);
+ }
  
- 	/*
-@@ -4234,7 +4233,8 @@ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
+ static void *vmemmap_buf;
+@@ -226,7 +227,8 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
  
- 	if (!slab_is_available()) {
- 		zone->wait_table = (wait_queue_head_t *)
--			alloc_bootmem_node_nopanic(pgdat, alloc_size);
-+			memblock_virt_alloc_node_nopanic(
-+				alloc_size, zone->zone_pgdat->node_id);
+ 	if (vmemmap_buf_start) {
+ 		/* need to free left buf */
+-		free_bootmem(__pa(vmemmap_buf), vmemmap_buf_end - vmemmap_buf);
++		memblock_free_early(__pa(vmemmap_buf),
++				    vmemmap_buf_end - vmemmap_buf);
+ 		vmemmap_buf = NULL;
+ 		vmemmap_buf_end = NULL;
+ 	}
+diff --git a/mm/sparse.c b/mm/sparse.c
+index 4ac1d7e..0afcd41 100644
+--- a/mm/sparse.c
++++ b/mm/sparse.c
+@@ -69,7 +69,7 @@ static struct mem_section noinline __init_refok *sparse_index_alloc(int nid)
+ 		else
+ 			section = kzalloc(array_size, GFP_KERNEL);
  	} else {
- 		/*
- 		 * This case means that a zone whose size was 0 gets new memory
-@@ -4354,13 +4354,14 @@ bool __meminit early_pfn_in_nid(unsigned long pfn, int node)
- #endif
+-		section = alloc_bootmem_node(NODE_DATA(nid), array_size);
++		section = memblock_virt_alloc_node(array_size, nid);
+ 	}
  
- /**
-- * free_bootmem_with_active_regions - Call free_bootmem_node for each active range
-+ * free_bootmem_with_active_regions - Call memblock_free_early_nid for each active range
-  * @nid: The node to free memory on. If MAX_NUMNODES, all nodes are freed.
-- * @max_low_pfn: The highest PFN that will be passed to free_bootmem_node
-+ * @max_low_pfn: The highest PFN that will be passed to memblock_free_early_nid
-  *
-  * If an architecture guarantees that all ranges registered with
-  * add_active_ranges() contain no holes and may be freed, this
-- * this function may be used instead of calling free_bootmem() manually.
-+ * this function may be used instead of calling memblock_free_early_nid()
-+ * manually.
-  */
- void __init free_bootmem_with_active_regions(int nid, unsigned long max_low_pfn)
+ 	return section;
+@@ -279,8 +279,9 @@ sparse_early_usemaps_alloc_pgdat_section(struct pglist_data *pgdat,
+ 	limit = goal + (1UL << PA_SECTION_SHIFT);
+ 	nid = early_pfn_to_nid(goal >> PAGE_SHIFT);
+ again:
+-	p = ___alloc_bootmem_node_nopanic(NODE_DATA(nid), size,
+-					  SMP_CACHE_BYTES, goal, limit);
++	p = memblock_virt_alloc_try_nid_nopanic(size,
++						SMP_CACHE_BYTES, goal, limit,
++						NODE_DATA(nid));
+ 	if (!p && limit) {
+ 		limit = 0;
+ 		goto again;
+@@ -331,7 +332,7 @@ static unsigned long * __init
+ sparse_early_usemaps_alloc_pgdat_section(struct pglist_data *pgdat,
+ 					 unsigned long size)
  {
-@@ -4372,9 +4373,9 @@ void __init free_bootmem_with_active_regions(int nid, unsigned long max_low_pfn)
- 		end_pfn = min(end_pfn, max_low_pfn);
- 
- 		if (start_pfn < end_pfn)
--			free_bootmem_node(NODE_DATA(this_nid),
--					  PFN_PHYS(start_pfn),
--					  (end_pfn - start_pfn) << PAGE_SHIFT);
-+			memblock_free_early_nid(PFN_PHYS(start_pfn),
-+					(end_pfn - start_pfn) << PAGE_SHIFT,
-+					this_nid);
- 	}
+-	return alloc_bootmem_node_nopanic(pgdat, size);
++	return memblock_virt_alloc_node_nopanic(size, pgdat->node_id);
  }
  
-@@ -4645,8 +4646,9 @@ static void __init setup_usemap(struct pglist_data *pgdat,
- 	unsigned long usemapsize = usemap_size(zone_start_pfn, zonesize);
- 	zone->pageblock_flags = NULL;
- 	if (usemapsize)
--		zone->pageblock_flags = alloc_bootmem_node_nopanic(pgdat,
--								   usemapsize);
-+		zone->pageblock_flags =
-+			memblock_virt_alloc_node_nopanic(usemapsize,
-+							 pgdat->node_id);
+ static void __init check_usemap_section_nr(int nid, unsigned long *usemap)
+@@ -376,8 +377,9 @@ struct page __init *sparse_mem_map_populate(unsigned long pnum, int nid)
+ 		return map;
+ 
+ 	size = PAGE_ALIGN(sizeof(struct page) * PAGES_PER_SECTION);
+-	map = __alloc_bootmem_node_high(NODE_DATA(nid), size,
+-					 PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
++	map = memblock_virt_alloc_try_nid(size,
++					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
++					  BOOTMEM_ALLOC_ACCESSIBLE, nid);
+ 	return map;
  }
- #else
- static inline void setup_usemap(struct pglist_data *pgdat, struct zone *zone,
-@@ -4840,7 +4842,8 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
- 		size =  (end - start) * sizeof(struct page);
- 		map = alloc_remap(pgdat->node_id, size);
- 		if (!map)
--			map = alloc_bootmem_node_nopanic(pgdat, size);
-+			map = memblock_virt_alloc_node_nopanic(size,
-+							       pgdat->node_id);
- 		pgdat->node_mem_map = map + (pgdat->node_start_pfn - start);
+ void __init sparse_mem_maps_populate_node(struct page **map_map,
+@@ -401,8 +403,9 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
  	}
- #ifndef CONFIG_NEED_MULTIPLE_NODES
-@@ -5866,7 +5869,7 @@ void *__init alloc_large_system_hash(const char *tablename,
- 	do {
- 		size = bucketsize << log2qty;
- 		if (flags & HASH_EARLY)
--			table = alloc_bootmem_nopanic(size);
-+			table = memblock_virt_alloc_nopanic(size);
- 		else if (hashdist)
- 			table = __vmalloc(size, GFP_ATOMIC, PAGE_KERNEL);
- 		else {
+ 
+ 	size = PAGE_ALIGN(size);
+-	map = __alloc_bootmem_node_high(NODE_DATA(nodeid), size * map_count,
+-					 PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
++	map = memblock_virt_alloc_try_nid(size * map_count,
++					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
++					  BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
+ 	if (map) {
+ 		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
+ 			if (!present_section_nr(pnum))
+@@ -545,7 +548,7 @@ void __init sparse_init(void)
+ 	 * sparse_early_mem_map_alloc, so allocate usemap_map@first.
+ 	 */
+ 	size = sizeof(unsigned long *) * NR_MEM_SECTIONS;
+-	usemap_map = alloc_bootmem(size);
++	usemap_map = memblock_virt_alloc(size);
+ 	if (!usemap_map)
+ 		panic("can not allocate usemap_map\n");
+ 	alloc_usemap_and_memmap(sparse_early_usemaps_alloc_node,
+@@ -553,7 +556,7 @@ void __init sparse_init(void)
+ 
+ #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
+ 	size2 = sizeof(struct page *) * NR_MEM_SECTIONS;
+-	map_map = alloc_bootmem(size2);
++	map_map = memblock_virt_alloc(size2);
+ 	if (!map_map)
+ 		panic("can not allocate map_map\n");
+ 	alloc_usemap_and_memmap(sparse_early_mem_maps_alloc_node,
+@@ -583,9 +586,9 @@ void __init sparse_init(void)
+ 	vmemmap_populate_print_last();
+ 
+ #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
+-	free_bootmem(__pa(map_map), size2);
++	memblock_free_early(__pa(map_map), size2);
+ #endif
+-	free_bootmem(__pa(usemap_map), size);
++	memblock_free_early(__pa(usemap_map), size);
+ }
+ 
+ #ifdef CONFIG_MEMORY_HOTPLUG
 -- 
 1.7.9.5
