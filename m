@@ -1,57 +1,26 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 8 Nov 2013 16:08:49 +0530
-Subject: [PATCH 2/2] ARM: dts: doc: Document missing binding for ti-sdma
- controller
-In-Reply-To: <1383907129-7325-1-git-send-email-r.sricharan@ti.com>
-References: <1383907129-7325-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1383907129-7325-2-git-send-email-r.sricharan@ti.com>
+From: b35083@freescale.com (Jingchang Lu)
+Date: Fri, 8 Nov 2013 18:01:52 +0800
+Subject: [PATCHv7 0/3] dma: Add Freescale eDMA engine driver support
+Message-ID: <1383904915-27634-1-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding and support for system DMA module present in OMAP2+ Socs
-and DRA7 with dma-engine is already present. So adding the missing
-documentation for the same.
+This series add Freescale eDMA engine support.
 
-Cc: Benoit Cousson <bcousson@baylibre.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
----
- Documentation/devicetree/bindings/dma/ti-sdma.txt |   28 +++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/ti-sdma.txt
+Jingchang Lu (3):
+	ARM: imx: Add DMAMUX clock for Vybrid vf610 SoC
+	ARM: dts: vf610: Add eDMA node
+	dma: Add Freescale eDMA engine driver support
 
-diff --git a/Documentation/devicetree/bindings/dma/ti-sdma.txt b/Documentation/devicetree/bindings/dma/ti-sdma.txt
-new file mode 100644
-index 0000000..7fb2342
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/ti-sdma.txt
-@@ -0,0 +1,28 @@
-+TI SDMA
-+
-+Required Properties:
-+- compatible :	Should be "ti,omap2420-sdma", "ti,omap2430-sdma" for OMAP2
-+		Should be "ti,omap3430-sdma", "ti,omap3630-sdma" for OMAP3
-+		Should be "ti,omap4430-sdma" for OMAP4, OMAP5 and DRA7
-+- reg: Memory map for accessing module
-+- interrupts: Interrupt request number from the dma controller to
-+	      interrupt controller
-+- dma-cells: Should be set to <1>
-+- dma-channels: Total number of logical DMA channels supported by the
-+		controller
-+- dma-requests: Total number of dma request signals supported by the
-+		controller
-+
-+Example:
-+
-+sdma: dma-controller at 48056000 {
-+	compatible = "ti,omap4430-sdma";
-+	reg = <0x48056000 0x1000>;
-+	interrupts = <12>,
-+		     <13>,
-+		     <14>,
-+		     <15>;
-+	#dma-cells = <1>;
-+	#dma-channels = <32>;
-+	#dma-requests = <64>;
-+};
--- 
-1.7.9.5
+ Documentation/devicetree/bindings/dma/fsl-edma.txt |  84 ++++
+ arch/arm/boot/dts/vf610.dtsi                       |  49 +++
+ arch/arm/mach-imx/clk-vf610.c                      |   5 +
+ drivers/dma/Kconfig                                |  10 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/fsl-edma.c                             | 944 +++++++++++++++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/vf610-clock.h            |   6 +-
+ include/dt-bindings/dma/vf610-edma.h               | 103 +++++
+ 8 files changed, 1201 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/fsl-edma.txt
+ create mode 100644 drivers/dma/fsl-edma.c
+ create mode 100644 include/dt-bindings/dma/vf610-edma.h
