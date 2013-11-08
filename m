@@ -1,37 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 8 Nov 2013 15:54:04 +0000
-Subject: [PATCH 2/2] mfd: max77693: reorder params in API for regmap
- consistency
-In-Reply-To: <1383923118-26921-2-git-send-email-k.kozlowski@samsung.com>
-References: <1383923118-26921-1-git-send-email-k.kozlowski@samsung.com>
- <1383923118-26921-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20131108155404.GA30901@lee--X1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 Nov 2013 15:57:17 +0000
+Subject: [PATCH 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <1383739658-10036-3-git-send-email-vkale@apm.com>
+References: <1383739658-10036-1-git-send-email-vkale@apm.com>
+ <1383739658-10036-3-git-send-email-vkale@apm.com>
+Message-ID: <20131108155717.GB15074@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 08 Nov 2013, Krzysztof Kozlowski wrote:
-
-> The last two parameters of certain register access functions were in
-> different order than regmap API. This was confusing and error-prone.
+On Wed, Nov 06, 2013 at 12:07:37PM +0000, Vinayak Kale wrote:
+> Add support for irq registration when pmu interrupt is percpu.
 > 
-> Reorder parameters for register access API to match regmap API:
->  - max77693_bulk_read() reorder count and buf,
->  - max77693_bulk_write() reorder count and buf,
->  - max77693_update_reg() reorder val and mask.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
 > ---
->  drivers/extcon/extcon-max77693.c     |   14 +++++++-------
->  drivers/mfd/max77693-irq.c           |    2 +-
->  drivers/mfd/max77693.c               |    6 +++---
->  include/linux/mfd/max77693-private.h |   10 +++++-----
->  4 files changed, 16 insertions(+), 16 deletions(-)
+>  arch/arm64/kernel/perf_event.c |  109 +++++++++++++++++++++++++++++-----------
+>  1 file changed, 81 insertions(+), 28 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index cea1594..e60dae3 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -44,6 +44,7 @@
+>  static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
+>  static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
+>  static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
+> +static bool is_percpuirq;
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+This isn't a global property; it should be part of the struct arm_pmu.
+The rest of the patch looks ok, but obvious requires you to merge the core
+changes first.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
