@@ -1,69 +1,48 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 08 Nov 2013 11:10:47 +0100
-Subject: [PATCH v2 2/2] clocksource: sh_tmu: Add clk_prepare/unprepare
- support
-In-Reply-To: <1383057097-22689-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383057097-22689-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383057097-22689-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <527CB8A7.5080502@linaro.org>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri,  8 Nov 2013 15:41:43 +0530
+Subject: [PATCH v5 0/7] gpio: daVinci: cleanup and feature enhancement
+Message-ID: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2013 03:31 PM, Laurent Pinchart wrote:
-> Prepare the clock at probe time, as there is no other appropriate place
-> in the driver where we're allowed to sleep.
->
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: KV Sujith <sujithkv@ti.com>
 
-Applied in my tree as 3.13 fixes
+This patch series does the following
+1> Ports the driver to use irqdomain.
+2> Adds dt binding support for gpio-davinci.
+3> Adds DA850 dt support goio.
 
-Thanks Laurent.
+Changes for v5:
+1: Fixed review comments pointed by Grygorii.
+2: Dropped the fixup patch
 
-   -- Daniel
+This patch series is based on following fixup series
+http://us.generation-nt.com/answer/patch-0-2-davinci-gpio-fixes-help-212978272.html
 
-> ---
->   drivers/clocksource/sh_tmu.c | 9 ++++++++-
->   1 file changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-> index 1597837..63557cd 100644
-> --- a/drivers/clocksource/sh_tmu.c
-> +++ b/drivers/clocksource/sh_tmu.c
-> @@ -472,6 +472,11 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
->   		ret = PTR_ERR(p->clk);
->   		goto err1;
->   	}
-> +
-> +	ret = clk_prepare(p->clk);
-> +	if (ret < 0)
-> +		goto err2;
-> +
->   	p->cs_enabled = false;
->   	p->enable_count = 0;
->
-> @@ -479,10 +484,12 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
->   			      cfg->clockevent_rating,
->   			      cfg->clocksource_rating);
->   	if (ret < 0)
-> -		goto err2;
-> +		goto err3;
->
->   	return 0;
->
-> + err3:
-> +	clk_unprepare(p->clk);
->    err2:
->   	clk_put(p->clk);
->    err1:
->
+KV Sujith (3):
+  gpio: davinci: add OF support
+  ARM: davinci: da850: add GPIO DT node
+  ARM: davinci: da850 evm: add GPIO pinumux entries DT node
 
+Lad, Prabhakar (4):
+  gpio: davinci: remove unnecessary printk
+  gpio: davinci: use readl/writel instead of __raw_*
+  gpio: davinci: use irqdomain
+  gpio: davinci: remove unused variable intc_irq_num
+
+ .../devicetree/bindings/gpio/gpio-davinci.txt      |   39 +++++
+ arch/arm/boot/dts/da850-evm.dts                    |   20 +++
+ arch/arm/boot/dts/da850.dtsi                       |   14 ++
+ arch/arm/mach-davinci/da830.c                      |    1 -
+ arch/arm/mach-davinci/da850.c                      |    1 -
+ arch/arm/mach-davinci/dm355.c                      |    1 -
+ arch/arm/mach-davinci/dm365.c                      |    1 -
+ arch/arm/mach-davinci/dm644x.c                     |    1 -
+ arch/arm/mach-davinci/dm646x.c                     |    1 -
+ drivers/gpio/gpio-davinci.c                        |  170 +++++++++++++-------
+ include/linux/platform_data/gpio-davinci.h         |    3 +-
+ 11 files changed, 185 insertions(+), 67 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
