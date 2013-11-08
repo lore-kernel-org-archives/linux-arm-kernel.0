@@ -1,47 +1,52 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 08 Nov 2013 08:59:33 +0100
-Subject: [PATCH v5] ARM: omap: edma: add suspend suspend/resume hooks
-In-Reply-To: <87siv7pxpp.fsf@linaro.org>
-References: <1383863549-7438-1-git-send-email-zonque@gmail.com>
- <87siv7pxpp.fsf@linaro.org>
-Message-ID: <527C99E5.9020305@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 8 Nov 2013 16:59:41 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790: Correct typo in clocks
+In-Reply-To: <20131106083556.GC14694@verge.net.au>
+References: <1383714098-28770-1-git-send-email-horms+renesas@verge.net.au>
+ <87zjpiysh4.wl%kuninori.morimoto.gx@renesas.com>
+ <20131106083556.GC14694@verge.net.au>
+Message-ID: <20131108075939.GK23477@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 01:02 AM, Kevin Hilman wrote:
-> Daniel Mack <zonque@gmail.com> writes:
-
->> +	.resume_noirq	= edma_pm_resume,
->> +};
+On Wed, Nov 06, 2013 at 05:35:58PM +0900, Simon Horman wrote:
+> On Tue, Nov 05, 2013 at 10:06:20PM -0800, Kuninori Morimoto wrote:
+> > 
+> > Hi Simon
+> > 
+> > > This is the r8a7790 SoC not the r8a77a4 SoC and
+> > > clocks are updated in r8a7790_clock_init.  not r8a73a4_clock_init.
 > 
-> Also, I believe it was already suggested by Nishanth, but the late/early
-> callbacks are probably more appropriate here than the noirq callbacks.
-> Unless there's a *really* good reason to use the noirq callbacks, they
-> should be avoided.
+> Ironically there is a typo in the line above.
+> I'll fix that up before applying the patch.
 
-Ok, no problem to change that. Regarding the function ordering,
-late/early didn't show any lockup in my tests yet.
+I have queued-up the following:
 
-> That being said, I wonder if the whole approach here is the right one.
-> I know you're basing your stuff on some TI tree, but that doesn't make
-> it the right way (usually, it's the opposite, but I digress...)  ;)
+From: Simon Horman <horms+renesas@verge.net.au>
 
-:)
+ARM: shmobile: r8a7790: Correct typo in clocks
 
-Well, I was primarily looking for a solution to bring the edma back to
-life after suspend. As I wrote in the first version of this patch that I
-sent, I didn't even intent that patch to go mainline at all, given that
-arch/arm/common/edma.c woill go away soon.
+This is the r8a7790 SoC not the r8a77a4 SoC and
+clocks are updated in r8a7790_clock_init not r8a73a4_clock_init.
 
-> IMO, EDMA should be done like we currently do I2C and not implement
-> suspend/resume at all.  Instead, the driver should do runtime PM done on
-> a per xfer basis.  Then when suspend comes along, all that needs to be
-> done is ensure all in-flight xfers are done, then runtime PM will kick
-> in.
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7790.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I see your point in general, but isn't runtime PM there to actually save
-power at runtime? Does disabling unused channels in the EDMA really
-reduce the consumption of that IP block?
-
-
-Daniel
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index a64f965..fa1b477 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -77,7 +77,7 @@ static struct sh_clk_ops followparent_clk_ops = {
+ };
+ 
+ static struct clk main_clk = {
+-	/* .parent will be set r8a73a4_clock_init */
++	/* .parent will be set r8a7790_clock_init */
+ 	.ops	= &followparent_clk_ops,
+ };
+ 
+-- 
+1.8.4
