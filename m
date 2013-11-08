@@ -1,109 +1,182 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Thu, 7 Nov 2013 16:29:52 -0800
-Subject: [PATCH 3/4] ARM: pinctrl: Add Broadcom Capri pinctrl driver
-In-Reply-To: <CACRpkdaxPv6CLMjab_4umyUvbBVYcazjmwx_LGRK76vxT4VUqA@mail.gmail.com>
-References: <1380846199-12829-1-git-send-email-syin@broadcom.com>
- <051069C10411E24D9749790C498526FA1BE0B7D7@SJEXCHMB12.corp.ad.broadcom.com>
- <CACRpkdYSLxp2M4HghcUdjEYGh-UQ+DaiCGp6yee+Qds6DR9poA@mail.gmail.com>
- <201311050026.56321.heiko@sntech.de> <527835FE.2030102@wwwdotorg.org>
- <5279A319.5060701@broadcom.com>
- <CACRpkdaxPv6CLMjab_4umyUvbBVYcazjmwx_LGRK76vxT4VUqA@mail.gmail.com>
-Message-ID: <527C3080.5050202@broadcom.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 07 Nov 2013 16:38:37 -0800
+Subject: [PATCH] ARM: OMAP2+: omap_device: maintain sane runtime pm status
+ around suspend/resume
+In-Reply-To: <527C2B78.2070201@ti.com> (Nishanth Menon's message of "Thu, 07
+ Nov 2013 18:08:24 -0600")
+References: <1383857942-23630-1-git-send-email-nm@ti.com>
+ <87iow3rd3y.fsf@linaro.org> <527C2B78.2070201@ti.com>
+Message-ID: <874n7npw1e.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-11-06 01:40 AM, Linus Walleij wrote:
-> On Wed, Nov 6, 2013 at 3:02 AM, Sherman Yin <syin@broadcom.com> wrote:
->> When Linus asked me to try using generic pinconf instead, I ran into
->> problems with this feature due to how the generic pinconf properties are
->> defined differently than my properties - perhaps this feature just doesn't
->> work for generic pinconf-based drivers with the (Unless we are ok with using
->> 1/0 for boolean properties, but it has already been pointed out that these
->> should be valueless.).
->
-> Well it seems you would need a way to pass an array of the same
-> boolean property and that seems a bit more complex and hard to
-> read than the generic boolean bindings.
->
-> You would have to patch the OF core to do something like that:
->
-> bias-pull-up = <true true false>;
->
-> 1/0 isn't so good I think, what should the parser do with e.g. 2?
-> This is more to the point.
+Nishanth Menon <nm@ti.com> writes:
 
-I would imagine that the platform-specific device tree bindings would 
-need to clearly explain what the valid values are, as they should.  If 
-we're using integers, we could either have a) !0 and 0, or b) just 1 and 
-0, and everything else is an error.  Or c) the platform could decide 
-that the value provides addition info like pull-up-strength, so 0 = no 
-pull up, >0 = pull up enabled and the number is the pull up strength in 
-Ohm (bindings should indicate which values are valid), and everything 
-else is an error.
-
->> While I'd love to be able define my pin config nodes this way, if I have to
->> use generic pinconf for the driver to be upstreamed, then I'm fine with it.
->
-> Well you need to use generic pin config because all the custom
-> stuff - i.MX comes to mind - is creating a mess. I prefer that we
-> share bindings and code, as any programmer would...
-
-Ok
-
-> That said, if you can patch the OF core and the generic pin config
-> parser to do what you want with lists like that, it's your pick.
-> It may take some time though.
-
-I don't mind patching the generic pin config, and I don't think the core 
-needs to change, but first there needs to be an agreement on the changes 
-since other drivers will need to use pinconf-generic. Am I the only one 
-who would like to see this feature, or do others see value in being able 
-to group more pins together - resulting in fewer sub-nodes?  Do the pros 
-out-weight the cons?
-
->>> "input disable"
->>> This setting disconnects the input (DIN) to the internal logic from >the
->>> pin pad. However, the output (DOUT) can still drive the pad.  It
->>> seems to match PIN_CONFIG_OUTPUT, but the current generic option is
->>> either "output-low" or "output-high" - are these referring to a static
->>> output of 0 and 1?
+> On 11/07/2013 05:44 PM, Kevin Hilman wrote:
+>> Nishanth Menon <nm@ti.com> writes:
 >>
->> What's the best property to use in this case?
->
-> Seems like a new case.
->
-> What about you patch include/linux/pinctrl/pinconf-generic.h
-> to add PIN_CONFIG_INPUT_DISABLE with this semantic
-> and also patch the generic pinconf parser in drivers/pinctrl/pinconf-generic.c
-> to handle this?
-
-Sure, I can add PIN_CONFIG_INPUT_DISABLE.  However I suspect people 
-might be confused by this and PIN_CONFIG_OUTPUT.
-
->>> "mode"
->>> This controls several aspect of the pin (slew rate, pull up strength,
->>> etc) to meet I2C specs for Standard/Fast mode vs High Speed mode.  I
->>> think the best way is to map this to slew rate, which would require
->>> some explanation because the meaning of slew rate differs depending on
->>> what pin function is selected:
->>> - When I2C (*_SCL or *_SDA) function is selected for the pin: 0:
->>>   Standard (100kbps)
->>>   & Fast mode (400kbps), 1: High Speed mode (3.4Mbps)
->>> - When IC_DM or IC_DP function is selected, 0: normal slew rate, 1:
->>>   fast slew rate
->>> - Else: 0: fast slew rate, 1: normal slew rate
+>>> OMAP device hooks around suspend|resume_noirq ensures that hwmod
+>>> devices are forced to idle using omap_device_idle/enable as part of
+>>> the last stage of suspend activity.
+>>>
+>>> For a device such as i2c who uses autosuspend, it is possible to enter
+>>> the suspend path with dev->power.runtime_status = RPM_ACTIVE.
+>>>
+>>> As part of the suspend flow, the generic runtime logic would increment
+>>> it's dev->power.disable_depth to 1. This should prevent further
+>>> pm_runtime_get_sync from succeeding once the runtime_status has been
+>>> set to RPM_SUSPENDED.
+>>>
+>>> Now, as part of the suspend_noirq handler in omap_device, we force the
+>>> following: if the device status is !suspended, we force the device
+>>> to idle using omap_device_idle (clocks are cut etc..). This ensures
+>>> that from a hardware perspective, the device is "suspended". However,
+>>> runtime_status is left to be active.
+>>>
+>>> *if* an operation is attempted after this point to
+>>> pm_runtime_get_sync, runtime framework depends on runtime_status to
+>>> indicate accurately the device status, and since it sees it to be
+>>> ACTIVE, it assumes the module is functional and returns a non-error
+>>> value. As a result the user will see pm_runtime_get succeed, however a
+>>> register access will crash due to the lack of clocks.
 >>
->> Do we agree that the "slew rate" is the best property to use for "mode"?
+>> Ouch.
+>>
+>> Dumb Q: who is requesting an i2c transaction after ->suspend_noirq().
+>> The i2c driver itself should be able to detect that it's being accessed
+>> after this point and return an error.
 >
-> It seems to be indeed mostly related to slew rate.
+> i2c dropped it generic suspend handlers at
+> commit 584b408d37af4e0b38ad5b60f236381bcdf396bc
+> Author: Kevin Hilman <khilman@ti.com>
+
+sheesh, who is that crazy TI guy.  They should probably fire him.
+
+> Date:   Thu Aug 4 07:53:02 2011 -0700
 >
-> However if you want a custom brcm,mode binding that should
-> be possible too, as well as augmenting the driver to use
-> *both* generic pinconf *and* some custom config options
-> on top. That has not been done so far though I think, so you
-> might need a bit of hacking to do that.
+>     Revert "i2c-omap: fix static suspend vs. runtime suspend"
+>
+>     Also, as of v3.1, the PM domain level code for OMAP handles device
+>     power state transistions automatically for devices, so drivers no
+>     longer need to specifically call the bus/pm_domain methods themselves.
+>
+>
+> - So it is rightly in the mercy of runtime PM to adequately represent
+> it's state. I disagree that i2c driver should in addition have to
+> remember what it's generic suspend state is.
 
-I think I'll stick with slew rate.  :)
+That's debatable I guess.  The ideal world is that runtime PM hides all
+of this, but I'm not sure it's achievable in all cases.
 
-Regards,
-Sherman
+>  - See the link to the cpufreq and the logs to see the call stack
+> where it fails.
+>
+> Now, this is fine, since omap_i2c_xfer should ideally fail with a
+> pm_runtime_get_sync returning -EACCESS when device is really suspended
+> (remember, we are doing autosuspend - so, in the case I caught, there
+> was regulator voltage set prior to entering suspend, but timeout was
+> not yet hit for autosuspend of i2c to kick in yet).
+
+Ah, I see.  Makes sense.
+
+>>
+>> That being said, I agree that omap_device should still be catching this
+>> case in order to find/fix driver races like this.
+>
+>>
+>>> To prevent this from happening, we should ensure that runtime_status
+>>> exactly indicates the device status. As a result of this change
+>>> any further calls to pm_runtime_get* would return -EACCES (since
+>>> disable_depth is 1). On resume, we restore the clocks and runtime
+>>> status exactly as we suspended with.
+>>>
+>>> Reported-by: J Keerthy <j-keerthy@ti.com>
+>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>> Acked-by: Rajendra Nayak <rnayak@ti.com>
+>>> ---
+>>> patch baseline: V3.12 tag (also applies on linux-next next-20131107 tag)
+>>>
+>>> Logs from 3.12 based vendor kernel:
+>>> Before: http://pastebin.com/m5KxnB7a
+>>> After: http://pastebin.com/8AfX4e7r
+>>>
+>>> The discussion on cpufreq side of the story which triggered this scenario:
+>>> 	http://marc.info/?l=linux-pm&m=138263811321921&w=2
+>>>
+>>> Tested on TI vendor kernel (with dt boot):
+>>> 	AM335x: evm, BBB, sk, BBW
+>>> 	OMAP5uEVM, DRA7-evm
+>>>
+>>>   arch/arm/mach-omap2/omap_device.c |   16 ++++++++++++++--
+>>>   arch/arm/mach-omap2/omap_device.h |    1 +
+>>>   2 files changed, 15 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+>>> index b69dd9a..87ecbb0 100644
+>>> --- a/arch/arm/mach-omap2/omap_device.c
+>>> +++ b/arch/arm/mach-omap2/omap_device.c
+>>> @@ -621,6 +621,13 @@ static int _od_suspend_noirq(struct device *dev)
+>>>
+>>>   	if (!ret && !pm_runtime_status_suspended(dev)) {
+>>>   		if (pm_generic_runtime_suspend(dev) == 0) {
+>>> +			if (!pm_runtime_suspended(dev)) {
+>>
+>> Why the addition check for supended here?
+>
+> pm_runtime_status_suspended checks only the dev->power.runtime_status
+> but that may not truely indicate device was in previous use - in the
+> case of devices like i2c who depend on autosuspend.
+>
+> pm_runtime_suspended checks for dev->power.runtime_status ==
+> RPM_SUSPENDED and disable_depth
+>
+>>
+>> This version (as opposed to the _status_suspended() version above will
+>> fail if runtime PM has been disabled from userspace (via
+>> /sys/devices/.../power/control), and will thus prevent low power states
+>> from being hit in suspend if runtime suspend has been disabled from
+>> userspace.  That's a bug.
+>
+> yes, and so it should fail to achieve low power state. we explicitly
+> stated disable suspend, yet we go behind the runtime PM's back and
+> force disable the module clocks. now drivers should NOT know what the
+> state of the omap_device meddling is and should obey the configuration
+> and completely trust pm_runtime to accurately denote the module state.
+
+No, that sysfs knob is for disabling runtime PM.  We still want the
+device to hit low-power state in system suspend.  Solving that problem
+is half the reason we have this omap_device noirq mess in the first
+place.
+
+You need to test this by disabling runtime PM from userspace and ensure
+that the low power state is still hit during suspend.
+
+>>
+>>> +				/* NOTE: *might* indicate driver race */
+>>
+>> Yes, a driver race which should then be fixed in the driver.
+>
+> true if this is a non-autosuspend device, in auto suspend devices,
+> this could be a regular phenomenon if timeout is pretty large.. but
+> atleast that should allow debug.
+
+Agreed.  I wasn't thinking about the autosuspend case.  Thanks for
+clarifying.
+
+>>
+>>> +				dev_dbg(dev, "%s: Force suspending\n",
+>>> +					__func__);
+>>> +				pm_runtime_set_suspended(dev);
+>>> +				od->flags |= OMAP_DEVICE_SUSPEND_FORCED;
+>>
+>> Not sure why you need an additonal flag.  Why not just always do this
+>> and use the existin OMAP_DEVICE_SUSPENDED flag.
+>
+> restore of runtime data structure state is only needed for specific
+> devices - not all..
+
+The question is why do you a flag in addition to OMAP_DEVICE_SUSPEND.
+Whenever that flag is set, omap_device has gone behind your back, and
+the runtime PM status should be kept in sync.
+
+Kevin
