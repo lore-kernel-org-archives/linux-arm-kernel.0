@@ -1,70 +1,57 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 08 Nov 2013 10:14:44 +1030
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
-References: <1383789208.5970.1.camel@phoenix>
- <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
- <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
- <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
- <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
- <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
- <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
-Message-ID: <87zjpf4w0j.fsf@rustcorp.com.au>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 07 Nov 2013 16:02:26 -0800
+Subject: [PATCH v5] ARM: omap: edma: add suspend suspend/resume hooks
+In-Reply-To: <1383863549-7438-1-git-send-email-zonque@gmail.com> (Daniel
+ Mack's message of "Thu, 7 Nov 2013 23:32:29 +0100")
+References: <1383863549-7438-1-git-send-email-zonque@gmail.com>
+Message-ID: <87siv7pxpp.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Axel Lin <axel.lin@ingics.com> writes:
-> 2013/11/7 Ming Lei <tom.leiming@gmail.com>:
->> Hi,
->>
->> On Thu, Nov 7, 2013 at 10:47 AM, Axel Lin <axel.lin@ingics.com> wrote:
->>>
->>> hi Ming,
->>> Seems CONFIG_PAGE_OFFSET is not configurabe in "make menuconfig".
->>> And I found CONFIG_PAGE_OFFSET=0xC0000000 for all below configs...
->>> $ make at91_dt_defconfig; grep  CONFIG_PAGE_OFFSET .config
->>> $ make ep93xx_defconfig; grep  CONFIG_PAGE_OFFSET .config
->>> $ make imx_v4_v5_defconfig; grep CONFIG_PAGE_OFFSET .config
->>> $ make mxs_defconfig; grep CONFIG_PAGE_OFFSET .config
->>> $ make omap2plus_defconfig; grep CONFIG_PAGE_OFFSET .config
->>> $ make s3c6400_defconfig; grep CONFIG_PAGE_OFFSET .config
->>> $ make at91x40_defconfig; grep CONFIG_PAGE_OFFSET .config
->>> ( at91x40_defconfig is also arm7tdmi )
->>
->> Firstly it can be configured via VMSPLIT_3GVMSPLIT_2G/VMSPLIT_1G.
->>
->> Secondly, configurable or not isn't the point, and maybe some uclinux
->> platforms do not use CONFIG_PAGE_OFFSET at all, but they should
->> set it as a reasonable value or at least be below than the start link
->> address of vmlinux.
+Daniel Mack <zonque@gmail.com> writes:
+
+> This patch makes the edma driver resume correctly after suspend. Tested
+> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
 >
-> Hi Ming,
+> All information can be reconstructed by already known runtime
+> information.
 >
-> I found in arch/arm/include/asm/memory.h:
-> CONFIG_PAGE_OFFSET is not used if !CONFIG_MMU.
-> So looks like setting CONFIG_PAGE_OFFSET to other value still won't work.
+> As we now use some functions that were previously only used from __init
+> context, annotations had to be dropped.
+>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+> Ok, here is v5.
+>
+> v4 -> v5:
+>
+> 	* dropped pm_runtime_* function calls entirely
+> 	* moved the function pointers to .suspend/resume _noirq
 
-This seems like the simplest solution, but it may mean you still have
-crap in /proc/kallsyms.
+[...]
 
-Does it work for you?
+> +static const struct dev_pm_ops edma_pm_ops = {
+> +	.suspend	= edma_pm_suspend,
 
-Thanks,
-Rusty.
+I suspect you intended to use the _noirq version like the changelog
+says?
 
+> +	.resume_noirq	= edma_pm_resume,
+> +};
 
-diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
-index 32b10f53d0b4..c3bd3efec4cc 100644
---- a/scripts/link-vmlinux.sh
-+++ b/scripts/link-vmlinux.sh
-@@ -82,7 +82,9 @@ kallsyms()
- 		kallsymopt="${kallsymopt} --all-symbols"
- 	fi
- 
--	kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
-+	if [ -n "${CONFIG_MMU}" ]; then
-+		kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
-+	fi
- 
- 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
- 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
+Also, I believe it was already suggested by Nishanth, but the late/early
+callbacks are probably more appropriate here than the noirq callbacks.
+Unless there's a *really* good reason to use the noirq callbacks, they
+should be avoided.
+
+That being said, I wonder if the whole approach here is the right one.
+I know you're basing your stuff on some TI tree, but that doesn't make
+it the right way (usually, it's the opposite, but I digress...)  ;)
+
+IMO, EDMA should be done like we currently do I2C and not implement
+suspend/resume at all.  Instead, the driver should do runtime PM done on
+a per xfer basis.  Then when suspend comes along, all that needs to be
+done is ensure all in-flight xfers are done, then runtime PM will kick
+in.
+
+Kevin
