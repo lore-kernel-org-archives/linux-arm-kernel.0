@@ -1,44 +1,35 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 7 Nov 2013 22:58:24 -0600
-Subject: [PATCH v5] ARM: omap: edma: add suspend suspend/resume hooks
-In-Reply-To: <87siv7pxpp.fsf@linaro.org>
-References: <1383863549-7438-1-git-send-email-zonque@gmail.com>
- <87siv7pxpp.fsf@linaro.org>
-Message-ID: <527C6F70.1010103@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 8 Nov 2013 14:22:22 +0900
+Subject: [PATCH v2 2/2] clocksource: sh_tmu: Add clk_prepare/unprepare
+ support
+In-Reply-To: <527B9861.1020606@linaro.org>
+References: <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383057097-22689-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383057097-22689-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131031052406.GN1603@verge.net.au> <527B9861.1020606@linaro.org>
+Message-ID: <20131108052222.GA9828@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On 11/07/2013 06:02 PM, Kevin Hilman wrote:
-> Daniel Mack <zonque@gmail.com> writes:
-[..]
->> +	.resume_noirq	= edma_pm_resume,
->> +};
+On Thu, Nov 07, 2013 at 02:40:49PM +0100, Daniel Lezcano wrote:
+> On 10/31/2013 06:24 AM, Simon Horman wrote:
+> >On Tue, Oct 29, 2013 at 03:31:37PM +0100, Laurent Pinchart wrote:
+> >>Prepare the clock at probe time, as there is no other appropriate place
+> >>in the driver where we're allowed to sleep.
+> >>
+> >>Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >>Cc: linux-kernel at vger.kernel.org
+> >>Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> >
+> >Thanks, I have queued this up.
 > 
-> Also, I believe it was already suggested by Nishanth, but the late/early
-> callbacks are probably more appropriate here than the noirq callbacks.
-> Unless there's a *really* good reason to use the noirq callbacks, they
-> should be avoided.
+> Ok, so those patches go through your tree, right ?
 > 
-> That being said, I wonder if the whole approach here is the right one.
-> I know you're basing your stuff on some TI tree, but that doesn't make
-> it the right way (usually, it's the opposite, but I digress...)  ;)
-> 
-> IMO, EDMA should be done like we currently do I2C and not implement
-> suspend/resume at all.  Instead, the driver should do runtime PM done on
+> I have been out for the Linaro connect but I saw you picked them. In
+> the future, I would prefer to take them in my tree as they fall
+> under the drivers/clocksource maintainer's umbrella.
 
-But a potential problem with this is powering edma on or off between xfers may
-slow things down quite a bit because xfers happen so much often and there is
-some overhead in the pm_runtime calls which adds up overtime when dealing with
-something as frequent as EDMA. Also we would lose the global EDMA context right
-so we'd have to restore the context every time during runtime PM (?).
+I was planning to send a pull request to you.
+But if you would rather just pick them up directly that is quite fine by me.
 
-I had a patch that also made AES driver not pm_runtime_get/put specially when
-the next crypto request was imminent. But instead adopted a softer approach
-where the pm_runtime_put call would happen at a time when we are sure we're at
-the end of all requests. This resulted in quite a speed up.
-
-thanks,
-
--Joel
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
