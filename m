@@ -1,50 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 8 Nov 2013 10:45:01 +0100
-Subject: [PATCH v6 4/8] ARM: dts: imx27 pinctrl
-In-Reply-To: <CAHCPf3sz6eOYrnNDfOTo5Z5dZP2U9+GtQMKYZEb-1WfuXepa6A@mail.gmail.com>
-References: <1382950843-26066-1-git-send-email-mpa@pengutronix.de>
- <1382950843-26066-5-git-send-email-mpa@pengutronix.de>
- <CAHCPf3sz6eOYrnNDfOTo5Z5dZP2U9+GtQMKYZEb-1WfuXepa6A@mail.gmail.com>
-Message-ID: <CACRpkdazhujHpjVuOhee9UXfi=zV3Z7TjbxzQ_3H+gmFrgDmWA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 8 Nov 2013 10:43:06 +0100
+Subject: [PATCH v3 1/2] ARM: sun4i/sun7i: RTC driver
+In-Reply-To: <CAOQ7t2b4WpH2fpSMC9DbczVSZMSQ=WNyQzoKiJi=r1JD9os-7Q@mail.gmail.com>
+References: <1383172738-8206-1-git-send-email-carlo.caione@gmail.com>
+ <20131106141357.GQ26440@lukather>
+ <CAOQ7t2b4WpH2fpSMC9DbczVSZMSQ=WNyQzoKiJi=r1JD9os-7Q@mail.gmail.com>
+Message-ID: <20131108094306.GC26440@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 6, 2013 at 11:43 PM, Matt Sealey <neko@bakuhatsu.net> wrote:
-> On Mon, Oct 28, 2013 at 4:00 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
->>
->> +                       iomuxc: iomuxc at 10015000 {
->> +                               compatible = "fsl,imx27-iomuxc";
->> +                               reg = <0x10015000 0x600>;
->> +
->> +                       };
->> +
->>                         gpio1: gpio at 10015000 {
->>                                 compatible = "fsl,imx27-gpio", "fsl,imx21-gpio";
->>                                 reg = <0x10015000 0x100>;
->
-> Linus,
->
-> Case in point, you can't have two nodes which overlap registers.
->
-> Probably the most reasonable way to effect this is to keep the GPIO
-> bindings, put pinctrl definitions in there (there's no reason pinctrl
-> and gpio drivers can't probe the same compatible property) and use
-> regmap internally on that single node.
+On Wed, Nov 06, 2013 at 10:07:36PM +0100, Carlo Caione wrote:
+> > So this means that whenever the time actually has a number of seconds
+> > = 0, you just loop over, adding a 500ms delay? That seems pretty
+> > inefficient to me.
+> 
+> I agree. Any suggestion is welcome.
+> 
+> > Also, what happens if you get two times in a row a number of seconds
+> > equals to 0?
+> 
+> in that case I think that using t <= 2 in the for cycle will solve
+> the problem.
 
-If the I/O region is tightly coupled across two subsystems like
-that we usually merge the driver into one combined
-pinctrl+gpio driver and put it into drivers/pinctrl/*.
+I don't see how it actually solves the issue. It just makes it less
+likely to happen.
 
-This often solves more problems and make the code
-simpler too.
+> > This kind of construct seems really really odd, and doesn't the issue
+> > you were trying to address.
+> >
+> > However, this looks like a common issue. Have you looked at the other
+> > drivers to see how they are handling it? Maybe Alessandro will have
+> > some suggestions as well.
+> 
+> This portion of the code is taken from the original RTC driver leaked
+> from Allwinner.
+> Otherwise a better solution could be something like in
+> http://lxr.linux.no/linux+v3.12/drivers/rtc/rtc-at91rm9200.c#L114
 
-An alternative if address 0x10015000- 0x100150ff is
-really only used for GPIO is to map the pinctrl like
-that:
+That sounds much more robust yes.
 
-reg = <0x10015100 0x500>
+> > So, that means that the A10 RTC starts a year 1900, and the A20 at
+> > year 2010? Why not just put those in your year_offset field directly?
+> 
+> Agree
+> 
+> > Why not just busy-wait ? (with a timeout if you really want to).
+> 
+> because if it fails after 150ms you are almost certainly screwed and
+> something is wrong
 
-and rewrite all the base offset handling in the driver.
+Hmmm, I'm not sure anymore about the code I was commenting about here
+(please try to at least keep the relevant code portions in your
+mails), but you can be delayed by 150ms even if nothing went wrong.
 
-Yours,
-Linus Walleij
+And you can always have a timeout while busy-waiting if you want, with
+something like
+http://lxr.free-electrons.com/source/drivers/spi/spi-mxs.c#L166
+
+> > Isn't the write operation supposed to be done already?
+> 
+> In theory yes, in practice you cannot be sure. This is also a legacy
+> of the old AW's code. I'll investigate more to check if this is really
+> useful.
+
+Again, I'm not sure about which part of the code we were talking
+about, but I think I recall that there was two similar access in your
+drivers, once that was doing what I was commenting about, and the
+other didn't. I'm fine with it being required, but if it is, it should
+always be required.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131108/99894fbe/attachment.sig>
