@@ -1,35 +1,226 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Fri, 8 Nov 2013 11:42:12 -0800
-Subject: [RESEND PATCH v2 1/6] ARM: dts: Declare clocks as fixed on
- bcm11351
-In-Reply-To: <527CC2A5.7080000@linaro.org>
-References: <1381960030-1640-1-git-send-email-tim.kryger@linaro.org>
- <1381960030-1640-2-git-send-email-tim.kryger@linaro.org>
- <527CC2A5.7080000@linaro.org>
-Message-ID: <CAAYSxhoHYaFzcoxEAJrNb6d8n1aKGDN68K3eekRT22s0h7960w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 8 Nov 2013 11:49:06 -0800
+Subject: [PATCH] arm64: reboot driver missing dts entry and ACPI support
+ for storm platform.
+In-Reply-To: <1383938010-15296-1-git-send-email-fkan@apm.com>
+References: <1383938010-15296-1-git-send-email-fkan@apm.com>
+Message-ID: <CAOesGMgCePQXeLFkdNWUUsoBbeg6cwEDGU9UnSpJ7Fb0-AjB4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 8, 2013 at 2:53 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
+On Fri, Nov 8, 2013 at 11:13 AM, Feng Kan <fkan@apm.com> wrote:
+> Signed-off-by: Feng Kan <fkan@apm.com>
 
-> I was wondering what is the status of this patchset ?
+
+Please provide patch description. it's also clear that this patch does
+more than one change. One patch per change, one change per patch.
+
+Add the DTS info in one (and you haven't posted a binding for that
+compatible string, you have to do that).
+
+The ACPI junk should be split up in separate changes too.
+
+
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index 9b3ea53..84883bc 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -39,7 +39,7 @@ config POWER_RESET_RESTART
 >
-> The patchset touches different areas maintained by different people. Through
-> what tree do you expect this patchset to be merged ??
+>  config POWER_RESET_VEXPRESS
+>         bool "ARM Versatile Express power-off and reset driver"
+> -       depends on ARM || ARM64
+> +       depends on (ARM || ARM64) && ARCH_VEXPRESS
+>         depends on POWER_RESET && VEXPRESS_CONFIG
+>         help
+>           Power off and reset support for the ARM Ltd. Versatile
 
-Hi Daniel,
+This seems completely unrelated to the rest of this patch. It fixes a
+bug, but please do it in a separate patch.
 
-I plan to send an updated version soon to address some concerns raised by Mark.
+> @@ -47,7 +47,6 @@ config POWER_RESET_VEXPRESS
+>
+>  config POWER_RESET_XGENE
+>         bool "APM SoC X-Gene reset driver"
+> -       depends on ARM64
+> -       depends on POWER_RESET
+> +       default y if (ARM64 && ARCH_XGENE && POWER_RESET)
 
-Once all the maintainers are satisfied and provide their acks, I would
-like Christian to take the series into his tree.
+Ick, no, don't do these kind of default y if (compex statement).
 
-I expect Christian will have a few other Broadcom DTS file changes in
-his tree so sending the series through him should make it easier to
-avoid/manage conflicts.
 
-Christian, would that work for you?
+> diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
+> index ecd55f8..856fed1 100644
+> --- a/drivers/power/reset/xgene-reboot.c
+> +++ b/drivers/power/reset/xgene-reboot.c
+> @@ -30,6 +30,8 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/stat.h>
+>  #include <linux/slab.h>
+> +#include <linux/acpi.h>
+> +#include <linux/efi.h>
+>  #include <asm/system_misc.h>
+>
+>  struct xgene_reboot_context {
+> @@ -40,7 +42,7 @@ struct xgene_reboot_context {
+>
+>  static struct xgene_reboot_context *xgene_restart_ctx;
+>
+> -static void xgene_restart(char str, const char *cmd)
+> +static void xgene_restart(enum reboot_mode reboot_mode, const char *cmd)
+>  {
+>         struct xgene_reboot_context *ctx = xgene_restart_ctx;
+>         unsigned long timeout;
 
-Thanks,
-Tim Kryger
+Unrelated change (but relevant fix)
+
+> @@ -56,48 +58,114 @@ static void xgene_restart(char str, const char *cmd)
+>         dev_emerg(&ctx->pdev->dev, "Unable to restart system\n");
+>  }
+>
+> +static int xgene_reboot_get_resource(struct platform_device *pdev, int index,
+> +                                    struct resource *res)
+> +{
+> +       struct resource *regs;
+> +       if (efi_enabled(EFI_BOOT)) {
+> +               regs = platform_get_resource(pdev, IORESOURCE_MEM, index);
+> +               if (regs == NULL)
+> +                       return -ENODEV;
+> +               *res = *regs;
+> +               return 0;
+> +       }
+> +       return of_address_to_resource(pdev->dev.of_node, index, res);
+> +}
+> +
+> +static int xgene_reboot_get_u32_param(struct platform_device *pdev,
+> +                                     const char *of_name, char *acpi_name,
+> +                                     u32 *param)
+> +{
+> +#ifdef CONFIG_ACPI
+> +       if (efi_enabled(EFI_BOOT)) {
+> +               unsigned long long value;
+> +               acpi_status status;
+> +               if (acpi_name == NULL)
+> +                       return -ENODEV;
+> +               status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
+> +                                              acpi_name, NULL, &value);
+> +               if (ACPI_FAILURE(status))
+> +                       return -ENODEV;
+> +               *param = value;
+> +               return 0;
+> +       }
+> +#endif
+
+Why ifdef here when there's none above? Are there stubs missing in the
+acpi framework?
+
+> +       if (of_name == NULL)
+> +               return -ENODEV;
+> +       return of_property_read_u32(pdev->dev.of_node, of_name, param);
+> +}
+> +
+>  static int xgene_reboot_probe(struct platform_device *pdev)
+>  {
+>         struct xgene_reboot_context *ctx;
+> +       struct resource res;
+> +       int rc;
+> +
+> +       /* Skip the ACPI probe if booting via DTS */
+> +       if (!efi_enabled(EFI_BOOT) && !pdev->dev.of_node)
+> +               goto error;
+
+The comment and the code say two different things.
+
+> +
+> +       rc = xgene_reboot_get_resource(pdev, 0, &res);
+> +       if (rc) {
+> +               dev_err(&pdev->dev, "no resource address\n");
+> +               goto error;
+> +       }
+>
+>         ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
+>         if (!ctx) {
+>                 dev_err(&pdev->dev, "out of memory for context\n");
+> -               return -ENODEV;
+> +               goto error;
+>         }
+>
+> -       ctx->csr = of_iomap(pdev->dev.of_node, 0);
+> +       ctx->csr = devm_ioremap(&pdev->dev, res.start, resource_size(&res));
+>         if (!ctx->csr) {
+> -               devm_kfree(&pdev->dev, ctx);
+> -               dev_err(&pdev->dev, "can not map resource\n");
+> -               return -ENODEV;
+> +               dev_err(&pdev->dev, "can't map CSR resource\n");
+> +               rc = -ENOMEM;
+> +               goto error;
+>         }
+>
+> -       if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
+> -               ctx->mask = 0xFFFFFFFF;
+> +       ctx->mask = 0x1;
+> +
+> +       dev_info(&pdev->dev, "X-Gene register reboot driver\n");
+>
+>         ctx->pdev = pdev;
+>         arm_pm_restart = xgene_restart;
+>         xgene_restart_ctx = ctx;
+> -
+>         return 0;
+> +
+> +error:
+> +       if (ctx->csr)
+> +               devm_iounmap(&pdev->dev, ctx->csr);
+
+With devm, you don't have to worry about freeing, that's the whole beauty of it.
+
+> +       devm_kfree(&pdev->dev, ctx);
+> +       return rc;
+
+For the first test with goto error, you will be returning an
+inititalized value of rc. Did you compile this code before posting it?
+
+>  }
+>
+>  static struct of_device_id xgene_reboot_of_match[] = {
+> -       { .compatible = "apm,xgene-reboot" },
+> +       {.compatible = "apm,xgene-reboot"},
+>         {}
+>  };
+>
+> +#ifdef CONFIG_ACPI
+> +static const struct acpi_device_id xgene_reset_acpi_ids[] = {
+> +       {"APMC0D00", 0},
+> +       {}
+> +};
+> +#endif
+
+Do you have to ifdef this?
+> +
+>  static struct platform_driver xgene_reboot_driver = {
+>         .probe = xgene_reboot_probe,
+>         .driver = {
+> -               .name = "xgene-reboot",
+> -               .of_match_table = xgene_reboot_of_match,
+> -       },
+> +                  .name = "xgene-reboot",
+> +                  .of_match_table = xgene_reboot_of_match,
+> +#ifdef CONFIG_ACPI
+> +                  .acpi_match_table = ACPI_PTR(xgene_reset_acpi_ids),
+> +#endif
+
+And this? It'll make for really cluttered drivers if we need this everywhere.
+
+> +                  }
+>  };
+>
+>  static int __init xgene_reboot_init(void)
+>  {
+>         return platform_driver_register(&xgene_reboot_driver);
+>  }
+> +
+
+Gratuitous whitespace change.
+
+
+-Olof
