@@ -1,53 +1,79 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 8 Nov 2013 10:14:30 -0600
-Subject: [PATCH v5] ARM: omap: edma: add suspend suspend/resume hooks
-In-Reply-To: <CAGa+x85W_N9FCYu=dWTG8OgURr9Fo6oZ2KpW_XY9j_xZr8bBrg@mail.gmail.com>
-References: <1383863549-7438-1-git-send-email-zonque@gmail.com>
- <87siv7pxpp.fsf@linaro.org> <527C6F70.1010103@ti.com>
- <CAGa+x85W_N9FCYu=dWTG8OgURr9Fo6oZ2KpW_XY9j_xZr8bBrg@mail.gmail.com>
-Message-ID: <527D0DE6.6090506@ti.com>
+From: pmoore@redhat.com (Paul Moore)
+Date: Fri, 08 Nov 2013 11:29:58 -0500
+Subject: [libseccomp-discuss] [PATCH v2] seccomp: not compatible with ARM
+ OABI
+In-Reply-To: <CALCETrVgwMto=5Rn34dDOLrmzLargvs4QxCdPWdEvd=UZhg_Jg@mail.gmail.com>
+References: <20131107174746.GA22344@www.outflux.net>
+ <1383850597.2938.52.camel@localhost>
+ <CALCETrVgwMto=5Rn34dDOLrmzLargvs4QxCdPWdEvd=UZhg_Jg@mail.gmail.com>
+Message-ID: <1464650.041viV29xe@sifl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 12:28 AM, Kevin Hilman wrote:
-[..]
->>> Also, I believe it was already suggested by Nishanth, but the late/early
->>> callbacks are probably more appropriate here than the noirq callbacks.
->>> Unless there's a *really* good reason to use the noirq callbacks, they
->>> should be avoided.
->>>
->>> That being said, I wonder if the whole approach here is the right one.
->>> I know you're basing your stuff on some TI tree, but that doesn't make
->>> it the right way (usually, it's the opposite, but I digress...)  ;)
->>>
->>> IMO, EDMA should be done like we currently do I2C and not implement
->>> suspend/resume at all.  Instead, the driver should do runtime PM done on
->>
->> But a potential problem with this is powering edma on or off between xfers may
->> slow things down quite a bit because xfers happen so much often and there is
->> some overhead in the pm_runtime calls which adds up overtime when dealing with
->> something as frequent as EDMA. Also we would lose the global EDMA context right
->> so we'd have to restore the context every time during runtime PM (?).
+On Thursday, November 07, 2013 11:05:26 AM Andy Lutomirski wrote:
+> On Thu, Nov 7, 2013 at 10:56 AM, Eric Paris <eparis@redhat.com> wrote:
+>
+> > Isn't x32 similarly screwy?  Does it work because the syscall numbers
+> > are different?
 > 
-> Have a look at the autosuspend feature of runtime PM.  (c.f.
-> Documentation/power/pm_runtime.txt)
+> Yes (from reading the code -- I haven't actually tried it).
 
-Sure, will do that. Thanks :)
+I've got a x32 VM that I boot occasionally to test seccomp/libseccomp.  For 
+the purposes of seccomp it looks exactly like x86_64, including sharing the 
+same AUDIT_ARCH_X86_64 value, the only difference being the syscall number 
+offset ... Assuming you're using kernel 3.9 or later.  Previous kernels had a 
+bug which stripped the x32 syscall offset so it was impossible to distinguish 
+from x86_64 and x32 with seccomp.  See the following commit for the details:
 
-Just one more silly question, in very frequent operations is there no over-head
-even when using autosuspend? Because when I traced last time (without
-autosuspend), the depth of pm runtime calls were quite a lot but this could also
-be because of the OMAP implementation.
+ commit 8b4b9f27e57584f3d90e0bb84cf800ad81cfe3a1
+ Author: Paul Moore <pmoore@redhat.com>
+ Date:   Fri Feb 15 12:21:43 2013 -0500
 
->> I had a patch that also made AES driver not pm_runtime_get/put specially when
->> the next crypto request was imminent. But instead adopted a softer approach
->> where the pm_runtime_put call would happen at a time when we are sure we're at
->> the end of all requests. This resulted in quite a speed up.
-> 
-> Sounds like you partially re-invented autosuspend.
+    x86: remove the x32 syscall bitmask from syscall_get_nr()
+    
+    Commit fca460f95e928bae373daa8295877b6905bc62b8 simplified the x32
+    implementation by creating a syscall bitmask, equal to 0x40000000, that
+    could be applied to x32 syscalls such that the masked syscall number
+    would be the same as a x86_64 syscall.  While that patch was a nice
+    way to simplify the code, it went a bit too far by adding the mask to
+    syscall_get_nr(); returning the masked syscall numbers can cause
+    confusion with callers that expect syscall numbers matching the x32
+    ABI, e.g. unmasked syscall numbers.
+    
+    This patch fixes this by simply removing the mask from syscall_get_nr()
+    while preserving the other changes from the original commit.  While
+    there are several syscall_get_nr() callers in the kernel, most simply
+    check that the syscall number is greater than zero, in this case this
+    patch will have no effect.  Of those remaining callers, they appear
+    to be few, seccomp and ftrace, and from my testing of seccomp without
+    this patch the original commit definitely breaks things; the seccomp
+    filter does not correctly filter the syscalls due to the difference in
+    syscall numbers in the BPF filter and the value from syscall_get_nr().
+    Applying this patch restores the seccomp BPF filter functionality on
+    x32.
+    
+    I've tested this patch with the seccomp BPF filters as well as ftrace
+    and everything looks reasonable to me; needless to say general usage
+    seemed fine as well.
+    
+    Signed-off-by: Paul Moore <pmoore@redhat.com>
+    Link: http://lkml.kernel.org/r/20130215172143.12549.10292.stgit at localhost
+    Cc: <stable@vger.kernel.org>
+    Cc: Will Drewry <wad@chromium.org>
+    Cc: H. Peter Anvin <hpa@zytor.com>
+    Signed-off-by: H. Peter Anvin <hpa@linux.intel.com>
 
-Hehe. :)
+> I've always interpreted the AUDIT_ARCH stuff as meaning that
+> (audit_arch, nr) uniquely identifies a syscall and that (audit_arch,
+> nr, argument registers) identifies a syscall and its arguments.
 
-regards,
+That matches my own experience working with seccomp.
 
--Joel
+> On x32, the syscall invocation instruction is identical to x86_64 and
+> the mode of the process has nothing to do with which syscall is
+> invoked, so having a different audit_arch is unnecessary (as long as
+> the x32 bit in nr is preserved).
+
+-- 
+paul moore
+security and virtualization @ redhat
