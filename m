@@ -1,37 +1,18 @@
 From: kamal@canonical.com (Kamal Mostafa)
-Date: Thu,  7 Nov 2013 18:09:03 -0800
-Subject: [3.8.y.z extended stable] Patch "scripts/kallsyms: filter symbols not
- in kernel address space" has been added to staging queue
-Message-ID: <1383876543-942-1-git-send-email-kamal@canonical.com>
+Date: Thu,  7 Nov 2013 18:15:46 -0800
+Subject: [PATCH 3.8 91/91] scripts/kallsyms: filter symbols not in kernel
+ address space
+In-Reply-To: <1383876946-2396-1-git-send-email-kamal@canonical.com>
+References: <1383876946-2396-1-git-send-email-kamal@canonical.com>
+Message-ID: <1383876946-2396-92-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a note to let you know that I have just added a patch titled
+3.8.13.13 -stable review patch.  If anyone has any objections, please let me know.
 
-    scripts/kallsyms: filter symbols not in kernel address space
+------------------
 
-to the linux-3.8.y-queue branch of the 3.8.y.z extended stable tree 
-which can be found at:
-
- http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.8.y-queue
-
-This patch is scheduled to be released in version 3.8.13.13.
-
-If you, or anyone else, feels it should not be added to this tree, please 
-reply to this email.
-
-For more information about the 3.8.y.z tree, see
-https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
-
-Thanks.
--Kamal
-
-------
-
->From a167c775a75886a8b40531bbe796d67af0af4c0e Mon Sep 17 00:00:00 2001
 From: Ming Lei <tom.leiming@gmail.com>
-Date: Sat, 2 Nov 2013 09:11:33 +1030
-Subject: scripts/kallsyms: filter symbols not in kernel address space
 
 commit f6537f2f0eba4eba3354e48dbe3047db6d8b6254 upstream.
 
@@ -65,11 +46,11 @@ index 487ac6f..9a11f9f 100644
  static int all_symbols = 0;
  static char symbol_prefix_char = '\0';
 +static unsigned long long kernel_start_addr = 0;
-
+ 
  int token_profit[0x10000];
-
+ 
 @@ -65,7 +66,10 @@ unsigned char best_table_len[256];
-
+ 
  static void usage(void)
  {
 -	fprintf(stderr, "Usage: kallsyms [--all-symbols] [--symbol-prefix=<prefix char>] < in.map > out.S\n");
@@ -79,11 +60,11 @@ index 487ac6f..9a11f9f 100644
 +			"< in.map > out.S\n");
  	exit(1);
  }
-
+ 
 @@ -194,6 +198,9 @@ static int symbol_valid(struct sym_entry *s)
  	int i;
  	int offset = 1;
-
+ 
 +	if (s->addr < kernel_start_addr)
 +		return 0;
 +
@@ -107,11 +88,11 @@ index b3d907e..5716ba1 100644
 @@ -83,6 +83,8 @@ kallsyms()
  		kallsymopt="${kallsymopt} --all-symbols"
  	fi
-
+ 
 +	kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
 +
  	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
  		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
-
---
+ 
+-- 
 1.8.1.2
