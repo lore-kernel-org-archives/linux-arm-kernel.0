@@ -1,51 +1,47 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri,  8 Nov 2013 18:37:06 +0000
-Subject: [PATCH 3/9] ARM: kprobes-test: use <asm/opcodes.h> for instruction
- accesses
+Date: Fri,  8 Nov 2013 18:37:09 +0000
+Subject: [PATCH 6/9] ARM: kprobes-test: Workaround GAS .align bug
 In-Reply-To: <1383935832-20865-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1383935832-20865-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1383935832-20865-4-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1383935832-20865-7-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure we read instructions in the correct endian-ness by using
-the <asm/opcodes.h> helper to transform them as necessary.
+From: Taras Kondratiuk <taras.kondratiuk@linaro.org>
 
-CC: Jon Medhurst <tixy@yxit.co.uk>
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+By default if no fill symbol is given to .align directive in a code
+section it fills gap with NOPs. If previous fragment is not
+instruction-aligned, additional pre-alignment is done by zero bytes
+before NOPs. These zero bytes are marked as data by special symbol $d in
+symbol table. Unfortunately GAS assumes that there is only code in the
+code section so it "puts back" code symbol $a at the end of this
+pre-alignment. So if there is some data after alignment it will be
+interpreted as code and will be swapped back to LE for BE8 system during
+a final linking.
+
+If explicit fill value is given to .align, the NOP-padding code is
+skipped and symbol table does not get messed-up.
+
+So the workaround for this issue:
+Use explicit fill value if data should be aligned in the code section.
+
+Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
 ---
- arch/arm/kernel/kprobes-test.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ arch/arm/kernel/kprobes-test.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index 0cd63d0..d39cd2e 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -1374,13 +1374,13 @@ static uintptr_t __used kprobes_test_case_start(const char *title, void *stack)
+diff --git a/arch/arm/kernel/kprobes-test.h b/arch/arm/kernel/kprobes-test.h
+index e28a869..eecc90a 100644
+--- a/arch/arm/kernel/kprobes-test.h
++++ b/arch/arm/kernel/kprobes-test.h
+@@ -115,7 +115,7 @@ struct test_arg_end {
+ 	/* multiple strings to be concatenated.  */		\
+ 	".ascii "#title"				\n\t"	\
+ 	".byte	0					\n\t"	\
+-	".align	2					\n\t"
++	".align	2, 0					\n\t"
  
- 	if (test_case_is_thumb) {
- 		u16 *p = (u16 *)(test_code & ~1);
--		current_instruction = p[0];
-+		current_instruction = __mem_to_opcode_thumb16(p[0]);
- 		if (is_wide_instruction(current_instruction)) {
--			current_instruction <<= 16;
--			current_instruction |= p[1];
-+			u16 instr2 = __mem_to_opcode_thumb16(p[1]);
-+			current_instruction = __opcode_thumb32_compose(current_instruction, instr2);
- 		}
- 	} else {
--		current_instruction = *(u32 *)test_code;
-+		current_instruction = __mem_to_opcode_arm(*(u32 *)test_code);
- 	}
- 
- 	if (current_title[0] == '.')
-@@ -1593,7 +1593,6 @@ static int run_test_cases(void (*tests)(void), const union decode_item *table)
- 	return 0;
- }
- 
--
- static int __init run_all_tests(void)
- {
- 	int ret = 0;
+ #define	TEST_ARG_REG(reg, val)					\
+ 	".byte	"__stringify(ARG_TYPE_REG)"		\n\t"	\
 -- 
 1.8.4.rc3
