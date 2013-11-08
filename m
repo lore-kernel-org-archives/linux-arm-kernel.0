@@ -1,75 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 8 Nov 2013 12:10:27 -0800
-Subject: [PATCH v3 7/9] ARM: add Armada 1500 and Sony NSZ-GS7 device tree
- files
-In-Reply-To: <20131108193054.GJ10335@titan.lakedaemon.net>
-References: <1381235073-17134-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1383661723-17956-8-git-send-email-sebastian.hesselbarth@gmail.com>
- <0AF697FD-60AA-4B8B-A35F-3DF2FFBCF7AF@codeaurora.org>
- <20131108165721.GA10335@titan.lakedaemon.net>
- <8DC09031-553C-4FD5-8F05-F93D6FE40F3A@codeaurora.org>
- <20131108182415.GG10335@titan.lakedaemon.net>
- <CAOesGMhfr3CNxKNRJa+eJepr2Fc-jx4rTQ7cPerTkQM-CyzuCg@mail.gmail.com>
- <20131108193054.GJ10335@titan.lakedaemon.net>
-Message-ID: <CAOesGMir+Zar0hskPQ+ZN6Z7+R-G5GhrafenQPgjZGbVGG9uwA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri,  8 Nov 2013 21:25:18 +0100
+Subject: [PATCH] rtc: pxa: drop usage of CLOCK_TICK_RATE
+Message-ID: <1383942318-12569-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 8, 2013 at 11:30 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Fri, Nov 08, 2013 at 11:14:07AM -0800, Olof Johansson wrote:
->> On Fri, Nov 8, 2013 at 10:24 AM, Jason Cooper <jason@lakedaemon.net> wrote:
->> > On Fri, Nov 08, 2013 at 12:06:26PM -0600, Kumar Gala wrote:
->> >>
->> >> On Nov 8, 2013, at 10:57 AM, Jason Cooper wrote:
->> >>
->> >> > On Fri, Nov 08, 2013 at 10:13:19AM -0600, Kumar Gala wrote:
->> >> >> On Nov 5, 2013, at 8:28 AM, Sebastian Hesselbarth wrote:
->> >> > ...
->> >> >>> .../devicetree/bindings/arm/marvell,berlin.txt     |   24 +++
->> >> >>> arch/arm/boot/dts/Makefile                         |    2 +
->> >> >>> arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |   29 +++
->> >> >>> arch/arm/boot/dts/berlin2.dtsi                     |  227 ++++++++++++++++++++
->> >> >>> 4 files changed, 282 insertions(+)
->> >> >>> create mode 100644 Documentation/devicetree/bindings/arm/marvell,berlin.txt
->> >> >>> create mode 100644 arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
->> >> >>> create mode 100644 arch/arm/boot/dts/berlin2.dtsi
->> >> >>
->> >> >> Haven't we been trying to go away from non-prefixed dts/dtsi?
->> >> >
->> >> > hmmm, this is the first I've heard of that.  Although, your proposal
->> >> > (in another thread) makes more sense now.  :)
->> >> >
->> >> >> So should these be something like marvell-berlin2-...
->> >> >
->> >> > I don't recall this being brought up at the summit, nor in Grant's
->> >> > report.  I do need to give it a more careful read this weekend, though.
->> >> > Perhaps I missed something.
->> >>
->> >> This was based on review comments Olof gave when we pushed some .dts
->> >> files for MSM/APQ Qualcomm Technologies soc/boards.
->> >
->> > As Andrew Lunn mentioned to me earlier, we should consider the fact that
->> > the dts file names are being used by Debian's flash-kernel.  Oh no!
->> > Another ABI! ;-)
->>
->> Yes, the names are mostly stable. ST-Ericsson renamed their dts files
->> and it caused some pain, some build environments have them hardcoded,
->> etc.
->>
->> Still, it is a good idea to start adding new ones using family or
->> vendor prefixes, so they are easier to group. Please keep that in mind
->> on new ones too, Jason -- I don't think I've discussed with you in the
->> past. :-)
->
-> Nope, I definitely missed that if you did ;-)  Will do in the future.
->
-> Perhaps now is the time to consider separating the dts filename from the
-> dtb filename?  I'm warming up to my idea of globalscale,mirabox.dtb...
+The symbol CLOCK_TICK_RATE is (at least on ARM) defined in an platform
+specific header <mach/timex.h>. There are plans to stop using and kill
+these platform specific headers. So fix the only user of pxa's
+<mach/timex.h> to not use it.
 
-Having a "dtb-install" make target that sets those up as softlinks
-could be a good idea, at least. I'm not sold on using them as
-filenames myself though.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+It would be nice to use the clk API to find the tick rate, but I didn't
+find any clk to use.
+---
+ drivers/rtc/rtc-pxa.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
--Olof
+diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
+index a355f2b..0ba07e1 100644
+--- a/drivers/rtc/rtc-pxa.c
++++ b/drivers/rtc/rtc-pxa.c
+@@ -32,7 +32,7 @@
+ 
+ #include <mach/hardware.h>
+ 
+-#define TIMER_FREQ		CLOCK_TICK_RATE
++#define TIMER_FREQ		get_clock_tick_rate()
+ #define RTC_DEF_DIVIDER		(32768 - 1)
+ #define RTC_DEF_TRIM		0
+ #define MAXFREQ_PERIODIC	1000
+-- 
+1.7.10.4
