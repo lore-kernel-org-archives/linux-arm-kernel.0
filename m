@@ -1,17 +1,18 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 08 Nov 2013 11:10:31 +0100
-Subject: [PATCH v2 1/2] clocksource: sh_tmu: Release clock when
- sh_tmu_register() fails
-In-Reply-To: <1383057097-22689-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383057097-22689-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <527CB897.8070107@linaro.org>
+Date: Fri, 08 Nov 2013 11:10:23 +0100
+Subject: [PATCH v2 2/2] clocksource: sh_mtu2: Add clk_prepare/unprepare
+ support
+In-Reply-To: <1383057045-22608-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383057045-22608-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383057045-22608-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <527CB88F.1060107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2013 03:31 PM, Laurent Pinchart wrote:
-> Fix the probe error path to release the clock resource when the
-> sh_tmu_register() call fails.
+On 10/29/2013 03:30 PM, Laurent Pinchart wrote:
+> Prepare the clock at probe time, as there is no other appropriate place
+> in the driver where we're allowed to sleep.
 >
 > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 > Cc: linux-kernel at vger.kernel.org
@@ -20,33 +21,34 @@ On 10/29/2013 03:31 PM, Laurent Pinchart wrote:
 Applied in my tree as 3.13 fixes
 
 > ---
->   drivers/clocksource/sh_tmu.c | 13 ++++++++++---
->   1 file changed, 10 insertions(+), 3 deletions(-)
+>   drivers/clocksource/sh_mtu2.c | 9 +++++++--
+>   1 file changed, 7 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-> index 78b8dae..1597837 100644
-> --- a/drivers/clocksource/sh_tmu.c
-> +++ b/drivers/clocksource/sh_tmu.c
-> @@ -475,9 +475,16 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
->   	p->cs_enabled = false;
->   	p->enable_count = 0;
+> diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+> index e6cfb32..3cf1283 100644
+> --- a/drivers/clocksource/sh_mtu2.c
+> +++ b/drivers/clocksource/sh_mtu2.c
+> @@ -313,13 +313,18 @@ static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
+>   		goto err1;
+>   	}
 >
-> -	return sh_tmu_register(p, (char *)dev_name(&p->pdev->dev),
-> -			       cfg->clockevent_rating,
-> -			       cfg->clocksource_rating);
-> +	ret = sh_tmu_register(p, (char *)dev_name(&p->pdev->dev),
-> +			      cfg->clockevent_rating,
-> +			      cfg->clocksource_rating);
+> +	ret = clk_prepare(p->clk);
 > +	if (ret < 0)
 > +		goto err2;
 > +
-> +	return 0;
-> +
-> + err2:
-> +	clk_put(p->clk);
+>   	ret = sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
+>   			       cfg->clockevent_rating);
+>   	if (ret < 0)
+> -		goto err2;
+> +		goto err3;
+>
+>   	return 0;
+> -
+> + err3:
+> +	clk_unprepare(p->clk);
+>    err2:
+>   	clk_put(p->clk);
 >    err1:
->   	iounmap(p->mapbase);
->    err0:
 >
 
 
