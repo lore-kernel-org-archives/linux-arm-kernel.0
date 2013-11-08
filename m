@@ -1,27 +1,117 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 8 Nov 2013 02:43:33 +0100
-Subject: [PATCH] ARM: pxa/colibri: fix build with CONFIG_USB_OHCI_HCD=y
-In-Reply-To: <1383835013-22215-1-git-send-email-mad_soft@inbox.lv>
-References: <1383835013-22215-1-git-send-email-mad_soft@inbox.lv>
-Message-ID: <201311080243.33269.marex@denx.de>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Thu,  7 Nov 2013 18:09:03 -0800
+Subject: [3.8.y.z extended stable] Patch "scripts/kallsyms: filter symbols not
+ in kernel address space" has been added to staging queue
+Message-ID: <1383876543-942-1-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Dmitry Artamonow,
+This is a note to let you know that I have just added a patch titled
 
-> Fix following build failure observed when support for
-> OHCI host controller is enabled.
-> 
->   CC      arch/arm/mach-pxa/colibri-evalboard.o
-> arch/arm/mach-pxa/colibri-evalboard.c: In function 'colibri_ohci_init':
-> arch/arm/mach-pxa/colibri-evalboard.c:68: error: implicit declaration of
-> function 'IOMEM' make[1]: *** [arch/arm/mach-pxa/colibri-evalboard.o]
-> Error 1
-> make: *** [arch/arm/mach-pxa] Error 2
-> 
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.lv>
+    scripts/kallsyms: filter symbols not in kernel address space
 
-Acked-by: Marek Vasut <marex@denx.de>
+to the linux-3.8.y-queue branch of the 3.8.y.z extended stable tree 
+which can be found at:
 
-Best regards,
-Marek Vasut
+ http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.8.y-queue
+
+This patch is scheduled to be released in version 3.8.13.13.
+
+If you, or anyone else, feels it should not be added to this tree, please 
+reply to this email.
+
+For more information about the 3.8.y.z tree, see
+https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
+
+Thanks.
+-Kamal
+
+------
+
+>From a167c775a75886a8b40531bbe796d67af0af4c0e Mon Sep 17 00:00:00 2001
+From: Ming Lei <tom.leiming@gmail.com>
+Date: Sat, 2 Nov 2013 09:11:33 +1030
+Subject: scripts/kallsyms: filter symbols not in kernel address space
+
+commit f6537f2f0eba4eba3354e48dbe3047db6d8b6254 upstream.
+
+This patch uses CONFIG_PAGE_OFFSET to filter symbols which
+are not in kernel address space because these symbols are
+generally for generating code purpose and can't be run at
+kernel mode, so we needn't keep them in /proc/kallsyms.
+
+For example, on ARM there are some symbols which may be
+linked in relocatable code section, then perf can't parse
+symbols any more from /proc/kallsyms, this patch fixes the
+problem (introduced b9b32bf70f2fb710b07c94e13afbc729afe221da)
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Michal Marek <mmarek@suse.cz>
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+---
+ scripts/kallsyms.c      | 12 +++++++++++-
+ scripts/link-vmlinux.sh |  2 ++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+index 487ac6f..9a11f9f 100644
+--- a/scripts/kallsyms.c
++++ b/scripts/kallsyms.c
+@@ -55,6 +55,7 @@ static struct sym_entry *table;
+ static unsigned int table_size, table_cnt;
+ static int all_symbols = 0;
+ static char symbol_prefix_char = '\0';
++static unsigned long long kernel_start_addr = 0;
+
+ int token_profit[0x10000];
+
+@@ -65,7 +66,10 @@ unsigned char best_table_len[256];
+
+ static void usage(void)
+ {
+-	fprintf(stderr, "Usage: kallsyms [--all-symbols] [--symbol-prefix=<prefix char>] < in.map > out.S\n");
++	fprintf(stderr, "Usage: kallsyms [--all-symbols] "
++			"[--symbol-prefix=<prefix char>] "
++			"[--page-offset=<CONFIG_PAGE_OFFSET>] "
++			"< in.map > out.S\n");
+ 	exit(1);
+ }
+
+@@ -194,6 +198,9 @@ static int symbol_valid(struct sym_entry *s)
+ 	int i;
+ 	int offset = 1;
+
++	if (s->addr < kernel_start_addr)
++		return 0;
++
+ 	/* skip prefix char */
+ 	if (symbol_prefix_char && *(s->sym + 1) == symbol_prefix_char)
+ 		offset++;
+@@ -646,6 +653,9 @@ int main(int argc, char **argv)
+ 				if ((*p == '"' && *(p+2) == '"') || (*p == '\'' && *(p+2) == '\''))
+ 					p++;
+ 				symbol_prefix_char = *p;
++			} else if (strncmp(argv[i], "--page-offset=", 14) == 0) {
++				const char *p = &argv[i][14];
++				kernel_start_addr = strtoull(p, NULL, 16);
+ 			} else
+ 				usage();
+ 		}
+diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
+index b3d907e..5716ba1 100644
+--- a/scripts/link-vmlinux.sh
++++ b/scripts/link-vmlinux.sh
+@@ -83,6 +83,8 @@ kallsyms()
+ 		kallsymopt="${kallsymopt} --all-symbols"
+ 	fi
+
++	kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
++
+ 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
+ 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
+
+--
+1.8.1.2
