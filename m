@@ -1,200 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 8 Nov 2013 16:08:15 +0100
-Subject: [PATCH RESEND 6/7] crypto: atmel-sha - add support for Device Tree
-In-Reply-To: <cover.1383922546.git.nicolas.ferre@atmel.com>
-References: <cover.1383922546.git.nicolas.ferre@atmel.com>
-Message-ID: <15ba31027b31357003a7802fd32beab8f2fd2cdb.1383922546.git.nicolas.ferre@atmel.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Fri, 08 Nov 2013 07:09:36 -0800
+Subject: [RFC PATCH 0/4] wire up CPU features to udev based module loading
+In-Reply-To: <20131107223046.GK1962@tassilo.jf.intel.com>
+References: <1383844657-17487-1-git-send-email-ard.biesheuvel@linaro.org>
+ <527C0195.50008@zytor.com> <20131107213944.GJ1962@tassilo.jf.intel.com>
+ <CAKv+Gu9W-Pu4DGgB-85A3D4Ps9_FLSQgyK3EM7=k7KE1=xsnwg@mail.gmail.com>
+ <20131107223046.GK1962@tassilo.jf.intel.com>
+Message-ID: <a36043f3-15cc-40a4-9226-70e357ceb4d8@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Device Tree and use of the DMA DT API to
-get the channels if needed.
-Documentation is added for these DT nodes.
+I assumed he was referring to just dropping those fields of they didn't make sense for the architecture.  That would make sense to do.
 
-Initial code by: Nicolas Royer and Eukrea.
+Andi Kleen <ak@linux.intel.com> wrote:
+>> - the module aliases host tool has no arch specific dependencies at
+>> all except having x86cpu as one of the entries: would you mind
+>> dropping the x86 prefix there? Or rather add dependencies on $ARCH?
+>> (If we drop it there, we basically end up with 'cpu:' everywhere)
+>
+>Should be fine.
+>
+>> - in the vendor/family/model case, it may be preferable to drop these
+>> fields entirely from certain modules' aliases if they match on 'any'
+>> (provided that the module tools permit this) rather than add
+>> architecture, variant, revision, etc  fields for all architectures if
+>> they can only ever match on one
+>
+>The module tools require everything matching with the same wild cards.
+>
+>So I don't know how "any" would work.
+>
+>-Andi
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- .../devicetree/bindings/crypto/atmel-crypto.txt    | 22 +++++
- drivers/crypto/atmel-sha.c                         | 99 ++++++++++++++++------
- 2 files changed, 97 insertions(+), 24 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/crypto/atmel-crypto.txt b/Documentation/devicetree/bindings/crypto/atmel-crypto.txt
-index 9a24fd9..f2aab3d 100644
---- a/Documentation/devicetree/bindings/crypto/atmel-crypto.txt
-+++ b/Documentation/devicetree/bindings/crypto/atmel-crypto.txt
-@@ -44,3 +44,25 @@ tdes at f803c000 {
- 	       <&dma1 2 21>;
- 	dma-names = "tx", "rx";
- };
-+
-+* Secure Hash Algorithm (SHA)
-+
-+Required properties:
-+- compatible : Should be "atmel,at91sam9g46-sha".
-+- reg: Should contain SHA registers location and length.
-+- interrupts: Should contain the IRQ line for the SHA.
-+
-+Optional properties:
-+- dmas: One DMA specifiers as described in
-+        atmel-dma.txt and dma.txt files.
-+- dma-names: Contains one identifier string for each DMA specifier
-+             in the dmas property. Only one "tx" string needed.
-+
-+Example:
-+sha at f8034000 {
-+	compatible = "atmel,at91sam9g46-sha";
-+	reg = <0xf8034000 0x100>;
-+	interrupts = <42 4 0>;
-+	dmas = <&dma1 2 17>;
-+	dma-names = "tx";
-+};
-diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index eaed8bf..ecfdf72 100644
---- a/drivers/crypto/atmel-sha.c
-+++ b/drivers/crypto/atmel-sha.c
-@@ -30,6 +30,7 @@
- #include <linux/irq.h>
- #include <linux/scatterlist.h>
- #include <linux/dma-mapping.h>
-+#include <linux/of_device.h>
- #include <linux/delay.h>
- #include <linux/crypto.h>
- #include <linux/cryptohash.h>
-@@ -1263,32 +1264,29 @@ static int atmel_sha_dma_init(struct atmel_sha_dev *dd,
- 	int err = -ENOMEM;
- 	dma_cap_mask_t mask_in;
- 
--	if (pdata && pdata->dma_slave->rxdata.dma_dev) {
--		/* Try to grab DMA channel */
--		dma_cap_zero(mask_in);
--		dma_cap_set(DMA_SLAVE, mask_in);
-+	/* Try to grab DMA channel */
-+	dma_cap_zero(mask_in);
-+	dma_cap_set(DMA_SLAVE, mask_in);
- 
--		dd->dma_lch_in.chan = dma_request_channel(mask_in,
--				atmel_sha_filter, &pdata->dma_slave->rxdata);
--
--		if (!dd->dma_lch_in.chan)
--			return err;
--
--		dd->dma_lch_in.dma_conf.direction = DMA_MEM_TO_DEV;
--		dd->dma_lch_in.dma_conf.dst_addr = dd->phys_base +
--			SHA_REG_DIN(0);
--		dd->dma_lch_in.dma_conf.src_maxburst = 1;
--		dd->dma_lch_in.dma_conf.src_addr_width =
--			DMA_SLAVE_BUSWIDTH_4_BYTES;
--		dd->dma_lch_in.dma_conf.dst_maxburst = 1;
--		dd->dma_lch_in.dma_conf.dst_addr_width =
--			DMA_SLAVE_BUSWIDTH_4_BYTES;
--		dd->dma_lch_in.dma_conf.device_fc = false;
--
--		return 0;
-+	dd->dma_lch_in.chan = dma_request_slave_channel_compat(mask_in,
-+			atmel_sha_filter, &pdata->dma_slave->rxdata, dd->dev, "tx");
-+	if (!dd->dma_lch_in.chan) {
-+		dev_warn(dd->dev, "no DMA channel available\n");
-+		return err;
- 	}
- 
--	return -ENODEV;
-+	dd->dma_lch_in.dma_conf.direction = DMA_MEM_TO_DEV;
-+	dd->dma_lch_in.dma_conf.dst_addr = dd->phys_base +
-+		SHA_REG_DIN(0);
-+	dd->dma_lch_in.dma_conf.src_maxburst = 1;
-+	dd->dma_lch_in.dma_conf.src_addr_width =
-+		DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	dd->dma_lch_in.dma_conf.dst_maxburst = 1;
-+	dd->dma_lch_in.dma_conf.dst_addr_width =
-+		DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	dd->dma_lch_in.dma_conf.device_fc = false;
-+
-+	return 0;
- }
- 
- static void atmel_sha_dma_cleanup(struct atmel_sha_dev *dd)
-@@ -1326,6 +1324,48 @@ static void atmel_sha_get_cap(struct atmel_sha_dev *dd)
- 	}
- }
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id atmel_sha_dt_ids[] = {
-+	{ .compatible = "atmel,at91sam9g46-sha" },
-+	{ /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, atmel_sha_dt_ids);
-+
-+static struct crypto_platform_data *atmel_sha_of_init(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct crypto_platform_data *pdata;
-+
-+	if (!np) {
-+		dev_err(&pdev->dev, "device node not found\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "could not allocate memory for pdata\n");
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	pdata->dma_slave = devm_kzalloc(&pdev->dev,
-+					sizeof(*(pdata->dma_slave)),
-+					GFP_KERNEL);
-+	if (!pdata->dma_slave) {
-+		dev_err(&pdev->dev, "could not allocate memory for dma_slave\n");
-+		devm_kfree(&pdev->dev, pdata);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	return pdata;
-+}
-+#else /* CONFIG_OF */
-+static inline struct crypto_platform_data *atmel_sha_of_init(struct platform_device *dev)
-+{
-+	return ERR_PTR(-EINVAL);
-+}
-+#endif
-+
- static int atmel_sha_probe(struct platform_device *pdev)
- {
- 	struct atmel_sha_dev *sha_dd;
-@@ -1402,13 +1442,23 @@ static int atmel_sha_probe(struct platform_device *pdev)
- 	if (sha_dd->caps.has_dma) {
- 		pdata = pdev->dev.platform_data;
- 		if (!pdata) {
--			dev_err(&pdev->dev, "platform data not available\n");
-+			pdata = atmel_sha_of_init(pdev);
-+			if (IS_ERR(pdata)) {
-+				dev_err(&pdev->dev, "platform data not available\n");
-+				err = PTR_ERR(pdata);
-+				goto err_pdata;
-+			}
-+		}
-+		if (!pdata->dma_slave) {
- 			err = -ENXIO;
- 			goto err_pdata;
- 		}
- 		err = atmel_sha_dma_init(sha_dd, pdata);
- 		if (err)
- 			goto err_sha_dma;
-+
-+		dev_info(dev, "using %s for DMA transfers\n",
-+				dma_chan_name(sha_dd->dma_lch_in.chan));
- 	}
- 
- 	spin_lock(&atmel_sha.lock);
-@@ -1483,6 +1533,7 @@ static struct platform_driver atmel_sha_driver = {
- 	.driver		= {
- 		.name	= "atmel_sha",
- 		.owner	= THIS_MODULE,
-+		.of_match_table	= of_match_ptr(atmel_sha_dt_ids),
- 	},
- };
- 
 -- 
-1.8.2.2
+Sent from my mobile phone.  Please pardon brevity and lack of formatting.
