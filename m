@@ -1,42 +1,34 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 08 Nov 2013 23:17:32 +0100
-Subject: [patch] [media] exynos4-is: cleanup a define
-In-Reply-To: <20131108095224.GJ27977@elgon.mountain>
-References: <20131108095224.GJ27977@elgon.mountain>
-Message-ID: <527D62FC.3010001@gmail.com>
+From: lho@apm.com (Loc Ho)
+Date: Fri,  8 Nov 2013 15:30:33 -0700
+Subject: [PATCH 0/5] ata: Add APM X-Gene SATA controller support
+Message-ID: <1383949838-25106-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add APM X-Gene SATA controller support
 
-(dropping some unrelated e-mail addresses from Cc)
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+---
+Loc Ho (5):
+  ata: Export AHCI library functions required by APM X-Gene SATA driver
+  arm64: Add APM X-Gene SATA DTS binding
+  ata: Add APM X-Gene SATA driver
+  ata: Add APM X-Gene SATA serdes functions
+  Documentation: Add documentation for APM X-Gene SATA binding
 
-On 11/08/2013 10:52 AM, Dan Carpenter wrote:
-> This define is only used in s5pcsis_irq_handler():
->
-> 	if ((status&  S5PCSIS_INTSRC_NON_IMAGE_DATA)&&  pktbuf->data) {
->
-> The problem is that "status" is a 32 bit and (0xff<<  28) is larger than
-> 32 bits and that sets off a static checker warning.  I consulted with
-> Sylwester Nawrocki and the define should actually be (0xf<<  28).
->
-> Signed-off-by: Dan Carpenter<dan.carpenter@oracle.com>
-
-Thanks for the fix, patch added to my tree for v3.14.
-
-> diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
-> index 9fc2af6..31dfc50 100644
-> --- a/drivers/media/platform/exynos4-is/mipi-csis.c
-> +++ b/drivers/media/platform/exynos4-is/mipi-csis.c
-> @@ -91,7 +91,7 @@ MODULE_PARM_DESC(debug, "Debug level (0-2)");
->   #define S5PCSIS_INTSRC_ODD_BEFORE	(1<<  29)
->   #define S5PCSIS_INTSRC_ODD_AFTER	(1<<  28)
->   #define S5PCSIS_INTSRC_ODD		(0x3<<  28)
-> -#define S5PCSIS_INTSRC_NON_IMAGE_DATA	(0xff<<  28)
-> +#define S5PCSIS_INTSRC_NON_IMAGE_DATA	(0xf<<  28)
->   #define S5PCSIS_INTSRC_FRAME_START	(1<<  27)
->   #define S5PCSIS_INTSRC_FRAME_END	(1<<  26)
->   #define S5PCSIS_INTSRC_ERR_SOT_HS	(0xf<<  12)
-
---
-Regards,
-Sylwester
+ .../devicetree/bindings/ata/apm-xgene.txt          |   84 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   73 +
+ drivers/ata/Kconfig                                |    7 +
+ drivers/ata/Makefile                               |    2 +
+ drivers/ata/ahci.h                                 |    6 +
+ drivers/ata/libahci.c                              |   13 +-
+ drivers/ata/sata_xgene.c                           | 1385 ++++++++++++++
+ drivers/ata/sata_xgene.h                           |  112 ++
+ drivers/ata/sata_xgene_serdes.c                    | 1982 ++++++++++++++++++++
+ 9 files changed, 3659 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
+ create mode 100644 drivers/ata/sata_xgene.c
+ create mode 100644 drivers/ata/sata_xgene.h
+ create mode 100644 drivers/ata/sata_xgene_serdes.c
