@@ -1,41 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 08 Nov 2013 10:37:34 +0100
-Subject: [patch 1/1] ARM: kirkwood: stop printk TCLK value at boot for
- DT boards
-In-Reply-To: <87vc03s0l1.fsf@lebrac.rtp-net.org>
-References: <20131105180931.674625171@rtp-net.org>
- <527CA812.9050003@gmail.com> <87vc03s0l1.fsf@lebrac.rtp-net.org>
-Message-ID: <527CB0DE.6020303@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 Nov 2013 09:40:18 +0000
+Subject: [PATCH] ARM: kexec: Use the right ISA for relocate_new_kernel
+In-Reply-To: <1383857496-32672-1-git-send-email-Dave.Martin@arm.com>
+References: <1383857496-32672-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20131108094017.GA17461@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2013 10:29 AM, Arnaud Patard (Rtp) wrote:
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
->> On 11/05/2013 07:09 PM, Arnaud Patard (Rtp) wrote:
->>> Commit 2326f04321a9 (ARM: kirkwood: convert to DT irqchip and clocksource)
->>> dropped the call to kirkwood_timer_init() when booting with DT.
->>> This results in kirkwood_tclk not being set and the boot message is now:
->>>
->>> Kirkwood: MV88F6281-A0, TCLK=0
->>>
->>> This patch modifies the message for printing only the kirkwood id,
->>> as it allows to detect if we're running A0/A1/... variants with a simple
->>> dmesg.
->>
->> for DT based booting we also have the "Machine" printed right above the
->> "Kirkwood" string. Don't you think, that we can remove the pr_info
->> completely?
->
-> The Machine give some valuable information as one can load wrong dtb
-> (already happened here). Moreover, it's a of thing (see
-> of_flat_dt_match_machine) so not something that can be decided on
-> kirkwookd side.
-> About possible redundancy of informations between the "Kirkwood:" and
-> the "Machine" lines, the former one gives the stepping. This allows to
-> know easily if kwboot has a chance to work on the serial port.
+Hi Dave,
 
-Ok, I see there is a use for it. So,
+On Thu, Nov 07, 2013 at 08:51:36PM +0000, Dave Martin wrote:
+> Copying a function with memcpy() and then trying to execute the
+> result isn't trivially portable to Thumb.
+> 
+> This patch modifies the kexec soft restart code to copy its
+> assembler trampoline relocate_new_kernel() using fncpy() instead,
+> so that relocate_new_kernel can be in the same ISA as the rest of
+> the kernel without problems.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+[...]
 
-Sebastian
+> @@ -168,16 +171,16 @@ void machine_kexec(struct kimage *image)
+>  
+>  
+>  	/* copy our kernel relocation code to the control code page */
+> -	memcpy(reboot_code_buffer,
+> -	       relocate_new_kernel, relocate_new_kernel_size);
+> +	reboot_entry = fncpy(reboot_code_buffer,
+> +			     reboot_entry,
+> +			     relocate_new_kernel_size);
+
+My only slight gripe with this is that relocate_new_kernel_size also
+includes a bunch of data following the function (which you have now delimited
+with ENTRY/ENDPROC), so using fncpy for that feels a bit awkward.
+
+Will
