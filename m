@@ -1,49 +1,58 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 08 Nov 2013 19:09:34 +0900
-Subject: [PATCH] ARM: shmobile: Select USE_OF on EMEV2
-Message-ID: <20131108100934.24755.56317.sendpatchset@w520>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 08 Nov 2013 11:10:31 +0100
+Subject: [PATCH v2 1/2] clocksource: sh_tmu: Release clock when
+ sh_tmu_register() fails
+In-Reply-To: <1383057097-22689-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383057097-22689-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <527CB897.8070107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On 10/29/2013 03:31 PM, Laurent Pinchart wrote:
+> Fix the probe error path to release the clock resource when the
+> sh_tmu_register() call fails.
+>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Now when the legacy KZM9D board code is gone, make sure
-USE_OF is selected in case of the EMEV2 SoC.
+Applied in my tree as 3.13 fixes
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+> ---
+>   drivers/clocksource/sh_tmu.c | 13 ++++++++++---
+>   1 file changed, 10 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+> index 78b8dae..1597837 100644
+> --- a/drivers/clocksource/sh_tmu.c
+> +++ b/drivers/clocksource/sh_tmu.c
+> @@ -475,9 +475,16 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
+>   	p->cs_enabled = false;
+>   	p->enable_count = 0;
+>
+> -	return sh_tmu_register(p, (char *)dev_name(&p->pdev->dev),
+> -			       cfg->clockevent_rating,
+> -			       cfg->clocksource_rating);
+> +	ret = sh_tmu_register(p, (char *)dev_name(&p->pdev->dev),
+> +			      cfg->clockevent_rating,
+> +			      cfg->clocksource_rating);
+> +	if (ret < 0)
+> +		goto err2;
+> +
+> +	return 0;
+> +
+> + err2:
+> +	clk_put(p->clk);
+>    err1:
+>   	iounmap(p->mapbase);
+>    err0:
+>
 
- Built on top of "renesas-devel-v3.12-rc7-20131101" and
- [PATCH 00/04] ARM: shmobile: KZM9D legacy board code removal
 
- arch/arm/mach-shmobile/Kconfig       |    1 +
- arch/arm/mach-shmobile/setup-emev2.c |    4 ----
- 2 files changed, 1 insertion(+), 4 deletions(-)
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
---- 0017/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-11-08 19:04:48.000000000 +0900
-@@ -123,6 +123,7 @@ config ARCH_EMEV2
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
- 	select CPU_V7
-+	select USE_OF
- 
- config ARCH_R7S72100
- 	bool "RZ/A1H (R7S72100)"
---- 0005/arch/arm/mach-shmobile/setup-emev2.c
-+++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-11-08 19:05:00.000000000 +0900
-@@ -48,8 +48,6 @@ void __init emev2_init_delay(void)
- 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
- }
- 
--#ifdef CONFIG_USE_OF
--
- static void __init emev2_add_standard_devices_dt(void)
- {
- #ifdef CONFIG_COMMON_CLK
-@@ -73,5 +71,3 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma
- 	.init_late	= shmobile_init_late,
- 	.dt_compat	= emev2_boards_compat_dt,
- MACHINE_END
--
--#endif /* CONFIG_USE_OF */
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
