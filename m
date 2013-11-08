@@ -1,319 +1,86 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Fri, 8 Nov 2013 16:26:01 +0200
-Subject: [PATCH v3 RFC] clk: add gpio controlled clock
-In-Reply-To: <cover.1383312867.git.jsarha@ti.com>
-References: <cover.1383312867.git.jsarha@ti.com>
-Message-ID: <1383920761-7295-1-git-send-email-jsarha@ti.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 8 Nov 2013 08:30:11 -0600
+Subject: [PATCH 03/11] devicetree: bindings: Document qcom,kpss-acc
+In-Reply-To: <1986087.9ItmqCgipJ@flatron>
+References: <1383343739-23080-1-git-send-email-sboyd@codeaurora.org>
+ <52792E78.4060600@codeaurora.org>
+ <E034522B-A62C-40A4-800C-00D592AAEF47@codeaurora.org>
+ <1986087.9ItmqCgipJ@flatron>
+Message-ID: <716EE5E6-F792-423A-86C3-6251C54683E1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The added clk-gpio is a basic clock that can be enabled and disabled
-trough a gpio output. The DT binding document for the clock is also
-added. For EPROBE_DEFER handling the registering of the clock has to
-be delayed until of_clk_get() call time.
 
-Signed-off-by: Jyri Sarha <jsarha@ti.com>
-CC: t-kristo at ti.com
----
- .../devicetree/bindings/clock/gpio-clock.txt       |   21 ++
- drivers/clk/Makefile                               |    1 +
- drivers/clk/clk-gpio.c                             |  211 ++++++++++++++++++++
- include/linux/clk-provider.h                       |   25 +++
- 4 files changed, 258 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/gpio-clock.txt
- create mode 100644 drivers/clk/clk-gpio.c
+On Nov 8, 2013, at 3:10 AM, Tomasz Figa wrote:
 
-diff --git a/Documentation/devicetree/bindings/clock/gpio-clock.txt b/Documentation/devicetree/bindings/clock/gpio-clock.txt
-new file mode 100644
-index 0000000..54fea39
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/gpio-clock.txt
-@@ -0,0 +1,21 @@
-+Binding for simple gpio controlled clock.
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : shall be "gpio-clock".
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- enable-gpios : GPIO reference for enabling and disabling the clock.
-+
-+Optional properties:
-+- clocks: Maximum of one parent clock is supported.
-+
-+Example:
-+	clock {
-+		compatible = "gpio-clock";
-+		clocks = <&parentclk>;
-+		#clock-cells = <0>;
-+		enable-gpios = <&gpio 1 GPIO_ACTIVE_HIGH>;
-+	};
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 7d74d06..81b65a3 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
-+obj-$(CONFIG_COMMON_CLK)	+= clk-gpio.o
- 
- # SoCs specific
- obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-diff --git a/drivers/clk/clk-gpio.c b/drivers/clk/clk-gpio.c
-new file mode 100644
-index 0000000..c4c7c69
---- /dev/null
-+++ b/drivers/clk/clk-gpio.c
-@@ -0,0 +1,211 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments
-+ * Author: Jyri Sarha <jsarha@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Gpio controlled clock implementation
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/gpio.h>
-+#include <linux/of_gpio.h>
-+#include <linux/err.h>
-+#include <linux/device.h>
-+
-+/**
-+ * DOC: basic gpio controlled clock which can be enabled and disabled
-+ *      with gpio output
-+ * Traits of this clock:
-+ * prepare - clk_(un)prepare only ensures parent is (un)prepared
-+ * enable - clk_enable and clk_disable are functional & control gpio
-+ * rate - inherits rate from parent.  No clk_set_rate support
-+ * parent - fixed parent.  No clk_set_parent support
-+ */
-+
-+#define to_clk_gpio(_hw) container_of(_hw, struct clk_gpio, hw)
-+
-+static int clk_gpio_enable(struct clk_hw *hw)
-+{
-+	struct clk_gpio *gpio = to_clk_gpio(hw);
-+	int value = gpio->active_low ? 0 : 1;
-+
-+	gpio_set_value(gpio->gpio, value);
-+
-+	return 0;
-+}
-+
-+static void clk_gpio_disable(struct clk_hw *hw)
-+{
-+	struct clk_gpio *gpio = to_clk_gpio(hw);
-+	int value = gpio->active_low ? 1 : 0;
-+
-+	gpio_set_value(gpio->gpio, value);
-+}
-+
-+static int clk_gpio_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_gpio *gpio = to_clk_gpio(hw);
-+	int value = gpio_get_value(gpio->gpio);
-+
-+	return gpio->active_low ? !value : value;
-+}
-+
-+const struct clk_ops clk_gpio_ops = {
-+	.enable = clk_gpio_enable,
-+	.disable = clk_gpio_disable,
-+	.is_enabled = clk_gpio_is_enabled,
-+};
-+EXPORT_SYMBOL_GPL(clk_gpio_ops);
-+
-+/**
-+ * clk_register_gpio - register a gpip clock with the clock framework
-+ * @dev: device that is registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of this clock's parent
-+ * @flags: framework-specific flags for this clock
-+ * @gpio: gpio to control this clock
-+ * @active_low: gpio polarity
-+ */
-+struct clk *clk_register_gpio(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		unsigned int gpio, bool active_low)
-+{
-+	struct clk_gpio *clk_gpio;
-+	struct clk *clk;
-+	struct clk_init_data init = { NULL };
-+	unsigned long gpio_flags;
-+	int err;
-+
-+	if (active_low)
-+		gpio_flags = GPIOF_OUT_INIT_LOW;
-+	else
-+		gpio_flags = GPIOF_OUT_INIT_HIGH;
-+
-+	err = gpio_request_one(gpio, gpio_flags, name);
-+	if (err) {
-+		pr_err("%s: %s: Error requesting clock control gpio %u\n",
-+		       __func__, name, gpio);
-+		return ERR_PTR(err);
-+	}
-+
-+	if (dev)
-+		clk_gpio = devm_kzalloc(dev, sizeof(struct clk_gpio),
-+					GFP_KERNEL);
-+	else
-+		clk_gpio = kzalloc(sizeof(struct clk_gpio), GFP_KERNEL);
-+
-+	if (!clk_gpio) {
-+		pr_err("%s: %s: could not allocate gpio clk\n", __func__, name);
-+		gpio_free(gpio);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	init.name = name;
-+	init.ops = &clk_gpio_ops;
-+	init.flags = flags | CLK_IS_BASIC;
-+	init.parent_names = (parent_name ? &parent_name : NULL);
-+	init.num_parents = (parent_name ? 1 : 0);
-+
-+	clk_gpio->gpio = gpio;
-+	clk_gpio->active_low = active_low;
-+	clk_gpio->hw.init = &init;
-+
-+	clk = clk_register(dev, &clk_gpio->hw);
-+
-+	if (IS_ERR(clk)) {
-+		gpio_free(gpio);
-+		kfree(clk_gpio);
-+	}
-+
-+	pr_err("%s: gpio-clk %s with gpio %u succesfully registered\n",
-+	       __func__, name, gpio);
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL_GPL(clk_register_gpio);
-+
-+#ifdef CONFIG_OF
-+/**
-+ * The clk_register_gpio has to be delayed, because the EPROBE_DEFER
-+ * can not be handled properly at of_clk_init() call time.
-+ */
-+
-+struct clk_gpio_delayed_register_data {
-+	struct device_node *node;
-+	struct mutex lock;
-+	struct clk *clk;
-+};
-+
-+struct clk *of_clk_gpio_delayed_register_get(struct of_phandle_args *clkspec,
-+					     void *_data)
-+{
-+	struct clk_gpio_delayed_register_data *data =
-+		(struct clk_gpio_delayed_register_data *) _data;
-+	struct clk *clk;
-+	const char *clk_name = data->node->name;
-+	const char *parent_name;
-+	enum of_gpio_flags gpio_flags;
-+	int gpio;
-+	bool active_low;
-+
-+	mutex_lock(&data->lock);
-+
-+	if (data->clk) {
-+		mutex_unlock(&data->lock);
-+		return data->clk;
-+	}
-+
-+	gpio = of_get_named_gpio_flags(data->node, "enable-gpios", 0,
-+				       &gpio_flags);
-+
-+	if (gpio < 0) {
-+		mutex_unlock(&data->lock);
-+		if (gpio != -EPROBE_DEFER)
-+			pr_err("%s: %s: Can't get 'enable-gpios' DT property\n",
-+		       __func__, clk_name);
-+		return ERR_PTR(gpio);
-+	}
-+
-+	active_low = gpio_flags & OF_GPIO_ACTIVE_LOW;
-+
-+	parent_name = of_clk_get_parent_name(data->node, 0);
-+
-+	clk = clk_register_gpio(NULL, clk_name, parent_name, 0,
-+				gpio, active_low);
-+	if (IS_ERR(clk)) {
-+		mutex_unlock(&data->lock);
-+		return clk;
-+	}
-+
-+	data->clk = clk;
-+	mutex_unlock(&data->lock);
-+
-+	return clk;
-+}
-+
-+/**
-+ * of_gpio_clk_setup() - Setup function for gpio controlled clock
-+ */
-+void __init of_gpio_clk_setup(struct device_node *node)
-+{
-+	struct clk_gpio_delayed_register_data *data;
-+	data = kzalloc(sizeof(struct clk_gpio_delayed_register_data),
-+		       GFP_KERNEL);
-+	if (!data) {
-+		pr_err("%s: could not allocate gpio clk\n", __func__);
-+		return;
-+	}
-+
-+	data->node = node;
-+	mutex_init(&data->lock);
-+
-+	of_clk_add_provider(node, of_clk_gpio_delayed_register_get, data);
-+}
-+EXPORT_SYMBOL_GPL(of_gpio_clk_setup);
-+CLK_OF_DECLARE(gpio_clk, "gpio-clock", of_gpio_clk_setup);
-+#endif
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 3493c76..f861568 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -439,6 +439,31 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
- 		unsigned long flags);
- 
-+/***
-+ * struct clk_gpio - gpio controlled clock
-+ *
-+ * @hw:		handle between common and hardware-specific interfaces
-+ * @gpio:	gpio
-+ * @active_low:	gpio polarity
-+ *
-+ * Clock with a gpio control for enabling and disabling the parent clock.
-+ * Implements .enable, .disable and .is_enabled
-+ */
-+
-+struct clk_gpio {
-+	struct clk_hw	hw;
-+	unsigned int	gpio;
-+	bool		active_low;
-+};
-+
-+extern const struct clk_ops clk_gpio_ops;
-+
-+struct clk *clk_register_gpio(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		unsigned int gpio, bool active_low);
-+
-+void of_gpio_clk_setup(struct device_node *node);
-+
- /**
-  * clk_register - allocate a new clock, register it and return an opaque cookie
-  * @dev: device that is registering this clock
+> On Tuesday 05 of November 2013 11:51:07 Kumar Gala wrote:
+>> On Nov 5, 2013, at 11:44 AM, Stephen Boyd wrote:
+>>> On 11/05/13 09:13, Kumar Gala wrote:
+>>>> On Nov 1, 2013, at 5:08 PM, Stephen Boyd wrote:
+>>>>> diff --git
+>>>>> a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+>>>>> b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt new
+>>>>> file mode 100644
+>>>>> index 0000000..ed4a9c8
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+>>>>> @@ -0,0 +1,21 @@
+>>>>> +* Krait Processor Sub-system (KPSS) Application Clock Controller
+>>>>> (ACC)
+>>>>> +
+>>>>> +The KPSS ACC provides clock, power domain, and reset control to a
+>>>>> Krait CPU. +There is one ACC register region per CPU within the
+>>>>> KPSS remaped region as +well as an alias register region that
+>>>>> remaps accesses to the ACC associated +with the CPU accessing the
+>>>>> region.
+>>>>> +
+>>>>> +Required Properties:
+>>>>> +
+>>>>> +- compatible : Shall contain "qcom,kpss-acc-v1" or
+>>>>> "qcom,kpss-acc-v2".
+>>>>> +- reg: Specifies the base address and size of the banked register
+>>>>> region. +- cpu-offset : per-cpu offset used when the device is
+>>>>> accessed without the +		CPU remapping facilities.
+>>>>> +		The offset is cpu-offset + (0x10000 * cpu-nr).
+>>>>> +
+>>>>> +Example:
+>>>>> +
+>>>>> +	clock-controller at 2008000 {
+>>>>> +		compatible = "qcom,kpss-acc-v2";
+>>>>> +		reg = <0x02008000 0x1000>;
+>>>>> +	};
+>>>> 
+>>>> I don't get the cpu-offset business, shouldn't this just be:
+>>>> 	reg = <0x02008000 0x1000>, <0x02018000 0x1000>, <0x02028000 
+> 0x1000>,
+>>>> 	<0x02038000 0x1000>;> 
+>>> (Sorry I forgot to add the cpu-offset to the example.)
+>>> 
+>>> Your reg property is one way to do it. I was following the example of
+>>> the GIC binding which just specifies the alias region of the GIC's CPU
+>>> registers and then has a cpu-offset property to describe how to reach
+>>> a
+>>> specific CPU's region.
+>> 
+>> Even in the gic's case I think we should have the reg property cover the
+>> memory map.
+> 
+> The GIC case was supposed to be a hack for Exynos SoCs that do not have 
+> banked per-CPU registers. Currently I consider it broken, because it does 
+> not scale for multi cluster configurations. I believe you should consider 
+> the same.
+> 
+> IMHO the way to provide per-CPU properties should involve CPU nodes to 
+> make sure that the same CPU ID namespace is always used.
+> 
+> Best regards,
+> Tomasz
+
+
+Yeah, Stephen and I talked off line about it and I think we'll end up with a bit of both.  Having the reg property describe both regions, as well as having some nodes via the CPU node to get to the proper "device" for that cpu.
+
+- k
+
 -- 
-1.7.9.5
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
