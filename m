@@ -1,56 +1,49 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 8 Nov 2013 19:03:22 +0900
-Subject: [PATCH 03/04] ARM: shmobile: Remove legacy KZM9D board code
-In-Reply-To: <20131108084859.GA5213@verge.net.au>
-References: <20131106232102.8081.20523.sendpatchset@w520>
- <20131106232129.8081.77546.sendpatchset@w520>
- <20131108084859.GA5213@verge.net.au>
-Message-ID: <CANqRtoQdgUqDC6LCkC91G6TD=cgK2ya-M4miPGdhdEPVmc_efQ@mail.gmail.com>
+Date: Fri, 08 Nov 2013 19:09:34 +0900
+Subject: [PATCH] ARM: shmobile: Select USE_OF on EMEV2
+Message-ID: <20131108100934.24755.56317.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 8, 2013 at 5:49 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Nov 07, 2013 at 08:21:29AM +0900, Magnus Damm wrote:
->> From: Magnus Damm <damm@opensource.se>
->>
->> Remove the C and platform device version of KZM9D.
->>
->> The DT version of KZM9D board support can now instead
->> directly be used with SoC specific code in setup-emev2.c.
->
-> Am I right in thinking that with this change in place we need the following
-> change to the defconfig in order for it to compile.
->
-> diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
-> index 6c37f4a..002488a 100644
-> --- a/arch/arm/configs/kzm9d_defconfig
-> +++ b/arch/arm/configs/kzm9d_defconfig
-> @@ -13,7 +13,7 @@ CONFIG_SLAB=y
->  # CONFIG_BLK_DEV_BSG is not set
->  # CONFIG_IOSCHED_DEADLINE is not set
->  # CONFIG_IOSCHED_CFQ is not set
-> -CONFIG_ARCH_SHMOBILE=y
-> +CONFIG_ARCH_SHMOBILE_MULTI=y
->  CONFIG_ARCH_EMEV2=y
->  CONFIG_MACH_KZM9D=y
->  CONFIG_MEMORY_START=0x40000000
->
->
-> I am holding off on pushing the patches I queued up today until
-> this can be resolved one way or another.
+From: Magnus Damm <damm@opensource.se>
 
-Oh, right, I guess it doesn't know the link address now when the C
-bits are gone. Sorry about that, I totally forgot about the defconfig.
+Now when the legacy KZM9D board code is gone, make sure
+USE_OF is selected in case of the EMEV2 SoC.
 
-At this point I think we should fix up the defconfig to build for
-kzm9d with single platform. So instead of enabling MULTI in the
-kzmd_defconfig, how about this?
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-CONFIG_AUTO_ZRELADDR=y
+ Built on top of "renesas-devel-v3.12-rc7-20131101" and
+ [PATCH 00/04] ARM: shmobile: KZM9D legacy board code removal
 
-Also, it seems that the "select USE_OF" went away with the board code
-Kconfig bits. I will send a patch for that right away.
+ arch/arm/mach-shmobile/Kconfig       |    1 +
+ arch/arm/mach-shmobile/setup-emev2.c |    4 ----
+ 2 files changed, 1 insertion(+), 4 deletions(-)
 
-Cheers,
-
-/ magnus
+--- 0017/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-11-08 19:04:48.000000000 +0900
+@@ -123,6 +123,7 @@ config ARCH_EMEV2
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
++	select USE_OF
+ 
+ config ARCH_R7S72100
+ 	bool "RZ/A1H (R7S72100)"
+--- 0005/arch/arm/mach-shmobile/setup-emev2.c
++++ work/arch/arm/mach-shmobile/setup-emev2.c	2013-11-08 19:05:00.000000000 +0900
+@@ -48,8 +48,6 @@ void __init emev2_init_delay(void)
+ 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
+ }
+ 
+-#ifdef CONFIG_USE_OF
+-
+ static void __init emev2_add_standard_devices_dt(void)
+ {
+ #ifdef CONFIG_COMMON_CLK
+@@ -73,5 +71,3 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= emev2_boards_compat_dt,
+ MACHINE_END
+-
+-#endif /* CONFIG_USE_OF */
