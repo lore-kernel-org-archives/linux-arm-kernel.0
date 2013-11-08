@@ -1,50 +1,52 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Fri,  8 Nov 2013 13:00:22 +0400
-Subject: [PATCH] ARM: i.MX5x: Add SAHARA clock for i.MX5x CPUs
-Message-ID: <1383901222-12013-1-git-send-email-shc_work@mail.ru>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 08 Nov 2013 10:00:02 +0100
+Subject: [patch 1/1] ARM: kirkwood: stop printk TCLK value at boot for
+ DT boards
+In-Reply-To: <20131105180931.674625171@rtp-net.org>
+References: <20131105180931.674625171@rtp-net.org>
+Message-ID: <527CA812.9050003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds missing Security Accelerator (SAHARA) clock for i.MX5x CPUs.
+On 11/05/2013 07:09 PM, Arnaud Patard (Rtp) wrote:
+> Commit 2326f04321a9 (ARM: kirkwood: convert to DT irqchip and clocksource)
+> dropped the call to kirkwood_timer_init() when booting with DT.
+> This results in kirkwood_tclk not being set and the boot message is now:
+>
+> Kirkwood: MV88F6281-A0, TCLK=0
+>
+> This patch modifies the message for printing only the kirkwood id,
+> as it allows to detect if we're running A0/A1/... variants with a simple
+> dmesg.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- Documentation/devicetree/bindings/clock/imx5-clock.txt | 1 +
- arch/arm/mach-imx/clk-imx51-imx53.c                    | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+Arnaud,
 
-diff --git a/Documentation/devicetree/bindings/clock/imx5-clock.txt b/Documentation/devicetree/bindings/clock/imx5-clock.txt
-index 4c029a8..a8bbe77 100644
---- a/Documentation/devicetree/bindings/clock/imx5-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx5-clock.txt
-@@ -198,6 +198,7 @@ clocks and IDs.
- 	spdif1_gate		184
- 	spdif_ipg_gate		185
- 	ocram			186
-+	sahara_ipg_gate		187
- 
- Examples (for mx53):
- 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 219c65e..931f7f9 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -123,7 +123,7 @@ enum imx5_clks {
- 	srtc_gate, pata_gate, sata_gate, spdif_xtal_sel, spdif0_sel,
- 	spdif1_sel, spdif0_pred, spdif0_podf, spdif1_pred, spdif1_podf,
- 	spdif0_com_s, spdif1_com_sel, spdif0_gate, spdif1_gate, spdif_ipg_gate,
--	ocram, clk_max
-+	ocram, sahara_ipg_gate, clk_max
- };
- 
- static struct clk *clk[clk_max];
-@@ -286,6 +286,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 				spdif0_com_sel, ARRAY_SIZE(spdif0_com_sel), CLK_SET_RATE_PARENT);
- 	clk[spdif0_gate] = imx_clk_gate2("spdif0_gate", "spdif0_com_sel", MXC_CCM_CCGR5, 26);
- 	clk[spdif_ipg_gate] = imx_clk_gate2("spdif_ipg_gate", "ipg", MXC_CCM_CCGR5, 30);
-+	clk[sahara_ipg_gate] = imx_clk_gate2("sahara_ipg_gate", "ipg", MXC_CCM_CCGR4, 14);
- 
- 	for (i = 0; i < ARRAY_SIZE(clk); i++)
- 		if (IS_ERR(clk[i]))
--- 
-1.8.1.5
+for DT based booting we also have the "Machine" printed right above the
+"Kirkwood" string. Don't you think, that we can remove the pr_info
+completely?
+
+Sebastian
+
+> ---
+>
+> Index: linux-next/arch/arm/mach-kirkwood/board-dt.c
+> ===================================================================
+> --- linux-next.orig/arch/arm/mach-kirkwood/board-dt.c	2013-11-05 18:36:23.131191305 +0100
+> +++ linux-next/arch/arm/mach-kirkwood/board-dt.c	2013-11-05 18:36:35.867190745 +0100
+> @@ -140,7 +140,7 @@ eth_fixup_skip:
+>
+>   static void __init kirkwood_dt_init(void)
+>   {
+> -	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
+> +	pr_info("Kirkwood: %s.\n", kirkwood_id());
+>
+>   	/*
+>   	 * Disable propagation of mbus errors to the CPU local bus,
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
