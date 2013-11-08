@@ -1,63 +1,56 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri,  8 Nov 2013 15:41:50 +0530
-Subject: [PATCH v5 7/7] ARM: davinci: da850 evm: add GPIO pinumux entries DT
- node
-In-Reply-To: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1383905510-31760-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1383905510-31760-8-git-send-email-prabhakar.csengg@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 08 Nov 2013 11:10:15 +0100
+Subject: [PATCH v2 1/2] clocksource: sh_mtu2: Release clock when
+ sh_mtu2_register() fails
+In-Reply-To: <1383057045-22608-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383000569-8916-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383057045-22608-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <527CB887.8090703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: KV Sujith <sujithkv@ti.com>
+On 10/29/2013 03:30 PM, Laurent Pinchart wrote:
+> Fix the probe error path to release the clock resource when the
+> sh_mtu2_register() call fails.
+>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Add GPIO DT node and pinmux entries for DA850 EVM. GPIO is
-configurable differently on different boards. So add GPIO
-pinmuxing in dts file.
+Applied in my tree as 3.13 fixes
 
-Signed-off-by: KV Sujith <sujithkv@ti.com>
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- arch/arm/boot/dts/da850-evm.dts |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+> ---
+>   drivers/clocksource/sh_mtu2.c | 11 +++++++++--
+>   1 file changed, 9 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+> index 4aac9ee..e6cfb32 100644
+> --- a/drivers/clocksource/sh_mtu2.c
+> +++ b/drivers/clocksource/sh_mtu2.c
+> @@ -313,8 +313,15 @@ static int sh_mtu2_setup(struct sh_mtu2_priv *p, struct platform_device *pdev)
+>   		goto err1;
+>   	}
+>
+> -	return sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
+> -				cfg->clockevent_rating);
+> +	ret = sh_mtu2_register(p, (char *)dev_name(&p->pdev->dev),
+> +			       cfg->clockevent_rating);
+> +	if (ret < 0)
+> +		goto err2;
+> +
+> +	return 0;
+> +
+> + err2:
+> +	clk_put(p->clk);
+>    err1:
+>   	iounmap(p->mapbase);
+>    err0:
+>
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 588ce58..f82c129 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -17,6 +17,21 @@
- 	soc {
- 		pmx_core: pinmux at 1c14120 {
- 			status = "okay";
-+
-+			gpio_pins: pinmux_gpio_pins {
-+				pinctrl-single,bits = <
-+					/* GPIO2_4 GPIO2_6 */
-+					0x18 0x00008080 0x0000f0f0
-+					/* GPIO2_8 GPIO2_15 */
-+					0x14 0x80000008 0xf000000f
-+					/* GPIO3_12 GPIO3_13 */
-+					0x1C 0x00008800 0x0000ff00
-+					/* GPIO4_0 GPIO4_1 */
-+					0x28 0x88000000 0xff000000
-+					/* GPIO6_9 GPIO6_10 GPIO6_13 */
-+					0x34 0x08800800 0x0ff00f00
-+				>;
-+			};
- 		};
- 		serial0: serial at 1c42000 {
- 			status = "okay";
-@@ -101,6 +116,11 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mii_pins>;
- 		};
-+		gpio: gpio at 1e26000 {
-+			status = "okay";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&gpio_pins>;
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		status = "okay";
+
 -- 
-1.7.9.5
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
