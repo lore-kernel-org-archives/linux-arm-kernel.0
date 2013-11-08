@@ -1,57 +1,113 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Fri, 8 Nov 2013 11:56:02 +0800
-Subject: kernel BUG at kernel/kallsyms.c:222!
-In-Reply-To: <87zjpf4w0j.fsf@rustcorp.com.au>
-References: <1383789208.5970.1.camel@phoenix>
- <CACVXFVMn6RSXchQ8u47F35_J+YSnp1bwF1tr-8uCEYwvFsOfgQ@mail.gmail.com>
- <CAFRkauAEt-YhBt11opj_GVCLrxGsTSd2LowWGmukTSmGuJkd3A@mail.gmail.com>
- <CACVXFVO=QA-R1+twCL9fc_3vASg6Ap-3ezi=tU1MV1pdPYrfWw@mail.gmail.com>
- <CAFRkauAdR3=ByE0_B3OsqOBjmbz2a02EXb+6g-vn=1TJ7AZc8Q@mail.gmail.com>
- <CACVXFVMaLOfDvzdn_1NryQY59cgtLdMMqHL-_ZAa95MPz4p56Q@mail.gmail.com>
- <CAFRkauDe7V3N0AbfvE_=GEXHZ_Fw62VsA8p50wSUYE1-TRqMfw@mail.gmail.com>
- <87zjpf4w0j.fsf@rustcorp.com.au>
-Message-ID: <CAFRkauAH7VeuxCU7xQm8+26-P49FjmNyhOu8c4+G2Ki40xTA8g@mail.gmail.com>
+From: gururaja.hebbar@ti.com (Gururaja Hebbar)
+Date: Fri, 8 Nov 2013 09:37:09 +0530
+Subject: [PATCH v4] ARM: omap: edma: add suspend suspend/resume hooks
+In-Reply-To: <527BCFD8.9010207@gmail.com>
+References: <1383164468-4610-1-git-send-email-zonque@gmail.com>
+ <527BC118.1050609@ti.com> <527BCFD8.9010207@gmail.com>
+Message-ID: <527C636D.4040007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/8 Rusty Russell <rusty@rustcorp.com.au>:
-> Axel Lin <axel.lin@ingics.com> writes:
->> 2013/11/7 Ming Lei <tom.leiming@gmail.com>:
->>> Hi,
->>>
->>> On Thu, Nov 7, 2013 at 10:47 AM, Axel Lin <axel.lin@ingics.com> wrote:
->>>>
->>>> hi Ming,
->>>> Seems CONFIG_PAGE_OFFSET is not configurabe in "make menuconfig".
->>>> And I found CONFIG_PAGE_OFFSET=0xC0000000 for all below configs...
->>>> $ make at91_dt_defconfig; grep  CONFIG_PAGE_OFFSET .config
->>>> $ make ep93xx_defconfig; grep  CONFIG_PAGE_OFFSET .config
->>>> $ make imx_v4_v5_defconfig; grep CONFIG_PAGE_OFFSET .config
->>>> $ make mxs_defconfig; grep CONFIG_PAGE_OFFSET .config
->>>> $ make omap2plus_defconfig; grep CONFIG_PAGE_OFFSET .config
->>>> $ make s3c6400_defconfig; grep CONFIG_PAGE_OFFSET .config
->>>> $ make at91x40_defconfig; grep CONFIG_PAGE_OFFSET .config
->>>> ( at91x40_defconfig is also arm7tdmi )
->>>
->>> Firstly it can be configured via VMSPLIT_3GVMSPLIT_2G/VMSPLIT_1G.
->>>
->>> Secondly, configurable or not isn't the point, and maybe some uclinux
->>> platforms do not use CONFIG_PAGE_OFFSET at all, but they should
->>> set it as a reasonable value or at least be below than the start link
->>> address of vmlinux.
+On Thursday 07 November 2013 11:07 PM, Daniel Mack wrote:
+> Hi Joel,
+> 
+> On 11/07/2013 05:34 PM, Joel Fernandes wrote:
+>> Thanks for your followup patch on this. It looks much better now using existing
+>> functions to save/restore the state.
+> 
+> Yes, thanks for the suggesting it in the first place.
+> 
+>> On 10/30/2013 03:21 PM, Daniel Mack wrote:
+>>> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+>> [..]
+>>> +static int edma_pm_resume(struct device *dev)
+>>> +{
+>>> +	int i, j;
+>>> +
+>>> +	pm_runtime_get_sync(dev);
+>>> +
+>>> +	for (j = 0; j < arch_num_cc; j++) {
+>>> +		struct edma *cc = edma_cc[j];
+>>> +
+>>> +		s8 (*queue_priority_mapping)[2];
+>>> +		s8 (*queue_tc_mapping)[2];
+>>> +
+>>> +		queue_tc_mapping = cc->info->queue_tc_mapping;
+>>> +		queue_priority_mapping = cc->info->queue_priority_mapping;
+>>> +
+>>> +		/* Event queue to TC mapping */
+>>> +		for (i = 0; queue_tc_mapping[i][0] != -1; i++)
+>>> +			map_queue_tc(j, queue_tc_mapping[i][0],
+>>> +					queue_tc_mapping[i][1]);
+>>> +
+>>> +		/* Event queue priority mapping */
+>>> +		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
+>>> +			assign_priority_to_queue(j,
+>>> +						queue_priority_mapping[i][0],
+>>> +						queue_priority_mapping[i][1]);
 >>
->> Hi Ming,
+>> I know ti,edma-regions property is not currently being used, but we should
+>> future proof this by setting up DRAE for like done in probe:
 >>
->> I found in arch/arm/include/asm/memory.h:
->> CONFIG_PAGE_OFFSET is not used if !CONFIG_MMU.
->> So looks like setting CONFIG_PAGE_OFFSET to other value still won't work.
->
-> This seems like the simplest solution, but it may mean you still have
-> crap in /proc/kallsyms.
->
-> Does it work for you?
+>>                 for (i = 0; i < info[j]->n_region; i++) {
+>>                         edma_write_array2(j, EDMA_DRAE, i, 0, 0x0);
+>>                         edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
+>>                         edma_write_array(j, EDMA_QRAE, i, 0x0);
+>>                 }
+> 
+> That doesn't work for me. I'm running long-time tests here on a device
+> which has a mwifiex connected to omap_hsmmc. The test procedure includes:
+> 
+> a) a script on the device that puts the device to sleep some seconds
+> after it has been woken up
 
-Yes, it works.
 
-Thanks,
-Axel
+
+> 
+> b) a script on a host that wakes up the device with wake-on-lan every 10
+> seconds
+> 
+> c) a flood ping that checks whether the device is responding
+
+can you share above 2 (b & C) test scripts? (pastebin or inline if small)
+
+thanks in advance
+
+regards
+Gururaja
+
+
+> 
+> 
+> That precedure is running since a couple of hourse here, and it works
+> well with both by v3 and v4 patches. Moving the functions to
+> .suspend/resume _noirq doesn't seem to break anything.
+> 
+> Setting QRAE to 0 as you mentioned above, however, makes the device fail
+> at resume.
+> 
+>>> +static SIMPLE_DEV_PM_OPS(edma_pm_ops, edma_pm_suspend, edma_pm_resume);
+>>
+>> I agree with Nishanth here, it is better to do this in .suspend/resume _noirq
+>> stage to rule out any ordering bugs that may show up in the future, since such
+>> an issue already showed up in earlier testing.
+> 
+> Alright, I already did that.
+> 
+>> I would appreciate it if you can make these 2 changes and post a v5. Thanks for
+>> a lot for all the hardwork.
+> 
+> No problem at all :)
+> 
+>> Acked-by: Joel Fernandes <joelf@ti.com>
+> 
+> Still sure about that? What about your follow-up to your own reply?
+> 
+> 
+> Many thanks for all the feedback!
+> 
+> Daniel
+> 
+> 
+> 
+> 
