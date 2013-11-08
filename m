@@ -1,40 +1,44 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 8 Nov 2013 18:46:25 +0000
-Subject: [PATCH v2] ARM: kexec: Use the right ISA for relocate_new_kernel
-In-Reply-To: <20131108133426.GE17461@mudshark.cambridge.arm.com>
-References: <1383913444-9153-1-git-send-email-Dave.Martin@arm.com>
- <20131108133426.GE17461@mudshark.cambridge.arm.com>
-Message-ID: <20131108184625.GE2602@localhost.localdomain>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 08 Nov 2013 10:51:21 -0800
+Subject: [PATCH] ARM: Use udiv/sdiv for __aeabi_{u}idiv library functions
+In-Reply-To: <20131108165437.GM16735@n2100.arm.linux.org.uk>
+References: <1383852042-10780-1-git-send-email-sboyd@codeaurora.org>
+ <CAL_JsqJ9zbJFJePk2FHH8UhrUP2J7fuuiZLb+NhuTovRodqrCA@mail.gmail.com>
+ <20131108115004.GH28304@ns203013.ovh.net>
+ <20131108165437.GM16735@n2100.arm.linux.org.uk>
+Message-ID: <527D32A9.2060603@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 08, 2013 at 01:34:27PM +0000, Will Deacon wrote:
-> On Fri, Nov 08, 2013 at 12:24:04PM +0000, Dave Martin wrote:
-> > Copying a function with memcpy() and then trying to execute the
-> > result isn't trivially portable to Thumb.
-> > 
-> > This patch modifies the kexec soft restart code to copy its
-> > assembler trampoline relocate_new_kernel() using fncpy() instead,
-> > so that relocate_new_kernel can be in the same ISA as the rest of
-> > the kernel without problems.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> > Changes since v1:
-> > 
-> >   * Move ENDPROC() after relocate_new_kernel's literals, to be
-> >     consistent the location of relocate_new_kernel_end and with the way
-> >     GCC sets ELF symbol sizes for functions.  This is just a tidyup,
-> >     with no functional impact.
-> 
-> Cheers Dave:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
+On 11/08/13 08:54, Russell King - ARM Linux wrote:
+> On Fri, Nov 08, 2013 at 12:50:04PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 19:34 Thu 07 Nov     , Rob Herring wrote:
+>>> On Thu, Nov 7, 2013 at 1:20 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>>> If we're running on a v7 ARM CPU, detect if the CPU supports the
+>>>> sdiv/udiv instructions and replace the signed and unsigned
+>>>> division library functions with an sdiv/udiv instruction.
+>>> [snip]
+>>>
+>>>> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+>>>> index bd454b0..6ed6496 100644
+>>>> --- a/arch/arm/lib/Makefile
+>>>> +++ b/arch/arm/lib/Makefile
+>>>> @@ -15,6 +15,9 @@ lib-y         := backtrace.o changebit.o csumipv6.o csumpartial.o   \
+>>>>                    io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
+>>>>                    call_with_stack.o
+>>>>
+>>>> +lib-$(CONFIG_CPU_V7) += div-v7.o
+>>>> +CFLAGS_div-v7.o := -march=armv7-a
+>>> Won't this fail to build if the compiler doesn't have armv7-a support.
+>>> Perhaps we don't care about compilers that old.
+>> use the propoer compiler to compile a armv7 kernel
+> It's probably about time to get rid of the conditionals for this in
+> the main arch/arm/Makefile actually - some of those date back some
+> 10 or so years.  That's something for the v3.14 merge window.
 
-Thanks
+I'll take that as an endorsement for not falling back to -march=armv5t
+-Wa,-march=armv7-a like is done in arch/arm/Makefile.
 
-
-Are you still in a position to test this, Taras?
-
-Cheers
----Dave
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
