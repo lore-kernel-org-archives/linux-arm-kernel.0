@@ -1,45 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Nov 2013 15:06:02 +0000
-Subject: [RFC v1 PATCH] ARM64: KGDB: Add FP/SIMD debug support
-In-Reply-To: <1383827921-18526-2-git-send-email-vijay.kilari@gmail.com>
-References: <1383827921-18526-1-git-send-email-vijay.kilari@gmail.com>
- <1383827921-18526-2-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20131108150602.GN17461@mudshark.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 8 Nov 2013 16:08:10 +0100
+Subject: [PATCH RESEND 1/7] ARM: at91/dt/trivial: use macro for AES irq type
+In-Reply-To: <cover.1383922546.git.nicolas.ferre@atmel.com>
+References: <cover.1383922546.git.nicolas.ferre@atmel.com>
+Message-ID: <65912068430b5832aeb586f9ea588d1861b43ad0.1383922546.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 07, 2013 at 12:38:41PM +0000, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> 
-> Add KGDB debug support for FP/SIMD processor.This support
-> only debugging of FP/SIMD in kernel mode.
-> With this patch one can view or set FP/SIMD registers in
-> kernel context
-> 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> ---
->  arch/arm64/kernel/kgdb.c |   98 ++++++++++++++++++++++++++++------------------
->  1 file changed, 60 insertions(+), 38 deletions(-)
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-[...]
-
-> @@ -100,11 +108,18 @@ char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
->  	if (regno >= DBG_MAX_REG_NUM || regno < 0)
->  		return NULL;
->  
-> -	if (dbg_reg_def[regno].offset != -1)
-> +	if (dbg_reg_def[regno].offset != -1 && regno < _GP_REGS)
->  		memcpy(mem, (void *)regs + dbg_reg_def[regno].offset,
->  		       dbg_reg_def[regno].size);
-> -	else
-> +	else {
-> +#ifdef CONFIG_KERNEL_MODE_NEON
-> +		fpsimd_save_state(&kgdb_fpsimd_regs);
-> +		memcpy(mem, (void *)&kgdb_fpsimd_regs +
-> +			dbg_reg_def[regno].offset, dbg_reg_def[regno].size);
-
-Don't you only want to do this if you're inside a kernel_neon_{begin,end}
-section? Otherwise, you'll be copying out user registers. It really depends
-on what semantics you want.
-
-Will
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index b7f4961..fca56c7 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -359,7 +359,7 @@
+ 			aes at f8038000 {
+ 				compatible = "atmel,sam9g46-aes";
+ 				reg = <0xf8038000 0x100>;
+-				interrupts = <43 4 0>;
++				interrupts = <43 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			tdes at f803c000 {
+-- 
+1.8.2.2
