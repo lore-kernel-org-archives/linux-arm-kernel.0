@@ -1,242 +1,125 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sat,  9 Nov 2013 13:23:53 +0100
-Subject: [PATCH 1/7] ARM: shmobile: Use #include in device tree sources
+Date: Sat,  9 Nov 2013 13:23:55 +0100
+Subject: [PATCH 3/7] ARM: shmobile: Use interrupt macros in board DT files
 In-Reply-To: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383999839-3339-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1383999839-3339-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow usage of the preprocessor in the SoC device tree
-sources, switch from /include/ to #include.
-
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r7s72100-genmai.dts                   | 2 +-
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts         | 2 +-
- arch/arm/boot/dts/r8a73a4-ape6evm.dts                   | 2 +-
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 +-
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts           | 2 +-
- arch/arm/boot/dts/r8a7778-bockw-reference.dts           | 2 +-
- arch/arm/boot/dts/r8a7778-bockw.dts                     | 2 +-
- arch/arm/boot/dts/r8a7779-marzen-reference.dts          | 2 +-
- arch/arm/boot/dts/r8a7779-marzen.dts                    | 2 +-
- arch/arm/boot/dts/r8a7790-lager-reference.dts           | 2 +-
- arch/arm/boot/dts/r8a7790-lager.dts                     | 2 +-
- arch/arm/boot/dts/r8a7791-koelsch-reference.dts         | 2 +-
- arch/arm/boot/dts/r8a7791-koelsch.dts                   | 2 +-
- arch/arm/boot/dts/sh7372-mackerel.dts                   | 2 +-
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts            | 2 +-
- arch/arm/boot/dts/sh73a0-kzm9g.dts                      | 2 +-
- 16 files changed, 16 insertions(+), 16 deletions(-)
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts                   | 3 ++-
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 3 ++-
+ arch/arm/boot/dts/r8a7778-bockw-reference.dts           | 3 ++-
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts          | 3 ++-
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts            | 3 ++-
+ 5 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
-index 1fb20f2..b1deaf7 100644
---- a/arch/arm/boot/dts/r7s72100-genmai.dts
-+++ b/arch/arm/boot/dts/r7s72100-genmai.dts
-@@ -9,7 +9,7 @@
-  */
- 
- /dts-v1/;
--/include/ "r7s72100.dtsi"
-+#include "r7s72100.dtsi"
- 
- / {
- 	model = "Genmai";
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-index 25dbc1c..338f0cb 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-@@ -9,7 +9,7 @@
-  */
- 
- /dts-v1/;
--/include/ "r8a73a4.dtsi"
-+#include "r8a73a4.dtsi"
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
 diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index 91436b5..7db8d79 100644
+index 7db8d79..e84d1a7 100644
 --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
 +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -9,7 +9,7 @@
-  */
+@@ -10,6 +10,7 @@
  
  /dts-v1/;
--/include/ "r8a73a4.dtsi"
-+#include "r8a73a4.dtsi"
+ #include "r8a73a4.dtsi"
++#include <dt-bindings/interrupt-controller/irq.h>
  
  / {
  	model = "APE6EVM";
+@@ -40,7 +41,7 @@
+ 			compatible = "smsc,lan9118", "smsc,lan9115";
+ 			reg = <0x08000000 0x1000>;
+ 			interrupt-parent = <&irqc1>;
+-			interrupts = <8 0x4>;
++			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
+ 			phy-mode = "mii";
+ 			reg-io-width = <4>;
+ 			smsc,irq-active-high;
 diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 6a54219..c7c5bcb 100644
+index c7c5bcb..aef425f 100644
 --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
 +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -9,7 +9,7 @@
-  */
- 
+@@ -11,6 +11,7 @@
  /dts-v1/;
--/include/ "r8a7740.dtsi"
-+#include "r8a7740.dtsi"
+ #include "r8a7740.dtsi"
  #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
  #include <dt-bindings/pwm/pwm.h>
  
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index 426cd9c..a06a11e 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -9,7 +9,7 @@
-  */
- 
- /dts-v1/;
--/include/ "r8a7740.dtsi"
-+#include "r8a7740.dtsi"
- 
  / {
- 	model = "armadillo 800 eva";
+@@ -94,7 +95,7 @@
+ 		compatible = "sitronix,st1232";
+ 		reg = <0x55>;
+ 		interrupt-parent = <&irqpin1>;
+-		interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
++		interrupts = <2 IRQ_TYPE_NONE>; /* IRQ10: hwirq 2 on irqpin1 */
+ 		pinctrl-0 = <&st1232_pins>;
+ 		pinctrl-names = "default";
+ 		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
 diff --git a/arch/arm/boot/dts/r8a7778-bockw-reference.dts b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-index 9c8bd37..e7751ee 100644
+index e7751ee..f887dc1 100644
 --- a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
 +++ b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
-@@ -15,7 +15,7 @@
-  */
+@@ -16,6 +16,7 @@
  
  /dts-v1/;
--/include/ "r8a7778.dtsi"
-+#include "r8a7778.dtsi"
+ #include "r8a7778.dtsi"
++#include <dt-bindings/interrupt-controller/irq.h>
  
  / {
  	model = "bockw";
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index 12bbebc..46a884d 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -15,7 +15,7 @@
-  */
+@@ -45,7 +46,7 @@
  
- /dts-v1/;
--/include/ "r8a7778.dtsi"
-+#include "r8a7778.dtsi"
- 
- / {
- 	model = "bockw";
+ 		phy-mode = "mii";
+ 		interrupt-parent = <&irqpin>;
+-		interrupts = <0 0>; /* IRQ0: hwirq 0 on irqpin */
++		interrupts = <0 IRQ_TYPE_NONE>; /* IRQ0: hwirq 0 on irqpin */
+ 		reg-io-width = <4>;
+ 		vddvario-supply = <&fixedregulator3v3>;
+ 		vdd33a-supply = <&fixedregulator3v3>;
 diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-index ce3fe9e..08b9ee37 100644
+index 08b9ee37..0f5c614 100644
 --- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
 +++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-@@ -10,7 +10,7 @@
-  */
- 
+@@ -12,6 +12,7 @@
  /dts-v1/;
--/include/ "r8a7779.dtsi"
-+#include "r8a7779.dtsi"
+ #include "r8a7779.dtsi"
  #include <dt-bindings/gpio/gpio.h>
- 
- / {
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index f3f7f79..a7af2c2 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -10,7 +10,7 @@
-  */
- 
- /dts-v1/;
--/include/ "r8a7779.dtsi"
-+#include "r8a7779.dtsi"
++#include <dt-bindings/interrupt-controller/irq.h>
  
  / {
  	model = "marzen";
-diff --git a/arch/arm/boot/dts/r8a7790-lager-reference.dts b/arch/arm/boot/dts/r8a7790-lager-reference.dts
-index ec82674..cce7dbf 100644
---- a/arch/arm/boot/dts/r8a7790-lager-reference.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager-reference.dts
-@@ -9,7 +9,7 @@
-  */
+@@ -43,7 +44,7 @@
  
- /dts-v1/;
--/include/ "r8a7790.dtsi"
-+#include "r8a7790.dtsi"
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 203bd08..8799dfb 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -9,7 +9,7 @@
-  */
- 
- /dts-v1/;
--/include/ "r8a7790.dtsi"
-+#include "r8a7790.dtsi"
- 
- / {
- 	model = "Lager";
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
-index b8a374a..1a0f082 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch-reference.dts
-@@ -10,7 +10,7 @@
-  */
- 
- /dts-v1/;
--/include/ "r8a7791.dtsi"
-+#include "r8a7791.dtsi"
- 
- / {
- 	model = "Koelsch";
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 1ce5250..c4e8b3a 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -10,7 +10,7 @@
-  */
- 
- /dts-v1/;
--/include/ "r8a7791.dtsi"
-+#include "r8a7791.dtsi"
- 
- / {
- 	model = "Koelsch";
-diff --git a/arch/arm/boot/dts/sh7372-mackerel.dts b/arch/arm/boot/dts/sh7372-mackerel.dts
-index 8acf51e..a759a27 100644
---- a/arch/arm/boot/dts/sh7372-mackerel.dts
-+++ b/arch/arm/boot/dts/sh7372-mackerel.dts
-@@ -9,7 +9,7 @@
-  */
- 
- /dts-v1/;
--/include/ "sh7372.dtsi"
-+#include "sh7372.dtsi"
- 
- / {
- 	model = "Mackerel (AP4 EVM 2nd)";
+ 		phy-mode = "mii";
+ 		interrupt-parent = <&irqpin0>;
+-		interrupts = <1 0>; /* IRQ1: hwirq 1 on irqpin0 */
++		interrupts = <1 IRQ_TYPE_NONE>; /* IRQ1: hwirq 1 on irqpin0 */
+ 		reg-io-width = <4>;
+ 		vddvario-supply = <&fixedregulator3v3>;
+ 		vdd33a-supply = <&fixedregulator3v3>;
 diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index df75aea..d5a6d74 100644
+index d5a6d74..605f6c6 100644
 --- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
 +++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -12,7 +12,7 @@
-  */
- 
+@@ -14,6 +14,7 @@
  /dts-v1/;
--/include/ "sh73a0.dtsi"
-+#include "sh73a0.dtsi"
+ #include "sh73a0.dtsi"
  #include <dt-bindings/gpio/gpio.h>
- 
- / {
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-index 0f1ca77..27c5f42 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-@@ -9,7 +9,7 @@
-  */
- 
- /dts-v1/;
--/include/ "sh73a0.dtsi"
-+#include "sh73a0.dtsi"
++#include <dt-bindings/interrupt-controller/irq.h>
  
  / {
  	model = "KZM-A9-GT";
+@@ -82,7 +83,7 @@
+ 		reg = <0x10000000 0x100>;
+ 		phy-mode = "mii";
+ 		interrupt-parent = <&irqpin0>;
+-		interrupts = <3 0>;	/* active low */
++		interrupts = <3 IRQ_TYPE_NONE>;	/* active low */
+ 		reg-io-width = <4>;
+ 		smsc,irq-push-pull;
+ 		smsc,save-mac-address;
 -- 
 1.8.1.5
