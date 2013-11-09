@@ -1,39 +1,76 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 10 Nov 2013 09:15:33 +0100
-Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 2120 board
-In-Reply-To: <527ECBDD.7050607@gmail.com>
-References: <87bo1tmibv.fsf@natisbad.org>
-	<527ECBDD.7050607@gmail.com>
-Message-ID: <20131110091533.463cabb2@skate>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 10 Nov 2013 00:59:08 +0100
+Subject: [PATCH] ARM: mvebu: Add RN104 SATA LEDs driven via NXP PCA9554
+ I2C to GPIO muxer
+In-Reply-To: <877gchmggw.fsf@natisbad.org>
+References: <877gchmggw.fsf@natisbad.org>
+Message-ID: <527ECC4C.8080207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+On 11/09/2013 10:07 PM, Arnaud Ebalard wrote:
+> NETGEAR ReadyNAS 104 has a NXP PCA9554 I2C to GPIO chip. Among the 8 GPIO
+> lines the chip makes available, four are used on the device to control
+> the SATA LEDs (the four remaining ones are used for SATA disk presence).
+> This patch adds DT entries for NXP PCA9554 and the four SATA GPIO LEDs.
+>
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+[...]
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> index b0b32f5..1efc871 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> @@ -123,6 +123,13 @@
+>   					fan_startv = <1>;
+>   					pwm_polarity = <0>;
+>   				};
+> +
+> +				pca9554: pca9554 at 23 {
+> +					compatible = "nxp,pca9554";
+> +					gpio-controller;
+> +					#gpio-cells = <2>;
+> +					reg = <0x23>;
+> +				};
+>   			};
+>   		};
+>   	};
+> @@ -154,6 +161,30 @@
+>   			gpios = <&gpio2 0 1>;    /* GPIO 64 Active Low */
+>   			linux,default-trigger = "keep";
+>   		};
+> +
+> +		sata1_led {
+> +			label = "rn104:blue:sata1";
+> +			gpios = <&pca9554 0 1>;  /* Active Low */
 
-On Sun, 10 Nov 2013 00:57:17 +0100, Sebastian Hesselbarth wrote:
+Same comment as for ReadyNAS 2120 patch:
 
-> >   arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 289 +++++++++++++++++++++++++
-> 
-> Arnaud,
-> 
-> thanks for providing this! I do have some comments below.
-> 
-> we recently had a discussion about the naming of new DTS files, which
-> proposes to name those after vendor,board.dts (or vendor-board.dts).
-> 
-> I personally prefer vendor,board.dts which would give
-> netgear,readynas-2120.dts based on your compatible below.
-> The final call for ',' vs '-' has not been made, so I  suggest Jason
-> makes a call here.
+#include <dt-bindings/gpio/gpio.h> and use GPIO_ACTIVE_HIGH/LOW.
 
-Hum, do we really want that? The current naming scheme is really,
-really great, because whenever you want to grep through all Armada
-370/XP DTS, you just have to use armada-*, for all Kirkwood,
-kirkwood-*. I've found this very very convenient to verify the
-coherency between .dts/.dtsi for a given family of SoCs.
+Sebastian
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> +			default-state = "off";
+> +		};
+> +
+> +		sata2_led {
+> +			label = "rn104:blue:sata2";
+> +			gpios = <&pca9554 1 1>;  /* Active Low */
+> +			default-state = "off";
+> +		};
+> +
+> +		sata3_led {
+> +			label = "rn104:blue:sata3";
+> +			gpios = <&pca9554 2 1>;  /* Active Low */
+> +			default-state = "off";
+> +		};
+> +
+> +		sata4_led {
+> +			label = "rn104:blue:sata4";
+> +			gpios = <&pca9554 3 1>;  /* Active Low */
+> +			default-state = "off";
+> +		};
+>   	};
+>
+>   	gpio_keys {
+>
