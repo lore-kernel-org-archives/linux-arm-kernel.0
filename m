@@ -1,33 +1,40 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat,  9 Nov 2013 08:47:45 +0900
-Subject: [PATCH] ARM: shmobile: kzm9d: Enable AUTO_ZRELADDR in defconfig
-Message-ID: <1383954465-6056-1-git-send-email-horms+renesas@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Nov 2013 00:01:23 +0000
+Subject: [PATCH] ARM: Support arch_irq_work_raise() via self IPIs
+In-Reply-To: <527D7621.2000105@codeaurora.org>
+References: <526DBEAA.4030707@linaro.org>
+ <1382984701-2371-1-git-send-email-sboyd@codeaurora.org>
+ <878uxcq1m7.fsf@linaro.org> <20131029060058.GD21983@codeaurora.org>
+ <CAOesGMhjC=NDn4YiY4tQ3ZcW_rK9_qOY03CVD1eyVFC74ucdrA@mail.gmail.com>
+ <CAOesGMhB2Akf_B2_J3LVdt1bDvcsTE7+8Kq=NvsXmkf3EwGsiw@mail.gmail.com>
+ <527D5D5C.2080409@codeaurora.org>
+ <CAOesGMhyPaMUs3XJshqZ-KYhtWhenttq7qDpF0+4dQ9PvBYVGA@mail.gmail.com>
+ <527D7621.2000105@codeaurora.org>
+Message-ID: <20131109000123.GV16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is required to allow the load address to be supplied
-as an environment variable when building a uImage.
+On Fri, Nov 08, 2013 at 03:39:13PM -0800, Stephen Boyd wrote:
+> On 11/08/13 15:35, Olof Johansson wrote:
+> > On Fri, Nov 8, 2013 at 1:53 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >>
+> >> Ah yes. We don't have IPI support on UP kernels but SMP_ON_UP exposes
+> >> arch_irq_work_raise(). How about this? We should just skip this function
+> >> if we're running on UP.
+> > Yep.
+> >
+> > Tested-by: Olof Johansson <olof@lixom.net>
+> >
+> > Send it to Russell's tracker, plz.
+> >
+> 
+> Thanks. 7887/1.
 
-LOADADDR=0x40008000 ARCH=arm make uImage
+It's probably going to miss Stephen's pull from my tree this evening (if
+he even does one) so... that gives me two options: either drop the original
+commit or apply this.
 
-This is necessary since "ARM: shmobile: Remove legacy KZM9D board code"
+I think I'll apply this and put it in place just after the original commit
+which caused the breakage.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/kzm9d_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
-index 6c37f4a..e6aed23 100644
---- a/arch/arm/configs/kzm9d_defconfig
-+++ b/arch/arm/configs/kzm9d_defconfig
-@@ -32,6 +32,7 @@ CONFIG_FORCE_MAX_ZONEORDER=13
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_AUTO_ZRELADDR=y
- CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_PM_RUNTIME=y
--- 
-1.8.4
+Thanks.
