@@ -1,119 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 08 Nov 2013 17:04:27 -0800
-Subject: [PATCH 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <1383739658-10036-3-git-send-email-vkale@apm.com>
-References: <1383739658-10036-1-git-send-email-vkale@apm.com>
- <1383739658-10036-3-git-send-email-vkale@apm.com>
-Message-ID: <527D8A1B.3030001@codeaurora.org>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sat, 09 Nov 2013 02:30:44 +0100
+Subject: [PATCH 13/24] mm/power: Use memblock apis for early memory
+ allocations
+In-Reply-To: <1383954120-24368-14-git-send-email-santosh.shilimkar@ti.com>
+References: <1383954120-24368-1-git-send-email-santosh.shilimkar@ti.com>
+ <1383954120-24368-14-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1479529.EjZ9YN8f8I@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just some pointer casting nits.
+On Friday, November 08, 2013 06:41:49 PM Santosh Shilimkar wrote:
+> Switch to memblock interfaces for early memory allocator instead of
+> bootmem allocator. No functional change in beahvior than what it is
+> in current code from bootmem users points of view.
+> 
+> Archs already converted to NO_BOOTMEM now directly use memblock
+> interfaces instead of bootmem wrappers build on top of memblock. And the
+> archs which still uses bootmem, these new apis just fallback to exiting
+> bootmem APIs.
+> 
+> Cc: Yinghai Lu <yinghai@kernel.org>
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Pavel Machek <pavel@ucw.cz>
+> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+> Cc: linux-pm at vger.kernel.org
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-On 11/06/13 04:07, Vinayak Kale wrote:
-> Add support for irq registration when pmu interrupt is percpu.
->
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> Signed-off-by: Tuan Phan <tphan@apm.com>
+Fine by me, thanks!
+
 > ---
->  arch/arm64/kernel/perf_event.c |  109 +++++++++++++++++++++++++++++-----------
->  1 file changed, 81 insertions(+), 28 deletions(-)
->
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index cea1594..e60dae3 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -44,6 +44,7 @@
->  static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
->  static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
->  static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
-> +static bool is_percpuirq;
->  
->  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
->  
-> @@ -363,22 +364,51 @@ validate_group(struct perf_event *event)
->  }
->  
->  static void
-> +armpmu_disable_percpu_irq(void *data)
-> +{
-> +	struct arm_pmu *armpmu = (struct arm_pmu *)data;
-
-Useless cast from void *.
-
-> +	struct platform_device *pmu_device = armpmu->plat_device;
-> +	int irq = platform_get_irq(pmu_device, 0);
-> +
-> +	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
-> +	disable_percpu_irq(irq);
-> +}
-> +
-[...]
->  
-> +static void
-> +armpmu_enable_percpu_irq(void *data)
-> +{
-> +	struct arm_pmu *armpmu = (struct arm_pmu *)data;
-
-Here too.
-
-> +	struct platform_device *pmu_device = armpmu->plat_device;
-> +	int irq = platform_get_irq(pmu_device, 0);
-> +
-> +	enable_percpu_irq(irq, 0);
-> +	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
-> +}
-> +
->  static int
->  armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  {
-> @@ -396,34 +426,57 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  		return -ENODEV;
->  	}
->  
-> -	for (i = 0; i < irqs; ++i) {
-> -		err = 0;
-> -		irq = platform_get_irq(pmu_device, i);
-> -		if (irq < 0)
-> -			continue;
-> +	irq = platform_get_irq(pmu_device, 0);
->  
-> -		/*
-> -		 * If we have a single PMU interrupt that we can't shift,
-> -		 * assume that we're running on a uniprocessor machine and
-> -		 * continue. Otherwise, continue without this interrupt.
-> -		 */
-> -		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-> -			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-> -				    irq, i);
-> -			continue;
-> -		}
-> +	/*
-> +	 * Try 'request_percpu_irq' first. If it's return value indicates
-> +	 * that irq is not percpu then try 'request_irq'
-> +	 */
-> +	err = request_percpu_irq(irq, armpmu->handle_irq,
-> +			"arm-pmu", &cpu_hw_events);
-> +	if (err != -EPERM) {
-> +		is_percpuirq = true;
->  
-> -		err = request_irq(irq, armpmu->handle_irq,
-> -				  IRQF_NOBALANCING,
-> -				  "arm-pmu", armpmu);
->  		if (err) {
-> -			pr_err("unable to request IRQ%d for ARM PMU counters\n",
-> -				irq);
-> +			pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
-> +					irq);
->  			armpmu_release_hardware(armpmu);
->  			return err;
->  		}
->  
-> -		cpumask_set_cpu(i, &armpmu->active_irqs);
-> +		on_each_cpu(armpmu_enable_percpu_irq, (void *)armpmu, 1);
-
-Looks like a useless cast to void * here.
-
+>  kernel/power/snapshot.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
+> index 358a146..887134e 100644
+> --- a/kernel/power/snapshot.c
+> +++ b/kernel/power/snapshot.c
+> @@ -637,7 +637,7 @@ __register_nosave_region(unsigned long start_pfn, unsigned long end_pfn,
+>  		BUG_ON(!region);
+>  	} else
+>  		/* This allocation cannot fail */
+> -		region = alloc_bootmem(sizeof(struct nosave_region));
+> +		region = memblock_virt_alloc(sizeof(struct nosave_region));
+>  	region->start_pfn = start_pfn;
+>  	region->end_pfn = end_pfn;
+>  	list_add_tail(&region->list, &nosave_regions);
+> 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
