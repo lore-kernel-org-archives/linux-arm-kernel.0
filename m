@@ -1,69 +1,70 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 09 Nov 2013 13:34:31 +0100
-Subject: [PATCH/RFC] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
-In-Reply-To: <20131108060803.GF9828@verge.net.au>
-References: <1383782061-7111-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CANqRtoRDo6_VYhaq9KkSCo2TnhmwW-vFK99HuBS=umrC1_fD_g@mail.gmail.com>
- <20131108060803.GF9828@verge.net.au>
-Message-ID: <9547447.Oq0RhNMWv3@avalon>
+Date: Sat, 09 Nov 2013 13:56:40 +0100
+Subject: [PATCH 08/12] mmc: sh_mobile_sdhi: Convert to
+ clk_prepare/unprepare
+In-Reply-To: <Pine.LNX.4.64.1310290907520.8404@axis700.grange>
+References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383000569-8916-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <Pine.LNX.4.64.1310290907520.8404@axis700.grange>
+Message-ID: <3901213.QOEV1AdNoe@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Chris,
 
-On Friday 08 November 2013 15:08:05 Simon Horman wrote:
-> On Thu, Nov 07, 2013 at 03:04:57PM +0900, Magnus Damm wrote:
-> > On Thu, Nov 7, 2013 at 8:54 AM, Laurent Pinchart wrote:
-> > > SH-Mobile platforms are transitioning from non-multiplatform to
-> > > multiplatform kernel. A new ARCH_SHMOBILE_MULTI configuration symbol has
-> > > been created to group all multiplatform-enabled SH-Mobile SoCs. The
-> > > existing ARCH_SHMOBILE configuration symbol groups SoCs that haven't
-> > > been converted yet.
-> > > 
-> > > This arrangement works fine for the arch/ code, but lots of drivers
-> > > needed on both ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI depend on
-> > > ARCH_SHMOBILE only. In order to avoid changing them, rename
-> > > ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY, and create a new boolean
-> > > ARCH_SHMOBILE configuration symbol that is selected by both
-> > > ARCH_SHMOBILE_LEGACY and ARCH_SHMOBILE_MULTI.
-> > > 
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
+Could you please pick this patch up ?
+
+On Tuesday 29 October 2013 09:09:37 Guennadi Liakhovetski wrote:
+> On Mon, 28 Oct 2013, Laurent Pinchart wrote:
+> > Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
+> > clk_disable_unprepare() to get ready for the migration to the common
+> > clock framework.
 > > 
-> > Thanks, this looks good to me.
-> > 
-> > Acked-by: Magnus Damm <damm@opensource.se>
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > Cc: linux-mmc at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> This seems reasonable to me.
-> I would pick it up now but it is marked as "RFC".
-> Please let me know if you wish me to pick it up.
-
-I've sent a non-RFC series, please pick that one up.
-
-> > I have one semi-related question below:
-> > > @@ -1619,7 +1621,7 @@ config HZ_FIXED
-> > > 
-> > >         default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
-> > >         
-> > >                 ARCH_S5PV210 || ARCH_EXYNOS4
-> > >         
-> > >         default AT91_TIMER_HZ if ARCH_AT91
-> > > 
-> > > -       default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
-> > > +       default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE_LEGACY
-> > > 
-> > >         default 0
-> > >  
-> > >  choice
+> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> 
+> Thanks
+> Guennadi
+> 
+> > ---
 > > 
-> > For the hunk above, it makes sense that we cannot HZ in the
-> > multiplatform case, so I think your patch is right.
+> >  drivers/mmc/host/sh_mobile_sdhi.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
 > > 
-> > I do however wonder what's the plan with multiplatform and the HZ
-> > value, how do we handle hardware platforms that use 32768 Hz as clock?
-> > Historically those platforms work best with a
-> > even-divide-by-a-power-of-two HZ value, so with a HZ=100 value things
-> > may drift slowly...
+> > diff --git a/drivers/mmc/host/sh_mobile_sdhi.c
+> > b/drivers/mmc/host/sh_mobile_sdhi.c index f344659..ed1718a 100644
+> > --- a/drivers/mmc/host/sh_mobile_sdhi.c
+> > +++ b/drivers/mmc/host/sh_mobile_sdhi.c
+> > @@ -54,7 +54,7 @@ static int sh_mobile_sdhi_clk_enable(struct
+> > platform_device *pdev, unsigned int> 
+> >  	struct mmc_host *mmc = platform_get_drvdata(pdev);
+> >  	struct tmio_mmc_host *host = mmc_priv(mmc);
+> >  	struct sh_mobile_sdhi *priv = container_of(host->pdata, struct
+> >  	sh_mobile_sdhi, mmc_data);> 
+> > -	int ret = clk_enable(priv->clk);
+> > +	int ret = clk_prepare_enable(priv->clk);
+> > 
+> >  	if (ret < 0)
+> >  	
+> >  		return ret;
+> > 
+> > @@ -67,7 +67,7 @@ static void sh_mobile_sdhi_clk_disable(struct
+> > platform_device *pdev)> 
+> >  	struct mmc_host *mmc = platform_get_drvdata(pdev);
+> >  	struct tmio_mmc_host *host = mmc_priv(mmc);
+> >  	struct sh_mobile_sdhi *priv = container_of(host->pdata, struct
+> >  	sh_mobile_sdhi, mmc_data);> 
+> > -	clk_disable(priv->clk);
+> > +	clk_disable_unprepare(priv->clk);
+> > 
+> >  }
+> >  
+> >  static int sh_mobile_sdhi_wait_idle(struct tmio_mmc_host *host)
 
 -- 
 Regards,
