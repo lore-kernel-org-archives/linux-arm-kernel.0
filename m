@@ -1,56 +1,55 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Sat, 9 Nov 2013 17:23:50 +0530
-Subject: [PATCH 2/2] ARM: dts: doc: Document missing binding for ti-sdma
- controller
-In-Reply-To: <CAL_JsqLT0zOMDEQD5gkvTN2KYD2D--=pM6xgwQqPQOmkgcQBVg@mail.gmail.com>
-References: <1383907129-7325-1-git-send-email-r.sricharan@ti.com>
- <1383907129-7325-2-git-send-email-r.sricharan@ti.com>
- <CAL_JsqLT0zOMDEQD5gkvTN2KYD2D--=pM6xgwQqPQOmkgcQBVg@mail.gmail.com>
-Message-ID: <527E224E.5020405@ti.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Sat,  9 Nov 2013 13:23:52 +0100
+Subject: [PATCH 0/7] ARM: shmobile: Use interrupt macros in DT files
+Message-ID: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hello,
 
-On Saturday 09 November 2013 03:24 AM, Rob Herring wrote:
-> On Fri, Nov 8, 2013 at 4:38 AM, Sricharan R <r.sricharan@ti.com> wrote:
->> The binding and support for system DMA module present in OMAP2+ Socs
->> and DRA7 with dma-engine is already present. So adding the missing
->> documentation for the same.
->>
->> Cc: Benoit Cousson <bcousson@baylibre.com>
->> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->> ---
->>  Documentation/devicetree/bindings/dma/ti-sdma.txt |   28 +++++++++++++++++++++
->>  1 file changed, 28 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/dma/ti-sdma.txt
->>
->> diff --git a/Documentation/devicetree/bindings/dma/ti-sdma.txt b/Documentation/devicetree/bindings/dma/ti-sdma.txt
->> new file mode 100644
->> index 0000000..7fb2342
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/dma/ti-sdma.txt
->> @@ -0,0 +1,28 @@
->> +TI SDMA
->> +
->> +Required Properties:
->> +- compatible : Should be "ti,omap2420-sdma", "ti,omap2430-sdma" for OMAP2
->> +               Should be "ti,omap3430-sdma", "ti,omap3630-sdma" for OMAP3
->> +               Should be "ti,omap4430-sdma" for OMAP4, OMAP5 and DRA7
->> +- reg: Memory map for accessing module
->> +- interrupts: Interrupt request number from the dma controller to
-> s/dma/DMA/
->
->> +             interrupt controller
->> +- dma-cells: Should be set to <1>
->> +- dma-channels: Total number of logical DMA channels supported by the
->> +               controller
->> +- dma-requests: Total number of dma request signals supported by the
-> s/dma/DMA/
- Ok, will correct case.
->> +               controller
-> These should have the # included.
- Sorry, i do not follow this ?
+This patch series replaces all numerical IRQ types by the corresponding
+IRQ_TYPE_* macros in device tree sources. It starts by switching from
+/include/ to #include (1/7), replacing numerical types by macros in SoC DT
+files (2/7) and board DT files (3/7), and fixing several boards that use a
+defined IRQ type instead of IRQ_TYPE_NONE.
 
+The changes have been tested on the armadillo and marzen boards.
+
+Laurent Pinchart (7):
+  ARM: shmobile: Use #include in device tree sources
+  ARM: shmobile: Use interrupt macros in SoC DT files
+  ARM: shmobile: Use interrupt macros in board DT files
+  ARM: shmobile: marzen-reference: Use falling edge IRQ for LAN9221
+  ARM: shmobile: bockw-reference: Use falling edge IRQ for LAN9221
+  ARM: shmobile: kzm9g-reference: Use falling edge IRQ for LAN9221
+  ARM: shmobile: armadillo-reference: Use low level IRQ for ST1231
+
+ arch/arm/boot/dts/r7s72100-genmai.dts              |   2 +-
+ arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts    |   2 +-
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts              |   5 +-
+ arch/arm/boot/dts/r8a73a4.dtsi                     | 108 ++++++++++++-----
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts |   5 +-
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts      |   2 +-
+ arch/arm/boot/dts/r8a7740.dtsi                     | 106 ++++++++---------
+ arch/arm/boot/dts/r8a7778-bockw-reference.dts      |   5 +-
+ arch/arm/boot/dts/r8a7778-bockw.dts                |   2 +-
+ arch/arm/boot/dts/r8a7778.dtsi                     |  44 +++----
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts     |   5 +-
+ arch/arm/boot/dts/r8a7779-marzen.dts               |   2 +-
+ arch/arm/boot/dts/r8a7779.dtsi                     |  42 +++----
+ arch/arm/boot/dts/r8a7790-lager-reference.dts      |   2 +-
+ arch/arm/boot/dts/r8a7790-lager.dts                |   2 +-
+ arch/arm/boot/dts/r8a7790.dtsi                     |  58 +++++-----
+ arch/arm/boot/dts/r8a7791-koelsch-reference.dts    |   2 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |   2 +-
+ arch/arm/boot/dts/r8a7791.dtsi                     |  49 ++++----
+ arch/arm/boot/dts/sh7372-mackerel.dts              |   2 +-
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |   5 +-
+ arch/arm/boot/dts/sh73a0-kzm9g.dts                 |   2 +-
+ arch/arm/boot/dts/sh73a0.dtsi                      | 128 +++++++++++----------
+ 23 files changed, 325 insertions(+), 257 deletions(-)
+
+-- 
 Regards,
- Sricharan
+
+Laurent Pinchart
