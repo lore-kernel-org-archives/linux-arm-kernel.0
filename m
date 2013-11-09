@@ -1,68 +1,75 @@
 From: lho@apm.com (Loc Ho)
-Date: Sat,  9 Nov 2013 00:00:28 -0700
-Subject: [PATCH v2 2/5] arm64: Add APM X-Gene DTS entry for SATA controllers
-In-Reply-To: <1383980431-6572-2-git-send-email-lho@apm.com>
+Date: Sat,  9 Nov 2013 00:00:31 -0700
+Subject: [PATCH v2 5/5] Documentation: Add documentation for APM X-Gene SATA
+ DTS binding
+In-Reply-To: <1383980431-6572-5-git-send-email-lho@apm.com>
 References: <1383980431-6572-1-git-send-email-lho@apm.com>
  <1383980431-6572-2-git-send-email-lho@apm.com>
-Message-ID: <1383980431-6572-3-git-send-email-lho@apm.com>
+ <1383980431-6572-3-git-send-email-lho@apm.com>
+ <1383980431-6572-4-git-send-email-lho@apm.com>
+ <1383980431-6572-5-git-send-email-lho@apm.com>
+Message-ID: <1383980431-6572-6-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64: Add APM X-Gene SATA clock and controller DTS entries.
+Documentation: Add documentation for APM X-Gene SATA DTS binding
 
 Signed-off-by: Loc Ho <lho@apm.com>
 Signed-off-by: Tuan Phan <tphan@apm.com>
 Signed-off-by: Suman Tripathi <stripathi@apm.com>
 ---
- arch/arm64/boot/dts/apm-storm.dtsi |   73 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 73 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/ata/apm-xgene.txt          |   84 ++++++++++++++++++++
+ 1 files changed, 84 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 359d7b6..09fc967 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -176,6 +176,36 @@
- 				reg-names = "csr-reg";
- 				clock-output-names = "eth8clk";
- 			};
+diff --git a/Documentation/devicetree/bindings/ata/apm-xgene.txt b/Documentation/devicetree/bindings/ata/apm-xgene.txt
+new file mode 100644
+index 0000000..cd52864
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/apm-xgene.txt
+@@ -0,0 +1,84 @@
++* APM X-Gene 6.0 Gb/s SATA nodes
 +
-+			eth01clk: eth01clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "eth01clk";
-+	                        reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "eth01clk";
-+			};
++SATA nodes are defined to describe on-chip Serial ATA controllers.
++Each SATA controller (pair of ports) have its own node.
 +
-+			eth23clk: eth23clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "eth23clk";
-+	                        reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "eth23clk";
-+			};
++Required properties:
++- compatible		: Shall be "apm,xgene-ahci"
++- reg			: First memory resource shall be the AHCI memory resource
++			  Second memory resource shall be the Serdes memory resource
++			  Third memory resource shall be the optional Serdes
++			  memory resource if mux'ed with another IP
++- interrupt-parent	: Interrupt controller
++- interrupts		: Interrupt mapping for SATA IRQ
++- #clock-cells		: Shall be value of 1
++- clocks		: Reference to the clock entry
++- clock-names		: Shall be "eth01clk", "eth23clk", or "eth45clk".
 +
-+			sata45clk: sata45clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "sata45clk";
-+	                        reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata45clk";
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -193,5 +223,48 @@
- 			reg = <0x0 0x17000014 0x0 0x100>;
- 			mask = <0x1>;
- 		};
++Optional properties:
++- status		: Shall be "ok" if enabled or "na" if disabled. Default
++			  is "ok".
++- serdes-diff-clk	: Shall be 0 for external, 1 internal differential,
++			  or 2 internal single ended clock. Default is 0.
++- gen-sel		: Shall be 1 (force Gen1), 2 (Force Gen2, or 3 Gen3).
++			  Default is 3.
++- EQA1			: Serdes EQ parameter for A1 chip. Default is 9.
++- EQ			: Serdes EQ parameter for non-A1 chip. Default is 2.
++- GENAVG		: Enable averaging Serdes calculation. Default is 0 for
++			  A1 chip and 1 for non-A1 chip.
++- LBA1			: Serdes loopback buffer for A1 chip. Default is 1;
++- LB			: Serdes loopback buffer for non-A1 chip. Default is 0;
++- LCA1			: Serdes loopback enable control for A1 chip. Default
++			  is 1;
++- LC			: Serdes loopback enable control for non-A1 chip.
++			  Default is 0;
++- CDRA1			: Serdes SPD select CDR for A1 chip. Default is 5.
++- CDR			: Serdes SPD select CDR for non-A1 chip. Default is 5.
++- PQA1			: Serdes PQ for A1 chip. Default is 8.
++- PQ			: Serdes PQ for non-A1 chip. Default is 0xA.
++- coherent		: Enable coherent (1 = enable, 0 = disable).
++			  Default is 1.
 +
++Example:
 +		sata0: sata at 1a000000 {
 +			compatible = "apm,xgene-ahci";
 +			reg =  <0x0 0x1a000000 0x0 0x100000
@@ -105,7 +112,5 @@ index 359d7b6..09fc967 100644
 +			serdes-diff-clk = <0>;
 +			gen-sel = <3>;
 +		};
- 	};
- };
 -- 
 1.5.5
