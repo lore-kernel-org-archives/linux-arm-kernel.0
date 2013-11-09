@@ -1,71 +1,86 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 09 Nov 2013 13:56:40 +0100
-Subject: [PATCH 08/12] mmc: sh_mobile_sdhi: Convert to
+Date: Sat, 09 Nov 2013 15:09:33 +0100
+Subject: [PATCH 09/12] usb: gadget: r8a66597-udc: Convert to
  clk_prepare/unprepare
-In-Reply-To: <Pine.LNX.4.64.1310290907520.8404@axis700.grange>
+In-Reply-To: <526F8427.8000209@renesas.com>
 References: <1383000569-8916-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383000569-8916-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <Pine.LNX.4.64.1310290907520.8404@axis700.grange>
-Message-ID: <3901213.QOEV1AdNoe@avalon>
+ <1383000569-8916-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <526F8427.8000209@renesas.com>
+Message-ID: <1930202.N3RGv6418i@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi Felipe,
 
-Could you please pick this patch up ?
-
-On Tuesday 29 October 2013 09:09:37 Guennadi Liakhovetski wrote:
-> On Mon, 28 Oct 2013, Laurent Pinchart wrote:
+On Tuesday 29 October 2013 18:47:19 Shimoda, Yoshihiro wrote:
+> Hi Laurent-san,
+> 
+> (2013/10/29 7:49), Laurent Pinchart wrote:
 > > Turn clk_enable() and clk_disable() calls into clk_prepare_enable() and
 > > clk_disable_unprepare() to get ready for the migration to the common
 > > clock framework.
 > > 
-> > Cc: Chris Ball <cjb@laptop.org>
-> > Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> > Cc: linux-mmc at vger.kernel.org
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: linux-usb at vger.kernel.org
 > > Signed-off-by: Laurent Pinchart
 > > <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Thank you for the patch.
 > 
-> Thanks
-> Guennadi
-> 
+> Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+
+Could you please pick this patch up ?
+
 > > ---
 > > 
-> >  drivers/mmc/host/sh_mobile_sdhi.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >  drivers/usb/gadget/r8a66597-udc.c | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
 > > 
-> > diff --git a/drivers/mmc/host/sh_mobile_sdhi.c
-> > b/drivers/mmc/host/sh_mobile_sdhi.c index f344659..ed1718a 100644
-> > --- a/drivers/mmc/host/sh_mobile_sdhi.c
-> > +++ b/drivers/mmc/host/sh_mobile_sdhi.c
-> > @@ -54,7 +54,7 @@ static int sh_mobile_sdhi_clk_enable(struct
-> > platform_device *pdev, unsigned int> 
-> >  	struct mmc_host *mmc = platform_get_drvdata(pdev);
-> >  	struct tmio_mmc_host *host = mmc_priv(mmc);
-> >  	struct sh_mobile_sdhi *priv = container_of(host->pdata, struct
-> >  	sh_mobile_sdhi, mmc_data);> 
-> > -	int ret = clk_enable(priv->clk);
-> > +	int ret = clk_prepare_enable(priv->clk);
-> > 
-> >  	if (ret < 0)
-> >  	
-> >  		return ret;
-> > 
-> > @@ -67,7 +67,7 @@ static void sh_mobile_sdhi_clk_disable(struct
+> > diff --git a/drivers/usb/gadget/r8a66597-udc.c
+> > b/drivers/usb/gadget/r8a66597-udc.c index 68be48d..4728751 100644
+> > --- a/drivers/usb/gadget/r8a66597-udc.c
+> > +++ b/drivers/usb/gadget/r8a66597-udc.c
+> > @@ -1833,7 +1833,7 @@ static int __exit r8a66597_remove(struct
 > > platform_device *pdev)> 
-> >  	struct mmc_host *mmc = platform_get_drvdata(pdev);
-> >  	struct tmio_mmc_host *host = mmc_priv(mmc);
-> >  	struct sh_mobile_sdhi *priv = container_of(host->pdata, struct
-> >  	sh_mobile_sdhi, mmc_data);> 
-> > -	clk_disable(priv->clk);
-> > +	clk_disable_unprepare(priv->clk);
+> >  	r8a66597_free_request(&r8a66597->ep[0].ep, r8a66597->ep0_req);
+> >  	
+> >  	if (r8a66597->pdata->on_chip) {
 > > 
-> >  }
+> > -		clk_disable(r8a66597->clk);
+> > +		clk_disable_unprepare(r8a66597->clk);
+> > 
+> >  		clk_put(r8a66597->clk);
+> >  	
+> >  	}
+> > 
+> > @@ -1931,7 +1931,7 @@ static int __init r8a66597_probe(struct
+> > platform_device *pdev)> 
+> >  			ret = PTR_ERR(r8a66597->clk);
+> >  			goto clean_up;
+> >  		
+> >  		}
+> > 
+> > -		clk_enable(r8a66597->clk);
+> > +		clk_prepare_enable(r8a66597->clk);
+> > 
+> >  	}
+> >  	
+> >  	if (r8a66597->pdata->sudmac) {
+> > 
+> > @@ -1996,7 +1996,7 @@ clean_up3:
+> >  	free_irq(irq, r8a66597);
 > >  
-> >  static int sh_mobile_sdhi_wait_idle(struct tmio_mmc_host *host)
-
+> >  clean_up2:
+> >  	if (r8a66597->pdata->on_chip) {
+> > 
+> > -		clk_disable(r8a66597->clk);
+> > +		clk_disable_unprepare(r8a66597->clk);
+> > 
+> >  		clk_put(r8a66597->clk);
+> >  	
+> >  	}
+> >  
+> >  clean_up:
 -- 
 Regards,
 
