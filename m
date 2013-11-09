@@ -1,83 +1,66 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 09 Nov 2013 22:07:43 +0100
-Subject: [PATCH] ARM: mvebu: Add RN104 SATA LEDs driven via NXP PCA9554 I2C to
- GPIO muxer
-Message-ID: <877gchmggw.fsf@natisbad.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 9 Nov 2013 22:08:36 +0100
+Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 2120 board
+In-Reply-To: <87bo1tmibv.fsf@natisbad.org>
+References: <87bo1tmibv.fsf@natisbad.org>
+Message-ID: <20131109210836.GK14890@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Nov 09, 2013 at 09:27:32PM +0100, Arnaud Ebalard wrote:
+> 
+> All hardware parts of the (mv78230 Armada XP based) NETGEAR ReadyNAS
+> 2120 are supported by mainline kernel (USB 3.0 and eSATA rear ports,
+> USB 2.0 front port, Gigabit controller and PHYs for the two rear ports,
+> serial port, LEDs, Buttons, 88SE9170 SATA controllers, three G762 fan
+> controllers, G751 temperature sensor) except for:
 
-NETGEAR ReadyNAS 104 has a NXP PCA9554 I2C to GPIO chip. Among the 8 GPIO
-lines the chip makes available, four are used on the device to control
-the SATA LEDs (the four remaining ones are used for SATA disk presence).
-This patch adds DT entries for NXP PCA9554 and the four SATA GPIO LEDs.
+> +			i2c at 11000 {
+> +				compatible = "marvell,mv64xxx-i2c";
+> +				clock-frequency = <400000>;
+> +				status = "okay";
+> +
+> +				/* Rear fan #1 of 3 (Protechnic MGT4012XB-O20,
+> +				 * 8000RPM) near eSATA port */
+> +				g762_fan1: g762 at 3e {
+> +					compatible = "gmt,g762";
+> +					reg = <0x3e>;
+> +					clocks = <&g762_clk>; /* input clock */
+> +					fan_gear_mode = <0>;
+> +					fan_startv = <1>;
+> +					pwm_polarity = <0>;
+> +				};
+> +
+> +				/* Rear fan #2 of 3 at the center */
+> +				g762_fan2: g762 at 48 {
+> +					compatible = "gmt,g762";
+> +					reg = <0x48>;
+> +					clocks = <&g762_clk>; /* input clock */
+> +					fan_gear_mode = <0>;
+> +					fan_startv = <1>;
+> +					pwm_polarity = <0>;
+> +				};
+> +
+> +				/* Rear fan #3 of 3 */
+> +				g762_fan3: g762 at 49 {
+> +					compatible = "gmt,g762";
+> +					reg = <0x49>;
+> +					clocks = <&g762_clk>; /* input clock */
+> +					fan_gear_mode = <0>;
+> +					fan_startv = <1>;
+> +					pwm_polarity = <0>;
+> +				};
+> +
+> +				g751: g751 at 4c {
+> +					compatible = "gmt,g751";
+> +					reg = <0x4c>;
+> +				};
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
-Hi Jason,
+Hi Arnaud
 
-This one depends on the patch (ARM: mvebu: Add Netgear ReadyNAS 104
-board) which you pushed to Olof for inclusion in v3.13.
+Looks good to me. However, if for some reason you need to respin, it
+would be nice to add a comment about what the g751 is. All the other
+i2c devices you say what they are. No need to respin just because of
+this.
 
-If you wonder why NETGEAR was short on GPIO lines from the Armada 370
-SoC and had to add this, the answer is: the front Winstar WH1602 LCD
-consumes 7 lines.
-
-Cheers,
-
-a+
-
- arch/arm/boot/dts/armada-370-netgear-rn104.dts | 31 ++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-index b0b32f5..1efc871 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-@@ -123,6 +123,13 @@
- 					fan_startv = <1>;
- 					pwm_polarity = <0>;
- 				};
-+
-+				pca9554: pca9554 at 23 {
-+					compatible = "nxp,pca9554";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					reg = <0x23>;
-+				};
- 			};
- 		};
- 	};
-@@ -154,6 +161,30 @@
- 			gpios = <&gpio2 0 1>;    /* GPIO 64 Active Low */
- 			linux,default-trigger = "keep";
- 		};
-+
-+		sata1_led {
-+			label = "rn104:blue:sata1";
-+			gpios = <&pca9554 0 1>;  /* Active Low */
-+			default-state = "off";
-+		};
-+
-+		sata2_led {
-+			label = "rn104:blue:sata2";
-+			gpios = <&pca9554 1 1>;  /* Active Low */
-+			default-state = "off";
-+		};
-+
-+		sata3_led {
-+			label = "rn104:blue:sata3";
-+			gpios = <&pca9554 2 1>;  /* Active Low */
-+			default-state = "off";
-+		};
-+
-+		sata4_led {
-+			label = "rn104:blue:sata4";
-+			gpios = <&pca9554 3 1>;  /* Active Low */
-+			default-state = "off";
-+		};
- 	};
- 
- 	gpio_keys {
--- 
-1.8.4.rc3
+	Andrew
