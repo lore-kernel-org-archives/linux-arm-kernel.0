@@ -1,170 +1,155 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri,  8 Nov 2013 22:51:52 -0800
-Subject: [PATCH 3.11 46/94] clockevents: Sanitize ticks to nsec conversion
-In-Reply-To: <20131109065204.252462489@linuxfoundation.org>
-References: <20131109065204.252462489@linuxfoundation.org>
-Message-ID: <20131109065207.464151098@linuxfoundation.org>
+From: anurag19aggarwal@gmail.com (Anurag Aggarwal)
+Date: Sat, 9 Nov 2013 12:28:57 +0530
+Subject: [PATCH] ARM: unwinder: Handle Stackoverflow in unwind_exec_insn
+In-Reply-To: <20131108132119.GB2602@localhost.localdomain>
+References: <1383731448-847-1-git-send-email-a.anurag@samsung.com>
+ <20131108132119.GB2602@localhost.localdomain>
+Message-ID: <CAPoNrtuuHOB5d+vo-wGJ=5JQG=K0ZdaAv2Nyfxnit=WAWzXegg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.11-stable review patch.  If anyone has any objections, please let me know.
+Thanks for your input Dave,
 
-------------------
+I think there is another way to avoid the stack overflow and reduce
+the number of checks also,
 
-From: Thomas Gleixner <tglx@linutronix.de>
+Stack overflow will cause a problem only when we are backtracking the
+last set of registers.
+i.e when the difference between current SP and top of stack is less
+than or equal to number of registers
 
-commit 97b9410643475d6557d2517c2aff9fd2221141a9 upstream.
+we can create two unwind_exec_insn, one without checks and one with checks.
 
-Marc Kleine-Budde pointed out, that commit 77cc982 "clocksource: use
-clockevents_config_and_register() where possible" caused a regression
-for some of the converted subarchs.
+then we call the correct function from unwind_frame depending on the
+difference of SP and top of stack.
 
-The reason is, that the clockevents core code converts the minimal
-hardware tick delta to a nanosecond value for core internal
-usage. This conversion is affected by integer math rounding loss, so
-the backwards conversion to hardware ticks will likely result in a
-value which is less than the configured hardware limitation. The
-affected subarchs used their own workaround (SIGH!) which got lost in
-the conversion.
+This will reduce the amount of checks every time we read a set of
+registers from stack
 
-The solution for the issue at hand is simple: adding evt->mult - 1 to
-the shifted value before the integer divison in the core conversion
-function takes care of it. But this only works for the case where for
-the scaled math mult/shift pair "mult <= 1 << shift" is true. For the
-case where "mult > 1 << shift" we can apply the rounding add only for
-the minimum delta value to make sure that the backward conversion is
-not less than the given hardware limit. For the upper bound we need to
-omit the rounding add, because the backwards conversion is always
-larger than the original latch value. That would violate the upper
-bound of the hardware device.
+Regards
+Anurag
 
-Though looking closer@the details of that function reveals another
-bogosity: The upper bounds check is broken as well. Checking for a
-resulting "clc" value greater than KTIME_MAX after the conversion is
-pointless. The conversion does:
+On Fri, Nov 8, 2013 at 6:51 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Wed, Nov 06, 2013 at 03:20:48PM +0530, Anurag Aggarwal wrote:
+>> Altough stack overflow is expected in unwind_exec_insn, but in cases when area beyond stack is not mapped to physical memory this can cause data abort.
+>>
+>> To avoid above condition handle stack overflow in unwind_exec_insn by checking vsp pointer from top of stack
+>
+> This looks worthwhile, but this patch duplicates the same check in
+> many places, making the code harder to read and maintain than
+> necessary.  It would be a good opportunity for a bit of refactoring,
+> since we've already tried to fix these backtrace overrun issues
+> at least once in the past (not 100% successfully ...)
+>
+>
+> Really, there is a single common check needed: every time we want to
+> read a word from the stack, we need to check that word is within
+> the proper stack bounds before doing the read.
+>
+>
+> At the start of the backtrace, we should determine the thread stack
+> bounds for the thread.  Those bounds should be fixed for the whole
+> backtrace; it makes sense to store them in the unwind_ctrl_block
+> structure, so that called functions can see them.
+>
+> Then a helper can be written that does the correct bounds check and
+> reads a word from the stack, using the current frame's base virtual
+> SP and the thread stack bounds.
+>
+> Then we just need to use that helper whenever we want to read a
+> word from the stack.
+>
+> Cheers
+> ---Dave
+>
+>
+>> Signed-off-by: Anurag Aggarwal <a.anurag@samsung.com>
+>> ---
+>>  arch/arm/kernel/unwind.c | 23 +++++++++++++++--------
+>>  1 files changed, 15 insertions(+), 8 deletions(-)
+>> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+>> index 00df012..d8b8721 100644
+>> --- a/arch/arm/kernel/unwind.c
+>> +++ b/arch/arm/kernel/unwind.c
+>> @@ -241,6 +241,10 @@ static unsigned long unwind_get_byte(struct unwind_ctrl_block *ctrl)
+>> static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+>>  {
+>>       unsigned long insn = unwind_get_byte(ctrl);
+>> +     unsigned long high, low;
+>> +     unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
+>> +     low = ctrl->vrs[SP];
+>> +     high = ALIGN(low, THREAD_SIZE);
+>>
+>>       pr_debug("%s: insn = %08lx\n", __func__, insn);
+>>
+>> @@ -263,27 +267,27 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+>>
+>>               /* pop R4-R15 according to mask */
+>>               load_sp = mask & (1 << (13 - 4));
+>> -             while (mask) {
+>> +             while (mask && vsp < high) {
+>>                       if (mask & 1)
+>>                               ctrl->vrs[reg] = *vsp++;
+>>                       mask >>= 1;
+>>                       reg++;
+>>               }
+>> -             if (!load_sp)
+>> +             if (!load_sp && vsp < high)
+>>                       ctrl->vrs[SP] = (unsigned long)vsp;
+>>       } else if ((insn & 0xf0) == 0x90 &&
+>>                  (insn & 0x0d) != 0x0d)
+>>               ctrl->vrs[SP] = ctrl->vrs[insn & 0x0f];
+>>       else if ((insn & 0xf0) == 0xa0) {
+>> -             unsigned long *vsp = (unsigned long *)ctrl->vrs[SP];
+>>               int reg;
+>>
+>>               /* pop R4-R[4+bbb] */
+>> -             for (reg = 4; reg <= 4 + (insn & 7); reg++)
+>> +             for (reg = 4;  (reg <= 4 + (insn & 7)) && (vsp < high; reg++)
+>>                       ctrl->vrs[reg] = *vsp++;
+>> -             if (insn & 0x80)
+>> +             if (insn & 0x80 && vsp < high)
+>>                       ctrl->vrs[14] = *vsp++;
+>> -             ctrl->vrs[SP] = (unsigned long)vsp;
+>> +             if (vsp < high)
+>> +                     ctrl->vrs[SP] = (unsigned long)vsp;
+>>       } else if (insn == 0xb0) {
+>>               if (ctrl->vrs[PC] == 0)
+>>                       ctrl->vrs[PC] = ctrl->vrs[LR];
+>> @@ -301,13 +305,14 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+>>               }
+>>
+>>               /* pop R0-R3 according to mask */
+>> -             while (mask) {
+>> +             while (mask && vsp < high) {
+>>                       if (mask & 1)
+>>                               ctrl->vrs[reg] = *vsp++;
+>>                       mask >>= 1;
+>>                       reg++;
+>>               }
+>> -             ctrl->vrs[SP] = (unsigned long)vsp;
+>> +             if (vsp < high)
+>> +                     ctrl->vrs[SP] = (unsigned long)vsp;
+>>       } else if (insn == 0xb2) {
+>>               unsigned long uleb128 = unwind_get_byte(ctrl);
+>>
+>> @@ -317,6 +322,8 @@ static int unwind_exec_insn(struct unwind_ctrl_block *ctrl)
+>>               return -URC_FAILURE;
+>>       }
+>>
+>> +     if (vsp >= high)
+>> +             return -URC_FAILURE;
+>>       pr_debug("%s: fp = %08lx sp = %08lx lr = %08lx pc = %08lx\n", __func__,
+>>                ctrl->vrs[FP], ctrl->vrs[SP], ctrl->vrs[LR], ctrl->vrs[PC]);
+>>
+>> --
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-      u64 clc = (latch << evt->shift) / evt->mult;
 
-So there is no sanity check for (latch << evt->shift) exceeding the
-64bit boundary. The latch argument is "unsigned long", so on a 64bit
-arch the handed in argument could easily lead to an unnoticed shift
-overflow. With the above rounding fix applied the calculation before
-the divison is:
 
-       u64 clc = (latch << evt->shift) + evt->mult - 1;
-
-So we need to make sure, that neither the shift nor the rounding add
-is overflowing the u64 boundary.
-
-[ukl: move assignment to rnd after eventually changing mult, fix build
- issue and correct comment with the right math]
-
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-Cc: nicolas.ferre at atmel.com
-Cc: Marc Pignat <marc.pignat@hevs.ch>
-Cc: john.stultz at linaro.org
-Cc: kernel at pengutronix.de
-Cc: Ronald Wahl <ronald.wahl@raritan.com>
-Cc: LAK <linux-arm-kernel@lists.infradead.org>
-Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-Link: http://lkml.kernel.org/r/1380052223-24139-1-git-send-email-u.kleine-koenig at pengutronix.de
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- kernel/time/clockevents.c |   65 +++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 50 insertions(+), 15 deletions(-)
-
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -33,29 +33,64 @@ struct ce_unbind {
- 	int res;
- };
- 
--/**
-- * clockevents_delta2ns - Convert a latch value (device ticks) to nanoseconds
-- * @latch:	value to convert
-- * @evt:	pointer to clock event device descriptor
-- *
-- * Math helper, returns latch value converted to nanoseconds (bound checked)
-- */
--u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
-+static u64 cev_delta2ns(unsigned long latch, struct clock_event_device *evt,
-+			bool ismax)
- {
- 	u64 clc = (u64) latch << evt->shift;
-+	u64 rnd;
- 
- 	if (unlikely(!evt->mult)) {
- 		evt->mult = 1;
- 		WARN_ON(1);
- 	}
-+	rnd = (u64) evt->mult - 1;
-+
-+	/*
-+	 * Upper bound sanity check. If the backwards conversion is
-+	 * not equal latch, we know that the above shift overflowed.
-+	 */
-+	if ((clc >> evt->shift) != (u64)latch)
-+		clc = ~0ULL;
-+
-+	/*
-+	 * Scaled math oddities:
-+	 *
-+	 * For mult <= (1 << shift) we can safely add mult - 1 to
-+	 * prevent integer rounding loss. So the backwards conversion
-+	 * from nsec to device ticks will be correct.
-+	 *
-+	 * For mult > (1 << shift), i.e. device frequency is > 1GHz we
-+	 * need to be careful. Adding mult - 1 will result in a value
-+	 * which when converted back to device ticks can be larger
-+	 * than latch by up to (mult - 1) >> shift. For the min_delta
-+	 * calculation we still want to apply this in order to stay
-+	 * above the minimum device ticks limit. For the upper limit
-+	 * we would end up with a latch value larger than the upper
-+	 * limit of the device, so we omit the add to stay below the
-+	 * device upper boundary.
-+	 *
-+	 * Also omit the add if it would overflow the u64 boundary.
-+	 */
-+	if ((~0ULL - clc > rnd) &&
-+	    (!ismax || evt->mult <= (1U << evt->shift)))
-+		clc += rnd;
- 
- 	do_div(clc, evt->mult);
--	if (clc < 1000)
--		clc = 1000;
--	if (clc > KTIME_MAX)
--		clc = KTIME_MAX;
- 
--	return clc;
-+	/* Deltas less than 1usec are pointless noise */
-+	return clc > 1000 ? clc : 1000;
-+}
-+
-+/**
-+ * clockevents_delta2ns - Convert a latch value (device ticks) to nanoseconds
-+ * @latch:	value to convert
-+ * @evt:	pointer to clock event device descriptor
-+ *
-+ * Math helper, returns latch value converted to nanoseconds (bound checked)
-+ */
-+u64 clockevent_delta2ns(unsigned long latch, struct clock_event_device *evt)
-+{
-+	return cev_delta2ns(latch, evt, false);
- }
- EXPORT_SYMBOL_GPL(clockevent_delta2ns);
- 
-@@ -380,8 +415,8 @@ void clockevents_config(struct clock_eve
- 		sec = 600;
- 
- 	clockevents_calc_mult_shift(dev, freq, sec);
--	dev->min_delta_ns = clockevent_delta2ns(dev->min_delta_ticks, dev);
--	dev->max_delta_ns = clockevent_delta2ns(dev->max_delta_ticks, dev);
-+	dev->min_delta_ns = cev_delta2ns(dev->min_delta_ticks, dev, false);
-+	dev->max_delta_ns = cev_delta2ns(dev->max_delta_ticks, dev, true);
- }
- 
- /**
+-- 
+Anurag Aggarwal
