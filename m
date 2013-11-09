@@ -1,41 +1,48 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat,  9 Nov 2013 03:17:34 +0100
-Subject: [PATCH] MAINTAINERS: Add entry for Samsung SoC clock drivers
-Message-ID: <1383963454-2749-1-git-send-email-tomasz.figa@gmail.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Sat, 9 Nov 2013 10:32:58 +0530
+Subject: [PATCH V4] arm64: KVM: Support X-Gene guest VCPU on APM X-Gene
+ host
+In-Reply-To: <51F7B80E.3040905@arm.com>
+References: <1374471119-26461-1-git-send-email-anup.patel@linaro.org>
+ <CAAhSdy29wvVcmwaUh5PfJTrw4R+MeDrLoWWOPwpnhw2hDvKmKg@mail.gmail.com>
+ <51F7B80E.3040905@arm.com>
+Message-ID: <CALrVBkt3eBM4hJ7W0orgdS9O=dU26Mb8Fd0Q+wozV87YZQjEHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+On 30 July 2013 18:26, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 30/07/13 12:57, Anup Patel wrote:
+>> On Mon, Jul 22, 2013 at 11:01 AM, Anup Patel <anup.patel@linaro.org> wrote:
+>>> This patch allows us to have X-Gene guest VCPU when using KVM arm64
+>>> on APM X-Gene host.
+>>>
+>>> We add KVM_ARM_TARGET_XGENE_POTENZA for X-Gene Potenza compatible
+>>> guest VCPU and we return KVM_ARM_TARGET_XGENE_POTENZA in kvm_target_cpu()
+>>> when running on X-Gene host with Potenza core.
+>
+> [...]
+>
+>> Hi Marc,
+>>
+>> Do you think more changes are required to this patch ?
+>
+> Hi Anup,
+>
+> It looks OK to me as it is. I'll queue it for 3.12.
 
-This patch adds an entry for Samsung SoC clock drivers located under
-drivers/clk/samsung/ directory, with me taking the maintainer role.
+Hi Marc,
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Acked-by: Mike Turquette <mturquette@linaro.org>
-Acked-by: Sachin Kamat <sachin.kamat@linaro.org>
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
----
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+I think this patch was missed for 3.12
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 61b8757..df7e1bf 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7319,6 +7319,12 @@ L:	linux-media at vger.kernel.org
- S:	Supported
- F:	drivers/media/i2c/s5c73m3/*
- 
-+SAMSUNG SOC CLOCK DRIVERS
-+M:	Tomasz Figa <t.figa@samsung.com>
-+S:	Supported
-+L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-+F:	drivers/clk/samsung/
-+
- SERIAL DRIVERS
- M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
- L:	linux-serial at vger.kernel.org
--- 
-1.8.4.2
+Do you want me to resend this patch ??
+
+Regards,
+Anup
+
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
