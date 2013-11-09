@@ -1,38 +1,118 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 08 Nov 2013 17:04:23 -0800
-Subject: [PATCH 0/2] genirq: arm64: perf: support for percpu pmu interrupt
-In-Reply-To: <1383739658-10036-1-git-send-email-vkale@apm.com>
+Date: Fri, 08 Nov 2013 17:04:27 -0800
+Subject: [PATCH 2/2] arm64: perf: add support for percpu pmu interrupt
+In-Reply-To: <1383739658-10036-3-git-send-email-vkale@apm.com>
 References: <1383739658-10036-1-git-send-email-vkale@apm.com>
-Message-ID: <527D8A17.9020208@codeaurora.org>
+ <1383739658-10036-3-git-send-email-vkale@apm.com>
+Message-ID: <527D8A1B.3030001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Just some pointer casting nits.
+
 On 11/06/13 04:07, Vinayak Kale wrote:
-> This patch series adds support to handle interrupt registration/deregistration
-> in arm64 pmu driver when pmu interrupt type is percpu.
+> Add support for irq registration when pmu interrupt is percpu.
 >
-> Patches in this patch series were previously sent out as separate patches [1].
-> This patch series incorporates comments/fixes suggested for original patches.
->
-> [1] 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/205888.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/204414.html 
->
-> Vinayak Kale (2):
->   genirq: error reporting in request_percpu_irq() and
->     request_threaded_irq()
->   arm64: perf: add support for percpu pmu interrupt
->
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> ---
 >  arch/arm64/kernel/perf_event.c |  109 +++++++++++++++++++++++++++++-----------
->  kernel/irq/manage.c            |   12 +++--
->  2 files changed, 89 insertions(+), 32 deletions(-)
+>  1 file changed, 81 insertions(+), 28 deletions(-)
 >
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index cea1594..e60dae3 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -44,6 +44,7 @@
+>  static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
+>  static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
+>  static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
+> +static bool is_percpuirq;
+>  
+>  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+>  
+> @@ -363,22 +364,51 @@ validate_group(struct perf_event *event)
+>  }
+>  
+>  static void
+> +armpmu_disable_percpu_irq(void *data)
+> +{
+> +	struct arm_pmu *armpmu = (struct arm_pmu *)data;
 
-What ever happened to the approach here[1]? It doesn't look very nice to
-have to request the irq first as a per-cpu interrupt and then try as a
-non-percpu interrupt when genirq already knows if its per-cpu or not.
+Useless cast from void *.
 
-[1] http://lkml.indiana.edu/hypermail/linux/kernel/1207.3/02955.html
+> +	struct platform_device *pmu_device = armpmu->plat_device;
+> +	int irq = platform_get_irq(pmu_device, 0);
+> +
+> +	cpumask_test_and_clear_cpu(smp_processor_id(), &armpmu->active_irqs);
+> +	disable_percpu_irq(irq);
+> +}
+> +
+[...]
+>  
+> +static void
+> +armpmu_enable_percpu_irq(void *data)
+> +{
+> +	struct arm_pmu *armpmu = (struct arm_pmu *)data;
+
+Here too.
+
+> +	struct platform_device *pmu_device = armpmu->plat_device;
+> +	int irq = platform_get_irq(pmu_device, 0);
+> +
+> +	enable_percpu_irq(irq, 0);
+> +	cpumask_set_cpu(smp_processor_id(), &armpmu->active_irqs);
+> +}
+> +
+>  static int
+>  armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  {
+> @@ -396,34 +426,57 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+>  		return -ENODEV;
+>  	}
+>  
+> -	for (i = 0; i < irqs; ++i) {
+> -		err = 0;
+> -		irq = platform_get_irq(pmu_device, i);
+> -		if (irq < 0)
+> -			continue;
+> +	irq = platform_get_irq(pmu_device, 0);
+>  
+> -		/*
+> -		 * If we have a single PMU interrupt that we can't shift,
+> -		 * assume that we're running on a uniprocessor machine and
+> -		 * continue. Otherwise, continue without this interrupt.
+> -		 */
+> -		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+> -			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+> -				    irq, i);
+> -			continue;
+> -		}
+> +	/*
+> +	 * Try 'request_percpu_irq' first. If it's return value indicates
+> +	 * that irq is not percpu then try 'request_irq'
+> +	 */
+> +	err = request_percpu_irq(irq, armpmu->handle_irq,
+> +			"arm-pmu", &cpu_hw_events);
+> +	if (err != -EPERM) {
+> +		is_percpuirq = true;
+>  
+> -		err = request_irq(irq, armpmu->handle_irq,
+> -				  IRQF_NOBALANCING,
+> -				  "arm-pmu", armpmu);
+>  		if (err) {
+> -			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+> -				irq);
+> +			pr_err("unable to request percpu IRQ%d for ARM PMU counters\n",
+> +					irq);
+>  			armpmu_release_hardware(armpmu);
+>  			return err;
+>  		}
+>  
+> -		cpumask_set_cpu(i, &armpmu->active_irqs);
+> +		on_each_cpu(armpmu_enable_percpu_irq, (void *)armpmu, 1);
+
+Looks like a useless cast to void * here.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
