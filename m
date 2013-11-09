@@ -1,34 +1,36 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sat,  9 Nov 2013 13:23:59 +0100
-Subject: [PATCH 7/7] ARM: shmobile: armadillo-reference: Use low level IRQ for
- ST1231
-In-Reply-To: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383999839-3339-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1383999839-3339-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Sat,  9 Nov 2013 13:33:47 +0100
+Subject: [PATCH 0/2] ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
+Message-ID: <1384000429-3590-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device is configured to generate an active-low interrupt signal that
-needs to be acknowledged by the host. Configure the IRQ to trigger on
-low level.
+Hello,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patch series enables compilation of SH-Mobile drivers on both the
+non-multiplatform (ARCH_SHMOBILE) and the multiplatform (ARCH_SHMOBILE_MULTI)
+SH-Mobile architectures. To do so it renames ARCH_SHMOBILE to
+ARCH_SHMOBILE_LEGACY and creates a new ARCH_SHMOBILE symbol selected by both
+ARCH_SHMOBILE_MULTI and ARCH_SHMOBILE_LEGACY.
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index aef425f..04e9d49 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -95,7 +95,7 @@
- 		compatible = "sitronix,st1232";
- 		reg = <0x55>;
- 		interrupt-parent = <&irqpin1>;
--		interrupts = <2 IRQ_TYPE_NONE>; /* IRQ10: hwirq 2 on irqpin1 */
-+		interrupts = <2 IRQ_TYPE_LOW_LEVEL>;
- 		pinctrl-0 = <&st1232_pins>;
- 		pinctrl-names = "default";
- 		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
+The second patch adds a dependency on ARCH_SHMOBILE_LEGACY to the ASoC R-Car
+driver. It can be squashed with the first patch or applied separately to
+minimize the risk of conflicts if desired.
+
+Laurent Pinchart (2):
+  ARM: Rename ARCH_SHMOBILE to ARCH_SHMOBILE_LEGACY
+  ASoC: sh: rcar: Depend on ARCH_SHMOBILE_LEGACY
+
+ arch/arm/Kconfig                  | 14 ++++++++------
+ arch/arm/Makefile                 |  1 -
+ arch/arm/boot/compressed/Makefile |  2 +-
+ arch/arm/boot/dts/Makefile        |  2 +-
+ arch/arm/mach-shmobile/Kconfig    |  8 ++++++--
+ drivers/Makefile                  |  2 +-
+ sound/soc/sh/Kconfig              |  1 +
+ 7 files changed, 18 insertions(+), 12 deletions(-)
+
 -- 
-1.8.1.5
+Regards,
+
+Laurent Pinchart
