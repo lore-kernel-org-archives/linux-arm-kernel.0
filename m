@@ -1,47 +1,41 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 10 Nov 2013 19:16:31 +0100
-Subject: [PATCHv3 3/3] ARM: dts: exynos4x12: Add gps_alive power domain
- for exynos4x12
-In-Reply-To: <1383530161-24080-4-git-send-email-cw00.choi@samsung.com>
-References: <1383530161-24080-1-git-send-email-cw00.choi@samsung.com>
- <1383530161-24080-4-git-send-email-cw00.choi@samsung.com>
-Message-ID: <4207742.ampVWzpqgB@flatron>
+Date: Sun, 10 Nov 2013 19:18:11 +0100
+Subject: [PATCH] hwmon: ntc_thermistor: Fix typo (pullup-uV -> pullup-uv)
+In-Reply-To: <1382492690-4056-1-git-send-email-cw00.choi@samsung.com>
+References: <1382492690-4056-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1404489.sfyjHCEcVN@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Chanwoo,
 
-On Monday 04 of November 2013 10:56:01 Chanwoo Choi wrote:
-> This patch gps_alive power domain to exynos4x12.dtsi.
-
-Patch description lacks rationale behind the change.
-
+On Wednesday 23 of October 2013 10:44:50 Chanwoo Choi wrote:
+> This patch fix typo of property name from 'pullup-uV' to 'pullup-uv'.
+> The ntc_thermistor.c use 'pullup-uv' when parsing dt data.
 > 
 > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/boot/dts/exynos4x12.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
+>  Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index ad531fe..3f5b416 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -35,6 +35,11 @@
->  		reg = <0x10023CA0 0x20>;
->  	};
->  
-> +	pd_gps_alive: gps-alive-power-domain at 10023D00 {
-> +		compatible = "samsung,exynos4210-pd";
-> +		reg = <0x10023D00 0x20>;
-> +	};
-> +
->  	clock: clock-controller at 10030000 {
->  		compatible = "samsung,exynos4412-clock";
->  		reg = <0x10030000 0x20000>;
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> index 47ada1d..5d49f2b 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+> @@ -49,7 +49,7 @@ adc at 12D10000 {
+>  	/* NTC thermistor is a hwmon device */
+>  	ncp15wb473 at 0 {
+>  		compatible = "ntc,ncp15wb473";
+> -		pullup-uV = <1800000>;
+> +		pullup-uv = <1800000>;
+>  		pullup-ohm = <47000>;
+>  		pulldown-ohm = <0>;
+>  		io-channels = <&adc 4>;
 > 
 
-Otherwise the patch looks good.
+Good catch.
+
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
 Best regards,
 Tomasz
