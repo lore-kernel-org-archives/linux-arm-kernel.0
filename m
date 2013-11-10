@@ -1,98 +1,212 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 09 Nov 2013 22:26:12 +0100
+Date: Sun, 10 Nov 2013 01:42:21 +0100
 Subject: [PATCH] ARM: mvebu: Add Netgear ReadyNAS 2120 board
-In-Reply-To: <20131109210836.GK14890@lunn.ch> (Andrew Lunn's message of "Sat,
- 9 Nov 2013 22:08:36 +0100")
-References: <87bo1tmibv.fsf@natisbad.org> <20131109210836.GK14890@lunn.ch>
-Message-ID: <871u2pmfm3.fsf@natisbad.org>
+In-Reply-To: <527ECBDD.7050607@gmail.com> (Sebastian Hesselbarth's message of
+ "Sun, 10 Nov 2013 00:57:17 +0100")
+References: <87bo1tmibv.fsf@natisbad.org> <527ECBDD.7050607@gmail.com>
+Message-ID: <87hablulxu.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sebastian,
 
-Andrew Lunn <andrew@lunn.ch> writes:
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
 
-> On Sat, Nov 09, 2013 at 09:27:32PM +0100, Arnaud Ebalard wrote:
->> 
+> On 11/09/2013 09:27 PM, Arnaud Ebalard wrote:
 >> All hardware parts of the (mv78230 Armada XP based) NETGEAR ReadyNAS
 >> 2120 are supported by mainline kernel (USB 3.0 and eSATA rear ports,
 >> USB 2.0 front port, Gigabit controller and PHYs for the two rear ports,
 >> serial port, LEDs, Buttons, 88SE9170 SATA controllers, three G762 fan
 >> controllers, G751 temperature sensor) except for:
+>>
+>>   - the Intersil ISL12057 I2C RTC Chip,
+>>   - the Armada NAND controller.
+>>
+>> Support for both of those is currently work in progress and does not
+>> prevent boot.
+>>
+>> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+>> ---
+> [...]
+>>   arch/arm/boot/dts/Makefile                     |   1 +
+>>   arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 289 +++++++++++++++++++++++++
 >
->> +			i2c at 11000 {
->> +				compatible = "marvell,mv64xxx-i2c";
->> +				clock-frequency = <400000>;
+> Arnaud,
+>
+> thanks for providing this! I do have some comments below.
+>
+> we recently had a discussion about the naming of new DTS files, which
+> proposes to name those after vendor,board.dts (or vendor-board.dts).
+>
+> I personally prefer vendor,board.dts which would give
+> netgear,readynas-2120.dts based on your compatible below.
+> The final call for ',' vs '-' has not been made, so I  suggest Jason
+> makes a call here.
+
+ok, will wait for a decision before resending. I a am not in a hurry.
+
+>> +
+>> +			serial at 12000 {
+>> +				clock-frequency = <250000000>;
+>
+> Where does that 250MHz come from? If it is an internal clock
+> and we already have a DT clock provider for it, please use
+> clocks = <&provider num>;
+>
+> If it is TCLK it can be optained from <&coreclk 0>.
+
+Well, no innovation here: to be honest - it's not a valid argument but -
+I copy pasted the line from other armada-xp-*.dts files:
+
+$ grep 250000000 armada-xp-*.dts
+armada-xp-axpwifiap.dts:                                clock-frequency = <250000000>;
+armada-xp-axpwifiap.dts:                                clock-frequency = <250000000>;
+armada-xp-db.dts:                               clock-frequency = <250000000>;
+armada-xp-db.dts:                               clock-frequency = <250000000>;
+armada-xp-db.dts:                               clock-frequency = <250000000>;
+armada-xp-db.dts:                               clock-frequency = <250000000>;
+armada-xp-gp.dts:                               clock-frequency = <250000000>;
+armada-xp-gp.dts:                               clock-frequency = <250000000>;
+armada-xp-gp.dts:                               clock-frequency = <250000000>;
+armada-xp-gp.dts:                               clock-frequency = <250000000>;
+armada-xp-openblocks-ax3-4.dts:                         clock-frequency = <250000000>;
+armada-xp-openblocks-ax3-4.dts:                         clock-frequency = <250000000>;
+
+I will use <&coreclk 0> in next resend.
+
+
+>
 >> +				status = "okay";
+>> +			};
 >> +
->> +				/* Rear fan #1 of 3 (Protechnic MGT4012XB-O20,
->> +				 * 8000RPM) near eSATA port */
->> +				g762_fan1: g762 at 3e {
->> +					compatible = "gmt,g762";
->> +					reg = <0x3e>;
->> +					clocks = <&g762_clk>; /* input clock */
->> +					fan_gear_mode = <0>;
->> +					fan_startv = <1>;
->> +					pwm_polarity = <0>;
->> +				};
->> +
->> +				/* Rear fan #2 of 3 at the center */
->> +				g762_fan2: g762 at 48 {
->> +					compatible = "gmt,g762";
->> +					reg = <0x48>;
->> +					clocks = <&g762_clk>; /* input clock */
->> +					fan_gear_mode = <0>;
->> +					fan_startv = <1>;
->> +					pwm_polarity = <0>;
->> +				};
->> +
->> +				/* Rear fan #3 of 3 */
->> +				g762_fan3: g762 at 49 {
->> +					compatible = "gmt,g762";
->> +					reg = <0x49>;
->> +					clocks = <&g762_clk>; /* input clock */
->> +					fan_gear_mode = <0>;
->> +					fan_startv = <1>;
->> +					pwm_polarity = <0>;
->> +				};
->> +
->> +				g751: g751 at 4c {
->> +					compatible = "gmt,g751";
->> +					reg = <0x4c>;
->> +				};
+>> +			mdio {
+>> +				phy0: ethernet-phy at 0 {
+>> +					reg = <0>;
 >
-> Hi Arnaud
+> Can you evaluate PHYs compatible from u-boot or post vendor:prodid
+> from MDIO registers?
+
+Looking at the PCB, 88E1318-NNB2. I will dig into Documentation/ the
+associated compatible. Out of curiosity, how do you get the PHY model
+from u-boot or userland?
+
+
+>> +
+>> +	clocks {
+>> +	       #address-cells = <1>;
+>> +	       #size-cells = <0>;
 >
-> Looks good to me. However, if for some reason you need to respin, it
-> would be nice to add a comment about what the g751 is. All the other
-> i2c devices you say what they are. No need to respin just because of
-> this.
+> Your nodes below neither have a reg property nor can they be
+> addressed in any way.
 
-I'll keep that in mind. Thanks.
+I think I do not understand that comment. Can you clarify, possibly w/
+an example of you think is wrong and how it could be corrected? 
 
-GMT G751 is an I2C temperature sensor and thermal watchdog chip. It is
-basically a clone of National Semiconductor LM75 chip:
 
-root at thin:/sys# sensors
-g762-i2c-0-3e
-Adapter: mv64xxx_i2c adapter
-fan1:        5461 RPM  (div = 1)
+> Both properties above are not required, so please remove them.
+>
+>> +	       g762_clk: fixedclk {
+>
+> s/fixedclk/oscillator/ ?
+>
+>> +			 compatible = "fixed-clock";
+>> +			 #clock-cells = <0>;
+>> +			 clock-frequency = <32768>;
+>> +	       };
+>> +	};
+>> +
 
-g762-i2c-0-48
-Adapter: mv64xxx_i2c adapter
-fan1:        5461 RPM  (div = 1)
+Something like the following?
 
-g762-i2c-0-49
-Adapter: mv64xxx_i2c adapter
-fan1:        5461 RPM  (div = 1)
+        clocks {
+               g762_clk: oscillator {
+                         compatible = "fixed-clock";
+                         #clock-cells = <0>;
+                         clock-frequency = <32768>;
+               };
+        };
 
-g751-i2c-0-4c
-Adapter: mv64xxx_i2c adapter
-temp1:        +30.5?C  (high = +80.0?C, hyst = +75.0?C)
+I think I could then backport that change to all readynas .dts and
+the Documentation/devicetree/bindings/hwmon/g762.txt at some point.
 
-armada_thermal-virtual-0
-Adapter: Virtual device
-temp1:        +34.2?C
+
+>> +	gpio_leds {
+>> +		compatible = "gpio-leds";
+>> +		pinctrl-0 = <&sata1_led_pin &sata2_led_pin &err_led_pin
+>> +			     &sata3_led_pin &sata4_led_pin>;
+>> +		pinctrl-names = "default";
+>> +
+>> +		red_sata1_led {
+>> +			label = "rn2120:red:sata1";
+>> +			gpios = <&gpio0 31 0>;   /* GPIO 31 Active High */
+>
+> You can
+>
+> #include <dt-bindings/gpio/gpio.h>
+>
+> then use
+>
+> gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>
+>
+> and get rid of the comments.
+
+ok, will do.
+
+
+>> +			default-state = "off";
+>> +		};
+>> +
+>> +		red_sata2_led {
+>> +			label = "rn2120:red:sata2";
+>> +			gpios = <&gpio1 8 0>;   /* GPIO 40 Active High */
+>> +			default-state = "off";
+>> +		};
+>> +
+>> +		red_sata3_led {
+>> +			label = "rn2120:red:sata3";
+>> +			gpios = <&gpio1 12 0>;   /* GPIO 44 Active High */
+>> +			default-state = "off";
+>> +		};
+>> +
+>> +		red_sata4_led {
+>> +			label = "rn2120:red:sata4";
+>> +			gpios = <&gpio1 15 0>;   /* GPIO 47 Active High */
+>> +			default-state = "off";
+>> +		};
+>> +
+>> +		red_err_led {
+>> +			label = "rn2120:red:err";
+>> +			gpios = <&gpio1 13 1>;   /* GPIO 45 Active Low */
+>> +			default-state = "off";
+>> +		};
+>> +	};
+>> +
+>> +	gpio_keys {
+>> +		compatible = "gpio-keys";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>
+> Again, no addressing of those buttons possible.
+>
+>> +		pinctrl-0 = <&power_key_pin
+>> +			     &reset_key_pin>;
+>> +		pinctrl-names = "default";
+>> +
+>> +		button at 1 {
+>
+> Instead of button at n you can name the nodes after their function,
+> e.g. power_button, reset_button, ...
+
+ok, will change that.
+
+
+> I know both comments above are in the current binding documentation
+> (at least for gpio-keys-polled.txt, there is no gpio-keys.txt); but
+> IMHO both "bus-like" structure of gpio_keys and numbering of buttons
+> just looks so wrong.
+
+
+Thanks for your feedback.
 
 Cheers,
 
