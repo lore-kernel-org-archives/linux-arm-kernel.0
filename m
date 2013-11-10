@@ -1,78 +1,53 @@
-From: dave.long@linaro.org (David Long)
-Date: Sun, 10 Nov 2013 17:57:06 -0500
-Subject: [PATCH v2 09/13] ARM: Disable jprobe selftests in thumb kernels
-In-Reply-To: <1383845166.3401.77.camel@linaro1.home>
-References: <1381871068-27660-1-git-send-email-dave.long@linaro.org>
- <1381871068-27660-10-git-send-email-dave.long@linaro.org>
- <1383845166.3401.77.camel@linaro1.home>
-Message-ID: <52800F42.5060904@linaro.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 11 Nov 2013 08:14:51 +0900
+Subject: [PATCH] MAINTAINERS: Add entry for Samsung SoC clock drivers
+In-Reply-To: <1383963454-2749-1-git-send-email-tomasz.figa@gmail.com>
+References: <1383963454-2749-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <002201cede6a$a8a183a0$f9e48ae0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/13 12:26, Jon Medhurst (Tixy) wrote:
-> On Tue, 2013-10-15 at 17:04 -0400, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> jprobe kernel selftests are not supported for thumb kernels. Conditionally
->> disable them in the kernel kprobes-test module.
->
-> I don't think it's fair to say they aren't supported, it's just that the
-> implementation of jprobes and/or symbol lookup has bugs on Thumb kernels
-> which the test code is finding, see
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/063026.html
->
-> Note, the current code works OK if the function being probed is in a
-> loadable module (which is why I didn't spot the problem when doing the
-> original Thumb kprobes work).
->
-> Now I admit that having the tests always bombing out because of this
-> hinders testing of kprobes, but simply disabling the test is just
-> burying this long standing problem even more. So what do people think
-> about something like the change below, to let other tests get run but
-> make the overall test still fail...?
->
-> --- a/arch/arm/kernel/kprobes-test.c
-> +++ b/arch/arm/kernel/kprobes-test.c
-> @@ -221,6 +221,7 @@ static int pre_handler_called;
->   static int post_handler_called;
->   static int jprobe_func_called;
->   static int kretprobe_handler_called;
-> +static int tests_failed;
->
->   #define FUNC_ARG1 0x12345678
->   #define FUNC_ARG2 0xabcdef
-> @@ -457,6 +458,13 @@ static int run_api_tests(long (*func)(long, long))
->
->   	pr_info("    jprobe\n");
->   	ret = test_jprobe(func);
-> +#if defined(CONFIG_THUMB2_KERNEL) && !defined(MODULE)
-> +	if (ret == -EINVAL) {
-> +		pr_err("FAIL: Known longtime bug with jprobe on Thumb kernels");
-> +		tests_failed = ret;
-> +		ret = 0;
-> +	}
-> +#endif
->   	if (ret < 0)
->   		return ret;
->
-> @@ -1667,6 +1675,8 @@ static int __init run_all_tests(void)
->
->   out:
->   	if (ret == 0)
-> +		ret = tests_failed;
-> +	if (ret == 0)
->   		pr_info("Finished kprobe tests OK\n");
->   	else
->   		pr_err("kprobe tests failed\n");
->
->
->
->
+On Saturday, November 09, 2013 11:18 AM, Tomasz Figa wrote:
+> 
+> From: Tomasz Figa <t.figa@samsung.com>
+> 
+> This patch adds an entry for Samsung SoC clock drivers located under
+> drivers/clk/samsung/ directory, with me taking the maintainer role.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Acked-by: Mike Turquette <mturquette@linaro.org>
+> Acked-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
+It looks good.
 
-Thanks for clarifying the problem Tixy.  I agree we should try and allow 
-the tests to run for these more typical use cases where they do actually 
-work.  I have tested your patch and I will use it in place of mine 
-unless there are strong objections.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
--dl
+Best regards,
+Jingoo Han
+
+> ---
+>  MAINTAINERS | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 61b8757..df7e1bf 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -7319,6 +7319,12 @@ L:	linux-media at vger.kernel.org
+>  S:	Supported
+>  F:	drivers/media/i2c/s5c73m3/*
+> 
+> +SAMSUNG SOC CLOCK DRIVERS
+> +M:	Tomasz Figa <t.figa@samsung.com>
+> +S:	Supported
+> +L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+> +F:	drivers/clk/samsung/
+> +
+>  SERIAL DRIVERS
+>  M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>  L:	linux-serial at vger.kernel.org
+> --
+> 1.8.4.2
