@@ -1,128 +1,146 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 10 Nov 2013 18:41:28 +0100
-Subject: [PATCH v3 2/4] clk: exynos5410: register clocks using common
- clock framework
-In-Reply-To: <1383811969-32712-3-git-send-email-v.tyrtov@samsung.com>
-References: <1383811969-32712-1-git-send-email-v.tyrtov@samsung.com>
- <1383811969-32712-3-git-send-email-v.tyrtov@samsung.com>
-Message-ID: <6379094.zWymlDc09O@flatron>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 11 Nov 2013 06:55:01 +1300
+Subject: [PATCH] ARM: vt8500: add defconfig
+In-Reply-To: <1384057450-23640-1-git-send-email-olof@lixom.net>
+References: <1384057450-23640-1-git-send-email-olof@lixom.net>
+Message-ID: <527FC875.7080402@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 07 of November 2013 12:12:47 Vyacheslav Tyrtov wrote:
-> From: Tarek Dakhran <t.dakhran@samsung.com>
-> 
-> The EXYNOS5410 clocks are statically listed and registered
-> using the Samsung specific common clock helper functions.
-
-Thanks for keeping up with addressing the comments. However there are
-still few things that need to be corrected. Please see my comments inline.
-
-> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+On 10/11/13 17:24, Olof Johansson wrote:
+> Add a single-vendor config for vt8500. We can't enable WM8750 in
+> multi_v7_defconfig since it's a v6-based device, but it's still valuable
+> to have an in-tree defconfig that is suitable for the hardware.
+>
+> This is based on multi_v7_defconfig and can be tweaked over time. It
+> gets us off the ground for now.
+>
+> Booted on an APC8750 with USB rootfs.
+>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ---
->  .../devicetree/bindings/clock/exynos5410-clock.txt |  37 ++++
->  drivers/clk/samsung/Makefile                       |   1 +
->  drivers/clk/samsung/clk-exynos5410.c               | 239 +++++++++++++++++++++
->  include/dt-bindings/clock/exynos5410.h             | 175 +++++++++++++++
->  4 files changed, 452 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
->  create mode 100644 drivers/clk/samsung/clk-exynos5410.c
->  create mode 100644 include/dt-bindings/clock/exynos5410.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/exynos5410-clock.txt b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+>
+> Tony,
+>
+>
+> I'll apply this to a suitable arm-soc branch sometime during the merge window,
+> since it doesn't affect existing systems. A review/ack would be appreciated!
+>
+>
+> -Olof
+>
+>   arch/arm/configs/vt8500_defconfig |   88 +++++++++++++++++++++++++++++++++++++
+>   1 file changed, 88 insertions(+)
+>   create mode 100644 arch/arm/configs/vt8500_defconfig
+>
+> diff --git a/arch/arm/configs/vt8500_defconfig b/arch/arm/configs/vt8500_defconfig
 > new file mode 100644
-> index 0000000..a462da231
+> index 0000000..6fd3717
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/exynos5410-clock.txt
-> @@ -0,0 +1,37 @@
-> +* Samsung Exynos5410 Clock Controller
-> +
-> +The Exynos5410 clock controller generates and supplies clock to various
-> +controllers within the Exynos5410 SoC.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be "samsung,exynos5410-clock"
-> +
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +- #clock-cells: should be 1.
+> +++ b/arch/arm/configs/vt8500_defconfig
+> @@ -0,0 +1,88 @@
+> +CONFIG_IRQ_DOMAIN_DEBUG=y
+> +CONFIG_NO_HZ=y
+> +CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_BLK_DEV_INITRD=y
+> +CONFIG_ARCH_MULTI_V6=y
+> +CONFIG_ARCH_WM8750=y
+> +CONFIG_ARCH_WM8850=y
+> +CONFIG_ARM_ERRATA_720789=y
+> +CONFIG_ARM_ERRATA_754322=y
+> +CONFIG_ARM_ERRATA_775420=y
+> +CONFIG_HAVE_ARM_ARCH_TIMER=y
+> +CONFIG_AEABI=y
+> +CONFIG_HIGHMEM=y
+> +CONFIG_HIGHPTE=y
+> +CONFIG_ARM_APPENDED_DTB=y
+> +CONFIG_ARM_ATAG_DTB_COMPAT=y
+> +CONFIG_VFP=y
+> +CONFIG_NEON=y
+> +CONFIG_PM_RUNTIME=y
+> +CONFIG_NET=y
+> +CONFIG_UNIX=y
+> +CONFIG_INET=y
+> +CONFIG_IP_PNP=y
+> +CONFIG_IP_PNP_DHCP=y
+> +CONFIG_DEVTMPFS=y
+> +CONFIG_DEVTMPFS_MOUNT=y
+> +CONFIG_PROC_DEVICETREE=y
+> +CONFIG_EEPROM_93CX6=y
+> +CONFIG_SCSI=y
+> +CONFIG_BLK_DEV_SD=y
+> +CONFIG_NETDEVICES=y
+> +# CONFIG_NET_CADENCE is not set
+> +# CONFIG_NET_VENDOR_BROADCOM is not set
+> +# CONFIG_NET_VENDOR_CIRRUS is not set
+> +# CONFIG_NET_VENDOR_FARADAY is not set
+> +# CONFIG_NET_VENDOR_INTEL is not set
+> +# CONFIG_NET_VENDOR_MARVELL is not set
+> +# CONFIG_NET_VENDOR_MICREL is not set
+> +# CONFIG_NET_VENDOR_NATSEMI is not set
+> +# CONFIG_NET_VENDOR_SEEQ is not set
+> +# CONFIG_NET_VENDOR_SMSC is not set
+> +# CONFIG_NET_VENDOR_STMICRO is not set
+> +CONFIG_VIA_VELOCITY=y
+> +# CONFIG_NET_VENDOR_WIZNET is not set
+> +CONFIG_PHYLIB=y
+> +CONFIG_INPUT_MATRIXKMAP=y
+> +CONFIG_SERIAL_VT8500=y
+> +CONFIG_SERIAL_VT8500_CONSOLE=y
+> +CONFIG_PINCTRL_SINGLE=y
+> +CONFIG_PINCTRL_WM8750=y
+> +CONFIG_GPIO_GENERIC_PLATFORM=y
+> +CONFIG_POWER_SUPPLY=y
+> +CONFIG_POWER_RESET=y
+> +CONFIG_MFD_SYSCON=y
+> +CONFIG_REGULATOR=y
+> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> +CONFIG_REGULATOR_GPIO=y
+> +CONFIG_USB=y
+> +CONFIG_USB_EHCI_HCD=y
+> +CONFIG_USB_EHCI_HCD_PLATFORM=y
+> +CONFIG_USB_UHCI_HCD=y
+> +CONFIG_USB_STORAGE=y
+> +CONFIG_NOP_USB_XCEIV=y
+> +CONFIG_USB_GPIO_VBUS=y
+> +CONFIG_USB_ULPI=y
+> +CONFIG_MMC=y
+> +CONFIG_MMC_DEBUG=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_RTC_CLASS=y
+> +CONFIG_RTC_DRV_VT8500=y
+> +CONFIG_DMADEVICES=y
+> +CONFIG_COMMON_CLK_DEBUG=y
+> +# CONFIG_IOMMU_SUPPORT is not set
+> +CONFIG_PWM=y
+> +CONFIG_PWM_VT8500=y
+> +CONFIG_RESET_CONTROLLER=y
+> +CONFIG_GENERIC_PHY=y
+> +CONFIG_EXT4_FS=y
+> +CONFIG_TMPFS=y
+> +CONFIG_NFS_FS=y
+> +CONFIG_NFS_V3_ACL=y
+> +CONFIG_NFS_V4=y
+> +CONFIG_ROOT_NFS=y
+> +CONFIG_PRINTK_TIME=y
+> +CONFIG_DEBUG_KERNEL=y
+> +CONFIG_LOCKUP_DETECTOR=y
 
-If there are any external clocks that need to be provided (and I believe
-there are), you should mention them in the documentation.
+I notice you left out the I2C driver and the MMC driver - given you 
+had/have problems with them this is understandable. They can be sorted 
+out later.
 
-Also, to make this more future-proof, I would add clock-names and clocks
-properties to the binding, listing all those external clocks. It's just
-about the binding definition - you don't have to implement this in the
-driver yet, as we don't have the framework to handle this at early system
-initialization. However, when we finally implement this in the Common
-Clock Framework, we will not have to change existing DT bindings.
+My main concern is that this file is named 'vt8500_defconfig', but it 
+won't be able to cover all of the VT8500 'family'.
+The earlier models (vt8500/wm8505) are ARM9, the WM8650 was ARM11, and 
+then we got to the WM8750 that you are targetting (ARMv6) and finally 
+the ARMv7 stuff (WM8850/WM8950).
+I'm not particularly fussed about it (it's fine as is), but if you think 
+of a better filename to fit the situation I wouldn't complain :)
 
-> +
-> +All available clocks are defined as preprocessor macros in
-> +dt-bindings/clock/exynos5410.h header and can be used in device
-> +tree sources.
-> +
-> +Example 1: An example of a clock controller node is listed below.
-> +
-> +	clock: clock-controller at 0x10010000 {
-> +		compatible = "samsung,exynos5410-clock";
-> +		reg = <0x10010000 0x30000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +Example 2: UART controller node that consumes the clock generated by the clock
-> +	   controller. Refer to the standard clock bindings for information
-> +	   about 'clocks' and 'clock-names' property.
-> +
-> +	serial at 12C20000 {
-> +		compatible = "samsung,exynos4210-uart";
-> +		reg = <0x12C00000 0x100>;
-> +		interrupts = <0 51 0>;
-> +		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
-> +		clock-names = "uart", "clk_uart_baud0";
-> +	};
-[snip]
-> diff --git a/include/dt-bindings/clock/exynos5410.h b/include/dt-bindings/clock/exynos5410.h
-> new file mode 100644
-> index 0000000..9b4a58b
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/exynos5410.h
-> @@ -0,0 +1,175 @@
-> +#ifndef _DT_BINDINGS_CLOCK_EXYNOS_5410_H
-> +#define _DT_BINDINGS_CLOCK_EXYNOS_5410_H
-> +
-> +/* core clocks */
-> +#define CLK_FIN_PLL 1
+Reviewed-by: Tony Prisk <linux@prisktech.co.nz>
 
-This is external clock, not provided by this clock controller, isn't it?
-
-> +#define CLK_FOUT_APLL 2
-> +#define CLK_FOUT_CPLL 3
-> +#define CLK_FOUT_DPLL 4
-> +#define CLK_FOUT_EPLL 5
-[snip]
-> +#define CLK_ACLK_G3D 500
-> +#define CLK_G3D 501
-> +#define CLK_SMMU_MIXER 502
-> +
-> +/* mux clocks */
-> +#define CLK_MOUT_HDMI 640
-
-This definition does not seem to be used anywhere in the driver itself.
-
-> +
-> +/* divider clocks */
-> +#define CLK_DOUT_PIXEL 768
-
-Ditto.
-
-Please don't define IDs for clocks that are not yet provided by the
-driver.
-
-Best regards,
-Tomasz
+Regards
+Tony P
