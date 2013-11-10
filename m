@@ -1,64 +1,128 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 10 Nov 2013 13:05:10 +0000
-Subject: [PATCH] arm64: emulate aarch32 CP15 barriers if needed
-In-Reply-To: <CACVXFVNavc_YbLoS81fcaiVx8UYSu--0CXXVNL_-nk=ayoTeOQ@mail.gmail.com>
-References: <1384075404-19605-1-git-send-email-ming.lei@canonical.com>
- <C6F109E2-5DFE-4F76-A5FA-3638481424BB@arm.com>
- <CACVXFVNavc_YbLoS81fcaiVx8UYSu--0CXXVNL_-nk=ayoTeOQ@mail.gmail.com>
-Message-ID: <B814035C-D4B2-4D5F-B679-274E6FE9FCCE@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat,  9 Nov 2013 20:24:10 -0800
+Subject: [PATCH] ARM: vt8500: add defconfig
+Message-ID: <1384057450-23640-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Nov 2013, at 12:08, Ming Lei <ming.lei@canonical.com> wrote:
-> On Sun, Nov 10, 2013 at 7:25 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->> On 10 Nov 2013, at 09:23, Ming Lei <ming.lei@canonical.com> wrote:
->>> CP15BEN of SCTLR_EL1 may not be implemented, so we need
->>> to emulate these three CP15 barriers to avoid breaking
->>> aarch32 applications since they can be used in user mode.
->>> 
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Signed-off-by: Ming Lei <ming.lei@canonical.com>
->> 
->> Can you describe which aarch32 applications is this breaking?  These
->> barriers have been deprecated in ARMv7 and removed in ARMv8 (same as the
->> SWP instruction).  User space is supposed to use the kuser helpers which
->> provide the right barriers for the architecture.  Compiler intrinsics
->> for ARMv7 already generate (inline) the new ARMv7 barriers.
-> 
-> I know one armv7 business software(closed source) uses cp15 dmb,
+Add a single-vendor config for vt8500. We can't enable WM8750 in
+multi_v7_defconfig since it's a v6-based device, but it's still valuable
+to have an in-tree defconfig that is suitable for the hardware.
 
-OK, so that?s even easier ;)
+This is based on multi_v7_defconfig and can be tweaked over time. It
+gets us off the ground for now.
 
-Next they?ll complain about the performance of such operations (imagine
-some fast user-space locking in a database software trapping for each
-barrier).
+Booted on an APC8750 with USB rootfs.
 
-> and actually any armv7 user applications may use these instructions
-> since they are allowed in user mode.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-There are others allowed like SWP but we decided not to emulate them
-since they?ve been deprecated for a long time.
+Tony,
 
->> So for compat support, I consider this similar to other instructions we
->> will not emulate like SWP and certain unaligned accesses.  IOW, arm64
->> compat only supports non-deprecated ARMv7 features.
-> 
-> That will inevitably break some current armv7 user space, and cause
-> compatibility problem since aarch64 claims to support armv7 user
-> application.
 
-It supports armv7 user applications using *non-deprecated& features
-(and EABI).
+I'll apply this to a suitable arm-soc branch sometime during the merge window,
+since it doesn't affect existing systems. A review/ack would be appreciated!
 
-> Also looks CP15BEN of SCTLR_EL1 is for such purpose.
 
-If it?s just a matter of enabling it in SCTLR_EL1, that would be easier
-but the hardware may simply not implement these instructions in ARMv8
-(I guess that?s why you want emulation). My position is that such legacy
-software should be upgraded to make use of the kuser helpers (if ARMv6
-and earlier support is required) or just DMB/DSB/ISB if optimised for
-ARMv7.
+-Olof
 
-Catalin
+ arch/arm/configs/vt8500_defconfig |   88 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 88 insertions(+)
+ create mode 100644 arch/arm/configs/vt8500_defconfig
+
+diff --git a/arch/arm/configs/vt8500_defconfig b/arch/arm/configs/vt8500_defconfig
+new file mode 100644
+index 0000000..6fd3717
+--- /dev/null
++++ b/arch/arm/configs/vt8500_defconfig
+@@ -0,0 +1,88 @@
++CONFIG_IRQ_DOMAIN_DEBUG=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_ARCH_MULTI_V6=y
++CONFIG_ARCH_WM8750=y
++CONFIG_ARCH_WM8850=y
++CONFIG_ARM_ERRATA_720789=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_ARM_ERRATA_775420=y
++CONFIG_HAVE_ARM_ARCH_TIMER=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_HIGHPTE=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_PM_RUNTIME=y
++CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_PROC_DEVICETREE=y
++CONFIG_EEPROM_93CX6=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_NETDEVICES=y
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++CONFIG_VIA_VELOCITY=y
++# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_PHYLIB=y
++CONFIG_INPUT_MATRIXKMAP=y
++CONFIG_SERIAL_VT8500=y
++CONFIG_SERIAL_VT8500_CONSOLE=y
++CONFIG_PINCTRL_SINGLE=y
++CONFIG_PINCTRL_WM8750=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
++CONFIG_POWER_SUPPLY=y
++CONFIG_POWER_RESET=y
++CONFIG_MFD_SYSCON=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_HCD_PLATFORM=y
++CONFIG_USB_UHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_NOP_USB_XCEIV=y
++CONFIG_USB_GPIO_VBUS=y
++CONFIG_USB_ULPI=y
++CONFIG_MMC=y
++CONFIG_MMC_DEBUG=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_VT8500=y
++CONFIG_DMADEVICES=y
++CONFIG_COMMON_CLK_DEBUG=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_PWM=y
++CONFIG_PWM_VT8500=y
++CONFIG_RESET_CONTROLLER=y
++CONFIG_GENERIC_PHY=y
++CONFIG_EXT4_FS=y
++CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_LOCKUP_DETECTOR=y
+-- 
+1.7.10.4
