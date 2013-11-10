@@ -1,52 +1,73 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 10 Nov 2013 11:52:00 +0400
-Subject: [PATCH 1/2] ARM: dts: i.MX27: Add SSI nodes
-Message-ID: <1384069921-15270-1-git-send-email-shc_work@mail.ru>
+Date: Sun, 10 Nov 2013 13:34:49 +0400
+Subject: [PATCH v3 RESEND] ARM: imx: pllv1: Fix PLL calculation for i.MX27
+Message-ID: <1384076089-30536-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing (Synchronous Serial Interface) SSI1 & SSI2
-devicetree nodes for i.MX27 CPUs.
+MFN bit 9 on i.MX27 has a different meaning than in other SOCs. This
+is a just sign bit. This patch makes different calculation for i.MX27.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/mach-imx/clk-pllv1.c | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 826231e..52520fb 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -204,6 +204,30 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/mach-imx/clk-pllv1.c b/arch/arm/mach-imx/clk-pllv1.c
+index c1eaee3..d21d14c 100644
+--- a/arch/arm/mach-imx/clk-pllv1.c
++++ b/arch/arm/mach-imx/clk-pllv1.c
+@@ -18,6 +18,11 @@
+  *
+  * PLL clock version 1, found on i.MX1/21/25/27/31/35
+  */
++
++#define MFN_BITS	(10)
++#define MFN_SIGN	(BIT(MFN_BITS - 1))
++#define MFN_MASK	(MFN_SIGN - 1)
++
+ struct clk_pllv1 {
+ 	struct clk_hw	hw;
+ 	void __iomem	*base;
+@@ -25,6 +30,11 @@ struct clk_pllv1 {
  
-+			ssi1: ssi at 10010000 {
-+				compatible = "fsl,imx27-ssi", "fsl,imx21-ssi";
-+				reg = <0x10010000 0x1000>;
-+				interrupts = <14>;
-+				clocks = <&clks 26>;
-+				dmas = <&dma 12>, <&dma 13>;
-+				dma-names = "rx", "tx";
-+				fsl,fifo-depth = <8>;
-+				fsl,ssi-dma-events = <13 12 15 14>; /* TX0 RX0 TX1 RX1 */
-+				status = "disabled";
-+			};
+ #define to_clk_pllv1(clk) (container_of(clk, struct clk_pllv1, clk))
+ 
++static inline bool mfn_is_negative(unsigned int mfn)
++{
++	return !cpu_is_mx1() && !cpu_is_mx21() && (mfn & MFN_SIGN);
++}
 +
-+			ssi2: ssi at 10011000 {
-+				compatible = "fsl,imx27-ssi", "fsl,imx21-ssi";
-+				reg = <0x10011000 0x1000>;
-+				interrupts = <13>;
-+				clocks = <&clks 25>;
-+				dmas = <&dma 8>, <&dma 9>;
-+				dma-names = "rx", "tx";
-+				fsl,fifo-depth = <8>;
-+				fsl,ssi-dma-events = <9 8 11 10>; /* TX0 RX0 TX1 RX1 */
-+				status = "disabled";
-+			};
-+
- 			i2c1: i2c at 10012000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 		unsigned long parent_rate)
+ {
+@@ -58,10 +68,15 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 
+ 	/*
+ 	 * On all i.MXs except i.MX1 and i.MX21 mfn is a 10bit
+-	 * 2's complements number
++	 * 2's complements number.
++	 * On i.MX27 the bit 9 is the sign bit.
+ 	 */
+-	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
+-		mfn_abs = 0x400 - mfn;
++	if (mfn_is_negative(mfn)) {
++		if (cpu_is_mx27())
++			mfn_abs = mfn & MFN_MASK;
++		else
++			mfn_abs = BIT(MFN_BITS) - mfn;
++	}
+ 
+ 	rate = parent_rate * 2;
+ 	rate /= pd + 1;
+@@ -70,7 +85,7 @@ static unsigned long clk_pllv1_recalc_rate(struct clk_hw *hw,
+ 
+ 	do_div(ll, mfd + 1);
+ 
+-	if (!cpu_is_mx1() && !cpu_is_mx21() && mfn >= 0x200)
++	if (mfn_is_negative(mfn))
+ 		ll = -ll;
+ 
+ 	ll = (rate * mfi) + ll;
 -- 
 1.8.1.5
