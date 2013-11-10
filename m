@@ -1,146 +1,168 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 11 Nov 2013 06:55:01 +1300
-Subject: [PATCH] ARM: vt8500: add defconfig
-In-Reply-To: <1384057450-23640-1-git-send-email-olof@lixom.net>
-References: <1384057450-23640-1-git-send-email-olof@lixom.net>
-Message-ID: <527FC875.7080402@prisktech.co.nz>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 10 Nov 2013 19:02:50 +0100
+Subject: [PATCH v3 4/4] ARM: dts: Add initial device tree support for
+ EXYNOS5410
+In-Reply-To: <1383811969-32712-5-git-send-email-v.tyrtov@samsung.com>
+References: <1383811969-32712-1-git-send-email-v.tyrtov@samsung.com>
+ <1383811969-32712-5-git-send-email-v.tyrtov@samsung.com>
+Message-ID: <19495187.Nrl1zS8Kog@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/13 17:24, Olof Johansson wrote:
-> Add a single-vendor config for vt8500. We can't enable WM8750 in
-> multi_v7_defconfig since it's a v6-based device, but it's still valuable
-> to have an in-tree defconfig that is suitable for the hardware.
->
-> This is based on multi_v7_defconfig and can be tweaked over time. It
-> gets us off the ground for now.
->
-> Booted on an APC8750 with USB rootfs.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+Hi,
+
+Please see my comments inline.
+
+On Thursday 07 of November 2013 12:12:49 Vyacheslav Tyrtov wrote:
+> From: Tarek Dakhran <t.dakhran@samsung.com>
+> 
+> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
+> 
+> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
+> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
 > ---
->
-> Tony,
->
->
-> I'll apply this to a suitable arm-soc branch sometime during the merge window,
-> since it doesn't affect existing systems. A review/ack would be appreciated!
->
->
-> -Olof
->
->   arch/arm/configs/vt8500_defconfig |   88 +++++++++++++++++++++++++++++++++++++
->   1 file changed, 88 insertions(+)
->   create mode 100644 arch/arm/configs/vt8500_defconfig
->
-> diff --git a/arch/arm/configs/vt8500_defconfig b/arch/arm/configs/vt8500_defconfig
+>  arch/arm/boot/dts/Makefile                |   1 +
+>  arch/arm/boot/dts/exynos5410-smdk5410.dts |  65 ++++++++++
+>  arch/arm/boot/dts/exynos5410.dtsi         | 209 ++++++++++++++++++++++++++++++
+>  3 files changed, 275 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+>  create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+[snip]
+> diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
 > new file mode 100644
-> index 0000000..6fd3717
+> index 0000000..06ae479
 > --- /dev/null
-> +++ b/arch/arm/configs/vt8500_defconfig
-> @@ -0,0 +1,88 @@
-> +CONFIG_IRQ_DOMAIN_DEBUG=y
-> +CONFIG_NO_HZ=y
-> +CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_BLK_DEV_INITRD=y
-> +CONFIG_ARCH_MULTI_V6=y
-> +CONFIG_ARCH_WM8750=y
-> +CONFIG_ARCH_WM8850=y
-> +CONFIG_ARM_ERRATA_720789=y
-> +CONFIG_ARM_ERRATA_754322=y
-> +CONFIG_ARM_ERRATA_775420=y
-> +CONFIG_HAVE_ARM_ARCH_TIMER=y
-> +CONFIG_AEABI=y
-> +CONFIG_HIGHMEM=y
-> +CONFIG_HIGHPTE=y
-> +CONFIG_ARM_APPENDED_DTB=y
-> +CONFIG_ARM_ATAG_DTB_COMPAT=y
-> +CONFIG_VFP=y
-> +CONFIG_NEON=y
-> +CONFIG_PM_RUNTIME=y
-> +CONFIG_NET=y
-> +CONFIG_UNIX=y
-> +CONFIG_INET=y
-> +CONFIG_IP_PNP=y
-> +CONFIG_IP_PNP_DHCP=y
-> +CONFIG_DEVTMPFS=y
-> +CONFIG_DEVTMPFS_MOUNT=y
-> +CONFIG_PROC_DEVICETREE=y
-> +CONFIG_EEPROM_93CX6=y
-> +CONFIG_SCSI=y
-> +CONFIG_BLK_DEV_SD=y
-> +CONFIG_NETDEVICES=y
-> +# CONFIG_NET_CADENCE is not set
-> +# CONFIG_NET_VENDOR_BROADCOM is not set
-> +# CONFIG_NET_VENDOR_CIRRUS is not set
-> +# CONFIG_NET_VENDOR_FARADAY is not set
-> +# CONFIG_NET_VENDOR_INTEL is not set
-> +# CONFIG_NET_VENDOR_MARVELL is not set
-> +# CONFIG_NET_VENDOR_MICREL is not set
-> +# CONFIG_NET_VENDOR_NATSEMI is not set
-> +# CONFIG_NET_VENDOR_SEEQ is not set
-> +# CONFIG_NET_VENDOR_SMSC is not set
-> +# CONFIG_NET_VENDOR_STMICRO is not set
-> +CONFIG_VIA_VELOCITY=y
-> +# CONFIG_NET_VENDOR_WIZNET is not set
-> +CONFIG_PHYLIB=y
-> +CONFIG_INPUT_MATRIXKMAP=y
-> +CONFIG_SERIAL_VT8500=y
-> +CONFIG_SERIAL_VT8500_CONSOLE=y
-> +CONFIG_PINCTRL_SINGLE=y
-> +CONFIG_PINCTRL_WM8750=y
-> +CONFIG_GPIO_GENERIC_PLATFORM=y
-> +CONFIG_POWER_SUPPLY=y
-> +CONFIG_POWER_RESET=y
-> +CONFIG_MFD_SYSCON=y
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> +CONFIG_REGULATOR_GPIO=y
-> +CONFIG_USB=y
-> +CONFIG_USB_EHCI_HCD=y
-> +CONFIG_USB_EHCI_HCD_PLATFORM=y
-> +CONFIG_USB_UHCI_HCD=y
-> +CONFIG_USB_STORAGE=y
-> +CONFIG_NOP_USB_XCEIV=y
-> +CONFIG_USB_GPIO_VBUS=y
-> +CONFIG_USB_ULPI=y
-> +CONFIG_MMC=y
-> +CONFIG_MMC_DEBUG=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_TRIGGERS=y
-> +CONFIG_RTC_CLASS=y
-> +CONFIG_RTC_DRV_VT8500=y
-> +CONFIG_DMADEVICES=y
-> +CONFIG_COMMON_CLK_DEBUG=y
-> +# CONFIG_IOMMU_SUPPORT is not set
-> +CONFIG_PWM=y
-> +CONFIG_PWM_VT8500=y
-> +CONFIG_RESET_CONTROLLER=y
-> +CONFIG_GENERIC_PHY=y
-> +CONFIG_EXT4_FS=y
-> +CONFIG_TMPFS=y
-> +CONFIG_NFS_FS=y
-> +CONFIG_NFS_V3_ACL=y
-> +CONFIG_NFS_V4=y
-> +CONFIG_ROOT_NFS=y
-> +CONFIG_PRINTK_TIME=y
-> +CONFIG_DEBUG_KERNEL=y
-> +CONFIG_LOCKUP_DETECTOR=y
+> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+> @@ -0,0 +1,65 @@
+> +/*
+> + * SAMSUNG SMDK5410 board device tree source
+> + *
+> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +/dts-v1/;
+> +#include "exynos5410.dtsi"
+> +/ {
+> +	model = "Samsung SMDK5410 board based on EXYNOS5410";
+> +	compatible = "samsung,smdk5410", "samsung,exynos5410";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x80000000>;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttySAC2,115200";
+> +	};
+> +
+> +	oscclk: oscclk {
 
-I notice you left out the I2C driver and the MMC driver - given you 
-had/have problems with them this is understandable. They can be sorted 
-out later.
+coding style: According to ePAPR recommendation, node name should
+represent hardware type, not particular instance of hardware.
 
-My main concern is that this file is named 'vt8500_defconfig', but it 
-won't be able to cover all of the VT8500 'family'.
-The earlier models (vt8500/wm8505) are ARM9, the WM8650 was ARM11, and 
-then we got to the WM8750 that you are targetting (ARMv6) and finally 
-the ARMv7 stuff (WM8850/WM8950).
-I'm not particularly fussed about it (it's fine as is), but if you think 
-of a better filename to fit the situation I wouldn't complain :)
+So instead, the preferred way would be to specify the clock using
+following layout:
 
-Reviewed-by: Tony Prisk <linux@prisktech.co.nz>
+	clocks {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <0>;
 
-Regards
-Tony P
+		oscclk: clock at 0 {
+			compatible = "fixed-clock";
+			reg = <0>;
+			#clock-cells = <0>;
+			clock-frequency = <24000000>;
+			clock-output-names = "fin_pll";
+		};
+	};
+
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <24000000>;
+> +		clock-output-names = "fin_pll";
+> +	};
+[snip]
+> +
+> +};
+> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+> new file mode 100644
+> index 0000000..9921b66
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+> @@ -0,0 +1,209 @@
+> +/*
+> + * SAMSUNG EXYNOS5410 SoC device tree source
+> + *
+> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
+> + * EXYNOS5410 based board files can include this file and provide
+> + * values for board specfic bindings.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <dt-bindings/clock/exynos5410.h>
+> +#include "exynos5.dtsi"
+> +/ {
+[snip]
+> +	clock: clock-controller at 10010000 {
+> +		compatible = "samsung,exynos5410-clock";
+> +		reg = <0x10010000 0x30000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +	mct at 101C0000 {
+
+A generic name would be: timer at 101C0000
+
+> +		compatible = "samsung,exynos4210-mct";
+> +		reg = <0x101C0000 0xB00>;
+> +		interrupt-controller;
+> +		#interrups-cells = <1>;
+
+MCT is not an interrupt controller, so both interrupt-controller and
+#interrupt-cells properties are incorrect. I guess that's due to the
+broken example in the documentation, that I already posted patches to fix.
+
+> +		interrupt-parent = <&mct_map>;
+> +		interrupts = <0>, <1>, <2>, <3>,
+> +			<4>, <5>, <6>, <7>,
+> +			<8>, <9>, <10>, <11>;
+> +		clocks = <&oscclk>, <&clock CLK_MCT>;
+> +		clock-names = "fin_pll", "mct";
+> +
+> +		mct_map: mct-map {
+
+Again, interrupt-map would be a better name for this node.
+
+> +			#interrupt-cells = <1>;
+> +			#address-cells = <0>;
+> +			#size-cells = <0>;
+> +			interrupt-map = <0 &combiner 23 3>,
+> +					<1 &combiner 23 4>,
+> +					<2 &combiner 25 2>,
+> +					<3 &combiner 25 3>,
+> +					<4 &gic 0 120 0>,
+> +					<5 &gic 0 121 0>,
+> +					<6 &gic 0 122 0>,
+> +					<7 &gic 0 123 0>,
+> +					<8 &gic 0 128 0>,
+> +					<9 &gic 0 129 0>,
+> +					<10 &gic 0 130 0>,
+> +					<11 &gic 0 131 0>;
+> +		};
+> +	};
+
+Otherwise, the patch looks good.
+
+Best regards,
+Tomasz
