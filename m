@@ -1,103 +1,263 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 10 Nov 2013 04:09:37 +0100
-Subject: [PATCH v2 7/7] ARM: shmobile: r8a7790: Reference clocks
+Date: Sun, 10 Nov 2013 04:09:32 +0100
+Subject: [PATCH v2 2/7] clk: shmobile: Add DIV6 clock support
 In-Reply-To: <1384052977-30616-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1384052977-30616-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1384052977-30616-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1384052977-30616-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference clocks using a "clocks" property in all nodes corresponding to
-devices that require a clock.
+DIV6 clocks are divider gate clocks controlled through a single
+register. The divider is expressed on 6 bits, hence the name, and can
+take values from 1/1 to 1/64.
 
+Those clocks are found on Renesas ARM SoCs.
+
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../bindings/clock/renesas,cpg-div6-clocks.txt     |  27 +++
+ drivers/clk/shmobile/Makefile                      |   1 +
+ drivers/clk/shmobile/clk-div6.c                    | 185 +++++++++++++++++++++
+ 3 files changed, 213 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+ create mode 100644 drivers/clk/shmobile/clk-div6.c
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 5d8c8c7..098b2d6 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -185,6 +185,7 @@
- 		reg = <0 0xe6508000 0 0x40>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 287 0x4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_I2C0>;
- 		status = "disabled";
- 	};
+diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+new file mode 100644
+index 0000000..316d745
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/renesas,cpg-div6-clocks.txt
+@@ -0,0 +1,27 @@
++* Renesas CPG DIV6 Clock
++
++The CPG DIV6 clocks are variable factor clocks provided by the Clock Pulse
++Generator (CPG). They clock input is divided by a configurable factor from 1
++to 64.
++
++Required Properties:
++
++  - compatible: Must be one of the following
++    - "renesas,r8a7790-div6-clock" for R8A7790 (R-Car H2) DIV6 clocks
++    - "renesas,cpg-div6-clock" for generic DIV6 clocks
++  - reg: Base address and length of the memory resource used by the DIV6 clock
++  - clocks: Reference to the parent clock
++  - #clock-cells: Must be 0
++  - clock-output-names: The name of the clock as a free-form string
++
++
++Example
++-------
++
++	sd2_clk: sd2_clk at e6150078 {
++		compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
++		reg = <0 0xe6150078 0 4>;
++		clocks = <&pll1_div2_clk>;
++		#clock-cells = <0>;
++		clock-output-names = "sd2";
++	};
+diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
+index 40d88e6..eded163 100644
+--- a/drivers/clk/shmobile/Makefile
++++ b/drivers/clk/shmobile/Makefile
+@@ -1,6 +1,7 @@
+ obj-$(CONFIG_ARCH_EMEV2)		+= clk-emev2.o
+ obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
++obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-div6.o
  
-@@ -195,6 +196,7 @@
- 		reg = <0 0xe6518000 0 0x40>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 288 0x4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_I2C1>;
- 		status = "disabled";
- 	};
- 
-@@ -205,6 +207,7 @@
- 		reg = <0 0xe6530000 0 0x40>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 286 0x4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_I2C2>;
- 		status = "disabled";
- 	};
- 
-@@ -215,6 +218,7 @@
- 		reg = <0 0xe6540000 0 0x40>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 290 0x4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_I2C3>;
- 		status = "disabled";
- 	};
- 
-@@ -223,6 +227,7 @@
- 		reg = <0 0xee200000 0 0x80>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 169 0x4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_MMCIF0>;
- 		reg-io-width = <4>;
- 		status = "disabled";
- 	};
-@@ -232,6 +237,7 @@
- 		reg = <0 0xee220000 0 0x80>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 170 0x4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_MMCIF1>;
- 		reg-io-width = <4>;
- 		status = "disabled";
- 	};
-@@ -246,6 +252,7 @@
- 		reg = <0 0xee100000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 165 4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_SDHI0>;
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
-@@ -255,6 +262,7 @@
- 		reg = <0 0xee120000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 166 4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_SDHI1>;
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
-@@ -264,6 +272,7 @@
- 		reg = <0 0xee140000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 167 4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_SDHI2>;
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
-@@ -273,6 +282,7 @@
- 		reg = <0 0xee160000 0 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 168 4>;
-+		clocks = <&mstp3_clks R8A7790_CLK_SDHI3>;
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
+ # for emply built-in.o
+ obj-n	:= dummy
+diff --git a/drivers/clk/shmobile/clk-div6.c b/drivers/clk/shmobile/clk-div6.c
+new file mode 100644
+index 0000000..aac4756
+--- /dev/null
++++ b/drivers/clk/shmobile/clk-div6.c
+@@ -0,0 +1,185 @@
++/*
++ * r8a7790 Common Clock Framework support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ *
++ * Contact: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++#define CPG_DIV6_CKSTP		BIT(8)
++#define CPG_DIV6_DIV(d)		((d) & 0x3f)
++#define CPG_DIV6_DIV_MASK	0x3f
++
++/**
++ * struct div6_clock - MSTP gating clock
++ * @hw: handle between common and hardware-specific interfaces
++ * @reg: IO-remapped register
++ * @div: divisor value (1-64)
++ */
++struct div6_clock {
++	struct clk_hw hw;
++	void __iomem *reg;
++	unsigned int div;
++};
++
++#define to_div6_clock(_hw) container_of(_hw, struct div6_clock, hw)
++
++static int cpg_div6_clock_enable(struct clk_hw *hw)
++{
++	struct div6_clock *clock = to_div6_clock(hw);
++
++	clk_writel(CPG_DIV6_DIV(clock->div - 1), clock->reg);
++
++	return 0;
++}
++
++static void cpg_div6_clock_disable(struct clk_hw *hw)
++{
++	struct div6_clock *clock = to_div6_clock(hw);
++
++	/* DIV6 clocks require the divisor field to be non-zero when stopping
++	 * the clock.
++	 */
++	clk_writel(CPG_DIV6_CKSTP | CPG_DIV6_DIV(CPG_DIV6_DIV_MASK),
++		   clock->reg);
++}
++
++static int cpg_div6_clock_is_enabled(struct clk_hw *hw)
++{
++	struct div6_clock *clock = to_div6_clock(hw);
++
++	return !(clk_readl(clock->reg) & CPG_DIV6_CKSTP);
++}
++
++static unsigned long cpg_div6_clock_recalc_rate(struct clk_hw *hw,
++						unsigned long parent_rate)
++{
++	struct div6_clock *clock = to_div6_clock(hw);
++	unsigned int div = (clk_readl(clock->reg) & CPG_DIV6_DIV_MASK) + 1;
++
++	return parent_rate / div;
++}
++
++static unsigned int cpg_div6_clock_calc_div(unsigned long rate,
++					    unsigned long parent_rate)
++{
++	unsigned int div;
++
++	div = DIV_ROUND_CLOSEST(parent_rate, rate);
++	return clamp_t(unsigned int, div, 1, 64);
++}
++
++static long cpg_div6_clock_round_rate(struct clk_hw *hw, unsigned long rate,
++				      unsigned long *parent_rate)
++{
++	unsigned int div = cpg_div6_clock_calc_div(rate, *parent_rate);
++
++	return *parent_rate / div;
++}
++
++static int cpg_div6_clock_set_rate(struct clk_hw *hw, unsigned long rate,
++				   unsigned long parent_rate)
++{
++	struct div6_clock *clock = to_div6_clock(hw);
++	unsigned int div = cpg_div6_clock_calc_div(rate, parent_rate);
++
++	clock->div = div;
++
++	/* Only program the new divisor if the clock isn't stopped. */
++	if (!(clk_readl(clock->reg) & CPG_DIV6_CKSTP))
++		clk_writel(CPG_DIV6_DIV(clock->div - 1), clock->reg);
++
++	return 0;
++}
++
++static const struct clk_ops cpg_div6_clock_ops = {
++	.enable = cpg_div6_clock_enable,
++	.disable = cpg_div6_clock_disable,
++	.is_enabled = cpg_div6_clock_is_enabled,
++	.recalc_rate = cpg_div6_clock_recalc_rate,
++	.round_rate = cpg_div6_clock_round_rate,
++	.set_rate = cpg_div6_clock_set_rate,
++};
++
++static void __init cpg_div6_clock_init(struct device_node *np)
++{
++	struct clk_init_data init;
++	struct div6_clock *clock;
++	const char *parent_name;
++	const char *name;
++	struct clk *clk;
++	int ret;
++
++	clock = kzalloc(sizeof(*clock), GFP_KERNEL);
++	if (!clock) {
++		pr_err("%s: failed to allocate %s DIV6 clock\n",
++		       __func__, np->name);
++		return;
++	}
++
++	/* Remap the clock register and read the divisor. Disabling the
++	 * clock overwrites the divisor, so we need to cache its value for the
++	 * enable operation.
++	 */
++	clock->reg = of_iomap(np, 0);
++	if (clock->reg == NULL) {
++		pr_err("%s: failed to map %s DIV6 clock register\n",
++		       __func__, np->name);
++		goto error;
++	}
++
++	clock->div = (clk_readl(clock->reg) & CPG_DIV6_DIV_MASK) + 1;
++
++	/* Parse the DT properties. */
++	ret = of_property_read_string(np, "clock-output-names", &name);
++	if (ret < 0) {
++		pr_err("%s: failed to get %s DIV6 clock output name\n",
++		       __func__, np->name);
++		goto error;
++	}
++
++	parent_name = of_clk_get_parent_name(np, 0);
++	if (parent_name == NULL) {
++		pr_err("%s: failed to get %s DIV6 clock parent name\n",
++		       __func__, np->name);
++		goto error;
++	}
++
++	/* Register the clock. */
++	init.name = name;
++	init.ops = &cpg_div6_clock_ops;
++	init.flags = CLK_IS_BASIC;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	clock->hw.init = &init;
++
++	clk = clk_register(NULL, &clock->hw);
++	if (IS_ERR(clk)) {
++		pr_err("%s: failed to register %s DIV6 clock (%ld)\n",
++		       __func__, np->name, PTR_ERR(clk));
++		goto error;
++	}
++
++	of_clk_add_provider(np, of_clk_src_simple_get, clk);
++
++	return;
++
++error:
++	if (clock->reg)
++		iounmap(clock->reg);
++	kfree(clock);
++}
++CLK_OF_DECLARE(cpg_div6_clk, "renesas,cpg-div6-clock", cpg_div6_clock_init);
 -- 
 1.8.1.5
