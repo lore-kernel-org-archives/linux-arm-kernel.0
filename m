@@ -1,30 +1,288 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 10 Nov 2013 04:09:35 +0100
-Subject: [PATCH v2 5/7] ARM: shmobile: r8a7791: Add clock index macros for DT
- sources
+Date: Sun, 10 Nov 2013 04:09:31 +0100
+Subject: [PATCH v2 1/7] clk: shmobile: Add R-Car Gen2 clocks support
 In-Reply-To: <1384052977-30616-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1384052977-30616-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1384052977-30616-6-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1384052977-30616-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add macros usable by device tree sources to reference r8a7791 clocks by
-index.
+The R-Car Gen2 SoCs (R8A7790 and R8A7791) have several clocks that are
+too custom to be supported in a generic driver. Those clocks can be
+divided in two categories:
 
+- Fixed rate clocks with multiplier and divisor set according to boot
+  mode configuration
+
+- Custom divider clocks with SoC-specific divider values
+
+This driver supports both.
+
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- include/dt-bindings/clock/r8a7791-clock.h | 104 ++++++++++++++++++++++++++++++
- 1 file changed, 104 insertions(+)
- create mode 100644 include/dt-bindings/clock/r8a7791-clock.h
+ .../clock/renesas,rcar-gen2-cpg-clocks.txt         |  32 ++++
+ drivers/clk/shmobile/Makefile                      |   5 +-
+ drivers/clk/shmobile/clk-rcar-gen2.c               | 187 +++++++++++++++++++++
+ include/linux/clk/shmobile.h                       |  19 +++
+ 4 files changed, 242 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt
+ create mode 100644 drivers/clk/shmobile/clk-rcar-gen2.c
+ create mode 100644 include/linux/clk/shmobile.h
 
-diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
+diff --git a/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt
 new file mode 100644
-index 0000000..5a4482a
+index 0000000..f85a0ed
 --- /dev/null
-+++ b/include/dt-bindings/clock/r8a7791-clock.h
-@@ -0,0 +1,104 @@
++++ b/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt
+@@ -0,0 +1,32 @@
++* Renesas R-Car Gen2 Clock Pulse Generator (CPG)
++
++The CPG generates core clocks for the R-Car Gen2 SoCs. It includes three PLLs
++and several fixed ratio dividers.
++
++Required Properties:
++
++  - compatible: Must be one of
++    - "renesas,r8a7790-cpg-clocks" for the r8a7790 CPG
++    - "renesas,r8a7791-cpg-clocks" for the r8a7791 CPG
++    - "renesas,rcar-gen2-cpg-clocks" for the generic R-Car Gen2 CPG
++
++  - reg: Base address and length of the memory resource used by the CPG
++
++  - clocks: Reference to the parent clock
++  - #clock-cells: Must be 1
++  - clock-output-names: The names of the clocks. Supported clocks are "main",
++    "pll0", "pll1", "pll3", "lb", "qspi", "sdh", "sd0" and "sd1".
++
++
++Example
++-------
++
++	cpg_clocks: cpg_clocks at e6150000 {
++		compatible = "renesas,r8a7790-cpg-clocks",
++			     "renesas,rcar-gen2-cpg-clocks";
++		reg = <0 0xe6150000 0 0x1000>;
++		clocks = <&extal_clk>;
++		#clock-cells = <1>;
++		clock-output-names = "main", "pll0, "pll1", "pll3",
++				     "lb", "qspi", "sdh", "sd0", "sd1";
++	};
+diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
+index 2240730..40d88e6 100644
+--- a/drivers/clk/shmobile/Makefile
++++ b/drivers/clk/shmobile/Makefile
+@@ -1,3 +1,6 @@
+-obj-$(CONFIG_ARCH_EMEV2)	+= clk-emev2.o
++obj-$(CONFIG_ARCH_EMEV2)		+= clk-emev2.o
++obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
++obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
++
+ # for emply built-in.o
+ obj-n	:= dummy
+diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c b/drivers/clk/shmobile/clk-rcar-gen2.c
+new file mode 100644
+index 0000000..1d309f0
+--- /dev/null
++++ b/drivers/clk/shmobile/clk-rcar-gen2.c
+@@ -0,0 +1,187 @@
++/*
++ * rcar_gen2 Core CPG Clocks
++ *
++ * Copyright (C) 2013  Ideas On Board SPRL
++ *
++ * Contact: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/clk/shmobile.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/spinlock.h>
++
++struct rcar_gen2_cpg {
++	struct clk_onecell_data data;
++	spinlock_t lock;
++	void __iomem *reg;
++};
++
++/*
++ *   MD		EXTAL		PLL0	PLL1	PLL3
++ * 14 13 19	(MHz)		*1	*1
++ *---------------------------------------------------
++ * 0  0  0	15 x 1		x172/2	x208/2	x106
++ * 0  0  1	15 x 1		x172/2	x208/2	x88
++ * 0  1  0	20 x 1		x130/2	x156/2	x80
++ * 0  1  1	20 x 1		x130/2	x156/2	x66
++ * 1  0  0	26 / 2		x200/2	x240/2	x122
++ * 1  0  1	26 / 2		x200/2	x240/2	x102
++ * 1  1  0	30 / 2		x172/2	x208/2	x106
++ * 1  1  1	30 / 2		x172/2	x208/2	x88
++ *
++ * *1 :	Table 7.6 indicates VCO ouput (PLLx = VCO/2)
++ */
++#define CPG_PLL_CONFIG_INDEX(md)	((((md) & BIT(14)) >> 12) | \
++					 (((md) & BIT(13)) >> 12) | \
++					 (((md) & BIT(19)) >> 19))
++struct cpg_pll_config {
++	unsigned int extal_div;
++	unsigned int pll1_mult;
++	unsigned int pll3_mult;
++};
++
++static const struct cpg_pll_config cpg_pll_configs[8] __initconst = {
++	{ 1, 208, 106 }, { 1, 208,  88 }, { 1, 156,  80 }, { 1, 156,  66 },
++	{ 2, 240, 122 }, { 2, 240, 102 }, { 2, 208, 106 }, { 2, 208,  88 },
++};
++
++/* SDHI divisors */
++static const struct clk_div_table cpg_sdh_div_table[] = {
++	{  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
++	{  4,  8 }, {  5, 12 }, {  6, 16 }, {  7, 18 },
++	{  8, 24 }, { 10, 36 }, { 11, 48 }, {  0,  0 },
++};
++
++static const struct clk_div_table cpg_sd01_div_table[] = {
++	{  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
++	{ 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
++};
++
++#define CPG_SDCKCR			0x00000074
++#define CPG_PLL0CR			0x000000d8
++
++static u32 cpg_mode __initdata;
++
++static struct clk * __init
++rcar_gen2_cpg_register_clock(struct device_node *np, struct rcar_gen2_cpg *cpg,
++			     const struct cpg_pll_config *config,
++			     const char *name)
++{
++	const struct clk_div_table *table = NULL;
++	const char *parent_name = "main";
++	unsigned int shift;
++	unsigned int mult = 1;
++	unsigned int div = 1;
++
++	if (!strcmp(name, "main")) {
++		parent_name = of_clk_get_parent_name(np, 0);
++		div = config->extal_div;
++	} else if (!strcmp(name, "pll0")) {
++		/* PLL0 is a configurable multiplier clock. Register it as a
++		 * fixed factor clock for now as there's no generic multiplier
++		 * clock implementation and we currently have no need to change
++		 * the multiplier value.
++		 */
++		u32 value = clk_readl(cpg->reg + CPG_PLL0CR);
++		mult = ((value >> 24) & ((1 << 7) - 1)) + 1;
++	} else if (!strcmp(name, "pll1")) {
++		mult = config->pll1_mult / 2;
++	} else if (!strcmp(name, "pll3")) {
++		mult = config->pll3_mult;
++	} else if (!strcmp(name, "lb")) {
++		div = cpg_mode & BIT(18) ? 36 : 24;
++	} else if (!strcmp(name, "qspi")) {
++		div = (cpg_mode & (BIT(3) | BIT(2) | BIT(1))) == BIT(2)
++		    ? 16 : 20;
++	} else if (!strcmp(name, "sdh")) {
++		table = cpg_sdh_div_table;
++		shift = 8;
++	} else if (!strcmp(name, "sd0")) {
++		table = cpg_sd01_div_table;
++		shift = 4;
++	} else if (!strcmp(name, "sd0")) {
++		table = cpg_sd01_div_table;
++		shift = 0;
++	} else {
++		return ERR_PTR(-EINVAL);
++	}
++
++	if (!table)
++		return clk_register_fixed_factor(NULL, name, parent_name, 0,
++						 mult, div);
++	else
++		return clk_register_divider_table(NULL, name, parent_name, 0,
++						 cpg->reg + CPG_SDCKCR, shift,
++						 4, 0, table, &cpg->lock);
++}
++
++static void __init rcar_gen2_cpg_clocks_init(struct device_node *np)
++{
++	const struct cpg_pll_config *config;
++	struct rcar_gen2_cpg *cpg;
++	struct clk **clks;
++	unsigned int i;
++	int num_clks;
++
++	num_clks = of_property_count_strings(np, "clock-output-names");
++	if (num_clks < 0) {
++		pr_err("%s: failed to count clocks\n", __func__);
++		return;
++	}
++
++	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
++	clks = kzalloc(num_clks * sizeof(*clks), GFP_KERNEL);
++	if (cpg == NULL || clks == NULL) {
++		/* We're leaking memory on purpose, there's no point in cleaning
++		 * up as the system won't boot anyway.
++		 */
++		pr_err("%s: failed to allocate cpg\n", __func__);
++		return;
++	}
++
++	spin_lock_init(&cpg->lock);
++
++	cpg->data.clks = clks;
++	cpg->data.clk_num = num_clks;
++
++	cpg->reg = of_iomap(np, 0);
++	if (WARN_ON(cpg->reg == NULL))
++		return;
++
++	config = &cpg_pll_configs[CPG_PLL_CONFIG_INDEX(cpg_mode)];
++
++	for (i = 0; i < num_clks; ++i) {
++		const char *name;
++		struct clk *clk;
++
++		of_property_read_string_index(np, "clock-output-names", i,
++					      &name);
++
++		clk = rcar_gen2_cpg_register_clock(np, cpg, config, name);
++		if (IS_ERR(clk))
++			pr_err("%s: failed to register %s %s clock (%ld)\n",
++			       __func__, np->name, name, PTR_ERR(clk));
++		else
++			cpg->data.clks[i] = clk;
++	}
++
++	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
++}
++CLK_OF_DECLARE(rcar_gen2_cpg_clks, "renesas,rcar-gen2-cpg-clocks",
++	       rcar_gen2_cpg_clocks_init);
++
++void __init rcar_gen2_clocks_init(u32 mode)
++{
++	cpg_mode = mode;
++
++	of_clk_init(NULL);
++}
+diff --git a/include/linux/clk/shmobile.h b/include/linux/clk/shmobile.h
+new file mode 100644
+index 0000000..f9bf080
+--- /dev/null
++++ b/include/linux/clk/shmobile.h
+@@ -0,0 +1,19 @@
 +/*
 + * Copyright 2013 Ideas On Board SPRL
++ *
++ * Contact: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -32,100 +290,13 @@ index 0000000..5a4482a
 + * (at your option) any later version.
 + */
 +
-+#ifndef __DT_BINDINGS_CLOCK_R8A7791_H__
-+#define __DT_BINDINGS_CLOCK_R8A7791_H__
++#ifndef __LINUX_CLK_SHMOBILE_H_
++#define __LINUX_CLK_SHMOBILE_H_
 +
-+/* CPG */
-+#define R8A7791_CLK_MAIN		0
-+#define R8A7791_CLK_PLL0		1
-+#define R8A7791_CLK_PLL1		2
-+#define R8A7791_CLK_PLL3		3
-+#define R8A7791_CLK_LB			4
-+#define R8A7791_CLK_QSPI		5
-+#define R8A7791_CLK_SDH			6
-+#define R8A7791_CLK_SD0			7
++#include <linux/types.h>
 +
-+/* MSTP1 */
-+#define R8A7791_CLK_TMU1		11
-+#define R8A7791_CLK_TMU3		21
-+#define R8A7791_CLK_TMU2		22
-+#define R8A7791_CLK_CMT0		24
-+#define R8A7791_CLK_TMU0		25
-+#define R8A7791_CLK_VSP1_DU1		27
-+#define R8A7791_CLK_VSP1_DU0		28
-+#define R8A7791_CLK_VSP1_SY		31
++void rcar_gen2_clocks_init(u32 mode);
 +
-+/* MSTP2 */
-+#define R8A7791_CLK_SCIFA2		2
-+#define R8A7791_CLK_SCIFA1		3
-+#define R8A7791_CLK_SCIFA0		4
-+#define R8A7791_CLK_SCIFB0		6
-+#define R8A7791_CLK_SCIFB1		7
-+#define R8A7791_CLK_SCIFB2		16
-+#define R8A7791_CLK_DMAC		18
-+
-+/* MSTP3 */
-+#define R8A7791_CLK_TPU0		4
-+#define R8A7791_CLK_SDHI2		11
-+#define R8A7791_CLK_SDHI1		12
-+#define R8A7791_CLK_SDHI0		14
-+#define R8A7791_CLK_MMCIF0		15
-+#define R8A7791_CLK_SSUSB		28
-+#define R8A7791_CLK_CMT1		29
-+#define R8A7791_CLK_USBDMAC0		30
-+#define R8A7791_CLK_USBDMAC1		31
-+
-+/* MSTP5 */
-+#define R8A7791_CLK_THERMAL		22
-+#define R8A7791_CLK_PWM			23
-+
-+/* MSTP7 */
-+#define R8A7791_CLK_HSUSB		4
-+#define R8A7791_CLK_HSCIF2		13
-+#define R8A7791_CLK_SCIF5		14
-+#define R8A7791_CLK_SCIF4		15
-+#define R8A7791_CLK_HSCIF1		16
-+#define R8A7791_CLK_HSCIF0		17
-+#define R8A7791_CLK_SCIF3		18
-+#define R8A7791_CLK_SCIF2		19
-+#define R8A7791_CLK_SCIF1		20
-+#define R8A7791_CLK_SCIF0		21
-+#define R8A7791_CLK_DU1			23
-+#define R8A7791_CLK_DU0			24
-+#define R8A7791_CLK_LVDS0		26
-+
-+/* MSTP8 */
-+#define R8A7791_CLK_VIN2		9
-+#define R8A7791_CLK_VIN1		10
-+#define R8A7791_CLK_VIN0		11
-+#define R8A7791_CLK_ETHER		13
-+#define R8A7791_CLK_SATA1		14
-+#define R8A7791_CLK_SATA0		15
-+
-+/* MSTP9 */
-+#define R8A7791_CLK_GPIO7		4
-+#define R8A7791_CLK_GPIO6		5
-+#define R8A7791_CLK_GPIO5		7
-+#define R8A7791_CLK_GPIO4		8
-+#define R8A7791_CLK_GPIO3		9
-+#define R8A7791_CLK_GPIO2		10
-+#define R8A7791_CLK_GPIO1		11
-+#define R8A7791_CLK_GPIO0		12
-+#define R8A7791_CLK_RCAN1		15
-+#define R8A7791_CLK_RCAN0		16
-+#define R8A7791_CLK_I2C5		25
-+#define R8A7791_CLK_IICDVFS		26
-+#define R8A7791_CLK_I2C4		27
-+#define R8A7791_CLK_I2C3		28
-+#define R8A7791_CLK_I2C2		29
-+#define R8A7791_CLK_I2C1		30
-+#define R8A7791_CLK_I2C0		31
-+
-+/* MSTP11 */
-+#define R8A7791_CLK_SCIF23		6
-+#define R8A7791_CLK_SCIF24		7
-+#define R8A7791_CLK_SCIF25		8
-+
-+#endif /* __DT_BINDINGS_CLOCK_R8A7791_H__ */
++#endif
 -- 
 1.8.1.5
