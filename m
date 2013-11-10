@@ -1,128 +1,135 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat,  9 Nov 2013 20:24:10 -0800
-Subject: [PATCH] ARM: vt8500: add defconfig
-Message-ID: <1384057450-23640-1-git-send-email-olof@lixom.net>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 10 Nov 2013 14:53:46 +0100
+Subject: [BUG,REGRESSION?] 3.11.6+,3.12: GbE iface rate drops to few KB/s
+Message-ID: <8761s0cqhh.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a single-vendor config for vt8500. We can't enable WM8750 in
-multi_v7_defconfig since it's a v6-based device, but it's still valuable
-to have an in-tree defconfig that is suitable for the hardware.
+Hi,
 
-This is based on multi_v7_defconfig and can be tweaked over time. It
-gets us off the ground for now.
+I decided to upgrade the kernel on one of my ReadyNAS 102 from 3.11.1 to 
+3.11.7. The device is based on Marvell Armada 370 SoC and uses mvneta
+driver. Mine runs Debian armel unstable but I can confirm the issue also
+happens on a debian harmhf unstable.
 
-Booted on an APC8750 with USB rootfs.
+Doing some scp transfers of files located on the NAS (1000baseT-FD on
+both side), I noticed the transfers rate is ridiculously slow (280KB/s).
+I did the same test with a 3.12 kernel and got the same results,
+i.e. AFAICT the bug also exist upstream.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
+So, I decided to go to hell and start digging a bit: I run a 'git bisect'
+session on stable tree from 3.11.1 (known good) to 3.11.7 (known
+bad). The results are given below.
 
-Tony,
+I decided to reboot on my old 3.11.1 kernel and do 20 files transfers
+of a 1GB file located on the NAS to my laptop via scp. I took the 20+
+minutes and let them all finish: each transfer took between 1min5s and
+1min7s (around 16MB/s, the limitation in that case being the crypto part).
+
+I rebooted again and did the exact same thing on the 3.11.7 and after
+the completion of the first file transfer in 1m6s (16MB/s), the second
+one gave me that:
+
+arno at small:~scp RN102:/tmp/random /dev/null
+random                               0% 1664KB 278.9KB/s 1:05:37 ETA^C
+
+And it continued that way for the remaining transfers (i did ^c after
+some seconds to restart the transfer when the rate was low):
+
+$ for k in $(seq 1 20) ; do scp RN102:random /dev/null ; done 
+random                             100% 1024MB  15.6MB/s   01:06 ETA^C 
+random                               0% 9856KB 282.2KB/s 1:01:20 ETA^C
+random                              16%  168MB 563.9KB/s   25:54 ETA^C
+random                               0% 2816KB 273.5KB/s 1:03:43 ETA^C
+random                             100% 1024MB  15.5MB/s   01:06    
+random                               1%   17MB 282.3KB/s 1:00:54 ETA^C
+random                               0%  544KB 259.2KB/s 1:07:23 ETA^C
+random                               0% 4224KB 277.3KB/s 1:02:45 ETA^C
+random                               0%  832KB 262.1KB/s 1:06:37 ETA^C
+random                               0% 3360KB 273.4KB/s 1:03:43 ETA^C
+random                               0% 3072KB 271.8KB/s 1:04:07 ETA^C
+random                               0%  832KB 262.1KB/s 1:06:37 ETA^C
+random                               0% 1408KB 267.0KB/s 1:05:21 ETA^C
+random                               0% 1120KB 264.7KB/s 1:05:57 ETA
+...
+
+To be sure, I did 2 additional reboots, one on each kernel and the
+result is consistent. Perfect on 3.11.1 and slow rate most of the time
+on 3.11.7 (Both kernel are compiled from a fresh make clean, using the
+same config file).
+
+Then, knowing that, I started a git bisect session on stable tree to end
+up with the following suspects. I failed to go any further to a single
+commit, due to crashes, but I could recompile a kernel w/ debug info and
+report what I get if neeeded.
+
+commit dc0791aee672 tcp: do not forget FIN in tcp_shifted_skb()     [bad]
+commit 18ddf5127c9f tcp: must unclone packets before mangling them
+commit 80bd5d8968d8 tcp: TSQ can use a dynamic limit
+commit dbeb18b22197 tcp: TSO packets automatic sizing
+commit 50704410d014 Linux 3.11.6                                    [good]
+
+Eric, David, if it has already been reported and fixed, just tell
+me. Otherwise, if you have any ideas, I'll be happy to test this
+evening.
+
+Cheers,
+
+a+
 
 
-I'll apply this to a suitable arm-soc branch sometime during the merge window,
-since it doesn't affect existing systems. A review/ack would be appreciated!
+Just in case it may be useful, here is what ethtool reports on RN102:
 
+# ethtool -i eth0
+driver: mvneta
+version: 1.0
+firmware-version: 
+bus-info: eth0
+supports-statistics: no
+supports-test: no
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: no
 
--Olof
-
- arch/arm/configs/vt8500_defconfig |   88 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 88 insertions(+)
- create mode 100644 arch/arm/configs/vt8500_defconfig
-
-diff --git a/arch/arm/configs/vt8500_defconfig b/arch/arm/configs/vt8500_defconfig
-new file mode 100644
-index 0000000..6fd3717
---- /dev/null
-+++ b/arch/arm/configs/vt8500_defconfig
-@@ -0,0 +1,88 @@
-+CONFIG_IRQ_DOMAIN_DEBUG=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_ARCH_MULTI_V6=y
-+CONFIG_ARCH_WM8750=y
-+CONFIG_ARCH_WM8850=y
-+CONFIG_ARM_ERRATA_720789=y
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_ARM_ERRATA_775420=y
-+CONFIG_HAVE_ARM_ARCH_TIMER=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+CONFIG_HIGHPTE=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+CONFIG_PM_RUNTIME=y
-+CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_PROC_DEVICETREE=y
-+CONFIG_EEPROM_93CX6=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+CONFIG_VIA_VELOCITY=y
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+CONFIG_PHYLIB=y
-+CONFIG_INPUT_MATRIXKMAP=y
-+CONFIG_SERIAL_VT8500=y
-+CONFIG_SERIAL_VT8500_CONSOLE=y
-+CONFIG_PINCTRL_SINGLE=y
-+CONFIG_PINCTRL_WM8750=y
-+CONFIG_GPIO_GENERIC_PLATFORM=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
-+CONFIG_MFD_SYSCON=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_GPIO=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_UHCI_HCD=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_NOP_USB_XCEIV=y
-+CONFIG_USB_GPIO_VBUS=y
-+CONFIG_USB_ULPI=y
-+CONFIG_MMC=y
-+CONFIG_MMC_DEBUG=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_VT8500=y
-+CONFIG_DMADEVICES=y
-+CONFIG_COMMON_CLK_DEBUG=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PWM=y
-+CONFIG_PWM_VT8500=y
-+CONFIG_RESET_CONTROLLER=y
-+CONFIG_GENERIC_PHY=y
-+CONFIG_EXT4_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_LOCKUP_DETECTOR=y
--- 
-1.7.10.4
+# ethtool -k eth0
+Features for eth0:
+rx-checksumming: off [fixed]
+tx-checksumming: on
+        tx-checksum-ipv4: on
+        tx-checksum-ip-generic: off [fixed]
+        tx-checksum-ipv6: off [fixed]
+        tx-checksum-fcoe-crc: off [fixed]
+        tx-checksum-sctp: off [fixed]
+scatter-gather: on
+        tx-scatter-gather: on
+        tx-scatter-gather-fraglist: off [fixed]
+tcp-segmentation-offload: off
+        tx-tcp-segmentation: off [fixed]
+        tx-tcp-ecn-segmentation: off [fixed]
+        tx-tcp6-segmentation: off [fixed]
+udp-fragmentation-offload: off [fixed]
+generic-segmentation-offload: on
+generic-receive-offload: on
+large-receive-offload: off [fixed]
+rx-vlan-offload: off [fixed]
+tx-vlan-offload: off [fixed]
+ntuple-filters: off [fixed]
+receive-hashing: off [fixed]
+highdma: off [fixed]
+rx-vlan-filter: off [fixed]
+vlan-challenged: off [fixed]
+tx-lockless: off [fixed]
+netns-local: off [fixed]
+tx-gso-robust: off [fixed]
+tx-fcoe-segmentation: off [fixed]
+tx-gre-segmentation: off [fixed]
+tx-udp_tnl-segmentation: off [fixed]
+tx-mpls-segmentation: off [fixed]
+fcoe-mtu: off [fixed]
+tx-nocache-copy: on
+loopback: off [fixed]
+rx-fcs: off [fixed]
+rx-all: off [fixed]
+tx-vlan-stag-hw-insert: off [fixed]
+rx-vlan-stag-hw-parse: off [fixed]
+rx-vlan-stag-filter: off [fixed]
