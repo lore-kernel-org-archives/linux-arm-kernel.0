@@ -1,36 +1,130 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 10 Nov 2013 15:49:52 +0100
-Subject: [PATCH v2 0/2] ARM: shmobile: Lager reference serial port support
-Message-ID: <1384094994-5115-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Sun, 10 Nov 2013 15:49:53 +0100
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: Add serial ports to the device
+ tree
+In-Reply-To: <1384094994-5115-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1384094994-5115-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1384094994-5115-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add all serial ports marked as disabled.
 
-This patch set implements serial port support for the Lager reference board.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 100 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 100 insertions(+)
 
-The code is available in my git tree at
-
-        git://linuxtv.org/pinchartl/fbdev.git clocks/ccf/serial-lager
-
-The patches are based on top of the "[PATCH v2 00/29] Add OF support to the
-sh-sci serial port driver" patch series posted yesterday.
-
-Compared to v1 I've removed early debugging support as it requires more work
-before being mainlined.
-
-Laurent Pinchart (2):
-  ARM: shmobile: r8a7790: Add serial ports to the device tree
-  ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports in DT
-
- arch/arm/boot/dts/r8a7790-lager.dts            |  24 +++++-
- arch/arm/boot/dts/r8a7790.dtsi                 | 100 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/board-lager-reference.c |  18 +----
- arch/arm/mach-shmobile/clock-r8a7790.c         |  16 ++--
- arch/arm/mach-shmobile/setup-r8a7790.c         |  26 +++----
- 5 files changed, 143 insertions(+), 41 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 098b2d6..df9e858 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -287,6 +287,106 @@
+ 		status = "disabled";
+ 	};
+ 
++	scifa0: serial at e6c40000 {
++		compatible = "renesas,scifa-r8a7790", "renesas,scifa-generic";
++		reg = <0 0xe6c40000 0 64>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 144 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFA0>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifa1: serial at e6c50000 {
++		compatible = "renesas,scifa-r8a7790", "renesas,scifa-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6c50000 0 64>;
++		interrupts = <0 145 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFA1>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifa2: serial at e6c60000 {
++		compatible = "renesas,scifa-r8a7790", "renesas,scifa-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6c60000 0 64>;
++		interrupts = <0 151 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFA2>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifb0: serial at e6c20000 {
++		compatible = "renesas,scifb-r8a7790", "renesas,scifb-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6c20000 0 64>;
++		interrupts = <0 148 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFB0>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifb1: serial at e6c30000 {
++		compatible = "renesas,scifb-r8a7790", "renesas,scifb-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6c30000 0 64>;
++		interrupts = <0 149 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFB1>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scifb2: serial at e6ce0000 {
++		compatible = "renesas,scifb-r8a7790", "renesas,scifb-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6ce0000 0 64>;
++		interrupts = <0 150 4>;
++		clocks = <&mstp2_clks R8A7790_CLK_SCIFB2>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif0: serial at e6e60000 {
++		compatible = "renesas,scif-r8a7790", "renesas,scif-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6e60000 0 64>;
++		interrupts = <0 152 4>;
++		clocks = <&mstp7_clks R8A7790_CLK_SCIF0>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif1: serial at e6e68000 {
++		compatible = "renesas,scif-r8a7790", "renesas,scif-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe6e68000 0 64>;
++		interrupts = <0 153 4>;
++		clocks = <&mstp7_clks R8A7790_CLK_SCIF1>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	hscif0: serial at e62c0000 {
++		compatible = "renesas,hscif-r8a7790", "renesas,hscif-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe62c0000 0 96>;
++		interrupts = <0 154 4>;
++		clocks = <&mstp7_clks R8A7790_CLK_HSCIF0>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	hscif1: serial at e62c8000 {
++		compatible = "renesas,hscif-r8a7790", "renesas,hscif-generic";
++		interrupt-parent = <&gic>;
++		reg = <0 0xe62c8000 0 96>;
++		interrupts = <0 155 4>;
++		clocks = <&mstp7_clks R8A7790_CLK_HSCIF1>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.1.5
