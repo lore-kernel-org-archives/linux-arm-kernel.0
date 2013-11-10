@@ -1,168 +1,43 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 10 Nov 2013 19:02:50 +0100
-Subject: [PATCH v3 4/4] ARM: dts: Add initial device tree support for
- EXYNOS5410
-In-Reply-To: <1383811969-32712-5-git-send-email-v.tyrtov@samsung.com>
-References: <1383811969-32712-1-git-send-email-v.tyrtov@samsung.com>
- <1383811969-32712-5-git-send-email-v.tyrtov@samsung.com>
-Message-ID: <19495187.Nrl1zS8Kog@flatron>
+Date: Sun, 10 Nov 2013 19:12:18 +0100
+Subject: [PATCHv3 1/3] ARM: dts: exynos4212: Add PMU dt data for pmu-irq
+In-Reply-To: <1383530161-24080-2-git-send-email-cw00.choi@samsung.com>
+References: <1383530161-24080-1-git-send-email-cw00.choi@samsung.com>
+ <1383530161-24080-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <9228109.fILkd0ZUhT@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Chanwoo,
 
-Please see my comments inline.
+Please add a patch description. Even if trivial, it is good to have one.
 
-On Thursday 07 of November 2013 12:12:49 Vyacheslav Tyrtov wrote:
-> From: Tarek Dakhran <t.dakhran@samsung.com>
-> 
-> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
-> 
-> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
+On Monday 04 of November 2013 10:55:59 Chanwoo Choi wrote:
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/boot/dts/Makefile                |   1 +
->  arch/arm/boot/dts/exynos5410-smdk5410.dts |  65 ++++++++++
->  arch/arm/boot/dts/exynos5410.dtsi         | 209 ++++++++++++++++++++++++++++++
->  3 files changed, 275 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
->  create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
-[snip]
-> diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-> new file mode 100644
-> index 0000000..06ae479
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-> @@ -0,0 +1,65 @@
-> +/*
-> + * SAMSUNG SMDK5410 board device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
+>  arch/arm/boot/dts/exynos4212.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+> index 6f34d7f..3081bae 100644
+> --- a/arch/arm/boot/dts/exynos4212.dtsi
+> +++ b/arch/arm/boot/dts/exynos4212.dtsi
+> @@ -56,4 +56,10 @@
+>  					<0x5 0 &gic 1 12 0>;
+>  		};
+>  	};
 > +
-> +/dts-v1/;
-> +#include "exynos5410.dtsi"
-> +/ {
-> +	model = "Samsung SMDK5410 board based on EXYNOS5410";
-> +	compatible = "samsung,smdk5410", "samsung,exynos5410";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x80000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttySAC2,115200";
-> +	};
-> +
-> +	oscclk: oscclk {
-
-coding style: According to ePAPR recommendation, node name should
-represent hardware type, not particular instance of hardware.
-
-So instead, the preferred way would be to specify the clock using
-following layout:
-
-	clocks {
-		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		oscclk: clock at 0 {
-			compatible = "fixed-clock";
-			reg = <0>;
-			#clock-cells = <0>;
-			clock-frequency = <24000000>;
-			clock-output-names = "fin_pll";
-		};
-	};
-
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <24000000>;
-> +		clock-output-names = "fin_pll";
-> +	};
-[snip]
-> +
-> +};
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-> new file mode 100644
-> index 0000000..9921b66
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -0,0 +1,209 @@
-> +/*
-> + * SAMSUNG EXYNOS5410 SoC device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
-> + * EXYNOS5410 based board files can include this file and provide
-> + * values for board specfic bindings.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <dt-bindings/clock/exynos5410.h>
-> +#include "exynos5.dtsi"
-> +/ {
-[snip]
-> +	clock: clock-controller at 10010000 {
-> +		compatible = "samsung,exynos5410-clock";
-> +		reg = <0x10010000 0x30000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +	mct at 101C0000 {
-
-A generic name would be: timer at 101C0000
-
-> +		compatible = "samsung,exynos4210-mct";
-> +		reg = <0x101C0000 0xB00>;
-> +		interrupt-controller;
-> +		#interrups-cells = <1>;
-
-MCT is not an interrupt controller, so both interrupt-controller and
-#interrupt-cells properties are incorrect. I guess that's due to the
-broken example in the documentation, that I already posted patches to fix.
-
-> +		interrupt-parent = <&mct_map>;
-> +		interrupts = <0>, <1>, <2>, <3>,
-> +			<4>, <5>, <6>, <7>,
-> +			<8>, <9>, <10>, <11>;
-> +		clocks = <&oscclk>, <&clock CLK_MCT>;
-> +		clock-names = "fin_pll", "mct";
-> +
-> +		mct_map: mct-map {
-
-Again, interrupt-map would be a better name for this node.
-
-> +			#interrupt-cells = <1>;
-> +			#address-cells = <0>;
-> +			#size-cells = <0>;
-> +			interrupt-map = <0 &combiner 23 3>,
-> +					<1 &combiner 23 4>,
-> +					<2 &combiner 25 2>,
-> +					<3 &combiner 25 3>,
-> +					<4 &gic 0 120 0>,
-> +					<5 &gic 0 121 0>,
-> +					<6 &gic 0 122 0>,
-> +					<7 &gic 0 123 0>,
-> +					<8 &gic 0 128 0>,
-> +					<9 &gic 0 129 0>,
-> +					<10 &gic 0 130 0>,
-> +					<11 &gic 0 131 0>;
-> +		};
+> +	pmu {
+> +		compatible = "arm,cortex-a9-pmu";
+> +		interrupt-parent = <&combiner>;
+> +		interrupts = <2 2>, <3 2>;
 > +	};
 
-Otherwise, the patch looks good.
+I believe it would be better to put this in exynos4x12.dtsi, specifying
+all four interrupts for possible four cores in Exynos4412. It would be
+fine, since the interrupt layout is the same on all Exynos4x12 SoCs, just
+some interrupts are not used.
 
 Best regards,
 Tomasz
