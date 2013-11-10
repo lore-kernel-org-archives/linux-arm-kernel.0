@@ -1,93 +1,45 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 10 Nov 2013 17:55:55 +0100
-Subject: [PATCH 1/1] ARM: EXYNOS: Add default latency values for Device
- and Power Domain
-In-Reply-To: <1383892025-14759-1-git-send-email-sachin.kamat@linaro.org>
-References: <1383892025-14759-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <9546263.JaCWNRjo5C@flatron>
+Date: Sun, 10 Nov 2013 18:01:28 +0100
+Subject: [PATCH 1/3] clk: exynos5250: save/restore EPLL0 configuration
+In-Reply-To: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
+References: <1383905648-23733-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <2334797.Ti06tGyoel@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin, Prasanna,
+Hi Sachin, Andrew,
 
-[CCing Rafael and respective mailing lists]
-
-Please see my comments inline. Also please always remember to add all
-appropriate recipients on CC list. More reviewers means higher chance of
-spotting (and so eliminating) potential issues.
-
-On Friday 08 of November 2013 11:57:05 Sachin Kamat wrote:
-> From: Prasanna Kumar <prasanna.ps@samsung.com>
+On Friday 08 of November 2013 15:44:06 Sachin Kamat wrote:
+> From: Andrew Bresticker <abrestic@chromium.org>
 > 
-> Power domain and device timing data are intialized with default
-> values to avoid dump of warnings from various power domains
-> during power gating.
+> The EPLL configuration register needs to be saved across
+> suspend/resume.
 > 
-> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
-> Signed-off-by: Prathyush K <prathyush.k@samsung.com>
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 > ---
->  arch/arm/mach-exynos/pm_domains.c |   15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
+>  drivers/clk/samsung/clk-exynos5250.c |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index 84e0483a0500..9bbb4ac23980 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -25,6 +25,10 @@
->  #include <mach/regs-pmu.h>
->  #include <plat/devs.h>
->  
-> +#define DEFAULT_DEV_LATENCY_NS			1000000UL
-> +#define DEFAULT_PD_PWRON_LATENCY_NS		10000000UL
-> +#define DEFAULT_PD_PWROFF_LATENCY_NS		10000000UL
+> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+> index ee866e377c80..6767635dc895 100644
+> --- a/drivers/clk/samsung/clk-exynos5250.c
+> +++ b/drivers/clk/samsung/clk-exynos5250.c
+> @@ -143,6 +143,7 @@ static unsigned long exynos5250_clk_regs[] __initdata = {
+>  	SRC_CPU,
+>  	DIV_CPU0,
+>  	SRC_CORE1,
+> +	EPLL_CON0,
 
-Is there any rationale behind choosing these particular values?
+What about EPLL_CON1 and EPLL_CON2? Also, have you considered register
+restoration order?
 
-> +
->  /*
->   * Exynos specific wrapper around the generic power domain
->   */
-> @@ -36,6 +40,13 @@ struct exynos_pm_domain {
->  	u32 enable;
->  };
->  
-> +static struct gpd_timing_data dev_latencies = {
-> +	.stop_latency_ns = DEFAULT_DEV_LATENCY_NS,
-> +	.start_latency_ns = DEFAULT_DEV_LATENCY_NS,
-> +	.save_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
-> +	.restore_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
+Anyway, I believe it's not the correct way to restore PLL configuration.
+See my Samsung PM consolidation series, especially patch [1] to see my
+proposed way of handling this. (Beware of a bug that snuck into this patch
+ - samsung_clk_save() is not being called for PLL registers.)
 
-I don't think that stop, start, save and restore latencies should be all
-the same.
-
-> +};
-> +
->  static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
->  {
->  	struct exynos_pm_domain *pd;
-> @@ -83,7 +94,7 @@ static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
->  	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
->  
->  	while (1) {
-> -		ret = pm_genpd_add_device(&pd->pd, dev);
-> +		ret = __pm_genpd_add_device(&pd->pd, dev, &dev_latencies);
-
-The double underscore prefix scares me a bit. Is this function really
-supposed to be used like this?
-
->  		if (ret != -EAGAIN)
->  			break;
->  		cond_resched();
-> @@ -173,6 +184,8 @@ static __init int exynos4_pm_init_power_domain(void)
->  		pd->base = of_iomap(np, 0);
->  		pd->pd.power_off = exynos_pd_power_off;
->  		pd->pd.power_on = exynos_pd_power_on;
-> +		pd->pd.power_off_latency_ns = DEFAULT_PD_PWROFF_LATENCY_NS;
-> +		pd->pd.power_on_latency_ns = DEFAULT_PD_PWRON_LATENCY_NS;
-
-It might be worth to set up the latencies indeed, but wrong values can do
-more harm than good.
+[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/24078/focus=24087
 
 Best regards,
 Tomasz
