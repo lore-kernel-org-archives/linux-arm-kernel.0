@@ -1,52 +1,93 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 10 Nov 2013 15:54:13 +0100
-Subject: [PATCH 2/4] dt: exynos5250: Enable support for generic USB 3.0 phy
-In-Reply-To: <1383205544-32244-3-git-send-email-gautam.vivek@samsung.com>
-References: <1383205544-32244-1-git-send-email-gautam.vivek@samsung.com>
- <1383205544-32244-3-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1538612.pj7iqCuQ7M@flatron>
+Date: Sun, 10 Nov 2013 17:55:55 +0100
+Subject: [PATCH 1/1] ARM: EXYNOS: Add default latency values for Device
+ and Power Domain
+In-Reply-To: <1383892025-14759-1-git-send-email-sachin.kamat@linaro.org>
+References: <1383892025-14759-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <9546263.JaCWNRjo5C@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+Hi Sachin, Prasanna,
 
-On Thursday 31 of October 2013 13:15:42 Vivek Gautam wrote:
-> Update device tree bindings for DWC3 controller and
-> USB 3.0 phy present on Exynos 5250 SoC, to start using
-> the phy driver based on generic phy framework.
+[CCing Rafael and respective mailing lists]
+
+Please see my comments inline. Also please always remember to add all
+appropriate recipients on CC list. More reviewers means higher chance of
+spotting (and so eliminating) potential issues.
+
+On Friday 08 of November 2013 11:57:05 Sachin Kamat wrote:
+> From: Prasanna Kumar <prasanna.ps@samsung.com>
 > 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Power domain and device timing data are intialized with default
+> values to avoid dump of warnings from various power domains
+> during power gating.
+> 
+> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+> Signed-off-by: Prathyush K <prathyush.k@samsung.com>
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 > ---
->  arch/arm/boot/dts/exynos5250.dtsi |   17 ++++++-----------
->  1 files changed, 6 insertions(+), 11 deletions(-)
+>  arch/arm/mach-exynos/pm_domains.c |   15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index bbac42a..31a6595 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -472,22 +472,17 @@
->  			compatible = "synopsys,dwc3";
->  			reg = <0x12000000 0x10000>;
->  			interrupts = <0 72 0>;
-> -			usb-phy = <&usb2_phy &usb3_phy>;
-> +			phys = <&usb3_phy>;
-> +			phy-names = "usb3-phy";
-
-Does the driver already support generic PHY framework?
-
-Also it looks like originally it required two PHYs, while your patch
-changes it to just one.
-
->  		};
->  	};
+> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> index 84e0483a0500..9bbb4ac23980 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
+> @@ -25,6 +25,10 @@
+>  #include <mach/regs-pmu.h>
+>  #include <plat/devs.h>
 >  
->  	usb3_phy: usbphy at 12100000 {
->  		compatible = "samsung,exynos5250-usb3phy";
+> +#define DEFAULT_DEV_LATENCY_NS			1000000UL
+> +#define DEFAULT_PD_PWRON_LATENCY_NS		10000000UL
+> +#define DEFAULT_PD_PWROFF_LATENCY_NS		10000000UL
 
-Hmm, this is not fully right. The new bindings should have new compatible
-value. This is also a comment to patch 1/1. This is because a device tree
-binding associated with specific compatible value is an ABI and should not
-be changed in a way that breaks backwards compatibility.
+Is there any rationale behind choosing these particular values?
+
+> +
+>  /*
+>   * Exynos specific wrapper around the generic power domain
+>   */
+> @@ -36,6 +40,13 @@ struct exynos_pm_domain {
+>  	u32 enable;
+>  };
+>  
+> +static struct gpd_timing_data dev_latencies = {
+> +	.stop_latency_ns = DEFAULT_DEV_LATENCY_NS,
+> +	.start_latency_ns = DEFAULT_DEV_LATENCY_NS,
+> +	.save_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
+> +	.restore_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
+
+I don't think that stop, start, save and restore latencies should be all
+the same.
+
+> +};
+> +
+>  static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+>  {
+>  	struct exynos_pm_domain *pd;
+> @@ -83,7 +94,7 @@ static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
+>  	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
+>  
+>  	while (1) {
+> -		ret = pm_genpd_add_device(&pd->pd, dev);
+> +		ret = __pm_genpd_add_device(&pd->pd, dev, &dev_latencies);
+
+The double underscore prefix scares me a bit. Is this function really
+supposed to be used like this?
+
+>  		if (ret != -EAGAIN)
+>  			break;
+>  		cond_resched();
+> @@ -173,6 +184,8 @@ static __init int exynos4_pm_init_power_domain(void)
+>  		pd->base = of_iomap(np, 0);
+>  		pd->pd.power_off = exynos_pd_power_off;
+>  		pd->pd.power_on = exynos_pd_power_on;
+> +		pd->pd.power_off_latency_ns = DEFAULT_PD_PWROFF_LATENCY_NS;
+> +		pd->pd.power_on_latency_ns = DEFAULT_PD_PWRON_LATENCY_NS;
+
+It might be worth to set up the latencies indeed, but wrong values can do
+more harm than good.
 
 Best regards,
 Tomasz
