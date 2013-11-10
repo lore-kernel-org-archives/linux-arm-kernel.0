@@ -1,111 +1,47 @@
-From: Bharat.Bhushan@freescale.com (Bharat Bhushan)
-Date: Sun, 10 Nov 2013 06:57:08 +0000
-Subject: [PATCH v4 1/4] dma: imx-sdma: Add sdma firmware version 2 support
-In-Reply-To: <1524b725cecd208ad63741f0b7214d0039608ac0.1383907685.git.b42378@freescale.com>
-References: <cover.1383907685.git.b42378@freescale.com>
- <1524b725cecd208ad63741f0b7214d0039608ac0.1383907685.git.b42378@freescale.com>
-Message-ID: <6A3DF150A5B70D4F9B66A25E3F7C888D071EDFC5@039-SN2MPN1-013.039d.mgd.msft.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 10 Nov 2013 00:03:42 -0500 (EST)
+Subject: [PATCH v2] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
+References: <1383951632-6090-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <alpine.LFD.2.10.1311092357090.2314@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 8 Nov 2013, Stephen Boyd wrote:
+
+> If we're running on a v7 ARM CPU, detect if the CPU supports the
+> sdiv/udiv instructions and replace the signed and unsigned
+> division library functions with an sdiv/udiv instruction.
+> 
+> Running the perf messaging benchmark in pipe mode
+> 
+>  $ perf bench sched messaging -p
+> 
+> shows a modest improvement on my v7 CPU.
+> 
+> before:
+> (5.060 + 5.960 + 5.971 + 5.643 + 6.029 + 5.665 + 6.050 + 5.870 + 6.117 + 5.683) / 10 = 5.805
+> 
+> after:
+> (4.884 + 5.549 + 5.749 + 6.001 + 5.460 + 5.103 + 5.956 + 6.112 + 5.468 + 5.093) / 10 = 5.538
+> 
+> (5.805 - 5.538) / 5.805 = 4.6%
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Bah..... NAK.
+
+We are doing runtime patching of the kernel for many many things
+already.  So why not do the same here?
+
+The obvious strategy is to simply overwrite the start of the existing 
+__aeabi_idiv code with the "sdiv r0, r0, r1" and "bx lr" opcodes.  
+
+Similarly for the unsigned case.
+
+That let you test the hardware capability only once during boot instead 
+of everytime a divide operation is performed.
 
 
-> -----Original Message-----
-> From: Linuxppc-dev [mailto:linuxppc-dev-
-> bounces+bharat.bhushan=freescale.com at lists.ozlabs.org] On Behalf Of Nicolin Chen
-> Sent: Friday, November 08, 2013 4:20 PM
-> To: vinod.koul at intel.com; dan.j.williams at intel.com; s.hauer at pengutronix.de;
-> timur at tabi.org; shawn.guo at linaro.org; broonie at kernel.org
-> Cc: mark.rutland at arm.com; devicetree at vger.kernel.org; alsa-devel at alsa-
-> project.org; pawel.moll at arm.com; linux-doc at vger.kernel.org;
-> swarren at wwwdotorg.org; linux-kernel at vger.kernel.org; rob.herring at calxeda.com;
-> dmaengine at vger.kernel.org; ijc+devicetree at hellion.org.uk; linuxppc-
-> dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH v4 1/4] dma: imx-sdma: Add sdma firmware version 2 support
-> 
-> On i.MX5/6 series, SDMA is using new version firmware to support SSI dual FIFO
-> feature and HDMI Audio (i.MX6Q/DL only). Thus add it.
-> 
-> Signed-off-by: Nicolin Chen <b42378@freescale.com>
-> ---
->  drivers/dma/imx-sdma.c                     | 15 ++++++++++++++-
->  include/linux/platform_data/dma-imx-sdma.h |  5 +++++
->  2 files changed, 19 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c index
-> fc43603..c7ece8d 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -323,6 +323,7 @@ struct sdma_engine {
->  	struct clk			*clk_ipg;
->  	struct clk			*clk_ahb;
->  	spinlock_t			channel_0_lock;
-> +	u32				script_number;
->  	struct sdma_script_start_addrs	*script_addrs;
->  	const struct sdma_driver_data	*drvdata;
->  };
-> @@ -1238,6 +1239,7 @@ static void sdma_issue_pending(struct dma_chan *chan)  }
-> 
->  #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	34
-> +#define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V2	38
-> 
->  static void sdma_add_scripts(struct sdma_engine *sdma,
->  		const struct sdma_script_start_addrs *addr) @@ -1246,7 +1248,7 @@
-> static void sdma_add_scripts(struct sdma_engine *sdma,
->  	s32 *saddr_arr = (u32 *)sdma->script_addrs;
->  	int i;
-> 
-> -	for (i = 0; i < SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1; i++)
-> +	for (i = 0; i < sdma->script_number; i++)
->  		if (addr_arr[i] > 0)
->  			saddr_arr[i] = addr_arr[i];
->  }
-> @@ -1272,6 +1274,17 @@ static void sdma_load_firmware(const struct firmware *fw,
-> void *context)
->  		goto err_firmware;
->  	if (header->ram_code_start + header->ram_code_size > fw->size)
->  		goto err_firmware;
-> +	switch (header->version_major) {
-> +		case 1:
-> +			sdma->script_number = SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1;
-> +			break;
-> +		case 2:
-> +			sdma->script_number = SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V2;
-> +			break;
-> +		default:
-> +			dev_err(sdma->dev, "unknown firmware version\n");
-> +			return;
-
-Why return and not "goto err_firmware" ?
-
--Bharat
-
-> +	}
-> 
->  	addr = (void *)header + header->script_addrs_start;
->  	ram_code = (void *)header + header->ram_code_start; diff --git
-> a/include/linux/platform_data/dma-imx-sdma.h b/include/linux/platform_data/dma-
-> imx-sdma.h
-> index 3a39428..eabac4e 100644
-> --- a/include/linux/platform_data/dma-imx-sdma.h
-> +++ b/include/linux/platform_data/dma-imx-sdma.h
-> @@ -43,6 +43,11 @@ struct sdma_script_start_addrs {
->  	s32 dptc_dvfs_addr;
->  	s32 utra_addr;
->  	s32 ram_code_start_addr;
-> +	/* End of v1 array */
-> +	s32 mcu_2_ssish_addr;
-> +	s32 ssish_2_mcu_addr;
-> +	s32 hdmi_dma_addr;
-> +	/* End of v2 array */
->  };
-> 
->  /**
-> --
-> 1.8.4
-> 
-> 
-> _______________________________________________
-> Linuxppc-dev mailing list
-> Linuxppc-dev at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/linuxppc-dev
+Nicolas
