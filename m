@@ -1,56 +1,52 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 10 Nov 2013 11:52:01 +0400
-Subject: [PATCH 2/2] ARM: dts: imx27-phytec-phycore-som: Update FEC node
-In-Reply-To: <1384069921-15270-1-git-send-email-shc_work@mail.ru>
-References: <1384069921-15270-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1384069921-15270-2-git-send-email-shc_work@mail.ru>
+Date: Sun, 10 Nov 2013 11:52:00 +0400
+Subject: [PATCH 1/2] ARM: dts: i.MX27: Add SSI nodes
+Message-ID: <1384069921-15270-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates FEC devicetree node of Phytec PCM038 module:
-- Adding missing phy_mode properties.
-- Adding dummy regulator to provide functionality without
-  dummy-regulator in the kernel.
+This patch adds the missing (Synchronous Serial Interface) SSI1 & SSI2
+devicetree nodes for i.MX27 CPUs.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-som.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/imx27.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-index 4ec402c..317df5e 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dts
-@@ -19,6 +19,20 @@
- 	memory {
- 		reg = <0xa0000000 0x08000000>;
- 	};
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 826231e..52520fb 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -204,6 +204,30 @@
+ 				status = "disabled";
+ 			};
+ 
++			ssi1: ssi at 10010000 {
++				compatible = "fsl,imx27-ssi", "fsl,imx21-ssi";
++				reg = <0x10010000 0x1000>;
++				interrupts = <14>;
++				clocks = <&clks 26>;
++				dmas = <&dma 12>, <&dma 13>;
++				dma-names = "rx", "tx";
++				fsl,fifo-depth = <8>;
++				fsl,ssi-dma-events = <13 12 15 14>; /* TX0 RX0 TX1 RX1 */
++				status = "disabled";
++			};
 +
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++			ssi2: ssi at 10011000 {
++				compatible = "fsl,imx27-ssi", "fsl,imx21-ssi";
++				reg = <0x10011000 0x1000>;
++				interrupts = <13>;
++				clocks = <&clks 25>;
++				dmas = <&dma 8>, <&dma 9>;
++				dma-names = "rx", "tx";
++				fsl,fifo-depth = <8>;
++				fsl,ssi-dma-events = <9 8 11 10>; /* TX0 RX0 TX1 RX1 */
++				status = "disabled";
++			};
 +
-+		reg_3v3: 3v3 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "3V3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+	};
- };
- 
- &audmux {
-@@ -134,7 +148,9 @@
- };
- 
- &fec {
-+	phy-mode = "mii";
- 	phy-reset-gpios = <&gpio3 30 0>;
-+	phy-supply = <&reg_3v3>;
- 	status = "okay";
- };
- 
+ 			i2c1: i2c at 10012000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
 -- 
 1.8.1.5
