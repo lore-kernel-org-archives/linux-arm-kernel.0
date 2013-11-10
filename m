@@ -1,71 +1,75 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 10 Nov 2013 18:48:11 +0100
-Subject: [PATCH 2/3] ARM: mxs: crypto: Add Freescale MXS DCP driver
-In-Reply-To: <201310081233.37136.marex@denx.de>
-References: <1380194306-5243-1-git-send-email-marex@denx.de>
- <20131008043631.GA18365@gondor.apana.org.au>
- <201310081233.37136.marex@denx.de>
-Message-ID: <201311101848.12215.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 10 Nov 2013 21:39:09 +0100
+Subject: [PATCH v2 5/5] Documentation: Add documentation for APM X-Gene
+ SATA DTS binding
+In-Reply-To: <1383980431-6572-6-git-send-email-lho@apm.com>
+References: <1383980431-6572-1-git-send-email-lho@apm.com>
+ <1383980431-6572-5-git-send-email-lho@apm.com>
+ <1383980431-6572-6-git-send-email-lho@apm.com>
+Message-ID: <201311102139.10082.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> Hello Herbert,
+On Saturday 09 November 2013, Loc Ho wrote:
+> Documentation: Add documentation for APM X-Gene SATA DTS binding
 > 
-> > On Mon, Oct 07, 2013 at 05:48:26PM +0200, Marek Vasut wrote:
-> > > Hello Christoph,
-> > > 
-> > > > Hello Marek,
-> > > > 
-> > > > > Marek Vasut <marex@denx.de> hat am 28. September 2013 um 05:35
-> > > > > geschrieben: [...]
-> > > > > 
-> > > > > > > 3) What are those ugly new IOCTLs in the dcp.c driver?
-> > > > > > 
-> > > > > > When I firstly posted the driver in the mailinglist, there where
-> > > > > > one person who actually used this interface (it was introduced in
-> > > > > > Freescale's SDK) to use the OTP keys for crypto. As far as I have
-> > > > > > seen, the crypto API does not support such keys (i.e. there seems
-> > > > > > to be no way to tell a driver to use some kind of special keys -
-> > > > > > which are not delivered by the user - via the API).
-> > > > > > Therefore I added this miscdevice and adopted Freescale's
-> > > > > > interface.
-> > > > > 
-> > > > > The keys are programmed into the OTP registers, correct? There is
-> > > > > OCOTP d
-> > > > >
-> > > > >river
-> > > > >for the MX23/MX28 OTP hardware. This is what should have been used
-> > > > >then.
-> > > > >
-> > > > > NOTE: This IOCTL interface seems like quite an abusive way to allow
-> > > > > userl
-> > > > >
-> > > > >and to
-> > > > >access the crypto API in kernel. I understand this is used by some
-> > > > >Freesc ale tool, but won't it be better to fix the Freescale tool
-> > > > >instead ?
-> > > > 
-> > > > the IOCTL interface is used to AES encrypt a bootstream with the AES
-> > > > key in OCOTP.
-> > > > The idea is that only the DCP can read/access the key once it has
-> > > > been programmed
-> > > > into the OCOTP. If the crypto API has means to tell the DCP to use
-> > > > the key from OCOTP, the tool from Freescale is a minor problem.
-> > > 
-> > > Ah right. I suspect the crypto API services shall not be exported into
-> > > userland at all, yes ? So there has to be some kind of workaround here
-> > > for this freescale tool, which is rather unfortunate.
-> > 
-> > These ioctls have to go.  I should have never let them through in
-> > the first place.  Can someone cook up a patch to kill them please?
-> 
-> I can do that. I wonder if we can't agree to nuke the in-tree driver
-> altogether instead and replace it by this one though. Does it not sound
-> more reasonable?
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>  .../devicetree/bindings/ata/apm-xgene.txt          |   84 ++++++++++++++++++++
 
-Bump?
+Please Cc the devicetree-discuss mailing list for the binding submission.
 
-Best regards,
-Marek Vasut
+> +SATA nodes are defined to describe on-chip Serial ATA controllers.
+> +Each SATA controller (pair of ports) have its own node.
+> +
+> +Required properties:
+> +- compatible		: Shall be "apm,xgene-ahci"
+> +- reg			: First memory resource shall be the AHCI memory resource
+> +			  Second memory resource shall be the Serdes memory resource
+> +			  Third memory resource shall be the optional Serdes
+> +			  memory resource if mux'ed with another IP
+> +- interrupt-parent	: Interrupt controller
+> +- interrupts		: Interrupt mapping for SATA IRQ
+> +- #clock-cells		: Shall be value of 1
+
+Why is there a #clock-cells entry here?
+
+> +- clocks		: Reference to the clock entry
+> +- clock-names		: Shall be "eth01clk", "eth23clk", or "eth45clk".
+
+This makes no sense. The clock-names property needs to have a fixed
+string according to the name of the clock input signal of the hardware,
+not a name of the clock provider.
+
+> +- serdes-diff-clk	: Shall be 0 for external, 1 internal differential,
+> +			  or 2 internal single ended clock. Default is 0.
+> +- gen-sel		: Shall be 1 (force Gen1), 2 (Force Gen2, or 3 Gen3).
+> +			  Default is 3.
+> +- EQA1			: Serdes EQ parameter for A1 chip. Default is 9.
+> +- EQ			: Serdes EQ parameter for non-A1 chip. Default is 2.
+> +- GENAVG		: Enable averaging Serdes calculation. Default is 0 for
+> +			  A1 chip and 1 for non-A1 chip.
+> +- LBA1			: Serdes loopback buffer for A1 chip. Default is 1;
+> +- LB			: Serdes loopback buffer for non-A1 chip. Default is 0;
+> +- LCA1			: Serdes loopback enable control for A1 chip. Default
+> +			  is 1;
+> +- LC			: Serdes loopback enable control for non-A1 chip.
+> +			  Default is 0;
+> +- CDRA1			: Serdes SPD select CDR for A1 chip. Default is 5.
+> +- CDR			: Serdes SPD select CDR for non-A1 chip. Default is 5.
+> +- PQA1			: Serdes PQ for A1 chip. Default is 8.
+> +- PQ			: Serdes PQ for non-A1 chip. Default is 0xA.
+> +- coherent		: Enable coherent (1 = enable, 0 = disable).
+> +			  Default is 1.
+
+This looks like a really bad binding. I would suggest that instead of having
+individual register values in here, you hardwire the settings in the driver
+based on the compatible string. It's pretty crazy to put register-level configuration
+in the DT like this.
+
+Further, you should probably use the generic PHY binding to create a separate driver
+for the serdes PHY,
+
+	Arnd
