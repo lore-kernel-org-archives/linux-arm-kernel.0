@@ -1,20 +1,18 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 11 Nov 2013 13:42:47 -0600
+Date: Mon, 11 Nov 2013 13:43:55 -0600
 Subject: [PATCH] clk: add flags to distinguish xtal clocks
-In-Reply-To: <20131110113716.GN26440@lukather>
+In-Reply-To: <5281058E.5050607@wwwdotorg.org>
 References: <1382528150.21526.25.camel@porter.coelho.fi>
  <1383933648-28595-1-git-send-email-balbi@ti.com>
- <20131110113716.GN26440@lukather>
-Message-ID: <20131111194247.GB19212@saruman.home>
+ <5281058E.5050607@wwwdotorg.org>
+Message-ID: <20131111194355.GC19212@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, Nov 10, 2013 at 12:37:16PM +0100, Maxime Ripard wrote:
-> Hi Felipe,
-> 
-> On Fri, Nov 08, 2013 at 12:00:48PM -0600, Felipe Balbi wrote:
+On Mon, Nov 11, 2013 at 09:27:58AM -0700, Stephen Warren wrote:
+> On 11/08/2013 11:00 AM, Felipe Balbi wrote:
 > > From: Luciano Coelho <luca@coelho.fi>
 > > 
 > > Add a flag that indicate whether the clock is a crystal or not.
@@ -27,57 +25,14 @@ On Sun, Nov 10, 2013 at 12:37:16PM +0100, Maxime Ripard wrote:
 > > right now which is Texas Instruments' WiLink devices which need to know
 > > details about the clock in order to initialize the underlying WiFi HW
 > > correctly.
-> > 
-> > Signed-off-by: Luciano Coelho <luca@coelho.fi>
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> > 
-> > Dropped CLK_IS_TYPE_DEFINED flag and just assume that if the flag
-> > isn't there, default behavior will be taken.
-> > 
-> >  Documentation/devicetree/bindings/clock/fixed-clock.txt | 1 +
-> >  drivers/clk/clk-fixed-rate.c                            | 6 +++++-
-> >  include/linux/clk-provider.h                            | 1 +
-> >  3 files changed, 7 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/fixed-clock.txt b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-> > index 0b1fe78..3036dfe 100644
-> > --- a/Documentation/devicetree/bindings/clock/fixed-clock.txt
-> > +++ b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-> > @@ -12,6 +12,7 @@ Required properties:
-> >  Optional properties:
-> >  - gpios : From common gpio binding; gpio connection to clock enable pin.
-> >  - clock-output-names : From common clock binding.
-> > +- clock-xtal: true when a clock is provided by a crystal
-> >  
-> >  Example:
-> >  	clock {
-> > diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-> > index 1ed591a..5db9bf0 100644
-> > --- a/drivers/clk/clk-fixed-rate.c
-> > +++ b/drivers/clk/clk-fixed-rate.c
-> > @@ -91,13 +91,17 @@ void of_fixed_clk_setup(struct device_node *node)
-> >  	struct clk *clk;
-> >  	const char *clk_name = node->name;
-> >  	u32 rate;
-> > +	unsigned long flags = CLK_IS_ROOT;
-> >  
-> >  	if (of_property_read_u32(node, "clock-frequency", &rate))
-> >  		return;
-> >  
-> > +	if (of_property_read_bool(node, "clock-xtal"))
-> > +		flags |= CLK_IS_TYPE_XTAL;
-> > +
 > 
-> Introducing a new compatible instead of a property would make more
-> sense here I think.
-> 
-> Do you have a reason not to do so?
+> Why on earth does it care? Surely the WiFi HW doesn't care about
+> crystal-vs-non-crystal, but rather some facet of the clock signal that
+> the type of source implies. Shouldn't the DT property describe that
+> facet of the signal, rather than the reason why it has that facet?
 
-As you can see, this is original work from Luca but I disagree that
-adding a new compatible makes more sense. This still related to a fixed
-rate clock, we're just giving it one extra metadata which will
-differentiate between crystal and oscilator fixed rate clocks.
+well, if you can figure out what that facet is, then _do_ tell. Luca has
+tried for months to get that information with no success.
 
 -- 
 balbi
@@ -87,4 +42,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/158055b1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/b9e5646b/attachment.sig>
