@@ -1,119 +1,143 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Mon, 11 Nov 2013 11:28:52 +0530
-Subject: [PATCH RFC 3/6] arm64: Kprobes instruction simulation support
-In-Reply-To: <20131108170333.GE15074@mudshark.cambridge.arm.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-4-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108170333.GE15074@mudshark.cambridge.arm.com>
-Message-ID: <CA+b37P1uEYX=kTtLfDn=OYoB0nrX1igeGT+-1LfEhNpEjS9MFA@mail.gmail.com>
+From: chris.ruehl@gtsys.com.hk (Chris Ruehl)
+Date: Mon, 11 Nov 2013 14:10:10 +0800
+Subject: [PATCH 1/2] usb: chipidea: usbmisc: Add support for i.MX27/i.MX31
+ CPUs
+In-Reply-To: <1384148852.19743495@f117.i.mail.ru>
+References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
+ <1384145140.400290349@f353.i.mail.ru> <52806C24.8040100@gtsys.com.hk>
+ <1384148852.19743495@f117.i.mail.ru>
+Message-ID: <528074C2.9070707@gtsys.com.hk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 November 2013 22:33, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Oct 17, 2013 at 12:17:48PM +0100, Sandeepa Prabhu wrote:
->> Add support for AArch64 instruction simulation in kprobes.
+On Monday, November 11, 2013 01:47 PM, Alexander Shiyan wrote:
+>> On Monday, November 11, 2013 12:45 PM, Alexander Shiyan wrote:
+>>>> Hi Alexander,
+>>>>
+>>>> On Sunday, November 10, 2013 03:18 PM, Alexander Shiyan wrote:
+>>>>> This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
+>>>>>
+>>>>> Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
+>>>>> ---
+>>>>>     drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
+>>>>>     1 file changed, 42 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+>>> ...
+>>>>> +static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
+>>>>> +{
+>>>>> +	unsigned long flags;
+>>>>> +	u32 val;
+>>>>> +
+>>>>> +	switch (data->index) {
+>>>>> +	case 0:
+>>>>> +		val = MX27_OTG_PM_BIT;
+>>>>> +		break;
+>>>>> +	case 1:
+>>>>> +		val = MX27_H1_PM_BIT;
+>>>>> +		break;
+>>>>> +	case 2:
+>>>>> +		val = MX27_H2_PM_BIT;
+>>>>> +		break;
+>>>>> +	default:
+>>>>> +		return -EINVAL;
+>>>>> +	};
+>>>>> +
+>>>>
+>>>>      From my understanding this can not work, the usbmisc->base not point into the
+>>>> usb control register (USB_CTRL). Reference manual 30.5.1.1 says
+>>>> BASE + 0x600
+>>>> you must add the offset to the readl instruction.
+>>>
+>>> Why not work?
+>>> usbotg: usb at 10024000
+>>> usbh1: usb at 10024200
+>>> usbh2: usb at 10024400
+>>> usbmisc: usbmisc at 10024600
+>>> So, offset to USB_CTRL should already be defined by DTS.
 >>
->> Kprobes need simulation of instructions that cannot be stepped
->> right-away from different memory location. i.e. those instructions
->> that uses PC-relative addressing. In simulation, the behaviour
->> of the instruction is implemented using copy of pt_regs.
+>> in the usbmisc_imx_probe() the base pointer is loaded from
 >>
->> Following instruction catagories are simulated:
->>  - All branching instructions(conditional, register, and immediate)
->>  - Literal access instructions(load-literal, adr/adrp)
+>> res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> data->base = devm_ioremap_resource(&pdev->dev, res);
 >>
->> conditional execution are limited to branching instructions in
->> ARM v8. If conditions at PSTATE does not match the condition fields
->> of opcode, the instruction is effectively NOP. Kprobes consider
->> this case as 'miss'.
+>> (and I did not see any of_ operations)
 >
-> [...]
->
->> diff --git a/arch/arm64/kernel/kprobes-arm64.c b/arch/arm64/kernel/kprobes-arm64.c
->> index 30d1c14..c690be3 100644
->> --- a/arch/arm64/kernel/kprobes-arm64.c
->> +++ b/arch/arm64/kernel/kprobes-arm64.c
->> @@ -20,6 +20,101 @@
->>
->>  #include "probes-decode.h"
->>  #include "kprobes-arm64.h"
->> +#include "simulate-insn.h"
->> +
->> +/*
->> + * condition check functions for kprobes simulation
->> + */
->> +static unsigned long __kprobes
->> +__check_pstate(struct kprobe *p, struct pt_regs *regs)
->> +{
->> +       struct arch_specific_insn *asi = &p->ainsn;
->> +       unsigned long pstate = regs->pstate & 0xffffffff;
->> +
->> +       return asi->pstate_cc(pstate);
->> +}
->> +
->> +static unsigned long __kprobes
->> +__check_cbz(struct kprobe *p, struct pt_regs *regs)
->> +{
->> +       return check_cbz((u32)p->opcode, regs);
->
-> Isn't p->opcode already a u32? (by your definition of kprobe_opcode_t).
-Yup, can avoid typecasting.
->
->> diff --git a/arch/arm64/kernel/simulate-insn.c b/arch/arm64/kernel/simulate-insn.c
->> new file mode 100644
->> index 0000000..10173cf
->> --- /dev/null
->> +++ b/arch/arm64/kernel/simulate-insn.c
->> @@ -0,0 +1,184 @@
->> +/*
->> + * arch/arm64/kernel/simulate-insn.c
->> + *
->> + * Copyright (C) 2013 Linaro Limited.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * General Public License for more details.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/kprobes.h>
->> +#include <linux/module.h>
->> +
->> +#include "simulate-insn.h"
->> +
->> +#define sign_extend(x, signbit)                \
->> +       ((x) | (0 - ((x) & (1 << (signbit)))))
->> +
->> +#define bbl_displacement(insn)         \
->> +       sign_extend(((insn) & 0x3ffffff) << 2, 27)
->> +
->> +#define bcond_displacement(insn)       \
->> +       sign_extend(((insn >> 5) & 0xfffff) << 2, 21)
->> +
->> +#define cbz_displacement(insn) \
->> +       sign_extend(((insn >> 5) & 0xfffff) << 2, 21)
->> +
->> +#define tbz_displacement(insn) \
->> +       sign_extend(((insn >> 5) & 0x3fff) << 2, 15)
->> +
->> +#define ldr_displacement(insn) \
->> +       sign_extend(((insn >> 5) & 0xfffff) << 2, 21)
->
-> The mask, shift and signbit position are all related here, so you could
-> rework the definition of sign_extend to avoid having three magic numbers.
-Hmm, mask and signbit are related, shift is based on instruction type
-(conditional instructions need >> 5 for extracting immediate offset).
-I will refine these macros in next version.
+> Yes, and this is an address of usbmisc node, not otg.
 
+Sorry, you are right. I misunderstood because I didn't see any of sample DTS 
+files define usbmisc yet.
+
+At this point might be good to patch the imx27.dtsi with the usb defines.
+
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -30,6 +30,9 @@
+                 spi0 = &cspi1;
+                 spi1 = &cspi2;
+                 spi2 = &cspi3;
++               usb0 = &usbotg;
++               usb1 = &usbh1;
++               usb2 = &usbh2;
+         };
+
+@@ -404,6 +419,44 @@
+                                 iram = <&iram>;
+                         };
+
++                       usbotg: usb at 10024000 {
++                               compatible = "fsl,imx27-usb";
++                               reg = <0x10024000 0x200>;
++                               interrupts = <56>;
++                               clocks = <&clks 75>, <&clks 62>;
++                               clock-names = "ipg", "ahb";
++                               dr_mode = "host";
++                               phy_type = "ulpi";
++                               status = "disabled";
++                       };
++
++                       usbh1: usb at 10024200 {
++                               compatible = "fsl,imx27-usb";
++                               reg = <0x10024200 0x200>;
++                               interrupts = <54>;
++                               clocks = <&clks 75>, <&clks 62>;
++                               clock-names = "ipg", "ahb";
++                               dr_mode = "host";
++                               phy_type = "serial";
++                               status = "disabled";
++                       };
++
++                       usbh2: usb at 10024400 {
++                               compatible = "fsl,imx27-usb";
++                               reg = <0x10024400 0x200>;
++                               interrupts = <55>;
++                               clocks = <&clks 75>, <&clks 62>;
++                               clock-names = "ipg", "ahb";
++                               dr_mode = "host";
++                               phy_type = "ulpi";
++                               status = "disabled";
++                       };
++
++                       usbmisc: usbmisc at 10024600 {
++                               compatible = "fsl,imx27-usb";
++                               reg = <0x10024600 0x4>;
++                       };
++
+
+Regards
+Chris
 >
-> Will
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+>> usbmisc = data;
+>>
+>>    base is set to 0x10024000
+>>
+>> when I look around all other functions init functions did a offset calculation.
+>
+> Can you point me on this?
+> For example, for i.MX5 CPUs we calculate only offset to PHY_CTRL_X register
+> relative to basic offset 0x800, which is already defined in DTS.
+>
+> ...
+>
+
+r
