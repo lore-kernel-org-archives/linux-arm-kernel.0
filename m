@@ -1,33 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Nov 2013 10:04:17 +0100
-Subject: [PATCH] MAINTAINERS: drop discontinued mailing list
-Message-ID: <1384160657-2953-1-git-send-email-linus.walleij@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 11 Nov 2013 10:08:10 +0100
+Subject: [GIT PULL] prefetch support for 3.13
+In-Reply-To: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
+References: <20131009171312.GJ8378@mudshark.cambridge.arm.com>
+Message-ID: <20131111090810.GI14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ST-internal Nomadik mailing list is going down. Remove
-it from the MAINTAINERS file.
+Hello Will,
 
-Cc: Olivier CLERGEAUD <olivier.clergeaud@st.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please apply this directly for fixes unless
-there are some problems with it.
----
- MAINTAINERS | 1 -
- 1 file changed, 1 deletion(-)
+On Wed, Oct 09, 2013 at 06:13:13PM +0100, Will Deacon wrote:
+> The following changes since commit 15c03dd4859ab16f9212238f29dd315654aa94f6:
+> 
+>   Linux 3.12-rc3 (2013-09-29 15:02:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/prefetch
+> 
+> for you to fetch changes up to d779c07dd72098a7416d907494f958213b7726f3:
+> 
+>   ARM: bitops: prefetch the destination word for write prior to strex (2013-09-30 16:42:56 +0100)
+> 
+> ----------------------------------------------------------------
+> Will Deacon (6):
+>       ARM: prefetch: remove redundant "cc" clobber
+>       ARM: smp_on_up: move inline asm ALT_SMP patching macro out of spinlock.h
+>       ARM: prefetch: add support for prefetchw using pldw on SMP ARMv7+ CPUs
+>       ARM: locks: prefetch the destination word for write prior to strex
+>       ARM: atomics: prefetch the destination word for write prior to strex
+>       ARM: bitops: prefetch the destination word for write prior to strex
+Hello Will,
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4d66a03e4f57..7d280b7c1400 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1056,7 +1056,6 @@ S:	Maintained
- ARM/NOMADIK ARCHITECTURE
- M:	Alessandro Rubini <rubini@unipv.it>
- M:	Linus Walleij <linus.walleij@linaro.org>
--M:	STEricsson <STEricsson_nomadik_linux@list.st.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-nomadik/
+it seems the last patch breaks on efm32:
+
+arch/arm/lib/changebit.S: Assembler messages:
+arch/arm/lib/changebit.S:15: Error: architectural extension `mp' is not allowed for the current base architecture
+
+Best regards
+Uwe
+
 -- 
-1.8.3.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
