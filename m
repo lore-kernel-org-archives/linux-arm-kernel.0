@@ -1,130 +1,118 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 11 Nov 2013 10:31:53 +0200
-Subject: [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
+Date: Mon, 11 Nov 2013 10:31:55 +0200
+Subject: [PATCHv4 4/7] iommu/tegra: smmu: Calculate ASID register offset by ID
 In-Reply-To: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
 References: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1384158718-4756-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1384158718-4756-5-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An "IOMMU device" on the bus is poplulated first, "IOMMU'able devices"
-are done later.
+ASID register offset is caclulated by SWGROUP ID so that we can get
+rid of old SoC specific MACROs. This ID conversion is needed for the
+unified SMMU driver over Tegra SoCs. We use dt-bindings MACRO instead
+of SoC dependent MACROs. The formula is:
 
-With CONFIG_OF_IOMMU, "#stream-id-cells" DT binding would be used to
-identify whether a device is IOMMU'able or not. If a device is
-IOMMU'able, we'll defer to populate that device till an iommu device
-is populated. Once an iommu device is populated, "dev->bus->iommu_ops"
-is set in the bus. Then, those defered IOMMU'able devices are
-populated and configured as IOMMU'abled with help of the already
-populated iommu device via iommu_ops->add_device().
+  MC_SMMU_<swgroup name>_ASID_0 = MC_SMMU_AFI_ASID_0 + ID * 4;
+
+Now SWGROUP ID is the global HardWare Accelerator(HWA) identifier
+among all Tegra SoC except Tegra2.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
 Update:
-This is newly added, and the successor of the following RFC:
-  [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
-  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
+Combined the following patches from v3:
+[PATCHv3 09/19] iommu/tegra: smmu: Calculate ASID register offset by ID
+[PATCHv3 16/19] iommu/tegra: smmu: Use dt-bindings MACRO
 ---
- drivers/base/dd.c        |  5 +++++
- drivers/iommu/of_iommu.c | 33 +++++++++++++++++++++++++++++++++
- include/linux/of_iommu.h |  7 +++++++
- 3 files changed, 45 insertions(+)
+ drivers/iommu/tegra-smmu.c | 62 +++-------------------------------------------
+ 1 file changed, 3 insertions(+), 59 deletions(-)
 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 35fa368..6e892d4 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -25,6 +25,7 @@
- #include <linux/async.h>
- #include <linux/pm_runtime.h>
- #include <linux/pinctrl/devinfo.h>
-+#include <linux/of_iommu.h>
+diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+index 6968c11..67252e1 100644
+--- a/drivers/iommu/tegra-smmu.c
++++ b/drivers/iommu/tegra-smmu.c
+@@ -41,45 +41,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/dma-iommu.h>
  
- #include "base.h"
- #include "power/power.h"
-@@ -273,6 +274,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
+-enum smmu_hwgrp {
+-	HWGRP_AFI,
+-	HWGRP_AVPC,
+-	HWGRP_DC,
+-	HWGRP_DCB,
+-	HWGRP_EPP,
+-	HWGRP_G2,
+-	HWGRP_HC,
+-	HWGRP_HDA,
+-	HWGRP_ISP,
+-	HWGRP_MPE,
+-	HWGRP_NV,
+-	HWGRP_NV2,
+-	HWGRP_PPCS,
+-	HWGRP_SATA,
+-	HWGRP_VDE,
+-	HWGRP_VI,
+-
+-	HWGRP_COUNT,
+-
+-	HWGRP_END = ~0,
+-};
+-
+-#define HWG_AFI		(1 << HWGRP_AFI)
+-#define HWG_AVPC	(1 << HWGRP_AVPC)
+-#define HWG_DC		(1 << HWGRP_DC)
+-#define HWG_DCB		(1 << HWGRP_DCB)
+-#define HWG_EPP		(1 << HWGRP_EPP)
+-#define HWG_G2		(1 << HWGRP_G2)
+-#define HWG_HC		(1 << HWGRP_HC)
+-#define HWG_HDA		(1 << HWGRP_HDA)
+-#define HWG_ISP		(1 << HWGRP_ISP)
+-#define HWG_MPE		(1 << HWGRP_MPE)
+-#define HWG_NV		(1 << HWGRP_NV)
+-#define HWG_NV2		(1 << HWGRP_NV2)
+-#define HWG_PPCS	(1 << HWGRP_PPCS)
+-#define HWG_SATA	(1 << HWGRP_SATA)
+-#define HWG_VDE		(1 << HWGRP_VDE)
+-#define HWG_VI		(1 << HWGRP_VI)
++#include <dt-bindings/memory/tegra-swgroup.h>
  
- 	dev->driver = drv;
+ /* bitmap of the page sizes currently supported */
+ #define SMMU_IOMMU_PGSIZES	(SZ_4K)
+@@ -238,25 +200,7 @@ enum {
  
-+	ret = of_iommu_attach(dev);
-+	if (ret)
-+		goto probe_failed;
-+
- 	/* If using pinctrl, bind pins now before probing */
- 	ret = pinctrl_bind_pins(dev);
- 	if (ret)
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index ee249bc..335bf6a 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -20,6 +20,8 @@
- #include <linux/export.h>
- #include <linux/limits.h>
- #include <linux/of.h>
-+#include <linux/device.h>
-+#include <linux/iommu.h>
+ #define HWGRP_INIT(client) [HWGRP_##client] = SMMU_##client##_ASID
  
- /**
-  * of_get_dma_window - Parse *dma-window property and returns 0 if found.
-@@ -88,3 +90,34 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(of_get_dma_window);
-+
-+static bool of_is_iommuable(struct device *dev)
-+{
-+	size_t bytes;
-+	const __be32 *prop;
-+	const char *propname = "#stream-id-cells";
-+
-+	prop = of_get_property(dev->of_node, propname, &bytes);
-+	if (!prop || !bytes)
-+		return false;
-+
-+	pr_debug("%s=%d %s\n", propname, bytes, dev_name(dev));
-+	return true;
-+}
-+
-+int of_iommu_attach(struct device *dev)
-+{
-+	struct iommu_ops *ops;
-+
-+	if (!of_is_iommuable(dev))
-+		return 0;
-+
-+	ops = dev->bus->iommu_ops;
-+	if (!ops)
-+		return -EPROBE_DEFER;
-+
-+	if (ops->add_device)
-+		return ops->add_device(dev);
-+
-+	return 0;
-+}
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index 51a560f..3457489 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -7,6 +7,8 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
- 			     int index, unsigned long *busno, dma_addr_t *addr,
- 			     size_t *size);
+-static const u32 smmu_hwgrp_asid_reg[] = {
+-	HWGRP_INIT(AFI),
+-	HWGRP_INIT(AVPC),
+-	HWGRP_INIT(DC),
+-	HWGRP_INIT(DCB),
+-	HWGRP_INIT(EPP),
+-	HWGRP_INIT(G2),
+-	HWGRP_INIT(HC),
+-	HWGRP_INIT(HDA),
+-	HWGRP_INIT(ISP),
+-	HWGRP_INIT(MPE),
+-	HWGRP_INIT(NV),
+-	HWGRP_INIT(NV2),
+-	HWGRP_INIT(PPCS),
+-	HWGRP_INIT(SATA),
+-	HWGRP_INIT(VDE),
+-	HWGRP_INIT(VI),
+-};
+-#define HWGRP_ASID_REG(x) (smmu_hwgrp_asid_reg[x])
++#define HWGRP_ASID_REG(x) ((x) * sizeof(u32) + SMMU_AFI_ASID)
  
-+extern int of_iommu_attach(struct device *dev);
-+
- #else
+ /*
+  * Per client for address space
+@@ -826,7 +770,7 @@ static int smmu_iommu_attach_dev(struct iommu_domain *domain,
+ 	 * Reserve "page zero" for AVP vectors using a common dummy
+ 	 * page.
+ 	 */
+-	if (map & HWG_AVPC) {
++	if (map & TEGRA_SWGROUP_BIT(AVPC)) {
+ 		struct page *page;
  
- static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
-@@ -16,6 +18,11 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
- 	return -EINVAL;
- }
- 
-+static inline int of_iommu_attach(struct device *dev)
-+{
-+	return 0;
-+}
-+
- #endif	/* CONFIG_OF_IOMMU */
- 
- #endif /* __OF_IOMMU_H */
+ 		page = as->smmu->avp_vector_page;
 -- 
 1.8.1.5
