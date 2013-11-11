@@ -1,54 +1,91 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 11 Nov 2013 16:41:33 +0530
-Subject: [PATCH RFC 1/4] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <000301ceda84$1d648bf0$582da3d0$%han@samsung.com>
-References: <1383205544-32244-1-git-send-email-gautam.vivek@samsung.com>
- <1383205544-32244-2-git-send-email-gautam.vivek@samsung.com>
- <527744B2.4090303@ti.com>
- <030d01ced946$d6e23490$84a69db0$%debski@samsung.com>
- <52779D28.9000905@ti.com>
- <CAFp+6iH7vQ-OtMFL4pyr4tFDRchH4oh1Z0753WNgrHiUzj+kzw@mail.gmail.com>
- <00fe01ceda0a$941957a0$bc4c06e0$%debski@samsung.com>
- <000001ceda17$f41c2030$dc546090$%han@samsung.com>
- <000101ceda1f$04ca6f20$0e5f4d60$%han@samsung.com>
- <CAFp+6iFAZab35F-MOOZHcHpzSEOL=51gWBK2KZbOJS+0731GJQ@mail.gmail.com>
- <000301ceda84$1d648bf0$582da3d0$%han@samsung.com>
-Message-ID: <5280BB65.5040305@ti.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 11 Nov 2013 16:39:46 +0530
+Subject: [PATCH v4 3/4] AArch64: KGDB: Add step debugging support
+In-Reply-To: <20131108141841.GI17461@mudshark.cambridge.arm.com>
+References: <1383641146-27274-1-git-send-email-vijay.kilari@gmail.com>
+ <1383641146-27274-4-git-send-email-vijay.kilari@gmail.com>
+ <20131108141841.GI17461@mudshark.cambridge.arm.com>
+Message-ID: <CALicx6uaK_xk+nNCvYMjO2FrNQDQWqhWk54NMccYTE2ji=gycw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wednesday 06 November 2013 05:37 AM, Jingoo Han wrote:
-> On Wednesday, November 06, 2013 2:58 AM, Vivek Gautam wrote:
->> On Tue, Nov 5, 2013 at 5:33 PM, Jingoo Han <jg1.han@samsung.com> wrote:
-> 
-> [.....]
-> 
->>> USB3.0 PHY consists of two blocks such as 3.0 block and 2.0 block.
->>> This USB3.0 PHY can support UTMI+ and PIPE3 interface for 3.0 block
->>> and 2.0 block, respectively.
->>>
->>> Conclusion:
->>>
->>>    1) USB2.0 PHY: USB2.0 HOST, USB2.0 Device
->>>                        Base address: 0x1213 0000
->>>
->>>    2) USB3.0 PHY: USB3.0 DRD (3.0 HOST & 3.0 Device)
->>>                        Base address: 0x1210 0000
->>>                        2.0 block(UTMI+) & 3.0 block(PIPE3)
+On Fri, Nov 8, 2013 at 7:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Nov 05, 2013 at 08:45:45AM +0000, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 >>
->> And this is of course the PHY used by DWC3 controller, which works at
->> both High speed as well as Super Speed.
->> Right ?
-> 
-> Right.
-> 
-> While 3.0 block(PIPE3) can be used for Super Speed, 2.0 block(UTMI+)
-> can be used for High speed.
+>> Add KGDB software step debugging support for EL1 debug
+>> in AArch64 mode.
+>>
+>> KGDB registers step debug handler with debug monitor.
+>> On receiving 'step' command from GDB tool, target enables
+>> software step debugging and step address is updated.
+>> If no step address is received from GDB tool, target assumes
+>> next step address is current PC.
+>>
+>> Software Step debugging is disabled when 'continue' command
+>> is received
+>>
+>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>> ---
+>>  arch/arm64/kernel/kgdb.c |   67 +++++++++++++++++++++++++++++++++++++++-------
+>>  1 file changed, 58 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+>> index ec624bc..f10f2ba 100644
+>> --- a/arch/arm64/kernel/kgdb.c
+>> +++ b/arch/arm64/kernel/kgdb.c
+>> @@ -137,13 +137,26 @@ void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long pc)
+>>
+>>  static int compiled_break;
+>>
+>> +static void kgdb_arch_update_addr(struct pt_regs *regs,
+>> +                             char *remcom_in_buffer)
+>> +{
+>> +     unsigned long addr;
+>> +     char *ptr;
+>> +
+>> +     ptr = &remcom_in_buffer[1];
+>> +     if (kgdb_hex2long(&ptr, &addr))
+>> +             kgdb_arch_set_pc(regs, addr);
+>> +     else if (compiled_break == 1)
+>> +             kgdb_arch_set_pc(regs, regs->pc + 4);
+>> +
+>> +     compiled_break = 0;
+>> +}
+>> +
+>>  int kgdb_arch_handle_exception(int exception_vector, int signo,
+>>                              int err_code, char *remcom_in_buffer,
+>>                              char *remcom_out_buffer,
+>>                              struct pt_regs *linux_regs)
+>>  {
+>> -     unsigned long addr;
+>> -     char *ptr;
+>>       int err;
+>>
+>>       switch (remcom_in_buffer[0]) {
+>> @@ -153,6 +166,8 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+>>                * Packet D (Detach), k (kill). No special handling
+>>                * is required here
+>>                */
+>> +             atomic_set(&kgdb_cpu_doing_single_step, -1);
+>> +             kgdb_single_step =  0;
+>
+> This looks really weird: you have two variables, which you attempt to keep
+> in sync, only one of them is an atomic access and you don't have any
+> locking or memory barriers between them, so it must be ok if they're not
+> in-sync. In which case, why do we have two variables?
+>
+IMHO, two variables are being used by kgdb framework
+The variables 'kgdb_cpu_doing_single_step'  holds the cpu on which
+step debugging
+is happening. With this, when during step debugging, it ensures that on next
+step debug exception only this CPU aquires master lock and step
+debugging is performed.
 
-It should then come under *single IP muliple PHY* category similar to what
-Sylwester has done.
+The variable 'kgdb_single_step' is used to know if step debugging is
+ongoing or not.
+If so, the non-primary cpu's are not released untill the continue
+command is received
+So, with this the cpu's are not released and acquired for every step command
 
-Thanks
-Kishon
+> Will
