@@ -1,40 +1,80 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 11 Nov 2013 10:33:11 +0100
-Subject: [PATCH] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
-In-Reply-To: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
-References: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20131111093311.GK14892@pengutronix.de>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 11 Nov 2013 10:47:23 +0100
+Subject: Report from 2013 ARM kernel summit
+In-Reply-To: <CACxGe6stYhZOc=MfGj8BgtG8zp6eh=jRFGUbFn1SSYRtw+zryA@mail.gmail.com>
+References: <CACxGe6stYhZOc=MfGj8BgtG8zp6eh=jRFGUbFn1SSYRtw+zryA@mail.gmail.com>
+Message-ID: <20131111.114723.1885845500744256130.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Victor,
+Missed some MLs. Resending....
 
-On Mon, Nov 11, 2013 at 12:10:26AM -0800, Victor Kamensky wrote:
-> Here is proposal for armv7-m build failure in sigreturn_codes.S. The 
-> armv7-m build issue was discussed in [1].
-> 
-> Proposed solution is based on conditional compilation. If 
-> CONFIG_CPU_THUMBONLY is set instead of arm opcodes nops in thumb mode
-> are used. I've tried to wrap conditional compilation as nice as I 
-> found possible. Other suggestions/approaches are welcome.
-> 
-> Fix was tested:
->    linux-next with efm32_defconfig build (along with few other fixes)
->    rmk-next BE/LE arndale build/boot and LTP rt_sigaction0? tests run
-Next currently fails for other reasons, too and I'm out of time. I'd say
-if it compiles for you it's fine and I will handle eventual fall-outs
-later.
+Grant Likely <grant.likely@secretlab.ca> wrote @ Fri, 8 Nov 2013 14:20:46 +0100:
 
-> Uwe, is it possible for you to test that the fix runs on efm32. Also
-> if the platform can run LTP, you give a spin to LTP rt_sigaction0? 
-> tests that would be great. It is known that this tests covers code 
-> under change.
-No, at least not as easily as enable/install LTP and run it. ptxdist
-doesn't offer a working LTP integration unfortunately.
+> Early Init, Deferred Probe and Init Order
+...
+> The big problem with deferring to initcalls is that the kernel doesn?t
+> have any information about dependencies between devices and so doesn?t
+> know what order to call modules in. Right now driver probe order is
+> roughly determined by kernel link order first, and registration order
+> second for devices populated during or after initcalls. Olof commented
+> that the current driver model is based on the assumption that devices
+> live in a single hierarchy. There is no easy way to add in dependency
+> data with the current structure, and in most cases dependencies aren?t
+> specifically on other devices, but rather on the service provided by
+> another device (ie, a GPIO line).
 
-Best regards
-Uwe
+I think that an IOMMU device is also the service provider for other
+devices, where an single IOMMU device resides in the bus to provide
+the address translation to the bus children.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Kumar is concerned that deferred probe won?t work in all situations. For
+> instance, what about a device that has an optional dependency? Does it
+> fail to probe in the hope that the dependency will show up later? It was
+
+Other devices don't know if the system has IOMMU or not. IOMMU'able
+devices' population can be deferred till IOMMU device is populated,
+but they don't know if there's really IOMMU device exists or not at
+their population time.
+
+....
+> The suggestion was made that it would be a really nice to have the core
+> kernel sort out probe order rather than using deferred probe. Grant
+> replied that deferred probe was designed as the simplest possible
+> solution to the problem, and by no means is he attached to it if someone
+> can come up with a better approach. He did consider other options that
+> put dependency resolution into the core, but it ended up pulling all
+> kinds of GPIO, IRQ, Clock and DMA details into the core which made it
+> quite complex.
+
+I have a problem to control the poplution order for IOMMU in Tegra
+SoC, and currently I haven't found any framework so that I inserted an
+IOMMU hook in the driver core[1] since I discussed with Stephen Warren
+and we thought that the number of those subsystem which requires this
+kind of control isn't so many. This patch depends on a certain DT
+bindings("#stream-id-cells") if a device has an dependency on IOMMU or
+not. But at least this doesn't require anything for a client driver
+side at all. The exsiting driver can be used as they are. The current
+design is:
+
+1, When a device is populated, it checks if that device is IOMMU'able
+   or not. This is identified by "#stream-id-cells" in DT. If
+   a device is normal(non IOMMU), a device is populated. If a device
+   is IOMMU'able, it continues to be checked.
+
+2, When an IOMMU device has been already populated,
+   "dev->bus->iommu_ops" is set. If so a device(client) is registered
+   as IOMMU'able, and the rest of population process continues. If not
+   set yet, a device population would be deferred til
+   "dev->bus->iommu_ops" is set.
+
+3, After an IOMMU device has been already populated, deferred
+   population will be continued.
+
+I'm not so sure if this dependecy on "#stream-id-cells" is acceptable
+or not, but I haven't any better idea right now.
+
+Any suggestion/hint would be really appreciated.
+
+[1]
+http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006933.html
