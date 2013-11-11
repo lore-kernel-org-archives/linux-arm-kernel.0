@@ -1,45 +1,42 @@
-From: ivan.khoronzhuk@ti.com (Khoronzhuk, Ivan)
-Date: Mon, 11 Nov 2013 16:52:05 +0000
-Subject: [PATCH 01/12] mtd: nand: davinci: fix driver registration
-In-Reply-To: <1384187188-5776-2-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
- <1384187188-5776-2-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <4F5844B3A985794BA902E12C070812375F8CE2@DNCE04.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Nov 2013 08:54:04 -0800
+Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
+In-Reply-To: <F97741D2-FC6F-4DBD-A0DD-E35304501993@goldelico.com>
+References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
+ <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
+ <5280DBA6.50303@ti.com>
+ <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
+ <5280E617.3000004@ti.com>
+ <F97741D2-FC6F-4DBD-A0DD-E35304501993@goldelico.com>
+Message-ID: <20131111165404.GO15154@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Dr. H. Nikolaus Schaller <hns@goldelico.com> [131111 06:30]:
+> Am 11.11.2013 um 15:13 schrieb Tomi Valkeinen:
+> > On 2013-11-11 15:57, Dr. H. Nikolaus Schaller wrote:
+> >
+> > The display.c file is not strictly DSS stuff, but DSS related "glue" for
+> > the SoC. For example, the muxing of the DSI pads is also done on the
+> > CONTROL module, and it's also in display.c.
+> > 
+> > The file is getting a bit large, so I'm not against splitting it. But I
+> > don't think there's point to add omap3-tvout.c file, which most likely
+> > will ever contain only that one function.
+> 
+> Yes that is very likely true.
+> 
+> The problem is that there is no other official API to modify the DEFCONF1
+> register. Therefore we introduced this (propsal).
+> 
+> Our first idea was a readDEFCONF1() and writeDEFCONF1() and use the
+> constants (bit patterns) you suggested below.
 
-When kernel is booted using DT, there is no guarantee that Davinci
-NAND device has been created already at the time when driver init
-function is executed. Therefore, platform_driver_probe() can't be used
-because this may result the Davinci NAND driver will never be probed.
-The driver probing has to be made with core mechanism.
+I posted something about accessing the ctrl module regs to the first
+patch in the series. It's best to set it up as a separate driver for
+now and then maybe handle it with pinctrl-single,bits when DSS is
+device tree enabled.
 
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- drivers/mtd/nand/davinci_nand.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Regards,
 
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index b77a01e..d87213f 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -877,6 +877,7 @@ static int __exit nand_davinci_remove(struct platform_device *pdev)
- }
-
- static struct platform_driver nand_davinci_driver = {
-+       .probe          = nand_davinci_probe,
-        .remove         = __exit_p(nand_davinci_remove),
-        .driver         = {
-                .name   = "davinci_nand",
-@@ -886,7 +887,7 @@ static struct platform_driver nand_davinci_driver = {
- };
- MODULE_ALIAS("platform:davinci_nand");
-
--module_platform_driver_probe(nand_davinci_driver, nand_davinci_probe);
-+module_platform_driver(nand_davinci_driver);
-
- MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Texas Instruments");
---
-1.7.9.5
+Tony
