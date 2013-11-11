@@ -1,38 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 11 Nov 2013 15:57:02 +0100
-Subject: SPARSE_IRQ on Kirkwood
-In-Reply-To: <5280ED8B.5060206@keymile.com>
-References: <51E6F9E3.9030302@keymile.com>
-	<5280ED8B.5060206@keymile.com>
-Message-ID: <20131111155702.24e020c5@skate>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Nov 2013 15:00:13 +0000
+Subject: [PATCH v4 3/4] AArch64: KGDB: Add step debugging support
+In-Reply-To: <CALicx6uaK_xk+nNCvYMjO2FrNQDQWqhWk54NMccYTE2ji=gycw@mail.gmail.com>
+References: <1383641146-27274-1-git-send-email-vijay.kilari@gmail.com>
+ <1383641146-27274-4-git-send-email-vijay.kilari@gmail.com>
+ <20131108141841.GI17461@mudshark.cambridge.arm.com>
+ <CALicx6uaK_xk+nNCvYMjO2FrNQDQWqhWk54NMccYTE2ji=gycw@mail.gmail.com>
+Message-ID: <20131111150013.GJ28302@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerlando Falauto,
-
-On Mon, 11 Nov 2013 15:45:31 +0100, Gerlando Falauto wrote:
-
-> On 07/17/2013 10:09 PM, Gerlando Falauto wrote:
-> > Hi everyone,
+On Mon, Nov 11, 2013 at 11:09:46AM +0000, Vijay Kilari wrote:
+> On Fri, Nov 8, 2013 at 7:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Nov 05, 2013 at 08:45:45AM +0000, vijay.kilari at gmail.com wrote:
+> >> @@ -153,6 +166,8 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+> >>                * Packet D (Detach), k (kill). No special handling
+> >>                * is required here
+> >>                */
+> >> +             atomic_set(&kgdb_cpu_doing_single_step, -1);
+> >> +             kgdb_single_step =  0;
 > >
-> > newbie's question: are sparse IRQs [going to be] supported on Kirkwood?
-> > I thought irq domains were pretty much the same thing...
-> > So if I understand correctly, without sparse IRQs I still have to
-> > increase NR_IRQS within arch/arm/mach-kirkwood/include/mach/irqs.h in
-> > order to support additional PICs.
+> > This looks really weird: you have two variables, which you attempt to keep
+> > in sync, only one of them is an atomic access and you don't have any
+> > locking or memory barriers between them, so it must be ok if they're not
+> > in-sync. In which case, why do we have two variables?
+> >
+> IMHO, two variables are being used by kgdb framework
+> The variables 'kgdb_cpu_doing_single_step'  holds the cpu on which
+> step debugging
+> is happening. With this, when during step debugging, it ensures that on next
+> step debug exception only this CPU aquires master lock and step
+> debugging is performed.
+> 
+> The variable 'kgdb_single_step' is used to know if step debugging is
+> ongoing or not.
+> If so, the non-primary cpu's are not released untill the continue
+> command is received
+> So, with this the cpu's are not released and acquired for every step command
 
-I believe all the Kirkwood boards that have been converted to the
-Device Tree now use a driver in drivers/irqchip/ for IRQ handling, and
-therefore use all the modern irqdomain stuff.
+Ok, but in what situation would you have both kgdb_cpu_doing_single_step == -1
+and kgdb_single_step == 1 (ignoring races between setting the two variables)?
 
-I do have a bunch of other patches to convert more Kirkwood boards to
-DT (needs more work), and once that's done, we can throw away the
-legacy IRQ handling for Kirkwood.
+In other words, can we reduce this to a single variable?
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
