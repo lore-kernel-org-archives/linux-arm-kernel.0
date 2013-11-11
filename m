@@ -1,54 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 11 Nov 2013 11:13:39 -0800
-Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
- status
-In-Reply-To: <20131030130325.GA18788@intel.com>
-References: <20131017020745.GA14013@intel.com>
- <20131017142755.GA4477@breakpoint.cc>
- <20131017134846.GG14013@intel.com>
- <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
- <20131025042310.GC21230@intel.com>
- <Pine.LNX.4.64.1310250813370.6186@axis700.grange>
- <20131025054321.GD21230@intel.com>
- <Pine.LNX.4.64.1310250840350.6186@axis700.grange>
- <CAOesGMivD_3zSL503R0OaqyGv4Rj8qJqnbM2TdmjtxR2U63ztw@mail.gmail.com>
- <20131030130325.GA18788@intel.com>
-Message-ID: <20131111191339.GA10328@quad.lixom.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Nov 2013 19:32:36 +0000
+Subject: kernel BUG at kernel/kallsyms.c:222!
+In-Reply-To: <528110B1.4060402@arm.com>
+References: <CACVXFVNHryPXy2NQhPwXkoCeLUXQSgrWmgBkMNtGD_=X_62_5Q@mail.gmail.com>
+ <CAFRkauDGiy3yZOwKFWMEJvYUe0OoXMEZHKaxogZHdgzMxexdHA@mail.gmail.com>
+ <CACVXFVMAnewCkSNNke3kf1-yO+JCc_HBRp8iaLBPJ+14G79Haw@mail.gmail.com>
+ <87y54vzszo.fsf@rustcorp.com.au>
+ <CAFRkauBYUq3UAjqLvkuDVEz5BVyDpC0DuVRGTe4K+kcoCX17GA@mail.gmail.com>
+ <CACVXFVMvvG1unnR0rsmBMdp9p19Q3JRbURxZF-UWxvrThDPKTw@mail.gmail.com>
+ <CAFRkauCW3FDSuh4t0gvmSWH1m0+qaG0XSoBxmk30Wq1FMy7iFw@mail.gmail.com>
+ <CACVXFVMzOzD+D-MQCUBvC80d4zS-TJfcucKuUvzerGs6gT1fEg@mail.gmail.com>
+ <CACVXFVOnVXcVdRCm=OfPjpvvWCiXi8GRV+9ViOGmSZ3tTf6WDg@mail.gmail.com>
+ <528110B1.4060402@arm.com>
+Message-ID: <20131111193236.GB16735@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 30, 2013 at 06:33:25PM +0530, Vinod Koul wrote:
-> On Tue, Oct 29, 2013 at 09:47:55AM -0700, Olof Johansson wrote:
-> > This patch broke some TI platforms (using edma) due to namespace
-> > conflicts. The error is:
-> > 
-> > ../../include/linux/dmaengine.h:54:2: error: expected identifier
-> > before numeric constant   (for DMA_COMPLETE)
-> > 
-> > .. it's because they define DMA_COMPLETE in include/platform_data/edma.h.
-> > 
-> > The edma driver seems to overall lack prefixes and thus pollutes
-> > global namespaces, so it should be fixed up.
-> Yup this needs some work.
-> 
-> I fixed up the error with below, can you pls verify. Pls note this is compile
-> tested only!
-> 
-> -----><8---------------------------
-> 
-> From: Vinod Koul <vinod.koul@intel.com>
-> Date: Wed, 30 Oct 2013 18:22:30 +0530
-> Subject: [PATCH] dmanengine: fix edma driver to not define DMA_COMPLETE
-> 
-> edma header defines DMA_COMPLETE, this causes issues as commit adfedd9a32e4 move
-> DMA_SUCCESS to DMA_COMPLETE. edma should properly namespace its defines and
-> needs a future fix
-> 
-> Reported-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+On Mon, Nov 11, 2013 at 05:15:29PM +0000, Jonathan Austin wrote:
+> I've tested the patch below and it solves the ARM side of things - so
+> gives you an option other than a complete revert. Happy to put this in to
+> RMK's patch system if you'd prefer not to have to revert and he's happy
+> with the patch.
 
-Thanks, I've applied this to fixes together with the follow-up from
-Sebastian. Cc:ing Mark since it touches drivers/soc.
-
-
--Olof
+I think this is the right solution because it then means that this symbol
+has the same meaning whether on MMU or !MMU - and getting rid of these
+kinds of gratuitous variances are the only way that !MMU is going to
+become less fragile.
