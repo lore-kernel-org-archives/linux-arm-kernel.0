@@ -1,28 +1,67 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 Nov 2013 16:28:25 +0800
-Subject: [PATCH 1/5] ARM: dts: i.MX51: Move usbphy0 node from AIPS1
-In-Reply-To: <1384157706.39361830@f119.i.mail.ru>
-References: <1383813908-26571-1-git-send-email-shc_work@mail.ru>
- <20131111081148.GA11083@S2101-09.ap.freescale.net>
- <1384157706.39361830@f119.i.mail.ru>
-Message-ID: <20131111082823.GB11083@S2101-09.ap.freescale.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Mon, 11 Nov 2013 10:31:51 +0200
+Subject: [PATCHv4 0/7] Unifying SMMU driver among Tegra SoCs
+Message-ID: <1384158718-4756-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 12:15:06PM +0400, Alexander Shiyan wrote:
-> > On Thu, Nov 07, 2013 at 12:45:04PM +0400, Alexander Shiyan wrote:
-> > > usbphy0 is not a part of AIPS1, so move this node under usbotg.
-> > > Additionally this patch removes useless "status" property.
-> > > 
-> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > 
-> > Applied all except #4.  I would add those pingroups only when there are
-> > in-tree users of it.
-> 
-> Please revert this one part too [1/5]. This change is incorrect. I will make
-> other solution later.
-> Thanks.
+Hi,
 
-Okay.  Dropped the patch 'ARM: dts: i.MX51: Move usbphy0 node from AIPS1'.
+This series provides:
 
-Shawn
+(1) Unified SMMU driver among Tegra SoCs
+(2) Multiple Address Space support(MASID) in IOMMU(SMMMU)
+(3) Tegra IOMMU'able devices, most of platform devices are IOMMU'able.
+
+There's been some discussion[1] about device population order, and I
+added a IOMMU hook in driver core:
+
+  [PATCHv4 2/7] driver/core: Populate IOMMU'able devices in order
+
+which is based on the following RFC patch:
+
+  [RFC][PATCHv3+ 1/2] driver/core: Add of_iommu_attach()
+  http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006914.html
+
+Tested IOMMU functionality with T30 SD/MMC. Any further testing with
+T114 and/or other devices would be really appreciated.
+
+v4:
+Add a hook in driver core to control device populatin order.
+Introduced arm,smmu "mmu-master" binding instead of tegra own.
+Removed DT patches from this series.
+
+v3:
+Updated based on Stephen Warren's feedback
+
+v2:
+Updated based on Thierry Reding's and Stephen Warren's feedback
+
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/181888.html
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/180267.html
+
+Available in the git repository at:
+
+  git://git at nv-tegra.nvidia.com/user/hdoyu/linux.git smmu-upstreaming at 20131111
+
+Hiroshi Doyu (7):
+  ARM: tegra: Create a DT header defining SWGROUP ID
+  driver/core: Populate IOMMU'able devices in order
+  iommu/tegra: smmu: Register IOMMU'able devices dynamically
+  iommu/tegra: smmu: Calculate ASID register offset by ID
+  iommu/tegra: smmu: Support "mmu-masters" binding
+  iommu/tegra: smmu: Rename hwgrp -> swgroups
+  iommu/tegra: smmu: Allow duplicate ASID wirte
+
+ .../bindings/iommu/nvidia,tegra30-smmu.txt         |  28 +-
+ drivers/base/dd.c                                  |   5 +
+ drivers/iommu/Kconfig                              |   1 +
+ drivers/iommu/of_iommu.c                           |  33 +++
+ drivers/iommu/tegra-smmu.c                         | 301 ++++++++++++++-------
+ include/dt-bindings/memory/tegra-swgroup.h         |  48 ++++
+ include/linux/of_iommu.h                           |   7 +
+ 7 files changed, 318 insertions(+), 105 deletions(-)
+ create mode 100644 include/dt-bindings/memory/tegra-swgroup.h
+
+-- 
+1.8.1.5
