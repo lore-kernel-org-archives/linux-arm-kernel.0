@@ -1,91 +1,77 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Mon, 11 Nov 2013 09:59:22 +0530
-Subject: [PATCH RFC 4/6] arm64: Add kernel return probes
- support(kretprobes)
-In-Reply-To: <20131108170448.GF15074@mudshark.cambridge.arm.com>
-References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
- <1382008671-4515-5-git-send-email-sandeepa.prabhu@linaro.org>
- <20131108170448.GF15074@mudshark.cambridge.arm.com>
-Message-ID: <CA+b37P2aeXs4Cy_HxF24HQAYAnYzZ19PgV6rqrQLY9SMpZHDJg@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 11 Nov 2013 08:45:40 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIHVzYjogY2hpcGlkZWE6IHVzYm1pc2M6IEFkZCBz?=
+ =?UTF-8?B?dXBwb3J0IGZvciBpLk1YMjcvaS5NWDMxIENQVXM=?=
+In-Reply-To: <5280414C.3060806@gtsys.com.hk>
+References: <1384067901-9377-1-git-send-email-shc_work@mail.ru>
+ <5280414C.3060806@gtsys.com.hk>
+Message-ID: <1384145140.400290349@f353.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 November 2013 22:34, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Oct 17, 2013 at 12:17:49PM +0100, Sandeepa Prabhu wrote:
->> AArch64 ISA does not instructions to pop PC register value
->> from stack(like ARM v7 has ldmia {...,pc}) without using
->> one of the general purpose registers. This means return probes
->> cannot return to the actual return address directly without
->> modifying register context, and without trapping into debug exception.
->>
->> So like many other architectures, we prepare a global routine
->> with NOPs, which serve as trampoline to hack away the
->> function return address, by placing an extra kprobe on the
->> trampoline entry.
->>
->> The pre-handler of this special trampoline' kprobe execute return
->> probe handler functions and restore original return address in ELR_EL1,
->> this way, saved pt_regs still hold the original register context to be
->> carried back to the probed kernel function.
->>
->> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
->> ---
->>  arch/arm64/Kconfig               |   1 +
->>  arch/arm64/include/asm/kprobes.h |   1 +
->>  arch/arm64/include/asm/ptrace.h  |   5 ++
->>  arch/arm64/kernel/kprobes.c      | 125 ++++++++++++++++++++++++++++++++++++++-
->>  4 files changed, 129 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 2e89059..73eff55 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -28,6 +28,7 @@ config ARM64
->>       select HAVE_MEMBLOCK
->>       select HAVE_PERF_EVENTS
->>       select HAVE_KPROBES if !XIP_KERNEL
->> +     select HAVE_KRETPROBES if (HAVE_KPROBES)
->
-> Don't need the brackets.
-OK.
->
->>       select IRQ_DOMAIN
->>       select MODULES_USE_ELF_RELA
->>       select NO_BOOTMEM
->> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
->> index 9b491d0..eaca849 100644
->> --- a/arch/arm64/include/asm/kprobes.h
->> +++ b/arch/arm64/include/asm/kprobes.h
->> @@ -55,5 +55,6 @@ void arch_remove_kprobe(struct kprobe *);
->>  int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
->>  int kprobe_exceptions_notify(struct notifier_block *self,
->>                            unsigned long val, void *data);
->> +void kretprobe_trampoline(void);
->>
->>  #endif /* _ARM_KPROBES_H */
->> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
->> index 89f1727..58b2589 100644
->> --- a/arch/arm64/include/asm/ptrace.h
->> +++ b/arch/arm64/include/asm/ptrace.h
->> @@ -166,6 +166,11 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
->>  #define instruction_pointer(regs)    (regs)->pc
->>  #define stack_pointer(regs)          ((regs)->sp)
->>
->> +static inline long regs_return_value(struct pt_regs *regs)
->> +{
->> +     return regs->regs[0];
->> +}
->
-> This is also being implemented by another patch series (I think the audit
-> stuff?).
-Not sure, I did not see this being implemented in audit(audit adds for
-'syscallno',  not for return value in x0)
-I can rebase my code if this change is implemented and queued in other patchset.
+> Hi Alexander,
+> 
+> On Sunday, November 10, 2013 03:18 PM, Alexander Shiyan wrote:
+> > This adds i.MX27 and i.MX31 as the next user of the usbmisc driver.
+> >
+> > Signed-off-by: Alexander Shiyan<shc_work@mail.ru>
+> > ---
+> >   drivers/usb/chipidea/usbmisc_imx.c | 42 ++++++++++++++++++++++++++++++++++++++
+> >   1 file changed, 42 insertions(+)
+> >
+> > diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+...
+> > +static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
+> > +{
+> > +	unsigned long flags;
+> > +	u32 val;
+> > +
+> > +	switch (data->index) {
+> > +	case 0:
+> > +		val = MX27_OTG_PM_BIT;
+> > +		break;
+> > +	case 1:
+> > +		val = MX27_H1_PM_BIT;
+> > +		break;
+> > +	case 2:
+> > +		val = MX27_H2_PM_BIT;
+> > +		break;
+> > +	default:
+> > +		return -EINVAL;
+> > +	};
+> > +
+> 
+>  From my understanding this can not work, the usbmisc->base not point into the
+> usb control register (USB_CTRL). Reference manual 30.5.1.1 says
+> BASE + 0x600
+> you must add the offset to the readl instruction.
 
->
-> Will
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Why not work?
+usbotg: usb at 10024000
+usbh1: usb at 10024200
+usbh2: usb at 10024400
+usbmisc: usbmisc at 10024600
+So, offset to USB_CTRL should already be defined by DTS.
+
+
+> > +	spin_lock_irqsave(&usbmisc->lock, flags);
+> > +	if (data->disable_oc)
+> > +		val = readl(usbmisc->base) | val;
+> 
+> else part not needed, the registers bits are set to 0 (reset)
+> the function is called on start-up once only, right?!
+> 
+> > +	else
+> > +		val = readl(usbmisc->base)&  ~val;
+> > +	writel(val, usbmisc->base);
+> > +	spin_unlock_irqrestore(&usbmisc->lock, flags);
+> > +
+> > +	return 0;
+> > +}
+
+Bit can be set/cleared wrongly by the bootloader, it is not a big
+overhead to set it in proper state.
+
+...
+
+---
