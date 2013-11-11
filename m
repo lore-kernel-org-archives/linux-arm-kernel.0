@@ -1,80 +1,85 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 11 Nov 2013 10:47:23 +0100
-Subject: Report from 2013 ARM kernel summit
-In-Reply-To: <CACxGe6stYhZOc=MfGj8BgtG8zp6eh=jRFGUbFn1SSYRtw+zryA@mail.gmail.com>
-References: <CACxGe6stYhZOc=MfGj8BgtG8zp6eh=jRFGUbFn1SSYRtw+zryA@mail.gmail.com>
-Message-ID: <20131111.114723.1885845500744256130.hdoyu@nvidia.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 11 Nov 2013 17:47:58 +0800
+Subject: [PATCH] spi: sirf: move to use generic dma dt-binding
+Message-ID: <1384163278-28108-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Missed some MLs. Resending....
+sirf-dma driver enabled generic dt binding for dma channels.
+see here we remove self-defined dma channel prop and move to
+use generic dma_request_slave_channel.
+related changes in dts is something like:
+    dmas = <&dmac1 9>,
+    <&dmac1 4>;
+    dma-names = "rx", "tx";
 
-Grant Likely <grant.likely@secretlab.ca> wrote @ Fri, 8 Nov 2013 14:20:46 +0100:
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/spi/spi-sirf.c | 26 ++------------------------
+ 1 file changed, 2 insertions(+), 24 deletions(-)
 
-> Early Init, Deferred Probe and Init Order
-...
-> The big problem with deferring to initcalls is that the kernel doesn?t
-> have any information about dependencies between devices and so doesn?t
-> know what order to call modules in. Right now driver probe order is
-> roughly determined by kernel link order first, and registration order
-> second for devices populated during or after initcalls. Olof commented
-> that the current driver model is based on the assumption that devices
-> live in a single hierarchy. There is no easy way to add in dependency
-> data with the current structure, and in most cases dependencies aren?t
-> specifically on other devices, but rather on the service provided by
-> another device (ie, a GPIO line).
-
-I think that an IOMMU device is also the service provider for other
-devices, where an single IOMMU device resides in the bus to provide
-the address translation to the bus children.
-
-> Kumar is concerned that deferred probe won?t work in all situations. For
-> instance, what about a device that has an optional dependency? Does it
-> fail to probe in the hope that the dependency will show up later? It was
-
-Other devices don't know if the system has IOMMU or not. IOMMU'able
-devices' population can be deferred till IOMMU device is populated,
-but they don't know if there's really IOMMU device exists or not at
-their population time.
-
-....
-> The suggestion was made that it would be a really nice to have the core
-> kernel sort out probe order rather than using deferred probe. Grant
-> replied that deferred probe was designed as the simplest possible
-> solution to the problem, and by no means is he attached to it if someone
-> can come up with a better approach. He did consider other options that
-> put dependency resolution into the core, but it ended up pulling all
-> kinds of GPIO, IRQ, Clock and DMA details into the core which made it
-> quite complex.
-
-I have a problem to control the poplution order for IOMMU in Tegra
-SoC, and currently I haven't found any framework so that I inserted an
-IOMMU hook in the driver core[1] since I discussed with Stephen Warren
-and we thought that the number of those subsystem which requires this
-kind of control isn't so many. This patch depends on a certain DT
-bindings("#stream-id-cells") if a device has an dependency on IOMMU or
-not. But at least this doesn't require anything for a client driver
-side at all. The exsiting driver can be used as they are. The current
-design is:
-
-1, When a device is populated, it checks if that device is IOMMU'able
-   or not. This is identified by "#stream-id-cells" in DT. If
-   a device is normal(non IOMMU), a device is populated. If a device
-   is IOMMU'able, it continues to be checked.
-
-2, When an IOMMU device has been already populated,
-   "dev->bus->iommu_ops" is set. If so a device(client) is registered
-   as IOMMU'able, and the rest of population process continues. If not
-   set yet, a device population would be deferred til
-   "dev->bus->iommu_ops" is set.
-
-3, After an IOMMU device has been already populated, deferred
-   population will be continued.
-
-I'm not so sure if this dependecy on "#stream-id-cells" is acceptable
-or not, but I haven't any better idea right now.
-
-Any suggestion/hint would be really appreciated.
-
-[1]
-http://lists.linuxfoundation.org/pipermail/iommu/2013-November/006933.html
+diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
+index a1f21b7..7c6a797 100644
+--- a/drivers/spi/spi-sirf.c
++++ b/drivers/spi/spi-sirf.c
+@@ -22,7 +22,6 @@
+ #include <linux/dmaengine.h>
+ #include <linux/dma-direction.h>
+ #include <linux/dma-mapping.h>
+-#include <linux/sirfsoc_dma.h>
+ 
+ #define DRIVER_NAME "sirfsoc_spi"
+ 
+@@ -555,8 +554,6 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	struct spi_master *master;
+ 	struct resource *mem_res;
+ 	int num_cs, cs_gpio, irq;
+-	u32 rx_dma_ch, tx_dma_ch;
+-	dma_cap_mask_t dma_cap_mask;
+ 	int i;
+ 	int ret;
+ 
+@@ -567,20 +564,6 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 		goto err_cs;
+ 	}
+ 
+-	ret = of_property_read_u32(pdev->dev.of_node,
+-			"sirf,spi-dma-rx-channel", &rx_dma_ch);
+-	if (ret < 0) {
+-		dev_err(&pdev->dev, "Unable to get rx dma channel\n");
+-		goto err_cs;
+-	}
+-
+-	ret = of_property_read_u32(pdev->dev.of_node,
+-			"sirf,spi-dma-tx-channel", &tx_dma_ch);
+-	if (ret < 0) {
+-		dev_err(&pdev->dev, "Unable to get tx dma channel\n");
+-		goto err_cs;
+-	}
+-
+ 	master = spi_alloc_master(&pdev->dev, sizeof(*sspi) + sizeof(int) * num_cs);
+ 	if (!master) {
+ 		dev_err(&pdev->dev, "Unable to allocate SPI master\n");
+@@ -644,18 +627,13 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	sspi->bitbang.master->dev.of_node = pdev->dev.of_node;
+ 
+ 	/* request DMA channels */
+-	dma_cap_zero(dma_cap_mask);
+-	dma_cap_set(DMA_INTERLEAVE, dma_cap_mask);
+-
+-	sspi->rx_chan = dma_request_channel(dma_cap_mask, (dma_filter_fn)sirfsoc_dma_filter_id,
+-		(void *)rx_dma_ch);
++	sspi->rx_chan = dma_request_slave_channel(&pdev->dev, "rx");
+ 	if (!sspi->rx_chan) {
+ 		dev_err(&pdev->dev, "can not allocate rx dma channel\n");
+ 		ret = -ENODEV;
+ 		goto free_master;
+ 	}
+-	sspi->tx_chan = dma_request_channel(dma_cap_mask, (dma_filter_fn)sirfsoc_dma_filter_id,
+-		(void *)tx_dma_ch);
++	sspi->tx_chan = dma_request_slave_channel(&pdev->dev, "tx");
+ 	if (!sspi->tx_chan) {
+ 		dev_err(&pdev->dev, "can not allocate tx dma channel\n");
+ 		ret = -ENODEV;
+-- 
+1.8.2.3
