@@ -1,42 +1,157 @@
-From: christian.gmeiner@gmail.com (Christian Gmeiner)
-Date: Mon, 11 Nov 2013 15:30:56 +0100
-Subject: imx-drm: possible circular locking dependency detected
-In-Reply-To: <20131111140614.GZ16735@n2100.arm.linux.org.uk>
-References: <CAH9NwWdswcfwVOoCz3AmS8O7Adaun5tf3QJh5YE2iK96d3ajOg@mail.gmail.com>
- <CAOMZO5A1i2jf1Mw-js=+ZF=rRL5JZFHD_d-KMhsqOuaZQx-9zw@mail.gmail.com>
- <CAH9NwWdXxzQc3zJrH+p2bV8js2Pz5tA8HZRDjWrWkvFBeSd2Eg@mail.gmail.com>
- <20131111140614.GZ16735@n2100.arm.linux.org.uk>
-Message-ID: <CAH9NwWfjBTkWpJWjJasB=87yRMgEM=pGJmL4oL0FWrG7RRkWBQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 11 Nov 2013 20:06:12 +0530
+Subject: [PATCH v2 1/7] usb: dwc3: get "usb_phy" only if the platform
+ indicates the presence of PHY's
+In-Reply-To: <20131017163828.GH11611@gimli>
+References: <1381866857-3861-1-git-send-email-kishon@ti.com>
+ <1381866857-3861-2-git-send-email-kishon@ti.com>
+ <20131017163828.GH11611@gimli>
+Message-ID: <5280EB5C.1040001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/11/11 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Nov 11, 2013 at 01:08:24PM +0100, Christian Gmeiner wrote:
->> Hi Fabio
->>
->> 2013/11/11 Fabio Estevam <festevam@gmail.com>:
->> > Hi Christian,
->> >
->> > On Mon, Nov 11, 2013 at 7:25 AM, Christian Gmeiner
->> > <christian.gmeiner@gmail.com> wrote:
->> >> I am not sure if this problem is known but here is dmesg output. If a
->> >> kernel config is needed I can
->> >> send it
->> >
->> > Please apply this patch:
->> > https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/staging/imx-drm/imx-drm-core.c?id=c35d6a37bdcb1dde42dd65b00676696e2dd78f2f
->> >
->>
->> thanks
->
-> If you're looking at using imx-drm, please note that I have a substantial
-> pile of patches against this now - some 58 patches.  I'll be posting them
-> only once v3.13-rc1 has been released.
+Hi Felipe,
 
-It may sounds brutal but my company is using the imx-drm for a new
-device which will ship in Q1 2014.
-So I am very interested in your patches and can do some testing.
+On Thursday 17 October 2013 10:08 PM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Wed, Oct 16, 2013 at 01:24:11AM +0530, Kishon Vijay Abraham I wrote:
+>> There can be systems which does not have a external usb_phy, so get
+>> usb_phy only if dt data indicates the presence of PHY in the case of dt boot or
+>> if platform_data indicates the presence of PHY. Also remove checking if
+>> return value is -ENXIO since it's now changed to always enable usb_phy layer.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> 
+> I'm fine with this patch, but one comment below:
+> 
+>> @@ -387,16 +388,49 @@ static int dwc3_probe(struct platform_device *pdev)
+>>  	if (node) {
+>>  		dwc->maximum_speed = of_usb_get_maximum_speed(node);
+>>  
+>> -		dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+>> -		dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+>> +		count = of_count_phandle_with_args(node, "usb-phy", NULL);
+>> +		switch (count) {
+>> +		case 2:
+>> +			dwc->usb3_phy = devm_usb_get_phy_by_phandle(dev,
+>> +				"usb-phy", 1);
+>> +			if (IS_ERR(dwc->usb3_phy)) {
+>> +				dev_err(dev, "usb3 phy not found\n");
+>> +				return PTR_ERR(dwc->usb3_phy);
+>> +			}
+>> +		case 1:
+>> +			dwc->usb2_phy = devm_usb_get_phy_by_phandle(dev,
+>> +				"usb-phy", 0);
+>> +			if (IS_ERR(dwc->usb2_phy)) {
+>> +				dev_err(dev, "usb2 phy not found\n");
+>> +				return PTR_ERR(dwc->usb2_phy);
+>> +			}
+>> +			break;
+>> +		default:
+>> +			dev_err(dev, "usb phy nodes not configured\n");
+>> +		}
+>>  
+>>  		dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
+>>  		dwc->dr_mode = of_usb_get_dr_mode(node);
+>>  	} else if (pdata) {
+>>  		dwc->maximum_speed = pdata->maximum_speed;
+>>  
+>> -		dwc->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+>> -		dwc->usb3_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB3);
+>> +		if (pdata->usb2_phy) {
+>> +			dwc->usb2_phy = devm_usb_get_phy(dev,
+>> +				USB_PHY_TYPE_USB2);
+>> +			if (IS_ERR(dwc->usb2_phy)) {
+>> +				dev_err(dev, "usb2 phy not found\n");
+>> +				return PTR_ERR(dwc->usb2_phy);
+>> +			}
+>> +		}
+>> +
+>> +		if (pdata->usb3_phy) {
+>> +			dwc->usb3_phy = devm_usb_get_phy(dev,
+>> +				USB_PHY_TYPE_USB3);
+>> +			if (IS_ERR(dwc->usb3_phy)) {
+>> +				dev_err(dev, "usb3 phy not found\n");
+>> +				return PTR_ERR(dwc->usb3_phy);
+>> +			}
+>> +		}
+>>  
+>>  		dwc->needs_fifo_resize = pdata->tx_fifo_resize;
+>>  		dwc->dr_mode = pdata->dr_mode;
+>> @@ -409,36 +443,6 @@ static int dwc3_probe(struct platform_device *pdev)
+>>  	if (dwc->maximum_speed == USB_SPEED_UNKNOWN)
+>>  		dwc->maximum_speed = USB_SPEED_SUPER;
+>>  
+>> -	if (IS_ERR(dwc->usb2_phy)) {
+>> -		ret = PTR_ERR(dwc->usb2_phy);
+>> -
+>> -		/*
+>> -		 * if -ENXIO is returned, it means PHY layer wasn't
+>> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
+>> -		 * in that case, since no PHY driver will ever probe.
+>> -		 */
+>> -		if (ret == -ENXIO)
+>> -			return ret;
+>> -
+>> -		dev_err(dev, "no usb2 phy configured\n");
+>> -		return -EPROBE_DEFER;
+>> -	}
+>> -
+>> -	if (IS_ERR(dwc->usb3_phy)) {
+>> -		ret = PTR_ERR(dwc->usb3_phy);
+>> -
+>> -		/*
+>> -		 * if -ENXIO is returned, it means PHY layer wasn't
+>> -		 * enabled, so it makes no sense to return -EPROBE_DEFER
+>> -		 * in that case, since no PHY driver will ever probe.
+>> -		 */
+>> -		if (ret == -ENXIO)
+>> -			return ret;
+>> -
+>> -		dev_err(dev, "no usb3 phy configured\n");
+>> -		return -EPROBE_DEFER;
+>> -	}
+> 
+> the idea for doing the error checking here was actually to avoid
+> duplicating it in all previous cases, as you did. Please keep the error
+> checking here and you're good to go.
+> 
+>> -
+>>  	dwc->xhci_resources[0].start = res->start;
+>>  	dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
+>>  					DWC3_XHCI_REGS_END;
+>> diff --git a/drivers/usb/dwc3/platform_data.h b/drivers/usb/dwc3/platform_data.h
+>> index 7db34f0..49ffa6d 100644
+>> --- a/drivers/usb/dwc3/platform_data.h
+>> +++ b/drivers/usb/dwc3/platform_data.h
+>> @@ -24,4 +24,6 @@ struct dwc3_platform_data {
+>>  	enum usb_device_speed maximum_speed;
+>>  	enum usb_dr_mode dr_mode;
+>>  	bool tx_fifo_resize;
+>> +	bool usb2_phy;
+>> +	bool usb3_phy;
+> 
+> This would look better as a quirks flag, then we could:
+> 
+> unsigned long quirks;
+> #define DWC3_QUIRK_NO_USB3_PHY	BIT(0)
+> #define DWC3_QUIRK_NO_USB2_PHY	BIT(1)
 
-greets
---
-Christian Gmeiner, MSc
+Should this quirk be used for dt also? Currently we find if it has usb3 phy or
+usb2 phy from the dt data only. But if we add a quirk, we'll have to add a
+property to populate the quirk no?
+
+Thanks
+Kishon
+
+> 
+> ...
+> 
+> if (!test_bit(DWC3_QUIRK_NO_USB3_PHY), &dwc->quirks &&
+> 	dwc->has_usb3_phy) {
+> 	grab_usb3_phy();
+> }
+> 
+> cheers
+> 
