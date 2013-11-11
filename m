@@ -1,31 +1,83 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Mon, 11 Nov 2013 13:40:30 +0000
-Subject: [PATCH v4] ARM: vexpress/TC2: Implement MCPM power_down_finish()
-In-Reply-To: <1384160080.4495.2.camel@hornet>
-References: <20131108185613.GF2602@localhost.localdomain>
- <1384160080.4495.2.camel@hornet>
-Message-ID: <20131111134030.GA2391@e103592.cambridge.arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 11 Nov 2013 14:48:40 +0100
+Subject: [PATCH 0/6] PCI: imx6: Random fixes
+In-Reply-To: <201311111432.59318.jbe@pengutronix.de>
+References: <1381853200-5534-1-git-send-email-marex@denx.de>
+ <201311111432.59318.jbe@pengutronix.de>
+Message-ID: <201311111448.40922.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 11, 2013 at 08:54:40AM +0000, Pawel Moll wrote:
-> On Fri, 2013-11-08 at 18:56 +0000, Dave Martin wrote:
-> > Hi Pawel, did you manage to take a look at this?
-> > 
-> > I want to have something in place here, otherwise there's a nice WARN_ON
-> > to look forward to in 3.13 :)
-> > 
-> > I don't think I've seen a response from you so far?
+Dear J?rgen Beisert,
+
+> Hi,
 > 
-> On Fri, 2013-11-01 at 12:21 +0000, Pawel Moll wrote:
-> > PS. I actually had a look at the patches after you reminded me last week
-> > (two weeks ago? ;-)
+> I'm also trying to get the PCIe to work on an i.MX6. But the attached
+> device cannot be enabled. The external device is an FPGA directly
+> connected to the i.MX6. I'm using the changes from linux-next to get the
+> machine working up to this point. But it seems I still miss something.
 > 
-> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> What I see is:
+> 
+> [...]
+> PCI host bridge to bus 0000:00
+> pci_bus 0000:00: root bus resource [io  0x1000-0x10000]
+> pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+> pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
+> pci_bus 0000:00: scanning bus
+> pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+> pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+> pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
+> pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x5c
+> pci 0000:00:00.0: supports D1
+> pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
+> pci 0000:00:00.0: PME# disabled
+> pci_bus 0000:00: fixups for bus
+> PCI: bus0: Fast back to back transfers disabled
+> pci 0000:00:00.0: scanning [bus 01-01] behind bridge, pass 0
+> pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+> pci_bus 0000:01: scanning bus
+> pci 0000:01:00.0: [1172:0004] type 00 class 0x000000
+> pci 0000:01:00.0: reg 0x10: [mem 0x00000000-0x0000ffff]
+> pci 0000:01:00.0: calling pci_fixup_ide_bases+0x0/0x5c
+> pci_bus 0000:01: fixups for bus
+> PCI: bus1: Fast back to back transfers disabled
+> pci_bus 0000:01: bus scan returning with max=01
+> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+> pci_bus 0000:00: bus scan returning with max=01
+> pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 01
+> pci 0000:00:00.0: fixup irq: got 155
+> pci 0000:00:00.0: assigning IRQ 155
+> pci 0000:01:00.0: fixup irq: got 155
+> pci 0000:01:00.0: assigning IRQ 155
+> pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
+> pci 0000:00:00.0: BAR 0: set to [mem 0x01000000-0x010fffff] (PCI address
+> [0x1000000-0x10fffff]) pci 0000:00:00.0: BAR 8: assigned [mem
+> 0x01100000-0x011fffff]
+> pci 0000:00:00.0: BAR 6: assigned [mem 0x01200000-0x0120ffff pref]
+> pci 0000:00:00.0: PCI bridge to [bus 01]
+> pci 0000:00:00.0:   bridge window [mem 0x01100000-0x011fffff]
+> pci_bus 0000:00: max bus depth: 1 pci_try_num: 2
+> pci 0000:00:00.0: PCI bridge to [bus 01]
+> pci 0000:00:00.0:   bridge window [mem 0x01100000-0x011fffff]
+> pci_bus 0000:00: resource 4 [io  0x1000-0x10000]
+> pci_bus 0000:00: resource 5 [mem 0x01000000-0x01efffff]
+> pci_bus 0000:01: resource 1 [mem 0x01100000-0x011fffff]
+> [...]
+> pcieport 0000:00:00.0: Resource 0: from 1000000 to 10FFFFF <- my message
+> from pcibios_enable_device()/arch/arm/kernel/bios32.c [...]
+> FPGA 0000:01:00.0: Dummy FPGA driver starts probing
+> FPGA 0000:01:00.0: Resource 0: from 0 to FFFF <- my message from
+> pcibios_enable_device()/arch/arm/kernel/bios32.c PCI: Device 0000:01:00.0
+> not available because of resource collisions FPGA 000:01:00.0: Cannot
+> enable PCIe device, aborting
+> FPGA: probe of 0000:01:00.0 failed with error -5
+> 
+> pcibios_enable_device() fails due to the start address of this device is
+> still 0.
 
-Thanks
+Looks like your device isn't assigned it's memory windows for some reason. There 
+is a discussion going on about DWC PCIe and how the iATU configuration is wrong 
+and how to fix it in the PCI ML. I'd check that.
 
-What's the best way to send this upstream?
-
-Cheers
----Dave
+btw. do you need to switch the bus to Gen1 to get it to probe your device?
