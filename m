@@ -1,37 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 11 Nov 2013 17:55:02 +0100
-Subject: [PATCH] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
-In-Reply-To: <20131111093311.GK14892@pengutronix.de>
-References: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
- <20131111093311.GK14892@pengutronix.de>
-Message-ID: <20131111165502.GL14892@pengutronix.de>
+From: ivan.khoronzhuk@ti.com (Khoronzhuk, Ivan)
+Date: Mon, 11 Nov 2013 16:55:09 +0000
+Subject: [PATCH 04/12] mtd: nand: davinci: move bindings under mtd
+In-Reply-To: <1384187188-5776-5-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1384187188-5776-1-git-send-email-ivan.khoronzhuk@ti.com>,
+ <1384187188-5776-5-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <4F5844B3A985794BA902E12C070812375F8D08@DNCE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Victor,
+Move bindings under mtd. Do this in order to make davinci-nand
+driver usable by keystone architecture.
 
-On Mon, Nov 11, 2013 at 10:33:11AM +0100, Uwe Kleine-K?nig wrote:
-> On Mon, Nov 11, 2013 at 12:10:26AM -0800, Victor Kamensky wrote:
-> > Here is proposal for armv7-m build failure in sigreturn_codes.S. The 
-> > armv7-m build issue was discussed in [1].
-> > 
-> > Proposed solution is based on conditional compilation. If 
-> > CONFIG_CPU_THUMBONLY is set instead of arm opcodes nops in thumb mode
-> > are used. I've tried to wrap conditional compilation as nice as I 
-> > found possible. Other suggestions/approaches are welcome.
-> > 
-> > Fix was tested:
-> >    linux-next with efm32_defconfig build (along with few other fixes)
-> >    rmk-next BE/LE arndale build/boot and LTP rt_sigaction0? tests run
-> Next currently fails for other reasons, too and I'm out of time. I'd say
-> if it compiles for you it's fine and I will handle eventual fall-outs
-> later.
-next-20131111 + your patch + reverts of d779c07dd7209 and 50e05119f9800
-compiles and boots fine.
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ .../{arm/davinci/nand.txt => mtd/davinci-nand.txt} |    0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/{arm/davinci/nand.txt => mtd/davinci-nand.txt} (100%)
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+diff --git a/Documentation/devicetree/bindings/arm/davinci/nand.txt b/Documentation/devicetree/bindings/mtd/davinci-nand.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/davinci/nand.txt
+rename to Documentation/devicetree/bindings/mtd/davinci-nand.txt
+--
+1.7.9.5
