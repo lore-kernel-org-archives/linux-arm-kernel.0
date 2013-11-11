@@ -1,220 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 Nov 2013 15:51:10 +0800
-Subject: [PATCH v2] ARM: mxs: add support for I2SE's duckbill series
-In-Reply-To: <1383995657-5388-1-git-send-email-mhei@heimpold.de>
-References: <1383995657-5388-1-git-send-email-mhei@heimpold.de>
-Message-ID: <20131111075108.GF10085@S2101-09.ap.freescale.net>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 11 Nov 2013 16:53:32 +0900
+Subject: [PATCH RFC 4/6] arm64: Add kernel return probes
+ support(kretprobes)
+In-Reply-To: <CA+b37P2aeXs4Cy_HxF24HQAYAnYzZ19PgV6rqrQLY9SMpZHDJg@mail.gmail.com>
+References: <1382008671-4515-1-git-send-email-sandeepa.prabhu@linaro.org>
+ <1382008671-4515-5-git-send-email-sandeepa.prabhu@linaro.org>
+ <20131108170448.GF15074@mudshark.cambridge.arm.com>
+ <CA+b37P2aeXs4Cy_HxF24HQAYAnYzZ19PgV6rqrQLY9SMpZHDJg@mail.gmail.com>
+Message-ID: <52808CFC.6060701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 09, 2013 at 12:14:16PM +0100, Michael Heimpold wrote:
-> Signed-off-by: Michael Heimpold <mhei@heimpold.de>
-> ---
-> 
-> Changelog v1->v2:
-> - rebased on git://git.linaro.org/people/shawnguo/linux-2.6.git for-next
-> - used macros for pinctrl constants
-> - used generic name for fixed regulator node
-> 
->  arch/arm/boot/dts/Makefile           |    1 +
->  arch/arm/boot/dts/imx28-duckbill.dts |  121 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/mach-mxs.c         |   13 ++++
->  3 files changed, 135 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx28-duckbill.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 3159ab6..5801ed0 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -172,6 +172,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
->  	imx28-cfa10056.dtb \
->  	imx28-cfa10057.dtb \
->  	imx28-cfa10058.dtb \
-> +	imx28-duckbill.dtb \
->  	imx28-evk.dtb \
->  	imx28-m28cu3.dtb \
->  	imx28-m28evk.dtb \
-> diff --git a/arch/arm/boot/dts/imx28-duckbill.dts b/arch/arm/boot/dts/imx28-duckbill.dts
-> new file mode 100644
-> index 0000000..88733c1
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx28-duckbill.dts
-> @@ -0,0 +1,121 @@
-> +/*
-> + * Copyright (C) 2013 Michael Heimpold <mhei@heimpold.de>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "imx28.dtsi"
+On 11/11/2013 01:29 PM, Sandeepa Prabhu wrote:
+> On 8 November 2013 22:34, Will Deacon <will.deacon@arm.com> wrote:
+>>> +static inline long regs_return_value(struct pt_regs *regs)
+>>> +{
+>>> +     return regs->regs[0];
+>>> +}
+>>
+>> This is also being implemented by another patch series (I think the audit
+>> stuff?).
+> Not sure, I did not see this being implemented in audit(audit adds for
+> 'syscallno',  not for return value in x0)
+> I can rebase my code if this change is implemented and queued in other patchset.
 
-#include "imx28.dtsi"
+Yes, my audit patch has it.
+The definition is referred to in include/linux/audit.h (and ptrace.h),
+too.
 
-Otherwise, the DTS does not compile at all.
-
-I just fixed it up and applied the patch.
-
-Shawn
-
-> +
-> +/ {
-> +	model = "I2SE Duckbill";
-> +	compatible = "i2se,duckbill", "fsl,imx28";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x08000000>;
-> +	};
-> +
-> +	apb at 80000000 {
-> +		apbh at 80000000 {
-> +			ssp0: ssp at 80010000 {
-> +				compatible = "fsl,imx28-mmc";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&mmc0_8bit_pins_a
-> +					&mmc0_cd_cfg &mmc0_sck_cfg>;
-> +				bus-width = <8>;
-> +				vmmc-supply = <&reg_3p3v>;
-> +				status = "okay";
-> +			};
-> +
-> +			pinctrl at 80018000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&hog_pins_a>;
-> +
-> +				hog_pins_a: hog at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						MX28_PAD_ENET0_RX_CLK__GPIO_4_13 /* PHY Reset */
-> +					>;
-> +					fsl,drive-strength = <MXS_DRIVE_4mA>;
-> +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-> +					fsl,pull-up = <MXS_PULL_DISABLE>;
-> +				};
-> +
-> +				led_pins_a: led_gpio at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						MX28_PAD_AUART1_RX__GPIO_3_4
-> +						MX28_PAD_AUART1_TX__GPIO_3_5
-> +					>;
-> +					fsl,drive-strength = <MXS_DRIVE_4mA>;
-> +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-> +					fsl,pull-up = <MXS_PULL_DISABLE>;
-> +				};
-> +			};
-> +		};
-> +
-> +		apbx at 80040000 {
-> +			duart: serial at 80074000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&duart_pins_a>;
-> +				status = "okay";
-> +			};
-> +
-> +			usbphy0: usbphy at 8007c000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	ahb at 80080000 {
-> +		usb0: usb at 80080000 {
-> +			status = "okay";
-> +		};
-> +
-> +		mac0: ethernet at 800f0000 {
-> +			phy-mode = "rmii";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&mac0_pins_a>;
-> +			phy-supply = <&reg_3p3v>;
-> +			phy-reset-gpios = <&gpio4 13 0>;
-> +			phy-reset-duration = <100>;
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_3p3v: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-> +			regulator-name = "3P3V";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-always-on;
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pins_a>;
-> +
-> +		status {
-> +			label = "duckbill:green:status";
-> +			gpios = <&gpio3 5 0>;
-> +		};
-> +
-> +		failure {
-> +			label = "duckbill:red:status";
-> +			gpios = <&gpio3 4 0>;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index 1dc5acd..3982e12 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -157,6 +157,7 @@ enum mac_oui {
->  	OUI_FSL,
->  	OUI_DENX,
->  	OUI_CRYSTALFONTZ,
-> +	OUI_I2SE,
->  };
->  
->  static void __init update_fec_mac_prop(enum mac_oui oui)
-> @@ -211,6 +212,11 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
->  			macaddr[1] = 0xb9;
->  			macaddr[2] = 0xe1;
->  			break;
-> +		case OUI_I2SE:
-> +			macaddr[0] = 0x00;
-> +			macaddr[1] = 0x01;
-> +			macaddr[2] = 0x87;
-> +			break;
->  		}
->  		val = ocotp[i];
->  		macaddr[3] = (val >> 16) & 0xff;
-> @@ -330,6 +336,11 @@ static void __init crystalfontz_init(void)
->  	update_fec_mac_prop(OUI_CRYSTALFONTZ);
->  }
->  
-> +static void __init duckbill_init(void)
-> +{
-> +	update_fec_mac_prop(OUI_I2SE);
-> +}
-> +
->  static void __init m28cu3_init(void)
->  {
->  	update_fec_mac_prop(OUI_DENX);
-> @@ -462,6 +473,8 @@ static void __init mxs_machine_init(void)
->  		apx4devkit_init();
->  	else if (of_machine_is_compatible("crystalfontz,cfa10036"))
->  		crystalfontz_init();
-> +	else if (of_machine_is_compatible("i2se,duckbill"))
-> +		duckbill_init();
->  	else if (of_machine_is_compatible("msr,m28cu3"))
->  		m28cu3_init();
->  
-> -- 
-> 1.7.10.4
-> 
+-Takahiro AKASHI
