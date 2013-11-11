@@ -1,66 +1,103 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Mon, 11 Nov 2013 23:20:22 +0100
-Subject: [PATCH 1/3] arm: omap2: Export devconf1 bypass and acbias.
-In-Reply-To: <20131111164917.GN15154@atomide.com>
-References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
- <1381784555-18344-2-git-send-email-marek@goldelico.com>
- <20131111164917.GN15154@atomide.com>
-Message-ID: <CAAfyv34CyviSt_Jaygr-CYSQdZOBHz14awT3U8=2ZBT14s896g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 11 Nov 2013 17:37:41 -0500 (EST)
+Subject: [PATCH v3 3/4] ARM: EXYNOS: add Exynos Dual Cluster Support
+In-Reply-To: <20131111200152.GF3166@localhost.localdomain>
+References: <20131108184036.GD2602@localhost.localdomain>
+ <alpine.LFD.2.03.1311081356300.15571@syhkavp.arg>
+ <52808E09.9060902@samsung.com> <5280FB9A.7030500@samsung.com>
+ <alpine.LFD.2.10.1311111107040.9667@knanqh.ubzr>
+ <20131111200152.GF3166@localhost.localdomain>
+Message-ID: <alpine.LFD.2.10.1311111724480.9667@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Mon, 11 Nov 2013, Dave Martin wrote:
 
-On Mon, Nov 11, 2013 at 5:49 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Marek Belisko <marek@goldelico.com> [131014 14:11]:
->> devconf1 reg access is localized only in mach-omap2 and we need to export
->> updating of devconf1 from omapdss venc driver (bypass and acbias bits).
->> Add simple api call which update only necessary bits.
-> ...
->
->> +void update_bypass_acbias(bool bypass, bool acbias)
->> +{
->> +#ifdef CONFIG_ARCH_OMAP3
->> +     int val = omap_ctrl_readl(OMAP343X_CONTROL_DEVCONF1);
->> +
->> +     if (bypass)
->> +             val |= OMAP2_TVOUTBYPASS;
->> +     else
->> +             val &= ~OMAP2_TVOUTBYPASS;
->> +
->> +     if (acbias)
->> +             val |= OMAP2_TVACEN;
->> +     else
->> +             val &= ~OMAP2_TVACEN;
->> +
->> +     omap_ctrl_writel(val, OMAP343X_CONTROL_DEVCONF1);
->> +#endif
->
-> If this is truly a pinmux, you could already access this
-> using pinctrl-single,bits device tree driver.
-AFAIK it's not pinmux it's register where we update bits. Or am I
-missing something?
->
-> But I guess that won't work yet, so it's best to set this
-> up as a separate driver like we've done for the USB PHY
-> registers.
->
-> Regards,
->
-> Tony
+> On Mon, Nov 11, 2013 at 11:27:46AM -0500, Nicolas Pitre wrote:
+> > It is preferable if the power_up and power_down don't wait.
+> 
+> I agree with this.
+> 
+> If a wait is needed anywhere, it is
+> 
+>  a) in power_down_finish(), and
+>  b) *before* the call to exynos_core_power_control() in
+>         exynos_core_power_up() (see below for explanation)
+> 
+> Any waits should not be busy-waits either: we should use msleep or
+> similar.  This is fine that we only wait from contexts that can sleep --
+> I think this is OK for the power_up() and power_down_finish() paths
+> (which aren't executed on the target CPU), but not on the power_down()
+> path.
 
-BR,
+Beware.. exynos_core_power_up() is called with a lock held.
 
-marek
+> Busy-waiting for 1ms every time we power a CPU down is not great for
+> power-saving...
+> 
+> In both cases, we should check the PMU status bits first, and only
+> wait if they are not already in the desired state.  The most likely
+> case will always by that the target CPU already caught up.
 
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
+There is no need for the CPU going down to check the PMU status.  It can 
+only have one state at that point.
 
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+> Nico currently disagrees with me on (b), so we need to explore that
+> (below).
+> 
+> > No need to wait for a power_up to be complete as the only CPU that can 
+> > do a power_down is the CPU being powered up itself.
+> 
+> To extend this argument further, there is no conceiveable situation
+> where we would need to wait for power_up to complete explicitly.
+> 
+> We will only ever need to wait for power_down to complete.
+
+Exact.
+
+> > 
+> > The exynos_core_power_down call is now appropriately located i.e. within 
+> > the lock protected area.  That's fine because we know power won't be cut 
+> > until the lock is released and WFI is executed.
+> > 
+> > Also, if exynos_core_power_up() is called from another CPU right after 
+> > the lock is released on the CPU trying to shut itself down but before it 
+> > actually executes WFI then the WFI will not be effective and the 
+> > power_down method is expected to return in that case.  So no problem 
+> > there either.
+> > 
+> > The only case where it is important to really wait for the power down to 
+> > be effective is for kexec.  This is why Dave introduced the 
+> > power_down_finish method (you may find this in linux-next at the 
+> > moment).  That would be the place where to use your controller_wait 
+> > code.
+> 
+> For (b), I think we're still missing some information here...
+> 
+> Suppose CPU0 is powering down.  The PMU has been told to power the CPU
+> down, and CPU0 has released edcs_lock.  Suppose soon afterwards, CPU1
+> wants to turn CPU0 back on again.
+> 
+> Now, unless CPU1 checks the power controller status, CPU1 has no way
+> to know whether the power-down request is still in progress before CPU1
+> issues a new power-up request for CPU0.
+
+Does it matter?  As you say ...
+
+> Now, what behaviour does the power controller guarantee when it is still
+> in this state, and a new power-up request is issued to it?
+> 
+> I worry that the power controller may not cope with a new request while
+> in this state, or may not guarantee predictable behaviour.  If so then
+> the new power-up request may just get lost
+
+This is not the case on TC2 it seems.  We never check if a power-down 
+sequence has completed before issuing a power-up request.  Given each 
+CPU has its own request bit then this might not matter.
+
+Where this matters is when you really want to ensure a given CPU is not 
+executing code anymore and therefore need to know when power-down has 
+effectively completed, hence the power_down_finish method.
+
+
+Nicolas
