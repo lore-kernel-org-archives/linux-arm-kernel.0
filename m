@@ -1,37 +1,40 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Mon, 11 Nov 2013 15:00:24 +0530
-Subject: [PATCH 2/2] arm64: perf: add support for percpu pmu interrupt
-In-Reply-To: <20131108155717.GB15074@mudshark.cambridge.arm.com>
-References: <1383739658-10036-1-git-send-email-vkale@apm.com>
- <1383739658-10036-3-git-send-email-vkale@apm.com>
- <20131108155717.GB15074@mudshark.cambridge.arm.com>
-Message-ID: <CAPrCYkdCjUyPT3b+YQV_YWkwRwBgx2Tt_zQR+4W6hD7roTR1Xg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 11 Nov 2013 10:33:11 +0100
+Subject: [PATCH] ARM: signal: fix armv7-m build issue in sigreturn_codes.S
+In-Reply-To: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
+References: <1384157427-31613-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20131111093311.GK14892@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 8, 2013 at 9:27 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Nov 06, 2013 at 12:07:37PM +0000, Vinayak Kale wrote:
->> Add support for irq registration when pmu interrupt is percpu.
->>
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
->> ---
->>  arch/arm64/kernel/perf_event.c |  109 +++++++++++++++++++++++++++++-----------
->>  1 file changed, 81 insertions(+), 28 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index cea1594..e60dae3 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -44,6 +44,7 @@
->>  static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
->>  static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
->>  static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
->> +static bool is_percpuirq;
->
-> This isn't a global property; it should be part of the struct arm_pmu.
-> The rest of the patch looks ok, but obvious requires you to merge the core
-> changes first.
+Hi Victor,
 
-Okay. I will incorporate above change in next revision once the core
-changes are agreed upon.
+On Mon, Nov 11, 2013 at 12:10:26AM -0800, Victor Kamensky wrote:
+> Here is proposal for armv7-m build failure in sigreturn_codes.S. The 
+> armv7-m build issue was discussed in [1].
+> 
+> Proposed solution is based on conditional compilation. If 
+> CONFIG_CPU_THUMBONLY is set instead of arm opcodes nops in thumb mode
+> are used. I've tried to wrap conditional compilation as nice as I 
+> found possible. Other suggestions/approaches are welcome.
+> 
+> Fix was tested:
+>    linux-next with efm32_defconfig build (along with few other fixes)
+>    rmk-next BE/LE arndale build/boot and LTP rt_sigaction0? tests run
+Next currently fails for other reasons, too and I'm out of time. I'd say
+if it compiles for you it's fine and I will handle eventual fall-outs
+later.
+
+> Uwe, is it possible for you to test that the fix runs on efm32. Also
+> if the platform can run LTP, you give a spin to LTP rt_sigaction0? 
+> tests that would be great. It is known that this tests covers code 
+> under change.
+No, at least not as easily as enable/install LTP and run it. ptxdist
+doesn't offer a working LTP integration unfortunately.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
