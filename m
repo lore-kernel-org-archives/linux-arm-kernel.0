@@ -1,191 +1,165 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 10 Nov 2013 21:29:35 -0800
-Subject: [GIT PULL 5/6] ARM: SoC board updates for 3.13
+Date: Sun, 10 Nov 2013 21:29:34 -0800
+Subject: [GIT PULL 4/6] ARM: driver updates for 3.13
 In-Reply-To: <1384147776-18735-1-git-send-email-olof@lixom.net>
 References: <1384147776-18735-1-git-send-email-olof@lixom.net>
-Message-ID: <1384147776-18735-6-git-send-email-olof@lixom.net>
+Message-ID: <1384147776-18735-5-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Board-related updates. This branch is getting smaller and smaller, which is
-the whole idea so that's reassuring.
+Updates of SoC-near drivers and other driver updates that makes more sense to
+take through our tree. In this case it's involved:
 
-Right now by far most of the code is related to shmobile updates, and
-they are now switching over to removal of board code and migration to
-multiplatform, so we'll see their board code base shrink in the near
-future too, I hope.
-
-In addition to that is some defconfig updates, some display updates for OMAP
-and a bit of new board support for Rockchip boards.
+- Some Davinci driver updates that has required corresponding platform code
+changes (gpio mostly)
+- CCI bindings and a few driver updates
+- Marvell mvebu patches for PCI MSI support (could have gone through the PCI
+tree for this release, but they were acked by Bjorn for 3.12 so we kept them
+through arm-soc).
+- Marvell dove switch-over to DT-based PCIe configuration
+- Misc updates for Samsung platform dmaengine drivers
 
 
 Conflicts:
-* arch/arm/mach-shmobile/board-bockw.c:
-  Add/add conflicts. Keep all sides of all changes. Another case of us missing
-  to base things on the cleanup branch.
+* arch/arm/mach-dove/board-dt.c:
+  Remove/remove conflicts, remove all conflicting lines.
+  This should have been resolved locally in our tree but we missed to base
+  this branch off of the next/cleanup branch that did one side of the
+  code removals.
 
 ----------------------------------------------------------------
 
-The following changes since commit 1b9219d9a96c0cc797079f8f8c523ae663ccec61:
+The following changes since commit c8f3588db3d3cc41c88d846d5dbd45473a40ff56:
 
-  Merge branch 'next/drivers' into HEAD
+  Merge branch 'next/soc' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/boards-for-linus
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/drivers-for-linus
 
-for you to fetch changes up to 60cd8b09f1e26dec0e866085f110d1d665d53cec:
+for you to fetch changes up to 3316dee245ef297155fa45b8d14263dfd6a9164b:
 
-  Merge branch 'rockchip/boards' into next/boards
+  Merge tag 's3c24xx-dma' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into next/drivers
 
 ----------------------------------------------------------------
 
-Archit Taneja (4):
-      ARM: OMAP2+: drm: Don't build device for DMM
-      ARM: OMAP2+: display: Create omapdrm device inside omap_display_init
-      ARM: OMAP2+: display: Create omapvrfb and omapfb devices inside omap_display_init
-      ARM: OMAP2+: display: Create omap_vout device inside omap_display_init
+Gregory CLEMENT (1):
+      ARM: mvebu: fix gated clock documentation
 
-Guennadi Liakhovetski (9):
-      ARM: shmobile: ape6evm: update MMC0, SDHI0 and SDHI1 with correct regulators
-      ARM: shmobile: ape6evm: disable MMCIF Command Completion Signal
-      ARM: shmobile: armadillo800eva: disable MMCIF Command Completion Signal
-      ARM: shmobile: kzm9g: disable MMCIF Command Completion Signal
-      ARM: shmobile: lager: disable MMCIF Command Completion Signal, add CLK_CTRL2
-      ARM: shmobile: r8a73a4: add a DMAC platform device and clock for it
-      ARM: shmobile: r8a7790: add I2C clocks and aliases for the DT mode
-      ARM: shmobile: r8a73a4: add a clock alias for the DMAC in DT mode
-      ARM: shmobile: ape6evm: add DMA support to MMCIF
+Heiko Stuebner (7):
+      ARM: S3C24XX: number the dma clocks
+      dmaengine: add driver for Samsung s3c24xx SoCs
+      ARM: S3C24XX: add platform-devices for new dma driver for s3c2412 and s3c2443
+      ARM: SAMSUNG: set s3c24xx_dma_filter for s3c64xx-spi0 device
+      ARM: S3C24XX: Fix possible dma selection warning
+      dmaengine: s3c24xx-dma: add support for the s3c2410 type of controller
+      ARM: S3C24XX: add dma pdata for s3c2410, s3c2440 and s3c2442
 
-Heiko Stuebner (4):
-      ARM: rockchip: move shared dt properties to common source file
-      ARM: rockchip: enable arm-global-timer
-      ARM: rockchip: add dts for bqcurie2 tablet
-      ARM: rockchip: add support for rk3188 and Radxa Rock board
+Jason Gunthorpe (1):
+      PCI: mvebu: Dynamically detect if the PEX link is up to enable hot plug
 
-Hisashi Nakamura (1):
-      ARM: shmobile: Koelsch support
+Jingoo Han (1):
+      PCI: mvebu: make local functions static
 
-Kevin Hilman (4):
-      Merge branch 'renesas/boards2' into next/boards
-      Merge tag 'omap-for-v3.13/board-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/boards
-      Merge branch 'tegra/defconfig' into next/boards
-      Merge branch 'rockchip/boards' into next/boards
+KV Sujith (2):
+      gpio: davinci: move to platform device
+      ARM: davinci: da8xx: support gpio platform device
 
-Kuninori Morimoto (8):
-      ARM: shmobile: bockw defconfig: add Sound support
-      ARM: shmobile: bockw: enable global use of FPGA
-      ARM: shmobile: bockw: add R-Car sound support (PIO)
-      ARM: shmobile: bockw: add USB Function support
-      ARM: shmobile: r8a7778: split r8a7778_init_irq_extpin() for DT
-      ARM: shmobile: r8a7779: split r8a7779_init_irq_extpin() for DT
-      ARM: shmobile: bockw: add SMSC support on reference
-      ARM: shmobile: marzen: enable INTC IRQ
-
-Laurent Pinchart (5):
-      ARM: shmobile: marzen: Select DRM_RCAR_DU in defconfig
-      ARM: shmobile: lager: Select DRM_RCAR_DU in defconfig
-      ARM: shmobile: marzen: Add Display Unit support
-      ARM: shmobile: lager: Add Display Unit support
-      ARM: shmobile: lager: Fix Display Unit platform data
-
-Magnus Damm (16):
-      ARM: shmobile: Break out R-Car Gen2 setup code
-      ARM: shmobile: Introduce r8a7791_add_standard_devices()
-      ARM: shmobile: r8a7791 IRQC platform device support
-      ARM: shmobile: r8a7791 Arch timer workaround
-      ARM: shmobile: Initial r7s72100 SoC support
-      ARM: shmobile: r7s72100 SCIF support
-      ARM: shmobile: r8a7791 SMP support
-      ARM: shmobile: Genmai support
-      ARM: shmobile: Use r8a7791_add_standard_devices() on Koelsch
-      ARM: shmobile: Use arch timer on Koelsch
-      ARM: shmobile: Sync KZM9D DTS with KZM9D reference DTS
-      ARM: shmobile: Use KZM9D without reference for multiplatform
-      ARM: shmobile: Remove non-multiplatform KZM9D reference support
-      ARM: shmobile: Let KZM9D multiplatform boot with KZM9D DTB
-      ARM: shmobile: Remove KZM9D reference DTS
-      ARM: shmobile: Use SMP on Koelsch
-
-Max Filippov (4):
-      ARM: shmobile: r8a7778: add HPB-DMAC support
-      ARM: shmobile: r8a7779: add HPB-DMAC support
-      ARM: shmobile: bockw: enable DMA for SDHI0
-      ARM: shmobile: marzen: enable DMA for SDHI0
+Kevin Hilman (3):
+      Merge tag 'drivers-3.13' of git://git.infradead.org/linux-mvebu into next/drivers
+      Merge tag 'arm-perf-3.13' of git://git.kernel.org/.../will/linux into next/drivers
+      Merge tag 'drivers-3.13-2' of git://git.infradead.org/linux-mvebu into next/drivers
 
 Olof Johansson (2):
-      Merge tag 'renesas-boards-for-v3.13' of git://git.kernel.org/.../horms/renesas into next/boards
-      Merge tag 'renesas-defconfig-for-v3.13' of git://git.kernel.org/.../horms/renesas into next/boards
+      Merge tag 'davinci-for-v3.13/gpio' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
+      Merge tag 's3c24xx-dma' of git://git.kernel.org/.../kgene/linux-samsung into next/drivers
 
-Pali Roh?r (3):
-      ARM: OMAP3: Add secure function omap_smc3() which calling instruction smc #1
-      ARM: OMAP3: RX-51: ARM errata 430973 workaround
-      RX-51: Add support for OMAP3 ROM Random Number Generator
+Philip Avinash (5):
+      gpio: davinci: coding style correction
+      ARM: davinci: support gpio platform device
+      ARM: davinci: da8xx boards: gpio device creation
+      ARM: davinci: board: gpio device creation
+      ARM: davinci: gpio: use gpiolib API instead of inline functions
 
-Simon Horman (3):
-      ARM: shmobile: Add koelsch defconfig
-      Merge branch 'heads/soc2' into boards2-base
-      Merge branch 'heads/soc2' into boards2-base
+Punit Agrawal (3):
+      ARM: dts: Improve CCI bindings documentation
+      ARM: dts: Document the CCI PMU DT bindings
+      drivers: CCI: add ARM CCI PMU support
 
-Stephen Warren (1):
-      ARM: tegra: defconfig updates
+Sebastian Hesselbarth (7):
+      PCI: mvebu: move clock enable before register access
+      PCI: mvebu: increment nports only for registered ports
+      PCI: mvebu: remove subsys_initcall
+      PCI: mvebu: add support for reset on GPIO
+      PCI: mvebu: add support for Marvell Dove SoCs
+      ARM: dove: switch to DT probed mbus address windows
+      ARM: dove: remove legacy pcie and clock init
 
-Tony Lindgren (1):
-      Merge branch 'omap-for-v3.13/n900' into omap-for-v3.13/board
+Seungwon Jeon (1):
+      PCI: mvebu: add I/O access wrappers
+
+Thomas Petazzoni (3):
+      irqchip: armada-370-xp: properly request resources
+      irqchip: armada-370-xp: implement MSI support
+      PCI: mvebu: add support for MSI
+
+Wei Yongjun (1):
+      drivers: CCI: fix the error handle in cci_pmu_probe()
 
 
- arch/arm/boot/dts/Makefile                      |   5 +-
- arch/arm/boot/dts/emev2-kzm9d-reference.dts     |  57 ---
- arch/arm/boot/dts/emev2-kzm9d.dts               |  33 +-
- arch/arm/boot/dts/r7s72100-genmai.dts           |  31 ++
- arch/arm/boot/dts/r8a7791-koelsch.dts           |  32 ++
- arch/arm/boot/dts/rk3066a-bqcurie2.dts          | 109 ++++++
- arch/arm/boot/dts/rk3066a.dtsi                  |  98 +----
- arch/arm/boot/dts/rk3188-clocks.dtsi            | 289 ++++++++++++++
- arch/arm/boot/dts/rk3188-radxarock.dts          |  80 ++++
- arch/arm/boot/dts/rk3188.dtsi                   | 253 +++++++++++++
- arch/arm/boot/dts/rk3xxx.dtsi                   | 124 +++++++
- arch/arm/configs/bockw_defconfig                |   4 +
- arch/arm/configs/koelsch_defconfig              |  54 +++
- arch/arm/configs/lager_defconfig                |   2 +
- arch/arm/configs/marzen_defconfig               |   2 +
- arch/arm/configs/tegra_defconfig                |   5 +
- arch/arm/mach-omap2/Makefile                    |   6 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c    |  19 +
- arch/arm/mach-omap2/board-rx51.c                |  12 +
- arch/arm/mach-omap2/cclock3xxx_data.c           |   1 +
- arch/arm/mach-omap2/devices.c                   |  10 +-
- arch/arm/mach-omap2/display.c                   |  28 ++
- arch/arm/mach-omap2/display.h                   |   4 +
- arch/arm/mach-omap2/drm.c                       |  24 +-
- arch/arm/mach-omap2/fb.c                        |  14 +-
- arch/arm/mach-omap2/omap-secure.c               |  76 ++++
- arch/arm/mach-omap2/omap-secure.h               |  13 +
- arch/arm/mach-omap2/omap-smc.S                  |  21 +-
- arch/arm/mach-rockchip/Kconfig                  |   2 +
- arch/arm/mach-shmobile/Kconfig                  |  34 +-
- arch/arm/mach-shmobile/Makefile                 |   7 +-
- arch/arm/mach-shmobile/Makefile.boot            |   3 +-
- arch/arm/mach-shmobile/board-ape6evm.c          |  57 ++-
- arch/arm/mach-shmobile/board-armadillo800eva.c  |   1 +
- arch/arm/mach-shmobile/board-bockw-reference.c  |  20 +
- arch/arm/mach-shmobile/board-bockw.c            | 372 ++++++++++++++++++-
- arch/arm/mach-shmobile/board-genmai.c           |  43 +++
- arch/arm/mach-shmobile/board-koelsch.c          |  47 +++
- arch/arm/mach-shmobile/board-kzm9d-reference.c  |   1 +
- arch/arm/mach-shmobile/board-kzm9g.c            |   1 +
- arch/arm/mach-shmobile/board-lager.c            |  68 ++++
- arch/arm/mach-shmobile/board-marzen-reference.c |   1 +
- arch/arm/mach-shmobile/board-marzen.c           |  74 ++++
- 43 files changed, 1902 insertions(+), 235 deletions(-)
- delete mode 100644 arch/arm/boot/dts/emev2-kzm9d-reference.dts
- create mode 100644 arch/arm/boot/dts/r7s72100-genmai.dts
- create mode 100644 arch/arm/boot/dts/r8a7791-koelsch.dts
- create mode 100644 arch/arm/boot/dts/rk3066a-bqcurie2.dts
- create mode 100644 arch/arm/boot/dts/rk3188-clocks.dtsi
- create mode 100644 arch/arm/boot/dts/rk3188-radxarock.dts
- create mode 100644 arch/arm/boot/dts/rk3188.dtsi
- create mode 100644 arch/arm/boot/dts/rk3xxx.dtsi
- create mode 100644 arch/arm/configs/koelsch_defconfig
- create mode 100644 arch/arm/mach-shmobile/board-genmai.c
- create mode 100644 arch/arm/mach-shmobile/board-koelsch.c
+ .../bindings/arm/armada-370-xp-mpic.txt         |    3 +
+ Documentation/devicetree/bindings/arm/cci.txt   |   60 +-
+ .../bindings/clock/mvebu-gated-clock.txt        |   14 +-
+ .../devicetree/bindings/pci/mvebu-pci.txt       |   10 +
+ arch/arm/Kconfig                                |    1 -
+ arch/arm/mach-davinci/board-da830-evm.c         |   14 +-
+ arch/arm/mach-davinci/board-da850-evm.c         |    6 +
+ arch/arm/mach-davinci/board-dm355-evm.c         |   15 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c     |   14 +-
+ arch/arm/mach-davinci/board-dm365-evm.c         |    6 +
+ arch/arm/mach-davinci/board-dm644x-evm.c        |    5 +
+ arch/arm/mach-davinci/board-dm646x-evm.c        |   13 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c       |   14 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c     |    6 +
+ arch/arm/mach-davinci/da830.c                   |   16 +-
+ arch/arm/mach-davinci/da850.c                   |   16 +-
+ arch/arm/mach-davinci/davinci.h                 |    7 +
+ arch/arm/mach-davinci/devices-da8xx.c           |   26 +
+ arch/arm/mach-davinci/devices.c                 |   13 +
+ arch/arm/mach-davinci/dm355.c                   |   35 +-
+ arch/arm/mach-davinci/dm365.c                   |   37 +-
+ arch/arm/mach-davinci/dm644x.c                  |   30 +-
+ arch/arm/mach-davinci/dm646x.c                  |   30 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h      |    3 +
+ .../mach-davinci/include/mach/gpio-davinci.h    |   91 --
+ arch/arm/mach-davinci/include/mach/gpio.h       |   88 --
+ arch/arm/mach-dove/board-dt.c                   |   39 +-
+ arch/arm/mach-s3c24xx/Kconfig                   |    3 +-
+ arch/arm/mach-s3c24xx/clock-s3c2412.c           |    8 +-
+ arch/arm/mach-s3c24xx/common-s3c2443.c          |   12 +-
+ arch/arm/mach-s3c24xx/common.c                  |  206 +++
+ arch/arm/mach-s3c24xx/common.h                  |    5 +
+ arch/arm/mach-s3c24xx/mach-jive.c               |    1 +
+ arch/arm/mach-s3c24xx/mach-smdk2413.c           |    1 +
+ arch/arm/mach-s3c24xx/mach-smdk2416.c           |    1 +
+ arch/arm/mach-s3c24xx/mach-smdk2443.c           |    1 +
+ arch/arm/mach-s3c24xx/mach-vstms.c              |    1 +
+ arch/arm/plat-samsung/devs.c                    |    5 +-
+ drivers/bus/arm-cci.c                           |  617 +++++++-
+ drivers/dma/Kconfig                             |   12 +
+ drivers/dma/Makefile                            |    1 +
+ drivers/dma/s3c24xx-dma.c                       | 1350 ++++++++++++++++++
+ drivers/gpio/gpio-davinci.c                     |  132 +-
+ drivers/gpio/gpio-tnetv107x.c                   |    1 +
+ drivers/irqchip/irq-armada-370-xp.c             |  202 ++-
+ drivers/pci/host/Kconfig                        |    2 +-
+ drivers/pci/host/pci-mvebu.c                    |  235 +--
+ include/linux/platform_data/dma-s3c24xx.h       |   46 +
+ include/linux/platform_data/gpio-davinci.h      |   60 +
+ sound/soc/samsung/Kconfig                       |    2 +-
+ 50 files changed, 3082 insertions(+), 434 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/gpio-davinci.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/gpio.h
+ create mode 100644 drivers/dma/s3c24xx-dma.c
+ create mode 100644 include/linux/platform_data/dma-s3c24xx.h
+ create mode 100644 include/linux/platform_data/gpio-davinci.h
