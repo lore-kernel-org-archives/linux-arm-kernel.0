@@ -1,76 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Nov 2013 20:06:44 +0100
-Subject: [PATCH v2 5/5] Documentation: Add documentation for APM X-Gene
- SATA DTS binding
-In-Reply-To: <CAPw-ZT=pBmDERDkaX66qStqVB2bD95248GKQpVQZWjmryA4uxA@mail.gmail.com>
-References: <1383980431-6572-1-git-send-email-lho@apm.com>
- <201311102139.10082.arnd@arndb.de>
- <CAPw-ZT=pBmDERDkaX66qStqVB2bD95248GKQpVQZWjmryA4uxA@mail.gmail.com>
-Message-ID: <201311112006.44921.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 11 Nov 2013 11:13:39 -0800
+Subject: [PATCH 01/28] dmaengine: use DMA_COMPLETE for dma completion
+ status
+In-Reply-To: <20131030130325.GA18788@intel.com>
+References: <20131017020745.GA14013@intel.com>
+ <20131017142755.GA4477@breakpoint.cc>
+ <20131017134846.GG14013@intel.com>
+ <Pine.LNX.4.64.1310242326500.2900@axis700.grange>
+ <20131025042310.GC21230@intel.com>
+ <Pine.LNX.4.64.1310250813370.6186@axis700.grange>
+ <20131025054321.GD21230@intel.com>
+ <Pine.LNX.4.64.1310250840350.6186@axis700.grange>
+ <CAOesGMivD_3zSL503R0OaqyGv4Rj8qJqnbM2TdmjtxR2U63ztw@mail.gmail.com>
+ <20131030130325.GA18788@intel.com>
+Message-ID: <20131111191339.GA10328@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 November 2013, Loc Ho wrote:
-> Hi Arnd,
+On Wed, Oct 30, 2013 at 06:33:25PM +0530, Vinod Koul wrote:
+> On Tue, Oct 29, 2013 at 09:47:55AM -0700, Olof Johansson wrote:
+> > This patch broke some TI platforms (using edma) due to namespace
+> > conflicts. The error is:
+> > 
+> > ../../include/linux/dmaengine.h:54:2: error: expected identifier
+> > before numeric constant   (for DMA_COMPLETE)
+> > 
+> > .. it's because they define DMA_COMPLETE in include/platform_data/edma.h.
+> > 
+> > The edma driver seems to overall lack prefixes and thus pollutes
+> > global namespaces, so it should be fixed up.
+> Yup this needs some work.
 > 
-> >> ---
-> >>  .../devicetree/bindings/ata/apm-xgene.txt          |   84 ++++++++++++++++++++
-> >
-> > Please Cc the devicetree-discuss mailing list for the binding submission.
-> [Loc Ho]
-> I did cc on the first version. But this email
-> 'devicetree-discuss at lists.ozlabs.org' bounced on me.
-
-It has recently moved to devicetree at vger.kernel.org
-
-> >> +- clocks             : Reference to the clock entry
-> >> +- clock-names                : Shall be "eth01clk", "eth23clk", or "eth45clk".
-> >
-> > This makes no sense. The clock-names property needs to have a fixed
-> > string according to the name of the clock input signal of the hardware,
-> > not a name of the clock provider.
-> [Loc Ho]
-> The clock "eth01clk", "eth23clk", and "eth45clk" are the internal
-> divider clock. They are not the physical input clock. It sounds like
-> we don't need the "clock-names" are all.
-
-Ok.
-
+> I fixed up the error with below, can you pls verify. Pls note this is compile
+> tested only!
 > 
-> >
-> >> +- serdes-diff-clk    : Shall be 0 for external, 1 internal differential,
-> >> +                       or 2 internal single ended clock. Default is 0.
-> >> +- gen-sel            : Shall be 1 (force Gen1), 2 (Force Gen2, or 3 Gen3).
-> >> +                       Default is 3.
-> >> +- EQA1                       : Serdes EQ parameter for A1 chip. Default is 9.
-> >> +- EQ                 : Serdes EQ parameter for non-A1 chip. Default is 2.
-> >> +- GENAVG             : Enable averaging Serdes calculation. Default is 0 for
-> >> +                       A1 chip and 1 for non-A1 chip.
-> >> +- LBA1                       : Serdes loopback buffer for A1 chip. Default is 1;
-> >> +- LB                 : Serdes loopback buffer for non-A1 chip. Default is 0;
-> >> +- LCA1                       : Serdes loopback enable control for A1 chip. Default
-> >> +                       is 1;
-> >> +- LC                 : Serdes loopback enable control for non-A1 chip.
-> >> +                       Default is 0;
-> >> +- CDRA1                      : Serdes SPD select CDR for A1 chip. Default is 5.
-> >> +- CDR                        : Serdes SPD select CDR for non-A1 chip. Default is 5.
-> >> +- PQA1                       : Serdes PQ for A1 chip. Default is 8.
-> >> +- PQ                 : Serdes PQ for non-A1 chip. Default is 0xA.
-> >> +- coherent           : Enable coherent (1 = enable, 0 = disable).
-> >> +                       Default is 1.
-> >
-> > This looks like a really bad binding. I would suggest that instead of having
-> > individual register values in here, you hardwire the settings in the driver
-> > based on the compatible string. It's pretty crazy to put register-level configuration
-> > in the DT like this.
-> [Loc Ho]
-> If I hardwire them in the driver, it will NOT scale across multiple
-> board. I guess if I moved it out to the PHY driver, then we can
-> discuss in that driver.
+> -----><8---------------------------
+> 
+> From: Vinod Koul <vinod.koul@intel.com>
+> Date: Wed, 30 Oct 2013 18:22:30 +0530
+> Subject: [PATCH] dmanengine: fix edma driver to not define DMA_COMPLETE
+> 
+> edma header defines DMA_COMPLETE, this causes issues as commit adfedd9a32e4 move
+> DMA_SUCCESS to DMA_COMPLETE. edma should properly namespace its defines and
+> needs a future fix
+> 
+> Reported-by: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
 
-Yes, makes sense. If you need the values to change per board, it's probably best to
-come up with a somewhat higher-level representation of the same contents. Ideally
-we should be able to use the same properties for any SerDes PHY, regarless of
-how the register level interface is implemented.
+Thanks, I've applied this to fixes together with the follow-up from
+Sebastian. Cc:ing Mark since it touches drivers/soc.
 
-	Arnd
+
+-Olof
