@@ -1,34 +1,138 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 11 Nov 2013 15:29:06 +0100
-Subject: [PATCH] dmaengine: sirf: enable generic dt binding for dma
- channels
-In-Reply-To: <1384161191-24140-1-git-send-email-Baohua.Song@csr.com>
-References: <1384161191-24140-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <5280E9B2.9090309@metafoo.de>
+From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
+Date: Mon, 11 Nov 2013 15:30:08 +0100
+Subject: [PATCH 0/3] omapdss: venc: Add support for bypass and acbias.
+In-Reply-To: <5280E617.3000004@ti.com>
+References: <1381784555-18344-1-git-send-email-marek@goldelico.com>
+ <CAAfyv34j+YhEjtHyf7zg5oBoCV5ROEXow8VV0PQNHLTF5uDZJg@mail.gmail.com>
+ <5280DBA6.50303@ti.com> <FB10035C-B13C-4A03-BE9C-0576806F2577@goldelico.com>
+ <5280E617.3000004@ti.com>
+Message-ID: <F97741D2-FC6F-4DBD-A0DD-E35304501993@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2013 10:13 AM, Barry Song wrote:
-[...]
-> +static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
-> +	struct of_dma *ofdma)
-> +{
-> +	struct sirfsoc_dma *sdma = ofdma->of_dma_data;
-> +	struct sirfsoc_dma_filter_args fargs;
-> +
-> +	if (!sdma)
-> +		return NULL;
-> +
-> +	if (dma_spec->args_count != 1)
-> +		return NULL;
-> +
-> +	fargs.sdma = sdma;
-> +	fargs.chan_id = dma_spec->args[0];
-> +
-> +	return dma_request_channel(sdma->cap, sirfsoc_dma_dt_filter, &fargs);
-> +}
 
-There is now the dma_get_slave_channel() function which makes it a bit
-cleaner to implement this. I think you can use the k3dma driver as an example.
+Am 11.11.2013 um 15:13 schrieb Tomi Valkeinen:
 
-- Lars
+> On 2013-11-11 15:57, Dr. H. Nikolaus Schaller wrote:
+>> Hi Tomi,
+>> 
+>> Am 11.11.2013 um 14:29 schrieb Tomi Valkeinen:
+>> 
+>>> Hi,
+>>> 
+>>> On 2013-11-05 09:24, Belisko Marek wrote:
+>>>> Hi,
+>>>> 
+>>>> ping.
+>>>> 
+>>>> On Mon, Oct 14, 2013 at 11:02 PM, Marek Belisko <marek@goldelico.com> wrote:
+>>>>> This patches is adding bypass and acbias functionality to omapdss venc driver.
+>>>>> In first patch we export updatin bypass and acbias in devconf1 register. Next patch
+>>>>> add handling for updating in venc driver and last patch add driver for opa362 which
+>>>>> is used on gta04 board and set bypass + acbias.
+>>>> Is there a chance to get this series to 3.13? Thanks.
+>>> 
+>>> Sorry, I haven't had time to do much reviewing.
+>>> 
+>>> The code in omap3-tvout.c should be included in the display.c file,
+>>> which already contains some things like muxing.
+>> 
+>> Ok, that might be better - but we were not sure where to place code to
+>> modify the DEVCONF1 registers. It is not directly DSS related but a special
+>> control of the OMAP3 SoC. Therefore we think it is better located in omap3-tvout.c
+> 
+> The display.c file is not strictly DSS stuff, but DSS related "glue" for
+> the SoC. For example, the muxing of the DSI pads is also done on the
+> CONTROL module, and it's also in display.c.
+> 
+> The file is getting a bit large, so I'm not against splitting it. But I
+> don't think there's point to add omap3-tvout.c file, which most likely
+> will ever contain only that one function.
+
+Yes that is very likely true.
+
+The problem is that there is no other official API to modify the DEFCONF1
+register. Therefore we introduced this (propsal).
+
+Our first idea was a readDEFCONF1() and writeDEFCONF1() and use the
+constants (bit patterns) you suggested below.
+
+But we thought that it is not robust enough because a VENC driver or other
+one could then change bits it is not responsible for.
+
+> 
+>>> Also, func(bool, bool)
+>>> style functions are rather confusing to read. Maybe an enum would be
+>>> better, so you'd instead have something like:
+>>> 
+>>> func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN)
+>> 
+>> We have no special preference on that.
+> 
+> It's just about readability. Which one tells you better what the code does:
+> 
+> func(true, true);
+> 
+> or
+> 
+> func(OMAP_VENC_TVOUTBYPASS | OMAP_VENC_TVACEN);
+
+Hm. Depends on. If the func is explaining enough it is clear. Or if I have
+access to some header file. If I don't, the enum values are probably more
+readable.
+
+> 
+>>> But the main issue is: while this series probably works well, I really
+>>> don't like it that the OPA driver needs to pass bypass and acbias. It
+>>> shouldn't know anything about such things. I'm just not certain how to
+>>> implement that with the current omapdss driver.
+>> 
+>> Well, it must know bypass and acbias because it requires the OMAP
+>> CPU to be configured accordingly. I.e. it is the one who pushes the
+>> button. Or we get a problem that people might misconfigure it.
+> 
+> While the omapdss display drivers are currently OMAP specific, I want to
+> (or at least try to) keep them platform independent. Afaik, acbias and
+> bypass are OMAP VENC specific things, not something that every SoC with
+> an analog TV-out have. Thus, the OPA driver should not know about them,
+> and it should be something that only the DSS glue code in mach-omap2/
+> and the venc driver know about.
+
+Well, there must be a method how the OPA can tell the VENC that it exists
+and the VENC can tell the SoC DEFCONF1 to enable bias and bypass.
+
+> 
+>> I would see it similar as a driver must be able to control power. Here
+>> it must be able to control bypass and acbias in a special way that it works.
+> 
+> The difference is that on all possible SoCs where you could add OPA
+> chip, you'll need to manage the power for OPA, and it's done in a common
+> way. Whereas the bypass and acbias are OMAP specific things.
+
+Maybe it looks as if it is an unsolvable problem. The OPA works only if acbias
+and bypass are enabled, but is not allowed to tell that it is there.
+
+> 
+>>> I'll try to find time to think about this more, but I don't think I can
+>>> merge this for 3.13.
+>> 
+>> Please take your time.
+>> 
+>> And please also consider the approach to merge it into 3.13 as it is
+>> and we can then fix it in the weeks while release candidates are pushed.
+> 
+> If it was purely omapdss code, I could possibly take it. But it contains
+> arch/arm code also,
+
+because we think that it is unavoidable (no API to control the DEFCONF1
+register exists yet).
+
+Maybe one of the omap3 core maintainers can comment as well?
+
+> and I don't want to cause needless changes on code
+> that I do not maintain.
+
+Yes, this should be avoided of course.
+
+BR,
+Nikolaus
