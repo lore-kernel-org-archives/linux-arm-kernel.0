@@ -1,35 +1,50 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Mon, 11 Nov 2013 21:53:55 +0100
-Subject: [PATCHv2] ARM: mvebu: Add Netgear ReadyNAS 2120 board
-In-Reply-To: <52813F25.40703@gmail.com> (Sebastian Hesselbarth's message of
- "Mon, 11 Nov 2013 21:33:41 +0100")
-References: <87bo1qhfnf.fsf@natisbad.org> <52813F25.40703@gmail.com>
-Message-ID: <874n7ifyn0.fsf@natisbad.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 11 Nov 2013 21:54:01 +0100
+Subject: [PATCH] clk: add flags to distinguish xtal clocks
+In-Reply-To: <20131111194247.GB19212@saruman.home>
+References: <1382528150.21526.25.camel@porter.coelho.fi>
+ <1383933648-28595-1-git-send-email-balbi@ti.com>
+ <20131110113716.GN26440@lukather>
+ <20131111194247.GB19212@saruman.home>
+Message-ID: <20131111205401.GZ26440@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian.
+On Mon, Nov 11, 2013 at 01:42:47PM -0600, Felipe Balbi wrote:
+> > > +	if (of_property_read_bool(node, "clock-xtal"))
+> > > +		flags |= CLK_IS_TYPE_XTAL;
+> > > +
+> > 
+> > Introducing a new compatible instead of a property would make more
+> > sense here I think.
+> > 
+> > Do you have a reason not to do so?
+> 
+> As you can see, this is original work from Luca but I disagree that
+> adding a new compatible makes more sense. This still related to a fixed
+> rate clock, we're just giving it one extra metadata which will
+> differentiate between crystal and oscilator fixed rate clocks.
 
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
+I don't know, I think it's more a matter of consistency.
 
->> +			serial at 12000 {
->> +				clocks = <&coreclk 0>;
->> +				status = "okay";
->> +			};
->
-> For your possible cleanup later: move clocks = <&coreclk 0> to
-> armada-370-xp.dtsi and remove this then.
->
-> Also for cleanup later: It would be great if most SoC nodes get
-> a node label. That way you can just write:
->
-> uart0: { status = "okay" };
->
-> without replaying node hierarchy over and over again.
+If we turn the problem the other way around. Let's say we have a
+crystal that for some reason can't be used with clk-fixed-rate. You'd
+add a new driver for it, with a compatible of its own, and you'd put
+that XTAL flag in there, without any extra metadata in the DT, right?
 
-I will keep that in mind for later cleanups. Regarding the nits, as you
-took the time to report those, I will send a v3 fixing them tomorrow.
+And I'm pretty sure having a compatible like "clk-xtal" would make it
+pretty obvious that it's still a fixed rate clock.
 
-Cheers,,
+Maxime
 
-a+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20131111/05cc51db/attachment.sig>
