@@ -1,225 +1,189 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Mon, 11 Nov 2013 13:36:21 +0100
-Subject: [PATCH] dmaengine: Add support for BCM2835.
-In-Reply-To: <20131108191117.GT16735@n2100.arm.linux.org.uk>
-References: <527D1DDA.2040004@koalo.de>
- <20131108191117.GT16735@n2100.arm.linux.org.uk>
-Message-ID: <CABDT8WxMKDoBB8W5GMWusy3dvf8D6tz5zVVm11ZS+M1T6zno=Q@mail.gmail.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 11 Nov 2013 13:41:35 +0100
+Subject: [PATCH v7] videobuf2: Add missing lock held on vb2_fop_relase
+In-Reply-To: <1383752507-25902-1-git-send-email-ricardo.ribalda@gmail.com>
+References: <1383752507-25902-1-git-send-email-ricardo.ribalda@gmail.com>
+Message-ID: <5280D07F.3060709@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you for your helpful comments.
-I have applied them to my code and will upload a new version soon
-(hoping that I understand everything correctly).
+On 11/06/2013 04:41 PM, Ricardo Ribalda Delgado wrote:
+> From: Ricardo Ribalda <ricardo.ribalda@gmail.com>
+> 
+> vb2_fop_release does not held the lock although it is modifying the
+> queue->owner field.
+> 
+> This could lead to race conditions on the vb2_perform_io function
+> when multiple applications are accessing the video device via
+> read/write API:
+> 
+> [ 308.297741] BUG: unable to handle kernel NULL pointer dereference at
+> 0000000000000260
+> [ 308.297759] IP: [<ffffffffa07a9fd2>] vb2_perform_fileio+0x372/0x610
+> [videobuf2_core]
+> [ 308.297794] PGD 159719067 PUD 158119067 PMD 0
+> [ 308.297812] Oops: 0000 #1 SMP
+> [ 308.297826] Modules linked in: qt5023_video videobuf2_dma_sg
+> qtec_xform videobuf2_vmalloc videobuf2_memops videobuf2_core
+> qtec_white qtec_mem gpio_xilinx qtec_cmosis qtec_pcie fglrx(PO)
+> spi_xilinx spi_bitbang qt5023
+> [ 308.297888] CPU: 1 PID: 2189 Comm: java Tainted: P O 3.11.0-qtec-standard #1
+> [ 308.297919] Hardware name: QTechnology QT5022/QT5022, BIOS
+> PM_2.1.0.309 X64 05/23/2013
+> [ 308.297952] task: ffff8801564e1690 ti: ffff88014dc02000 task.ti:
+> ffff88014dc02000
+> [ 308.297962] RIP: 0010:[<ffffffffa07a9fd2>] [<ffffffffa07a9fd2>]
+> vb2_perform_fileio+0x372/0x610 [videobuf2_core]
+> [ 308.297985] RSP: 0018:ffff88014dc03df8 EFLAGS: 00010202
+> [ 308.297995] RAX: 0000000000000000 RBX: ffff880158a23000 RCX: dead000000100100
+> [ 308.298003] RDX: 0000000000000000 RSI: dead000000200200 RDI: 0000000000000000
+> [ 308.298012] RBP: ffff88014dc03e58 R08: 0000000000000000 R09: 0000000000000001
+> [ 308.298020] R10: ffffea00051e8380 R11: ffff88014dc03fd8 R12: ffff880158a23070
+> [ 308.298029] R13: ffff8801549040b8 R14: 0000000000198000 R15: 0000000001887e60
+> [ 308.298040] FS: 00007f65130d5700(0000) GS:ffff88015ed00000(0000)
+> knlGS:0000000000000000
+> [ 308.298049] CS: 0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+> [ 308.298057] CR2: 0000000000000260 CR3: 0000000159630000 CR4: 00000000000007e0
+> [ 308.298064] Stack:
+> [ 308.298071] ffff880156416c00 0000000000198000 0000000000000000
+> ffff880100000001
+> [ 308.298087] ffff88014dc03f50 00000000810a79ca 0002000000000001
+> ffff880154904718
+> [ 308.298101] ffff880156416c00 0000000000198000 ffff880154904338
+> ffff88014dc03f50
+> [ 308.298116] Call Trace:
+> [ 308.298143] [<ffffffffa07aa3c4>] vb2_read+0x14/0x20 [videobuf2_core]
+> [ 308.298198] [<ffffffffa07aa494>] vb2_fop_read+0xc4/0x120 [videobuf2_core]
+> [ 308.298252] [<ffffffff8154ee9e>] v4l2_read+0x7e/0xc0
+> [ 308.298296] [<ffffffff8116e639>] vfs_read+0xa9/0x160
+> [ 308.298312] [<ffffffff8116e882>] SyS_read+0x52/0xb0
+> [ 308.298328] [<ffffffff81784179>] tracesys+0xd0/0xd5
+> [ 308.298335] Code: e5 d6 ff ff 83 3d be 24 00 00 04 89 c2 4c 8b 45 b0
+> 44 8b 4d b8 0f 8f 20 02 00 00 85 d2 75 32 83 83 78 03 00 00 01 4b 8b
+> 44 c5 48 <8b> 88 60 02 00 00 85 c9 0f 84 b0 00 00 00 8b 40 58 89 c2 41
+> 89
+> [ 308.298487] RIP [<ffffffffa07a9fd2>] vb2_perform_fileio+0x372/0x610
+> [videobuf2_core]
+> [ 308.298507] RSP <ffff88014dc03df8>
+> [ 308.298514] CR2: 0000000000000260
+> [ 308.298526] ---[ end trace e8f01717c96d1e41 ]---
+> 
+> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+> Signed-off-by: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
+> ---
+> 
+> v2: Comments by Sylvester Nawrocki
+> 
+> fimc-capture and fimc-lite where calling vb2_fop_release with the lock held.
+> Therefore a new __vb2_fop_release function has been created to be used by
+> drivers that overload the release function.
+> 
+> v3: Comments by Sylvester Nawrocki and Mauro Carvalho Chehab
+> 
+> Use vb2_fop_release_locked instead of __vb2_fop_release
+> 
+> v4: Comments by Sylvester Nawrocki
+> 
+> Rename vb2_fop_release_locked to __vb2_fop_release and fix patch format
+> 
+> v5: Comments by Sylvester Nawrocki and Hans Verkuil
+> 
+> Rename __vb2_fop_release to vb2_fop_release_unlock and rearrange
+> arguments
+> 
+> v6: Comments by Hans Verkuil
+> 
+> Fix typo on description
+> Rename vb2_fop_release_locked to vb2_fop_release_no_lock
+> 
+> v7: Comments by Hans Verkuil and Sylvester Nawrocki
+> 
+> Export _vb2_fop_release instead of using vb2_fop_release_no_lock
+> 
+>  drivers/media/platform/exynos4-is/fimc-capture.c |  2 +-
+>  drivers/media/platform/exynos4-is/fimc-lite.c    |  2 +-
+>  drivers/media/v4l2-core/videobuf2-core.c         | 15 ++++++++++++++-
+>  include/media/videobuf2-core.h                   |  1 +
+>  4 files changed, 17 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
+> index fb27ff7..8a712ca 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-capture.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-capture.c
+> @@ -549,7 +549,7 @@ static int fimc_capture_release(struct file *file)
+>  		vc->streaming = false;
+>  	}
+>  
+> -	ret = vb2_fop_release(file);
+> +	ret = _vb2_fop_release(file, NULL);
+>  
+>  	if (close) {
+>  		clear_bit(ST_CAPT_BUSY, &fimc->state);
+> diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
+> index e5798f7..d3b32b6 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-lite.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-lite.c
+> @@ -546,7 +546,7 @@ static int fimc_lite_release(struct file *file)
+>  		mutex_unlock(&entity->parent->graph_mutex);
+>  	}
+>  
+> -	vb2_fop_release(file);
+> +	_vb2_fop_release(file, NULL);
+>  	pm_runtime_put(&fimc->pdev->dev);
+>  	clear_bit(ST_FLITE_SUSPENDED, &fimc->state);
+>  
+> diff --git a/drivers/media/v4l2-core/videobuf2-core.c b/drivers/media/v4l2-core/videobuf2-core.c
+> index 594c75e..52dbe2f 100644
+> --- a/drivers/media/v4l2-core/videobuf2-core.c
+> +++ b/drivers/media/v4l2-core/videobuf2-core.c
+> @@ -2619,16 +2619,29 @@ int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma)
+>  }
+>  EXPORT_SYMBOL_GPL(vb2_fop_mmap);
+>  
+> -int vb2_fop_release(struct file *file)
+> +int _vb2_fop_release(struct file *file, struct mutex *lock)
+>  {
+>  	struct video_device *vdev = video_devdata(file);
+>  
+>  	if (file->private_data == vdev->queue->owner) {
+> +		if (lock)
+> +			mutex_lock(lock);
+>  		vb2_queue_release(vdev->queue);
+>  		vdev->queue->owner = NULL;
+> +		if (lock)
+> +			mutex_unlock(lock);
+>  	}
+>  	return v4l2_fh_release(file);
+>  }
+> +EXPORT_SYMBOL_GPL(_vb2_fop_release);
+> +
+> +int vb2_fop_release(struct file *file)
+> +{
+> +	struct video_device *vdev = video_devdata(file);
+> +	struct mutex *lock = vdev->queue->lock ? vdev->queue->lock : vdev->lock;
+> +
+> +	return _vb2_fop_release(file, lock);
+> +}
+>  EXPORT_SYMBOL_GPL(vb2_fop_release);
+>  
+>  ssize_t vb2_fop_write(struct file *file, char __user *buf,
+> diff --git a/include/media/videobuf2-core.h b/include/media/videobuf2-core.h
+> index 6781258..5a9e239 100644
+> --- a/include/media/videobuf2-core.h
+> +++ b/include/media/videobuf2-core.h
+> @@ -491,6 +491,7 @@ int vb2_ioctl_expbuf(struct file *file, void *priv,
+>  
+>  int vb2_fop_mmap(struct file *file, struct vm_area_struct *vma);
+>  int vb2_fop_release(struct file *file);
+> +int _vb2_fop_release(struct file *file, struct mutex *lock)
 
-2013/11/8 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Fri, Nov 08, 2013 at 06:22:34PM +0100, Florian Meier wrote:
->
-> Hi Florian, some initial comments.
->
->> +#define BCM2835_DMA_DATA_TYPE_S8 1
->> +#define BCM2835_DMA_DATA_TYPE_S16 2
->> +#define BCM2835_DMA_DATA_TYPE_S32 4
->> +#define BCM2835_DMA_DATA_TYPE_S128 16
-> ...
->> +
->> +static const unsigned es_bytes[] = {
->> +     [BCM2835_DMA_DATA_TYPE_S8] = 1,
->> +     [BCM2835_DMA_DATA_TYPE_S16] = 2,
->> +     [BCM2835_DMA_DATA_TYPE_S32] = 4,
->> +     [BCM2835_DMA_DATA_TYPE_S128] = 16
->> +};
->
-> This looks rather fun - and the only place d->es is used is to convey
-> this as an index into this table for bcm2835_dma_desc_size().  I can't
-> quite see the point of this table existing.
->
->> +static void bcm2835_dma_start_sg(struct bcm2835_chan *c, struct bcm2835_desc *d,
->> +             unsigned idx)
->> +{
->> +     struct bcm2835_sg *sg = d->sg + idx;
->> +     int frame;
->> +     int frames = sg->fn;
->> +
->> +     /*
->> +      * Iterate over all frames and create a control block
->> +      * for each frame and link them together.
->> +      */
->> +     for (frame = 0; frame < frames; frame++) {
->> +             struct bcm2835_dma_cb *control_block =
->> +                     &d->control_block_base[frame];
->> +
->> +             /* Setup adresses */
->> +             if (d->dir == DMA_DEV_TO_MEM) {
->> +                     control_block->info = BCM2835_DMA_D_INC;
->> +                     control_block->src = d->dev_addr;
->> +                     control_block->dst = sg->addr+frame*sg->en;
->> +             } else {
->> +                     control_block->info = BCM2835_DMA_S_INC;
->> +                     control_block->src = sg->addr+frame*sg->en;
->> +                     control_block->dst = d->dev_addr;
->> +             }
->> +
->> +             /* Enable interrupt */
->> +             control_block->info |= BCM2835_DMA_INT_EN;
->> +
->> +             /* Setup synchronization */
->> +             if (d->sync_type != 0)
->> +                     control_block->info |= d->sync_type;
->> +
->> +             /* Setup DREQ channel */
->> +             if (d->sync_dreq != 0)
->> +                     control_block->info |=
->> +                             BCM2835_DMA_PER_MAP(d->sync_dreq);
->> +
->> +             /* Length of a frame */
->> +             control_block->length = sg->en;
->> +
->> +             /*
->> +              * Next block is the next frame.
->> +              * This DMA engine driver currently only supports cyclic DMA.
->> +              * Therefore, wrap around at number of frames.
->> +              */
->> +             control_block->next = d->control_block_base_phys +
->> +                     sizeof(struct bcm2835_dma_cb)*((frame+1)%(frames));
->> +
->> +             /* The following fields are not used here */
->> +             control_block->stride = 0;
->> +             control_block->pad[0] = 0;
->> +             control_block->pad[1] = 0;
->> +     }
->
-> Why not move the initialisation of this control block to the preparation
-> function?  I think doing that would simplify this code somewhat, as
-> you won't be converting the information passed to the preparation function
-> multiple times.
->
->> +static int bcm2835_dma_alloc_chan_resources(struct dma_chan *chan)
->> +{
->> +     struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
->> +     int ret;
->> +     struct bcm2835_dmadev *d = to_bcm2835_dma_dev(chan->device);
->> +     uint32_t chans = d->chans_available;
->> +     int chanID = 0;
->> +
->> +     dev_dbg(c->vc.chan.device->dev,
->> +                     "allocating channel for %u\n", c->dma_sig);
->> +
->> +     /* do not use the FIQ and BULK channels */
->> +     chans &= ~0xD;
->> +
->> +     if (chans) {
->> +             /* return the ordinal of the first channel in the bitmap */
->> +             while (chans != 0 && (chans & 1) == 0) {
->> +                     chans >>= 1;
->> +                     chanID++;
->> +             }
->> +
->> +             /* claim the channel */
->> +             d->chans_available &= ~(1 << chanID);
->> +
->> +             c->dma_chan_base = BCM2835_DMA_CHANIO(d->dma_base, chanID);
->> +
->> +             c->dma_irq_number = d->dma_irq_numbers[chanID];
->> +
->> +             c->dma_ch = chanID;
->> +     } else {
->> +             return -ENOMEM;
->> +     }
->> +
->> +     c->dma_irq_handler.name = "DMA engine IRQ handler";
->> +     c->dma_irq_handler.flags = 0;
->> +     c->dma_irq_handler.handler = bcm2835_dma_callback;
->> +
->> +     ret = request_any_context_irq(c->dma_irq_number,
->> +                     bcm2835_dma_callback, 0, "DMA IRQ", c);
->
-> Hmm.  Why "request_any_context_irq" ?  Looking at what your "dma callback"
-> is doing, it's operating entirely beneath a spinlock with IRQs disabled.
-> You might as well handle it in hard IRQ context.
->
->> +static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
->> +     struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
->> +     size_t period_len, enum dma_transfer_direction direction,
->> +     unsigned long flags, void *context)
->> +{
->> +     struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
->> +     enum dma_slave_buswidth dev_width;
->> +     struct bcm2835_desc *d;
->> +     dma_addr_t dev_addr;
->> +     unsigned int es, sync_type, sync_dreq;
->> +
->> +     /* Grab configuration */
->> +     if (direction == DMA_DEV_TO_MEM) {
->> +             dev_addr = c->cfg.src_addr;
->> +             dev_width = c->cfg.src_addr_width;
->> +             sync_type = BCM2835_DMA_S_DREQ;
->> +             sync_dreq = c->cfg.slave_id;
->> +     } else if (direction == DMA_MEM_TO_DEV) {
->> +             dev_addr = c->cfg.dst_addr;
->> +             dev_width = c->cfg.dst_addr_width;
->> +             sync_type = BCM2835_DMA_D_DREQ;
->> +             sync_dreq = c->cfg.slave_id;
->> +     } else {
->> +             dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
->> +             return NULL;
->> +     }
->
-> Please move sync_dreq out of the if() statements; it doesn't appear to
-> depend on the direction (there's only one of them in that structure too.)
-> While there, you might as well assign it directly to d->sync_dreq below.
->
-> Even better, with the code in bcm2835_dma_start_sg() moved into this
-> function to generate the control block, you don't need to save a lot
-> of the information in your descriptor.
->
->> +
->> +     /* Bus width translates to the element size (ES) */
->> +     switch (dev_width) {
->> +     case DMA_SLAVE_BUSWIDTH_4_BYTES:
->> +             es = BCM2835_DMA_DATA_TYPE_S32;
->> +             break;
->> +     default:
->> +             return NULL;
->> +     }
->> +
->> +     /* Now allocate and setup the descriptor. */
->> +     d = kzalloc(sizeof(*d) + sizeof(d->sg[0]), GFP_ATOMIC);
->> +     if (!d)
->> +             return NULL;
->> +
->> +     d->dir = direction;
->> +     d->dev_addr = dev_addr;
->> +     d->es = es;
->> +     d->sync_type = sync_type;
->> +     d->sync_dreq = sync_dreq;
->> +     d->sg[0].addr = buf_addr;
->> +     d->sg[0].en = period_len;
->> +     d->sg[0].fn = buf_len / period_len;
->> +     d->sglen = 1;
->> +
->> +     /* Allocate memory for control blocks */
->> +     d->control_block_size = d->sg[0].fn*sizeof(struct bcm2835_dma_cb);
->> +     d->control_block_base = dma_alloc_coherent(chan->device->dev,
->> +                     d->control_block_size, &d->control_block_base_phys,
->> +                     GFP_KERNEL);
->> +
->> +     if (!d->control_block_base) {
->> +             dev_err(chan->device->dev,
->> +                             "%s: Memory allocation error\n", __func__);
->> +             return NULL;
->> +     }
->> +
->> +     memset(d->control_block_base, 0, d->control_block_size);
->> +
->> +     if (!c->cyclic) {
->> +             c->cyclic = true;
->> +             /* nothing else is implemented */
->> +     }
->
-> This is needlessly complex; please simplify this.
->
->> +
->> +     return vchan_tx_prep(&c->vc, &d->vd, DMA_CTRL_ACK | DMA_PREP_INTERRUPT);
->
-> You should pass 'flags' as the 3rd argument here.
+Missing ';' at the end. Let me guess, you forgot to compile it :-)
+
+Regards,
+
+	Hans
+
+>  ssize_t vb2_fop_write(struct file *file, char __user *buf,
+>  		size_t count, loff_t *ppos);
+>  ssize_t vb2_fop_read(struct file *file, char __user *buf,
+> 
